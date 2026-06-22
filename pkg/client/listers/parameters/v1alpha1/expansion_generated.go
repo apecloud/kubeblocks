@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -37,6 +37,14 @@ type ParameterListerExpansion interface{}
 // ParameterNamespaceListerExpansion allows custom methods to be added to
 // ParameterNamespaceLister.
 type ParameterNamespaceListerExpansion interface{}
+
+// ParameterViewListerExpansion allows custom methods to be added to
+// ParameterViewLister.
+type ParameterViewListerExpansion interface{}
+
+// ParameterViewNamespaceListerExpansion allows custom methods to be added to
+// ParameterViewNamespaceLister.
+type ParameterViewNamespaceListerExpansion interface{}
 
 // ParametersDefinitionListerExpansion allows custom methods to be added to
 // ParametersDefinitionLister.

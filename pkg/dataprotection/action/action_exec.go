@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -91,7 +91,7 @@ func (e *ExecAction) buildPodSpec() *corev1.PodSpec {
 			"--",
 		}, e.Command...),
 	}
-	intctrlutil.InjectZeroResourcesLimitsIfEmpty(container)
+	intctrlutil.InjectZeroResourcesLimitsForDataProtection(container)
 	return &corev1.PodSpec{
 		RestartPolicy:      corev1.RestartPolicyNever,
 		ServiceAccountName: e.ServiceAccountName,

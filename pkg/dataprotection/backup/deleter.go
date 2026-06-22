@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -59,11 +59,28 @@ const (
 
 type Deleter struct {
 	ctrlutil.RequestCtx
-	Client               client.Client
-	Scheme               *runtime.Scheme
-	WorkerServiceAccount string
+	Client                     client.Client
+	Scheme                     *runtime.Scheme
+	WorkerServiceAccount       string
+	EnsureWorkerServiceAccount func() (string, error)
 
 	actionSet *dpv1alpha1.ActionSet
+}
+
+func (d *Deleter) ensureWorkerServiceAccount() error {
+	if d.WorkerServiceAccount != "" {
+		return nil
+	}
+	if d.EnsureWorkerServiceAccount == nil {
+		d.WorkerServiceAccount = viper.GetString(dptypes.CfgKeyWorkerServiceAccountName)
+		return nil
+	}
+	saName, err := d.EnsureWorkerServiceAccount()
+	if err != nil {
+		return err
+	}
+	d.WorkerServiceAccount = saName
+	return nil
 }
 
 // DeleteBackupFiles builds a job to delete backup files, and returns the deletion status.
@@ -246,7 +263,10 @@ func (d *Deleter) createDeleteJob(container corev1.Container,
 	backup *dpv1alpha1.Backup,
 	backupRepo *dpv1alpha1.BackupRepo,
 	legacyPVCName string) error {
-	ctrlutil.InjectZeroResourcesLimitsIfEmpty(&container)
+	if err := d.ensureWorkerServiceAccount(); err != nil {
+		return err
+	}
+	ctrlutil.InjectZeroResourcesLimitsForDataProtection(&container)
 
 	// build pod
 	podSpec := corev1.PodSpec{

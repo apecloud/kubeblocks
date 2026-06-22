@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -108,6 +108,7 @@ func init() {
 	viper.AutomaticEnv()
 
 	viper.SetDefault(constant.CfgKeyCtrlrReconcileRetryDurationMS, 1000)
+	viper.SetDefault(constant.CfgKeyDataProtectionZeroResourceForUnset, true)
 	viper.SetDefault("CERT_DIR", "/tmp/k8s-webhook-server/serving-certs")
 	viper.SetDefault("VOLUMESNAPSHOT_API_BETA", false)
 	viper.SetDefault(constant.KBToolsImage, "apecloud/kubeblocks-tools:latest")
@@ -334,6 +335,14 @@ func main() {
 		Recorder: mgr.GetEventRecorderFor("backup-policy-driver-controller"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "BackupPolicyDriver")
+		os.Exit(1)
+	}
+
+	if err = (&dpcontrollers.ClusterBackupReconciler{
+		Client:   mgr.GetClient(),
+		Recorder: mgr.GetEventRecorderFor("cluster-backup-controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "ClusterBackup")
 		os.Exit(1)
 	}
 

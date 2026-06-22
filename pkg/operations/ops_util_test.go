@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -94,6 +95,56 @@ var _ = Describe("OpsUtil functions", func() {
 			Expect(PatchClusterNotFound(ctx, k8sClient, opsRes)).Should(Succeed())
 		})
 
+		It("handles timeout and precondition deadline timing branches", func() {
+			By("init operations resources ")
+			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+
+			ops := testops.NewOpsRequestObj("timeout-ops-"+randomStr, testCtx.DefaultNamespace,
+				clusterName, opsv1alpha1.RestartType)
+			ops.Spec.RestartList = []opsv1alpha1.ComponentOps{{ComponentName: defaultCompName}}
+			timeoutSeconds := int32(1)
+			ops.Spec.TimeoutSeconds = &timeoutSeconds
+			opsRes.OpsRequest = testops.CreateOpsRequest(ctx, testCtx, ops)
+			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsRunningPhase
+			opsRes.OpsRequest.Status.StartTimestamp = metav1.NewTime(time.Now().Add(-2 * time.Second))
+
+			requeueAfter, err := GetOpsManager().checkAndHandleOpsTimeout(reqCtx, k8sClient, opsRes, time.Minute)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(requeueAfter).Should(BeZero())
+			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(opsv1alpha1.OpsAbortedPhase))
+
+			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsRunningPhase
+			opsRes.OpsRequest.Status.StartTimestamp = metav1.Now()
+			opsRes.OpsRequest.Spec.TimeoutSeconds = &timeoutSeconds
+			requeueAfter, err = GetOpsManager().checkAndHandleOpsTimeout(reqCtx, k8sClient, opsRes, time.Minute)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(requeueAfter).Should(BeNumerically(">", 0))
+			Expect(requeueAfter).Should(BeNumerically("<", time.Minute))
+
+			requeueAfter, err = GetOpsManager().checkAndHandleOpsTimeout(reqCtx, k8sClient, opsRes, time.Millisecond)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(requeueAfter).Should(Equal(time.Millisecond))
+
+			opsRes.OpsRequest.Spec.TimeoutSeconds = nil
+			requeueAfter, err = GetOpsManager().checkAndHandleOpsTimeout(reqCtx, k8sClient, opsRes, time.Second)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(requeueAfter).Should(Equal(time.Second))
+
+			Expect(preConditionDeadlineSecondsIsSet(opsRes.OpsRequest)).Should(BeFalse())
+			preConditionDeadlineSeconds := int32(60)
+			opsRes.OpsRequest.Spec.PreConditionDeadlineSeconds = &preConditionDeadlineSeconds
+			opsRes.OpsRequest.CreationTimestamp = metav1.Now()
+			Expect(preConditionDeadlineSecondsIsSet(opsRes.OpsRequest)).Should(BeTrue())
+			Expect(needWaitPreConditionDeadline(opsRes.OpsRequest)).Should(BeTrue())
+			opsRes.OpsRequest.Annotations = map[string]string{
+				constant.QueueEndTimeAnnotationKey: time.Now().Add(-2 * time.Minute).Format(time.RFC3339),
+			}
+			Expect(needWaitPreConditionDeadline(opsRes.OpsRequest)).Should(BeFalse())
+			opsRes.OpsRequest.Annotations[constant.QueueEndTimeAnnotationKey] = time.Now().Format(time.RFC3339)
+			Expect(needWaitPreConditionDeadline(opsRes.OpsRequest)).Should(BeTrue())
+		})
+
 		It("Test opsRequest failed cases", func() {
 			By("init operations resources ")
 			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
@@ -107,6 +158,10 @@ var _ = Describe("OpsUtil functions", func() {
 			opsRes.OpsRequest = testops.CreateOpsRequest(ctx, testCtx, ops)
 			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsRunningPhase
 			opsRes.OpsRequest.Status.StartTimestamp = metav1.Now()
+			var err error
+			runtimes, err := buildOpsRuntimes(ctx, k8sClient, opsRes)
+			Expect(err).Should(BeNil())
+			opsRes.Runtimes = runtimes
 
 			By("mock component failed")
 			clusterComp := opsRes.Cluster.Status.Components[defaultCompName]
@@ -120,8 +175,9 @@ var _ = Describe("OpsUtil functions", func() {
 				pgRes *progressResource,
 				compStatus *opsv1alpha1.OpsRequestComponentStatus) (expectProgressCount int32, completedCount int32, err error) {
 				return handleComponentStatusProgress(reqCtx, cli, opsRes, pgRes, compStatus,
-					func(ops *opsv1alpha1.OpsRequest, pod *corev1.Pod, pgRes *progressResource) bool {
-						return !pod.CreationTimestamp.Before(&ops.Status.StartTimestamp)
+					func(ops *opsv1alpha1.OpsRequest, instance Instance, pgRes *progressResource) bool {
+						creationTimestamp := instance.GetCreationTimestamp()
+						return !creationTimestamp.Before(&ops.Status.StartTimestamp)
 					})
 			}
 
@@ -143,6 +199,154 @@ var _ = Describe("OpsUtil functions", func() {
 			opsPhase, _, err = compOpsHelper.reconcileActionWithComponentOps(reqCtx, k8sClient, opsRes, "test", handleRestartProgress)
 			Expect(err).Should(BeNil())
 			Expect(opsPhase).Should(Equal(opsv1alpha1.OpsFailedPhase))
+		})
+
+		It("keeps restart ops running when a failed progress is not backed by a failed component", func() {
+			By("init operations resources ")
+			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
+			testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
+			pods := testapps.MockInstanceSetPods(&testCtx, nil, opsRes.Cluster, defaultCompName)
+			time.Sleep(time.Second)
+
+			ops := testops.NewOpsRequestObj("restart-ops-"+randomStr, testCtx.DefaultNamespace,
+				clusterName, opsv1alpha1.RestartType)
+			ops.Spec.RestartList = []opsv1alpha1.ComponentOps{{ComponentName: defaultCompName}}
+			opsRes.OpsRequest = testops.CreateOpsRequest(ctx, testCtx, ops)
+			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsRunningPhase
+			opsRes.OpsRequest.Status.StartTimestamp = metav1.NewTime(time.Now().Add(-time.Second))
+			runtimes, err := buildOpsRuntimes(ctx, k8sClient, opsRes)
+			Expect(err).Should(BeNil())
+			opsRes.Runtimes = runtimes
+
+			handleRestartProgress := func(reqCtx intctrlutil.RequestCtx,
+				cli client.Client,
+				opsRes *OpsResource,
+				pgRes *progressResource,
+				compStatus *opsv1alpha1.OpsRequestComponentStatus) (expectProgressCount int32, completedCount int32, err error) {
+				pgRes.deferInstanceFailureToWorkloadPhase = true
+				return handleComponentStatusProgress(reqCtx, cli, opsRes, pgRes, compStatus,
+					func(ops *opsv1alpha1.OpsRequest, instance Instance, pgRes *progressResource) bool {
+						creationTimestamp := instance.GetCreationTimestamp()
+						return !creationTimestamp.Before(&ops.Status.StartTimestamp)
+					})
+			}
+
+			recreatePod := func(pod *corev1.Pod) *corev1.Pod {
+				testk8s.MockPodIsTerminating(ctx, testCtx, pod)
+				testk8s.RemovePodFinalizer(ctx, testCtx, pod)
+				return testapps.MockInstanceSetPod(&testCtx, nil, clusterName, defaultCompName, pod.Name, "follower")
+			}
+			for i := range pods {
+				pods[i] = recreatePod(pods[i])
+			}
+			testk8s.MockPodIsFailed(ctx, testCtx, pods[2])
+
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+			compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.RestartList)
+			opsPhase, requeueAfter, err := compOpsHelper.reconcileActionWithComponentOps(reqCtx, k8sClient, opsRes,
+				"test", handleRestartProgress)
+			Expect(err).Should(BeNil())
+			Expect(opsPhase).Should(Equal(opsv1alpha1.OpsRunningPhase))
+			Expect(requeueAfter).Should(BeZero())
+			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("2/3"))
+			progressDetail := findStatusProgressDetail(opsRes.OpsRequest.Status.Components[defaultCompName].ProgressDetails,
+				getProgressObjectKey(constant.PodKind, pods[2].Name))
+			Expect(progressDetail).ShouldNot(BeNil())
+			Expect(progressDetail.Status).Should(Equal(opsv1alpha1.ProcessingProgressStatus))
+
+			By("mock the failed instance recovers while the component remains Running")
+			recoveredPod := pods[2]
+			patch := client.MergeFrom(recoveredPod.DeepCopy())
+			recoveredPod.Status.Conditions = []corev1.PodCondition{
+				{
+					Type:   corev1.PodReady,
+					Status: corev1.ConditionTrue,
+				},
+				{
+					Type:   corev1.ContainersReady,
+					Status: corev1.ConditionTrue,
+				},
+			}
+			recoveredPod.Status.ContainerStatuses = []corev1.ContainerStatus{
+				{
+					Name: recoveredPod.Spec.Containers[0].Name,
+					State: corev1.ContainerState{
+						Running: &corev1.ContainerStateRunning{},
+					},
+				},
+			}
+			Expect(k8sClient.Status().Patch(ctx, recoveredPod, patch)).Should(Succeed())
+
+			opsPhase, _, err = compOpsHelper.reconcileActionWithComponentOps(reqCtx, k8sClient, opsRes,
+				"test", handleRestartProgress)
+			Expect(err).Should(BeNil())
+			Expect(opsPhase).Should(Equal(opsv1alpha1.OpsSucceedPhase))
+			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("3/3"))
+		})
+
+		It("fails restart ops when component reaches terminal failed phase", func() {
+			By("init operations resources ")
+			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
+			testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
+			pods := testapps.MockInstanceSetPods(&testCtx, nil, opsRes.Cluster, defaultCompName)
+			time.Sleep(time.Second)
+
+			ops := testops.NewOpsRequestObj("restart-ops-"+randomStr, testCtx.DefaultNamespace,
+				clusterName, opsv1alpha1.RestartType)
+			ops.Spec.RestartList = []opsv1alpha1.ComponentOps{{ComponentName: defaultCompName}}
+			opsRes.OpsRequest = testops.CreateOpsRequest(ctx, testCtx, ops)
+			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsRunningPhase
+			opsRes.OpsRequest.Status.StartTimestamp = metav1.NewTime(time.Now().Add(-time.Second))
+			runtimes, err := buildOpsRuntimes(ctx, k8sClient, opsRes)
+			Expect(err).Should(BeNil())
+			opsRes.Runtimes = runtimes
+
+			handleRestartProgress := func(reqCtx intctrlutil.RequestCtx,
+				cli client.Client,
+				opsRes *OpsResource,
+				pgRes *progressResource,
+				compStatus *opsv1alpha1.OpsRequestComponentStatus) (expectProgressCount int32, completedCount int32, err error) {
+				pgRes.deferInstanceFailureToWorkloadPhase = true
+				return handleComponentStatusProgress(reqCtx, cli, opsRes, pgRes, compStatus,
+					func(ops *opsv1alpha1.OpsRequest, instance Instance, pgRes *progressResource) bool {
+						creationTimestamp := instance.GetCreationTimestamp()
+						return !creationTimestamp.Before(&ops.Status.StartTimestamp)
+					})
+			}
+
+			recreatePod := func(pod *corev1.Pod) *corev1.Pod {
+				testk8s.MockPodIsTerminating(ctx, testCtx, pod)
+				testk8s.RemovePodFinalizer(ctx, testCtx, pod)
+				return testapps.MockInstanceSetPod(&testCtx, nil, clusterName, defaultCompName, pod.Name, "follower")
+			}
+			for i := range pods {
+				pods[i] = recreatePod(pods[i])
+			}
+			testk8s.MockPodIsFailed(ctx, testCtx, pods[2])
+
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+			compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.RestartList)
+			opsPhase, requeueAfter, err := compOpsHelper.reconcileActionWithComponentOps(reqCtx, k8sClient, opsRes,
+				"test", handleRestartProgress)
+			Expect(err).Should(BeNil())
+			Expect(opsPhase).Should(Equal(opsv1alpha1.OpsRunningPhase))
+			Expect(requeueAfter).Should(BeZero())
+
+			By("mock component reaches terminal Failed phase")
+			clusterComp := opsRes.Cluster.Status.Components[defaultCompName]
+			clusterComp.Phase = appsv1.FailedComponentPhase
+			opsRes.Cluster.Status.SetComponentStatus(defaultCompName, clusterComp)
+
+			opsPhase, requeueAfter, err = compOpsHelper.reconcileActionWithComponentOps(reqCtx, k8sClient, opsRes,
+				"test", handleRestartProgress)
+			Expect(err).Should(BeNil())
+			Expect(requeueAfter).Should(BeZero())
+			Expect(opsPhase).Should(Equal(opsv1alpha1.OpsFailedPhase))
+			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("3/3"))
+			progressDetail := findStatusProgressDetail(opsRes.OpsRequest.Status.Components[defaultCompName].ProgressDetails,
+				getProgressObjectKey(constant.PodKind, pods[2].Name))
+			Expect(progressDetail).ShouldNot(BeNil())
+			Expect(progressDetail.Status).Should(Equal(opsv1alpha1.FailedProgressStatus))
 		})
 
 		It("Test opsRequest with disable ha", func() {
@@ -349,6 +553,92 @@ var _ = Describe("OpsUtil functions", func() {
 			By("expect the ops phase is Creating")
 			_, _ = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
+		})
+
+		It("Test swapOpsWithDependentBefore when force ops enqueued before dependent ops", func() {
+			By("init operations resources ")
+			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
+			testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
+
+			By("create a force opsRequest that depends on another ops")
+			ops1 := createHorizontalScaling(clusterName, opsv1alpha1.HorizontalScaling{
+				ComponentOps: opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
+				ScaleIn: &opsv1alpha1.ScaleIn{
+					ReplicaChanger: opsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(1)},
+				},
+			}, false)
+			ops2 := createHorizontalScaling(clusterName, opsv1alpha1.HorizontalScaling{
+				ComponentOps: opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
+				ScaleOut: &opsv1alpha1.ScaleOut{
+					ReplicaChanger: opsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(1)},
+				},
+			}, false)
+			ops3 := createHorizontalScaling(clusterName, opsv1alpha1.HorizontalScaling{
+				ComponentOps: opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
+				ScaleOut: &opsv1alpha1.ScaleOut{
+					ReplicaChanger: opsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(1)},
+				},
+			}, false)
+			ops3.Annotations = map[string]string{constant.OpsDependentOnSuccessfulOpsAnnoKey: fmt.Sprintf("%s,%s", ops1.Name, ops2.Name)}
+			ops3.Spec.Force = true
+
+			By("manually add ops3 to cluster annotation first with InQueue=false")
+			ops3Recorder := opsv1alpha1.OpsRecorder{
+				Name:        ops3.Name,
+				Type:        opsv1alpha1.HorizontalScalingType,
+				InQueue:     false,
+				QueueBySelf: false,
+			}
+			Expect(testapps.ChangeObj(&testCtx, opsRes.Cluster, func(cluster *appsv1.Cluster) {
+				opsutil.SetOpsRequestToCluster(cluster, []opsv1alpha1.OpsRecorder{ops3Recorder})
+			})).Should(Succeed())
+
+			By("ops2 should be in queue")
+			opsRequestSlice, _ := opsutil.GetOpsRequestSliceFromCluster(opsRes.Cluster)
+			Expect(len(opsRequestSlice)).Should(Equal(1))
+			Expect(opsRequestSlice[0].Name).Should(Equal(ops3.Name))
+			Expect(opsRequestSlice[0].InQueue).Should(BeFalse())
+
+			By("now create ops1 and add it to cluster annotation after ops2")
+			ops1Recorder := opsv1alpha1.OpsRecorder{
+				Name:        ops1.Name,
+				Type:        opsv1alpha1.HorizontalScalingType,
+				InQueue:     true,
+				QueueBySelf: false,
+			}
+			ops2Recorder := opsv1alpha1.OpsRecorder{
+				Name:        ops2.Name,
+				Type:        opsv1alpha1.HorizontalScalingType,
+				InQueue:     true,
+				QueueBySelf: false,
+			}
+			Expect(testapps.ChangeObj(&testCtx, opsRes.Cluster, func(cluster *appsv1.Cluster) {
+				opsutil.SetOpsRequestToCluster(cluster, []opsv1alpha1.OpsRecorder{ops3Recorder, ops1Recorder, ops2Recorder})
+			})).Should(Succeed())
+
+			By("verify ops1 is after ops2 in the slice")
+			opsRequestSlice, _ = opsutil.GetOpsRequestSliceFromCluster(opsRes.Cluster)
+			Expect(len(opsRequestSlice)).Should(Equal(3))
+			Expect(opsRequestSlice[0].Name).Should(Equal(ops3.Name))
+			Expect(opsRequestSlice[1].Name).Should(Equal(ops1.Name))
+			Expect(opsRequestSlice[2].Name).Should(Equal(ops2.Name))
+
+			By("simulate ops3 reconciliation that triggers swap")
+			opsRes.OpsRequest = ops3
+			ops3.Status.Phase = opsv1alpha1.OpsPendingPhase
+
+			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
+			opsBehaviour := GetOpsManager().OpsMap[opsv1alpha1.HorizontalScalingType]
+			opsRecorder, err := enqueueOpsRequestToClusterAnnotation(reqCtx.Ctx, k8sClient, opsRes, opsBehaviour)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(opsRecorder).ShouldNot(BeNil())
+
+			By("verify ops1 and ops2 have been swapped")
+			opsRequestSlice, _ = opsutil.GetOpsRequestSliceFromCluster(opsRes.Cluster)
+			Expect(len(opsRequestSlice)).Should(Equal(3))
+			Expect(opsRequestSlice[0].Name).Should(Equal(ops1.Name))
+			Expect(opsRequestSlice[1].Name).Should(Equal(ops2.Name))
+			Expect(opsRequestSlice[2].Name).Should(Equal(ops3.Name))
 		})
 	})
 })

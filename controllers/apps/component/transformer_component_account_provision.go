@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -159,8 +159,7 @@ func (t *componentAccountProvisionTransformer) createAccount(transCtx *component
 	// specific account&password environment variables name supported by the engine.
 	// When the engine starts up, it will automatically load and create this account.
 	if !account.InitAccount {
-		// TODO: restore account secret from backup.
-		if transCtx.SynthesizeComponent.Annotations[constant.RestoreFromBackupAnnotationKey] == "" {
+		if !t.accountAlreadyProvisioned(transCtx, secret) {
 			// provision account when the component is not recovered from backup
 			err = t.provision(transCtx, lfa, account.Statement.Create, secret)
 		}
@@ -171,6 +170,10 @@ func (t *componentAccountProvisionTransformer) createAccount(transCtx *component
 		t.updateProvisionedAccount(cond, account.Name, secret.Annotations[systemAccountHashAnnotation])
 	}
 	return err
+}
+
+func (t *componentAccountProvisionTransformer) accountAlreadyProvisioned(transCtx *componentTransformContext, secret *corev1.Secret) bool {
+	return secret != nil && secret.Annotations[constant.SystemAccountProvisionedAnnotationKey] == "true"
 }
 
 func (t *componentAccountProvisionTransformer) deleteAccount(transCtx *componentTransformContext,

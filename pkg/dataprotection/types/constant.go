@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -70,6 +70,16 @@ const (
 	SkipReconciliationAnnotationKey = "dataprotection.kubeblocks.io/skip-reconciliation"
 	// SkipRestorationCheckAnnotationKey specifies whether to skip restoration check.
 	SkipRestorationCheckAnnotationKey = "dataprotection.kubeblocks.io/skip-restoration-check"
+	// SourceTargetNameAnnotationKey records the backup target name for Backup dataSource PVC restores.
+	SourceTargetNameAnnotationKey = "dataprotection.kubeblocks.io/source-target-name"
+	// SourceTargetPodNameAnnotationKey records the source target pod name for Backup dataSource PVC restores.
+	SourceTargetPodNameAnnotationKey = "dataprotection.kubeblocks.io/source-target-pod-name"
+	// VolumeRestorePolicyParameterKey records the volume restore policy for Backup dataSource PVC restores.
+	VolumeRestorePolicyParameterKey = "dataprotection.kubeblocks.io/volume-restore-policy"
+	// RestoreEnvParameterKey records restore env for Backup dataSource PVC restores.
+	RestoreEnvParameterKey = "dataprotection.kubeblocks.io/restore-env"
+	// DeferPostReadyUntilClusterRunningParameterKey records whether post-ready restore should wait for Cluster running.
+	DeferPostReadyUntilClusterRunningParameterKey = "dataprotection.kubeblocks.io/defer-post-ready-until-cluster-running"
 )
 
 // label keys

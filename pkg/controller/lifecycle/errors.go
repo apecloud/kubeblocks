@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -26,7 +26,7 @@ import (
 var (
 	ErrActionNotDefined     = errors.New("action is not defined")
 	ErrActionNotImplemented = errors.New("action is not implemented")
-	ErrPreconditionFailed   = errors.New("action precondition is not matched")
+	ErrPreconditionFailed   = errors.New("action precondition is not met")
 	ErrActionInProgress     = errors.New("action is in progress")
 	ErrActionBusy           = errors.New("action is busy")
 	ErrActionTimedOut       = errors.New("action timed-out")

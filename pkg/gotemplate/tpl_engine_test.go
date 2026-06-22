@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -82,6 +82,26 @@ my friend name is test2
 			context, err := emptyTplEngine(&pp, nil, tplString)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(context).To(Equal(expectString))
+		})
+
+		It("Should render empty template content as empty", func() {
+			engine := NewTplEngine(&TplValues{}, nil, "for_test", nil, nil)
+
+			rendered, err := engine.Render("member-leave")
+			Expect(err).Should(Succeed())
+			Expect(rendered).Should(Equal("member-leave"))
+
+			rendered, err = engine.Render("")
+			Expect(err).Should(Succeed())
+			Expect(rendered).Should(Equal(""))
+
+			rendered, err = engine.Render("role-probe")
+			Expect(err).Should(Succeed())
+			Expect(rendered).Should(Equal("role-probe"))
+
+			rendered, err = engine.Render("")
+			Expect(err).Should(Succeed())
+			Expect(rendered).Should(Equal(""))
 		})
 	})
 

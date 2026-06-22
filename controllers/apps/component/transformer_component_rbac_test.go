@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -31,13 +31,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/generics"
@@ -130,6 +130,39 @@ var _ = Describe("object rbac transformer test.", func() {
 	}
 
 	Context("transformer rbac manager", func() {
+		It("adds RBAC assistant objects to synthesized component before workload exists", func() {
+			init(true, true)
+			dag = graph.NewDAG()
+			graphCli.Root(dag, compObj, compObj, model.ActionStatusPtr())
+			synthesizedComp.EnableInstanceAPI = ptr.To(true)
+			if synthesizedComp.Annotations == nil {
+				synthesizedComp.Annotations = map[string]string{}
+			}
+			synthesizedComp.Annotations[constant.KBAppMultiClusterPlacementKey] = "test-context"
+
+			Expect(transformer.Transform(transCtx, dag)).Should(BeNil())
+
+			actual := synthesizedComp.InstanceAssistantObjects
+			Expect(actual).To(HaveLen(3))
+			Expect(actual).To(ContainElements(
+				corev1.ObjectReference{
+					Kind:      "RoleBinding",
+					Namespace: testCtx.DefaultNamespace,
+					Name:      serviceAccountName,
+				},
+				corev1.ObjectReference{
+					Kind:      "RoleBinding",
+					Namespace: testCtx.DefaultNamespace,
+					Name:      fmt.Sprintf("%v-pod", serviceAccountName),
+				},
+				corev1.ObjectReference{
+					Kind:      "ServiceAccount",
+					Namespace: testCtx.DefaultNamespace,
+					Name:      serviceAccountName,
+				},
+			))
+		})
+
 		It("tests labelAndAnnotationEqual", func() {
 			// nil and not nil
 			Expect(labelAndAnnotationEqual(
@@ -187,7 +220,7 @@ var _ = Describe("object rbac transformer test.", func() {
 			init(false, false)
 			Expect(transformer.Transform(transCtx, dag)).Should(BeNil())
 			// sa should be created
-			serviceAccount := factory.BuildServiceAccount(synthesizedComp, serviceAccountName)
+			serviceAccount := buildServiceAccount(synthesizedComp, serviceAccountName)
 
 			dagExpected := mockDAG(graphCli, compObj)
 			graphCli.Create(dagExpected, serviceAccount)
@@ -198,12 +231,12 @@ var _ = Describe("object rbac transformer test.", func() {
 		It("w/ lifecycle actions", func() {
 			init(true, false)
 			Expect(transformer.Transform(transCtx, dag)).Should(BeNil())
-			clusterPodRoleBinding := factory.BuildRoleBinding(synthesizedComp, fmt.Sprintf("%v-pod", serviceAccountName), &rbacv1.RoleRef{
+			clusterPodRoleBinding := buildRoleBinding(synthesizedComp, fmt.Sprintf("%v-pod", serviceAccountName), &rbacv1.RoleRef{
 				APIGroup: rbacv1.GroupName,
 				Kind:     "ClusterRole",
 				Name:     constant.RBACRoleName,
 			}, serviceAccountName)
-			serviceAccount := factory.BuildServiceAccount(synthesizedComp, serviceAccountName)
+			serviceAccount := buildServiceAccount(synthesizedComp, serviceAccountName)
 			dagExpected := mockDAG(graphCli, compObj)
 			graphCli.Create(dagExpected, serviceAccount)
 			graphCli.Create(dagExpected, clusterPodRoleBinding)
@@ -218,12 +251,12 @@ var _ = Describe("object rbac transformer test.", func() {
 		It("w/ cmpd's PolicyRules", func() {
 			init(false, true)
 			Expect(transformer.Transform(transCtx, dag)).Should(BeNil())
-			cmpdRoleBinding := factory.BuildRoleBinding(synthesizedComp, serviceAccountName, &rbacv1.RoleRef{
+			cmpdRoleBinding := buildRoleBinding(synthesizedComp, serviceAccountName, &rbacv1.RoleRef{
 				APIGroup: rbacv1.GroupName,
 				Kind:     "ClusterRole",
 				Name:     constant.GenerateDefaultRoleName(compDefObj.Name),
 			}, serviceAccountName)
-			serviceAccount := factory.BuildServiceAccount(synthesizedComp, serviceAccountName)
+			serviceAccount := buildServiceAccount(synthesizedComp, serviceAccountName)
 			dagExpected := mockDAG(graphCli, compObj)
 			graphCli.Create(dagExpected, serviceAccount)
 			graphCli.Create(dagExpected, cmpdRoleBinding)
@@ -333,8 +366,8 @@ var _ = Describe("object rbac transformer test.", func() {
 				Expect(transformer.Transform(transCtx, dag)).Should(BeNil())
 				// sa should be created
 				oldSAName := constant.GenerateDefaultServiceAccountName(compDefObj.Name)
-				serviceAccount := factory.BuildServiceAccount(synthesizedComp, oldSAName)
-				newServiceAccount := factory.BuildServiceAccount(synthesizedComp, serviceAccountName)
+				serviceAccount := buildServiceAccount(synthesizedComp, oldSAName)
+				newServiceAccount := buildServiceAccount(synthesizedComp, serviceAccountName)
 
 				hash, err := computeServiceAccountRuleHash(ctx)
 				Expect(err).ShouldNot(HaveOccurred())

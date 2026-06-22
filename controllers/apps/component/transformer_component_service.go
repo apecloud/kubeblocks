@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -38,7 +38,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -66,7 +65,7 @@ func (t *componentServiceTransformer) Transform(ctx graph.TransformContext, dag 
 	}
 
 	runningITS := transCtx.RunningWorkload
-	protoITS, err := factory.BuildInstanceSet(transCtx.SynthesizeComponent, transCtx.CompDef)
+	protoITS, err := component.BuildInstanceSet(transCtx.SynthesizeComponent, transCtx.CompDef)
 	if err != nil {
 		return err
 	}
@@ -280,7 +279,7 @@ func (t *componentServiceTransformer) createOrUpdateService(ctx graph.TransformC
 	}
 
 	if podService && kind == multiClusterServicePlacementInUnique {
-		service.Annotations[constant.KBAppMultiClusterObjectProvisionPolicyKey] = "ordinal" // HACK
+		service.Annotations[constant.KBAppMultiClusterObjectProvisionPolicyKey] = constant.KBAppMultiClusterObjectProvisionOrdinal
 	}
 
 	createOrUpdateService := func(service *corev1.Service) error {

@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -77,11 +77,6 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		template2TotalReplicas[template.Name] = templateReplicas
 	}
 
-	// podToNodeMapping, err := ParseNodeSelectorOnceAnnotation(its)
-	// if err != nil {
-	//	return kubebuilderx.Continue, err
-	// }
-
 	for _, inst := range instanceList {
 		templateName := inst.Labels[instancetemplate.TemplateNameLabelKey]
 		if template2TemplatesStatus[templateName] == nil {
@@ -114,16 +109,6 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 				template2TemplatesStatus[templateName].CurrentReplicas++
 			}
 		}
-
-		// TODO: ???
-		// if nodeName, ok := podToNodeMapping[inst.Name]; ok {
-		//	// there's chance that a pod is currently running and wait to be deleted so that it can be rescheduled
-		//	if inst.Spec.NodeName == nodeName {
-		//		if err := deleteNodeSelectorOnceAnnotation(its, inst.Name); err != nil {
-		//			return kubebuilderx.Continue, err
-		//		}
-		//	}
-		// }
 	}
 	its.Status.Replicas = replicas
 	its.Status.ReadyReplicas = readyReplicas
@@ -274,7 +259,7 @@ func setInstanceStatus(its *workloads.InstanceSet, instances []*workloads.Instan
 
 	syncMemberStatus(its, instanceStatus, instances)
 
-	syncInstanceConfigStatus(its, instanceStatus)
+	syncInstanceConfigStatus(instanceStatus, instances)
 
 	syncInstancePVCStatus(its, instanceStatus, instances)
 
@@ -311,38 +296,12 @@ func syncMemberStatus(its *workloads.InstanceSet, instanceStatus []workloads.Ins
 	}
 }
 
-func syncInstanceConfigStatus(its *workloads.InstanceSet, instanceStatus []workloads.InstanceStatus) {
-	if its.Status.InstanceStatus == nil {
-		// initialize
-		configs := make([]workloads.InstanceConfigStatus, 0)
-		for _, config := range its.Spec.Configs {
-			configs = append(configs, workloads.InstanceConfigStatus{
-				Name:       config.Name,
-				Generation: config.Generation,
-			})
-		}
-		for i := range instanceStatus {
-			instanceStatus[i].Configs = configs
-		}
-	} else {
-		// HACK: copy the existing config status from the current its.status.instanceStatus
-		configs := sets.New[string]()
-		for _, config := range its.Spec.Configs {
-			configs.Insert(config.Name)
-		}
-		for i, newStatus := range instanceStatus {
-			for _, status := range its.Status.InstanceStatus {
-				if status.PodName == newStatus.PodName {
-					if instanceStatus[i].Configs == nil {
-						instanceStatus[i].Configs = make([]workloads.InstanceConfigStatus, 0)
-					}
-					for j, config := range status.Configs {
-						if configs.Has(config.Name) {
-							instanceStatus[i].Configs = append(instanceStatus[i].Configs, status.Configs[j])
-						}
-					}
-					break
-				}
+func syncInstanceConfigStatus(instanceStatus []workloads.InstanceStatus, instances []*workloads.Instance) {
+	for _, inst := range instances {
+		for i, status := range instanceStatus {
+			if status.PodName == inst.Name {
+				instanceStatus[i].Configs = inst.Status.Configs
+				break
 			}
 		}
 	}

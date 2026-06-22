@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -73,9 +73,10 @@ type RetryPolicy struct {
 type ActionRequest struct {
 	Action         string            `json:"action"`
 	Parameters     map[string]string `json:"parameters,omitempty"`
+	Arguments      [][]string        `json:"arguments,omitempty"`
 	NonBlocking    *bool             `json:"nonBlocking,omitempty"`
-	TimeoutSeconds *int32            `json:"timeoutSeconds,omitempty"` // TODO: not implemented
-	RetryPolicy    *RetryPolicy      `json:"retryPolicy,omitempty"`    // TODO: not implemented
+	TimeoutSeconds *int32            `json:"timeoutSeconds,omitempty"`
+	RetryPolicy    *RetryPolicy      `json:"retryPolicy,omitempty"`
 }
 
 type ActionResponse struct {
@@ -100,6 +101,10 @@ type Probe struct {
 	SuccessThreshold    int32  `json:"successThreshold,omitempty"`
 	FailureThreshold    int32  `json:"failureThreshold,omitempty"`
 	ReportPeriodSeconds int32  `json:"reportPeriodSeconds,omitempty"`
+	// ReportOnFileChange triggers a forced probe report when any configured path changes.
+	// Directory paths watch immediate child create/remove/rename events only; file paths
+	// watch create/write/remove/rename events for the exact file path.
+	ReportOnFileChange []string `json:"reportOnFileChange,omitempty"`
 }
 
 type ProbeEvent struct {

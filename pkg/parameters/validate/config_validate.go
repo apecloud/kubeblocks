@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -21,12 +21,9 @@ package validate
 
 import (
 	apiext "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	"k8s.io/kube-openapi/pkg/validation/errors"
-	kubeopenapispec "k8s.io/kube-openapi/pkg/validation/spec"
-	"k8s.io/kube-openapi/pkg/validation/strfmt"
-	"k8s.io/kube-openapi/pkg/validation/validate"
 
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 )
 
@@ -59,13 +56,11 @@ func (s *schemaValidator) Validate(content string) error {
 	var err error
 	var parameters map[string]interface{}
 
-	openAPITypes := &kubeopenapispec.Schema{}
-	validator := validate.NewSchemaValidator(openAPITypes, nil, "", strfmt.Default)
 	if parameters, err = LoadConfigObjectFromContent(s.cfgType, content); err != nil {
 		return err
 	}
-	if res := validator.Validate(parameters); res.HasErrors() {
-		return core.WrapError(errors.CompositeValidationError(res.Errors...), "failed to schema validate for config file")
+	if err = common.ValidateDataWithSchema(s.schema, parameters); err != nil {
+		return core.WrapError(err, "failed to schema validate for config file")
 	}
 	return nil
 }

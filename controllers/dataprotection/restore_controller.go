@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -477,17 +477,29 @@ func (r *RestoreReconciler) handleBackupActionSet(reqCtx intctrlutil.RequestCtx,
 	}
 
 	var jobs []*batchv1.Job
+	// For in-flight actions, check the recorded Job before rebuilding the Job
+	// spec from the current target pod selector. The target pod may become
+	// unavailable after the Job is created, but the existing Job is still the
+	// action fact source that should drive convergence.
+	jobs, err = restoreMgr.GetExistingActionJobs(reqCtx, r.Client, stage, backupSet.Backup.Name, actionName)
+	if err != nil {
+		return false, err
+	}
 	switch stage {
 	case dpv1alpha1.PrepareData:
-		if backupSet.UseVolumeSnapshot {
-			if err = restoreMgr.RestorePVCFromSnapshot(reqCtx, r.Client, backupSet, target); err != nil {
-				return false, nil
+		if len(jobs) == 0 {
+			if backupSet.UseVolumeSnapshot {
+				if err = restoreMgr.RestorePVCFromSnapshot(reqCtx, r.Client, backupSet, target); err != nil {
+					return false, nil
+				}
 			}
+			jobs, err = restoreMgr.BuildPrepareDataJobs(reqCtx, r.Client, backupSet, target, actionName)
 		}
-		jobs, err = restoreMgr.BuildPrepareDataJobs(reqCtx, r.Client, backupSet, target, actionName)
 	case dpv1alpha1.PostReady:
-		// 2. build jobs for postReady action
-		jobs, err = restoreMgr.BuildPostReadyActionJobs(reqCtx, r.Client, backupSet, target, step)
+		if len(jobs) == 0 {
+			// 2. build jobs for postReady action
+			jobs, err = restoreMgr.BuildPostReadyActionJobs(reqCtx, r.Client, backupSet, target, step)
+		}
 	}
 	if err != nil {
 		return false, err

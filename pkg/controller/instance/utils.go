@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -20,12 +20,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instance
 
 import (
+	"encoding/json"
 	"reflect"
 	"slices"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -118,76 +120,14 @@ func isImageMatched(pod *corev1.Pod) bool {
 			continue
 		}
 		specImage := container.Image
-		statusImage := pod.Status.ContainerStatuses[index].Image
+		status := pod.Status.ContainerStatuses[index]
 		// Image in status may not match the image used in the PodSpec.
 		// More info: https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#PodStatus
-		specName, specTag, specDigest := imageSplit(specImage)
-		statusName, statusTag, statusDigest := imageSplit(statusImage)
-		// if digest presents in spec, it must be same in status
-		if len(specDigest) != 0 && specDigest != statusDigest {
+		if !intctrlutil.MatchContainerImageInStatus(specImage, status.Image, status.ImageID) {
 			return false
-		}
-		// if tag presents in spec, it must be same in status
-		if len(specTag) != 0 && specTag != statusTag {
-			return false
-		}
-		// otherwise, statusName should be same as or has suffix of specName
-		if specName != statusName {
-			specNames := strings.Split(specName, "/")
-			statusNames := strings.Split(statusName, "/")
-			if specNames[len(specNames)-1] != statusNames[len(statusNames)-1] {
-				return false
-			}
 		}
 	}
 	return true
-}
-
-// imageSplit separates and returns the name and tag parts
-// from the image string using either colon `:` or at `@` separators.
-// image reference pattern: [[host[:port]/]component/]component[:tag][@digest]
-func imageSplit(imageName string) (name string, tag string, digest string) {
-	// check if image name contains a domain
-	// if domain is present, ignore domain and check for `:`
-	searchName := imageName
-	slashIndex := strings.Index(imageName, "/")
-	if slashIndex > 0 {
-		searchName = imageName[slashIndex:]
-	} else {
-		slashIndex = 0
-	}
-
-	id := strings.Index(searchName, "@")
-	ic := strings.Index(searchName, ":")
-
-	// no tag or digest
-	if ic < 0 && id < 0 {
-		return imageName, "", ""
-	}
-
-	// digest only
-	if id >= 0 && (id < ic || ic < 0) {
-		id += slashIndex
-		name = imageName[:id]
-		digest = strings.TrimPrefix(imageName[id:], "@")
-		return name, "", digest
-	}
-
-	// tag and digest
-	if id >= 0 && ic >= 0 {
-		id += slashIndex
-		ic += slashIndex
-		name = imageName[:ic]
-		tag = strings.TrimPrefix(imageName[ic:id], ":")
-		digest = strings.TrimPrefix(imageName[id:], "@")
-		return name, tag, digest
-	}
-
-	// tag only
-	ic += slashIndex
-	name = imageName[:ic]
-	tag = strings.TrimPrefix(imageName[ic:], ":")
-	return name, tag, ""
 }
 
 func buildInstancePod(inst *workloads.Instance, revision string) (*corev1.Pod, error) {
@@ -231,6 +171,9 @@ func buildInstancePod(inst *workloads.Instance, revision string) (*corev1.Pod, e
 			return v.Name == item.Name
 		}
 	})
+	if err := configsToPod(inst.Spec.Configs, pod); err != nil {
+		return nil, err
+	}
 
 	if err := controllerutil.SetControllerReference(inst, pod, model.GetScheme()); err != nil {
 		return nil, err
@@ -262,6 +205,86 @@ func buildInstancePVCs(inst *workloads.Instance) ([]*corev1.PersistentVolumeClai
 		}
 	}
 	return pvcs, nil
+}
+
+func configsToPod(configs []workloads.ConfigTemplate, pod *corev1.Pod) error {
+	if len(configs) == 0 {
+		return nil
+	}
+	m := make(map[string]string)
+	for _, config := range configs {
+		m[config.Name] = ptr.Deref(config.ConfigHash, "")
+	}
+	res, err := json.Marshal(m)
+	if err != nil {
+		return err
+	}
+	if pod.Annotations == nil {
+		pod.Annotations = make(map[string]string)
+	}
+	pod.Annotations[constant.CMInsConfigurationHashLabelKey] = string(res)
+	return nil
+}
+
+func configsFromPod(pod *corev1.Pod) ([]workloads.ConfigTemplate, error) {
+	str := pod.Annotations[constant.CMInsConfigurationHashLabelKey]
+	if str == "" {
+		return nil, nil
+	}
+
+	m := make(map[string]string)
+	if err := json.Unmarshal([]byte(str), &m); err != nil {
+		return nil, err
+	}
+	if len(m) == 0 {
+		return nil, nil
+	}
+
+	var configs []workloads.ConfigTemplate
+	for k := range m {
+		configs = append(configs, workloads.ConfigTemplate{
+			Name:       k,
+			ConfigHash: ptr.To(m[k]),
+		})
+	}
+	slices.SortFunc(configs, func(a, b workloads.ConfigTemplate) int {
+		return strings.Compare(a.Name, b.Name)
+	})
+	return configs, nil
+}
+
+func configsToUpdate(inst *workloads.Instance, pod *corev1.Pod) ([]workloads.ConfigTemplate, error) {
+	configs, err := configsFromPod(pod)
+	if err != nil {
+		return nil, err
+	}
+	toUpdate := make([]workloads.ConfigTemplate, 0)
+	for i, config := range inst.Spec.Configs {
+		idx := slices.IndexFunc(configs, func(cfg workloads.ConfigTemplate) bool {
+			return cfg.Name == config.Name
+		})
+		if idx < 0 || ptr.Deref(config.ConfigHash, "") != ptr.Deref(configs[idx].ConfigHash, "") {
+			toUpdate = append(toUpdate, inst.Spec.Configs[i])
+		}
+	}
+	return toUpdate, nil
+}
+
+func hasConfigRestart(inst *workloads.Instance, pod *corev1.Pod) (bool, []string, error) {
+	toUpdate, err := configsToUpdate(inst, pod)
+	if err != nil {
+		return false, nil, err
+	}
+	toRestart := make([]string, 0)
+	for _, config := range toUpdate {
+		if ptr.Deref(config.Restart, false) {
+			toRestart = append(toRestart, config.Name)
+		}
+	}
+	if len(toRestart) > 0 {
+		return true, toRestart, nil
+	}
+	return false, nil, nil
 }
 
 func copyAndMerge(oldObj, newObj client.Object) client.Object {
@@ -351,7 +374,11 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 	}
 }
 
-func newLifecycleAction(inst *workloads.Instance, pods []*corev1.Pod, pod *corev1.Pod) (lifecycle.Lifecycle, error) {
+// newLifecycleAction is a package-level variable so tests can substitute a
+// spy implementation to assert call-site behavior (e.g., that switchover is
+// not invoked when an in-place update is metadata-only). Production behavior
+// is unchanged.
+var newLifecycleAction = func(inst *workloads.Instance, pods []*corev1.Pod, pod *corev1.Pod) (lifecycle.Lifecycle, error) {
 	var (
 		clusterName      = inst.Labels[constant.AppInstanceLabelKey]
 		compName         = inst.Labels[constant.KBAppComponentLabelKey]

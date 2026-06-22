@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -164,4 +164,5 @@ var _ = Describe("clusterDeletionTransformer", func() {
 		Expect(err).Should(Equal(graph.ErrPrematureStop))
 		Expect(dag.Vertices()).Should(HaveLen(1))
 	})
+
 })

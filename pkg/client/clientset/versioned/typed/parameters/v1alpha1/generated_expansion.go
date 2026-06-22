@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,5 +23,7 @@ type ComponentParameterExpansion interface{}
 type ParamConfigRendererExpansion interface{}
 
 type ParameterExpansion interface{}
+
+type ParameterViewExpansion interface{}
 
 type ParametersDefinitionExpansion interface{}

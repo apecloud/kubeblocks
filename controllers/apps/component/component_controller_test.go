@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -818,7 +818,7 @@ var _ = Describe("Component Controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *kbappsv1.Component) {
 				g.Expect(comp.Spec.Replicas).Should(BeEquivalentTo(replicas))
 				g.Expect(comp.Status.Conditions).Should(HaveLen(1))
-				g.Expect(comp.Status.Conditions[0].Type).Should(BeEquivalentTo(kbappsv1.ConditionTypeProvisioningStarted))
+				g.Expect(comp.Status.Conditions[0].Type).Should(BeEquivalentTo(kbappsv1.ComponentConditionProvisioningStarted))
 				g.Expect(comp.Status.Conditions[0].Status).Should(BeEquivalentTo(metav1.ConditionFalse))
 				g.Expect(comp.Status.Conditions[0].Message).Should(ContainSubstring(replicasOutOfLimitError(replicas, *replicasLimit).Error()))
 			})).Should(Succeed())
@@ -1502,6 +1502,64 @@ var _ = Describe("Component Controller", func() {
 		Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(cm), &corev1.ConfigMap{}, false)).Should(Succeed())
 	}
 
+	testExternalManagedConfigMapWithoutLabelsRejected := func(compName, compDefName string) {
+		var (
+			serverConfigName   = "server-conf"
+			serverConfigHash   = "abcdefg"
+			serverConfigAction = testapps.NewLifecycleAction(serverConfigName)
+		)
+
+		By("mock the cmpd to add a new config template")
+		compDefKey := types.NamespacedName{Name: compDefName}
+		Expect(testapps.GetAndChangeObj(&testCtx, compDefKey, func(cmpd *kbappsv1.ComponentDefinition) {
+			cmpd.Spec.Configs = append(cmpd.Spec.Configs, kbappsv1.ComponentFileTemplate{
+				Name:            serverConfigName,
+				VolumeName:      "server-conf",
+				ExternalManaged: ptr.To(true),
+			})
+			for i := range cmpd.Spec.Runtime.Containers {
+				cmpd.Spec.Runtime.Containers[i].VolumeMounts =
+					append(cmpd.Spec.Runtime.Containers[i].VolumeMounts, corev1.VolumeMount{
+						Name:      "server-conf",
+						MountPath: "/var/run/app/conf/server",
+					})
+			}
+			compDefObj = cmpd.DeepCopy()
+		})()).ShouldNot(HaveOccurred())
+
+		createCompObjWithPhase(compName, compDefName, func(f *testapps.MockComponentFactory) {
+			f.SetConfigs([]kbappsv1.ClusterComponentConfig{
+				{
+					Name: ptr.To(serverConfigName),
+					ClusterComponentConfigSource: kbappsv1.ClusterComponentConfigSource{
+						ConfigMap: &corev1.ConfigMapVolumeSource{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: compDefObj.Spec.Configs[0].Template, // reuse log-conf template
+							},
+						},
+					},
+					ConfigHash:        ptr.To(serverConfigHash),
+					Restart:           ptr.To(true),
+					Reconfigure:       ptr.To(true),
+					ReconfigureAction: serverConfigAction,
+				},
+			})
+		}, "")
+
+		By("check the component validation error")
+		Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *kbappsv1.Component) {
+			g.Expect(comp.Status.Conditions).Should(HaveLen(1))
+			g.Expect(comp.Status.Conditions[0].Type).Should(BeEquivalentTo(kbappsv1.ComponentConditionProvisioningStarted))
+			g.Expect(comp.Status.Conditions[0].Status).Should(BeEquivalentTo(metav1.ConditionFalse))
+			g.Expect(comp.Status.Conditions[0].Message).Should(ContainSubstring(
+				fmt.Sprintf("configMap %q for external-managed config must have label", compDefObj.Spec.Configs[0].Template)))
+		})).Should(Succeed())
+
+		By("check the workload is not created")
+		itsKey := compKey
+		Consistently(testapps.CheckObjExists(&testCtx, itsKey, &workloads.InstanceSet{}, false)).Should(Succeed())
+	}
+
 	testReconfigureAction := func(compName, compDefName, fileTemplate string) {
 		createCompObj(compName, compDefName, nil)
 
@@ -1522,6 +1580,7 @@ var _ = Describe("Component Controller", func() {
 					Variables: map[string]string{
 						"LOG_LEVEL": "debug",
 					},
+					ConfigHash: ptr.To("123456"),
 				},
 			}
 		})()).Should(Succeed())
@@ -1536,9 +1595,10 @@ var _ = Describe("Component Controller", func() {
 		Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 			g.Expect(its.Spec.Configs).Should(HaveLen(1))
 			g.Expect(its.Spec.Configs[0].Name).Should(Equal(fileTemplate))
-			g.Expect(its.Spec.Configs[0].Generation).Should(Equal(its.Generation))
+			g.Expect(its.Spec.Configs[0].ConfigHash).ShouldNot(BeNil())
+			g.Expect(*its.Spec.Configs[0].ConfigHash).Should(Equal("123456"))
 			g.Expect(its.Spec.Configs[0].Reconfigure).ShouldNot(BeNil())
-			g.Expect(its.Spec.Configs[0].ReconfigureActionName).Should(BeEmpty())
+			g.Expect(its.Spec.Configs[0].ReconfigureActionName).Should(BeEmpty()) // default reconfigure action
 			g.Expect(its.Spec.Configs[0].Parameters).Should(HaveKey("KB_CONFIG_FILES_UPDATED"))
 			g.Expect(its.Spec.Configs[0].Parameters["KB_CONFIG_FILES_UPDATED"]).Should(ContainSubstring("level"))
 		})).Should(Succeed())
@@ -1552,7 +1612,8 @@ var _ = Describe("Component Controller", func() {
 					Variables: map[string]string{
 						"LOG_LEVEL": "debug",
 					},
-					Reconfigure: testapps.NewLifecycleAction("reconfigure"),
+					Reconfigure:       ptr.To(true),
+					ReconfigureAction: testapps.NewLifecycleAction(fileTemplate),
 				},
 			})
 		})
@@ -1571,6 +1632,7 @@ var _ = Describe("Component Controller", func() {
 			comp.Spec.Configs[0].Variables = map[string]string{
 				"LOG_LEVEL": "warn",
 			}
+			comp.Spec.Configs[0].ConfigHash = ptr.To("123456")
 		})()).Should(Succeed())
 
 		By("check the file template object again")
@@ -1583,9 +1645,10 @@ var _ = Describe("Component Controller", func() {
 		Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 			g.Expect(its.Spec.Configs).Should(HaveLen(1))
 			g.Expect(its.Spec.Configs[0].Name).Should(Equal(fileTemplate))
-			g.Expect(its.Spec.Configs[0].Generation).Should(Equal(its.Generation))
+			g.Expect(its.Spec.Configs[0].ConfigHash).ShouldNot(BeNil())
+			g.Expect(*its.Spec.Configs[0].ConfigHash).Should(Equal("123456"))
 			g.Expect(its.Spec.Configs[0].Reconfigure).ShouldNot(BeNil())
-			g.Expect(its.Spec.Configs[0].ReconfigureActionName).Should(Equal(fmt.Sprintf("reconfigure-%s", fileTemplate)))
+			g.Expect(its.Spec.Configs[0].ReconfigureActionName).Should(Equal(fmt.Sprintf("reconfigure-user-%s", fileTemplate)))
 			g.Expect(its.Spec.Configs[0].Parameters).Should(HaveKey("KB_CONFIG_FILES_UPDATED"))
 			g.Expect(its.Spec.Configs[0].Parameters["KB_CONFIG_FILES_UPDATED"]).Should(ContainSubstring("level"))
 		})).Should(Succeed())
@@ -1622,7 +1685,9 @@ var _ = Describe("Component Controller", func() {
 		By("check the workload updated")
 		itsKey := compKey
 		Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
-			g.Expect(its.Spec.Configs).Should(BeNil())
+			g.Expect(its.Spec.Configs).Should(HaveLen(2))
+			g.Expect(its.Spec.Configs[0].Name).Should(Equal(fileTemplate))
+			g.Expect(its.Spec.Configs[1].Name).Should(Equal("server-conf"))
 		})).Should(Succeed())
 	}
 
@@ -1666,9 +1731,68 @@ var _ = Describe("Component Controller", func() {
 		By("check the workload updated")
 		itsKey := compKey
 		Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
-			g.Expect(its.Spec.Configs).Should(BeNil())
-			g.Expect(its.Spec.Template.Annotations).ShouldNot(BeNil())
-			g.Expect(its.Spec.Template.Annotations).Should(HaveKey(constant.RestartAnnotationKey))
+			g.Expect(its.Spec.Configs).Should(HaveLen(1))
+			g.Expect(its.Spec.Configs[0].Name).Should(Equal(fileTemplate))
+			g.Expect(its.Spec.Configs[0].Restart).ShouldNot(BeNil())
+			g.Expect(*its.Spec.Configs[0].Restart).Should(BeTrue())
+			g.Expect(its.Spec.Configs[0].Reconfigure).ShouldNot(BeNil())
+			g.Expect(its.Spec.Configs[0].ReconfigureActionName).Should(BeEmpty()) // default reconfigure action
+		})).Should(Succeed())
+	}
+
+	testReconfigureConfigHash := func(compName, compDefName, fileTemplate string) {
+		var (
+			initConfigHash, newConfigHash string
+		)
+
+		createCompObj(compName, compDefName, nil)
+
+		By("check the file template object")
+		fileTemplateCMKey := types.NamespacedName{
+			Namespace: testCtx.DefaultNamespace,
+			Name:      fileTemplateObjectName(&component.SynthesizedComponent{FullCompName: compKey.Name}, fileTemplate),
+		}
+		Eventually(testapps.CheckObj(&testCtx, fileTemplateCMKey, func(g Gomega, cm *corev1.ConfigMap) {
+			g.Expect(cm.Data).Should(HaveKeyWithValue("level", "info"))
+			initConfigHash = cm.Annotations[constant.CMInsConfigurationHashLabelKey]
+			g.Expect(initConfigHash).NotTo(BeEmpty())
+		})).Should(Succeed())
+
+		By("check the init workload")
+		itsKey := compKey
+		Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+			g.Expect(its.Spec.Configs).Should(HaveLen(1))
+			g.Expect(its.Spec.Configs[0].Name).Should(Equal(fileTemplate))
+			g.Expect(its.Spec.Configs[0].ConfigHash).ShouldNot(BeNil())
+			g.Expect(*its.Spec.Configs[0].ConfigHash).Should(Equal(initConfigHash))
+		})).Should(Succeed())
+
+		By("update the config template variables")
+		Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
+			comp.Spec.Configs = []kbappsv1.ClusterComponentConfig{
+				{
+					Name: ptr.To(fileTemplate),
+					Variables: map[string]string{
+						"LOG_LEVEL": "debug",
+					},
+				},
+			}
+		})()).Should(Succeed())
+
+		By("check the file template object again")
+		Eventually(testapps.CheckObj(&testCtx, fileTemplateCMKey, func(g Gomega, cm *corev1.ConfigMap) {
+			g.Expect(cm.Data).Should(HaveKeyWithValue("level", "debug"))
+			newConfigHash = cm.Annotations[constant.CMInsConfigurationHashLabelKey]
+			g.Expect(newConfigHash).NotTo(BeEmpty())
+			g.Expect(newConfigHash).NotTo(Equal(initConfigHash))
+		})).Should(Succeed())
+
+		By("check the workload updated")
+		Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+			g.Expect(its.Spec.Configs).Should(HaveLen(1))
+			g.Expect(its.Spec.Configs[0].Name).Should(Equal(fileTemplate))
+			g.Expect(its.Spec.Configs[0].ConfigHash).ShouldNot(BeNil())
+			g.Expect(*its.Spec.Configs[0].ConfigHash).Should(Equal(newConfigHash))
 		})).Should(Succeed())
 	}
 
@@ -2230,6 +2354,10 @@ var _ = Describe("Component Controller", func() {
 			testFileTemplateVolumes(defaultCompName, compDefObj.Name, fileTemplate)
 		})
 
+		It("rejects external-managed configmap without labels", func() {
+			testExternalManagedConfigMapWithoutLabelsRejected(defaultCompName, compDefObj.Name)
+		})
+
 		It("reconfigure - action", func() {
 			testReconfigureAction(defaultCompName, compDefObj.Name, fileTemplate)
 		})
@@ -2244,6 +2372,10 @@ var _ = Describe("Component Controller", func() {
 
 		It("reconfigure - restart", func() {
 			testReconfigureRestart(defaultCompName, compDefObj.Name, fileTemplate)
+		})
+
+		It("reconfigure - config hash", func() {
+			testReconfigureConfigHash(defaultCompName, compDefObj.Name, fileTemplate)
 		})
 	})
 })

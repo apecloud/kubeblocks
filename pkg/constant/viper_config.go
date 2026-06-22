@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -21,23 +21,27 @@ package constant
 
 // config keys used in viper, DON'T refactor the value without careful inspections
 const (
-	CfgKeyServerInfo                    = "_KUBE_SERVER_INFO"
-	CfgKeyCtrlrMgrNS                    = "CM_NAMESPACE"
-	CfgKeyCtrlrMgrAffinity              = "CM_AFFINITY"
-	CfgKeyCtrlrMgrNodeSelector          = "CM_NODE_SELECTOR"
-	CfgKeyCtrlrMgrTolerations           = "CM_TOLERATIONS"
-	CfgKeyCtrlrReconcileRetryDurationMS = "CM_RECON_RETRY_DURATION_MS" // accept time
-	CfgKeyProvider                      = "KUBE_PROVIDER"
-	CfgHostPortConfigMapName            = "HOST_PORT_CM_NAME"
-	CfgHostPortIncludeRanges            = "HOST_PORT_INCLUDE_RANGES"
-	CfgHostPortExcludeRanges            = "HOST_PORT_EXCLUDE_RANGES"
+	CfgKeyServerInfo                         = "_KUBE_SERVER_INFO"
+	CfgKeyCtrlrMgrNS                         = "CM_NAMESPACE"
+	CfgKeyCtrlrMgrAffinity                   = "CM_AFFINITY"
+	CfgKeyCtrlrMgrNodeSelector               = "CM_NODE_SELECTOR"
+	CfgKeyCtrlrMgrTolerations                = "CM_TOLERATIONS"
+	CfgKeyCtrlrReconcileRetryDurationMS      = "CM_RECON_RETRY_DURATION_MS" // accept time
+	CfgKeyProvider                           = "KUBE_PROVIDER"
+	CfgHostPortConfigMapName                 = "HOST_PORT_CM_NAME"
+	CfgHostPortIncludeRanges                 = "HOST_PORT_INCLUDE_RANGES"
+	CfgHostPortExcludeRanges                 = "HOST_PORT_EXCLUDE_RANGES"
+	CfgKeyClusterDefaultResources            = "CLUSTER_DEFAULT_RESOURCES"
+	CfgKeyDataProtectionZeroResourceForUnset = "DATAPROTECTION_ZERO_RESOURCE_FOR_UNSET"
+	CfgKeyOperationZeroResourceForUnset      = "OPERATION_ZERO_RESOURCE_FOR_UNSET"
 
 	// addon config keys
-	CfgKeyAddonJobTTL        = "ADDON_JOB_TTL"
-	CfgAddonJobImgPullPolicy = "ADDON_JOB_IMAGE_PULL_POLICY"
+	CfgKeyAddonJobTTL           = "ADDON_JOB_TTL"
+	CfgKeyAddonJobImgPullPolicy = "ADDON_JOB_IMAGE_PULL_POLICY"
+	CfgKeyAddonJobResources     = "ADDON_JOB_RESOURCES"
 
 	// addon charts config keys
-	CfgAddonChartsImgPullPolicy = "KUBEBLOCKS_ADDON_CHARTS_IMAGE_PULL_POLICY"
+	CfgKeyAddonChartsImgPullPolicy = "KUBEBLOCKS_ADDON_CHARTS_IMAGE_PULL_POLICY"
 
 	// storage config keys
 	CfgKeyDefaultStorageClass = "DEFAULT_STORAGE_CLASS"

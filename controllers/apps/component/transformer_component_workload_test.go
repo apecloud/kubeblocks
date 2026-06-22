@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 This file is part of KubeBlocks project
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -23,14 +23,17 @@ import (
 
 	"github.com/golang/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
 	kbagentproto "github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -194,6 +197,1013 @@ var _ = Describe("Component Workload Operations Test", func() {
 
 			By("executing leave member for leader")
 			Expect(ops.leaveMemberForPod(pod1, pods)).Should(Succeed())
+		})
+
+		It("should eliminate upgrade-only diff by preserving legacy config-manager", func() {
+			oldITS := testapps.NewInstanceSetFactory(testCtx.DefaultNamespace,
+				"old-its", clusterName, compName).
+				AddContainer(corev1.Container{
+					Name:  "main",
+					Image: "test-image",
+					VolumeMounts: []corev1.VolumeMount{{
+						Name:      "kb-tools",
+						MountPath: "/opt/kb-tools",
+					}},
+				}).
+				AddVolume(corev1.Volume{
+					Name: "kb-tools",
+					VolumeSource: corev1.VolumeSource{
+						EmptyDir: &corev1.EmptyDirVolumeSource{},
+					},
+				}).
+				GetObject()
+			oldITS.Spec.Template.Spec.Containers = append(oldITS.Spec.Template.Spec.Containers,
+				corev1.Container{
+					Name:  "config-manager",
+					Image: "cm-image",
+					VolumeMounts: []corev1.VolumeMount{{
+						Name:      "kb-tools",
+						MountPath: "/opt/kb-tools",
+					}},
+				},
+				corev1.Container{
+					Name:  "metrics",
+					Image: "metrics-image",
+				},
+			)
+			oldITS.Spec.Template.Spec.InitContainers = append(oldITS.Spec.Template.Spec.InitContainers, corev1.Container{
+				Name:  "install-config-manager-tool",
+				Image: "tools-image",
+				VolumeMounts: []corev1.VolumeMount{{
+					Name:      "kb-tools",
+					MountPath: "/opt/kb-tools",
+				}},
+			})
+
+			newITS := oldITS.DeepCopy()
+			newITS.Spec.Template.Spec.Containers = []corev1.Container{
+				{
+					Name:  "main",
+					Image: "test-image",
+				},
+				{
+					Name:  "metrics",
+					Image: "metrics-image",
+				},
+			}
+			newITS.Spec.Template.Spec.InitContainers = nil
+			newITS.Spec.Template.Spec.Volumes = nil
+
+			merged := copyAndMergeITS(oldITS, newITS, legacyConfigManagerPolicyKeep)
+			Expect(merged).Should(BeNil())
+		})
+
+		It("should not reintroduce legacy config-manager for workloads that never had it", func() {
+			oldITS := testapps.NewInstanceSetFactory(testCtx.DefaultNamespace,
+				"old-its-no-legacy", clusterName, compName).
+				AddContainer(corev1.Container{
+					Name:  "main",
+					Image: "test-image",
+				}).
+				GetObject()
+
+			newITS := oldITS.DeepCopy()
+			newITS.Spec.Template.Spec.Containers = []corev1.Container{
+				{
+					Name:  "main",
+					Image: "new-image",
+				},
+			}
+
+			merged := copyAndMergeITS(oldITS, newITS, legacyConfigManagerPolicyKeep)
+			Expect(merged).ShouldNot(BeNil())
+			Expect(merged.Spec.Template.Spec.Containers).Should(HaveLen(1))
+			Expect(merged.Spec.Template.Spec.Containers[0].Name).Should(Equal("main"))
+			Expect(merged.Spec.Template.Spec.Containers[0].Image).Should(Equal("new-image"))
+			_, cfg := intctrlutil.GetContainerByName(merged.Spec.Template.Spec.Containers, "config-manager")
+			Expect(cfg).Should(BeNil())
+			_, init := intctrlutil.GetContainerByName(merged.Spec.Template.Spec.InitContainers, "install-config-manager-tool")
+			Expect(init).Should(BeNil())
+			Expect(merged.Spec.Template.Spec.Volumes).Should(BeEmpty())
+		})
+
+		It("should preserve only the legacy config-manager resources that still exist on the live template", func() {
+			// Some clusters may carry partially migrated legacy resources. The compatibility logic should
+			// keep only what still exists on the live template instead of synthesizing a full legacy bundle.
+			buildBaseITS := func(name string) *workloads.InstanceSet {
+				its := testapps.NewInstanceSetFactory(testCtx.DefaultNamespace, name, clusterName, compName).
+					AddContainer(corev1.Container{
+						Name:  "main",
+						Image: "test-image",
+					}).
+					GetObject()
+				its.Spec.Template.Spec.Containers = append(its.Spec.Template.Spec.Containers, corev1.Container{
+					Name:  "config-manager",
+					Image: "cm-image",
+					VolumeMounts: []corev1.VolumeMount{{
+						Name:      "kb-tools",
+						MountPath: "/opt/kb-tools",
+					}},
+				})
+				return its
+			}
+
+			tests := []struct {
+				name            string
+				oldITS          *workloads.InstanceSet
+				wantInit        bool
+				wantVolume      bool
+				wantMainMount   bool
+				wantConfigMount bool
+			}{
+				{
+					name: "missing legacy init container",
+					oldITS: func() *workloads.InstanceSet {
+						its := buildBaseITS("old-its-no-legacy-init")
+						its.Spec.Template.Spec.Volumes = append(its.Spec.Template.Spec.Volumes, corev1.Volume{
+							Name: "kb-tools",
+							VolumeSource: corev1.VolumeSource{
+								EmptyDir: &corev1.EmptyDirVolumeSource{},
+							},
+						})
+						its.Spec.Template.Spec.Containers[0].VolumeMounts = append(its.Spec.Template.Spec.Containers[0].VolumeMounts, corev1.VolumeMount{
+							Name:      "kb-tools",
+							MountPath: "/opt/kb-tools",
+						})
+						return its
+					}(),
+					wantInit:        false,
+					wantVolume:      true,
+					wantMainMount:   true,
+					wantConfigMount: true,
+				},
+				{
+					name: "missing legacy volume",
+					oldITS: func() *workloads.InstanceSet {
+						its := buildBaseITS("old-its-no-legacy-volume")
+						its.Spec.Template.Spec.InitContainers = append(its.Spec.Template.Spec.InitContainers, corev1.Container{
+							Name:  "install-config-manager-tool",
+							Image: "tools-image",
+							VolumeMounts: []corev1.VolumeMount{{
+								Name:      "kb-tools",
+								MountPath: "/opt/kb-tools",
+							}},
+						})
+						its.Spec.Template.Spec.Containers[0].VolumeMounts = append(its.Spec.Template.Spec.Containers[0].VolumeMounts, corev1.VolumeMount{
+							Name:      "kb-tools",
+							MountPath: "/opt/kb-tools",
+						})
+						return its
+					}(),
+					wantInit:        true,
+					wantVolume:      false,
+					wantMainMount:   true,
+					wantConfigMount: true,
+				},
+				{
+					name: "missing business mount for legacy volume",
+					oldITS: func() *workloads.InstanceSet {
+						its := buildBaseITS("old-its-no-business-mount")
+						its.Spec.Template.Spec.InitContainers = append(its.Spec.Template.Spec.InitContainers, corev1.Container{
+							Name:  "install-config-manager-tool",
+							Image: "tools-image",
+							VolumeMounts: []corev1.VolumeMount{{
+								Name:      "kb-tools",
+								MountPath: "/opt/kb-tools",
+							}},
+						})
+						its.Spec.Template.Spec.Volumes = append(its.Spec.Template.Spec.Volumes, corev1.Volume{
+							Name: "kb-tools",
+							VolumeSource: corev1.VolumeSource{
+								EmptyDir: &corev1.EmptyDirVolumeSource{},
+							},
+						})
+						return its
+					}(),
+					wantInit:        true,
+					wantVolume:      true,
+					wantMainMount:   false,
+					wantConfigMount: true,
+				},
+			}
+
+			for _, tt := range tests {
+				By(tt.name)
+				newITS := tt.oldITS.DeepCopy()
+				newITS.Spec.Template.Spec.Containers = []corev1.Container{
+					{
+						Name:  "main",
+						Image: "new-image",
+					},
+				}
+				newITS.Spec.Template.Spec.InitContainers = nil
+				newITS.Spec.Template.Spec.Volumes = nil
+
+				merged := copyAndMergeITS(tt.oldITS, newITS, legacyConfigManagerPolicyKeep)
+				Expect(merged).ShouldNot(BeNil())
+
+				_, cfg := intctrlutil.GetContainerByName(merged.Spec.Template.Spec.Containers, "config-manager")
+				Expect(cfg).ShouldNot(BeNil())
+				Expect(hasVolumeMount(cfg.VolumeMounts, "kb-tools")).Should(Equal(tt.wantConfigMount))
+
+				_, init := intctrlutil.GetContainerByName(merged.Spec.Template.Spec.InitContainers, "install-config-manager-tool")
+				if tt.wantInit {
+					Expect(init).ShouldNot(BeNil())
+				} else {
+					Expect(init).Should(BeNil())
+				}
+
+				if tt.wantVolume {
+					Expect(merged.Spec.Template.Spec.Volumes).ShouldNot(BeEmpty())
+					Expect(hasVolumeByName(func() map[string]struct{} {
+						names := map[string]struct{}{}
+						for _, volume := range merged.Spec.Template.Spec.Volumes {
+							names[volume.Name] = struct{}{}
+						}
+						return names
+					}(), "kb-tools")).Should(BeTrue())
+				} else {
+					Expect(merged.Spec.Template.Spec.Volumes).Should(BeEmpty())
+				}
+
+				_, main := intctrlutil.GetContainerByName(merged.Spec.Template.Spec.Containers, "main")
+				Expect(main).ShouldNot(BeNil())
+				Expect(hasVolumeMount(main.VolumeMounts, "kb-tools")).Should(Equal(tt.wantMainMount))
+			}
+		})
+
+		It("should keep legacy config-manager ordering during in-place business changes", func() {
+			oldITS := testapps.NewInstanceSetFactory(testCtx.DefaultNamespace,
+				"old-its-order", clusterName, compName).
+				AddContainer(corev1.Container{
+					Name:  "main",
+					Image: "test-image",
+					VolumeMounts: []corev1.VolumeMount{{
+						Name:      "kb-tools",
+						MountPath: "/opt/kb-tools",
+					}},
+				}).
+				GetObject()
+			oldITS.Spec.PodUpgradePolicy = appsv1.PreferInPlacePodUpdatePolicyType
+			oldITS.Spec.Template.Spec.Containers = append(oldITS.Spec.Template.Spec.Containers,
+				corev1.Container{
+					Name:  "config-manager",
+					Image: "cm-image",
+					VolumeMounts: []corev1.VolumeMount{{
+						Name:      "kb-tools",
+						MountPath: "/opt/kb-tools",
+					}},
+				},
+				corev1.Container{
+					Name:  "exporter",
+					Image: "exporter-image",
+				},
+			)
+			oldITS.Spec.Template.Spec.InitContainers = append(oldITS.Spec.Template.Spec.InitContainers,
+				corev1.Container{
+					Name:    "business-init",
+					Image:   "init-image",
+					Command: []string{"prepare-old"},
+				},
+				corev1.Container{
+					Name:  "install-config-manager-tool",
+					Image: "tools-image",
+					VolumeMounts: []corev1.VolumeMount{{
+						Name:      "kb-tools",
+						MountPath: "/opt/kb-tools",
+					}},
+				},
+			)
+			oldITS.Spec.Template.Spec.Volumes = append(oldITS.Spec.Template.Spec.Volumes, corev1.Volume{
+				Name: "kb-tools",
+				VolumeSource: corev1.VolumeSource{
+					EmptyDir: &corev1.EmptyDirVolumeSource{},
+				},
+			})
+
+			newITS := oldITS.DeepCopy()
+			newITS.Spec.Template.Spec.Containers = []corev1.Container{
+				{
+					Name:  "main",
+					Image: "main-business-upgrade",
+				},
+				{
+					Name:  "exporter",
+					Image: "exporter-business-upgrade",
+				},
+			}
+			newITS.Spec.Template.Spec.InitContainers = []corev1.Container{
+				{
+					Name:    "business-init",
+					Image:   "init-image",
+					Command: []string{"prepare-new"},
+				},
+			}
+			newITS.Spec.Template.Spec.Volumes = nil
+
+			merged := copyAndMergeITS(oldITS, newITS, legacyConfigManagerPolicyKeep)
+			Expect(merged).ShouldNot(BeNil())
+			_, cfg := intctrlutil.GetContainerByName(merged.Spec.Template.Spec.Containers, "config-manager")
+			Expect(cfg).ShouldNot(BeNil())
+			_, init := intctrlutil.GetContainerByName(merged.Spec.Template.Spec.InitContainers, "install-config-manager-tool")
+			Expect(init).ShouldNot(BeNil())
+			Expect(len(merged.Spec.Template.Spec.Volumes)).ShouldNot(BeZero())
+			for _, c := range merged.Spec.Template.Spec.Containers {
+				if c.Name == "main" {
+					Expect(len(c.VolumeMounts)).Should(Equal(1))
+					Expect(c.VolumeMounts[0].Name).Should(Equal("kb-tools"))
+				}
+			}
+			Expect(merged.Spec.Template.Spec.Containers[0].Name).Should(Equal("main"))
+			Expect(merged.Spec.Template.Spec.Containers[1].Name).Should(Equal("config-manager"))
+			Expect(merged.Spec.Template.Spec.Containers[2].Name).Should(Equal("exporter"))
+			Expect(merged.Spec.Template.Spec.InitContainers[0].Name).Should(Equal("business-init"))
+			Expect(merged.Spec.Template.Spec.InitContainers[0].Command).Should(Equal([]string{"prepare-new"}))
+			Expect(merged.Spec.Template.Spec.InitContainers[1].Name).Should(Equal("install-config-manager-tool"))
+		})
+
+		It("should drop legacy config-manager when business changes already recreate pods", func() {
+			oldITS := testapps.NewInstanceSetFactory(testCtx.DefaultNamespace,
+				"old-its-recreate", clusterName, compName).
+				AddContainer(corev1.Container{
+					Name:  "main",
+					Image: "test-image",
+					VolumeMounts: []corev1.VolumeMount{{
+						Name:      "kb-tools",
+						MountPath: "/opt/kb-tools",
+					}},
+				}).
+				AddVolume(corev1.Volume{
+					Name: "kb-tools",
+					VolumeSource: corev1.VolumeSource{
+						EmptyDir: &corev1.EmptyDirVolumeSource{},
+					},
+				}).
+				GetObject()
+			oldITS.Spec.PodUpgradePolicy = appsv1.ReCreatePodUpdatePolicyType
+			oldITS.Spec.Template.Spec.Containers = append(oldITS.Spec.Template.Spec.Containers, corev1.Container{
+				Name:  "config-manager",
+				Image: "cm-image",
+				VolumeMounts: []corev1.VolumeMount{{
+					Name:      "kb-tools",
+					MountPath: "/opt/kb-tools",
+				}},
+			})
+			oldITS.Spec.Template.Spec.InitContainers = append(oldITS.Spec.Template.Spec.InitContainers, corev1.Container{
+				Name:  "install-config-manager-tool",
+				Image: "tools-image",
+				VolumeMounts: []corev1.VolumeMount{{
+					Name:      "kb-tools",
+					MountPath: "/opt/kb-tools",
+				}},
+			})
+			oldITS.Spec.Template.Spec.InitContainers = append([]corev1.Container{{
+				Name:    "business-init",
+				Image:   "init-image",
+				Command: []string{"prepare-old"},
+			}}, oldITS.Spec.Template.Spec.InitContainers...)
+
+			newITS := oldITS.DeepCopy()
+			newITS.Spec.PodUpgradePolicy = appsv1.ReCreatePodUpdatePolicyType
+			newITS.Spec.Template.Spec.Containers = []corev1.Container{
+				{
+					Name:  "main",
+					Image: "test-image",
+				},
+			}
+			newITS.Spec.Template.Spec.InitContainers = []corev1.Container{{
+				Name:    "business-init",
+				Image:   "init-image",
+				Command: []string{"prepare-new"},
+			}}
+			newITS.Spec.Template.Spec.Volumes = nil
+
+			merged := copyAndMergeITS(oldITS, newITS, legacyConfigManagerPolicyCleanup)
+			Expect(merged).ShouldNot(BeNil())
+			_, cfg := intctrlutil.GetContainerByName(merged.Spec.Template.Spec.Containers, "config-manager")
+			Expect(cfg).Should(BeNil())
+			_, init := intctrlutil.GetContainerByName(merged.Spec.Template.Spec.InitContainers, "install-config-manager-tool")
+			Expect(init).Should(BeNil())
+			Expect(merged.Spec.Template.Spec.Volumes).Should(BeEmpty())
+		})
+
+		It("should clean legacy config-manager when component annotation allows cleanup on recreate rollout", func() {
+			oldITS := testapps.NewInstanceSetFactory(testCtx.DefaultNamespace,
+				"old-its-recreate-false-annotation", clusterName, compName).
+				AddContainer(corev1.Container{
+					Name:  "main",
+					Image: "test-image",
+					VolumeMounts: []corev1.VolumeMount{{
+						Name:      "kb-tools",
+						MountPath: "/opt/kb-tools",
+					}},
+				}).
+				AddVolume(corev1.Volume{
+					Name: "kb-tools",
+					VolumeSource: corev1.VolumeSource{
+						EmptyDir: &corev1.EmptyDirVolumeSource{},
+					},
+				}).
+				GetObject()
+			oldITS.Spec.PodUpgradePolicy = appsv1.ReCreatePodUpdatePolicyType
+			oldITS.Spec.Template.Spec.Containers = append(oldITS.Spec.Template.Spec.Containers, corev1.Container{
+				Name:  "config-manager",
+				Image: "cm-image",
+				VolumeMounts: []corev1.VolumeMount{{
+					Name:      "kb-tools",
+					MountPath: "/opt/kb-tools",
+				}},
+			})
+			oldITS.Spec.Template.Spec.InitContainers = append(oldITS.Spec.Template.Spec.InitContainers,
+				corev1.Container{
+					Name:    "business-init",
+					Image:   "init-image",
+					Command: []string{"prepare-old"},
+				},
+				corev1.Container{
+					Name:  "install-config-manager-tool",
+					Image: "tools-image",
+					VolumeMounts: []corev1.VolumeMount{{
+						Name:      "kb-tools",
+						MountPath: "/opt/kb-tools",
+					}},
+				},
+			)
+
+			comp := &appsv1.Component{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						constant.LegacyConfigManagerRequiredAnnotationKey: "false",
+					},
+				},
+			}
+
+			newITS := oldITS.DeepCopy()
+			newITS.Spec.PodUpgradePolicy = appsv1.ReCreatePodUpdatePolicyType
+			newITS.Spec.Template.Spec.Containers = []corev1.Container{{
+				Name:  "main",
+				Image: "test-image",
+			}}
+			newITS.Spec.Template.Spec.InitContainers = []corev1.Container{{
+				Name:    "business-init",
+				Image:   "init-image",
+				Command: []string{"prepare-new"},
+			}}
+			newITS.Spec.Template.Spec.Volumes = nil
+
+			merged := copyAndMergeITS(oldITS, newITS, legacyConfigManagerRequired(comp))
+			Expect(legacyConfigManagerRequired(comp)).Should(Equal(legacyConfigManagerPolicyCleanup))
+			Expect(merged).ShouldNot(BeNil())
+
+			_, cfg := intctrlutil.GetContainerByName(merged.Spec.Template.Spec.Containers, "config-manager")
+			Expect(cfg).Should(BeNil())
+			_, init := intctrlutil.GetContainerByName(merged.Spec.Template.Spec.InitContainers, "install-config-manager-tool")
+			Expect(init).Should(BeNil())
+			Expect(hasVolumeByName(func() map[string]struct{} {
+				names := map[string]struct{}{}
+				for _, volume := range merged.Spec.Template.Spec.Volumes {
+					names[volume.Name] = struct{}{}
+				}
+				return names
+			}(), "kb-tools")).Should(BeFalse())
+			_, main := intctrlutil.GetContainerByName(merged.Spec.Template.Spec.Containers, "main")
+			Expect(main).ShouldNot(BeNil())
+			Expect(hasVolumeMount(main.VolumeMounts, "kb-tools")).Should(BeFalse())
+		})
+
+		It("should keep legacy config-manager when compatibility annotation is still required", func() {
+			oldITS := testapps.NewInstanceSetFactory(testCtx.DefaultNamespace,
+				"old-its-annotation-required", clusterName, compName).
+				AddContainer(corev1.Container{
+					Name:  "main",
+					Image: "test-image",
+					VolumeMounts: []corev1.VolumeMount{{
+						Name:      "kb-tools",
+						MountPath: "/opt/kb-tools",
+					}},
+				}).
+				AddVolume(corev1.Volume{
+					Name: "kb-tools",
+					VolumeSource: corev1.VolumeSource{
+						EmptyDir: &corev1.EmptyDirVolumeSource{},
+					},
+				}).
+				GetObject()
+			oldITS.Spec.PodUpgradePolicy = appsv1.ReCreatePodUpdatePolicyType
+			oldITS.Spec.Template.Spec.Containers = append(oldITS.Spec.Template.Spec.Containers, corev1.Container{
+				Name:  "config-manager",
+				Image: "cm-image",
+				VolumeMounts: []corev1.VolumeMount{{
+					Name:      "kb-tools",
+					MountPath: "/opt/kb-tools",
+				}},
+			})
+			oldITS.Spec.Template.Spec.InitContainers = append(oldITS.Spec.Template.Spec.InitContainers,
+				corev1.Container{
+					Name:    "business-init",
+					Image:   "init-image",
+					Command: []string{"prepare-old"},
+				},
+				corev1.Container{
+					Name:  "install-config-manager-tool",
+					Image: "tools-image",
+					VolumeMounts: []corev1.VolumeMount{{
+						Name:      "kb-tools",
+						MountPath: "/opt/kb-tools",
+					}},
+				},
+			)
+
+			newITS := oldITS.DeepCopy()
+			newITS.Spec.PodUpgradePolicy = appsv1.ReCreatePodUpdatePolicyType
+			newITS.Spec.Template.Spec.Containers = []corev1.Container{
+				{
+					Name:  "main",
+					Image: "test-image",
+				},
+			}
+			newITS.Spec.Template.Spec.InitContainers = []corev1.Container{{
+				Name:    "business-init",
+				Image:   "init-image",
+				Command: []string{"prepare-new"},
+			}}
+			newITS.Spec.Template.Spec.Volumes = nil
+
+			merged := copyAndMergeITS(oldITS, newITS, legacyConfigManagerPolicyKeep)
+			Expect(merged).ShouldNot(BeNil())
+			_, cfg := intctrlutil.GetContainerByName(merged.Spec.Template.Spec.Containers, "config-manager")
+			Expect(cfg).ShouldNot(BeNil())
+			_, init := intctrlutil.GetContainerByName(merged.Spec.Template.Spec.InitContainers, "install-config-manager-tool")
+			Expect(init).ShouldNot(BeNil())
+			Expect(merged.Spec.Template.Spec.Volumes).Should(HaveLen(1))
+			Expect(merged.Spec.Template.Spec.Volumes[0].Name).Should(Equal("kb-tools"))
+		})
+
+		It("should keep legacy config-manager when business changes stay in-place", func() {
+			oldITS := testapps.NewInstanceSetFactory(testCtx.DefaultNamespace,
+				"old-its-inplace", clusterName, compName).
+				AddContainer(corev1.Container{
+					Name:  "main",
+					Image: "test-image",
+					VolumeMounts: []corev1.VolumeMount{{
+						Name:      "kb-tools",
+						MountPath: "/opt/kb-tools",
+					}},
+				}).
+				AddVolume(corev1.Volume{
+					Name: "kb-tools",
+					VolumeSource: corev1.VolumeSource{
+						EmptyDir: &corev1.EmptyDirVolumeSource{},
+					},
+				}).
+				GetObject()
+			oldITS.Spec.PodUpgradePolicy = appsv1.PreferInPlacePodUpdatePolicyType
+			oldITS.Spec.Template.Spec.Containers = append(oldITS.Spec.Template.Spec.Containers, corev1.Container{
+				Name:  "config-manager",
+				Image: "cm-image",
+				VolumeMounts: []corev1.VolumeMount{{
+					Name:      "kb-tools",
+					MountPath: "/opt/kb-tools",
+				}},
+			})
+			oldITS.Spec.Template.Spec.InitContainers = append(oldITS.Spec.Template.Spec.InitContainers, corev1.Container{
+				Name:  "install-config-manager-tool",
+				Image: "tools-image",
+				VolumeMounts: []corev1.VolumeMount{{
+					Name:      "kb-tools",
+					MountPath: "/opt/kb-tools",
+				}},
+			})
+			oldITS.Spec.Template.Spec.InitContainers = append([]corev1.Container{{
+				Name:    "business-init",
+				Image:   "init-image",
+				Command: []string{"prepare-old"},
+			}}, oldITS.Spec.Template.Spec.InitContainers...)
+
+			newITS := oldITS.DeepCopy()
+			newITS.Spec.PodUpgradePolicy = appsv1.PreferInPlacePodUpdatePolicyType
+			newITS.Spec.Template.Spec.Containers = []corev1.Container{
+				{
+					Name:  "main",
+					Image: "test-image",
+				},
+			}
+			newITS.Spec.Template.Spec.InitContainers = []corev1.Container{{
+				Name:    "business-init",
+				Image:   "init-image",
+				Command: []string{"prepare-new"},
+			}}
+			newITS.Spec.Template.Spec.Volumes = nil
+
+			merged := copyAndMergeITS(oldITS, newITS, legacyConfigManagerPolicyKeep)
+			Expect(merged).ShouldNot(BeNil())
+			_, cfg := intctrlutil.GetContainerByName(merged.Spec.Template.Spec.Containers, "config-manager")
+			Expect(cfg).ShouldNot(BeNil())
+			Expect(merged.Spec.Template.Spec.InitContainers[0].Name).Should(Equal("business-init"))
+			Expect(merged.Spec.Template.Spec.InitContainers[0].Command).Should(Equal([]string{"prepare-new"}))
+			Expect(merged.Spec.Template.Spec.InitContainers[1].Name).Should(Equal("install-config-manager-tool"))
+		})
+
+		It("should keep legacy config-manager when annotation is absent and rollout stays in-place", func() {
+			oldITS := testapps.NewInstanceSetFactory(testCtx.DefaultNamespace,
+				"old-its-inplace-no-annotation", clusterName, compName).
+				AddContainer(corev1.Container{
+					Name:  "main",
+					Image: "test-image",
+					VolumeMounts: []corev1.VolumeMount{{
+						Name:      "kb-tools",
+						MountPath: "/opt/kb-tools",
+					}},
+				}).
+				AddVolume(corev1.Volume{
+					Name: "kb-tools",
+					VolumeSource: corev1.VolumeSource{
+						EmptyDir: &corev1.EmptyDirVolumeSource{},
+					},
+				}).
+				GetObject()
+			oldITS.Spec.PodUpgradePolicy = appsv1.PreferInPlacePodUpdatePolicyType
+			oldITS.Spec.Template.Spec.Containers = append(oldITS.Spec.Template.Spec.Containers, corev1.Container{
+				Name:  "config-manager",
+				Image: "cm-image",
+				VolumeMounts: []corev1.VolumeMount{{
+					Name:      "kb-tools",
+					MountPath: "/opt/kb-tools",
+				}},
+			})
+			oldITS.Spec.Template.Spec.InitContainers = append(oldITS.Spec.Template.Spec.InitContainers,
+				corev1.Container{
+					Name:    "business-init",
+					Image:   "init-image",
+					Command: []string{"prepare-old"},
+				},
+				corev1.Container{
+					Name:  "install-config-manager-tool",
+					Image: "tools-image",
+					VolumeMounts: []corev1.VolumeMount{{
+						Name:      "kb-tools",
+						MountPath: "/opt/kb-tools",
+					}},
+				},
+			)
+
+			newITS := oldITS.DeepCopy()
+			newITS.Spec.PodUpgradePolicy = appsv1.PreferInPlacePodUpdatePolicyType
+			newITS.Spec.Template.Spec.Containers = []corev1.Container{
+				{
+					Name:  "main",
+					Image: "test-image",
+				},
+			}
+			newITS.Spec.Template.Spec.InitContainers = []corev1.Container{{
+				Name:    "business-init",
+				Image:   "init-image",
+				Command: []string{"prepare-new"},
+			}}
+			newITS.Spec.Template.Spec.Volumes = nil
+
+			merged := copyAndMergeITS(oldITS, newITS, legacyConfigManagerPolicyKeep)
+			Expect(merged).ShouldNot(BeNil())
+			_, cfg := intctrlutil.GetContainerByName(merged.Spec.Template.Spec.Containers, "config-manager")
+			Expect(cfg).ShouldNot(BeNil())
+			_, init := intctrlutil.GetContainerByName(merged.Spec.Template.Spec.InitContainers, "install-config-manager-tool")
+			Expect(init).ShouldNot(BeNil())
+			Expect(merged.Spec.Template.Spec.Volumes).Should(HaveLen(1))
+			Expect(merged.Spec.Template.Spec.Volumes[0].Name).Should(Equal("kb-tools"))
+		})
+
+		It("should keep legacy config-manager when annotation is absent and rollout recreates pods", func() {
+			oldITS := testapps.NewInstanceSetFactory(testCtx.DefaultNamespace,
+				"old-its-recreate-no-annotation", clusterName, compName).
+				AddContainer(corev1.Container{
+					Name:  "main",
+					Image: "test-image",
+					VolumeMounts: []corev1.VolumeMount{{
+						Name:      "kb-tools",
+						MountPath: "/opt/kb-tools",
+					}},
+				}).
+				AddVolume(corev1.Volume{
+					Name: "kb-tools",
+					VolumeSource: corev1.VolumeSource{
+						EmptyDir: &corev1.EmptyDirVolumeSource{},
+					},
+				}).
+				GetObject()
+			oldITS.Spec.PodUpgradePolicy = appsv1.ReCreatePodUpdatePolicyType
+			oldITS.Spec.Template.Spec.Containers = append(oldITS.Spec.Template.Spec.Containers, corev1.Container{
+				Name:  "config-manager",
+				Image: "cm-image",
+				VolumeMounts: []corev1.VolumeMount{{
+					Name:      "kb-tools",
+					MountPath: "/opt/kb-tools",
+				}},
+			})
+			oldITS.Spec.Template.Spec.InitContainers = append(oldITS.Spec.Template.Spec.InitContainers,
+				corev1.Container{
+					Name:    "business-init",
+					Image:   "init-image",
+					Command: []string{"prepare-old"},
+				},
+				corev1.Container{
+					Name:  "install-config-manager-tool",
+					Image: "tools-image",
+					VolumeMounts: []corev1.VolumeMount{{
+						Name:      "kb-tools",
+						MountPath: "/opt/kb-tools",
+					}},
+				},
+			)
+
+			newITS := oldITS.DeepCopy()
+			newITS.Spec.PodUpgradePolicy = appsv1.ReCreatePodUpdatePolicyType
+			newITS.Spec.Template.Spec.Containers = []corev1.Container{{
+				Name:  "main",
+				Image: "test-image",
+			}}
+			newITS.Spec.Template.Spec.InitContainers = []corev1.Container{{
+				Name:    "business-init",
+				Image:   "init-image",
+				Command: []string{"prepare-new"},
+			}}
+			newITS.Spec.Template.Spec.Volumes = nil
+
+			merged := copyAndMergeITS(oldITS, newITS, legacyConfigManagerPolicyKeep)
+			Expect(merged).ShouldNot(BeNil())
+			_, cfg := intctrlutil.GetContainerByName(merged.Spec.Template.Spec.Containers, "config-manager")
+			Expect(cfg).ShouldNot(BeNil())
+			_, init := intctrlutil.GetContainerByName(merged.Spec.Template.Spec.InitContainers, "install-config-manager-tool")
+			Expect(init).ShouldNot(BeNil())
+			Expect(merged.Spec.Template.Spec.Volumes).Should(HaveLen(1))
+		})
+
+		It("should keep legacy config-manager when annotation is false but rollout stays in-place", func() {
+			oldITS := testapps.NewInstanceSetFactory(testCtx.DefaultNamespace,
+				"old-its-inplace-false-annotation", clusterName, compName).
+				AddContainer(corev1.Container{
+					Name:  "main",
+					Image: "test-image",
+					VolumeMounts: []corev1.VolumeMount{{
+						Name:      "kb-tools",
+						MountPath: "/opt/kb-tools",
+					}},
+				}).
+				AddVolume(corev1.Volume{
+					Name: "kb-tools",
+					VolumeSource: corev1.VolumeSource{
+						EmptyDir: &corev1.EmptyDirVolumeSource{},
+					},
+				}).
+				GetObject()
+			oldITS.Spec.PodUpgradePolicy = appsv1.PreferInPlacePodUpdatePolicyType
+			oldITS.Spec.Template.Spec.Containers = append(oldITS.Spec.Template.Spec.Containers, corev1.Container{
+				Name:  "config-manager",
+				Image: "cm-image",
+				VolumeMounts: []corev1.VolumeMount{{
+					Name:      "kb-tools",
+					MountPath: "/opt/kb-tools",
+				}},
+			})
+			oldITS.Spec.Template.Spec.InitContainers = append(oldITS.Spec.Template.Spec.InitContainers,
+				corev1.Container{
+					Name:    "business-init",
+					Image:   "init-image",
+					Command: []string{"prepare-old"},
+				},
+				corev1.Container{
+					Name:  "install-config-manager-tool",
+					Image: "tools-image",
+					VolumeMounts: []corev1.VolumeMount{{
+						Name:      "kb-tools",
+						MountPath: "/opt/kb-tools",
+					}},
+				},
+			)
+
+			newITS := oldITS.DeepCopy()
+			newITS.Spec.PodUpgradePolicy = appsv1.PreferInPlacePodUpdatePolicyType
+			newITS.Spec.Template.Spec.Containers = []corev1.Container{{
+				Name:  "main",
+				Image: "test-image",
+			}}
+			newITS.Spec.Template.Spec.InitContainers = []corev1.Container{{
+				Name:    "business-init",
+				Image:   "init-image",
+				Command: []string{"prepare-new"},
+			}}
+			newITS.Spec.Template.Spec.Volumes = nil
+
+			merged := copyAndMergeITS(oldITS, newITS, legacyConfigManagerPolicyCleanup)
+			Expect(merged).ShouldNot(BeNil())
+			_, cfg := intctrlutil.GetContainerByName(merged.Spec.Template.Spec.Containers, "config-manager")
+			Expect(cfg).ShouldNot(BeNil())
+			_, init := intctrlutil.GetContainerByName(merged.Spec.Template.Spec.InitContainers, "install-config-manager-tool")
+			Expect(init).ShouldNot(BeNil())
+			Expect(merged.Spec.Template.Spec.Volumes).Should(HaveLen(1))
+		})
+
+		It("should resolve legacy config-manager policy conservatively when annotation is missing", func() {
+			Expect(legacyConfigManagerRequired(nil)).Should(Equal(legacyConfigManagerPolicyKeep))
+			Expect(legacyConfigManagerRequired(&appsv1.Component{})).Should(Equal(legacyConfigManagerPolicyKeep))
+			Expect(legacyConfigManagerRequired(&appsv1.Component{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						constant.LegacyConfigManagerRequiredAnnotationKey: "true",
+					},
+				},
+			})).Should(Equal(legacyConfigManagerPolicyKeep))
+			Expect(legacyConfigManagerRequired(&appsv1.Component{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						constant.LegacyConfigManagerRequiredAnnotationKey: "false",
+					},
+				},
+			})).Should(Equal(legacyConfigManagerPolicyCleanup))
+			Expect(legacyConfigManagerRequired(&appsv1.Component{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						constant.LegacyConfigManagerRequiredAnnotationKey: "",
+					},
+				},
+			})).Should(Equal(legacyConfigManagerPolicyKeep))
+		})
+	})
+
+	Context("workload helper edge cases", func() {
+		It("detects pod resource and metadata-only template changes", func() {
+			emptySpec := corev1.PodSpec{
+				Containers: []corev1.Container{{Name: "main"}},
+			}
+			Expect(hasPodResourceChanges(emptySpec, emptySpec)).Should(BeFalse())
+
+			resourceSpec := corev1.PodSpec{
+				Containers: []corev1.Container{{
+					Name: "main",
+					Resources: corev1.ResourceRequirements{
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU: resource.MustParse("1"),
+						},
+					},
+				}},
+			}
+			Expect(hasPodResourceChanges(emptySpec, resourceSpec)).Should(BeTrue())
+
+			oldTemplate := corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"app": "old"},
+				},
+				Spec: emptySpec,
+			}
+			newTemplate := *oldTemplate.DeepCopy()
+			Expect(hasPodUpdateTemplateChanges(oldTemplate, newTemplate)).Should(BeFalse())
+
+			newTemplate.Labels = map[string]string{"app": "new"}
+			Expect(hasPodUpdateTemplateChanges(oldTemplate, newTemplate)).Should(BeTrue())
+
+			newTemplate = *oldTemplate.DeepCopy()
+			newTemplate.Annotations = map[string]string{"rollout": "yes"}
+			Expect(hasPodUpdateTemplateChanges(oldTemplate, newTemplate)).Should(BeTrue())
+
+			newTemplate = *oldTemplate.DeepCopy()
+			deadline := int64(30)
+			newTemplate.Spec.ActiveDeadlineSeconds = &deadline
+			Expect(hasPodUpdateTemplateChanges(oldTemplate, newTemplate)).Should(BeTrue())
+
+			newTemplate = *oldTemplate.DeepCopy()
+			newTemplate.Spec.Tolerations = []corev1.Toleration{{Key: "dedicated", Value: "db"}}
+			Expect(hasPodUpdateTemplateChanges(oldTemplate, newTemplate)).Should(BeTrue())
+		})
+
+		It("preserves legacy volume and mount order without synthesizing missing business entries", func() {
+			oldVolumes := []corev1.Volume{
+				{Name: "data"},
+				{Name: "kb-tools"},
+				{Name: "logs"},
+			}
+			newVolumes := []corev1.Volume{
+				{Name: "logs"},
+				{Name: "data"},
+				{Name: "cache"},
+			}
+			mergedVolumes := preserveLegacyVolumeOrder(oldVolumes, newVolumes, map[string]struct{}{"kb-tools": {}})
+			Expect([]string{mergedVolumes[0].Name, mergedVolumes[1].Name, mergedVolumes[2].Name, mergedVolumes[3].Name}).
+				Should(Equal([]string{"data", "kb-tools", "logs", "cache"}))
+			Expect(preserveLegacyVolumeOrder(oldVolumes, newVolumes, nil)).Should(Equal(newVolumes))
+			Expect(hasVolumeByNameMap(map[string]corev1.Volume{"data": {Name: "data"}}, "data")).Should(BeTrue())
+			Expect(hasVolumeByNameMap(map[string]corev1.Volume{"data": {Name: "data"}}, "logs")).Should(BeFalse())
+
+			oldMounts := []corev1.VolumeMount{
+				{Name: "data", MountPath: "/data"},
+				{Name: "kb-tools", MountPath: "/opt/kb-tools"},
+				{Name: "logs", MountPath: "/logs"},
+			}
+			newMounts := []corev1.VolumeMount{
+				{Name: "logs", MountPath: "/logs"},
+				{Name: "cache", MountPath: "/cache"},
+				{Name: "data", MountPath: "/data"},
+			}
+			mergedMounts := preserveLegacyVolumeMountOrder(oldMounts, newMounts, "kb-tools")
+			Expect([]string{mergedMounts[0].Name, mergedMounts[1].Name, mergedMounts[2].Name, mergedMounts[3].Name}).
+				Should(Equal([]string{"data", "kb-tools", "logs", "cache"}))
+			Expect(volumeMountKey(corev1.VolumeMount{Name: "data", MountPath: "/data", SubPath: "main"})).
+				Should(Equal("data|/data|main"))
+			Expect(preserveLegacyVolumeMountOrder(oldMounts, append(newMounts, corev1.VolumeMount{Name: "kb-tools"}), "kb-tools")).
+				Should(HaveLen(4))
+			Expect(preserveLegacyVolumeMountOrder(newMounts, newMounts, "kb-tools")).Should(Equal(newMounts))
+		})
+
+		It("collects and restores container resource and volume mount helpers", func() {
+			containers := []corev1.Container{
+				{
+					Name: "main",
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceMemory: resource.MustParse("128Mi"),
+						},
+					},
+					VolumeMounts: []corev1.VolumeMount{{Name: "data"}},
+				},
+				{
+					Name:         "sidecar",
+					VolumeMounts: []corev1.VolumeMount{{Name: "logs"}},
+				},
+			}
+
+			resources := getContainerResources(containers)
+			Expect(resources).Should(HaveKey("main"))
+			memory := resources["main"].Requests[corev1.ResourceMemory]
+			Expect(memory.String()).Should(Equal("128Mi"))
+
+			names := collectVolumeNamesFromContainers(&containers[0], nil, &containers[1])
+			Expect(names).Should(HaveKey("data"))
+			Expect(names).Should(HaveKey("logs"))
+			Expect(hasVolumeMount(containers[0].VolumeMounts, "data")).Should(BeTrue())
+			Expect(hasVolumeMount(containers[0].VolumeMounts, "logs")).Should(BeFalse())
+		})
+
+		It("decides legacy config-manager cleanup from concrete pod template change classes", func() {
+			baseTemplate := corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"app": "mysql"},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{{Name: "main", Image: "mysql:1"}},
+				},
+			}
+			newInstanceSet := func() *workloads.InstanceSet {
+				return &workloads.InstanceSet{
+					Spec: workloads.InstanceSetSpec{
+						Template:         *baseTemplate.DeepCopy(),
+						PodUpgradePolicy: appsv1.PreferInPlacePodUpdatePolicyType,
+						PodUpdatePolicy:  appsv1.PreferInPlacePodUpdatePolicyType,
+					},
+				}
+			}
+
+			oldITS := newInstanceSet()
+			Expect(shouldCleanupLegacyConfigManager(oldITS, newInstanceSet())).Should(BeFalse())
+
+			upgradeITS := newInstanceSet()
+			upgradeITS.Spec.Template.Spec.Containers[0].Image = "mysql:2"
+			Expect(shouldCleanupLegacyConfigManager(oldITS, upgradeITS)).Should(BeFalse())
+			upgradeITS.Spec.PodUpgradePolicy = appsv1.ReCreatePodUpdatePolicyType
+			Expect(shouldCleanupLegacyConfigManager(oldITS, upgradeITS)).Should(BeTrue())
+
+			resourceITS := newInstanceSet()
+			resourceITS.Spec.Template.Spec.Containers[0].Resources = corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{
+					corev1.ResourceCPU: resource.MustParse("2"),
+				},
+			}
+			Expect(shouldCleanupLegacyConfigManager(oldITS, resourceITS)).Should(BeTrue())
+
+			updateITS := newInstanceSet()
+			updateITS.Spec.Template.Labels = map[string]string{"app": "mysql", "rollout": "yes"}
+			Expect(shouldCleanupLegacyConfigManager(oldITS, updateITS)).Should(BeFalse())
+			updateITS.Spec.PodUpdatePolicy = appsv1.ReCreatePodUpdatePolicyType
+			Expect(shouldCleanupLegacyConfigManager(oldITS, updateITS)).Should(BeTrue())
+		})
+
+		It("copies multi-cluster placement annotation to generated InstanceSet only when present", func() {
+			transformer := &componentWorkloadTransformer{}
+			its := &workloads.InstanceSet{}
+
+			transformer.buildInstanceSetPlacementAnnotation(&appsv1.Component{}, its)
+			Expect(its.Annotations).Should(BeNil())
+
+			transformer.buildInstanceSetPlacementAnnotation(&appsv1.Component{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{constant.KBAppMultiClusterPlacementKey: ""},
+				},
+			}, its)
+			Expect(its.Annotations).Should(BeNil())
+
+			transformer.buildInstanceSetPlacementAnnotation(&appsv1.Component{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{constant.KBAppMultiClusterPlacementKey: "ctx-a,ctx-b"},
+				},
+			}, its)
+			Expect(its.Annotations).Should(HaveKeyWithValue(constant.KBAppMultiClusterPlacementKey, "ctx-a,ctx-b"))
 		})
 	})
 })

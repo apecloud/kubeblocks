@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -119,7 +119,8 @@ var _ = Describe("synthesized component", func() {
 						},
 					},
 				},
-				Reconfigure: &appsv1.Action{
+				Reconfigure: ptr.To(true),
+				ReconfigureAction: &appsv1.Action{
 					Exec: &appsv1.ExecAction{
 						Command: []string{"echo", "external", "reconfigure"},
 					},
@@ -140,8 +141,69 @@ var _ = Describe("synthesized component", func() {
 					Namespace:  comp.Namespace,
 					VolumeName: compDef.Spec.Configs[1].VolumeName,
 				},
-				Config:      true,
-				Reconfigure: comp.Spec.Configs[0].Reconfigure,
+				Config:              true,
+				ReconfigureRequired: ptr.To(true),
+				ReconfigureAction:   comp.Spec.Configs[0].ReconfigureAction,
+			}))
+		})
+
+		It("action override does not imply reconfigure", func() {
+			comp.Spec.Configs = append(comp.Spec.Configs, appsv1.ClusterComponentConfig{
+				Name: ptr.To(compDef.Spec.Configs[1].Name),
+				ClusterComponentConfigSource: appsv1.ClusterComponentConfigSource{
+					ConfigMap: &corev1.ConfigMapVolumeSource{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: "external-server-conf",
+						},
+					},
+				},
+				ReconfigureAction: &appsv1.Action{
+					Exec: &appsv1.ExecAction{
+						Command: []string{"echo", "external", "reconfigure"},
+					},
+				},
+			})
+			synthesizedComp, err := BuildSynthesizedComponent(ctx, cli, compDef, comp)
+			Expect(err).Should(BeNil())
+
+			Expect(synthesizedComp).ShouldNot(BeNil())
+			Expect(synthesizedComp.FileTemplates).Should(ContainElement(SynthesizedFileTemplate{
+				ComponentFileTemplate: appsv1.ComponentFileTemplate{
+					Name:       compDef.Spec.Configs[1].Name,
+					Template:   comp.Spec.Configs[0].ConfigMap.Name,
+					Namespace:  comp.Namespace,
+					VolumeName: compDef.Spec.Configs[1].VolumeName,
+				},
+				Config:            true,
+				ReconfigureAction: comp.Spec.Configs[0].ReconfigureAction,
+			}))
+		})
+
+		It("restart does not disable default reconfigure", func() {
+			compDef.Spec.Configs[1].Reconfigure = &appsv1.Action{
+				Exec: &appsv1.ExecAction{
+					Command: []string{"echo", "template", "reconfigure"},
+				},
+			}
+			comp.Spec.Configs = append(comp.Spec.Configs, appsv1.ClusterComponentConfig{
+				Name:    ptr.To(compDef.Spec.Configs[1].Name),
+				Restart: ptr.To(true),
+			})
+
+			synthesizedComp, err := BuildSynthesizedComponent(ctx, cli, compDef, comp)
+			Expect(err).Should(BeNil())
+
+			Expect(synthesizedComp).ShouldNot(BeNil())
+			Expect(synthesizedComp.FileTemplates).Should(ContainElement(SynthesizedFileTemplate{
+				ComponentFileTemplate: appsv1.ComponentFileTemplate{
+					Name:                compDef.Spec.Configs[1].Name,
+					Template:            compDef.Spec.Configs[1].Template,
+					Namespace:           compDef.Spec.Configs[1].Namespace,
+					VolumeName:          compDef.Spec.Configs[1].VolumeName,
+					RestartOnFileChange: ptr.To(true),
+					Reconfigure:         compDef.Spec.Configs[1].Reconfigure,
+				},
+				Config: true,
 			}))
 		})
 
@@ -155,7 +217,8 @@ var _ = Describe("synthesized component", func() {
 						},
 					},
 				},
-				Reconfigure: &appsv1.Action{
+				Reconfigure: ptr.To(true),
+				ReconfigureAction: &appsv1.Action{
 					Exec: &appsv1.ExecAction{
 						Command: []string{"echo", "external", "reconfigure"},
 					},
@@ -178,8 +241,9 @@ var _ = Describe("synthesized component", func() {
 					VolumeName:      compDef.Spec.Configs[1].VolumeName,
 					ExternalManaged: comp.Spec.Configs[0].ExternalManaged,
 				},
-				Config:      true,
-				Reconfigure: comp.Spec.Configs[0].Reconfigure,
+				Config:              true,
+				ReconfigureRequired: ptr.To(true),
+				ReconfigureAction:   comp.Spec.Configs[0].ReconfigureAction,
 			}))
 		})
 
@@ -204,8 +268,7 @@ var _ = Describe("synthesized component", func() {
 					VolumeName:      compDef.Spec.Configs[1].VolumeName,
 					ExternalManaged: comp.Spec.Configs[0].ExternalManaged,
 				},
-				Config:      true,
-				Reconfigure: comp.Spec.Configs[0].Reconfigure,
+				Config: true,
 			}))
 		})
 	})

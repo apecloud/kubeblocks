@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -24,7 +24,6 @@ import (
 	"reflect"
 	"slices"
 
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -87,13 +86,13 @@ func trimNestedField(updatedParams any, trimField string) (any, error) {
 	return updatedParams, nil
 }
 
-// ValidateConfigPatch Verifies if the changed parameters have been removed
-func ValidateConfigPatch(patch *ConfigPatchInfo, configRender parametersv1alpha1.ParamConfigRendererSpec) error {
+// ValidateConfigPatch verifies if the changed parameters have been removed.
+func ValidateConfigPatch(patch *ConfigPatchInfo, configs []parametersv1alpha1.ComponentConfigDescription) error {
 	if !patch.IsModify || len(patch.UpdateConfig) == 0 {
 		return nil
 	}
 
-	vParams := GenerateVisualizedParamsList(patch, configRender.Configs)
+	vParams := GenerateVisualizedParamsList(patch, configs)
 	for _, param := range vParams {
 		for _, p := range param.Parameters {
 			if p.Value == nil {
@@ -183,6 +182,24 @@ func CheckUpdateDynamicParameters(config *parametersv1alpha1.FileFormatConfig, p
 	return false, nil
 }
 
+// HasDynamicParameterUpdate returns true when at least one updated parameter is dynamic.
+func HasDynamicParameterUpdate(config *parametersv1alpha1.FileFormatConfig, paramsDef *parametersv1alpha1.ParametersDefinitionSpec, patch string) (bool, error) {
+	if patch == "" {
+		return false, nil
+	}
+
+	updatedParams, err := resolveUpdateParameter([]byte(patch), NestedPrefixField(config))
+	if err != nil {
+		return false, err
+	}
+	for _, param := range updatedParams {
+		if IsDynamicParameter(param, paramsDef) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 // IsDynamicParameter checks if the parameter supports hot update
 func IsDynamicParameter(paramName string, paramsDef *parametersv1alpha1.ParametersDefinitionSpec) bool {
 	if len(paramsDef.DynamicParameters) != 0 {
@@ -192,46 +209,6 @@ func IsDynamicParameter(paramName string, paramsDef *parametersv1alpha1.Paramete
 		return !slices.Contains(paramsDef.StaticParameters, paramName)
 	}
 	return false
-}
-
-// IsParametersUpdateFromManager checks if the parameters are updated from manager
-func IsParametersUpdateFromManager(cm *corev1.ConfigMap) bool {
-	annotation := cm.ObjectMeta.Annotations
-	if annotation == nil {
-		return false
-	}
-	v := annotation[constant.KBParameterUpdateSourceAnnotationKey]
-	return v == constant.ReconfigureManagerSource
-}
-
-// IsNotUserReconfigureOperation checks if the parameters are updated from operation
-func IsNotUserReconfigureOperation(cm *corev1.ConfigMap) bool {
-	labels := cm.GetLabels()
-	annotations := cm.GetAnnotations()
-	if labels == nil || annotations == nil {
-		return false
-	}
-	if _, ok := annotations[constant.CMInsEnableRerenderTemplateKey]; !ok {
-		return false
-	}
-	lastReconfigurePhase := labels[constant.CMInsLastReconfigurePhaseKey]
-	if annotations[constant.KBParameterUpdateSourceAnnotationKey] != constant.ReconfigureManagerSource {
-		return false
-	}
-	return lastReconfigurePhase == "" || ReconfigureCreatedPhase == lastReconfigurePhase
-}
-
-// SetParametersUpdateSource sets the parameters' update source
-// manager: parameter only updated from manager
-// external-template: parameter only updated from template
-// ops: parameter updated from operation
-func SetParametersUpdateSource(cm *corev1.ConfigMap, source string) {
-	annotation := cm.GetAnnotations()
-	if annotation == nil {
-		annotation = make(map[string]string)
-	}
-	annotation[constant.KBParameterUpdateSourceAnnotationKey] = source
-	cm.SetAnnotations(annotation)
 }
 
 func IsSchedulableConfigResource(object client.Object) bool {

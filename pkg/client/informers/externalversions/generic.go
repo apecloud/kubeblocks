@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -135,6 +135,8 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Parameters().V1alpha1().ParamConfigRenderers().Informer()}, nil
 	case parametersv1alpha1.SchemeGroupVersion.WithResource("parameters"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Parameters().V1alpha1().Parameters().Informer()}, nil
+	case parametersv1alpha1.SchemeGroupVersion.WithResource("parameterviews"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Parameters().V1alpha1().ParameterViews().Informer()}, nil
 	case parametersv1alpha1.SchemeGroupVersion.WithResource("parametersdefinitions"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Parameters().V1alpha1().ParametersDefinitions().Informer()}, nil
 

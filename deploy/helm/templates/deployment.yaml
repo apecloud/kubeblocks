@@ -137,6 +137,8 @@ spec:
             - name: CM_TOLERATIONS
               value: {{ toJson . | quote }}
             {{- end }}
+            - name: OPERATION_ZERO_RESOURCE_FOR_UNSET
+              value: {{ .Values.operations.zeroResourceForUnset | quote }}
             - name: KUBEBLOCKS_IMAGE_PULL_POLICY
               value: {{ .Values.image.pullPolicy }}
             - name: KUBEBLOCKS_IMAGE_PULL_SECRETS
@@ -145,6 +147,8 @@ spec:
               value: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.tools.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
             - name: KUBEBLOCKS_SERVICEACCOUNT_NAME
               value: {{ include "kubeblocks.serviceAccountName" . }}
+            - name: CLUSTER_DEFAULT_RESOURCES
+              value: {{ .Values.clusterDefaultResources | toJson | quote }}
             {{- if .Capabilities.APIVersions.Has "snapshot.storage.k8s.io/v1" }}
             - name: VOLUMESNAPSHOT_API_BETA
               value: "false"
@@ -164,6 +168,10 @@ spec:
               value: {{ .jobTTL | quote }}
             - name: ADDON_JOB_IMAGE_PULL_POLICY
               value: {{ .jobImagePullPolicy | default "IfNotPresent" }}
+            {{- with .jobResources }}
+            - name: ADDON_JOB_RESOURCES
+              value: {{ toJson . | quote }}
+            {{- end }}
             {{- end }}
             - name: KUBEBLOCKS_ADDON_HELM_INSTALL_OPTIONS
               value: {{ join " " .Values.addonHelmInstallOptions }}

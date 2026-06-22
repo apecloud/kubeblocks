@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -309,7 +309,7 @@ type InstanceSetStatus struct {
 	UpdateRevision string `json:"updateRevision,omitempty"`
 
 	// Represents the latest available observations of an instanceset's current state.
-	// Known .status.conditions.type are: "InstanceFailure", "InstanceReady"
+	// Known .status.conditions.type are: "InstanceFailure", "InstanceReady", "Restore"
 	//
 	// +optional
 	// +patchMergeKey=type
@@ -534,15 +534,15 @@ type ConfigTemplate struct {
 	// The name of the config.
 	Name string `json:"name"`
 
-	// The generation of the config content.
-	//
-	// +optional
-	Generation int64 `json:"generation,omitempty"`
-
 	// Represents a checksum or hash of the config content.
 	//
 	// +optional
 	ConfigHash *string `json:"configHash,omitempty"`
+
+	// Specifies whether to restart instances.
+	//
+	// +optional
+	Restart *bool `json:"restart,omitempty"`
 
 	// The custom reconfigure action.
 	//
@@ -556,10 +556,15 @@ type ConfigTemplate struct {
 	// +optional
 	ReconfigureActionName string `json:"reconfigureActionName,omitempty"`
 
-	// The parameters to call the reconfigure action.
+	// The env/template parameters to call the reconfigure action.
 	//
 	// +optional
 	Parameters map[string]string `json:"parameters,omitempty"`
+
+	// ReconfigureArgs is the runtime argv payload for the reconfigure action.
+	//
+	// +optional
+	ReconfigureArgs [][]string `json:"reconfigureArgs,omitempty"`
 }
 
 type InstanceStatus struct {
@@ -590,11 +595,6 @@ type InstanceConfigStatus struct {
 	//
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
-
-	// The generation of the config.
-	//
-	// +optional
-	Generation int64 `json:"generation,omitempty"`
 
 	// Represents a checksum or hash of the config content.
 	//
@@ -644,6 +644,9 @@ const (
 	// InstanceFailure is added in an instance set when at least one of its instances(pods) is in a `Failed` phase.
 	InstanceFailure ConditionType = "InstanceFailure"
 
+	// InstanceRestore indicates whether the initial data restore for this InstanceSet has completed.
+	InstanceRestore ConditionType = "Restore"
+
 	// InstanceUpdateRestricted represents a ConditionType that indicates updates to an InstanceSet are blocked(when the
 	// PodUpdatePolicy is set to StrictInPlace but the pods cannot be updated in-place).
 	InstanceUpdateRestricted ConditionType = "InstanceUpdateRestricted"
@@ -664,6 +667,15 @@ const (
 
 	// ReasonInstanceFailure is a reason for condition InstanceFailure.
 	ReasonInstanceFailure = "InstanceFailure"
+
+	// ReasonRestoreCompleted is a reason for condition InstanceRestore.
+	ReasonRestoreCompleted = "RestoreCompleted"
+
+	// ReasonRestoreRunning is a reason for condition InstanceRestore.
+	ReasonRestoreRunning = "RestoreRunning"
+
+	// ReasonRestoreFailed is a reason for condition InstanceRestore.
+	ReasonRestoreFailed = "RestoreFailed"
 
 	// ReasonInstanceUpdateRestricted is a reason for condition InstanceUpdateRestricted.
 	ReasonInstanceUpdateRestricted = "InstanceUpdateRestricted"

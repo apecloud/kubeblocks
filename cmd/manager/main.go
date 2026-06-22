@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -146,12 +146,12 @@ func init() {
 	viper.SetDefault("VOLUMESNAPSHOT_API_BETA", false)
 	viper.SetDefault(constant.KBToolsImage, "apecloud/kubeblocks-tools:latest")
 	viper.SetDefault("KUBEBLOCKS_SERVICEACCOUNT_NAME", "kubeblocks")
-	viper.SetDefault(constant.ConfigManagerGPRCPortEnv, 9901)
-	viper.SetDefault("CONFIG_MANAGER_LOG_LEVEL", "info")
 	viper.SetDefault(constant.CfgKeyCtrlrMgrNS, "default")
 	viper.SetDefault(constant.CfgHostPortConfigMapName, "kubeblocks-host-ports")
 	viper.SetDefault(constant.CfgHostPortIncludeRanges, "55000-59999")
 	viper.SetDefault(constant.CfgHostPortExcludeRanges, "6443,10250,10257,10259,2379-2380,30000-32767")
+	viper.SetDefault(constant.CfgKeyClusterDefaultResources, `{"zero":true}`)
+	viper.SetDefault(constant.CfgKeyOperationZeroResourceForUnset, true)
 	viper.SetDefault(constant.KubernetesClusterDomainEnv, constant.DefaultDNSDomain)
 	viper.SetDefault(instanceset.MaxPlainRevisionCount, 1024)
 	viper.SetDefault(instanceset.FeatureGateIgnorePodVerticalScaling, false)
@@ -266,6 +266,12 @@ func validateRequiredToParseConfigs() error {
 			return err
 		}
 	}
+	if jobResources := viper.GetString(constant.CfgKeyAddonJobResources); jobResources != "" {
+		resources := corev1.ResourceRequirements{}
+		if err := json.Unmarshal([]byte(jobResources), &resources); err != nil {
+			return err
+		}
+	}
 	if err := validateTolerations(viper.GetString(constant.CfgKeyCtrlrMgrTolerations)); err != nil {
 		return err
 	}
@@ -278,7 +284,16 @@ func validateRequiredToParseConfigs() error {
 			return err
 		}
 	}
-
+	if clusterDefaultResources := viper.GetString(constant.CfgKeyClusterDefaultResources); clusterDefaultResources != "" {
+		resources := struct {
+			Zero     bool                `json:"zero,omitempty"`
+			Requests corev1.ResourceList `json:"requests,omitempty"`
+			Limits   corev1.ResourceList `json:"limits,omitempty"`
+		}{}
+		if err := json.Unmarshal([]byte(clusterDefaultResources), &resources); err != nil {
+			return err
+		}
+	}
 	if imagePullSecrets := viper.GetString(constant.KBImagePullSecrets); imagePullSecrets != "" {
 		secrets := make([]corev1.LocalObjectReference, 0)
 		if err := json.Unmarshal([]byte(imagePullSecrets), &secrets); err != nil {
@@ -416,7 +431,22 @@ func main() {
 		os.Exit(1)
 	}
 
-	if viper.GetBool(appsFlagKey.viperName()) {
+	appsEnabled := viper.GetBool(appsFlagKey.viperName())
+	workloadsEnabled := viper.GetBool(workloadsFlagKey.viperName())
+	if appsEnabled || workloadsEnabled {
+		if err = (&k8scorecontrollers.EventReconciler{
+			Client:           mgr.GetClient(),
+			Scheme:           mgr.GetScheme(),
+			Recorder:         mgr.GetEventRecorderFor("event-controller"),
+			AppsEnabled:      appsEnabled,
+			WorkloadsEnabled: workloadsEnabled,
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "Event")
+			os.Exit(1)
+		}
+	}
+
+	if appsEnabled {
 		if err = (&appscontrollers.ClusterDefinitionReconciler{
 			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),
@@ -490,15 +520,6 @@ func main() {
 			os.Exit(1)
 		}
 
-		if err = (&k8scorecontrollers.EventReconciler{
-			Client:   mgr.GetClient(),
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("event-controller"),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "Event")
-			os.Exit(1)
-		}
-
 		if err = (&rollout.RolloutReconciler{
 			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),
@@ -509,7 +530,7 @@ func main() {
 		}
 	}
 
-	if viper.GetBool(workloadsFlagKey.viperName()) {
+	if workloadsEnabled {
 		if err = (&workloadscontrollers.InstanceSetReconciler{
 			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),
@@ -537,14 +558,6 @@ func main() {
 			os.Exit(1)
 		}
 
-		if err = (&workloadscontrollers.InstanceEventReconciler{
-			Client:   mgr.GetClient(),
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("instance-event-controller"),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "InstanceEvent")
-			os.Exit(1)
-		}
 	}
 
 	if viper.GetBool(operationsFlagKey.viperName()) {
@@ -558,10 +571,10 @@ func main() {
 		}
 
 		if err = (&opscontrollers.OpsRequestReconciler{
-			Client:   mgr.GetClient(),
+			Client:   client,
 			Scheme:   mgr.GetScheme(),
 			Recorder: mgr.GetEventRecorderFor("ops-request-controller"),
-		}).SetupWithManager(mgr); err != nil {
+		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "OpsRequest")
 			os.Exit(1)
 		}
@@ -646,7 +659,7 @@ func main() {
 			setupLog.Error(err, "unable to create controller", "controller", "ParametersDefinition")
 			os.Exit(1)
 		}
-		if err = (&parameterscontrollers.ParameterReconciler{
+		if err = (&parameterscontrollers.LegacyParameterReconciler{
 			Client:   client,
 			Scheme:   mgr.GetScheme(),
 			Recorder: mgr.GetEventRecorderFor("parameter-controller"),
@@ -660,6 +673,14 @@ func main() {
 			Recorder: mgr.GetEventRecorderFor("component-driven-parameter-controller"),
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "ComponentParameter")
+			os.Exit(1)
+		}
+		if err = (&parameterscontrollers.LegacyParamConfigRendererReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("legacy-param-config-renderer-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "LegacyParamConfigRenderer")
 			os.Exit(1)
 		}
 		if err = (&parameterscontrollers.ComponentParameterReconciler{
@@ -678,20 +699,20 @@ func main() {
 			setupLog.Error(err, "unable to create controller", "controller", "ReconfigureRequest")
 			os.Exit(1)
 		}
-		if err = (&parameterscontrollers.ParameterDrivenConfigRenderReconciler{
-			Client:   mgr.GetClient(),
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("component-driven-config-render-controller"),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "ParamConfigRenderer")
-			os.Exit(1)
-		}
 		if err = (&parameterscontrollers.ParameterTemplateExtensionReconciler{
 			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),
 			Recorder: mgr.GetEventRecorderFor("parameter-template-extension-controller"),
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "ParameterTemplateExtension")
+			os.Exit(1)
+		}
+		if err = (&parameterscontrollers.ParameterViewReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("parameter-view-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "ParameterView")
 			os.Exit(1)
 		}
 	}

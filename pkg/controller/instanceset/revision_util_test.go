@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -782,7 +782,7 @@ var _ = Describe("revision util test", func() {
 			its := &workloads.InstanceSet{}
 			err := json.Unmarshal([]byte(stsJSON), its)
 			Expect(err).Should(Succeed())
-			cr, err := NewRevision(its)
+			cr, err := newRevision(its)
 			Expect(err).Should(Succeed())
 			Expect(cr.Name).Should(Equal("redis-test-redis-cc4cd5c55"))
 		})

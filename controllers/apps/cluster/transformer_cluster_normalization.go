@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -76,6 +76,10 @@ func (t *clusterNormalizationTransformer) Transform(ctx graph.TransformContext, 
 	}
 
 	if err = t.checkNPatchCRDAPIVersionKey(transCtx); err != nil {
+		return err
+	}
+
+	if err = applyClusterRestoreIntent(cluster, transCtx.components, transCtx.shardings); err != nil {
 		return err
 	}
 
@@ -433,7 +437,7 @@ func (t *clusterNormalizationTransformer) resolveDefinitions4ComponentWithObj(tr
 		if len(tpl.ServiceVersion) == 0 && len(tpl.CompDef) == 0 {
 			continue
 		}
-		compDef, serviceVersion, err = t.resolveCompDefinitionNServiceVersionWithTemplate(transCtx, comp, &tpl)
+		compDef, serviceVersion, err = t.resolveCompDefinitionNServiceVersionWithTemplate(transCtx, comp, &tpl, compSpec.ComponentDef)
 		if err != nil {
 			return nil, err
 		}
@@ -458,7 +462,7 @@ func (t *clusterNormalizationTransformer) resolveCompDefinitionNServiceVersionWi
 }
 
 func (t *clusterNormalizationTransformer) resolveCompDefinitionNServiceVersionWithTemplate(transCtx *clusterTransformContext,
-	comp *appsv1.Component, protoTpl *appsv1.InstanceTemplate) (*appsv1.ComponentDefinition, string, error) {
+	comp *appsv1.Component, protoTpl *appsv1.InstanceTemplate, defaultCompDefName string) (*appsv1.ComponentDefinition, string, error) {
 	var (
 		ctx        = transCtx.Context
 		cli        = transCtx.Client
@@ -474,6 +478,9 @@ func (t *clusterNormalizationTransformer) resolveCompDefinitionNServiceVersionWi
 	}
 	serviceVersion := protoTpl.ServiceVersion
 	compDefName := protoTpl.CompDef
+	if len(compDefName) == 0 {
+		compDefName = defaultCompDefName
+	}
 	if comp == nil || runningTpl == nil || t.checkTemplateUpgrade(serviceVersion, compDefName, runningTpl) {
 		return resolveCompDefinitionNServiceVersion(ctx, cli, compDefName, serviceVersion)
 	}

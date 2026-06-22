@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -100,6 +100,14 @@ var _ = Describe("component hostnetwork transformer test", func() {
 						},
 					},
 				},
+				Network: &appsv1.ComponentNetwork{
+					HostNetwork: true,
+					HostPorts: []appsv1.HostPort{
+						{Name: "mysql", Port: 13306},
+						{Name: "http", Port: 13501},
+						{Name: "streaming", Port: 13502},
+					},
+				},
 				PodSpec: &corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
@@ -142,6 +150,33 @@ var _ = Describe("component hostnetwork transformer test", func() {
 			Expect(transCtx.SynthesizeComponent.PodSpec.Containers[0].Ports[0].ContainerPort).ShouldNot(Equal(3306))
 			Expect(transCtx.SynthesizeComponent.PodSpec.Containers[1].Ports[0].ContainerPort).ShouldNot(Equal(3501))
 			Expect(transCtx.SynthesizeComponent.PodSpec.Containers[1].Ports[1].ContainerPort).ShouldNot(Equal(3502))
+		})
+
+		It("allocates configured host network ports and updates synthesized pod spec", func() {
+			transCtx.SynthesizeComponent.Annotations = map[string]string{
+				constant.HostNetworkAnnotationKey: compName,
+			}
+
+			transformer := &componentHostNetworkTransformer{}
+			Expect(transformer.Transform(transCtx, dag)).Should(Succeed())
+
+			Expect(transCtx.SynthesizeComponent.PodSpec.HostNetwork).Should(BeTrue())
+			Expect(transCtx.SynthesizeComponent.PodSpec.DNSPolicy).Should(Equal(corev1.DNSClusterFirstWithHostNet))
+			Expect(transCtx.SynthesizeComponent.PodSpec.Containers[0].Ports[0].ContainerPort).ShouldNot(Equal(int32(3306)))
+			Expect(transCtx.SynthesizeComponent.PodSpec.Containers[1].Ports[0].ContainerPort).ShouldNot(Equal(int32(3501)))
+			Expect(transCtx.SynthesizeComponent.PodSpec.Containers[1].Ports[1].ContainerPort).ShouldNot(Equal(int32(3502)))
+		})
+
+		It("skips allocation when the original component is deleting", func() {
+			now := metav1.Now()
+			transCtx.ComponentOrig.DeletionTimestamp = &now
+			transCtx.SynthesizeComponent.Annotations = map[string]string{
+				constant.HostNetworkAnnotationKey: compName,
+			}
+
+			transformer := &componentHostNetworkTransformer{}
+			Expect(transformer.Transform(transCtx, dag)).Should(Succeed())
+			Expect(transCtx.SynthesizeComponent.PodSpec.HostNetwork).Should(BeFalse())
 		})
 	})
 })

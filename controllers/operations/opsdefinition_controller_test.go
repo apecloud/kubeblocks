@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -23,7 +23,11 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/record"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/generics"
@@ -61,6 +65,40 @@ var _ = Describe("OpsDefinition Controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsDef), func(g Gomega, opsD *opsv1alpha1.OpsDefinition) {
 				g.Expect(opsD.Status.Phase).Should(Equal(opsv1alpha1.AvailablePhase))
 			}))
+		})
+
+		It("marks OpsDefinition unavailable when a precondition template is invalid", func() {
+			scheme := newOperationsTestScheme()
+			opsDef := &opsv1alpha1.OpsDefinition{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "invalid-template",
+					Generation: 3,
+				},
+				Spec: opsv1alpha1.OpsDefinitionSpec{
+					PreConditions: []opsv1alpha1.PreCondition{
+						{Rule: &opsv1alpha1.Rule{Expression: "{{ if }}"}},
+					},
+				},
+			}
+			reconciler := &OpsDefinitionReconciler{
+				Client: fake.NewClientBuilder().
+					WithScheme(scheme).
+					WithStatusSubresource(&opsv1alpha1.OpsDefinition{}).
+					WithObjects(opsDef).
+					Build(),
+				Scheme:   scheme,
+				Recorder: record.NewFakeRecorder(1),
+			}
+
+			result, err := reconciler.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(opsDef)})
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(result).Should(Equal(ctrl.Result{}))
+
+			fetched := &opsv1alpha1.OpsDefinition{}
+			Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(opsDef), fetched)).Should(Succeed())
+			Expect(fetched.Status.ObservedGeneration).Should(Equal(opsDef.Generation))
+			Expect(fetched.Status.Phase).Should(Equal(opsv1alpha1.UnavailablePhase))
+			Expect(fetched.Status.Message).Should(ContainSubstring("missing value for if"))
 		})
 	})
 

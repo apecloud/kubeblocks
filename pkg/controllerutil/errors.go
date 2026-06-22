@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -55,10 +55,6 @@ const (
 	ErrorTypeBackupFailed  ErrorType = "BackupFailed"
 	ErrorTypeRestoreFailed ErrorType = "RestoreFailed"
 	ErrorTypeNeedWaiting   ErrorType = "NeedWaiting" // waiting for next reconcile
-
-	// ErrorType for preflight
-	ErrorTypePreflightCommon = "PreflightCommon"
-	ErrorTypeSkipPreflight   = "SkipPreflight"
 
 	// ErrorTypeExpectedInProcess is used to indicate that the operation is expected to be in process.
 	ErrorTypeExpectedInProcess ErrorType = "ExpectedInProcess"

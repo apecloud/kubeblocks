@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -177,21 +177,12 @@ func getHostNetworkPort(synthesizedComp *SynthesizedComponent, clusterName, comp
 	return pm.GetPort(key)
 }
 
-func UDFReconfigureActionName(tpl SynthesizedFileTemplate) string {
-	return fmt.Sprintf("reconfigure-%s", tpl.Name)
+func CMPDReconfigureActionName(tpl SynthesizedFileTemplate) string {
+	return fmt.Sprintf("reconfigure-cmpd-%s", tpl.Name)
 }
 
-func ConfigTemplates(synthesizedComp *SynthesizedComponent) []appsv1.ComponentFileTemplate {
-	if synthesizedComp.FileTemplates == nil {
-		return nil
-	}
-	templates := make([]appsv1.ComponentFileTemplate, 0)
-	for i, tpl := range synthesizedComp.FileTemplates {
-		if tpl.Config {
-			templates = append(templates, synthesizedComp.FileTemplates[i].ComponentFileTemplate)
-		}
-	}
-	return templates
+func UserReconfigureActionName(tpl SynthesizedFileTemplate) string {
+	return fmt.Sprintf("reconfigure-user-%s", tpl.Name)
 }
 
 func AddInstanceAssistantObject(synthesizedComp *SynthesizedComponent, object client.Object) {
@@ -205,12 +196,6 @@ func AddInstanceAssistantObject(synthesizedComp *SynthesizedComponent, object cl
 	}
 	if instanceAPINAssistantObjectsEnabled(its) {
 		synthesizedComp.InstanceAssistantObjects = addInstanceAssistantObjects(synthesizedComp.InstanceAssistantObjects, object)
-	}
-}
-
-func AddInstanceAssistantObjectsToITS(its *workloads.InstanceSet, objs ...client.Object) {
-	if instanceAPINAssistantObjectsEnabled(its) {
-		its.Spec.InstanceAssistantObjects = addInstanceAssistantObjects(its.Spec.InstanceAssistantObjects, objs...)
 	}
 }
 

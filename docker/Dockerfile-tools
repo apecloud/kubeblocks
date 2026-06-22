@@ -11,7 +11,7 @@
 #TARGETARCH - Architecture from --platform, e.g. arm64
 #TARGETVARIANT - used to set target ARM variant, e.g. v7
 
-ARG GO_VERSION=1.24.11-alpine
+ARG GO_VERSION=1.25.10-alpine
 
 FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION} AS builder
 ARG TARGETOS
@@ -37,7 +37,6 @@ COPY go.sum go.sum
 # Copy the go source
 #COPY pkg/ pkg/
 #COPY controllers/ controllers/
-#COPY cmd/reloader/ cmd/reloader/
 #COPY externalapis/ externalapis/
 #COPY version/ version/
 #COPY cmd/cli/ cmd/cli/
@@ -50,11 +49,6 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 RUN --mount=type=bind,target=. \
     --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg/mod \
-    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o /out/reloader cmd/reloader/main.go
-
-RUN --mount=type=bind,target=. \
-    --mount=type=cache,target=/root/.cache/go-build \
-    --mount=type=cache,target=/go/pkg/mod \
     CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o /out/kbagent cmd/kbagent/main.go
 
 # Use alpine with tag 20230329 is corresponding to "edge" tag (latest release to date is 3.18) as of 20230625
@@ -64,13 +58,13 @@ ARG APK_MIRROR
 # install tools via apk
 ENV APK_MIRROR=${APK_MIRROR}
 RUN if [ -n "${APK_MIRROR}" ]; then sed -i "s/dl-cdn.alpinelinux.org/${APK_MIRROR}/g" /etc/apk/repositories; fi
+RUN apk upgrade --no-cache
 # curl is used to send certain requests, such as reload in config-manager.
 RUN apk add --no-cache curl kubectl helm jq --allow-untrusted \
     && rm -rf /var/cache/apk/*
 
 # copy kubeblocks tools
 COPY config/crd/bases /kubeblocks/crd
-COPY --from=builder /out/reloader /bin
 COPY --from=builder /out/kbagent /bin
 
 # mkdir kbcli config dir and helm cache dir.

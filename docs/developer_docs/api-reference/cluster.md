@@ -282,6 +282,20 @@ ClusterBackup
 <p>Specifies the backup configuration of the Cluster.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>restore</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ClusterRestore">
+ClusterRestore
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the restore configuration of the Cluster.</p>
+</td>
+</tr>
 </tbody>
 </table>
 </td>
@@ -2465,6 +2479,9 @@ The impact of this field depends on the <code>targetPodSelector</code> value:</p
 <li>When <code>targetPodSelector</code> is set to <code>Any</code> or <code>All</code>, this field will be ignored.</li>
 <li>When <code>targetPodSelector</code> is set to <code>Role</code>, only those replicas whose role matches the <code>matchingKey</code>
 will be selected for the Action.</li>
+<li>When <code>targetPodSelector</code> is set to <code>Ordinal</code>, <code>matchingKey</code> must be a non-negative integer
+and only the replica whose Pod name ends with <code>-&lt;matchingKey&gt;</code> will be selected for the Action.
+The selector is considered ambiguous and the action fails if multiple Pods share the same ordinal.</li>
 </ul>
 <p>This field cannot be updated.</p>
 </td>
@@ -2668,7 +2685,9 @@ bool
 <td>
 <code>retentionPeriod</code><br/>
 <em>
-github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1.RetentionPeriod
+<a href="#apps.kubeblocks.io/v1.RetentionPeriod">
+RetentionPeriod
+</a>
 </em>
 </td>
 <td>
@@ -2823,7 +2842,7 @@ map[string]string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Variables are key-value pairs for dynamic configuration values that can be provided by the user.</p>
+<p>Variables are template variables used to render managed configuration templates.</p>
 </td>
 </tr>
 <tr>
@@ -2851,11 +2870,11 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>ExternalManaged specifies whether the configuration management is delegated to an external system
-or manual user control.</p>
-<p>When set to true, the controller will exclusively utilize the user-provided configuration source
-and the &lsquo;reconfigure&rsquo; action defined in this config, bypassing the default templates and
-update behaviors specified in the ComponentDefinition.</p>
+<p>ExternalManaged specifies whether the configuration management is delegated to an external system.</p>
+<p>When set to true, the apps controller does not render or manage the configuration from the
+default templates and update behaviors specified in the ComponentDefinition. A ConfigMap source
+for an external-managed configuration is accepted only when the referenced ConfigMap carries
+the common KubeBlocks component labels.</p>
 </td>
 </tr>
 <tr>
@@ -2874,7 +2893,7 @@ is necessary to apply updates.</p>
 </tr>
 <tr>
 <td>
-<code>restartOnConfigChange</code><br/>
+<code>restart</code><br/>
 <em>
 bool
 </em>
@@ -2888,6 +2907,20 @@ bool
 <td>
 <code>reconfigure</code><br/>
 <em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies whether to execute a reconfigure action for the updated configuration.</p>
+<p>When set to true and <code>reconfigureAction</code> is empty, the controller uses the default
+reconfigure action defined by the corresponding configuration template or component lifecycle.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>reconfigureAction</code><br/>
+<em>
 <a href="#apps.kubeblocks.io/v1.Action">
 Action
 </a>
@@ -2895,14 +2928,25 @@ Action
 </td>
 <td>
 <em>(Optional)</em>
-<p>The custom reconfigure action to reload the updated configuration.</p>
-<p>When @restartOnConfigChange is set to true, this action will be ignored.</p>
+<p>The custom reconfigure action to apply the updated configuration.</p>
 <p>The container executing this action has access to following variables:</p>
 <ul>
 <li>KB_CONFIG_FILES_CREATED: file1,file2&hellip;</li>
 <li>KB_CONFIG_FILES_REMOVED: file1,file2&hellip;</li>
 <li>KB_CONFIG_FILES_UPDATED: file1:checksum1,file2:checksum2&hellip;</li>
 </ul>
+</td>
+</tr>
+<tr>
+<td>
+<code>reconfigureArgs</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ReconfigureArgs is a list of runtime argument groups for the reconfigure action.</p>
 </td>
 </tr>
 </tbody>
@@ -3844,6 +3888,125 @@ component is in <code>Creating</code> or <code>Updating</code> phase, indicates 
 </td>
 </tr></tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1.ClusterRestore">ClusterRestore
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterSpec">ClusterSpec</a>)
+</p>
+<div>
+<p>ClusterRestore specifies how to initialize a Cluster from a restore source.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>source</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ClusterRestoreSource">
+ClusterRestoreSource
+</a>
+</em>
+</td>
+<td>
+<p>Specifies the restore source.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>pitr</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the point-in-time recovery target. The value is opaque to apps and interpreted by the restore runtime.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>parameters</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies runtime-specific restore parameters.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ClusterRestoreSource">ClusterRestoreSource
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterRestore">ClusterRestore</a>)
+</p>
+<div>
+<p>ClusterRestoreSource describes the source object used by a Cluster restore.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>apiGroup</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the API group of the restore source. For example, use &ldquo;dataprotection.kubeblocks.io&rdquo; for KubeBlocks
+data protection Backup sources.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>kind</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the kind of the restore source.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the name of the restore source.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>namespace</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the namespace of the restore source. If empty, the Cluster namespace is used.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1.ClusterService">ClusterService
 </h3>
 <p>
@@ -4301,6 +4464,20 @@ ClusterBackup
 <td>
 <em>(Optional)</em>
 <p>Specifies the backup configuration of the Cluster.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>restore</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ClusterRestore">
+ClusterRestore
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the restore configuration of the Cluster.</p>
 </td>
 </tr>
 </tbody>
@@ -4780,6 +4957,9 @@ VarOption
 </p>
 <div>
 <p>ComponentAvailable defines the strategies for determining whether the component is available.</p>
+<p>If both <code>WithPhases</code> and <code>WithRole</code> are specified, the component will be considered
+unavailable if any of them fail.
+If <code>WithProbe</code> is specified, <code>WithPhases</code> and <code>WithRole</code> fields are ignored.</p>
 </div>
 <table>
 <thead>
@@ -4798,7 +4978,8 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the phases that the component will go through to be considered available.</p>
+<p>Specifies the phases that the component will go through to be considered available.
+Multiple phases are separated by comma.</p>
 <p>This field is immutable once set.</p>
 </td>
 </tr>
@@ -4827,7 +5008,6 @@ ComponentAvailableWithProbe
 <td>
 <em>(Optional)</em>
 <p>Specifies the strategies for determining whether the component is available based on the available probe.</p>
-<p>If specified, it will take precedence over the WithPhases and WithRole fields.</p>
 <p>This field is immutable once set.</p>
 </td>
 </tr>
@@ -5950,8 +6130,8 @@ Action
 <em>(Optional)</em>
 <p>Defines the procedure that reloads the file when it&rsquo;s content changes.</p>
 <p>If specified, this action overrides the global reconfigure action defined in lifecycle actions
-for this specific file template.</p>
-<p>When @restartOnFileChange is set to true, this action will be ignored.</p>
+for this specific file template.
+External-managed systems may define different behavior for this action entry.</p>
 <p>The container executing this action has access to following variables:</p>
 <ul>
 <li>KB_CONFIG_FILES_CREATED: file1,file2&hellip;</li>
@@ -5970,8 +6150,27 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>ExternalManaged specifies whether the file management is delegated to an external system or manual user control.</p>
-<p>When set to true, the controller will ignore the management of this file.</p>
+<p>ExternalManaged specifies whether the file management is delegated to an external system.</p>
+<p>When set to true, the apps controller will ignore the rendering and lifecycle management of
+this file. A ConfigMap source for this template is accepted only when the referenced ConfigMap
+carries the common KubeBlocks component labels.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>variables</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.FileTemplateVariable">
+[]FileTemplateVariable
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Declares the user-configurable variables supported by this file template.</p>
+<p>This field is used for API discovery so users can inspect the ComponentDefinition and learn which
+variables are accepted by <code>cluster.spec.componentSpecs[*].configs[*].variables</code> without reading the
+template content directly.</p>
 </td>
 </tr>
 </tbody>
@@ -6052,9 +6251,31 @@ which initiates an update of the replica&rsquo;s role.</p>
 It ensures replicas are correctly labeled with their respective roles.
 Without this, services that rely on roleSelectors might improperly direct traffic to wrong replicas.</p>
 <p>Expected output of this action:
-- On Success: The determined role of the replica, which must align with one of the roles specified
-  in the component definition.
-- On Failure: An error message, if applicable, indicating why the action failed.</p>
+  - On Success: The determined role of the replica, which must align with one of the roles
+specified in the component definition. Stdout MUST be one of the two forms below:</p>
+<pre><code>  &lt;role&gt;                  // single-token form
+  &lt;role&gt; &lt;roleVersion&gt;    // versioned form
+The two tokens are separated by whitespace (spaces, tabs, or newlines).
+&lt;roleVersion&gt; is an optional unsigned 64-bit decimal integer that
+carries the component's authoritative role version for stale-role
+handling, especially stale exclusive-role claims. A versioned
+result is accepted only when its &lt;roleVersion&gt; is newer than the
+versioned result the controller has already accepted for this Pod.
+The version should represent the complete role fact. For an
+exclusive primary role, identical versions reported by different
+replicas must not describe contradictory primary ownership.
+&lt;role&gt; remains a valid single-token form. Stdout that looks
+versioned but whose second token is not an unsigned 64-bit decimal
+integer, or stdout with three or more whitespace-separated tokens,
+is rejected as malformed and the Pod's role label is not updated.
+A component may migrate a Pod from the single-token form to the
+versioned form. After a Pod has reported the versioned form,
+later single-token results from that Pod are ignored to avoid
+downgrading from authoritative role-version ordering.
+</code></pre>
+<ul>
+<li>On Failure: An error message, if applicable, indicating why the action failed.</li>
+</ul>
 <p>Note: This field is immutable once it has been set.</p>
 </td>
 </tr>
@@ -8190,6 +8411,9 @@ The impact of this field depends on the <code>targetPodSelector</code> value:</p
 <li>When <code>targetPodSelector</code> is set to <code>Any</code> or <code>All</code>, this field will be ignored.</li>
 <li>When <code>targetPodSelector</code> is set to <code>Role</code>, only those replicas whose role matches the <code>matchingKey</code>
 will be selected for the Action.</li>
+<li>When <code>targetPodSelector</code> is set to <code>Ordinal</code>, <code>matchingKey</code> must be a non-negative integer
+and only the replica whose Pod name ends with <code>-&lt;matchingKey&gt;</code> will be selected for the Action.
+The selector is considered ambiguous and the action fails if multiple Pods share the same ordinal.</li>
 </ul>
 <p>This field cannot be updated.</p>
 </td>
@@ -8281,6 +8505,60 @@ PrometheusScheme
 <p>Specifies the schema to use for scraping.
 <code>http</code> and <code>https</code> are the expected values unless you rewrite the <code>__scheme__</code> label via relabeling.
 If empty, Prometheus uses the default value <code>http</code>.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.FileTemplateVariable">FileTemplateVariable
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentFileTemplate">ComponentFileTemplate</a>)
+</p>
+<div>
+<p>FileTemplateVariable declares a user-configurable variable supported by a file template.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the variable name that can be referenced from the file template and set by users
+through <code>cluster.spec.componentSpecs[*].configs[*].variables</code>.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>description</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Provides a human-readable explanation of the variable&rsquo;s purpose.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>defaultValue</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the default value used.</p>
 </td>
 </tr>
 </tbody>
@@ -10565,6 +10843,15 @@ NamedVar
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1.RetentionPeriod">RetentionPeriod
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterBackup">ClusterBackup</a>, <a href="#apps.kubeblocks.io/v1alpha1.ClusterBackup">ClusterBackup</a>)
+</p>
+<div>
+<p>RetentionPeriod represents a duration in the format &ldquo;1y2mo3w4d5h6m&rdquo;, where
+y=year, mo=month, w=week, d=day, h=hour, m=minute.</p>
+</div>
 <h3 id="apps.kubeblocks.io/v1.RetryPolicy">RetryPolicy
 </h3>
 <p>
@@ -15994,7 +16281,7 @@ Modifications to these parameters trigger a configuration reload without requiri
 <td>
 <em>(Optional)</em>
 <p>Lists the parameters that cannot be modified once set.
-Attempting to change any of these parameters will be ignored.</p>
+Attempts to change any of these parameters are rejected during configuration merge and surface as a merge failure.</p>
 </td>
 </tr>
 <tr>
@@ -17029,7 +17316,9 @@ bool
 <td>
 <code>retentionPeriod</code><br/>
 <em>
-github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1.RetentionPeriod
+<a href="#apps.kubeblocks.io/v1.RetentionPeriod">
+RetentionPeriod
+</a>
 </em>
 </td>
 <td>
@@ -22977,7 +23266,7 @@ Modifications to these parameters trigger a configuration reload without requiri
 <td>
 <em>(Optional)</em>
 <p>Lists the parameters that cannot be modified once set.
-Attempting to change any of these parameters will be ignored.</p>
+Attempts to change any of these parameters are rejected during configuration merge and surface as a merge failure.</p>
 </td>
 </tr>
 <tr>
@@ -26953,6 +27242,8 @@ Kubernetes api utils intstr.IntOrString
 <td>
 <em>(Optional)</em>
 <p>Specifies the number of instances to be rolled out.</p>
+<p>For the <code>Create</code> strategy, this is the number of canary instances to create and promote, and it must be
+in the range [0, original stable replicas]. The rollout keeps the component stable replica count unchanged.</p>
 </td>
 </tr>
 <tr>
@@ -27325,6 +27616,22 @@ RolloutStrategy
 </td>
 <td>
 <p>Specifies the rollout strategy for the sharding.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>replicas</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/util/intstr#IntOrString">
+Kubernetes api utils intstr.IntOrString
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the number of instances to be rolled out for each shard.</p>
+<p>For the <code>Create</code> strategy, this is the number of canary instances to create and promote in each shard, and it
+must be in the range [0, original stable replicas]. The rollout keeps the sharding stable replica count unchanged.</p>
 </td>
 </tr>
 <tr>
@@ -27786,7 +28093,8 @@ RolloutPromotion
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the promotion strategy for the component.</p>
+<p>Specifies the promotion strategy for the created instances.</p>
+<p>Promotion turns the created instances into stable instances without changing the stable replica count.</p>
 </td>
 </tr>
 </tbody>
@@ -30738,7 +31046,7 @@ Modifications to these parameters trigger a configuration reload without requiri
 <td>
 <em>(Optional)</em>
 <p>Lists the parameters that cannot be modified once set.
-Attempting to change any of these parameters will be ignored.</p>
+Attempts to change any of these parameters are rejected during configuration merge and surface as a merge failure.</p>
 </td>
 </tr>
 <tr>
@@ -31031,7 +31339,7 @@ Modifications to these parameters trigger a configuration reload without requiri
 <td>
 <em>(Optional)</em>
 <p>Lists the parameters that cannot be modified once set.
-Attempting to change any of these parameters will be ignored.</p>
+Attempts to change any of these parameters are rejected during configuration merge and surface as a merge failure.</p>
 </td>
 </tr>
 <tr>
@@ -32266,6 +32574,20 @@ LifecycleActions
 </tr>
 <tr>
 <td>
+<code>configs</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.ConfigTemplate">
+[]ConfigTemplate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Configs define the desired config templates applied to this instance.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>instanceAssistantObjects</code><br/>
 <em>
 <a href="#workloads.kubeblocks.io/v1.InstanceAssistantObject">
@@ -32803,6 +33125,9 @@ and continue for &ldquo;MinReadySeconds&rdquo; seconds. Otherwise, it will be se
 ConditionStatus will be True if all its instances(pods) are in a Ready condition.
 Or, a NotReady reason with not ready instances encoded in the Message filed will be set.</p>
 </td>
+</tr><tr><td><p>&#34;Restore&#34;</p></td>
+<td><p>InstanceRestore indicates whether the initial data restore for this InstanceSet has completed.</p>
+</td>
 </tr><tr><td><p>&#34;InstanceUpdateRestricted&#34;</p></td>
 <td><p>InstanceUpdateRestricted represents a ConditionType that indicates updates to an InstanceSet are blocked(when the
 PodUpdatePolicy is set to StrictInPlace but the pods cannot be updated in-place).</p>
@@ -32812,7 +33137,7 @@ PodUpdatePolicy is set to StrictInPlace but the pods cannot be updated in-place)
 <h3 id="workloads.kubeblocks.io/v1.ConfigTemplate">ConfigTemplate
 </h3>
 <p>
-(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>)
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSpec">InstanceSpec</a>)
 </p>
 <div>
 </div>
@@ -32837,18 +33162,6 @@ string
 </tr>
 <tr>
 <td>
-<code>generation</code><br/>
-<em>
-int64
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>The generation of the config content.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>configHash</code><br/>
 <em>
 string
@@ -32857,6 +33170,18 @@ string
 <td>
 <em>(Optional)</em>
 <p>Represents a checksum or hash of the config content.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>restart</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies whether to restart instances.</p>
 </td>
 </tr>
 <tr>
@@ -32895,7 +33220,19 @@ map[string]string
 </td>
 <td>
 <em>(Optional)</em>
-<p>The parameters to call the reconfigure action.</p>
+<p>The env/template parameters to call the reconfigure action.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>reconfigureArgs</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ReconfigureArgs is the runtime argv payload for the reconfigure action.</p>
 </td>
 </tr>
 </tbody>
@@ -32992,7 +33329,7 @@ Kubernetes rbac/v1.RoleBinding
 <h3 id="workloads.kubeblocks.io/v1.InstanceConfigStatus">InstanceConfigStatus
 </h3>
 <p>
-(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceStatus">InstanceStatus</a>)
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceStatus">InstanceStatus</a>, <a href="#workloads.kubeblocks.io/v1.InstanceStatus2">InstanceStatus2</a>)
 </p>
 <div>
 </div>
@@ -33013,18 +33350,6 @@ string
 </td>
 <td>
 <p>The name of the config.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>generation</code><br/>
-<em>
-int64
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>The generation of the config.</p>
 </td>
 </tr>
 <tr>
@@ -33566,7 +33891,7 @@ string
 <td>
 <em>(Optional)</em>
 <p>Represents the latest available observations of an instanceset&rsquo;s current state.
-Known .status.conditions.type are: &ldquo;InstanceFailure&rdquo;, &ldquo;InstanceReady&rdquo;</p>
+Known .status.conditions.type are: &ldquo;InstanceFailure&rdquo;, &ldquo;InstanceReady&rdquo;, &ldquo;Restore&rdquo;</p>
 </td>
 </tr>
 <tr>
@@ -33884,6 +34209,20 @@ LifecycleActions
 </tr>
 <tr>
 <td>
+<code>configs</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.ConfigTemplate">
+[]ConfigTemplate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Configs define the desired config templates applied to this instance.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>instanceAssistantObjects</code><br/>
 <em>
 <a href="#workloads.kubeblocks.io/v1.InstanceAssistantObject">
@@ -34102,6 +34441,20 @@ bool
 <td>
 <em>(Optional)</em>
 <p>Represents whether the instance is in volume expansion.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>configs</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.InstanceConfigStatus">
+[]InstanceConfigStatus
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents the config status observed from the running pod of this instance.</p>
 </td>
 </tr>
 </tbody>

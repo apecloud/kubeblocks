@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -33,17 +33,17 @@ import (
 
 type KBAgentTaskEventHandler struct{}
 
-func (h *KBAgentTaskEventHandler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
+func (h *KBAgentTaskEventHandler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) (bool, error) {
 	if !h.isTaskEvent(event) {
-		return nil
+		return false, nil
 	}
 
 	taskEvent := &proto.TaskEvent{}
 	if err := json.Unmarshal([]byte(event.Message), taskEvent); err != nil {
-		return err
+		return true, err
 	}
 
-	return h.handleEvent(reqCtx, cli, event.InvolvedObject.Namespace, *taskEvent)
+	return true, h.handleEvent(reqCtx, cli, event.InvolvedObject.Namespace, *taskEvent)
 }
 
 func (h *KBAgentTaskEventHandler) isTaskEvent(event *corev1.Event) bool {

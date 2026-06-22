@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,14 +17,10 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"errors"
-	"strconv"
-	"strings"
-	"time"
-	"unicode"
-
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
 // Phase defines the BackupPolicy and ActionSet CR .status.phase
@@ -60,132 +56,7 @@ const (
 
 // RetentionPeriod represents a duration in the format "1y2mo3w4d5h6m", where
 // y=year, mo=month, w=week, d=day, h=hour, m=minute.
-type RetentionPeriod string
-
-// ToDuration converts the RetentionPeriod to time.Duration.
-func (r RetentionPeriod) ToDuration() (time.Duration, error) {
-	if len(r.String()) == 0 {
-		return time.Duration(0), nil
-	}
-
-	minutes, err := r.toMinutes()
-	if err != nil {
-		return time.Duration(0), err
-	}
-	return time.Minute * time.Duration(minutes), nil
-}
-
-func (r RetentionPeriod) String() string {
-	return string(r)
-}
-
-func (r RetentionPeriod) toMinutes() (int, error) {
-	d, err := r.parseDuration()
-	if err != nil {
-		return 0, err
-	}
-	minutes := d.Minutes
-	minutes += d.Hours * 60
-	minutes += d.Days * 24 * 60
-	minutes += d.Weeks * 7 * 24 * 60
-	minutes += d.Months * 30 * 24 * 60
-	minutes += d.Years * 365 * 24 * 60
-	return minutes, nil
-}
-
-type duration struct {
-	Minutes int
-	Hours   int
-	Days    int
-	Weeks   int
-	Months  int
-	Years   int
-}
-
-var errInvalidDuration = errors.New("invalid duration provided")
-
-// parseDuration parses a duration from a string. The format is `6y5m234d37h`
-func (r RetentionPeriod) parseDuration() (duration, error) {
-	var (
-		d   duration
-		num int
-		err error
-	)
-
-	s := strings.TrimSpace(r.String())
-	for s != "" {
-		num, s, err = r.nextNumber(s)
-		if err != nil {
-			return duration{}, err
-		}
-
-		if len(s) == 0 {
-			return duration{}, errInvalidDuration
-		}
-
-		if len(s) > 1 && s[0] == 'm' && s[1] == 'o' {
-			d.Months = num
-			s = s[2:]
-			continue
-		}
-
-		switch s[0] {
-		case 'y':
-			d.Years = num
-		case 'w':
-			d.Weeks = num
-		case 'd':
-			d.Days = num
-		case 'h':
-			d.Hours = num
-		case 'm':
-			d.Minutes = num
-		default:
-			return duration{}, errInvalidDuration
-		}
-		s = s[1:]
-	}
-	return d, nil
-}
-
-func (r RetentionPeriod) nextNumber(input string) (num int, rest string, err error) {
-	if len(input) == 0 {
-		return 0, "", nil
-	}
-
-	var (
-		n        string
-		negative bool
-	)
-
-	if input[0] == '-' {
-		negative = true
-		input = input[1:]
-	}
-
-	for i, s := range input {
-		if !unicode.IsNumber(s) {
-			rest = input[i:]
-			break
-		}
-
-		n += string(s)
-	}
-
-	if len(n) == 0 {
-		return 0, input, errInvalidDuration
-	}
-
-	num, err = strconv.Atoi(n)
-	if err != nil {
-		return 0, input, err
-	}
-
-	if negative {
-		num = -num
-	}
-	return num, rest, nil
-}
+type RetentionPeriod = appsv1.RetentionPeriod
 
 // RestorePhase The current phase. Valid values are Running, Completed, Failed, AsDataSource.
 // +enum

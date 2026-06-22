@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -22,7 +22,6 @@ package instance
 import (
 	"reflect"
 	"slices"
-	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -50,19 +49,11 @@ func filterInPlaceFields(src *corev1.PodTemplateSpec) *corev1.PodTemplateSpec {
 	// filter annotations
 	var annotations map[string]string
 	if len(template.Annotations) > 0 {
-		annotations = make(map[string]string)
 		// keep Restart annotation
 		if restart, ok := template.Annotations[constant.RestartAnnotationKey]; ok {
-			annotations[constant.RestartAnnotationKey] = restart
-		}
-		// keep Reconfigure annotation
-		for k, v := range template.Annotations {
-			if strings.HasPrefix(k, constant.UpgradeRestartAnnotationKey) {
-				annotations[k] = v
+			annotations = map[string]string{
+				constant.RestartAnnotationKey: restart,
 			}
-		}
-		if len(annotations) == 0 {
-			annotations = nil
 		}
 	}
 	template.Annotations = annotations
@@ -208,7 +199,7 @@ func equalField(old, new any) bool {
 			if index < 0 {
 				return false
 			}
-			if nc.Image != ocs[index].Image {
+			if !intctrlutil.EqualContainerImageInSpec(ocs[index].Image, nc.Image) {
 				return false
 			}
 		}
@@ -256,6 +247,44 @@ func equalBasicInPlaceFields(old, new *corev1.Pod) bool {
 	return true
 }
 
+// safeMetadataOnlyInPlaceUpdate returns true when the only difference between
+// old and new is a Pod metadata patch (annotations and/or labels) that has no
+// effect on the running database process or availability. In that case the
+// caller can skip the lifecycle switchover that is normally invoked before an
+// in-place pod update.
+//
+// Specifically, it returns true if and only if:
+//   - old and new are otherwise equal when annotations and labels are ignored
+//     (basic spec fields + container resources match)
+//   - metadata has actually changed (do not vacuously skip switchover when
+//     there is no real diff)
+//   - the annotation diff does not include constant.RestartAnnotationKey, the
+//     explicit restart trigger which always implies a process restart
+//
+// Label changes are allowed because pure label patches do not restart the
+// container, do not change the spec, and do not touch the database process.
+// Service-selector routing impact is a network-layer concern and is not
+// resolved by invoking lifecycle switchover. Role-label patches are likewise
+// state synchronization, not a trigger for additional switchover.
+func safeMetadataOnlyInPlaceUpdate(old, new *corev1.Pod) bool {
+	oldCopy := old.DeepCopy()
+	newCopy := new.DeepCopy()
+	oldCopy.Annotations = nil
+	newCopy.Annotations = nil
+	oldCopy.Labels = nil
+	newCopy.Labels = nil
+	if !equalBasicInPlaceFields(oldCopy, newCopy) || !equalResourcesInPlaceFields(oldCopy, newCopy) {
+		return false
+	}
+	if equalField(old.Annotations, new.Annotations) && equalField(old.Labels, new.Labels) {
+		return false
+	}
+	if !equalField(old.Annotations[constant.RestartAnnotationKey], new.Annotations[constant.RestartAnnotationKey]) {
+		return false
+	}
+	return true
+}
+
 // equalResourcesInPlaceFields checks if the desired values of pod resources are equal to their current actual values.
 // If they are equal, it returns true. Containers in 'old' that are not recognized (they may have been injected by external mutating admission webhooks)
 // will not participate in the comparison.
@@ -284,6 +313,14 @@ func equalResourcesInPlaceFields(old, new *corev1.Pod) bool {
 }
 
 func getPodUpdatePolicy(inst *workloads.Instance, pod *corev1.Pod) (podUpdatePolicy, workloads.PodUpdatePolicyType, error) {
+	configRestart, _, err := hasConfigRestart(inst, pod)
+	if err != nil {
+		return noOpsPolicy, "", err
+	}
+	if configRestart {
+		return recreatePolicy, inst.Spec.PodUpdatePolicy, nil
+	}
+
 	newPod, err := buildInstancePod(inst, getPodRevision(pod))
 	if err != nil {
 		return noOpsPolicy, "", err
@@ -331,5 +368,12 @@ func getPodUpdatePolicyInSpec(inst *workloads.Instance, old, new *corev1.Pod) wo
 
 func isPodUpdated(inst *workloads.Instance, pod *corev1.Pod) (bool, error) {
 	policy, _, err := getPodUpdatePolicy(inst, pod)
-	return policy == noOpsPolicy, err
+	if err != nil {
+		return false, err
+	}
+	toUpdate, err := configsToUpdate(inst, pod)
+	if err != nil {
+		return false, err
+	}
+	return policy == noOpsPolicy && len(toUpdate) == 0, nil
 }

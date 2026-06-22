@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -139,7 +139,7 @@ type ConfigConstraintSpec struct {
 	DynamicParameters []string `json:"dynamicParameters,omitempty"`
 
 	// Lists the parameters that cannot be modified once set.
-	// Attempting to change any of these parameters will be ignored.
+	// Attempts to change any of these parameters are rejected during configuration merge and surface as a merge failure.
 	//
 	// +listType=set
 	// +optional

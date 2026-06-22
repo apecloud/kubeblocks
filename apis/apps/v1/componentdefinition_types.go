@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -1115,8 +1115,7 @@ type ComponentFileTemplate struct {
 	//
 	// If specified, this action overrides the global reconfigure action defined in lifecycle actions
 	// for this specific file template.
-	//
-	// When @restartOnFileChange is set to true, this action will be ignored.
+	// External-managed systems may define different behavior for this action entry.
 	//
 	// The container executing this action has access to following variables:
 	//
@@ -1129,12 +1128,42 @@ type ComponentFileTemplate struct {
 	// +optional
 	Reconfigure *Action `json:"reconfigure,omitempty"`
 
-	// ExternalManaged specifies whether the file management is delegated to an external system or manual user control.
+	// ExternalManaged specifies whether the file management is delegated to an external system.
 	//
-	// When set to true, the controller will ignore the management of this file.
+	// When set to true, the apps controller will ignore the rendering and lifecycle management of
+	// this file. A ConfigMap source for this template is accepted only when the referenced ConfigMap
+	// carries the common KubeBlocks component labels.
 	//
 	// +optional
 	ExternalManaged *bool `json:"externalManaged,omitempty"`
+
+	// Declares the user-configurable variables supported by this file template.
+	//
+	// This field is used for API discovery so users can inspect the ComponentDefinition and learn which
+	// variables are accepted by `cluster.spec.componentSpecs[*].configs[*].variables` without reading the
+	// template content directly.
+	//
+	// +optional
+	Variables []FileTemplateVariable `json:"variables,omitempty"`
+}
+
+// FileTemplateVariable declares a user-configurable variable supported by a file template.
+type FileTemplateVariable struct {
+	// Specifies the variable name that can be referenced from the file template and set by users
+	// through `cluster.spec.componentSpecs[*].configs[*].variables`.
+	//
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// Provides a human-readable explanation of the variable's purpose.
+	//
+	// +optional
+	Description string `json:"description,omitempty"`
+
+	// Specifies the default value used.
+	//
+	// +optional
+	DefaultValue string `json:"defaultValue,omitempty"`
 }
 
 type LogConfig struct {
@@ -1275,8 +1304,13 @@ type ReplicasLimit struct {
 }
 
 // ComponentAvailable defines the strategies for determining whether the component is available.
+//
+// If both `WithPhases` and `WithRole` are specified, the component will be considered
+// unavailable if any of them fail.
+// If `WithProbe` is specified, `WithPhases` and `WithRole` fields are ignored.
 type ComponentAvailable struct {
 	// Specifies the phases that the component will go through to be considered available.
+	// Multiple phases are separated by comma.
 	//
 	// This field is immutable once set.
 	//
@@ -1291,8 +1325,6 @@ type ComponentAvailable struct {
 	WithRole *string `json:"withRole,omitempty"`
 
 	// Specifies the strategies for determining whether the component is available based on the available probe.
-	//
-	// If specified, it will take precedence over the WithPhases and WithRole fields.
 	//
 	// This field is immutable once set.
 	//
@@ -1546,9 +1578,30 @@ type ComponentLifecycleActions struct {
 	// Without this, services that rely on roleSelectors might improperly direct traffic to wrong replicas.
 	//
 	// Expected output of this action:
-	// - On Success: The determined role of the replica, which must align with one of the roles specified
-	//   in the component definition.
-	// - On Failure: An error message, if applicable, indicating why the action failed.
+	//   - On Success: The determined role of the replica, which must align with one of the roles
+	//     specified in the component definition. Stdout MUST be one of the two forms below:
+	//
+	//       <role>                  // single-token form
+	//       <role> <roleVersion>    // versioned form
+	//
+	//     The two tokens are separated by whitespace (spaces, tabs, or newlines).
+	//     <roleVersion> is an optional unsigned 64-bit decimal integer that
+	//     carries the component's authoritative role version for stale-role
+	//     handling, especially stale exclusive-role claims. A versioned
+	//     result is accepted only when its <roleVersion> is newer than the
+	//     versioned result the controller has already accepted for this Pod.
+	//     The version should represent the complete role fact. For an
+	//     exclusive primary role, identical versions reported by different
+	//     replicas must not describe contradictory primary ownership.
+	//     <role> remains a valid single-token form. Stdout that looks
+	//     versioned but whose second token is not an unsigned 64-bit decimal
+	//     integer, or stdout with three or more whitespace-separated tokens,
+	//     is rejected as malformed and the Pod's role label is not updated.
+	//     A component may migrate a Pod from the single-token form to the
+	//     versioned form. After a Pod has reported the versioned form,
+	//     later single-token results from that Pod are ignored to avoid
+	//     downgrading from authoritative role-version ordering.
+	//   - On Failure: An error message, if applicable, indicating why the action failed.
 	//
 	// Note: This field is immutable once it has been set.
 	//
@@ -1832,6 +1885,9 @@ type Action struct {
 	// - When `targetPodSelector` is set to `Any` or `All`, this field will be ignored.
 	// - When `targetPodSelector` is set to `Role`, only those replicas whose role matches the `matchingKey`
 	//   will be selected for the Action.
+	// - When `targetPodSelector` is set to `Ordinal`, `matchingKey` must be a non-negative integer
+	//   and only the replica whose Pod name ends with `-<matchingKey>` will be selected for the Action.
+	//   The selector is considered ambiguous and the action fails if multiple Pods share the same ordinal.
 	//
 	// This field cannot be updated.
 	//
@@ -1941,6 +1997,9 @@ type ExecAction struct {
 	// - When `targetPodSelector` is set to `Any` or `All`, this field will be ignored.
 	// - When `targetPodSelector` is set to `Role`, only those replicas whose role matches the `matchingKey`
 	//   will be selected for the Action.
+	// - When `targetPodSelector` is set to `Ordinal`, `matchingKey` must be a non-negative integer
+	//   and only the replica whose Pod name ends with `-<matchingKey>` will be selected for the Action.
+	//   The selector is considered ambiguous and the action fails if multiple Pods share the same ordinal.
 	//
 	// This field cannot be updated.
 	//

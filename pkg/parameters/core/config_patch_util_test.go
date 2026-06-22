@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -302,8 +302,7 @@ max_connections=666
 					})
 				}
 			}
-			configRender := parametersv1alpha1.ParamConfigRendererSpec{Configs: configs}
-			got, excludeDiff, err := CreateConfigPatch(tt.args.oldVersion, tt.args.newVersion, configRender, tt.args.enableExcludeDiff)
+			got, excludeDiff, err := CreateConfigPatch(tt.args.oldVersion, tt.args.newVersion, configs, tt.args.enableExcludeDiff)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("CreateConfigPatch() error = %v, wantErr %v", err, tt.wantErr)
 				return

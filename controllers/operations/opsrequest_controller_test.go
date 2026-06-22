@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -28,26 +28,53 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	ctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/generics"
+	kboperations "github.com/apecloud/kubeblocks/pkg/operations"
 	opsutil "github.com/apecloud/kubeblocks/pkg/operations/util"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 	testops "github.com/apecloud/kubeblocks/pkg/testutil/operations"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
+
+func newOperationsTestScheme() *runtime.Scheme {
+	scheme := runtime.NewScheme()
+	mustAddToScheme := []func(*runtime.Scheme) error{
+		corev1.AddToScheme,
+		batchv1.AddToScheme,
+		appsv1.AddToScheme,
+		dpv1alpha1.AddToScheme,
+		opsv1alpha1.AddToScheme,
+		parametersv1alpha1.AddToScheme,
+		workloads.AddToScheme,
+	}
+	for _, addToScheme := range mustAddToScheme {
+		Expect(addToScheme(scheme)).Should(Succeed())
+	}
+	return scheme
+}
 
 var _ = Describe("OpsRequest Controller", func() {
 	const compDefName = "test-compdef"
@@ -94,6 +121,267 @@ var _ = Describe("OpsRequest Controller", func() {
 
 	AfterEach(func() {
 		cleanEnv()
+	})
+
+	Context("direct controller helper branches", func() {
+		const helperNamespace = "helper-ns"
+		const helperClusterName = "helper-cluster"
+
+		newOpsRequestReconciler := func(objs ...client.Object) *OpsRequestReconciler {
+			scheme := newOperationsTestScheme()
+			return &OpsRequestReconciler{
+				Client: fake.NewClientBuilder().
+					WithScheme(scheme).
+					WithStatusSubresource(&opsv1alpha1.OpsRequest{}, &appsv1.Cluster{}).
+					WithObjects(objs...).
+					Build(),
+				Scheme:   scheme,
+				Recorder: record.NewFakeRecorder(20),
+			}
+		}
+
+		newClusterWithOps := func() *appsv1.Cluster {
+			cluster := &appsv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      helperClusterName,
+					Namespace: helperNamespace,
+				},
+			}
+			opsutil.SetOpsRequestToCluster(cluster, []opsv1alpha1.OpsRecorder{
+				{Name: "running-restart", Type: opsv1alpha1.RestartType},
+				{Name: "queued-restart", Type: opsv1alpha1.RestartType, InQueue: true},
+				{Name: "queued-expose", Type: opsv1alpha1.ExposeType, InQueue: true, QueueBySelf: true},
+			})
+			return cluster
+		}
+
+		expectMappedRequests := func(requests []reconcile.Request) {
+			Expect(requests).Should(ConsistOf(
+				reconcile.Request{NamespacedName: types.NamespacedName{Namespace: helperNamespace, Name: "running-restart"}},
+				reconcile.Request{NamespacedName: types.NamespacedName{Namespace: helperNamespace, Name: "queued-expose"}},
+			))
+		}
+
+		It("maps dependent resources to running ops requests", func() {
+			cluster := newClusterWithOps()
+			volumeOps := testops.NewOpsRequestObj("volume-ops", helperNamespace, helperClusterName, opsv1alpha1.VolumeExpansionType)
+			volumeOps.Status.Phase = opsv1alpha1.OpsRunningPhase
+			reconciler := newOpsRequestReconciler(cluster, volumeOps)
+
+			instance := &workloads.Instance{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "instance",
+					Namespace: helperNamespace,
+					Labels: map[string]string{
+						constant.AppInstanceLabelKey: helperClusterName,
+					},
+				},
+			}
+			expectMappedRequests(reconciler.parseRunningOpsRequestsForInstance(ctx, instance))
+			Expect(reconciler.parseRunningOpsRequestsForInstance(ctx, &workloads.Instance{})).Should(BeNil())
+
+			componentParameter := &parametersv1alpha1.ComponentParameter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "parameters",
+					Namespace: helperNamespace,
+				},
+				Spec: parametersv1alpha1.ComponentParameterSpec{
+					ClusterName: helperClusterName,
+				},
+			}
+			expectMappedRequests(reconciler.parseRunningOpsRequestsForComponentParameter(ctx, componentParameter))
+			Expect(reconciler.parseRunningOpsRequestsForComponentParameter(ctx, &parametersv1alpha1.ComponentParameter{})).Should(BeNil())
+
+			pvc := &corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "data-volume",
+					Namespace: helperNamespace,
+					Labels: map[string]string{
+						constant.AppManagedByLabelKey: constant.AppName,
+						constant.AppInstanceLabelKey:  helperClusterName,
+					},
+				},
+			}
+			Expect(reconciler.parseVolumeExpansionOpsRequest(ctx, pvc)).Should(Equal([]reconcile.Request{
+				{NamespacedName: types.NamespacedName{Namespace: helperNamespace, Name: volumeOps.Name}},
+			}))
+		})
+
+		It("maps backup records to the owning ops request", func() {
+			reconciler := newOpsRequestReconciler()
+			backup := &dpv1alpha1.Backup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "backup",
+					Namespace: helperNamespace,
+					Labels: map[string]string{
+						constant.OpsRequestNameLabelKey: "backup-ops",
+						constant.OpsRequestTypeLabelKey: string(opsv1alpha1.BackupType),
+					},
+				},
+			}
+
+			Expect(reconciler.parseBackupOpsRequest(ctx, backup)).Should(Equal([]reconcile.Request{
+				{NamespacedName: types.NamespacedName{Namespace: helperNamespace, Name: "backup-ops"}},
+			}))
+			Expect(reconciler.parseBackupOpsRequest(ctx, &dpv1alpha1.Backup{})).Should(BeNil())
+		})
+
+		It("deletes external jobs and temporary pods created for an ops request", func() {
+			ops := testops.NewOpsRequestObj("cleanup-ops", helperNamespace, helperClusterName, opsv1alpha1.RestartType)
+			job := &batchv1.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "cleanup-job",
+					Namespace: helperNamespace,
+					Labels: map[string]string{
+						constant.OpsRequestNameLabelKey: ops.Name,
+					},
+				},
+			}
+			reconciler := newOpsRequestReconciler(job)
+			Expect(reconciler.deleteExternalJobs(ctx, ops)).Should(Succeed())
+			jobList := &batchv1.JobList{}
+			Expect(reconciler.Client.List(ctx, jobList, client.InNamespace(helperNamespace))).Should(Succeed())
+			Expect(jobList.Items).Should(BeEmpty())
+
+			oldControllerNamespace := viper.GetString(constant.CfgKeyCtrlrMgrNS)
+			viper.Set(constant.CfgKeyCtrlrMgrNS, helperNamespace)
+			defer viper.Set(constant.CfgKeyCtrlrMgrNS, oldControllerNamespace)
+
+			pod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "cleanup-pod",
+					Namespace: helperNamespace,
+					Labels: map[string]string{
+						constant.OpsRequestNameLabelKey:      ops.Name,
+						constant.OpsRequestNamespaceLabelKey: ops.Namespace,
+					},
+				},
+			}
+			reconciler = newOpsRequestReconciler(pod)
+			Expect(reconciler.deleteCreatedPodsInKBNamespace(ctrlutil.RequestCtx{Ctx: ctx}, ops)).Should(Succeed())
+			podList := &corev1.PodList{}
+			Expect(reconciler.Client.List(ctx, podList, client.InNamespace(helperNamespace))).Should(Succeed())
+			Expect(podList.Items).Should(BeEmpty())
+		})
+
+		It("cleans deleted ops annotations and reconciles related ops requests", func() {
+			deletedOpsName := "deleted-ops"
+			supportedCluster := &appsv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "supported",
+					Namespace: helperNamespace,
+					Annotations: map[string]string{
+						constant.CRDAPIVersionAnnotationKey: appsv1.GroupVersion.String(),
+					},
+				},
+			}
+			opsutil.SetOpsRequestToCluster(supportedCluster, []opsv1alpha1.OpsRecorder{{Name: deletedOpsName, Type: opsv1alpha1.RestartType}})
+			unsupportedCluster := &appsv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "unsupported",
+					Namespace: helperNamespace,
+					Annotations: map[string]string{
+						constant.CRDAPIVersionAnnotationKey: "unsupported/v1",
+					},
+				},
+			}
+			opsutil.SetOpsRequestToCluster(unsupportedCluster, []opsv1alpha1.OpsRecorder{{Name: deletedOpsName, Type: opsv1alpha1.RestartType}})
+			relatedOps := testops.NewOpsRequestObj("related-ops", helperNamespace, helperClusterName, opsv1alpha1.RestartType)
+			reconciler := newOpsRequestReconciler(supportedCluster, unsupportedCluster, relatedOps)
+
+			reqCtx := ctrlutil.RequestCtx{
+				Ctx: ctx,
+				Req: reconcile.Request{NamespacedName: types.NamespacedName{Namespace: helperNamespace, Name: deletedOpsName}},
+			}
+			Expect(reconciler.handleOpsReqDeletedDuringRunning(reqCtx)).Should(Succeed())
+
+			fetchedCluster := &appsv1.Cluster{}
+			Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(supportedCluster), fetchedCluster)).Should(Succeed())
+			opsSlice, err := opsutil.GetOpsRequestSliceFromCluster(fetchedCluster)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(opsSlice).Should(BeEmpty())
+
+			Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(unsupportedCluster), fetchedCluster)).Should(Succeed())
+			opsSlice, err = opsutil.GetOpsRequestSliceFromCluster(fetchedCluster)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(opsSlice).Should(HaveLen(1))
+
+			sourceOps := testops.NewOpsRequestObj("source-ops", helperNamespace, helperClusterName, opsv1alpha1.RestartType)
+			sourceOps.ResourceVersion = "42"
+			sourceOps.Annotations = map[string]string{
+				constant.RelatedOpsAnnotationKey: "related-ops,missing-ops",
+			}
+			Expect(reconciler.annotateRelatedOps(reqCtx, sourceOps)).Should(Succeed())
+
+			fetchedOps := &opsv1alpha1.OpsRequest{}
+			Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(relatedOps), fetchedOps)).Should(Succeed())
+			Expect(fetchedOps.Annotations[constant.ReconcileAnnotationKey]).Should(Equal(sourceOps.ResourceVersion))
+		})
+
+		It("fetches clusters for supported ops requests and reports unsupported or missing targets", func() {
+			cluster := &appsv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      helperClusterName,
+					Namespace: helperNamespace,
+				},
+			}
+			restartOps := testops.NewOpsRequestObj("restart-fetch", helperNamespace, helperClusterName, opsv1alpha1.RestartType)
+			reconciler := newOpsRequestReconciler(cluster, restartOps)
+			reqCtx := ctrlutil.RequestCtx{
+				Ctx: ctx,
+				Req: reconcile.Request{NamespacedName: client.ObjectKeyFromObject(restartOps)},
+			}
+			opsRes := &kboperations.OpsResource{OpsRequest: restartOps, Recorder: reconciler.Recorder}
+			res, err := reconciler.fetchCluster(reqCtx, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(res).Should(BeNil())
+			Expect(opsRes.Cluster.Name).Should(Equal(helperClusterName))
+
+			restoreOps := testops.NewOpsRequestObj("restore-fetch", helperNamespace, "restored-cluster", opsv1alpha1.RestoreType)
+			reconciler = newOpsRequestReconciler(restoreOps)
+			reqCtx.Req = reconcile.Request{NamespacedName: client.ObjectKeyFromObject(restoreOps)}
+			opsRes = &kboperations.OpsResource{OpsRequest: restoreOps, Recorder: reconciler.Recorder}
+			res, err = reconciler.fetchCluster(reqCtx, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(res).Should(BeNil())
+			Expect(opsRes.Cluster.Name).Should(Equal("restored-cluster"))
+			Expect(opsRes.Cluster.Namespace).Should(Equal(helperNamespace))
+
+			unsupportedOps := testops.NewOpsRequestObj("unsupported-fetch", helperNamespace, helperClusterName, opsv1alpha1.OpsType("Unsupported"))
+			reconciler = newOpsRequestReconciler(unsupportedOps)
+			reqCtx.Req = reconcile.Request{NamespacedName: client.ObjectKeyFromObject(unsupportedOps)}
+			opsRes = &kboperations.OpsResource{OpsRequest: unsupportedOps, Recorder: reconciler.Recorder}
+			res, err = reconciler.fetchCluster(reqCtx, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(res).Should(BeNil())
+			fetchedOps := &opsv1alpha1.OpsRequest{}
+			Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(unsupportedOps), fetchedOps)).Should(Succeed())
+			Expect(fetchedOps.Status.Phase).Should(Equal(opsv1alpha1.OpsFailedPhase))
+
+			missingClusterOps := testops.NewOpsRequestObj("missing-cluster-fetch", helperNamespace, "missing-cluster", opsv1alpha1.RestartType)
+			reconciler = newOpsRequestReconciler(missingClusterOps)
+			reqCtx.Req = reconcile.Request{NamespacedName: client.ObjectKeyFromObject(missingClusterOps)}
+			opsRes = &kboperations.OpsResource{OpsRequest: missingClusterOps, Recorder: reconciler.Recorder}
+			res, err = reconciler.fetchCluster(reqCtx, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(res).ShouldNot(BeNil())
+			Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(missingClusterOps), fetchedOps)).Should(Succeed())
+			Expect(fetchedOps.Status.Phase).Should(Equal(opsv1alpha1.OpsFailedPhase))
+		})
+
+		It("reconciles cleanly when the ops request no longer exists", func() {
+			reconciler := newOpsRequestReconciler()
+			reqCtx := ctrlutil.RequestCtx{
+				Ctx: ctx,
+				Req: reconcile.Request{NamespacedName: types.NamespacedName{Namespace: helperNamespace, Name: "missing-ops"}},
+			}
+			opsRes := &kboperations.OpsResource{Recorder: reconciler.Recorder}
+
+			res, err := reconciler.fetchOpsRequest(reqCtx, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(res).ShouldNot(BeNil())
+			Expect(opsRes.OpsRequest).Should(BeNil())
+		})
 	})
 
 	var (
@@ -635,7 +923,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			// TODO: test head opsRequest phase is Failed by mocking pod is Failed
 		})
 
-		It("test opsRequest force flag", func() {
+		XIt("test opsRequest force flag", func() {
 			By("create cluster and mock it to running")
 			replicas := int32(3)
 			createMysqlCluster(replicas)

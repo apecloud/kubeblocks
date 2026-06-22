@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -21,6 +21,7 @@ package cluster
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -29,10 +30,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 )
 
 type gvkNObjKey struct {
@@ -60,32 +60,6 @@ func getAppInstanceML(cluster appsv1.Cluster) client.MatchingLabels {
 	return client.MatchingLabels{
 		constant.AppInstanceLabelKey: cluster.Name,
 	}
-}
-
-func getFailedBackups(ctx context.Context,
-	cli client.Reader,
-	namespace string,
-	labels client.MatchingLabels,
-	owningNamespacedObjects owningObjects) error {
-	backupList := &dpv1alpha1.BackupList{}
-	if err := cli.List(ctx, backupList, client.InNamespace(namespace), labels); err != nil {
-		return err
-	}
-
-	for i := range backupList.Items {
-		backup := &backupList.Items[i]
-		if backup.Status.Phase != dpv1alpha1.BackupPhaseFailed {
-			continue
-		}
-		if backup.Labels[dptypes.BackupTypeLabelKey] != string(dpv1alpha1.BackupTypeContinuous) {
-			gvr, err := getGVKName(backup, model.GetScheme())
-			if err != nil {
-				return err
-			}
-			owningNamespacedObjects[*gvr] = backup
-		}
-	}
-	return nil
 }
 
 func getOwningNamespacedObjects(ctx context.Context,
@@ -138,4 +112,48 @@ func isOwnedByComp(obj client.Object) bool {
 		}
 	}
 	return false
+}
+
+func listClusterComponents(ctx context.Context, cli client.Reader, cluster *appsv1.Cluster) (map[string]*appsv1.Component, map[string][]*appsv1.Component, error) {
+	compList := &appsv1.ComponentList{}
+	ml := client.MatchingLabels(constant.GetClusterLabels(cluster.Name))
+	if err := cli.List(ctx, compList, client.InNamespace(cluster.Namespace), ml); err != nil {
+		return nil, nil, err
+	}
+
+	if len(compList.Items) == 0 {
+		return nil, nil, nil
+	}
+
+	comps := make(map[string]*appsv1.Component)
+	shardingComps := make(map[string][]*appsv1.Component)
+
+	sharding := func(comp *appsv1.Component) bool {
+		shardingName := shardingCompNName(comp)
+		if len(shardingName) == 0 {
+			return false
+		}
+
+		if _, ok := shardingComps[shardingName]; !ok {
+			shardingComps[shardingName] = []*appsv1.Component{comp}
+		} else {
+			shardingComps[shardingName] = append(shardingComps[shardingName], comp)
+		}
+		return true
+	}
+
+	for i, comp := range compList.Items {
+		if sharding(&compList.Items[i]) {
+			continue
+		}
+		compName, err := component.ShortName(cluster.Name, comp.Name)
+		if err != nil {
+			return nil, nil, err
+		}
+		if _, ok := comps[compName]; ok {
+			return nil, nil, fmt.Errorf("duplicate component name: %s", compName)
+		}
+		comps[compName] = &compList.Items[i]
+	}
+	return comps, shardingComps, nil
 }

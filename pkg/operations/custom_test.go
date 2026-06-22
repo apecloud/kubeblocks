@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -82,6 +82,76 @@ var _ = Describe("CustomOps", func() {
 	BeforeEach(cleanEnv)
 
 	AfterEach(cleanEnv)
+
+	It("runs workflow status transitions without executing new actions", func() {
+		opsRequest := testops.NewOpsRequestObj("workflow-ops-"+randomStr, testCtx.DefaultNamespace,
+			clusterName, opsv1alpha1.CustomType)
+		opsRequest.Spec.CustomOps = &opsv1alpha1.CustomOps{
+			CustomOpsComponents: []opsv1alpha1.CustomOpsComponent{{
+				ComponentOps: opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
+			}},
+		}
+		clusterObj := &appsv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{Name: clusterName, Namespace: testCtx.DefaultNamespace},
+			Spec: appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{{
+				Name:           defaultCompName,
+				ComponentDef:   "cmpd",
+				ServiceVersion: "8.0.30",
+			}}},
+		}
+		opsDefinition := &opsv1alpha1.OpsDefinition{Spec: opsv1alpha1.OpsDefinitionSpec{
+			Actions: []opsv1alpha1.OpsAction{
+				{Name: "ignore-failed", FailurePolicy: opsv1alpha1.FailurePolicyIgnore},
+				{Name: "done", FailurePolicy: opsv1alpha1.FailurePolicyFail},
+			},
+			ComponentInfos: []opsv1alpha1.ComponentInfo{{
+				ComponentDefinitionName: "cmpd",
+				ImageMappings: []opsv1alpha1.ImageMappings{{
+					ServiceVersions: []string{"8.0.30"},
+					Images:          map[string]string{"runner": "custom:8.0.30"},
+				}},
+			}},
+		}}
+		opsRequest.Status.Components = map[string]opsv1alpha1.OpsRequestComponentStatus{
+			defaultCompName: {
+				ProgressDetails: []opsv1alpha1.ProgressStatusDetail{
+					{ActionName: "ignore-failed", Status: opsv1alpha1.FailedProgressStatus},
+					{ActionName: "done", Status: opsv1alpha1.SucceedProgressStatus},
+				},
+			},
+		}
+		opsResource := &OpsResource{OpsRequest: opsRequest, Cluster: clusterObj, OpsDef: opsDefinition}
+		workflow := NewWorkflowContext(intctrlutil.RequestCtx{Ctx: testCtx.Ctx}, k8sClient, opsResource)
+		Expect(workflow.getImages(&clusterObj.Spec.ComponentSpecs[0])).Should(HaveKeyWithValue("runner", "custom:8.0.30"))
+		Expect(workflow.getImages(&appsv1.ClusterComponentSpec{ComponentDef: "other"})).Should(BeNil())
+
+		status, err := workflow.Run(&opsRequest.Spec.CustomOps.CustomOpsComponents[0])
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(status.IsCompleted).Should(BeTrue())
+		Expect(status.ExistFailure).Should(BeFalse())
+		Expect(status.CompletedCount).Should(Equal(2))
+
+		opsDefinition.Spec.Actions[0].FailurePolicy = opsv1alpha1.FailurePolicyFail
+		opsRequest.Status.Components[defaultCompName] = opsv1alpha1.OpsRequestComponentStatus{
+			ProgressDetails: []opsv1alpha1.ProgressStatusDetail{
+				{ActionName: "ignore-failed", Status: opsv1alpha1.FailedProgressStatus},
+			},
+		}
+		status, err = workflow.Run(&opsRequest.Spec.CustomOps.CustomOpsComponents[0])
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(status.IsCompleted).Should(BeTrue())
+		Expect(status.ExistFailure).Should(BeTrue())
+		Expect(status.CompletedCount).Should(Equal(1))
+
+		opsRequest.Status.Components[defaultCompName] = opsv1alpha1.OpsRequestComponentStatus{}
+		status, err = workflow.Run(&opsRequest.Spec.CustomOps.CustomOpsComponents[0])
+		Expect(status).Should(BeNil())
+		Expect(err).Should(HaveOccurred())
+		Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeTrue())
+
+		Expect(workflow.getAction(opsv1alpha1.OpsAction{ResourceModifier: &opsv1alpha1.OpsResourceModifierAction{}},
+			&opsRequest.Spec.CustomOps.CustomOpsComponents[0], &clusterObj.Spec.ComponentSpecs[0], opsv1alpha1.ProgressStatusDetail{})).Should(BeNil())
+	})
 
 	createCustomOps := func(comp string, params []opsv1alpha1.Parameter) *opsv1alpha1.OpsRequest {
 		opsName := "custom-ops-" + testCtx.GetRandomStr()

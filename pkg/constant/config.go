@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,21 +17,12 @@ limitations under the License.
 package constant
 
 const (
-	ConfigManagerToolPath = "/bin/reloader"
-
 	ConfigurationConstraintsLabelPrefixKey = "config.kubeblocks.io/constraints"
-
-	// CMInsLastReconfigurePhaseKey defines the current phase
-	CMInsLastReconfigurePhaseKey = "config.kubeblocks.io/last-applied-reconfigure-phase"
 
 	// ConfigurationRevision defines the current revision
 	// TODO support multi version
 	ConfigurationRevision          = "config.kubeblocks.io/configuration-revision"
 	LastConfigurationRevisionPhase = "config.kubeblocks.io/revision-reconcile-phase"
-
-	// Deprecated: only compatible with version 0.6, will be removed in 0.8
-	// CMInsEnableRerenderTemplateKey is used to enable rerender template
-	CMInsEnableRerenderTemplateKey = "config.kubeblocks.io/enable-rerender"
 )
 
 const (
@@ -41,31 +32,18 @@ const (
 	CMConfigurationTypeLabelKey            = "config.kubeblocks.io/config-type"
 	CMInsConfigurationHashLabelKey         = "config.kubeblocks.io/config-hash"
 	CMConfigurationConstraintsNameLabelKey = "config.kubeblocks.io/config-constraints-name"
-
-	ParametersInitLabelKey               = "config.kubeblocks.io/init-parameters"
-	CustomParameterTemplateAnnotationKey = "config.kubeblocks.io/custom-template"
 )
 
 const (
 	DisableUpgradeInsConfigurationAnnotationKey = "config.kubeblocks.io/disable-reconfigure"
 	LastAppliedConfigAnnotationKey              = "config.kubeblocks.io/last-applied-configuration"
 	UpgradePolicyAnnotationKey                  = "config.kubeblocks.io/reconfigure-policy"
-	KBParameterUpdateSourceAnnotationKey        = "config.kubeblocks.io/reconfigure-source"
-	UpgradeRestartAnnotationKey                 = "config.kubeblocks.io/restart"
 	ConfigAppliedVersionAnnotationKey           = "config.kubeblocks.io/config-applied-version"
+	ParametersAppliedComponentGenerationKey     = "parameters.kubeblocks.io/latest-component-generation"
 )
 
 const (
-	ConfigSidecarName        = "config-manager"
-	ConfigManagerGPRCPortEnv = "CONFIG_MANAGER_GRPC_PORT"
-	ConfigManagerLogLevel    = "CONFIG_MANAGER_LOG_LEVEL"
-
 	ConfigInstanceType = "instance"
-
-	ReconfigureManagerSource = "manager"
-	ReconfigureUserSource    = "ops"
-
-	ConfigManagerPortName = "config-manager"
 )
 
 const (

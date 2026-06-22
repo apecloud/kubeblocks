@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -23,8 +23,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-
-	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 )
 
 // +genclient
@@ -172,7 +170,7 @@ type ClusterSpec struct {
 	// +kubebuilder:validation:MinItems=1
 	// +kubebuilder:validation:MaxItems=128
 	// +optional
-	Shardings []ClusterSharding `json:"shardings,omitempty"`
+	Shardings []ClusterSharding `json:"shardings,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
 	// Specifies runtimeClassName for all Pods managed by this Cluster.
 	//
@@ -198,6 +196,12 @@ type ClusterSpec struct {
 	//
 	// +optional
 	Backup *ClusterBackup `json:"backup,omitempty"`
+
+	// Specifies the restore configuration of the Cluster.
+	//
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="restore is immutable"
+	// +optional
+	Restore *ClusterRestore `json:"restore,omitempty"`
 }
 
 // ClusterStatus defines the observed state of the Cluster.
@@ -820,7 +824,7 @@ type ClusterBackup struct {
 	//
 	// +kubebuilder:default="7d"
 	// +optional
-	RetentionPeriod dpv1alpha1.RetentionPeriod `json:"retentionPeriod,omitempty"`
+	RetentionPeriod RetentionPeriod `json:"retentionPeriod,omitempty"`
 
 	// Specifies the backup method to use, as defined in backupPolicy.
 	//
@@ -867,6 +871,48 @@ type ClusterBackup struct {
 	//
 	// +optional
 	IncrementalCronExpression string `json:"incrementalCronExpression,omitempty"`
+}
+
+// ClusterRestore specifies how to initialize a Cluster from a restore source.
+type ClusterRestore struct {
+	// Specifies the restore source.
+	//
+	// +kubebuilder:validation:Required
+	Source ClusterRestoreSource `json:"source"`
+
+	// Specifies the point-in-time recovery target. The value is opaque to apps and interpreted by the restore runtime.
+	//
+	// +optional
+	PITR string `json:"pitr,omitempty"`
+
+	// Specifies runtime-specific restore parameters.
+	//
+	// +optional
+	Parameters map[string]string `json:"parameters,omitempty"`
+}
+
+// ClusterRestoreSource describes the source object used by a Cluster restore.
+type ClusterRestoreSource struct {
+	// Specifies the API group of the restore source. For example, use "dataprotection.kubeblocks.io" for KubeBlocks
+	// data protection Backup sources.
+	//
+	// +kubebuilder:validation:Required
+	APIGroup string `json:"apiGroup"`
+
+	// Specifies the kind of the restore source.
+	//
+	// +kubebuilder:validation:Required
+	Kind string `json:"kind"`
+
+	// Specifies the name of the restore source.
+	//
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// Specifies the namespace of the restore source. If empty, the Cluster namespace is used.
+	//
+	// +optional
+	Namespace string `json:"namespace,omitempty"`
 }
 
 // ClusterPhase defines the phase of the Cluster within the .status.phase field.

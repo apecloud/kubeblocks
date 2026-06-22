@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -43,6 +43,7 @@ const (
 	K8SQuantityType         CueType = "quantity"
 	ClassicStorageType      CueType = "storage"
 	ClassicTimeDurationType CueType = "timeDuration"
+	IECQuantityType         CueType = "iecQuantity"
 )
 
 // CueValidate validates cue file

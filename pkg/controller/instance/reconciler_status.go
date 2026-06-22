@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -65,11 +65,6 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	ready, available, updated := false, false, false
 	notReadyName, notAvailableName := "", ""
 
-	// podToNodeMapping, err := ParseNodeSelectorOnceAnnotation(inst)
-	// if err != nil {
-	//	return kubebuilderx.Continue, err
-	// }
-
 	if isCreated(pod) {
 		notReadyName = pod.Name
 	}
@@ -88,17 +83,6 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			return kubebuilderx.Continue, err
 		}
 	}
-
-	// TODO: ???
-	// if nodeName, ok := podToNodeMapping[pod.Name]; ok {
-	//	// there's chance that a pod is currently running and wait to be deleted so that it can be rescheduled
-	//	if pod.Spec.NodeName == nodeName {
-	//		if err := deleteNodeSelectorOnceAnnotation(its, pod.Name); err != nil {
-	//			return kubebuilderx.Continue, err
-	//		}
-	//	}
-	// }
-
 	inst.Status.CurrentRevision = getPodRevision(pod)
 	if updated {
 		inst.Status.CurrentRevision = inst.Status.UpdateRevision
@@ -122,6 +106,11 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	inst.Status.Available = available
 	inst.Status.Role = r.observedRoleOfPod(inst, pod)
 	inst.Status.VolumeExpansion = r.hasRunningVolumeExpansion(tree, inst)
+	configs, err := r.observedConfigsOfPod(pod)
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
+	inst.Status.Configs = configs
 
 	if inst.Spec.MinReadySeconds > 0 && !available {
 		return kubebuilderx.RetryAfter(time.Second), nil
@@ -223,4 +212,22 @@ func (r *statusReconciler) hasRunningVolumeExpansion(tree *kubebuilderx.ObjectTr
 		}
 	}
 	return false
+}
+
+func (r *statusReconciler) observedConfigsOfPod(pod *corev1.Pod) ([]workloads.InstanceConfigStatus, error) {
+	configs, err := configsFromPod(pod)
+	if err != nil {
+		return nil, err
+	}
+	if len(configs) == 0 {
+		return nil, nil
+	}
+	status := make([]workloads.InstanceConfigStatus, 0, len(configs))
+	for _, config := range configs {
+		status = append(status, workloads.InstanceConfigStatus{
+			Name:       config.Name,
+			ConfigHash: config.ConfigHash,
+		})
+	}
+	return status, nil
 }

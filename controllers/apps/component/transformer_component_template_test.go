@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -120,6 +120,10 @@ var _ = Describe("file templates transformer test", func() {
 				ClusterName:  clusterName,
 				Name:         compName,
 				FullCompName: fmt.Sprintf("%s-%s", clusterName, compName),
+				Annotations: map[string]string{
+					constant.KBAppMultiClusterPlacementKey: "member-1",
+				},
+				EnableInstanceAPI: ptr.To(true),
 				PodSpec: &corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
@@ -214,6 +218,14 @@ var _ = Describe("file templates transformer test", func() {
 		}
 	}
 
+	checkAssistantObject := func(kind, namespace, name string) {
+		Expect(transCtx.SynthesizeComponent.InstanceAssistantObjects).Should(ContainElement(corev1.ObjectReference{
+			Kind:      kind,
+			Namespace: namespace,
+			Name:      name,
+		}))
+	}
+
 	// checkEnvWithAction := func(action string) {
 	//	podSpec := transCtx.SynthesizeComponent.PodSpec
 	//	for _, c := range podSpec.Containers {
@@ -268,8 +280,25 @@ var _ = Describe("file templates transformer test", func() {
 			})
 		})
 
+		It("keeps empty template file content empty", func() {
+			logConfCM.Data["member_leave.sh"] = "member_leave"
+			logConfCM.Data["role_probe.sh"] = "role_probe"
+			logConfCM.Data["switchover.sh"] = ""
+
+			transformer := &componentFileTemplateTransformer{}
+			Expect(transformer.Transform(transCtx, dag)).Should(BeNil())
+
+			checkTemplateObject("logConf", func(obj *corev1.ConfigMap) {
+				Expect(obj.Labels).Should(HaveKeyWithValue(kubeBlockFileTemplateLabelKey, "true"))
+				Expect(obj.Data).Should(HaveKeyWithValue("member_leave.sh", "member_leave"))
+				Expect(obj.Data).Should(HaveKeyWithValue("role_probe.sh", "role_probe"))
+				Expect(obj.Data).Should(HaveKeyWithValue("switchover.sh", ""))
+			})
+		})
+
 		It("udf reconfigure", func() {
-			transCtx.SynthesizeComponent.FileTemplates[0].Reconfigure = &appsv1.Action{
+			transCtx.SynthesizeComponent.FileTemplates[0].ReconfigureRequired = ptr.To(true)
+			transCtx.SynthesizeComponent.FileTemplates[0].ReconfigureAction = &appsv1.Action{
 				Exec: &appsv1.ExecAction{
 					Command: []string{"echo", "reconfigure"},
 				},
@@ -284,8 +313,31 @@ var _ = Describe("file templates transformer test", func() {
 			// checkEnvWithAction(component.UDFReconfigureActionName(transCtx.SynthesizeComponent.FileTemplates[0]))
 		})
 
+		It("reconfigure args", func() {
+			transCtx.SynthesizeComponent.FileTemplates[0].Config = true
+			transCtx.SynthesizeComponent.FileTemplates[0].ReconfigureRequired = ptr.To(true)
+			transCtx.SynthesizeComponent.FileTemplates[0].ReconfigureAction = &appsv1.Action{
+				HTTP: &appsv1.HTTPAction{
+					Port: "8080",
+					Path: "/reload",
+				},
+			}
+			transCtx.SynthesizeComponent.FileTemplates[0].ReconfigureArgs = [][]string{{"maxmemory", "1gb"}, {"timeout", "30"}}
+
+			transformer := &componentFileTemplateTransformer{}
+			err := transformer.Transform(transCtx, dag)
+			Expect(err).Should(BeNil())
+
+			Expect(transCtx.SynthesizeComponent.Configs).Should(HaveLen(1))
+			Expect(transCtx.SynthesizeComponent.Configs[0].Name).Should(Equal("logConf"))
+			Expect(transCtx.SynthesizeComponent.Configs[0].ReconfigureActionName).Should(Equal(component.UserReconfigureActionName(transCtx.SynthesizeComponent.FileTemplates[0])))
+			Expect(transCtx.SynthesizeComponent.Configs[0].Reconfigure).Should(Equal(transCtx.SynthesizeComponent.FileTemplates[0].ReconfigureAction))
+			Expect(transCtx.SynthesizeComponent.Configs[0].ReconfigureArgs).Should(Equal(transCtx.SynthesizeComponent.FileTemplates[0].ReconfigureArgs))
+		})
+
 		It("external managed", func() {
-			transCtx.SynthesizeComponent.FileTemplates[1].Reconfigure = &appsv1.Action{
+			transCtx.SynthesizeComponent.FileTemplates[1].ReconfigureRequired = ptr.To(true)
+			transCtx.SynthesizeComponent.FileTemplates[1].ReconfigureAction = &appsv1.Action{
 				Exec: &appsv1.ExecAction{
 					Command: []string{"echo", "reconfigure"},
 				},
@@ -298,6 +350,7 @@ var _ = Describe("file templates transformer test", func() {
 
 			checkVolumes([]string{"logConf", "serverConf"})
 			checkTemplateObjects([]string{"logConf", "serverConf"})
+			checkAssistantObject("ConfigMap", serverConfCM.Namespace, serverConfCM.Name)
 			// checkEnvWithAction(component.UDFReconfigureActionName(transCtx.SynthesizeComponent.FileTemplates[1]))
 		})
 

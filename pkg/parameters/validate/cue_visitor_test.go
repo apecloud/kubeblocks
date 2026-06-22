@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -55,19 +55,19 @@ func TestCueTypeExtractorVisit(t *testing.T) {
 			cue: `#a: {
 		b : #c
 		g : #j
-		
+
 		#j : {
 				"x": string
 				"y": int & > 100
 				"m": #n
 			}
 		}
-		
+
 		#n : {
 			"d" : {}
 			"j" : null
 		}
-		
+
 		#c : {
 			e: int
 			f: string|float|int & 2000 | "100.10" | 200 | * "100.10"

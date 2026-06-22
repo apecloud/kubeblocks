@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -93,6 +93,27 @@ var _ = Describe("plan builder test", func() {
 					Expect(obj.Namespace).Should(Equal(svc.Namespace))
 					Expect(obj.Name).Should(Equal(svc.Name))
 					Expect(obj.Spec).Should(Equal(svc.Spec))
+					return nil
+				}).Times(1)
+			Expect(planBuilder.defaultWalkFunc(v)).Should(Succeed())
+		})
+
+		It("should patch object", func() {
+			svcOrig := builder.NewServiceBuilder(namespace, name).GetObject()
+			svc := svcOrig.DeepCopy()
+			svc.Labels = map[string]string{"patched": "true"}
+			v := &model.ObjectVertex{
+				OriObj: svcOrig,
+				Obj:    svc,
+				Action: model.ActionPatchPtr(),
+			}
+			k8sMock.EXPECT().
+				Patch(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ context.Context, obj *corev1.Service, _ client.Patch, _ ...client.PatchOption) error {
+					Expect(obj).ShouldNot(BeNil())
+					Expect(obj.Namespace).Should(Equal(svc.Namespace))
+					Expect(obj.Name).Should(Equal(svc.Name))
+					Expect(obj.Labels).Should(Equal(svc.Labels))
 					return nil
 				}).Times(1)
 			Expect(planBuilder.defaultWalkFunc(v)).Should(Succeed())
@@ -282,6 +303,30 @@ var _ = Describe("plan builder test", func() {
 					if pod, ok := v.Obj.(*corev1.Pod); ok && pod.Name == "pod" && v.SubResource == subResource {
 						found = true
 						Expect(*v.Action).To(Equal(model.UPDATE))
+					}
+				}
+				Expect(found).To(BeTrue())
+			})
+
+			It("should append a patch vertex when requested by object options", func() {
+				oldPod := builder.NewPodBuilder("ns", "pod").GetObject()
+				newPod := oldPod.DeepCopy()
+				newPod.Labels = map[string]string{"patched": "true"}
+
+				currentTree := NewObjectTree()
+				desiredTree := NewObjectTree()
+				currentTree.SetRoot(builder.NewInstanceSetBuilder("ns", "root").GetObject())
+				desiredTree.SetRoot(currentTree.GetRoot())
+				Expect(currentTree.Add(oldPod)).Should(Succeed())
+				Expect(desiredTree.Update(newPod, WithPatch(true))).Should(Succeed())
+
+				vertices := buildOrderedVertices(transCtx, currentTree, desiredTree)
+
+				found := false
+				for _, v := range vertices {
+					if pod, ok := v.Obj.(*corev1.Pod); ok && pod.Name == "pod" {
+						found = true
+						Expect(*v.Action).To(Equal(model.PATCH))
 					}
 				}
 				Expect(found).To(BeTrue())

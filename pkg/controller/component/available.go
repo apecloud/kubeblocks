@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -50,14 +50,14 @@ const (
 
 type AvailableEventHandler struct{}
 
-func (h *AvailableEventHandler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
+func (h *AvailableEventHandler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) (bool, error) {
 	if !h.isAvailableEvent(event) {
-		return nil
+		return false, nil
 	}
 
 	ppEvent := &proto.ProbeEvent{}
 	if err := json.Unmarshal([]byte(event.Message), ppEvent); err != nil {
-		return err
+		return true, err
 	}
 
 	compKey := types.NamespacedName{
@@ -66,13 +66,13 @@ func (h *AvailableEventHandler) Handle(cli client.Client, reqCtx intctrlutil.Req
 	}
 	comp := &appsv1.Component{}
 	if err := cli.Get(reqCtx.Ctx, compKey, comp); err != nil {
-		return err
+		return true, err
 	}
 	compCopy := comp.DeepCopy()
 
 	compDef, err := h.getNCheckCompDefinition(reqCtx.Ctx, cli, comp.Spec.CompDef)
 	if err != nil {
-		return err
+		return true, err
 	}
 
 	itsKey := types.NamespacedName{
@@ -81,20 +81,20 @@ func (h *AvailableEventHandler) Handle(cli client.Client, reqCtx intctrlutil.Req
 	}
 	its := &workloads.InstanceSet{}
 	if err := cli.Get(reqCtx.Ctx, itsKey, its); err != nil {
-		return err
+		return true, err
 	}
 
 	available, message, err := h.handleEvent(newProbeEvent(event, ppEvent), comp, compDef, its)
 	if err != nil {
-		return err
+		return true, err
 	}
 	if available == nil {
-		return nil // w/o available probe
+		return true, nil // w/o available probe
 	}
 	if *available {
-		return h.available(reqCtx.Ctx, cli, recorder, compCopy, comp, message)
+		return true, h.available(reqCtx.Ctx, cli, recorder, compCopy, comp, message)
 	}
-	return h.unavailable(reqCtx.Ctx, cli, recorder, compCopy, comp, message)
+	return true, h.unavailable(reqCtx.Ctx, cli, recorder, compCopy, comp, message)
 }
 
 func (h *AvailableEventHandler) isAvailableEvent(event *corev1.Event) bool {
@@ -109,14 +109,14 @@ func (h *AvailableEventHandler) available(ctx context.Context, cli client.Client
 
 func (h *AvailableEventHandler) unavailable(ctx context.Context, cli client.Client,
 	recorder record.EventRecorder, compCopy, comp *appsv1.Component, message string) error {
-	return h.status(ctx, cli, recorder, compCopy, comp, metav1.ConditionFalse, "Unavailable", message)
+	return h.status(ctx, cli, recorder, compCopy, comp, metav1.ConditionFalse, "ProbeCheckFail", message)
 }
 
 func (h *AvailableEventHandler) status(ctx context.Context, cli client.Client, recorder record.EventRecorder,
 	compCopy, comp *appsv1.Component, status metav1.ConditionStatus, reason, message string) error {
 	var (
 		cond = metav1.Condition{
-			Type:               appsv1.ConditionTypeAvailable,
+			Type:               appsv1.ComponentConditionAvailable,
 			Status:             status,
 			ObservedGeneration: comp.Generation, // TODO: ???
 			LastTransitionTime: metav1.Now(),
@@ -501,7 +501,7 @@ func (h *AvailableEventHandler) evalActionEvent(assertion appsv1.ActionAssertion
 	}
 	if assertion.Stdout != nil {
 		if assertion.Stdout.EqualTo != nil && !bytes.Equal(event.Stdout, []byte(*assertion.Stdout.EqualTo)) {
-			return false, fmt.Sprintf("probe stdout is not match: %s", prefix16(*assertion.Stdout.EqualTo))
+			return false, fmt.Sprintf("probe stdout does not match: %s", prefix16(*assertion.Stdout.EqualTo))
 		}
 		if assertion.Stdout.Contains != nil && !bytes.Contains(event.Stdout, []byte(*assertion.Stdout.Contains)) {
 			return false, fmt.Sprintf("probe stdout does not contain: %s", prefix16(*assertion.Stdout.Contains))
@@ -509,7 +509,7 @@ func (h *AvailableEventHandler) evalActionEvent(assertion appsv1.ActionAssertion
 	}
 	if assertion.Stderr != nil {
 		if assertion.Stderr.EqualTo != nil && !bytes.Equal(event.Stderr, []byte(*assertion.Stderr.EqualTo)) {
-			return false, fmt.Sprintf("probe stderr is not match: %s", prefix16(*assertion.Stderr.EqualTo))
+			return false, fmt.Sprintf("probe stderr does not match: %s", prefix16(*assertion.Stderr.EqualTo))
 		}
 		if assertion.Stderr.Contains != nil && !bytes.Contains(event.Stderr, []byte(*assertion.Stderr.Contains)) {
 			return false, fmt.Sprintf("probe stderr does not contain: %s", prefix16(*assertion.Stderr.Contains))

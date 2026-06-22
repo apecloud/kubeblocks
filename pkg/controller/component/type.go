@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 )
 
 type SynthesizedComponent struct {
@@ -47,6 +48,7 @@ type SynthesizedComponent struct {
 	VolumeClaimTemplates             []corev1.PersistentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
 	PVCRetentionPolicy               kbappsv1.PersistentVolumeClaimRetentionPolicy
 	FileTemplates                    []SynthesizedFileTemplate
+	Configs                          []workloads.ConfigTemplate
 	LogConfigs                       []kbappsv1.LogConfig                   `json:"logConfigs,omitempty"`
 	TLSConfig                        *kbappsv1.TLSConfig                    `json:"tlsConfig"`
 	ServiceReferences                map[string]*kbappsv1.ServiceDescriptor `json:"serviceReferences,omitempty"`
@@ -88,9 +90,12 @@ type SynthesizedComponent struct {
 
 type SynthesizedFileTemplate struct {
 	kbappsv1.ComponentFileTemplate
-	Config      bool
-	Variables   map[string]string
-	Reconfigure *kbappsv1.Action
+	Config              bool
+	Variables           map[string]string
+	ConfigHash          *string
+	ReconfigureRequired *bool
+	ReconfigureAction   *kbappsv1.Action
+	ReconfigureArgs     [][]string
 }
 
 type SynthesizedLifecycleActions struct {

@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -82,135 +82,6 @@ func newCfgDiffMeta(testData string, add, delete map[string]interface{}) *Config
 	}
 }
 
-// func TestIsUpdateDynamicParameters(t *testing.T) {
-// 	type args struct {
-// 		ccSpec *parametersv1alpha1.ParametersDefinitionSpec
-// 		diff   *ConfigPatchInfo
-// 	}
-// 	tests := []struct {
-// 		name    string
-// 		args    args
-// 		want    bool
-// 		wantErr bool
-// 	}{{
-// 		name: "test",
-// 		// null
-// 		args: args{
-// 			ccSpec: &parametersv1alpha1.ParametersDefinitionSpec{},
-// 			diff:   newCfgDiffMeta(`null`, nil, nil),
-// 		},
-// 		want:    true,
-// 		wantErr: false,
-// 	}, {
-// 		name: "test",
-// 		// error
-// 		args: args{
-// 			ccSpec: &parametersv1alpha1.ParametersDefinitionSpec{},
-// 			diff:   newCfgDiffMeta(`invalid json formatter`, nil, nil),
-// 		},
-// 		want:    false,
-// 		wantErr: true,
-// 	}, {
-// 		name: "test",
-// 		// add/delete config file
-// 		args: args{
-// 			ccSpec: &parametersv1alpha1.ParametersDefinitionSpec{},
-// 			diff:   newCfgDiffMeta(`{}`, map[string]interface{}{"a": "b"}, nil),
-// 		},
-// 		want:    false,
-// 		wantErr: false,
-// 	}, {
-// 		name: "test",
-// 		// not set static or dynamic parameters
-// 		args: args{
-// 			ccSpec: &parametersv1alpha1.ParametersDefinitionSpec{},
-// 			diff:   newCfgDiffMeta(`{"a":"b"}`, nil, nil),
-// 		},
-// 		want:    false,
-// 		wantErr: false,
-// 	}, {
-// 		name: "test",
-// 		// static parameters contains
-// 		args: args{
-// 			ccSpec: &parametersv1alpha1.ParametersDefinitionSpec{
-// 				StaticParameters: []string{"param1", "param2", "param3"},
-// 			},
-// 			diff: newCfgDiffMeta(`{"param3":"b"}`, nil, nil),
-// 		},
-// 		want:    false,
-// 		wantErr: false,
-// 	}, {
-// 		name: "test",
-// 		// static parameters not contains
-// 		args: args{
-// 			ccSpec: &parametersv1alpha1.ParametersDefinitionSpec{
-// 				StaticParameters: []string{"param1", "param2", "param3"},
-// 			},
-// 			diff: newCfgDiffMeta(`{"param4":"b"}`, nil, nil),
-// 		},
-// 		want:    true,
-// 		wantErr: false,
-// 	}, {
-// 		name: "test",
-// 		// dynamic parameters contains
-// 		args: args{
-// 			ccSpec: &parametersv1alpha1.ParametersDefinitionSpec{
-// 				DynamicParameters: []string{"param1", "param2", "param3"},
-// 			},
-// 			diff: newCfgDiffMeta(`{"param1":"b", "param3": 20}`, nil, nil),
-// 		},
-// 		want:    true,
-// 		wantErr: false,
-// 	}, {
-// 		name: "test",
-// 		// dynamic parameters not contains
-// 		args: args{
-// 			ccSpec: &parametersv1alpha1.ParametersDefinitionSpec{
-// 				DynamicParameters: []string{"param1", "param2", "param3"},
-// 			},
-// 			diff: newCfgDiffMeta(`{"param1":"b", "param4": 20}`, nil, nil),
-// 		},
-// 		want:    false,
-// 		wantErr: false,
-// 	}, {
-// 		name: "test",
-// 		// dynamic/static parameters not contains
-// 		args: args{
-// 			ccSpec: &parametersv1alpha1.ParametersDefinitionSpec{
-// 				DynamicParameters: []string{"dparam1", "dparam2", "dparam3"},
-// 				StaticParameters:  []string{"sparam1", "sparam2", "sparam3"},
-// 			},
-// 			diff: newCfgDiffMeta(`{"a":"b"}`, nil, nil),
-// 		},
-// 		want:    false,
-// 		wantErr: false,
-// 	}, {
-// 		name: "empty-test",
-// 		// dynamic/static parameters not contains
-// 		args: args{
-// 			ccSpec: &parametersv1alpha1.ParametersDefinitionSpec{
-// 				DynamicParameters: []string{},
-// 				StaticParameters:  []string{},
-// 			},
-// 			diff: newCfgDiffMeta(`{}`, nil, nil),
-// 		},
-// 		want:    true,
-// 		wantErr: false,
-// 	}}
-// 	for _, tt := range tests {
-// 		t.Run(tt.name, func(t *testing.T) {
-// 			got, err := IsUpdateDynamicParameters(tt.args.ccSpec, tt.args.diff)
-// 			if (err != nil) != tt.wantErr {
-// 				t.Errorf("IsUpdateDynamicParameters() error = %v, wantErr %v", err, tt.wantErr)
-// 				return
-// 			}
-// 			if got != tt.want {
-// 				t.Errorf("IsUpdateDynamicParameters() got = %v, want %v", got, tt.want)
-// 			}
-// 		})
-// 	}
-// }
-
 func TestIsSchedulableConfigResource(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -257,83 +128,6 @@ func TestIsSchedulableConfigResource(t *testing.T) {
 		})
 	}
 }
-
-func TestSetParametersUpdateSource(t *testing.T) {
-	mockConfigMap := func() *corev1.ConfigMap {
-		return &corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "test",
-				Namespace: "default",
-				Labels:    make(map[string]string),
-			},
-			Data: make(map[string]string),
-		}
-	}
-
-	cm := mockConfigMap()
-	require.False(t, IsParametersUpdateFromManager(cm))
-	require.False(t, IsNotUserReconfigureOperation(cm))
-	SetParametersUpdateSource(cm, constant.ReconfigureManagerSource)
-	require.True(t, IsParametersUpdateFromManager(cm))
-	require.False(t, IsNotUserReconfigureOperation(cm))
-
-	// check user reconfigure
-	cm.Annotations[constant.CMInsEnableRerenderTemplateKey] = "true"
-	require.True(t, IsNotUserReconfigureOperation(cm))
-
-	SetParametersUpdateSource(cm, constant.ReconfigureUserSource)
-	require.False(t, IsNotUserReconfigureOperation(cm))
-}
-
-// func TestValidateConfigPatch(t *testing.T) {
-// 	type args struct {
-// 		patch     *ConfigPatchInfo
-// 		formatCfg *appsv1beta1.FileFormatConfig
-// 	}
-// 	tests := []struct {
-// 		name    string
-// 		args    args
-// 		wantErr bool
-// 	}{{
-// 		name: "test",
-// 		args: args{
-// 			patch:     &ConfigPatchInfo{},
-// 			formatCfg: &appsv1beta1.FileFormatConfig{Format: appsv1beta1.YAML},
-// 		},
-// 		wantErr: false,
-// 	}, {
-// 		name: "test",
-// 		args: args{
-// 			patch: &ConfigPatchInfo{
-// 				IsModify: true,
-// 				UpdateConfig: map[string][]byte{
-// 					"file1": []byte(`{"a":"b"}`),
-// 				},
-// 			},
-// 			formatCfg: &appsv1beta1.FileFormatConfig{Format: appsv1beta1.YAML},
-// 		},
-// 		wantErr: false,
-// 	}, {
-// 		name: "test-failed",
-// 		args: args{
-// 			patch: &ConfigPatchInfo{
-// 				IsModify: true,
-// 				UpdateConfig: map[string][]byte{
-// 					"file1": []byte(`{"a":null}`),
-// 				},
-// 			},
-// 			formatCfg: &appsv1beta1.FileFormatConfig{Format: appsv1beta1.YAML},
-// 		},
-// 		wantErr: true,
-// 	}}
-// 	for _, tt := range tests {
-// 		t.Run(tt.name, func(t *testing.T) {
-// 			if err := ValidateConfigPatch(tt.args.patch, tt.args.formatCfg); (err != nil) != tt.wantErr {
-// 				t.Errorf("ValidateConfigPatch() error = %v, wantErr %v", err, tt.wantErr)
-// 			}
-// 		})
-// 	}
-// }
 
 func TestIsDynamicParameter(t *testing.T) {
 	type args struct {
@@ -399,6 +193,216 @@ func TestIsDynamicParameter(t *testing.T) {
 			if got := IsDynamicParameter(tt.args.paramName, tt.args.ccSpec); got != tt.want {
 				t.Errorf("IsDynamicParameter() = %v, want %v", got, tt.want)
 			}
+		})
+	}
+}
+
+func TestHasDynamicParameterUpdate(t *testing.T) {
+	config := &parametersv1alpha1.FileFormatConfig{
+		Format: parametersv1alpha1.Ini,
+		FormatterAction: parametersv1alpha1.FormatterAction{
+			IniConfig: &parametersv1alpha1.IniConfig{
+				SectionName: "mysqld",
+			},
+		},
+	}
+	pd := &parametersv1alpha1.ParametersDefinitionSpec{
+		DynamicParameters: []string{"binlog_expire_logs_seconds"},
+	}
+
+	tests := []struct {
+		name  string
+		patch string
+		want  bool
+	}{
+		{
+			name:  "static only",
+			patch: `{"mysqld":{"table_open_cache_instances":"8"}}`,
+			want:  false,
+		},
+		{
+			name:  "dynamic only",
+			patch: `{"mysqld":{"binlog_expire_logs_seconds":"432000"}}`,
+			want:  true,
+		},
+		{
+			name:  "mixed",
+			patch: `{"mysqld":{"binlog_expire_logs_seconds":"432000","table_open_cache_instances":"8"}}`,
+			want:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := HasDynamicParameterUpdate(config, pd, tt.patch)
+			if err != nil {
+				t.Fatalf("HasDynamicParameterUpdate() error = %v", err)
+			}
+			if got != tt.want {
+				t.Fatalf("HasDynamicParameterUpdate() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestValidateConfigPatch(t *testing.T) {
+	configs := []parametersv1alpha1.ComponentConfigDescription{{
+		Name: "mysql.cnf",
+		FileFormatConfig: &parametersv1alpha1.FileFormatConfig{
+			Format: parametersv1alpha1.Ini,
+			FormatterAction: parametersv1alpha1.FormatterAction{
+				IniConfig: &parametersv1alpha1.IniConfig{SectionName: "mysqld"},
+			},
+		},
+	}}
+
+	require.NoError(t, ValidateConfigPatch(&ConfigPatchInfo{}, configs))
+	require.NoError(t, ValidateConfigPatch(&ConfigPatchInfo{
+		IsModify:     true,
+		UpdateConfig: map[string][]byte{"mysql.cnf": []byte(`{"mysqld":{"max_connections":"200"}}`)},
+	}, configs))
+
+	err := ValidateConfigPatch(&ConfigPatchInfo{
+		IsModify:     true,
+		UpdateConfig: map[string][]byte{"mysql.cnf": []byte(`{"mysqld":{"max_connections":null}}`)},
+	}, configs)
+	require.ErrorContains(t, err, "delete config parameter [max_connections] is not support")
+}
+
+func TestIsUpdateDynamicParameters(t *testing.T) {
+	config := &parametersv1alpha1.FileFormatConfig{
+		Format: parametersv1alpha1.Ini,
+		FormatterAction: parametersv1alpha1.FormatterAction{
+			IniConfig: &parametersv1alpha1.IniConfig{SectionName: "mysqld"},
+		},
+	}
+
+	tests := []struct {
+		name    string
+		def     *parametersv1alpha1.ParametersDefinitionSpec
+		patch   *ConfigPatchInfo
+		want    bool
+		wantErr bool
+	}{
+		{
+			name: "delete config requires restart",
+			def:  &parametersv1alpha1.ParametersDefinitionSpec{},
+			patch: &ConfigPatchInfo{
+				DeleteConfig: map[string]interface{}{"mysql.cnf": map[string]interface{}{"max_connections": "200"}},
+			},
+			want: false,
+		},
+		{
+			name:  "empty update is dynamic",
+			def:   &parametersv1alpha1.ParametersDefinitionSpec{},
+			patch: &ConfigPatchInfo{},
+			want:  true,
+		},
+		{
+			name: "invalid update patch",
+			def:  &parametersv1alpha1.ParametersDefinitionSpec{},
+			patch: &ConfigPatchInfo{
+				UpdateConfig: map[string][]byte{"mysql.cnf": []byte(`{`)},
+			},
+			wantErr: true,
+		},
+		{
+			name: "dynamic parameter only",
+			def: &parametersv1alpha1.ParametersDefinitionSpec{
+				DynamicParameters: []string{"max_connections"},
+			},
+			patch: &ConfigPatchInfo{
+				UpdateConfig: map[string][]byte{"mysql.cnf": []byte(`{"mysqld":{"max_connections":"200"}}`)},
+			},
+			want: true,
+		},
+		{
+			name: "static parameter is not dynamic",
+			def: &parametersv1alpha1.ParametersDefinitionSpec{
+				StaticParameters: []string{"max_connections"},
+			},
+			patch: &ConfigPatchInfo{
+				UpdateConfig: map[string][]byte{"mysql.cnf": []byte(`{"mysqld":{"max_connections":"200"}}`)},
+			},
+			want: false,
+		},
+		{
+			name: "unknown parameter with dynamic list is not dynamic",
+			def: &parametersv1alpha1.ParametersDefinitionSpec{
+				DynamicParameters: []string{"innodb_buffer_pool_size"},
+			},
+			patch: &ConfigPatchInfo{
+				UpdateConfig: map[string][]byte{"mysql.cnf": []byte(`{"mysqld":{"max_connections":"200"}}`)},
+			},
+			want: false,
+		},
+		{
+			name: "static list without dynamic list defaults to reload for non-static update",
+			def: &parametersv1alpha1.ParametersDefinitionSpec{
+				StaticParameters: []string{"innodb_buffer_pool_size"},
+			},
+			patch: &ConfigPatchInfo{
+				UpdateConfig: map[string][]byte{"mysql.cnf": []byte(`{"mysqld":{"max_connections":"200"}}`)},
+			},
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := IsUpdateDynamicParameters(config, tt.def, tt.patch)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestCheckUpdateDynamicParameters(t *testing.T) {
+	config := &parametersv1alpha1.FileFormatConfig{
+		Format: parametersv1alpha1.Ini,
+		FormatterAction: parametersv1alpha1.FormatterAction{
+			IniConfig: &parametersv1alpha1.IniConfig{SectionName: "mysqld"},
+		},
+	}
+
+	tests := []struct {
+		name    string
+		def     *parametersv1alpha1.ParametersDefinitionSpec
+		patch   string
+		want    bool
+		wantErr bool
+	}{
+		{name: "empty patch", def: &parametersv1alpha1.ParametersDefinitionSpec{}, want: true},
+		{name: "invalid patch", def: &parametersv1alpha1.ParametersDefinitionSpec{}, patch: `{`, wantErr: true},
+		{
+			name: "dynamic parameter",
+			def: &parametersv1alpha1.ParametersDefinitionSpec{
+				DynamicParameters: []string{"max_connections"},
+			},
+			patch: `{"mysqld":{"max_connections":"200"}}`,
+			want:  true,
+		},
+		{
+			name:  "no parameter lists defaults to restart",
+			def:   &parametersv1alpha1.ParametersDefinitionSpec{},
+			patch: `{"mysqld":{"max_connections":"200"}}`,
+			want:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := CheckUpdateDynamicParameters(config, tt.def, tt.patch)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tt.want, got)
 		})
 	}
 }

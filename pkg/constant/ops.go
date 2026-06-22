@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -24,6 +24,7 @@ const (
 	OpsRequestTypeLabelKey      = "operations.kubeblocks.io/ops-type"
 	OpsRequestNameLabelKey      = "operations.kubeblocks.io/ops-name"
 	OpsRequestNamespaceLabelKey = "operations.kubeblocks.io/ops-namespace"
+	OpsRequestUIDAnnotationKey  = "operations.kubeblocks.io/ops-uid"
 )
 
 // annotations

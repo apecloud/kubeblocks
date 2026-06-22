@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -23,6 +23,8 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"strconv"
+	"strings"
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -283,6 +285,9 @@ func (a *kbagent) buildActionRequest(ctx context.Context, cli client.Reader, lfa
 				RetryInterval: opts.RetryPolicy.RetryInterval,
 			}
 		}
+		if len(opts.Arguments) > 0 {
+			req.Arguments = opts.Arguments
+		}
 	}
 	return req, nil
 }
@@ -303,7 +308,44 @@ func (a *kbagent) parameters(ctx context.Context, cli client.Reader, lfa lifecyc
 			m[k] = v
 		}
 	}
+	addShellSafeParameterAliases(m)
 	return m, nil
+}
+
+func addShellSafeParameterAliases(m map[string]string) {
+	for k, v := range m {
+		alias := shellSafeParameterAlias(k)
+		if alias == "" || alias == k {
+			continue
+		}
+		if existing, ok := m[alias]; !ok || existing == "" {
+			m[alias] = v
+		}
+	}
+}
+
+func shellSafeParameterAlias(name string) string {
+	if name == "" {
+		return ""
+	}
+	var b strings.Builder
+	for i := 0; i < len(name); i++ {
+		c := name[i]
+		switch {
+		case c >= 'a' && c <= 'z':
+			b.WriteByte(c - 'a' + 'A')
+		case c >= 'A' && c <= 'Z':
+			b.WriteByte(c)
+		case c >= '0' && c <= '9':
+			if b.Len() == 0 {
+				b.WriteByte('_')
+			}
+			b.WriteByte(c)
+		default:
+			b.WriteByte('_')
+		}
+	}
+	return b.String()
 }
 
 func (a *kbagent) templateVarsParameters() (map[string]string, error) {
@@ -450,6 +492,37 @@ func SelectTargetPods(pods []*corev1.Pod, pod *corev1.Pod, spec *appsv1.Action) 
 		return rolePods
 	}
 
+	podsWithOrdinal := func() ([]*corev1.Pod, error) {
+		ordinal, err := strconv.Atoi(matchingKey)
+		if err != nil || ordinal < 0 {
+			return nil, fmt.Errorf("invalid ordinal matchingKey: %s", matchingKey)
+		}
+
+		var ordinalPods []*corev1.Pod
+		for i, pod := range pods {
+			idx := strings.LastIndex(pod.Name, "-")
+			if idx < 0 || idx == len(pod.Name)-1 {
+				continue
+			}
+			podOrdinal, err := strconv.Atoi(pod.Name[idx+1:])
+			if err != nil {
+				continue
+			}
+			if podOrdinal == ordinal {
+				ordinalPods = append(ordinalPods, pods[i])
+			}
+		}
+		if len(ordinalPods) > 1 {
+			var podNames []string
+			for _, pod := range ordinalPods {
+				podNames = append(podNames, pod.Name)
+			}
+			return nil, fmt.Errorf("ambiguous ordinal selector matchingKey %s matches multiple pods: %s",
+				matchingKey, strings.Join(podNames, ","))
+		}
+		return ordinalPods, nil
+	}
+
 	switch selector {
 	case appsv1.AnyReplica:
 		return anyPod(), nil
@@ -458,7 +531,7 @@ func SelectTargetPods(pods []*corev1.Pod, pod *corev1.Pod, spec *appsv1.Action) 
 	case appsv1.RoleSelector:
 		return podsWithRole(), nil
 	case appsv1.OrdinalSelector:
-		return nil, fmt.Errorf("ordinal selector is not supported")
+		return podsWithOrdinal()
 	default:
 		return nil, fmt.Errorf("unknown pod selector: %s", selector)
 	}

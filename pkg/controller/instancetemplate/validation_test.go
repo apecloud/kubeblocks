@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 This file is part of KubeBlocks project
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -97,7 +97,7 @@ var _ = Describe("Validation", func() {
 			tree := &kubebuilderx.ObjectTree{}
 			err := ValidateInstanceTemplates(its, tree)
 			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("total replicas in instances(4) should not greater than replicas in spec(3)"))
+			Expect(err.Error()).To(ContainSubstring("total replicas in instances(4) should not be greater than replicas in spec(3)"))
 		})
 
 		It("should fail validation when total replicas restricted by ordinals do not equal to spec.replicas", func() {
@@ -139,7 +139,7 @@ var _ = Describe("Validation", func() {
 			tree := &kubebuilderx.ObjectTree{}
 			err := ValidateInstanceTemplates(its, tree)
 			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("total replicas in instances(4) should not greater than replicas in spec(3)"))
+			Expect(err.Error()).To(ContainSubstring("total replicas in instances(4) should not be greater than replicas in spec(3)"))
 		})
 	})
 })

@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -58,19 +58,11 @@ func filterInPlaceFields(src *corev1.PodTemplateSpec) *corev1.PodTemplateSpec {
 	// filter annotations
 	var annotations map[string]string
 	if len(template.Annotations) > 0 {
-		annotations = make(map[string]string)
 		// keep Restart annotation
 		if restart, ok := template.Annotations[constant.RestartAnnotationKey]; ok {
-			annotations[constant.RestartAnnotationKey] = restart
-		}
-		// keep Reconfigure annotation
-		for k, v := range template.Annotations {
-			if strings.HasPrefix(k, constant.UpgradeRestartAnnotationKey) {
-				annotations[k] = v
+			annotations = map[string]string{
+				constant.RestartAnnotationKey: restart,
 			}
-		}
-		if len(annotations) == 0 {
-			annotations = nil
 		}
 	}
 	template.Annotations = annotations
@@ -216,7 +208,7 @@ func equalField(old, new any) bool {
 			if index < 0 {
 				return false
 			}
-			if nc.Image != ocs[index].Image {
+			if !intctrlutil.EqualContainerImageInSpec(ocs[index].Image, nc.Image) {
 				return false
 			}
 		}
@@ -264,6 +256,44 @@ func equalBasicInPlaceFields(old, new *corev1.Pod) bool {
 	return true
 }
 
+// safeMetadataOnlyInPlaceUpdate returns true when the only difference between
+// old and new is a Pod metadata patch (annotations and/or labels) that has no
+// effect on the running database process or availability. In that case the
+// caller can skip the lifecycle switchover that is normally invoked before an
+// in-place pod update.
+//
+// Specifically, it returns true if and only if:
+//   - old and new are otherwise equal when annotations and labels are ignored
+//     (basic spec fields + container resources match)
+//   - metadata has actually changed (do not vacuously skip switchover when
+//     there is no real diff)
+//   - the annotation diff does not include constant.RestartAnnotationKey, the
+//     explicit restart trigger which always implies a process restart
+//
+// Label changes are allowed because pure label patches do not restart the
+// container, do not change the spec, and do not touch the database process.
+// Service-selector routing impact is a network-layer concern and is not
+// resolved by invoking lifecycle switchover. Role-label patches are likewise
+// state synchronization, not a trigger for additional switchover.
+func safeMetadataOnlyInPlaceUpdate(old, new *corev1.Pod) bool {
+	oldCopy := old.DeepCopy()
+	newCopy := new.DeepCopy()
+	oldCopy.Annotations = nil
+	newCopy.Annotations = nil
+	oldCopy.Labels = nil
+	newCopy.Labels = nil
+	if !equalBasicInPlaceFields(oldCopy, newCopy) || !equalResourcesInPlaceFields(oldCopy, newCopy) {
+		return false
+	}
+	if equalField(old.Annotations, new.Annotations) && equalField(old.Labels, new.Labels) {
+		return false
+	}
+	if !equalField(old.Annotations[constant.RestartAnnotationKey], new.Annotations[constant.RestartAnnotationKey]) {
+		return false
+	}
+	return true
+}
+
 // equalResourcesInPlaceFields checks if the desired values of pod resources are equal to their current actual values.
 // If they are equal, it returns true. Containers in 'old' that are not recognized (they may have been injected by external mutating admission webhooks)
 // will not participate in the comparison.
@@ -291,14 +321,14 @@ func equalResourcesInPlaceFields(old, new *corev1.Pod) bool {
 	return true
 }
 
-func getPodUpdatePolicy(its *workloads.InstanceSet, pod *corev1.Pod) (podUpdatePolicy, workloads.PodUpdatePolicyType, error) {
+func getPodUpdatePolicy(its *workloads.InstanceSet, pod *corev1.Pod) (podUpdatePolicy, workloads.PodUpdatePolicyType, string, error) {
 	updateRevisions, err := GetRevisions(its.Status.UpdateRevisions)
 	if err != nil {
-		return noOpsPolicy, "", err
+		return noOpsPolicy, "", "", err
 	}
 	proposedRevisions, err := GetRevisions(its.Status.DeferredUpdatedRevisions)
 	if err != nil {
-		return noOpsPolicy, "", err
+		return noOpsPolicy, "", "", err
 	}
 
 	// In case of the ITS is stopping and replicas is 0, we can't compose the instance template and instance
@@ -306,55 +336,63 @@ func getPodUpdatePolicy(its *workloads.InstanceSet, pod *corev1.Pod) (podUpdateP
 	if ptr.Deref(its.Spec.Replicas, 0) == 0 {
 		// the update revisions will be empty
 		if getPodRevision(pod) != updateRevisions[pod.Name] {
-			return recreatePolicy, its.Spec.PodUpdatePolicy, nil
+			return recreatePolicy, its.Spec.PodUpdatePolicy, "0 replica", nil
 		}
+	}
+
+	configRestart, configs, err := hasConfigRestart(its, pod)
+	if err != nil {
+		return noOpsPolicy, "", "", err
+	}
+	if configRestart {
+		return recreatePolicy, its.Spec.PodUpdatePolicy, fmt.Sprintf("config restart: %s", strings.Join(configs, ",")), nil
 	}
 
 	itsExt, err := instancetemplate.BuildInstanceSetExt(its, nil)
 	if err != nil {
-		return noOpsPolicy, "", err
+		return noOpsPolicy, "", "", err
 	}
 	templateList := instancetemplate.BuildInstanceTemplateExt(itsExt)
 	templateName, err := getTemplateNameByPod(itsExt, pod)
 	if err != nil {
-		return noOpsPolicy, "", err
+		return noOpsPolicy, "", "", err
 	}
 	index := slices.IndexFunc(templateList, func(templateExt *instancetemplate.InstanceTemplateExt) bool {
 		return templateName == templateExt.Name
 	})
 	if index < 0 {
-		return noOpsPolicy, "", errors.Wrapf(errTemplateNotFound, "pod: %s/%s", pod.Namespace, pod.Name)
+		return noOpsPolicy, "", "", errors.Wrapf(errTemplateNotFound, "pod: %s/%s", pod.Namespace, pod.Name)
 	}
 	newPod, err := buildInstancePodByTemplate(pod.Name, templateList[index], its, getPodRevision(pod))
 	if err != nil {
-		return noOpsPolicy, "", err
+		return noOpsPolicy, "", "", err
 	}
 
 	specUpdatePolicy := getPodUpdatePolicyInSpec(its, pod, newPod)
 	if getPodRevision(pod) != updateRevisions[pod.Name] && getPodRevision(pod) != proposedRevisions[pod.Name] {
-		return recreatePolicy, specUpdatePolicy, nil
+		return recreatePolicy, specUpdatePolicy, "revision update", nil
 	}
 
 	basicUpdate := !equalBasicInPlaceFields(pod, newPod)
 	if viper.GetBool(FeatureGateIgnorePodVerticalScaling) {
 		if basicUpdate {
-			return inPlaceUpdatePolicy, specUpdatePolicy, nil
+			return inPlaceUpdatePolicy, specUpdatePolicy, "", nil
 		}
-		return noOpsPolicy, "", nil
+		return noOpsPolicy, "", "", nil
 	}
 
 	resourceUpdate := !equalResourcesInPlaceFields(pod, newPod)
 	if resourceUpdate {
 		if supportPodVerticalScaling() {
-			return inPlaceUpdatePolicy, specUpdatePolicy, nil
+			return inPlaceUpdatePolicy, specUpdatePolicy, "", nil
 		}
-		return recreatePolicy, specUpdatePolicy, nil
+		return recreatePolicy, specUpdatePolicy, "resource update", nil
 	}
 
 	if basicUpdate {
-		return inPlaceUpdatePolicy, specUpdatePolicy, nil
+		return inPlaceUpdatePolicy, specUpdatePolicy, "", nil
 	}
-	return noOpsPolicy, "", nil
+	return noOpsPolicy, "", "", nil
 }
 
 func getPodUpdatePolicyInSpec(its *workloads.InstanceSet, old, new *corev1.Pod) workloads.PodUpdatePolicyType {
@@ -387,7 +425,7 @@ func getTemplateNameByPod(itsExt *instancetemplate.InstanceSetExt, pod *corev1.P
 // This function is meant to replace the old fashion `GetPodRevision(pod) == updateRevision`,
 // as the pod template revision has been redefined in instanceset.
 func isPodUpdated(its *workloads.InstanceSet, pod *corev1.Pod) (bool, error) {
-	policy, _, err := getPodUpdatePolicy(its, pod)
+	policy, _, _, err := getPodUpdatePolicy(its, pod)
 	if err != nil {
 		if errors.Is(err, errTemplateNotFound) {
 			return true, nil

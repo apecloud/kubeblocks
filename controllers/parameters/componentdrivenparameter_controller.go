@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -21,34 +21,36 @@ package parameters
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"reflect"
-	"slices"
+	"strconv"
 
-	"github.com/imdario/mergo"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	reconfigurectrl "github.com/apecloud/kubeblocks/controllers/parameters/reconfigure"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	"github.com/apecloud/kubeblocks/pkg/generics"
 	"github.com/apecloud/kubeblocks/pkg/parameters"
-	configcore "github.com/apecloud/kubeblocks/pkg/parameters/core"
+	parameterscore "github.com/apecloud/kubeblocks/pkg/parameters/core"
 )
 
-// ComponentDrivenParameterReconciler reconciles a Parameter object
+// ComponentDrivenParameterReconciler reconciles a Component object into the corresponding ComponentParameter.
 type ComponentDrivenParameterReconciler struct {
 	client.Client
 	Scheme   *runtime.Scheme
@@ -74,8 +76,8 @@ func (r *ComponentDrivenParameterReconciler) Reconcile(ctx context.Context, req 
 		Req:      req,
 		Recorder: r.Recorder,
 		Log: log.FromContext(ctx).
-			WithName("ComponentParameterReconciler").
-			WithValues("Namespace", req.Namespace, "Parameter", req.Name),
+			WithName("ComponentDrivenParameterReconciler").
+			WithValues("Namespace", req.Namespace, "Component", req.Name),
 	}
 
 	comp := &appsv1.Component{}
@@ -89,10 +91,88 @@ func (r *ComponentDrivenParameterReconciler) Reconcile(ctx context.Context, req 
 }
 
 // SetupWithManager sets up the controller with the Manager.
+//
+// In addition to the primary `For(Component)` watch, we also watch
+// `ParametersDefinition` so that a Component which was reconciled into the
+// silent "no valid parameter template" branch (because its dependent PD was
+// not yet Available) gets re-enqueued once the matching PD becomes Available.
+// The watch layer stays intentionally notification-only:
+//
+//   - Availability, ServiceVersion, create/update/delete/no-op, and stale
+//     cleanup semantics remain centralized in the reconcile path through
+//     `ResolveCmpdParametersDefs` and `buildComponentParameter`.
+//   - The map function `componentsAffectedByParametersDefinition` only lists
+//     Components from the controller-runtime cache and filters them by the
+//     PD's `Spec.ComponentDef` pattern using the same matcher as
+//     `ResolveCmpdParametersDefs`. Only Components whose `Spec.CompDef` would
+//     have plausibly matched this PD are enqueued.
+//   - controller-runtime runs EnqueueRequestsFromMapFunc on both old and new
+//     objects for Update events, so a PD pattern change enqueues Components
+//     matching either side of the change.
 func (r *ComponentDrivenParameterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1.Component{}).
+		Watches(
+			&parametersv1alpha1.ParametersDefinition{},
+			handler.EnqueueRequestsFromMapFunc(r.componentsAffectedByParametersDefinition),
+		).
 		Complete(r)
+}
+
+// componentsAffectedByParametersDefinition resolves the set of Components
+// that may be affected by a change to the given ParametersDefinition.
+//
+// It applies the same `ComponentDef` pattern matching that
+// `ResolveCmpdParametersDefs` uses, so the enqueue set is the dependency
+// inverse of the resolution graph: if the reconcile would have considered
+// this PD as a candidate descriptor, the Component is enqueued.
+//
+// We deliberately do NOT enforce the ServiceVersion narrowing here. The
+// reconcile is idempotent and the existing silent-nil branch covers
+// mismatched SVs, so any over-enqueue collapses cheaply rather than risking
+// a missed re-enqueue.
+//
+// For Update events, controller-runtime calls this map function for both the
+// old and new ParametersDefinition objects. That means ComponentDef pattern
+// changes enqueue Components matching either side of the update; reconcile
+// then creates, updates, deletes, or no-ops from the current dependency state.
+func (r *ComponentDrivenParameterReconciler) componentsAffectedByParametersDefinition(ctx context.Context, obj client.Object) []reconcile.Request {
+	paramsDef, ok := obj.(*parametersv1alpha1.ParametersDefinition)
+	if !ok {
+		return nil
+	}
+	pattern := paramsDef.Spec.ComponentDef
+	if pattern == "" {
+		return nil
+	}
+	logger := log.FromContext(ctx).
+		WithName("ComponentDrivenParameterReconciler").
+		WithValues("ParametersDefinition", paramsDef.Name)
+
+	compList := &appsv1.ComponentList{}
+	if err := r.Client.List(ctx, compList); err != nil {
+		logger.V(1).Info("componentsAffectedByParametersDefinition: list Components failed", "error", err)
+		return nil
+	}
+	requests := make([]reconcile.Request, 0, len(compList.Items))
+	for i := range compList.Items {
+		comp := &compList.Items[i]
+		if comp.Spec.CompDef == "" {
+			continue
+		}
+		if !component.PrefixOrRegexMatched(comp.Spec.CompDef, pattern) {
+			continue
+		}
+		requests = append(requests, reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Namespace: comp.Namespace,
+				Name:      comp.Name,
+			},
+		})
+	}
+	logger.V(1).Info("componentsAffectedByParametersDefinition: enqueued",
+		"pattern", pattern, "matched", len(requests), "scanned", len(compList.Items))
+	return requests
 }
 
 func (r *ComponentDrivenParameterReconciler) reconcile(reqCtx intctrlutil.RequestCtx, component *appsv1.Component) (ctrl.Result, error) {
@@ -100,13 +180,24 @@ func (r *ComponentDrivenParameterReconciler) reconcile(reqCtx intctrlutil.Reques
 	var existingObject *parametersv1alpha1.ComponentParameter
 	var expectedObject *parametersv1alpha1.ComponentParameter
 
-	if existingObject, err = runningComponentParameter(reqCtx, r.Client, component); err != nil {
+	if existingObject, err = r.runningComponentParameter(reqCtx, r.Client, component); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	if model.IsObjectDeleting(component) {
+		if err = r.syncLegacyConfigManagerRequirement(reqCtx, component, false); err != nil {
+			return intctrlutil.RequeueWithError(err, reqCtx.Log, errors.Wrap(err, "failed to clear legacy config-manager compatibility annotation").Error())
+		}
 		return r.delete(reqCtx, existingObject)
 	}
-	if expectedObject, err = buildComponentParameter(reqCtx, r.Client, component); err != nil {
+	required, err := resolveLegacyConfigManagerRequirement(reqCtx.Ctx, r.Client, component)
+	if err != nil {
+		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
+	}
+	if err = r.syncLegacyConfigManagerRequirement(reqCtx, component, required); err != nil {
+		return intctrlutil.RequeueWithError(err, reqCtx.Log, errors.Wrap(err, "failed to sync legacy config-manager compatibility annotation").Error())
+	}
+	includeInitOverlay := existingObject == nil
+	if expectedObject, err = r.buildComponentParameter(reqCtx, r.Client, component, includeInitOverlay); err != nil {
 		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
 	}
 
@@ -141,6 +232,8 @@ func (r *ComponentDrivenParameterReconciler) delete(reqCtx intctrlutil.RequestCt
 }
 
 func (r *ComponentDrivenParameterReconciler) update(reqCtx intctrlutil.RequestCtx, expected, existing *parametersv1alpha1.ComponentParameter) (ctrl.Result, error) {
+	// By design, initial inputs are seeded only when the ComponentParameter is first created.
+	// Subsequent Component-driven updates only synchronize metadata and preserve the existing init payload.
 	mergedObject := r.mergeComponentParameter(expected, existing)
 	if reflect.DeepEqual(mergedObject, existing) {
 		return intctrlutil.Reconciled()
@@ -151,20 +244,212 @@ func (r *ComponentDrivenParameterReconciler) update(reqCtx intctrlutil.RequestCt
 	return intctrlutil.Reconciled()
 }
 
-func runningComponentParameter(reqCtx intctrlutil.RequestCtx, reader client.Reader, comp *appsv1.Component) (*parametersv1alpha1.ComponentParameter, error) {
+func (r *ComponentDrivenParameterReconciler) mergeComponentParameter(expected *parametersv1alpha1.ComponentParameter, existing *parametersv1alpha1.ComponentParameter) *parametersv1alpha1.ComponentParameter {
+	updated := existing.DeepCopy()
+	updated.SetLabels(intctrlutil.MergeMetadataMaps(expected.GetLabels(), updated.GetLabels()))
+	if len(expected.GetOwnerReferences()) != 0 {
+		updated.SetOwnerReferences(expected.GetOwnerReferences())
+	}
+	return updated
+}
+
+func (r *ComponentDrivenParameterReconciler) syncLegacyConfigManagerRequirement(reqCtx intctrlutil.RequestCtx, comp *appsv1.Component, required bool) error {
+	clusterName, _ := component.GetClusterName(comp)
+	clusterKey := types.NamespacedName{Namespace: comp.Namespace, Name: clusterName}
+	cluster := &appsv1.Cluster{}
+	if err := r.Client.Get(reqCtx.Ctx, clusterKey, cluster); err != nil {
+		return client.IgnoreNotFound(err)
+	}
+	aggregated, err := r.resolveClusterLegacyConfigManagerRequirement(reqCtx.Ctx, cluster, comp, required)
+	if err != nil {
+		return err
+	}
+	desiredValue := strconv.FormatBool(aggregated)
+	currentValue := ""
+	if cluster.Annotations != nil {
+		currentValue = cluster.Annotations[constant.LegacyConfigManagerRequiredAnnotationKey]
+	}
+	if currentValue == desiredValue {
+		return nil
+	}
+	patch := client.MergeFrom(cluster.DeepCopy())
+	if cluster.Annotations == nil {
+		cluster.Annotations = map[string]string{}
+	}
+	// Keep an explicit "false" marker instead of deleting the key. The compatible
+	// config-manager cleanup flow treats a missing key as "unknown, keep legacy
+	// resources" during controller upgrade races, while "false" means cleanup is
+	// now safe when the workload naturally recreates Pods.
+	cluster.Annotations[constant.LegacyConfigManagerRequiredAnnotationKey] = desiredValue
+	return r.Client.Patch(reqCtx.Ctx, cluster, patch)
+}
+
+func (r *ComponentDrivenParameterReconciler) resolveClusterLegacyConfigManagerRequirement(ctx context.Context, cluster *appsv1.Cluster, currentComp *appsv1.Component, currentRequired bool) (bool, error) {
+	if cluster == nil {
+		return false, nil
+	}
+	compList := &appsv1.ComponentList{}
+	if err := r.Client.List(ctx, compList, client.InNamespace(cluster.Namespace), client.MatchingLabels{constant.AppInstanceLabelKey: cluster.Name}); err != nil {
+		return false, err
+	}
+	for i := range compList.Items {
+		comp := &compList.Items[i]
+		if currentComp != nil && comp.Name == currentComp.Name {
+			if currentRequired && !model.IsObjectDeleting(comp) {
+				return true, nil
+			}
+			continue
+		}
+		if model.IsObjectDeleting(comp) {
+			continue
+		}
+		required, err := resolveLegacyConfigManagerRequirement(ctx, r.Client, comp)
+		if err != nil {
+			return false, err
+		}
+		if required {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (r *ComponentDrivenParameterReconciler) runningComponentParameter(reqCtx intctrlutil.RequestCtx, reader client.Reader, comp *appsv1.Component) (*parametersv1alpha1.ComponentParameter, error) {
 	var componentParameter = &parametersv1alpha1.ComponentParameter{}
 
 	clusterName, _ := component.GetClusterName(comp)
 	componentName, _ := component.ShortName(clusterName, comp.Name)
 
 	parameterKey := types.NamespacedName{
-		Name:      configcore.GenerateComponentConfigurationName(clusterName, componentName),
+		Name:      parameterscore.GenerateComponentConfigurationName(clusterName, componentName),
 		Namespace: comp.Namespace,
 	}
 	if err := reader.Get(reqCtx.Ctx, parameterKey, componentParameter); err != nil {
 		return nil, client.IgnoreNotFound(err)
 	}
 	return componentParameter, nil
+}
+
+func (r *ComponentDrivenParameterReconciler) buildComponentParameter(reqCtx intctrlutil.RequestCtx, reader client.Reader, comp *appsv1.Component, includeInitOverlay bool) (*parametersv1alpha1.ComponentParameter, error) {
+	var err error
+	var cmpd *appsv1.ComponentDefinition
+
+	if cmpd, err = getCompDefinition(reqCtx.Ctx, reader, comp.Spec.CompDef); err != nil {
+		return nil, err
+	}
+	if len(cmpd.Spec.Configs) == 0 {
+		return nil, nil
+	}
+
+	configDescs, _, err := parameters.ResolveCmpdParametersDefs(reqCtx.Ctx, reader, cmpd)
+	if err != nil {
+		return nil, err
+	}
+	if !parameters.HasValidParameterTemplate(configDescs) {
+		return nil, nil
+	}
+
+	var initialInputs *parametersv1alpha1.ParameterInputs
+	if includeInitOverlay {
+		initial, err := resolveInitialParameters(reqCtx, reader, comp)
+		if err != nil {
+			return nil, err
+		}
+		if err = validateCustomTemplate(reqCtx.Ctx, reader, initial.Templates); err != nil {
+			return nil, err
+		}
+		if len(initial.Assignments) != 0 || len(initial.Updates) != 0 || len(initial.UnmanagedUpdates) != 0 || len(initial.Templates) != 0 {
+			initialInputs = initial.DeepCopy()
+		}
+	}
+
+	clusterName, _ := component.GetClusterName(comp)
+	compName, _ := component.ShortName(clusterName, comp.Name)
+	parameterObj := builder.NewComponentParameterBuilder(comp.Namespace,
+		parameterscore.GenerateComponentConfigurationName(clusterName, compName)).
+		AddLabelsInMap(constant.GetCompLabelsWithDef(clusterName, compName, cmpd.Name)).
+		SetClusterName(clusterName).
+		SetCompName(compName).
+		SetInitial(initialInputs).
+		GetObject()
+	if err = intctrlutil.SetOwnerReference(comp, parameterObj); err != nil {
+		return nil, err
+	}
+	return parameterObj, nil
+}
+
+func resolveInitialParameters(reqCtx intctrlutil.RequestCtx, reader client.Reader, comp *appsv1.Component) (*parametersv1alpha1.ParameterInputs, error) {
+	if comp == nil {
+		return &parametersv1alpha1.ParameterInputs{}, nil
+	}
+	clusterName, err := component.GetClusterName(comp)
+	if err != nil {
+		return nil, err
+	}
+	compName, err := component.ShortName(clusterName, comp.Name)
+	if err != nil {
+		return nil, err
+	}
+	cluster := &appsv1.Cluster{}
+	if err := reader.Get(reqCtx.Ctx, types.NamespacedName{Namespace: comp.Namespace, Name: clusterName}, cluster); err != nil {
+		if client.IgnoreNotFound(err) != nil {
+			return nil, err
+		}
+		return &parametersv1alpha1.ParameterInputs{}, nil
+	}
+	initialParams, err := parametersv1alpha1.ParseInitialParameters(cluster)
+	if err != nil {
+		return nil, intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal,
+			"invalid cluster initialization payload: %v", err)
+	}
+	spec := initialParams.Get(compName)
+	if spec == nil {
+		return &parametersv1alpha1.ParameterInputs{}, nil
+	}
+	return spec, nil
+}
+
+// resolveLegacyConfigManagerRequirement reports whether this component still depends on the
+// legacy config-manager compatibility path. The requirement exists only when the parameters
+// definition still uses legacy actions and the running workload still carries the injected
+// config-manager sidecar from older releases.
+func resolveLegacyConfigManagerRequirement(ctx context.Context, reader client.Reader, comp *appsv1.Component) (bool, error) {
+	cmpd, err := getCompDefinition(ctx, reader, comp.Spec.CompDef)
+	if err != nil {
+		return false, err
+	}
+	_, paramsDefs, err := parameters.ResolveCmpdParametersDefs(ctx, reader, cmpd)
+	if err != nil {
+		return false, err
+	}
+	if !parameters.LegacyConfigManagerRequiredForParamsDefs(paramsDefs) {
+		return false, nil
+	}
+	its, err := resolveLegacyConfigManagerWorkload(ctx, reader, comp)
+	if client.IgnoreNotFound(err) != nil {
+		return false, err
+	}
+	return reconfigurectrl.HasLegacyConfigManagerRuntime(its), nil
+}
+
+func resolveLegacyConfigManagerWorkload(ctx context.Context, reader client.Reader, comp *appsv1.Component) (*workloads.InstanceSet, error) {
+	clusterName, err := component.GetClusterName(comp)
+	if err != nil {
+		return nil, err
+	}
+	componentName, err := component.ShortName(clusterName, comp.Name)
+	if err != nil {
+		return nil, err
+	}
+	its := &workloads.InstanceSet{}
+	key := types.NamespacedName{
+		Namespace: comp.Namespace,
+		Name:      constant.GenerateWorkloadNamePattern(clusterName, componentName),
+	}
+	if err := reader.Get(ctx, key, its); err != nil {
+		return nil, err
+	}
+	return its, nil
 }
 
 func getCompDefinition(ctx context.Context, cli client.Reader, cmpdName string) (*appsv1.ComponentDefinition, error) {
@@ -181,157 +466,19 @@ func getCompDefinition(ctx context.Context, cli client.Reader, cmpdName string) 
 	return cmpd, nil
 }
 
-func buildComponentParameter(reqCtx intctrlutil.RequestCtx, reader client.Reader, comp *appsv1.Component) (*parametersv1alpha1.ComponentParameter, error) {
-	var err error
-	var cmpd *appsv1.ComponentDefinition
-
-	if cmpd, err = getCompDefinition(reqCtx.Ctx, reader, comp.Spec.CompDef); err != nil {
-		return nil, err
-	}
-	if len(cmpd.Spec.Configs) == 0 {
-		return nil, nil
-	}
-
-	configRender, paramsDefs, err := parameters.ResolveCmpdParametersDefs(reqCtx.Ctx, reader, cmpd)
-	if err != nil {
-		return nil, err
-	}
-	tpls, err := resolveComponentTemplate(reqCtx.Ctx, reader, cmpd)
-	if err != nil {
-		return nil, err
-	}
-	initParameters, err := resolveInitParameters(reqCtx, reader, comp)
-	if err != nil {
-		return nil, err
-	}
-	parameterSpecs, err := parameters.ClassifyParamsFromConfigTemplate(initParameters, cmpd, paramsDefs, tpls, configRender)
-	if err != nil {
-		return nil, err
-	}
-	if len(parameterSpecs) == 0 {
-		return nil, nil
-	}
-	if err = handleCustomParameterTemplate(reqCtx.Ctx, reader, comp.Spec.Annotations, parameterSpecs); err != nil {
-		return nil, err
-	}
-
-	clusterName, _ := component.GetClusterName(comp)
-	componentName, _ := component.ShortName(clusterName, comp.Name)
-	parameterObj := builder.NewComponentParameterBuilder(comp.Namespace,
-		configcore.GenerateComponentConfigurationName(clusterName, componentName)).
-		AddLabelsInMap(constant.GetCompLabelsWithDef(clusterName, componentName, cmpd.Name)).
-		ClusterRef(clusterName).
-		Component(componentName).
-		SetConfigurationItem(parameterSpecs).
-		GetObject()
-	if err = intctrlutil.SetOwnerReference(comp, parameterObj); err != nil {
-		return nil, err
-	}
-	sharding, err := parameters.ResolveShardingReference(reqCtx.Ctx, reader, comp)
-	if err != nil {
-		return nil, err
-	}
-	if configRender != nil {
-		err = parameters.UpdateConfigPayload(&parameterObj.Spec, &comp.Spec, &configRender.Spec, sharding)
-	}
-	return parameterObj, err
-}
-
-func handleCustomParameterTemplate(ctx context.Context, reader client.Reader, annotations map[string]string, specs []parametersv1alpha1.ConfigTemplateItemDetail) error {
-	if len(annotations) == 0 {
-		return nil
-	}
-	customParamsTpl := annotations[constant.CustomParameterTemplateAnnotationKey]
-	if customParamsTpl == "" {
-		return nil
-	}
-
-	var customTemplates map[string]parametersv1alpha1.ConfigTemplateExtension
-	if err := json.Unmarshal([]byte(customParamsTpl), &customTemplates); err != nil {
-		return errors.Wrap(err, "failed to unmarshal custom parameter template")
-	}
-	if err := validateCustomTemplate(ctx, reader, customTemplates); err != nil {
-		return errors.Wrap(err, "failed to validate custom parameter template")
-	}
-
-	for tplName, tpl := range customTemplates {
-		match := func(spec parametersv1alpha1.ConfigTemplateItemDetail) bool {
-			return spec.Name == tplName
+func validateCustomTemplate(ctx context.Context, cli client.Reader, templates map[string]parametersv1alpha1.ConfigTemplateExtension) error {
+	for configSpec, custom := range templates {
+		cm := &corev1.ConfigMap{}
+		err := cli.Get(ctx, types.NamespacedName{Name: custom.TemplateRef, Namespace: custom.Namespace}, cm)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "not found configmap[%s/%s] for custom template: %s",
+					custom.Namespace, custom.TemplateRef, configSpec)
+			}
+			return err
 		}
-		index := generics.FindFirstFunc(specs, match)
-		if index < 0 {
-			return fmt.Errorf("custom template[%s] not found in component definition", tplName)
-		}
-		specs[index].CustomTemplates = tpl.DeepCopy()
 	}
 	return nil
-}
-
-func resolveInitParameters(reqCtx intctrlutil.RequestCtx, reader client.Reader, comp *appsv1.Component) (parametersv1alpha1.ComponentParameters, error) {
-	resolveShardingName := func(comp *appsv1.Component) string {
-		if len(comp.Labels) == 0 {
-			return ""
-		}
-		return comp.Labels[constant.KBAppShardingNameLabelKey]
-	}
-	componentMatcher := func(clusterName, compName string) func(parametersv1alpha1.Parameter) bool {
-		return func(pcr parametersv1alpha1.Parameter) bool {
-			if model.IsObjectDeleting(&pcr) {
-				return false
-			}
-			if pcr.Spec.ClusterName != clusterName {
-				return false
-			}
-			for _, parameter := range pcr.Spec.ComponentParameters {
-				if parameter.ComponentName == compName {
-					return true
-				}
-			}
-			return false
-		}
-	}
-
-	parameters := &parametersv1alpha1.ParameterList{}
-	clusterName, _ := component.GetClusterName(comp)
-	listOptions := []client.ListOption{
-		client.MatchingLabels{
-			constant.AppInstanceLabelKey:    clusterName,
-			constant.ParametersInitLabelKey: "true",
-		},
-		client.InNamespace(comp.Namespace),
-	}
-	if err := reader.List(reqCtx.Ctx, parameters, listOptions...); err != nil {
-		return nil, errors.Wrapf(err, "failed to list init parameters: %v", client.ObjectKeyFromObject(comp))
-	}
-
-	compRealName, _ := component.ShortName(clusterName, comp.Name)
-	if shardingName := resolveShardingName(comp); shardingName != "" {
-		compRealName = shardingName
-	}
-
-	parameterCRs := generics.FindFunc(parameters.Items, componentMatcher(clusterName, compRealName))
-	if len(parameterCRs) == 0 {
-		return nil, nil
-	}
-	return resolveInitParametersFromParameterCR(parameterCRs, compRealName)
-}
-
-func resolveInitParametersFromParameterCR(parameterCRs []parametersv1alpha1.Parameter, compName string) (parametersv1alpha1.ComponentParameters, error) {
-	var initParams parametersv1alpha1.ComponentParameters
-
-	slices.SortStableFunc(parameterCRs, func(a, b parametersv1alpha1.Parameter) int {
-		return a.CreationTimestamp.Compare(b.CreationTimestamp.Time)
-	})
-	for _, pcr := range parameterCRs {
-		for _, compParams := range pcr.Spec.ComponentParameters {
-			if compParams.ComponentName == compName {
-				if err := mergo.Merge(&initParams, compParams.Parameters); err != nil {
-					return nil, err
-				}
-			}
-		}
-	}
-	return initParams, nil
 }
 
 func resolveComponentTemplate(ctx context.Context, reader client.Reader, cmpd *appsv1.ComponentDefinition) (map[string]*corev1.ConfigMap, error) {
@@ -344,17 +491,4 @@ func resolveComponentTemplate(ctx context.Context, reader client.Reader, cmpd *a
 		tpls[config.Name] = cm
 	}
 	return tpls, nil
-}
-
-func (r *ComponentDrivenParameterReconciler) mergeComponentParameter(expected *parametersv1alpha1.ComponentParameter, existing *parametersv1alpha1.ComponentParameter) *parametersv1alpha1.ComponentParameter {
-	return parameters.MergeComponentParameter(expected, existing, func(dest, expected *parametersv1alpha1.ConfigTemplateItemDetail) {
-		if len(dest.ConfigFileParams) == 0 && len(expected.ConfigFileParams) != 0 {
-			dest.ConfigFileParams = expected.ConfigFileParams
-		}
-		if expected.CustomTemplates != nil {
-			dest.CustomTemplates = expected.CustomTemplates
-		}
-		dest.Payload = expected.Payload
-		dest.ConfigSpec = expected.ConfigSpec
-	})
 }

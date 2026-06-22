@@ -15,17 +15,39 @@ jobs:
         run: echo "PR_NUMBER=${{ github.event.issue.number }}" >> $GITHUB_OUTPUT
 
       - name: Trigger CLA check
+        id: trigger
         run: |
-          curl -X GET "https://cla-assistant.io/check/${{ github.repository_owner }}/${{ github.event.repository.name }}?pullRequest=${{ steps.pr_number.outputs.PR_NUMBER }}"
+          set -e
+          RESPONSE=$(curl -L -f -s -w "\n%{http_code}" --retry 3 --retry-delay 2 \
+            -X GET "https://cla-assistant.io/check/${{ github.repository_owner }}/${{ github.event.repository.name }}?pullRequest=${{ steps.pr_number.outputs.PR_NUMBER }}")
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | head -n -1)
+          echo "HTTP status: $HTTP_CODE"
+          echo "Response body: $BODY"
+          if [[ "$HTTP_CODE" -ge 200 && "$HTTP_CODE" -lt 300 ]]; then
+            echo "success=true" >> $GITHUB_OUTPUT
+          else
+            echo "success=false" >> $GITHUB_OUTPUT
+            echo "CLA assistant returned HTTP $HTTP_CODE" >> $GITHUB_OUTPUT
+            exit 1
+          fi
 
-      - name: Comment on PR
+      - name: Comment result on PR
+        if: ${{ always() && ! contains(github.event.comment.body, 'Instructions') }}
         uses: actions/github-script@v6
         with:
-          github-token: ${{secrets.GITHUB_TOKEN}}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            github.rest.issues.createComment({
+            const success = '${{ steps.trigger.outputs.success }}' === 'true';
+            let body = '';
+            if (success) {
+              body = '✅ CLA recheck triggered. The status should update shortly.';
+            } else {
+              body = '⚠️ Failed to trigger CLA recheck. Please try again later. If the problem persists, check the [CLA Assistant status](https://cla-assistant.io/).';
+            }
+            await github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: 'Recheck CLA triggered.'
-            })
+              body: body
+            });

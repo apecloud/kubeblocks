@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -113,7 +113,11 @@ func (t *TplEngine) GetTplEngine() *template.Template {
 
 func (t *TplEngine) Render(context string) (string, error) {
 	var buf strings.Builder
-	tpl, err := t.tpl.Parse(context)
+	tpl, err := t.tpl.Clone()
+	if err != nil {
+		return "", err
+	}
+	tpl, err = tpl.Parse(context)
 	if err != nil {
 		return "", err
 	}

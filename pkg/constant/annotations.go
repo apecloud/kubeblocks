@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -30,15 +30,25 @@ const (
 	OpsRequestAnnotationKey              = "kubeblocks.io/ops-request"               // OpsRequestAnnotationKey OpsRequest annotation key in Cluster
 	ReconcileAnnotationKey               = "kubeblocks.io/reconcile"                 // ReconcileAnnotationKey Notify k8s object to reconcile
 	RestartAnnotationKey                 = "kubeblocks.io/restart"                   // RestartAnnotationKey the annotation which notices the StatefulSet/DeploySet to restart
-	RestoreFromBackupAnnotationKey       = "kubeblocks.io/restore-from-backup"
-	RestoreDoneAnnotationKey             = "kubeblocks.io/restore-done"
-	BackupSourceTargetAnnotationKey      = "kubeblocks.io/backup-source-target" // RestoreFromBackupAnnotationKey specifies the component to recover from the backup.
-	SkipRestoreAnnotationKey             = "kubeblocks.io/skip-restore"         // SkipRestoreAnnotationKey indicates the shard component should skip sharding restore scheduling.
 
-	KBAppClusterUIDKey                   = "apps.kubeblocks.io/cluster-uid"
-	BackupPolicyTemplateAnnotationKey    = "apps.kubeblocks.io/backup-policy-template"
-	LastRoleSnapshotVersionAnnotationKey = "apps.kubeblocks.io/last-role-snapshot-version"
-	ComponentScaleInAnnotationKey        = "apps.kubeblocks.io/component-scale-in" // ComponentScaleInAnnotationKey specifies whether the component is scaled in
+	KBAppClusterUIDKey                = "apps.kubeblocks.io/cluster-uid"
+	BackupPolicyTemplateAnnotationKey = "apps.kubeblocks.io/backup-policy-template"
+	// LastRoleEventVersionAnnotationKey records the EventTime micros of the
+	// most recent single-token roleProbe result the controller accepted on a
+	// Pod. It is the staleness anchor for the `<role>` stdout form;
+	// versioned stdout (`<role> <roleVersion>`) is tracked separately via
+	// LastRoleAuthoritativeVersionAnnotationKey.
+	LastRoleEventVersionAnnotationKey = "apps.kubeblocks.io/last-role-snapshot-version"
+	// LastRoleAuthoritativeVersionAnnotationKey records the authoritative uint64
+	// roleVersion from the most recent versioned roleProbe result the
+	// controller accepted on a Pod. The two annotation keys never share
+	// semantics: single-token results read/write only the EventTime key and
+	// versioned results read/write only the roleVersion key.
+	LastRoleAuthoritativeVersionAnnotationKey = "apps.kubeblocks.io/last-role-authoritative-version"
+	ComponentScaleInAnnotationKey             = "apps.kubeblocks.io/component-scale-in" // ComponentScaleInAnnotationKey specifies whether the component is scaled in
+
+	// SystemAccountProvisionedAnnotationKey marks a system account secret whose account has already been prepared externally.
+	SystemAccountProvisionedAnnotationKey = "apps.kubeblocks.io/system-account-provisioned"
 
 	// SkipPreTerminateAnnotationKey specifies to skip the pre-terminate action for a component.
 	SkipPreTerminateAnnotationKey = "apps.kubeblocks.io/skip-pre-terminate"
@@ -52,6 +62,15 @@ const (
 
 	PVCNamePrefixAnnotationKey = "apps.kubeblocks.io/pvc-name-prefix"
 
+	RestoreSourceAPIGroupAnnotationKey  = "apps.kubeblocks.io/restore-source-api-group"
+	RestoreSourceKindAnnotationKey      = "apps.kubeblocks.io/restore-source-kind"
+	RestoreSourceNameAnnotationKey      = "apps.kubeblocks.io/restore-source-name"
+	RestoreSourceNamespaceAnnotationKey = "apps.kubeblocks.io/restore-source-namespace"
+	RestorePITRAnnotationKey            = "apps.kubeblocks.io/restore-pitr"
+	RestoreParametersAnnotationKey      = "apps.kubeblocks.io/restore-parameters"
+	RestoreComponentAnnotationKey       = "apps.kubeblocks.io/restore-component"
+	RestoreVolumeTemplateAnnotationKey  = "apps.kubeblocks.io/restore-volume-template"
+
 	// These annoations serve in a transition period when existing clusters can adopt
 	// new serviceaccount naming rules.
 	// They will be removed in the future.
@@ -59,6 +78,10 @@ const (
 	ComponentLastServiceAccountRuleHashAnnotationKey = "component.kubeblocks.io/last-service-account-rule-hash"
 	ProposedServiceAccountNameAnnotationKey          = "workloads.kubeblocks.io/proposed-service-account-name"
 	ServiceAccountInUseAnnotationKey                 = "workloads.kubeblocks.io/service-account-in-use"
+
+	// LegacyConfigManagerRequiredAnnotationKey indicates whether the cluster still requires
+	// the legacy config-manager runtime for parameters compatibility.
+	LegacyConfigManagerRequiredAnnotationKey = "parameters.kubeblocks.io/legacy-config-manager-required"
 )
 
 const (
@@ -73,14 +96,14 @@ const (
 	KBAppMultiClusterPlacementKey             = "apps.kubeblocks.io/multi-cluster-placement"
 	KBAppMultiClusterServicePlacementKey      = "apps.kubeblocks.io/multi-cluster-service-placement"
 	KBAppMultiClusterObjectProvisionPolicyKey = "apps.kubeblocks.io/multi-cluster-object-provision-policy"
+	KBAppMultiClusterObjectProvisionOrdinal   = "ordinal"
 )
 
 func InheritedAnnotations() []string {
 	return []string{
-		RestoreFromBackupAnnotationKey,
-		BackupSourceTargetAnnotationKey,
 		HostNetworkAnnotationKey,
 		FeatureReconciliationInCompactModeAnnotationKey,
+		LegacyConfigManagerRequiredAnnotationKey,
 		KBAppMultiClusterPlacementKey,
 	}
 }

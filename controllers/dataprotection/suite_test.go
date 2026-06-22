@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -30,6 +30,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/go-logr/logr"
 	vsv1beta1 "github.com/kubernetes-csi/external-snapshotter/client/v3/apis/volumesnapshot/v1beta1"
 	vsv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"go.uber.org/zap/zapcore"
@@ -82,6 +83,8 @@ var _ = BeforeSuite(func() {
 		logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true), func(o *zap.Options) {
 			o.TimeEncoder = zapcore.ISO8601TimeEncoder
 		}))
+	} else {
+		logf.SetLogger(logr.New(logf.NullLogSink{}))
 	}
 	reconcileInterval = time.Millisecond
 
@@ -175,6 +178,12 @@ var _ = BeforeSuite(func() {
 		Client:   k8sClient,
 		Scheme:   k8sManager.GetScheme(),
 		Recorder: k8sManager.GetEventRecorderFor("backup-policy-driver-controller"),
+	}).SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
+	err = (&ClusterBackupReconciler{
+		Client:   k8sClient,
+		Recorder: k8sManager.GetEventRecorderFor("cluster-backup-controller"),
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 

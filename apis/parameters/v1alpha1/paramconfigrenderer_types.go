@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -31,7 +31,11 @@ import (
 // +kubebuilder:printcolumn:name="PHASE",type="string",JSONPath=".status.phase",description="status phase"
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
-// ParamConfigRenderer is the Schema for the paramconfigrenderers API
+// Deprecated: retained for API compatibility only.
+//
+// # ParamConfigRenderer is the Schema for the paramconfigrenderers API
+//
+// +kubebuilder:deprecatedversion:warning="This CRD has been deprecated since 1.2.0"
 type ParamConfigRenderer struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -56,6 +60,13 @@ func init() {
 // ParamConfigRendererSpec defines the desired state of ParamConfigRenderer
 type ParamConfigRendererSpec struct {
 	// Specifies the ComponentDefinition custom resource (CR) that defines the Component's characteristics and behavior.
+	// The value can represent an exact name, a name prefix, or a regular expression pattern.
+	//
+	// For example:
+	//
+	// - "clickhouse-1.0.0": Matches the exact name "clickhouse-1.0.0"
+	// - "clickhouse-1": Matches all names starting with "clickhouse-1"
+	// - "^clickhouse-1\\.\\d+\\.\\d+$": Matches all names starting with "clickhouse-1." followed by version numbers.
 	//
 	// +kubebuilder:validation:Required
 	ComponentDef string `json:"componentDef"`

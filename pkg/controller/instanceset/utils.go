@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -204,7 +204,11 @@ func getMemberUpdateStrategy(its *workloads.InstanceSet) workloads.MemberUpdateS
 	return updateStrategy
 }
 
-func newLifecycleAction(its *workloads.InstanceSet, tree *kubebuilderx.ObjectTree, pod *corev1.Pod) (lifecycle.Lifecycle, error) {
+// newLifecycleAction is a package-level variable so tests can substitute a
+// spy implementation to assert call-site behavior (e.g., that switchover is
+// not invoked when an in-place update is metadata-only). Production behavior
+// is unchanged.
+var newLifecycleAction = func(its *workloads.InstanceSet, tree *kubebuilderx.ObjectTree, pod *corev1.Pod) (lifecycle.Lifecycle, error) {
 	var (
 		clusterName      = its.Labels[constant.AppInstanceLabelKey]
 		compName         = its.Labels[constant.KBAppComponentLabelKey]

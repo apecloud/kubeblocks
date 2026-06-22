@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -50,6 +50,7 @@ import (
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -64,6 +65,7 @@ type OpsRequestReconciler struct {
 // +kubebuilder:rbac:groups=operations.kubeblocks.io,resources=opsrequests,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=operations.kubeblocks.io,resources=opsrequests/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=operations.kubeblocks.io,resources=opsrequests/finalizers,verbs=update
+// +kubebuilder:rbac:groups=workloads.kubeblocks.io,resources=instances,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -89,21 +91,24 @@ func (r *OpsRequestReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *OpsRequestReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return intctrlutil.NewControllerManagedBy(mgr).
+func (r *OpsRequestReconciler) SetupWithManager(mgr ctrl.Manager, multiClusterMgr multicluster.Manager) error {
+	b := intctrlutil.NewControllerManagedBy(mgr).
 		For(&opsv1alpha1.OpsRequest{}).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: viper.GetInt(constant.CfgKBReconcileWorkers) / 2,
 		}).
 		Watches(&appsv1.Cluster{}, handler.EnqueueRequestsFromMapFunc(r.parseRunningOpsRequests)).
 		Watches(&workloads.InstanceSet{}, handler.EnqueueRequestsFromMapFunc(r.parseRunningOpsRequestsForInstanceSet)).
+		Watches(&parametersv1alpha1.ComponentParameter{}, handler.EnqueueRequestsFromMapFunc(r.parseRunningOpsRequestsForComponentParameter)).
 		Watches(&dpv1alpha1.Backup{}, handler.EnqueueRequestsFromMapFunc(r.parseBackupOpsRequest)).
-		Watches(&corev1.PersistentVolumeClaim{}, handler.EnqueueRequestsFromMapFunc(r.parseVolumeExpansionOpsRequest)).
-		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.parsePod)).
-		Owns(&batchv1.Job{}).
 		Owns(&dpv1alpha1.Restore{}).
-		Owns(&parametersv1alpha1.Parameter{}).
-		Complete(r)
+		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.parsePod)).
+		Watches(&corev1.PersistentVolumeClaim{}, handler.EnqueueRequestsFromMapFunc(r.parseVolumeExpansionOpsRequest)).
+		Owns(&batchv1.Job{})
+	if multiClusterMgr != nil {
+		multiClusterMgr.Watch(b, &workloads.Instance{}, handler.EnqueueRequestsFromMapFunc(r.parseRunningOpsRequestsForInstance))
+	}
+	return b.Complete(r)
 }
 
 // fetchOpsRequestAndCluster fetches the OpsRequest from the request.
@@ -459,6 +464,35 @@ func (r *OpsRequestReconciler) parseRunningOpsRequestsForInstanceSet(ctx context
 	}
 	cluster := &appsv1.Cluster{}
 	if err := r.Client.Get(ctx, client.ObjectKey{Name: clusterName, Namespace: its.Namespace}, cluster); err != nil {
+		return nil
+	}
+	return r.getRunningOpsRequestsFromCluster(cluster)
+}
+
+func (r *OpsRequestReconciler) parseRunningOpsRequestsForInstance(ctx context.Context, object client.Object) []reconcile.Request {
+	inst := object.(*workloads.Instance)
+	clusterName := inst.Labels[constant.AppInstanceLabelKey]
+	if clusterName == "" {
+		return nil
+	}
+	cluster := &appsv1.Cluster{}
+	if err := r.Client.Get(ctx, client.ObjectKey{Name: clusterName, Namespace: inst.Namespace}, cluster); err != nil {
+		return nil
+	}
+	return r.getRunningOpsRequestsFromCluster(cluster)
+}
+
+func (r *OpsRequestReconciler) parseRunningOpsRequestsForComponentParameter(ctx context.Context, object client.Object) []reconcile.Request {
+	componentParameter := object.(*parametersv1alpha1.ComponentParameter)
+	clusterName := componentParameter.Labels[constant.AppInstanceLabelKey]
+	if clusterName == "" {
+		clusterName = componentParameter.Spec.ClusterName
+	}
+	if clusterName == "" {
+		return nil
+	}
+	cluster := &appsv1.Cluster{}
+	if err := r.Client.Get(ctx, client.ObjectKey{Name: clusterName, Namespace: componentParameter.Namespace}, cluster); err != nil {
 		return nil
 	}
 	return r.getRunningOpsRequestsFromCluster(cluster)

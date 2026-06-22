@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -146,6 +146,11 @@ func (builder *InstanceSetBuilder) SetLifecycleActions(lifecycleActions *kbappsv
 
 func (builder *InstanceSetBuilder) SetPaused(paused bool) *InstanceSetBuilder {
 	builder.get().Spec.Paused = paused
+	return builder
+}
+
+func (builder *InstanceSetBuilder) SetConfigs(configs []workloads.ConfigTemplate) *InstanceSetBuilder {
+	builder.get().Spec.Configs = configs
 	return builder
 }
 

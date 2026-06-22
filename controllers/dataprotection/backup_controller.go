@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -31,6 +31,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -78,6 +79,7 @@ type BackupReconciler struct {
 // +kubebuilder:rbac:groups=snapshot.storage.k8s.io,resources=volumesnapshots/finalizers,verbs=update;patch
 // +kubebuilder:rbac:groups=snapshot.storage.k8s.io,resources=volumesnapshotclasses,verbs=get;list;watch
 
+// +kubebuilder:rbac:groups=core,resources=namespaces,verbs=get;list;watch
 // +kubebuilder:rbac:groups=core,resources=serviceaccounts,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings,verbs=get;list;watch;create;update;patch;delete
 
@@ -224,14 +226,10 @@ func (r *BackupReconciler) deleteBackupFiles(reqCtx intctrlutil.RequestCtx, back
 		RequestCtx: reqCtx,
 		Client:     r.Client,
 		Scheme:     r.Scheme,
+		EnsureWorkerServiceAccount: func() (string, error) {
+			return r.ensureWorkerServiceAccountForBackupDeletion(reqCtx, backup.Namespace)
+		},
 	}
-
-	// TODO: update the mcMgr param
-	saName, err := EnsureWorkerServiceAccount(reqCtx, r.Client, backup.Namespace, nil)
-	if err != nil {
-		return fmt.Errorf("failed to get worker service account: %w", err)
-	}
-	deleter.WorkerServiceAccount = saName
 
 	status, err := deleter.DeleteBackupFiles(backup)
 	switch status {
@@ -252,6 +250,18 @@ func (r *BackupReconciler) deleteBackupFiles(reqCtx intctrlutil.RequestCtx, back
 		return err
 	}
 	return err
+}
+
+func (r *BackupReconciler) ensureWorkerServiceAccountForBackupDeletion(reqCtx intctrlutil.RequestCtx, namespace string) (string, error) {
+	ns := &corev1.Namespace{}
+	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Name: namespace}, ns); err != nil {
+		return "", fmt.Errorf("failed to get backup namespace %q before deleting backup files: %w", namespace, err)
+	}
+	if !ns.DeletionTimestamp.IsZero() {
+		return "", fmt.Errorf("backup namespace %q is terminating; cannot create worker resources to delete backup files, delete the Backup and wait until it is gone before deleting the namespace", namespace)
+	}
+	// TODO: update the mcMgr param
+	return EnsureWorkerServiceAccount(reqCtx, r.Client, namespace, nil)
 }
 
 // handleDeletingPhase handles the deletion of backup. It will delete the backup CR
@@ -658,7 +668,7 @@ func (r *BackupReconciler) handleRunningPhase(
 	}
 	if existFailedAction {
 		return r.updateStatusIfFailed(reqCtx, backup, request.Backup,
-			fmt.Errorf("there are failed actions, you can obtain the more informations in the status.actions"))
+			fmt.Errorf("there are failed actions, you can obtain the more information in the status.actions"))
 	}
 	// all actions completed, update backup status to completed
 	request.Status.Phase = dpv1alpha1.BackupPhaseCompleted
@@ -700,16 +710,20 @@ func (r *BackupReconciler) checkRestoreInProgress(reqCtx intctrlutil.RequestCtx,
 		return false, nil
 	}
 	cluster := &kbappsv1.Cluster{}
-	backupTargetExists, err := intctrlutil.CheckResourceExists(reqCtx.Ctx, r.Client,
+	clusterExists, err := intctrlutil.CheckResourceExists(reqCtx.Ctx, r.Client,
 		client.ObjectKey{Name: clusterName, Namespace: backup.Namespace}, cluster)
-	if err != nil || !backupTargetExists {
+	if err != nil || !clusterExists {
 		return false, err
 	}
-	if cluster.Annotations == nil {
-		return false, nil
+	return clusterRestoreInProgress(cluster), nil
+}
+
+func clusterRestoreInProgress(cluster *kbappsv1.Cluster) bool {
+	if cluster.Spec.Restore == nil {
+		return false
 	}
-	_, ok = cluster.Annotations[constant.RestoreFromBackupAnnotationKey]
-	return ok, nil
+	cond := meta.FindStatusCondition(cluster.Status.Conditions, kbappsv1.ConditionTypeRestore)
+	return cond == nil || (cond.Status != metav1.ConditionTrue && cond.Status != metav1.ConditionFalse)
 }
 
 // checkIsCompletedDuringRunning when continuous schedule is disabled or cluster has been deleted,
@@ -963,13 +977,25 @@ func updateBackupStatusByActionStatus(backupStatus *dpv1alpha1.BackupStatus) {
 	}
 }
 
+const systemAccountSecretLabel = "apps.kubeblocks.io/system-account"
+
 func setEncryptedSystemAccountsAnnotation(request *dpbackup.Request, cluster *kbappsv1.Cluster) error {
 	usernameKey := constant.AccountNameForSecret
 	passwordKey := constant.AccountPasswdForSecret
 	isSystemAccountSecret := func(secret *corev1.Secret) bool {
 		username := secret.Data[usernameKey]
 		password := secret.Data[passwordKey]
-		return username != nil && password != nil
+		if username == nil || password == nil {
+			return false
+		}
+		if secret.Labels[systemAccountSecretLabel] != "" {
+			return true
+		}
+		shardingName := secret.Labels[constant.KBAppShardingNameLabelKey]
+		if shardingName == "" {
+			return false
+		}
+		return secret.Name == fmt.Sprintf("%s-%s-%s", cluster.Name, shardingName, string(username))
 	}
 	// fetch secret objects
 	objectList, err := listObjectsOfCluster(request.Ctx, request.Client, cluster, &corev1.SecretList{})

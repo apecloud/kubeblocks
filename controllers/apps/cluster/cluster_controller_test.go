@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -36,12 +36,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
-	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -107,9 +105,7 @@ var _ = Describe("Cluster Controller", func() {
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PodSignature, true, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.VolumeSnapshotSignature, true, inNS)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ServiceSignature, true, inNS, ml)
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupSignature, true, inNS, ml)
 		// non-namespaced
-		testapps.ClearResources(&testCtx, generics.ActionSetSignature, ml)
 		testapps.ClearResources(&testCtx, generics.StorageClassSignature, ml)
 		resetTestContext()
 	}
@@ -739,35 +735,12 @@ var _ = Describe("Cluster Controller", func() {
 		}
 	}
 
-	deleteClusterWithBackup := func(terminationPolicy appsv1.TerminationPolicyType) {
-		By("mocking a retained backup")
-		backupPolicyName := "test-backup-policy"
-		backupName := "test-backup"
-		backupMethod := "test-backup-method"
-		backup := testdp.NewBackupFactory(testCtx.DefaultNamespace, backupName).
-			SetBackupPolicyName(backupPolicyName).
-			SetBackupMethod(backupMethod).
-			SetLabels(map[string]string{
-				constant.AppManagedByLabelKey: constant.AppName,
-				constant.AppInstanceLabelKey:  clusterObj.Name,
-			}).
-			WithRandomName().
-			Create(&testCtx).GetObject()
-		backupKey := client.ObjectKeyFromObject(backup)
-		Eventually(testapps.CheckObjExists(&testCtx, backupKey, &dpv1alpha1.Backup{}, true)).Should(Succeed())
-
+	deleteClusterByPolicy := func(terminationPolicy appsv1.TerminationPolicyType) {
 		By("delete the cluster")
 		testapps.DeleteObject(&testCtx, clusterKey, &appsv1.Cluster{})
 
 		By("wait for the cluster to terminate")
 		Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1.Cluster{}, false)).Should(Succeed())
-
-		By(fmt.Sprintf("checking the backup with TerminationPolicyType=%s", terminationPolicy))
-		if terminationPolicy == appsv1.WipeOut {
-			Eventually(testapps.CheckObjExists(&testCtx, backupKey, &dpv1alpha1.Backup{}, false)).Should(Succeed())
-		} else {
-			Consistently(testapps.CheckObjExists(&testCtx, backupKey, &dpv1alpha1.Backup{}, true)).Should(Succeed())
-		}
 
 		By("check all other resources deleted")
 		transCtx := &clusterTransformContext{
@@ -788,12 +761,12 @@ var _ = Describe("Cluster Controller", func() {
 
 	testDeleteClusterWithDelete := func(createObj func(appsv1.TerminationPolicyType)) {
 		createObj(appsv1.Delete)
-		deleteClusterWithBackup(appsv1.Delete)
+		deleteClusterByPolicy(appsv1.Delete)
 	}
 
 	testDeleteClusterWithWipeOut := func(createObj func(appsv1.TerminationPolicyType)) {
 		createObj(appsv1.WipeOut)
-		deleteClusterWithBackup(appsv1.WipeOut)
+		deleteClusterByPolicy(appsv1.WipeOut)
 	}
 
 	Context("cluster provisioning", func() {

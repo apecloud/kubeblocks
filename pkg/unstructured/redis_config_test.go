@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -191,6 +191,22 @@ zset-max-listpack-value 64`
 		want:  commentsConfig,
 		updated: map[string]interface{}{
 			"zset-max-listpack-entries": 128,
+		},
+	}, {
+		name: "single_line_comment_preserved_after_update",
+		input: `port 6379
+maxmemory 100mb
+# maxmemory-policy controls eviction behavior
+maxmemory-policy volatile-lru
+timeout 0`,
+		want: `port 6379
+maxmemory 100mb
+# maxmemory-policy controls eviction behavior
+maxmemory-policy allkeys-lru
+timeout 300`,
+		updated: map[string]interface{}{
+			"maxmemory-policy": "allkeys-lru",
+			"timeout":          300,
 		},
 	}}
 	for _, tt := range tests {

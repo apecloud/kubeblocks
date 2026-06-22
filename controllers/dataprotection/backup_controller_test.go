@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -21,22 +21,29 @@ package dataprotection
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"slices"
 	"strconv"
 	"time"
 
-	vsv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	vsv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/utils/pointer"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -65,7 +72,7 @@ var _ = Describe("Backup Controller test", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 
-		testapps.ClearResources(&testCtx, generics.ClusterSignature, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ClusterSignature, true, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.PodSignature, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupSignature, true, inNS)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupRepoSignature, true, ml)
@@ -79,7 +86,6 @@ var _ = Describe("Backup Controller test", func() {
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupPolicySignature, true, inNS)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.JobSignature, true, inNS)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS)
-
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ActionSetSignature, true, ml)
 		testapps.ClearResources(&testCtx, generics.StorageClassSignature, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeSignature, true, ml)
@@ -96,6 +102,168 @@ var _ = Describe("Backup Controller test", func() {
 
 	AfterEach(func() {
 		cleanEnv()
+	})
+
+	Context("backup annotations", func() {
+		It("records cluster snapshot and encrypted system account secrets", func() {
+			cluster := clusterInfo.Cluster
+			cluster.Annotations = map[string]string{
+				constant.OpsRequestAnnotationKey:        "removed",
+				corev1.LastAppliedConfigAnnotation:      "removed",
+				"dataprotection.kubeblocks.io/retained": "true",
+			}
+
+			labels := constant.GetClusterLabels(cluster.Name)
+			componentLabels := constant.GetCompLabels(cluster.Name, testdp.ComponentName)
+			componentLabels[systemAccountSecretLabel] = "admin"
+			shardingLabels := constant.GetClusterLabels(cluster.Name, map[string]string{
+				constant.KBAppShardingNameLabelKey: "shard",
+			})
+			componentSecret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: cluster.Namespace,
+					Name:      "component-account",
+					Labels:    componentLabels,
+				},
+				Data: map[string][]byte{
+					constant.AccountNameForSecret:   []byte("admin"),
+					constant.AccountPasswdForSecret: []byte("component-password"),
+				},
+			}
+			shardingSecret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: cluster.Namespace,
+					Name:      fmt.Sprintf("%s-%s-%s", cluster.Name, "shard", "root"),
+					Labels:    shardingLabels,
+				},
+				Data: map[string][]byte{
+					constant.AccountNameForSecret:   []byte("root"),
+					constant.AccountPasswdForSecret: []byte("sharding-password"),
+				},
+			}
+			ignoredSecret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: cluster.Namespace,
+					Name:      "not-system-account",
+					Labels:    labels,
+				},
+				Data: map[string][]byte{
+					constant.AccountNameForSecret: []byte("ignored"),
+				},
+			}
+			ordinarySecret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: cluster.Namespace,
+					Name:      "ordinary-credentials",
+					Labels:    constant.GetCompLabels(cluster.Name, testdp.ComponentName),
+				},
+				Data: map[string][]byte{
+					constant.AccountNameForSecret:   []byte("ordinary"),
+					constant.AccountPasswdForSecret: []byte("ordinary-password"),
+				},
+			}
+			ordinaryShardingSecret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: cluster.Namespace,
+					Name:      "ordinary-sharding-credentials",
+					Labels:    constant.GetClusterLabels(cluster.Name, map[string]string{constant.KBAppShardingNameLabelKey: "shard"}),
+				},
+				Data: map[string][]byte{
+					constant.AccountNameForSecret:   []byte("ordinary-shard"),
+					constant.AccountPasswdForSecret: []byte("ordinary-sharding-password"),
+				},
+			}
+			Expect(testCtx.CreateObj(ctx, componentSecret)).Should(Succeed())
+			Expect(testCtx.CreateObj(ctx, shardingSecret)).Should(Succeed())
+			Expect(testCtx.CreateObj(ctx, ignoredSecret)).Should(Succeed())
+			Expect(testCtx.CreateObj(ctx, ordinarySecret)).Should(Succeed())
+			Expect(testCtx.CreateObj(ctx, ordinaryShardingSecret)).Should(Succeed())
+
+			backup := &dpv1alpha1.Backup{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace:   cluster.Namespace,
+					Name:        "annotation-backup",
+					Annotations: map[string]string{},
+				},
+			}
+			request := &dpbackup.Request{
+				RequestCtx: intctrlutil.RequestCtx{Ctx: ctx},
+				Client:     k8sClient,
+				Backup:     backup,
+			}
+
+			Expect(setClusterSnapshotAnnotation(request, cluster)).Should(Succeed())
+			Expect(backup.Annotations[constant.ClusterSnapshotAnnotationKey]).To(ContainSubstring(`"name":"` + cluster.Name + `"`))
+			Expect(backup.Annotations[constant.ClusterSnapshotAnnotationKey]).To(ContainSubstring(`"dataprotection.kubeblocks.io/retained":"true"`))
+			Expect(backup.Annotations[constant.ClusterSnapshotAnnotationKey]).NotTo(ContainSubstring(constant.OpsRequestAnnotationKey))
+			Expect(backup.Annotations[constant.ClusterSnapshotAnnotationKey]).NotTo(ContainSubstring(corev1.LastAppliedConfigAnnotation))
+
+			Expect(setEncryptedSystemAccountsAnnotation(request, cluster)).Should(Succeed())
+			accounts := map[string]map[string]string{}
+			Expect(json.Unmarshal([]byte(backup.Annotations[constant.EncryptedSystemAccountsAnnotationKey]), &accounts)).Should(Succeed())
+			Expect(accounts).To(HaveKey(testdp.ComponentName))
+			Expect(accounts[testdp.ComponentName]).To(HaveKey("admin"))
+			Expect(accounts[testdp.ComponentName]).NotTo(HaveKey("ordinary"))
+			Expect(accounts).To(HaveKey("shard"))
+			Expect(accounts["shard"]).To(HaveKey("root"))
+			Expect(accounts["shard"]).NotTo(HaveKey("ordinary-shard"))
+			Expect(accounts).NotTo(HaveKey(""))
+		})
+	})
+
+	Context("continuous backup validation", func() {
+		It("validates schedule ownership and waits for creating clusters", func() {
+			scheme := runtime.NewScheme()
+			Expect(kbappsv1.AddToScheme(scheme)).Should(Succeed())
+			Expect(dpv1alpha1.AddToScheme(scheme)).Should(Succeed())
+
+			backup := &dpv1alpha1.Backup{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "continuous-backup",
+					Labels: map[string]string{
+						constant.AppInstanceLabelKey: "cluster",
+					},
+				},
+			}
+			creatingCluster := &kbappsv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "cluster",
+				},
+				Status: kbappsv1.ClusterStatus{
+					Phase: kbappsv1.CreatingClusterPhase,
+				},
+			}
+			reqCtx := intctrlutil.RequestCtx{Ctx: context.Background()}
+			cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(creatingCluster).Build()
+
+			Expect(clusterIsCreating(reqCtx, backup, cli)).To(BeTrue())
+			Expect(validateContinuousBackup(backup, reqCtx, cli)).ShouldNot(Succeed())
+
+			readyCluster := creatingCluster.DeepCopy()
+			readyCluster.Status.Phase = kbappsv1.RunningClusterPhase
+			backup.Labels[dptypes.BackupScheduleLabelKey] = "schedule"
+			failedSchedule := &dpv1alpha1.BackupSchedule{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: backup.Namespace,
+					Name:      "schedule",
+				},
+				Status: dpv1alpha1.BackupScheduleStatus{
+					Phase: dpv1alpha1.BackupSchedulePhaseFailed,
+				},
+			}
+			cli = fake.NewClientBuilder().WithScheme(scheme).WithObjects(readyCluster, failedSchedule).Build()
+
+			Expect(clusterIsCreating(reqCtx, backup, cli)).To(BeFalse())
+			Expect(validateContinuousBackup(backup, reqCtx, cli)).ShouldNot(Succeed())
+
+			availableSchedule := failedSchedule.DeepCopy()
+			availableSchedule.Status.Phase = dpv1alpha1.BackupSchedulePhaseAvailable
+			cli = fake.NewClientBuilder().WithScheme(scheme).WithObjects(readyCluster, availableSchedule).Build()
+
+			Expect(validateContinuousBackup(backup, reqCtx, cli)).Should(Succeed())
+		})
 	})
 
 	When("with default settings", func() {
@@ -789,6 +957,48 @@ var _ = Describe("Backup Controller test", func() {
 
 				// TODO: add delete backup test case with the pvc not exists
 			})
+
+			It("should not create worker resources when backup namespace is terminating", func() {
+				nsName := "backup-delete-terminating"
+				ns := &corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: nsName,
+					},
+				}
+				Expect(client.IgnoreAlreadyExists(testCtx.Cli.Create(testCtx.Ctx, ns))).Should(Succeed())
+
+				finalizeNamespace := func() {
+					Eventually(func(g Gomega) {
+						current := &corev1.Namespace{}
+						err := testCtx.Cli.Get(testCtx.Ctx, types.NamespacedName{Name: nsName}, current)
+						if apierrors.IsNotFound(err) {
+							return
+						}
+						g.Expect(err).ShouldNot(HaveOccurred())
+						current.Spec.Finalizers = []corev1.FinalizerName{}
+						clientGo, err := kubernetes.NewForConfig(testEnv.Config)
+						g.Expect(err).ShouldNot(HaveOccurred())
+						_, err = clientGo.CoreV1().Namespaces().Finalize(testCtx.Ctx, current, metav1.UpdateOptions{})
+						g.Expect(err).ShouldNot(HaveOccurred())
+					}).Should(Succeed())
+				}
+				DeferCleanup(finalizeNamespace)
+
+				By("marking the namespace terminating")
+				Expect(testCtx.Cli.Delete(testCtx.Ctx, ns)).Should(Succeed())
+				Eventually(func(g Gomega) {
+					current := &corev1.Namespace{}
+					g.Expect(testCtx.Cli.Get(testCtx.Ctx, types.NamespacedName{Name: nsName}, current)).Should(Succeed())
+					g.Expect(current.DeletionTimestamp.IsZero()).Should(BeFalse())
+				}).Should(Succeed())
+
+				reconciler := &BackupReconciler{Client: testCtx.Cli}
+				_, err := reconciler.ensureWorkerServiceAccountForBackupDeletion(
+					intctrlutil.RequestCtx{Ctx: testCtx.Ctx},
+					nsName)
+				Expect(err).Should(HaveOccurred())
+				Expect(err.Error()).Should(ContainSubstring("is terminating; cannot create worker resources to delete backup files"))
+			})
 		})
 
 		Context("creates a snapshot backup", func() {
@@ -1065,14 +1275,31 @@ var _ = Describe("Backup Controller test", func() {
 			})
 		})
 
-		It("delays backup job when restore is in progress", func() {
-			By("setting restore annotation on cluster")
-			Expect(testapps.ChangeObj(&testCtx, clusterInfo.Cluster, func(cluster *kbappsv1.Cluster) {
-				if cluster.Annotations == nil {
-					cluster.Annotations = make(map[string]string)
-				}
-				cluster.Annotations[constant.RestoreFromBackupAnnotationKey] = "any-value"
-			})).Should(Succeed())
+		It("delays backup job when Backup dataSource PVC restore is in progress", func() {
+			By("creating an in-progress Backup dataSource PVC")
+			pvc := &corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "restore-pvc",
+					Namespace: testCtx.DefaultNamespace,
+					Annotations: map[string]string{
+						constant.RestoreSourceNamespaceAnnotationKey: testCtx.DefaultNamespace,
+					},
+				},
+				Spec: corev1.PersistentVolumeClaimSpec{
+					AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+					DataSourceRef: &corev1.TypedObjectReference{
+						APIGroup: pointer.String(dptypes.DataprotectionAPIGroup),
+						Kind:     dptypes.BackupKind,
+						Name:     testdp.BackupName,
+					},
+					Resources: corev1.VolumeResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceStorage: resource.MustParse("1Gi"),
+						},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, pvc)).Should(Succeed())
 
 			By("creating a backup from backupPolicy " + testdp.BackupPolicyName)
 			backup := testdp.NewFakeBackup(&testCtx, nil)
@@ -1089,29 +1316,61 @@ var _ = Describe("Backup Controller test", func() {
 			}
 			Eventually(testapps.CheckObjExists(&testCtx, jobKey, &batchv1.Job{}, false)).Should(Succeed())
 
-			By("check event fired")
-			Eventually(func() bool {
-				eventList := &corev1.EventList{}
-				err := k8sClient.List(ctx, eventList, client.InNamespace(clusterInfo.Cluster.Namespace))
-				if err != nil {
-					return false
-				}
-				for _, e := range eventList.Items {
-					if e.Reason == "RestoreInProgress" && e.InvolvedObject.Name == backup.Name {
-						return true
-					}
-				}
-				return false
-			}).Should(BeTrue())
-
-			By("delete restore annotation")
-			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterInfo.Cluster), func(cluster *kbappsv1.Cluster) {
-				delete(cluster.Annotations, constant.RestoreFromBackupAnnotationKey)
+			By("mark PVC restore completed")
+			Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(pvc), func(pvc *corev1.PersistentVolumeClaim) {
+				pvc.Status.Conditions = []corev1.PersistentVolumeClaimCondition{{
+					Type:   corev1.PersistentVolumeClaimConditionType(kbappsv1.ConditionTypeRestore),
+					Status: corev1.ConditionTrue,
+					Reason: ReasonPopulatingSucceed,
+				}}
 			})).Should(Succeed())
 
 			By("check job is created")
 			Eventually(testapps.CheckObjExists(&testCtx, jobKey, &batchv1.Job{}, true)).Should(Succeed())
 		})
+
+		It("delays backup job when target Cluster restore is in progress", func() {
+			By("patching the target cluster with a restore intent from another backup")
+			clusterKey := types.NamespacedName{Namespace: testCtx.DefaultNamespace, Name: testdp.ClusterName}
+			Eventually(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *kbappsv1.Cluster) {
+				cluster.Spec.Restore = &kbappsv1.ClusterRestore{
+					Source: kbappsv1.ClusterRestoreSource{
+						APIGroup:  dptypes.DataprotectionAPIGroup,
+						Kind:      dptypes.BackupKind,
+						Name:      "source-backup",
+						Namespace: testCtx.DefaultNamespace,
+					},
+				}
+			})).Should(Succeed())
+
+			By("creating a backup from backupPolicy " + testdp.BackupPolicyName)
+			backup := testdp.NewFakeBackup(&testCtx, nil)
+			backupKey := client.ObjectKeyFromObject(backup)
+			jobKey := client.ObjectKey{
+				Name:      dpbackup.GenerateBackupJobName(backup, dpbackup.BackupDataJobNamePrefix+"-0"),
+				Namespace: backup.Namespace,
+			}
+
+			By("check backup is delayed before restore condition completes")
+			Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
+				g.Expect(fetched.Status.Phase).Should(Equal(dpv1alpha1.BackupPhaseRunning))
+			})).Should(Succeed())
+			Eventually(testapps.CheckObjExists(&testCtx, jobKey, &batchv1.Job{}, false)).Should(Succeed())
+
+			By("mark cluster restore completed")
+			Eventually(testapps.GetAndChangeObjStatus(&testCtx, clusterKey, func(cluster *kbappsv1.Cluster) {
+				cluster.Status.Conditions = []metav1.Condition{{
+					Type:               kbappsv1.ConditionTypeRestore,
+					Status:             metav1.ConditionTrue,
+					Reason:             "RestoreCompleted",
+					LastTransitionTime: metav1.Now(),
+				}}
+			})).Should(Succeed())
+
+			By("check job is created")
+			Eventually(testapps.CheckObjExists(&testCtx, jobKey, &batchv1.Job{}, true)).Should(Succeed())
+		})
+
 	})
 
 	When("with exceptional settings", func() {

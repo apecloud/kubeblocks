@@ -35,7 +35,7 @@ spec:
             - -c
             - |
               set -e
-              kb_json=$(kubectl get deployments.apps -n {{ .Release.Namespace }} {{ .Release.Name }} -ojson )
+              kb_json=$(kubectl get deployments.apps -n {{ .Release.Namespace }} {{ include "kubeblocks.fullname" . }} -ojson )
               version=$(echo $kb_json | jq '.metadata.labels["app.kubernetes.io/version"]' | tr -d '"')
               echo "Current KubeBlocks Version: $version"
               if echo "$version" | grep -q '^0\.'; then

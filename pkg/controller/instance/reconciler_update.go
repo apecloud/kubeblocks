@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/ptr"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -136,6 +137,15 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		if updatePolicy == inPlaceUpdatePolicy && specUpdatePolicy == kbappsv1.ReCreatePodUpdatePolicyType {
 			updatePolicy = recreatePolicy
 		}
+
+		allUpdated, err := r.reconfigure(tree, inst, pod)
+		if err != nil {
+			return kubebuilderx.Continue, err
+		}
+		if !allUpdated && updatePolicy == noOpsPolicy {
+			continue
+		}
+
 		switch updatePolicy {
 		case inPlaceUpdatePolicy:
 			newPod, err := buildInstancePod(inst, getPodRevision(pod))
@@ -149,11 +159,12 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 				return kubebuilderx.Continue, err
 			}
 
-			// if already updating using subresource, don't update it again, because without subresource, those fields are considered immutable.
-			// Another reconciliation will be triggered since pod status will be updated.
-			if !equalResourcesInPlaceFields(pod, newPod) && supportResizeSubResource {
+			switch {
+			case !equalResourcesInPlaceFields(pod, newPod) && supportResizeSubResource:
 				err = tree.Update(newMergedPod, kubebuilderx.WithSubResource("resize"))
-			} else {
+			case safeMetadataOnlyInPlaceUpdate(pod, newPod):
+				err = tree.Update(newMergedPod, kubebuilderx.WithPatch(true))
+			default:
 				if err = r.switchover(tree, inst, newMergedPod.(*corev1.Pod)); err != nil {
 					return kubebuilderx.Continue, err
 				}
@@ -172,15 +183,6 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 				}
 			}
 		}
-
-		// TODO: ???
-		//// actively reload the new configuration when the pod or container has not been updated
-		// if updatePolicy == noOpsPolicy {
-		//	_, err := r.reconfigure(tree, inst, pod)
-		//	if err != nil {
-		//		return kubebuilderx.Continue, err
-		//	}
-		// }
 	}
 	if !isBlocked {
 		meta.RemoveStatusCondition(&inst.Status.Conditions, string(workloads.InstanceUpdateRestricted))
@@ -211,126 +213,61 @@ func (r *updateReconciler) switchover(tree *kubebuilderx.ObjectTree, inst *workl
 	return nil
 }
 
-// func (r *updateReconciler) reconfigure(tree *kubebuilderx.ObjectTree, inst *workloads.Instance, pod *corev1.Pod) (bool, error) {
-//	allUpdated := true
-//	for _, config := range inst.Spec.Configs {
-//		if !r.isConfigUpdated(inst, pod, config) {
-//			allUpdated = false
-//			if err := r.reconfigureConfig(tree, inst, pod, config); err != nil {
-//				return false, err
-//			}
-//		}
-//		// TODO: compose the status from pods but not the its spec and status
-//		r.setInstanceConfigStatus(inst, pod, config)
-//	}
-//	return allUpdated, nil
-// }
-//
-// func (r *updateReconciler) reconfigureConfig(tree *kubebuilderx.ObjectTree, inst *workloads.Instance, pod *corev1.Pod, config workloads.ConfigTemplate) error {
-//	if config.Reconfigure == nil {
-//		return nil // skip
-//	}
-//
-//	clusterName, err := r.clusterName(inst)
-//	if err != nil {
-//		return err
-//	}
-//
-//	lifecycleActions := &kbappsv1.ComponentLifecycleActions{
-//		Reconfigure: config.Reconfigure,
-//	}
-//	templateVars := func() map[string]any {
-//		if inst.Spec.TemplateVars == nil {
-//			return nil
-//		}
-//		m := make(map[string]any)
-//		for k, v := range inst.Spec.TemplateVars {
-//			m[k] = v
-//		}
-//		return m
-//	}()
-//	lfa, err := lifecycle.New(inst.Namespace, clusterName, inst.Spec.InstanceSetName, lifecycleActions, templateVars, pod)
-//	if err != nil {
-//		return err
-//	}
-//
-//	if len(config.ReconfigureActionName) == 0 {
-//		err = lfa.Reconfigure(tree.Context, nil, nil, config.Parameters)
-//	} else {
-//		err = lfa.UserDefined(tree.Context, nil, nil, config.ReconfigureActionName, config.Reconfigure, config.Parameters)
-//	}
-//	if err != nil {
-//		if errors.Is(err, lifecycle.ErrActionNotDefined) {
-//			return nil
-//		}
-//		if errors.Is(err, lifecycle.ErrPreconditionFailed) {
-//			return intctrlutil.NewDelayedRequeueError(time.Second,
-//				fmt.Sprintf("replicas not up-to-date when reconfiguring: %s", err.Error()))
-//		}
-//		return err
-//	}
-//	tree.Logger.Info("successfully reconfigure the pod", "pod", pod.Name, "generation", config.Generation)
-//	return nil
-// }
-//
-// func (r *updateReconciler) setInstanceConfigStatus(its *workloads.InstanceSet, pod *corev1.Pod, config workloads.ConfigTemplate) {
-//	if its.Status.InstanceStatus == nil {
-//		its.Status.InstanceStatus = make([]workloads.InstanceStatus, 0)
-//	}
-//	idx := slices.IndexFunc(its.Status.InstanceStatus, func(instance workloads.InstanceStatus) bool {
-//		return instance.PodName == pod.Name
-//	})
-//	if idx < 0 {
-//		its.Status.InstanceStatus = append(its.Status.InstanceStatus, workloads.InstanceStatus{PodName: pod.Name})
-//		idx = len(its.Status.InstanceStatus) - 1
-//	}
-//
-//	if its.Status.InstanceStatus[idx].Configs == nil {
-//		its.Status.InstanceStatus[idx].Configs = make([]workloads.InstanceConfigStatus, 0)
-//	}
-//	status := workloads.InstanceConfigStatus{
-//		Name:       config.Name,
-//		Generation: config.Generation,
-//	}
-//	for i, configStatus := range its.Status.InstanceStatus[idx].Configs {
-//		if configStatus.Name == config.Name {
-//			its.Status.InstanceStatus[idx].Configs[i] = status
-//			return
-//		}
-//	}
-//	its.Status.InstanceStatus[idx].Configs = append(its.Status.InstanceStatus[idx].Configs, status)
-// }
-//
-// func (r *updateReconciler) isPodOrConfigUpdated(inst *workloads.Instance, pod *corev1.Pod) (bool, error) {
-//	policy, err := getPodUpdatePolicy(inst, pod)
-//	if err != nil {
-//		return false, err
-//	}
-//	if policy != noOpsPolicy {
-//		return false, nil
-//	}
-//	for _, config := range inst.Spec.Configs {
-//		if !r.isConfigUpdated(inst, pod, config) {
-//			return false, nil
-//		}
-//	}
-//	return true, nil
-// }
-//
-// func (r *updateReconciler) isConfigUpdated(inst *workloads.Instance, pod *corev1.Pod, config workloads.ConfigTemplate) bool {
-//	idx := slices.IndexFunc(inst.Status.InstanceStatus, func(instance workloads.InstanceStatus) bool {
-//		return instance.PodName == pod.Name
-//	})
-//	if idx < 0 {
-//		return true // new pod provisioned
-//	}
-//	for _, configStatus := range inst.Status.InstanceStatus[idx].Configs {
-//		if configStatus.Name == config.Name {
-//			return config.Generation <= configStatus.Generation
-//		}
-//	}
-//	return config.Generation <= 0
-// }
+func (r *updateReconciler) reconfigure(tree *kubebuilderx.ObjectTree, inst *workloads.Instance, pod *corev1.Pod) (bool, error) {
+	toUpdate, err := configsToUpdate(inst, pod)
+	if err != nil {
+		return false, err
+	}
+	for _, config := range toUpdate {
+		if err = r.reconfigureInst(tree, inst, pod, config); err != nil {
+			return false, err
+		}
+	}
+	return len(toUpdate) == 0, nil
+}
+
+func (r *updateReconciler) reconfigureInst(tree *kubebuilderx.ObjectTree, inst *workloads.Instance, pod *corev1.Pod, config workloads.ConfigTemplate) error {
+	if config.Reconfigure == nil {
+		return nil
+	}
+
+	instCopy := inst.DeepCopy()
+	if instCopy.Spec.LifecycleActions == nil {
+		instCopy.Spec.LifecycleActions = &workloads.LifecycleActions{}
+	}
+	instCopy.Spec.LifecycleActions.Reconfigure = config.Reconfigure
+
+	lfa, err := newLifecycleAction(instCopy, []*corev1.Pod{pod}, pod)
+	if err != nil {
+		return err
+	}
+
+	opts := reconfigureOptions(config)
+	if len(config.ReconfigureActionName) == 0 {
+		err = lfa.Reconfigure(tree.Context, nil, opts, config.Parameters)
+	} else {
+		err = lfa.UserDefined(tree.Context, nil, opts, config.ReconfigureActionName, config.Reconfigure, config.Parameters)
+	}
+	if err != nil {
+		if errors.Is(err, lifecycle.ErrActionNotDefined) {
+			return nil
+		}
+		if errors.Is(err, lifecycle.ErrPreconditionFailed) {
+			return intctrlutil.NewDelayedRequeueError(time.Second,
+				fmt.Sprintf("replicas not up-to-date when reconfiguring: %s", err.Error()))
+		}
+		return err
+	}
+	tree.Logger.Info("successfully reconfigure the pod", "pod", pod.Name, "configHash", ptr.Deref(config.ConfigHash, ""))
+	return nil
+}
+
+func reconfigureOptions(config workloads.ConfigTemplate) *lifecycle.Options {
+	if len(config.ReconfigureArgs) == 0 {
+		return nil
+	}
+	return &lifecycle.Options{Arguments: config.ReconfigureArgs}
+}
 
 func buildBlockedCondition(inst *workloads.Instance, message string) *metav1.Condition {
 	return &metav1.Condition{

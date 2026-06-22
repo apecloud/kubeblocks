@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -59,6 +59,9 @@ func (opsMgr *OpsManager) Do(reqCtx intctrlutil.RequestCtx, cli client.Client, o
 	)
 	if opsBehaviour, ok = opsMgr.OpsMap[opsRequest.Spec.Type]; !ok || opsBehaviour.OpsHandler == nil {
 		return &ctrl.Result{}, PatchOpsHandlerNotSupported(reqCtx.Ctx, cli, opsRes)
+	}
+	if err = opsMgr.initRuntime(reqCtx, cli, opsRes); err != nil {
+		return nil, err
 	}
 
 	if opsRequest.Spec.Type == opsv1alpha1.CustomType {
@@ -164,6 +167,9 @@ func (opsMgr *OpsManager) Reconcile(reqCtx intctrlutil.RequestCtx, cli client.Cl
 	if opsBehaviour, ok = opsMgr.OpsMap[opsRes.OpsRequest.Spec.Type]; !ok || opsBehaviour.OpsHandler == nil {
 		return 0, PatchOpsHandlerNotSupported(reqCtx.Ctx, cli, opsRes)
 	}
+	if err = opsMgr.initRuntime(reqCtx, cli, opsRes); err != nil {
+		return 0, err
+	}
 	opsRes.ToClusterPhase = opsBehaviour.ToClusterPhase
 	if opsRequest.Spec.Type == opsv1alpha1.CustomType {
 		err = initOpsDefAndValidate(reqCtx, cli, opsRes)
@@ -268,15 +274,33 @@ func (opsMgr *OpsManager) checkAndHandleOpsTimeout(reqCtx intctrlutil.RequestCtx
 		return 0, PatchOpsStatus(reqCtx.Ctx, cli, opsRes, opsv1alpha1.OpsAbortedPhase,
 			opsv1alpha1.NewAbortedCondition("Aborted due to exceeding the specified timeout period (timeoutSeconds)"))
 	}
+	timeoutRequeueAfter := time.Until(timeoutPoint)
 	if requeueAfter != 0 {
+		if timeoutRequeueAfter < requeueAfter {
+			return timeoutRequeueAfter, nil
+		}
 		return requeueAfter, nil
 	}
-	return time.Until(timeoutPoint), nil
+	return timeoutRequeueAfter, nil
 }
 
 func GetOpsManager() *OpsManager {
 	opsManagerOnce.Do(func() {
-		opsManager = &OpsManager{OpsMap: make(map[opsv1alpha1.OpsType]OpsBehaviour)}
+		opsManager = &OpsManager{
+			OpsMap: make(map[opsv1alpha1.OpsType]OpsBehaviour),
+		}
 	})
 	return opsManager
+}
+
+func (opsMgr *OpsManager) initRuntime(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
+	if opsRes.Runtimes != nil {
+		return nil
+	}
+	runtimes, err := buildOpsRuntimes(reqCtx.Ctx, cli, opsRes)
+	if err != nil {
+		return err
+	}
+	opsRes.Runtimes = runtimes
+	return nil
 }

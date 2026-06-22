@@ -3,13 +3,18 @@ kind: Cluster
 metadata:
   name: qdrant-cluster-restore
   namespace: demo
-  annotations:
-    # qdrant-cluster-backup is the backup name
-    kubeblocks.io/restore-from-backup: '{"qdrant":{"name":"qdrant-cluster-backup","namespace":"demo","volumeRestorePolicy":"Parallel"}}'
 spec:
   terminationPolicy: Delete
   clusterDef: qdrant
   topology: cluster
+  restore:
+    source:
+      apiGroup: dataprotection.kubeblocks.io
+      kind: Backup
+      name: qdrant-cluster-backup
+      namespace: demo
+    parameters:
+      dataprotection.kubeblocks.io/volume-restore-policy: Parallel
   componentSpecs:
     - name: qdrant
       serviceVersion: 1.10.0

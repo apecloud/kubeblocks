@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -208,6 +208,11 @@ func (builder *InstanceBuilder) SetRoles(roles []workloads.ReplicaRole) *Instanc
 
 func (builder *InstanceBuilder) SetLifecycleActions(actions *workloads.LifecycleActions) *InstanceBuilder {
 	builder.get().Spec.LifecycleActions = actions
+	return builder
+}
+
+func (builder *InstanceBuilder) SetConfigs(configs []workloads.ConfigTemplate) *InstanceBuilder {
+	builder.get().Spec.Configs = configs
 	return builder
 }
 

@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -108,6 +108,11 @@ func (v *apiPackage) identifier() string { return fmt.Sprintf("%s/%s", v.apiGrou
 
 func init() {
 	klog.InitFlags(nil)
+	// Opt into the new klog behavior so that -stderrthreshold is honored even
+	// when -logtostderr=true (the default).
+	// Ref: kubernetes/klog#212, kubernetes/klog#432
+	flag.Set("legacy_stderr_threshold_behavior", "false") //nolint:errcheck
+	flag.Set("stderrthreshold", "INFO")                   //nolint:errcheck
 	err := flag.Set("alsologtostderr", "true")
 	if err != nil {
 		return

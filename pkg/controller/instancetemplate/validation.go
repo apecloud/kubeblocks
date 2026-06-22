@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 This file is part of KubeBlocks project
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -27,7 +27,7 @@ import (
 func ValidateInstanceTemplates(its *workloads.InstanceSet, tree *kubebuilderx.ObjectTree) error {
 	instancesCompressed, err := findTemplateObject(its, tree)
 	if err != nil {
-		return fmt.Errorf("failed to find compreesssed template: %w", err)
+		return fmt.Errorf("failed to find compressed template: %w", err)
 	}
 
 	instanceTemplates := getInstanceTemplates(its.Spec.Instances, instancesCompressed)
@@ -45,9 +45,9 @@ func ValidateInstanceTemplates(its *workloads.InstanceSet, tree *kubebuilderx.Ob
 		}
 		templateNames.Insert(template.Name)
 	}
-	// sum of spec.templates[*].replicas should not greater than spec.replicas
+	// sum of spec.templates[*].replicas should not be greater than spec.replicas
 	if replicasInTemplates > *its.Spec.Replicas {
-		err = fmt.Errorf("total replicas in instances(%d) should not greater than replicas in spec(%d)", replicasInTemplates, *its.Spec.Replicas)
+		err = fmt.Errorf("total replicas in instances(%d) should not be greater than replicas in spec(%d)", replicasInTemplates, *its.Spec.Replicas)
 		return err
 	}
 

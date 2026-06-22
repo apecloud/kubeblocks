@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -56,10 +56,8 @@ var _ = Describe("cluster plan builder test", func() {
 		// namespaced
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PodSignature, true, inNS, ml)
-		testapps.ClearResources(&testCtx, generics.BackupSignature, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.VolumeSnapshotSignature, true, inNS)
 		// non-namespaced
-		testapps.ClearResources(&testCtx, generics.ActionSetSignature, ml)
 		testapps.ClearResources(&testCtx, generics.StorageClassSignature, ml)
 	}
 

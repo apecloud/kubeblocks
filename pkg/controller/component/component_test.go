@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 
@@ -185,6 +186,16 @@ var _ = Describe("Component", func() {
 					Expect(*vol.EmptyDir.SizeLimit).Should(BeEquivalentTo(_2048m))
 				}
 			}
+		})
+
+		It("should inherit legacy config-manager keep annotation from cluster metadata", func() {
+			cluster.Annotations = map[string]string{
+				constant.LegacyConfigManagerRequiredAnnotationKey: "true",
+			}
+
+			comp := compObj()
+			Expect(comp.Annotations).Should(HaveKeyWithValue(constant.LegacyConfigManagerRequiredAnnotationKey, "true"))
+			Expect(comp.Spec.Annotations).Should(BeNil())
 		})
 	})
 })

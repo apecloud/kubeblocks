@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -32,12 +32,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	ctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -219,23 +217,8 @@ func (t *componentAccountTransformer) getPasswordFromSecret(transCtx *componentT
 }
 
 func (t *componentAccountTransformer) buildPassword(transCtx *componentTransformContext, account synthesizedSystemAccount) ([]byte, error) {
-	synthesizedComp := transCtx.SynthesizeComponent
-	// get restore password if exists during recovery.
-	password, err := appsutil.GetRestoreSystemAccountPassword(transCtx.Context, transCtx.Client,
-		synthesizedComp.Annotations, synthesizedComp.Name, account.Name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to restore password for system account %s of component %s from annotation, err: %w", account.Name, synthesizedComp.Name, err)
-	}
-	if account.InitAccount && len(password) == 0 {
-		// initAccount can also restore from factory.GetRestoreSystemAccountPassword(synthesizedComp, account).
-		// This is compatibility processing.
-		password = []byte(factory.GetRestorePassword(synthesizedComp))
-	}
-	if len(password) == 0 {
-		password, err := common.GeneratePasswordByConfig(account.PasswordGenerationPolicy)
-		return []byte(password), err
-	}
-	return password, nil
+	password, err := common.GeneratePasswordByConfig(account.PasswordGenerationPolicy)
+	return []byte(password), err
 }
 
 func (t *componentAccountTransformer) buildAccountSecretWithPassword(ctx *componentTransformContext,

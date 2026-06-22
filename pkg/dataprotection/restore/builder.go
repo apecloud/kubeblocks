@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -81,12 +81,13 @@ func (r *restoreJobBuilder) buildPVCVolumeAndMount(
 	claim dpv1alpha1.VolumeConfig,
 	claimName,
 	identifier string) (*corev1.Volume, *corev1.VolumeMount, error) {
-	volumeName := fmt.Sprintf("%s-%s", identifier, claimName)
+	rawVolumeName := fmt.Sprintf("%s-%s", identifier, claimName)
+	safeVolumeName := constant.ShortenKubeName(rawVolumeName, constant.KubeNameMaxLength)
 	volume := &corev1.Volume{
-		Name:         volumeName,
+		Name:         safeVolumeName,
 		VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: claimName}},
 	}
-	volumeMount := &corev1.VolumeMount{Name: volumeName}
+	volumeMount := &corev1.VolumeMount{Name: safeVolumeName}
 	if claim.MountPath != "" {
 		volumeMount.MountPath = claim.MountPath
 		return volume, volumeMount, nil
@@ -411,7 +412,7 @@ func (r *restoreJobBuilder) build() *batchv1.Job {
 	// downward backup.status.extras to volumes
 	buildBackupExtrasDownward()
 
-	intctrlutil.InjectZeroResourcesLimitsIfEmpty(&container)
+	intctrlutil.InjectZeroResourcesLimitsForDataProtection(&container)
 	job.Spec.Template.Spec.Containers = []corev1.Container{container}
 	controllerutil.AddFinalizer(job, dptypes.DataProtectionFinalizerName)
 
@@ -451,7 +452,7 @@ func (r *restoreJobBuilder) InjectManagerContainer(podSpec *corev1.PodSpec) {
 		Resources:       corev1.ResourceRequirements{Limits: nil, Requests: nil},
 		Command:         []string{"sh", "-c"},
 	}
-	intctrlutil.InjectZeroResourcesLimitsIfEmpty(&container)
+	intctrlutil.InjectZeroResourcesLimitsForDataProtection(&container)
 
 	checkIntervalSeconds := int32(1)
 	volumeName := "downward-volume-sidecard"

@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -23,32 +23,29 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	configcore "github.com/apecloud/kubeblocks/pkg/parameters/core"
+	"k8s.io/utils/ptr"
+
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 )
 
-var _ = Describe("configuration builder", func() {
-	It("should work well", func() {
-		const (
-			clusterName   = "test"
-			componentName = "mysql"
-			ns            = "default"
-		)
-		name := configcore.GenerateComponentConfigurationName(clusterName, componentName)
-		config := NewComponentParameterBuilder(ns, name).
-			ClusterRef(clusterName).
-			Component(componentName).
-			AddConfigurationItem(appsv1.ComponentFileTemplate{
-				Name: "mysql-config",
-			}).
-			AddConfigurationItem(appsv1.ComponentFileTemplate{
-				Name: "mysql-oteld-config",
-			}).
+var _ = Describe("component parameter builder", func() {
+	It("should set component parameter spec fields", func() {
+		initial := &parametersv1alpha1.ParameterInputs{
+			Assignments: map[string]*string{
+				"max_connections": ptr.To("100"),
+			},
+		}
+
+		obj := NewComponentParameterBuilder("default", "mysql-params").
+			SetClusterName("cluster").
+			SetCompName("mysql").
+			SetInitial(initial).
 			GetObject()
 
-		Expect(config.Name).Should(BeEquivalentTo(name))
-		Expect(config.Spec.ClusterName).Should(BeEquivalentTo(clusterName))
-		Expect(config.Spec.ComponentName).Should(BeEquivalentTo(componentName))
-		Expect(len(config.Spec.ConfigItemDetails)).Should(Equal(2))
+		Expect(obj.Namespace).Should(Equal("default"))
+		Expect(obj.Name).Should(Equal("mysql-params"))
+		Expect(obj.Spec.ClusterName).Should(Equal("cluster"))
+		Expect(obj.Spec.ComponentName).Should(Equal("mysql"))
+		Expect(obj.Spec.Initial).Should(Equal(initial))
 	})
 })

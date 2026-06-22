@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -101,7 +101,7 @@ func (s *streamingService) handshake(ctx context.Context, conn net.Conn) (*proto
 }
 
 func (s *streamingService) streaming(ctx context.Context, conn net.Conn, action *proto.Action, req *proto.ActionRequest) error {
-	errChan, err1 := nonBlockingCallActionX(ctx, action, req.Parameters, &action.TimeoutSeconds, nil, conn, nil)
+	errChan, err1 := nonBlockingCallActionX(ctx, action, req.Parameters, nil, &action.TimeoutSeconds, nil, conn, nil)
 	if err1 != nil {
 		return err1
 	}

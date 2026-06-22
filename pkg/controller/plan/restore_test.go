@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -20,581 +20,307 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package plan
 
 import (
-	"fmt"
-	"strings"
-	"time"
-
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	"reflect"
+	"testing"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes/scheme"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	"github.com/apecloud/kubeblocks/pkg/generics"
-	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
-	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
 )
 
-var _ = Describe("Restore", func() {
-	const backupName = "test-backup-job"
-	const sourceCluster = "source-cluster"
-
-	var (
-		randomStr   = testCtx.GetRandomStr()
-		clusterName = "cluster-" + randomStr
-
-		now       = metav1.Now()
-		startTime = metav1.Time{Time: now.Add(-time.Hour * 2)}
-	)
-
-	cleanEnv := func() {
-		// must wait till resources deleted and no longer existed before the testcases start,
-		// otherwise if later it needs to create some new resource objects with the same name,
-		// in race conditions, it will find the existence of old objects, resulting failure to
-		// create the new objects.
-		By("clean resources")
-
-		// delete cluster(and all dependent sub-resources), cluster definition
-		testapps.ClearClusterResources(&testCtx)
-		inNS := client.InNamespace(testCtx.DefaultNamespace)
-		ml := client.HasLabels{testCtx.TestObjLabelKey}
-
-		deletionPropagation := metav1.DeletePropagationBackground
-		deletionGracePeriodSeconds := int64(0)
-		opts := client.DeleteAllOfOptions{
-			DeleteOptions: client.DeleteOptions{
-				GracePeriodSeconds: &deletionGracePeriodSeconds,
-				PropagationPolicy:  &deletionPropagation,
+func newRestoreManagerForTest() *RestoreManager {
+	return &RestoreManager{
+		Cluster: &appsv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "default",
+				Name:      "cluster",
+				UID:       types.UID("12345678-1234-1234-1234-1234567890ab"),
 			},
-		}
-		testapps.ClearResources(&testCtx, generics.PodSignature, inNS, ml, &opts)
-		testapps.ClearResources(&testCtx, generics.BackupSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, generics.BackupPolicySignature, inNS, ml)
-		testapps.ClearResources(&testCtx, generics.RestoreSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, generics.ComponentSignature, inNS, ml)
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ComponentDefinitionSignature, true, ml)
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS, ml)
-		//
-		// non-namespaced
-		testapps.ClearResources(&testCtx, generics.BackupPolicyTemplateSignature, ml)
+		},
+		namespace:           "default",
+		replicas:            2,
+		startingIndex:       1,
+		volumeRestorePolicy: dpv1alpha1.VolumeClaimRestorePolicyParallel,
+		restoreLabels:       map[string]string{"restore": "true"},
+	}
+}
+
+func TestBackupSourceTargetForRestore(t *testing.T) {
+	statusTarget := &dpv1alpha1.BackupStatusTarget{
+		BackupTarget: dpv1alpha1.BackupTarget{
+			Name: "status-target",
+		},
+	}
+	tests := []struct {
+		name     string
+		backup   *dpv1alpha1.Backup
+		wantName string
+		wantNil  bool
+	}{
+		{name: "nil backup", wantNil: true},
+		{
+			name: "status target wins",
+			backup: &dpv1alpha1.Backup{
+				Status: dpv1alpha1.BackupStatus{Target: statusTarget},
+			},
+		},
+		{
+			name: "single target returns name",
+			backup: &dpv1alpha1.Backup{
+				Status: dpv1alpha1.BackupStatus{
+					Targets: []dpv1alpha1.BackupStatusTarget{{
+						BackupTarget: dpv1alpha1.BackupTarget{Name: "target-a"},
+					}},
+				},
+			},
+			wantName: "target-a",
+		},
+		{
+			name: "multiple targets are ambiguous",
+			backup: &dpv1alpha1.Backup{
+				Status: dpv1alpha1.BackupStatus{
+					Targets: []dpv1alpha1.BackupStatusTarget{
+						{BackupTarget: dpv1alpha1.BackupTarget{Name: "target-a"}},
+						{BackupTarget: dpv1alpha1.BackupTarget{Name: "target-b"}},
+					},
+				},
+			},
+			wantNil: true,
+		},
 	}
 
-	BeforeEach(cleanEnv)
-
-	AfterEach(cleanEnv)
-
-	Context("Cluster Restore", func() {
-		const (
-			compDefName     = "test-compdef"
-			defaultCompName = "mysql"
-			topologyKey     = "testTopologyKey"
-			labelKey        = "testNodeLabelKey"
-			labelValue      = "testLabelValue"
-		)
-
-		var (
-			compDef                 *appsv1.ComponentDefinition
-			cluster                 *appsv1.Cluster
-			synthesizedComponent    *component.SynthesizedComponent
-			compObj                 *appsv1.Component
-			pvc                     *corev1.PersistentVolumeClaim
-			backup                  *dpv1alpha1.Backup
-			fullBackupActionSet     *dpv1alpha1.ActionSet
-			fullBackupActionSetName string
-		)
-
-		BeforeEach(func() {
-			By("By creating backup policyTemplate ")
-			compDef = testapps.NewComponentDefinitionFactory(compDefName).
-				SetDefaultSpec().
-				Create(&testCtx).GetObject()
-
-			testdp.NewBackupPolicyTemplateFactory("backup-policy-template").
-				SetCompDefs(compDef.Name).
-				WithRandomName().
-				AddBackupMethod(testdp.BackupMethodName, false, fullBackupActionSetName).
-				SetBackupMethodVolumeMounts(testapps.DataVolumeName, "/data").Create(&testCtx).Get()
-
-			pvcSpec := testapps.NewPVCSpec("1Gi")
-			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
-				AddComponent(defaultCompName, compDefName).
-				SetReplicas(3).
-				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
-				Create(&testCtx).GetObject()
-
-			By("By mocking a pvc")
-			pvc = testapps.NewPersistentVolumeClaimFactory(
-				testCtx.DefaultNamespace, "data-"+clusterName+"-"+defaultCompName+"-0", clusterName, defaultCompName, "data").
-				SetStorage("1Gi").
-				Create(&testCtx).GetObject()
-
-			By("By mocking a pod")
-			volume := corev1.Volume{Name: pvc.Name, VolumeSource: corev1.VolumeSource{
-				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: pvc.Name}}}
-			_ = testapps.NewPodFactory(testCtx.DefaultNamespace, clusterName+"-"+defaultCompName+"-0").
-				AddAppInstanceLabel(clusterName).
-				AddAppComponentLabel(defaultCompName).
-				AddAppManagedByLabel().
-				AddVolume(volume).
-				AddContainer(corev1.Container{Name: testapps.DefaultMySQLContainerName, Image: testapps.ApeCloudMySQLImage}).
-				AddNodeName("fake-node-name").
-				Create(&testCtx).GetObject()
-
-			By("create actionset of full backup")
-			fullBackupActionSet = testapps.CreateCustomizedObj(&testCtx, "backup/actionset.yaml", &dpv1alpha1.ActionSet{}, testapps.RandomizedObjName())
-			fullBackupActionSetName = fullBackupActionSet.Name
-
-			synthesizedComponent = &component.SynthesizedComponent{
-				PodSpec:              &compDef.Spec.Runtime,
-				VolumeClaimTemplates: intctrlutil.ToCoreV1PVCTs(cluster.Spec.ComponentSpecs[0].VolumeClaimTemplates),
-				Name:                 defaultCompName,
-				Replicas:             1,
-				Roles: []appsv1.ReplicaRole{
-					{
-						Name:           "leader",
-						UpdatePriority: 2,
-					},
-					{
-						Name:           "follower",
-						UpdatePriority: 1,
-					},
-				},
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotName, gotTarget := backupSourceTargetForRestore(tt.backup)
+			if gotName != tt.wantName {
+				t.Fatalf("source target name = %q, want %q", gotName, tt.wantName)
 			}
-			By("create component object")
-			compObj = testapps.NewComponentFactory(testCtx.DefaultNamespace, cluster.Name+"-"+synthesizedComponent.Name, "").
-				AddAnnotations(constant.KBAppClusterUIDKey, string(cluster.UID)).
-				AddLabels(constant.AppInstanceLabelKey, cluster.Name).
-				SetReplicas(1).
-				Create(&testCtx).
-				GetObject()
-
-			By("By creating remote pvc: ")
-			remotePVC := testapps.NewPersistentVolumeClaimFactory(
-				testCtx.DefaultNamespace, "remote-pvc", clusterName, defaultCompName, "log").
-				SetStorage("1Gi").
-				Create(&testCtx).GetObject()
-
-			By("By creating base backup: ")
-			backupLabels := map[string]string{
-				constant.AppInstanceLabelKey:    sourceCluster,
-				constant.KBAppComponentLabelKey: defaultCompName,
+			if tt.wantNil && gotTarget != nil {
+				t.Fatalf("source target = %#v, want nil", gotTarget)
 			}
-			backup = testdp.NewBackupFactory(testCtx.DefaultNamespace, backupName).
-				WithRandomName().SetLabels(backupLabels).
-				SetBackupPolicyName("test-fake").
-				SetBackupMethod(testdp.VSBackupMethodName).
-				Create(&testCtx).GetObject()
-			baseStartTime := &startTime
-			baseStopTime := &now
-			backup.Status = dpv1alpha1.BackupStatus{
-				Phase:                     dpv1alpha1.BackupPhaseCompleted,
-				StartTimestamp:            baseStartTime,
-				CompletionTimestamp:       baseStopTime,
-				PersistentVolumeClaimName: remotePVC.Name,
+			if !tt.wantNil && gotTarget == nil {
+				t.Fatal("source target is nil")
 			}
-			testdp.MockBackupStatusMethod(backup, testdp.VSBackupMethodName, testapps.DataVolumeName, testdp.ActionSetName)
-			patchBackupStatus(backup.Status, client.ObjectKeyFromObject(backup))
 		})
+	}
+}
 
-		It("Test restore", func() {
-			By("restore from backup")
-			restoreFromBackup := fmt.Sprintf(`{"%s": {"name":"%s"}}`, defaultCompName, backup.Name)
-			Expect(testapps.ChangeObj(&testCtx, cluster, func(tmpCluster *appsv1.Cluster) {
-				tmpCluster.Annotations = map[string]string{
-					constant.RestoreFromBackupAnnotationKey: restoreFromBackup,
-				}
-			})).Should(Succeed())
-			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cluster), cluster)).Should(Succeed())
-			restoreMGR := NewRestoreManager(ctx, k8sClient, cluster, scheme.Scheme, nil, 3, 0)
-			err := restoreMGR.DoRestore(synthesizedComponent, compObj, true)
-			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeNeedWaiting)).Should(BeTrue())
-
-			By("mock restore of prepareData stage to Completed")
-			restoreMeta := restoreMGR.GetRestoreObjectMeta(synthesizedComponent, dpv1alpha1.PrepareData, "")
-			namedspace := types.NamespacedName{Name: restoreMeta.Name, Namespace: restoreMeta.Namespace}
-			Expect(testapps.GetAndChangeObjStatus(&testCtx, namedspace, func(restore *dpv1alpha1.Restore) {
-				restore.Status.Phase = dpv1alpha1.RestorePhaseCompleted
-			})()).ShouldNot(HaveOccurred())
-
-			By("mock component and cluster phase to Running")
-			Expect(testapps.ChangeObjStatus(&testCtx, cluster, func() {
-				cluster.Status.Phase = appsv1.RunningClusterPhase
-				cluster.Status.Components = map[string]appsv1.ClusterComponentStatus{
-					defaultCompName: {
-						Phase: appsv1.RunningComponentPhase,
-					},
-				}
-			})).Should(Succeed())
-			Expect(testapps.ChangeObjStatus(&testCtx, compObj, func() {
-				compObj.Status.Phase = appsv1.RunningComponentPhase
-			})).Should(Succeed())
-
-			By("wait for postReady restore created and mock it to Completed")
-			restoreMGR.Cluster = cluster
-			_ = restoreMGR.DoRestore(synthesizedComponent, compObj, true)
-
-			// check if restore CR of postReady stage is created.
-			restoreMeta = restoreMGR.GetRestoreObjectMeta(synthesizedComponent, dpv1alpha1.PostReady, "")
-			namedspace = types.NamespacedName{Name: restoreMeta.Name, Namespace: restoreMeta.Namespace}
-			Eventually(testapps.CheckObjExists(&testCtx, namedspace,
-				&dpv1alpha1.Restore{}, true)).Should(Succeed())
-			// set restore to Completed
-			Expect(testapps.GetAndChangeObjStatus(&testCtx, namedspace, func(restore *dpv1alpha1.Restore) {
-				restore.Status.Phase = dpv1alpha1.RestorePhaseCompleted
-			})()).ShouldNot(HaveOccurred())
-
-			By("clean up annotations after cluster running")
-			_ = restoreMGR.DoRestore(synthesizedComponent, compObj, true)
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, tmpCluster *appsv1.Cluster) {
-				g.Expect(tmpCluster.Annotations[constant.RestoreFromBackupAnnotationKey]).Should(BeEmpty())
-			})).Should(Succeed())
-		})
+func TestRestoreManagerBuildRequiredPolicy(t *testing.T) {
+	manager := newRestoreManagerForTest()
+	if got := manager.buildRequiredPolicy(nil); got != nil {
+		t.Fatalf("nil source target policy = %#v, want nil", got)
+	}
+	if got := manager.buildRequiredPolicy(&dpv1alpha1.BackupStatusTarget{
+		BackupTarget: dpv1alpha1.BackupTarget{
+			PodSelector: &dpv1alpha1.PodSelector{Strategy: dpv1alpha1.PodSelectionStrategyAny},
+		},
+	}); got != nil {
+		t.Fatalf("any strategy policy = %#v, want nil", got)
+	}
+	got := manager.buildRequiredPolicy(&dpv1alpha1.BackupStatusTarget{
+		BackupTarget: dpv1alpha1.BackupTarget{
+			PodSelector: &dpv1alpha1.PodSelector{Strategy: dpv1alpha1.PodSelectionStrategyAll},
+		},
 	})
-	Context("Cluster InstanceTemplate ranges Restore", func() {
-		const (
-			compDefName     = "test-compdef-1"
-			defaultCompName = "mysql"
-			topologyKey     = "testTopologyKey"
-			labelKey        = "testNodeLabelKey"
-			labelValue      = "testLabelValue"
-			istLabelKey     = "testISTLabelKey"
-			istLabelValue   = "testISTLabelValue"
-		)
+	if got == nil || got.DataRestorePolicy != dpv1alpha1.OneToOneRestorePolicy {
+		t.Fatalf("unexpected all strategy policy: %#v", got)
+	}
+}
 
-		var (
-			compDef                 *appsv1.ComponentDefinition
-			cluster                 *appsv1.Cluster
-			synthesizedComponent    *component.SynthesizedComponent
-			compObj                 *appsv1.Component
-			pvc                     *corev1.PersistentVolumeClaim
-			backup                  *dpv1alpha1.Backup
-			fullBackupActionSet     *dpv1alpha1.ActionSet
-			fullBackupActionSetName string
-			startIndex              int32 = 10
-		)
+func TestRestoreManagerBuildSchedulingSpec(t *testing.T) {
+	manager := newRestoreManagerForTest()
+	comp := &component.SynthesizedComponent{
+		PodSpec: &corev1.PodSpec{
+			NodeSelector:  map[string]string{"disk": "ssd"},
+			SchedulerName: "default-scheduler",
+			NodeName:      "node-a",
+			Tolerations:   []corev1.Toleration{{Key: "dedicated", Value: "db"}},
+		},
+	}
 
-		BeforeEach(func() {
-			By("By creating backup policyTemplate ")
-			compDef = testapps.NewComponentDefinitionFactory(compDefName).
-				SetDefaultSpec().
-				Create(&testCtx).GetObject()
+	got := manager.buildSchedulingSpec(comp, nil)
+	if !reflect.DeepEqual(got.NodeSelector, comp.PodSpec.NodeSelector) ||
+		got.SchedulerName != "default-scheduler" ||
+		got.NodeName != "node-a" ||
+		!reflect.DeepEqual(got.Tolerations, comp.PodSpec.Tolerations) {
+		t.Fatalf("component scheduling spec not copied: %#v", got)
+	}
 
-			testdp.NewBackupPolicyTemplateFactory("backup-policy-template").
-				SetCompDefs(compDef.Name).
-				WithRandomName().
-				AddBackupMethod(testdp.BackupMethodName, false, fullBackupActionSetName).
-				SetBackupMethodVolumeMounts(testapps.DataVolumeName, "/data").Create(&testCtx).Get()
+	template := &appsv1.InstanceTemplate{
+		SchedulingPolicy: &appsv1.SchedulingPolicy{
+			NodeSelector:  map[string]string{"zone": "east"},
+			SchedulerName: "template-scheduler",
+			NodeName:      "node-b",
+		},
+	}
+	got = manager.buildSchedulingSpec(comp, template)
+	if !reflect.DeepEqual(got.NodeSelector, map[string]string{"zone": "east"}) ||
+		got.SchedulerName != "template-scheduler" ||
+		got.NodeName != "node-b" {
+		t.Fatalf("template scheduling spec not preferred: %#v", got)
+	}
 
-			pvcSpec := testapps.NewPVCSpec("1Gi")
-			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
-				AddMultipleTemplateComponentRange(defaultCompName, compDefName).
-				SetReplicas(3).
-				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
-				Create(&testCtx).GetObject()
+	if got = manager.buildSchedulingSpec(&component.SynthesizedComponent{}, nil); !reflect.DeepEqual(got, dpv1alpha1.SchedulingSpec{}) {
+		t.Fatalf("empty component scheduling spec = %#v, want empty", got)
+	}
+}
 
-			By("By mocking a pvc")
-			pvc = testapps.NewPersistentVolumeClaimFactory(
-				testCtx.DefaultNamespace, "data-"+clusterName+"-"+defaultCompName+"-0", clusterName, defaultCompName, "data").
-				SetStorage("1Gi").
-				Create(&testCtx).GetObject()
+func TestRestoreManagerGetConnectionCredential(t *testing.T) {
+	manager := newRestoreManagerForTest()
+	if got := manager.getConnectionCredential(&component.SynthesizedComponent{}); got != nil {
+		t.Fatalf("empty system accounts credential = %#v, want nil", got)
+	}
 
-			By("By mocking a pod")
-			volume := corev1.Volume{Name: pvc.Name, VolumeSource: corev1.VolumeSource{
-				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: pvc.Name}}}
-			_ = testapps.NewPodFactory(testCtx.DefaultNamespace, clusterName+"-"+defaultCompName+"-0").
-				AddAppInstanceLabel(clusterName).
-				AddAppComponentLabel(defaultCompName).
-				AddAppManagedByLabel().
-				AddVolume(volume).
-				AddContainer(corev1.Container{Name: testapps.DefaultMySQLContainerName, Image: testapps.ApeCloudMySQLImage}).
-				AddNodeName("fake-node-name").
-				Create(&testCtx).GetObject()
+	comp := &component.SynthesizedComponent{
+		Name: "mysql",
+		SystemAccounts: []appsv1.SystemAccount{
+			{Name: "readonly"},
+			{Name: "root", InitAccount: true},
+		},
+	}
+	got := manager.getConnectionCredential(comp)
+	if got == nil {
+		t.Fatal("connection credential is nil")
+	}
+	if got.SecretName != constant.GenerateAccountSecretName("cluster", "mysql", "root") ||
+		got.UsernameKey != constant.AccountNameForSecret ||
+		got.PasswordKey != constant.AccountPasswdForSecret {
+		t.Fatalf("unexpected credential: %#v", got)
+	}
+}
 
-			By("create actionset of full backup")
-			fullBackupActionSet = testapps.CreateCustomizedObj(&testCtx, "backup/actionset.yaml", &dpv1alpha1.ActionSet{}, testapps.RandomizedObjName())
-			fullBackupActionSetName = fullBackupActionSet.Name
-			podSpec := &compDef.Spec.Runtime
-			podSpec.Affinity = &corev1.Affinity{
-				NodeAffinity: &corev1.NodeAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
-						NodeSelectorTerms: []corev1.NodeSelectorTerm{
-							{
-								MatchExpressions: []corev1.NodeSelectorRequirement{
-									{
-										Key:      labelKey,
-										Operator: corev1.NodeSelectorOpIn,
-										Values:   []string{labelValue},
-									},
-								},
-							},
-						},
+func TestBuildPersistentVolumeClaimLabels(t *testing.T) {
+	pvc := &corev1.PersistentVolumeClaim{}
+	BuildPersistentVolumeClaimLabels(&component.SynthesizedComponent{}, pvc, "data", "az-a")
+	if pvc.Labels[constant.VolumeClaimTemplateNameLabelKey] != "data" ||
+		pvc.Labels[constant.KBAppInstanceTemplateLabelKey] != "az-a" {
+		t.Fatalf("unexpected pvc labels: %#v", pvc.Labels)
+	}
+
+	BuildPersistentVolumeClaimLabels(nil, pvc, "ignored", "ignored")
+	BuildPersistentVolumeClaimLabels(&component.SynthesizedComponent{}, nil, "ignored", "ignored")
+}
+
+func TestRestoreManagerBuildPrepareDataRestore(t *testing.T) {
+	manager := newRestoreManagerForTest()
+	comp := &component.SynthesizedComponent{
+		Name:     "mysql",
+		Replicas: 2,
+		Labels:   map[string]string{"component-label": "true"},
+		StaticLabels: map[string]string{
+			"static-label": "true",
+		},
+		DynamicLabels: map[string]string{
+			"dynamic-label": "true",
+		},
+		VolumeClaimTemplates: []corev1.PersistentVolumeClaimTemplate{{
+			ObjectMeta: metav1.ObjectMeta{Name: "data"},
+			Spec: corev1.PersistentVolumeClaimSpec{
+				AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+			},
+		}},
+	}
+	template := &appsv1.InstanceTemplate{
+		Name: "az-a",
+		Ordinals: appsv1.Ordinals{
+			Ranges: []appsv1.Range{{Start: 3, End: 4}},
+		},
+		SchedulingPolicy: &appsv1.SchedulingPolicy{NodeName: "node-a"},
+	}
+	backup := &dpv1alpha1.Backup{
+		ObjectMeta: metav1.ObjectMeta{Name: "backup"},
+		Status: dpv1alpha1.BackupStatus{
+			Targets: []dpv1alpha1.BackupStatusTarget{{
+				BackupTarget: dpv1alpha1.BackupTarget{
+					Name: "target-a",
+					PodSelector: &dpv1alpha1.PodSelector{
+						Strategy: dpv1alpha1.PodSelectionStrategyAll,
 					},
 				},
-			}
-			synthesizedComponent = &component.SynthesizedComponent{
-				PodSpec:              podSpec,
-				VolumeClaimTemplates: intctrlutil.ToCoreV1PVCTs(cluster.Spec.ComponentSpecs[0].VolumeClaimTemplates),
-				Name:                 defaultCompName,
-				Replicas:             3,
-				Roles: []appsv1.ReplicaRole{
-					{
-						Name:           "leader",
-						UpdatePriority: 2,
-					},
-					{
-						Name:           "follower",
-						UpdatePriority: 1,
-					},
+			}},
+			BackupMethod: &dpv1alpha1.BackupMethod{
+				Name: "snapshot",
+				TargetVolumes: &dpv1alpha1.TargetVolumeInfo{
+					Volumes: []string{"data"},
 				},
-				Instances: []appsv1.InstanceTemplate{{
-					Name:     "foo",
-					Replicas: func() *int32 { replicas := int32(1); return &replicas }(),
-					SchedulingPolicy: &appsv1.SchedulingPolicy{
-						Affinity: &corev1.Affinity{
-							NodeAffinity: &corev1.NodeAffinity{
-								RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
-									NodeSelectorTerms: []corev1.NodeSelectorTerm{
-										{
-											MatchExpressions: []corev1.NodeSelectorRequirement{
-												{
-													Key:      istLabelKey,
-													Operator: corev1.NodeSelectorOpIn,
-													Values:   []string{istLabelValue},
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-					Ordinals: appsv1.Ordinals{
-						Ranges: []appsv1.Range{
-							{Start: startIndex, End: 20},
-						},
-					},
-				}},
-			}
-			By("create component object")
-			compObj = testapps.NewComponentFactory(testCtx.DefaultNamespace, cluster.Name+"-"+synthesizedComponent.Name, "").
-				AddAnnotations(constant.KBAppClusterUIDKey, string(cluster.UID)).
-				AddLabels(constant.AppInstanceLabelKey, cluster.Name).
-				SetReplicas(1).
-				Create(&testCtx).
-				GetObject()
+			},
+		},
+	}
 
-			By("By creating remote pvc: ")
-			remotePVC := testapps.NewPersistentVolumeClaimFactory(
-				testCtx.DefaultNamespace, "remote-pvc", clusterName, defaultCompName, "log").
-				SetStorage("1Gi").
-				Create(&testCtx).GetObject()
+	restore, err := manager.BuildPrepareDataRestore(comp, backup, template)
+	if err != nil {
+		t.Fatalf("BuildPrepareDataRestore() error = %v", err)
+	}
+	if restore == nil {
+		t.Fatal("restore is nil")
+	}
+	if restore.Spec.Backup.Name != "backup" ||
+		restore.Spec.Backup.Namespace != "default" ||
+		restore.Spec.Backup.SourceTargetName != "target-a" {
+		t.Fatalf("unexpected backup ref: %#v", restore.Spec.Backup)
+	}
+	cfg := restore.Spec.PrepareDataConfig
+	if cfg == nil {
+		t.Fatal("prepare data config is nil")
+	}
+	if cfg.RequiredPolicyForAllPodSelection == nil ||
+		cfg.RequiredPolicyForAllPodSelection.DataRestorePolicy != dpv1alpha1.OneToOneRestorePolicy {
+		t.Fatalf("unexpected required policy: %#v", cfg.RequiredPolicyForAllPodSelection)
+	}
+	if cfg.SchedulingSpec.NodeName != "node-a" {
+		t.Fatalf("unexpected scheduling spec: %#v", cfg.SchedulingSpec)
+	}
+	if cfg.RestoreVolumeClaimsTemplate.Replicas != 2 ||
+		cfg.RestoreVolumeClaimsTemplate.StartingIndex != 3 ||
+		len(cfg.RestoreVolumeClaimsTemplate.Templates) != 1 {
+		t.Fatalf("unexpected restore volume claim template: %#v", cfg.RestoreVolumeClaimsTemplate)
+	}
+	labels := cfg.RestoreVolumeClaimsTemplate.Templates[0].Labels
+	if labels[constant.VolumeClaimTemplateNameLabelKey] != "data" ||
+		labels[constant.KBAppInstanceTemplateLabelKey] != "az-a" ||
+		labels["component-label"] != "true" ||
+		labels["static-label"] != "true" ||
+		labels["dynamic-label"] != "true" {
+		t.Fatalf("unexpected restore pvc labels: %#v", labels)
+	}
+}
 
-			By("By creating base backup: ")
-			backupLabels := map[string]string{
-				constant.AppInstanceLabelKey:    sourceCluster,
-				constant.KBAppComponentLabelKey: defaultCompName,
-			}
-			backup = testdp.NewBackupFactory(testCtx.DefaultNamespace, backupName).
-				WithRandomName().SetLabels(backupLabels).
-				SetBackupPolicyName("test-fake").
-				SetBackupMethod(testdp.VSBackupMethodName).
-				Create(&testCtx).GetObject()
-			baseStartTime := &startTime
-			baseStopTime := &now
-			backup.Status = dpv1alpha1.BackupStatus{
-				Phase:                     dpv1alpha1.BackupPhaseCompleted,
-				StartTimestamp:            baseStartTime,
-				CompletionTimestamp:       baseStopTime,
-				PersistentVolumeClaimName: remotePVC.Name,
-			}
-			testdp.MockBackupStatusMethod(backup, testdp.VSBackupMethodName, testapps.DataVolumeName, testdp.ActionSetName)
-			patchBackupStatus(backup.Status, client.ObjectKeyFromObject(backup))
-		})
+func TestRestoreManagerBuildPrepareDataRestoreWithoutVolumes(t *testing.T) {
+	manager := newRestoreManagerForTest()
+	comp := &component.SynthesizedComponent{
+		Name: "mysql",
+		VolumeClaimTemplates: []corev1.PersistentVolumeClaimTemplate{{
+			ObjectMeta: metav1.ObjectMeta{Name: "data"},
+		}},
+	}
 
-		It("Test restore Serial", func() {
-			By("restore from backup")
-			restoreFromBackup := fmt.Sprintf(`{"%s": {"name":"%s","volumeRestorePolicy":"%s"}}`, defaultCompName, backup.Name, dpv1alpha1.VolumeClaimRestorePolicySerial)
-			Expect(testapps.ChangeObj(&testCtx, cluster, func(tmpCluster *appsv1.Cluster) {
-				tmpCluster.Annotations = map[string]string{
-					constant.RestoreFromBackupAnnotationKey: restoreFromBackup,
-				}
-			})).Should(Succeed())
-			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cluster), cluster)).Should(Succeed())
-			restoreMGR := NewRestoreManager(ctx, k8sClient, cluster, scheme.Scheme, nil, 3, 0)
+	restore, err := manager.BuildPrepareDataRestore(comp, &dpv1alpha1.Backup{
+		ObjectMeta: metav1.ObjectMeta{Name: "backup"},
+		Status: dpv1alpha1.BackupStatus{
+			BackupMethod: &dpv1alpha1.BackupMethod{
+				Name: "action",
+			},
+		},
+	}, nil)
+	if err != nil {
+		t.Fatalf("BuildPrepareDataRestore() error = %v", err)
+	}
+	if restore != nil {
+		t.Fatalf("restore = %#v, want nil", restore)
+	}
+}
 
-			By("restore from template")
-			err := restoreMGR.DoRestore(synthesizedComponent, compObj, true)
-			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeNeedWaiting)).Should(BeTrue())
-
-			By("verify template restore")
-			restore := &dpv1alpha1.Restore{}
-			restoreMeta := restoreMGR.GetRestoreObjectMeta(synthesizedComponent, dpv1alpha1.PrepareData, "foo")
-			namedspace := types.NamespacedName{Name: restoreMeta.Name, Namespace: restoreMeta.Namespace}
-			Expect(k8sClient.Get(ctx, namedspace, restore)).Should(Succeed())
-			Expect(restore.Spec.PrepareDataConfig.RestoreVolumeClaimsTemplate.StartingIndex).Should(Equal(startIndex))
-			Expect(restore.Spec.PrepareDataConfig.RestoreVolumeClaimsTemplate.Replicas).Should(Equal(int32(1)))
-			Expect(restore.Spec.PrepareDataConfig.SchedulingSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Key).Should(Equal(istLabelKey))
-			Expect(restore.Spec.PrepareDataConfig.SchedulingSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Values[0]).Should(Equal(istLabelValue))
-
-			By("default restore should not exist")
-			defaultMeta := restoreMGR.GetRestoreObjectMeta(synthesizedComponent, dpv1alpha1.PrepareData, "")
-			defaultNs := types.NamespacedName{Name: defaultMeta.Name, Namespace: defaultMeta.Namespace}
-			defaultRestore := &dpv1alpha1.Restore{}
-			Expect(k8sClient.Get(ctx, defaultNs, defaultRestore)).ShouldNot(Succeed())
-
-			By("mock template restore of prepareData stage to Completed")
-			Expect(testapps.GetAndChangeObjStatus(&testCtx, namedspace, func(restore *dpv1alpha1.Restore) {
-				restore.Status.Phase = dpv1alpha1.RestorePhaseCompleted
-			})()).ShouldNot(HaveOccurred())
-
-			By("restore from default")
-			err = restoreMGR.DoRestore(synthesizedComponent, compObj, true)
-			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeNeedWaiting)).Should(BeTrue())
-
-			By("verify default restore")
-			Expect(k8sClient.Get(ctx, defaultNs, defaultRestore)).Should(Succeed())
-			Expect(defaultRestore.Spec.PrepareDataConfig.RestoreVolumeClaimsTemplate.StartingIndex).Should(Equal(int32(0)))
-			Expect(defaultRestore.Spec.PrepareDataConfig.RestoreVolumeClaimsTemplate.Replicas).Should(Equal(int32(2)))
-			Expect(defaultRestore.Spec.PrepareDataConfig.SchedulingSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Key).Should(Equal(labelKey))
-			Expect(defaultRestore.Spec.PrepareDataConfig.SchedulingSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Values[0]).Should(Equal(labelValue))
-
-			By("mock default restore of prepareData stage to Completed")
-			Expect(testapps.GetAndChangeObjStatus(&testCtx, defaultNs, func(restore *dpv1alpha1.Restore) {
-				restore.Status.Phase = dpv1alpha1.RestorePhaseCompleted
-			})()).ShouldNot(HaveOccurred())
-
-			By("mock component and cluster phase to Running")
-			Expect(testapps.ChangeObjStatus(&testCtx, cluster, func() {
-				cluster.Status.Phase = appsv1.RunningClusterPhase
-				cluster.Status.Components = map[string]appsv1.ClusterComponentStatus{
-					defaultCompName: {
-						Phase: appsv1.RunningComponentPhase,
-					},
-				}
-			})).Should(Succeed())
-			Expect(testapps.ChangeObjStatus(&testCtx, compObj, func() {
-				compObj.Status.Phase = appsv1.RunningComponentPhase
-			})).Should(Succeed())
-
-			By("wait for postReady restore created and mock it to Completed")
-			restoreMGR.Cluster = cluster
-			_ = restoreMGR.DoRestore(synthesizedComponent, compObj, true)
-
-			// check if restore CR of postReady stage is created.
-			restoreMeta = restoreMGR.GetRestoreObjectMeta(synthesizedComponent, dpv1alpha1.PostReady, "")
-			namedspace = types.NamespacedName{Name: restoreMeta.Name, Namespace: restoreMeta.Namespace}
-			Eventually(testapps.CheckObjExists(&testCtx, namedspace,
-				&dpv1alpha1.Restore{}, true)).Should(Succeed())
-			// set restore to Completed
-			Expect(testapps.GetAndChangeObjStatus(&testCtx, namedspace, func(restore *dpv1alpha1.Restore) {
-				restore.Status.Phase = dpv1alpha1.RestorePhaseCompleted
-			})()).ShouldNot(HaveOccurred())
-
-			By("clean up annotations after cluster running")
-			_ = restoreMGR.DoRestore(synthesizedComponent, compObj, true)
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, tmpCluster *appsv1.Cluster) {
-				g.Expect(tmpCluster.Annotations[constant.RestoreFromBackupAnnotationKey]).Should(BeEmpty())
-			})).Should(Succeed())
-		})
-
-		It("Test restore Parallel", func() {
-			By("restore from backup")
-			restoreFromBackup := fmt.Sprintf(`{"%s": {"name":"%s","volumeRestorePolicy":"%s"}}`, defaultCompName, backup.Name, dpv1alpha1.VolumeClaimRestorePolicyParallel)
-			Expect(testapps.ChangeObj(&testCtx, cluster, func(tmpCluster *appsv1.Cluster) {
-				tmpCluster.Annotations = map[string]string{
-					constant.RestoreFromBackupAnnotationKey: restoreFromBackup,
-				}
-			})).Should(Succeed())
-			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cluster), cluster)).Should(Succeed())
-			restoreMGR := NewRestoreManager(ctx, k8sClient, cluster, scheme.Scheme, nil, 3, 0)
-
-			By("restore from template parallel")
-			err := restoreMGR.DoRestore(synthesizedComponent, compObj, true)
-			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeNeedWaiting)).Should(BeTrue())
-			Expect(strings.Contains(err.Error(), ";")).Should(BeTrue())
-
-			By("verify template restore")
-			restore := &dpv1alpha1.Restore{}
-			restoreMeta := restoreMGR.GetRestoreObjectMeta(synthesizedComponent, dpv1alpha1.PrepareData, "foo")
-			namedspace := types.NamespacedName{Name: restoreMeta.Name, Namespace: restoreMeta.Namespace}
-			Expect(k8sClient.Get(ctx, namedspace, restore)).Should(Succeed())
-			Expect(restore.Spec.PrepareDataConfig.RestoreVolumeClaimsTemplate.StartingIndex).Should(Equal(startIndex))
-			Expect(restore.Spec.PrepareDataConfig.RestoreVolumeClaimsTemplate.Replicas).Should(Equal(int32(1)))
-			Expect(restore.Spec.PrepareDataConfig.SchedulingSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Key).Should(Equal(istLabelKey))
-			Expect(restore.Spec.PrepareDataConfig.SchedulingSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Values[0]).Should(Equal(istLabelValue))
-
-			By("verify default restore")
-			defaultMeta := restoreMGR.GetRestoreObjectMeta(synthesizedComponent, dpv1alpha1.PrepareData, "")
-			defaultNs := types.NamespacedName{Name: defaultMeta.Name, Namespace: defaultMeta.Namespace}
-			defaultRestore := &dpv1alpha1.Restore{}
-			Expect(k8sClient.Get(ctx, defaultNs, defaultRestore)).Should(Succeed())
-			Expect(defaultRestore.Spec.PrepareDataConfig.RestoreVolumeClaimsTemplate.StartingIndex).Should(Equal(int32(0)))
-			Expect(defaultRestore.Spec.PrepareDataConfig.RestoreVolumeClaimsTemplate.Replicas).Should(Equal(int32(2)))
-			Expect(defaultRestore.Spec.PrepareDataConfig.SchedulingSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Key).Should(Equal(labelKey))
-			Expect(defaultRestore.Spec.PrepareDataConfig.SchedulingSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Values[0]).Should(Equal(labelValue))
-
-			By("mock template restore of prepareData stage to Completed")
-			Expect(testapps.GetAndChangeObjStatus(&testCtx, namedspace, func(restore *dpv1alpha1.Restore) {
-				restore.Status.Phase = dpv1alpha1.RestorePhaseCompleted
-			})()).ShouldNot(HaveOccurred())
-
-			By("restore remains default")
-			err = restoreMGR.DoRestore(synthesizedComponent, compObj, true)
-			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeNeedWaiting)).Should(BeTrue())
-			// only one restore waiting and one err msg
-			Expect(strings.Contains(err.Error(), ";")).Should(BeFalse())
-
-			By("mock default restore of prepareData stage to Completed")
-			Expect(testapps.GetAndChangeObjStatus(&testCtx, defaultNs, func(restore *dpv1alpha1.Restore) {
-				restore.Status.Phase = dpv1alpha1.RestorePhaseCompleted
-			})()).ShouldNot(HaveOccurred())
-
-			By("mock component and cluster phase to Running")
-			Expect(testapps.ChangeObjStatus(&testCtx, cluster, func() {
-				cluster.Status.Phase = appsv1.RunningClusterPhase
-				cluster.Status.Components = map[string]appsv1.ClusterComponentStatus{
-					defaultCompName: {
-						Phase: appsv1.RunningComponentPhase,
-					},
-				}
-			})).Should(Succeed())
-			Expect(testapps.ChangeObjStatus(&testCtx, compObj, func() {
-				compObj.Status.Phase = appsv1.RunningComponentPhase
-			})).Should(Succeed())
-
-			By("wait for postReady restore created and mock it to Completed")
-			restoreMGR.Cluster = cluster
-			_ = restoreMGR.DoRestore(synthesizedComponent, compObj, true)
-
-			// check if restore CR of postReady stage is created.
-			restoreMeta = restoreMGR.GetRestoreObjectMeta(synthesizedComponent, dpv1alpha1.PostReady, "")
-			namedspace = types.NamespacedName{Name: restoreMeta.Name, Namespace: restoreMeta.Namespace}
-			Eventually(testapps.CheckObjExists(&testCtx, namedspace,
-				&dpv1alpha1.Restore{}, true)).Should(Succeed())
-			// set restore to Completed
-			Expect(testapps.GetAndChangeObjStatus(&testCtx, namedspace, func(restore *dpv1alpha1.Restore) {
-				restore.Status.Phase = dpv1alpha1.RestorePhaseCompleted
-			})()).ShouldNot(HaveOccurred())
-
-			By("clean up annotations after cluster running")
-			_ = restoreMGR.DoRestore(synthesizedComponent, compObj, true)
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, tmpCluster *appsv1.Cluster) {
-				g.Expect(tmpCluster.Annotations[constant.RestoreFromBackupAnnotationKey]).Should(BeEmpty())
-			})).Should(Succeed())
-		})
-	})
-})
-
-func patchBackupStatus(status dpv1alpha1.BackupStatus, key types.NamespacedName) {
-	Eventually(testapps.GetAndChangeObjStatus(&testCtx, key, func(fetched *dpv1alpha1.Backup) {
-		fetched.Status = status
-	})).Should(Succeed())
+func TestRestoreManagerBuildPrepareDataRestoreRequiresBackupMethod(t *testing.T) {
+	manager := newRestoreManagerForTest()
+	_, err := manager.BuildPrepareDataRestore(&component.SynthesizedComponent{}, &dpv1alpha1.Backup{
+		ObjectMeta: metav1.ObjectMeta{Name: "backup"},
+	}, nil)
+	if err == nil {
+		t.Fatal("expected missing backup method error")
+	}
 }

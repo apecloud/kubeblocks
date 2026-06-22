@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -399,7 +399,7 @@ var _ = Describe("status reconciler test", func() {
 			replicas := int32(3)
 			its.Spec.Replicas = &replicas
 			its.Status.InstanceStatus = oldInstanceStatus
-			setInstanceStatus(nil, its, pods)
+			Expect(setInstanceStatus(nil, its, pods)).Should(Succeed())
 
 			Expect(its.Status.InstanceStatus).Should(HaveLen(3))
 			Expect(its.Status.InstanceStatus[0].PodName).Should(Equal("pod-0"))
@@ -408,6 +408,66 @@ var _ = Describe("status reconciler test", func() {
 			Expect(its.Status.InstanceStatus[1].Role).Should(Equal("leader"))
 			Expect(its.Status.InstanceStatus[2].PodName).Should(Equal("pod-2"))
 			Expect(its.Status.InstanceStatus[2].Role).Should(Equal(""))
+		})
+
+		Context("restore condition", func() {
+			BeforeEach(func() {
+				its.Spec.VolumeClaimTemplates[0].Annotations = map[string]string{
+					constant.RestoreSourceKindAnnotationKey: "ExampleSource",
+				}
+			})
+
+			newRestorePVC := func(name string, status corev1.ConditionStatus) *corev1.PersistentVolumeClaim {
+				pvc := builder.NewPVCBuilder(namespace, name).GetObject()
+				pvc.Status.Conditions = []corev1.PersistentVolumeClaimCondition{{
+					Type:    corev1.PersistentVolumeClaimConditionType(workloads.InstanceRestore),
+					Status:  status,
+					Reason:  "Restore",
+					Message: "restore status",
+				}}
+				return pvc
+			}
+
+			It("should wait for expected restore PVCs to be created", func() {
+				tree := kubebuilderx.NewObjectTree()
+				tree.SetRoot(its)
+
+				cond, err := buildRestoreCondition(tree, its)
+				Expect(err).Should(BeNil())
+				Expect(cond).ShouldNot(BeNil())
+				Expect(cond.Status).Should(Equal(metav1.ConditionUnknown))
+				Expect(cond.Reason).Should(Equal(workloads.ReasonRestoreRunning))
+			})
+
+			It("should complete when expected restore PVCs are completed", func() {
+				replicas := int32(1)
+				its.Spec.Replicas = &replicas
+				tree := kubebuilderx.NewObjectTree()
+				tree.SetRoot(its)
+				pvcName := intctrlutil.ComposePVCName(its.Spec.VolumeClaimTemplates[0], its.Name, its.Name+"-0")
+				Expect(tree.Add(newRestorePVC(pvcName, corev1.ConditionTrue))).Should(Succeed())
+
+				cond, err := buildRestoreCondition(tree, its)
+				Expect(err).Should(BeNil())
+				Expect(cond).ShouldNot(BeNil())
+				Expect(cond.Status).Should(Equal(metav1.ConditionTrue))
+				Expect(cond.Reason).Should(Equal(workloads.ReasonRestoreCompleted))
+			})
+
+			It("should fail when any expected restore PVC fails", func() {
+				replicas := int32(1)
+				its.Spec.Replicas = &replicas
+				tree := kubebuilderx.NewObjectTree()
+				tree.SetRoot(its)
+				pvcName := intctrlutil.ComposePVCName(its.Spec.VolumeClaimTemplates[0], its.Name, its.Name+"-0")
+				Expect(tree.Add(newRestorePVC(pvcName, corev1.ConditionFalse))).Should(Succeed())
+
+				cond, err := buildRestoreCondition(tree, its)
+				Expect(err).Should(BeNil())
+				Expect(cond).ShouldNot(BeNil())
+				Expect(cond.Status).Should(Equal(metav1.ConditionFalse))
+				Expect(cond.Reason).Should(Equal(workloads.ReasonRestoreFailed))
+			})
 		})
 	})
 })

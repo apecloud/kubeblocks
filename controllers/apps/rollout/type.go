@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -21,6 +21,10 @@ package rollout
 
 import (
 	"fmt"
+)
+
+const (
+	instanceTemplateCreatedByAnnotationKey = "apps.kubeblocks.io/instance-template-created-by-rollout"
 )
 
 func strategyNotSupportedError(strategy string) error {

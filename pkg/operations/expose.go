@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -388,6 +388,16 @@ func (e ExposeOpsHandler) buildClusterServices(reqCtx intctrlutil.RequestCtx,
 		// set ip families
 		if len(exposeService.IPFamilies) > 0 {
 			clusterService.Spec.IPFamilies = exposeService.IPFamilies
+		}
+
+		// set external traffic policy
+		if exposeService.ExternalTrafficPolicy != "" {
+			clusterService.Spec.ExternalTrafficPolicy = exposeService.ExternalTrafficPolicy
+		}
+
+		// set internal traffic policy
+		if exposeService.InternalTrafficPolicy != nil {
+			clusterService.Spec.InternalTrafficPolicy = exposeService.InternalTrafficPolicy
 		}
 
 		// set service selector

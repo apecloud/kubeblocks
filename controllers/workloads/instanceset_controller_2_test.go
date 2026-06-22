@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -179,6 +179,39 @@ var _ = Describe("InstanceSet Controller 2", func() {
 				g.Expect(len(its.Status.InstanceStatus)).Should(Equal(int(replicas)))
 				for i := int32(0); i < replicas; i++ {
 					g.Expect(its.Status.InstanceStatus[i].Role).Should(Equal("leader"))
+				}
+			})).Should(Succeed())
+		})
+
+		It("instance status - configs", func() {
+			createITSObj(itsName, func(f *testapps.MockInstanceSetFactory) {
+				f.AddConfigs(
+					workloads.ConfigTemplate{
+						Name:       "log",
+						ConfigHash: ptr.To("123456"),
+					},
+					workloads.ConfigTemplate{
+						Name:       "server",
+						ConfigHash: ptr.To("654321"),
+					},
+				)
+			})
+
+			mockPodsReady()
+
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(its.Status.InstanceStatus).Should(HaveLen(int(replicas)))
+				for i := range its.Status.InstanceStatus {
+					g.Expect(its.Status.InstanceStatus[i].Configs).Should(Equal([]workloads.InstanceConfigStatus{
+						{
+							Name:       "log",
+							ConfigHash: ptr.To("123456"),
+						},
+						{
+							Name:       "server",
+							ConfigHash: ptr.To("654321"),
+						},
+					}))
 				}
 			})).Should(Succeed())
 		})

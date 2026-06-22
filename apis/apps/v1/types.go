@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -47,6 +47,7 @@ const (
 	ConditionTypeApplyResources      = "ApplyResources"      // ConditionTypeApplyResources the operator start to apply resources to create or change the cluster
 	ConditionTypeReady               = "Ready"               // ConditionTypeReady all components and shardings are running
 	ConditionTypeAvailable           = "Available"           // ConditionTypeAvailable indicates whether the target object is available for serving.
+	ConditionTypeRestore             = "Restore"             // ConditionTypeRestore indicates whether the initial cluster restore has completed.
 )
 
 type ServiceRef struct {
@@ -521,7 +522,7 @@ type ClusterComponentConfig struct {
 	// +optional
 	Name *string `json:"name,omitempty"`
 
-	// Variables are key-value pairs for dynamic configuration values that can be provided by the user.
+	// Variables are template variables used to render managed configuration templates.
 	//
 	// +optional
 	Variables map[string]string `json:"variables,omitempty"`
@@ -529,12 +530,12 @@ type ClusterComponentConfig struct {
 	// The external source for the configuration.
 	ClusterComponentConfigSource `json:",inline"`
 
-	// ExternalManaged specifies whether the configuration management is delegated to an external system
-	// or manual user control.
+	// ExternalManaged specifies whether the configuration management is delegated to an external system.
 	//
-	// When set to true, the controller will exclusively utilize the user-provided configuration source
-	// and the 'reconfigure' action defined in this config, bypassing the default templates and
-	// update behaviors specified in the ComponentDefinition.
+	// When set to true, the apps controller does not render or manage the configuration from the
+	// default templates and update behaviors specified in the ComponentDefinition. A ConfigMap source
+	// for an external-managed configuration is accepted only when the referenced ConfigMap carries
+	// the common KubeBlocks component labels.
 	//
 	// +optional
 	ExternalManaged *bool `json:"externalManaged,omitempty"`
@@ -550,11 +551,17 @@ type ClusterComponentConfig struct {
 	// Specifies whether to restart the component to reload the updated configuration.
 	//
 	// +optional
-	RestartOnConfigChange *bool `json:"restartOnConfigChange,omitempty"`
+	Restart *bool `json:"restart,omitempty"`
 
-	// The custom reconfigure action to reload the updated configuration.
+	// Specifies whether to execute a reconfigure action for the updated configuration.
 	//
-	// When @restartOnConfigChange is set to true, this action will be ignored.
+	// When set to true and `reconfigureAction` is empty, the controller uses the default
+	// reconfigure action defined by the corresponding configuration template or component lifecycle.
+	//
+	// +optional
+	Reconfigure *bool `json:"reconfigure,omitempty"`
+
+	// The custom reconfigure action to apply the updated configuration.
 	//
 	// The container executing this action has access to following variables:
 	//
@@ -563,7 +570,12 @@ type ClusterComponentConfig struct {
 	// - KB_CONFIG_FILES_UPDATED: file1:checksum1,file2:checksum2...
 	//
 	// +optional
-	Reconfigure *Action `json:"reconfigure,omitempty"`
+	ReconfigureAction *Action `json:"reconfigureAction,omitempty"`
+
+	// ReconfigureArgs is a list of runtime argument groups for the reconfigure action.
+	//
+	// +optional
+	ReconfigureArgs [][]string `json:"reconfigureArgs,omitempty"`
 }
 
 // ClusterComponentConfigSource represents the source of a configuration for a component.

@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package parameters
 
 import (
+	"fmt"
+
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 )
@@ -29,8 +31,9 @@ func DoMerge(baseData map[string]string,
 	paramsDefs []*parametersv1alpha1.ParametersDefinition,
 	configDescs []parametersv1alpha1.ComponentConfigDescription) (map[string]string, error) {
 	var (
-		updatedFiles  = make(map[string]string, len(patch))
-		updatedParams = make([]core.ParamPairs, 0, len(patch))
+		updatedFiles            = make(map[string]string, len(patch))
+		updatedParams           = make([]core.ParamPairs, 0, len(patch))
+		unmanagedUpdatedByFiles = make(map[string][]parametersv1alpha1.UnmanagedParameterSectionUpdate, len(patch))
 	)
 
 	builder := NewValueManager(paramsDefs, configDescs)
@@ -39,19 +42,23 @@ func DoMerge(baseData map[string]string,
 			updatedFiles[key] = *params.Content
 		}
 		if len(params.Parameters) > 0 {
-			upParams, _ := core.FromStringMap(params.Parameters, builder.BuildValueTransformer(key))
+			upParams, _ := core.FromStringMap(DecodeParameterOverlay(params.Parameters), builder.BuildValueTransformer(key))
 			updatedParams = append(updatedParams, core.ParamPairs{
 				Key:           key,
 				UpdatedParams: upParams,
 			})
 		}
+		if len(params.UnmanagedUpdates) > 0 {
+			unmanagedUpdatedByFiles[key] = params.UnmanagedUpdates
+		}
 	}
-	return mergeUpdatedParams(baseData, updatedFiles, updatedParams, paramsDefs, configDescs)
+	return mergeUpdatedParams(baseData, updatedFiles, updatedParams, unmanagedUpdatedByFiles, paramsDefs, configDescs)
 }
 
 func mergeUpdatedParams(base map[string]string,
 	updatedFiles map[string]string,
 	updatedParams []core.ParamPairs,
+	unmanagedUpdatedByFiles map[string][]parametersv1alpha1.UnmanagedParameterSectionUpdate,
 	paramsDefs []*parametersv1alpha1.ParametersDefinition,
 	configDescs []parametersv1alpha1.ComponentConfigDescription) (map[string]string, error) {
 	updatedConfig := base
@@ -59,9 +66,146 @@ func mergeUpdatedParams(base map[string]string,
 	// merge updated files into configmap
 	if len(updatedFiles) != 0 {
 		updatedConfig = core.MergeUpdatedConfig(base, updatedFiles)
+		// Reject content-level updates that would alter any immutable parameter.
+		// MergeUpdatedConfig substitutes whole file contents key-by-key, so without
+		// this guard a user submitting raw file content could bypass the
+		// parameter-level immutable check performed below by
+		// MergeAndValidateConfigs/filterImmutableParameters.
+		if err := validateImmutableContentChanges(base, updatedConfig, updatedFiles, paramsDefs, configDescs); err != nil {
+			return nil, err
+		}
 	}
 	if len(configDescs) == 0 {
 		return updatedConfig, nil
 	}
-	return MergeAndValidateConfigs(updatedConfig, updatedParams, paramsDefs, configDescs)
+	updatedConfig, err := MergeAndValidateConfigs(updatedConfig, updatedParams, paramsDefs, configDescs)
+	if err != nil {
+		return nil, err
+	}
+	return mergeUnmanagedUpdates(updatedConfig, unmanagedUpdatedByFiles, paramsDefs, configDescs)
+}
+
+func mergeUnmanagedUpdates(base map[string]string,
+	unmanagedUpdatedByFiles map[string][]parametersv1alpha1.UnmanagedParameterSectionUpdate,
+	paramsDefs []*parametersv1alpha1.ParametersDefinition,
+	configDescs []parametersv1alpha1.ComponentConfigDescription) (map[string]string, error) {
+	if len(unmanagedUpdatedByFiles) == 0 {
+		return base, nil
+	}
+	updatedConfig := core.MergeUpdatedConfig(base, nil)
+	for file, sectionUpdates := range unmanagedUpdatedByFiles {
+		current, ok := updatedConfig[file]
+		if !ok {
+			current = ""
+		}
+		fileFormat := core.ResolveConfigFormat(configDescs, file)
+		if fileFormat == nil {
+			return nil, fmt.Errorf("not support unmanaged updates for file: %s", file)
+		}
+		next := current
+		for _, sectionUpdate := range sectionUpdates {
+			formatConfig, err := resolveUnmanagedFormatConfig(fileFormat, sectionUpdate.Section)
+			if err != nil {
+				return nil, err
+			}
+			if err := rejectImmutableUnmanagedUpdates(file, fileFormat, sectionUpdate, paramsDefs); err != nil {
+				return nil, err
+			}
+			normalizedUpdates, err := normalizeUnmanagedParameterUpdates(sectionUpdate.Updates)
+			if err != nil {
+				return nil, err
+			}
+			next, err = core.ApplyConfigPatch([]byte(next), normalizedUpdates, formatConfig, nil)
+			if err != nil {
+				return nil, err
+			}
+		}
+		updatedConfig[file] = next
+	}
+	updatedFiles := make(map[string]string, len(unmanagedUpdatedByFiles))
+	for file := range unmanagedUpdatedByFiles {
+		updatedFiles[file] = updatedConfig[file]
+	}
+	if err := validateImmutableContentChanges(base, updatedConfig, updatedFiles, paramsDefs, configDescs); err != nil {
+		return nil, err
+	}
+	return updatedConfig, nil
+}
+
+func rejectImmutableUnmanagedUpdates(
+	fileName string,
+	fileFormat *parametersv1alpha1.FileFormatConfig,
+	sectionUpdate parametersv1alpha1.UnmanagedParameterSectionUpdate,
+	paramsDefs []*parametersv1alpha1.ParametersDefinition,
+) error {
+	paramsDef := resolveParametersDef(paramsDefs, fileName)
+	if paramsDef == nil || len(paramsDef.Spec.ImmutableParameters) == 0 {
+		return nil
+	}
+	if !unmanagedUpdateTargetsManagedScope(fileFormat, sectionUpdate.Section) {
+		return nil
+	}
+	immutableParams := make(map[string]struct{}, len(paramsDef.Spec.ImmutableParameters))
+	for _, immutableParam := range paramsDef.Spec.ImmutableParameters {
+		immutableParams[immutableParam] = struct{}{}
+	}
+	for _, update := range sectionUpdate.Updates {
+		if _, ok := immutableParams[update.Key]; ok {
+			return fmt.Errorf("immutable parameter %s cannot be modified (file %q)", update.Key, fileName)
+		}
+	}
+	return nil
+}
+
+func unmanagedUpdateTargetsManagedScope(fileFormat *parametersv1alpha1.FileFormatConfig, section *string) bool {
+	if fileFormat == nil || fileFormat.Format != parametersv1alpha1.Ini {
+		return true
+	}
+	managedSection := ""
+	if fileFormat.IniConfig != nil {
+		managedSection = fileFormat.IniConfig.SectionName
+	}
+	if section == nil {
+		return true
+	}
+	return *section == managedSection
+}
+
+func resolveUnmanagedFormatConfig(base *parametersv1alpha1.FileFormatConfig, section *string) (*parametersv1alpha1.FileFormatConfig, error) {
+	if base == nil {
+		if section != nil {
+			return nil, fmt.Errorf("section is not supported without file format configuration")
+		}
+		return nil, fmt.Errorf("file format configuration is required for unmanaged updates")
+	}
+	formatConfig := base.DeepCopy()
+	if section == nil {
+		return formatConfig, nil
+	}
+	if formatConfig.Format != parametersv1alpha1.Ini {
+		return nil, fmt.Errorf("section is only supported for ini unmanaged updates")
+	}
+	if formatConfig.IniConfig == nil {
+		formatConfig.IniConfig = &parametersv1alpha1.IniConfig{}
+	}
+	formatConfig.IniConfig.SectionName = *section
+	return formatConfig, nil
+}
+
+func normalizeUnmanagedParameterUpdates(updates []parametersv1alpha1.ParameterUpdate) (map[string]*string, error) {
+	normalized := make(map[string]*string, len(updates))
+	for _, update := range updates {
+		switch update.Type {
+		case parametersv1alpha1.ParameterUpdateSet:
+			if update.Value == nil {
+				return nil, fmt.Errorf("unmanaged parameter update %q with type %q requires a value", update.Key, update.Type)
+			}
+			normalized[update.Key] = update.Value
+		case parametersv1alpha1.ParameterUpdateRemove:
+			normalized[update.Key] = nil
+		default:
+			return nil, fmt.Errorf("unsupported unmanaged parameter update type %q for key %q", update.Type, update.Key)
+		}
+	}
+	return normalized, nil
 }

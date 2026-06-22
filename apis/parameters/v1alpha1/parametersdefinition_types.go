@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,7 +17,6 @@ limitations under the License.
 package v1alpha1
 
 import (
-	corev1 "k8s.io/api/core/v1"
 	apiext "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -28,7 +27,7 @@ import (
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster
-// +kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName={paramsdef,pd}
+// +kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName={pd}
 // +kubebuilder:printcolumn:name="FILE",type="string",JSONPath=".spec.fileName",description="config file name"
 // +kubebuilder:printcolumn:name="PHASE",type="string",JSONPath=".status.phase",description="status phase"
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
@@ -57,10 +56,34 @@ func init() {
 
 // ParametersDefinitionSpec defines the desired state of ParametersDefinition
 type ParametersDefinitionSpec struct {
+	// Specifies the ComponentDefinition custom resource (CR) that defines the Component's characteristics and behavior.
+	// The value can represent an exact name, a name prefix, or a regular expression pattern.
+	//
+	// +optional
+	ComponentDef string `json:"componentDef,omitempty"`
+
+	// ServiceVersion specifies the version of the Service expected to be provisioned by this Component.
+	// The version should follow the syntax and semantics of the "Semantic Versioning" specification (http://semver.org/).
+	// If no version is specified, the latest available version will be used.
+	//
+	// +optional
+	ServiceVersion string `json:"serviceVersion,omitempty"`
+
+	// Specifies the name of the referenced config template.
+	//
+	// +optional
+	TemplateName string `json:"templateName,omitempty"`
+
 	// Specifies the config file name in the config template.
 	//
 	// +optional
 	FileName string `json:"fileName,omitempty"`
+
+	// Specifies the format of the configuration file and any associated parameters that are specific to the chosen format.
+	// Supported formats include `ini`, `xml`, `yaml`, `json`, `hcl`, `dotenv`, `properties`, and `toml`.
+	//
+	// +optional
+	FileFormatConfig *FileFormatConfig `json:"fileFormatConfig,omitempty"`
 
 	// Defines a list of parameters including their names, default values, descriptions,
 	// types, and constraints (permissible values or the range of valid values).
@@ -81,37 +104,13 @@ type ParametersDefinitionSpec struct {
 	// If `reloadAction` is not set or the modified parameters are not listed in `dynamicParameters`,
 	// dynamic reloading will not be triggered.
 	//
-	// Example:
-	// ```yaml
-	// dynamicReloadAction:
-	//  tplScriptTrigger:
-	//    namespace: kb-system
-	//    scriptConfigMapRef: mysql-reload-script
-	//    sync: true
-	// ```
-	//
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 1.2.0"
 	// +optional
 	ReloadAction *ReloadAction `json:"reloadAction,omitempty"`
 
-	// TODO: migrate DownwardAPITriggeredActions to ComponentDefinition.spec.lifecycleActions
-	// Specifies a list of actions to execute specified commands based on Pod labels.
-	//
-	// It utilizes the K8s Downward API to mount label information as a volume into the pod.
-	// The 'config-manager' sidecar container watches for changes in the role label and dynamically invoke
-	// registered commands (usually execute some SQL statements) when a change is detected.
-	//
-	// It is designed for scenarios where:
-	//
-	// - Replicas with different roles have different configurations, such as Redis primary & secondary replicas.
-	// - After a role switch (e.g., from secondary to primary), some changes in configuration are needed
-	//   to reflect the new role.
-	//
-	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 1.1.0"
-	// +optional
-	DownwardAPIChangeTriggeredActions []DownwardAPIChangeTriggeredAction `json:"downwardAPIChangeTriggeredActions,omitempty"`
-
 	// Specifies the policy when parameter be removed.
 	//
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 1.2.0"
 	// +optional
 	ParameterDeletedPolicy *ParameterDeletedPolicy `json:"deletedPolicy,omitempty"`
 
@@ -148,19 +147,24 @@ type ParametersDefinitionSpec struct {
 
 	// List dynamic parameters.
 	// Modifications to these parameters trigger a configuration reload without requiring a process restart.
+	// When parameter updates are applied through a ComponentDefinition config template reconfigure ExecAction,
+	// the controller invokes the action once for each updated
+	// parameter and appends the parameter name and value as the last arguments.
+	// HTTP and gRPC reconfigure actions are not currently supported for parameter updates.
 	//
 	// +listType=set
 	// +optional
 	DynamicParameters []string `json:"dynamicParameters,omitempty"`
 
 	// Lists the parameters that cannot be modified once set.
-	// Attempting to change any of these parameters will be ignored.
+	// Attempts to change any of these parameters are rejected during configuration merge and surface as a merge failure.
 	//
 	// +listType=set
 	// +optional
 	ImmutableParameters []string `json:"immutableParameters,omitempty"`
 }
 
+// Deprecated: It is retained for API compatibility with existing ParametersDefinition objects.
 type ParameterDeletedPolicy struct {
 
 	// Specifies the method to handle the deletion of a parameter.
@@ -204,24 +208,14 @@ type ParametersDefinitionStatus struct {
 
 // ReloadAction defines the mechanisms available for dynamically reloading a process within K8s without requiring a restart.
 //
+// Deprecated: It is retained for API compatibility with existing ParametersDefinition objects.
+//
 // Only one of the mechanisms can be specified at a time.
 type ReloadAction struct {
-	// Used to trigger a reload by sending a specific Unix signal to the process.
-	//
-	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 1.1.0"
-	// +optional
-	UnixSignalTrigger *UnixSignalTrigger `json:"unixSignalTrigger,omitempty"`
-
 	// Allows to execute a custom shell script to reload the process.
 	//
 	// +optional
 	ShellTrigger *ShellTrigger `json:"shellTrigger,omitempty"`
-
-	// Enables reloading process using a Go template script.
-	//
-	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 1.1.0"
-	// +optional
-	TPLScriptTrigger *TPLScriptTrigger `json:"tplScriptTrigger"`
 
 	// Automatically perform the reload when specified conditions are met.
 	//
@@ -238,19 +232,6 @@ type ReloadAction struct {
 	//
 	// +optional
 	TargetPodSelector *metav1.LabelSelector `json:"targetPodSelector,omitempty"`
-}
-
-// UnixSignalTrigger is used to trigger a reload by sending a specific Unix signal to the process.
-type UnixSignalTrigger struct {
-	// Specifies a valid Unix signal to be sent.
-	//
-	// +kubebuilder:validation:Required
-	Signal SignalType `json:"signal"`
-
-	// Identifies the name of the process to which the Unix signal will be sent.
-	//
-	// +kubebuilder:validation:Required
-	ProcessName string `json:"processName"`
 }
 
 // ToolsSetup prepares the tools for dynamic reloads used in ShellTrigger from a specified container image.
@@ -375,41 +356,6 @@ type ImageMapping struct {
 	Image string `json:"image"`
 }
 
-// DownwardAPIChangeTriggeredAction defines an action that triggers specific commands in response to changes in Pod labels.
-// For example, a command might be executed when the 'role' label of the Pod is updated.
-type DownwardAPIChangeTriggeredAction struct {
-	// Specifies the name of the field. It must be a string of maximum length 63.
-	// The name should match the regex pattern `^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`.
-	//
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=63
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	Name string `json:"name"`
-
-	// Specifies the mount point of the Downward API volume.
-	//
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=128
-	MountPoint string `json:"mountPoint"`
-
-	// Represents a list of files under the Downward API volume.
-	//
-	// +kubebuilder:validation:Required
-	Items []corev1.DownwardAPIVolumeFile `json:"items"`
-
-	// Specifies the command to be triggered when changes are detected in Downward API volume files.
-	// It relies on the inotify mechanism in the config-manager sidecar to monitor file changes.
-	//
-	// +optional
-	Command []string `json:"command,omitempty"`
-
-	// ScriptConfig object specifies a ConfigMap that contains script files that should be mounted inside the pod.
-	// The scripts are mounted as volumes and can be referenced and executed by the DownwardAction to perform specific tasks or configurations.
-	//
-	// +optional
-	ScriptConfig *ScriptConfig `json:"scriptConfig,omitempty"`
-}
-
 type ScriptConfig struct {
 	// Specifies the reference to the ConfigMap containing the scripts.
 	//
@@ -441,49 +387,6 @@ type ShellTrigger struct {
 	// +optional
 	Sync *bool `json:"sync,omitempty"`
 
-	// Controls whether parameter updates are processed individually or collectively in a batch:
-	//
-	// - 'True': Processes all changes in one batch reload.
-	// - 'False': Processes each change individually.
-	//
-	// Defaults to 'False' if unspecified.
-	//
-	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 1.1.0"
-	// +optional
-	BatchReload *bool `json:"batchReload,omitempty"`
-
-	// Specifies a Go template string for formatting batch input data.
-	// It's used when `batchReload` is 'True' to format data passed into STDIN of the script.
-	// The template accesses key-value pairs of updated parameters via the '$' variable.
-	// This allows for custom formatting of the input data.
-	//
-	// Example template:
-	//
-	// ```yaml
-	// batchParamsFormatterTemplate: |-
-	// {{- range $pKey, $pValue := $ }}
-	// {{ printf "%s:%s" $pKey $pValue }}
-	// {{- end }}
-	// ```
-	//
-	// This example generates batch input data in a key:value format, sorted by keys.
-	// ```
-	// key1:value1
-	// key2:value2
-	// key3:value3
-	// ```
-	//
-	// If not specified, the default format is key=value, sorted by keys, for each updated parameter.
-	// ```
-	// key1=value1
-	// key2=value2
-	// key3=value3
-	// ```
-	//
-	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 1.1.0"
-	// +optional
-	BatchParamsFormatterTemplate string `json:"batchParamsFormatterTemplate,omitempty"`
-
 	// Specifies the tools container image used by ShellTrigger for dynamic reload.
 	// If the dynamic reload action is triggered by a ShellTrigger, this field is required.
 	// This image must contain all necessary tools for executing the ShellTrigger scripts.
@@ -500,24 +403,6 @@ type ShellTrigger struct {
 	//
 	// +optional
 	ScriptConfig *ScriptConfig `json:"scriptConfig,omitempty"`
-}
-
-// TPLScriptTrigger Enables reloading process using a Go template script.
-type TPLScriptTrigger struct {
-	// Specifies the ConfigMap that contains the script to be executed for reload.
-	//
-	ScriptConfig `json:",inline"`
-
-	// Determines whether parameter updates should be synchronized with the "config-manager".
-	// Specifies the controller's reload strategy:
-	//
-	// - If set to 'True', the controller executes the reload action in synchronous mode,
-	//   pausing execution until the reload completes.
-	// - If set to 'False', the controller executes the reload action in asynchronous mode,
-	//   updating the ConfigMap without waiting for the reload process to finish.
-	//
-	// +optional
-	Sync *bool `json:"sync,omitempty"`
 }
 
 // AutoTrigger automatically perform the reload when specified conditions are met.

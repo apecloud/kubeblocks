@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -235,6 +235,25 @@ var _ = Describe("lifecycle", func() {
 				RetryPolicy:    action.RetryPolicy,
 			}
 			err = lifecycle.PostProvision(ctx, k8sClient, opts)
+			Expect(err).Should(BeNil())
+		})
+
+		It("action request arguments", func() {
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods)
+			Expect(err).Should(BeNil())
+			Expect(lifecycle).ShouldNot(BeNil())
+
+			arguments := [][]string{{"maxmemory", "1gb"}, {"timeout", "30"}}
+			mockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
+					Expect(req.Action).Should(Equal("postProvision"))
+					Expect(req.Arguments).Should(Equal(arguments))
+					Expect(req.Parameters).Should(BeEmpty())
+					return proto.ActionResponse{}, nil
+				}).AnyTimes()
+			})
+
+			err = lifecycle.PostProvision(ctx, k8sClient, &Options{Arguments: arguments})
 			Expect(err).Should(BeNil())
 		})
 
@@ -483,7 +502,7 @@ var _ = Describe("lifecycle", func() {
 
 			err = lifecycle.PostProvision(ctx, reader, nil)
 			Expect(err).ShouldNot(BeNil())
-			Expect(err.Error()).Should(ContainSubstring("action precondition is not matched"))
+			Expect(err.Error()).Should(ContainSubstring("action precondition is not met"))
 		})
 
 		It("precondition - object selector", func() {
@@ -576,7 +595,7 @@ var _ = Describe("lifecycle", func() {
 				PreConditionObjectSelector: labels,
 			}, "custom-action", customAction, nil)
 			Expect(err).ShouldNot(BeNil())
-			Expect(err.Error()).Should(ContainSubstring("action precondition is not matched"))
+			Expect(err.Error()).Should(ContainSubstring("action precondition is not met"))
 		})
 
 		It("pod selector - any", func() {
@@ -715,6 +734,97 @@ var _ = Describe("lifecycle", func() {
 			err = lifecycle.PostProvision(ctx, k8sClient, nil)
 			Expect(err).ShouldNot(BeNil())
 			Expect(err.Error()).Should(ContainSubstring("pod pod-1 has no ip"))
+		})
+
+		It("pod selector - ordinal", func() {
+			lifecycleActions.PostProvision.Exec.TargetPodSelector = appsv1.OrdinalSelector
+			lifecycleActions.PostProvision.Exec.MatchingKey = "1"
+			pods = []*corev1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: namespace,
+						Name:      "pod-0",
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name: "kbagent",
+								Ports: []corev1.ContainerPort{
+									{
+										Name: "http",
+									},
+								},
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: namespace,
+						Name:      "pod-1",
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name: "kbagent",
+								Ports: []corev1.ContainerPort{
+									{
+										Name: "http",
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods)
+			Expect(err).Should(BeNil())
+			Expect(lifecycle).ShouldNot(BeNil())
+
+			err = lifecycle.PostProvision(ctx, k8sClient, nil)
+			Expect(err).ShouldNot(BeNil())
+			Expect(err.Error()).Should(ContainSubstring("pod pod-1 has no ip"))
+		})
+
+		It("pod selector - ordinal invalid matching key", func() {
+			lifecycleActions.PostProvision.Exec.TargetPodSelector = appsv1.OrdinalSelector
+			lifecycleActions.PostProvision.Exec.MatchingKey = "invalid"
+
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods)
+			Expect(err).Should(BeNil())
+			Expect(lifecycle).ShouldNot(BeNil())
+
+			err = lifecycle.PostProvision(ctx, k8sClient, nil)
+			Expect(err).ShouldNot(BeNil())
+			Expect(err.Error()).Should(ContainSubstring("invalid ordinal matchingKey: invalid"))
+		})
+
+		It("pod selector - ordinal ambiguous", func() {
+			lifecycleActions.PostProvision.Exec.TargetPodSelector = appsv1.OrdinalSelector
+			lifecycleActions.PostProvision.Exec.MatchingKey = "0"
+			pods = []*corev1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: namespace,
+						Name:      "pod-0",
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: namespace,
+						Name:      "pod-template-0",
+					},
+				},
+			}
+
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods)
+			Expect(err).Should(BeNil())
+			Expect(lifecycle).ShouldNot(BeNil())
+
+			err = lifecycle.PostProvision(ctx, k8sClient, nil)
+			Expect(err).ShouldNot(BeNil())
+			Expect(err.Error()).Should(ContainSubstring("ambiguous ordinal selector matchingKey 0 matches multiple pods: pod-0,pod-template-0"))
 		})
 
 		It("pod selector - has no matched", func() {

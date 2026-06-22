@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,12 +17,17 @@ limitations under the License.
 package dataprotection
 
 import (
+	"context"
 	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -58,6 +63,43 @@ var _ = Describe("", func() {
 	})
 
 	Context("create a BackupPolicyTemplate", func() {
+		It("maps compatible component definitions to backup policy template requests", func() {
+			scheme := runtime.NewScheme()
+			Expect(appsv1.AddToScheme(scheme)).Should(Succeed())
+			Expect(dpv1alpha1.AddToScheme(scheme)).Should(Succeed())
+
+			matchingBPT := &dpv1alpha1.BackupPolicyTemplate{
+				ObjectMeta: metav1.ObjectMeta{Name: "mysql-bpt"},
+				Spec: dpv1alpha1.BackupPolicyTemplateSpec{
+					CompDefs: []string{"mysql-.*"},
+				},
+			}
+			nonMatchingBPT := &dpv1alpha1.BackupPolicyTemplate{
+				ObjectMeta: metav1.ObjectMeta{Name: "postgres-bpt"},
+				Spec: dpv1alpha1.BackupPolicyTemplateSpec{
+					CompDefs: []string{"postgres"},
+				},
+			}
+			reconciler := &BackupPolicyTemplateReconciler{
+				Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(matchingBPT, nonMatchingBPT).Build(),
+			}
+
+			Expect(reconciler.isCompatibleWith(appsv1.ComponentDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "mysql-8.0"},
+			}, matchingBPT)).To(BeTrue())
+			Expect(reconciler.isCompatibleWith(appsv1.ComponentDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "redis"},
+			}, matchingBPT)).To(BeFalse())
+			Expect(reconciler.compatibleBackupPolicyTemplate(context.Background(), &dpv1alpha1.BackupPolicyTemplate{})).To(BeNil())
+
+			requests := reconciler.compatibleBackupPolicyTemplate(context.Background(), &appsv1.ComponentDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "mysql-8.0"},
+			})
+
+			Expect(requests).To(HaveLen(1))
+			Expect(requests[0].Name).To(Equal(matchingBPT.Name))
+		})
+
 		It("test BackupPolicyTemplate", func() {
 			var (
 				compDef1 = "comp-def1"
@@ -112,6 +154,7 @@ var _ = Describe("", func() {
 			actionSet := testdp.NewFakeActionSet(&testCtx, nil)
 			testdp.MockActionSetWithSchema(&testCtx, actionSet)
 			bpt := testdp.NewBackupPolicyTemplateFactory(BackupPolicyTemplateName).
+				SetCompDefs("test-comp-def").
 				AddBackupMethod(BackupMethod, false, testdp.ActionSetName).
 				SetBackupMethodVolumeMounts("data", "/data").
 				AddSchedule(BackupMethod, "0 0 * * *", ttl, true, scheduleName1, testdp.InvalidParameters).

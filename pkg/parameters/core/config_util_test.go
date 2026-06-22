@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -18,6 +18,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package core
+
+import (
+	"errors"
+	"reflect"
+	"strings"
+	"testing"
+
+	"github.com/stretchr/testify/require"
+	"k8s.io/utils/ptr"
+
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
+)
 
 // import (
 // 	"reflect"
@@ -186,6 +198,105 @@ package core
 // 		})
 // 	}
 // }
+
+func TestMergeUpdatedConfig(t *testing.T) {
+	base := map[string]string{
+		"mysql.cnf": "[mysqld]",
+		"proxy.cnf": "port=3306",
+	}
+	updated := map[string]string{
+		"mysql.cnf": "[mysqld]\nmax_connections=200",
+		"extra.cnf": "ignored=true",
+	}
+
+	got := MergeUpdatedConfig(base, updated)
+	require.Equal(t, map[string]string{
+		"mysql.cnf": "[mysqld]\nmax_connections=200",
+		"proxy.cnf": "port=3306",
+	}, got)
+}
+
+func TestFromStringMap(t *testing.T) {
+	port := "3306"
+	hosts := `["mysql-0","mysql-1"]`
+	params := map[string]*string{
+		"port":   &port,
+		"unset":  nil,
+		"@hosts": &hosts,
+	}
+
+	got, err := FromStringMap(params, ValueTransformerFunc(func(value string, fieldName string) (any, error) {
+		if fieldName == "port" {
+			return "tcp:" + value, nil
+		}
+		return value, nil
+	}))
+	require.NoError(t, err)
+	require.Equal(t, "tcp:3306", got["port"])
+	require.Nil(t, got["unset"])
+	require.Equal(t, []interface{}{"mysql-0", "mysql-1"}, got["hosts"])
+
+	_, err = FromStringMap(map[string]*string{"port": &port}, ValueTransformerFunc(func(string, string) (any, error) {
+		return nil, errors.New("bad value")
+	}))
+	require.ErrorContains(t, err, "bad value")
+}
+
+func TestApplyConfigPatch(t *testing.T) {
+	base := []byte("[mysqld]\nmax_connections=100\nold_value=keep\n")
+	format := &parametersv1alpha1.FileFormatConfig{
+		Format: parametersv1alpha1.Ini,
+		FormatterAction: parametersv1alpha1.FormatterAction{
+			IniConfig: &parametersv1alpha1.IniConfig{SectionName: "mysqld"},
+		},
+	}
+
+	got, err := ApplyConfigPatch(base, map[string]*string{
+		"max_connections": ptr.To("200"),
+		"old_value":       nil,
+	}, format, nil)
+	require.NoError(t, err)
+	require.Contains(t, got, "[mysqld]")
+	require.Contains(t, got, "max_connections=200")
+
+	_, err = ApplyConfigPatch([]byte(":"), map[string]*string{"max_connections": ptr.To("200")}, format, nil)
+	require.Error(t, err)
+}
+
+func TestIsWatchModuleForShellTrigger(t *testing.T) {
+	sync := true
+	async := false
+
+	tests := []struct {
+		name    string
+		trigger *parametersv1alpha1.ShellTrigger
+		want    bool
+	}{
+		{name: "nil trigger", want: true},
+		{name: "nil sync", trigger: &parametersv1alpha1.ShellTrigger{}, want: true},
+		{name: "sync trigger", trigger: &parametersv1alpha1.ShellTrigger{Sync: &sync}, want: false},
+		{name: "async trigger", trigger: &parametersv1alpha1.ShellTrigger{Sync: &async}, want: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, IsWatchModuleForShellTrigger(tt.trigger))
+		})
+	}
+}
+
+func TestArrayFieldHelpers(t *testing.T) {
+	require.True(t, hasArrayField("@hosts"))
+	require.False(t, hasArrayField("hosts"))
+	require.Equal(t, "@hosts", transArrayFieldName("hosts"))
+	require.Equal(t, "hosts", GetValidFieldName("@hosts"))
+	require.Equal(t, "hosts", GetValidFieldName("hosts"))
+	require.Equal(t, "", transJSONString(nil))
+	require.Equal(t, []any{}, fromJSONString(ptr.To("")))
+	require.True(t, reflect.DeepEqual([]any{"a"}, fromJSONString(ptr.To(`["a"]`))))
+	require.True(t, strings.HasPrefix(transJSONString([]string{"a"}), "["))
+}
+
 //
 // func TestApplyConfigPatch(t *testing.T) {
 // 	type args struct {

@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -114,5 +114,11 @@ func (factory *MockInstanceFactory) SetRoles(roles []workloads.ReplicaRole) *Moc
 
 func (factory *MockInstanceFactory) SetLifecycleActions(actions *workloads.LifecycleActions) *MockInstanceFactory {
 	factory.Get().Spec.LifecycleActions = actions
+	return factory
+}
+
+func (factory *MockInstanceFactory) AddConfigs(config ...workloads.ConfigTemplate) *MockInstanceFactory {
+	configs := &factory.Get().Spec.Configs
+	*configs = append(*configs, config...)
 	return factory
 }

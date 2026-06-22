@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -269,5 +269,17 @@ func (factory *MockClusterFactory) SetServiceRefs(serviceRefs []appsv1.ServiceRe
 func (factory *MockClusterFactory) SetFlatInstanceOrdinal(flatInstanceOrdinal bool) *MockClusterFactory {
 	return factory.lastComponentRef(func(comp *appsv1.ClusterComponentSpec) {
 		comp.FlatInstanceOrdinal = flatInstanceOrdinal
+	})
+}
+
+func (factory *MockClusterFactory) SetConfig(config appsv1.ClusterComponentConfig) *MockClusterFactory {
+	return factory.lastComponentRef(func(comp *appsv1.ClusterComponentSpec) {
+		comp.Configs = append(comp.Configs, config)
+	})
+}
+
+func (factory *MockClusterFactory) SetShardingConfig(config appsv1.ClusterComponentConfig) *MockClusterFactory {
+	return factory.lastSharding(func(sharding *appsv1.ClusterSharding) {
+		sharding.Template.Configs = append(sharding.Template.Configs, config)
 	})
 }

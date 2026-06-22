@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -38,6 +38,9 @@ const (
 	ReasonApplyResourcesSucceed = "ApplyResourcesSucceed" // ReasonApplyResourcesSucceed applies resources succeeded to create or change the cluster
 	ReasonClusterReady          = "ClusterReady"          // ReasonClusterReady the components of cluster are ready, the component phase is running
 	ReasonComponentsNotReady    = "ComponentsNotReady"    // ReasonComponentsNotReady the components of cluster are not ready
+	ReasonRestoreCompleted      = "RestoreCompleted"
+	ReasonRestoreRunning        = "RestoreRunning"
+	ReasonRestoreFailed         = "RestoreFailed"
 )
 
 func setProvisioningStartedCondition(conditions *[]metav1.Condition, clusterName string, clusterGeneration int64, err error) {
@@ -77,8 +80,8 @@ func newFailedProvisioningStartedCondition(err error) metav1.Condition {
 	return metav1.Condition{
 		Type:    appsv1.ConditionTypeProvisioningStarted,
 		Status:  metav1.ConditionFalse,
-		Message: err.Error(),
-		Reason:  getConditionReasonWithError(ReasonPreCheckFailed, err),
+		Message: intctrlutil.TruncateConditionMessage(err.Error()),
+		Reason:  intctrlutil.TruncateConditionReason(getConditionReasonWithError(ReasonPreCheckFailed, err)),
 	}
 }
 
@@ -105,8 +108,8 @@ func newFailedApplyResourcesCondition(err error) metav1.Condition {
 	return metav1.Condition{
 		Type:    appsv1.ConditionTypeApplyResources,
 		Status:  metav1.ConditionFalse,
-		Message: err.Error(),
-		Reason:  getConditionReasonWithError(ReasonApplyResourcesFailed, err),
+		Message: intctrlutil.TruncateConditionMessage(err.Error()),
+		Reason:  intctrlutil.TruncateConditionReason(getConditionReasonWithError(ReasonApplyResourcesFailed, err)),
 	}
 }
 

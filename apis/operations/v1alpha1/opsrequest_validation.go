@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -172,6 +172,11 @@ func (r *OpsRequest) validateExpose(_ context.Context, cluster *appsv1.Cluster) 
 			for _, opssvc := range v.Services {
 				if len(opssvc.Ports) == 0 {
 					return fmt.Errorf("spec.expose.services.ports must be specified when componentName is empty")
+				}
+				if opssvc.ExternalTrafficPolicy != "" &&
+					opssvc.ServiceType != corev1.ServiceTypeNodePort &&
+					opssvc.ServiceType != corev1.ServiceTypeLoadBalancer {
+					return fmt.Errorf("externalTrafficPolicy can only be set for NodePort or LoadBalancer service types, got %s", opssvc.ServiceType)
 				}
 			}
 		}

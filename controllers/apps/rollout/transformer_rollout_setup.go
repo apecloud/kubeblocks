@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"reflect"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -47,7 +48,7 @@ func (t *rolloutSetupTransformer) Transform(ctx graph.TransformContext, dag *gra
 	)
 
 	// pre-check
-	if err := t.precheck(rollout); err != nil {
+	if err := t.precheck(transCtx.Cluster, rollout); err != nil {
 		return err
 	}
 
@@ -60,16 +61,19 @@ func (t *rolloutSetupTransformer) Transform(ctx graph.TransformContext, dag *gra
 	return t.initRolloutStatus(transCtx, dag, rollout)
 }
 
-func (t *rolloutSetupTransformer) precheck(rollout *appsv1alpha1.Rollout) error {
-	if err := t.compPrecheck(rollout); err != nil {
+func (t *rolloutSetupTransformer) precheck(cluster *appsv1.Cluster, rollout *appsv1alpha1.Rollout) error {
+	if err := t.compPrecheck(cluster, rollout); err != nil {
 		return err
 	}
-	return t.shardingPrecheck(rollout)
+	return t.shardingPrecheck(cluster, rollout)
 }
 
-func (t *rolloutSetupTransformer) compPrecheck(rollout *appsv1alpha1.Rollout) error {
+func (t *rolloutSetupTransformer) compPrecheck(cluster *appsv1.Cluster, rollout *appsv1alpha1.Rollout) error {
 	for _, comp := range rollout.Spec.Components {
 		// target serviceVersion & componentDef
+		if withClusterUserDefined(cluster) && (comp.ServiceVersion == nil || comp.CompDef == nil) {
+			return fmt.Errorf("serviceVersion and compDef must be defined for component %s when rolling out a user-defined cluster", comp.Name)
+		}
 		if comp.ServiceVersion == nil && comp.CompDef == nil {
 			return fmt.Errorf("neither serviceVersion nor compDef is defined for component %s", comp.Name)
 		}
@@ -80,9 +84,12 @@ func (t *rolloutSetupTransformer) compPrecheck(rollout *appsv1alpha1.Rollout) er
 	return nil
 }
 
-func (t *rolloutSetupTransformer) shardingPrecheck(rollout *appsv1alpha1.Rollout) error {
+func (t *rolloutSetupTransformer) shardingPrecheck(cluster *appsv1.Cluster, rollout *appsv1alpha1.Rollout) error {
 	for _, sharding := range rollout.Spec.Shardings {
 		// target shardingDef & serviceVersion & componentDef
+		if withClusterUserDefined(cluster) && (sharding.ServiceVersion == nil || sharding.CompDef == nil) {
+			return fmt.Errorf("serviceVersion and compDef must be defined for sharding %s when rolling out a user-defined cluster", sharding.Name)
+		}
 		if sharding.ShardingDef == nil && sharding.ServiceVersion == nil && sharding.CompDef == nil {
 			return fmt.Errorf("neither shardingDef, serviceVersion nor compDef is defined for sharding %s", sharding.Name)
 		}
@@ -91,6 +98,35 @@ func (t *rolloutSetupTransformer) shardingPrecheck(rollout *appsv1alpha1.Rollout
 		}
 	}
 	return nil
+}
+
+func withClusterUserDefined(cluster *appsv1.Cluster) bool {
+	if cluster == nil || len(cluster.Spec.ClusterDef) > 0 || len(cluster.Spec.Topology) > 0 {
+		return false
+	}
+	hasDefSet := func(comp appsv1.ClusterComponentSpec, sharding appsv1.ClusterSharding) bool {
+		return len(comp.ComponentDef) > 0 || len(sharding.ShardingDef) > 0
+	}
+	return clusterCompCnt(cluster) == clusterCompCntWithFunc(cluster, hasDefSet)
+}
+
+func clusterCompCnt(cluster *appsv1.Cluster) int {
+	return clusterCompCntWithFunc(cluster, func(appsv1.ClusterComponentSpec, appsv1.ClusterSharding) bool { return true })
+}
+
+func clusterCompCntWithFunc(cluster *appsv1.Cluster, match func(comp appsv1.ClusterComponentSpec, sharding appsv1.ClusterSharding) bool) int {
+	cnt := 0
+	for _, spec := range cluster.Spec.ComponentSpecs {
+		if match(spec, appsv1.ClusterSharding{}) {
+			cnt++
+		}
+	}
+	for _, sharding := range cluster.Spec.Shardings {
+		if match(sharding.Template, sharding) {
+			cnt += int(sharding.Shards)
+		}
+	}
+	return cnt
 }
 
 func (t *rolloutSetupTransformer) checkRolloutStrategy(kind, name string, strategy appsv1alpha1.RolloutStrategy) error {

@@ -1086,6 +1086,7 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Specifies the namespace of the Backup namespace.
 If not specified, the namespace of the OpsRequest will be used.</p>
 </td>
@@ -2874,6 +2875,51 @@ or a single IP family on single-stack clusters.</li>
 <li>&lsquo;RequiredDualStack&rsquo; : The Service requires two IP families on dual-stack configured clusters.
 If the cluster is not configured for dual-stack, the Service creation fails.</li>
 </ul>
+</td>
+</tr>
+<tr>
+<td>
+<code>externalTrafficPolicy</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#serviceexternaltrafficpolicy-v1-core">
+Kubernetes core/v1.ServiceExternalTrafficPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the external traffic policy of the Service. This controls how external traffic is routed to node-local or cluster-wide endpoints.</p>
+<p>Possible values:</p>
+<ul>
+<li><code>Cluster</code> (default for NodePort): Routes external traffic to all ready endpoints of the Service.
+This preserves the original source IP and avoids a second hop for LoadBalancer and NodePort services.</li>
+<li><code>Local</code>: Routes external traffic only to node-local endpoints.
+If no node-local endpoints exist, traffic is dropped. This ensures that the source IP is exposed.</li>
+</ul>
+<p>This field is only applicable to LoadBalancer and NodePort services.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>internalTrafficPolicy</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#serviceinternaltrafficpolicy-v1-core">
+Kubernetes core/v1.ServiceInternalTrafficPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the internal traffic policy of the Service. This controls how traffic from internal sources
+is routed.</p>
+<p>Possible values:</p>
+<ul>
+<li><code>Cluster</code> (default): Routes internal traffic to all ready endpoints of the Service.
+This distributes traffic evenly across all endpoints.</li>
+<li><code>Local</code>: Routes internal traffic only to node-local endpoints.
+If no node-local endpoints exist, traffic is dropped.</li>
+</ul>
+<p>This field can be specified on any Service type.</p>
 </td>
 </tr>
 </tbody>

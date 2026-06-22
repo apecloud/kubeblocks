@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -133,7 +133,7 @@ func (hs horizontalScalingOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli 
 			insReplicas += v.GetReplicas()
 		}
 		if insReplicas > replicas {
-			errMsg := fmt.Sprintf(`the total number of replicas for the instance template can not greater than the number of replicas for component "%s" after horizontally scaling`,
+			errMsg := fmt.Sprintf(`the total number of replicas for the instance template cannot be greater than the number of replicas for component "%s" after horizontally scaling`,
 				horizontalScaling.ComponentName)
 			return intctrlutil.NewFatalError(errMsg)
 		}
@@ -223,6 +223,10 @@ func (hs horizontalScalingOpsHandler) createRestore(reqCtx intctrlutil.RequestCt
 			}
 		}
 		return nil
+	}
+	if len(backupObj.Status.Targets) > 1 {
+		// TODO: support explicit source target selection for scale-out restore from multi-target backups.
+		return intctrlutil.NewFatalError(fmt.Sprintf("scale-out from backup %s/%s is not supported because it has multiple source targets", backupObj.Namespace, backupObj.Name))
 	}
 	// create restore
 	restore, err := restoreMGR.BuildPrepareDataRestore(synthesizedComponent, backupObj, getTemplate(templateName))
@@ -370,8 +374,12 @@ func (hs horizontalScalingOpsHandler) getCreateAndDeletePodSet(opsRes *OpsResour
 	horizontalScaling opsv1alpha1.HorizontalScaling,
 	fullCompName string) (map[string]string, map[string]string, error) {
 	clusterName := opsRes.Cluster.Name
-	lastPodSet, err := generateAllPodNamesToSet(*lastCompConfiguration.Replicas,
-		lastCompConfiguration.Instances, lastCompConfiguration.OfflineInstances, clusterName, fullCompName)
+	runtime, err := opsRes.GetRuntime(horizontalScaling.ComponentName)
+	if err != nil {
+		return nil, nil, err
+	}
+	lastPodSet, err := runtime.GenerateInstanceNameSet(clusterName, fullCompName,
+		*lastCompConfiguration.Replicas, lastCompConfiguration.Instances, lastCompConfiguration.OfflineInstances)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -379,8 +387,8 @@ func (hs horizontalScalingOpsHandler) getCreateAndDeletePodSet(opsRes *OpsResour
 	if err != nil {
 		return nil, nil, err
 	}
-	currPodSet, err := generateAllPodNamesToSet(expectReplicas, expectInstanceTpls,
-		expectOfflineInstances, clusterName, fullCompName)
+	currPodSet, err := runtime.GenerateInstanceNameSet(clusterName, fullCompName,
+		expectReplicas, expectInstanceTpls, expectOfflineInstances)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -482,8 +490,12 @@ func filterHorizontalScalingSpec(
 	compOfflineInstances []string,
 	horizontalScaling *opsv1alpha1.HorizontalScaling) (*opsv1alpha1.HorizontalScaling, error) {
 	offlineInstances := sets.New(compOfflineInstances...)
-	podSet, err := generateAllPodNamesToSet(compReplicas, compInstanceTpls, compOfflineInstances,
-		opsRes.Cluster.Name, horizontalScaling.ComponentName)
+	runtime, err := opsRes.GetRuntime(horizontalScaling.ComponentName)
+	if err != nil {
+		return nil, err
+	}
+	podSet, err := runtime.GenerateInstanceNameSet(opsRes.Cluster.Name, horizontalScaling.ComponentName,
+		compReplicas, compInstanceTpls, compOfflineInstances)
 	if err != nil {
 		return nil, err
 	}
@@ -595,8 +607,12 @@ func (hs horizontalScalingOpsHandler) getToOnlineInsCountMap(
 		}
 	}
 	// 2. obtain the updated Pod set after synchronization replicas.
-	podSet, err := generateAllPodNamesToSet(compReplicas, compInstanceTplsClone, compExpectOfflineInstances,
-		opsRes.Cluster.Name, horizontalScaling.ComponentName)
+	runtime, err := opsRes.GetRuntime(horizontalScaling.ComponentName)
+	if err != nil {
+		return nil, err
+	}
+	podSet, err := runtime.GenerateInstanceNameSet(opsRes.Cluster.Name, horizontalScaling.ComponentName,
+		compReplicas, compInstanceTplsClone, compExpectOfflineInstances)
 	if err != nil {
 		return nil, err
 	}
@@ -694,7 +710,7 @@ func (hs horizontalScalingOpsHandler) validateHorizontalScaling(
 	}
 	if horizontalScaling.ScaleIn != nil {
 		if err := hs.validateOnlineInstancesToOffline(lastCompConfiguration,
-			horizontalScaling.ScaleIn.OnlineInstancesToOffline, opsRes.Cluster.Name, horizontalScaling.ComponentName); err != nil {
+			horizontalScaling.ScaleIn.OnlineInstancesToOffline, opsRes, horizontalScaling.ComponentName); err != nil {
 			return err
 		}
 	}
@@ -710,7 +726,8 @@ func (hs horizontalScalingOpsHandler) validateHorizontalScaling(
 func (hs horizontalScalingOpsHandler) validateOnlineInstancesToOffline(
 	lastCompConfiguration opsv1alpha1.LastComponentConfiguration,
 	onlineInstancesToOffline []string,
-	clusterName, componentName string) error {
+	opsRes *OpsResource,
+	componentName string) error {
 	if len(onlineInstancesToOffline) == 0 {
 		return nil
 	}
@@ -718,8 +735,12 @@ func (hs horizontalScalingOpsHandler) validateOnlineInstancesToOffline(
 	if len(toOfflineSet) < len(onlineInstancesToOffline) {
 		return intctrlutil.NewFatalError("instances specified in onlineInstancesToOffline has duplicates")
 	}
-	currPodSet, err := generateAllPodNamesToSet(*lastCompConfiguration.Replicas, lastCompConfiguration.Instances,
-		lastCompConfiguration.OfflineInstances, clusterName, componentName)
+	runtime, err := opsRes.GetRuntime(componentName)
+	if err != nil {
+		return err
+	}
+	currPodSet, err := runtime.GenerateInstanceNameSet(opsRes.Cluster.Name, componentName,
+		*lastCompConfiguration.Replicas, lastCompConfiguration.Instances, lastCompConfiguration.OfflineInstances)
 	if err != nil {
 		return err
 	}

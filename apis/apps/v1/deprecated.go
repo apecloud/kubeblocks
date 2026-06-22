@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -40,18 +40,9 @@ func (r *Cluster) IsStatusUpdating() bool {
 	return !r.IsDeleting() && !r.IsUpdating()
 }
 
-func (r *Cluster) GetComponentByName(componentName string) *ClusterComponentSpec {
-	for _, v := range r.Spec.ComponentSpecs {
-		if v.Name == componentName {
-			return &v
-		}
-	}
-	return nil
-}
-
-func (r *ClusterSpec) GetComponentByName(componentName string) *ClusterComponentSpec {
+func (r *ClusterSpec) GetComponentByName(compName string) *ClusterComponentSpec {
 	for i, v := range r.ComponentSpecs {
-		if v.Name == componentName {
+		if v.Name == compName {
 			return &r.ComponentSpecs[i]
 		}
 	}

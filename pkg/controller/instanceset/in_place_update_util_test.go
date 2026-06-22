@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -45,9 +45,6 @@ var _ = Describe("instance util test", func() {
 			pod := buildRandomPod()
 			restartTime := (metav1.Time{Time: time.Now()}).Format(time.RFC3339)
 			pod.Annotations[constant.RestartAnnotationKey] = restartTime
-			reconfigureKey := "config.kubeblocks.io/restart-foo-bar-config"
-			reconfigureValue := "7cdb79ffdb"
-			pod.Annotations[reconfigureKey] = reconfigureValue
 			podTemplate := &corev1.PodTemplateSpec{
 				ObjectMeta: pod.ObjectMeta,
 				Spec:       pod.Spec,
@@ -56,8 +53,6 @@ var _ = Describe("instance util test", func() {
 			result := filterInPlaceFields(podTemplate)
 			Expect(result.Annotations).Should(HaveKey(constant.RestartAnnotationKey))
 			Expect(result.Annotations[constant.RestartAnnotationKey]).Should(Equal(restartTime))
-			Expect(result.Annotations).Should(HaveKey(reconfigureKey))
-			Expect(result.Annotations[reconfigureKey]).Should(Equal(reconfigureValue))
 			Expect(result.Labels).Should(BeNil())
 			Expect(result.Spec.ActiveDeadlineSeconds).Should(BeNil())
 			Expect(result.Spec.Tolerations).Should(BeNil())
@@ -95,12 +90,58 @@ var _ = Describe("instance util test", func() {
 		})
 	})
 
+	Context("container image comparison", func() {
+		It("ignores registry rewrites but keeps tag, digest, and basename strict", func() {
+			oldPod := buildRandomPod()
+			newPod := oldPod.DeepCopy()
+			oldPod.Spec.Containers[0].Image = "172.31.255.3:5000/apecloud/redis:8.4.0"
+			newPod.Spec.Containers[0].Image = "192.168.173.140:6451/apecloud/redis:8.4.0"
+			oldPod.Spec.InitContainers[0].Image = "172.31.255.3:5000/apecloud/kbagent:1.0.3-beta.5"
+			newPod.Spec.InitContainers[0].Image = "192.168.173.140:6451/apecloud/kbagent:1.0.3-beta.5"
+
+			its := builder.NewInstanceSetBuilder(namespace, name).
+				SetPodUpdatePolicy(kbappsv1.ReCreatePodUpdatePolicyType).
+				SetPodUpgradePolicy(kbappsv1.PreferInPlacePodUpdatePolicyType).
+				GetObject()
+
+			Expect(equalBasicInPlaceFields(oldPod, newPod)).Should(BeTrue())
+			Expect(getPodUpdatePolicyInSpec(its, oldPod, newPod)).Should(Equal(kbappsv1.ReCreatePodUpdatePolicyType))
+
+			By("tag mismatch")
+			tagChangedPod := newPod.DeepCopy()
+			tagChangedPod.Spec.Containers[0].Image = "192.168.173.140:6451/apecloud/redis:8.4.1"
+			Expect(equalBasicInPlaceFields(oldPod, tagChangedPod)).Should(BeFalse())
+			Expect(getPodUpdatePolicyInSpec(its, oldPod, tagChangedPod)).Should(Equal(kbappsv1.PreferInPlacePodUpdatePolicyType))
+
+			By("init container tag mismatch")
+			initTagChangedPod := newPod.DeepCopy()
+			initTagChangedPod.Spec.InitContainers[0].Image = "192.168.173.140:6451/apecloud/kbagent:1.0.3-beta.6"
+			Expect(equalBasicInPlaceFields(oldPod, initTagChangedPod)).Should(BeFalse())
+			Expect(getPodUpdatePolicyInSpec(its, oldPod, initTagChangedPod)).Should(Equal(kbappsv1.PreferInPlacePodUpdatePolicyType))
+
+			By("digest mismatch")
+			digestChangedPod := newPod.DeepCopy()
+			oldPod.Spec.Containers[0].Image = "172.31.255.3:5000/apecloud/redis:8.4.0@sha256:old"
+			digestChangedPod.Spec.Containers[0].Image = "192.168.173.140:6451/apecloud/redis:8.4.0@sha256:new"
+			Expect(equalBasicInPlaceFields(oldPod, digestChangedPod)).Should(BeFalse())
+			Expect(getPodUpdatePolicyInSpec(its, oldPod, digestChangedPod)).Should(Equal(kbappsv1.PreferInPlacePodUpdatePolicyType))
+
+			By("basename mismatch")
+			basenameChangedPod := newPod.DeepCopy()
+			oldPod.Spec.Containers[0].Image = "172.31.255.3:5000/apecloud/redis:8.4.0"
+			basenameChangedPod.Spec.Containers[0].Image = "192.168.173.140:6451/apecloud/redis-stack:8.4.0"
+			Expect(equalBasicInPlaceFields(oldPod, basenameChangedPod)).Should(BeFalse())
+			Expect(getPodUpdatePolicyInSpec(its, oldPod, basenameChangedPod)).Should(Equal(kbappsv1.PreferInPlacePodUpdatePolicyType))
+		})
+	})
+
 	Context("getPodUpdatePolicy", func() {
 		It("should work well", func() {
 			By("build an updated pod")
 			randStr := rand.String(16)
 			key := randStr
 			podTemplate := template.DeepCopy()
+			podTemplate.Spec.Containers[0].Image = "192.168.173.140:6451/apecloud/redis:8.4.0"
 			mergeMap(&map[string]string{key: randStr}, &podTemplate.Annotations)
 			mergeMap(&map[string]string{key: randStr}, &podTemplate.Labels)
 			its = builder.NewInstanceSetBuilder(namespace, name).
@@ -141,7 +182,15 @@ var _ = Describe("instance util test", func() {
 			Expect(objects).Should(HaveLen(3))
 			pod1, ok := objects[0].(*corev1.Pod)
 			Expect(ok).Should(BeTrue())
-			policy, specPolicy, err := getPodUpdatePolicy(its, pod1)
+			policy, specPolicy, _, err := getPodUpdatePolicy(its, pod1)
+			Expect(err).Should(BeNil())
+			Expect(policy).Should(Equal(noOpsPolicy))
+			Expect(specPolicy).Should(Equal(kbappsv1.PodUpdatePolicyType("")))
+
+			By("build a pod with registry rewritten by admission")
+			podWithRewrittenRegistry := pod1.DeepCopy()
+			podWithRewrittenRegistry.Spec.Containers[0].Image = "172.31.255.3:5000/apecloud/redis:8.4.0"
+			policy, specPolicy, _, err = getPodUpdatePolicy(its, podWithRewrittenRegistry)
 			Expect(err).Should(BeNil())
 			Expect(policy).Should(Equal(noOpsPolicy))
 			Expect(specPolicy).Should(Equal(kbappsv1.PodUpdatePolicyType("")))
@@ -161,16 +210,18 @@ var _ = Describe("instance util test", func() {
 			})
 			pod2.Labels[appsv1.ControllerRevisionHashLabelKey] = "new-revision"
 			its.Status.UpdateRevisions[pod2.Name] = getPodRevision(pod2)
-			policy, specPolicy, err = getPodUpdatePolicy(its, pod2)
+			var reason string
+			policy, specPolicy, reason, err = getPodUpdatePolicy(its, pod2)
 			Expect(err).Should(BeNil())
 			Expect(policy).Should(Equal(recreatePolicy))
 			Expect(specPolicy).Should(Equal(kbappsv1.PreferInPlacePodUpdatePolicyType))
+			Expect(reason).Should(Equal("revision update"))
 
 			By("build a pod without revision updated, with basic mutable fields updated")
 			pod3 := pod1.DeepCopy()
 			randStr = rand.String(16)
 			mergeMap(&map[string]string{key: randStr}, &pod3.Annotations)
-			policy, specPolicy, err = getPodUpdatePolicy(its, pod3)
+			policy, specPolicy, _, err = getPodUpdatePolicy(its, pod3)
 			Expect(err).Should(BeNil())
 			Expect(policy).Should(Equal(inPlaceUpdatePolicy))
 			Expect(specPolicy).Should(Equal(kbappsv1.ReCreatePodUpdatePolicyType))
@@ -182,10 +233,11 @@ var _ = Describe("instance util test", func() {
 				corev1.ResourceCPU: resource.MustParse(fmt.Sprintf("%dm", randInt)),
 			}
 			pod4.Spec.Containers[0].Resources.Requests = requests
-			policy, specPolicy, err = getPodUpdatePolicy(its, pod4)
+			policy, specPolicy, reason, err = getPodUpdatePolicy(its, pod4)
 			Expect(err).Should(BeNil())
 			Expect(policy).Should(Equal(recreatePolicy))
 			Expect(specPolicy).Should(Equal(kbappsv1.ReCreatePodUpdatePolicyType))
+			Expect(reason).Should(Equal("resource update"))
 
 			By("build a pod without revision updated, with resources fields updated")
 			pod5 := pod1.DeepCopy()
@@ -194,16 +246,17 @@ var _ = Describe("instance util test", func() {
 				corev1.ResourceCPU: resource.MustParse(fmt.Sprintf("%dm", randInt)),
 			}
 			pod5.Spec.Containers[0].Resources.Requests = requests
-			policy, specPolicy, err = getPodUpdatePolicy(its, pod5)
+			policy, specPolicy, reason, err = getPodUpdatePolicy(its, pod5)
 			Expect(err).Should(BeNil())
 			Expect(policy).Should(Equal(recreatePolicy))
 			Expect(specPolicy).Should(Equal(kbappsv1.ReCreatePodUpdatePolicyType))
+			Expect(reason).Should(Equal("resource update"))
 
 			By("build a pod without revision updated, with resources fields updated, with IgnorePodVerticalScaling enabled")
 			ignorePodVerticalScaling := viper.GetBool(FeatureGateIgnorePodVerticalScaling)
 			defer viper.Set(FeatureGateIgnorePodVerticalScaling, ignorePodVerticalScaling)
 			viper.Set(FeatureGateIgnorePodVerticalScaling, true)
-			policy, specPolicy, err = getPodUpdatePolicy(its, pod5)
+			policy, specPolicy, _, err = getPodUpdatePolicy(its, pod5)
 			Expect(err).Should(BeNil())
 			Expect(policy).Should(Equal(noOpsPolicy))
 			Expect(specPolicy).Should(Equal(kbappsv1.PodUpdatePolicyType("")))
@@ -226,7 +279,7 @@ var _ = Describe("instance util test", func() {
 			ignorePodVerticalScaling = viper.GetBool(FeatureGateIgnorePodVerticalScaling)
 			defer viper.Set(FeatureGateIgnorePodVerticalScaling, ignorePodVerticalScaling)
 			viper.Set(FeatureGateIgnorePodVerticalScaling, false)
-			policy, specPolicy, err = getPodUpdatePolicy(its, pod6)
+			policy, specPolicy, _, err = getPodUpdatePolicy(its, pod6)
 			Expect(err).Should(BeNil())
 			Expect(policy).Should(Equal(inPlaceUpdatePolicy))
 			Expect(specPolicy).Should(Equal(kbappsv1.PreferInPlacePodUpdatePolicyType))

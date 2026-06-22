@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -69,6 +69,11 @@ func main() {
 	}
 	opts.BindFlags(flag.CommandLine)
 	klog.InitFlags(nil)
+	// Opt into the new klog behavior so that -stderrthreshold is honored even
+	// when -logtostderr=true (the default).
+	// Ref: kubernetes/klog#212, kubernetes/klog#432
+	flag.Set("legacy_stderr_threshold_behavior", "false") //nolint:errcheck
+	flag.Set("stderrthreshold", "INFO")                   //nolint:errcheck
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
 	err := viper.BindPFlags(pflag.CommandLine)

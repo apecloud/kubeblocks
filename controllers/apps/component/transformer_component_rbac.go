@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -34,12 +34,12 @@ import (
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -173,7 +173,7 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 		}
 	}
 
-	t.rbacInstanceAssistantObjects(graphCli, dag, objs)
+	t.rbacInstanceAssistantObjects(synthesizedComp, objs)
 
 	return nil
 }
@@ -211,12 +211,13 @@ func (t *componentRBACTransformer) handleRBACNewRule(transCtx *componentTransfor
 		}
 	}
 
-	t.rbacInstanceAssistantObjects(graphCli, dag, objs)
+	t.rbacInstanceAssistantObjects(synthesizedComp, objs)
+
 	return nil
 }
 
 func createOrUpdateRoleBindingNew(transCtx *componentTransformContext,
-	cmpd *appsv1.ComponentDefinition, serviceAccountName string, graphCli model.GraphClient, dag *graph.DAG) ([]*rbacv1.RoleBinding, error) {
+	cmpd *kbappsv1.ComponentDefinition, serviceAccountName string, graphCli model.GraphClient, dag *graph.DAG) ([]*rbacv1.RoleBinding, error) {
 	cmpRoleBinding := func(old, new *rbacv1.RoleBinding) bool {
 		return labelAndAnnotationEqual(old, new) &&
 			equality.Semantic.DeepEqual(old.Subjects, new.Subjects) &&
@@ -226,7 +227,7 @@ func createOrUpdateRoleBindingNew(transCtx *componentTransformContext,
 
 	if len(cmpd.Spec.PolicyRules) != 0 {
 		// cluster role is handled by cmpd controller
-		cmpdRoleBinding := factory.BuildRoleBinding(transCtx.SynthesizeComponent, serviceAccountName, &rbacv1.RoleRef{
+		cmpdRoleBinding := buildRoleBinding(transCtx.SynthesizeComponent, serviceAccountName, &rbacv1.RoleRef{
 			APIGroup: rbacv1.GroupName,
 			Kind:     "ClusterRole",
 			Name:     constant.GenerateDefaultRoleName(cmpd.Name),
@@ -242,7 +243,7 @@ func createOrUpdateRoleBindingNew(transCtx *componentTransformContext,
 	}
 
 	if isLifecycleActionsEnabled(transCtx.CompDef) {
-		clusterPodRoleBinding := factory.BuildRoleBinding(
+		clusterPodRoleBinding := buildRoleBinding(
 			transCtx.SynthesizeComponent,
 			fmt.Sprintf("%v-pod", serviceAccountName),
 			&rbacv1.RoleRef{
@@ -265,11 +266,9 @@ func createOrUpdateRoleBindingNew(transCtx *componentTransformContext,
 	return res, nil
 }
 
-func (t *componentRBACTransformer) rbacInstanceAssistantObjects(graphCli model.GraphClient, dag *graph.DAG, objs []client.Object) {
-	itsList := graphCli.FindAll(dag, &workloads.InstanceSet{})
-	for _, itsObj := range itsList {
-		its := itsObj.(*workloads.InstanceSet)
-		component.AddInstanceAssistantObjectsToITS(its, objs...)
+func (t *componentRBACTransformer) rbacInstanceAssistantObjects(synthesizedComp *component.SynthesizedComponent, objs []client.Object) {
+	for _, obj := range objs {
+		component.AddInstanceAssistantObject(synthesizedComp, obj)
 	}
 }
 
@@ -341,7 +340,7 @@ func createOrUpdateServiceAccount(transCtx *componentTransformContext,
 	serviceAccountName string, graphCli model.GraphClient, dag *graph.DAG) (*corev1.ServiceAccount, error) {
 	synthesizedComp := transCtx.SynthesizeComponent
 
-	sa := factory.BuildServiceAccount(synthesizedComp, serviceAccountName)
+	sa := buildServiceAccount(synthesizedComp, serviceAccountName)
 	if err := intctrlutil.SetOwnership(transCtx.Component, sa, model.GetScheme(), ""); err != nil {
 		return nil, err
 	}
@@ -354,7 +353,7 @@ func createOrUpdateServiceAccount(transCtx *componentTransformContext,
 }
 
 func createOrUpdateRole(transCtx *componentTransformContext, graphCli model.GraphClient, dag *graph.DAG) (*rbacv1.Role, error) {
-	role := factory.BuildRole(transCtx.SynthesizeComponent, transCtx.CompDef)
+	role := buildRole(transCtx.SynthesizeComponent, transCtx.CompDef)
 	if role == nil {
 		return nil, nil
 	}
@@ -377,7 +376,7 @@ func createOrUpdateRoleBinding(transCtx *componentTransformContext,
 	res := make([]*rbacv1.RoleBinding, 0)
 
 	if cmpdRole != nil {
-		cmpdRoleBinding := factory.BuildRoleBinding(transCtx.SynthesizeComponent, serviceAccountName, &rbacv1.RoleRef{
+		cmpdRoleBinding := buildRoleBinding(transCtx.SynthesizeComponent, serviceAccountName, &rbacv1.RoleRef{
 			APIGroup: rbacv1.GroupName,
 			Kind:     "Role",
 			Name:     cmpdRole.Name,
@@ -393,7 +392,7 @@ func createOrUpdateRoleBinding(transCtx *componentTransformContext,
 	}
 
 	if isLifecycleActionsEnabled(transCtx.CompDef) {
-		clusterPodRoleBinding := factory.BuildRoleBinding(
+		clusterPodRoleBinding := buildRoleBinding(
 			transCtx.SynthesizeComponent,
 			fmt.Sprintf("%v-pod", serviceAccountName),
 			&rbacv1.RoleRef{
@@ -416,6 +415,42 @@ func createOrUpdateRoleBinding(transCtx *componentTransformContext,
 	return res, nil
 }
 
-func isLifecycleActionsEnabled(compDef *appsv1.ComponentDefinition) bool {
+func buildServiceAccount(synthesizedComp *component.SynthesizedComponent, saName string) *corev1.ServiceAccount {
+	return builder.NewServiceAccountBuilder(synthesizedComp.Namespace, saName).
+		AddLabelsInMap(synthesizedComp.StaticLabels).
+		AddLabelsInMap(constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name)).
+		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
+		SetImagePullSecrets(intctrlutil.BuildImagePullSecrets()).
+		GetObject()
+}
+
+func buildRoleBinding(synthesizedComp *component.SynthesizedComponent, name string, roleRef *rbacv1.RoleRef, saName string) *rbacv1.RoleBinding {
+	return builder.NewRoleBindingBuilder(synthesizedComp.Namespace, name).
+		AddLabelsInMap(synthesizedComp.StaticLabels).
+		AddLabelsInMap(constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name)).
+		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
+		SetRoleRef(*roleRef).
+		AddSubjects(rbacv1.Subject{
+			Kind:      rbacv1.ServiceAccountKind,
+			Namespace: synthesizedComp.Namespace,
+			Name:      saName,
+		}).
+		GetObject()
+}
+
+func buildRole(synthesizedComp *component.SynthesizedComponent, cmpd *kbappsv1.ComponentDefinition) *rbacv1.Role {
+	rules := cmpd.Spec.PolicyRules
+	if len(rules) == 0 {
+		return nil
+	}
+	return builder.NewRoleBuilder(synthesizedComp.Namespace, constant.GenerateDefaultRoleName(cmpd.Name)).
+		AddLabelsInMap(synthesizedComp.StaticLabels).
+		AddLabelsInMap(constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name)).
+		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
+		AddPolicyRules(rules).
+		GetObject()
+}
+
+func isLifecycleActionsEnabled(compDef *kbappsv1.ComponentDefinition) bool {
 	return compDef.Spec.LifecycleActions != nil
 }

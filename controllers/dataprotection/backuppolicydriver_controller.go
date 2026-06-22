@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -737,12 +737,12 @@ func (r *backupPolicyAndScheduleBuilder) buildTargetPodLabels(role string, fullC
 
 // generateBackupPolicyName generates the backup policy name which is created from backup policy template.
 func generateBackupPolicyName(clusterName, componentName string) string {
-	return fmt.Sprintf("%s-%s-backup-policy", clusterName, componentName)
+	return constant.ShortenKubeName(fmt.Sprintf("%s-%s-backup-policy", clusterName, componentName), constant.KubeNameMaxLength)
 }
 
 // generateBackupScheduleName generates the backup schedule name which is created from backup policy template.
 func generateBackupScheduleName(clusterName, componentName string) string {
-	return fmt.Sprintf("%s-%s-backup-schedule", clusterName, componentName)
+	return constant.ShortenKubeName(fmt.Sprintf("%s-%s-backup-schedule", clusterName, componentName), constant.KubeNameMaxLength)
 }
 
 func buildBackupPathPrefix(cluster *appsv1.Cluster, compName string) string {

@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -58,7 +58,7 @@ func (s *newReplicaTask) run(ctx context.Context) (chan error, error) {
 		return nil, err
 	}
 
-	return nonBlockingCallActionX(ctx, action, s.task.Parameters, &action.TimeoutSeconds, conn, nil, nil)
+	return nonBlockingCallActionX(ctx, action, s.task.Parameters, nil, &action.TimeoutSeconds, conn, nil, nil)
 }
 
 func (s *newReplicaTask) status(ctx context.Context, event *proto.TaskEvent) {

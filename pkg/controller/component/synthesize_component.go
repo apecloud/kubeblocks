@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -22,6 +22,7 @@ package component
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strconv"
 
 	"github.com/pkg/errors"
@@ -476,25 +477,41 @@ func buildFileTemplates(synthesizedComp *SynthesizedComponent, compDef *appsv1.C
 }
 
 func synthesizeFileTemplate(comp *appsv1.Component, tpl appsv1.ComponentFileTemplate, config bool) SynthesizedFileTemplate {
-	merge := func(tpl SynthesizedFileTemplate, utpl appsv1.ClusterComponentConfig) SynthesizedFileTemplate {
-		tpl.Variables = utpl.Variables
+	merge := func(stpl SynthesizedFileTemplate, utpl appsv1.ClusterComponentConfig) SynthesizedFileTemplate {
 		if utpl.ConfigMap != nil {
-			tpl.Namespace = comp.Namespace
-			tpl.Template = utpl.ConfigMap.Name
-		}
-		tpl.Reconfigure = utpl.Reconfigure // custom reconfigure action
-		if utpl.ExternalManaged != nil {
-			tpl.ExternalManaged = utpl.ExternalManaged
+			stpl.Namespace = comp.Namespace
+			stpl.Template = utpl.ConfigMap.Name
 		}
 
-		if tpl.ExternalManaged != nil && *tpl.ExternalManaged {
-			if utpl.ConfigMap == nil {
-				// reset the template and wait the external system to provision it.
-				tpl.Namespace = ""
-				tpl.Template = ""
+		stpl.Variables = utpl.Variables
+		stpl.ConfigHash = utpl.ConfigHash
+		stpl.ReconfigureArgs = utpl.ReconfigureArgs
+
+		// if restartOnFileChange is not specified as required, use the user specified value
+		if !ptr.Deref(stpl.RestartOnFileChange, false) {
+			stpl.RestartOnFileChange = utpl.Restart
+		}
+
+		if utpl.Reconfigure != nil {
+			stpl.ReconfigureRequired = utpl.Reconfigure
+			if !*utpl.Reconfigure {
+				stpl.Reconfigure = nil
 			}
 		}
-		return tpl
+		stpl.ReconfigureAction = utpl.ReconfigureAction
+
+		// if externalManaged is not specified as required, use the user specified value
+		if !ptr.Deref(stpl.ExternalManaged, false) {
+			stpl.ExternalManaged = utpl.ExternalManaged
+		}
+		if ptr.Deref(stpl.ExternalManaged, false) {
+			if utpl.ConfigMap == nil {
+				// reset the template and wait the external system to provision it.
+				stpl.Namespace = ""
+				stpl.Template = ""
+			}
+		}
+		return stpl
 	}
 
 	stpl := SynthesizedFileTemplate{
@@ -502,14 +519,15 @@ func synthesizeFileTemplate(comp *appsv1.Component, tpl appsv1.ComponentFileTemp
 		Config:                config,
 	}
 	if config {
-		for _, utpl := range comp.Spec.Configs {
-			if utpl.Name != nil && *utpl.Name == tpl.Name {
-				return merge(stpl, utpl)
-			}
+		i := slices.IndexFunc(comp.Spec.Configs, func(c appsv1.ClusterComponentConfig) bool {
+			return ptr.Deref(c.Name, "") == tpl.Name
+		})
+		if i >= 0 {
+			return merge(stpl, comp.Spec.Configs[i])
 		}
 		return merge(stpl, appsv1.ClusterComponentConfig{})
 	}
-	return stpl
+	return stpl // script
 }
 
 func buildRuntimeClassName(synthesizeComp *SynthesizedComponent, comp *appsv1.Component) {

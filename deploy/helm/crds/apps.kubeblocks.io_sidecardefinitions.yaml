@@ -2,7 +2,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.14.0
+    controller-gen.kubebuilder.io/version: v0.18.0
   labels:
     app.kubernetes.io/name: kubeblocks
   name: sidecardefinitions.apps.kubeblocks.io
@@ -64,7 +64,6 @@ spec:
                 description: |-
                   Specifies the configuration file templates used by the Sidecar.
 
-
                   This field is immutable.
                 items:
                   properties:
@@ -72,11 +71,9 @@ spec:
                       description: |-
                         The operator attempts to set default file permissions (0444).
 
-
                         Must be specified as an octal value between 0000 and 0777 (inclusive),
                         or as a decimal value between 0 and 511 (inclusive).
                         YAML supports both octal and decimal values for file permissions.
-
 
                         Please note that this setting only affects the permissions of the files themselves.
                         Directories within the specified path are not impacted by this setting.
@@ -88,10 +85,11 @@ spec:
                       type: integer
                     externalManaged:
                       description: |-
-                        ExternalManaged specifies whether the file management is delegated to an external system or manual user control.
+                        ExternalManaged specifies whether the file management is delegated to an external system.
 
-
-                        When set to true, the controller will ignore the management of this file.
+                        When set to true, the apps controller will ignore the rendering and lifecycle management of
+                        this file. A ConfigMap source for this template is accepted only when the referenced ConfigMap
+                        carries the common KubeBlocks component labels.
                       type: boolean
                     name:
                       description: Specifies the name of the template.
@@ -109,28 +107,21 @@ spec:
                       description: |-
                         Defines the procedure that reloads the file when it's content changes.
 
-
                         If specified, this action overrides the global reconfigure action defined in lifecycle actions
                         for this specific file template.
-
-
-                        When @restartOnFileChange is set to true, this action will be ignored.
-
+                        External-managed systems may define different behavior for this action entry.
 
                         The container executing this action has access to following variables:
-
 
                         - KB_CONFIG_FILES_CREATED: file1,file2...
                         - KB_CONFIG_FILES_REMOVED: file1,file2...
                         - KB_CONFIG_FILES_UPDATED: file1:checksum1,file2:checksum2...
-
 
                         Note: This field is immutable once it has been set.
                       properties:
                         exec:
                           description: |-
                             Defines the command to run.
-
 
                             This field cannot be updated.
                           properties:
@@ -147,7 +138,6 @@ spec:
                                 Commands are executed directly without a shell environment, meaning shell-specific syntax ('|', etc.) is not supported.
                                 If the shell is required, it must be explicitly invoked in the command.
 
-
                                 A successful execution is indicated by an exit status of 0; any non-zero status signifies a failure.
                               items:
                                 type: string
@@ -157,15 +147,11 @@ spec:
                                 Specifies the name of the container within the same pod whose resources will be shared with the action.
                                 This allows the action to utilize the specified container's resources without executing within it.
 
-
                                 The name must match one of the containers defined in `componentDefinition.spec.runtime`.
-
 
                                 The resources that can be shared are included:
 
-
                                 - volume mounts
-
 
                                 This field cannot be updated.
                               type: string
@@ -173,7 +159,6 @@ spec:
                               description: |-
                                 Represents a list of environment variables that will be injected into the container.
                                 These variables enable the container to adapt its behavior based on the environment it's running in.
-
 
                                 This field cannot be updated.
                               items:
@@ -210,7 +195,6 @@ spec:
                                             description: |-
                                               Name of the referent.
                                               More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                              TODO: Add other useful fields. apiVersion, kind, uid?
                                             type: string
                                           optional:
                                             description: Specify whether the ConfigMap
@@ -276,7 +260,6 @@ spec:
                                             description: |-
                                               Name of the referent.
                                               More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                              TODO: Add other useful fields. apiVersion, kind, uid?
                                             type: string
                                           optional:
                                             description: Specify whether the Secret
@@ -295,10 +278,8 @@ spec:
                               description: |-
                                 Specifies the container image to be used for running the Action.
 
-
                                 When specified, a dedicated container will be created using this image to execute the Action.
                                 All actions with same image will share the same container.
-
 
                                 This field cannot be updated.
                               type: string
@@ -307,11 +288,12 @@ spec:
                                 Used in conjunction with the `targetPodSelector` field to refine the selection of target pod(s) for Action execution.
                                 The impact of this field depends on the `targetPodSelector` value:
 
-
                                 - When `targetPodSelector` is set to `Any` or `All`, this field will be ignored.
                                 - When `targetPodSelector` is set to `Role`, only those replicas whose role matches the `matchingKey`
                                   will be selected for the Action.
-
+                                - When `targetPodSelector` is set to `Ordinal`, `matchingKey` must be a non-negative integer
+                                  and only the replica whose Pod name ends with `-<matchingKey>` will be selected for the Action.
+                                  The selector is considered ambiguous and the action fails if multiple Pods share the same ordinal.
 
                                 This field cannot be updated.
                               type: string
@@ -321,11 +303,9 @@ spec:
                                 This is useful when there is no default target replica identified.
                                 It allows for precise control over which Pod(s) the Action should run in.
 
-
                                 If not specified, the Action will be executed in the pod where the Action is triggered, such as the pod
                                 to be removed or added; or a random pod if the Action is triggered at the component level, such as
                                 post-provision or pre-terminate of the component.
-
 
                                 This field cannot be updated.
                               enum:
@@ -338,7 +318,6 @@ spec:
                         grpc:
                           description: |-
                             Defines the gRPC call to issue.
-
 
                             This field cannot be updated.
                           properties:
@@ -361,7 +340,6 @@ spec:
                                 type: string
                               description: |-
                                 Request payload for the gRPC method.
-
 
                                 Keys are proto field names (lowerCamelCase); values are strings that can include Go templates.
                                 Templates are rendered with predefined action variables before the request is sent.
@@ -393,13 +371,11 @@ spec:
                           description: |-
                             Defines the HTTP request to perform.
 
-
                             This field cannot be updated.
                           properties:
                             body:
                               description: |-
                                 Optional HTTP request body.
-
 
                                 Supports Go text/template syntax; rendered with predefined variables before sending.
                               type: string
@@ -469,11 +445,12 @@ spec:
                             Used in conjunction with the `targetPodSelector` field to refine the selection of target pod(s) for Action execution.
                             The impact of this field depends on the `targetPodSelector` value:
 
-
                             - When `targetPodSelector` is set to `Any` or `All`, this field will be ignored.
                             - When `targetPodSelector` is set to `Role`, only those replicas whose role matches the `matchingKey`
                               will be selected for the Action.
-
+                            - When `targetPodSelector` is set to `Ordinal`, `matchingKey` must be a non-negative integer
+                              and only the replica whose Pod name ends with `-<matchingKey>` will be selected for the Action.
+                              The selector is considered ambiguous and the action fails if multiple Pods share the same ordinal.
 
                             This field cannot be updated.
                           type: string
@@ -482,9 +459,7 @@ spec:
                             Specifies the state that the cluster must reach before the Action is executed.
                             Currently, this is only applicable to the `postProvision` action.
 
-
                             The conditions are as follows:
-
 
                             - `Immediately`: Executed right after the Component object is created.
                               The readiness of the Component and its resources is not guaranteed at this stage.
@@ -495,17 +470,14 @@ spec:
                             - `ClusterReady`: The Action is executed after the Cluster is in a ready state.
                               This execution does not alter the Component or the Cluster's state of readiness.
 
-
                             This field cannot be updated.
                           type: string
                         retryPolicy:
                           description: |-
                             Defines the strategy to be taken when retrying the Action after a failure.
 
-
                             It specifies the conditions under which the Action should be retried and the limits to apply,
                             such as the maximum number of retries and backoff strategy.
-
 
                             This field cannot be updated.
                           properties:
@@ -529,11 +501,9 @@ spec:
                             This is useful when there is no default target replica identified.
                             It allows for precise control over which Pod(s) the Action should run in.
 
-
                             If not specified, the Action will be executed in the pod where the Action is triggered, such as the pod
                             to be removed or added; or a random pod if the Action is triggered at the component level, such as
                             post-provision or pre-terminate of the component.
-
 
                             This field cannot be updated.
                           enum:
@@ -547,12 +517,10 @@ spec:
                           description: |-
                             Specifies the maximum duration in seconds that the Action is allowed to run.
 
-
                             Behavior based on the value:
                             - Positive (> 0): The action will be terminated after this many seconds. The maximum allowed value is 60.
                             - Zero (= 0): The timeout is managed by the system, defaulting to 30 seconds typically.
                             - Negative (< 0): No timeout is applied; the action runs until the command completes.
-
 
                             This field cannot be updated.
                           format: int32
@@ -568,6 +536,33 @@ spec:
                       maxLength: 63
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
+                    variables:
+                      description: |-
+                        Declares the user-configurable variables supported by this file template.
+
+                        This field is used for API discovery so users can inspect the ComponentDefinition and learn which
+                        variables are accepted by `cluster.spec.componentSpecs[*].configs[*].variables` without reading the
+                        template content directly.
+                      items:
+                        description: FileTemplateVariable declares a user-configurable
+                          variable supported by a file template.
+                        properties:
+                          defaultValue:
+                            description: Specifies the default value used.
+                            type: string
+                          description:
+                            description: Provides a human-readable explanation of
+                              the variable's purpose.
+                            type: string
+                          name:
+                            description: |-
+                              Specifies the variable name that can be referenced from the file template and set by users
+                              through `cluster.spec.componentSpecs[*].configs[*].variables`.
+                            type: string
+                        required:
+                        - name
+                        type: object
+                      type: array
                     volumeName:
                       description: |-
                         Refers to the volume name of PodTemplate. The file produced through the template will be mounted to
@@ -583,7 +578,6 @@ spec:
               containers:
                 description: |-
                   List of containers for the sidecar.
-
 
                   Cannot be updated.
                 items:
@@ -654,7 +648,6 @@ spec:
                                     description: |-
                                       Name of the referent.
                                       More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                      TODO: Add other useful fields. apiVersion, kind, uid?
                                     type: string
                                   optional:
                                     description: Specify whether the ConfigMap or
@@ -717,7 +710,6 @@ spec:
                                     description: |-
                                       Name of the referent.
                                       More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                      TODO: Add other useful fields. apiVersion, kind, uid?
                                     type: string
                                   optional:
                                     description: Specify whether the Secret or its
@@ -751,7 +743,6 @@ spec:
                                 description: |-
                                   Name of the referent.
                                   More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                  TODO: Add other useful fields. apiVersion, kind, uid?
                                 type: string
                               optional:
                                 description: Specify whether the ConfigMap must be
@@ -770,7 +761,6 @@ spec:
                                 description: |-
                                   Name of the referent.
                                   More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                  TODO: Add other useful fields. apiVersion, kind, uid?
                                 type: string
                               optional:
                                 description: Specify whether the Secret must be defined
@@ -1049,10 +1039,10 @@ spec:
                               format: int32
                               type: integer
                             service:
+                              default: ""
                               description: |-
                                 Service is the name of the service to place in the gRPC HealthCheckRequest
                                 (see https://github.com/grpc/grpc/blob/master/doc/health-checking.md).
-
 
                                 If this is not specified, the default behavior is defined by gRPC.
                               type: string
@@ -1259,10 +1249,10 @@ spec:
                               format: int32
                               type: integer
                             service:
+                              default: ""
                               description: |-
                                 Service is the name of the service to place in the gRPC HealthCheckRequest
                                 (see https://github.com/grpc/grpc/blob/master/doc/health-checking.md).
-
 
                                 If this is not specified, the default behavior is defined by gRPC.
                               type: string
@@ -1410,10 +1400,8 @@ spec:
                             Claims lists the names of resources, defined in spec.resourceClaims,
                             that are used by this container.
 
-
                             This is an alpha field and requires enabling the
                             DynamicResourceAllocation feature gate.
-
 
                             This field is immutable. It can only be set for containers.
                           items:
@@ -1604,7 +1592,6 @@ spec:
                                 type indicates which kind of seccomp profile will be applied.
                                 Valid options are:
 
-
                                 Localhost - a profile defined in a file on the node should be used.
                                 RuntimeDefault - the container runtime default profile should be used.
                                 Unconfined - no profile should be applied.
@@ -1684,10 +1671,10 @@ spec:
                               format: int32
                               type: integer
                             service:
+                              default: ""
                               description: |-
                                 Service is the name of the service to place in the gRPC HealthCheckRequest
                                 (see https://github.com/grpc/grpc/blob/master/doc/health-checking.md).
-
 
                                 If this is not specified, the default behavior is defined by gRPC.
                               type: string
@@ -1927,18 +1914,15 @@ spec:
                 description: |-
                   Specifies the component definition that the sidecar belongs to.
 
-
                   For a specific cluster object, if there is any components provided by the component definition of @owner,
                   the sidecar will be created and injected into the components which are provided by
                   the component definition of @selectors automatically.
-
 
                   This field is immutable.
                 type: string
               scripts:
                 description: |-
                   Specifies the scripts used by the Sidecar.
-
 
                   This field is immutable.
                 items:
@@ -1947,11 +1931,9 @@ spec:
                       description: |-
                         The operator attempts to set default file permissions (0444).
 
-
                         Must be specified as an octal value between 0000 and 0777 (inclusive),
                         or as a decimal value between 0 and 511 (inclusive).
                         YAML supports both octal and decimal values for file permissions.
-
 
                         Please note that this setting only affects the permissions of the files themselves.
                         Directories within the specified path are not impacted by this setting.
@@ -1963,10 +1945,11 @@ spec:
                       type: integer
                     externalManaged:
                       description: |-
-                        ExternalManaged specifies whether the file management is delegated to an external system or manual user control.
+                        ExternalManaged specifies whether the file management is delegated to an external system.
 
-
-                        When set to true, the controller will ignore the management of this file.
+                        When set to true, the apps controller will ignore the rendering and lifecycle management of
+                        this file. A ConfigMap source for this template is accepted only when the referenced ConfigMap
+                        carries the common KubeBlocks component labels.
                       type: boolean
                     name:
                       description: Specifies the name of the template.
@@ -1984,28 +1967,21 @@ spec:
                       description: |-
                         Defines the procedure that reloads the file when it's content changes.
 
-
                         If specified, this action overrides the global reconfigure action defined in lifecycle actions
                         for this specific file template.
-
-
-                        When @restartOnFileChange is set to true, this action will be ignored.
-
+                        External-managed systems may define different behavior for this action entry.
 
                         The container executing this action has access to following variables:
-
 
                         - KB_CONFIG_FILES_CREATED: file1,file2...
                         - KB_CONFIG_FILES_REMOVED: file1,file2...
                         - KB_CONFIG_FILES_UPDATED: file1:checksum1,file2:checksum2...
-
 
                         Note: This field is immutable once it has been set.
                       properties:
                         exec:
                           description: |-
                             Defines the command to run.
-
 
                             This field cannot be updated.
                           properties:
@@ -2022,7 +1998,6 @@ spec:
                                 Commands are executed directly without a shell environment, meaning shell-specific syntax ('|', etc.) is not supported.
                                 If the shell is required, it must be explicitly invoked in the command.
 
-
                                 A successful execution is indicated by an exit status of 0; any non-zero status signifies a failure.
                               items:
                                 type: string
@@ -2032,15 +2007,11 @@ spec:
                                 Specifies the name of the container within the same pod whose resources will be shared with the action.
                                 This allows the action to utilize the specified container's resources without executing within it.
 
-
                                 The name must match one of the containers defined in `componentDefinition.spec.runtime`.
-
 
                                 The resources that can be shared are included:
 
-
                                 - volume mounts
-
 
                                 This field cannot be updated.
                               type: string
@@ -2048,7 +2019,6 @@ spec:
                               description: |-
                                 Represents a list of environment variables that will be injected into the container.
                                 These variables enable the container to adapt its behavior based on the environment it's running in.
-
 
                                 This field cannot be updated.
                               items:
@@ -2085,7 +2055,6 @@ spec:
                                             description: |-
                                               Name of the referent.
                                               More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                              TODO: Add other useful fields. apiVersion, kind, uid?
                                             type: string
                                           optional:
                                             description: Specify whether the ConfigMap
@@ -2151,7 +2120,6 @@ spec:
                                             description: |-
                                               Name of the referent.
                                               More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                              TODO: Add other useful fields. apiVersion, kind, uid?
                                             type: string
                                           optional:
                                             description: Specify whether the Secret
@@ -2170,10 +2138,8 @@ spec:
                               description: |-
                                 Specifies the container image to be used for running the Action.
 
-
                                 When specified, a dedicated container will be created using this image to execute the Action.
                                 All actions with same image will share the same container.
-
 
                                 This field cannot be updated.
                               type: string
@@ -2182,11 +2148,12 @@ spec:
                                 Used in conjunction with the `targetPodSelector` field to refine the selection of target pod(s) for Action execution.
                                 The impact of this field depends on the `targetPodSelector` value:
 
-
                                 - When `targetPodSelector` is set to `Any` or `All`, this field will be ignored.
                                 - When `targetPodSelector` is set to `Role`, only those replicas whose role matches the `matchingKey`
                                   will be selected for the Action.
-
+                                - When `targetPodSelector` is set to `Ordinal`, `matchingKey` must be a non-negative integer
+                                  and only the replica whose Pod name ends with `-<matchingKey>` will be selected for the Action.
+                                  The selector is considered ambiguous and the action fails if multiple Pods share the same ordinal.
 
                                 This field cannot be updated.
                               type: string
@@ -2196,11 +2163,9 @@ spec:
                                 This is useful when there is no default target replica identified.
                                 It allows for precise control over which Pod(s) the Action should run in.
 
-
                                 If not specified, the Action will be executed in the pod where the Action is triggered, such as the pod
                                 to be removed or added; or a random pod if the Action is triggered at the component level, such as
                                 post-provision or pre-terminate of the component.
-
 
                                 This field cannot be updated.
                               enum:
@@ -2213,7 +2178,6 @@ spec:
                         grpc:
                           description: |-
                             Defines the gRPC call to issue.
-
 
                             This field cannot be updated.
                           properties:
@@ -2236,7 +2200,6 @@ spec:
                                 type: string
                               description: |-
                                 Request payload for the gRPC method.
-
 
                                 Keys are proto field names (lowerCamelCase); values are strings that can include Go templates.
                                 Templates are rendered with predefined action variables before the request is sent.
@@ -2268,13 +2231,11 @@ spec:
                           description: |-
                             Defines the HTTP request to perform.
 
-
                             This field cannot be updated.
                           properties:
                             body:
                               description: |-
                                 Optional HTTP request body.
-
 
                                 Supports Go text/template syntax; rendered with predefined variables before sending.
                               type: string
@@ -2344,11 +2305,12 @@ spec:
                             Used in conjunction with the `targetPodSelector` field to refine the selection of target pod(s) for Action execution.
                             The impact of this field depends on the `targetPodSelector` value:
 
-
                             - When `targetPodSelector` is set to `Any` or `All`, this field will be ignored.
                             - When `targetPodSelector` is set to `Role`, only those replicas whose role matches the `matchingKey`
                               will be selected for the Action.
-
+                            - When `targetPodSelector` is set to `Ordinal`, `matchingKey` must be a non-negative integer
+                              and only the replica whose Pod name ends with `-<matchingKey>` will be selected for the Action.
+                              The selector is considered ambiguous and the action fails if multiple Pods share the same ordinal.
 
                             This field cannot be updated.
                           type: string
@@ -2357,9 +2319,7 @@ spec:
                             Specifies the state that the cluster must reach before the Action is executed.
                             Currently, this is only applicable to the `postProvision` action.
 
-
                             The conditions are as follows:
-
 
                             - `Immediately`: Executed right after the Component object is created.
                               The readiness of the Component and its resources is not guaranteed at this stage.
@@ -2370,17 +2330,14 @@ spec:
                             - `ClusterReady`: The Action is executed after the Cluster is in a ready state.
                               This execution does not alter the Component or the Cluster's state of readiness.
 
-
                             This field cannot be updated.
                           type: string
                         retryPolicy:
                           description: |-
                             Defines the strategy to be taken when retrying the Action after a failure.
 
-
                             It specifies the conditions under which the Action should be retried and the limits to apply,
                             such as the maximum number of retries and backoff strategy.
-
 
                             This field cannot be updated.
                           properties:
@@ -2404,11 +2361,9 @@ spec:
                             This is useful when there is no default target replica identified.
                             It allows for precise control over which Pod(s) the Action should run in.
 
-
                             If not specified, the Action will be executed in the pod where the Action is triggered, such as the pod
                             to be removed or added; or a random pod if the Action is triggered at the component level, such as
                             post-provision or pre-terminate of the component.
-
 
                             This field cannot be updated.
                           enum:
@@ -2422,12 +2377,10 @@ spec:
                           description: |-
                             Specifies the maximum duration in seconds that the Action is allowed to run.
 
-
                             Behavior based on the value:
                             - Positive (> 0): The action will be terminated after this many seconds. The maximum allowed value is 60.
                             - Zero (= 0): The timeout is managed by the system, defaulting to 30 seconds typically.
                             - Negative (< 0): No timeout is applied; the action runs until the command completes.
-
 
                             This field cannot be updated.
                           format: int32
@@ -2443,6 +2396,33 @@ spec:
                       maxLength: 63
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
+                    variables:
+                      description: |-
+                        Declares the user-configurable variables supported by this file template.
+
+                        This field is used for API discovery so users can inspect the ComponentDefinition and learn which
+                        variables are accepted by `cluster.spec.componentSpecs[*].configs[*].variables` without reading the
+                        template content directly.
+                      items:
+                        description: FileTemplateVariable declares a user-configurable
+                          variable supported by a file template.
+                        properties:
+                          defaultValue:
+                            description: Specifies the default value used.
+                            type: string
+                          description:
+                            description: Provides a human-readable explanation of
+                              the variable's purpose.
+                            type: string
+                          name:
+                            description: |-
+                              Specifies the variable name that can be referenced from the file template and set by users
+                              through `cluster.spec.componentSpecs[*].configs[*].variables`.
+                            type: string
+                        required:
+                        - name
+                        type: object
+                      type: array
                     volumeName:
                       description: |-
                         Refers to the volume name of PodTemplate. The file produced through the template will be mounted to
@@ -2459,7 +2439,6 @@ spec:
                 description: |-
                   Specifies the component definition of components that the sidecar along with.
 
-
                   This field is immutable.
                 items:
                   type: string
@@ -2468,7 +2447,6 @@ spec:
               vars:
                 description: |-
                   Defines variables which are needed by the sidecar.
-
 
                   This field is immutable.
                 items:
@@ -2479,19 +2457,15 @@ spec:
                       description: |-
                         A Go template expression that will be applied to the resolved value of the var.
 
-
                         The expression will only be evaluated if the var is successfully resolved to a non-credential value.
-
 
                         The resolved value can be accessed by its name within the expression, system vars and other user-defined
                         non-credential vars can be used within the expression in the same way.
                         Notice that, when accessing vars by its name, you should replace all the "-" in the name with "_", because of
                         that "-" is not a valid identifier in Go.
 
-
                         All expressions are evaluated in the order the vars are defined. If a var depends on any vars that also
                         have expressions defined, be careful about the evaluation order as it may use intermediate values.
-
 
                         The result of evaluation will be used as the final value of the var. If the expression fails to evaluate,
                         the resolving of var will also be considered failed.
@@ -2503,13 +2477,10 @@ spec:
                       description: |-
                         Variable references `$(VAR_NAME)` are expanded using the previously defined variables in the current context.
 
-
                         If a variable cannot be resolved, the reference in the input string will be unchanged.
                         Double `$$` are reduced to a single `$`, which allows for escaping the `$(VAR_NAME)` syntax: i.e.
 
-
                         - `$$(VAR_NAME)` will produce the string literal `$(VAR_NAME)`.
-
 
                         Escaped references will never be expanded, regardless of whether the variable exists or not.
                         Defaults to "".
@@ -2548,7 +2519,6 @@ spec:
                               description: |-
                                 Specifies the exact name, name prefix, or regular expression pattern for matching the name of the ComponentDefinition
                                 custom resource (CR) used by the component that the referent object resident in.
-
 
                                 If not specified, the component itself will be used.
                               type: string
@@ -2697,7 +2667,6 @@ spec:
                               description: |-
                                 Name of the referent.
                                 More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                TODO: Add other useful fields. apiVersion, kind, uid?
                               type: string
                             optional:
                               description: Specify whether the ConfigMap or its key
@@ -2714,7 +2683,6 @@ spec:
                               description: |-
                                 Specifies the exact name, name prefix, or regular expression pattern for matching the name of the ComponentDefinition
                                 custom resource (CR) used by the component that the referent object resident in.
-
 
                                 If not specified, the component itself will be used.
                               type: string
@@ -2801,7 +2769,6 @@ spec:
                               description: |-
                                 Specifies the exact name, name prefix, or regular expression pattern for matching the name of the ComponentDefinition
                                 custom resource (CR) used by the component that the referent object resident in.
-
 
                                 If not specified, the component itself will be used.
                               type: string
@@ -2897,7 +2864,6 @@ spec:
                               description: |-
                                 Specifies the exact name, name prefix, or regular expression pattern for matching the name of the ComponentDefinition
                                 custom resource (CR) used by the component that the referent object resident in.
-
 
                                 If not specified, the component itself will be used.
                               type: string
@@ -3014,7 +2980,6 @@ spec:
                               description: |-
                                 Name of the referent.
                                 More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                TODO: Add other useful fields. apiVersion, kind, uid?
                               type: string
                             optional:
                               description: Specify whether the Secret or its key must
@@ -3031,7 +2996,6 @@ spec:
                               description: |-
                                 Specifies the exact name, name prefix, or regular expression pattern for matching the name of the ComponentDefinition
                                 custom resource (CR) used by the component that the referent object resident in.
-
 
                                 If not specified, the component itself will be used.
                               type: string
@@ -3147,7 +3111,6 @@ spec:
                                 Specifies the exact name, name prefix, or regular expression pattern for matching the name of the ComponentDefinition
                                 custom resource (CR) used by the component that the referent object resident in.
 
-
                                 If not specified, the component itself will be used.
                               type: string
                             host:
@@ -3160,7 +3123,6 @@ spec:
                             loadBalancer:
                               description: |-
                                 LoadBalancer represents the LoadBalancer ingress point of the service.
-
 
                                 If multiple ingress points are available, the first one will be used automatically, choosing between IP and Hostname.
                               enum:
@@ -3232,7 +3194,6 @@ spec:
                               description: |-
                                 Port references a port or node-port defined in the service.
 
-
                                 If the referenced service is a pod-service, there will be multiple service objects matched,
                                 and the value will be presented in the following format: service1.name:port1,service2.name:port2...
                               properties:
@@ -3261,7 +3222,6 @@ spec:
                               description: |-
                                 Specifies the exact name, name prefix, or regular expression pattern for matching the name of the ComponentDefinition
                                 custom resource (CR) used by the component that the referent object resident in.
-
 
                                 If not specified, the component itself will be used.
                               type: string

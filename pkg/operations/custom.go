@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -40,6 +40,8 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
+// CustomOpsHandler is intentionally not covered by OpsRuntime.
+// It still executes against concrete Pod/Job/ConfigMap/Secret resources.
 type CustomOpsHandler struct{}
 
 var _ OpsHandler = CustomOpsHandler{}
@@ -155,11 +157,11 @@ func (c CustomOpsHandler) checkExpression(reqCtx intctrlutil.RequestCtx,
 		return err
 	}
 	for _, comp := range comps {
-		params, err := covertParametersToMap(reqCtx.Ctx, cli, compCustomItem.Parameters, opsRes.OpsRequest.Namespace)
+		params, err := convertParametersToMap(reqCtx.Ctx, cli, compCustomItem.Parameters, opsRes.OpsRequest.Namespace)
 		if err != nil {
 			return err
 		}
-		// get the built-in objects and covert the json tag
+		// get the built-in objects and convert the json tag
 		getBuiltInObjs := func() (map[string]interface{}, error) {
 			b, err := json.Marshal(map[string]interface{}{
 				"cluster":    opsRes.Cluster,
@@ -236,7 +238,7 @@ func (c CustomOpsHandler) initCompActionStatusAndPreCheck(reqCtx intctrlutil.Req
 	return 0, true
 }
 
-func covertParametersToMap(ctx context.Context,
+func convertParametersToMap(ctx context.Context,
 	cli client.Client,
 	parameters []opsv1alpha1.Parameter,
 	opsNamespace string) (map[string]string, error) {
@@ -300,7 +302,7 @@ func validateAndGetCompSpec(cluster *appsv1.Cluster, opsDef *opsv1alpha1.OpsDefi
 	}
 	shardingSpec := cluster.Spec.GetShardingByName(componentName)
 	if shardingSpec == nil {
-		return nil, intctrlutil.NewFatalError(fmt.Sprintf(`cannot found the component "%s" in cluster "%s"`, componentName, cluster.Name))
+		return nil, intctrlutil.NewFatalError(fmt.Sprintf(`cannot find the component "%s" in cluster "%s"`, componentName, cluster.Name))
 	}
 	if len(opsDef.Spec.PodInfoExtractors) == 0 {
 		return nil, intctrlutil.NewFatalError(fmt.Sprintf(`podInfoExtractors cannot be empty in opsDef "%s" when the component "%s" is a shard component`, opsDef.Name, componentName))
@@ -326,11 +328,11 @@ func initOpsDefAndValidate(reqCtx intctrlutil.RequestCtx,
 	for _, v := range customSpec.CustomOpsComponents {
 		// 1. validate OpenApV3Schema
 		if parametersSchema != nil {
-			paramsMap, err := covertParametersToMap(reqCtx.Ctx, cli, v.Parameters, opsRes.OpsRequest.Namespace)
+			paramsMap, err := convertParametersToMap(reqCtx.Ctx, cli, v.Parameters, opsRes.OpsRequest.Namespace)
 			if err != nil {
 				return err
 			}
-			// covert to type map[string]interface{}
+			// convert to type map[string]interface{}
 			params, err := common.ConvertStringToInterfaceBySchemaType(parametersSchema.OpenAPIV3Schema, paramsMap)
 			if err != nil {
 				return intctrlutil.NewFatalError(err.Error())

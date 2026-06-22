@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -21,8 +21,6 @@ package parameters
 
 import (
 	"slices"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
@@ -62,14 +60,6 @@ func ParametersDefinitionTerminalPhases(status parametersv1alpha1.ParametersDefi
 	return status.ObservedGeneration == generation && status.Phase == parametersv1alpha1.PDAvailablePhase
 }
 
-func ParametersDrivenConfigRenderTerminalPhases(status parametersv1alpha1.ParamConfigRendererStatus, generation int64) bool {
-	return status.ObservedGeneration == generation && status.Phase == parametersv1alpha1.PDAvailablePhase
-}
-
-func ParametersTerminalPhases(status parametersv1alpha1.ParameterStatus, generation int64) bool {
-	return status.ObservedGeneration == generation && IsParameterFinished(status.Phase)
-}
-
 func IsParameterFinished(phase parametersv1alpha1.ParameterPhase) bool {
 	return slices.Contains([]parametersv1alpha1.ParameterPhase{
 		parametersv1alpha1.CFinishedPhase,
@@ -97,40 +87,6 @@ func GetItemStatus(status *parametersv1alpha1.ComponentParameterStatus, name str
 	return nil
 }
 
-func GetParameter(spec *parametersv1alpha1.ParameterSpec, component string) *parametersv1alpha1.ComponentParametersSpec {
-	match := func(status parametersv1alpha1.ComponentParametersSpec) bool {
-		return status.ComponentName == component
-	}
-
-	if index := generics.FindFirstFunc(spec.ComponentParameters, match); index >= 0 {
-		return &spec.ComponentParameters[index]
-	}
-	return nil
-
-}
-
-func GetParameterStatus(status *parametersv1alpha1.ParameterStatus, name string) *parametersv1alpha1.ComponentReconfiguringStatus {
-	match := func(status parametersv1alpha1.ComponentReconfiguringStatus) bool {
-		return status.ComponentName == name
-	}
-
-	if index := generics.FindFirstFunc(status.ReconfiguringStatus, match); index >= 0 {
-		return &status.ReconfiguringStatus[index]
-	}
-	return nil
-}
-
-func GetParameterReconfiguringStatus(status *parametersv1alpha1.ComponentReconfiguringStatus, name string) *parametersv1alpha1.ReconfiguringStatus {
-	match := func(status parametersv1alpha1.ReconfiguringStatus) bool {
-		return status.Name == name
-	}
-
-	if index := generics.FindFirstFunc(status.ParameterStatus, match); index >= 0 {
-		return &status.ParameterStatus[index]
-	}
-	return nil
-}
-
 func GetConfigTemplateItem(parameterSpec *parametersv1alpha1.ComponentParameterSpec, name string) *parametersv1alpha1.ConfigTemplateItemDetail {
 	match := func(spec parametersv1alpha1.ConfigTemplateItemDetail) bool {
 		return spec.Name == name
@@ -140,33 +96,4 @@ func GetConfigTemplateItem(parameterSpec *parametersv1alpha1.ComponentParameterS
 		return &parameterSpec.ConfigItemDetails[index]
 	}
 	return nil
-}
-
-func GetComponentConfigDescription(pdcr *parametersv1alpha1.ParamConfigRendererSpec, name string) *parametersv1alpha1.ComponentConfigDescription {
-	match := func(desc parametersv1alpha1.ComponentConfigDescription) bool {
-		return desc.Name == name
-	}
-
-	if index := generics.FindFirstFunc(pdcr.Configs, match); index >= 0 {
-		return &pdcr.Configs[index]
-	}
-	return nil
-}
-
-func GetComponentConfigDescriptions(pdcr *parametersv1alpha1.ParamConfigRendererSpec, tpl string) []parametersv1alpha1.ComponentConfigDescription {
-	match := func(desc parametersv1alpha1.ComponentConfigDescription) bool {
-		return desc.TemplateName == tpl
-	}
-	return generics.FindFunc(pdcr.Configs, match)
-}
-
-func GetPodSelector(pd *parametersv1alpha1.ParametersDefinitionSpec) *metav1.LabelSelector {
-	if pd.ReloadAction != nil {
-		return pd.ReloadAction.TargetPodSelector
-	}
-	return nil
-}
-
-func AsSidecarContainerImage(toolImage parametersv1alpha1.ToolConfig) bool {
-	return toolImage.AsContainerImage != nil && *toolImage.AsContainerImage
 }

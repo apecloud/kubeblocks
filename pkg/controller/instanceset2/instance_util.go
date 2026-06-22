@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -21,7 +21,6 @@ package instanceset2
 
 import (
 	"encoding/json"
-	"fmt"
 	"reflect"
 	"sort"
 	"strconv"
@@ -108,18 +107,6 @@ func baseSort(x any, getNameNOrdinalFunc func(i int) (string, int), getRolePrior
 	})
 }
 
-func parseNodeSelectorOnceAnnotation(its *workloads.InstanceSet) (map[string]string, error) {
-	podToNodeMapping := make(map[string]string)
-	data, ok := its.Annotations[constant.NodeSelectorOnceAnnotationKey]
-	if !ok {
-		return podToNodeMapping, nil
-	}
-	if err := json.Unmarshal([]byte(data), &podToNodeMapping); err != nil {
-		return nil, fmt.Errorf("can't unmarshal scheduling information: %w", err)
-	}
-	return podToNodeMapping, nil
-}
-
 func buildInstanceByTemplate(tree *kubebuilderx.ObjectTree,
 	instName string, template *instancetemplate.InstanceTemplateExt, its *workloads.InstanceSet) (*workloads.Instance, error) {
 	labels := getMatchLabels(its.Name)
@@ -138,19 +125,12 @@ func buildInstanceByTemplate(tree *kubebuilderx.ObjectTree,
 		SetPodUpdatePolicy(its.Spec.PodUpdatePolicy).
 		SetPodUpgradePolicy(its.Spec.PodUpgradePolicy).
 		SetRoles(its.Spec.Roles).
-		SetLifecycleActions(its.Spec.LifecycleActions)
+		SetLifecycleActions(its.Spec.LifecycleActions).
+		SetConfigs(its.Spec.Configs)
 
 	// set these immutable fields only on initial Pod creation, not updates.
 	b.SetHostname(instName).
 		SetSubdomain(getHeadlessSvcName(its.Name))
-	podToNodeMapping, err := parseNodeSelectorOnceAnnotation(its)
-	if err != nil {
-		return nil, err
-	}
-	if nodeName, ok := podToNodeMapping[instName]; ok {
-		// don't specify nodeName directly here, because it may affect WaitForFirstConsumer StorageClass
-		b.SetNodeSelector(map[string]string{corev1.LabelHostname: nodeName})
-	}
 
 	for i := range template.VolumeClaimTemplates {
 		b.AddVolumeClaimTemplate(template.VolumeClaimTemplates[i])
@@ -312,6 +292,7 @@ func copyAndMergeInstance(oldInst, newInst *workloads.Instance) *workloads.Insta
 	targetInst.Spec.PodUpgradePolicy = newInst.Spec.PodUpgradePolicy
 	targetInst.Spec.Roles = newInst.Spec.Roles
 	targetInst.Spec.LifecycleActions = newInst.Spec.LifecycleActions
+	targetInst.Spec.Configs = newInst.Spec.Configs
 
 	// object meta
 	mergeMap(&newInst.Labels, &targetInst.Labels)
@@ -417,5 +398,8 @@ func isInstanceUpdated(its *workloads.InstanceSet, inst *workloads.Instance) boo
 	if !ok {
 		return false
 	}
-	return strconv.FormatInt(its.Generation, 10) == generation
+	if strconv.FormatInt(its.Generation, 10) != generation {
+		return false
+	}
+	return inst.Generation == inst.Status.ObservedGeneration && inst.Status.UpToDate
 }

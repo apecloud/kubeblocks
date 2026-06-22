@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -87,9 +87,10 @@ const (
 	ReasonVolumePopulateFailed  = "VolumePopulateFailed"
 
 	// pvc condition type and reason
-	ReasonPopulatingFailed     = "Failed"
-	ReasonPopulatingProcessing = "Processing"
-	ReasonPopulatingSucceed    = "Succeed"
+	ReasonPopulatingFailed      = "Failed"
+	ReasonPopulatingProcessing  = "Processing"
+	ReasonPopulatingSucceed     = "Succeed"
+	ReasonPopulatingProvisioned = "Provisioned"
 
 	PersistentVolumeClaimPopulating corev1.PersistentVolumeClaimConditionType = "Populating"
 )

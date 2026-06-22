@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -173,6 +173,69 @@ var _ = Describe("kb-agent", func() {
 			Expect(c.Env).Should(HaveLen(6)) // 4 + 2
 		})
 
+		It("role label downward api volume", func() {
+			err := buildKBAgentContainer(synthesizedComp)
+			Expect(err).Should(BeNil())
+
+			c := kbAgentContainer()
+			Expect(c).ShouldNot(BeNil())
+			Expect(c.VolumeMounts).Should(ContainElement(roleLabelVolumeMount))
+			Expect(synthesizedComp.PodSpec.Volumes).Should(ContainElement(corev1.Volume{
+				Name: roleLabelVolumeName,
+				VolumeSource: corev1.VolumeSource{
+					DownwardAPI: &corev1.DownwardAPIVolumeSource{
+						Items: []corev1.DownwardAPIVolumeFile{
+							{
+								Path: podRoleLabelFileName,
+								FieldRef: &corev1.ObjectFieldSelector{
+									FieldPath: fmt.Sprintf("metadata.labels['%s']", constant.RoleLabelKey),
+								},
+							},
+						},
+					},
+				},
+			}))
+		})
+
+		It("role label downward api volume conflicts with user volume", func() {
+			synthesizedComp.PodSpec.Volumes = append(synthesizedComp.PodSpec.Volumes, corev1.Volume{
+				Name: roleLabelVolumeName,
+				VolumeSource: corev1.VolumeSource{
+					EmptyDir: &corev1.EmptyDirVolumeSource{},
+				},
+			})
+
+			err := buildKBAgentContainer(synthesizedComp)
+			Expect(err).Should(MatchError(ContainSubstring("conflicts with kbagent role label volume")))
+		})
+
+		It("role probe reports periodically and on role label file change", func() {
+			err := buildKBAgentContainer(synthesizedComp)
+			Expect(err).Should(BeNil())
+
+			c := kbAgentContainer()
+			Expect(c).ShouldNot(BeNil())
+			var val string
+			for _, e := range c.Env {
+				if e.Name == "KB_AGENT_PROBE" {
+					val = e.Value
+				}
+			}
+			Expect(val).ShouldNot(BeEmpty())
+
+			probes := make([]proto.Probe, 0)
+			Expect(json.Unmarshal([]byte(val), &probes)).Should(Succeed())
+			Expect(probes).Should(ContainElement(proto.Probe{
+				Action:              "roleProbe",
+				InitialDelaySeconds: 5,
+				PeriodSeconds:       1,
+				SuccessThreshold:    3,
+				FailureThreshold:    3,
+				ReportPeriodSeconds: minProbeReportPeriodSeconds,
+				ReportOnFileChange:  []string{podMetadataMountPath},
+			}))
+		})
+
 		It("action env", func() {
 			env := []corev1.EnvVar{
 				{
@@ -214,8 +277,9 @@ var _ = Describe("kb-agent", func() {
 			Expect(c).ShouldNot(BeNil())
 			Expect(c.Image).Should(Equal(image))
 			Expect(c.Command[0]).Should(Equal(kbAgentCommandOnSharedMount))
-			Expect(c.VolumeMounts).Should(HaveLen(1))
+			Expect(c.VolumeMounts).Should(HaveLen(2))
 			Expect(c.VolumeMounts[0]).Should(Equal(sharedVolumeMount))
+			Expect(c.VolumeMounts[1]).Should(Equal(roleLabelVolumeMount))
 		})
 
 		It("custom image - two same images", func() {
@@ -252,7 +316,8 @@ var _ = Describe("kb-agent", func() {
 			Expect(c).ShouldNot(BeNil())
 			Expect(c.Image).Should(Equal(viperx.GetString(constant.KBToolsImage)))
 			Expect(c.Command[0]).Should(Equal(kbAgentCommand))
-			Expect(c.VolumeMounts).Should(HaveLen(0))
+			Expect(c.VolumeMounts).Should(HaveLen(1))
+			Expect(c.VolumeMounts[0]).Should(Equal(roleLabelVolumeMount))
 		})
 
 		It("custom container - volume mounts", func() {
@@ -270,8 +335,9 @@ var _ = Describe("kb-agent", func() {
 
 			c := kbAgentContainer()
 			Expect(c).ShouldNot(BeNil())
-			Expect(c.VolumeMounts).Should(HaveLen(1))
+			Expect(c.VolumeMounts).Should(HaveLen(2))
 			Expect(c.VolumeMounts[0]).Should(Equal(container.VolumeMounts[0]))
+			Expect(c.VolumeMounts[1]).Should(Equal(roleLabelVolumeMount))
 		})
 
 		It("custom container - two same containers", func() {
@@ -328,9 +394,10 @@ var _ = Describe("kb-agent", func() {
 			Expect(c).ShouldNot(BeNil())
 			Expect(c.Image).Should(Equal(container.Image))
 			Expect(c.Command[0]).Should(Equal(kbAgentCommandOnSharedMount))
-			Expect(c.VolumeMounts).Should(HaveLen(2))
+			Expect(c.VolumeMounts).Should(HaveLen(3))
 			Expect(c.VolumeMounts[0]).Should(Equal(sharedVolumeMount))
 			Expect(c.VolumeMounts[1]).Should(Equal(container.VolumeMounts[0]))
+			Expect(c.VolumeMounts[2]).Should(Equal(roleLabelVolumeMount))
 		})
 
 		It("custom image & container - different images", func() {
@@ -355,9 +422,10 @@ var _ = Describe("kb-agent", func() {
 			c := kbAgentContainer()
 			Expect(c.Image).Should(Equal(image))
 			Expect(c.Command[0]).Should(Equal(kbAgentCommandOnSharedMount))
-			Expect(c.VolumeMounts).Should(HaveLen(2))
+			Expect(c.VolumeMounts).Should(HaveLen(3))
 			Expect(c.VolumeMounts[0]).Should(Equal(sharedVolumeMount))
 			Expect(c.VolumeMounts[1]).Should(Equal(container.VolumeMounts[0]))
+			Expect(c.VolumeMounts[2]).Should(Equal(roleLabelVolumeMount))
 		})
 
 		// TODO: host-network
@@ -379,35 +447,40 @@ var _ = Describe("kb-agent", func() {
 					ComponentFileTemplate: appsv1.ComponentFileTemplate{
 						Name:     "log.conf",
 						Template: "default",
-					},
-					Reconfigure: &appsv1.Action{
-						Exec: &appsv1.ExecAction{
-							Env: []corev1.EnvVar{
-								{
-									Name:  "LOG_CONF_PATH",
-									Value: "/var/run/log.conf",
+						Reconfigure: &appsv1.Action{
+							Exec: &appsv1.ExecAction{
+								Env: []corev1.EnvVar{
+									{
+										Name:  "LOG_CONF_PATH",
+										Value: "/var/run/log.conf",
+									},
 								},
+								Command: []string{"echo", "reconfigure"},
 							},
-							Command: []string{"echo", "reconfigure"},
+						},
+					},
+					ReconfigureAction: &appsv1.Action{
+						Exec: &appsv1.ExecAction{
+							Command: []string{"echo", "user-reconfigure"},
 						},
 					},
 				},
 				{
 					ComponentFileTemplate: appsv1.ComponentFileTemplate{
-						Name:            "server.conf",
-						Template:        "default",
-						ExternalManaged: ptr.To(true),
-					},
-					Reconfigure: &appsv1.Action{
-						Exec: &appsv1.ExecAction{
-							Env: []corev1.EnvVar{
-								{
-									Name:  "SERVER_CONF_PATH",
-									Value: "/var/run/server.conf",
+						Name:     "server.conf",
+						Template: "default",
+						Reconfigure: &appsv1.Action{
+							Exec: &appsv1.ExecAction{
+								Env: []corev1.EnvVar{
+									{
+										Name:  "SERVER_CONF_PATH",
+										Value: "/var/run/server.conf",
+									},
 								},
+								Command: []string{"echo", "reconfigure"},
 							},
-							Command: []string{"echo", "reconfigure"},
 						},
+						ExternalManaged: ptr.To(true),
 					},
 				},
 			}
@@ -434,13 +507,19 @@ var _ = Describe("kb-agent", func() {
 				},
 			}))
 			Expect(actions).Should(ContainElement(proto.Action{
-				Name: "udf-reconfigure-log.conf",
+				Name: "udf-reconfigure-cmpd-log.conf",
 				Exec: &proto.ExecAction{
 					Commands: []string{"echo", "reconfigure"},
 				},
 			}))
 			Expect(actions).Should(ContainElement(proto.Action{
-				Name: "udf-reconfigure-server.conf",
+				Name: "udf-reconfigure-user-log.conf",
+				Exec: &proto.ExecAction{
+					Commands: []string{"echo", "user-reconfigure"},
+				},
+			}))
+			Expect(actions).Should(ContainElement(proto.Action{
+				Name: "udf-reconfigure-cmpd-server.conf",
 				Exec: &proto.ExecAction{
 					Commands: []string{"echo", "reconfigure"},
 				},

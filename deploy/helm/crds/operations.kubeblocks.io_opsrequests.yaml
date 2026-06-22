@@ -2,7 +2,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.14.0
+    controller-gen.kubebuilder.io/version: v0.18.0
   labels:
     app.kubernetes.io/name: kubeblocks
   name: opsrequests.operations.kubeblocks.io
@@ -123,11 +123,9 @@ spec:
                     description: |-
                       Determines the duration for which the Backup custom resources should be retained.
 
-
                       The controller will automatically remove all Backup objects that are older than the specified RetentionPeriod.
                       For example, RetentionPeriod of `30d` will keep only the Backup objects of last 30 days.
                       Sample duration format:
-
 
                       - years: 2y
                       - months: 6mo
@@ -135,10 +133,8 @@ spec:
                       - hours: 12h
                       - minutes: 30m
 
-
                       You can also combine the above durations. For example: 30d12h30m.
                       If not set, the Backup objects will be kept forever.
-
 
                       If the `deletionPolicy` is set to 'Delete', then the associated backup data will also be deleted
                       along with the Backup object.
@@ -153,9 +149,7 @@ spec:
                   Indicates whether the current operation should be canceled and terminated gracefully if it's in the
                   "Pending", "Creating", or "Running" state.
 
-
                   This field applies only to "VerticalScaling" and "HorizontalScaling" opsRequests.
-
 
                   Note: Setting `cancel` to true is irreversible; further modifications to this field are ineffective.
                 type: boolean
@@ -207,7 +201,6 @@ spec:
                                         description: |-
                                           Name of the referent.
                                           More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                          TODO: Add other useful fields. apiVersion, kind, uid?
                                         type: string
                                       optional:
                                         description: Specify whether the ConfigMap
@@ -228,7 +221,6 @@ spec:
                                         description: |-
                                           Name of the referent.
                                           More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                          TODO: Add other useful fields. apiVersion, kind, uid?
                                         type: string
                                       optional:
                                         description: Specify whether the Secret or
@@ -264,14 +256,11 @@ spec:
                       Specifies the maximum number of components to be operated on concurrently to mitigate performance impact
                       on clusters with multiple components.
 
-
                       It accepts an absolute number (e.g., 5) or a percentage of components to execute in parallel (e.g., "10%").
                       Percentages are rounded up to the nearest whole number of components.
                       For example, if "10%" results in less than one, it rounds up to 1.
 
-
                       When unspecified, all components are processed simultaneously by default.
-
 
                       Note: This feature is not implemented yet.
                     x-kubernetes-int-or-string: true
@@ -306,7 +295,6 @@ spec:
                         On the other hand, when an OpsService is unexposed, the corresponding ClusterService will be removed
                         from `cluster.spec.services`.
 
-
                         Note: If `componentName` is not specified, the `ports` and `selector` fields must be provided
                         in each OpsService definition.
                       items:
@@ -320,31 +308,51 @@ spec:
                             description: |-
                               Contains cloud provider related parameters if ServiceType is LoadBalancer.
 
-
                               More info: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer.
                             type: object
+                          externalTrafficPolicy:
+                            description: |-
+                              Specifies the external traffic policy of the Service. This controls how external traffic is routed to node-local or cluster-wide endpoints.
+
+                              Possible values:
+
+                              - `Cluster` (default for NodePort): Routes external traffic to all ready endpoints of the Service.
+                                This preserves the original source IP and avoids a second hop for LoadBalancer and NodePort services.
+                              - `Local`: Routes external traffic only to node-local endpoints.
+                                If no node-local endpoints exist, traffic is dropped. This ensures that the source IP is exposed.
+
+                              This field is only applicable to LoadBalancer and NodePort services.
+                            type: string
+                          internalTrafficPolicy:
+                            description: |-
+                              Specifies the internal traffic policy of the Service. This controls how traffic from internal sources
+                              is routed.
+
+                              Possible values:
+
+                              - `Cluster` (default): Routes internal traffic to all ready endpoints of the Service.
+                                This distributes traffic evenly across all endpoints.
+                              - `Local`: Routes internal traffic only to node-local endpoints.
+                                If no node-local endpoints exist, traffic is dropped.
+
+                              This field can be specified on any Service type.
+                            type: string
                           ipFamilies:
                             description: |-
                               A list of IP families (e.g., IPv4, IPv6) assigned to this Service.
-
 
                               Usually assigned automatically based on the cluster configuration and the `ipFamilyPolicy` field.
                               If specified manually, the requested IP family must be available in the cluster and allowed by the `ipFamilyPolicy`.
                               If the requested IP family is not available or not allowed, the Service creation will fail.
 
-
                               Valid values:
-
 
                               - "IPv4"
                               - "IPv6"
 
-
                               This field may hold a maximum of two entries (dual-stack families, in either order).
 
-
                               Common combinations of `ipFamilies` and `ipFamilyPolicy` are:
-
 
                               - ipFamilies=[] + ipFamilyPolicy="PreferDualStack" :
                                 The Service prefers dual-stack but can fall back to single-stack if the cluster does not support dual-stack.
@@ -370,9 +378,7 @@ spec:
                             description: |-
                               Specifies whether the Service should use a single IP family (SingleStack) or two IP families (DualStack).
 
-
                               Possible values:
-
 
                               - 'SingleStack' (default) : The Service uses a single IP family.
                                 If no value is provided, IPFamilyPolicy defaults to SingleStack.
@@ -385,7 +391,6 @@ spec:
                             description: |-
                               Specifies the name of the Service. This name is used to set `clusterService.name`.
 
-
                               Note: This field cannot be updated.
                             type: string
                           podSelector:
@@ -395,7 +400,6 @@ spec:
                               Routes service traffic to pods with matching label keys and values.
                               If specified, the service will only be exposed to pods matching the selector.
 
-
                               Note: If the component has roles, at least one of 'roleSelector' or 'podSelector' must be specified.
                               If both are specified, a pod must match both conditions to be selected.
                             type: object
@@ -404,11 +408,9 @@ spec:
                             description: |-
                               Specifies Port definitions that are to be exposed by a ClusterService.
 
-
                               If not specified, the Port definitions from non-NodePort and non-LoadBalancer type ComponentService
                               defined in the ComponentDefinition (`componentDefinition.spec.services`) will be used.
                               If no matching ComponentService is found, the expose operation will fail.
-
 
                               More info: https://kubernetes.io/docs/concepts/services-networking/service/#field-spec-ports
                             items:
@@ -422,16 +424,13 @@ spec:
                                     This field follows standard Kubernetes label syntax.
                                     Valid values are either:
 
-
                                     * Un-prefixed protocol names - reserved for IANA standard service names (as per
                                     RFC-6335 and https://www.iana.org/assignments/service-names).
-
 
                                     * Kubernetes-defined prefixed names:
                                       * 'kubernetes.io/h2c' - HTTP/2 prior knowledge over cleartext as described in https://www.rfc-editor.org/rfc/rfc9113.html#name-starting-http-2-with-prior-
                                       * 'kubernetes.io/ws'  - WebSocket over cleartext as described in https://www.rfc-editor.org/rfc/rfc6455
                                       * 'kubernetes.io/wss' - WebSocket over TLS as described in https://www.rfc-editor.org/rfc/rfc6455
-
 
                                     * Other protocols should use implementation-defined prefixed names such as
                                     mycompany.com/my-custom-protocol.
@@ -495,7 +494,6 @@ spec:
                               Specifies a role to target with the service.
                               If specified, the service will only be exposed to pods with the matching role.
 
-
                               Note: If the component has roles, at least one of 'roleSelector' or 'podSelector' must be specified.
                               If both are specified, a pod must match both conditions to be selected.
                             type: string
@@ -504,7 +502,6 @@ spec:
                               Determines how the Service is exposed. Defaults to 'ClusterIP'.
                               Valid options are `ClusterIP`, `NodePort`, and `LoadBalancer`.
 
-
                               - `ClusterIP`: allocates a cluster-internal IP address for load-balancing to endpoints.
                                  Endpoints are determined by the selector or if that is not specified,
                                  they are determined by manual construction of an Endpoints object or EndpointSlice objects.
@@ -512,9 +509,7 @@ spec:
                               - `LoadBalancer`: builds on NodePort and creates an external load-balancer (if supported in the current cloud)
                                  which routes to the same endpoints as the clusterIP.
 
-
                               Note: although K8s Service type allows the 'ExternalName' type, it is not a valid option for the expose operation.
-
 
                               For more info, see:
                               https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types.
@@ -542,11 +537,9 @@ spec:
                   and immediately execute the opsRequest, except for the opsRequest of 'Start' type, which will still undergo
                   pre-checks even if `force` is true.
 
-
                   This is useful for concurrent execution of 'VerticalScaling' and 'HorizontalScaling' opsRequests.
                   By setting `force` to true, you can bypass the default checks and demand these opsRequests to run
                   simultaneously.
-
 
                   Note: Once set, the `force` field is immutable and cannot be updated.
                 type: boolean
@@ -634,9 +627,7 @@ spec:
                                 Defines container environment variables for the restore process.
                                 merged with the ones specified in the Backup and ActionSet resources.
 
-
                                 Merge priority: Restore env > Backup env > ActionSet env.
-
 
                                 Purpose: Some databases require different configurations when being restored as a standby
                                 compared to being restored as a primary.
@@ -678,7 +669,6 @@ spec:
                                             description: |-
                                               Name of the referent.
                                               More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                              TODO: Add other useful fields. apiVersion, kind, uid?
                                             type: string
                                           optional:
                                             description: Specify whether the ConfigMap
@@ -744,7 +734,6 @@ spec:
                                             description: |-
                                               Name of the referent.
                                               More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                              TODO: Add other useful fields. apiVersion, kind, uid?
                                             type: string
                                           optional:
                                             description: Specify whether the Secret
@@ -764,7 +753,6 @@ spec:
                               description: |-
                                 Specifies the point in time to which the restore should be performed.
                                 Supported time formats:
-
 
                                 - RFC3339 format, e.g. "2023-11-25T18:52:53Z"
                                 - A human-readable date-time format, e.g. "Jul 25,2023 18:52:53 UTC+0800"
@@ -859,7 +847,6 @@ spec:
                                               description: |-
                                                 Name of the referent.
                                                 More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                                TODO: Add other useful fields. apiVersion, kind, uid?
                                               type: string
                                             optional:
                                               description: Specify whether the ConfigMap
@@ -926,7 +913,6 @@ spec:
                                               description: |-
                                                 Name of the referent.
                                                 More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                                TODO: Add other useful fields. apiVersion, kind, uid?
                                               type: string
                                             optional:
                                               description: Specify whether the Secret
@@ -962,7 +948,6 @@ spec:
                                   Specifies the desired Ordinals of this InstanceTemplate.
                                   The Ordinals used to specify the ordinal of the instance (pod) names to be generated under this InstanceTemplate.
                                   If Ordinals are defined, their number must be equal to or more than the corresponding replicas.
-
 
                                   For example, if Ordinals is {ranges: [{start: 0, end: 1}], discrete: [7]},
                                   then the instance names generated under this InstanceTemplate would be
@@ -1012,10 +997,8 @@ spec:
                                       Claims lists the names of resources, defined in spec.resourceClaims,
                                       that are used by this container.
 
-
                                       This is an alpha field and requires enabling the
                                       DynamicResourceAllocation feature gate.
-
 
                                       This field is immutable. It can only be set for containers.
                                     items:
@@ -2020,10 +2003,8 @@ spec:
                                       Each toleration in the array allows the Pod to tolerate node taints based on
                                       specified `key`, `value`, `effect`, and `operator`.
 
-
                                       - The `key`, `value`, and `effect` identify the taint that the toleration matches.
                                       - The `operator` determines how the toleration matches the taint.
-
 
                                       Pods with matching tolerations are allowed to be scheduled on tainted nodes, typically reserved for specific purposes.
                                     items:
@@ -2133,7 +2114,6 @@ spec:
                                             Keys that don't exist in the incoming pod labels will
                                             be ignored. A null or empty list means only match against labelSelector.
 
-
                                             This is a beta field and requires the MatchLabelKeysInPodTopologySpread feature gate to be enabled (enabled by default).
                                           items:
                                             type: string
@@ -2173,7 +2153,6 @@ spec:
                                             Valid values are integers greater than 0.
                                             When value is not nil, WhenUnsatisfiable must be DoNotSchedule.
 
-
                                             For example, in a 3-zone cluster, MaxSkew is set to 2, MinDomains is set to 5 and pods with the same
                                             labelSelector spread as 2/2/2:
                                             | zone1 | zone2 | zone3 |
@@ -2182,7 +2161,6 @@ spec:
                                             In this situation, new pod with the same labelSelector cannot be scheduled,
                                             because computed skew will be 3(3 - 0) if new Pod is scheduled to any of the three zones,
                                             it will violate MaxSkew.
-
 
                                             This is a beta field and requires the MinDomainsInPodTopologySpread feature gate to be enabled (enabled by default).
                                           format: int32
@@ -2194,7 +2172,6 @@ spec:
                                             - Honor: only nodes matching nodeAffinity/nodeSelector are included in the calculations.
                                             - Ignore: nodeAffinity/nodeSelector are ignored. All nodes are included in the calculations.
 
-
                                             If this value is nil, the behavior is equivalent to the Honor policy.
                                             This is a beta-level feature default enabled by the NodeInclusionPolicyInPodTopologySpread feature flag.
                                           type: string
@@ -2205,7 +2182,6 @@ spec:
                                             - Honor: nodes without taints, along with tainted nodes for which the incoming pod
                                             has a toleration, are included.
                                             - Ignore: node taints are ignored. All nodes are included.
-
 
                                             If this value is nil, the behavior is equivalent to the Ignore policy.
                                             This is a beta-level feature default enabled by the NodeInclusionPolicyInPodTopologySpread feature flag.
@@ -2278,16 +2254,13 @@ spec:
                                       description: |-
                                         Refers to the name of a volumeMount defined in either:
 
-
                                         - `componentDefinition.spec.runtime.containers[*].volumeMounts`
-
 
                                         The value of `name` must match the `name` field of a volumeMount specified in the corresponding `volumeMounts` array.
                                       type: string
                                     persistentVolumeClaimName:
                                       description: |-
                                         Specifies the prefix of the PVC name for the volume.
-
 
                                         For each replica, the final name of the PVC will be in format: <persistentVolumeClaimName>-<ordinal>
                                       type: string
@@ -2558,7 +2531,6 @@ spec:
                         Indicates the name of the Backup custom resource from which to recover the instance.
                         Defaults to an empty PersistentVolume if unspecified.
 
-
                         Note:
                         - Only full physical backups are supported for multi-replica Components (e.g., 'xtrabackup' for MySQL).
                         - Logical backups (e.g., 'mysqldump' for MySQL) are unsupported in the current version.
@@ -2596,9 +2568,7 @@ spec:
                         Defines container environment variables for the restore process.
                         merged with the ones specified in the Backup and ActionSet resources.
 
-
                         Merge priority: Restore env > Backup env > ActionSet env.
-
 
                         Purpose: Some databases require different configurations when being restored as a standby
                         compared to being restored as a primary.
@@ -2640,7 +2610,6 @@ spec:
                                     description: |-
                                       Name of the referent.
                                       More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                      TODO: Add other useful fields. apiVersion, kind, uid?
                                     type: string
                                   optional:
                                     description: Specify whether the ConfigMap or
@@ -2703,7 +2672,6 @@ spec:
                                     description: |-
                                       Name of the referent.
                                       More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                      TODO: Add other useful fields. apiVersion, kind, uid?
                                     type: string
                                   optional:
                                     description: Specify whether the Secret or its
@@ -2813,11 +2781,9 @@ spec:
                     description: |-
                       Controls the timing of PostReady actions during the recovery process.
 
-
                       If false (default), PostReady actions execute when the Component reaches the "Running" state.
                       If true, PostReady actions are delayed until the entire Cluster is "Running,"
                       ensuring the cluster's overall stability before proceeding.
-
 
                       This setting is useful for coordinating PostReady operations across the Cluster for optimal cluster conditions.
                     type: boolean
@@ -2858,7 +2824,6 @@ spec:
                                   description: |-
                                     Name of the referent.
                                     More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                    TODO: Add other useful fields. apiVersion, kind, uid?
                                   type: string
                                 optional:
                                   description: Specify whether the ConfigMap or its
@@ -2921,7 +2886,6 @@ spec:
                                   description: |-
                                     Name of the referent.
                                     More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                    TODO: Add other useful fields. apiVersion, kind, uid?
                                   type: string
                                 optional:
                                   description: Specify whether the Secret or its key
@@ -2966,7 +2930,6 @@ spec:
                       Specifies the point in time to which the restore should be performed.
                       Supported time formats:
 
-
                       - RFC3339 format, e.g. "2023-11-25T18:52:53Z"
                       - A human-readable date-time format, e.g. "Jul 25,2023 18:52:53 UTC+0800"
                     type: string
@@ -2976,7 +2939,6 @@ spec:
                       Specifies the policy for restoring volume claims of a Component's Pods.
                       It determines whether the volume claims should be restored sequentially (one by one) or in parallel (all at once).
                       Support values:
-
 
                       - "Serial"
                       - "Parallel"
@@ -3093,7 +3055,6 @@ spec:
                   "VerticalScaling", "HorizontalScaling", "VolumeExpansion", "Reconfiguring", "Upgrade", "Backup", "Restore",
                   "Expose", "RebuildInstance", "Custom".
 
-
                   Note: This field is immutable once set.
                 enum:
                 - Upgrade
@@ -3117,7 +3078,6 @@ spec:
               upgrade:
                 description: |-
                   Specifies the desired new version of the Cluster.
-
 
                   Note: This field is immutable once set.
                 properties:
@@ -3176,10 +3136,8 @@ spec:
                         Claims lists the names of resources, defined in spec.resourceClaims,
                         that are used by this container.
 
-
                         This is an alpha field and requires enabling the
                         DynamicResourceAllocation feature gate.
-
 
                         This field is immutable. It can only be set for containers.
                       items:
@@ -3212,10 +3170,8 @@ spec:
                               Claims lists the names of resources, defined in spec.resourceClaims,
                               that are used by this container.
 
-
                               This is an alpha field and requires enabling the
                               DynamicResourceAllocation feature gate.
-
 
                               This field is immutable. It can only be set for containers.
                             items:
@@ -3354,10 +3310,6 @@ spec:
             required:
             - type
             type: object
-            x-kubernetes-validations:
-            - message: forbidden to cancel the opsRequest which type not in ['VerticalScaling','HorizontalScaling']
-              rule: 'has(self.cancel) && self.cancel ? (self.type in [''VerticalScaling'',
-                ''HorizontalScaling'']) : true'
           status:
             description: OpsRequestStatus represents the observed state of an OpsRequest.
             properties:
@@ -3514,16 +3466,8 @@ spec:
                   "VerticalScaling", "HorizontalScaling", "VolumeExpanding", "Reconfigure", "Switchover", "Stopping", "Starting",
                   "VersionUpgrading", "Exposing", "Backup", "InstancesRebuilding", "CustomOperation".
                 items:
-                  description: "Condition contains details for one aspect of the current
-                    state of this API Resource.\n---\nThis struct is intended for
-                    direct use as an array at the field path .status.conditions.  For
-                    example,\n\n\n\ttype FooStatus struct{\n\t    // Represents the
-                    observations of a foo's current state.\n\t    // Known .status.conditions.type
-                    are: \"Available\", \"Progressing\", and \"Degraded\"\n\t    //
-                    +patchMergeKey=type\n\t    // +patchStrategy=merge\n\t    // +listType=map\n\t
-                    \   // +listMapKey=type\n\t    Conditions []metav1.Condition `json:\"conditions,omitempty\"
-                    patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"`\n\n\n\t
-                    \   // other fields\n\t}"
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
                   properties:
                     lastTransitionTime:
                       description: |-
@@ -3564,12 +3508,7 @@ spec:
                       - Unknown
                       type: string
                     type:
-                      description: |-
-                        type of condition in CamelCase or in foo.example.com/CamelCase.
-                        ---
-                        Many .condition.type values are consistent across resources like Available, but because arbitrary conditions can be
-                        useful (see .node.status.conditions), the ability to deconflict is important.
-                        The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
                       maxLength: 316
                       pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
                       type: string
@@ -3605,10 +3544,8 @@ spec:
                             Claims lists the names of resources, defined in spec.resourceClaims,
                             that are used by this container.
 
-
                             This is an alpha field and requires enabling the
                             DynamicResourceAllocation feature gate.
-
 
                             This field is immutable. It can only be set for containers.
                           items:
@@ -3692,7 +3629,6 @@ spec:
                                               description: |-
                                                 Name of the referent.
                                                 More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                                TODO: Add other useful fields. apiVersion, kind, uid?
                                               type: string
                                             optional:
                                               description: Specify whether the ConfigMap
@@ -3759,7 +3695,6 @@ spec:
                                               description: |-
                                                 Name of the referent.
                                                 More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                                TODO: Add other useful fields. apiVersion, kind, uid?
                                               type: string
                                             optional:
                                               description: Specify whether the Secret
@@ -3795,7 +3730,6 @@ spec:
                                   Specifies the desired Ordinals of this InstanceTemplate.
                                   The Ordinals used to specify the ordinal of the instance (pod) names to be generated under this InstanceTemplate.
                                   If Ordinals are defined, their number must be equal to or more than the corresponding replicas.
-
 
                                   For example, if Ordinals is {ranges: [{start: 0, end: 1}], discrete: [7]},
                                   then the instance names generated under this InstanceTemplate would be
@@ -3845,10 +3779,8 @@ spec:
                                       Claims lists the names of resources, defined in spec.resourceClaims,
                                       that are used by this container.
 
-
                                       This is an alpha field and requires enabling the
                                       DynamicResourceAllocation feature gate.
-
 
                                       This field is immutable. It can only be set for containers.
                                     items:
@@ -4853,10 +4785,8 @@ spec:
                                       Each toleration in the array allows the Pod to tolerate node taints based on
                                       specified `key`, `value`, `effect`, and `operator`.
 
-
                                       - The `key`, `value`, and `effect` identify the taint that the toleration matches.
                                       - The `operator` determines how the toleration matches the taint.
-
 
                                       Pods with matching tolerations are allowed to be scheduled on tainted nodes, typically reserved for specific purposes.
                                     items:
@@ -4966,7 +4896,6 @@ spec:
                                             Keys that don't exist in the incoming pod labels will
                                             be ignored. A null or empty list means only match against labelSelector.
 
-
                                             This is a beta field and requires the MatchLabelKeysInPodTopologySpread feature gate to be enabled (enabled by default).
                                           items:
                                             type: string
@@ -5006,7 +4935,6 @@ spec:
                                             Valid values are integers greater than 0.
                                             When value is not nil, WhenUnsatisfiable must be DoNotSchedule.
 
-
                                             For example, in a 3-zone cluster, MaxSkew is set to 2, MinDomains is set to 5 and pods with the same
                                             labelSelector spread as 2/2/2:
                                             | zone1 | zone2 | zone3 |
@@ -5015,7 +4943,6 @@ spec:
                                             In this situation, new pod with the same labelSelector cannot be scheduled,
                                             because computed skew will be 3(3 - 0) if new Pod is scheduled to any of the three zones,
                                             it will violate MaxSkew.
-
 
                                             This is a beta field and requires the MinDomainsInPodTopologySpread feature gate to be enabled (enabled by default).
                                           format: int32
@@ -5027,7 +4954,6 @@ spec:
                                             - Honor: only nodes matching nodeAffinity/nodeSelector are included in the calculations.
                                             - Ignore: nodeAffinity/nodeSelector are ignored. All nodes are included in the calculations.
 
-
                                             If this value is nil, the behavior is equivalent to the Honor policy.
                                             This is a beta-level feature default enabled by the NodeInclusionPolicyInPodTopologySpread feature flag.
                                           type: string
@@ -5038,7 +4964,6 @@ spec:
                                             - Honor: nodes without taints, along with tainted nodes for which the incoming pod
                                             has a toleration, are included.
                                             - Ignore: node taints are ignored. All nodes are included.
-
 
                                             If this value is nil, the behavior is equivalent to the Ignore policy.
                                             This is a beta-level feature default enabled by the NodeInclusionPolicyInPodTopologySpread feature flag.
@@ -5111,16 +5036,13 @@ spec:
                                       description: |-
                                         Refers to the name of a volumeMount defined in either:
 
-
                                         - `componentDefinition.spec.runtime.containers[*].volumeMounts`
-
 
                                         The value of `name` must match the `name` field of a volumeMount specified in the corresponding `volumeMounts` array.
                                       type: string
                                     persistentVolumeClaimName:
                                       description: |-
                                         Specifies the prefix of the PVC name for the volume.
-
 
                                         For each replica, the final name of the PVC will be in format: <persistentVolumeClaimName>-<ordinal>
                                       type: string
@@ -5401,7 +5323,6 @@ spec:
                                 description: |-
                                   Determines how the Service is exposed. Valid options are `ClusterIP`, `NodePort`, and `LoadBalancer`.
 
-
                                   - `ClusterIP` allocates a Cluster-internal IP address for load-balancing to endpoints.
                                      Endpoints are determined by the selector or if that is not specified,
                                      they are determined by manual construction of an Endpoints object or EndpointSlice objects.
@@ -5409,9 +5330,7 @@ spec:
                                   - `LoadBalancer` builds on NodePort and creates an external load-balancer (if supported in the current cloud)
                                      which routes to the same endpoints as the ClusterIP.
 
-
                                   Note: although K8s Service type allows the 'ExternalName' type, it is not a valid option for ClusterComponentService.
-
 
                                   For more info, see:
                                   https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types.

@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -231,7 +231,7 @@ EOF
 		Command:         []string{"sh", "-c"},
 		Args:            []string{createBackupCmd},
 	}
-	intctrlutil.InjectZeroResourcesLimitsIfEmpty(&container)
+	intctrlutil.InjectZeroResourcesLimitsForDataProtection(&container)
 
 	podSpec := &corev1.PodSpec{
 		ServiceAccountName: s.WorkerServiceAccount,

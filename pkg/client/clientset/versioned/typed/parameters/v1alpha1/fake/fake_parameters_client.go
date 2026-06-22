@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -38,6 +38,10 @@ func (c *FakeParametersV1alpha1) ParamConfigRenderers() v1alpha1.ParamConfigRend
 
 func (c *FakeParametersV1alpha1) Parameters(namespace string) v1alpha1.ParameterInterface {
 	return &FakeParameters{c, namespace}
+}
+
+func (c *FakeParametersV1alpha1) ParameterViews(namespace string) v1alpha1.ParameterViewInterface {
+	return &FakeParameterViews{c, namespace}
 }
 
 func (c *FakeParametersV1alpha1) ParametersDefinitions() v1alpha1.ParametersDefinitionInterface {

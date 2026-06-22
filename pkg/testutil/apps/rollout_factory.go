@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -124,5 +124,11 @@ func (factory *MockRolloutFactory) SetShardingCompDef(compDef string) *MockRollo
 func (factory *MockRolloutFactory) SetShardingStrategy(strategy appsv1alpha1.RolloutStrategy) *MockRolloutFactory {
 	return factory.updateLastSharding(func(sharding *appsv1alpha1.RolloutSharding) {
 		sharding.Strategy = strategy
+	})
+}
+
+func (factory *MockRolloutFactory) SetShardingReplicas(replicas int32) *MockRolloutFactory {
+	return factory.updateLastSharding(func(sharding *appsv1alpha1.RolloutSharding) {
+		sharding.Replicas = ptr.To(intstr.FromInt32(replicas))
 	})
 }

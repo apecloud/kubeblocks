@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -128,6 +128,11 @@ type InstanceSpec struct {
 	// +optional
 	LifecycleActions *LifecycleActions `json:"lifecycleActions,omitempty"`
 
+	// Configs define the desired config templates applied to this instance.
+	//
+	// +optional
+	Configs []ConfigTemplate `json:"configs,omitempty"`
+
 	// Assistant objects that are necessary to run the instance.
 	//
 	// +optional
@@ -187,6 +192,11 @@ type InstanceStatus2 struct {
 	//
 	// +optional
 	VolumeExpansion bool `json:"volumeExpansion,omitempty"`
+
+	// Represents the config status observed from the running pod of this instance.
+	//
+	// +optional
+	Configs []InstanceConfigStatus `json:"configs,omitempty"`
 }
 
 type InstanceAssistantObject struct {

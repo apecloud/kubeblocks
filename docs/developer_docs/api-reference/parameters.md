@@ -21,6 +21,8 @@ Resource Types:
 </li><li>
 <a href="#parameters.kubeblocks.io/v1alpha1.Parameter">Parameter</a>
 </li><li>
+<a href="#parameters.kubeblocks.io/v1alpha1.ParameterView">ParameterView</a>
+</li><li>
 <a href="#parameters.kubeblocks.io/v1alpha1.ParametersDefinition">ParametersDefinition</a>
 </li></ul>
 <h3 id="parameters.kubeblocks.io/v1alpha1.ComponentParameter">ComponentParameter
@@ -113,16 +115,37 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>ConfigItemDetails is an array of ConfigTemplateItemDetail objects.</p>
-<p>Each ConfigTemplateItemDetail corresponds to a configuration template,
-which is a ConfigMap that contains multiple configuration files.
-Each configuration file is stored as a key-value pair within the ConfigMap.</p>
-<p>The ConfigTemplateItemDetail includes information such as:</p>
-<ul>
-<li>The configuration template (a ConfigMap)</li>
-<li>The corresponding ConfigConstraint (constraints and validation rules for the configuration)</li>
-<li>Volume mounts (for mounting the configuration files)</li>
-</ul>
+<p>ConfigItemDetails is the internal execution model derived and maintained by the controller.</p>
+<p>It corresponds to configuration templates, resolved files, and effective
+parameter/template overlays used by the reconcile pipeline.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>initial</code><br/>
+<em>
+<a href="#parameters.kubeblocks.io/v1alpha1.ParameterInputs">
+ParameterInputs
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Initial provides the initial parameter inputs used when the managed runtime configuration is created.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>desired</code><br/>
+<em>
+<a href="#parameters.kubeblocks.io/v1alpha1.ParameterInputs">
+ParameterInputs
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Desired provides the current desired parameter inputs.</p>
 </td>
 </tr>
 </tbody>
@@ -146,7 +169,8 @@ ComponentParameterStatus
 <h3 id="parameters.kubeblocks.io/v1alpha1.ParamConfigRenderer">ParamConfigRenderer
 </h3>
 <div>
-<p>ParamConfigRenderer is the Schema for the paramconfigrenderers API</p>
+<p>Deprecated: retained for API compatibility only.</p>
+<h1>ParamConfigRenderer is the Schema for the paramconfigrenderers API</h1>
 </div>
 <table>
 <thead>
@@ -207,7 +231,14 @@ string
 </em>
 </td>
 <td>
-<p>Specifies the ComponentDefinition custom resource (CR) that defines the Component&rsquo;s characteristics and behavior.</p>
+<p>Specifies the ComponentDefinition custom resource (CR) that defines the Component&rsquo;s characteristics and behavior.
+The value can represent an exact name, a name prefix, or a regular expression pattern.</p>
+<p>For example:</p>
+<ul>
+<li>&ldquo;clickhouse-1.0.0&rdquo;: Matches the exact name &ldquo;clickhouse-1.0.0&rdquo;</li>
+<li>&ldquo;clickhouse-1&rdquo;: Matches all names starting with &ldquo;clickhouse-1&rdquo;</li>
+<li>&rdquo;^clickhouse-1\.\d+\.\d+$&ldquo;: Matches all names starting with &ldquo;clickhouse-1.&rdquo; followed by version numbers.</li>
+</ul>
 </td>
 </tr>
 <tr>
@@ -271,7 +302,8 @@ ParamConfigRendererStatus
 <h3 id="parameters.kubeblocks.io/v1alpha1.Parameter">Parameter
 </h3>
 <div>
-<p>Parameter is the Schema for the parameters API</p>
+<p>Deprecated: retained for API compatibility only.</p>
+<h1>Parameter is the Schema for the parameters API</h1>
 </div>
 <table>
 <thead>
@@ -366,6 +398,171 @@ ParameterStatus
 </tr>
 </tbody>
 </table>
+<h3 id="parameters.kubeblocks.io/v1alpha1.ParameterView">ParameterView
+</h3>
+<div>
+<p>ParameterView is the Schema for the parameterviews API.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>apiVersion</code><br/>
+string</td>
+<td>
+<code>parameters.kubeblocks.io/v1alpha1</code>
+</td>
+</tr>
+<tr>
+<td>
+<code>kind</code><br/>
+string
+</td>
+<td><code>ParameterView</code></td>
+</tr>
+<tr>
+<td>
+<code>metadata</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#objectmeta-v1-meta">
+Kubernetes meta/v1.ObjectMeta
+</a>
+</em>
+</td>
+<td>
+Refer to the Kubernetes API documentation for the fields of the
+<code>metadata</code> field.
+</td>
+</tr>
+<tr>
+<td>
+<code>spec</code><br/>
+<em>
+<a href="#parameters.kubeblocks.io/v1alpha1.ParameterViewSpec">
+ParameterViewSpec
+</a>
+</em>
+</td>
+<td>
+<br/>
+<br/>
+<table>
+<tbody>
+<tr>
+<td>
+<code>parameterRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#localobjectreference-v1-core">
+Kubernetes core/v1.LocalObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>ParameterRef identifies the ComponentParameter edited through this view.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>templateName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>TemplateName identifies the config template inside the referenced ComponentParameter.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>fileName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>FileName identifies the config file inside the selected template.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>mode</code><br/>
+<em>
+<a href="#parameters.kubeblocks.io/v1alpha1.ParameterViewMode">
+ParameterViewMode
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Mode controls whether edits are allowed to be translated back into ComponentParameter patches.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>resetToLatest</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ResetToLatest requests the controller to discard the current draft in spec.content
+and rebuild it from the latest observed effective content.</p>
+<p>This is a reset-style action rather than a git-style rebase:
+1. the current draft is dropped;
+2. spec.content is reconstructed from status.latest;
+3. status.base is advanced to the rebuilt content revision.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>content</code><br/>
+<em>
+<a href="#parameters.kubeblocks.io/v1alpha1.ParameterViewContent">
+ParameterViewContent
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Content is the current user-facing document for the selected file.</p>
+<p>Controllers treat Content as the user&rsquo;s current draft:
+1. on initialization, Content is populated from the effective content and
+   status.base and status.latest point to the same revision;
+2. while status.base and status.latest remain equal, Content is based on the
+   latest observed effective content;
+3. when status.latest advances and Content is still only a projection of
+   status.base, the controller may auto-refresh Content and move status.base
+   forward to status.latest;
+4. when Content has diverged into a real user draft, the controller preserves
+   it and uses status.base as the draft base when replaying the draft onto
+status.latest or surfacing a conflict.</p>
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+<tr>
+<td>
+<code>status</code><br/>
+<em>
+<a href="#parameters.kubeblocks.io/v1alpha1.ParameterViewStatus">
+ParameterViewStatus
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="parameters.kubeblocks.io/v1alpha1.ParametersDefinition">ParametersDefinition
 </h3>
 <div>
@@ -424,6 +621,45 @@ ParametersDefinitionSpec
 <tbody>
 <tr>
 <td>
+<code>componentDef</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the ComponentDefinition custom resource (CR) that defines the Component&rsquo;s characteristics and behavior.
+The value can represent an exact name, a name prefix, or a regular expression pattern.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceVersion</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ServiceVersion specifies the version of the Service expected to be provisioned by this Component.
+The version should follow the syntax and semantics of the &ldquo;Semantic Versioning&rdquo; specification (<a href="http://semver.org/">http://semver.org/</a>).
+If no version is specified, the latest available version will be used.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>templateName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the name of the referenced config template.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>fileName</code><br/>
 <em>
 string
@@ -432,6 +668,21 @@ string
 <td>
 <em>(Optional)</em>
 <p>Specifies the config file name in the config template.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>fileFormatConfig</code><br/>
+<em>
+<a href="#parameters.kubeblocks.io/v1alpha1.FileFormatConfig">
+FileFormatConfig
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the format of the configuration file and any associated parameters that are specific to the chosen format.
+Supported formats include <code>ini</code>, <code>xml</code>, <code>yaml</code>, <code>json</code>, <code>hcl</code>, <code>dotenv</code>, <code>properties</code>, and <code>toml</code>.</p>
 </td>
 </tr>
 <tr>
@@ -471,36 +722,6 @@ can also trigger a reload.</li>
 </ol>
 <p>If <code>reloadAction</code> is not set or the modified parameters are not listed in <code>dynamicParameters</code>,
 dynamic reloading will not be triggered.</p>
-<p>Example:</p>
-<pre><code class="language-yaml">dynamicReloadAction:
- tplScriptTrigger:
-   namespace: kb-system
-   scriptConfigMapRef: mysql-reload-script
-   sync: true
-</code></pre>
-</td>
-</tr>
-<tr>
-<td>
-<code>downwardAPIChangeTriggeredActions</code><br/>
-<em>
-<a href="#parameters.kubeblocks.io/v1alpha1.DownwardAPIChangeTriggeredAction">
-[]DownwardAPIChangeTriggeredAction
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies a list of actions to execute specified commands based on Pod labels.</p>
-<p>It utilizes the K8s Downward API to mount label information as a volume into the pod.
-The &lsquo;config-manager&rsquo; sidecar container watches for changes in the role label and dynamically invoke
-registered commands (usually execute some SQL statements) when a change is detected.</p>
-<p>It is designed for scenarios where:</p>
-<ul>
-<li>Replicas with different roles have different configurations, such as Redis primary &amp; secondary replicas.</li>
-<li>After a role switch (e.g., from secondary to primary), some changes in configuration are needed
-to reflect the new role.</li>
-</ul>
 </td>
 </tr>
 <tr>
@@ -579,7 +800,11 @@ Modifications to any of these parameters require a restart of the process to tak
 <td>
 <em>(Optional)</em>
 <p>List dynamic parameters.
-Modifications to these parameters trigger a configuration reload without requiring a process restart.</p>
+Modifications to these parameters trigger a configuration reload without requiring a process restart.
+When parameter updates are applied through a ComponentDefinition config template reconfigure ExecAction,
+the controller invokes the action once for each updated
+parameter and appends the parameter name and value as the last arguments.
+HTTP and gRPC reconfigure actions are not currently supported for parameter updates.</p>
 </td>
 </tr>
 <tr>
@@ -592,7 +817,7 @@ Modifications to these parameters trigger a configuration reload without requiri
 <td>
 <em>(Optional)</em>
 <p>Lists the parameters that cannot be modified once set.
-Attempting to change any of these parameters will be ignored.</p>
+Attempts to change any of these parameters are rejected during configuration merge and surface as a merge failure.</p>
 </td>
 </tr>
 </tbody>
@@ -646,7 +871,7 @@ string
 <h3 id="parameters.kubeblocks.io/v1alpha1.CfgFileFormat">CfgFileFormat
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.FileFormatConfig">FileFormatConfig</a>)
+(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.FileFormatConfig">FileFormatConfig</a>, <a href="#parameters.kubeblocks.io/v1alpha1.ParameterViewStatus">ParameterViewStatus</a>)
 </p>
 <div>
 <p>CfgFileFormat defines formatter of configuration files.</p>
@@ -772,7 +997,7 @@ or cluster topology. Examples:</p>
 (<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ComponentParameter">ComponentParameter</a>)
 </p>
 <div>
-<p>ComponentParameterSpec defines the desired state of ComponentConfiguration</p>
+<p>ComponentParameterSpec defines the desired and execution state of ComponentParameter.</p>
 </div>
 <table>
 <thead>
@@ -816,16 +1041,37 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>ConfigItemDetails is an array of ConfigTemplateItemDetail objects.</p>
-<p>Each ConfigTemplateItemDetail corresponds to a configuration template,
-which is a ConfigMap that contains multiple configuration files.
-Each configuration file is stored as a key-value pair within the ConfigMap.</p>
-<p>The ConfigTemplateItemDetail includes information such as:</p>
-<ul>
-<li>The configuration template (a ConfigMap)</li>
-<li>The corresponding ConfigConstraint (constraints and validation rules for the configuration)</li>
-<li>Volume mounts (for mounting the configuration files)</li>
-</ul>
+<p>ConfigItemDetails is the internal execution model derived and maintained by the controller.</p>
+<p>It corresponds to configuration templates, resolved files, and effective
+parameter/template overlays used by the reconcile pipeline.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>initial</code><br/>
+<em>
+<a href="#parameters.kubeblocks.io/v1alpha1.ParameterInputs">
+ParameterInputs
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Initial provides the initial parameter inputs used when the managed runtime configuration is created.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>desired</code><br/>
+<em>
+<a href="#parameters.kubeblocks.io/v1alpha1.ParameterInputs">
+ParameterInputs
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Desired provides the current desired parameter inputs.</p>
 </td>
 </tr>
 </tbody>
@@ -1043,7 +1289,7 @@ ParameterPhase
 <h3 id="parameters.kubeblocks.io/v1alpha1.ConfigTemplateExtension">ConfigTemplateExtension
 </h3>
 <p>
-(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ComponentParametersSpec">ComponentParametersSpec</a>, <a href="#parameters.kubeblocks.io/v1alpha1.ConfigTemplateItemDetail">ConfigTemplateItemDetail</a>, <a href="#parameters.kubeblocks.io/v1alpha1.ReconfiguringStatus">ReconfiguringStatus</a>)
+(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ComponentParametersSpec">ComponentParametersSpec</a>, <a href="#parameters.kubeblocks.io/v1alpha1.ConfigTemplateItemDetail">ConfigTemplateItemDetail</a>, <a href="#parameters.kubeblocks.io/v1alpha1.ParameterInputs">ParameterInputs</a>, <a href="#parameters.kubeblocks.io/v1alpha1.ReconfiguringStatus">ReconfiguringStatus</a>)
 </p>
 <div>
 </div>
@@ -1136,9 +1382,7 @@ Payload
 </td>
 <td>
 <em>(Optional)</em>
-<p>External controllers can trigger a configuration rerender by modifying this field.</p>
-<p>Note: Currently, the <code>payload</code> field is opaque and its content is not interpreted by the system.
-Modifying this field will cause a rerender, regardless of the specific content of this field.</p>
+<p>Deprecated: retained for API compatibility only.</p>
 </td>
 </tr>
 <tr>
@@ -1287,138 +1531,10 @@ ReconcileDetail
 </tr>
 </tbody>
 </table>
-<h3 id="parameters.kubeblocks.io/v1alpha1.DownwardAPIChangeTriggeredAction">DownwardAPIChangeTriggeredAction
-</h3>
-<p>
-(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ParametersDefinitionSpec">ParametersDefinitionSpec</a>)
-</p>
-<div>
-<p>DownwardAPIChangeTriggeredAction defines an action that triggers specific commands in response to changes in Pod labels.
-For example, a command might be executed when the &lsquo;role&rsquo; label of the Pod is updated.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>name</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Specifies the name of the field. It must be a string of maximum length 63.
-The name should match the regex pattern <code>^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$</code>.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>mountPoint</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Specifies the mount point of the Downward API volume.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>items</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#downwardapivolumefile-v1-core">
-[]Kubernetes core/v1.DownwardAPIVolumeFile
-</a>
-</em>
-</td>
-<td>
-<p>Represents a list of files under the Downward API volume.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>command</code><br/>
-<em>
-[]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the command to be triggered when changes are detected in Downward API volume files.
-It relies on the inotify mechanism in the config-manager sidecar to monitor file changes.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>scriptConfig</code><br/>
-<em>
-<a href="#parameters.kubeblocks.io/v1alpha1.ScriptConfig">
-ScriptConfig
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>ScriptConfig object specifies a ConfigMap that contains script files that should be mounted inside the pod.
-The scripts are mounted as volumes and can be referenced and executed by the DownwardAction to perform specific tasks or configurations.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="parameters.kubeblocks.io/v1alpha1.DynamicParameterSelectedPolicy">DynamicParameterSelectedPolicy
-(<code>string</code> alias)</h3>
-<div>
-<p>DynamicParameterSelectedPolicy determines how to select the parameters of dynamic reload actions</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;all&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;dynamic&#34;</p></td>
-<td></td>
-</tr></tbody>
-</table>
-<h3 id="parameters.kubeblocks.io/v1alpha1.DynamicReloadType">DynamicReloadType
-(<code>string</code> alias)</h3>
-<div>
-<p>DynamicReloadType defines reload method.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;auto&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;http&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;sql&#34;</p></td>
-<td><p>deprecated since 1.1.0</p>
-</td>
-</tr><tr><td><p>&#34;exec&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;tpl&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;signal&#34;</p></td>
-<td></td>
-</tr></tbody>
-</table>
 <h3 id="parameters.kubeblocks.io/v1alpha1.FileFormatConfig">FileFormatConfig
 </h3>
 <p>
-(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ComponentConfigDescription">ComponentConfigDescription</a>)
+(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ComponentConfigDescription">ComponentConfigDescription</a>, <a href="#parameters.kubeblocks.io/v1alpha1.ParametersDefinitionSpec">ParametersDefinitionSpec</a>)
 </p>
 <div>
 <p>FileFormatConfig specifies the format of the configuration file and any associated parameters
@@ -1579,6 +1695,12 @@ string
 </tr>
 </tbody>
 </table>
+<h3 id="parameters.kubeblocks.io/v1alpha1.InitialParameters">InitialParameters
+(<code>map[string]github.com/apecloud/kubeblocks/apis/parameters/v1alpha1.ParameterInputs</code> alias)</h3>
+<div>
+<p>InitialParameters describes the initialization overlays keyed by cluster sub-resource name,
+such as a component or sharding item name.</p>
+</div>
 <h3 id="parameters.kubeblocks.io/v1alpha1.MergedPolicy">MergedPolicy
 (<code>string</code> alias)</h3>
 <p>
@@ -1628,7 +1750,14 @@ string
 </em>
 </td>
 <td>
-<p>Specifies the ComponentDefinition custom resource (CR) that defines the Component&rsquo;s characteristics and behavior.</p>
+<p>Specifies the ComponentDefinition custom resource (CR) that defines the Component&rsquo;s characteristics and behavior.
+The value can represent an exact name, a name prefix, or a regular expression pattern.</p>
+<p>For example:</p>
+<ul>
+<li>&ldquo;clickhouse-1.0.0&rdquo;: Matches the exact name &ldquo;clickhouse-1.0.0&rdquo;</li>
+<li>&ldquo;clickhouse-1&rdquo;: Matches all names starting with &ldquo;clickhouse-1&rdquo;</li>
+<li>&rdquo;^clickhouse-1\.\d+\.\d+$&ldquo;: Matches all names starting with &ldquo;clickhouse-1.&rdquo; followed by version numbers.</li>
+</ul>
 </td>
 </tr>
 <tr>
@@ -1736,6 +1865,7 @@ When set to PDAvailablePhase, the ParamsDesc can be referenced by ComponentDefin
 (<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ParameterDeletedPolicy">ParameterDeletedPolicy</a>)
 </p>
 <div>
+<p>Deprecated: It is retained for API compatibility with existing ParametersDefinition objects.</p>
 <p>ParameterDeletedMethod defines how to handle parameter remove</p>
 </div>
 <table>
@@ -1757,6 +1887,7 @@ When set to PDAvailablePhase, the ParamsDesc can be referenced by ComponentDefin
 (<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ParametersDefinitionSpec">ParametersDefinitionSpec</a>)
 </p>
 <div>
+<p>Deprecated: It is retained for API compatibility with existing ParametersDefinition objects.</p>
 </div>
 <table>
 <thead>
@@ -1794,6 +1925,78 @@ string
 <p>Specifies the value to use if DeletedMethod is RestoreToDefault.
 Example: pg
 SET configuration_parameter TO DEFAULT;</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="parameters.kubeblocks.io/v1alpha1.ParameterInputs">ParameterInputs
+</h3>
+<p>
+(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ComponentParameterSpec">ComponentParameterSpec</a>)
+</p>
+<div>
+<p>ParameterInputs describes user-provided parameter inputs and template overrides.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>assignments</code><br/>
+<em>
+map[string]*string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Assignments are flat managed parameter key/value assignments.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>updates</code><br/>
+<em>
+<a href="#parameters.kubeblocks.io/v1alpha1.ParameterUpdate">
+[]ParameterUpdate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Updates is the advanced path for schema-managed parameter changes with explicit update semantics.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>unmanagedUpdates</code><br/>
+<em>
+<a href="#parameters.kubeblocks.io/v1alpha1.UnmanagedParameterUpdate">
+[]UnmanagedParameterUpdate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>UnmanagedUpdates is the advanced path for parameters not defined in ParametersDefinition.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>userConfigTemplates</code><br/>
+<em>
+<a href="#parameters.kubeblocks.io/v1alpha1.ConfigTemplateExtension">
+map[string]github.com/apecloud/kubeblocks/apis/parameters/v1alpha1.ConfigTemplateExtension
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Templates are user-provided template overrides keyed by config template name.</p>
 </td>
 </tr>
 </tbody>
@@ -1953,6 +2156,697 @@ updated by the API Server.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="parameters.kubeblocks.io/v1alpha1.ParameterUpdate">ParameterUpdate
+</h3>
+<p>
+(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ParameterInputs">ParameterInputs</a>, <a href="#parameters.kubeblocks.io/v1alpha1.UnmanagedParameterSectionUpdate">UnmanagedParameterSectionUpdate</a>)
+</p>
+<div>
+<p>ParameterUpdate is an explicit parameter update.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>type</code><br/>
+<em>
+<a href="#parameters.kubeblocks.io/v1alpha1.ParameterUpdateType">
+ParameterUpdateType
+</a>
+</em>
+</td>
+<td>
+<p>Type defines the update type.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>key</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Key is the logical parameter key defined in ParametersDefinition.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>value</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Value is used by set/update style operations.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="parameters.kubeblocks.io/v1alpha1.ParameterUpdateType">ParameterUpdateType
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ParameterUpdate">ParameterUpdate</a>)
+</p>
+<div>
+<p>ParameterUpdateType defines supported parameter update types.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Remove&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Set&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
+<h3 id="parameters.kubeblocks.io/v1alpha1.ParameterViewContent">ParameterViewContent
+</h3>
+<p>
+(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ParameterViewSpec">ParameterViewSpec</a>)
+</p>
+<div>
+<p>ParameterViewContent describes the editable document shown to users.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>type</code><br/>
+<em>
+<a href="#parameters.kubeblocks.io/v1alpha1.ParameterViewContentType">
+ParameterViewContentType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Type declares how Text should be parsed and rendered.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>text</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Text is the user-facing document content.</p>
+<p>When type is PlainText, Text is the raw editable file content.
+When type is MarkerLine, each line is expected to begin with a marker such as
+&ldquo;[D]&rdquo;, &ldquo;[S]&rdquo;, &ldquo;[I]&rdquo;, or &ldquo;[U]&rdquo;. The controller is responsible for parsing the
+view document into raw file content before translating edits into ComponentParameter
+patches.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="parameters.kubeblocks.io/v1alpha1.ParameterViewContentMarker">ParameterViewContentMarker
+(<code>string</code> alias)</h3>
+<div>
+<p>ParameterViewContentMarker indicates how a marker line should be interpreted.</p>
+<p>D means a dynamic parameter managed by ParametersDefinition.
+S means a static parameter managed by ParametersDefinition.
+I means an immutable parameter that is rendered but not editable.
+U means unmanaged content such as comments, section headers, blank lines, or
+file fragments that are not defined by the current ParametersDefinition.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;D&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;I&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;S&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;U&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
+<h3 id="parameters.kubeblocks.io/v1alpha1.ParameterViewContentType">ParameterViewContentType
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ParameterViewContent">ParameterViewContent</a>)
+</p>
+<div>
+<p>ParameterViewContentType defines how ParameterView content should be interpreted.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;MarkerLine&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;PlainText&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
+<h3 id="parameters.kubeblocks.io/v1alpha1.ParameterViewMode">ParameterViewMode
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ParameterViewSpec">ParameterViewSpec</a>)
+</p>
+<div>
+<p>ParameterViewMode defines whether a ParameterView can be edited.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;ReadOnly&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;ReadWrite&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
+<h3 id="parameters.kubeblocks.io/v1alpha1.ParameterViewPhase">ParameterViewPhase
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ParameterViewStatus">ParameterViewStatus</a>)
+</p>
+<div>
+<p>ParameterViewPhase defines the current lifecycle state of a ParameterView.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Applying&#34;</p></td>
+<td><p>ParameterViewApplyingPhase means the controller has already derived and
+submitted desired parameter updates from the current draft and is waiting
+for the effective content to catch up.</p>
+</td>
+</tr><tr><td><p>&#34;Conflict&#34;</p></td>
+<td><p>ParameterViewConflictPhase means the preserved draft in spec.content is
+based on an older revision and the controller cannot automatically move it
+forward to the latest observed effective content revision.</p>
+</td>
+</tr><tr><td><p>&#34;Invalid&#34;</p></td>
+<td><p>ParameterViewInvalidPhase means the current view or draft cannot be
+processed, for example because the reference is invalid, the content type
+is unsupported, or the draft cannot be translated into a valid desired
+parameter patch.</p>
+</td>
+</tr><tr><td><p>&#34;Synced&#34;</p></td>
+<td><p>ParameterViewSyncedPhase means spec.content is aligned with the latest
+effective content revision observed by the controller and there is no
+pending submission, invalid draft, or unresolved conflict.</p>
+</td>
+</tr></tbody>
+</table>
+<h3 id="parameters.kubeblocks.io/v1alpha1.ParameterViewRevision">ParameterViewRevision
+</h3>
+<p>
+(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ParameterViewStatus">ParameterViewStatus</a>, <a href="#parameters.kubeblocks.io/v1alpha1.ParameterViewSubmission">ParameterViewSubmission</a>)
+</p>
+<div>
+<p>ParameterViewRevision identifies an effective content revision for a view.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>revision</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Revision records the effective content revision associated with this view state.
+The controller resolves it from the generated ConfigMap revision metadata when available.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>contentHash</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ContentHash records the hash of the effective file content for this revision.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="parameters.kubeblocks.io/v1alpha1.ParameterViewSpec">ParameterViewSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ParameterView">ParameterView</a>)
+</p>
+<div>
+<p>ParameterViewSpec defines the desired state of ParameterView.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>parameterRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#localobjectreference-v1-core">
+Kubernetes core/v1.LocalObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>ParameterRef identifies the ComponentParameter edited through this view.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>templateName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>TemplateName identifies the config template inside the referenced ComponentParameter.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>fileName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>FileName identifies the config file inside the selected template.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>mode</code><br/>
+<em>
+<a href="#parameters.kubeblocks.io/v1alpha1.ParameterViewMode">
+ParameterViewMode
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Mode controls whether edits are allowed to be translated back into ComponentParameter patches.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>resetToLatest</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ResetToLatest requests the controller to discard the current draft in spec.content
+and rebuild it from the latest observed effective content.</p>
+<p>This is a reset-style action rather than a git-style rebase:
+1. the current draft is dropped;
+2. spec.content is reconstructed from status.latest;
+3. status.base is advanced to the rebuilt content revision.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>content</code><br/>
+<em>
+<a href="#parameters.kubeblocks.io/v1alpha1.ParameterViewContent">
+ParameterViewContent
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Content is the current user-facing document for the selected file.</p>
+<p>Controllers treat Content as the user&rsquo;s current draft:
+1. on initialization, Content is populated from the effective content and
+   status.base and status.latest point to the same revision;
+2. while status.base and status.latest remain equal, Content is based on the
+   latest observed effective content;
+3. when status.latest advances and Content is still only a projection of
+   status.base, the controller may auto-refresh Content and move status.base
+   forward to status.latest;
+4. when Content has diverged into a real user draft, the controller preserves
+   it and uses status.base as the draft base when replaying the draft onto
+status.latest or surfacing a conflict.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="parameters.kubeblocks.io/v1alpha1.ParameterViewStatus">ParameterViewStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ParameterView">ParameterView</a>)
+</p>
+<div>
+<p>ParameterViewStatus defines the observed state of ParameterView.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>observedGeneration</code><br/>
+<em>
+int64
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ObservedGeneration is the most recent ParameterView generation observed by the controller.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>phase</code><br/>
+<em>
+<a href="#parameters.kubeblocks.io/v1alpha1.ParameterViewPhase">
+ParameterViewPhase
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Phase describes the current state of this view.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>message</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Message provides a human-readable summary for the current state.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>conditions</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#condition-v1-meta">
+[]Kubernetes meta/v1.Condition
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Conditions captures detailed reconciliation and validation status.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>fileFormat</code><br/>
+<em>
+<a href="#parameters.kubeblocks.io/v1alpha1.CfgFileFormat">
+CfgFileFormat
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>FileFormat identifies the file format used by the selected config file.
+It is resolved and refreshed by the controller from template metadata.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>base</code><br/>
+<em>
+<a href="#parameters.kubeblocks.io/v1alpha1.ParameterViewRevision">
+ParameterViewRevision
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Base records the effective content revision that spec.content is currently based on.
+It is the draft base used to decide whether spec.content is still only a
+projection of the source, or whether it has diverged into a real user draft.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>latest</code><br/>
+<em>
+<a href="#parameters.kubeblocks.io/v1alpha1.ParameterViewRevision">
+ParameterViewRevision
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Latest records the latest effective content revision observed by the controller.
+When Base and Latest are equal, spec.content is based on the current latest
+effective revision. When they differ, spec.content is either waiting to
+auto-refresh because no real draft exists, or waiting for the controller to
+replay or reject a preserved user draft against the newer latest revision.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>submissions</code><br/>
+<em>
+<a href="#parameters.kubeblocks.io/v1alpha1.ParameterViewSubmission">
+[]ParameterViewSubmission
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Submissions records recent desired parameter submissions derived from this view.
+Newer entries appear first. The controller may compact older entries, but it
+keeps enough history for users to understand which changes were recently submitted.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="parameters.kubeblocks.io/v1alpha1.ParameterViewSubmission">ParameterViewSubmission
+</h3>
+<p>
+(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ParameterViewStatus">ParameterViewStatus</a>)
+</p>
+<div>
+<p>ParameterViewSubmission records the most recent submission derived from a view draft.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>revision</code><br/>
+<em>
+<a href="#parameters.kubeblocks.io/v1alpha1.ParameterViewRevision">
+ParameterViewRevision
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Revision records the effective content revision that the submission was based on.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>submittedAt</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#time-v1-meta">
+Kubernetes meta/v1.Time
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>SubmittedAt records when the submission entry was created or last refreshed.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>assignments</code><br/>
+<em>
+map[string]*string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Assignments contains the desired simple parameter assignments submitted from the view.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>result</code><br/>
+<em>
+<a href="#parameters.kubeblocks.io/v1alpha1.ParameterViewSubmissionResult">
+ParameterViewSubmissionResult
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Result records the current observed outcome of this submission after it has
+been handed off to the ComponentParameter controller.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="parameters.kubeblocks.io/v1alpha1.ParameterViewSubmissionPhase">ParameterViewSubmissionPhase
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ParameterViewSubmissionResult">ParameterViewSubmissionResult</a>)
+</p>
+<div>
+<p>ParameterViewSubmissionPhase defines the observed execution state of a submission.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Failed&#34;</p></td>
+<td><p>ParameterViewSubmissionFailedPhase means the submission has reached a final
+failure outcome in the ComponentParameter processing chain.</p>
+</td>
+</tr><tr><td><p>&#34;Processing&#34;</p></td>
+<td><p>ParameterViewSubmissionProcessingPhase means the submission has already
+been handed off to the ComponentParameter controller, and its final
+execution outcome is not known yet.</p>
+</td>
+</tr><tr><td><p>&#34;Succeeded&#34;</p></td>
+<td><p>ParameterViewSubmissionSucceededPhase means the submission has reached a
+final successful outcome in the ComponentParameter processing chain.</p>
+</td>
+</tr></tbody>
+</table>
+<h3 id="parameters.kubeblocks.io/v1alpha1.ParameterViewSubmissionResult">ParameterViewSubmissionResult
+</h3>
+<p>
+(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ParameterViewSubmission">ParameterViewSubmission</a>)
+</p>
+<div>
+<p>ParameterViewSubmissionResult records the current observed outcome of a submission.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>phase</code><br/>
+<em>
+<a href="#parameters.kubeblocks.io/v1alpha1.ParameterViewSubmissionPhase">
+ParameterViewSubmissionPhase
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Phase describes the current execution state of this submission.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>reason</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Reason is a stable, machine-friendly summary for the current submission result.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>message</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Message provides a human-readable summary for the current submission result.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>updatedAt</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#time-v1-meta">
+Kubernetes meta/v1.Time
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>UpdatedAt records when the result was last refreshed by the controller.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="parameters.kubeblocks.io/v1alpha1.ParametersDefinitionSpec">ParametersDefinitionSpec
 </h3>
 <p>
@@ -1971,6 +2865,45 @@ updated by the API Server.</p>
 <tbody>
 <tr>
 <td>
+<code>componentDef</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the ComponentDefinition custom resource (CR) that defines the Component&rsquo;s characteristics and behavior.
+The value can represent an exact name, a name prefix, or a regular expression pattern.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceVersion</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ServiceVersion specifies the version of the Service expected to be provisioned by this Component.
+The version should follow the syntax and semantics of the &ldquo;Semantic Versioning&rdquo; specification (<a href="http://semver.org/">http://semver.org/</a>).
+If no version is specified, the latest available version will be used.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>templateName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the name of the referenced config template.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>fileName</code><br/>
 <em>
 string
@@ -1979,6 +2912,21 @@ string
 <td>
 <em>(Optional)</em>
 <p>Specifies the config file name in the config template.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>fileFormatConfig</code><br/>
+<em>
+<a href="#parameters.kubeblocks.io/v1alpha1.FileFormatConfig">
+FileFormatConfig
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the format of the configuration file and any associated parameters that are specific to the chosen format.
+Supported formats include <code>ini</code>, <code>xml</code>, <code>yaml</code>, <code>json</code>, <code>hcl</code>, <code>dotenv</code>, <code>properties</code>, and <code>toml</code>.</p>
 </td>
 </tr>
 <tr>
@@ -2018,36 +2966,6 @@ can also trigger a reload.</li>
 </ol>
 <p>If <code>reloadAction</code> is not set or the modified parameters are not listed in <code>dynamicParameters</code>,
 dynamic reloading will not be triggered.</p>
-<p>Example:</p>
-<pre><code class="language-yaml">dynamicReloadAction:
- tplScriptTrigger:
-   namespace: kb-system
-   scriptConfigMapRef: mysql-reload-script
-   sync: true
-</code></pre>
-</td>
-</tr>
-<tr>
-<td>
-<code>downwardAPIChangeTriggeredActions</code><br/>
-<em>
-<a href="#parameters.kubeblocks.io/v1alpha1.DownwardAPIChangeTriggeredAction">
-[]DownwardAPIChangeTriggeredAction
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies a list of actions to execute specified commands based on Pod labels.</p>
-<p>It utilizes the K8s Downward API to mount label information as a volume into the pod.
-The &lsquo;config-manager&rsquo; sidecar container watches for changes in the role label and dynamically invoke
-registered commands (usually execute some SQL statements) when a change is detected.</p>
-<p>It is designed for scenarios where:</p>
-<ul>
-<li>Replicas with different roles have different configurations, such as Redis primary &amp; secondary replicas.</li>
-<li>After a role switch (e.g., from secondary to primary), some changes in configuration are needed
-to reflect the new role.</li>
-</ul>
 </td>
 </tr>
 <tr>
@@ -2126,7 +3044,11 @@ Modifications to any of these parameters require a restart of the process to tak
 <td>
 <em>(Optional)</em>
 <p>List dynamic parameters.
-Modifications to these parameters trigger a configuration reload without requiring a process restart.</p>
+Modifications to these parameters trigger a configuration reload without requiring a process restart.
+When parameter updates are applied through a ComponentDefinition config template reconfigure ExecAction,
+the controller invokes the action once for each updated
+parameter and appends the parameter name and value as the last arguments.
+HTTP and gRPC reconfigure actions are not currently supported for parameter updates.</p>
 </td>
 </tr>
 <tr>
@@ -2139,7 +3061,7 @@ Modifications to these parameters trigger a configuration reload without requiri
 <td>
 <em>(Optional)</em>
 <p>Lists the parameters that cannot be modified once set.
-Attempting to change any of these parameters will be ignored.</p>
+Attempts to change any of these parameters are rejected during configuration merge and surface as a merge failure.</p>
 </td>
 </tr>
 </tbody>
@@ -2270,6 +3192,20 @@ map[string]*string
 <p>Represents the updated parameters for a single configuration file.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>unmanagedUpdates</code><br/>
+<em>
+<a href="#parameters.kubeblocks.io/v1alpha1.UnmanagedParameterSectionUpdate">
+[]UnmanagedParameterSectionUpdate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents unmanaged parameter updates for a single configuration file.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="parameters.kubeblocks.io/v1alpha1.ParametersSchema">ParametersSchema
@@ -2342,6 +3278,7 @@ Kubernetes api extensions v1.JSONSchemaProps
 (<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ConfigTemplateItemDetail">ConfigTemplateItemDetail</a>)
 </p>
 <div>
+<p>Deprecated: It is retained for API compatibility with existing ComponentParameter objects.</p>
 <p>Payload holds the payload data. This field is optional and can contain any type of data.
 Not included in the JSON representation of the object.</p>
 </div>
@@ -2504,6 +3441,7 @@ This allows users to customize the configuration template according to their spe
 </p>
 <div>
 <p>ReloadAction defines the mechanisms available for dynamically reloading a process within K8s without requiring a restart.</p>
+<p>Deprecated: It is retained for API compatibility with existing ParametersDefinition objects.</p>
 <p>Only one of the mechanisms can be specified at a time.</p>
 </div>
 <table>
@@ -2516,20 +3454,6 @@ This allows users to customize the configuration template according to their spe
 <tbody>
 <tr>
 <td>
-<code>unixSignalTrigger</code><br/>
-<em>
-<a href="#parameters.kubeblocks.io/v1alpha1.UnixSignalTrigger">
-UnixSignalTrigger
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Used to trigger a reload by sending a specific Unix signal to the process.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>shellTrigger</code><br/>
 <em>
 <a href="#parameters.kubeblocks.io/v1alpha1.ShellTrigger">
@@ -2540,20 +3464,6 @@ ShellTrigger
 <td>
 <em>(Optional)</em>
 <p>Allows to execute a custom shell script to reload the process.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>tplScriptTrigger</code><br/>
-<em>
-<a href="#parameters.kubeblocks.io/v1alpha1.TPLScriptTrigger">
-TPLScriptTrigger
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Enables reloading process using a Go template script.</p>
 </td>
 </tr>
 <tr>
@@ -2590,36 +3500,13 @@ reload.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="parameters.kubeblocks.io/v1alpha1.ReloadPolicy">ReloadPolicy
-(<code>string</code> alias)</h3>
-<div>
-<p>ReloadPolicy defines the policy of reconfiguring.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;asyncReload&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;dynamicReloadBeginRestart&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;none&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;restart&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;syncReload&#34;</p></td>
-<td></td>
-</tr></tbody>
-</table>
 <h3 id="parameters.kubeblocks.io/v1alpha1.RerenderResourceType">RerenderResourceType
 (<code>string</code> alias)</h3>
 <p>
 (<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ComponentConfigDescription">ComponentConfigDescription</a>)
 </p>
 <div>
+<p>Deprecated: It is retained for API compatibility with existing ParamConfigRenderer objects.</p>
 <p>RerenderResourceType defines the resource requirements for a component.</p>
 </div>
 <table>
@@ -2642,7 +3529,7 @@ reload.</p>
 <h3 id="parameters.kubeblocks.io/v1alpha1.ScriptConfig">ScriptConfig
 </h3>
 <p>
-(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.DownwardAPIChangeTriggeredAction">DownwardAPIChangeTriggeredAction</a>, <a href="#parameters.kubeblocks.io/v1alpha1.ShellTrigger">ShellTrigger</a>, <a href="#parameters.kubeblocks.io/v1alpha1.TPLScriptTrigger">TPLScriptTrigger</a>)
+(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ShellTrigger">ShellTrigger</a>)
 </p>
 <div>
 </div>
@@ -2725,54 +3612,6 @@ bool
 </tr>
 <tr>
 <td>
-<code>batchReload</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Controls whether parameter updates are processed individually or collectively in a batch:</p>
-<ul>
-<li>&lsquo;True&rsquo;: Processes all changes in one batch reload.</li>
-<li>&lsquo;False&rsquo;: Processes each change individually.</li>
-</ul>
-<p>Defaults to &lsquo;False&rsquo; if unspecified.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>batchParamsFormatterTemplate</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies a Go template string for formatting batch input data.
-It&rsquo;s used when <code>batchReload</code> is &lsquo;True&rsquo; to format data passed into STDIN of the script.
-The template accesses key-value pairs of updated parameters via the &lsquo;$&rsquo; variable.
-This allows for custom formatting of the input data.</p>
-<p>Example template:</p>
-<pre><code class="language-yaml">batchParamsFormatterTemplate: |-
-&#123;&#123;- range $pKey, $pValue := $ &#125;&#125;
-&#123;&#123; printf &quot;%s:%s&quot; $pKey $pValue &#125;&#125;
-&#123;&#123;- end &#125;&#125;
-</code></pre>
-<p>This example generates batch input data in a key:value format, sorted by keys.</p>
-<pre><code>key1:value1
-key2:value2
-key3:value3
-</code></pre>
-<p>If not specified, the default format is key=value, sorted by keys, for each updated parameter.</p>
-<pre><code>key1=value1
-key2=value2
-key3=value3
-</code></pre>
-</td>
-</tr>
-<tr>
-<td>
 <code>toolsSetup</code><br/>
 <em>
 <a href="#parameters.kubeblocks.io/v1alpha1.ToolsSetup">
@@ -2803,138 +3642,6 @@ ScriptConfig
 <em>(Optional)</em>
 <p>ScriptConfig object specifies a ConfigMap that contains script files that should be mounted inside the pod.
 The scripts are mounted as volumes and can be referenced and executed by the dynamic reload.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="parameters.kubeblocks.io/v1alpha1.SignalType">SignalType
-(<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.UnixSignalTrigger">UnixSignalTrigger</a>)
-</p>
-<div>
-<p>SignalType defines which signals are valid.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;SIGABRT&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGALRM&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGBUS&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGCHLD&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGCONT&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGFPE&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGHUP&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGILL&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGINT&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGIO&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGKILL&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGPIPE&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGPROF&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGPWR&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGQUIT&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGSEGV&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGSTKFLT&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGSTOP&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGSYS&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGTERM&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGTRAP&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGTSTP&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGTTIN&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGTTOU&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGURG&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGUSR1&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGUSR2&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGVTALRM&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGWINCH&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGXCPU&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;SIGXFSZ&#34;</p></td>
-<td></td>
-</tr></tbody>
-</table>
-<h3 id="parameters.kubeblocks.io/v1alpha1.TPLScriptTrigger">TPLScriptTrigger
-</h3>
-<p>
-(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ReloadAction">ReloadAction</a>)
-</p>
-<div>
-<p>TPLScriptTrigger Enables reloading process using a Go template script.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>ScriptConfig</code><br/>
-<em>
-<a href="#parameters.kubeblocks.io/v1alpha1.ScriptConfig">
-ScriptConfig
-</a>
-</em>
-</td>
-<td>
-<p>
-(Members of <code>ScriptConfig</code> are embedded into this type.)
-</p>
-<p>Specifies the ConfigMap that contains the script to be executed for reload.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>sync</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Determines whether parameter updates should be synchronized with the &ldquo;config-manager&rdquo;.
-Specifies the controller&rsquo;s reload strategy:</p>
-<ul>
-<li>If set to &lsquo;True&rsquo;, the controller executes the reload action in synchronous mode,
-pausing execution until the reload completes.</li>
-<li>If set to &lsquo;False&rsquo;, the controller executes the reload action in asynchronous mode,
-updating the ConfigMap without waiting for the reload process to finish.</li>
-</ul>
 </td>
 </tr>
 </tbody>
@@ -3114,13 +3821,13 @@ This field is typically used with an emptyDir volume to ensure a temporary, empt
 </tr>
 </tbody>
 </table>
-<h3 id="parameters.kubeblocks.io/v1alpha1.UnixSignalTrigger">UnixSignalTrigger
+<h3 id="parameters.kubeblocks.io/v1alpha1.UnmanagedParameterSectionUpdate">UnmanagedParameterSectionUpdate
 </h3>
 <p>
-(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ReloadAction">ReloadAction</a>)
+(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ParametersInFile">ParametersInFile</a>, <a href="#parameters.kubeblocks.io/v1alpha1.UnmanagedParameterUpdate">UnmanagedParameterUpdate</a>)
 </p>
 <div>
-<p>UnixSignalTrigger is used to trigger a reload by sending a specific Unix signal to the process.</p>
+<p>UnmanagedParameterSectionUpdate describes unmanaged parameter updates scoped to an optional section within a file.</p>
 </div>
 <table>
 <thead>
@@ -3132,26 +3839,82 @@ This field is typically used with an emptyDir volume to ensure a temporary, empt
 <tbody>
 <tr>
 <td>
-<code>signal</code><br/>
-<em>
-<a href="#parameters.kubeblocks.io/v1alpha1.SignalType">
-SignalType
-</a>
-</em>
-</td>
-<td>
-<p>Specifies a valid Unix signal to be sent.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>processName</code><br/>
+<code>section</code><br/>
 <em>
 string
 </em>
 </td>
 <td>
-<p>Identifies the name of the process to which the Unix signal will be sent.</p>
+<em>(Optional)</em>
+<p>Section optionally identifies a nested scope for formats that support it.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>updates</code><br/>
+<em>
+<a href="#parameters.kubeblocks.io/v1alpha1.ParameterUpdate">
+[]ParameterUpdate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Updates are the unmanaged parameter changes to apply within the target section scope.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="parameters.kubeblocks.io/v1alpha1.UnmanagedParameterUpdate">UnmanagedParameterUpdate
+</h3>
+<p>
+(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ParameterInputs">ParameterInputs</a>)
+</p>
+<div>
+<p>UnmanagedParameterUpdate describes unmanaged parameter updates scoped to a target template and file.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>template</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Template is the target config template name.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>file</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>File is the target config file name under the template.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>updates</code><br/>
+<em>
+<a href="#parameters.kubeblocks.io/v1alpha1.UnmanagedParameterSectionUpdate">
+[]UnmanagedParameterSectionUpdate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Updates are the unmanaged parameter changes to apply within the target file scope.</p>
 </td>
 </tr>
 </tbody>

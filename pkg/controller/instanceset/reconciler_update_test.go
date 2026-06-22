@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset
 
 import (
+	"context"
 	"slices"
 	"time"
 
@@ -39,12 +40,26 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
+	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 var _ = Describe("update reconciler test", func() {
 	var replicas int32
+
+	Context("reconfigure options", func() {
+		It("passes workload reconfigure args as lifecycle arguments", func() {
+			args := [][]string{{"maxmemory", "1gb"}, {"timeout", "30"}}
+			opts := reconfigureOptions(workloads.ConfigTemplate{ReconfigureArgs: args})
+			Expect(opts).ShouldNot(BeNil())
+			Expect(opts.Arguments).Should(Equal(args))
+		})
+
+		It("uses nil options when reconfigure args are empty", func() {
+			Expect(reconfigureOptions(workloads.ConfigTemplate{})).Should(BeNil())
+		})
+	})
 
 	BeforeEach(func() {
 		replicas = 3
@@ -410,5 +425,128 @@ var _ = Describe("update reconciler test", func() {
 		It("inplace updates pod resource using resize subresource", func() {
 			testInplacePodVerticalScaling(true)
 		})
+
+		It("patches pod without calling switchover for metadata-only in-place updates", func() {
+			// This test exercises the Reconcile call site (not just the
+			// safeMetadataOnlyInPlaceUpdate helper) to assert the contract
+			// from PR #10252: when the only difference between the existing
+			// pod and the rebuilt pod is non-restart metadata, the pod is
+			// patched but the switchover lifecycle action must not be
+			// invoked.
+			origSupportResize := intctrlutil.SupportResizeSubResource
+			intctrlutil.SupportResizeSubResource = func() (bool, error) { return false, nil }
+			defer func() { intctrlutil.SupportResizeSubResource = origSupportResize }()
+
+			spy := &lifecycleCallSpy{}
+			origNewLifecycleAction := newLifecycleAction
+			newLifecycleAction = func(_ *workloads.InstanceSet, _ *kubebuilderx.ObjectTree, _ *corev1.Pod) (lifecycle.Lifecycle, error) {
+				return spy, nil
+			}
+			defer func() { newLifecycleAction = origNewLifecycleAction }()
+
+			tree := kubebuilderx.NewObjectTree()
+			its.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
+			its.Spec.Replicas = ptr.To[int32](1)
+			its.Spec.PodUpdatePolicy = kbappsv1.PreferInPlacePodUpdatePolicyType
+			// Configure a switchover action so r.switchover would invoke
+			// newLifecycleAction (and thus the spy) if the gate did not
+			// suppress it.
+			its.Spec.LifecycleActions = &workloads.LifecycleActions{
+				Switchover: &kbappsv1.Action{
+					Exec: &kbappsv1.ExecAction{Command: []string{"true"}},
+				},
+			}
+			tree.SetRoot(its)
+
+			// Run the revision pipeline against the original template so the
+			// generated pod's controller-revision label matches
+			// its.Status.UpdateRevisions. This avoids the revision-mismatch
+			// branch in getPodUpdatePolicy that would force recreatePolicy.
+			prepareForUpdate(tree)
+
+			pods := tree.List(&corev1.Pod{})
+			Expect(pods).Should(HaveLen(1))
+			pod := pods[0].(*corev1.Pod)
+			pod.Status.Phase = corev1.PodRunning
+			pod.Status.Conditions = append(pod.Status.Conditions, corev1.PodCondition{
+				Type:               corev1.PodReady,
+				Status:             corev1.ConditionTrue,
+				LastTransitionTime: metav1.NewTime(time.Now().Add(-1 * minReadySeconds * time.Second)),
+			})
+
+			// Mutate the template AFTER prepareForUpdate so the rebuilt pod
+			// differs from the existing pod only in the config-hash
+			// annotation. its.Status.UpdateRevisions is no longer
+			// recomputed, so the pod's revision still matches and the
+			// reconciler enters the in-place branch via basicUpdate=true.
+			if its.Spec.Template.ObjectMeta.Annotations == nil {
+				its.Spec.Template.ObjectMeta.Annotations = map[string]string{}
+			}
+			its.Spec.Template.ObjectMeta.Annotations[constant.CMInsConfigurationHashLabelKey] = "new-hash"
+
+			reconciler = NewUpdateReconciler()
+			res, err := reconciler.Reconcile(tree)
+			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
+
+			postPods := tree.List(&corev1.Pod{})
+			Expect(postPods).Should(HaveLen(1),
+				"pod should be in-place updated, not deleted/recreated")
+			updatedPod := postPods[0].(*corev1.Pod)
+			Expect(updatedPod.Annotations).Should(HaveKeyWithValue(constant.CMInsConfigurationHashLabelKey, "new-hash"),
+				"pod should be patched with the new config-hash annotation even though switchover is skipped")
+			_, option, err := tree.GetWithOption(updatedPod)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(option.Patch).Should(BeTrue(),
+				"metadata-only pod updates should use a patch to avoid stale full-update conflicts")
+			Expect(spy.switchoverCalls).Should(Equal(0),
+				"switchover must not be invoked when only the config-hash annotation differs")
+		})
 	})
 })
+
+// lifecycleCallSpy is a test double for lifecycle.Lifecycle used to assert
+// that switchover is or is not invoked during reconciliation. Methods that
+// the call-site tests do not exercise return nil to satisfy the interface.
+type lifecycleCallSpy struct {
+	switchoverCalls  int
+	reconfigureCalls int
+}
+
+func (s *lifecycleCallSpy) PostProvision(_ context.Context, _ client.Reader, _ *lifecycle.Options) error {
+	return nil
+}
+
+func (s *lifecycleCallSpy) PreTerminate(_ context.Context, _ client.Reader, _ *lifecycle.Options) error {
+	return nil
+}
+
+func (s *lifecycleCallSpy) RoleProbe(_ context.Context, _ client.Reader, _ *lifecycle.Options) ([]byte, error) {
+	return nil, nil
+}
+
+func (s *lifecycleCallSpy) Switchover(_ context.Context, _ client.Reader, _ *lifecycle.Options, _ string) error {
+	s.switchoverCalls++
+	return nil
+}
+
+func (s *lifecycleCallSpy) MemberJoin(_ context.Context, _ client.Reader, _ *lifecycle.Options) error {
+	return nil
+}
+
+func (s *lifecycleCallSpy) MemberLeave(_ context.Context, _ client.Reader, _ *lifecycle.Options) error {
+	return nil
+}
+
+func (s *lifecycleCallSpy) Reconfigure(_ context.Context, _ client.Reader, _ *lifecycle.Options, _ map[string]string) error {
+	s.reconfigureCalls++
+	return nil
+}
+
+func (s *lifecycleCallSpy) AccountProvision(_ context.Context, _ client.Reader, _ *lifecycle.Options, _, _, _ string) error {
+	return nil
+}
+
+func (s *lifecycleCallSpy) UserDefined(_ context.Context, _ client.Reader, _ *lifecycle.Options, _ string, _ *kbappsv1.Action, _ map[string]string) error {
+	return nil
+}

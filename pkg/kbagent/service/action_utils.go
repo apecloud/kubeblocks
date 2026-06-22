@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -22,6 +22,7 @@ package service
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -101,8 +102,8 @@ type asyncResult struct {
 	stderr *bytes.Buffer
 }
 
-func blockingCallAction(ctx context.Context, action *kbaproto.Action, parameters map[string]string, timeout *int32) ([]byte, error) {
-	resultChan, err := nonBlockingCallAction(ctx, action, parameters, timeout)
+func blockingCallAction(ctx context.Context, action *kbaproto.Action, parameters map[string]string, arguments []string, timeout *int32) ([]byte, error) {
+	resultChan, err := nonBlockingCallAction(ctx, action, parameters, arguments, timeout)
 	if err != nil {
 		return nil, err
 	}
@@ -125,10 +126,10 @@ func blockingCallAction(ctx context.Context, action *kbaproto.Action, parameters
 	return result.stdout.Bytes(), nil
 }
 
-func nonBlockingCallAction(ctx context.Context, action *kbaproto.Action, parameters map[string]string, timeout *int32) (chan *asyncResult, error) {
+func nonBlockingCallAction(ctx context.Context, action *kbaproto.Action, parameters map[string]string, arguments []string, timeout *int32) (chan *asyncResult, error) {
 	stdoutBuf := bytes.NewBuffer(make([]byte, 0, defaultBufferSize))
 	stderrBuf := bytes.NewBuffer(make([]byte, 0, defaultBufferSize))
-	execErrorChan, err := nonBlockingCallActionX(ctx, action, parameters, timeout, nil, stdoutBuf, stderrBuf)
+	execErrorChan, err := nonBlockingCallActionX(ctx, action, parameters, arguments, timeout, nil, stdoutBuf, stderrBuf)
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +149,7 @@ func nonBlockingCallAction(ctx context.Context, action *kbaproto.Action, paramet
 	return resultChan, nil
 }
 
-func nonBlockingCallActionX(ctx context.Context, action *kbaproto.Action, parameters map[string]string, timeout *int32,
+func nonBlockingCallActionX(ctx context.Context, action *kbaproto.Action, parameters map[string]string, arguments []string, timeout *int32,
 	stdinReader io.Reader, stdoutWriter, stderrWriter io.Writer) (chan error, error) {
 	var cancel context.CancelFunc
 	ctx, cancel = actionCallTimeoutContext(ctx, timeout)
@@ -157,10 +158,18 @@ func nonBlockingCallActionX(ctx context.Context, action *kbaproto.Action, parame
 	errChan := make(chan error, 1)
 	switch {
 	case action.Exec != nil:
-		err = execActionCallX(ctx, cancel, action.Exec, parameters, errChan, stdinReader, stdoutWriter, stderrWriter)
+		err = execActionCallX(ctx, cancel, action.Exec, parameters, arguments, errChan, stdinReader, stdoutWriter, stderrWriter)
 	case action.HTTP != nil:
+		if len(arguments) > 0 {
+			cancel()
+			return nil, errors.Wrapf(kbaproto.ErrBadRequest, "runtime arguments are only supported for exec actions")
+		}
 		err = httpActionCallX(ctx, cancel, action.HTTP, parameters, errChan, stdinReader, stdoutWriter, stderrWriter)
 	case action.GRPC != nil:
+		if len(arguments) > 0 {
+			cancel()
+			return nil, errors.Wrapf(kbaproto.ErrBadRequest, "runtime arguments are only supported for exec actions")
+		}
 		err = grpcActionCallX(ctx, cancel, action.GRPC, parameters, errChan, stdinReader, stdoutWriter, stderrWriter)
 	default:
 		cancel() // cancel the context to release the resources
@@ -184,13 +193,14 @@ func actionCallTimeoutContext(ctx context.Context, timeout *int32) (context.Cont
 }
 
 func execActionCallX(ctx context.Context, cancel context.CancelFunc,
-	action *kbaproto.ExecAction, parameters map[string]string, errChan chan error, stdinReader io.Reader, stdoutWriter, stderrWriter io.Writer) error {
+	action *kbaproto.ExecAction, parameters map[string]string, arguments []string, errChan chan error, stdinReader io.Reader, stdoutWriter, stderrWriter io.Writer) error {
 	mergedArgs := func() []string {
 		args := make([]string, 0)
 		if len(action.Commands) > 1 {
 			args = append(args, action.Commands[1:]...)
 		}
 		args = append(args, action.Args...)
+		args = append(args, arguments...)
 		return args
 	}()
 
@@ -376,7 +386,6 @@ func grpcActionCallX(ctx context.Context, cancel context.CancelFunc,
 			return err
 		}
 	}
-
 	go func() {
 		defer cancel()
 		defer close(errChan)
@@ -531,6 +540,21 @@ func setGRPCMessageField(msg *dynamicpb.Message, fieldName, value string) error 
 	field := msg.Descriptor().Fields().ByTextName(fieldName)
 	if field == nil {
 		return fmt.Errorf("field %s not found", fieldName)
+	}
+
+	if field.IsMap() {
+		if field.MapKey().Kind() != protoreflect.StringKind || field.MapValue().Kind() != protoreflect.StringKind {
+			return fmt.Errorf("unsupported map field type: %s", field.Kind())
+		}
+		items := map[string]string{}
+		if err := json.Unmarshal([]byte(value), &items); err != nil {
+			return err
+		}
+		mapField := msg.Mutable(field).Map()
+		for k, v := range items {
+			mapField.Set(protoreflect.ValueOfString(k).MapKey(), protoreflect.ValueOfString(v))
+		}
+		return nil
 	}
 
 	var val protoreflect.Value

@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -50,11 +50,10 @@ import (
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 const (
-	namespace   = "foo"
-	name        = "bar"
-	oldRevision = "old-revision"
-	newRevision = "new-revision"
-
+	namespace       = "foo"
+	name            = "bar"
+	oldRevisionStr  = "old-revision"
+	newRevisionStr  = "new-revision"
 	minReadySeconds = 10
 )
 

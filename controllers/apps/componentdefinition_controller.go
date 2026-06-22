@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -557,6 +557,8 @@ func (r *ComponentDefinitionReconciler) cmpdHash(cmpd *appsv1.ComponentDefinitio
 	objCopy.Spec.Description = ""
 	objCopy.Spec.Exporter = nil
 	objCopy.Spec.PodManagementPolicy = nil
+	objCopy.Spec.PodUpdatePolicy = nil
+	objCopy.Spec.PodUpgradePolicy = nil
 	objCopy.Spec.MinReadySeconds = 0
 
 	// TODO: bpt

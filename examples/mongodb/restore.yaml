@@ -3,13 +3,18 @@ kind: Cluster
 metadata:
   name: mongo-cluster-restore
   namespace: demo
-  annotations:
-    # e.g. set  "encryptedSystemAccounts": {\"root\":\"ENCRYPTEDPASSWORD\"}
-    kubeblocks.io/restore-from-backup: '{"mongodb":{"encryptedSystemAccounts":"<ENCRYPTED-SYSTEM-ACCOUNTS>","name":"mongo-cluster-backup","namespace":"demo","volumeRestorePolicy":"Parallel"}}'
 spec:
   terminationPolicy: Delete
   clusterDef: mongodb
   topology: replicaset
+  restore:
+    source:
+      apiGroup: dataprotection.kubeblocks.io
+      kind: Backup
+      name: mongo-cluster-backup
+      namespace: demo
+    parameters:
+      dataprotection.kubeblocks.io/volume-restore-policy: Parallel
   componentSpecs:
     - name: mongodb
       serviceVersion: "6.0.16"

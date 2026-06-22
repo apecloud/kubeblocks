@@ -1,0 +1,348 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.18.0
+  labels:
+    app.kubernetes.io/name: kubeblocks
+  name: parameterviews.parameters.kubeblocks.io
+spec:
+  group: parameters.kubeblocks.io
+  names:
+    categories:
+    - kubeblocks
+    - parameters
+    kind: ParameterView
+    listKind: ParameterViewList
+    plural: parameterviews
+    shortNames:
+    - pview
+    singular: parameterview
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - description: referenced parameter name
+      jsonPath: .spec.parameterRef.name
+      name: PARAMETER
+      type: string
+    - description: config template name
+      jsonPath: .spec.templateName
+      name: TEMPLATE
+      type: string
+    - description: config file name
+      jsonPath: .spec.fileName
+      name: FILE
+      type: string
+    - description: view mode
+      jsonPath: .spec.mode
+      name: MODE
+      type: string
+    - description: status phase
+      jsonPath: .status.phase
+      name: PHASE
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: ParameterView is the Schema for the parameterviews API.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ParameterViewSpec defines the desired state of ParameterView.
+            properties:
+              content:
+                description: |-
+                  Content is the current user-facing document for the selected file.
+
+                  Controllers treat Content as the user's current draft:
+                  1. on initialization, Content is populated from the effective content and
+                     status.base and status.latest point to the same revision;
+                  2. while status.base and status.latest remain equal, Content is based on the
+                     latest observed effective content;
+                  3. when status.latest advances and Content is still only a projection of
+                     status.base, the controller may auto-refresh Content and move status.base
+                     forward to status.latest;
+                  4. when Content has diverged into a real user draft, the controller preserves
+                     it and uses status.base as the draft base when replaying the draft onto
+                     status.latest or surfacing a conflict.
+                properties:
+                  text:
+                    description: |-
+                      Text is the user-facing document content.
+
+                      When type is PlainText, Text is the raw editable file content.
+                      When type is MarkerLine, each line is expected to begin with a marker such as
+                      "[D]", "[S]", "[I]", or "[U]". The controller is responsible for parsing the
+                      view document into raw file content before translating edits into ComponentParameter
+                      patches.
+                    type: string
+                  type:
+                    default: PlainText
+                    description: Type declares how Text should be parsed and rendered.
+                    enum:
+                    - PlainText
+                    - MarkerLine
+                    type: string
+                type: object
+              fileName:
+                description: FileName identifies the config file inside the selected
+                  template.
+                minLength: 1
+                type: string
+              mode:
+                default: ReadWrite
+                description: Mode controls whether edits are allowed to be translated
+                  back into ComponentParameter patches.
+                enum:
+                - ReadOnly
+                - ReadWrite
+                type: string
+              parameterRef:
+                description: ParameterRef identifies the ComponentParameter edited
+                  through this view.
+                properties:
+                  name:
+                    description: |-
+                      Name of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    type: string
+                type: object
+                x-kubernetes-map-type: atomic
+              resetToLatest:
+                description: |-
+                  ResetToLatest requests the controller to discard the current draft in spec.content
+                  and rebuild it from the latest observed effective content.
+
+                  This is a reset-style action rather than a git-style rebase:
+                  1. the current draft is dropped;
+                  2. spec.content is reconstructed from status.latest;
+                  3. status.base is advanced to the rebuilt content revision.
+                type: boolean
+              templateName:
+                description: TemplateName identifies the config template inside the
+                  referenced ComponentParameter.
+                maxLength: 63
+                pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                type: string
+            required:
+            - fileName
+            - parameterRef
+            - templateName
+            type: object
+          status:
+            description: ParameterViewStatus defines the observed state of ParameterView.
+            properties:
+              base:
+                description: |-
+                  Base records the effective content revision that spec.content is currently based on.
+                  It is the draft base used to decide whether spec.content is still only a
+                  projection of the source, or whether it has diverged into a real user draft.
+                properties:
+                  contentHash:
+                    description: ContentHash records the hash of the effective file
+                      content for this revision.
+                    type: string
+                  revision:
+                    description: |-
+                      Revision records the effective content revision associated with this view state.
+                      The controller resolves it from the generated ConfigMap revision metadata when available.
+                    type: string
+                type: object
+              conditions:
+                description: Conditions captures detailed reconciliation and validation
+                  status.
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              fileFormat:
+                description: |-
+                  FileFormat identifies the file format used by the selected config file.
+                  It is resolved and refreshed by the controller from template metadata.
+                enum:
+                - xml
+                - ini
+                - yaml
+                - json
+                - hcl
+                - dotenv
+                - toml
+                - properties
+                - redis
+                - props-plus
+                - props-ultra
+                type: string
+              latest:
+                description: |-
+                  Latest records the latest effective content revision observed by the controller.
+                  When Base and Latest are equal, spec.content is based on the current latest
+                  effective revision. When they differ, spec.content is either waiting to
+                  auto-refresh because no real draft exists, or waiting for the controller to
+                  replay or reject a preserved user draft against the newer latest revision.
+                properties:
+                  contentHash:
+                    description: ContentHash records the hash of the effective file
+                      content for this revision.
+                    type: string
+                  revision:
+                    description: |-
+                      Revision records the effective content revision associated with this view state.
+                      The controller resolves it from the generated ConfigMap revision metadata when available.
+                    type: string
+                type: object
+              message:
+                description: Message provides a human-readable summary for the current
+                  state.
+                type: string
+              observedGeneration:
+                description: ObservedGeneration is the most recent ParameterView generation
+                  observed by the controller.
+                format: int64
+                type: integer
+              phase:
+                description: Phase describes the current state of this view.
+                enum:
+                - Synced
+                - Conflict
+                - Invalid
+                - Applying
+                type: string
+              submissions:
+                description: |-
+                  Submissions records recent desired parameter submissions derived from this view.
+                  Newer entries appear first. The controller may compact older entries, but it
+                  keeps enough history for users to understand which changes were recently submitted.
+                items:
+                  description: ParameterViewSubmission records the most recent submission
+                    derived from a view draft.
+                  properties:
+                    assignments:
+                      additionalProperties:
+                        type: string
+                      description: Assignments contains the desired simple parameter
+                        assignments submitted from the view.
+                      type: object
+                    result:
+                      description: |-
+                        Result records the current observed outcome of this submission after it has
+                        been handed off to the ComponentParameter controller.
+                      properties:
+                        message:
+                          description: Message provides a human-readable summary for
+                            the current submission result.
+                          type: string
+                        phase:
+                          description: Phase describes the current execution state
+                            of this submission.
+                          enum:
+                          - Processing
+                          - Failed
+                          - Succeeded
+                          type: string
+                        reason:
+                          description: Reason is a stable, machine-friendly summary
+                            for the current submission result.
+                          type: string
+                        updatedAt:
+                          description: UpdatedAt records when the result was last
+                            refreshed by the controller.
+                          format: date-time
+                          type: string
+                      type: object
+                    revision:
+                      description: Revision records the effective content revision
+                        that the submission was based on.
+                      properties:
+                        contentHash:
+                          description: ContentHash records the hash of the effective
+                            file content for this revision.
+                          type: string
+                        revision:
+                          description: |-
+                            Revision records the effective content revision associated with this view state.
+                            The controller resolves it from the generated ConfigMap revision metadata when available.
+                          type: string
+                      type: object
+                    submittedAt:
+                      description: SubmittedAt records when the submission entry was
+                        created or last refreshed.
+                      format: date-time
+                      type: string
+                  type: object
+                type: array
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

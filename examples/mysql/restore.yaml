@@ -3,10 +3,16 @@ kind: Cluster
 metadata:
   name: mysql-cluster-restore
   namespace: demo
-  annotations:
-    kubeblocks.io/restore-from-backup: '{"mysql":{"encryptedSystemAccounts":"<ENCRYPTED-SYSTEM-ACCOUNTS>","name":"mysql-cluster-backup","namespace":"demo","volumeRestorePolicy":"Parallel"}}'
 spec:
   terminationPolicy: Delete
+  restore:
+    source:
+      apiGroup: dataprotection.kubeblocks.io
+      kind: Backup
+      name: mysql-cluster-backup
+      namespace: demo
+    parameters:
+      dataprotection.kubeblocks.io/volume-restore-policy: Parallel
   componentSpecs:
     - name: mysql
       componentDef: "mysql-8.0"  # match all CMPD named with 'mysql-8.0-'

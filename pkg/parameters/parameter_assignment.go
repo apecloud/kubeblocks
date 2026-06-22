@@ -72,15 +72,15 @@ func hasParameterSchema(paramsDefs []*parametersv1alpha1.ParametersDefinition) b
 	return false
 }
 
-// capUint64Maximum returns a copy of the schema with Maximum capped to MaxInt64
-// when it exceeds int64 range. The kube-openapi validator converts float64 Maximum
-// to int64 internally; values like CUE uint64's 2^64-1 overflow to MinInt64,
-// causing all positive values to fail validation. Capping preserves validation
-// for the int64 value range that ConvertStringToInterfaceBySchemaType can produce.
+// capUint64Maximum returns a copy of the schema with Maximum capped to the largest
+// float64 that fits in int64. The kube-openapi validator converts float64 Maximum
+// to int64 internally; float64(math.MaxInt64) rounds up to 2^63 which still
+// overflows to MinInt64. math.Nextafter(2^63, 0) gives 2^63-1024, the largest
+// float64 that survives int64 truncation.
 func capUint64Maximum(schema apiext.JSONSchemaProps) apiext.JSONSchemaProps {
-	if schema.Type == "integer" && schema.Maximum != nil && *schema.Maximum > float64(math.MaxInt64) {
-		maxInt64 := float64(math.MaxInt64)
-		schema.Maximum = &maxInt64
+	if schema.Type == "integer" && schema.Maximum != nil && *schema.Maximum >= math.Exp2(63) {
+		safeMax := math.Nextafter(math.Exp2(63), 0)
+		schema.Maximum = &safeMax
 	}
 	return schema
 }

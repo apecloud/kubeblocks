@@ -2489,6 +2489,117 @@ func TestEnsurePostReadyRestore_MultiComponent_PostReadyOnly_TargetComponentNotY
 	require.Len(t, restoreList.Items, 0, "no Restore CR should be created while target component doesn't exist")
 }
 
+func TestEnsurePostReadyRestore_MultiComponent_PostReadyOnly_WaitsForAllComponentPVCs(t *testing.T) {
+	// When PD PVCs are bound but TiKV PVCs are NOT yet bound, the redirect path must
+	// wait (return false, nil) instead of creating the postReady Restore CR early.
+	// This prevents the logical restore job from running before the cluster is ready.
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, kbappsv1.AddToScheme(scheme))
+	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
+	apiGroup := dptypes.DataprotectionAPIGroup
+
+	backup := newBackupForRestoreDecision(nil, nil)
+	backup.Status.BackupMethod.TargetVolumes = nil
+	backup.Status.Target = &dpv1alpha1.BackupStatusTarget{
+		BackupTarget: dpv1alpha1.BackupTarget{
+			Name: "tidb",
+			PodSelector: &dpv1alpha1.PodSelector{
+				LabelSelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						constant.AppInstanceLabelKey:    "cluster",
+						constant.KBAppComponentLabelKey: "tidb",
+					},
+				},
+			},
+		},
+	}
+
+	// PD data PVC — bound (has VolumeName)
+	pdPVC := newPVCForRestoreDecision("data", "pd", "")
+	pdPVC.UID = types.UID("pd-pvc-uid")
+	pdPVC.Spec.VolumeName = "pd-data-pv"
+	pdPVC.Spec.DataSourceRef = &corev1.TypedObjectReference{
+		APIGroup: &apiGroup,
+		Kind:     dptypes.BackupKind,
+		Name:     backup.Name,
+	}
+	pdPVC.Annotations[constant.RestoreSourceKindAnnotationKey] = dptypes.BackupKind
+	pdPVC.Annotations[constant.RestoreSourceNamespaceAnnotationKey] = backup.Namespace
+
+	// TiKV data PVC — NOT bound (no VolumeName)
+	tikvPVC := newPVCForRestoreDecision("data", "tikv", "")
+	tikvPVC.UID = types.UID("tikv-pvc-uid")
+	tikvPVC.Spec.DataSourceRef = &corev1.TypedObjectReference{
+		APIGroup: &apiGroup,
+		Kind:     dptypes.BackupKind,
+		Name:     backup.Name,
+	}
+	tikvPVC.Annotations[constant.RestoreSourceKindAnnotationKey] = dptypes.BackupKind
+	tikvPVC.Annotations[constant.RestoreSourceNamespaceAnnotationKey] = backup.Namespace
+
+	pdComp := &kbappsv1.Component{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      constant.GenerateClusterComponentName("cluster", "pd"),
+			UID:       "pd-component-uid",
+		},
+		Status: kbappsv1.ComponentStatus{Phase: kbappsv1.RunningComponentPhase},
+	}
+	tikvComp := &kbappsv1.Component{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      constant.GenerateClusterComponentName("cluster", "tikv"),
+			UID:       "tikv-component-uid",
+		},
+		Status: kbappsv1.ComponentStatus{Phase: kbappsv1.CreatingComponentPhase},
+	}
+	tidbComp := &kbappsv1.Component{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      constant.GenerateClusterComponentName("cluster", "tidb"),
+			UID:       "tidb-component-uid",
+		},
+		Status: kbappsv1.ComponentStatus{Phase: kbappsv1.RunningComponentPhase},
+	}
+
+	reconciler := &VolumePopulatorReconciler{
+		Client: fake.NewClientBuilder().WithScheme(scheme).
+			WithStatusSubresource(pdPVC, tikvPVC).
+			WithObjects(backup, pdPVC, tikvPVC, pdComp, tikvComp, tidbComp).
+			Build(),
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(10),
+	}
+
+	restoreMgr := dprestore.NewRestoreManager(&dpv1alpha1.Restore{
+		Spec: dpv1alpha1.RestoreSpec{Backup: dpv1alpha1.BackupRef{Name: backup.Name, Namespace: backup.Namespace}},
+	}, nil, scheme, reconciler.Client)
+	restoreMgr.PostReadyBackupSets = []dprestore.BackupActionSet{{Backup: backup}}
+
+	pdDecision, err := reconciler.decidePVCRestore(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, pdPVC, backup, nil)
+	require.NoError(t, err)
+	require.True(t, pdDecision.skipPostReady, "PD PVC should have skipPostReady=true")
+
+	pdCtx := &pvcRestoreContext{
+		restoreMgr:    restoreMgr,
+		mode:          pdDecision.mode,
+		skipPostReady: pdDecision.skipPostReady,
+	}
+
+	// PD PVC triggers redirect, but TiKV PVC is not bound yet — should wait
+	completed, err := reconciler.ensurePostReadyRestoreCompleted(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, pdPVC, pdCtx)
+	require.NoError(t, err, "should requeue without error while TiKV PVCs are still pending")
+	require.False(t, completed, "should not be completed while TiKV PVCs are unbound")
+
+	restoreList := &dpv1alpha1.RestoreList{}
+	require.NoError(t, reconciler.Client.List(context.Background(), restoreList, client.InNamespace("default")))
+	require.Len(t, restoreList.Items, 0,
+		"no Restore CR should be created while other component PVCs are still unbound")
+}
+
 func TestEnsurePostReadyRestore_MultiComponent_PostReadyOnly_TargetsSlice(t *testing.T) {
 	// Regression: backup target in Status.Targets[0] (not Status.Target) must also
 	// trigger the postReady-only redirect. This mirrors resolveSourceTargetFromBackup

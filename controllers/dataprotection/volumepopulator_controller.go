@@ -1183,7 +1183,13 @@ func (r *VolumePopulatorReconciler) ensurePostReadyRestoreCompleted(reqCtx intct
 	if pvc.Annotations[constant.RestoreSourceKindAnnotationKey] == "" {
 		return true, nil
 	}
-	allBound, err := r.allRestorePVCsForComponentBound(reqCtx, pvc)
+	var allBound bool
+	var err error
+	if restoreCtx.skipPostReady {
+		allBound, err = r.allRestorePVCsForClusterBound(reqCtx, pvc)
+	} else {
+		allBound, err = r.allRestorePVCsForComponentBound(reqCtx, pvc)
+	}
 	if err != nil || !allBound {
 		if err == nil {
 			err = r.updatePVCConditionsIfPopulateNotReleased(reqCtx, pvc, "Waiting for all restore PVCs to finish prepareData")
@@ -1435,6 +1441,59 @@ func (r *VolumePopulatorReconciler) allRestorePVCsForComponentBound(reqCtx intct
 		}
 	}
 	return true, nil
+}
+
+func (r *VolumePopulatorReconciler) allRestorePVCsForClusterBound(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim) (bool, error) {
+	pvcs, err := r.listRestorePVCsForCluster(reqCtx, pvc)
+	if err != nil {
+		return false, err
+	}
+	for i := range pvcs {
+		item := &pvcs[i]
+		cond := findPVCConditionByType(item, appsv1.ConditionTypeRestore)
+		if cond != nil && cond.Status == corev1.ConditionFalse {
+			return false, intctrlutil.NewFatalError(fmt.Sprintf("restore PVC %s/%s failed: %s", item.Namespace, item.Name, cond.Message))
+		}
+		if item.Spec.VolumeName == "" {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+func (r *VolumePopulatorReconciler) listRestorePVCsForCluster(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim) ([]corev1.PersistentVolumeClaim, error) {
+	clusterName := pvc.Labels[constant.AppInstanceLabelKey]
+	if clusterName == "" || pvc.Spec.DataSourceRef == nil {
+		return []corev1.PersistentVolumeClaim{*pvc}, nil
+	}
+	pvcList := &corev1.PersistentVolumeClaimList{}
+	if err := r.Client.List(reqCtx.Ctx, pvcList, client.InNamespace(pvc.Namespace),
+		client.MatchingLabels(constant.GetClusterLabels(clusterName))); err != nil {
+		return nil, err
+	}
+	var result []corev1.PersistentVolumeClaim
+	sourceNamespace, err := r.authorizedBackupNamespaceFromPVC(reqCtx, pvc)
+	if err != nil {
+		return nil, intctrlutil.NewFatalError(err.Error())
+	}
+	for i := range pvcList.Items {
+		item := pvcList.Items[i]
+		if item.Spec.DataSourceRef == nil || item.Spec.DataSourceRef.Name != pvc.Spec.DataSourceRef.Name {
+			continue
+		}
+		if item.Annotations[constant.RestoreSourceKindAnnotationKey] == "" {
+			continue
+		}
+		itemSourceNamespace, err := r.authorizedBackupNamespaceFromPVC(reqCtx, &item)
+		if err != nil {
+			return nil, intctrlutil.NewFatalError(err.Error())
+		}
+		if itemSourceNamespace != sourceNamespace {
+			continue
+		}
+		result = append(result, item)
+	}
+	return result, nil
 }
 
 func findPVCConditionByType(pvc *corev1.PersistentVolumeClaim, conditionType string) *corev1.PersistentVolumeClaimCondition {

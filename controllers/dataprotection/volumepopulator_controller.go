@@ -1722,6 +1722,9 @@ func (r *VolumePopulatorReconciler) getProvisionOnlyPVC(reqCtx intctrlutil.Reque
 }
 
 func (r *VolumePopulatorReconciler) rebindPVCAndPV(reqCtx intctrlutil.RequestCtx, populatePVC, pvc *corev1.PersistentVolumeClaim) (bool, error) {
+	if populatePVC == nil {
+		return false, nil
+	}
 	if populatePVC.Spec.VolumeName == "" {
 		return false, nil
 	}

@@ -2163,3 +2163,187 @@ func TestRestoreSystemAccountSecretsReturnsFatalForInvalidAccountsPayload(t *tes
 	require.Error(t, err)
 	require.True(t, intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal))
 }
+
+// TiDB-shaped multi-component test: backup target (tidb) has no data PVC,
+// data PVCs belong to other components (pd, tikv).
+// ActionSet has only postReady (no prepareData) — logical backup pattern.
+
+func TestDecidePVCRestore_MultiComponent_PostReadyOnly_SkipsNonMatchingPVC(t *testing.T) {
+	// Documents current behavior (the bug): when backup target is scoped to
+	// component "tidb" and a PVC belongs to component "pd", skipPostReady=true.
+	reconciler := &VolumePopulatorReconciler{}
+	backup := newBackupForRestoreDecision(nil, nil) // no targetVolumes (logical backup)
+	backup.Status.BackupMethod.TargetVolumes = nil
+	backup.Status.Target = &dpv1alpha1.BackupStatusTarget{
+		BackupTarget: dpv1alpha1.BackupTarget{Name: "tidb"},
+		PodSelector: &dpv1alpha1.PodSelector{
+			LabelSelector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					constant.AppInstanceLabelKey:    "cluster",
+					constant.KBAppComponentLabelKey: "tidb",
+				},
+			},
+		},
+	}
+
+	// PD data PVC — belongs to "pd" component, not "tidb"
+	pdPVC := newPVCForRestoreDecision("data", "pd", "")
+	decision, err := reconciler.decidePVCRestore(intctrlutil.RequestCtx{Ctx: context.Background()}, pdPVC, backup, nil)
+	require.NoError(t, err)
+	require.Equal(t, pvcRestoreModeProvisionOnly, decision.mode)
+	// Current behavior: skipPostReady=true for non-matching component
+	require.True(t, decision.skipPostReady, "current behavior: non-matching PVC gets skipPostReady=true")
+	require.Nil(t, decision.sourceTarget)
+
+	// TiKV data PVC — also not "tidb"
+	tikvPVC := newPVCForRestoreDecision("data", "tikv", "")
+	decision, err = reconciler.decidePVCRestore(intctrlutil.RequestCtx{Ctx: context.Background()}, tikvPVC, backup, nil)
+	require.NoError(t, err)
+	require.Equal(t, pvcRestoreModeProvisionOnly, decision.mode)
+	require.True(t, decision.skipPostReady, "current behavior: non-matching PVC gets skipPostReady=true")
+	require.Nil(t, decision.sourceTarget)
+}
+
+func TestEnsurePostReadyRestore_MultiComponent_PostReadyOnly_ShouldNotSilentlySkip(t *testing.T) {
+	// Desired behavior: when ActionSet has only postReady (no prepareData) and
+	// backup target component has no data PVC, at least one data PVC's component
+	// should trigger postReady restore. The result should be exactly 1 Restore CR.
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, kbappsv1.AddToScheme(scheme))
+	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
+	apiGroup := dptypes.DataprotectionAPIGroup
+
+	backup := newBackupForRestoreDecision(nil, nil)
+	backup.Status.BackupMethod.TargetVolumes = nil
+	backup.Status.Target = &dpv1alpha1.BackupStatusTarget{
+		BackupTarget: dpv1alpha1.BackupTarget{Name: "tidb"},
+		PodSelector: &dpv1alpha1.PodSelector{
+			LabelSelector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					constant.AppInstanceLabelKey:    "cluster",
+					constant.KBAppComponentLabelKey: "tidb",
+				},
+			},
+		},
+	}
+
+	// PD data PVC
+	pdPVC := newPVCForRestoreDecision("data", "pd", "")
+	pdPVC.UID = types.UID("pd-pvc-uid")
+	pdPVC.Spec.VolumeName = "pd-data-pv"
+	pdPVC.Spec.DataSourceRef = &corev1.TypedObjectReference{
+		APIGroup: &apiGroup,
+		Kind:     dptypes.BackupKind,
+		Name:     backup.Name,
+	}
+	pdPVC.Annotations[constant.RestoreSourceKindAnnotationKey] = dptypes.BackupKind
+	pdPVC.Annotations[constant.RestoreSourceNamespaceAnnotationKey] = backup.Namespace
+
+	// TiKV data PVC
+	tikvPVC := newPVCForRestoreDecision("data", "tikv", "")
+	tikvPVC.UID = types.UID("tikv-pvc-uid")
+	tikvPVC.Spec.VolumeName = "tikv-data-pv"
+	tikvPVC.Spec.DataSourceRef = &corev1.TypedObjectReference{
+		APIGroup: &apiGroup,
+		Kind:     dptypes.BackupKind,
+		Name:     backup.Name,
+	}
+	tikvPVC.Annotations[constant.RestoreSourceKindAnnotationKey] = dptypes.BackupKind
+	tikvPVC.Annotations[constant.RestoreSourceNamespaceAnnotationKey] = backup.Namespace
+
+	pdComp := &kbappsv1.Component{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      constant.GenerateClusterComponentName("cluster", "pd"),
+			UID:       "pd-component-uid",
+		},
+		Status: kbappsv1.ComponentStatus{Phase: kbappsv1.RunningComponentPhase},
+	}
+	tikvComp := &kbappsv1.Component{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      constant.GenerateClusterComponentName("cluster", "tikv"),
+			UID:       "tikv-component-uid",
+		},
+		Status: kbappsv1.ComponentStatus{Phase: kbappsv1.RunningComponentPhase},
+	}
+
+	reconciler := &VolumePopulatorReconciler{
+		Client: fake.NewClientBuilder().WithScheme(scheme).
+			WithStatusSubresource(pdPVC, tikvPVC).
+			WithObjects(backup, pdPVC, tikvPVC, pdComp, tikvComp).
+			Build(),
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(10),
+	}
+
+	restoreMgr := dprestore.NewRestoreManager(&dpv1alpha1.Restore{
+		Spec: dpv1alpha1.RestoreSpec{Backup: dpv1alpha1.BackupRef{Name: backup.Name, Namespace: backup.Namespace}},
+	}, nil, scheme, reconciler.Client)
+	// PostReady-only ActionSet: PostReadyBackupSets non-empty, PrepareDataBackupSets empty
+	restoreMgr.PostReadyBackupSets = []dprestore.BackupActionSet{{Backup: backup}}
+	// PrepareDataBackupSets stays nil/empty (no prepareData in ActionSet)
+
+	// Simulate the VolumePopulator flow for both PVCs with skipPostReady=true
+	// (as decidePVCRestore currently sets it for non-matching PVCs)
+	pdCtx := &pvcRestoreContext{
+		restoreMgr:    restoreMgr,
+		mode:          pvcRestoreModeProvisionOnly,
+		skipPostReady: true, // current decidePVCRestore result for non-matching PVC
+	}
+	tikvCtx := &pvcRestoreContext{
+		restoreMgr:    restoreMgr,
+		mode:          pvcRestoreModeProvisionOnly,
+		skipPostReady: true,
+	}
+
+	// Process both PVCs through ensurePostReadyRestoreCompleted
+	completed1, err := reconciler.ensurePostReadyRestoreCompleted(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, pdPVC, pdCtx)
+	require.NoError(t, err)
+	completed2, err := reconciler.ensurePostReadyRestoreCompleted(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, tikvPVC, tikvCtx)
+	require.NoError(t, err)
+
+	// DESIRED: at least one PVC should have triggered postReady restore creation
+	restoreList := &dpv1alpha1.RestoreList{}
+	require.NoError(t, reconciler.Client.List(context.Background(), restoreList, client.InNamespace("default")))
+
+	// BUG: currently both return completed=true (silent skip) and 0 Restore CRs
+	// After fix: exactly 1 Restore CR should be created, not 0 and not 2
+	require.Len(t, restoreList.Items, 1,
+		"postReady-only ActionSet with multi-component backup should create exactly 1 Restore CR, "+
+			"not silently skip all non-matching PVCs")
+
+	// Both PVCs should not both report completed=true when no restore was created
+	require.False(t, completed1 && completed2,
+		"at least one PVC should trigger postReady restore, not all silently skip")
+}
+
+func TestRebindPVCAndPV_NilPopulatePVC_ShouldNotPanic(t *testing.T) {
+	// Guard: rebindPVCAndPV(nil, pvc) should not nil-pointer panic.
+	// This can happen when entering restoreData path without prepareData backup set.
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:       "default",
+			Name:            "data-target-0",
+			UID:             "target-pvc-uid",
+			ResourceVersion: "1",
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			DataSourceRef: &corev1.TypedObjectReference{Name: "backup"},
+		},
+	}
+	reconciler := &VolumePopulatorReconciler{
+		Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(pvc).Build(),
+	}
+	reqCtx := intctrlutil.RequestCtx{Ctx: context.Background()}
+
+	// Should not panic; should return gracefully
+	require.NotPanics(t, func() {
+		_, _ = reconciler.rebindPVCAndPV(reqCtx, nil, pvc)
+	}, "rebindPVCAndPV should not panic when populatePVC is nil")
+}

@@ -1287,7 +1287,7 @@ func TestBuildPostReadyRestoreSelectsHighestPriorityRole(t *testing.T) {
 	}
 	restoreMgr := dprestore.NewRestoreManager(&dpv1alpha1.Restore{}, nil, scheme, reconciler.Client)
 
-	restore, err := reconciler.buildPostReadyRestore(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, restoreMgr, comp)
+	restore, err := reconciler.buildPostReadyRestore(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, restoreMgr, comp, "")
 
 	require.NoError(t, err)
 	require.Equal(t, "leader", restore.Spec.ReadyConfig.JobAction.Target.PodSelector.LabelSelector.MatchLabels[instanceset.RoleLabelKey])
@@ -1325,7 +1325,7 @@ func TestBuildPostReadyRestoreUsesInitAccountFromComponentDefinition(t *testing.
 	}
 	restoreMgr := dprestore.NewRestoreManager(&dpv1alpha1.Restore{}, nil, scheme, reconciler.Client)
 
-	restore, err := reconciler.buildPostReadyRestore(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, restoreMgr, comp)
+	restore, err := reconciler.buildPostReadyRestore(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, restoreMgr, comp, "")
 
 	require.NoError(t, err)
 	require.NotNil(t, restore.Spec.ReadyConfig.ConnectionCredential)
@@ -1675,6 +1675,7 @@ func TestCompleteBoundPVCMarksRestoreSucceededAfterPostReadyCompleted(t *testing
 		pvc,
 		restoreMgr,
 		comp,
+		"",
 	)
 	require.NoError(t, err)
 	postReadyRestore.Status.Phase = dpv1alpha1.RestorePhaseCompleted

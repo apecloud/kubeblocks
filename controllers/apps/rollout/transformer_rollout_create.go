@@ -86,7 +86,7 @@ func (t *rolloutCreateTransformer) component(transCtx *rolloutTransformContext,
 		return err
 	}
 
-	if (replicas + targetReplicas) > spec.Replicas {
+	if (replicas+targetReplicas) > spec.Replicas && !hasPromotedCreateTemplate(rollout, spec.Instances) {
 		return t.rolling(transCtx, comp, spec, replicas, targetReplicas)
 	}
 
@@ -101,7 +101,7 @@ func (t *rolloutCreateTransformer) sharding(transCtx *rolloutTransformContext,
 		return err
 	}
 
-	if (replicas + targetReplicas) > spec.Template.Replicas {
+	if (replicas+targetReplicas) > spec.Template.Replicas && !hasPromotedCreateTemplate(rollout, spec.Template.Instances) {
 		return t.shardingRolling(transCtx, sharding, spec, replicas, targetReplicas)
 	}
 
@@ -285,6 +285,11 @@ func createShardingReplicas(rollout *appsv1alpha1.Rollout, sharding appsv1alpha1
 		return 0, 0, err
 	}
 	return replicas, target, nil
+}
+
+func hasPromotedCreateTemplate(rollout *appsv1alpha1.Rollout, instances []appsv1.InstanceTemplate) bool {
+	tpl := createInstanceTemplate(instances, replaceInstanceTemplateNamePrefix(rollout))
+	return tpl != nil && !ptr.Deref(tpl.Canary, false)
 }
 
 func createTargetReplicas(name string, replicasSpec *intstr.IntOrString, originalReplicas int32, subject string) (int32, error) {

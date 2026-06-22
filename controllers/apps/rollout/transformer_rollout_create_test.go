@@ -23,6 +23,8 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
 
@@ -54,6 +56,186 @@ func TestCreateReplicasRejectsTargetGreaterThanOriginal(t *testing.T) {
 	_, _, err := transformer.replicas(rollout, comp, spec)
 	if err == nil {
 		t.Fatalf("expected target replicas validation error")
+	}
+}
+
+func TestCreateComponentDoesNotReenterRollingAfterPromotion(t *testing.T) {
+	const compName = "comp"
+
+	transformer := &rolloutCreateTransformer{}
+	rollout := &appsv1alpha1.Rollout{
+		ObjectMeta: metav1.ObjectMeta{
+			UID: types.UID("12345678"),
+		},
+		Status: appsv1alpha1.RolloutStatus{
+			Components: []appsv1alpha1.RolloutComponentStatus{
+				{
+					Name:                   compName,
+					Replicas:               2,
+					CanaryReplicas:         1,
+					LastScaleUpTimestamp:   metav1.Now(),
+					LastScaleDownTimestamp: metav1.Now(),
+				},
+			},
+		},
+	}
+	prefix := replaceInstanceTemplateNamePrefix(rollout)
+	spec := &appsv1.ClusterComponentSpec{
+		Replicas: 2,
+		Instances: []appsv1.InstanceTemplate{
+			{
+				Name:     prefix,
+				Canary:   ptr.To(false),
+				Replicas: ptr.To[int32](1),
+			},
+		},
+	}
+	comp := appsv1alpha1.RolloutComponent{
+		Name:     compName,
+		Replicas: ptr.To(intstr.FromInt32(1)),
+		Strategy: appsv1alpha1.RolloutStrategy{
+			Create: &appsv1alpha1.RolloutStrategyCreate{
+				Canary: ptr.To(true),
+				Promotion: &appsv1alpha1.RolloutPromotion{
+					Auto:                  ptr.To(true),
+					DelaySeconds:          ptr.To[int32](0),
+					ScaleDownDelaySeconds: ptr.To[int32](0),
+				},
+			},
+		},
+	}
+	transCtx := &rolloutTransformContext{
+		Rollout: rollout,
+		ClusterOrig: &appsv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Generation: 1,
+			},
+			Status: appsv1.ClusterStatus{
+				ObservedGeneration: 1,
+				Components: map[string]appsv1.ClusterComponentStatus{
+					compName: {
+						Phase: appsv1.RunningComponentPhase,
+					},
+				},
+			},
+		},
+		ClusterComps: map[string]*appsv1.ClusterComponentSpec{
+			compName: spec,
+		},
+		Components: map[string]*appsv1.Component{
+			compName: {
+				ObjectMeta: metav1.ObjectMeta{
+					Generation: 1,
+				},
+				Status: appsv1.ComponentStatus{
+					ObservedGeneration: 1,
+					Phase:              appsv1.RunningComponentPhase,
+				},
+			},
+		},
+	}
+
+	if err := transformer.component(transCtx, rollout, comp); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if spec.Replicas != 2 {
+		t.Fatalf("promoted create rollout re-entered rolling, replicas = %d, want 2", spec.Replicas)
+	}
+	if got := ptr.Deref(spec.Instances[0].Replicas, 0); got != 1 {
+		t.Fatalf("unexpected promoted template replicas: %d", got)
+	}
+}
+
+func TestCreateShardingDoesNotReenterRollingAfterPromotion(t *testing.T) {
+	const shardingName = "sharding"
+
+	transformer := &rolloutCreateTransformer{}
+	rollout := &appsv1alpha1.Rollout{
+		ObjectMeta: metav1.ObjectMeta{
+			UID: types.UID("12345678"),
+		},
+		Status: appsv1alpha1.RolloutStatus{
+			Shardings: []appsv1alpha1.RolloutShardingStatus{
+				{
+					Name:                   shardingName,
+					Replicas:               2,
+					CanaryReplicas:         1,
+					LastScaleUpTimestamp:   metav1.Now(),
+					LastScaleDownTimestamp: metav1.Now(),
+				},
+			},
+		},
+	}
+	prefix := replaceInstanceTemplateNamePrefix(rollout)
+	spec := &appsv1.ClusterSharding{
+		Name:   shardingName,
+		Shards: 1,
+		Template: appsv1.ClusterComponentSpec{
+			Replicas: 2,
+			Instances: []appsv1.InstanceTemplate{
+				{
+					Name:     prefix,
+					Canary:   ptr.To(false),
+					Replicas: ptr.To[int32](1),
+				},
+			},
+		},
+	}
+	sharding := appsv1alpha1.RolloutSharding{
+		Name:     shardingName,
+		Replicas: ptr.To(intstr.FromInt32(1)),
+		Strategy: appsv1alpha1.RolloutStrategy{
+			Create: &appsv1alpha1.RolloutStrategyCreate{
+				Canary: ptr.To(true),
+				Promotion: &appsv1alpha1.RolloutPromotion{
+					Auto:                  ptr.To(true),
+					DelaySeconds:          ptr.To[int32](0),
+					ScaleDownDelaySeconds: ptr.To[int32](0),
+				},
+			},
+		},
+	}
+	transCtx := &rolloutTransformContext{
+		Rollout: rollout,
+		ClusterOrig: &appsv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Generation: 1,
+			},
+			Status: appsv1.ClusterStatus{
+				ObservedGeneration: 1,
+				Shardings: map[string]appsv1.ClusterShardingStatus{
+					shardingName: {
+						Phase: appsv1.RunningComponentPhase,
+					},
+				},
+			},
+		},
+		ClusterShardings: map[string]*appsv1.ClusterSharding{
+			shardingName: spec,
+		},
+		ShardingComps: map[string][]*appsv1.Component{
+			shardingName: {
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Generation: 1,
+					},
+					Status: appsv1.ComponentStatus{
+						ObservedGeneration: 1,
+						Phase:              appsv1.RunningComponentPhase,
+					},
+				},
+			},
+		},
+	}
+
+	if err := transformer.sharding(transCtx, rollout, sharding); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if spec.Template.Replicas != 2 {
+		t.Fatalf("promoted create sharding rollout re-entered rolling, replicas = %d, want 2", spec.Template.Replicas)
+	}
+	if got := ptr.Deref(spec.Template.Instances[0].Replicas, 0); got != 1 {
+		t.Fatalf("unexpected promoted template replicas: %d", got)
 	}
 }
 

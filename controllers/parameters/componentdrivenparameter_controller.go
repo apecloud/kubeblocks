@@ -142,6 +142,9 @@ func (r *ComponentDrivenParameterReconciler) delete(reqCtx intctrlutil.RequestCt
 
 func (r *ComponentDrivenParameterReconciler) update(reqCtx intctrlutil.RequestCtx, expected, existing *parametersv1alpha1.ComponentParameter) (ctrl.Result, error) {
 	mergedObject := r.mergeComponentParameter(expected, existing)
+	if len(mergedObject.Spec.ConfigItemDetails) == 0 && len(existing.Spec.ConfigItemDetails) == 0 {
+		mergedObject.Spec.ConfigItemDetails = existing.Spec.ConfigItemDetails
+	}
 	if reflect.DeepEqual(mergedObject, existing) {
 		return intctrlutil.Reconciled()
 	}

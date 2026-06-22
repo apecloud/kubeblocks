@@ -71,7 +71,8 @@ func reconcileConfigItemDetailsIntoSpec(ctx context.Context, cli client.Client, 
 		}
 		dest.ConfigSpec = expected.ConfigSpec
 	})
-	if reflect.DeepEqual(compParam.Spec.ConfigItemDetails, merged.Spec.ConfigItemDetails) {
+	if len(compParam.Spec.ConfigItemDetails) == 0 && len(merged.Spec.ConfigItemDetails) == 0 ||
+		reflect.DeepEqual(compParam.Spec.ConfigItemDetails, merged.Spec.ConfigItemDetails) {
 		return false, nil
 	}
 	patch := client.MergeFrom(compParam.DeepCopy())

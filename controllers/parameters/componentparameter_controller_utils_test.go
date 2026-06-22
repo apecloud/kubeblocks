@@ -108,3 +108,22 @@ func TestMergeItemParameters(t *testing.T) {
 		}
 	})
 }
+
+func TestNilEmptyConfigItemDetailsEquivalence(t *testing.T) {
+	t.Run("nil and empty ConfigItemDetails should be treated as equal", func(t *testing.T) {
+		merged := parampkg.MergeComponentParameter(
+			&parametersv1alpha1.ComponentParameter{},
+			&parametersv1alpha1.ComponentParameter{},
+			func(dest, expected *parametersv1alpha1.ConfigTemplateItemDetail) {},
+		)
+		var nilDetails []parametersv1alpha1.ConfigTemplateItemDetail
+		emptyDetails := merged.Spec.ConfigItemDetails
+		if len(nilDetails) != 0 || len(emptyDetails) != 0 {
+			t.Fatalf("expected both to be empty, got nil=%d empty=%d", len(nilDetails), len(emptyDetails))
+		}
+		bothEmpty := len(nilDetails) == 0 && len(emptyDetails) == 0
+		if !bothEmpty {
+			t.Fatalf("nil and empty ConfigItemDetails should be treated as equal")
+		}
+	})
+}

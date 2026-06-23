@@ -30,7 +30,6 @@ import (
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/util/retry"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -397,15 +396,4 @@ func updateReplicaStatusFunc(ctx context.Context, cli client.Client,
 		return err
 	}
 	return cli.Update(ctx, its)
-}
-
-func UpdateReplicaStatusWithRetry(ctx context.Context, cli client.Client,
-	key types.NamespacedName, replicaName string, f func(*ReplicaStatus) error) error {
-	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		its := &workloads.InstanceSet{}
-		if err := cli.Get(ctx, key, its); err != nil {
-			return err
-		}
-		return updateReplicaStatusFunc(ctx, cli, its, replicaName, f)
-	})
 }

@@ -26,7 +26,6 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -354,14 +353,6 @@ func (r *componentWorkloadOps) joinMember4ScaleOut() error {
 			if err := r.joinMemberForPod(pod, pods); err != nil {
 				joinErrors = append(joinErrors, fmt.Errorf("pod %s: %w", pod.Name, err))
 			} else {
-				key := types.NamespacedName{Namespace: r.protoITS.Namespace, Name: r.protoITS.Name}
-				if err := component.UpdateReplicaStatusWithRetry(r.transCtx.Context, r.cli, key, pod.Name, func(status *component.ReplicaStatus) error {
-					status.MemberJoined = ptr.To(true)
-					return nil
-				}); err != nil {
-					joinErrors = append(joinErrors, fmt.Errorf("pod %s: persist member joined status: %w", pod.Name, err))
-					continue
-				}
 				replicas.Status[i].MemberJoined = ptr.To(true)
 			}
 		}

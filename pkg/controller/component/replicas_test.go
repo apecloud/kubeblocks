@@ -20,36 +20,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
-	"context"
 	"slices"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
-
-type conflictOnceClient struct {
-	client.Client
-	conflict bool
-}
-
-func (c *conflictOnceClient) Update(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
-	if c.conflict {
-		c.conflict = false
-		return apierrors.NewConflict(schema.GroupResource{Group: "workloads.kubeblocks.io", Resource: "instancesets"}, obj.GetName(), nil)
-	}
-	return c.Client.Update(ctx, obj, opts...)
-}
 
 var _ = Describe("replicas", func() {
 	var (
@@ -198,43 +179,6 @@ var _ = Describe("replicas", func() {
 				Expect(s.MemberJoined).ShouldNot(BeNil())
 				Expect(*s.MemberJoined).Should(BeFalse())
 			})).Should(Succeed())
-		})
-
-		It("retries member-joined status update on conflict", func() {
-			key := types.NamespacedName{Namespace: testCtx.DefaultNamespace, Name: "test-cluster-its-member-join-retry"}
-			_ = k8sClient.Delete(ctx, &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Namespace: key.Namespace, Name: key.Name}})
-
-			its.Name = key.Name
-			its.Namespace = key.Namespace
-			its.Spec.Selector = &metav1.LabelSelector{MatchLabels: map[string]string{"app": key.Name}}
-			its.Spec.Template = corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": key.Name}},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{{Name: "test", Image: "test"}},
-				},
-			}
-			Expect(StatusReplicasStatus(its, replicas, true, true)).Should(Succeed())
-			its.Spec.Replicas = ptr.To[int32](4)
-			newReplica := "test-cluster-its-3"
-			Expect(NewReplicasStatus(its, []string{newReplica}, true, false)).Should(Succeed())
-			Expect(k8sClient.Create(ctx, its)).Should(Succeed())
-
-			cli := &conflictOnceClient{Client: k8sClient, conflict: true}
-			Expect(UpdateReplicaStatusWithRetry(ctx, cli, key, newReplica, func(status *ReplicaStatus) error {
-				status.MemberJoined = ptr.To(true)
-				return nil
-			})).Should(Succeed())
-
-			got := &workloads.InstanceSet{}
-			Expect(k8sClient.Get(ctx, key, got)).Should(Succeed())
-			status, err := getReplicasStatus(got)
-			Expect(err).Should(BeNil())
-			i := slices.IndexFunc(status.Status, func(s ReplicaStatus) bool {
-				return s.Name == newReplica
-			})
-			Expect(i).Should(BeNumerically(">=", 0))
-			Expect(status.Status[i].MemberJoined).ShouldNot(BeNil())
-			Expect(*status.Status[i].MemberJoined).Should(BeTrue())
 		})
 
 		// It("task event for new replicas - succeed", func() {

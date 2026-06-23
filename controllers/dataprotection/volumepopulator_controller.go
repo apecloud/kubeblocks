@@ -397,6 +397,11 @@ func (r *VolumePopulatorReconciler) decidePVCRestore(reqCtx intctrlutil.RequestC
 	if restoreData && !skipPostReady {
 		mode = pvcRestoreModeRestoreData
 	}
+	// When no volume-level restore exists, postReady may be the only restore
+	// path (e.g. multi-component logical backup). Don't block it.
+	if !restoreData {
+		skipPostReady = false
+	}
 	return &pvcRestoreDecision{
 		mode:          mode,
 		sourceTarget:  sourceTarget,

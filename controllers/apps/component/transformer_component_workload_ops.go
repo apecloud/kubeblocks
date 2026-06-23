@@ -171,6 +171,7 @@ func (r *componentWorkloadOps) gatePendingMemberLifecycle(deleteReplicas []strin
 			return intctrlutil.NewRequeueError(time.Second*30,
 				fmt.Sprintf("scale-in gated: replica %s has pending member lifecycle, waiting for completion or grace period (%s)", pod.Name, memberLifecycleGracePeriod))
 		}
+		r.transCtx.Logger.V(1).Info("scale-in gate expired, proceeding despite pending member lifecycle", "pod", pod.Name)
 	}
 	return nil
 }

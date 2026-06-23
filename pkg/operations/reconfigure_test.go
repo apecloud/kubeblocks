@@ -450,43 +450,25 @@ parameter: {
 			})).Should(Succeed())
 		})
 
-		It("sharding: validates against actual shard ComponentDefinition", func() {
-			By("create a cluster with a sharding spec")
+		It("sharding: validates against actual shard ComponentDefinition, not template default", func() {
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
-			compDef := testapps.NewComponentDefinitionFactory(compDefName).
-				SetDefaultSpec().
-				Create(&testCtx).
-				GetObject()
-			clusterObject := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
-				AddSharding(defaultCompName, "", compDef.GetName()).
-				Create(&testCtx).
-				GetObject()
-			Expect(testapps.ChangeObjStatus(&testCtx, clusterObject, func() {
-				clusterObject.Status.Phase = appsv1.RunningClusterPhase
-			})).Should(Succeed())
-			opsRes := &OpsResource{
-				Cluster:  clusterObject,
-				Recorder: k8sManager.GetEventRecorderFor("opsrequest-controller"),
-			}
 
-			By("create a shard Component with the actual CompDef")
-			shardShortName := fmt.Sprintf("%s-%s", defaultCompName, rand.String(sharding.ShardIDLength))
-			shardFullName := fmt.Sprintf("%s-%s", clusterName, shardShortName)
-			testapps.NewComponentFactory(testCtx.DefaultNamespace, shardFullName, compDef.GetName()).
-				AddLabels(constant.AppManagedByLabelKey, constant.AppName).
-				AddLabels(constant.AppInstanceLabelKey, clusterName).
-				AddLabels(constant.KBAppClusterUIDKey, string(clusterObject.UID)).
-				AddLabels(constant.KBAppShardingNameLabelKey, defaultCompName).
-				AddLabels(constant.KBAppComponentLabelKey, shardShortName).
-				SetReplicas(1).
+			By("create template CompDef (no schema — validation would pass if code only checks this)")
+			templateCompDefName := "template-compdef-" + randomStr
+			testapps.NewComponentDefinitionFactory(templateCompDefName).
+				SetDefaultSpec().
 				Create(&testCtx)
 
-			By("prepare ParametersDefinition with schema")
+			By("create actual shard CompDef with strict schema that rejects unknown_param")
+			actualShardCompDefName := "shard-compdef-" + randomStr
+			testapps.NewComponentDefinitionFactory(actualShardCompDefName).
+				SetDefaultSpec().
+				Create(&testCtx)
 			template := testparameters.NewComponentTemplateFactory("mysql-config", testCtx.DefaultNamespace).
 				Create(&testCtx).
 				GetObject()
 			paramsDef := testparameters.NewParametersDefinitionFactory("mysql-params-shard-" + randomStr).
-				SetComponentDefinition(compDefName).
+				SetComponentDefinition(actualShardCompDefName).
 				SetTemplateName("mysql-config").
 				Schema(`
 parameter: {
@@ -498,7 +480,7 @@ parameter: {
 			Expect(testapps.ChangeObjStatus(&testCtx, paramsDef, func() {
 				paramsDef.Status.Phase = parametersv1alpha1.PDAvailablePhase
 			})).Should(Succeed())
-			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKey{Name: compDefName}, func(cd *appsv1.ComponentDefinition) {
+			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKey{Name: actualShardCompDefName}, func(cd *appsv1.ComponentDefinition) {
 				cd.Spec.ServiceVersion = "8.0.30"
 				cd.Spec.Configs = []appsv1.ComponentFileTemplate{
 					{
@@ -511,8 +493,33 @@ parameter: {
 				}
 			})()).Should(Succeed())
 
+			By("create cluster with sharding template pointing to templateCompDef")
+			clusterObject := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
+				AddSharding(defaultCompName, "", templateCompDefName).
+				Create(&testCtx).
+				GetObject()
+			Expect(testapps.ChangeObjStatus(&testCtx, clusterObject, func() {
+				clusterObject.Status.Phase = appsv1.RunningClusterPhase
+			})).Should(Succeed())
+			opsRes := &OpsResource{
+				Cluster:  clusterObject,
+				Recorder: k8sManager.GetEventRecorderFor("opsrequest-controller"),
+			}
+
+			By("create actual shard Component with actualShardCompDef (differs from template)")
+			shardShortName := fmt.Sprintf("%s-%s", defaultCompName, rand.String(sharding.ShardIDLength))
+			shardFullName := fmt.Sprintf("%s-%s", clusterName, shardShortName)
+			testapps.NewComponentFactory(testCtx.DefaultNamespace, shardFullName, actualShardCompDefName).
+				AddLabels(constant.AppManagedByLabelKey, constant.AppName).
+				AddLabels(constant.AppInstanceLabelKey, clusterName).
+				AddLabels(constant.KBAppClusterUIDKey, string(clusterObject.UID)).
+				AddLabels(constant.KBAppShardingNameLabelKey, defaultCompName).
+				AddLabels(constant.KBAppComponentLabelKey, shardShortName).
+				SetReplicas(1).
+				Create(&testCtx)
+
 			cpShard := builder.NewComponentParameterBuilder(testCtx.DefaultNamespace, parameterscore.GenerateComponentConfigurationName(clusterName, shardShortName)).
-				AddLabelsInMap(constant.GetCompLabelsWithDef(clusterName, shardShortName, compDefName)).
+				AddLabelsInMap(constant.GetCompLabelsWithDef(clusterName, shardShortName, actualShardCompDefName)).
 				SetClusterName(clusterName).
 				SetCompName(shardShortName).
 				GetObject()
@@ -532,7 +539,7 @@ parameter: {
 				}}
 			})()).Should(Succeed())
 
-			By("reconfigure the sharding name with an unknown parameter")
+			By("reconfigure the sharding name with unknown_param")
 			ops := testops.NewOpsRequestObj("shard-validate-"+randomStr, testCtx.DefaultNamespace,
 				clusterName, opsv1alpha1.ReconfiguringType)
 			ops.Spec.Reconfigures = []opsv1alpha1.Reconfigure{
@@ -549,7 +556,7 @@ parameter: {
 			Expect(err).ShouldNot(HaveOccurred())
 			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
 
-			By("Action should reject via shard's actual CompDef schema")
+			By("Action should reject via actual shard CompDef schema, not template default")
 			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest), func(g Gomega, fetched *opsv1alpha1.OpsRequest) {
@@ -557,6 +564,13 @@ parameter: {
 				condition := meta.FindStatusCondition(fetched.Status.Conditions, opsv1alpha1.ConditionTypeFailed)
 				g.Expect(condition).ShouldNot(BeNil())
 				g.Expect(condition.Message).Should(ContainSubstring("unknown_param"))
+			})).Should(Succeed())
+
+			By("CP desired must NOT contain unknown_param")
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cpShard), func(g Gomega, cp *parametersv1alpha1.ComponentParameter) {
+				if cp.Spec.Desired != nil && cp.Spec.Desired.Assignments != nil {
+					g.Expect(cp.Spec.Desired.Assignments).ShouldNot(HaveKey("unknown_param"))
+				}
 			})).Should(Succeed())
 		})
 

@@ -123,7 +123,7 @@ var _ = Describe("action", func() {
 			Expect(resolveTimeout(&actionTimeout, nil)).Should(Equal(&actionTimeout))
 		})
 
-		It("caps requested action timeout at 120 seconds", func() {
+		It("caps requested action timeout at 60 seconds", func() {
 			timeout := int32(180)
 			timedCtx, cancel := actionCallTimeoutContext(context.Background(), &timeout)
 			defer cancel()
@@ -131,8 +131,8 @@ var _ = Describe("action", func() {
 			deadline, ok := timedCtx.Deadline()
 			Expect(ok).Should(BeTrue())
 			remaining := time.Until(deadline)
-			Expect(remaining).Should(BeNumerically(">", 119*time.Second))
-			Expect(remaining).Should(BeNumerically("<=", 120*time.Second))
+			Expect(remaining).Should(BeNumerically(">", 59*time.Second))
+			Expect(remaining).Should(BeNumerically("<=", 60*time.Second))
 		})
 
 		newRetryAction := func(name string, counterPath string, maxRetries int) proto.Action {

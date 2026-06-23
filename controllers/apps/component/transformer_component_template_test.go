@@ -354,7 +354,7 @@ var _ = Describe("file templates transformer test", func() {
 			// checkEnvWithAction(component.UDFReconfigureActionName(transCtx.SynthesizeComponent.FileTemplates[1]))
 		})
 
-		It("external managed - w/o template", func() {
+		It("external managed script - w/o template", func() {
 			transCtx.SynthesizeComponent.FileTemplates[1].Template = ""
 			transCtx.SynthesizeComponent.FileTemplates[1].Namespace = ""
 			transCtx.SynthesizeComponent.FileTemplates[1].Reconfigure = nil
@@ -364,6 +364,34 @@ var _ = Describe("file templates transformer test", func() {
 			err := transformer.Transform(transCtx, dag)
 			Expect(err).ShouldNot(BeNil())
 			Expect(err.Error()).Should(ContainSubstring("config/script template has no template specified"))
+		})
+
+		It("external managed config - w/o template", func() {
+			transCtx.SynthesizeComponent.FileTemplates[1].Template = ""
+			transCtx.SynthesizeComponent.FileTemplates[1].Namespace = ""
+			transCtx.SynthesizeComponent.FileTemplates[1].Reconfigure = nil
+			transCtx.SynthesizeComponent.FileTemplates[1].ExternalManaged = ptr.To(true)
+			transCtx.SynthesizeComponent.FileTemplates[1].Config = true
+
+			transformer := &componentFileTemplateTransformer{}
+			err := transformer.Transform(transCtx, dag)
+			Expect(err).Should(BeNil())
+
+			checkVolumes([]string{"logConf"})
+			checkTemplateObjects([]string{"logConf"})
+			podSpec := transCtx.SynthesizeComponent.PodSpec
+			expectedObjName := fileTemplateObjectName(transCtx.SynthesizeComponent, "serverConf")
+			Expect(podSpec.Volumes).Should(ContainElement(corev1.Volume{
+				Name: "serverConf",
+				VolumeSource: corev1.VolumeSource{
+					ConfigMap: &corev1.ConfigMapVolumeSource{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: expectedObjName,
+						},
+						DefaultMode: ptr.To[int32](0444),
+					},
+				},
+			}))
 		})
 	})
 })

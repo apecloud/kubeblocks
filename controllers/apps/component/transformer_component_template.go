@@ -112,7 +112,7 @@ func (t *componentFileTemplateTransformer) instanceAssistantObject(transCtx *com
 
 func (t *componentFileTemplateTransformer) precheck(transCtx *componentTransformContext) error {
 	for _, tpl := range transCtx.SynthesizeComponent.FileTemplates {
-		if len(tpl.Template) == 0 {
+		if len(tpl.Template) == 0 && !(tpl.Config && isExternalManaged(tpl)) {
 			return fmt.Errorf("config/script template has no template specified: %s", tpl.Name)
 		}
 	}
@@ -147,8 +147,10 @@ func (t *componentFileTemplateTransformer) buildPodVolumes(transCtx *componentTr
 	}
 	for _, tpl := range synthesizedComp.FileTemplates {
 		objName := fileTemplateObjectName(transCtx.SynthesizeComponent, tpl.Name)
-		// If the file template is managed by external, the volume mount object should be the external object.
-		if isExternalManaged(tpl) {
+		// If the file template is managed by external and has a template specified, use the external object.
+		// When externalManaged config has empty template, the parameters controller will provision
+		// a ConfigMap using the deterministic name (fileTemplateObjectName).
+		if isExternalManaged(tpl) && len(tpl.Template) > 0 {
 			objName = tpl.Template
 		}
 		createFn := func(_ string) corev1.Volume {

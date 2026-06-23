@@ -127,19 +127,20 @@ func (s *actionService) handleRequest(ctx context.Context, req *proto.ActionRequ
 		return nil, err
 	}
 	timeout := resolveTimeout(&action.TimeoutSeconds, req.TimeoutSeconds)
+	retryPolicy := resolveRetryPolicy(action.RetryPolicy, req.RetryPolicy)
 	if req.NonBlocking == nil || !*req.NonBlocking {
-		return callActionWithRetry(ctx, action, req.Parameters, req.Arguments, timeout, req.RetryPolicy)
+		return callActionWithRetry(ctx, action, req.Parameters, req.Arguments, timeout, retryPolicy)
 	}
-	return s.handleRequestNonBlocking(ctx, req, action, timeout)
+	return s.handleRequestNonBlocking(ctx, req, action, timeout, retryPolicy)
 }
 
-func (s *actionService) handleRequestNonBlocking(ctx context.Context, req *proto.ActionRequest, action *proto.Action, timeout *int32) ([]byte, error) {
+func (s *actionService) handleRequestNonBlocking(ctx context.Context, req *proto.ActionRequest, action *proto.Action, timeout *int32, retryPolicy *proto.RetryPolicy) ([]byte, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
 	running, ok := s.runningActions[req.Action]
 	if !ok {
-		resultChan, err := nonBlockingCallActionWithRetry(ctx, action, req.Parameters, req.Arguments, timeout, req.RetryPolicy)
+		resultChan, err := nonBlockingCallActionWithRetry(ctx, action, req.Parameters, req.Arguments, timeout, retryPolicy)
 		if err != nil {
 			return nil, err
 		}
@@ -166,6 +167,13 @@ func resolveTimeout(actionTimeout *int32, requestTimeout *int32) *int32 {
 	return actionTimeout
 }
 
+func resolveRetryPolicy(actionRetryPolicy *proto.RetryPolicy, requestRetryPolicy *proto.RetryPolicy) *proto.RetryPolicy {
+	if requestRetryPolicy != nil {
+		return requestRetryPolicy
+	}
+	return actionRetryPolicy
+}
+
 func callActionWithRetry(ctx context.Context, action *proto.Action, parameters map[string]string, arguments [][]string, timeout *int32, retryPolicy *proto.RetryPolicy) ([]byte, error) {
 	if len(arguments) == 0 {
 		return callActionWithRetryOnce(ctx, action, parameters, nil, timeout, retryPolicy)
@@ -187,10 +195,7 @@ func callActionWithRetry(ctx context.Context, action *proto.Action, parameters m
 }
 
 func nonBlockingCallActionWithRetry(ctx context.Context, action *proto.Action, parameters map[string]string, arguments [][]string, timeout *int32, retryPolicy *proto.RetryPolicy) (chan *asyncResult, error) {
-	if len(arguments) == 0 {
-		return nonBlockingCallAction(ctx, action, parameters, nil, timeout)
-	}
-	if action.Exec == nil {
+	if len(arguments) > 0 && action.Exec == nil {
 		return nil, errors.Wrapf(proto.ErrBadRequest, "runtime arguments are only supported for exec actions")
 	}
 	resultChan := make(chan *asyncResult, 1)

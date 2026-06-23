@@ -378,7 +378,7 @@ func (a *kbagent) callActionWithSelector(ctx context.Context, spec *appsv1.Actio
 	//  - back-off to retry
 	//  - timeout
 	var (
-		output         []byte
+		output          []byte
 		dispatchedCount int
 	)
 	for _, pod := range pods {

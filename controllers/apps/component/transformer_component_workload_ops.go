@@ -120,6 +120,11 @@ func (r *componentWorkloadOps) scaleIn() error {
 	}
 
 	deleteReplicas := r.runningItsPodNameSet.Difference(r.desiredCompPodNameSet).UnsortedList()
+
+	if err := r.gatePendingMemberLifecycle(deleteReplicas); err != nil {
+		return err
+	}
+
 	joinedReplicas := make([]string, 0)
 	err := component.DeleteReplicasStatus(r.protoITS, deleteReplicas, func(s component.ReplicaStatus) {
 		// has no member join defined or has joined successfully
@@ -135,6 +140,37 @@ func (r *componentWorkloadOps) scaleIn() error {
 	if err := r.leaveMember4ScaleIn(deleteReplicas, joinedReplicas); err != nil {
 		r.transCtx.Logger.Error(err, "leave member at scale-in error")
 		return err
+	}
+	return nil
+}
+
+const memberLifecycleGracePeriod = 10 * time.Minute
+
+func (r *componentWorkloadOps) gatePendingMemberLifecycle(deleteReplicas []string) error {
+	deleteSet := sets.New(deleteReplicas...)
+	pendingReplicas, err := component.GetReplicasStatusFunc(r.runningITS, func(s component.ReplicaStatus) bool {
+		return deleteSet.Has(s.Name) && s.MemberJoined != nil && !*s.MemberJoined
+	})
+	if err != nil || len(pendingReplicas) == 0 {
+		return err
+	}
+
+	pods, err := component.ListOwnedPods(r.transCtx.Context, r.cli,
+		r.synthesizeComp.Namespace, r.synthesizeComp.ClusterName, r.synthesizeComp.Name)
+	if err != nil {
+		return err
+	}
+
+	pendingSet := sets.New(pendingReplicas...)
+	now := time.Now()
+	for _, pod := range pods {
+		if !pendingSet.Has(pod.Name) {
+			continue
+		}
+		if now.Sub(pod.CreationTimestamp.Time) < memberLifecycleGracePeriod {
+			return intctrlutil.NewRequeueError(time.Second*30,
+				fmt.Sprintf("scale-in gated: replica %s has pending member lifecycle, waiting for completion or grace period (%s)", pod.Name, memberLifecycleGracePeriod))
+		}
 	}
 	return nil
 }

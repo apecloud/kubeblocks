@@ -163,13 +163,8 @@ func validateLargeIntegerBounds(schema *apiextensionsv1.JSONSchemaProps, data in
 		if !exists {
 			continue
 		}
-		var f float64
-		switch v := val.(type) {
-		case int64:
-			f = float64(v)
-		case uint64:
-			f = float64(v)
-		default:
+		f, ok := toFloat64(val)
+		if !ok {
 			continue
 		}
 		if prop.ExclusiveMaximum {
@@ -183,4 +178,26 @@ func validateLargeIntegerBounds(schema *apiextensionsv1.JSONSchemaProps, data in
 		}
 	}
 	return nil
+}
+
+func toFloat64(val interface{}) (float64, bool) {
+	switch v := val.(type) {
+	case float64:
+		return v, true
+	case float32:
+		return float64(v), true
+	case int64:
+		return float64(v), true
+	case uint64:
+		return float64(v), true
+	case int:
+		return float64(v), true
+	case int32:
+		return float64(v), true
+	case uint:
+		return float64(v), true
+	case uint32:
+		return float64(v), true
+	}
+	return 0, false
 }

@@ -254,6 +254,19 @@ func TestValidateLargeIntegerBounds(t *testing.T) {
 	if err := validateLargeIntegerBounds(cueI64Schema, map[string]interface{}{"cue_i64": int64(math.MaxInt64)}); err != nil {
 		t.Fatalf("expected CUE int64 extremum to be skipped, got %v", err)
 	}
+
+	// float64 value (JSON/YAML parser output) within user max should pass
+	if err := validateLargeIntegerBounds(schema, map[string]interface{}{"custom_max": float64(9e18)}); err != nil {
+		t.Fatalf("expected float64 value within user max to pass, got %v", err)
+	}
+	// float64 value above user max should fail
+	if err := validateLargeIntegerBounds(schema, map[string]interface{}{"custom_max": float64(1.1e19)}); err == nil {
+		t.Fatalf("expected float64 value above user max to be rejected")
+	}
+	// int value (YAML parser output) within user max should pass
+	if err := validateLargeIntegerBounds(schema, map[string]interface{}{"custom_max": int(100)}); err != nil {
+		t.Fatalf("expected int value within user max to pass, got %v", err)
+	}
 }
 
 func TestValidateDataWithSchemaUserDeclaredLargeMax(t *testing.T) {
@@ -276,6 +289,29 @@ func TestValidateDataWithSchemaUserDeclaredLargeMax(t *testing.T) {
 	// Value above user max fails end-to-end
 	if err := ValidateDataWithSchema(schema, map[string]interface{}{"max_items": uint64(11e18)}); err == nil {
 		t.Fatalf("expected value above user-declared max to be rejected")
+	}
+}
+
+func TestValidateDataWithSchemaIntTypeLargeMax(t *testing.T) {
+	userMax := float64(1e19)
+	schema := &apiextensionsv1.JSONSchemaProps{
+		Type: "object",
+		Properties: map[string]apiextensionsv1.JSONSchemaProps{
+			"max_items": {
+				Type:    "integer",
+				Minimum: ptrFloat64(0),
+				Maximum: &userMax,
+			},
+		},
+	}
+
+	// int value within user max passes end-to-end (YAML parser produces int)
+	if err := ValidateDataWithSchema(schema, map[string]interface{}{"max_items": int(100)}); err != nil {
+		t.Fatalf("expected int value within user max to pass, got %v", err)
+	}
+	// int32 value passes end-to-end
+	if err := ValidateDataWithSchema(schema, map[string]interface{}{"max_items": int32(100)}); err != nil {
+		t.Fatalf("expected int32 value within user max to pass, got %v", err)
 	}
 }
 

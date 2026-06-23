@@ -548,18 +548,22 @@ func componentLogicalName(component *appsv1.Component) string {
 	return component.Name
 }
 
+func isPodOnlyLabel(key string) bool {
+	return key == constant.AppInstanceLabelKey || key == constant.RoleLabelKey
+}
+
 func backupTargetHasEffectivePVCSelector(target *dpv1alpha1.BackupStatusTarget) bool {
 	if target == nil || target.PodSelector == nil || target.PodSelector.LabelSelector == nil {
 		return false
 	}
 	selector := target.PodSelector.LabelSelector
 	for k := range selector.MatchLabels {
-		if k != constant.AppInstanceLabelKey {
+		if !isPodOnlyLabel(k) {
 			return true
 		}
 	}
 	for _, expression := range selector.MatchExpressions {
-		if expression.Key != constant.AppInstanceLabelKey {
+		if !isPodOnlyLabel(expression.Key) {
 			return true
 		}
 	}
@@ -573,7 +577,7 @@ func backupTargetMatchesPVC(target *dpv1alpha1.BackupStatusTarget, pvc *corev1.P
 	selector := target.PodSelector.LabelSelector
 	var effective bool
 	for k, v := range selector.MatchLabels {
-		if k == constant.AppInstanceLabelKey {
+		if isPodOnlyLabel(k) {
 			continue
 		}
 		effective = true
@@ -582,7 +586,7 @@ func backupTargetMatchesPVC(target *dpv1alpha1.BackupStatusTarget, pvc *corev1.P
 		}
 	}
 	for _, expression := range selector.MatchExpressions {
-		if expression.Key == constant.AppInstanceLabelKey {
+		if isPodOnlyLabel(expression.Key) {
 			continue
 		}
 		effective = true

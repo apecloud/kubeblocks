@@ -33,6 +33,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/sharding"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	pkgparameters "github.com/apecloud/kubeblocks/pkg/parameters"
 	parameterscore "github.com/apecloud/kubeblocks/pkg/parameters/core"
 )
 
@@ -87,10 +88,19 @@ func (r *reconfigureAction) Action(reqCtx intctrlutil.RequestCtx, cli client.Cli
 	if len(resource.OpsRequest.Spec.Reconfigures) == 0 {
 		return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, `invalid reconfigure request: %s`, resource.OpsRequest.GetName())
 	}
+
+	// Pass 1: validate all reconfigure entries before patching any CP desired.
 	for _, reconfigure := range resource.OpsRequest.Spec.Reconfigures {
 		if len(reconfigure.Parameters) == 0 {
 			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "invalid reconfigure request for component %s: no parameters", reconfigure.ComponentName)
 		}
+		if err := r.validateReconfigureParameters(reqCtx, cli, resource.Cluster, reconfigure); err != nil {
+			return err
+		}
+	}
+
+	// Pass 2: apply all patches.
+	for _, reconfigure := range resource.OpsRequest.Spec.Reconfigures {
 		compNames, err := r.resolveReconfigureComponents(reqCtx.Ctx, cli, resource.Cluster, reconfigure.ComponentName)
 		if err != nil {
 			return err
@@ -180,6 +190,58 @@ func (r *reconfigureAction) resolveReconfigureComponents(ctx context.Context, re
 		compNames = append(compNames, shortName)
 	}
 	return compNames, nil
+}
+
+func (r *reconfigureAction) validateReconfigureParameters(reqCtx intctrlutil.RequestCtx, cli client.Client,
+	cluster *appsv1.Cluster, reconfigure opsv1alpha1.Reconfigure) error {
+	compDefNames, err := r.resolveCompDefNames(reqCtx.Ctx, cli, cluster, reconfigure.ComponentName)
+	if err != nil {
+		return err
+	}
+	assignments := make(parametersv1alpha1.ComponentParameters, len(reconfigure.Parameters))
+	for _, param := range reconfigure.Parameters {
+		assignments[param.Key] = param.Value
+	}
+	for _, compDefName := range compDefNames {
+		cmpd := &appsv1.ComponentDefinition{}
+		if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: compDefName}, cmpd); err != nil {
+			return err
+		}
+		_, paramsDefs, err := pkgparameters.ResolveCmpdParametersDefs(reqCtx.Ctx, cli, cmpd)
+		if err != nil {
+			return err
+		}
+		if err := pkgparameters.ValidateComponentParameterAssignments(assignments, paramsDefs); err != nil {
+			return intctrlutil.NewFatalError(err.Error())
+		}
+	}
+	return nil
+}
+
+func (r *reconfigureAction) resolveCompDefNames(ctx context.Context, cli client.Reader, cluster *appsv1.Cluster, compName string) ([]string, error) {
+	if compSpec := cluster.Spec.GetComponentByName(compName); compSpec != nil {
+		if compSpec.ComponentDef == "" {
+			return nil, nil
+		}
+		return []string{compSpec.ComponentDef}, nil
+	}
+	shardingSpec := cluster.Spec.GetShardingByName(compName)
+	if shardingSpec == nil {
+		return nil, intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "component not found: %s", compName)
+	}
+	comps, err := sharding.ListShardingComponents(ctx, cli, cluster, compName)
+	if err != nil {
+		return nil, err
+	}
+	seen := make(map[string]struct{})
+	var compDefNames []string
+	for _, comp := range comps {
+		if _, ok := seen[comp.Spec.CompDef]; !ok {
+			seen[comp.Spec.CompDef] = struct{}{}
+			compDefNames = append(compDefNames, comp.Spec.CompDef)
+		}
+	}
+	return compDefNames, nil
 }
 
 func (r *reconfigureAction) getRunningComponentParameter(ctx context.Context, cli client.Client, namespace, clusterName, compName string) (*parametersv1alpha1.ComponentParameter, error) {

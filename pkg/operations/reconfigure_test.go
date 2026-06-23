@@ -202,6 +202,109 @@ parameter: {
 			Expect(err).Should(BeNil())
 		})
 
+		It("rejects unknown parameter before patching CP desired", func() {
+			By("init operations resources ")
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
+			testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
+
+			By("prepare configuration metadata and component parameter")
+			template := testparameters.NewComponentTemplateFactory("mysql-config", testCtx.DefaultNamespace).
+				Create(&testCtx).
+				GetObject()
+			paramsDef := testparameters.NewParametersDefinitionFactory("mysql-params-prevalidate-" + randomStr).
+				SetComponentDefinition(compDefName).
+				SetTemplateName("mysql-config").
+				Schema(`
+parameter: {
+  max_connections?: string
+  gtid_mode?: string
+}`).
+				Create(&testCtx).
+				GetObject()
+			Expect(testapps.ChangeObjStatus(&testCtx, paramsDef, func() {
+				paramsDef.Status.Phase = parametersv1alpha1.PDAvailablePhase
+			})).Should(Succeed())
+			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKey{Name: compDefName}, func(compDef *appsv1.ComponentDefinition) {
+				compDef.Spec.ServiceVersion = "8.0.30"
+				compDef.Spec.Configs = []appsv1.ComponentFileTemplate{
+					{
+						Name:            "mysql-config",
+						Template:        template.Name,
+						Namespace:       template.Namespace,
+						VolumeName:      "mysql-config",
+						ExternalManaged: pointer.Bool(true),
+					},
+				}
+			})()).Should(Succeed())
+
+			componentParameter := builder.NewComponentParameterBuilder(testCtx.DefaultNamespace, parameterscore.GenerateComponentConfigurationName(clusterName, defaultCompName)).
+				AddLabelsInMap(constant.GetCompLabelsWithDef(clusterName, defaultCompName, compDefName)).
+				SetClusterName(clusterName).
+				SetCompName(defaultCompName).
+				GetObject()
+			componentParameter.Spec.ConfigItemDetails = []parametersv1alpha1.ConfigTemplateItemDetail{{
+				Name: "mysql-config",
+				ConfigSpec: &appsv1.ComponentFileTemplate{
+					Name:            "mysql-config",
+					Template:        template.Name,
+					Namespace:       template.Namespace,
+					VolumeName:      "mysql-config",
+					ExternalManaged: pointer.Bool(true),
+				},
+			}}
+			Expect(testCtx.CreateObj(ctx, componentParameter)).Should(Succeed())
+
+			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(componentParameter), func(cp *parametersv1alpha1.ComponentParameter) {
+				cp.Status.ObservedGeneration = cp.Generation
+				cp.Status.Phase = parametersv1alpha1.CFinishedPhase
+				cp.Status.ConfigurationItemStatus = []parametersv1alpha1.ConfigTemplateItemDetailStatus{{
+					Name:  cp.Spec.ConfigItemDetails[0].Name,
+					Phase: parametersv1alpha1.CFinishedPhase,
+				}}
+			})()).Should(Succeed())
+
+			By("create reconfigure with unknown parameter http_port")
+			ops := testops.NewOpsRequestObj("reject-unknown-"+randomStr, testCtx.DefaultNamespace,
+				clusterName, opsv1alpha1.ReconfiguringType)
+			ops.Spec.Reconfigures = []opsv1alpha1.Reconfigure{
+				{
+					ComponentOps: opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
+					Parameters: []opsv1alpha1.ParameterPair{
+						{
+							Key:   "http_port",
+							Value: pointer.String("9999"),
+						},
+					},
+				},
+			}
+			opsRes.OpsRequest = testops.CreateOpsRequest(ctx, testCtx, ops)
+			Expect(opsutil.UpdateClusterOpsAnnotations(ctx, k8sClient, opsRes.Cluster, nil)).Should(Succeed())
+
+			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsPendingPhase
+			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
+
+			By("Action should reject the unknown parameter with a fatal error")
+			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest), func(g Gomega, fetched *opsv1alpha1.OpsRequest) {
+				g.Expect(fetched.Status.Phase).Should(Equal(opsv1alpha1.OpsFailedPhase))
+				condition := meta.FindStatusCondition(fetched.Status.Conditions, opsv1alpha1.ConditionTypeFailed)
+				g.Expect(condition).ShouldNot(BeNil())
+				g.Expect(condition.Message).Should(ContainSubstring("http_port"))
+			})).Should(Succeed())
+
+			By("CP desired must NOT contain http_port")
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentParameter), func(g Gomega, cp *parametersv1alpha1.ComponentParameter) {
+				if cp.Spec.Desired != nil && cp.Spec.Desired.Assignments != nil {
+					g.Expect(cp.Spec.Desired.Assignments).ShouldNot(HaveKey("http_port"))
+				}
+			})).Should(Succeed())
+		})
+
 		It("propagates ComponentParameter merge failure", func() {
 			By("init operations resources ")
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}

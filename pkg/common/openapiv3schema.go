@@ -21,6 +21,7 @@ package common
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 
@@ -37,8 +38,9 @@ func ValidateDataWithSchema(openAPIV3Schema *apiextensionsv1.JSONSchemaProps, da
 	if openAPIV3Schema == nil {
 		return fmt.Errorf("openAPIV3Schema can not be empty")
 	}
+	sanitized := stripIntegerOverflow(openAPIV3Schema)
 	out := &apiextensions.JSONSchemaProps{}
-	if err := apiextensionsv1.Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(openAPIV3Schema, out, nil); err != nil {
+	if err := apiextensionsv1.Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(sanitized, out, nil); err != nil {
 		return err
 	}
 	openapiSchema := &spec.Schema{}
@@ -68,7 +70,11 @@ func ConvertStringToInterfaceBySchemaType(openAPIV3Schema *apiextensionsv1.JSONS
 		}
 		switch p.Type {
 		case "integer":
-			out[k], err = strconv.ParseInt(v, 10, 64)
+			if IsUnsignedIntegerFormat(p.Format) || isUnsignedByBounds(p) {
+				out[k], err = strconv.ParseUint(v, 10, 64)
+			} else {
+				out[k], err = strconv.ParseInt(v, 10, 64)
+			}
 		case "number":
 			out[k], err = strconv.ParseFloat(v, 64)
 		case "boolean":
@@ -84,4 +90,56 @@ func ConvertStringToInterfaceBySchemaType(openAPIV3Schema *apiextensionsv1.JSONS
 		}
 	}
 	return out, nil
+}
+
+func IsUnsignedIntegerFormat(format string) bool {
+	switch format {
+	case "uint", "uint8", "uint16", "uint32", "uint64":
+		return true
+	}
+	return false
+}
+
+// IsUnsignedInteger returns true if the schema represents an unsigned integer,
+// detected by explicit Format or by CUE-generated bounds (Minimum >= 0, Maximum > 2^63).
+func IsUnsignedInteger(prop apiextensionsv1.JSONSchemaProps) bool {
+	return IsUnsignedIntegerFormat(prop.Format) || isUnsignedByBounds(prop)
+}
+
+// isUnsignedByBounds detects CUE-generated uint64 schemas by their bounds:
+// Minimum >= 0 and Maximum above the signed int64 range.
+func isUnsignedByBounds(prop apiextensionsv1.JSONSchemaProps) bool {
+	return prop.Minimum != nil && *prop.Minimum >= 0 &&
+		prop.Maximum != nil && *prop.Maximum > math.Exp2(63)
+}
+
+// stripIntegerOverflow removes Maximum from integer properties whose Maximum
+// >= 2^63. kube-openapi internally converts float64 Maximum to int64;
+// float64(MaxInt64) rounds to 2^63 and float64(MaxUint64) rounds to 2^64,
+// both of which overflow int64. Stripping is safe because the integer range
+// is already enforced by ParseInt/ParseUint at the conversion layer.
+// User-defined maximums below 2^63 are preserved.
+func stripIntegerOverflow(schema *apiextensionsv1.JSONSchemaProps) *apiextensionsv1.JSONSchemaProps {
+	if schema == nil {
+		return nil
+	}
+	needsCopy := false
+	for _, prop := range schema.Properties {
+		if prop.Type == "integer" && prop.Maximum != nil && *prop.Maximum >= math.Exp2(63) {
+			needsCopy = true
+			break
+		}
+	}
+	if !needsCopy {
+		return schema
+	}
+	out := schema.DeepCopy()
+	for k, prop := range out.Properties {
+		if prop.Type == "integer" && prop.Maximum != nil && *prop.Maximum >= math.Exp2(63) {
+			prop.Maximum = nil
+			prop.ExclusiveMaximum = false
+			out.Properties[k] = prop
+		}
+	}
+	return out
 }

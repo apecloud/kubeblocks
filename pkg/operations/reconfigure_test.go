@@ -20,11 +20,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"fmt"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -33,6 +36,7 @@ import (
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"github.com/apecloud/kubeblocks/pkg/controller/sharding"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	opsutil "github.com/apecloud/kubeblocks/pkg/operations/util"
@@ -302,6 +306,257 @@ parameter: {
 				if cp.Spec.Desired != nil && cp.Spec.Desired.Assignments != nil {
 					g.Expect(cp.Spec.Desired.Assignments).ShouldNot(HaveKey("http_port"))
 				}
+			})).Should(Succeed())
+		})
+
+		It("multi-entry: invalid second entry blocks valid first entry from patching CP", func() {
+			By("create cluster with two components sharing the same compDef")
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+			compDef := testapps.NewComponentDefinitionFactory(compDefName).
+				SetDefaultSpec().
+				Create(&testCtx).
+				GetObject()
+			pvcSpec := testapps.NewPVCSpec("1Gi")
+			clusterObject := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
+				AddComponent(defaultCompName, compDef.GetName()).
+				SetReplicas(1).
+				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
+				AddComponent(secondaryCompName, compDef.GetName()).
+				SetReplicas(1).
+				Create(&testCtx).
+				GetObject()
+			Expect(testapps.ChangeObjStatus(&testCtx, clusterObject, func() {
+				clusterObject.Status.Phase = appsv1.RunningClusterPhase
+				clusterObject.Status.Components = map[string]appsv1.ClusterComponentStatus{
+					defaultCompName:   {Phase: appsv1.RunningComponentPhase},
+					secondaryCompName: {Phase: appsv1.RunningComponentPhase},
+				}
+			})).Should(Succeed())
+			opsRes := &OpsResource{
+				Cluster:  clusterObject,
+				Recorder: k8sManager.GetEventRecorderFor("opsrequest-controller"),
+			}
+			testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
+			testapps.MockInstanceSetComponent(&testCtx, clusterName, secondaryCompName)
+
+			By("prepare ParametersDefinition and ComponentParameters for both components")
+			template := testparameters.NewComponentTemplateFactory("mysql-config", testCtx.DefaultNamespace).
+				Create(&testCtx).
+				GetObject()
+			paramsDef := testparameters.NewParametersDefinitionFactory("mysql-params-multi-" + randomStr).
+				SetComponentDefinition(compDefName).
+				SetTemplateName("mysql-config").
+				Schema(`
+parameter: {
+  max_connections?: string
+  gtid_mode?: string
+}`).
+				Create(&testCtx).
+				GetObject()
+			Expect(testapps.ChangeObjStatus(&testCtx, paramsDef, func() {
+				paramsDef.Status.Phase = parametersv1alpha1.PDAvailablePhase
+			})).Should(Succeed())
+			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKey{Name: compDefName}, func(cd *appsv1.ComponentDefinition) {
+				cd.Spec.ServiceVersion = "8.0.30"
+				cd.Spec.Configs = []appsv1.ComponentFileTemplate{
+					{
+						Name:            "mysql-config",
+						Template:        template.Name,
+						Namespace:       template.Namespace,
+						VolumeName:      "mysql-config",
+						ExternalManaged: pointer.Bool(true),
+					},
+				}
+			})()).Should(Succeed())
+
+			cpDefault := builder.NewComponentParameterBuilder(testCtx.DefaultNamespace, parameterscore.GenerateComponentConfigurationName(clusterName, defaultCompName)).
+				AddLabelsInMap(constant.GetCompLabelsWithDef(clusterName, defaultCompName, compDefName)).
+				SetClusterName(clusterName).
+				SetCompName(defaultCompName).
+				GetObject()
+			cpDefault.Spec.ConfigItemDetails = []parametersv1alpha1.ConfigTemplateItemDetail{{
+				Name: "mysql-config",
+				ConfigSpec: &appsv1.ComponentFileTemplate{
+					Name: "mysql-config", Template: template.Name, Namespace: template.Namespace,
+					VolumeName: "mysql-config", ExternalManaged: pointer.Bool(true),
+				},
+			}}
+			Expect(testCtx.CreateObj(ctx, cpDefault)).Should(Succeed())
+			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(cpDefault), func(cp *parametersv1alpha1.ComponentParameter) {
+				cp.Status.ObservedGeneration = cp.Generation
+				cp.Status.Phase = parametersv1alpha1.CFinishedPhase
+				cp.Status.ConfigurationItemStatus = []parametersv1alpha1.ConfigTemplateItemDetailStatus{{
+					Name: "mysql-config", Phase: parametersv1alpha1.CFinishedPhase,
+				}}
+			})()).Should(Succeed())
+
+			cpSecondary := builder.NewComponentParameterBuilder(testCtx.DefaultNamespace, parameterscore.GenerateComponentConfigurationName(clusterName, secondaryCompName)).
+				AddLabelsInMap(constant.GetCompLabelsWithDef(clusterName, secondaryCompName, compDefName)).
+				SetClusterName(clusterName).
+				SetCompName(secondaryCompName).
+				GetObject()
+			cpSecondary.Spec.ConfigItemDetails = []parametersv1alpha1.ConfigTemplateItemDetail{{
+				Name: "mysql-config",
+				ConfigSpec: &appsv1.ComponentFileTemplate{
+					Name: "mysql-config", Template: template.Name, Namespace: template.Namespace,
+					VolumeName: "mysql-config", ExternalManaged: pointer.Bool(true),
+				},
+			}}
+			Expect(testCtx.CreateObj(ctx, cpSecondary)).Should(Succeed())
+			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(cpSecondary), func(cp *parametersv1alpha1.ComponentParameter) {
+				cp.Status.ObservedGeneration = cp.Generation
+				cp.Status.Phase = parametersv1alpha1.CFinishedPhase
+				cp.Status.ConfigurationItemStatus = []parametersv1alpha1.ConfigTemplateItemDetailStatus{{
+					Name: "mysql-config", Phase: parametersv1alpha1.CFinishedPhase,
+				}}
+			})()).Should(Succeed())
+
+			By("create OpsRequest: entry[0] valid for default, entry[1] invalid for secondary")
+			ops := testops.NewOpsRequestObj("multi-entry-"+randomStr, testCtx.DefaultNamespace,
+				clusterName, opsv1alpha1.ReconfiguringType)
+			ops.Spec.Reconfigures = []opsv1alpha1.Reconfigure{
+				{
+					ComponentOps: opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
+					Parameters:   []opsv1alpha1.ParameterPair{{Key: "max_connections", Value: pointer.String("200")}},
+				},
+				{
+					ComponentOps: opsv1alpha1.ComponentOps{ComponentName: secondaryCompName},
+					Parameters:   []opsv1alpha1.ParameterPair{{Key: "http_port", Value: pointer.String("9999")}},
+				},
+			}
+			opsRes.OpsRequest = testops.CreateOpsRequest(ctx, testCtx, ops)
+			Expect(opsutil.UpdateClusterOpsAnnotations(ctx, k8sClient, opsRes.Cluster, nil)).Should(Succeed())
+
+			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsPendingPhase
+			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
+
+			By("Action should fail on the invalid second entry")
+			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest), func(g Gomega, fetched *opsv1alpha1.OpsRequest) {
+				g.Expect(fetched.Status.Phase).Should(Equal(opsv1alpha1.OpsFailedPhase))
+				condition := meta.FindStatusCondition(fetched.Status.Conditions, opsv1alpha1.ConditionTypeFailed)
+				g.Expect(condition).ShouldNot(BeNil())
+				g.Expect(condition.Message).Should(ContainSubstring("http_port"))
+			})).Should(Succeed())
+
+			By("first entry CP desired must NOT be patched either")
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cpDefault), func(g Gomega, cp *parametersv1alpha1.ComponentParameter) {
+				if cp.Spec.Desired != nil && cp.Spec.Desired.Assignments != nil {
+					g.Expect(cp.Spec.Desired.Assignments).ShouldNot(HaveKey("max_connections"))
+				}
+			})).Should(Succeed())
+		})
+
+		It("sharding: validates against actual shard ComponentDefinition", func() {
+			By("create a cluster with a sharding spec")
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+			compDef := testapps.NewComponentDefinitionFactory(compDefName).
+				SetDefaultSpec().
+				Create(&testCtx).
+				GetObject()
+			clusterObject := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
+				AddSharding(defaultCompName, "", compDef.GetName()).
+				Create(&testCtx).
+				GetObject()
+			Expect(testapps.ChangeObjStatus(&testCtx, clusterObject, func() {
+				clusterObject.Status.Phase = appsv1.RunningClusterPhase
+			})).Should(Succeed())
+			opsRes := &OpsResource{
+				Cluster:  clusterObject,
+				Recorder: k8sManager.GetEventRecorderFor("opsrequest-controller"),
+			}
+
+			By("create a shard Component with the actual CompDef")
+			shardShortName := fmt.Sprintf("%s-%s", defaultCompName, rand.String(sharding.ShardIDLength))
+			shardFullName := fmt.Sprintf("%s-%s", clusterName, shardShortName)
+			testapps.NewComponentFactory(testCtx.DefaultNamespace, shardFullName, compDef.GetName()).
+				AddLabels(constant.AppManagedByLabelKey, constant.AppName).
+				AddLabels(constant.AppInstanceLabelKey, clusterName).
+				AddLabels(constant.KBAppClusterUIDKey, string(clusterObject.UID)).
+				AddLabels(constant.KBAppShardingNameLabelKey, defaultCompName).
+				AddLabels(constant.KBAppComponentLabelKey, shardShortName).
+				SetReplicas(1).
+				Create(&testCtx)
+
+			By("prepare ParametersDefinition with schema")
+			template := testparameters.NewComponentTemplateFactory("mysql-config", testCtx.DefaultNamespace).
+				Create(&testCtx).
+				GetObject()
+			paramsDef := testparameters.NewParametersDefinitionFactory("mysql-params-shard-" + randomStr).
+				SetComponentDefinition(compDefName).
+				SetTemplateName("mysql-config").
+				Schema(`
+parameter: {
+  max_connections?: string
+  gtid_mode?: string
+}`).
+				Create(&testCtx).
+				GetObject()
+			Expect(testapps.ChangeObjStatus(&testCtx, paramsDef, func() {
+				paramsDef.Status.Phase = parametersv1alpha1.PDAvailablePhase
+			})).Should(Succeed())
+			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKey{Name: compDefName}, func(cd *appsv1.ComponentDefinition) {
+				cd.Spec.ServiceVersion = "8.0.30"
+				cd.Spec.Configs = []appsv1.ComponentFileTemplate{
+					{
+						Name:            "mysql-config",
+						Template:        template.Name,
+						Namespace:       template.Namespace,
+						VolumeName:      "mysql-config",
+						ExternalManaged: pointer.Bool(true),
+					},
+				}
+			})()).Should(Succeed())
+
+			cpShard := builder.NewComponentParameterBuilder(testCtx.DefaultNamespace, parameterscore.GenerateComponentConfigurationName(clusterName, shardShortName)).
+				AddLabelsInMap(constant.GetCompLabelsWithDef(clusterName, shardShortName, compDefName)).
+				SetClusterName(clusterName).
+				SetCompName(shardShortName).
+				GetObject()
+			cpShard.Spec.ConfigItemDetails = []parametersv1alpha1.ConfigTemplateItemDetail{{
+				Name: "mysql-config",
+				ConfigSpec: &appsv1.ComponentFileTemplate{
+					Name: "mysql-config", Template: template.Name, Namespace: template.Namespace,
+					VolumeName: "mysql-config", ExternalManaged: pointer.Bool(true),
+				},
+			}}
+			Expect(testCtx.CreateObj(ctx, cpShard)).Should(Succeed())
+			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(cpShard), func(cp *parametersv1alpha1.ComponentParameter) {
+				cp.Status.ObservedGeneration = cp.Generation
+				cp.Status.Phase = parametersv1alpha1.CFinishedPhase
+				cp.Status.ConfigurationItemStatus = []parametersv1alpha1.ConfigTemplateItemDetailStatus{{
+					Name: "mysql-config", Phase: parametersv1alpha1.CFinishedPhase,
+				}}
+			})()).Should(Succeed())
+
+			By("reconfigure the sharding name with an unknown parameter")
+			ops := testops.NewOpsRequestObj("shard-validate-"+randomStr, testCtx.DefaultNamespace,
+				clusterName, opsv1alpha1.ReconfiguringType)
+			ops.Spec.Reconfigures = []opsv1alpha1.Reconfigure{
+				{
+					ComponentOps: opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
+					Parameters:   []opsv1alpha1.ParameterPair{{Key: "unknown_param", Value: pointer.String("1")}},
+				},
+			}
+			opsRes.OpsRequest = testops.CreateOpsRequest(ctx, testCtx, ops)
+			Expect(opsutil.UpdateClusterOpsAnnotations(ctx, k8sClient, opsRes.Cluster, nil)).Should(Succeed())
+
+			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsPendingPhase
+			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
+
+			By("Action should reject via shard's actual CompDef schema")
+			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest), func(g Gomega, fetched *opsv1alpha1.OpsRequest) {
+				g.Expect(fetched.Status.Phase).Should(Equal(opsv1alpha1.OpsFailedPhase))
+				condition := meta.FindStatusCondition(fetched.Status.Conditions, opsv1alpha1.ConditionTypeFailed)
+				g.Expect(condition).ShouldNot(BeNil())
+				g.Expect(condition.Message).Should(ContainSubstring("unknown_param"))
 			})).Should(Succeed())
 		})
 

@@ -859,6 +859,29 @@ func TestDecidePVCRestoreTreatsNilTargetVolumesAsProvisionOnly(t *testing.T) {
 	require.False(t, decision.skipPostReady)
 }
 
+func TestDecidePVCRestoreDoesNotSkipPostReadyWhenNoTargetVolumes(t *testing.T) {
+	reconciler := &VolumePopulatorReconciler{}
+	backup := newBackupForRestoreDecision(nil, nil)
+	backup.Status.BackupMethod.TargetVolumes = nil
+	backup.Status.Target.PodSelector = &dpv1alpha1.PodSelector{
+		LabelSelector: &metav1.LabelSelector{
+			MatchLabels: map[string]string{
+				constant.AppInstanceLabelKey:    "source-cluster",
+				constant.KBAppComponentLabelKey: "tidb",
+			},
+		},
+		Strategy: dpv1alpha1.PodSelectionStrategyAny,
+	}
+	pvc := newPVCForRestoreDecision("data", "pd", "")
+
+	decision, err := reconciler.decidePVCRestore(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, backup, nil)
+
+	require.NoError(t, err)
+	require.Equal(t, pvcRestoreModeProvisionOnly, decision.mode)
+	require.False(t, decision.skipPostReady,
+		"postReady must not be skipped when no volume-level restore exists — it may be the only restore path")
+}
+
 func TestMatchToPopulateSupportsRestoreAndBackupDataSources(t *testing.T) {
 	apiGroup := dptypes.DataprotectionAPIGroup
 	reconciler := &VolumePopulatorReconciler{}

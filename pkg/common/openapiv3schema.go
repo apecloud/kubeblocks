@@ -53,7 +53,7 @@ func ValidateDataWithSchema(openAPIV3Schema *apiextensionsv1.JSONSchemaProps, da
 		// throw the head error
 		return res.Errors[0]
 	}
-	return nil
+	return validateLargeIntegerBounds(openAPIV3Schema, data)
 }
 
 func ConvertStringToInterfaceBySchemaType(openAPIV3Schema *apiextensionsv1.JSONSchemaProps, input map[string]string) (map[string]interface{}, error) {
@@ -116,9 +116,8 @@ func isUnsignedByBounds(prop apiextensionsv1.JSONSchemaProps) bool {
 // stripIntegerOverflow removes Maximum from integer properties whose Maximum
 // >= 2^63. kube-openapi internally converts float64 Maximum to int64;
 // float64(MaxInt64) rounds to 2^63 and float64(MaxUint64) rounds to 2^64,
-// both of which overflow int64. Stripping is safe because the integer range
-// is already enforced by ParseInt/ParseUint at the conversion layer.
-// User-defined maximums below 2^63 are preserved.
+// both of which overflow int64. User-declared maximums that were stripped
+// are enforced separately by validateLargeIntegerBounds.
 func stripIntegerOverflow(schema *apiextensionsv1.JSONSchemaProps) *apiextensionsv1.JSONSchemaProps {
 	if schema == nil {
 		return nil
@@ -142,4 +141,46 @@ func stripIntegerOverflow(schema *apiextensionsv1.JSONSchemaProps) *apiextension
 		}
 	}
 	return out
+}
+
+// validateLargeIntegerBounds enforces original Maximum for integer properties
+// whose Maximum was >= 2^63 (stripped by stripIntegerOverflow to prevent
+// kube-openapi int64 overflow). CUE type extrema (2^63 for int64, 2^64 for
+// uint64) are skipped because ParseInt/ParseUint already enforce type range.
+func validateLargeIntegerBounds(schema *apiextensionsv1.JSONSchemaProps, data interface{}) error {
+	dataMap, ok := data.(map[string]interface{})
+	if !ok {
+		return nil
+	}
+	for k, prop := range schema.Properties {
+		if prop.Type != "integer" || prop.Maximum == nil || *prop.Maximum < math.Exp2(63) {
+			continue
+		}
+		if *prop.Maximum == math.Exp2(63) || *prop.Maximum == math.Exp2(64) {
+			continue
+		}
+		val, exists := dataMap[k]
+		if !exists {
+			continue
+		}
+		var f float64
+		switch v := val.(type) {
+		case int64:
+			f = float64(v)
+		case uint64:
+			f = float64(v)
+		default:
+			continue
+		}
+		if prop.ExclusiveMaximum {
+			if f >= *prop.Maximum {
+				return fmt.Errorf("%s: must be less than %g", k, *prop.Maximum)
+			}
+		} else {
+			if f > *prop.Maximum {
+				return fmt.Errorf("%s: must be less than or equal to %g", k, *prop.Maximum)
+			}
+		}
+	}
+	return nil
 }

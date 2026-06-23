@@ -202,6 +202,83 @@ func TestStripIntegerOverflow(t *testing.T) {
 	}
 }
 
+func TestValidateLargeIntegerBounds(t *testing.T) {
+	// User-declared maximum 1e19 (not a CUE extremum) must be enforced
+	userMax := float64(1e19)
+	schema := &apiextensionsv1.JSONSchemaProps{
+		Type: "object",
+		Properties: map[string]apiextensionsv1.JSONSchemaProps{
+			"custom_max": {
+				Type:    "integer",
+				Minimum: ptrFloat64(0),
+				Maximum: &userMax,
+			},
+		},
+	}
+
+	// Value within user-declared max should pass
+	if err := validateLargeIntegerBounds(schema, map[string]interface{}{"custom_max": uint64(9e18)}); err != nil {
+		t.Fatalf("expected value within user max to pass, got %v", err)
+	}
+	// Value above user-declared max should fail
+	if err := validateLargeIntegerBounds(schema, map[string]interface{}{"custom_max": uint64(11e18)}); err == nil {
+		t.Fatalf("expected value above user max to be rejected")
+	}
+
+	// CUE uint64 extremum (2^64) should be skipped (not enforced manually)
+	cueSchema := &apiextensionsv1.JSONSchemaProps{
+		Type: "object",
+		Properties: map[string]apiextensionsv1.JSONSchemaProps{
+			"cue_u64": {
+				Type:    "integer",
+				Minimum: ptrFloat64(0),
+				Maximum: ptrFloat64(math.Exp2(64)),
+			},
+		},
+	}
+	if err := validateLargeIntegerBounds(cueSchema, map[string]interface{}{"cue_u64": uint64(math.MaxUint64)}); err != nil {
+		t.Fatalf("expected CUE uint64 extremum to be skipped, got %v", err)
+	}
+
+	// CUE int64 extremum (2^63) should be skipped
+	cueI64Schema := &apiextensionsv1.JSONSchemaProps{
+		Type: "object",
+		Properties: map[string]apiextensionsv1.JSONSchemaProps{
+			"cue_i64": {
+				Type:    "integer",
+				Minimum: ptrFloat64(-math.Exp2(63)),
+				Maximum: ptrFloat64(math.Exp2(63)),
+			},
+		},
+	}
+	if err := validateLargeIntegerBounds(cueI64Schema, map[string]interface{}{"cue_i64": int64(math.MaxInt64)}); err != nil {
+		t.Fatalf("expected CUE int64 extremum to be skipped, got %v", err)
+	}
+}
+
+func TestValidateDataWithSchemaUserDeclaredLargeMax(t *testing.T) {
+	userMax := float64(1e19)
+	schema := &apiextensionsv1.JSONSchemaProps{
+		Type: "object",
+		Properties: map[string]apiextensionsv1.JSONSchemaProps{
+			"max_items": {
+				Type:    "integer",
+				Minimum: ptrFloat64(0),
+				Maximum: &userMax,
+			},
+		},
+	}
+
+	// Value within user max passes end-to-end
+	if err := ValidateDataWithSchema(schema, map[string]interface{}{"max_items": uint64(9e18)}); err != nil {
+		t.Fatalf("expected value within user max to pass, got %v", err)
+	}
+	// Value above user max fails end-to-end
+	if err := ValidateDataWithSchema(schema, map[string]interface{}{"max_items": uint64(11e18)}); err == nil {
+		t.Fatalf("expected value above user-declared max to be rejected")
+	}
+}
+
 func ptrFloat64(v float64) *float64 {
 	return &v
 }

@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -357,6 +358,8 @@ func (a *kbagent) templateVarsParameters() (map[string]string, error) {
 }
 
 func (a *kbagent) callActionWithSelector(ctx context.Context, spec *appsv1.Action, lfa lifecycleAction, req *proto.ActionRequest) ([]byte, error) {
+	logger := log.FromContext(ctx).WithValues("cluster", a.clusterName, "component", a.compName, "action", lfa.name())
+
 	pods, err := a.selectTargetPods(spec)
 	if err != nil {
 		return nil, err
@@ -365,10 +368,19 @@ func (a *kbagent) callActionWithSelector(ctx context.Context, spec *appsv1.Actio
 		return nil, fmt.Errorf("no available pod to execute action %s", lfa.name())
 	}
 
+	podNames := make([]string, len(pods))
+	for i, p := range pods {
+		podNames[i] = p.Name
+	}
+	logger.V(1).Info("selected target pods for lifecycle action", "pods", podNames)
+
 	// TODO: impl
 	//  - back-off to retry
 	//  - timeout
-	var output []byte
+	var (
+		output         []byte
+		dispatchedCount int
+	)
 	for _, pod := range pods {
 		endpoint := func() (string, int32, error) {
 			host, port, err := a.serverEndpoint(pod)
@@ -390,7 +402,8 @@ func (a *kbagent) callActionWithSelector(ctx context.Context, spec *appsv1.Actio
 			return nil, err // mock client error
 		}
 		if cli == nil {
-			continue // not kb-agent container and port defined, for test only
+			logger.Info("skipped pod: no kbagent endpoint defined", "pod", pod.Name)
+			continue
 		}
 
 		rsp, err := cli.Action(ctx, *req)
@@ -402,10 +415,15 @@ func (a *kbagent) callActionWithSelector(ctx context.Context, spec *appsv1.Actio
 		if len(rsp.Error) > 0 {
 			return nil, a.formatError(lfa, rsp, pod.Name)
 		}
+		logger.V(1).Info("lifecycle action dispatched successfully", "pod", pod.Name)
+		dispatchedCount++
 		// take first non-nil output
 		if output == nil && rsp.Output != nil {
 			output = rsp.Output
 		}
+	}
+	if dispatchedCount == 0 {
+		logger.Info("lifecycle action had zero successful dispatches — all selected pods were skipped", "selectedPods", len(pods))
 	}
 	return output, nil
 }

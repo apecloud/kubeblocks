@@ -131,6 +131,34 @@ var _ = Describe("builder", func() {
 			Expect(*its.Spec.MemberUpdateStrategy).Should(BeEquivalentTo(workloads.BestEffortParallelUpdateStrategy))
 		})
 
+		It("propagates sharding labels to InstanceSet metadata", func() {
+			shardingName := "shard"
+			compLabels := constant.GetClusterLabels(clusterName, map[string]string{
+				constant.KBAppShardingNameLabelKey: shardingName,
+			})
+			synthesizedComp := &component.SynthesizedComponent{
+				Namespace:     testCtx.DefaultNamespace,
+				ClusterName:   clusterName,
+				Name:          "shard-a",
+				CompDefName:   "mongodb",
+				Generation:    "1",
+				Labels:        compLabels,
+				DynamicLabels: map[string]string{"dynamic-label": "true"},
+				Replicas:      1,
+				PodSpec: &corev1.PodSpec{
+					Containers: []corev1.Container{{Name: "mongodb"}},
+				},
+			}
+
+			its, err := BuildInstanceSet(synthesizedComp, nil)
+
+			Expect(err).Should(Succeed())
+			Expect(its.Labels).Should(HaveKeyWithValue(constant.KBAppShardingNameLabelKey, shardingName))
+			Expect(its.Labels).Should(HaveKeyWithValue("dynamic-label", "true"))
+			Expect(its.Spec.Selector.MatchLabels).Should(HaveKeyWithValue(constant.KBAppShardingNameLabelKey, shardingName))
+			Expect(its.Spec.Template.Labels).Should(HaveKeyWithValue(constant.KBAppShardingNameLabelKey, shardingName))
+		})
+
 		It("builds ConfigMap with template correctly", func() {
 			config := map[string]string{}
 			_, cluster, synthesizedComponent := newClusterObjs(nil)

@@ -144,8 +144,6 @@ func (r *componentWorkloadOps) scaleIn() error {
 	return nil
 }
 
-const memberLifecycleGracePeriod = 10 * time.Minute
-
 func (r *componentWorkloadOps) gatePendingMemberLifecycle(deleteReplicas []string) error {
 	deleteSet := sets.New(deleteReplicas...)
 	pendingReplicas, err := component.GetReplicasStatusFunc(r.runningITS, func(s component.ReplicaStatus) bool {
@@ -155,25 +153,8 @@ func (r *componentWorkloadOps) gatePendingMemberLifecycle(deleteReplicas []strin
 		return err
 	}
 
-	pods, err := component.ListOwnedPods(r.transCtx.Context, r.cli,
-		r.synthesizeComp.Namespace, r.synthesizeComp.ClusterName, r.synthesizeComp.Name)
-	if err != nil {
-		return err
-	}
-
-	pendingSet := sets.New(pendingReplicas...)
-	now := time.Now()
-	for _, pod := range pods {
-		if !pendingSet.Has(pod.Name) {
-			continue
-		}
-		if now.Sub(pod.CreationTimestamp.Time) < memberLifecycleGracePeriod {
-			return intctrlutil.NewRequeueError(time.Second*30,
-				fmt.Sprintf("scale-in gated: replica %s has pending member lifecycle, waiting for completion or grace period (%s)", pod.Name, memberLifecycleGracePeriod))
-		}
-		r.transCtx.Logger.V(1).Info("scale-in gate expired, proceeding despite pending member lifecycle", "pod", pod.Name)
-	}
-	return nil
+	return intctrlutil.NewRequeueError(time.Second*30,
+		fmt.Sprintf("scale-in gated: replicas %v have pending member lifecycle (MemberJoined=false), waiting for terminal state", pendingReplicas))
 }
 
 func (r *componentWorkloadOps) leaveMember4ScaleIn(deleteReplicas, joinedReplicas []string) error {

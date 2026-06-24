@@ -17,7 +17,6 @@ package component
 
 import (
 	"context"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -26,8 +25,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes/scheme"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -1216,68 +1213,49 @@ var _ = Describe("Component Workload Operations Test", func() {
 			gatePodName = gateITSName + "-0"
 		)
 
-		buildITSWithPendingMember := func() *workloads.InstanceSet {
+		buildITS := func(replicas int32) *workloads.InstanceSet {
 			container := corev1.Container{
 				Name:  "main",
 				Image: "test-image",
 			}
-			its := testapps.NewInstanceSetFactory(testCtx.DefaultNamespace,
+			return testapps.NewInstanceSetFactory(testCtx.DefaultNamespace,
 				gateITSName, clusterName, compName).
 				AddContainer(container).
 				AddAppInstanceLabel(clusterName).
 				AddAppComponentLabel(compName).
 				AddAppManagedByLabel().
-				SetReplicas(1).
+				SetReplicas(replicas).
 				GetObject()
-			Expect(component.NewReplicasStatus(its, []string{gatePodName}, true, false)).Should(Succeed())
-			return its
 		}
 
-		buildPodWithAge := func(age time.Duration) *corev1.Pod {
-			pod := testapps.NewPodFactory(testCtx.DefaultNamespace, gatePodName).
-				AddContainer(corev1.Container{Name: "main", Image: "test-image"}).
-				AddLabels(
-					constant.AppManagedByLabelKey, constant.AppName,
-					constant.AppInstanceLabelKey, clusterName,
-					constant.KBAppComponentLabelKey, compName,
-				).
-				GetObject()
-			pod.CreationTimestamp = metav1.NewTime(time.Now().Add(-age))
-			return pod
-		}
-
-		buildOpsWithPod := func(its *workloads.InstanceSet, pod *corev1.Pod) *componentWorkloadOps {
-			fakeCli := fake.NewClientBuilder().
-				WithScheme(scheme.Scheme).
-				WithObjects(pod).
-				Build()
+		buildOps := func(its *workloads.InstanceSet) *componentWorkloadOps {
 			return &componentWorkloadOps{
 				transCtx: &componentTransformContext{
 					Context:       ctx,
 					Logger:        logger,
 					EventRecorder: clusterRecorder,
 				},
-				cli:            fakeCli,
+				cli:            k8sClient,
 				component:      comp,
 				synthesizeComp: synthesizeComp,
 				runningITS:     its,
 			}
 		}
 
-		It("should requeue scale-in when pending member lifecycle is within grace period", func() {
-			its := buildITSWithPendingMember()
-			pod := buildPodWithAge(5 * time.Minute)
-			ops := buildOpsWithPod(its, pod)
+		It("should requeue scale-in when replica has pending member lifecycle", func() {
+			its := buildITS(1)
+			Expect(component.NewReplicasStatus(its, []string{gatePodName}, true, false)).Should(Succeed())
+			ops := buildOps(its)
 
 			err := ops.gatePendingMemberLifecycle([]string{gatePodName})
 			Expect(err).ShouldNot(BeNil())
 			Expect(intctrlutil.IsRequeueError(err)).Should(BeTrue())
 		})
 
-		It("should proceed with scale-in when pending member lifecycle exceeds grace period", func() {
-			its := buildITSWithPendingMember()
-			pod := buildPodWithAge(11 * time.Minute)
-			ops := buildOpsWithPod(its, pod)
+		It("should proceed with scale-in when replica has no pending member lifecycle", func() {
+			its := buildITS(1)
+			Expect(component.StatusReplicasStatus(its, []string{gatePodName}, true, false)).Should(Succeed())
+			ops := buildOps(its)
 
 			err := ops.gatePendingMemberLifecycle([]string{gatePodName})
 			Expect(err).Should(BeNil())

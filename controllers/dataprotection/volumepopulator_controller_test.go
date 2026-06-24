@@ -1256,7 +1256,7 @@ func TestProvisionOnlyCreatesPopulatePVCWithoutJob(t *testing.T) {
 	require.Empty(t, jobs.Items)
 }
 
-func TestDispatchUnboundPVCFallsBackToProvisionOnlyWhenPrepareDataBackupSetsEmpty(t *testing.T) {
+func TestDispatchUnboundPVCFallsBackToProvisionOnlyWhenOnlyPostReadyExists(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, corev1.AddToScheme(scheme))
 	require.NoError(t, batchv1.AddToScheme(scheme))
@@ -1287,6 +1287,7 @@ func TestDispatchUnboundPVCFallsBackToProvisionOnlyWhenPrepareDataBackupSetsEmpt
 	restoreMgr := dprestore.NewRestoreManager(&dpv1alpha1.Restore{
 		Spec: dpv1alpha1.RestoreSpec{Backup: dpv1alpha1.BackupRef{Name: "backup", Namespace: "default"}},
 	}, nil, scheme, reconciler.Client)
+	restoreMgr.PostReadyBackupSets = []dprestore.BackupActionSet{{Backup: &dpv1alpha1.Backup{}}}
 	restoreCtx := &pvcRestoreContext{
 		mode:       pvcRestoreModeRestoreData,
 		restoreMgr: restoreMgr,
@@ -1299,6 +1300,33 @@ func TestDispatchUnboundPVCFallsBackToProvisionOnlyWhenPrepareDataBackupSetsEmpt
 	populatePVC := &corev1.PersistentVolumeClaim{}
 	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: getPopulatePVCName(pvc.UID)}, populatePVC))
 	require.Empty(t, populatePVC.Spec.DataSourceRef, "populate PVC must not have dataSourceRef (ProvisionOnly path)")
+}
+
+func TestDispatchUnboundPVCFailsWhenNoRestoreActionsExist(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      "data-restore-cluster-0",
+		},
+	}
+	reconciler := &VolumePopulatorReconciler{
+		Client: fake.NewClientBuilder().WithScheme(scheme).Build(),
+	}
+	restoreMgr := dprestore.NewRestoreManager(&dpv1alpha1.Restore{
+		Spec: dpv1alpha1.RestoreSpec{Backup: dpv1alpha1.BackupRef{Name: "backup", Namespace: "default"}},
+	}, nil, scheme, reconciler.Client)
+	restoreCtx := &pvcRestoreContext{
+		mode:       pvcRestoreModeRestoreData,
+		restoreMgr: restoreMgr,
+	}
+
+	err := reconciler.dispatchUnboundPVC(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, restoreCtx)
+
+	require.Error(t, err)
+	require.True(t, intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal),
+		"expected fatal error when neither prepareData nor postReady exists, got: %v", err)
 }
 
 func TestBuildPostReadyRestoreSelectsHighestPriorityRole(t *testing.T) {

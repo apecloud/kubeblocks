@@ -919,6 +919,29 @@ func TestDecidePVCRestoreNoTargetVolumesMultiComponentTargets(t *testing.T) {
 	require.Equal(t, "etcd", decision.sourceTarget.Name)
 }
 
+func TestDecidePVCRestoreNoTargetVolumesNoComponentLabel(t *testing.T) {
+	reconciler := &VolumePopulatorReconciler{}
+	backup := newBackupForRestoreDecision(nil, nil)
+	backup.Status.BackupMethod.TargetVolumes = nil
+	backup.Status.Target.PodSelector = &dpv1alpha1.PodSelector{
+		LabelSelector: &metav1.LabelSelector{
+			MatchLabels: map[string]string{
+				constant.AppInstanceLabelKey: "source-cluster",
+				constant.RoleLabelKey:        "leader",
+			},
+		},
+		Strategy: dpv1alpha1.PodSelectionStrategyAny,
+	}
+
+	pvc := newPVCForRestoreDecision("data", "mysql", "")
+	decision, err := reconciler.decidePVCRestore(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, backup, nil)
+	require.NoError(t, err)
+	require.Equal(t, pvcRestoreModeProvisionOnly, decision.mode)
+	require.True(t, decision.skipPostReady,
+		"when target selector has no component label, cannot confirm PVC belongs to target — keep skipPostReady")
+	require.Nil(t, decision.sourceTarget)
+}
+
 func TestMatchToPopulateSupportsRestoreAndBackupDataSources(t *testing.T) {
 	apiGroup := dptypes.DataprotectionAPIGroup
 	reconciler := &VolumePopulatorReconciler{}

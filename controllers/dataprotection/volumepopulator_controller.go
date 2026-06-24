@@ -508,7 +508,7 @@ func targetMatchesComponent(target *dpv1alpha1.BackupStatusTarget, componentName
 	}
 	targetComp := target.PodSelector.MatchLabels[constant.KBAppComponentLabelKey]
 	if targetComp == "" {
-		return true
+		return false
 	}
 	return targetComp == componentName
 }

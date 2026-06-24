@@ -86,7 +86,7 @@ func (t *rolloutCreateTransformer) component(transCtx *rolloutTransformContext,
 		return err
 	}
 
-	if (replicas+targetReplicas) > spec.Replicas && !hasPromotedCreateTemplate(rollout, spec.Instances) {
+	if (replicas+targetReplicas) > spec.Replicas && !hasPromotedCreateTemplate(rollout, spec.Instances, targetReplicas) {
 		return t.rolling(transCtx, comp, spec, replicas, targetReplicas)
 	}
 
@@ -101,7 +101,7 @@ func (t *rolloutCreateTransformer) sharding(transCtx *rolloutTransformContext,
 		return err
 	}
 
-	if (replicas+targetReplicas) > spec.Template.Replicas && !hasPromotedCreateTemplate(rollout, spec.Template.Instances) {
+	if (replicas+targetReplicas) > spec.Template.Replicas && !hasPromotedCreateTemplate(rollout, spec.Template.Instances, targetReplicas) {
 		return t.shardingRolling(transCtx, sharding, spec, replicas, targetReplicas)
 	}
 
@@ -287,9 +287,9 @@ func createShardingReplicas(rollout *appsv1alpha1.Rollout, sharding appsv1alpha1
 	return replicas, target, nil
 }
 
-func hasPromotedCreateTemplate(rollout *appsv1alpha1.Rollout, instances []appsv1.InstanceTemplate) bool {
+func hasPromotedCreateTemplate(rollout *appsv1alpha1.Rollout, instances []appsv1.InstanceTemplate, targetReplicas int32) bool {
 	tpl := createInstanceTemplate(instances, replaceInstanceTemplateNamePrefix(rollout))
-	return tpl != nil && !ptr.Deref(tpl.Canary, false)
+	return tpl != nil && !ptr.Deref(tpl.Canary, false) && ptr.Deref(tpl.Replicas, 0) == targetReplicas
 }
 
 func createTargetReplicas(name string, replicasSpec *intstr.IntOrString, originalReplicas int32, subject string) (int32, error) {

@@ -350,6 +350,10 @@ func resolvedClients(mctx mcontext, ctx context.Context, obj client.Object, opts
 		return []contextCli{{"", mctx.control}}
 	}
 
+	if o.placement != "" {
+		return dataClients(mctx, parsePlacement(o.placement))
+	}
+
 	if o.unspecified {
 		return dataClients(mctx, maps.Keys(mctx.workers))
 	}

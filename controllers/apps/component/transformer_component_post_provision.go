@@ -96,7 +96,8 @@ func (t *componentPostProvisionTransformer) postProvision(transCtx *componentTra
 func (t *componentPostProvisionTransformer) lifecycleAction4Component(transCtx *componentTransformContext) (lifecycle.Lifecycle, error) {
 	synthesizedComp := transCtx.SynthesizeComponent
 	pods, err := component.ListOwnedPods(transCtx.Context, transCtx.Client,
-		synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name)
+		synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name,
+		inDataContextOf(transCtx.Component, transCtx.RunningWorkload))
 	if err != nil {
 		return nil, err
 	}

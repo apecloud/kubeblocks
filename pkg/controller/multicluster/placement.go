@@ -113,7 +113,7 @@ func fromContext(ctx context.Context) []string {
 	if err != nil {
 		return nil
 	}
-	return strings.Split(p, ",")
+	return parsePlacement(p)
 }
 
 func fromObject(obj client.Object) []string {
@@ -124,5 +124,19 @@ func fromObject(obj client.Object) []string {
 	if !ok {
 		return nil
 	}
-	return strings.Split(p, ",")
+	return parsePlacement(p)
+}
+
+func parsePlacement(placement string) []string {
+	if placement == "" {
+		return nil
+	}
+	parts := strings.Split(placement, ",")
+	contexts := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if context := strings.TrimSpace(part); context != "" {
+			contexts = append(contexts, context)
+		}
+	}
+	return contexts
 }

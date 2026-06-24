@@ -45,6 +45,28 @@ func inDataContext() *multicluster.ClientOption {
 	return multicluster.InDataContext()
 }
 
+func inDataContextOfObject(obj client.Object) *multicluster.ClientOption {
+	if !isNilObject(obj) && obj.GetAnnotations() != nil {
+		if placement := obj.GetAnnotations()[constant.KBAppMultiClusterPlacementKey]; placement != "" {
+			return multicluster.InDataContextOf(placement)
+		}
+	}
+	return multicluster.InDataContext()
+}
+
+func isNilObject(obj client.Object) bool {
+	if obj == nil {
+		return true
+	}
+	v := reflect.ValueOf(obj)
+	switch v.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Ptr, reflect.Slice:
+		return v.IsNil()
+	default:
+		return false
+	}
+}
+
 func ValidateDefNameRegexp(defNamePattern string) error {
 	_, err := regexp.Compile(defNamePattern)
 	return err

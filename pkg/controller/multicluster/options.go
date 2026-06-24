@@ -33,6 +33,12 @@ func InDataContext() *ClientOption {
 	return &ClientOption{}
 }
 
+func InDataContextOf(placement string) *ClientOption {
+	return &ClientOption{
+		placement: placement,
+	}
+}
+
 func InDataContextUnspecified() *ClientOption {
 	return &ClientOption{
 		unspecified: true,
@@ -63,6 +69,7 @@ type ClientOption struct {
 	unspecified bool // data planes, but don't know which ones exactly
 	oneshot     bool
 	multiCheck  bool // only support the Get operation
+	placement   string
 }
 
 func (o *ClientOption) ApplyToGet(*client.GetOptions) {

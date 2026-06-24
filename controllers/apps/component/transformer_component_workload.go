@@ -133,7 +133,8 @@ func (t *componentWorkloadTransformer) reconcileReplicasStatus(ctx context.Conte
 	component.BuildReplicasStatus(runningITS, protoITS)
 
 	replicas, err := func() ([]string, error) {
-		pods, err := component.ListOwnedPods(ctx, cli, namespace, clusterName, compName)
+		pods, err := component.ListOwnedPods(ctx, cli, namespace, clusterName, compName,
+			inDataContextOf(protoITS, runningITS))
 		if err != nil {
 			return nil, err
 		}

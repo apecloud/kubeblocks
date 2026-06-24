@@ -176,7 +176,8 @@ func NewLifecycle(ctx context.Context, cli client.Reader, compDef *appsv1.Compon
 		return nil, err
 	}
 
-	pods, err := ListOwnedPods(ctx, cli, synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name)
+	pods, err := ListOwnedPods(ctx, cli, synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name,
+		inDataContextOfObject(comp))
 	if err != nil {
 		return nil, err
 	}

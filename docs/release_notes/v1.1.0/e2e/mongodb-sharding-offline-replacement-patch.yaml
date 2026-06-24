@@ -1,6 +1,6 @@
 - op: replace
   path: /spec/shardings/0/shards
-  value: 2
+  value: 4
 - op: add
   path: /spec/shardings/0/offline
   value:

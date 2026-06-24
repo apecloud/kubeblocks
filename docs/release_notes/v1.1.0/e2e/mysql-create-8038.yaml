@@ -15,8 +15,8 @@ spec:
           canary: true
           promotion:
             auto: true
-            delaySeconds: 0
-            scaleDownDelaySeconds: 0
+            delaySeconds: ${ROLLOUT_CREATE_PROMOTION_DELAY_SECONDS}
+            scaleDownDelaySeconds: ${ROLLOUT_CREATE_SCALE_DOWN_DELAY_SECONDS}
       instanceMeta:
         canary:
           labels:

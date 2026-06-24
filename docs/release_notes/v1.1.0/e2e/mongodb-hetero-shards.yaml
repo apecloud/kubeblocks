@@ -13,13 +13,13 @@ spec:
       resources:
         limits: { cpu: 500m, memory: 512Mi }
         requests: { cpu: 500m, memory: 512Mi }
-      serviceVersion: ${MONGO_VERSION}
+      serviceVersion: ${MONGO_SHARD_VERSION_BASE}
     - name: config-server
       replicas: 1
       resources:
         limits: { cpu: 500m, memory: 512Mi }
         requests: { cpu: 500m, memory: 512Mi }
-      serviceVersion: ${MONGO_VERSION}
+      serviceVersion: ${MONGO_SHARD_VERSION_BASE}
       systemAccounts:
         - disabled: false
           name: root
@@ -45,7 +45,7 @@ spec:
         resources:
           limits: { cpu: 500m, memory: 512Mi }
           requests: { cpu: 500m, memory: 512Mi }
-        serviceVersion: ${MONGO_VERSION}
+        serviceVersion: ${MONGO_SHARD_VERSION_BASE}
         volumeClaimTemplates:
           - name: data
             spec:
@@ -60,7 +60,7 @@ spec:
           resources:
             limits: { cpu: "1", memory: 1Gi }
             requests: { cpu: "1", memory: 1Gi }
-          serviceVersion: ${MONGO_VERSION}
+          serviceVersion: ${MONGO_SHARD_VERSION_BASE}
           volumeClaimTemplates:
             - name: data
               spec:

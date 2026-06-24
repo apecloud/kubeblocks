@@ -332,7 +332,7 @@ spec:
   shardings:
     - name: shard
       compDef: mongo-shard
-      serviceVersion: "8.0.17"
+      serviceVersion: "6.0.27"
       strategy:
         replace:
           perInstanceIntervalSeconds: 30
@@ -341,11 +341,14 @@ spec:
 
 Expected results:
 
-* `status.shardings` is populated.
-* Each shard is rolled out.
+* `status.shardings` is populated and reports `state: Succeed`, the source `serviceVersion`, and `replicas == newReplicas == rolledOutReplicas`.
+* Each shard is rolled out from the base MongoDB 6.0 patch version, for example `6.0.20`, to another supported 6.0 patch version, for example `6.0.27`.
 * Shard instances are rolled one at a time with at least 30 seconds between successive instance updates.
+* Shard pod UIDs change after replace rollout, and all shard pods carry the target service version.
+* Marker data seeded through `mongos` before rollout is still readable with the same counts and checksums after rollout.
 * No shard remains in stale `Updating` or `Failed` state.
 * The sharded cluster returns to `Running`.
+* Keep the completed `mongodb-sharding-rollout` CR for trace inspection; delete it manually before rerunning the same case.
 
 ### E2E-1E: Concurrency and Abort Semantics
 
@@ -805,7 +808,7 @@ spec:
         requests:
           cpu: 500m
           memory: 512Mi
-      serviceVersion: "6.0.27"
+      serviceVersion: "6.0.20"
     - name: config-server
       replicas: 1
       resources:
@@ -815,7 +818,7 @@ spec:
         requests:
           cpu: 500m
           memory: 512Mi
-      serviceVersion: "6.0.27"
+      serviceVersion: "6.0.20"
       systemAccounts:
         - disabled: false
           name: root
@@ -846,7 +849,7 @@ spec:
           requests:
             cpu: 500m
             memory: 512Mi
-        serviceVersion: "6.0.27"
+        serviceVersion: "6.0.20"
         volumeClaimTemplates:
           - name: data
             spec:
@@ -899,32 +902,56 @@ Expected results:
 * Cluster returns to `Running`.
 * All marker databases and marker documents inserted before scale-out are still readable through `mongos`; the test does not require shard names to remain unchanged.
 
-### E2E-4C: Scale In Shards
+### E2E-4C: Offline With Unchanged Shard Count Creates a Replacement
 
 Steps:
 
-1. Record existing shard component names.
-2. Patch `spec.shardings[0].shards` from `4` to `3`.
-3. Wait until `spec.shardings[0].shards` is `3`, exactly three shard components remain, and all three shard components are `Running`.
-4. Re-read all marker documents inserted before scale-out.
+1. After scaling `mongo-sharding` out to four shards, generate a shard offline readiness report from `mongos`.
+2. Select only a shard that is not draining and has no chunks, jumbo chunks, or primary databases (`dbsToMove`).
+3. Keep `shards: 4` and add the selected shard's full component name to `offline`.
+4. Wait for reconciliation.
+5. Verify marker data through `mongos`.
 
 Expected results:
 
-* One shard component is removed.
-* `spec.shardings[0].shards` is `3` after the scale-in patch.
-* Remaining shards continue running.
-* Cluster returns to `Running`.
-* All marker databases and marker documents inserted before scale-out are still readable through `mongos`; the test does not require shard names to remain unchanged.
+* If no shard is ready for offline, the test fails before patching the Cluster and saves a report listing blockers such as chunks, jumbo chunks, draining state, or databases that require `movePrimary`/`dropDatabase`.
+* The offline shard is removed, and a new shard with a fresh ID is created to keep four shards.
+* The freed shard ID is not reused.
+* The other shards keep running with unchanged pod UIDs.
+* All marker databases and marker documents inserted before scale-out are still readable through `mongos`.
+
+### E2E-4D: Scale In a Specific Shard via offline
+
+Steps:
+
+1. Generate a shard offline readiness report from `mongos`.
+2. Select only a shard that is not draining and has no chunks, jumbo chunks, or primary databases (`dbsToMove`).
+3. Patch the sharding: set `shards: 3` and `offline: ["<victim>"]`.
+4. Watch component deletion.
+5. Verify marker data through `mongos`.
+
+Expected results:
+
+* If no shard is ready for offline, the test fails before patching the Cluster and saves a report listing why each candidate cannot be removed.
+* Exactly `<victim>` is removed; the other shards keep running with unchanged pod UIDs.
+* Cluster returns to `Running` with three shards.
+* All marker databases and marker documents inserted before scale-out are still readable through `mongos`.
+
+### E2E-4 Failure Checks
+
+* `offline` entries must be full component names (`<cluster>-<sharding>-<id>`); naming a non-existent shard is a no-op, not a deletion of an arbitrary shard.
+* Offline precondition checks must report blockers before patching the Cluster. Blockers include chunks still on the shard, jumbo chunks, an already-draining shard, or primary databases that require `movePrimary` or `dropDatabase`.
+* Decreasing `shards` without `offline` should still work; KubeBlocks removes the shards with the highest names, proving `offline` is optional.
 
 ### TODO: Sharding Lifecycle Actions
 
 Add separate coverage for `postProvision`, `preTerminate`, `shardAdd`, and `shardRemove` after the lifecycle test design and action implementation are finalized.
 
-## E2E-5: Heterogeneous Shards and Shard-Specific Scale-In
+## E2E-5: Heterogeneous Shards
 
 ### Purpose
 
-Verify that `spec.shardings[*].shardTemplates` creates shard groups with distinct configurations, and `spec.shardings[*].offline` removes exactly the named shard.
+Verify that `spec.shardings[*].shardTemplates` creates shard groups with distinct configurations. Offline shard removal is covered by the regular `mongo-sharding` scale tests so it is not mixed with heterogeneous shard coverage.
 
 ### Prerequisites
 
@@ -980,7 +1007,7 @@ Expected results:
 
 Steps:
 
-1. Patch the `hot` shard template with a different `serviceVersion` (or `compDef`). The script defaults to `MONGO_VERSION=6.0.27` and `MONGO_VERSION_TARGET=7.0.28`; `8.0.17` is also a valid target override for the current MongoDB sharding addon.
+1. Patch the `hot` shard template with a different `serviceVersion` (or `compDef`). The script defaults to `MONGO_SHARD_VERSION_BASE=6.0.20` and `MONGO_SHARD_VERSION_TARGET=6.0.27`; valid sharding rollout versions are `6.0.20`, `6.0.21`, `6.0.22`, and `6.0.27`.
 2. Wait for reconciliation.
 
 Expected results:
@@ -989,44 +1016,8 @@ Expected results:
 * The `hot` shard component reports `spec.serviceVersion` equal to the target version.
 * Other shards show no pod restarts (compare pod UIDs before and after).
 
-### E2E-5C: Scale In a Specific Shard via offline
-
-Steps:
-
-1. Record all shard component names; choose one base-template shard `<victim>`.
-2. Patch the sharding: set `shards: 2` and `offline: ["<victim>"]`.
-3. Watch component deletion.
-
-Commands:
-
-```bash
-kubectl get components -n ${TEST_NAMESPACE} -l apps.kubeblocks.io/sharding-name=shard -o wide
-kubectl get pod -n ${TEST_NAMESPACE} -o json | jq '.items[] | {name: .metadata.name, uid: .metadata.uid, component: .metadata.labels["apps.kubeblocks.io/component-name"]}'
-kubectl patch cluster shard-hetero -n ${TEST_NAMESPACE} --type merge --patch-file shard-offline-patch.yaml
-kubectl get components -n ${TEST_NAMESPACE} -l apps.kubeblocks.io/sharding-name=shard -w
-```
-
-Expected results:
-
-* Exactly `<victim>` is removed; the other shards keep running with unchanged pod UIDs.
-* Cluster returns to `Running` with two shards.
-
-### E2E-5D: Offline With Unchanged Shard Count Creates a Replacement
-
-Steps:
-
-1. Keep `shards: 3` and add one shard's full component name to `offline`.
-2. Wait for reconciliation.
-
-Expected results:
-
-* The offline shard is removed, and a new shard with a fresh ID is created to keep three shards.
-* The freed shard ID is not reused.
-
 ### Failure Checks
 
-* `offline` entries must be full component names (`<cluster>-<sharding>-<id>`); naming a non-existent shard is a no-op, not a deletion of an arbitrary shard.
-* Decreasing `shards` without `offline` should still work; KubeBlocks removes the shards with the highest names, proving `offline` is optional.
 * A sharding where the sum of `shardTemplates[*].shards` exceeds `shards` must fail with `the sum of shards in shard templates is greater than the total shards`.
 * Duplicate shard template names or duplicate `shardIDs` must be rejected.
 
@@ -1161,5 +1152,5 @@ The KubeBlocks 1.1 release is not ready until:
 * ComponentNetwork tests cover host ports, host aliases, and DNS config;
 * dynamic adoption tests prove pod/PVC identity is preserved;
 * sharding lifecycle tests prove add/remove hooks run with the expected shard variables;
-* heterogeneous shard tests prove per-group configuration and shard-specific scale-in via `offline`;
+* heterogeneous shard tests prove per-group configuration without mixing in offline removal;
 * no P0/P1 bugs remain open for these feature areas.

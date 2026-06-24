@@ -17,7 +17,7 @@ spec:
         requests:
           cpu: 500m
           memory: 512Mi
-      serviceVersion: 6.0.27
+      serviceVersion: ${MONGO_SHARD_VERSION_BASE}
     - name: config-server
       replicas: 1
       resources:
@@ -27,7 +27,7 @@ spec:
         requests:
           cpu: 500m
           memory: 512Mi
-      serviceVersion: 6.0.27
+      serviceVersion: ${MONGO_SHARD_VERSION_BASE}
       systemAccounts:
         - disabled: false
           name: root
@@ -50,7 +50,7 @@ spec:
       shards: 3
       template:
         name: shard
-        replicas: 1
+        replicas: 2
         resources:
           limits:
             cpu: 500m
@@ -58,7 +58,7 @@ spec:
           requests:
             cpu: 500m
             memory: 512Mi
-        serviceVersion: 6.0.27
+        serviceVersion: ${MONGO_SHARD_VERSION_BASE}
         volumeClaimTemplates:
           - name: data
             spec:

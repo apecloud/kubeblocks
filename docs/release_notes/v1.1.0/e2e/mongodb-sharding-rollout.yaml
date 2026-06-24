@@ -7,7 +7,7 @@ spec:
   clusterName: mongo-sharding
   shardings:
     - name: shard
-      serviceVersion: "${MONGO_VERSION_TARGET}"
+      serviceVersion: "${MONGO_SHARD_VERSION_TARGET}"
       strategy:
         replace:
           perInstanceIntervalSeconds: ${ROLLOUT_INSTANCE_INTERVAL_SECONDS}

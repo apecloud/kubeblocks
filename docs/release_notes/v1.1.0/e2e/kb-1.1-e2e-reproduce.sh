@@ -35,11 +35,14 @@ MYSQL_VERSION_REPLACE="${MYSQL_VERSION_REPLACE:-8.0.37}"
 MYSQL_VERSION_CANARY="${MYSQL_VERSION_CANARY:-8.0.38}"
 ROLLOUT_INSTANCE_INTERVAL_SECONDS="${ROLLOUT_INSTANCE_INTERVAL_SECONDS:-30}"
 ROLLOUT_SCALE_DOWN_DELAY_SECONDS="${ROLLOUT_SCALE_DOWN_DELAY_SECONDS:-30}"
+ROLLOUT_CREATE_PROMOTION_DELAY_SECONDS="${ROLLOUT_CREATE_PROMOTION_DELAY_SECONDS:-5}"
+ROLLOUT_CREATE_SCALE_DOWN_DELAY_SECONDS="${ROLLOUT_CREATE_SCALE_DOWN_DELAY_SECONDS:-5}"
 
 MONGO_COMPDEF="${MONGO_COMPDEF:-mongodb-1.1.0-alpha.0}"
 MONGO_COMPDEF_PREFIX="${MONGO_COMPDEF_PREFIX:-mongodb-}"
 MONGO_VERSION="${MONGO_VERSION:-6.0.27}"
-MONGO_VERSION_TARGET="${MONGO_VERSION_TARGET:-7.0.28}"
+MONGO_SHARD_VERSION_BASE="${MONGO_SHARD_VERSION_BASE:-6.0.20}"
+MONGO_SHARD_VERSION_TARGET="${MONGO_SHARD_VERSION_TARGET:-6.0.27}"
 MONGO_SHARD_COMPDEF="${MONGO_SHARD_COMPDEF:-mongo}"
 MONGO_SHARD_COMPDEF_PREFIX="${MONGO_SHARD_COMPDEF_PREFIX:-mongo-}"
 MONGO_SHARD_STORAGE="${MONGO_SHARD_STORAGE:-10Gi}"
@@ -80,11 +83,14 @@ Useful env vars:
   SKIP_HELM_REPO_UPDATE=true|false
   AUTO_INSTALLED_ADDONS='["mysql","mongodb"]'
   MONGO_COMPDEF_PREFIX=mongodb-
-  MONGO_VERSION_TARGET=7.0.28
+  MONGO_SHARD_VERSION_BASE=6.0.20
+  MONGO_SHARD_VERSION_TARGET=6.0.27
   MONGO_SHARD_COMPDEF=mongo
   MONGO_SHARD_COMPDEF_PREFIX=mongo-
   ROLLOUT_INSTANCE_INTERVAL_SECONDS=30
   ROLLOUT_SCALE_DOWN_DELAY_SECONDS=30
+  ROLLOUT_CREATE_PROMOTION_DELAY_SECONDS=5
+  ROLLOUT_CREATE_SCALE_DOWN_DELAY_SECONDS=5
   MANIFEST_DIR=docs/release_notes/v1.1.0/e2e
   WORK_DIR=./docs/release_notes/v1.1.0/e2e/
   CACHE_DIR=./docs/release_notes/v1.1.0/e2e/cache
@@ -100,6 +106,23 @@ USAGE
 
 require_cmd() {
   command -v "$1" >/dev/null 2>&1 || fail "missing required command: $1"
+}
+
+is_supported_mongodb_shard_version() {
+  case "$1" in
+    6.0.20|6.0.21|6.0.22|6.0.27) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+validate_mongodb_shard_versions() {
+  is_supported_mongodb_shard_version "${MONGO_SHARD_VERSION_BASE}" \
+    || fail "unsupported MONGO_SHARD_VERSION_BASE=${MONGO_SHARD_VERSION_BASE}; use one of 6.0.20, 6.0.21, 6.0.22, 6.0.27"
+  is_supported_mongodb_shard_version "${MONGO_SHARD_VERSION_TARGET}" \
+    || fail "unsupported MONGO_SHARD_VERSION_TARGET=${MONGO_SHARD_VERSION_TARGET}; use one of 6.0.20, 6.0.21, 6.0.22, 6.0.27"
+
+  [[ "${MONGO_SHARD_VERSION_BASE%.*}" == "${MONGO_SHARD_VERSION_TARGET%.*}" ]] \
+    || fail "MongoDB sharding rollout must stay within one minor version: base=${MONGO_SHARD_VERSION_BASE}, target=${MONGO_SHARD_VERSION_TARGET}"
 }
 
 prepare_dirs() {
@@ -136,10 +159,13 @@ render_manifest() {
     "MYSQL_VERSION_CANARY=${MYSQL_VERSION_CANARY}"
     "ROLLOUT_INSTANCE_INTERVAL_SECONDS=${ROLLOUT_INSTANCE_INTERVAL_SECONDS}"
     "ROLLOUT_SCALE_DOWN_DELAY_SECONDS=${ROLLOUT_SCALE_DOWN_DELAY_SECONDS}"
+    "ROLLOUT_CREATE_PROMOTION_DELAY_SECONDS=${ROLLOUT_CREATE_PROMOTION_DELAY_SECONDS}"
+    "ROLLOUT_CREATE_SCALE_DOWN_DELAY_SECONDS=${ROLLOUT_CREATE_SCALE_DOWN_DELAY_SECONDS}"
     "MONGO_COMPDEF=${MONGO_COMPDEF}"
     "MONGO_COMPDEF_PREFIX=${MONGO_COMPDEF_PREFIX}"
     "MONGO_VERSION=${MONGO_VERSION}"
-    "MONGO_VERSION_TARGET=${MONGO_VERSION_TARGET}"
+    "MONGO_SHARD_VERSION_BASE=${MONGO_SHARD_VERSION_BASE}"
+    "MONGO_SHARD_VERSION_TARGET=${MONGO_SHARD_VERSION_TARGET}"
     "MONGO_SHARD_COMPDEF=${MONGO_SHARD_COMPDEF}"
     "MONGO_SHARD_COMPDEF_PREFIX=${MONGO_SHARD_COMPDEF_PREFIX}"
     "MONGO_SHARD_STORAGE=${MONGO_SHARD_STORAGE}"
@@ -428,6 +454,25 @@ assert_min_ready_interval() {
   ' "${pod_snapshot}" >/dev/null
 }
 
+assert_mysql_stable_pods_unchanged() {
+  local before="$1"
+  local after="$2"
+
+  log "checking create rollout keeps existing stable MySQL pods unchanged"
+  diff -u \
+    <(jq '[.[] | select(.template == "") | {name, uid}] | sort_by(.name)' "${before}") \
+    <(jq '[.[] | select(.template == "") | {name, uid}] | sort_by(.name)' "${after}")
+}
+
+assert_mysql_create_canary_present() {
+  local pod_snapshot="$1"
+
+  log "checking create rollout produced a MySQL ${MYSQL_VERSION_CANARY} instance template pod"
+  jq -e --arg version "${MYSQL_VERSION_CANARY}" '
+    any(.[]; .template != "" and any(.images[]; .name == "mysql" and (.image | endswith(":" + $version))))
+  ' "${pod_snapshot}" >/dev/null
+}
+
 snapshot_all_managed_pods() {
   local out="$1"
   kubectl get pod -A -l app.kubernetes.io/managed-by=kubeblocks -o json \
@@ -571,6 +616,7 @@ run_mysql_replace_rollout() {
 
 run_mysql_create_rollout() {
   delete_rollout_if_exists mysql-create-8038
+  snapshot_cluster_pods "${MYSQL_CLUSTER}" "${WORK_DIR}/mysql-before-create-rollout-pods.json"
 
   create_manifest mysql-create-8038.yaml
   wait_rollout_succeed mysql-create-8038
@@ -578,8 +624,12 @@ run_mysql_create_rollout() {
   kubectl get rollout mysql-create-8038 -n "${TEST_NAMESPACE}" -o yaml >"${WORK_DIR}/mysql-create-8038.result.yaml"
   kubectl get cluster "${MYSQL_CLUSTER}" -n "${TEST_NAMESPACE}" -o yaml >"${WORK_DIR}/mysql-after-create-rollout.cluster.yaml"
   snapshot_cluster_pods "${MYSQL_CLUSTER}" "${WORK_DIR}/mysql-after-create-rollout-pods.json"
+  assert_mysql_create_canary_present "${WORK_DIR}/mysql-after-create-rollout-pods.json"
+  assert_mysql_stable_pods_unchanged \
+    "${WORK_DIR}/mysql-before-create-rollout-pods.json" \
+    "${WORK_DIR}/mysql-after-create-rollout-pods.json"
 
-  delete_rollout_if_exists mysql-create-8038
+  # delete_rollout_if_exists mysql-create-8038
 }
 
 run_dynamic_mysql_instance_template_test() {
@@ -645,6 +695,7 @@ run_dynamic_mysql_instance_template_test() {
 }
 
 create_mongodb_sharding_cluster() {
+  validate_mongodb_shard_versions
   wait_component_definition_prefix "${MONGO_SHARD_COMPDEF_PREFIX}" >/dev/null
   if kubectl -n "${TEST_NAMESPACE}" get cluster mongo-sharding >/dev/null 2>&1; then
     log "cluster mongo-sharding already exists; skipping create"
@@ -654,7 +705,7 @@ create_mongodb_sharding_cluster() {
 
   wait_cluster_running mongo-sharding
   kubectl get cluster mongo-sharding -n "${TEST_NAMESPACE}" -o json \
-    | jq -e --arg version "${MONGO_VERSION}" '
+    | jq -e --arg version "${MONGO_SHARD_VERSION_BASE}" '
         ([.spec.componentSpecs[]?.replicas, .spec.shardings[]?.template.replicas] | all(. != null and . > 0))
         and
         ([.spec.componentSpecs[]?.serviceVersion, .spec.shardings[]?.template.serviceVersion] | all(. == $version))
@@ -687,6 +738,7 @@ seed_mongodb_sharding_data() {
   local cluster="$1"
   local out="${WORK_DIR}/${cluster}-sharding-data-seed.json"
   local live_shards
+  local js
   live_shards="$(
     kubectl get components -n "${TEST_NAMESPACE}" \
       -l "app.kubernetes.io/instance=${cluster},apps.kubeblocks.io/sharding-name=shard" \
@@ -696,11 +748,12 @@ seed_mongodb_sharding_data() {
   [[ "${live_shards}" != "[]" ]] || fail "no running MongoDB shard components found for ${cluster}"
 
   log "seeding MongoDB data through ${cluster} mongos, one marker database per shard"
-  mongo_sharding_exec "${cluster}" "
-const clusterName = '${cluster}';
+  js="$(cat <<'JS'
+const clusterName = '__CLUSTER__';
 const markerId = 'kb11-sharding-marker';
 const metaDbName = 'kb11_e2e_meta';
-const liveShards = ${live_shards};
+const liveShards = __LIVE_SHARDS__;
+const sampleCount = 20;
 const listedShards = db.adminCommand({listShards: 1}).shards.map(s => s._id).sort();
 if (liveShards.length === 0) {
   throw new Error('no MongoDB shards found');
@@ -724,51 +777,104 @@ for (let i = 0; i < liveShards.length; i++) {
   const markerDb = db.getSiblingDB(dbName);
   markerDb.marker.updateOne(
     {_id: markerId},
-    {\$set: {cluster: clusterName, dbName, markerIndex: i, seededAt: new Date()}},
+    {$set: {cluster: clusterName, dbName, markerIndex: i, seededAt: new Date()}},
     {upsert: true}
   );
   const doc = markerDb.marker.findOne({_id: markerId});
   if (!doc || doc.dbName !== dbName || doc.markerIndex !== i || doc.cluster !== clusterName) {
     throw new Error('marker verification failed for ' + dbName);
   }
-  seeded.push({dbName, markerIndex: i, initialShard: shard});
+  markerDb.integrity.deleteMany({markerId});
+  const docs = [];
+  for (let n = 0; n < sampleCount; n++) {
+    docs.push({
+      _id: markerId + '-' + i + '-' + n,
+      markerId,
+      cluster: clusterName,
+      dbName,
+      markerIndex: i,
+      sampleIndex: n,
+      checksum: i * 100000 + n,
+      payload: 'kb11-sharding-integrity-' + i + '-' + n
+    });
+  }
+  markerDb.integrity.insertMany(docs);
+  const writtenDocs = markerDb.integrity.find({markerId}).toArray();
+  const checksum = writtenDocs.reduce((sum, item) => sum + item.checksum, 0);
+  const malformed = writtenDocs.some((item) =>
+    item.cluster !== clusterName ||
+    item.dbName !== dbName ||
+    item.markerIndex !== i ||
+    item.markerId !== markerId
+  );
+  if (writtenDocs.length !== sampleCount || checksum !== docs.reduce((sum, item) => sum + item.checksum, 0) || malformed) {
+    throw new Error('integrity sample verification failed for ' + dbName);
+  }
+  seeded.push({dbName, markerIndex: i, initialShard: shard, sampleCount, checksum});
 }
 metaDb.shardingMarkers.updateOne(
   {_id: clusterName},
-  {\$set: {cluster: clusterName, markerId, seeded, expectedCount: seeded.length, updatedAt: new Date()}},
+  {$set: {cluster: clusterName, markerId, seeded, expectedCount: seeded.length, updatedAt: new Date()}},
   {upsert: true}
 );
 print(JSON.stringify({ok: 1, cluster: clusterName, seeded}, null, 2));
-" >"${out}"
+JS
+)"
+  js="${js//__CLUSTER__/${cluster}}"
+  js="${js//__LIVE_SHARDS__/${live_shards}}"
+  mongo_sharding_exec "${cluster}" "${js}" >"${out}"
 }
 
 verify_mongodb_sharding_data() {
   local cluster="$1"
   local phase="$2"
   local out="${WORK_DIR}/${cluster}-sharding-data-${phase}.json"
+  local js
   log "verifying MongoDB sharding data for ${cluster} (${phase})"
-  mongo_sharding_exec "${cluster}" "
-const clusterName = '${cluster}';
+  js="$(cat <<'JS'
+const clusterName = '__CLUSTER__';
 const meta = db.getSiblingDB('kb11_e2e_meta').shardingMarkers.findOne({_id: clusterName});
 if (!meta || !Array.isArray(meta.seeded) || meta.seeded.length === 0) {
   throw new Error('missing sharding marker metadata for ' + clusterName);
 }
 const verified = [];
 for (const expected of meta.seeded) {
-  const doc = db.getSiblingDB(expected.dbName).marker.findOne({_id: meta.markerId});
+  const markerDb = db.getSiblingDB(expected.dbName);
+  const doc = markerDb.marker.findOne({_id: meta.markerId});
   if (!doc) {
     throw new Error('missing marker document in ' + expected.dbName);
   }
   if (doc.dbName !== expected.dbName || doc.markerIndex !== expected.markerIndex || doc.cluster !== clusterName) {
     throw new Error('marker mismatch in ' + expected.dbName + ': ' + JSON.stringify(doc));
   }
-  verified.push({dbName: expected.dbName, markerIndex: expected.markerIndex});
+  const docs = markerDb.integrity.find({markerId: meta.markerId}).toArray();
+  const checksum = docs.reduce((sum, item) => sum + item.checksum, 0);
+  const malformed = docs.some((item) =>
+    item.cluster !== clusterName ||
+    item.dbName !== expected.dbName ||
+    item.markerIndex !== expected.markerIndex ||
+    item.markerId !== meta.markerId
+  );
+  if (docs.length !== expected.sampleCount || checksum !== expected.checksum || malformed) {
+    throw new Error(
+      'integrity sample mismatch in ' + expected.dbName +
+      ': expected count=' + expected.sampleCount +
+      ', checksum=' + expected.checksum +
+      '; got count=' + docs.length +
+      ', checksum=' + checksum
+    );
+  }
+  verified.push({dbName: expected.dbName, markerIndex: expected.markerIndex, sampleCount: docs.length, checksum});
 }
 if (verified.length !== meta.expectedCount) {
   throw new Error('verified marker count mismatch: expected ' + meta.expectedCount + ', got ' + verified.length);
 }
-print(JSON.stringify({ok: 1, cluster: clusterName, phase: '${phase}', verified}, null, 2));
-" >"${out}"
+print(JSON.stringify({ok: 1, cluster: clusterName, phase: '__PHASE__', verified}, null, 2));
+JS
+)"
+  js="${js//__CLUSTER__/${cluster}}"
+  js="${js//__PHASE__/${phase}}"
+  mongo_sharding_exec "${cluster}" "${js}" >"${out}"
 }
 
 run_mongodb_sharding_scale() {
@@ -787,20 +893,105 @@ run_mongodb_sharding_scale() {
     -l app.kubernetes.io/instance=mongo-sharding,apps.kubeblocks.io/sharding-name=shard \
     -o yaml >"${WORK_DIR}/mongodb-sharding-after-scale-out.components.yaml"
 
-  log "patching mongo-sharding spec.shardings[name=shard].shards to 3"
-  patch_cluster_json mongo-sharding mongodb-sharding-scale-in-patch.yaml
-  assert_mongodb_sharding_shards mongo-sharding 3
-  wait_cluster_running mongo-sharding
-  wait_shard_component_count mongo-sharding shard 3
-  verify_mongodb_sharding_data mongo-sharding after-scale-in
-  kubectl get cluster mongo-sharding -n "${TEST_NAMESPACE}" -o yaml \
-    >"${WORK_DIR}/mongodb-sharding-after-scale-in.cluster.yaml"
+  run_mongodb_sharding_offline_replacement
+  run_mongodb_sharding_offline_scale_in
+}
+
+run_mongodb_sharding_offline_replacement() {
+  local victim
+  victim="$(pick_mongodb_offline_ready_base_shard mongo-sharding offline-replacement)"
+
   kubectl get components -n "${TEST_NAMESPACE}" \
     -l app.kubernetes.io/instance=mongo-sharding,apps.kubeblocks.io/sharding-name=shard \
-    -o yaml >"${WORK_DIR}/mongodb-sharding-after-scale-in.components.yaml"
+    -o json \
+    | jq '[.items[] | .metadata.name] | sort' \
+    >"${WORK_DIR}/mongodb-sharding-before-offline-replacement.components.json"
+  snapshot_sharding_pods mongo-sharding shard "${WORK_DIR}/mongodb-sharding-before-offline-replacement-pods.json"
+
+  log "patching mongo-sharding offline shard ${victim} with unchanged shards=4"
+  patch_cluster_json mongo-sharding mongodb-sharding-offline-replacement-patch.yaml MONGO_OFFLINE_SHARD "${victim}"
+  assert_mongodb_sharding_shards mongo-sharding 4
+  wait_component_absent "${victim}" mongo-sharding
+  wait_cluster_running mongo-sharding
+  wait_shard_component_count mongo-sharding shard 4
+  verify_mongodb_sharding_data mongo-sharding after-offline-replacement
+
+  kubectl get cluster mongo-sharding -n "${TEST_NAMESPACE}" -o yaml \
+    >"${WORK_DIR}/mongodb-sharding-after-offline-replacement.cluster.yaml"
+  kubectl get components -n "${TEST_NAMESPACE}" \
+    -l app.kubernetes.io/instance=mongo-sharding,apps.kubeblocks.io/sharding-name=shard \
+    -o json \
+    | jq '[.items[] | .metadata.name] | sort' \
+    >"${WORK_DIR}/mongodb-sharding-after-offline-replacement.components.json"
+  jq -e --slurp --arg victim "${victim}" '
+        .[0] as $before
+        | .[1] as $after
+        | ($before | index($victim)) != null
+          and (($after | index($victim)) == null)
+          and ($after | length == 4)
+          and ((($before - [$victim]) - $after) | length == 0)
+          and (($after - $before) | length == 1)
+      ' \
+      "${WORK_DIR}/mongodb-sharding-before-offline-replacement.components.json" \
+      "${WORK_DIR}/mongodb-sharding-after-offline-replacement.components.json" >/dev/null
+  snapshot_sharding_pods mongo-sharding shard "${WORK_DIR}/mongodb-sharding-after-offline-replacement-pods.json"
+  assert_non_victim_shard_pods_unchanged \
+    "${WORK_DIR}/mongodb-sharding-before-offline-replacement-pods.json" \
+    "${WORK_DIR}/mongodb-sharding-after-offline-replacement-pods.json" \
+    "${victim}"
+  kubectl get components -n "${TEST_NAMESPACE}" \
+    -l app.kubernetes.io/instance=mongo-sharding,apps.kubeblocks.io/sharding-name=shard \
+    -o yaml >"${WORK_DIR}/mongodb-sharding-after-offline-replacement.components.yaml"
+}
+
+run_mongodb_sharding_offline_scale_in() {
+  local victim
+  victim="$(pick_mongodb_offline_ready_base_shard mongo-sharding offline-scale-in)"
+
+  kubectl get components -n "${TEST_NAMESPACE}" \
+    -l app.kubernetes.io/instance=mongo-sharding,apps.kubeblocks.io/sharding-name=shard \
+    -o json \
+    | jq '[.items[] | .metadata.name] | sort' \
+    >"${WORK_DIR}/mongodb-sharding-before-offline-scale-in.components.json"
+  snapshot_sharding_pods mongo-sharding shard "${WORK_DIR}/mongodb-sharding-before-offline-scale-in-pods.json"
+
+  log "patching mongo-sharding offline shard ${victim} and shards=3"
+  patch_cluster_json mongo-sharding mongodb-sharding-offline-scale-in-patch.yaml MONGO_OFFLINE_SHARD "${victim}"
+  assert_mongodb_sharding_shards mongo-sharding 3
+  wait_component_absent "${victim}" mongo-sharding
+  wait_cluster_running mongo-sharding
+  wait_shard_component_count mongo-sharding shard 3
+  verify_mongodb_sharding_data mongo-sharding after-offline-scale-in
+
+  kubectl get cluster mongo-sharding -n "${TEST_NAMESPACE}" -o yaml \
+    >"${WORK_DIR}/mongodb-sharding-after-offline-scale-in.cluster.yaml"
+  kubectl get components -n "${TEST_NAMESPACE}" \
+    -l app.kubernetes.io/instance=mongo-sharding,apps.kubeblocks.io/sharding-name=shard \
+    -o json \
+    | jq '[.items[] | .metadata.name] | sort' \
+    >"${WORK_DIR}/mongodb-sharding-after-offline-scale-in.components.json"
+  jq -e --slurp --arg victim "${victim}" '
+        .[0] as $before
+        | .[1] as $after
+        | ($before | index($victim)) != null
+          and (($after | index($victim)) == null)
+          and ($after | length == 3)
+          and (($after - ($before - [$victim])) | length == 0)
+      ' \
+      "${WORK_DIR}/mongodb-sharding-before-offline-scale-in.components.json" \
+      "${WORK_DIR}/mongodb-sharding-after-offline-scale-in.components.json" >/dev/null
+  snapshot_sharding_pods mongo-sharding shard "${WORK_DIR}/mongodb-sharding-after-offline-scale-in-pods.json"
+  assert_non_victim_shard_pods_unchanged \
+    "${WORK_DIR}/mongodb-sharding-before-offline-scale-in-pods.json" \
+    "${WORK_DIR}/mongodb-sharding-after-offline-scale-in-pods.json" \
+    "${victim}"
+  kubectl get components -n "${TEST_NAMESPACE}" \
+    -l app.kubernetes.io/instance=mongo-sharding,apps.kubeblocks.io/sharding-name=shard \
+    -o yaml >"${WORK_DIR}/mongodb-sharding-after-offline-scale-in.components.yaml"
 }
 
 create_mongodb_heterogeneous_shards() {
+  validate_mongodb_shard_versions
   wait_component_definition_prefix "${MONGO_SHARD_COMPDEF_PREFIX}" >/dev/null
   if kubectl -n "${TEST_NAMESPACE}" get cluster mongodb-hetero-shards >/dev/null 2>&1; then
     log "cluster mongodb-hetero-shards already exists; skipping create"
@@ -814,106 +1005,11 @@ create_mongodb_heterogeneous_shards() {
     >"${WORK_DIR}/mongodb-hetero-hot-components.yaml" || true
 }
 
-run_mongodb_heterogeneous_offline() {
+run_mongodb_heterogeneous_test() {
   create_mongodb_heterogeneous_shards
+  seed_mongodb_sharding_data mongodb-hetero-shards
   run_mongodb_heterogeneous_version_canary
-
-  local replacement_victim
-  replacement_victim="$(pick_mongodb_offline_ready_base_shard mongodb-hetero-shards offline-replacement)"
-  kubectl get components -n "${TEST_NAMESPACE}" \
-    -l app.kubernetes.io/instance=mongodb-hetero-shards,apps.kubeblocks.io/sharding-name=shard \
-    -o json \
-    | jq '[.items[] | .metadata.name] | sort' \
-    >"${WORK_DIR}/mongodb-hetero-before-offline-replacement.components.json"
-  snapshot_sharding_pods mongodb-hetero-shards shard "${WORK_DIR}/mongodb-hetero-before-offline-replacement-pods.json"
-  patch_cluster_json mongodb-hetero-shards mongodb-hetero-offline-replacement-patch.yaml MONGO_OFFLINE_SHARD "${replacement_victim}"
-  wait_component_absent "${replacement_victim}" mongodb-hetero-shards
-  wait_cluster_running mongodb-hetero-shards
-  wait_shard_component_count mongodb-hetero-shards shard 3
-  kubectl get components -n "${TEST_NAMESPACE}" \
-    -l app.kubernetes.io/instance=mongodb-hetero-shards,apps.kubeblocks.io/sharding-name=shard \
-    -o json \
-    | jq '[.items[] | .metadata.name] | sort' \
-    >"${WORK_DIR}/mongodb-hetero-after-offline-replacement.components.json"
-  jq -e --slurp --arg victim "${replacement_victim}" '
-        .[0] as $before
-        | .[1] as $after
-        | ($before | index($victim)) != null
-          and (($after | index($victim)) == null)
-          and ($after | length == 3)
-          and ((($before - [$victim]) - $after) | length == 0)
-          and (($after - $before) | length == 1)
-      ' \
-      "${WORK_DIR}/mongodb-hetero-before-offline-replacement.components.json" \
-      "${WORK_DIR}/mongodb-hetero-after-offline-replacement.components.json" >/dev/null
-  snapshot_sharding_pods mongodb-hetero-shards shard "${WORK_DIR}/mongodb-hetero-after-offline-replacement-pods.json"
-  assert_non_victim_shard_pods_unchanged \
-    "${WORK_DIR}/mongodb-hetero-before-offline-replacement-pods.json" \
-    "${WORK_DIR}/mongodb-hetero-after-offline-replacement-pods.json" \
-    "${replacement_victim}"
-  kubectl get components -n "${TEST_NAMESPACE}" \
-    -l app.kubernetes.io/instance=mongodb-hetero-shards,apps.kubeblocks.io/sharding-name=shard \
-    -o json \
-    | jq -e --arg victim "${replacement_victim}" '
-        [.items[] | .metadata.name] as $names
-        | ($names | length == 3)
-          and (($names | index($victim)) == null)
-      ' >/dev/null
-  kubectl get components -n "${TEST_NAMESPACE}" \
-    -l app.kubernetes.io/instance=mongodb-hetero-shards,apps.kubeblocks.io/sharding-name=shard \
-    -o yaml >"${WORK_DIR}/mongodb-hetero-after-offline-replacement.components.yaml"
-
-  local victim
-  victim="$(pick_mongodb_offline_ready_base_shard mongodb-hetero-shards offline-scale-in)"
-
-  kubectl get components -n "${TEST_NAMESPACE}" \
-    -l app.kubernetes.io/instance=mongodb-hetero-shards,apps.kubeblocks.io/sharding-name=shard \
-    -o json \
-    | jq '[.items[] | .metadata.name] | sort' \
-    >"${WORK_DIR}/mongodb-hetero-before-offline.components.json"
-  snapshot_sharding_pods mongodb-hetero-shards shard "${WORK_DIR}/mongodb-hetero-before-offline-pods.json"
-
-  patch_cluster_json mongodb-hetero-shards mongodb-hetero-offline-patch.yaml MONGO_OFFLINE_SHARD "${victim}"
-  wait_component_absent "${victim}" mongodb-hetero-shards
-  wait_cluster_running mongodb-hetero-shards
-  wait_shard_component_count mongodb-hetero-shards shard 2
-  kubectl get components -n "${TEST_NAMESPACE}" \
-    -l app.kubernetes.io/instance=mongodb-hetero-shards,apps.kubeblocks.io/sharding-name=shard \
-    -o json \
-    | jq '[.items[] | .metadata.name] | sort' \
-    >"${WORK_DIR}/mongodb-hetero-after-offline.components.json"
-  jq -e --slurp --arg victim "${victim}" '
-        .[0] as $before
-        | .[1] as $after
-        | ($before | index($victim)) != null
-          and (($after | index($victim)) == null)
-          and ($after | length == 2)
-          and (($after - ($before - [$victim])) | length == 0)
-      ' \
-      "${WORK_DIR}/mongodb-hetero-before-offline.components.json" \
-      "${WORK_DIR}/mongodb-hetero-after-offline.components.json" >/dev/null
-  snapshot_sharding_pods mongodb-hetero-shards shard "${WORK_DIR}/mongodb-hetero-after-offline-pods.json"
-  assert_non_victim_shard_pods_unchanged \
-    "${WORK_DIR}/mongodb-hetero-before-offline-pods.json" \
-    "${WORK_DIR}/mongodb-hetero-after-offline-pods.json" \
-    "${victim}"
-
-  if kubectl get component "${victim}" -n "${TEST_NAMESPACE}" >/dev/null 2>&1; then
-    fail "offline shard ${victim} still exists"
-  fi
-  kubectl get components -n "${TEST_NAMESPACE}" \
-    -l app.kubernetes.io/instance=mongodb-hetero-shards,apps.kubeblocks.io/sharding-name=shard \
-    -o yaml >"${WORK_DIR}/mongodb-hetero-after-offline.components.yaml"
-}
-
-pick_mongodb_base_shard() {
-  local cluster="$1"
-  kubectl get components -n "${TEST_NAMESPACE}" \
-    -l "app.kubernetes.io/instance=${cluster},apps.kubeblocks.io/sharding-name=shard" \
-    -o json \
-    | jq -r '[.items[]
-        | select(.metadata.labels["apps.kubeblocks.io/shard-template"] != "hot")
-        | .metadata.name][0] // ""'
+  verify_mongodb_sharding_data mongodb-hetero-shards after-version-canary
 }
 
 write_mongodb_shard_offline_report() {
@@ -993,8 +1089,10 @@ pick_mongodb_offline_ready_base_shard() {
   write_mongodb_shard_offline_report "${cluster}" "${report}"
   victim="$(
     jq -r --argjson baseShards "${base_shards}" '
-      [.[] | select(($baseShards | index(.shard))
-                    and .offlineReady)
+      [.[] as $shard
+       | select(($baseShards | index($shard.shard))
+                and $shard.offlineReady)
+       | $shard
        | .shard][0] // ""
     ' "${report}"
   )"
@@ -1007,8 +1105,9 @@ pick_mongodb_offline_ready_base_shard() {
 }
 
 run_mongodb_heterogeneous_version_canary() {
-  if [[ "${MONGO_VERSION_TARGET}" == "${MONGO_VERSION}" ]]; then
-    log "MONGO_VERSION_TARGET equals MONGO_VERSION; skipping MongoDB shard template version canary"
+  validate_mongodb_shard_versions
+  if [[ "${MONGO_SHARD_VERSION_TARGET}" == "${MONGO_SHARD_VERSION_BASE}" ]]; then
+    log "MONGO_SHARD_VERSION_TARGET equals MONGO_SHARD_VERSION_BASE; skipping MongoDB shard template version canary"
     return
   fi
 
@@ -1031,7 +1130,7 @@ run_mongodb_heterogeneous_version_canary() {
   kubectl get components -n "${TEST_NAMESPACE}" -l apps.kubeblocks.io/shard-template=hot -o yaml \
     >"${WORK_DIR}/mongodb-hetero-after-version-hot.components.yaml"
   kubectl get components -n "${TEST_NAMESPACE}" -l apps.kubeblocks.io/shard-template=hot -o json \
-    | jq -e --arg version "${MONGO_VERSION_TARGET}" '
+    | jq -e --arg version "${MONGO_SHARD_VERSION_TARGET}" '
         .items | length == 1
         and .[0].spec.serviceVersion == $version
       ' >/dev/null
@@ -1065,10 +1164,55 @@ snapshot_sharding_pods() {
          | {
              name: .metadata.name,
              uid: .metadata.uid,
-             component: (.metadata.labels["workloads.kubeblocks.io/instance"] // ($cluster + "-" + .metadata.labels["apps.kubeblocks.io/component-name"]))
+             component: (.metadata.labels["workloads.kubeblocks.io/instance"] // ($cluster + "-" + .metadata.labels["apps.kubeblocks.io/component-name"])),
+             readyTime: ([.status.conditions[]? | select(.type == "Ready" and .status == "True") | .lastTransitionTime][0] // ""),
+             serviceVersion: (.metadata.labels["apps.kubeblocks.io/service-version"] // ""),
+             images: [.spec.containers[] | {name, image}]
            }]
         | sort_by(.name)
       ' >"${out}"
+}
+
+assert_sharding_rollout_status() {
+  local rollout="$1"
+  local sharding="$2"
+  local source_version="$3"
+  kubectl get rollout "${rollout}" -n "${TEST_NAMESPACE}" -o json \
+    | jq -e --arg sharding "${sharding}" --arg version "${source_version}" '
+        .status.state == "Succeed"
+        and (.status.shardings | type == "array")
+        and ([
+          .status.shardings[]
+          | select(.name == $sharding)
+          | select(.serviceVersion == $version)
+          | select(.replicas == .newReplicas and .replicas == .rolledOutReplicas)
+        ] | length == 1)
+      ' >/dev/null
+}
+
+assert_sharding_pods_replaced_with_version() {
+  local before="$1"
+  local after="$2"
+  local expected_version="$3"
+  local diff_out="${WORK_DIR}/$(basename "${after}" .json).rollout.diff"
+
+  jq -e --arg version "${expected_version}" '
+    length > 0
+    and all(.serviceVersion == $version)
+  ' "${after}" >/dev/null
+
+  if ! jq -e --slurp '
+      .[0] as $before
+      | .[1] as $after
+      | ($before | length) > 0
+        and ($before | length) == ($after | length)
+        and (($before | map(.component) | sort) == ($after | map(.component) | sort))
+        and all($before[]; . as $old
+          | ($after[] | select(.component == $old.component) | .uid) != $old.uid)
+    ' "${before}" "${after}" >"${diff_out}"; then
+    cat "${diff_out}"
+    fail "MongoDB sharding rollout did not replace every shard pod; inspect ${diff_out}"
+  fi
 }
 
 assert_non_victim_shard_pods_unchanged() {
@@ -1290,17 +1434,31 @@ create_mysql_hostnetwork_negative_cluster() {
 
 run_mongodb_sharding_rollout() {
   create_mongodb_sharding_cluster
+  seed_mongodb_sharding_data mongo-sharding
   delete_rollout_if_exists mongodb-sharding-rollout
+  snapshot_sharding_pods mongo-sharding shard "${WORK_DIR}/mongodb-sharding-before-rollout-pods.json"
 
   create_manifest mongodb-sharding-rollout.yaml
   wait_rollout_succeed mongodb-sharding-rollout
   wait_cluster_running mongo-sharding
+  snapshot_sharding_pods mongo-sharding shard "${WORK_DIR}/mongodb-sharding-after-rollout-pods.json"
+  assert_sharding_rollout_status mongodb-sharding-rollout shard "${MONGO_SHARD_VERSION_BASE}"
+  verify_mongodb_sharding_data mongo-sharding after-rollout
+  assert_min_ready_interval "${WORK_DIR}/mongodb-sharding-after-rollout-pods.json" "${ROLLOUT_INSTANCE_INTERVAL_SECONDS}"
+  assert_sharding_pods_replaced_with_version \
+    "${WORK_DIR}/mongodb-sharding-before-rollout-pods.json" \
+    "${WORK_DIR}/mongodb-sharding-after-rollout-pods.json" \
+    "${MONGO_SHARD_VERSION_TARGET}"
+  kubectl get cluster mongo-sharding -n "${TEST_NAMESPACE}" -o json \
+    | jq -e --arg version "${MONGO_SHARD_VERSION_TARGET}" '
+        .spec.shardings[]
+        | select(.name == "shard")
+        | .template.serviceVersion == $version
+      ' >/dev/null
   kubectl get rollout mongodb-sharding-rollout -n "${TEST_NAMESPACE}" -o yaml \
     >"${WORK_DIR}/mongodb-sharding-rollout.result.yaml"
   kubectl get cluster mongo-sharding -n "${TEST_NAMESPACE}" -o yaml \
     >"${WORK_DIR}/mongodb-sharding.after-rollout.yaml"
-
-  delete_rollout_if_exists mongodb-sharding-rollout
 }
 
 run_case_upgrade() {
@@ -1323,11 +1481,11 @@ run_case_network() {
 run_case_rollout_api() {
   ensure_namespace "${TEST_NAMESPACE}"
   create_mysql_test_cluster
-  run_mysql_inplace_rollout
-  run_mysql_replace_rollout
+  # run_mysql_inplace_rollout
+  # run_mysql_replace_rollout
   run_mysql_create_rollout
 
-  run_mongodb_sharding_rollout
+  # run_mongodb_sharding_rollout
 }
 
 run_case_dynamic_instance_template() {
@@ -1344,7 +1502,7 @@ run_case_dynamic_instance_template() {
 run_case_sharding() {
   ensure_namespace "${TEST_NAMESPACE}"
   run_mongodb_sharding_scale
-  run_mongodb_heterogeneous_offline
+  run_mongodb_heterogeneous_test
 }
 
 cleanup() {

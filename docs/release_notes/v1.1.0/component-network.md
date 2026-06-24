@@ -1,159 +1,193 @@
 # Component Network
 
-KubeBlocks 1.1 adds `spec.componentSpecs[*].network`, a component-level network configuration API. It lets users describe pod network behavior directly in the `Cluster` spec instead of relying on addon defaults, manual pod patches, or environment-specific workarounds.
+## Overview
 
-The API covers five related settings:
+KubeBlocks 1.1.0 introduces `spec.componentSpecs[*].network` for component-level pod network settings. Instead of relying on addon defaults, annotations, or manual pod patches, you can describe the network behavior directly in the `Cluster` spec.
 
-* host networking;
-* named host port mappings;
-* pod host aliases;
-* DNS policy;
-* DNS config.
+Use this when a database component needs something beyond the Kubernetes default network setup. Typical examples include enabling host networking for a supported engine, pinning a runtime port to a fixed host port, adding temporary host aliases during migration, or customizing DNS for cross-domain service discovery.
 
-## Why This Helps
-
-Database components often need network behavior that differs from the Kubernetes default. For example:
-
-* a database engine may need stable node ports for external clients;
-* a component may need host networking for performance, migration, or compatibility with an existing network design;
-* pods may need temporary `/etc/hosts` entries during hybrid migration or failover testing;
-* DNS search domains or resolver options may need to be tuned for cross-domain discovery.
-
-`ComponentNetwork` makes these settings part of the declarative database cluster spec, so operators can review, apply, and audit them with the rest of the workload configuration.
-
-## What It Does
-
-`ComponentNetwork` is available on:
+For users, the supported entry point is:
 
 * `Cluster.spec.componentSpecs[*].network`
-* `Component.spec.network`
 
-The common shape is:
+KubeBlocks reconciles the managed `Component` object from the `Cluster`. Do not edit `Component.spec.network` directly. `Component` is controlled by KubeBlocks and should be used for observation, not as the source of user configuration.
 
-```yaml
-network:
-  hostNetwork: false
-  hostPorts: []
-  hostAliases: []
-  dnsPolicy: ClusterFirst
-  dnsConfig: {}
+## What You Can Configure
+
+| Field | What it controls | When to use it |
+| --- | --- | --- |
+| `hostNetwork` | Whether component pods use the node network namespace | Use host networking for engines that require direct host network access or host-network port rendering |
+| `hostPorts` | Mapping from named container ports to node host ports | Pin a runtime port to a known host port, or provide explicit ports for host-network mode |
+| `hostAliases` | Static entries in the pod `/etc/hosts` file | Bridge temporary hostname dependencies during migration, failover testing, or hybrid connectivity checks |
+| `dnsPolicy` | Pod DNS policy | Use `None`, `ClusterFirst`, or `ClusterFirstWithHostNet` when the default resolver behavior is not correct |
+| `dnsConfig` | Pod DNS nameservers, search domains, and resolver options | Tune search domains, `ndots`, or nameservers for database discovery |
+
+## Host Networking vs. Pod Networking
+
+Kubernetes normally runs database workloads on the pod network. Each pod gets its own IP address, traffic is routed by the cluster CNI, and clients usually connect through Kubernetes Services or DNS names. This is the default and recommended choice for most KubeBlocks clusters.
+
+Host networking works differently. A pod that uses host networking shares the node's network namespace, binds ports directly on the node, and is reached through the node network path. This is useful when an engine or deployment environment needs node-level addresses, host-network port rendering, or direct integration with an existing network design.
+
+The tradeoff is operational complexity. Host networking removes one layer of network isolation and turns port conflicts into a node-level concern. It can also affect scheduling, because two pods that need the same host port cannot run on the same node. DNS behavior is slightly different as well: when host networking is enabled and no DNS policy is specified, KubeBlocks uses `ClusterFirstWithHostNet`.
+
+In practice, start with pod networking. Use host networking only when the addon supports it and there is a concrete requirement that Services, LoadBalancers, NodePorts, or normal `hostPorts` cannot satisfy.
+
+## Practical Network Choices
+
+Most clusters should stay on the default Kubernetes pod network. It is easier to schedule, avoids node-level port conflicts, and works well with Services and Kubernetes DNS.
+
+Use the following guidance when choosing a configuration:
+
+| Scenario | Recommended configuration | Notes |
+| --- | --- | --- |
+| The component only needs normal in-cluster traffic | Leave `network` unset | KubeBlocks uses the default pod network and Kubernetes DNS. |
+| The addon supports host networking and the engine needs node-level network access | Set `network.hostNetwork: true` | Check `ComponentDefinition.spec.hostNetwork` first. For new manifests, prefer the API field over annotations. |
+| You need one runtime port to be reachable through a fixed node port | Set `network.hostPorts` with the runtime port name | The name must exist in `ComponentDefinition.spec.runtime.containers[*].ports`; unknown names are ignored. |
+| A host-network addon needs predictable port values | Set `network.hostNetwork: true` and list required ports in `hostPorts` | Get the required port names from `ComponentDefinition.spec.hostNetwork.containerPorts`. If fixed values are not required, omit `hostPorts` and let KubeBlocks allocate them. |
+| The pod needs to resolve an old or external hostname temporarily | Use `hostAliases` | Keep the mapping small and temporary. Prefer DNS or Kubernetes Services for long-term service discovery. |
+| The component must use custom resolvers, search domains, or resolver options | Set `dnsPolicy` and `dnsConfig` | Use `dnsPolicy: None` only when you provide the full resolver configuration in `dnsConfig`. |
+
+## Enable Host Networking
+
+Host networking only works for addons whose `ComponentDefinition` declares host-network support. Check the `ComponentDefinition` before enabling it:
+
+```bash
+kubectl get cmpd <cmpd-name> -o yaml | yq '.spec.hostNetwork'
 ```
 
-| Field | Purpose |
-| --- | --- |
-| `hostNetwork` | Run component pods in the host network namespace. |
-| `hostPorts` | Map named container ports to explicit host ports, or request automatic host-port allocation with host networking. |
-| `hostAliases` | Add static entries to the pod `/etc/hosts` file. |
-| `dnsPolicy` | Set pod DNS policy, such as `ClusterFirst`, `ClusterFirstWithHostNet`, or `None`. |
-| `dnsConfig` | Set pod DNS nameservers, search domains, and resolver options. |
+If `spec.hostNetwork` or `spec.hostNetwork.containerPorts` is empty, the addon does not support host networking. Setting `network.hostNetwork: true` in the `Cluster` spec will not force it on; KubeBlocks keeps the pod on normal pod networking.
 
-## How to Use It
-
-### Enable host networking
-
-Use `hostNetwork: true` when the component must share the node network namespace. The referenced `ComponentDefinition` must declare host-network capability in `spec.hostNetwork`.
+For a supported addon, the recommended 1.1 API is `network.hostNetwork: true`:
 
 ```yaml
 apiVersion: apps.kubeblocks.io/v1
 kind: Cluster
 metadata:
-  name: foo
+  name: network-mongodb
   namespace: demo
 spec:
-  clusterDef: foo
-  topology: cluster
   componentSpecs:
-    - name: foo
-      componentDef: foo
-      replicas: 3
+    - name: mongodb
+      componentDef: mongodb-1.0
+      serviceVersion: "6.0.27"
+      replicas: 1
       network:
         hostNetwork: true
+# other component spec fields are omitted for brevity
 ```
 
-If `hostNetwork` is enabled and `dnsPolicy` is not set, KubeBlocks defaults the DNS policy to `ClusterFirstWithHostNet`.
+When host networking is enabled and `dnsPolicy` is not set, KubeBlocks uses `ClusterFirstWithHostNet` for the pod DNS policy.
 
-### Configure host ports
+In host-network mode:
 
-Use `hostPorts` when a component needs predictable host port values or when host-network ports must be rendered into addon variables.
+* Allocated ports are recorded in a ConfigMap in the KubeBlocks namespace.
+* The default automatic allocation range in 1.1 is `55000-59999`, controlled by Helm values `hostPorts.include` and `hostPorts.exclude` when deploying KubeBlocks.
+
+## Configure Host Ports
+
+Use `hostPorts` when a component needs a stable node port for a named container port.
+
+For normal pod networking, host ports are matched by port name. The port name must match a port declared in `ComponentDefinition.spec.runtime.containers[*].ports`. Unknown runtime port names are ignored.
 
 ```yaml
 apiVersion: apps.kubeblocks.io/v1
 kind: Cluster
 metadata:
-  name: foo
+  name: network-mongodb-hostport
   namespace: demo
 spec:
-  clusterDef: foo
-  topology: cluster
   componentSpecs:
-    - name: foo
-      componentDef: foo
-      replicas: 3
+    - name: mongodb
+      componentDef: mongodb-1.0
+      serviceVersion: "6.0.27"
+      replicas: 1
+      network:
+        hostPorts:
+          - name: mongodb  # port name in the ComponentDefinition's runtime.containers[*].ports
+            port: 31110
+# other component spec fields are omitted for brevity
+```
+
+With `hostNetwork: true`, `hostPorts` is also used to provide explicit host-network port values:
+
+```yaml
+apiVersion: apps.kubeblocks.io/v1
+kind: Cluster
+metadata:
+  name: network-mongodb-hostport
+  namespace: demo
+spec:
+  componentSpecs:
+    - name: mongodb
+      componentDef: mongodb-1.0
+      serviceVersion: "6.0.27"
+      replicas: 1
       network:
         hostNetwork: true
         hostPorts:
-          - name: client
-            port: 31001
-          - name: metrics
-            port: 31002
+          - name: mongodb
+            port: 31110
+          - name: ha
+            port: 31000
+# other component spec fields are omitted for brevity
 ```
 
-Port resolution rules:
+To sum up, the host-network port mapping behavior is as follows:
 
-* `hostPorts` entries are matched by **port name**.
-* With `hostNetwork: true`, mappings for ports declared in `ComponentDefinition.spec.hostNetwork` are required. Kbagent ports such as `http` and `streaming` are optional; omitted kbagent ports can still be allocated automatically.
-* With `hostNetwork: true` and no explicit `hostPorts`, KubeBlocks allocates required ports automatically through the host-port manager.
-* With `hostNetwork: false`, explicit `hostPorts` can map runtime container ports to node host ports. Port names must match ports declared in `ComponentDefinition.spec.runtime.containers[*].ports`; unknown runtime port names are ignored.
-* The allocated or mapped port value is rendered into vars that use `hostNetworkVarRef`.
+* When HostNetwork is Enabled
+  1. **If `hostPorts` is empty**: All ports are automatically allocated by the host-port manager.
+  2. **If `hostPorts` is specified**:
+    - Mappings for all ports defined in `cmpd.spec.hostNetwork` are MANDATORY
+* When HostNetwork is Disabled
+  - Host port mappings are optional (per user request)
+  - Mappings are restricted to ports defined in `cmpd.spec.runtime.containers.ports`
+  - Any specified container ports not present in the runtime definition will be ignored
 
-KubeBlocks tracks host port allocations in a ConfigMap in the KubeBlocks namespace. The allocatable range is controlled by Helm values `hostPorts.include` and `hostPorts.exclude`; the 1.1 default include range is `55000-59999`.
 
-### Add host aliases
+## Add Host Aliases
 
-Use `hostAliases` to add static host-to-IP mappings to component pods.
+Use `hostAliases` when a pod needs a small number of fixed hostname-to-IP entries in `/etc/hosts`. This is most useful for temporary compatibility cases, such as migrating from an old database endpoint, testing hybrid-cloud connectivity, or keeping a legacy hostname working while DNS records are being moved.
 
 ```yaml
 apiVersion: apps.kubeblocks.io/v1
 kind: Cluster
 metadata:
-  name: foo
+  name: network-dns
   namespace: demo
 spec:
-  clusterDef: foo
-  topology: cluster
   componentSpecs:
-    - name: foo
-      componentDef: foo
-      replicas: 3
+    - name: mysql
+      componentDef: mysql-8.0
+      serviceVersion: "8.0.30"
+      replicas: 1
       network:
         hostAliases:
           - ip: "10.10.0.12"
             hostnames:
-              - old-primary.example.internal
               - legacy-db.internal
+# other component spec fields are omitted for brevity
 ```
 
-This is useful during migration, hybrid-cloud connectivity testing, or integration with systems that still depend on fixed hostnames.
+Keep this list small and explicit. Kubernetes applies `hostAliases` when the pod is created, so it is best for stable or short-lived mappings. For normal service discovery, prefer Kubernetes Services or DNS records that can be updated without changing the pod spec.
 
-`hostAliases` is only valid for non-hostNetwork pods.
+`hostAliases` is only valid for pods that are not using host networking.
 
-### Configure DNS
+## Configure DNS
 
-Use `dnsPolicy` and `dnsConfig` when pods need custom name resolution behavior.
+Most components should use the Kubernetes default DNS behavior. Configure `dnsPolicy` and `dnsConfig` only when the default `ClusterFirst` policy cannot provide the resolver behavior the pod needs, such as custom nameservers, additional search domains, or resolver options like `ndots`.
 
 ```yaml
 apiVersion: apps.kubeblocks.io/v1
 kind: Cluster
 metadata:
-  name: foo
+  name: network-dns
   namespace: demo
 spec:
-  clusterDef: foo
-  topology: cluster
   componentSpecs:
-    - name: foo
-      componentDef: foo
-      replicas: 3
+    - name: mysql
+      componentDef: mysql-8.0
+      serviceVersion: "8.0.30"
+      replicas: 1
       network:
         dnsPolicy: None
         dnsConfig:
@@ -165,44 +199,14 @@ spec:
           options:
             - name: ndots
               value: "2"
+# other component spec fields are omitted for brevity
 ```
 
-DNS changes can affect database discovery, replication, and client connection behavior. Validate them in staging before applying them to production clusters.
-
-## Verify the Result
-
-Check the generated pods:
-
-```bash
-kubectl get pod -n demo
-kubectl get pod <pod-name> -n demo -o yaml
-```
-
-Inspect these pod fields:
-
-```yaml
-spec:
-  hostNetwork:
-  hostAliases:
-  dnsPolicy:
-  dnsConfig:
-  containers:
-    - ports:
-```
-
-For host ports, also check pod placement and the host-port allocation ConfigMap:
-
-```bash
-kubectl get pod <pod-name> -n demo -o wide
-kubectl -n kb-system get configmap
-```
-
-For release validation, confirm that host-port allocations are created when the component is reconciled, remain stable across ordinary reconciliations, and are removed after the component or cluster is deleted.
+When `dnsPolicy: None` is used, the pod depends on the values in `dnsConfig`; make sure nameservers, search domains, and options are all set intentionally. DNS changes can affect database discovery, replication, backup agents, and client connection paths, so validate the resolver behavior before applying it to production clusters.
 
 ## Notes
 
-* `hostNetwork` requires the referenced `ComponentDefinition` to declare host-network capability. Without it, the setting is ignored.
-* Plan host port ranges carefully to avoid conflicts with other workloads on the same nodes.
-* Combine explicit host ports with scheduling rules when specific ports must not collide on a node.
-* `hostAliases` is not valid for host-network pods.
-* DNS changes are workload-sensitive; test database discovery and replication after changing DNS settings.
+* `network.hostNetwork: true` requires host-network capability in the referenced `ComponentDefinition`; otherwise the pod stays on normal pod networking.
+* `hostPorts` entries are matched by port name declared by the `ComponentDefinition`; unknown names are ignored.
+* DNS settings are workload-sensitive. Test database discovery and replication after changing them.
+* KubeBlocks keeps compatibility with the earlier annotation-based form. Existing manifests can continue to use `kubeblocks.io/host-network: <component-name>` to enable host networking.

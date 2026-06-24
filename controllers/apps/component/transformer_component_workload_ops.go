@@ -153,8 +153,27 @@ func (r *componentWorkloadOps) gatePendingMemberLifecycle(deleteReplicas []strin
 		return err
 	}
 
+	pods, err := component.ListOwnedPods(r.transCtx.Context, r.cli,
+		r.synthesizeComp.Namespace, r.synthesizeComp.ClusterName, r.synthesizeComp.Name)
+	if err != nil {
+		return err
+	}
+	podSet := sets.New[string]()
+	for _, pod := range pods {
+		podSet.Insert(pod.Name)
+	}
+	activePending := make([]string, 0, len(pendingReplicas))
+	for _, name := range pendingReplicas {
+		if podSet.Has(name) {
+			activePending = append(activePending, name)
+		}
+	}
+	if len(activePending) == 0 {
+		return nil
+	}
+
 	return intctrlutil.NewRequeueError(time.Second*30,
-		fmt.Sprintf("scale-in gated: replicas %v have pending member lifecycle (MemberJoined=false), waiting for terminal state", pendingReplicas))
+		fmt.Sprintf("scale-in gated: replicas %v have pending member lifecycle (MemberJoined=false) with active pods, waiting for join to complete", activePending))
 }
 
 func (r *componentWorkloadOps) leaveMember4ScaleIn(deleteReplicas, joinedReplicas []string) error {

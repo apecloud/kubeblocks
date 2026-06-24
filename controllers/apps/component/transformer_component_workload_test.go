@@ -1242,7 +1242,23 @@ var _ = Describe("Component Workload Operations Test", func() {
 			}
 		}
 
-		It("should requeue scale-in when replica has pending member lifecycle", func() {
+		createGatePod := func() {
+			pod := testapps.NewPodFactory(testCtx.DefaultNamespace, gatePodName).
+				AddContainer(corev1.Container{Name: "main", Image: "test-image"}).
+				AddLabels(
+					constant.AppManagedByLabelKey, kubeblocksName,
+					constant.AppInstanceLabelKey, clusterName,
+					constant.KBAppComponentLabelKey, compName,
+				).
+				GetObject()
+			Expect(k8sClient.Create(ctx, pod)).Should(Succeed())
+			DeferCleanup(func() {
+				Expect(k8sClient.Delete(ctx, pod)).Should(Succeed())
+			})
+		}
+
+		It("should requeue scale-in when replica has pending member lifecycle and pod exists", func() {
+			createGatePod()
 			its := buildITS(1)
 			Expect(component.NewReplicasStatus(its, []string{gatePodName}, true, false)).Should(Succeed())
 			ops := buildOps(its)
@@ -1250,6 +1266,15 @@ var _ = Describe("Component Workload Operations Test", func() {
 			err := ops.gatePendingMemberLifecycle([]string{gatePodName})
 			Expect(err).ShouldNot(BeNil())
 			Expect(intctrlutil.IsRequeueError(err)).Should(BeTrue())
+		})
+
+		It("should proceed with scale-in when replica has pending member lifecycle but pod does not exist", func() {
+			its := buildITS(1)
+			Expect(component.NewReplicasStatus(its, []string{gatePodName}, true, false)).Should(Succeed())
+			ops := buildOps(its)
+
+			err := ops.gatePendingMemberLifecycle([]string{gatePodName})
+			Expect(err).Should(BeNil())
 		})
 
 		It("should proceed with scale-in when replica has no pending member lifecycle", func() {

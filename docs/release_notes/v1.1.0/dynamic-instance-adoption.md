@@ -1,37 +1,78 @@
 # Dynamic InstanceSet Template Adoption
 
-KubeBlocks 1.1 supports dynamic adoption of existing instances by named instance templates. This lets you move specific pods from the default component template into a specialized template, or move them back, by assigning their ordinals.
+KubeBlocks 1.1.0 lets an existing component pod move between the component's default template and a named instance template. To move a pod, update the ordinal lists so the pod's ordinal belongs to the target template.
 
-## Why This Helps
+This is useful when a database component starts out uniform, then one or a few replicas need to be treated differently. A hot replica may need more CPU, one pod may need to try a new engine version, a disaster recovery replica may need to run in another zone, or a data-heavy pod may need a larger PVC.
 
-Real database clusters do not always stay homogeneous. A user may start with three identical replicas, then later discover that one replica needs more CPU, another should run in a different zone, or one pod should test a new engine version before the full cluster is upgraded.
+The key point is that adoption changes template ownership, not logical identity. The pod keeps the same name, ordinal, service endpoint, and PVC identity. KubeBlocks may still recreate the pod if the new template changes fields that cannot be updated in place.
 
-Before dynamic template adoption, users had to plan these templates ahead of time. If requirements changed later, changing a pod's template was difficult because pod identity, PVC identity, and network identity all matter for stateful workloads.
+## When to Use It
 
-Dynamic template adoption helps users:
+Use dynamic template adoption when only part of a component needs a different configuration:
 
-* tune resources for one or a few hot instances;
-* test new versions on selected instances;
-* move specific replicas to different nodes or zones;
-* expand storage for only the instances that need it;
-* preserve pod identity and PVC data while changing the template assignment.
+* increase CPU or memory for one or a few busy pods;
+* test a new service version or ComponentDefinition on a few pods before a full rollout;
+* place a few replicas in another node pool, availability zone, or capacity class;
+* expand storage for pods with skewed data distribution;
+* add temporary labels, annotations, environment variables, or debug settings to one pod.
 
-## What It Does
+Before 1.1.0, named instance templates had to be planned when the cluster was created. Dynamic adoption lets you add or remove those assignments later, without changing the instance ordinals.
 
-A KubeBlocks component has a default template and optional named templates in `spec.componentSpecs[*].instances`.
+## How It Works
 
-With dynamic adoption:
+A component in KubeBlocks always has a no named `default` template. It can also have named templates under `spec.componentSpecs[*].instances`.
 
-* each pod is identified by its ordinal;
-* `flatInstanceOrdinal: true` keeps pod names independent of template names;
-* `ordinals.discrete` on a named template tells KubeBlocks which existing pods the template should adopt;
-* pods not assigned to a named template remain in the default template.
+Dynamic adoption follows these rules:
 
-For example, with pods `foo-0`, `foo-1`, and `foo-2`, you can assign only `foo-2` to a `highperf` template while `foo-0` and `foo-1` continue using the default template.
+* `flatInstanceOrdinal: true` is required, so pod names do not include template names.
+* Each pod is selected by ordinal.
+* The component-level `ordinals` owns the default-template ordinals.
+* Each named template's `instances[*].ordinals` owns that template's ordinals.
+* Each ordinal must appear in exactly one place across the default template and all named templates.
+* A named template's `replicas` should match the number of ordinals assigned to it.
+
+For a component named `foo` with three pods, flat ordinal naming produces:
+
+| Pod | Template |
+| --- | --- |
+| `foo-0` | default |
+| `foo-1` | default |
+| `foo-2` | default |
+
+After assigning ordinal `2` to a named template `highperf`, the pods become:
+
+| Pod | Template |
+| --- | --- |
+| `foo-0` | default |
+| `foo-1` | default |
+| `foo-2` | `highperf` |
+
+The pod is still named `foo-2`; it is not renamed to include `highperf`.
+
+Adopted pods are marked with the assigned template name in labels. Check `apps.kubeblocks.io/instance-template`. Pods that stay in the default template usually have no named template label value.
+
+## What Can Be Heterogeneous
+
+A named instance template can override only the fields supported by `spec.componentSpecs[*].instances[*]`. These are the settings you can use when a few pods need to be heterogeneous from the component default:
+
+| Field | What it changes | Typical use |
+| --- | --- | --- |
+| `serviceVersion` | Service version for these pods | Try a new engine version on a small set of pods |
+| `compDef` | ComponentDefinition for these pods | Move pods to a compatible new ComponentDefinition |
+| `annotations` | Pod annotations merged into these pods | Add operational metadata or integration hints |
+| `labels` | Pod labels merged into these pods | Mark hot, canary, debug, or DR replicas |
+| `schedulingPolicy` | Scheduling rules for these pods | Place pods in a specific zone, node pool, or capacity class |
+| `resources` | CPU and memory requests or limits for the first container | Give pods more or fewer resources |
+| `env` | Environment variables added to or overriding these pods | Enable debug flags or per-instance runtime settings |
+| `volumeClaimTemplates` | Storage requirements for these pods | Use larger PVCs for these pods |
+
+The fields `name`, `replicas`, and `ordinals` control template identity and ownership. They are required for adoption, but they do not change the pod configuration by themselves.
+
+Fields that are not listed above remain component-level settings. This includes services, accounts, TLS, configs, pod update policy, and component-level networking.
 
 ## Prerequisite: Enable Flat Ordinals
 
-Dynamic adoption requires flat instance ordinals. Set `flatInstanceOrdinal: true` on the component.
+Set `flatInstanceOrdinal: true` on the component. You can also list the initial default ordinals explicitly. If all replicas start in the default template, the `ordinals` block is mainly there to make the ownership clear.
 
 ```yaml
 apiVersion: apps.kubeblocks.io/v1
@@ -57,17 +98,11 @@ With flat ordinals, pod names use:
 $(component)-$(ordinal)
 ```
 
-For example:
+For example: `foo-0`, `foo-1`, and `foo-2`.
 
-| Pod | Template |
-| --- | --- |
-| `foo-0` | default |
-| `foo-1` | default |
-| `foo-2` | default |
+## Adopt Pods Into a Named Template
 
-## How to Use It
-
-### Adopt selected pods into a named template
+To adopt existing pods, remove their ordinals from the component-level `ordinals.discrete` and add them to a named instance template.
 
 The following example moves `foo-0` and `foo-2` into the `highperf` template. `foo-1` remains in the default template.
 
@@ -109,9 +144,11 @@ Result:
 | `foo-1` | default |
 | `foo-2` | `highperf` |
 
-### Return a pod to the default template
+## Return Pods to the Default Template
 
-To move `foo-0` back to the default template, remove ordinal `0` from the named template and include it in the component-level ordinals.
+To return a pod to the default template, remove its ordinal from the named template and add it back to the component-level `ordinals.discrete`.
+
+The following example moves `foo-0` back to the default template. `foo-2` stays in `highperf`.
 
 ```yaml
 apiVersion: apps.kubeblocks.io/v1
@@ -144,9 +181,15 @@ Result:
 | `foo-1` | default |
 | `foo-2` | `highperf` |
 
+If the named template should no longer own any pods, remove that entry from `instances` and put all ordinals back under the component-level `ordinals.discrete`.
+
+KubeBlocks requires explicit ordinals because the intent is otherwise ambiguous. Removing an ordinal from a template could mean "give this same pod back to the default template", or it could mean "scale down this template and create a different pod elsewhere". Listing the target ordinals makes the intent clear.
+
 ## Common Use Cases
 
-### Increase resources for one hot pod
+### Increase Resources for a Hot Pod
+
+Move the busy pod into a higher-resource template:
 
 ```yaml
 instances:
@@ -163,9 +206,11 @@ instances:
         memory: 16Gi
 ```
 
-This keeps `foo-0` as `foo-0`, while applying the higher resource template to that pod.
+The pod stays `foo-0` and keeps its PVC. Depending on the component's pod update policy and the exact resource change, KubeBlocks may update the pod in place or recreate it.
 
-### Test a new service version on one pod
+### Canary a New Service Version
+
+Move one pod into a canary template:
 
 ```yaml
 instances:
@@ -187,34 +232,11 @@ instances:
     serviceVersion: "x.y.z"
 ```
 
-When all pods should use the new version, move the version to the component-level spec and remove the temporary template.
+When all pods should use the new version, move the version to the component-level spec, put all ordinals back under the default template, and remove the temporary canary template.
 
-### Tune a promoted rollout instance
+### Move a Replica to Another Zone
 
-`Rollout` create/canary can leave a promoted instance template when only part of the component is promoted. You can later edit that named template directly to keep the promoted instance as a long-running heterogeneous instance.
-
-For example, after promoting one MySQL instance to `8.0.38`, make that instance the hot replica:
-
-```yaml
-instances:
-  - name: <rollout-template-name>
-    compDef: mysql-8.0-1.0.3
-    serviceVersion: "8.0.38"
-    replicas: 1
-    labels:
-      workload-tier: hot
-    resources:
-      requests:
-        cpu: 750m
-        memory: 768Mi
-      limits:
-        cpu: 750m
-        memory: 768Mi
-```
-
-Use `kubectl replace` for the updated `Cluster` object. In release validation, this update kept the logical template assignment, applied the `workload-tier=hot` label, and changed the first container's resource requests and limits. The affected pod was recreated because the pod template changed.
-
-### Move one replica to another zone
+Move one replica into a template with a different scheduling policy:
 
 ```yaml
 instances:
@@ -227,16 +249,18 @@ instances:
         topology.kubernetes.io/zone: us-west-2b
 ```
 
-This is useful for fault-domain placement or disaster recovery replicas.
+This is useful for fault-domain placement or disaster recovery replicas. A scheduling change usually recreates the selected pod so Kubernetes can place it on a matching node.
 
-### Expand storage for one instance
+### Expand Storage for Selected Pods
+
+Use a named template with larger `volumeClaimTemplates` for pods that need more storage:
 
 ```yaml
 instances:
   - name: large-storage
-    replicas: 1
+    replicas: 2
     ordinals:
-      discrete: [0]
+      discrete: [2, 5]
     volumeClaimTemplates:
       - name: data
         spec:
@@ -247,39 +271,33 @@ instances:
               storage: 500Gi
 ```
 
-Use this when data distribution is skewed and only one instance needs more storage.
+Make sure the StorageClass supports volume expansion. To keep PVC identity stable when a pod moves between templates, use the same volume claim template `name` and the same `persistentVolumeClaimName` prefix in both templates.
 
-## Verify the Result
+### Add Temporary Debug Settings
 
-Check pods:
+Move one pod into a debug template when you need extra logs or profiling on a specific replica:
 
-```bash
-kubectl get pod -n demo
+```yaml
+instances:
+  - name: debug
+    replicas: 1
+    ordinals:
+      discrete: [1]
+    env:
+      - name: LOG_LEVEL
+        value: DEBUG
+      - name: ENABLE_PROFILING
+        value: "true"
 ```
 
-Check the generated InstanceSet:
+Environment variable changes may require pod recreation.
 
-```bash
-kubectl get instanceset -n demo
-kubectl get instanceset <name> -n demo -o yaml
-```
-
-Look for:
-
-* stable pod names;
-* expected ordinals in template status;
-* expected resource, scheduling, image, or storage changes on adopted pods.
-* pod labels that match the template assignment, especially `apps.kubeblocks.io/instance-template` and `workloads.kubeblocks.io/template-name`;
-* service version evidence from both pod images and pod labels.
-
-For release validation, record pod UIDs and PVC UIDs before and after adoption. Pod recreation may be required for immutable pod-template changes, but the logical pod name, ordinal assignment, and PVC identity must stay attached to the intended instance.
-
-## Notes
+## Limitations and Notes
 
 * `flatInstanceOrdinal: true` is required.
 * Ordinals must be unique across the default template and all named templates.
-* Pod names remain stable, but pods may be recreated when the new template changes immutable pod fields.
-* PVC data is preserved according to the component's PVC retention policy and storage behavior.
-* To keep PVC identity stable when an instance moves between templates, set the same `persistentVolumeClaimName` prefix in both templates.
-* If a template changes `serviceVersion`, verify the actual container images in addition to `apps.kubeblocks.io/service-version`. Release validation found that a promoted MySQL instance could run the expected image while the inherited service-version label still reflected the component default.
+* A pod can move from the default template to a named template, or from a named template back to the default template, but not between two named templates. To move a pod from template `A` to template `B`, first return the ordinal from `A` to the default template, then adopt it into `B`.
+* Pod names remain stable, but pods may be recreated when the new template changes fields that cannot be updated in place, such as scheduling or environment variables.
+* PVC data is preserved according to the component's PVC retention policy, volume claim template compatibility, and storage behavior.
+* If a template changes `serviceVersion`, verify the actual container images as well as the `apps.kubeblocks.io/service-version` label.
 * For sharded clusters, use `shardTemplates[*].shardIDs` to adopt specific shards. See [Heterogeneous Shards and Shard-Specific Scale-In](./heterogeneous-shards.md).

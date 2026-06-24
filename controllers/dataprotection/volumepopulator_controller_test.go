@@ -846,6 +846,31 @@ func TestDecidePVCRestoreKeepsSingleBackupTargetScopedToMatchingComponent(t *tes
 	require.Nil(t, decision.sourceTarget)
 }
 
+func TestDecidePVCRestoreIgnoresRoleLabelInPVCMatch(t *testing.T) {
+	reconciler := &VolumePopulatorReconciler{}
+	backup := newBackupForRestoreDecision([]string{"data"}, nil)
+	backup.Status.Target.PodSelector = &dpv1alpha1.PodSelector{
+		LabelSelector: &metav1.LabelSelector{
+			MatchLabels: map[string]string{
+				constant.AppInstanceLabelKey:    "source-cluster",
+				constant.AppManagedByLabelKey:   constant.AppName,
+				constant.KBAppComponentLabelKey: "falkordb",
+				constant.RoleLabelKey:           "secondary",
+			},
+		},
+		Strategy: dpv1alpha1.PodSelectionStrategyAny,
+	}
+
+	pvc := newPVCForRestoreDecision("data", "falkordb", "")
+
+	decision, err := reconciler.decidePVCRestore(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, backup, nil)
+
+	require.NoError(t, err)
+	require.Equal(t, pvcRestoreModeRestoreData, decision.mode)
+	require.False(t, decision.skipPostReady)
+	require.NotNil(t, decision.sourceTarget)
+}
+
 func TestDecidePVCRestoreTreatsNilTargetVolumesAsProvisionOnly(t *testing.T) {
 	reconciler := &VolumePopulatorReconciler{}
 	backup := newBackupForRestoreDecision(nil, nil)

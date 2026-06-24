@@ -859,7 +859,7 @@ func TestDecidePVCRestoreTreatsNilTargetVolumesAsProvisionOnly(t *testing.T) {
 	require.False(t, decision.skipPostReady)
 }
 
-func TestDecidePVCRestoreDoesNotSkipPostReadyWhenNoTargetVolumes(t *testing.T) {
+func TestDecidePVCRestoreNoTargetVolumesTargetComponent(t *testing.T) {
 	reconciler := &VolumePopulatorReconciler{}
 	backup := newBackupForRestoreDecision(nil, nil)
 	backup.Status.BackupMethod.TargetVolumes = nil
@@ -868,18 +868,55 @@ func TestDecidePVCRestoreDoesNotSkipPostReadyWhenNoTargetVolumes(t *testing.T) {
 			MatchLabels: map[string]string{
 				constant.AppInstanceLabelKey:    "source-cluster",
 				constant.KBAppComponentLabelKey: "tidb",
+				constant.RoleLabelKey:           "leader",
 			},
 		},
 		Strategy: dpv1alpha1.PodSelectionStrategyAny,
 	}
-	pvc := newPVCForRestoreDecision("data", "pd", "")
 
+	// PVC from the backup target component: postReady must not be skipped
+	pvc := newPVCForRestoreDecision("data", "tidb", "")
 	decision, err := reconciler.decidePVCRestore(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, backup, nil)
-
 	require.NoError(t, err)
 	require.Equal(t, pvcRestoreModeProvisionOnly, decision.mode)
 	require.False(t, decision.skipPostReady,
-		"postReady must not be skipped when no volume-level restore exists — it may be the only restore path")
+		"target component PVC must not skip postReady when no volume-level restore exists")
+	require.NotNil(t, decision.sourceTarget,
+		"sourceTarget must be recovered for the target component")
+
+	// PVC from a different component: postReady must be skipped
+	pvc = newPVCForRestoreDecision("data", "pd", "")
+	decision, err = reconciler.decidePVCRestore(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, backup, nil)
+	require.NoError(t, err)
+	require.Equal(t, pvcRestoreModeProvisionOnly, decision.mode)
+	require.True(t, decision.skipPostReady,
+		"non-target component PVC must skip postReady to avoid running restore on wrong component")
+	require.Nil(t, decision.sourceTarget)
+}
+
+func TestDecidePVCRestoreNoTargetVolumesMultiComponentTargets(t *testing.T) {
+	reconciler := &VolumePopulatorReconciler{}
+	backup := newBackupForRestoreDecision(nil, []string{"etcd"})
+	backup.Status.BackupMethod.TargetVolumes = nil
+	backup.Status.Targets[0].PodSelector = &dpv1alpha1.PodSelector{
+		LabelSelector: &metav1.LabelSelector{
+			MatchLabels: map[string]string{
+				constant.AppInstanceLabelKey:    "source-cluster",
+				constant.KBAppComponentLabelKey: "etcd",
+				constant.RoleLabelKey:           "leader",
+			},
+		},
+		Strategy: dpv1alpha1.PodSelectionStrategyAny,
+	}
+
+	// Etcd PVC matches target component — postReady enabled
+	pvc := newPVCForRestoreDecision("data", "etcd", "")
+	decision, err := reconciler.decidePVCRestore(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, backup, nil)
+	require.NoError(t, err)
+	require.Equal(t, pvcRestoreModeProvisionOnly, decision.mode)
+	require.False(t, decision.skipPostReady)
+	require.NotNil(t, decision.sourceTarget)
+	require.Equal(t, "etcd", decision.sourceTarget.Name)
 }
 
 func TestMatchToPopulateSupportsRestoreAndBackupDataSources(t *testing.T) {

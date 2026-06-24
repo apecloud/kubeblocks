@@ -397,10 +397,16 @@ func (r *VolumePopulatorReconciler) decidePVCRestore(reqCtx intctrlutil.RequestC
 	if restoreData && !skipPostReady {
 		mode = pvcRestoreModeRestoreData
 	}
-	// When no volume-level restore exists, postReady may be the only restore
-	// path (e.g. multi-component logical backup). Don't block it.
-	if !restoreData {
-		skipPostReady = false
+	// When no volume-level restore exists and the PVC belongs to the backup
+	// target component, postReady must not be blocked — it may be the only
+	// data delivery path (e.g. logical backup via dataLoad). Only clear
+	// skipPostReady for the target component; non-target component PVCs
+	// (e.g. pd/tikv in a TiDB backup) must stay skipped.
+	if !restoreData && skipPostReady {
+		if target := backupTargetForPVCComponent(backup, pvc); target != nil {
+			skipPostReady = false
+			sourceTarget = target
+		}
 	}
 	return &pvcRestoreDecision{
 		mode:          mode,
@@ -471,6 +477,40 @@ func resolveSingleSourceTargetForPVC(target *dpv1alpha1.BackupStatusTarget, pvc 
 		return nil, true, nil
 	}
 	return target, false, nil
+}
+
+// backupTargetForPVCComponent returns the backup target whose component label
+// matches the PVC's component. This is a fallback for when backupTargetMatchesPVC
+// rejected the PVC due to pod-only labels (role, pod-name, etc.) that PVCs
+// never carry. Returns nil if no target matches the PVC's component.
+func backupTargetForPVCComponent(backup *dpv1alpha1.Backup, pvc *corev1.PersistentVolumeClaim) *dpv1alpha1.BackupStatusTarget {
+	pvcComp := pvc.Labels[constant.KBAppComponentLabelKey]
+	if pvcComp == "" {
+		return nil
+	}
+	if backup.Status.Target != nil {
+		if targetMatchesComponent(backup.Status.Target, pvcComp) {
+			return backup.Status.Target
+		}
+		return nil
+	}
+	for i := range backup.Status.Targets {
+		if targetMatchesComponent(&backup.Status.Targets[i], pvcComp) {
+			return &backup.Status.Targets[i]
+		}
+	}
+	return nil
+}
+
+func targetMatchesComponent(target *dpv1alpha1.BackupStatusTarget, componentName string) bool {
+	if target.PodSelector == nil || target.PodSelector.LabelSelector == nil {
+		return true
+	}
+	targetComp := target.PodSelector.MatchLabels[constant.KBAppComponentLabelKey]
+	if targetComp == "" {
+		return true
+	}
+	return targetComp == componentName
 }
 
 func (r *VolumePopulatorReconciler) resolveShardingSourceTarget(reqCtx intctrlutil.RequestCtx,

@@ -1,10 +1,14 @@
-# Sharding Lifecycle Actions
+# Sharding Lifecycle Actions for Addon Developers
 
 ## Overview
 
-KubeBlocks 1.1.0 adds lifecycle actions for sharded clusters. Addon developers can define actions in `ShardingDefinition.spec.lifecycleActions`, and KubeBlocks will run those actions when a logical sharding is created, removed, scaled out, or scaled in.
+Sharded databases usually need more than Kubernetes object creation and deletion. When a shard is added, the database may need to register it in a router, create metadata records, or start rebalancing. When a shard is removed, the addon may need to drain data, migrate ownership, unregister metadata, or block deletion until cleanup is complete.
 
-Use this when a sharded database needs more than Kubernetes object creation and deletion. Common examples include registering a new shard in a router, initializing global sharding metadata, starting a rebalance after scale-out, draining data before scale-in, or unregistering a shard from an external metadata service.
+The existing lifecycle actions are component-oriented. They work well for a concrete `Component`, but they do not fully describe sharding events: a logical sharding does not have its own CR, and scale-out or scale-in creates or removes shard components that together represent one sharding. Addon code needs to know not only that a component exists, but also whether it is the shard being added, the shard being removed, or part of a logical sharding lifecycle.
+
+KubeBlocks 1.1.0 adds sharding lifecycle actions to close that gap. Addon developers can define actions in `ShardingDefinition.spec.lifecycleActions`, and KubeBlocks will run those actions when a logical sharding is created, removed, scaled out, or scaled in.
+
+This guide is for addon developers who define `ShardingDefinition` objects, not for end users configuring a `Cluster`.
 
 ## Conceptual Model
 

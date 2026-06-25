@@ -86,11 +86,7 @@ Shards created from the named template have the label `apps.kubeblocks.io/shard-
 
 ### Adopt an Existing Shard
 
-Sometimes the shard that needs special treatment already exists. For example, monitoring may show that a specific shard is hot, or you may want one known shard to join a canary group. In that case, creating a new shard group is not enough; you need the template to take over the existing shard.
-
-Use `shardIDs` for this case.
-
-In KubeBlocks 1.1.0, this is an adoption-only workflow. A shard can be adopted into a named shard template, but KubeBlocks does not support returning that shard from the named template back to the base template by removing it from `shardIDs`.
+Use a new shard template when KubeBlocks can create a new shard for the group. But one never knows when a specific shard should be treated differently. For example, monitoring may show that a specific shard is hot, or you may want one known shard to join a canary group. In that case, creating a new shard group is not enough; you can create a named template to take over or adopt that specific shard by shard id.
 
 First list the shard components. A shard component name follows this pattern:
 
@@ -106,16 +102,18 @@ spec:
     - name: shard
       shards: 3
       shardTemplates:
-        - name: hot
+        - name: hot      # a new tempate named "hot"
           shards: 1
           shardIDs:
-            - <shard-id>  # replace shard-id with the actual ID in your cluster
+            - <shard-id>  # set the shard ID to be adopted into the template
           resources:
             requests: { cpu: "8", memory: 8Gi }
             limits: { cpu: "8", memory: 8Gi }
 ```
 
 The value in `shardIDs` is the generated shard ID suffix, not the full component name.
+
+In KubeBlocks 1.1.0, this is an adoption-only workflow. A shard can be adopted into a named shard template, but KubeBlocks does not support returning that shard from the named template back to the base template by removing it from `shardIDs`.
 
 ## Common Use Cases
 
@@ -132,6 +130,19 @@ shardTemplates:
     resources:
       requests: { cpu: "2", memory: 4Gi }
       limits: { cpu: "2", memory: 4Gi }
+```
+
+### Increase Replicas for Selected Shards
+
+Problem: one shard group needs stronger availability or more read capacity than the rest of the sharding, but increasing replicas for every shard would add unnecessary cost.
+
+Solution: create a shard template and override only `replicas`.
+
+```yaml
+shardTemplates:
+  - name: high-availability
+    shards: 1
+    replicas: 3
 ```
 
 ### Canary a New Service Version

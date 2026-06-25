@@ -39,7 +39,6 @@ The fields `name`, `replicas`, and `ordinals` control template identity and owne
 
 Fields that are not listed above remain component-level settings. This includes services, accounts, TLS, configs, pod update policy, and component-level networking.
 
-
 ## How to Use It
 
 ### Prerequisite: Enable Flat Ordinals
@@ -47,21 +46,14 @@ Fields that are not listed above remain component-level settings. This includes 
 Set `flatInstanceOrdinal: true` through the cluster API. You can also list the initial default ordinals explicitly. If all replicas start in the default template, the `ordinals` block is mainly there to make the ownership clear.
 
 ```yaml
-apiVersion: apps.kubeblocks.io/v1
-kind: Cluster
-metadata:
-  name: demo-cluster
-  namespace: demo
 spec:
-  clusterDef: foo
-  topology: cluster
   componentSpecs:
     - name: foo
       componentDef: foo
       replicas: 3
       flatInstanceOrdinal: true # required
       ordinals:
-        discrete: [0, 1, 2]  # optional, default is [0, 1, 2]. it is listed here for clarity.
+        discrete: [0, 1, 2]  # optional, default is [0, 1, 2]. It is listed here for clarity.
 ```
 
 With flat ordinals, pods are named after `$(component)-$(ordinal)` (e.g., foo-0, foo-1) instead of the default `$(component)-$(template)-$(ordinal)` format.
@@ -73,14 +65,7 @@ To adopt existing pods, remove their ordinals from the component-level `ordinals
 The following example moves `foo-0` and `foo-2` into the `highperf` template. `foo-1` remains in the default template.
 
 ```yaml
-apiVersion: apps.kubeblocks.io/v1
-kind: Cluster
-metadata:
-  name: demo-cluster
-  namespace: demo
 spec:
-  clusterDef: foo
-  topology: cluster
   componentSpecs:
     - name: foo
       componentDef: foo
@@ -89,10 +74,10 @@ spec:
       ordinals:
         discrete: [1]
       instances:
-        - name: highperf # highperf adopts foo-0 and foo-2
+        - name: highperf # highperf template
           replicas: 2
           ordinals:
-            discrete: [0, 2]
+            discrete: [0, 2] # adopts foo-0 and foo-2 from default template
           resources:
             requests:
               cpu: "4"
@@ -117,14 +102,7 @@ To return a pod to the default template, remove its ordinal from the named templ
 The following example moves `foo-0` back to the default template. `foo-2` stays in `highperf`.
 
 ```yaml
-apiVersion: apps.kubeblocks.io/v1
-kind: Cluster
-metadata:
-  name: demo-cluster
-  namespace: demo
 spec:
-  clusterDef: foo
-  topology: cluster
   componentSpecs:
     - name: foo
       componentDef: foo
@@ -136,7 +114,7 @@ spec:
         - name: highperf
           replicas: 1
           ordinals:
-            discrete: [2] # [0,2] -> [2], remove foo-0 from highperf tempalte
+            discrete: [2] # [0,2] -> [2], remove foo-0 from highperf template
 ```
 
 Result:
@@ -265,6 +243,5 @@ Environment variable changes may require pod recreation.
 * A pod can move from the default template to a named template, or from a named template back to the default template, but not between two named templates. To move a pod from template `A` to template `B`, first return the ordinal from `A` to the default template, then adopt it into `B`.
 * Pod names remain stable, but pods may be recreated when the new template changes fields that cannot be updated in place, such as scheduling or environment variables.
 * PVC data is preserved according to the component's PVC retention policy, volume claim template compatibility, and storage behavior.
-* If a template changes `serviceVersion`, verify the actual container images instead of relying soly on the `apps.kubeblocks.io/service-version` label.
+* If a template changes `serviceVersion`, verify the actual container images instead of relying solely on the `apps.kubeblocks.io/service-version` label.
 * When returning a pod to the default template, explicitly specify the ordinals that should stay in the default template.
-* For sharded clusters, use `shardTemplates[*].shardIDs` to adopt specific shards. See [Heterogeneous Shards and Shard-Specific Scale-In](./heterogeneous-shards.md).

@@ -1442,6 +1442,126 @@ func TestProvisionOnlyCreatesPopulatePVCWithoutJob(t *testing.T) {
 	require.Empty(t, jobs.Items)
 }
 
+func TestPopulateRequeuesWhenRestoreContainerFinishedBeforeJobComplete(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, batchv1.AddToScheme(scheme))
+	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
+	apiGroup := dptypes.DataprotectionAPIGroup
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:       "default",
+			Name:            "data-target-0",
+			UID:             "target-pvc-uid",
+			ResourceVersion: "1",
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+			Resources: corev1.VolumeResourceRequirements{
+				Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("1Gi")},
+			},
+			DataSourceRef: &corev1.TypedObjectReference{
+				APIGroup: &apiGroup,
+				Kind:     dptypes.BackupKind,
+				Name:     "backup",
+			},
+		},
+	}
+	backup := newBackupForRestoreDecision([]string{"data"}, nil)
+	backup.Status.Target.PodSelector = &dpv1alpha1.PodSelector{Strategy: dpv1alpha1.PodSelectionStrategyAny}
+	actionSet := &dpv1alpha1.ActionSet{
+		ObjectMeta: metav1.ObjectMeta{Name: "prepare-action"},
+		Spec: dpv1alpha1.ActionSetSpec{
+			BackupType: dpv1alpha1.BackupTypeFull,
+			Restore: &dpv1alpha1.RestoreActionSpec{
+				PrepareData: &dpv1alpha1.JobActionSpec{
+					BaseJobActionSpec: dpv1alpha1.BaseJobActionSpec{
+						Image:   "busybox",
+						Command: []string{"restore"},
+					},
+				},
+			},
+		},
+	}
+	restore := &dpv1alpha1.Restore{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      "internal-restore",
+		},
+		Spec: dpv1alpha1.RestoreSpec{
+			Backup: dpv1alpha1.BackupRef{Name: backup.Name, Namespace: backup.Namespace},
+			PrepareDataConfig: &dpv1alpha1.PrepareDataConfig{
+				DataSourceRef: &dpv1alpha1.VolumeConfig{
+					VolumeSource: "data",
+					MountPath:    "/data",
+				},
+			},
+		},
+	}
+	populatePVCName := getPopulatePVCName(pvc.UID)
+	jobName := fmt.Sprintf("%s-%d", populatePVCName, 0)
+	job := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      jobName,
+			Labels: map[string]string{
+				dprestore.DataProtectionRestoreLabelKey:     restore.Name,
+				dprestore.DataProtectionPopulatePVCLabelKey: populatePVCName,
+			},
+		},
+	}
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      jobName + "-pod",
+			Labels:    map[string]string{"job-name": jobName},
+		},
+		Status: corev1.PodStatus{
+			ContainerStatuses: []corev1.ContainerStatus{
+				{
+					Name:  dprestore.Restore,
+					State: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{ExitCode: 0}},
+				},
+				{
+					Name:  "restore-manager",
+					State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}},
+				},
+			},
+		},
+	}
+	cli := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithStatusSubresource(pvc, restore).
+		WithObjects(pvc, backup, actionSet, restore, job, pod).
+		Build()
+	reconciler := &VolumePopulatorReconciler{
+		Client:   cli,
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(10),
+	}
+	restoreMgr := dprestore.NewRestoreManager(restore.DeepCopy(), nil, scheme, cli)
+	restoreMgr.PrepareDataBackupSets = []dprestore.BackupActionSet{{
+		Backup:    backup,
+		ActionSet: actionSet,
+	}}
+
+	err := reconciler.Populate(
+		intctrlutil.RequestCtx{Ctx: context.Background()},
+		pvc,
+		&pvcRestoreContext{restoreMgr: restoreMgr, mode: pvcRestoreModeRestoreData},
+	)
+
+	require.Error(t, err)
+	require.True(t, intctrlutil.IsRequeueError(err), err.Error())
+	currentPod := &corev1.Pod{}
+	require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(pod), currentPod))
+	require.Equal(t, "true", currentPod.Annotations[dprestore.DataProtectionStopRestoreManagerAnnotationKey])
+	currentRestore := &dpv1alpha1.Restore{}
+	require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(restore), currentRestore))
+	require.Len(t, currentRestore.Status.Actions.PrepareData, 1)
+	require.Equal(t, dpv1alpha1.RestoreActionProcessing, currentRestore.Status.Actions.PrepareData[0].Status)
+}
+
 func TestBuildPostReadyRestoreSelectsHighestPriorityRole(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, corev1.AddToScheme(scheme))

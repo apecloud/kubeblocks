@@ -976,7 +976,7 @@ func (r *VolumePopulatorReconciler) Populate(reqCtx intctrlutil.RequestCtx, pvc 
 			if err = r.patchInternalRestoreStatus(reqCtx, restoreMgr); err != nil {
 				return err
 			}
-			return nil
+			return intctrlutil.NewRequeueError(reconcileInterval, "waiting for prepareData job")
 		}
 		if actionFailed {
 			dprestore.SetRestoreStageCondition(restoreMgr.Restore, dpv1alpha1.PrepareData, dprestore.ReasonFailed, "restore prepareData job failed")

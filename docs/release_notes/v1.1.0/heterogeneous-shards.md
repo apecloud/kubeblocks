@@ -1,133 +1,196 @@
-# Heterogeneous Shards and Shard-Specific Scale-In
+# Heterogeneous Shards
 
-KubeBlocks 1.1 extends the sharding API with two capabilities:
+## Overview
 
-* `spec.shardings[*].shardTemplates`: create groups of shards with different configurations inside one sharding.
-* `spec.shardings[*].offline`: take a specific named shard offline instead of letting KubeBlocks choose which shard to remove.
+Sharded databases usually start with a simple assumption: every shard uses the same configuration. That works well at the beginning, but real workloads rarely stay that even. One shard may receive more traffic, own more active data, need larger storage, or become the safest place to try a new database version.
 
-## Why This Helps
+Before heterogeneous shards, operators had two poor choices. They could over-provision every shard just because one shard was hot, or they could work around KubeBlocks and tune generated shard components manually. The first option wastes resources. The second makes the cluster harder to operate because manual changes drift away from the declared `Cluster` spec.
 
-In real sharded deployments, shards are rarely equal forever:
+KubeBlocks 1.1.0 solves this by letting you define named shard groups in the `Cluster` spec. Most shards can continue to use the base sharding template, while selected shard groups use their own resources, replicas, storage, versions, definitions, labels, environment variables, or scheduling rules.
 
-* a hot shard may need more CPU, memory, or storage than the others;
-* a subset of shards may need to run a newer engine version or a different component definition;
-* during incident response or data rebalancing, operators must remove one *specific* shard, not just "any shard".
+Use heterogeneous shards when the problem is shard-level configuration difference. Do not use it as a replacement for database-level data balancing. KubeBlocks changes the Kubernetes resources and shard components; your database engine or addon still needs to handle data movement, routing metadata, and rebalancing.
 
-Before 1.1, all shards inside a sharding shared one template, and scaling in only reduced the shard count without letting you choose the victim. Both gaps required manual workarounds.
+## When to Use It
 
-## What It Does
+Use heterogeneous shards when only part of a sharding needs a different configuration:
 
-### Shard templates
-
-A sharding still has a base `template`. `shardTemplates` adds named groups that override the base configuration for some of the shards:
-
-| Field | Purpose |
+| Situation | Why heterogeneous shards help |
 | --- | --- |
-| `name` | Template name, used as part of generated shard names. |
-| `shards` | Number of shards created from this template. |
-| `shardIDs` | Optional explicit IDs, used to adopt or pin specific shards. |
-| `serviceVersion` / `compDef` / `shardingDef` | Run these shards on a different version or definition. |
-| `replicas`, `resources`, `volumeClaimTemplates` | Override capacity and storage. |
-| `schedulingPolicy`, `labels`, `annotations`, `env`, `instances`, `ordinals` | Other per-group overrides. |
+| One shard is hotter than the others | Increase CPU, memory, storage, or replicas only for that shard group |
+| You want to canary a new database version | Run the new `serviceVersion` on one shard group before touching the rest |
+| You need to test a new definition | Use a different `ComponentDefinition` or `ShardingDefinition` on a small shard group |
+| Selected shards should run in a specific zone or node pool | Apply a shard-specific `schedulingPolicy` |
+| A known existing shard needs special treatment | Use `shardIDs` to move that shard into a named template |
 
-Shards not covered by any shard template continue to use the base `template`.
-
-### Shard naming
-
-Each shard is a Component. The component object is named `<cluster>-<sharding>-<id>`, where `<id>` is a generated 3-character shard ID (for example `mycluster-shard-q7z`). Shards created from a shard template additionally carry the label `apps.kubeblocks.io/shard-template: <templateName>`. `shardIDs` lets a template adopt existing shards by listing their IDs.
-
-### Offline shards
-
-`offline` lists full shard component names (for example `mycluster-shard-q7z`) that must be transitioned to offline status. KubeBlocks scales in exactly those shards and leaves all the others untouched. Combined with sharding lifecycle actions, the `shardRemove` hook still runs before the shard is deleted, so data can be drained safely.
-
-Without `offline`, scale-in removes the shards with the highest names (sorted lexically). If a shard is listed in `offline` while `shards` stays unchanged, KubeBlocks removes that shard and creates a new one to keep the desired count.
+If all shards should remain identical, keep using the base `spec.shardings[*].template`.
 
 ## How to Use It
 
-### Create a sharding with a high-performance shard group
+Configure heterogeneous shards with `Cluster.spec.shardings[*].shardTemplates`.
 
-```yaml
-apiVersion: apps.kubeblocks.io/v1
-kind: Cluster
-metadata:
-  name: redis-sharding
-  namespace: demo
-spec:
-  clusterDef: redis
-  topology: sharding
-  shardings:
-    - name: shard
-      shardingDef: redis-sharding
-      shards: 4
-      template:
-        componentDef: redis
-        serviceVersion: "7.2.4"
-        replicas: 2
-        resources:
-          requests: { cpu: "1", memory: 2Gi }
-          limits: { cpu: "1", memory: 2Gi }
-      shardTemplates:
-        - name: hot
-          shards: 1
-          replicas: 2
-          resources:
-            requests: { cpu: "4", memory: 8Gi }
-            limits: { cpu: "4", memory: 8Gi }
-```
+Each sharding has a base `template`. Shards not covered by a shard template use that base template. A shard template describes a named shard group and overrides only the fields that should be different for that group.
 
-Result: four shards in total; one shard is created from the `hot` template with larger resources, and the remaining three use the base template.
+### What Can Be Different
 
-### Canary a new engine version on one shard group
+The following fields can be different from the base template:
 
-```yaml
-      shardTemplates:
-        - name: canary
-          shards: 1
-          serviceVersion: "7.2.11"
-```
+| Field | What it changes | Typical use |
+| --- | --- | --- |
+| `name` | Name of the shard template | Use names such as `hot`, `canary`, or `archive` |
+| `shards` | Number of shards in this group | Reserve a fixed number of shards for this configuration |
+| `shardIDs` | Existing shard IDs adopted by this group | Move known shards into this template |
+| `serviceVersion` | Database service version | Canary or pin a version for selected shards |
+| `compDef` | Component definition | Test or run a different component implementation |
+| `shardingDef` | Sharding definition | Use a different sharding behavior definition |
+| `replicas` | Replica count of each shard component | Give selected shards a different HA shape |
+| `resources` | CPU and memory requests or limits | Add capacity to hot shards |
+| `volumeClaimTemplates` | Storage request and PVC template | Give selected shards larger or different volumes |
+| `schedulingPolicy` | Placement rules | Place shard groups on specific nodes or zones |
+| `labels`, `annotations`, `env` | Metadata and environment variables | Pass shard-group-specific settings to the workload |
 
-Only the `canary` shard group runs the new version. After validation, raise the version in the base `template` and remove the shard template, or grow `shards` of the canary group gradually.
+The total number of shards is still controlled by `spec.shardings[*].shards`. The sum of `shardTemplates[*].shards` must not be greater than that total. Any remaining shards are created from the base template.
 
-### Scale in a specific shard
+For example, if `shards: 3` and one shard template has `shards: 1`, KubeBlocks creates one shard from the named template and two shards from the base template.
 
-List the shard component names first:
+### Add a Shard Template
 
-```bash
-kubectl get components -n demo -l app.kubernetes.io/instance=redis-sharding
-```
-
-Then mark the target shard offline (full component name) and reduce the count:
+Suppose a MongoDB sharding has three shards, and one shard group needs more CPU and memory. Instead of increasing resources for every shard, define a `hot` shard template:
 
 ```yaml
 spec:
   shardings:
     - name: shard
       shards: 3
-      offline:
-        - redis-sharding-shard-q7z
+      template:
+        replicas: 1
+        serviceVersion: "6.0.20"
+        resources:
+          requests: { cpu: 500m, memory: 512Mi }
+          limits: { cpu: 500m, memory: 512Mi }
+      shardTemplates:
+        - name: hot
+          shards: 1
+          resources:
+            requests: { cpu: "1", memory: 1Gi }
+            limits: { cpu: "1", memory: 1Gi }
 ```
 
-KubeBlocks removes exactly `redis-sharding-shard-q7z`. If the `ShardingDefinition` defines a `shardRemove` lifecycle action, it runs before the shard component is deleted (the shard name is available as `KB_REMOVE_SHARD_NAME`).
+KubeBlocks creates:
 
-## Verify the Result
+| Shard group | Count | Configuration |
+| --- | --- | --- |
+| `hot` | 1 | Uses the resource settings from `shardTemplates[0]` |
+| Base template | 2 | Uses `spec.shardings[0].template` |
 
-```bash
-kubectl get components -n demo -l app.kubernetes.io/instance=redis-sharding
-kubectl get cluster redis-sharding -n demo -o jsonpath='{.status.shardings}'
+Shards created from the named template have the label `apps.kubeblocks.io/shard-template=hot`.
+
+### Adopt an Existing Shard
+
+Sometimes the shard that needs special treatment already exists. For example, monitoring may show that a specific shard is hot, or you may want one known shard to join a canary group. In that case, creating a new shard group is not enough; you need the template to take over the existing shard.
+
+Use `shardIDs` for this case.
+
+In KubeBlocks 1.1.0, this is an adoption-only workflow. A shard can be adopted into a named shard template, but KubeBlocks does not support returning that shard from the named template back to the base template by removing it from `shardIDs`.
+
+First list the shard components. A shard component name follows this pattern:
+
+```text
+<cluster-name>-<shard-name>-<shard-id>
 ```
 
-Look for:
+Use only that ID in `shardIDs` to apply the template to that specific shard:
 
-* the expected number of shards per template, with template-specific resources or versions;
-* removed shards limited to the names listed in `offline`;
-* remaining shards untouched (no pod restarts or PVC changes).
+```yaml
+spec:
+  shardings:
+    - name: shard
+      shards: 3
+      shardTemplates:
+        - name: hot
+          shards: 1
+          shardIDs:
+            - <shard-id>  # replace shard-id with the actual ID in your cluster
+          resources:
+            requests: { cpu: "8", memory: 8Gi }
+            limits: { cpu: "8", memory: 8Gi }
+```
 
-For release validation, record the full component names and pod UIDs before scale-in. The target shard named in `offline` should be the only removed shard; all non-target shard component names and pod UIDs should remain stable.
+The value in `shardIDs` is the generated shard ID suffix, not the full component name.
 
-## Notes
+## Common Use Cases
 
-* Shard names are generated; always read the actual component names before filling `offline`. `offline` entries are full component names (`<cluster>-<sharding>-<id>`).
-* Keep `shards` and `offline` consistent: taking a shard offline while keeping the same total count causes a replacement shard to be created.
-* The sum of `shardTemplates[*].shards` must not exceed `shards`; the remainder is created from the base `template`. Duplicate template names or shard IDs are rejected.
-* Shard templates affect new and adopted shards; changing a template triggers updates for the shards in that group only.
-* Combine with [Sharding Lifecycle Actions](./sharding-lifecycle-actions.md) so data is drained before any shard is removed.
+### Increase Resources for a Hot Shard
+
+Problem: one shard carries more active data or traffic, but increasing resources for every shard would waste capacity.
+
+Solution: create a `hot` shard template and override only `resources`.
+
+```yaml
+shardTemplates:
+  - name: hot
+    shards: 1
+    resources:
+      requests: { cpu: "2", memory: 4Gi }
+      limits: { cpu: "2", memory: 4Gi }
+```
+
+### Canary a New Service Version
+
+Problem: upgrading every shard at once is too risky, but you need a real shard to validate the new version.
+
+Solution: put one shard group on the target `serviceVersion`.
+
+```yaml
+shardTemplates:
+  - name: canary
+    shards: 1
+    serviceVersion: "6.0.27"
+```
+
+After validation, you can expand the canary group, update the base template, or remove the temporary template if all shards should use the same version again.
+
+### Place Shards in a Specific Zone
+
+Problem: some shards need to run in a specific fault domain, node pool, or capacity class.
+
+Solution: create a shard template with a different `schedulingPolicy`.
+
+```yaml
+shardTemplates:
+  - name: zone-b
+    shards: 1
+    schedulingPolicy:
+      nodeSelector:
+        topology.kubernetes.io/zone: us-west-2b
+```
+
+### Give Selected Shards Larger Storage
+
+Problem: one shard is growing faster than the others, but increasing storage for every shard is unnecessary.
+
+Solution: override `volumeClaimTemplates` for that shard group.
+
+```yaml
+shardTemplates:
+  - name: large-storage
+    shards: 1
+    volumeClaimTemplates:
+      - name: data
+        spec:
+          accessModes: [ReadWriteOnce]
+          resources:
+            requests:
+              storage: 100Gi
+```
+
+Use the same volume claim template name as the base template when the storage should map to the same data volume.
+
+## Restrictions and Gotchas
+
+* `shardTemplates[*].shards` is optional, but a template with `shards: 0` or no shard count does not create new shards by itself.
+* The sum of `shardTemplates[*].shards` must not exceed `spec.shardings[*].shards`.
+* Shard template names must be unique within the sharding.
+* `shardIDs` must be unique within the sharding.
+* `shardTemplates[*].shardIDs` entries are only the generated shard ID suffix, such as `q7z`.
+* `shardIDs` currently supports adoption into a shard template only. Returning an adopted shard back to the base template is not supported.
+* KubeBlocks manages generated shard `Component` objects from the `Cluster`; do not edit shard components directly.

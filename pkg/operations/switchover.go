@@ -127,6 +127,9 @@ func switchoverPreCheck(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes
 		}
 		instance, err := runtime.GetInstance(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name, switchover.InstanceName)
 		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" not found`, switchover.InstanceName))
+			}
 			return err
 		}
 		roleName := instance.GetRole()
@@ -135,8 +138,15 @@ func switchoverPreCheck(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes
 		}
 
 		if switchover.CandidateName != "" {
-			if _, err := runtime.GetInstance(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name, switchover.CandidateName); err != nil {
+			candidate, err := runtime.GetInstance(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name, switchover.CandidateName)
+			if err != nil {
+				if apierrors.IsNotFound(err) {
+					return intctrlutil.NewFatalError(fmt.Sprintf(`candidate instance "%s" not found`, switchover.CandidateName))
+				}
 				return err
+			}
+			if candidate.GetRole() == "" {
+				return intctrlutil.NewFatalError(fmt.Sprintf("candidate pod %s cannot perform switchover because it does not have a role label", switchover.CandidateName))
 			}
 		}
 
@@ -233,10 +243,16 @@ func handleSwitchover(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *
 		targetRole := progressDetail.Group
 		if switchover.CandidateName != "" {
 			candidateInstance, err := runtime.GetInstance(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name, switchover.CandidateName)
-			if err != nil {
+			switch {
+			case err != nil && !apierrors.IsNotFound(err):
 				return err
-			}
-			if targetRole == candidateInstance.GetRole() {
+			case err != nil:
+				progressDetail.Message = fmt.Sprintf(`component %s candidate instance "%s" not found`, compName, switchover.CandidateName)
+				progressDetail.Status = opsv1alpha1.FailedProgressStatus
+			case candidateInstance.GetRole() == "":
+				progressDetail.Message = fmt.Sprintf("component %s candidate pod %s cannot perform switchover because it does not have a role label", compName, switchover.CandidateName)
+				progressDetail.Status = opsv1alpha1.FailedProgressStatus
+			case targetRole == candidateInstance.GetRole():
 				progressDetail.Message = "do switchover succeed"
 				progressDetail.Status = opsv1alpha1.SucceedProgressStatus
 			}

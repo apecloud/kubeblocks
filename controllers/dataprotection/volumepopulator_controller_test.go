@@ -894,6 +894,42 @@ func TestDecidePVCRestoreNoTargetVolumesTargetComponent(t *testing.T) {
 	require.Nil(t, decision.sourceTarget)
 }
 
+func TestDecidePVCRestoreNoTargetVolumesTargetComponentMatchExpression(t *testing.T) {
+	reconciler := &VolumePopulatorReconciler{}
+	backup := newBackupForRestoreDecision(nil, nil)
+	backup.Status.BackupMethod.TargetVolumes = nil
+	backup.Status.Target.PodSelector = &dpv1alpha1.PodSelector{
+		LabelSelector: &metav1.LabelSelector{
+			MatchLabels: map[string]string{
+				constant.AppInstanceLabelKey: "source-cluster",
+				constant.RoleLabelKey:        "leader",
+			},
+			MatchExpressions: []metav1.LabelSelectorRequirement{{
+				Key:      constant.KBAppComponentLabelKey,
+				Operator: metav1.LabelSelectorOpIn,
+				Values:   []string{"tidb"},
+			}},
+		},
+		Strategy: dpv1alpha1.PodSelectionStrategyAny,
+	}
+
+	pvc := newPVCForRestoreDecision("data", "tidb", "")
+	decision, err := reconciler.decidePVCRestore(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, backup, nil)
+	require.NoError(t, err)
+	require.Equal(t, pvcRestoreModeProvisionOnly, decision.mode)
+	require.False(t, decision.skipPostReady,
+		"target component selected by MatchExpressions must not skip postReady")
+	require.NotNil(t, decision.sourceTarget)
+
+	pvc = newPVCForRestoreDecision("data", "pd", "")
+	decision, err = reconciler.decidePVCRestore(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, backup, nil)
+	require.NoError(t, err)
+	require.Equal(t, pvcRestoreModeProvisionOnly, decision.mode)
+	require.True(t, decision.skipPostReady,
+		"non-target component must still skip postReady when component expression does not match")
+	require.Nil(t, decision.sourceTarget)
+}
+
 func TestDecidePVCRestoreNoTargetVolumesMultiComponentTargets(t *testing.T) {
 	reconciler := &VolumePopulatorReconciler{}
 	backup := newBackupForRestoreDecision(nil, []string{"etcd"})

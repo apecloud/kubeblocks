@@ -35,6 +35,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
@@ -506,11 +507,33 @@ func targetMatchesComponent(target *dpv1alpha1.BackupStatusTarget, componentName
 	if target.PodSelector == nil || target.PodSelector.LabelSelector == nil {
 		return true
 	}
-	targetComp := target.PodSelector.MatchLabels[constant.KBAppComponentLabelKey]
-	if targetComp == "" {
+	componentSelector := componentLabelSelector(target.PodSelector.LabelSelector)
+	if componentSelector == nil {
 		return false
 	}
-	return targetComp == componentName
+	selector, err := metav1.LabelSelectorAsSelector(componentSelector)
+	if err != nil {
+		return false
+	}
+	return selector.Matches(labels.Set{constant.KBAppComponentLabelKey: componentName})
+}
+
+func componentLabelSelector(selector *metav1.LabelSelector) *metav1.LabelSelector {
+	componentSelector := &metav1.LabelSelector{}
+	if component, ok := selector.MatchLabels[constant.KBAppComponentLabelKey]; ok {
+		componentSelector.MatchLabels = map[string]string{
+			constant.KBAppComponentLabelKey: component,
+		}
+	}
+	for _, expression := range selector.MatchExpressions {
+		if expression.Key == constant.KBAppComponentLabelKey {
+			componentSelector.MatchExpressions = append(componentSelector.MatchExpressions, expression)
+		}
+	}
+	if len(componentSelector.MatchLabels) == 0 && len(componentSelector.MatchExpressions) == 0 {
+		return nil
+	}
+	return componentSelector
 }
 
 func (r *VolumePopulatorReconciler) resolveShardingSourceTarget(reqCtx intctrlutil.RequestCtx,

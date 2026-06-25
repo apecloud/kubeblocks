@@ -127,6 +127,9 @@ func switchoverPreCheck(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes
 		}
 		instance, err := runtime.GetInstance(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name, switchover.InstanceName)
 		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" not found`, switchover.InstanceName))
+			}
 			return err
 		}
 		roleName := instance.GetRole()
@@ -135,8 +138,15 @@ func switchoverPreCheck(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes
 		}
 
 		if switchover.CandidateName != "" {
-			if _, err := runtime.GetInstance(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name, switchover.CandidateName); err != nil {
+			candidate, err := runtime.GetInstance(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name, switchover.CandidateName)
+			if err != nil {
+				if apierrors.IsNotFound(err) {
+					return intctrlutil.NewFatalError(fmt.Sprintf(`candidate instance "%s" not found`, switchover.CandidateName))
+				}
 				return err
+			}
+			if candidate.GetRole() == "" {
+				return intctrlutil.NewFatalError(fmt.Sprintf("candidate pod %s cannot perform switchover because it does not have a role label", switchover.CandidateName))
 			}
 		}
 

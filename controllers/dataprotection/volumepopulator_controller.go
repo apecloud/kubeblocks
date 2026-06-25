@@ -126,6 +126,9 @@ func (r *VolumePopulatorReconciler) handleSyncPVCError(reqCtx intctrlutil.Reques
 	if requeueErr, ok := err.(intctrlutil.RequeueError); ok {
 		return intctrlutil.RequeueAfter(requeueErr.RequeueAfter(), reqCtx.Log, requeueErr.Reason())
 	}
+	if apierrors.IsConflict(err) {
+		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
+	}
 	if r.ContainPopulatingCondition(pvc) {
 		// Ignore the error if an external controller handles this PVC.
 		return intctrlutil.Reconciled()
@@ -1037,7 +1040,17 @@ func (r *VolumePopulatorReconciler) patchInternalRestoreStatus(reqCtx intctrluti
 	if reflect.DeepEqual(restoreMgr.OriginalRestore.Status, restoreMgr.Restore.Status) {
 		return nil
 	}
-	return r.Client.Status().Patch(reqCtx.Ctx, restoreMgr.Restore, client.MergeFrom(restoreMgr.OriginalRestore))
+	latest := &dpv1alpha1.Restore{}
+	if err := r.Client.Get(reqCtx.Ctx, client.ObjectKeyFromObject(restoreMgr.Restore), latest); err != nil {
+		return err
+	}
+	mergedStatus := mergeRestoreStatusChanges(restoreMgr.OriginalRestore.Status, restoreMgr.Restore.Status, latest.Status)
+	if reflect.DeepEqual(latest.Status, mergedStatus) {
+		return nil
+	}
+	statusPatch := client.MergeFrom(latest.DeepCopy())
+	latest.Status = mergedStatus
+	return r.Client.Status().Patch(reqCtx.Ctx, latest, statusPatch)
 }
 
 func (r *VolumePopulatorReconciler) patchInternalRestoreMetaAndStatus(reqCtx intctrlutil.RequestCtx,
@@ -1055,8 +1068,31 @@ func (r *VolumePopulatorReconciler) patchInternalRestoreMetaAndStatus(reqCtx int
 		return err
 	}
 	statusPatch := client.MergeFrom(latest.DeepCopy())
-	latest.Status = restore.Status
+	latest.Status = mergeRestoreStatusChanges(original.Status, restore.Status, latest.Status)
 	return r.Client.Status().Patch(reqCtx.Ctx, latest, statusPatch)
+}
+
+func mergeRestoreStatusChanges(original, desired, latest dpv1alpha1.RestoreStatus) dpv1alpha1.RestoreStatus {
+	merged := latest
+	if !reflect.DeepEqual(original.Phase, desired.Phase) {
+		merged.Phase = desired.Phase
+	}
+	if !reflect.DeepEqual(original.StartTimestamp, desired.StartTimestamp) {
+		merged.StartTimestamp = desired.StartTimestamp
+	}
+	if !reflect.DeepEqual(original.CompletionTimestamp, desired.CompletionTimestamp) {
+		merged.CompletionTimestamp = desired.CompletionTimestamp
+	}
+	if !reflect.DeepEqual(original.Duration, desired.Duration) {
+		merged.Duration = desired.Duration
+	}
+	if !reflect.DeepEqual(original.Actions, desired.Actions) {
+		merged.Actions = desired.Actions
+	}
+	if !reflect.DeepEqual(original.Conditions, desired.Conditions) {
+		merged.Conditions = desired.Conditions
+	}
+	return merged
 }
 
 func (r *VolumePopulatorReconciler) completeBoundPVCIfNeeded(reqCtx intctrlutil.RequestCtx,

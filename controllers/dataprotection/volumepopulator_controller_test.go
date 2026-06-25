@@ -31,14 +31,17 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -1259,6 +1262,70 @@ func TestHandleSyncPVCErrorKeepsInternalRequeueWhenPVCIsPopulating(t *testing.T)
 
 	require.NoError(t, err)
 	require.Equal(t, reconcileInterval, result.RequeueAfter)
+}
+
+func TestHandleSyncPVCErrorRequeuesConflictWhenPVCIsPopulating(t *testing.T) {
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "target"},
+		Status: corev1.PersistentVolumeClaimStatus{
+			Conditions: []corev1.PersistentVolumeClaimCondition{{
+				Type:   PersistentVolumeClaimPopulating,
+				Status: corev1.ConditionTrue,
+			}},
+		},
+	}
+	reconciler := &VolumePopulatorReconciler{Recorder: record.NewFakeRecorder(10)}
+	conflict := apierrors.NewConflict(
+		schema.GroupResource{Resource: "persistentvolumeclaims"},
+		pvc.Name,
+		fmt.Errorf("stale resource version"),
+	)
+
+	_, err := reconciler.handleSyncPVCError(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, conflict)
+
+	require.Error(t, err)
+	require.True(t, apierrors.IsConflict(err), err.Error())
+}
+
+func TestPatchInternalRestoreStatusUsesLatestRestoreResourceVersion(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
+	latest := &dpv1alpha1.Restore{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:       "default",
+			Name:            "restore",
+			ResourceVersion: "42",
+		},
+		Status: dpv1alpha1.RestoreStatus{Phase: dpv1alpha1.RestorePhaseAsDataSource},
+	}
+	original := latest.DeepCopy()
+	original.ResourceVersion = "1"
+	original.Status = dpv1alpha1.RestoreStatus{}
+	var patchedResourceVersion string
+	cli := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithStatusSubresource(latest).
+		WithObjects(latest).
+		WithInterceptorFuncs(interceptor.Funcs{
+			SubResourcePatch: func(ctx context.Context, c client.Client, subResourceName string, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {
+				require.Equal(t, "status", subResourceName)
+				patchedResourceVersion = obj.GetResourceVersion()
+				return c.SubResource(subResourceName).Patch(ctx, obj, patch, opts...)
+			},
+		}).
+		Build()
+	reconciler := &VolumePopulatorReconciler{Client: cli}
+	restoreMgr := dprestore.NewRestoreManager(original.DeepCopy(), nil, scheme, cli)
+	dprestore.SetRestoreStageCondition(restoreMgr.Restore, dpv1alpha1.PrepareData, dprestore.ReasonSucceed, "prepare data successfully")
+
+	err := reconciler.patchInternalRestoreStatus(intctrlutil.RequestCtx{Ctx: context.Background()}, restoreMgr)
+
+	require.NoError(t, err)
+	require.Equal(t, "42", patchedResourceVersion)
+	got := &dpv1alpha1.Restore{}
+	require.NoError(t, cli.Get(context.Background(), types.NamespacedName{Namespace: "default", Name: "restore"}, got))
+	require.Equal(t, dpv1alpha1.RestorePhaseAsDataSource, got.Status.Phase)
+	require.NotEmpty(t, got.Status.Conditions)
 }
 
 func TestDecidePVCRestoreAssignsShardingTargetsByStableComponentOrder(t *testing.T) {

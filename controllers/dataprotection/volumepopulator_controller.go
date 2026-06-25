@@ -195,18 +195,35 @@ func (r *VolumePopulatorReconciler) syncPVC(reqCtx intctrlutil.RequestCtx, pvc *
 	}
 	// if pvc has not bound pv, populate it.
 	if pvc.Spec.VolumeName == "" {
-		if restoreCtx.mode == pvcRestoreModeRestoreData {
-			if err = r.waitForSerialPredecessors(reqCtx, pvc, restoreCtx.restoreMgr); err != nil {
-				return err
-			}
-			return r.Populate(reqCtx, pvc, restoreCtx)
-		}
-		return r.ProvisionOnly(reqCtx, pvc, restoreCtx)
+		return r.dispatchUnboundPVC(reqCtx, pvc, restoreCtx)
 	}
 	if err = r.completeBoundPVCIfNeeded(reqCtx, pvc, restoreCtx); err != nil {
 		return err
 	}
 	return r.Cleanup(reqCtx, pvc)
+}
+
+// dispatchUnboundPVC routes an unbound PVC to either Populate or ProvisionOnly.
+// When mode is RestoreData but PrepareDataBackupSets is empty, it checks
+// PostReadyBackupSets: if postReady actions exist, fall back to ProvisionOnly
+// (data arrives via postReady); if neither stage exists, fail the invalid
+// restore contract rather than silently completing with an empty PVC.
+func (r *VolumePopulatorReconciler) dispatchUnboundPVC(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim, restoreCtx *pvcRestoreContext) error {
+	if restoreCtx.mode == pvcRestoreModeRestoreData {
+		if len(restoreCtx.restoreMgr.PrepareDataBackupSets) == 0 {
+			if len(restoreCtx.restoreMgr.PostReadyBackupSets) > 0 {
+				return r.ProvisionOnly(reqCtx, pvc, restoreCtx)
+			}
+			return intctrlutil.NewFatalError(fmt.Sprintf(
+				"backup matched targetVolumes for PVC %s/%s but ActionSet has no restore actions (neither prepareData nor postReady)",
+				pvc.Namespace, pvc.Name))
+		}
+		if err := r.waitForSerialPredecessors(reqCtx, pvc, restoreCtx.restoreMgr); err != nil {
+			return err
+		}
+		return r.Populate(reqCtx, pvc, restoreCtx)
+	}
+	return r.ProvisionOnly(reqCtx, pvc, restoreCtx)
 }
 
 func (r *VolumePopulatorReconciler) validateRestoreRefAndBuildMGR(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim) (*dprestore.RestoreManager, error) {

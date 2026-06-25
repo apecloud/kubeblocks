@@ -1,5 +1,7 @@
 # Rollout API
 
+## Overview
+
 KubeBlocks 1.1.0 introduces the experimental `Rollout` API (`apps.kubeblocks.io/v1alpha1`) for controlled database instance updates. Instead of editing a `Cluster` and letting the normal reconciliation path update every affected instance, you can create a `Rollout` object that describes the target version or definition, the rollout target, and the strategy KubeBlocks should use.
 
 Use `Rollout` when an update needs operational control: one instance at a time, extra validation before promotion, temporary replacement capacity, sharding-wide rollout, or better progress visibility than a plain `Cluster` spec change.

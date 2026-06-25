@@ -1,5 +1,7 @@
 # Dynamic InstanceSet Template Adoption
 
+## Overview
+
 Dynamic Template Adoption is a KubeBlocks cluster management feature that allows you to assign or reassign instance templates to specific Pods dynamically on demand. You can change settings for individual Pods while preserving their identity, data, and network endpoints.
 
 This is useful when a database component starts out uniform, then one or a few replicas need to be treated differently. A hot replica may need more CPU, one pod may need to try a new engine version, a disaster recovery replica may need to run in another zone, or a data-heavy pod may need a larger PVC.

@@ -1,222 +1,88 @@
 # Sharding Lifecycle Actions
 
-KubeBlocks 1.1 adds lifecycle actions for sharded clusters. A `ShardingDefinition` can now define hooks that run when the whole sharding is provisioned or terminated, and when an individual shard is added or removed.
+## Overview
 
-## Why This Helps
+KubeBlocks 1.1.0 adds lifecycle actions for sharded clusters. Addon developers can define actions in `ShardingDefinition.spec.lifecycleActions`, and KubeBlocks will run those actions when a logical sharding is created, removed, scaled out, or scaled in.
 
-Sharded databases often need more than "create or delete a component." When a shard is added, the database may need to update metadata, register the shard in a router, create slots, rebalance data, or notify an external system. When a shard is removed, the database may need to drain traffic, migrate data, unregister the shard, or run cleanup.
+Use this when a sharded database needs more than Kubernetes object creation and deletion. Common examples include registering a new shard in a router, initializing global sharding metadata, starting a rebalance after scale-out, draining data before scale-in, or unregistering a shard from an external metadata service.
 
-Without lifecycle actions, users had to coordinate these steps manually outside KubeBlocks. Sharding lifecycle actions make these steps part of the declarative sharding workflow.
+## Conceptual Model
 
-## What It Does
+In KubeBlocks, a `Cluster` is described by component specs and sharding specs.
+
+A component spec describes how to build a `Component`, the basic managed unit in KubeBlocks. From a database point of view, a component usually stores or serves one independent part of the database.
+
+A sharding spec describes a logical sharding. A sharding spreads one dataset across multiple shards. Those shards share the same general behavior, but each shard owns only part of the data. In this model, a sharding and a component are both top-level database building blocks, while a shard belongs to the logical sharding.
+
+A useful mental model is to treat a normal component as a special case of this pattern: one fixed template and one data-bearing unit. Sharding generalizes that model to multiple shard components.
+
+Implementation-wise, there is an important difference:
+
+* A component has a concrete `Component` custom resource.
+* A sharding does not have its own `Sharding` custom resource in KubeBlocks 1.1.0.
+* KubeBlocks creates multiple shard `Component` objects from `Cluster.spec.shardings[*]`. These shard components together form the logical sharding.
+
+The relationship is maintained in two directions:
+
+* From the top down, `Cluster.spec.shardings[*]` defines the sharding name, shard count, shard template, optional heterogeneous shard templates.
+* From the bottom up, each shard component carries labels and annotations that identify which cluster and sharding it belongs to.
+
+This distinction matters for lifecycle actions. `ComponentLifecycleActions` belong to a concrete component object. `ShardingLifecycleActions` belong to the logical sharding described by the cluster's sharding spec and represented at runtime by a set of shard components.
+
+## What Addons Can Configure
 
 Lifecycle actions are defined in `ShardingDefinition.spec.lifecycleActions`.
 
-KubeBlocks 1.1 supports:
-
-| Action | When It Runs | Typical Use |
+| Action | When it runs | Typical use |
 | --- | --- | --- |
-| `postProvision` | after a sharding is created | initialize global sharding metadata |
-| `preTerminate` | before a sharding is terminated | drain or clean up the whole sharding |
-| `shardAdd` | after one shard is added | register a new shard or start rebalancing |
-| `shardRemove` | before one shard is removed | drain, migrate, or unregister a shard |
+| `postProvision` | After the logical `sharding` is created | Initialize sharding metadata or register the sharding |
+| `preTerminate` | Before the logical `sharding` is removed | Drain or clean up the whole sharding |
+| `shardAdd` | After a `shard component` is added | Register the new shard or start rebalancing |
+| `shardRemove` | Before a `shard component` is removed | Drain, migrate, or unregister the shard |
 
-For shard-level actions, the action container receives shard-specific environment variables:
+`ShardingAction.targetShardSelector` controls where the action runs:
 
-| Variable | Meaning |
+| Selector | Behavior |
 | --- | --- |
-| `KB_ADD_SHARD_NAME` | name of the shard being added |
-| `KB_REMOVE_SHARD_NAME` | name of the shard being removed |
+| `Any` or omitted | Run on one shard. For `shardAdd` and `shardRemove`, this is the shard being added or removed. For `postProvision` and `preTerminate`, KubeBlocks selects one existing shard. |
+| `All` | Run on all shard components in the sharding. |
 
-`ShardingAction.targetShardSelector` controls which shard runs the action:
+## Action Semantics
 
-* `Any` (or omitted): run on one shard. For `shardAdd`/`shardRemove` this is the shard being added or removed; for `postProvision`/`preTerminate` a random shard is selected.
-* `All`: run on all shards.
+### `postProvision`
 
-## How to Use It
+`postProvision` is a sharding-level action. It is intended to run once after the logical sharding is created. By default, it runs after all shard components in the sharding are ready. The action can also use lifecycle preconditions such as `Immediately`, `ComponentReady`, or `ClusterReady`.
 
-### Define sharding lifecycle actions
+Because sharding has no standalone CR, the creation signal comes from `Cluster.spec.shardings[*]`. If a sharding spec exists, the logical sharding exists from the cluster's point of view, even when the shard count is `0`. In that case, the sharding-level lifecycle state is still driven by the spec, but an action that must execute inside a shard still needs at least one shard target.
 
-The example below uses simple shell commands to show the wiring. In a real addon, these actions usually call a database admin tool or script.
+### `preTerminate`
 
-```yaml
-apiVersion: apps.kubeblocks.io/v1
-kind: ShardingDefinition
-metadata:
-  name: redis-sharding
-spec:
-  template:
-    compDef: redis
-  lifecycleActions:
-    postProvision:
-      exec:
-        command:
-          - /bin/sh
-          - -c
-          - echo "initialize sharding metadata"
-      targetShardSelector: Any
-    preTerminate:
-      exec:
-        command:
-          - /bin/sh
-          - -c
-          - echo "drain sharding before terminate"
-      targetShardSelector: All
-    shardAdd:
-      exec:
-        command:
-          - /bin/sh
-          - -c
-          - echo "register added shard ${KB_ADD_SHARD_NAME}"
-      targetShardSelector: Any
-    shardRemove:
-      exec:
-        command:
-          - /bin/sh
-          - -c
-          - echo "drain removed shard ${KB_REMOVE_SHARD_NAME}"
-      targetShardSelector: Any
-```
+`preTerminate` is also a sharding-level action. It runs before KubeBlocks removes the logical sharding and blocks cleanup until it succeeds or is skipped.
 
-### Create a sharded cluster
+For a component, pre-termination can be driven by the concrete `Component` object. For a sharding, KubeBlocks relies on the cluster sharding spec and the currently running shard components to decide which logical sharding is being removed. If a sharding spec is removed and there are still shard components labeled as part of that sharding, KubeBlocks can run `preTerminate` before deleting them. If the sharding had `shards: 0` and the sharding spec is removed, there may be no remaining shard component to identify or execute against, so there is no practical runtime target for the action.
 
-Create a cluster that references the `ShardingDefinition`.
+If `postProvision` is defined but has not succeeded or been skipped, `preTerminate` is skipped.
 
-```yaml
-apiVersion: apps.kubeblocks.io/v1
-kind: Cluster
-metadata:
-  name: redis-sharding
-  namespace: demo
-spec:
-  clusterDef: redis
-  topology: sharding
-  shardings:
-    - name: shard
-      shardingDef: redis-sharding
-      shards: 2
-      template:
-        componentDef: redis
-        serviceVersion: "7.2.4"
-        replicas: 2
-```
+### `shardAdd`
 
-When the sharding is created, KubeBlocks provisions the shard components and runs `postProvision` according to its precondition and selector.
+`shardAdd` is a shard-level action. KubeBlocks marks a newly created shard component with the annotation `kubeblocks.io/sharding-add-shard: <timestamp>` and runs `shardAdd` after that shard component exists. When the action succeeds, KubeBlocks removes the annotation.
 
-### Add a shard
+When invoking the action, KubeBlocks injects the built-in variable `KB_ADD_SHARD_NAME` with the name of the shard component being added. Action commands can use this value to operate on the exact shard that triggered the scale-out event.
 
-Increase `spec.shardings[*].shards`.
+Use `shardAdd` for work that must happen after a new shard becomes part of the sharding, such as registering the shard in a router, creating metadata records, or triggering rebalancing.
 
-```yaml
-spec:
-  shardings:
-    - name: shard
-      shardingDef: redis-sharding
-      shards: 3
-      template:
-        componentDef: redis
-        serviceVersion: "7.2.4"
-        replicas: 2
-```
+### `shardRemove`
 
-KubeBlocks creates a new shard component. After it is provisioned, KubeBlocks runs `shardAdd`, and the action can read the new shard name from `KB_ADD_SHARD_NAME`.
+`shardRemove` is a shard-level action. KubeBlocks runs it before deleting a shard component. If the action fails, KubeBlocks skips the shard deletion and retries in a later reconciliation, so the shard remains until the action succeeds.
 
-### Remove a shard
+When invoking the action, KubeBlocks injects the built-in variable `KB_REMOVE_SHARD_NAME` with the name of the shard component being removed. Action commands can use this value to drain, migrate, or unregister the correct shard before KubeBlocks deletes the component.
 
-Decrease `spec.shardings[*].shards`, or remove a specific named shard with `spec.shardings[*].offline` (see [Heterogeneous Shards and Shard-Specific Scale-In](./heterogeneous-shards.md)).
-
-```yaml
-spec:
-  shardings:
-    - name: shard
-      shardingDef: redis-sharding
-      shards: 2
-```
-
-Before the shard component is deleted, KubeBlocks runs `shardRemove`, and the action can read the target shard name from `KB_REMOVE_SHARD_NAME`.
-
-## Observe Action Status
-
-Check cluster status:
-
-```bash
-kubectl get cluster redis-sharding -n demo -o yaml
-```
-
-Look under:
-
-```yaml
-status:
-  shardings:
-    shard:
-      postProvision:
-      preTerminate:
-```
-
-Each entry records `phase` (`Pending`, `Succeeded`, `Failed`, or `Skipped`), `message`, `startTime`, and `completionTime`. If an action is not defined in the `ShardingDefinition`, its status is recorded as `Skipped`.
-
-`shardAdd` and `shardRemove` do not have status entries. Instead:
-
-* A newly created shard component carries the annotation `kubeblocks.io/sharding-add-shard: <timestamp>` until `shardAdd` succeeds; the annotation is removed on success.
-* If `shardRemove` fails, the shard component deletion is skipped and retried, so the shard stays until the action succeeds. If a shard is removed before its `shardAdd` ever completed, `shardRemove` is skipped.
-
-For troubleshooting, also inspect events and logs:
-
-```bash
-kubectl describe cluster redis-sharding -n demo
-kubectl get pod -n demo
-kubectl logs <action-or-target-pod> -n demo
-```
-
-For release validation, capture one successful run for each action and one retry path. `postProvision` and `preTerminate` should be visible in `status.shardings`; `shardAdd` and `shardRemove` should be verified through shard annotations, action logs, and whether the shard creation or deletion is blocked until the action succeeds.
-
-## Common Use Cases
-
-### Register a new shard in a router
-
-Use `shardAdd` to call the database router or metadata service after a shard is created.
-
-```yaml
-shardAdd:
-  exec:
-    command:
-      - /bin/sh
-      - -c
-      - register-shard --name "${KB_ADD_SHARD_NAME}"
-```
-
-### Drain a shard before removal
-
-Use `shardRemove` to disable traffic and migrate data before KubeBlocks deletes the shard component.
-
-```yaml
-shardRemove:
-  exec:
-    command:
-      - /bin/sh
-      - -c
-      - drain-shard --name "${KB_REMOVE_SHARD_NAME}" --wait
-```
-
-### Initialize all shards after creation
-
-Use `postProvision` with `targetShardSelector: All` when every shard must run an initialization step.
-
-```yaml
-postProvision:
-  targetShardSelector: All
-  exec:
-    command:
-      - /bin/sh
-      - -c
-      - initialize-shard-local-state
-```
+If a shard is removed before its pending `shardAdd` action ever completes, KubeBlocks skips `shardRemove` for that shard. This avoids running remove logic for a shard that was never fully admitted by the sharding lifecycle.
 
 ## Notes
 
-* Lifecycle action definitions are immutable once set.
-* `preTerminate` blocks actual cleanup until the action succeeds.
-* If `postProvision` is defined and fails, `preTerminate` is skipped.
-* Keep actions idempotent. Reconciliation and failure recovery are easier when rerunning an action is safe.
-* Use short, explicit timeouts for actions that call external systems.
+* `ShardingDefinition.spec.lifecycleActions` is immutable once set.
+* `postProvision` and `preTerminate` are sharding-level actions, but they still execute through selected shard components.
+* Keep all lifecycle actions idempotent and bounded. Reconciliation, retries, and failure recovery are much safer when rerunning an action has the same effect and does not wait forever.
+* Use explicit timeouts for actions.
 * Validate scale-out and scale-in workflows in staging before enabling automatic shard changes in production.

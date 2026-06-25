@@ -1242,7 +1242,7 @@ var _ = Describe("Component Workload Operations Test", func() {
 			}
 		}
 
-		createGatePod := func() {
+		createGatePod := func(phase corev1.PodPhase) {
 			pod := testapps.NewPodFactory(testCtx.DefaultNamespace, gatePodName).
 				AddContainer(corev1.Container{Name: "main", Image: "test-image"}).
 				AddLabels(
@@ -1252,13 +1252,17 @@ var _ = Describe("Component Workload Operations Test", func() {
 				).
 				GetObject()
 			Expect(k8sClient.Create(ctx, pod)).Should(Succeed())
+			if phase != "" {
+				pod.Status.Phase = phase
+				Expect(k8sClient.Status().Update(ctx, pod)).Should(Succeed())
+			}
 			DeferCleanup(func() {
 				Expect(k8sClient.Delete(ctx, pod)).Should(Succeed())
 			})
 		}
 
-		It("should requeue scale-in when replica has pending member lifecycle and pod exists", func() {
-			createGatePod()
+		It("should requeue scale-in when replica has pending member lifecycle and pod is running", func() {
+			createGatePod(corev1.PodRunning)
 			its := buildITS(1)
 			Expect(component.NewReplicasStatus(its, []string{gatePodName}, true, false)).Should(Succeed())
 			ops := buildOps(its)
@@ -1266,6 +1270,16 @@ var _ = Describe("Component Workload Operations Test", func() {
 			err := ops.gatePendingMemberLifecycle([]string{gatePodName})
 			Expect(err).ShouldNot(BeNil())
 			Expect(intctrlutil.IsRequeueError(err)).Should(BeTrue())
+		})
+
+		It("should proceed with scale-in when replica has pending member lifecycle but pod has not started", func() {
+			createGatePod(corev1.PodPending)
+			its := buildITS(1)
+			Expect(component.NewReplicasStatus(its, []string{gatePodName}, true, false)).Should(Succeed())
+			ops := buildOps(its)
+
+			err := ops.gatePendingMemberLifecycle([]string{gatePodName})
+			Expect(err).Should(BeNil())
 		})
 
 		It("should proceed with scale-in when replica has pending member lifecycle but pod does not exist", func() {
@@ -1284,6 +1298,19 @@ var _ = Describe("Component Workload Operations Test", func() {
 
 			err := ops.gatePendingMemberLifecycle([]string{gatePodName})
 			Expect(err).Should(BeNil())
+		})
+
+		It("should treat terminating pods as inactive for the member lifecycle gate", func() {
+			now := metav1.Now()
+			pod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              gatePodName,
+					DeletionTimestamp: &now,
+				},
+				Status: corev1.PodStatus{Phase: corev1.PodRunning},
+			}
+
+			Expect(isMemberLifecycleActivePod(pod)).Should(BeFalse())
 		})
 	})
 })

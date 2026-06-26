@@ -3,8 +3,8 @@ coverage:
     project:
       default:
         # basic
-        target: 80%
-        threshold: 1%
+        target: auto
+        threshold: 0%
         base: auto
         # advanced
         branches:
@@ -12,7 +12,7 @@ coverage:
         flags:
           - unittests
         if_ci_failed: success
-        informational: false
+        informational: true
         only_pulls: true
     patch:
       default:
@@ -26,9 +26,4 @@ coverage:
         flags:
           - unittests
         if_ci_failed: success
-        informational: true
         only_pulls: true
-ignore:
-  - pkg/client/
-  - pkg/testutil/
-  - pkg/constant/

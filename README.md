@@ -9,7 +9,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/apecloud/kubeblocks)](https://goreportcard.com/report/github.com/apecloud/kubeblocks)
 [![Docker Pulls](https://img.shields.io/docker/pulls/apecloud/kubeblocks)](https://hub.docker.com/r/apecloud/kubeblocks)
 [![Codecov](https://codecov.io/gh/apecloud/kubeblocks/branch/main/graph/badge.svg?token=GEH4I1C80Y)](https://codecov.io/gh/apecloud/kubeblocks)
-![maturity](https://img.shields.io/static/v1?label=maturity&message=alpha&color=red)
+![maturity](https://img.shields.io/static/v1?label=maturity&message=beta&color=orange)
 [![Artifact Hub](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/kubeblocks)](https://artifacthub.io/packages/search?repo=kubeblocks)
 
 ![image](./docs/img/banner-readme.jpeg)

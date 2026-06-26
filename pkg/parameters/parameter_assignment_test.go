@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package parameters
 
 import (
+	"fmt"
+	"math"
 	"testing"
 
 	"k8s.io/utils/pointer"
@@ -99,6 +101,56 @@ parameter: {
 				"not-a-real-parameter": nil,
 			},
 			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateComponentParameterAssignments(tt.assignments, []*parametersv1alpha1.ParametersDefinition{paramsDef})
+			if tt.wantErr && err == nil {
+				t.Fatalf("expected validation error")
+			}
+			if !tt.wantErr && err != nil {
+				t.Fatalf("expected no validation error, got %v", err)
+			}
+		})
+	}
+}
+
+func TestValidateComponentParameterAssignmentsUint64(t *testing.T) {
+	paramsDef := testparameters.NewParametersDefinitionFactory("clickhouse-params").
+		SetTemplateName("clickhouse-config").
+		SetConfigFile("config.xml").
+		SetFileFormatConfig(parametersv1alpha1.FileFormatConfig{Format: parametersv1alpha1.XML}).
+		Schema(`
+parameter: {
+  max_concurrent_queries?: uint64 | *0
+}`).
+		GetObject()
+
+	tests := []struct {
+		name        string
+		assignments parametersv1alpha1.ComponentParameters
+		wantErr     bool
+	}{
+		{
+			name: "valid uint64 value",
+			assignments: parametersv1alpha1.ComponentParameters{
+				"max_concurrent_queries": pointer.String("50"),
+			},
+		},
+		{
+			name: "reject negative value for uint64",
+			assignments: parametersv1alpha1.ComponentParameters{
+				"max_concurrent_queries": pointer.String("-1"),
+			},
+			wantErr: true,
+		},
+		{
+			name: "accept value above MaxInt64",
+			assignments: parametersv1alpha1.ComponentParameters{
+				"max_concurrent_queries": pointer.String(fmt.Sprintf("%d", uint64(math.MaxInt64)+1)),
+			},
 		},
 	}
 

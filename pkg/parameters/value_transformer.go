@@ -25,6 +25,7 @@ import (
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 	"github.com/apecloud/kubeblocks/pkg/parameters/openapi"
@@ -43,6 +44,9 @@ func (d *defaultValueTransformer) resolveValueWithType(value string, fieldName s
 	default:
 		return value, nil
 	case "integer":
+		if common.IsUnsignedInteger(schema) {
+			return strconv.ParseUint(value, 10, 64)
+		}
 		return strconv.ParseInt(value, 10, 64)
 	case "number":
 		return strconv.ParseFloat(value, 64)

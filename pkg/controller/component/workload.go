@@ -56,7 +56,7 @@ func BuildInstanceSet(synthesizedComp *SynthesizedComponent, compDef *kbappsv1.C
 		// priority: static < dynamic < built-in
 		AddLabelsInMap(synthesizedComp.StaticLabels).
 		AddLabelsInMap(synthesizedComp.DynamicLabels).
-		AddLabelsInMap(constant.GetCompLabels(clusterName, compName)).
+		AddLabelsInMap(constant.GetCompLabels(clusterName, compName, synthesizedComp.Labels)).
 		AddAnnotations(constant.KubeBlocksGenerationKey, synthesizedComp.Generation).
 		AddAnnotations(constant.CRDAPIVersionAnnotationKey, workloads.GroupVersion.String()).
 		AddAnnotationsInMap(map[string]string{

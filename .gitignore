@@ -70,4 +70,7 @@ pkg/cli/cluster/charts/
 # ignore client-sdk-gen temp directory
 hack/github.com/
 
+# ignore git worktrees
+.worktrees/
+
 

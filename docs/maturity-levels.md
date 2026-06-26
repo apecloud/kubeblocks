@@ -64,8 +64,20 @@ production-readiness of the project. The current level is shown as a badge in
 
 ## Current Status
 
-KubeBlocks is currently at **Beta**. The project is used in production by
+KubeBlocks is currently at **Alpha**. The project is used in production by
 internet companies, financial institutions, telecom carriers, and SaaS
-providers. Core CRDs (`Cluster`, `ClusterDefinition`, `ClusterVersion`,
-`Backup`, `Restore`, etc.) are at `v1`. The addon ecosystem spans 35+ database
-engines.
+providers, and the addon ecosystem spans 35+ database engines.
+
+API version snapshot:
+
+| API group | Version | Key resources |
+|-----------|---------|---------------|
+| `apps.kubeblocks.io` | `v1` | `Cluster`, `ClusterDefinition`, `ClusterVersion` |
+| `workloads.kubeblocks.io` | `v1` | `InstanceSet` |
+| `dataprotection.kubeblocks.io` | `v1alpha1` | `Backup`, `Restore`, `BackupPolicy`, `BackupSchedule` |
+| `operations.kubeblocks.io` | `v1alpha1` | `OpsRequest`, `OpsDefinition` |
+| `parameters.kubeblocks.io` | `v1alpha1` | `ParametersDefinition`, `ConfigConstraint` |
+| `extensions.kubeblocks.io` | `v1alpha1` | `AddOn` |
+
+Promoting the remaining `v1alpha1` APIs to `v1` and obtaining maintainer
+approval per the process above are prerequisites for moving to **Beta**.

@@ -83,6 +83,31 @@ When invoking the action, KubeBlocks injects the built-in variable `KB_REMOVE_SH
 
 If a shard is removed before its pending `shardAdd` action ever completes, KubeBlocks skips `shardRemove` for that shard. This avoids running remove logic for a shard that was never fully admitted by the sharding lifecycle.
 
+## Example
+
+The following example shows the shape of `shardAdd` and `shardRemove` actions. Replace the commands with the addon-specific scripts that register, drain, migrate, or unregister shards for your database engine.
+
+```yaml
+spec:
+  lifecycleActions:
+    shardAdd:
+      targetShardSelector: Any
+      timeoutSeconds: 60
+      exec:
+        command: ["/bin/sh", "-c"]
+        args:
+          - register-shard "$KB_ADD_SHARD_NAME"
+    shardRemove:
+      targetShardSelector: Any
+      timeoutSeconds: 300
+      exec:
+        command: ["/bin/sh", "-c"]
+        args:
+          - drain-and-unregister-shard "$KB_REMOVE_SHARD_NAME"
+```
+
+For `shardAdd` and `shardRemove`, omitting `targetShardSelector` has the same practical target as `Any`: KubeBlocks runs the action on the shard being added or removed. Use `All` only when every shard must participate in the operation.
+
 ## Notes
 
 * `ShardingDefinition.spec.lifecycleActions` is immutable once set.

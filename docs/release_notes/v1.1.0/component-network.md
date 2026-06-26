@@ -38,7 +38,7 @@ Start with the default pod network unless you have a concrete requirement for on
 | `dnsPolicy` | Pod DNS policy | `None`, `ClusterFirst`, or `ClusterFirstWithHostNet` behavior |
 | `dnsConfig` | Nameservers, search domains, and resolver options | Custom resolver settings such as `ndots` |
 
-## Enable Host Networking
+## Enable Host Networking for Supported Addons
 
 Host networking only works for addons whose `ComponentDefinition` declares host-network support. Check the `ComponentDefinition` before enabling it:
 
@@ -121,7 +121,7 @@ Allocated host-network ports are recorded in a ConfigMap in the KubeBlocks names
 
 ## Add Host Aliases
 
-Use `hostAliases` when a pod needs a small number of fixed hostname-to-IP entries in `/etc/hosts`.
+Use `hostAliases` when a pod needs a small number of fixed hostname-to-IP entries in `/etc/hosts`. This setting is only valid for pods that are not using host networking.
 
 This is mainly for temporary compatibility cases: migration from an old database endpoint, hybrid connectivity testing, or keeping a legacy hostname working while DNS records are being moved.
 
@@ -140,8 +140,6 @@ spec:
 ```
 
 Keep this list small and explicit. Kubernetes applies `hostAliases` when the pod is created, so it works best for stable or short-lived mappings. For normal service discovery, prefer Kubernetes Services or DNS records that can be updated without changing the pod spec.
-
-`hostAliases` is only valid for pods that are not using host networking.
 
 ## Configure DNS
 
@@ -176,5 +174,5 @@ When `dnsPolicy: None` is used, the pod depends on the values in `dnsConfig`; ma
 * `network.hostNetwork: true` requires host-network capability in the referenced `ComponentDefinition`; otherwise the pod stays on normal pod networking.
 * Host networking can create node-level port conflicts and scheduling constraints.
 * `hostPorts` entries are matched by port names declared by the `ComponentDefinition`.
-* `hostAliases` should be temporary and small. Prefer Services or DNS for long-term discovery.
+* `hostAliases` is only valid without host networking, and should be temporary and small. Prefer Services or DNS for long-term discovery.
 * DNS settings are workload-sensitive. Test database discovery and replication after changing them.

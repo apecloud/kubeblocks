@@ -21,6 +21,16 @@ Use `Rollout` when a database update needs more control than a direct `Cluster` 
 
 For low-risk changes where the normal workload update behavior is enough, updating the `Cluster` spec directly is still simpler.
 
+## Before You Begin
+
+Treat a rollout as a controlled database change, not just an API object. Before using it on a production-like cluster:
+
+* verify backup and recovery for the target database;
+* confirm the target `serviceVersion`, `compDef`, or `shardingDef` is compatible with the running addon;
+* check that no other `Rollout` is already bound to the cluster;
+* make sure the cluster has enough temporary capacity if you plan to use `replace` or `create`;
+* decide how canary traffic will be routed if you use `create` with canary instances.
+
 ## Supported Targets
 
 A `Rollout` targets one `Cluster` in the same namespace:
@@ -44,7 +54,7 @@ Inside the rollout, use one or both target lists:
 
 For a component rollout, each target must set `serviceVersion`, `compDef`, or both. For a sharding rollout, each target must set at least one of `shardingDef`, `serviceVersion`.
 
-If you have a specific `ComponentDefinition` in mind, set `compDef` explicitly. If `compDef` is omitted, KubeBlocks resolves a latest compatible definition for the target version.
+For production rollouts, set `compDef` explicitly when you have a specific `ComponentDefinition` in mind. If `compDef` is omitted, KubeBlocks resolves a latest compatible definition for the target version.
 
 ## Strategy Choices
 
@@ -190,7 +200,7 @@ In this example:
 
 For sharded databases, validate data placement and routing after the rollout. A rollout can succeed at the Kubernetes level while the database still needs engine-specific checks, such as shard health, replica-set health, or application-level read/write verification.
 
-## Abort and Roll Back
+## Abort, Cleanup, and Rollback
 
 To stop an in-progress rollout, delete the `Rollout` object:
 

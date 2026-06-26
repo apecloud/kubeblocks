@@ -86,7 +86,7 @@ Shards created from the named template have the label `apps.kubeblocks.io/shard-
 
 ### Adopt an Existing Shard
 
-Use a new shard template when KubeBlocks can create a new shard for the group. But one never knows when a specific shard should be treated differently. For example, monitoring may show that a specific shard is hot, or you may want one known shard to join a canary group. In that case, creating a new shard group is not enough; you can create a named template to take over or adopt that specific shard by shard id.
+Use a new shard template when KubeBlocks can create a new shard for the group. Sometimes, however, the shard that needs special treatment is only known after the cluster is already running. Monitoring may show that a specific shard is hot, or you may want a known shard to join a canary group. In that case, creating a new shard group is not enough; create a named template and adopt that specific shard by shard ID.
 
 First list the shard components. A shard component name follows this pattern:
 
@@ -102,7 +102,7 @@ spec:
     - name: shard
       shards: 3
       shardTemplates:
-        - name: hot      # a new tempate named "hot"
+        - name: hot      # a new template named "hot"
           shards: 1
           shardIDs:
             - <shard-id>  # set the shard ID to be adopted into the template

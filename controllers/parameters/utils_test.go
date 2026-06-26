@@ -134,7 +134,6 @@ func mockReconcileResource() (*corev1.ConfigMap, *appsv1.Cluster, *appsv1.Compon
 			Name: ptr.To(configSpecName),
 		}).
 		SetReplicas(1).
-		AddAnnotations(constant.CRDAPIVersionAnnotationKey, appsv1.GroupVersion.String()).
 		AddSharding(shardingCompName, "", compDefObj.GetName()).
 		SetShards(3).
 		SetShardingConfig(appsv1.ClusterComponentConfig{
@@ -148,7 +147,6 @@ func mockReconcileResource() (*corev1.ConfigMap, *appsv1.Cluster, *appsv1.Compon
 	fullCompName := constant.GenerateClusterComponentName(clusterName, defaultCompName)
 	compObj := testapps.NewComponentFactory(testCtx.DefaultNamespace, fullCompName, compDefObj.Name).
 		AddAnnotations(constant.KBAppClusterUIDKey, string(clusterObj.UID)).
-		AddAnnotations(constant.CRDAPIVersionAnnotationKey, appsv1.GroupVersion.String()).
 		AddLabels(constant.AppInstanceLabelKey, clusterName).
 		SetUID(types.UID(fmt.Sprintf("%s-%s", clusterObj.Name, "test-uid"))).
 		SetReplicas(1).

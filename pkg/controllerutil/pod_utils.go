@@ -31,7 +31,7 @@ import (
 	"k8s.io/kubectl/pkg/util/podutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -56,7 +56,7 @@ const (
 //		   name: data
 //		 - mountPath: /log
 //		   name: log
-func GetContainerByConfigSpec(podSpec *corev1.PodSpec, configs []appsv1alpha1.ComponentConfigSpec) *corev1.Container {
+func GetContainerByConfigSpec(podSpec *corev1.PodSpec, configs []kbappsv1.ComponentFileTemplate) *corev1.Container {
 	containers := podSpec.Containers
 	initContainers := podSpec.InitContainers
 	if container := getContainerWithTplList(containers, configs); container != nil {
@@ -133,7 +133,7 @@ func GetContainersByConfigmap(containers []corev1.Container, volumeName string, 
 	return tmpList
 }
 
-func getContainerWithTplList(containers []corev1.Container, configs []appsv1alpha1.ComponentConfigSpec) *corev1.Container {
+func getContainerWithTplList(containers []corev1.Container, configs []kbappsv1.ComponentFileTemplate) *corev1.Container {
 	if len(containers) == 0 {
 		return nil
 	}
@@ -146,7 +146,7 @@ func getContainerWithTplList(containers []corev1.Container, configs []appsv1alph
 	return nil
 }
 
-func checkContainerWithVolumeMount(volumeMounts []corev1.VolumeMount, configs []appsv1alpha1.ComponentConfigSpec) bool {
+func checkContainerWithVolumeMount(volumeMounts []corev1.VolumeMount, configs []kbappsv1.ComponentFileTemplate) bool {
 	volumes := make(map[string]int)
 	for _, c := range configs {
 		for j, vm := range volumeMounts {

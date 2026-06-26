@@ -192,6 +192,7 @@ func TestCopyAndMergeInstance(t *testing.T) {
 	got := copyAndMergeInstance(oldInst, newInst)
 	if got == nil {
 		t.Fatal("expected merged instance")
+		return
 	}
 	if got.Spec.Template.Spec.Containers[0].Image != "mysql:8.4" {
 		t.Fatalf("unexpected merged image: %s", got.Spec.Template.Spec.Containers[0].Image)

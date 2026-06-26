@@ -16,15 +16,6 @@ resources:
   domain: kubeblocks.io
   group: apps
   kind: Cluster
-  path: github.com/apecloud/kubeblocks/apis/apps/v1alpha1
-  version: v1alpha1
-- api:
-    crdVersion: v1
-    namespaced: true
-  controller: true
-  domain: kubeblocks.io
-  group: apps
-  kind: Cluster
   path: github.com/apecloud/kubeblocks/apis/apps/v1
   version: v1
   webhooks:
@@ -36,27 +27,11 @@ resources:
   domain: kubeblocks.io
   group: apps
   kind: ClusterDefinition
-  path: github.com/apecloud/kubeblocks/apis/apps/v1alpha1
-  version: v1alpha1
-- api:
-    crdVersion: v1
-  controller: true
-  domain: kubeblocks.io
-  group: apps
-  kind: ClusterDefinition
   path: github.com/apecloud/kubeblocks/apis/apps/v1
   version: v1
   webhooks:
     conversion: true
     webhookVersion: v1
-- api:
-    crdVersion: v1
-  controller: true
-  domain: kubeblocks.io
-  group: apps
-  kind: ClusterVersion
-  path: github.com/apecloud/kubeblocks/apis/apps/v1alpha1
-  version: v1alpha1
 - api:
     crdVersion: v1
     namespaced: true
@@ -117,15 +92,6 @@ resources:
   domain: kubeblocks.io
   group: workloads
   kind: InstanceSet
-  path: github.com/apecloud/kubeblocks/apis/workloads/v1alpha1
-  version: v1alpha1
-- api:
-    crdVersion: v1
-    namespaced: true
-  controller: true
-  domain: kubeblocks.io
-  group: workloads
-  kind: InstanceSet
   path: github.com/apecloud/kubeblocks/apis/workloads/v1
   version: v1
   webhooks:
@@ -163,15 +129,6 @@ resources:
   domain: kubeblocks.io
   group: apps
   kind: ServiceDescriptor
-  path: github.com/apecloud/kubeblocks/apis/apps/v1alpha1
-  version: v1alpha1
-- api:
-    crdVersion: v1
-    namespaced: true
-  controller: true
-  domain: kubeblocks.io
-  group: apps
-  kind: ServiceDescriptor
   path: github.com/apecloud/kubeblocks/apis/apps/v1
   version: v1
   webhooks:
@@ -192,14 +149,6 @@ resources:
   domain: kubeblocks.io
   group: apps
   kind: ComponentDefinition
-  path: github.com/apecloud/kubeblocks/apis/apps/v1alpha1
-  version: v1alpha1
-- api:
-    crdVersion: v1
-  controller: true
-  domain: kubeblocks.io
-  group: apps
-  kind: ComponentDefinition
   path: github.com/apecloud/kubeblocks/apis/apps/v1
   version: v1
   webhooks:
@@ -212,28 +161,11 @@ resources:
   domain: kubeblocks.io
   group: apps
   kind: Component
-  path: github.com/apecloud/kubeblocks/apis/apps/v1alpha1
-  version: v1alpha1
-- api:
-    crdVersion: v1
-    namespaced: true
-  controller: true
-  domain: kubeblocks.io
-  group: apps
-  kind: Component
   path: github.com/apecloud/kubeblocks/apis/apps/v1
   version: v1
   webhooks:
     conversion: true
     webhookVersion: v1
-- api:
-    crdVersion: v1
-  controller: true
-  domain: kubeblocks.io
-  group: apps
-  kind: ComponentVersion
-  path: github.com/apecloud/kubeblocks/apis/apps/v1alpha1
-  version: v1alpha1
 - api:
     crdVersion: v1
   controller: true
@@ -286,14 +218,6 @@ resources:
   group: operations
   kind: OpsRequest
   path: github.com/apecloud/kubeblocks/apis/operations/v1alpha1
-  version: v1alpha1
-- api:
-    crdVersion: v1
-  controller: true
-  domain: kubeblocks.io
-  group: operations
-  kind: OpsDefinition
-  path: github.com/apecloud/kubeblocks/apis/apps/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1

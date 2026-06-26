@@ -266,28 +266,22 @@ var _ = Describe("OpsRequest Controller", func() {
 
 		It("cleans deleted ops annotations and reconciles related ops requests", func() {
 			deletedOpsName := "deleted-ops"
-			supportedCluster := &appsv1.Cluster{
+			firstCluster := &appsv1.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "supported",
+					Name:      "first",
 					Namespace: helperNamespace,
-					Annotations: map[string]string{
-						constant.CRDAPIVersionAnnotationKey: appsv1.GroupVersion.String(),
-					},
 				},
 			}
-			opsutil.SetOpsRequestToCluster(supportedCluster, []opsv1alpha1.OpsRecorder{{Name: deletedOpsName, Type: opsv1alpha1.RestartType}})
-			unsupportedCluster := &appsv1.Cluster{
+			opsutil.SetOpsRequestToCluster(firstCluster, []opsv1alpha1.OpsRecorder{{Name: deletedOpsName, Type: opsv1alpha1.RestartType}})
+			secondCluster := &appsv1.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "unsupported",
+					Name:      "second",
 					Namespace: helperNamespace,
-					Annotations: map[string]string{
-						constant.CRDAPIVersionAnnotationKey: "unsupported/v1",
-					},
 				},
 			}
-			opsutil.SetOpsRequestToCluster(unsupportedCluster, []opsv1alpha1.OpsRecorder{{Name: deletedOpsName, Type: opsv1alpha1.RestartType}})
+			opsutil.SetOpsRequestToCluster(secondCluster, []opsv1alpha1.OpsRecorder{{Name: deletedOpsName, Type: opsv1alpha1.RestartType}})
 			relatedOps := testops.NewOpsRequestObj("related-ops", helperNamespace, helperClusterName, opsv1alpha1.RestartType)
-			reconciler := newOpsRequestReconciler(supportedCluster, unsupportedCluster, relatedOps)
+			reconciler := newOpsRequestReconciler(firstCluster, secondCluster, relatedOps)
 
 			reqCtx := ctrlutil.RequestCtx{
 				Ctx: ctx,
@@ -296,15 +290,15 @@ var _ = Describe("OpsRequest Controller", func() {
 			Expect(reconciler.handleOpsReqDeletedDuringRunning(reqCtx)).Should(Succeed())
 
 			fetchedCluster := &appsv1.Cluster{}
-			Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(supportedCluster), fetchedCluster)).Should(Succeed())
+			Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(firstCluster), fetchedCluster)).Should(Succeed())
 			opsSlice, err := opsutil.GetOpsRequestSliceFromCluster(fetchedCluster)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(opsSlice).Should(BeEmpty())
 
-			Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(unsupportedCluster), fetchedCluster)).Should(Succeed())
+			Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(secondCluster), fetchedCluster)).Should(Succeed())
 			opsSlice, err = opsutil.GetOpsRequestSliceFromCluster(fetchedCluster)
 			Expect(err).ShouldNot(HaveOccurred())
-			Expect(opsSlice).Should(HaveLen(1))
+			Expect(opsSlice).Should(BeEmpty())
 
 			sourceOps := testops.NewOpsRequestObj("source-ops", helperNamespace, helperClusterName, opsv1alpha1.RestartType)
 			sourceOps.ResourceVersion = "42"

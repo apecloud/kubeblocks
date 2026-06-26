@@ -37,8 +37,6 @@ resources:
 patchesStrategicMerge:
 # [WEBHOOK] To enable webhook, uncomment all the sections with [WEBHOOK] prefix.
 # patches here are for enabling the conversion webhook for each CRD
-#- patches/webhook_in_clusters.yaml
-#- patches/webhook_in_clusterdefinitions.yaml
 #- patches/webhook_in_backuptools.yaml
 #- patches/webhook_in_backuppolicies.yaml
 #- patches/webhook_in_backups.yaml
@@ -47,16 +45,11 @@ patchesStrategicMerge:
 #- patches/webhook_in_reconfigurerequests.yaml
 #- patches/webhook_in_configconstraints.yaml
 #- patches/webhook_in_addons.yaml
-#- patches/webhook_in_instancesets.yaml
 #- patches/webhook_in_storageproviders.yaml
 #- patches/webhook_in_backuprepos.yaml
 #- patches/webhook_in_restores.yaml
 #- patches/webhook_in_configurations.yaml
-#- patches/webhook_in_servicedescriptors.yaml
-#- patches/webhook_in_componentdefinitions.yaml
-#- patches/webhook_in_components.yaml
 #- patches/webhook_in_opsdefinitions.yaml
-#- patches/webhook_in_componentversions.yaml
 #- patches/webhook_in_nodecountscalers.yaml
 #- patches/webhook_in_reconciliationtraces.yaml
 #- patches/webhook_in_shardingdefinitions.yaml
@@ -71,8 +64,6 @@ patchesStrategicMerge:
 
 # [CERTMANAGER] To enable cert-manager, uncomment all the sections with [CERTMANAGER] prefix.
 # patches here are for enabling the CA injection for each CRD
-#- patches/cainjection_in_clusters.yaml
-#- patches/cainjection_in_clusterdefinitions.yaml
 #- patches/cainjection_in_backuptools.yaml
 #- patches/cainjection_in_backuppolicies.yaml
 #- patches/cainjection_in_backups.yaml
@@ -81,16 +72,11 @@ patchesStrategicMerge:
 #- patches/cainjection_in_reconfigurerequests.yaml
 #- patches/cainjection_in_configconstraints.yaml
 #- patches/cainjection_in_addonspecs.yaml
-#- patches/cainjection_in_instancesets.yaml
 #- patches/cainjection_in_storageproviders.yaml
 #- patches/cainjection_in_backuprepos.yaml
 #- patches/cainjection_in_restores.yaml
 #- patches/cainjection_in_configurations.yaml
-#- patches/cainjection_in_servicedescriptors.yaml
-#- patches/cainjection_in_componentdefinitions.yaml
-#- patches/cainjection_in_components.yaml
 #- patches/cainjection_in_opsdefinitions.yaml
-#- patches/cainjection_in_componentversions.yaml
 #- patches/cainjection_in_nodecountscalers.yaml
 #- patches/cainjection_in_reconciliationtraces.yaml
 #- patches/cainjection_in_shardingdefinitions.yaml

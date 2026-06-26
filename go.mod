@@ -23,7 +23,6 @@ require (
 	github.com/google/cel-go v0.17.8
 	github.com/google/go-cmp v0.7.0
 	github.com/jhump/protoreflect v1.17.0
-	github.com/jinzhu/copier v0.4.0
 	github.com/json-iterator/go v1.1.12
 	github.com/klauspost/compress v1.17.8
 	github.com/kubernetes-csi/external-snapshotter/client/v3 v3.0.0

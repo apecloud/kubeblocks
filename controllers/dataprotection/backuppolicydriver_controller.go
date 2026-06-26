@@ -85,10 +85,6 @@ func (r *BackupPolicyDriverReconciler) Reconcile(ctx context.Context, req ctrl.R
 	if model.IsObjectDeleting(cluster) {
 		return intctrlutil.Reconciled()
 	}
-	crdAPIVersion := cluster.GetAnnotations()[constant.CRDAPIVersionAnnotationKey]
-	if !intctrlutil.IsAPIVersionSupported(crdAPIVersion) {
-		return intctrlutil.Reconciled()
-	}
 	if err := r.reconcile(reqCtx, cluster); err != nil {
 		if apierrors.IsConflict(err) {
 			return intctrlutil.Requeue(reqCtx.Log, err.Error())

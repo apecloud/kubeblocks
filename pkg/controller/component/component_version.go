@@ -98,6 +98,12 @@ func UpdateCompDefinitionImages4ServiceVersion(ctx context.Context, cli client.R
 	if len(compVersions) == 0 {
 		return nil
 	}
+	return UpdateCompDefinitionImagesWithCompVersions(compDef, compVersions, serviceVersion)
+}
+
+// UpdateCompDefinitionImagesWithCompVersions resolves and updates images using the given compatible component versions.
+func UpdateCompDefinitionImagesWithCompVersions(compDef *appsv1.ComponentDefinition,
+	compVersions []*appsv1.ComponentVersion, serviceVersion string) error {
 	return resolveImagesWithCompVersions(compDef, compVersions, serviceVersion)
 }
 

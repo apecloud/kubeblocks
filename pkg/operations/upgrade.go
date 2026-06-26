@@ -150,12 +150,27 @@ func (u upgradeOpsHandler) getComponentDefMapWithUpdatedImages(reqCtx intctrluti
 		if err != nil {
 			return nil, err
 		}
-		if err = component.UpdateCompDefinitionImages4ServiceVersion(reqCtx.Ctx, cli, compDef, compSpec.ServiceVersion); err != nil {
+		if err = u.updateCompDefinitionImages4ServiceVersion(reqCtx, cli, compDef, compSpec.ServiceVersion); err != nil {
 			return nil, err
 		}
 		compDefMap[v.ComponentName] = compDef
 	}
 	return compDefMap, nil
+}
+
+func (u upgradeOpsHandler) updateCompDefinitionImages4ServiceVersion(reqCtx intctrlutil.RequestCtx, cli client.Client,
+	compDef *appsv1.ComponentDefinition, serviceVersion string) error {
+	compVersions, err := component.CompatibleCompVersions4Definition(reqCtx.Ctx, cli, compDef)
+	if err != nil {
+		return err
+	}
+	if len(compVersions) == 0 {
+		return nil
+	}
+	if err = component.UpdateCompDefinitionImagesWithCompVersions(compDef, compVersions, serviceVersion); err != nil {
+		return intctrlutil.NewFatalError(err.Error())
+	}
+	return nil
 }
 
 // podImageApplied checks if the pod has applied the new image.

@@ -24,6 +24,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -393,6 +394,54 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.Cluster), func(g Gomega, cluster *appsv1.Cluster) {
 				g.Expect(cluster.Spec.ComponentSpecs[0].ComponentDef).Should(Equal(compDef1.Name))
 				g.Expect(cluster.Spec.ComponentSpecs[0].ServiceVersion).Should(Equal(""))
+			})).Should(Succeed())
+		})
+
+		It("should fail when serviceVersion cannot be resolved from ComponentVersion releases", func() {
+			By("init operations resources")
+			compDef1, _, opsRes := initOpsResWithComponentDef(true)
+			semanticRelease := "r-17-5-0"
+			compVersion := testapps.NewComponentVersionFactory("cmpv-semantic-"+randomStr).
+				AddCompatibilityRule([]string{compDef1.Name}, []string{semanticRelease}).
+				AddRelease(semanticRelease, "publish PostgreSQL 17.5.0", "17.5.0", map[string]string{
+					testapps.DefaultMySQLContainerName: testapps.AppImage(testapps.AppName, semanticRelease),
+				}).
+				Create(&testCtx).
+				GetObject()
+			Expect(testapps.ChangeObj(&testCtx, compVersion, func(version *appsv1.ComponentVersion) {
+				if version.Labels == nil {
+					version.Labels = map[string]string{}
+				}
+				version.Labels[compDef1.Name] = compDef1.Name
+			})).Should(Succeed())
+			Expect(testapps.ChangeObjStatus(&testCtx, compVersion, func() {
+				compVersion.Status.Phase = appsv1.AvailablePhase
+				compVersion.Status.ObservedGeneration = compVersion.Generation
+			})).Should(Succeed())
+
+			By("create Upgrade Ops with an invalid serviceVersion format")
+			opsRes.OpsRequest = createUpgradeOpsRequest(opsRes.Cluster, opsv1alpha1.Upgrade{
+				Components: []opsv1alpha1.UpgradeComponent{
+					{
+						ComponentOps:            opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
+						ComponentDefinitionName: pointer.String(compDef1.Name),
+						ServiceVersion:          pointer.String("17.5"),
+					},
+				},
+			})
+
+			By("expect for this opsRequest is Running before status reconciliation")
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+			makeUpgradeOpsIsRunning(reqCtx, opsRes)
+
+			By("expect the invalid serviceVersion resolution to fail the OpsRequest")
+			_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest), func(g Gomega, fetched *opsv1alpha1.OpsRequest) {
+				g.Expect(fetched.Status.Phase).Should(Equal(opsv1alpha1.OpsFailedPhase))
+				condition := meta.FindStatusCondition(fetched.Status.Conditions, opsv1alpha1.ConditionTypeFailed)
+				g.Expect(condition).ShouldNot(BeNil())
+				g.Expect(condition.Message).Should(ContainSubstring("17.5"))
 			})).Should(Succeed())
 		})
 		// TODO: add case with ClusterDefinition and topology

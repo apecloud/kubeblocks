@@ -192,9 +192,6 @@ func (r *opsRuntime) GenerateTemplateInstanceNames(clusterName, compName, templa
 }
 
 func (r *opsRuntime) Switchover(ctx context.Context, namespace, clusterName, compName, instanceName, candidateName string) error {
-	if r.multiCluster {
-		return intctrlutil.NewFatalError(fmt.Sprintf(`switchover is not supported for component "%s" with multi-cluster runtime`, compName))
-	}
 	synthesizedComp, err := r.buildSynthesizedCompByCompName(ctx, r.cli, namespace, clusterName, compName)
 	if err != nil {
 		return err
@@ -239,6 +236,8 @@ func (r *opsRuntime) doSwitchover(ctx context.Context, cli client.Reader, synthe
 	}
 
 	// NOTE: switchover is a blocking action currently. May change to non-blocking for better performance.
+	// Lifecycle preconditions still use the lifecycle reader contract as-is. If a multi-cluster
+	// action needs data-plane runtime readiness checks, model that explicitly in the lifecycle API.
 	return lfa.Switchover(ctx, cli, nil, switchover.CandidateName)
 }
 

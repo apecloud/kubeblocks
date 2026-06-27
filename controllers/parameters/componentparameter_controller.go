@@ -22,7 +22,9 @@ package parameters
 import (
 	"context"
 	"fmt"
+	"os"
 	"strconv"
+	"strings"
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -30,13 +32,18 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
@@ -53,6 +60,8 @@ type ComponentParameterReconciler struct {
 	Scheme   *runtime.Scheme
 	Recorder record.EventRecorder
 }
+
+const componentParameterSourceDiagnosticsEnv = "KB_COMPONENT_PARAMETER_SOURCE_DIAGNOSTICS"
 
 // +kubebuilder:rbac:groups=parameters.kubeblocks.io,resources=componentparameters,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=parameters.kubeblocks.io,resources=componentparameters/status,verbs=get;update;patch
@@ -87,14 +96,100 @@ func (r *ComponentParameterReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ComponentParameterReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return intctrlutil.NewControllerManagedBy(mgr).
-		For(&parametersv1alpha1.ComponentParameter{}).
+	b := intctrlutil.NewControllerManagedBy(mgr)
+	forOptions := []builder.ForOption{}
+	if componentParameterSourceDiagnosticsEnabled() {
+		forOptions = append(forOptions, builder.WithPredicates(componentParameterSourceDiagnosticPredicate("primary-for")))
+		b = b.
+			WatchesRawSource(
+				source.Kind(mgr.GetCache(), &parametersv1alpha1.ComponentParameter{}),
+				componentParameterSourceTapHandler("typed-cache-tap")).
+			WatchesMetadata(
+				&parametersv1alpha1.ComponentParameter{},
+				componentParameterSourceTapHandler("metadata-cache-tap"))
+	}
+
+	return b.
+		For(&parametersv1alpha1.ComponentParameter{}, forOptions...).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: viper.GetInt(constant.CfgKBReconcileWorkers) / 4,
 		}).
 		Owns(&corev1.ConfigMap{}).
 		Watches(&appsv1.Component{}, handler.EnqueueRequestsFromMapFunc(r.enqueueByComponent)).
 		Complete(r)
+}
+
+func componentParameterSourceDiagnosticsEnabled() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(componentParameterSourceDiagnosticsEnv))) {
+	case "1", "true", "yes", "on":
+		return true
+	default:
+		return false
+	}
+}
+
+func componentParameterSourceDiagnosticPredicate(sourceName string) predicate.Predicate {
+	return predicate.Funcs{
+		CreateFunc: func(e event.CreateEvent) bool {
+			logComponentParameterSourceEvent(sourceName, "create", nil, e.Object)
+			return true
+		},
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			logComponentParameterSourceEvent(sourceName, "update", e.ObjectOld, e.ObjectNew)
+			return true
+		},
+		DeleteFunc: func(e event.DeleteEvent) bool {
+			logComponentParameterSourceEvent(sourceName, "delete", nil, e.Object)
+			return true
+		},
+		GenericFunc: func(e event.GenericEvent) bool {
+			logComponentParameterSourceEvent(sourceName, "generic", nil, e.Object)
+			return true
+		},
+	}
+}
+
+func componentParameterSourceTapHandler(sourceName string) handler.Funcs {
+	return handler.Funcs{
+		CreateFunc: func(_ context.Context, e event.CreateEvent, _ workqueue.RateLimitingInterface) {
+			logComponentParameterSourceEvent(sourceName, "create", nil, e.Object)
+		},
+		UpdateFunc: func(_ context.Context, e event.UpdateEvent, _ workqueue.RateLimitingInterface) {
+			logComponentParameterSourceEvent(sourceName, "update", e.ObjectOld, e.ObjectNew)
+		},
+		DeleteFunc: func(_ context.Context, e event.DeleteEvent, _ workqueue.RateLimitingInterface) {
+			logComponentParameterSourceEvent(sourceName, "delete", nil, e.Object)
+		},
+		GenericFunc: func(_ context.Context, e event.GenericEvent, _ workqueue.RateLimitingInterface) {
+			logComponentParameterSourceEvent(sourceName, "generic", nil, e.Object)
+		},
+	}
+}
+
+func logComponentParameterSourceEvent(sourceName, eventType string, oldObj, newObj client.Object) {
+	logger := ctrl.Log.WithName("ComponentParameterSourceDiagnostics").WithValues(
+		"source", sourceName,
+		"event", eventType,
+	)
+	if newObj != nil {
+		logger = logger.WithValues(
+			"namespace", newObj.GetNamespace(),
+			"name", newObj.GetName(),
+			"newResourceVersion", newObj.GetResourceVersion(),
+			"newGeneration", newObj.GetGeneration(),
+			"newDeletionTimestamp", newObj.GetDeletionTimestamp(),
+			"newType", fmt.Sprintf("%T", newObj),
+		)
+	}
+	if oldObj != nil {
+		logger = logger.WithValues(
+			"oldResourceVersion", oldObj.GetResourceVersion(),
+			"oldGeneration", oldObj.GetGeneration(),
+			"oldDeletionTimestamp", oldObj.GetDeletionTimestamp(),
+			"oldType", fmt.Sprintf("%T", oldObj),
+		)
+	}
+	logger.Info("observed ComponentParameter source event")
 }
 
 func (r *ComponentParameterReconciler) enqueueByComponent(_ context.Context, object client.Object) []reconcile.Request {

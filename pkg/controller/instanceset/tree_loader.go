@@ -30,10 +30,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 )
 
 type treeLoader struct{}
@@ -52,11 +50,6 @@ func (r *treeLoader) Load(ctx context.Context, reader client.Reader, req ctrl.Re
 	}
 
 	tree.Context = ctx
-	if root := tree.GetRoot(); root != nil && root.GetAnnotations() != nil {
-		if placement := root.GetAnnotations()[constant.KBAppMultiClusterPlacementKey]; placement != "" {
-			tree.Context = multicluster.IntoContext(ctx, placement)
-		}
-	}
 	tree.EventRecorder = recorder
 	tree.Logger = logger
 	tree.SetFinalizer(finalizer)

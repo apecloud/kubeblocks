@@ -45,8 +45,7 @@ func inDataContext() *multicluster.ClientOption {
 	return multicluster.InDataContext()
 }
 
-// DataContextOf returns a scoped context carrying the first multi-cluster placement found on objects.
-func DataContextOf(ctx context.Context, objects ...client.Object) context.Context {
+func dataContextOf(ctx context.Context, objects ...client.Object) context.Context {
 	for _, obj := range objects {
 		if isNilObject(obj) || obj.GetAnnotations() == nil {
 			continue

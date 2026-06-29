@@ -316,7 +316,7 @@ func ListOwnedInstances(ctx context.Context, cli client.Reader, comp *kbappsv1.C
 		return nil, err
 	}
 	objects = append([]client.Object{comp}, objects...)
-	return ListOwnedPods(DataContextOf(ctx, objects...), cli, comp.Namespace, clusterName, compName)
+	return ListOwnedPods(dataContextOf(ctx, objects...), cli, comp.Namespace, clusterName, compName)
 }
 
 func ListOwnedPodsWithRole(ctx context.Context, cli client.Reader, namespace, clusterName, compName, role string,

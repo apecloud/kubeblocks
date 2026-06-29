@@ -140,8 +140,8 @@ func (r *componentWorkloadOps) scaleIn() error {
 }
 
 func (r *componentWorkloadOps) leaveMember4ScaleIn(deleteReplicas, joinedReplicas []string) error {
-	pods, err := component.ListOwnedPods(r.transCtx.Context, r.cli,
-		r.synthesizeComp.Namespace, r.synthesizeComp.ClusterName, r.synthesizeComp.Name)
+	pods, err := component.ListOwnedInstances(r.transCtx.Context, r.cli,
+		r.component, r.runningITS, r.protoITS)
 	if err != nil {
 		return err
 	}
@@ -282,8 +282,8 @@ func (r *componentWorkloadOps) buildDataReplicationTask() error {
 }
 
 func (r *componentWorkloadOps) sourceReplica(dataDump *appsv1.Action, provisioningReplicas []string) (*corev1.Pod, error) {
-	pods, err := component.ListOwnedPods(r.transCtx.Context, r.cli,
-		r.synthesizeComp.Namespace, r.synthesizeComp.ClusterName, r.synthesizeComp.Name)
+	pods, err := component.ListOwnedInstances(r.transCtx.Context, r.cli,
+		r.component, r.runningITS, r.protoITS)
 	if err != nil {
 		return nil, err
 	}
@@ -327,8 +327,8 @@ func (r *componentWorkloadOps) postScaleOut() error {
 }
 
 func (r *componentWorkloadOps) joinMember4ScaleOut() error {
-	pods, err := component.ListOwnedPods(r.transCtx.Context, r.cli,
-		r.synthesizeComp.Namespace, r.synthesizeComp.ClusterName, r.synthesizeComp.Name)
+	pods, err := component.ListOwnedInstances(r.transCtx.Context, r.cli,
+		r.component, r.runningITS, r.protoITS)
 	if err != nil {
 		return err
 	}

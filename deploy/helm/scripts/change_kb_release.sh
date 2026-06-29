@@ -42,7 +42,6 @@ clusterRoles=(
     "patroni-pod-role"
     "manager-role"
     "dataprotection-worker-role"
-    "helmhook-role"
     "backup-editor-role"
     "backuppolicy-editor-role"
     "dataprotection-exec-worker-role"

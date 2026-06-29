@@ -45,8 +45,12 @@ func inDataContext() *multicluster.ClientOption {
 	return multicluster.InDataContext()
 }
 
-func dataContextOfObject(ctx context.Context, obj client.Object) context.Context {
-	if !isNilObject(obj) && obj.GetAnnotations() != nil {
+// DataContextOf returns a scoped context carrying the first multi-cluster placement found on objects.
+func DataContextOf(ctx context.Context, objects ...client.Object) context.Context {
+	for _, obj := range objects {
+		if isNilObject(obj) || obj.GetAnnotations() == nil {
+			continue
+		}
 		if placement := obj.GetAnnotations()[constant.KBAppMultiClusterPlacementKey]; placement != "" {
 			return multicluster.IntoContext(ctx, placement)
 		}

@@ -102,7 +102,7 @@ func (t *componentWorkloadTransformer) reconcileWorkload(ctx context.Context, cl
 
 	t.buildInstanceSetPlacementAnnotation(comp, protoITS)
 
-	if err := t.reconcileReplicasStatus(ctx, cli, synthesizedComp, runningITS, protoITS); err != nil {
+	if err := t.reconcileReplicasStatus(ctx, cli, synthesizedComp, comp, runningITS, protoITS); err != nil {
 		return err
 	}
 
@@ -122,18 +122,12 @@ func (t *componentWorkloadTransformer) buildInstanceSetPlacementAnnotation(comp 
 }
 
 func (t *componentWorkloadTransformer) reconcileReplicasStatus(ctx context.Context, cli client.Reader,
-	synthesizedComp *component.SynthesizedComponent, runningITS, protoITS *workloads.InstanceSet) error {
-	var (
-		namespace   = synthesizedComp.Namespace
-		clusterName = synthesizedComp.ClusterName
-		compName    = synthesizedComp.Name
-	)
-
+	synthesizedComp *component.SynthesizedComponent, comp *appsv1.Component, runningITS, protoITS *workloads.InstanceSet) error {
 	// HACK: sync replicas status from runningITS to protoITS
 	component.BuildReplicasStatus(runningITS, protoITS)
 
 	replicas, err := func() ([]string, error) {
-		pods, err := component.ListOwnedPods(dataContextOf(ctx, protoITS, runningITS), cli, namespace, clusterName, compName)
+		pods, err := component.ListOwnedInstances(ctx, cli, comp, protoITS, runningITS)
 		if err != nil {
 			return nil, err
 		}

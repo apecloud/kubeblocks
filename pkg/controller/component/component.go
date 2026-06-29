@@ -51,6 +51,10 @@ func GetClusterName(comp *appsv1.Component) (string, error) {
 	return getCompLabelValue(comp, constant.AppInstanceLabelKey)
 }
 
+func GetComponentName(comp *appsv1.Component) (string, error) {
+	return getCompLabelValue(comp, constant.KBAppComponentLabelKey)
+}
+
 func GetClusterUID(comp *appsv1.Component) (string, error) {
 	return getCompAnnotationValue(comp, constant.KBAppClusterUIDKey)
 }
@@ -176,8 +180,7 @@ func NewLifecycle(ctx context.Context, cli client.Reader, compDef *appsv1.Compon
 		return nil, err
 	}
 
-	pods, err := ListOwnedPods(dataContextOfObject(ctx, comp), cli,
-		synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name)
+	pods, err := ListOwnedInstances(ctx, cli, comp)
 	if err != nil {
 		return nil, err
 	}

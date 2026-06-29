@@ -157,9 +157,8 @@ func (t *componentPreTerminateTransformer) lifecycleAction4Component(transCtx *c
 	if err1 != nil {
 		return nil, err1
 	}
-	ctx := dataContextOf(transCtx.Context, transCtx.Component, transCtx.RunningWorkload)
-	pods, err2 := component.ListOwnedPods(ctx, transCtx.Client,
-		synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name)
+	pods, err2 := component.ListOwnedInstances(transCtx.Context, transCtx.Client,
+		transCtx.Component, transCtx.RunningWorkload)
 	if err2 != nil {
 		return nil, err2
 	}

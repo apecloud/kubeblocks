@@ -18,14 +18,11 @@ on:
       CLOUD_PROVIDER:
         description: 'cloud provider'
         required: true
-        default: 'aks'
+        default: 'eks'
         type: choice
         options:
           - eks
-          - vke
-          - gke
           - aks
-          - aks-cn
       CLUSTER_VERSION:
         description: 'k8s cluster version'
         required: false

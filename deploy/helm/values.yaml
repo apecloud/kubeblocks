@@ -41,6 +41,15 @@ client:
   # default is 256
   burst: ""
 
+## Installation checks.
+##
+## @param installationChecks.kubeblocksCRDs.enabled - fail installation when required KubeBlocks core CRDs are unavailable.
+## @param installationChecks.volumeSnapshotCRDs - fail installation when required VolumeSnapshot CRDs are unavailable.
+installationChecks:
+  kubeblocksCRDs:
+    enabled: true
+  volumeSnapshotCRDs: true
+
 ## @param nameOverride
 ##
 nameOverride: ""

@@ -202,6 +202,7 @@ jobs:
       VERSION: "v0.8.0-check"
       CHART_NAME: "kubeblocks"
       CHART_DIR: "deploy/helm"
+      HELM_SET: "installationChecks.kubeblocksCRDs.enabled=false,installationChecks.volumeSnapshotCRDs=false"
       APECD_REF: "v0.1.43"
       MAKE_OPS_POST: "install"
       GO_VERSION: "1.25"

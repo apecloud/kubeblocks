@@ -153,8 +153,8 @@ func (r *componentWorkloadOps) gatePendingMemberLifecycle(deleteReplicas []strin
 		return err
 	}
 
-	pods, err := component.ListOwnedPods(r.transCtx.Context, r.cli,
-		r.synthesizeComp.Namespace, r.synthesizeComp.ClusterName, r.synthesizeComp.Name)
+	pods, err := component.ListOwnedInstances(r.transCtx.Context, r.cli,
+		r.component, r.runningITS, r.protoITS)
 	if err != nil {
 		return err
 	}

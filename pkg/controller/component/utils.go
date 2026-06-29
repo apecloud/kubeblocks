@@ -45,13 +45,13 @@ func inDataContext() *multicluster.ClientOption {
 	return multicluster.InDataContext()
 }
 
-func inDataContextOfObject(obj client.Object) *multicluster.ClientOption {
+func dataContextOfObject(ctx context.Context, obj client.Object) context.Context {
 	if !isNilObject(obj) && obj.GetAnnotations() != nil {
 		if placement := obj.GetAnnotations()[constant.KBAppMultiClusterPlacementKey]; placement != "" {
-			return multicluster.InDataContextOf(placement)
+			return multicluster.IntoContext(ctx, placement)
 		}
 	}
-	return multicluster.InDataContext()
+	return ctx
 }
 
 func isNilObject(obj client.Object) bool {

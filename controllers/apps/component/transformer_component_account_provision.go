@@ -136,9 +136,9 @@ func (t *componentAccountProvisionTransformer) Transform(ctx graph.TransformCont
 
 func (t *componentAccountProvisionTransformer) lifecycleAction(transCtx *componentTransformContext) (lifecycle.Lifecycle, error) {
 	synthesizedComp := transCtx.SynthesizeComponent
-	pods, err := component.ListOwnedPods(transCtx.Context, transCtx.Client,
-		synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name,
-		inDataContextOf(transCtx.Component, transCtx.RunningWorkload))
+	ctx := dataContextOf(transCtx.Context, transCtx.Component, transCtx.RunningWorkload)
+	pods, err := component.ListOwnedPods(ctx, transCtx.Client,
+		synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name)
 	if err != nil {
 		return nil, err
 	}

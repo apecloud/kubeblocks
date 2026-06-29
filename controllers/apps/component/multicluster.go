@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
+	"context"
 	"reflect"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -28,16 +29,16 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 )
 
-func inDataContextOf(objects ...client.Object) *multicluster.ClientOption {
+func dataContextOf(ctx context.Context, objects ...client.Object) context.Context {
 	for _, obj := range objects {
 		if isNilObject(obj) || obj.GetAnnotations() == nil {
 			continue
 		}
 		if placement := obj.GetAnnotations()[constant.KBAppMultiClusterPlacementKey]; placement != "" {
-			return multicluster.InDataContextOf(placement)
+			return multicluster.IntoContext(ctx, placement)
 		}
 	}
-	return multicluster.InDataContext()
+	return ctx
 }
 
 func isNilObject(obj client.Object) bool {

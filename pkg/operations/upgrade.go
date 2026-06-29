@@ -148,10 +148,10 @@ func (u upgradeOpsHandler) getComponentDefMapWithUpdatedImages(reqCtx intctrluti
 		}
 		compDef, err := component.GetCompDefByName(reqCtx.Ctx, cli, compSpec.ComponentDef)
 		if err != nil {
-			return nil, intctrlutil.NewFatalError(err.Error())
+			return nil, err
 		}
 		if err = component.UpdateCompDefinitionImages4ServiceVersion(reqCtx.Ctx, cli, compDef, compSpec.ServiceVersion); err != nil {
-			return nil, intctrlutil.NewFatalError(err.Error())
+			return nil, err
 		}
 		compDefMap[v.ComponentName] = compDef
 	}

@@ -20,15 +20,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
+	"context"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -107,6 +114,89 @@ var _ = Describe("workload InstanceSet", func() {
 		Expect(its.Labels).Should(HaveKeyWithValue("dynamic-label", "true"))
 		Expect(its.Spec.Selector.MatchLabels).Should(HaveKeyWithValue(constant.KBAppShardingNameLabelKey, shardingName))
 		Expect(its.Spec.Template.Labels).Should(HaveKeyWithValue(constant.KBAppShardingNameLabelKey, shardingName))
+	})
+})
+
+var _ = Describe("workload instance listing", func() {
+	const (
+		namespace   = "default"
+		clusterName = "test-cluster"
+		compName    = "mysql"
+		placement   = "member-a"
+	)
+
+	newScheme := func() *runtime.Scheme {
+		scheme := runtime.NewScheme()
+		Expect(corev1.AddToScheme(scheme)).Should(Succeed())
+		Expect(appsv1.AddToScheme(scheme)).Should(Succeed())
+		Expect(workloads.AddToScheme(scheme)).Should(Succeed())
+		return scheme
+	}
+
+	newComponent := func(annotations map[string]string) *appsv1.Component {
+		return &appsv1.Component{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        FullName(clusterName, compName),
+				Namespace:   namespace,
+				Labels:      constant.GetCompLabels(clusterName, compName),
+				Annotations: annotations,
+			},
+		}
+	}
+
+	newPod := func(name string) *corev1.Pod {
+		return &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      name,
+				Namespace: namespace,
+				Labels:    constant.GetCompLabels(clusterName, compName),
+			},
+		}
+	}
+
+	newMultiClusterClient := func(scheme *runtime.Scheme, controlObjects []client.Object, workerObjects []client.Object) client.Client {
+		control := fake.NewClientBuilder().WithScheme(scheme).WithObjects(controlObjects...).Build()
+		worker := fake.NewClientBuilder().WithScheme(scheme).WithObjects(workerObjects...).Build()
+		return multicluster.NewClient(control, map[string]client.Client{placement: worker})
+	}
+
+	It("uses Component placement when listing instance pods from member clusters", func() {
+		scheme := newScheme()
+		comp := newComponent(map[string]string{constant.KBAppMultiClusterPlacementKey: placement})
+		pod := newPod("test-cluster-mysql-0")
+		cli := newMultiClusterClient(scheme, []client.Object{comp}, []client.Object{pod})
+
+		pods, err := ListOwnedPods(context.Background(), cli, namespace, clusterName, compName)
+		Expect(err).Should(Succeed())
+		Expect(pods).Should(BeEmpty())
+
+		pods, err = ListOwnedInstances(context.Background(), cli, comp)
+		Expect(err).Should(Succeed())
+		Expect(pods).Should(HaveLen(1))
+		Expect(pods[0].Name).Should(Equal(pod.Name))
+	})
+
+	It("falls back to running InstanceSet placement when Component has no placement", func() {
+		scheme := newScheme()
+		comp := newComponent(nil)
+		runningITS := &workloads.InstanceSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        FullName(clusterName, compName),
+				Namespace:   namespace,
+				Annotations: map[string]string{constant.KBAppMultiClusterPlacementKey: placement},
+			},
+		}
+		pod := newPod("test-cluster-mysql-0")
+		cli := newMultiClusterClient(scheme, []client.Object{comp, runningITS}, []client.Object{pod})
+
+		pods, err := ListOwnedPods(context.Background(), cli, namespace, clusterName, compName)
+		Expect(err).Should(Succeed())
+		Expect(pods).Should(BeEmpty())
+
+		pods, err = ListOwnedInstances(context.Background(), cli, comp, runningITS)
+		Expect(err).Should(Succeed())
+		Expect(pods).Should(HaveLen(1))
+		Expect(pods[0].Name).Should(Equal(pod.Name))
 	})
 })
 

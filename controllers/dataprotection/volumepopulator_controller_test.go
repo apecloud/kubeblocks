@@ -1354,6 +1354,89 @@ func TestDispatchUnboundPVCFailsWhenNoRestoreActionsExist(t *testing.T) {
 		"expected fatal error when neither prepareData nor postReady exists, got: %v", err)
 }
 
+func TestPopulateRequeuesWhilePrepareDataJobIsStillActive(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, batchv1.AddToScheme(scheme))
+	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
+	apiGroup := dptypes.DataprotectionAPIGroup
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      "data-etcd-restore-0",
+			UID:       "data-etcd-restore-0-uid",
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+			Resources: corev1.VolumeResourceRequirements{
+				Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("1Gi")},
+			},
+			DataSourceRef: &corev1.TypedObjectReference{
+				APIGroup: &apiGroup,
+				Kind:     dptypes.BackupKind,
+				Name:     "backup",
+			},
+		},
+	}
+	restore := &dpv1alpha1.Restore{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      "restore",
+		},
+		Spec: dpv1alpha1.RestoreSpec{
+			Backup: dpv1alpha1.BackupRef{Name: "backup", Namespace: "default"},
+			PrepareDataConfig: &dpv1alpha1.PrepareDataConfig{
+				DataSourceRef: &dpv1alpha1.VolumeConfig{
+					VolumeSource: "data",
+					MountPath:    "/var/run/etcd/backup",
+				},
+			},
+		},
+	}
+	cli := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithStatusSubresource(pvc, restore).
+		WithObjects(pvc, restore).
+		Build()
+	reconciler := &VolumePopulatorReconciler{
+		Client:   cli,
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(10),
+	}
+	backup := newBackupForRestoreDecision([]string{"data"}, nil)
+	backup.Status.Target.PodSelector = &dpv1alpha1.PodSelector{Strategy: dpv1alpha1.PodSelectionStrategyAny}
+	actionSet := &dpv1alpha1.ActionSet{
+		Spec: dpv1alpha1.ActionSetSpec{
+			Restore: &dpv1alpha1.RestoreActionSpec{
+				PrepareData: &dpv1alpha1.JobActionSpec{
+					BaseJobActionSpec: dpv1alpha1.BaseJobActionSpec{
+						Image:   "restore-image",
+						Command: []string{"sh", "-c", "restore"},
+					},
+				},
+			},
+		},
+	}
+	restoreMgr := dprestore.NewRestoreManager(restore, record.NewFakeRecorder(10), scheme, reconciler.Client)
+	restoreMgr.PrepareDataBackupSets = []dprestore.BackupActionSet{{
+		Backup:    backup,
+		ActionSet: actionSet,
+	}}
+	restoreCtx := &pvcRestoreContext{
+		mode:       pvcRestoreModeRestoreData,
+		restoreMgr: restoreMgr,
+	}
+
+	err := reconciler.Populate(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, restoreCtx)
+
+	require.Error(t, err)
+	require.True(t, intctrlutil.IsRequeueError(err), "expected requeue while prepareData job is still active, got: %v", err)
+	jobs := &batchv1.JobList{}
+	require.NoError(t, reconciler.Client.List(context.Background(), jobs))
+	require.Len(t, jobs.Items, 1)
+	require.Empty(t, jobs.Items[0].Status.Conditions)
+}
+
 func TestBuildPostReadyRestoreSelectsHighestPriorityRole(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, corev1.AddToScheme(scheme))

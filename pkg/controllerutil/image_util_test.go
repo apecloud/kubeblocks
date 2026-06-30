@@ -22,6 +22,11 @@ package controllerutil
 import (
 	"fmt"
 
+	corev1 "k8s.io/api/core/v1"
+
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -55,6 +60,88 @@ var _ = Describe("image util test", func() {
 
 		_, _, _, _, err := parseImageName("/invalid")
 		Expect(err).To(HaveOccurred())
+	})
+
+	It("detects only KB-managed tools image updates", func() {
+		oldToolsImage := viper.GetString(constant.KBToolsImage)
+		defer viper.Set(constant.KBToolsImage, oldToolsImage)
+		viper.Set(constant.KBToolsImage, "docker.io/apecloud/kubeblocks-tools:1.0.0")
+
+		basePod := &corev1.Pod{
+			Spec: corev1.PodSpec{
+				InitContainers: []corev1.Container{
+					{
+						Name:    "init-kbagent",
+						Image:   "docker.io/apecloud/kubeblocks-tools:1.0.0",
+						Command: []string{"cp"},
+					},
+					{
+						Name:    "install-config-manager-tool",
+						Image:   "docker.io/apecloud/kubeblocks-tools:1.0.0",
+						Command: []string{"install"},
+					},
+				},
+				Containers: []corev1.Container{
+					{
+						Name:  "app",
+						Image: "docker.io/apecloud/redis:7.2",
+					},
+					{
+						Name:    "kbagent",
+						Image:   "docker.io/apecloud/kubeblocks-tools:1.0.0",
+						Command: []string{"/bin/kbagent"},
+					},
+					{
+						Name:    "kbagent-worker",
+						Image:   "docker.io/apecloud/kubeblocks-tools:1.0.0",
+						Command: []string{"/bin/kbagent"},
+						Args:    []string{"--server=false"},
+					},
+					{
+						Name:    "config-manager",
+						Image:   "docker.io/apecloud/kubeblocks-tools:1.0.0",
+						Command: []string{"/bin/config-manager"},
+					},
+				},
+			},
+		}
+
+		newPod := basePod.DeepCopy()
+		for i := range newPod.Spec.InitContainers {
+			newPod.Spec.InitContainers[i].Image = "mirror.local/apecloud/kubeblocks-tools:1.1.0"
+		}
+		for i := range newPod.Spec.Containers {
+			if newPod.Spec.Containers[i].Name != "app" {
+				newPod.Spec.Containers[i].Image = "mirror.local/apecloud/kubeblocks-tools:1.1.0"
+			}
+		}
+		changed, ok := OnlyKBManagedContainerImageChanged(basePod.Spec.InitContainers, newPod.Spec.InitContainers)
+		Expect(ok).Should(BeTrue())
+		Expect(changed).Should(BeTrue())
+		changed, ok = OnlyKBManagedContainerImageChanged(basePod.Spec.Containers, newPod.Spec.Containers)
+		Expect(ok).Should(BeTrue())
+		Expect(changed).Should(BeTrue())
+
+		appChangedPod := basePod.DeepCopy()
+		appChangedPod.Spec.Containers[0].Image = "docker.io/apecloud/redis:7.4"
+		_, ok = OnlyKBManagedContainerImageChanged(basePod.Spec.Containers, appChangedPod.Spec.Containers)
+		Expect(ok).Should(BeFalse())
+
+		customAgentPod := basePod.DeepCopy()
+		customAgentPod.Spec.Containers[1].Image = "docker.io/example/custom-agent:1.1.0"
+		_, ok = OnlyKBManagedContainerImageChanged(basePod.Spec.Containers, customAgentPod.Spec.Containers)
+		Expect(ok).Should(BeFalse())
+
+		agentEnvChangedPod := basePod.DeepCopy()
+		agentEnvChangedPod.Spec.Containers[1].Image = "mirror.local/apecloud/kubeblocks-tools:1.1.0"
+		agentEnvChangedPod.Spec.Containers[1].Env = []corev1.EnvVar{{Name: "EXTRA", Value: "true"}}
+		_, ok = OnlyKBManagedContainerImageChanged(basePod.Spec.Containers, agentEnvChangedPod.Spec.Containers)
+		Expect(ok).Should(BeFalse())
+
+		removedContainerPod := basePod.DeepCopy()
+		removedContainerPod.Spec.Containers = removedContainerPod.Spec.Containers[:len(removedContainerPod.Spec.Containers)-1]
+		_, ok = OnlyKBManagedContainerImageChanged(basePod.Spec.Containers, removedContainerPod.Spec.Containers)
+		Expect(ok).Should(BeFalse())
 	})
 
 	It("only expands image when config does not exist", func() {

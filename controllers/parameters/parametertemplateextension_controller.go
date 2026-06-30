@@ -78,9 +78,6 @@ func (r *ParameterTemplateExtensionReconciler) Reconcile(ctx context.Context, re
 	if model.IsObjectDeleting(component) {
 		return intctrlutil.Reconciled()
 	}
-	if !intctrlutil.ObjectAPIVersionSupported(component) {
-		return intctrlutil.Reconciled()
-	}
 	return r.reconcile(reqCtx, component)
 }
 

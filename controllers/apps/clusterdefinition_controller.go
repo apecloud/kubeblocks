@@ -72,10 +72,6 @@ func (r *ClusterDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
-	if !intctrlutil.ObjectAPIVersionSupported(clusterDef) {
-		return intctrlutil.Reconciled()
-	}
-
 	if res, err := intctrlutil.HandleCRDeletion(reqCtx, r, clusterDef,
 		clusterDefinitionFinalizerName, r.deletionHandler(reqCtx, clusterDef)); res != nil {
 		return *res, err

@@ -35,7 +35,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -50,6 +49,12 @@ const (
 	// defaultRoleProbeTimeoutAfterPodsReady the default role probe timeout for application when all pods of component are ready.
 	defaultRoleProbeTimeoutAfterPodsReady int32 = 60
 )
+
+type componentMessageMap map[string]string
+
+func (m componentMessageMap) setObjectMessage(kind, name, message string) {
+	m[fmt.Sprintf("%s/%s", kind, name)] = message
+}
 
 // componentStatusTransformer computes the current status: read the underlying workload status and update the component status
 type componentStatusTransformer struct {
@@ -269,17 +274,17 @@ func (t *componentStatusTransformer) hasVolumeExpansionRunning() bool {
 }
 
 // hasFailedPod checks if the instance set has failed pod.
-func (t *componentStatusTransformer) hasFailedPod() (bool, appsv1alpha1.ComponentMessageMap) {
+func (t *componentStatusTransformer) hasFailedPod() (bool, componentMessageMap) {
 	if t.runningITS == nil {
 		return false, nil
 	}
 
-	messages := appsv1alpha1.ComponentMessageMap{}
+	messages := componentMessageMap{}
 	// check InstanceFailure condition
 	hasFailedPod := meta.IsStatusConditionTrue(t.runningITS.Status.Conditions, string(workloads.InstanceFailure))
 	if hasFailedPod {
 		failureCondition := meta.FindStatusCondition(t.runningITS.Status.Conditions, string(workloads.InstanceFailure))
-		messages.SetObjectMessage(workloads.InstanceSetKind, t.runningITS.Name, failureCondition.Message)
+		messages.setObjectMessage(workloads.InstanceSetKind, t.runningITS.Name, failureCondition.Message)
 		return true, messages
 	}
 
@@ -295,7 +300,7 @@ func (t *componentStatusTransformer) hasFailedPod() (bool, appsv1alpha1.Componen
 	probeTimeoutDuration := time.Duration(defaultRoleProbeTimeoutAfterPodsReady) * time.Second
 	condition := meta.FindStatusCondition(t.runningITS.Status.Conditions, string(workloads.InstanceReady))
 	if time.Now().After(condition.LastTransitionTime.Add(probeTimeoutDuration)) {
-		messages.SetObjectMessage(workloads.InstanceSetKind, t.runningITS.Name, "Role probe timeout, check whether the application is available")
+		messages.setObjectMessage(workloads.InstanceSetKind, t.runningITS.Name, "Role probe timeout, check whether the application is available")
 		return true, messages
 	}
 

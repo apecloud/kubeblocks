@@ -37,7 +37,6 @@ import (
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -83,7 +82,6 @@ var _ = Describe("InstanceSet Controller 2", func() {
 		}
 		f := testapps.NewInstanceSetFactory(testCtx.DefaultNamespace, name, "test-cluster", "comp").
 			WithRandomName().
-			AddAnnotations(constant.CRDAPIVersionAnnotationKey, workloads.GroupVersion.String()).
 			AddContainer(container).
 			SetReplicas(replicas).
 			SetEnableInstanceAPI(ptr.To(true)).

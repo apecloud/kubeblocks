@@ -22,8 +22,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
 const (
@@ -78,6 +76,7 @@ const (
 	ReasonStartCluster                    = "StartCluster"
 	ReasonReconfigureStarted              = "ReconfigureStarted"
 	ReasonReconfigureFailed               = "ReconfigureFailed"
+	ReasonReconfigureRunning              = "ReconfigureRunning"
 	ReasonBackupStarted                   = "BackupStarted"
 	ReasonRestoreStarted                  = "RestoreStarted"
 )
@@ -322,7 +321,7 @@ func NewReconfigureCondition(ops *OpsRequest) *metav1.Condition {
 // NewReconfigureRunningCondition creates a condition that the OpsRequest reconfigure workflow
 func NewReconfigureRunningCondition(ops *OpsRequest, conditionType string, configSpecName string, info ...string) *metav1.Condition {
 	status := metav1.ConditionTrue
-	if conditionType == appsv1alpha1.ReasonReconfigureFailed {
+	if conditionType == ReasonReconfigureFailed {
 		status = metav1.ConditionFalse
 	}
 	message := fmt.Sprintf("Reconfiguring in Cluster: %s, Component: %s, ConfigSpec: %s",
@@ -358,7 +357,7 @@ func NewReconfigureFailedCondition(ops *OpsRequest, err error) *metav1.Condition
 		msg = fmt.Sprintf("Failed to reconfigure: %s in cluster: %s", ops.Name, ops.Spec.GetClusterName())
 	}
 	return &metav1.Condition{
-		Type:               appsv1alpha1.ReasonReconfigureFailed,
+		Type:               ReasonReconfigureFailed,
 		Status:             metav1.ConditionFalse,
 		Reason:             ReasonReconfigureFailed,
 		LastTransitionTime: metav1.Now(),

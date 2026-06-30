@@ -29,7 +29,6 @@ import (
 	operationsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
-	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	cache "k8s.io/client-go/tools/cache"
 )
@@ -79,22 +78,10 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1().SidecarDefinitions().Informer()}, nil
 
 		// Group=apps.kubeblocks.io, Version=v1alpha1
-	case v1alpha1.SchemeGroupVersion.WithResource("clusters"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1alpha1().Clusters().Informer()}, nil
-	case v1alpha1.SchemeGroupVersion.WithResource("clusterdefinitions"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1alpha1().ClusterDefinitions().Informer()}, nil
-	case v1alpha1.SchemeGroupVersion.WithResource("components"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1alpha1().Components().Informer()}, nil
-	case v1alpha1.SchemeGroupVersion.WithResource("componentdefinitions"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1alpha1().ComponentDefinitions().Informer()}, nil
-	case v1alpha1.SchemeGroupVersion.WithResource("componentversions"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1alpha1().ComponentVersions().Informer()}, nil
 	case v1alpha1.SchemeGroupVersion.WithResource("configconstraints"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1alpha1().ConfigConstraints().Informer()}, nil
 	case v1alpha1.SchemeGroupVersion.WithResource("rollouts"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1alpha1().Rollouts().Informer()}, nil
-	case v1alpha1.SchemeGroupVersion.WithResource("servicedescriptors"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1alpha1().ServiceDescriptors().Informer()}, nil
 
 		// Group=apps.kubeblocks.io, Version=v1beta1
 	case v1beta1.SchemeGroupVersion.WithResource("configconstraints"):
@@ -145,10 +132,6 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Workloads().V1().Instances().Informer()}, nil
 	case workloadsv1.SchemeGroupVersion.WithResource("instancesets"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Workloads().V1().InstanceSets().Informer()}, nil
-
-		// Group=workloads.kubeblocks.io, Version=v1alpha1
-	case workloadsv1alpha1.SchemeGroupVersion.WithResource("instancesets"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Workloads().V1alpha1().InstanceSets().Informer()}, nil
 
 	}
 

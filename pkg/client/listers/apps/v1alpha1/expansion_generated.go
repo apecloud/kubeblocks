@@ -18,34 +18,6 @@ limitations under the License.
 
 package v1alpha1
 
-// ClusterListerExpansion allows custom methods to be added to
-// ClusterLister.
-type ClusterListerExpansion interface{}
-
-// ClusterNamespaceListerExpansion allows custom methods to be added to
-// ClusterNamespaceLister.
-type ClusterNamespaceListerExpansion interface{}
-
-// ClusterDefinitionListerExpansion allows custom methods to be added to
-// ClusterDefinitionLister.
-type ClusterDefinitionListerExpansion interface{}
-
-// ComponentListerExpansion allows custom methods to be added to
-// ComponentLister.
-type ComponentListerExpansion interface{}
-
-// ComponentNamespaceListerExpansion allows custom methods to be added to
-// ComponentNamespaceLister.
-type ComponentNamespaceListerExpansion interface{}
-
-// ComponentDefinitionListerExpansion allows custom methods to be added to
-// ComponentDefinitionLister.
-type ComponentDefinitionListerExpansion interface{}
-
-// ComponentVersionListerExpansion allows custom methods to be added to
-// ComponentVersionLister.
-type ComponentVersionListerExpansion interface{}
-
 // ConfigConstraintListerExpansion allows custom methods to be added to
 // ConfigConstraintLister.
 type ConfigConstraintListerExpansion interface{}
@@ -57,11 +29,3 @@ type RolloutListerExpansion interface{}
 // RolloutNamespaceListerExpansion allows custom methods to be added to
 // RolloutNamespaceLister.
 type RolloutNamespaceListerExpansion interface{}
-
-// ServiceDescriptorListerExpansion allows custom methods to be added to
-// ServiceDescriptorLister.
-type ServiceDescriptorListerExpansion interface{}
-
-// ServiceDescriptorNamespaceListerExpansion allows custom methods to be added to
-// ServiceDescriptorNamespaceLister.
-type ServiceDescriptorNamespaceListerExpansion interface{}

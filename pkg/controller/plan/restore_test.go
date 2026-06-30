@@ -186,6 +186,7 @@ func TestRestoreManagerGetConnectionCredential(t *testing.T) {
 	got := manager.getConnectionCredential(comp)
 	if got == nil {
 		t.Fatal("connection credential is nil")
+		return
 	}
 	if got.SecretName != constant.GenerateAccountSecretName("cluster", "mysql", "root") ||
 		got.UsernameKey != constant.AccountNameForSecret ||
@@ -258,6 +259,7 @@ func TestRestoreManagerBuildPrepareDataRestore(t *testing.T) {
 	}
 	if restore == nil {
 		t.Fatal("restore is nil")
+		return
 	}
 	if restore.Spec.Backup.Name != "backup" ||
 		restore.Spec.Backup.Namespace != "default" ||
@@ -267,6 +269,7 @@ func TestRestoreManagerBuildPrepareDataRestore(t *testing.T) {
 	cfg := restore.Spec.PrepareDataConfig
 	if cfg == nil {
 		t.Fatal("prepare data config is nil")
+		return
 	}
 	if cfg.RequiredPolicyForAllPodSelection == nil ||
 		cfg.RequiredPolicyForAllPodSelection.DataRestorePolicy != dpv1alpha1.OneToOneRestorePolicy {

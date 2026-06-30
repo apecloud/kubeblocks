@@ -29,7 +29,7 @@ CODE_GENERATOR_PATH=$(go list -f '{{.Dir}}' -m k8s.io/code-generator)
 GENERATORS="client,informer,lister"
 OUTPUT_PACKAGE="github.com/apecloud/kubeblocks/pkg/client"
 APIS_PACKAGE="github.com/apecloud/kubeblocks/apis"
-GROUP_VERSIONS="apps:v1alpha1 apps:v1beta1 apps:v1 dataprotection:v1alpha1 extensions:v1alpha1 operations:v1alpha1 workloads:v1alpha1 workloads:v1 parameters:v1alpha1"
+GROUP_VERSIONS="apps:v1alpha1 apps:v1beta1 apps:v1 dataprotection:v1alpha1 extensions:v1alpha1 operations:v1alpha1 workloads:v1 parameters:v1alpha1"
 OUTPUT_BASE="${SCRIPT_ROOT}/hack"
 
 trap 'rm -rf "${OUTPUT_BASE}/github.com"' EXIT

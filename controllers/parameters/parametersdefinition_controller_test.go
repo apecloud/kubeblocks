@@ -28,7 +28,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/generics"
@@ -99,7 +98,7 @@ client?: {
 			By("check ParametersDefinition(template) status and finalizer")
 			Eventually(testapps.CheckObj(&testCtx, parametersDefKey,
 				func(g Gomega, tpl *parametersv1alpha1.ParametersDefinition) {
-					g.Expect(tpl.Status.Phase).To(BeEquivalentTo(appsv1alpha1.AvailablePhase))
+					g.Expect(tpl.Status.Phase).To(BeEquivalentTo(parametersv1alpha1.PDAvailablePhase))
 					g.Expect(tpl.Finalizers).To(ContainElement(constant.ConfigFinalizerName))
 				})).Should(Succeed())
 

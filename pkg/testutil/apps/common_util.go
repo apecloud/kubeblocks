@@ -377,8 +377,8 @@ func ClearComponentResources(testCtx *testutil.TestContext) {
 	inNs := client.InNamespace(testCtx.DefaultNamespace)
 	hasLabels := client.HasLabels{testCtx.TestObjLabelKey}
 	ClearResources(testCtx, intctrlutil.ComponentSignature, inNs, hasLabels)
-	ClearResources(testCtx, intctrlutil.ComponentDefinitionSignature, hasLabels)
-	ClearResources(testCtx, intctrlutil.ComponentVersionSignature, hasLabels)
+	ClearResourcesWithRemoveFinalizerOption(testCtx, intctrlutil.ComponentDefinitionSignature, true, hasLabels)
+	ClearResourcesWithRemoveFinalizerOption(testCtx, intctrlutil.ComponentVersionSignature, true, hasLabels)
 }
 
 // ClearComponentResourcesWithRemoveFinalizerOption clears all dependent resources belonging to existing components.

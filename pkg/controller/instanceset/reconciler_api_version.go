@@ -24,7 +24,6 @@ import (
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 type apiVersionReconciler struct{}
@@ -37,9 +36,6 @@ func (r *apiVersionReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kube
 }
 
 func (r *apiVersionReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
-	if !intctrlutil.ObjectAPIVersionSupported(tree.GetRoot()) {
-		return kubebuilderx.Commit, nil
-	}
 	its := tree.GetRoot().(*workloads.InstanceSet)
 	if ptr.Deref(its.Spec.EnableInstanceAPI, false) {
 		return kubebuilderx.Commit, nil

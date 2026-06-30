@@ -18,18 +18,6 @@ limitations under the License.
 
 package v1alpha1
 
-type ClusterExpansion interface{}
-
-type ClusterDefinitionExpansion interface{}
-
-type ComponentExpansion interface{}
-
-type ComponentDefinitionExpansion interface{}
-
-type ComponentVersionExpansion interface{}
-
 type ConfigConstraintExpansion interface{}
 
 type RolloutExpansion interface{}
-
-type ServiceDescriptorExpansion interface{}

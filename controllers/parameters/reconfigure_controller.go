@@ -39,7 +39,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/parameters/reconfigure"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -64,6 +63,9 @@ const (
 	configurationNoChangedMessage           = "the configuration file has not been modified, skip reconfigure"
 	configurationNotRelatedComponentMessage = "related component does not found any configSpecs, skip reconfigure"
 	legacyReloadValidationPolicy            = "legacyReloadValidation"
+	reasonReconfigureFailed                 = "ReconfigureFailed"
+	reasonReconfigureRunning                = "ReconfigureRunning"
+	reasonReconfigureSucceed                = "ReconfigureSucceed"
 )
 
 var reconfigureRequiredLabels = []string{
@@ -128,7 +130,7 @@ func (r *ReconfigureReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 			config.Labels[constant.CMConfigurationSpecProviderLabelKey], config.Labels[constant.KBAppComponentLabelKey]))
 		reqCtx.Recorder.Event(config,
 			corev1.EventTypeWarning,
-			appsv1alpha1.ReasonReconfigureFailed,
+			reasonReconfigureFailed,
 			configurationNotRelatedComponentMessage)
 		return updateConfigPhase(r.Client, reqCtx, config, parametersv1alpha1.CFinishedPhase, configurationNotRelatedComponentMessage)
 	}
@@ -214,7 +216,7 @@ func (r *ReconfigureReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *c
 
 	// No parameters updated
 	if configPatch != nil && !configPatch.IsModify {
-		reqCtx.Recorder.Event(configMap, corev1.EventTypeNormal, appsv1alpha1.ReasonReconfigureRunning, "nothing changed, skip reconfigure")
+		reqCtx.Recorder.Event(configMap, corev1.EventTypeNormal, reasonReconfigureRunning, "nothing changed, skip reconfigure")
 		return r.updateConfigCMStatus(reqCtx, configMap, core.ReconfigureNoChangeType, nil)
 	}
 
@@ -227,7 +229,7 @@ func (r *ReconfigureReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *c
 	}
 	if err := validateLegacyReloadActionSupport(rctx, configPatch); err != nil {
 		reqCtx.Log.Error(err, "reject legacy reloadAction for unsupported instance")
-		reqCtx.Recorder.Event(configMap, corev1.EventTypeWarning, appsv1alpha1.ReasonReconfigureFailed, err.Error())
+		reqCtx.Recorder.Event(configMap, corev1.EventTypeWarning, reasonReconfigureFailed, err.Error())
 		status := reconfigure.Status{Status: reconfigure.StatusFailed, Reason: err.Error(), ExpectedCount: core.Unconfirmed, SucceedCount: core.Unconfirmed}
 		result := reconciled(status, legacyReloadValidationPolicy, parametersv1alpha1.CFailedAndPausePhase, withFailed(err, false))
 		return updateConfigPhaseWithResult(r.Client, reqCtx, configMap, result)
@@ -460,7 +462,7 @@ func (r *ReconfigureReconciler) status(rctx *reconcileContext, policy string, st
 func (r *ReconfigureReconciler) succeed(rctx *reconcileContext, policy string, status reconfigure.Status) (ctrl.Result, error) {
 	rctx.Recorder.Eventf(rctx.configMap,
 		corev1.EventTypeNormal,
-		appsv1alpha1.ReasonReconfigureSucceed,
+		reasonReconfigureSucceed,
 		"the reconfigure[%s] has been processed successfully",
 		policy)
 	result := reconciled(status, policy, parametersv1alpha1.CFinishedPhase)

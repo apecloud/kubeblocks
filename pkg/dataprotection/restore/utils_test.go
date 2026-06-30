@@ -70,6 +70,7 @@ func TestBuildPVCVolumeAndMountShortensDerivedVolumeName(t *testing.T) {
 	}
 	if volume == nil || volumeMount == nil {
 		t.Fatalf("expected volume and volumeMount to be created")
+		return
 	}
 	if len(volume.Name) > constant.KubeNameMaxLength {
 		t.Fatalf("volume name length = %d, want <= %d", len(volume.Name), constant.KubeNameMaxLength)

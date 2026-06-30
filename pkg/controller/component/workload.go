@@ -58,7 +58,6 @@ func BuildInstanceSet(synthesizedComp *SynthesizedComponent, compDef *kbappsv1.C
 		AddLabelsInMap(synthesizedComp.DynamicLabels).
 		AddLabelsInMap(constant.GetCompLabels(clusterName, compName, synthesizedComp.Labels)).
 		AddAnnotations(constant.KubeBlocksGenerationKey, synthesizedComp.Generation).
-		AddAnnotations(constant.CRDAPIVersionAnnotationKey, workloads.GroupVersion.String()).
 		AddAnnotationsInMap(map[string]string{
 			constant.AppComponentLabelKey:   compDefName,
 			constant.KBAppServiceVersionKey: synthesizedComp.ServiceVersion,

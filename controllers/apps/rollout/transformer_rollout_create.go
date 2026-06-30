@@ -312,7 +312,7 @@ func createOrUpdateInstanceTemplate(name string,
 	canary *bool,
 	serviceVersion *string,
 	compDef *string,
-	schedulingPolicy *appsv1alpha1.SchedulingPolicy,
+	schedulingPolicy *appsv1.SchedulingPolicy,
 	instanceMeta *appsv1alpha1.RolloutInstanceMeta) (*appsv1.InstanceTemplate, error) {
 	for i, tpl := range *instances {
 		if tpl.Name == name {
@@ -403,7 +403,7 @@ func applyCreatePromotion(promotion *appsv1alpha1.RolloutPromotion,
 	return nil
 }
 
-func rolloutSchedulingPolicy(policy *appsv1alpha1.SchedulingPolicy) *appsv1.SchedulingPolicy {
+func rolloutSchedulingPolicy(policy *appsv1.SchedulingPolicy) *appsv1.SchedulingPolicy {
 	if policy == nil {
 		return nil
 	}

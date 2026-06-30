@@ -27,8 +27,6 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
 func TestFromYamlConfig(t *testing.T) {
@@ -47,18 +45,18 @@ func TestFromYamlConfig(t *testing.T) {
 	tests := []testCase[struct {
 		metav1.TypeMeta   `json:",inline"`
 		metav1.ObjectMeta `json:"metadata,omitempty"`
-		Status            v1alpha1.Phase `json:"status"`
+		Status            string `json:"status"`
 	}]{{
 		name: "normal_test",
 		args: args[struct {
 			metav1.TypeMeta   `json:",inline"`
 			metav1.ObjectMeta `json:"metadata,omitempty"`
-			Status            v1alpha1.Phase `json:"status"`
+			Status            string `json:"status"`
 		}]{
 			obj: struct {
 				metav1.TypeMeta   `json:",inline"`
 				metav1.ObjectMeta `json:"metadata,omitempty"`
-				Status            v1alpha1.Phase `json:"status"`
+				Status            string `json:"status"`
 			}{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "ConfigConstraint",
@@ -67,7 +65,7 @@ func TestFromYamlConfig(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "for_test",
 				},
-				Status: v1alpha1.AvailablePhase,
+				Status: "Available",
 			},
 		},
 		wantErr: false,

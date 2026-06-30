@@ -32,18 +32,6 @@ function takeOverResources() {
     kubectl annotate $kind $name --overwrite meta.helm.sh/release-namespace=$namespace
 }
 
-function setCRDAPIVersion() {
-    local kind=$1
-    crs=$(kubectl get $kind)
-    OLD_IFS=$IFS
-    IFS=$'\n'
-    for line in $crs; do
-      name=$(echo "$line" | awk '{print $1}')
-      kubectl annotate $kind $name --overwrite kubeblocks.io/crd-api-version=apps.kubeblocks.io/v1alpha1
-    done
-    IFS=$OLD_IFS
-}
-
 # 1. change clusterRoles
 clusterRoles=(
     "cluster-editor-role"
@@ -54,7 +42,6 @@ clusterRoles=(
     "patroni-pod-role"
     "manager-role"
     "dataprotection-worker-role"
-    "helmhook-role"
     "backup-editor-role"
     "backuppolicy-editor-role"
     "dataprotection-exec-worker-role"
@@ -111,6 +98,3 @@ takeOverResources BackupRepo ${release}-backuprepo
 
 # 5. takeover StorageClass
 takeOverResources StorageClass kb-default-sc
-
-# 5. set kubeblocks.io/crd-api-version: apps.kubeblocks.io/v1alpha1 to old componentDefinition
-setCRDAPIVersion ComponentDefinition

@@ -25,7 +25,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
@@ -79,8 +78,8 @@ func TestGcConfigRevision(t *testing.T) {
 
 	revisions = gcRevision(cm.GetAnnotations())
 	assert.Equal(t, 2, len(revisions))
-	assert.Equal(t, string(appsv1alpha1.CInitPhase), string(revisions[1].phase))
-	assert.Equal(t, string(appsv1alpha1.CFinishedPhase), string(revisions[0].phase))
+	assert.Equal(t, string(parametersv1alpha1.CInitPhase), string(revisions[1].phase))
+	assert.Equal(t, string(parametersv1alpha1.CFinishedPhase), string(revisions[0].phase))
 
 	gcConfigRevision(cm)
 	assert.Equal(t, 10, len(retrieveRevision(cm.GetAnnotations())))

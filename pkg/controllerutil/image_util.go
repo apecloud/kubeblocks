@@ -25,13 +25,16 @@ import (
 	_ "crypto/sha512"
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 	"sync"
 
 	"github.com/distribution/reference"
+	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/kbagent"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -283,4 +286,82 @@ func imageBaseName(name string) string {
 		return name
 	}
 	return name[index+1:]
+}
+
+const (
+	legacyConfigManagerContainerName = "config-manager"
+	legacyConfigManagerToolsInitName = "install-config-manager-tool"
+)
+
+// OnlyKBManagedContainerImageChanged checks only the image fields in the given
+// container lists. It returns changed=true when at least one known KB-managed
+// container image changed, and ok=false when any list shape, non-image field, or
+// non-KB-managed image change is detected.
+func OnlyKBManagedContainerImageChanged(oldContainers, newContainers []corev1.Container) (changed bool, ok bool) {
+	toolsImage := viper.GetString(constant.KBToolsImage)
+	if toolsImage == "" {
+		return false, false
+	}
+	return onlyKBManagedContainerImageChanged(oldContainers, newContainers, toolsImage)
+}
+
+func onlyKBManagedContainerImageChanged(oldContainers, newContainers []corev1.Container, toolsImage string) (bool, bool) {
+	if len(oldContainers) != len(newContainers) {
+		return false, false
+	}
+	changed := false
+	for i := range oldContainers {
+		oldContainer := oldContainers[i]
+		newContainer := newContainers[i]
+		if oldContainer.Name != newContainer.Name {
+			return false, false
+		}
+		oldImage := oldContainer.Image
+		newImage := newContainer.Image
+		oldContainer.Image = ""
+		newContainer.Image = ""
+		if !reflect.DeepEqual(oldContainer, newContainer) {
+			return false, false
+		}
+		if oldImage == newImage {
+			continue
+		}
+		if !isKBManagedContainerName(oldContainer.Name) ||
+			!sameImageRepositoryName(oldImage, toolsImage) ||
+			!sameImageRepositoryName(newImage, toolsImage) {
+			return false, false
+		}
+		changed = true
+	}
+	return changed, true
+}
+
+func isKBManagedContainerName(name string) bool {
+	switch name {
+	case kbagent.ContainerName, kbagent.ContainerName4Worker, kbagent.InitContainerName,
+		legacyConfigManagerContainerName, legacyConfigManagerToolsInitName:
+		return true
+	default:
+		return false
+	}
+}
+
+func sameImageRepositoryName(image, target string) bool {
+	imageNamespace, imageRepository, ok := imageRepositoryName(image)
+	if !ok {
+		return false
+	}
+	targetNamespace, targetRepository, ok := imageRepositoryName(target)
+	if !ok {
+		return false
+	}
+	return imageNamespace == targetNamespace && imageRepository == targetRepository
+}
+
+func imageRepositoryName(image string) (string, string, bool) {
+	_, namespace, repository, _, err := parseImageName(image)
+	if err != nil {
+		return "", "", false
+	}
+	return namespace, repository, true
 }

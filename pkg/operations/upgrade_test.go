@@ -373,6 +373,27 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			})).Should(Succeed())
 		})
 
+		It("Test upgrade OpsRequest with invalid service version should fail validation", func() {
+			By("init operations resources")
+			_, _, opsRes := initOpsResWithComponentDef(true)
+
+			By("create Upgrade Ops with invalid service version")
+			opsRes.OpsRequest = createUpgradeOpsRequest(opsRes.Cluster, opsv1alpha1.Upgrade{
+				Components: []opsv1alpha1.UpgradeComponent{
+					{
+						ComponentOps:   opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
+						ServiceVersion: pointer.String("17.5"),
+					},
+				},
+			})
+
+			By("expect Do() fails with validation error and OpsRequest enters Failed phase")
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsFailedPhase))
+		})
+
 		It("Test upgrade OpsRequest when componentDefinitionName is nil", func() {
 			By("init operations resources")
 			compDef1, _, opsRes := initOpsResWithComponentDef(true)

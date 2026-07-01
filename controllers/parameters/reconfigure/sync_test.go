@@ -821,6 +821,59 @@ func TestApplyChangesToClusterTemplateReconfigureWithRestartSemantics(t *testing
 	})
 }
 
+func TestSyncReconfigureStatusClearsCompletedConfigIntent(t *testing.T) {
+	configHash := "test-config-hash"
+	ctx := Context{
+		ConfigTemplate: appsv1.ComponentFileTemplate{
+			Name: "my.cnf",
+		},
+		ConfigHash: &configHash,
+		ClusterComponent: &appsv1.ClusterComponentSpec{
+			Replicas: 1,
+			Configs: []appsv1.ClusterComponentConfig{{
+				Name:              ptr.To("my.cnf"),
+				ConfigHash:        ptr.To(configHash),
+				Restart:           ptr.To(true),
+				Reconfigure:       ptr.To(true),
+				ReconfigureAction: &appsv1.Action{Exec: &appsv1.ExecAction{Command: []string{"bash", "-c", "reload"}}},
+				ReconfigureArgs:   [][]string{{"http-idle-timeout", "200000000000"}},
+			}},
+		},
+		ITS: &workloads.InstanceSet{
+			Status: workloads.InstanceSetStatus{
+				InstanceStatus: []workloads.InstanceStatus{{
+					Configs: []workloads.InstanceConfigStatus{{
+						Name:       "my.cnf",
+						ConfigHash: ptr.To(configHash),
+					}},
+				}},
+			},
+		},
+	}
+
+	status := syncReconfigureStatus(ctx)
+
+	if status.Status != StatusNone {
+		t.Fatalf("expected status %q, got %q", StatusNone, status.Status)
+	}
+	config := ctx.ClusterComponent.Configs[0]
+	if config.ConfigHash == nil || *config.ConfigHash != configHash {
+		t.Fatalf("expected config hash to be preserved, got %v", config.ConfigHash)
+	}
+	if config.Restart != nil {
+		t.Fatalf("expected completed restart intent to be cleared, got %v", config.Restart)
+	}
+	if config.Reconfigure != nil {
+		t.Fatalf("expected completed reconfigure intent to be cleared, got %v", config.Reconfigure)
+	}
+	if config.ReconfigureAction != nil {
+		t.Fatalf("expected completed reconfigure action to be cleared")
+	}
+	if config.ReconfigureArgs != nil {
+		t.Fatalf("expected completed reconfigure args to be cleared, got %v", config.ReconfigureArgs)
+	}
+}
+
 func TestApplyChangesToClusterTemplateReconfigureWithNonExecAction(t *testing.T) {
 	newContext := func() Context {
 		return Context{

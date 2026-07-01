@@ -257,7 +257,25 @@ func syncReconfigureStatus(ctx Context) Status {
 		}
 	}
 	if updated == replicas {
+		clearCompletedConfigIntent(ctx)
 		return makeStatus(StatusNone, withReason("reconfigure completed"), withExpected(replicas), withSucceed(updated))
 	}
 	return makeStatus(StatusRetry, withReason("reconfiguring"), withExpected(replicas), withSucceed(updated))
+}
+
+func clearCompletedConfigIntent(ctx Context) {
+	if ctx.ClusterComponent == nil {
+		return
+	}
+	for i := range ctx.ClusterComponent.Configs {
+		config := &ctx.ClusterComponent.Configs[i]
+		if ptr.Deref(config.Name, "") != ctx.ConfigTemplate.Name {
+			continue
+		}
+		config.Restart = nil
+		config.Reconfigure = nil
+		config.ReconfigureAction = nil
+		config.ReconfigureArgs = nil
+		return
+	}
 }

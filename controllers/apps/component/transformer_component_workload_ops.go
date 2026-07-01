@@ -146,7 +146,7 @@ func (r *componentWorkloadOps) scaleIn() error {
 
 func (r *componentWorkloadOps) gatePendingMemberLifecycle(deleteReplicas []string) error {
 	deleteSet := sets.New(deleteReplicas...)
-	pendingReplicas, err := component.GetReplicasStatusFunc(r.runningITS, func(s component.ReplicaStatus) bool {
+	pendingReplicas, err := component.GetReplicasStatusListFunc(r.runningITS, func(s component.ReplicaStatus) bool {
 		return deleteSet.Has(s.Name) && s.MemberJoined != nil && !*s.MemberJoined
 	})
 	if err != nil || len(pendingReplicas) == 0 {
@@ -165,9 +165,9 @@ func (r *componentWorkloadOps) gatePendingMemberLifecycle(deleteReplicas []strin
 		}
 	}
 	activePending := make([]string, 0, len(pendingReplicas))
-	for _, name := range pendingReplicas {
-		if podSet.Has(name) {
-			activePending = append(activePending, name)
+	for _, replica := range pendingReplicas {
+		if podSet.Has(replica.Name) && !replica.MemberJoinFailed {
+			activePending = append(activePending, replica.Name)
 		}
 	}
 	if len(activePending) == 0 {
@@ -395,8 +395,14 @@ func (r *componentWorkloadOps) joinMember4ScaleOut() error {
 
 			if err := r.joinMemberForPod(pod, pods); err != nil {
 				joinErrors = append(joinErrors, fmt.Errorf("pod %s: %w", pod.Name, err))
+				if isTerminalMemberJoinError(err) {
+					replicas.Status[i].MemberJoinFailed = true
+					replicas.Status[i].Message = err.Error()
+				}
 			} else {
 				replicas.Status[i].MemberJoined = ptr.To(true)
+				replicas.Status[i].MemberJoinFailed = false
+				replicas.Status[i].Message = ""
 			}
 		}
 
@@ -418,6 +424,11 @@ func (r *componentWorkloadOps) joinMember4ScaleOut() error {
 		return intctrlutil.NewRequeueError(time.Second, fmt.Sprintf("%v", joinErrors))
 	}
 	return nil
+}
+
+func isTerminalMemberJoinError(err error) bool {
+	return errors.Is(err, lifecycle.ErrActionFailed) ||
+		errors.Is(err, lifecycle.ErrActionNotImplemented)
 }
 
 func (r *componentWorkloadOps) joinMemberForPod(pod *corev1.Pod, pods []*corev1.Pod) error {

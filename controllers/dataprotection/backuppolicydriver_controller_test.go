@@ -222,7 +222,6 @@ var _ = Describe("BackupPolicyDriver Controller test", func() {
 			By("creating a cluster")
 			clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
 				AddComponent(defaultCompName, compDefObj.Name).SetReplicas(1).
-				AddAnnotations(constant.CRDAPIVersionAnnotationKey, appsv1.GroupVersion.String()).
 				WithRandomName().Create(&testCtx).GetObject()
 
 			By("checking backup policy")
@@ -275,7 +274,6 @@ var _ = Describe("BackupPolicyDriver Controller test", func() {
 		It("test backup policy for a sharding cluster", func() {
 			By("creating a sharding cluster")
 			clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
-				AddAnnotations(constant.CRDAPIVersionAnnotationKey, appsv1.GroupVersion.String()).
 				AddSharding(defaultShardingCompName, "", compDefObj.Name).SetReplicas(1).
 				SetShards(3).
 				WithRandomName().Create(&testCtx).GetObject()
@@ -343,7 +341,6 @@ var _ = Describe("BackupPolicyDriver Controller test", func() {
 			clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
 				WithRandomName().
 				AddComponent(defaultCompName, compDefObj.Name).
-				AddAnnotations(constant.CRDAPIVersionAnnotationKey, appsv1.GroupVersion.String()).
 				SetBackup(backup).
 				Create(&testCtx).GetObject()
 			clusterKey = client.ObjectKeyFromObject(clusterObj)

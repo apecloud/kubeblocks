@@ -420,7 +420,7 @@ func TestCreateShardingReentersRollingWhenPromotedTemplateTargetChanges(t *testi
 }
 
 func TestRolloutSchedulingPolicyCopiesFields(t *testing.T) {
-	policy := &appsv1alpha1.SchedulingPolicy{
+	policy := &appsv1.SchedulingPolicy{
 		SchedulerName: "custom-scheduler",
 		NodeSelector: map[string]string{
 			"disk": "ssd",
@@ -439,6 +439,7 @@ func TestRolloutSchedulingPolicyCopiesFields(t *testing.T) {
 	got := rolloutSchedulingPolicy(policy)
 	if got == nil {
 		t.Fatalf("expected scheduling policy to be copied")
+		return
 	}
 	if got.SchedulerName != policy.SchedulerName {
 		t.Fatalf("unexpected scheduler name: %s", got.SchedulerName)

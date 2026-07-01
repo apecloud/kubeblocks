@@ -63,9 +63,7 @@ func reconcileConfigItemDetailsIntoSpec(ctx context.Context, cli client.Client, 
 	expected := compParam.DeepCopy()
 	expected.Spec.ConfigItemDetails = configItemDetails
 	merged := parameters.MergeComponentParameter(expected, compParam, func(dest, expected *parametersv1alpha1.ConfigTemplateItemDetail) {
-		if len(dest.ConfigFileParams) == 0 && len(expected.ConfigFileParams) != 0 {
-			dest.ConfigFileParams = expected.ConfigFileParams
-		}
+		mergeMissingConfigFileParams(dest, expected)
 		if dest.CustomTemplates == nil && expected.CustomTemplates != nil {
 			dest.CustomTemplates = expected.CustomTemplates
 		}
@@ -78,6 +76,21 @@ func reconcileConfigItemDetailsIntoSpec(ctx context.Context, cli client.Client, 
 	patch := client.MergeFrom(compParam.DeepCopy())
 	compParam.Spec.ConfigItemDetails = merged.Spec.ConfigItemDetails
 	return true, cli.Patch(ctx, compParam, patch)
+}
+
+func mergeMissingConfigFileParams(dest, expected *parametersv1alpha1.ConfigTemplateItemDetail) {
+	if len(expected.ConfigFileParams) == 0 {
+		return
+	}
+	if dest.ConfigFileParams == nil {
+		dest.ConfigFileParams = map[string]parametersv1alpha1.ParametersInFile{}
+	}
+	for file, params := range expected.ConfigFileParams {
+		if _, ok := dest.ConfigFileParams[file]; ok {
+			continue
+		}
+		dest.ConfigFileParams[file] = *params.DeepCopy()
+	}
 }
 
 func reconcileParameterValuesIntoSpec(ctx context.Context, cli client.Client, compParam *parametersv1alpha1.ComponentParameter, fetchTask *Task) (bool, error) {

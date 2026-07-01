@@ -58,7 +58,6 @@ func BuildInstanceSet(synthesizedComp *SynthesizedComponent, compDef *kbappsv1.C
 		AddLabelsInMap(synthesizedComp.DynamicLabels).
 		AddLabelsInMap(constant.GetCompLabels(clusterName, compName, synthesizedComp.Labels)).
 		AddAnnotations(constant.KubeBlocksGenerationKey, synthesizedComp.Generation).
-		AddAnnotations(constant.CRDAPIVersionAnnotationKey, workloads.GroupVersion.String()).
 		AddAnnotationsInMap(map[string]string{
 			constant.AppComponentLabelKey:   compDefName,
 			constant.KBAppServiceVersionKey: synthesizedComp.ServiceVersion,
@@ -302,6 +301,21 @@ func ListOwnedWorkloads(ctx context.Context, cli client.Reader, namespace, clust
 func ListOwnedPods(ctx context.Context, cli client.Reader, namespace, clusterName, compName string,
 	opts ...client.ListOption) ([]*corev1.Pod, error) {
 	return listPods(ctx, cli, namespace, clusterName, compName, nil, opts...)
+}
+
+// ListOwnedInstances returns the pods that currently represent a Component's instances.
+func ListOwnedInstances(ctx context.Context, cli client.Reader, comp *kbappsv1.Component,
+	objects ...client.Object) ([]*corev1.Pod, error) {
+	clusterName, err := GetClusterName(comp)
+	if err != nil {
+		return nil, err
+	}
+	compName, err := GetComponentName(comp)
+	if err != nil {
+		return nil, err
+	}
+	objects = append([]client.Object{comp}, objects...)
+	return ListOwnedPods(dataContextOf(ctx, objects...), cli, comp.Namespace, clusterName, compName)
 }
 
 func ListOwnedPodsWithRole(ctx context.Context, cli client.Reader, namespace, clusterName, compName, role string,

@@ -51,6 +51,10 @@ func GetClusterName(comp *appsv1.Component) (string, error) {
 	return getCompLabelValue(comp, constant.AppInstanceLabelKey)
 }
 
+func GetComponentName(comp *appsv1.Component) (string, error) {
+	return getCompLabelValue(comp, constant.KBAppComponentLabelKey)
+}
+
 func GetClusterUID(comp *appsv1.Component) (string, error) {
 	return getCompAnnotationValue(comp, constant.KBAppClusterUIDKey)
 }
@@ -59,7 +63,6 @@ func GetClusterUID(comp *appsv1.Component) (string, error) {
 func BuildComponent(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSpec, labels, annotations map[string]string) (*appsv1.Component, error) {
 	compBuilder := builder.NewComponentBuilder(cluster.Namespace, FullName(cluster.Name, compSpec.Name), compSpec.ComponentDef).
 		AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(cluster.Generation, 10)).
-		AddAnnotations(constant.CRDAPIVersionAnnotationKey, appsv1.GroupVersion.String()).
 		AddAnnotations(constant.KBAppClusterUIDKey, string(cluster.UID)).
 		AddAnnotationsInMap(inheritedAnnotations(cluster)).
 		AddAnnotationsInMap(annotations). // annotations added by the cluster controller
@@ -176,7 +179,7 @@ func NewLifecycle(ctx context.Context, cli client.Reader, compDef *appsv1.Compon
 		return nil, err
 	}
 
-	pods, err := ListOwnedPods(ctx, cli, synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name)
+	pods, err := ListOwnedInstances(ctx, cli, comp)
 	if err != nil {
 		return nil, err
 	}

@@ -231,7 +231,7 @@ type RolloutStrategyReplace struct {
 	// Specifies the scheduling policy for the new instance.
 	//
 	// +optional
-	SchedulingPolicy *SchedulingPolicy `json:"schedulingPolicy,omitempty"`
+	SchedulingPolicy *appsv1.SchedulingPolicy `json:"schedulingPolicy,omitempty"`
 
 	// The number of seconds to wait between rolling out two instances.
 	//
@@ -255,7 +255,7 @@ type RolloutStrategyCreate struct {
 	// Specifies the scheduling policy for the new instance.
 	//
 	// +optional
-	SchedulingPolicy *SchedulingPolicy `json:"schedulingPolicy,omitempty"`
+	SchedulingPolicy *appsv1.SchedulingPolicy `json:"schedulingPolicy,omitempty"`
 
 	// Specifies the promotion strategy for the created instances.
 	//

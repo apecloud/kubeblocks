@@ -24,7 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
@@ -60,7 +59,7 @@ func TestNewAllCondition(t *testing.T) {
 		},
 	}
 	NewReconfigureCondition(opsRequest)
-	NewReconfigureRunningCondition(opsRequest, appsv1alpha1.ReasonReconfigureRunning, "for_test", "")
+	NewReconfigureRunningCondition(opsRequest, ReasonReconfigureRunning, "for_test", "")
 }
 
 // TestReasonConstantsStringDrift pins the literal value of every Reason

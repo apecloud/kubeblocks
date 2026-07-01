@@ -109,6 +109,46 @@ func TestMergeItemParameters(t *testing.T) {
 	})
 }
 
+func TestMergeMissingConfigFileParams(t *testing.T) {
+	dest := &parametersv1alpha1.ConfigTemplateItemDetail{
+		ConfigFileParams: map[string]parametersv1alpha1.ParametersInFile{
+			"my.cnf": {
+				Parameters: map[string]*string{
+					"max_connections": ptr.To("2000"),
+				},
+			},
+		},
+	}
+	expected := &parametersv1alpha1.ConfigTemplateItemDetail{
+		ConfigFileParams: map[string]parametersv1alpha1.ParametersInFile{
+			"my.cnf": {
+				Parameters: map[string]*string{
+					"max_connections": ptr.To("1000"),
+				},
+			},
+			"log.conf": {
+				Parameters: map[string]*string{
+					"slow_query_log": ptr.To("1"),
+				},
+			},
+		},
+	}
+
+	mergeMissingConfigFileParams(dest, expected)
+
+	if got := dest.ConfigFileParams["my.cnf"].Parameters["max_connections"]; got == nil || *got != "2000" {
+		t.Fatalf("expected existing file params to be preserved, got %#v", got)
+	}
+	if _, ok := dest.ConfigFileParams["log.conf"]; !ok {
+		t.Fatalf("expected missing legacy file params to be merged")
+	}
+
+	*expected.ConfigFileParams["log.conf"].Parameters["slow_query_log"] = "0"
+	if got := dest.ConfigFileParams["log.conf"].Parameters["slow_query_log"]; got == nil || *got != "1" {
+		t.Fatalf("expected merged params to be deep-copied, got %#v", got)
+	}
+}
+
 func TestNilEmptyConfigItemDetailsEquivalence(t *testing.T) {
 	t.Run("nil and empty ConfigItemDetails should be treated as equal", func(t *testing.T) {
 		merged := parampkg.MergeComponentParameter(

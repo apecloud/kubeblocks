@@ -74,11 +74,6 @@ type Key string
 // DryRunContextKey tells the KB Controllers to do dry-run reconciliations
 const DryRunContextKey Key = "dry-run"
 
-// APIVersionSupported specifies the API version supported by the operator.
-const (
-	APIVersionSupported = "api-version-supported"
-)
-
 const (
 	ReleasePhaseStable string = "stable"
 	ReleasePhaseCanary string = "canary"

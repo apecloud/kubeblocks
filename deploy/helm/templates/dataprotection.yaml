@@ -14,7 +14,7 @@ metadata:
     app.kubernetes.io/component: "dataprotection"
 spec:
   {{- if not .Values.autoscaling.enabled }}
-  replicas: {{ include "kubeblocks.replicaCount" . }}
+  replicas: {{ .Values.replicaCount }}
   {{- end }}
   selector:
     matchLabels:

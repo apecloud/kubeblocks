@@ -34,12 +34,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/sharding"
-	"github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 // clusterNormalizationTransformer handles the cluster API conversion.
@@ -72,10 +70,6 @@ func (t *clusterNormalizationTransformer) Transform(ctx graph.TransformContext, 
 
 	// resolve component definitions referenced for components
 	if err = t.resolveDefinitions4Components(transCtx); err != nil {
-		return err
-	}
-
-	if err = t.checkNPatchCRDAPIVersionKey(transCtx); err != nil {
 		return err
 	}
 
@@ -568,66 +562,6 @@ func (t *clusterNormalizationTransformer) writeBackCompNShardingSpecs(transCtx *
 		}
 		transCtx.Cluster.Spec.Shardings = shardings
 	}
-}
-
-func (t *clusterNormalizationTransformer) checkNPatchCRDAPIVersionKey(transCtx *clusterTransformContext) error {
-	// get the v1Alpha1Cluster from the annotations
-	v1Alpha1Cluster, err := appsv1alpha1.GetV1Alpha1ClusterFromIncrementConverter(transCtx.Cluster)
-	if err != nil {
-		return err
-	}
-	getCRDAPIVersion := func() (string, error) {
-		apiVersion := transCtx.Cluster.Annotations[constant.CRDAPIVersionAnnotationKey]
-		if len(apiVersion) > 0 {
-			return apiVersion, nil
-		}
-		if v1Alpha1Cluster != nil && len(v1Alpha1Cluster.Spec.ClusterDefRef) > 0 {
-			return appsv1alpha1.GroupVersion.String(), nil
-		}
-
-		// get the CRD API version from the annotations of the clusterDef or componentDefs
-		apiVersions := map[string][]string{}
-		from := func(name string, annotations map[string]string) {
-			key := annotations[constant.CRDAPIVersionAnnotationKey]
-			apiVersions[key] = append(apiVersions[key], name)
-		}
-
-		if transCtx.clusterDef != nil {
-			from(transCtx.clusterDef.Name, transCtx.clusterDef.Annotations)
-		} else {
-			for _, compDef := range transCtx.componentDefs {
-				from(compDef.Name, compDef.Annotations)
-			}
-			for _, shardingDef := range transCtx.shardingDefs {
-				from(shardingDef.Name, shardingDef.Annotations)
-			}
-		}
-		switch {
-		case len(apiVersions) > 1:
-			return "", fmt.Errorf("multiple CRD API versions found: %v", apiVersions)
-		case len(apiVersions) == 1:
-			return maps.Keys(apiVersions)[0], nil
-		default:
-			return "", nil
-		}
-	}
-
-	apiVersion, err := getCRDAPIVersion()
-	if err != nil {
-		return err
-	}
-	if transCtx.Cluster.Annotations == nil {
-		transCtx.Cluster.Annotations = make(map[string]string)
-	}
-	transCtx.Cluster.Annotations[constant.CRDAPIVersionAnnotationKey] = apiVersion
-	if controllerutil.IsAPIVersionSupported(apiVersion) {
-		return nil
-	}
-	if v1Alpha1Cluster != nil && len(v1Alpha1Cluster.Spec.ClusterVersionRef) > 0 {
-		// revert the topology to empty
-		transCtx.Cluster.Spec.Topology = ""
-	}
-	return graph.ErrPrematureStop // un-supported CRD API version, stop the transformation
 }
 
 // referredClusterTopology returns the cluster topology which has name @name.

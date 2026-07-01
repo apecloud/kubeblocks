@@ -166,7 +166,6 @@ var _ = Describe("Component Controller", func() {
 		factory := testapps.NewComponentFactory(testCtx.DefaultNamespace, compObjName, compDefName).
 			AddLabels().
 			AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(clusterGeneration, 10)).
-			AddAnnotations(constant.CRDAPIVersionAnnotationKey, kbappsv1.GroupVersion.String()).
 			AddAnnotations(constant.KBAppClusterUIDKey, clusterUID).
 			AddLabelsInMap(constant.GetCompLabelsWithDef(clusterKey.Name, compName, compDefName)).
 			SetReplicas(1)

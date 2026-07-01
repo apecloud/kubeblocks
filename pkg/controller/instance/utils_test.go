@@ -43,6 +43,7 @@ func TestReconfigureOptions(t *testing.T) {
 	opts := reconfigureOptions(workloads.ConfigTemplate{ReconfigureArgs: args})
 	if opts == nil {
 		t.Fatalf("expected options for non-empty reconfigure args")
+		return
 	}
 	if !reflect.DeepEqual(opts.Arguments, args) {
 		t.Fatalf("expected arguments %v, got %v", args, opts.Arguments)

@@ -23,8 +23,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 )
@@ -39,22 +37,10 @@ var _ = Describe("api version reconciler test", func() {
 			reconciler := NewAPIVersionReconciler()
 			Expect(reconciler.PreCondition(tree)).Should(Equal(kubebuilderx.ConditionSatisfied))
 
-			By("Reconcile with supported api version")
-			if its.Annotations == nil {
-				its.Annotations = make(map[string]string)
-			}
-			its.Annotations[constant.CRDAPIVersionAnnotationKey] = workloads.GroupVersion.String()
-			tree.SetRoot(its)
+			By("Reconcile with Instance API disabled")
 			res, err := reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())
 			Expect(res).Should(Equal(kubebuilderx.Continue))
-
-			By("Reconcile with unsupported api version")
-			delete(its.Annotations, constant.CRDAPIVersionAnnotationKey)
-			tree.SetRoot(its)
-			res, err = reconciler.Reconcile(tree)
-			Expect(err).Should(BeNil())
-			Expect(res).Should(Equal(kubebuilderx.Commit))
 		})
 	})
 })

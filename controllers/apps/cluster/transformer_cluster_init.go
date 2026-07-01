@@ -23,7 +23,6 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 type clusterInitTransformer struct {
@@ -40,8 +39,5 @@ func (t *clusterInitTransformer) Transform(ctx graph.TransformContext, dag *grap
 	// init dag
 	graphCli.Root(dag, transCtx.OrigCluster, transCtx.Cluster, model.ActionStatusPtr())
 
-	if !intctrlutil.ObjectAPIVersionSupported(t.cluster) {
-		return graph.ErrPrematureStop
-	}
 	return nil
 }

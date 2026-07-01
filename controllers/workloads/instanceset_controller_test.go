@@ -92,7 +92,6 @@ var _ = Describe("InstanceSet Controller", func() {
 		}
 		f := testapps.NewInstanceSetFactory(testCtx.DefaultNamespace, name, "test-cluster", "comp").
 			WithRandomName().
-			AddAnnotations(constant.CRDAPIVersionAnnotationKey, workloads.GroupVersion.String()).
 			AddContainer(container).
 			SetReplicas(1)
 		for _, processor := range processors {
@@ -171,7 +170,6 @@ var _ = Describe("InstanceSet Controller", func() {
 			}
 			its := builder.NewInstanceSetBuilder(testCtx.DefaultNamespace, name).
 				SetSelectorMatchLabel(commonLabels).
-				AddAnnotations(constant.CRDAPIVersionAnnotationKey, workloads.GroupVersion.String()).
 				SetTemplate(template).
 				GetObject()
 			viper.Set(constant.KBToolsImage, "kb-tool-image")
@@ -1211,6 +1209,9 @@ var _ = Describe("InstanceSet Controller", func() {
 			By("update proposed sa name")
 			newSAName := "new-sa"
 			Eventually(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
+				if its.Annotations == nil {
+					its.Annotations = map[string]string{}
+				}
 				its.Annotations[constant.ProposedServiceAccountNameAnnotationKey] = newSAName
 			})).Should(Succeed())
 			podsKey := []types.NamespacedName{

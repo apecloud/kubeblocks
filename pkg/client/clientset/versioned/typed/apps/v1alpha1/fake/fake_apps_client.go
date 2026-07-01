@@ -28,36 +28,12 @@ type FakeAppsV1alpha1 struct {
 	*testing.Fake
 }
 
-func (c *FakeAppsV1alpha1) Clusters(namespace string) v1alpha1.ClusterInterface {
-	return &FakeClusters{c, namespace}
-}
-
-func (c *FakeAppsV1alpha1) ClusterDefinitions() v1alpha1.ClusterDefinitionInterface {
-	return &FakeClusterDefinitions{c}
-}
-
-func (c *FakeAppsV1alpha1) Components(namespace string) v1alpha1.ComponentInterface {
-	return &FakeComponents{c, namespace}
-}
-
-func (c *FakeAppsV1alpha1) ComponentDefinitions() v1alpha1.ComponentDefinitionInterface {
-	return &FakeComponentDefinitions{c}
-}
-
-func (c *FakeAppsV1alpha1) ComponentVersions() v1alpha1.ComponentVersionInterface {
-	return &FakeComponentVersions{c}
-}
-
 func (c *FakeAppsV1alpha1) ConfigConstraints() v1alpha1.ConfigConstraintInterface {
 	return &FakeConfigConstraints{c}
 }
 
 func (c *FakeAppsV1alpha1) Rollouts(namespace string) v1alpha1.RolloutInterface {
 	return &FakeRollouts{c, namespace}
-}
-
-func (c *FakeAppsV1alpha1) ServiceDescriptors(namespace string) v1alpha1.ServiceDescriptorInterface {
-	return &FakeServiceDescriptors{c, namespace}
 }
 
 // RESTClient returns a RESTClient that is used to communicate

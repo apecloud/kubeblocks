@@ -276,6 +276,11 @@ var _ = Describe("desired_state_handler test", func() {
 					return apierrors.NewNotFound(parametersv1alpha1.Resource(constant.ComponentParameterKind), objKey.Name)
 				}).AnyTimes()
 			k8sMock.EXPECT().
+				Get(gomock.Any(), gomock.Any(), &corev1.Secret{}, gomock.Any()).
+				DoAndReturn(func(_ context.Context, objKey client.ObjectKey, obj *corev1.Secret, _ ...client.GetOption) error {
+					return apierrors.NewNotFound(corev1.Resource(constant.SecretKind), objKey.Name)
+				}).AnyTimes()
+			k8sMock.EXPECT().
 				Get(gomock.Any(), gomock.Any(), &corev1.ConfigMap{}, gomock.Any()).
 				DoAndReturn(func(_ context.Context, objKey client.ObjectKey, obj *corev1.ConfigMap, _ ...client.GetOption) error {
 					return apierrors.NewNotFound(corev1.Resource(constant.ConfigMapKind), objKey.Name)

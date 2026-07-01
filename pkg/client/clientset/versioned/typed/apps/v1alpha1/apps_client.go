@@ -28,39 +28,13 @@ import (
 
 type AppsV1alpha1Interface interface {
 	RESTClient() rest.Interface
-	ClustersGetter
-	ClusterDefinitionsGetter
-	ComponentsGetter
-	ComponentDefinitionsGetter
-	ComponentVersionsGetter
 	ConfigConstraintsGetter
 	RolloutsGetter
-	ServiceDescriptorsGetter
 }
 
 // AppsV1alpha1Client is used to interact with features provided by the apps.kubeblocks.io group.
 type AppsV1alpha1Client struct {
 	restClient rest.Interface
-}
-
-func (c *AppsV1alpha1Client) Clusters(namespace string) ClusterInterface {
-	return newClusters(c, namespace)
-}
-
-func (c *AppsV1alpha1Client) ClusterDefinitions() ClusterDefinitionInterface {
-	return newClusterDefinitions(c)
-}
-
-func (c *AppsV1alpha1Client) Components(namespace string) ComponentInterface {
-	return newComponents(c, namespace)
-}
-
-func (c *AppsV1alpha1Client) ComponentDefinitions() ComponentDefinitionInterface {
-	return newComponentDefinitions(c)
-}
-
-func (c *AppsV1alpha1Client) ComponentVersions() ComponentVersionInterface {
-	return newComponentVersions(c)
 }
 
 func (c *AppsV1alpha1Client) ConfigConstraints() ConfigConstraintInterface {
@@ -69,10 +43,6 @@ func (c *AppsV1alpha1Client) ConfigConstraints() ConfigConstraintInterface {
 
 func (c *AppsV1alpha1Client) Rollouts(namespace string) RolloutInterface {
 	return newRollouts(c, namespace)
-}
-
-func (c *AppsV1alpha1Client) ServiceDescriptors(namespace string) ServiceDescriptorInterface {
-	return newServiceDescriptors(c, namespace)
 }
 
 // NewForConfig creates a new AppsV1alpha1Client for the given config.

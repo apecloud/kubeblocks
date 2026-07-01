@@ -37,7 +37,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
@@ -245,48 +245,36 @@ var _ = Describe("pod utils", func() {
 	var (
 		statefulSet     *appsv1.StatefulSet
 		pod             *corev1.Pod
-		configTemplates = []appsv1alpha1.ComponentConfigSpec{
+		configTemplates = []kbappsv1.ComponentFileTemplate{
 			{
-				ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-					Name:       "xxxxx",
-					VolumeName: "config1",
-				},
+				Name:       "xxxxx",
+				VolumeName: "config1",
 			},
 			{
-				ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-					Name:       "xxxxx2",
-					VolumeName: "config2",
-				},
+				Name:       "xxxxx2",
+				VolumeName: "config2",
 			},
 		}
 
-		foundInitContainerConfigTemplates = []appsv1alpha1.ComponentConfigSpec{
+		foundInitContainerConfigTemplates = []kbappsv1.ComponentFileTemplate{
 			{
-				ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-					Name:       "xxxxx",
-					VolumeName: "config1_init_container",
-				},
+				Name:       "xxxxx",
+				VolumeName: "config1_init_container",
 			},
 			{
-				ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-					Name:       "xxxxx2",
-					VolumeName: "config2_init_container",
-				},
+				Name:       "xxxxx2",
+				VolumeName: "config2_init_container",
 			},
 		}
 
-		notFoundConfigTemplates = []appsv1alpha1.ComponentConfigSpec{
+		notFoundConfigTemplates = []kbappsv1.ComponentFileTemplate{
 			{
-				ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-					Name:       "xxxxx",
-					VolumeName: "config1_not_fount",
-				},
+				Name:       "xxxxx",
+				VolumeName: "config1_not_fount",
 			},
 			{
-				ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-					Name:       "xxxxx2",
-					VolumeName: "config2_not_fount",
-				},
+				Name:       "xxxxx2",
+				VolumeName: "config2_not_fount",
 			},
 		}
 	)

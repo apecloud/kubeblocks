@@ -88,7 +88,6 @@ var _ = Describe("ComponentDrivenParameter re-enqueue contract", func() {
 		// Step 2: create the Component referencing the Available CompDef.
 		fullCompName := constant.GenerateClusterComponentName(clusterName, defaultCompName)
 		_ = testapps.NewComponentFactory(testCtx.DefaultNamespace, fullCompName, compDefObj.Name).
-			AddAnnotations(constant.CRDAPIVersionAnnotationKey, appsv1.GroupVersion.String()).
 			AddLabels(constant.AppInstanceLabelKey, clusterName).
 			SetReplicas(1).
 			Create(&testCtx).
@@ -176,12 +175,10 @@ var _ = Describe("ComponentDrivenParameter re-enqueue contract", func() {
 		compNameA := defaultCompName
 		compNameB := defaultCompName + "-alt"
 		testapps.NewComponentFactory(testCtx.DefaultNamespace, constant.GenerateClusterComponentName(clusterName, compNameA), compDefA.Name).
-			AddAnnotations(constant.CRDAPIVersionAnnotationKey, appsv1.GroupVersion.String()).
 			AddLabels(constant.AppInstanceLabelKey, clusterName).
 			SetReplicas(1).
 			Create(&testCtx)
 		testapps.NewComponentFactory(testCtx.DefaultNamespace, constant.GenerateClusterComponentName(clusterName, compNameB), compDefB.Name).
-			AddAnnotations(constant.CRDAPIVersionAnnotationKey, appsv1.GroupVersion.String()).
 			AddLabels(constant.AppInstanceLabelKey, clusterName).
 			SetReplicas(1).
 			Create(&testCtx)
@@ -263,7 +260,6 @@ var _ = Describe("ComponentDrivenParameter re-enqueue contract", func() {
 
 		fullCompName := constant.GenerateClusterComponentName(clusterName, defaultCompName)
 		compObj := testapps.NewComponentFactory(testCtx.DefaultNamespace, fullCompName, compDefObj.Name).
-			AddAnnotations(constant.CRDAPIVersionAnnotationKey, appsv1.GroupVersion.String()).
 			AddLabels(constant.AppInstanceLabelKey, clusterName).
 			SetReplicas(1).
 			Create(&testCtx).

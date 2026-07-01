@@ -28,35 +28,4 @@ data:
   tls.key: {{ $cert.Key | b64enc }}
   tls.crt: {{ $cert.Cert | b64enc }}
 {{- end }}
-{{- if .Values.webhooks.conversionEnabled }}
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: {{ include "kubeblocks.fullname" . }}.{{ .Release.Namespace }}.crd.conversion.webhook
-data:
-  conversion_webhook_patch.json: |
-    {
-      "spec": {
-        "conversion": {
-           "strategy": "Webhook",
-           "webhook": {
-              "clientConfig": {
-                  "service": {
-                     "name": {{ include "kubeblocks.svcName" . | quote }},
-                     "namespace": {{ .Release.Namespace | quote }},
-                     "port": {{ .Values.service.port }},
-                     "path": "/convert"
-                  }
-                  {{- if .Values.webhooks.createSelfSignedCert -}}
-                  ,
-                  "caBundle": {{ $ca.Cert | b64enc | quote }}
-                  {{- end }}
-              },
-             "conversionReviewVersions": ["v1"]
-           }
-        }
-      }
-    }
-{{- end }}
 {{- end }}

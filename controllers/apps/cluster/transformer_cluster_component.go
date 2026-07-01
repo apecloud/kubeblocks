@@ -32,6 +32,7 @@ import (
 	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -365,6 +366,7 @@ func newOrderedHandler(topology appsv1.ClusterTopology, orders []string, op int)
 				topology:       topology,
 				orders:         orders,
 				ignoreNotExist: op == updateOp,
+				op:             op,
 			},
 			clusterCompNShardingHandler: clusterCompNShardingHandler{op: op},
 		}
@@ -534,6 +536,7 @@ type phasePrecondition struct {
 	topology       appsv1.ClusterTopology
 	orders         []string
 	ignoreNotExist bool
+	op             int
 }
 
 func (c *phasePrecondition) match(transCtx *clusterTransformContext, dag *graph.DAG, name string) (bool, error) {
@@ -585,7 +588,11 @@ func (c *phasePrecondition) compMatch(transCtx *clusterTransformContext, dag *gr
 	if err := transCtx.Client.Get(transCtx.Context, compKey, comp); err != nil {
 		return c.ignoreNotExist, client.IgnoreNotFound(err)
 	}
-	if !c.expected(comp) {
+	expected, err := c.expected(transCtx, comp)
+	if err != nil {
+		return false, err
+	}
+	if !expected {
 		transCtx.Logger.Info("waiting for predecessor component in expected phase",
 			"component", comp.Name, "predecessor", name)
 		return false, nil
@@ -626,7 +633,11 @@ func (c *phasePrecondition) shardingMatch(transCtx *clusterTransformContext, dag
 		return false, nil
 	}
 	for _, comp := range comps {
-		if !c.expected(&comp) {
+		expected, err := c.expected(transCtx, &comp)
+		if err != nil {
+			return false, err
+		}
+		if !expected {
 			transCtx.Logger.Info("waiting for predecessor sharding in expected phase",
 				"shard", comp.Name, "predecessor sharding", name)
 			return false, nil
@@ -641,13 +652,79 @@ func (c *phasePrecondition) shardingMatch(transCtx *clusterTransformContext, dag
 	return true, nil
 }
 
-func (c *phasePrecondition) expected(comp *appsv1.Component) bool {
-	if comp.Generation == comp.Status.ObservedGeneration {
-		expect := appsv1.RunningComponentPhase
-		if comp.Spec.Stop != nil && *comp.Spec.Stop {
-			expect = appsv1.StoppedComponentPhase
+func (c *phasePrecondition) expected(transCtx *clusterTransformContext, comp *appsv1.Component) (bool, error) {
+	if comp.Generation != comp.Status.ObservedGeneration {
+		return false, nil
+	}
+	expect := appsv1.RunningComponentPhase
+	if comp.Spec.Stop != nil && *comp.Spec.Stop {
+		expect = appsv1.StoppedComponentPhase
+	}
+	if comp.Status.Phase == expect {
+		return true, nil
+	}
+	if c.op != createOp {
+		return false, nil
+	}
+	return restorePVCInitialStepCompletedForComponent(transCtx, comp)
+}
+
+func restorePVCInitialStepCompletedForComponent(transCtx *clusterTransformContext, comp *appsv1.Component) (bool, error) {
+	cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ConditionTypeRestore)
+	if cond == nil || cond.Status != metav1.ConditionUnknown || cond.Reason != ReasonRestoreRunning {
+		return false, nil
+	}
+	expected := expectedRestorePVCCountForComponentSpec(comp.Spec.Replicas, comp.Spec.VolumeClaimTemplates, comp.Spec.Instances)
+	if expected == 0 {
+		return false, nil
+	}
+	componentName := comp.Labels[constant.KBAppComponentLabelKey]
+	if componentName == "" {
+		var err error
+		componentName, err = component.ShortName(transCtx.Cluster.Name, comp.Name)
+		if err != nil {
+			return false, err
 		}
-		return comp.Status.Phase == expect
+	}
+	pvcList := &corev1.PersistentVolumeClaimList{}
+	if err := transCtx.Client.List(transCtx.Context, pvcList,
+		client.InNamespace(comp.Namespace),
+		client.MatchingLabels(constant.GetCompLabels(transCtx.Cluster.Name, componentName))); err != nil {
+		return false, err
+	}
+	completed := 0
+	for i := range pvcList.Items {
+		pvc := &pvcList.Items[i]
+		if !pvc.DeletionTimestamp.IsZero() ||
+			pvc.Annotations[constant.RestoreSourceKindAnnotationKey] == "" {
+			continue
+		}
+		if !restorePVCInitialStepCompleted(pvc) {
+			return false, nil
+		}
+		completed++
+	}
+	return completed >= expected, nil
+}
+
+func restorePVCInitialStepCompleted(pvc *corev1.PersistentVolumeClaim) bool {
+	for i := range pvc.Status.Conditions {
+		condition := pvc.Status.Conditions[i]
+		if string(condition.Type) != appsv1.ConditionTypeRestore {
+			continue
+		}
+		if condition.Status == corev1.ConditionFalse {
+			return false
+		}
+	}
+	for i := range pvc.Status.Conditions {
+		condition := pvc.Status.Conditions[i]
+		if string(condition.Type) != constant.DataProtectionPVCConditionPopulating {
+			continue
+		}
+		return condition.Status == corev1.ConditionTrue &&
+			(condition.Reason == constant.DataProtectionPVCConditionReasonPopulatingSucceed ||
+				condition.Reason == constant.DataProtectionPVCConditionReasonPopulatingProvision)
 	}
 	return false
 }

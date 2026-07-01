@@ -22,6 +22,7 @@ package instanceset
 import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -135,7 +136,8 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 			break
 		}
 		predecessor := getPredecessor(i)
-		if isOrderedReady && predecessor != nil && !intctrlutil.IsPodAvailable(predecessor, its.Spec.MinReadySeconds) {
+		if isOrderedReady && predecessor != nil && !intctrlutil.IsPodAvailable(predecessor, its.Spec.MinReadySeconds) &&
+			!restorePVCInitialStepCompletedForPod(tree, its, predecessor.Name, nameToTemplateMap[predecessor.Name]) {
 			break
 		}
 		newPod, err := buildInstancePodByTemplate(name, nameToTemplateMap[name], its, "")
@@ -228,3 +230,60 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 }
 
 var _ kubebuilderx.Reconciler = &instanceAlignmentReconciler{}
+
+func restorePVCInitialStepCompletedForPod(tree *kubebuilderx.ObjectTree,
+	its *workloads.InstanceSet,
+	podName string,
+	template *instancetemplate.InstanceTemplateExt) bool {
+	if template == nil {
+		return false
+	}
+	expected := 0
+	for _, claimTemplate := range template.VolumeClaimTemplates {
+		if claimTemplate.Annotations[constant.RestoreSourceKindAnnotationKey] == "" {
+			continue
+		}
+		expected++
+		pvcName := intctrlutil.ComposePVCName(claimTemplate, its.Name, podName)
+		pvcObj, err := tree.Get(pvcForLookup(its.Namespace, pvcName))
+		if err != nil || pvcObj == nil {
+			return false
+		}
+		pvc, ok := pvcObj.(*corev1.PersistentVolumeClaim)
+		if !ok || !restorePVCInitialStepCompleted(pvc) {
+			return false
+		}
+	}
+	return expected > 0
+}
+
+func pvcForLookup(namespace, name string) *corev1.PersistentVolumeClaim {
+	return &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      name,
+		},
+	}
+}
+
+func restorePVCInitialStepCompleted(pvc *corev1.PersistentVolumeClaim) bool {
+	for i := range pvc.Status.Conditions {
+		condition := pvc.Status.Conditions[i]
+		if string(condition.Type) != string(workloads.InstanceRestore) {
+			continue
+		}
+		if condition.Status == corev1.ConditionFalse {
+			return false
+		}
+	}
+	for i := range pvc.Status.Conditions {
+		condition := pvc.Status.Conditions[i]
+		if string(condition.Type) != constant.DataProtectionPVCConditionPopulating {
+			continue
+		}
+		return condition.Status == corev1.ConditionTrue &&
+			(condition.Reason == constant.DataProtectionPVCConditionReasonPopulatingSucceed ||
+				condition.Reason == constant.DataProtectionPVCConditionReasonPopulatingProvision)
+	}
+	return false
+}

@@ -1653,7 +1653,7 @@ func TestCompleteBoundPVCReleasesPopulatePVCBeforeWaitingForPostReady(t *testing
 	require.NotNil(t, populatingCondition)
 	require.Equal(t, ReasonPopulatingSucceed, populatingCondition.Reason)
 	restoreCondition := findPVCConditionByType(currentPVC, kbappsv1.ConditionTypeRestore)
-	require.Nil(t, restoreCondition)
+	require.Nil(t, restoreCondition, "Restore=True must wait for postReady completion")
 	currentPopulatePVC := &corev1.PersistentVolumeClaim{}
 	require.Error(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(populatePVC), currentPopulatePVC))
 }
@@ -3013,6 +3013,122 @@ func TestEnsurePostReadyRestore_MultiComponent_PostReadyOnly_WaitsForAllComponen
 	require.NoError(t, reconciler.Client.List(context.Background(), restoreList, client.InNamespace("default")))
 	require.Len(t, restoreList.Items, 0,
 		"no Restore CR should be created while other component PVCs are still unbound")
+}
+
+func TestCompleteBoundPVCIfNeeded_PostReadyOnlyProvisionedPVCKeepsRestoreUnknownBeforePostReady(t *testing.T) {
+	// TiDB-shaped logical backups have no targetVolumes; PD/TiKV data PVCs are
+	// provision-only and the postReady action redirects to the TiDB component.
+	// While postReady waits for other component PVCs, the current PVC may publish
+	// Populating=Provisioned as an initial-step signal, but Restore=True is still
+	// reserved for postReady completion.
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, batchv1.AddToScheme(scheme))
+	require.NoError(t, kbappsv1.AddToScheme(scheme))
+	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
+	apiGroup := dptypes.DataprotectionAPIGroup
+
+	backup := newBackupForRestoreDecision(nil, nil)
+	backup.Status.BackupMethod.TargetVolumes = nil
+	backup.Status.Target = &dpv1alpha1.BackupStatusTarget{
+		BackupTarget: dpv1alpha1.BackupTarget{
+			Name: "tidb",
+			PodSelector: &dpv1alpha1.PodSelector{
+				LabelSelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						constant.AppInstanceLabelKey:    "cluster",
+						constant.KBAppComponentLabelKey: "tidb",
+					},
+				},
+			},
+		},
+	}
+
+	pdPVC := newPVCForRestoreDecision("data", "pd", "")
+	pdPVC.UID = types.UID("pd-pvc-uid")
+	pdPVC.Spec.VolumeName = "pd-data-pv"
+	pdPVC.Spec.DataSourceRef = &corev1.TypedObjectReference{
+		APIGroup: &apiGroup,
+		Kind:     dptypes.BackupKind,
+		Name:     backup.Name,
+	}
+	pdPVC.Annotations[constant.RestoreSourceKindAnnotationKey] = dptypes.BackupKind
+	pdPVC.Annotations[constant.RestoreSourceNamespaceAnnotationKey] = backup.Namespace
+
+	tikvPVC := newPVCForRestoreDecision("data", "tikv", "")
+	tikvPVC.UID = types.UID("tikv-pvc-uid")
+	tikvPVC.Spec.DataSourceRef = &corev1.TypedObjectReference{
+		APIGroup: &apiGroup,
+		Kind:     dptypes.BackupKind,
+		Name:     backup.Name,
+	}
+	tikvPVC.Annotations[constant.RestoreSourceKindAnnotationKey] = dptypes.BackupKind
+	tikvPVC.Annotations[constant.RestoreSourceNamespaceAnnotationKey] = backup.Namespace
+
+	pdComp := &kbappsv1.Component{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      constant.GenerateClusterComponentName("cluster", "pd"),
+			UID:       "pd-component-uid",
+		},
+		Status: kbappsv1.ComponentStatus{Phase: kbappsv1.RunningComponentPhase},
+	}
+	tikvComp := &kbappsv1.Component{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      constant.GenerateClusterComponentName("cluster", "tikv"),
+			UID:       "tikv-component-uid",
+		},
+		Status: kbappsv1.ComponentStatus{Phase: kbappsv1.CreatingComponentPhase},
+	}
+	tidbComp := &kbappsv1.Component{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      constant.GenerateClusterComponentName("cluster", "tidb"),
+			UID:       "tidb-component-uid",
+		},
+		Status: kbappsv1.ComponentStatus{Phase: kbappsv1.RunningComponentPhase},
+	}
+
+	reconciler := &VolumePopulatorReconciler{
+		Client: fake.NewClientBuilder().WithScheme(scheme).
+			WithStatusSubresource(pdPVC, tikvPVC).
+			WithObjects(backup, pdPVC, tikvPVC, pdComp, tikvComp, tidbComp).
+			Build(),
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(10),
+	}
+	restoreMgr := dprestore.NewRestoreManager(&dpv1alpha1.Restore{
+		Spec: dpv1alpha1.RestoreSpec{Backup: dpv1alpha1.BackupRef{Name: backup.Name, Namespace: backup.Namespace}},
+	}, nil, scheme, reconciler.Client)
+	restoreMgr.PostReadyBackupSets = []dprestore.BackupActionSet{{Backup: backup}}
+
+	decision, err := reconciler.decidePVCRestore(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, pdPVC, backup, nil)
+	require.NoError(t, err)
+	require.Equal(t, pvcRestoreModeProvisionOnly, decision.mode)
+	require.True(t, decision.skipPostReady)
+
+	err = reconciler.completeBoundPVCIfNeeded(intctrlutil.RequestCtx{Ctx: context.Background()}, pdPVC, &pvcRestoreContext{
+		restoreMgr:    restoreMgr,
+		mode:          decision.mode,
+		skipPostReady: decision.skipPostReady,
+	})
+
+	require.Error(t, err)
+	require.True(t, intctrlutil.IsRequeueError(err), "expected postReady wait requeue, got: %v", err)
+	currentPVC := &corev1.PersistentVolumeClaim{}
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(pdPVC), currentPVC))
+	populatingCondition := findPVCConditionByType(currentPVC, string(PersistentVolumeClaimPopulating))
+	require.NotNil(t, populatingCondition)
+	require.Equal(t, corev1.ConditionTrue, populatingCondition.Status)
+	require.Equal(t, ReasonPopulatingProvisioned, populatingCondition.Reason)
+	restoreCondition := findPVCConditionByType(currentPVC, kbappsv1.ConditionTypeRestore)
+	require.Nil(t, restoreCondition, "Restore=True must not be written before postReady completes")
+
+	restoreList := &dpv1alpha1.RestoreList{}
+	require.NoError(t, reconciler.Client.List(context.Background(), restoreList, client.InNamespace("default")))
+	require.Empty(t, restoreList.Items, "postReady Restore must still wait for other component PVCs")
 }
 
 func TestEnsurePostReadyRestore_MultiComponent_PostReadyOnly_TargetsSlice(t *testing.T) {

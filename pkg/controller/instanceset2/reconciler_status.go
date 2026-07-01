@@ -29,10 +29,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
-	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/revisionmap"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -67,7 +68,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	notReadyNames := sets.New[string]()
 	notAvailableNames := sets.New[string]()
 	currentRevisions := map[string]string{}
-	updateRevisions, err := instanceset.GetRevisions(its.Status.UpdateRevisions)
+	updateRevisions, err := revisionmap.Decode(its.Status.UpdateRevisions)
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}
@@ -83,7 +84,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 
 	for _, inst := range instanceList {
-		templateName := inst.Labels[instancetemplate.TemplateNameLabelKey]
+		templateName := getInstanceTemplateName(inst)
 		if template2TemplatesStatus[templateName] == nil {
 			template2TemplatesStatus[templateName] = &workloads.InstanceTemplateStatus{
 				Name: templateName,
@@ -121,7 +122,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	its.Status.AvailableReplicas = availableReplicas
 	its.Status.CurrentReplicas = currentReplicas
 	its.Status.UpdatedReplicas = updatedReplicas
-	its.Status.CurrentRevisions, _ = instanceset.BuildRevisions(currentRevisions)
+	its.Status.CurrentRevisions, _ = revisionmap.Encode(currentRevisions)
 	its.Status.TemplatesStatus = buildTemplatesStatus(template2TemplatesStatus)
 	// all pods have been updated
 	totalReplicas := int32(1)
@@ -169,6 +170,16 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		return kubebuilderx.RetryAfter(time.Second), nil
 	}
 	return kubebuilderx.Continue, nil
+}
+
+func getInstanceTemplateName(inst *workloads.Instance) string {
+	if inst.Labels == nil {
+		return ""
+	}
+	if templateName := inst.Labels[instancetemplate.TemplateNameLabelKey]; templateName != "" {
+		return templateName
+	}
+	return inst.Labels[constant.KBAppInstanceTemplateLabelKey]
 }
 
 func buildConditionMessageWithNames(instanceNames []string) ([]byte, error) {

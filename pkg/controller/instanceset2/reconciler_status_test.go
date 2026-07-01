@@ -28,8 +28,8 @@ import (
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
+	"github.com/apecloud/kubeblocks/pkg/controller/revisionmap"
 )
 
 func TestSyncInstanceConfigStatus(t *testing.T) {
@@ -116,7 +116,7 @@ func TestIsInstanceUpdated(t *testing.T) {
 		}
 	}
 	latestInst := newInstance("2", true)
-	updateRevisions, err := instanceset.BuildRevisions(map[string]string{
+	updateRevisions, err := revisionmap.Encode(map[string]string{
 		latestInst.Name: buildInstanceRevision(latestInst),
 	})
 	if err != nil {
@@ -195,13 +195,16 @@ func TestStatusReconcilerKeepsScaleOutInstancesUpdatedAfterParentGenerationBump(
 	desired := &workloads.Instance{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-its-0",
+			Labels: map[string]string{
+				constant.KBAppInstanceTemplateLabelKey: "tpl",
+			},
 			Annotations: map[string]string{
 				constant.KubeBlocksGenerationKey: "3",
 			},
 		},
 		Spec: workloads.InstanceSpec{MinReadySeconds: 1},
 	}
-	updateRevisions, err := instanceset.BuildRevisions(map[string]string{
+	updateRevisions, err := revisionmap.Encode(map[string]string{
 		desired.Name: buildInstanceRevision(desired),
 	})
 	if err != nil {
@@ -214,7 +217,12 @@ func TestStatusReconcilerKeepsScaleOutInstancesUpdatedAfterParentGenerationBump(
 			Namespace:  "default",
 			Generation: 3,
 		},
-		Spec: workloads.InstanceSetSpec{Replicas: ptr.To[int32](1)},
+		Spec: workloads.InstanceSetSpec{
+			Replicas: ptr.To[int32](1),
+			Instances: []workloads.InstanceTemplate{
+				{Name: "tpl", Replicas: ptr.To[int32](1)},
+			},
+		},
 		Status: workloads.InstanceSetStatus{
 			ObservedGeneration: 3,
 			UpdateRevision:     "update-revision",
@@ -243,7 +251,7 @@ func TestStatusReconcilerKeepsScaleOutInstancesUpdatedAfterParentGenerationBump(
 	}
 
 	got := tree.GetRoot().(*workloads.InstanceSet)
-	currentRevisions, err := instanceset.GetRevisions(got.Status.CurrentRevisions)
+	currentRevisions, err := revisionmap.Decode(got.Status.CurrentRevisions)
 	if err != nil {
 		t.Fatalf("get current revisions: %v", err)
 	}
@@ -252,6 +260,13 @@ func TestStatusReconcilerKeepsScaleOutInstancesUpdatedAfterParentGenerationBump(
 	}
 	if got.Status.UpdatedReplicas != 1 {
 		t.Fatalf("expected updated replicas to stay at 1, got %d", got.Status.UpdatedReplicas)
+	}
+	if len(got.Status.TemplatesStatus) != 1 ||
+		got.Status.TemplatesStatus[0].Name != "tpl" ||
+		got.Status.TemplatesStatus[0].Replicas != 1 ||
+		got.Status.TemplatesStatus[0].UpdatedReplicas != 1 ||
+		got.Status.TemplatesStatus[0].CurrentReplicas != 1 {
+		t.Fatalf("unexpected template status: %#v", got.Status.TemplatesStatus)
 	}
 	if got.Status.CurrentRevision != got.Status.UpdateRevision {
 		t.Fatalf("expected current revision to advance to update revision")

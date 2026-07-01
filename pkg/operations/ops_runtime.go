@@ -40,6 +40,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
+	"github.com/apecloud/kubeblocks/pkg/controller/revisionmap"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -111,7 +112,7 @@ func (r *opsRuntime) GetWorkload(namespace, clusterName, compName string) (Workl
 		instanceNames:      sets.New[string](),
 	}
 	if its.Name != "" {
-		currRevisionMap, _ := instanceset.GetRevisions(its.Status.CurrentRevisions)
+		currRevisionMap, _ := revisionmap.Decode(its.Status.CurrentRevisions)
 		workload.minReadySeconds = its.Spec.MinReadySeconds
 		workload.currentRevisionMap = currRevisionMap
 		workload.instanceNames = sets.KeySet(currRevisionMap)

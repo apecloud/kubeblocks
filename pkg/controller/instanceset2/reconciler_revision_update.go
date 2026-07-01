@@ -25,10 +25,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
-	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/revisionmap"
 )
 
 func NewRevisionUpdateReconciler() kubebuilderx.Reconciler {
@@ -76,7 +76,7 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kub
 		}
 		updateRevisions[name] = buildInstanceRevision(inst)
 	}
-	revisions, err := instanceset.BuildRevisions(updateRevisions)
+	revisions, err := revisionmap.Encode(updateRevisions)
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}

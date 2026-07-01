@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package parameters
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -28,9 +29,12 @@ import (
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
@@ -612,6 +616,99 @@ func TestValidateLegacyReloadActionSupportWithClusterAnnotation(t *testing.T) {
 				t.Fatalf("expected error containing %q, got %q", tt.wantErr, err.Error())
 			}
 		})
+	}
+}
+
+func TestSubmitShardingReconfigureConfigsToConcreteComponent(t *testing.T) {
+	hash := "target-hash"
+	configName := configSpecName
+	scheme := runtime.NewScheme()
+	if err := appsv1.AddToScheme(scheme); err != nil {
+		t.Fatalf("add apps scheme: %v", err)
+	}
+	cluster := &appsv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      clusterName,
+		},
+		Spec: appsv1.ClusterSpec{
+			Shardings: []appsv1.ClusterSharding{{
+				Name: "shard",
+				Template: appsv1.ClusterComponentSpec{
+					Replicas: 3,
+					Configs: []appsv1.ClusterComponentConfig{{
+						Name: ptr.To(configName),
+					}},
+				},
+			}},
+		},
+	}
+	comp := &appsv1.Component{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      constant.GenerateClusterComponentName(clusterName, "shard-abc"),
+			Labels: map[string]string{
+				constant.AppInstanceLabelKey:       clusterName,
+				constant.KBAppComponentLabelKey:    "shard-abc",
+				constant.KBAppShardingNameLabelKey: "shard",
+			},
+		},
+		Spec: appsv1.ComponentSpec{
+			Replicas: 3,
+			Configs: []appsv1.ClusterComponentConfig{{
+				Name: ptr.To(configName),
+			}},
+		},
+	}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, comp).Build()
+	rctx := &reconcileContext{
+		ResourceFetcher: parameters.ResourceFetcher[reconcileContext]{
+			ResourceCtx: &render.ResourceCtx{
+				Context:       context.Background(),
+				Client:        cli,
+				Namespace:     "default",
+				ClusterName:   clusterName,
+				ComponentName: "shard-abc",
+			},
+			ClusterObj:     cluster,
+			ClusterObjCopy: cluster.DeepCopy(),
+			ComponentObj:   comp,
+			ClusterComObj: &appsv1.ClusterComponentSpec{
+				Name:     "shard-abc",
+				Replicas: 3,
+				Configs: []appsv1.ClusterComponentConfig{{
+					Name:       ptr.To(configName),
+					ConfigHash: ptr.To(hash),
+					Restart:    ptr.To(true),
+				}},
+			},
+		},
+	}
+
+	if err := (&ReconfigureReconciler{Client: cli}).submit(rctx); err != nil {
+		t.Fatalf("submit: %v", err)
+	}
+
+	updatedComp := &appsv1.Component{}
+	if err := cli.Get(context.Background(), client.ObjectKeyFromObject(comp), updatedComp); err != nil {
+		t.Fatalf("get component: %v", err)
+	}
+	if len(updatedComp.Spec.Configs) != 1 {
+		t.Fatalf("expected one component config, got %d", len(updatedComp.Spec.Configs))
+	}
+	if updatedComp.Spec.Configs[0].ConfigHash == nil || *updatedComp.Spec.Configs[0].ConfigHash != hash {
+		t.Fatalf("expected component config hash %q, got %v", hash, updatedComp.Spec.Configs[0].ConfigHash)
+	}
+	if updatedComp.Spec.Configs[0].Restart == nil || !*updatedComp.Spec.Configs[0].Restart {
+		t.Fatalf("expected component restart intent, got %v", updatedComp.Spec.Configs[0].Restart)
+	}
+
+	updatedCluster := &appsv1.Cluster{}
+	if err := cli.Get(context.Background(), client.ObjectKeyFromObject(cluster), updatedCluster); err != nil {
+		t.Fatalf("get cluster: %v", err)
+	}
+	if updatedCluster.Spec.Shardings[0].Template.Configs[0].ConfigHash != nil {
+		t.Fatalf("expected sharding template config hash to remain nil")
 	}
 }
 

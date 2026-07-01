@@ -21,6 +21,7 @@ package parameters
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -128,9 +129,20 @@ func (r *ResourceFetcher[T]) getComponentSpecByName() (*appsv1.ClusterComponentS
 	shardingName := strings.Join(tokens[0:len(tokens)-1], "-")
 	sharding := r.ClusterObj.Spec.GetShardingByName(shardingName)
 	if sharding != nil {
-		return &sharding.Template, nil
+		return clusterComponentSpecFromComponent(r.ComponentName, r.ComponentObj), nil
 	}
 	return nil, nil
+}
+
+func clusterComponentSpecFromComponent(componentName string, comp *appsv1.Component) *appsv1.ClusterComponentSpec {
+	if comp == nil {
+		return nil
+	}
+	return &appsv1.ClusterComponentSpec{
+		Name:     componentName,
+		Replicas: comp.Spec.Replicas,
+		Configs:  slices.Clone(comp.Spec.Configs),
+	}
 }
 
 func (r *ResourceFetcher[T]) ConfigMap(configSpec string) *T {

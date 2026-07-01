@@ -431,6 +431,9 @@ func (r *ReconfigureReconciler) performUpgrade(rctx *reconcileContext, tasks []r
 }
 
 func (r *ReconfigureReconciler) submit(rctx *reconcileContext) error {
+	if rctx.ComponentObj != nil && rctx.ClusterObj != nil && rctx.ClusterObj.Spec.GetComponentByName(rctx.ComponentName) == nil {
+		return r.submitComponentConfigs(rctx)
+	}
 	if rctx.ClusterObj == nil || rctx.ClusterObjCopy == nil {
 		return fmt.Errorf("the cluster object is nil")
 	}
@@ -438,6 +441,18 @@ func (r *ReconfigureReconciler) submit(rctx *reconcileContext) error {
 		return nil
 	}
 	return rctx.Client.Update(rctx.RequestCtx.Ctx, rctx.ClusterObj)
+}
+
+func (r *ReconfigureReconciler) submitComponentConfigs(rctx *reconcileContext) error {
+	if rctx.ComponentObj == nil || rctx.ClusterComObj == nil {
+		return fmt.Errorf("the component object is nil")
+	}
+	if reflect.DeepEqual(rctx.ComponentObj.Spec.Configs, rctx.ClusterComObj.Configs) {
+		return nil
+	}
+	patch := client.MergeFrom(rctx.ComponentObj.DeepCopy())
+	rctx.ComponentObj.Spec.Configs = rctx.ClusterComObj.Configs
+	return rctx.Client.Patch(rctx.RequestCtx.Ctx, rctx.ComponentObj, patch)
 }
 
 func (r *ReconfigureReconciler) status(rctx *reconcileContext, policy string, status reconfigure.Status, err error) (ctrl.Result, error) {

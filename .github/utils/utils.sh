@@ -505,7 +505,10 @@ get_trigger_mode() {
             deploy/*)
                 add_trigger_mode "[deploy]"
             ;;
-            .github/*|.devcontainer/*|githooks/*|examples/*)
+            .github/*|.devcontainer/*|githooks/*|examples/*|.claude/*|.codex/*|.opencode/*|openspec/*)
+                add_trigger_mode "[other]"
+            ;;
+            */AGENTS.md|AGENTS.md|.gitignore|*package-lock.json)
                 add_trigger_mode "[other]"
             ;;
             pkg/cli/cmd/*)

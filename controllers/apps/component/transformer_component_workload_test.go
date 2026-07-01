@@ -1333,10 +1333,46 @@ var _ = Describe("Component Workload Operations Test", func() {
 			})
 
 			err := ops.joinMember4ScaleOut()
-			Expect(err).ShouldNot(BeNil())
-			Expect(intctrlutil.IsRequeueError(err)).Should(BeTrue())
+			Expect(err).Should(Succeed())
 
 			statuses, err := component.GetReplicasStatusListFunc(ops.protoITS, func(status component.ReplicaStatus) bool {
+				return status.Name == gatePodName
+			})
+			Expect(err).Should(Succeed())
+			Expect(statuses).Should(HaveLen(1))
+			Expect(statuses[0].MemberJoinFailed).Should(BeTrue())
+			Expect(statuses[0].Message).Should(ContainSubstring("mock failed"))
+		})
+
+		It("should submit terminal member join failure through the workload update path", func() {
+			createGatePod(corev1.PodRunning)
+			runningITS := buildITS(1)
+			Expect(component.NewReplicasStatus(runningITS, []string{gatePodName}, true, false)).Should(Succeed())
+			protoITS := runningITS.DeepCopy()
+			graphCli := model.NewGraphClient(reader)
+			updateDAG := newDAG(graphCli, comp)
+
+			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).Times(1).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+					Expect(req.Action).Should(Equal("memberJoin"))
+					return kbagentproto.ActionResponse{Error: "failed", Message: "mock failed"}, nil
+				})
+			})
+
+			transformer := &componentWorkloadTransformer{Client: k8sClient}
+			transCtx := &componentTransformContext{
+				Context:       ctx,
+				Logger:        logger,
+				EventRecorder: clusterRecorder,
+			}
+			err := transformer.handleUpdate(transCtx, graphCli, updateDAG, synthesizeComp, comp, runningITS, protoITS)
+			Expect(err).Should(Succeed())
+
+			objs := graphCli.FindAll(updateDAG, &workloads.InstanceSet{})
+			Expect(objs).Should(HaveLen(1))
+			updatedITS := objs[0].(*workloads.InstanceSet)
+			Expect(graphCli.IsAction(updateDAG, updatedITS, model.ActionUpdatePtr())).Should(BeTrue())
+			statuses, err := component.GetReplicasStatusListFunc(updatedITS, func(status component.ReplicaStatus) bool {
 				return status.Name == gatePodName
 			})
 			Expect(err).Should(Succeed())

@@ -377,6 +377,7 @@ func (r *componentWorkloadOps) joinMember4ScaleOut() error {
 	}
 
 	joinErrors := make([]error, 0)
+	terminalFailureRecorded := false
 	if err = component.UpdateReplicasStatusFunc(r.protoITS, func(replicas *component.ReplicasStatus) error {
 		for _, pod := range pods {
 			i := slices.IndexFunc(replicas.Status, func(r component.ReplicaStatus) bool {
@@ -390,15 +391,20 @@ func (r *componentWorkloadOps) joinMember4ScaleOut() error {
 			if status.MemberJoined == nil || *status.MemberJoined {
 				continue // no need to join or already joined
 			}
+			if status.MemberJoinFailed {
+				continue // terminal failure is persisted and cancelable by scale-in
+			}
 
 			// TODO: should wait for the data to be loaded before joining the member?
 
 			if err := r.joinMemberForPod(pod, pods); err != nil {
-				joinErrors = append(joinErrors, fmt.Errorf("pod %s: %w", pod.Name, err))
 				if isTerminalMemberJoinError(err) {
 					replicas.Status[i].MemberJoinFailed = true
 					replicas.Status[i].Message = err.Error()
+					terminalFailureRecorded = true
+					continue
 				}
+				joinErrors = append(joinErrors, fmt.Errorf("pod %s: %w", pod.Name, err))
 			} else {
 				replicas.Status[i].MemberJoined = ptr.To(true)
 				replicas.Status[i].MemberJoinFailed = false
@@ -408,7 +414,7 @@ func (r *componentWorkloadOps) joinMember4ScaleOut() error {
 
 		notJoinedReplicas := make([]string, 0)
 		for _, r := range replicas.Status {
-			if r.MemberJoined != nil && !*r.MemberJoined {
+			if r.MemberJoined != nil && !*r.MemberJoined && !r.MemberJoinFailed {
 				notJoinedReplicas = append(notJoinedReplicas, r.Name)
 			}
 		}
@@ -421,6 +427,9 @@ func (r *componentWorkloadOps) joinMember4ScaleOut() error {
 	}
 
 	if len(joinErrors) > 0 {
+		if terminalFailureRecorded {
+			return nil
+		}
 		return intctrlutil.NewRequeueError(time.Second, fmt.Sprintf("%v", joinErrors))
 	}
 	return nil

@@ -138,9 +138,17 @@ func (t *componentStatusTransformer) reconcileStatus(transCtx *componentTransfor
 	hasFailedPod, messages := t.hasFailedPod()
 
 	// check if the component scale out failed
-	hasRunningScaleOut, hasFailedScaleOut, err := t.hasScaleOutRunning(transCtx)
+	hasRunningScaleOut, hasFailedScaleOut, scaleOutMessages, err := t.hasScaleOutRunning(transCtx)
 	if err != nil {
 		return err
+	}
+	if len(scaleOutMessages) > 0 {
+		if messages == nil {
+			messages = appsv1alpha1.ComponentMessageMap{}
+		}
+		for k, v := range scaleOutMessages {
+			messages[k] = v
+		}
 	}
 
 	// check if the volume expansion is running
@@ -173,7 +181,7 @@ func (t *componentStatusTransformer) reconcileStatus(transCtx *componentTransfor
 		t.setComponentStatusPhase(transCtx, appsv1.StoppingComponentPhase, nil, "component is Stopping")
 	case stopped:
 		t.setComponentStatusPhase(transCtx, appsv1.StoppedComponentPhase, nil, "component is Stopped")
-	case isITSUpdatedNRunning && !hasRunningScaleOut && !hasRunningVolumeExpansion:
+	case !hasFailure && isITSUpdatedNRunning && !hasRunningScaleOut && !hasRunningVolumeExpansion:
 		t.setComponentStatusPhase(transCtx, appsv1.RunningComponentPhase, nil, "component is Running")
 	case !hasFailure && isInCreatingPhase:
 		t.setComponentStatusPhase(transCtx, appsv1.CreatingComponentPhase, nil, "component is Creating")
@@ -240,25 +248,37 @@ func (t *componentStatusTransformer) isInstanceSetRunning() bool {
 }
 
 // hasScaleOutRunning checks if the scale out is running.
-func (t *componentStatusTransformer) hasScaleOutRunning(transCtx *componentTransformContext) (running bool, failed bool, err error) {
+func (t *componentStatusTransformer) hasScaleOutRunning(_ *componentTransformContext) (running bool, failed bool, messages appsv1alpha1.ComponentMessageMap, err error) {
 	if t.runningITS == nil || t.runningITS.Spec.Replicas == nil {
-		return false, false, nil
+		return false, false, nil, nil
 	}
 
-	replicas, err := component.GetReplicasStatusFunc(t.protoITS, func(status component.ReplicaStatus) bool {
+	replicas, err := component.GetReplicasStatusListFunc(t.protoITS, func(status component.ReplicaStatus) bool {
 		return status.DataLoaded != nil && !*status.DataLoaded ||
 			status.MemberJoined != nil && !*status.MemberJoined
 	})
 	if err != nil {
-		return false, false, err
+		return false, false, nil, err
 	}
 	if len(replicas) == 0 {
-		return false, false, nil
+		return false, false, nil, nil
 	}
 
-	// TODO: scale-out failed
+	messages = appsv1alpha1.ComponentMessageMap{}
+	for _, replica := range replicas {
+		if !replica.MemberJoinFailed {
+			running = true
+			continue
+		}
+		failed = true
+		message := replica.Message
+		if message == "" {
+			message = "member join failed"
+		}
+		messages.SetObjectMessage(constant.PodKind, replica.Name, message)
+	}
 
-	return true, false, nil
+	return running, failed, messages, nil
 }
 
 func (t *componentStatusTransformer) hasVolumeExpansionRunning() bool {
@@ -506,7 +526,7 @@ func (t *componentStatusTransformer) reconcileProgressingCondition(transCtx *com
 				return metav1.ConditionTrue, "WorkloadNotUpdated", "observed workload's generation not matching component's", nil
 			}
 
-			hasRunningScaleOut, _, err := t.hasScaleOutRunning(transCtx)
+			hasRunningScaleOut, _, _, err := t.hasScaleOutRunning(transCtx)
 			if err != nil {
 				return "", "", "", err
 			}
@@ -543,7 +563,7 @@ func (t *componentStatusTransformer) reconcileHealthyCondition(transCtx *compone
 				return metav1.ConditionFalse, "RoleProbeNotDone", "some instances do not have roles", nil
 			}
 
-			_, hasFailedScaleOut, err := t.hasScaleOutRunning(transCtx)
+			_, hasFailedScaleOut, _, err := t.hasScaleOutRunning(transCtx)
 			if err != nil {
 				return "", "", "", err
 			}

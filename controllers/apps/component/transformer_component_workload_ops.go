@@ -120,6 +120,11 @@ func (r *componentWorkloadOps) scaleIn() error {
 	}
 
 	deleteReplicas := r.runningItsPodNameSet.Difference(r.desiredCompPodNameSet).UnsortedList()
+
+	if err := r.gatePendingMemberLifecycle(deleteReplicas); err != nil {
+		return err
+	}
+
 	joinedReplicas := make([]string, 0)
 	err := component.DeleteReplicasStatus(r.protoITS, deleteReplicas, func(s component.ReplicaStatus) {
 		// has no member join defined or has joined successfully
@@ -137,6 +142,44 @@ func (r *componentWorkloadOps) scaleIn() error {
 		return err
 	}
 	return nil
+}
+
+func (r *componentWorkloadOps) gatePendingMemberLifecycle(deleteReplicas []string) error {
+	deleteSet := sets.New(deleteReplicas...)
+	pendingReplicas, err := component.GetReplicasStatusListFunc(r.runningITS, func(s component.ReplicaStatus) bool {
+		return deleteSet.Has(s.Name) && s.MemberJoined != nil && !*s.MemberJoined
+	})
+	if err != nil || len(pendingReplicas) == 0 {
+		return err
+	}
+
+	pods, err := component.ListOwnedInstances(r.transCtx.Context, r.cli,
+		r.component, r.runningITS, r.protoITS)
+	if err != nil {
+		return err
+	}
+	podSet := sets.New[string]()
+	for _, pod := range pods {
+		if isMemberLifecycleActivePod(pod) {
+			podSet.Insert(pod.Name)
+		}
+	}
+	activePending := make([]string, 0, len(pendingReplicas))
+	for _, replica := range pendingReplicas {
+		if podSet.Has(replica.Name) && !replica.MemberJoinFailed {
+			activePending = append(activePending, replica.Name)
+		}
+	}
+	if len(activePending) == 0 {
+		return nil
+	}
+
+	return intctrlutil.NewRequeueError(time.Second*30,
+		fmt.Sprintf("scale-in gated: replicas %v have pending member lifecycle (MemberJoined=false) with active pods, waiting for join to complete", activePending))
+}
+
+func isMemberLifecycleActivePod(pod *corev1.Pod) bool {
+	return pod != nil && pod.DeletionTimestamp == nil && pod.Status.Phase == corev1.PodRunning
 }
 
 func (r *componentWorkloadOps) leaveMember4ScaleIn(deleteReplicas, joinedReplicas []string) error {
@@ -334,6 +377,7 @@ func (r *componentWorkloadOps) joinMember4ScaleOut() error {
 	}
 
 	joinErrors := make([]error, 0)
+	terminalFailureObserved := false
 	if err = component.UpdateReplicasStatusFunc(r.protoITS, func(replicas *component.ReplicasStatus) error {
 		for _, pod := range pods {
 			i := slices.IndexFunc(replicas.Status, func(r component.ReplicaStatus) bool {
@@ -347,13 +391,25 @@ func (r *componentWorkloadOps) joinMember4ScaleOut() error {
 			if status.MemberJoined == nil || *status.MemberJoined {
 				continue // no need to join or already joined
 			}
+			if status.MemberJoinFailed {
+				terminalFailureObserved = true
+				continue // terminal failure is persisted and cancelable by scale-in
+			}
 
 			// TODO: should wait for the data to be loaded before joining the member?
 
 			if err := r.joinMemberForPod(pod, pods); err != nil {
+				if isTerminalMemberJoinError(err) {
+					replicas.Status[i].MemberJoinFailed = true
+					replicas.Status[i].Message = err.Error()
+					terminalFailureObserved = true
+					continue
+				}
 				joinErrors = append(joinErrors, fmt.Errorf("pod %s: %w", pod.Name, err))
 			} else {
 				replicas.Status[i].MemberJoined = ptr.To(true)
+				replicas.Status[i].MemberJoinFailed = false
+				replicas.Status[i].Message = ""
 			}
 		}
 
@@ -372,9 +428,17 @@ func (r *componentWorkloadOps) joinMember4ScaleOut() error {
 	}
 
 	if len(joinErrors) > 0 {
+		if terminalFailureObserved {
+			return nil
+		}
 		return intctrlutil.NewRequeueError(time.Second, fmt.Sprintf("%v", joinErrors))
 	}
 	return nil
+}
+
+func isTerminalMemberJoinError(err error) bool {
+	return errors.Is(err, lifecycle.ErrActionFailed) ||
+		errors.Is(err, lifecycle.ErrActionNotImplemented)
 }
 
 func (r *componentWorkloadOps) joinMemberForPod(pod *corev1.Pod, pods []*corev1.Pod) error {

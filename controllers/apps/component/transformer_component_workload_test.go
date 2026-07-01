@@ -1206,4 +1206,238 @@ var _ = Describe("Component Workload Operations Test", func() {
 			Expect(its.Annotations).Should(HaveKeyWithValue(constant.KBAppMultiClusterPlacementKey, "ctx-a,ctx-b"))
 		})
 	})
+
+	Context("Scale-in Gate for Pending Member Lifecycle", func() {
+		const (
+			gateITSName = "test-gate-its"
+			gatePodName = gateITSName + "-0"
+		)
+
+		buildITS := func(replicas int32) *workloads.InstanceSet {
+			container := corev1.Container{
+				Name:  "main",
+				Image: "test-image",
+			}
+			return testapps.NewInstanceSetFactory(testCtx.DefaultNamespace,
+				gateITSName, clusterName, compName).
+				AddContainer(container).
+				AddAppInstanceLabel(clusterName).
+				AddAppComponentLabel(compName).
+				AddAppManagedByLabel().
+				SetReplicas(replicas).
+				GetObject()
+		}
+
+		buildOps := func(its *workloads.InstanceSet) *componentWorkloadOps {
+			return &componentWorkloadOps{
+				transCtx: &componentTransformContext{
+					Context:       ctx,
+					Logger:        logger,
+					EventRecorder: clusterRecorder,
+				},
+				cli:            k8sClient,
+				component:      comp,
+				synthesizeComp: synthesizeComp,
+				runningITS:     its,
+				protoITS:       its.DeepCopy(),
+			}
+		}
+
+		createGatePod := func(phase corev1.PodPhase, mutateStatus ...func(*corev1.Pod)) {
+			pod := testapps.NewPodFactory(testCtx.DefaultNamespace, gatePodName).
+				AddContainer(corev1.Container{Name: "main", Image: "test-image"}).
+				AddLabels(
+					constant.AppManagedByLabelKey, kubeblocksName,
+					constant.AppInstanceLabelKey, clusterName,
+					constant.KBAppComponentLabelKey, compName,
+				).
+				GetObject()
+			Expect(k8sClient.Create(ctx, pod)).Should(Succeed())
+			if phase != "" || len(mutateStatus) > 0 {
+				pod.Status.Phase = phase
+				for _, fn := range mutateStatus {
+					fn(pod)
+				}
+				Expect(k8sClient.Status().Update(ctx, pod)).Should(Succeed())
+			}
+			DeferCleanup(func() {
+				Expect(k8sClient.Delete(ctx, pod)).Should(Succeed())
+			})
+		}
+
+		It("should requeue scale-in when replica has pending member lifecycle and pod is running", func() {
+			createGatePod(corev1.PodRunning)
+			its := buildITS(1)
+			Expect(component.NewReplicasStatus(its, []string{gatePodName}, true, false)).Should(Succeed())
+			ops := buildOps(its)
+
+			err := ops.gatePendingMemberLifecycle([]string{gatePodName})
+			Expect(err).ShouldNot(BeNil())
+			Expect(intctrlutil.IsRequeueError(err)).Should(BeTrue())
+		})
+
+		It("should proceed with scale-in when replica has pending member lifecycle but pod has not started", func() {
+			createGatePod(corev1.PodPending)
+			its := buildITS(1)
+			Expect(component.NewReplicasStatus(its, []string{gatePodName}, true, false)).Should(Succeed())
+			ops := buildOps(its)
+
+			err := ops.gatePendingMemberLifecycle([]string{gatePodName})
+			Expect(err).Should(BeNil())
+		})
+
+		It("should proceed with scale-in when replica pod is unschedulable and member join never started", func() {
+			createGatePod(corev1.PodPending, func(pod *corev1.Pod) {
+				pod.Status.Conditions = []corev1.PodCondition{
+					{
+						Type:   corev1.PodScheduled,
+						Status: corev1.ConditionFalse,
+						Reason: corev1.PodReasonUnschedulable,
+					},
+				}
+			})
+			its := buildITS(1)
+			Expect(component.NewReplicasStatus(its, []string{gatePodName}, true, false)).Should(Succeed())
+			ops := buildOps(its)
+
+			err := ops.gatePendingMemberLifecycle([]string{gatePodName})
+			Expect(err).Should(BeNil())
+		})
+
+		It("should proceed with scale-in when member join reached terminal failure", func() {
+			createGatePod(corev1.PodRunning)
+			its := buildITS(1)
+			Expect(component.NewReplicasStatus(its, []string{gatePodName}, true, false)).Should(Succeed())
+			Expect(component.UpdateReplicasStatusFunc(its, func(status *component.ReplicasStatus) error {
+				status.Status[0].MemberJoinFailed = true
+				status.Status[0].Message = "action failed"
+				return nil
+			})).Should(Succeed())
+			ops := buildOps(its)
+
+			err := ops.gatePendingMemberLifecycle([]string{gatePodName})
+			Expect(err).Should(BeNil())
+		})
+
+		It("should record terminal member join failure as cancelable lifecycle state", func() {
+			createGatePod(corev1.PodRunning)
+			its := buildITS(1)
+			Expect(component.NewReplicasStatus(its, []string{gatePodName}, true, false)).Should(Succeed())
+			ops := buildOps(its)
+
+			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).Times(1).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+					Expect(req.Action).Should(Equal("memberJoin"))
+					return kbagentproto.ActionResponse{Error: "failed", Message: "mock failed"}, nil
+				})
+			})
+
+			err := ops.joinMember4ScaleOut()
+			Expect(err).Should(Succeed())
+
+			statuses, err := component.GetReplicasStatusListFunc(ops.protoITS, func(status component.ReplicaStatus) bool {
+				return status.Name == gatePodName
+			})
+			Expect(err).Should(Succeed())
+			Expect(statuses).Should(HaveLen(1))
+			Expect(statuses[0].MemberJoinFailed).Should(BeTrue())
+			Expect(statuses[0].Message).Should(ContainSubstring("mock failed"))
+		})
+
+		It("should submit terminal member join failure through the workload update path", func() {
+			createGatePod(corev1.PodRunning)
+			runningITS := buildITS(1)
+			Expect(component.NewReplicasStatus(runningITS, []string{gatePodName}, true, false)).Should(Succeed())
+			protoITS := runningITS.DeepCopy()
+			graphCli := model.NewGraphClient(reader)
+			updateDAG := newDAG(graphCli, comp)
+
+			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).Times(1).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+					Expect(req.Action).Should(Equal("memberJoin"))
+					return kbagentproto.ActionResponse{Error: "failed", Message: "mock failed"}, nil
+				})
+			})
+
+			transformer := &componentWorkloadTransformer{Client: k8sClient}
+			transCtx := &componentTransformContext{
+				Context:       ctx,
+				Logger:        logger,
+				EventRecorder: clusterRecorder,
+			}
+			err := transformer.handleUpdate(transCtx, graphCli, updateDAG, synthesizeComp, comp, runningITS, protoITS)
+			Expect(err).Should(Succeed())
+
+			objs := graphCli.FindAll(updateDAG, &workloads.InstanceSet{})
+			Expect(objs).Should(HaveLen(1))
+			updatedITS := objs[0].(*workloads.InstanceSet)
+			Expect(graphCli.IsAction(updateDAG, updatedITS, model.ActionUpdatePtr())).Should(BeTrue())
+			statuses, err := component.GetReplicasStatusListFunc(updatedITS, func(status component.ReplicaStatus) bool {
+				return status.Name == gatePodName
+			})
+			Expect(err).Should(Succeed())
+			Expect(statuses).Should(HaveLen(1))
+			Expect(statuses[0].MemberJoinFailed).Should(BeTrue())
+			Expect(statuses[0].Message).Should(ContainSubstring("mock failed"))
+		})
+
+		It("should keep persisted terminal member join failure unfinished without blocking status reconciliation", func() {
+			createGatePod(corev1.PodRunning)
+			its := buildITS(1)
+			Expect(component.NewReplicasStatus(its, []string{gatePodName}, true, false)).Should(Succeed())
+			Expect(component.UpdateReplicasStatusFunc(its, func(status *component.ReplicasStatus) error {
+				status.Status[0].MemberJoinFailed = true
+				status.Status[0].Message = "mock failed"
+				return nil
+			})).Should(Succeed())
+			ops := buildOps(its)
+
+			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).Times(0)
+			})
+
+			err := ops.joinMember4ScaleOut()
+			Expect(err).Should(Succeed())
+
+			statuses, err := component.GetReplicasStatusListFunc(ops.protoITS, func(status component.ReplicaStatus) bool {
+				return status.Name == gatePodName
+			})
+			Expect(err).Should(Succeed())
+			Expect(statuses).Should(HaveLen(1))
+			Expect(statuses[0].MemberJoined).ShouldNot(BeNil())
+			Expect(*statuses[0].MemberJoined).Should(BeFalse())
+			Expect(statuses[0].MemberJoinFailed).Should(BeTrue())
+		})
+
+		It("should proceed with scale-in when replica has pending member lifecycle but pod does not exist", func() {
+			its := buildITS(1)
+			Expect(component.NewReplicasStatus(its, []string{gatePodName}, true, false)).Should(Succeed())
+			ops := buildOps(its)
+
+			err := ops.gatePendingMemberLifecycle([]string{gatePodName})
+			Expect(err).Should(BeNil())
+		})
+
+		It("should proceed with scale-in when replica has no pending member lifecycle", func() {
+			its := buildITS(1)
+			Expect(component.StatusReplicasStatus(its, []string{gatePodName}, true, false)).Should(Succeed())
+			ops := buildOps(its)
+
+			err := ops.gatePendingMemberLifecycle([]string{gatePodName})
+			Expect(err).Should(BeNil())
+		})
+
+		It("should treat terminating pods as inactive for the member lifecycle gate", func() {
+			now := metav1.Now()
+			pod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              gatePodName,
+					DeletionTimestamp: &now,
+				},
+				Status: corev1.PodStatus{Phase: corev1.PodRunning},
+			}
+
+			Expect(isMemberLifecycleActivePod(pod)).Should(BeFalse())
+		})
+	})
 })

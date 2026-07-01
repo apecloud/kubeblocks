@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/klauspost/compress/zstd"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -167,6 +168,10 @@ func mockCompressedInstanceTemplates(ns, name string) (*corev1.ConfigMap, string
 		},
 	}
 	templateByte, err := json.Marshal(instances)
+	if err != nil {
+		return nil, "", err
+	}
+	writer, err := zstd.NewWriter(nil)
 	if err != nil {
 		return nil, "", err
 	}

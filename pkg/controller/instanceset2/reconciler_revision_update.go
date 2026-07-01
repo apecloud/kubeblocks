@@ -45,7 +45,11 @@ func (r *revisionUpdateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *
 func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
 
-	updatedReplicas := r.calculateUpdatedReplicas(its, tree.List(&workloads.Instance{}))
+	desiredInstances, err := buildDesiredInstances(tree, its)
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
+	updatedReplicas := r.calculateUpdatedReplicas(its, tree.List(&workloads.Instance{}), desiredInstances)
 	its.Status.UpdatedReplicas = updatedReplicas
 
 	its.Status.ObservedGeneration = its.Generation
@@ -53,11 +57,11 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kub
 	return kubebuilderx.Continue, nil
 }
 
-func (r *revisionUpdateReconciler) calculateUpdatedReplicas(its *workloads.InstanceSet, instances []client.Object) int32 {
+func (r *revisionUpdateReconciler) calculateUpdatedReplicas(its *workloads.InstanceSet, instances []client.Object, desiredInstances map[string]*workloads.Instance) int32 {
 	updatedReplicas := int32(0)
 	for i := range instances {
 		inst, _ := instances[i].(*workloads.Instance)
-		if isInstanceUpdated(its, inst) {
+		if isInstanceUpdatedForStatus(its, inst, desiredInstances[inst.Name]) {
 			updatedReplicas++
 		}
 	}

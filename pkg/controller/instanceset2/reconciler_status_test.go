@@ -23,6 +23,7 @@ import (
 	"reflect"
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 
@@ -147,6 +148,76 @@ func TestStatusReconcilerPopulatesCurrentRevisionsFromInstances(t *testing.T) {
 	}
 }
 
+func TestStatusReconcilerCountsInstanceAPIScaleOutReplicasUpdated(t *testing.T) {
+	replicas := int32(3)
+	its := newInstanceAPIStatusTestInstanceSet(replicas)
+	tree := kubebuilderx.NewObjectTree()
+	tree.SetRoot(its)
+	desiredInstances, err := buildDesiredInstances(tree, its)
+	if err != nil {
+		t.Fatalf("build desired instances: %v", err)
+	}
+	instances := []*workloads.Instance{
+		readyInstanceForStatusTest(desiredInstances["test-its-0"], 1, "1"),
+		readyInstanceForStatusTest(desiredInstances["test-its-1"], 1, "1"),
+		readyInstanceForStatusTest(desiredInstances["test-its-2"], 2, "2"),
+	}
+	if err := tree.Add(instances[0], instances[1], instances[2]); err != nil {
+		t.Fatalf("tree.Add() error = %v", err)
+	}
+
+	result, err := NewStatusReconciler().Reconcile(tree)
+	if err != nil {
+		t.Fatalf("reconcile status: %v", err)
+	}
+	if result != kubebuilderx.Continue {
+		t.Fatalf("unexpected result: %v", result)
+	}
+	if its.Status.UpdatedReplicas != replicas {
+		t.Fatalf("expected updated replicas %d, got %d", replicas, its.Status.UpdatedReplicas)
+	}
+	if its.Status.CurrentReplicas != replicas {
+		t.Fatalf("expected current replicas %d, got %d", replicas, its.Status.CurrentReplicas)
+	}
+	expected := map[string]string{
+		"test-its-0": "1",
+		"test-its-1": "1",
+		"test-its-2": "2",
+	}
+	if !reflect.DeepEqual(expected, its.Status.CurrentRevisions) {
+		t.Fatalf("unexpected current revisions: %#v", its.Status.CurrentRevisions)
+	}
+}
+
+func TestRevisionUpdateReconcilerCountsInstanceAPIScaleOutReplicasUpdated(t *testing.T) {
+	replicas := int32(3)
+	its := newInstanceAPIStatusTestInstanceSet(replicas)
+	tree := kubebuilderx.NewObjectTree()
+	tree.SetRoot(its)
+	desiredInstances, err := buildDesiredInstances(tree, its)
+	if err != nil {
+		t.Fatalf("build desired instances: %v", err)
+	}
+	if err := tree.Add(
+		readyInstanceForStatusTest(desiredInstances["test-its-0"], 1, "1"),
+		readyInstanceForStatusTest(desiredInstances["test-its-1"], 1, "1"),
+		readyInstanceForStatusTest(desiredInstances["test-its-2"], 2, "2"),
+	); err != nil {
+		t.Fatalf("tree.Add() error = %v", err)
+	}
+
+	result, err := NewRevisionUpdateReconciler().Reconcile(tree)
+	if err != nil {
+		t.Fatalf("reconcile revision update: %v", err)
+	}
+	if result != kubebuilderx.Continue {
+		t.Fatalf("unexpected result: %v", result)
+	}
+	if its.Status.UpdatedReplicas != replicas {
+		t.Fatalf("expected updated replicas %d, got %d", replicas, its.Status.UpdatedReplicas)
+	}
+}
+
 func TestIsInstanceUpdated(t *testing.T) {
 	its := &workloads.InstanceSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -216,4 +287,46 @@ func TestIsInstanceUpdated(t *testing.T) {
 			}
 		})
 	}
+}
+
+func newInstanceAPIStatusTestInstanceSet(replicas int32) *workloads.InstanceSet {
+	return &workloads.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:  "default",
+			Name:       "test-its",
+			Generation: 2,
+		},
+		Spec: workloads.InstanceSetSpec{
+			Replicas:          &replicas,
+			EnableInstanceAPI: ptr.To(true),
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{Name: "main", Image: "nginx:latest"},
+					},
+				},
+			},
+		},
+	}
+}
+
+func readyInstanceForStatusTest(inst *workloads.Instance, generation int64, parentGeneration string) *workloads.Instance {
+	inst = inst.DeepCopy()
+	inst.Generation = generation
+	inst.Annotations[constant.KubeBlocksGenerationKey] = parentGeneration
+	inst.Status = workloads.InstanceStatus2{
+		ObservedGeneration: generation,
+		UpToDate:           true,
+		Conditions: []metav1.Condition{
+			{
+				Type:   string(workloads.InstanceReady),
+				Status: metav1.ConditionTrue,
+			},
+			{
+				Type:   string(workloads.InstanceAvailable),
+				Status: metav1.ConditionTrue,
+			},
+		},
+	}
+	return inst
 }

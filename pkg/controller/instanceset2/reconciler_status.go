@@ -60,6 +60,10 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		inst, _ := object.(*workloads.Instance)
 		instanceList = append(instanceList, inst)
 	}
+	desiredInstances, err := buildDesiredInstances(tree, its)
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
 
 	replicas := int32(0)
 	currentReplicas, updatedReplicas := int32(0), int32(0)
@@ -103,7 +107,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			}
 		}
 		if !intctrlutil.IsInstanceTerminating(inst) {
-			if isInstanceUpdated(its, inst) {
+			if isInstanceUpdatedForStatus(its, inst, desiredInstances[inst.Name]) {
 				updatedReplicas++
 				template2TemplatesStatus[templateName].UpdatedReplicas++
 			} else {
@@ -165,6 +169,58 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		return kubebuilderx.RetryAfter(time.Second), nil
 	}
 	return kubebuilderx.Continue, nil
+}
+
+func buildDesiredInstances(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet) (map[string]*workloads.Instance, error) {
+	if its.Spec.EnableInstanceAPI == nil || !*its.Spec.EnableInstanceAPI {
+		return nil, nil
+	}
+	if its.Spec.Replicas == nil {
+		return nil, nil
+	}
+	itsExt, err := instancetemplate.BuildInstanceSetExt(its, tree)
+	if err != nil {
+		return nil, err
+	}
+	nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt, nil)
+	if err != nil {
+		return nil, err
+	}
+	nameToTemplateMap, err := nameBuilder.BuildInstanceName2TemplateMap()
+	if err != nil {
+		return nil, err
+	}
+	desiredInstances := make(map[string]*workloads.Instance, len(nameToTemplateMap))
+	for name, template := range nameToTemplateMap {
+		inst, err := buildInstanceByTemplate(tree, name, template, its)
+		if err != nil {
+			return nil, err
+		}
+		desiredInstances[name] = inst
+	}
+	return desiredInstances, nil
+}
+
+func isInstanceUpdatedForStatus(its *workloads.InstanceSet, inst, desired *workloads.Instance) bool {
+	if isInstanceUpdated(its, inst) {
+		return true
+	}
+	if its.Spec.EnableInstanceAPI == nil || !*its.Spec.EnableInstanceAPI || desired == nil {
+		return false
+	}
+	generation, ok := inst.Annotations[constant.KubeBlocksGenerationKey]
+	if !ok {
+		return false
+	}
+	if inst.Generation != inst.Status.ObservedGeneration || !inst.Status.UpToDate {
+		return false
+	}
+	desired = desired.DeepCopy()
+	if desired.Annotations == nil {
+		desired.Annotations = map[string]string{}
+	}
+	desired.Annotations[constant.KubeBlocksGenerationKey] = generation
+	return copyAndMergeInstance(inst, desired) == nil
 }
 
 func buildConditionMessageWithNames(instanceNames []string) ([]byte, error) {

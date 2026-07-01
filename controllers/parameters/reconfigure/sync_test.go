@@ -21,7 +21,9 @@ package reconfigure
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -37,6 +39,7 @@ import (
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/kbagent"
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 )
 
@@ -675,19 +678,46 @@ func TestApplyChangesToClusterClearsHistoricalRestartFlag(t *testing.T) {
 func TestApplyChangesToClusterTemplateReconfigureArgs(t *testing.T) {
 	ctx := Context{
 		ConfigTemplate: appsv1.ComponentFileTemplate{
-			Name: "my.cnf",
+			Name:       "my.cnf",
+			VolumeName: "config",
 			Reconfigure: &appsv1.Action{
-				Exec: &appsv1.ExecAction{Command: []string{"bash", "-c", "reload"}},
+				Exec: &appsv1.ExecAction{Command: []string{"bash", "-c", "reload"}, Container: "action"},
 			},
 		},
-		ConfigHash:       ptr.To("hash"),
+		ConfigHash: ptr.To("hash"),
+		ConfigData: map[string]string{
+			"my.cnf": "timeout=30\nmaxmemory=1gb\n",
+		},
 		ClusterComponent: &appsv1.ClusterComponentSpec{Replicas: 1},
-		ParametersDef:    &parametersv1alpha1.ParametersDefinitionSpec{},
+		ITS: &workloads.InstanceSet{
+			Spec: workloads.InstanceSetSpec{
+				Template: corev1.PodTemplateSpec{
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{{
+							Name: "mysql",
+							VolumeMounts: []corev1.VolumeMount{{
+								Name:      "config",
+								MountPath: "/wrong/conf",
+							}},
+						}, {
+							Name: "action",
+							VolumeMounts: []corev1.VolumeMount{{
+								Name:      "config",
+								MountPath: "/etc/conf",
+							}},
+						}},
+					},
+				},
+			},
+		},
+		ConfigDescription: &parametersv1alpha1.ComponentConfigDescription{Name: "my.cnf"},
+		ParametersDef:     &parametersv1alpha1.ParametersDefinitionSpec{},
 	}
 	config := &appsv1.ClusterComponentConfig{
 		Name: ptr.To("my.cnf"),
 		Variables: map[string]string{
-			"template_var": "kept",
+			"template_var":            "kept",
+			"KB_CONFIG_FILES_UPDATED": "stale",
 		},
 	}
 
@@ -708,6 +738,230 @@ func TestApplyChangesToClusterTemplateReconfigureArgs(t *testing.T) {
 	}
 	if _, ok := config.Variables["timeout"]; ok {
 		t.Fatalf("expected updated params not to be written into variables, got %v", config.Variables)
+	}
+	checksum := sha256.Sum256([]byte(ctx.ConfigData["my.cnf"]))
+	expectedUpdated := fmt.Sprintf("/etc/conf/my.cnf:%x", checksum)
+	if got := config.Variables["KB_CONFIG_FILES_UPDATED"]; got != expectedUpdated {
+		t.Fatalf("expected updated file checksum %q, got %q", expectedUpdated, got)
+	}
+}
+
+func TestApplyChangesToClusterTemplateReconfigureFailsWhenActionContainerDoesNotMountConfig(t *testing.T) {
+	ctx := Context{
+		ConfigTemplate: appsv1.ComponentFileTemplate{
+			Name:       "my.cnf",
+			VolumeName: "config",
+			Reconfigure: &appsv1.Action{
+				Exec: &appsv1.ExecAction{Command: []string{"bash", "-c", "reload"}, Container: "action"},
+			},
+		},
+		ConfigHash: ptr.To("hash"),
+		ConfigData: map[string]string{
+			"my.cnf": "timeout=30\n",
+		},
+		ClusterComponent: &appsv1.ClusterComponentSpec{Replicas: 1},
+		ITS: &workloads.InstanceSet{
+			Spec: workloads.InstanceSetSpec{
+				Template: corev1.PodTemplateSpec{
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{{
+							Name: "mysql",
+							VolumeMounts: []corev1.VolumeMount{{
+								Name:      "config",
+								MountPath: "/etc/conf",
+							}},
+						}, {
+							Name: "action",
+						}},
+					},
+				},
+			},
+		},
+		ConfigDescription: &parametersv1alpha1.ComponentConfigDescription{Name: "my.cnf"},
+		ParametersDef:     &parametersv1alpha1.ParametersDefinitionSpec{},
+	}
+	config := &appsv1.ClusterComponentConfig{Name: ptr.To("my.cnf")}
+
+	status := applyChangesToCluster(ctx, config, map[string]string{"timeout": "30"}, false)
+
+	if status.Status != StatusFailed {
+		t.Fatalf("expected failed status, got %v", status.Status)
+	}
+	want := `reconfigure exec container "action" does not mount config volume "config"`
+	if status.Reason != want {
+		t.Fatalf("expected reason %q, got %q", want, status.Reason)
+	}
+	if config.ConfigHash != nil {
+		t.Fatalf("expected config to stay unchanged, got hash %v", config.ConfigHash)
+	}
+	if config.Reconfigure != nil {
+		t.Fatalf("expected reconfigure intent not to be written, got %v", config.Reconfigure)
+	}
+}
+
+func TestApplyChangesToClusterTemplateReconfigureChecksumUsesSubPathMountPath(t *testing.T) {
+	ctx := Context{
+		ConfigTemplate: appsv1.ComponentFileTemplate{
+			Name:       "my.cnf",
+			VolumeName: "config",
+			Reconfigure: &appsv1.Action{
+				Exec: &appsv1.ExecAction{Command: []string{"bash", "-c", "reload"}, Container: "action"},
+			},
+		},
+		ConfigHash: ptr.To("hash"),
+		ConfigData: map[string]string{
+			"my.cnf": "timeout=30\n",
+		},
+		ClusterComponent: &appsv1.ClusterComponentSpec{Replicas: 1},
+		ITS: &workloads.InstanceSet{
+			Spec: workloads.InstanceSetSpec{
+				Template: corev1.PodTemplateSpec{
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{{
+							Name: "action",
+							VolumeMounts: []corev1.VolumeMount{{
+								Name:      "config",
+								MountPath: "/etc/my.cnf",
+								SubPath:   "my.cnf",
+							}},
+						}},
+					},
+				},
+			},
+		},
+		ConfigDescription: &parametersv1alpha1.ComponentConfigDescription{Name: "my.cnf"},
+		ParametersDef:     &parametersv1alpha1.ParametersDefinitionSpec{},
+	}
+	config := &appsv1.ClusterComponentConfig{Name: ptr.To("my.cnf")}
+
+	status := applyChangesToCluster(ctx, config, map[string]string{"timeout": "30"}, false)
+
+	if status.Status != StatusRetry {
+		t.Fatalf("expected retry status, got %v", status.Status)
+	}
+	checksum := sha256.Sum256([]byte(ctx.ConfigData["my.cnf"]))
+	expectedUpdated := fmt.Sprintf("/etc/my.cnf:%x", checksum)
+	if got := config.Variables["KB_CONFIG_FILES_UPDATED"]; got != expectedUpdated {
+		t.Fatalf("expected updated file checksum %q, got %q", expectedUpdated, got)
+	}
+}
+
+func TestApplyChangesToClusterTemplateReconfigureUsesDefaultWorkerWhenActionContainerUnset(t *testing.T) {
+	ctx := Context{
+		ConfigTemplate: appsv1.ComponentFileTemplate{
+			Name:       "my.cnf",
+			VolumeName: "config",
+			Reconfigure: &appsv1.Action{
+				Exec: &appsv1.ExecAction{Command: []string{"bash", "-c", "reload"}},
+			},
+		},
+		ConfigHash: ptr.To("hash"),
+		ConfigData: map[string]string{
+			"my.cnf": "timeout=30\n",
+		},
+		ClusterComponent: &appsv1.ClusterComponentSpec{Replicas: 1},
+		ITS: &workloads.InstanceSet{
+			Spec: workloads.InstanceSetSpec{
+				Template: corev1.PodTemplateSpec{
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{{
+							Name: "mysql",
+							VolumeMounts: []corev1.VolumeMount{{
+								Name:      "config",
+								MountPath: "/etc/conf",
+							}},
+						}},
+						InitContainers: []corev1.Container{{
+							Name: kbagent.ContainerName4Worker,
+							VolumeMounts: []corev1.VolumeMount{{
+								Name:      "config",
+								MountPath: "/worker/conf",
+							}},
+						}},
+					},
+				},
+			},
+		},
+		ConfigDescription: &parametersv1alpha1.ComponentConfigDescription{Name: "my.cnf"},
+		ParametersDef:     &parametersv1alpha1.ParametersDefinitionSpec{},
+	}
+	config := &appsv1.ClusterComponentConfig{
+		Name: ptr.To("my.cnf"),
+		Variables: map[string]string{
+			"KB_CONFIG_FILES_UPDATED": "stale",
+		},
+	}
+
+	status := applyChangesToCluster(ctx, config, map[string]string{"timeout": "30"}, false)
+
+	if status.Status != StatusRetry {
+		t.Fatalf("expected retry status, got %v", status.Status)
+	}
+	if config.Reconfigure == nil || !*config.Reconfigure {
+		t.Fatalf("expected reconfigure intent to be true")
+	}
+	if len(config.ReconfigureArgs) != 1 || config.ReconfigureArgs[0][0] != "timeout" || config.ReconfigureArgs[0][1] != "30" {
+		t.Fatalf("unexpected reconfigure args: %v", config.ReconfigureArgs)
+	}
+	checksum := sha256.Sum256([]byte(ctx.ConfigData["my.cnf"]))
+	expectedUpdated := fmt.Sprintf("/worker/conf/my.cnf:%x", checksum)
+	if got := config.Variables["KB_CONFIG_FILES_UPDATED"]; got != expectedUpdated {
+		t.Fatalf("expected updated file checksum %q, got %q", expectedUpdated, got)
+	}
+}
+
+func TestResolveMountedPathFromContainer(t *testing.T) {
+	tests := []struct {
+		name      string
+		container corev1.Container
+		want      string
+	}{{
+		name: "directory mount",
+		container: corev1.Container{VolumeMounts: []corev1.VolumeMount{{
+			Name:      "config",
+			MountPath: "/etc/conf",
+		}}},
+		want: "/etc/conf/my.cnf",
+	}, {
+		name: "matching subPath file mount",
+		container: corev1.Container{VolumeMounts: []corev1.VolumeMount{{
+			Name:      "config",
+			MountPath: "/etc/my.cnf",
+			SubPath:   "my.cnf",
+		}}},
+		want: "/etc/my.cnf",
+	}, {
+		name: "non-matching subPath is unresolved",
+		container: corev1.Container{VolumeMounts: []corev1.VolumeMount{{
+			Name:      "config",
+			MountPath: "/etc/other.cnf",
+			SubPath:   "other.cnf",
+		}}},
+	}, {
+		name: "subPathExpr is unresolved",
+		container: corev1.Container{VolumeMounts: []corev1.VolumeMount{{
+			Name:        "config",
+			MountPath:   "/etc/my.cnf",
+			SubPathExpr: "$(CONFIG_FILE)",
+		}}},
+	}, {
+		name: "multiple candidates are unresolved",
+		container: corev1.Container{VolumeMounts: []corev1.VolumeMount{{
+			Name:      "config",
+			MountPath: "/etc/conf",
+		}, {
+			Name:      "config",
+			MountPath: "/etc/my.cnf",
+			SubPath:   "my.cnf",
+		}}},
+	}}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := resolveMountedPathFromContainer(tt.container, "config", "my.cnf"); got != tt.want {
+				t.Fatalf("expected path %q, got %q", tt.want, got)
+			}
+		})
 	}
 }
 

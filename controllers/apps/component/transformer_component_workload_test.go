@@ -1381,7 +1381,7 @@ var _ = Describe("Component Workload Operations Test", func() {
 			Expect(statuses[0].Message).Should(ContainSubstring("mock failed"))
 		})
 
-		It("should keep persisted terminal member join failure unfinished", func() {
+		It("should keep persisted terminal member join failure unfinished without blocking status reconciliation", func() {
 			createGatePod(corev1.PodRunning)
 			its := buildITS(1)
 			Expect(component.NewReplicasStatus(its, []string{gatePodName}, true, false)).Should(Succeed())
@@ -1397,9 +1397,16 @@ var _ = Describe("Component Workload Operations Test", func() {
 			})
 
 			err := ops.joinMember4ScaleOut()
-			Expect(err).ShouldNot(Succeed())
-			Expect(intctrlutil.IsRequeueError(err)).Should(BeTrue())
-			Expect(err.Error()).Should(ContainSubstring(gatePodName))
+			Expect(err).Should(Succeed())
+
+			statuses, err := component.GetReplicasStatusListFunc(ops.protoITS, func(status component.ReplicaStatus) bool {
+				return status.Name == gatePodName
+			})
+			Expect(err).Should(Succeed())
+			Expect(statuses).Should(HaveLen(1))
+			Expect(statuses[0].MemberJoined).ShouldNot(BeNil())
+			Expect(*statuses[0].MemberJoined).Should(BeFalse())
+			Expect(statuses[0].MemberJoinFailed).Should(BeTrue())
 		})
 
 		It("should proceed with scale-in when replica has pending member lifecycle but pod does not exist", func() {

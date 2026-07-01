@@ -377,7 +377,7 @@ func (r *componentWorkloadOps) joinMember4ScaleOut() error {
 	}
 
 	joinErrors := make([]error, 0)
-	terminalFailureRecorded := false
+	terminalFailureObserved := false
 	if err = component.UpdateReplicasStatusFunc(r.protoITS, func(replicas *component.ReplicasStatus) error {
 		for _, pod := range pods {
 			i := slices.IndexFunc(replicas.Status, func(r component.ReplicaStatus) bool {
@@ -392,6 +392,7 @@ func (r *componentWorkloadOps) joinMember4ScaleOut() error {
 				continue // no need to join or already joined
 			}
 			if status.MemberJoinFailed {
+				terminalFailureObserved = true
 				continue // terminal failure is persisted and cancelable by scale-in
 			}
 
@@ -401,7 +402,7 @@ func (r *componentWorkloadOps) joinMember4ScaleOut() error {
 				if isTerminalMemberJoinError(err) {
 					replicas.Status[i].MemberJoinFailed = true
 					replicas.Status[i].Message = err.Error()
-					terminalFailureRecorded = true
+					terminalFailureObserved = true
 					continue
 				}
 				joinErrors = append(joinErrors, fmt.Errorf("pod %s: %w", pod.Name, err))
@@ -427,7 +428,7 @@ func (r *componentWorkloadOps) joinMember4ScaleOut() error {
 	}
 
 	if len(joinErrors) > 0 {
-		if terminalFailureRecorded {
+		if terminalFailureObserved {
 			return nil
 		}
 		return intctrlutil.NewRequeueError(time.Second, fmt.Sprintf("%v", joinErrors))

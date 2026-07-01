@@ -17,14 +17,18 @@ package component
 
 import (
 	"context"
+	"fmt"
+	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	"github.com/golang/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -37,6 +41,9 @@ import (
 	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
 	kbagentproto "github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 )
 
 var _ = Describe("Component Workload Operations Test", func() {
@@ -1207,3 +1214,69 @@ var _ = Describe("Component Workload Operations Test", func() {
 		})
 	})
 })
+
+func TestPersistMemberJoinedRetriesUpdateConflict(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := workloads.AddToScheme(scheme); err != nil {
+		t.Fatalf("add workloads scheme: %v", err)
+	}
+
+	replicas := int32(2)
+	its := &workloads.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      "test-its",
+		},
+		Spec: workloads.InstanceSetSpec{
+			Replicas: &replicas,
+		},
+	}
+	const podName = "test-pod-1"
+	if err := component.NewReplicasStatus(its, []string{podName}, true, false); err != nil {
+		t.Fatalf("new replicas status: %v", err)
+	}
+
+	updateCount := 0
+	cli := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(its).
+		WithInterceptorFuncs(interceptor.Funcs{
+			Update: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.UpdateOption) error {
+				updateCount++
+				if updateCount == 1 {
+					return apierrors.NewConflict(workloads.Resource("instancesets"), obj.GetName(),
+						fmt.Errorf("simulated conflict"))
+				}
+				return c.Update(ctx, obj, opts...)
+			},
+		}).
+		Build()
+	ops := &componentWorkloadOps{
+		transCtx: &componentTransformContext{
+			Context: context.Background(),
+		},
+		cli:        cli,
+		runningITS: its,
+	}
+
+	if err := ops.persistMemberJoined(podName); err != nil {
+		t.Fatalf("persist member joined: %v", err)
+	}
+
+	current := &workloads.InstanceSet{}
+	if err := cli.Get(context.Background(), client.ObjectKeyFromObject(its), current); err != nil {
+		t.Fatalf("get current instanceset: %v", err)
+	}
+	joined, err := component.GetReplicasStatusFunc(current, func(s component.ReplicaStatus) bool {
+		return s.Name == podName && s.MemberJoined != nil && *s.MemberJoined
+	})
+	if err != nil {
+		t.Fatalf("get replicas status: %v", err)
+	}
+	if len(joined) != 1 || joined[0] != podName {
+		t.Fatalf("expected %s joined, got %v", podName, joined)
+	}
+	if updateCount != 2 {
+		t.Fatalf("expected one conflict retry, got %d updates", updateCount)
+	}
+}

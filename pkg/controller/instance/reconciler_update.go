@@ -162,7 +162,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			switch {
 			case !equalResourcesInPlaceFields(pod, newPod) && supportResizeSubResource:
 				err = tree.Update(newMergedPod, kubebuilderx.WithSubResource("resize"))
-			case safeMetadataOnlyInPlaceUpdate(pod, newPod):
+			case safeMetadataOnlyInPlaceUpdate(pod, newPod), safeKBManagedImageOnlyInPlaceUpdate(pod, newPod):
 				err = tree.Update(newMergedPod, kubebuilderx.WithPatch(true))
 			default:
 				if err = r.switchover(tree, inst, newMergedPod.(*corev1.Pod)); err != nil {

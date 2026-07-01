@@ -41,6 +41,7 @@ import (
 	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
 	kbagentproto "github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
@@ -1149,6 +1150,10 @@ var _ = Describe("Component Workload Operations Test", func() {
 		})
 
 		It("decides legacy config-manager cleanup from concrete pod template change classes", func() {
+			oldToolsImage := viper.GetString(constant.KBToolsImage)
+			defer viper.Set(constant.KBToolsImage, oldToolsImage)
+			viper.Set(constant.KBToolsImage, "docker.io/apecloud/kubeblocks-tools:1.0.0")
+
 			baseTemplate := corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"app": "mysql"},
@@ -1175,6 +1180,18 @@ var _ = Describe("Component Workload Operations Test", func() {
 			Expect(shouldCleanupLegacyConfigManager(oldITS, upgradeITS)).Should(BeFalse())
 			upgradeITS.Spec.PodUpgradePolicy = appsv1.ReCreatePodUpdatePolicyType
 			Expect(shouldCleanupLegacyConfigManager(oldITS, upgradeITS)).Should(BeTrue())
+
+			kbManagedITS := newInstanceSet()
+			kbManagedITS.Spec.PodUpgradePolicy = appsv1.ReCreatePodUpdatePolicyType
+			kbManagedITS.Spec.Template.Spec.InitContainers = []corev1.Container{
+				{Name: "init-kbagent", Image: "docker.io/apecloud/kubeblocks-tools:1.0.0", Command: []string{"cp"}},
+			}
+			kbManagedITS.Spec.Template.Spec.Containers = append(kbManagedITS.Spec.Template.Spec.Containers,
+				corev1.Container{Name: "kbagent", Image: "docker.io/apecloud/kubeblocks-tools:1.0.0", Command: []string{"/bin/kbagent"}})
+			kbManagedUpgradeITS := kbManagedITS.DeepCopy()
+			kbManagedUpgradeITS.Spec.Template.Spec.InitContainers[0].Image = "mirror.local/apecloud/kubeblocks-tools:1.1.0"
+			kbManagedUpgradeITS.Spec.Template.Spec.Containers[1].Image = "mirror.local/apecloud/kubeblocks-tools:1.1.0"
+			Expect(shouldCleanupLegacyConfigManager(kbManagedITS, kbManagedUpgradeITS)).Should(BeFalse())
 
 			resourceITS := newInstanceSet()
 			resourceITS.Spec.Template.Spec.Containers[0].Resources = corev1.ResourceRequirements{

@@ -235,6 +235,8 @@ type ComponentSpec struct {
 	// PodUpgradePolicy indicates how pods should be updated when the component is upgraded.
 	//
 	// If not specified, the value of PodUpdatePolicy will be used.
+	// If the referenced ComponentDefinition specifies PodUpgradePolicy or PodUpdatePolicy as "ReCreate",
+	// the definition-level "ReCreate" takes precedence over this field.
 	//
 	// +kubebuilder:validation:Enum={StrictInPlace,PreferInPlace}
 	// +optional

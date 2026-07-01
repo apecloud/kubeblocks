@@ -111,7 +111,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 				notAvailableNames.Insert(inst.Name)
 			}
 		}
-		currentRevisions[inst.Name] = buildInstanceRevisionWithDesiredMetadata(inst, desiredInstances[inst.Name])
+		currentRevisions[inst.Name] = buildCurrentInstanceRevision(inst, desiredInstances[inst.Name])
 		if !intctrlutil.IsInstanceTerminating(inst) {
 			if isInstanceUpdatedWithRevisions(inst, currentRevisions[inst.Name], updateRevisions) {
 				updatedReplicas++

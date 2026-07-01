@@ -430,7 +430,7 @@ func isInstanceUpdated(its *workloads.InstanceSet, inst, desired *workloads.Inst
 	if err != nil {
 		return false
 	}
-	return isInstanceUpdatedWithRevisions(inst, buildInstanceRevisionWithDesiredMetadata(inst, desired), updateRevisions)
+	return isInstanceUpdatedWithRevisions(inst, buildCurrentInstanceRevision(inst, desired), updateRevisions)
 }
 
 func isInstanceUpdatedWithRevisions(inst *workloads.Instance, currentRevision string, updateRevisions map[string]string) bool {

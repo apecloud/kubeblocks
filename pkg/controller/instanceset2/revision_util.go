@@ -37,22 +37,24 @@ type instanceRevisionIntent struct {
 }
 
 func buildInstanceRevision(inst *workloads.Instance) string {
-	return buildInstanceRevisionWithDesiredMetadata(inst, nil)
+	return buildRevisionIntentHash(copyRevisionLabels(inst.Labels), copyRevisionAnnotations(inst.Annotations), *inst.Spec.DeepCopy())
 }
 
-func buildInstanceRevisionWithDesiredMetadata(inst, desired *workloads.Instance) string {
-	var labels, annotations map[string]string
-	if desired != nil {
-		labels = copyRevisionLabelsByKeys(inst.Labels, desired.Labels)
-		annotations = copyRevisionAnnotationsByKeys(inst.Annotations, desired.Annotations)
-	} else {
-		labels = copyRevisionLabels(inst.Labels)
-		annotations = copyRevisionAnnotations(inst.Annotations)
+func buildCurrentInstanceRevision(inst, desired *workloads.Instance) string {
+	if desired == nil {
+		return buildInstanceRevision(inst)
 	}
+	return buildRevisionIntentHash(
+		copyRevisionLabelsByKeys(inst.Labels, desired.Labels),
+		copyRevisionAnnotationsByKeys(inst.Annotations, desired.Annotations),
+		*inst.Spec.DeepCopy())
+}
+
+func buildRevisionIntentHash(labels, annotations map[string]string, spec workloads.InstanceSpec) string {
 	intent := instanceRevisionIntent{
 		Labels:      labels,
 		Annotations: annotations,
-		Spec:        *inst.Spec.DeepCopy(),
+		Spec:        spec,
 	}
 	hasher := fnv.New32()
 	fmt.Fprintf(hasher, "%v", dump.ForHash(intent))

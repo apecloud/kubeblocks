@@ -214,19 +214,19 @@ func TestBuildInstanceRevisionUsesDesiredMetadataKeys(t *testing.T) {
 	actual.Annotations[constant.KubeBlocksGenerationKey] = "1"
 	actual.Annotations["external-annotation"] = "ignored"
 	actual.Labels["external-label"] = "ignored"
-	if got := buildInstanceRevisionWithDesiredMetadata(actual, desired); got != revision {
+	if got := buildCurrentInstanceRevision(actual, desired); got != revision {
 		t.Fatalf("expected unmanaged metadata to be ignored, got %s want %s", got, revision)
 	}
 
 	actual = desired.DeepCopy()
 	actual.Annotations["managed-annotation"] = "changed"
-	if got := buildInstanceRevisionWithDesiredMetadata(actual, desired); got == revision {
+	if got := buildCurrentInstanceRevision(actual, desired); got == revision {
 		t.Fatalf("expected managed annotation change to alter revision")
 	}
 
 	actual = desired.DeepCopy()
 	actual.Labels["managed-label"] = "changed"
-	if got := buildInstanceRevisionWithDesiredMetadata(actual, desired); got == revision {
+	if got := buildCurrentInstanceRevision(actual, desired); got == revision {
 		t.Fatalf("expected managed label change to alter revision")
 	}
 }
@@ -305,7 +305,7 @@ func TestStatusReconcilerKeepsScaleOutInstancesUpdatedAfterParentGenerationBump(
 	if err != nil {
 		t.Fatalf("get current revisions: %v", err)
 	}
-	if currentRevisions[inst.Name] != buildInstanceRevisionWithDesiredMetadata(inst, desired) {
+	if currentRevisions[inst.Name] != buildCurrentInstanceRevision(inst, desired) {
 		t.Fatalf("unexpected current revision: %#v", currentRevisions)
 	}
 	if currentRevisions[inst.Name] != desiredRevision {

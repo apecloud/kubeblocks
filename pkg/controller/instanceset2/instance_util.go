@@ -35,6 +35,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -394,11 +395,16 @@ func getHeadlessSvcName(itsName string) string {
 // }
 
 func isInstanceUpdated(its *workloads.InstanceSet, inst *workloads.Instance) bool {
-	generation, ok := inst.Annotations[constant.KubeBlocksGenerationKey]
-	if !ok {
+	updateRevisions, err := instanceset.GetRevisions(its.Status.UpdateRevisions)
+	if err != nil {
 		return false
 	}
-	if strconv.FormatInt(its.Generation, 10) != generation {
+	return isInstanceUpdatedWithRevisions(inst, buildInstanceRevision(inst), updateRevisions)
+}
+
+func isInstanceUpdatedWithRevisions(inst *workloads.Instance, currentRevision string, updateRevisions map[string]string) bool {
+	updateRevision, ok := updateRevisions[inst.Name]
+	if !ok || currentRevision != updateRevision {
 		return false
 	}
 	return inst.Generation == inst.Status.ObservedGeneration && inst.Status.UpToDate

@@ -20,9 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset2
 
 import (
+	"slices"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
+	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
@@ -44,6 +48,42 @@ func (r *revisionUpdateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *
 
 func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
+
+	itsExt, err := instancetemplate.BuildInstanceSetExt(its, tree)
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
+	nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt, nil)
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
+	nameMap, err := nameBuilder.BuildInstanceName2TemplateMap()
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
+
+	names := make([]string, 0, len(nameMap))
+	for name := range nameMap {
+		names = append(names, name)
+	}
+	slices.Sort(names)
+
+	updateRevisions := make(map[string]string, len(names))
+	for _, name := range names {
+		inst, err := buildInstanceByTemplate(tree, name, nameMap[name], its)
+		if err != nil {
+			return kubebuilderx.Continue, err
+		}
+		updateRevisions[name] = buildInstanceRevision(inst)
+	}
+	revisions, err := instanceset.BuildRevisions(updateRevisions)
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
+	its.Status.UpdateRevisions = revisions
+	if len(names) > 0 {
+		its.Status.UpdateRevision = updateRevisions[names[len(names)-1]]
+	}
 
 	updatedReplicas := r.calculateUpdatedReplicas(its, tree.List(&workloads.Instance{}))
 	its.Status.UpdatedReplicas = updatedReplicas

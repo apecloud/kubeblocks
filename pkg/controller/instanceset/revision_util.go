@@ -192,7 +192,8 @@ func GetRevisions(revisions map[string]string) (map[string]string, error) {
 	return updateRevisions, nil
 }
 
-func buildRevisions(updateRevisions map[string]string) (map[string]string, error) {
+// BuildRevisions returns a status-safe revisions map, compressing it when it exceeds the plain-entry limit.
+func BuildRevisions(updateRevisions map[string]string) (map[string]string, error) {
 	maxPlainRevisionCount := viper.GetInt(MaxPlainRevisionCount)
 	if len(updateRevisions) <= maxPlainRevisionCount {
 		return updateRevisions, nil
@@ -204,4 +205,8 @@ func buildRevisions(updateRevisions map[string]string) (map[string]string, error
 	revisionsData := writer.EncodeAll(revisionsJSON, nil)
 	revisionsStr := base64.StdEncoding.EncodeToString(revisionsData)
 	return map[string]string{revisionsZSTDKey: revisionsStr}, nil
+}
+
+func buildRevisions(updateRevisions map[string]string) (map[string]string, error) {
+	return BuildRevisions(updateRevisions)
 }

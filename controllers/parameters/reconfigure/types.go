@@ -89,6 +89,8 @@ type Context struct {
 	ConfigDescription *parametersv1alpha1.ComponentConfigDescription
 	ParametersDef     *parametersv1alpha1.ParametersDefinitionSpec
 	Patch             *core.ConfigPatchInfo
+
+	ReloadBeforeRestart bool
 }
 
 func (c *Context) getTargetConfigHash() *string {

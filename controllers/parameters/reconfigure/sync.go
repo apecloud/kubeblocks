@@ -48,7 +48,6 @@ func createSyncPolicy(restart bool) func(Context) (Status, error) {
 	return func(ctx Context) (Status, error) {
 		var (
 			paramDef               = ctx.ParametersDef
-			dynamicAction          = parameters.NeedDynamicReloadAction(paramDef)
 			needReloadStaticParams = parameters.ReloadStaticParameters(paramDef)
 			visualizedParams       = core.GenerateVisualizedParamsList(ctx.Patch,
 				[]parametersv1alpha1.ComponentConfigDescription{*ctx.ConfigDescription})
@@ -59,7 +58,7 @@ func createSyncPolicy(restart bool) func(Context) (Status, error) {
 				continue
 			}
 			for _, p := range key.Parameters {
-				if dynamicAction && !needReloadStaticParams && !core.IsDynamicParameter(p.Key, paramDef) {
+				if shouldSkipReloadParam(p.Key, paramDef, needReloadStaticParams, restart, ctx.ReloadBeforeRestart) {
 					continue
 				}
 				if p.Value != nil {
@@ -88,6 +87,16 @@ func createSyncPolicy(restart bool) func(Context) (Status, error) {
 		}
 		return submit(ctx, params, restart)
 	}
+}
+
+func shouldSkipReloadParam(param string, paramDef *parametersv1alpha1.ParametersDefinitionSpec, reloadStaticParams, restart, reloadBeforeRestart bool) bool {
+	if reloadStaticParams {
+		return false
+	}
+	if restart && reloadBeforeRestart {
+		return !core.IsDynamicParameter(param, paramDef)
+	}
+	return false
 }
 
 func submit(ctx Context, parameters map[string]string, restart bool) (Status, error) {
@@ -192,10 +201,7 @@ func shouldInvokeTemplateReconfigureAction(ctx Context, params map[string]string
 	if !restart {
 		return true
 	}
-	if ctx.ParametersDef == nil {
-		return false
-	}
-	return parameters.ReloadStaticParameters(ctx.ParametersDef) || parameters.NeedDynamicReloadAction(ctx.ParametersDef)
+	return ctx.ReloadBeforeRestart || parameters.ReloadStaticParameters(ctx.ParametersDef) || parameters.NeedDynamicReloadAction(ctx.ParametersDef)
 }
 
 func reloadActionToReconfigureAction(ctx Context, params map[string]string) *appsv1.Action {

@@ -275,7 +275,7 @@ func (r *ReconfigureReconciler) buildReconfigureTasks(templateSpec *appsv1.Compo
 		}
 		// If a reload action is needed, append a new reload action task to the tasks slice.
 		if needReloadAction(pd, policy) {
-			tasks = append(tasks, r.buildReloadTask(policy, templateSpec, rctx, pd, configFormat, patch))
+			tasks = append(tasks, r.buildReloadTask(policy, templateSpec, rctx, pd, configFormat, patch, policy == reconfigure.DynamicReloadAndRestartPolicy))
 		}
 	}
 
@@ -316,18 +316,19 @@ func validateLegacyReloadActionSupport(rctx *reconcileContext, patch *core.Confi
 
 func (r *ReconfigureReconciler) buildReloadTask(policy reconfigure.Policy,
 	templateSpec *appsv1.ComponentFileTemplate, rctx *reconcileContext, pd *parametersv1alpha1.ParametersDefinition,
-	configDescription *parametersv1alpha1.ComponentConfigDescription, patch *core.ConfigPatchInfo) reconfigure.Task {
+	configDescription *parametersv1alpha1.ComponentConfigDescription, patch *core.ConfigPatchInfo, reloadBeforeRestart bool) reconfigure.Task {
 	reCtx := reconfigure.Context{
-		RequestCtx:        rctx.RequestCtx,
-		Client:            rctx.Client,
-		ConfigTemplate:    *templateSpec,
-		ConfigHash:        computeTargetConfigHash(&rctx.RequestCtx, rctx.configMap.Data),
-		Cluster:           rctx.ClusterObj,
-		ClusterComponent:  rctx.ClusterComObj,
-		ITS:               rctx.its,
-		ConfigDescription: configDescription,
-		ParametersDef:     &pd.Spec,
-		Patch:             patch,
+		RequestCtx:          rctx.RequestCtx,
+		Client:              rctx.Client,
+		ConfigTemplate:      *templateSpec,
+		ConfigHash:          computeTargetConfigHash(&rctx.RequestCtx, rctx.configMap.Data),
+		Cluster:             rctx.ClusterObj,
+		ClusterComponent:    rctx.ClusterComObj,
+		ITS:                 rctx.its,
+		ConfigDescription:   configDescription,
+		ParametersDef:       &pd.Spec,
+		Patch:               patch,
+		ReloadBeforeRestart: reloadBeforeRestart,
 	}
 	return reconfigure.Task{Policy: policy, Ctx: reCtx}
 }
@@ -362,6 +363,9 @@ func (r *ReconfigureReconciler) resolveReconfigurePolicy(jsonPatch string, forma
 		if dynamicUpdate {
 			return reconfigure.SyncDynamicReloadPolicy, nil
 		}
+		if hasDynamicUpdate && templateReconfigureBeforeRestart(pd, templateSpec) {
+			return reconfigure.DynamicReloadAndRestartPolicy, nil
+		}
 		if parameters.ReloadStaticParameters(pd) || (hasDynamicUpdate && parameters.NeedDynamicReloadAction(pd)) {
 			return reconfigure.DynamicReloadAndRestartPolicy, nil
 		}
@@ -370,6 +374,8 @@ func (r *ReconfigureReconciler) resolveReconfigurePolicy(jsonPatch string, forma
 
 	// make decision
 	switch {
+	case !dynamicUpdate && hasDynamicUpdate && templateReconfigureBeforeRestart(pd, templateSpec):
+		policy = reconfigure.DynamicReloadAndRestartPolicy
 	case !dynamicUpdate && (parameters.ReloadStaticParameters(pd) || (hasDynamicUpdate && parameters.NeedDynamicReloadAction(pd))): // static parameters update and need to do hot update
 		policy = reconfigure.DynamicReloadAndRestartPolicy
 	case !dynamicUpdate: // static parameters update and only need to restart
@@ -382,6 +388,13 @@ func (r *ReconfigureReconciler) resolveReconfigurePolicy(jsonPatch string, forma
 		policy = reconfigure.AsyncDynamicReloadPolicy
 	}
 	return policy, nil
+}
+
+func templateReconfigureBeforeRestart(pd *parametersv1alpha1.ParametersDefinitionSpec, templateSpec *appsv1.ComponentFileTemplate) bool {
+	if pd == nil || templateSpec == nil || templateSpec.Reconfigure == nil {
+		return false
+	}
+	return pd.MergeReloadAndRestart == nil || !*pd.MergeReloadAndRestart
 }
 
 func (r *ReconfigureReconciler) enableSyncTrigger(reloadAction *parametersv1alpha1.ReloadAction) bool {

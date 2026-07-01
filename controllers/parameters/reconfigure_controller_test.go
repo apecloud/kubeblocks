@@ -132,6 +132,7 @@ var _ = Describe("Reconfigure Controller", func() {
 				pd,
 				configDesc,
 				patch,
+				false,
 			)
 
 			Expect(task.Policy).Should(Equal(reconfigure.SyncDynamicReloadPolicy))
@@ -799,6 +800,34 @@ func TestResolveReconfigurePolicyUsesTemplateReconfigureForSplitMixedUpdate(t *t
 					SectionName: "mysqld",
 				},
 			},
+		},
+		pd,
+		configSpec,
+	)
+	if err != nil {
+		t.Fatalf("resolveReconfigurePolicy returned error: %v", err)
+	}
+	if policy != reconfigure.DynamicReloadAndRestartPolicy {
+		t.Fatalf("expected %q, got %q", reconfigure.DynamicReloadAndRestartPolicy, policy)
+	}
+}
+
+func TestResolveReconfigurePolicySplitsTemplateReconfigureMixedUpdateByDefault(t *testing.T) {
+	r := &ReconfigureReconciler{}
+	pd := &parametersv1alpha1.ParametersDefinitionSpec{
+		DynamicParameters: []string{"max_connections"},
+	}
+	configSpec := &appsv1.ComponentFileTemplate{
+		Name: "postgresql-configuration",
+		Reconfigure: &appsv1.Action{
+			Exec: &appsv1.ExecAction{Command: []string{"bash", "-c", "reload"}},
+		},
+	}
+
+	policy, err := r.resolveReconfigurePolicy(
+		`{"max_connections":"500","shared_buffers":"1024MB"}`,
+		&parametersv1alpha1.FileFormatConfig{
+			Format: parametersv1alpha1.YAML,
 		},
 		pd,
 		configSpec,

@@ -326,6 +326,37 @@ func getHeadlessSvcName(itsName string) string {
 	return strings.Join([]string{itsName, "headless"}, "-")
 }
 
+func buildDesiredInstancesByName(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet) (map[string]*workloads.Instance, []string, error) {
+	itsExt, err := instancetemplate.BuildInstanceSetExt(its, tree)
+	if err != nil {
+		return nil, nil, err
+	}
+	nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+	nameMap, err := nameBuilder.BuildInstanceName2TemplateMap()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	names := make([]string, 0, len(nameMap))
+	for name := range nameMap {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	desired := make(map[string]*workloads.Instance, len(names))
+	for _, name := range names {
+		inst, err := buildInstanceByTemplate(tree, name, nameMap[name], its)
+		if err != nil {
+			return nil, nil, err
+		}
+		desired[name] = inst
+	}
+	return desired, names, nil
+}
+
 // func mergeInPlaceFields(src, dst *corev1.PodTemplateSpec) {
 //	mergeMap(&src.Annotations, &dst.Annotations)
 //	mergeMap(&src.Labels, &dst.Labels)
@@ -394,11 +425,7 @@ func getHeadlessSvcName(itsName string) string {
 //	return requests, limits
 // }
 
-func isInstanceUpdated(its *workloads.InstanceSet, inst *workloads.Instance) bool {
-	return isInstanceUpdatedWithDesired(its, inst, nil)
-}
-
-func isInstanceUpdatedWithDesired(its *workloads.InstanceSet, inst, desired *workloads.Instance) bool {
+func isInstanceUpdated(its *workloads.InstanceSet, inst, desired *workloads.Instance) bool {
 	updateRevisions, err := revisionmap.Decode(its.Status.UpdateRevisions)
 	if err != nil {
 		return false

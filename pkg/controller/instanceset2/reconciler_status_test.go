@@ -159,7 +159,7 @@ func TestIsInstanceUpdated(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := isInstanceUpdated(its, tt.inst); got != tt.want {
+			if got := isInstanceUpdated(its, tt.inst, nil); got != tt.want {
 				t.Fatalf("expected %v, got %v", tt.want, got)
 			}
 		})

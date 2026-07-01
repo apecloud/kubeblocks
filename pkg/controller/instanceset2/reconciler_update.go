@@ -118,10 +118,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			}
 			desiredInstances[name] = inst
 		}
-		isUpdated := func(its *workloads.InstanceSet, inst *workloads.Instance) bool {
-			return isInstanceUpdatedWithDesired(its, inst, desiredInstances[inst.Name])
-		}
-		plan := newUpdatePlan(*its, oldInstanceList, isUpdated)
+		plan := newUpdatePlan(*its, oldInstanceList, desiredInstances)
 		instancesToBeUpdated, err := plan.Execute()
 		if err != nil {
 			return kubebuilderx.Continue, err

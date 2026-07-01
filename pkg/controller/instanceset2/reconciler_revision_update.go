@@ -76,7 +76,7 @@ func (r *revisionUpdateReconciler) calculateUpdatedReplicas(its *workloads.Insta
 	updatedReplicas := int32(0)
 	for i := range instances {
 		inst, _ := instances[i].(*workloads.Instance)
-		if isInstanceUpdatedWithDesired(its, inst, desiredInstances[inst.Name]) {
+		if isInstanceUpdated(its, inst, desiredInstances[inst.Name]) {
 			updatedReplicas++
 		}
 	}

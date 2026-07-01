@@ -414,7 +414,7 @@ func (r *componentWorkloadOps) joinMember4ScaleOut() error {
 
 		notJoinedReplicas := make([]string, 0)
 		for _, r := range replicas.Status {
-			if r.MemberJoined != nil && !*r.MemberJoined && !r.MemberJoinFailed {
+			if r.MemberJoined != nil && !*r.MemberJoined {
 				notJoinedReplicas = append(notJoinedReplicas, r.Name)
 			}
 		}

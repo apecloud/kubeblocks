@@ -118,6 +118,15 @@ func (r *opsRuntime) GetWorkload(namespace, clusterName, compName string) (Workl
 		workload.notReadySet = instanceset.GetPodNameSetFromInstanceSetCondition(its, workloads.InstanceReady)
 		workload.notAvailableSet = instanceset.GetPodNameSetFromInstanceSetCondition(its, workloads.InstanceAvailable)
 		workload.failedSet = instanceset.GetPodNameSetFromInstanceSetCondition(its, workloads.InstanceFailure)
+		replicaStatuses, err := component.GetReplicasStatusListFunc(its, func(status component.ReplicaStatus) bool {
+			return status.MemberJoinFailed
+		})
+		if err != nil {
+			return nil, err
+		}
+		for _, status := range replicaStatuses {
+			workload.failedSet.Insert(status.Name)
+		}
 		return workload, nil
 	}
 	pods, err := component.ListOwnedPods(r.dataContext(), r.cli, namespace, clusterName, compName, r.dataListOpts...)

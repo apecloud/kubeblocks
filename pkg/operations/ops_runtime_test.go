@@ -27,11 +27,13 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	ctrlcomp "github.com/apecloud/kubeblocks/pkg/controller/component"
 )
 
 func TestOpsRuntimeBuildsInstanceAPIView(t *testing.T) {
@@ -275,6 +277,84 @@ func TestOpsRuntimeBuildsInstanceAPIView(t *testing.T) {
 	}
 	if volume.IsExpanding() {
 		t.Fatalf("did not expect volume to be expanding")
+	}
+}
+
+func TestOpsRuntimeTreatsTerminalMemberJoinFailureAsFailedInstance(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatalf("add core scheme: %v", err)
+	}
+	if err := appsv1.AddToScheme(scheme); err != nil {
+		t.Fatalf("add apps scheme: %v", err)
+	}
+	if err := workloads.AddToScheme(scheme); err != nil {
+		t.Fatalf("add workloads scheme: %v", err)
+	}
+
+	const (
+		namespace     = "default"
+		clusterName   = "test-cluster"
+		componentName = "mysql"
+		instanceName  = "test-cluster-mysql-0"
+	)
+	its := &workloads.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      constant.GenerateClusterComponentName(clusterName, componentName),
+			Labels:    constant.GetCompLabels(clusterName, componentName),
+		},
+		Spec: workloads.InstanceSetSpec{
+			Replicas: ptr.To[int32](1),
+		},
+		Status: workloads.InstanceSetStatus{
+			CurrentRevisions: map[string]string{
+				instanceName: "rev-a",
+			},
+		},
+	}
+	if err := ctrlcomp.NewReplicasStatus(its, []string{instanceName}, true, false); err != nil {
+		t.Fatalf("new replicas status: %v", err)
+	}
+	if err := ctrlcomp.UpdateReplicasStatusFunc(its, func(status *ctrlcomp.ReplicasStatus) error {
+		status.Status[0].MemberJoinFailed = true
+		status.Status[0].Message = "mock failed"
+		return nil
+	}); err != nil {
+		t.Fatalf("mark member join failed: %v", err)
+	}
+	cluster := &appsv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      clusterName,
+		},
+		Spec: appsv1.ClusterSpec{
+			ComponentSpecs: []appsv1.ClusterComponentSpec{{
+				Name: componentName,
+			}},
+		},
+	}
+
+	cli := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(its).
+		Build()
+	opsRes := &OpsResource{Cluster: cluster}
+	runtimes, err := buildOpsRuntimes(context.Background(), cli, opsRes)
+	if err != nil {
+		t.Fatalf("build runtime: %v", err)
+	}
+	opsRes.Runtimes = runtimes
+	rt, err := opsRes.GetRuntime(componentName)
+	if err != nil {
+		t.Fatalf("get runtime: %v", err)
+	}
+	workload, err := rt.GetWorkload(namespace, clusterName, componentName)
+	if err != nil {
+		t.Fatalf("get workload: %v", err)
+	}
+	if !workload.GetFailedInstanceNameSet().Has(instanceName) {
+		t.Fatalf("expected failed instance set to include %s", instanceName)
 	}
 }
 

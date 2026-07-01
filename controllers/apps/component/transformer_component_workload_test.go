@@ -1381,6 +1381,27 @@ var _ = Describe("Component Workload Operations Test", func() {
 			Expect(statuses[0].Message).Should(ContainSubstring("mock failed"))
 		})
 
+		It("should keep persisted terminal member join failure unfinished", func() {
+			createGatePod(corev1.PodRunning)
+			its := buildITS(1)
+			Expect(component.NewReplicasStatus(its, []string{gatePodName}, true, false)).Should(Succeed())
+			Expect(component.UpdateReplicasStatusFunc(its, func(status *component.ReplicasStatus) error {
+				status.Status[0].MemberJoinFailed = true
+				status.Status[0].Message = "mock failed"
+				return nil
+			})).Should(Succeed())
+			ops := buildOps(its)
+
+			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).Times(0)
+			})
+
+			err := ops.joinMember4ScaleOut()
+			Expect(err).ShouldNot(Succeed())
+			Expect(intctrlutil.IsRequeueError(err)).Should(BeTrue())
+			Expect(err.Error()).Should(ContainSubstring(gatePodName))
+		})
+
 		It("should proceed with scale-in when replica has pending member lifecycle but pod does not exist", func() {
 			its := buildITS(1)
 			Expect(component.NewReplicasStatus(its, []string{gatePodName}, true, false)).Should(Succeed())

@@ -424,6 +424,25 @@ var _ = Describe("component status transformer conditions", func() {
 			// when scale out is done
 			// TODO
 		})
+
+		It("should fail when scale out member join reached terminal failure", func() {
+			protoITS.Spec.Replicas = ptr.To[int32](4)
+			err := component.NewReplicasStatus(protoITS, []string{"pod-3"}, true, false)
+			Expect(err).Should(BeNil())
+			err = component.UpdateReplicasStatusFunc(protoITS, func(status *component.ReplicasStatus) error {
+				status.Status[0].MemberJoinFailed = true
+				status.Status[0].Message = "mock failed"
+				return nil
+			})
+			Expect(err).Should(BeNil())
+			transformer.protoITS = protoITS
+
+			err = transformer.reconcileStatus(transCtx)
+			Expect(err).Should(BeNil())
+
+			Expect(comp.Status.Phase).Should(Equal(appsv1.FailedComponentPhase))
+			Expect(comp.Status.Message[constant.PodKind+"/pod-3"]).Should(ContainSubstring("mock failed"))
+		})
 	})
 
 	Context("reconcileAvailableCondition", func() {

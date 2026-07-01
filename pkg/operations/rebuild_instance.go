@@ -525,10 +525,7 @@ func (r rebuildInstanceOpsHandler) checkProgressForScalingOutPods(reqCtx intctrl
 				progressDetail.SetStatusAndMessage(opsv1alpha1.ProcessingProgressStatus,
 					r.buildScalingOutPodMessage(scalingOutPodName, string(opsv1alpha1.AvailablePhase)))
 				if oldInstance.IsDeleting() && opsRes.OpsRequest.Force() {
-					pod := &corev1.Pod{}
-					if getErr := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: instance.Name, Namespace: opsRes.Cluster.Namespace}, pod); getErr == nil {
-						_ = intctrlutil.BackgroundDeleteObject(cli, reqCtx.Ctx, pod, client.GracePeriodSeconds(0))
-					}
+					_ = runtime.DeleteInstance(reqCtx.Ctx, opsRes.Cluster.Namespace, instance.Name, client.GracePeriodSeconds(0))
 				}
 			}
 			setComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest, &compStatus.ProgressDetails, progressDetail)

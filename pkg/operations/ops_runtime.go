@@ -170,6 +170,14 @@ func (r *opsRuntime) GetInstance(namespace, clusterName, compName, instanceName 
 	return r.newPodInstance(compName, pod)
 }
 
+func (r *opsRuntime) DeleteInstance(ctx context.Context, namespace, instanceName string, opts ...client.DeleteOption) error {
+	pod := &corev1.Pod{}
+	if err := r.cli.Get(r.dataContext(), client.ObjectKey{Name: instanceName, Namespace: namespace}, pod, r.dataGetOpts...); err != nil {
+		return err
+	}
+	return intctrlutil.BackgroundDeleteObject(r.cli, r.dataContext(), pod, opts...)
+}
+
 func (r *opsRuntime) ListInstances(namespace, clusterName, compName string) ([]Instance, error) {
 	pods, err := component.ListOwnedPods(r.dataContext(), r.cli, namespace, clusterName, compName, r.dataListOpts...)
 	if err != nil {

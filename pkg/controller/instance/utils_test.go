@@ -29,9 +29,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 func TestReconfigureOptions(t *testing.T) {
@@ -47,6 +49,65 @@ func TestReconfigureOptions(t *testing.T) {
 	}
 	if !reflect.DeepEqual(opts.Arguments, args) {
 		t.Fatalf("expected arguments %v, got %v", args, opts.Arguments)
+	}
+}
+
+func TestGetPodUpdatePolicyInSpecForKBManagedToolsImage(t *testing.T) {
+	oldToolsImage := viper.GetString(constant.KBToolsImage)
+	defer viper.Set(constant.KBToolsImage, oldToolsImage)
+	viper.Set(constant.KBToolsImage, "docker.io/apecloud/kubeblocks-tools:1.0.0")
+
+	oldPod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "inst-0",
+			Namespace: "default",
+		},
+		Spec: corev1.PodSpec{
+			InitContainers: []corev1.Container{
+				{Name: "init-kbagent", Image: "docker.io/apecloud/kubeblocks-tools:1.0.0", Command: []string{"cp"}},
+			},
+			Containers: []corev1.Container{
+				{Name: "app", Image: "docker.io/apecloud/redis:7.2"},
+				{Name: "kbagent", Image: "docker.io/apecloud/kubeblocks-tools:1.0.0", Command: []string{"/bin/kbagent"}},
+			},
+		},
+	}
+	newPod := oldPod.DeepCopy()
+	newPod.Spec.InitContainers[0].Image = "mirror.local/apecloud/kubeblocks-tools:1.1.0"
+	newPod.Spec.Containers[1].Image = "mirror.local/apecloud/kubeblocks-tools:1.1.0"
+
+	inst := builder.NewInstanceBuilder("default", "inst-0").
+		SetPodUpdatePolicy(kbappsv1.ReCreatePodUpdatePolicyType).
+		SetPodUpgradePolicy(kbappsv1.ReCreatePodUpdatePolicyType).
+		GetObject()
+
+	if policy := getPodUpdatePolicyInSpec(inst, oldPod, newPod); policy != kbappsv1.PreferInPlacePodUpdatePolicyType {
+		t.Fatalf("expected PreferInPlace for KB-managed tools image change, got %s", policy)
+	}
+	strictInPlaceInst := builder.NewInstanceBuilder("default", "inst-0").
+		SetPodUpdatePolicy(kbappsv1.ReCreatePodUpdatePolicyType).
+		SetPodUpgradePolicy(kbappsv1.StrictInPlacePodUpdatePolicyType).
+		GetObject()
+	if policy := getPodUpdatePolicyInSpec(strictInPlaceInst, oldPod, newPod); policy != kbappsv1.StrictInPlacePodUpdatePolicyType {
+		t.Fatalf("expected StrictInPlace for KB-managed tools image change with StrictInPlace policy, got %s", policy)
+	}
+	if !safeKBManagedImageOnlyInPlaceUpdate(oldPod, newPod) {
+		t.Fatalf("expected KB-managed tools image-only change to skip switchover")
+	}
+
+	labelChangedPod := newPod.DeepCopy()
+	labelChangedPod.Labels = map[string]string{"extra": "true"}
+	if policy := getPodUpdatePolicyInSpec(inst, oldPod, labelChangedPod); policy != kbappsv1.ReCreatePodUpdatePolicyType {
+		t.Fatalf("expected ReCreate for KB-managed tools image plus label change, got %s", policy)
+	}
+	if safeKBManagedImageOnlyInPlaceUpdate(oldPod, labelChangedPod) {
+		t.Fatalf("expected KB-managed tools image plus label change not to skip switchover")
+	}
+
+	appChangedPod := oldPod.DeepCopy()
+	appChangedPod.Spec.Containers[0].Image = "docker.io/apecloud/redis:7.4"
+	if policy := getPodUpdatePolicyInSpec(inst, oldPod, appChangedPod); policy != kbappsv1.ReCreatePodUpdatePolicyType {
+		t.Fatalf("expected ReCreate for app image change, got %s", policy)
 	}
 }
 

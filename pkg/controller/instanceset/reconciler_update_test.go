@@ -502,6 +502,77 @@ var _ = Describe("update reconciler test", func() {
 			Expect(spy.switchoverCalls).Should(Equal(0),
 				"switchover must not be invoked when only the config-hash annotation differs")
 		})
+
+		It("patches pod without calling switchover for KB-managed tools image-only in-place updates", func() {
+			oldToolsImage := viper.GetString(constant.KBToolsImage)
+			defer viper.Set(constant.KBToolsImage, oldToolsImage)
+			viper.Set(constant.KBToolsImage, "docker.io/apecloud/kubeblocks-tools:1.0.0")
+
+			origSupportResize := intctrlutil.SupportResizeSubResource
+			intctrlutil.SupportResizeSubResource = func() (bool, error) { return false, nil }
+			defer func() { intctrlutil.SupportResizeSubResource = origSupportResize }()
+
+			spy := &lifecycleCallSpy{}
+			origNewLifecycleAction := newLifecycleAction
+			newLifecycleAction = func(_ *workloads.InstanceSet, _ *kubebuilderx.ObjectTree, _ *corev1.Pod) (lifecycle.Lifecycle, error) {
+				return spy, nil
+			}
+			defer func() { newLifecycleAction = origNewLifecycleAction }()
+
+			its.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
+			its.Spec.Replicas = ptr.To[int32](1)
+			its.Spec.PodUpdatePolicy = kbappsv1.ReCreatePodUpdatePolicyType
+			its.Spec.PodUpgradePolicy = kbappsv1.ReCreatePodUpdatePolicyType
+			its.Spec.Template.Spec.Containers = append(its.Spec.Template.Spec.Containers, corev1.Container{
+				Name:    "kbagent",
+				Image:   "docker.io/apecloud/kubeblocks-tools:1.0.0",
+				Command: []string{"/bin/kbagent"},
+			})
+			its.Spec.LifecycleActions = &workloads.LifecycleActions{
+				Switchover: &kbappsv1.Action{
+					Exec: &kbappsv1.ExecAction{Command: []string{"true"}},
+				},
+			}
+
+			tree := kubebuilderx.NewObjectTree()
+			tree.SetRoot(its)
+			prepareForUpdate(tree)
+
+			pods := tree.List(&corev1.Pod{})
+			Expect(pods).Should(HaveLen(1))
+			pod := pods[0].(*corev1.Pod)
+			pod.Status.Phase = corev1.PodRunning
+			pod.Status.Conditions = append(pod.Status.Conditions, corev1.PodCondition{
+				Type:               corev1.PodReady,
+				Status:             corev1.ConditionTrue,
+				LastTransitionTime: metav1.NewTime(time.Now().Add(-1 * minReadySeconds * time.Second)),
+			})
+
+			for i := range its.Spec.Template.Spec.Containers {
+				if its.Spec.Template.Spec.Containers[i].Name == "kbagent" {
+					its.Spec.Template.Spec.Containers[i].Image = "mirror.local/apecloud/kubeblocks-tools:1.1.0"
+				}
+			}
+
+			reconciler = NewUpdateReconciler()
+			res, err := reconciler.Reconcile(tree)
+			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
+
+			postPods := tree.List(&corev1.Pod{})
+			Expect(postPods).Should(HaveLen(1),
+				"pod should be in-place updated, not deleted/recreated")
+			updatedPod := postPods[0].(*corev1.Pod)
+			_, updatedKBAgent := intctrlutil.GetContainerByName(updatedPod.Spec.Containers, "kbagent")
+			Expect(updatedKBAgent).ShouldNot(BeNil())
+			Expect(updatedKBAgent.Image).Should(Equal("mirror.local/apecloud/kubeblocks-tools:1.1.0"))
+			_, option, err := tree.GetWithOption(updatedPod)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(option.Patch).Should(BeTrue(),
+				"KB-managed tools image-only pod updates should use a patch")
+			Expect(spy.switchoverCalls).Should(Equal(0),
+				"switchover must not be invoked when only KB-managed tools images differ")
+		})
 	})
 })
 

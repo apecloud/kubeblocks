@@ -523,6 +523,9 @@ func validateLegacyParametersDefs(ctx context.Context, reader client.Reader, par
 }
 
 func NeedDynamicReloadAction(pd *parametersv1alpha1.ParametersDefinitionSpec) bool {
+	if pd == nil {
+		return false
+	}
 	if pd.MergeReloadAndRestart != nil {
 		return !*pd.MergeReloadAndRestart
 	}
@@ -530,6 +533,9 @@ func NeedDynamicReloadAction(pd *parametersv1alpha1.ParametersDefinitionSpec) bo
 }
 
 func ReloadStaticParameters(pd *parametersv1alpha1.ParametersDefinitionSpec) bool {
+	if pd == nil {
+		return false
+	}
 	if pd.ReloadStaticParamsBeforeRestart != nil {
 		return *pd.ReloadStaticParamsBeforeRestart
 	}

@@ -799,6 +799,43 @@ func TestApplyChangesToClusterTemplateReconfigureWithRestartSemantics(t *testing
 		}
 	})
 
+	t.Run("mixed default split update passes only dynamic parameter to template action", func(t *testing.T) {
+		ctx := baseContext()
+		ctx.ParametersDef = &parametersv1alpha1.ParametersDefinitionSpec{
+			DynamicParameters: []string{"max_connections"},
+		}
+		ctx.ReloadBeforeRestart = true
+		ctx.Patch = &core.ConfigPatchInfo{
+			IsModify: true,
+			UpdateConfig: map[string][]byte{
+				"my.cnf": []byte(`{"max_connections":"500","shared_buffers":"1024MB"}`),
+			},
+		}
+
+		status, err := syncNRestartPolicy(ctx)
+		if err != nil {
+			t.Fatalf("syncNRestartPolicy returned error: %v", err)
+		}
+		if status.Status != StatusRetry {
+			t.Fatalf("expected status %q, got %q", StatusRetry, status.Status)
+		}
+
+		config := ctx.ClusterComponent.Configs[0]
+		if config.Reconfigure == nil || !*config.Reconfigure {
+			t.Fatalf("expected reconfigure intent to be true for mixed reload-before-restart update")
+		}
+		if config.ReconfigureAction != nil {
+			t.Fatalf("expected template reconfigure to use default action")
+		}
+		want := [][]string{{"max_connections", "500"}}
+		if !reflect.DeepEqual(config.ReconfigureArgs, want) {
+			t.Fatalf("expected dynamic-only args %v, got %v", want, config.ReconfigureArgs)
+		}
+		if config.Restart == nil || !*config.Restart {
+			t.Fatalf("expected restart to remain true")
+		}
+	})
+
 	t.Run("mixed merged update clears template action", func(t *testing.T) {
 		ctx := baseContext()
 		ctx.ParametersDef = &parametersv1alpha1.ParametersDefinitionSpec{

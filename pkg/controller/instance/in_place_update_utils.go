@@ -26,6 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -285,6 +286,29 @@ func safeMetadataOnlyInPlaceUpdate(old, new *corev1.Pod) bool {
 	return true
 }
 
+// safeKBManagedImageOnlyInPlaceUpdate returns true when the only effective
+// difference is a KB-managed tools image update. These updates should patch the
+// Pod in place without inheriting application upgrade policy or invoking
+// database switchover. Init container image patches only converge PodSpec and
+// revision state; already-completed init containers are not re-run, so any
+// init-time copied tools refresh on the next natural Pod recreation.
+func safeKBManagedImageOnlyInPlaceUpdate(old, new *corev1.Pod) bool {
+	initChanged, ok := intctrlutil.OnlyKBManagedContainerImageChanged(old.Spec.InitContainers, new.Spec.InitContainers)
+	if !ok {
+		return false
+	}
+	containerChanged, ok := intctrlutil.OnlyKBManagedContainerImageChanged(old.Spec.Containers, new.Spec.Containers)
+	if !ok || (!initChanged && !containerChanged) {
+		return false
+	}
+
+	oldCopy := old.DeepCopy()
+	newCopy := new.DeepCopy()
+	oldCopy.Spec.InitContainers = newCopy.Spec.InitContainers
+	oldCopy.Spec.Containers = newCopy.Spec.Containers
+	return equalBasicInPlaceFields(oldCopy, newCopy) && equalResourcesInPlaceFields(oldCopy, newCopy)
+}
+
 // equalResourcesInPlaceFields checks if the desired values of pod resources are equal to their current actual values.
 // If they are equal, it returns true. Containers in 'old' that are not recognized (they may have been injected by external mutating admission webhooks)
 // will not participate in the comparison.
@@ -357,10 +381,10 @@ func getPodUpdatePolicy(inst *workloads.Instance, pod *corev1.Pod) (podUpdatePol
 }
 
 func getPodUpdatePolicyInSpec(inst *workloads.Instance, old, new *corev1.Pod) workloads.PodUpdatePolicyType {
-	if !equalField(old.Spec.InitContainers, new.Spec.InitContainers) {
-		return inst.Spec.PodUpgradePolicy
-	}
-	if !equalField(old.Spec.Containers, new.Spec.Containers) {
+	if !equalField(old.Spec.InitContainers, new.Spec.InitContainers) || !equalField(old.Spec.Containers, new.Spec.Containers) {
+		if inst.Spec.PodUpgradePolicy == kbappsv1.ReCreatePodUpdatePolicyType && safeKBManagedImageOnlyInPlaceUpdate(old, new) {
+			return kbappsv1.PreferInPlacePodUpdatePolicyType
+		}
 		return inst.Spec.PodUpgradePolicy
 	}
 	return inst.Spec.PodUpdatePolicy

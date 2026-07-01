@@ -126,6 +126,7 @@ type progressResource struct {
 type OpsRuntime interface {
 	GetWorkload(namespace, clusterName, compName string) (Workload, error)
 	GetInstance(namespace, clusterName, compName, instanceName string) (Instance, error)
+	DeleteInstance(ctx context.Context, namespace, instanceName string, opts ...client.DeleteOption) error
 	ListInstances(namespace, clusterName, compName string) ([]Instance, error)
 	GenerateInstanceNameSet(clusterName, compName string, compReplicas int32, instances []appsv1.InstanceTemplate, offlineInstances []string) (map[string]string, error)
 	GenerateTemplateInstanceNames(clusterName, compName, templateName string, replicas int32, offlineInstances []string, ordinals appsv1.Ordinals) ([]string, error)

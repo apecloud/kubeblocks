@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -275,6 +276,43 @@ func TestOpsRuntimeBuildsInstanceAPIView(t *testing.T) {
 	}
 	if volume.IsExpanding() {
 		t.Fatalf("did not expect volume to be expanding")
+	}
+}
+
+func TestOpsRuntimeDeleteInstanceUsesRuntimeContext(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatalf("add core scheme: %v", err)
+	}
+
+	const (
+		namespace    = "default"
+		clusterName  = "test-cluster"
+		component    = "mysql"
+		instanceName = "test-cluster-mysql-0"
+	)
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      instanceName,
+			Labels: map[string]string{
+				constant.AppInstanceLabelKey:    clusterName,
+				constant.KBAppComponentLabelKey: component,
+			},
+		},
+	}
+	cli := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(pod).
+		Build()
+	rt := newOpsRuntime(context.Background(), cli, "data-ctx-a")
+
+	if err := rt.DeleteInstance(context.Background(), namespace, instanceName, client.GracePeriodSeconds(0)); err != nil {
+		t.Fatalf("delete instance: %v", err)
+	}
+	current := &corev1.Pod{}
+	if err := cli.Get(context.Background(), client.ObjectKey{Namespace: namespace, Name: instanceName}, current); err == nil {
+		t.Fatalf("expected pod to be deleted")
 	}
 }
 

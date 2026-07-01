@@ -28,11 +28,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/klauspost/compress/zstd"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
@@ -59,19 +57,6 @@ type instanceTemplateExt struct {
 	Replicas int32
 	corev1.PodTemplateSpec
 	VolumeClaimTemplates []corev1.PersistentVolumeClaim
-}
-
-var (
-	reader *zstd.Decoder
-	writer *zstd.Encoder
-)
-
-func init() {
-	var err error
-	reader, err = zstd.NewReader(nil)
-	runtime.Must(err)
-	writer, err = zstd.NewWriter(nil)
-	runtime.Must(err)
 }
 
 // parseParentNameAndOrdinal parses parent (instance template) Name and ordinal from the give instance name.

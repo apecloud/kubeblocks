@@ -20,14 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"hash"
 	"hash/fnv"
 	"strconv"
 
-	jsoniter "github.com/json-iterator/go"
 	apps "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -38,8 +36,7 @@ import (
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/apecloud/kubeblocks/pkg/lru"
-	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+	"github.com/apecloud/kubeblocks/pkg/controller/revisionmap"
 )
 
 // controllerRevisionHashLabel is the label used to indicate the hash value of a controllerRevision's Data.
@@ -48,8 +45,6 @@ const controllerRevisionHashLabel = "controller.kubernetes.io/hash"
 var codecs = serializer.NewCodecFactory(model.GetScheme())
 var patchCodec = codecs.LegacyCodec(workloads.SchemeGroupVersion)
 var controllerKind = apps.SchemeGroupVersion.WithKind("StatefulSet")
-
-var jsonIter = jsoniter.ConfigCompatibleWithStandardLibrary
 
 func newRevision(its *workloads.InstanceSet) (*apps.ControllerRevision, error) {
 	patch, err := getPatch(its)
@@ -162,46 +157,10 @@ func deepHashObject(hasher hash.Hash, objectToWrite interface{}) {
 	fmt.Fprintf(hasher, "%v", dump.ForHash(objectToWrite))
 }
 
-var revisionsCache = lru.New(1024)
-
 func GetRevisions(revisions map[string]string) (map[string]string, error) {
-	if revisions == nil {
-		return nil, nil
-	}
-	revisionsStr, ok := revisions[revisionsZSTDKey]
-	if !ok {
-		return revisions, nil
-	}
-	if revisionsInCache, ok := revisionsCache.Get(revisionsStr); ok {
-		return revisionsInCache.(map[string]string), nil
-	}
-	revisionsData, err := base64.StdEncoding.DecodeString(revisionsStr)
-	if err != nil {
-		return nil, err
-	}
-	revisionsJSON, err := reader.DecodeAll(revisionsData, nil)
-	if err != nil {
-		return nil, err
-	}
-	updateRevisions := make(map[string]string)
-
-	if err = jsonIter.Unmarshal(revisionsJSON, &updateRevisions); err != nil {
-		return nil, err
-	}
-	revisionsCache.Put(revisionsStr, updateRevisions)
-	return updateRevisions, nil
+	return revisionmap.Decode(revisions)
 }
 
 func buildRevisions(updateRevisions map[string]string) (map[string]string, error) {
-	maxPlainRevisionCount := viper.GetInt(MaxPlainRevisionCount)
-	if len(updateRevisions) <= maxPlainRevisionCount {
-		return updateRevisions, nil
-	}
-	revisionsJSON, err := jsonIter.Marshal(updateRevisions)
-	if err != nil {
-		return nil, err
-	}
-	revisionsData := writer.EncodeAll(revisionsJSON, nil)
-	revisionsStr := base64.StdEncoding.EncodeToString(revisionsData)
-	return map[string]string{revisionsZSTDKey: revisionsStr}, nil
+	return revisionmap.Encode(updateRevisions)
 }

@@ -231,12 +231,23 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1.Component) *appsv1.Com
 		return *normalized
 	}
 
-	mergeConfigs := func(running, expected []appsv1.ClusterComponentConfig) []appsv1.ClusterComponentConfig {
+	mergeConfigs := func(running, expected []appsv1.ClusterComponentConfig, preserveReconfigure bool) []appsv1.ClusterComponentConfig {
 		var mergedConfigs []appsv1.ClusterComponentConfig
+
+		hasReconfigureIntent := func(config appsv1.ClusterComponentConfig) bool {
+			return config.ConfigHash != nil ||
+				config.Restart != nil ||
+				config.Reconfigure != nil ||
+				config.ReconfigureAction != nil ||
+				config.ReconfigureArgs != nil
+		}
 
 		mergedConfigs = append(mergedConfigs, expected...)
 		for _, config := range running {
-			if config.Name == nil || config.ConfigMap == nil {
+			if config.Name == nil {
+				continue
+			}
+			if config.ConfigMap == nil && !preserveReconfigure {
 				continue
 			}
 			matchConfig := func(c appsv1.ClusterComponentConfig) bool {
@@ -249,6 +260,13 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1.Component) *appsv1.Com
 			}
 			if mergedConfigs[index].ConfigMap == nil {
 				mergedConfigs[index].ConfigMap = config.ConfigMap
+			}
+			if preserveReconfigure && hasReconfigureIntent(config) && !hasReconfigureIntent(mergedConfigs[index]) {
+				mergedConfigs[index].ConfigHash = config.ConfigHash
+				mergedConfigs[index].Restart = config.Restart
+				mergedConfigs[index].Reconfigure = config.Reconfigure
+				mergedConfigs[index].ReconfigureAction = config.ReconfigureAction
+				mergedConfigs[index].ReconfigureArgs = config.ReconfigureArgs
 			}
 		}
 		return mergedConfigs
@@ -273,7 +291,7 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1.Component) *appsv1.Com
 	compObjCopy.Spec.Services = compProto.Spec.Services
 	compObjCopy.Spec.SystemAccounts = compProto.Spec.SystemAccounts
 	compObjCopy.Spec.Replicas = compProto.Spec.Replicas
-	compObjCopy.Spec.Configs = mergeConfigs(compObjCopy.Spec.Configs, compProto.Spec.Configs)
+	compObjCopy.Spec.Configs = mergeConfigs(compObjCopy.Spec.Configs, compProto.Spec.Configs, oldCompObj.Labels[constant.KBAppShardingNameLabelKey] != "")
 	compObjCopy.Spec.ServiceAccountName = compProto.Spec.ServiceAccountName
 	compObjCopy.Spec.ParallelPodManagementConcurrency = compProto.Spec.ParallelPodManagementConcurrency
 	compObjCopy.Spec.PodUpdatePolicy = compProto.Spec.PodUpdatePolicy

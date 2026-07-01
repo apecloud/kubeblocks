@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/yaml"
 
@@ -72,6 +73,84 @@ func TestInjectRestoreIntentRemovesStaleOptionalAnnotations(t *testing.T) {
 	require.Equal(t, "backup", vct.Spec.DataSourceRef.Name)
 	require.NotNil(t, vct.Spec.DataSourceRef.Namespace)
 	require.Equal(t, "backup-ns", *vct.Spec.DataSourceRef.Namespace)
+}
+
+func TestCopyAndMergeComponentPreservesShardingReconfigureIntent(t *testing.T) {
+	hash := "target-hash"
+	oldCompObj := &appsv1.Component{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{
+				constant.KBAppShardingNameLabelKey: "shard",
+			},
+		},
+		Spec: appsv1.ComponentSpec{
+			Configs: []appsv1.ClusterComponentConfig{{
+				Name:       ptr.To("mongodb.conf"),
+				ConfigHash: ptr.To(hash),
+				Restart:    ptr.To(true),
+			}},
+		},
+	}
+	newCompObj := oldCompObj.DeepCopy()
+	newCompObj.Spec.Configs = []appsv1.ClusterComponentConfig{{
+		Name: ptr.To("mongodb.conf"),
+	}}
+
+	require.Nil(t, copyAndMergeComponent(oldCompObj, newCompObj))
+}
+
+func TestCopyAndMergeComponentUsesNewShardingReconfigureIntent(t *testing.T) {
+	oldHash := "old-hash"
+	newHash := "new-hash"
+	oldCompObj := &appsv1.Component{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{
+				constant.KBAppShardingNameLabelKey: "shard",
+			},
+		},
+		Spec: appsv1.ComponentSpec{
+			Configs: []appsv1.ClusterComponentConfig{{
+				Name:       ptr.To("mongodb.conf"),
+				ConfigHash: ptr.To(oldHash),
+				Restart:    ptr.To(true),
+			}},
+		},
+	}
+	newCompObj := oldCompObj.DeepCopy()
+	newCompObj.Spec.Configs = []appsv1.ClusterComponentConfig{{
+		Name:       ptr.To("mongodb.conf"),
+		ConfigHash: ptr.To(newHash),
+		Restart:    ptr.To(true),
+	}}
+
+	result := copyAndMergeComponent(oldCompObj, newCompObj)
+	require.NotNil(t, result)
+	require.Len(t, result.Spec.Configs, 1)
+	require.NotNil(t, result.Spec.Configs[0].ConfigHash)
+	require.Equal(t, newHash, *result.Spec.Configs[0].ConfigHash)
+}
+
+func TestCopyAndMergeComponentClearsNonShardingReconfigureIntent(t *testing.T) {
+	hash := "target-hash"
+	oldCompObj := &appsv1.Component{
+		Spec: appsv1.ComponentSpec{
+			Configs: []appsv1.ClusterComponentConfig{{
+				Name:       ptr.To("mongodb.conf"),
+				ConfigHash: ptr.To(hash),
+				Restart:    ptr.To(true),
+			}},
+		},
+	}
+	newCompObj := oldCompObj.DeepCopy()
+	newCompObj.Spec.Configs = []appsv1.ClusterComponentConfig{{
+		Name: ptr.To("mongodb.conf"),
+	}}
+
+	result := copyAndMergeComponent(oldCompObj, newCompObj)
+	require.NotNil(t, result)
+	require.Len(t, result.Spec.Configs, 1)
+	require.Nil(t, result.Spec.Configs[0].ConfigHash)
+	require.Nil(t, result.Spec.Configs[0].Restart)
 }
 
 func TestInjectRestoreIntentOmitsDataSourceRefNamespaceForSameNamespaceSource(t *testing.T) {

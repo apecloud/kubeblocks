@@ -1658,6 +1658,104 @@ func TestCompleteBoundPVCReleasesPopulatePVCBeforeWaitingForPostReady(t *testing
 	require.Error(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(populatePVC), currentPopulatePVC))
 }
 
+func TestCompleteBoundProvisionOnlyPVCMarksRestoreBeforeWaitingForPostReady(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, batchv1.AddToScheme(scheme))
+	require.NoError(t, kbappsv1.AddToScheme(scheme))
+	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
+	apiGroup := dptypes.DataprotectionAPIGroup
+	backup := newBackupForRestoreDecision(nil, nil)
+	backup.Status.BackupMethod.TargetVolumes = nil
+	pvc := newPVCForRestoreDecision("data", "mysql", "")
+	pvc.UID = types.UID("target-pvc")
+	pvc.Finalizers = []string{dptypes.DataProtectionFinalizerName}
+	pvc.Spec.VolumeName = "data-pv"
+	pvc.Spec.DataSourceRef = &corev1.TypedObjectReference{
+		APIGroup: &apiGroup,
+		Kind:     dptypes.BackupKind,
+		Name:     backup.Name,
+	}
+	pvc.Annotations[constant.RestoreSourceKindAnnotationKey] = dptypes.BackupKind
+	pvc.Annotations[constant.RestoreSourceNamespaceAnnotationKey] = backup.Namespace
+	populatePVC := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: pvc.Namespace,
+			Name:      getPopulatePVCName(pvc.UID),
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			VolumeName: "data-pv",
+		},
+	}
+	pv := &corev1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{Name: "data-pv"},
+		Spec: corev1.PersistentVolumeSpec{
+			Capacity: corev1.ResourceList{
+				corev1.ResourceStorage: resource.MustParse("1Gi"),
+			},
+			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+			ClaimRef: &corev1.ObjectReference{
+				Namespace: pvc.Namespace,
+				Name:      pvc.Name,
+				UID:       pvc.UID,
+			},
+		},
+		Status: corev1.PersistentVolumeStatus{
+			Phase: corev1.VolumeBound,
+		},
+	}
+	comp := &kbappsv1.Component{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      constant.GenerateClusterComponentName("cluster", "mysql"),
+			UID:       "component-uid",
+		},
+		Status: kbappsv1.ComponentStatus{
+			Phase: kbappsv1.CreatingComponentPhase,
+			Conditions: []metav1.Condition{{
+				Type:   kbappsv1.ComponentConditionProgressing,
+				Status: metav1.ConditionTrue,
+				Reason: "PostProvision",
+			}},
+		},
+	}
+	restore := &dpv1alpha1.Restore{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      "prepare-data-restore",
+		},
+		Spec: dpv1alpha1.RestoreSpec{Backup: dpv1alpha1.BackupRef{Name: backup.Name, Namespace: backup.Namespace}},
+	}
+	reconciler := &VolumePopulatorReconciler{
+		Client: fake.NewClientBuilder().WithScheme(scheme).
+			WithStatusSubresource(pvc, restore).
+			WithObjects(backup, pvc, populatePVC, pv, comp, restore).
+			Build(),
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(10),
+	}
+	restoreMgr := dprestore.NewRestoreManager(restore, nil, scheme, reconciler.Client)
+	restoreMgr.PostReadyBackupSets = []dprestore.BackupActionSet{{Backup: backup}}
+
+	err := reconciler.completeBoundPVCIfNeeded(
+		intctrlutil.RequestCtx{Ctx: context.Background()},
+		pvc,
+		&pvcRestoreContext{restoreMgr: restoreMgr, mode: pvcRestoreModeProvisionOnly},
+	)
+
+	require.Error(t, err)
+	require.True(t, intctrlutil.IsRequeueError(err), err)
+	currentPVC := &corev1.PersistentVolumeClaim{}
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(pvc), currentPVC))
+	populatingCondition := findPVCConditionByType(currentPVC, string(PersistentVolumeClaimPopulating))
+	require.NotNil(t, populatingCondition)
+	require.Equal(t, ReasonPopulatingProvisioned, populatingCondition.Reason)
+	restoreCondition := findPVCConditionByType(currentPVC, kbappsv1.ConditionTypeRestore)
+	require.NotNil(t, restoreCondition)
+	require.Equal(t, corev1.ConditionTrue, restoreCondition.Status)
+	require.Equal(t, ReasonPopulatingProvisioned, restoreCondition.Reason)
+}
+
 func TestCompleteBoundPVCContinuesPostReadyAfterPopulateReleased(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, corev1.AddToScheme(scheme))

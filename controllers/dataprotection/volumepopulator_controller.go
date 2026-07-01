@@ -1094,8 +1094,14 @@ func (r *VolumePopulatorReconciler) completeBoundPVCIfNeeded(reqCtx intctrlutil.
 			reason = ReasonPopulatingProvisioned
 			message = "PVC provisioned without data restore"
 		}
-		if err := r.updatePVCPopulatingCondition(reqCtx, pvc, reason, message); err != nil {
-			return err
+		if restoreCtx.mode == pvcRestoreModeProvisionOnly {
+			if err := r.UpdatePVCConditions(reqCtx, pvc, reason, message); err != nil {
+				return err
+			}
+		} else {
+			if err := r.updatePVCPopulatingCondition(reqCtx, pvc, reason, message); err != nil {
+				return err
+			}
 		}
 		if restoreCtx.mode == pvcRestoreModeRestoreData {
 			dprestore.SetRestoreStageCondition(restoreMgr.Restore, dpv1alpha1.PrepareData, dprestore.ReasonSucceed, "prepare data successfully")

@@ -278,6 +278,76 @@ func TestOpsRuntimeBuildsInstanceAPIView(t *testing.T) {
 	}
 }
 
+func TestOpsRuntimeBuildsInstanceAPIViewFromInstanceStatusWhenCurrentRevisionsEmpty(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatalf("add core scheme: %v", err)
+	}
+	if err := appsv1.AddToScheme(scheme); err != nil {
+		t.Fatalf("add apps scheme: %v", err)
+	}
+	if err := workloads.AddToScheme(scheme); err != nil {
+		t.Fatalf("add workloads scheme: %v", err)
+	}
+
+	const (
+		namespace    = "default"
+		clusterName  = "test-cluster"
+		component    = "mysql"
+		instanceName = "test-cluster-mysql-3"
+	)
+	enableInstanceAPI := true
+	its := &workloads.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      constant.GenerateClusterComponentName(clusterName, component),
+			Labels:    constant.GetCompLabels(clusterName, component),
+		},
+		Status: workloads.InstanceSetStatus{
+			InstanceStatus: []workloads.InstanceStatus{{
+				PodName: instanceName,
+			}},
+		},
+	}
+	cluster := &appsv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      clusterName,
+		},
+		Spec: appsv1.ClusterSpec{
+			ComponentSpecs: []appsv1.ClusterComponentSpec{{
+				Name:              component,
+				EnableInstanceAPI: &enableInstanceAPI,
+			}},
+		},
+	}
+	cli := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(its).
+		Build()
+	opsRes := &OpsResource{Cluster: cluster}
+	runtimes, err := buildOpsRuntimes(context.Background(), cli, opsRes)
+	if err != nil {
+		t.Fatalf("build runtime: %v", err)
+	}
+	opsRes.Runtimes = runtimes
+	rt, err := opsRes.GetRuntime(component)
+	if err != nil {
+		t.Fatalf("get runtime: %v", err)
+	}
+
+	workload, err := rt.GetWorkload(namespace, clusterName, component)
+	if err != nil {
+		t.Fatalf("get workload: %v", err)
+	}
+	if _, ok := workload.GetCurrentRevisionMap()[instanceName]; !ok {
+		t.Fatalf("expected current revision fallback for %s", instanceName)
+	}
+	if !workload.GetInstanceNameSet().Has(instanceName) {
+		t.Fatalf("expected instance name fallback for %s", instanceName)
+	}
+}
+
 func TestDefaultInstanceAndVolumeNilBranches(t *testing.T) {
 	instance := &defaultInstance{name: "missing", componentName: "mysql"}
 	if instance.GetComponentName() != "mysql" {

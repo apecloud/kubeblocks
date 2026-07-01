@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -65,7 +66,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	readyReplicas, availableReplicas := int32(0), int32(0)
 	notReadyNames := sets.New[string]()
 	notAvailableNames := sets.New[string]()
-	// currentRevisions := map[string]string{}
+	currentRevisions := map[string]string{}
 
 	template2TemplatesStatus := map[string]*workloads.InstanceTemplateStatus{}
 	template2TotalReplicas := map[string]int32{}
@@ -78,6 +79,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 
 	for _, inst := range instanceList {
+		currentRevisions[inst.Name] = inst.Annotations[constant.KubeBlocksGenerationKey]
 		templateName := inst.Labels[instancetemplate.TemplateNameLabelKey]
 		if template2TemplatesStatus[templateName] == nil {
 			template2TemplatesStatus[templateName] = &workloads.InstanceTemplateStatus{
@@ -115,7 +117,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	its.Status.AvailableReplicas = availableReplicas
 	its.Status.CurrentReplicas = currentReplicas
 	its.Status.UpdatedReplicas = updatedReplicas
-	// its.Status.CurrentRevisions, _ = buildRevisions(currentRevisions)
+	its.Status.CurrentRevisions = currentRevisions
 	its.Status.TemplatesStatus = buildTemplatesStatus(template2TemplatesStatus)
 	// all pods have been updated
 	totalReplicas := int32(1)

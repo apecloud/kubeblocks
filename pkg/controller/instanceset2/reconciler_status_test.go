@@ -28,6 +28,7 @@ import (
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 )
 
 func TestSyncInstanceConfigStatus(t *testing.T) {
@@ -91,6 +92,58 @@ func TestSyncInstanceConfigStatusKeepsEmptyWhenInstanceHasNotReported(t *testing
 
 	if instanceStatus[0].Configs != nil {
 		t.Fatalf("expected empty configs, got %#v", instanceStatus[0].Configs)
+	}
+}
+
+func TestStatusReconcilerPopulatesCurrentRevisionsFromInstances(t *testing.T) {
+	replicas := int32(2)
+	its := &workloads.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:  "default",
+			Name:       "test-its",
+			Generation: 3,
+		},
+		Spec: workloads.InstanceSetSpec{
+			Replicas: &replicas,
+		},
+	}
+	inst0 := &workloads.Instance{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      "test-its-0",
+			Annotations: map[string]string{
+				constant.KubeBlocksGenerationKey: "1",
+			},
+		},
+	}
+	inst1 := &workloads.Instance{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      "test-its-1",
+			Annotations: map[string]string{
+				constant.KubeBlocksGenerationKey: "3",
+			},
+		},
+	}
+	tree := kubebuilderx.NewObjectTree()
+	tree.SetRoot(its)
+	if err := tree.Add(inst0, inst1); err != nil {
+		t.Fatalf("tree.Add() error = %v", err)
+	}
+
+	result, err := NewStatusReconciler().Reconcile(tree)
+	if err != nil {
+		t.Fatalf("reconcile status: %v", err)
+	}
+	if result != kubebuilderx.Continue {
+		t.Fatalf("unexpected result: %v", result)
+	}
+	expected := map[string]string{
+		"test-its-0": "1",
+		"test-its-1": "3",
+	}
+	if !reflect.DeepEqual(expected, its.Status.CurrentRevisions) {
+		t.Fatalf("unexpected current revisions: %#v", its.Status.CurrentRevisions)
 	}
 }
 

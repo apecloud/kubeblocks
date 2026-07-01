@@ -29,9 +29,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/revisionmap"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -53,6 +55,11 @@ func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
 
+	desiredInstances, _, err := buildDesiredInstancesByName(tree, its)
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
+
 	instances := tree.List(&workloads.Instance{})
 	var instanceList []*workloads.Instance
 	for _, object := range instances {
@@ -65,7 +72,11 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	readyReplicas, availableReplicas := int32(0), int32(0)
 	notReadyNames := sets.New[string]()
 	notAvailableNames := sets.New[string]()
-	// currentRevisions := map[string]string{}
+	currentRevisions := map[string]string{}
+	updateRevisions, err := revisionmap.Decode(its.Status.UpdateRevisions)
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
 
 	template2TemplatesStatus := map[string]*workloads.InstanceTemplateStatus{}
 	template2TotalReplicas := map[string]int32{}
@@ -78,7 +89,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 
 	for _, inst := range instanceList {
-		templateName := inst.Labels[instancetemplate.TemplateNameLabelKey]
+		templateName := getInstanceTemplateName(inst)
 		if template2TemplatesStatus[templateName] == nil {
 			template2TemplatesStatus[templateName] = &workloads.InstanceTemplateStatus{
 				Name: templateName,
@@ -100,8 +111,9 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 				notAvailableNames.Insert(inst.Name)
 			}
 		}
+		currentRevisions[inst.Name] = buildCurrentInstanceRevision(inst, desiredInstances[inst.Name])
 		if !intctrlutil.IsInstanceTerminating(inst) {
-			if isInstanceUpdated(its, inst) {
+			if isInstanceUpdatedWithRevisions(inst, currentRevisions[inst.Name], updateRevisions) {
 				updatedReplicas++
 				template2TemplatesStatus[templateName].UpdatedReplicas++
 			} else {
@@ -115,7 +127,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	its.Status.AvailableReplicas = availableReplicas
 	its.Status.CurrentReplicas = currentReplicas
 	its.Status.UpdatedReplicas = updatedReplicas
-	// its.Status.CurrentRevisions, _ = buildRevisions(currentRevisions)
+	its.Status.CurrentRevisions, _ = revisionmap.Encode(currentRevisions)
 	its.Status.TemplatesStatus = buildTemplatesStatus(template2TemplatesStatus)
 	// all pods have been updated
 	totalReplicas := int32(1)
@@ -123,7 +135,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		totalReplicas = *its.Spec.Replicas
 	}
 	if its.Status.Replicas == totalReplicas && its.Status.UpdatedReplicas == totalReplicas {
-		// its.Status.CurrentRevision = its.Status.UpdateRevision
+		its.Status.CurrentRevision = its.Status.UpdateRevision
 		its.Status.CurrentReplicas = totalReplicas
 	}
 	for idx, templateStatus := range its.Status.TemplatesStatus {
@@ -163,6 +175,16 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		return kubebuilderx.RetryAfter(time.Second), nil
 	}
 	return kubebuilderx.Continue, nil
+}
+
+func getInstanceTemplateName(inst *workloads.Instance) string {
+	if inst.Labels == nil {
+		return ""
+	}
+	if templateName := inst.Labels[instancetemplate.TemplateNameLabelKey]; templateName != "" {
+		return templateName
+	}
+	return inst.Labels[constant.KBAppInstanceTemplateLabelKey]
 }
 
 func buildConditionMessageWithNames(instanceNames []string) ([]byte, error) {

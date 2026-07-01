@@ -133,6 +133,45 @@ var _ = Describe("instance util test", func() {
 			Expect(equalBasicInPlaceFields(oldPod, basenameChangedPod)).Should(BeFalse())
 			Expect(getPodUpdatePolicyInSpec(its, oldPod, basenameChangedPod)).Should(Equal(kbappsv1.PreferInPlacePodUpdatePolicyType))
 		})
+
+		It("uses in-place policy for KB-managed tools image changes even when pod upgrade policy is ReCreate", func() {
+			oldToolsImage := viper.GetString(constant.KBToolsImage)
+			defer viper.Set(constant.KBToolsImage, oldToolsImage)
+			viper.Set(constant.KBToolsImage, "docker.io/apecloud/kubeblocks-tools:1.0.0")
+
+			oldPod := buildRandomPod()
+			oldPod.Spec.Containers = []corev1.Container{
+				{Name: "app", Image: "docker.io/apecloud/redis:7.2"},
+				{Name: "kbagent", Image: "docker.io/apecloud/kubeblocks-tools:1.0.0", Command: []string{"/bin/kbagent"}},
+			}
+			oldPod.Spec.InitContainers = []corev1.Container{
+				{Name: "init-kbagent", Image: "docker.io/apecloud/kubeblocks-tools:1.0.0", Command: []string{"cp"}},
+			}
+			newPod := oldPod.DeepCopy()
+			newPod.Spec.Containers[1].Image = "mirror.local/apecloud/kubeblocks-tools:1.1.0"
+			newPod.Spec.InitContainers[0].Image = "mirror.local/apecloud/kubeblocks-tools:1.1.0"
+
+			its := builder.NewInstanceSetBuilder(namespace, name).
+				SetPodUpdatePolicy(kbappsv1.ReCreatePodUpdatePolicyType).
+				SetPodUpgradePolicy(kbappsv1.ReCreatePodUpdatePolicyType).
+				GetObject()
+
+			Expect(getPodUpdatePolicyInSpec(its, oldPod, newPod)).Should(Equal(kbappsv1.PreferInPlacePodUpdatePolicyType))
+
+			strictInPlaceITS := builder.NewInstanceSetBuilder(namespace, name).
+				SetPodUpdatePolicy(kbappsv1.ReCreatePodUpdatePolicyType).
+				SetPodUpgradePolicy(kbappsv1.StrictInPlacePodUpdatePolicyType).
+				GetObject()
+			Expect(getPodUpdatePolicyInSpec(strictInPlaceITS, oldPod, newPod)).Should(Equal(kbappsv1.StrictInPlacePodUpdatePolicyType))
+
+			labelChangedPod := newPod.DeepCopy()
+			labelChangedPod.Labels["extra"] = "true"
+			Expect(getPodUpdatePolicyInSpec(its, oldPod, labelChangedPod)).Should(Equal(kbappsv1.ReCreatePodUpdatePolicyType))
+
+			appChangedPod := oldPod.DeepCopy()
+			appChangedPod.Spec.Containers[0].Image = "docker.io/apecloud/redis:7.4"
+			Expect(getPodUpdatePolicyInSpec(its, oldPod, appChangedPod)).Should(Equal(kbappsv1.ReCreatePodUpdatePolicyType))
+		})
 	})
 
 	Context("getPodUpdatePolicy", func() {

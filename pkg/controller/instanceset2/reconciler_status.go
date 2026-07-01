@@ -33,6 +33,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/revisionmap"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -54,15 +55,16 @@ func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
 
+	desiredInstances, _, err := buildDesiredInstancesByName(tree, its)
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
+
 	instances := tree.List(&workloads.Instance{})
 	var instanceList []*workloads.Instance
 	for _, object := range instances {
 		inst, _ := object.(*workloads.Instance)
 		instanceList = append(instanceList, inst)
-	}
-	desiredInstances, err := buildDesiredInstances(tree, its)
-	if err != nil {
-		return kubebuilderx.Continue, err
 	}
 
 	replicas := int32(0)
@@ -71,6 +73,10 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	notReadyNames := sets.New[string]()
 	notAvailableNames := sets.New[string]()
 	currentRevisions := map[string]string{}
+	updateRevisions, err := revisionmap.Decode(its.Status.UpdateRevisions)
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
 
 	template2TemplatesStatus := map[string]*workloads.InstanceTemplateStatus{}
 	template2TotalReplicas := map[string]int32{}
@@ -83,8 +89,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 
 	for _, inst := range instanceList {
-		currentRevisions[inst.Name] = inst.Annotations[constant.KubeBlocksGenerationKey]
-		templateName := inst.Labels[instancetemplate.TemplateNameLabelKey]
+		templateName := getInstanceTemplateName(inst)
 		if template2TemplatesStatus[templateName] == nil {
 			template2TemplatesStatus[templateName] = &workloads.InstanceTemplateStatus{
 				Name: templateName,
@@ -106,8 +111,9 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 				notAvailableNames.Insert(inst.Name)
 			}
 		}
+		currentRevisions[inst.Name] = buildCurrentInstanceRevision(inst, desiredInstances[inst.Name])
 		if !intctrlutil.IsInstanceTerminating(inst) {
-			if isInstanceUpdatedForStatus(its, inst, desiredInstances[inst.Name]) {
+			if isInstanceUpdatedWithRevisions(inst, currentRevisions[inst.Name], updateRevisions) {
 				updatedReplicas++
 				template2TemplatesStatus[templateName].UpdatedReplicas++
 			} else {
@@ -121,7 +127,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	its.Status.AvailableReplicas = availableReplicas
 	its.Status.CurrentReplicas = currentReplicas
 	its.Status.UpdatedReplicas = updatedReplicas
-	its.Status.CurrentRevisions = currentRevisions
+	its.Status.CurrentRevisions, _ = revisionmap.Encode(currentRevisions)
 	its.Status.TemplatesStatus = buildTemplatesStatus(template2TemplatesStatus)
 	// all pods have been updated
 	totalReplicas := int32(1)
@@ -129,7 +135,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		totalReplicas = *its.Spec.Replicas
 	}
 	if its.Status.Replicas == totalReplicas && its.Status.UpdatedReplicas == totalReplicas {
-		// its.Status.CurrentRevision = its.Status.UpdateRevision
+		its.Status.CurrentRevision = its.Status.UpdateRevision
 		its.Status.CurrentReplicas = totalReplicas
 	}
 	for idx, templateStatus := range its.Status.TemplatesStatus {
@@ -171,56 +177,14 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	return kubebuilderx.Continue, nil
 }
 
-func buildDesiredInstances(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet) (map[string]*workloads.Instance, error) {
-	if its.Spec.EnableInstanceAPI == nil || !*its.Spec.EnableInstanceAPI {
-		return nil, nil
+func getInstanceTemplateName(inst *workloads.Instance) string {
+	if inst.Labels == nil {
+		return ""
 	}
-	if its.Spec.Replicas == nil {
-		return nil, nil
+	if templateName := inst.Labels[instancetemplate.TemplateNameLabelKey]; templateName != "" {
+		return templateName
 	}
-	itsExt, err := instancetemplate.BuildInstanceSetExt(its, tree)
-	if err != nil {
-		return nil, err
-	}
-	nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt, nil)
-	if err != nil {
-		return nil, err
-	}
-	nameToTemplateMap, err := nameBuilder.BuildInstanceName2TemplateMap()
-	if err != nil {
-		return nil, err
-	}
-	desiredInstances := make(map[string]*workloads.Instance, len(nameToTemplateMap))
-	for name, template := range nameToTemplateMap {
-		inst, err := buildInstanceByTemplate(tree, name, template, its)
-		if err != nil {
-			return nil, err
-		}
-		desiredInstances[name] = inst
-	}
-	return desiredInstances, nil
-}
-
-func isInstanceUpdatedForStatus(its *workloads.InstanceSet, inst, desired *workloads.Instance) bool {
-	if isInstanceUpdated(its, inst) {
-		return true
-	}
-	if its.Spec.EnableInstanceAPI == nil || !*its.Spec.EnableInstanceAPI || desired == nil {
-		return false
-	}
-	generation, ok := inst.Annotations[constant.KubeBlocksGenerationKey]
-	if !ok {
-		return false
-	}
-	if inst.Generation != inst.Status.ObservedGeneration || !inst.Status.UpToDate {
-		return false
-	}
-	desired = desired.DeepCopy()
-	if desired.Annotations == nil {
-		desired.Annotations = map[string]string{}
-	}
-	desired.Annotations[constant.KubeBlocksGenerationKey] = generation
-	return copyAndMergeInstance(inst, desired) == nil
+	return inst.Labels[constant.KBAppInstanceTemplateLabelKey]
 }
 
 func buildConditionMessageWithNames(instanceNames []string) ([]byte, error) {

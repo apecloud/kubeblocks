@@ -27,6 +27,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -353,6 +354,9 @@ func (r *componentWorkloadOps) joinMember4ScaleOut() error {
 			if err := r.joinMemberForPod(pod, pods); err != nil {
 				joinErrors = append(joinErrors, fmt.Errorf("pod %s: %w", pod.Name, err))
 			} else {
+				if err := r.persistMemberJoined(pod.Name); err != nil {
+					return err
+				}
 				replicas.Status[i].MemberJoined = ptr.To(true)
 			}
 		}
@@ -375,6 +379,30 @@ func (r *componentWorkloadOps) joinMember4ScaleOut() error {
 		return intctrlutil.NewRequeueError(time.Second, fmt.Sprintf("%v", joinErrors))
 	}
 	return nil
+}
+
+func (r *componentWorkloadOps) persistMemberJoined(podName string) error {
+	if r.runningITS == nil {
+		return nil
+	}
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		its := &workloads.InstanceSet{}
+		if err := r.cli.Get(r.transCtx.Context, client.ObjectKeyFromObject(r.runningITS), its); err != nil {
+			return err
+		}
+		if err := component.UpdateReplicasStatusFunc(its, func(replicas *component.ReplicasStatus) error {
+			for i := range replicas.Status {
+				if replicas.Status[i].Name == podName {
+					replicas.Status[i].MemberJoined = ptr.To(true)
+					return nil
+				}
+			}
+			return fmt.Errorf("replica %s not found", podName)
+		}); err != nil {
+			return err
+		}
+		return r.cli.Update(r.transCtx.Context, its)
+	})
 }
 
 func (r *componentWorkloadOps) joinMemberForPod(pod *corev1.Pod, pods []*corev1.Pod) error {

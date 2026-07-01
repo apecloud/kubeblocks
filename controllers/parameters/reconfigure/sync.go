@@ -93,7 +93,10 @@ func shouldSkipReloadParam(param string, paramDef *parametersv1alpha1.Parameters
 	if reloadStaticParams {
 		return false
 	}
-	if restart && reloadBeforeRestart {
+	if paramDef == nil {
+		return false
+	}
+	if parameters.NeedDynamicReloadAction(paramDef) || (restart && reloadBeforeRestart) {
 		return !core.IsDynamicParameter(param, paramDef)
 	}
 	return false

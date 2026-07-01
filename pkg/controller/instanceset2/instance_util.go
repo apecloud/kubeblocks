@@ -395,11 +395,15 @@ func getHeadlessSvcName(itsName string) string {
 // }
 
 func isInstanceUpdated(its *workloads.InstanceSet, inst *workloads.Instance) bool {
+	return isInstanceUpdatedWithDesired(its, inst, nil)
+}
+
+func isInstanceUpdatedWithDesired(its *workloads.InstanceSet, inst, desired *workloads.Instance) bool {
 	updateRevisions, err := revisionmap.Decode(its.Status.UpdateRevisions)
 	if err != nil {
 		return false
 	}
-	return isInstanceUpdatedWithRevisions(inst, buildInstanceRevision(inst), updateRevisions)
+	return isInstanceUpdatedWithRevisions(inst, buildInstanceRevisionWithDesiredMetadata(inst, desired), updateRevisions)
 }
 
 func isInstanceUpdatedWithRevisions(inst *workloads.Instance, currentRevision string, updateRevisions map[string]string) bool {

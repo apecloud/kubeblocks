@@ -191,26 +191,47 @@ func TestBuildInstanceRevisionIgnoresParentGenerationAnnotation(t *testing.T) {
 	}
 }
 
-func TestStatusReconcilerKeepsScaleOutInstancesUpdatedAfterParentGenerationBump(t *testing.T) {
+func TestBuildInstanceRevisionUsesDesiredMetadataKeys(t *testing.T) {
 	desired := &workloads.Instance{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-its-0",
 			Labels: map[string]string{
 				constant.KBAppInstanceTemplateLabelKey: "tpl",
+				"managed-label":                        "desired",
 			},
 			Annotations: map[string]string{
 				constant.KubeBlocksGenerationKey: "3",
+				"managed-annotation":             "desired",
 			},
 		},
-		Spec: workloads.InstanceSpec{MinReadySeconds: 1},
+		Spec: workloads.InstanceSpec{
+			MinReadySeconds: 1,
+		},
 	}
-	updateRevisions, err := revisionmap.Encode(map[string]string{
-		desired.Name: buildInstanceRevision(desired),
-	})
-	if err != nil {
-		t.Fatalf("build revisions: %v", err)
+	revision := buildInstanceRevision(desired)
+
+	actual := desired.DeepCopy()
+	actual.Annotations[constant.KubeBlocksGenerationKey] = "1"
+	actual.Annotations["external-annotation"] = "ignored"
+	actual.Labels["external-label"] = "ignored"
+	if got := buildInstanceRevisionWithDesiredMetadata(actual, desired); got != revision {
+		t.Fatalf("expected unmanaged metadata to be ignored, got %s want %s", got, revision)
 	}
 
+	actual = desired.DeepCopy()
+	actual.Annotations["managed-annotation"] = "changed"
+	if got := buildInstanceRevisionWithDesiredMetadata(actual, desired); got == revision {
+		t.Fatalf("expected managed annotation change to alter revision")
+	}
+
+	actual = desired.DeepCopy()
+	actual.Labels["managed-label"] = "changed"
+	if got := buildInstanceRevisionWithDesiredMetadata(actual, desired); got == revision {
+		t.Fatalf("expected managed label change to alter revision")
+	}
+}
+
+func TestStatusReconcilerKeepsScaleOutInstancesUpdatedAfterParentGenerationBump(t *testing.T) {
 	its := &workloads.InstanceSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:       "test-its",
@@ -218,19 +239,50 @@ func TestStatusReconcilerKeepsScaleOutInstancesUpdatedAfterParentGenerationBump(
 			Generation: 3,
 		},
 		Spec: workloads.InstanceSetSpec{
-			Replicas: ptr.To[int32](1),
+			Replicas:            ptr.To[int32](1),
+			FlatInstanceOrdinal: true,
 			Instances: []workloads.InstanceTemplate{
-				{Name: "tpl", Replicas: ptr.To[int32](1)},
+				{
+					Name:     "tpl",
+					Replicas: ptr.To[int32](1),
+					Labels: map[string]string{
+						"managed-label": "desired",
+					},
+					Annotations: map[string]string{
+						"managed-annotation": "desired",
+					},
+				},
 			},
 		},
 		Status: workloads.InstanceSetStatus{
 			ObservedGeneration: 3,
-			UpdateRevision:     "update-revision",
-			UpdateRevisions:    updateRevisions,
 		},
 	}
+
+	tree := kubebuilderx.NewObjectTree()
+	tree.SetRoot(its)
+	desiredInstances, _, err := buildDesiredInstancesByName(tree, its)
+	if err != nil {
+		t.Fatalf("build desired instances: %v", err)
+	}
+	desired := desiredInstances["test-its-0"]
+	if desired == nil {
+		t.Fatalf("expected desired instance test-its-0, got %#v", desiredInstances)
+	}
+	desiredRevision := buildInstanceRevision(desired)
+	updateRevisions, err := revisionmap.Encode(map[string]string{
+		desired.Name: desiredRevision,
+	})
+	if err != nil {
+		t.Fatalf("build revisions: %v", err)
+	}
+	its.Status.UpdateRevision = "update-revision"
+	its.Status.UpdateRevisions = updateRevisions
+
 	inst := desired.DeepCopy()
 	inst.Annotations[constant.KubeBlocksGenerationKey] = "1"
+	inst.Annotations["external-annotation"] = "ignored"
+	inst.Labels["external-label"] = "ignored"
 	inst.Generation = 2
 	inst.Status = workloads.InstanceStatus2{
 		ObservedGeneration: 2,
@@ -241,8 +293,6 @@ func TestStatusReconcilerKeepsScaleOutInstancesUpdatedAfterParentGenerationBump(
 		},
 	}
 
-	tree := kubebuilderx.NewObjectTree()
-	tree.SetRoot(its)
 	if err := tree.Add(inst); err != nil {
 		t.Fatalf("add instance: %v", err)
 	}
@@ -255,8 +305,11 @@ func TestStatusReconcilerKeepsScaleOutInstancesUpdatedAfterParentGenerationBump(
 	if err != nil {
 		t.Fatalf("get current revisions: %v", err)
 	}
-	if currentRevisions[inst.Name] != buildInstanceRevision(inst) {
+	if currentRevisions[inst.Name] != buildInstanceRevisionWithDesiredMetadata(inst, desired) {
 		t.Fatalf("unexpected current revision: %#v", currentRevisions)
+	}
+	if currentRevisions[inst.Name] != desiredRevision {
+		t.Fatalf("expected current revision to match desired update revision, got %s want %s", currentRevisions[inst.Name], desiredRevision)
 	}
 	if got.Status.UpdatedReplicas != 1 {
 		t.Fatalf("expected updated replicas to stay at 1, got %d", got.Status.UpdatedReplicas)

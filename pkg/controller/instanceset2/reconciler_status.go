@@ -55,6 +55,11 @@ func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
 
+	desiredInstances, _, err := buildDesiredInstancesByName(tree, its)
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
+
 	instances := tree.List(&workloads.Instance{})
 	var instanceList []*workloads.Instance
 	for _, object := range instances {
@@ -106,7 +111,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 				notAvailableNames.Insert(inst.Name)
 			}
 		}
-		currentRevisions[inst.Name] = buildInstanceRevision(inst)
+		currentRevisions[inst.Name] = buildInstanceRevisionWithDesiredMetadata(inst, desiredInstances[inst.Name])
 		if !intctrlutil.IsInstanceTerminating(inst) {
 			if isInstanceUpdatedWithRevisions(inst, currentRevisions[inst.Name], updateRevisions) {
 				updatedReplicas++

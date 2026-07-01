@@ -20,12 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset2
 
 import (
-	"slices"
-
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
-	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/revisionmap"
@@ -49,32 +46,14 @@ func (r *revisionUpdateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *
 func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
 
-	itsExt, err := instancetemplate.BuildInstanceSetExt(its, tree)
+	desiredInstances, names, err := buildDesiredInstancesByName(tree, its)
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}
-	nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt, nil)
-	if err != nil {
-		return kubebuilderx.Continue, err
-	}
-	nameMap, err := nameBuilder.BuildInstanceName2TemplateMap()
-	if err != nil {
-		return kubebuilderx.Continue, err
-	}
-
-	names := make([]string, 0, len(nameMap))
-	for name := range nameMap {
-		names = append(names, name)
-	}
-	slices.Sort(names)
 
 	updateRevisions := make(map[string]string, len(names))
 	for _, name := range names {
-		inst, err := buildInstanceByTemplate(tree, name, nameMap[name], its)
-		if err != nil {
-			return kubebuilderx.Continue, err
-		}
-		updateRevisions[name] = buildInstanceRevision(inst)
+		updateRevisions[name] = buildInstanceRevision(desiredInstances[name])
 	}
 	revisions, err := revisionmap.Encode(updateRevisions)
 	if err != nil {
@@ -85,7 +64,7 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kub
 		its.Status.UpdateRevision = updateRevisions[names[len(names)-1]]
 	}
 
-	updatedReplicas := r.calculateUpdatedReplicas(its, tree.List(&workloads.Instance{}))
+	updatedReplicas := r.calculateUpdatedReplicas(its, tree.List(&workloads.Instance{}), desiredInstances)
 	its.Status.UpdatedReplicas = updatedReplicas
 
 	its.Status.ObservedGeneration = its.Generation
@@ -93,11 +72,11 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kub
 	return kubebuilderx.Continue, nil
 }
 
-func (r *revisionUpdateReconciler) calculateUpdatedReplicas(its *workloads.InstanceSet, instances []client.Object) int32 {
+func (r *revisionUpdateReconciler) calculateUpdatedReplicas(its *workloads.InstanceSet, instances []client.Object, desiredInstances map[string]*workloads.Instance) int32 {
 	updatedReplicas := int32(0)
 	for i := range instances {
 		inst, _ := instances[i].(*workloads.Instance)
-		if isInstanceUpdated(its, inst) {
+		if isInstanceUpdatedWithDesired(its, inst, desiredInstances[inst.Name]) {
 			updatedReplicas++
 		}
 	}

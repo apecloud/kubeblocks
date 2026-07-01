@@ -787,7 +787,9 @@ PodUpdatePolicyType
 <td>
 <em>(Optional)</em>
 <p>PodUpgradePolicy indicates how pods should be updated when the component is upgraded.</p>
-<p>If not specified, the value of PodUpdatePolicy will be used.</p>
+<p>If not specified, the value of PodUpdatePolicy will be used.
+If the referenced ComponentDefinition specifies PodUpgradePolicy or PodUpdatePolicy as &ldquo;ReCreate&rdquo;,
+the definition-level &ldquo;ReCreate&rdquo; takes precedence over this field.</p>
 </td>
 </tr>
 <tr>
@@ -1626,7 +1628,9 @@ PodUpdatePolicyType
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the default update policy for pods when the Component is updated.</p>
+<p>Specifies the default update policy for pods when the Component is updated.
+If PodUpgradePolicy is not specified and this field is set to &ldquo;ReCreate&rdquo;, this definition-level
+policy also takes precedence over the Component or Cluster user-specified PodUpgradePolicy during upgrades.</p>
 </td>
 </tr>
 <tr>
@@ -1640,7 +1644,9 @@ PodUpdatePolicyType
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the default update policy for pods when the Component is upgraded (the service version changes).</p>
+<p>Specifies the default update policy for pods when the Component is upgraded (the service version changes).
+If set to &ldquo;ReCreate&rdquo;, this definition-level policy takes precedence over the Component or Cluster
+user-specified PodUpgradePolicy.</p>
 <p>If not specified, the default behavior is the same as <code>podUpdatePolicy</code>.</p>
 </td>
 </tr>
@@ -3459,7 +3465,9 @@ PodUpdatePolicyType
 <td>
 <em>(Optional)</em>
 <p>PodUpgradePolicy indicates how pods should be updated when the component is upgraded.</p>
-<p>If not specified, the value of PodUpdatePolicy will be used.</p>
+<p>If not specified, the value of PodUpdatePolicy will be used.
+If the referenced ComponentDefinition specifies PodUpgradePolicy or PodUpdatePolicy as &ldquo;ReCreate&rdquo;,
+the definition-level &ldquo;ReCreate&rdquo; takes precedence over this field.</p>
 </td>
 </tr>
 <tr>
@@ -5853,7 +5861,9 @@ PodUpdatePolicyType
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the default update policy for pods when the Component is updated.</p>
+<p>Specifies the default update policy for pods when the Component is updated.
+If PodUpgradePolicy is not specified and this field is set to &ldquo;ReCreate&rdquo;, this definition-level
+policy also takes precedence over the Component or Cluster user-specified PodUpgradePolicy during upgrades.</p>
 </td>
 </tr>
 <tr>
@@ -5867,7 +5877,9 @@ PodUpdatePolicyType
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the default update policy for pods when the Component is upgraded (the service version changes).</p>
+<p>Specifies the default update policy for pods when the Component is upgraded (the service version changes).
+If set to &ldquo;ReCreate&rdquo;, this definition-level policy takes precedence over the Component or Cluster
+user-specified PodUpgradePolicy.</p>
 <p>If not specified, the default behavior is the same as <code>podUpdatePolicy</code>.</p>
 </td>
 </tr>
@@ -7086,7 +7098,9 @@ PodUpdatePolicyType
 <td>
 <em>(Optional)</em>
 <p>PodUpgradePolicy indicates how pods should be updated when the component is upgraded.</p>
-<p>If not specified, the value of PodUpdatePolicy will be used.</p>
+<p>If not specified, the value of PodUpdatePolicy will be used.
+If the referenced ComponentDefinition specifies PodUpgradePolicy or PodUpdatePolicy as &ldquo;ReCreate&rdquo;,
+the definition-level &ldquo;ReCreate&rdquo; takes precedence over this field.</p>
 </td>
 </tr>
 <tr>

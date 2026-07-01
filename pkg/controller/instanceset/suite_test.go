@@ -30,6 +30,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/golang/mock/gomock"
+	"github.com/klauspost/compress/zstd"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -167,6 +168,10 @@ func mockCompressedInstanceTemplates(ns, name string) (*corev1.ConfigMap, string
 		},
 	}
 	templateByte, err := json.Marshal(instances)
+	if err != nil {
+		return nil, "", err
+	}
+	writer, err := zstd.NewWriter(nil)
 	if err != nil {
 		return nil, "", err
 	}

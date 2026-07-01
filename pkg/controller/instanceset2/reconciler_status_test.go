@@ -325,3 +325,62 @@ func TestStatusReconcilerKeepsScaleOutInstancesUpdatedAfterParentGenerationBump(
 		t.Fatalf("expected current revision to advance to update revision")
 	}
 }
+
+func TestRevisionUpdateReconcilerKeepsScaleOutInstancesUpdatedAfterParentGenerationBump(t *testing.T) {
+	its := &workloads.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       "test-its",
+			Namespace:  "default",
+			Generation: 3,
+		},
+		Spec: workloads.InstanceSetSpec{
+			Replicas:            ptr.To[int32](1),
+			FlatInstanceOrdinal: true,
+			Instances: []workloads.InstanceTemplate{
+				{
+					Name:     "tpl",
+					Replicas: ptr.To[int32](1),
+					Labels: map[string]string{
+						"managed-label": "desired",
+					},
+					Annotations: map[string]string{
+						"managed-annotation": "desired",
+					},
+				},
+			},
+		},
+	}
+
+	tree := kubebuilderx.NewObjectTree()
+	tree.SetRoot(its)
+	desiredInstances, _, err := buildDesiredInstancesByName(tree, its)
+	if err != nil {
+		t.Fatalf("build desired instances: %v", err)
+	}
+	desired := desiredInstances["test-its-0"]
+	if desired == nil {
+		t.Fatalf("expected desired instance test-its-0, got %#v", desiredInstances)
+	}
+
+	inst := desired.DeepCopy()
+	inst.Annotations[constant.KubeBlocksGenerationKey] = "1"
+	inst.Generation = 2
+	inst.Status = workloads.InstanceStatus2{
+		ObservedGeneration: 2,
+		UpToDate:           true,
+		Conditions: []metav1.Condition{
+			{Type: string(workloads.InstanceReady), Status: metav1.ConditionTrue},
+			{Type: string(workloads.InstanceAvailable), Status: metav1.ConditionTrue},
+		},
+	}
+	if err := tree.Add(inst); err != nil {
+		t.Fatalf("add instance: %v", err)
+	}
+
+	if _, err := NewRevisionUpdateReconciler().Reconcile(tree); err != nil {
+		t.Fatalf("reconcile revision update: %v", err)
+	}
+	if its.Status.UpdatedReplicas != 1 {
+		t.Fatalf("expected updated replicas to stay at 1, got %d", its.Status.UpdatedReplicas)
+	}
+}

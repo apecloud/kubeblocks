@@ -112,9 +112,21 @@ func (r *opsRuntime) GetWorkload(namespace, clusterName, compName string) (Workl
 	}
 	if its.Name != "" {
 		currRevisionMap, _ := instanceset.GetRevisions(its.Status.CurrentRevisions)
+		if currRevisionMap == nil {
+			currRevisionMap = map[string]string{}
+		}
 		workload.minReadySeconds = its.Spec.MinReadySeconds
 		workload.currentRevisionMap = currRevisionMap
 		workload.instanceNames = sets.KeySet(currRevisionMap)
+		if len(workload.currentRevisionMap) == 0 {
+			for _, status := range its.Status.InstanceStatus {
+				if status.PodName == "" {
+					continue
+				}
+				workload.currentRevisionMap[status.PodName] = ""
+				workload.instanceNames.Insert(status.PodName)
+			}
+		}
 		workload.notReadySet = instanceset.GetPodNameSetFromInstanceSetCondition(its, workloads.InstanceReady)
 		workload.notAvailableSet = instanceset.GetPodNameSetFromInstanceSetCondition(its, workloads.InstanceAvailable)
 		workload.failedSet = instanceset.GetPodNameSetFromInstanceSetCondition(its, workloads.InstanceFailure)

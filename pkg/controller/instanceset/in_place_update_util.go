@@ -306,6 +306,11 @@ func equalResourcesInPlaceFields(old, new *corev1.Pod) bool {
 			return false
 		}
 		oc := old.Spec.Containers[index]
+		// Compare a request only when the desired template explicitly sets it.
+		// An omitted request is not owned by the template: the live value was
+		// defaulted from the limit at pod admission and is intentionally left
+		// untouched by the in-place merge, so demanding it to match anything
+		// would keep the resize path from converging.
 		for _, resourceName := range []corev1.ResourceName{corev1.ResourceCPU, corev1.ResourceMemory} {
 			if request, ok := nc.Resources.Requests[resourceName]; ok {
 				oldRequest := corev1.ResourceList{}

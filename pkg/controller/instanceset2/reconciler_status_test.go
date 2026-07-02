@@ -325,3 +325,81 @@ func TestStatusReconcilerKeepsScaleOutInstancesUpdatedAfterParentGenerationBump(
 		t.Fatalf("expected current revision to advance to update revision")
 	}
 }
+
+func TestStatusReconcilerInitializesUpdateRevisionsOnFreshCreate(t *testing.T) {
+	its := &workloads.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       "test-its",
+			Namespace:  "default",
+			Generation: 1,
+		},
+		Spec: workloads.InstanceSetSpec{
+			Replicas:            ptr.To[int32](1),
+			FlatInstanceOrdinal: true,
+			Instances: []workloads.InstanceTemplate{
+				{
+					Name:     "tpl",
+					Replicas: ptr.To[int32](1),
+					Labels: map[string]string{
+						"managed-label": "desired",
+					},
+				},
+			},
+		},
+		Status: workloads.InstanceSetStatus{
+			ObservedGeneration: 1,
+		},
+	}
+
+	tree := kubebuilderx.NewObjectTree()
+	tree.SetRoot(its)
+	desiredInstances, _, err := buildDesiredInstancesByName(tree, its)
+	if err != nil {
+		t.Fatalf("build desired instances: %v", err)
+	}
+	desired := desiredInstances["test-its-0"]
+	if desired == nil {
+		t.Fatalf("expected desired instance test-its-0, got %#v", desiredInstances)
+	}
+
+	inst := desired.DeepCopy()
+	inst.Generation = 1
+	inst.Status = workloads.InstanceStatus2{
+		ObservedGeneration: 1,
+		UpToDate:           true,
+		Conditions: []metav1.Condition{
+			{Type: string(workloads.InstanceReady), Status: metav1.ConditionTrue},
+			{Type: string(workloads.InstanceAvailable), Status: metav1.ConditionTrue},
+		},
+	}
+	if err := tree.Add(inst); err != nil {
+		t.Fatalf("add instance: %v", err)
+	}
+
+	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+		t.Fatalf("reconcile status: %v", err)
+	}
+
+	got := tree.GetRoot().(*workloads.InstanceSet)
+	if got.Status.UpdatedReplicas != 1 {
+		t.Fatalf("expected updated replicas to converge on fresh create, got %d", got.Status.UpdatedReplicas)
+	}
+	updateRevisions, err := revisionmap.Decode(got.Status.UpdateRevisions)
+	if err != nil {
+		t.Fatalf("decode update revisions: %v", err)
+	}
+	desiredRevision := buildInstanceRevision(desired)
+	if updateRevisions[inst.Name] != desiredRevision {
+		t.Fatalf("expected update revision to be initialized, got %#v want %s", updateRevisions, desiredRevision)
+	}
+	currentRevisions, err := revisionmap.Decode(got.Status.CurrentRevisions)
+	if err != nil {
+		t.Fatalf("decode current revisions: %v", err)
+	}
+	if currentRevisions[inst.Name] != desiredRevision {
+		t.Fatalf("expected current revision to match desired revision, got %#v want %s", currentRevisions, desiredRevision)
+	}
+	if got.Status.CurrentRevision != got.Status.UpdateRevision {
+		t.Fatalf("expected current revision to advance to update revision")
+	}
+}

@@ -55,7 +55,7 @@ func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
 
-	desiredInstances, _, err := buildDesiredInstancesByName(tree, its)
+	desiredInstances, desiredNames, err := buildDesiredInstancesByName(tree, its)
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}
@@ -76,6 +76,19 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	updateRevisions, err := revisionmap.Decode(its.Status.UpdateRevisions)
 	if err != nil {
 		return kubebuilderx.Continue, err
+	}
+	if updateRevisions == nil {
+		updateRevisions = map[string]string{}
+	}
+	for name, desired := range desiredInstances {
+		if _, ok := updateRevisions[name]; ok {
+			continue
+		}
+		updateRevisions[name] = buildInstanceRevision(desired)
+	}
+	its.Status.UpdateRevisions, _ = revisionmap.Encode(updateRevisions)
+	if len(desiredNames) > 0 {
+		its.Status.UpdateRevision = updateRevisions[desiredNames[len(desiredNames)-1]]
 	}
 
 	template2TemplatesStatus := map[string]*workloads.InstanceTemplateStatus{}

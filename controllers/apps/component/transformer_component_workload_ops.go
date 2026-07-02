@@ -377,7 +377,7 @@ func (r *componentWorkloadOps) joinMember4ScaleOut() error {
 	}
 
 	joinErrors := make([]error, 0)
-	terminalFailureObserved := false
+	pendingReplicas := make([]string, 0)
 	if err = component.UpdateReplicasStatusFunc(r.protoITS, func(replicas *component.ReplicasStatus) error {
 		for _, pod := range pods {
 			i := slices.IndexFunc(replicas.Status, func(r component.ReplicaStatus) bool {
@@ -392,7 +392,6 @@ func (r *componentWorkloadOps) joinMember4ScaleOut() error {
 				continue // no need to join or already joined
 			}
 			if status.MemberJoinFailed {
-				terminalFailureObserved = true
 				continue // terminal failure is persisted and cancelable by scale-in
 			}
 
@@ -402,7 +401,6 @@ func (r *componentWorkloadOps) joinMember4ScaleOut() error {
 				if isTerminalMemberJoinError(err) {
 					replicas.Status[i].MemberJoinFailed = true
 					replicas.Status[i].Message = err.Error()
-					terminalFailureObserved = true
 					continue
 				}
 				joinErrors = append(joinErrors, fmt.Errorf("pod %s: %w", pod.Name, err))
@@ -413,14 +411,10 @@ func (r *componentWorkloadOps) joinMember4ScaleOut() error {
 			}
 		}
 
-		notJoinedReplicas := make([]string, 0)
 		for _, r := range replicas.Status {
-			if r.MemberJoined != nil && !*r.MemberJoined {
-				notJoinedReplicas = append(notJoinedReplicas, r.Name)
+			if r.MemberJoined != nil && !*r.MemberJoined && !r.MemberJoinFailed {
+				pendingReplicas = append(pendingReplicas, r.Name)
 			}
-		}
-		if len(notJoinedReplicas) > 0 {
-			joinErrors = append(joinErrors, fmt.Errorf("some replicas have not joined: %v", notJoinedReplicas))
 		}
 		return nil
 	}); err != nil {
@@ -428,17 +422,25 @@ func (r *componentWorkloadOps) joinMember4ScaleOut() error {
 	}
 
 	if len(joinErrors) > 0 {
-		if terminalFailureObserved {
-			return nil
-		}
 		return intctrlutil.NewRequeueError(time.Second, fmt.Sprintf("%v", joinErrors))
 	}
+	if len(pendingReplicas) > 0 {
+		return intctrlutil.NewRequeueError(time.Second, fmt.Sprintf("some replicas have not joined: %v", pendingReplicas))
+	}
+	// Only terminally failed replicas (if any) remain unjoined. Let the
+	// reconciliation continue so the failure state is persisted through the
+	// normal workload update path and surfaced as a failure by the status
+	// transformer, instead of blocking the transformer chain with a requeue.
 	return nil
 }
 
+// isTerminalMemberJoinError reports whether a memberJoin action error can never
+// be resolved by retrying. A plain action failure (non-zero exit) is the
+// documented retry-safe deferral signal of the addon lifecycle contract and
+// kbagent maps every non-zero exit to it, so it must stay retryable; only a
+// statically unimplemented action is terminal.
 func isTerminalMemberJoinError(err error) bool {
-	return errors.Is(err, lifecycle.ErrActionFailed) ||
-		errors.Is(err, lifecycle.ErrActionNotImplemented)
+	return errors.Is(err, lifecycle.ErrActionNotImplemented)
 }
 
 func (r *componentWorkloadOps) joinMemberForPod(pod *corev1.Pod, pods []*corev1.Pod) error {

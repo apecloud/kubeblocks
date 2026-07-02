@@ -1328,7 +1328,7 @@ var _ = Describe("Component Workload Operations Test", func() {
 			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
 				recorder.Action(gomock.Any(), gomock.Any()).Times(1).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
 					Expect(req.Action).Should(Equal("memberJoin"))
-					return kbagentproto.ActionResponse{Error: "failed", Message: "mock failed"}, nil
+					return kbagentproto.ActionResponse{Error: "notImplemented", Message: "mock not implemented"}, nil
 				})
 			})
 
@@ -1341,7 +1341,36 @@ var _ = Describe("Component Workload Operations Test", func() {
 			Expect(err).Should(Succeed())
 			Expect(statuses).Should(HaveLen(1))
 			Expect(statuses[0].MemberJoinFailed).Should(BeTrue())
-			Expect(statuses[0].Message).Should(ContainSubstring("mock failed"))
+			Expect(statuses[0].Message).Should(ContainSubstring("mock not implemented"))
+		})
+
+		It("should keep retrying member join on ordinary action failure", func() {
+			// a non-zero action exit is the retry-safe deferral signal of the
+			// addon lifecycle contract, it must not be recorded as terminal
+			createGatePod(corev1.PodRunning)
+			its := buildITS(1)
+			Expect(component.NewReplicasStatus(its, []string{gatePodName}, true, false)).Should(Succeed())
+			ops := buildOps(its)
+
+			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).Times(1).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+					Expect(req.Action).Should(Equal("memberJoin"))
+					return kbagentproto.ActionResponse{Error: "failed", Message: "mock deferral"}, nil
+				})
+			})
+
+			err := ops.joinMember4ScaleOut()
+			Expect(err).Should(HaveOccurred())
+			Expect(intctrlutil.IsRequeueError(err)).Should(BeTrue())
+
+			statuses, err := component.GetReplicasStatusListFunc(ops.protoITS, func(status component.ReplicaStatus) bool {
+				return status.Name == gatePodName
+			})
+			Expect(err).Should(Succeed())
+			Expect(statuses).Should(HaveLen(1))
+			Expect(statuses[0].MemberJoinFailed).Should(BeFalse())
+			Expect(statuses[0].MemberJoined).ShouldNot(BeNil())
+			Expect(*statuses[0].MemberJoined).Should(BeFalse())
 		})
 
 		It("should submit terminal member join failure through the workload update path", func() {
@@ -1355,7 +1384,7 @@ var _ = Describe("Component Workload Operations Test", func() {
 			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
 				recorder.Action(gomock.Any(), gomock.Any()).Times(1).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
 					Expect(req.Action).Should(Equal("memberJoin"))
-					return kbagentproto.ActionResponse{Error: "failed", Message: "mock failed"}, nil
+					return kbagentproto.ActionResponse{Error: "notImplemented", Message: "mock not implemented"}, nil
 				})
 			})
 
@@ -1378,7 +1407,7 @@ var _ = Describe("Component Workload Operations Test", func() {
 			Expect(err).Should(Succeed())
 			Expect(statuses).Should(HaveLen(1))
 			Expect(statuses[0].MemberJoinFailed).Should(BeTrue())
-			Expect(statuses[0].Message).Should(ContainSubstring("mock failed"))
+			Expect(statuses[0].Message).Should(ContainSubstring("mock not implemented"))
 		})
 
 		It("should keep persisted terminal member join failure unfinished without blocking status reconciliation", func() {

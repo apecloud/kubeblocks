@@ -272,7 +272,10 @@ func restorePVCInitialStepCompleted(pvc *corev1.PersistentVolumeClaim) bool {
 		if string(condition.Type) != string(workloads.InstanceRestore) {
 			continue
 		}
-		if condition.Status == corev1.ConditionFalse {
+		// A terminal Restore condition means the PVC is out of the initial-step
+		// window: False is a failed restore, True means the full restore has
+		// already completed and ordering reverts to the regular readiness gate.
+		if condition.Status != corev1.ConditionUnknown {
 			return false
 		}
 	}

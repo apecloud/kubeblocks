@@ -41,9 +41,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
+	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/sharding"
@@ -678,33 +681,63 @@ func restorePVCInitialStepCompletedForComponent(transCtx *clusterTransformContex
 	if expected == 0 {
 		return false, nil
 	}
-	componentName := comp.Labels[constant.KBAppComponentLabelKey]
-	if componentName == "" {
-		var err error
-		componentName, err = component.ShortName(transCtx.Cluster.Name, comp.Name)
-		if err != nil {
-			return false, err
-		}
-	}
-	pvcList := &corev1.PersistentVolumeClaimList{}
-	if err := transCtx.Client.List(transCtx.Context, pvcList,
-		client.InNamespace(comp.Namespace),
-		client.MatchingLabels(constant.GetCompLabels(transCtx.Cluster.Name, componentName))); err != nil {
+	pvcNames, err := expectedRestorePVCNamesForComponent(transCtx, comp)
+	if err != nil {
 		return false, err
 	}
-	completed := 0
-	for i := range pvcList.Items {
-		pvc := &pvcList.Items[i]
-		if !pvc.DeletionTimestamp.IsZero() ||
-			pvc.Annotations[constant.RestoreSourceKindAnnotationKey] == "" {
-			continue
+	// The ITS spec may not have converged to the component spec yet; keep the
+	// strict phase gate until both agree on the restore PVC set, so that stale
+	// or leftover PVCs cannot substitute for expected ones.
+	if len(pvcNames) != expected {
+		return false, nil
+	}
+	for _, pvcName := range pvcNames {
+		pvc := &corev1.PersistentVolumeClaim{}
+		pvcKey := types.NamespacedName{Namespace: comp.Namespace, Name: pvcName}
+		if err := transCtx.Client.Get(transCtx.Context, pvcKey, pvc); err != nil {
+			return false, client.IgnoreNotFound(err)
 		}
-		if !restorePVCInitialStepCompleted(pvc) {
+		if !pvc.DeletionTimestamp.IsZero() || !restorePVCInitialStepCompleted(pvc) {
 			return false, nil
 		}
-		completed++
 	}
-	return completed >= expected, nil
+	return true, nil
+}
+
+func expectedRestorePVCNamesForComponent(transCtx *clusterTransformContext, comp *appsv1.Component) ([]string, error) {
+	its := &workloads.InstanceSet{}
+	if err := transCtx.Client.Get(transCtx.Context, client.ObjectKeyFromObject(comp), its); err != nil {
+		return nil, client.IgnoreNotFound(err)
+	}
+	if its.Spec.Replicas == nil {
+		return nil, nil
+	}
+	// The empty tree makes compressed instance templates unresolvable; name
+	// generation then comes up short and the caller falls back to the strict
+	// phase gate.
+	itsExt, err := instancetemplate.BuildInstanceSetExt(its, kubebuilderx.NewObjectTree())
+	if err != nil {
+		return nil, err
+	}
+	nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt, nil)
+	if err != nil {
+		return nil, err
+	}
+	name2TemplateMap, err := nameBuilder.BuildInstanceName2TemplateMap()
+	if err != nil {
+		return nil, err
+	}
+	var pvcNames []string
+	for podName, template := range name2TemplateMap {
+		for i := range template.VolumeClaimTemplates {
+			claimTemplate := template.VolumeClaimTemplates[i]
+			if claimTemplate.Annotations[constant.RestoreSourceKindAnnotationKey] == "" {
+				continue
+			}
+			pvcNames = append(pvcNames, ictrlutil.ComposePVCName(claimTemplate, its.Name, podName))
+		}
+	}
+	return pvcNames, nil
 }
 
 func restorePVCInitialStepCompleted(pvc *corev1.PersistentVolumeClaim) bool {
@@ -713,7 +746,10 @@ func restorePVCInitialStepCompleted(pvc *corev1.PersistentVolumeClaim) bool {
 		if string(condition.Type) != appsv1.ConditionTypeRestore {
 			continue
 		}
-		if condition.Status == corev1.ConditionFalse {
+		// A terminal Restore condition means the PVC is out of the initial-step
+		// window: False is a failed restore, True means the full restore has
+		// already completed and ordering reverts to the regular phase gate.
+		if condition.Status != corev1.ConditionUnknown {
 			return false
 		}
 	}

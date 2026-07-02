@@ -223,6 +223,40 @@ var _ = Describe("replicas alignment reconciler test", func() {
 			Expect(pods[0].GetName()).Should(Equal(name + "-0"))
 		})
 
+		It("should stop using the initial-step signal once the full restore completes", func() {
+			its.Generation = 1
+			restoreVCTs := []corev1.PersistentVolumeClaim{*volumeClaimTemplates[0].DeepCopy()}
+			restoreVCTs[0].Annotations = map[string]string{
+				constant.RestoreSourceKindAnnotationKey: "Backup",
+			}
+			its.Spec.VolumeClaimTemplates = restoreVCTs
+			tree := kubebuilderx.NewObjectTree()
+			tree.SetRoot(its)
+			reconciler = NewReplicasAlignmentReconciler()
+			pod0 := builder.NewPodBuilder(namespace, name+"-0").GetObject()
+			pvc0 := builder.NewPVCBuilder(namespace, volumeClaimTemplates[0].Name+"-"+pod0.Name).GetObject()
+			// after postReady the PVC keeps Populating=True and gains a terminal
+			// Restore=True: ordering must revert to the regular readiness gate
+			pvc0.Status.Conditions = []corev1.PersistentVolumeClaimCondition{{
+				Type:   corev1.PersistentVolumeClaimConditionType(constant.DataProtectionPVCConditionPopulating),
+				Status: corev1.ConditionTrue,
+				Reason: constant.DataProtectionPVCConditionReasonPopulatingProvision,
+			}, {
+				Type:   corev1.PersistentVolumeClaimConditionType(workloads.InstanceRestore),
+				Status: corev1.ConditionTrue,
+				Reason: constant.DataProtectionPVCConditionReasonPopulatingProvision,
+			}}
+			Expect(tree.Add(pod0, pvc0)).Should(Succeed())
+
+			res, err := reconciler.Reconcile(tree)
+
+			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
+			pods := tree.List(&corev1.Pod{})
+			Expect(pods).Should(HaveLen(1))
+			Expect(pods[0].GetName()).Should(Equal(name + "-0"))
+		})
+
 		It("handles nodeSelectorOnce Annotation", func() {
 			tree := kubebuilderx.NewObjectTree()
 			tree.SetRoot(its)

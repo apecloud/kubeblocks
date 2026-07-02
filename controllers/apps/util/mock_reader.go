@@ -36,8 +36,9 @@ type MockReader struct {
 
 func (r *MockReader) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
 	for _, o := range r.Objects {
-		// ignore the GVK check
-		if client.ObjectKeyFromObject(o) == key {
+		// objects of different kinds may share the same key (e.g. a Component
+		// and its InstanceSet), so match the concrete type as well
+		if client.ObjectKeyFromObject(o) == key && reflect.TypeOf(o) == reflect.TypeOf(obj) {
 			reflect.ValueOf(obj).Elem().Set(reflect.ValueOf(o).Elem())
 			return nil
 		}

@@ -44,6 +44,7 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/controllers/apps"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -122,6 +123,10 @@ var _ = BeforeSuite(func() {
 	err = snapshotv1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 	model.AddScheme(snapshotv1.AddToScheme)
+
+	err = workloadsv1.AddToScheme(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
+	model.AddScheme(workloadsv1.AddToScheme)
 
 	// +kubebuilder:scaffold:rscheme
 

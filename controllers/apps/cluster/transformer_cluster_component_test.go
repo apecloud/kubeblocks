@@ -37,6 +37,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -613,6 +614,23 @@ var _ = Describe("cluster component transformer test", func() {
 					}},
 				},
 			}
+			its := &workloads.InstanceSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: predecessor.Namespace,
+					Name:      predecessor.Name,
+				},
+				Spec: workloads.InstanceSetSpec{
+					Replicas: ptr.To[int32](1),
+					VolumeClaimTemplates: []corev1.PersistentVolumeClaim{{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "data",
+							Annotations: map[string]string{
+								constant.RestoreSourceKindAnnotationKey: "Backup",
+							},
+						},
+					}},
+				},
+			}
 			restoreOnlyPVC := pvc.DeepCopy()
 			restoreOnlyPVC.Status.Conditions = []corev1.PersistentVolumeClaimCondition{{
 				Type:   corev1.PersistentVolumeClaimConditionType(appsv1.ConditionTypeRestore),
@@ -620,14 +638,48 @@ var _ = Describe("cluster component transformer test", func() {
 				Reason: constant.DataProtectionPVCConditionReasonPopulatingProvision,
 			}}
 			transCtx.Client = model.NewGraphClient(&appsutil.MockReader{
-				Objects: []client.Object{predecessor, peerPredecessor, restoreOnlyPVC},
+				Objects: []client.Object{predecessor, peerPredecessor, its, restoreOnlyPVC},
 			})
 			completed, err := restorePVCInitialStepCompletedForComponent(transCtx, predecessor)
 			Expect(err).Should(BeNil())
 			Expect(completed).Should(BeFalse())
 
-			reader := &appsutil.MockReader{
+			// the full restore has already completed for this PVC: the initial-step
+			// bypass must not apply anymore
+			terminalPVC := pvc.DeepCopy()
+			terminalPVC.Status.Conditions = append(terminalPVC.Status.Conditions, corev1.PersistentVolumeClaimCondition{
+				Type:   corev1.PersistentVolumeClaimConditionType(appsv1.ConditionTypeRestore),
+				Status: corev1.ConditionTrue,
+				Reason: constant.DataProtectionPVCConditionReasonPopulatingProvision,
+			})
+			transCtx.Client = model.NewGraphClient(&appsutil.MockReader{
+				Objects: []client.Object{predecessor, peerPredecessor, its, terminalPVC},
+			})
+			completed, err = restorePVCInitialStepCompletedForComponent(transCtx, predecessor)
+			Expect(err).Should(BeNil())
+			Expect(completed).Should(BeFalse())
+
+			// a leftover PVC with a name outside the expected set cannot substitute
+			// for the expected one
+			stalePVC := pvc.DeepCopy()
+			stalePVC.Name = "data-" + predecessor.Name + "-1"
+			transCtx.Client = model.NewGraphClient(&appsutil.MockReader{
+				Objects: []client.Object{predecessor, peerPredecessor, its, stalePVC},
+			})
+			completed, err = restorePVCInitialStepCompletedForComponent(transCtx, predecessor)
+			Expect(err).Should(BeNil())
+			Expect(completed).Should(BeFalse())
+
+			// without the ITS the expected PVC names cannot be resolved: stay strict
+			transCtx.Client = model.NewGraphClient(&appsutil.MockReader{
 				Objects: []client.Object{predecessor, peerPredecessor, pvc},
+			})
+			completed, err = restorePVCInitialStepCompletedForComponent(transCtx, predecessor)
+			Expect(err).Should(BeNil())
+			Expect(completed).Should(BeFalse())
+
+			reader := &appsutil.MockReader{
+				Objects: []client.Object{predecessor, peerPredecessor, its, pvc},
 			}
 			transCtx.Client = model.NewGraphClient(reader)
 			completed, err = restorePVCInitialStepCompletedForComponent(transCtx, predecessor)

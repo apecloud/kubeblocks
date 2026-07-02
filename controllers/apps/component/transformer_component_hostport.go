@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
+	pkgcomponent "github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 )
 
@@ -47,6 +48,9 @@ func (t *componentHostPortTransformer) Transform(ctx graph.TransformContext, dag
 	}
 	if len(ports) > 0 {
 		for i, c := range synthesizedComp.PodSpec.Containers {
+			if pkgcomponent.IsKBAgentContainer(&c) {
+				continue
+			}
 			for j, p := range c.Ports {
 				if hostPort, ok := ports[p.Name]; ok {
 					synthesizedComp.PodSpec.Containers[i].Ports[j].HostPort = hostPort

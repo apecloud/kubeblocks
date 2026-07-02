@@ -28,6 +28,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -193,6 +194,36 @@ var _ = Describe("replicas alignment reconciler test", func() {
 			Expect(slices.IndexFunc(pods, func(item client.Object) bool {
 				return item.GetName() == name+"-2"
 			})).Should(Equal(-1))
+		})
+
+		It("should not create next ordered pod from terminating predecessor restore PVC", func() {
+			its.Generation = 1
+			restoreVCTs := []corev1.PersistentVolumeClaim{*volumeClaimTemplates[0].DeepCopy()}
+			restoreVCTs[0].Annotations = map[string]string{
+				constant.RestoreSourceKindAnnotationKey: "Backup",
+			}
+			its.Spec.VolumeClaimTemplates = restoreVCTs
+			tree := kubebuilderx.NewObjectTree()
+			tree.SetRoot(its)
+			reconciler = NewReplicasAlignmentReconciler()
+			pod0 := builder.NewPodBuilder(namespace, name+"-0").GetObject()
+			pvc0 := builder.NewPVCBuilder(namespace, volumeClaimTemplates[0].Name+"-"+pod0.Name).GetObject()
+			now := metav1.Now()
+			pvc0.DeletionTimestamp = &now
+			pvc0.Status.Conditions = []corev1.PersistentVolumeClaimCondition{{
+				Type:   corev1.PersistentVolumeClaimConditionType(constant.DataProtectionPVCConditionPopulating),
+				Status: corev1.ConditionTrue,
+				Reason: constant.DataProtectionPVCConditionReasonPopulatingProvision,
+			}}
+			Expect(tree.Add(pod0, pvc0)).Should(Succeed())
+
+			res, err := reconciler.Reconcile(tree)
+
+			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
+			pods := tree.List(&corev1.Pod{})
+			Expect(pods).Should(HaveLen(1))
+			Expect(pods[0].GetName()).Should(Equal(name + "-0"))
 		})
 
 		It("should not use terminal Restore condition as ordered restore initial step", func() {

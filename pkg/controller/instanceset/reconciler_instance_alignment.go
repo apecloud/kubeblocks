@@ -250,7 +250,7 @@ func restorePVCInitialStepCompletedForPod(tree *kubebuilderx.ObjectTree,
 			return false
 		}
 		pvc, ok := pvcObj.(*corev1.PersistentVolumeClaim)
-		if !ok || !restorePVCInitialStepCompleted(pvc) {
+		if !ok || !pvc.DeletionTimestamp.IsZero() || !restorePVCInitialStepCompleted(pvc) {
 			return false
 		}
 	}

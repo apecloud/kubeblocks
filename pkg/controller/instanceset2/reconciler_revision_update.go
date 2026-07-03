@@ -53,7 +53,7 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kub
 
 	updateRevisions := make(map[string]string, len(names))
 	for _, name := range names {
-		updateRevisions[name] = buildInstanceRevision(desiredInstances[name])
+		updateRevisions[name] = getInstanceRevision(desiredInstances[name])
 	}
 	revisions, err := revisionmap.Encode(updateRevisions)
 	if err != nil {
@@ -64,7 +64,7 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kub
 		its.Status.UpdateRevision = updateRevisions[names[len(names)-1]]
 	}
 
-	updatedReplicas := r.calculateUpdatedReplicas(its, tree.List(&workloads.Instance{}), desiredInstances)
+	updatedReplicas := r.calculateUpdatedReplicas(its, tree.List(&workloads.Instance{}))
 	its.Status.UpdatedReplicas = updatedReplicas
 
 	its.Status.ObservedGeneration = its.Generation
@@ -72,11 +72,11 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kub
 	return kubebuilderx.Continue, nil
 }
 
-func (r *revisionUpdateReconciler) calculateUpdatedReplicas(its *workloads.InstanceSet, instances []client.Object, desiredInstances map[string]*workloads.Instance) int32 {
+func (r *revisionUpdateReconciler) calculateUpdatedReplicas(its *workloads.InstanceSet, instances []client.Object) int32 {
 	updatedReplicas := int32(0)
 	for i := range instances {
 		inst, _ := instances[i].(*workloads.Instance)
-		if isInstanceUpdated(its, inst, desiredInstances[inst.Name]) {
+		if isInstanceUpdated(its, inst) {
 			updatedReplicas++
 		}
 	}

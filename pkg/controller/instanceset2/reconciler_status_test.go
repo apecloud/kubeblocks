@@ -116,8 +116,9 @@ func TestIsInstanceUpdated(t *testing.T) {
 		}
 	}
 	latestInst := newInstance("2", true)
+	latestRevision := stampInstanceRevision(latestInst)
 	updateRevisions, err := revisionmap.Encode(map[string]string{
-		latestInst.Name: buildInstanceRevision(latestInst),
+		latestInst.Name: latestRevision,
 	})
 	if err != nil {
 		t.Fatalf("build revisions: %v", err)
@@ -138,19 +139,46 @@ func TestIsInstanceUpdated(t *testing.T) {
 	}{
 		{
 			name: "true when instance revision matches even if parent generation changed",
-			inst: newInstance("1", true),
+			inst: func() *workloads.Instance {
+				inst := newInstance("1", true)
+				inst.Annotations[constant.InstanceSetRevisionAnnotationKey] = latestRevision
+				return inst
+			}(),
 			want: true,
 		},
 		{
 			name: "false when instance spec is latest but pod status is not up to date",
-			inst: newInstance("3", false),
+			inst: func() *workloads.Instance {
+				inst := newInstance("3", false)
+				inst.Annotations[constant.InstanceSetRevisionAnnotationKey] = latestRevision
+				return inst
+			}(),
 			want: false,
 		},
 		{
-			name: "false when instance intent revision differs",
+			name: "false when instance revision annotation differs",
 			inst: func() *workloads.Instance {
 				inst := newInstance("3", true)
-				inst.Spec.MinReadySeconds = 2
+				inst.Annotations[constant.InstanceSetRevisionAnnotationKey] = "stale"
+				return inst
+			}(),
+			want: false,
+		},
+		{
+			name: "false when instance revision annotation is missing",
+			inst: func() *workloads.Instance {
+				inst := newInstance("3", true)
+				delete(inst.Annotations, constant.InstanceSetRevisionAnnotationKey)
+				return inst
+			}(),
+			want: false,
+		},
+		{
+			name: "false when instance status has not observed latest generation",
+			inst: func() *workloads.Instance {
+				inst := newInstance("3", true)
+				inst.Annotations[constant.InstanceSetRevisionAnnotationKey] = latestRevision
+				inst.Status.ObservedGeneration = 1
 				return inst
 			}(),
 			want: false,
@@ -159,19 +187,20 @@ func TestIsInstanceUpdated(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := isInstanceUpdated(its, tt.inst, nil); got != tt.want {
+			if got := isInstanceUpdated(its, tt.inst); got != tt.want {
 				t.Fatalf("expected %v, got %v", tt.want, got)
 			}
 		})
 	}
 }
 
-func TestBuildInstanceRevisionIgnoresParentGenerationAnnotation(t *testing.T) {
+func TestBuildInstanceRevisionIgnoresControllerOwnedAnnotations(t *testing.T) {
 	inst := &workloads.Instance{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-its-0",
 			Annotations: map[string]string{
-				constant.KubeBlocksGenerationKey: "1",
+				constant.KubeBlocksGenerationKey:          "1",
+				constant.InstanceSetRevisionAnnotationKey: "revision-1",
 			},
 		},
 		Spec: workloads.InstanceSpec{
@@ -181,8 +210,9 @@ func TestBuildInstanceRevisionIgnoresParentGenerationAnnotation(t *testing.T) {
 	revision := buildInstanceRevision(inst)
 
 	inst.Annotations[constant.KubeBlocksGenerationKey] = "2"
+	inst.Annotations[constant.InstanceSetRevisionAnnotationKey] = "revision-2"
 	if got := buildInstanceRevision(inst); got != revision {
-		t.Fatalf("expected generation annotation to be ignored, got %s want %s", got, revision)
+		t.Fatalf("expected controller-owned annotations to be ignored, got %s want %s", got, revision)
 	}
 
 	inst.Spec.MinReadySeconds = 2
@@ -191,7 +221,7 @@ func TestBuildInstanceRevisionIgnoresParentGenerationAnnotation(t *testing.T) {
 	}
 }
 
-func TestBuildInstanceRevisionUsesDesiredMetadataKeys(t *testing.T) {
+func TestStampInstanceRevisionCarriesDesiredRevision(t *testing.T) {
 	desired := &workloads.Instance{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-its-0",
@@ -208,30 +238,68 @@ func TestBuildInstanceRevisionUsesDesiredMetadataKeys(t *testing.T) {
 			MinReadySeconds: 1,
 		},
 	}
-	revision := buildInstanceRevision(desired)
-
-	actual := desired.DeepCopy()
-	actual.Annotations[constant.KubeBlocksGenerationKey] = "1"
-	actual.Annotations["external-annotation"] = "ignored"
-	actual.Labels["external-label"] = "ignored"
-	if got := buildCurrentInstanceRevision(actual, desired); got != revision {
-		t.Fatalf("expected unmanaged metadata to be ignored, got %s want %s", got, revision)
+	revision := stampInstanceRevision(desired)
+	if revision == "" {
+		t.Fatalf("expected revision to be stamped")
+	}
+	if got := desired.Annotations[constant.InstanceSetRevisionAnnotationKey]; got != revision {
+		t.Fatalf("expected revision annotation %s, got %s", revision, got)
+	}
+	if got := buildInstanceRevision(desired); got != revision {
+		t.Fatalf("expected stamped annotation to be ignored by revision hash, got %s want %s", got, revision)
 	}
 
-	actual = desired.DeepCopy()
-	actual.Annotations["managed-annotation"] = "changed"
-	if got := buildCurrentInstanceRevision(actual, desired); got == revision {
+	desired.Annotations[constant.InstanceSetRevisionAnnotationKey] = "changed"
+	if got := buildInstanceRevision(desired); got != revision {
+		t.Fatalf("expected revision annotation changes to be ignored, got %s want %s", got, revision)
+	}
+
+	desired.Annotations["managed-annotation"] = "changed"
+	if got := buildInstanceRevision(desired); got == revision {
 		t.Fatalf("expected managed annotation change to alter revision")
 	}
 
-	actual = desired.DeepCopy()
-	actual.Labels["managed-label"] = "changed"
-	if got := buildCurrentInstanceRevision(actual, desired); got == revision {
+	desired.Annotations["managed-annotation"] = "desired"
+	desired.Labels["managed-label"] = "changed"
+	if got := buildInstanceRevision(desired); got == revision {
 		t.Fatalf("expected managed label change to alter revision")
 	}
 }
 
-func TestStatusReconcilerKeepsScaleOutInstancesUpdatedAfterParentGenerationBump(t *testing.T) {
+func TestBuildInstanceByTemplateStampsRevisionAnnotation(t *testing.T) {
+	its := &workloads.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       "test-its",
+			Namespace:  "default",
+			Generation: 3,
+		},
+		Spec: workloads.InstanceSetSpec{
+			Replicas:            ptr.To[int32](1),
+			FlatInstanceOrdinal: true,
+			Instances: []workloads.InstanceTemplate{
+				{Name: "tpl", Replicas: ptr.To[int32](1)},
+			},
+		},
+	}
+	tree := kubebuilderx.NewObjectTree()
+	tree.SetRoot(its)
+
+	desiredInstances, _, err := buildDesiredInstancesByName(tree, its)
+	if err != nil {
+		t.Fatalf("build desired instances: %v", err)
+	}
+	inst := desiredInstances["test-its-0"]
+	if inst == nil {
+		t.Fatalf("expected desired instance test-its-0, got %#v", desiredInstances)
+	}
+	if got := getInstanceRevision(inst); got == "" {
+		t.Fatalf("expected desired instance to carry revision annotation")
+	} else if want := buildInstanceRevision(inst); got != want {
+		t.Fatalf("expected carried revision to match desired revision, got %s want %s", got, want)
+	}
+}
+
+func TestStatusReconcilerReadsCurrentRevisionFromInstanceAnnotation(t *testing.T) {
 	its := &workloads.InstanceSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:       "test-its",
@@ -269,7 +337,7 @@ func TestStatusReconcilerKeepsScaleOutInstancesUpdatedAfterParentGenerationBump(
 	if desired == nil {
 		t.Fatalf("expected desired instance test-its-0, got %#v", desiredInstances)
 	}
-	desiredRevision := buildInstanceRevision(desired)
+	desiredRevision := getInstanceRevision(desired)
 	updateRevisions, err := revisionmap.Encode(map[string]string{
 		desired.Name: desiredRevision,
 	})
@@ -281,6 +349,7 @@ func TestStatusReconcilerKeepsScaleOutInstancesUpdatedAfterParentGenerationBump(
 
 	inst := desired.DeepCopy()
 	inst.Annotations[constant.KubeBlocksGenerationKey] = "1"
+	inst.Annotations[constant.InstanceSetRevisionAnnotationKey] = desiredRevision
 	inst.Annotations["external-annotation"] = "ignored"
 	inst.Labels["external-label"] = "ignored"
 	inst.Generation = 2
@@ -305,9 +374,6 @@ func TestStatusReconcilerKeepsScaleOutInstancesUpdatedAfterParentGenerationBump(
 	if err != nil {
 		t.Fatalf("get current revisions: %v", err)
 	}
-	if currentRevisions[inst.Name] != buildCurrentInstanceRevision(inst, desired) {
-		t.Fatalf("unexpected current revision: %#v", currentRevisions)
-	}
 	if currentRevisions[inst.Name] != desiredRevision {
 		t.Fatalf("expected current revision to match desired update revision, got %s want %s", currentRevisions[inst.Name], desiredRevision)
 	}
@@ -323,5 +389,78 @@ func TestStatusReconcilerKeepsScaleOutInstancesUpdatedAfterParentGenerationBump(
 	}
 	if got.Status.CurrentRevision != got.Status.UpdateRevision {
 		t.Fatalf("expected current revision to advance to update revision")
+	}
+}
+
+func TestStatusReconcilerDoesNotFallbackToLiveHashWhenRevisionAnnotationMissing(t *testing.T) {
+	its := &workloads.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       "test-its",
+			Namespace:  "default",
+			Generation: 3,
+		},
+		Spec: workloads.InstanceSetSpec{
+			Replicas:            ptr.To[int32](1),
+			FlatInstanceOrdinal: true,
+			Instances: []workloads.InstanceTemplate{
+				{Name: "tpl", Replicas: ptr.To[int32](1)},
+			},
+		},
+		Status: workloads.InstanceSetStatus{
+			ObservedGeneration: 3,
+		},
+	}
+
+	tree := kubebuilderx.NewObjectTree()
+	tree.SetRoot(its)
+	desiredInstances, _, err := buildDesiredInstancesByName(tree, its)
+	if err != nil {
+		t.Fatalf("build desired instances: %v", err)
+	}
+	desired := desiredInstances["test-its-0"]
+	desiredRevision := getInstanceRevision(desired)
+	updateRevisions, err := revisionmap.Encode(map[string]string{
+		desired.Name: desiredRevision,
+	})
+	if err != nil {
+		t.Fatalf("build revisions: %v", err)
+	}
+	its.Status.UpdateRevision = "update-revision"
+	its.Status.UpdateRevisions = updateRevisions
+
+	inst := desired.DeepCopy()
+	delete(inst.Annotations, constant.InstanceSetRevisionAnnotationKey)
+	inst.Generation = 2
+	inst.Status = workloads.InstanceStatus2{
+		ObservedGeneration: 2,
+		UpToDate:           true,
+		Conditions: []metav1.Condition{
+			{Type: string(workloads.InstanceReady), Status: metav1.ConditionTrue},
+			{Type: string(workloads.InstanceAvailable), Status: metav1.ConditionTrue},
+		},
+	}
+
+	if err := tree.Add(inst); err != nil {
+		t.Fatalf("add instance: %v", err)
+	}
+	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+		t.Fatalf("reconcile status: %v", err)
+	}
+
+	got := tree.GetRoot().(*workloads.InstanceSet)
+	currentRevisions, err := revisionmap.Decode(got.Status.CurrentRevisions)
+	if err != nil {
+		t.Fatalf("get current revisions: %v", err)
+	}
+	if currentRevisions[inst.Name] != "" {
+		t.Fatalf("expected empty current revision for missing annotation, got %#v", currentRevisions)
+	}
+	if got.Status.UpdatedReplicas != 0 {
+		t.Fatalf("expected missing revision annotation to keep updated replicas at 0, got %d", got.Status.UpdatedReplicas)
+	}
+	if len(got.Status.TemplatesStatus) != 1 ||
+		got.Status.TemplatesStatus[0].UpdatedReplicas != 0 ||
+		got.Status.TemplatesStatus[0].CurrentReplicas != 1 {
+		t.Fatalf("unexpected template status: %#v", got.Status.TemplatesStatus)
 	}
 }

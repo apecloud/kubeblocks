@@ -57,6 +57,9 @@ const (
 	// NodeSelectorOnceAnnotationKey adds nodeSelector in podSpec for one pod exactly once
 	NodeSelectorOnceAnnotationKey = "workloads.kubeblocks.io/node-selector-once"
 
+	// InstanceSetRevisionAnnotationKey records the InstanceSet-managed revision carried by an Instance.
+	InstanceSetRevisionAnnotationKey = "workloads.kubeblocks.io/instance-revision"
+
 	PVCNamePrefixAnnotationKey = "apps.kubeblocks.io/pvc-name-prefix"
 
 	RestoreSourceAPIGroupAnnotationKey  = "apps.kubeblocks.io/restore-source-api-group"

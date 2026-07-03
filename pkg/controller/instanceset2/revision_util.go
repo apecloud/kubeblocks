@@ -40,14 +40,20 @@ func buildInstanceRevision(inst *workloads.Instance) string {
 	return buildRevisionIntentHash(copyRevisionLabels(inst.Labels), copyRevisionAnnotations(inst.Annotations), *inst.Spec.DeepCopy())
 }
 
-func buildCurrentInstanceRevision(inst, desired *workloads.Instance) string {
-	if desired == nil {
-		return buildInstanceRevision(inst)
+func stampInstanceRevision(inst *workloads.Instance) string {
+	revision := buildInstanceRevision(inst)
+	if inst.Annotations == nil {
+		inst.Annotations = make(map[string]string)
 	}
-	return buildRevisionIntentHash(
-		copyRevisionLabelsByKeys(inst.Labels, desired.Labels),
-		copyRevisionAnnotationsByKeys(inst.Annotations, desired.Annotations),
-		*inst.Spec.DeepCopy())
+	inst.Annotations[constant.InstanceSetRevisionAnnotationKey] = revision
+	return revision
+}
+
+func getInstanceRevision(inst *workloads.Instance) string {
+	if inst.Annotations == nil {
+		return ""
+	}
+	return inst.Annotations[constant.InstanceSetRevisionAnnotationKey]
 }
 
 func buildRevisionIntentHash(labels, annotations map[string]string, spec workloads.InstanceSpec) string {
@@ -72,22 +78,6 @@ func copyRevisionLabels(labels map[string]string) map[string]string {
 	return copied
 }
 
-func copyRevisionLabelsByKeys(labels, keys map[string]string) map[string]string {
-	if len(labels) == 0 || len(keys) == 0 {
-		return nil
-	}
-	copied := make(map[string]string, len(keys))
-	for k := range keys {
-		if v, ok := labels[k]; ok {
-			copied[k] = v
-		}
-	}
-	if len(copied) == 0 {
-		return nil
-	}
-	return copied
-}
-
 func copyRevisionAnnotations(annotations map[string]string) map[string]string {
 	if len(annotations) == 0 {
 		return nil
@@ -105,28 +95,9 @@ func copyRevisionAnnotations(annotations map[string]string) map[string]string {
 	return copied
 }
 
-func copyRevisionAnnotationsByKeys(annotations, keys map[string]string) map[string]string {
-	if len(annotations) == 0 || len(keys) == 0 {
-		return nil
-	}
-	copied := make(map[string]string, len(keys))
-	for k := range keys {
-		if isNonRevisionAnnotation(k) {
-			continue
-		}
-		if v, ok := annotations[k]; ok {
-			copied[k] = v
-		}
-	}
-	if len(copied) == 0 {
-		return nil
-	}
-	return copied
-}
-
 func isNonRevisionAnnotation(key string) bool {
 	switch key {
-	case constant.KubeBlocksGenerationKey:
+	case constant.KubeBlocksGenerationKey, constant.InstanceSetRevisionAnnotationKey:
 		return true
 	default:
 		return false

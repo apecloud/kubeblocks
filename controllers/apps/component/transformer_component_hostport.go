@@ -48,11 +48,11 @@ func (t *componentHostPortTransformer) Transform(ctx graph.TransformContext, dag
 		ports[hostPort.Name] = hostPort.Port
 	}
 	if len(ports) > 0 {
-		// non-host-network mappings are restricted to ports defined in
-		// cmpd.spec.runtime.containers.ports: port names are not unique across
-		// the containers of a pod, and injected containers (kbagent, sidecars)
-		// or injected ports may reuse a name such as "http" and must not be
-		// bound to the same host port.
+		// Per the ComponentNetwork API contract, non-host-network hostPort
+		// mappings are restricted to ports defined in
+		// cmpd.spec.runtime.containers.ports; ports of injected containers or
+		// ports injected into runtime containers after synthesis are not
+		// eligible, regardless of their names.
 		runtimePorts := map[string]sets.Set[string]{}
 		for _, c := range transCtx.CompDef.Spec.Runtime.Containers {
 			portNames := sets.New[string]()

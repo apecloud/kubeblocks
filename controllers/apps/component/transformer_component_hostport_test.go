@@ -30,12 +30,12 @@ import (
 )
 
 func TestComponentHostPortTransformerAppliesToRuntimeDefinedPortsOnly(t *testing.T) {
-	// Elasticsearch-style collision: the runtime container and the injected
-	// kbagent container both name a port "http". Per the ComponentNetwork API
-	// contract, non-host-network hostPort mappings are restricted to ports
-	// defined in cmpd.spec.runtime.containers.ports, so only the runtime
-	// container's own "http" port may receive the hostPort — otherwise the pod
-	// is rejected with a duplicate hostPort value.
+	// Per the ComponentNetwork API contract, non-host-network hostPort
+	// mappings are restricted to ports defined in
+	// cmpd.spec.runtime.containers.ports: only the runtime container's own
+	// declared port may receive the hostPort, never ports of injected
+	// containers or ports injected after synthesis, even when they carry the
+	// same name as the mapping entry.
 	transCtx := &componentTransformContext{
 		ComponentOrig: &appsv1.Component{},
 		CompDef: &appsv1.ComponentDefinition{

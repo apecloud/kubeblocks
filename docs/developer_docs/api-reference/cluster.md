@@ -6627,8 +6627,9 @@ The behavior varies based on the HostNetwork setting:</p>
 <li>If this field is empty: All ports are automatically allocated by the host-port manager.</li>
 <li>If this field is specified:
 a) Mappings for all ports defined in <code>cmpd.spec.hostNetwork</code> are MANDATORY.
-b) Mappings for kbagent ports (&ldquo;http&rdquo;, &ldquo;streaming&rdquo;) are OPTIONAL.
-You can explicitly map them here, or leave them omitted to be allocated by the host-port manager.</li>
+b) Mappings for kbagent ports (&ldquo;kba-http&rdquo;, &ldquo;kba-streaming&rdquo;) are OPTIONAL.
+You can explicitly map them here, or leave them omitted to be allocated by the host-port manager.
+The legacy names &ldquo;http&rdquo; and &ldquo;streaming&rdquo; are still accepted as aliases for the kbagent ports.</li>
 </ul></li>
 <li><p>When HostNetwork is disabled:
 It allows optional mapping for container ports to host ports.</p>

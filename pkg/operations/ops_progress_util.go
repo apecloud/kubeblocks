@@ -459,6 +459,7 @@ func handleScaleOutProgressWithWorkload(
 	notReadyPodSet := workload.GetNotReadyInstanceNameSet()
 	notAvailablePodSet := workload.GetNotAvailableInstanceNameSet()
 	failurePodSet := workload.GetFailedInstanceNameSet()
+	notJoinedPodSet := workload.GetNotJoinedInstanceNameSet()
 	pgRes.opsMessageKey = "Create"
 	memberStatusMap := workload.GetInstanceNameSet()
 	for podName := range pgRes.createdPodSet {
@@ -477,6 +478,12 @@ func handleScaleOutProgressWithWorkload(
 			continue
 		}
 		if _, ok := notAvailablePodSet[podName]; ok {
+			continue
+		}
+		if notJoinedPodSet.Has(podName) {
+			// the pod is running but its dataLoad/memberJoin lifecycle action has not
+			// completed, so the scale-out of this replica is not done yet.
+			updateProgressDetailForHScale(opsRes, pgRes, compStatus, objectKey, opsv1alpha1.ProcessingProgressStatus)
 			continue
 		}
 		if !memberStatusMap.Has(podName) && needToCheckRole(pgRes) {

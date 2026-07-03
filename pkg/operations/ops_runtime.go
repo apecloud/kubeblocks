@@ -109,6 +109,7 @@ func (r *opsRuntime) GetWorkload(namespace, clusterName, compName string) (Workl
 		notAvailableSet:    sets.New[string](),
 		failedSet:          sets.New[string](),
 		instanceNames:      sets.New[string](),
+		notJoinedSet:       sets.New[string](),
 	}
 	if its.Name != "" {
 		currRevisionMap, _ := instanceset.GetRevisions(its.Status.CurrentRevisions)
@@ -118,6 +119,16 @@ func (r *opsRuntime) GetWorkload(namespace, clusterName, compName string) (Workl
 		workload.notReadySet = instanceset.GetPodNameSetFromInstanceSetCondition(its, workloads.InstanceReady)
 		workload.notAvailableSet = instanceset.GetPodNameSetFromInstanceSetCondition(its, workloads.InstanceAvailable)
 		workload.failedSet = instanceset.GetPodNameSetFromInstanceSetCondition(its, workloads.InstanceFailure)
+		// replicas whose dataLoad/memberJoin lifecycle actions have not completed are
+		// still being provisioned, even if their pods are ready; same predicate as the
+		// component controller's hasScaleOutRunning.
+		notJoined, err := component.GetReplicasStatusFunc(its, func(s component.ReplicaStatus) bool {
+			return s.DataLoaded != nil && !*s.DataLoaded || s.MemberJoined != nil && !*s.MemberJoined
+		})
+		if err != nil {
+			return nil, err
+		}
+		workload.notJoinedSet = sets.New(notJoined...)
 		return workload, nil
 	}
 	pods, err := component.ListOwnedPods(r.dataContext(), r.cli, namespace, clusterName, compName, r.dataListOpts...)
@@ -339,6 +350,7 @@ type defaultWorkload struct {
 	notAvailableSet    sets.Set[string]
 	failedSet          sets.Set[string]
 	instanceNames      sets.Set[string]
+	notJoinedSet       sets.Set[string]
 }
 
 func (w *defaultWorkload) GetMinReadySeconds() int32 { return w.minReadySeconds }
@@ -357,6 +369,10 @@ func (w *defaultWorkload) GetFailedInstanceNameSet() sets.Set[string] { return w
 
 func (w *defaultWorkload) GetInstanceNameSet() sets.Set[string] {
 	return w.instanceNames.Clone()
+}
+
+func (w *defaultWorkload) GetNotJoinedInstanceNameSet() sets.Set[string] {
+	return w.notJoinedSet.Clone()
 }
 
 type defaultInstance struct {

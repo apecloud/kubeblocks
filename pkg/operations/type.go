@@ -139,6 +139,9 @@ type Workload interface {
 	GetNotReadyInstanceNameSet() sets.Set[string]
 	GetNotAvailableInstanceNameSet() sets.Set[string]
 	GetFailedInstanceNameSet() sets.Set[string]
+	// GetNotJoinedInstanceNameSet returns the instances whose scale-out provisioning
+	// (dataLoad/memberJoin lifecycle actions) has not completed yet.
+	GetNotJoinedInstanceNameSet() sets.Set[string]
 }
 
 type Instance interface {

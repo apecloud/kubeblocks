@@ -4,7 +4,7 @@
 
 ## Layout
 
-- `doc.go`: package documentation describing the 7 key features (role update strategy, access mode, member reconfiguration, multi-template, designated pod deletion, in-place update).
+- `doc.go`: package documentation describing the workload features, including role update strategy, access mode, automatic switchover, member reconfiguration, multiple templates, specified scale-in, and in-place update.
 - `types.go`: core types and constants (roles, update strategies, access modes).
 - `reconciler_*.go`: split reconciler files by concern — `api_version`, `assistant_object`, `deletion`, `fix_meta`, `instance_alignment`, `revision_update`, `status`, `update`.
 - `instance_util.go`, `in_place_update_util.go`: instance and in-place update helpers.

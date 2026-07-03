@@ -5,15 +5,16 @@
 ## Layout
 
 - `componentparameter_controller.go`, `parameterview_controller.go`, `parametersdefinition_controller.go`: new API controllers.
-- `legacy_parameter_controller.go`, `legacy_paramconfigrenderer_controller.go`, `legacy_reconfigure_controller.go`: legacy controllers being migrated out.
+- `componentdrivenparameter_controller.go`, `parametertemplateextension_controller.go`: controllers that bridge component-driven parameter flows and template extensions.
+- `legacy_parameter_controller.go`, `legacy_paramconfigrenderer_controller.go`, `reconfigure_controller.go`: legacy parameter and reconfigure controllers.
 - `reconfigure/`: sync/restart helpers for reconfigure operations (`sync.go`, `restart.go`, `auto.go`, `legacy_compat.go`).
-- `transformer_parameterview_*.go`: transformers for ParameterView spec initialization, conflict/invalid phases, and submission status.
-- `scheme.go`, `suite_test.go`.
+- `revision.go`, `utils.go`, `parameterview_markerline.go`, `componentparameter_controller_utils.go`: shared helpers for revision tracking, marker handling, and controller support.
+- `suite_test.go`: Ginkgo test suite setup for the package.
 
 ## Editing Rules
 
 - `pkg/parameters` is the active parameter implementation layer. Do not reintroduce the removed `configmanager` or proto client paths.
-- New controllers (`ComponentParameter`, `ParameterView`, `ParametersDefinition`) use the transformer pattern for `ParameterView` — follow the existing `transformer_parameterview_*.go` convention.
+- New controllers (`ComponentParameter`, `ParameterView`, `ParametersDefinition`) should keep validation, rendering, and patch logic delegated to `pkg/parameters`.
 - Legacy controllers (`legacy_*.go`) exist for backward compatibility. Do not add new features; fix only critical bugs. Plan removal when migration is complete.
 - `ParameterView` is user-editable: controllers must handle spec-content initialization, conflict/invalid phases, and submission status transitions. Keep these covered by tests.
 - `reconfigure/` contains the sync/restart logic shared between legacy and new paths. Changes here affect both — test both code paths.

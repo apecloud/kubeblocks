@@ -1,6 +1,6 @@
 # KBAgent Packages
 
-`pkg/kbagent/` implements the node-side agent that runs as a sidecar in database pods. It provides HTTP/gRPC services for executing lifecycle actions, probes, streaming, and tasks on behalf of the control plane.
+`pkg/kbagent/` implements the node-side agent that runs as a sidecar in database pods. It provides HTTP services for executing lifecycle actions, probes, streaming, and tasks on behalf of the control plane.
 
 ## Layout
 

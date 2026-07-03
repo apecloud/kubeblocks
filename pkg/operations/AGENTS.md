@@ -4,7 +4,7 @@
 
 ## Layout
 
-- `type.go`: operation type definitions and the `OpsInterface` that each operation type implements.
+- `type.go`: operation type definitions and the `OpsHandler` interface that built-in operation handlers implement.
 - `ops_comp_helper.go`: `ComponentOpsInterface` and shared component-operation helpers.
 - `ops_manager.go`, `ops_runtime.go`, `ops_util.go`, `ops_progress_util.go`, `queue_util.go`: ops request lifecycle, validation, progress tracking, and queue management.
 - `restart.go`, `upgrade.go`, `horizontal_scaling.go`, `vertical_scaling.go`, `volume_expansion.go`, `switchover.go`, `start.go`, `stop.go`, `expose.go`, `reconfigure.go`, `rebuild_instance.go`, `rebuild_instance_inplace.go`, `restore.go`, `backup.go`: per-operation implementations.
@@ -13,7 +13,7 @@
 
 ## Editing Rules
 
-- Each operation type implements `OpsInterface` — add new operations as a new `{operation}.go` file implementing the interface, not by extending existing operation files.
+- Each built-in operation type implements `OpsHandler` — add new operations as a new `{operation}.go` file implementing the interface, not by extending existing operation files.
 - Operations should not directly mutate Kubernetes resources outside the `OpsRequest` status and the target cluster/component. Use the reconciler's client and recorder.
 - Operation validation and progress tracking go in `ops_util.go` / `ops_progress_util.go` — keep operation implementations focused on execution.
 - Custom operations (`custom/`) are user-defined via `OpsDefinition` — do not hardcode engine-specific logic here.

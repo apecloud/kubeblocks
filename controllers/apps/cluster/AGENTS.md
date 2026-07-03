@@ -5,7 +5,7 @@
 ## Layout
 
 - `cluster_controller.go`, `cluster_plan_builder.go`: reconciler entry and plan builder.
-- `transformer_cluster_*.go`: 13 transformers covering init, deletion, normalization, placement, sharding, sharding-account, service, component, component-status, status, termination-policy.
+- `transformer_cluster_*.go`: transformer implementations for termination policy, deletion, metadata, validation, normalization, placement, sharding accounts, services, components, ownership, and status.
 - `restore_intent.go`: cluster restore intent annotation handling, consumed by dataprotection restore code.
 - `multicluster.go`: multi-cluster placement logic.
 - `cluster_status_conditions.go`: status condition helpers.
@@ -15,7 +15,7 @@
 
 - Follow the transformer chain pattern — see `controllers/apps/component/AGENTS.md` for the contract.
 - Restore intent is a cross-package contract: changes to annotation keys or values in `restore_intent.go` must be coordinated with `controllers/dataprotection/` restore code. Test cross-namespace and default-namespace cases.
-- Cluster normalization (`transformer_cluster_normalization.go`) runs early in the chain and fills defaults that downstream transformers depend on — do not skip it.
+- Cluster normalization (`transformer_cluster_normalization.go`) runs before placement, service, and component transformers and fills defaults that downstream transformers depend on — do not skip it.
 - Component status aggregation (`transformer_cluster_component_status.go`) reads status from child `Component` objects — preserve the label/selector contract that links clusters to components.
 - Multi-cluster placement (`multicluster.go`, `transformer_cluster_placement.go`) interacts with `pkg/controller/multicluster` — preserve the local client contract unless explicitly opting into remote behavior.
 - Status updates use `Status().Patch(..., client.MergeFrom(...))` — keep conflict-safe patch patterns.

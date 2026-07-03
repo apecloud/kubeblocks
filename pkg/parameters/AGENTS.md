@@ -18,7 +18,6 @@
 - Patch merge logic (`patch_merger.go`, `core/config_patch.go`) must handle both JSON merge patch and strategic merge patch semantics — test both.
 - CUE validation in `validate/` must handle all parameter data types (string, int, float, bool, enum, array). When adding new types, extend the CUE schema generator.
 - OpenAPI schema in `openapi/` is exposed via the `ParameterView` API — schema changes are user-visible API changes.
-- Do not hand-edit generated mocks under `pkg/configuration/**/mocks/` — update the source interface and regenerate.
 
 ## Testing
 

@@ -1,13 +1,13 @@
 # Data Protection Controllers
 
-`controllers/dataprotection/` contains 11 controllers for backup, restore, scheduling, repos, storage providers, GC, and log collection. Unlike `controllers/apps/`, these use traditional reconciler patterns (no transformer DAG) and delegate domain logic to `pkg/dataprotection/`.
+`controllers/dataprotection/` contains reconcilers for backup, restore, scheduling, repos, storage providers, GC, volume population, and log collection. Unlike `controllers/apps/`, these use traditional reconciler patterns (no transformer DAG) and delegate domain logic to `pkg/dataprotection/`.
 
 ## Layout
 
-- `backup_controller.go`, `restore_controller.go`, `backuppolicy_controller.go`, `backuppolicytemplate_controller.go`, `backupschedule_controller.go`, `backuprepo_controller.go`, `storageprovider_controller.go`, `actionset_controller.go`, `log_collection_controller.go`, `garbage_collection_controller.go`, `volumepopulator_controller.go`.
+- `backup_controller.go`, `restore_controller.go`, `backuppolicy_controller.go`, `backuppolicytemplate_controller.go`, `backupschedule_controller.go`, `backuprepo_controller.go`, `storageprovider_controller.go`, `actionset_controller.go`, `log_collection_controller.go`, `gc_controller.go`, `volumepopulator_controller.go`.
 - `cluster_backup_controller.go`: cluster-level backup orchestration.
-- `backuppolicy_driver_controller.go`: backup policy driver reconciliation.
-- `scheme.go`, `suite_test.go`.
+- `backuppolicydriver_controller.go`: backup policy driver reconciliation.
+- `types.go`, `utils.go`, `suite_test.go`: shared package types, helpers, and test suite setup.
 
 ## Editing Rules
 

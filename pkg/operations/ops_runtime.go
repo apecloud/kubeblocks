@@ -109,7 +109,7 @@ func (r *opsRuntime) GetWorkload(namespace, clusterName, compName string) (Workl
 		notAvailableSet:    sets.New[string](),
 		failedSet:          sets.New[string](),
 		instanceNames:      sets.New[string](),
-		notJoinedSet:       sets.New[string](),
+		unprovisionedSet:   sets.New[string](),
 	}
 	if its.Name != "" {
 		currRevisionMap, _ := instanceset.GetRevisions(its.Status.CurrentRevisions)
@@ -122,13 +122,12 @@ func (r *opsRuntime) GetWorkload(namespace, clusterName, compName string) (Workl
 		// replicas whose dataLoad/memberJoin lifecycle actions have not completed are
 		// still being provisioned, even if their pods are ready; same predicate as the
 		// component controller's hasScaleOutRunning.
-		notJoined, err := component.GetReplicasStatusFunc(its, func(s component.ReplicaStatus) bool {
-			return s.DataLoaded != nil && !*s.DataLoaded || s.MemberJoined != nil && !*s.MemberJoined
-		})
+		unprovisioned, err := component.GetReplicasStatusFunc(its, component.IsReplicaProvisioningOpen)
 		if err != nil {
 			return nil, err
 		}
-		workload.notJoinedSet = sets.New(notJoined...)
+		workload.unprovisionedSet = sets.New(unprovisioned...)
+		workload.provisioningStatusSourced = true
 		return workload, nil
 	}
 	pods, err := component.ListOwnedPods(r.dataContext(), r.cli, namespace, clusterName, compName, r.dataListOpts...)
@@ -350,7 +349,11 @@ type defaultWorkload struct {
 	notAvailableSet    sets.Set[string]
 	failedSet          sets.Set[string]
 	instanceNames      sets.Set[string]
-	notJoinedSet       sets.Set[string]
+	unprovisionedSet   sets.Set[string]
+	// provisioningStatusSourced records whether this workload view was built from a
+	// source that carries replica provisioning records (the InstanceSet
+	// replicas-status). It stays false for the pod-list fallback.
+	provisioningStatusSourced bool
 }
 
 func (w *defaultWorkload) GetMinReadySeconds() int32 { return w.minReadySeconds }
@@ -371,8 +374,12 @@ func (w *defaultWorkload) GetInstanceNameSet() sets.Set[string] {
 	return w.instanceNames.Clone()
 }
 
-func (w *defaultWorkload) GetNotJoinedInstanceNameSet() sets.Set[string] {
-	return w.notJoinedSet.Clone()
+func (w *defaultWorkload) GetUnprovisionedInstanceNameSet() sets.Set[string] {
+	return w.unprovisionedSet.Clone()
+}
+
+func (w *defaultWorkload) HasProvisioningStatusSource() bool {
+	return w.provisioningStatusSourced
 }
 
 type defaultInstance struct {

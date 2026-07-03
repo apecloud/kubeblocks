@@ -245,10 +245,7 @@ func (t *componentStatusTransformer) hasScaleOutRunning(transCtx *componentTrans
 		return false, false, nil
 	}
 
-	replicas, err := component.GetReplicasStatusFunc(t.protoITS, func(status component.ReplicaStatus) bool {
-		return status.DataLoaded != nil && !*status.DataLoaded ||
-			status.MemberJoined != nil && !*status.MemberJoined
-	})
+	replicas, err := component.GetReplicasStatusFunc(t.protoITS, component.IsReplicaProvisioningOpen)
 	if err != nil {
 		return false, false, err
 	}

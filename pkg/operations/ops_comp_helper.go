@@ -283,14 +283,15 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 		}
 		expectProgressCount += expectCount
 		completedProgressCount += completedCount
-		// conditions whether ops is running:
-		//  1. completedProgressCount is not equal to expectProgressCount.
-		//  2. the component phase is not a terminal phase or no completed progress if the ops
-		//  needs to wait for the component phase to reach a terminal state.
+		// two completion gates:
+		//  1. the operation-owned objects gate: every object the ops manages must have
+		//     completed its progress (always required, never skippable).
+		//  2. the component terminal-phase gate: the component phase must reach a
+		//     terminal phase (skippable via skipComponentTerminalPhaseWait).
 		switch {
 		case expectCount != completedCount:
 			opsIsCompleted = false
-		case !pgResource.noWaitComponentCompleted &&
+		case !pgResource.skipComponentTerminalPhaseWait &&
 			(!slices.Contains(componentTerminalPhases(), componentPhase) || noAnyProgressCompleted(pgResource.clusterComponent.Replicas, completedCount)):
 			opsIsCompleted = false
 		}

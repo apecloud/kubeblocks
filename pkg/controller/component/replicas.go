@@ -192,6 +192,15 @@ func UpdateReplicasStatusFunc(its *workloads.InstanceSet, f func(status *Replica
 	return setReplicasStatus(its, status)
 }
 
+// IsReplicaProvisioningOpen reports whether the replica's scale-out provisioning
+// (dataLoad / memberJoin lifecycle actions) has not completed yet.
+// Field semantics: nil means the action is not applicable to this replica or its
+// record is already closed — nil is NOT "unknown". Only an explicit false means
+// the action is still open.
+func IsReplicaProvisioningOpen(s ReplicaStatus) bool {
+	return (s.DataLoaded != nil && !*s.DataLoaded) || (s.MemberJoined != nil && !*s.MemberJoined)
+}
+
 func GetReplicasStatusFunc(its *workloads.InstanceSet, f func(ReplicaStatus) bool) ([]string, error) {
 	if f == nil {
 		return nil, nil

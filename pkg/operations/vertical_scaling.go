@@ -139,7 +139,7 @@ func (vs verticalScalingHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, 
 					updatedPodSet[podName] = ""
 				}
 			} else {
-				pgRes.noWaitComponentCompleted = true
+				pgRes.skipComponentTerminalPhaseWait = true
 			}
 			pgRes.updatedPodSet = updatedPodSet
 		}

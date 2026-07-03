@@ -108,9 +108,14 @@ type progressResource struct {
 	createdPodSet map[string]string
 	deletedPodSet map[string]string
 	compOps       ComponentOpsInterface
-	// checks if it needs to wait the component to complete.
-	// if only updates a part of pods, set it to false.
-	noWaitComponentCompleted bool
+	// skipComponentTerminalPhaseWait skips the completion gate that requires the
+	// component phase to reach a terminal phase (Running/Stopped/Failed).
+	// Set it to true when the ops manages only a subset of the component's objects,
+	// so that unrelated component-level async state does not block ops completion.
+	// It must NEVER weaken the completion conditions of the objects the ops itself
+	// manages; each ops that sets it remains fully responsible for its own objects'
+	// completion invariants (see the per-ops progress handlers).
+	skipComponentTerminalPhaseWait bool
 	// lets ops types such as restart defer pod-level failure signals until the
 	// workload/component reaches a terminal failure state.
 	deferInstanceFailureToWorkloadPhase bool
@@ -139,9 +144,15 @@ type Workload interface {
 	GetNotReadyInstanceNameSet() sets.Set[string]
 	GetNotAvailableInstanceNameSet() sets.Set[string]
 	GetFailedInstanceNameSet() sets.Set[string]
-	// GetNotJoinedInstanceNameSet returns the instances whose scale-out provisioning
-	// (dataLoad/memberJoin lifecycle actions) has not completed yet.
-	GetNotJoinedInstanceNameSet() sets.Set[string]
+	// GetUnprovisionedInstanceNameSet returns instances whose scale-out provisioning
+	// (dataLoad/memberJoin lifecycle actions) is recorded as still open in the
+	// workload's replicas-status. Empty when no provisioning record is open; see
+	// HasProvisioningStatusSource for whether a record source exists at all.
+	GetUnprovisionedInstanceNameSet() sets.Set[string]
+	// HasProvisioningStatusSource reports whether the workload view was built from
+	// a source that carries replica provisioning records (the InstanceSet
+	// replicas-status). When false, provisioning state is UNKNOWN — not closed.
+	HasProvisioningStatusSource() bool
 }
 
 type Instance interface {

@@ -450,6 +450,15 @@ func updateProgressDetailForHScale(
 		&compStatus.ProgressDetails, progressDetail)
 }
 
+// hasProvisioningLifecycleActions reports whether the component definition declares
+// scale-out provisioning lifecycle actions (memberJoin/dataLoad).
+func hasProvisioningLifecycleActions(compDef *appsv1.ComponentDefinition) bool {
+	if compDef == nil || compDef.Spec.LifecycleActions == nil {
+		return false
+	}
+	return compDef.Spec.LifecycleActions.MemberJoin != nil || compDef.Spec.LifecycleActions.DataLoad != nil
+}
+
 func handleScaleOutProgressWithWorkload(
 	opsRes *OpsResource,
 	pgRes *progressResource,
@@ -459,7 +468,11 @@ func handleScaleOutProgressWithWorkload(
 	notReadyPodSet := workload.GetNotReadyInstanceNameSet()
 	notAvailablePodSet := workload.GetNotAvailableInstanceNameSet()
 	failurePodSet := workload.GetFailedInstanceNameSet()
-	notJoinedPodSet := workload.GetNotJoinedInstanceNameSet()
+	unprovisionedPodSet := workload.GetUnprovisionedInstanceNameSet()
+	// when the workload view has no provisioning record source, provisioning state is
+	// unknown; if the component defines provisioning lifecycle actions, created pods
+	// must not be counted complete on unknown state (no silent fallback to "closed").
+	provisioningUnknown := !workload.HasProvisioningStatusSource() && hasProvisioningLifecycleActions(pgRes.componentDef)
 	pgRes.opsMessageKey = "Create"
 	memberStatusMap := workload.GetInstanceNameSet()
 	for podName := range pgRes.createdPodSet {
@@ -480,9 +493,10 @@ func handleScaleOutProgressWithWorkload(
 		if _, ok := notAvailablePodSet[podName]; ok {
 			continue
 		}
-		if notJoinedPodSet.Has(podName) {
+		if provisioningUnknown || unprovisionedPodSet.Has(podName) {
 			// the pod is running but its dataLoad/memberJoin lifecycle action has not
-			// completed, so the scale-out of this replica is not done yet.
+			// completed (or its provisioning state is unknown), so the scale-out of
+			// this replica is not done yet.
 			updateProgressDetailForHScale(opsRes, pgRes, compStatus, objectKey, opsv1alpha1.ProcessingProgressStatus)
 			continue
 		}

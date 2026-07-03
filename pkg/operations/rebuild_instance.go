@@ -101,6 +101,11 @@ func (r rebuildInstanceOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli cli
 			}
 			targetInstance, err := runtime.GetInstance(opsRes.Cluster.Namespace, opsRes.Cluster.Name, v.ComponentName, ins.Name)
 			if err != nil {
+				if apierrors.IsNotFound(err) {
+					// neither a Pod nor a retained PVC exists for this name, so
+					// retrying the same input can never converge
+					return intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" not found`, ins.Name))
+				}
 				return err
 			}
 			synthesizedComp, err = r.buildSynthesizedComponent(reqCtx.Ctx, cli, opsRes.Cluster, targetInstance.GetComponentName())

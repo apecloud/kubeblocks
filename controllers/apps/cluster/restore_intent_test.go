@@ -88,6 +88,9 @@ func TestCopyAndMergeComponentPreservesShardingReconfigureIntent(t *testing.T) {
 				Name:       ptr.To("mongodb.conf"),
 				ConfigHash: ptr.To(hash),
 				Restart:    ptr.To(true),
+				Variables: map[string]string{
+					"KB_CONFIG_FILES_UPDATED": "checksum",
+				},
 			}},
 		},
 	}
@@ -95,8 +98,11 @@ func TestCopyAndMergeComponentPreservesShardingReconfigureIntent(t *testing.T) {
 	newCompObj.Spec.Configs = []appsv1.ClusterComponentConfig{{
 		Name: ptr.To("mongodb.conf"),
 	}}
+	newCompObj.Spec.Replicas = 3
 
-	require.Nil(t, copyAndMergeComponent(oldCompObj, newCompObj))
+	result := copyAndMergeComponent(oldCompObj, newCompObj)
+	require.NotNil(t, result)
+	require.Equal(t, map[string]string{"KB_CONFIG_FILES_UPDATED": "checksum"}, result.Spec.Configs[0].Variables)
 }
 
 func TestCopyAndMergeComponentUsesNewShardingReconfigureIntent(t *testing.T) {

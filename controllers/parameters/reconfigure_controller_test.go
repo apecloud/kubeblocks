@@ -637,7 +637,13 @@ func TestSubmitShardingReconfigureConfigsToConcreteComponent(t *testing.T) {
 				Template: appsv1.ClusterComponentSpec{
 					Replicas: 3,
 					Configs: []appsv1.ClusterComponentConfig{{
-						Name: ptr.To(configName),
+						Name:       ptr.To(configName),
+						ConfigHash: ptr.To("stale-hash"),
+						Restart:    ptr.To(true),
+						Variables: map[string]string{
+							"KB_CONFIG_FILES_UPDATED": "stale",
+							"template_var":            "kept",
+						},
 					}},
 				},
 			}},
@@ -709,6 +715,16 @@ func TestSubmitShardingReconfigureConfigsToConcreteComponent(t *testing.T) {
 	}
 	if updatedCluster.Spec.Shardings[0].Template.Configs[0].ConfigHash != nil {
 		t.Fatalf("expected sharding template config hash to remain nil")
+	}
+	if updatedCluster.Spec.Shardings[0].Template.Configs[0].Restart != nil {
+		t.Fatalf("expected sharding template restart to be cleared")
+	}
+	variables := updatedCluster.Spec.Shardings[0].Template.Configs[0].Variables
+	if variables["template_var"] != "kept" {
+		t.Fatalf("expected user template variables to be preserved, got %v", variables)
+	}
+	if _, ok := variables["KB_CONFIG_FILES_UPDATED"]; ok {
+		t.Fatalf("expected system checksum variable to be cleared, got %v", variables)
 	}
 }
 

@@ -21,7 +21,6 @@ package parameters
 
 import (
 	"fmt"
-	"slices"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -141,7 +140,7 @@ func clusterComponentSpecFromComponent(componentName string, comp *appsv1.Compon
 	return &appsv1.ClusterComponentSpec{
 		Name:     componentName,
 		Replicas: comp.Spec.Replicas,
-		Configs:  slices.Clone(comp.Spec.Configs),
+		Configs:  comp.Spec.DeepCopy().Configs,
 	}
 }
 

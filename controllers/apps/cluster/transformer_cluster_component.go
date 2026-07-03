@@ -239,7 +239,8 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1.Component) *appsv1.Com
 				config.Restart != nil ||
 				config.Reconfigure != nil ||
 				config.ReconfigureAction != nil ||
-				config.ReconfigureArgs != nil
+				config.ReconfigureArgs != nil ||
+				config.Variables != nil
 		}
 
 		mergedConfigs = append(mergedConfigs, expected...)
@@ -255,6 +256,9 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1.Component) *appsv1.Com
 			}
 			index := generics.FindFirstFunc(mergedConfigs, matchConfig)
 			if index < 0 {
+				if config.ConfigMap == nil {
+					continue
+				}
 				mergedConfigs = append(mergedConfigs, config)
 				continue
 			}
@@ -267,6 +271,7 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1.Component) *appsv1.Com
 				mergedConfigs[index].Reconfigure = config.Reconfigure
 				mergedConfigs[index].ReconfigureAction = config.ReconfigureAction
 				mergedConfigs[index].ReconfigureArgs = config.ReconfigureArgs
+				mergedConfigs[index].Variables = config.Variables
 			}
 		}
 		return mergedConfigs

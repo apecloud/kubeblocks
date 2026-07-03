@@ -25,6 +25,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -80,6 +81,24 @@ var _ = Describe("resource Fetcher", func() {
 				ComponentParameter().
 				Complete()
 			Expect(err).Should(Succeed())
+		})
+
+		It("should deep-copy configs when deriving sharding component spec from Component", func() {
+			comp := &appsv1.Component{
+				Spec: appsv1.ComponentSpec{
+					Configs: []appsv1.ClusterComponentConfig{{
+						Name: ptr.To(mysqlConfigName),
+						Variables: map[string]string{
+							"checksum": "old",
+						},
+					}},
+				},
+			}
+
+			spec := clusterComponentSpecFromComponent(mysqlCompName, comp)
+			spec.Configs[0].Variables["checksum"] = "new"
+
+			Expect(comp.Spec.Configs[0].Variables).Should(HaveKeyWithValue("checksum", "old"))
 		})
 	})
 

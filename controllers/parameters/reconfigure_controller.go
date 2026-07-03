@@ -66,6 +66,7 @@ const (
 	reasonReconfigureFailed                 = "ReconfigureFailed"
 	reasonReconfigureRunning                = "ReconfigureRunning"
 	reasonReconfigureSucceed                = "ReconfigureSucceed"
+	configFilesUpdated                      = "KB_CONFIG_FILES_UPDATED"
 )
 
 var reconfigureRequiredLabels = []string{
@@ -443,9 +444,30 @@ func (r *ReconfigureReconciler) submit(rctx *reconcileContext) error {
 	return rctx.Client.Update(rctx.RequestCtx.Ctx, rctx.ClusterObj)
 }
 
+func clearConfigReconfigureIntent(config *appsv1.ClusterComponentConfig) {
+	config.ConfigHash = nil
+	config.Restart = nil
+	config.Reconfigure = nil
+	config.ReconfigureAction = nil
+	config.ReconfigureArgs = nil
+	if config.Variables != nil {
+		delete(config.Variables, configFilesUpdated)
+	}
+}
+
 func (r *ReconfigureReconciler) submitComponentConfigs(rctx *reconcileContext) error {
 	if rctx.ComponentObj == nil || rctx.ClusterComObj == nil {
 		return fmt.Errorf("the component object is nil")
+	}
+	for i := range rctx.ClusterObj.Spec.Shardings {
+		for j := range rctx.ClusterObj.Spec.Shardings[i].Template.Configs {
+			clearConfigReconfigureIntent(&rctx.ClusterObj.Spec.Shardings[i].Template.Configs[j])
+		}
+	}
+	if !reflect.DeepEqual(rctx.ClusterObj.Spec, rctx.ClusterObjCopy.Spec) {
+		if err := rctx.Client.Update(rctx.RequestCtx.Ctx, rctx.ClusterObj); err != nil {
+			return err
+		}
 	}
 	if reflect.DeepEqual(rctx.ComponentObj.Spec.Configs, rctx.ClusterComObj.Configs) {
 		return nil

@@ -40,3 +40,9 @@ make deploy            # Deploy the operator to the current kubeconfig cluster.
 - Put focused Go tests next to the package under test.
 - Controller and API tests use Ginkgo/Gomega and envtest patterns already present in the repo.
 - For API changes, include validation/default/conversion coverage when behavior changes, not only compile-time checks.
+
+## OpenSpec
+
+- Do not vendor generated OpenSpec agent skills, command wrappers, or tool lockfiles into this repo.
+- If OpenSpec assets are missing locally, run `openspec init` in your own checkout and keep the generated tool files untracked.
+- When updating local OpenSpec tooling, regenerate or upgrade it locally rather than committing `.claude/skills/openspec-*`, `.codex/skills/openspec-*`, `.opencode/skills/openspec-*`, `.opencode/commands/opsx-*`, or `.opencode/package-lock.json`.

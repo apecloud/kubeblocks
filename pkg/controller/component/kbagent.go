@@ -64,6 +64,27 @@ func IsKBAgentContainer(c *corev1.Container) bool {
 	return c.Name == kbagent.ContainerName || c.Name == kbagent.ContainerName4Worker || c.Name == kbagent.InitContainerName
 }
 
+// NonKBAgentPortNames returns the port names declared by the component's own
+// containers, excluding the injected kbagent containers.
+func NonKBAgentPortNames(synthesizedComp *SynthesizedComponent) sets.Set[string] {
+	names := sets.New[string]()
+	if synthesizedComp == nil || synthesizedComp.PodSpec == nil {
+		return names
+	}
+	for i := range synthesizedComp.PodSpec.Containers {
+		c := &synthesizedComp.PodSpec.Containers[i]
+		if IsKBAgentContainer(c) {
+			continue
+		}
+		for _, p := range c.Ports {
+			if p.Name != "" {
+				names.Insert(p.Name)
+			}
+		}
+	}
+	return names
+}
+
 func UpdateKBAgentContainer4HostNetwork(synthesizedComp *SynthesizedComponent) {
 	idx, c := intctrlutil.GetContainerByName(synthesizedComp.PodSpec.Containers, kbagent.ContainerName)
 	if c == nil {

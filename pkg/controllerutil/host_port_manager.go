@@ -30,6 +30,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -50,14 +51,18 @@ var (
 	defaultPortManager PortManager
 )
 
-func GetPortManager(network *appsv1.ComponentNetwork) PortManager {
+// GetPortManager returns the port manager for a component. componentPortNames
+// holds the port names declared by the component's own (non-kbagent)
+// containers; the legacy kbagent port-name aliases are disabled for names that
+// belong to a real component port.
+func GetPortManager(network *appsv1.ComponentNetwork, componentPortNames sets.Set[string]) PortManager {
 	if network == nil || !network.HostNetwork || len(network.HostPorts) == 0 {
 		return defaultPortManager
 	}
 	if defaultPortManager == nil {
-		return newDefinedPortManager(nil, network.HostPorts)
+		return newDefinedPortManager(nil, network.HostPorts, componentPortNames)
 	}
-	return newDefinedPortManager(defaultPortManager.(*portManager), network.HostPorts)
+	return newDefinedPortManager(defaultPortManager.(*portManager), network.HostPorts, componentPortNames)
 }
 
 func InitDefaultHostPortManager(cli client.Client) error {
@@ -383,6 +388,9 @@ func (m *portManager) ReleaseByPrefix(prefix string) error {
 type definedPortManager struct {
 	defaultPortManager *portManager
 	hostPorts          map[string]int32
+	// componentPortNames are port names owned by the component's own
+	// containers; a legacy kbagent alias must not consume their mappings.
+	componentPortNames sets.Set[string]
 }
 
 func (m *definedPortManager) PortKey(clusterName, compName, containerName, portName string) string {
@@ -459,6 +467,11 @@ func (m *definedPortManager) definedKBAgentPort(portName string) (int32, bool) {
 		return port, true
 	}
 	if legacy, ok := kbagentLegacyPortNames[portName]; ok {
+		// a mapping under the legacy name is only a kbagent alias when the
+		// name cannot refer to a real component port
+		if m.componentPortNames.Has(legacy) {
+			return 0, false
+		}
 		if port, ok := m.hostPorts[legacy]; ok {
 			return port, true
 		}
@@ -491,7 +504,7 @@ func (m *definedPortManager) isKBAgentPortNNotDefinedInKey(key string) bool {
 	return false
 }
 
-func newDefinedPortManager(defaultPortManager *portManager, hostPorts []appsv1.HostPort) *definedPortManager {
+func newDefinedPortManager(defaultPortManager *portManager, hostPorts []appsv1.HostPort, componentPortNames sets.Set[string]) *definedPortManager {
 	hostPortsMap := make(map[string]int32)
 	for _, hp := range hostPorts {
 		hostPortsMap[hp.Name] = hp.Port
@@ -499,5 +512,6 @@ func newDefinedPortManager(defaultPortManager *portManager, hostPorts []appsv1.H
 	return &definedPortManager{
 		defaultPortManager: defaultPortManager,
 		hostPorts:          hostPortsMap,
+		componentPortNames: componentPortNames,
 	}
 }

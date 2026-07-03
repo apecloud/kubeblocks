@@ -50,7 +50,7 @@ var _ = Describe("instance util test", func() {
 				Spec:       pod.Spec,
 			}
 
-			result := filterInPlaceFields(podTemplate)
+			result := FilterInPlaceFields(podTemplate)
 			Expect(result.Annotations).Should(HaveKey(constant.RestartAnnotationKey))
 			Expect(result.Annotations[constant.RestartAnnotationKey]).Should(Equal(restartTime))
 			Expect(result.Labels).Should(BeNil())

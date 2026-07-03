@@ -27,6 +27,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -69,7 +70,7 @@ var _ = Describe("host port manager test", func() {
 
 		BeforeEach(func() {
 			defaultPortManager = nil
-			manager = GetPortManager(network)
+			manager = GetPortManager(network, nil)
 		})
 
 		AfterEach(func() {
@@ -197,7 +198,7 @@ var _ = Describe("host port manager test", func() {
 			err := InitDefaultHostPortManager(mockClient.Client())
 			Expect(err).ShouldNot(HaveOccurred())
 
-			manager = GetPortManager(network)
+			manager = GetPortManager(network, nil)
 			Expect(manager).ShouldNot(BeNil())
 			definedPortManagerInst = manager.(*definedPortManager)
 		})
@@ -340,7 +341,7 @@ var _ = Describe("host port manager test", func() {
 
 		BeforeEach(func() {
 			defaultPortManager = nil
-			manager = GetPortManager(network)
+			manager = GetPortManager(network, nil)
 		})
 
 		It("port key resolves the legacy mapping as defined", func() {
@@ -364,6 +365,24 @@ var _ = Describe("host port manager test", func() {
 
 		It("treats both kbagent ports as defined via legacy names", func() {
 			Expect(manager.(*definedPortManager).hasKBAgentPortDefined()).Should(BeTrue())
+		})
+
+		It("does not treat a real component port name as a kbagent alias", func() {
+			// an engine that declares its own "http" port owns the "http"
+			// mapping; kbagent must not consume it as a legacy alias
+			scoped := GetPortManager(network, sets.New(kbagent.LegacyHTTPPortName))
+			pm := scoped.(*definedPortManager)
+
+			_, defined := pm.definedKBAgentPort(kbagent.DefaultHTTPPortName)
+			Expect(defined).Should(BeFalse())
+
+			// streaming is not a component port, the alias still applies
+			port, defined := pm.definedKBAgentPort(kbagent.DefaultStreamingPortName)
+			Expect(defined).Should(BeTrue())
+			Expect(port).Should(Equal(int32(kbagent.DefaultStreamingPort)))
+
+			// with one alias suppressed, kbagent ports are no longer fully defined
+			Expect(pm.hasKBAgentPortDefined()).Should(BeFalse())
 		})
 	})
 })

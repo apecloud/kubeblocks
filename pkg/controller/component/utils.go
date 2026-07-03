@@ -194,7 +194,7 @@ func hasHostNetworkEnabled(synthesizedComp *SynthesizedComponent,
 }
 
 func getHostNetworkPort(synthesizedComp *SynthesizedComponent, clusterName, compName, cName, pName string) (int32, error) {
-	pm := intctrlutil.GetPortManager(synthesizedComp.Network)
+	pm := intctrlutil.GetPortManager(synthesizedComp.Network, NonKBAgentPortNames(synthesizedComp))
 	if pm == nil {
 		return 0, nil
 	}

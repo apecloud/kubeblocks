@@ -36,6 +36,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/kbagent"
@@ -294,11 +295,13 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet, legacyConfigManagerP
 }
 
 // deferKBAgentPortRename keeps the legacy kbagent port names on an existing
-// workload whose live template still carries them, as long as the rename would
-// be the only pod template change. Port names are pure identifiers inside the
-// template (kbagent probes and args reference numeric ports), so preserving
-// them avoids a rename-only diff from restarting all pods; once any other
-// change rebuilds the pods, the rename is applied together with it.
+// workload whose live template still carries them, unless the accompanying
+// template change is going to recreate the pods anyway. Port names are pure
+// identifiers inside the template (kbagent probes and args reference numeric
+// ports) but they are not in-place updatable, so letting the rename ride on an
+// in-place or metadata-only change would turn it into a full rollout (or block
+// it under StrictInPlace); only a recreate-class diff — detected with the same
+// field filter the InstanceSet controller uses — carries the rename along.
 func deferKBAgentPortRename(oldITS, mergedITS *workloads.InstanceSet) {
 	if oldITS == nil || mergedITS == nil {
 		return
@@ -332,8 +335,11 @@ func deferKBAgentPortRename(oldITS, mergedITS *workloads.InstanceSet) {
 	if len(renamed) == 0 {
 		return
 	}
-	if !reflect.DeepEqual(oldITS.Spec.Template, mergedITS.Spec.Template) {
-		// other template changes exist, the pods are rebuilt anyway
+	// with the legacy names restored, any remaining difference in the
+	// recreate-relevant part of the template means the pods are rebuilt anyway
+	oldFiltered := instanceset.FilterInPlaceFields(&oldITS.Spec.Template)
+	mergedFiltered := instanceset.FilterInPlaceFields(&mergedITS.Spec.Template)
+	if !reflect.DeepEqual(oldFiltered, mergedFiltered) {
 		for i, name := range renamed {
 			ports[i].Name = name
 		}

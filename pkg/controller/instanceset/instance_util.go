@@ -555,7 +555,7 @@ func buildInstanceTemplateRevision(template *corev1.PodTemplateSpec, parent *wor
 	if mutateTemplateFn != nil {
 		mutateTemplateFn(templateCopy)
 	}
-	podTemplate := filterInPlaceFields(templateCopy)
+	podTemplate := FilterInPlaceFields(templateCopy)
 	its := builder.NewInstanceSetBuilder(parent.Namespace, parent.Name).
 		SetUID(parent.UID).
 		AddAnnotationsInMap(parent.Annotations).

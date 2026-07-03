@@ -54,7 +54,10 @@ func supportPodVerticalScaling() bool {
 	return viper.GetBool(constant.FeatureGateInPlacePodVerticalScaling)
 }
 
-func filterInPlaceFields(src *corev1.PodTemplateSpec) *corev1.PodTemplateSpec {
+// FilterInPlaceFields strips the fields that the InstanceSet controller can
+// update without recreating pods, leaving only the recreate-relevant part of
+// the template for comparison.
+func FilterInPlaceFields(src *corev1.PodTemplateSpec) *corev1.PodTemplateSpec {
 	template := src.DeepCopy()
 	// filter annotations
 	var annotations map[string]string

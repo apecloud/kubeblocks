@@ -210,6 +210,9 @@ spec:
                 maxItems: 128
                 minItems: 1
                 type: array
+                x-kubernetes-validations:
+                - message: at most one topology can be marked as default
+                  rule: size(self.filter(t, has(t.default) && t.default)) <= 1
             type: object
           status:
             description: ClusterDefinitionStatus defines the observed state of ClusterDefinition

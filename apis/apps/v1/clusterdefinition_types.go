@@ -71,6 +71,7 @@ type ClusterDefinitionSpec struct {
 	//
 	// +kubebuilder:validation:MinItems=1
 	// +kubebuilder:validation:MaxItems=128
+	// +kubebuilder:validation:XValidation:rule="size(self.filter(t, has(t.default) && t.default)) <= 1",message="at most one topology can be marked as default"
 	// +optional
 	Topologies []ClusterTopology `json:"topologies,omitempty"`
 }

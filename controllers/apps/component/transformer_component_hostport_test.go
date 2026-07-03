@@ -29,11 +29,13 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/kbagent"
 )
 
-func TestComponentHostPortTransformerAppliesToRuntimeContainersOnly(t *testing.T) {
+func TestComponentHostPortTransformerAppliesToRuntimeDefinedPortsOnly(t *testing.T) {
 	// Elasticsearch-style collision: the runtime container and the injected
-	// kbagent container both name a port "http". Only the runtime container may
-	// receive the hostPort mapping, otherwise the pod is rejected with a
-	// duplicate hostPort value.
+	// kbagent container both name a port "http". Per the ComponentNetwork API
+	// contract, non-host-network hostPort mappings are restricted to ports
+	// defined in cmpd.spec.runtime.containers.ports, so only the runtime
+	// container's own "http" port may receive the hostPort — otherwise the pod
+	// is rejected with a duplicate hostPort value.
 	transCtx := &componentTransformContext{
 		ComponentOrig: &appsv1.Component{},
 		CompDef: &appsv1.ComponentDefinition{
@@ -52,6 +54,7 @@ func TestComponentHostPortTransformerAppliesToRuntimeContainersOnly(t *testing.T
 			Network: &appsv1.ComponentNetwork{
 				HostPorts: []appsv1.HostPort{
 					{Name: "http", Port: 56595},
+					{Name: "injected", Port: 56596},
 				},
 			},
 			PodSpec: &corev1.PodSpec{
@@ -60,6 +63,9 @@ func TestComponentHostPortTransformerAppliesToRuntimeContainersOnly(t *testing.T
 						Name: "elasticsearch",
 						Ports: []corev1.ContainerPort{
 							{Name: "http", ContainerPort: 9200},
+							// a port injected into the runtime container after
+							// synthesis, not part of the cmpd runtime definition
+							{Name: "injected", ContainerPort: 9300},
 						},
 					},
 					{
@@ -85,9 +91,12 @@ func TestComponentHostPortTransformerAppliesToRuntimeContainersOnly(t *testing.T
 		t.Fatalf("Transform() error = %v", err)
 	}
 
-	appPort := transCtx.SynthesizeComponent.PodSpec.Containers[0].Ports[0]
-	if appPort.HostPort != 56595 {
-		t.Fatalf("app http HostPort = %d, want 56595", appPort.HostPort)
+	appPorts := transCtx.SynthesizeComponent.PodSpec.Containers[0].Ports
+	if appPorts[0].HostPort != 56595 {
+		t.Fatalf("app http HostPort = %d, want 56595", appPorts[0].HostPort)
+	}
+	if appPorts[1].HostPort != 0 {
+		t.Fatalf("injected port on runtime container HostPort = %d, want 0", appPorts[1].HostPort)
 	}
 
 	for _, container := range transCtx.SynthesizeComponent.PodSpec.Containers[1:] {

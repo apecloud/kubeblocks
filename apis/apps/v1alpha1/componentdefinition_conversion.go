@@ -62,6 +62,17 @@ func (r *ComponentDefinition) ConvertFrom(srcRaw conversion.Hub) error {
 	if err := copier.Copy(&r.Spec, &src.Spec); err != nil {
 		return err
 	}
+	// The field was renamed between versions (v1 `template` vs v1alpha1
+	// `templateRef`), so the name-based copy above cannot map it. For objects
+	// created natively as v1 there is no increment-converter annotation to
+	// restore it from, so map it from the source here; the annotation path
+	// below still takes precedence for round-tripped v1alpha1 objects.
+	for i := range src.Spec.Configs {
+		r.Spec.Configs[i].TemplateRef = src.Spec.Configs[i].Template
+	}
+	for i := range src.Spec.Scripts {
+		r.Spec.Scripts[i].TemplateRef = src.Spec.Scripts[i].Template
+	}
 	if err := incrementConvertFrom(r, src, &componentDefinitionConverter{}); err != nil {
 		return err
 	}

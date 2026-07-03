@@ -180,3 +180,33 @@ func TestHandleScaleOutProgressWaitsForProvisioning(t *testing.T) {
 		assertProgress(t, opsRes, pgRes, workload, compStatus, 1, opsv1alpha1.SucceedProgressStatus)
 	})
 }
+
+func TestComponentOpsCompletedSkipSemantics(t *testing.T) {
+	const replicas = int32(2)
+	cases := []struct {
+		name           string
+		skip           bool
+		phase          appsv1.ComponentPhase
+		expectCount    int32
+		completedCount int32
+		want           bool
+	}{
+		// the skip flag only skips the component terminal-phase gate: with all
+		// operation-owned objects completed, a non-terminal component phase must
+		// not block completion.
+		{"skip=true allows completion despite non-terminal component phase", true, appsv1.UpdatingComponentPhase, 1, 1, true},
+		{"skip=false keeps waiting on non-terminal component phase", false, appsv1.UpdatingComponentPhase, 1, 1, false},
+		// the operation-owned objects gate is never skippable.
+		{"skip=true never overrides incomplete owned objects", true, appsv1.RunningComponentPhase, 1, 0, false},
+		{"skip=false with terminal phase and completed objects completes", false, appsv1.RunningComponentPhase, 1, 1, true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got := componentOpsCompleted(c.skip, c.phase, replicas, c.expectCount, c.completedCount)
+			if got != c.want {
+				t.Fatalf("componentOpsCompleted(skip=%v, phase=%s, %d/%d) = %v, want %v",
+					c.skip, c.phase, c.completedCount, c.expectCount, got, c.want)
+			}
+		})
+	}
+}

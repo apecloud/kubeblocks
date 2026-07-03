@@ -283,16 +283,8 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 		}
 		expectProgressCount += expectCount
 		completedProgressCount += completedCount
-		// two completion gates:
-		//  1. the operation-owned objects gate: every object the ops manages must have
-		//     completed its progress (always required, never skippable).
-		//  2. the component terminal-phase gate: the component phase must reach a
-		//     terminal phase (skippable via skipComponentTerminalPhaseWait).
-		switch {
-		case expectCount != completedCount:
-			opsIsCompleted = false
-		case !pgResource.skipComponentTerminalPhaseWait &&
-			(!slices.Contains(componentTerminalPhases(), componentPhase) || noAnyProgressCompleted(pgResource.clusterComponent.Replicas, completedCount)):
+		if !componentOpsCompleted(pgResource.skipComponentTerminalPhaseWait, componentPhase,
+			pgResource.clusterComponent.Replicas, expectCount, completedCount) {
 			opsIsCompleted = false
 		}
 		opsCompStatus.Phase = componentPhase
@@ -312,6 +304,26 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 		return opsv1alpha1.OpsFailedPhase, 0, nil
 	}
 	return opsv1alpha1.OpsSucceedPhase, 0, nil
+}
+
+// componentOpsCompleted reports whether the ops has completed for one component,
+// under the two completion gates of the ops completion contract:
+//  1. the operation-owned objects gate: every object the ops manages must have
+//     completed its progress — always required, never skippable;
+//  2. the component terminal-phase gate: the component phase must reach a
+//     terminal phase — skippable via skipComponentTerminalPhaseWait, so that an
+//     ops managing only a subset of objects is not blocked by unrelated
+//     component-level async state.
+func componentOpsCompleted(skipComponentTerminalPhaseWait bool, componentPhase appsv1.ComponentPhase,
+	replicas, expectCount, completedCount int32) bool {
+	if expectCount != completedCount {
+		return false
+	}
+	if skipComponentTerminalPhaseWait {
+		return true
+	}
+	return slices.Contains(componentTerminalPhases(), componentPhase) &&
+		!noAnyProgressCompleted(replicas, completedCount)
 }
 
 func noAnyProgressCompleted(replicas, completedCount int32) bool {

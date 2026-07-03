@@ -33,6 +33,7 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 )
 
 func TestOpsRuntimeBuildsInstanceAPIView(t *testing.T) {
@@ -290,6 +291,7 @@ func TestOpsRuntimeDeleteInstanceUsesRuntimeContext(t *testing.T) {
 		clusterName  = "test-cluster"
 		component    = "mysql"
 		instanceName = "test-cluster-mysql-0"
+		placement    = "data-ctx-a"
 	)
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -299,20 +301,30 @@ func TestOpsRuntimeDeleteInstanceUsesRuntimeContext(t *testing.T) {
 				constant.AppInstanceLabelKey:    clusterName,
 				constant.KBAppComponentLabelKey: component,
 			},
+			Annotations: map[string]string{
+				constant.KBAppMultiClusterPlacementKey: placement,
+			},
 		},
 	}
-	cli := fake.NewClientBuilder().
+	control := fake.NewClientBuilder().
+		WithScheme(scheme).
+		Build()
+	worker := fake.NewClientBuilder().
 		WithScheme(scheme).
 		WithObjects(pod).
 		Build()
-	rt := newOpsRuntime(context.Background(), cli, "data-ctx-a")
+	cli := multicluster.NewClient(control, map[string]client.Client{placement: worker})
+	rt := newOpsRuntime(context.Background(), cli, placement)
 
 	if err := rt.DeleteInstance(context.Background(), namespace, instanceName, client.GracePeriodSeconds(0)); err != nil {
 		t.Fatalf("delete instance: %v", err)
 	}
 	current := &corev1.Pod{}
-	if err := cli.Get(context.Background(), client.ObjectKey{Namespace: namespace, Name: instanceName}, current); err == nil {
-		t.Fatalf("expected pod to be deleted")
+	if err := worker.Get(context.Background(), client.ObjectKey{Namespace: namespace, Name: instanceName}, current); err == nil {
+		t.Fatalf("expected worker pod to be deleted")
+	}
+	if err := control.Get(context.Background(), client.ObjectKey{Namespace: namespace, Name: instanceName}, current); err == nil {
+		t.Fatalf("did not expect pod in control plane")
 	}
 }
 

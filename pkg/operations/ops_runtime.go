@@ -50,6 +50,7 @@ type opsRuntime struct {
 	dataCtx      context.Context
 	dataGetOpts  []client.GetOption
 	dataListOpts []client.ListOption
+	dataDelOpts  []client.DeleteOption
 }
 
 func buildOpsRuntimes(ctx context.Context, cli client.Client, opsRes *OpsResource) (map[string]OpsRuntime, error) {
@@ -90,6 +91,7 @@ func newOpsRuntime(ctx context.Context, cli client.Client, placement string) *op
 	r.dataCtx = multicluster.IntoContext(ctx, placement)
 	r.dataGetOpts = []client.GetOption{multicluster.InDataContext()}
 	r.dataListOpts = []client.ListOption{multicluster.InDataContext()}
+	r.dataDelOpts = []client.DeleteOption{multicluster.InDataContext()}
 	return r
 }
 
@@ -175,6 +177,7 @@ func (r *opsRuntime) DeleteInstance(ctx context.Context, namespace, instanceName
 	if err := r.cli.Get(r.dataContext(), client.ObjectKey{Name: instanceName, Namespace: namespace}, pod, r.dataGetOpts...); err != nil {
 		return err
 	}
+	opts = append(opts, r.dataDelOpts...)
 	return intctrlutil.BackgroundDeleteObject(r.cli, r.dataContext(), pod, opts...)
 }
 

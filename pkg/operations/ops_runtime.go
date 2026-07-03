@@ -225,7 +225,7 @@ func toWorkloadInstanceTemplates(instances []appsv1.InstanceTemplate) []workload
 		templates[i] = workloads.InstanceTemplate{
 			Name:     instances[i].Name,
 			Replicas: instances[i].Replicas,
-			Ordinals: workloads.Ordinals(instances[i].Ordinals),
+			Ordinals: instances[i].Ordinals,
 		}
 	}
 	return templates

@@ -23,11 +23,13 @@ import (
 	"reflect"
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/revisionmap"
 )
@@ -296,6 +298,63 @@ func TestBuildInstanceByTemplateStampsRevisionAnnotation(t *testing.T) {
 		t.Fatalf("expected desired instance to carry revision annotation")
 	} else if want := buildInstanceRevision(inst); got != want {
 		t.Fatalf("expected carried revision to match desired revision, got %s want %s", got, want)
+	}
+}
+
+func TestBuildInstanceRevisionIgnoresAssistantObjectLiveState(t *testing.T) {
+	// In multi-cluster, desired instances carry InstanceAssistantObjects cloned
+	// from live tree objects. Server-assigned fields (e.g. a headless Service's
+	// clusterIP that only appears after creation) must not change the pod
+	// revision, otherwise updatedReplicas can never converge.
+	its := &workloads.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-its",
+			Namespace: "default",
+			Annotations: map[string]string{
+				constant.KBAppMultiClusterPlacementKey: "c1,c2,c3",
+			},
+			Generation: 1,
+		},
+		Spec: workloads.InstanceSetSpec{
+			Replicas:            ptr.To[int32](1),
+			FlatInstanceOrdinal: true,
+			Instances:           []workloads.InstanceTemplate{{Name: "tpl", Replicas: ptr.To[int32](1)}},
+			InstanceAssistantObjects: []corev1.ObjectReference{
+				{Kind: "Service", Namespace: "default", Name: "test-its-headless"},
+			},
+		},
+	}
+
+	revisionWithService := func(svc *corev1.Service) string {
+		tree := kubebuilderx.NewObjectTree()
+		tree.SetRoot(its)
+		if err := tree.Add(svc); err != nil {
+			t.Fatalf("add service: %v", err)
+		}
+		desired, _, err := buildDesiredInstancesByName(tree, its)
+		if err != nil {
+			t.Fatalf("build desired instances: %v", err)
+		}
+		inst := desired["test-its-0"]
+		if inst == nil {
+			t.Fatalf("expected desired instance test-its-0, got %#v", desired)
+		}
+		if len(inst.Spec.InstanceAssistantObjects) == 0 {
+			t.Fatalf("expected desired instance to carry the assistant object")
+		}
+		return getInstanceRevision(inst)
+	}
+
+	svcAtCreate := builder.NewServiceBuilder("default", "test-its-headless").GetObject()
+	revAtCreate := revisionWithService(svcAtCreate)
+
+	svcLive := svcAtCreate.DeepCopy()
+	svcLive.Spec.ClusterIP = "10.0.0.5"
+	svcLive.Spec.ClusterIPs = []string{"10.0.0.5"}
+	revLive := revisionWithService(svcLive)
+
+	if revAtCreate != revLive {
+		t.Fatalf("assistant-object live state must not change the revision, got %s then %s", revAtCreate, revLive)
 	}
 }
 

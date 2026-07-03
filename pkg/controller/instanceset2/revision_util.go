@@ -37,7 +37,14 @@ type instanceRevisionIntent struct {
 }
 
 func buildInstanceRevision(inst *workloads.Instance) string {
-	return buildRevisionIntentHash(copyRevisionLabels(inst.Labels), copyRevisionAnnotations(inst.Annotations), *inst.Spec.DeepCopy())
+	spec := *inst.Spec.DeepCopy()
+	// InstanceAssistantObjects are cloned from live cluster objects (e.g. the
+	// headless Service) and carry server-assigned fields such as clusterIP that
+	// only appear after creation. They are synced state, not pod-template
+	// intent, so hashing them makes the revision diverge on every reconcile in
+	// multi-cluster and keeps updatedReplicas at zero. Exclude them.
+	spec.InstanceAssistantObjects = nil
+	return buildRevisionIntentHash(copyRevisionLabels(inst.Labels), copyRevisionAnnotations(inst.Annotations), spec)
 }
 
 func stampInstanceRevision(inst *workloads.Instance) string {

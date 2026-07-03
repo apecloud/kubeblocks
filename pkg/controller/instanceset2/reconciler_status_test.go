@@ -23,6 +23,7 @@ import (
 	"reflect"
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 
@@ -194,13 +195,17 @@ func TestIsInstanceUpdated(t *testing.T) {
 	}
 }
 
-func TestBuildInstanceRevisionIgnoresControllerOwnedAnnotations(t *testing.T) {
+func TestBuildInstanceRevisionIgnoresInstanceMetadata(t *testing.T) {
 	inst := &workloads.Instance{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-its-0",
+			Labels: map[string]string{
+				"managed-label": "desired",
+			},
 			Annotations: map[string]string{
 				constant.KubeBlocksGenerationKey:          "1",
 				constant.InstanceSetRevisionAnnotationKey: "revision-1",
+				"managed-annotation":                      "desired",
 			},
 		},
 		Spec: workloads.InstanceSpec{
@@ -211,13 +216,136 @@ func TestBuildInstanceRevisionIgnoresControllerOwnedAnnotations(t *testing.T) {
 
 	inst.Annotations[constant.KubeBlocksGenerationKey] = "2"
 	inst.Annotations[constant.InstanceSetRevisionAnnotationKey] = "revision-2"
+	inst.Annotations["managed-annotation"] = "changed"
+	inst.Labels["managed-label"] = "changed"
 	if got := buildInstanceRevision(inst); got != revision {
-		t.Fatalf("expected controller-owned annotations to be ignored, got %s want %s", got, revision)
+		t.Fatalf("expected instance metadata to be ignored, got %s want %s", got, revision)
 	}
 
 	inst.Spec.MinReadySeconds = 2
 	if got := buildInstanceRevision(inst); got == revision {
 		t.Fatalf("expected spec change to alter revision")
+	}
+}
+
+func TestBuildInstanceRevisionIgnoresAssistantObjectLiveState(t *testing.T) {
+	inst := &workloads.Instance{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-its-0",
+		},
+		Spec: workloads.InstanceSpec{
+			MinReadySeconds: 1,
+			InstanceAssistantObjects: []workloads.InstanceAssistantObject{
+				{
+					Service: &corev1.Service{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:              "test-its-headless",
+							Namespace:         "default",
+							CreationTimestamp: metav1.Now(),
+						},
+						Spec: corev1.ServiceSpec{
+							ClusterIP:  "10.0.0.1",
+							ClusterIPs: []string{"10.0.0.1"},
+						},
+					},
+				},
+			},
+		},
+	}
+	revision := buildInstanceRevision(inst)
+
+	inst.Spec.InstanceAssistantObjects[0].Service.Spec.ClusterIP = "10.0.0.2"
+	inst.Spec.InstanceAssistantObjects[0].Service.Spec.ClusterIPs = []string{"10.0.0.2"}
+	inst.Spec.InstanceAssistantObjects[0].Service.ResourceVersion = "2"
+	if got := buildInstanceRevision(inst); got != revision {
+		t.Fatalf("expected assistant object live state to be ignored, got %s want %s", got, revision)
+	}
+
+	inst.Spec.MinReadySeconds = 2
+	if got := buildInstanceRevision(inst); got == revision {
+		t.Fatalf("expected non-assistant spec change to alter revision")
+	}
+}
+
+func TestBuildInstanceRevisionIgnoresTemplateObjectMetadata(t *testing.T) {
+	inst := &workloads.Instance{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-its-0",
+		},
+		Spec: workloads.InstanceSpec{
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels:      map[string]string{"pod-label": "desired"},
+					Annotations: map[string]string{"pod-annotation": "desired"},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{{Name: "postgres", Image: "postgres:16"}},
+				},
+			},
+			VolumeClaimTemplates: []corev1.PersistentVolumeClaimTemplate{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:        "data",
+						Labels:      map[string]string{"pvc-label": "desired"},
+						Annotations: map[string]string{"pvc-annotation": "desired"},
+					},
+					Spec: corev1.PersistentVolumeClaimSpec{
+						AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+					},
+				},
+			},
+		},
+	}
+	revision := buildInstanceRevision(inst)
+
+	inst.Spec.Template.CreationTimestamp = metav1.Now()
+	inst.Spec.Template.ResourceVersion = "2"
+	inst.Spec.Template.Generation = 2
+	inst.Spec.VolumeClaimTemplates[0].CreationTimestamp = metav1.Now()
+	inst.Spec.VolumeClaimTemplates[0].ResourceVersion = "2"
+	inst.Spec.VolumeClaimTemplates[0].Generation = 2
+	if got := buildInstanceRevision(inst); got != revision {
+		t.Fatalf("expected template object metadata to be ignored, got %s want %s", got, revision)
+	}
+
+	inst.Spec.Template.Labels["pod-label"] = "changed"
+	if got := buildInstanceRevision(inst); got == revision {
+		t.Fatalf("expected pod template label change to alter revision")
+	}
+
+	inst.Spec.Template.Labels["pod-label"] = "desired"
+	inst.Spec.VolumeClaimTemplates[0].Spec.AccessModes = []corev1.PersistentVolumeAccessMode{corev1.ReadWriteMany}
+	if got := buildInstanceRevision(inst); got == revision {
+		t.Fatalf("expected PVC template spec change to alter revision")
+	}
+}
+
+func TestBuildInstanceRevisionIgnoresLifecycleActions(t *testing.T) {
+	inst := &workloads.Instance{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-its-0",
+		},
+		Spec: workloads.InstanceSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{{Name: "postgres", Image: "postgres:16"}},
+				},
+			},
+			LifecycleActions: &workloads.LifecycleActions{
+				TemplateVars: map[string]string{"instance": "test-its-0"},
+			},
+		},
+	}
+	revision := buildInstanceRevision(inst)
+
+	inst.Spec.LifecycleActions.TemplateVars["instance"] = "test-its-1"
+	if got := buildInstanceRevision(inst); got != revision {
+		t.Fatalf("expected lifecycle action context to be ignored, got %s want %s", got, revision)
+	}
+
+	inst.Spec.Template.Spec.Containers[0].Image = "postgres:17"
+	if got := buildInstanceRevision(inst); got == revision {
+		t.Fatalf("expected pod template spec change to alter revision")
 	}
 }
 
@@ -255,14 +383,19 @@ func TestStampInstanceRevisionCarriesDesiredRevision(t *testing.T) {
 	}
 
 	desired.Annotations["managed-annotation"] = "changed"
-	if got := buildInstanceRevision(desired); got == revision {
-		t.Fatalf("expected managed annotation change to alter revision")
+	if got := buildInstanceRevision(desired); got != revision {
+		t.Fatalf("expected instance metadata annotation changes to be ignored, got %s want %s", got, revision)
 	}
 
 	desired.Annotations["managed-annotation"] = "desired"
 	desired.Labels["managed-label"] = "changed"
+	if got := buildInstanceRevision(desired); got != revision {
+		t.Fatalf("expected instance metadata label changes to be ignored, got %s want %s", got, revision)
+	}
+
+	desired.Spec.Template.Labels = map[string]string{"pod-label": "desired"}
 	if got := buildInstanceRevision(desired); got == revision {
-		t.Fatalf("expected managed label change to alter revision")
+		t.Fatalf("expected pod template label change to alter revision")
 	}
 }
 

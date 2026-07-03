@@ -40,14 +40,20 @@ func buildInstanceRevision(inst *workloads.Instance) string {
 	return buildRevisionIntentHash(copyRevisionLabels(inst.Labels), copyRevisionAnnotations(inst.Annotations), *inst.Spec.DeepCopy())
 }
 
-func buildCurrentInstanceRevision(inst, desired *workloads.Instance) string {
-	if desired == nil {
-		return buildInstanceRevision(inst)
+func stampInstanceRevision(inst *workloads.Instance) string {
+	revision := buildInstanceRevision(inst)
+	if inst.Annotations == nil {
+		inst.Annotations = make(map[string]string)
 	}
-	return buildRevisionIntentHash(
-		copyRevisionLabelsByKeys(inst.Labels, desired.Labels),
-		copyRevisionAnnotationsByKeys(inst.Annotations, desired.Annotations),
-		*inst.Spec.DeepCopy())
+	inst.Annotations[constant.InstanceSetRevisionAnnotationKey] = revision
+	return revision
+}
+
+func getInstanceRevision(inst *workloads.Instance) string {
+	if inst.Annotations == nil {
+		return ""
+	}
+	return inst.Annotations[constant.InstanceSetRevisionAnnotationKey]
 }
 
 func buildRevisionIntentHash(labels, annotations map[string]string, spec workloads.InstanceSpec) string {
@@ -126,7 +132,7 @@ func copyRevisionAnnotationsByKeys(annotations, keys map[string]string) map[stri
 
 func isNonRevisionAnnotation(key string) bool {
 	switch key {
-	case constant.KubeBlocksGenerationKey:
+	case constant.KubeBlocksGenerationKey, constant.InstanceSetRevisionAnnotationKey:
 		return true
 	default:
 		return false

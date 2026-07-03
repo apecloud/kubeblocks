@@ -22,6 +22,7 @@ package operations
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -38,6 +39,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
+	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -46,6 +48,7 @@ import (
 type opsRuntime struct {
 	ctx          context.Context
 	cli          client.Client
+	namespace    string
 	multiCluster bool
 	dataCtx      context.Context
 	dataGetOpts  []client.GetOption
@@ -64,6 +67,7 @@ func buildOpsRuntimes(ctx context.Context, cli client.Client, opsRes *OpsResourc
 		} else {
 			runtimes[comp.Name] = newOpsRuntime(ctx, cli, "")
 		}
+		runtimes[comp.Name].(*opsRuntime).namespace = opsRes.Cluster.Namespace
 	}
 	for _, sharding := range opsRes.Cluster.Spec.Shardings {
 		if enabledMultiCluster(opsRes.Cluster) {
@@ -71,6 +75,7 @@ func buildOpsRuntimes(ctx context.Context, cli client.Client, opsRes *OpsResourc
 		} else {
 			runtimes[sharding.Name] = newOpsRuntime(ctx, cli, "")
 		}
+		runtimes[sharding.Name].(*opsRuntime).namespace = opsRes.Cluster.Namespace
 	}
 	return runtimes, nil
 }
@@ -179,6 +184,66 @@ func (r *opsRuntime) ListInstances(namespace, clusterName, compName string) ([]I
 }
 
 func (r *opsRuntime) GenerateInstanceNameSet(clusterName, compName string, compReplicas int32, instances []appsv1.InstanceTemplate, offlineInstances []string) (map[string]string, error) {
+	if r.namespace == "" {
+		return generateInstanceNameSetFromSpec(clusterName, compName, compReplicas, instances, offlineInstances)
+	}
+	itsName := constant.GenerateClusterComponentName(clusterName, compName)
+	its := &workloads.InstanceSet{}
+	if err := r.cli.Get(r.ctx, client.ObjectKey{Name: itsName, Namespace: r.namespace}, its); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return nil, err
+		}
+		return generateInstanceNameSetFromSpec(clusterName, compName, compReplicas, instances, offlineInstances)
+	}
+	if !matchInstanceSetSpec(its, compReplicas, instances, offlineInstances) {
+		return generateInstanceNameSetFromSpec(clusterName, compName, compReplicas, instances, offlineInstances)
+	}
+	names, err := generateAllInstanceNamesFromInstanceSet(its)
+	if err != nil {
+		return nil, err
+	}
+	instanceSet := map[string]string{}
+	for _, name := range names {
+		instanceSet[name] = appsv1.GetInstanceTemplateName(clusterName, compName, name)
+	}
+	return instanceSet, nil
+}
+
+func matchInstanceSetSpec(its *workloads.InstanceSet, compReplicas int32, instances []appsv1.InstanceTemplate, offlineInstances []string) bool {
+	if its.Spec.Replicas == nil || *its.Spec.Replicas != compReplicas {
+		return false
+	}
+	if !reflect.DeepEqual(its.Spec.OfflineInstances, offlineInstances) {
+		return false
+	}
+	return reflect.DeepEqual(its.Spec.Instances, toWorkloadInstanceTemplates(instances))
+}
+
+func toWorkloadInstanceTemplates(instances []appsv1.InstanceTemplate) []workloads.InstanceTemplate {
+	templates := make([]workloads.InstanceTemplate, len(instances))
+	for i := range instances {
+		templates[i] = workloads.InstanceTemplate{
+			Name:     instances[i].Name,
+			Replicas: instances[i].Replicas,
+			Ordinals: workloads.Ordinals(instances[i].Ordinals),
+		}
+	}
+	return templates
+}
+
+func generateAllInstanceNamesFromInstanceSet(its *workloads.InstanceSet) ([]string, error) {
+	itsExt, err := instancetemplate.BuildInstanceSetExt(its, nil)
+	if err != nil {
+		return nil, err
+	}
+	nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt, nil)
+	if err != nil {
+		return nil, err
+	}
+	return nameBuilder.GenerateAllInstanceNames()
+}
+
+func generateInstanceNameSetFromSpec(clusterName, compName string, compReplicas int32, instances []appsv1.InstanceTemplate, offlineInstances []string) (map[string]string, error) {
 	return generateAllPodNamesToSet(compReplicas, instances, offlineInstances, clusterName, compName)
 }
 

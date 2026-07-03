@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -275,6 +276,88 @@ func TestOpsRuntimeBuildsInstanceAPIView(t *testing.T) {
 	}
 	if volume.IsExpanding() {
 		t.Fatalf("did not expect volume to be expanding")
+	}
+}
+
+func TestOpsRuntimeGenerateInstanceNameSetUsesLiveFlatOrdinalInstanceSet(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := appsv1.AddToScheme(scheme); err != nil {
+		t.Fatalf("add apps scheme: %v", err)
+	}
+	if err := workloads.AddToScheme(scheme); err != nil {
+		t.Fatalf("add workloads scheme: %v", err)
+	}
+
+	const (
+		namespace    = "default"
+		clusterName  = "mysql-qpferu"
+		component    = "mysql"
+		templateName = "32a9e872"
+	)
+	its := &workloads.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      constant.GenerateClusterComponentName(clusterName, component),
+			Labels:    constant.GetCompLabels(clusterName, component),
+		},
+		Spec: workloads.InstanceSetSpec{
+			Replicas:            ptr.To[int32](2),
+			FlatInstanceOrdinal: true,
+			OfflineInstances:    []string{constant.GenerateClusterComponentName(clusterName, component) + "-1"},
+			Instances: []workloads.InstanceTemplate{{
+				Name:     templateName,
+				Replicas: ptr.To[int32](1),
+			}},
+		},
+	}
+	cluster := &appsv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      clusterName,
+		},
+		Spec: appsv1.ClusterSpec{
+			ComponentSpecs: []appsv1.ClusterComponentSpec{{
+				Name:                component,
+				Replicas:            2,
+				FlatInstanceOrdinal: true,
+				OfflineInstances:    []string{constant.GenerateClusterComponentName(clusterName, component) + "-1"},
+				Instances: []appsv1.InstanceTemplate{{
+					Name:     templateName,
+					Replicas: ptr.To[int32](1),
+				}},
+			}},
+		},
+	}
+	cli := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(its).
+		Build()
+	opsRes := &OpsResource{Cluster: cluster}
+	runtimes, err := buildOpsRuntimes(context.Background(), cli, opsRes)
+	if err != nil {
+		t.Fatalf("build runtime: %v", err)
+	}
+
+	names, err := runtimes[component].GenerateInstanceNameSet(clusterName, component, 2, cluster.Spec.ComponentSpecs[0].Instances, cluster.Spec.ComponentSpecs[0].OfflineInstances)
+	if err != nil {
+		t.Fatalf("generate instance names: %v", err)
+	}
+	if _, ok := names["mysql-qpferu-mysql-0"]; !ok {
+		t.Fatalf("expected default flat ordinal pod name, got %v", names)
+	}
+	if _, ok := names["mysql-qpferu-mysql-2"]; !ok {
+		t.Fatalf("expected canary flat ordinal pod name, got %v", names)
+	}
+	if _, ok := names["mysql-qpferu-mysql-32a9e872-0"]; ok {
+		t.Fatalf("did not expect deprecated template-based pod name, got %v", names)
+	}
+
+	oldSpecNames, err := runtimes[component].GenerateInstanceNameSet(clusterName, component, 1, cluster.Spec.ComponentSpecs[0].Instances, cluster.Spec.ComponentSpecs[0].OfflineInstances)
+	if err != nil {
+		t.Fatalf("generate instance names from non-current spec: %v", err)
+	}
+	if _, ok := oldSpecNames["mysql-qpferu-mysql-32a9e872-0"]; !ok {
+		t.Fatalf("expected non-current spec to use spec-based template pod name, got %v", oldSpecNames)
 	}
 }
 

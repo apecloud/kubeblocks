@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -198,13 +199,9 @@ func (r *opsRuntime) GenerateInstanceNameSet(clusterName, compName string, compR
 	if !matchInstanceSetSpec(its, compReplicas, instances, offlineInstances) {
 		return generateInstanceNameSetFromSpec(clusterName, compName, compReplicas, instances, offlineInstances)
 	}
-	names, err := generateAllInstanceNamesFromInstanceSet(its)
+	instanceSet, err := generateInstanceNameSetFromInstanceSet(its)
 	if err != nil {
 		return nil, err
-	}
-	instanceSet := map[string]string{}
-	for _, name := range names {
-		instanceSet[name] = appsv1.GetInstanceTemplateName(clusterName, compName, name)
 	}
 	return instanceSet, nil
 }
@@ -216,22 +213,33 @@ func matchInstanceSetSpec(its *workloads.InstanceSet, compReplicas int32, instan
 	if !reflect.DeepEqual(its.Spec.OfflineInstances, offlineInstances) {
 		return false
 	}
-	return reflect.DeepEqual(its.Spec.Instances, toWorkloadInstanceTemplates(instances))
+	return instanceTemplatesHaveSameNamingSpec(its.Spec.Instances, instances)
 }
 
-func toWorkloadInstanceTemplates(instances []appsv1.InstanceTemplate) []workloads.InstanceTemplate {
-	templates := make([]workloads.InstanceTemplate, len(instances))
-	for i := range instances {
-		templates[i] = workloads.InstanceTemplate{
-			Name:     instances[i].Name,
-			Replicas: instances[i].Replicas,
-			Ordinals: instances[i].Ordinals,
+func instanceTemplatesHaveSameNamingSpec(current []workloads.InstanceTemplate, expected []appsv1.InstanceTemplate) bool {
+	if len(current) != len(expected) {
+		return false
+	}
+	expectedByName := make(map[string]appsv1.InstanceTemplate, len(expected))
+	for i := range expected {
+		expectedByName[expected[i].Name] = expected[i]
+	}
+	for i := range current {
+		expectedTemplate, ok := expectedByName[current[i].Name]
+		if !ok {
+			return false
+		}
+		if current[i].GetReplicas() != expectedTemplate.GetReplicas() {
+			return false
+		}
+		if !reflect.DeepEqual(current[i].Ordinals, expectedTemplate.Ordinals) {
+			return false
 		}
 	}
-	return templates
+	return true
 }
 
-func generateAllInstanceNamesFromInstanceSet(its *workloads.InstanceSet) ([]string, error) {
+func generateInstanceNameSetFromInstanceSet(its *workloads.InstanceSet) (map[string]string, error) {
 	itsExt, err := instancetemplate.BuildInstanceSetExt(its, nil)
 	if err != nil {
 		return nil, err
@@ -240,7 +248,15 @@ func generateAllInstanceNamesFromInstanceSet(its *workloads.InstanceSet) ([]stri
 	if err != nil {
 		return nil, err
 	}
-	return nameBuilder.GenerateAllInstanceNames()
+	name2Template, err := nameBuilder.BuildInstanceName2TemplateMap()
+	if err != nil {
+		return nil, err
+	}
+	instanceSet := make(map[string]string, len(name2Template))
+	for name, template := range name2Template {
+		instanceSet[name] = template.Name
+	}
+	return instanceSet, nil
 }
 
 func generateInstanceNameSetFromSpec(clusterName, compName string, compReplicas int32, instances []appsv1.InstanceTemplate, offlineInstances []string) (map[string]string, error) {
@@ -248,12 +264,62 @@ func generateInstanceNameSetFromSpec(clusterName, compName string, compReplicas 
 }
 
 func (r *opsRuntime) GenerateTemplateInstanceNames(clusterName, compName, templateName string, replicas int32, offlineInstances []string, ordinals appsv1.Ordinals) ([]string, error) {
+	if r.namespace != "" {
+		itsName := constant.GenerateClusterComponentName(clusterName, compName)
+		its := &workloads.InstanceSet{}
+		if err := r.cli.Get(r.ctx, client.ObjectKey{Name: itsName, Namespace: r.namespace}, its); err != nil {
+			if !apierrors.IsNotFound(err) {
+				return nil, err
+			}
+		} else if names, ok, err := generateTemplateInstanceNamesFromInstanceSet(its, templateName, replicas, offlineInstances, ordinals); ok || err != nil {
+			return names, err
+		}
+	}
 	workloadName := constant.GenerateWorkloadNamePattern(clusterName, compName)
 	ordinalList, err := instanceset.ConvertOrdinalsToSortedList(ordinals)
 	if err != nil {
 		return nil, err
 	}
 	return instanceset.GenerateInstanceNamesFromTemplate(workloadName, templateName, replicas, offlineInstances, ordinalList)
+}
+
+func generateTemplateInstanceNamesFromInstanceSet(its *workloads.InstanceSet, templateName string, replicas int32, offlineInstances []string, ordinals appsv1.Ordinals) ([]string, bool, error) {
+	if !instanceSetHasTemplateSpec(its, templateName, replicas, offlineInstances, ordinals) {
+		return nil, false, nil
+	}
+	itsExt, err := instancetemplate.BuildInstanceSetExt(its, nil)
+	if err != nil {
+		return nil, true, err
+	}
+	nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt, nil)
+	if err != nil {
+		return nil, true, err
+	}
+	name2Template, err := nameBuilder.BuildInstanceName2TemplateMap()
+	if err != nil {
+		return nil, true, err
+	}
+	names := make([]string, 0, replicas)
+	for name, tpl := range name2Template {
+		if tpl.Name == templateName {
+			names = append(names, name)
+		}
+	}
+	slices.Sort(names)
+	return names, true, nil
+}
+
+func instanceSetHasTemplateSpec(its *workloads.InstanceSet, templateName string, replicas int32, offlineInstances []string, ordinals appsv1.Ordinals) bool {
+	if !reflect.DeepEqual(its.Spec.OfflineInstances, offlineInstances) {
+		return false
+	}
+	for _, template := range its.Spec.Instances {
+		if template.Name != templateName {
+			continue
+		}
+		return template.GetReplicas() == replicas && reflect.DeepEqual(template.Ordinals, ordinals)
+	}
+	return false
 }
 
 func (r *opsRuntime) Switchover(ctx context.Context, namespace, clusterName, compName, instanceName, candidateName string) error {

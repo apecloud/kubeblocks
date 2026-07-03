@@ -305,8 +305,11 @@ func TestOpsRuntimeGenerateInstanceNameSetUsesLiveFlatOrdinalInstanceSet(t *test
 			FlatInstanceOrdinal: true,
 			OfflineInstances:    []string{constant.GenerateClusterComponentName(clusterName, component) + "-1"},
 			Instances: []workloads.InstanceTemplate{{
-				Name:     templateName,
-				Replicas: ptr.To[int32](1),
+				Name:        templateName,
+				Replicas:    ptr.To[int32](1),
+				Labels:      map[string]string{constant.KBAppReleasePhaseKey: constant.ReleasePhaseCanary},
+				Annotations: map[string]string{"rollout.kubeblocks.io/canary": "true"},
+				Images:      map[string]string{"mysql": "mysql:canary"},
 			}},
 		},
 	}
@@ -348,6 +351,9 @@ func TestOpsRuntimeGenerateInstanceNameSetUsesLiveFlatOrdinalInstanceSet(t *test
 	if _, ok := names["mysql-qpferu-mysql-2"]; !ok {
 		t.Fatalf("expected canary flat ordinal pod name, got %v", names)
 	}
+	if got := names["mysql-qpferu-mysql-2"]; got != templateName {
+		t.Fatalf("expected canary pod to map to live template %q, got %q in %v", templateName, got, names)
+	}
 	if _, ok := names["mysql-qpferu-mysql-32a9e872-0"]; ok {
 		t.Fatalf("did not expect deprecated template-based pod name, got %v", names)
 	}
@@ -358,6 +364,22 @@ func TestOpsRuntimeGenerateInstanceNameSetUsesLiveFlatOrdinalInstanceSet(t *test
 	}
 	if _, ok := oldSpecNames["mysql-qpferu-mysql-32a9e872-0"]; !ok {
 		t.Fatalf("expected non-current spec to use spec-based template pod name, got %v", oldSpecNames)
+	}
+
+	templateNames, err := runtimes[component].GenerateTemplateInstanceNames(clusterName, component, templateName, 1, cluster.Spec.ComponentSpecs[0].OfflineInstances, appsv1.Ordinals{})
+	if err != nil {
+		t.Fatalf("generate template instance names: %v", err)
+	}
+	if len(templateNames) != 1 || templateNames[0] != "mysql-qpferu-mysql-2" {
+		t.Fatalf("expected flat ordinal template pod name, got %v", templateNames)
+	}
+
+	oldTemplateNames, err := runtimes[component].GenerateTemplateInstanceNames(clusterName, component, templateName, 2, cluster.Spec.ComponentSpecs[0].OfflineInstances, appsv1.Ordinals{})
+	if err != nil {
+		t.Fatalf("generate non-current template instance names: %v", err)
+	}
+	if len(oldTemplateNames) == 0 || oldTemplateNames[0] != "mysql-qpferu-mysql-32a9e872-0" {
+		t.Fatalf("expected non-current template spec to use spec-based pod name, got %v", oldTemplateNames)
 	}
 }
 

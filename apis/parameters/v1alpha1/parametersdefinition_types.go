@@ -64,7 +64,7 @@ type ParametersDefinitionSpec struct {
 
 	// ServiceVersion specifies the version of the Service expected to be provisioned by this Component.
 	// The version should follow the syntax and semantics of the "Semantic Versioning" specification (http://semver.org/).
-	// If no version is specified, the latest available version will be used.
+	// If not specified, it applies to any service version of the matched ComponentDefinition.
 	//
 	// +optional
 	ServiceVersion string `json:"serviceVersion,omitempty"`

@@ -367,6 +367,38 @@ func (r *probeRunner) buildEvent(instance, probe string, code int32, output []by
 	}
 }
 
+// maxEventMessageLength is the Kubernetes limit for the Event message field;
+// creating an Event with a longer message is rejected by the apiserver.
+const maxEventMessageLength = 1024
+
+// marshalEventWithSizeLimit marshals the probe event and, when the encoded
+// form exceeds the Event message limit, shrinks the free-text fields —
+// Message first (keeping its head, where the root error lives), then Output —
+// so that the payload stays valid JSON that event consumers can unmarshal.
+func marshalEventWithSizeLimit(event proto.ProbeEvent) ([]byte, error) {
+	const marker = "...(truncated)"
+	for {
+		msg, err := json.Marshal(event)
+		if err != nil {
+			return nil, err
+		}
+		if len(msg) <= maxEventMessageLength {
+			return msg, nil
+		}
+		overflow := len(msg) - maxEventMessageLength
+		switch {
+		case len(event.Message) > len(marker):
+			cut := min(overflow+len(marker), len(event.Message))
+			event.Message = event.Message[:len(event.Message)-cut] + marker
+		case len(event.Output) > 0:
+			event.Output = event.Output[:len(event.Output)-min(overflow, len(event.Output))]
+		default:
+			// nothing left to shrink; send as-is and let the apiserver decide
+			return msg, nil
+		}
+	}
+}
+
 func (r *probeRunner) launchReportLoop(probe *proto.Probe) {
 	go func() {
 		var reportChan <-chan time.Time
@@ -405,7 +437,7 @@ func (r *probeRunner) launchReportLoop(probe *proto.Probe) {
 				return true
 			}
 
-			msg, err := json.Marshal(event)
+			msg, err := marshalEventWithSizeLimit(event)
 			if err != nil {
 				log(err, "failed to marshal the probe event", retry, periodically)
 				return true

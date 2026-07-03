@@ -2747,8 +2747,9 @@ spec:
                                - If this field is empty: All ports are automatically allocated by the host-port manager.
                                - If this field is specified:
                                  a) Mappings for all ports defined in `cmpd.spec.hostNetwork` are MANDATORY.
-                                 b) Mappings for kbagent ports ("http", "streaming") are OPTIONAL.
+                                 b) Mappings for kbagent ports ("kba-http", "kba-streaming") are OPTIONAL.
                                     You can explicitly map them here, or leave them omitted to be allocated by the host-port manager.
+                                    The legacy names "http" and "streaming" are still accepted as aliases for the kbagent ports.
 
                             2. When HostNetwork is disabled:
                                It allows optional mapping for container ports to host ports.
@@ -13994,8 +13995,9 @@ spec:
                                    - If this field is empty: All ports are automatically allocated by the host-port manager.
                                    - If this field is specified:
                                      a) Mappings for all ports defined in `cmpd.spec.hostNetwork` are MANDATORY.
-                                     b) Mappings for kbagent ports ("http", "streaming") are OPTIONAL.
+                                     b) Mappings for kbagent ports ("kba-http", "kba-streaming") are OPTIONAL.
                                         You can explicitly map them here, or leave them omitted to be allocated by the host-port manager.
+                                        The legacy names "http" and "streaming" are still accepted as aliases for the kbagent ports.
 
                                 2. When HostNetwork is disabled:
                                    It allows optional mapping for container ports to host ports.

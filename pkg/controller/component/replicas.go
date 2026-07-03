@@ -212,6 +212,10 @@ func GetReplicasStatusFunc(its *workloads.InstanceSet, f func(ReplicaStatus) boo
 func NewReplicaTask(compName, uid string, source *corev1.Pod, replicas []string) (map[string]string, error) {
 	port, err := intctrlutil.GetPortByName(*source, kbagent.ContainerName, kbagent.DefaultStreamingPortName)
 	if err != nil {
+		// pods created before the port rename still carry the legacy name
+		port, err = intctrlutil.GetPortByName(*source, kbagent.ContainerName, kbagent.LegacyStreamingPortName)
+	}
+	if err != nil {
 		return nil, err
 	}
 	task := proto.Task{

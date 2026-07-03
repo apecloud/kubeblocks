@@ -34,6 +34,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/kbagent"
 	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
 	kbagentproto "github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -255,6 +256,86 @@ var _ = Describe("Component Workload Operations Test", func() {
 			newITS.Spec.Template.Spec.InitContainers = nil
 			newITS.Spec.Template.Spec.Volumes = nil
 
+			merged := copyAndMergeITS(oldITS, newITS, legacyConfigManagerPolicyKeep)
+			Expect(merged).Should(BeNil())
+		})
+
+		It("should defer the kbagent port rename when it is the only template change", func() {
+			oldITS := testapps.NewInstanceSetFactory(testCtx.DefaultNamespace,
+				"old-its-kbagent-ports", clusterName, compName).
+				AddContainer(corev1.Container{
+					Name:  "main",
+					Image: "test-image",
+				}).
+				GetObject()
+			oldITS.Spec.Template.Spec.Containers = append(oldITS.Spec.Template.Spec.Containers,
+				corev1.Container{
+					Name: kbagent.ContainerName,
+					Ports: []corev1.ContainerPort{
+						{Name: kbagent.LegacyHTTPPortName, ContainerPort: 3501, Protocol: corev1.ProtocolTCP},
+						{Name: kbagent.LegacyStreamingPortName, ContainerPort: 3502, Protocol: corev1.ProtocolTCP},
+					},
+				})
+
+			newITS := oldITS.DeepCopy()
+			_, agent := intctrlutil.GetContainerByName(newITS.Spec.Template.Spec.Containers, kbagent.ContainerName)
+			agent.Ports[0].Name = kbagent.DefaultHTTPPortName
+			agent.Ports[1].Name = kbagent.DefaultStreamingPortName
+
+			merged := copyAndMergeITS(oldITS, newITS, legacyConfigManagerPolicyKeep)
+			Expect(merged).Should(BeNil())
+		})
+
+		It("should apply the kbagent port rename together with another template change", func() {
+			oldITS := testapps.NewInstanceSetFactory(testCtx.DefaultNamespace,
+				"old-its-kbagent-ports-2", clusterName, compName).
+				AddContainer(corev1.Container{
+					Name:  "main",
+					Image: "test-image",
+				}).
+				GetObject()
+			oldITS.Spec.Template.Spec.Containers = append(oldITS.Spec.Template.Spec.Containers,
+				corev1.Container{
+					Name: kbagent.ContainerName,
+					Ports: []corev1.ContainerPort{
+						{Name: kbagent.LegacyHTTPPortName, ContainerPort: 3501, Protocol: corev1.ProtocolTCP},
+						{Name: kbagent.LegacyStreamingPortName, ContainerPort: 3502, Protocol: corev1.ProtocolTCP},
+					},
+				})
+
+			newITS := oldITS.DeepCopy()
+			newITS.Spec.Template.Spec.Containers[0].Image = "new-image"
+			_, agent := intctrlutil.GetContainerByName(newITS.Spec.Template.Spec.Containers, kbagent.ContainerName)
+			agent.Ports[0].Name = kbagent.DefaultHTTPPortName
+			agent.Ports[1].Name = kbagent.DefaultStreamingPortName
+
+			merged := copyAndMergeITS(oldITS, newITS, legacyConfigManagerPolicyKeep)
+			Expect(merged).ShouldNot(BeNil())
+			Expect(merged.Spec.Template.Spec.Containers[0].Image).Should(Equal("new-image"))
+			_, mergedAgent := intctrlutil.GetContainerByName(merged.Spec.Template.Spec.Containers, kbagent.ContainerName)
+			Expect(mergedAgent).ShouldNot(BeNil())
+			Expect(mergedAgent.Ports[0].Name).Should(Equal(kbagent.DefaultHTTPPortName))
+			Expect(mergedAgent.Ports[1].Name).Should(Equal(kbagent.DefaultStreamingPortName))
+		})
+
+		It("should keep the new kbagent port names for workloads already renamed", func() {
+			oldITS := testapps.NewInstanceSetFactory(testCtx.DefaultNamespace,
+				"old-its-kbagent-ports-3", clusterName, compName).
+				AddContainer(corev1.Container{
+					Name:  "main",
+					Image: "test-image",
+				}).
+				GetObject()
+			oldITS.Spec.Template.Spec.Containers = append(oldITS.Spec.Template.Spec.Containers,
+				corev1.Container{
+					Name: kbagent.ContainerName,
+					Ports: []corev1.ContainerPort{
+						{Name: kbagent.DefaultHTTPPortName, ContainerPort: 3501, Protocol: corev1.ProtocolTCP},
+						{Name: kbagent.DefaultStreamingPortName, ContainerPort: 3502, Protocol: corev1.ProtocolTCP},
+					},
+				})
+
+			newITS := oldITS.DeepCopy()
 			merged := copyAndMergeITS(oldITS, newITS, legacyConfigManagerPolicyKeep)
 			Expect(merged).Should(BeNil())
 		})

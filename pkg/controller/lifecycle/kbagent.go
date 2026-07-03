@@ -417,6 +417,10 @@ func (a *kbagent) selectTargetPods(spec *appsv1.Action) ([]*corev1.Pod, error) {
 func (a *kbagent) serverEndpoint(pod *corev1.Pod) (string, int32, error) {
 	port, err := intctrlutil.GetPortByName(*pod, kbagt.ContainerName, kbagt.DefaultHTTPPortName)
 	if err != nil {
+		// pods created before the port rename still carry the legacy name
+		port, err = intctrlutil.GetPortByName(*pod, kbagt.ContainerName, kbagt.LegacyHTTPPortName)
+	}
+	if err != nil {
 		// has no kb-agent defined
 		return "", 0, nil
 	}

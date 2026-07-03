@@ -327,6 +327,21 @@ func (m *portManager) AllocatePort(key string) (int32, error) {
 		return port, nil
 	}
 
+	// adopt an allocation recorded under the legacy kbagent port-name key, so
+	// that workloads created before the port rename keep their numeric ports
+	if legacyKey := legacyKBAgentPortKey(key); legacyKey != "" {
+		if value, ok := m.cm.Data[legacyKey]; ok {
+			port, err := m.parsePort(value)
+			if err != nil {
+				return 0, err
+			}
+			if err := m.update(key, port); err != nil {
+				return 0, err
+			}
+			return port, nil
+		}
+	}
+
 	if len(m.used) >= int(m.to-m.from)+1 {
 		return 0, fmt.Errorf("no available port: %s", key)
 	}
@@ -381,6 +396,9 @@ func (m *definedPortManager) GetPort(key string) (int32, error) {
 	if m.isKBAgentPortNNotDefinedInKey(key) {
 		return m.defaultPortManager.GetPort(key)
 	}
+	if port, ok := m.definedKBAgentPort(key); ok {
+		return port, nil
+	}
 	return m.hostPorts[key], nil
 }
 
@@ -392,8 +410,7 @@ func (m *definedPortManager) UsePort(key string, port int32) error {
 }
 
 func (m *definedPortManager) AllocatePort(key string) (int32, error) {
-	port, ok := m.hostPorts[key]
-	if ok {
+	if port, ok := m.definedKBAgentPort(key); ok {
 		return port, nil
 	}
 	if m.isKBAgentPortNNotDefinedInKey(key) {
@@ -410,27 +427,68 @@ func (m *definedPortManager) ReleaseByPrefix(prefix string) error {
 	return m.defaultPortManager.ReleaseByPrefix(prefix)
 }
 
+// kbagentLegacyPortNames maps the current kbagent port names to the names used
+// before the rename, which existing specs may still reference.
+var kbagentLegacyPortNames = map[string]string{
+	kbagent.DefaultHTTPPortName:      kbagent.LegacyHTTPPortName,
+	kbagent.DefaultStreamingPortName: kbagent.LegacyStreamingPortName,
+}
+
+// legacyKBAgentPortKey rewrites an allocation key that refers to a kbagent
+// port by its current name into the key used before the port rename, or
+// returns "" when the key does not refer to a kbagent port.
+func legacyKBAgentPortKey(key string) string {
+	for portName, legacy := range kbagentLegacyPortNames {
+		suffix := fmt.Sprintf("-%s-%s", kbagent.ContainerName, portName)
+		if strings.HasSuffix(key, suffix) {
+			return strings.TrimSuffix(key, suffix) + fmt.Sprintf("-%s-%s", kbagent.ContainerName, legacy)
+		}
+	}
+	return ""
+}
+
 func (m *definedPortManager) isKBAgentPort(containerName, portName string) bool {
 	return containerName == kbagent.ContainerName && (portName == kbagent.DefaultHTTPPortName || portName == kbagent.DefaultStreamingPortName)
 }
 
+// definedKBAgentPort resolves a user-defined host port for a kbagent port
+// name, accepting the legacy name as an alias for specs written before the
+// kbagent ports were renamed.
+func (m *definedPortManager) definedKBAgentPort(portName string) (int32, bool) {
+	if port, ok := m.hostPorts[portName]; ok {
+		return port, true
+	}
+	if legacy, ok := kbagentLegacyPortNames[portName]; ok {
+		if port, ok := m.hostPorts[legacy]; ok {
+			return port, true
+		}
+	}
+	return 0, false
+}
+
 func (m *definedPortManager) hasKBAgentPortDefined() bool {
-	_, http := m.hostPorts[kbagent.DefaultHTTPPortName]
-	_, stream := m.hostPorts[kbagent.DefaultStreamingPortName]
+	_, http := m.definedKBAgentPort(kbagent.DefaultHTTPPortName)
+	_, stream := m.definedKBAgentPort(kbagent.DefaultStreamingPortName)
 	return http && stream
 }
 
 func (m *definedPortManager) isKBAgentPortNNotDefined(containerName, portName string) bool {
-	_, defined := m.hostPorts[portName]
-	return m.isKBAgentPort(containerName, portName) && !defined
+	if !m.isKBAgentPort(containerName, portName) {
+		return false
+	}
+	_, defined := m.definedKBAgentPort(portName)
+	return !defined
 }
 
 func (m *definedPortManager) isKBAgentPortNNotDefinedInKey(key string) bool {
-	subs := strings.Split(key, "-")
-	if len(subs) < 4 {
-		return false
+	// the port names contain dashes, so match the "<container>-<port>" key
+	// suffix instead of splitting the key
+	for _, portName := range []string{kbagent.DefaultHTTPPortName, kbagent.DefaultStreamingPortName} {
+		if strings.HasSuffix(key, fmt.Sprintf("-%s-%s", kbagent.ContainerName, portName)) {
+			return m.isKBAgentPortNNotDefined(kbagent.ContainerName, portName)
+		}
 	}
-	return m.isKBAgentPortNNotDefined(subs[len(subs)-2], subs[len(subs)-1])
+	return false
 }
 
 func newDefinedPortManager(defaultPortManager *portManager, hostPorts []appsv1.HostPort) *definedPortManager {

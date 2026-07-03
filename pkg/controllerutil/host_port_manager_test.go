@@ -307,5 +307,63 @@ var _ = Describe("host port manager test", func() {
 			Expect(err).Should(BeNil())
 			Expect(dataCM).Should(BeEmpty())
 		})
+
+		It("allocate port - kbagent adopts allocation recorded under legacy port name", func() {
+			legacyKey := fmt.Sprintf("%s-%s-%s-%s", clusterName, compName, kbagent.ContainerName, kbagent.LegacyHTTPPortName)
+			err := definedPortManagerInst.defaultPortManager.UsePort(legacyKey, int32(30001))
+			Expect(err).Should(BeNil())
+
+			key := manager.PortKey(clusterName, compName, kbagent.ContainerName, kbagent.DefaultHTTPPortName)
+			port, err := manager.AllocatePort(key)
+			Expect(err).Should(BeNil())
+			Expect(port).Should(Equal(int32(30001)))
+			Expect(dataCM).Should(HaveKeyWithValue(key, "30001"))
+		})
+	})
+
+	Context("defined host-port manager - legacy kbagent port names", func() {
+		var (
+			network = &appsv1.ComponentNetwork{
+				HostNetwork: true,
+				HostPorts: []appsv1.HostPort{
+					{
+						Name: kbagent.LegacyHTTPPortName,
+						Port: kbagent.DefaultHTTPPort,
+					},
+					{
+						Name: kbagent.LegacyStreamingPortName,
+						Port: kbagent.DefaultStreamingPort,
+					},
+				},
+			}
+		)
+
+		BeforeEach(func() {
+			defaultPortManager = nil
+			manager = GetPortManager(network)
+		})
+
+		It("port key resolves the legacy mapping as defined", func() {
+			key := manager.PortKey(clusterName, compName, kbagent.ContainerName, kbagent.DefaultHTTPPortName)
+			Expect(key).To(Equal(kbagent.DefaultHTTPPortName))
+		})
+
+		It("allocate port via legacy alias", func() {
+			key := manager.PortKey(clusterName, compName, kbagent.ContainerName, kbagent.DefaultHTTPPortName)
+			port, err := manager.AllocatePort(key)
+			Expect(err).Should(BeNil())
+			Expect(port).Should(Equal(int32(kbagent.DefaultHTTPPort)))
+		})
+
+		It("get port via legacy alias", func() {
+			key := manager.PortKey(clusterName, compName, kbagent.ContainerName, kbagent.DefaultStreamingPortName)
+			port, err := manager.GetPort(key)
+			Expect(err).Should(BeNil())
+			Expect(port).Should(Equal(int32(kbagent.DefaultStreamingPort)))
+		})
+
+		It("treats both kbagent ports as defined via legacy names", func() {
+			Expect(manager.(*definedPortManager).hasKBAgentPortDefined()).Should(BeTrue())
+		})
 	})
 })

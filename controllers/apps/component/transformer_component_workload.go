@@ -38,6 +38,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/kbagent"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -278,6 +279,11 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet, legacyConfigManagerP
 
 	intctrlutil.ResolvePodSpecDefaultFields(oldITS.Spec.Template.Spec, &itsObjCopy.Spec.Template.Spec)
 
+	// Defer the kbagent port rename on existing workloads: keep the legacy
+	// names while the rename would be the only template change, and let the
+	// rename ride along when some other change rebuilds the pods anyway.
+	deferKBAgentPortRename(oldITS, itsObjCopy)
+
 	isSpecUpdated := !reflect.DeepEqual(&oldITS.Spec, &itsObjCopy.Spec)
 	isLabelsUpdated := !reflect.DeepEqual(oldITS.Labels, itsObjCopy.Labels)
 	isAnnotationsUpdated := !reflect.DeepEqual(oldITS.Annotations, itsObjCopy.Annotations)
@@ -285,6 +291,53 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet, legacyConfigManagerP
 		return nil
 	}
 	return itsObjCopy
+}
+
+// deferKBAgentPortRename keeps the legacy kbagent port names on an existing
+// workload whose live template still carries them, as long as the rename would
+// be the only pod template change. Port names are pure identifiers inside the
+// template (kbagent probes and args reference numeric ports), so preserving
+// them avoids a rename-only diff from restarting all pods; once any other
+// change rebuilds the pods, the rename is applied together with it.
+func deferKBAgentPortRename(oldITS, mergedITS *workloads.InstanceSet) {
+	if oldITS == nil || mergedITS == nil {
+		return
+	}
+	_, oldAgent := intctrlutil.GetContainerByName(oldITS.Spec.Template.Spec.Containers, kbagent.ContainerName)
+	if oldAgent == nil {
+		return
+	}
+	oldNames := sets.New[string]()
+	for _, p := range oldAgent.Ports {
+		oldNames.Insert(p.Name)
+	}
+	idx, agent := intctrlutil.GetContainerByName(mergedITS.Spec.Template.Spec.Containers, kbagent.ContainerName)
+	if agent == nil {
+		return
+	}
+	legacyNames := map[string]string{
+		kbagent.DefaultHTTPPortName:      kbagent.LegacyHTTPPortName,
+		kbagent.DefaultStreamingPortName: kbagent.LegacyStreamingPortName,
+	}
+	ports := mergedITS.Spec.Template.Spec.Containers[idx].Ports
+	renamed := map[int]string{}
+	for i, p := range ports {
+		legacy, ok := legacyNames[p.Name]
+		if !ok || oldNames.Has(p.Name) || !oldNames.Has(legacy) {
+			continue
+		}
+		renamed[i] = p.Name
+		ports[i].Name = legacy
+	}
+	if len(renamed) == 0 {
+		return
+	}
+	if !reflect.DeepEqual(oldITS.Spec.Template, mergedITS.Spec.Template) {
+		// other template changes exist, the pods are rebuilt anyway
+		for i, name := range renamed {
+			ports[i].Name = name
+		}
+	}
 }
 
 const (

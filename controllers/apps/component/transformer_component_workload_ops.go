@@ -355,7 +355,8 @@ func (r *componentWorkloadOps) joinMember4ScaleOut() error {
 				joinErrors = append(joinErrors, fmt.Errorf("pod %s: %w", pod.Name, err))
 			} else {
 				if err := r.persistMemberJoined(pod.Name); err != nil {
-					return err
+					joinErrors = append(joinErrors, fmt.Errorf("pod %s: persist member joined: %w", pod.Name, err))
+					continue
 				}
 				replicas.Status[i].MemberJoined = ptr.To(true)
 			}
@@ -385,7 +386,8 @@ func (r *componentWorkloadOps) persistMemberJoined(podName string) error {
 	if r.runningITS == nil {
 		return nil
 	}
-	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+	var updatedITS *workloads.InstanceSet
+	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		its := &workloads.InstanceSet{}
 		if err := r.cli.Get(r.transCtx.Context, client.ObjectKeyFromObject(r.runningITS), its); err != nil {
 			return err
@@ -401,8 +403,18 @@ func (r *componentWorkloadOps) persistMemberJoined(podName string) error {
 		}); err != nil {
 			return err
 		}
-		return r.cli.Update(r.transCtx.Context, its)
-	})
+		if err := r.cli.Update(r.transCtx.Context, its); err != nil {
+			return err
+		}
+		updatedITS = its
+		return nil
+	}); err != nil {
+		return err
+	}
+	if updatedITS != nil {
+		r.runningITS.SetResourceVersion(updatedITS.GetResourceVersion())
+	}
+	return nil
 }
 
 func (r *componentWorkloadOps) joinMemberForPod(pod *corev1.Pod, pods []*corev1.Pod) error {

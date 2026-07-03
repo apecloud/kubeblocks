@@ -1296,4 +1296,95 @@ func TestPersistMemberJoinedRetriesUpdateConflict(t *testing.T) {
 	if updateCount != 2 {
 		t.Fatalf("expected one conflict retry, got %d updates", updateCount)
 	}
+	if its.GetResourceVersion() != current.GetResourceVersion() {
+		t.Fatalf("expected running InstanceSet resourceVersion %q, got %q",
+			current.GetResourceVersion(), its.GetResourceVersion())
+	}
+}
+
+func TestJoinMemberCollectsPersistMemberJoinedError(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatalf("add core scheme: %v", err)
+	}
+	if err := appsv1.AddToScheme(scheme); err != nil {
+		t.Fatalf("add apps scheme: %v", err)
+	}
+	if err := workloads.AddToScheme(scheme); err != nil {
+		t.Fatalf("add workloads scheme: %v", err)
+	}
+
+	const (
+		namespace   = "default"
+		clusterName = "test-cluster"
+		compName    = "test-comp"
+		podName     = "test-pod-1"
+	)
+	replicas := int32(1)
+	runningITS := &workloads.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      "test-its",
+		},
+		Spec: workloads.InstanceSetSpec{
+			Replicas: &replicas,
+		},
+	}
+	protoITS := runningITS.DeepCopy()
+	if err := component.NewReplicasStatus(protoITS, []string{podName}, true, false); err != nil {
+		t.Fatalf("new proto replicas status: %v", err)
+	}
+	comp := &appsv1.Component{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      constant.GenerateClusterComponentName(clusterName, compName),
+			Labels:    constant.GetCompLabels(clusterName, compName),
+		},
+	}
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      podName,
+			Labels:    constant.GetCompLabels(clusterName, compName),
+		},
+	}
+	cli := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(runningITS, comp, pod).
+		Build()
+	ops := &componentWorkloadOps{
+		transCtx: &componentTransformContext{
+			Context: context.Background(),
+			Logger:  logger,
+		},
+		cli:       cli,
+		component: comp,
+		synthesizeComp: &component.SynthesizedComponent{
+			Namespace:   namespace,
+			ClusterName: clusterName,
+			Name:        compName,
+			LifecycleActions: component.SynthesizedLifecycleActions{
+				ComponentLifecycleActions: &appsv1.ComponentLifecycleActions{},
+			},
+		},
+		runningITS: runningITS,
+		protoITS:   protoITS,
+	}
+
+	err := ops.joinMember4ScaleOut()
+	if err == nil {
+		t.Fatal("expected requeue error")
+	}
+	if !intctrlutil.IsRequeueError(err) {
+		t.Fatalf("expected requeue error, got %T: %v", err, err)
+	}
+	joined, getErr := component.GetReplicasStatusFunc(protoITS, func(s component.ReplicaStatus) bool {
+		return s.Name == podName && s.MemberJoined != nil && *s.MemberJoined
+	})
+	if getErr != nil {
+		t.Fatalf("get proto replicas status: %v", getErr)
+	}
+	if len(joined) != 0 {
+		t.Fatalf("expected proto status to remain unjoined, got %v", joined)
+	}
 }

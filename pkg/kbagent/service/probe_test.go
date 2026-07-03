@@ -295,7 +295,7 @@ var _ = Describe("probe", func() {
 				Output:  []byte("leader"),
 				Message: "ok",
 			}
-			msg, err := marshalEventWithSizeLimit(event)
+			msg, err := marshalEventWithSizeLimit(&event, &event.Message, &event.Output)
 			Expect(err).Should(BeNil())
 			plain, err := json.Marshal(event)
 			Expect(err).Should(BeNil())
@@ -310,7 +310,7 @@ var _ = Describe("probe", func() {
 				Code:    255,
 				Message: longStderr,
 			}
-			msg, err := marshalEventWithSizeLimit(event)
+			msg, err := marshalEventWithSizeLimit(&event, &event.Message, &event.Output)
 			Expect(err).Should(BeNil())
 			Expect(len(msg)).Should(BeNumerically("<=", maxEventMessageLength))
 
@@ -327,7 +327,7 @@ var _ = Describe("probe", func() {
 				Code:   255,
 				Output: []byte(strings.Repeat("x", 8192)),
 			}
-			msg, err := marshalEventWithSizeLimit(event)
+			msg, err := marshalEventWithSizeLimit(&event, &event.Message, &event.Output)
 			Expect(err).Should(BeNil())
 			Expect(len(msg)).Should(BeNumerically("<=", maxEventMessageLength))
 

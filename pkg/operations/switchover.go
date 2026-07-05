@@ -255,6 +255,7 @@ func handleSwitchover(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *
 			case targetRole == candidateInstance.GetRole():
 				progressDetail.Message = "do switchover succeed"
 				progressDetail.Status = opsv1alpha1.SucceedProgressStatus
+			// default: candidate role hasn't converged to target; stay Processing
 			}
 		} else {
 			progressDetail.Message = "do switchover succeed"

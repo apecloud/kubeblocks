@@ -67,10 +67,10 @@ func (r *ComponentDefinition) ConvertFrom(srcRaw conversion.Hub) error {
 	// created natively as v1 there is no increment-converter annotation to
 	// restore it from, so map it from the source here; the annotation path
 	// below still takes precedence for round-tripped v1alpha1 objects.
-	for i := range src.Spec.Configs {
+	for i := 0; i < len(src.Spec.Configs) && i < len(r.Spec.Configs); i++ {
 		r.Spec.Configs[i].TemplateRef = src.Spec.Configs[i].Template
 	}
-	for i := range src.Spec.Scripts {
+	for i := 0; i < len(src.Spec.Scripts) && i < len(r.Spec.Scripts); i++ {
 		r.Spec.Scripts[i].TemplateRef = src.Spec.Scripts[i].Template
 	}
 	if err := incrementConvertFrom(r, src, &componentDefinitionConverter{}); err != nil {
@@ -117,10 +117,10 @@ func (r *ComponentDefinition) incrementConvertTo(dstRaw metav1.Object) (incremen
 			}
 		}
 	}
-	for i := range r.Spec.Scripts {
+	for i := 0; i < len(r.Spec.Scripts) && i < len(dstObj.Spec.Scripts); i++ {
 		dstObj.Spec.Scripts[i].Template = r.Spec.Scripts[i].TemplateRef
 	}
-	for i := range r.Spec.Configs {
+	for i := 0; i < len(r.Spec.Configs) && i < len(dstObj.Spec.Configs); i++ {
 		dstObj.Spec.Configs[i].Template = r.Spec.Configs[i].TemplateRef
 	}
 	// changed

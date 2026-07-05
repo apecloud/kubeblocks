@@ -429,7 +429,14 @@ func (m *definedPortManager) AllocatePort(key string) (int32, error) {
 }
 
 func (m *definedPortManager) ReleaseByPrefix(prefix string) error {
-	if m.hasKBAgentPortDefined() {
+	// Release must not depend on legacy-alias resolution: the deletion path
+	// builds this manager without the component-port context, so
+	// hasKBAgentPortDefined() can resolve aliases differently from allocation
+	// and skip entries the default manager actually allocated (leaking host
+	// ports). Dynamic allocations live only in the default manager and are
+	// keyed by the component prefix, so releasing unconditionally is safe and
+	// idempotent: fully user-defined setups simply have no entries there.
+	if m.defaultPortManager == nil {
 		return nil
 	}
 	return m.defaultPortManager.ReleaseByPrefix(prefix)

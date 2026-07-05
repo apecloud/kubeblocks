@@ -320,6 +320,44 @@ var _ = Describe("host port manager test", func() {
 			Expect(port).Should(Equal(int32(30001)))
 			Expect(dataCM).Should(HaveKeyWithValue(key, "30001"))
 		})
+
+		It("release - deletion-path nil context still releases default-manager allocations", func() {
+			// allocation side: the component owns real ports named "http" and
+			// "streaming", so both legacy aliases are suppressed and the two
+			// kbagent ports are dynamically allocated in the default manager.
+			// unique cluster/comp names keep this spec independent from the
+			// allocations other specs may have recorded in the shared manager
+			delCluster, delComp := "del-cluster", "del-comp"
+			aliasNetwork := &appsv1.ComponentNetwork{
+				HostNetwork: true,
+				HostPorts: []appsv1.HostPort{
+					{Name: kbagent.LegacyHTTPPortName, Port: 7001},
+					{Name: kbagent.LegacyStreamingPortName, Port: 7002},
+				},
+			}
+			alloc := GetPortManager(aliasNetwork, sets.New(kbagent.LegacyHTTPPortName, kbagent.LegacyStreamingPortName))
+			cmData := func() map[string]string {
+				return alloc.(*definedPortManager).defaultPortManager.cm.Data
+			}
+			for _, pn := range []string{kbagent.DefaultHTTPPortName, kbagent.DefaultStreamingPortName} {
+				key := alloc.PortKey(delCluster, delComp, kbagent.ContainerName, pn)
+				_, err := alloc.AllocatePort(key)
+				Expect(err).Should(BeNil())
+				Expect(cmData()).Should(HaveKey(key))
+			}
+
+			// deletion side: the component-port context is unavailable (nil),
+			// so the legacy aliases resolve and hasKBAgentPortDefined() is
+			// true — release must not consult alias resolution and still has
+			// to remove the default-manager allocations, or the host ports
+			// leak forever
+			del := GetPortManager(aliasNetwork, nil)
+			Expect(del.ReleaseByPrefix(fmt.Sprintf("%s-%s", delCluster, delComp))).Should(Succeed())
+			for _, pn := range []string{kbagent.DefaultHTTPPortName, kbagent.DefaultStreamingPortName} {
+				key := alloc.PortKey(delCluster, delComp, kbagent.ContainerName, pn)
+				Expect(cmData()).ShouldNot(HaveKey(key))
+			}
+		})
 	})
 
 	Context("defined host-port manager - legacy kbagent port names", func() {

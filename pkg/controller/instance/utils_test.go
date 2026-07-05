@@ -225,6 +225,38 @@ func TestEqualResourcesInPlaceFieldsSkipsOmittedRequests(t *testing.T) {
 	}
 }
 
+func TestLimitOnlyScaleDownMergesValidAndConverges(t *testing.T) {
+	livePod := builder.NewPodBuilder("default", "mysql-0").
+		SetContainers([]corev1.Container{{
+			Name: "mysql",
+			Resources: corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")},
+				// the live request was defaulted from the old limit at admission
+				Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")},
+			},
+		}}).
+		GetObject()
+
+	desired := livePod.DeepCopy()
+	desired.Spec.Containers[0].Resources = corev1.ResourceRequirements{
+		Limits: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("500m")},
+	}
+
+	merged := livePod.DeepCopy()
+	mergeInPlaceFields(desired, merged)
+
+	limit := merged.Spec.Containers[0].Resources.Limits[corev1.ResourceCPU]
+	request := merged.Spec.Containers[0].Resources.Requests[corev1.ResourceCPU]
+	if request.Cmp(limit) > 0 {
+		t.Fatalf("merged pod is invalid: request %s > limit %s", request.String(), limit.String())
+	}
+	// second reconcile: the merged (now live) pod must compare equal to the
+	// desired template so the resize path terminates instead of looping
+	if !equalResourcesInPlaceFields(merged, desired) {
+		t.Fatal("resize must converge: merged pod still differs from the desired template")
+	}
+}
+
 func TestConfigsToUpdateStillReportsRealConfigHashMismatch(t *testing.T) {
 	inst := builder.NewInstanceBuilder("default", "valkey-0").
 		SetConfigs([]workloads.ConfigTemplate{{

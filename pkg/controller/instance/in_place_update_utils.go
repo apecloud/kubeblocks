@@ -142,9 +142,32 @@ func mergeInPlaceFields(src, dst *corev1.Pod) {
 					requests, limits := copyRequestsNLimitsFields(&container)
 					mergeResources(&requests, &dst.Spec.Containers[i].Resources.Requests)
 					mergeResources(&limits, &dst.Spec.Containers[i].Resources.Limits)
+					capOmittedRequestsToLimits(&container, &dst.Spec.Containers[i])
 				}
 				break
 			}
+		}
+	}
+}
+
+// capOmittedRequestsToLimits keeps a limit-only template mergeable: when the
+// desired template omits a CPU/memory request, the live request is preserved
+// by the merge — but a limit-only scale-down can leave that preserved request
+// above the new limit, producing an invalid pod that the resize subresource
+// rejects, so the update never converges. Cap the preserved request at the
+// merged limit. Explicit desired requests are applied as-is and stay owned by
+// the template.
+func capOmittedRequestsToLimits(src, dst *corev1.Container) {
+	for _, resourceName := range []corev1.ResourceName{corev1.ResourceCPU, corev1.ResourceMemory} {
+		if _, owned := src.Resources.Requests[resourceName]; owned {
+			continue
+		}
+		limit, hasLimit := dst.Resources.Limits[resourceName]
+		if !hasLimit {
+			continue
+		}
+		if request, ok := dst.Resources.Requests[resourceName]; ok && request.Cmp(limit) > 0 {
+			dst.Resources.Requests[resourceName] = limit
 		}
 	}
 }

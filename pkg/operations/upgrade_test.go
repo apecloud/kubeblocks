@@ -394,6 +394,93 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsFailedPhase))
 		})
 
+		It("Test upgrade OpsRequest with a non-existent componentDefinitionName should fail fast without polluting the cluster spec", func() {
+			By("init operations resources")
+			compDef1, _, opsRes := initOpsResWithComponentDef(true)
+
+			By("create Upgrade Ops with a non-existent componentDefinition")
+			opsRes.OpsRequest = createUpgradeOpsRequest(opsRes.Cluster, opsv1alpha1.Upgrade{
+				Components: []opsv1alpha1.UpgradeComponent{
+					{
+						ComponentOps:            opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
+						ComponentDefinitionName: pointer.String("cmpd-not-exist"),
+					},
+				},
+			})
+
+			By("expect the opsRequest to be Failed instead of retrying forever")
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
+			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsFailedPhase))
+
+			By("expect the cluster spec not to be updated with the non-existent componentDefinition")
+			Consistently(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.Cluster), func(g Gomega, cluster *appsv1.Cluster) {
+				g.Expect(cluster.Spec.ComponentSpecs[0].ComponentDef).Should(Equal(compDef1.Name))
+			})).Should(Succeed())
+		})
+
+		It("Test upgrade OpsRequest with an unresolvable serviceVersion should fail fast without polluting the cluster spec", func() {
+			By("init operations resources")
+			_, _, opsRes := initOpsResWithComponentDef(true)
+
+			By("create Upgrade Ops with a serviceVersion that no release provides")
+			opsRes.OpsRequest = createUpgradeOpsRequest(opsRes.Cluster, opsv1alpha1.Upgrade{
+				Components: []opsv1alpha1.UpgradeComponent{
+					{
+						ComponentOps:   opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
+						ServiceVersion: pointer.String("99.99.99"),
+					},
+				},
+			})
+
+			By("expect the opsRequest to be Failed instead of retrying forever")
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
+			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsFailedPhase))
+
+			By("expect the cluster spec not to be updated with the unresolvable serviceVersion")
+			Consistently(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.Cluster), func(g Gomega, cluster *appsv1.Cluster) {
+				g.Expect(cluster.Spec.ComponentSpecs[0].ServiceVersion).Should(Equal(serviceVer0))
+			})).Should(Succeed())
+		})
+
+		It("Test upgrade OpsRequest should fail when the componentDefinition is deleted during reconciling", func() {
+			By("init operations resources")
+			_, compDef2, opsRes := initOpsResWithComponentDef(false)
+
+			By("create Upgrade Ops")
+			opsRes.OpsRequest = createUpgradeOpsRequest(opsRes.Cluster, opsv1alpha1.Upgrade{
+				Components: []opsv1alpha1.UpgradeComponent{
+					{
+						ComponentOps:            opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
+						ComponentDefinitionName: &compDef2.Name,
+					},
+				},
+			})
+
+			By("mock upgrade OpsRequest phase is Running")
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+			makeUpgradeOpsIsRunning(reqCtx, opsRes)
+
+			By("delete the target componentDefinition")
+			Expect(k8sClient.Delete(ctx, compDef2)).Should(Succeed())
+			Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(compDef2),
+				&appsv1.ComponentDefinition{}, false)).Should(Succeed())
+
+			By("expect the opsRequest to be Failed instead of retrying forever")
+			_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsFailedPhase))
+		})
+
 		It("Test upgrade OpsRequest when componentDefinitionName is nil", func() {
 			By("init operations resources")
 			compDef1, _, opsRes := initOpsResWithComponentDef(true)

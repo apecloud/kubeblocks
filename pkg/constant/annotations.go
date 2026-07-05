@@ -71,6 +71,8 @@ const (
 	RestoreComponentAnnotationKey       = "apps.kubeblocks.io/restore-component"
 	RestoreVolumeTemplateAnnotationKey  = "apps.kubeblocks.io/restore-volume-template"
 
+	RestorePVCInitialStepCompletedAnnotationKey = "apps.kubeblocks.io/restore-pvc-initial-step-completed"
+
 	// These annoations serve in a transition period when existing clusters can adopt
 	// new serviceaccount naming rules.
 	// They will be removed in the future.

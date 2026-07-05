@@ -869,6 +869,66 @@ var _ = Describe("OpsUtil functions", func() {
 			testRebuildInstanceWithBackup(true)
 		})
 
+		It("test rebuild instance in place when the backup does not exist", func() {
+			By("init operations resources with a nonexistent backup")
+			opsRes := prepareOpsRes("backup-not-exist-"+randomStr, true)
+			_ = testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
+			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsRunningPhase
+			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
+			handler := rebuildInstanceOpsHandler{}
+
+			By("expect the missing backup to fail the instances instead of returning a retryable error")
+			_, _, err := handler.ReconcileAction(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			progressDetails := opsRes.OpsRequest.Status.Components[defaultCompName].ProgressDetails
+			Expect(progressDetails).Should(HaveLen(rebuildInstanceCount))
+			for _, detail := range progressDetails {
+				Expect(detail.Status).Should(Equal(opsv1alpha1.FailedProgressStatus))
+				Expect(detail.Message).Should(ContainSubstring("not found"))
+			}
+
+			By("expect the opsRequest to fail on the next reconciliation")
+			opsPhase, _, err := handler.ReconcileAction(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(opsPhase).Should(Equal(opsv1alpha1.OpsFailedPhase))
+		})
+
+		It("test rebuild instance in place when the actionSet of the backup does not exist", func() {
+			By("init operations resources with a backup that references a nonexistent actionSet")
+			backup := testdp.NewBackupFactory(testCtx.DefaultNamespace, testdp.BackupName).
+				SetBackupPolicyName(testdp.BackupPolicyName).
+				SetBackupMethod(testdp.BackupMethodName).
+				AddLabels(dptypes.BackupTypeLabelKey, string(dpv1alpha1.BackupTypeFull)).
+				Create(&testCtx).GetObject()
+			Expect(testapps.ChangeObjStatus(&testCtx, backup, func() {
+				backup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
+				backup.Status.BackupMethod = &dpv1alpha1.BackupMethod{
+					Name:          backup.Spec.BackupMethod,
+					ActionSetName: "actionset-not-exist-" + randomStr,
+				}
+			})).Should(Succeed())
+			opsRes := prepareOpsRes(backup.Name, true)
+			_ = testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
+			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsRunningPhase
+			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
+			handler := rebuildInstanceOpsHandler{}
+
+			By("expect the missing actionSet to fail the instances instead of returning a retryable error")
+			_, _, err := handler.ReconcileAction(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			progressDetails := opsRes.OpsRequest.Status.Components[defaultCompName].ProgressDetails
+			Expect(progressDetails).Should(HaveLen(rebuildInstanceCount))
+			for _, detail := range progressDetails {
+				Expect(detail.Status).Should(Equal(opsv1alpha1.FailedProgressStatus))
+				Expect(detail.Message).Should(ContainSubstring("not found"))
+			}
+
+			By("expect the opsRequest to fail on the next reconciliation")
+			opsPhase, _, err := handler.ReconcileAction(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(opsPhase).Should(Equal(opsv1alpha1.OpsFailedPhase))
+		})
+
 		It("rebuild instance with horizontal scaling", func() {
 			By("init operations resources ")
 			opsRes, _, _ := initOperationsResources(compDefName, clusterName)

@@ -596,6 +596,9 @@ func (r rebuildInstanceOpsHandler) prepareInplaceRebuildHelper(reqCtx intctrluti
 		// prepare backup infos
 		backup = &dpv1alpha1.Backup{}
 		if err = cli.Get(reqCtx.Ctx, client.ObjectKey{Name: rebuildInstance.BackupName, Namespace: opsRes.Cluster.Namespace}, backup); err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil, intctrlutil.NewFatalError(fmt.Sprintf(`the backup "%s" is not found`, rebuildInstance.BackupName))
+			}
 			return nil, err
 		}
 		if !slices.Contains([]string{string(dpv1alpha1.BackupTypeFull), string(dpv1alpha1.BackupTypeIncremental)}, backup.Labels[dptypes.BackupTypeLabelKey]) {
@@ -609,6 +612,9 @@ func (r rebuildInstanceOpsHandler) prepareInplaceRebuildHelper(reqCtx intctrluti
 		}
 		actionSet, err = dputils.GetActionSetByName(reqCtx, cli, backup.Status.BackupMethod.ActionSetName)
 		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil, intctrlutil.NewFatalError(fmt.Sprintf(`the actionSet "%s" of the backup "%s" is not found`, backup.Status.BackupMethod.ActionSetName, rebuildInstance.BackupName))
+			}
 			return nil, err
 		}
 	}

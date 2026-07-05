@@ -24,6 +24,7 @@ import (
 	"strings"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -69,7 +70,18 @@ func (b BackupOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clien
 	if backup, err := buildBackup(reqCtx, cli, opsRequest, cluster); err != nil {
 		return err
 	} else {
-		return cli.Create(reqCtx.Ctx, backup)
+		if err = cli.Create(reqCtx.Ctx, backup); !apierrors.IsAlreadyExists(err) {
+			return err
+		}
+		existingBackup := &dpv1alpha1.Backup{}
+		if getErr := cli.Get(reqCtx.Ctx, client.ObjectKeyFromObject(backup), existingBackup); getErr != nil {
+			return getErr
+		}
+		if existingBackup.Labels[constant.OpsRequestNameLabelKey] == opsRequest.Name {
+			// the backup has already been created by this OpsRequest.
+			return nil
+		}
+		return intctrlutil.NewFatalError(fmt.Sprintf(`backup "%s" already exists and is not created by this OpsRequest`, backup.Name))
 	}
 }
 
@@ -133,12 +145,12 @@ func buildBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRequest *o
 	defaultBackupMethod, backupMethodMap := utils.GetBackupMethodsFromBackupPolicy(backupPolicyList, backupSpec.BackupPolicyName)
 	if backupSpec.BackupMethod == "" {
 		if defaultBackupMethod == "" {
-			return nil, fmt.Errorf("failed to find default backup method, please check cluster's backup policy")
+			return nil, intctrlutil.NewFatalError("failed to find default backup method, please check cluster's backup policy")
 		}
 		backupSpec.BackupMethod = defaultBackupMethod
 	}
 	if _, ok := backupMethodMap[backupSpec.BackupMethod]; !ok {
-		return nil, fmt.Errorf("backup method %s is not supported, please check cluster's backup policy", backupSpec.BackupMethod)
+		return nil, intctrlutil.NewFatalError(fmt.Sprintf("backup method %s is not supported, please check cluster's backup policy", backupSpec.BackupMethod))
 	}
 
 	backup := &dpv1alpha1.Backup{
@@ -160,22 +172,28 @@ func buildBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRequest *o
 	if backupSpec.RetentionPeriod != "" {
 		retentionPeriod := dpv1alpha1.RetentionPeriod(backupSpec.RetentionPeriod)
 		if _, err := retentionPeriod.ToDuration(); err != nil {
-			return nil, err
+			return nil, intctrlutil.NewFatalError(err.Error())
 		}
 		backup.Spec.RetentionPeriod = retentionPeriod
 	}
 	if backupSpec.ParentBackupName != "" {
 		parentBackup := dpv1alpha1.Backup{}
 		if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: backupSpec.ParentBackupName, Namespace: cluster.Namespace}, &parentBackup); err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil, intctrlutil.NewFatalError(err.Error())
+			}
 			return nil, err
 		}
 		// check parent backup exists and completed
 		if parentBackup.Status.Phase != dpv1alpha1.BackupPhaseCompleted {
+			if parentBackup.Status.Phase == dpv1alpha1.BackupPhaseFailed || parentBackup.Status.Phase == dpv1alpha1.BackupPhaseDeleting {
+				return nil, intctrlutil.NewFatalError(fmt.Sprintf("parent backup %s is %s", backupSpec.ParentBackupName, parentBackup.Status.Phase))
+			}
 			return nil, fmt.Errorf("parent backup %s is not completed", backupSpec.ParentBackupName)
 		}
 		// check parent backup belongs to the cluster of the backup
 		if parentBackup.Labels[constant.AppInstanceLabelKey] != cluster.Name {
-			return nil, fmt.Errorf("parent backup %s is not belong to cluster %s", backupSpec.ParentBackupName, cluster.Name)
+			return nil, intctrlutil.NewFatalError(fmt.Sprintf("parent backup %s is not belong to cluster %s", backupSpec.ParentBackupName, cluster.Name))
 		}
 		backup.Spec.ParentBackupName = backupSpec.ParentBackupName
 	}
@@ -204,10 +222,10 @@ func getDefaultBackupPolicy(reqCtx intctrlutil.RequestCtx, cli client.Client, cl
 	}
 
 	if len(defaultBackupPolices.Items) == 0 {
-		return "", fmt.Errorf(`not found any default backup policy for cluster "%s"`, cluster.Name)
+		return "", intctrlutil.NewFatalError(fmt.Sprintf(`not found any default backup policy for cluster "%s"`, cluster.Name))
 	}
 	if len(defaultBackupPolices.Items) > 1 {
-		return "", fmt.Errorf(`cluster "%s" has multiple default backup policies`, cluster.Name)
+		return "", intctrlutil.NewFatalError(fmt.Sprintf(`cluster "%s" has multiple default backup policies`, cluster.Name))
 	}
 
 	return defaultBackupPolices.Items[0].GetName(), nil

@@ -181,6 +181,191 @@ var _ = Describe("Backup OpsRequest", func() {
 			Expect(err).Should(HaveOccurred())
 		})
 
+		It("fails fast with fatal errors on deterministic invalid inputs", func() {
+			fakeScheme := runtime.NewScheme()
+			Expect(dpv1alpha1.AddToScheme(fakeScheme)).Should(Succeed())
+			policy := &dpv1alpha1.BackupPolicy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "default-policy",
+					Namespace: testCtx.DefaultNamespace,
+					Labels: map[string]string{
+						"app.kubernetes.io/instance": opsRes.Cluster.Name,
+					},
+					Annotations: map[string]string{
+						dptypes.DefaultBackupPolicyAnnotationKey: "true",
+					},
+				},
+				Spec: dpv1alpha1.BackupPolicySpec{
+					BackupMethods: []dpv1alpha1.BackupMethod{{
+						Name:            "snapshot",
+						SnapshotVolumes: func() *bool { v := true; return &v }(),
+					}},
+				},
+				Status: dpv1alpha1.BackupPolicyStatus{Phase: dpv1alpha1.AvailablePhase},
+			}
+			failedParentBackup := &dpv1alpha1.Backup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "failed-parent-backup",
+					Namespace: testCtx.DefaultNamespace,
+					Labels: map[string]string{
+						"app.kubernetes.io/instance": opsRes.Cluster.Name,
+					},
+				},
+				Status: dpv1alpha1.BackupStatus{Phase: dpv1alpha1.BackupPhaseFailed},
+			}
+			otherClusterParentBackup := &dpv1alpha1.Backup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "other-cluster-parent-backup",
+					Namespace: testCtx.DefaultNamespace,
+					Labels: map[string]string{
+						"app.kubernetes.io/instance": "other-cluster",
+					},
+				},
+				Status: dpv1alpha1.BackupStatus{Phase: dpv1alpha1.BackupPhaseCompleted},
+			}
+			fakeClient := fake.NewClientBuilder().WithScheme(fakeScheme).
+				WithObjects(policy, failedParentBackup, otherClusterParentBackup).Build()
+			ops := createBackupOpsObj(clusterName, "backup-fatal-"+randomStr)
+
+			By("expect fatal error when backupPolicyName refers to a nonexistent backup policy")
+			ops.Spec.Backup = &opsv1alpha1.Backup{BackupPolicyName: "missing"}
+			_, err := buildBackup(reqCtx, fakeClient, ops, opsRes.Cluster)
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeTrue())
+
+			By("expect fatal error when backupMethod is not defined in the backup policy")
+			ops.Spec.Backup = &opsv1alpha1.Backup{BackupMethod: "not-exist-method"}
+			_, err = buildBackup(reqCtx, fakeClient, ops, opsRes.Cluster)
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeTrue())
+			Expect(err.Error()).Should(ContainSubstring("backup method not-exist-method is not supported"))
+
+			By("expect fatal error when retentionPeriod is invalid")
+			ops.Spec.Backup = &opsv1alpha1.Backup{RetentionPeriod: "not-a-duration"}
+			_, err = buildBackup(reqCtx, fakeClient, ops, opsRes.Cluster)
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeTrue())
+
+			By("expect fatal error when parentBackupName refers to a nonexistent backup")
+			ops.Spec.Backup = &opsv1alpha1.Backup{ParentBackupName: "not-exist-parent-backup"}
+			_, err = buildBackup(reqCtx, fakeClient, ops, opsRes.Cluster)
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeTrue())
+
+			By("expect fatal error when parent backup is Failed")
+			ops.Spec.Backup = &opsv1alpha1.Backup{ParentBackupName: failedParentBackup.Name}
+			_, err = buildBackup(reqCtx, fakeClient, ops, opsRes.Cluster)
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeTrue())
+
+			By("expect fatal error when parent backup belongs to another cluster")
+			ops.Spec.Backup = &opsv1alpha1.Backup{ParentBackupName: otherClusterParentBackup.Name}
+			_, err = buildBackup(reqCtx, fakeClient, ops, opsRes.Cluster)
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeTrue())
+
+			By("expect fatal error when no default backup policy exists for the cluster")
+			emptyClient := fake.NewClientBuilder().WithScheme(fakeScheme).Build()
+			_, err = getDefaultBackupPolicy(reqCtx, emptyClient, opsRes.Cluster, "")
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeTrue())
+
+			By("expect fatal error when multiple default backup policies exist for the cluster")
+			policy2 := policy.DeepCopy()
+			policy2.Name = "default-policy-2"
+			policy2.ResourceVersion = ""
+			multiPolicyClient := fake.NewClientBuilder().WithScheme(fakeScheme).WithObjects(policy, policy2).Build()
+			_, err = getDefaultBackupPolicy(reqCtx, multiPolicyClient, opsRes.Cluster, "")
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeTrue())
+		})
+
+		It("keeps retrying while parent backup is still running", func() {
+			fakeScheme := runtime.NewScheme()
+			Expect(dpv1alpha1.AddToScheme(fakeScheme)).Should(Succeed())
+			policy := &dpv1alpha1.BackupPolicy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "default-policy",
+					Namespace: testCtx.DefaultNamespace,
+					Labels: map[string]string{
+						"app.kubernetes.io/instance": opsRes.Cluster.Name,
+					},
+					Annotations: map[string]string{
+						dptypes.DefaultBackupPolicyAnnotationKey: "true",
+					},
+				},
+				Spec: dpv1alpha1.BackupPolicySpec{
+					BackupMethods: []dpv1alpha1.BackupMethod{{
+						Name:            "snapshot",
+						SnapshotVolumes: func() *bool { v := true; return &v }(),
+					}},
+				},
+				Status: dpv1alpha1.BackupPolicyStatus{Phase: dpv1alpha1.AvailablePhase},
+			}
+			runningParentBackup := &dpv1alpha1.Backup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "running-parent-backup",
+					Namespace: testCtx.DefaultNamespace,
+					Labels: map[string]string{
+						"app.kubernetes.io/instance": opsRes.Cluster.Name,
+					},
+				},
+				Status: dpv1alpha1.BackupStatus{Phase: dpv1alpha1.BackupPhaseRunning},
+			}
+			fakeClient := fake.NewClientBuilder().WithScheme(fakeScheme).
+				WithObjects(policy, runningParentBackup).Build()
+			ops := createBackupOpsObj(clusterName, "backup-parent-running-"+randomStr)
+			ops.Spec.Backup = &opsv1alpha1.Backup{ParentBackupName: runningParentBackup.Name}
+			_, err := buildBackup(reqCtx, fakeClient, ops, opsRes.Cluster)
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring("is not completed"))
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeFalse())
+		})
+
+		It("handles a backup name collision with an existing backup", func() {
+			fakeScheme := runtime.NewScheme()
+			Expect(dpv1alpha1.AddToScheme(fakeScheme)).Should(Succeed())
+			policy := &dpv1alpha1.BackupPolicy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "default-policy",
+					Namespace: testCtx.DefaultNamespace,
+					Labels: map[string]string{
+						"app.kubernetes.io/instance": opsRes.Cluster.Name,
+					},
+					Annotations: map[string]string{
+						dptypes.DefaultBackupPolicyAnnotationKey: "true",
+					},
+				},
+				Spec: dpv1alpha1.BackupPolicySpec{
+					BackupMethods: []dpv1alpha1.BackupMethod{{
+						Name:            "snapshot",
+						SnapshotVolumes: func() *bool { v := true; return &v }(),
+					}},
+				},
+				Status: dpv1alpha1.BackupPolicyStatus{Phase: dpv1alpha1.AvailablePhase},
+			}
+			ops := createBackupOpsObj(clusterName, "backup-collision-"+randomStr)
+			ops.Spec.Backup = &opsv1alpha1.Backup{BackupName: "colliding-backup"}
+			opsRes.OpsRequest = ops
+
+			By("expect fatal error when the existing backup is not created by this OpsRequest")
+			foreignBackup := &dpv1alpha1.Backup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "colliding-backup",
+					Namespace: testCtx.DefaultNamespace,
+				},
+			}
+			fakeClient := fake.NewClientBuilder().WithScheme(fakeScheme).
+				WithObjects(policy, foreignBackup).Build()
+			err := BackupOpsHandler{}.Action(reqCtx, fakeClient, opsRes)
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeTrue())
+			Expect(err.Error()).Should(ContainSubstring("already exists and is not created by this OpsRequest"))
+
+			By("expect success when the existing backup was created by this OpsRequest")
+			ownedBackup := &dpv1alpha1.Backup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "colliding-backup",
+					Namespace: testCtx.DefaultNamespace,
+					Labels:    getBackupLabels(opsRes.Cluster.Name, ops.Name),
+				},
+			}
+			fakeClient = fake.NewClientBuilder().WithScheme(fakeScheme).
+				WithObjects(policy, ownedBackup).Build()
+			Expect(BackupOpsHandler{}.Action(reqCtx, fakeClient, opsRes)).Should(Succeed())
+		})
+
 		It("reports backup policy and method validation errors", func() {
 			fakeScheme := runtime.NewScheme()
 			Expect(dpv1alpha1.AddToScheme(fakeScheme)).Should(Succeed())

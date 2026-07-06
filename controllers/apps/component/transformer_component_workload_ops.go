@@ -127,8 +127,11 @@ func (r *componentWorkloadOps) scaleIn() error {
 
 	joinedReplicas := make([]string, 0)
 	err := component.DeleteReplicasStatus(r.protoITS, deleteReplicas, func(s component.ReplicaStatus) {
-		// has no member join defined or has joined successfully
-		if s.Provisioned && (s.MemberJoined == nil || *s.MemberJoined) {
+		// has joined successfully, or has no member join defined and has been provisioned.
+		// a joined replica must leave regardless of the provisioned flag: a join driven
+		// by the scale-in gate in this reconcile sets MemberJoined in the in-memory
+		// records while the provisioned flag may not have been persisted yet.
+		if (s.MemberJoined != nil && *s.MemberJoined) || (s.MemberJoined == nil && s.Provisioned) {
 			joinedReplicas = append(joinedReplicas, s.Name)
 		}
 	})
@@ -144,19 +147,70 @@ func (r *componentWorkloadOps) scaleIn() error {
 	return nil
 }
 
+// gatePendingMemberLifecycle holds the scale-in while any replica to be deleted
+// still has a pending (non-terminal) member-join record and an active pod, and
+// keeps driving the pending joins in the same reconcile.
+//
+// The scale-in path runs before postScaleOut(), and postScaleOut() only runs
+// when there is no replica to scale in or out. So once the gate holds, nothing
+// else would drive the pending joins to completion; the gate has to drive them
+// itself, otherwise a scale-in that cancels a not-yet-joined scale-out would
+// wait forever on a join that nobody re-invokes.
 func (r *componentWorkloadOps) gatePendingMemberLifecycle(deleteReplicas []string) error {
 	deleteSet := sets.New(deleteReplicas...)
-	pendingReplicas, err := component.GetReplicasStatusListFunc(r.runningITS, func(s component.ReplicaStatus) bool {
-		return deleteSet.Has(s.Name) && s.MemberJoined != nil && !*s.MemberJoined
+	activePending, err := r.activePendingMemberJoins(r.runningITS, deleteSet)
+	if err != nil {
+		return err
+	}
+	if len(activePending) == 0 {
+		return nil
+	}
+
+	// Keep driving the pending joins while the gate holds. This reuses the
+	// scale-out join path: it is guarded by the replicas-status records, and
+	// re-invoking the memberJoin action is safe the same way the scale-out
+	// path re-drives it on every reconcile until the records are persisted.
+	// A requeue from the drive is superseded by the gate's own requeue below;
+	// the gate re-evaluates the records the drive has just updated instead.
+	if err := r.joinMember4ScaleOut(); err != nil && !intctrlutil.IsRequeueError(err) {
+		return err
+	}
+
+	// re-evaluate against protoITS, whose records joinMember4ScaleOut has updated
+	stillPending, err := r.activePendingMemberJoins(r.protoITS, deleteSet)
+	if err != nil {
+		return err
+	}
+	if len(stillPending) == 0 {
+		// all pending joins have completed (or turned terminal), release the
+		// gate and let the scale-in (member-leave included) proceed within
+		// this reconcile, so that the updated records are persisted through
+		// the workload update path.
+		return nil
+	}
+
+	r.transCtx.EventRecorder.Eventf(r.component, corev1.EventTypeWarning, "PendingMemberJoin",
+		"scale-in of component %s is waiting for replicas %v to finish the member join, the join is re-driven on every reconcile until it completes",
+		r.synthesizeComp.Name, stillPending)
+	return intctrlutil.NewRequeueError(time.Second,
+		fmt.Sprintf("scale-in gated: replicas %v have pending member lifecycle (MemberJoined=false) with active pods, driving the member join until it completes", stillPending))
+}
+
+// activePendingMemberJoins returns the replicas within deleteSet whose
+// member-join records in its are still pending (not joined and not terminally
+// failed) and whose pods are active.
+func (r *componentWorkloadOps) activePendingMemberJoins(its *workloads.InstanceSet, deleteSet sets.Set[string]) ([]string, error) {
+	pendingReplicas, err := component.GetReplicasStatusListFunc(its, func(s component.ReplicaStatus) bool {
+		return deleteSet.Has(s.Name) && s.MemberJoined != nil && !*s.MemberJoined && !s.MemberJoinFailed
 	})
 	if err != nil || len(pendingReplicas) == 0 {
-		return err
+		return nil, err
 	}
 
 	pods, err := component.ListOwnedInstances(r.transCtx.Context, r.cli,
 		r.component, r.runningITS, r.protoITS)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	podSet := sets.New[string]()
 	for _, pod := range pods {
@@ -166,16 +220,11 @@ func (r *componentWorkloadOps) gatePendingMemberLifecycle(deleteReplicas []strin
 	}
 	activePending := make([]string, 0, len(pendingReplicas))
 	for _, replica := range pendingReplicas {
-		if podSet.Has(replica.Name) && !replica.MemberJoinFailed {
+		if podSet.Has(replica.Name) {
 			activePending = append(activePending, replica.Name)
 		}
 	}
-	if len(activePending) == 0 {
-		return nil
-	}
-
-	return intctrlutil.NewRequeueError(time.Second*30,
-		fmt.Sprintf("scale-in gated: replicas %v have pending member lifecycle (MemberJoined=false) with active pods, waiting for join to complete", activePending))
+	return activePending, nil
 }
 
 func isMemberLifecycleActivePod(pod *corev1.Pod) bool {

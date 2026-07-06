@@ -250,6 +250,15 @@ var _ = Describe("file templates transformer test", func() {
 			checkTemplateObjects([]string{"logConf", "serverConf"})
 		})
 
+		It("template not specified and not externally managed - error", func() {
+			transCtx.SynthesizeComponent.FileTemplates[0].Template = ""
+
+			transformer := &componentFileTemplateTransformer{}
+			err := transformer.Transform(transCtx, dag)
+			Expect(err).ShouldNot(BeNil())
+			Expect(err.Error()).Should(ContainSubstring("has no template specified"))
+		})
+
 		It("variables - w/o", func() {
 			logConfCM.Data["level"] = "{{- if (index $ \"LOG_LEVEL\") }}\n\t{{- .LOG_LEVEL }}\n{{- else }}\n\t{{- \"info\" }}\n{{- end }}"
 
@@ -354,16 +363,34 @@ var _ = Describe("file templates transformer test", func() {
 			// checkEnvWithAction(component.UDFReconfigureActionName(transCtx.SynthesizeComponent.FileTemplates[1]))
 		})
 
-		It("external managed - w/o template", func() {
+		It("external managed config - w/o template", func() {
 			transCtx.SynthesizeComponent.FileTemplates[1].Template = ""
 			transCtx.SynthesizeComponent.FileTemplates[1].Namespace = ""
 			transCtx.SynthesizeComponent.FileTemplates[1].Reconfigure = nil
 			transCtx.SynthesizeComponent.FileTemplates[1].ExternalManaged = ptr.To(true)
+			transCtx.SynthesizeComponent.FileTemplates[1].Config = true
 
+			// the ConfigMap of an externally managed config is not provisioned yet: the
+			// transformation should succeed and mount the deterministic runtime ConfigMap
+			// name, so that the pod waits for the parameters controllers to provision it.
+			transformer := &componentFileTemplateTransformer{}
+			err := transformer.Transform(transCtx, dag)
+			Expect(err).Should(BeNil())
+			Expect(transCtx.SynthesizeComponent.PodSpec.Volumes).Should(ContainElement(newVolume("serverConf")))
+		})
+
+		It("external managed script - w/o template", func() {
+			transCtx.SynthesizeComponent.FileTemplates[1].Template = ""
+			transCtx.SynthesizeComponent.FileTemplates[1].Namespace = ""
+			transCtx.SynthesizeComponent.FileTemplates[1].Reconfigure = nil
+			transCtx.SynthesizeComponent.FileTemplates[1].ExternalManaged = ptr.To(true)
+			transCtx.SynthesizeComponent.FileTemplates[1].Config = false
+
+			// scripts have no producer for the ConfigMap, the bypass must not apply to them.
 			transformer := &componentFileTemplateTransformer{}
 			err := transformer.Transform(transCtx, dag)
 			Expect(err).ShouldNot(BeNil())
-			Expect(err.Error()).Should(ContainSubstring("config/script template has no template specified"))
+			Expect(err.Error()).Should(ContainSubstring("has no template specified"))
 		})
 	})
 })

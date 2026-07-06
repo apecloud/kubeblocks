@@ -113,6 +113,18 @@ func (t *componentFileTemplateTransformer) instanceAssistantObject(transCtx *com
 func (t *componentFileTemplateTransformer) precheck(transCtx *componentTransformContext) error {
 	for _, tpl := range transCtx.SynthesizeComponent.FileTemplates {
 		if len(tpl.Template) == 0 {
+			if tpl.Config && isExternalManaged(tpl) {
+				// The template of an externally managed config is reset when no ConfigMap
+				// source has been provided (see synthesizeFileTemplates): the parameters
+				// controllers will provision the runtime ConfigMap and back-fill
+				// spec.configs[].configMap with it later. Provision the workload with the
+				// deterministic runtime ConfigMap name (see buildPodVolumes) and let the
+				// pod wait for it, instead of failing the transformation.
+				continue
+			}
+			// Externally managed scripts are NOT covered by the bypass above: only configs
+			// have a producer (the parameters controllers) for the ConfigMap, so an empty
+			// template is a definition error for scripts as well as for ordinary templates.
 			return fmt.Errorf("config/script template has no template specified: %s", tpl.Name)
 		}
 	}
@@ -148,7 +160,12 @@ func (t *componentFileTemplateTransformer) buildPodVolumes(transCtx *componentTr
 	for _, tpl := range synthesizedComp.FileTemplates {
 		objName := fileTemplateObjectName(transCtx.SynthesizeComponent, tpl.Name)
 		// If the file template is managed by external, the volume mount object should be the external object.
-		if isExternalManaged(tpl) {
+		// An externally managed config whose ConfigMap has not been provisioned yet (empty
+		// template, configs only, see precheck) keeps the default objName: the parameters
+		// controllers create the runtime ConfigMap with exactly this deterministic name
+		// (GetComponentCfgName == fileTemplateObjectName), so the pod waits on the volume
+		// mount until it is provisioned.
+		if isExternalManaged(tpl) && len(tpl.Template) > 0 {
 			objName = tpl.Template
 		}
 		createFn := func(_ string) corev1.Volume {

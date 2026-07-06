@@ -24,6 +24,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -450,6 +451,79 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			Consistently(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.Cluster), func(g Gomega, cluster *appsv1.Cluster) {
 				g.Expect(cluster.Spec.ComponentSpecs[0].ServiceVersion).Should(Equal(serviceVer0))
 			})).Should(Succeed())
+		})
+
+		It("Test upgrade OpsRequest with a pattern componentDef and an incompatible serviceVersion should fail fast without polluting the cluster spec", func() {
+			By("init operations resources")
+			compDef1, _, opsRes := initOpsResWithComponentDef(true)
+
+			By("create Upgrade Ops with a componentDefinition name prefix and a serviceVersion that no matched componentDefinition supports")
+			// "test-component-definition-cmpd" is a name prefix of both compDef1 and compDef2.
+			compDefPrefix := testapps.CompDefName("cmpd")
+			opsRes.OpsRequest = createUpgradeOpsRequest(opsRes.Cluster, opsv1alpha1.Upgrade{
+				Components: []opsv1alpha1.UpgradeComponent{
+					{
+						ComponentOps:            opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
+						ComponentDefinitionName: pointer.String(compDefPrefix),
+						ServiceVersion:          pointer.String("99.99.99"),
+					},
+				},
+			})
+
+			By("expect the opsRequest to be Failed instead of retrying forever")
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
+			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsFailedPhase))
+
+			By("expect the cluster spec not to be updated with the pattern componentDef and the incompatible serviceVersion")
+			Consistently(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.Cluster), func(g Gomega, cluster *appsv1.Cluster) {
+				g.Expect(cluster.Spec.ComponentSpecs[0].ComponentDef).Should(Equal(compDef1.Name))
+				g.Expect(cluster.Spec.ComponentSpecs[0].ServiceVersion).Should(Equal(serviceVer0))
+			})).Should(Succeed())
+		})
+
+		It("Test upgrade OpsRequest with a pattern componentDef and a resolvable serviceVersion", func() {
+			By("init operations resources")
+			_, compDef2, opsRes := initOpsResWithComponentDef(true)
+
+			By("create Upgrade Ops with a componentDefinition name prefix and a serviceVersion supported by a matched componentDefinition")
+			compDefPrefix := testapps.CompDefName("cmpd")
+			opsRes.OpsRequest = createUpgradeOpsRequest(opsRes.Cluster, opsv1alpha1.Upgrade{
+				Components: []opsv1alpha1.UpgradeComponent{
+					{
+						ComponentOps:            opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
+						ComponentDefinitionName: pointer.String(compDefPrefix),
+						ServiceVersion:          pointer.String(serviceVer2),
+					},
+				},
+			})
+
+			By("expect the opsRequest to pass the pre-check and update the cluster spec")
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+			makeUpgradeOpsIsRunning(reqCtx, opsRes)
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.Cluster), func(g Gomega, cluster *appsv1.Cluster) {
+				g.Expect(cluster.Spec.ComponentSpecs[0].ComponentDef).Should(Equal(compDefPrefix))
+				g.Expect(cluster.Spec.ComponentSpecs[0].ServiceVersion).Should(Equal(serviceVer2))
+			})).Should(Succeed())
+
+			By("expect the reconcile not to fail fatally while the cluster controller has not resolved the pattern yet")
+			_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			Expect(err).Should(HaveOccurred())
+			Expect(apierrors.IsNotFound(err)).Should(BeTrue())
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsRunningPhase))
+
+			By("mimic the cluster controller normalization that writes the resolved componentDefinition back to the cluster spec")
+			Expect(testapps.ChangeObj(&testCtx, opsRes.Cluster, func(cluster *appsv1.Cluster) {
+				cluster.Spec.ComponentSpecs[0].ComponentDef = compDef2.Name
+			})).Should(Succeed())
+
+			By("expect upgrade successfully with the pattern resolved to the compatible componentDefinition")
+			mockPodsAppliedImage(opsRes.Cluster, release3)
+			expectOpsSucceed(reqCtx, opsRes, defaultCompName)
 		})
 
 		It("Test upgrade OpsRequest should fail when the componentDefinition is deleted during reconciling", func() {

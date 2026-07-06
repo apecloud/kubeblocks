@@ -23,104 +23,44 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
-	"reflect"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
 func TestGenerateOpenApiSchema(t *testing.T) {
-	type args struct {
-		cueFile    string
-		schemaType string
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    string
-		wantErr bool
-	}{{
-		name: "normal_test",
-		args: args{
-			cueFile:    "test_import_type.cue",
-			schemaType: "Exemplar",
-		},
-		want:    "test_import_type.json",
-		wantErr: false,
-	}, {
-		name: "normal_test",
-		args: args{
-			cueFile:    "mysql_openapi.cue",
-			schemaType: "MysqlParameter",
-		},
-		want:    "mysql_openapi.json",
-		wantErr: false,
-	}, {
-		//	name: "normal_test",
-		//	args: args{
-		//		cueFile:    "mysql_openapi_v2.cue",
-		//		schemaType: "MysqlSchema",
-		//	},
-		//	want:    "mysql_openapi_v2.json",
-		//	wantErr: false,
-		// }, {
-		name: "normal_with_not_empty",
-		args: args{
-			cueFile:    "mysql_openapi.cue",
-			schemaType: "",
-		},
-		want:    "mysql_openapi.json",
-		wantErr: false,
-	}, {
-		name: "pg14_openapi",
-		args: args{
-			cueFile:    "pg14.cue",
-			schemaType: "PGPameter",
-		},
-		want:    "pg14_openapi.json",
-		wantErr: false,
-	}, {
-		name: "multiple_schema_arch_a",
-		args: args{
-			cueFile:    "multiple_schema.cue",
-			schemaType: "archA",
-		},
-		want:    "multiple_schema_arch_a.json",
-		wantErr: false,
-	}, {
-		name: "multiple_schema_combined",
-		args: args{
-			cueFile:    "multiple_schema.cue",
-			schemaType: "combined",
-		},
-		want:    "multiple_schema_combined.json",
-		wantErr: false,
-	}, {
-		name: "failed_test",
-		args: args{
-			cueFile:    "mysql.cue",
-			schemaType: "NotType",
-		},
-		want:    "mysql_openapi_failed_not_exist",
-		wantErr: true,
-	}}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := runOpenAPITest(tt.args.cueFile, tt.args.schemaType)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("GenerateOpenAPISchema() error = %v, wantErr %v", err, tt.wantErr)
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "OpenAPI Schema Suite")
+}
+
+var _ = Describe("GenerateOpenAPISchema", func() {
+	DescribeTable("generates schema from CUE definitions",
+		func(cueFile, schemaType, want string, wantErr bool) {
+			got, err := runOpenAPITest(cueFile, schemaType)
+			GinkgoWriter.Println(string(got))
+			Expect(err != nil).To(Equal(wantErr), "GenerateOpenAPISchema() error = %v, wantErr %v", err, wantErr)
+			if wantErr {
 				return
 			}
-			wantContent := getContentFromFile(tt.want)
-			if !reflect.DeepEqual(got, wantContent) {
-				t.Errorf("GenerateOpenAPISchema() diff: %s", cmp.Diff(wantContent, got))
-			}
-		})
-	}
-}
+
+			wantContent := getContentFromFile(want)
+			Expect(got).To(Equal(wantContent), "GenerateOpenAPISchema() diff: %s", cmp.Diff(wantContent, got))
+		},
+		Entry("test_import_type", "test_import_type.cue", "Exemplar", "test_import_type.json", false),
+		Entry("normal_test with mysql", "mysql_openapi.cue", "MysqlParameter", "mysql_openapi.json", false),
+		FEntry("normal_test with mysql2", "mysql_openapi_v2.cue", "MysqlSchema", "mysql_openapi_v2.json", false),
+		Entry("normal_with_not_empty", "mysql_openapi.cue", "", "mysql_openapi.json", false),
+		Entry("pg14_openapi", "pg14.cue", "PGPameter", "pg14_openapi.json", false),
+		Entry("multiple_schema_arch_a", "multiple_schema.cue", "archA", "multiple_schema_arch_a.json", false),
+		Entry("multiple_schema_combined", "multiple_schema.cue", "combined", "multiple_schema_combined.json", false),
+		Entry("failed_test", "mysql.cue", "NotType", "mysql_openapi_failed_not_exist", true),
+	)
+})
 
 func getContentFromFile(file string) []byte {
 	content, err := os.ReadFile(testdata.SubTestDataPath("./cue_testdata/" + file))

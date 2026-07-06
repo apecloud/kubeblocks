@@ -10,4 +10,4 @@
 	c?: string
 }
 
-#conbined: #archA & #archB
+#combined: #archA & #archB

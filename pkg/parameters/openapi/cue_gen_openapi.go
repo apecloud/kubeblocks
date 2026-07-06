@@ -164,6 +164,15 @@ func deReferenceSchema(props *apiextv1.JSONSchemaProps, resolveFn func(path stri
 			return err
 		}
 	}
+	for i := range props.AllOf {
+		schemaProps := util.ToPointer(props.AllOf[i])
+		schemaProps, err = oneProps(schemaProps)
+		if err != nil {
+			return err
+		}
+		props.AllOf[i] = *schemaProps
+	}
+	expandAllOf(props)
 	for key := range props.Properties {
 		schemaProps := util.ToPointer(props.Properties[key])
 		schemaProps, err = oneProps(schemaProps)
@@ -173,4 +182,57 @@ func deReferenceSchema(props *apiextv1.JSONSchemaProps, resolveFn func(path stri
 		props.Properties[key] = *schemaProps
 	}
 	return nil
+}
+
+func expandAllOf(props *apiextv1.JSONSchemaProps) {
+	if len(props.AllOf) == 0 {
+		return
+	}
+	allOf := props.AllOf
+	props.AllOf = nil
+	for _, schemaProps := range allOf {
+		if schemaProps.Type != "" && schemaProps.Type != SchemaStructType {
+			props.AllOf = append(props.AllOf, schemaProps)
+			continue
+		}
+		mergeSchemaProps(props, schemaProps)
+	}
+}
+
+func mergeSchemaProps(dst *apiextv1.JSONSchemaProps, src apiextv1.JSONSchemaProps) {
+	if dst.Type == "" {
+		dst.Type = src.Type
+	}
+	if len(src.Properties) > 0 {
+		if dst.Properties == nil {
+			dst.Properties = map[string]apiextv1.JSONSchemaProps{}
+		}
+		for key, value := range src.Properties {
+			if _, ok := dst.Properties[key]; !ok {
+				dst.Properties[key] = value
+			}
+		}
+	}
+	if dst.AdditionalProperties == nil {
+		dst.AdditionalProperties = src.AdditionalProperties
+	}
+	dst.Required = mergeRequired(dst.Required, src.Required)
+}
+
+func mergeRequired(dst, src []string) []string {
+	if len(src) == 0 {
+		return dst
+	}
+	required := make(map[string]struct{}, len(dst)+len(src))
+	for _, item := range dst {
+		required[item] = struct{}{}
+	}
+	for _, item := range src {
+		if _, ok := required[item]; ok {
+			continue
+		}
+		required[item] = struct{}{}
+		dst = append(dst, item)
+	}
+	return dst
 }

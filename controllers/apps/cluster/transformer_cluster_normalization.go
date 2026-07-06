@@ -656,4 +656,3 @@ func validateShardingShards(shardingDef *appsv1.ShardingDefinition, sharding *ap
 func shardsOutOfLimitError(shardingName string, shards int32, limit appsv1.ShardsLimit) error {
 	return fmt.Errorf("shards %d out-of-limit [%d, %d], sharding: %s", shards, limit.MinShards, limit.MaxShards, shardingName)
 }
-

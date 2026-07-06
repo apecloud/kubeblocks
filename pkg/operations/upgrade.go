@@ -20,17 +20,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"errors"
 	"fmt"
-	"slices"
 	"strings"
 	"time"
 
-	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/version"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -207,9 +204,13 @@ func (u upgradeOpsHandler) getCompDefWithUpdatedImages(reqCtx intctrlutil.Reques
 		}
 		// compDefName may be a name prefix or a regex pattern that will be resolved to a specific
 		// componentDefinition by the cluster controller. resolve it together with the serviceVersion
-		// here to detect the deterministic no-match failures before/without relying on the cluster controller.
-		compDef, err = u.resolveCompDefFromPattern(reqCtx, cli, compDefName, serviceVersion)
+		// here to detect the deterministic no-match failures before/without relying on the cluster controller,
+		// with exactly the same compatibility semantics as the cluster controller's normalization.
+		compDef, _, err = component.ResolveCompDefinitionNServiceVersion(reqCtx.Ctx, cli, compDefName, serviceVersion)
 		if err != nil {
+			if errors.Is(err, component.ErrCompDefinitionNServiceVersionUnmatched) {
+				return nil, intctrlutil.NewFatalError(err.Error())
+			}
 			return nil, err
 		}
 	}
@@ -221,131 +222,6 @@ func (u upgradeOpsHandler) getCompDefWithUpdatedImages(reqCtx intctrlutil.Reques
 		return nil, err
 	}
 	return compDef, nil
-}
-
-// resolveCompDefFromPattern resolves a componentDefinition name prefix or regex pattern together with
-// the requested serviceVersion, mirroring the compatibility semantics of the cluster controller's
-// normalization (resolveCompDefinitionNServiceVersion): among the pattern-matched componentDefinitions,
-// only those that support the serviceVersion (either by their own spec.serviceVersion or by a compatible
-// componentVersion release, see component.CompatibleCompVersions4Definition and
-// component.CompareServiceVersion) are candidates, and the latest one is chosen.
-// the deterministic no-match failures are classified as fatal errors.
-func (u upgradeOpsHandler) resolveCompDefFromPattern(reqCtx intctrlutil.RequestCtx,
-	cli client.Client, compDefPattern, serviceVersion string) (*appsv1.ComponentDefinition, error) {
-	compDefList := &appsv1.ComponentDefinitionList{}
-	if err := cli.List(reqCtx.Ctx, compDefList); err != nil {
-		return nil, err
-	}
-	matched := make([]*appsv1.ComponentDefinition, 0)
-	for i := range compDefList.Items {
-		if component.PrefixOrRegexMatched(compDefList.Items[i].Name, compDefPattern) {
-			matched = append(matched, &compDefList.Items[i])
-		}
-	}
-	if len(matched) == 0 {
-		return nil, intctrlutil.NewFatalError(fmt.Sprintf(`the componentDefinition "%s" is not found`, compDefPattern))
-	}
-	// mapping from <service version> to <compDef name> to <compDef>, same as the cluster normalization.
-	serviceVersionToCompDefs := map[string]map[string]*appsv1.ComponentDefinition{}
-	for _, compDef := range matched {
-		serviceVersions, err := u.compatibleServiceVersions(reqCtx, cli, compDef)
-		if err != nil {
-			return nil, err
-		}
-		for ver := range serviceVersions {
-			match, err := component.CompareServiceVersion(serviceVersion, ver)
-			if err != nil {
-				return nil, err
-			}
-			if !match {
-				continue
-			}
-			if _, ok := serviceVersionToCompDefs[ver]; !ok {
-				serviceVersionToCompDefs[ver] = map[string]*appsv1.ComponentDefinition{}
-			}
-			serviceVersionToCompDefs[ver][compDef.Name] = compDef
-		}
-	}
-	// use the specified serviceVersion, or the latest one otherwise.
-	resolvedServiceVersion := serviceVersion
-	if len(resolvedServiceVersion) == 0 {
-		serviceVersions := maps.Keys(serviceVersionToCompDefs)
-		if len(serviceVersions) > 0 {
-			var err error
-			slices.SortFunc(serviceVersions, func(a, b string) int {
-				cmp, cmpErr := compareServiceVersions(a, b)
-				if cmpErr != nil && err == nil {
-					err = cmpErr
-				}
-				return cmp
-			})
-			if err != nil {
-				return nil, err
-			}
-			resolvedServiceVersion = serviceVersions[len(serviceVersions)-1]
-		}
-	}
-	compatibleCompDefs := serviceVersionToCompDefs[resolvedServiceVersion]
-	if len(compatibleCompDefs) == 0 {
-		return nil, intctrlutil.NewFatalError(fmt.Sprintf(`no matched component definition found with componentDef "%s" and serviceVersion "%s"`,
-			compDefPattern, serviceVersion))
-	}
-	// choose the latest one, same as the cluster normalization.
-	compatibleCompDefNames := maps.Keys(compatibleCompDefs)
-	slices.Sort(compatibleCompDefNames)
-	return compatibleCompDefs[compatibleCompDefNames[len(compatibleCompDefNames)-1]], nil
-}
-
-// compatibleServiceVersions returns all service versions supported by the given componentDefinition,
-// either by its own spec.serviceVersion or by the releases of the compatible componentVersions,
-// same as the cluster normalization.
-func (u upgradeOpsHandler) compatibleServiceVersions(reqCtx intctrlutil.RequestCtx,
-	cli client.Client, compDef *appsv1.ComponentDefinition) (sets.Set[string], error) {
-	compVersions, err := component.CompatibleCompVersions4Definition(reqCtx.Ctx, cli, compDef)
-	if err != nil {
-		return nil, err
-	}
-	serviceVersions := sets.New[string]()
-	// add definition's service version as default, in case there is no component versions provided
-	if compDef.Spec.ServiceVersion != "" {
-		serviceVersions.Insert(compDef.Spec.ServiceVersion)
-	}
-	for _, compVersion := range compVersions {
-		releases := sets.New[string]()
-		for _, rule := range compVersion.Spec.CompatibilityRules {
-			if slices.ContainsFunc(rule.CompDefs, func(pattern string) bool {
-				return component.PrefixOrRegexMatched(compDef.Name, pattern)
-			}) {
-				releases.Insert(rule.Releases...)
-			}
-		}
-		for _, release := range compVersion.Spec.Releases {
-			if releases.Has(release.Name) {
-				serviceVersions.Insert(release.ServiceVersion)
-			}
-		}
-	}
-	return serviceVersions, nil
-}
-
-// compareServiceVersions compares two service versions, same semantics as the cluster
-// normalization's serviceVersionComparator, but returns an error instead of panicking.
-func compareServiceVersions(a, b string) (int, error) {
-	if len(a) == 0 {
-		return -1, nil
-	}
-	if len(b) == 0 {
-		return 1, nil
-	}
-	v, err := version.ParseSemantic(a)
-	if err != nil {
-		return 0, fmt.Errorf("invalid service version %s: %w", a, err)
-	}
-	ret, err := v.Compare(b)
-	if err != nil {
-		return 0, fmt.Errorf("invalid service version %s: %w", b, err)
-	}
-	return ret, nil
 }
 
 // podImageApplied checks if the pod has applied the new image.

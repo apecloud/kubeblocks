@@ -317,5 +317,64 @@ parameter: {
 				g.Expect(cp.Spec.Desired.Assignments).Should(HaveKeyWithValue("maxmemory-samples", pointer.String("7")))
 			})).Should(Succeed())
 		})
+
+		It("withdraws only the failed ops's keys from assignments mixed with another ops's writes", func() {
+			// Modeled on a live field sample (MariaDB, 2026-07-07): the desired
+			// assignments of one ComponentParameter carried the writes of two ops at
+			// once — the failed ops's invalid value plus a later legitimate ops's
+			// keys. The withdrawal must remove exactly the failed ops's own keys and
+			// leave the other ops's intent untouched.
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
+
+			componentParameter := builder.NewComponentParameterBuilder(testCtx.DefaultNamespace, parameterscore.GenerateComponentConfigurationName(clusterName, defaultCompName)).
+				AddLabelsInMap(constant.GetCompLabelsWithDef(clusterName, defaultCompName, compDefName)).
+				SetClusterName(clusterName).
+				SetCompName(defaultCompName).
+				GetObject()
+			componentParameter.Spec.Desired = &parametersv1alpha1.ParameterInputs{
+				Assignments: map[string]*string{
+					// written by the failing ops
+					"slow-query-log":  pointer.String("nonsense"),
+					"long-query-time": pointer.String("5"),
+					// written by a later, legitimate ops
+					"wait-timeout":        pointer.String("90"),
+					"interactive-timeout": pointer.String("90"),
+				},
+			}
+			Expect(testCtx.CreateObj(ctx, componentParameter)).Should(Succeed())
+
+			ops := testops.NewOpsRequestObj("failed-reconfigure-mixed-"+randomStr, testCtx.DefaultNamespace,
+				clusterName, opsv1alpha1.ReconfiguringType)
+			ops.Spec.Reconfigures = []opsv1alpha1.Reconfigure{{
+				ComponentOps: opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
+				Parameters: []opsv1alpha1.ParameterPair{
+					{Key: "slow-query-log", Value: pointer.String("nonsense")},
+					{Key: "long-query-time", Value: pointer.String("5")},
+				},
+			}}
+			opsRes.OpsRequest = testops.CreateOpsRequest(ctx, testCtx, ops)
+
+			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(componentParameter), func(cp *parametersv1alpha1.ComponentParameter) {
+				cp.Status.ObservedGeneration = cp.Generation
+				cp.Status.Phase = parametersv1alpha1.CMergeFailedPhase
+				cp.Status.Message = "parameter slow-query-log value \"nonsense\" is invalid"
+				cp.Status.ConfigurationItemStatus = []parametersv1alpha1.ConfigTemplateItemDetailStatus{{
+					Name:  "mysql-config",
+					Phase: parametersv1alpha1.CMergeFailedPhase,
+				}}
+			})()).Should(Succeed())
+
+			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsRunningPhase
+			_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentParameter), func(g Gomega, cp *parametersv1alpha1.ComponentParameter) {
+				g.Expect(cp.Spec.Desired).ShouldNot(BeNil())
+				g.Expect(cp.Spec.Desired.Assignments).ShouldNot(HaveKey("slow-query-log"))
+				g.Expect(cp.Spec.Desired.Assignments).ShouldNot(HaveKey("long-query-time"))
+				g.Expect(cp.Spec.Desired.Assignments).Should(HaveKeyWithValue("wait-timeout", pointer.String("90")))
+				g.Expect(cp.Spec.Desired.Assignments).Should(HaveKeyWithValue("interactive-timeout", pointer.String("90")))
+			})).Should(Succeed())
+		})
 	})
 })

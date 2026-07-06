@@ -202,7 +202,7 @@ func referencedPodFQDNsVar(ctx context.Context, cli client.Reader, namespace str
 		compName    = selector.PodFQDNs.Component
 	)
 	if selector.PodFQDNs.Role == nil {
-		fqdn, err = componentVarPodsGetter(ctx, cli, namespace, clusterName, compName, nil, true)
+		fqdn, err = componentVarPodsGetter(ctx, cli, namespace, clusterName, compName, nil, nil, nil, true)
 	} else {
 		fqdn, err = componentVarPodsWithRoleGetter(ctx, cli, namespace, clusterName, compName, *selector.PodFQDNs.Role, true)
 	}

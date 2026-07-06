@@ -120,7 +120,7 @@ func isReconcileStatus(phase parametersv1alpha1.ParameterPhase) bool {
 func buildTemplateVars(ctx context.Context, cli client.Reader,
 	compDef *appsv1.ComponentDefinition, synthesizedComp *component.SynthesizedComponent) error {
 	if compDef != nil && len(compDef.Spec.Vars) > 0 {
-		templateVars, _, err := component.ResolveTemplateNEnvVars(ctx, cli, synthesizedComp, compDef.Spec.Vars)
+		templateVars, _, err := component.ResolveTemplateNEnvVarsWithCompDef(ctx, cli, synthesizedComp, compDef, compDef.Spec.Vars)
 		if err != nil {
 			return err
 		}

@@ -35,7 +35,6 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -59,7 +58,7 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 	synthesizeComp := transCtx.SynthesizeComponent
 
 	runningITS := transCtx.RunningWorkload
-	protoITS, err := factory.BuildInstanceSet(synthesizeComp, compDef)
+	protoITS, err := component.BuildInstanceSet(synthesizeComp, compDef)
 	if err != nil {
 		return err
 	}

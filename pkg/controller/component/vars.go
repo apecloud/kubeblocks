@@ -56,7 +56,13 @@ func VarReferenceRegExp() *regexp.Regexp {
 
 // ResolveTemplateNEnvVars resolves all built-in and user-defined vars for config template and Env usage.
 func ResolveTemplateNEnvVars(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent, definedVars []appsv1.EnvVar) (map[string]string, []corev1.EnvVar, error) {
-	return resolveTemplateNEnvVars(ctx, cli, synthesizedComp, definedVars)
+	return ResolveTemplateNEnvVarsWithCompDef(ctx, cli, synthesizedComp, nil, definedVars)
+}
+
+// ResolveTemplateNEnvVarsWithCompDef resolves vars with the current ComponentDefinition context.
+func ResolveTemplateNEnvVarsWithCompDef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
+	compDef *appsv1.ComponentDefinition, definedVars []appsv1.EnvVar) (map[string]string, []corev1.EnvVar, error) {
+	return resolveTemplateNEnvVars(ctx, cli, synthesizedComp, compDef, definedVars)
 }
 
 func InjectEnvVars(synthesizedComp *SynthesizedComponent, envVars []corev1.EnvVar, envFromSources []corev1.EnvFromSource) {
@@ -94,9 +100,9 @@ func InjectEnvVars4Containers(synthesizedComp *SynthesizedComponent, envVars []c
 	}
 }
 
-func resolveTemplateNEnvVars(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
+func resolveTemplateNEnvVars(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent, compDef *appsv1.ComponentDefinition,
 	definedVars []appsv1.EnvVar) (map[string]string, []corev1.EnvVar, error) {
-	templateVars, envVars, err := resolveNewTemplateNEnvVars(ctx, cli, synthesizedComp, definedVars)
+	templateVars, envVars, err := resolveNewTemplateNEnvVars(ctx, cli, synthesizedComp, compDef, definedVars)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -111,9 +117,9 @@ func resolveTemplateNEnvVars(ctx context.Context, cli client.Reader, synthesized
 	return formattedTemplateVars(), envVars, nil
 }
 
-func resolveNewTemplateNEnvVars(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
+func resolveNewTemplateNEnvVars(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent, compDef *appsv1.ComponentDefinition,
 	definedVars []appsv1.EnvVar) ([]corev1.EnvVar, []corev1.EnvVar, error) {
-	vars, credentialVars, err := resolveObjectRefVars(ctx, cli, synthesizedComp, definedVars)
+	vars, credentialVars, err := resolveObjectRefVars(ctx, cli, synthesizedComp, compDef, definedVars)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -121,9 +127,9 @@ func resolveNewTemplateNEnvVars(ctx context.Context, cli client.Reader, synthesi
 	return templateVars, append(envVars, credentialVars...), nil
 }
 
-func resolveObjectRefVars(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
+func resolveObjectRefVars(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent, compDef *appsv1.ComponentDefinition,
 	definedVars []appsv1.EnvVar) ([]corev1.EnvVar, []corev1.EnvVar, error) {
-	vars, vars2, err := resolveClusterObjectRefVars(ctx, cli, synthesizedComp, definedVars)
+	vars, vars2, err := resolveClusterObjectRefVars(ctx, cli, synthesizedComp, compDef, definedVars)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -305,7 +311,7 @@ func evaluateObjectVarsExpression(definedVars []appsv1.EnvVar, credentialVars []
 	return nil
 }
 
-func resolveClusterObjectRefVars(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
+func resolveClusterObjectRefVars(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent, compDef *appsv1.ComponentDefinition,
 	definedVars []appsv1.EnvVar) ([]corev1.EnvVar, []corev1.EnvVar, error) {
 	if synthesizedComp == nil {
 		return nil, nil, nil
@@ -314,7 +320,7 @@ func resolveClusterObjectRefVars(ctx context.Context, cli client.Reader, synthes
 	for _, v := range definedVars {
 		switch {
 		case v.ValueFrom != nil:
-			var1, var2, err := resolveClusterObjectVarRef(ctx, cli, synthesizedComp, v.Name, *v.ValueFrom, v)
+			var1, var2, err := resolveClusterObjectVarRef(ctx, cli, synthesizedComp, compDef, v.Name, *v.ValueFrom, v)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -330,7 +336,7 @@ func resolveClusterObjectRefVars(ctx context.Context, cli client.Reader, synthes
 }
 
 // resolveClusterObjectVarRef resolves vars referred from cluster objects, returns the resolved non-credential and credential vars respectively.
-func resolveClusterObjectVarRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
+func resolveClusterObjectVarRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent, compDef *appsv1.ComponentDefinition,
 	defineKey string, source appsv1.VarSource, ext ...any) ([]corev1.EnvVar, []corev1.EnvVar, error) {
 	switch {
 	case source.ConfigMapKeyRef != nil:
@@ -350,7 +356,7 @@ func resolveClusterObjectVarRef(ctx context.Context, cli client.Reader, synthesi
 	case source.ResourceVarRef != nil:
 		return resolveResourceVarRef(ctx, cli, synthesizedComp, defineKey, *source.ResourceVarRef)
 	case source.ComponentVarRef != nil:
-		return resolveComponentVarRef(ctx, cli, synthesizedComp, defineKey, *source.ComponentVarRef)
+		return resolveComponentVarRef(ctx, cli, synthesizedComp, compDef, defineKey, *source.ComponentVarRef)
 	case source.ClusterVarRef != nil:
 		return resolveClusterVarRef(ctx, cli, synthesizedComp, defineKey, *source.ClusterVarRef)
 	}
@@ -1135,9 +1141,9 @@ func resolveResourceStorageRef(ctx context.Context, cli client.Reader, synthesiz
 	return resolveComponentVarRefLow(ctx, cli, synthesizedComp, selector.ClusterObjectReference, selector.Storage.Option, resolveStorage)
 }
 
-func resolveComponentVarRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
+func resolveComponentVarRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent, compDef *appsv1.ComponentDefinition,
 	defineKey string, selector appsv1.ComponentVarSelector) ([]corev1.EnvVar, []corev1.EnvVar, error) {
-	var resolveFunc func(context.Context, client.Reader, *SynthesizedComponent, string, appsv1.ComponentVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error)
+	var resolveFunc func(context.Context, client.Reader, *SynthesizedComponent, *appsv1.ComponentDefinition, string, appsv1.ComponentVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error)
 	switch {
 	case selector.ComponentName != nil || selector.ShortName != nil:
 		resolveFunc = resolveComponentNameRef
@@ -1152,10 +1158,10 @@ func resolveComponentVarRef(ctx context.Context, cli client.Reader, synthesizedC
 	default:
 		return nil, nil, nil
 	}
-	return checkNBuildVars(resolveFunc(ctx, cli, synthesizedComp, defineKey, selector))
+	return checkNBuildVars(resolveFunc(ctx, cli, synthesizedComp, compDef, defineKey, selector))
 }
 
-func resolveComponentNameRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
+func resolveComponentNameRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent, _ *appsv1.ComponentDefinition,
 	defineKey string, selector appsv1.ComponentVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
 	resolveComponentName := func(obj any) (*corev1.EnvVar, *corev1.EnvVar, error) {
 		comp := obj.(*appsv1.Component)
@@ -1168,7 +1174,7 @@ func resolveComponentNameRef(ctx context.Context, cli client.Reader, synthesized
 	return resolveComponentVarRefLow(ctx, cli, synthesizedComp, selector.ClusterObjectReference, selector.ComponentName, resolveComponentName)
 }
 
-func resolveComponentReplicasRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
+func resolveComponentReplicasRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent, _ *appsv1.ComponentDefinition,
 	defineKey string, selector appsv1.ComponentVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
 	resolveReplicas := func(obj any) (*corev1.EnvVar, *corev1.EnvVar, error) {
 		comp := obj.(*appsv1.Component)
@@ -1177,7 +1183,7 @@ func resolveComponentReplicasRef(ctx context.Context, cli client.Reader, synthes
 	return resolveComponentVarRefLow(ctx, cli, synthesizedComp, selector.ClusterObjectReference, selector.Replicas, resolveReplicas)
 }
 
-func resolveComponentPodsRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
+func resolveComponentPodsRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent, compDef *appsv1.ComponentDefinition,
 	defineKey string, selector appsv1.ComponentVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
 	resolvePods := func(obj any) (*corev1.EnvVar, *corev1.EnvVar, error) {
 		var (
@@ -1186,7 +1192,7 @@ func resolveComponentPodsRef(ctx context.Context, cli client.Reader, synthesized
 			comp        = obj.(*appsv1.Component)
 			compName, _ = ShortName(clusterName, comp.Name)
 		)
-		value, err := componentVarPodsGetter(ctx, cli, namespace, clusterName, compName, comp, selector.PodFQDNs != nil)
+		value, err := componentVarPodsGetter(ctx, cli, namespace, clusterName, compName, synthesizedComp, compDef, comp, selector.PodFQDNs != nil)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -1199,7 +1205,7 @@ func resolveComponentPodsRef(ctx context.Context, cli client.Reader, synthesized
 	return resolveComponentVarRefLow(ctx, cli, synthesizedComp, selector.ClusterObjectReference, option, resolvePods)
 }
 
-func resolveComponentPodsForRoleRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
+func resolveComponentPodsForRoleRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent, _ *appsv1.ComponentDefinition,
 	defineKey string, selector appsv1.ComponentVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
 	resolvePodsForRole := func(obj any) (*corev1.EnvVar, *corev1.EnvVar, error) {
 		var (
@@ -1228,7 +1234,8 @@ func resolveComponentPodsForRoleRef(ctx context.Context, cli client.Reader, synt
 }
 
 func componentVarPodsGetter(ctx context.Context, cli client.Reader,
-	namespace, clusterName, compName string, comp *appsv1.Component, fqdn bool) (string, error) {
+	namespace, clusterName, compName string, synthesizedComp *SynthesizedComponent, compDef *appsv1.ComponentDefinition,
+	comp *appsv1.Component, fqdn bool) (string, error) {
 	if comp == nil {
 		key := types.NamespacedName{
 			Namespace: namespace,
@@ -1247,13 +1254,32 @@ func componentVarPodsGetter(ctx context.Context, cli client.Reader,
 		Namespace: namespace,
 		Name:      constant.GenerateWorkloadNamePattern(clusterName, compName),
 	}
-	err := cli.Get(ctx, itsKey, its)
-	if err != nil && !apierrors.IsNotFound(err) {
-		return "", err
+	getErr := cli.Get(ctx, itsKey, its)
+	if getErr != nil && !apierrors.IsNotFound(getErr) {
+		return "", getErr
 	}
 
-	var names []string
-	if err == nil {
+	useDesiredPods := synthesizedComp != nil &&
+		compDef != nil &&
+		synthesizedComp.Namespace == namespace &&
+		synthesizedComp.ClusterName == clusterName &&
+		synthesizedComp.Name == compName
+
+	var (
+		names []string
+		err   error
+	)
+	if useDesiredPods {
+		protoITS, err := BuildInstanceSet(synthesizedComp, compDef)
+		if err != nil {
+			return "", err
+		}
+		var runningITS *workloadsv1.InstanceSet
+		if getErr == nil {
+			runningITS = its
+		}
+		names, err = GetDesiredPodNamesByITS(runningITS, protoITS)
+	} else if getErr == nil {
 		names, err = GetCurrentPodNamesByITS(its)
 	} else {
 		names, err = generatePodNamesByComp(comp)
@@ -1302,7 +1328,7 @@ func componentVarPodsWithRoleGetter(ctx context.Context, cli client.Reader,
 	return strings.Join(names, ","), nil
 }
 
-func resolveComponentServiceVersionRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
+func resolveComponentServiceVersionRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent, _ *appsv1.ComponentDefinition,
 	defineKey string, selector appsv1.ComponentVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
 	resolveServiceVersion := func(obj any) (*corev1.EnvVar, *corev1.EnvVar, error) {
 		comp := obj.(*appsv1.Component)

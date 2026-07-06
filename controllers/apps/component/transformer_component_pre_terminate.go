@@ -181,7 +181,7 @@ func (t *componentPreTerminateTransformer) synthesizedComponent(transCtx *compon
 		return nil, intctrlutil.NewRequeueError(appsutil.RequeueDuration,
 			fmt.Sprintf("build synthesized component failed at pre-terminate: %s", err.Error()))
 	}
-	synthesizedComp.TemplateVars, _, err = component.ResolveTemplateNEnvVars(ctx, cli, synthesizedComp, compDef.Spec.Vars)
+	synthesizedComp.TemplateVars, _, err = component.ResolveTemplateNEnvVarsWithCompDef(ctx, cli, synthesizedComp, compDef, compDef.Spec.Vars)
 	if err != nil {
 		return nil, err
 	}

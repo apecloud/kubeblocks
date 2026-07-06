@@ -1269,19 +1269,20 @@ func componentVarPodsGetter(ctx context.Context, cli client.Reader,
 		names []string
 		err   error
 	)
-	if useDesiredPods {
-		protoITS, err := BuildInstanceSet(synthesizedComp, compDef)
-		if err != nil {
-			return "", err
+	switch {
+	case useDesiredPods:
+		protoITS, buildErr := BuildInstanceSet(synthesizedComp, compDef)
+		if buildErr != nil {
+			return "", buildErr
 		}
 		var runningITS *workloadsv1.InstanceSet
 		if getErr == nil {
 			runningITS = its
 		}
 		names, err = GetDesiredPodNamesByITS(runningITS, protoITS)
-	} else if getErr == nil {
+	case getErr == nil:
 		names, err = GetCurrentPodNamesByITS(its)
-	} else {
+	default:
 		names, err = generatePodNamesByComp(comp)
 	}
 	if err != nil {

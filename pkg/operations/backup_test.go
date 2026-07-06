@@ -258,10 +258,12 @@ var _ = Describe("Backup OpsRequest", func() {
 			_, err = buildBackup(reqCtx, fakeClient, ops, opsRes.Cluster)
 			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeTrue())
 
-			By("expect fatal error when no default backup policy exists for the cluster")
+			By("expect retryable error when no default backup policy exists yet for the cluster")
 			emptyClient := fake.NewClientBuilder().WithScheme(fakeScheme).Build()
 			_, err = getDefaultBackupPolicy(reqCtx, emptyClient, opsRes.Cluster, "")
-			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeTrue())
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring("not found any default backup policy"))
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeFalse())
 
 			By("expect fatal error when multiple default backup policies exist for the cluster")
 			policy2 := policy.DeepCopy()
@@ -270,6 +272,56 @@ var _ = Describe("Backup OpsRequest", func() {
 			multiPolicyClient := fake.NewClientBuilder().WithScheme(fakeScheme).WithObjects(policy, policy2).Build()
 			_, err = getDefaultBackupPolicy(reqCtx, multiPolicyClient, opsRes.Cluster, "")
 			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeTrue())
+		})
+
+		It("keeps retrying while the backup policy is not yet Available", func() {
+			fakeScheme := runtime.NewScheme()
+			Expect(dpv1alpha1.AddToScheme(fakeScheme)).Should(Succeed())
+			pendingPolicy := &dpv1alpha1.BackupPolicy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pending-policy",
+					Namespace: testCtx.DefaultNamespace,
+					Labels: map[string]string{
+						"app.kubernetes.io/instance": opsRes.Cluster.Name,
+					},
+					Annotations: map[string]string{
+						dptypes.DefaultBackupPolicyAnnotationKey: "true",
+					},
+				},
+				Spec: dpv1alpha1.BackupPolicySpec{
+					BackupMethods: []dpv1alpha1.BackupMethod{{
+						Name:            "snapshot",
+						SnapshotVolumes: func() *bool { v := true; return &v }(),
+					}},
+				},
+				// the policy exists but its status has not been reconciled to Available yet.
+			}
+			fakeClient := fake.NewClientBuilder().WithScheme(fakeScheme).WithObjects(pendingPolicy).Build()
+			ops := createBackupOpsObj(clusterName, "backup-pending-policy-"+randomStr)
+
+			By("expect retryable error when the policy is referenced explicitly with a valid method")
+			ops.Spec.Backup = &opsv1alpha1.Backup{BackupPolicyName: pendingPolicy.Name, BackupMethod: "snapshot"}
+			_, err := buildBackup(reqCtx, fakeClient, ops, opsRes.Cluster)
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring("is not available yet"))
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeFalse())
+
+			By("expect retryable error when the default policy is resolved implicitly")
+			ops.Spec.Backup = &opsv1alpha1.Backup{BackupMethod: "snapshot"}
+			_, err = buildBackup(reqCtx, fakeClient, ops, opsRes.Cluster)
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring("is not available yet"))
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeFalse())
+
+			By("expect fatal error only after the policy is Available and the method is still absent")
+			availablePolicy := pendingPolicy.DeepCopy()
+			availablePolicy.ResourceVersion = ""
+			availablePolicy.Status.Phase = dpv1alpha1.AvailablePhase
+			availableClient := fake.NewClientBuilder().WithScheme(fakeScheme).WithObjects(availablePolicy).Build()
+			ops.Spec.Backup = &opsv1alpha1.Backup{BackupPolicyName: availablePolicy.Name, BackupMethod: "bogus-method"}
+			_, err = buildBackup(reqCtx, availableClient, ops, opsRes.Cluster)
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeTrue())
+			Expect(err.Error()).Should(ContainSubstring("backup method bogus-method is not supported"))
 		})
 
 		It("keeps retrying while parent backup is still running", func() {
@@ -374,7 +426,7 @@ var _ = Describe("Backup OpsRequest", func() {
 			ops.Spec.Backup = &opsv1alpha1.Backup{BackupPolicyName: "missing", BackupMethod: "snapshot"}
 			_, err := buildBackup(reqCtx, fakeClient, ops, opsRes.Cluster)
 			Expect(err).Should(HaveOccurred())
-			Expect(err.Error()).Should(ContainSubstring("backup method snapshot is not supported"))
+			Expect(err.Error()).Should(ContainSubstring(`"missing" not found`))
 
 			ops.Spec.Backup = nil
 			_, err = getDefaultBackupPolicy(reqCtx, fakeClient, opsRes.Cluster, "")

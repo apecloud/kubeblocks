@@ -20,10 +20,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package parameters
 
 import (
+	"context"
+	"strings"
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	parampkg "github.com/apecloud/kubeblocks/pkg/parameters"
 )
@@ -146,6 +153,123 @@ func TestMergeMissingConfigFileParams(t *testing.T) {
 	*expected.ConfigFileParams["log.conf"].Parameters["slow_query_log"] = "0"
 	if got := dest.ConfigFileParams["log.conf"].Parameters["slow_query_log"]; got == nil || *got != "1" {
 		t.Fatalf("expected merged params to be deep-copied, got %#v", got)
+	}
+}
+
+func TestReconcileConfigItemDetailsExternalManagedEmptyTemplate(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatalf("AddToScheme(core) error = %v", err)
+	}
+	if err := appsv1.AddToScheme(scheme); err != nil {
+		t.Fatalf("AddToScheme(apps) error = %v", err)
+	}
+	if err := parametersv1alpha1.AddToScheme(scheme); err != nil {
+		t.Fatalf("AddToScheme(parameters) error = %v", err)
+	}
+
+	compDef := &appsv1.ComponentDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: "obce"},
+		Spec: appsv1.ComponentDefinitionSpec{
+			Configs: []appsv1.ComponentFileTemplate{{
+				Name:            "oceanbase-sysvars",
+				Template:        "",
+				ExternalManaged: ptr.To(true),
+			}},
+		},
+	}
+	paramsDef := &parametersv1alpha1.ParametersDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: "obce-sysvars"},
+		Spec: parametersv1alpha1.ParametersDefinitionSpec{
+			ComponentDef: compDef.Name,
+			TemplateName: "oceanbase-sysvars",
+			FileName:     "sysvars.conf",
+			FileFormatConfig: &parametersv1alpha1.FileFormatConfig{
+				Format: parametersv1alpha1.Properties,
+			},
+		},
+		Status: parametersv1alpha1.ParametersDefinitionStatus{
+			Phase: parametersv1alpha1.PDAvailablePhase,
+		},
+	}
+	compParam := &parametersv1alpha1.ComponentParameter{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      "obce-oceanbase",
+		},
+		Spec: parametersv1alpha1.ComponentParameterSpec{
+			ClusterName:   "obce",
+			ComponentName: "oceanbase",
+		},
+	}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(compDef, paramsDef, compParam).Build()
+
+	updated, err := reconcileConfigItemDetailsIntoSpec(context.Background(), cli, compParam, &Task{
+		ResourceFetcher: parampkg.ResourceFetcher[Task]{ComponentDefObj: compDef},
+	})
+	if err != nil {
+		t.Fatalf("reconcileConfigItemDetailsIntoSpec() error = %v", err)
+	}
+	if !updated {
+		t.Fatalf("expected ConfigItemDetails update for externalManaged config with empty template")
+	}
+	if got := compParam.Spec.ConfigItemDetails; len(got) != 1 || got[0].Name != "oceanbase-sysvars" {
+		t.Fatalf("unexpected ConfigItemDetails: %#v", got)
+	}
+	if compParam.Spec.ConfigItemDetails[0].ConfigSpec == nil || compParam.Spec.ConfigItemDetails[0].ConfigSpec.Template != "" {
+		t.Fatalf("expected empty-template config spec to be preserved, got %#v", compParam.Spec.ConfigItemDetails[0].ConfigSpec)
+	}
+}
+
+func TestReconcileConfigItemDetailsRequiresOrdinaryTemplateConfigMap(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatalf("AddToScheme(core) error = %v", err)
+	}
+	if err := appsv1.AddToScheme(scheme); err != nil {
+		t.Fatalf("AddToScheme(apps) error = %v", err)
+	}
+	if err := parametersv1alpha1.AddToScheme(scheme); err != nil {
+		t.Fatalf("AddToScheme(parameters) error = %v", err)
+	}
+
+	compDef := &appsv1.ComponentDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: "mysql"},
+		Spec: appsv1.ComponentDefinitionSpec{
+			Configs: []appsv1.ComponentFileTemplate{{
+				Name:      "mysql-config",
+				Namespace: "default",
+				Template:  "runtime-template",
+			}},
+		},
+	}
+	paramsDef := &parametersv1alpha1.ParametersDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: "mysql-config"},
+		Spec: parametersv1alpha1.ParametersDefinitionSpec{
+			ComponentDef: compDef.Name,
+			TemplateName: "mysql-config",
+			FileName:     "my.cnf",
+			FileFormatConfig: &parametersv1alpha1.FileFormatConfig{
+				Format: parametersv1alpha1.Properties,
+			},
+		},
+		Status: parametersv1alpha1.ParametersDefinitionStatus{
+			Phase: parametersv1alpha1.PDAvailablePhase,
+		},
+	}
+	compParam := &parametersv1alpha1.ComponentParameter{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      "mysql",
+		},
+	}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(compDef, paramsDef, compParam).Build()
+
+	_, err := reconcileConfigItemDetailsIntoSpec(context.Background(), cli, compParam, &Task{
+		ResourceFetcher: parampkg.ResourceFetcher[Task]{ComponentDefObj: compDef},
+	})
+	if err == nil || !strings.Contains(err.Error(), `configmaps "runtime-template" not found`) {
+		t.Fatalf("expected ordinary template ConfigMap lookup error, got %v", err)
 	}
 }
 

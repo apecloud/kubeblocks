@@ -52,7 +52,7 @@ func reconcileConfigItemDetailsIntoSpec(ctx context.Context, cli client.Client, 
 	if !parameters.HasValidParameterTemplate(configDescs) {
 		return false, nil
 	}
-	templates, err := resolveComponentTemplate(ctx, cli, fetchTask.ComponentDefObj)
+	templates, err := resolveComponentTemplateForConfigItemDetails(ctx, cli, fetchTask.ComponentDefObj)
 	if err != nil {
 		return false, err
 	}
@@ -76,6 +76,23 @@ func reconcileConfigItemDetailsIntoSpec(ctx context.Context, cli client.Client, 
 	patch := client.MergeFrom(compParam.DeepCopy())
 	compParam.Spec.ConfigItemDetails = merged.Spec.ConfigItemDetails
 	return true, cli.Patch(ctx, compParam, patch)
+}
+
+func resolveComponentTemplateForConfigItemDetails(ctx context.Context, reader client.Reader, cmpd *appsv1.ComponentDefinition) (map[string]*corev1.ConfigMap, error) {
+	tpls := make(map[string]*corev1.ConfigMap, len(cmpd.Spec.Configs))
+	for _, config := range cmpd.Spec.Configs {
+		// ConfigItemDetails can be generated for this delegated config without
+		// reading a runtime template that intentionally does not exist yet.
+		if config.Template == "" && pointer.BoolDeref(config.ExternalManaged, false) {
+			continue
+		}
+		cm := &corev1.ConfigMap{}
+		if err := reader.Get(ctx, client.ObjectKey{Name: config.Template, Namespace: config.Namespace}, cm); err != nil {
+			return nil, err
+		}
+		tpls[config.Name] = cm
+	}
+	return tpls, nil
 }
 
 func mergeMissingConfigFileParams(dest, expected *parametersv1alpha1.ConfigTemplateItemDetail) {

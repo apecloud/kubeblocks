@@ -244,6 +244,11 @@ parameter: {
 				g.Expect(cp.Spec.Desired.Assignments).Should(HaveKeyWithValue("maxmemory-samples", pointer.String("0")))
 			})).Should(Succeed())
 
+			By("seed an unrelated pre-existing desired key that must survive the withdrawal")
+			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(componentParameter), func(cp *parametersv1alpha1.ComponentParameter) {
+				cp.Spec.Desired.Assignments["unrelated-key"] = pointer.String("keep")
+			})()).Should(Succeed())
+
 			By("surface the ComponentParameter failure back to the opsRequest")
 			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(componentParameter), func(cp *parametersv1alpha1.ComponentParameter) {
 				cp.Status.ObservedGeneration = cp.Generation
@@ -262,6 +267,54 @@ parameter: {
 				condition := meta.FindStatusCondition(fetched.Status.Conditions, opsv1alpha1.ConditionTypeFailed)
 				g.Expect(condition).ShouldNot(BeNil())
 				g.Expect(condition.Message).Should(ContainSubstring("maxmemory-samples"))
+			})).Should(Succeed())
+
+			By("the failed ops's own assignment is withdrawn; unrelated intent survives")
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentParameter), func(g Gomega, cp *parametersv1alpha1.ComponentParameter) {
+				g.Expect(cp.Spec.Desired).ShouldNot(BeNil())
+				g.Expect(cp.Spec.Desired.Assignments).ShouldNot(HaveKey("maxmemory-samples"))
+				g.Expect(cp.Spec.Desired.Assignments).Should(HaveKeyWithValue("unrelated-key", pointer.String("keep")))
+			})).Should(Succeed())
+		})
+
+		It("does not withdraw a key that a newer ops has re-set to a different value", func() {
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
+
+			componentParameter := builder.NewComponentParameterBuilder(testCtx.DefaultNamespace, parameterscore.GenerateComponentConfigurationName(clusterName, defaultCompName)).
+				AddLabelsInMap(constant.GetCompLabelsWithDef(clusterName, defaultCompName, compDefName)).
+				SetClusterName(clusterName).
+				SetCompName(defaultCompName).
+				GetObject()
+			componentParameter.Spec.Desired = &parametersv1alpha1.ParameterInputs{
+				// a newer ops has re-set the same key to a different value
+				Assignments: map[string]*string{"maxmemory-samples": pointer.String("7")},
+			}
+			Expect(testCtx.CreateObj(ctx, componentParameter)).Should(Succeed())
+
+			ops := testops.NewOpsRequestObj("failed-reconfigure-guard-"+randomStr, testCtx.DefaultNamespace,
+				clusterName, opsv1alpha1.ReconfiguringType)
+			ops.Spec.Reconfigures = []opsv1alpha1.Reconfigure{{
+				ComponentOps: opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
+				Parameters:   []opsv1alpha1.ParameterPair{{Key: "maxmemory-samples", Value: pointer.String("0")}},
+			}}
+			opsRes.OpsRequest = testops.CreateOpsRequest(ctx, testCtx, ops)
+
+			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(componentParameter), func(cp *parametersv1alpha1.ComponentParameter) {
+				cp.Status.ObservedGeneration = cp.Generation
+				cp.Status.Phase = parametersv1alpha1.CMergeFailedPhase
+				cp.Status.Message = "merge failed"
+				cp.Status.ConfigurationItemStatus = []parametersv1alpha1.ConfigTemplateItemDetailStatus{{
+					Name:  "mysql-config",
+					Phase: parametersv1alpha1.CMergeFailedPhase,
+				}}
+			})()).Should(Succeed())
+
+			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsRunningPhase
+			_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+
+			Consistently(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentParameter), func(g Gomega, cp *parametersv1alpha1.ComponentParameter) {
+				g.Expect(cp.Spec.Desired.Assignments).Should(HaveKeyWithValue("maxmemory-samples", pointer.String("7")))
 			})).Should(Succeed())
 		})
 	})

@@ -76,7 +76,60 @@ func (r *reconfigureAction) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli c
 	if phase == opsv1alpha1.OpsSucceedPhase {
 		return r.syncReconfigureForOps(reqCtx, cli, resource, opsDeepCopy, opsv1alpha1.OpsSucceedPhase)
 	}
+	// The merge failed, so the assignments this ops wrote will never be applied,
+	// yet they would stay in the ComponentParameter desired spec and keep failing
+	// the projection for every later reconfigure. Withdraw this ops's own writes
+	// (and only them) so the failed intent does not outlive the failed ops.
+	if err := r.withdrawReconfigureFromParameters(reqCtx, cli, resource); err != nil {
+		return "", noRequeueAfter, err
+	}
 	return opsv1alpha1.OpsFailedPhase, 0, intctrlutil.NewFatalError(fmt.Sprintf("reconfigure failed: %s", msg))
+}
+
+// withdrawReconfigureFromParameters removes the desired assignments written by
+// this ops from the ComponentParameter, guarded by value equality so that a
+// newer ops that re-set the same key with a different value is not clobbered.
+// It is the failure-path counterpart of applyReconfigureToParameters: the ops
+// only withdraws its own write, it does not do any schema validation.
+func (r *reconfigureAction) withdrawReconfigureFromParameters(reqCtx intctrlutil.RequestCtx, cli client.Client, resource *OpsResource) error {
+	sameValue := func(a, b *string) bool {
+		if a == nil || b == nil {
+			return a == b
+		}
+		return *a == *b
+	}
+	for _, reconfigure := range resource.OpsRequest.Spec.Reconfigures {
+		compNames, err := r.resolveReconfigureComponents(reqCtx.Ctx, cli, resource.Cluster, reconfigure.ComponentName)
+		if err != nil {
+			return err
+		}
+		for _, compName := range compNames {
+			compParam, err := r.getRunningComponentParameter(reqCtx.Ctx, cli, resource.Cluster.Namespace, resource.Cluster.Name, compName)
+			if err != nil {
+				return client.IgnoreNotFound(err)
+			}
+			if compParam.Spec.Desired == nil || len(compParam.Spec.Desired.Assignments) == 0 {
+				continue
+			}
+			patch := client.MergeFrom(compParam.DeepCopy())
+			changed := false
+			for _, param := range reconfigure.Parameters {
+				current, ok := compParam.Spec.Desired.Assignments[param.Key]
+				if !ok || !sameValue(current, param.Value) {
+					continue
+				}
+				delete(compParam.Spec.Desired.Assignments, param.Key)
+				changed = true
+			}
+			if !changed {
+				continue
+			}
+			if err := cli.Patch(reqCtx.Ctx, compParam, patch); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func (r *reconfigureAction) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, resource *OpsResource) (err error) {

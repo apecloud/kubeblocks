@@ -103,7 +103,7 @@ func (r rebuildInstanceOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli cli
 			if err != nil {
 				return err
 			}
-			synthesizedComp, err = r.buildSynthesizedComponent(reqCtx.Ctx, cli, opsRes.Cluster, targetInstance.GetComponentName())
+			synthesizedComp, _, err = r.buildSynthesizedComponent(reqCtx.Ctx, cli, opsRes.Cluster, targetInstance.GetComponentName())
 			if err != nil {
 				return err
 			}
@@ -479,7 +479,11 @@ func (r rebuildInstanceOpsHandler) checkProgressForScalingOutPods(reqCtx intctrl
 	}
 	currPodSet, _ := runtime.GenerateInstanceNameSet(opsRes.Cluster.Name, compSpec.Name,
 		compSpec.Replicas, compSpec.Instances, compSpec.OfflineInstances)
-	synthesizedComp, err := r.buildSynthesizedComponent(reqCtx.Ctx, cli, opsRes.Cluster, compSpec.Name)
+	synthesizedComp, compDef, err := r.buildSynthesizedComponent(reqCtx.Ctx, cli, opsRes.Cluster, compSpec.Name)
+	if err != nil {
+		return 0, 0, nil, err
+	}
+	workload, err := runtime.GetWorkload(opsRes.Cluster.Namespace, opsRes.Cluster.Name, compSpec.Name)
 	if err != nil {
 		return 0, 0, nil, err
 	}
@@ -510,6 +514,13 @@ func (r rebuildInstanceOpsHandler) checkProgressForScalingOutPods(reqCtx intctrl
 			reqCtx.Log.Info(fmt.Sprintf("waiting to create the pod %s", scalingOutPodName))
 			continue
 		}
+		if !rebuildInstanceProvisioned(workload, compDef, scalingOutPodName) {
+			// the replacement pod is available but its scale-out provisioning
+			// (dataLoad/memberJoin lifecycle actions) has not closed yet; the old
+			// instance must not be offlined nor the rebuild counted as completed.
+			reqCtx.Log.Info(fmt.Sprintf("waiting for the pod %s to complete provisioning", scalingOutPodName))
+			continue
+		}
 		if slices.Contains(compSpec.OfflineInstances, instance.Name) {
 			oldInstance, err := runtime.GetInstance(opsRes.Cluster.Namespace, opsRes.Cluster.Name, compSpec.Name, instance.Name)
 			if err != nil && !apierrors.IsNotFound(err) {
@@ -537,6 +548,22 @@ func (r rebuildInstanceOpsHandler) checkProgressForScalingOutPods(reqCtx intctrl
 		}
 	}
 	return completedCount, failedCount, instancesNeedToOffline, nil
+}
+
+// rebuildInstanceProvisioned reports whether the scaled-out replacement instance's
+// scale-out provisioning (memberJoin/dataLoad lifecycle actions) has closed, using
+// the same machinery as the h-scale scale-out progress gate.
+func rebuildInstanceProvisioned(workload Workload, compDef *appsv1.ComponentDefinition, instanceName string) bool {
+	if workload.GetUnprovisionedInstanceNameSet().Has(instanceName) {
+		return false
+	}
+	// when the workload view has no provisioning record source, provisioning state is
+	// unknown; if the component defines provisioning lifecycle actions, the instance
+	// must not be treated as rebuilt on unknown state (no silent fallback to "closed").
+	if !workload.HasProvisioningStatusSource() && hasProvisioningLifecycleActions(compDef) {
+		return false
+	}
+	return true
 }
 
 // offlineSpecifiedInstances to take the specific instances offline.
@@ -572,12 +599,16 @@ func (r rebuildInstanceOpsHandler) getScalingOutPodNameFromMessage(progressMsg s
 func (r rebuildInstanceOpsHandler) buildSynthesizedComponent(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1.Cluster,
-	compName string) (*component.SynthesizedComponent, error) {
+	compName string) (*component.SynthesizedComponent, *appsv1.ComponentDefinition, error) {
 	comp, compDef, err := component.GetCompNCompDefByName(ctx, cli, cluster.Namespace, constant.GenerateClusterComponentName(cluster.Name, compName))
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return component.BuildSynthesizedComponent(ctx, cli, compDef, comp)
+	synthesizedComp, err := component.BuildSynthesizedComponent(ctx, cli, compDef, comp)
+	if err != nil {
+		return nil, nil, err
+	}
+	return synthesizedComp, compDef, nil
 }
 
 func (r rebuildInstanceOpsHandler) prepareInplaceRebuildHelper(reqCtx intctrlutil.RequestCtx,
@@ -616,7 +647,7 @@ func (r rebuildInstanceOpsHandler) prepareInplaceRebuildHelper(reqCtx intctrluti
 	if err = cli.Get(reqCtx.Ctx, client.ObjectKey{Name: instance.Name, Namespace: opsRes.Cluster.Namespace}, targetPod); err != nil {
 		return nil, err
 	}
-	synthesizedComp, err = r.buildSynthesizedComponent(reqCtx.Ctx, cli, opsRes.Cluster, targetPod.Labels[constant.KBAppComponentLabelKey])
+	synthesizedComp, _, err = r.buildSynthesizedComponent(reqCtx.Ctx, cli, opsRes.Cluster, targetPod.Labels[constant.KBAppComponentLabelKey])
 	if err != nil {
 		return nil, err
 	}

@@ -83,6 +83,22 @@ func TestGenerateOpenApiSchema(t *testing.T) {
 		want:    "pg14_openapi.json",
 		wantErr: false,
 	}, {
+		name: "multiple_schema_arch_a",
+		args: args{
+			cueFile:    "multiple_schema.cue",
+			schemaType: "archA",
+		},
+		want:    "multiple_schema_arch_a.json",
+		wantErr: false,
+	}, {
+		name: "multiple_schema_combined",
+		args: args{
+			cueFile:    "multiple_schema.cue",
+			schemaType: "combined",
+		},
+		want:    "multiple_schema_combined.json",
+		wantErr: false,
+	}, {
 		name: "failed_test",
 		args: args{
 			cueFile:    "mysql.cue",

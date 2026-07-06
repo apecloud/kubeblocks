@@ -372,7 +372,11 @@ func (r *componentWorkloadOps) joinMember4ScaleOut() error {
 	}
 
 	if len(joinErrors) > 0 {
-		return intctrlutil.NewRequeueError(time.Second, fmt.Sprintf("%v", joinErrors))
+		// surface the failure on the Component object, otherwise the kbagent error is only visible in V-level logs
+		r.transCtx.EventRecorder.Eventf(r.component, corev1.EventTypeWarning, "MemberJoinFailed",
+			"member join for scale-out has not completed: %v", joinErrors)
+		// delayed requeue lets the status transformer still run so component phase/conditions stay live while the join retries
+		return intctrlutil.NewDelayedRequeueError(time.Second, fmt.Sprintf("%v", joinErrors))
 	}
 	return nil
 }

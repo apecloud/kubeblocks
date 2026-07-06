@@ -136,6 +136,46 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
+      path: /validate-apps-kubeblocks-io-v1-cluster
+  failurePolicy: Fail
+  name: vcluster.kb.io
+  rules:
+  - apiGroups:
+    - apps.kubeblocks.io
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - clusters
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-apps-kubeblocks-io-v1-component
+  failurePolicy: Fail
+  name: vcomponent.kb.io
+  rules:
+  - apiGroups:
+    - apps.kubeblocks.io
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - components
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
       path: /validate-apps-kubeblocks-io-v1alpha1-clusterdefinition
   failurePolicy: Fail
   name: vclusterdefinition.kb.io

@@ -20,7 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package v1
 
 import (
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 // log is for logging in this package.
@@ -32,4 +36,22 @@ func (r *Component) SetupWebhookWithManager(mgr ctrl.Manager) error {
 		Complete()
 }
 
-// TODO(user): EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
+func (r *Component) ValidateCreate() (admission.Warnings, error) {
+	return nil, r.validateInstanceTemplateLabels()
+}
+
+func (r *Component) ValidateUpdate(_ runtime.Object) (admission.Warnings, error) {
+	return nil, r.validateInstanceTemplateLabels()
+}
+
+func (r *Component) ValidateDelete() (admission.Warnings, error) {
+	return nil, nil
+}
+
+func (r *Component) validateInstanceTemplateLabels() error {
+	allErrs := validateInstanceTemplatesLabels(r.Spec.Instances, field.NewPath("spec").Child("instances"))
+	if len(allErrs) == 0 {
+		return nil
+	}
+	return apierrors.NewInvalid(GroupVersion.WithKind("Component").GroupKind(), r.Name, allErrs)
+}

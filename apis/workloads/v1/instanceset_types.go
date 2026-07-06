@@ -433,6 +433,9 @@ type InstanceTemplate struct {
 	// Specifies a map of key-value pairs that will be merged into the Pod's existing labels.
 	// Values for existing keys will be overwritten, and new keys will be added.
 	//
+	// +kubebuilder:validation:MaxProperties=64
+	// +kubebuilder:validation:XValidation:rule="self.all(k, size(k) <= 317 && (!k.contains('/') || k.matches('^.{1,253}/.*$')) && k.matches('^(([a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?)(\\\\.([a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?))*\\\\/)?([A-Za-z0-9]([-A-Za-z0-9_.]{0,61}[A-Za-z0-9])?)$'))",message="label keys must be valid Kubernetes label keys"
+	// +kubebuilder:validation:XValidation:rule="self.all(k, size(self[k]) <= 63 && self[k].matches('^(([A-Za-z0-9]([-A-Za-z0-9_.]*[A-Za-z0-9])?)?)$'))",message="label values must be valid Kubernetes label values"
 	// +optional
 	Labels map[string]string `json:"labels,omitempty"`
 

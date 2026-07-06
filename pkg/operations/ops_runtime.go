@@ -191,25 +191,13 @@ func (r *opsRuntime) GenerateTemplateInstanceNames(clusterName, compName, templa
 	return instanceset.GenerateInstanceNamesFromTemplate(workloadName, templateName, replicas, offlineInstances, ordinalList)
 }
 
-func (r *opsRuntime) Switchover(ctx context.Context, namespace, clusterName, compName, instanceName, candidateName string) error {
-	synthesizedComp, err := r.buildSynthesizedCompByCompName(ctx, r.cli, namespace, clusterName, compName)
-	if err != nil {
-		return err
-	}
+func (r *opsRuntime) Switchover(ctx context.Context, synthesizedComp *component.SynthesizedComponent, instanceName, candidateName string) error {
 	switchover := &opsv1alpha1.Switchover{
-		ComponentName: compName,
+		ComponentName: synthesizedComp.Name,
 		InstanceName:  instanceName,
 		CandidateName: candidateName,
 	}
 	return r.doSwitchover(ctx, r.cli, synthesizedComp, switchover)
-}
-
-func (r *opsRuntime) buildSynthesizedCompByCompName(ctx context.Context, cli client.Client, namespace, clusterName, compName string) (*component.SynthesizedComponent, error) {
-	compObj, compDefObj, err := component.GetCompNCompDefByName(ctx, cli, namespace, constant.GenerateClusterComponentName(clusterName, compName))
-	if err != nil {
-		return nil, err
-	}
-	return component.BuildSynthesizedComponent(ctx, cli, compDefObj, compObj)
 }
 
 // We consider a switchover action succeeds if the action returns without error.

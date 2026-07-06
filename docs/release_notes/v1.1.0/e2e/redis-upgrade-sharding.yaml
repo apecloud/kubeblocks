@@ -1,0 +1,36 @@
+apiVersion: apps.kubeblocks.io/v1
+kind: Cluster
+metadata:
+  name: ${REDIS_CLUSTER}
+  namespace: ${TEST_NAMESPACE}
+spec:
+  terminationPolicy: Delete
+  shardings:
+  - name: shard
+    shardingDef: ${REDIS_SHARDING_DEF}
+    shards: ${REDIS_SHARDS}
+    template:
+      name: redis
+      componentDef: ${REDIS_COMPDEF}
+      disableExporter: true
+      replicas: ${REDIS_REPLICAS}
+      resources:
+        limits:
+          cpu: "250m"
+          memory: 256Mi
+        requests:
+          cpu: "250m"
+          memory: 256Mi
+      serviceVersion: ${REDIS_VERSION}
+      services:
+      - name: redis-advertised
+        podService: true
+        serviceType: NodePort
+      volumeClaimTemplates:
+      - name: data
+        spec:
+          accessModes:
+          - ReadWriteOnce
+          resources:
+            requests:
+              storage: ${REDIS_STORAGE}

@@ -1,0 +1,27 @@
+apiVersion: apps.kubeblocks.io/v1
+kind: Cluster
+metadata:
+  name: ${MONGODB_CLUSTER}
+  namespace: ${TEST_NAMESPACE}
+spec:
+  terminationPolicy: Delete
+  componentSpecs:
+    - name: mongodb
+      componentDef: ${MONGODB_UPGRADE_COMPDEF}
+      serviceVersion: "${MONGO_VERSION}"
+      replicas: 1
+      resources:
+        requests:
+          cpu: 500m
+          memory: 512Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+      volumeClaimTemplates:
+        - name: data
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 10Gi

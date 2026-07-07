@@ -25,6 +25,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/revisionmap"
 )
 
 func NewRevisionUpdateReconciler() kubebuilderx.Reconciler {
@@ -45,7 +46,25 @@ func (r *revisionUpdateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *
 func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
 
-	updatedReplicas := r.calculateUpdatedReplicas(its, tree.List(&workloads.Instance{}))
+	desiredInstances, names, err := buildDesiredInstancesByName(tree, its)
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
+
+	updateRevisions := make(map[string]string, len(names))
+	for _, name := range names {
+		updateRevisions[name] = buildInstanceRevision(desiredInstances[name])
+	}
+	revisions, err := revisionmap.Encode(updateRevisions)
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
+	its.Status.UpdateRevisions = revisions
+	if len(names) > 0 {
+		its.Status.UpdateRevision = updateRevisions[names[len(names)-1]]
+	}
+
+	updatedReplicas := r.calculateUpdatedReplicas(its, tree.List(&workloads.Instance{}), desiredInstances)
 	its.Status.UpdatedReplicas = updatedReplicas
 
 	its.Status.ObservedGeneration = its.Generation
@@ -53,11 +72,11 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kub
 	return kubebuilderx.Continue, nil
 }
 
-func (r *revisionUpdateReconciler) calculateUpdatedReplicas(its *workloads.InstanceSet, instances []client.Object) int32 {
+func (r *revisionUpdateReconciler) calculateUpdatedReplicas(its *workloads.InstanceSet, instances []client.Object, desiredInstances map[string]*workloads.Instance) int32 {
 	updatedReplicas := int32(0)
 	for i := range instances {
 		inst, _ := instances[i].(*workloads.Instance)
-		if isInstanceUpdated(its, inst) {
+		if isInstanceUpdated(its, inst, desiredInstances[inst.Name]) {
 			updatedReplicas++
 		}
 	}

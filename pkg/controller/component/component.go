@@ -174,7 +174,7 @@ func NewLifecycle(ctx context.Context, cli client.Reader, compDef *appsv1.Compon
 	if err != nil {
 		return nil, err
 	}
-	synthesizedComp.TemplateVars, _, err = ResolveTemplateNEnvVarsWithCompDef(ctx, cli, synthesizedComp, compDef, compDef.Spec.Vars)
+	synthesizedComp.TemplateVars, _, err = ResolveTemplateNEnvVars(ctx, cli, synthesizedComp, compDef, compDef.Spec.Vars)
 	if err != nil {
 		return nil, err
 	}

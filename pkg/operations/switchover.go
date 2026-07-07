@@ -200,7 +200,7 @@ func handleSwitchover(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *
 	if err != nil {
 		return err
 	}
-	synthesizedComp.TemplateVars, _, err = component.ResolveTemplateNEnvVarsWithCompDef(reqCtx.Ctx, cli, synthesizedComp, compDef, compDef.Spec.Vars)
+	synthesizedComp.TemplateVars, _, err = component.ResolveTemplateNEnvVars(reqCtx.Ctx, cli, synthesizedComp, compDef, compDef.Spec.Vars)
 	if err != nil {
 		return err
 	}

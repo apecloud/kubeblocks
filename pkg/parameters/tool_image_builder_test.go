@@ -29,7 +29,6 @@ import (
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	cfgcm "github.com/apecloud/kubeblocks/pkg/parameters/configmanager"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -55,7 +54,7 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 
 	Context("ToolsImageBuilderTest", func() {
 		It("TestScriptSpec", func() {
-			its, err := factory.BuildInstanceSet(clusterComponent, nil)
+			its, err := component.BuildInstanceSet(clusterComponent, nil)
 			Expect(err).Should(Succeed())
 
 			cfgManagerParams := &cfgcm.CfgManagerBuildParams{
@@ -102,7 +101,7 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 	})
 
 	It("TesImageMappings", func() {
-		its, err := factory.BuildInstanceSet(clusterComponent, nil)
+		its, err := component.BuildInstanceSet(clusterComponent, nil)
 		Expect(err).Should(Succeed())
 
 		cfgManagerParams := &cfgcm.CfgManagerBuildParams{

@@ -1247,17 +1247,24 @@ func componentVarPodsGetter(ctx context.Context, cli client.Reader,
 		Namespace: namespace,
 		Name:      constant.GenerateWorkloadNamePattern(clusterName, compName),
 	}
-	err := cli.Get(ctx, itsKey, its)
-	if err != nil && !apierrors.IsNotFound(err) {
-		return "", err
+	getErr := cli.Get(ctx, itsKey, its)
+	if getErr != nil && !apierrors.IsNotFound(getErr) {
+		return "", getErr
 	}
 
-	var names []string
-	if err == nil {
-		names, err = GetCurrentPodNamesByITS(its)
-	} else {
-		names, err = generatePodNamesByComp(comp)
+	// Resolve pod vars from the desired component spec, not only from the
+	// running InstanceSet. During hscale, the Component may already carry the new
+	// desired replicas while the workload object has not caught up yet; the
+	// target can be either this component or a referenced component. A minimal
+	// proto ITS from the target Component is enough for pod naming, while
+	// passing the running ITS still lets GetDesiredPodNamesByITS preserve
+	// assigned ordinals.
+	protoITS := buildMinimalInstanceSetForPodNames(comp)
+	var runningITS *workloadsv1.InstanceSet
+	if getErr == nil {
+		runningITS = its
 	}
+	names, err := GetDesiredPodNamesByITS(runningITS, protoITS)
 	if err != nil {
 		return "", err
 	}

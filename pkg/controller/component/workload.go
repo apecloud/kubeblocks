@@ -403,7 +403,12 @@ func GetDesiredPodNamesByITS(runningITS, protoITS *workloads.InstanceSet) ([]str
 	return GetCurrentPodNamesByITS(protoITS)
 }
 
-func generatePodNamesByComp(comp *kbappsv1.Component) ([]string, error) {
+// buildInstanceSetByComp returns the smallest InstanceSet shape needed by the
+// pod name builder. Vars and service reference resolution can run before the
+// workload transformer has built the desired InstanceSet, and the target may be
+// any referenced Component. Pod names only need these component-owned naming
+// fields, so keep this path independent from ComponentDefinition synthesis.
+func buildInstanceSetByComp(comp *kbappsv1.Component) *workloads.InstanceSet {
 	instanceTemplates := func() []workloads.InstanceTemplate {
 		if len(comp.Spec.Instances) == 0 {
 			return nil
@@ -418,7 +423,7 @@ func generatePodNamesByComp(comp *kbappsv1.Component) ([]string, error) {
 		}
 		return templates
 	}
-	its := &workloads.InstanceSet{
+	return &workloads.InstanceSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:   comp.Namespace,
 			Name:        comp.Name,
@@ -432,5 +437,4 @@ func generatePodNamesByComp(comp *kbappsv1.Component) ([]string, error) {
 			OfflineInstances:    comp.Spec.OfflineInstances,
 		},
 	}
-	return GetCurrentPodNamesByITS(its)
 }

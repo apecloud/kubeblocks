@@ -68,7 +68,7 @@ func (t *componentVarsTransformer) Transform(ctx graph.TransformContext, dag *gr
 			vars = append(vars, synthesizedComp.SidecarVars...)
 		}
 	}
-	templateVars, envVars, err := component.ResolveTemplateNEnvVars(transCtx.Context, reader, synthesizedComp, transCtx.CompDef, vars)
+	templateVars, envVars, err := component.ResolveTemplateNEnvVars(transCtx.Context, reader, synthesizedComp, vars)
 	if err != nil {
 		return err
 	}

@@ -1253,12 +1253,13 @@ func componentVarPodsGetter(ctx context.Context, cli client.Reader,
 	}
 
 	// Resolve pod vars from the desired component spec, not only from the
-	// running InstanceSet. During hscale, parameter rendering can observe the
-	// updated Component before the workload object catches up, and the target can
-	// be either this component or a referenced component. A lightweight proto ITS
-	// from the target Component is enough for pod naming, while passing the
-	// running ITS still lets GetDesiredPodNamesByITS preserve assigned ordinals.
-	protoITS := buildInstanceSetByComp(comp)
+	// running InstanceSet. During hscale, the Component may already carry the new
+	// desired replicas while the workload object has not caught up yet; the
+	// target can be either this component or a referenced component. A minimal
+	// proto ITS from the target Component is enough for pod naming, while
+	// passing the running ITS still lets GetDesiredPodNamesByITS preserve
+	// assigned ordinals.
+	protoITS := buildMinimalInstanceSetForPodNames(comp)
 	var runningITS *workloadsv1.InstanceSet
 	if getErr == nil {
 		runningITS = its

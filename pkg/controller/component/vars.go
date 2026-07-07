@@ -1192,7 +1192,17 @@ func resolveComponentPodsRef(ctx context.Context, cli client.Reader, synthesized
 			comp        = obj.(*appsv1.Component)
 			compName, _ = ShortName(clusterName, comp.Name)
 		)
-		value, err := componentVarPodsGetter(ctx, cli, namespace, clusterName, compName, synthesizedComp, compDef, comp, selector.PodFQDNs != nil)
+		var (
+			desiredComp    *SynthesizedComponent
+			desiredCompDef *appsv1.ComponentDefinition
+		)
+		if synthesizedComp.Namespace == namespace &&
+			synthesizedComp.ClusterName == clusterName &&
+			synthesizedComp.Name == compName {
+			desiredComp = synthesizedComp
+			desiredCompDef = compDef
+		}
+		value, err := componentVarPodsGetter(ctx, cli, namespace, clusterName, compName, desiredComp, desiredCompDef, comp, selector.PodFQDNs != nil)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -1234,7 +1244,7 @@ func resolveComponentPodsForRoleRef(ctx context.Context, cli client.Reader, synt
 }
 
 func componentVarPodsGetter(ctx context.Context, cli client.Reader,
-	namespace, clusterName, compName string, synthesizedComp *SynthesizedComponent, compDef *appsv1.ComponentDefinition,
+	namespace, clusterName, compName string, desiredComp *SynthesizedComponent, desiredCompDef *appsv1.ComponentDefinition,
 	comp *appsv1.Component, fqdn bool) (string, error) {
 	if comp == nil {
 		key := types.NamespacedName{
@@ -1259,11 +1269,7 @@ func componentVarPodsGetter(ctx context.Context, cli client.Reader,
 		return "", getErr
 	}
 
-	useDesiredPods := synthesizedComp != nil &&
-		compDef != nil &&
-		synthesizedComp.Namespace == namespace &&
-		synthesizedComp.ClusterName == clusterName &&
-		synthesizedComp.Name == compName
+	useDesiredPods := desiredComp != nil && desiredCompDef != nil
 
 	var (
 		names []string
@@ -1271,7 +1277,7 @@ func componentVarPodsGetter(ctx context.Context, cli client.Reader,
 	)
 	switch {
 	case useDesiredPods:
-		protoITS, buildErr := BuildInstanceSet(synthesizedComp, compDef)
+		protoITS, buildErr := BuildInstanceSet(desiredComp, desiredCompDef)
 		if buildErr != nil {
 			return "", buildErr
 		}

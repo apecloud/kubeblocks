@@ -22,7 +22,7 @@ package component
 import (
 	"encoding/json"
 
-	appsk8s "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/klog/v2"
@@ -177,11 +177,11 @@ func getInstanceTemplates(synthesizedComp *SynthesizedComponent) []workloads.Ins
 	return instanceTemplates
 }
 
-func getPodManagementPolicy(synthesizedComp *SynthesizedComponent) appsk8s.PodManagementPolicyType {
+func getPodManagementPolicy(synthesizedComp *SynthesizedComponent) appsv1.PodManagementPolicyType {
 	if synthesizedComp.PodManagementPolicy != nil {
 		return *synthesizedComp.PodManagementPolicy
 	}
-	return appsk8s.OrderedReadyPodManagement // default value
+	return appsv1.OrderedReadyPodManagement // default value
 }
 
 func getParallelPodManagementConcurrency(synthesizedComp *SynthesizedComponent) *intstr.IntOrString {

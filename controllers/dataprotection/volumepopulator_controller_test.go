@@ -188,7 +188,7 @@ var _ = Describe("Volume Populator Controller test", func() {
 	})
 
 	Context("system account secret helpers", func() {
-		It("patches existing mutable secrets and recreates changed immutable secrets", func() {
+		It("patches existing mutable secrets and waits before recreating changed immutable secrets", func() {
 			scheme := runtime.NewScheme()
 			Expect(corev1.AddToScheme(scheme)).Should(Succeed())
 			Expect(kbappsv1.AddToScheme(scheme)).Should(Succeed())
@@ -248,6 +248,15 @@ var _ = Describe("Volume Populator Controller test", func() {
 			Expect(patched.OwnerReferences).To(HaveLen(1))
 			Expect(patched.OwnerReferences[0].Kind).To(Equal("Component"))
 
+			err := reconciler.upsertSystemAccountSecret(reqCtx, pvc, systemAccountSecretScopeComponent,
+				"cluster", "mysql", "root", []byte("new-root-password"), map[string]string{"role": "root"})
+			Expect(err).To(HaveOccurred())
+			Expect(intctrlutil.IsRequeueError(err)).To(BeTrue(), err.Error())
+			Expect(reconciler.Client.Get(context.Background(), client.ObjectKey{
+				Namespace: "default",
+				Name:      immutableSecret.Name,
+			}, &corev1.Secret{})).To(MatchError(ContainSubstring("not found")))
+
 			Expect(reconciler.upsertSystemAccountSecret(reqCtx, pvc, systemAccountSecretScopeComponent,
 				"cluster", "mysql", "root", []byte("new-root-password"), map[string]string{"role": "root"})).Should(Succeed())
 			recreated := &corev1.Secret{}
@@ -260,6 +269,119 @@ var _ = Describe("Volume Populator Controller test", func() {
 			Expect(recreated.Data[constant.AccountPasswdForSecret]).To(Equal([]byte("new-root-password")))
 			Expect(systemAccountSecretMatches(recreated, "root", []byte("new-root-password"))).To(BeTrue())
 			Expect(systemAccountSecretMatches(recreated, "root", []byte("old-password"))).To(BeFalse())
+		})
+
+		It("removes the cluster finalizer before replacing immutable sharding account secrets", func() {
+			scheme := runtime.NewScheme()
+			Expect(corev1.AddToScheme(scheme)).Should(Succeed())
+			Expect(kbappsv1.AddToScheme(scheme)).Should(Succeed())
+
+			cluster := &kbappsv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "cluster",
+					UID:       types.UID("cluster-uid"),
+				},
+			}
+			immutable := true
+			secret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace:  "default",
+					Name:       "cluster-shard-root",
+					Finalizers: []string{constant.DBClusterFinalizerName},
+				},
+				Immutable: &immutable,
+				Data: map[string][]byte{
+					constant.AccountNameForSecret:   []byte("root"),
+					constant.AccountPasswdForSecret: []byte("old-password"),
+				},
+			}
+			pvc := &corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "data-target-0",
+				},
+			}
+			reconciler := &VolumePopulatorReconciler{
+				Client: fake.NewClientBuilder().
+					WithScheme(scheme).
+					WithObjects(cluster, secret).
+					Build(),
+				Scheme: scheme,
+			}
+			reqCtx := intctrlutil.RequestCtx{Ctx: context.Background()}
+
+			err := reconciler.upsertSystemAccountSecret(reqCtx, pvc, systemAccountSecretScopeSharding,
+				"cluster", "shard", "root", []byte("new-password"),
+				map[string]string{constant.KBAppShardingNameLabelKey: "shard"})
+			Expect(err).To(HaveOccurred())
+			Expect(intctrlutil.IsRequeueError(err)).To(BeTrue(), err.Error())
+			Expect(reconciler.Client.Get(context.Background(), client.ObjectKey{
+				Namespace: "default",
+				Name:      secret.Name,
+			}, &corev1.Secret{})).To(MatchError(ContainSubstring("not found")))
+
+			Expect(reconciler.upsertSystemAccountSecret(reqCtx, pvc, systemAccountSecretScopeSharding,
+				"cluster", "shard", "root", []byte("new-password"),
+				map[string]string{constant.KBAppShardingNameLabelKey: "shard"})).Should(Succeed())
+			recreated := &corev1.Secret{}
+			Expect(reconciler.Client.Get(context.Background(), client.ObjectKey{
+				Namespace: "default",
+				Name:      secret.Name,
+			}, recreated)).Should(Succeed())
+			Expect(recreated.Finalizers).To(BeEmpty())
+			Expect(recreated.OwnerReferences).To(HaveLen(1))
+			Expect(recreated.OwnerReferences[0].Kind).To(Equal("Cluster"))
+			Expect(recreated.Data[constant.AccountPasswdForSecret]).To(Equal([]byte("new-password")))
+		})
+
+		It("removes the cluster finalizer from deletion-stamped immutable sharding account secrets", func() {
+			scheme := runtime.NewScheme()
+			Expect(corev1.AddToScheme(scheme)).Should(Succeed())
+			Expect(kbappsv1.AddToScheme(scheme)).Should(Succeed())
+
+			deletionTime := metav1.Now()
+			immutable := true
+			secret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace:         "default",
+					Name:              "cluster-shard-root",
+					DeletionTimestamp: &deletionTime,
+					Finalizers:        []string{constant.DBClusterFinalizerName},
+				},
+				Immutable: &immutable,
+				Data: map[string][]byte{
+					constant.AccountNameForSecret:   []byte("root"),
+					constant.AccountPasswdForSecret: []byte("old-password"),
+				},
+			}
+			pvc := &corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "data-target-0",
+				},
+			}
+			reconciler := &VolumePopulatorReconciler{
+				Client: fake.NewClientBuilder().
+					WithScheme(scheme).
+					WithObjects(secret).
+					Build(),
+				Scheme: scheme,
+			}
+
+			err := reconciler.upsertSystemAccountSecret(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc,
+				systemAccountSecretScopeSharding, "cluster", "shard", "root", []byte("new-password"),
+				map[string]string{constant.KBAppShardingNameLabelKey: "shard"})
+			Expect(err).To(HaveOccurred())
+			Expect(intctrlutil.IsRequeueError(err)).To(BeTrue(), err.Error())
+
+			patched := &corev1.Secret{}
+			Expect(reconciler.Client.Get(context.Background(), client.ObjectKey{
+				Namespace: "default",
+				Name:      secret.Name,
+			}, patched)).Should(Succeed())
+			Expect(patched.Finalizers).To(BeEmpty())
+			Expect(patched.DeletionTimestamp).NotTo(BeNil())
 		})
 
 		It("validates PVC names against instance volume templates", func() {

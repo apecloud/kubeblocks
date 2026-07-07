@@ -2312,31 +2312,18 @@ func (r *VolumePopulatorReconciler) upsertSystemAccountSecret(reqCtx intctrlutil
 		return r.Client.Create(reqCtx.Ctx, secret)
 	}
 	if secret.Immutable != nil && *secret.Immutable && !systemAccountSecretMatches(secret, accountName, password) {
+		if controllerutil.RemoveFinalizer(secret, constant.DBClusterFinalizerName) {
+			if err := r.Client.Update(reqCtx.Ctx, secret); err != nil && !apierrors.IsNotFound(err) {
+				return err
+			}
+		}
+		if !secret.DeletionTimestamp.IsZero() {
+			return intctrlutil.NewRequeueError(reconcileInterval, fmt.Sprintf("waiting for immutable system account secret %s/%s to be deleted", secret.Namespace, secret.Name))
+		}
 		if err := r.Client.Delete(reqCtx.Ctx, secret); err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
-		secret = &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      secretName,
-				Namespace: pvc.Namespace,
-				Labels:    labels,
-				Annotations: map[string]string{
-					constant.SystemAccountProvisionedAnnotationKey: "true",
-				},
-			},
-			Type: corev1.SecretTypeOpaque,
-			Data: map[string][]byte{
-				constant.AccountNameForSecret:   []byte(accountName),
-				constant.AccountPasswdForSecret: password,
-			},
-		}
-		if err := r.setSystemAccountSecretOwner(reqCtx, pvc.Namespace, secret, scope, clusterName, ownerName); err != nil {
-			return err
-		}
-		if err := r.Client.Create(reqCtx.Ctx, secret); err != nil {
-			return err
-		}
-		return nil
+		return intctrlutil.NewRequeueError(reconcileInterval, fmt.Sprintf("waiting for immutable system account secret %s/%s to be recreated", secret.Namespace, secret.Name))
 	}
 	patch := client.MergeFrom(secret.DeepCopy())
 	if secret.Labels == nil {

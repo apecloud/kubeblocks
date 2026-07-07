@@ -21,6 +21,7 @@ package instanceset
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"time"
 
@@ -58,6 +59,44 @@ var _ = Describe("update reconciler test", func() {
 
 		It("uses nil options when reconfigure args are empty", func() {
 			Expect(reconfigureOptions(workloads.ConfigTemplate{})).Should(BeNil())
+		})
+
+		It("records action failures with the target config hash", func() {
+			spy := &lifecycleCallSpy{
+				reconfigureErr: fmt.Errorf("%w: mysql rejected unknown variable expire_logs_days", lifecycle.ErrActionFailed),
+			}
+			origNewLifecycleAction := newLifecycleAction
+			newLifecycleAction = func(_ *workloads.InstanceSet, _ *kubebuilderx.ObjectTree, _ *corev1.Pod) (lifecycle.Lifecycle, error) {
+				return spy, nil
+			}
+			defer func() { newLifecycleAction = origNewLifecycleAction }()
+
+			tree := kubebuilderx.NewObjectTree()
+			tree.SetRoot(its)
+			pod := builder.NewPodBuilder(namespace, name+"-0").GetObject()
+			Expect(tree.Add(pod)).Should(Succeed())
+
+			config := workloads.ConfigTemplate{
+				Name:       "mysql-config",
+				ConfigHash: ptr.To("target-hash"),
+				Reconfigure: &kbappsv1.Action{
+					Exec: &kbappsv1.ExecAction{Command: []string{"reload"}},
+				},
+			}
+
+			blocked, err := (&updateReconciler{}).reconfigureInst(tree, its, pod, config)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(blocked).Should(BeTrue())
+			Expect(spy.reconfigureCalls).Should(Equal(1))
+
+			failures := getReconfigureActionFailures(pod)
+			Expect(failures).Should(HaveKey("mysql-config"))
+			Expect(failures["mysql-config"].ConfigHash).Should(Equal("target-hash"))
+			Expect(failures["mysql-config"].Message).Should(ContainSubstring("expire_logs_days"))
+
+			_, option, err := tree.GetWithOption(pod)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(option.Patch).Should(BeTrue())
 		})
 	})
 
@@ -582,6 +621,7 @@ var _ = Describe("update reconciler test", func() {
 type lifecycleCallSpy struct {
 	switchoverCalls  int
 	reconfigureCalls int
+	reconfigureErr   error
 }
 
 func (s *lifecycleCallSpy) PostProvision(_ context.Context, _ client.Reader, _ *lifecycle.Options) error {
@@ -611,7 +651,7 @@ func (s *lifecycleCallSpy) MemberLeave(_ context.Context, _ client.Reader, _ *li
 
 func (s *lifecycleCallSpy) Reconfigure(_ context.Context, _ client.Reader, _ *lifecycle.Options, _ map[string]string) error {
 	s.reconfigureCalls++
-	return nil
+	return s.reconfigureErr
 }
 
 func (s *lifecycleCallSpy) AccountProvision(_ context.Context, _ client.Reader, _ *lifecycle.Options, _, _, _ string) error {

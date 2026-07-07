@@ -28,16 +28,25 @@ import (
 	"sort"
 	"strconv"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/parameters"
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 )
 
 const configFilesUpdated = "KB_CONFIG_FILES_UPDATED"
+
+type actionFailureRecord struct {
+	ConfigHash string `json:"configHash,omitempty"`
+	Message    string `json:"message,omitempty"`
+}
 
 func init() {
 	registerPolicy(SyncDynamicReloadPolicy, syncPolicy)
@@ -322,8 +331,44 @@ func syncReconfigureStatus(ctx Context) Status {
 			}
 		}
 	}
+	if message, ok := getReconfigureActionFailure(ctx, configHash); ok {
+		return makeStatus(StatusFailedAndRetry, withReason(message), withExpected(replicas), withSucceed(updated))
+	}
 	if updated == replicas {
 		return makeStatus(StatusNone, withReason("reconfigure completed"), withExpected(replicas), withSucceed(updated))
 	}
 	return makeStatus(StatusRetry, withReason("reconfiguring"), withExpected(replicas), withSucceed(updated))
+}
+
+func getReconfigureActionFailure(ctx Context, configHash *string) (string, bool) {
+	if ctx.Client == nil || ctx.ITS == nil || configHash == nil || *configHash == "" {
+		return "", false
+	}
+	pods := &corev1.PodList{}
+	if err := ctx.Client.List(ctx.Ctx, pods,
+		client.InNamespace(ctx.ITS.Namespace),
+		client.MatchingLabels(instanceset.GetMatchLabels(ctx.ITS.Name))); err != nil {
+		ctx.Log.Error(err, "failed to list pods for reconfigure action failure")
+		return "", false
+	}
+	for i := range pods.Items {
+		failures := parseActionFailures(pods.Items[i].Annotations)
+		failure, ok := failures[ctx.ConfigTemplate.Name]
+		if !ok || failure.ConfigHash != *configHash {
+			continue
+		}
+		return fmt.Sprintf("reconfigure action failed on pod %s: %s", pods.Items[i].Name, failure.Message), true
+	}
+	return "", false
+}
+
+func parseActionFailures(annotations map[string]string) map[string]actionFailureRecord {
+	if len(annotations) == 0 || annotations[constant.ReconfigureActionFailureAnnotationKey] == "" {
+		return nil
+	}
+	failures := map[string]actionFailureRecord{}
+	if err := json.Unmarshal([]byte(annotations[constant.ReconfigureActionFailureAnnotationKey]), &failures); err != nil {
+		return nil
+	}
+	return failures
 }

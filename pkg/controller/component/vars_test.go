@@ -158,7 +158,7 @@ var _ = Describe("vars", func() {
 					},
 				},
 			}
-			templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, nil, vars)
+			templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, vars)
 			Expect(err).Should(Succeed())
 			Expect(templateVars).ShouldNot(HaveKey("non-exist-cm-var"))
 			checkEnvVarNotExist(envVars, "non-exist-cm-var")
@@ -178,7 +178,7 @@ var _ = Describe("vars", func() {
 					},
 				},
 			}
-			_, _, err = ResolveTemplateNEnvVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, nil, vars)
+			_, _, err = ResolveTemplateNEnvVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, vars)
 			Expect(err).ShouldNot(Succeed())
 
 			By("ok")
@@ -209,7 +209,7 @@ var _ = Describe("vars", func() {
 					},
 				},
 			}
-			templateVars, envVars, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)
+			templateVars, envVars, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 			Expect(err).Should(Succeed())
 			Expect(templateVars).Should(HaveKeyWithValue("cm-var", "cm-var-value"))
 			checkEnvVarWithValue(envVars, "cm-var", "cm-var-value")
@@ -231,7 +231,7 @@ var _ = Describe("vars", func() {
 					},
 				},
 			}
-			templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, nil, vars)
+			templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, vars)
 			Expect(err).Should(Succeed())
 			Expect(templateVars).ShouldNot(HaveKey("non-exist-secret-var"))
 			checkEnvVarNotExist(envVars, "non-exist-secret-var")
@@ -251,7 +251,7 @@ var _ = Describe("vars", func() {
 					},
 				},
 			}
-			_, _, err = ResolveTemplateNEnvVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, nil, vars)
+			_, _, err = ResolveTemplateNEnvVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, vars)
 			Expect(err).ShouldNot(Succeed())
 
 			By("ok")
@@ -282,7 +282,7 @@ var _ = Describe("vars", func() {
 					},
 				},
 			}
-			templateVars, envVars, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)
+			templateVars, envVars, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 			Expect(err).Should(Succeed())
 			Expect(templateVars).ShouldNot(HaveKeyWithValue("secret-var", "secret-var-value"))
 			checkEnvVarWithValueFrom(envVars, "secret-var", &corev1.EnvVarSource{
@@ -320,25 +320,25 @@ var _ = Describe("vars", func() {
 			}
 
 			By("has no host-network capability")
-			_, _, err := ResolveTemplateNEnvVars(ctx, testCtx.Cli, synthesizedComp, nil, vars)
+			_, _, err := ResolveTemplateNEnvVars(ctx, testCtx.Cli, synthesizedComp, vars)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(And(ContainSubstring("has no HostNetwork"), ContainSubstring("found when resolving vars")))
 
 			By("has no host-network enabled")
 			synthesizedComp.HostNetwork = &appsv1.HostNetwork{}
-			_, _, err = ResolveTemplateNEnvVars(ctx, testCtx.Cli, synthesizedComp, nil, vars)
+			_, _, err = ResolveTemplateNEnvVars(ctx, testCtx.Cli, synthesizedComp, vars)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(And(ContainSubstring("has no HostNetwork"), ContainSubstring("found when resolving vars")))
 
 			By("has no host-network port")
 			synthesizedComp.Network = &appsv1.ComponentNetwork{HostNetwork: true}
-			_, _, err = ResolveTemplateNEnvVars(ctx, testCtx.Cli, synthesizedComp, nil, vars)
+			_, _, err = ResolveTemplateNEnvVars(ctx, testCtx.Cli, synthesizedComp, vars)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("the required var is not found"))
 
 			By("ok")
 			synthesizedComp.Network.HostPorts = []appsv1.HostPort{{Name: "default", Port: 30001}}
-			templateVars, envVars, err := ResolveTemplateNEnvVars(ctx, testCtx.Cli, synthesizedComp, nil, vars)
+			templateVars, envVars, err := ResolveTemplateNEnvVars(ctx, testCtx.Cli, synthesizedComp, vars)
 			Expect(err).Should(Succeed())
 			Expect(templateVars).Should(HaveKeyWithValue("host-network-port", "30001"))
 			checkEnvVarWithValue(envVars, "host-network-port", "30001")
@@ -366,14 +366,14 @@ var _ = Describe("vars", func() {
 					},
 				},
 			}
-			templateVars, envVars, err = ResolveTemplateNEnvVars(ctx, testCtx.Cli, synthesizedComp, nil, vars)
+			templateVars, envVars, err = ResolveTemplateNEnvVars(ctx, testCtx.Cli, synthesizedComp, vars)
 			Expect(err).Should(Succeed())
 			Expect(templateVars).Should(HaveKeyWithValue("host-network-port", "30001"))
 			checkEnvVarWithValue(envVars, "host-network-port", "30001")
 
 			By("w/ default value - back-off to default value")
 			synthesizedComp.Network = nil // disable the host-network
-			templateVars, envVars, err = ResolveTemplateNEnvVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, nil, vars)
+			templateVars, envVars, err = ResolveTemplateNEnvVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, vars)
 			Expect(err).Should(Succeed())
 			Expect(templateVars).Should(HaveKeyWithValue("host-network-port", "3306"))
 			checkEnvVarWithValue(envVars, "host-network-port", "3306")
@@ -433,7 +433,7 @@ var _ = Describe("vars", func() {
 						},
 					},
 				}
-				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)
+				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 				Expect(err).Should(Succeed())
 				Expect(templateVars).ShouldNot(HaveKey("non-exist-service-var"))
 				checkEnvVarNotExist(envVars, "non-exist-service-var")
@@ -456,7 +456,7 @@ var _ = Describe("vars", func() {
 						},
 					},
 				}
-				_, _, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)
+				_, _, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 				Expect(err).ShouldNot(Succeed())
 			})
 
@@ -478,7 +478,7 @@ var _ = Describe("vars", func() {
 						},
 					},
 				}
-				_, _, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)
+				_, _, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 				Expect(err).ShouldNot(Succeed())
 				Expect(err.Error()).Should(ContainSubstring("not defined in the component definition"))
 
@@ -499,7 +499,7 @@ var _ = Describe("vars", func() {
 						},
 					},
 				}
-				_, _, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)
+				_, _, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 				Expect(err).ShouldNot(Succeed())
 				Expect(err.Error()).Should(ContainSubstring("not defined in the component definition"))
 			})
@@ -602,7 +602,7 @@ var _ = Describe("vars", func() {
 						},
 					},
 				}...)
-				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)
+				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 				Expect(err).Should(Succeed())
 				Expect(templateVars).Should(HaveKeyWithValue("service-type", string(corev1.ServiceTypeClusterIP)))
 				Expect(templateVars).Should(HaveKeyWithValue("service-host", svcName))
@@ -656,7 +656,7 @@ var _ = Describe("vars", func() {
 						},
 					},
 				})
-				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)
+				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 				Expect(err).Should(Succeed())
 				Expect(templateVars).Should(HaveKeyWithValue("service-host", svcName))
 				checkEnvVarWithValue(envVars, "service-host", svcName)
@@ -702,7 +702,7 @@ var _ = Describe("vars", func() {
 						},
 					},
 				})
-				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)
+				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 				Expect(err).Should(Succeed())
 				Expect(templateVars).Should(HaveKeyWithValue("service-node-port", strconv.Itoa(nodePort)))
 				checkEnvVarWithValue(envVars, "service-node-port", strconv.Itoa(nodePort))
@@ -748,14 +748,14 @@ var _ = Describe("vars", func() {
 						},
 					},
 				})
-				_, _, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)
+				_, _, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 				Expect(err).ShouldNot(BeNil())
 				Expect(err.Error()).Should(ContainSubstring("the required var is not found"))
 
 				// assign a node port to the service
 				reader.objs[len(reader.objs)-1].(*corev1.Service).Spec.Ports[0].NodePort = int32(nodePort + 1)
 
-				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)
+				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 				Expect(err).Should(Succeed())
 				Expect(templateVars).Should(HaveKeyWithValue("service-node-port", strconv.Itoa(nodePort+1)))
 				checkEnvVarWithValue(envVars, "service-node-port", strconv.Itoa(nodePort+1))
@@ -849,7 +849,7 @@ var _ = Describe("vars", func() {
 						},
 					},
 				}...)
-				_, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)
+				_, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 				Expect(err).Should(Succeed())
 				checkEnvVarWithValue(envVars, "pod-service-type", string(corev1.ServiceTypeNodePort))
 				checkEnvVarWithValue(envVars, "pod-service-endpoint", strings.Join([]string{svcName0, svcName1}, ","))
@@ -901,7 +901,7 @@ var _ = Describe("vars", func() {
 						},
 					},
 				})
-				_, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)
+				_, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 				Expect(err).Should(Succeed())
 				checkEnvVarWithValue(envVars, "lb", "127.0.0.1")
 			})
@@ -1008,7 +1008,7 @@ var _ = Describe("vars", func() {
 						},
 					},
 				}...)
-				_, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)
+				_, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 				Expect(err).Should(Succeed())
 				endpoints := []string{
 					fmt.Sprintf("%s:127.0.0.1", lbSvcName0),
@@ -1083,7 +1083,7 @@ var _ = Describe("vars", func() {
 						Status: corev1.ServiceStatus{}, // has no load balancer status, may be in provisioning
 					},
 				}...)
-				_, _, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)
+				_, _, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 				Expect(err).ShouldNot(BeNil())
 				Expect(err.Error()).Should(ContainSubstring("the required var is not found"))
 			})
@@ -1134,7 +1134,7 @@ var _ = Describe("vars", func() {
 						},
 					},
 				})
-				_, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)
+				_, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 				Expect(err).Should(Succeed())
 				endpoints := []string{
 					fmt.Sprintf("%s:127.0.0.1", advertisedSvcName),
@@ -1179,7 +1179,7 @@ var _ = Describe("vars", func() {
 						},
 					},
 				})
-				_, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)
+				_, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 				Expect(err).Should(Succeed())
 				checkEnvVarWithValue(envVars, "advertised", advertisedSvcName)
 			})
@@ -1223,7 +1223,7 @@ var _ = Describe("vars", func() {
 					},
 					Status: corev1.ServiceStatus{}, // has no load balancer status, may be in provisioning
 				})
-				_, _, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)
+				_, _, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 				Expect(err).ShouldNot(BeNil())
 				Expect(err.Error()).Should(ContainSubstring("the required var is not found"))
 
@@ -1252,7 +1252,7 @@ var _ = Describe("vars", func() {
 						},
 					},
 				}
-				_, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)
+				_, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 				Expect(err).Should(Succeed())
 				checkEnvVarWithValue(envVars, "advertised", "127.0.0.1")
 			})
@@ -1276,7 +1276,7 @@ var _ = Describe("vars", func() {
 						},
 					},
 				}
-				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, nil, vars)
+				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, vars)
 				Expect(err).Should(Succeed())
 				Expect(templateVars).ShouldNot(HaveKey("non-exist-credential-var"))
 				checkEnvVarNotExist(envVars, "non-exist-credential-var")
@@ -1299,7 +1299,7 @@ var _ = Describe("vars", func() {
 						},
 					},
 				}
-				_, _, err := ResolveTemplateNEnvVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, nil, vars)
+				_, _, err := ResolveTemplateNEnvVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, vars)
 				Expect(err).ShouldNot(Succeed())
 			})
 
@@ -1349,7 +1349,7 @@ var _ = Describe("vars", func() {
 						},
 					},
 				}
-				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)
+				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 				Expect(err).Should(Succeed())
 				Expect(templateVars).ShouldNot(HaveKey("credential-username"))
 				Expect(templateVars).ShouldNot(HaveKey("credential-password"))
@@ -1390,7 +1390,7 @@ var _ = Describe("vars", func() {
 						},
 					},
 				}
-				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, nil, vars)
+				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, vars)
 				Expect(err).Should(Succeed())
 				Expect(templateVars).ShouldNot(HaveKey("non-exist-serviceref-var"))
 				checkEnvVarNotExist(envVars, "non-exist-serviceref-var")
@@ -1413,7 +1413,7 @@ var _ = Describe("vars", func() {
 						},
 					},
 				}
-				_, _, err := ResolveTemplateNEnvVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, nil, vars)
+				_, _, err := ResolveTemplateNEnvVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, vars)
 				Expect(err).ShouldNot(Succeed())
 			})
 
@@ -1540,7 +1540,7 @@ var _ = Describe("vars", func() {
 						},
 					},
 				}
-				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, nil, vars)
+				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, vars)
 				Expect(err).Should(Succeed())
 				Expect(templateVars).Should(HaveKeyWithValue("serviceref-endpoint", "endpoint"))
 				Expect(templateVars).Should(HaveKeyWithValue("serviceref-host", "host"))
@@ -1687,7 +1687,7 @@ var _ = Describe("vars", func() {
 						},
 					},
 				}
-				_, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)
+				_, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 				Expect(err).Should(Succeed())
 				quantity := func(val string) string {
 					q := resource.MustParse(val)
@@ -1720,7 +1720,7 @@ var _ = Describe("vars", func() {
 						},
 					},
 				}
-				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, nil, vars)
+				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, vars)
 				Expect(err).Should(Succeed())
 				Expect(templateVars).ShouldNot(HaveKey("non-exist-component-var"))
 				checkEnvVarNotExist(envVars, "non-exist-component-var")
@@ -1743,7 +1743,7 @@ var _ = Describe("vars", func() {
 						},
 					},
 				}
-				_, _, err := ResolveTemplateNEnvVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, nil, vars)
+				_, _, err := ResolveTemplateNEnvVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, vars)
 				Expect(err).ShouldNot(Succeed())
 			})
 
@@ -1918,7 +1918,7 @@ var _ = Describe("vars", func() {
 					fmt.Sprintf("%s-%s-%d", synthesizedComp.ClusterName, synthesizedComp.Name, 1),
 					fmt.Sprintf("%s-%s-%d", synthesizedComp.ClusterName, synthesizedComp.Name, 2),
 				}
-				_, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)
+				_, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 				Expect(err).Should(Succeed())
 				compName := constant.GenerateClusterComponentName(synthesizedComp.ClusterName, synthesizedComp.Name)
 				checkEnvVarWithValue(envVars, "name", compName)
@@ -1939,7 +1939,7 @@ var _ = Describe("vars", func() {
 				checkEnvVarWithValue(envVars, "serviceVersion", "v3.6.5")
 			})
 
-			It("uses desired pods for current component when component definition is available", func() {
+			It("uses desired pods for current component when the running InstanceSet is stale", func() {
 				synthesizedComp.Replicas = 5
 				vars := []appsv1.EnvVar{
 					{
@@ -1982,7 +1982,7 @@ var _ = Describe("vars", func() {
 					},
 				}
 
-				_, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, &appsv1.ComponentDefinition{}, vars)
+				_, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 
 				Expect(err).Should(Succeed())
 				expected := make([]string, 0, 5)
@@ -2027,7 +2027,7 @@ var _ = Describe("vars", func() {
 					},
 				}
 
-				_, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, &appsv1.ComponentDefinition{}, vars)
+				_, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 
 				Expect(err).Should(Succeed())
 				expected := make([]string, 0, 5)
@@ -2037,7 +2037,7 @@ var _ = Describe("vars", func() {
 				checkEnvVarWithValue(envVars, "podNames", strings.Join(expected, ","))
 			})
 
-			It("keeps running InstanceSet pods for another component", func() {
+			It("uses desired pods for another component when the running InstanceSet is stale", func() {
 				synthesizedComp.Replicas = 5
 				const anotherCompName = "another"
 				const anotherCompDefName = "anotherDef"
@@ -2085,11 +2085,11 @@ var _ = Describe("vars", func() {
 					},
 				}
 
-				_, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, &appsv1.ComponentDefinition{}, vars)
+				_, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 
 				Expect(err).Should(Succeed())
-				expected := make([]string, 0, 3)
-				for i := 0; i < 3; i++ {
+				expected := make([]string, 0, 5)
+				for i := 0; i < 5; i++ {
 					expected = append(expected, fmt.Sprintf("%s-%s-%d", synthesizedComp.ClusterName, anotherCompName, i))
 				}
 				checkEnvVarWithValue(envVars, "podNames", strings.Join(expected, ","))
@@ -2130,7 +2130,7 @@ var _ = Describe("vars", func() {
 						},
 					},
 				}
-				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, nil, synthesizedComp, nil, vars)
+				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, nil, synthesizedComp, vars)
 				Expect(err).Should(Succeed())
 				Expect(templateVars).Should(HaveKeyWithValue("namespace", synthesizedComp.Namespace))
 				Expect(templateVars).Should(HaveKeyWithValue("name", synthesizedComp.ClusterName))
@@ -2196,7 +2196,7 @@ var _ = Describe("vars", func() {
 						},
 					},
 				}
-				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, nil, vars)
+				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, vars)
 				Expect(err).Should(Succeed())
 				Expect(templateVars).ShouldNot(HaveKey("service-hst"))
 				checkEnvVarNotExist(envVars, "service-host")
@@ -2220,7 +2220,7 @@ var _ = Describe("vars", func() {
 						},
 					},
 				}
-				_, _, err := ResolveTemplateNEnvVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, nil, vars)
+				_, _, err := ResolveTemplateNEnvVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, vars)
 				Expect(err).ShouldNot(Succeed())
 			})
 
@@ -2257,7 +2257,7 @@ var _ = Describe("vars", func() {
 						},
 					},
 				})
-				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)
+				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 				Expect(err).Should(Succeed())
 				Expect(templateVars).Should(HaveKeyWithValue("service-host", svcName))
 				checkEnvVarWithValue(envVars, "service-host", svcName)
@@ -2408,7 +2408,7 @@ var _ = Describe("vars", func() {
 						},
 					},
 				}
-				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)
+				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 				Expect(err).Should(Succeed())
 				Expect(templateVars).Should(HaveKeyWithValue("service-host", svcName1))
 				checkEnvVarWithValue(envVars, "service-host", svcName1)
@@ -2432,7 +2432,7 @@ var _ = Describe("vars", func() {
 						},
 					},
 				}
-				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)
+				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 				Expect(err).Should(Succeed())
 				Expect(templateVars).Should(HaveKeyWithValue("service-host", svcName1))
 				checkEnvVarWithValue(envVars, "service-host", svcName1)
@@ -2456,7 +2456,7 @@ var _ = Describe("vars", func() {
 						},
 					},
 				}
-				_, _, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)
+				_, _, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 				Expect(err).ShouldNot(Succeed())
 				Expect(err.Error()).Should(ContainSubstring("more than one referent component found"))
 			})
@@ -2500,7 +2500,7 @@ var _ = Describe("vars", func() {
 						},
 					},
 				}
-				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)
+				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 				Expect(err).Should(Succeed())
 				// the defined var will have empty values.
 				Expect(templateVars).Should(HaveKeyWithValue("service-host", ""))
@@ -2551,7 +2551,7 @@ var _ = Describe("vars", func() {
 						},
 					},
 				}
-				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)
+				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 				Expect(err).Should(Succeed())
 				Expect(templateVars).Should(HaveKeyWithValue("service-host", combinedSvcVarValue))
 				// check that per-component vars not been created.
@@ -2590,7 +2590,7 @@ var _ = Describe("vars", func() {
 						},
 					},
 				}
-				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)
+				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 				Expect(err).Should(Succeed())
 				// the defined var will have empty values.
 				Expect(templateVars).Should(HaveKeyWithValue("service-host", ""))
@@ -2625,7 +2625,7 @@ var _ = Describe("vars", func() {
 						},
 					},
 				}
-				_, _, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)
+				_, _, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 				Expect(err).ShouldNot(Succeed())
 				Expect(err.Error()).Should(ContainSubstring("combined strategy doesn't support vars with valueFrom values"))
 			})
@@ -2656,7 +2656,7 @@ var _ = Describe("vars", func() {
 						},
 					},
 				}
-				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)
+				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 				Expect(err).Should(Succeed())
 				Expect(templateVars).Should(HaveKeyWithValue("service-host", ""))
 				Expect(templateVars).Should(HaveKeyWithValue(svcVarName1, svcName1))
@@ -2696,7 +2696,7 @@ var _ = Describe("vars", func() {
 						},
 					},
 				}
-				_, _, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)
+				_, _, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 				Expect(err).ShouldNot(BeNil())
 				Expect(err.Error()).Should(And(ContainSubstring("has no"), ContainSubstring("found when resolving vars")))
 
@@ -2714,7 +2714,7 @@ var _ = Describe("vars", func() {
 						},
 					},
 				})
-				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)
+				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 				Expect(err).Should(BeNil())
 				Expect(templateVars).Should(HaveKeyWithValue("service-host", ""))
 				Expect(templateVars).Should(HaveKeyWithValue(svcVarName1, svcName1))
@@ -2752,7 +2752,7 @@ var _ = Describe("vars", func() {
 						},
 					},
 				}
-				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)
+				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 				Expect(err).Should(Succeed())
 				// the combined value will have comp3 in it, but its value will be empty: "comp1:val1,comp2:val2,comp3:"
 				Expect(templateVars).Should(HaveKeyWithValue("service-host", combinedSvcVarValueWithComp3KeyOnly))
@@ -2792,7 +2792,7 @@ var _ = Describe("vars", func() {
 						},
 					},
 				}
-				_, _, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)
+				_, _, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 				Expect(err).ShouldNot(BeNil())
 				Expect(err.Error()).Should(And(ContainSubstring("has no"), ContainSubstring("found when resolving vars")))
 
@@ -2810,7 +2810,7 @@ var _ = Describe("vars", func() {
 						},
 					},
 				})
-				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)
+				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 				Expect(err).Should(Succeed())
 				Expect(templateVars).Should(HaveKeyWithValue("service-host", combinedSvcVarValueWithComp3))
 				Expect(templateVars).ShouldNot(HaveKey(svcVarName1))
@@ -2850,7 +2850,7 @@ var _ = Describe("vars", func() {
 						},
 					},
 				}
-				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)
+				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 				Expect(err).Should(BeNil())
 				// Expect(templateVars).Should(HaveKeyWithValue("service-host", ""))
 				// Expect(templateVars).Should(HaveKeyWithValue(svcVarName1, svcName1))
@@ -2888,7 +2888,7 @@ var _ = Describe("vars", func() {
 						},
 					},
 				}
-				_, _, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)
+				_, _, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 				Expect(err).ShouldNot(BeNil())
 				Expect(err.Error()).Should(And(ContainSubstring("insufficient component objects to resolve vars"),
 					ContainSubstring(fmt.Sprintf("expected: %d, actual: %d", 2, 1))))
@@ -2923,7 +2923,7 @@ var _ = Describe("vars", func() {
 						},
 					},
 				}
-				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)
+				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 				Expect(err).Should(BeNil())
 				Expect(templateVars).Should(HaveKeyWithValue("service-host", ""))
 				Expect(templateVars).Should(HaveKeyWithValue(svcVarName1, svcName1))
@@ -2972,7 +2972,7 @@ var _ = Describe("vars", func() {
 						Value: "abc$(aa)xyz",
 					},
 				}
-				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, nil, synthesizedComp, nil, vars)
+				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, nil, synthesizedComp, vars)
 				Expect(err).Should(Succeed())
 				Expect(templateVars).Should(HaveKeyWithValue("ab", "~"))
 				Expect(templateVars).Should(HaveKeyWithValue("ac", "abc~xyz"))
@@ -2995,7 +2995,7 @@ var _ = Describe("vars", func() {
 						Value: "abc$(x)xyz",
 					},
 				}
-				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, nil, synthesizedComp, nil, vars)
+				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, nil, synthesizedComp, vars)
 				Expect(err).Should(Succeed())
 				Expect(templateVars).Should(HaveKeyWithValue("bb", "$(x)"))
 				Expect(templateVars).Should(HaveKeyWithValue("bc", "abc$(x)xyz"))
@@ -3028,7 +3028,7 @@ var _ = Describe("vars", func() {
 						},
 					},
 				}
-				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)
+				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 				Expect(err).Should(Succeed())
 				Expect(templateVars).Should(HaveKeyWithValue("cb", "$(credential-username)"))
 				checkEnvVarWithValueFrom(envVars, "cb", &corev1.EnvVarSource{
@@ -3056,7 +3056,7 @@ var _ = Describe("vars", func() {
 						Value: "abc$$(da)xyz",
 					},
 				}
-				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, nil, synthesizedComp, nil, vars)
+				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, nil, synthesizedComp, vars)
 				Expect(err).Should(Succeed())
 				Expect(templateVars).Should(HaveKeyWithValue("db", "$(da)"))
 				Expect(templateVars).Should(HaveKeyWithValue("dc", "abc$(da)xyz"))
@@ -3083,7 +3083,7 @@ var _ = Describe("vars", func() {
 						Value: "$$(x)$(x)",
 					},
 				}
-				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, nil, synthesizedComp, nil, vars)
+				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, nil, synthesizedComp, vars)
 				Expect(err).Should(Succeed())
 				Expect(templateVars).Should(HaveKeyWithValue("eb", "~$(ea)$(ea)~~$(ea)"))
 				Expect(templateVars).Should(HaveKeyWithValue("ec", "abc~xyz$(ea)"))
@@ -3118,7 +3118,7 @@ var _ = Describe("vars", func() {
 						},
 					},
 				}
-				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)
+				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 				Expect(err).Should(Succeed())
 				Expect(templateVars).Should(HaveKeyWithValue("fb", "abc~$(fa)$(fa)$(credential-username)~$(x)$(x)xyz"))
 				checkEnvVarWithValue(envVars, "fb", "abc~$(fa)$(fa)$(credential-username)~$(x)$(x)xyz")
@@ -3134,7 +3134,7 @@ var _ = Describe("vars", func() {
 						Expression: expp("0{{ .port }}"),
 					},
 				}
-				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, nil, synthesizedComp, nil, vars)
+				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, nil, synthesizedComp, vars)
 				Expect(err).Should(Succeed())
 				Expect(templateVars).Should(HaveKeyWithValue("port", "012345"))
 				checkEnvVarWithValue(envVars, "port", "012345")
@@ -3148,7 +3148,7 @@ var _ = Describe("vars", func() {
 						Expression: expp("{{ if eq .port \"12345\" }}54321{{ else }}0{{ end }}"),
 					},
 				}
-				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, nil, synthesizedComp, nil, vars)
+				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, nil, synthesizedComp, vars)
 				Expect(err).Should(Succeed())
 				Expect(templateVars).Should(HaveKeyWithValue("port", "54321"))
 				checkEnvVarWithValue(envVars, "port", "54321")
@@ -3161,7 +3161,7 @@ var _ = Describe("vars", func() {
 						Expression: expp("12345"),
 					},
 				}
-				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, nil, synthesizedComp, nil, vars)
+				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, nil, synthesizedComp, vars)
 				Expect(err).Should(Succeed())
 				Expect(templateVars).Should(HaveKeyWithValue("port", "12345"))
 				checkEnvVarWithValue(envVars, "port", "12345")
@@ -3174,7 +3174,7 @@ var _ = Describe("vars", func() {
 						Expression: expp("{{ if eq .port 12345 }}54321{{ end }}"),
 					},
 				}
-				_, _, err := ResolveTemplateNEnvVars(testCtx.Ctx, nil, synthesizedComp, nil, vars)
+				_, _, err := ResolveTemplateNEnvVars(testCtx.Ctx, nil, synthesizedComp, vars)
 				Expect(err).ShouldNot(Succeed())
 				Expect(err.Error()).Should(ContainSubstring("incompatible types for comparison"))
 			})
@@ -3194,7 +3194,7 @@ var _ = Describe("vars", func() {
 						Expression: expp("{{ .host }}:{{ .port }}"),
 					},
 				}
-				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, nil, synthesizedComp, nil, vars)
+				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, nil, synthesizedComp, vars)
 				Expect(err).Should(Succeed())
 				Expect(templateVars).Should(HaveKeyWithValue("endpoint", "localhost:12345"))
 				checkEnvVarWithValue(envVars, "endpoint", "localhost:12345")
@@ -3272,7 +3272,7 @@ var _ = Describe("vars", func() {
 						},
 					},
 				}
-				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)
+				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 				Expect(err).Should(Succeed())
 				// the defined var will have empty values.
 				Expect(templateVars).Should(HaveKeyWithValue("host", ""))
@@ -3305,7 +3305,7 @@ var _ = Describe("vars", func() {
 						Expression: expp("{{ if index . \"host\" }}{{ .host }}{{ else }}localhost{{ end }}"),
 					},
 				}
-				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, nil, vars)
+				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, vars)
 				Expect(err).Should(Succeed())
 				Expect(templateVars).Should(HaveKeyWithValue("host", "localhost"))
 				checkEnvVarWithValue(envVars, "host", "localhost")
@@ -3328,7 +3328,7 @@ var _ = Describe("vars", func() {
 						},
 					},
 				}
-				templateVars, envVars, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)
+				templateVars, envVars, err = ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 				Expect(err).Should(Succeed())
 				Expect(templateVars).Should(HaveKeyWithValue("host", svcName))
 				checkEnvVarWithValue(envVars, "host", svcName)
@@ -3366,7 +3366,7 @@ var _ = Describe("vars", func() {
 						},
 					},
 				}
-				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)
+				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 				Expect(err).Should(Succeed())
 				Expect(templateVars).ShouldNot(HaveKey("password"))
 				checkEnvVarWithValueFrom(envVars, "password", &corev1.EnvVarSource{
@@ -3416,7 +3416,7 @@ var _ = Describe("vars", func() {
 						},
 					},
 				}
-				_, _, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, nil, vars)
+				_, _, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
 				Expect(err).ShouldNot(Succeed())
 				Expect(err.Error()).Should(And(ContainSubstring("map has no entry for key"), ContainSubstring("raw")))
 			})
@@ -3437,7 +3437,7 @@ var _ = Describe("vars", func() {
 						Value: "12345",
 					},
 				}
-				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, nil, synthesizedComp, nil, vars)
+				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, nil, synthesizedComp, vars)
 				Expect(err).Should(Succeed())
 				Expect(templateVars).Should(HaveKeyWithValue("endpoint", "localhost:12345"))
 				Expect(templateVars).Should(HaveKeyWithValue("host", "127.0.0.1"))

@@ -55,12 +55,7 @@ func VarReferenceRegExp() *regexp.Regexp {
 }
 
 // ResolveTemplateNEnvVars resolves all built-in and user-defined vars for config template and Env usage.
-func ResolveTemplateNEnvVars(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent, definedVars []appsv1.EnvVar) (map[string]string, []corev1.EnvVar, error) {
-	return ResolveTemplateNEnvVarsWithCompDef(ctx, cli, synthesizedComp, nil, definedVars)
-}
-
-// ResolveTemplateNEnvVarsWithCompDef resolves vars with the current ComponentDefinition context.
-func ResolveTemplateNEnvVarsWithCompDef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
+func ResolveTemplateNEnvVars(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
 	compDef *appsv1.ComponentDefinition, definedVars []appsv1.EnvVar) (map[string]string, []corev1.EnvVar, error) {
 	return resolveTemplateNEnvVars(ctx, cli, synthesizedComp, compDef, definedVars)
 }

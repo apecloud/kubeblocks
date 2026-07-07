@@ -110,15 +110,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	// if it's a roleful InstanceSet, we use updateCount to represent Pods can be updated according to the spec.memberUpdateStrategy.
 	updateCount := len(oldInstanceList)
 	if len(its.Spec.Roles) > 0 {
-		desiredInstances := make(map[string]*workloads.Instance, len(nameToTemplateMap))
-		for name, template := range nameToTemplateMap {
-			inst, err := buildInstanceByTemplate(tree, name, template, its)
-			if err != nil {
-				return kubebuilderx.Continue, err
-			}
-			desiredInstances[name] = inst
-		}
-		plan := newUpdatePlan(*its, oldInstanceList, desiredInstances)
+		plan := newUpdatePlan(*its, oldInstanceList)
 		instancesToBeUpdated, err := plan.Execute()
 		if err != nil {
 			return kubebuilderx.Continue, err

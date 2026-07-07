@@ -23,112 +23,143 @@ import (
 	"fmt"
 	"hash/fnv"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/apimachinery/pkg/util/rand"
 
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
+const instanceSetRevisionAnnotationKey = "workloads.kubeblocks.io/instance-revision-hash"
+
 type instanceRevisionIntent struct {
+	Template                   podTemplateRevisionIntent
+	MinReadySeconds            int32
+	VolumeClaimTemplates       []pvcTemplateRevisionIntent
+	InstanceSetName            string
+	InstanceTemplateName       string
+	InstanceUpdateStrategyType *kbappsv1.InstanceUpdateStrategyType
+	PodUpdatePolicy            workloads.PodUpdatePolicyType
+	PodUpgradePolicy           workloads.PodUpdatePolicyType
+	Roles                      []workloads.ReplicaRole
+	Configs                    []workloads.ConfigTemplate
+}
+
+type podTemplateRevisionIntent struct {
 	Labels      map[string]string
 	Annotations map[string]string
-	Spec        workloads.InstanceSpec
+	Spec        corev1.PodSpec
+}
+
+type pvcTemplateRevisionIntent struct {
+	Name        string
+	Labels      map[string]string
+	Annotations map[string]string
+	Spec        corev1.PersistentVolumeClaimSpec
 }
 
 func buildInstanceRevision(inst *workloads.Instance) string {
-	return buildRevisionIntentHash(copyRevisionLabels(inst.Labels), copyRevisionAnnotations(inst.Annotations), *inst.Spec.DeepCopy())
+	return buildRevisionIntentHash(buildInstanceRevisionIntent(inst))
 }
 
-func buildCurrentInstanceRevision(inst, desired *workloads.Instance) string {
-	if desired == nil {
-		return buildInstanceRevision(inst)
+func stampInstanceRevision(inst *workloads.Instance) string {
+	revision := buildInstanceRevision(inst)
+	if inst.Annotations == nil {
+		inst.Annotations = make(map[string]string)
 	}
-	return buildRevisionIntentHash(
-		copyRevisionLabelsByKeys(inst.Labels, desired.Labels),
-		copyRevisionAnnotationsByKeys(inst.Annotations, desired.Annotations),
-		*inst.Spec.DeepCopy())
+	inst.Annotations[instanceSetRevisionAnnotationKey] = revision
+	return revision
 }
 
-func buildRevisionIntentHash(labels, annotations map[string]string, spec workloads.InstanceSpec) string {
-	intent := instanceRevisionIntent{
-		Labels:      labels,
-		Annotations: annotations,
-		Spec:        spec,
+func getInstanceRevision(inst *workloads.Instance) string {
+	if inst.Annotations == nil {
+		return ""
 	}
+	return inst.Annotations[instanceSetRevisionAnnotationKey]
+}
+
+func buildInstanceRevisionIntent(inst *workloads.Instance) instanceRevisionIntent {
+	spec := inst.Spec.DeepCopy()
+	return instanceRevisionIntent{
+		Template:                   buildPodTemplateRevisionIntent(spec.Template),
+		MinReadySeconds:            spec.MinReadySeconds,
+		VolumeClaimTemplates:       buildPVCTemplateRevisionIntents(spec.VolumeClaimTemplates),
+		InstanceSetName:            spec.InstanceSetName,
+		InstanceTemplateName:       spec.InstanceTemplateName,
+		InstanceUpdateStrategyType: copyInstanceUpdateStrategyType(spec.InstanceUpdateStrategyType),
+		PodUpdatePolicy:            spec.PodUpdatePolicy,
+		PodUpgradePolicy:           spec.PodUpgradePolicy,
+		Roles:                      copyReplicaRoles(spec.Roles),
+		Configs:                    copyConfigTemplates(spec.Configs),
+	}
+}
+
+func buildRevisionIntentHash(intent instanceRevisionIntent) string {
 	hasher := fnv.New32()
 	fmt.Fprintf(hasher, "%v", dump.ForHash(intent))
 	return rand.SafeEncodeString(fmt.Sprint(hasher.Sum32()))
 }
 
-func copyRevisionLabels(labels map[string]string) map[string]string {
-	if len(labels) == 0 {
+func buildPodTemplateRevisionIntent(template corev1.PodTemplateSpec) podTemplateRevisionIntent {
+	return podTemplateRevisionIntent{
+		Labels:      copyStringMap(template.Labels),
+		Annotations: copyStringMap(template.Annotations),
+		Spec:        *template.Spec.DeepCopy(),
+	}
+}
+
+func buildPVCTemplateRevisionIntents(templates []corev1.PersistentVolumeClaimTemplate) []pvcTemplateRevisionIntent {
+	if len(templates) == 0 {
 		return nil
 	}
-	copied := make(map[string]string, len(labels))
-	for k, v := range labels {
+	intents := make([]pvcTemplateRevisionIntent, len(templates))
+	for i := range templates {
+		intents[i] = pvcTemplateRevisionIntent{
+			Name:        templates[i].Name,
+			Labels:      copyStringMap(templates[i].Labels),
+			Annotations: copyStringMap(templates[i].Annotations),
+			Spec:        *templates[i].Spec.DeepCopy(),
+		}
+	}
+	return intents
+}
+
+func copyInstanceUpdateStrategyType(strategy *kbappsv1.InstanceUpdateStrategyType) *kbappsv1.InstanceUpdateStrategyType {
+	if strategy == nil {
+		return nil
+	}
+	copied := *strategy
+	return &copied
+}
+
+func copyStringMap(m map[string]string) map[string]string {
+	if len(m) == 0 {
+		return nil
+	}
+	copied := make(map[string]string, len(m))
+	for k, v := range m {
 		copied[k] = v
 	}
 	return copied
 }
 
-func copyRevisionLabelsByKeys(labels, keys map[string]string) map[string]string {
-	if len(labels) == 0 || len(keys) == 0 {
+func copyReplicaRoles(roles []workloads.ReplicaRole) []workloads.ReplicaRole {
+	if len(roles) == 0 {
 		return nil
 	}
-	copied := make(map[string]string, len(keys))
-	for k := range keys {
-		if v, ok := labels[k]; ok {
-			copied[k] = v
-		}
-	}
-	if len(copied) == 0 {
-		return nil
-	}
+	copied := make([]workloads.ReplicaRole, len(roles))
+	copy(copied, roles)
 	return copied
 }
 
-func copyRevisionAnnotations(annotations map[string]string) map[string]string {
-	if len(annotations) == 0 {
+func copyConfigTemplates(configs []workloads.ConfigTemplate) []workloads.ConfigTemplate {
+	if len(configs) == 0 {
 		return nil
 	}
-	copied := make(map[string]string, len(annotations))
-	for k, v := range annotations {
-		if isNonRevisionAnnotation(k) {
-			continue
-		}
-		copied[k] = v
-	}
-	if len(copied) == 0 {
-		return nil
+	copied := make([]workloads.ConfigTemplate, len(configs))
+	for i := range configs {
+		configs[i].DeepCopyInto(&copied[i])
 	}
 	return copied
-}
-
-func copyRevisionAnnotationsByKeys(annotations, keys map[string]string) map[string]string {
-	if len(annotations) == 0 || len(keys) == 0 {
-		return nil
-	}
-	copied := make(map[string]string, len(keys))
-	for k := range keys {
-		if isNonRevisionAnnotation(k) {
-			continue
-		}
-		if v, ok := annotations[k]; ok {
-			copied[k] = v
-		}
-	}
-	if len(copied) == 0 {
-		return nil
-	}
-	return copied
-}
-
-func isNonRevisionAnnotation(key string) bool {
-	switch key {
-	case constant.KubeBlocksGenerationKey:
-		return true
-	default:
-		return false
-	}
 }

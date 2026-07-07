@@ -147,6 +147,7 @@ func buildInstanceByTemplate(tree *kubebuilderx.ObjectTree,
 	}
 
 	inst := b.GetObject()
+	stampInstanceRevision(inst)
 	if !shouldCloneInstanceAssistantObjects(its) {
 		if err := controllerutil.SetControllerReference(its, inst, model.GetScheme()); err != nil {
 			return nil, err
@@ -425,12 +426,12 @@ func buildDesiredInstancesByName(tree *kubebuilderx.ObjectTree, its *workloads.I
 //	return requests, limits
 // }
 
-func isInstanceUpdated(its *workloads.InstanceSet, inst, desired *workloads.Instance) bool {
+func isInstanceUpdated(its *workloads.InstanceSet, inst *workloads.Instance) bool {
 	updateRevisions, err := revisionmap.Decode(its.Status.UpdateRevisions)
 	if err != nil {
 		return false
 	}
-	return isInstanceUpdatedWithRevisions(inst, buildCurrentInstanceRevision(inst, desired), updateRevisions)
+	return isInstanceUpdatedWithRevisions(inst, getInstanceRevision(inst), updateRevisions)
 }
 
 func isInstanceUpdatedWithRevisions(inst *workloads.Instance, currentRevision string, updateRevisions map[string]string) bool {

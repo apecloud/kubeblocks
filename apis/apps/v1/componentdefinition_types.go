@@ -1127,6 +1127,9 @@ type ComponentFileTemplate struct {
 	// - KB_CONFIG_FILES_REMOVED: file1,file2...
 	// - KB_CONFIG_FILES_UPDATED: file1:checksum1,file2:checksum2...
 	//
+	// Before invoking the action, KubeBlocks verifies these file changes.
+	// For updated files, the local mounted file content must match the target checksum.
+	//
 	// Note: This field is immutable once it has been set.
 	//
 	// +optional

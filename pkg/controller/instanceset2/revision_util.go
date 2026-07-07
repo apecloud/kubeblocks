@@ -31,7 +31,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 )
 
-const instanceSetRevisionAnnotationKey = "workloads.kubeblocks.io/instance-revision"
+const instanceSetRevisionAnnotationKey = "workloads.kubeblocks.io/instance-revision-hash"
 
 type instanceRevisionIntent struct {
 	Template                   podTemplateRevisionIntent

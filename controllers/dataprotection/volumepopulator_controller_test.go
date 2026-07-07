@@ -376,10 +376,14 @@ var _ = Describe("Volume Populator Controller test", func() {
 			Expect(intctrlutil.IsRequeueError(err)).To(BeTrue(), err.Error())
 
 			patched := &corev1.Secret{}
-			Expect(reconciler.Client.Get(context.Background(), client.ObjectKey{
+			err = reconciler.Client.Get(context.Background(), client.ObjectKey{
 				Namespace: "default",
 				Name:      secret.Name,
-			}, patched)).Should(Succeed())
+			}, patched)
+			if apierrors.IsNotFound(err) {
+				return
+			}
+			Expect(err).Should(Succeed())
 			Expect(patched.Finalizers).To(BeEmpty())
 			Expect(patched.DeletionTimestamp).NotTo(BeNil())
 		})

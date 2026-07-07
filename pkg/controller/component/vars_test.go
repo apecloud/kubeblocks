@@ -2036,6 +2036,64 @@ var _ = Describe("vars", func() {
 				}
 				checkEnvVarWithValue(envVars, "podNames", strings.Join(expected, ","))
 			})
+
+			It("keeps running InstanceSet pods for another component", func() {
+				synthesizedComp.Replicas = 5
+				const anotherCompName = "another"
+				const anotherCompDefName = "anotherDef"
+				synthesizedComp.Comp2CompDefs = map[string]string{
+					anotherCompName: anotherCompDefName,
+				}
+				vars := []appsv1.EnvVar{
+					{
+						Name: "podNames",
+						ValueFrom: &appsv1.VarSource{
+							ComponentVarRef: &appsv1.ComponentVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
+									CompDef:  anotherCompDefName,
+									Optional: required(),
+								},
+								ComponentVars: appsv1.ComponentVars{
+									PodNames: &appsv1.VarRequired,
+								},
+							},
+						},
+					},
+				}
+				reader := &mockReader{
+					cli: testCtx.Cli,
+					objs: []client.Object{
+						&appsv1.Component{
+							ObjectMeta: metav1.ObjectMeta{
+								Namespace: testCtx.DefaultNamespace,
+								Name:      constant.GenerateClusterComponentName(synthesizedComp.ClusterName, anotherCompName),
+							},
+							Spec: appsv1.ComponentSpec{
+								CompDef:  anotherCompDefName,
+								Replicas: 5,
+							},
+						},
+						&workloads.InstanceSet{
+							ObjectMeta: metav1.ObjectMeta{
+								Namespace: testCtx.DefaultNamespace,
+								Name:      constant.GenerateWorkloadNamePattern(synthesizedComp.ClusterName, anotherCompName),
+							},
+							Spec: workloads.InstanceSetSpec{
+								Replicas: ptr.To(int32(3)),
+							},
+						},
+					},
+				}
+
+				_, envVars, err := ResolveTemplateNEnvVarsWithCompDef(testCtx.Ctx, reader, synthesizedComp, &appsv1.ComponentDefinition{}, vars)
+
+				Expect(err).Should(Succeed())
+				expected := make([]string, 0, 3)
+				for i := 0; i < 3; i++ {
+					expected = append(expected, fmt.Sprintf("%s-%s-%d", synthesizedComp.ClusterName, anotherCompName, i))
+				}
+				checkEnvVarWithValue(envVars, "podNames", strings.Join(expected, ","))
+			})
 		})
 
 		Context("cluster vars", func() {

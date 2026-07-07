@@ -142,7 +142,7 @@ func TestIsInstanceUpdated(t *testing.T) {
 			name: "true when instance revision matches even if parent generation changed",
 			inst: func() *workloads.Instance {
 				inst := newInstance("1", true)
-				inst.Annotations[constant.InstanceSetRevisionAnnotationKey] = latestRevision
+				inst.Annotations[instanceSetRevisionAnnotationKey] = latestRevision
 				return inst
 			}(),
 			want: true,
@@ -151,7 +151,7 @@ func TestIsInstanceUpdated(t *testing.T) {
 			name: "false when instance spec is latest but pod status is not up to date",
 			inst: func() *workloads.Instance {
 				inst := newInstance("3", false)
-				inst.Annotations[constant.InstanceSetRevisionAnnotationKey] = latestRevision
+				inst.Annotations[instanceSetRevisionAnnotationKey] = latestRevision
 				return inst
 			}(),
 			want: false,
@@ -160,7 +160,7 @@ func TestIsInstanceUpdated(t *testing.T) {
 			name: "false when instance revision annotation differs",
 			inst: func() *workloads.Instance {
 				inst := newInstance("3", true)
-				inst.Annotations[constant.InstanceSetRevisionAnnotationKey] = "stale"
+				inst.Annotations[instanceSetRevisionAnnotationKey] = "stale"
 				return inst
 			}(),
 			want: false,
@@ -169,7 +169,7 @@ func TestIsInstanceUpdated(t *testing.T) {
 			name: "false when instance revision annotation is missing",
 			inst: func() *workloads.Instance {
 				inst := newInstance("3", true)
-				delete(inst.Annotations, constant.InstanceSetRevisionAnnotationKey)
+				delete(inst.Annotations, instanceSetRevisionAnnotationKey)
 				return inst
 			}(),
 			want: false,
@@ -178,7 +178,7 @@ func TestIsInstanceUpdated(t *testing.T) {
 			name: "false when instance status has not observed latest generation",
 			inst: func() *workloads.Instance {
 				inst := newInstance("3", true)
-				inst.Annotations[constant.InstanceSetRevisionAnnotationKey] = latestRevision
+				inst.Annotations[instanceSetRevisionAnnotationKey] = latestRevision
 				inst.Status.ObservedGeneration = 1
 				return inst
 			}(),
@@ -203,9 +203,9 @@ func TestBuildInstanceRevisionIgnoresInstanceMetadata(t *testing.T) {
 				"managed-label": "desired",
 			},
 			Annotations: map[string]string{
-				constant.KubeBlocksGenerationKey:          "1",
-				constant.InstanceSetRevisionAnnotationKey: "revision-1",
-				"managed-annotation":                      "desired",
+				constant.KubeBlocksGenerationKey: "1",
+				instanceSetRevisionAnnotationKey: "revision-1",
+				"managed-annotation":             "desired",
 			},
 		},
 		Spec: workloads.InstanceSpec{
@@ -215,7 +215,7 @@ func TestBuildInstanceRevisionIgnoresInstanceMetadata(t *testing.T) {
 	revision := buildInstanceRevision(inst)
 
 	inst.Annotations[constant.KubeBlocksGenerationKey] = "2"
-	inst.Annotations[constant.InstanceSetRevisionAnnotationKey] = "revision-2"
+	inst.Annotations[instanceSetRevisionAnnotationKey] = "revision-2"
 	inst.Annotations["managed-annotation"] = "changed"
 	inst.Labels["managed-label"] = "changed"
 	if got := buildInstanceRevision(inst); got != revision {
@@ -370,14 +370,14 @@ func TestStampInstanceRevisionCarriesDesiredRevision(t *testing.T) {
 	if revision == "" {
 		t.Fatalf("expected revision to be stamped")
 	}
-	if got := desired.Annotations[constant.InstanceSetRevisionAnnotationKey]; got != revision {
+	if got := desired.Annotations[instanceSetRevisionAnnotationKey]; got != revision {
 		t.Fatalf("expected revision annotation %s, got %s", revision, got)
 	}
 	if got := buildInstanceRevision(desired); got != revision {
 		t.Fatalf("expected stamped annotation to be ignored by revision hash, got %s want %s", got, revision)
 	}
 
-	desired.Annotations[constant.InstanceSetRevisionAnnotationKey] = "changed"
+	desired.Annotations[instanceSetRevisionAnnotationKey] = "changed"
 	if got := buildInstanceRevision(desired); got != revision {
 		t.Fatalf("expected revision annotation changes to be ignored, got %s want %s", got, revision)
 	}
@@ -482,7 +482,7 @@ func TestStatusReconcilerReadsCurrentRevisionFromInstanceAnnotation(t *testing.T
 
 	inst := desired.DeepCopy()
 	inst.Annotations[constant.KubeBlocksGenerationKey] = "1"
-	inst.Annotations[constant.InstanceSetRevisionAnnotationKey] = desiredRevision
+	inst.Annotations[instanceSetRevisionAnnotationKey] = desiredRevision
 	inst.Annotations["external-annotation"] = "ignored"
 	inst.Labels["external-label"] = "ignored"
 	inst.Generation = 2
@@ -562,7 +562,7 @@ func TestStatusReconcilerDoesNotFallbackToLiveHashWhenRevisionAnnotationMissing(
 	its.Status.UpdateRevisions = updateRevisions
 
 	inst := desired.DeepCopy()
-	delete(inst.Annotations, constant.InstanceSetRevisionAnnotationKey)
+	delete(inst.Annotations, instanceSetRevisionAnnotationKey)
 	inst.Generation = 2
 	inst.Status = workloads.InstanceStatus2{
 		ObservedGeneration: 2,

@@ -29,8 +29,9 @@ import (
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 )
+
+const instanceSetRevisionAnnotationKey = "workloads.kubeblocks.io/instance-revision"
 
 type instanceRevisionIntent struct {
 	Template                   podTemplateRevisionIntent
@@ -67,7 +68,7 @@ func stampInstanceRevision(inst *workloads.Instance) string {
 	if inst.Annotations == nil {
 		inst.Annotations = make(map[string]string)
 	}
-	inst.Annotations[constant.InstanceSetRevisionAnnotationKey] = revision
+	inst.Annotations[instanceSetRevisionAnnotationKey] = revision
 	return revision
 }
 
@@ -75,7 +76,7 @@ func getInstanceRevision(inst *workloads.Instance) string {
 	if inst.Annotations == nil {
 		return ""
 	}
-	return inst.Annotations[constant.InstanceSetRevisionAnnotationKey]
+	return inst.Annotations[instanceSetRevisionAnnotationKey]
 }
 
 func buildInstanceRevisionIntent(inst *workloads.Instance) instanceRevisionIntent {

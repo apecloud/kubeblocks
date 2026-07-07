@@ -45,6 +45,20 @@ func (r *revisionUpdateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *
 func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
 
+	desiredInstances, names, err := buildDesiredInstancesByName(tree, its)
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
+
+	updateRevisions := make(map[string]string, len(names))
+	for _, name := range names {
+		updateRevisions[name] = getInstanceRevision(desiredInstances[name])
+	}
+	its.Status.UpdateRevisions = updateRevisions
+	if len(names) > 0 {
+		its.Status.UpdateRevision = updateRevisions[names[len(names)-1]]
+	}
+
 	updatedReplicas := r.calculateUpdatedReplicas(its, tree.List(&workloads.Instance{}))
 	its.Status.UpdatedReplicas = updatedReplicas
 

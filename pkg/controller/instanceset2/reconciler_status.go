@@ -65,7 +65,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	readyReplicas, availableReplicas := int32(0), int32(0)
 	notReadyNames := sets.New[string]()
 	notAvailableNames := sets.New[string]()
-	// currentRevisions := map[string]string{}
+	currentRevisions := map[string]string{}
 
 	template2TemplatesStatus := map[string]*workloads.InstanceTemplateStatus{}
 	template2TotalReplicas := map[string]int32{}
@@ -100,8 +100,9 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 				notAvailableNames.Insert(inst.Name)
 			}
 		}
+		currentRevisions[inst.Name] = getInstanceRevision(inst)
 		if !intctrlutil.IsInstanceTerminating(inst) {
-			if isInstanceUpdated(its, inst) {
+			if isInstanceUpdatedWithRevisions(inst, currentRevisions[inst.Name], its.Status.UpdateRevisions) {
 				updatedReplicas++
 				template2TemplatesStatus[templateName].UpdatedReplicas++
 			} else {
@@ -115,7 +116,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	its.Status.AvailableReplicas = availableReplicas
 	its.Status.CurrentReplicas = currentReplicas
 	its.Status.UpdatedReplicas = updatedReplicas
-	// its.Status.CurrentRevisions, _ = buildRevisions(currentRevisions)
+	its.Status.CurrentRevisions = currentRevisions
 	its.Status.TemplatesStatus = buildTemplatesStatus(template2TemplatesStatus)
 	// all pods have been updated
 	totalReplicas := int32(1)
@@ -123,7 +124,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		totalReplicas = *its.Spec.Replicas
 	}
 	if its.Status.Replicas == totalReplicas && its.Status.UpdatedReplicas == totalReplicas {
-		// its.Status.CurrentRevision = its.Status.UpdateRevision
+		its.Status.CurrentRevision = its.Status.UpdateRevision
 		its.Status.CurrentReplicas = totalReplicas
 	}
 	for idx, templateStatus := range its.Status.TemplatesStatus {

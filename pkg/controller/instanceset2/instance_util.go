@@ -146,6 +146,7 @@ func buildInstanceByTemplate(tree *kubebuilderx.ObjectTree,
 	}
 
 	inst := b.GetObject()
+	stampInstanceRevision(inst)
 	if !shouldCloneInstanceAssistantObjects(its) {
 		if err := controllerutil.SetControllerReference(its, inst, model.GetScheme()); err != nil {
 			return nil, err
@@ -325,6 +326,39 @@ func getHeadlessSvcName(itsName string) string {
 	return strings.Join([]string{itsName, "headless"}, "-")
 }
 
+func buildDesiredInstancesByName(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet) (map[string]*workloads.Instance, []string, error) {
+	itsExt, err := instancetemplate.BuildInstanceSetExt(its, tree)
+	if err != nil {
+		return nil, nil, err
+	}
+	nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+	nameToTemplateMap, err := nameBuilder.BuildInstanceName2TemplateMap()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	names := make([]string, 0, len(nameToTemplateMap))
+	for name := range nameToTemplateMap {
+		names = append(names, name)
+	}
+	baseSort(names, func(i int) (string, int) {
+		return parseParentNameAndOrdinal(names[i])
+	}, nil, true)
+
+	instances := make(map[string]*workloads.Instance, len(names))
+	for _, name := range names {
+		inst, err := buildInstanceByTemplate(tree, name, nameToTemplateMap[name], its)
+		if err != nil {
+			return nil, nil, err
+		}
+		instances[name] = inst
+	}
+	return instances, names, nil
+}
+
 // func mergeInPlaceFields(src, dst *corev1.PodTemplateSpec) {
 //	mergeMap(&src.Annotations, &dst.Annotations)
 //	mergeMap(&src.Labels, &dst.Labels)
@@ -394,9 +428,13 @@ func getHeadlessSvcName(itsName string) string {
 // }
 
 func isInstanceUpdated(its *workloads.InstanceSet, inst *workloads.Instance) bool {
-	generation, ok := inst.Annotations[constant.KubeBlocksGenerationKey]
-	if !ok {
+	return isInstanceUpdatedWithRevisions(inst, getInstanceRevision(inst), its.Status.UpdateRevisions)
+}
+
+func isInstanceUpdatedWithRevisions(inst *workloads.Instance, currentRevision string, updateRevisions map[string]string) bool {
+	updateRevision, ok := updateRevisions[inst.Name]
+	if !ok || currentRevision != updateRevision {
 		return false
 	}
-	return strconv.FormatInt(its.Generation, 10) == generation
+	return inst.Generation == inst.Status.ObservedGeneration && inst.Status.UpToDate
 }

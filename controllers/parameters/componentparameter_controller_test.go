@@ -21,6 +21,7 @@ package parameters
 
 import (
 	"strings"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -353,22 +354,23 @@ var _ = Describe("ComponentParameter Controller", func() {
 				g.Expect(fetched.Finalizers).Should(ContainElement(constant.ConfigFinalizerName))
 			})).Should(Succeed())
 
-			By("touch the component to regenerate ComponentParameter from mixed sources")
-			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(compObj), func(comp *appsv1.Component) {
-				if comp.Annotations == nil {
-					comp.Annotations = map[string]string{}
-				}
-				comp.Annotations["parameters.kubeblocks.io/mixed-mode-test"] = "true"
-			})).Should(Succeed())
-
 			configKey := client.ObjectKey{
 				Namespace: testCtx.DefaultNamespace,
 				Name:      core.GetComponentCfgName(clusterName, defaultCompName, configSpecName),
 			}
-			Eventually(testapps.CheckObj(&testCtx, configKey, func(g Gomega, cfg *corev1.ConfigMap) {
-				g.Expect(cfg.Data).Should(HaveKey(testparameters.MysqlConfigFile))
-				g.Expect(cfg.Data).Should(HaveKeyWithValue(legacyFile, "slow_query_log=1\n"))
-			})).Should(Succeed())
+			By("touch the component until ComponentParameter regenerates from mixed sources")
+			Eventually(func(g Gomega) {
+				g.Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(compObj), func(comp *appsv1.Component) {
+					if comp.Annotations == nil {
+						comp.Annotations = map[string]string{}
+					}
+					comp.Annotations["parameters.kubeblocks.io/mixed-mode-test"] = time.Now().Format(time.RFC3339Nano)
+				})()).Should(Succeed())
+				testapps.CheckObj(&testCtx, configKey, func(g Gomega, cfg *corev1.ConfigMap) {
+					g.Expect(cfg.Data).Should(HaveKey(testparameters.MysqlConfigFile))
+					g.Expect(cfg.Data).Should(HaveKeyWithValue(legacyFile, "slow_query_log=1\n"))
+				})(g)
+			}, 30*time.Second, 500*time.Millisecond).Should(Succeed())
 		})
 	})
 })

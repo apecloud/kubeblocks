@@ -348,4 +348,40 @@ type ReconcileDetail struct {
 	//
 	// +optional
 	ErrMessage string `json:"errMessage,omitempty"`
+
+	// FailureClass classifies the failure for Ops aggregation.
+	// Valid values are "Permanent", "Retryable", and "Unknown".
+	//
+	// +optional
+	FailureClass string `json:"failureClass,omitempty"`
+
+	// Reason is a stable machine-readable code. It must be interpreted together with FailureClass.
+	//
+	// +optional
+	Reason string `json:"reason,omitempty"`
+
+	// OperationUID identifies the OpsRequest or equivalent operation that produced this result.
+	//
+	// +optional
+	OperationUID string `json:"operationUID,omitempty"`
+
+	// ConfigName identifies the configuration item this result belongs to.
+	//
+	// +optional
+	ConfigName string `json:"configName,omitempty"`
+
+	// TargetConfigHash identifies the target rendered config content.
+	//
+	// +optional
+	TargetConfigHash string `json:"targetConfigHash,omitempty"`
+
+	// ComponentParameterGeneration is the ComponentParameter generation observed when this result was produced.
+	//
+	// +optional
+	ComponentParameterGeneration int64 `json:"componentParameterGeneration,omitempty"`
+
+	// AffectedPodCount is the number of pods affected by this result.
+	//
+	// +optional
+	AffectedPodCount int32 `json:"affectedPodCount,omitempty"`
 }

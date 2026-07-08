@@ -24,6 +24,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -48,6 +49,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 		compDefName = "test-compdef-" + randomStr
 		clusterName = "test-cluster-" + randomStr
 	)
+	const targetConfigHash = "target-hash"
 
 	cleanEnv := func() {
 		// must wait till resources deleted and no longer existed before the testcases start,
@@ -264,5 +266,307 @@ parameter: {
 				g.Expect(condition.Message).Should(ContainSubstring("maxmemory-samples"))
 			})).Should(Succeed())
 		})
+
+		It("consumes stable permanent reconfigure failures and withdraws only matching desired entries", func() {
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
+			componentParameter := createReconfigureComponentParameter(clusterName, compDefName)
+			opsRes.OpsRequest = createReconfigureOpsRequest("permanent-reconfigure-"+testCtx.GetRandomStr(), clusterName, "max_connections", pointer.String("200"))
+
+			Expect(opsutil.UpdateClusterOpsAnnotations(ctx, k8sClient, opsRes.Cluster, nil)).Should(Succeed())
+			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsPendingPhase
+			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentParameter), func(g Gomega, cp *parametersv1alpha1.ComponentParameter) {
+				g.Expect(cp.Spec.Desired.Assignments).Should(HaveKeyWithValue("max_connections", pointer.String("200")))
+			})).Should(Succeed())
+			Expect(testCtx.Cli.Get(ctx, client.ObjectKeyFromObject(opsRes.OpsRequest), opsRes.OpsRequest)).Should(Succeed())
+			setReconfigureTargetConfigHash(opsRes.Cluster, targetConfigHash)
+
+			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(componentParameter), func(cp *parametersv1alpha1.ComponentParameter) {
+				cp.Status.ObservedGeneration = cp.Generation
+				cp.Status.Phase = parametersv1alpha1.CFailedPhase
+				cp.Status.ConfigurationItemStatus = []parametersv1alpha1.ConfigTemplateItemDetailStatus{stableReconfigureFailureStatus(
+					cp, opsRes.OpsRequest, parametersv1alpha1.ReconfigureFailureClassPermanent,
+					parametersv1alpha1.ReconfigureFailureReasonUnsupportedParameter,
+					"password=secret token=abc SELECT * FROM t")}
+			})()).Should(Succeed())
+			Expect(testCtx.Cli.Get(ctx, client.ObjectKeyFromObject(componentParameter), componentParameter)).Should(Succeed())
+			Expect(isConsumablePermanentReconfigureFailure(opsRes.OpsRequest, componentParameter,
+				&componentParameter.Status.ConfigurationItemStatus[0], targetConfigHash)).Should(BeTrue())
+
+			Expect(testCtx.Cli.Get(ctx, client.ObjectKeyFromObject(opsRes.OpsRequest), opsRes.OpsRequest)).Should(Succeed())
+			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest), func(g Gomega, fetched *opsv1alpha1.OpsRequest) {
+				g.Expect(fetched.Status.Phase).Should(Equal(opsv1alpha1.OpsFailedPhase))
+				condition := meta.FindStatusCondition(fetched.Status.Conditions, opsv1alpha1.ConditionTypeFailed)
+				g.Expect(condition).ShouldNot(BeNil())
+				g.Expect(condition.Message).Should(ContainSubstring(parametersv1alpha1.ReconfigureFailureReasonUnsupportedParameter))
+				g.Expect(condition.Message).ShouldNot(ContainSubstring("password"))
+				g.Expect(condition.Message).ShouldNot(ContainSubstring("SELECT"))
+			})).Should(Succeed())
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentParameter), func(g Gomega, cp *parametersv1alpha1.ComponentParameter) {
+				g.Expect(cp.Spec.Desired.Assignments).ShouldNot(HaveKey("max_connections"))
+			})).Should(Succeed())
+		})
+
+		It("does not consume permanent-looking failures with invalid identity or reason matrix", func() {
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
+			componentParameter := createReconfigureComponentParameter(clusterName, compDefName)
+			opsRes.OpsRequest = createReconfigureOpsRequest("invalid-permanent-"+testCtx.GetRandomStr(), clusterName, "max_connections", pointer.String("200"))
+
+			Expect(opsutil.UpdateClusterOpsAnnotations(ctx, k8sClient, opsRes.Cluster, nil)).Should(Succeed())
+			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsPendingPhase
+			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			cases := []struct {
+				name   string
+				mutate func(*parametersv1alpha1.ConfigTemplateItemDetailStatus)
+			}{
+				{
+					name: "missing operation uid",
+					mutate: func(status *parametersv1alpha1.ConfigTemplateItemDetailStatus) {
+						status.ReconcileDetail.OperationUID = ""
+					},
+				},
+				{
+					name: "permanent transport error",
+					mutate: func(status *parametersv1alpha1.ConfigTemplateItemDetailStatus) {
+						status.ReconcileDetail.Reason = parametersv1alpha1.ReconfigureFailureReasonActionTransportError
+					},
+				},
+				{
+					name: "permanent unknown",
+					mutate: func(status *parametersv1alpha1.ConfigTemplateItemDetailStatus) {
+						status.ReconcileDetail.Reason = parametersv1alpha1.ReconfigureFailureReasonUnknown
+					},
+				},
+			}
+			Expect(testCtx.Cli.Get(ctx, client.ObjectKeyFromObject(opsRes.OpsRequest), opsRes.OpsRequest)).Should(Succeed())
+			setReconfigureTargetConfigHash(opsRes.Cluster, targetConfigHash)
+			for _, tc := range cases {
+				By(tc.name)
+				Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(componentParameter), func(cp *parametersv1alpha1.ComponentParameter) {
+					status := stableReconfigureFailureStatus(cp, opsRes.OpsRequest,
+						parametersv1alpha1.ReconfigureFailureClassPermanent,
+						parametersv1alpha1.ReconfigureFailureReasonUnsupportedParameter, "raw stderr")
+					tc.mutate(&status)
+					cp.Status.ObservedGeneration = cp.Generation
+					cp.Status.Phase = parametersv1alpha1.CFailedPhase
+					cp.Status.ConfigurationItemStatus = []parametersv1alpha1.ConfigTemplateItemDetailStatus{status}
+				})()).Should(Succeed())
+				Expect(testCtx.Cli.Get(ctx, client.ObjectKeyFromObject(opsRes.OpsRequest), opsRes.OpsRequest)).Should(Succeed())
+				_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+				Expect(err).ShouldNot(HaveOccurred())
+				Consistently(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).ShouldNot(Equal(opsv1alpha1.OpsFailedPhase))
+				Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest), func(ops *opsv1alpha1.OpsRequest) {
+					ops.Status.Phase = opsv1alpha1.OpsRunningPhase
+				})()).Should(Succeed())
+				Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(componentParameter), func(cp *parametersv1alpha1.ComponentParameter) {
+					if cp.Spec.Desired == nil {
+						cp.Spec.Desired = &parametersv1alpha1.ParameterInputs{}
+					}
+					if cp.Spec.Desired.Assignments == nil {
+						cp.Spec.Desired.Assignments = map[string]*string{}
+					}
+					cp.Spec.Desired.Assignments["max_connections"] = pointer.String("200")
+				})()).Should(Succeed())
+			}
+		})
+
+		It("does not withdraw desired values changed by a later operation", func() {
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
+			componentParameter := createReconfigureComponentParameter(clusterName, compDefName)
+			opsRes.OpsRequest = createReconfigureOpsRequest("stale-permanent-"+testCtx.GetRandomStr(), clusterName, "max_connections", pointer.String("200"))
+
+			Expect(opsutil.UpdateClusterOpsAnnotations(ctx, k8sClient, opsRes.Cluster, nil)).Should(Succeed())
+			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsPendingPhase
+			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(componentParameter), func(cp *parametersv1alpha1.ComponentParameter) {
+				cp.Spec.Desired.Assignments["max_connections"] = pointer.String("300")
+			})()).Should(Succeed())
+			Expect(testCtx.Cli.Get(ctx, client.ObjectKeyFromObject(opsRes.OpsRequest), opsRes.OpsRequest)).Should(Succeed())
+			setReconfigureTargetConfigHash(opsRes.Cluster, "new-target-hash")
+
+			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(componentParameter), func(cp *parametersv1alpha1.ComponentParameter) {
+				cp.Status.ObservedGeneration = cp.Generation
+				cp.Status.Phase = parametersv1alpha1.CFailedPhase
+				cp.Status.ConfigurationItemStatus = []parametersv1alpha1.ConfigTemplateItemDetailStatus{stableReconfigureFailureStatus(
+					cp, opsRes.OpsRequest, parametersv1alpha1.ReconfigureFailureClassPermanent,
+					parametersv1alpha1.ReconfigureFailureReasonUnsupportedParameter, "raw stderr")}
+			})()).Should(Succeed())
+
+			Expect(testCtx.Cli.Get(ctx, client.ObjectKeyFromObject(opsRes.OpsRequest), opsRes.OpsRequest)).Should(Succeed())
+			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentParameter), func(g Gomega, cp *parametersv1alpha1.ComponentParameter) {
+				g.Expect(cp.Spec.Desired.Assignments).Should(HaveKeyWithValue("max_connections", pointer.String("300")))
+			})).Should(Succeed())
+		})
+
+		It("does not consume permanent failures for a stale target config hash", func() {
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
+			componentParameter := createReconfigureComponentParameter(clusterName, compDefName)
+			opsRes.OpsRequest = createReconfigureOpsRequest("stale-hash-permanent-"+testCtx.GetRandomStr(), clusterName, "max_connections", pointer.String("200"))
+
+			Expect(opsutil.UpdateClusterOpsAnnotations(ctx, k8sClient, opsRes.Cluster, nil)).Should(Succeed())
+			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsPendingPhase
+			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			setReconfigureTargetConfigHash(opsRes.Cluster, "new-target-hash")
+
+			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(componentParameter), func(cp *parametersv1alpha1.ComponentParameter) {
+				cp.Status.ObservedGeneration = cp.Generation
+				cp.Status.Phase = parametersv1alpha1.CFailedPhase
+				cp.Status.ConfigurationItemStatus = []parametersv1alpha1.ConfigTemplateItemDetailStatus{stableReconfigureFailureStatus(
+					cp, opsRes.OpsRequest, parametersv1alpha1.ReconfigureFailureClassPermanent,
+					parametersv1alpha1.ReconfigureFailureReasonUnsupportedParameter, "raw stderr")}
+			})()).Should(Succeed())
+
+			Expect(testCtx.Cli.Get(ctx, client.ObjectKeyFromObject(opsRes.OpsRequest), opsRes.OpsRequest)).Should(Succeed())
+			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Consistently(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).ShouldNot(Equal(opsv1alpha1.OpsFailedPhase))
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentParameter), func(g Gomega, cp *parametersv1alpha1.ComponentParameter) {
+				g.Expect(cp.Spec.Desired.Assignments).Should(HaveKeyWithValue("max_connections", pointer.String("200")))
+			})).Should(Succeed())
+		})
+
+		It("uses optimistic locking when withdrawing desired entries", func() {
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+			componentParameter := createReconfigureComponentParameter(clusterName, compDefName)
+			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(componentParameter), func(cp *parametersv1alpha1.ComponentParameter) {
+				cp.Spec.Desired = &parametersv1alpha1.ParameterInputs{Assignments: map[string]*string{
+					"max_connections": pointer.String("200"),
+				}}
+			})()).Should(Succeed())
+			Expect(testCtx.Cli.Get(ctx, client.ObjectKeyFromObject(componentParameter), componentParameter)).Should(Succeed())
+			stale := componentParameter.DeepCopy()
+			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(componentParameter), func(cp *parametersv1alpha1.ComponentParameter) {
+				cp.Spec.Desired.Assignments["max_connections"] = pointer.String("300")
+			})()).Should(Succeed())
+
+			err := withdrawReconfigureDesired(reqCtx, k8sClient, stale, opsv1alpha1.Reconfigure{
+				Parameters: []opsv1alpha1.ParameterPair{{
+					Key:   "max_connections",
+					Value: pointer.String("200"),
+				}},
+			})
+			Expect(apierrors.IsConflict(err)).Should(BeTrue())
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentParameter), func(g Gomega, cp *parametersv1alpha1.ComponentParameter) {
+				g.Expect(cp.Spec.Desired.Assignments).Should(HaveKeyWithValue("max_connections", pointer.String("300")))
+			})).Should(Succeed())
+		})
+
+		It("withdraws matching desired entries from all resolved component parameters", func() {
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
+			componentParameter := createReconfigureComponentParameter(clusterName, compDefName)
+			otherCompName := defaultCompName + "-1"
+			otherComponentParameter := createReconfigureComponentParameterForComp(clusterName, otherCompName, compDefName)
+			for _, cp := range []*parametersv1alpha1.ComponentParameter{componentParameter, otherComponentParameter} {
+				Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(cp), func(fetched *parametersv1alpha1.ComponentParameter) {
+					fetched.Spec.Desired = &parametersv1alpha1.ParameterInputs{Assignments: map[string]*string{
+						"max_connections": pointer.String("200"),
+						"innodb_buffer":   pointer.String("1G"),
+					}}
+				})()).Should(Succeed())
+			}
+
+			err := (&reconfigureAction{}).withdrawReconfigureDesiredFromComponents(reqCtx, k8sClient, opsRes,
+				[]string{defaultCompName, otherCompName}, opsv1alpha1.Reconfigure{
+					Parameters: []opsv1alpha1.ParameterPair{{
+						Key:   "max_connections",
+						Value: pointer.String("200"),
+					}},
+				})
+			Expect(err).ShouldNot(HaveOccurred())
+			for _, cp := range []*parametersv1alpha1.ComponentParameter{componentParameter, otherComponentParameter} {
+				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cp), func(g Gomega, fetched *parametersv1alpha1.ComponentParameter) {
+					g.Expect(fetched.Spec.Desired.Assignments).ShouldNot(HaveKey("max_connections"))
+					g.Expect(fetched.Spec.Desired.Assignments).Should(HaveKeyWithValue("innodb_buffer", pointer.String("1G")))
+				})).Should(Succeed())
+			}
+		})
 	})
 })
+
+func createReconfigureComponentParameter(clusterName, compDefName string) *parametersv1alpha1.ComponentParameter {
+	return createReconfigureComponentParameterForComp(clusterName, defaultCompName, compDefName)
+}
+
+func createReconfigureComponentParameterForComp(clusterName, compName, compDefName string) *parametersv1alpha1.ComponentParameter {
+	componentParameter := builder.NewComponentParameterBuilder(testCtx.DefaultNamespace, parameterscore.GenerateComponentConfigurationName(clusterName, compName)).
+		AddLabelsInMap(constant.GetCompLabelsWithDef(clusterName, compName, compDefName)).
+		SetClusterName(clusterName).
+		SetCompName(compName).
+		GetObject()
+	componentParameter.Spec.ConfigItemDetails = []parametersv1alpha1.ConfigTemplateItemDetail{{
+		Name: "mysql-config",
+		ConfigSpec: &appsv1.ComponentFileTemplate{
+			Name:            "mysql-config",
+			Template:        "mysql-config",
+			Namespace:       testCtx.DefaultNamespace,
+			VolumeName:      "mysql-config",
+			ExternalManaged: pointer.Bool(true),
+		},
+	}}
+	Expect(testCtx.CreateObj(ctx, componentParameter)).Should(Succeed())
+	return componentParameter
+}
+
+func createReconfigureOpsRequest(name, clusterName, key string, value *string) *opsv1alpha1.OpsRequest {
+	ops := testops.NewOpsRequestObj(name, testCtx.DefaultNamespace, clusterName, opsv1alpha1.ReconfiguringType)
+	ops.Spec.Reconfigures = []opsv1alpha1.Reconfigure{{
+		ComponentOps: opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
+		Parameters: []opsv1alpha1.ParameterPair{{
+			Key:   key,
+			Value: value,
+		}},
+	}}
+	return testops.CreateOpsRequest(ctx, testCtx, ops)
+}
+
+func stableReconfigureFailureStatus(cp *parametersv1alpha1.ComponentParameter, ops *opsv1alpha1.OpsRequest, failureClass, reason, rawMessage string) parametersv1alpha1.ConfigTemplateItemDetailStatus {
+	return parametersv1alpha1.ConfigTemplateItemDetailStatus{
+		Name:    "mysql-config",
+		Phase:   parametersv1alpha1.CFailedPhase,
+		Message: pointer.String(rawMessage),
+		ReconcileDetail: &parametersv1alpha1.ReconcileDetail{
+			ExecResult:                   "Failed",
+			ErrMessage:                   rawMessage,
+			FailureClass:                 failureClass,
+			Reason:                       reason,
+			OperationUID:                 string(ops.UID),
+			ConfigName:                   "mysql-config",
+			TargetConfigHash:             "target-hash",
+			ComponentParameterGeneration: cp.Generation,
+			AffectedPodCount:             1,
+		},
+	}
+}
+
+func setReconfigureTargetConfigHash(cluster *appsv1.Cluster, targetConfigHash string) {
+	component := cluster.Spec.GetComponentByName(defaultCompName)
+	Expect(component).ShouldNot(BeNil())
+	component.Configs = []appsv1.ClusterComponentConfig{{
+		Name:       pointer.String("mysql-config"),
+		ConfigHash: pointer.String(targetConfigHash),
+	}}
+}

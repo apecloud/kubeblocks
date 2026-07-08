@@ -91,6 +91,19 @@ const (
 	CFinishedPhase       ParameterPhase = "Finished"
 )
 
+const (
+	ReconfigureFailureClassPermanent = "Permanent"
+	ReconfigureFailureClassRetryable = "Retryable"
+	ReconfigureFailureClassUnknown   = "Unknown"
+
+	ReconfigureFailureReasonInvalidParameter        = "InvalidParameter"
+	ReconfigureFailureReasonUnsupportedParameter    = "UnsupportedParameter"
+	ReconfigureFailureReasonActionRejectedPermanent = "ActionRejectedPermanent"
+	ReconfigureFailureReasonActionFailedRetryable   = "ActionFailedRetryable"
+	ReconfigureFailureReasonActionTransportError    = "ActionTransportError"
+	ReconfigureFailureReasonUnknown                 = "Unknown"
+)
+
 type ParametersInFile struct {
 	// Holds the configuration keys and values. This field is a workaround for issues found in kubebuilder and code-generator.
 	// Refer to https://github.com/kubernetes-sigs/kubebuilder/issues/528 and https://github.com/kubernetes/code-generator/issues/50 for more details.

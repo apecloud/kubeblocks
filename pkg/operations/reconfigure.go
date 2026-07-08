@@ -121,6 +121,12 @@ func (r *reconfigureAction) aggregatePhase(reqCtx intctrlutil.RequestCtx, cli cl
 			if compParam.Generation != compParam.Status.ObservedGeneration {
 				return opsv1alpha1.OpsRunningPhase, "", nil
 			}
+			if msg, ok := hasPermanentReconfigureFailure(resource, compParam, compName); ok {
+				if err := r.withdrawReconfigureDesiredFromComponents(reqCtx, cli, resource, compNames, reconfigure); err != nil {
+					return "", "", err
+				}
+				return opsv1alpha1.OpsFailedPhase, msg, nil
+			}
 			switch compParam.Status.Phase {
 			case parametersv1alpha1.CMergeFailedPhase, parametersv1alpha1.CFailedAndPausePhase:
 				return opsv1alpha1.OpsFailedPhase, compParam.Status.Message, nil
@@ -132,6 +138,126 @@ func (r *reconfigureAction) aggregatePhase(reqCtx intctrlutil.RequestCtx, cli cl
 		}
 	}
 	return opsv1alpha1.OpsSucceedPhase, "", nil
+}
+
+func hasPermanentReconfigureFailure(resource *OpsResource, compParam *parametersv1alpha1.ComponentParameter, compName string) (string, bool) {
+	for i := range compParam.Status.ConfigurationItemStatus {
+		itemStatus := &compParam.Status.ConfigurationItemStatus[i]
+		targetConfigHash, ok := getCurrentConfigHash(resource.Cluster, compName, itemStatus.Name)
+		if !ok || !isConsumablePermanentReconfigureFailure(resource.OpsRequest, compParam, itemStatus, targetConfigHash) {
+			continue
+		}
+		return renderSafeReconfigureFailureMessage(itemStatus.Name, itemStatus.ReconcileDetail.Reason), true
+	}
+	return "", false
+}
+
+func isConsumablePermanentReconfigureFailure(ops *opsv1alpha1.OpsRequest, compParam *parametersv1alpha1.ComponentParameter,
+	itemStatus *parametersv1alpha1.ConfigTemplateItemDetailStatus, targetConfigHash string) bool {
+	if ops == nil || compParam == nil || itemStatus == nil || itemStatus.ReconcileDetail == nil {
+		return false
+	}
+	detail := itemStatus.ReconcileDetail
+	if detail.OperationUID == "" ||
+		detail.ConfigName == "" ||
+		detail.TargetConfigHash == "" ||
+		detail.ComponentParameterGeneration == 0 {
+		return false
+	}
+	if detail.OperationUID != string(ops.UID) ||
+		detail.ConfigName != itemStatus.Name ||
+		detail.TargetConfigHash != targetConfigHash ||
+		detail.ComponentParameterGeneration != compParam.Generation {
+		return false
+	}
+	return isPermanentFailureReason(detail.FailureClass, detail.Reason)
+}
+
+func getCurrentConfigHash(cluster *appsv1.Cluster, compName, configName string) (string, bool) {
+	if cluster == nil {
+		return "", false
+	}
+	comp := cluster.Spec.GetComponentByName(compName)
+	if comp == nil {
+		return "", false
+	}
+	for i := range comp.Configs {
+		config := &comp.Configs[i]
+		if config.Name == nil || *config.Name != configName || config.ConfigHash == nil || *config.ConfigHash == "" {
+			continue
+		}
+		return *config.ConfigHash, true
+	}
+	return "", false
+}
+
+func isPermanentFailureReason(failureClass, reason string) bool {
+	if failureClass != parametersv1alpha1.ReconfigureFailureClassPermanent {
+		return false
+	}
+	switch reason {
+	case parametersv1alpha1.ReconfigureFailureReasonInvalidParameter,
+		parametersv1alpha1.ReconfigureFailureReasonUnsupportedParameter,
+		parametersv1alpha1.ReconfigureFailureReasonActionRejectedPermanent:
+		return true
+	default:
+		return false
+	}
+}
+
+func (r *reconfigureAction) withdrawReconfigureDesiredFromComponents(reqCtx intctrlutil.RequestCtx, cli client.Client,
+	resource *OpsResource, compNames []string, reconfigure opsv1alpha1.Reconfigure) error {
+	for _, compName := range compNames {
+		compParam, err := r.getRunningComponentParameter(reqCtx.Ctx, cli, resource.Cluster.Namespace, resource.Cluster.Name, compName)
+		if err != nil {
+			return err
+		}
+		if err := withdrawReconfigureDesired(reqCtx, cli, compParam, reconfigure); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func withdrawReconfigureDesired(reqCtx intctrlutil.RequestCtx, cli client.Client,
+	compParam *parametersv1alpha1.ComponentParameter, reconfigure opsv1alpha1.Reconfigure) error {
+	if compParam.Spec.Desired == nil || len(compParam.Spec.Desired.Assignments) == 0 || len(reconfigure.Parameters) == 0 {
+		return nil
+	}
+	changed := false
+	for _, param := range reconfigure.Parameters {
+		current, ok := compParam.Spec.Desired.Assignments[param.Key]
+		if !ok || !sameParameterValue(current, param.Value) {
+			continue
+		}
+		delete(compParam.Spec.Desired.Assignments, param.Key)
+		changed = true
+	}
+	if !changed {
+		return nil
+	}
+	return cli.Update(reqCtx.Ctx, compParam)
+}
+
+func sameParameterValue(a, b *string) bool {
+	switch {
+	case a == nil && b == nil:
+		return true
+	case a == nil || b == nil:
+		return false
+	default:
+		return *a == *b
+	}
+}
+
+func renderSafeReconfigureFailureMessage(configName, reason string) string {
+	if reason == "" {
+		reason = parametersv1alpha1.ReconfigureFailureReasonUnknown
+	}
+	if configName == "" {
+		return fmt.Sprintf("reconfigure action was rejected with reason %s", reason)
+	}
+	return fmt.Sprintf("reconfigure action for config %s was rejected with reason %s", configName, reason)
 }
 
 func (r *reconfigureAction) applyReconfigureToParameters(reqCtx intctrlutil.RequestCtx, cli client.Client,

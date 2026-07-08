@@ -54,6 +54,14 @@ type Result struct {
 	Retry   bool   `json:"retry"`
 	Failed  bool   `json:"failed"`
 	Message string `json:"message"`
+
+	FailureClass                 string `json:"failureClass,omitempty"`
+	Reason                       string `json:"reason,omitempty"`
+	OperationUID                 string `json:"operationUID,omitempty"`
+	ConfigName                   string `json:"configName,omitempty"`
+	TargetConfigHash             string `json:"targetConfigHash,omitempty"`
+	ComponentParameterGeneration int64  `json:"componentParameterGeneration,omitempty"`
+	AffectedPodCount             int32  `json:"affectedPodCount,omitempty"`
 }
 
 // MergeAndValidateConfigs merges and validates configuration files

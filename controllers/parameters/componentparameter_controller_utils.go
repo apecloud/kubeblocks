@@ -628,12 +628,19 @@ func updateRevision(revision configurationRevision, status *parametersv1alpha1.C
 	if revision.strRevision == status.UpdateRevision {
 		status.Phase = revision.phase
 		status.ReconcileDetail = &parametersv1alpha1.ReconcileDetail{
-			CurrentRevision: revision.strRevision,
-			Policy:          revision.result.Policy,
-			SucceedCount:    revision.result.SucceedCount,
-			ExpectedCount:   revision.result.ExpectedCount,
-			ExecResult:      revision.result.ExecResult,
-			ErrMessage:      revision.result.Message,
+			CurrentRevision:              revision.strRevision,
+			Policy:                       revision.result.Policy,
+			SucceedCount:                 revision.result.SucceedCount,
+			ExpectedCount:                revision.result.ExpectedCount,
+			ExecResult:                   revision.result.ExecResult,
+			ErrMessage:                   revision.result.Message,
+			FailureClass:                 revision.result.FailureClass,
+			Reason:                       revision.result.Reason,
+			OperationUID:                 revision.result.OperationUID,
+			ConfigName:                   revision.result.ConfigName,
+			TargetConfigHash:             revision.result.TargetConfigHash,
+			ComponentParameterGeneration: revision.result.ComponentParameterGeneration,
+			AffectedPodCount:             revision.result.AffectedPodCount,
 		}
 	}
 }

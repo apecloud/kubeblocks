@@ -32,16 +32,12 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/utils/ptr"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 )
@@ -205,30 +201,6 @@ var _ = ginkgo.Describe("syncPolicy test", func() {
 			Expect(status.SucceedCount).Should(BeEquivalentTo(3))
 		})
 
-		ginkgo.It("status surfaces action failures without terminal failure", func() {
-			ginkgo.By("mock submitted cluster spec")
-			rctx.ClusterComponent.Configs[0].ConfigHash = rctx.getTargetConfigHash()
-			pod := &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: rctx.ITS.Namespace,
-					Name:      "pod-0",
-					Labels:    instanceset.GetMatchLabels(rctx.ITS.Name),
-					Annotations: map[string]string{
-						constant.ReconfigureActionFailureAnnotationKey: `{"` + cfgName + `":{"configHash":"test-config-hash","message":"mysql rejected unknown variable expire_logs_days"}}`,
-					},
-				},
-			}
-			rctx.Client = fake.NewClientBuilder().WithScheme(scheme.Scheme).WithObjects(pod).Build()
-
-			ginkgo.By("status check")
-			status, err := syncPolicy(rctx)
-			Expect(err).Should(Succeed())
-			Expect(status.Status).Should(Equal(StatusFailedAndRetry))
-			Expect(status.Reason).Should(ContainSubstring("pod-0"))
-			Expect(status.Reason).Should(ContainSubstring("expire_logs_days"))
-			Expect(status.ExpectedCount).Should(BeEquivalentTo(3))
-			Expect(status.SucceedCount).Should(BeEquivalentTo(0))
-		})
 	})
 
 	ginkgo.Context("reconfigure conditions", func() {

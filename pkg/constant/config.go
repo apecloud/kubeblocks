@@ -40,7 +40,6 @@ const (
 	UpgradePolicyAnnotationKey                  = "config.kubeblocks.io/reconfigure-policy"
 	ConfigAppliedVersionAnnotationKey           = "config.kubeblocks.io/config-applied-version"
 	ParametersAppliedComponentGenerationKey     = "parameters.kubeblocks.io/latest-component-generation"
-	ReconfigureActionFailureAnnotationKey       = "config.kubeblocks.io/reconfigure-action-failure"
 )
 
 const (

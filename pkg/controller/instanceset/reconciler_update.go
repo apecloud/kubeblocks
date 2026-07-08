@@ -167,13 +167,9 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		}
 
 		// Always call reconfigure to execute reconfigure actions
-		allUpdated, reconfigureBlocked, err1 := r.reconfigure(tree, its, pod)
+		allUpdated, err1 := r.reconfigure(tree, its, pod)
 		if err1 != nil {
 			return kubebuilderx.Continue, err1
-		}
-		if reconfigureBlocked {
-			needRetry = true
-			break
 		}
 		if !allUpdated && updatePolicy == noOpsPolicy {
 			updatingPods++
@@ -300,26 +296,22 @@ func (r *updateReconciler) switchover(tree *kubebuilderx.ObjectTree, its *worklo
 	return nil
 }
 
-func (r *updateReconciler) reconfigure(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pod *corev1.Pod) (bool, bool, error) {
+func (r *updateReconciler) reconfigure(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pod *corev1.Pod) (bool, error) {
 	toUpdate, err := configsToUpdate(its, pod)
 	if err != nil {
-		return false, false, err
+		return false, err
 	}
 	for _, config := range toUpdate {
-		blocked, err := r.reconfigureInst(tree, its, pod, config)
-		if err != nil {
-			return false, false, err
-		}
-		if blocked {
-			return false, true, nil
+		if err = r.reconfigureInst(tree, its, pod, config); err != nil {
+			return false, err
 		}
 	}
-	return len(toUpdate) == 0, false, nil
+	return len(toUpdate) == 0, nil
 }
 
-func (r *updateReconciler) reconfigureInst(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pod *corev1.Pod, config workloads.ConfigTemplate) (bool, error) {
+func (r *updateReconciler) reconfigureInst(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pod *corev1.Pod, config workloads.ConfigTemplate) error {
 	if config.Reconfigure == nil {
-		return false, nil // skip
+		return nil // skip
 	}
 
 	itsCopy := its.DeepCopy()
@@ -329,7 +321,7 @@ func (r *updateReconciler) reconfigureInst(tree *kubebuilderx.ObjectTree, its *w
 	itsCopy.Spec.LifecycleActions.Reconfigure = config.Reconfigure
 	lfa, err := newLifecycleAction(itsCopy, tree, pod)
 	if err != nil {
-		return false, err
+		return err
 	}
 
 	opts := reconfigureOptions(config)
@@ -340,32 +332,16 @@ func (r *updateReconciler) reconfigureInst(tree *kubebuilderx.ObjectTree, its *w
 	}
 	if err != nil {
 		if errors.Is(err, lifecycle.ErrActionNotDefined) {
-			return false, nil
+			return nil
 		}
 		if errors.Is(err, lifecycle.ErrPreconditionFailed) {
-			return false, intctrlutil.NewDelayedRequeueError(time.Second,
+			return intctrlutil.NewDelayedRequeueError(time.Second,
 				fmt.Sprintf("replicas not up-to-date when reconfiguring: %s", err.Error()))
 		}
-		if errors.Is(err, lifecycle.ErrActionFailed) {
-			if err1 := setReconfigureActionFailure(pod, config, err.Error()); err1 != nil {
-				return false, err1
-			}
-			if err1 := tree.Update(pod, kubebuilderx.WithPatch(true)); err1 != nil {
-				return false, err1
-			}
-			tree.Logger.Info("reconfigure action failed", "pod", pod.Name, "config", config.Name, "configHash", ptr.Deref(config.ConfigHash, ""), "error", err)
-			return true, nil
-		}
-		return false, err
-	}
-	if err = clearReconfigureActionFailure(pod, config); err != nil {
-		return false, err
-	}
-	if err = tree.Update(pod, kubebuilderx.WithPatch(true)); err != nil {
-		return false, err
+		return err
 	}
 	tree.Logger.Info("successfully reconfigure the pod", "pod", pod.Name, "configHash", ptr.Deref(config.ConfigHash, ""))
-	return false, nil
+	return nil
 }
 
 func reconfigureOptions(config workloads.ConfigTemplate) *lifecycle.Options {

@@ -349,6 +349,9 @@ var _ = Describe("ComponentParameter Controller", func() {
 				},
 			}
 			Expect(testCtx.CreateObj(testCtx.Ctx, pcr)).Should(Succeed())
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(pcr), func(g Gomega, fetched *parametersv1alpha1.ParamConfigRenderer) {
+				g.Expect(fetched.Finalizers).Should(ContainElement(constant.ConfigFinalizerName))
+			})).Should(Succeed())
 
 			By("touch the component to regenerate ComponentParameter from mixed sources")
 			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(compObj), func(comp *appsv1.Component) {

@@ -608,9 +608,81 @@ parameter: {
 			shardCompName := "shard-" + testCtx.GetRandomStr()
 			createResolvedComponentWithConfigHash(opsRes.Cluster.Name, shardCompName, compDefName, targetConfigHash)
 
-			got, ok := getCurrentConfigHash(ctx, k8sClient, testCtx.DefaultNamespace, opsRes.Cluster, shardCompName, "mysql-config")
+			got, ok, err := getCurrentConfigHash(ctx, k8sClient, testCtx.DefaultNamespace, opsRes.Cluster, shardCompName, "mysql-config")
+			Expect(err).ShouldNot(HaveOccurred())
 			Expect(ok).Should(BeTrue())
 			Expect(got).Should(Equal(targetConfigHash))
+		})
+
+		It("returns an explicit error when a resolved Component hash source is missing", func() {
+			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
+			shardCompName := "missing-shard-" + testCtx.GetRandomStr()
+
+			got, ok, err := getCurrentConfigHash(ctx, k8sClient, testCtx.DefaultNamespace, opsRes.Cluster, shardCompName, "mysql-config")
+
+			Expect(err).Should(HaveOccurred())
+			Expect(apierrors.IsNotFound(err)).Should(BeTrue())
+			Expect(ok).Should(BeFalse())
+			Expect(got).Should(BeEmpty())
+		})
+
+		It("returns an explicit error when a resolved Component hash source is terminating", func() {
+			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
+			shardCompName := "terminating-shard-" + testCtx.GetRandomStr()
+			componentObj := createResolvedComponentWithConfigHash(opsRes.Cluster.Name, shardCompName, compDefName, targetConfigHash)
+			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(componentObj), func(comp *appsv1.Component) {
+				comp.Finalizers = append(comp.Finalizers, "test.kubeblocks.io/hold")
+			})()).Should(Succeed())
+			Expect(testCtx.Cli.Delete(ctx, componentObj)).Should(Succeed())
+
+			got, ok, err := getCurrentConfigHash(ctx, k8sClient, testCtx.DefaultNamespace, opsRes.Cluster, shardCompName, "mysql-config")
+
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring("terminating"))
+			Expect(ok).Should(BeFalse())
+			Expect(got).Should(BeEmpty())
+		})
+
+		It("does not silently convert resolved Component hash read errors into Running", func() {
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
+			shardingName := "sharding-" + testCtx.GetRandomStr()
+			shardCompName := shardingName + "-0"
+			componentObj := createResolvedComponentWithConfigHash(opsRes.Cluster.Name, shardCompName, compDefName, targetConfigHash)
+			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(componentObj), func(comp *appsv1.Component) {
+				comp.Labels[constant.KBAppShardingNameLabelKey] = shardingName
+				comp.Finalizers = append(comp.Finalizers, "test.kubeblocks.io/hold")
+			})()).Should(Succeed())
+			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(opsRes.Cluster), func(cluster *appsv1.Cluster) {
+				cluster.Spec.ComponentSpecs = nil
+				cluster.Spec.Shardings = []appsv1.ClusterSharding{{
+					Name: shardingName,
+					Template: appsv1.ClusterComponentSpec{
+						Name:         "ignored",
+						ComponentDef: compDefName,
+					},
+					Shards: 1,
+				}}
+			})()).Should(Succeed())
+			Expect(testCtx.Cli.Get(ctx, client.ObjectKeyFromObject(opsRes.Cluster), opsRes.Cluster)).Should(Succeed())
+			componentParameter := createReconfigureComponentParameterForComp(clusterName, shardCompName, compDefName)
+			opsRes.OpsRequest = createReconfigureOpsRequest("terminating-shard-hash-"+testCtx.GetRandomStr(), clusterName, "max_connections", pointer.String("200"))
+			opsRes.OpsRequest.Spec.Reconfigures[0].ComponentName = shardingName
+			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(componentParameter), func(cp *parametersv1alpha1.ComponentParameter) {
+				cp.Status.ObservedGeneration = cp.Generation
+				cp.Status.Phase = parametersv1alpha1.CFailedPhase
+				cp.Status.ConfigurationItemStatus = []parametersv1alpha1.ConfigTemplateItemDetailStatus{stableReconfigureFailureStatus(
+					cp, opsRes.OpsRequest, parametersv1alpha1.ReconfigureFailureClassPermanent,
+					parametersv1alpha1.ReconfigureFailureReasonUnsupportedParameter, "raw stderr")}
+			})()).Should(Succeed())
+			Expect(testCtx.Cli.Delete(ctx, componentObj)).Should(Succeed())
+
+			phase, requeueAfter, err := (&reconfigureAction{}).ReconcileAction(reqCtx, k8sClient, opsRes)
+
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring("terminating"))
+			Expect(phase).Should(BeEmpty())
+			Expect(requeueAfter).Should(Equal(noRequeueAfter))
 		})
 	})
 })
@@ -689,11 +761,13 @@ func setReconfigureTargetConfigHash(cluster *appsv1.Cluster, targetConfigHash st
 	}}
 }
 
-func createResolvedComponentWithConfigHash(clusterName, compName, compDefName, targetConfigHash string) {
-	testapps.NewComponentFactory(testCtx.DefaultNamespace, clusterName+"-"+compName, compDefName).
+func createResolvedComponentWithConfigHash(clusterName, compName, compDefName, targetConfigHash string) *appsv1.Component {
+	return testapps.NewComponentFactory(testCtx.DefaultNamespace, clusterName+"-"+compName, compDefName).
+		AddLabelsInMap(constant.GetClusterLabels(clusterName)).
 		SetConfigs([]appsv1.ClusterComponentConfig{{
 			Name:       pointer.String("mysql-config"),
 			ConfigHash: pointer.String(targetConfigHash),
 		}}).
-		Create(&testCtx)
+		Create(&testCtx).
+		GetObject()
 }

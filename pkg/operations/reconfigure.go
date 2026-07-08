@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -121,7 +122,11 @@ func (r *reconfigureAction) aggregatePhase(reqCtx intctrlutil.RequestCtx, cli cl
 			if compParam.Generation != compParam.Status.ObservedGeneration {
 				return opsv1alpha1.OpsRunningPhase, "", nil
 			}
-			if msg, ok := r.hasPermanentReconfigureFailure(reqCtx.Ctx, cli, resource, compParam, compName); ok {
+			msg, ok, err := r.hasPermanentReconfigureFailure(reqCtx.Ctx, cli, resource, compParam, compName)
+			if err != nil {
+				return "", "", err
+			}
+			if ok {
 				if err := r.withdrawReconfigureDesiredFromComponents(reqCtx, cli, resource, compNames, reconfigure); err != nil {
 					return "", "", err
 				}
@@ -141,16 +146,19 @@ func (r *reconfigureAction) aggregatePhase(reqCtx intctrlutil.RequestCtx, cli cl
 }
 
 func (r *reconfigureAction) hasPermanentReconfigureFailure(ctx context.Context, reader client.Reader,
-	resource *OpsResource, compParam *parametersv1alpha1.ComponentParameter, compName string) (string, bool) {
+	resource *OpsResource, compParam *parametersv1alpha1.ComponentParameter, compName string) (string, bool, error) {
 	for i := range compParam.Status.ConfigurationItemStatus {
 		itemStatus := &compParam.Status.ConfigurationItemStatus[i]
-		targetConfigHash, ok := getCurrentConfigHash(ctx, reader, compParam.GetNamespace(), resource.Cluster, compName, itemStatus.Name)
+		targetConfigHash, ok, err := getCurrentConfigHash(ctx, reader, compParam.GetNamespace(), resource.Cluster, compName, itemStatus.Name)
+		if err != nil {
+			return "", false, err
+		}
 		if !ok || !isConsumablePermanentReconfigureFailure(resource.OpsRequest, compParam, itemStatus, targetConfigHash) {
 			continue
 		}
-		return renderSafeReconfigureFailureMessage(itemStatus.Name, itemStatus.ReconcileDetail.Reason), true
+		return renderSafeReconfigureFailureMessage(itemStatus.Name, itemStatus.ReconcileDetail.Reason), true, nil
 	}
-	return "", false
+	return "", false, nil
 }
 
 func isConsumablePermanentReconfigureFailure(ops *opsv1alpha1.OpsRequest, compParam *parametersv1alpha1.ComponentParameter,
@@ -174,19 +182,30 @@ func isConsumablePermanentReconfigureFailure(ops *opsv1alpha1.OpsRequest, compPa
 	return isPermanentFailureReason(detail.FailureClass, detail.Reason)
 }
 
-func getCurrentConfigHash(ctx context.Context, reader client.Reader, namespace string, cluster *appsv1.Cluster, compName, configName string) (string, bool) {
+func getCurrentConfigHash(ctx context.Context, reader client.Reader, namespace string, cluster *appsv1.Cluster, compName, configName string) (string, bool, error) {
 	if cluster == nil {
-		return "", false
+		return "", false, nil
 	}
 	comp := cluster.Spec.GetComponentByName(compName)
 	if comp != nil {
-		return configHashFromConfigs(comp.Configs, configName)
+		hash, ok := configHashFromConfigs(comp.Configs, configName)
+		return hash, ok, nil
 	}
 	componentObj := &appsv1.Component{}
 	if err := reader.Get(ctx, client.ObjectKey{Namespace: namespace, Name: component.FullName(cluster.Name, compName)}, componentObj); err != nil {
-		return "", false
+		if apierrors.IsNotFound(err) {
+			return "", false, fmt.Errorf("resolved component %s/%s not found while reading current config hash for config %s: %w",
+				namespace, component.FullName(cluster.Name, compName), configName, err)
+		}
+		return "", false, fmt.Errorf("failed to read resolved component %s/%s current config hash for config %s: %w",
+			namespace, component.FullName(cluster.Name, compName), configName, err)
 	}
-	return configHashFromConfigs(componentObj.Spec.Configs, configName)
+	if !componentObj.DeletionTimestamp.IsZero() {
+		return "", false, fmt.Errorf("resolved component %s/%s is terminating while reading current config hash for config %s",
+			namespace, componentObj.Name, configName)
+	}
+	hash, ok := configHashFromConfigs(componentObj.Spec.Configs, configName)
+	return hash, ok, nil
 }
 
 func configHashFromConfigs(configs []appsv1.ClusterComponentConfig, configName string) (string, bool) {
@@ -221,7 +240,11 @@ func (r *reconfigureAction) withdrawReconfigureDesiredFromComponents(reqCtx intc
 		if err != nil {
 			return err
 		}
-		if _, ok := r.hasPermanentReconfigureFailure(reqCtx.Ctx, cli, resource, compParam, compName); !ok {
+		_, ok, err := r.hasPermanentReconfigureFailure(reqCtx.Ctx, cli, resource, compParam, compName)
+		if err != nil {
+			return err
+		}
+		if !ok {
 			continue
 		}
 		if err := withdrawReconfigureDesired(reqCtx, cli, compParam, reconfigure); err != nil {

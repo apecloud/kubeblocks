@@ -629,6 +629,7 @@ func updateConfigPhaseWithResult(cli client.Client, ctx intctrlutil.RequestCtx, 
 
 	gcConfigRevision(config)
 	if _, ok := config.ObjectMeta.Annotations[core.GenerateRevisionPhaseKey(revision)]; !ok || isReconciledResult(result) {
+		result = sanitizeStableReconfigureResult(result)
 		result.Revision = revision
 		b, _ := json.Marshal(result)
 		config.ObjectMeta.Annotations[core.GenerateRevisionPhaseKey(revision)] = string(b)
@@ -671,8 +672,9 @@ func updateAppliedConfigs(cli client.Client, ctx intctrlutil.RequestCtx, config 
 		if result == nil {
 			result = ptr.To(unReconciled(parametersv1alpha1.CFinishedPhase, "", fmt.Sprintf("phase: %s", reconfigurePhase)))
 		}
-		result.Revision = revision
-		b, _ := json.Marshal(result)
+		sanitized := sanitizeStableReconfigureResult(*result)
+		sanitized.Revision = revision
+		b, _ := json.Marshal(sanitized)
 		config.ObjectMeta.Annotations[core.GenerateRevisionPhaseKey(revision)] = string(b)
 	}
 	config.ObjectMeta.Annotations[constant.LastAppliedConfigAnnotationKey] = string(configData)

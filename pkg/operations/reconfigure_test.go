@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"encoding/json"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -309,6 +311,11 @@ parameter: {
 				g.Expect(condition.Message).Should(ContainSubstring(parametersv1alpha1.ReconfigureFailureReasonUnsupportedParameter))
 				g.Expect(condition.Message).ShouldNot(ContainSubstring("password"))
 				g.Expect(condition.Message).ShouldNot(ContainSubstring("SELECT"))
+				expectNoRawReconfigureLeak(g, fetched.Status)
+			})).Should(Succeed())
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentParameter), func(g Gomega, cp *parametersv1alpha1.ComponentParameter) {
+				expectNoRawReconfigureLeak(g, cp.Status)
+				expectNoRawReconfigureLeak(g, cp.ObjectMeta)
 			})).Should(Succeed())
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentParameter), func(g Gomega, cp *parametersv1alpha1.ComponentParameter) {
 				g.Expect(cp.Spec.Desired.Assignments).ShouldNot(HaveKey("max_connections"))
@@ -474,18 +481,28 @@ parameter: {
 			})).Should(Succeed())
 		})
 
-		It("withdraws matching desired entries from all resolved component parameters", func() {
+		It("withdraws matching desired entries only from components with matching failure identity", func() {
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
 			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
 			componentParameter := createReconfigureComponentParameter(clusterName, compDefName)
-			otherCompName := defaultCompName + "-1"
+			otherCompName := defaultCompName + "-" + testCtx.GetRandomStr()
 			otherComponentParameter := createReconfigureComponentParameterForComp(clusterName, otherCompName, compDefName)
+			opsRes.OpsRequest = createReconfigureOpsRequest("multi-withdraw-"+testCtx.GetRandomStr(), clusterName, "max_connections", pointer.String("200"))
+			setReconfigureTargetConfigHash(opsRes.Cluster, targetConfigHash)
+			createResolvedComponentWithConfigHash(opsRes.Cluster.Name, otherCompName, compDefName, targetConfigHash)
 			for _, cp := range []*parametersv1alpha1.ComponentParameter{componentParameter, otherComponentParameter} {
 				Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(cp), func(fetched *parametersv1alpha1.ComponentParameter) {
 					fetched.Spec.Desired = &parametersv1alpha1.ParameterInputs{Assignments: map[string]*string{
 						"max_connections": pointer.String("200"),
 						"innodb_buffer":   pointer.String("1G"),
 					}}
+				})()).Should(Succeed())
+				Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(cp), func(fetched *parametersv1alpha1.ComponentParameter) {
+					fetched.Status.ObservedGeneration = fetched.Generation
+					fetched.Status.Phase = parametersv1alpha1.CFailedPhase
+					fetched.Status.ConfigurationItemStatus = []parametersv1alpha1.ConfigTemplateItemDetailStatus{stableReconfigureFailureStatus(
+						fetched, opsRes.OpsRequest, parametersv1alpha1.ReconfigureFailureClassPermanent,
+						parametersv1alpha1.ReconfigureFailureReasonUnsupportedParameter, "raw stderr")}
 				})()).Should(Succeed())
 			}
 
@@ -503,6 +520,97 @@ parameter: {
 					g.Expect(fetched.Spec.Desired.Assignments).Should(HaveKeyWithValue("innodb_buffer", pointer.String("1G")))
 				})).Should(Succeed())
 			}
+		})
+
+		It("does not withdraw matching desired entries from components without matching failure identity", func() {
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
+			componentParameter := createReconfigureComponentParameter(clusterName, compDefName)
+			otherCompName := defaultCompName + "-" + testCtx.GetRandomStr()
+			otherComponentParameter := createReconfigureComponentParameterForComp(clusterName, otherCompName, compDefName)
+			opsRes.OpsRequest = createReconfigureOpsRequest("multi-withdraw-skip-"+testCtx.GetRandomStr(), clusterName, "max_connections", pointer.String("200"))
+			setReconfigureTargetConfigHash(opsRes.Cluster, targetConfigHash)
+			createResolvedComponentWithConfigHash(opsRes.Cluster.Name, otherCompName, compDefName, targetConfigHash)
+			for _, cp := range []*parametersv1alpha1.ComponentParameter{componentParameter, otherComponentParameter} {
+				Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(cp), func(fetched *parametersv1alpha1.ComponentParameter) {
+					fetched.Spec.Desired = &parametersv1alpha1.ParameterInputs{Assignments: map[string]*string{
+						"max_connections": pointer.String("200"),
+					}}
+				})()).Should(Succeed())
+			}
+			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(componentParameter), func(fetched *parametersv1alpha1.ComponentParameter) {
+				fetched.Status.ObservedGeneration = fetched.Generation
+				fetched.Status.Phase = parametersv1alpha1.CFailedPhase
+				fetched.Status.ConfigurationItemStatus = []parametersv1alpha1.ConfigTemplateItemDetailStatus{stableReconfigureFailureStatus(
+					fetched, opsRes.OpsRequest, parametersv1alpha1.ReconfigureFailureClassPermanent,
+					parametersv1alpha1.ReconfigureFailureReasonUnsupportedParameter, "raw stderr")}
+			})()).Should(Succeed())
+
+			err := (&reconfigureAction{}).withdrawReconfigureDesiredFromComponents(reqCtx, k8sClient, opsRes,
+				[]string{defaultCompName, otherCompName}, opsv1alpha1.Reconfigure{
+					Parameters: []opsv1alpha1.ParameterPair{{
+						Key:   "max_connections",
+						Value: pointer.String("200"),
+					}},
+				})
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentParameter), func(g Gomega, fetched *parametersv1alpha1.ComponentParameter) {
+				g.Expect(fetched.Spec.Desired.Assignments).ShouldNot(HaveKey("max_connections"))
+			})).Should(Succeed())
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(otherComponentParameter), func(g Gomega, fetched *parametersv1alpha1.ComponentParameter) {
+				g.Expect(fetched.Spec.Desired.Assignments).Should(HaveKeyWithValue("max_connections", pointer.String("200")))
+			})).Should(Succeed())
+		})
+
+		It("does not withdraw desired values when later legal state keeps the same key and value", func() {
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
+			componentParameter := createReconfigureComponentParameter(clusterName, compDefName)
+			opsRes.OpsRequest = createReconfigureOpsRequest("same-value-later-"+testCtx.GetRandomStr(), clusterName, "max_connections", pointer.String("200"))
+			setReconfigureTargetConfigHash(opsRes.Cluster, targetConfigHash)
+
+			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(componentParameter), func(cp *parametersv1alpha1.ComponentParameter) {
+				cp.Spec.Desired = &parametersv1alpha1.ParameterInputs{Assignments: map[string]*string{
+					"max_connections": pointer.String("200"),
+				}}
+			})()).Should(Succeed())
+			Expect(testCtx.Cli.Get(ctx, client.ObjectKeyFromObject(componentParameter), componentParameter)).Should(Succeed())
+			oldGeneration := componentParameter.Generation
+			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(componentParameter), func(cp *parametersv1alpha1.ComponentParameter) {
+				cp.Status.ObservedGeneration = cp.Generation
+				cp.Status.Phase = parametersv1alpha1.CFailedPhase
+				status := stableReconfigureFailureStatus(cp, opsRes.OpsRequest, parametersv1alpha1.ReconfigureFailureClassPermanent,
+					parametersv1alpha1.ReconfigureFailureReasonUnsupportedParameter, "raw stderr")
+				status.ReconcileDetail.ComponentParameterGeneration = oldGeneration
+				cp.Status.ConfigurationItemStatus = []parametersv1alpha1.ConfigTemplateItemDetailStatus{status}
+			})()).Should(Succeed())
+			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(componentParameter), func(cp *parametersv1alpha1.ComponentParameter) {
+				cp.Spec.Desired.Assignments["max_connections"] = pointer.String("200")
+				cp.Spec.Desired.Assignments["later_safe_key"] = pointer.String("kept")
+			})()).Should(Succeed())
+
+			err := (&reconfigureAction{}).withdrawReconfigureDesiredFromComponents(reqCtx, k8sClient, opsRes,
+				[]string{defaultCompName}, opsv1alpha1.Reconfigure{
+					Parameters: []opsv1alpha1.ParameterPair{{
+						Key:   "max_connections",
+						Value: pointer.String("200"),
+					}},
+				})
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentParameter), func(g Gomega, fetched *parametersv1alpha1.ComponentParameter) {
+				g.Expect(fetched.Spec.Desired.Assignments).Should(HaveKeyWithValue("max_connections", pointer.String("200")))
+				g.Expect(fetched.Spec.Desired.Assignments).Should(HaveKeyWithValue("later_safe_key", pointer.String("kept")))
+			})).Should(Succeed())
+		})
+
+		It("resolves target config hash from concrete Component objects", func() {
+			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
+			shardCompName := "shard-" + testCtx.GetRandomStr()
+			createResolvedComponentWithConfigHash(opsRes.Cluster.Name, shardCompName, compDefName, targetConfigHash)
+
+			got, ok := getCurrentConfigHash(ctx, k8sClient, testCtx.DefaultNamespace, opsRes.Cluster, shardCompName, "mysql-config")
+			Expect(ok).Should(BeTrue())
+			Expect(got).Should(Equal(targetConfigHash))
 		})
 	})
 })
@@ -544,13 +652,14 @@ func createReconfigureOpsRequest(name, clusterName, key string, value *string) *
 }
 
 func stableReconfigureFailureStatus(cp *parametersv1alpha1.ComponentParameter, ops *opsv1alpha1.OpsRequest, failureClass, reason, rawMessage string) parametersv1alpha1.ConfigTemplateItemDetailStatus {
+	safeMessage := renderSafeReconfigureFailureMessage("mysql-config", reason)
 	return parametersv1alpha1.ConfigTemplateItemDetailStatus{
 		Name:    "mysql-config",
 		Phase:   parametersv1alpha1.CFailedPhase,
-		Message: pointer.String(rawMessage),
+		Message: pointer.String(safeMessage),
 		ReconcileDetail: &parametersv1alpha1.ReconcileDetail{
 			ExecResult:                   "Failed",
-			ErrMessage:                   rawMessage,
+			ErrMessage:                   safeMessage,
 			FailureClass:                 failureClass,
 			Reason:                       reason,
 			OperationUID:                 string(ops.UID),
@@ -562,6 +671,15 @@ func stableReconfigureFailureStatus(cp *parametersv1alpha1.ComponentParameter, o
 	}
 }
 
+func expectNoRawReconfigureLeak(g Gomega, obj any) {
+	b, err := json.Marshal(obj)
+	g.Expect(err).ShouldNot(HaveOccurred())
+	rendered := string(b)
+	g.Expect(rendered).ShouldNot(ContainSubstring("password"))
+	g.Expect(rendered).ShouldNot(ContainSubstring("token=abc"))
+	g.Expect(rendered).ShouldNot(ContainSubstring("SELECT"))
+}
+
 func setReconfigureTargetConfigHash(cluster *appsv1.Cluster, targetConfigHash string) {
 	component := cluster.Spec.GetComponentByName(defaultCompName)
 	Expect(component).ShouldNot(BeNil())
@@ -569,4 +687,13 @@ func setReconfigureTargetConfigHash(cluster *appsv1.Cluster, targetConfigHash st
 		Name:       pointer.String("mysql-config"),
 		ConfigHash: pointer.String(targetConfigHash),
 	}}
+}
+
+func createResolvedComponentWithConfigHash(clusterName, compName, compDefName, targetConfigHash string) {
+	testapps.NewComponentFactory(testCtx.DefaultNamespace, clusterName+"-"+compName, compDefName).
+		SetConfigs([]appsv1.ClusterComponentConfig{{
+			Name:       pointer.String("mysql-config"),
+			ConfigHash: pointer.String(targetConfigHash),
+		}}).
+		Create(&testCtx)
 }

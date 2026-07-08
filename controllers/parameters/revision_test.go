@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package parameters
 
 import (
+	"encoding/json"
 	"fmt"
 	"testing"
 
@@ -83,6 +84,55 @@ func TestGcConfigRevision(t *testing.T) {
 
 	gcConfigRevision(cm)
 	assert.Equal(t, 10, len(retrieveRevision(cm.GetAnnotations())))
+}
+
+func TestUpdateRevisionSanitizesStableReconfigureFailureMessage(t *testing.T) {
+	status := &parametersv1alpha1.ConfigTemplateItemDetailStatus{
+		Name:           "mysql-config",
+		UpdateRevision: "1",
+	}
+	updateRevision(configurationRevision{
+		revision:    1,
+		strRevision: "1",
+		phase:       parametersv1alpha1.CFailedPhase,
+		result: parameters.Result{
+			Message:                      "password=secret token=abc SELECT * FROM t",
+			FailureClass:                 parametersv1alpha1.ReconfigureFailureClassPermanent,
+			Reason:                       parametersv1alpha1.ReconfigureFailureReasonUnsupportedParameter,
+			OperationUID:                 "ops-uid",
+			ConfigName:                   "mysql-config",
+			TargetConfigHash:             "target-hash",
+			ComponentParameterGeneration: 2,
+		},
+	}, status)
+
+	assert.NotNil(t, status.Message)
+	assert.NotNil(t, status.ReconcileDetail)
+	assert.Contains(t, *status.Message, parametersv1alpha1.ReconfigureFailureReasonUnsupportedParameter)
+	assert.Contains(t, status.ReconcileDetail.ErrMessage, parametersv1alpha1.ReconfigureFailureReasonUnsupportedParameter)
+	for _, raw := range []string{"password", "token=abc", "SELECT"} {
+		assert.NotContains(t, *status.Message, raw)
+		assert.NotContains(t, status.ReconcileDetail.ErrMessage, raw)
+	}
+}
+
+func TestSanitizeStableReconfigureResultBeforeMetadataMarshal(t *testing.T) {
+	result := sanitizeStableReconfigureResult(parameters.Result{
+		Message:                      "password=secret token=abc SELECT * FROM t",
+		FailureClass:                 parametersv1alpha1.ReconfigureFailureClassPermanent,
+		Reason:                       parametersv1alpha1.ReconfigureFailureReasonUnsupportedParameter,
+		OperationUID:                 "ops-uid",
+		ConfigName:                   "mysql-config",
+		TargetConfigHash:             "target-hash",
+		ComponentParameterGeneration: 2,
+	})
+	b, err := json.Marshal(result)
+	assert.NoError(t, err)
+	rendered := string(b)
+	assert.Contains(t, rendered, parametersv1alpha1.ReconfigureFailureReasonUnsupportedParameter)
+	for _, raw := range []string{"password", "token=abc", "SELECT"} {
+		assert.NotContains(t, rendered, raw)
+	}
 }
 
 func TestParseRevision(t *testing.T) {

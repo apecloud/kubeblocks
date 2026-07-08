@@ -3375,6 +3375,91 @@ string
 <p>Represents the error message generated when the execution of configuration changes fails.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>failureClass</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>FailureClass classifies the failure for Ops aggregation.
+Valid values are &ldquo;Permanent&rdquo;, &ldquo;Retryable&rdquo;, and &ldquo;Unknown&rdquo;.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>reason</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Reason is a stable machine-readable code. It must be interpreted together with FailureClass.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>operationUID</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>OperationUID identifies the OpsRequest or equivalent operation that produced this result.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>configName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ConfigName identifies the configuration item this result belongs to.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>targetConfigHash</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>TargetConfigHash identifies the target rendered config content.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>componentParameterGeneration</code><br/>
+<em>
+int64
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ComponentParameterGeneration is the ComponentParameter generation observed when this result was produced.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>affectedPodCount</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>AffectedPodCount is the number of pods affected by this result.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="parameters.kubeblocks.io/v1alpha1.ReconfiguringStatus">ReconfiguringStatus

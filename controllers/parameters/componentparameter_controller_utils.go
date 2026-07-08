@@ -626,23 +626,53 @@ func updateLastDoneRevision(revision configurationRevision, status *parametersv1
 
 func updateRevision(revision configurationRevision, status *parametersv1alpha1.ConfigTemplateItemDetailStatus) {
 	if revision.strRevision == status.UpdateRevision {
+		result := sanitizeStableReconfigureResult(revision.result)
+		if isStableReconfigureFailureSignal(result) {
+			status.Message = pointer.String(result.Message)
+		}
 		status.Phase = revision.phase
 		status.ReconcileDetail = &parametersv1alpha1.ReconcileDetail{
 			CurrentRevision:              revision.strRevision,
-			Policy:                       revision.result.Policy,
-			SucceedCount:                 revision.result.SucceedCount,
-			ExpectedCount:                revision.result.ExpectedCount,
-			ExecResult:                   revision.result.ExecResult,
-			ErrMessage:                   revision.result.Message,
-			FailureClass:                 revision.result.FailureClass,
-			Reason:                       revision.result.Reason,
-			OperationUID:                 revision.result.OperationUID,
-			ConfigName:                   revision.result.ConfigName,
-			TargetConfigHash:             revision.result.TargetConfigHash,
-			ComponentParameterGeneration: revision.result.ComponentParameterGeneration,
-			AffectedPodCount:             revision.result.AffectedPodCount,
+			Policy:                       result.Policy,
+			SucceedCount:                 result.SucceedCount,
+			ExpectedCount:                result.ExpectedCount,
+			ExecResult:                   result.ExecResult,
+			ErrMessage:                   result.Message,
+			FailureClass:                 result.FailureClass,
+			Reason:                       result.Reason,
+			OperationUID:                 result.OperationUID,
+			ConfigName:                   result.ConfigName,
+			TargetConfigHash:             result.TargetConfigHash,
+			ComponentParameterGeneration: result.ComponentParameterGeneration,
+			AffectedPodCount:             result.AffectedPodCount,
 		}
 	}
+}
+
+func sanitizeStableReconfigureResult(result parameters.Result) parameters.Result {
+	if isStableReconfigureFailureSignal(result) {
+		result.Message = renderSafeReconfigureFailureMessage(result.ConfigName, result.Reason)
+	}
+	return result
+}
+
+func isStableReconfigureFailureSignal(result parameters.Result) bool {
+	return result.FailureClass != "" ||
+		result.Reason != "" ||
+		result.OperationUID != "" ||
+		result.ConfigName != "" ||
+		result.TargetConfigHash != "" ||
+		result.ComponentParameterGeneration != 0
+}
+
+func renderSafeReconfigureFailureMessage(configName, reason string) string {
+	if reason == "" {
+		reason = parametersv1alpha1.ReconfigureFailureReasonUnknown
+	}
+	if configName == "" {
+		return fmt.Sprintf("reconfigure action was rejected with reason %s", reason)
+	}
+	return fmt.Sprintf("reconfigure action for config %s was rejected with reason %s", configName, reason)
 }
 
 func prepareReconcileTask(reqCtx intctrlutil.RequestCtx, cli client.Client, componentParameter *parametersv1alpha1.ComponentParameter) (*Task, error) {

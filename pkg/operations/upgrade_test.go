@@ -98,8 +98,9 @@ var _ = Describe("Upgrade OpsRequest", func() {
 		})).Should(Succeed())
 	}
 
-	markClusterProvisioningFailed := func(clusterObject *appsv1.Cluster, message string) {
-		Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(clusterObject), func(cluster *appsv1.Cluster) {
+	markClusterProvisioningFailed := func(opsRes *OpsResource, message string) {
+		clusterKey := client.ObjectKeyFromObject(opsRes.Cluster)
+		Eventually(testapps.GetAndChangeObjStatus(&testCtx, clusterKey, func(cluster *appsv1.Cluster) {
 			meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
 				Type:               appsv1.ConditionTypeProvisioningStarted,
 				Status:             metav1.ConditionFalse,
@@ -107,8 +108,13 @@ var _ = Describe("Upgrade OpsRequest", func() {
 				Reason:             "PreCheckFailed",
 				Message:            message,
 			})
-			clusterObject.Status = cluster.Status
-			clusterObject.Generation = cluster.Generation
+		})).Should(Succeed())
+		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
+			condition := meta.FindStatusCondition(cluster.Status.Conditions, appsv1.ConditionTypeProvisioningStarted)
+			g.Expect(condition).ShouldNot(BeNil())
+			g.Expect(condition.Status).Should(Equal(metav1.ConditionFalse))
+			g.Expect(condition.ObservedGeneration).Should(Equal(cluster.Generation))
+			opsRes.Cluster = cluster.DeepCopy()
 		})).Should(Succeed())
 	}
 
@@ -433,7 +439,7 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			})).Should(Succeed())
 
 			By("expect the opsRequest to fail after the cluster controller reports the current generation failure")
-			markClusterProvisioningFailed(opsRes.Cluster, `no matched component definition found with componentDef "cmpd-not-exist"`)
+			markClusterProvisioningFailed(opsRes, `no matched component definition found with componentDef "cmpd-not-exist"`)
 			_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsFailedPhase))
@@ -461,7 +467,7 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			})).Should(Succeed())
 
 			By("expect the opsRequest to fail after the cluster controller reports the current generation failure")
-			markClusterProvisioningFailed(opsRes.Cluster, `no matched component definition found with serviceVersion "99.99.99"`)
+			markClusterProvisioningFailed(opsRes, `no matched component definition found with serviceVersion "99.99.99"`)
 			_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsFailedPhase))
@@ -493,7 +499,7 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			})).Should(Succeed())
 
 			By("expect the opsRequest to fail after the cluster controller reports the current generation failure")
-			markClusterProvisioningFailed(opsRes.Cluster, `no matched component definition found with componentDef "`+compDefPrefix+`"`)
+			markClusterProvisioningFailed(opsRes, `no matched component definition found with componentDef "`+compDefPrefix+`"`)
 			_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsFailedPhase))
@@ -563,7 +569,7 @@ var _ = Describe("Upgrade OpsRequest", func() {
 				&appsv1.ComponentDefinition{}, false)).Should(Succeed())
 
 			By("expect the opsRequest to fail after the cluster controller reports the current generation failure")
-			markClusterProvisioningFailed(opsRes.Cluster, `componentDefinition "`+compDef2.Name+`" not found`)
+			markClusterProvisioningFailed(opsRes, `componentDefinition "`+compDef2.Name+`" not found`)
 			_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsFailedPhase))

@@ -641,6 +641,9 @@ parameter: {
 			Expect(err.Error()).Should(ContainSubstring("terminating"))
 			Expect(ok).Should(BeFalse())
 			Expect(got).Should(BeEmpty())
+			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(componentObj), func(comp *appsv1.Component) {
+				comp.Finalizers = nil
+			})()).Should(Succeed())
 		})
 
 		It("does not silently convert resolved Component hash read errors into Running", func() {
@@ -683,6 +686,9 @@ parameter: {
 			Expect(err.Error()).Should(ContainSubstring("terminating"))
 			Expect(phase).Should(BeEmpty())
 			Expect(requeueAfter).Should(Equal(noRequeueAfter))
+			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(componentObj), func(comp *appsv1.Component) {
+				comp.Finalizers = nil
+			})()).Should(Succeed())
 		})
 	})
 })

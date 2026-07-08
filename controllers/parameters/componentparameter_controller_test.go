@@ -358,13 +358,13 @@ var _ = Describe("ComponentParameter Controller", func() {
 				Namespace: testCtx.DefaultNamespace,
 				Name:      core.GetComponentCfgName(clusterName, defaultCompName, configSpecName),
 			}
-			By("touch the component until ComponentParameter regenerates from mixed sources")
+			By("touch the ComponentParameter until it regenerates from mixed sources")
 			Eventually(func(g Gomega) {
-				g.Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(compObj), func(comp *appsv1.Component) {
-					if comp.Annotations == nil {
-						comp.Annotations = map[string]string{}
+				g.Expect(testapps.GetAndChangeObj(&testCtx, cfgKey, func(cfg *parametersv1alpha1.ComponentParameter) {
+					if cfg.Annotations == nil {
+						cfg.Annotations = map[string]string{}
 					}
-					comp.Annotations["parameters.kubeblocks.io/mixed-mode-test"] = time.Now().Format(time.RFC3339Nano)
+					cfg.Annotations["parameters.kubeblocks.io/mixed-mode-test"] = time.Now().Format(time.RFC3339Nano)
 				})()).Should(Succeed())
 				testapps.CheckObj(&testCtx, configKey, func(g Gomega, cfg *corev1.ConfigMap) {
 					g.Expect(cfg.Data).Should(HaveKey(testparameters.MysqlConfigFile))

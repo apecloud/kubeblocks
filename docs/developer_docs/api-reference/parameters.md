@@ -252,7 +252,7 @@ string
 <em>(Optional)</em>
 <p>ServiceVersion specifies the version of the Service expected to be provisioned by this Component.
 The version should follow the syntax and semantics of the &ldquo;Semantic Versioning&rdquo; specification (<a href="http://semver.org/">http://semver.org/</a>).
-If no version is specified, the latest available version will be used.</p>
+If no version is specified, this ParamConfigRenderer matches every compatible ComponentDefinition selected by ComponentDef.</p>
 </td>
 </tr>
 <tr>
@@ -643,7 +643,7 @@ string
 <em>(Optional)</em>
 <p>ServiceVersion specifies the version of the Service expected to be provisioned by this Component.
 The version should follow the syntax and semantics of the &ldquo;Semantic Versioning&rdquo; specification (<a href="http://semver.org/">http://semver.org/</a>).
-If no version is specified, the latest available version will be used.</p>
+If no version is specified, this ParametersDefinition matches every compatible ComponentDefinition selected by ComponentDef.</p>
 </td>
 </tr>
 <tr>
@@ -1774,7 +1774,7 @@ string
 <em>(Optional)</em>
 <p>ServiceVersion specifies the version of the Service expected to be provisioned by this Component.
 The version should follow the syntax and semantics of the &ldquo;Semantic Versioning&rdquo; specification (<a href="http://semver.org/">http://semver.org/</a>).
-If no version is specified, the latest available version will be used.</p>
+If no version is specified, this ParamConfigRenderer matches every compatible ComponentDefinition selected by ComponentDef.</p>
 </td>
 </tr>
 <tr>
@@ -2890,7 +2890,7 @@ string
 <em>(Optional)</em>
 <p>ServiceVersion specifies the version of the Service expected to be provisioned by this Component.
 The version should follow the syntax and semantics of the &ldquo;Semantic Versioning&rdquo; specification (<a href="http://semver.org/">http://semver.org/</a>).
-If no version is specified, the latest available version will be used.</p>
+If no version is specified, this ParametersDefinition matches every compatible ComponentDefinition selected by ComponentDef.</p>
 </td>
 </tr>
 <tr>

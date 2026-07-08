@@ -347,7 +347,7 @@ func TestResolveCmpdParametersDefs(t *testing.T) {
 	}
 }
 
-func TestResolveCmpdParametersDefsDefaultsToLatestServiceVersion(t *testing.T) {
+func TestResolveCmpdParametersDefsUnversionedMatchesEveryCompatibleServiceVersion(t *testing.T) {
 	scheme := runtime.NewScheme()
 	_ = appsv1.AddToScheme(scheme)
 	_ = parametersv1alpha1.AddToScheme(scheme)
@@ -387,8 +387,8 @@ func TestResolveCmpdParametersDefsDefaultsToLatestServiceVersion(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ResolveCmpdParametersDefs(old) error = %v", err)
 	}
-	if len(paramsDefs) != 0 {
-		t.Fatalf("ResolveCmpdParametersDefs(old) paramsDefs len = %d, want 0", len(paramsDefs))
+	if len(paramsDefs) != 1 {
+		t.Fatalf("ResolveCmpdParametersDefs(old) paramsDefs len = %d, want 1", len(paramsDefs))
 	}
 
 	configDescs, paramsDefs, err := ResolveCmpdParametersDefs(context.Background(), cli, latestCmpd)
@@ -496,7 +496,7 @@ func TestResolveCmpdParametersDefsFallbacksToParamConfigRenderer(t *testing.T) {
 	}
 }
 
-func TestResolveCmpdParametersDefsParamConfigRendererDefaultsToLatestServiceVersion(t *testing.T) {
+func TestResolveCmpdParametersDefsParamConfigRendererUnversionedMatchesEveryCompatibleServiceVersion(t *testing.T) {
 	scheme := runtime.NewScheme()
 	_ = appsv1.AddToScheme(scheme)
 	_ = parametersv1alpha1.AddToScheme(scheme)
@@ -545,8 +545,8 @@ func TestResolveCmpdParametersDefsParamConfigRendererDefaultsToLatestServiceVers
 	if err != nil {
 		t.Fatalf("ResolveCmpdParametersDefs(old) error = %v", err)
 	}
-	if len(paramsDefs) != 0 {
-		t.Fatalf("ResolveCmpdParametersDefs(old) paramsDefs len = %d, want 0", len(paramsDefs))
+	if len(paramsDefs) != 1 {
+		t.Fatalf("ResolveCmpdParametersDefs(old) paramsDefs len = %d, want 1", len(paramsDefs))
 	}
 
 	configDescs, paramsDefs, err := ResolveCmpdParametersDefs(context.Background(), cli, latestCmpd)

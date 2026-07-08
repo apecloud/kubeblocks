@@ -30,7 +30,6 @@ import (
 
 	"github.com/StudioSol/set"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/version"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -314,7 +313,7 @@ func ResolveCmpdParametersDefs(ctx context.Context, reader client.Reader, cmpd *
 	coveredFiles := make(map[string]string)
 	for i := range paramsDefList.Items {
 		paramsDef := &paramsDefList.Items[i]
-		matched, err := MatchParametersDefinition(ctx, reader, cmpd, paramsDef)
+		matched, err := MatchParametersDefinition(cmpd, paramsDef)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -387,7 +386,7 @@ func resolveCmpdParametersDefsByConfigRender(ctx context.Context, reader client.
 }
 
 // MatchParametersDefinition reports whether a ParametersDefinition applies to the ComponentDefinition.
-func MatchParametersDefinition(ctx context.Context, reader client.Reader, cmpd *appsv1.ComponentDefinition, paramsDef *parametersv1alpha1.ParametersDefinition) (bool, error) {
+func MatchParametersDefinition(cmpd *appsv1.ComponentDefinition, paramsDef *parametersv1alpha1.ParametersDefinition) (bool, error) {
 	if cmpd == nil || paramsDef == nil {
 		return false, nil
 	}
@@ -398,64 +397,7 @@ func MatchParametersDefinition(ctx context.Context, reader client.Reader, cmpd *
 	if !component.PrefixOrRegexMatched(cmpd.Name, pattern) {
 		return false, nil
 	}
-	return matchServiceVersion(ctx, reader, cmpd, pattern, paramsDef.Spec.ServiceVersion)
-}
-
-func matchServiceVersion(ctx context.Context, reader client.Reader, cmpd *appsv1.ComponentDefinition, componentDefPattern, serviceVersion string) (bool, error) {
-	if serviceVersion != "" {
-		return serviceVersion == cmpd.Spec.ServiceVersion, nil
-	}
-	return matchLatestAvailableServiceVersion(ctx, reader, cmpd, componentDefPattern)
-}
-
-func matchLatestAvailableServiceVersion(ctx context.Context, reader client.Reader, cmpd *appsv1.ComponentDefinition, componentDefPattern string) (bool, error) {
-	if cmpd.Status.Phase != appsv1.AvailablePhase {
-		return false, nil
-	}
-	compDefList := &appsv1.ComponentDefinitionList{}
-	if err := reader.List(ctx, compDefList); err != nil {
-		return false, err
-	}
-	var latest string
-	found := false
-	for _, item := range compDefList.Items {
-		if item.Status.Phase != appsv1.AvailablePhase {
-			continue
-		}
-		if !component.PrefixOrRegexMatched(item.Name, componentDefPattern) {
-			continue
-		}
-		if !found {
-			latest = item.Spec.ServiceVersion
-			found = true
-			continue
-		}
-		cmp, err := serviceVersionComparator(item.Spec.ServiceVersion, latest)
-		if err != nil {
-			return false, err
-		}
-		if cmp > 0 {
-			latest = item.Spec.ServiceVersion
-		}
-	}
-	return found && cmpd.Spec.ServiceVersion == latest, nil
-}
-
-func serviceVersionComparator(a, b string) (int, error) {
-	if len(a) == 0 && len(b) == 0 {
-		return 0, nil
-	}
-	if len(a) == 0 {
-		return -1, nil
-	}
-	if len(b) == 0 {
-		return 1, nil
-	}
-	v, err := version.ParseSemantic(a)
-	if err != nil {
-		return 0, err
-	}
-	return v.Compare(b)
+	return paramsDef.Spec.ServiceVersion == "" || paramsDef.Spec.ServiceVersion == cmpd.Spec.ServiceVersion, nil
 }
 
 func validateMatchedParametersDefinition(paramsDef *parametersv1alpha1.ParametersDefinition) error {
@@ -499,11 +441,7 @@ func ResolveComponentConfigRender(ctx context.Context, reader client.Reader, cmp
 		if !component.PrefixOrRegexMatched(cmpd.Name, item.Spec.ComponentDef) {
 			continue
 		}
-		matched, err := matchServiceVersion(ctx, reader, cmpd, item.Spec.ComponentDef, item.Spec.ServiceVersion)
-		if err != nil {
-			return nil, err
-		}
-		if matched {
+		if item.Spec.ServiceVersion == "" || item.Spec.ServiceVersion == cmpd.Spec.ServiceVersion {
 			resolved := configDefList.Items[i].DeepCopy()
 			if err := hydrateLegacyConfigRender(ctx, reader, resolved, cmpd); err != nil {
 				return nil, err

@@ -157,7 +157,7 @@ func (r *ParametersDefinitionReconciler) mapCmpdToPDs(ctx context.Context, obj c
 	requests := make([]reconcile.Request, 0, len(paramsDefList.Items))
 	for i := range paramsDefList.Items {
 		paramsDef := &paramsDefList.Items[i]
-		matched, err := paramutil.MatchParametersDefinition(ctx, r.Client, cmpd, paramsDef)
+		matched, err := paramutil.MatchParametersDefinition(cmpd, paramsDef)
 		if err != nil {
 			log.FromContext(ctx).WithName("ParametersDefinitionReconcile").Error(err,
 				"failed to match ParametersDefinition for ComponentDefinition watch",
@@ -185,7 +185,7 @@ func (r *ParametersDefinitionReconciler) validateTemplateName(ctx context.Contex
 	}
 	for i := range cmpdList.Items {
 		cmpd := &cmpdList.Items[i]
-		matched, err := paramutil.MatchParametersDefinition(ctx, r.Client, cmpd, parametersDef)
+		matched, err := paramutil.MatchParametersDefinition(cmpd, parametersDef)
 		if err != nil {
 			return err
 		}

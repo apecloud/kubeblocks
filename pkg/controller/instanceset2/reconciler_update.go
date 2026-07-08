@@ -22,11 +22,13 @@ package instanceset2
 import (
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -139,18 +141,20 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 
 	for _, inst := range oldInstanceList {
-		if updatingInstances >= min(replicas, unavailable, updateCount) {
-			break
-		}
-
-		if !canBeUpdated(inst) {
-			break
-		}
-
 		newInst, err := buildInstanceByTemplate(tree, inst.Name, nameToTemplateMap[inst.Name], its)
 		if err != nil {
 			return kubebuilderx.Continue, err
 		}
+		storageOnly := isStorageOnlyUpdate(inst, newInst)
+		if !storageOnly {
+			if updatingInstances >= min(replicas, unavailable, updateCount) {
+				break
+			}
+			if !canBeUpdated(inst) {
+				break
+			}
+		}
+
 		mergedInst := copyAndMergeInstance(inst, newInst)
 		if mergedInst != nil {
 			err = tree.Update(mergedInst)
@@ -161,6 +165,32 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		}
 	}
 	return kubebuilderx.Continue, nil
+}
+
+func isStorageOnlyUpdate(oldInst, newInst *workloads.Instance) bool {
+	normalized := newInst.DeepCopy()
+	normalized.Spec.VolumeClaimTemplates = oldInst.Spec.VolumeClaimTemplates
+	normalized.Spec.PersistentVolumeClaimRetentionPolicy = oldInst.Spec.PersistentVolumeClaimRetentionPolicy
+	if normalized.Annotations != nil {
+		if oldInst.Annotations == nil {
+			delete(normalized.Annotations, instanceSetRevisionAnnotationKey)
+			delete(normalized.Annotations, constant.KubeBlocksGenerationKey)
+		} else {
+			if oldRevision := getInstanceRevision(oldInst); oldRevision != "" {
+				normalized.Annotations[instanceSetRevisionAnnotationKey] = oldRevision
+			} else {
+				delete(normalized.Annotations, instanceSetRevisionAnnotationKey)
+			}
+			if oldGeneration := oldInst.Annotations[constant.KubeBlocksGenerationKey]; oldGeneration != "" {
+				normalized.Annotations[constant.KubeBlocksGenerationKey] = oldGeneration
+			} else {
+				delete(normalized.Annotations, constant.KubeBlocksGenerationKey)
+			}
+		}
+	}
+	return equality.Semantic.DeepEqual(&oldInst.Spec, &normalized.Spec) &&
+		equality.Semantic.DeepEqual(oldInst.Labels, normalized.Labels) &&
+		equality.Semantic.DeepEqual(oldInst.Annotations, normalized.Annotations)
 }
 
 func parseReplicasNMaxUnavailable(updateStrategy *workloads.InstanceUpdateStrategy, totalReplicas int) (int, int, error) {

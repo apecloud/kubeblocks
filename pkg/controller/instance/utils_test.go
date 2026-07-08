@@ -400,6 +400,8 @@ func TestIsImageMatched(t *testing.T) {
 func TestBuildInstancePodAndPVCs(t *testing.T) {
 	inst := builder.NewInstanceBuilder("default", "mysql-0").
 		SetUID(types.UID("12345678-1234-1234-1234-1234567890ab")).
+		AddLabels(constant.AppInstanceLabelKey, "cluster").
+		AddLabels(constant.KBAppComponentLabelKey, "mysql").
 		AddAnnotations("instance-annotation", "true").
 		SetPodTemplate(corev1.PodTemplateSpec{
 			ObjectMeta: metav1.ObjectMeta{
@@ -464,6 +466,8 @@ func TestBuildInstancePodAndPVCs(t *testing.T) {
 	}
 	pvc := pvcs[0]
 	if pvc.Labels[constant.KBAppPodNameLabelKey] != "mysql-0" ||
+		pvc.Labels[constant.AppInstanceLabelKey] != "cluster" ||
+		pvc.Labels[constant.KBAppComponentLabelKey] != "mysql" ||
 		pvc.Labels[constant.VolumeClaimTemplateNameLabelKey] != "data" ||
 		pvc.Labels[constant.KBAppInstanceTemplateLabelKey] != "az-a" ||
 		pvc.Labels["pvc-label"] != "true" {

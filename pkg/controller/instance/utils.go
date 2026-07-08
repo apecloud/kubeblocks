@@ -184,6 +184,12 @@ func buildInstancePod(inst *workloads.Instance, revision string) (*corev1.Pod, e
 func buildInstancePVCs(inst *workloads.Instance) ([]*corev1.PersistentVolumeClaim, error) {
 	var pvcs []*corev1.PersistentVolumeClaim
 	labels := getMatchLabels(inst.Name)
+	if clusterName := inst.Labels[constant.AppInstanceLabelKey]; clusterName != "" {
+		labels[constant.AppInstanceLabelKey] = clusterName
+	}
+	if compName := inst.Labels[constant.KBAppComponentLabelKey]; compName != "" {
+		labels[constant.KBAppComponentLabelKey] = compName
+	}
 	for _, claimTemplate := range inst.Spec.VolumeClaimTemplates {
 		pvcName := intctrlutil.ComposePVCName(corev1.PersistentVolumeClaim{ObjectMeta: claimTemplate.ObjectMeta}, inst.Spec.InstanceSetName, inst.Name)
 		pvc := builder.NewPVCBuilder(inst.Namespace, pvcName).

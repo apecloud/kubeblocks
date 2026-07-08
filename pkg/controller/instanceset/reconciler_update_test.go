@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -97,6 +98,24 @@ var _ = Describe("update reconciler test", func() {
 			_, option, err := tree.GetWithOption(pod)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(option.Patch).Should(BeTrue())
+		})
+
+		It("bounds persisted action failure messages", func() {
+			pod := builder.NewPodBuilder(namespace, name+"-0").GetObject()
+			config := workloads.ConfigTemplate{
+				Name:       "mysql-config",
+				ConfigHash: ptr.To("target-hash"),
+			}
+			message := strings.Repeat("x", maxReconfigureActionFailureMessageBytes+1024)
+
+			Expect(setReconfigureActionFailure(pod, config, message)).Should(Succeed())
+
+			failures := getReconfigureActionFailures(pod)
+			Expect(failures).Should(HaveKey("mysql-config"))
+			persisted := failures["mysql-config"].Message
+			Expect(len(persisted)).Should(BeNumerically("<=", maxReconfigureActionFailureMessageBytes))
+			Expect(persisted).Should(HaveSuffix(reconfigureActionFailureTruncatedSuffix))
+			Expect(persisted).Should(HavePrefix(strings.Repeat("x", 32)))
 		})
 	})
 

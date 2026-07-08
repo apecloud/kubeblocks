@@ -21,6 +21,7 @@ package instanceset
 
 import (
 	"encoding/json"
+	"unicode/utf8"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
@@ -34,6 +35,11 @@ type reconfigureActionFailureRecord struct {
 	Message    string `json:"message,omitempty"`
 }
 
+const (
+	maxReconfigureActionFailureMessageBytes = 4096
+	reconfigureActionFailureTruncatedSuffix = "... [truncated]"
+)
+
 func setReconfigureActionFailure(pod *corev1.Pod, config workloads.ConfigTemplate, message string) error {
 	failures := getReconfigureActionFailures(pod)
 	if failures == nil {
@@ -41,7 +47,7 @@ func setReconfigureActionFailure(pod *corev1.Pod, config workloads.ConfigTemplat
 	}
 	failures[config.Name] = reconfigureActionFailureRecord{
 		ConfigHash: ptr.Deref(config.ConfigHash, ""),
-		Message:    message,
+		Message:    truncateReconfigureActionFailureMessage(message),
 	}
 	return setReconfigureActionFailures(pod, failures)
 }
@@ -84,4 +90,15 @@ func setReconfigureActionFailures(pod *corev1.Pod, failures map[string]reconfigu
 	annotations[constant.ReconfigureActionFailureAnnotationKey] = string(data)
 	pod.SetAnnotations(annotations)
 	return nil
+}
+
+func truncateReconfigureActionFailureMessage(message string) string {
+	if len(message) <= maxReconfigureActionFailureMessageBytes {
+		return message
+	}
+	limit := maxReconfigureActionFailureMessageBytes - len(reconfigureActionFailureTruncatedSuffix)
+	for limit > 0 && !utf8.ValidString(message[:limit]) {
+		limit--
+	}
+	return message[:limit] + reconfigureActionFailureTruncatedSuffix
 }

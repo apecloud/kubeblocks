@@ -347,6 +347,62 @@ func TestResolveCmpdParametersDefs(t *testing.T) {
 	}
 }
 
+func TestResolveCmpdParametersDefsDefaultsToLatestServiceVersion(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = appsv1.AddToScheme(scheme)
+	_ = parametersv1alpha1.AddToScheme(scheme)
+
+	newCompDef := func(name, serviceVersion string) *appsv1.ComponentDefinition {
+		return &appsv1.ComponentDefinition{
+			ObjectMeta: metav1.ObjectMeta{Name: name},
+			Spec: appsv1.ComponentDefinitionSpec{
+				ServiceVersion: serviceVersion,
+				Configs: []appsv1.ComponentFileTemplate{{
+					Name:     "mysql-config",
+					Template: "mysql-config",
+				}},
+			},
+			Status: appsv1.ComponentDefinitionStatus{Phase: appsv1.AvailablePhase},
+		}
+	}
+	oldCmpd := newCompDef("mysql-8.0.30", "8.0.30")
+	latestCmpd := newCompDef("mysql-8.0.31", "8.0.31")
+	pd := &parametersv1alpha1.ParametersDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: "mysql-params"},
+		Spec: parametersv1alpha1.ParametersDefinitionSpec{
+			ComponentDef:   "mysql-8",
+			TemplateName:   "mysql-config",
+			FileName:       "my.cnf",
+			ServiceVersion: "",
+			FileFormatConfig: &parametersv1alpha1.FileFormatConfig{
+				Format: parametersv1alpha1.Ini,
+			},
+		},
+		Status: parametersv1alpha1.ParametersDefinitionStatus{Phase: parametersv1alpha1.PDAvailablePhase},
+	}
+
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(oldCmpd, latestCmpd, pd).Build()
+
+	_, paramsDefs, err := ResolveCmpdParametersDefs(context.Background(), cli, oldCmpd)
+	if err != nil {
+		t.Fatalf("ResolveCmpdParametersDefs(old) error = %v", err)
+	}
+	if len(paramsDefs) != 0 {
+		t.Fatalf("ResolveCmpdParametersDefs(old) paramsDefs len = %d, want 0", len(paramsDefs))
+	}
+
+	configDescs, paramsDefs, err := ResolveCmpdParametersDefs(context.Background(), cli, latestCmpd)
+	if err != nil {
+		t.Fatalf("ResolveCmpdParametersDefs(latest) error = %v", err)
+	}
+	if len(paramsDefs) != 1 {
+		t.Fatalf("ResolveCmpdParametersDefs(latest) paramsDefs len = %d, want 1", len(paramsDefs))
+	}
+	if len(configDescs) != 1 {
+		t.Fatalf("ResolveCmpdParametersDefs(latest) configs len = %d, want 1", len(configDescs))
+	}
+}
+
 func TestResolveCmpdParametersDefsRejectsDuplicateFiles(t *testing.T) {
 	scheme := runtime.NewScheme()
 	_ = appsv1.AddToScheme(scheme)
@@ -437,6 +493,71 @@ func TestResolveCmpdParametersDefsFallbacksToParamConfigRenderer(t *testing.T) {
 	}
 	if configDescs[0].TemplateName != "mysql-config" {
 		t.Fatalf("ResolveCmpdParametersDefs() templateName = %q, want %q", configDescs[0].TemplateName, "mysql-config")
+	}
+}
+
+func TestResolveCmpdParametersDefsParamConfigRendererDefaultsToLatestServiceVersion(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = appsv1.AddToScheme(scheme)
+	_ = parametersv1alpha1.AddToScheme(scheme)
+
+	newCompDef := func(name, serviceVersion string) *appsv1.ComponentDefinition {
+		return &appsv1.ComponentDefinition{
+			ObjectMeta: metav1.ObjectMeta{Name: name},
+			Spec: appsv1.ComponentDefinitionSpec{
+				ServiceVersion: serviceVersion,
+				Configs: []appsv1.ComponentFileTemplate{{
+					Name:     "mysql-config",
+					Template: "mysql-config",
+				}},
+			},
+			Status: appsv1.ComponentDefinitionStatus{Phase: appsv1.AvailablePhase},
+		}
+	}
+	oldCmpd := newCompDef("mysql-8.0.30", "8.0.30")
+	latestCmpd := newCompDef("mysql-8.0.31", "8.0.31")
+	pd := &parametersv1alpha1.ParametersDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: "mysql-params"},
+		Spec: parametersv1alpha1.ParametersDefinitionSpec{
+			FileName: "my.cnf",
+		},
+		Status: parametersv1alpha1.ParametersDefinitionStatus{Phase: parametersv1alpha1.PDAvailablePhase},
+	}
+	pcr := &parametersv1alpha1.ParamConfigRenderer{
+		ObjectMeta: metav1.ObjectMeta{Name: "mysql-pcr"},
+		Spec: parametersv1alpha1.ParamConfigRendererSpec{
+			ComponentDef:   "mysql-8",
+			ServiceVersion: "",
+			ParametersDefs: []string{pd.Name},
+			Configs: []parametersv1alpha1.ComponentConfigDescription{{
+				Name:         "my.cnf",
+				TemplateName: "mysql-config",
+				FileFormatConfig: &parametersv1alpha1.FileFormatConfig{
+					Format: parametersv1alpha1.Ini,
+				},
+			}},
+		},
+	}
+
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(oldCmpd, latestCmpd, pd, pcr).Build()
+
+	_, paramsDefs, err := ResolveCmpdParametersDefs(context.Background(), cli, oldCmpd)
+	if err != nil {
+		t.Fatalf("ResolveCmpdParametersDefs(old) error = %v", err)
+	}
+	if len(paramsDefs) != 0 {
+		t.Fatalf("ResolveCmpdParametersDefs(old) paramsDefs len = %d, want 0", len(paramsDefs))
+	}
+
+	configDescs, paramsDefs, err := ResolveCmpdParametersDefs(context.Background(), cli, latestCmpd)
+	if err != nil {
+		t.Fatalf("ResolveCmpdParametersDefs(latest) error = %v", err)
+	}
+	if len(paramsDefs) != 1 {
+		t.Fatalf("ResolveCmpdParametersDefs(latest) paramsDefs len = %d, want 1", len(paramsDefs))
+	}
+	if len(configDescs) != 1 {
+		t.Fatalf("ResolveCmpdParametersDefs(latest) configs len = %d, want 1", len(configDescs))
 	}
 }
 

@@ -26,6 +26,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"text/template"
 
@@ -397,10 +398,15 @@ func (t *componentFileTemplateTransformer) buildConfigTemplates(transCtx *compon
 			return result
 		}
 	)
+	generation, err := strconv.ParseInt(synthesizedComp.Generation, 10, 64)
+	if err != nil {
+		return err
+	}
 	for _, tpl := range synthesizedComp.FileTemplates {
 		if tpl.Config {
 			config := workloads.ConfigTemplate{
 				Name:                  tpl.Name,
+				Generation:            generation,
 				ConfigHash:            configHash(tpl),
 				Restart:               tpl.RestartOnFileChange,
 				Reconfigure:           action(tpl),

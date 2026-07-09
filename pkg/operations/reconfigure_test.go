@@ -314,7 +314,10 @@ parameter: {
 				expectNoRawReconfigureLeak(g, fetched.Status)
 			})).Should(Succeed())
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentParameter), func(g Gomega, cp *parametersv1alpha1.ComponentParameter) {
-				expectNoRawReconfigureLeak(g, cp.Status)
+				g.Expect(cp.Status.ConfigurationItemStatus).ShouldNot(BeEmpty())
+				g.Expect(cp.Status.ConfigurationItemStatus[0].ReconcileDetail).ShouldNot(BeNil())
+				g.Expect(cp.Status.ConfigurationItemStatus[0].ReconcileDetail.ErrMessage).Should(ContainSubstring("password=secret"))
+				g.Expect(cp.Status.ConfigurationItemStatus[0].ReconcileDetail.ErrMessage).Should(ContainSubstring("SELECT * FROM t"))
 				expectNoRawReconfigureLeak(g, cp.ObjectMeta)
 			})).Should(Succeed())
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentParameter), func(g Gomega, cp *parametersv1alpha1.ComponentParameter) {
@@ -343,6 +346,54 @@ parameter: {
 					name: "missing operation uid",
 					mutate: func(status *parametersv1alpha1.ConfigTemplateItemDetailStatus) {
 						status.ReconcileDetail.OperationUID = ""
+					},
+				},
+				{
+					name: "missing config name",
+					mutate: func(status *parametersv1alpha1.ConfigTemplateItemDetailStatus) {
+						status.ReconcileDetail.ConfigName = ""
+					},
+				},
+				{
+					name: "missing target config hash",
+					mutate: func(status *parametersv1alpha1.ConfigTemplateItemDetailStatus) {
+						status.ReconcileDetail.TargetConfigHash = ""
+					},
+				},
+				{
+					name: "missing component parameter generation",
+					mutate: func(status *parametersv1alpha1.ConfigTemplateItemDetailStatus) {
+						status.ReconcileDetail.ComponentParameterGeneration = 0
+					},
+				},
+				{
+					name: "stale operation uid",
+					mutate: func(status *parametersv1alpha1.ConfigTemplateItemDetailStatus) {
+						status.ReconcileDetail.OperationUID = "old-ops-uid"
+					},
+				},
+				{
+					name: "mismatched config name",
+					mutate: func(status *parametersv1alpha1.ConfigTemplateItemDetailStatus) {
+						status.ReconcileDetail.ConfigName = "other-config"
+					},
+				},
+				{
+					name: "stale target config hash",
+					mutate: func(status *parametersv1alpha1.ConfigTemplateItemDetailStatus) {
+						status.ReconcileDetail.TargetConfigHash = "old-target-hash"
+					},
+				},
+				{
+					name: "stale component parameter generation",
+					mutate: func(status *parametersv1alpha1.ConfigTemplateItemDetailStatus) {
+						status.ReconcileDetail.ComponentParameterGeneration = 1
+					},
+				},
+				{
+					name: "missing failure class",
+					mutate: func(status *parametersv1alpha1.ConfigTemplateItemDetailStatus) {
+						status.ReconcileDetail.FailureClass = ""
 					},
 				},
 				{
@@ -731,13 +782,17 @@ func createReconfigureOpsRequest(name, clusterName, key string, value *string) *
 
 func stableReconfigureFailureStatus(cp *parametersv1alpha1.ComponentParameter, ops *opsv1alpha1.OpsRequest, failureClass, reason, rawMessage string) parametersv1alpha1.ConfigTemplateItemDetailStatus {
 	safeMessage := renderSafeReconfigureFailureMessage("mysql-config", reason)
+	storedMessage := safeMessage
+	if rawMessage != "" {
+		storedMessage = rawMessage
+	}
 	return parametersv1alpha1.ConfigTemplateItemDetailStatus{
 		Name:    "mysql-config",
 		Phase:   parametersv1alpha1.CFailedPhase,
-		Message: pointer.String(safeMessage),
+		Message: pointer.String(storedMessage),
 		ReconcileDetail: &parametersv1alpha1.ReconcileDetail{
 			ExecResult:                   "Failed",
-			ErrMessage:                   safeMessage,
+			ErrMessage:                   storedMessage,
 			FailureClass:                 failureClass,
 			Reason:                       reason,
 			OperationUID:                 string(ops.UID),

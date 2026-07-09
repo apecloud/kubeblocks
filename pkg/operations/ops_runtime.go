@@ -235,10 +235,14 @@ func (r *opsRuntime) doSwitchover(ctx context.Context, cli client.Reader, synthe
 		return intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" not found`, switchover.InstanceName))
 	}
 	if switchover.CandidateName != "" {
-		if _, err := r.GetInstance(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name, switchover.CandidateName); err != nil {
-			if !apierrors.IsNotFound(err) {
-				return err
+		candidateFound := false
+		for _, p := range pods {
+			if p.Name == switchover.CandidateName {
+				candidateFound = true
+				break
 			}
+		}
+		if !candidateFound {
 			return intctrlutil.NewFatalError(fmt.Sprintf(`candidate instance "%s" not found`, switchover.CandidateName))
 		}
 	}

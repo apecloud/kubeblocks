@@ -381,7 +381,7 @@ var _ = Describe("", func() {
 			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsFailedPhase))
 		})
 
-		It("accepts switchover candidate when GetInstance returns a retained PVC instance", func() {
+		It("fails switchover OpsRequest when candidate only has retained PVC", func() {
 			By("create a retained candidate PVC without a candidate Pod")
 			ops := testops.NewOpsRequestObj("ops-switchover-"+testCtx.GetRandomStr(), testCtx.DefaultNamespace,
 				clusterObj.Name, opsv1alpha1.SwitchoverType)
@@ -405,6 +405,11 @@ var _ = Describe("", func() {
 			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
+
+			By("do switchover action and expect terminal failure")
+			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsFailedPhase))
 		})
 
 		It("accepts a real candidate pod with a temporarily empty role label in precheck", func() {
@@ -557,7 +562,7 @@ var _ = Describe("", func() {
 			expectProcessingCandidateFailure(key, fmt.Sprintf(`candidate instance "%s" not found`, candidateName))
 		})
 
-		It("keeps Processing switchover when GetInstance returns a retained PVC candidate", func() {
+		It("fails Processing switchover when candidate only has retained PVC", func() {
 			key, candidateName := startProcessingSwitchoverWithCandidate()
 			By("leave only a retained candidate PVC after the switchover action starts")
 			waitForCandidatePodGone(candidateName)
@@ -565,10 +570,7 @@ var _ = Describe("", func() {
 				clusterObj.Name, defaultCompName, testapps.DataVolumeName).
 				SetStorage("1Gi").
 				Create(&testCtx)
-			expectProcessingCandidateWaiting(key,
-				fmt.Sprintf("waiting for candidate pod %s role change", candidateName),
-				`current role ""`,
-				`expected role "`)
+			expectProcessingCandidateFailure(key, fmt.Sprintf(`candidate instance "%s" not found`, candidateName))
 		})
 
 		It("keeps Processing switchover when candidate temporarily loses role label", func() {

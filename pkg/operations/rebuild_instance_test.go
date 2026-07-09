@@ -203,6 +203,41 @@ var _ = Describe("OpsUtil functions", func() {
 			Expect(opsRes.OpsRequest.Status.Conditions[0].Message).Should(ContainSubstring(fmt.Sprintf(`instance "%s" not found`, missingName)))
 		})
 
+		It("fails in-place rebuild OpsRequest when the target has retained PVCs but no pod", func() {
+			By("init operations resources")
+			opsRes := prepareOpsRes("", true)
+			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
+
+			By("fake component phase to Failed so the phase gate passes")
+			Expect(testapps.ChangeObjStatus(&testCtx, opsRes.Cluster, func() {
+				compStatus := opsRes.Cluster.Status.Components[defaultCompName]
+				compStatus.Phase = appsv1.FailedComponentPhase
+				opsRes.Cluster.Status.Components[defaultCompName] = compStatus
+			})).Should(Succeed())
+
+			By("delete the target pod while retaining its source PVC")
+			targetName := opsRes.OpsRequest.Spec.RebuildFrom[0].Instances[0].Name
+			targetPod := &corev1.Pod{}
+			Expect(k8sClient.Get(ctx, client.ObjectKey{Name: targetName, Namespace: testCtx.DefaultNamespace}, targetPod)).Should(Succeed())
+			Expect(k8sClient.Delete(ctx, targetPod)).Should(Succeed())
+			retainedPVC := &corev1.PersistentVolumeClaim{}
+			Expect(k8sClient.Get(ctx, client.ObjectKey{Name: fmt.Sprintf("%s-%s", testapps.DataVolumeName, targetName), Namespace: testCtx.DefaultNamespace}, retainedPVC)).Should(Succeed())
+
+			By("expect terminal failure before creating rebuild execution resources")
+			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsCreatingPhase
+			_, _ = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(opsv1alpha1.OpsFailedPhase))
+			Expect(opsRes.OpsRequest.Status.Conditions[0].Message).Should(ContainSubstring(fmt.Sprintf(`instance "%s" has retained PVCs but no Pod`, targetName)))
+
+			matchingLabels := client.MatchingLabels{
+				constant.OpsRequestNameLabelKey:      opsRes.OpsRequest.Name,
+				constant.OpsRequestNamespaceLabelKey: opsRes.OpsRequest.Namespace,
+			}
+			Eventually(testapps.List(&testCtx, generics.PodSignature, matchingLabels, client.InNamespace(opsRes.OpsRequest.Namespace))).Should(HaveLen(0))
+			Eventually(testapps.List(&testCtx, generics.RestoreSignature, matchingLabels, client.InNamespace(opsRes.OpsRequest.Namespace))).Should(HaveLen(0))
+			Eventually(testapps.List(&testCtx, generics.PersistentVolumeClaimSignature, matchingLabels, client.InNamespace(opsRes.OpsRequest.Namespace))).Should(HaveLen(0))
+		})
+
 		It("test rebuild instance when cluster/component are mismatched", func() {
 			By("init operations resources ")
 			opsRes := prepareOpsRes("", true)

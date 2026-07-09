@@ -108,6 +108,9 @@ func (r rebuildInstanceOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli cli
 				}
 				return err
 			}
+			if v.InPlace && !targetInstance.HasPod() {
+				return intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" has retained PVCs but no Pod; in-place rebuild requires an existing Pod`, ins.Name))
+			}
 			synthesizedComp, err = r.buildSynthesizedComponent(reqCtx.Ctx, cli, opsRes.Cluster, targetInstance.GetComponentName())
 			if err != nil {
 				return err

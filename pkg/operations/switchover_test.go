@@ -274,6 +274,45 @@ var _ = Describe("", func() {
 			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsFailedPhase))
 		})
 
+		It("fails switchover OpsRequest when source instance disappears before action execution", func() {
+			By("create switchover opsRequest with a valid source instance")
+			ops := testops.NewOpsRequestObj("ops-switchover-"+testCtx.GetRandomStr(), testCtx.DefaultNamespace,
+				clusterObj.Name, opsv1alpha1.SwitchoverType)
+			instanceName := fmt.Sprintf("%s-%s-%d", clusterObj.Name, defaultCompName, 1)
+			ops.Spec.SwitchoverList = []opsv1alpha1.Switchover{
+				{
+					ComponentName: defaultCompName,
+					InstanceName:  instanceName,
+				},
+			}
+			opsRes.OpsRequest = testops.CreateOpsRequest(ctx, testCtx, ops)
+			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsPendingPhase
+			key := client.ObjectKeyFromObject(opsRes.OpsRequest)
+
+			By("run precheck while the source pod still exists")
+			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testops.GetOpsRequestPhase(&testCtx, key)).Should(Equal(opsv1alpha1.OpsCreatingPhase))
+
+			By("delete the source Pod before the lifecycle action is invoked")
+			sourcePod := &corev1.Pod{}
+			Expect(k8sClient.Get(ctx, client.ObjectKey{Namespace: testCtx.DefaultNamespace, Name: instanceName}, sourcePod)).Should(Succeed())
+			Expect(k8sClient.Delete(ctx, sourcePod)).Should(Succeed())
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, client.ObjectKey{Namespace: testCtx.DefaultNamespace, Name: instanceName}, &corev1.Pod{})
+				return apierrors.IsNotFound(err)
+			}).Should(BeTrue())
+
+			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).Times(0)
+			})
+
+			By("do switchover action and expect terminal failure without calling the addon")
+			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testops.GetOpsRequestPhase(&testCtx, key)).Should(Equal(opsv1alpha1.OpsFailedPhase))
+		})
+
 		It("fails switchover OpsRequest when candidate instance does not exist", func() {
 			By("create switchover opsRequest with a missing candidate")
 			ops := testops.NewOpsRequestObj("ops-switchover-"+testCtx.GetRandomStr(), testCtx.DefaultNamespace,
@@ -390,6 +429,21 @@ var _ = Describe("", func() {
 			}).Should(Succeed())
 		}
 
+		expectProcessingCandidateWaiting := func(key client.ObjectKey, expectedMessage string) {
+			By("reconcile Processing status and expect it to keep waiting")
+			_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(func(g Gomega) {
+				fetched := &opsv1alpha1.OpsRequest{}
+				g.Expect(k8sClient.Get(ctx, key, fetched)).Should(Succeed())
+				g.Expect(fetched.Status.Phase).ShouldNot(Equal(opsv1alpha1.OpsFailedPhase))
+				progressDetail := findStatusProgressDetail(fetched.Status.Components[defaultCompName].ProgressDetails, getProgressObjectKey(KBSwitchoverKey, defaultCompName))
+				g.Expect(progressDetail).ShouldNot(BeNil())
+				g.Expect(progressDetail.Status).Should(Equal(opsv1alpha1.ProcessingProgressStatus))
+				g.Expect(progressDetail.Message).Should(ContainSubstring(expectedMessage))
+			}).Should(Succeed())
+		}
+
 		waitForCandidatePodGone := func(candidateName string) {
 			candidatePod := &corev1.Pod{}
 			Expect(k8sClient.Get(ctx, client.ObjectKey{Namespace: testCtx.DefaultNamespace, Name: candidateName}, candidatePod)).Should(Succeed())
@@ -418,14 +472,14 @@ var _ = Describe("", func() {
 			expectProcessingCandidateFailure(key, fmt.Sprintf("candidate pod %s cannot perform switchover because it does not have a role label", candidateName))
 		})
 
-		It("fails Processing switchover when candidate loses role label", func() {
+		It("keeps Processing switchover when candidate temporarily loses role label", func() {
 			key, candidateName := startProcessingSwitchoverWithCandidate()
 			By("remove the candidate role label after the switchover action starts")
 			candidatePod := &corev1.Pod{}
 			Expect(k8sClient.Get(ctx, client.ObjectKey{Namespace: testCtx.DefaultNamespace, Name: candidateName}, candidatePod)).Should(Succeed())
 			delete(candidatePod.Labels, constant.RoleLabelKey)
 			Expect(k8sClient.Update(ctx, candidatePod)).Should(Succeed())
-			expectProcessingCandidateFailure(key, fmt.Sprintf("candidate pod %s cannot perform switchover because it does not have a role label", candidateName))
+			expectProcessingCandidateWaiting(key, fmt.Sprintf("waiting for candidate pod %s role label", candidateName))
 		})
 
 		It("Test switchover OpsRequest with sharding component name", func() {

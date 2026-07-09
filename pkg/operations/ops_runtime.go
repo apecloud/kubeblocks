@@ -231,6 +231,9 @@ func (r *opsRuntime) doSwitchover(ctx context.Context, cli client.Reader, synthe
 			break
 		}
 	}
+	if pod.Name == "" {
+		return intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" not found`, switchover.InstanceName))
+	}
 
 	lfa, err := lifecycle.New(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name,
 		synthesizedComp.LifecycleActions.ComponentLifecycleActions, synthesizedComp.TemplateVars, pod, pods)

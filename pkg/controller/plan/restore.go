@@ -60,6 +60,7 @@ type RestoreManager struct {
 	replicas            int32
 	restoreLabels       map[string]string
 	RestoreNamePrefix   string
+	SourceTargetName    string
 }
 
 func NewRestoreManager(ctx context.Context,
@@ -175,6 +176,14 @@ func (r *RestoreManager) BuildPrepareDataRestore(comp *component.SynthesizedComp
 		return nil, nil
 	}
 	sourceTargetName, sourceTarget := backupSourceTargetForRestore(backupObj)
+	if r.SourceTargetName != "" {
+		sourceTargetName = r.SourceTargetName
+		sourceTarget = backupSourceTargetByName(backupObj, r.SourceTargetName)
+		if sourceTarget == nil {
+			return nil, intctrlutil.NewErrorf(intctrlutil.ErrorTypeRestoreFailed,
+				`source target "%s" not found in backup "%s"`, r.SourceTargetName, backupObj.Name)
+		}
+	}
 	restore := &dpv1alpha1.Restore{
 		ObjectMeta: r.GetRestoreObjectMeta(comp, dpv1alpha1.PrepareData, templateName),
 		Spec: dpv1alpha1.RestoreSpec{
@@ -292,6 +301,24 @@ func backupSourceTargetForRestore(backupObj *dpv1alpha1.Backup) (string, *dpv1al
 		return backupObj.Status.Targets[0].Name, &backupObj.Status.Targets[0]
 	}
 	return "", nil
+}
+
+func backupSourceTargetByName(backupObj *dpv1alpha1.Backup, sourceTargetName string) *dpv1alpha1.BackupStatusTarget {
+	if backupObj == nil || sourceTargetName == "" {
+		return nil
+	}
+	if backupObj.Status.Target != nil {
+		if backupObj.Status.Target.Name == sourceTargetName {
+			return backupObj.Status.Target
+		}
+		return nil
+	}
+	for i := range backupObj.Status.Targets {
+		if backupObj.Status.Targets[i].Name == sourceTargetName {
+			return &backupObj.Status.Targets[i]
+		}
+	}
+	return nil
 }
 
 func (r *RestoreManager) buildRequiredPolicy(sourceTarget *dpv1alpha1.BackupStatusTarget) *dpv1alpha1.RequiredPolicyForAllPodSelection {

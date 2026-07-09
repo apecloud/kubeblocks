@@ -278,18 +278,37 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 						Volumes: []string{"data"},
 					},
 				}
+				backup.Status.Targets = []dpv1alpha1.BackupStatusTarget{
+					{BackupTarget: dpv1alpha1.BackupTarget{
+						Name:        "target-a",
+						PodSelector: &dpv1alpha1.PodSelector{},
+					}},
+					{BackupTarget: dpv1alpha1.BackupTarget{
+						Name:        "target-b",
+						PodSelector: &dpv1alpha1.PodSelector{},
+					}},
+				}
 			})).Should(Succeed())
 
 			By("scale out replicas from a full backup")
 			horizontalScaling := opsv1alpha1.HorizontalScaling{ScaleOut: &opsv1alpha1.ScaleOut{
 				FromBackup: &opsv1alpha1.FromBackup{
-					Name: backupName,
+					Name:             backupName,
+					SourceTargetName: "target-b",
 				},
 			}}
 
 			horizontalScaling.ScaleOut.ReplicaChanges = pointer.Int32(2)
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx, Recorder: eventRecorder}
 			opsRes, _ := commonHScaleConsensusCompTest(reqCtx, nil, horizontalScaling, false, true)
+			restoreList := &dpv1alpha1.RestoreList{}
+			Expect(k8sClient.List(ctx, restoreList, client.MatchingLabels{
+				constant.OpsRequestNameLabelKey: opsRes.OpsRequest.Name,
+			}, client.InNamespace(opsRes.OpsRequest.Namespace))).Should(Succeed())
+			Expect(restoreList.Items).Should(HaveLen(2))
+			for i := range restoreList.Items {
+				Expect(restoreList.Items[i].Spec.Backup.SourceTargetName).Should(Equal("target-b"))
+			}
 
 			By("mock restore phase to completed")
 			comp, compDef, err := component.GetCompNCompDefByName(reqCtx.Ctx, k8sClient, opsRes.Cluster.Namespace, constant.GenerateClusterComponentName(opsRes.Cluster.Name, defaultCompName))
@@ -321,6 +340,35 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			createPods("", 3, 4)
 			testapps.MockInstanceSetStatus(testCtx, opsRes.Cluster, defaultCompName)
 			checkOpsRequestPhaseIsSucceed(reqCtx, opsRes)
+		})
+
+		It("fails scale-out from a multi-target backup without source target name", func() {
+			backup := &dpv1alpha1.Backup{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testCtx.DefaultNamespace,
+					Name:      "multi-target-backup-" + randomStr,
+				},
+				Status: dpv1alpha1.BackupStatus{
+					Targets: []dpv1alpha1.BackupStatusTarget{
+						{BackupTarget: dpv1alpha1.BackupTarget{Name: "target-a"}},
+						{BackupTarget: dpv1alpha1.BackupTarget{Name: "target-b"}},
+					},
+				},
+			}
+			restoreMGR := plan.NewRestoreManager(ctx, k8sClient, &appsv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{Name: clusterName, Namespace: testCtx.DefaultNamespace},
+			}, model.GetScheme(), nil, 1, 0)
+			err := horizontalScalingOpsHandler{}.createRestore(
+				intctrlutil.RequestCtx{Ctx: ctx},
+				k8sClient,
+				&OpsResource{OpsRequest: &opsv1alpha1.OpsRequest{}},
+				nil,
+				restoreMGR,
+				&appsv1.ClusterComponentSpec{},
+				backup,
+				"")
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring("requires sourceTargetName"))
 		})
 
 		It("test to scale in replicas with `scaleIn`", func() {

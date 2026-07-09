@@ -42,6 +42,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/plan"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	dputils "github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
 )
 
 type horizontalScalingOpsHandler struct{}
@@ -212,6 +213,7 @@ func (hs horizontalScalingOpsHandler) createRestore(reqCtx intctrlutil.RequestCt
 	restoreMGR *plan.RestoreManager,
 	compSpecDeepyCopy *appsv1.ClusterComponentSpec,
 	backupObj *dpv1alpha1.Backup,
+	restoreEnv []corev1.EnvVar,
 	templateName string) error {
 	getTemplate := func(templateName string) *appsv1.InstanceTemplate {
 		if templateName == "" {
@@ -228,6 +230,10 @@ func (hs horizontalScalingOpsHandler) createRestore(reqCtx intctrlutil.RequestCt
 		// TODO: support explicit source target selection for scale-out restore from multi-target backups.
 		return intctrlutil.NewFatalError(fmt.Sprintf("scale-out from backup %s/%s is not supported because it has multiple source targets", backupObj.Namespace, backupObj.Name))
 	}
+	if backupObj.Status.BackupMethod == nil {
+		return intctrlutil.NewFatalError(fmt.Sprintf(`scale-out from backup %s/%s is not supported because status.backupMethod is empty`,
+			backupObj.Namespace, backupObj.Name))
+	}
 	// create restore
 	restore, err := restoreMGR.BuildPrepareDataRestore(synthesizedComponent, backupObj, getTemplate(templateName))
 	if err != nil {
@@ -237,6 +243,7 @@ func (hs horizontalScalingOpsHandler) createRestore(reqCtx intctrlutil.RequestCt
 		return intctrlutil.NewFatalError(fmt.Sprintf("scale-out from backup %s/%s is not supported because backup method %q has no target volumes matching component %q",
 			backupObj.Namespace, backupObj.Name, backupObj.Status.BackupMethod.Name, synthesizedComponent.Name))
 	}
+	restore.Spec.Env = dputils.MergeEnv(restore.Spec.Env, restoreEnv)
 	scheme, _ := opsv1alpha1.SchemeBuilder.Build()
 	if err := intctrlutil.SetOwnership(opsRes.OpsRequest, restore, scheme, ""); err != nil {
 		return err
@@ -305,7 +312,7 @@ func (hs horizontalScalingOpsHandler) restoreDataFromBackup(reqCtx intctrlutil.R
 		if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Namespace: opsRes.Cluster.Namespace, Name: restoreMeta.Name}, restore); err != nil {
 			if apierrors.IsNotFound(err) {
 				allRestoreCompleted = false
-				if err = hs.createRestore(reqCtx, cli, opsRes, synthesizedComponent, restoreMGR, compSpecDeepyCopy, backupObj, templateName); err != nil {
+				if err = hs.createRestore(reqCtx, cli, opsRes, synthesizedComponent, restoreMGR, compSpecDeepyCopy, backupObj, fromBackup.RestoreEnv, templateName); err != nil {
 					return err
 				}
 				continue

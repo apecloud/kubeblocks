@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -1008,10 +1009,12 @@ func TestHorizontalScalingCreateRestoreReturnsFatalWhenNoRestoreBuilt(t *testing
 	testCases := []struct {
 		name         string
 		backupMethod *dpv1alpha1.BackupMethod
+		expectError  string
 	}{{
 		// logical backups (e.g. TiDB BR) have no targetVolumes at all
 		name:         "backup method without target volumes",
 		backupMethod: &dpv1alpha1.BackupMethod{Name: "br"},
+		expectError:  "has no target volumes matching component",
 	}, {
 		// targetVolumes exist but none match the component's volume claim templates
 		name: "backup method target volumes match no component volume",
@@ -1021,6 +1024,10 @@ func TestHorizontalScalingCreateRestoreReturnsFatalWhenNoRestoreBuilt(t *testing
 				Volumes: []string{"other-data"},
 			},
 		},
+		expectError: "has no target volumes matching component",
+	}, {
+		name:        "backup method missing from backup status",
+		expectError: "status.backupMethod is empty",
 	}}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -1080,14 +1087,14 @@ func TestHorizontalScalingCreateRestoreReturnsFatalWhenNoRestoreBuilt(t *testing
 			}, 1, 3)
 
 			err := horizontalScalingOpsHandler{}.createRestore(intctrlutil.RequestCtx{Ctx: ctx}, cli, opsRes,
-				synthesizedComponent, restoreMGR, &appsv1.ClusterComponentSpec{Name: "tikv"}, backup, "")
+				synthesizedComponent, restoreMGR, &appsv1.ClusterComponentSpec{Name: "tikv"}, backup, nil, "")
 			if err == nil {
 				t.Fatal("expected fatal error when backup method cannot build prepareData restore")
 			}
 			if !intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal) {
 				t.Fatalf("expected fatal error, got %T: %v", err, err)
 			}
-			if !strings.Contains(err.Error(), "has no target volumes matching component") {
+			if !strings.Contains(err.Error(), tc.expectError) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
@@ -1099,5 +1106,85 @@ func TestHorizontalScalingCreateRestoreReturnsFatalWhenNoRestoreBuilt(t *testing
 				t.Fatalf("expected no restore to be created, got %d", len(restoreList.Items))
 			}
 		})
+	}
+}
+
+func TestHorizontalScalingCreateRestorePropagatesRestoreEnv(t *testing.T) {
+	ctx := context.Background()
+	scheme := runtime.NewScheme()
+	for _, addToScheme := range []func(*runtime.Scheme) error{
+		corev1.AddToScheme,
+		appsv1.AddToScheme,
+		dpv1alpha1.AddToScheme,
+		opsv1alpha1.AddToScheme,
+	} {
+		if err := addToScheme(scheme); err != nil {
+			t.Fatalf("add scheme: %v", err)
+		}
+	}
+
+	cluster := &appsv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "mysql",
+			Namespace: "default",
+			UID:       types.UID("cluster1"),
+		},
+	}
+	opsRequest := &opsv1alpha1.OpsRequest{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "scale-out-from-backup",
+			Namespace: "default",
+			UID:       types.UID("opsreq1"),
+		},
+	}
+	backup := &dpv1alpha1.Backup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "xtrabackup-full",
+			Namespace: "default",
+		},
+		Status: dpv1alpha1.BackupStatus{
+			Phase: dpv1alpha1.BackupPhaseCompleted,
+			BackupMethod: &dpv1alpha1.BackupMethod{
+				Name: "xtrabackup",
+				TargetVolumes: &dpv1alpha1.TargetVolumeInfo{
+					Volumes: []string{"data"},
+				},
+			},
+		},
+	}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, opsRequest, backup).Build()
+	opsRes := &OpsResource{
+		Cluster:    cluster,
+		OpsRequest: opsRequest,
+	}
+	synthesizedComponent := &component.SynthesizedComponent{
+		Name: "mysql",
+		VolumeClaimTemplates: []corev1.PersistentVolumeClaimTemplate{{
+			ObjectMeta: metav1.ObjectMeta{Name: "data"},
+			Spec: corev1.PersistentVolumeClaimSpec{
+				AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+			},
+		}},
+	}
+	restoreMGR := plan.NewRestoreManager(ctx, cli, cluster, scheme, map[string]string{
+		constant.OpsRequestNameLabelKey: opsRequest.Name,
+	}, 1, 3)
+	restoreEnv := []corev1.EnvVar{{Name: "RESTORE_ENV", Value: "true"}}
+
+	err := horizontalScalingOpsHandler{}.createRestore(intctrlutil.RequestCtx{Ctx: ctx, Recorder: record.NewFakeRecorder(1)}, cli, opsRes,
+		synthesizedComponent, restoreMGR, &appsv1.ClusterComponentSpec{Name: "mysql"}, backup, restoreEnv, "")
+	if err != nil {
+		t.Fatalf("create restore: %v", err)
+	}
+
+	restoreList := &dpv1alpha1.RestoreList{}
+	if err := cli.List(ctx, restoreList, client.InNamespace("default")); err != nil {
+		t.Fatalf("list restores: %v", err)
+	}
+	if len(restoreList.Items) != 1 {
+		t.Fatalf("expected one restore to be created, got %d", len(restoreList.Items))
+	}
+	if len(restoreList.Items[0].Spec.Env) != 1 || restoreList.Items[0].Spec.Env[0] != restoreEnv[0] {
+		t.Fatalf("expected restore env %v, got %v", restoreEnv, restoreList.Items[0].Spec.Env)
 	}
 }

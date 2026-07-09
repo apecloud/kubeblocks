@@ -134,7 +134,7 @@ func switchoverPreCheck(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes
 		}
 		roleName := instance.GetRole()
 		if roleName == "" {
-			return intctrlutil.NewFatalError(fmt.Sprintf("pod %s cannot perform switchover because it does not have a role label", switchover.InstanceName))
+			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeNeedWaiting, "waiting for instance %s role label", switchover.InstanceName)
 		}
 
 		if switchover.CandidateName != "" {
@@ -246,12 +246,12 @@ func handleSwitchover(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *
 			case err != nil:
 				progressDetail.Message = fmt.Sprintf(`component %s candidate instance "%s" not found`, compName, switchover.CandidateName)
 				progressDetail.Status = opsv1alpha1.FailedProgressStatus
-			case candidateInstance.GetRole() == "":
-				progressDetail.Message = fmt.Sprintf("component %s is waiting for candidate pod %s role label", compName, switchover.CandidateName)
 			case targetRole == candidateInstance.GetRole():
 				progressDetail.Message = "do switchover succeed"
 				progressDetail.Status = opsv1alpha1.SucceedProgressStatus
-				// default: candidate role hasn't converged to target; stay Processing
+			default:
+				progressDetail.Message = fmt.Sprintf("component %s is waiting for candidate pod %s role change, current role %q, expected role %q",
+					compName, switchover.CandidateName, candidateInstance.GetRole(), targetRole)
 			}
 		} else {
 			progressDetail.Message = "do switchover succeed"

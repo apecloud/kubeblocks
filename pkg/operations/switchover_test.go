@@ -433,6 +433,38 @@ var _ = Describe("", func() {
 			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
 		})
 
+		It("keeps switchover OpsRequest creating when source instance temporarily has no role label", func() {
+			By("create switchover opsRequest with a roleless source instance")
+			ops := testops.NewOpsRequestObj("ops-switchover-"+testCtx.GetRandomStr(), testCtx.DefaultNamespace,
+				clusterObj.Name, opsv1alpha1.SwitchoverType)
+			instanceName := fmt.Sprintf("%s-%s-%d", clusterObj.Name, defaultCompName, 1)
+			candidateName := fmt.Sprintf("%s-%s-%d", clusterObj.Name, defaultCompName, 0)
+			sourcePod := &corev1.Pod{}
+			Expect(k8sClient.Get(ctx, client.ObjectKey{Namespace: testCtx.DefaultNamespace, Name: instanceName}, sourcePod)).Should(Succeed())
+			delete(sourcePod.Labels, constant.RoleLabelKey)
+			Expect(k8sClient.Update(ctx, sourcePod)).Should(Succeed())
+			ops.Spec.SwitchoverList = []opsv1alpha1.Switchover{
+				{
+					ComponentName: defaultCompName,
+					InstanceName:  instanceName,
+					CandidateName: candidateName,
+				},
+			}
+			opsRes.OpsRequest = testops.CreateOpsRequest(ctx, testCtx, ops)
+			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsPendingPhase
+			key := client.ObjectKeyFromObject(opsRes.OpsRequest)
+
+			By("move the OpsRequest to Creating")
+			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testops.GetOpsRequestPhase(&testCtx, key)).Should(Equal(opsv1alpha1.OpsCreatingPhase))
+
+			By("run switchover precheck and expect waiting instead of terminal failure")
+			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Consistently(testops.GetOpsRequestPhase(&testCtx, key)).Should(Equal(opsv1alpha1.OpsCreatingPhase))
+		})
+
 		startProcessingSwitchoverWithCandidate := func() (client.ObjectKey, string) {
 			By("create a valid switchover OpsRequest with a candidate")
 			ops := testops.NewOpsRequestObj("ops-switchover-"+testCtx.GetRandomStr(), testCtx.DefaultNamespace,
@@ -491,7 +523,7 @@ var _ = Describe("", func() {
 			}).Should(Succeed())
 		}
 
-		expectProcessingCandidateWaiting := func(key client.ObjectKey, expectedMessage string) {
+		expectProcessingCandidateWaiting := func(key client.ObjectKey, expectedMessages ...string) {
 			By("reconcile Processing status and expect it to keep waiting")
 			_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
@@ -502,7 +534,9 @@ var _ = Describe("", func() {
 				progressDetail := findStatusProgressDetail(fetched.Status.Components[defaultCompName].ProgressDetails, getProgressObjectKey(KBSwitchoverKey, defaultCompName))
 				g.Expect(progressDetail).ShouldNot(BeNil())
 				g.Expect(progressDetail.Status).Should(Equal(opsv1alpha1.ProcessingProgressStatus))
-				g.Expect(progressDetail.Message).Should(ContainSubstring(expectedMessage))
+				for _, expectedMessage := range expectedMessages {
+					g.Expect(progressDetail.Message).Should(ContainSubstring(expectedMessage))
+				}
 			}).Should(Succeed())
 		}
 
@@ -531,7 +565,10 @@ var _ = Describe("", func() {
 				clusterObj.Name, defaultCompName, testapps.DataVolumeName).
 				SetStorage("1Gi").
 				Create(&testCtx)
-			expectProcessingCandidateWaiting(key, fmt.Sprintf("waiting for candidate pod %s role label", candidateName))
+			expectProcessingCandidateWaiting(key,
+				fmt.Sprintf("waiting for candidate pod %s role change", candidateName),
+				`current role ""`,
+				`expected role "`)
 		})
 
 		It("keeps Processing switchover when candidate temporarily loses role label", func() {
@@ -541,7 +578,10 @@ var _ = Describe("", func() {
 			Expect(k8sClient.Get(ctx, client.ObjectKey{Namespace: testCtx.DefaultNamespace, Name: candidateName}, candidatePod)).Should(Succeed())
 			delete(candidatePod.Labels, constant.RoleLabelKey)
 			Expect(k8sClient.Update(ctx, candidatePod)).Should(Succeed())
-			expectProcessingCandidateWaiting(key, fmt.Sprintf("waiting for candidate pod %s role label", candidateName))
+			expectProcessingCandidateWaiting(key,
+				fmt.Sprintf("waiting for candidate pod %s role change", candidateName),
+				`current role ""`,
+				`expected role "`)
 		})
 
 		It("Test switchover OpsRequest with sharding component name", func() {

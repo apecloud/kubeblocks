@@ -313,6 +313,47 @@ var _ = Describe("", func() {
 			Eventually(testops.GetOpsRequestPhase(&testCtx, key)).Should(Equal(opsv1alpha1.OpsFailedPhase))
 		})
 
+		It("fails switchover OpsRequest when candidate disappears before action execution", func() {
+			By("create switchover opsRequest with a valid source and candidate")
+			ops := testops.NewOpsRequestObj("ops-switchover-"+testCtx.GetRandomStr(), testCtx.DefaultNamespace,
+				clusterObj.Name, opsv1alpha1.SwitchoverType)
+			instanceName := fmt.Sprintf("%s-%s-%d", clusterObj.Name, defaultCompName, 1)
+			candidateName := fmt.Sprintf("%s-%s-%d", clusterObj.Name, defaultCompName, 0)
+			ops.Spec.SwitchoverList = []opsv1alpha1.Switchover{
+				{
+					ComponentName: defaultCompName,
+					InstanceName:  instanceName,
+					CandidateName: candidateName,
+				},
+			}
+			opsRes.OpsRequest = testops.CreateOpsRequest(ctx, testCtx, ops)
+			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsPendingPhase
+			key := client.ObjectKeyFromObject(opsRes.OpsRequest)
+
+			By("run precheck while the candidate pod still exists")
+			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testops.GetOpsRequestPhase(&testCtx, key)).Should(Equal(opsv1alpha1.OpsCreatingPhase))
+
+			By("delete the candidate Pod before the lifecycle action is invoked")
+			candidatePod := &corev1.Pod{}
+			Expect(k8sClient.Get(ctx, client.ObjectKey{Namespace: testCtx.DefaultNamespace, Name: candidateName}, candidatePod)).Should(Succeed())
+			Expect(k8sClient.Delete(ctx, candidatePod)).Should(Succeed())
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, client.ObjectKey{Namespace: testCtx.DefaultNamespace, Name: candidateName}, &corev1.Pod{})
+				return apierrors.IsNotFound(err)
+			}).Should(BeTrue())
+
+			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).Times(0)
+			})
+
+			By("do switchover action and expect terminal failure without calling the addon")
+			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testops.GetOpsRequestPhase(&testCtx, key)).Should(Equal(opsv1alpha1.OpsFailedPhase))
+		})
+
 		It("fails switchover OpsRequest when candidate instance does not exist", func() {
 			By("create switchover opsRequest with a missing candidate")
 			ops := testops.NewOpsRequestObj("ops-switchover-"+testCtx.GetRandomStr(), testCtx.DefaultNamespace,
@@ -369,6 +410,32 @@ var _ = Describe("", func() {
 			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsFailedPhase))
+		})
+
+		It("accepts a real candidate pod with a temporarily empty role label in precheck", func() {
+			By("create switchover opsRequest with a roleless real candidate pod")
+			ops := testops.NewOpsRequestObj("ops-switchover-"+testCtx.GetRandomStr(), testCtx.DefaultNamespace,
+				clusterObj.Name, opsv1alpha1.SwitchoverType)
+			instanceName := fmt.Sprintf("%s-%s-%d", clusterObj.Name, defaultCompName, 1)
+			candidateName := fmt.Sprintf("%s-%s-%d", clusterObj.Name, defaultCompName, 0)
+			candidatePod := &corev1.Pod{}
+			Expect(k8sClient.Get(ctx, client.ObjectKey{Namespace: testCtx.DefaultNamespace, Name: candidateName}, candidatePod)).Should(Succeed())
+			delete(candidatePod.Labels, constant.RoleLabelKey)
+			Expect(k8sClient.Update(ctx, candidatePod)).Should(Succeed())
+			ops.Spec.SwitchoverList = []opsv1alpha1.Switchover{
+				{
+					ComponentName: defaultCompName,
+					InstanceName:  instanceName,
+					CandidateName: candidateName,
+				},
+			}
+			opsRes.OpsRequest = testops.CreateOpsRequest(ctx, testCtx, ops)
+			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsPendingPhase
+
+			By("mock switchover OpsRequest phase is Creating")
+			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
 		})
 
 		startProcessingSwitchoverWithCandidate := func() (client.ObjectKey, string) {
@@ -587,6 +654,52 @@ var _ = Describe("", func() {
 			By("do reconcile switchover action")
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
+		})
+
+		It("fails sharding switchover OpsRequest when source instance does not exist", func() {
+			const (
+				shardingName = "shard"
+			)
+
+			By("creating a sharding cluster")
+			shardingCluster := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
+				WithRandomName().
+				AddSharding(shardingName, "", compDefObj.Name).
+				SetShardingReplicas(2).
+				Create(&testCtx).GetObject()
+
+			By("mocking the sharding cluster status as Running")
+			Expect(testapps.ChangeObjStatus(&testCtx, shardingCluster, func() {
+				shardingCluster.Status.Phase = appsv1.RunningClusterPhase
+				shardingCluster.Status.Shardings = map[string]appsv1.ClusterShardingStatus{
+					shardingName: {
+						Phase: appsv1.RunningComponentPhase,
+					},
+				}
+			})).Should(Succeed())
+
+			opsRes.Cluster = shardingCluster
+			ops := testops.NewOpsRequestObj("ops-switchover-"+testCtx.GetRandomStr(), testCtx.DefaultNamespace,
+				shardingCluster.Name, opsv1alpha1.SwitchoverType)
+			instanceName := fmt.Sprintf("%s-%s-%d", shardingCluster.Name, shardingName, 99)
+			ops.Spec.SwitchoverList = []opsv1alpha1.Switchover{
+				{
+					ComponentName: shardingName,
+					InstanceName:  instanceName,
+				},
+			}
+			opsRes.OpsRequest = testops.CreateOpsRequest(ctx, testCtx, ops)
+			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsPendingPhase
+
+			By("mock switchover OpsRequest phase is Creating")
+			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
+
+			By("do switchover action and expect terminal failure")
+			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsFailedPhase))
 		})
 	})
 })

@@ -145,7 +145,7 @@ func switchoverPreCheck(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes
 				}
 				return err
 			}
-			if candidate.GetRole() == "" {
+			if candidate.GetRole() == "" && isPVCOnlyInstance(candidate) {
 				return intctrlutil.NewFatalError(fmt.Sprintf("candidate pod %s cannot perform switchover because it does not have a role label", switchover.CandidateName))
 			}
 		}
@@ -374,6 +374,9 @@ func buildSynthesizedComp(ctx context.Context, cli client.Client, opsRes *OpsRes
 func getShardingComponentObjectNameByInstance(ctx context.Context, cli client.Client, cluster *appsv1.Cluster, shardingName, instanceName string) (string, error) {
 	pod := &corev1.Pod{}
 	if err := cli.Get(ctx, client.ObjectKey{Namespace: cluster.Namespace, Name: instanceName}, pod); err != nil {
+		if apierrors.IsNotFound(err) {
+			return "", intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" not found`, instanceName))
+		}
 		return "", err
 	}
 	if pod.Labels[constant.AppInstanceLabelKey] != cluster.Name {

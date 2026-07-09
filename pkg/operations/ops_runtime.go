@@ -235,14 +235,14 @@ func (r *opsRuntime) doSwitchover(ctx context.Context, cli client.Reader, synthe
 		return intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" not found`, switchover.InstanceName))
 	}
 	if switchover.CandidateName != "" {
-		candidateFound := false
-		for _, p := range pods {
-			if p.Name == switchover.CandidateName {
-				candidateFound = true
-				break
+		candidate, err := r.GetInstance(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name, switchover.CandidateName)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return intctrlutil.NewFatalError(fmt.Sprintf(`candidate instance "%s" not found`, switchover.CandidateName))
 			}
+			return err
 		}
-		if !candidateFound {
+		if !candidate.HasPod() {
 			return intctrlutil.NewFatalError(fmt.Sprintf(`candidate instance "%s" not found`, switchover.CandidateName))
 		}
 	}
@@ -391,6 +391,10 @@ func (i *defaultInstance) GetCreationTimestamp() metav1.Time {
 		return metav1.Time{}
 	}
 	return i.pod.CreationTimestamp
+}
+
+func (i *defaultInstance) HasPod() bool {
+	return i.pod != nil
 }
 
 func (i *defaultInstance) IsDeleting() bool {

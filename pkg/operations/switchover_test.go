@@ -465,8 +465,10 @@ var _ = Describe("", func() {
 			Eventually(testops.GetOpsRequestPhase(&testCtx, key)).Should(Equal(opsv1alpha1.OpsCreatingPhase))
 
 			By("run switchover precheck and expect waiting instead of terminal failure")
-			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			result, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
+			Expect(result).ShouldNot(BeNil())
+			Expect(result.RequeueAfter).Should(BeNumerically(">", 0))
 			Consistently(testops.GetOpsRequestPhase(&testCtx, key)).Should(Equal(opsv1alpha1.OpsCreatingPhase))
 		})
 

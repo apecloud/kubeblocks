@@ -145,7 +145,7 @@ func switchoverPreCheck(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes
 				}
 				return err
 			}
-			if candidate.GetRole() == "" && isPVCOnlyInstance(candidate) {
+			if candidate.GetRole() == "" && hasRetainedPVCWithoutPod(candidate) {
 				return intctrlutil.NewFatalError(fmt.Sprintf("candidate pod %s cannot perform switchover because it does not have a role label", switchover.CandidateName))
 			}
 		}
@@ -250,7 +250,7 @@ func handleSwitchover(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *
 				progressDetail.Message = fmt.Sprintf(`component %s candidate instance "%s" not found`, compName, switchover.CandidateName)
 				progressDetail.Status = opsv1alpha1.FailedProgressStatus
 			case candidateInstance.GetRole() == "":
-				if isPVCOnlyInstance(candidateInstance) {
+				if hasRetainedPVCWithoutPod(candidateInstance) {
 					progressDetail.Message = fmt.Sprintf("component %s candidate pod %s cannot perform switchover because it does not have a role label", compName, switchover.CandidateName)
 					progressDetail.Status = opsv1alpha1.FailedProgressStatus
 				} else {
@@ -270,7 +270,9 @@ func handleSwitchover(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *
 	return nil
 }
 
-func isPVCOnlyInstance(instance Instance) bool {
+// GetInstance may return a defaultInstance built from retained PVCs when the named Pod is gone.
+// That is terminal for switchover, unlike a real Pod whose role label is temporarily empty.
+func hasRetainedPVCWithoutPod(instance Instance) bool {
 	podInstance, ok := instance.(*defaultInstance)
 	return ok && podInstance.pod == nil && len(podInstance.volumes) > 0
 }

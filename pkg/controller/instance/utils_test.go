@@ -401,9 +401,15 @@ func TestBuildInstancePodAndPVCs(t *testing.T) {
 	inst := builder.NewInstanceBuilder("default", "mysql-0").
 		SetUID(types.UID("12345678-1234-1234-1234-1234567890ab")).
 		AddAnnotations("instance-annotation", "true").
+		AddLabels("instance-only-label", "true").
 		SetPodTemplate(corev1.PodTemplateSpec{
 			ObjectMeta: metav1.ObjectMeta{
-				Labels:      map[string]string{"template-label": "true"},
+				Labels: map[string]string{
+					"template-label":                   "true",
+					constant.AppInstanceLabelKey:       "cluster",
+					constant.KBAppComponentLabelKey:    "mysql",
+					constant.KBAppInstanceNameLabelKey: "template-instance",
+				},
 				Annotations: map[string]string{"template-annotation": "true"},
 			},
 			Spec: corev1.PodSpec{
@@ -463,11 +469,18 @@ func TestBuildInstancePodAndPVCs(t *testing.T) {
 		t.Fatalf("pvcs = %d, want 1", len(pvcs))
 	}
 	pvc := pvcs[0]
-	if pvc.Labels[constant.KBAppPodNameLabelKey] != "mysql-0" ||
+	if pvc.Labels[constant.KBAppInstanceNameLabelKey] != "mysql-0" ||
+		pvc.Labels[constant.KBAppPodNameLabelKey] != "mysql-0" ||
 		pvc.Labels[constant.VolumeClaimTemplateNameLabelKey] != "data" ||
 		pvc.Labels[constant.KBAppInstanceTemplateLabelKey] != "az-a" ||
+		pvc.Labels[constant.AppInstanceLabelKey] != "cluster" ||
+		pvc.Labels[constant.KBAppComponentLabelKey] != "mysql" ||
+		pvc.Labels["template-label"] != "true" ||
 		pvc.Labels["pvc-label"] != "true" {
 		t.Fatalf("unexpected pvc labels: %#v", pvc.Labels)
+	}
+	if _, ok := pvc.Labels["instance-only-label"]; ok {
+		t.Fatalf("unexpected instance-only label on pvc: %#v", pvc.Labels)
 	}
 	if pvc.Annotations["pvc-annotation"] != "true" {
 		t.Fatalf("unexpected pvc annotations: %#v", pvc.Annotations)

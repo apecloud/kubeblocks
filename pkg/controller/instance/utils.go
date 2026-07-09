@@ -87,6 +87,20 @@ func getMatchLabels(name string) map[string]string {
 	}
 }
 
+func pvcTemplateLabels(labels map[string]string) map[string]string {
+	if len(labels) == 0 {
+		return nil
+	}
+	copied := make(map[string]string, len(labels))
+	for k, v := range labels {
+		copied[k] = v
+	}
+	// PVCs use this label to identify their owning Instance; a pod template
+	// value must not override the PVC's own instance identity.
+	delete(copied, constant.KBAppInstanceNameLabelKey)
+	return copied
+}
+
 // isRoleReady returns true if pod has role label
 func isRoleReady(pod *corev1.Pod, roles []workloads.ReplicaRole) bool {
 	if len(roles) == 0 {
@@ -188,9 +202,10 @@ func buildInstancePVCs(inst *workloads.Instance) ([]*corev1.PersistentVolumeClai
 		pvcName := intctrlutil.ComposePVCName(corev1.PersistentVolumeClaim{ObjectMeta: claimTemplate.ObjectMeta}, inst.Spec.InstanceSetName, inst.Name)
 		pvc := builder.NewPVCBuilder(inst.Namespace, pvcName).
 			AddLabelsInMap(labels).
+			AddLabelsInMap(pvcTemplateLabels(inst.Spec.Template.Labels)).
 			AddLabelsInMap(claimTemplate.Labels).
-			AddLabels(constant.KBAppPodNameLabelKey, inst.Name).
 			AddLabels(constant.VolumeClaimTemplateNameLabelKey, claimTemplate.Name).
+			AddLabels(constant.KBAppPodNameLabelKey, inst.Name).
 			AddAnnotationsInMap(claimTemplate.Annotations).
 			SetSpec(*claimTemplate.Spec.DeepCopy()).
 			GetObject()

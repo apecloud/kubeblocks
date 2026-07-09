@@ -138,15 +138,12 @@ func switchoverPreCheck(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes
 		}
 
 		if switchover.CandidateName != "" {
-			candidate, err := runtime.GetInstance(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name, switchover.CandidateName)
+			_, err := runtime.GetInstance(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name, switchover.CandidateName)
 			if err != nil {
 				if apierrors.IsNotFound(err) {
 					return intctrlutil.NewFatalError(fmt.Sprintf(`candidate instance "%s" not found`, switchover.CandidateName))
 				}
 				return err
-			}
-			if candidate.GetRole() == "" && hasRetainedPVCWithoutPod(candidate) {
-				return intctrlutil.NewFatalError(fmt.Sprintf("candidate pod %s cannot perform switchover because it does not have a role label", switchover.CandidateName))
 			}
 		}
 
@@ -250,12 +247,7 @@ func handleSwitchover(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *
 				progressDetail.Message = fmt.Sprintf(`component %s candidate instance "%s" not found`, compName, switchover.CandidateName)
 				progressDetail.Status = opsv1alpha1.FailedProgressStatus
 			case candidateInstance.GetRole() == "":
-				if hasRetainedPVCWithoutPod(candidateInstance) {
-					progressDetail.Message = fmt.Sprintf("component %s candidate pod %s cannot perform switchover because it does not have a role label", compName, switchover.CandidateName)
-					progressDetail.Status = opsv1alpha1.FailedProgressStatus
-				} else {
-					progressDetail.Message = fmt.Sprintf("component %s is waiting for candidate pod %s role label", compName, switchover.CandidateName)
-				}
+				progressDetail.Message = fmt.Sprintf("component %s is waiting for candidate pod %s role label", compName, switchover.CandidateName)
 			case targetRole == candidateInstance.GetRole():
 				progressDetail.Message = "do switchover succeed"
 				progressDetail.Status = opsv1alpha1.SucceedProgressStatus
@@ -268,13 +260,6 @@ func handleSwitchover(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *
 	}
 	handleProgressDetail(reqCtx, opsRequest, progressDetail, compName, completedCount, failedCount)
 	return nil
-}
-
-// GetInstance may return a defaultInstance built from retained PVCs when the named Pod is gone.
-// That is terminal for switchover, unlike a real Pod whose role label is temporarily empty.
-func hasRetainedPVCWithoutPod(instance Instance) bool {
-	podInstance, ok := instance.(*defaultInstance)
-	return ok && podInstance.pod == nil && len(podInstance.volumes) > 0
 }
 
 // setComponentSwitchoverProgressDetails sets component switchover progress details.

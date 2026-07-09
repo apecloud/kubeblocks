@@ -25,6 +25,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -234,4 +235,95 @@ func TestSafeMetadataOnlyInPlaceUpdate(t *testing.T) {
 			t.Fatalf("expected non-restart config.kubeblocks.io/* annotation change to be a safe metadata-only update")
 		}
 	})
+}
+
+func TestBuildInstancePodAndPVCs(t *testing.T) {
+	inst := builder.NewInstanceBuilder("default", "mysql-0").
+		SetUID(types.UID("12345678-1234-1234-1234-1234567890ab")).
+		AddAnnotations("instance-annotation", "true").
+		AddLabels("instance-only-label", "true").
+		SetPodTemplate(corev1.PodTemplateSpec{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{
+					"template-label":                   "true",
+					constant.AppInstanceLabelKey:       "cluster",
+					constant.KBAppComponentLabelKey:    "mysql",
+					constant.KBAppInstanceNameLabelKey: "template-instance",
+				},
+				Annotations: map[string]string{"template-annotation": "true"},
+			},
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{{Name: "mysql", Image: "mysql:8.0"}},
+				Volumes:    []corev1.Volume{{Name: "config"}},
+			},
+		}).
+		SetInstanceSetName("mysql").
+		SetInstanceTemplateName("az-a").
+		AddVolumeClaimTemplate(corev1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        "data",
+				Labels:      map[string]string{"pvc-label": "true"},
+				Annotations: map[string]string{"pvc-annotation": "true"},
+			},
+			Spec: corev1.PersistentVolumeClaimSpec{
+				AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+				Resources: corev1.VolumeResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceStorage: resource.MustParse("1Gi"),
+					},
+				},
+			},
+		}).
+		GetObject()
+
+	pod, err := buildInstancePod(inst, "revision")
+	if err != nil {
+		t.Fatalf("buildInstancePod() error = %v", err)
+	}
+	if pod.Name != "mysql-0" || pod.Namespace != "default" {
+		t.Fatalf("unexpected pod key: %s/%s", pod.Namespace, pod.Name)
+	}
+	if pod.Labels[constant.KBAppInstanceNameLabelKey] != "mysql-0" ||
+		pod.Labels[constant.KBAppPodNameLabelKey] != "mysql-0" ||
+		pod.Labels[constant.KBAppInstanceTemplateLabelKey] != "az-a" ||
+		pod.Labels["template-label"] != "true" {
+		t.Fatalf("unexpected pod labels: %#v", pod.Labels)
+	}
+	if pod.Annotations["template-annotation"] != "true" {
+		t.Fatalf("unexpected pod annotations: %#v", pod.Annotations)
+	}
+	if len(pod.Spec.Volumes) != 2 {
+		t.Fatalf("pod volumes = %d, want 2: %#v", len(pod.Spec.Volumes), pod.Spec.Volumes)
+	}
+	if len(pod.OwnerReferences) != 1 || pod.OwnerReferences[0].Name != "mysql-0" {
+		t.Fatalf("unexpected pod owner references: %#v", pod.OwnerReferences)
+	}
+
+	pvcs, err := buildInstancePVCs(inst)
+	if err != nil {
+		t.Fatalf("buildInstancePVCs() error = %v", err)
+	}
+	if len(pvcs) != 1 {
+		t.Fatalf("pvcs = %d, want 1", len(pvcs))
+	}
+	pvc := pvcs[0]
+	if pvc.Labels[constant.KBAppInstanceNameLabelKey] != "mysql-0" ||
+		pvc.Labels[constant.KBAppPodNameLabelKey] != "mysql-0" ||
+		pvc.Labels[constant.VolumeClaimTemplateNameLabelKey] != "data" ||
+		pvc.Labels[constant.KBAppInstanceTemplateLabelKey] != "az-a" ||
+		pvc.Labels[constant.AppInstanceLabelKey] != "cluster" ||
+		pvc.Labels[constant.KBAppComponentLabelKey] != "mysql" ||
+		pvc.Labels["template-label"] != "true" ||
+		pvc.Labels["pvc-label"] != "true" {
+		t.Fatalf("unexpected pvc labels: %#v", pvc.Labels)
+	}
+	if _, ok := pvc.Labels["instance-only-label"]; ok {
+		t.Fatalf("unexpected instance-only label on pvc: %#v", pvc.Labels)
+	}
+	if pvc.Annotations["pvc-annotation"] != "true" {
+		t.Fatalf("unexpected pvc annotations: %#v", pvc.Annotations)
+	}
+	if len(pvc.OwnerReferences) != 1 || pvc.OwnerReferences[0].Name != "mysql-0" {
+		t.Fatalf("unexpected pvc owner references: %#v", pvc.OwnerReferences)
+	}
 }

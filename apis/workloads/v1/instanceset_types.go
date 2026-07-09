@@ -534,6 +534,11 @@ type ConfigTemplate struct {
 	// The name of the config.
 	Name string `json:"name"`
 
+	// The generation of the config.
+	//
+	// +optional
+	Generation int64 `json:"generation,omitempty"`
+
 	// Represents a checksum or hash of the config content.
 	//
 	// +optional

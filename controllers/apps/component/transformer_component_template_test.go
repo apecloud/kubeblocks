@@ -314,6 +314,7 @@ var _ = Describe("file templates transformer test", func() {
 
 			Expect(transCtx.SynthesizeComponent.Configs).Should(HaveLen(1))
 			Expect(transCtx.SynthesizeComponent.Configs[0].Name).Should(Equal("logConf"))
+			Expect(transCtx.SynthesizeComponent.Configs[0].Generation).Should(BeNumerically(">", 0))
 			Expect(transCtx.SynthesizeComponent.Configs[0].ReconfigureActionName).Should(Equal(component.UserReconfigureActionName(transCtx.SynthesizeComponent.FileTemplates[0])))
 			Expect(transCtx.SynthesizeComponent.Configs[0].Reconfigure).Should(Equal(transCtx.SynthesizeComponent.FileTemplates[0].ReconfigureAction))
 			Expect(transCtx.SynthesizeComponent.Configs[0].ReconfigureArgs).Should(Equal(transCtx.SynthesizeComponent.FileTemplates[0].ReconfigureArgs))

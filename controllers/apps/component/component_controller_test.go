@@ -1595,6 +1595,7 @@ var _ = Describe("Component Controller", func() {
 		Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 			g.Expect(its.Spec.Configs).Should(HaveLen(1))
 			g.Expect(its.Spec.Configs[0].Name).Should(Equal(fileTemplate))
+			g.Expect(its.Spec.Configs[0].Generation).Should(BeNumerically(">", 0))
 			g.Expect(its.Spec.Configs[0].ConfigHash).ShouldNot(BeNil())
 			g.Expect(*its.Spec.Configs[0].ConfigHash).Should(Equal("123456"))
 			g.Expect(its.Spec.Configs[0].Reconfigure).ShouldNot(BeNil())
@@ -1645,6 +1646,7 @@ var _ = Describe("Component Controller", func() {
 		Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 			g.Expect(its.Spec.Configs).Should(HaveLen(1))
 			g.Expect(its.Spec.Configs[0].Name).Should(Equal(fileTemplate))
+			g.Expect(its.Spec.Configs[0].Generation).Should(BeNumerically(">", 0))
 			g.Expect(its.Spec.Configs[0].ConfigHash).ShouldNot(BeNil())
 			g.Expect(*its.Spec.Configs[0].ConfigHash).Should(Equal("123456"))
 			g.Expect(its.Spec.Configs[0].Reconfigure).ShouldNot(BeNil())
@@ -1687,7 +1689,9 @@ var _ = Describe("Component Controller", func() {
 		Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 			g.Expect(its.Spec.Configs).Should(HaveLen(2))
 			g.Expect(its.Spec.Configs[0].Name).Should(Equal(fileTemplate))
+			g.Expect(its.Spec.Configs[0].Generation).Should(BeNumerically(">", 0))
 			g.Expect(its.Spec.Configs[1].Name).Should(Equal("server-conf"))
+			g.Expect(its.Spec.Configs[1].Generation).Should(BeNumerically(">", 0))
 		})).Should(Succeed())
 	}
 
@@ -1733,6 +1737,7 @@ var _ = Describe("Component Controller", func() {
 		Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 			g.Expect(its.Spec.Configs).Should(HaveLen(1))
 			g.Expect(its.Spec.Configs[0].Name).Should(Equal(fileTemplate))
+			g.Expect(its.Spec.Configs[0].Generation).Should(BeNumerically(">", 0))
 			g.Expect(its.Spec.Configs[0].Restart).ShouldNot(BeNil())
 			g.Expect(*its.Spec.Configs[0].Restart).Should(BeTrue())
 			g.Expect(its.Spec.Configs[0].Reconfigure).ShouldNot(BeNil())
@@ -1763,6 +1768,7 @@ var _ = Describe("Component Controller", func() {
 		Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 			g.Expect(its.Spec.Configs).Should(HaveLen(1))
 			g.Expect(its.Spec.Configs[0].Name).Should(Equal(fileTemplate))
+			g.Expect(its.Spec.Configs[0].Generation).Should(BeNumerically(">", 0))
 			g.Expect(its.Spec.Configs[0].ConfigHash).ShouldNot(BeNil())
 			g.Expect(*its.Spec.Configs[0].ConfigHash).Should(Equal(initConfigHash))
 		})).Should(Succeed())
@@ -1791,6 +1797,7 @@ var _ = Describe("Component Controller", func() {
 		Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 			g.Expect(its.Spec.Configs).Should(HaveLen(1))
 			g.Expect(its.Spec.Configs[0].Name).Should(Equal(fileTemplate))
+			g.Expect(its.Spec.Configs[0].Generation).Should(BeNumerically(">", 0))
 			g.Expect(its.Spec.Configs[0].ConfigHash).ShouldNot(BeNil())
 			g.Expect(*its.Spec.Configs[0].ConfigHash).Should(Equal(newConfigHash))
 		})).Should(Succeed())

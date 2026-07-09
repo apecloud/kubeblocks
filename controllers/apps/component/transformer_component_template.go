@@ -26,6 +26,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"text/template"
 
@@ -399,8 +400,13 @@ func (t *componentFileTemplateTransformer) buildConfigTemplates(transCtx *compon
 	)
 	for _, tpl := range synthesizedComp.FileTemplates {
 		if tpl.Config {
+			generation, err := configTemplateGeneration(transCtx)
+			if err != nil {
+				return err
+			}
 			config := workloads.ConfigTemplate{
 				Name:                  tpl.Name,
+				Generation:            generation,
 				ConfigHash:            configHash(tpl),
 				Restart:               tpl.RestartOnFileChange,
 				Reconfigure:           action(tpl),
@@ -415,6 +421,16 @@ func (t *componentFileTemplateTransformer) buildConfigTemplates(transCtx *compon
 		return strings.Compare(a.Name, b.Name)
 	})
 	return nil
+}
+
+func configTemplateGeneration(transCtx *componentTransformContext) (int64, error) {
+	if generation := transCtx.SynthesizeComponent.Generation; generation != "" {
+		return strconv.ParseInt(generation, 10, 64)
+	}
+	if transCtx.Component != nil && transCtx.Component.Generation > 0 {
+		return transCtx.Component.Generation, nil
+	}
+	return 1, nil
 }
 
 func (t *componentFileTemplateTransformer) templateFileChanges(transCtx *componentTransformContext,

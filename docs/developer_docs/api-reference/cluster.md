@@ -33162,6 +33162,18 @@ string
 </tr>
 <tr>
 <td>
+<code>generation</code><br/>
+<em>
+int64
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The generation of the config.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>configHash</code><br/>
 <em>
 string

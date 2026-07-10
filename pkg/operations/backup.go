@@ -112,7 +112,16 @@ func (b BackupOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cli
 	}
 	backup := &dpv1alpha1.Backup{}
 	if err = cli.Get(reqCtx.Ctx, client.ObjectKey{Name: backupIntent.BackupName, Namespace: cluster.Namespace}, backup); err != nil {
-		return opsv1alpha1.OpsFailedPhase, 0, err
+		if !apierrors.IsNotFound(err) || opsRes.APIReader == nil {
+			return opsv1alpha1.OpsFailedPhase, 0, err
+		}
+		if err = opsRes.APIReader.Get(reqCtx.Ctx,
+			client.ObjectKey{Name: backupIntent.BackupName, Namespace: cluster.Namespace}, backup); err != nil {
+			if apierrors.IsNotFound(err) {
+				return opsv1alpha1.OpsFailedPhase, 0, err
+			}
+			return opsv1alpha1.OpsRunningPhase, 0, err
+		}
 	}
 	if err = validateBackupOwnedByOpsRequest(backup, opsRequest, cluster.Name); err != nil {
 		return opsv1alpha1.OpsFailedPhase, 0, intctrlutil.NewFatalError(err.Error())

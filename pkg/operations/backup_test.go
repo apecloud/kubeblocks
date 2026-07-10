@@ -20,11 +20,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"context"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -38,6 +42,32 @@ import (
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testops "github.com/apecloud/kubeblocks/pkg/testutil/operations"
 )
+
+type backupCacheLagClient struct {
+	client.Client
+	key        client.ObjectKey
+	missesLeft int
+}
+
+type backupReadErrorClient struct {
+	client.Reader
+	err error
+}
+
+func (c *backupReadErrorClient) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+	if _, ok := obj.(*dpv1alpha1.Backup); ok {
+		return c.err
+	}
+	return c.Reader.Get(ctx, key, obj, opts...)
+}
+
+func (c *backupCacheLagClient) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+	if _, ok := obj.(*dpv1alpha1.Backup); ok && key == c.key && c.missesLeft > 0 {
+		c.missesLeft--
+		return apierrors.NewNotFound(schema.GroupResource{Group: dpv1alpha1.GroupVersion.Group, Resource: "backups"}, key.Name)
+	}
+	return c.Client.Get(ctx, key, obj, opts...)
+}
 
 var _ = Describe("Backup OpsRequest", func() {
 
@@ -62,6 +92,7 @@ var _ = Describe("Backup OpsRequest", func() {
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
 		testapps.ClearResources(&testCtx, generics.OpsRequestSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.BackupPolicySignature, inNS, ml)
 	}
 
 	BeforeEach(cleanEnv)
@@ -83,6 +114,38 @@ var _ = Describe("Backup OpsRequest", func() {
 		testBackupOps := func(opsRes *OpsResource) {
 			By("create Backup OpsRequest")
 			opsRes.OpsRequest = createBackupOpsObj(clusterName, "backup-ops-"+randomStr)
+			policy := &dpv1alpha1.BackupPolicy{
+				ObjectMeta: metav1.ObjectMeta{
+					GenerateName: "backup-policy-",
+					Namespace:    testCtx.DefaultNamespace,
+					Labels: map[string]string{
+						constant.AppInstanceLabelKey: opsRes.Cluster.Name,
+						testCtx.TestObjLabelKey:      "true",
+					},
+				},
+				Spec: dpv1alpha1.BackupPolicySpec{
+					Target: &dpv1alpha1.BackupTarget{
+						PodSelector: &dpv1alpha1.PodSelector{
+							LabelSelector: &metav1.LabelSelector{MatchLabels: map[string]string{
+								constant.AppInstanceLabelKey: opsRes.Cluster.Name,
+							}},
+						},
+					},
+					BackupMethods: []dpv1alpha1.BackupMethod{{
+						Name:            "snapshot",
+						SnapshotVolumes: func() *bool { v := true; return &v }(),
+					}},
+				},
+			}
+			Expect(k8sClient.Create(reqCtx.Ctx, policy)).Should(Succeed())
+			Expect(testapps.ChangeObjStatus(&testCtx, policy, func() {
+				policy.Status.Phase = dpv1alpha1.AvailablePhase
+			})).Should(Succeed())
+			opsRes.OpsRequest.Spec.Backup = &opsv1alpha1.Backup{
+				BackupPolicyName: policy.Name,
+				BackupMethod:     "snapshot",
+			}
+			Expect(k8sClient.Update(reqCtx.Ctx, opsRes.OpsRequest)).Should(Succeed())
 			// set ops phase to Pending
 			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsPendingPhase
 
@@ -93,7 +156,7 @@ var _ = Describe("Backup OpsRequest", func() {
 
 			By("test backup action and reconcile function")
 			bHandler := BackupOpsHandler{}
-			_ = bHandler.Action(reqCtx, k8sClient, opsRes)
+			Expect(bHandler.Action(reqCtx, k8sClient, opsRes)).Should(Succeed())
 
 			By("test backup reconcile action")
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
@@ -460,6 +523,71 @@ var _ = Describe("Backup OpsRequest", func() {
 				WithObjects(policy, staleBackup, currentBackup).Build()
 			phase, _, err := BackupOpsHandler{}.ReconcileAction(reqCtx, fakeClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
+			Expect(phase).Should(Equal(opsv1alpha1.OpsRunningPhase))
+		})
+
+		It("reads through a cache miss while the created Backup is visible from the API server", func() {
+			fakeScheme := runtime.NewScheme()
+			Expect(dpv1alpha1.AddToScheme(fakeScheme)).Should(Succeed())
+			ops := createBackupOpsObj(clusterName, "backup-cache-lag-"+randomStr)
+			ops.Spec.Backup = &opsv1alpha1.Backup{}
+			opsRes.OpsRequest = ops
+			intent, err := normalizedBackupIntent(ops)
+			Expect(err).ShouldNot(HaveOccurred())
+			backup := &dpv1alpha1.Backup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      intent.BackupName,
+					Namespace: opsRes.Cluster.Namespace,
+					Labels:    getBackupLabels(opsRes.Cluster.Name, ops.Name),
+				},
+				Spec:   dpv1alpha1.BackupSpec{DeletionPolicy: dpv1alpha1.BackupDeletionPolicyDelete},
+				Status: dpv1alpha1.BackupStatus{Phase: dpv1alpha1.BackupPhaseRunning},
+			}
+			backup.Annotations, err = getBackupAnnotations(ops, backup.Spec)
+			Expect(err).ShouldNot(HaveOccurred())
+			baseClient := fake.NewClientBuilder().WithScheme(fakeScheme).WithObjects(backup).Build()
+			laggedClient := &backupCacheLagClient{
+				Client:     baseClient,
+				key:        client.ObjectKeyFromObject(backup),
+				missesLeft: 1,
+			}
+			opsRes.APIReader = baseClient
+
+			phase, _, err := BackupOpsHandler{}.ReconcileAction(reqCtx, laggedClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(phase).Should(Equal(opsv1alpha1.OpsRunningPhase))
+
+			phase, _, err = BackupOpsHandler{}.ReconcileAction(reqCtx, laggedClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(phase).Should(Equal(opsv1alpha1.OpsRunningPhase))
+		})
+
+		It("fails when both the cache and API server confirm the Backup is absent", func() {
+			fakeScheme := runtime.NewScheme()
+			Expect(dpv1alpha1.AddToScheme(fakeScheme)).Should(Succeed())
+			ops := createBackupOpsObj(clusterName, "backup-missing-"+randomStr)
+			ops.Spec.Backup = &opsv1alpha1.Backup{}
+			opsRes.OpsRequest = ops
+			missingClient := fake.NewClientBuilder().WithScheme(fakeScheme).Build()
+			opsRes.APIReader = missingClient
+
+			phase, _, err := BackupOpsHandler{}.ReconcileAction(reqCtx, missingClient, opsRes)
+			Expect(apierrors.IsNotFound(err)).Should(BeTrue())
+			Expect(phase).Should(Equal(opsv1alpha1.OpsFailedPhase))
+		})
+
+		It("keeps the OpsRequest running when the APIReader cannot confirm a cache miss", func() {
+			fakeScheme := runtime.NewScheme()
+			Expect(dpv1alpha1.AddToScheme(fakeScheme)).Should(Succeed())
+			ops := createBackupOpsObj(clusterName, "backup-reader-error-"+randomStr)
+			ops.Spec.Backup = &opsv1alpha1.Backup{}
+			opsRes.OpsRequest = ops
+			missingClient := fake.NewClientBuilder().WithScheme(fakeScheme).Build()
+			readerErr := apierrors.NewServiceUnavailable("APIReader unavailable")
+			opsRes.APIReader = &backupReadErrorClient{Reader: missingClient, err: readerErr}
+
+			phase, _, err := BackupOpsHandler{}.ReconcileAction(reqCtx, missingClient, opsRes)
+			Expect(err).Should(MatchError(readerErr))
 			Expect(phase).Should(Equal(opsv1alpha1.OpsRunningPhase))
 		})
 

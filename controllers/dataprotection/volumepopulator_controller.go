@@ -208,6 +208,12 @@ func (r *VolumePopulatorReconciler) MatchToPopulate(pvc *corev1.PersistentVolume
 }
 
 func (r *VolumePopulatorReconciler) syncPVC(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim) error {
+	if !pvc.DeletionTimestamp.IsZero() {
+		if slices.Contains(pvc.Finalizers, dptypes.DataProtectionFinalizerName) {
+			return r.Cleanup(reqCtx, pvc)
+		}
+		return nil
+	}
 	matched, err := r.MatchToPopulate(pvc)
 	if err != nil {
 		return err
@@ -1730,14 +1736,7 @@ func postReadyRestoreName(componentUID types.UID) string {
 }
 
 func (r *VolumePopulatorReconciler) Cleanup(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim) error {
-	if slices.Contains(pvc.Finalizers, dptypes.DataProtectionFinalizerName) {
-		pvcPatch := client.MergeFrom(pvc.DeepCopy())
-		controllerutil.RemoveFinalizer(pvc, dptypes.DataProtectionFinalizerName)
-		if err := r.Client.Patch(reqCtx.Ctx, pvc, pvcPatch); err != nil {
-			return err
-		}
-	}
-
+	dependentsPending := false
 	jobs := &batchv1.JobList{}
 	if err := r.Client.List(reqCtx.Ctx, jobs,
 		client.InNamespace(pvc.Namespace), client.MatchingLabels(map[string]string{
@@ -1748,6 +1747,7 @@ func (r *VolumePopulatorReconciler) Cleanup(reqCtx intctrlutil.RequestCtx, pvc *
 
 	for i := range jobs.Items {
 		job := &jobs.Items[i]
+		dependentsPending = true
 		if controllerutil.ContainsFinalizer(job, dptypes.DataProtectionFinalizerName) {
 			patch := client.MergeFrom(job.DeepCopy())
 			controllerutil.RemoveFinalizer(job, dptypes.DataProtectionFinalizerName)
@@ -1766,9 +1766,29 @@ func (r *VolumePopulatorReconciler) Cleanup(reqCtx intctrlutil.RequestCtx, pvc *
 	populatePVC := &corev1.PersistentVolumeClaim{}
 	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Name: getPopulatePVCName(pvc.UID),
 		Namespace: pvc.Namespace}, populatePVC); err != nil {
-		return client.IgnoreNotFound(err)
+		if !apierrors.IsNotFound(err) {
+			return err
+		}
+	} else {
+		dependentsPending = true
+		if populatePVC.DeletionTimestamp.IsZero() {
+			if err := r.Client.Delete(reqCtx.Ctx, populatePVC); err != nil && !apierrors.IsNotFound(err) {
+				return err
+			}
+		}
 	}
-	return r.Client.Delete(reqCtx.Ctx, populatePVC)
+	if dependentsPending && !pvc.DeletionTimestamp.IsZero() {
+		return intctrlutil.NewRequeueError(reconcileInterval, "waiting for volume populate dependents to be deleted")
+	}
+
+	if slices.Contains(pvc.Finalizers, dptypes.DataProtectionFinalizerName) {
+		pvcPatch := client.MergeFrom(pvc.DeepCopy())
+		controllerutil.RemoveFinalizer(pvc, dptypes.DataProtectionFinalizerName)
+		if err := r.Client.Patch(reqCtx.Ctx, pvc, pvcPatch); err != nil && !apierrors.IsNotFound(err) {
+			return err
+		}
+	}
+	return nil
 }
 
 func (r *VolumePopulatorReconciler) checkIntreeStorageClass(pvc *corev1.PersistentVolumeClaim, sc *storagev1.StorageClass) error {

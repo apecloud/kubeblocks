@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -122,6 +123,54 @@ var _ = Describe("OpsUtil functions", func() {
 			comp, err := component.BuildComponent(cluster, &cluster.Spec.ComponentSpecs[0], nil, nil)
 			Expect(err).Should(BeNil())
 			Expect(testCtx.CreateObj(ctx, comp)).Should(Succeed())
+		}
+
+		projectClusterComponentLifecycle := func(opsRes *OpsResource, mutate func(*appsv1.ClusterComponentSpec)) {
+			cluster := &appsv1.Cluster{}
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(opsRes.Cluster), cluster)).Should(Succeed())
+			Expect(testapps.ChangeObj(&testCtx, cluster, func(c *appsv1.Cluster) {
+				mutate(c.Spec.GetComponentByName(defaultCompName))
+			})).Should(Succeed())
+			opsRes.Cluster = cluster
+
+			desired := cluster.Spec.GetComponentByName(defaultCompName)
+			comp := &appsv1.Component{}
+			Expect(k8sClient.Get(ctx, client.ObjectKey{
+				Name:      constant.GenerateClusterComponentName(clusterName, defaultCompName),
+				Namespace: testCtx.DefaultNamespace,
+			}, comp)).Should(Succeed())
+			Expect(testapps.ChangeObj(&testCtx, comp, func(c *appsv1.Component) {
+				c.Spec.Replicas = desired.Replicas
+				c.Spec.Instances = desired.Instances
+				c.Spec.Ordinals = desired.Ordinals
+				c.Spec.FlatInstanceOrdinal = desired.FlatInstanceOrdinal
+				c.Spec.OfflineInstances = desired.OfflineInstances
+				c.Spec.Stop = desired.Stop
+				if c.Annotations == nil {
+					c.Annotations = map[string]string{}
+				}
+				c.Annotations[constant.KubeBlocksGenerationKey] = fmt.Sprintf("%d", cluster.Generation)
+			})).Should(Succeed())
+		}
+
+		setRebuildComponentPhaseFailed := func(opsRes *OpsResource) {
+			Expect(testapps.ChangeObjStatus(&testCtx, opsRes.Cluster, func() {
+				compStatus := opsRes.Cluster.Status.Components[defaultCompName]
+				compStatus.Phase = appsv1.FailedComponentPhase
+				opsRes.Cluster.Status.Components[defaultCompName] = compStatus
+			})).Should(Succeed())
+		}
+
+		markRebuildTargetsUnavailable := func(opsRes *OpsResource) {
+			for _, rebuildFrom := range opsRes.OpsRequest.Spec.RebuildFrom {
+				for _, target := range rebuildFrom.Instances {
+					Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKey{
+						Name: target.Name, Namespace: opsRes.OpsRequest.Namespace,
+					}, func(pod *corev1.Pod) {
+						pod.Status.Conditions = nil
+					})()).Should(Succeed())
+				}
+			}
 		}
 
 		prepareOpsRes := func(backupName string, inPlace bool) *OpsResource {
@@ -224,15 +273,22 @@ var _ = Describe("OpsUtil functions", func() {
 			retainedPVC := &corev1.PersistentVolumeClaim{}
 			Expect(k8sClient.Get(ctx, client.ObjectKey{Name: fmt.Sprintf("%s-%s", testapps.DataVolumeName, targetName), Namespace: testCtx.DefaultNamespace}, retainedPVC)).Should(Succeed())
 
-			By("expect action not to turn a desired instance into terminal failure")
+			By("expect action to remain in precheck until availability can be evaluated")
 			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsCreatingPhase
-			_, _ = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
-			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(opsv1alpha1.OpsCreatingPhase))
+			err := rebuildInstanceOpsHandler{}.Action(reqCtx, k8sClient, opsRes)
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeNeedWaiting)).Should(BeTrue())
 
 			By("expect execution to wait at the pod action boundary")
-			_, err := rebuildInstanceOpsHandler{}.prepareInplaceRebuildHelper(reqCtx, k8sClient, opsRes,
-				opsRes.OpsRequest.Spec.RebuildFrom[0], opsRes.OpsRequest.Spec.RebuildFrom[0].Instances[0], 0)
+			_, err = rebuildInstanceOpsHandler{}.prepareInplaceRebuildHelper(reqCtx, k8sClient, opsRes,
+				opsRes.OpsRequest.Spec.RebuildFrom[0], opsRes.OpsRequest.Spec.RebuildFrom[0].Instances[0], 0, true)
 			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeNeedWaiting)).Should(BeTrue())
+
+			By("recreate the target as Available and expect the non-force action boundary to reject it")
+			testapps.MockInstanceSetPod(&testCtx, nil, clusterName, defaultCompName, targetName, "")
+			_, err = rebuildInstanceOpsHandler{}.prepareInplaceRebuildHelper(reqCtx, k8sClient, opsRes,
+				opsRes.OpsRequest.Spec.RebuildFrom[0], opsRes.OpsRequest.Spec.RebuildFrom[0].Instances[0], 0, true)
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeTrue())
+			Expect(err.Error()).Should(ContainSubstring(fmt.Sprintf(`instance "%s" is available, can not rebuild it`, targetName)))
 
 			matchingLabels := client.MatchingLabels{
 				constant.OpsRequestNameLabelKey:      opsRes.OpsRequest.Name,
@@ -241,6 +297,89 @@ var _ = Describe("OpsUtil functions", func() {
 			Eventually(testapps.List(&testCtx, generics.PodSignature, matchingLabels, client.InNamespace(opsRes.OpsRequest.Namespace))).Should(HaveLen(0))
 			Eventually(testapps.List(&testCtx, generics.RestoreSignature, matchingLabels, client.InNamespace(opsRes.OpsRequest.Namespace))).Should(HaveLen(0))
 			Eventually(testapps.List(&testCtx, generics.PersistentVolumeClaimSignature, matchingLabels, client.InNamespace(opsRes.OpsRequest.Namespace))).Should(HaveLen(0))
+		})
+
+		It("waits when the desired Component projection is temporarily absent", func() {
+			opsRes := prepareOpsRes("", true)
+			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
+			setRebuildComponentPhaseFailed(opsRes)
+			comp := &appsv1.Component{}
+			Expect(k8sClient.Get(ctx, client.ObjectKey{
+				Name:      constant.GenerateClusterComponentName(clusterName, defaultCompName),
+				Namespace: testCtx.DefaultNamespace,
+			}, comp)).Should(Succeed())
+			Expect(k8sClient.Delete(ctx, comp)).Should(Succeed())
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, client.ObjectKeyFromObject(comp), &appsv1.Component{})
+				return apierrors.IsNotFound(err)
+			}).Should(BeTrue())
+
+			err := rebuildInstanceOpsHandler{}.Action(reqCtx, k8sClient, opsRes)
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeNeedWaiting)).Should(BeTrue())
+		})
+
+		It("waits for Cluster and Component lifecycle projection to converge", func() {
+			opsRes := prepareOpsRes("", true)
+			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
+			setRebuildComponentPhaseFailed(opsRes)
+
+			cluster := &appsv1.Cluster{}
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(opsRes.Cluster), cluster)).Should(Succeed())
+			Expect(testapps.ChangeObj(&testCtx, cluster, func(c *appsv1.Cluster) {
+				c.Spec.GetComponentByName(defaultCompName).Stop = pointer.Bool(true)
+			})).Should(Succeed())
+			opsRes.Cluster = cluster
+
+			err := rebuildInstanceOpsHandler{}.Action(reqCtx, k8sClient, opsRes)
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeNeedWaiting)).Should(BeTrue())
+
+			projectClusterComponentLifecycle(opsRes, func(compSpec *appsv1.ClusterComponentSpec) {
+				compSpec.Stop = pointer.Bool(true)
+			})
+			err = rebuildInstanceOpsHandler{}.Action(reqCtx, k8sClient, opsRes)
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeTrue())
+			Expect(err.Error()).Should(ContainSubstring(fmt.Sprintf(`component "%s" is stopped`, defaultCompName)))
+		})
+
+		It("revalidates stopped desired state at the in-place action boundary", func() {
+			opsRes := prepareOpsRes("", true)
+			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
+			projectClusterComponentLifecycle(opsRes, func(compSpec *appsv1.ClusterComponentSpec) {
+				compSpec.Stop = pointer.Bool(true)
+			})
+
+			_, err := rebuildInstanceOpsHandler{}.prepareInplaceRebuildHelper(reqCtx, k8sClient, opsRes,
+				opsRes.OpsRequest.Spec.RebuildFrom[0], opsRes.OpsRequest.Spec.RebuildFrom[0].Instances[0], 0, false)
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeTrue())
+			Expect(err.Error()).Should(ContainSubstring(fmt.Sprintf(`component "%s" is stopped`, defaultCompName)))
+		})
+
+		It("revalidates offline desired state at the in-place action boundary", func() {
+			opsRes := prepareOpsRes("", true)
+			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
+			target := opsRes.OpsRequest.Spec.RebuildFrom[0].Instances[0]
+			projectClusterComponentLifecycle(opsRes, func(compSpec *appsv1.ClusterComponentSpec) {
+				compSpec.OfflineInstances = []string{target.Name}
+			})
+
+			_, err := rebuildInstanceOpsHandler{}.prepareInplaceRebuildHelper(reqCtx, k8sClient, opsRes,
+				opsRes.OpsRequest.Spec.RebuildFrom[0], target, 0, false)
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeTrue())
+			Expect(err.Error()).Should(ContainSubstring(fmt.Sprintf(`instance "%s" is offline`, target.Name)))
+		})
+
+		It("revalidates scale-in desired state at the in-place action boundary", func() {
+			opsRes := prepareOpsRes("", true)
+			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
+			target := opsRes.OpsRequest.Spec.RebuildFrom[0].Instances[1]
+			projectClusterComponentLifecycle(opsRes, func(compSpec *appsv1.ClusterComponentSpec) {
+				compSpec.Replicas = 1
+			})
+
+			_, err := rebuildInstanceOpsHandler{}.prepareInplaceRebuildHelper(reqCtx, k8sClient, opsRes,
+				opsRes.OpsRequest.Spec.RebuildFrom[0], target, 0, false)
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeTrue())
+			Expect(err.Error()).Should(ContainSubstring(fmt.Sprintf(`instance "%s" not found in desired workload`, target.Name)))
 		})
 
 		It("waits for in-place rebuild when the desired target uses component ordinals", func() {
@@ -327,16 +466,11 @@ var _ = Describe("OpsUtil functions", func() {
 				opsRes.Cluster.Status.Components[defaultCompName] = compStatus
 			})).Should(Succeed())
 
-			By("mark the target offline in the Component desired state")
+			By("mark the target offline in Cluster intent and the converged Component projection")
 			targetName := opsRes.OpsRequest.Spec.RebuildFrom[0].Instances[0].Name
-			comp := &appsv1.Component{}
-			Expect(k8sClient.Get(ctx, client.ObjectKey{
-				Name:      constant.GenerateClusterComponentName(clusterName, defaultCompName),
-				Namespace: testCtx.DefaultNamespace,
-			}, comp)).Should(Succeed())
-			Expect(testapps.ChangeObj(&testCtx, comp, func(c *appsv1.Component) {
-				c.Spec.OfflineInstances = []string{targetName}
-			})).Should(Succeed())
+			projectClusterComponentLifecycle(opsRes, func(compSpec *appsv1.ClusterComponentSpec) {
+				compSpec.OfflineInstances = []string{targetName}
+			})
 
 			By("expect terminal failure from desired lifecycle state")
 			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsCreatingPhase
@@ -808,6 +942,7 @@ var _ = Describe("OpsUtil functions", func() {
 			By("init operations resources ")
 			opsRes := prepareOpsRes("", true)
 			its := testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
+			markRebuildTargetsUnavailable(opsRes)
 			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsRunningPhase
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
 			matchingLabels := client.MatchingLabels{
@@ -973,6 +1108,7 @@ var _ = Describe("OpsUtil functions", func() {
 			})).Should(Succeed())
 			opsRes := prepareOpsRes(backup.Name, true)
 			_ = testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
+			markRebuildTargetsUnavailable(opsRes)
 			if ignoreRoleCheck {
 				Expect(testapps.ChangeObj(&testCtx, opsRes.OpsRequest, func(request *opsv1alpha1.OpsRequest) {
 					if request.Annotations == nil {

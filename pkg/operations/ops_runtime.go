@@ -370,8 +370,6 @@ func (i *defaultInstance) GetComponentName() string { return i.componentName }
 
 func (i *defaultInstance) GetName() string { return i.name }
 
-func (i *defaultInstance) HasPod() bool { return i.pod != nil }
-
 func (i *defaultInstance) GetCreationTimestamp() metav1.Time {
 	if i.pod == nil {
 		return metav1.Time{}

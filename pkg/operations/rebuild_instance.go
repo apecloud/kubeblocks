@@ -102,14 +102,22 @@ func (r rebuildInstanceOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli cli
 			targetInstance, err := runtime.GetInstance(opsRes.Cluster.Namespace, opsRes.Cluster.Name, v.ComponentName, ins.Name)
 			if err != nil {
 				if apierrors.IsNotFound(err) {
+					if v.InPlace {
+						if err = r.validateInPlaceRebuildTargetDesiredState(reqCtx, cli, opsRes, runtime, v.ComponentName, ins.Name); err != nil {
+							return err
+						}
+						continue
+					}
 					// neither a Pod nor a retained PVC exists for this name, so
 					// retrying the same input can never converge
 					return intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" not found`, ins.Name))
 				}
 				return err
 			}
-			if v.InPlace && !targetInstance.HasPod() {
-				return intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" has retained PVCs but no Pod; in-place rebuild requires an existing Pod`, ins.Name))
+			if v.InPlace {
+				if err = r.validateInPlaceRebuildTargetDesiredState(reqCtx, cli, opsRes, runtime, targetInstance.GetComponentName(), ins.Name); err != nil {
+					return err
+				}
 			}
 			synthesizedComp, err = r.buildSynthesizedComponent(reqCtx.Ctx, cli, opsRes.Cluster, targetInstance.GetComponentName())
 			if err != nil {
@@ -130,6 +138,41 @@ func (r rebuildInstanceOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli cli
 				return err
 			}
 		}
+	}
+	return nil
+}
+
+func (r rebuildInstanceOpsHandler) validateInPlaceRebuildTargetDesiredState(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	opsRes *OpsResource,
+	runtime OpsRuntime,
+	componentName,
+	instanceName string) error {
+	comp := &appsv1.Component{}
+	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{
+		Name:      constant.GenerateClusterComponentName(opsRes.Cluster.Name, componentName),
+		Namespace: opsRes.Cluster.Namespace,
+	}, comp); err != nil {
+		if apierrors.IsNotFound(err) {
+			return intctrlutil.NewFatalError(fmt.Sprintf(`component "%s" not found`, componentName))
+		}
+		return err
+	}
+	if !comp.DeletionTimestamp.IsZero() {
+		return intctrlutil.NewFatalError(fmt.Sprintf(`component "%s" is deleting`, componentName))
+	}
+	if pointer.BoolDeref(comp.Spec.Stop, false) {
+		return intctrlutil.NewFatalError(fmt.Sprintf(`component "%s" is stopped`, componentName))
+	}
+	if slices.Contains(comp.Spec.OfflineInstances, instanceName) {
+		return intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" is offline`, instanceName))
+	}
+	instanceSet, err := runtime.GenerateInstanceNameSet(opsRes.Cluster.Name, componentName, comp.Spec.Replicas, comp.Spec.Instances, comp.Spec.OfflineInstances)
+	if err != nil {
+		return err
+	}
+	if _, ok := instanceSet[instanceName]; !ok {
+		return intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" not found in desired workload`, instanceName))
 	}
 	return nil
 }
@@ -622,7 +665,13 @@ func (r rebuildInstanceOpsHandler) prepareInplaceRebuildHelper(reqCtx intctrluti
 	}
 	targetPod := &corev1.Pod{}
 	if err = cli.Get(reqCtx.Ctx, client.ObjectKey{Name: instance.Name, Namespace: opsRes.Cluster.Namespace}, targetPod); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, intctrlutil.NewErrorf(intctrlutil.ErrorTypeNeedWaiting, `wait for pod "%s" to exist before rebuilding in place`, instance.Name)
+		}
 		return nil, err
+	}
+	if !targetPod.DeletionTimestamp.IsZero() {
+		return nil, intctrlutil.NewErrorf(intctrlutil.ErrorTypeNeedWaiting, `wait for pod "%s" deletion to finish before rebuilding in place`, instance.Name)
 	}
 	synthesizedComp, err = r.buildSynthesizedComponent(reqCtx.Ctx, cli, opsRes.Cluster, targetPod.Labels[constant.KBAppComponentLabelKey])
 	if err != nil {

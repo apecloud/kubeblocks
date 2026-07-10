@@ -203,7 +203,7 @@ var _ = Describe("OpsUtil functions", func() {
 			Expect(opsRes.OpsRequest.Status.Conditions[0].Message).Should(ContainSubstring(fmt.Sprintf(`instance "%s" not found`, missingName)))
 		})
 
-		It("fails in-place rebuild OpsRequest when the target has retained PVCs but no pod", func() {
+		It("waits for in-place rebuild when the desired target pod is temporarily absent", func() {
 			By("init operations resources")
 			opsRes := prepareOpsRes("", true)
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
@@ -217,17 +217,22 @@ var _ = Describe("OpsUtil functions", func() {
 
 			By("delete the target pod while retaining its source PVC")
 			targetName := opsRes.OpsRequest.Spec.RebuildFrom[0].Instances[0].Name
+			opsRes.OpsRequest = createRebuildInstanceOps("", true, targetName)
 			targetPod := &corev1.Pod{}
 			Expect(k8sClient.Get(ctx, client.ObjectKey{Name: targetName, Namespace: testCtx.DefaultNamespace}, targetPod)).Should(Succeed())
 			Expect(k8sClient.Delete(ctx, targetPod)).Should(Succeed())
 			retainedPVC := &corev1.PersistentVolumeClaim{}
 			Expect(k8sClient.Get(ctx, client.ObjectKey{Name: fmt.Sprintf("%s-%s", testapps.DataVolumeName, targetName), Namespace: testCtx.DefaultNamespace}, retainedPVC)).Should(Succeed())
 
-			By("expect terminal failure before creating rebuild execution resources")
+			By("expect action not to turn a desired instance into terminal failure")
 			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsCreatingPhase
 			_, _ = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
-			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(opsv1alpha1.OpsFailedPhase))
-			Expect(opsRes.OpsRequest.Status.Conditions[0].Message).Should(ContainSubstring(fmt.Sprintf(`instance "%s" has retained PVCs but no Pod`, targetName)))
+			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(opsv1alpha1.OpsCreatingPhase))
+
+			By("expect execution to wait at the pod action boundary")
+			_, err := rebuildInstanceOpsHandler{}.prepareInplaceRebuildHelper(reqCtx, k8sClient, opsRes,
+				opsRes.OpsRequest.Spec.RebuildFrom[0], opsRes.OpsRequest.Spec.RebuildFrom[0].Instances[0], 0)
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeNeedWaiting)).Should(BeTrue())
 
 			matchingLabels := client.MatchingLabels{
 				constant.OpsRequestNameLabelKey:      opsRes.OpsRequest.Name,
@@ -236,6 +241,36 @@ var _ = Describe("OpsUtil functions", func() {
 			Eventually(testapps.List(&testCtx, generics.PodSignature, matchingLabels, client.InNamespace(opsRes.OpsRequest.Namespace))).Should(HaveLen(0))
 			Eventually(testapps.List(&testCtx, generics.RestoreSignature, matchingLabels, client.InNamespace(opsRes.OpsRequest.Namespace))).Should(HaveLen(0))
 			Eventually(testapps.List(&testCtx, generics.PersistentVolumeClaimSignature, matchingLabels, client.InNamespace(opsRes.OpsRequest.Namespace))).Should(HaveLen(0))
+		})
+
+		It("fails in-place rebuild OpsRequest when the target is offline in desired state", func() {
+			By("init operations resources")
+			opsRes := prepareOpsRes("", true)
+			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
+
+			By("fake component phase to Failed so the phase gate passes")
+			Expect(testapps.ChangeObjStatus(&testCtx, opsRes.Cluster, func() {
+				compStatus := opsRes.Cluster.Status.Components[defaultCompName]
+				compStatus.Phase = appsv1.FailedComponentPhase
+				opsRes.Cluster.Status.Components[defaultCompName] = compStatus
+			})).Should(Succeed())
+
+			By("mark the target offline in the Component desired state")
+			targetName := opsRes.OpsRequest.Spec.RebuildFrom[0].Instances[0].Name
+			comp := &appsv1.Component{}
+			Expect(k8sClient.Get(ctx, client.ObjectKey{
+				Name:      constant.GenerateClusterComponentName(clusterName, defaultCompName),
+				Namespace: testCtx.DefaultNamespace,
+			}, comp)).Should(Succeed())
+			Expect(testapps.ChangeObj(&testCtx, comp, func(c *appsv1.Component) {
+				c.Spec.OfflineInstances = []string{targetName}
+			})).Should(Succeed())
+
+			By("expect terminal failure from desired lifecycle state")
+			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsCreatingPhase
+			_, _ = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(opsv1alpha1.OpsFailedPhase))
+			Expect(opsRes.OpsRequest.Status.Conditions[0].Message).Should(ContainSubstring(fmt.Sprintf(`instance "%s" is offline`, targetName)))
 		})
 
 		It("test rebuild instance when cluster/component are mismatched", func() {

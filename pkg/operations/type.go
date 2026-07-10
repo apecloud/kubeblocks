@@ -144,7 +144,6 @@ type Workload interface {
 type Instance interface {
 	GetName() string
 	GetComponentName() string
-	HasPod() bool
 	GetCreationTimestamp() metav1.Time
 	IsDeleting() bool
 	GetRole() string

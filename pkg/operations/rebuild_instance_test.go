@@ -243,6 +243,78 @@ var _ = Describe("OpsUtil functions", func() {
 			Eventually(testapps.List(&testCtx, generics.PersistentVolumeClaimSignature, matchingLabels, client.InNamespace(opsRes.OpsRequest.Namespace))).Should(HaveLen(0))
 		})
 
+		It("waits for in-place rebuild when the desired target uses component ordinals", func() {
+			By("init operations resources")
+			opsRes := prepareOpsRes("", true)
+			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
+
+			By("fake component phase to Failed so the phase gate passes")
+			Expect(testapps.ChangeObjStatus(&testCtx, opsRes.Cluster, func() {
+				compStatus := opsRes.Cluster.Status.Components[defaultCompName]
+				compStatus.Phase = appsv1.FailedComponentPhase
+				opsRes.Cluster.Status.Components[defaultCompName] = compStatus
+			})).Should(Succeed())
+
+			By("move the desired component instances to explicit ordinals")
+			comp := &appsv1.Component{}
+			Expect(k8sClient.Get(ctx, client.ObjectKey{
+				Name:      constant.GenerateClusterComponentName(clusterName, defaultCompName),
+				Namespace: testCtx.DefaultNamespace,
+			}, comp)).Should(Succeed())
+			Expect(testapps.ChangeObj(&testCtx, comp, func(c *appsv1.Component) {
+				c.Spec.Replicas = 2
+				c.Spec.Ordinals = appsv1.Ordinals{Discrete: []int32{3, 4}}
+			})).Should(Succeed())
+
+			By("request an absent but desired ordinal target")
+			targetName := fmt.Sprintf("%s-%s-3", clusterName, defaultCompName)
+			opsRes.OpsRequest = createRebuildInstanceOps("", true, targetName)
+			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsCreatingPhase
+
+			By("expect action not to turn the desired ordinal instance into terminal failure")
+			_, _ = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(opsv1alpha1.OpsCreatingPhase))
+		})
+
+		It("waits for in-place rebuild when the desired target uses flat instance ordinals", func() {
+			By("init operations resources")
+			opsRes := prepareOpsRes("", true)
+			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
+
+			By("fake component phase to Failed so the phase gate passes")
+			Expect(testapps.ChangeObjStatus(&testCtx, opsRes.Cluster, func() {
+				compStatus := opsRes.Cluster.Status.Components[defaultCompName]
+				compStatus.Phase = appsv1.FailedComponentPhase
+				opsRes.Cluster.Status.Components[defaultCompName] = compStatus
+			})).Should(Succeed())
+
+			By("move the desired component to flat ordinal naming with a named template")
+			tplReplicas := int32(1)
+			comp := &appsv1.Component{}
+			Expect(k8sClient.Get(ctx, client.ObjectKey{
+				Name:      constant.GenerateClusterComponentName(clusterName, defaultCompName),
+				Namespace: testCtx.DefaultNamespace,
+			}, comp)).Should(Succeed())
+			Expect(testapps.ChangeObj(&testCtx, comp, func(c *appsv1.Component) {
+				c.Spec.Replicas = 2
+				c.Spec.FlatInstanceOrdinal = true
+				c.Spec.Instances = []appsv1.InstanceTemplate{{
+					Name:     "canary",
+					Replicas: &tplReplicas,
+					Ordinals: appsv1.Ordinals{Discrete: []int32{7}},
+				}}
+			})).Should(Succeed())
+
+			By("request an absent but desired flat ordinal target")
+			targetName := fmt.Sprintf("%s-%s-7", clusterName, defaultCompName)
+			opsRes.OpsRequest = createRebuildInstanceOps("", true, targetName)
+			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsCreatingPhase
+
+			By("expect action not to turn the desired flat ordinal instance into terminal failure")
+			_, _ = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(opsv1alpha1.OpsCreatingPhase))
+		})
+
 		It("fails in-place rebuild OpsRequest when the target is offline in desired state", func() {
 			By("init operations resources")
 			opsRes := prepareOpsRes("", true)

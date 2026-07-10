@@ -41,6 +41,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
+	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	dputils "github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
@@ -167,7 +168,7 @@ func (r rebuildInstanceOpsHandler) validateInPlaceRebuildTargetDesiredState(reqC
 	if slices.Contains(comp.Spec.OfflineInstances, instanceName) {
 		return intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" is offline`, instanceName))
 	}
-	instanceSet, err := runtime.GenerateInstanceNameSet(opsRes.Cluster.Name, componentName, comp.Spec.Replicas, comp.Spec.Instances, comp.Spec.OfflineInstances)
+	instanceSet, err := r.buildDesiredInstanceNameSet(reqCtx, cli, comp)
 	if err != nil {
 		return err
 	}
@@ -175,6 +176,64 @@ func (r rebuildInstanceOpsHandler) validateInPlaceRebuildTargetDesiredState(reqC
 		return intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" not found in desired workload`, instanceName))
 	}
 	return nil
+}
+
+func (r rebuildInstanceOpsHandler) buildDesiredInstanceNameSet(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	comp *appsv1.Component) (map[string]struct{}, error) {
+	protoITS := buildInstanceSetForRebuildTargetNames(comp)
+	runningITS := &workloads.InstanceSet{}
+	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{
+		Name:      protoITS.Name,
+		Namespace: protoITS.Namespace,
+	}, runningITS); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return nil, err
+		}
+	} else {
+		protoITS.Status.AssignedOrdinals = runningITS.Status.AssignedOrdinals
+	}
+	itsExt, err := instancetemplate.BuildInstanceSetExt(protoITS, nil)
+	if err != nil {
+		return nil, err
+	}
+	nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt, nil)
+	if err != nil {
+		return nil, err
+	}
+	names, err := nameBuilder.GenerateAllInstanceNames()
+	if err != nil {
+		return nil, err
+	}
+	nameSet := make(map[string]struct{}, len(names))
+	for _, name := range names {
+		nameSet[name] = struct{}{}
+	}
+	return nameSet, nil
+}
+
+func buildInstanceSetForRebuildTargetNames(comp *appsv1.Component) *workloads.InstanceSet {
+	instances := make([]workloads.InstanceTemplate, 0, len(comp.Spec.Instances))
+	for _, ins := range comp.Spec.Instances {
+		instances = append(instances, workloads.InstanceTemplate{
+			Name:     ins.Name,
+			Replicas: ins.Replicas,
+			Ordinals: ins.Ordinals,
+		})
+	}
+	return &workloads.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      comp.Name,
+			Namespace: comp.Namespace,
+		},
+		Spec: workloads.InstanceSetSpec{
+			Replicas:            pointer.Int32(comp.Spec.Replicas),
+			Instances:           instances,
+			Ordinals:            comp.Spec.Ordinals,
+			FlatInstanceOrdinal: comp.Spec.FlatInstanceOrdinal,
+			OfflineInstances:    comp.Spec.OfflineInstances,
+		},
+	}
 }
 
 func (r rebuildInstanceOpsHandler) getCompStatusFromCluster(opsRes *OpsResource, compName string) *appsv1.ComponentPhase {

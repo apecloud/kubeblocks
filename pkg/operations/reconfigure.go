@@ -21,15 +21,18 @@ package operations
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/sharding"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -60,8 +63,62 @@ func (r *reconfigureAction) ActionStartedCondition(reqCtx intctrlutil.RequestCtx
 	return opsv1alpha1.NewReconfigureCondition(opsRes.OpsRequest), nil
 }
 
+// reconfigurePriorValue records the desired-assignment state of one parameter
+// key before this ops applied its write. Existed=false means the key was not
+// present in the ComponentParameter desired assignments at that time.
+type reconfigurePriorValue struct {
+	Existed bool    `json:"existed"`
+	Value   *string `json:"value,omitempty"`
+}
+
+// SaveLastConfiguration snapshots, per component, the prior desired-assignment
+// state of every key this ops is about to write, so that the failure path can
+// restore (rather than blindly delete) previously accepted desired intent.
+// The ops framework invokes this hook before Action, while the
+// ComponentParameter still holds the pre-apply state; the snapshot is stored
+// as an annotation on the OpsRequest.
 func (r *reconfigureAction) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
-	return nil
+	ops := opsRes.OpsRequest
+	if _, ok := ops.Annotations[constant.ReconfigurePriorParametersAnnotationKey]; ok {
+		return nil
+	}
+	snapshot := map[string]map[string]reconfigurePriorValue{}
+	for _, reconfigure := range ops.Spec.Reconfigures {
+		compNames, err := r.resolveReconfigureComponents(reqCtx.Ctx, cli, opsRes.Cluster, reconfigure.ComponentName)
+		if err != nil {
+			return err
+		}
+		for _, compName := range compNames {
+			compParam, err := r.getRunningComponentParameter(reqCtx.Ctx, cli, opsRes.Cluster.Namespace, opsRes.Cluster.Name, compName)
+			if err != nil && !apierrors.IsNotFound(err) {
+				return err
+			}
+			prior, ok := snapshot[compName]
+			if !ok {
+				prior = map[string]reconfigurePriorValue{}
+				snapshot[compName] = prior
+			}
+			for _, param := range reconfigure.Parameters {
+				pv := reconfigurePriorValue{}
+				if err == nil && compParam.Spec.Desired != nil {
+					if v, exist := compParam.Spec.Desired.Assignments[param.Key]; exist {
+						pv.Existed = true
+						pv.Value = v
+					}
+				}
+				prior[param.Key] = pv
+			}
+		}
+	}
+	data, err := json.Marshal(snapshot)
+	if err != nil {
+		return err
+	}
+	if ops.Annotations == nil {
+		ops.Annotations = map[string]string{}
+	}
+	ops.Annotations[constant.ReconfigurePriorParametersAnnotationKey] = string(data)
+	return cli.Update(reqCtx.Ctx, ops)
 }
 
 func (r *reconfigureAction) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, resource *OpsResource) (opsv1alpha1.OpsPhase, time.Duration, error) {
@@ -86,12 +143,26 @@ func (r *reconfigureAction) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli c
 	return opsv1alpha1.OpsFailedPhase, 0, intctrlutil.NewFatalError(fmt.Sprintf("reconfigure failed: %s", msg))
 }
 
-// withdrawReconfigureFromParameters removes the desired assignments written by
-// this ops from the ComponentParameter, guarded by value equality so that a
-// newer ops that re-set the same key with a different value is not clobbered.
-// It is the failure-path counterpart of applyReconfigureToParameters: the ops
-// only withdraws its own write, it does not do any schema validation.
+// withdrawReconfigureFromParameters restores, in the ComponentParameter
+// desired assignments, the pre-ops state of every key this failed ops wrote —
+// but only while the current value still equals this ops's write (a newer
+// writer wins). Value equality against the ops spec alone cannot prove
+// ownership: the same key=value pair may be previously accepted desired intent
+// from an earlier successful reconfigure, in which case it must be kept, not
+// deleted. Ownership is therefore anchored on the prior-state snapshot taken
+// by SaveLastConfiguration; without a snapshot this path leaves the desired
+// state untouched. No schema validation is performed here.
 func (r *reconfigureAction) withdrawReconfigureFromParameters(reqCtx intctrlutil.RequestCtx, cli client.Client, resource *OpsResource) error {
+	raw, ok := resource.OpsRequest.Annotations[constant.ReconfigurePriorParametersAnnotationKey]
+	if !ok {
+		// no prior-state snapshot (e.g. ops created before this mechanism):
+		// do not mutate existing desired state on failure.
+		return nil
+	}
+	snapshot := map[string]map[string]reconfigurePriorValue{}
+	if err := json.Unmarshal([]byte(raw), &snapshot); err != nil {
+		return err
+	}
 	sameValue := func(a, b *string) bool {
 		if a == nil || b == nil {
 			return a == b
@@ -104,6 +175,10 @@ func (r *reconfigureAction) withdrawReconfigureFromParameters(reqCtx intctrlutil
 			return err
 		}
 		for _, compName := range compNames {
+			prior, ok := snapshot[compName]
+			if !ok {
+				continue
+			}
 			compParam, err := r.getRunningComponentParameter(reqCtx.Ctx, cli, resource.Cluster.Namespace, resource.Cluster.Name, compName)
 			if err != nil {
 				return client.IgnoreNotFound(err)
@@ -114,11 +189,25 @@ func (r *reconfigureAction) withdrawReconfigureFromParameters(reqCtx intctrlutil
 			patch := client.MergeFrom(compParam.DeepCopy())
 			changed := false
 			for _, param := range reconfigure.Parameters {
-				current, ok := compParam.Spec.Desired.Assignments[param.Key]
-				if !ok || !sameValue(current, param.Value) {
+				pv, snapshotted := prior[param.Key]
+				if !snapshotted {
 					continue
 				}
-				delete(compParam.Spec.Desired.Assignments, param.Key)
+				current, exist := compParam.Spec.Desired.Assignments[param.Key]
+				if !exist || !sameValue(current, param.Value) {
+					// already gone, or a newer writer re-set the key: leave it.
+					continue
+				}
+				if pv.Existed {
+					if sameValue(pv.Value, param.Value) {
+						// the same key=value was already accepted desired intent
+						// before this ops: keep it.
+						continue
+					}
+					compParam.Spec.Desired.Assignments[param.Key] = pv.Value
+				} else {
+					delete(compParam.Spec.Desired.Assignments, param.Key)
+				}
 				changed = true
 			}
 			if !changed {

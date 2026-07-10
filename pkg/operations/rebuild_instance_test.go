@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"context"
 	"fmt"
 	"slices"
 
@@ -30,6 +31,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -170,6 +172,41 @@ var _ = Describe("OpsUtil functions", func() {
 						pod.Status.Conditions = nil
 					})()).Should(Succeed())
 				}
+			}
+		}
+
+		markRebuildTargetsAvailable := func(opsRes *OpsResource) {
+			for _, rebuildFrom := range opsRes.OpsRequest.Spec.RebuildFrom {
+				for _, target := range rebuildFrom.Instances {
+					Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKey{
+						Name: target.Name, Namespace: opsRes.OpsRequest.Namespace,
+					}, func(pod *corev1.Pod) {
+						pod.Status.Conditions = []corev1.PodCondition{{
+							Type: corev1.PodReady, Status: corev1.ConditionTrue,
+						}}
+					})()).Should(Succeed())
+				}
+			}
+		}
+
+		cleanupRebuildSideEffects := func(opsRes *OpsResource) {
+			matchingLabels := client.MatchingLabels{
+				constant.OpsRequestNameLabelKey:      opsRes.OpsRequest.Name,
+				constant.OpsRequestNamespaceLabelKey: opsRes.OpsRequest.Namespace,
+			}
+			testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.RestoreSignature, true,
+				matchingLabels, client.InNamespace(opsRes.OpsRequest.Namespace))
+			testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PodSignature, true,
+				matchingLabels, client.InNamespace(opsRes.OpsRequest.Namespace))
+			pvcList := &corev1.PersistentVolumeClaimList{}
+			Expect(k8sClient.List(ctx, pvcList, client.InNamespace(opsRes.OpsRequest.Namespace))).Should(Succeed())
+			for i := range pvcList.Items {
+				pvc := &pvcList.Items[i]
+				if pvc.Annotations[rebuildFromAnnotation] != opsRes.OpsRequest.Name {
+					continue
+				}
+				testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true,
+					client.InNamespace(opsRes.OpsRequest.Namespace), client.MatchingFields{"metadata.name": pvc.Name})
 			}
 		}
 
@@ -380,6 +417,256 @@ var _ = Describe("OpsUtil functions", func() {
 				opsRes.OpsRequest.Spec.RebuildFrom[0], target, 0, false)
 			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeTrue())
 			Expect(err.Error()).Should(ContainSubstring(fmt.Sprintf(`instance "%s" not found in desired workload`, target.Name)))
+		})
+
+		It("continues after a PrepareData Restore commits rebuild execution", func() {
+			actionSet := testapps.CreateCustomizedObj(&testCtx, "backup/actionset.yaml",
+				&dpv1alpha1.ActionSet{}, testapps.WithName("prepare-data-"+testCtx.GetRandomStr()))
+			backup := testdp.NewBackupFactory(testCtx.DefaultNamespace, "backup-"+testCtx.GetRandomStr()).
+				SetBackupPolicyName(testdp.BackupPolicyName).
+				SetBackupMethod(testdp.BackupMethodName).
+				AddLabels(dptypes.BackupTypeLabelKey, string(dpv1alpha1.BackupTypeFull)).
+				Create(&testCtx).GetObject()
+			Expect(testapps.ChangeObjStatus(&testCtx, backup, func() {
+				backup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
+				backup.Status.BackupMethod = &dpv1alpha1.BackupMethod{
+					Name:          backup.Spec.BackupMethod,
+					ActionSetName: actionSet.Name,
+					TargetVolumes: &dpv1alpha1.TargetVolumeInfo{VolumeMounts: []corev1.VolumeMount{{
+						Name: testapps.DataVolumeName, MountPath: "/test",
+					}}},
+				}
+			})).Should(Succeed())
+
+			opsRes := prepareOpsRes(backup.Name, true)
+			DeferCleanup(cleanupRebuildSideEffects, opsRes)
+			_ = testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
+			markRebuildTargetsUnavailable(opsRes)
+			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsRunningPhase
+			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
+			matchingLabels := client.MatchingLabels{
+				constant.OpsRequestNameLabelKey:      opsRes.OpsRequest.Name,
+				constant.OpsRequestNamespaceLabelKey: opsRes.OpsRequest.Namespace,
+			}
+
+			_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			restoreList := &dpv1alpha1.RestoreList{}
+			Expect(k8sClient.List(ctx, restoreList, matchingLabels,
+				client.InNamespace(opsRes.OpsRequest.Namespace))).Should(Succeed())
+			Expect(restoreList.Items).Should(BeEmpty())
+			persisted := &opsv1alpha1.OpsRequest{}
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest),
+				func(g Gomega, request *opsv1alpha1.OpsRequest) {
+					g.Expect(request.Status.Components[defaultCompName].ProgressDetails).Should(HaveLen(rebuildInstanceCount))
+					for _, detail := range request.Status.Components[defaultCompName].ProgressDetails {
+						g.Expect(detail.StartTime.IsZero()).Should(BeFalse())
+					}
+				})).Should(Succeed())
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(opsRes.OpsRequest), persisted)).Should(Succeed())
+			opsRes.OpsRequest = persisted
+
+			Eventually(func(g Gomega) {
+				_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+				g.Expect(err).Should(Succeed())
+				g.Expect(testapps.List(&testCtx, generics.RestoreSignature, matchingLabels,
+					client.InNamespace(opsRes.OpsRequest.Namespace))(g)).Should(HaveLen(rebuildInstanceCount))
+			}).Should(Succeed())
+
+			markRebuildTargetsAvailable(opsRes)
+			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			for _, detail := range opsRes.OpsRequest.Status.Components[defaultCompName].ProgressDetails {
+				Expect(detail.Status).ShouldNot(Equal(opsv1alpha1.FailedProgressStatus))
+			}
+			Eventually(testapps.List(&testCtx, generics.RestoreSignature, matchingLabels,
+				client.InNamespace(opsRes.OpsRequest.Namespace))).Should(HaveLen(rebuildInstanceCount))
+		})
+
+		It("creates no rebuild side effect when the start status commit conflicts", func() {
+			actionSet := testapps.CreateCustomizedObj(&testCtx, "backup/actionset.yaml",
+				&dpv1alpha1.ActionSet{}, testapps.WithName("status-conflict-"+testCtx.GetRandomStr()))
+			backup := testdp.NewBackupFactory(testCtx.DefaultNamespace, "backup-"+testCtx.GetRandomStr()).
+				SetBackupPolicyName(testdp.BackupPolicyName).
+				SetBackupMethod(testdp.BackupMethodName).
+				AddLabels(dptypes.BackupTypeLabelKey, string(dpv1alpha1.BackupTypeFull)).
+				Create(&testCtx).GetObject()
+			Expect(testapps.ChangeObjStatus(&testCtx, backup, func() {
+				backup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
+				backup.Status.BackupMethod = &dpv1alpha1.BackupMethod{
+					Name:          backup.Spec.BackupMethod,
+					ActionSetName: actionSet.Name,
+					TargetVolumes: &dpv1alpha1.TargetVolumeInfo{VolumeMounts: []corev1.VolumeMount{{
+						Name: testapps.DataVolumeName, MountPath: "/test",
+					}}},
+				}
+			})).Should(Succeed())
+
+			opsRes := prepareOpsRes(backup.Name, true)
+			DeferCleanup(cleanupRebuildSideEffects, opsRes)
+			_ = testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
+			markRebuildTargetsUnavailable(opsRes)
+			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsRunningPhase
+			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
+			conflictClient := &opsStatusPatchConflictClient{Client: k8sClient}
+
+			_, err := GetOpsManager().Reconcile(reqCtx, conflictClient, opsRes)
+			Expect(apierrors.IsConflict(err)).Should(BeTrue())
+
+			matchingLabels := client.MatchingLabels{
+				constant.OpsRequestNameLabelKey:      opsRes.OpsRequest.Name,
+				constant.OpsRequestNamespaceLabelKey: opsRes.OpsRequest.Namespace,
+			}
+			restoreList := &dpv1alpha1.RestoreList{}
+			Expect(k8sClient.List(ctx, restoreList, matchingLabels,
+				client.InNamespace(opsRes.OpsRequest.Namespace))).Should(Succeed())
+			Expect(restoreList.Items).Should(BeEmpty())
+			persisted := &opsv1alpha1.OpsRequest{}
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(opsRes.OpsRequest), persisted)).Should(Succeed())
+			Expect(persisted.Status.Components[defaultCompName].ProgressDetails).Should(BeEmpty())
+		})
+
+		It("continues after a rebuild tmp Pod commits rebuild execution", func() {
+			actionSet := testapps.CreateCustomizedObj(&testCtx, "backup/actionset.yaml",
+				&dpv1alpha1.ActionSet{}, testapps.WithName("tmp-pod-"+testCtx.GetRandomStr()),
+				func(obj *dpv1alpha1.ActionSet) {
+					obj.Spec.Restore.PrepareData = nil
+				})
+			backup := testdp.NewBackupFactory(testCtx.DefaultNamespace, "backup-"+testCtx.GetRandomStr()).
+				SetBackupPolicyName(testdp.BackupPolicyName).
+				SetBackupMethod(testdp.BackupMethodName).
+				AddLabels(dptypes.BackupTypeLabelKey, string(dpv1alpha1.BackupTypeFull)).
+				Create(&testCtx).GetObject()
+			Expect(testapps.ChangeObjStatus(&testCtx, backup, func() {
+				backup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
+				backup.Status.BackupMethod = &dpv1alpha1.BackupMethod{
+					Name:          backup.Spec.BackupMethod,
+					ActionSetName: actionSet.Name,
+					TargetVolumes: &dpv1alpha1.TargetVolumeInfo{VolumeMounts: []corev1.VolumeMount{{
+						Name: testapps.DataVolumeName, MountPath: "/test",
+					}}},
+				}
+			})).Should(Succeed())
+
+			opsRes := prepareOpsRes(backup.Name, true)
+			DeferCleanup(cleanupRebuildSideEffects, opsRes)
+			_ = testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
+			markRebuildTargetsUnavailable(opsRes)
+			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsRunningPhase
+			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
+			matchingLabels := client.MatchingLabels{
+				constant.OpsRequestNameLabelKey:      opsRes.OpsRequest.Name,
+				constant.OpsRequestNamespaceLabelKey: opsRes.OpsRequest.Namespace,
+			}
+
+			_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			podList := &corev1.PodList{}
+			Expect(k8sClient.List(ctx, podList, matchingLabels,
+				client.InNamespace(opsRes.OpsRequest.Namespace))).Should(Succeed())
+			Expect(podList.Items).Should(BeEmpty())
+
+			persisted := &opsv1alpha1.OpsRequest{}
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(opsRes.OpsRequest), persisted)).Should(Succeed())
+			Expect(persisted.Status.Components[defaultCompName].ProgressDetails).Should(HaveLen(rebuildInstanceCount))
+			for _, detail := range persisted.Status.Components[defaultCompName].ProgressDetails {
+				Expect(detail.StartTime.IsZero()).Should(BeFalse())
+			}
+			opsRes.OpsRequest = persisted
+
+			Eventually(func(g Gomega) {
+				_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+				g.Expect(err).Should(Succeed())
+				g.Expect(testapps.List(&testCtx, generics.PodSignature, matchingLabels,
+					client.InNamespace(opsRes.OpsRequest.Namespace))(g)).Should(HaveLen(rebuildInstanceCount))
+			}).Should(Succeed())
+
+			markRebuildTargetsAvailable(opsRes)
+			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			for _, detail := range opsRes.OpsRequest.Status.Components[defaultCompName].ProgressDetails {
+				Expect(detail.Status).ShouldNot(Equal(opsv1alpha1.FailedProgressStatus))
+			}
+			Eventually(testapps.List(&testCtx, generics.PodSignature, matchingLabels,
+				client.InNamespace(opsRes.OpsRequest.Namespace))).Should(HaveLen(rebuildInstanceCount))
+		})
+
+		It("accepts an in-place target owned by the requested sharding", func() {
+			const (
+				shardingName       = "shard"
+				shardComponentName = "shard-abc"
+			)
+			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
+			Expect(testapps.ChangeObj(&testCtx, opsRes.Cluster, func(cluster *appsv1.Cluster) {
+				template := cluster.Spec.ComponentSpecs[0]
+				template.Name = ""
+				cluster.Spec.ComponentSpecs = nil
+				cluster.Spec.Shardings = []appsv1.ClusterSharding{{
+					Name: shardingName, Shards: 1, Template: template,
+				}}
+			})).Should(Succeed())
+			Expect(testapps.ChangeObjStatus(&testCtx, opsRes.Cluster, func() {
+				opsRes.Cluster.Status.Components = nil
+				opsRes.Cluster.Status.Shardings = map[string]appsv1.ClusterShardingStatus{
+					shardingName: {Phase: appsv1.FailedComponentPhase},
+				}
+			})).Should(Succeed())
+
+			actualSpec := opsRes.Cluster.Spec.Shardings[0].Template.DeepCopy()
+			actualSpec.Name = shardComponentName
+			shardComp, err := component.BuildComponent(opsRes.Cluster, actualSpec, map[string]string{
+				constant.KBAppShardingNameLabelKey: shardingName,
+			}, nil)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(testCtx.CreateObj(ctx, shardComp)).Should(Succeed())
+			DeferCleanup(func() {
+				Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, shardComp))).Should(Succeed())
+			})
+			targetName := fmt.Sprintf("%s-%s-0", clusterName, shardComponentName)
+			targetPod := testapps.MockInstanceSetPod(&testCtx, nil, clusterName, shardComponentName, targetName, "")
+			Expect(testapps.ChangeObj(&testCtx, targetPod, func(pod *corev1.Pod) {
+				pod.Labels[constant.KBAppShardingNameLabelKey] = shardingName
+			})).Should(Succeed())
+			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(targetPod), func(pod *corev1.Pod) {
+				pod.Status.Conditions = nil
+			})()).Should(Succeed())
+
+			ops := testops.NewOpsRequestObj("rebuild-shard-"+testCtx.GetRandomStr(), testCtx.DefaultNamespace,
+				clusterName, opsv1alpha1.RebuildInstanceType)
+			ops.Spec.RebuildFrom = []opsv1alpha1.RebuildInstance{{
+				ComponentOps: opsv1alpha1.ComponentOps{ComponentName: shardingName},
+				Instances:    []opsv1alpha1.Instance{{Name: targetName}},
+				InPlace:      true,
+			}}
+			opsRes.OpsRequest = testops.CreateOpsRequest(ctx, testCtx, ops)
+			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsCreatingPhase
+			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
+
+			Expect(rebuildInstanceOpsHandler{}.Action(reqCtx, k8sClient, opsRes)).Should(Succeed())
+
+			Expect(testapps.ChangeObj(&testCtx, targetPod, func(pod *corev1.Pod) {
+				pod.Labels[constant.KBAppShardingNameLabelKey] = "other-shard"
+			})).Should(Succeed())
+			err = rebuildInstanceOpsHandler{}.Action(reqCtx, k8sClient, opsRes)
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeTrue())
+			Expect(err.Error()).Should(ContainSubstring("does not belong to sharding"))
+
+			Expect(testapps.ChangeObj(&testCtx, targetPod, func(pod *corev1.Pod) {
+				pod.Labels[constant.KBAppShardingNameLabelKey] = shardingName
+			})).Should(Succeed())
+			Expect(testapps.ChangeObj(&testCtx, shardComp, func(comp *appsv1.Component) {
+				comp.Labels[constant.KBAppShardingNameLabelKey] = "other-shard"
+			})).Should(Succeed())
+			err = rebuildInstanceOpsHandler{}.Action(reqCtx, k8sClient, opsRes)
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeTrue())
+			Expect(err.Error()).Should(ContainSubstring("does not belong to sharding"))
+
+			Expect(testapps.ChangeObj(&testCtx, shardComp, func(comp *appsv1.Component) {
+				comp.Labels[constant.KBAppShardingNameLabelKey] = shardingName
+			})).Should(Succeed())
+			Expect(k8sClient.Delete(ctx, shardComp)).Should(Succeed())
+			err = rebuildInstanceOpsHandler{}.Action(reqCtx, k8sClient, opsRes)
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeNeedWaiting)).Should(BeTrue())
 		})
 
 		It("waits for in-place rebuild when the desired target uses component ordinals", func() {
@@ -950,6 +1237,10 @@ var _ = Describe("OpsUtil functions", func() {
 				constant.OpsRequestNamespaceLabelKey: opsRes.OpsRequest.Namespace,
 			}
 
+			By("persisting the rebuild execution boundary before changing storage")
+			_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+
 			By("expect to dynamically reprovision the source pvcs without helper tmp resources.")
 			sourcePVCsShouldDynamicReprovision(reqCtx, opsRes)
 
@@ -975,7 +1266,7 @@ var _ = Describe("OpsUtil functions", func() {
 			}))
 
 			By("expect no tmp pods were left behind")
-			_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).NotTo(HaveOccurred())
 			Eventually(testapps.List(&testCtx, generics.PodSignature, matchingLabels, client.InNamespace(opsRes.OpsRequest.Namespace))).Should(HaveLen(0))
 
@@ -1122,6 +1413,7 @@ var _ = Describe("OpsUtil functions", func() {
 
 			By("expect for the prepareData Restore CR has been created.")
 			_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			matchingLabels := client.MatchingLabels{
 				constant.OpsRequestNameLabelKey:      opsRes.OpsRequest.Name,
 				constant.OpsRequestNamespaceLabelKey: opsRes.OpsRequest.Namespace,
@@ -1249,3 +1541,25 @@ var _ = Describe("OpsUtil functions", func() {
 
 	})
 })
+
+type opsStatusPatchConflictClient struct {
+	client.Client
+}
+
+func (c *opsStatusPatchConflictClient) Status() client.SubResourceWriter {
+	return &opsStatusPatchConflictWriter{SubResourceWriter: c.Client.Status()}
+}
+
+type opsStatusPatchConflictWriter struct {
+	client.SubResourceWriter
+}
+
+func (w *opsStatusPatchConflictWriter) Patch(ctx context.Context, obj client.Object,
+	patch client.Patch, opts ...client.SubResourcePatchOption) error {
+	if _, ok := obj.(*opsv1alpha1.OpsRequest); ok {
+		return apierrors.NewConflict(schema.GroupResource{
+			Group: opsv1alpha1.GroupVersion.Group, Resource: "opsrequests",
+		}, obj.GetName(), fmt.Errorf("injected status patch conflict"))
+	}
+	return w.SubResourceWriter.Patch(ctx, obj, patch, opts...)
+}

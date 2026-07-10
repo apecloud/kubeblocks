@@ -44,6 +44,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
+	"github.com/apecloud/kubeblocks/pkg/controller/sharding"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	dputils "github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
@@ -147,31 +148,32 @@ func (r rebuildInstanceOpsHandler) validateInPlaceRebuildTargetDesiredState(reqC
 	cli client.Client,
 	opsRes *OpsResource,
 	componentName,
-	instanceName string) error {
-	comp, err := r.getConvergedInPlaceRebuildComponent(reqCtx, cli, opsRes, componentName)
+	instanceName string) (*appsv1.Component, error) {
+	comp, err := r.getConvergedInPlaceRebuildComponent(reqCtx, cli, opsRes, componentName, instanceName)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if pointer.BoolDeref(comp.Spec.Stop, false) {
-		return intctrlutil.NewFatalError(fmt.Sprintf(`component "%s" is stopped`, componentName))
+		return nil, intctrlutil.NewFatalError(fmt.Sprintf(`component "%s" is stopped`, componentName))
 	}
 	if slices.Contains(comp.Spec.OfflineInstances, instanceName) {
-		return intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" is offline`, instanceName))
+		return nil, intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" is offline`, instanceName))
 	}
 	instanceSet, err := r.buildDesiredInstanceNameSet(reqCtx, cli, comp)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if _, ok := instanceSet[instanceName]; !ok {
-		return intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" not found in desired workload`, instanceName))
+		return nil, intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" not found in desired workload`, instanceName))
 	}
-	return nil
+	return comp, nil
 }
 
 func (r rebuildInstanceOpsHandler) getConvergedInPlaceRebuildComponent(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	opsRes *OpsResource,
-	componentName string) (*appsv1.Component, error) {
+	componentName,
+	instanceName string) (*appsv1.Component, error) {
 	cluster := &appsv1.Cluster{}
 	if err := cli.Get(reqCtx.Ctx, client.ObjectKeyFromObject(opsRes.Cluster), cluster); err != nil {
 		if apierrors.IsNotFound(err) {
@@ -181,9 +183,44 @@ func (r rebuildInstanceOpsHandler) getConvergedInPlaceRebuildComponent(reqCtx in
 	}
 	desiredCompSpec := cluster.Spec.GetComponentByName(componentName)
 	if desiredCompSpec == nil {
-		return nil, intctrlutil.NewFatalError(fmt.Sprintf(`component "%s" not found in desired cluster`, componentName))
+		shardingSpec := cluster.Spec.GetShardingByName(componentName)
+		if shardingSpec == nil {
+			return nil, intctrlutil.NewFatalError(fmt.Sprintf(`component "%s" not found in desired cluster`, componentName))
+		}
+		shardCompSpecs, err := sharding.BuildShardingCompSpecs(reqCtx.Ctx, cli,
+			cluster.Namespace, cluster.Name, shardingSpec)
+		if err != nil {
+			return nil, err
+		}
+		for _, specs := range shardCompSpecs {
+			for _, spec := range specs {
+				candidate, err := component.BuildComponent(cluster, spec,
+					map[string]string{constant.KBAppShardingNameLabelKey: componentName}, nil)
+				if err != nil {
+					return nil, err
+				}
+				nameSet, err := r.buildDesiredInstanceNameSet(reqCtx, cli, candidate)
+				if err != nil {
+					return nil, err
+				}
+				if _, ok := nameSet[instanceName]; ok {
+					desiredCompSpec = spec
+					break
+				}
+			}
+			if desiredCompSpec != nil {
+				break
+			}
+		}
+		if desiredCompSpec == nil {
+			return nil, r.classifyUnresolvedShardingTarget(reqCtx, cli, cluster, shardingSpec, instanceName)
+		}
 	}
-	desiredComp, err := component.BuildComponent(cluster, desiredCompSpec, nil, nil)
+	labels := map[string]string(nil)
+	if cluster.Spec.GetShardingByName(componentName) != nil {
+		labels = map[string]string{constant.KBAppShardingNameLabelKey: componentName}
+	}
+	desiredComp, err := component.BuildComponent(cluster, desiredCompSpec, labels, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -199,12 +236,71 @@ func (r rebuildInstanceOpsHandler) getConvergedInPlaceRebuildComponent(reqCtx in
 		return nil, intctrlutil.NewErrorf(intctrlutil.ErrorTypeNeedWaiting,
 			`wait for component "%s" recreation to finish`, componentName)
 	}
+	if liveComp.Labels[constant.AppInstanceLabelKey] != cluster.Name ||
+		liveComp.Labels[constant.KBAppComponentLabelKey] != desiredCompSpec.Name {
+		return nil, intctrlutil.NewFatalError(fmt.Sprintf(`component "%s" does not belong to cluster "%s"`, liveComp.Name, cluster.Name))
+	}
+	if desiredComp.Labels[constant.KBAppShardingNameLabelKey] != "" &&
+		liveComp.Labels[constant.KBAppShardingNameLabelKey] != componentName {
+		return nil, intctrlutil.NewFatalError(fmt.Sprintf(`component "%s" does not belong to sharding "%s"`, liveComp.Name, componentName))
+	}
 	if liveComp.Annotations[constant.KubeBlocksGenerationKey] != strconv.FormatInt(cluster.Generation, 10) ||
 		!rebuildComponentLifecycleProjectionEqual(desiredComp, liveComp) {
 		return nil, intctrlutil.NewErrorf(intctrlutil.ErrorTypeNeedWaiting,
 			`wait for component "%s" to reflect cluster generation %d`, componentName, cluster.Generation)
 	}
 	return desiredComp, nil
+}
+
+func (r rebuildInstanceOpsHandler) classifyUnresolvedShardingTarget(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	cluster *appsv1.Cluster,
+	shardingSpec *appsv1.ClusterSharding,
+	instanceName string) error {
+	targetPod := &corev1.Pod{}
+	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: instanceName, Namespace: cluster.Namespace}, targetPod); err == nil {
+		actualComponentName := targetPod.Labels[constant.KBAppComponentLabelKey]
+		if targetPod.Labels[constant.AppInstanceLabelKey] != cluster.Name || actualComponentName == "" {
+			return intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" does not belong to cluster "%s"`, instanceName, cluster.Name))
+		}
+		if targetPod.Labels[constant.KBAppShardingNameLabelKey] != shardingSpec.Name {
+			return intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" does not belong to sharding "%s"`, instanceName, shardingSpec.Name))
+		}
+		liveComp := &appsv1.Component{}
+		if err = cli.Get(reqCtx.Ctx, client.ObjectKey{
+			Name: component.FullName(cluster.Name, actualComponentName), Namespace: cluster.Namespace,
+		}, liveComp); err != nil {
+			if apierrors.IsNotFound(err) {
+				return intctrlutil.NewErrorf(intctrlutil.ErrorTypeNeedWaiting,
+					`wait for component "%s" to be recreated for sharding "%s"`, actualComponentName, shardingSpec.Name)
+			}
+			return err
+		}
+		if !liveComp.DeletionTimestamp.IsZero() {
+			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeNeedWaiting,
+				`wait for component "%s" recreation to finish`, actualComponentName)
+		}
+		if liveComp.Labels[constant.AppInstanceLabelKey] != cluster.Name ||
+			liveComp.Labels[constant.KBAppComponentLabelKey] != actualComponentName ||
+			liveComp.Labels[constant.KBAppShardingNameLabelKey] != shardingSpec.Name {
+			return intctrlutil.NewFatalError(fmt.Sprintf(`component "%s" does not belong to sharding "%s"`, liveComp.Name, shardingSpec.Name))
+		}
+		return intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" not found in desired workload`, instanceName))
+	} else if !apierrors.IsNotFound(err) {
+		return err
+	}
+
+	shardingComps, err := sharding.ListShardingComponents(reqCtx.Ctx, cli, cluster, shardingSpec.Name)
+	if err != nil {
+		return err
+	}
+	if int32(len(shardingComps)) < shardingSpec.Shards || slices.ContainsFunc(shardingComps, func(comp appsv1.Component) bool {
+		return !comp.DeletionTimestamp.IsZero()
+	}) {
+		return intctrlutil.NewErrorf(intctrlutil.ErrorTypeNeedWaiting,
+			`wait for sharding "%s" components to converge`, shardingSpec.Name)
+	}
+	return intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" not found in desired workload`, instanceName))
 }
 
 func rebuildComponentLifecycleProjectionEqual(desiredComp, liveComp *appsv1.Component) bool {
@@ -222,7 +318,8 @@ func (r rebuildInstanceOpsHandler) validateInPlaceRebuildTargetAtActionBoundary(
 	componentName,
 	instanceName string,
 	enforceAvailability bool) (*corev1.Pod, *component.SynthesizedComponent, error) {
-	if err := r.validateInPlaceRebuildTargetDesiredState(reqCtx, cli, opsRes, componentName, instanceName); err != nil {
+	desiredComp, err := r.validateInPlaceRebuildTargetDesiredState(reqCtx, cli, opsRes, componentName, instanceName)
+	if err != nil {
 		return nil, nil, err
 	}
 	targetPod := &corev1.Pod{}
@@ -237,11 +334,19 @@ func (r rebuildInstanceOpsHandler) validateInPlaceRebuildTargetAtActionBoundary(
 		return nil, nil, intctrlutil.NewErrorf(intctrlutil.ErrorTypeNeedWaiting,
 			`wait for pod "%s" deletion to finish before rebuilding in place`, instanceName)
 	}
+	actualComponentName, err := component.ShortName(opsRes.Cluster.Name, desiredComp.Name)
+	if err != nil {
+		return nil, nil, err
+	}
 	if targetPod.Labels[constant.AppInstanceLabelKey] != opsRes.Cluster.Name ||
-		targetPod.Labels[constant.KBAppComponentLabelKey] != componentName {
+		targetPod.Labels[constant.KBAppComponentLabelKey] != actualComponentName {
 		return nil, nil, intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" does not belong to component "%s"`, instanceName, componentName))
 	}
-	synthesizedComp, err := r.buildSynthesizedComponent(reqCtx.Ctx, cli, opsRes.Cluster, componentName)
+	if desiredComp.Labels[constant.KBAppShardingNameLabelKey] != "" &&
+		targetPod.Labels[constant.KBAppShardingNameLabelKey] != componentName {
+		return nil, nil, intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" does not belong to sharding "%s"`, instanceName, componentName))
+	}
+	synthesizedComp, err := r.buildSynthesizedComponent(reqCtx.Ctx, cli, opsRes.Cluster, actualComponentName)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -456,6 +561,22 @@ func (r rebuildInstanceOpsHandler) rebuildInstancesInPlace(reqCtx intctrlutil.Re
 			}
 			continue
 		}
+		if progressDetail.StartTime.IsZero() {
+			if _, _, err := r.validateInPlaceRebuildTargetAtActionBoundary(reqCtx, cli, opsRes,
+				rebuildInstance.ComponentName, instance.Name, true); err != nil {
+				if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal) {
+					progressDetail.SetStatusAndMessage(opsv1alpha1.FailedProgressStatus, err.Error())
+					setComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest, &compStatus.ProgressDetails, progressDetail)
+					continue
+				}
+				return 0, 0, err
+			}
+			// Persist the execution boundary before creating a Restore or temporary
+			// Pod. A retry with StartTime set may continue even if the rebuilt Pod
+			// has already become Available.
+			setComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest, &compStatus.ProgressDetails, progressDetail)
+			continue
+		}
 		// rebuild instance
 		completed, err := r.rebuildInstanceInPlace(reqCtx, cli, opsRes, &progressDetail, rebuildInstance, instance, i)
 		if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal) {
@@ -485,9 +606,7 @@ func (r rebuildInstanceOpsHandler) rebuildInstanceInPlace(reqCtx intctrlutil.Req
 	rebuildFrom opsv1alpha1.RebuildInstance,
 	instance opsv1alpha1.Instance,
 	index int) (bool, error) {
-	initialMessage := fmt.Sprintf("Start to rebuild pod %s", instance.Name)
-	enforceAvailability := progressDetail.Message == "" || progressDetail.Message == initialMessage
-	inPlaceHelper, err := r.prepareInplaceRebuildHelper(reqCtx, cli, opsRes, rebuildFrom, instance, index, enforceAvailability)
+	inPlaceHelper, err := r.prepareInplaceRebuildHelper(reqCtx, cli, opsRes, rebuildFrom, instance, index, false)
 	if err != nil {
 		return false, err
 	}

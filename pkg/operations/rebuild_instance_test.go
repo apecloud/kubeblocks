@@ -779,6 +779,13 @@ var _ = Describe("OpsUtil functions", func() {
 			projectClusterComponentLifecycle(opsRes, func(compSpec *appsv1.ClusterComponentSpec) {
 				compSpec.OfflineInstances = []string{targetName}
 			})
+			targetPod := &corev1.Pod{}
+			Expect(k8sClient.Get(ctx, client.ObjectKey{Name: targetName, Namespace: testCtx.DefaultNamespace}, targetPod)).Should(Succeed())
+			Expect(k8sClient.Delete(ctx, targetPod)).Should(Succeed())
+			retainedPVC := &corev1.PersistentVolumeClaim{}
+			Expect(k8sClient.Get(ctx, client.ObjectKey{
+				Name: fmt.Sprintf("%s-%s", testapps.DataVolumeName, targetName), Namespace: testCtx.DefaultNamespace,
+			}, retainedPVC)).Should(Succeed())
 
 			By("expect terminal failure from desired lifecycle state")
 			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsCreatingPhase

@@ -48,7 +48,7 @@ func setProvisioningStartedCondition(conditions *[]metav1.Condition, clusterName
 	if err == nil {
 		condition = newProvisioningStartedCondition(clusterName, clusterGeneration)
 	} else {
-		condition = newFailedProvisioningStartedCondition(clusterGeneration, err)
+		condition = newFailedProvisioningStartedCondition(err)
 	}
 	meta.SetStatusCondition(conditions, condition)
 }
@@ -76,13 +76,12 @@ func getConditionReasonWithError(defaultReason string, err error) string {
 }
 
 // newApplyResourcesCondition creates a condition when applied resources succeed.
-func newFailedProvisioningStartedCondition(clusterGeneration int64, err error) metav1.Condition {
+func newFailedProvisioningStartedCondition(err error) metav1.Condition {
 	return metav1.Condition{
-		Type:               appsv1.ConditionTypeProvisioningStarted,
-		ObservedGeneration: clusterGeneration,
-		Status:             metav1.ConditionFalse,
-		Message:            intctrlutil.TruncateConditionMessage(err.Error()),
-		Reason:             intctrlutil.TruncateConditionReason(getConditionReasonWithError(ReasonPreCheckFailed, err)),
+		Type:    appsv1.ConditionTypeProvisioningStarted,
+		Status:  metav1.ConditionFalse,
+		Message: intctrlutil.TruncateConditionMessage(err.Error()),
+		Reason:  intctrlutil.TruncateConditionReason(getConditionReasonWithError(ReasonPreCheckFailed, err)),
 	}
 }
 
@@ -90,7 +89,7 @@ func setApplyResourceCondition(conditions *[]metav1.Condition, clusterGeneration
 	condition := newApplyResourcesCondition(clusterGeneration)
 	// ignore requeue error
 	if err != nil && !intctrlutil.IsRequeueError(err) {
-		condition = newFailedApplyResourcesCondition(clusterGeneration, err)
+		condition = newFailedApplyResourcesCondition(err)
 	}
 	meta.SetStatusCondition(conditions, condition)
 }
@@ -105,13 +104,12 @@ func newApplyResourcesCondition(clusterGeneration int64) metav1.Condition {
 	}
 }
 
-func newFailedApplyResourcesCondition(clusterGeneration int64, err error) metav1.Condition {
+func newFailedApplyResourcesCondition(err error) metav1.Condition {
 	return metav1.Condition{
-		Type:               appsv1.ConditionTypeApplyResources,
-		ObservedGeneration: clusterGeneration,
-		Status:             metav1.ConditionFalse,
-		Message:            intctrlutil.TruncateConditionMessage(err.Error()),
-		Reason:             intctrlutil.TruncateConditionReason(getConditionReasonWithError(ReasonApplyResourcesFailed, err)),
+		Type:    appsv1.ConditionTypeApplyResources,
+		Status:  metav1.ConditionFalse,
+		Message: intctrlutil.TruncateConditionMessage(err.Error()),
+		Reason:  intctrlutil.TruncateConditionReason(getConditionReasonWithError(ReasonApplyResourcesFailed, err)),
 	}
 }
 

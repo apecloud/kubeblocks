@@ -228,7 +228,7 @@ func (p *clusterPlan) Execute() error {
 
 func (p *clusterPlan) handlePlanExecutionError(err error) error {
 	clusterCopy := p.transCtx.OrigCluster.DeepCopy()
-	condition := newFailedApplyResourcesCondition(clusterCopy.Generation, err)
+	condition := newFailedApplyResourcesCondition(err)
 	meta.SetStatusCondition(&clusterCopy.Status.Conditions, condition)
 	return p.cli.Status().Patch(p.transCtx.Context, clusterCopy, client.MergeFrom(p.transCtx.OrigCluster))
 }

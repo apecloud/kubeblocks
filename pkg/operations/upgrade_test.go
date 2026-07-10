@@ -25,8 +25,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -95,20 +93,6 @@ var _ = Describe("Upgrade OpsRequest", func() {
 					Phase: appsv1.RunningComponentPhase,
 				},
 			}
-		})).Should(Succeed())
-	}
-
-	markClusterProvisioningFailed := func(clusterObject *appsv1.Cluster, message string) {
-		Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(clusterObject), func(cluster *appsv1.Cluster) {
-			meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
-				Type:               appsv1.ConditionTypeProvisioningStarted,
-				Status:             metav1.ConditionFalse,
-				ObservedGeneration: cluster.Generation,
-				Reason:             "PreCheckFailed",
-				Message:            message,
-			})
-			clusterObject.Status = cluster.Status
-			clusterObject.Generation = cluster.Generation
 		})).Should(Succeed())
 	}
 
@@ -411,9 +395,9 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsFailedPhase))
 		})
 
-		It("Test upgrade OpsRequest with a non-existent componentDefinitionName should fail from cluster reconciliation result", func() {
+		It("Test upgrade OpsRequest with a non-existent componentDefinitionName should fail fast without polluting the cluster spec", func() {
 			By("init operations resources")
-			_, _, opsRes := initOpsResWithComponentDef(true)
+			compDef1, _, opsRes := initOpsResWithComponentDef(true)
 
 			By("create Upgrade Ops with a non-existent componentDefinition")
 			opsRes.OpsRequest = createUpgradeOpsRequest(opsRes.Cluster, opsv1alpha1.Upgrade{
@@ -425,21 +409,22 @@ var _ = Describe("Upgrade OpsRequest", func() {
 				},
 			})
 
-			By("expect Action to write desired state without resolving componentDefinition in Ops")
+			By("expect the opsRequest to be Failed instead of retrying forever")
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
-			makeUpgradeOpsIsRunning(reqCtx, opsRes)
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.Cluster), func(g Gomega, cluster *appsv1.Cluster) {
-				g.Expect(cluster.Spec.ComponentSpecs[0].ComponentDef).Should(Equal("cmpd-not-exist"))
-			})).Should(Succeed())
-
-			By("expect the opsRequest to fail after the cluster controller reports the current generation failure")
-			markClusterProvisioningFailed(opsRes.Cluster, `no matched component definition found with componentDef "cmpd-not-exist"`)
-			_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
+			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsFailedPhase))
+
+			By("expect the cluster spec not to be updated with the non-existent componentDefinition")
+			Consistently(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.Cluster), func(g Gomega, cluster *appsv1.Cluster) {
+				g.Expect(cluster.Spec.ComponentSpecs[0].ComponentDef).Should(Equal(compDef1.Name))
+			})).Should(Succeed())
 		})
 
-		It("Test upgrade OpsRequest with an unresolvable serviceVersion should fail from cluster reconciliation result", func() {
+		It("Test upgrade OpsRequest with an unresolvable serviceVersion should fail fast without polluting the cluster spec", func() {
 			By("init operations resources")
 			_, _, opsRes := initOpsResWithComponentDef(true)
 
@@ -453,23 +438,24 @@ var _ = Describe("Upgrade OpsRequest", func() {
 				},
 			})
 
-			By("expect Action to write desired state without resolving serviceVersion in Ops")
+			By("expect the opsRequest to be Failed instead of retrying forever")
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
-			makeUpgradeOpsIsRunning(reqCtx, opsRes)
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.Cluster), func(g Gomega, cluster *appsv1.Cluster) {
-				g.Expect(cluster.Spec.ComponentSpecs[0].ServiceVersion).Should(Equal("99.99.99"))
-			})).Should(Succeed())
-
-			By("expect the opsRequest to fail after the cluster controller reports the current generation failure")
-			markClusterProvisioningFailed(opsRes.Cluster, `no matched component definition found with serviceVersion "99.99.99"`)
-			_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
+			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsFailedPhase))
+
+			By("expect the cluster spec not to be updated with the unresolvable serviceVersion")
+			Consistently(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.Cluster), func(g Gomega, cluster *appsv1.Cluster) {
+				g.Expect(cluster.Spec.ComponentSpecs[0].ServiceVersion).Should(Equal(serviceVer0))
+			})).Should(Succeed())
 		})
 
-		It("Test upgrade OpsRequest with a pattern componentDef and an incompatible serviceVersion should fail from cluster reconciliation result", func() {
+		It("Test upgrade OpsRequest with a pattern componentDef and an incompatible serviceVersion should fail fast without polluting the cluster spec", func() {
 			By("init operations resources")
-			_, _, opsRes := initOpsResWithComponentDef(true)
+			compDef1, _, opsRes := initOpsResWithComponentDef(true)
 
 			By("create Upgrade Ops with a componentDefinition name prefix and a serviceVersion that no matched componentDefinition supports")
 			// "test-component-definition-cmpd" is a name prefix of both compDef1 and compDef2.
@@ -484,19 +470,20 @@ var _ = Describe("Upgrade OpsRequest", func() {
 				},
 			})
 
-			By("expect Action to write desired state without resolving pattern compatibility in Ops")
+			By("expect the opsRequest to be Failed instead of retrying forever")
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
-			makeUpgradeOpsIsRunning(reqCtx, opsRes)
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.Cluster), func(g Gomega, cluster *appsv1.Cluster) {
-				g.Expect(cluster.Spec.ComponentSpecs[0].ComponentDef).Should(Equal(compDefPrefix))
-				g.Expect(cluster.Spec.ComponentSpecs[0].ServiceVersion).Should(Equal("99.99.99"))
-			})).Should(Succeed())
-
-			By("expect the opsRequest to fail after the cluster controller reports the current generation failure")
-			markClusterProvisioningFailed(opsRes.Cluster, `no matched component definition found with componentDef "`+compDefPrefix+`"`)
-			_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
+			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsFailedPhase))
+
+			By("expect the cluster spec not to be updated with the pattern componentDef and the incompatible serviceVersion")
+			Consistently(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.Cluster), func(g Gomega, cluster *appsv1.Cluster) {
+				g.Expect(cluster.Spec.ComponentSpecs[0].ComponentDef).Should(Equal(compDef1.Name))
+				g.Expect(cluster.Spec.ComponentSpecs[0].ServiceVersion).Should(Equal(serviceVer0))
+			})).Should(Succeed())
 		})
 
 		It("Test upgrade OpsRequest with a pattern componentDef and a resolvable serviceVersion", func() {
@@ -562,8 +549,7 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(compDef2),
 				&appsv1.ComponentDefinition{}, false)).Should(Succeed())
 
-			By("expect the opsRequest to fail after the cluster controller reports the current generation failure")
-			markClusterProvisioningFailed(opsRes.Cluster, `componentDefinition "`+compDef2.Name+`" not found`)
+			By("expect the opsRequest to be Failed instead of retrying forever")
 			_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsFailedPhase))

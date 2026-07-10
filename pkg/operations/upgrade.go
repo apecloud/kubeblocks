@@ -20,12 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -61,6 +62,11 @@ func (u upgradeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	var compOpsHelper componentOpsHelper
 	upgradeSpec := opsRes.OpsRequest.Spec.Upgrade
 	compOpsHelper = newComponentOpsHelper(upgradeSpec.Components)
+	// pre-check if the desired componentDefinition and serviceVersion can be resolved before updating
+	// the cluster spec, to fail the opsRequest fast instead of polluting the cluster spec and retrying forever.
+	if err := u.upgradePreCheck(reqCtx, cli, opsRes); err != nil {
+		return err
+	}
 	if err := compOpsHelper.updateClusterComponentsAndShardings(opsRes.Cluster, func(compSpec *appsv1.ClusterComponentSpec, obj ComponentOpsInterface) error {
 		upgradeComp := obj.(opsv1alpha1.UpgradeComponent)
 		if u.needUpdateCompDef(upgradeComp, opsRes.Cluster) {
@@ -98,9 +104,6 @@ func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 		componentDefMap map[string]*appsv1.ComponentDefinition
 		err             error
 	)
-	if err = u.clusterReconcileFailure(opsRes.Cluster); err != nil {
-		return opsv1alpha1.OpsFailedPhase, 0, err
-	}
 	compOpsHelper = newComponentOpsHelper(upgradeSpec.Components)
 	if componentDefMap, err = u.getComponentDefMapWithUpdatedImages(reqCtx, cli, opsRes); err != nil {
 		return opsRes.OpsRequest.Status.Phase, 0, err
@@ -138,6 +141,34 @@ func (u upgradeOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, 
 	return nil
 }
 
+// upgradePreCheck checks if the desired componentDefinition and serviceVersion can be resolved
+// before the cluster spec is updated by the Action.
+func (u upgradeOpsHandler) upgradePreCheck(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
+	for _, v := range opsRes.OpsRequest.Spec.Upgrade.Components {
+		compSpec := getComponentSpecOrShardingTemplate(opsRes.Cluster, v.ComponentName)
+		if compSpec == nil {
+			return intctrlutil.NewFatalError(fmt.Sprintf(`"can not found the component "%s" in the cluster "%s"`,
+				v.ComponentName, opsRes.Cluster.Name))
+		}
+		compDefName := compSpec.ComponentDef
+		if u.needUpdateCompDef(v, opsRes.Cluster) {
+			compDefName = *v.ComponentDefinitionName
+		}
+		serviceVersion := compSpec.ServiceVersion
+		if v.ServiceVersion != nil {
+			serviceVersion = *v.ServiceVersion
+		}
+		if compDefName == "" {
+			// the specific componentDefinition will be resolved from the cluster topology by the cluster controller.
+			continue
+		}
+		if _, err := u.getCompDefWithUpdatedImages(reqCtx, cli, compDefName, serviceVersion); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // getComponentDefMapWithUpdatedImages gets the desired componentDefinition map
 // that is updated with the corresponding images of the ComponentDefinition and service version.
 func (u upgradeOpsHandler) getComponentDefMapWithUpdatedImages(reqCtx intctrlutil.RequestCtx,
@@ -159,35 +190,38 @@ func (u upgradeOpsHandler) getComponentDefMapWithUpdatedImages(reqCtx intctrluti
 	return compDefMap, nil
 }
 
+// getCompDefWithUpdatedImages gets the componentDefinition that is updated with the images matching the
+// given serviceVersion. if compDefName is a name prefix or regex pattern, it is resolved together with
+// the serviceVersion first, with the same compatibility semantics as the cluster controller.
+// the deterministic resolution failures (no componentDefinition matches the name, or the serviceVersion
+// is not supported) are classified as fatal errors to fail the opsRequest fast instead of retrying forever.
 func (u upgradeOpsHandler) getCompDefWithUpdatedImages(reqCtx intctrlutil.RequestCtx,
 	cli client.Client, compDefName, serviceVersion string) (*appsv1.ComponentDefinition, error) {
 	compDef, err := component.GetCompDefByName(reqCtx.Ctx, cli, compDefName)
 	if err != nil {
-		return nil, err
+		if !apierrors.IsNotFound(err) {
+			return nil, err
+		}
+		// compDefName may be a name prefix or a regex pattern that will be resolved to a specific
+		// componentDefinition by the cluster controller. resolve it together with the serviceVersion
+		// here to detect the deterministic no-match failures before/without relying on the cluster controller,
+		// with exactly the same compatibility semantics as the cluster controller's normalization.
+		compDef, _, err = component.ResolveCompDefinitionNServiceVersion(reqCtx.Ctx, cli, compDefName, serviceVersion)
+		if err != nil {
+			if errors.Is(err, component.ErrCompDefinitionNServiceVersionUnmatched) {
+				return nil, intctrlutil.NewFatalError(err.Error())
+			}
+			return nil, err
+		}
 	}
 	if err = component.UpdateCompDefinitionImages4ServiceVersion(reqCtx.Ctx, cli, compDef, serviceVersion); err != nil {
+		if strings.Contains(err.Error(), "no matched image found") {
+			return nil, intctrlutil.NewFatalError(fmt.Sprintf(`cannot find matched images with serviceVersion "%s" for the componentDefinition "%s": %s`,
+				serviceVersion, compDef.Name, err.Error()))
+		}
 		return nil, err
 	}
 	return compDef, nil
-}
-
-func (u upgradeOpsHandler) clusterReconcileFailure(cluster *appsv1.Cluster) error {
-	for _, conditionType := range []string{
-		appsv1.ConditionTypeProvisioningStarted,
-		appsv1.ConditionTypeApplyResources,
-	} {
-		condition := meta.FindStatusCondition(cluster.Status.Conditions, conditionType)
-		if condition == nil || condition.Status != metav1.ConditionFalse ||
-			condition.ObservedGeneration != cluster.Generation {
-			continue
-		}
-		message := condition.Message
-		if message == "" {
-			message = condition.Reason
-		}
-		return intctrlutil.NewFatalError(message)
-	}
-	return nil
 }
 
 // podImageApplied checks if the pod has applied the new image.

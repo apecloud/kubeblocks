@@ -21,9 +21,9 @@ package operations
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -36,8 +36,6 @@ import (
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
 )
-
-const backupTimeLayout = "20060102150405"
 
 type BackupOpsHandler struct{}
 
@@ -77,7 +75,7 @@ func (b BackupOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clien
 		if getErr := cli.Get(reqCtx.Ctx, client.ObjectKeyFromObject(backup), existingBackup); getErr != nil {
 			return getErr
 		}
-		if existingBackup.Labels[constant.OpsRequestNameLabelKey] == opsRequest.Name {
+		if validateBackupOwnedByOpsRequest(existingBackup, backup, opsRequest) == nil {
 			// the backup has already been created by this OpsRequest.
 			return nil
 		}
@@ -127,7 +125,10 @@ func buildBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRequest *o
 	}
 
 	if len(backupSpec.BackupName) == 0 {
-		backupSpec.BackupName = strings.Join([]string{"backup", cluster.Namespace, cluster.Name, time.Now().Format(backupTimeLayout)}, "-")
+		if opsRequest.UID == "" {
+			return nil, fmt.Errorf("opsRequest %s/%s has no UID yet", opsRequest.Namespace, opsRequest.Name)
+		}
+		backupSpec.BackupName = fmt.Sprintf("backup-%s", opsRequest.UID)
 	}
 
 	explicitPolicyName := backupSpec.BackupPolicyName != ""
@@ -143,6 +144,9 @@ func buildBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRequest *o
 			return nil, intctrlutil.NewFatalError(err.Error())
 		}
 		return nil, err
+	}
+	if explicitPolicyName && backupPolicy.Labels[constant.AppInstanceLabelKey] != cluster.Name {
+		return nil, intctrlutil.NewFatalError(fmt.Sprintf("backup policy %s is not belong to cluster %s", backupPolicy.Name, cluster.Name))
 	}
 	if backupPolicy.Status.Phase != dpv1alpha1.AvailablePhase {
 		// the backup policy exists but has not been reconciled to Available yet, retry until it converges.
@@ -163,9 +167,10 @@ func buildBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRequest *o
 
 	backup := &dpv1alpha1.Backup{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      backupSpec.BackupName,
-			Namespace: cluster.Namespace,
-			Labels:    getBackupLabels(cluster.Name, opsRequest.Name),
+			Name:        backupSpec.BackupName,
+			Namespace:   cluster.Namespace,
+			Labels:      getBackupLabels(cluster.Name, opsRequest.Name),
+			Annotations: getBackupAnnotations(opsRequest),
 		},
 		Spec: dpv1alpha1.BackupSpec{
 			BackupPolicyName: backupSpec.BackupPolicyName,
@@ -209,6 +214,20 @@ func buildBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRequest *o
 	return backup, nil
 }
 
+func validateBackupOwnedByOpsRequest(existingBackup, desiredBackup *dpv1alpha1.Backup, opsRequest *opsv1alpha1.OpsRequest) error {
+	if existingBackup.Labels[constant.OpsRequestNameLabelKey] != opsRequest.Name ||
+		existingBackup.Labels[constant.OpsRequestTypeLabelKey] != string(opsv1alpha1.BackupType) {
+		return fmt.Errorf("backup labels do not match OpsRequest")
+	}
+	if existingBackup.Annotations[constant.OpsRequestUIDAnnotationKey] != string(opsRequest.UID) {
+		return fmt.Errorf("backup UID annotation does not match OpsRequest")
+	}
+	if !apiequality.Semantic.DeepEqual(existingBackup.Spec, desiredBackup.Spec) {
+		return fmt.Errorf("backup spec does not match OpsRequest")
+	}
+	return nil
+}
+
 func getDefaultBackupPolicy(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster *appsv1.Cluster, backupPolicy string) (string, error) {
 	// if backupPolicy is not empty, return it directly
 	if backupPolicy != "" {
@@ -246,5 +265,11 @@ func getBackupLabels(cluster, request string) map[string]string {
 		constant.AppInstanceLabelKey:    cluster,
 		constant.OpsRequestNameLabelKey: request,
 		constant.OpsRequestTypeLabelKey: string(opsv1alpha1.BackupType),
+	}
+}
+
+func getBackupAnnotations(opsRequest *opsv1alpha1.OpsRequest) map[string]string {
+	return map[string]string{
+		constant.OpsRequestUIDAnnotationKey: string(opsRequest.UID),
 	}
 }

@@ -31,6 +31,7 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	"github.com/apecloud/kubeblocks/pkg/generics"
@@ -223,8 +224,12 @@ var _ = Describe("Backup OpsRequest", func() {
 				},
 				Status: dpv1alpha1.BackupStatus{Phase: dpv1alpha1.BackupPhaseCompleted},
 			}
+			otherClusterPolicy := policy.DeepCopy()
+			otherClusterPolicy.Name = "other-cluster-policy"
+			otherClusterPolicy.ResourceVersion = ""
+			otherClusterPolicy.Labels["app.kubernetes.io/instance"] = "other-cluster"
 			fakeClient := fake.NewClientBuilder().WithScheme(fakeScheme).
-				WithObjects(policy, failedParentBackup, otherClusterParentBackup).Build()
+				WithObjects(policy, failedParentBackup, otherClusterParentBackup, otherClusterPolicy).Build()
 			ops := createBackupOpsObj(clusterName, "backup-fatal-"+randomStr)
 
 			By("expect fatal error when backupPolicyName refers to a nonexistent backup policy")
@@ -257,6 +262,12 @@ var _ = Describe("Backup OpsRequest", func() {
 			ops.Spec.Backup = &opsv1alpha1.Backup{ParentBackupName: otherClusterParentBackup.Name}
 			_, err = buildBackup(reqCtx, fakeClient, ops, opsRes.Cluster)
 			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeTrue())
+
+			By("expect fatal error when explicit backupPolicyName belongs to another cluster")
+			ops.Spec.Backup = &opsv1alpha1.Backup{BackupPolicyName: otherClusterPolicy.Name}
+			_, err = buildBackup(reqCtx, fakeClient, ops, opsRes.Cluster)
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeTrue())
+			Expect(err.Error()).Should(ContainSubstring("is not belong to cluster"))
 
 			By("expect retryable error when no default backup policy exists yet for the cluster")
 			emptyClient := fake.NewClientBuilder().WithScheme(fakeScheme).Build()
@@ -366,6 +377,48 @@ var _ = Describe("Backup OpsRequest", func() {
 			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeFalse())
 		})
 
+		It("uses a stable generated backup name for OpsRequest re-entry", func() {
+			fakeScheme := runtime.NewScheme()
+			Expect(dpv1alpha1.AddToScheme(fakeScheme)).Should(Succeed())
+			policy := &dpv1alpha1.BackupPolicy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "default-policy",
+					Namespace: testCtx.DefaultNamespace,
+					Labels: map[string]string{
+						"app.kubernetes.io/instance": opsRes.Cluster.Name,
+					},
+					Annotations: map[string]string{
+						dptypes.DefaultBackupPolicyAnnotationKey: "true",
+					},
+				},
+				Spec: dpv1alpha1.BackupPolicySpec{
+					BackupMethods: []dpv1alpha1.BackupMethod{{
+						Name:            "snapshot",
+						SnapshotVolumes: func() *bool { v := true; return &v }(),
+					}},
+				},
+				Status: dpv1alpha1.BackupPolicyStatus{Phase: dpv1alpha1.AvailablePhase},
+			}
+			fakeClient := fake.NewClientBuilder().WithScheme(fakeScheme).WithObjects(policy).Build()
+			ops := createBackupOpsObj(clusterName, "backup-generated-name-"+randomStr)
+			ops.Spec.Backup = &opsv1alpha1.Backup{}
+
+			firstBackup, err := buildBackup(reqCtx, fakeClient, ops, opsRes.Cluster)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(firstBackup.Name).Should(Equal("backup-" + string(ops.UID)))
+
+			freshOps := ops.DeepCopy()
+			freshOps.Spec.Backup = &opsv1alpha1.Backup{}
+			secondBackup, err := buildBackup(reqCtx, fakeClient, freshOps, opsRes.Cluster)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(secondBackup.Name).Should(Equal(firstBackup.Name))
+
+			opsRes.OpsRequest = freshOps
+			reentryClient := fake.NewClientBuilder().WithScheme(fakeScheme).
+				WithObjects(policy, firstBackup).Build()
+			Expect(BackupOpsHandler{}.Action(reqCtx, reentryClient, opsRes)).Should(Succeed())
+		})
+
 		It("handles a backup name collision with an existing backup", func() {
 			fakeScheme := runtime.NewScheme()
 			Expect(dpv1alpha1.AddToScheme(fakeScheme)).Should(Succeed())
@@ -391,6 +444,10 @@ var _ = Describe("Backup OpsRequest", func() {
 			ops := createBackupOpsObj(clusterName, "backup-collision-"+randomStr)
 			ops.Spec.Backup = &opsv1alpha1.Backup{BackupName: "colliding-backup"}
 			opsRes.OpsRequest = ops
+			desiredBackup, err := buildBackup(reqCtx,
+				fake.NewClientBuilder().WithScheme(fakeScheme).WithObjects(policy).Build(),
+				ops, opsRes.Cluster)
+			Expect(err).ShouldNot(HaveOccurred())
 
 			By("expect fatal error when the existing backup is not created by this OpsRequest")
 			foreignBackup := &dpv1alpha1.Backup{
@@ -401,18 +458,28 @@ var _ = Describe("Backup OpsRequest", func() {
 			}
 			fakeClient := fake.NewClientBuilder().WithScheme(fakeScheme).
 				WithObjects(policy, foreignBackup).Build()
-			err := BackupOpsHandler{}.Action(reqCtx, fakeClient, opsRes)
+			err = BackupOpsHandler{}.Action(reqCtx, fakeClient, opsRes)
 			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeTrue())
 			Expect(err.Error()).Should(ContainSubstring("already exists and is not created by this OpsRequest"))
 
+			By("expect fatal error when the existing backup only matches the reusable OpsRequest name")
+			staleUIDBackup := desiredBackup.DeepCopy()
+			staleUIDBackup.Annotations[constant.OpsRequestUIDAnnotationKey] = "stale-ops-uid"
+			fakeClient = fake.NewClientBuilder().WithScheme(fakeScheme).
+				WithObjects(policy, staleUIDBackup).Build()
+			err = BackupOpsHandler{}.Action(reqCtx, fakeClient, opsRes)
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeTrue())
+
+			By("expect fatal error when the existing backup ownership matches but the spec is stale")
+			staleSpecBackup := desiredBackup.DeepCopy()
+			staleSpecBackup.Spec.BackupMethod = "stale-method"
+			fakeClient = fake.NewClientBuilder().WithScheme(fakeScheme).
+				WithObjects(policy, staleSpecBackup).Build()
+			err = BackupOpsHandler{}.Action(reqCtx, fakeClient, opsRes)
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeTrue())
+
 			By("expect success when the existing backup was created by this OpsRequest")
-			ownedBackup := &dpv1alpha1.Backup{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "colliding-backup",
-					Namespace: testCtx.DefaultNamespace,
-					Labels:    getBackupLabels(opsRes.Cluster.Name, ops.Name),
-				},
-			}
+			ownedBackup := desiredBackup.DeepCopy()
 			fakeClient = fake.NewClientBuilder().WithScheme(fakeScheme).
 				WithObjects(policy, ownedBackup).Build()
 			Expect(BackupOpsHandler{}.Action(reqCtx, fakeClient, opsRes)).Should(Succeed())

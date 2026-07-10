@@ -20,10 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"time"
 
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -64,6 +65,21 @@ func (b BackupOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clien
 	opsRequest := opsRes.OpsRequest
 	cluster := opsRes.Cluster
 
+	backupIntent, err := normalizedBackupIntent(opsRequest)
+	if err != nil {
+		return err
+	}
+	existingBackup := &dpv1alpha1.Backup{}
+	backupKey := client.ObjectKey{Name: backupIntent.BackupName, Namespace: cluster.Namespace}
+	if err = cli.Get(reqCtx.Ctx, backupKey, existingBackup); err == nil {
+		if validateBackupOwnedByOpsRequest(existingBackup, opsRequest, cluster.Name) == nil {
+			return nil
+		}
+		return intctrlutil.NewFatalError(fmt.Sprintf(`backup "%s" already exists and is not created by this OpsRequest`, backupIntent.BackupName))
+	} else if !apierrors.IsNotFound(err) {
+		return err
+	}
+
 	// create backup
 	if backup, err := buildBackup(reqCtx, cli, opsRequest, cluster); err != nil {
 		return err
@@ -71,11 +87,10 @@ func (b BackupOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clien
 		if err = cli.Create(reqCtx.Ctx, backup); !apierrors.IsAlreadyExists(err) {
 			return err
 		}
-		existingBackup := &dpv1alpha1.Backup{}
 		if getErr := cli.Get(reqCtx.Ctx, client.ObjectKeyFromObject(backup), existingBackup); getErr != nil {
 			return getErr
 		}
-		if validateBackupOwnedByOpsRequest(existingBackup, backup, opsRequest) == nil {
+		if validateBackupOwnedByOpsRequest(existingBackup, opsRequest, cluster.Name) == nil {
 			// the backup has already been created by this OpsRequest.
 			return nil
 		}
@@ -91,17 +106,19 @@ func (b BackupOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cli
 	opsRequest := opsRes.OpsRequest
 	cluster := opsRes.Cluster
 
-	// get backup
-	backups := &dpv1alpha1.BackupList{}
-	if err := cli.List(reqCtx.Ctx, backups, client.InNamespace(cluster.Namespace), client.MatchingLabels(getBackupLabels(cluster.Name, opsRequest.Name))); err != nil {
+	backupIntent, err := normalizedBackupIntent(opsRequest)
+	if err != nil {
 		return opsv1alpha1.OpsFailedPhase, 0, err
 	}
-
-	if len(backups.Items) == 0 {
-		return opsv1alpha1.OpsFailedPhase, 0, fmt.Errorf("backup not found")
+	backup := &dpv1alpha1.Backup{}
+	if err = cli.Get(reqCtx.Ctx, client.ObjectKey{Name: backupIntent.BackupName, Namespace: cluster.Namespace}, backup); err != nil {
+		return opsv1alpha1.OpsFailedPhase, 0, err
+	}
+	if err = validateBackupOwnedByOpsRequest(backup, opsRequest, cluster.Name); err != nil {
+		return opsv1alpha1.OpsFailedPhase, 0, intctrlutil.NewFatalError(err.Error())
 	}
 	// check backup status
-	phase := backups.Items[0].Status.Phase
+	phase := backup.Status.Phase
 	switch phase {
 	case dpv1alpha1.BackupPhaseCompleted:
 		return opsv1alpha1.OpsSucceedPhase, 0, nil
@@ -119,16 +136,9 @@ func (b BackupOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, c
 func buildBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRequest *opsv1alpha1.OpsRequest, cluster *appsv1.Cluster) (*dpv1alpha1.Backup, error) {
 	var err error
 
-	backupSpec := opsRequest.Spec.GetBackup()
-	if backupSpec == nil {
-		backupSpec = &opsv1alpha1.Backup{}
-	}
-
-	if len(backupSpec.BackupName) == 0 {
-		if opsRequest.UID == "" {
-			return nil, fmt.Errorf("opsRequest %s/%s has no UID yet", opsRequest.Namespace, opsRequest.Name)
-		}
-		backupSpec.BackupName = fmt.Sprintf("backup-%s", opsRequest.UID)
+	backupSpec, err := normalizedBackupIntent(opsRequest)
+	if err != nil {
+		return nil, err
 	}
 
 	explicitPolicyName := backupSpec.BackupPolicyName != ""
@@ -167,14 +177,14 @@ func buildBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRequest *o
 
 	backup := &dpv1alpha1.Backup{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        backupSpec.BackupName,
-			Namespace:   cluster.Namespace,
-			Labels:      getBackupLabels(cluster.Name, opsRequest.Name),
-			Annotations: getBackupAnnotations(opsRequest),
+			Name:      backupSpec.BackupName,
+			Namespace: cluster.Namespace,
+			Labels:    getBackupLabels(cluster.Name, opsRequest.Name),
 		},
 		Spec: dpv1alpha1.BackupSpec{
 			BackupPolicyName: backupSpec.BackupPolicyName,
 			BackupMethod:     backupSpec.BackupMethod,
+			DeletionPolicy:   dpv1alpha1.BackupDeletionPolicyDelete,
 			Parameters:       backupSpec.Parameters,
 		},
 	}
@@ -210,22 +220,79 @@ func buildBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRequest *o
 		}
 		backup.Spec.ParentBackupName = backupSpec.ParentBackupName
 	}
+	backup.Annotations, err = getBackupAnnotations(opsRequest, backup.Spec)
+	if err != nil {
+		return nil, err
+	}
 
 	return backup, nil
 }
 
-func validateBackupOwnedByOpsRequest(existingBackup, desiredBackup *dpv1alpha1.Backup, opsRequest *opsv1alpha1.OpsRequest) error {
-	if existingBackup.Labels[constant.OpsRequestNameLabelKey] != opsRequest.Name ||
+func validateBackupOwnedByOpsRequest(existingBackup *dpv1alpha1.Backup, opsRequest *opsv1alpha1.OpsRequest, clusterName string) error {
+	intent, err := normalizedBackupIntent(opsRequest)
+	if err != nil {
+		return err
+	}
+	if existingBackup.Name != intent.BackupName {
+		return fmt.Errorf("backup name does not match OpsRequest intent")
+	}
+	if existingBackup.Labels[constant.AppInstanceLabelKey] != clusterName ||
+		existingBackup.Labels[constant.OpsRequestNameLabelKey] != opsRequest.Name ||
 		existingBackup.Labels[constant.OpsRequestTypeLabelKey] != string(opsv1alpha1.BackupType) {
 		return fmt.Errorf("backup labels do not match OpsRequest")
 	}
 	if existingBackup.Annotations[constant.OpsRequestUIDAnnotationKey] != string(opsRequest.UID) {
 		return fmt.Errorf("backup UID annotation does not match OpsRequest")
 	}
-	if !apiequality.Semantic.DeepEqual(existingBackup.Spec, desiredBackup.Spec) {
-		return fmt.Errorf("backup spec does not match OpsRequest")
+	intentHash, err := hashBackupObject(intent)
+	if err != nil {
+		return err
+	}
+	if existingBackup.Annotations[constant.OpsRequestBackupIntentHashAnnotationKey] != intentHash {
+		return fmt.Errorf("backup intent does not match OpsRequest")
+	}
+	resolvedSpecHash, err := hashBackupObject(normalizedBackupSpec(existingBackup.Spec))
+	if err != nil {
+		return err
+	}
+	if existingBackup.Annotations[constant.OpsRequestBackupSpecHashAnnotationKey] != resolvedSpecHash {
+		return fmt.Errorf("backup spec does not match its resolved write intent")
 	}
 	return nil
+}
+
+func normalizedBackupIntent(opsRequest *opsv1alpha1.OpsRequest) (*opsv1alpha1.Backup, error) {
+	backupSpec := opsRequest.Spec.GetBackup()
+	if backupSpec == nil {
+		backupSpec = &opsv1alpha1.Backup{}
+	} else {
+		backupSpec = backupSpec.DeepCopy()
+	}
+	if backupSpec.BackupName == "" {
+		if opsRequest.UID == "" {
+			return nil, fmt.Errorf("opsRequest %s/%s has no UID yet", opsRequest.Namespace, opsRequest.Name)
+		}
+		backupSpec.BackupName = fmt.Sprintf("backup-%s", opsRequest.UID)
+	}
+	if backupSpec.DeletionPolicy == "" {
+		backupSpec.DeletionPolicy = string(dpv1alpha1.BackupDeletionPolicyDelete)
+	}
+	return backupSpec, nil
+}
+
+func normalizedBackupSpec(spec dpv1alpha1.BackupSpec) dpv1alpha1.BackupSpec {
+	if spec.DeletionPolicy == "" {
+		spec.DeletionPolicy = dpv1alpha1.BackupDeletionPolicyDelete
+	}
+	return spec
+}
+
+func hashBackupObject(obj any) (string, error) {
+	data, err := json.Marshal(obj)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%x", sha256.Sum256(data)), nil
 }
 
 func getDefaultBackupPolicy(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster *appsv1.Cluster, backupPolicy string) (string, error) {
@@ -268,8 +335,22 @@ func getBackupLabels(cluster, request string) map[string]string {
 	}
 }
 
-func getBackupAnnotations(opsRequest *opsv1alpha1.OpsRequest) map[string]string {
-	return map[string]string{
-		constant.OpsRequestUIDAnnotationKey: string(opsRequest.UID),
+func getBackupAnnotations(opsRequest *opsv1alpha1.OpsRequest, resolvedSpec dpv1alpha1.BackupSpec) (map[string]string, error) {
+	intent, err := normalizedBackupIntent(opsRequest)
+	if err != nil {
+		return nil, err
 	}
+	intentHash, err := hashBackupObject(intent)
+	if err != nil {
+		return nil, err
+	}
+	resolvedSpecHash, err := hashBackupObject(normalizedBackupSpec(resolvedSpec))
+	if err != nil {
+		return nil, err
+	}
+	return map[string]string{
+		constant.OpsRequestUIDAnnotationKey:              string(opsRequest.UID),
+		constant.OpsRequestBackupIntentHashAnnotationKey: intentHash,
+		constant.OpsRequestBackupSpecHashAnnotationKey:   resolvedSpecHash,
+	}, nil
 }

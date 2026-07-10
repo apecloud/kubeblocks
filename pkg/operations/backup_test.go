@@ -419,6 +419,93 @@ var _ = Describe("Backup OpsRequest", func() {
 			Expect(BackupOpsHandler{}.Action(reqCtx, reentryClient, opsRes)).Should(Succeed())
 		})
 
+		It("reconciles only the backup owned by the current OpsRequest UID", func() {
+			fakeScheme := runtime.NewScheme()
+			Expect(dpv1alpha1.AddToScheme(fakeScheme)).Should(Succeed())
+			policy := &dpv1alpha1.BackupPolicy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "default-policy",
+					Namespace: testCtx.DefaultNamespace,
+					Labels: map[string]string{
+						constant.AppInstanceLabelKey: opsRes.Cluster.Name,
+					},
+					Annotations: map[string]string{
+						dptypes.DefaultBackupPolicyAnnotationKey: "true",
+					},
+				},
+				Spec: dpv1alpha1.BackupPolicySpec{
+					BackupMethods: []dpv1alpha1.BackupMethod{{
+						Name:            "snapshot",
+						SnapshotVolumes: func() *bool { v := true; return &v }(),
+					}},
+				},
+				Status: dpv1alpha1.BackupPolicyStatus{Phase: dpv1alpha1.AvailablePhase},
+			}
+			ops := createBackupOpsObj(clusterName, "backup-reconcile-uid-"+randomStr)
+			ops.Spec.Backup = &opsv1alpha1.Backup{BackupName: "zz-current-backup"}
+			opsRes.OpsRequest = ops
+
+			currentBackup, err := buildBackup(reqCtx,
+				fake.NewClientBuilder().WithScheme(fakeScheme).WithObjects(policy).Build(),
+				ops, opsRes.Cluster)
+			Expect(err).ShouldNot(HaveOccurred())
+			currentBackup.Status.Phase = dpv1alpha1.BackupPhaseRunning
+
+			staleBackup := currentBackup.DeepCopy()
+			staleBackup.Name = "aa-stale-backup"
+			staleBackup.Annotations[constant.OpsRequestUIDAnnotationKey] = "stale-ops-uid"
+			staleBackup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
+
+			fakeClient := fake.NewClientBuilder().WithScheme(fakeScheme).
+				WithObjects(policy, staleBackup, currentBackup).Build()
+			phase, _, err := BackupOpsHandler{}.ReconcileAction(reqCtx, fakeClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(phase).Should(Equal(opsv1alpha1.OpsRunningPhase))
+		})
+
+		It("accepts re-entry after API defaulting and dynamic default method changes", func() {
+			fakeScheme := runtime.NewScheme()
+			Expect(dpv1alpha1.AddToScheme(fakeScheme)).Should(Succeed())
+			policy := &dpv1alpha1.BackupPolicy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "default-policy",
+					Namespace: testCtx.DefaultNamespace,
+					Labels: map[string]string{
+						constant.AppInstanceLabelKey: opsRes.Cluster.Name,
+					},
+					Annotations: map[string]string{
+						dptypes.DefaultBackupPolicyAnnotationKey: "true",
+					},
+				},
+				Spec: dpv1alpha1.BackupPolicySpec{
+					BackupMethods: []dpv1alpha1.BackupMethod{{
+						Name:            "snapshot",
+						SnapshotVolumes: func() *bool { v := true; return &v }(),
+					}},
+				},
+				Status: dpv1alpha1.BackupPolicyStatus{Phase: dpv1alpha1.AvailablePhase},
+			}
+			ops := createBackupOpsObj(clusterName, "backup-defaulted-reentry-"+randomStr)
+			ops.Spec.Backup = &opsv1alpha1.Backup{}
+			opsRes.OpsRequest = ops
+
+			createdBackup, err := buildBackup(reqCtx,
+				fake.NewClientBuilder().WithScheme(fakeScheme).WithObjects(policy).Build(),
+				ops, opsRes.Cluster)
+			Expect(err).ShouldNot(HaveOccurred())
+			createdBackup.Spec.DeletionPolicy = dpv1alpha1.BackupDeletionPolicyDelete
+
+			changedPolicy := policy.DeepCopy()
+			changedPolicy.Spec.BackupMethods = []dpv1alpha1.BackupMethod{{
+				Name:            "new-snapshot",
+				SnapshotVolumes: func() *bool { v := true; return &v }(),
+			}}
+			fakeClient := fake.NewClientBuilder().WithScheme(fakeScheme).
+				WithObjects(changedPolicy, createdBackup).Build()
+
+			Expect(BackupOpsHandler{}.Action(reqCtx, fakeClient, opsRes)).Should(Succeed())
+		})
+
 		It("handles a backup name collision with an existing backup", func() {
 			fakeScheme := runtime.NewScheme()
 			Expect(dpv1alpha1.AddToScheme(fakeScheme)).Should(Succeed())

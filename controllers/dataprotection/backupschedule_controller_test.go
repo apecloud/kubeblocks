@@ -20,12 +20,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package dataprotection
 
 import (
+	"context"
 	"fmt"
+	"reflect"
+	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	batchv1 "k8s.io/api/batch/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -245,6 +250,32 @@ var _ = Describe("Backup Schedule Controller", func() {
 		})
 	})
 })
+
+func TestParseBackupMapsContinuousBackupToOwningSchedule(t *testing.T) {
+	reconciler := &BackupScheduleReconciler{}
+	backup := &dpv1alpha1.Backup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "continuous-backup",
+			Namespace: "default",
+			Labels: map[string]string{
+				dptypes.BackupTypeLabelKey:     string(dpv1alpha1.BackupTypeContinuous),
+				dptypes.BackupScheduleLabelKey: "mysql-backup-schedule",
+			},
+		},
+	}
+
+	requests := reconciler.parseBackup(context.Background(), backup)
+	expected := []reconcile.Request{{
+		NamespacedName: client.ObjectKey{
+			Namespace: "default",
+			Name:      "mysql-backup-schedule",
+		},
+	}}
+
+	if !reflect.DeepEqual(requests, expected) {
+		t.Fatalf("unexpected requests: got %#v, want %#v", requests, expected)
+	}
+}
 
 func getStartingDeadlineSeconds(backupSchedule *dpv1alpha1.BackupSchedule) int64 {
 	if backupSchedule.Spec.StartingDeadlineMinutes == nil {

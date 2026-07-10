@@ -219,7 +219,7 @@ func (r *BackupScheduleReconciler) patchScheduleMetadata(
 
 func (r *BackupScheduleReconciler) parseBackup(ctx context.Context, object client.Object) []reconcile.Request {
 	backup := object.(*dpv1alpha1.Backup)
-	backupScheduleName := dptypes.BackupScheduleLabelKey
+	backupScheduleName := backup.Labels[dptypes.BackupScheduleLabelKey]
 	if backup.Labels[dptypes.BackupTypeLabelKey] == string(dpv1alpha1.BackupTypeContinuous) &&
 		backupScheduleName != "" {
 		return []reconcile.Request{

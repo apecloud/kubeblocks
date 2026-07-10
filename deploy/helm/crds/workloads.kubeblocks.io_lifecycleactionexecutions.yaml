@@ -1,0 +1,367 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.18.0
+  labels:
+    app.kubernetes.io/name: kubeblocks
+  name: lifecycleactionexecutions.workloads.kubeblocks.io
+spec:
+  group: workloads.kubeblocks.io
+  names:
+    categories:
+    - kubeblocks
+    kind: LifecycleActionExecution
+    listKind: LifecycleActionExecutionList
+    plural: lifecycleactionexecutions
+    shortNames:
+    - lae
+    singular: lifecycleactionexecution
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.phase
+      name: PHASE
+      type: string
+    - jsonPath: .status.reason
+      name: REASON
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: LifecycleActionExecution records one immutable lifecycle-action
+          attempt.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            properties:
+              actionName:
+                minLength: 1
+                type: string
+              attempt:
+                format: int32
+                minimum: 1
+                type: integer
+              context:
+                properties:
+                  reconfigure:
+                    properties:
+                      componentParameterGeneration:
+                        format: int64
+                        minimum: 1
+                        type: integer
+                      configName:
+                        minLength: 1
+                        type: string
+                      operationUID:
+                        description: |-
+                          UID is a type that holds unique ID values, including UUIDs.  Because we
+                          don't ONLY use UUIDs, this is an alias to string.  Being a type captures
+                          intent and helps make sure that UIDs and names do not get conflated.
+                        type: string
+                      targetConfigHash:
+                        minLength: 1
+                        type: string
+                    required:
+                    - componentParameterGeneration
+                    - configName
+                    - targetConfigHash
+                    type: object
+                  type:
+                    enum:
+                    - Reconfigure
+                    type: string
+                required:
+                - type
+                type: object
+                x-kubernetes-validations:
+                - message: reconfigure is required for Reconfigure context
+                  rule: self.type == 'Reconfigure' && has(self.reconfigure)
+              identityVersion:
+                enum:
+                - v1
+                type: string
+              invocationKey:
+                pattern: ^[a-z2-7]{52}$
+                type: string
+              sourceRef:
+                properties:
+                  apiGroup:
+                    minLength: 1
+                    type: string
+                  kind:
+                    minLength: 1
+                    type: string
+                  name:
+                    minLength: 1
+                    type: string
+                  namespace:
+                    minLength: 1
+                    type: string
+                  uid:
+                    description: |-
+                      UID is a type that holds unique ID values, including UUIDs.  Because we
+                      don't ONLY use UUIDs, this is an alias to string.  Being a type captures
+                      intent and helps make sure that UIDs and names do not get conflated.
+                    type: string
+                required:
+                - apiGroup
+                - kind
+                - name
+                - namespace
+                - uid
+                type: object
+                x-kubernetes-validations:
+                - message: uid must not be empty
+                  rule: self.uid.size() > 0
+              target:
+                properties:
+                  pod:
+                    properties:
+                      clusterContext:
+                        properties:
+                          placement:
+                            type: string
+                          type:
+                            enum:
+                            - Local
+                            - Placement
+                            type: string
+                        required:
+                        - type
+                        type: object
+                        x-kubernetes-validations:
+                        - message: placement must be absent for Local and non-empty
+                            for Placement
+                          rule: 'self.type == ''Local'' ? !has(self.placement) : has(self.placement)
+                            && self.placement.size() > 0'
+                      componentName:
+                        minLength: 1
+                        type: string
+                      instanceName:
+                        minLength: 1
+                        type: string
+                      namespace:
+                        minLength: 1
+                        type: string
+                      podName:
+                        minLength: 1
+                        type: string
+                      podUID:
+                        description: |-
+                          UID is a type that holds unique ID values, including UUIDs.  Because we
+                          don't ONLY use UUIDs, this is an alias to string.  Being a type captures
+                          intent and helps make sure that UIDs and names do not get conflated.
+                        type: string
+                    required:
+                    - clusterContext
+                    - componentName
+                    - instanceName
+                    - namespace
+                    - podName
+                    - podUID
+                    type: object
+                    x-kubernetes-validations:
+                    - message: podUID must not be empty
+                      rule: self.podUID.size() > 0
+                  type:
+                    enum:
+                    - Pod
+                    type: string
+                required:
+                - type
+                type: object
+                x-kubernetes-validations:
+                - message: pod is required for Pod targets
+                  rule: self.type == 'Pod' && has(self.pod)
+              workloadRef:
+                properties:
+                  apiGroup:
+                    minLength: 1
+                    type: string
+                  kind:
+                    minLength: 1
+                    type: string
+                  name:
+                    minLength: 1
+                    type: string
+                  namespace:
+                    minLength: 1
+                    type: string
+                  uid:
+                    description: |-
+                      UID is a type that holds unique ID values, including UUIDs.  Because we
+                      don't ONLY use UUIDs, this is an alias to string.  Being a type captures
+                      intent and helps make sure that UIDs and names do not get conflated.
+                    type: string
+                required:
+                - apiGroup
+                - kind
+                - name
+                - namespace
+                - uid
+                type: object
+                x-kubernetes-validations:
+                - message: uid must not be empty
+                  rule: self.uid.size() > 0
+            required:
+            - actionName
+            - attempt
+            - context
+            - identityVersion
+            - invocationKey
+            - sourceRef
+            - target
+            - workloadRef
+            type: object
+            x-kubernetes-validations:
+            - message: spec is immutable
+              rule: self == oldSelf
+            - message: source, workload, and target namespaces must match
+              rule: self.sourceRef.__namespace__ == self.workloadRef.__namespace__
+                && self.sourceRef.__namespace__ == self.target.pod.__namespace__
+          status:
+            default:
+              phase: Unobserved
+            description: The first rule freezes equal-phase and terminal statuses.
+              Later rules constrain every legal edge and shape.
+            properties:
+              detail:
+                properties:
+                  reconfigure:
+                    properties:
+                      reason:
+                        enum:
+                        - InvalidParameter
+                        - UnsupportedParameter
+                        type: string
+                    required:
+                    - reason
+                    type: object
+                  type:
+                    enum:
+                    - Reconfigure
+                    type: string
+                required:
+                - type
+                type: object
+                x-kubernetes-validations:
+                - message: reconfigure is required for Reconfigure detail
+                  rule: self.type == 'Reconfigure' && has(self.reconfigure)
+              failureClass:
+                enum:
+                - Permanent
+                - Retryable
+                - Unknown
+                type: string
+              finishedTime:
+                format: date-time
+                type: string
+              phase:
+                default: Unobserved
+                enum:
+                - Unobserved
+                - Pending
+                - Running
+                - Succeeded
+                - Failed
+                - Cancelled
+                type: string
+              reason:
+                enum:
+                - ActionRejected
+                - ActionFailed
+                - TransportError
+                - ConfirmationLost
+                - TargetUnavailable
+                - TargetIdentityChanged
+                - InvalidExecutionIdentity
+                - CancelledBySource
+                type: string
+              startTime:
+                format: date-time
+                type: string
+            type: object
+            x-kubernetes-validations:
+            - message: illegal lifecycle action execution phase transition
+              rule: self == oldSelf || (oldSelf.phase == 'Unobserved' && self.phase
+                in ['Pending', 'Failed', 'Cancelled']) || (oldSelf.phase == 'Pending'
+                && self.phase in ['Running', 'Failed', 'Cancelled']) || (oldSelf.phase
+                == 'Running' && self.phase in ['Succeeded', 'Failed'])
+            - message: unobserved and pending statuses cannot contain terminal data
+              rule: 'self.phase == ''Unobserved'' || self.phase == ''Pending'' ? !has(self.failureClass)
+                && !has(self.reason) && !has(self.detail) && !has(self.startTime)
+                && !has(self.finishedTime) : true'
+            - message: running status requires only startTime
+              rule: 'self.phase == ''Running'' ? has(self.startTime) && !has(self.failureClass)
+                && !has(self.reason) && !has(self.detail) && !has(self.finishedTime)
+                : true'
+            - message: succeeded status requires startTime and finishedTime
+              rule: 'self.phase == ''Succeeded'' ? has(self.startTime) && has(self.finishedTime)
+                && !has(self.failureClass) && !has(self.reason) && !has(self.detail)
+                : true'
+            - message: failed status requires failureClass, reason, and finishedTime
+              rule: 'self.phase == ''Failed'' ? has(self.failureClass) && has(self.reason)
+                && has(self.finishedTime) : true'
+            - message: cancelled status has a fixed reason and no execution or failure
+                data
+              rule: 'self.phase == ''Cancelled'' ? self.reason == ''CancelledBySource''
+                && has(self.finishedTime) && !has(self.startTime) && !has(self.failureClass)
+                && !has(self.detail) : true'
+            - message: finishedTime cannot precede startTime
+              rule: '!has(self.startTime) || !has(self.finishedTime) || self.finishedTime
+                >= self.startTime'
+            - message: failureClass and reason combination is invalid
+              rule: self.phase != 'Failed' || (self.failureClass == 'Permanent' &&
+                self.reason in ['ActionRejected', 'ActionFailed', 'TargetIdentityChanged',
+                'InvalidExecutionIdentity']) || (self.failureClass == 'Retryable'
+                && self.reason in ['ActionFailed', 'TransportError', 'TargetUnavailable'])
+                || (self.failureClass == 'Unknown' && self.reason in ['ActionFailed',
+                'TransportError', 'ConfirmationLost'])
+            - message: typed detail is allowed only for permanent action rejection
+              rule: '!has(self.detail) || (self.phase == ''Failed'' && self.failureClass
+                == ''Permanent'' && self.reason == ''ActionRejected'')'
+            - message: identity failures are pre-dispatch only
+              rule: 'self.phase == ''Failed'' && self.reason in [''InvalidExecutionIdentity'',
+                ''TargetIdentityChanged''] ? oldSelf.phase in [''Unobserved'', ''Pending'']
+                : true'
+            - message: target unavailable is a pending failure
+              rule: self.phase != 'Failed' || self.reason != 'TargetUnavailable' ||
+                oldSelf.phase == 'Pending'
+            - message: failure reason is invalid for the source phase
+              rule: self.phase != 'Failed' || self.reason in ['InvalidExecutionIdentity',
+                'TargetIdentityChanged', 'TargetUnavailable'] || (self.reason == 'ActionRejected'
+                && oldSelf.phase in ['Pending', 'Running']) || (self.reason in ['ActionFailed',
+                'TransportError', 'ConfirmationLost'] && oldSelf.phase == 'Running')
+            - message: terminal status must preserve running startTime
+              rule: oldSelf.phase != 'Running' || self == oldSelf || (self.phase in
+                ['Succeeded', 'Failed'] && has(self.startTime) && self.startTime ==
+                oldSelf.startTime)
+            - message: pre-dispatch failure cannot set startTime
+              rule: self.phase != 'Failed' || oldSelf.phase == 'Running' || !has(self.startTime)
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

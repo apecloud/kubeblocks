@@ -36,6 +36,8 @@ import (
 	fakeparametersv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/parameters/v1alpha1/fake"
 	workloadsv1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/workloads/v1"
 	fakeworkloadsv1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/workloads/v1/fake"
+	workloadsv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/workloads/v1alpha1"
+	fakeworkloadsv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/workloads/v1alpha1/fake"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"
@@ -131,4 +133,9 @@ func (c *Clientset) ParametersV1alpha1() parametersv1alpha1.ParametersV1alpha1In
 // WorkloadsV1 retrieves the WorkloadsV1Client
 func (c *Clientset) WorkloadsV1() workloadsv1.WorkloadsV1Interface {
 	return &fakeworkloadsv1.FakeWorkloadsV1{Fake: &c.Fake}
+}
+
+// WorkloadsV1alpha1 retrieves the WorkloadsV1alpha1Client
+func (c *Clientset) WorkloadsV1alpha1() workloadsv1alpha1.WorkloadsV1alpha1Interface {
+	return &fakeworkloadsv1alpha1.FakeWorkloadsV1alpha1{Fake: &c.Fake}
 }

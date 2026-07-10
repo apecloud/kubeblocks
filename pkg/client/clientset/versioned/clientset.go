@@ -30,6 +30,7 @@ import (
 	operationsv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/operations/v1alpha1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/parameters/v1alpha1"
 	workloadsv1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/workloads/v1"
+	workloadsv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/workloads/v1alpha1"
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
@@ -45,6 +46,7 @@ type Interface interface {
 	OperationsV1alpha1() operationsv1alpha1.OperationsV1alpha1Interface
 	ParametersV1alpha1() parametersv1alpha1.ParametersV1alpha1Interface
 	WorkloadsV1() workloadsv1.WorkloadsV1Interface
+	WorkloadsV1alpha1() workloadsv1alpha1.WorkloadsV1alpha1Interface
 }
 
 // Clientset contains the clients for groups.
@@ -58,6 +60,7 @@ type Clientset struct {
 	operationsV1alpha1     *operationsv1alpha1.OperationsV1alpha1Client
 	parametersV1alpha1     *parametersv1alpha1.ParametersV1alpha1Client
 	workloadsV1            *workloadsv1.WorkloadsV1Client
+	workloadsV1alpha1      *workloadsv1alpha1.WorkloadsV1alpha1Client
 }
 
 // AppsV1alpha1 retrieves the AppsV1alpha1Client
@@ -98,6 +101,11 @@ func (c *Clientset) ParametersV1alpha1() parametersv1alpha1.ParametersV1alpha1In
 // WorkloadsV1 retrieves the WorkloadsV1Client
 func (c *Clientset) WorkloadsV1() workloadsv1.WorkloadsV1Interface {
 	return c.workloadsV1
+}
+
+// WorkloadsV1alpha1 retrieves the WorkloadsV1alpha1Client
+func (c *Clientset) WorkloadsV1alpha1() workloadsv1alpha1.WorkloadsV1alpha1Interface {
+	return c.workloadsV1alpha1
 }
 
 // Discovery retrieves the DiscoveryClient
@@ -176,6 +184,10 @@ func NewForConfigAndClient(c *rest.Config, httpClient *http.Client) (*Clientset,
 	if err != nil {
 		return nil, err
 	}
+	cs.workloadsV1alpha1, err = workloadsv1alpha1.NewForConfigAndClient(&configShallowCopy, httpClient)
+	if err != nil {
+		return nil, err
+	}
 
 	cs.DiscoveryClient, err = discovery.NewDiscoveryClientForConfigAndClient(&configShallowCopy, httpClient)
 	if err != nil {
@@ -205,6 +217,7 @@ func New(c rest.Interface) *Clientset {
 	cs.operationsV1alpha1 = operationsv1alpha1.New(c)
 	cs.parametersV1alpha1 = parametersv1alpha1.New(c)
 	cs.workloadsV1 = workloadsv1.New(c)
+	cs.workloadsV1alpha1 = workloadsv1alpha1.New(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &cs

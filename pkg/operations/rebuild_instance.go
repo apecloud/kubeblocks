@@ -271,6 +271,13 @@ func (r rebuildInstanceOpsHandler) classifyUnresolvedShardingTarget(reqCtx intct
 			Name: component.FullName(cluster.Name, actualComponentName), Namespace: cluster.Namespace,
 		}, liveComp); err != nil {
 			if apierrors.IsNotFound(err) {
+				converged, err := r.shardingComponentsConverged(reqCtx, cli, cluster, shardingSpec)
+				if err != nil {
+					return err
+				}
+				if converged {
+					return intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" not found in desired workload`, instanceName))
+				}
 				return intctrlutil.NewErrorf(intctrlutil.ErrorTypeNeedWaiting,
 					`wait for component "%s" to be recreated for sharding "%s"`, actualComponentName, shardingSpec.Name)
 			}
@@ -290,17 +297,28 @@ func (r rebuildInstanceOpsHandler) classifyUnresolvedShardingTarget(reqCtx intct
 		return err
 	}
 
-	shardingComps, err := sharding.ListShardingComponents(reqCtx.Ctx, cli, cluster, shardingSpec.Name)
+	converged, err := r.shardingComponentsConverged(reqCtx, cli, cluster, shardingSpec)
 	if err != nil {
 		return err
 	}
-	if int32(len(shardingComps)) < shardingSpec.Shards || slices.ContainsFunc(shardingComps, func(comp appsv1.Component) bool {
-		return !comp.DeletionTimestamp.IsZero()
-	}) {
+	if !converged {
 		return intctrlutil.NewErrorf(intctrlutil.ErrorTypeNeedWaiting,
 			`wait for sharding "%s" components to converge`, shardingSpec.Name)
 	}
 	return intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" not found in desired workload`, instanceName))
+}
+
+func (r rebuildInstanceOpsHandler) shardingComponentsConverged(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	cluster *appsv1.Cluster,
+	shardingSpec *appsv1.ClusterSharding) (bool, error) {
+	shardingComps, err := sharding.ListShardingComponents(reqCtx.Ctx, cli, cluster, shardingSpec.Name)
+	if err != nil {
+		return false, err
+	}
+	return int32(len(shardingComps)) >= shardingSpec.Shards && !slices.ContainsFunc(shardingComps, func(comp appsv1.Component) bool {
+		return !comp.DeletionTimestamp.IsZero()
+	}), nil
 }
 
 func rebuildComponentLifecycleProjectionEqual(desiredComp, liveComp *appsv1.Component) bool {

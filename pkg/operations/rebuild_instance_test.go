@@ -665,8 +665,29 @@ var _ = Describe("OpsUtil functions", func() {
 				comp.Labels[constant.KBAppShardingNameLabelKey] = shardingName
 			})).Should(Succeed())
 			Expect(k8sClient.Delete(ctx, shardComp)).Should(Succeed())
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, client.ObjectKeyFromObject(shardComp), &appsv1.Component{})
+				return apierrors.IsNotFound(err)
+			}).Should(BeTrue())
 			err = rebuildInstanceOpsHandler{}.Action(reqCtx, k8sClient, opsRes)
 			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeNeedWaiting)).Should(BeTrue())
+
+			By("replace the old concrete shard while retaining its stale target pod")
+			replacementSpec := opsRes.Cluster.Spec.Shardings[0].Template.DeepCopy()
+			replacementSpec.Name = "shard-xyz"
+			replacementComp, err := component.BuildComponent(opsRes.Cluster, replacementSpec, map[string]string{
+				constant.KBAppShardingNameLabelKey: shardingName,
+			}, nil)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(testCtx.CreateObj(ctx, replacementComp)).Should(Succeed())
+			DeferCleanup(func() {
+				Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, replacementComp))).Should(Succeed())
+			})
+
+			By("reject the stale target after the authoritative sharding set has converged")
+			err = rebuildInstanceOpsHandler{}.Action(reqCtx, k8sClient, opsRes)
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeTrue())
+			Expect(err.Error()).Should(ContainSubstring(fmt.Sprintf(`instance "%s" not found in desired workload`, targetName)))
 		})
 
 		It("waits for in-place rebuild when the desired target uses component ordinals", func() {

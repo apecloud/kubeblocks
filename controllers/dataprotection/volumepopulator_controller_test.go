@@ -22,6 +22,7 @@ package dataprotection
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"testing"
 
@@ -40,6 +41,7 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -1490,6 +1492,7 @@ func TestDispatchUnboundPVCFailsWhenNoRestoreActionsExist(t *testing.T) {
 func TestDeletingTargetPVCCleansPopulationWithoutValidatingSource(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, batchv1.AddToScheme(scheme))
 	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
 	apiGroup := dptypes.DataprotectionAPIGroup
 	now := metav1.Now()
@@ -1521,9 +1524,18 @@ func TestDeletingTargetPVCCleansPopulationWithoutValidatingSource(t *testing.T) 
 	}
 
 	err := reconciler.syncPVC(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc)
-	require.NoError(t, err)
+	require.Error(t, err)
+	require.True(t, intctrlutil.IsRequeueError(err), err)
 	err = reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(populatePVC), &corev1.PersistentVolumeClaim{})
 	require.True(t, apierrors.IsNotFound(err), "populate PVC should be deleted, got: %v", err)
+	currentPVC := &corev1.PersistentVolumeClaim{}
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(pvc), currentPVC))
+	require.Contains(t, currentPVC.Finalizers, dptypes.DataProtectionFinalizerName)
+
+	err = reconciler.syncPVC(intctrlutil.RequestCtx{Ctx: context.Background()}, currentPVC)
+	require.NoError(t, err)
+	err = reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(pvc), &corev1.PersistentVolumeClaim{})
+	require.True(t, apierrors.IsNotFound(err), err)
 }
 
 func TestPopulateCreatesExecutionRestoreAndPolls(t *testing.T) {
@@ -2361,6 +2373,237 @@ func newRestorePVCForSerialTest(name, volumeName string) *corev1.PersistentVolum
 				Kind:     dptypes.BackupKind,
 				Name:     "backup",
 			},
+		},
+	}
+}
+
+func TestSyncPVCDeletionCleansUpWhenBackupIsMissing(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, batchv1.AddToScheme(scheme))
+	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
+
+	apiGroup := dptypes.DataprotectionAPIGroup
+	deletionTime := metav1.Now()
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:         "default",
+			Name:              "restore-data-mysql-0",
+			UID:               types.UID("target-pvc-uid"),
+			DeletionTimestamp: &deletionTime,
+			Finalizers:        []string{dptypes.DataProtectionFinalizerName},
+			Annotations: map[string]string{
+				constant.RestoreSourceNamespaceAnnotationKey: "default",
+			},
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			DataSourceRef: &corev1.TypedObjectReference{
+				APIGroup: &apiGroup,
+				Kind:     dptypes.BackupKind,
+				Name:     "deleted-backup",
+			},
+		},
+		Status: corev1.PersistentVolumeClaimStatus{
+			Conditions: []corev1.PersistentVolumeClaimCondition{{
+				Type:   PersistentVolumeClaimPopulating,
+				Status: corev1.ConditionTrue,
+				Reason: ReasonPopulatingProcessing,
+			}},
+		},
+	}
+	populatePVCName := getPopulatePVCName(pvc.UID)
+	populatePVC := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:  pvc.Namespace,
+			Name:       populatePVCName,
+			Finalizers: []string{"test.kubeblocks.io/hold"},
+		},
+	}
+	job := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:  pvc.Namespace,
+			Name:       "populate-job",
+			Finalizers: []string{dptypes.DataProtectionFinalizerName, "test.kubeblocks.io/hold"},
+			Labels: map[string]string{
+				dprestore.DataProtectionPopulatePVCLabelKey: populatePVCName,
+			},
+		},
+	}
+	reconciler := &VolumePopulatorReconciler{
+		Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(pvc, populatePVC, job).Build(),
+		Scheme: scheme,
+	}
+
+	err := reconciler.syncPVC(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc)
+
+	require.Error(t, err)
+	require.True(t, intctrlutil.IsRequeueError(err), err)
+	currentPVC := &corev1.PersistentVolumeClaim{}
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(pvc), currentPVC))
+	require.Contains(t, currentPVC.Finalizers, dptypes.DataProtectionFinalizerName)
+	currentPopulatePVC := &corev1.PersistentVolumeClaim{}
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(populatePVC), currentPopulatePVC))
+	require.False(t, currentPopulatePVC.DeletionTimestamp.IsZero())
+	currentJob := &batchv1.Job{}
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(job), currentJob))
+	require.False(t, currentJob.DeletionTimestamp.IsZero())
+	require.NotContains(t, currentJob.Finalizers, dptypes.DataProtectionFinalizerName)
+
+	jobPatch := client.MergeFrom(currentJob.DeepCopy())
+	currentJob.Finalizers = nil
+	require.NoError(t, reconciler.Client.Patch(context.Background(), currentJob, jobPatch))
+	populatePVCPatch := client.MergeFrom(currentPopulatePVC.DeepCopy())
+	currentPopulatePVC.Finalizers = nil
+	require.NoError(t, reconciler.Client.Patch(context.Background(), currentPopulatePVC, populatePVCPatch))
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(pvc), currentPVC))
+
+	err = reconciler.syncPVC(intctrlutil.RequestCtx{Ctx: context.Background()}, currentPVC)
+
+	require.NoError(t, err)
+	err = reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(currentPVC), &corev1.PersistentVolumeClaim{})
+	require.True(t, apierrors.IsNotFound(err), err)
+	err = reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(populatePVC), &corev1.PersistentVolumeClaim{})
+	require.True(t, apierrors.IsNotFound(err), err)
+	err = reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(job), &batchv1.Job{})
+	require.True(t, apierrors.IsNotFound(err), err)
+}
+
+func TestSyncPVCDeletionReleasesFinalizerWhenDependentsAreAbsent(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, batchv1.AddToScheme(scheme))
+	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
+	pvc := newDeletingBackupRestorePVC()
+	reconciler := &VolumePopulatorReconciler{
+		Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(pvc).Build(),
+		Scheme: scheme,
+	}
+
+	err := reconciler.syncPVC(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc)
+
+	require.NoError(t, err)
+	err = reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(pvc), &corev1.PersistentVolumeClaim{})
+	require.True(t, apierrors.IsNotFound(err), err)
+}
+
+func TestSyncPVCDeletionKeepsFinalizerOnCleanupAPIErrors(t *testing.T) {
+	testCases := []struct {
+		name              string
+		failurePoint      string
+		jobExists         bool
+		jobHasDPFinalizer bool
+		helperPVCExists   bool
+	}{
+		{name: "list jobs", failurePoint: "list-jobs"},
+		{name: "patch job finalizer", failurePoint: "patch-job", jobExists: true, jobHasDPFinalizer: true},
+		{name: "delete job", failurePoint: "delete-job", jobExists: true},
+		{name: "get helper PVC", failurePoint: "get-helper"},
+		{name: "delete helper PVC", failurePoint: "delete-helper", helperPVCExists: true},
+		{name: "patch target PVC", failurePoint: "patch-target"},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			scheme := runtime.NewScheme()
+			require.NoError(t, corev1.AddToScheme(scheme))
+			require.NoError(t, batchv1.AddToScheme(scheme))
+			require.NoError(t, dpv1alpha1.AddToScheme(scheme))
+			pvc := newDeletingBackupRestorePVC()
+			helperPVCName := getPopulatePVCName(pvc.UID)
+			jobName := "populate-job"
+			objects := []client.Object{pvc}
+			if testCase.jobExists {
+				jobFinalizers := []string(nil)
+				if testCase.jobHasDPFinalizer {
+					jobFinalizers = []string{dptypes.DataProtectionFinalizerName}
+				}
+				objects = append(objects, &batchv1.Job{ObjectMeta: metav1.ObjectMeta{
+					Namespace:  pvc.Namespace,
+					Name:       jobName,
+					Finalizers: jobFinalizers,
+					Labels: map[string]string{
+						dprestore.DataProtectionPopulatePVCLabelKey: helperPVCName,
+					},
+				}})
+			}
+			if testCase.helperPVCExists {
+				objects = append(objects, &corev1.PersistentVolumeClaim{
+					ObjectMeta: metav1.ObjectMeta{Namespace: pvc.Namespace, Name: helperPVCName},
+				})
+			}
+			injectedErr := errors.New("injected cleanup error")
+			cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).WithInterceptorFuncs(interceptor.Funcs{
+				List: func(ctx context.Context, cli client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
+					if testCase.failurePoint == "list-jobs" {
+						if _, ok := list.(*batchv1.JobList); ok {
+							return injectedErr
+						}
+					}
+					return cli.List(ctx, list, opts...)
+				},
+				Get: func(ctx context.Context, cli client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+					if testCase.failurePoint == "get-helper" && key.Name == helperPVCName {
+						return injectedErr
+					}
+					return cli.Get(ctx, key, obj, opts...)
+				},
+				Delete: func(ctx context.Context, cli client.WithWatch, obj client.Object, opts ...client.DeleteOption) error {
+					if testCase.failurePoint == "delete-job" && obj.GetName() == jobName {
+						return injectedErr
+					}
+					if testCase.failurePoint == "delete-helper" && obj.GetName() == helperPVCName {
+						return injectedErr
+					}
+					return cli.Delete(ctx, obj, opts...)
+				},
+				Patch: func(ctx context.Context, cli client.WithWatch, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
+					if testCase.failurePoint == "patch-job" && obj.GetName() == jobName {
+						return injectedErr
+					}
+					if testCase.failurePoint == "patch-target" && obj.GetName() == pvc.Name {
+						return injectedErr
+					}
+					return cli.Patch(ctx, obj, patch, opts...)
+				},
+			}).Build()
+			reconciler := &VolumePopulatorReconciler{Client: cli, Scheme: scheme}
+
+			err := reconciler.syncPVC(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc)
+
+			require.ErrorIs(t, err, injectedErr)
+			currentPVC := &corev1.PersistentVolumeClaim{}
+			require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(pvc), currentPVC))
+			require.Contains(t, currentPVC.Finalizers, dptypes.DataProtectionFinalizerName)
+		})
+	}
+}
+
+func newDeletingBackupRestorePVC() *corev1.PersistentVolumeClaim {
+	apiGroup := dptypes.DataprotectionAPIGroup
+	deletionTime := metav1.Now()
+	return &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:         "default",
+			Name:              "restore-data-mysql-0",
+			UID:               types.UID("target-pvc-uid"),
+			DeletionTimestamp: &deletionTime,
+			Finalizers:        []string{dptypes.DataProtectionFinalizerName},
+			Annotations: map[string]string{
+				constant.RestoreSourceNamespaceAnnotationKey: "default",
+			},
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			DataSourceRef: &corev1.TypedObjectReference{
+				APIGroup: &apiGroup,
+				Kind:     dptypes.BackupKind,
+				Name:     "deleted-backup",
+			},
+		},
+		Status: corev1.PersistentVolumeClaimStatus{
+			Conditions: []corev1.PersistentVolumeClaimCondition{{
+				Type:   PersistentVolumeClaimPopulating,
+				Status: corev1.ConditionTrue,
+				Reason: ReasonPopulatingProcessing,
+			}},
 		},
 	}
 }

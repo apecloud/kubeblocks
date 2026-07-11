@@ -21,19 +21,35 @@ package parameters
 
 import (
 	"context"
+	"errors"
+	"reflect"
 	"strings"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/controller/render"
 	parampkg "github.com/apecloud/kubeblocks/pkg/parameters"
 )
+
+type countingGetClient struct {
+	client.Client
+	err      error
+	getCount int
+}
+
+func (c *countingGetClient) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+	c.getCount++
+	return c.err
+}
 
 func TestNormalizeManagedParameterInputs(t *testing.T) {
 	t.Run("updates override assignments and remove is explicit", func(t *testing.T) {
@@ -219,6 +235,194 @@ func TestReconcileConfigItemDetailsExternalManagedEmptyTemplate(t *testing.T) {
 	if compParam.Spec.ConfigItemDetails[0].ConfigSpec == nil || compParam.Spec.ConfigItemDetails[0].ConfigSpec.Template != "" {
 		t.Fatalf("expected empty-template config spec to be preserved, got %#v", compParam.Spec.ConfigItemDetails[0].ConfigSpec)
 	}
+}
+
+func TestExternalManagedEmptyTemplateOnlyUpdatesStatus(t *testing.T) {
+	item := parametersv1alpha1.ConfigTemplateItemDetail{
+		Name: "oceanbase-sysvars",
+		ConfigSpec: &appsv1.ComponentFileTemplate{
+			Name:            "oceanbase-sysvars",
+			ExternalManaged: ptr.To(true),
+		},
+	}
+	status := &parametersv1alpha1.ConfigTemplateItemDetailStatus{
+		Name:  item.Name,
+		Phase: parametersv1alpha1.CInitPhase,
+	}
+
+	t.Run("task does not read the runtime ConfigMap", func(t *testing.T) {
+		taskStatus := status.DeepCopy()
+		task := newTask(item, taskStatus, 7)
+		if err := task.Do(&Task{}, nil, "revision-1"); err != nil {
+			t.Fatalf("Task.Do() error = %v", err)
+		}
+		if taskStatus.Phase != parametersv1alpha1.CFinishedPhase || taskStatus.UpdateRevision != "revision-1" ||
+			taskStatus.LastDoneRevision != "revision-1" || taskStatus.Message != nil {
+			t.Fatalf("expected status-only merge for delegated config, got %#v", taskStatus)
+		}
+		beforeReplay := taskStatus.DeepCopy()
+		if err := task.Do(&Task{}, nil, "revision-1"); err != nil {
+			t.Fatalf("Task.Do() replay error = %v", err)
+		}
+		if !reflect.DeepEqual(taskStatus, beforeReplay) {
+			t.Fatalf("expected exact status replay, before = %#v, after = %#v", beforeReplay, taskStatus)
+		}
+	})
+
+	t.Run("sync implementation keeps the same defensive contract", func(t *testing.T) {
+		syncStatus := status.DeepCopy()
+		fetcher := &Task{ResourceFetcher: parampkg.ResourceFetcher[Task]{
+			ComponentObj: &appsv1.Component{ObjectMeta: metav1.ObjectMeta{Generation: 7}},
+		}}
+		if err := syncImpl(&taskContext{}, fetcher, item, syncStatus, "revision-1", nil); err != nil {
+			t.Fatalf("syncImpl() error = %v", err)
+		}
+		if syncStatus.Phase != parametersv1alpha1.CFinishedPhase || syncStatus.UpdateRevision != "revision-1" ||
+			syncStatus.LastDoneRevision != "revision-1" || syncStatus.Message != nil {
+			t.Fatalf("expected status-only merge for delegated config, got %#v", syncStatus)
+		}
+	})
+
+	t.Run("adding a template re-enters the normal task path", func(t *testing.T) {
+		withTemplate := item
+		withTemplate.ConfigSpec = item.ConfigSpec.DeepCopy()
+		withTemplate.ConfigSpec.Template = "default-template"
+		evolvedStatus := &parametersv1alpha1.ConfigTemplateItemDetailStatus{
+			Name:             item.Name,
+			Phase:            parametersv1alpha1.CFinishedPhase,
+			UpdateRevision:   "revision-1",
+			LastDoneRevision: "revision-1",
+		}
+		before := evolvedStatus.DeepCopy()
+		lookupErr := errors.New("runtime ConfigMap lookup reached")
+		spy := &countingGetClient{err: lookupErr}
+		resource := &Task{}
+		resource.Init(&render.ResourceCtx{
+			Context:       context.Background(),
+			Client:        spy,
+			Namespace:     "default",
+			ClusterName:   "obce",
+			ComponentName: "oceanbase",
+		}, resource)
+
+		task := newTask(withTemplate, evolvedStatus, 7)
+		if err := task.Do(resource, nil, "revision-2"); !errors.Is(err, lookupErr) {
+			t.Fatalf("expected normal runtime ConfigMap lookup error, got %v", err)
+		}
+		if spy.getCount != 1 {
+			t.Fatalf("expected one runtime ConfigMap lookup, got %d", spy.getCount)
+		}
+		if !reflect.DeepEqual(evolvedStatus, before) {
+			t.Fatalf("failed normal lookup must not fake a new terminal revision: before = %#v, after = %#v", before, evolvedStatus)
+		}
+	})
+}
+
+func TestMergeAndApplyConfigDoesNotWriteExternalManagedEmptyTemplate(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatalf("AddToScheme(core) error = %v", err)
+	}
+	item := parametersv1alpha1.ConfigTemplateItemDetail{
+		Name: "external-config",
+		ConfigSpec: &appsv1.ComponentFileTemplate{
+			Name:            "external-config",
+			ExternalManaged: ptr.To(true),
+		},
+	}
+	owner := &parametersv1alpha1.ComponentParameter{
+		ObjectMeta: metav1.ObjectMeta{Name: "params", Namespace: "default", UID: "owner-uid"},
+	}
+
+	t.Run("does not update an existing user ConfigMap", func(t *testing.T) {
+		running := &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{Name: "user-config", Namespace: "default"},
+			Data:       map[string]string{"sysvars.conf": "user-value"},
+		}
+		expected := running.DeepCopy()
+		expected.Data["sysvars.conf"] = "controller-value"
+		cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(running).Build()
+		resourceCtx := &render.ResourceCtx{Context: context.Background(), Client: cli}
+
+		if err := mergeAndApplyConfig(resourceCtx, expected, running, owner, item, 7, "revision-1"); err != nil {
+			t.Fatalf("mergeAndApplyConfig() error = %v", err)
+		}
+		got := &corev1.ConfigMap{}
+		if err := cli.Get(context.Background(), client.ObjectKeyFromObject(running), got); err != nil {
+			t.Fatalf("get ConfigMap error = %v", err)
+		}
+		if got.Data["sysvars.conf"] != "user-value" || len(got.OwnerReferences) != 0 || len(got.Finalizers) != 0 {
+			t.Fatalf("external ConfigMap was mutated: %#v", got)
+		}
+	})
+
+	t.Run("does not create a user-owned ConfigMap", func(t *testing.T) {
+		expected := &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{Name: "user-config", Namespace: "default"},
+			Data:       map[string]string{"sysvars.conf": "controller-value"},
+		}
+		cli := fake.NewClientBuilder().WithScheme(scheme).Build()
+		resourceCtx := &render.ResourceCtx{Context: context.Background(), Client: cli}
+
+		if err := mergeAndApplyConfig(resourceCtx, expected, nil, owner, item, 7, "revision-1"); err != nil {
+			t.Fatalf("mergeAndApplyConfig() error = %v", err)
+		}
+		got := &corev1.ConfigMap{}
+		err := cli.Get(context.Background(), client.ObjectKeyFromObject(expected), got)
+		if !apierrors.IsNotFound(err) {
+			t.Fatalf("expected external ConfigMap to remain absent, got %#v, error = %v", got, err)
+		}
+	})
+
+	t.Run("keeps the ordinary managed update path", func(t *testing.T) {
+		managedItem := item
+		managedItem.ConfigSpec = item.ConfigSpec.DeepCopy()
+		managedItem.ConfigSpec.ExternalManaged = nil
+		running := &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{Name: "managed-config", Namespace: "default"},
+			Data:       map[string]string{"my.cnf": "old-value"},
+		}
+		expected := running.DeepCopy()
+		expected.Data["my.cnf"] = "new-value"
+		cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(running).Build()
+		resourceCtx := &render.ResourceCtx{Context: context.Background(), Client: cli}
+
+		if err := mergeAndApplyConfig(resourceCtx, expected, running, owner, managedItem, 7, "revision-1"); err != nil {
+			t.Fatalf("mergeAndApplyConfig() error = %v", err)
+		}
+		got := &corev1.ConfigMap{}
+		if err := cli.Get(context.Background(), client.ObjectKeyFromObject(running), got); err != nil {
+			t.Fatalf("get ConfigMap error = %v", err)
+		}
+		if got.Data["my.cnf"] != "new-value" {
+			t.Fatalf("expected managed ConfigMap update, got %#v", got.Data)
+		}
+	})
+
+	t.Run("keeps the parameter-managed path when an external template exists", func(t *testing.T) {
+		withTemplate := item
+		withTemplate.ConfigSpec = item.ConfigSpec.DeepCopy()
+		withTemplate.ConfigSpec.Template = "default-template"
+		running := &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{Name: "parameter-managed-config", Namespace: "default"},
+			Data:       map[string]string{"my.cnf": "old-value"},
+		}
+		expected := running.DeepCopy()
+		expected.Data["my.cnf"] = "new-value"
+		cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(running).Build()
+		resourceCtx := &render.ResourceCtx{Context: context.Background(), Client: cli}
+
+		if err := mergeAndApplyConfig(resourceCtx, expected, running, owner, withTemplate, 7, "revision-1"); err != nil {
+			t.Fatalf("mergeAndApplyConfig() error = %v", err)
+		}
+		got := &corev1.ConfigMap{}
+		if err := cli.Get(context.Background(), client.ObjectKeyFromObject(running), got); err != nil {
+			t.Fatalf("get ConfigMap error = %v", err)
+		}
+		if got.Data["my.cnf"] != "new-value" {
+			t.Fatalf("expected parameter-managed ConfigMap update, got %#v", got.Data)
+		}
+	})
 }
 
 func TestReconcileConfigItemDetailsRequiresOrdinaryTemplateConfigMap(t *testing.T) {

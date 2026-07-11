@@ -52,7 +52,7 @@ func reconcileConfigItemDetailsIntoSpec(ctx context.Context, cli client.Client, 
 	if !parameters.HasValidParameterTemplate(configDescs) {
 		return false, nil
 	}
-	templates, err := resolveComponentTemplateForConfigItemDetails(ctx, cli, fetchTask.ComponentDefObj)
+	templates, err := resolveComponentTemplatesToleratingDelegated(ctx, cli, fetchTask.ComponentDefObj)
 	if err != nil {
 		return false, err
 	}
@@ -78,7 +78,7 @@ func reconcileConfigItemDetailsIntoSpec(ctx context.Context, cli client.Client, 
 	return true, cli.Patch(ctx, compParam, patch)
 }
 
-func resolveComponentTemplateForConfigItemDetails(ctx context.Context, reader client.Reader, cmpd *appsv1.ComponentDefinition) (map[string]*corev1.ConfigMap, error) {
+func resolveComponentTemplatesToleratingDelegated(ctx context.Context, reader client.Reader, cmpd *appsv1.ComponentDefinition) (map[string]*corev1.ConfigMap, error) {
 	tpls := make(map[string]*corev1.ConfigMap, len(cmpd.Spec.Configs))
 	for _, config := range cmpd.Spec.Configs {
 		// ConfigItemDetails can be generated for this delegated config without
@@ -466,6 +466,10 @@ func newTask(item parametersv1alpha1.ConfigTemplateItemDetail,
 	return Task{
 		Name: item.Name,
 		Do: func(resource *Task, taskCtx *taskContext, revision string) error {
+			if isExternalManagedWithoutTemplate(item) {
+				completeExternalManagedStatus(status, revision)
+				return nil
+			}
 			if item.ConfigSpec == nil {
 				return core.MakeError("not found config spec: %s", item.Name)
 			}
@@ -498,6 +502,10 @@ func syncImpl(taskCtx *taskContext,
 	status *parametersv1alpha1.ConfigTemplateItemDetailStatus,
 	revision string,
 	configMap *corev1.ConfigMap) (err error) {
+	if isExternalManagedWithoutTemplate(item) {
+		completeExternalManagedStatus(status, revision)
+		return nil
+	}
 	if parameters.IsApplyUpdatedParameters(configMap, item, fetcher.ComponentObj.Generation) {
 		return syncStatus(configMap, status)
 	}
@@ -539,6 +547,9 @@ func syncImpl(taskCtx *taskContext,
 
 func mergeAndApplyConfig(resourceCtx *render.ResourceCtx, expected, running *corev1.ConfigMap, owner client.Object,
 	item parametersv1alpha1.ConfigTemplateItemDetail, compGeneration int64, revision string) error {
+	if isExternalManagedWithoutTemplate(item) {
+		return nil
+	}
 	fn := updateReconcileObject(item, owner, compGeneration, revision)
 	switch {
 	case expected == nil: // not update
@@ -548,6 +559,23 @@ func mergeAndApplyConfig(resourceCtx *render.ResourceCtx, expected, running *cor
 	default:
 		return update(resourceCtx.Context, resourceCtx.Client, running, running, mergedConfigmap(expected, fn))
 	}
+}
+
+func isExternalManaged(item parametersv1alpha1.ConfigTemplateItemDetail) bool {
+	return item.ConfigSpec != nil && pointer.BoolDeref(item.ConfigSpec.ExternalManaged, false)
+}
+
+func isExternalManagedWithoutTemplate(item parametersv1alpha1.ConfigTemplateItemDetail) bool {
+	return isExternalManaged(item) && item.ConfigSpec.Template == ""
+}
+
+func completeExternalManagedStatus(status *parametersv1alpha1.ConfigTemplateItemDetailStatus, revision string) {
+	// The external producer owns both rendering and application, so there is no
+	// reconfigure phase that can advance this item after the controller no-op.
+	status.Message = nil
+	status.Phase = parametersv1alpha1.CFinishedPhase
+	status.UpdateRevision = revision
+	status.LastDoneRevision = revision
 }
 
 func mergedConfigmap(expected *corev1.ConfigMap, setter func(*corev1.ConfigMap) error) func(*corev1.ConfigMap) error {

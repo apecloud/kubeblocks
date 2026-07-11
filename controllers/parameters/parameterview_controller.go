@@ -764,7 +764,7 @@ func (r *ParameterViewReconciler) resolveContent(ctx context.Context, compParam 
 	if err != nil {
 		return "", err
 	}
-	templates, err := resolveComponentTemplate(ctx, r.Client, fetchTask.ComponentDefObj)
+	templates, err := resolveComponentTemplatesToleratingDelegated(ctx, r.Client, fetchTask.ComponentDefObj)
 	if err != nil {
 		return "", err
 	}
@@ -793,7 +793,7 @@ func (r *ParameterViewReconciler) resolveConfigContext(ctx context.Context,
 	if err != nil {
 		return nil, err
 	}
-	templates, err := resolveComponentTemplate(ctx, r.Client, fetchTask.ComponentDefObj)
+	templates, err := resolveComponentTemplatesToleratingDelegated(ctx, r.Client, fetchTask.ComponentDefObj)
 	if err != nil {
 		return nil, err
 	}

@@ -1566,6 +1566,59 @@ func TestCompactSubmissionsKeepsNewestEntriesWithinCap(t *testing.T) {
 	}
 }
 
+func TestParameterViewToleratesExternalManagedEmptyTemplate(t *testing.T) {
+	objects := newParameterViewTestObjects("", &parametersv1alpha1.ParameterView{
+		ObjectMeta: metav1.ObjectMeta{Name: parameterViewName, Namespace: parameterViewNamespace},
+		Spec: parametersv1alpha1.ParameterViewSpec{
+			ParameterRef: corev1.LocalObjectReference{Name: componentParameterName},
+			TemplateName: templateName,
+			FileName:     fileName,
+		},
+	}, func(compParam *parametersv1alpha1.ComponentParameter) {
+		compParam.Spec.ConfigItemDetails[0].ConfigSpec.Template = ""
+		compParam.Spec.ConfigItemDetails[0].ConfigSpec.ExternalManaged = ptr.To(true)
+		compParam.Spec.ConfigItemDetails[0].ConfigFileParams = nil
+	})
+	var compParam *parametersv1alpha1.ComponentParameter
+	for _, obj := range objects {
+		switch typed := obj.(type) {
+		case *appsv1.ComponentDefinition:
+			typed.Spec.Configs[0].Template = ""
+		case *parametersv1alpha1.ComponentParameter:
+			compParam = typed
+		}
+	}
+	if compParam == nil {
+		t.Fatal("ComponentParameter fixture not found")
+	}
+	reconciler, cli := newParameterViewTestReconciler(t, objects...)
+	for _, key := range []client.ObjectKey{
+		{Namespace: parameterViewNamespace, Name: templateConfigMapName},
+		{Namespace: parameterViewNamespace, Name: parameterscore.GetComponentCfgName(pvClusterName, pvComponentName, templateName)},
+	} {
+		cm := &corev1.ConfigMap{}
+		if err := cli.Get(context.Background(), key, cm); err != nil {
+			t.Fatalf("get ConfigMap fixture %s error = %v", key, err)
+		}
+		if err := cli.Delete(context.Background(), cm); err != nil {
+			t.Fatalf("delete ConfigMap fixture %s error = %v", key, err)
+		}
+	}
+
+	_, err := reconciler.resolveContent(context.Background(), compParam, &compParam.Spec.ConfigItemDetails[0], fileName)
+	if err == nil || !strings.Contains(err.Error(), "template source not found") {
+		t.Fatalf("expected explicit missing external template source, got %v", err)
+	}
+	if strings.Contains(err.Error(), `configmaps "" not found`) {
+		t.Fatalf("empty template must not trigger a ConfigMap lookup: %v", err)
+	}
+
+	view := objects[0].(*parametersv1alpha1.ParameterView)
+	if _, err := reconciler.resolveConfigContext(context.Background(), compParam, view); err != nil {
+		t.Fatalf("resolveConfigContext() should tolerate delegated empty template: %v", err)
+	}
+}
+
 const (
 	parameterViewNamespace       = "default"
 	pvClusterName                = "test-cluster"

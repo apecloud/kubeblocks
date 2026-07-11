@@ -893,8 +893,9 @@ var _ = Describe("OpsUtil functions", func() {
 			Expect(opsPhase).Should(Equal(opsv1alpha1.OpsFailedPhase))
 		})
 
-		It("test rebuild instance in place when the actionSet of the backup does not exist", func() {
-			By("init operations resources with a backup that references a nonexistent actionSet")
+		It("test rebuild instance in place keeps retrying while the actionSet of the backup is absent", func() {
+			By("init operations resources with a backup that references a not-yet-installed actionSet")
+			lateActionSetName := "actionset-late-" + randomStr
 			backup := testdp.NewBackupFactory(testCtx.DefaultNamespace, testdp.BackupName).
 				SetBackupPolicyName(testdp.BackupPolicyName).
 				SetBackupMethod(testdp.BackupMethodName).
@@ -904,7 +905,12 @@ var _ = Describe("OpsUtil functions", func() {
 				backup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
 				backup.Status.BackupMethod = &dpv1alpha1.BackupMethod{
 					Name:          backup.Spec.BackupMethod,
-					ActionSetName: "actionset-not-exist-" + randomStr,
+					ActionSetName: lateActionSetName,
+					TargetVolumes: &dpv1alpha1.TargetVolumeInfo{
+						VolumeMounts: []corev1.VolumeMount{
+							{Name: testapps.DataVolumeName, MountPath: "/test"},
+						},
+					},
 				}
 			})).Should(Succeed())
 			opsRes := prepareOpsRes(backup.Name, true)
@@ -913,20 +919,28 @@ var _ = Describe("OpsUtil functions", func() {
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
 			handler := rebuildInstanceOpsHandler{}
 
-			By("expect the missing actionSet to fail the instances instead of returning a retryable error")
-			_, _, err := handler.ReconcileAction(reqCtx, k8sClient, opsRes)
-			Expect(err).ShouldNot(HaveOccurred())
-			progressDetails := opsRes.OpsRequest.Status.Components[defaultCompName].ProgressDetails
-			Expect(progressDetails).Should(HaveLen(rebuildInstanceCount))
-			for _, detail := range progressDetails {
-				Expect(detail.Status).Should(Equal(opsv1alpha1.FailedProgressStatus))
-				Expect(detail.Message).Should(ContainSubstring("not found"))
+			By("expect the absent actionSet to be a retryable error instead of failing the instances")
+			opsPhase, _, err := handler.ReconcileAction(reqCtx, k8sClient, opsRes)
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring("not found"))
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeFalse())
+			Expect(opsPhase).Should(Equal(opsv1alpha1.OpsRunningPhase))
+			for _, detail := range opsRes.OpsRequest.Status.Components[defaultCompName].ProgressDetails {
+				Expect(detail.Status).ShouldNot(Equal(opsv1alpha1.FailedProgressStatus))
 			}
 
-			By("expect the opsRequest to fail on the next reconciliation")
-			opsPhase, _, err := handler.ReconcileAction(reqCtx, k8sClient, opsRes)
+			By("expect the rebuild to proceed once the actionSet is installed")
+			_ = testapps.CreateCustomizedObj(&testCtx, "backup/actionset.yaml",
+				&dpv1alpha1.ActionSet{}, testapps.WithName(lateActionSetName))
+			opsPhase, _, err = handler.ReconcileAction(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
-			Expect(opsPhase).Should(Equal(opsv1alpha1.OpsFailedPhase))
+			Expect(opsPhase).Should(Equal(opsv1alpha1.OpsRunningPhase))
+			restoreList := &dpv1alpha1.RestoreList{}
+			Expect(k8sClient.List(ctx, restoreList, client.MatchingLabels{
+				constant.OpsRequestNameLabelKey:      opsRes.OpsRequest.Name,
+				constant.OpsRequestNamespaceLabelKey: opsRes.OpsRequest.Namespace,
+			}, client.InNamespace(opsRes.OpsRequest.Namespace))).Should(Succeed())
+			Expect(restoreList.Items).Should(HaveLen(rebuildInstanceCount))
 		})
 
 		It("rebuild instance with horizontal scaling", func() {

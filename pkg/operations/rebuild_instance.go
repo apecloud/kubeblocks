@@ -610,11 +610,10 @@ func (r rebuildInstanceOpsHandler) prepareInplaceRebuildHelper(reqCtx intctrluti
 		if backup.Status.BackupMethod == nil {
 			return nil, intctrlutil.NewFatalError(fmt.Sprintf(`the backupMethod of the backup "%s" can not be empty`, rebuildInstance.BackupName))
 		}
+		// NOTE: an ActionSet is a cluster-scoped resource supplied by the addon and can be
+		// temporarily absent (addon installation/upgrade), so a NotFound here stays retryable.
 		actionSet, err = dputils.GetActionSetByName(reqCtx, cli, backup.Status.BackupMethod.ActionSetName)
 		if err != nil {
-			if apierrors.IsNotFound(err) {
-				return nil, intctrlutil.NewFatalError(fmt.Sprintf(`the actionSet "%s" of the backup "%s" is not found`, backup.Status.BackupMethod.ActionSetName, rebuildInstance.BackupName))
-			}
 			return nil, err
 		}
 	}

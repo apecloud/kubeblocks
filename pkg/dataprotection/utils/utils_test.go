@@ -204,6 +204,38 @@ func TestBuildEnvByTargetAndParameters(t *testing.T) {
 	assert.Equal(t, []corev1.EnvVar{{Name: "P1", Value: "v1"}}, params)
 }
 
+func TestBuildEnvByTargetUsesNamedContainerPortWithCredentialFallback(t *testing.T) {
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "pod-0", Namespace: "ns"},
+		Spec: corev1.PodSpec{Containers: []corev1.Container{{
+			Name: "fe",
+			Ports: []corev1.ContainerPort{
+				{Name: "http-port", ContainerPort: 8030},
+				{Name: "query-port", ContainerPort: 9030},
+			},
+		}}},
+	}
+	containerPort := &dpv1alpha1.ContainerPort{ContainerName: "fe", PortName: "query-port"}
+	credential := &dpv1alpha1.ConnectionCredential{
+		SecretName:  "conn",
+		UsernameKey: "username",
+		PasswordKey: "password",
+	}
+
+	envs, err := BuildEnvByTarget(pod, credential, containerPort)
+	assert.NoError(t, err)
+	assert.Contains(t, envs, corev1.EnvVar{Name: dptypes.DPDBPort, Value: "9030"})
+
+	envs, err = BuildEnvByTarget(pod, credential, &dpv1alpha1.ContainerPort{ContainerName: "fe", PortName: "missing"})
+	assert.Error(t, err)
+	assert.Nil(t, envs)
+
+	credential.PortKey = "port"
+	envs, err = BuildEnvByTarget(pod, credential, &dpv1alpha1.ContainerPort{ContainerName: "fe", PortName: "missing"})
+	assert.NoError(t, err)
+	assert.Contains(t, envs, buildEnvBySecretKey(dptypes.DPDBPort, "conn", "port"))
+}
+
 func TestBackupPolicyAndScheduleHelpers(t *testing.T) {
 	policies := &dpv1alpha1.BackupPolicyList{Items: []dpv1alpha1.BackupPolicy{
 		{

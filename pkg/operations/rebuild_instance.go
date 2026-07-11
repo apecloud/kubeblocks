@@ -412,6 +412,12 @@ func (r rebuildInstanceOpsHandler) buildDesiredInstanceNameSet(reqCtx intctrluti
 				`wait for InstanceSet "%s" before resolving flat instance ordinals`, protoITS.Name)
 		}
 	} else {
+		if comp.Spec.FlatInstanceOrdinal && !runningITS.DeletionTimestamp.IsZero() {
+			return nil, intctrlutil.NewErrorf(intctrlutil.ErrorTypeNeedWaiting,
+				`wait for InstanceSet "%s" recreation before resolving flat instance ordinals`, runningITS.Name)
+		}
+		// Sharding candidate Components are synthetic and have generation zero;
+		// the selected live Component is checked again before terminal classification.
 		if comp.Spec.FlatInstanceOrdinal && (runningITS.Status.ObservedGeneration != runningITS.Generation ||
 			(comp.Generation > 0 && runningITS.Annotations[constant.KubeBlocksGenerationKey] != strconv.FormatInt(comp.Generation, 10))) {
 			return nil, intctrlutil.NewErrorf(intctrlutil.ErrorTypeNeedWaiting,

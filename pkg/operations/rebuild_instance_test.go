@@ -864,6 +864,62 @@ var _ = Describe("OpsUtil functions", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 		})
 
+		It("waits for a terminating InstanceSet before using historical flat ordinal membership", func() {
+			opsRes := prepareOpsRes("", true)
+			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
+			setRebuildComponentPhaseFailed(opsRes)
+			projectClusterComponentLifecycle(opsRes, func(compSpec *appsv1.ClusterComponentSpec) {
+				compSpec.FlatInstanceOrdinal = true
+			})
+
+			comp := &appsv1.Component{}
+			Expect(k8sClient.Get(ctx, client.ObjectKey{
+				Name: constant.GenerateClusterComponentName(clusterName, defaultCompName), Namespace: testCtx.DefaultNamespace,
+			}, comp)).Should(Succeed())
+			its := testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
+			Expect(testapps.ChangeObj(&testCtx, its, func(obj *workloads.InstanceSet) {
+				obj.Spec.FlatInstanceOrdinal = true
+				obj.Finalizers = append(obj.Finalizers, "operations.kubeblocks.io/test-hold")
+				if obj.Annotations == nil {
+					obj.Annotations = map[string]string{}
+				}
+				obj.Annotations[constant.KubeBlocksGenerationKey] = fmt.Sprintf("%d", comp.Generation)
+			})).Should(Succeed())
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(its), its)).Should(Succeed())
+			Expect(testapps.ChangeObjStatus(&testCtx, its, func() {
+				its.Status.Replicas = *its.Spec.Replicas
+				its.Status.ObservedGeneration = its.Generation
+				its.Status.AssignedOrdinals = map[string]workloads.Ordinals{
+					instancetemplate.DefaultTemplateName: {Discrete: []int32{5}},
+				}
+			})).Should(Succeed())
+			Expect(k8sClient.Delete(ctx, its)).Should(Succeed())
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(its), func(g Gomega, obj *workloads.InstanceSet) {
+				g.Expect(obj.DeletionTimestamp.IsZero()).Should(BeFalse())
+			})).Should(Succeed())
+
+			targetName := fmt.Sprintf("%s-%s-5", clusterName, defaultCompName)
+			opsRes.OpsRequest = createRebuildInstanceOps("", true, targetName)
+			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsCreatingPhase
+			for _, force := range []bool{false, true} {
+				opsRes.OpsRequest.Spec.Force = force
+				err := rebuildInstanceOpsHandler{}.Action(reqCtx, k8sClient, opsRes)
+				Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeNeedWaiting)).Should(BeTrue())
+				Expect(err.Error()).Should(ContainSubstring("InstanceSet"))
+				Expect(err.Error()).Should(ContainSubstring("recreation"))
+			}
+			matchingLabels := client.MatchingLabels{
+				constant.OpsRequestNameLabelKey:      opsRes.OpsRequest.Name,
+				constant.OpsRequestNamespaceLabelKey: opsRes.OpsRequest.Namespace,
+			}
+			Eventually(testapps.List(&testCtx, generics.PodSignature, matchingLabels,
+				client.InNamespace(opsRes.OpsRequest.Namespace))).Should(HaveLen(0))
+			Eventually(testapps.List(&testCtx, generics.RestoreSignature, matchingLabels,
+				client.InNamespace(opsRes.OpsRequest.Namespace))).Should(HaveLen(0))
+			Eventually(testapps.List(&testCtx, generics.PersistentVolumeClaimSignature, matchingLabels,
+				client.InNamespace(opsRes.OpsRequest.Namespace))).Should(HaveLen(0))
+		})
+
 		It("ignores non-naming InstanceTemplate projection differences", func() {
 			opsRes := prepareOpsRes("", true)
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}

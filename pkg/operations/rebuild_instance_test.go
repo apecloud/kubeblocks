@@ -45,6 +45,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
+	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	"github.com/apecloud/kubeblocks/pkg/generics"
@@ -760,6 +761,160 @@ var _ = Describe("OpsUtil functions", func() {
 			By("expect action not to turn the desired flat ordinal instance into terminal failure")
 			_, _ = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(opsv1alpha1.OpsCreatingPhase))
+		})
+
+		It("waits for flat ordinal membership while the InstanceSet projection is absent", func() {
+			opsRes := prepareOpsRes("", true)
+			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
+			setRebuildComponentPhaseFailed(opsRes)
+			projectClusterComponentLifecycle(opsRes, func(compSpec *appsv1.ClusterComponentSpec) {
+				compSpec.FlatInstanceOrdinal = true
+			})
+
+			targetName := fmt.Sprintf("%s-%s-5", clusterName, defaultCompName)
+			opsRes.OpsRequest = createRebuildInstanceOps("", true, targetName)
+			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsCreatingPhase
+
+			err := rebuildInstanceOpsHandler{}.Action(reqCtx, k8sClient, opsRes)
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeNeedWaiting)).Should(BeTrue())
+			Expect(err.Error()).Should(ContainSubstring("InstanceSet"))
+		})
+
+		It("waits for flat ordinal membership while the InstanceSet status is stale", func() {
+			opsRes := prepareOpsRes("", true)
+			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
+			setRebuildComponentPhaseFailed(opsRes)
+			projectClusterComponentLifecycle(opsRes, func(compSpec *appsv1.ClusterComponentSpec) {
+				compSpec.FlatInstanceOrdinal = true
+			})
+
+			comp := &appsv1.Component{}
+			Expect(k8sClient.Get(ctx, client.ObjectKey{
+				Name: constant.GenerateClusterComponentName(clusterName, defaultCompName), Namespace: testCtx.DefaultNamespace,
+			}, comp)).Should(Succeed())
+			its := testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
+			Expect(testapps.ChangeObj(&testCtx, its, func(obj *workloads.InstanceSet) {
+				obj.Spec.FlatInstanceOrdinal = true
+				if obj.Annotations == nil {
+					obj.Annotations = map[string]string{}
+				}
+				obj.Annotations[constant.KubeBlocksGenerationKey] = fmt.Sprintf("%d", comp.Generation)
+			})).Should(Succeed())
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(its), its)).Should(Succeed())
+			Expect(testapps.ChangeObjStatus(&testCtx, its, func() {
+				its.Status.Replicas = *its.Spec.Replicas
+				its.Status.ObservedGeneration = its.Generation - 1
+			})).Should(Succeed())
+
+			targetName := fmt.Sprintf("%s-%s-5", clusterName, defaultCompName)
+			opsRes.OpsRequest = createRebuildInstanceOps("", true, targetName)
+			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsCreatingPhase
+
+			err := rebuildInstanceOpsHandler{}.Action(reqCtx, k8sClient, opsRes)
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeNeedWaiting)).Should(BeTrue())
+			Expect(err.Error()).Should(ContainSubstring("InstanceSet"))
+
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(its), its)).Should(Succeed())
+			Expect(testapps.ChangeObj(&testCtx, its, func(obj *workloads.InstanceSet) {
+				obj.Annotations[constant.KubeBlocksGenerationKey] = "0"
+			})).Should(Succeed())
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(its), its)).Should(Succeed())
+			Expect(testapps.ChangeObjStatus(&testCtx, its, func() {
+				its.Status.Replicas = *its.Spec.Replicas
+				its.Status.ObservedGeneration = its.Generation
+			})).Should(Succeed())
+
+			err = rebuildInstanceOpsHandler{}.Action(reqCtx, k8sClient, opsRes)
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeNeedWaiting)).Should(BeTrue())
+			Expect(err.Error()).Should(ContainSubstring("InstanceSet"))
+		})
+
+		It("uses a converged InstanceSet assignment for historical flat ordinal membership", func() {
+			opsRes := prepareOpsRes("", true)
+			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
+			setRebuildComponentPhaseFailed(opsRes)
+			projectClusterComponentLifecycle(opsRes, func(compSpec *appsv1.ClusterComponentSpec) {
+				compSpec.FlatInstanceOrdinal = true
+			})
+
+			comp := &appsv1.Component{}
+			Expect(k8sClient.Get(ctx, client.ObjectKey{
+				Name: constant.GenerateClusterComponentName(clusterName, defaultCompName), Namespace: testCtx.DefaultNamespace,
+			}, comp)).Should(Succeed())
+			its := testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
+			Expect(testapps.ChangeObj(&testCtx, its, func(obj *workloads.InstanceSet) {
+				obj.Spec.FlatInstanceOrdinal = true
+				if obj.Annotations == nil {
+					obj.Annotations = map[string]string{}
+				}
+				obj.Annotations[constant.KubeBlocksGenerationKey] = fmt.Sprintf("%d", comp.Generation)
+			})).Should(Succeed())
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(its), its)).Should(Succeed())
+			Expect(testapps.ChangeObjStatus(&testCtx, its, func() {
+				its.Status.Replicas = *its.Spec.Replicas
+				its.Status.ObservedGeneration = its.Generation
+				its.Status.AssignedOrdinals = map[string]workloads.Ordinals{
+					instancetemplate.DefaultTemplateName: {Discrete: []int32{5}},
+				}
+			})).Should(Succeed())
+
+			targetName := fmt.Sprintf("%s-%s-5", clusterName, defaultCompName)
+			_, err := rebuildInstanceOpsHandler{}.validateInPlaceRebuildTargetDesiredState(reqCtx, k8sClient, opsRes,
+				defaultCompName, targetName)
+			Expect(err).ShouldNot(HaveOccurred())
+		})
+
+		It("ignores non-naming InstanceTemplate projection differences", func() {
+			opsRes := prepareOpsRes("", true)
+			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
+			setRebuildComponentPhaseFailed(opsRes)
+			tplReplicas := int32(1)
+			projectClusterComponentLifecycle(opsRes, func(compSpec *appsv1.ClusterComponentSpec) {
+				compSpec.Instances = []appsv1.InstanceTemplate{{Name: "canary", Replicas: &tplReplicas}}
+			})
+
+			comp := &appsv1.Component{}
+			Expect(k8sClient.Get(ctx, client.ObjectKey{
+				Name: constant.GenerateClusterComponentName(clusterName, defaultCompName), Namespace: testCtx.DefaultNamespace,
+			}, comp)).Should(Succeed())
+			Expect(testapps.ChangeObj(&testCtx, comp, func(c *appsv1.Component) {
+				c.Spec.Instances[0].Labels = map[string]string{"defaulted": "value"}
+			})).Should(Succeed())
+
+			_, err := rebuildInstanceOpsHandler{}.getConvergedInPlaceRebuildComponent(reqCtx, k8sClient, opsRes,
+				defaultCompName, opsRes.OpsRequest.Spec.RebuildFrom[0].Instances[0].Name)
+			Expect(err).ShouldNot(HaveOccurred())
+		})
+
+		It("allows a forced rebuild to continue for a terminating target pod", func() {
+			opsRes := prepareOpsRes("", true)
+			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
+			setRebuildComponentPhaseFailed(opsRes)
+			targetName := opsRes.OpsRequest.Spec.RebuildFrom[0].Instances[0].Name
+
+			targetPod := &corev1.Pod{}
+			Expect(k8sClient.Get(ctx, client.ObjectKey{Name: targetName, Namespace: testCtx.DefaultNamespace}, targetPod)).Should(Succeed())
+			Expect(testapps.ChangeObj(&testCtx, targetPod, func(pod *corev1.Pod) {
+				pod.Finalizers = append(pod.Finalizers, "operations.kubeblocks.io/test-hold")
+			})).Should(Succeed())
+			Expect(k8sClient.Delete(ctx, targetPod)).Should(Succeed())
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(targetPod), func(g Gomega, pod *corev1.Pod) {
+				g.Expect(pod.DeletionTimestamp.IsZero()).Should(BeFalse())
+			})).Should(Succeed())
+
+			_, _, err := rebuildInstanceOpsHandler{}.validateInPlaceRebuildTargetAtActionBoundary(reqCtx, k8sClient,
+				opsRes, defaultCompName, targetName, true)
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeNeedWaiting)).Should(BeTrue())
+
+			opsRes.OpsRequest.Spec.Force = true
+			Expect(rebuildInstanceOpsHandler{}.Action(reqCtx, k8sClient, opsRes)).Should(Succeed())
+			_, _, err = rebuildInstanceOpsHandler{}.validateInPlaceRebuildTargetAtActionBoundary(reqCtx, k8sClient,
+				opsRes, defaultCompName, targetName, true)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(targetPod), func(pod *corev1.Pod) {
+				pod.Finalizers = nil
+			})()).Should(Succeed())
 		})
 
 		It("fails in-place rebuild OpsRequest when the target is offline in desired state", func() {

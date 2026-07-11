@@ -249,7 +249,9 @@ func (r rebuildInstanceOpsHandler) getConvergedInPlaceRebuildComponent(reqCtx in
 		return nil, intctrlutil.NewErrorf(intctrlutil.ErrorTypeNeedWaiting,
 			`wait for component "%s" to reflect cluster generation %d`, componentName, cluster.Generation)
 	}
-	return desiredComp, nil
+	// Return the observed Component so the InstanceSet projection can be
+	// checked against the exact Component generation that produced it.
+	return liveComp, nil
 }
 
 func (r rebuildInstanceOpsHandler) classifyUnresolvedShardingTarget(reqCtx intctrlutil.RequestCtx,
@@ -323,11 +325,25 @@ func (r rebuildInstanceOpsHandler) shardingComponentsConverged(reqCtx intctrluti
 
 func rebuildComponentLifecycleProjectionEqual(desiredComp, liveComp *appsv1.Component) bool {
 	return desiredComp.Spec.Replicas == liveComp.Spec.Replicas &&
-		reflect.DeepEqual(desiredComp.Spec.Instances, liveComp.Spec.Instances) &&
+		rebuildInstanceTemplatesProjectionEqual(desiredComp.Spec.Instances, liveComp.Spec.Instances) &&
 		reflect.DeepEqual(desiredComp.Spec.Ordinals, liveComp.Spec.Ordinals) &&
 		desiredComp.Spec.FlatInstanceOrdinal == liveComp.Spec.FlatInstanceOrdinal &&
 		reflect.DeepEqual(desiredComp.Spec.OfflineInstances, liveComp.Spec.OfflineInstances) &&
 		reflect.DeepEqual(desiredComp.Spec.Stop, liveComp.Spec.Stop)
+}
+
+func rebuildInstanceTemplatesProjectionEqual(desired, live []appsv1.InstanceTemplate) bool {
+	if len(desired) != len(live) {
+		return false
+	}
+	for i := range desired {
+		if desired[i].Name != live[i].Name ||
+			desired[i].GetReplicas() != live[i].GetReplicas() ||
+			!reflect.DeepEqual(desired[i].Ordinals, live[i].Ordinals) {
+			return false
+		}
+	}
+	return true
 }
 
 func (r rebuildInstanceOpsHandler) validateInPlaceRebuildTargetAtActionBoundary(reqCtx intctrlutil.RequestCtx,
@@ -348,7 +364,7 @@ func (r rebuildInstanceOpsHandler) validateInPlaceRebuildTargetAtActionBoundary(
 		}
 		return nil, nil, err
 	}
-	if !targetPod.DeletionTimestamp.IsZero() {
+	if !targetPod.DeletionTimestamp.IsZero() && !opsRes.OpsRequest.Spec.Force {
 		return nil, nil, intctrlutil.NewErrorf(intctrlutil.ErrorTypeNeedWaiting,
 			`wait for pod "%s" deletion to finish before rebuilding in place`, instanceName)
 	}
@@ -391,7 +407,16 @@ func (r rebuildInstanceOpsHandler) buildDesiredInstanceNameSet(reqCtx intctrluti
 		if !apierrors.IsNotFound(err) {
 			return nil, err
 		}
+		if comp.Spec.FlatInstanceOrdinal {
+			return nil, intctrlutil.NewErrorf(intctrlutil.ErrorTypeNeedWaiting,
+				`wait for InstanceSet "%s" before resolving flat instance ordinals`, protoITS.Name)
+		}
 	} else {
+		if comp.Spec.FlatInstanceOrdinal && (runningITS.Status.ObservedGeneration != runningITS.Generation ||
+			(comp.Generation > 0 && runningITS.Annotations[constant.KubeBlocksGenerationKey] != strconv.FormatInt(comp.Generation, 10))) {
+			return nil, intctrlutil.NewErrorf(intctrlutil.ErrorTypeNeedWaiting,
+				`wait for InstanceSet "%s" to reflect component generation %d`, runningITS.Name, comp.Generation)
+		}
 		protoITS.Status.AssignedOrdinals = runningITS.Status.AssignedOrdinals
 	}
 	itsExt, err := instancetemplate.BuildInstanceSetExt(protoITS, nil)

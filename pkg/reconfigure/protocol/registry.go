@@ -421,7 +421,7 @@ func digestExternalRV(rv string) string {
 }
 
 func registrationIdentityStored(v RegistrationIdentity) storedRegistrationIdentity {
-	return storedRegistrationIdentity{v.PhysicalAPIID, v.InstallationEpoch, v.ExecutionUID, v.AttemptID, v.NamespaceUID, v.KeySecretUID, v.AuthorityUID, v.QueueUID}
+	return storedRegistrationIdentity(v)
 }
 
 func effectIdentityStored(v EffectIdentity) storedEffectIdentity {
@@ -431,7 +431,7 @@ func effectIdentityStored(v EffectIdentity) storedEffectIdentity {
 func (v EffectIdentity) KindString() string { return string(v.Kind) }
 
 func registrationIdentityRuntime(v storedRegistrationIdentity) RegistrationIdentity {
-	return RegistrationIdentity{v.PhysicalAPIID, v.InstallationEpoch, v.ExecutionUID, v.AttemptID, v.NamespaceUID, v.KeySecretUID, v.AuthorityUID, v.QueueUID}
+	return RegistrationIdentity(v)
 }
 
 func effectIdentityRuntime(v storedEffectIdentity) EffectIdentity {
@@ -974,15 +974,16 @@ func validateStoredEffect(status storedStatus, registration storedRegistration, 
 		if effect.Tombstone != nil || effect.NotFound != nil || !validateTerminal() {
 			return ErrStoredStatusInvalid
 		}
-		if effect.CloseoutVariant == string(CloseoutVariantUnitExecuted) {
+		switch EffectCloseoutVariant(effect.CloseoutVariant) {
+		case CloseoutVariantUnitExecuted:
 			if kind != EffectKindUnitExecution || !validateDispatch() {
 				return ErrStoredStatusInvalid
 			}
-		} else if effect.CloseoutVariant == string(CloseoutVariantObservedTerminal) {
+		case CloseoutVariantObservedTerminal:
 			if !isWindowKind(kind) || !validateObject() || effect.Dispatch != nil {
 				return ErrStoredStatusInvalid
 			}
-		} else {
+		default:
 			return ErrStoredStatusInvalid
 		}
 	case EffectStateConsumed:

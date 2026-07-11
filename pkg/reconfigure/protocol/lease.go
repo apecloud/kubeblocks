@@ -394,7 +394,8 @@ func NewSessionLeaseLock(config SessionLeaseLockConfig) (*SessionLeaseLock, erro
 func (lock *SessionLeaseLock) Acquire(ctx context.Context) (LeaseSession, error) {
 	leases := lock.config.Client.Leases(lock.config.Namespace)
 	lease, err := leases.Get(ctx, lock.config.Name, metav1.GetOptions{})
-	if apierrors.IsNotFound(err) {
+	switch {
+	case apierrors.IsNotFound(err):
 		now := metav1.NewMicroTime(time.Now())
 		holder := lock.config.HolderIdentity
 		duration := int32(lock.config.LeaseDuration / time.Second)
@@ -403,9 +404,9 @@ func (lock *SessionLeaseLock) Acquire(ctx context.Context) (LeaseSession, error)
 		if err != nil {
 			return LeaseSession{}, err
 		}
-	} else if err != nil {
+	case err != nil:
 		return LeaseSession{}, err
-	} else {
+	default:
 		current, parseErr := leaseSessionFromLease(lease)
 		if parseErr != nil {
 			return LeaseSession{}, parseErr

@@ -2248,16 +2248,7 @@ func cloneStoredStatusDTO(t *testing.T, status storedProtocolFenceStatusDTO) sto
 }
 
 func storedRegistrationIdentityDTOFrom(identity RegistrationIdentity) storedRegistrationIdentityDTO {
-	return storedRegistrationIdentityDTO{
-		PhysicalAPIID:     identity.PhysicalAPIID,
-		InstallationEpoch: identity.InstallationEpoch,
-		ExecutionUID:      identity.ExecutionUID,
-		AttemptID:         identity.AttemptID,
-		NamespaceUID:      identity.NamespaceUID,
-		KeySecretUID:      identity.KeySecretUID,
-		AuthorityUID:      identity.AuthorityUID,
-		QueueUID:          identity.QueueUID,
-	}
+	return storedRegistrationIdentityDTO(identity)
 }
 
 func storedEffectIdentityDTOFrom(identity EffectIdentity) storedEffectIdentityDTO {

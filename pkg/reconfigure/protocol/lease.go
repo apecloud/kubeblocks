@@ -27,7 +27,9 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"math"
 	"strconv"
+	"sync"
 	"time"
 
 	coordinationv1 "k8s.io/api/coordination/v1"
@@ -372,12 +374,17 @@ type SessionLeaseLockConfig struct {
 }
 
 type SessionLeaseLock struct {
-	config   SessionLeaseLockConfig
-	leaseUID types.UID
+	config SessionLeaseLockConfig
+	mu     sync.RWMutex
+
+	leaseUID       types.UID
+	committedEpoch int64
 }
 
 func NewSessionLeaseLock(config SessionLeaseLockConfig) (*SessionLeaseLock, error) {
-	if config.Client == nil || config.Namespace == "" || config.Name == "" || config.HolderIdentity == "" || config.LeaseDuration <= 0 {
+	duration := config.LeaseDuration / time.Second
+	if config.Client == nil || config.Namespace == "" || config.Name == "" || config.HolderIdentity == "" ||
+		config.LeaseDuration < time.Second || config.LeaseDuration%time.Second != 0 || duration > math.MaxInt32 {
 		return nil, ErrLeaseSessionKeyUnavailable
 	}
 	if !validSessionPublicKey(config.KeyPair.Algorithm, config.KeyPair.PublicKey, fingerprintSessionKey(config.KeyPair.PublicKey)) {
@@ -409,7 +416,23 @@ func (lock *SessionLeaseLock) Acquire(ctx context.Context) (LeaseSession, error)
 	default:
 		current, parseErr := leaseSessionFromLease(lease)
 		if parseErr != nil {
-			return LeaseSession{}, parseErr
+			if !leaseExpired(lease, time.Now()) || lease.UID == "" || lease.ResourceVersion == "" {
+				return LeaseSession{}, parseErr
+			}
+			uid := lease.UID
+			resourceVersion := lease.ResourceVersion
+			if err := leases.Delete(ctx, lock.config.Name, metav1.DeleteOptions{Preconditions: &metav1.Preconditions{UID: &uid, ResourceVersion: &resourceVersion}}); err != nil {
+				return LeaseSession{}, err
+			}
+			now := metav1.NewMicroTime(time.Now())
+			holder := lock.config.HolderIdentity
+			duration := int32(lock.config.LeaseDuration / time.Second)
+			replacement := &coordinationv1.Lease{ObjectMeta: metav1.ObjectMeta{Name: lock.config.Name, Namespace: lock.config.Namespace, Annotations: lock.annotations(1)}, Spec: coordinationv1.LeaseSpec{HolderIdentity: &holder, LeaseDurationSeconds: &duration, AcquireTime: &now, RenewTime: &now}}
+			lease, err = leases.Create(ctx, replacement, metav1.CreateOptions{})
+			if err != nil {
+				return LeaseSession{}, err
+			}
+			break
 		}
 		if !leaseExpired(lease, time.Now()) && current.HolderIdentity != lock.config.HolderIdentity {
 			return LeaseSession{}, ErrLeaseSessionHeld
@@ -426,7 +449,6 @@ func (lock *SessionLeaseLock) Acquire(ctx context.Context) (LeaseSession, error)
 		now := metav1.NewMicroTime(time.Now())
 		updated.Spec.AcquireTime = &now
 		updated.Spec.RenewTime = &now
-		lock.leaseUID = lease.UID
 		lease, err = leases.Update(ctx, updated, metav1.UpdateOptions{})
 		if err != nil {
 			return LeaseSession{}, err
@@ -436,7 +458,7 @@ func (lock *SessionLeaseLock) Acquire(ctx context.Context) (LeaseSession, error)
 	if err != nil {
 		return LeaseSession{}, err
 	}
-	lock.leaseUID = session.LeaseUID
+	lock.commitSession(session)
 	return session, nil
 }
 
@@ -445,14 +467,15 @@ func (lock *SessionLeaseLock) Renew(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if lock.leaseUID != "" && lease.UID != lock.leaseUID {
+	leaseUID, committedEpoch := lock.committedSession()
+	if leaseUID != "" && lease.UID != leaseUID {
 		return ErrLeaseUIDChanged
 	}
 	current, err := leaseSessionFromLease(lease)
 	if err != nil {
 		return ErrLeaseSessionKeyChanged
 	}
-	_, err = RenewLeaseSession(current, LeaseRenewRequest{HolderIdentity: lock.config.HolderIdentity, Epoch: current.Epoch, SessionKeyAlgorithm: lock.config.KeyPair.Algorithm, SessionPublicKey: lock.config.KeyPair.PublicKey, SessionKeyFingerprint: fingerprintSessionKey(lock.config.KeyPair.PublicKey)})
+	_, err = RenewLeaseSession(current, LeaseRenewRequest{HolderIdentity: lock.config.HolderIdentity, Epoch: committedEpoch, SessionKeyAlgorithm: lock.config.KeyPair.Algorithm, SessionPublicKey: lock.config.KeyPair.PublicKey, SessionKeyFingerprint: fingerprintSessionKey(lock.config.KeyPair.PublicKey)})
 	if err != nil {
 		return err
 	}
@@ -468,7 +491,8 @@ func (lock *SessionLeaseLock) RecoverCommittedSession(ctx context.Context, keyPa
 	if err != nil {
 		return LeaseSession{}, err
 	}
-	if lock.leaseUID != "" && lease.UID != lock.leaseUID {
+	leaseUID, _ := lock.committedSession()
+	if leaseUID != "" && lease.UID != leaseUID {
 		return LeaseSession{}, ErrLeaseUIDChanged
 	}
 	current, err := leaseSessionFromLease(lease)
@@ -479,8 +503,21 @@ func (lock *SessionLeaseLock) RecoverCommittedSession(ctx context.Context, keyPa
 	if err != nil {
 		return LeaseSession{}, err
 	}
-	lock.leaseUID = recovered.LeaseUID
+	lock.commitSession(recovered)
 	return recovered, nil
+}
+
+func (lock *SessionLeaseLock) commitSession(session LeaseSession) {
+	lock.mu.Lock()
+	defer lock.mu.Unlock()
+	lock.leaseUID = session.LeaseUID
+	lock.committedEpoch = session.Epoch
+}
+
+func (lock *SessionLeaseLock) committedSession() (types.UID, int64) {
+	lock.mu.RLock()
+	defer lock.mu.RUnlock()
+	return lock.leaseUID, lock.committedEpoch
 }
 
 func (lock *SessionLeaseLock) annotations(epoch int64) map[string]string {
@@ -503,8 +540,8 @@ func leaseSessionFromLease(lease *coordinationv1.Lease) (LeaseSession, error) {
 }
 
 func leaseExpired(lease *coordinationv1.Lease, now time.Time) bool {
-	if lease.Spec.RenewTime == nil || lease.Spec.LeaseDurationSeconds == nil {
-		return true
+	if lease.Spec.RenewTime == nil || lease.Spec.LeaseDurationSeconds == nil || *lease.Spec.LeaseDurationSeconds <= 0 {
+		return false
 	}
 	return lease.Spec.RenewTime.Add(time.Duration(*lease.Spec.LeaseDurationSeconds) * time.Second).Before(now)
 }

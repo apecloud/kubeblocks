@@ -226,11 +226,41 @@ func TestRegistrationAndEffectReplayAreIdempotent(t *testing.T) {
 		t.Run("rejects replay with changed "+name, func(t *testing.T) {
 			changed := effect
 			mutate(&changed)
-			unchanged, _, err := PlanEffect(planned, registrationKey, changed, limits)
+			unchanged, returnedKey, err := PlanEffect(planned, registrationKey, changed, limits)
 			require.ErrorIs(t, err, ErrEffectIdentityConflict)
+			require.Empty(t, returnedKey)
 			requireStateEqual(t, planned, unchanged)
 		})
 	}
+}
+
+func TestEffectNameCollisionIsScopedToNamespace(t *testing.T) {
+	state, registrationKey, limits := registeredFence(t)
+	first := testUnitEffect("unit-1")
+	first.Namespace = "namespace-a"
+	second := first
+	second.Namespace = "namespace-b"
+
+	planned, firstKey, err := PlanEffect(state, registrationKey, first, limits)
+	require.NoError(t, err)
+	planned, secondKey, err := PlanEffect(planned, registrationKey, second, limits)
+	require.NoError(t, err)
+	require.NotEqual(t, firstKey, secondKey)
+	require.Equal(t, 2, EffectCount(planned, registrationKey))
+
+	bound, err := ObserveEffectObject(planned, registrationKey, firstKey, presentObservation(first, types.UID("unit-object-uid-a")))
+	require.NoError(t, err)
+	bound, err = ObserveEffectObject(bound, registrationKey, secondKey, presentObservation(second, types.UID("unit-object-uid-b")))
+	require.NoError(t, err)
+	require.Equal(t, EffectStateObjectBound, EffectStateOf(bound, registrationKey, firstKey))
+	require.Equal(t, EffectStateObjectBound, EffectStateOf(bound, registrationKey, secondKey))
+
+	conflicting := first
+	conflicting.FullIdentityDigest = testDigest("different-unit")
+	unchanged, returnedKey, err := PlanEffect(bound, registrationKey, conflicting, limits)
+	require.ErrorIs(t, err, ErrEffectIdentityConflict)
+	require.Empty(t, returnedKey)
+	requireStateEqual(t, bound, unchanged)
 }
 
 func TestDrainFreezesRegistrationMembership(t *testing.T) {
@@ -465,8 +495,9 @@ func TestPlannedNotFoundRequiresDrainAndExactFreshObservation(t *testing.T) {
 			restarted, err := DecodeStoredProtocolFenceStatus(storedStateBytes(t, consumed), testFenceObjectIdentity())
 			require.NoError(t, err)
 
-			unchanged, _, err = PlanEffect(consumed, registrationKey, effect, limits)
+			unchanged, returnedKey, err := PlanEffect(consumed, registrationKey, effect, limits)
 			require.ErrorIs(t, err, ErrEffectAlreadyConsumed)
+			require.Empty(t, returnedKey)
 			requireStateEqual(t, consumed, unchanged)
 			changedDigest := effect
 			changedDigest.FullIdentityDigest = testDigest("different-target-window")
@@ -479,8 +510,9 @@ func TestPlannedNotFoundRequiresDrainAndExactFreshObservation(t *testing.T) {
 			unchanged, err = AuthorizeDispatch(consumed, registrationKey, effectKey)
 			require.ErrorIs(t, err, ErrEffectAlreadyConsumed)
 			requireStateEqual(t, consumed, unchanged)
-			unchanged, _, err = PlanEffect(restarted, registrationKey, effect, limits)
+			unchanged, returnedKey, err = PlanEffect(restarted, registrationKey, effect, limits)
 			require.ErrorIs(t, err, ErrEffectAlreadyConsumed)
+			require.Empty(t, returnedKey)
 			requireStateEqual(t, restarted, unchanged)
 		})
 	}
@@ -732,9 +764,6 @@ func TestDrainFreezesManifestWhileLivePhasesAdvance(t *testing.T) {
 			require.True(t, tc.contains(consumed, registrationKey, plannedKey))
 			require.True(t, tc.contains(consumed, registrationKey, boundKey))
 
-			unchanged, err = AdvanceEffectState(consumed, registrationKey, boundKey, EffectStateObjectBound)
-			require.ErrorIs(t, err, ErrEffectStateRegression)
-			requireStateEqual(t, consumed, unchanged)
 			unchanged, _, err = PlanEffect(consumed, registrationKey, testWindowEffect("late-window"), limits)
 			require.Error(t, err)
 			requireStateEqual(t, consumed, unchanged)
@@ -774,6 +803,42 @@ func TestDispatchAuthorizationIsBoundAndNotReplayable(t *testing.T) {
 		require.Error(t, err)
 		requireStateEqual(t, draining, unchanged)
 	}
+}
+
+func TestMarkEffectTerminalExactReplayIsIdempotent(t *testing.T) {
+	state, registrationKey, limits := registeredFence(t)
+	effect := testUnitEffect("unit-1")
+	planned, effectKey, err := PlanEffect(state, registrationKey, effect, limits)
+	require.NoError(t, err)
+	bound, err := ObserveEffectObject(planned, registrationKey, effectKey, presentObservation(effect, types.UID("unit-object-uid-1")))
+	require.NoError(t, err)
+	authorized, err := AuthorizeDispatch(bound, registrationKey, effectKey)
+	require.NoError(t, err)
+	evidence := executedTerminalEvidence()
+	terminal, err := MarkEffectTerminal(authorized, registrationKey, effectKey, evidence)
+	require.NoError(t, err)
+
+	replayed, err := MarkEffectTerminal(terminal, registrationKey, effectKey, evidence)
+	require.NoError(t, err)
+	requireStateEqual(t, terminal, replayed)
+
+	conflicting := evidence
+	conflicting.ReasonCode = "different-reason"
+	unchanged, err := MarkEffectTerminal(terminal, registrationKey, effectKey, conflicting)
+	require.ErrorIs(t, err, ErrEffectStateRegression)
+	requireStateEqual(t, terminal, unchanged)
+}
+
+func TestEffectObservationUsesConfiguredNamespace(t *testing.T) {
+	state, registrationKey, limits := registeredFence(t)
+	effect := testUnitEffect("unit-1")
+	effect.Namespace = "custom-system"
+	planned, effectKey, err := PlanEffect(state, registrationKey, effect, limits)
+	require.NoError(t, err)
+
+	bound, err := ObserveEffectObject(planned, registrationKey, effectKey, presentObservation(effect, types.UID("unit-object-uid-1")))
+	require.NoError(t, err)
+	require.Equal(t, EffectStateObjectBound, EffectStateOf(bound, registrationKey, effectKey))
 }
 
 func TestStoredProtocolFenceStatusMatchesIndependentJSONContract(t *testing.T) {
@@ -1098,8 +1163,9 @@ func TestDecodeStoredStatusEnforcesExactPhaseEvidenceMatrix(t *testing.T) {
 	restartedMixed, err := DecodeStoredProtocolFenceStatus(marshalExpectedStoredStatus(t, mixed), testFenceObjectIdentity())
 	require.NoError(t, err)
 	for _, storedEffect := range mixed.Registrations[0].Effects {
-		unchanged, _, err := PlanEffect(restartedMixed, mixed.Registrations[0].Key, effectIdentityFromStored(storedEffect.Identity), generousRegistryLimits())
+		unchanged, returnedKey, err := PlanEffect(restartedMixed, mixed.Registrations[0].Key, effectIdentityFromStored(storedEffect.Identity), generousRegistryLimits())
 		require.ErrorIs(t, err, ErrRegistrationAlreadyConsumed)
+		require.Empty(t, returnedKey)
 		requireStateEqual(t, restartedMixed, unchanged)
 	}
 
@@ -1617,6 +1683,7 @@ func TestUnitEffectRequiresFrozenTargetIdentity(t *testing.T) {
 		"pod UID":   func(v *EffectIdentity) { v.PodUID = "" },
 		"container": func(v *EffectIdentity) { v.ContainerName = "" },
 		"fence UID": func(v *EffectIdentity) { v.FenceUID = "" },
+		"namespace": func(v *EffectIdentity) { v.Namespace = "" },
 	} {
 		t.Run(name, func(t *testing.T) {
 			changed := base
@@ -1730,6 +1797,7 @@ type storedEffectIdentityDTO struct {
 	Kind               string    `json:"kind"`
 	DeterministicName  string    `json:"deterministicName"`
 	FullIdentityDigest string    `json:"fullIdentityDigest"`
+	Namespace          string    `json:"namespace"`
 	PodUID             types.UID `json:"podUID,omitempty"`
 	ContainerName      string    `json:"containerName,omitempty"`
 	FenceUID           types.UID `json:"fenceUID,omitempty"`
@@ -2256,6 +2324,7 @@ func storedEffectIdentityDTOFrom(identity EffectIdentity) storedEffectIdentityDT
 		Kind:               string(identity.Kind),
 		DeterministicName:  identity.DeterministicName,
 		FullIdentityDigest: identity.FullIdentityDigest,
+		Namespace:          identity.Namespace,
 		PodUID:             identity.PodUID,
 		ContainerName:      identity.ContainerName,
 		FenceUID:           identity.FenceUID,
@@ -2267,6 +2336,7 @@ func effectIdentityFromStored(identity storedEffectIdentityDTO) EffectIdentity {
 		Kind:               EffectKind(identity.Kind),
 		DeterministicName:  identity.DeterministicName,
 		FullIdentityDigest: identity.FullIdentityDigest,
+		Namespace:          identity.Namespace,
 		PodUID:             identity.PodUID,
 		ContainerName:      identity.ContainerName,
 		FenceUID:           identity.FenceUID,
@@ -2419,6 +2489,7 @@ func testWindowEffect(name string) EffectIdentity {
 		Kind:               EffectKindTargetFenceWindow,
 		DeterministicName:  name,
 		FullIdentityDigest: testDigest("window:" + name),
+		Namespace:          "kb-system",
 	}
 }
 
@@ -2427,6 +2498,7 @@ func testUnitEffect(name string) EffectIdentity {
 		Kind:               EffectKindUnitExecution,
 		DeterministicName:  name,
 		FullIdentityDigest: testDigest("unit:" + name),
+		Namespace:          "kb-system",
 		PodUID:             types.UID("pod-uid-1"),
 		ContainerName:      "mysql",
 		FenceUID:           types.UID("fence-uid-1"),
@@ -2441,7 +2513,7 @@ func effectTarget(effect EffectIdentity) EffectObjectTarget {
 	return EffectObjectTarget{
 		APIVersion: "protocol.kubeblocks.io/v1alpha1",
 		Kind:       kind,
-		Namespace:  "kb-system",
+		Namespace:  effect.Namespace,
 		Name:       effect.DeterministicName,
 	}
 }

@@ -23,6 +23,8 @@ import (
 	"context"
 	"crypto/ed25519"
 	"errors"
+	"math"
+	"sync"
 	"testing"
 	"time"
 
@@ -215,6 +217,138 @@ func TestSessionLeaseLockRecoversCommittedCreateAfterResponseLoss(t *testing.T) 
 func TestSessionLeaseLockRejectsUnsupportedAndConflictingPaths(t *testing.T) {
 	require.ErrorIs(t, ValidateSessionKeyBindingLock(&resourcelock.LeaseLock{}), ErrSessionKeyBindingUnsupported)
 
+	t.Run("subsecond lease duration is rejected", func(t *testing.T) {
+		publicKey, privateKey := testEd25519KeyPair(t)
+		_, err := NewSessionLeaseLock(SessionLeaseLockConfig{
+			Client: fake.NewSimpleClientset().CoordinationV1(), Namespace: "kb-system", Name: "reconfigure-protocol",
+			HolderIdentity: "controller-pod-uid-1/process-1",
+			KeyPair:        SessionKeyPair{Algorithm: SessionKeyAlgorithmEd25519, PublicKey: publicKey, PrivateKey: privateKey},
+			LeaseDuration:  time.Second - time.Nanosecond,
+		})
+		require.ErrorIs(t, err, ErrLeaseSessionKeyUnavailable)
+	})
+
+	t.Run("fractional and overflowing lease durations are rejected", func(t *testing.T) {
+		publicKey, privateKey := testEd25519KeyPair(t)
+		for _, duration := range []time.Duration{time.Second + 900*time.Millisecond, (time.Duration(math.MaxInt32) + 1) * time.Second} {
+			_, err := NewSessionLeaseLock(SessionLeaseLockConfig{
+				Client: fake.NewSimpleClientset().CoordinationV1(), Namespace: "kb-system", Name: "reconfigure-protocol",
+				HolderIdentity: "controller-pod-uid-1/process-1",
+				KeyPair:        SessionKeyPair{Algorithm: SessionKeyAlgorithmEd25519, PublicKey: publicKey, PrivateKey: privateKey},
+				LeaseDuration:  duration,
+			})
+			require.ErrorIs(t, err, ErrLeaseSessionKeyUnavailable)
+		}
+	})
+
+	t.Run("whole-second lease duration boundaries are accepted", func(t *testing.T) {
+		publicKey, privateKey := testEd25519KeyPair(t)
+		for _, duration := range []time.Duration{time.Second, time.Duration(math.MaxInt32) * time.Second} {
+			_, err := NewSessionLeaseLock(SessionLeaseLockConfig{
+				Client: fake.NewSimpleClientset().CoordinationV1(), Namespace: "kb-system", Name: "reconfigure-protocol",
+				HolderIdentity: "controller-pod-uid-1/process-1",
+				KeyPair:        SessionKeyPair{Algorithm: SessionKeyAlgorithmEd25519, PublicKey: publicKey, PrivateKey: privateKey},
+				LeaseDuration:  duration,
+			})
+			require.NoError(t, err)
+		}
+	})
+
+	t.Run("expired malformed lease is replaced with a new UID", func(t *testing.T) {
+		ctx := context.Background()
+		holder := "stale-holder"
+		malformed := &coordinationv1.Lease{
+			ObjectMeta: metav1.ObjectMeta{Namespace: "kb-system", Name: "reconfigure-protocol", UID: types.UID("stale-uid"), ResourceVersion: "7"},
+			Spec:       coordinationv1.LeaseSpec{HolderIdentity: &holder, LeaseDurationSeconds: ptr(int32(1)), RenewTime: &metav1.MicroTime{Time: time.Now().Add(-time.Minute)}},
+		}
+		client := fake.NewSimpleClientset(malformed)
+		client.PrependReactor("delete", "leases", func(action k8stesting.Action) (bool, runtime.Object, error) {
+			preconditions := action.(k8stesting.DeleteAction).GetDeleteOptions().Preconditions
+			require.NotNil(t, preconditions)
+			require.Equal(t, malformed.UID, *preconditions.UID)
+			require.Equal(t, malformed.ResourceVersion, *preconditions.ResourceVersion)
+			return false, nil, nil
+		})
+		client.PrependReactor("create", "leases", func(action k8stesting.Action) (bool, runtime.Object, error) {
+			lease := action.(k8stesting.CreateAction).GetObject().(*coordinationv1.Lease).DeepCopy()
+			lease.UID = types.UID("replacement-uid")
+			require.NoError(t, client.Tracker().Create(leaseGVR(), lease, lease.Namespace))
+			return true, lease, nil
+		})
+		lock := newTestSessionLeaseLock(t, client, "controller-pod-uid-2/process-1")
+		session, err := lock.Acquire(ctx)
+		require.NoError(t, err)
+		require.Equal(t, types.UID("replacement-uid"), session.LeaseUID)
+		require.Equal(t, int64(1), session.Epoch)
+	})
+
+	t.Run("unexpired malformed lease fails closed", func(t *testing.T) {
+		ctx := context.Background()
+		holder := "active-holder"
+		malformed := &coordinationv1.Lease{
+			ObjectMeta: metav1.ObjectMeta{Namespace: "kb-system", Name: "reconfigure-protocol", UID: types.UID("active-uid")},
+			Spec:       coordinationv1.LeaseSpec{HolderIdentity: &holder, LeaseDurationSeconds: ptr(int32(30)), RenewTime: &metav1.MicroTime{Time: time.Now()}},
+		}
+		client := fake.NewSimpleClientset(malformed)
+		lock := newTestSessionLeaseLock(t, client, "controller-pod-uid-2/process-1")
+		_, err := lock.Acquire(ctx)
+		require.ErrorIs(t, err, ErrLeaseSessionKeyUnavailable)
+		_, err = client.CoordinationV1().Leases("kb-system").Get(ctx, "reconfigure-protocol", metav1.GetOptions{})
+		require.NoError(t, err)
+		require.Empty(t, mutatingLeaseVerbs(client.Actions()))
+	})
+
+	t.Run("expired malformed lease without resource version fails closed", func(t *testing.T) {
+		ctx := context.Background()
+		holder := "stale-holder"
+		malformed := &coordinationv1.Lease{
+			ObjectMeta: metav1.ObjectMeta{Namespace: "kb-system", Name: "reconfigure-protocol", UID: types.UID("stale-uid")},
+			Spec:       coordinationv1.LeaseSpec{HolderIdentity: &holder, LeaseDurationSeconds: ptr(int32(1)), RenewTime: &metav1.MicroTime{Time: time.Now().Add(-time.Minute)}},
+		}
+		client := fake.NewSimpleClientset(malformed)
+		lock := newTestSessionLeaseLock(t, client, "controller-pod-uid-2/process-1")
+		_, err := lock.Acquire(ctx)
+		require.ErrorIs(t, err, ErrLeaseSessionKeyUnavailable)
+		require.Empty(t, mutatingLeaseVerbs(client.Actions()))
+	})
+
+	t.Run("malformed lease without positive expiry evidence fails closed", func(t *testing.T) {
+		now := metav1.MicroTime{Time: time.Now().Add(-time.Minute)}
+		for name, mutate := range map[string]func(*coordinationv1.Lease){
+			"missing renew time": func(lease *coordinationv1.Lease) { lease.Spec.RenewTime = nil },
+			"missing duration":   func(lease *coordinationv1.Lease) { lease.Spec.LeaseDurationSeconds = nil },
+			"zero duration":      func(lease *coordinationv1.Lease) { lease.Spec.LeaseDurationSeconds = ptr(int32(0)) },
+			"negative duration":  func(lease *coordinationv1.Lease) { lease.Spec.LeaseDurationSeconds = ptr(int32(-1)) },
+		} {
+			t.Run(name, func(t *testing.T) {
+				holder := "stale-holder"
+				lease := &coordinationv1.Lease{
+					ObjectMeta: metav1.ObjectMeta{Namespace: "kb-system", Name: "reconfigure-protocol", UID: types.UID("stale-uid"), ResourceVersion: "7"},
+					Spec:       coordinationv1.LeaseSpec{HolderIdentity: &holder, LeaseDurationSeconds: ptr(int32(1)), RenewTime: &now},
+				}
+				mutate(lease)
+				client := fake.NewSimpleClientset(lease)
+				lock := newTestSessionLeaseLock(t, client, "controller-pod-uid-2/process-1")
+				_, err := lock.Acquire(context.Background())
+				require.ErrorIs(t, err, ErrLeaseSessionKeyUnavailable)
+				require.Empty(t, mutatingLeaseVerbs(client.Actions()))
+			})
+		}
+	})
+
+	t.Run("expired malformed lease without UID fails closed", func(t *testing.T) {
+		holder := "stale-holder"
+		lease := &coordinationv1.Lease{
+			ObjectMeta: metav1.ObjectMeta{Namespace: "kb-system", Name: "reconfigure-protocol", ResourceVersion: "7"},
+			Spec:       coordinationv1.LeaseSpec{HolderIdentity: &holder, LeaseDurationSeconds: ptr(int32(1)), RenewTime: &metav1.MicroTime{Time: time.Now().Add(-time.Minute)}},
+		}
+		client := fake.NewSimpleClientset(lease)
+		lock := newTestSessionLeaseLock(t, client, "controller-pod-uid-2/process-1")
+		_, err := lock.Acquire(context.Background())
+		require.ErrorIs(t, err, ErrLeaseSessionKeyUnavailable)
+		require.Empty(t, mutatingLeaseVerbs(client.Actions()))
+	})
+
 	t.Run("second contender cannot acquire current lease", func(t *testing.T) {
 		ctx := context.Background()
 		client := fakeClientAssigningLeaseUID(types.UID("lease-uid-1"))
@@ -235,6 +369,20 @@ func TestSessionLeaseLockRejectsUnsupportedAndConflictingPaths(t *testing.T) {
 		lease, err := client.CoordinationV1().Leases("kb-system").Get(ctx, "reconfigure-protocol", metav1.GetOptions{})
 		require.NoError(t, err)
 		lease.Annotations[LeaseSessionKeyFingerprintAnnotation] = testDigest("forged-key")
+		_, err = client.CoordinationV1().Leases("kb-system").Update(ctx, lease, metav1.UpdateOptions{})
+		require.NoError(t, err)
+		require.ErrorIs(t, lock.Renew(ctx), ErrLeaseSessionKeyChanged)
+	})
+
+	t.Run("renew checks locally committed epoch", func(t *testing.T) {
+		ctx := context.Background()
+		client := fakeClientAssigningLeaseUID(types.UID("lease-uid-1"))
+		lock := newTestSessionLeaseLock(t, client, "controller-pod-uid-1/process-1")
+		_, err := lock.Acquire(ctx)
+		require.NoError(t, err)
+		lease, err := client.CoordinationV1().Leases("kb-system").Get(ctx, "reconfigure-protocol", metav1.GetOptions{})
+		require.NoError(t, err)
+		lease.Annotations[LeaseSessionEpochAnnotation] = "2"
 		_, err = client.CoordinationV1().Leases("kb-system").Update(ctx, lease, metav1.UpdateOptions{})
 		require.NoError(t, err)
 		require.ErrorIs(t, lock.Renew(ctx), ErrLeaseSessionKeyChanged)
@@ -290,6 +438,40 @@ func TestSessionLeaseLockOwnsPublicBindingAndDoesNotRetainPrivateKey(t *testing.
 	require.NoError(t, lock.Renew(ctx))
 	_, err = lock.RecoverCommittedSession(ctx, SessionKeyPair{Algorithm: SessionKeyAlgorithmEd25519, PublicKey: expectedPublic, PrivateKey: expectedPrivate})
 	require.NoError(t, err)
+}
+
+func TestSessionLeaseLockConcurrentRenewAndRecoveryAreRaceFree(t *testing.T) {
+	ctx := context.Background()
+	client := fakeClientAssigningLeaseUID(types.UID("lease-uid-1"))
+	publicKey, privateKey := testEd25519KeyPair(t)
+	keyPair := SessionKeyPair{Algorithm: SessionKeyAlgorithmEd25519, PublicKey: publicKey, PrivateKey: privateKey}
+	lock, err := NewSessionLeaseLock(SessionLeaseLockConfig{
+		Client: client.CoordinationV1(), Namespace: "kb-system", Name: "reconfigure-protocol",
+		HolderIdentity: "controller-pod-uid-1/process-1", KeyPair: keyPair, LeaseDuration: 30 * time.Second,
+	})
+	require.NoError(t, err)
+	_, err = lock.Acquire(ctx)
+	require.NoError(t, err)
+
+	var wg sync.WaitGroup
+	errors := make(chan error, 40)
+	for range 20 {
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			errors <- lock.Renew(ctx)
+		}()
+		go func() {
+			defer wg.Done()
+			_, err := lock.RecoverCommittedSession(ctx, keyPair)
+			errors <- err
+		}()
+	}
+	wg.Wait()
+	close(errors)
+	for err := range errors {
+		require.NoError(t, err)
+	}
 }
 
 func fakeClientAssigningLeaseUID(uid types.UID) *fake.Clientset {

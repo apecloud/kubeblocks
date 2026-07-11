@@ -136,6 +136,7 @@ type EffectIdentity struct {
 	Kind               EffectKind
 	DeterministicName  string
 	FullIdentityDigest string
+	Namespace          string
 	PodUID             types.UID
 	ContainerName      string
 	FenceUID           types.UID
@@ -270,6 +271,7 @@ type storedEffectIdentity struct {
 	Kind               string    `json:"kind"`
 	DeterministicName  string    `json:"deterministicName"`
 	FullIdentityDigest string    `json:"fullIdentityDigest"`
+	Namespace          string    `json:"namespace"`
 	PodUID             types.UID `json:"podUID,omitempty"`
 	ContainerName      string    `json:"containerName,omitempty"`
 	FenceUID           types.UID `json:"fenceUID,omitempty"`
@@ -358,13 +360,13 @@ func CanonicalEffectIdentityBytes(registrationKey string, identity EffectIdentit
 	if identity.Kind != EffectKindUnitExecution && !isWindowKind(identity.Kind) {
 		return nil, ErrIdentityIncomplete
 	}
-	if identity.DeterministicName == "" || ValidateIdentityDigest(identity.FullIdentityDigest) != nil {
+	if identity.DeterministicName == "" || identity.Namespace == "" || ValidateIdentityDigest(identity.FullIdentityDigest) != nil {
 		return nil, ErrIdentityIncomplete
 	}
 	if identity.Kind == EffectKindUnitExecution && (identity.PodUID == "" || identity.ContainerName == "" || identity.FenceUID == "") {
 		return nil, ErrIdentityIncomplete
 	}
-	return canonicalFields("kubeblocks.io/reconfigure-effect/v1", registrationKey, string(identity.Kind), identity.DeterministicName, identity.FullIdentityDigest, string(identity.PodUID), identity.ContainerName, string(identity.FenceUID)), nil
+	return canonicalFields("kubeblocks.io/reconfigure-effect/v1", registrationKey, string(identity.Kind), identity.DeterministicName, identity.FullIdentityDigest, identity.Namespace, string(identity.PodUID), identity.ContainerName, string(identity.FenceUID)), nil
 }
 
 func EffectKey(registrationKey string, identity EffectIdentity) (string, error) {
@@ -425,7 +427,7 @@ func registrationIdentityStored(v RegistrationIdentity) storedRegistrationIdenti
 }
 
 func effectIdentityStored(v EffectIdentity) storedEffectIdentity {
-	return storedEffectIdentity{v.KindString(), v.DeterministicName, v.FullIdentityDigest, v.PodUID, v.ContainerName, v.FenceUID}
+	return storedEffectIdentity{v.KindString(), v.DeterministicName, v.FullIdentityDigest, v.Namespace, v.PodUID, v.ContainerName, v.FenceUID}
 }
 
 func (v EffectIdentity) KindString() string { return string(v.Kind) }
@@ -435,7 +437,7 @@ func registrationIdentityRuntime(v storedRegistrationIdentity) RegistrationIdent
 }
 
 func effectIdentityRuntime(v storedEffectIdentity) EffectIdentity {
-	return EffectIdentity{EffectKind(v.Kind), v.DeterministicName, v.FullIdentityDigest, v.PodUID, v.ContainerName, v.FenceUID}
+	return EffectIdentity{EffectKind(v.Kind), v.DeterministicName, v.FullIdentityDigest, v.Namespace, v.PodUID, v.ContainerName, v.FenceUID}
 }
 
 func RegisterExecution(state FenceState, identity RegistrationIdentity, limits RegistryLimits) (FenceState, string, error) {
@@ -486,16 +488,16 @@ func PlanEffect(state FenceState, registrationKey string, identity EffectIdentit
 	for _, effect := range registration.Effects {
 		if effect.Key == key {
 			if RegistrationPhase(registration.Phase) == RegistrationPhaseConsumed && len(registration.Effects) > 1 {
-				return state, key, ErrRegistrationAlreadyConsumed
+				return state, "", ErrRegistrationAlreadyConsumed
 			}
 			if EffectState(effect.State) == EffectStateConsumed {
-				return state, key, ErrEffectAlreadyConsumed
+				return state, "", ErrEffectAlreadyConsumed
 			}
 			return state, key, nil
 		}
-		if effect.Identity.Kind == string(identity.Kind) && effect.Identity.DeterministicName == identity.DeterministicName {
+		if effect.Identity.Kind == string(identity.Kind) && effect.Identity.Namespace == identity.Namespace && effect.Identity.DeterministicName == identity.DeterministicName {
 			if EffectState(effect.State) == EffectStateConsumed {
-				return state, key, ErrEffectAlreadyConsumed
+				return state, "", ErrEffectAlreadyConsumed
 			}
 			return state, "", ErrEffectIdentityConflict
 		}
@@ -625,6 +627,13 @@ func MarkEffectTerminal(state FenceState, registrationKey, effectKey string, evi
 	if (kind == EffectKindUnitExecution && evidence.CloseoutVariant != CloseoutVariantUnitExecuted) || (isWindowKind(kind) && evidence.CloseoutVariant != CloseoutVariantObservedTerminal) {
 		return state, ErrEffectCloseoutVariantMismatch
 	}
+	terminal := storedTerminal{Outcome: string(evidence.Outcome), ReasonCode: evidence.ReasonCode, EvidenceDigest: evidence.EvidenceDigest, RecoveryRequired: evidence.RecoveryRequired}
+	if EffectState(effect.State) == EffectStateTerminal {
+		if effect.CloseoutVariant == string(evidence.CloseoutVariant) && effect.Terminal != nil && *effect.Terminal == terminal {
+			return state, nil
+		}
+		return state, ErrEffectStateRegression
+	}
 	if kind == EffectKindUnitExecution && (EffectState(effect.State) != EffectStateDispatchAuthorized || effect.Dispatch == nil) {
 		return state, ErrEffectDispatchRequired
 	}
@@ -635,7 +644,7 @@ func MarkEffectTerminal(state FenceState, registrationKey, effectKey string, evi
 	effect, _, _ = findEffect(&next.status, registrationKey, effectKey)
 	effect.State = string(EffectStateTerminal)
 	effect.CloseoutVariant = string(evidence.CloseoutVariant)
-	effect.Terminal = &storedTerminal{Outcome: string(evidence.Outcome), ReasonCode: evidence.ReasonCode, EvidenceDigest: evidence.EvidenceDigest, RecoveryRequired: evidence.RecoveryRequired}
+	effect.Terminal = &terminal
 	return next, nil
 }
 
@@ -674,33 +683,6 @@ func ConsumeRegistration(state FenceState, registrationKey string) (FenceState, 
 	registration, _, _ = findRegistration(&next.status, registrationKey)
 	registration.Phase = string(RegistrationPhaseConsumed)
 	return next, nil
-}
-
-func AdvanceEffectState(state FenceState, registrationKey, effectKey string, target EffectState) (FenceState, error) {
-	effect, _, ok := findEffect(&state.status, registrationKey, effectKey)
-	if !ok {
-		return state, ErrEffectIdentityConflict
-	}
-	if effectStateOrder(target) <= effectStateOrder(EffectState(effect.State)) {
-		return state, ErrEffectStateRegression
-	}
-	return state, ErrEffectStateRegression
-}
-
-func effectStateOrder(state EffectState) int {
-	switch state {
-	case EffectStatePlanned:
-		return 1
-	case EffectStateObjectBound:
-		return 2
-	case EffectStateDispatchAuthorized:
-		return 3
-	case EffectStateTerminal:
-		return 4
-	case EffectStateConsumed:
-		return 5
-	}
-	return 0
 }
 
 func DrainNamespace(state FenceState, namespaceUID types.UID) (FenceState, error) {
@@ -1114,7 +1096,7 @@ func expectedTarget(identity EffectIdentity) EffectObjectTarget {
 	if identity.Kind == EffectKindUnitExecution {
 		kind = "UnitExecution"
 	}
-	return EffectObjectTarget{"protocol.kubeblocks.io/v1alpha1", kind, "kb-system", identity.DeterministicName}
+	return EffectObjectTarget{"protocol.kubeblocks.io/v1alpha1", kind, identity.Namespace, identity.DeterministicName}
 }
 
 func isWindowKind(kind EffectKind) bool {

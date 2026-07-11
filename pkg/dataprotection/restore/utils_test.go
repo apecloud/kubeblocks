@@ -103,6 +103,49 @@ func TestRestoreBuilderCommonVolumesAndSourceMountPath(t *testing.T) {
 	assert.Len(t, builder.commonVolumes, 1)
 }
 
+func TestRestoreTargetPortLookupDoesNotFallbackToFirstPodPort(t *testing.T) {
+	pod := &corev1.Pod{
+		Spec: corev1.PodSpec{Containers: []corev1.Container{
+			{
+				Name: "fe",
+				Ports: []corev1.ContainerPort{
+					{Name: "http-port", ContainerPort: 8030},
+					{Name: "query-port", ContainerPort: 9030},
+				},
+			},
+		}},
+	}
+	credential := &dpv1alpha1.ConnectionCredential{SecretName: "connection"}
+
+	builder := &restoreJobBuilder{}
+	_, err := builder.addTargetPodAndCredentialEnv(pod, credential, &dpv1alpha1.BackupTarget{
+		ContainerPort: &dpv1alpha1.ContainerPort{ContainerName: "fe", PortName: "query-port"},
+	})
+	assert.NoError(t, err)
+	assert.Contains(t, builder.env, corev1.EnvVar{Name: dptypes.DPDBPort, Value: "9030"})
+
+	builder = &restoreJobBuilder{}
+	_, err = builder.addTargetPodAndCredentialEnv(pod, credential, &dpv1alpha1.BackupTarget{
+		ContainerPort: &dpv1alpha1.ContainerPort{ContainerName: "fe", PortName: "missing"},
+	})
+	assert.ErrorContains(t, err, "specified containerPort")
+	assert.NotContains(t, builder.env, corev1.EnvVar{Name: dptypes.DPDBPort, Value: "8030"})
+
+	builder = &restoreJobBuilder{}
+	credential.PortKey = "port"
+	_, err = builder.addTargetPodAndCredentialEnv(pod, credential, &dpv1alpha1.BackupTarget{
+		ContainerPort: &dpv1alpha1.ContainerPort{ContainerName: "fe", PortName: "missing"},
+	})
+	assert.NoError(t, err)
+	assert.Contains(t, builder.env, corev1.EnvVar{
+		Name: dptypes.DPDBPort,
+		ValueFrom: &corev1.EnvVarSource{SecretKeyRef: &corev1.SecretKeySelector{
+			LocalObjectReference: corev1.LocalObjectReference{Name: "connection"},
+			Key:                  "port",
+		}},
+	})
+}
+
 func TestRestoreConditionAndStatusHelpers(t *testing.T) {
 	restore := &dpv1alpha1.Restore{}
 	SetRestoreCheckBackupRepoCondition(restore, ReasonCheckBackupRepoSuccessfully, "ok")

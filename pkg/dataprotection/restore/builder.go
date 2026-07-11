@@ -271,9 +271,7 @@ func (r *restoreJobBuilder) addTargetPodAndCredentialEnv(pod *corev1.Pod,
 		if err != nil {
 			return err
 		}
-		if portEnv != nil {
-			env = append(env, *portEnv)
-		}
+		env = append(env, *portEnv)
 		return nil
 	}
 	if connectionCredential == nil {

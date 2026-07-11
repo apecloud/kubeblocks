@@ -125,6 +125,11 @@ func TestRestoreTargetPortLookupDoesNotFallbackToFirstPodPort(t *testing.T) {
 	assert.Contains(t, builder.env, corev1.EnvVar{Name: dptypes.DPDBPort, Value: "9030"})
 
 	builder = &restoreJobBuilder{}
+	_, err = builder.addTargetPodAndCredentialEnv(pod, credential, &dpv1alpha1.BackupTarget{})
+	assert.NoError(t, err)
+	assert.Contains(t, builder.env, corev1.EnvVar{Name: dptypes.DPDBPort, Value: "8030"})
+
+	builder = &restoreJobBuilder{}
 	_, err = builder.addTargetPodAndCredentialEnv(pod, credential, &dpv1alpha1.BackupTarget{
 		ContainerPort: &dpv1alpha1.ContainerPort{ContainerName: "fe", PortName: "missing"},
 	})

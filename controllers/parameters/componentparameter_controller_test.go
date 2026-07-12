@@ -21,6 +21,7 @@ package parameters
 
 import (
 	"strings"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -350,12 +351,12 @@ var _ = Describe("ComponentParameter Controller", func() {
 			}
 			Expect(testCtx.CreateObj(testCtx.Ctx, pcr)).Should(Succeed())
 
-			By("touch the component to regenerate ComponentParameter from mixed sources")
-			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(compObj), func(comp *appsv1.Component) {
-				if comp.Annotations == nil {
-					comp.Annotations = map[string]string{}
+			By("touch the ComponentParameter to regenerate it from mixed sources")
+			Eventually(testapps.GetAndChangeObj(&testCtx, cfgKey, func(cfg *parametersv1alpha1.ComponentParameter) {
+				if cfg.Annotations == nil {
+					cfg.Annotations = map[string]string{}
 				}
-				comp.Annotations["parameters.kubeblocks.io/mixed-mode-test"] = "true"
+				cfg.Annotations["parameters.kubeblocks.io/mixed-mode-test"] = time.Now().Format(time.RFC3339Nano)
 			})).Should(Succeed())
 
 			configKey := client.ObjectKey{

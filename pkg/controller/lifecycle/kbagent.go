@@ -21,6 +21,7 @@ package lifecycle
 
 import (
 	"context"
+	stderrors "errors"
 	"fmt"
 	"math/rand"
 	"strconv"
@@ -364,11 +365,14 @@ func (a *kbagent) callActionWithSelector(ctx context.Context, spec *appsv1.Actio
 	if len(pods) == 0 {
 		return nil, fmt.Errorf("no available pod to execute action %s", lfa.name())
 	}
+	selector, _ := resolveTargetPodSelector(spec)
+	aggregateErrors := selector == appsv1.AllReplicas
 
 	// TODO: impl
 	//  - back-off to retry
 	//  - timeout
 	var output []byte
+	var actionErrors []error
 	for _, pod := range pods {
 		endpoint := func() (string, int32, error) {
 			host, port, err := a.serverEndpoint(pod)
@@ -387,7 +391,11 @@ func (a *kbagent) callActionWithSelector(ctx context.Context, spec *appsv1.Actio
 			cli, err = kbacli.NewClient(endpoint)
 		}
 		if err != nil {
-			return nil, err // mock client error
+			if !aggregateErrors {
+				return nil, err // mock client error
+			}
+			actionErrors = append(actionErrors, errors.Wrapf(err, "error creating client to execute action %s at pod %s", lfa.name(), pod.Name))
+			continue
 		}
 		if cli == nil {
 			continue // not kb-agent container and port defined, for test only
@@ -397,15 +405,28 @@ func (a *kbagent) callActionWithSelector(ctx context.Context, spec *appsv1.Actio
 		_ = cli.Close()
 
 		if err != nil {
-			return nil, errors.Wrapf(err, "http error occurred when executing action %s at pod %s", lfa.name(), pod.Name)
+			actionErr := errors.Wrapf(err, "http error occurred when executing action %s at pod %s", lfa.name(), pod.Name)
+			if !aggregateErrors {
+				return nil, actionErr
+			}
+			actionErrors = append(actionErrors, actionErr)
+			continue
 		}
 		if len(rsp.Error) > 0 {
-			return nil, a.formatError(lfa, rsp, pod.Name)
+			actionErr := a.formatError(lfa, rsp, pod.Name)
+			if !aggregateErrors {
+				return nil, actionErr
+			}
+			actionErrors = append(actionErrors, actionErr)
+			continue
 		}
 		// take first non-nil output
 		if output == nil && rsp.Output != nil {
 			output = rsp.Output
 		}
+	}
+	if len(actionErrors) > 0 {
+		return nil, stderrors.Join(actionErrors...)
 	}
 	return output, nil
 }
@@ -459,13 +480,7 @@ func (a *kbagent) formatError(lfa lifecycleAction, rsp proto.ActionResponse, pod
 }
 
 func SelectTargetPods(pods []*corev1.Pod, pod *corev1.Pod, spec *appsv1.Action) ([]*corev1.Pod, error) {
-	selector := spec.TargetPodSelector
-	matchingKey := spec.MatchingKey
-	if len(selector) == 0 && spec.Exec != nil && len(spec.Exec.TargetPodSelector) > 0 {
-		// back-off to use spec.Exec
-		selector = spec.Exec.TargetPodSelector
-		matchingKey = spec.Exec.MatchingKey
-	}
+	selector, matchingKey := resolveTargetPodSelector(spec)
 	if len(selector) == 0 {
 		return []*corev1.Pod{pod}, nil
 	}
@@ -535,4 +550,15 @@ func SelectTargetPods(pods []*corev1.Pod, pod *corev1.Pod, spec *appsv1.Action) 
 	default:
 		return nil, fmt.Errorf("unknown pod selector: %s", selector)
 	}
+}
+
+func resolveTargetPodSelector(spec *appsv1.Action) (appsv1.TargetPodSelector, string) {
+	selector := spec.TargetPodSelector
+	matchingKey := spec.MatchingKey
+	if len(selector) == 0 && spec.Exec != nil && len(spec.Exec.TargetPodSelector) > 0 {
+		// back-off to use spec.Exec
+		selector = spec.Exec.TargetPodSelector
+		matchingKey = spec.Exec.MatchingKey
+	}
+	return selector, matchingKey
 }

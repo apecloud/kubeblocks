@@ -679,6 +679,93 @@ var _ = Describe("lifecycle", func() {
 			Expect(err).Should(BeNil())
 		})
 
+		It("pod selector - all attempts every pod after an error and can succeed next round", func() {
+			lifecycleActions.PostProvision.Exec.TargetPodSelector = appsv1.AllReplicas
+			pods = []*corev1.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "pod-0"}},
+				{ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "pod-1"}},
+			}
+
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods)
+			Expect(err).Should(BeNil())
+			Expect(lifecycle).ShouldNot(BeNil())
+
+			callCount := 0
+			mockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
+					callCount++
+					if callCount == 1 {
+						return proto.ActionResponse{Error: proto.Error2Type(proto.ErrInProgress)}, nil
+					}
+					return proto.ActionResponse{}, nil
+				}).AnyTimes()
+			})
+
+			err = lifecycle.PostProvision(ctx, k8sClient, nil)
+			Expect(errors.Is(err, ErrActionInProgress)).Should(BeTrue())
+			Expect(callCount).Should(Equal(2))
+
+			err = lifecycle.PostProvision(ctx, k8sClient, nil)
+			Expect(err).Should(BeNil())
+			Expect(callCount).Should(Equal(4))
+		})
+
+		It("pod selector - all aggregates every pod error with pod identity", func() {
+			lifecycleActions.PostProvision.Exec.TargetPodSelector = appsv1.AllReplicas
+			pods = []*corev1.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "pod-0"}},
+				{ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "pod-1"}},
+			}
+
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods)
+			Expect(err).Should(BeNil())
+			Expect(lifecycle).ShouldNot(BeNil())
+
+			callCount := 0
+			mockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
+					callCount++
+					if callCount == 1 {
+						return proto.ActionResponse{Error: proto.Error2Type(proto.ErrInProgress)}, nil
+					}
+					return proto.ActionResponse{Error: proto.Error2Type(proto.ErrBusy)}, nil
+				}).Times(2)
+			})
+
+			err = lifecycle.PostProvision(ctx, k8sClient, nil)
+			Expect(err).ShouldNot(BeNil())
+			Expect(errors.Is(err, ErrActionInProgress)).Should(BeTrue())
+			Expect(errors.Is(err, ErrActionBusy)).Should(BeTrue())
+			Expect(err.Error()).Should(ContainSubstring("pod-0"))
+			Expect(err.Error()).Should(ContainSubstring("pod-1"))
+			Expect(callCount).Should(Equal(2))
+		})
+
+		It("pod selector - role keeps first-error behavior", func() {
+			lifecycleActions.PostProvision.Exec.TargetPodSelector = appsv1.RoleSelector
+			lifecycleActions.PostProvision.Exec.MatchingKey = "leader"
+			pods = []*corev1.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "pod-0", Labels: map[string]string{constant.RoleLabelKey: "leader"}}},
+				{ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "pod-1", Labels: map[string]string{constant.RoleLabelKey: "leader"}}},
+			}
+
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods)
+			Expect(err).Should(BeNil())
+			Expect(lifecycle).ShouldNot(BeNil())
+
+			callCount := 0
+			mockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
+					callCount++
+					return proto.ActionResponse{Error: proto.Error2Type(proto.ErrFailed)}, nil
+				}).Times(1)
+			})
+
+			err = lifecycle.PostProvision(ctx, k8sClient, nil)
+			Expect(errors.Is(err, ErrActionFailed)).Should(BeTrue())
+			Expect(callCount).Should(Equal(1))
+		})
+
 		It("pod selector - role", func() {
 			lifecycleActions.PostProvision.Exec.TargetPodSelector = appsv1.RoleSelector
 			lifecycleActions.PostProvision.Exec.MatchingKey = "leader"

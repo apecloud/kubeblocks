@@ -28,4 +28,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // continue to count against RegistryLimits. A controller must rotate to a new
 // installation fence before capacity is exhausted; this package does not
 // compact or reclaim tombstones in place.
+//
+// A Lease with malformed session metadata and no complete, positive expiry
+// evidence is treated as unexpired and is not replaced automatically. After
+// verifying that no holder is active, an operator may delete it explicitly to
+// let the next acquisition create a fresh Lease identity.
 package protocol

@@ -49,7 +49,8 @@ import (
 )
 
 const (
-	restoreManagerContainerName = "restore-manager"
+	restoreManagerContainerName           = "restore-manager"
+	postReadyExecutionPolicyAnnotationKey = "dataprotection.kubeblocks.io/post-ready-execution-policy"
 )
 
 type BackupActionSet struct {
@@ -777,6 +778,7 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 		if err != nil {
 			return nil, err
 		}
+		sort.Sort(intctrlutil.ByPodName(targetPodList.Items))
 		var restoreJobs []*batchv1.Job
 		for i := range targetPodList.Items {
 			containerName := actionSpec.Exec.Container
@@ -810,11 +812,12 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 	if err != nil {
 		return nil, err
 	}
+	policy := dpv1alpha1.PostReadyExecutionPolicyParallel
 	if isSerialPostReady(backupSet) {
-		for i := range jobs {
-			suspend := i > 0
-			jobs[i].Spec.Suspend = &suspend
-		}
+		policy = dpv1alpha1.PostReadyExecutionPolicySerial
+	}
+	for i := range jobs {
+		setPostReadyExecutionPolicy(jobs[i], policy)
 	}
 	return jobs, nil
 }
@@ -825,15 +828,107 @@ func isSerialPostReady(backupSet BackupActionSet) bool {
 		backupSet.ActionSet.Spec.Restore.PostReadyExecutionPolicy == dpv1alpha1.PostReadyExecutionPolicySerial
 }
 
+func setPostReadyExecutionPolicy(job *batchv1.Job, policy dpv1alpha1.PostReadyExecutionPolicy) {
+	if job.Annotations == nil {
+		job.Annotations = map[string]string{}
+	}
+	job.Annotations[postReadyExecutionPolicyAnnotationKey] = string(policy)
+	if policy == dpv1alpha1.PostReadyExecutionPolicySerial {
+		job.Spec.Suspend = boolptr.True()
+	} else {
+		job.Spec.Suspend = nil
+	}
+}
+
+func postReadyExecutionPolicyForJob(job *batchv1.Job) (dpv1alpha1.PostReadyExecutionPolicy, error) {
+	if job.Annotations == nil || job.Annotations[postReadyExecutionPolicyAnnotationKey] == "" {
+		return dpv1alpha1.PostReadyExecutionPolicyParallel, nil
+	}
+	policy := dpv1alpha1.PostReadyExecutionPolicy(job.Annotations[postReadyExecutionPolicyAnnotationKey])
+	if policy != dpv1alpha1.PostReadyExecutionPolicyParallel && policy != dpv1alpha1.PostReadyExecutionPolicySerial {
+		return "", intctrlutil.NewFatalError(fmt.Sprintf(
+			"postReady job %s/%s has invalid frozen execution policy %q",
+			job.Namespace, job.Name, policy))
+	}
+	return policy, nil
+}
+
+func serialPostReadyJobs(jobs []*batchv1.Job) (bool, error) {
+	if len(jobs) == 0 {
+		return false, nil
+	}
+	policy, err := postReadyExecutionPolicyForJob(jobs[0])
+	if err != nil {
+		return false, err
+	}
+	for i := 1; i < len(jobs); i++ {
+		jobPolicy, err := postReadyExecutionPolicyForJob(jobs[i])
+		if err != nil {
+			return false, err
+		}
+		if jobPolicy != policy {
+			return false, intctrlutil.NewFatalError("postReady jobs have inconsistent frozen execution policies")
+		}
+	}
+	return policy == dpv1alpha1.PostReadyExecutionPolicySerial, nil
+}
+
+// FreezePostReadyExecutionPolicy preserves the policy chosen by the first
+// created job across partial creation retries and ActionSet updates.
+func (r *RestoreManager) FreezePostReadyExecutionPolicy(
+	reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	jobs []*batchv1.Job,
+) error {
+	if len(jobs) == 0 {
+		return nil
+	}
+	policy, err := postReadyExecutionPolicyForJob(jobs[0])
+	if err != nil {
+		return err
+	}
+	foundExisting := false
+	for i := range jobs {
+		existing := &batchv1.Job{}
+		if err := cli.Get(reqCtx.Ctx, client.ObjectKeyFromObject(jobs[i]), existing); err != nil {
+			if apierrors.IsNotFound(err) {
+				continue
+			}
+			return err
+		}
+		if !r.isJobForRestoreAction(existing) {
+			return intctrlutil.NewFatalError(fmt.Sprintf(
+				"restore job name collision: existing job %s/%s does not belong to restore %s/%s",
+				existing.Namespace, existing.Name, r.Restore.Namespace, r.Restore.Name))
+		}
+		existingPolicy, err := postReadyExecutionPolicyForJob(existing)
+		if err != nil {
+			return err
+		}
+		if foundExisting && existingPolicy != policy {
+			return intctrlutil.NewFatalError("postReady jobs have inconsistent frozen execution policies")
+		}
+		policy = existingPolicy
+		foundExisting = true
+	}
+	for i := range jobs {
+		setPostReadyExecutionPolicy(jobs[i], policy)
+	}
+	return nil
+}
+
 // ResumeNextSerialPostReadyJob starts at most one suspended postReady job after
 // every preceding job has completed successfully.
 func (r *RestoreManager) ResumeNextSerialPostReadyJob(
 	reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
-	backupSet BackupActionSet,
 	jobs []*batchv1.Job,
 ) error {
-	if !isSerialPostReady(backupSet) {
+	serial, err := serialPostReadyJobs(jobs)
+	if err != nil {
+		return err
+	}
+	if !serial {
 		return nil
 	}
 	sort.Slice(jobs, func(i, j int) bool {
@@ -949,7 +1044,14 @@ func (r *RestoreManager) CheckJobsDone(
 	if stage == dpv1alpha1.PostReady {
 		restoreActions = &r.Restore.Status.Actions.PostReady
 	}
-	serialPostReady := stage == dpv1alpha1.PostReady && isSerialPostReady(backupSet)
+	serialPostReady := false
+	if stage == dpv1alpha1.PostReady {
+		var err error
+		serialPostReady, err = serialPostReadyJobs(fetchedJobs)
+		if err != nil {
+			return false, false, err
+		}
+	}
 	// count the number of jobs that are completed, failed,
 	// or have the normally terminated `restore` container
 	finishedCount := 0

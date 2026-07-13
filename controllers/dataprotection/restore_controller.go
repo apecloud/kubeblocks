@@ -507,13 +507,18 @@ func (r *RestoreReconciler) handleBackupActionSet(reqCtx intctrlutil.RequestCtx,
 	if len(jobs) == 0 {
 		return true, nil
 	}
+	if stage == dpv1alpha1.PostReady {
+		if err = restoreMgr.FreezePostReadyExecutionPolicy(reqCtx, r.Client, jobs); err != nil {
+			return false, err
+		}
+	}
 	// 3. create jobs
 	jobs, err = restoreMgr.CreateJobsIfNotExist(reqCtx, r.Client, restoreMgr.Restore, jobs)
 	if err != nil {
 		return false, err
 	}
 	if stage == dpv1alpha1.PostReady {
-		if err = restoreMgr.ResumeNextSerialPostReadyJob(reqCtx, r.Client, backupSet, jobs); err != nil {
+		if err = restoreMgr.ResumeNextSerialPostReadyJob(reqCtx, r.Client, jobs); err != nil {
 			return false, err
 		}
 	}

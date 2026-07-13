@@ -32,6 +32,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -50,6 +51,32 @@ import (
 
 type reversePodListClient struct {
 	client.Client
+}
+
+type createAlreadyExistsClient struct {
+	client.Client
+	foreign *batchv1.Job
+}
+
+type failNthCreateClient struct {
+	client.Client
+	n     int
+	count int
+}
+
+func (c *failNthCreateClient) Create(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
+	c.count++
+	if c.count == c.n {
+		return fmt.Errorf("injected create failure at %d", c.n)
+	}
+	return c.Client.Create(ctx, obj, opts...)
+}
+
+func (c createAlreadyExistsClient) Create(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
+	if err := c.Client.Create(ctx, c.foreign.DeepCopy(), opts...); err != nil {
+		return err
+	}
+	return apierrors.NewAlreadyExists(schema.GroupResource{Group: "batch", Resource: "jobs"}, obj.GetName())
 }
 
 func (c reversePodListClient) List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
@@ -589,7 +616,8 @@ var _ = Describe("RestoreManager Test", func() {
 				}
 			}
 
-			Expect(restoreMGR.FreezePostReadyExecutionPolicy(reqCtx, k8sClient, jobs)).Should(Succeed())
+			jobs, err = restoreMGR.FreezePostReadyExecutionPlan(reqCtx, k8sClient, jobs)
+			Expect(err).ShouldNot(HaveOccurred())
 			jobs, err = restoreMGR.CreateJobsIfNotExist(reqCtx, k8sClient, restoreMGR.Restore, jobs)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(restoreMGR.ResumeNextSerialPostReadyJob(reqCtx, k8sClient, jobs)).Should(Succeed())
@@ -614,28 +642,68 @@ var _ = Describe("RestoreManager Test", func() {
 			Expect(*second.Spec.Suspend).Should(BeFalse())
 		})
 
-		It("freezes serial policy across a partial creation retry", func() {
+		It("freezes target membership and serial policy across a partial creation retry", func() {
 			reqCtx := getReqCtx()
 			restoreMGR, _ := initResources(reqCtx, 0, false, func(f *testdp.MockRestoreFactory) {})
 			labels := map[string]string{
 				DataProtectionRestoreLabelKey:          restoreMGR.Restore.Name,
 				DataProtectionRestoreNamespaceLabelKey: restoreMGR.Restore.Namespace,
 			}
-			first := newRestoreJob(testCtx.DefaultNamespace, "restore-post-ready-partial-0", labels)
-			setPostReadyExecutionPolicy(first, dpv1alpha1.PostReadyExecutionPolicySerial)
-			Expect(k8sClient.Create(reqCtx.Ctx, first)).Should(Succeed())
-
-			desiredFirst := newRestoreJob(testCtx.DefaultNamespace, first.Name, labels)
-			desiredSecond := newRestoreJob(testCtx.DefaultNamespace, "restore-post-ready-partial-1", labels)
-			setPostReadyExecutionPolicy(desiredFirst, dpv1alpha1.PostReadyExecutionPolicyParallel)
-			setPostReadyExecutionPolicy(desiredSecond, dpv1alpha1.PostReadyExecutionPolicyParallel)
-			desired := []*batchv1.Job{desiredFirst, desiredSecond}
-
-			Expect(restoreMGR.FreezePostReadyExecutionPolicy(reqCtx, k8sClient, desired)).Should(Succeed())
-			for i := range desired {
-				Expect(desired[i].Annotations[postReadyExecutionPolicyAnnotationKey]).Should(Equal(string(dpv1alpha1.PostReadyExecutionPolicySerial)))
-				Expect(*desired[i].Spec.Suspend).Should(BeTrue())
+			newTargetJob := func(index int, target string, policy dpv1alpha1.PostReadyExecutionPolicy) *batchv1.Job {
+				job := newRestoreJob(testCtx.DefaultNamespace, fmt.Sprintf("restore-post-ready-partial-%d", index), labels)
+				job.Annotations = map[string]string{postReadyTargetIdentityAnnotationKey: target}
+				setPostReadyExecutionPolicy(job, policy)
+				return job
 			}
+
+			oldPlan := []*batchv1.Job{
+				newTargetJob(0, "default/pod-b", dpv1alpha1.PostReadyExecutionPolicySerial),
+				newTargetJob(1, "default/pod-c", dpv1alpha1.PostReadyExecutionPolicySerial),
+			}
+			Expect(setPostReadyTargetPlan(oldPlan)).Should(Succeed())
+			failingClient := &failNthCreateClient{Client: k8sClient, n: 2}
+			created, err := restoreMGR.CreateJobsIfNotExist(reqCtx, failingClient, restoreMGR.Restore, oldPlan)
+			Expect(err).Should(HaveOccurred())
+			Expect(created).Should(BeNil())
+			firstAfterFailure := &batchv1.Job{}
+			Expect(k8sClient.Get(reqCtx.Ctx, client.ObjectKeyFromObject(oldPlan[0]), firstAfterFailure)).Should(Succeed())
+			Expect(*firstAfterFailure.Spec.Suspend).Should(BeTrue())
+			Expect(apierrors.IsNotFound(k8sClient.Get(reqCtx.Ctx, client.ObjectKeyFromObject(oldPlan[1]), &batchv1.Job{}))).Should(BeTrue())
+
+			missingTarget := []*batchv1.Job{
+				newTargetJob(0, "default/pod-a", dpv1alpha1.PostReadyExecutionPolicyParallel),
+				newTargetJob(1, "default/pod-b", dpv1alpha1.PostReadyExecutionPolicyParallel),
+			}
+			Expect(setPostReadyTargetPlan(missingTarget)).Should(Succeed())
+			_, err = restoreMGR.FreezePostReadyExecutionPlan(reqCtx, k8sClient, missingTarget)
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring("frozen target default/pod-c is not currently available"))
+
+			current := []*batchv1.Job{
+				newTargetJob(0, "default/pod-a", dpv1alpha1.PostReadyExecutionPolicyParallel),
+				newTargetJob(1, "default/pod-b", dpv1alpha1.PostReadyExecutionPolicyParallel),
+				newTargetJob(2, "default/pod-c", dpv1alpha1.PostReadyExecutionPolicyParallel),
+			}
+			Expect(setPostReadyTargetPlan(current)).Should(Succeed())
+			frozen, err := restoreMGR.FreezePostReadyExecutionPlan(reqCtx, k8sClient, current)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(frozen).Should(HaveLen(2))
+			for i, target := range []string{"default/pod-b", "default/pod-c"} {
+				Expect(frozen[i].Name).Should(Equal(fmt.Sprintf("restore-post-ready-partial-%d", i)))
+				Expect(postReadyTargetIdentity(frozen[i])).Should(Equal(target))
+				Expect(frozen[i].Annotations[postReadyExecutionPolicyAnnotationKey]).Should(Equal(string(dpv1alpha1.PostReadyExecutionPolicySerial)))
+				Expect(*frozen[i].Spec.Suspend).Should(BeTrue())
+			}
+
+			frozen, err = restoreMGR.CreateJobsIfNotExist(reqCtx, k8sClient, restoreMGR.Restore, frozen)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(restoreMGR.ResumeNextSerialPostReadyJob(reqCtx, k8sClient, frozen)).Should(Succeed())
+			first := &batchv1.Job{}
+			second := &batchv1.Job{}
+			Expect(k8sClient.Get(reqCtx.Ctx, client.ObjectKeyFromObject(frozen[0]), first)).Should(Succeed())
+			Expect(k8sClient.Get(reqCtx.Ctx, client.ObjectKeyFromObject(frozen[1]), second)).Should(Succeed())
+			Expect(*first.Spec.Suspend).Should(BeFalse())
+			Expect(*second.Spec.Suspend).Should(BeTrue())
 		})
 
 		It("does not resume a serial job after a failed predecessor", func() {
@@ -651,6 +719,10 @@ var _ = Describe("RestoreManager Test", func() {
 			}
 			for i := range jobs {
 				setPostReadyExecutionPolicy(jobs[i], dpv1alpha1.PostReadyExecutionPolicySerial)
+				jobs[i].Annotations[postReadyTargetIdentityAnnotationKey] = fmt.Sprintf("default/pod-%d", i)
+			}
+			Expect(setPostReadyTargetPlan(jobs)).Should(Succeed())
+			for i := range jobs {
 				Expect(k8sClient.Create(reqCtx.Ctx, jobs[i])).Should(Succeed())
 			}
 			testdp.PatchK8sJobStatus(&testCtx, client.ObjectKeyFromObject(jobs[0]), batchv1.JobFailed)
@@ -662,6 +734,50 @@ var _ = Describe("RestoreManager Test", func() {
 			second := &batchv1.Job{}
 			Expect(k8sClient.Get(reqCtx.Ctx, client.ObjectKeyFromObject(jobs[1]), second)).Should(Succeed())
 			Expect(*second.Spec.Suspend).Should(BeTrue())
+		})
+
+		It("refetches and rejects a foreign Job after an AlreadyExists create race", func() {
+			reqCtx := getReqCtx()
+			restoreMGR, _ := initResources(reqCtx, 0, false, func(f *testdp.MockRestoreFactory) {})
+			labels := map[string]string{
+				DataProtectionRestoreLabelKey:          restoreMGR.Restore.Name,
+				DataProtectionRestoreNamespaceLabelKey: restoreMGR.Restore.Namespace,
+			}
+			desired := newRestoreJob(testCtx.DefaultNamespace, "restore-post-ready-race-0", labels)
+			desired.Annotations = map[string]string{postReadyTargetIdentityAnnotationKey: "default/pod-0"}
+			setPostReadyExecutionPolicy(desired, dpv1alpha1.PostReadyExecutionPolicySerial)
+			Expect(setPostReadyTargetPlan([]*batchv1.Job{desired})).Should(Succeed())
+
+			foreign := desired.DeepCopy()
+			foreign.Labels[DataProtectionRestoreLabelKey] = "another-restore"
+			jobs, err := restoreMGR.CreateJobsIfNotExist(reqCtx,
+				createAlreadyExistsClient{Client: k8sClient, foreign: foreign}, restoreMGR.Restore, []*batchv1.Job{desired})
+			Expect(err).Should(HaveOccurred())
+			Expect(jobs).Should(BeNil())
+			Expect(err.Error()).Should(ContainSubstring("does not belong to restore"))
+		})
+
+		It("keeps a fully persisted legacy postReady action on the Parallel path", func() {
+			reqCtx := getReqCtx()
+			restoreMGR, _ := initResources(reqCtx, 0, false, func(f *testdp.MockRestoreFactory) {})
+			legacy := newRestoreJob(testCtx.DefaultNamespace, "restore-post-ready-legacy-0", map[string]string{
+				DataProtectionRestoreLabelKey:          restoreMGR.Restore.Name,
+				DataProtectionRestoreNamespaceLabelKey: restoreMGR.Restore.Namespace,
+			})
+			Expect(k8sClient.Create(reqCtx.Ctx, legacy)).Should(Succeed())
+			persisted := &batchv1.Job{}
+			Expect(k8sClient.Get(reqCtx.Ctx, client.ObjectKeyFromObject(legacy), persisted)).Should(Succeed())
+			Expect(persisted.ResourceVersion).ShouldNot(BeEmpty())
+
+			frozen, err := restoreMGR.FreezePostReadyExecutionPlan(reqCtx, k8sClient, []*batchv1.Job{persisted})
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(frozen).Should(HaveLen(1))
+			Expect(frozen[0].Annotations).Should(BeEmpty())
+			serial, err := serialPostReadyJobs(frozen)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(serial).Should(BeFalse())
+			Expect(frozen[0].Spec.Suspend).ShouldNot(BeNil())
+			Expect(*frozen[0].Spec.Suspend).Should(BeFalse())
 		})
 
 		Context("BuildContinuousRestoreManager", func() {

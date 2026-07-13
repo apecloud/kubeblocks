@@ -21,6 +21,7 @@ package restore
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strconv"
@@ -51,6 +52,8 @@ import (
 const (
 	restoreManagerContainerName           = "restore-manager"
 	postReadyExecutionPolicyAnnotationKey = "dataprotection.kubeblocks.io/post-ready-execution-policy"
+	postReadyTargetIdentityAnnotationKey  = "dataprotection.kubeblocks.io/post-ready-target-identity"
+	postReadyTargetPlanAnnotationKey      = "dataprotection.kubeblocks.io/post-ready-target-plan"
 )
 
 type BackupActionSet struct {
@@ -764,7 +767,9 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 				// no need to recover the volume when the pod selection policy is 'All' and sourceTargetPodName is not found.
 				continue
 			}
-			jobs = append(jobs, buildJob(&targetPodList.Items[i], sourceTargetPodName, i))
+			job := buildJob(&targetPodList.Items[i], sourceTargetPodName, i)
+			setPostReadyTargetIdentity(job, &targetPodList.Items[i], sourceTargetPodName)
+			jobs = append(jobs, job)
 		}
 		return jobs, nil
 	}
@@ -798,6 +803,7 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 				job.Spec.Template.Spec.ServiceAccountName = viper.GetString(dptypes.CfgKeyExecWorkerServiceAccountName)
 			}
 			job.Labels[DataProtectionRestoreNamespaceLabelKey] = r.Restore.Namespace
+			setPostReadyTargetIdentity(job, &targetPodList.Items[i], "")
 			restoreJobs = append(restoreJobs, job)
 		}
 		return restoreJobs, nil
@@ -819,6 +825,9 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 	for i := range jobs {
 		setPostReadyExecutionPolicy(jobs[i], policy)
 	}
+	if err := setPostReadyTargetPlan(jobs); err != nil {
+		return nil, err
+	}
 	return jobs, nil
 }
 
@@ -838,6 +847,69 @@ func setPostReadyExecutionPolicy(job *batchv1.Job, policy dpv1alpha1.PostReadyEx
 	} else {
 		job.Spec.Suspend = nil
 	}
+}
+
+func setPostReadyTargetIdentity(job *batchv1.Job, pod *corev1.Pod, sourceTargetPodName string) {
+	if job.Annotations == nil {
+		job.Annotations = map[string]string{}
+	}
+	target := types.NamespacedName{
+		Namespace: pod.Namespace,
+		Name:      pod.Name,
+	}.String()
+	job.Annotations[postReadyTargetIdentityAnnotationKey] = fmt.Sprintf("%s|source=%s", target, sourceTargetPodName)
+}
+
+func postReadyTargetIdentity(job *batchv1.Job) string {
+	if job.Annotations == nil {
+		return ""
+	}
+	return job.Annotations[postReadyTargetIdentityAnnotationKey]
+}
+
+func hasPostReadyFrozenContract(job *batchv1.Job) bool {
+	if job.Annotations == nil {
+		return false
+	}
+	return job.Annotations[postReadyExecutionPolicyAnnotationKey] != "" ||
+		job.Annotations[postReadyTargetIdentityAnnotationKey] != "" ||
+		job.Annotations[postReadyTargetPlanAnnotationKey] != ""
+}
+
+func setPostReadyTargetPlan(jobs []*batchv1.Job) error {
+	plan := make([]string, 0, len(jobs))
+	for i := range jobs {
+		identity := postReadyTargetIdentity(jobs[i])
+		if identity == "" {
+			return intctrlutil.NewFatalError(fmt.Sprintf(
+				"postReady job %s/%s has empty target identity", jobs[i].Namespace, jobs[i].Name))
+		}
+		plan = append(plan, identity)
+	}
+	serialized, err := json.Marshal(plan)
+	if err != nil {
+		return err
+	}
+	for i := range jobs {
+		jobs[i].Annotations[postReadyTargetPlanAnnotationKey] = string(serialized)
+	}
+	return nil
+}
+
+func postReadyTargetPlan(job *batchv1.Job) ([]string, error) {
+	if job.Annotations == nil || job.Annotations[postReadyTargetPlanAnnotationKey] == "" {
+		return nil, nil
+	}
+	var plan []string
+	if err := json.Unmarshal([]byte(job.Annotations[postReadyTargetPlanAnnotationKey]), &plan); err != nil {
+		return nil, intctrlutil.NewFatalError(fmt.Sprintf(
+			"postReady job %s/%s has invalid frozen target plan: %v", job.Namespace, job.Name, err))
+	}
+	if len(plan) == 0 {
+		return nil, intctrlutil.NewFatalError(fmt.Sprintf(
+			"postReady job %s/%s has empty frozen target plan", job.Namespace, job.Name))
+	}
+	return plan, nil
 }
 
 func postReadyExecutionPolicyForJob(job *batchv1.Job) (dpv1alpha1.PostReadyExecutionPolicy, error) {
@@ -873,48 +945,169 @@ func serialPostReadyJobs(jobs []*batchv1.Job) (bool, error) {
 	return policy == dpv1alpha1.PostReadyExecutionPolicySerial, nil
 }
 
-// FreezePostReadyExecutionPolicy preserves the policy chosen by the first
-// created job across partial creation retries and ActionSet updates.
-func (r *RestoreManager) FreezePostReadyExecutionPolicy(
+// FreezePostReadyExecutionPlan preserves the policy and ordered target set
+// chosen by the first created job across partial retries and ActionSet updates.
+func (r *RestoreManager) FreezePostReadyExecutionPlan(
 	reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	jobs []*batchv1.Job,
-) error {
+) ([]*batchv1.Job, error) {
 	if len(jobs) == 0 {
-		return nil
+		return jobs, nil
 	}
 	policy, err := postReadyExecutionPolicyForJob(jobs[0])
 	if err != nil {
-		return err
+		return nil, err
 	}
 	foundExisting := false
+	var frozenPlan []string
+	allInputJobsPersisted := true
+	for i := range jobs {
+		if jobs[i].ResourceVersion == "" {
+			allInputJobsPersisted = false
+			break
+		}
+	}
 	for i := range jobs {
 		existing := &batchv1.Job{}
 		if err := cli.Get(reqCtx.Ctx, client.ObjectKeyFromObject(jobs[i]), existing); err != nil {
 			if apierrors.IsNotFound(err) {
 				continue
 			}
-			return err
+			return nil, err
 		}
 		if !r.isJobForRestoreAction(existing) {
-			return intctrlutil.NewFatalError(fmt.Sprintf(
+			return nil, intctrlutil.NewFatalError(fmt.Sprintf(
 				"restore job name collision: existing job %s/%s does not belong to restore %s/%s",
 				existing.Namespace, existing.Name, r.Restore.Namespace, r.Restore.Name))
 		}
+		if !hasPostReadyFrozenContract(existing) {
+			if allInputJobsPersisted {
+				for j := range jobs {
+					if hasPostReadyFrozenContract(jobs[j]) {
+						return nil, intctrlutil.NewFatalError("legacy and frozen postReady jobs cannot be mixed")
+					}
+				}
+				return jobs, nil
+			}
+			return nil, intctrlutil.NewFatalError(fmt.Sprintf(
+				"legacy postReady job %s/%s cannot be combined with a new frozen target plan",
+				existing.Namespace, existing.Name))
+		}
 		existingPolicy, err := postReadyExecutionPolicyForJob(existing)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if foundExisting && existingPolicy != policy {
-			return intctrlutil.NewFatalError("postReady jobs have inconsistent frozen execution policies")
+			return nil, intctrlutil.NewFatalError("postReady jobs have inconsistent frozen execution policies")
 		}
 		policy = existingPolicy
+		plan, err := postReadyTargetPlan(existing)
+		if err != nil {
+			return nil, err
+		}
+		if len(plan) == 0 {
+			return nil, intctrlutil.NewFatalError(fmt.Sprintf(
+				"postReady job %s/%s has no frozen target plan", existing.Namespace, existing.Name))
+		}
+		if len(frozenPlan) > 0 && strings.Join(plan, "\x00") != strings.Join(frozenPlan, "\x00") {
+			return nil, intctrlutil.NewFatalError("postReady jobs have inconsistent frozen target plans")
+		}
+		index := postReadyJobIndex(existing.Name)
+		if index < 0 || index >= len(plan) || postReadyTargetIdentity(existing) != plan[index] {
+			return nil, intctrlutil.NewFatalError(fmt.Sprintf(
+				"postReady job %s/%s target identity does not match its frozen plan",
+				existing.Namespace, existing.Name))
+		}
+		frozenPlan = plan
 		foundExisting = true
 	}
+	if !foundExisting {
+		return jobs, nil
+	}
+
+	jobsByTarget := make(map[string]*batchv1.Job, len(jobs))
 	for i := range jobs {
-		setPostReadyExecutionPolicy(jobs[i], policy)
+		identity := postReadyTargetIdentity(jobs[i])
+		if identity == "" {
+			return nil, intctrlutil.NewFatalError(fmt.Sprintf(
+				"postReady job %s/%s has empty target identity", jobs[i].Namespace, jobs[i].Name))
+		}
+		if _, ok := jobsByTarget[identity]; ok {
+			return nil, intctrlutil.NewFatalError(fmt.Sprintf("duplicate postReady target identity %s", identity))
+		}
+		jobsByTarget[identity] = jobs[i]
+	}
+	frozenJobs := make([]*batchv1.Job, 0, len(frozenPlan))
+	for i, identity := range frozenPlan {
+		job, ok := jobsByTarget[identity]
+		if !ok {
+			return nil, intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue,
+				"postReady frozen target %s is not currently available", identity)
+		}
+		job = job.DeepCopy()
+		job.Name = postReadyJobNameForIndex(jobs[0].Name, i)
+		setPostReadyExecutionPolicy(job, policy)
+		serializedPlan, err := json.Marshal(frozenPlan)
+		if err != nil {
+			return nil, err
+		}
+		job.Annotations[postReadyTargetPlanAnnotationKey] = string(serializedPlan)
+		frozenJobs = append(frozenJobs, job)
+	}
+	return frozenJobs, nil
+}
+
+func (r *RestoreManager) validateExistingRestoreActionJob(desired, existing *batchv1.Job) error {
+	if !r.isJobForRestoreAction(existing) {
+		return intctrlutil.NewFatalError(fmt.Sprintf(
+			"restore job name collision: existing job %s/%s does not belong to restore %s/%s",
+			existing.Namespace, existing.Name, r.Restore.Namespace, r.Restore.Name))
+	}
+	desiredIdentity := postReadyTargetIdentity(desired)
+	if desiredIdentity == "" {
+		return nil
+	}
+	if postReadyTargetIdentity(existing) != desiredIdentity {
+		return intctrlutil.NewFatalError(fmt.Sprintf(
+			"postReady job %s/%s target identity does not match desired target",
+			existing.Namespace, existing.Name))
+	}
+	desiredPolicy, err := postReadyExecutionPolicyForJob(desired)
+	if err != nil {
+		return err
+	}
+	existingPolicy, err := postReadyExecutionPolicyForJob(existing)
+	if err != nil {
+		return err
+	}
+	if existingPolicy != desiredPolicy {
+		return intctrlutil.NewFatalError(fmt.Sprintf(
+			"postReady job %s/%s execution policy does not match desired policy",
+			existing.Namespace, existing.Name))
+	}
+	desiredPlan, err := postReadyTargetPlan(desired)
+	if err != nil {
+		return err
+	}
+	existingPlan, err := postReadyTargetPlan(existing)
+	if err != nil {
+		return err
+	}
+	if len(desiredPlan) == 0 || strings.Join(existingPlan, "\x00") != strings.Join(desiredPlan, "\x00") {
+		return intctrlutil.NewFatalError(fmt.Sprintf(
+			"postReady job %s/%s frozen target plan does not match desired plan",
+			existing.Namespace, existing.Name))
 	}
 	return nil
+}
+
+func postReadyJobNameForIndex(name string, index int) string {
+	separator := strings.LastIndexByte(name, '-')
+	if separator < 0 {
+		return name
+	}
+	return fmt.Sprintf("%s-%d", name[:separator], index)
 }
 
 // ResumeNextSerialPostReadyJob starts at most one suspended postReady job after
@@ -1012,17 +1205,26 @@ func (r *RestoreManager) CreateJobsIfNotExist(reqCtx intctrlutil.RequestCtx,
 					return nil, err
 				}
 			}
-			if err = cli.Create(reqCtx.Ctx, objs[i]); err != nil && !apierrors.IsAlreadyExists(err) {
-				return nil, err
+			if err = cli.Create(reqCtx.Ctx, objs[i]); err != nil {
+				if !apierrors.IsAlreadyExists(err) {
+					return nil, err
+				}
+				fetchedJob = &batchv1.Job{}
+				if err = cli.Get(reqCtx.Ctx, client.ObjectKeyFromObject(objs[i]), fetchedJob); err != nil {
+					return nil, err
+				}
+				if err = r.validateExistingRestoreActionJob(objs[i], fetchedJob); err != nil {
+					return nil, err
+				}
+				fetchedJobs = append(fetchedJobs, fetchedJob)
+				continue
 			}
 			msg := fmt.Sprintf("created job %s/%s", objs[i].Namespace, objs[i].Name)
 			r.Recorder.Event(r.Restore, corev1.EventTypeNormal, reasonCreateRestoreJob, msg)
 			fetchedJobs = append(fetchedJobs, objs[i])
 		} else {
-			if !r.isJobForRestoreAction(fetchedJob) {
-				err := fmt.Sprintf("restore job name collision: existing job %s/%s does not belong to restore %s/%s",
-					fetchedJob.Namespace, fetchedJob.Name, r.Restore.Namespace, r.Restore.Name)
-				return nil, intctrlutil.NewFatalError(err)
+			if err = r.validateExistingRestoreActionJob(objs[i], fetchedJob); err != nil {
+				return nil, err
 			}
 			fetchedJobs = append(fetchedJobs, fetchedJob)
 		}

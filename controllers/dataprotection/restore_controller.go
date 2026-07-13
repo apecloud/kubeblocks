@@ -508,7 +508,7 @@ func (r *RestoreReconciler) handleBackupActionSet(reqCtx intctrlutil.RequestCtx,
 		return true, nil
 	}
 	if stage == dpv1alpha1.PostReady {
-		if err = restoreMgr.FreezePostReadyExecutionPolicy(reqCtx, r.Client, jobs); err != nil {
+		if jobs, err = restoreMgr.FreezePostReadyExecutionPlan(reqCtx, r.Client, jobs); err != nil {
 			return false, err
 		}
 	}

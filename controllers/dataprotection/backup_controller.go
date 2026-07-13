@@ -21,6 +21,7 @@ package dataprotection
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -31,6 +32,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
@@ -69,6 +71,8 @@ type BackupReconciler struct {
 	RestConfig *rest.Config
 	clock      clock.RealClock
 }
+
+var errBackupNamespaceNotFound = errors.New("backup namespace not found")
 
 // +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backups,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backups/status,verbs=get;update;patch
@@ -215,13 +219,6 @@ func (r *BackupReconciler) deleteBackupFiles(reqCtx intctrlutil.RequestCtx, back
 		return nil
 	}
 
-	deleteBackup := func() error {
-		// remove backup finalizers to delete it
-		patch := client.MergeFrom(backup.DeepCopy())
-		controllerutil.RemoveFinalizer(backup, dptypes.DataProtectionFinalizerName)
-		return r.Patch(reqCtx.Ctx, backup, patch)
-	}
-
 	deleter := &dpbackup.Deleter{
 		RequestCtx: reqCtx,
 		Client:     r.Client,
@@ -234,27 +231,53 @@ func (r *BackupReconciler) deleteBackupFiles(reqCtx intctrlutil.RequestCtx, back
 	status, err := deleter.DeleteBackupFiles(backup)
 	switch status {
 	case dpbackup.DeletionStatusSucceeded:
-		return deleteBackup()
+		return r.removeBackupFinalizer(reqCtx, backup)
 	case dpbackup.DeletionStatusFailed:
-		failureReason := err.Error()
-		if backup.Status.FailureReason == failureReason {
-			return nil
-		}
-		backupPatch := client.MergeFrom(backup.DeepCopy())
-		backup.Status.FailureReason = failureReason
-		r.Recorder.Event(backup, corev1.EventTypeWarning, "DeleteBackupFilesFailed", failureReason)
-		return r.Status().Patch(reqCtx.Ctx, backup, backupPatch)
+		return r.recordDeleteBackupFilesFailure(reqCtx, backup, err.Error())
 	case dpbackup.DeletionStatusDeleting,
 		dpbackup.DeletionStatusUnknown:
+		if errors.Is(err, errBackupNamespaceNotFound) {
+			failureReason := fmt.Sprintf(
+				"backup namespace %q no longer exists, so worker resources cannot be created to delete backup files; the finalizer is retained to avoid silently orphaning backup files; change spec.deletionPolicy to Retain to explicitly keep the files and finish deleting the Backup: %v",
+				backup.Namespace, err)
+			return r.recordDeleteBackupFilesFailure(reqCtx, backup, failureReason)
+		}
 		// wait for the deletion job completed
 		return err
 	}
 	return err
 }
 
+func (r *BackupReconciler) removeBackupFinalizer(reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) error {
+	if !controllerutil.ContainsFinalizer(backup, dptypes.DataProtectionFinalizerName) {
+		return nil
+	}
+	patch := client.MergeFromWithOptions(backup.DeepCopy(), client.MergeFromWithOptimisticLock{})
+	controllerutil.RemoveFinalizer(backup, dptypes.DataProtectionFinalizerName)
+	return r.Patch(reqCtx.Ctx, backup, patch)
+}
+
+func (r *BackupReconciler) recordDeleteBackupFilesFailure(
+	reqCtx intctrlutil.RequestCtx,
+	backup *dpv1alpha1.Backup,
+	failureReason string) error {
+	if backup.Status.FailureReason == failureReason {
+		return nil
+	}
+	backupPatch := client.MergeFrom(backup.DeepCopy())
+	backup.Status.FailureReason = failureReason
+	if r.Recorder != nil {
+		r.Recorder.Event(backup, corev1.EventTypeWarning, "DeleteBackupFilesFailed", failureReason)
+	}
+	return r.Status().Patch(reqCtx.Ctx, backup, backupPatch)
+}
+
 func (r *BackupReconciler) ensureWorkerServiceAccountForBackupDeletion(reqCtx intctrlutil.RequestCtx, namespace string) (string, error) {
 	ns := &corev1.Namespace{}
 	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Name: namespace}, ns); err != nil {
+		if apierrors.IsNotFound(err) {
+			return "", fmt.Errorf("%w: failed to get backup namespace %q before deleting backup files: %v", errBackupNamespaceNotFound, namespace, err)
+		}
 		return "", fmt.Errorf("failed to get backup namespace %q before deleting backup files: %w", namespace, err)
 	}
 	if !ns.DeletionTimestamp.IsZero() {
@@ -280,7 +303,12 @@ func (r *BackupReconciler) handleDeletingPhase(reqCtx intctrlutil.RequestCtx, ba
 	}
 
 	if backup.Spec.DeletionPolicy == dpv1alpha1.BackupDeletionPolicyRetain {
-		r.Recorder.Event(backup, corev1.EventTypeWarning, "Retain", "can not delete the backup if deletionPolicy is Retain")
+		if r.Recorder != nil {
+			r.Recorder.Event(backup, corev1.EventTypeNormal, "Retain", "retaining backup files and deleting the Backup object")
+		}
+		if err := r.removeBackupFinalizer(reqCtx, backup); err != nil {
+			return intctrlutil.RequeueWithError(err, reqCtx.Log, "failed to remove finalizer from retained Backup")
+		}
 		return intctrlutil.Reconciled()
 	}
 

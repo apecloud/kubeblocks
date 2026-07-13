@@ -300,8 +300,8 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet, legacyConfigManagerP
 // identifiers inside the template (kbagent probes and args reference numeric
 // ports) but they are not in-place updatable, so letting the rename ride on an
 // in-place or metadata-only change would turn it into a full rollout (or block
-// it under StrictInPlace); only a recreate-class diff — detected with the same
-// field filter the InstanceSet controller uses — carries the rename along.
+// it under StrictInPlace); only a change that the configured update policy will
+// actually recreate carries the rename along.
 func deferKBAgentPortRename(oldITS, mergedITS *workloads.InstanceSet) {
 	if oldITS == nil || mergedITS == nil {
 		return
@@ -335,11 +335,11 @@ func deferKBAgentPortRename(oldITS, mergedITS *workloads.InstanceSet) {
 	if len(renamed) == 0 {
 		return
 	}
-	// with the legacy names restored, any remaining difference in the
-	// recreate-relevant part of the template means the pods are rebuilt anyway
-	oldFiltered := instanceset.FilterInPlaceFields(&oldITS.Spec.Template)
-	mergedFiltered := instanceset.FilterInPlaceFields(&mergedITS.Spec.Template)
-	if !reflect.DeepEqual(oldFiltered, mergedFiltered) {
+	// With the legacy names restored, classify the accompanying template change
+	// with the same policy and vertical-resize boundaries used for legacy
+	// config-manager cleanup. Filtering in-place fields alone is insufficient:
+	// an application image or resource update can still be ReCreate.
+	if shouldRecreatePodsForTemplateChange(oldITS.Spec.Template, mergedITS.Spec.Template, mergedITS) {
 		for i, name := range renamed {
 			ports[i].Name = name
 		}
@@ -439,6 +439,62 @@ func shouldCleanupLegacyConfigManager(oldITS, desiredITS *workloads.InstanceSet)
 		return desiredITS.Spec.PodUpdatePolicy == appsv1.ReCreatePodUpdatePolicyType
 	}
 	return false
+}
+
+func shouldRecreatePodsForTemplateChange(oldTemplate, newTemplate corev1.PodTemplateSpec,
+	desiredITS *workloads.InstanceSet) bool {
+	if reflect.DeepEqual(oldTemplate, newTemplate) {
+		return false
+	}
+	// A revision-changing field always selects the InstanceSet recreate path.
+	// StrictInPlace is the only policy that blocks that path. Which strictness
+	// field applies follows getPodUpdatePolicyInSpec: container/init-container
+	// changes use PodUpgradePolicy; other template changes use PodUpdatePolicy.
+	oldRecreateFields := podRecreateFields(oldTemplate)
+	newRecreateFields := podRecreateFields(newTemplate)
+	if !reflect.DeepEqual(oldRecreateFields, newRecreateFields) {
+		policy := desiredITS.Spec.PodUpdatePolicy
+		if !reflect.DeepEqual(oldTemplate.Spec.InitContainers, newTemplate.Spec.InitContainers) ||
+			!reflect.DeepEqual(oldTemplate.Spec.Containers, newTemplate.Spec.Containers) {
+			policy = desiredITS.Spec.PodUpgradePolicy
+		}
+		return policy != appsv1.StrictInPlacePodUpdatePolicyType
+	}
+
+	initChanged, initOK := intctrlutil.OnlyKBManagedContainerImageChanged(oldTemplate.Spec.InitContainers, newTemplate.Spec.InitContainers)
+	containerChanged, containerOK := intctrlutil.OnlyKBManagedContainerImageChanged(oldTemplate.Spec.Containers, newTemplate.Spec.Containers)
+	if initOK && containerOK && (initChanged || containerChanged) {
+		return false
+	}
+	if hasPodUpgradeTemplateChanges(oldTemplate, newTemplate) {
+		return desiredITS.Spec.PodUpgradePolicy == appsv1.ReCreatePodUpdatePolicyType
+	}
+	if hasPodResourceChanges(oldTemplate.Spec, newTemplate.Spec) {
+		if !viper.GetBool(constant.FeatureGateInPlacePodVerticalScaling) {
+			return desiredITS.Spec.PodUpdatePolicy != appsv1.StrictInPlacePodUpdatePolicyType
+		}
+		return desiredITS.Spec.PodUpdatePolicy == appsv1.ReCreatePodUpdatePolicyType
+	}
+	if hasPodUpdateTemplateChanges(oldTemplate, newTemplate) {
+		return desiredITS.Spec.PodUpdatePolicy == appsv1.ReCreatePodUpdatePolicyType
+	}
+	return false
+}
+
+func podRecreateFields(template corev1.PodTemplateSpec) *corev1.PodTemplateSpec {
+	filtered := instanceset.FilterInPlaceFields(&template)
+	// FilterInPlaceFields deletes CPU/memory entries. Normalize the empty maps
+	// that deletion can leave behind so this comparison matches the serialized
+	// revision contract (nil and omitted empty maps hash the same).
+	for i := range filtered.Spec.Containers {
+		if len(filtered.Spec.Containers[i].Resources.Requests) == 0 {
+			filtered.Spec.Containers[i].Resources.Requests = nil
+		}
+		if len(filtered.Spec.Containers[i].Resources.Limits) == 0 {
+			filtered.Spec.Containers[i].Resources.Limits = nil
+		}
+	}
+	return filtered
 }
 
 func stripLegacyConfigManagerPodTemplate(template corev1.PodTemplateSpec) corev1.PodTemplateSpec {

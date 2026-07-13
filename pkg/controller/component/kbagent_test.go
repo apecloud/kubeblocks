@@ -164,6 +164,19 @@ var _ = Describe("kb-agent", func() {
 			Expect(c.Ports[1].ContainerPort).Should(Equal(int32(kbagent.DefaultStreamingPort + 1)))
 		})
 
+		It("rejects runtime ports that use reserved kbagent port names", func() {
+			synthesizedComp.PodSpec.Containers[0].Ports = []corev1.ContainerPort{
+				{
+					Name:          kbagent.DefaultHTTPPortName,
+					ContainerPort: 9200,
+				},
+			}
+
+			err := buildKBAgentContainer(synthesizedComp)
+			Expect(err).Should(MatchError(ContainSubstring("reserved for the injected kbagent container")))
+			Expect(kbAgentContainer()).Should(BeNil())
+		})
+
 		It("startup env", func() {
 			err := buildKBAgentContainer(synthesizedComp)
 			Expect(err).Should(BeNil())

@@ -267,7 +267,9 @@ type ComponentNetwork struct {
 	//      a) Mappings for all ports defined in `cmpd.spec.hostNetwork` are MANDATORY.
 	//      b) Mappings for kbagent ports ("kba-http", "kba-streaming") are OPTIONAL.
 	//         You can explicitly map them here, or leave them omitted to be allocated by the host-port manager.
-	//         The legacy names "http" and "streaming" are still accepted as aliases for the kbagent ports.
+	//         The legacy names "http" and "streaming" are accepted as aliases only when no non-kbagent
+	//         container declares the same port name. When a component owns that name, its mapping takes
+	//         precedence; use the "kba-*" name to map kbagent explicitly, or omit it for automatic allocation.
 	//
 	// 2. When HostNetwork is disabled:
 	//    It allows optional mapping for container ports to host ports.

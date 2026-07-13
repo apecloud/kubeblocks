@@ -150,6 +150,12 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 	if !hasActionDefined(synthesizedComp) {
 		return nil
 	}
+	if err := validateKBAgentPortNames(
+		sets.New(kbagent.ContainerName),
+		synthesizedComp.PodSpec.InitContainers,
+		synthesizedComp.PodSpec.Containers); err != nil {
+		return err
+	}
 
 	envVars, err := buildKBAgentStartupEnvs(synthesizedComp)
 	if err != nil {
@@ -242,6 +248,36 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 	synthesizedComp.PodSpec.Containers = append(synthesizedComp.PodSpec.Containers, *container)
 	synthesizedComp.PodSpec.InitContainers = append(synthesizedComp.PodSpec.InitContainers, *workerContainer)
 
+	return nil
+}
+
+// ValidateKBAgentPortNames rejects user-defined ports that would collide with
+// the fixed names of the injected kbagent container. ContainerPort.Name is
+// pod-wide, so moving from the legacy generic names to prefixed names is only a
+// complete uniqueness contract when those prefixed names are reserved.
+func ValidateKBAgentPortNames(containerGroups ...[]corev1.Container) error {
+	return validateKBAgentPortNames(nil, containerGroups...)
+}
+
+func validateKBAgentPortNames(ignoredContainerNames sets.Set[string], containerGroups ...[]corev1.Container) error {
+	reserved := sets.New(kbagent.DefaultHTTPPortName, kbagent.DefaultStreamingPortName)
+	for _, containers := range containerGroups {
+		for _, container := range containers {
+			// BuildSynthesizedComponent may be called again with a PodSpec that
+			// already contains the controller-injected kbagent container. The API
+			// validator still checks every user runtime container; only this
+			// synthesis-time defense skips the already-injected container itself.
+			if ignoredContainerNames.Has(container.Name) {
+				continue
+			}
+			for _, port := range container.Ports {
+				if reserved.Has(port.Name) {
+					return fmt.Errorf("container port name %q in container %q is reserved for the injected kbagent container",
+						port.Name, container.Name)
+				}
+			}
+		}
+	}
 	return nil
 }
 

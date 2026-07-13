@@ -35,6 +35,7 @@ import (
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/generics"
+	"github.com/apecloud/kubeblocks/pkg/kbagent"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 
@@ -98,6 +99,26 @@ var _ = Describe("ComponentDefinition Controller", func() {
 					g.Expect(cmpd.Finalizers).ShouldNot(BeEmpty())
 					g.Expect(cmpd.Status.ObservedGeneration).Should(Equal(cmpd.GetGeneration()))
 					g.Expect(cmpd.Status.Phase).Should(Equal(kbappsv1.AvailablePhase))
+				})).Should(Succeed())
+		})
+	})
+
+	Context("runtime", func() {
+		It("rejects port names reserved for the injected kbagent container", func() {
+			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
+				SetRuntime(&corev1.Container{
+					Name: "database",
+					Ports: []corev1.ContainerPort{{
+						Name:          kbagent.DefaultHTTPPortName,
+						ContainerPort: 9200,
+					}},
+				}).
+				Create(&testCtx).GetObject()
+
+			checkObjectStatus(componentDefObj, kbappsv1.UnavailablePhase)
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentDefObj),
+				func(g Gomega, cmpd *kbappsv1.ComponentDefinition) {
+					g.Expect(cmpd.Status.Message).Should(ContainSubstring("reserved for the injected kbagent container"))
 				})).Should(Succeed())
 		})
 	})

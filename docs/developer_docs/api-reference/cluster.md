@@ -1265,6 +1265,8 @@ They should be specified in the <code>cluster.spec.componentSpecs</code> (Cluste
 or modifying environment variable values.
 These instance-specific overrides can be specified in <code>cluster.spec.componentSpecs[*].instances</code>.</p>
 <p>This field is immutable and cannot be updated once set.</p>
+<p>The container port names &ldquo;kba-http&rdquo; and &ldquo;kba-streaming&rdquo; are reserved by KubeBlocks for the
+kbagent container that it injects when lifecycle or reconfiguration actions are defined.</p>
 </td>
 </tr>
 <tr>
@@ -5498,6 +5500,8 @@ They should be specified in the <code>cluster.spec.componentSpecs</code> (Cluste
 or modifying environment variable values.
 These instance-specific overrides can be specified in <code>cluster.spec.componentSpecs[*].instances</code>.</p>
 <p>This field is immutable and cannot be updated once set.</p>
+<p>The container port names &ldquo;kba-http&rdquo; and &ldquo;kba-streaming&rdquo; are reserved by KubeBlocks for the
+kbagent container that it injects when lifecycle or reconfiguration actions are defined.</p>
 </td>
 </tr>
 <tr>
@@ -6629,7 +6633,9 @@ The behavior varies based on the HostNetwork setting:</p>
 a) Mappings for all ports defined in <code>cmpd.spec.hostNetwork</code> are MANDATORY.
 b) Mappings for kbagent ports (&ldquo;kba-http&rdquo;, &ldquo;kba-streaming&rdquo;) are OPTIONAL.
 You can explicitly map them here, or leave them omitted to be allocated by the host-port manager.
-The legacy names &ldquo;http&rdquo; and &ldquo;streaming&rdquo; are still accepted as aliases for the kbagent ports.</li>
+The legacy names &ldquo;http&rdquo; and &ldquo;streaming&rdquo; are accepted as aliases only when no non-kbagent
+container declares the same port name. When a component owns that name, its mapping takes
+precedence; use the &ldquo;kba-*&rdquo; name to map kbagent explicitly, or omit it for automatic allocation.</li>
 </ul></li>
 <li><p>When HostNetwork is disabled:
 It allows optional mapping for container ports to host ports.</p>

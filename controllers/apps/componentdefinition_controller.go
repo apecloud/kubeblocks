@@ -259,7 +259,9 @@ func (r *ComponentDefinitionReconciler) validateLabels(cli client.Client, rctx i
 
 func (r *ComponentDefinitionReconciler) validateRuntime(cli client.Client, rctx intctrlutil.RequestCtx,
 	cmpd *appsv1.ComponentDefinition) error {
-	return nil
+	return component.ValidateKBAgentPortNames(
+		cmpd.Spec.Runtime.InitContainers,
+		cmpd.Spec.Runtime.Containers)
 }
 
 func (r *ComponentDefinitionReconciler) validateVars(cli client.Client, rctx intctrlutil.RequestCtx,

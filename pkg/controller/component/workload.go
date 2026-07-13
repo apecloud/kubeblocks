@@ -403,7 +403,11 @@ func GetDesiredPodNamesByITS(runningITS, protoITS *workloads.InstanceSet) ([]str
 	return GetCurrentPodNamesByITS(protoITS)
 }
 
-func generatePodNamesByComp(comp *kbappsv1.Component) ([]string, error) {
+// buildMinimalInstanceSetForPodNames copies only the Component fields consumed
+// by the pod name builder. The target may be any referenced Component, so keep
+// this path independent from ComponentDefinition synthesis and the full
+// workload builder.
+func buildMinimalInstanceSetForPodNames(comp *kbappsv1.Component) *workloads.InstanceSet {
 	instanceTemplates := func() []workloads.InstanceTemplate {
 		if len(comp.Spec.Instances) == 0 {
 			return nil
@@ -418,7 +422,7 @@ func generatePodNamesByComp(comp *kbappsv1.Component) ([]string, error) {
 		}
 		return templates
 	}
-	its := &workloads.InstanceSet{
+	return &workloads.InstanceSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:   comp.Namespace,
 			Name:        comp.Name,
@@ -432,5 +436,4 @@ func generatePodNamesByComp(comp *kbappsv1.Component) ([]string, error) {
 			OfflineInstances:    comp.Spec.OfflineInstances,
 		},
 	}
-	return GetCurrentPodNamesByITS(its)
 }

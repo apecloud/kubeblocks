@@ -406,7 +406,6 @@ func EnsureWorkerServiceAccount(reqCtx intctrlutil.RequestCtx, cli client.Client
 				sa.Annotations[k] = v
 			}
 		}
-		sa.ImagePullSecrets = intctrlutil.BuildImagePullSecrets()
 		if !reflect.DeepEqual(sa, saCopy) {
 			err := cli.Patch(ctx, sa, client.MergeFrom(saCopy), multicluster.InUniversalContext())
 			if err != nil {

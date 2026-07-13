@@ -180,6 +180,29 @@ var _ = Describe("OpsUtil functions", func() {
 			return pvs
 		}
 
+		It("fails rebuild OpsRequest when the instance does not exist", func() {
+			By("init operations resources")
+			opsRes := prepareOpsRes("", true)
+			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
+
+			By("fake component phase to Failed so the phase gate passes")
+			Expect(testapps.ChangeObjStatus(&testCtx, opsRes.Cluster, func() {
+				compStatus := opsRes.Cluster.Status.Components[defaultCompName]
+				compStatus.Phase = appsv1.FailedComponentPhase
+				opsRes.Cluster.Status.Components[defaultCompName] = compStatus
+			})).Should(Succeed())
+
+			By("create a rebuild ops naming an instance with no pod and no retained PVC")
+			missingName := fmt.Sprintf("%s-%s-99", clusterName, defaultCompName)
+			opsRes.OpsRequest = createRebuildInstanceOps("", true, missingName)
+			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsCreatingPhase
+
+			By("expect terminal failure instead of endless retry")
+			_, _ = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(opsv1alpha1.OpsFailedPhase))
+			Expect(opsRes.OpsRequest.Status.Conditions[0].Message).Should(ContainSubstring(fmt.Sprintf(`instance "%s" not found`, missingName)))
+		})
+
 		It("test rebuild instance when cluster/component are mismatched", func() {
 			By("init operations resources ")
 			opsRes := prepareOpsRes("", true)

@@ -30,6 +30,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -125,17 +126,24 @@ func switchoverPreCheck(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes
 		if err != nil {
 			return err
 		}
-		instance, err := runtime.GetInstance(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name, switchover.InstanceName)
+		instance, err := getSwitchoverPodBackedInstance(runtime, synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name, switchover.InstanceName)
 		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" not found`, switchover.InstanceName))
+			}
 			return err
 		}
 		roleName := instance.GetRole()
 		if roleName == "" {
-			return intctrlutil.NewFatalError(fmt.Sprintf("pod %s cannot perform switchover because it does not have a role label", switchover.InstanceName))
+			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeNeedWaiting, "waiting for instance %s role label", switchover.InstanceName)
 		}
 
 		if switchover.CandidateName != "" {
-			if _, err := runtime.GetInstance(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name, switchover.CandidateName); err != nil {
+			_, err := getSwitchoverPodBackedInstance(runtime, synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name, switchover.CandidateName)
+			if err != nil {
+				if apierrors.IsNotFound(err) {
+					return intctrlutil.NewFatalError(fmt.Sprintf(`candidate instance "%s" not found`, switchover.CandidateName))
+				}
 				return err
 			}
 		}
@@ -232,13 +240,19 @@ func handleSwitchover(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *
 	case opsv1alpha1.ProcessingProgressStatus:
 		targetRole := progressDetail.Group
 		if switchover.CandidateName != "" {
-			candidateInstance, err := runtime.GetInstance(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name, switchover.CandidateName)
-			if err != nil {
+			candidateInstance, err := getSwitchoverPodBackedInstance(runtime, synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name, switchover.CandidateName)
+			switch {
+			case err != nil && !apierrors.IsNotFound(err):
 				return err
-			}
-			if targetRole == candidateInstance.GetRole() {
+			case err != nil:
+				progressDetail.Message = fmt.Sprintf(`component %s candidate instance "%s" not found`, compName, switchover.CandidateName)
+				progressDetail.Status = opsv1alpha1.FailedProgressStatus
+			case targetRole == candidateInstance.GetRole():
 				progressDetail.Message = "do switchover succeed"
 				progressDetail.Status = opsv1alpha1.SucceedProgressStatus
+			default:
+				progressDetail.Message = fmt.Sprintf("component %s is waiting for candidate pod %s role change, current role %q, expected role %q",
+					compName, switchover.CandidateName, candidateInstance.GetRole(), targetRole)
 			}
 		} else {
 			progressDetail.Message = "do switchover succeed"
@@ -247,6 +261,17 @@ func handleSwitchover(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *
 	}
 	handleProgressDetail(reqCtx, opsRequest, progressDetail, compName, completedCount, failedCount)
 	return nil
+}
+
+func getSwitchoverPodBackedInstance(runtime OpsRuntime, namespace, clusterName, compName, instanceName string) (Instance, error) {
+	instance, err := runtime.GetInstance(namespace, clusterName, compName, instanceName)
+	if err != nil {
+		return nil, err
+	}
+	if !instance.HasPod() {
+		return nil, apierrors.NewNotFound(schema.GroupResource{Resource: "pods"}, instanceName)
+	}
+	return instance, nil
 }
 
 // setComponentSwitchoverProgressDetails sets component switchover progress details.
@@ -348,6 +373,9 @@ func buildSynthesizedComp(ctx context.Context, cli client.Client, opsRes *OpsRes
 func getShardingComponentObjectNameByInstance(ctx context.Context, cli client.Client, cluster *appsv1.Cluster, shardingName, instanceName string) (string, error) {
 	pod := &corev1.Pod{}
 	if err := cli.Get(ctx, client.ObjectKey{Namespace: cluster.Namespace, Name: instanceName}, pod); err != nil {
+		if apierrors.IsNotFound(err) {
+			return "", intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" not found`, instanceName))
+		}
 		return "", err
 	}
 	if pod.Labels[constant.AppInstanceLabelKey] != cluster.Name {

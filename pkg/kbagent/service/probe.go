@@ -21,7 +21,6 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net"
 	"os"
@@ -405,7 +404,7 @@ func (r *probeRunner) launchReportLoop(probe *proto.Probe) {
 				return true
 			}
 
-			msg, err := json.Marshal(event)
+			msg, err := marshalEventWithSizeLimit(&event, &event.Message, &event.Output)
 			if err != nil {
 				log(err, "failed to marshal the probe event", retry, periodically)
 				return true

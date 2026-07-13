@@ -233,6 +233,10 @@ func (hs horizontalScalingOpsHandler) createRestore(reqCtx intctrlutil.RequestCt
 	if err != nil {
 		return err
 	}
+	if restore == nil {
+		return intctrlutil.NewFatalError(fmt.Sprintf("scale-out from backup %s/%s is not supported because backup method %q has no target volumes matching component %q",
+			backupObj.Namespace, backupObj.Name, backupObj.Status.BackupMethod.Name, synthesizedComponent.Name))
+	}
 	scheme, _ := opsv1alpha1.SchemeBuilder.Build()
 	if err := intctrlutil.SetOwnership(opsRes.OpsRequest, restore, scheme, ""); err != nil {
 		return err

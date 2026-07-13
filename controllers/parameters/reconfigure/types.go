@@ -81,6 +81,7 @@ type Context struct {
 
 	ConfigTemplate appsv1.ComponentFileTemplate
 	ConfigHash     *string // the hash of the new configuration content
+	ConfigData     map[string]string
 
 	Cluster          *appsv1.Cluster
 	ClusterComponent *appsv1.ClusterComponentSpec

@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
@@ -284,5 +285,55 @@ var _ = Describe("probe", func() {
 		})
 
 		// TODO: more test cases
+	})
+
+	Context("marshal event with size limit", func() {
+		It("keeps small events unchanged", func() {
+			event := proto.ProbeEvent{
+				Probe:   "roleProbe",
+				Code:    0,
+				Output:  []byte("leader"),
+				Message: "ok",
+			}
+			msg, err := marshalEventWithSizeLimit(&event, &event.Message, &event.Output)
+			Expect(err).Should(BeNil())
+			plain, err := json.Marshal(event)
+			Expect(err).Should(BeNil())
+			Expect(msg).Should(Equal(plain))
+		})
+
+		It("truncates a long message but keeps its head and valid JSON", func() {
+			longStderr := "DB manager initialize failed: fatal error config file: open /tools/config/dbctl/components/: no such file or directory\n" +
+				strings.Repeat("usage: dbctl [command] [flags] help text filler\n", 200)
+			event := proto.ProbeEvent{
+				Probe:   "roleProbe",
+				Code:    255,
+				Message: longStderr,
+			}
+			msg, err := marshalEventWithSizeLimit(&event, &event.Message, &event.Output)
+			Expect(err).Should(BeNil())
+			Expect(len(msg)).Should(BeNumerically("<=", maxEventMessageLength))
+
+			var decoded proto.ProbeEvent
+			Expect(json.Unmarshal(msg, &decoded)).Should(Succeed())
+			Expect(decoded.Code).Should(Equal(int32(255)))
+			Expect(decoded.Message).Should(HavePrefix("DB manager initialize failed"))
+			Expect(decoded.Message).Should(HaveSuffix("...(truncated)"))
+		})
+
+		It("shrinks the output when the message alone cannot absorb the overflow", func() {
+			event := proto.ProbeEvent{
+				Probe:  "roleProbe",
+				Code:   255,
+				Output: []byte(strings.Repeat("x", 8192)),
+			}
+			msg, err := marshalEventWithSizeLimit(&event, &event.Message, &event.Output)
+			Expect(err).Should(BeNil())
+			Expect(len(msg)).Should(BeNumerically("<=", maxEventMessageLength))
+
+			var decoded proto.ProbeEvent
+			Expect(json.Unmarshal(msg, &decoded)).Should(Succeed())
+			Expect(decoded.Probe).Should(Equal("roleProbe"))
+		})
 	})
 })

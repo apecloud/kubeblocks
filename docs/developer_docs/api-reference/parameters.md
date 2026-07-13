@@ -804,6 +804,9 @@ Modifications to these parameters trigger a configuration reload without requiri
 When parameter updates are applied through a ComponentDefinition config template reconfigure ExecAction,
 the controller invokes the action once for each updated
 parameter and appends the parameter name and value as the last arguments.
+If the config volume mount path can be resolved from the workload pod template,
+KubeBlocks also guards the action with the target rendered file checksum.
+When the mount path cannot be resolved, the action is invoked without the checksum guard.
 HTTP and gRPC reconfigure actions are not currently supported for parameter updates.</p>
 </td>
 </tr>
@@ -3048,6 +3051,9 @@ Modifications to these parameters trigger a configuration reload without requiri
 When parameter updates are applied through a ComponentDefinition config template reconfigure ExecAction,
 the controller invokes the action once for each updated
 parameter and appends the parameter name and value as the last arguments.
+If the config volume mount path can be resolved from the workload pod template,
+KubeBlocks also guards the action with the target rendered file checksum.
+When the mount path cannot be resolved, the action is invoked without the checksum guard.
 HTTP and gRPC reconfigure actions are not currently supported for parameter updates.</p>
 </td>
 </tr>

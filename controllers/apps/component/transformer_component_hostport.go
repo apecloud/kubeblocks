@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
+	"k8s.io/apimachinery/pkg/util/sets"
+
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 )
 
@@ -46,8 +48,30 @@ func (t *componentHostPortTransformer) Transform(ctx graph.TransformContext, dag
 		ports[hostPort.Name] = hostPort.Port
 	}
 	if len(ports) > 0 {
+		// Per the ComponentNetwork API contract, non-host-network hostPort
+		// mappings are restricted to ports defined in
+		// cmpd.spec.runtime.containers.ports; ports of injected containers or
+		// ports injected into runtime containers after synthesis are not
+		// eligible, regardless of their names.
+		runtimePorts := map[string]sets.Set[string]{}
+		for _, c := range transCtx.CompDef.Spec.Runtime.Containers {
+			portNames := sets.New[string]()
+			for _, p := range c.Ports {
+				if p.Name != "" {
+					portNames.Insert(p.Name)
+				}
+			}
+			runtimePorts[c.Name] = portNames
+		}
 		for i, c := range synthesizedComp.PodSpec.Containers {
+			definedPorts, ok := runtimePorts[c.Name]
+			if !ok {
+				continue
+			}
 			for j, p := range c.Ports {
+				if !definedPorts.Has(p.Name) {
+					continue
+				}
 				if hostPort, ok := ports[p.Name]; ok {
 					synthesizedComp.PodSpec.Containers[i].Ports[j].HostPort = hostPort
 				}

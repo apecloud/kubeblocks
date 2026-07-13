@@ -39,6 +39,7 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -884,6 +885,125 @@ func TestDecidePVCRestoreTreatsNilTargetVolumesAsProvisionOnly(t *testing.T) {
 	require.False(t, decision.skipPostReady)
 }
 
+func TestDecidePVCRestoreNoTargetVolumesTargetComponent(t *testing.T) {
+	reconciler := &VolumePopulatorReconciler{}
+	backup := newBackupForRestoreDecision(nil, nil)
+	backup.Status.BackupMethod.TargetVolumes = nil
+	backup.Status.Target.PodSelector = &dpv1alpha1.PodSelector{
+		LabelSelector: &metav1.LabelSelector{
+			MatchLabels: map[string]string{
+				constant.AppInstanceLabelKey:    "source-cluster",
+				constant.KBAppComponentLabelKey: "tidb",
+				constant.RoleLabelKey:           "leader",
+			},
+		},
+		Strategy: dpv1alpha1.PodSelectionStrategyAny,
+	}
+
+	// PVC from the backup target component: postReady must not be skipped
+	pvc := newPVCForRestoreDecision("data", "tidb", "")
+	decision, err := reconciler.decidePVCRestore(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, backup, nil)
+	require.NoError(t, err)
+	require.Equal(t, pvcRestoreModeProvisionOnly, decision.mode)
+	require.False(t, decision.skipPostReady,
+		"target component PVC must not skip postReady when no volume-level restore exists")
+	require.NotNil(t, decision.sourceTarget,
+		"sourceTarget must be recovered for the target component")
+
+	// PVC from a different component: postReady must be skipped
+	pvc = newPVCForRestoreDecision("data", "pd", "")
+	decision, err = reconciler.decidePVCRestore(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, backup, nil)
+	require.NoError(t, err)
+	require.Equal(t, pvcRestoreModeProvisionOnly, decision.mode)
+	require.True(t, decision.skipPostReady,
+		"non-target component PVC must skip postReady to avoid running restore on wrong component")
+	require.Nil(t, decision.sourceTarget)
+}
+
+func TestDecidePVCRestoreNoTargetVolumesTargetComponentMatchExpression(t *testing.T) {
+	reconciler := &VolumePopulatorReconciler{}
+	backup := newBackupForRestoreDecision(nil, nil)
+	backup.Status.BackupMethod.TargetVolumes = nil
+	backup.Status.Target.PodSelector = &dpv1alpha1.PodSelector{
+		LabelSelector: &metav1.LabelSelector{
+			MatchLabels: map[string]string{
+				constant.AppInstanceLabelKey: "source-cluster",
+				constant.RoleLabelKey:        "leader",
+			},
+			MatchExpressions: []metav1.LabelSelectorRequirement{{
+				Key:      constant.KBAppComponentLabelKey,
+				Operator: metav1.LabelSelectorOpIn,
+				Values:   []string{"tidb"},
+			}},
+		},
+		Strategy: dpv1alpha1.PodSelectionStrategyAny,
+	}
+
+	pvc := newPVCForRestoreDecision("data", "tidb", "")
+	decision, err := reconciler.decidePVCRestore(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, backup, nil)
+	require.NoError(t, err)
+	require.Equal(t, pvcRestoreModeProvisionOnly, decision.mode)
+	require.False(t, decision.skipPostReady,
+		"target component selected by MatchExpressions must not skip postReady")
+	require.NotNil(t, decision.sourceTarget)
+
+	pvc = newPVCForRestoreDecision("data", "pd", "")
+	decision, err = reconciler.decidePVCRestore(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, backup, nil)
+	require.NoError(t, err)
+	require.Equal(t, pvcRestoreModeProvisionOnly, decision.mode)
+	require.True(t, decision.skipPostReady,
+		"non-target component must still skip postReady when component expression does not match")
+	require.Nil(t, decision.sourceTarget)
+}
+
+func TestDecidePVCRestoreNoTargetVolumesMultiComponentTargets(t *testing.T) {
+	reconciler := &VolumePopulatorReconciler{}
+	backup := newBackupForRestoreDecision(nil, []string{"etcd"})
+	backup.Status.BackupMethod.TargetVolumes = nil
+	backup.Status.Targets[0].PodSelector = &dpv1alpha1.PodSelector{
+		LabelSelector: &metav1.LabelSelector{
+			MatchLabels: map[string]string{
+				constant.AppInstanceLabelKey:    "source-cluster",
+				constant.KBAppComponentLabelKey: "etcd",
+				constant.RoleLabelKey:           "leader",
+			},
+		},
+		Strategy: dpv1alpha1.PodSelectionStrategyAny,
+	}
+
+	// Etcd PVC matches target component — postReady enabled
+	pvc := newPVCForRestoreDecision("data", "etcd", "")
+	decision, err := reconciler.decidePVCRestore(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, backup, nil)
+	require.NoError(t, err)
+	require.Equal(t, pvcRestoreModeProvisionOnly, decision.mode)
+	require.False(t, decision.skipPostReady)
+	require.NotNil(t, decision.sourceTarget)
+	require.Equal(t, "etcd", decision.sourceTarget.Name)
+}
+
+func TestDecidePVCRestoreNoTargetVolumesPodOnlySelectorUsesTarget(t *testing.T) {
+	reconciler := &VolumePopulatorReconciler{}
+	backup := newBackupForRestoreDecision(nil, nil)
+	backup.Status.BackupMethod.TargetVolumes = nil
+	backup.Status.Target.PodSelector = &dpv1alpha1.PodSelector{
+		LabelSelector: &metav1.LabelSelector{
+			MatchLabels: map[string]string{
+				constant.AppInstanceLabelKey: "source-cluster",
+				constant.RoleLabelKey:        "leader",
+			},
+		},
+		Strategy: dpv1alpha1.PodSelectionStrategyAny,
+	}
+
+	pvc := newPVCForRestoreDecision("data", "mysql", "")
+	decision, err := reconciler.decidePVCRestore(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, backup, nil)
+	require.NoError(t, err)
+	require.Equal(t, pvcRestoreModeProvisionOnly, decision.mode)
+	require.False(t, decision.skipPostReady,
+		"pod-only selectors have no effective PVC selector, so the target applies to the PVC")
+	require.NotNil(t, decision.sourceTarget)
+}
+
 func TestMatchToPopulateSupportsRestoreAndBackupDataSources(t *testing.T) {
 	apiGroup := dptypes.DataprotectionAPIGroup
 	reconciler := &VolumePopulatorReconciler{}
@@ -1352,6 +1472,166 @@ func TestDispatchUnboundPVCFailsWhenNoRestoreActionsExist(t *testing.T) {
 	require.Error(t, err)
 	require.True(t, intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal),
 		"expected fatal error when neither prepareData nor postReady exists, got: %v", err)
+}
+
+func TestPopulateDoesNotPollWhilePrepareDataJobIsStillActive(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, batchv1.AddToScheme(scheme))
+	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
+	apiGroup := dptypes.DataprotectionAPIGroup
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      "data-etcd-restore-0",
+			UID:       "data-etcd-restore-0-uid",
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+			Resources: corev1.VolumeResourceRequirements{
+				Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("1Gi")},
+			},
+			DataSourceRef: &corev1.TypedObjectReference{
+				APIGroup: &apiGroup,
+				Kind:     dptypes.BackupKind,
+				Name:     "backup",
+			},
+		},
+	}
+	restore := &dpv1alpha1.Restore{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      "restore",
+		},
+		Spec: dpv1alpha1.RestoreSpec{
+			Backup: dpv1alpha1.BackupRef{Name: "backup", Namespace: "default"},
+			PrepareDataConfig: &dpv1alpha1.PrepareDataConfig{
+				DataSourceRef: &dpv1alpha1.VolumeConfig{
+					VolumeSource: "data",
+					MountPath:    "/var/run/etcd/backup",
+				},
+			},
+		},
+	}
+	cli := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithStatusSubresource(pvc, restore).
+		WithObjects(pvc, restore).
+		Build()
+	reconciler := &VolumePopulatorReconciler{
+		Client:   cli,
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(10),
+	}
+	backup := newBackupForRestoreDecision([]string{"data"}, nil)
+	backup.Status.Target.PodSelector = &dpv1alpha1.PodSelector{Strategy: dpv1alpha1.PodSelectionStrategyAny}
+	actionSet := &dpv1alpha1.ActionSet{
+		Spec: dpv1alpha1.ActionSetSpec{
+			Restore: &dpv1alpha1.RestoreActionSpec{
+				PrepareData: &dpv1alpha1.JobActionSpec{
+					BaseJobActionSpec: dpv1alpha1.BaseJobActionSpec{
+						Image:   "restore-image",
+						Command: []string{"sh", "-c", "restore"},
+					},
+				},
+			},
+		},
+	}
+	restoreMgr := dprestore.NewRestoreManager(restore, record.NewFakeRecorder(10), scheme, reconciler.Client)
+	restoreMgr.PrepareDataBackupSets = []dprestore.BackupActionSet{{
+		Backup:    backup,
+		ActionSet: actionSet,
+	}}
+	restoreCtx := &pvcRestoreContext{
+		mode:       pvcRestoreModeRestoreData,
+		restoreMgr: restoreMgr,
+	}
+
+	err := reconciler.Populate(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, restoreCtx)
+
+	require.NoError(t, err)
+	jobs := &batchv1.JobList{}
+	require.NoError(t, reconciler.Client.List(context.Background(), jobs))
+	require.Len(t, jobs.Items, 1)
+	require.Empty(t, jobs.Items[0].Status.Conditions)
+}
+
+func TestParsePopulatePodMapsJobPodToTargetPVC(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, batchv1.AddToScheme(scheme))
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      "data-etcd-restore-0",
+			UID:       "data-etcd-restore-0-uid",
+		},
+	}
+	job := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      "populate-job",
+			UID:       "populate-job-uid",
+			Labels: map[string]string{
+				dprestore.DataProtectionRestoreLabelKey:     "restore",
+				dprestore.DataProtectionPopulatePVCLabelKey: "populate-pvc",
+			},
+			OwnerReferences: []metav1.OwnerReference{{
+				APIVersion:         "v1",
+				Kind:               constant.PersistentVolumeClaimKind,
+				Name:               pvc.Name,
+				UID:                pvc.UID,
+				Controller:         ptr.To(true),
+				BlockOwnerDeletion: ptr.To(true),
+			}},
+		},
+	}
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      "populate-job-pod",
+			Labels: map[string]string{
+				dprestore.DataProtectionRestoreLabelKey:     "restore",
+				dprestore.DataProtectionPopulatePVCLabelKey: "populate-pvc",
+			},
+			OwnerReferences: []metav1.OwnerReference{{
+				APIVersion:         "batch/v1",
+				Kind:               constant.JobKind,
+				Name:               job.Name,
+				UID:                job.UID,
+				Controller:         ptr.To(true),
+				BlockOwnerDeletion: ptr.To(true),
+			}},
+		},
+	}
+	reconciler := &VolumePopulatorReconciler{
+		Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(pvc, job).Build(),
+		Scheme: scheme,
+	}
+
+	requests := reconciler.parsePopulatePod(context.Background(), pod)
+
+	require.Equal(t, []reconcile.Request{{
+		NamespacedName: types.NamespacedName{Namespace: "default", Name: pvc.Name},
+	}}, requests)
+}
+
+func TestParsePopulatePodIgnoresUnrelatedPods(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, batchv1.AddToScheme(scheme))
+	reconciler := &VolumePopulatorReconciler{
+		Client: fake.NewClientBuilder().WithScheme(scheme).Build(),
+		Scheme: scheme,
+	}
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      "unrelated",
+		},
+	}
+
+	require.Empty(t, reconciler.parsePopulatePod(context.Background(), pod))
 }
 
 func TestBuildPostReadyRestoreSelectsHighestPriorityRole(t *testing.T) {

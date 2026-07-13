@@ -118,6 +118,10 @@ func (r *RestoreManager) DoPrepareData(comp *component.SynthesizedComponent,
 	return r.createRestoreAndWait(compObj, restores...)
 }
 
+// BuildPrepareDataRestore returns (nil, nil) when the backup method has no
+// target volumes matching the component's volume claim templates, i.e. there
+// is nothing to prepareData-restore for this component. Callers must handle
+// the nil Restore instead of using it.
 func (r *RestoreManager) BuildPrepareDataRestore(comp *component.SynthesizedComponent, backupObj *dpv1alpha1.Backup, template *appsv1.InstanceTemplate) (*dpv1alpha1.Restore, error) {
 	templateName := ""
 	startingIndex := r.startingIndex

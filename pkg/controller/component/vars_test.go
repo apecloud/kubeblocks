@@ -1938,6 +1938,162 @@ var _ = Describe("vars", func() {
 					intctrlutil.PodFQDN(synthesizedComp.Namespace, synthesizedComp.FullCompName, podName("leader")))
 				checkEnvVarWithValue(envVars, "serviceVersion", "v3.6.5")
 			})
+
+			It("uses desired pods for current component when the running InstanceSet is stale", func() {
+				synthesizedComp.Replicas = 5
+				vars := []appsv1.EnvVar{
+					{
+						Name: "podFQDNs",
+						ValueFrom: &appsv1.VarSource{
+							ComponentVarRef: &appsv1.ComponentVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
+									CompDef:  synthesizedComp.CompDefName,
+									Optional: required(),
+								},
+								ComponentVars: appsv1.ComponentVars{
+									PodFQDNs: &appsv1.VarRequired,
+								},
+							},
+						},
+					},
+				}
+				reader := &mockReader{
+					cli: testCtx.Cli,
+					objs: []client.Object{
+						&appsv1.Component{
+							ObjectMeta: metav1.ObjectMeta{
+								Namespace: testCtx.DefaultNamespace,
+								Name:      constant.GenerateClusterComponentName(synthesizedComp.ClusterName, synthesizedComp.Name),
+							},
+							Spec: appsv1.ComponentSpec{
+								CompDef:  synthesizedComp.CompDefName,
+								Replicas: 5,
+							},
+						},
+						&workloads.InstanceSet{
+							ObjectMeta: metav1.ObjectMeta{
+								Namespace: testCtx.DefaultNamespace,
+								Name:      constant.GenerateWorkloadNamePattern(synthesizedComp.ClusterName, synthesizedComp.Name),
+							},
+							Spec: workloads.InstanceSetSpec{
+								Replicas: ptr.To(int32(3)),
+							},
+						},
+					},
+				}
+
+				_, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
+
+				Expect(err).Should(Succeed())
+				expected := make([]string, 0, 5)
+				for i := 0; i < 5; i++ {
+					podName := fmt.Sprintf("%s-%s-%d", synthesizedComp.ClusterName, synthesizedComp.Name, i)
+					expected = append(expected, intctrlutil.PodFQDN(synthesizedComp.Namespace, synthesizedComp.FullCompName, podName))
+				}
+				checkEnvVarWithValue(envVars, "podFQDNs", strings.Join(expected, ","))
+			})
+
+			It("uses desired pods for current component before the InstanceSet exists", func() {
+				synthesizedComp.Replicas = 5
+				vars := []appsv1.EnvVar{
+					{
+						Name: "podNames",
+						ValueFrom: &appsv1.VarSource{
+							ComponentVarRef: &appsv1.ComponentVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
+									CompDef:  synthesizedComp.CompDefName,
+									Optional: required(),
+								},
+								ComponentVars: appsv1.ComponentVars{
+									PodNames: &appsv1.VarRequired,
+								},
+							},
+						},
+					},
+				}
+				reader := &mockReader{
+					cli: testCtx.Cli,
+					objs: []client.Object{
+						&appsv1.Component{
+							ObjectMeta: metav1.ObjectMeta{
+								Namespace: testCtx.DefaultNamespace,
+								Name:      constant.GenerateClusterComponentName(synthesizedComp.ClusterName, synthesizedComp.Name),
+							},
+							Spec: appsv1.ComponentSpec{
+								CompDef:  synthesizedComp.CompDefName,
+								Replicas: 5,
+							},
+						},
+					},
+				}
+
+				_, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
+
+				Expect(err).Should(Succeed())
+				expected := make([]string, 0, 5)
+				for i := 0; i < 5; i++ {
+					expected = append(expected, fmt.Sprintf("%s-%s-%d", synthesizedComp.ClusterName, synthesizedComp.Name, i))
+				}
+				checkEnvVarWithValue(envVars, "podNames", strings.Join(expected, ","))
+			})
+
+			It("uses desired pods for another component when the running InstanceSet is stale", func() {
+				synthesizedComp.Replicas = 5
+				const anotherCompName = "another"
+				const anotherCompDefName = "anotherDef"
+				synthesizedComp.Comp2CompDefs = map[string]string{
+					anotherCompName: anotherCompDefName,
+				}
+				vars := []appsv1.EnvVar{
+					{
+						Name: "podNames",
+						ValueFrom: &appsv1.VarSource{
+							ComponentVarRef: &appsv1.ComponentVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
+									CompDef:  anotherCompDefName,
+									Optional: required(),
+								},
+								ComponentVars: appsv1.ComponentVars{
+									PodNames: &appsv1.VarRequired,
+								},
+							},
+						},
+					},
+				}
+				reader := &mockReader{
+					cli: testCtx.Cli,
+					objs: []client.Object{
+						&appsv1.Component{
+							ObjectMeta: metav1.ObjectMeta{
+								Namespace: testCtx.DefaultNamespace,
+								Name:      constant.GenerateClusterComponentName(synthesizedComp.ClusterName, anotherCompName),
+							},
+							Spec: appsv1.ComponentSpec{
+								CompDef:  anotherCompDefName,
+								Replicas: 5,
+							},
+						},
+						&workloads.InstanceSet{
+							ObjectMeta: metav1.ObjectMeta{
+								Namespace: testCtx.DefaultNamespace,
+								Name:      constant.GenerateWorkloadNamePattern(synthesizedComp.ClusterName, anotherCompName),
+							},
+							Spec: workloads.InstanceSetSpec{
+								Replicas: ptr.To(int32(3)),
+							},
+						},
+					},
+				}
+
+				_, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
+
+				Expect(err).Should(Succeed())
+				expected := make([]string, 0, 5)
+				for i := 0; i < 5; i++ {
+					expected = append(expected, fmt.Sprintf("%s-%s-%d", synthesizedComp.ClusterName, anotherCompName, i))
+				}
+				checkEnvVarWithValue(envVars, "podNames", strings.Join(expected, ","))
+			})
 		})
 
 		Context("cluster vars", func() {

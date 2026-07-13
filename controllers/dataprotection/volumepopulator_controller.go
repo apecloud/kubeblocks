@@ -42,7 +42,9 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -137,7 +139,44 @@ func (r *VolumePopulatorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return intctrlutil.NewControllerManagedBy(mgr).
 		For(&corev1.PersistentVolumeClaim{}).
 		Owns(&batchv1.Job{}).
+		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.parsePopulatePod)).
 		Complete(r)
+}
+
+func (r *VolumePopulatorReconciler) parsePopulatePod(ctx context.Context, object client.Object) []reconcile.Request {
+	labels := object.GetLabels()
+	if labels[dprestore.DataProtectionRestoreLabelKey] == "" ||
+		labels[dprestore.DataProtectionPopulatePVCLabelKey] == "" {
+		return nil
+	}
+	owner := metav1.GetControllerOf(object)
+	if owner == nil || owner.Kind != constant.JobKind {
+		return nil
+	}
+	job := &batchv1.Job{}
+	if err := r.Client.Get(ctx, types.NamespacedName{Namespace: object.GetNamespace(), Name: owner.Name}, job); err != nil {
+		if !apierrors.IsNotFound(err) {
+			log.FromContext(ctx).V(1).Info("failed to map volume populate pod to job",
+				"pod", client.ObjectKeyFromObject(object),
+				"job", types.NamespacedName{Namespace: object.GetNamespace(), Name: owner.Name},
+				"error", err)
+		}
+		return nil
+	}
+	if job.Labels[dprestore.DataProtectionRestoreLabelKey] == "" ||
+		job.Labels[dprestore.DataProtectionPopulatePVCLabelKey] == "" {
+		return nil
+	}
+	pvcOwner := metav1.GetControllerOf(job)
+	if pvcOwner == nil || pvcOwner.Kind != constant.PersistentVolumeClaimKind {
+		return nil
+	}
+	return []reconcile.Request{{
+		NamespacedName: types.NamespacedName{
+			Namespace: job.Namespace,
+			Name:      pvcOwner.Name,
+		},
+	}}
 }
 
 func (r *VolumePopulatorReconciler) MatchToPopulate(pvc *corev1.PersistentVolumeClaim) (bool, error) {

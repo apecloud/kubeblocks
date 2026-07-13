@@ -228,6 +228,21 @@ func (r *opsRuntime) doSwitchover(ctx context.Context, cli client.Reader, synthe
 			break
 		}
 	}
+	if pod.Name == "" {
+		return intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" not found`, switchover.InstanceName))
+	}
+	if switchover.CandidateName != "" {
+		candidate, err := r.GetInstance(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name, switchover.CandidateName)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return intctrlutil.NewFatalError(fmt.Sprintf(`candidate instance "%s" not found`, switchover.CandidateName))
+			}
+			return err
+		}
+		if !candidate.HasPod() {
+			return intctrlutil.NewFatalError(fmt.Sprintf(`candidate instance "%s" not found`, switchover.CandidateName))
+		}
+	}
 
 	lfa, err := lifecycle.New(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name,
 		synthesizedComp.LifecycleActions.ComponentLifecycleActions, synthesizedComp.TemplateVars, pod, pods)
@@ -375,6 +390,10 @@ func (i *defaultInstance) GetCreationTimestamp() metav1.Time {
 		return metav1.Time{}
 	}
 	return i.pod.CreationTimestamp
+}
+
+func (i *defaultInstance) HasPod() bool {
+	return i.pod != nil
 }
 
 func (i *defaultInstance) IsDeleting() bool {

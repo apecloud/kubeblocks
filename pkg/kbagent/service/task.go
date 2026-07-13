@@ -21,7 +21,6 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"slices"
@@ -154,7 +153,7 @@ func (s *taskService) wait(ch chan error) error {
 }
 
 func (s *taskService) notify(task proto.Task, event proto.TaskEvent, sync bool) error {
-	msg, err := json.Marshal(&event)
+	msg, err := marshalEventWithSizeLimit(&event, &event.Message, &event.Output)
 	if err == nil {
 		return util.SendEventWithMessage(&s.logger, "task", string(msg), sync)
 	} else {

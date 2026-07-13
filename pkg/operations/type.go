@@ -145,6 +145,7 @@ type Instance interface {
 	GetName() string
 	GetComponentName() string
 	GetCreationTimestamp() metav1.Time
+	HasPod() bool
 	IsDeleting() bool
 	GetRole() string
 	IsAvailable(minReadySeconds int32, roleAware bool) bool

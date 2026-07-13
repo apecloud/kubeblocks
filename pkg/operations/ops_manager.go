@@ -98,7 +98,7 @@ func (opsMgr *OpsManager) Do(reqCtx intctrlutil.RequestCtx, cli client.Client, o
 			return &ctrl.Result{}, patchFatalFailErrorCondition(reqCtx.Ctx, cli, opsRes, err)
 		}
 		if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeNeedWaiting) {
-			return intctrlutil.ResultToP(intctrlutil.Reconciled())
+			return intctrlutil.ResultToP(intctrlutil.RequeueAfter(time.Second, reqCtx.Log, err.Error()))
 		}
 		return nil, err
 	}

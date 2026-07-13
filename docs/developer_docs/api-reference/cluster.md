@@ -6147,6 +6147,8 @@ External-managed systems may define different behavior for this action entry.</p
 <li>KB_CONFIG_FILES_REMOVED: file1,file2&hellip;</li>
 <li>KB_CONFIG_FILES_UPDATED: file1:checksum1,file2:checksum2&hellip;</li>
 </ul>
+<p>Before invoking the action, KubeBlocks verifies these file changes.
+For updated files, the local mounted file content must match the target checksum.</p>
 <p>Note: This field is immutable once it has been set.</p>
 </td>
 </tr>

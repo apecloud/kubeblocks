@@ -240,7 +240,11 @@ func (r *BackupReconciler) deleteBackupFiles(reqCtx intctrlutil.RequestCtx, back
 			failureReason := fmt.Sprintf(
 				"backup namespace %q no longer exists, so worker resources cannot be created to delete backup files; the finalizer is retained to avoid silently orphaning backup files; change spec.deletionPolicy to Retain to explicitly keep the files and finish deleting the Backup: %v",
 				backup.Namespace, err)
-			return r.recordDeleteBackupFilesFailure(reqCtx, backup, failureReason)
+			if err := r.recordDeleteBackupFilesFailure(reqCtx, backup, failureReason); err != nil {
+				return err
+			}
+			return intctrlutil.NewRequeueError(reconcileInterval,
+				"waiting for the backup namespace to be restored before deleting backup files")
 		}
 		// wait for the deletion job completed
 		return err
@@ -323,6 +327,10 @@ func (r *BackupReconciler) handleDeletingPhase(reqCtx intctrlutil.RequestCtx, ba
 	}
 
 	if err := r.deleteBackupFiles(reqCtx, backup); err != nil {
+		var requeueErr intctrlutil.RequeueError
+		if errors.As(err, &requeueErr) {
+			return intctrlutil.RequeueAfter(requeueErr.RequeueAfter(), reqCtx.Log, requeueErr.Reason())
+		}
 		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
 	}
 	return intctrlutil.Reconciled()

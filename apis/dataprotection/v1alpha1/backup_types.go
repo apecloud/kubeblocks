@@ -41,12 +41,9 @@ type BackupSpec struct {
 	// should be deleted when the backup custom resource(CR) is deleted.
 	// Supported values are `Retain` and `Delete`.
 	//
-	// - `Retain` means that the backup content and its physical snapshot on backup repository are kept.
+	// - `Retain` means that the backup content and its physical snapshot on backup repository are kept
+	//   while deletion of the Backup CR is allowed to finish.
 	// - `Delete` means that the backup content and its physical snapshot on backup repository are deleted.
-	//
-	// TODO: for the retain policy, we should support in the future for only deleting
-	//   the backup CR but retaining the backup contents in backup repository.
-	//   The current implementation only prevent accidental deletion of backup data.
 	//
 	// +kubebuilder:validation:Enum=Delete;Retain
 	// +kubebuilder:validation:Required

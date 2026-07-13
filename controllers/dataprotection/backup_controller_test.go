@@ -1814,6 +1814,8 @@ func TestDeleteBackupFilesMissingNamespaceHoldsFinalizerAndSurfacesFailure(t *te
 	scheme := runtime.NewScheme()
 	require.NoError(t, corev1.AddToScheme(scheme))
 	require.NoError(t, batchv1.AddToScheme(scheme))
+	require.NoError(t, appsv1.AddToScheme(scheme))
+	require.NoError(t, vsv1.AddToScheme(scheme))
 	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
 	now := metav1.Now()
 	backup := &dpv1alpha1.Backup{
@@ -1844,9 +1846,11 @@ func TestDeleteBackupFilesMissingNamespaceHoldsFinalizerAndSurfacesFailure(t *te
 		Recorder: record.NewFakeRecorder(10),
 	}
 
-	err := reconciler.deleteBackupFiles(intctrlutil.RequestCtx{Ctx: context.Background()}, backup)
+	result, err := reconciler.handleDeletingPhase(intctrlutil.RequestCtx{Ctx: context.Background()}, backup)
 
 	require.NoError(t, err)
+	require.Equal(t, reconcileInterval, result.RequeueAfter,
+		"a restored namespace has no watch edge to a deleting Backup, so the controller must retry")
 	current := &dpv1alpha1.Backup{}
 	require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(backup), current))
 	require.Contains(t, current.Finalizers, dptypes.DataProtectionFinalizerName)

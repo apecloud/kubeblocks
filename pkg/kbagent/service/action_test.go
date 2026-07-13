@@ -277,5 +277,81 @@ var _ = Describe("action", func() {
 			Expect(err).Should(BeNil())
 			Expect(string(counter)).Should(Equal("2\n"))
 		})
+
+		It("retries the complete runtime batch as one invocation", func() {
+			counter, err := os.CreateTemp("", "kbagent-batch-retry-counter-*")
+			Expect(err).Should(BeNil())
+			counterPath := counter.Name()
+			Expect(counter.Close()).Should(Succeed())
+			defer os.Remove(counterPath)
+
+			log, err := os.CreateTemp("", "kbagent-batch-retry-log-*")
+			Expect(err).Should(BeNil())
+			logPath := log.Name()
+			Expect(log.Close()).Should(Succeed())
+			defer os.Remove(logPath)
+
+			svc, err := newActionService(logr.Discard(), []proto.Action{{
+				Name: "reconfigure",
+				Exec: &proto.ExecAction{
+					Commands: []string{"/bin/bash", "-c", `
+						n=0; [ -s "$0" ] && n=$(cat "$0")
+						n=$((n+1)); echo "$n" > "$0"
+						log=$1; shift
+						printf "%s:%s\n" "$#" "$*" >> "$log"
+						[ "$n" -ge 2 ] || exit 1
+						printf ok
+					`, counterPath, logPath},
+					BatchRuntimeArgs: true,
+				},
+				RetryPolicy: &proto.RetryPolicy{MaxRetries: 1},
+			}})
+			Expect(err).Should(BeNil())
+
+			output, err := svc.handleRequest(ctx, &proto.ActionRequest{
+				Action:    "reconfigure",
+				Arguments: [][]string{{"maxmemory", "1gb"}, {"timeout", "30"}},
+			})
+			Expect(err).Should(BeNil())
+			Expect(output).Should(Equal([]byte("ok")))
+			content, err := os.ReadFile(logPath)
+			Expect(err).Should(BeNil())
+			Expect(string(content)).Should(Equal("4:maxmemory 1gb timeout 30\n4:maxmemory 1gb timeout 30\n"))
+		})
+
+		It("launches one complete runtime batch for non-blocking requests", func() {
+			log, err := os.CreateTemp("", "kbagent-batch-nonblocking-*")
+			Expect(err).Should(BeNil())
+			logPath := log.Name()
+			Expect(log.Close()).Should(Succeed())
+			defer os.Remove(logPath)
+
+			svc, err := newActionService(logr.Discard(), []proto.Action{{
+				Name: "reconfigure",
+				Exec: &proto.ExecAction{
+					Commands:         []string{"/bin/bash", "-c", `printf "%s:%s\n" "$#" "$*" >> "$0"; sleep 0.1; printf ok`, logPath},
+					BatchRuntimeArgs: true,
+				},
+			}})
+			Expect(err).Should(BeNil())
+
+			nonBlocking := true
+			req := &proto.ActionRequest{
+				Action:      "reconfigure",
+				Arguments:   [][]string{{"maxmemory", "1gb"}, {"timeout", "30"}},
+				NonBlocking: &nonBlocking,
+			}
+			Eventually(func() string {
+				output, err := svc.handleRequest(ctx, req)
+				if err != nil {
+					return err.Error()
+				}
+				return string(output)
+			}, 2*time.Second, 50*time.Millisecond).Should(Equal("ok"))
+
+			content, err := os.ReadFile(logPath)
+			Expect(err).Should(BeNil())
+			Expect(string(content)).Should(Equal("4:maxmemory 1gb timeout 30\n"))
+		})
 	})
 })

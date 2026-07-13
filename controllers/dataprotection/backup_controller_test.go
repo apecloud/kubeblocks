@@ -36,6 +36,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1811,10 +1812,20 @@ var _ = Describe("Backup Controller test", func() {
 })
 
 func TestDeleteBackupFilesMissingNamespaceHoldsFinalizerAndSurfacesFailure(t *testing.T) {
+	oldServiceAccount := viper.GetString(dptypes.CfgKeyWorkerServiceAccountName)
+	oldClusterRole := viper.GetString(dptypes.CfgKeyWorkerClusterRoleName)
+	viper.Set(dptypes.CfgKeyWorkerServiceAccountName, "test-dataprotection-worker")
+	viper.Set(dptypes.CfgKeyWorkerClusterRoleName, "test-dataprotection-worker-role")
+	t.Cleanup(func() {
+		viper.Set(dptypes.CfgKeyWorkerServiceAccountName, oldServiceAccount)
+		viper.Set(dptypes.CfgKeyWorkerClusterRoleName, oldClusterRole)
+	})
+
 	scheme := runtime.NewScheme()
 	require.NoError(t, corev1.AddToScheme(scheme))
 	require.NoError(t, batchv1.AddToScheme(scheme))
 	require.NoError(t, appsv1.AddToScheme(scheme))
+	require.NoError(t, rbacv1.AddToScheme(scheme))
 	require.NoError(t, vsv1.AddToScheme(scheme))
 	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
 	now := metav1.Now()
@@ -1849,8 +1860,9 @@ func TestDeleteBackupFilesMissingNamespaceHoldsFinalizerAndSurfacesFailure(t *te
 	result, err := reconciler.handleDeletingPhase(intctrlutil.RequestCtx{Ctx: context.Background()}, backup)
 
 	require.NoError(t, err)
-	require.Equal(t, reconcileInterval, result.RequeueAfter,
+	require.Equal(t, missingBackupNamespaceRetryInterval, result.RequeueAfter,
 		"a restored namespace has no watch edge to a deleting Backup, so the controller must retry")
+	require.Greater(t, result.RequeueAfter, time.Second, "persistent namespace absence must not cause a hot loop")
 	current := &dpv1alpha1.Backup{}
 	require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(backup), current))
 	require.Contains(t, current.Finalizers, dptypes.DataProtectionFinalizerName)
@@ -1859,6 +1871,16 @@ func TestDeleteBackupFilesMissingNamespaceHoldsFinalizerAndSurfacesFailure(t *te
 	jobs := &batchv1.JobList{}
 	require.NoError(t, cli.List(context.Background(), jobs, client.InNamespace(backup.Namespace)))
 	require.Empty(t, jobs.Items)
+
+	require.NoError(t, cli.Create(context.Background(), &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{Name: backup.Namespace},
+	}))
+	require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(backup), current))
+	result, err = reconciler.handleDeletingPhase(intctrlutil.RequestCtx{Ctx: context.Background()}, current)
+	require.NoError(t, err)
+	require.Zero(t, result.RequeueAfter, "the available namespace must continue into the deletion worker path")
+	require.NoError(t, cli.List(context.Background(), jobs, client.InNamespace(backup.Namespace)))
+	require.Len(t, jobs.Items, 1)
 }
 
 func TestDeletingRetainBackupReleasesFinalizerWithoutNamespaceOrDeleteWorker(t *testing.T) {
@@ -1891,9 +1913,11 @@ func TestDeletingRetainBackupReleasesFinalizerWithoutNamespaceOrDeleteWorker(t *
 		Recorder: record.NewFakeRecorder(10),
 	}
 
-	_, err := reconciler.handleDeletingPhase(intctrlutil.RequestCtx{Ctx: context.Background()}, backup)
+	result, err := reconciler.handleDeletingPhase(intctrlutil.RequestCtx{Ctx: context.Background()}, backup)
 
 	require.NoError(t, err)
+	require.False(t, result.Requeue)
+	require.Zero(t, result.RequeueAfter, "Retain must release the object without entering the missing-namespace retry")
 	current := &dpv1alpha1.Backup{}
 	err = cli.Get(context.Background(), client.ObjectKeyFromObject(backup), current)
 	if err == nil {

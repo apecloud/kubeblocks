@@ -74,6 +74,8 @@ type BackupReconciler struct {
 
 var errBackupNamespaceNotFound = errors.New("backup namespace not found")
 
+const missingBackupNamespaceRetryInterval = 30 * time.Second
+
 // +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backups,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backups/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backups/finalizers,verbs=update
@@ -243,7 +245,7 @@ func (r *BackupReconciler) deleteBackupFiles(reqCtx intctrlutil.RequestCtx, back
 			if err := r.recordDeleteBackupFilesFailure(reqCtx, backup, failureReason); err != nil {
 				return err
 			}
-			return intctrlutil.NewRequeueError(reconcileInterval,
+			return intctrlutil.NewRequeueError(missingBackupNamespaceRetryInterval,
 				"waiting for the backup namespace to be restored before deleting backup files")
 		}
 		// wait for the deletion job completed

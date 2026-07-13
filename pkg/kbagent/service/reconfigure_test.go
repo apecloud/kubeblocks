@@ -58,7 +58,7 @@ var _ = Describe("reconfigure", func() {
 			req := &proto.ActionRequest{
 				Action: "switchover",
 			}
-			err := checkReconfigure(ctx, req)
+			err := checkReconfigure(ctx, req, false)
 			Expect(err).Should(BeNil())
 		})
 
@@ -67,14 +67,22 @@ var _ = Describe("reconfigure", func() {
 				Action:     "reconfigure",
 				Parameters: map[string]string{},
 			}
-			err := checkReconfigure(ctx, req)
+			err := checkReconfigure(ctx, req, false)
 			Expect(err).Should(BeNil())
+		})
+
+		It("preserves custom argument groups unless batch delivery is enabled", func() {
+			req := &proto.ActionRequest{
+				Action:    "reconfigure",
+				Arguments: [][]string{{"custom", "argument", "shape"}},
+			}
+			Expect(checkReconfigure(ctx, req, false)).Should(Succeed())
 		})
 
 		DescribeTable("rejects malformed reconfigure argument groups before execution",
 			func(arguments [][]string) {
 				req := &proto.ActionRequest{Action: "reconfigure", Arguments: arguments}
-				err := checkReconfigure(ctx, req)
+				err := checkReconfigure(ctx, req, true)
 				Expect(errors.Is(err, proto.ErrBadRequest)).Should(BeTrue())
 			},
 			Entry("first value missing", [][]string{{"first"}, {"middle", "2"}, {"last", "3"}}),
@@ -92,7 +100,7 @@ var _ = Describe("reconfigure", func() {
 					configFilesUpdated: "log.conf",
 				},
 			}
-			err := checkReconfigure(ctx, req)
+			err := checkReconfigure(ctx, req, false)
 			Expect(err).ShouldNot(BeNil())
 			Expect(errors.Is(err, proto.ErrBadRequest)).Should(BeTrue())
 		})
@@ -107,24 +115,24 @@ var _ = Describe("reconfigure", func() {
 					configFilesCreated: file,
 				},
 			}
-			Expect(checkReconfigure(ctx, req)).Should(Succeed())
+			Expect(checkReconfigure(ctx, req, false)).Should(Succeed())
 
 			req.Parameters = map[string]string{
 				configFilesCreated: file + ".missing",
 			}
-			err := checkReconfigure(ctx, req)
+			err := checkReconfigure(ctx, req, false)
 			Expect(err).ShouldNot(BeNil())
 			Expect(errors.Is(err, proto.ErrPreconditionFailed)).Should(BeTrue())
 
 			req.Parameters = map[string]string{
 				configFilesRemoved: file + ".missing",
 			}
-			Expect(checkReconfigure(ctx, req)).Should(Succeed())
+			Expect(checkReconfigure(ctx, req, false)).Should(Succeed())
 
 			req.Parameters = map[string]string{
 				configFilesRemoved: file,
 			}
-			err = checkReconfigure(ctx, req)
+			err = checkReconfigure(ctx, req, false)
 			Expect(err).ShouldNot(BeNil())
 			Expect(errors.Is(err, proto.ErrPreconditionFailed)).Should(BeTrue())
 		})
@@ -139,7 +147,7 @@ var _ = Describe("reconfigure", func() {
 					configFilesUpdated: fmt.Sprintf("%s:%s++", file, checksum),
 				},
 			}
-			err := checkReconfigure(ctx, req)
+			err := checkReconfigure(ctx, req, false)
 			Expect(err).ShouldNot(BeNil())
 			Expect(errors.Is(err, proto.ErrPreconditionFailed)).Should(BeTrue())
 		})
@@ -154,7 +162,7 @@ var _ = Describe("reconfigure", func() {
 					configFilesUpdated: fmt.Sprintf("%s:%s", file, checksum),
 				},
 			}
-			err := checkReconfigure(ctx, req)
+			err := checkReconfigure(ctx, req, false)
 			Expect(err).Should(BeNil())
 		})
 	})

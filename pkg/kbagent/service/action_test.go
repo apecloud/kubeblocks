@@ -148,6 +148,31 @@ var _ = Describe("action", func() {
 			Expect(content).Should(BeEmpty())
 		})
 
+		It("preserves custom reconfigure argument groups by default", func() {
+			f, err := os.CreateTemp("", "kbagent-reconfigure-custom-*")
+			Expect(err).Should(BeNil())
+			path := f.Name()
+			Expect(f.Close()).Should(Succeed())
+			defer os.Remove(path)
+
+			svc, err := newActionService(logr.Discard(), []proto.Action{{
+				Name: "reconfigure",
+				Exec: &proto.ExecAction{
+					Commands: []string{"/bin/bash", "-c", `printf "%s" "$#" > "$0"`, path},
+				},
+			}})
+			Expect(err).Should(BeNil())
+
+			_, err = svc.handleRequest(ctx, &proto.ActionRequest{
+				Action:    "reconfigure",
+				Arguments: [][]string{{"custom", "argument", "shape"}},
+			})
+			Expect(err).Should(BeNil())
+			content, err := os.ReadFile(path)
+			Expect(err).Should(BeNil())
+			Expect(string(content)).Should(Equal("3"))
+		})
+
 		It("resolves timeout preference", func() {
 			actionTimeout := int32(10)
 			requestTimeout := int32(1)

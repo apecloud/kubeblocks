@@ -123,7 +123,8 @@ func (s *actionService) handleRequest(ctx context.Context, req *proto.ActionRequ
 		return nil, errors.Wrapf(proto.ErrBadRequest, "%s is invalid", req.Action)
 	}
 	// HACK: pre-check for the reconfigure action
-	if err := checkReconfigure(ctx, req); err != nil {
+	batchRuntimeArgs := action.Exec != nil && action.Exec.BatchRuntimeArgs
+	if err := checkReconfigure(ctx, req, batchRuntimeArgs); err != nil {
 		return nil, err
 	}
 	timeout := resolveTimeout(&action.TimeoutSeconds, req.TimeoutSeconds)

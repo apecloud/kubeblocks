@@ -914,6 +914,11 @@ func postReadyTargetPlan(job *batchv1.Job) ([]string, error) {
 
 func postReadyExecutionPolicyForJob(job *batchv1.Job) (dpv1alpha1.PostReadyExecutionPolicy, error) {
 	if job.Annotations == nil || job.Annotations[postReadyExecutionPolicyAnnotationKey] == "" {
+		if hasPostReadyFrozenContract(job) {
+			return "", intctrlutil.NewFatalError(fmt.Sprintf(
+				"postReady job %s/%s has a frozen target contract without an execution policy",
+				job.Namespace, job.Name))
+		}
 		return dpv1alpha1.PostReadyExecutionPolicyParallel, nil
 	}
 	policy := dpv1alpha1.PostReadyExecutionPolicy(job.Annotations[postReadyExecutionPolicyAnnotationKey])

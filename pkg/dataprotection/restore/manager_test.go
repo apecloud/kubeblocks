@@ -772,12 +772,27 @@ var _ = Describe("RestoreManager Test", func() {
 			frozen, err := restoreMGR.FreezePostReadyExecutionPlan(reqCtx, k8sClient, []*batchv1.Job{persisted})
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(frozen).Should(HaveLen(1))
-			Expect(frozen[0].Annotations).Should(BeEmpty())
+			Expect(frozen[0].Annotations).ShouldNot(HaveKey(postReadyExecutionPolicyAnnotationKey))
+			Expect(frozen[0].Annotations).ShouldNot(HaveKey(postReadyTargetIdentityAnnotationKey))
+			Expect(frozen[0].Annotations).ShouldNot(HaveKey(postReadyTargetPlanAnnotationKey))
 			serial, err := serialPostReadyJobs(frozen)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(serial).Should(BeFalse())
 			Expect(frozen[0].Spec.Suspend).ShouldNot(BeNil())
 			Expect(*frozen[0].Spec.Suspend).Should(BeFalse())
+		})
+
+		It("rejects a frozen target contract without an execution policy", func() {
+			job := newRestoreJob(testCtx.DefaultNamespace, "restore-post-ready-missing-policy-0", nil)
+			job.Annotations = map[string]string{
+				postReadyTargetIdentityAnnotationKey: "default/pod-0",
+				postReadyTargetPlanAnnotationKey:     `["default/pod-0"]`,
+			}
+
+			serial, err := serialPostReadyJobs([]*batchv1.Job{job})
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring("frozen target contract without an execution policy"))
+			Expect(serial).Should(BeFalse())
 		})
 
 		Context("BuildContinuousRestoreManager", func() {

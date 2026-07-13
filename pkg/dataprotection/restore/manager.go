@@ -614,8 +614,10 @@ func (r *RestoreManager) BuildVolumePopulateJob(
 }
 
 // GetExistingActionJobs returns jobs already recorded in Restore status for an in-flight action.
-// If any recorded Processing Job is missing, it returns an empty list so callers can follow
-// the original build/create path.
+// PostReady needs completed predecessors as well as processing jobs because the persisted set
+// carries the frozen serial plan across reconciles. PrepareData retains its processing-only path.
+// If any required recorded Job is missing, it returns an empty list so callers can follow the
+// original build/create path.
 func (r *RestoreManager) GetExistingActionJobs(
 	reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
@@ -638,8 +640,10 @@ func (r *RestoreManager) GetExistingActionJobs(
 		action := restoreActions[i]
 		if action.BackupName != backupName ||
 			action.Name != actionName ||
-			action.Status != dpv1alpha1.RestoreActionProcessing ||
 			!strings.HasPrefix(action.ObjectKey, jobKeyPrefix) {
+			continue
+		}
+		if stage != dpv1alpha1.PostReady && action.Status != dpv1alpha1.RestoreActionProcessing {
 			continue
 		}
 		jobName := strings.TrimPrefix(action.ObjectKey, jobKeyPrefix)
@@ -725,6 +729,11 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 			return nil, err
 		}
 		sort.Sort(intctrlutil.ByPodName(targetPodList.Items))
+		frozenSourceByTarget, hasFrozenPlan, err := r.getFrozenPostReadySourceTargets(
+			reqCtx, cli, types.NamespacedName{Namespace: r.Restore.Namespace, Name: buildJobName(0)})
+		if err != nil {
+			return nil, err
+		}
 		buildJob := func(targetPod *corev1.Pod, sourceTargetPodName string, index int) *batchv1.Job {
 			if boolptr.IsSetToTrue(actionSpec.Job.RunOnTargetPodNode) {
 				jobBuilder.resetSpecificVolumesAndMounts()
@@ -750,7 +759,7 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 				build()
 		}
 
-		if podSelector.Strategy == dpv1alpha1.PodSelectionStrategyAny {
+		if podSelector.Strategy == dpv1alpha1.PodSelectionStrategyAny && !hasFrozenPlan {
 			targetPod := utils.GetFirstIndexRunningPod(targetPodList)
 			if targetPod == nil {
 				return nil, fmt.Errorf("can not found any running pod by spec.readyConfig.jobAction.target.podSelector")
@@ -759,9 +768,19 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 		}
 		var jobs []*batchv1.Job
 		for i := range targetPodList.Items {
-			sourceTargetPodName, err := GetSourcePodNameFromTarget(target, jobAction.RequiredPolicyForAllPodSelection, i)
-			if err != nil {
-				return nil, err
+			targetName := types.NamespacedName{
+				Namespace: targetPodList.Items[i].Namespace,
+				Name:      targetPodList.Items[i].Name,
+			}.String()
+			sourceTargetPodName, selectedByFrozenPlan := frozenSourceByTarget[targetName]
+			if hasFrozenPlan && !selectedByFrozenPlan {
+				continue
+			}
+			if !hasFrozenPlan {
+				sourceTargetPodName, err = GetSourcePodNameFromTarget(target, jobAction.RequiredPolicyForAllPodSelection, i)
+				if err != nil {
+					return nil, err
+				}
 			}
 			if target.PodSelector.Strategy == dpv1alpha1.PodSelectionStrategyAll && sourceTargetPodName == "" {
 				// no need to recover the volume when the pod selection policy is 'All' and sourceTargetPodName is not found.
@@ -770,6 +789,10 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 			job := buildJob(&targetPodList.Items[i], sourceTargetPodName, i)
 			setPostReadyTargetIdentity(job, &targetPodList.Items[i], sourceTargetPodName)
 			jobs = append(jobs, job)
+		}
+		if hasFrozenPlan && len(jobs) != len(frozenSourceByTarget) {
+			return nil, intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue,
+				"not all frozen postReady target pods are currently available")
 		}
 		return jobs, nil
 	}
@@ -865,6 +888,64 @@ func postReadyTargetIdentity(job *batchv1.Job) string {
 		return ""
 	}
 	return job.Annotations[postReadyTargetIdentityAnnotationKey]
+}
+
+func splitPostReadyTargetIdentity(identity string) (target, source string) {
+	const sourceMarker = "|source="
+	parts := strings.SplitN(identity, sourceMarker, 2)
+	if len(parts) == 1 {
+		return identity, ""
+	}
+	return parts[0], parts[1]
+}
+
+// getFrozenPostReadySourceTargets returns the original target-to-source mapping
+// after a partial create. JobAction must use it while rebuilding specs so the
+// backup path does not drift when the selected target Pod set changes.
+func (r *RestoreManager) getFrozenPostReadySourceTargets(
+	reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	firstJobKey types.NamespacedName,
+) (map[string]string, bool, error) {
+	existing := &batchv1.Job{}
+	if err := cli.Get(reqCtx.Ctx, firstJobKey, existing); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, false, nil
+		}
+		return nil, false, err
+	}
+	if !r.isJobForRestoreAction(existing) {
+		return nil, false, intctrlutil.NewFatalError(fmt.Sprintf(
+			"restore job name collision: existing job %s/%s does not belong to restore %s/%s",
+			existing.Namespace, existing.Name, r.Restore.Namespace, r.Restore.Name))
+	}
+	if !hasPostReadyFrozenContract(existing) {
+		return nil, false, nil
+	}
+	if _, err := postReadyExecutionPolicyForJob(existing); err != nil {
+		return nil, false, err
+	}
+	plan, err := postReadyTargetPlan(existing)
+	if err != nil {
+		return nil, false, err
+	}
+	if len(plan) == 0 {
+		return nil, false, intctrlutil.NewFatalError(fmt.Sprintf(
+			"postReady job %s/%s has no frozen target plan", existing.Namespace, existing.Name))
+	}
+	sourceByTarget := make(map[string]string, len(plan))
+	for _, identity := range plan {
+		target, source := splitPostReadyTargetIdentity(identity)
+		if target == "" {
+			return nil, false, intctrlutil.NewFatalError("postReady frozen target plan has an empty target")
+		}
+		if _, ok := sourceByTarget[target]; ok {
+			return nil, false, intctrlutil.NewFatalError(fmt.Sprintf(
+				"duplicate postReady frozen target %s", target))
+		}
+		sourceByTarget[target] = source
+	}
+	return sourceByTarget, true, nil
 }
 
 func hasPostReadyFrozenContract(job *batchv1.Job) bool {

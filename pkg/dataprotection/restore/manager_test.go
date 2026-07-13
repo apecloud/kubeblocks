@@ -396,6 +396,56 @@ var _ = Describe("RestoreManager Test", func() {
 			Expect(jobs[0].Name).Should(Equal(jobName))
 		})
 
+		It("loads completed postReady predecessors with the processing successor", func() {
+			reqCtx := getReqCtx()
+			restoreMGR, backupSet := initResources(reqCtx, 0, false, func(f *testdp.MockRestoreFactory) {})
+			actionName := "postready-0"
+			labels := map[string]string{
+				DataProtectionRestoreLabelKey:          restoreMGR.Restore.Name,
+				DataProtectionRestoreNamespaceLabelKey: restoreMGR.Restore.Namespace,
+			}
+			jobs := []*batchv1.Job{
+				newRestoreJob(testCtx.DefaultNamespace, "restore-postready-existing-0", labels),
+				newRestoreJob(testCtx.DefaultNamespace, "restore-postready-existing-1", labels),
+			}
+			for i := range jobs {
+				setPostReadyExecutionPolicy(jobs[i], dpv1alpha1.PostReadyExecutionPolicySerial)
+				jobs[i].Annotations[postReadyTargetIdentityAnnotationKey] = fmt.Sprintf("default/pod-%d", i)
+			}
+			Expect(setPostReadyTargetPlan(jobs)).Should(Succeed())
+			for i := range jobs {
+				Expect(k8sClient.Create(reqCtx.Ctx, jobs[i])).Should(Succeed())
+			}
+			testdp.PatchK8sJobStatus(&testCtx, client.ObjectKeyFromObject(jobs[0]), batchv1.JobComplete)
+			restoreMGR.Restore.Status.Actions.PostReady = []dpv1alpha1.RestoreStatusAction{
+				{
+					Name:       actionName,
+					ObjectKey:  BuildJobKeyForActionStatus(jobs[0].Name),
+					BackupName: backupSet.Backup.Name,
+					Status:     dpv1alpha1.RestoreActionCompleted,
+				},
+				{
+					Name:       actionName,
+					ObjectKey:  BuildJobKeyForActionStatus(jobs[1].Name),
+					BackupName: backupSet.Backup.Name,
+					Status:     dpv1alpha1.RestoreActionProcessing,
+				},
+			}
+
+			persisted, err := restoreMGR.GetExistingActionJobs(
+				reqCtx, k8sClient, dpv1alpha1.PostReady, backupSet.Backup.Name, actionName)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(persisted).Should(HaveLen(2))
+			persisted, err = restoreMGR.FreezePostReadyExecutionPlan(reqCtx, k8sClient, persisted)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(persisted).Should(HaveLen(2))
+			Expect(restoreMGR.ResumeNextSerialPostReadyJob(reqCtx, k8sClient, persisted)).Should(Succeed())
+
+			next := &batchv1.Job{}
+			Expect(k8sClient.Get(reqCtx.Ctx, client.ObjectKeyFromObject(jobs[1]), next)).Should(Succeed())
+			Expect(*next.Spec.Suspend).Should(BeFalse())
+		})
+
 		It("should not use a controller-namespace action job without the Restore namespace label", func() {
 			controllerNamespace := "kb-system-wrong-restore-ns"
 			viper.Set(constant.CfgKeyCtrlrMgrNS, controllerNamespace)
@@ -704,6 +754,77 @@ var _ = Describe("RestoreManager Test", func() {
 			Expect(k8sClient.Get(reqCtx.Ctx, client.ObjectKeyFromObject(frozen[1]), second)).Should(Succeed())
 			Expect(*first.Spec.Suspend).Should(BeFalse())
 			Expect(*second.Spec.Suspend).Should(BeTrue())
+		})
+
+		It("preserves the OneToOne source mapping through the real Job builder after target insertion", func() {
+			reqCtx := getReqCtx()
+			oldToolsImage := viper.GetString(constant.KBToolsImage)
+			viper.Set(constant.KBToolsImage, "kubeblocks-tools")
+			DeferCleanup(func() { viper.Set(constant.KBToolsImage, oldToolsImage) })
+			matchLabels := map[string]string{constant.AppInstanceLabelKey: testdp.ClusterName}
+			Expect(testapps.ChangeObj(&testCtx, actionSet, func(set *dpv1alpha1.ActionSet) {
+				set.Spec.Restore.PostReadyExecutionPolicy = dpv1alpha1.PostReadyExecutionPolicySerial
+			})).Should(Succeed())
+			restoreMGR, backupSet := initResources(reqCtx, 0, false, func(f *testdp.MockRestoreFactory) {
+				f.SetConnectCredential(testdp.ClusterName).SetJobActionConfig(matchLabels)
+			})
+			restoreMGR.Restore.Spec.ReadyConfig.JobAction.RequiredPolicyForAllPodSelection =
+				&dpv1alpha1.RequiredPolicyForAllPodSelection{DataRestorePolicy: dpv1alpha1.OneToOneRestorePolicy}
+			restoreMGR.Restore.Spec.ReadyConfig.JobAction.Target.PodSelector.Strategy =
+				dpv1alpha1.PodSelectionStrategyAll
+			testdp.NewFakeCluster(&testCtx)
+			target := utils.GetBackupStatusTarget(backupSet.Backup, restoreMGR.Restore.Spec.Backup.SourceTargetName)
+			target.PodSelector.Strategy = dpv1alpha1.PodSelectionStrategyAll
+			target.SelectedTargetPods = []string{"source-b", "source-c"}
+			backupSet.Backup.Status.Path = "/repo/default/test-backup"
+
+			initial, err := restoreMGR.BuildPostReadyActionJobs(reqCtx, k8sClient, *backupSet, target, 1)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(initial).Should(HaveLen(2))
+			initialIdentities := []string{postReadyTargetIdentity(initial[0]), postReadyTargetIdentity(initial[1])}
+			Expect(initialIdentities[0]).Should(ContainSubstring("|source=source-b"))
+			Expect(initialIdentities[1]).Should(ContainSubstring("|source=source-c"))
+			created, err := restoreMGR.CreateJobsIfNotExist(reqCtx,
+				&failNthCreateClient{Client: k8sClient, n: 2}, restoreMGR.Restore, initial)
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring("injected create failure at 2"))
+			Expect(created).Should(BeNil())
+			persistedFirst := &batchv1.Job{}
+			Expect(k8sClient.Get(reqCtx.Ctx, client.ObjectKeyFromObject(initial[0]), persistedFirst)).Should(Succeed())
+			Expect(persistedFirst.Annotations).Should(HaveKey(postReadyTargetPlanAnnotationKey))
+
+			inserted := testapps.NewPodFactory(testCtx.DefaultNamespace, "aaa-inserted-target").
+				AddAppInstanceLabel(testdp.ClusterName).
+				AddAppComponentLabel(testdp.ComponentName).
+				AddContainer(corev1.Container{Name: testdp.ContainerName, Image: testapps.ApeCloudMySQLImage}).
+				Create(&testCtx).GetObject()
+			Expect(testapps.ChangeObjStatus(&testCtx, inserted, func() {
+				inserted.Status.Phase = corev1.PodRunning
+			})).Should(Succeed())
+			frozenSources, hasFrozenPlan, err := restoreMGR.getFrozenPostReadySourceTargets(
+				reqCtx, k8sClient, client.ObjectKeyFromObject(initial[0]))
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(hasFrozenPlan).Should(BeTrue())
+			Expect(frozenSources).Should(HaveLen(2))
+
+			rebuilt, err := restoreMGR.BuildPostReadyActionJobs(reqCtx, k8sClient, *backupSet, target, 1)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(rebuilt).Should(HaveLen(2))
+			rebuilt, err = restoreMGR.FreezePostReadyExecutionPlan(reqCtx, k8sClient, rebuilt)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(rebuilt).Should(HaveLen(2))
+			Expect(postReadyTargetIdentity(rebuilt[0])).Should(Equal(initialIdentities[0]))
+			Expect(postReadyTargetIdentity(rebuilt[1])).Should(Equal(initialIdentities[1]))
+
+			targetRelativePaths := make([]string, 0, len(rebuilt))
+			for i := range rebuilt {
+				for _, env := range rebuilt[i].Spec.Template.Spec.Containers[0].Env {
+					if env.Name == dptypes.DPTargetRelativePath {
+						targetRelativePaths = append(targetRelativePaths, env.Value)
+					}
+				}
+			}
+			Expect(targetRelativePaths).Should(Equal([]string{"source-b", "source-c"}))
 		})
 
 		It("does not resume a serial job after a failed predecessor", func() {

@@ -19732,6 +19732,13 @@ spec:
           status:
             description: ComponentDefinitionStatus defines the observed state of ComponentDefinition.
             properties:
+              legacyKBAgentPortNames:
+                description: |-
+                  LegacyKBAgentPortNames records that this definition was already accepted
+                  before kba-http and kba-streaming became reserved names. The controller
+                  uses the durable status bit to preserve a compatible injected port name
+                  across later phase transitions without allowing new definitions to opt in.
+                type: boolean
               message:
                 description: Provides additional information about the current phase.
                 type: string

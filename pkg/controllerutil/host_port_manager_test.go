@@ -231,6 +231,19 @@ var _ = Describe("host port manager test", func() {
 			Expect(port).Should(Equal(minPort))
 		})
 
+		It("dynamically allocates an actual legacy kbagent port name", func() {
+			legacyManager := GetPortManager(network, sets.New(kbagent.DefaultHTTPPortName))
+			key := legacyManager.PortKey(clusterName, compName, kbagent.ContainerName, kbagent.LegacyHTTPPortName)
+			Expect(key).Should(Equal(fmt.Sprintf("%s-%s-%s-%s", clusterName, compName,
+				kbagent.ContainerName, kbagent.LegacyHTTPPortName)))
+
+			port, err := legacyManager.AllocatePort(key)
+			Expect(err).Should(BeNil())
+			Expect(port).Should(BeNumerically(">=", minPort))
+			Expect(port).Should(BeNumerically("<=", maxPort))
+			Expect(dataCM).Should(HaveKeyWithValue(key, fmt.Sprintf("%d", port)))
+		})
+
 		It("allocate port - not defined", func() {
 			errPortName := fmt.Sprintf("%s-not-defined", portName)
 			key := manager.PortKey(clusterName, compName, containerName, errPortName)
@@ -389,6 +402,14 @@ var _ = Describe("host port manager test", func() {
 
 		It("allocate port via legacy alias", func() {
 			key := manager.PortKey(clusterName, compName, kbagent.ContainerName, kbagent.DefaultHTTPPortName)
+			port, err := manager.AllocatePort(key)
+			Expect(err).Should(BeNil())
+			Expect(port).Should(Equal(int32(kbagent.DefaultHTTPPort)))
+		})
+
+		It("allocates an explicitly defined actual legacy port name", func() {
+			key := manager.PortKey(clusterName, compName, kbagent.ContainerName, kbagent.LegacyHTTPPortName)
+			Expect(key).Should(Equal(kbagent.LegacyHTTPPortName))
 			port, err := manager.AllocatePort(key)
 			Expect(err).Should(BeNil())
 			Expect(port).Should(Equal(int32(kbagent.DefaultHTTPPort)))

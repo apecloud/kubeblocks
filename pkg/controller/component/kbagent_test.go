@@ -177,6 +177,60 @@ var _ = Describe("kb-agent", func() {
 			Expect(kbAgentContainer()).Should(BeNil())
 		})
 
+		It("uses the legacy name for a reserved port on a grandfathered definition", func() {
+			synthesizedComp.grandfatherKBAgentPortNames = true
+			synthesizedComp.PodSpec.Containers[0].Ports = []corev1.ContainerPort{{
+				Name:          kbagent.DefaultHTTPPortName,
+				ContainerPort: 9200,
+			}}
+
+			err := buildKBAgentContainer(synthesizedComp)
+			Expect(err).Should(BeNil())
+			c := kbAgentContainer()
+			Expect(c).ShouldNot(BeNil())
+			Expect(c.Ports[0].Name).Should(Equal(kbagent.LegacyHTTPPortName))
+			Expect(c.Ports[1].Name).Should(Equal(kbagent.DefaultStreamingPortName))
+		})
+
+		It("updates host-network args and probe from an allocated legacy port", func() {
+			synthesizedComp.grandfatherKBAgentPortNames = true
+			synthesizedComp.PodSpec.Containers[0].Ports = []corev1.ContainerPort{{
+				Name:          kbagent.DefaultHTTPPortName,
+				ContainerPort: 9200,
+			}}
+
+			Expect(buildKBAgentContainer(synthesizedComp)).Should(Succeed())
+			idx := -1
+			for i := range synthesizedComp.PodSpec.Containers {
+				if synthesizedComp.PodSpec.Containers[i].Name == kbagent.ContainerName {
+					idx = i
+					break
+				}
+			}
+			Expect(idx).Should(BeNumerically(">=", 0))
+			agent := &synthesizedComp.PodSpec.Containers[idx]
+			Expect(agent.Ports[0].Name).Should(Equal(kbagent.LegacyHTTPPortName))
+			agent.Ports[0].ContainerPort = 13501
+			agent.Ports[1].ContainerPort = 13502
+
+			UpdateKBAgentContainer4HostNetwork(synthesizedComp)
+			agent = &synthesizedComp.PodSpec.Containers[idx]
+			Expect(agent.Args).Should(ContainElements("--port", "13501", "--streaming-port", "13502"))
+			Expect(agent.StartupProbe.TCPSocket.Port.IntValue()).Should(Equal(13501))
+		})
+
+		It("fails closed when a grandfathered definition occupies both compatible names", func() {
+			synthesizedComp.grandfatherKBAgentPortNames = true
+			synthesizedComp.PodSpec.Containers[0].Ports = []corev1.ContainerPort{
+				{Name: kbagent.DefaultHTTPPortName, ContainerPort: 9200},
+				{Name: kbagent.LegacyHTTPPortName, ContainerPort: 9201},
+			}
+
+			err := buildKBAgentContainer(synthesizedComp)
+			Expect(err).Should(MatchError(ContainSubstring("no compatible name remains")))
+			Expect(kbAgentContainer()).Should(BeNil())
+		})
+
 		It("startup env", func() {
 			err := buildKBAgentContainer(synthesizedComp)
 			Expect(err).Should(BeNil())

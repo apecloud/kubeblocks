@@ -395,7 +395,7 @@ func getPodUpdatePolicy(its *workloads.InstanceSet, pod *corev1.Pod) (podUpdateP
 		return noOpsPolicy, "", "", err
 	}
 
-	specUpdatePolicy := getPodUpdatePolicyInSpec(its, pod, newPod)
+	specUpdatePolicy := GetPodUpdatePolicyInSpec(its, pod, newPod)
 	if getPodRevision(pod) != updateRevisions[pod.Name] && getPodRevision(pod) != proposedRevisions[pod.Name] {
 		return recreatePolicy, specUpdatePolicy, "revision update", nil
 	}
@@ -422,7 +422,11 @@ func getPodUpdatePolicy(its *workloads.InstanceSet, pod *corev1.Pod) (podUpdateP
 	return noOpsPolicy, "", "", nil
 }
 
-func getPodUpdatePolicyInSpec(its *workloads.InstanceSet, old, new *corev1.Pod) workloads.PodUpdatePolicyType {
+// GetPodUpdatePolicyInSpec returns the policy selected by the InstanceSet
+// controller for a concrete old/new Pod pair. Container image changes use the
+// upgrade policy; command, port, resource, and other template changes use the
+// regular update policy.
+func GetPodUpdatePolicyInSpec(its *workloads.InstanceSet, old, new *corev1.Pod) workloads.PodUpdatePolicyType {
 	if !equalField(old.Spec.InitContainers, new.Spec.InitContainers) || !equalField(old.Spec.Containers, new.Spec.Containers) {
 		if its.Spec.PodUpgradePolicy == kbappsv1.ReCreatePodUpdatePolicyType && safeKBManagedImageOnlyInPlaceUpdate(old, new) {
 			return kbappsv1.PreferInPlacePodUpdatePolicyType

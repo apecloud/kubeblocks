@@ -449,6 +449,13 @@ var kbagentLegacyPortNames = map[string]string{
 	kbagent.DefaultStreamingPortName: kbagent.LegacyStreamingPortName,
 }
 
+var kbagentContainerPortNames = [...]string{
+	kbagent.DefaultHTTPPortName,
+	kbagent.DefaultStreamingPortName,
+	kbagent.LegacyHTTPPortName,
+	kbagent.LegacyStreamingPortName,
+}
+
 // legacyKBAgentPortKey rewrites an allocation key that refers to a kbagent
 // port by its current name into the key used before the port rename, or
 // returns "" when the key does not refer to a kbagent port.
@@ -463,7 +470,15 @@ func legacyKBAgentPortKey(key string) string {
 }
 
 func (m *definedPortManager) isKBAgentPort(containerName, portName string) bool {
-	return containerName == kbagent.ContainerName && (portName == kbagent.DefaultHTTPPortName || portName == kbagent.DefaultStreamingPortName)
+	if containerName != kbagent.ContainerName {
+		return false
+	}
+	for _, name := range kbagentContainerPortNames {
+		if portName == name {
+			return true
+		}
+	}
+	return false
 }
 
 // definedKBAgentPort resolves a user-defined host port for a kbagent port
@@ -503,7 +518,7 @@ func (m *definedPortManager) isKBAgentPortNNotDefined(containerName, portName st
 func (m *definedPortManager) isKBAgentPortNNotDefinedInKey(key string) bool {
 	// the port names contain dashes, so match the "<container>-<port>" key
 	// suffix instead of splitting the key
-	for _, portName := range []string{kbagent.DefaultHTTPPortName, kbagent.DefaultStreamingPortName} {
+	for _, portName := range kbagentContainerPortNames {
 		if strings.HasSuffix(key, fmt.Sprintf("-%s-%s", kbagent.ContainerName, portName)) {
 			return m.isKBAgentPortNNotDefined(kbagent.ContainerName, portName)
 		}

@@ -448,16 +448,15 @@ func shouldRecreatePodsForTemplateChange(oldTemplate, newTemplate corev1.PodTemp
 	}
 	// A revision-changing field always selects the InstanceSet recreate path.
 	// StrictInPlace is the only policy that blocks that path. Which strictness
-	// field applies follows getPodUpdatePolicyInSpec: container/init-container
-	// changes use PodUpgradePolicy; other template changes use PodUpdatePolicy.
+	// field applies follows GetPodUpdatePolicyInSpec: container image/list
+	// upgrade-class changes use PodUpgradePolicy; command, port, resource, and
+	// other template changes use PodUpdatePolicy.
 	oldRecreateFields := podRecreateFields(oldTemplate)
 	newRecreateFields := podRecreateFields(newTemplate)
 	if !reflect.DeepEqual(oldRecreateFields, newRecreateFields) {
-		policy := desiredITS.Spec.PodUpdatePolicy
-		if !reflect.DeepEqual(oldTemplate.Spec.InitContainers, newTemplate.Spec.InitContainers) ||
-			!reflect.DeepEqual(oldTemplate.Spec.Containers, newTemplate.Spec.Containers) {
-			policy = desiredITS.Spec.PodUpgradePolicy
-		}
+		oldPod := &corev1.Pod{Spec: *oldTemplate.Spec.DeepCopy()}
+		newPod := &corev1.Pod{Spec: *newTemplate.Spec.DeepCopy()}
+		policy := instanceset.GetPodUpdatePolicyInSpec(desiredITS, oldPod, newPod)
 		return policy != appsv1.StrictInPlacePodUpdatePolicyType
 	}
 

@@ -6006,6 +6006,21 @@ int64
 </tr>
 <tr>
 <td>
+<code>legacyKBAgentPortNames</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>LegacyKBAgentPortNames records that this definition was already accepted
+before kba-http and kba-streaming became reserved names. The controller
+uses the durable status bit to preserve a compatible injected port name
+across later phase transitions without allowing new definitions to opt in.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>phase</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.Phase">

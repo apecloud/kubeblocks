@@ -161,6 +161,8 @@ func (r *ComponentDefinitionReconciler) unavailable(cli client.Client, rctx intc
 func (r *ComponentDefinitionReconciler) status(cli client.Client, rctx intctrlutil.RequestCtx,
 	cmpd *appsv1.ComponentDefinition, phase appsv1.Phase, message string) error {
 	patch := client.MergeFrom(cmpd.DeepCopy())
+	cmpd.Status.LegacyKBAgentPortNames = component.KBAgentPortNamesGrandfathered(cmpd) &&
+		component.ValidateKBAgentPortNames(cmpd.Spec.Runtime.InitContainers, cmpd.Spec.Runtime.Containers) != nil
 	cmpd.Status.ObservedGeneration = cmpd.Generation
 	cmpd.Status.Phase = phase
 	cmpd.Status.Message = message
@@ -259,6 +261,9 @@ func (r *ComponentDefinitionReconciler) validateLabels(cli client.Client, rctx i
 
 func (r *ComponentDefinitionReconciler) validateRuntime(cli client.Client, rctx intctrlutil.RequestCtx,
 	cmpd *appsv1.ComponentDefinition) error {
+	if component.KBAgentPortNamesGrandfathered(cmpd) {
+		return nil
+	}
 	return component.ValidateKBAgentPortNames(
 		cmpd.Spec.Runtime.InitContainers,
 		cmpd.Spec.Runtime.Containers)

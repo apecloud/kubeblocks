@@ -105,33 +105,33 @@ var _ = Describe("instance util test", func() {
 				GetObject()
 
 			Expect(equalBasicInPlaceFields(oldPod, newPod)).Should(BeTrue())
-			Expect(getPodUpdatePolicyInSpec(its, oldPod, newPod)).Should(Equal(kbappsv1.ReCreatePodUpdatePolicyType))
+			Expect(GetPodUpdatePolicyInSpec(its, oldPod, newPod)).Should(Equal(kbappsv1.ReCreatePodUpdatePolicyType))
 
 			By("tag mismatch")
 			tagChangedPod := newPod.DeepCopy()
 			tagChangedPod.Spec.Containers[0].Image = "192.168.173.140:6451/apecloud/redis:8.4.1"
 			Expect(equalBasicInPlaceFields(oldPod, tagChangedPod)).Should(BeFalse())
-			Expect(getPodUpdatePolicyInSpec(its, oldPod, tagChangedPod)).Should(Equal(kbappsv1.PreferInPlacePodUpdatePolicyType))
+			Expect(GetPodUpdatePolicyInSpec(its, oldPod, tagChangedPod)).Should(Equal(kbappsv1.PreferInPlacePodUpdatePolicyType))
 
 			By("init container tag mismatch")
 			initTagChangedPod := newPod.DeepCopy()
 			initTagChangedPod.Spec.InitContainers[0].Image = "192.168.173.140:6451/apecloud/kbagent:1.0.3-beta.6"
 			Expect(equalBasicInPlaceFields(oldPod, initTagChangedPod)).Should(BeFalse())
-			Expect(getPodUpdatePolicyInSpec(its, oldPod, initTagChangedPod)).Should(Equal(kbappsv1.PreferInPlacePodUpdatePolicyType))
+			Expect(GetPodUpdatePolicyInSpec(its, oldPod, initTagChangedPod)).Should(Equal(kbappsv1.PreferInPlacePodUpdatePolicyType))
 
 			By("digest mismatch")
 			digestChangedPod := newPod.DeepCopy()
 			oldPod.Spec.Containers[0].Image = "172.31.255.3:5000/apecloud/redis:8.4.0@sha256:old"
 			digestChangedPod.Spec.Containers[0].Image = "192.168.173.140:6451/apecloud/redis:8.4.0@sha256:new"
 			Expect(equalBasicInPlaceFields(oldPod, digestChangedPod)).Should(BeFalse())
-			Expect(getPodUpdatePolicyInSpec(its, oldPod, digestChangedPod)).Should(Equal(kbappsv1.PreferInPlacePodUpdatePolicyType))
+			Expect(GetPodUpdatePolicyInSpec(its, oldPod, digestChangedPod)).Should(Equal(kbappsv1.PreferInPlacePodUpdatePolicyType))
 
 			By("basename mismatch")
 			basenameChangedPod := newPod.DeepCopy()
 			oldPod.Spec.Containers[0].Image = "172.31.255.3:5000/apecloud/redis:8.4.0"
 			basenameChangedPod.Spec.Containers[0].Image = "192.168.173.140:6451/apecloud/redis-stack:8.4.0"
 			Expect(equalBasicInPlaceFields(oldPod, basenameChangedPod)).Should(BeFalse())
-			Expect(getPodUpdatePolicyInSpec(its, oldPod, basenameChangedPod)).Should(Equal(kbappsv1.PreferInPlacePodUpdatePolicyType))
+			Expect(GetPodUpdatePolicyInSpec(its, oldPod, basenameChangedPod)).Should(Equal(kbappsv1.PreferInPlacePodUpdatePolicyType))
 		})
 
 		It("uses in-place policy for KB-managed tools image changes even when pod upgrade policy is ReCreate", func() {
@@ -156,21 +156,21 @@ var _ = Describe("instance util test", func() {
 				SetPodUpgradePolicy(kbappsv1.ReCreatePodUpdatePolicyType).
 				GetObject()
 
-			Expect(getPodUpdatePolicyInSpec(its, oldPod, newPod)).Should(Equal(kbappsv1.PreferInPlacePodUpdatePolicyType))
+			Expect(GetPodUpdatePolicyInSpec(its, oldPod, newPod)).Should(Equal(kbappsv1.PreferInPlacePodUpdatePolicyType))
 
 			strictInPlaceITS := builder.NewInstanceSetBuilder(namespace, name).
 				SetPodUpdatePolicy(kbappsv1.ReCreatePodUpdatePolicyType).
 				SetPodUpgradePolicy(kbappsv1.StrictInPlacePodUpdatePolicyType).
 				GetObject()
-			Expect(getPodUpdatePolicyInSpec(strictInPlaceITS, oldPod, newPod)).Should(Equal(kbappsv1.StrictInPlacePodUpdatePolicyType))
+			Expect(GetPodUpdatePolicyInSpec(strictInPlaceITS, oldPod, newPod)).Should(Equal(kbappsv1.StrictInPlacePodUpdatePolicyType))
 
 			labelChangedPod := newPod.DeepCopy()
 			labelChangedPod.Labels["extra"] = "true"
-			Expect(getPodUpdatePolicyInSpec(its, oldPod, labelChangedPod)).Should(Equal(kbappsv1.ReCreatePodUpdatePolicyType))
+			Expect(GetPodUpdatePolicyInSpec(its, oldPod, labelChangedPod)).Should(Equal(kbappsv1.ReCreatePodUpdatePolicyType))
 
 			appChangedPod := oldPod.DeepCopy()
 			appChangedPod.Spec.Containers[0].Image = "docker.io/apecloud/redis:7.4"
-			Expect(getPodUpdatePolicyInSpec(its, oldPod, appChangedPod)).Should(Equal(kbappsv1.ReCreatePodUpdatePolicyType))
+			Expect(GetPodUpdatePolicyInSpec(its, oldPod, appChangedPod)).Should(Equal(kbappsv1.ReCreatePodUpdatePolicyType))
 		})
 	})
 

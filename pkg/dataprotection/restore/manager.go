@@ -963,9 +963,10 @@ func hasPostReadyFrozenContract(job *batchv1.Job) bool {
 	if job.Annotations == nil {
 		return false
 	}
-	return job.Annotations[postReadyExecutionPolicyAnnotationKey] != "" ||
-		job.Annotations[postReadyTargetIdentityAnnotationKey] != "" ||
-		job.Annotations[postReadyTargetPlanAnnotationKey] != ""
+	_, hasPolicy := job.Annotations[postReadyExecutionPolicyAnnotationKey]
+	_, hasIdentity := job.Annotations[postReadyTargetIdentityAnnotationKey]
+	_, hasPlan := job.Annotations[postReadyTargetPlanAnnotationKey]
+	return hasPolicy || hasIdentity || hasPlan
 }
 
 func setPostReadyTargetPlan(jobs []*batchv1.Job) error {
@@ -1005,15 +1006,28 @@ func postReadyTargetPlan(job *batchv1.Job) ([]string, error) {
 }
 
 func postReadyExecutionPolicyForJob(job *batchv1.Job) (dpv1alpha1.PostReadyExecutionPolicy, error) {
-	if job.Annotations == nil || job.Annotations[postReadyExecutionPolicyAnnotationKey] == "" {
-		if hasPostReadyFrozenContract(job) {
-			return "", intctrlutil.NewFatalError(fmt.Sprintf(
-				"postReady job %s/%s has a frozen target contract without an execution policy",
-				job.Namespace, job.Name))
-		}
+	if !hasPostReadyFrozenContract(job) {
 		return dpv1alpha1.PostReadyExecutionPolicyParallel, nil
 	}
-	policy := dpv1alpha1.PostReadyExecutionPolicy(job.Annotations[postReadyExecutionPolicyAnnotationKey])
+	policyValue, hasPolicy := job.Annotations[postReadyExecutionPolicyAnnotationKey]
+	if !hasPolicy || policyValue == "" {
+		return "", intctrlutil.NewFatalError(fmt.Sprintf(
+			"postReady job %s/%s has a frozen target contract without an execution policy",
+			job.Namespace, job.Name))
+	}
+	identity, hasIdentity := job.Annotations[postReadyTargetIdentityAnnotationKey]
+	if !hasIdentity || identity == "" {
+		return "", intctrlutil.NewFatalError(fmt.Sprintf(
+			"postReady job %s/%s has a frozen target contract without a target identity",
+			job.Namespace, job.Name))
+	}
+	plan, hasPlan := job.Annotations[postReadyTargetPlanAnnotationKey]
+	if !hasPlan || plan == "" {
+		return "", intctrlutil.NewFatalError(fmt.Sprintf(
+			"postReady job %s/%s has a frozen target contract without a target plan",
+			job.Namespace, job.Name))
+	}
+	policy := dpv1alpha1.PostReadyExecutionPolicy(policyValue)
 	if policy != dpv1alpha1.PostReadyExecutionPolicyParallel && policy != dpv1alpha1.PostReadyExecutionPolicySerial {
 		return "", intctrlutil.NewFatalError(fmt.Sprintf(
 			"postReady job %s/%s has invalid frozen execution policy %q",

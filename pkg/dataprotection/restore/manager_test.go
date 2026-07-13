@@ -936,6 +936,28 @@ var _ = Describe("RestoreManager Test", func() {
 			Expect(serial).Should(BeFalse())
 		})
 
+		It("rejects a frozen target contract whose three keys have empty values", func() {
+			job := newRestoreJob(testCtx.DefaultNamespace, "restore-post-ready-empty-contract-0", nil)
+			job.Annotations = map[string]string{
+				postReadyExecutionPolicyAnnotationKey: "",
+				postReadyTargetIdentityAnnotationKey:  "",
+				postReadyTargetPlanAnnotationKey:      "",
+			}
+
+			serial, err := serialPostReadyJobs([]*batchv1.Job{job})
+			Expect(err).Should(HaveOccurred())
+			Expect(serial).Should(BeFalse())
+		})
+
+		It("rejects a single present frozen target key with an empty value", func() {
+			job := newRestoreJob(testCtx.DefaultNamespace, "restore-post-ready-empty-identity-0", nil)
+			job.Annotations = map[string]string{postReadyTargetIdentityAnnotationKey: ""}
+
+			serial, err := serialPostReadyJobs([]*batchv1.Job{job})
+			Expect(err).Should(HaveOccurred())
+			Expect(serial).Should(BeFalse())
+		})
+
 		Context("BuildContinuousRestoreManager", func() {
 			const (
 				continuousBackupStartTime = "2023-01-01T09:00:00Z"

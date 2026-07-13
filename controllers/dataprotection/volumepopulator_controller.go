@@ -799,6 +799,8 @@ func buildExecutionRestore(pvc, populatePVC *corev1.PersistentVolumeClaim, sourc
 			Backup:             source.Spec.Backup,
 			RestoreTime:        source.Spec.RestoreTime,
 			Env:                source.Spec.Env,
+			ContainerResources: source.Spec.ContainerResources,
+			BackoffLimit:       source.Spec.BackoffLimit,
 			Parameters:         source.Spec.Parameters,
 			ServiceAccountName: source.Spec.ServiceAccountName,
 			PrepareDataConfig: &dpv1alpha1.PrepareDataConfig{

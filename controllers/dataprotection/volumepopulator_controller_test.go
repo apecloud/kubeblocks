@@ -1560,7 +1560,12 @@ func TestPopulateCreatesExecutionRestoreAndPolls(t *testing.T) {
 			RestoreTime:        "2026-07-13T01:02:03Z",
 			ServiceAccountName: "restore-worker",
 			Env:                []corev1.EnvVar{{Name: "RESTORE_ENV", Value: "value"}},
-			Parameters:         []dpv1alpha1.ParameterPair{{Name: "parameter", Value: "value"}},
+			ContainerResources: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("250m")},
+				Limits:   corev1.ResourceList{corev1.ResourceMemory: resource.MustParse("512Mi")},
+			},
+			BackoffLimit: ptr.To(int32(4)),
+			Parameters:   []dpv1alpha1.ParameterPair{{Name: "parameter", Value: "value"}},
 			PrepareDataConfig: &dpv1alpha1.PrepareDataConfig{
 				DataSourceRef: &dpv1alpha1.VolumeConfig{
 					VolumeSource: "data",
@@ -1627,6 +1632,8 @@ func TestPopulateCreatesExecutionRestoreAndPolls(t *testing.T) {
 	require.Equal(t, restore.Spec.RestoreTime, executionRestore.Spec.RestoreTime)
 	require.Equal(t, restore.Spec.ServiceAccountName, executionRestore.Spec.ServiceAccountName)
 	require.Equal(t, restore.Spec.Env, executionRestore.Spec.Env)
+	require.Equal(t, restore.Spec.ContainerResources, executionRestore.Spec.ContainerResources)
+	require.Equal(t, restore.Spec.BackoffLimit, executionRestore.Spec.BackoffLimit)
 	require.Equal(t, restore.Spec.Parameters, executionRestore.Spec.Parameters)
 	require.Equal(t, restore.Spec.PrepareDataConfig.RequiredPolicyForAllPodSelection,
 		executionRestore.Spec.PrepareDataConfig.RequiredPolicyForAllPodSelection)

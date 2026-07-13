@@ -116,6 +116,38 @@ var _ = Describe("action", func() {
 			Expect(errors.Is(err, proto.ErrBadRequest)).Should(BeTrue())
 		})
 
+		It("rejects malformed reconfigure batches before the command can write", func() {
+			f, err := os.CreateTemp("", "kbagent-reconfigure-preflight-*")
+			Expect(err).Should(BeNil())
+			path := f.Name()
+			Expect(f.Close()).Should(Succeed())
+			defer os.Remove(path)
+
+			svc, err := newActionService(logr.Discard(), []proto.Action{{
+				Name: "reconfigure",
+				Exec: &proto.ExecAction{
+					Commands:         []string{"/bin/bash", "-c", `printf applied >> "$0"`, path},
+					BatchRuntimeArgs: true,
+				},
+			}})
+			Expect(err).Should(BeNil())
+
+			for _, arguments := range [][][]string{
+				{{"first"}, {"middle", "2"}, {"last", "3"}},
+				{{"first", "1"}, {"middle"}, {"last", "3"}},
+				{{"first", "1"}, {"middle", "2"}, {"last"}},
+				{{"first", "1"}, {"first", "2"}},
+				{{"first", "1", "extra"}},
+			} {
+				_, err = svc.handleRequest(ctx, &proto.ActionRequest{Action: "reconfigure", Arguments: arguments})
+				Expect(errors.Is(err, proto.ErrBadRequest)).Should(BeTrue())
+			}
+
+			content, err := os.ReadFile(path)
+			Expect(err).Should(BeNil())
+			Expect(content).Should(BeEmpty())
+		})
+
 		It("resolves timeout preference", func() {
 			actionTimeout := int32(10)
 			requestTimeout := int32(1)

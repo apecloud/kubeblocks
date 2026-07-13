@@ -346,6 +346,43 @@ var _ = Describe("action utils", func() {
 			Expect(string(content)).Should(Equal("static:maxmemory=1gb\nstatic:timeout=30\n"))
 		})
 
+		It("blocking - batched runtime arguments execute once after full prevalidation", func() {
+			f, err := os.CreateTemp("", "kbagent-batched-args-*")
+			Expect(err).Should(BeNil())
+			path := f.Name()
+			Expect(f.Close()).Should(Succeed())
+			defer os.Remove(path)
+
+			action := &proto.Action{
+				Exec: &proto.ExecAction{
+					Commands: []string{"/bin/bash", "-c", `
+						[ "$#" -gt 0 ] || exit 1
+						[ $(( $# % 2 )) -eq 0 ] || exit 2
+						for value in "$@"; do
+							[ -n "$value" ] || exit 3
+							done
+						printf "%s\n" "$*" >> "$0"
+					`, path},
+					BatchRuntimeArgs: true,
+				},
+			}
+			_, err = callActionWithRetry(ctx, action, nil, nil, nil, nil)
+			Expect(err).ShouldNot(BeNil())
+
+			_, err = callActionWithRetry(ctx, action, nil, [][]string{{"maxmemory", "1gb"}, {"timeout", ""}}, nil, nil)
+			Expect(err).ShouldNot(BeNil())
+
+			content, err := os.ReadFile(path)
+			Expect(err).Should(BeNil())
+			Expect(content).Should(BeEmpty())
+
+			_, err = callActionWithRetry(ctx, action, nil, [][]string{{"maxmemory", "1gb"}, {"timeout", "30"}}, nil, nil)
+			Expect(err).Should(BeNil())
+			content, err = os.ReadFile(path)
+			Expect(err).Should(BeNil())
+			Expect(string(content)).Should(Equal("maxmemory 1gb timeout 30\n"))
+		})
+
 		It("blocking - runtime argument group output is aggregated in order", func() {
 			action := &proto.Action{
 				Exec: &proto.ExecAction{

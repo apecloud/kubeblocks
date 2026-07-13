@@ -181,6 +181,9 @@ func callActionWithRetry(ctx context.Context, action *proto.Action, parameters m
 	if action.Exec == nil {
 		return nil, errors.Wrapf(proto.ErrBadRequest, "runtime arguments are only supported for exec actions")
 	}
+	if action.Exec.BatchRuntimeArgs {
+		return callActionWithRetryOnce(ctx, action, parameters, flattenRuntimeArguments(arguments), timeout, retryPolicy)
+	}
 	output := bytes.NewBuffer(nil)
 	for _, args := range arguments {
 		out, err := callActionWithRetryOnce(ctx, action, parameters, args, timeout, retryPolicy)
@@ -208,6 +211,18 @@ func nonBlockingCallActionWithRetry(ctx context.Context, action *proto.Action, p
 		}
 	}()
 	return resultChan, nil
+}
+
+func flattenRuntimeArguments(arguments [][]string) []string {
+	size := 0
+	for _, group := range arguments {
+		size += len(group)
+	}
+	flattened := make([]string, 0, size)
+	for _, group := range arguments {
+		flattened = append(flattened, group...)
+	}
+	return flattened
 }
 
 func callActionWithRetryOnce(ctx context.Context, action *proto.Action, parameters map[string]string, arguments []string, timeout *int32, retryPolicy *proto.RetryPolicy) ([]byte, error) {

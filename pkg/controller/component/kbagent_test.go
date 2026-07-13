@@ -433,7 +433,8 @@ var _ = Describe("kb-agent", func() {
 		It("user-defined actions", func() {
 			synthesizedComp.LifecycleActions.Reconfigure = &appsv1.Action{
 				Exec: &appsv1.ExecAction{
-					Command: []string{"echo", "reconfigure"},
+					Command:          []string{"echo", "reconfigure"},
+					BatchRuntimeArgs: true,
 				},
 			}
 			synthesizedComp.FileTemplates = []SynthesizedFileTemplate{
@@ -503,7 +504,8 @@ var _ = Describe("kb-agent", func() {
 			Expect(actions).Should(ContainElement(proto.Action{
 				Name: "reconfigure",
 				Exec: &proto.ExecAction{
-					Commands: []string{"echo", "reconfigure"},
+					Commands:         []string{"echo", "reconfigure"},
+					BatchRuntimeArgs: true,
 				},
 			}))
 			Expect(actions).Should(ContainElement(proto.Action{

@@ -71,6 +71,20 @@ var _ = Describe("reconfigure", func() {
 			Expect(err).Should(BeNil())
 		})
 
+		DescribeTable("rejects malformed reconfigure argument groups before execution",
+			func(arguments [][]string) {
+				req := &proto.ActionRequest{Action: "reconfigure", Arguments: arguments}
+				err := checkReconfigure(ctx, req)
+				Expect(errors.Is(err, proto.ErrBadRequest)).Should(BeTrue())
+			},
+			Entry("first value missing", [][]string{{"first"}, {"middle", "2"}, {"last", "3"}}),
+			Entry("middle value missing", [][]string{{"first", "1"}, {"middle"}, {"last", "3"}}),
+			Entry("last value missing", [][]string{{"first", "1"}, {"middle", "2"}, {"last"}}),
+			Entry("empty key", [][]string{{"", "1"}}),
+			Entry("duplicate key", [][]string{{"first", "1"}, {"first", "2"}}),
+			Entry("argument count mismatch", [][]string{{"first", "1", "extra"}}),
+		)
+
 		It("bad request", func() {
 			req := &proto.ActionRequest{
 				Action: "reconfigure",

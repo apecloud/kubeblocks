@@ -51,6 +51,28 @@ func checkReconfigure(_ context.Context, req *proto.ActionRequest) error {
 	if err := checkReconfigureUpdated(req); err != nil {
 		return err
 	}
+	if err := checkReconfigureArguments(req); err != nil {
+		return err
+	}
+	return nil
+}
+
+func checkReconfigureArguments(req *proto.ActionRequest) error {
+	seen := make(map[string]struct{}, len(req.Arguments))
+	for i, arguments := range req.Arguments {
+		if len(arguments) != 2 {
+			return errors.Wrapf(proto.ErrBadRequest,
+				"reconfigure - argument group %d must contain exactly one name and value", i)
+		}
+		name := arguments[0]
+		if name == "" {
+			return errors.Wrapf(proto.ErrBadRequest, "reconfigure - argument group %d has an empty name", i)
+		}
+		if _, ok := seen[name]; ok {
+			return errors.Wrapf(proto.ErrBadRequest, "reconfigure - duplicate argument name: %s", name)
+		}
+		seen[name] = struct{}{}
+	}
 	return nil
 }
 

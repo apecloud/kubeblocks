@@ -1985,6 +1985,15 @@ type ExecAction struct {
 	// +optional
 	Args []string `json:"args,omitempty"`
 
+	// BatchRuntimeArgs controls how runtime argument groups are delivered to the command.
+	//
+	// When false, the command is executed once for every runtime argument group.
+	// When true, all runtime argument groups are flattened in order and delivered to one command invocation.
+	// This allows the command to validate a complete parameter update before applying any change.
+	//
+	// +optional
+	BatchRuntimeArgs bool `json:"batchRuntimeArgs,omitempty"`
+
 	// Defines the criteria used to select the target Pod(s) for executing the Action.
 	// This is useful when there is no default target replica identified.
 	// It allows for precise control over which Pod(s) the Action should run in.

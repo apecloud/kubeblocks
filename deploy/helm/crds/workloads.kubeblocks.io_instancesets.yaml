@@ -96,6 +96,14 @@ spec:
                               items:
                                 type: string
                               type: array
+                            batchRuntimeArgs:
+                              description: |-
+                                BatchRuntimeArgs controls how runtime argument groups are delivered to the command.
+
+                                When false, the command is executed once for every runtime argument group.
+                                When true, all runtime argument groups are flattened in order and delivered to one command invocation.
+                                This allows the command to validate a complete parameter update before applying any change.
+                              type: boolean
                             command:
                               description: |-
                                 Specifies the command to be executed inside the container.
@@ -2500,6 +2508,14 @@ spec:
                             items:
                               type: string
                             type: array
+                          batchRuntimeArgs:
+                            description: |-
+                              BatchRuntimeArgs controls how runtime argument groups are delivered to the command.
+
+                              When false, the command is executed once for every runtime argument group.
+                              When true, all runtime argument groups are flattened in order and delivered to one command invocation.
+                              This allows the command to validate a complete parameter update before applying any change.
+                            type: boolean
                           command:
                             description: |-
                               Specifies the command to be executed inside the container.
@@ -2909,6 +2925,14 @@ spec:
                             items:
                               type: string
                             type: array
+                          batchRuntimeArgs:
+                            description: |-
+                              BatchRuntimeArgs controls how runtime argument groups are delivered to the command.
+
+                              When false, the command is executed once for every runtime argument group.
+                              When true, all runtime argument groups are flattened in order and delivered to one command invocation.
+                              This allows the command to validate a complete parameter update before applying any change.
+                            type: boolean
                           command:
                             description: |-
                               Specifies the command to be executed inside the container.

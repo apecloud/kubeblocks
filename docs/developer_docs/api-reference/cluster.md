@@ -8391,6 +8391,21 @@ If the shell is required, it must be explicitly invoked in the command.</p>
 </tr>
 <tr>
 <td>
+<code>batchRuntimeArgs</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>BatchRuntimeArgs controls how runtime argument groups are delivered to the command.</p>
+<p>When false, the command is executed once for every runtime argument group.
+When true, all runtime argument groups are flattened in order and delivered to one command invocation.
+This allows the command to validate a complete parameter update before applying any change.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>targetPodSelector</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.TargetPodSelector">

@@ -802,8 +802,9 @@ Modifications to any of these parameters require a restart of the process to tak
 <p>List dynamic parameters.
 Modifications to these parameters trigger a configuration reload without requiring a process restart.
 When parameter updates are applied through a ComponentDefinition config template reconfigure ExecAction,
-the controller invokes the action once for each updated
-parameter and appends the parameter name and value as the last arguments.
+the controller appends each parameter name and value as runtime arguments. By default, it invokes the action
+once for each updated parameter. Set ExecAction.BatchRuntimeArgs to deliver all updated parameters to one
+invocation so the action can validate the complete request before applying changes.
 If the config volume mount path can be resolved from the workload pod template,
 KubeBlocks also guards the action with the target rendered file checksum.
 When the mount path cannot be resolved, the action is invoked without the checksum guard.
@@ -3049,8 +3050,9 @@ Modifications to any of these parameters require a restart of the process to tak
 <p>List dynamic parameters.
 Modifications to these parameters trigger a configuration reload without requiring a process restart.
 When parameter updates are applied through a ComponentDefinition config template reconfigure ExecAction,
-the controller invokes the action once for each updated
-parameter and appends the parameter name and value as the last arguments.
+the controller appends each parameter name and value as runtime arguments. By default, it invokes the action
+once for each updated parameter. Set ExecAction.BatchRuntimeArgs to deliver all updated parameters to one
+invocation so the action can validate the complete request before applying changes.
 If the config volume mount path can be resolved from the workload pod template,
 KubeBlocks also guards the action with the target rendered file checksum.
 When the mount path cannot be resolved, the action is invoked without the checksum guard.

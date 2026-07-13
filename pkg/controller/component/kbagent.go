@@ -396,8 +396,9 @@ func buildAction4KBAgent(action *appsv1.Action, name string) *proto.Action {
 	}
 	if action.Exec != nil {
 		a.Exec = &proto.ExecAction{
-			Commands: action.Exec.Command,
-			Args:     action.Exec.Args,
+			Commands:         action.Exec.Command,
+			Args:             action.Exec.Args,
+			BatchRuntimeArgs: action.Exec.BatchRuntimeArgs,
 		}
 	}
 	if action.HTTP != nil {

@@ -729,7 +729,7 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 			return nil, err
 		}
 		sort.Sort(intctrlutil.ByPodName(targetPodList.Items))
-		frozenSourceByTarget, hasFrozenPlan, err := r.getFrozenPostReadySourceTargets(
+		frozenTargetByName, hasFrozenPlan, err := r.getFrozenPostReadySourceTargets(
 			reqCtx, cli, types.NamespacedName{Namespace: r.Restore.Namespace, Name: buildJobName(0)})
 		if err != nil {
 			return nil, err
@@ -772,9 +772,14 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 				Namespace: targetPodList.Items[i].Namespace,
 				Name:      targetPodList.Items[i].Name,
 			}.String()
-			sourceTargetPodName, selectedByFrozenPlan := frozenSourceByTarget[targetName]
+			frozenTarget, selectedByFrozenPlan := frozenTargetByName[targetName]
 			if hasFrozenPlan && !selectedByFrozenPlan {
 				continue
+			}
+			sourceTargetPodName := frozenTarget.source
+			jobIndex := i
+			if hasFrozenPlan {
+				jobIndex = frozenTarget.ordinal
 			}
 			if !hasFrozenPlan {
 				sourceTargetPodName, err = GetSourcePodNameFromTarget(target, jobAction.RequiredPolicyForAllPodSelection, i)
@@ -786,11 +791,11 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 				// no need to recover the volume when the pod selection policy is 'All' and sourceTargetPodName is not found.
 				continue
 			}
-			job := buildJob(&targetPodList.Items[i], sourceTargetPodName, i)
+			job := buildJob(&targetPodList.Items[i], sourceTargetPodName, jobIndex)
 			setPostReadyTargetIdentity(job, &targetPodList.Items[i], sourceTargetPodName)
 			jobs = append(jobs, job)
 		}
-		if hasFrozenPlan && len(jobs) != len(frozenSourceByTarget) {
+		if hasFrozenPlan && len(jobs) != len(frozenTargetByName) {
 			return nil, intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue,
 				"not all frozen postReady target pods are currently available")
 		}
@@ -899,14 +904,20 @@ func splitPostReadyTargetIdentity(identity string) (target, source string) {
 	return parts[0], parts[1]
 }
 
-// getFrozenPostReadySourceTargets returns the original target-to-source mapping
-// after a partial create. JobAction must use it while rebuilding specs so the
-// backup path does not drift when the selected target Pod set changes.
+type frozenPostReadyTarget struct {
+	source  string
+	ordinal int
+}
+
+// getFrozenPostReadySourceTargets returns the original target-to-source and
+// target-to-ordinal mappings after a partial create. JobAction must use both
+// while rebuilding specs so neither the backup path nor the Job name drifts
+// when the selected target Pod set changes.
 func (r *RestoreManager) getFrozenPostReadySourceTargets(
 	reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	firstJobKey types.NamespacedName,
-) (map[string]string, bool, error) {
+) (map[string]frozenPostReadyTarget, bool, error) {
 	existing := &batchv1.Job{}
 	if err := cli.Get(reqCtx.Ctx, firstJobKey, existing); err != nil {
 		if apierrors.IsNotFound(err) {
@@ -933,19 +944,19 @@ func (r *RestoreManager) getFrozenPostReadySourceTargets(
 		return nil, false, intctrlutil.NewFatalError(fmt.Sprintf(
 			"postReady job %s/%s has no frozen target plan", existing.Namespace, existing.Name))
 	}
-	sourceByTarget := make(map[string]string, len(plan))
-	for _, identity := range plan {
+	targets := make(map[string]frozenPostReadyTarget, len(plan))
+	for ordinal, identity := range plan {
 		target, source := splitPostReadyTargetIdentity(identity)
 		if target == "" {
 			return nil, false, intctrlutil.NewFatalError("postReady frozen target plan has an empty target")
 		}
-		if _, ok := sourceByTarget[target]; ok {
+		if _, ok := targets[target]; ok {
 			return nil, false, intctrlutil.NewFatalError(fmt.Sprintf(
 				"duplicate postReady frozen target %s", target))
 		}
-		sourceByTarget[target] = source
+		targets[target] = frozenPostReadyTarget{source: source, ordinal: ordinal}
 	}
-	return sourceByTarget, true, nil
+	return targets, true, nil
 }
 
 func hasPostReadyFrozenContract(job *batchv1.Job) bool {

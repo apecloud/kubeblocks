@@ -810,6 +810,8 @@ var _ = Describe("RestoreManager Test", func() {
 			rebuilt, err := restoreMGR.BuildPostReadyActionJobs(reqCtx, k8sClient, *backupSet, target, 1)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(rebuilt).Should(HaveLen(2))
+			Expect(rebuilt[0].Name).Should(Equal(initial[0].Name))
+			Expect(rebuilt[1].Name).Should(Equal(initial[1].Name))
 			rebuilt, err = restoreMGR.FreezePostReadyExecutionPlan(reqCtx, k8sClient, rebuilt)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(rebuilt).Should(HaveLen(2))
@@ -825,6 +827,24 @@ var _ = Describe("RestoreManager Test", func() {
 				}
 			}
 			Expect(targetRelativePaths).Should(Equal([]string{"source-b", "source-c"}))
+
+			rebuilt, err = restoreMGR.CreateJobsIfNotExist(reqCtx, k8sClient, restoreMGR.Restore, rebuilt)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(rebuilt).Should(HaveLen(2))
+			Expect(restoreMGR.ResumeNextSerialPostReadyJob(reqCtx, k8sClient, rebuilt)).Should(Succeed())
+			persistedJobs := &batchv1.JobList{}
+			Expect(k8sClient.List(reqCtx.Ctx, persistedJobs,
+				client.InNamespace(initial[0].Namespace),
+				client.MatchingLabels{DataProtectionRestoreLabelKey: restoreMGR.Restore.Name})).Should(Succeed())
+			Expect(persistedJobs.Items).Should(HaveLen(2))
+			Expect([]string{persistedJobs.Items[0].Name, persistedJobs.Items[1].Name}).Should(
+				ConsistOf(initial[0].Name, initial[1].Name))
+			for i := range initial {
+				persisted := &batchv1.Job{}
+				Expect(k8sClient.Get(reqCtx.Ctx, client.ObjectKeyFromObject(initial[i]), persisted)).Should(Succeed())
+				Expect(postReadyTargetIdentity(persisted)).Should(Equal(initialIdentities[i]))
+				Expect(*persisted.Spec.Suspend).Should(Equal(i != 0))
+			}
 		})
 
 		It("does not resume a serial job after a failed predecessor", func() {

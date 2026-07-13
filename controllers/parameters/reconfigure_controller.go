@@ -392,7 +392,7 @@ func (r *ReconfigureReconciler) resolveReconfigurePolicy(jsonPatch string, forma
 }
 
 func templateReconfigureBeforeRestart(pd *parametersv1alpha1.ParametersDefinitionSpec, templateSpec *appsv1.ComponentFileTemplate) bool {
-	if pd == nil || templateSpec == nil || templateSpec.Reconfigure == nil {
+	if pd == nil || templateSpec == nil || templateSpec.Reconfigure == nil || templateSpec.Reconfigure.Exec == nil {
 		return false
 	}
 	return pd.MergeReloadAndRestart == nil || !*pd.MergeReloadAndRestart

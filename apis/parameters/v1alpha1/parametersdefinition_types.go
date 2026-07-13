@@ -118,6 +118,8 @@ type ParametersDefinitionSpec struct {
 	//
 	// - If true, updates requiring both actions will result in only a restart, merging the actions.
 	// - If false, updates will trigger both actions executed sequentially: first dynamic reload, then restart.
+	// - If unset, legacy reloadAction handling treats it as true, while ComponentDefinition template
+	//   reconfigure actions with Exec treat it as false so dynamic parameters can reload before restart.
 	//
 	// This flag allows for more efficient handling of configuration changes by potentially eliminating
 	// an unnecessary reload step.

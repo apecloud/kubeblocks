@@ -840,6 +840,34 @@ func TestResolveReconfigurePolicySplitsTemplateReconfigureMixedUpdateByDefault(t
 	}
 }
 
+func TestResolveReconfigurePolicyKeepsNonExecTemplateReconfigureMixedUpdateAsRestartByDefault(t *testing.T) {
+	r := &ReconfigureReconciler{}
+	pd := &parametersv1alpha1.ParametersDefinitionSpec{
+		DynamicParameters: []string{"max_connections"},
+	}
+	configSpec := &appsv1.ComponentFileTemplate{
+		Name: "postgresql-configuration",
+		Reconfigure: &appsv1.Action{
+			HTTP: &appsv1.HTTPAction{Port: "8080", Path: "/reload"},
+		},
+	}
+
+	policy, err := r.resolveReconfigurePolicy(
+		`{"max_connections":"500","shared_buffers":"1024MB"}`,
+		&parametersv1alpha1.FileFormatConfig{
+			Format: parametersv1alpha1.YAML,
+		},
+		pd,
+		configSpec,
+	)
+	if err != nil {
+		t.Fatalf("resolveReconfigurePolicy returned error: %v", err)
+	}
+	if policy != reconfigure.RestartPolicy {
+		t.Fatalf("expected %q, got %q", reconfigure.RestartPolicy, policy)
+	}
+}
+
 func TestResolveReconfigurePolicyKeepsStaticOnlyUpdateAsRestartWhenMergeIsDisabled(t *testing.T) {
 	r := &ReconfigureReconciler{}
 	pd := &parametersv1alpha1.ParametersDefinitionSpec{

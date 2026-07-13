@@ -458,24 +458,6 @@ var _ = Describe("RestoreManager Test", func() {
 
 		})
 
-		It("test with BuildVolumePopulateJob function", func() {
-			reqCtx := getReqCtx()
-			restoreMGR, backupSet := initResources(reqCtx, 0, true, func(f *testdp.MockRestoreFactory) {
-				f.SetDataSourceRef(testdp.DataVolumeName, testdp.DataVolumeMountPath)
-			})
-
-			By("test BuildVolumePopulateJob function, expect for 1 job")
-			populatePVC := &corev1.PersistentVolumeClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-populate-pvc",
-				},
-			}
-			target := utils.GetBackupStatusTarget(backupSet.Backup, restoreMGR.Restore.Spec.Backup.SourceTargetName)
-			job, err := restoreMGR.BuildVolumePopulateJob(reqCtx, k8sClient, *backupSet, target, populatePVC, 0)
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(job).ShouldNot(BeNil())
-		})
-
 		testPostReady := func(existVolume bool) {
 			kbNamespace := "kb-system"
 			execWorkerServiceAccountName := "dp-exec-worker"

@@ -31,6 +31,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -39,7 +40,6 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -449,14 +449,22 @@ var _ = Describe("Volume Populator Controller test", func() {
 			Eventually(testapps.CheckObj(&testCtx, types.NamespacedName{Namespace: testCtx.DefaultNamespace,
 				Name: populatePVCName}, func(g Gomega, restore *dpv1alpha1.Restore) {
 				g.Expect(restore.Spec.Backup.Name).Should(Equal(pvc.Spec.DataSourceRef.Name))
-				g.Expect(restore.Spec.PrepareDataConfig.DataSourceRef.VolumeSource).Should(Equal(testdp.DataVolumeName))
+				g.Expect(restore.Spec.PrepareDataConfig.DataSourceRef).Should(BeNil())
+				g.Expect(restore.Spec.PrepareDataConfig.RestoreVolumeClaims).Should(HaveLen(1))
+				g.Expect(restore.Spec.PrepareDataConfig.RestoreVolumeClaims[0].Name).Should(Equal(populatePVCName))
+				g.Expect(restore.Spec.PrepareDataConfig.RestoreVolumeClaims[0].VolumeSource).Should(Equal(testdp.DataVolumeName))
+				g.Expect(restore.Spec.ReadyConfig).Should(BeNil())
 				g.Expect(restore.OwnerReferences).ShouldNot(BeEmpty())
 				g.Expect(restore.OwnerReferences[0].UID).Should(Equal(pvc.UID))
+			})).Should(Succeed())
+			Eventually(testapps.CheckObj(&testCtx, types.NamespacedName{Namespace: testCtx.DefaultNamespace,
+				Name: populatePVCName}, func(g Gomega, restore *dpv1alpha1.Restore) {
+				g.Expect(restore.Status.Phase).Should(Equal(dpv1alpha1.RestorePhaseRunning))
 			})).Should(Succeed())
 
 			By("expect for job created")
 			Eventually(testapps.List(&testCtx, generics.JobSignature,
-				client.MatchingLabels{dprestore.DataProtectionPopulatePVCLabelKey: populatePVCName},
+				client.MatchingLabels{dprestore.DataProtectionRestoreLabelKey: populatePVCName},
 				client.InNamespace(testCtx.DefaultNamespace))).Should(HaveLen(1))
 
 			By("mock to create pv and bind to populate pvc")
@@ -465,8 +473,13 @@ var _ = Describe("Volume Populator Controller test", func() {
 			By("mock job to succeed")
 			jobList := &batchv1.JobList{}
 			Expect(k8sClient.List(ctx, jobList,
-				client.MatchingLabels{dprestore.DataProtectionPopulatePVCLabelKey: getPopulatePVCName(pvc.UID)},
+				client.MatchingLabels{dprestore.DataProtectionRestoreLabelKey: getPopulatePVCName(pvc.UID)},
 				client.InNamespace(testCtx.DefaultNamespace))).Should(Succeed())
+			Expect(jobList.Items).Should(HaveLen(1))
+			jobOwner := metav1.GetControllerOf(&jobList.Items[0])
+			Expect(jobOwner).ShouldNot(BeNil())
+			Expect(jobOwner.Kind).Should(Equal(dptypes.RestoreKind))
+			Expect(jobOwner.Name).Should(Equal(populatePVCName))
 			checkJobsSA(jobList)
 			testdp.ReplaceK8sJobStatus(&testCtx, client.ObjectKeyFromObject(&jobList.Items[0]), batchv1.JobComplete)
 
@@ -496,7 +509,7 @@ var _ = Describe("Volume Populator Controller test", func() {
 
 			By("expect for resources are cleaned up")
 			Eventually(testapps.List(&testCtx, generics.JobSignature,
-				client.MatchingLabels{dprestore.DataProtectionPopulatePVCLabelKey: populatePVCName},
+				client.MatchingLabels{dprestore.DataProtectionRestoreLabelKey: populatePVCName},
 				client.InNamespace(testCtx.DefaultNamespace))).Should(HaveLen(0))
 			Eventually(testapps.CheckObjExists(&testCtx, types.NamespacedName{Namespace: testCtx.DefaultNamespace,
 				Name: populatePVCName}, populatePVC, false))
@@ -1474,7 +1487,46 @@ func TestDispatchUnboundPVCFailsWhenNoRestoreActionsExist(t *testing.T) {
 		"expected fatal error when neither prepareData nor postReady exists, got: %v", err)
 }
 
-func TestPopulateDoesNotPollWhilePrepareDataJobIsStillActive(t *testing.T) {
+func TestDeletingTargetPVCCleansPopulationWithoutValidatingSource(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
+	apiGroup := dptypes.DataprotectionAPIGroup
+	now := metav1.Now()
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:         "default",
+			Name:              "data-0",
+			UID:               "data-0-uid",
+			DeletionTimestamp: &now,
+			Finalizers:        []string{dptypes.DataProtectionFinalizerName},
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			DataSourceRef: &corev1.TypedObjectReference{
+				APIGroup: &apiGroup,
+				Kind:     dptypes.BackupKind,
+				Name:     "already-deleted-backup",
+			},
+		},
+	}
+	populatePVC := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: pvc.Namespace,
+			Name:      getPopulatePVCName(pvc.UID),
+		},
+	}
+	reconciler := &VolumePopulatorReconciler{
+		Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(pvc, populatePVC).Build(),
+		Scheme: scheme,
+	}
+
+	err := reconciler.syncPVC(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc)
+	require.NoError(t, err)
+	err = reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(populatePVC), &corev1.PersistentVolumeClaim{})
+	require.True(t, apierrors.IsNotFound(err), "populate PVC should be deleted, got: %v", err)
+}
+
+func TestPopulateCreatesExecutionRestoreAndPolls(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, corev1.AddToScheme(scheme))
 	require.NoError(t, batchv1.AddToScheme(scheme))
@@ -1504,12 +1556,20 @@ func TestPopulateDoesNotPollWhilePrepareDataJobIsStillActive(t *testing.T) {
 			Name:      "restore",
 		},
 		Spec: dpv1alpha1.RestoreSpec{
-			Backup: dpv1alpha1.BackupRef{Name: "backup", Namespace: "default"},
+			Backup:             dpv1alpha1.BackupRef{Name: "backup", Namespace: "backup-ns", SourceTargetName: "source"},
+			RestoreTime:        "2026-07-13T01:02:03Z",
+			ServiceAccountName: "restore-worker",
+			Env:                []corev1.EnvVar{{Name: "RESTORE_ENV", Value: "value"}},
+			Parameters:         []dpv1alpha1.ParameterPair{{Name: "parameter", Value: "value"}},
 			PrepareDataConfig: &dpv1alpha1.PrepareDataConfig{
 				DataSourceRef: &dpv1alpha1.VolumeConfig{
 					VolumeSource: "data",
 					MountPath:    "/var/run/etcd/backup",
 				},
+				RequiredPolicyForAllPodSelection: &dpv1alpha1.RequiredPolicyForAllPodSelection{
+					DataRestorePolicy: dpv1alpha1.OneToOneRestorePolicy,
+				},
+				VolumeClaimRestorePolicy: dpv1alpha1.VolumeClaimRestorePolicySerial,
 			},
 		},
 	}
@@ -1549,89 +1609,93 @@ func TestPopulateDoesNotPollWhilePrepareDataJobIsStillActive(t *testing.T) {
 
 	err := reconciler.Populate(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, restoreCtx)
 
-	require.NoError(t, err)
+	require.Error(t, err)
+	require.True(t, intctrlutil.IsRequeueError(err), err.Error())
 	jobs := &batchv1.JobList{}
 	require.NoError(t, reconciler.Client.List(context.Background(), jobs))
-	require.Len(t, jobs.Items, 1)
-	require.Empty(t, jobs.Items[0].Status.Conditions)
+	require.Empty(t, jobs.Items, "VolumePopulator must not create prepareData jobs")
+	executionRestore := &dpv1alpha1.Restore{}
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKey{
+		Namespace: pvc.Namespace,
+		Name:      getPopulatePVCName(pvc.UID),
+	}, executionRestore))
+	require.Nil(t, executionRestore.Spec.PrepareDataConfig.DataSourceRef)
+	require.Nil(t, executionRestore.Spec.ReadyConfig)
+	require.Len(t, executionRestore.Spec.PrepareDataConfig.RestoreVolumeClaims, 1)
+	require.Equal(t, getPopulatePVCName(pvc.UID), executionRestore.Spec.PrepareDataConfig.RestoreVolumeClaims[0].Name)
+	require.Equal(t, restore.Spec.Backup, executionRestore.Spec.Backup)
+	require.Equal(t, restore.Spec.RestoreTime, executionRestore.Spec.RestoreTime)
+	require.Equal(t, restore.Spec.ServiceAccountName, executionRestore.Spec.ServiceAccountName)
+	require.Equal(t, restore.Spec.Env, executionRestore.Spec.Env)
+	require.Equal(t, restore.Spec.Parameters, executionRestore.Spec.Parameters)
+	require.Equal(t, restore.Spec.PrepareDataConfig.RequiredPolicyForAllPodSelection,
+		executionRestore.Spec.PrepareDataConfig.RequiredPolicyForAllPodSelection)
+	require.Equal(t, restore.Spec.PrepareDataConfig.VolumeClaimRestorePolicy,
+		executionRestore.Spec.PrepareDataConfig.VolumeClaimRestorePolicy)
+	require.Equal(t, []corev1.Toleration{{Operator: corev1.TolerationOpExists}},
+		executionRestore.Spec.PrepareDataConfig.SchedulingSpec.Tolerations)
+	require.Len(t, executionRestore.OwnerReferences, 1)
+	require.Equal(t, pvc.UID, executionRestore.OwnerReferences[0].UID)
+
+	populatePVC := &corev1.PersistentVolumeClaim{}
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKey{
+		Namespace: pvc.Namespace,
+		Name:      getPopulatePVCName(pvc.UID),
+	}, populatePVC))
+	populatePVC.Annotations = map[string]string{"storage.example.io/provisioner-state": "selected"}
+	require.NoError(t, reconciler.Client.Update(context.Background(), populatePVC))
+	currentPVC := &corev1.PersistentVolumeClaim{}
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(pvc), currentPVC))
+	err = reconciler.Populate(intctrlutil.RequestCtx{Ctx: context.Background()}, currentPVC, restoreCtx)
+	require.Error(t, err)
+	require.True(t, intctrlutil.IsRequeueError(err), err.Error())
+
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(executionRestore), executionRestore))
+	executionRestore.Status.Phase = dpv1alpha1.RestorePhaseFailed
+	require.NoError(t, reconciler.Client.Status().Update(context.Background(), executionRestore))
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(pvc), currentPVC))
+	err = reconciler.Populate(intctrlutil.RequestCtx{Ctx: context.Background()}, currentPVC, restoreCtx)
+	require.Error(t, err)
+	require.True(t, intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal), err.Error())
+	_, reconcileErr := reconciler.handleSyncPVCError(intctrlutil.RequestCtx{Ctx: context.Background()}, currentPVC, err)
+	require.NoError(t, reconcileErr)
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(pvc), currentPVC))
+	failedCondition := findPVCConditionByType(currentPVC, string(PersistentVolumeClaimPopulating))
+	require.NotNil(t, failedCondition)
+	require.Equal(t, ReasonPopulatingFailed, failedCondition.Reason)
 }
 
-func TestParsePopulatePodMapsJobPodToTargetPVC(t *testing.T) {
-	scheme := runtime.NewScheme()
-	require.NoError(t, corev1.AddToScheme(scheme))
-	require.NoError(t, batchv1.AddToScheme(scheme))
+func TestBuildExecutionRestoreIsIndependentOfDataSourceEntry(t *testing.T) {
+	apiGroup := dptypes.DataprotectionAPIGroup
 	pvc := &corev1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "default",
-			Name:      "data-etcd-restore-0",
-			UID:       "data-etcd-restore-0-uid",
+		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "data-0", UID: "data-0-uid"},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			DataSourceRef: &corev1.TypedObjectReference{APIGroup: &apiGroup, Name: "source"},
 		},
 	}
-	job := &batchv1.Job{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "default",
-			Name:      "populate-job",
-			UID:       "populate-job-uid",
-			Labels: map[string]string{
-				dprestore.DataProtectionRestoreLabelKey:     "restore",
-				dprestore.DataProtectionPopulatePVCLabelKey: "populate-pvc",
-			},
-			OwnerReferences: []metav1.OwnerReference{{
-				APIVersion:         "v1",
-				Kind:               constant.PersistentVolumeClaimKind,
-				Name:               pvc.Name,
-				UID:                pvc.UID,
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
-			}},
+	populatePVC := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{Namespace: pvc.Namespace, Name: getPopulatePVCName(pvc.UID)},
+	}
+	sourceSpec := dpv1alpha1.RestoreSpec{
+		Backup: dpv1alpha1.BackupRef{Name: "backup", Namespace: "backup-ns", SourceTargetName: "source-target"},
+		PrepareDataConfig: &dpv1alpha1.PrepareDataConfig{
+			DataSourceRef: &dpv1alpha1.VolumeConfig{VolumeSource: "data", MountPath: "/data"},
 		},
 	}
-	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "default",
-			Name:      "populate-job-pod",
-			Labels: map[string]string{
-				dprestore.DataProtectionRestoreLabelKey:     "restore",
-				dprestore.DataProtectionPopulatePVCLabelKey: "populate-pvc",
-			},
-			OwnerReferences: []metav1.OwnerReference{{
-				APIVersion:         "batch/v1",
-				Kind:               constant.JobKind,
-				Name:               job.Name,
-				UID:                job.UID,
-				Controller:         ptr.To(true),
-				BlockOwnerDeletion: ptr.To(true),
-			}},
-		},
-	}
-	reconciler := &VolumePopulatorReconciler{
-		Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(pvc, job).Build(),
-		Scheme: scheme,
-	}
+	backupSource := &dpv1alpha1.Restore{Spec: *sourceSpec.DeepCopy()}
+	restoreSource := &dpv1alpha1.Restore{Spec: *sourceSpec.DeepCopy()}
 
-	requests := reconciler.parsePopulatePod(context.Background(), pod)
+	backupPVC := pvc.DeepCopy()
+	backupPVC.Spec.DataSourceRef.Kind = dptypes.BackupKind
+	restorePVC := pvc.DeepCopy()
+	restorePVC.Spec.DataSourceRef.Kind = dptypes.RestoreKind
 
-	require.Equal(t, []reconcile.Request{{
-		NamespacedName: types.NamespacedName{Namespace: "default", Name: pvc.Name},
-	}}, requests)
-}
-
-func TestParsePopulatePodIgnoresUnrelatedPods(t *testing.T) {
-	scheme := runtime.NewScheme()
-	require.NoError(t, corev1.AddToScheme(scheme))
-	require.NoError(t, batchv1.AddToScheme(scheme))
-	reconciler := &VolumePopulatorReconciler{
-		Client: fake.NewClientBuilder().WithScheme(scheme).Build(),
-		Scheme: scheme,
-	}
-	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "default",
-			Name:      "unrelated",
-		},
-	}
-
-	require.Empty(t, reconciler.parsePopulatePod(context.Background(), pod))
+	fromBackup := buildExecutionRestore(backupPVC, populatePVC, backupSource)
+	fromRestore := buildExecutionRestore(restorePVC, populatePVC, restoreSource)
+	require.Equal(t, fromBackup.Spec, fromRestore.Spec)
+	require.Equal(t, fromBackup.Labels, fromRestore.Labels)
+	require.Nil(t, fromBackup.Spec.PrepareDataConfig.DataSourceRef)
+	require.Len(t, fromBackup.Spec.PrepareDataConfig.RestoreVolumeClaims, 1)
 }
 
 func TestBuildPostReadyRestoreSelectsHighestPriorityRole(t *testing.T) {
@@ -2157,7 +2221,7 @@ func TestRestoreParametersToPairsSortsKeys(t *testing.T) {
 	}, pairs)
 }
 
-func TestEnsureInternalRestoreRejectsSpecMutation(t *testing.T) {
+func TestEnsureExecutionRestoreRejectsSpecMutation(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, corev1.AddToScheme(scheme))
 	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
@@ -2185,7 +2249,7 @@ func TestEnsureInternalRestoreRejectsSpecMutation(t *testing.T) {
 	desired := existing.DeepCopy()
 	desired.Spec.RestoreTime = "2026-05-02T00:00:00Z"
 
-	restore, err := reconciler.ensureInternalRestore(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, desired)
+	restore, err := reconciler.ensureExecutionRestore(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, desired)
 
 	require.Error(t, err)
 	require.Nil(t, restore)

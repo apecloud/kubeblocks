@@ -29,7 +29,6 @@ import (
 	"strings"
 
 	vsv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
-	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -42,9 +41,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -53,7 +50,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	dperrors "github.com/apecloud/kubeblocks/pkg/dataprotection/errors"
 	dprestore "github.com/apecloud/kubeblocks/pkg/dataprotection/restore"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
@@ -138,45 +134,7 @@ func (r *VolumePopulatorReconciler) handleSyncPVCError(reqCtx intctrlutil.Reques
 func (r *VolumePopulatorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return intctrlutil.NewControllerManagedBy(mgr).
 		For(&corev1.PersistentVolumeClaim{}).
-		Owns(&batchv1.Job{}).
-		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.parsePopulatePod)).
 		Complete(r)
-}
-
-func (r *VolumePopulatorReconciler) parsePopulatePod(ctx context.Context, object client.Object) []reconcile.Request {
-	labels := object.GetLabels()
-	if labels[dprestore.DataProtectionRestoreLabelKey] == "" ||
-		labels[dprestore.DataProtectionPopulatePVCLabelKey] == "" {
-		return nil
-	}
-	owner := metav1.GetControllerOf(object)
-	if owner == nil || owner.Kind != constant.JobKind {
-		return nil
-	}
-	job := &batchv1.Job{}
-	if err := r.Client.Get(ctx, types.NamespacedName{Namespace: object.GetNamespace(), Name: owner.Name}, job); err != nil {
-		if !apierrors.IsNotFound(err) {
-			log.FromContext(ctx).V(1).Info("failed to map volume populate pod to job",
-				"pod", client.ObjectKeyFromObject(object),
-				"job", types.NamespacedName{Namespace: object.GetNamespace(), Name: owner.Name},
-				"error", err)
-		}
-		return nil
-	}
-	if job.Labels[dprestore.DataProtectionRestoreLabelKey] == "" ||
-		job.Labels[dprestore.DataProtectionPopulatePVCLabelKey] == "" {
-		return nil
-	}
-	pvcOwner := metav1.GetControllerOf(job)
-	if pvcOwner == nil || pvcOwner.Kind != constant.PersistentVolumeClaimKind {
-		return nil
-	}
-	return []reconcile.Request{{
-		NamespacedName: types.NamespacedName{
-			Namespace: job.Namespace,
-			Name:      pvcOwner.Name,
-		},
-	}}
 }
 
 func (r *VolumePopulatorReconciler) MatchToPopulate(pvc *corev1.PersistentVolumeClaim) (bool, error) {
@@ -215,20 +173,15 @@ func (r *VolumePopulatorReconciler) syncPVC(reqCtx intctrlutil.RequestCtx, pvc *
 	if !matched {
 		return nil
 	}
-	if pvc.Spec.DataSourceRef.Kind == dptypes.RestoreKind {
-		restoreMgr, err := r.validateRestoreRefAndBuildMGR(reqCtx, pvc)
-		if err != nil {
-			return err
-		}
-		if pvc.Spec.VolumeName == "" {
-			return r.Populate(reqCtx, pvc, &pvcRestoreContext{
-				restoreMgr: restoreMgr,
-				mode:       pvcRestoreModeRestoreData,
-			})
-		}
+	if !pvc.DeletionTimestamp.IsZero() {
 		return r.Cleanup(reqCtx, pvc)
 	}
-	restoreCtx, err := r.validateRestoreAndBuildMGR(reqCtx, pvc)
+	var restoreCtx *pvcRestoreContext
+	if pvc.Spec.DataSourceRef.Kind == dptypes.RestoreKind {
+		restoreCtx, err = r.validateRestoreRefAndBuildMGR(reqCtx, pvc)
+	} else {
+		restoreCtx, err = r.validateRestoreAndBuildMGR(reqCtx, pvc)
+	}
 	if err != nil {
 		return err
 	}
@@ -265,7 +218,7 @@ func (r *VolumePopulatorReconciler) dispatchUnboundPVC(reqCtx intctrlutil.Reques
 	return r.ProvisionOnly(reqCtx, pvc, restoreCtx)
 }
 
-func (r *VolumePopulatorReconciler) validateRestoreRefAndBuildMGR(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim) (*dprestore.RestoreManager, error) {
+func (r *VolumePopulatorReconciler) validateRestoreRefAndBuildMGR(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim) (*pvcRestoreContext, error) {
 	restore := &dpv1alpha1.Restore{}
 	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Name: pvc.Spec.DataSourceRef.Name,
 		Namespace: pvc.Namespace}, restore); err != nil {
@@ -287,7 +240,10 @@ func (r *VolumePopulatorReconciler) validateRestoreRefAndBuildMGR(reqCtx intctrl
 		}
 	}
 	restoreMgr.WorkerServiceAccount = saName
-	return restoreMgr, nil
+	return &pvcRestoreContext{
+		restoreMgr: restoreMgr,
+		mode:       pvcRestoreModeRestoreData,
+	}, nil
 }
 
 func (r *VolumePopulatorReconciler) validateRestoreAndBuildMGR(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim) (*pvcRestoreContext, error) {
@@ -360,15 +316,6 @@ func (r *VolumePopulatorReconciler) validateRestoreAndBuildMGR(reqCtx intctrluti
 	if err = r.restoreSystemAccountSecrets(reqCtx, pvc, backupNamespace); err != nil {
 		return nil, err
 	}
-	if decision.mode == pvcRestoreModeRestoreData {
-		restore, err = r.ensureInternalRestore(reqCtx, pvc, restore)
-		if err != nil {
-			return nil, err
-		}
-		if err = r.ensureInternalRestoreBackupRepoReady(reqCtx, restore); err != nil {
-			return nil, err
-		}
-	}
 	restoreMgr := dprestore.NewRestoreManager(restore, r.Recorder, r.Scheme, r.Client)
 	if err = dprestore.ValidateAndInitRestoreMGR(reqCtx, r.Client, restoreMgr); err != nil {
 		return nil, err
@@ -390,40 +337,6 @@ func (r *VolumePopulatorReconciler) validateRestoreAndBuildMGR(reqCtx intctrluti
 		mode:          decision.mode,
 		skipPostReady: decision.skipPostReady,
 	}, nil
-}
-
-func (r *VolumePopulatorReconciler) ensureInternalRestoreBackupRepoReady(reqCtx intctrlutil.RequestCtx,
-	restore *dpv1alpha1.Restore) error {
-	original := restore.DeepCopy()
-	repoName, err := CheckBackupRepoForRestore(reqCtx, r.Client, restore)
-	switch {
-	case intctrlutil.IsTargetError(err, dperrors.ErrorTypeWaitForBackupRepoPreparation):
-		dprestore.SetRestoreCheckBackupRepoCondition(restore, dprestore.ReasonWaitForBackupRepo, err.Error())
-		if restore.Labels == nil {
-			restore.Labels = map[string]string{}
-		}
-		restore.Labels[dataProtectionBackupRepoKey] = repoName
-		restore.Labels[dataProtectionWaitRepoPreparationKey] = trueVal
-		if patchErr := r.patchInternalRestoreMetaAndStatus(reqCtx, original, restore); patchErr != nil {
-			return patchErr
-		}
-		return intctrlutil.NewRequeueError(reconcileInterval, err.Error())
-	case intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal):
-		dprestore.SetRestoreCheckBackupRepoCondition(restore, dprestore.ReasonCheckBackupRepoFailed, err.Error())
-		if patchErr := r.patchInternalRestoreMetaAndStatus(reqCtx, original, restore); patchErr != nil {
-			return patchErr
-		}
-		return err
-	case err != nil:
-		dprestore.SetRestoreCheckBackupRepoCondition(restore, ReasonUnknownError, err.Error())
-		if patchErr := r.patchInternalRestoreMetaAndStatus(reqCtx, original, restore); patchErr != nil {
-			return patchErr
-		}
-		return err
-	default:
-		dprestore.SetRestoreCheckBackupRepoCondition(restore, dprestore.ReasonCheckBackupRepoSuccessfully, "")
-		return r.patchInternalRestoreMetaAndStatus(reqCtx, original, restore)
-	}
 }
 
 func (r *VolumePopulatorReconciler) resolveSourceTarget(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim, backupNamespace string) (*dpv1alpha1.BackupStatusTarget, error) {
@@ -812,7 +725,7 @@ func internalRestoreLabels(pvc *corev1.PersistentVolumeClaim) map[string]string 
 	return labels
 }
 
-func (r *VolumePopulatorReconciler) ensureInternalRestore(reqCtx intctrlutil.RequestCtx,
+func (r *VolumePopulatorReconciler) ensureExecutionRestore(reqCtx intctrlutil.RequestCtx,
 	pvc *corev1.PersistentVolumeClaim,
 	desired *dpv1alpha1.Restore) (*dpv1alpha1.Restore, error) {
 	if err := controllerutil.SetOwnerReference(pvc, desired, r.Scheme); err != nil {
@@ -830,12 +743,22 @@ func (r *VolumePopulatorReconciler) ensureInternalRestore(reqCtx intctrlutil.Req
 		return desired, nil
 	}
 	if !reflect.DeepEqual(existing.Spec, desired.Spec) {
-		return nil, intctrlutil.NewFatalError(fmt.Sprintf("internal restore %s/%s spec does not match current PVC restore intent",
+		return nil, intctrlutil.NewFatalError(fmt.Sprintf("execution restore %s/%s spec does not match current PVC restore intent",
 			existing.Namespace, existing.Name))
 	}
 	original := existing.DeepCopy()
-	existing.Labels = desired.Labels
-	existing.Annotations = desired.Annotations
+	if existing.Labels == nil {
+		existing.Labels = map[string]string{}
+	}
+	for key, value := range desired.Labels {
+		existing.Labels[key] = value
+	}
+	if existing.Annotations == nil {
+		existing.Annotations = map[string]string{}
+	}
+	for key, value := range desired.Annotations {
+		existing.Annotations[key] = value
+	}
 	existing.OwnerReferences = desired.OwnerReferences
 	if !reflect.DeepEqual(original.Labels, existing.Labels) ||
 		!reflect.DeepEqual(original.Annotations, existing.Annotations) ||
@@ -845,6 +768,51 @@ func (r *VolumePopulatorReconciler) ensureInternalRestore(reqCtx intctrlutil.Req
 		}
 	}
 	return existing, nil
+}
+
+func buildExecutionRestore(pvc, populatePVC *corev1.PersistentVolumeClaim, source *dpv1alpha1.Restore) *dpv1alpha1.Restore {
+	prepareDataConfig := source.Spec.PrepareDataConfig
+	claimSpec := corev1.PersistentVolumeClaimSpec{
+		AccessModes:      pvc.Spec.AccessModes,
+		Resources:        pvc.Spec.Resources,
+		StorageClassName: pvc.Spec.StorageClassName,
+		VolumeMode:       pvc.Spec.VolumeMode,
+	}
+	if populatePVC.Spec.DataSource != nil {
+		claimSpec.DataSource = populatePVC.Spec.DataSource.DeepCopy()
+	}
+	if populatePVC.Spec.DataSourceRef != nil {
+		claimSpec.DataSourceRef = populatePVC.Spec.DataSourceRef.DeepCopy()
+	}
+	claimMeta := metav1.ObjectMeta{
+		Name:      populatePVC.Name,
+		Namespace: populatePVC.Namespace,
+	}
+	return &dpv1alpha1.Restore{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        getPopulatePVCName(pvc.UID),
+			Namespace:   pvc.Namespace,
+			Labels:      internalRestoreLabels(pvc),
+			Annotations: source.Annotations,
+		},
+		Spec: dpv1alpha1.RestoreSpec{
+			Backup:             source.Spec.Backup,
+			RestoreTime:        source.Spec.RestoreTime,
+			Env:                source.Spec.Env,
+			Parameters:         source.Spec.Parameters,
+			ServiceAccountName: source.Spec.ServiceAccountName,
+			PrepareDataConfig: &dpv1alpha1.PrepareDataConfig{
+				RequiredPolicyForAllPodSelection: prepareDataConfig.RequiredPolicyForAllPodSelection,
+				RestoreVolumeClaims: []dpv1alpha1.RestoreVolumeClaim{{
+					ObjectMeta:      claimMeta,
+					VolumeClaimSpec: claimSpec,
+					VolumeConfig:    *prepareDataConfig.DataSourceRef,
+				}},
+				VolumeClaimRestorePolicy: prepareDataConfig.VolumeClaimRestorePolicy,
+				SchedulingSpec:           prepareDataConfig.SchedulingSpec,
+			},
+		},
+	}
 }
 
 func restoreParametersMapFromPVC(pvc *corev1.PersistentVolumeClaim) (map[string]string, error) {
@@ -959,76 +927,28 @@ func (r *VolumePopulatorReconciler) Populate(reqCtx intctrlutil.RequestCtx, pvc 
 			corev1.LabelHostname: nodeName,
 		}
 	}
-	dprestore.SetRestoreStageCondition(restoreMgr.Restore, dpv1alpha1.PrepareData, dprestore.ReasonProcessing, "processing prepareData stage.")
-	var populatePVC *corev1.PersistentVolumeClaim
-	for i, v := range restoreMgr.PrepareDataBackupSets {
-		target := utils.GetBackupStatusTarget(v.Backup, restoreMgr.Restore.Spec.Backup.SourceTargetName)
-		if target == nil {
-			dprestore.SetRestoreStageCondition(restoreMgr.Restore, dpv1alpha1.PrepareData, dprestore.ReasonFailed, "can not found any source targe in backup "+v.Backup.Name)
-			if patchErr := r.patchInternalRestoreStatus(reqCtx, restoreMgr); patchErr != nil {
-				return patchErr
-			}
-			return intctrlutil.NewFatalError("can not found any source targe in backup " + v.Backup.Name)
-		}
-		if populatePVC == nil {
-			populatePVC, err = r.getPopulatePVC(reqCtx, pvc, v,
-				restoreMgr.Restore, target, nodeName)
-			if err != nil {
-				dprestore.SetRestoreStageCondition(restoreMgr.Restore, dpv1alpha1.PrepareData, dprestore.ReasonFailed, err.Error())
-				if patchErr := r.patchInternalRestoreStatus(reqCtx, restoreMgr); patchErr != nil {
-					return patchErr
-				}
-				return err
-			}
-		}
-
-		// 1. build populate job
-		job, err := restoreMgr.BuildVolumePopulateJob(reqCtx, r.Client, v, target, populatePVC, i)
-		if err != nil {
-			dprestore.SetRestoreStageCondition(restoreMgr.Restore, dpv1alpha1.PrepareData, dprestore.ReasonFailed, err.Error())
-			if patchErr := r.patchInternalRestoreStatus(reqCtx, restoreMgr); patchErr != nil {
-				return patchErr
-			}
-			return err
-		}
-		if job == nil {
-			continue
-		}
-
-		// 2. create job
-		jobs, err := restoreMgr.CreateJobsIfNotExist(reqCtx, r.Client, pvc, []*batchv1.Job{job})
-		if err != nil {
-			dprestore.SetRestoreStageCondition(restoreMgr.Restore, dpv1alpha1.PrepareData, dprestore.ReasonFailed, err.Error())
-			if patchErr := r.patchInternalRestoreStatus(reqCtx, restoreMgr); patchErr != nil {
-				return patchErr
-			}
-			return err
-		}
-
-		// 3. check if jobs are finished.
-		actionFinished, actionFailed, err := restoreMgr.CheckJobsDone(dpv1alpha1.PrepareData, "prepareData", v, jobs)
-		if err != nil {
-			dprestore.SetRestoreStageCondition(restoreMgr.Restore, dpv1alpha1.PrepareData, dprestore.ReasonFailed, err.Error())
-			if patchErr := r.patchInternalRestoreStatus(reqCtx, restoreMgr); patchErr != nil {
-				return patchErr
-			}
-			return err
-		}
-		if !actionFinished {
-			if err = r.patchInternalRestoreStatus(reqCtx, restoreMgr); err != nil {
-				return err
-			}
-			return nil
-		}
-		if actionFailed {
-			dprestore.SetRestoreStageCondition(restoreMgr.Restore, dpv1alpha1.PrepareData, dprestore.ReasonFailed, "restore prepareData job failed")
-			if err = r.patchInternalRestoreStatus(reqCtx, restoreMgr); err != nil {
-				return err
-			}
-			return intctrlutil.NewFatalError("restore prepareData job failed")
-		}
+	backupSet := restoreMgr.PrepareDataBackupSets[0]
+	target := utils.GetBackupStatusTarget(backupSet.Backup, restoreMgr.Restore.Spec.Backup.SourceTargetName)
+	if target == nil {
+		return intctrlutil.NewFatalError("can not found any source target in backup " + backupSet.Backup.Name)
 	}
-	// 4. if jobs are succeed, rebind the pvc and pv
+	populatePVC, err := r.getPopulatePVC(reqCtx, pvc, backupSet, restoreMgr.Restore, target, nodeName)
+	if err != nil {
+		return err
+	}
+	executionRestore, err := r.ensureExecutionRestore(reqCtx, pvc, buildExecutionRestore(pvc, populatePVC, restoreMgr.Restore))
+	if err != nil {
+		return err
+	}
+	switch executionRestore.Status.Phase {
+	case dpv1alpha1.RestorePhaseCompleted:
+		// continue with PV/PVC rebind
+	case dpv1alpha1.RestorePhaseFailed:
+		return intctrlutil.NewFatalError(fmt.Sprintf("execution restore %s/%s failed", executionRestore.Namespace, executionRestore.Name))
+	default:
+		return intctrlutil.NewRequeueError(reconcileInterval, "waiting for execution restore")
+	}
+	// If the execution Restore succeeds, rebind the PVC and PV.
 	rebound, err := r.rebindPVCAndPV(reqCtx, populatePVC, pvc)
 	if err != nil {
 		return err
@@ -1038,10 +958,6 @@ func (r *VolumePopulatorReconciler) Populate(reqCtx intctrlutil.RequestCtx, pvc 
 			return err
 		}
 		return intctrlutil.NewRequeueError(reconcileInterval, "waiting for populate PV to bind target PVC")
-	}
-	dprestore.SetRestoreStageCondition(restoreMgr.Restore, dpv1alpha1.PrepareData, dprestore.ReasonSucceed, "prepare data successfully")
-	if err = r.patchInternalRestoreStatus(reqCtx, restoreMgr); err != nil {
-		return err
 	}
 	return r.completeBoundPVCIfNeeded(reqCtx, pvc, restoreCtx)
 }
@@ -1078,36 +994,9 @@ func (r *VolumePopulatorReconciler) ProvisionOnly(reqCtx intctrlutil.RequestCtx,
 	return r.completeBoundPVCIfNeeded(reqCtx, pvc, restoreCtx)
 }
 
-func (r *VolumePopulatorReconciler) patchInternalRestoreStatus(reqCtx intctrlutil.RequestCtx, restoreMgr *dprestore.RestoreManager) error {
-	if reflect.DeepEqual(restoreMgr.OriginalRestore.Status, restoreMgr.Restore.Status) {
-		return nil
-	}
-	return r.Client.Status().Patch(reqCtx.Ctx, restoreMgr.Restore, client.MergeFrom(restoreMgr.OriginalRestore))
-}
-
-func (r *VolumePopulatorReconciler) patchInternalRestoreMetaAndStatus(reqCtx intctrlutil.RequestCtx,
-	original, restore *dpv1alpha1.Restore) error {
-	if !reflect.DeepEqual(original.ObjectMeta, restore.ObjectMeta) {
-		if err := r.Client.Patch(reqCtx.Ctx, restore, client.MergeFrom(original)); err != nil {
-			return err
-		}
-	}
-	if reflect.DeepEqual(original.Status, restore.Status) {
-		return nil
-	}
-	latest := &dpv1alpha1.Restore{}
-	if err := r.Client.Get(reqCtx.Ctx, client.ObjectKeyFromObject(restore), latest); err != nil {
-		return err
-	}
-	statusPatch := client.MergeFrom(latest.DeepCopy())
-	latest.Status = restore.Status
-	return r.Client.Status().Patch(reqCtx.Ctx, latest, statusPatch)
-}
-
 func (r *VolumePopulatorReconciler) completeBoundPVCIfNeeded(reqCtx intctrlutil.RequestCtx,
 	pvc *corev1.PersistentVolumeClaim,
 	restoreCtx *pvcRestoreContext) error {
-	restoreMgr := restoreCtx.restoreMgr
 	populateReleased := pvcPopulateReleased(pvc)
 	for i := range pvc.Status.Conditions {
 		condition := pvc.Status.Conditions[i]
@@ -1135,12 +1024,6 @@ func (r *VolumePopulatorReconciler) completeBoundPVCIfNeeded(reqCtx intctrlutil.
 		}
 		if err := r.updatePVCPopulatingCondition(reqCtx, pvc, reason, message); err != nil {
 			return err
-		}
-		if restoreCtx.mode == pvcRestoreModeRestoreData {
-			dprestore.SetRestoreStageCondition(restoreMgr.Restore, dpv1alpha1.PrepareData, dprestore.ReasonSucceed, "prepare data successfully")
-			if err := r.patchInternalRestoreStatus(reqCtx, restoreMgr); err != nil {
-				return err
-			}
 		}
 	}
 	if err := r.syncTargetPVCBoundStatusIfReady(reqCtx, pvc); err != nil {
@@ -1730,45 +1613,24 @@ func postReadyRestoreName(componentUID types.UID) string {
 }
 
 func (r *VolumePopulatorReconciler) Cleanup(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim) error {
+	populatePVC := &corev1.PersistentVolumeClaim{}
+	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Name: getPopulatePVCName(pvc.UID),
+		Namespace: pvc.Namespace}, populatePVC); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return err
+		}
+	} else if err = r.Client.Delete(reqCtx.Ctx, populatePVC); err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+
 	if slices.Contains(pvc.Finalizers, dptypes.DataProtectionFinalizerName) {
 		pvcPatch := client.MergeFrom(pvc.DeepCopy())
 		controllerutil.RemoveFinalizer(pvc, dptypes.DataProtectionFinalizerName)
 		if err := r.Client.Patch(reqCtx.Ctx, pvc, pvcPatch); err != nil {
-			return err
+			return client.IgnoreNotFound(err)
 		}
 	}
-
-	jobs := &batchv1.JobList{}
-	if err := r.Client.List(reqCtx.Ctx, jobs,
-		client.InNamespace(pvc.Namespace), client.MatchingLabels(map[string]string{
-			dprestore.DataProtectionPopulatePVCLabelKey: getPopulatePVCName(pvc.UID),
-		})); err != nil {
-		return err
-	}
-
-	for i := range jobs.Items {
-		job := &jobs.Items[i]
-		if controllerutil.ContainsFinalizer(job, dptypes.DataProtectionFinalizerName) {
-			patch := client.MergeFrom(job.DeepCopy())
-			controllerutil.RemoveFinalizer(job, dptypes.DataProtectionFinalizerName)
-			if err := r.Patch(reqCtx.Ctx, job, patch); err != nil {
-				return err
-			}
-		}
-		if !job.DeletionTimestamp.IsZero() {
-			continue
-		}
-		if err := intctrlutil.BackgroundDeleteObject(r.Client, reqCtx.Ctx, job); err != nil {
-			return err
-		}
-	}
-
-	populatePVC := &corev1.PersistentVolumeClaim{}
-	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Name: getPopulatePVCName(pvc.UID),
-		Namespace: pvc.Namespace}, populatePVC); err != nil {
-		return client.IgnoreNotFound(err)
-	}
-	return r.Client.Delete(reqCtx.Ctx, populatePVC)
+	return nil
 }
 
 func (r *VolumePopulatorReconciler) checkIntreeStorageClass(pvc *corev1.PersistentVolumeClaim, sc *storagev1.StorageClass) error {

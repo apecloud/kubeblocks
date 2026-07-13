@@ -570,44 +570,6 @@ func (r *RestoreManager) BuildPrepareDataJobs(reqCtx intctrlutil.RequestCtx, cli
 	return restoreJobs, nil
 }
 
-func (r *RestoreManager) BuildVolumePopulateJob(
-	reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	backupSet BackupActionSet,
-	target *dpv1alpha1.BackupStatusTarget,
-	populatePVC *corev1.PersistentVolumeClaim,
-	index int) (*batchv1.Job, error) {
-	prepareDataConfig := r.Restore.Spec.PrepareDataConfig
-	if prepareDataConfig == nil || prepareDataConfig.DataSourceRef == nil {
-		return nil, nil
-	}
-	if !backupSet.ActionSet.HasPrepareDataStage() {
-		return nil, nil
-	}
-	backupRepo, err := r.prepareBackupRepo(reqCtx, cli, backupSet)
-	if err != nil {
-		return nil, err
-	}
-	sourceTargetPodName, err := GetSourcePodNameFromTarget(target, prepareDataConfig.RequiredPolicyForAllPodSelection, 0)
-	if err != nil {
-		return nil, err
-	}
-	jobBuilder := newRestoreJobBuilder(r.Restore, backupSet, backupRepo, dpv1alpha1.PrepareData).
-		setJobName(fmt.Sprintf("%s-%d", populatePVC.Name, index)).
-		addLabel(DataProtectionPopulatePVCLabelKey, populatePVC.Name).
-		setImage(backupSet.ActionSet.Spec.Restore.PrepareData.Image).
-		setCommand(backupSet.ActionSet.Spec.Restore.PrepareData.Command).
-		setServiceAccount(r.WorkerServiceAccount).
-		attachBackupRepo().
-		addCommonEnv(sourceTargetPodName)
-	volume, volumeMount, err := jobBuilder.buildPVCVolumeAndMount(*prepareDataConfig.DataSourceRef, populatePVC.Name, "dp-claim")
-	if err != nil {
-		return nil, err
-	}
-	job := jobBuilder.addToSpecificVolumesAndMounts(volume, volumeMount).build()
-	return job, nil
-}
-
 // GetExistingActionJobs returns jobs already recorded in Restore status for an in-flight action.
 // If any recorded Processing Job is missing, it returns an empty list so callers can follow
 // the original build/create path.

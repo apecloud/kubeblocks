@@ -553,6 +553,16 @@ spec:
                           type: object
                       type: object
                     type: array
+                  postReadyExecutionPolicy:
+                    default: Parallel
+                    description: |-
+                      Specifies how postReady actions run when they target multiple pods.
+                      Parallel preserves the existing behavior. Serial waits for each target
+                      action to complete before starting the next one.
+                    enum:
+                    - Parallel
+                    - Serial
+                    type: string
                   prepareData:
                     description: Specifies the action required to prepare data for
                       restoration.

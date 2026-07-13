@@ -499,6 +499,9 @@ var _ = Describe("RestoreManager Test", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 			// the count of exec jobs should equal to the pods count of cluster
 			Expect(len(jobs)).Should(Equal(2))
+			for i := range jobs {
+				Expect(jobs[i].Spec.Suspend).Should(BeNil())
+			}
 			Expect(jobs[0].Namespace).Should(Equal(kbNamespace))
 			Expect(jobs[0].Spec.Template.Spec.ServiceAccountName).Should(Equal(execWorkerServiceAccountName))
 
@@ -530,6 +533,52 @@ var _ = Describe("RestoreManager Test", func() {
 				actionSet.Spec.Restore.PostReady[1].Job.RunOnTargetPodNode = &runTargetPodNode
 			})).Should(Succeed())
 			testPostReady(false)
+		})
+
+		It("serializes postReady jobs across selected pods", func() {
+			reqCtx := getReqCtx()
+			matchLabels := map[string]string{
+				constant.AppInstanceLabelKey: testdp.ClusterName,
+			}
+			Expect(testapps.ChangeObj(&testCtx, actionSet, func(set *dpv1alpha1.ActionSet) {
+				set.Spec.Restore.PostReadyExecutionPolicy = dpv1alpha1.PostReadyExecutionPolicySerial
+			})).Should(Succeed())
+			oldControllerNamespace := viper.GetString(constant.CfgKeyCtrlrMgrNS)
+			viper.Set(constant.CfgKeyCtrlrMgrNS, testCtx.DefaultNamespace)
+			DeferCleanup(func() { viper.Set(constant.CfgKeyCtrlrMgrNS, oldControllerNamespace) })
+			restoreMGR, backupSet := initResources(reqCtx, 0, false, func(f *testdp.MockRestoreFactory) {
+				f.SetConnectCredential(testdp.ClusterName).SetJobActionConfig(matchLabels).SetExecActionConfig(matchLabels)
+			})
+			testdp.NewFakeCluster(&testCtx)
+
+			target := utils.GetBackupStatusTarget(backupSet.Backup, restoreMGR.Restore.Spec.Backup.SourceTargetName)
+			jobs, err := restoreMGR.BuildPostReadyActionJobs(reqCtx, k8sClient, *backupSet, target, 0)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(jobs).Should(HaveLen(2))
+			Expect(jobs[0].Spec.Suspend).ShouldNot(BeNil())
+			Expect(*jobs[0].Spec.Suspend).Should(BeFalse())
+			Expect(jobs[1].Spec.Suspend).ShouldNot(BeNil())
+			Expect(*jobs[1].Spec.Suspend).Should(BeTrue())
+			for i := range jobs {
+				for j := range jobs[i].Spec.Template.Spec.Containers {
+					jobs[i].Spec.Template.Spec.Containers[j].Image = "test-image"
+				}
+			}
+
+			jobs, err = restoreMGR.CreateJobsIfNotExist(reqCtx, k8sClient, restoreMGR.Restore, jobs)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(restoreMGR.ResumeNextSerialPostReadyJob(reqCtx, k8sClient, *backupSet, jobs)).Should(Succeed())
+			second := &batchv1.Job{}
+			Expect(k8sClient.Get(reqCtx.Ctx, client.ObjectKeyFromObject(jobs[1]), second)).Should(Succeed())
+			Expect(*second.Spec.Suspend).Should(BeTrue())
+
+			testdp.PatchK8sJobStatus(&testCtx, client.ObjectKeyFromObject(jobs[0]), batchv1.JobComplete)
+			for i := range jobs {
+				Expect(k8sClient.Get(reqCtx.Ctx, client.ObjectKeyFromObject(jobs[i]), jobs[i])).Should(Succeed())
+			}
+			Expect(restoreMGR.ResumeNextSerialPostReadyJob(reqCtx, k8sClient, *backupSet, jobs)).Should(Succeed())
+			Expect(k8sClient.Get(reqCtx.Ctx, client.ObjectKeyFromObject(jobs[1]), second)).Should(Succeed())
+			Expect(*second.Spec.Suspend).Should(BeFalse())
 		})
 
 		Context("BuildContinuousRestoreManager", func() {

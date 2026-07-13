@@ -512,6 +512,11 @@ func (r *RestoreReconciler) handleBackupActionSet(reqCtx intctrlutil.RequestCtx,
 	if err != nil {
 		return false, err
 	}
+	if stage == dpv1alpha1.PostReady {
+		if err = restoreMgr.ResumeNextSerialPostReadyJob(reqCtx, r.Client, backupSet, jobs); err != nil {
+			return false, err
+		}
+	}
 
 	// 4. check if jobs are finished.
 	allActionsFinished, existFailedAction, err = restoreMgr.CheckJobsDone(stage, actionName, backupSet, jobs)

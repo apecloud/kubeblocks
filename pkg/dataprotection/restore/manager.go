@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -800,10 +801,75 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 		return restoreJobs, nil
 	}
 
+	var jobs []*batchv1.Job
 	if actionSpec.Job != nil {
-		return buildJobsForJobAction()
+		jobs, err = buildJobsForJobAction()
+	} else {
+		jobs, err = buildJobsForExecAction()
 	}
-	return buildJobsForExecAction()
+	if err != nil {
+		return nil, err
+	}
+	if isSerialPostReady(backupSet) {
+		for i := range jobs {
+			suspend := i > 0
+			jobs[i].Spec.Suspend = &suspend
+		}
+	}
+	return jobs, nil
+}
+
+func isSerialPostReady(backupSet BackupActionSet) bool {
+	return backupSet.ActionSet != nil &&
+		backupSet.ActionSet.Spec.Restore != nil &&
+		backupSet.ActionSet.Spec.Restore.PostReadyExecutionPolicy == dpv1alpha1.PostReadyExecutionPolicySerial
+}
+
+// ResumeNextSerialPostReadyJob starts at most one suspended postReady job after
+// every preceding job has completed successfully.
+func (r *RestoreManager) ResumeNextSerialPostReadyJob(
+	reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	backupSet BackupActionSet,
+	jobs []*batchv1.Job,
+) error {
+	if !isSerialPostReady(backupSet) {
+		return nil
+	}
+	sort.Slice(jobs, func(i, j int) bool {
+		return postReadyJobIndex(jobs[i].Name) < postReadyJobIndex(jobs[j].Name)
+	})
+	for i := range jobs {
+		done, _, errMsg := utils.IsJobFinished(jobs[i])
+		if errMsg != "" {
+			return nil
+		}
+		if done {
+			continue
+		}
+		if jobs[i].Spec.Suspend != nil && *jobs[i].Spec.Suspend {
+			updated := jobs[i].DeepCopy()
+			updated.Spec.Suspend = boolptr.False()
+			if err := cli.Patch(reqCtx.Ctx, updated, client.MergeFrom(jobs[i])); err != nil {
+				return err
+			}
+			jobs[i] = updated
+		}
+		return nil
+	}
+	return nil
+}
+
+func postReadyJobIndex(name string) int {
+	separator := strings.LastIndexByte(name, '-')
+	if separator < 0 {
+		return int(^uint(0) >> 1)
+	}
+	index, err := strconv.Atoi(name[separator+1:])
+	if err != nil {
+		return int(^uint(0) >> 1)
+	}
+	return index
 }
 
 func (r *RestoreManager) createPVCIfNotExist(
@@ -883,6 +949,7 @@ func (r *RestoreManager) CheckJobsDone(
 	if stage == dpv1alpha1.PostReady {
 		restoreActions = &r.Restore.Status.Actions.PostReady
 	}
+	serialPostReady := stage == dpv1alpha1.PostReady && isSerialPostReady(backupSet)
 	// count the number of jobs that are completed, failed,
 	// or have the normally terminated `restore` container
 	finishedCount := 0
@@ -914,8 +981,16 @@ func (r *RestoreManager) CheckJobsDone(
 			}
 			if normalTerminated {
 				finishedCount++
+				if serialPostReady {
+					if err := r.StopManagerContainerByJob(fetchedJobs[i]); err != nil {
+						return false, false, err
+					}
+				}
 			}
 		}
+	}
+	if serialPostReady && existFailedJob {
+		return true, true, nil
 	}
 	// wait until all `restore` containers are terminated normally or jobs are completed or failed
 	if finishedCount == len(fetchedJobs) {

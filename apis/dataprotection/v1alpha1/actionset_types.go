@@ -168,6 +168,14 @@ type RestoreActionSpec struct {
 	// +optional
 	PostReady []ActionSpec `json:"postReady,omitempty"`
 
+	// Specifies how postReady actions run when they target multiple pods.
+	// Parallel preserves the existing behavior. Serial waits for each target
+	// action to complete before starting the next one.
+	//
+	// +optional
+	// +kubebuilder:default=Parallel
+	PostReadyExecutionPolicy PostReadyExecutionPolicy `json:"postReadyExecutionPolicy,omitempty"`
+
 	// Determines if a base backup is required during restoration.
 	//
 	// +optional
@@ -179,6 +187,16 @@ type RestoreActionSpec struct {
 	// +optional
 	WithParameters []string `json:"withParameters,omitempty"`
 }
+
+// PostReadyExecutionPolicy specifies how postReady actions execute across target pods.
+// +enum
+// +kubebuilder:validation:Enum={Parallel,Serial}
+type PostReadyExecutionPolicy string
+
+const (
+	PostReadyExecutionPolicyParallel PostReadyExecutionPolicy = "Parallel"
+	PostReadyExecutionPolicySerial   PostReadyExecutionPolicy = "Serial"
+)
 
 // ActionSpec defines an action that should be executed. Only one of the fields may be set.
 type ActionSpec struct {

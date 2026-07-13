@@ -21,7 +21,6 @@ package lifecycle
 
 import (
 	"context"
-	stderrors "errors"
 	"fmt"
 	"math/rand"
 	"strconv"
@@ -426,7 +425,7 @@ func (a *kbagent) callActionWithSelector(ctx context.Context, spec *appsv1.Actio
 		}
 	}
 	if len(actionErrors) > 0 {
-		return nil, stderrors.Join(actionErrors...)
+		return nil, newActionAggregateError(actionErrors)
 	}
 	return output, nil
 }

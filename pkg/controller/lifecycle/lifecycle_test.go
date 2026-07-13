@@ -679,23 +679,31 @@ var _ = Describe("lifecycle", func() {
 			Expect(err).Should(BeNil())
 		})
 
-		It("pod selector - all attempts every pod after an error and can succeed next round", func() {
+		It("pod selector - all lets a later replica unblock an earlier primary", func() {
 			lifecycleActions.PostProvision.Exec.TargetPodSelector = appsv1.AllReplicas
 			pods = []*corev1.Pod{
-				{ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "pod-0"}},
-				{ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "pod-1"}},
+				{ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "primary-0"}},
+				{ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "replica-0"}},
 			}
 
 			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods)
 			Expect(err).Should(BeNil())
 			Expect(lifecycle).ShouldNot(BeNil())
 
-			callCount := 0
+			totalCallCount := 0
+			roundCallCount := 0
+			replicaAttached := false
 			mockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
 				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
-					callCount++
-					if callCount == 1 {
+					totalCallCount++
+					roundCallCount++
+					// The stable selection order is primary first, replica second. The
+					// primary cannot finish until the replica has executed its own action.
+					if roundCallCount == 1 && !replicaAttached {
 						return proto.ActionResponse{Error: proto.Error2Type(proto.ErrInProgress)}, nil
+					}
+					if roundCallCount == 2 {
+						replicaAttached = true
 					}
 					return proto.ActionResponse{}, nil
 				}).AnyTimes()
@@ -703,11 +711,14 @@ var _ = Describe("lifecycle", func() {
 
 			err = lifecycle.PostProvision(ctx, k8sClient, nil)
 			Expect(errors.Is(err, ErrActionInProgress)).Should(BeTrue())
-			Expect(callCount).Should(Equal(2))
+			Expect(roundCallCount).Should(Equal(2))
+			Expect(replicaAttached).Should(BeTrue())
 
+			roundCallCount = 0
 			err = lifecycle.PostProvision(ctx, k8sClient, nil)
 			Expect(err).Should(BeNil())
-			Expect(callCount).Should(Equal(4))
+			Expect(roundCallCount).Should(Equal(2))
+			Expect(totalCallCount).Should(Equal(4))
 		})
 
 		It("pod selector - all aggregates every pod error with pod identity", func() {

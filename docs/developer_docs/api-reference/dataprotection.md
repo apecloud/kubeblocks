@@ -293,11 +293,10 @@ BackupDeletionPolicy
 should be deleted when the backup custom resource(CR) is deleted.
 Supported values are <code>Retain</code> and <code>Delete</code>.</p>
 <ul>
-<li><code>Retain</code> means that the backup content and its physical snapshot on backup repository are kept.</li>
+<li><code>Retain</code> means that the backup content and its physical snapshot on backup repository are kept
+while deletion of the Backup CR is allowed to finish.</li>
 <li><code>Delete</code> means that the backup content and its physical snapshot on backup repository are deleted.</li>
 </ul>
-<p>the backup CR but retaining the backup contents in backup repository.
-The current implementation only prevent accidental deletion of backup data.</p>
 </td>
 </tr>
 <tr>
@@ -3317,11 +3316,10 @@ BackupDeletionPolicy
 should be deleted when the backup custom resource(CR) is deleted.
 Supported values are <code>Retain</code> and <code>Delete</code>.</p>
 <ul>
-<li><code>Retain</code> means that the backup content and its physical snapshot on backup repository are kept.</li>
+<li><code>Retain</code> means that the backup content and its physical snapshot on backup repository are kept
+while deletion of the Backup CR is allowed to finish.</li>
 <li><code>Delete</code> means that the backup content and its physical snapshot on backup repository are deleted.</li>
 </ul>
-<p>the backup CR but retaining the backup contents in backup repository.
-The current implementation only prevent accidental deletion of backup data.</p>
 </td>
 </tr>
 <tr>

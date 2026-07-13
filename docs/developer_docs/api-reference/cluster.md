@@ -13455,6 +13455,23 @@ SystemAccountStatement
 </tr>
 <tr>
 <td>
+<code>passwordConfig</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.PasswordConfig">
+PasswordConfig
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the configuration for generating the account&rsquo;s password.
+If this field is nil and passwordGenerationPolicy is zero-valued, the account is passwordless.
+This field takes precedence over the deprecated passwordGenerationPolicy field.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>passwordGenerationPolicy</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.PasswordConfig">
@@ -13464,8 +13481,10 @@ PasswordConfig
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the policy for generating the account&rsquo;s password.</p>
+<p>Specifies the legacy policy for generating the account&rsquo;s password.
+A non-zero value is used only when passwordConfig is nil.</p>
 <p>This field is immutable once set.</p>
+<p>Deprecated: use passwordConfig instead.</p>
 </td>
 </tr>
 </tbody>

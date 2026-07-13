@@ -65,6 +65,20 @@ func GeneratePasswordByConfig(config appsv1.PasswordConfig) (string, error) {
 	return passwd, err
 }
 
+// GenerateSystemAccountPassword resolves the ComponentDefinition-level
+// password contract. The pointer field preserves presence and takes precedence
+// over the legacy non-pointer field. No configuration means passwordless.
+func GenerateSystemAccountPassword(account appsv1.SystemAccount) (string, error) {
+	config := account.PasswordConfig
+	if config == nil && account.PasswordGenerationPolicy != (appsv1.PasswordConfig{}) {
+		config = &account.PasswordGenerationPolicy
+	}
+	if config == nil {
+		return "", nil
+	}
+	return GeneratePasswordByConfig(*config)
+}
+
 // generatePassword generates a password with the given requirements and seed in lowercase.
 func generatePassword(length, numDigits, numSymbols int, seed string, symbols string) (string, error) {
 	// #nosec G404

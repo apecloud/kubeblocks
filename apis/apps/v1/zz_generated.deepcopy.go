@@ -3879,6 +3879,11 @@ func (in *SystemAccount) DeepCopyInto(out *SystemAccount) {
 		*out = new(SystemAccountStatement)
 		**out = **in
 	}
+	if in.PasswordConfig != nil {
+		in, out := &in.PasswordConfig, &out.PasswordConfig
+		*out = new(PasswordConfig)
+		**out = **in
+	}
 	out.PasswordGenerationPolicy = in.PasswordGenerationPolicy
 }
 

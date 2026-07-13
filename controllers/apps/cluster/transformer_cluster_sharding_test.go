@@ -223,8 +223,9 @@ var _ = Describe("cluster sharding shared transformers", func() {
 		account, err := transformer.definedSystemAccount(transCtx, sharding, accountName)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(account.Name).Should(Equal(accountName))
-		Expect(account.PasswordGenerationPolicy.Length).Should(Equal(int32(12)))
-		Expect(account.PasswordGenerationPolicy.NumDigits).Should(Equal(int32(2)))
+		Expect(account.PasswordConfig).ShouldNot(BeNil())
+		Expect(account.PasswordConfig.Length).Should(Equal(int32(12)))
+		Expect(account.PasswordConfig.NumDigits).Should(Equal(int32(2)))
 
 		transCtx.componentDefs = nil
 		_, err = transformer.definedSystemAccount(transCtx, sharding, accountName)
@@ -268,6 +269,62 @@ var _ = Describe("cluster sharding shared transformers", func() {
 		Expect(secret.Name).Should(Equal(shardingAccountSecretName(clusterName, shardingName, accountName)))
 		Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountNameForSecret, []byte(accountName)))
 		Expect(secret.Data[constant.AccountPasswdForSecret]).Should(HaveLen(16))
+	})
+
+	It("creates a passwordless shared system account when no generation configuration is supplied", func() {
+		transformer := &clusterShardingAccountTransformer{}
+		sharding := newSharding()
+		compDef := newComponentDefinition()
+		compDef.Spec.SystemAccounts[0].PasswordGenerationPolicy = appsv1.PasswordConfig{}
+		transCtx := newTransformContext()
+		transCtx.componentDefs = map[string]*appsv1.ComponentDefinition{compDefName: compDef}
+
+		secret, err := transformer.newSystemAccountSecret(transCtx, sharding, accountName)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(secret.Data).Should(HaveKey(constant.AccountPasswdForSecret))
+		Expect(secret.Data[constant.AccountPasswdForSecret]).Should(BeEmpty())
+	})
+
+	It("preserves an empty password from a shared account secretRef", func() {
+		transformer := &clusterShardingAccountTransformer{}
+		sharding := newSharding()
+		sharding.Template.SystemAccounts = []appsv1.ComponentSystemAccount{{
+			Name: accountName,
+			SecretRef: &appsv1.ProvisionSecretRef{
+				Name: "passwordless",
+			},
+		}}
+		referenced := &corev1.Secret{
+			ObjectMeta: metav1ObjectMeta("passwordless", namespace),
+			Data:       map[string][]byte{constant.AccountPasswdForSecret: {}},
+		}
+		transCtx := newTransformContext(referenced)
+		transCtx.componentDefs = map[string]*appsv1.ComponentDefinition{compDefName: newComponentDefinition()}
+
+		secret, err := transformer.newSystemAccountSecret(transCtx, sharding, accountName)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(secret.Data).Should(HaveKey(constant.AccountPasswdForSecret))
+		Expect(secret.Data[constant.AccountPasswdForSecret]).Should(BeEmpty())
+	})
+
+	It("rejects a shared account secretRef with a missing password key", func() {
+		transformer := &clusterShardingAccountTransformer{}
+		sharding := newSharding()
+		sharding.Template.SystemAccounts = []appsv1.ComponentSystemAccount{{
+			Name: accountName,
+			SecretRef: &appsv1.ProvisionSecretRef{
+				Name: "missing-password-key",
+			},
+		}}
+		referenced := &corev1.Secret{
+			ObjectMeta: metav1ObjectMeta("missing-password-key", namespace),
+			Data:       map[string][]byte{"another-key": []byte("value")},
+		}
+		transCtx := newTransformContext(referenced)
+		transCtx.componentDefs = map[string]*appsv1.ComponentDefinition{compDefName: newComponentDefinition()}
+
+		_, err := transformer.newSystemAccountSecret(transCtx, sharding, accountName)
+		Expect(err).Should(MatchError(ContainSubstring("has no required credential field: password")))
 	})
 
 	It("checks shared system account secret existence with a fake client", func() {

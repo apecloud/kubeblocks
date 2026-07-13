@@ -217,7 +217,7 @@ func (t *componentAccountTransformer) getPasswordFromSecret(transCtx *componentT
 }
 
 func (t *componentAccountTransformer) buildPassword(transCtx *componentTransformContext, account synthesizedSystemAccount) ([]byte, error) {
-	password, err := common.GeneratePasswordByConfig(account.PasswordGenerationPolicy)
+	password, err := common.GenerateSystemAccountPassword(account.SystemAccount)
 	return []byte(password), err
 }
 
@@ -299,7 +299,8 @@ func synthesizeSystemAccounts(compDefAccounts []appsv1.SystemAccount,
 
 	merge := func(account synthesizedSystemAccount, compAccount appsv1.ComponentSystemAccount) synthesizedSystemAccount {
 		if compAccount.PasswordConfig != nil {
-			account.PasswordGenerationPolicy = *compAccount.PasswordConfig
+			passwordConfig := *compAccount.PasswordConfig
+			account.PasswordConfig = &passwordConfig
 		}
 		account.Disabled = compAccount.Disabled
 		account.SecretRef = compAccount.SecretRef

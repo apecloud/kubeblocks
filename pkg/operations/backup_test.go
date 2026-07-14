@@ -198,7 +198,7 @@ var _ = Describe("Backup OpsRequest", func() {
 					Name:      "default-policy",
 					Namespace: testCtx.DefaultNamespace,
 					Labels: map[string]string{
-						"app.kubernetes.io/instance": opsRes.Cluster.Name,
+						constant.AppInstanceLabelKey: opsRes.Cluster.Name,
 					},
 					Annotations: map[string]string{
 						dptypes.DefaultBackupPolicyAnnotationKey: "true",
@@ -217,7 +217,8 @@ var _ = Describe("Backup OpsRequest", func() {
 					Name:      "parent-backup",
 					Namespace: testCtx.DefaultNamespace,
 					Labels: map[string]string{
-						"app.kubernetes.io/instance": opsRes.Cluster.Name,
+						constant.AppInstanceLabelKey: opsRes.Cluster.Name,
+						dptypes.ClusterUIDLabelKey:   string(opsRes.Cluster.UID),
 					},
 				},
 				Status: dpv1alpha1.BackupStatus{Phase: dpv1alpha1.BackupPhaseCompleted},
@@ -245,7 +246,7 @@ var _ = Describe("Backup OpsRequest", func() {
 			Expect(err).Should(HaveOccurred())
 		})
 
-		It("fails fast with fatal errors on deterministic invalid inputs", func() {
+		It("keeps DataProtection input validation errors outside the Ops fatal state machine", func() {
 			fakeScheme := runtime.NewScheme()
 			Expect(dpv1alpha1.AddToScheme(fakeScheme)).Should(Succeed())
 			policy := &dpv1alpha1.BackupPolicy{
@@ -295,42 +296,42 @@ var _ = Describe("Backup OpsRequest", func() {
 				WithObjects(policy, failedParentBackup, otherClusterParentBackup, otherClusterPolicy).Build()
 			ops := createBackupOpsObj(clusterName, "backup-fatal-"+randomStr)
 
-			By("expect fatal error when backupPolicyName refers to a nonexistent backup policy")
+			By("keep a missing backup policy retryable")
 			ops.Spec.Backup = &opsv1alpha1.Backup{BackupPolicyName: "missing"}
 			_, err := buildBackup(reqCtx, fakeClient, ops, opsRes.Cluster)
-			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeTrue())
+			Expect(err).Should(HaveOccurred())
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeFalse())
 
-			By("expect fatal error when backupMethod is not defined in the backup policy")
+			By("keep an unknown backup method retryable")
 			ops.Spec.Backup = &opsv1alpha1.Backup{BackupMethod: "not-exist-method"}
 			_, err = buildBackup(reqCtx, fakeClient, ops, opsRes.Cluster)
-			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeTrue())
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeFalse())
 			Expect(err.Error()).Should(ContainSubstring("backup method not-exist-method is not supported"))
 
-			By("expect fatal error when retentionPeriod is invalid")
+			By("keep an invalid retention period retryable")
 			ops.Spec.Backup = &opsv1alpha1.Backup{RetentionPeriod: "not-a-duration"}
 			_, err = buildBackup(reqCtx, fakeClient, ops, opsRes.Cluster)
-			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeTrue())
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeFalse())
 
-			By("expect fatal error when parentBackupName refers to a nonexistent backup")
+			By("keep a missing parent backup retryable")
 			ops.Spec.Backup = &opsv1alpha1.Backup{ParentBackupName: "not-exist-parent-backup"}
 			_, err = buildBackup(reqCtx, fakeClient, ops, opsRes.Cluster)
-			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeTrue())
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeFalse())
 
-			By("expect fatal error when parent backup is Failed")
+			By("keep a failed parent backup retryable")
 			ops.Spec.Backup = &opsv1alpha1.Backup{ParentBackupName: failedParentBackup.Name}
 			_, err = buildBackup(reqCtx, fakeClient, ops, opsRes.Cluster)
-			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeTrue())
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeFalse())
 
-			By("expect fatal error when parent backup belongs to another cluster")
+			By("keep a cross-cluster parent backup retryable")
 			ops.Spec.Backup = &opsv1alpha1.Backup{ParentBackupName: otherClusterParentBackup.Name}
 			_, err = buildBackup(reqCtx, fakeClient, ops, opsRes.Cluster)
-			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeTrue())
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeFalse())
 
-			By("expect fatal error when explicit backupPolicyName belongs to another cluster")
+			By("keep a cross-cluster explicit backup policy retryable")
 			ops.Spec.Backup = &opsv1alpha1.Backup{BackupPolicyName: otherClusterPolicy.Name}
 			_, err = buildBackup(reqCtx, fakeClient, ops, opsRes.Cluster)
-			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeTrue())
-			Expect(err.Error()).Should(ContainSubstring("is not belong to cluster"))
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeFalse())
 
 			By("expect retryable error when no default backup policy exists yet for the cluster")
 			emptyClient := fake.NewClientBuilder().WithScheme(fakeScheme).Build()
@@ -339,16 +340,16 @@ var _ = Describe("Backup OpsRequest", func() {
 			Expect(err.Error()).Should(ContainSubstring("not found any default backup policy"))
 			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeFalse())
 
-			By("expect fatal error when multiple default backup policies exist for the cluster")
+			By("keep multiple default backup policies retryable")
 			policy2 := policy.DeepCopy()
 			policy2.Name = "default-policy-2"
 			policy2.ResourceVersion = ""
 			multiPolicyClient := fake.NewClientBuilder().WithScheme(fakeScheme).WithObjects(policy, policy2).Build()
 			_, err = getDefaultBackupPolicy(reqCtx, multiPolicyClient, opsRes.Cluster, "")
-			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeTrue())
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeFalse())
 		})
 
-		It("keeps retrying while the backup policy is not yet Available", func() {
+		It("does not turn backup policy status into an Ops terminal decision", func() {
 			fakeScheme := runtime.NewScheme()
 			Expect(dpv1alpha1.AddToScheme(fakeScheme)).Should(Succeed())
 			pendingPolicy := &dpv1alpha1.BackupPolicy{
@@ -373,28 +374,26 @@ var _ = Describe("Backup OpsRequest", func() {
 			fakeClient := fake.NewClientBuilder().WithScheme(fakeScheme).WithObjects(pendingPolicy).Build()
 			ops := createBackupOpsObj(clusterName, "backup-pending-policy-"+randomStr)
 
-			By("expect retryable error when the policy is referenced explicitly with a valid method")
+			By("keep an explicitly referenced unavailable policy retryable")
 			ops.Spec.Backup = &opsv1alpha1.Backup{BackupPolicyName: pendingPolicy.Name, BackupMethod: "snapshot"}
 			_, err := buildBackup(reqCtx, fakeClient, ops, opsRes.Cluster)
 			Expect(err).Should(HaveOccurred())
-			Expect(err.Error()).Should(ContainSubstring("is not available yet"))
 			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeFalse())
 
-			By("expect retryable error when the default policy is resolved implicitly")
+			By("keep an implicitly resolved unavailable policy retryable")
 			ops.Spec.Backup = &opsv1alpha1.Backup{BackupMethod: "snapshot"}
 			_, err = buildBackup(reqCtx, fakeClient, ops, opsRes.Cluster)
 			Expect(err).Should(HaveOccurred())
-			Expect(err.Error()).Should(ContainSubstring("is not available yet"))
 			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeFalse())
 
-			By("expect fatal error only after the policy is Available and the method is still absent")
+			By("leave an unknown method retryable regardless of policy status")
 			availablePolicy := pendingPolicy.DeepCopy()
 			availablePolicy.ResourceVersion = ""
 			availablePolicy.Status.Phase = dpv1alpha1.AvailablePhase
 			availableClient := fake.NewClientBuilder().WithScheme(fakeScheme).WithObjects(availablePolicy).Build()
 			ops.Spec.Backup = &opsv1alpha1.Backup{BackupPolicyName: availablePolicy.Name, BackupMethod: "bogus-method"}
 			_, err = buildBackup(reqCtx, availableClient, ops, opsRes.Cluster)
-			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeTrue())
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeFalse())
 			Expect(err.Error()).Should(ContainSubstring("backup method bogus-method is not supported"))
 		})
 
@@ -438,6 +437,49 @@ var _ = Describe("Backup OpsRequest", func() {
 			Expect(err).Should(HaveOccurred())
 			Expect(err.Error()).Should(ContainSubstring("is not completed"))
 			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeFalse())
+		})
+
+		It("rejects an incremental parent from a recreated same-name cluster", func() {
+			fakeScheme := runtime.NewScheme()
+			Expect(dpv1alpha1.AddToScheme(fakeScheme)).Should(Succeed())
+			policy := &dpv1alpha1.BackupPolicy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "default-policy",
+					Namespace: testCtx.DefaultNamespace,
+					Labels: map[string]string{
+						constant.AppInstanceLabelKey: opsRes.Cluster.Name,
+					},
+					Annotations: map[string]string{
+						dptypes.DefaultBackupPolicyAnnotationKey: "true",
+					},
+				},
+				Spec: dpv1alpha1.BackupPolicySpec{
+					BackupMethods: []dpv1alpha1.BackupMethod{{
+						Name:            "snapshot",
+						SnapshotVolumes: func() *bool { v := true; return &v }(),
+					}},
+				},
+				Status: dpv1alpha1.BackupPolicyStatus{Phase: dpv1alpha1.AvailablePhase},
+			}
+			staleParent := &dpv1alpha1.Backup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "stale-parent",
+					Namespace: testCtx.DefaultNamespace,
+					Labels: map[string]string{
+						constant.AppInstanceLabelKey: opsRes.Cluster.Name,
+						dptypes.ClusterUIDLabelKey:   "deleted-cluster-uid",
+					},
+				},
+				Status: dpv1alpha1.BackupStatus{Phase: dpv1alpha1.BackupPhaseCompleted},
+			}
+			fakeClient := fake.NewClientBuilder().WithScheme(fakeScheme).WithObjects(policy, staleParent).Build()
+			ops := createBackupOpsObj(clusterName, "backup-stale-parent-"+randomStr)
+			ops.Spec.Backup = &opsv1alpha1.Backup{ParentBackupName: staleParent.Name}
+
+			backup, err := buildBackup(reqCtx, fakeClient, ops, opsRes.Cluster)
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring("cluster UID"))
+			Expect(backup).Should(BeNil())
 		})
 
 		It("uses a stable generated backup name for OpsRequest re-entry", func() {
@@ -708,7 +750,7 @@ var _ = Describe("Backup OpsRequest", func() {
 			ops.Spec.Backup = &opsv1alpha1.Backup{BackupPolicyName: "missing", BackupMethod: "snapshot"}
 			_, err := buildBackup(reqCtx, fakeClient, ops, opsRes.Cluster)
 			Expect(err).Should(HaveOccurred())
-			Expect(err.Error()).Should(ContainSubstring(`"missing" not found`))
+			Expect(err.Error()).Should(ContainSubstring("backup method snapshot is not supported"))
 
 			ops.Spec.Backup = nil
 			_, err = getDefaultBackupPolicy(reqCtx, fakeClient, opsRes.Cluster, "")

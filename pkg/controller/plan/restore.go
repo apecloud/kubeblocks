@@ -182,17 +182,16 @@ func (r *RestoreManager) BuildPrepareDataRestore(comp *component.SynthesizedComp
 	sourceTargetName, sourceTarget := backupSourceTargetForRestore(backupObj)
 	if r.SourceTargetName != "" {
 		sourceTargetName = r.SourceTargetName
-		sourceTarget = backupSourceTargetByName(backupObj, r.SourceTargetName)
-		if sourceTarget == nil {
-			return nil, intctrlutil.NewFatalError(fmt.Sprintf(`source target "%s" not found in backup "%s"`, r.SourceTargetName, backupObj.Name))
-		}
+		// Source-target validation and resolution belong to the DataProtection
+		// Restore path. This layer only carries the public Restore intent.
+		sourceTarget = nil
 	}
 	restore := &dpv1alpha1.Restore{
 		ObjectMeta: r.GetRestoreObjectMeta(comp, dpv1alpha1.PrepareData, templateName),
 		Spec: dpv1alpha1.RestoreSpec{
 			Backup: dpv1alpha1.BackupRef{
 				Name:             backupObj.Name,
-				Namespace:        r.namespace,
+				Namespace:        backupObj.Namespace,
 				SourceTargetName: sourceTargetName,
 			},
 			RestoreTime: r.RestoreTime,
@@ -254,7 +253,7 @@ func (r *RestoreManager) DoPostReady(comp *component.SynthesizedComponent,
 		Spec: dpv1alpha1.RestoreSpec{
 			Backup: dpv1alpha1.BackupRef{
 				Name:             backupObj.Name,
-				Namespace:        r.namespace,
+				Namespace:        backupObj.Namespace,
 				SourceTargetName: sourceTargetName,
 			},
 			RestoreTime: r.RestoreTime,
@@ -304,24 +303,6 @@ func backupSourceTargetForRestore(backupObj *dpv1alpha1.Backup) (string, *dpv1al
 		return backupObj.Status.Targets[0].Name, &backupObj.Status.Targets[0]
 	}
 	return "", nil
-}
-
-func backupSourceTargetByName(backupObj *dpv1alpha1.Backup, sourceTargetName string) *dpv1alpha1.BackupStatusTarget {
-	if backupObj == nil || sourceTargetName == "" {
-		return nil
-	}
-	if backupObj.Status.Target != nil {
-		if backupObj.Status.Target.Name == sourceTargetName {
-			return backupObj.Status.Target
-		}
-		return nil
-	}
-	for i := range backupObj.Status.Targets {
-		if backupObj.Status.Targets[i].Name == sourceTargetName {
-			return &backupObj.Status.Targets[i]
-		}
-	}
-	return nil
 }
 
 func (r *RestoreManager) buildRequiredPolicy(sourceTarget *dpv1alpha1.BackupStatusTarget) *dpv1alpha1.RequiredPolicyForAllPodSelection {

@@ -930,8 +930,12 @@ var _ = Describe("OpsUtil functions", func() {
 			}
 
 			By("expect the rebuild to proceed once the actionSet is installed")
-			_ = testapps.CreateCustomizedObj(&testCtx, "backup/actionset.yaml",
+			actionSet := testapps.CreateCustomizedObj(&testCtx, "backup/actionset.yaml",
 				&dpv1alpha1.ActionSet{}, testapps.WithName(lateActionSetName))
+			Expect(testapps.ChangeObjStatus(&testCtx, actionSet, func() {
+				actionSet.Status.Phase = dpv1alpha1.AvailablePhase
+				actionSet.Status.ObservedGeneration = actionSet.Generation
+			})).Should(Succeed())
 			opsPhase, _, err = handler.ReconcileAction(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(opsPhase).Should(Equal(opsv1alpha1.OpsRunningPhase))

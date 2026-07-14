@@ -233,13 +233,25 @@ func (r *updateReconciler) rollingUpdateQuota(its *workloads.InstanceSet, podLis
 		return -1, -1, err
 	}
 	currentUnavailable := 0
+	updatedReplicas := 0
 	for _, pod := range podList {
 		if !intctrlutil.IsPodAvailable(pod, its.Spec.MinReadySeconds) {
 			currentUnavailable++
 		}
+		updated, err := r.isInstUpdated(its, pod)
+		if err != nil {
+			return -1, -1, err
+		}
+		if updated {
+			updatedReplicas++
+		}
 	}
 	unavailable := maxUnavailable - currentUnavailable
-	return replicas, unavailable, nil
+	remainingReplicas := replicas - updatedReplicas
+	if remainingReplicas < 0 {
+		remainingReplicas = 0
+	}
+	return remainingReplicas, unavailable, nil
 }
 
 func (r *updateReconciler) memberUpdateQuota(its *workloads.InstanceSet, podList []*corev1.Pod) (int, error) {

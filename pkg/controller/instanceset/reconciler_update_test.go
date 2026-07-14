@@ -228,7 +228,31 @@ var _ = Describe("update reconciler test", func() {
 			res, err = reconciler.Reconcile(partitionTree)
 			Expect(err).Should(BeNil())
 			Expect(res).Should(Equal(kubebuilderx.Continue))
-			expectUpdatedPods(partitionTree, []string{"bar-foo-0", "bar-3"})
+			expectUpdatedPods(partitionTree, []string{"bar-foo-0"})
+
+			By("do not update more pods after rollingUpdate.replicas are updated")
+			partitionTree, err = tree.DeepCopy()
+			Expect(err).Should(BeNil())
+			root, ok = partitionTree.GetRoot().(*workloads.InstanceSet)
+			Expect(ok).Should(BeTrue())
+			root.Spec.InstanceUpdateStrategy = &workloads.InstanceUpdateStrategy{
+				RollingUpdate: &workloads.RollingUpdate{
+					Replicas:       &updateReplicas,
+					MaxUnavailable: &maxUnavailable,
+				},
+			}
+			for _, name := range []string{"bar-hello-0", "bar-foo-1", "bar-foo-0"} {
+				pod := builder.NewPodBuilder(namespace, name).GetObject()
+				object, err := partitionTree.Get(pod)
+				Expect(err).Should(BeNil())
+				pod, ok = object.(*corev1.Pod)
+				Expect(ok).Should(BeTrue())
+				makePodLatestRevision(pod)
+			}
+			res, err = reconciler.Reconcile(partitionTree)
+			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
+			expectUpdatedPods(partitionTree, []string{})
 
 			By("reconcile with UpdateStrategy='OnDelete'")
 			onDeleteTree, err := tree.DeepCopy()

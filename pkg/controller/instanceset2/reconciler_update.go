@@ -100,12 +100,20 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		return kubebuilderx.Continue, err
 	}
 	currentUnavailable := 0
+	updatedReplicas := 0
 	for _, inst := range oldInstanceList {
 		if !intctrlutil.IsInstanceAvailable(inst) {
 			currentUnavailable++
 		}
+		if isInstanceUpdated(its, inst) {
+			updatedReplicas++
+		}
 	}
 	unavailable := maxUnavailable - currentUnavailable
+	remainingReplicas := replicas - updatedReplicas
+	if remainingReplicas < 0 {
+		remainingReplicas = 0
+	}
 
 	// if it's a roleful InstanceSet, we use updateCount to represent Pods can be updated according to the spec.memberUpdateStrategy.
 	updateCount := len(oldInstanceList)
@@ -139,7 +147,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 
 	for _, inst := range oldInstanceList {
-		if updatingInstances >= min(replicas, unavailable, updateCount) {
+		if updatingInstances >= min(remainingReplicas, unavailable, updateCount) {
 			break
 		}
 

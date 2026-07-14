@@ -33,7 +33,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -191,27 +190,22 @@ func (r *opsRuntime) GenerateTemplateInstanceNames(clusterName, compName, templa
 	return instanceset.GenerateInstanceNamesFromTemplate(workloadName, templateName, replicas, offlineInstances, ordinalList)
 }
 
-func (r *opsRuntime) Switchover(ctx context.Context, synthesizedComp *component.SynthesizedComponent, instanceName, candidateName string) error {
-	switchover := &opsv1alpha1.Switchover{
-		ComponentName: synthesizedComp.Name,
-		InstanceName:  instanceName,
-		CandidateName: candidateName,
-	}
-	return r.doSwitchover(ctx, r.cli, synthesizedComp, switchover)
+func (r *opsRuntime) Switchover(ctx context.Context, actionCtx SwitchoverActionContext, instanceName, candidateName string) error {
+	return r.doSwitchover(ctx, r.cli, actionCtx, instanceName, candidateName)
 }
 
 // We consider a switchover action succeeds if the action returns without error.
 // We don't need to know if a switchover is actually executed.
-func (r *opsRuntime) doSwitchover(ctx context.Context, cli client.Reader, synthesizedComp *component.SynthesizedComponent,
-	switchover *opsv1alpha1.Switchover) error {
-	pods, err := component.ListOwnedPods(r.dataContext(), cli, synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name, r.dataListOpts...)
+func (r *opsRuntime) doSwitchover(ctx context.Context, cli client.Reader, actionCtx SwitchoverActionContext,
+	instanceName, candidateName string) error {
+	pods, err := component.ListOwnedPods(r.dataContext(), cli, actionCtx.Namespace, actionCtx.ClusterName, actionCtx.ComponentName, r.dataListOpts...)
 	if err != nil {
 		return err
 	}
 
 	pod := &corev1.Pod{}
 	for _, p := range pods {
-		if p.Name == switchover.InstanceName {
+		if p.Name == instanceName {
 			pod = p
 			break
 		}
@@ -232,8 +226,8 @@ func (r *opsRuntime) doSwitchover(ctx context.Context, cli client.Reader, synthe
 		}
 	}
 
-	lfa, err := lifecycle.New(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name,
-		synthesizedComp.LifecycleActions.ComponentLifecycleActions, synthesizedComp.TemplateVars, pod, pods)
+	lfa, err := lifecycle.New(actionCtx.Namespace, actionCtx.ClusterName, actionCtx.ComponentName,
+		actionCtx.LifecycleActions, actionCtx.TemplateVars, pod, pods)
 	if err != nil {
 		return err
 	}
@@ -241,7 +235,7 @@ func (r *opsRuntime) doSwitchover(ctx context.Context, cli client.Reader, synthe
 	// NOTE: switchover is a blocking action currently. May change to non-blocking for better performance.
 	// Lifecycle preconditions still use the lifecycle reader contract as-is. If a multi-cluster
 	// action needs data-plane runtime readiness checks, model that explicitly in the lifecycle API.
-	return lfa.Switchover(ctx, cli, nil, switchover.CandidateName)
+	return lfa.Switchover(ctx, cli, nil, candidateName)
 }
 
 func (r *opsRuntime) buildInstances(namespace, clusterName, compName string, pods []*corev1.Pod) ([]Instance, error) {

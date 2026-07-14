@@ -29,6 +29,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -190,6 +191,20 @@ var _ = Describe("kb-agent", func() {
 			Expect(c).ShouldNot(BeNil())
 			Expect(c.Ports[0].Name).Should(Equal(kbagent.LegacyHTTPPortName))
 			Expect(c.Ports[1].Name).Should(Equal(kbagent.DefaultStreamingPortName))
+		})
+
+		It("requires a durable status bit before synthesis uses legacy port names", func() {
+			cmpd := &appsv1.ComponentDefinition{
+				ObjectMeta: metav1.ObjectMeta{Generation: 3},
+				Status: appsv1.ComponentDefinitionStatus{
+					ObservedGeneration: 3,
+					Phase:              appsv1.AvailablePhase,
+				},
+			}
+			Expect(KBAgentPortNamesGrandfathered(cmpd)).Should(BeFalse())
+
+			cmpd.Status.LegacyKBAgentPortNames = true
+			Expect(KBAgentPortNamesGrandfathered(cmpd)).Should(BeTrue())
 		})
 
 		It("updates host-network args and probe from an allocated legacy port", func() {

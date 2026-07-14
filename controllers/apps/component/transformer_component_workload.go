@@ -279,9 +279,9 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet, legacyConfigManagerP
 
 	intctrlutil.ResolvePodSpecDefaultFields(oldITS.Spec.Template.Spec, &itsObjCopy.Spec.Template.Spec)
 
-	// Defer the kbagent port rename on existing workloads: keep the legacy
-	// names while the rename would be the only template change, and let the
-	// rename ride along when some other change rebuilds the pods anyway.
+	// Defer the kbagent port rename on existing workloads while their legacy
+	// aliases remain valid. A preferred name still wins when it repairs a
+	// collision that already makes the live template invalid.
 	deferKBAgentPortRename(oldITS, itsObjCopy)
 
 	isSpecUpdated := !reflect.DeepEqual(&oldITS.Spec, &itsObjCopy.Spec)
@@ -317,6 +317,20 @@ func deferKBAgentPortRename(oldITS, mergedITS *workloads.InstanceSet) {
 	if agent == nil {
 		return
 	}
+	occupied := sets.New[string]()
+	for _, containers := range [][]corev1.Container{
+		mergedITS.Spec.Template.Spec.InitContainers,
+		mergedITS.Spec.Template.Spec.Containers,
+	} {
+		for i := range containers {
+			if component.IsKBAgentContainer(&containers[i]) {
+				continue
+			}
+			for _, port := range containers[i].Ports {
+				occupied.Insert(port.Name)
+			}
+		}
+	}
 	legacyNames := map[string]string{
 		kbagent.DefaultHTTPPortName:      kbagent.LegacyHTTPPortName,
 		kbagent.DefaultStreamingPortName: kbagent.LegacyStreamingPortName,
@@ -324,7 +338,7 @@ func deferKBAgentPortRename(oldITS, mergedITS *workloads.InstanceSet) {
 	ports := mergedITS.Spec.Template.Spec.Containers[idx].Ports
 	for i, p := range ports {
 		legacy, ok := legacyNames[p.Name]
-		if !ok || oldNames.Has(p.Name) || !oldNames.Has(legacy) {
+		if !ok || oldNames.Has(p.Name) || !oldNames.Has(legacy) || occupied.Has(legacy) {
 			continue
 		}
 		ports[i].Name = legacy

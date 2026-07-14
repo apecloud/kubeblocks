@@ -256,15 +256,22 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 	return nil
 }
 
-// KBAgentPortNamesGrandfathered reports whether a ComponentDefinition was
-// already accepted at its current generation before the prefixed kbagent port
-// names became reserved. Status is controller-owned, so a newly created or
-// changed definition cannot opt itself into this compatibility path.
+// KBAgentPortNamesGrandfathered reports whether the controller persisted a
+// compatibility proof for the ComponentDefinition's current generation.
 func KBAgentPortNamesGrandfathered(cmpd *appsv1.ComponentDefinition) bool {
-	if cmpd == nil || cmpd.Status.ObservedGeneration <= 0 || cmpd.Status.ObservedGeneration != cmpd.Generation {
-		return false
-	}
-	return cmpd.Status.LegacyKBAgentPortNames || cmpd.Status.Phase == appsv1.AvailablePhase
+	return kbagentPortNamesStatusCurrent(cmpd) && cmpd.Status.LegacyKBAgentPortNames
+}
+
+// KBAgentPortNamesUpgradeEligible reports whether an old, already available
+// current-generation definition may have its compatibility proof persisted.
+// This transitional signal is valid only during validation/status migration;
+// synthesis must rely on KBAgentPortNamesGrandfathered instead.
+func KBAgentPortNamesUpgradeEligible(cmpd *appsv1.ComponentDefinition) bool {
+	return kbagentPortNamesStatusCurrent(cmpd) && cmpd.Status.Phase == appsv1.AvailablePhase
+}
+
+func kbagentPortNamesStatusCurrent(cmpd *appsv1.ComponentDefinition) bool {
+	return cmpd != nil && cmpd.Status.ObservedGeneration > 0 && cmpd.Status.ObservedGeneration == cmpd.Generation
 }
 
 func kbagentContainerPortNames(synthesizedComp *SynthesizedComponent) (string, string, error) {

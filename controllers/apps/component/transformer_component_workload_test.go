@@ -287,6 +287,40 @@ var _ = Describe("Component Workload Operations Test", func() {
 			Expect(merged).Should(BeNil())
 		})
 
+		It("should keep a preferred kbagent name that repairs a legacy collision", func() {
+			oldITS := testapps.NewInstanceSetFactory(testCtx.DefaultNamespace,
+				"old-its-kbagent-collision", clusterName, compName).
+				AddContainer(corev1.Container{
+					Name:  "main",
+					Image: "test-image",
+					Ports: []corev1.ContainerPort{{
+						Name:          kbagent.LegacyHTTPPortName,
+						ContainerPort: 9200,
+					}},
+				}).
+				GetObject()
+			oldITS.Spec.Template.Spec.Containers = append(oldITS.Spec.Template.Spec.Containers,
+				corev1.Container{
+					Name: kbagent.ContainerName,
+					Ports: []corev1.ContainerPort{
+						{Name: kbagent.LegacyHTTPPortName, ContainerPort: 3501, Protocol: corev1.ProtocolTCP},
+						{Name: kbagent.LegacyStreamingPortName, ContainerPort: 3502, Protocol: corev1.ProtocolTCP},
+					},
+				})
+
+			newITS := oldITS.DeepCopy()
+			_, agent := intctrlutil.GetContainerByName(newITS.Spec.Template.Spec.Containers, kbagent.ContainerName)
+			agent.Ports[0].Name = kbagent.DefaultHTTPPortName
+			agent.Ports[1].Name = kbagent.DefaultStreamingPortName
+
+			merged := copyAndMergeITS(oldITS, newITS, legacyConfigManagerPolicyKeep)
+			Expect(merged).ShouldNot(BeNil())
+			_, mergedAgent := intctrlutil.GetContainerByName(merged.Spec.Template.Spec.Containers, kbagent.ContainerName)
+			Expect(mergedAgent).ShouldNot(BeNil())
+			Expect(mergedAgent.Ports[0].Name).Should(Equal(kbagent.DefaultHTTPPortName))
+			Expect(mergedAgent.Ports[1].Name).Should(Equal(kbagent.LegacyStreamingPortName))
+		})
+
 		It("should keep legacy kbagent port names when only in-place fields change", func() {
 			// an image bump is applied in place by the InstanceSet controller;
 			// the rename must not turn it into a pod-recreating rollout

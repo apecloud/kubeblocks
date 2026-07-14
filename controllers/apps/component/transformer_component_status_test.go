@@ -413,6 +413,10 @@ var _ = Describe("component status transformer conditions", func() {
 			Expect(err).Should(BeNil())
 			transformer.protoITS = protoITS
 
+			err = transformer.reconcileStatus(transCtx)
+			Expect(err).Should(BeNil())
+			Expect(comp.Status.Phase).Should(Equal(appsv1.UpdatingComponentPhase))
+
 			err = transformer.reconcileProgressingCondition(transCtx)
 			Expect(err).Should(BeNil())
 

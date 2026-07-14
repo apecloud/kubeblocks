@@ -140,3 +140,53 @@ func TestJoinMember4ScaleOutFailureVisibility(t *testing.T) {
 		t.Fatalf("expected a Warning event to be emitted on the component for the member join failure")
 	}
 }
+
+func TestJoinMember4ScaleOutPendingReplicaDoesNotReportFailure(t *testing.T) {
+	const (
+		namespace   = "default"
+		clusterName = "test-cluster"
+		compName    = "mysql"
+	)
+	fullCompName := clusterName + "-" + compName
+	podName := fullCompName + "-1"
+
+	scheme := runtime.NewScheme()
+	require.NoError(t, clientgoscheme.AddToScheme(scheme))
+	cli := fake.NewClientBuilder().WithScheme(scheme).Build()
+	comp := &appsv1.Component{ObjectMeta: metav1.ObjectMeta{
+		Namespace: namespace,
+		Name:      fullCompName,
+		Labels: map[string]string{
+			constant.AppInstanceLabelKey:    clusterName,
+			constant.KBAppComponentLabelKey: compName,
+		},
+	}}
+	runningITS := &workloads.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: fullCompName},
+		Spec:       workloads.InstanceSetSpec{Replicas: ptr.To[int32](2)},
+	}
+	protoITS := runningITS.DeepCopy()
+	require.NoError(t, component.NewReplicasStatus(protoITS, []string{podName}, true, false))
+	recorder := record.NewFakeRecorder(8)
+	synthesizedComp := &component.SynthesizedComponent{
+		Namespace: namespace, ClusterName: clusterName, Name: compName, Replicas: 2,
+	}
+	transCtx := &componentTransformContext{
+		Context: context.Background(), Client: cli, EventRecorder: recorder, Logger: logr.Discard(),
+		Component: comp, SynthesizeComponent: synthesizedComp,
+		RunningWorkload: runningITS, ProtoWorkload: protoITS,
+	}
+	ops := &componentWorkloadOps{
+		transCtx: transCtx, cli: cli, component: comp, synthesizeComp: synthesizedComp,
+		runningITS: runningITS, protoITS: protoITS,
+	}
+
+	err := ops.joinMember4ScaleOut()
+	require.Error(t, err)
+	require.Truef(t, intctrlutil.IsDelayedRequeueError(err), "expected delayed requeue, got %T: %v", err, err)
+	select {
+	case event := <-recorder.Events:
+		t.Fatalf("pending replica without a lifecycle invocation must not emit a failure event: %s", event)
+	default:
+	}
+}

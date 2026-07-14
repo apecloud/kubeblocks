@@ -120,7 +120,11 @@ func (j *JobAction) Execute(actCtx ActionContext) (*dpv1alpha1.ActionStatus, err
 	}
 	msg := fmt.Sprintf("creating job %s/%s", job.Namespace, job.Name)
 	actCtx.Recorder.Event(j.Owner, corev1.EventTypeNormal, "CreatingJob", msg)
-	return handleErr(client.IgnoreAlreadyExists(actCtx.Client.Create(actCtx.Ctx, job)))
+	if err = client.IgnoreAlreadyExists(actCtx.Client.Create(actCtx.Ctx, job)); err != nil {
+		return handleErr(err)
+	}
+	objRef, _ := ref.GetReference(actCtx.Scheme, job)
+	return sb.objectRef(objRef).build(), nil
 }
 
 func (j *JobAction) validate() error {

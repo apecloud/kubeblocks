@@ -355,6 +355,34 @@ var _ = Describe("Backup Controller test", func() {
 				Eventually(testapps.CheckObjExists(&testCtx, getJobKey(), &batchv1.Job{}, false)).Should(Succeed())
 			})
 
+			It("should complete when target pod disappears after job completes", func() {
+				By("check backup is running")
+				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
+					g.Expect(fetched.Status.Phase).Should(Equal(dpv1alpha1.BackupPhaseRunning))
+					g.Expect(fetched.Status.Actions).ShouldNot(BeEmpty())
+					g.Expect(fetched.Status.Actions[0].Phase).Should(Equal(dpv1alpha1.ActionPhaseRunning))
+					g.Expect(fetched.Status.Actions[0].ObjectRef).ShouldNot(BeNil())
+				})).Should(Succeed())
+
+				By("mark backup job complete before the selected target pod disappears")
+				testdp.PatchK8sJobStatus(&testCtx, getJobKey(), batchv1.JobComplete)
+				Eventually(testapps.CheckObj(&testCtx, getJobKey(), func(g Gomega, fetched *batchv1.Job) {
+					_, finishedType, _ := dputils.IsJobFinished(fetched)
+					g.Expect(finishedType).To(Equal(batchv1.JobComplete))
+				})).Should(Succeed())
+
+				By("delete the selected target pod before backup status observes completion")
+				Expect(k8sClient.Delete(ctx, targetPod)).Should(Succeed())
+				Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(targetPod), &corev1.Pod{}, false)).Should(Succeed())
+
+				By("backup should complete from recorded action status")
+				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseCompleted))
+					g.Expect(fetched.Status.FailureReason).Should(BeEmpty())
+					g.Expect(fetched.Status.Actions[0].Phase).Should(Equal(dpv1alpha1.ActionPhaseCompleted))
+				})).Should(Succeed())
+			})
+
 			It("should fail after job fails", func() {
 				testdp.PatchK8sJobStatus(&testCtx, getJobKey(), batchv1.JobFailed)
 

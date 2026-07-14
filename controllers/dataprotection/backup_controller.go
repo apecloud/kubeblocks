@@ -604,6 +604,11 @@ func (r *BackupReconciler) handleRunningPhase(
 	if err = r.syncContinuousBackupEncryptionConfig(reqCtx, backup, request.BackupPolicy); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "sync continuous backup encryption config failed")
 	}
+	if completed, err := r.completeFromRecordedActions(reqCtx, backup, request); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	} else if completed {
+		return intctrlutil.Reconciled()
+	}
 	var (
 		existFailedAction bool
 		waiting           bool
@@ -687,6 +692,57 @@ func (r *BackupReconciler) handleRunningPhase(
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	return intctrlutil.Reconciled()
+}
+
+func (r *BackupReconciler) completeFromRecordedActions(reqCtx intctrlutil.RequestCtx, original *dpv1alpha1.Backup, request *dpbackup.Request) (bool, error) {
+	if len(request.Status.Actions) == 0 {
+		return false, nil
+	}
+	for i := range request.Status.Actions {
+		actionStatus := &request.Status.Actions[i]
+		if actionStatus.Phase == dpv1alpha1.ActionPhaseCompleted {
+			continue
+		}
+		if actionStatus.ActionType != dpv1alpha1.ActionTypeJob || actionStatus.ObjectRef == nil {
+			return false, nil
+		}
+		job := &batchv1.Job{}
+		key := client.ObjectKey{Namespace: actionStatus.ObjectRef.Namespace, Name: actionStatus.ObjectRef.Name}
+		exists, err := intctrlutil.CheckResourceExists(reqCtx.Ctx, r.Client, key, job)
+		if err != nil {
+			return false, err
+		}
+		if !exists {
+			return false, nil
+		}
+		_, finishedType, msg := dputils.IsJobFinished(job)
+		if finishedType != batchv1.JobComplete {
+			if finishedType == batchv1.JobFailed {
+				actionStatus.Phase = dpv1alpha1.ActionPhaseFailed
+				actionStatus.FailureReason = msg
+			}
+			return false, nil
+		}
+		actionStatus.Phase = dpv1alpha1.ActionPhaseCompleted
+		actionStatus.CompletionTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
+	}
+
+	updateBackupStatusByActionStatus(&request.Status)
+	request.Status.Phase = dpv1alpha1.BackupPhaseCompleted
+	request.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
+	if !request.Status.StartTimestamp.IsZero() {
+		duration := request.Status.CompletionTimestamp.Sub(request.Status.StartTimestamp.Time).Round(time.Second)
+		request.Status.Duration = &metav1.Duration{Duration: duration}
+	}
+	if err := dpbackup.SetExpirationTime(request.Backup); err != nil {
+		reqCtx.Log.Error(err, "failed to set expiration time for completed backup")
+	}
+	r.Recorder.Event(request.Backup, corev1.EventTypeNormal, "CreatedBackup", "Completed backup")
+	if err := r.Client.Status().Patch(reqCtx.Ctx, request.Backup, client.MergeFrom(original)); err != nil {
+		reqCtx.Log.Error(err, "failed to patch completed backup status")
+		return false, err
+	}
+	return true, nil
 }
 
 func (r *BackupReconciler) syncContinuousBackupEncryptionConfig(reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup, backupPolicy *dpv1alpha1.BackupPolicy) error {

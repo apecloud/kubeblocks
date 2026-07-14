@@ -32,6 +32,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/kbagent"
@@ -321,7 +322,7 @@ var _ = Describe("Component Workload Operations Test", func() {
 			Expect(mergedAgent.Ports[1].Name).Should(Equal(kbagent.LegacyStreamingPortName))
 		})
 
-		It("should apply the kbagent port rename with an application image ReCreate upgrade", func() {
+		It("should not predict the InstanceSet rollout for an application image upgrade", func() {
 			oldITS := testapps.NewInstanceSetFactory(testCtx.DefaultNamespace,
 				"old-its-kbagent-ports-image-recreate", clusterName, compName).
 				AddContainer(corev1.Container{
@@ -348,14 +349,17 @@ var _ = Describe("Component Workload Operations Test", func() {
 			merged := copyAndMergeITS(oldITS, newITS, legacyConfigManagerPolicyKeep)
 			Expect(merged).ShouldNot(BeNil())
 			_, mergedAgent := intctrlutil.GetContainerByName(merged.Spec.Template.Spec.Containers, kbagent.ContainerName)
-			Expect(mergedAgent.Ports[0].Name).Should(Equal(kbagent.DefaultHTTPPortName))
-			Expect(mergedAgent.Ports[1].Name).Should(Equal(kbagent.DefaultStreamingPortName))
+			Expect(mergedAgent.Ports[0].Name).Should(Equal(kbagent.LegacyHTTPPortName))
+			Expect(mergedAgent.Ports[1].Name).Should(Equal(kbagent.LegacyStreamingPortName))
 		})
 
-		It("should apply the kbagent port rename when resource resize requires Pod recreation", func() {
+		It("should not predict a rollout when InstanceSet ignores vertical scaling", func() {
 			oldFeatureGate := viper.GetBool(constant.FeatureGateInPlacePodVerticalScaling)
 			defer viper.Set(constant.FeatureGateInPlacePodVerticalScaling, oldFeatureGate)
 			viper.Set(constant.FeatureGateInPlacePodVerticalScaling, false)
+			oldIgnoreGate := viper.GetBool(instanceset.FeatureGateIgnorePodVerticalScaling)
+			defer viper.Set(instanceset.FeatureGateIgnorePodVerticalScaling, oldIgnoreGate)
+			viper.Set(instanceset.FeatureGateIgnorePodVerticalScaling, true)
 
 			oldITS := testapps.NewInstanceSetFactory(testCtx.DefaultNamespace,
 				"old-its-kbagent-ports-resource-recreate", clusterName, compName).
@@ -385,11 +389,11 @@ var _ = Describe("Component Workload Operations Test", func() {
 			merged := copyAndMergeITS(oldITS, newITS, legacyConfigManagerPolicyKeep)
 			Expect(merged).ShouldNot(BeNil())
 			_, mergedAgent := intctrlutil.GetContainerByName(merged.Spec.Template.Spec.Containers, kbagent.ContainerName)
-			Expect(mergedAgent.Ports[0].Name).Should(Equal(kbagent.DefaultHTTPPortName))
-			Expect(mergedAgent.Ports[1].Name).Should(Equal(kbagent.DefaultStreamingPortName))
+			Expect(mergedAgent.Ports[0].Name).Should(Equal(kbagent.LegacyHTTPPortName))
+			Expect(mergedAgent.Ports[1].Name).Should(Equal(kbagent.LegacyStreamingPortName))
 		})
 
-		It("should apply the kbagent port rename together with a pod-recreating template change", func() {
+		It("should keep legacy names across a pod-recreating template change", func() {
 			oldITS := testapps.NewInstanceSetFactory(testCtx.DefaultNamespace,
 				"old-its-kbagent-ports-4", clusterName, compName).
 				AddContainer(corev1.Container{
@@ -419,11 +423,11 @@ var _ = Describe("Component Workload Operations Test", func() {
 			Expect(merged.Spec.Template.Spec.Containers[0].Command).Should(Equal([]string{"run", "--new-flag"}))
 			_, mergedAgent := intctrlutil.GetContainerByName(merged.Spec.Template.Spec.Containers, kbagent.ContainerName)
 			Expect(mergedAgent).ShouldNot(BeNil())
-			Expect(mergedAgent.Ports[0].Name).Should(Equal(kbagent.DefaultHTTPPortName))
-			Expect(mergedAgent.Ports[1].Name).Should(Equal(kbagent.DefaultStreamingPortName))
+			Expect(mergedAgent.Ports[0].Name).Should(Equal(kbagent.LegacyHTTPPortName))
+			Expect(mergedAgent.Ports[1].Name).Should(Equal(kbagent.LegacyStreamingPortName))
 		})
 
-		It("should classify command changes with PodUpdatePolicy instead of PodUpgradePolicy", func() {
+		It("should not copy InstanceSet policy classification into the apps controller", func() {
 			oldITS := testapps.NewInstanceSetFactory(testCtx.DefaultNamespace,
 				"old-its-kbagent-command-update-policy", clusterName, compName).
 				AddContainer(corev1.Container{Name: "main", Image: "test-image"}).
@@ -448,8 +452,8 @@ var _ = Describe("Component Workload Operations Test", func() {
 			merged := copyAndMergeITS(oldITS, newITS, legacyConfigManagerPolicyKeep)
 			Expect(merged).ShouldNot(BeNil())
 			_, mergedAgent := intctrlutil.GetContainerByName(merged.Spec.Template.Spec.Containers, kbagent.ContainerName)
-			Expect(mergedAgent.Ports[0].Name).Should(Equal(kbagent.DefaultHTTPPortName))
-			Expect(mergedAgent.Ports[1].Name).Should(Equal(kbagent.DefaultStreamingPortName))
+			Expect(mergedAgent.Ports[0].Name).Should(Equal(kbagent.LegacyHTTPPortName))
+			Expect(mergedAgent.Ports[1].Name).Should(Equal(kbagent.LegacyStreamingPortName))
 		})
 
 		It("should keep legacy names when PodUpdatePolicy blocks a command-change rollout", func() {

@@ -261,12 +261,32 @@ func (r *ComponentDefinitionReconciler) validateLabels(cli client.Client, rctx i
 
 func (r *ComponentDefinitionReconciler) validateRuntime(cli client.Client, rctx intctrlutil.RequestCtx,
 	cmpd *appsv1.ComponentDefinition) error {
+	if !componentDefinitionInjectsKBAgent(cmpd) {
+		return nil
+	}
 	if component.KBAgentPortNamesGrandfathered(cmpd) {
 		return nil
 	}
 	return component.ValidateKBAgentPortNames(
 		cmpd.Spec.Runtime.InitContainers,
 		cmpd.Spec.Runtime.Containers)
+}
+
+func componentDefinitionInjectsKBAgent(cmpd *appsv1.ComponentDefinition) bool {
+	if cmpd == nil {
+		return false
+	}
+	if cmpd.Spec.LifecycleActions != nil {
+		return true
+	}
+	for _, templates := range [][]appsv1.ComponentFileTemplate{cmpd.Spec.Configs, cmpd.Spec.Scripts} {
+		for i := range templates {
+			if templates[i].Reconfigure != nil {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (r *ComponentDefinitionReconciler) validateVars(cli client.Client, rctx intctrlutil.RequestCtx,

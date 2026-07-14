@@ -36,7 +36,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
-	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/kbagent"
@@ -295,13 +294,13 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet, legacyConfigManagerP
 }
 
 // deferKBAgentPortRename keeps the legacy kbagent port names on an existing
-// workload whose live template still carries them, unless the accompanying
-// template change is going to recreate the pods anyway. Port names are pure
+// workload whose live template still carries them. Port names are pure
 // identifiers inside the template (kbagent probes and args reference numeric
-// ports) but they are not in-place updatable, so letting the rename ride on an
-// in-place or metadata-only change would turn it into a full rollout (or block
-// it under StrictInPlace); only a change that the configured update policy will
-// actually recreate carries the rename along.
+// ports) but they are not in-place updatable. The apps controller must not
+// predict whether InstanceSet will roll a concrete Pod: that decision also
+// depends on InstanceSet-owned state and feature gates. Existing workloads
+// therefore retain the legacy aliases until InstanceSet owns an explicit
+// migration contract.
 func deferKBAgentPortRename(oldITS, mergedITS *workloads.InstanceSet) {
 	if oldITS == nil || mergedITS == nil {
 		return
@@ -323,26 +322,12 @@ func deferKBAgentPortRename(oldITS, mergedITS *workloads.InstanceSet) {
 		kbagent.DefaultStreamingPortName: kbagent.LegacyStreamingPortName,
 	}
 	ports := mergedITS.Spec.Template.Spec.Containers[idx].Ports
-	renamed := map[int]string{}
 	for i, p := range ports {
 		legacy, ok := legacyNames[p.Name]
 		if !ok || oldNames.Has(p.Name) || !oldNames.Has(legacy) {
 			continue
 		}
-		renamed[i] = p.Name
 		ports[i].Name = legacy
-	}
-	if len(renamed) == 0 {
-		return
-	}
-	// With the legacy names restored, classify the accompanying template change
-	// with the same policy and vertical-resize boundaries used for legacy
-	// config-manager cleanup. Filtering in-place fields alone is insufficient:
-	// an application image or resource update can still be ReCreate.
-	if shouldRecreatePodsForTemplateChange(oldITS.Spec.Template, mergedITS.Spec.Template, mergedITS) {
-		for i, name := range renamed {
-			ports[i].Name = name
-		}
 	}
 }
 
@@ -439,61 +424,6 @@ func shouldCleanupLegacyConfigManager(oldITS, desiredITS *workloads.InstanceSet)
 		return desiredITS.Spec.PodUpdatePolicy == appsv1.ReCreatePodUpdatePolicyType
 	}
 	return false
-}
-
-func shouldRecreatePodsForTemplateChange(oldTemplate, newTemplate corev1.PodTemplateSpec,
-	desiredITS *workloads.InstanceSet) bool {
-	if reflect.DeepEqual(oldTemplate, newTemplate) {
-		return false
-	}
-	// A revision-changing field always selects the InstanceSet recreate path.
-	// StrictInPlace is the only policy that blocks that path. Which strictness
-	// field applies follows GetPodUpdatePolicyInSpec: container image/list
-	// upgrade-class changes use PodUpgradePolicy; command, port, resource, and
-	// other template changes use PodUpdatePolicy.
-	oldRecreateFields := podRecreateFields(oldTemplate)
-	newRecreateFields := podRecreateFields(newTemplate)
-	if !reflect.DeepEqual(oldRecreateFields, newRecreateFields) {
-		oldPod := &corev1.Pod{Spec: *oldTemplate.Spec.DeepCopy()}
-		newPod := &corev1.Pod{Spec: *newTemplate.Spec.DeepCopy()}
-		policy := instanceset.GetPodUpdatePolicyInSpec(desiredITS, oldPod, newPod)
-		return policy != appsv1.StrictInPlacePodUpdatePolicyType
-	}
-
-	initChanged, initOK := intctrlutil.OnlyKBManagedContainerImageChanged(oldTemplate.Spec.InitContainers, newTemplate.Spec.InitContainers)
-	containerChanged, containerOK := intctrlutil.OnlyKBManagedContainerImageChanged(oldTemplate.Spec.Containers, newTemplate.Spec.Containers)
-	if initOK && containerOK && (initChanged || containerChanged) {
-		return false
-	}
-	if hasPodUpgradeTemplateChanges(oldTemplate, newTemplate) {
-		return desiredITS.Spec.PodUpgradePolicy == appsv1.ReCreatePodUpdatePolicyType
-	}
-	if hasPodResourceChanges(oldTemplate.Spec, newTemplate.Spec) {
-		if !viper.GetBool(constant.FeatureGateInPlacePodVerticalScaling) {
-			return desiredITS.Spec.PodUpdatePolicy != appsv1.StrictInPlacePodUpdatePolicyType
-		}
-		return desiredITS.Spec.PodUpdatePolicy == appsv1.ReCreatePodUpdatePolicyType
-	}
-	if hasPodUpdateTemplateChanges(oldTemplate, newTemplate) {
-		return desiredITS.Spec.PodUpdatePolicy == appsv1.ReCreatePodUpdatePolicyType
-	}
-	return false
-}
-
-func podRecreateFields(template corev1.PodTemplateSpec) *corev1.PodTemplateSpec {
-	filtered := instanceset.FilterInPlaceFields(&template)
-	// FilterInPlaceFields deletes CPU/memory entries. Normalize the empty maps
-	// that deletion can leave behind so this comparison matches the serialized
-	// revision contract (nil and omitted empty maps hash the same).
-	for i := range filtered.Spec.Containers {
-		if len(filtered.Spec.Containers[i].Resources.Requests) == 0 {
-			filtered.Spec.Containers[i].Resources.Requests = nil
-		}
-		if len(filtered.Spec.Containers[i].Resources.Limits) == 0 {
-			filtered.Spec.Containers[i].Resources.Limits = nil
-		}
-	}
-	return filtered
 }
 
 func stripLegacyConfigManagerPodTemplate(template corev1.PodTemplateSpec) corev1.PodTemplateSpec {

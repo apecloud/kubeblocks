@@ -116,8 +116,30 @@ var _ = Describe("ComponentDefinition Controller", func() {
 						ContainerPort: 9200,
 					}},
 				}).
+				SetLifecycleAction("PostProvision", &kbappsv1.Action{}).
 				GetObject()
 		}
+
+		It("allows kbagent port names when the definition has no actions", func() {
+			componentDefObj := newReservedPortDefinition()
+			componentDefObj.Spec.LifecycleActions = nil
+
+			reconciler := &ComponentDefinitionReconciler{}
+			Expect(reconciler.validateRuntime(nil, controllerutil.RequestCtx{}, componentDefObj)).Should(Succeed())
+		})
+
+		It("reserves kbagent port names when a file reconfigure action injects kbagent", func() {
+			componentDefObj := newReservedPortDefinition()
+			componentDefObj.Spec.LifecycleActions = nil
+			componentDefObj.Spec.Configs = []kbappsv1.ComponentFileTemplate{{
+				Name:        "config",
+				Reconfigure: &kbappsv1.Action{},
+			}}
+
+			reconciler := &ComponentDefinitionReconciler{}
+			Expect(reconciler.validateRuntime(nil, controllerutil.RequestCtx{}, componentDefObj)).Should(
+				MatchError(ContainSubstring("reserved for the injected kbagent container")))
+		})
 
 		newStatusClient := func(obj *kbappsv1.ComponentDefinition) (client.Client, *kbappsv1.ComponentDefinition) {
 			cli := fake.NewClientBuilder().

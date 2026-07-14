@@ -121,6 +121,9 @@ func (t *clusterShardingAccountTransformer) newSystemAccountSecret(transCtx *clu
 	if err != nil {
 		return nil, err
 	}
+	if err := common.ValidateSystemAccountPassword(password); err != nil {
+		return nil, err
+	}
 	return t.newAccountSecretWithPassword(transCtx, sharding, accountName, password)
 }
 

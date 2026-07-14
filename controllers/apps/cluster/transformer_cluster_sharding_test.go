@@ -307,6 +307,28 @@ var _ = Describe("cluster sharding shared transformers", func() {
 		Expect(secret.Data[constant.AccountPasswdForSecret]).Should(BeEmpty())
 	})
 
+	It("rejects an overlong password from a shared account secretRef", func() {
+		transformer := &clusterShardingAccountTransformer{}
+		sharding := newSharding()
+		sharding.Template.SystemAccounts = []appsv1.ComponentSystemAccount{{
+			Name: accountName,
+			SecretRef: &appsv1.ProvisionSecretRef{
+				Name: "overlong-password",
+			},
+		}}
+		referenced := &corev1.Secret{
+			ObjectMeta: metav1ObjectMeta("overlong-password", namespace),
+			Data: map[string][]byte{
+				constant.AccountPasswdForSecret: []byte("12345678901234567890123456789012345678901234567890123456789012345"),
+			},
+		}
+		transCtx := newTransformContext(referenced)
+		transCtx.componentDefs = map[string]*appsv1.ComponentDefinition{compDefName: newComponentDefinition()}
+
+		_, err := transformer.newSystemAccountSecret(transCtx, sharding, accountName)
+		Expect(err).Should(MatchError("password length exceeds 64 bytes"))
+	})
+
 	It("rejects a shared account secretRef with a missing password key", func() {
 		transformer := &clusterShardingAccountTransformer{}
 		sharding := newSharding()

@@ -21,6 +21,7 @@ package component
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -72,6 +73,40 @@ func TestBuildAccountSecretPreservesEmptyReferencedPassword(t *testing.T) {
 	}
 	if len(password) != 0 {
 		t.Fatalf("expected referenced empty password to be preserved, got %d bytes", len(password))
+	}
+}
+
+func TestBuildAccountSecretRejectsOverlongReferencedPassword(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatalf("add core scheme: %v", err)
+	}
+	referenced := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "overlong-password"},
+		Data:       map[string][]byte{constant.AccountPasswdForSecret: []byte(strings.Repeat("a", 65))},
+	}
+	transCtx := &componentTransformContext{
+		Context: context.Background(),
+		Client:  fake.NewClientBuilder().WithScheme(scheme).WithObjects(referenced).Build(),
+		Component: &appsv1.Component{
+			ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "demo-comp"},
+		},
+		SynthesizeComponent: &pkgcomponent.SynthesizedComponent{
+			Namespace:   "default",
+			ClusterName: "demo",
+			Name:        "comp",
+		},
+	}
+	account := synthesizedSystemAccount{
+		SystemAccount: appsv1.SystemAccount{Name: "default"},
+		SecretRef: &appsv1.ProvisionSecretRef{
+			Name: referenced.Name,
+		},
+	}
+
+	_, err := (&componentAccountTransformer{}).buildAccountSecret(transCtx, account)
+	if err == nil || err.Error() != "password length exceeds 64 bytes" {
+		t.Fatalf("expected password length error, got %v", err)
 	}
 }
 

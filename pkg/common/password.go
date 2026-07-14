@@ -22,6 +22,7 @@ package common
 import (
 	"crypto/sha256"
 	"encoding/binary"
+	"fmt"
 	"math/rand"
 	"strings"
 	"time"
@@ -34,7 +35,8 @@ import (
 
 const (
 	// defaultSymbols is the list of default symbols to generate password.
-	defaultSymbols = "!@#&*"
+	defaultSymbols                     = "!@#&*"
+	maximumSystemAccountPasswordLength = 64
 )
 
 type passwordReader struct {
@@ -77,6 +79,15 @@ func GenerateSystemAccountPassword(account appsv1.SystemAccount) (string, error)
 		return "", nil
 	}
 	return GeneratePasswordByConfig(*config)
+}
+
+// ValidateSystemAccountPassword enforces the password contract shared by all
+// ComponentSystemAccount provisioning paths.
+func ValidateSystemAccountPassword(password []byte) error {
+	if len(password) > maximumSystemAccountPasswordLength {
+		return fmt.Errorf("password length exceeds %d bytes", maximumSystemAccountPasswordLength)
+	}
+	return nil
 }
 
 // generatePassword generates a password with the given requirements and seed in lowercase.

@@ -103,3 +103,30 @@ func TestGenerateSystemAccountPasswordNewConfigurationPreservesExplicitValues(t 
 		t.Fatalf("expected explicit numDigits=0 to be preserved, got %q", password)
 	}
 }
+
+func TestValidateSystemAccountPassword(t *testing.T) {
+	tests := []struct {
+		name     string
+		password []byte
+		wantErr  string
+	}{
+		{name: "empty password is valid", password: nil},
+		{name: "maximum length is valid", password: []byte(strings.Repeat("a", 64))},
+		{name: "over maximum length is invalid", password: []byte(strings.Repeat("a", 65)), wantErr: "password length exceeds 64 bytes"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateSystemAccountPassword(tt.password)
+			if tt.wantErr == "" {
+				if err != nil {
+					t.Fatalf("validate password: %v", err)
+				}
+				return
+			}
+			if err == nil || err.Error() != tt.wantErr {
+				t.Fatalf("expected error %q, got %v", tt.wantErr, err)
+			}
+		})
+	}
+}

@@ -120,12 +120,13 @@ var _ = Describe("ComponentDefinition Controller", func() {
 				GetObject()
 		}
 
-		It("allows kbagent port names when the definition has no actions", func() {
+		It("reserves kbagent port names even when the definition has no actions", func() {
 			componentDefObj := newReservedPortDefinition()
 			componentDefObj.Spec.LifecycleActions = nil
 
 			reconciler := &ComponentDefinitionReconciler{}
-			Expect(reconciler.validateRuntime(nil, controllerutil.RequestCtx{}, componentDefObj)).Should(Succeed())
+			Expect(reconciler.validateRuntime(nil, controllerutil.RequestCtx{}, componentDefObj)).Should(
+				MatchError(ContainSubstring("reserved for the injected kbagent container")))
 		})
 
 		It("reserves kbagent port names when a file reconfigure action injects kbagent", func() {

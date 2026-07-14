@@ -1265,8 +1265,9 @@ They should be specified in the <code>cluster.spec.componentSpecs</code> (Cluste
 or modifying environment variable values.
 These instance-specific overrides can be specified in <code>cluster.spec.componentSpecs[*].instances</code>.</p>
 <p>This field is immutable and cannot be updated once set.</p>
-<p>The container port names &ldquo;kba-http&rdquo; and &ldquo;kba-streaming&rdquo; are reserved by KubeBlocks for the
-kbagent container that it injects when lifecycle or reconfiguration actions are defined.</p>
+<p>The container port names &ldquo;kba-http&rdquo; and &ldquo;kba-streaming&rdquo; are reserved by KubeBlocks for kbagent
+and must not be used by user-defined containers, regardless of whether this definition currently
+declares lifecycle or reconfiguration actions.</p>
 </td>
 </tr>
 <tr>
@@ -5500,8 +5501,9 @@ They should be specified in the <code>cluster.spec.componentSpecs</code> (Cluste
 or modifying environment variable values.
 These instance-specific overrides can be specified in <code>cluster.spec.componentSpecs[*].instances</code>.</p>
 <p>This field is immutable and cannot be updated once set.</p>
-<p>The container port names &ldquo;kba-http&rdquo; and &ldquo;kba-streaming&rdquo; are reserved by KubeBlocks for the
-kbagent container that it injects when lifecycle or reconfiguration actions are defined.</p>
+<p>The container port names &ldquo;kba-http&rdquo; and &ldquo;kba-streaming&rdquo; are reserved by KubeBlocks for kbagent
+and must not be used by user-defined containers, regardless of whether this definition currently
+declares lifecycle or reconfiguration actions.</p>
 </td>
 </tr>
 <tr>

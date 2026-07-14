@@ -213,8 +213,9 @@ type ComponentDefinitionSpec struct {
 	//
 	// This field is immutable and cannot be updated once set.
 	//
-	// The container port names "kba-http" and "kba-streaming" are reserved by KubeBlocks for the
-	// kbagent container that it injects when lifecycle or reconfiguration actions are defined.
+	// The container port names "kba-http" and "kba-streaming" are reserved by KubeBlocks for kbagent
+	// and must not be used by user-defined containers, regardless of whether this definition currently
+	// declares lifecycle or reconfiguration actions.
 	//
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +kubebuilder:validation:Required

@@ -407,6 +407,10 @@ func (r *RestoreReconciler) prepareData(reqCtx intctrlutil.RequestCtx, restoreMg
 }
 
 func (r *RestoreReconciler) postReady(reqCtx intctrlutil.RequestCtx, restoreMgr *dprestore.RestoreManager) (bool, error) {
+	orphanedActionsCompleted, err := restoreMgr.ReconcileOrphanedPostReadyActions(reqCtx, r.Client)
+	if err != nil || !orphanedActionsCompleted {
+		return false, err
+	}
 	readyConfig := restoreMgr.Restore.Spec.ReadyConfig
 	if len(restoreMgr.PostReadyBackupSets) == 0 || readyConfig == nil {
 		return true, nil
@@ -415,10 +419,7 @@ func (r *RestoreReconciler) postReady(reqCtx intctrlutil.RequestCtx, restoreMgr 
 		return true, nil
 	}
 	dprestore.SetRestoreStageCondition(restoreMgr.Restore, dpv1alpha1.PostReady, dprestore.ReasonProcessing, "processing postReady stage")
-	var (
-		err         error
-		isCompleted bool
-	)
+	var isCompleted bool
 	defer func() {
 		r.handleRestoreStageError(restoreMgr.Restore, dpv1alpha1.PrepareData, err)
 	}()

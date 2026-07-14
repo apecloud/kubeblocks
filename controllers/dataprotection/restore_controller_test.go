@@ -526,6 +526,40 @@ var _ = Describe("Restore Controller test", func() {
 				Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(restore), restore, false)).Should(Succeed())
 			})
 
+			It("keeps running persisted postReady jobs after the ActionSet removes them", func() {
+				By("remove the prepareData stage for testing post ready actions")
+				Expect(testapps.ChangeObj(&testCtx, actionSet, func(set *dpv1alpha1.ActionSet) {
+					set.Spec.Restore.PrepareData = nil
+				})).Should(Succeed())
+
+				matchLabels := map[string]string{
+					constant.AppInstanceLabelKey: testdp.ClusterName,
+				}
+				restore := initResourcesAndWaitRestore(true, false, false, "", dpv1alpha1.RestorePhaseRunning,
+					func(f *testdp.MockRestoreFactory) {
+						f.SetConnectCredential(testdp.ClusterName).SetJobActionConfig(matchLabels).SetExecActionConfig(matchLabels)
+					}, nil)
+
+				By("wait for the first postReady step to create its Jobs")
+				Eventually(testapps.List(&testCtx, generics.JobSignature,
+					client.MatchingLabels{dprestore.DataProtectionRestoreLabelKey: restore.Name},
+					client.InNamespace(testCtx.DefaultNamespace))).Should(HaveLen(2))
+
+				By("remove postReady from the mutable ActionSet while those Jobs are running")
+				Expect(testapps.ChangeObj(&testCtx, actionSet, func(set *dpv1alpha1.ActionSet) {
+					set.Spec.Restore.PostReady = nil
+				})).Should(Succeed())
+				Consistently(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(restore), func(g Gomega, r *dpv1alpha1.Restore) {
+					g.Expect(r.Status.Phase).Should(Equal(dpv1alpha1.RestorePhaseRunning))
+				}), 2*time.Second, 100*time.Millisecond).Should(Succeed())
+
+				By("complete the persisted Jobs and expect the Restore to complete")
+				mockRestoreJobsCompleted(restore)
+				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(restore), func(g Gomega, r *dpv1alpha1.Restore) {
+					g.Expect(r.Status.Phase).Should(Equal(dpv1alpha1.RestorePhaseCompleted))
+				})).Should(Succeed())
+			})
+
 			It("should complete an existing postReady job when target pod is no longer ready", func() {
 				By("remove the prepareData stage for testing post ready actions")
 				Expect(testapps.ChangeObj(&testCtx, actionSet, func(set *dpv1alpha1.ActionSet) {

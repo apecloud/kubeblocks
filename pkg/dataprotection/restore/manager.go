@@ -21,6 +21,7 @@ package restore
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"sort"
@@ -31,6 +32,7 @@ import (
 	vsv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -54,6 +56,9 @@ const (
 	postReadyExecutionPolicyAnnotationKey = "dataprotection.kubeblocks.io/post-ready-execution-policy"
 	postReadyTargetIdentityAnnotationKey  = "dataprotection.kubeblocks.io/post-ready-target-identity"
 	postReadyTargetPlanAnnotationKey      = "dataprotection.kubeblocks.io/post-ready-target-plan"
+	postReadyActionContractAnnotationKey  = "dataprotection.kubeblocks.io/post-ready-action-contract"
+	postReadyBackupNameAnnotationKey      = "dataprotection.kubeblocks.io/post-ready-backup-name"
+	postReadyActionNameAnnotationKey      = "dataprotection.kubeblocks.io/post-ready-action-name"
 )
 
 type BackupActionSet struct {
@@ -674,6 +679,168 @@ func (r *RestoreManager) GetExistingActionJobs(
 	return jobs, nil
 }
 
+// ReconcileOrphanedPostReadyActions keeps persisted in-flight Jobs authoritative
+// when a newer ActionSet removes or shortens postReady. Without this guard, the
+// latest ActionSet loop can skip a still-running Job and mark postReady complete.
+func (r *RestoreManager) ReconcileOrphanedPostReadyActions(
+	reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+) (bool, error) {
+	currentActions := map[string]struct{}{}
+	if r.Restore.Spec.ReadyConfig != nil {
+		for i := range r.PostReadyBackupSets {
+			backupSet := r.PostReadyBackupSets[i]
+			if backupSet.Backup == nil || backupSet.ActionSet == nil || backupSet.ActionSet.Spec.Restore == nil {
+				continue
+			}
+			for step := range backupSet.ActionSet.Spec.Restore.PostReady {
+				currentActions[postReadyActionKey(backupSet.Backup.Name, fmt.Sprintf("%s-%d", dpv1alpha1.PostReady, step))] = struct{}{}
+			}
+		}
+	}
+
+	namespaces := []string{r.Restore.Namespace}
+	if controllerNamespace := viper.GetString(constant.CfgKeyCtrlrMgrNS); controllerNamespace != "" && controllerNamespace != r.Restore.Namespace {
+		namespaces = append(namespaces, controllerNamespace)
+	}
+	orphaned := map[string][]*batchv1.Job{}
+	for _, namespace := range namespaces {
+		jobList := &batchv1.JobList{}
+		if err := cli.List(reqCtx.Ctx, jobList,
+			client.InNamespace(namespace),
+			client.MatchingLabels{DataProtectionRestoreLabelKey: r.Restore.Name}); err != nil {
+			return false, err
+		}
+		for i := range jobList.Items {
+			job := &jobList.Items[i]
+			if !r.isJobForRestoreAction(job) || !hasPostReadyFrozenContract(job) {
+				continue
+			}
+			backupName, actionName := postReadyActionIdentity(job)
+			if backupName == "" || actionName == "" {
+				return false, intctrlutil.NewFatalError(fmt.Sprintf(
+					"postReady job %s/%s has no recoverable action identity", job.Namespace, job.Name))
+			}
+			key := postReadyActionKey(backupName, actionName)
+			if _, ok := currentActions[key]; ok {
+				continue
+			}
+			orphaned[key] = append(orphaned[key], job.DeepCopy())
+		}
+	}
+
+	orphanedKeys := make([]string, 0, len(orphaned))
+	for key := range orphaned {
+		orphanedKeys = append(orphanedKeys, key)
+	}
+	sort.Strings(orphanedKeys)
+	for _, key := range orphanedKeys {
+		jobs := orphaned[key]
+		backupName, actionName := splitPostReadyActionKey(key)
+		plan, err := postReadyTargetPlan(jobs[0])
+		if err != nil {
+			return false, err
+		}
+		if len(plan) != len(jobs) {
+			return false, intctrlutil.NewFatalError(fmt.Sprintf(
+				"in-flight postReady action %s for backup %s is incomplete and no longer exists in the ActionSet",
+				actionName, backupName))
+		}
+		policy, err := postReadyExecutionPolicyForJob(jobs[0])
+		if err != nil {
+			return false, err
+		}
+		contract := postReadyActionContractForJob(jobs[0])
+		identities := map[string]struct{}{}
+		for i := range jobs {
+			jobPlan, err := postReadyTargetPlan(jobs[i])
+			if err != nil {
+				return false, err
+			}
+			jobPolicy, err := postReadyExecutionPolicyForJob(jobs[i])
+			if err != nil {
+				return false, err
+			}
+			identity := postReadyTargetIdentity(jobs[i])
+			index := postReadyJobIndex(jobs[i].Name)
+			if strings.Join(jobPlan, "\x00") != strings.Join(plan, "\x00") ||
+				jobPolicy != policy || postReadyActionContractForJob(jobs[i]) != contract ||
+				index < 0 || index >= len(plan) || identity != plan[index] {
+				return false, intctrlutil.NewFatalError(fmt.Sprintf(
+					"in-flight postReady action %s for backup %s has an inconsistent frozen contract",
+					actionName, backupName))
+			}
+			if _, ok := identities[identity]; ok {
+				return false, intctrlutil.NewFatalError(fmt.Sprintf(
+					"in-flight postReady action %s for backup %s has a duplicate frozen target",
+					actionName, backupName))
+			}
+			identities[identity] = struct{}{}
+		}
+		backupSet := BackupActionSet{Backup: &dpv1alpha1.Backup{ObjectMeta: metav1.ObjectMeta{Name: backupName}}}
+		completed, failed, err := r.CheckJobsDone(dpv1alpha1.PostReady, actionName, backupSet, jobs)
+		if err != nil {
+			return false, err
+		}
+		if failed {
+			return false, intctrlutil.NewFatalError(fmt.Sprintf(
+				"in-flight postReady action %s for backup %s failed after it was removed from the ActionSet",
+				actionName, backupName))
+		}
+		if !completed {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+func postReadyActionKey(backupName, actionName string) string {
+	return backupName + "\x00" + actionName
+}
+
+func splitPostReadyActionKey(key string) (string, string) {
+	parts := strings.SplitN(key, "\x00", 2)
+	if len(parts) != 2 {
+		return "", ""
+	}
+	return parts[0], parts[1]
+}
+
+func postReadyActionIdentity(job *batchv1.Job) (string, string) {
+	if job.Annotations != nil {
+		if backupName := job.Annotations[postReadyBackupNameAnnotationKey]; backupName != "" {
+			if actionName := job.Annotations[postReadyActionNameAnnotationKey]; actionName != "" {
+				return backupName, actionName
+			}
+		}
+	}
+	backupName := ""
+	for _, container := range job.Spec.Template.Spec.Containers {
+		for _, env := range container.Env {
+			if env.Name == dptypes.DPBackupName {
+				backupName = env.Value
+				break
+			}
+		}
+		if backupName != "" {
+			break
+		}
+	}
+	lastSeparator := strings.LastIndexByte(job.Name, '-')
+	if lastSeparator < 0 {
+		return backupName, ""
+	}
+	stepSeparator := strings.LastIndexByte(job.Name[:lastSeparator], '-')
+	if stepSeparator < 0 || stepSeparator+1 == lastSeparator {
+		return backupName, ""
+	}
+	step := job.Name[stepSeparator+1 : lastSeparator]
+	if _, err := strconv.Atoi(step); err != nil {
+		return backupName, ""
+	}
+	return backupName, fmt.Sprintf("%s-%s", dpv1alpha1.PostReady, step)
+}
+
 func (r *RestoreManager) isJobForRestoreAction(job *batchv1.Job) bool {
 	if job.Labels[DataProtectionRestoreLabelKey] != r.Restore.Name {
 		return false
@@ -856,6 +1023,9 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 	if err := setPostReadyTargetPlan(jobs); err != nil {
 		return nil, err
 	}
+	if err := r.setPostReadyActionContract(jobs, backupSet, step); err != nil {
+		return nil, err
+	}
 	return jobs, nil
 }
 
@@ -893,6 +1063,54 @@ func postReadyTargetIdentity(job *batchv1.Job) string {
 		return ""
 	}
 	return job.Annotations[postReadyTargetIdentityAnnotationKey]
+}
+
+type postReadyActionContract struct {
+	ReadyConfig              *dpv1alpha1.ReadyConfig `json:"readyConfig,omitempty"`
+	PostReady                []dpv1alpha1.ActionSpec `json:"postReady,omitempty"`
+	KBToolsImage             string                  `json:"kbToolsImage,omitempty"`
+	WorkerServiceAccount     string                  `json:"workerServiceAccount,omitempty"`
+	ControllerNamespace      string                  `json:"controllerNamespace,omitempty"`
+	ExecWorkerServiceAccount string                  `json:"execWorkerServiceAccount,omitempty"`
+}
+
+func (r *RestoreManager) setPostReadyActionContract(jobs []*batchv1.Job, backupSet BackupActionSet, step int) error {
+	if backupSet.ActionSet == nil || backupSet.ActionSet.Spec.Restore == nil {
+		return intctrlutil.NewFatalError("postReady action has no ActionSet restore contract")
+	}
+	if step < 0 || step >= len(backupSet.ActionSet.Spec.Restore.PostReady) {
+		return intctrlutil.NewFatalError(fmt.Sprintf("postReady action step %d is out of range", step))
+	}
+	contract := postReadyActionContract{
+		ReadyConfig:              r.Restore.Spec.ReadyConfig,
+		PostReady:                backupSet.ActionSet.Spec.Restore.PostReady,
+		KBToolsImage:             viper.GetString(constant.KBToolsImage),
+		WorkerServiceAccount:     r.WorkerServiceAccount,
+		ControllerNamespace:      viper.GetString(constant.CfgKeyCtrlrMgrNS),
+		ExecWorkerServiceAccount: viper.GetString(dptypes.CfgKeyExecWorkerServiceAccountName),
+	}
+	serialized, err := json.Marshal(contract)
+	if err != nil {
+		return err
+	}
+	digest := fmt.Sprintf("sha256:%x", sha256.Sum256(serialized))
+	actionName := fmt.Sprintf("%s-%d", dpv1alpha1.PostReady, step)
+	for i := range jobs {
+		if jobs[i].Annotations == nil {
+			jobs[i].Annotations = map[string]string{}
+		}
+		jobs[i].Annotations[postReadyActionContractAnnotationKey] = digest
+		jobs[i].Annotations[postReadyBackupNameAnnotationKey] = backupSet.Backup.Name
+		jobs[i].Annotations[postReadyActionNameAnnotationKey] = actionName
+	}
+	return nil
+}
+
+func postReadyActionContractForJob(job *batchv1.Job) string {
+	if job.Annotations == nil {
+		return ""
+	}
+	return job.Annotations[postReadyActionContractAnnotationKey]
 }
 
 func splitPostReadyTargetIdentity(identity string) (target, source string) {
@@ -1070,8 +1288,6 @@ func (r *RestoreManager) FreezePostReadyExecutionPlan(
 	if err != nil {
 		return nil, err
 	}
-	foundExisting := false
-	var frozenPlan []string
 	allInputJobsPersisted := true
 	for i := range jobs {
 		if jobs[i].ResourceVersion == "" {
@@ -1079,6 +1295,23 @@ func (r *RestoreManager) FreezePostReadyExecutionPlan(
 			break
 		}
 	}
+	desiredContract := postReadyActionContractForJob(jobs[0])
+	if desiredContract == "" {
+		if allInputJobsPersisted {
+			// All executable Job specs already exist, so they remain the action
+			// fact source for upgrades from the previous frozen-plan format.
+			return jobs, nil
+		}
+		return nil, intctrlutil.NewFatalError("postReady jobs have no frozen action contract")
+	}
+	for i := 1; i < len(jobs); i++ {
+		if postReadyActionContractForJob(jobs[i]) != desiredContract {
+			return nil, intctrlutil.NewFatalError("postReady jobs have inconsistent frozen action contracts")
+		}
+	}
+	foundExisting := false
+	foundLegacyPartial := false
+	var frozenPlan []string
 	for i := range jobs {
 		existing := &batchv1.Job{}
 		if err := cli.Get(reqCtx.Ctx, client.ObjectKeyFromObject(jobs[i]), existing); err != nil {
@@ -1101,9 +1334,24 @@ func (r *RestoreManager) FreezePostReadyExecutionPlan(
 				}
 				return jobs, nil
 			}
-			return nil, intctrlutil.NewFatalError(fmt.Sprintf(
-				"legacy postReady job %s/%s cannot be combined with a new frozen target plan",
-				existing.Namespace, existing.Name))
+			if foundExisting {
+				return nil, intctrlutil.NewFatalError("legacy and frozen postReady jobs cannot be mixed")
+			}
+			if policy != dpv1alpha1.PostReadyExecutionPolicyParallel {
+				return nil, intctrlutil.NewFatalError(fmt.Sprintf(
+					"legacy postReady job %s/%s cannot be migrated to serial execution",
+					existing.Namespace, existing.Name))
+			}
+			if !apiequality.Semantic.DeepDerivative(jobs[i].Spec, existing.Spec) {
+				return nil, intctrlutil.NewFatalError(fmt.Sprintf(
+					"legacy postReady job %s/%s executable action does not match the current ActionSet",
+					existing.Namespace, existing.Name))
+			}
+			foundLegacyPartial = true
+			continue
+		}
+		if foundLegacyPartial {
+			return nil, intctrlutil.NewFatalError("legacy and frozen postReady jobs cannot be mixed")
 		}
 		existingPolicy, err := postReadyExecutionPolicyForJob(existing)
 		if err != nil {
@@ -1124,6 +1372,18 @@ func (r *RestoreManager) FreezePostReadyExecutionPlan(
 		if len(frozenPlan) > 0 && strings.Join(plan, "\x00") != strings.Join(frozenPlan, "\x00") {
 			return nil, intctrlutil.NewFatalError("postReady jobs have inconsistent frozen target plans")
 		}
+		existingContract := postReadyActionContractForJob(existing)
+		if existingContract == "" {
+			if !allInputJobsPersisted {
+				return nil, intctrlutil.NewFatalError(fmt.Sprintf(
+					"postReady job %s/%s has no complete frozen action contract",
+					existing.Namespace, existing.Name))
+			}
+		} else if existingContract != desiredContract {
+			return nil, intctrlutil.NewFatalError(fmt.Sprintf(
+				"postReady job %s/%s executable action does not match its frozen contract",
+				existing.Namespace, existing.Name))
+		}
 		index := postReadyJobIndex(existing.Name)
 		if index < 0 || index >= len(plan) || postReadyTargetIdentity(existing) != plan[index] {
 			return nil, intctrlutil.NewFatalError(fmt.Sprintf(
@@ -1132,6 +1392,16 @@ func (r *RestoreManager) FreezePostReadyExecutionPlan(
 		}
 		frozenPlan = plan
 		foundExisting = true
+	}
+	if foundLegacyPartial {
+		for i := range jobs {
+			delete(jobs[i].Annotations, postReadyExecutionPolicyAnnotationKey)
+			delete(jobs[i].Annotations, postReadyTargetIdentityAnnotationKey)
+			delete(jobs[i].Annotations, postReadyTargetPlanAnnotationKey)
+			delete(jobs[i].Annotations, postReadyActionContractAnnotationKey)
+			jobs[i].Spec.Suspend = nil
+		}
+		return jobs, nil
 	}
 	if !foundExisting {
 		return jobs, nil
@@ -1159,6 +1429,7 @@ func (r *RestoreManager) FreezePostReadyExecutionPlan(
 		job = job.DeepCopy()
 		job.Name = postReadyJobNameForIndex(jobs[0].Name, i)
 		setPostReadyExecutionPolicy(job, policy)
+		job.Annotations[postReadyActionContractAnnotationKey] = desiredContract
 		serializedPlan, err := json.Marshal(frozenPlan)
 		if err != nil {
 			return nil, err
@@ -1208,6 +1479,12 @@ func (r *RestoreManager) validateExistingRestoreActionJob(desired, existing *bat
 	if len(desiredPlan) == 0 || strings.Join(existingPlan, "\x00") != strings.Join(desiredPlan, "\x00") {
 		return intctrlutil.NewFatalError(fmt.Sprintf(
 			"postReady job %s/%s frozen target plan does not match desired plan",
+			existing.Namespace, existing.Name))
+	}
+	desiredContract := postReadyActionContractForJob(desired)
+	if desiredContract == "" || postReadyActionContractForJob(existing) != desiredContract {
+		return intctrlutil.NewFatalError(fmt.Sprintf(
+			"postReady job %s/%s executable action does not match desired contract",
 			existing.Namespace, existing.Name))
 	}
 	return nil

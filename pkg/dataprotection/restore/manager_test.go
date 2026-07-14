@@ -598,10 +598,21 @@ var _ = Describe("RestoreManager Test", func() {
 			for i := range jobs {
 				Expect(jobs[i].Spec.Suspend).Should(BeNil())
 				Expect(jobs[i].Annotations[postReadyExecutionPolicyAnnotationKey]).Should(Equal(string(dpv1alpha1.PostReadyExecutionPolicyParallel)))
+				Expect(jobs[i].Annotations[postReadyActionContractAnnotationKey]).Should(HavePrefix("sha256:"))
+				Expect(jobs[i].Annotations[postReadyBackupNameAnnotationKey]).Should(Equal(backupSet.Backup.Name))
+				Expect(jobs[i].Annotations[postReadyActionNameAnnotationKey]).Should(Equal("postReady-0"))
 			}
+			execActionContract := jobs[0].Annotations[postReadyActionContractAnnotationKey]
 			Expect(jobs[0].Spec.Template.Spec.Containers[0].Args[3] < jobs[1].Spec.Template.Spec.Containers[0].Args[3]).Should(BeTrue())
 			Expect(jobs[0].Namespace).Should(Equal(kbNamespace))
 			Expect(jobs[0].Spec.Template.Spec.ServiceAccountName).Should(Equal(execWorkerServiceAccountName))
+			oldToolsImage := viper.GetString(constant.KBToolsImage)
+			viper.Set(constant.KBToolsImage, oldToolsImage+"-changed")
+			mutatedExecJobs, err := restoreMGR.BuildPostReadyActionJobs(reqCtx, k8sClient, *backupSet, target, 0)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(mutatedExecJobs).Should(HaveLen(2))
+			Expect(mutatedExecJobs[0].Annotations[postReadyActionContractAnnotationKey]).ShouldNot(Equal(execActionContract))
+			viper.Set(constant.KBToolsImage, oldToolsImage)
 
 			By("test with jobAction and expect for creating 1 job")
 			// step 0 is the execAction in actionSet
@@ -609,6 +620,9 @@ var _ = Describe("RestoreManager Test", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 			// count of job should equal to 1
 			Expect(len(jobs)).Should(Equal(1))
+			jobActionContract := jobs[0].Annotations[postReadyActionContractAnnotationKey]
+			Expect(jobActionContract).Should(Equal(execActionContract))
+			Expect(jobs[0].Annotations[postReadyActionNameAnnotationKey]).Should(Equal("postReady-1"))
 			// test timeZone transform
 			var backupStopTimeEnv string
 			for _, v := range jobs[0].Spec.Template.Spec.Containers[0].Env {
@@ -619,6 +633,17 @@ var _ = Describe("RestoreManager Test", func() {
 			}
 			Expect(backupStopTimeEnv).Should(Equal("2023-01-01 18:00:00"))
 			checkVolumes(jobs[0], testdp.DataVolumeName, existVolume)
+
+			By("change an executable action and expect the complete action contract to change")
+			backupSet.ActionSet.Spec.Restore.PostReady[1].Job.Image += "-changed"
+			mutatedJobs, err := restoreMGR.BuildPostReadyActionJobs(reqCtx, k8sClient, *backupSet, target, 1)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(mutatedJobs).Should(HaveLen(1))
+			Expect(mutatedJobs[0].Annotations[postReadyActionContractAnnotationKey]).ShouldNot(Equal(jobActionContract))
+			mutatedExecJobs, err = restoreMGR.BuildPostReadyActionJobs(reqCtx, k8sClient, *backupSet, target, 0)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(mutatedExecJobs).Should(HaveLen(2))
+			Expect(mutatedExecJobs[0].Annotations[postReadyActionContractAnnotationKey]).ShouldNot(Equal(execActionContract))
 		}
 
 		It("test with BuildPostReadyActionJobs function and run target pod node", func() {
@@ -701,7 +726,10 @@ var _ = Describe("RestoreManager Test", func() {
 			}
 			newTargetJob := func(index int, target string, policy dpv1alpha1.PostReadyExecutionPolicy) *batchv1.Job {
 				job := newRestoreJob(testCtx.DefaultNamespace, fmt.Sprintf("restore-post-ready-partial-%d", index), labels)
-				job.Annotations = map[string]string{postReadyTargetIdentityAnnotationKey: target}
+				job.Annotations = map[string]string{
+					postReadyTargetIdentityAnnotationKey: target,
+					postReadyActionContractAnnotationKey: "sha256:stable-action-contract",
+				}
 				setPostReadyExecutionPolicy(job, policy)
 				return job
 			}
@@ -754,6 +782,215 @@ var _ = Describe("RestoreManager Test", func() {
 			Expect(k8sClient.Get(reqCtx.Ctx, client.ObjectKeyFromObject(frozen[1]), second)).Should(Succeed())
 			Expect(*first.Spec.Suspend).Should(BeFalse())
 			Expect(*second.Spec.Suspend).Should(BeTrue())
+		})
+
+		It("rejects executable action drift across a frozen partial creation retry", func() {
+			reqCtx := getReqCtx()
+			restoreMGR, _ := initResources(reqCtx, 0, false, func(f *testdp.MockRestoreFactory) {})
+			labels := map[string]string{
+				DataProtectionRestoreLabelKey:          restoreMGR.Restore.Name,
+				DataProtectionRestoreNamespaceLabelKey: restoreMGR.Restore.Namespace,
+			}
+			newFrozenJob := func(index int, contract, image string) *batchv1.Job {
+				job := newRestoreJob(testCtx.DefaultNamespace, fmt.Sprintf("restore-post-ready-drift-%d", index), labels)
+				job.Spec.Template.Spec.Containers[0].Image = image
+				job.Annotations = map[string]string{
+					postReadyTargetIdentityAnnotationKey: fmt.Sprintf("default/pod-%d", index),
+					postReadyActionContractAnnotationKey: contract,
+				}
+				setPostReadyExecutionPolicy(job, dpv1alpha1.PostReadyExecutionPolicyParallel)
+				return job
+			}
+
+			initial := []*batchv1.Job{
+				newFrozenJob(0, "sha256:initial", "image:v1"),
+				newFrozenJob(1, "sha256:initial", "image:v1"),
+			}
+			Expect(setPostReadyTargetPlan(initial)).Should(Succeed())
+			_, err := restoreMGR.CreateJobsIfNotExist(reqCtx,
+				&failNthCreateClient{Client: k8sClient, n: 2}, restoreMGR.Restore, initial)
+			Expect(err).Should(HaveOccurred())
+
+			mutated := []*batchv1.Job{
+				newFrozenJob(0, "sha256:mutated", "image:v2"),
+				newFrozenJob(1, "sha256:mutated", "image:v2"),
+			}
+			Expect(setPostReadyTargetPlan(mutated)).Should(Succeed())
+			_, err = restoreMGR.FreezePostReadyExecutionPlan(reqCtx, k8sClient, mutated)
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring("executable action does not match its frozen contract"))
+		})
+
+		It("continues an unchanged legacy Parallel action after partial creation", func() {
+			reqCtx := getReqCtx()
+			restoreMGR, _ := initResources(reqCtx, 0, false, func(f *testdp.MockRestoreFactory) {})
+			labels := map[string]string{
+				DataProtectionRestoreLabelKey:          restoreMGR.Restore.Name,
+				DataProtectionRestoreNamespaceLabelKey: restoreMGR.Restore.Namespace,
+			}
+			desired := []*batchv1.Job{
+				newRestoreJob(testCtx.DefaultNamespace, "restore-post-ready-legacy-partial-0", labels),
+				newRestoreJob(testCtx.DefaultNamespace, "restore-post-ready-legacy-partial-1", labels),
+			}
+			for i := range desired {
+				desired[i].Annotations = map[string]string{
+					postReadyTargetIdentityAnnotationKey: fmt.Sprintf("default/pod-%d", i),
+					postReadyActionContractAnnotationKey: "sha256:current-action",
+				}
+				setPostReadyExecutionPolicy(desired[i], dpv1alpha1.PostReadyExecutionPolicyParallel)
+			}
+			Expect(setPostReadyTargetPlan(desired)).Should(Succeed())
+
+			legacyFirst := desired[0].DeepCopy()
+			legacyFirst.Annotations = nil
+			legacyFirst.Spec.Suspend = nil
+			Expect(k8sClient.Create(reqCtx.Ctx, legacyFirst)).Should(Succeed())
+
+			continued, err := restoreMGR.FreezePostReadyExecutionPlan(reqCtx, k8sClient, desired)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(continued).Should(HaveLen(2))
+			for i := range continued {
+				Expect(continued[i].Annotations).ShouldNot(HaveKey(postReadyExecutionPolicyAnnotationKey))
+				Expect(continued[i].Annotations).ShouldNot(HaveKey(postReadyTargetIdentityAnnotationKey))
+				Expect(continued[i].Annotations).ShouldNot(HaveKey(postReadyTargetPlanAnnotationKey))
+				Expect(continued[i].Annotations).ShouldNot(HaveKey(postReadyActionContractAnnotationKey))
+				Expect(continued[i].Spec.Suspend).Should(BeNil())
+			}
+			continued, err = restoreMGR.CreateJobsIfNotExist(reqCtx, k8sClient, restoreMGR.Restore, continued)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(continued).Should(HaveLen(2))
+		})
+
+		It("rejects executable drift while recovering a legacy Parallel partial creation", func() {
+			reqCtx := getReqCtx()
+			restoreMGR, _ := initResources(reqCtx, 0, false, func(f *testdp.MockRestoreFactory) {})
+			labels := map[string]string{
+				DataProtectionRestoreLabelKey:          restoreMGR.Restore.Name,
+				DataProtectionRestoreNamespaceLabelKey: restoreMGR.Restore.Namespace,
+			}
+			desired := []*batchv1.Job{
+				newRestoreJob(testCtx.DefaultNamespace, "restore-post-ready-legacy-drift-0", labels),
+				newRestoreJob(testCtx.DefaultNamespace, "restore-post-ready-legacy-drift-1", labels),
+			}
+			for i := range desired {
+				desired[i].Annotations = map[string]string{
+					postReadyTargetIdentityAnnotationKey: fmt.Sprintf("default/pod-%d", i),
+					postReadyActionContractAnnotationKey: "sha256:current-action",
+				}
+				setPostReadyExecutionPolicy(desired[i], dpv1alpha1.PostReadyExecutionPolicyParallel)
+			}
+			Expect(setPostReadyTargetPlan(desired)).Should(Succeed())
+
+			legacyFirst := desired[0].DeepCopy()
+			legacyFirst.Annotations = nil
+			legacyFirst.Spec.Suspend = nil
+			legacyFirst.Spec.Template.Spec.Containers[0].Image = "legacy:image"
+			Expect(k8sClient.Create(reqCtx.Ctx, legacyFirst)).Should(Succeed())
+
+			continued, err := restoreMGR.FreezePostReadyExecutionPlan(reqCtx, k8sClient, desired)
+			Expect(err).Should(HaveOccurred())
+			Expect(continued).Should(BeNil())
+			Expect(err.Error()).Should(ContainSubstring("executable action does not match the current ActionSet"))
+		})
+
+		It("waits for persisted postReady jobs after their ActionSet step is removed", func() {
+			reqCtx := getReqCtx()
+			restoreMGR, backupSet := initResources(reqCtx, 0, false, func(f *testdp.MockRestoreFactory) {})
+			Expect(backupSet.ActionSet.Spec.Restore.PostReady).Should(HaveLen(2))
+			backupSet.ActionSet.Spec.Restore.PostReady = backupSet.ActionSet.Spec.Restore.PostReady[:1]
+			restoreMGR.PostReadyBackupSets = []BackupActionSet{*backupSet}
+			labels := map[string]string{
+				DataProtectionRestoreLabelKey:          restoreMGR.Restore.Name,
+				DataProtectionRestoreNamespaceLabelKey: restoreMGR.Restore.Namespace,
+			}
+			actionName := fmt.Sprintf("%s-1", dpv1alpha1.PostReady)
+			jobs := []*batchv1.Job{
+				newRestoreJob(testCtx.DefaultNamespace, "restore-post-ready-removed-0", labels),
+				newRestoreJob(testCtx.DefaultNamespace, "restore-post-ready-removed-1", labels),
+			}
+			for i := range jobs {
+				jobs[i].Annotations = map[string]string{
+					postReadyTargetIdentityAnnotationKey: fmt.Sprintf("default/pod-%d", i),
+					postReadyActionContractAnnotationKey: "sha256:removed-action",
+					postReadyBackupNameAnnotationKey:     backupSet.Backup.Name,
+					postReadyActionNameAnnotationKey:     actionName,
+				}
+				setPostReadyExecutionPolicy(jobs[i], dpv1alpha1.PostReadyExecutionPolicyParallel)
+			}
+			Expect(setPostReadyTargetPlan(jobs)).Should(Succeed())
+			for i := range jobs {
+				Expect(k8sClient.Create(reqCtx.Ctx, jobs[i])).Should(Succeed())
+			}
+
+			completed, err := restoreMGR.ReconcileOrphanedPostReadyActions(reqCtx, k8sClient)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(completed).Should(BeFalse())
+			Expect(restoreMGR.Restore.Status.Actions.PostReady).Should(HaveLen(2))
+
+			for i := range jobs {
+				testdp.PatchK8sJobStatus(&testCtx, client.ObjectKeyFromObject(jobs[i]), batchv1.JobComplete)
+			}
+			completed, err = restoreMGR.ReconcileOrphanedPostReadyActions(reqCtx, k8sClient)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(completed).Should(BeTrue())
+			for i := range restoreMGR.Restore.Status.Actions.PostReady {
+				Expect(restoreMGR.Restore.Status.Actions.PostReady[i].Status).Should(Equal(dpv1alpha1.RestoreActionCompleted))
+			}
+		})
+
+		It("recovers an orphaned frozen-plan Job written before action-contract annotations", func() {
+			reqCtx := getReqCtx()
+			restoreMGR, backupSet := initResources(reqCtx, 0, false, func(f *testdp.MockRestoreFactory) {})
+			Expect(backupSet.ActionSet.Spec.Restore.PostReady).Should(HaveLen(2))
+			backupSet.ActionSet.Spec.Restore.PostReady = backupSet.ActionSet.Spec.Restore.PostReady[:1]
+			restoreMGR.PostReadyBackupSets = []BackupActionSet{*backupSet}
+			labels := map[string]string{
+				DataProtectionRestoreLabelKey:          restoreMGR.Restore.Name,
+				DataProtectionRestoreNamespaceLabelKey: restoreMGR.Restore.Namespace,
+			}
+			job := newRestoreJob(testCtx.DefaultNamespace,
+				fmt.Sprintf("restore-post-ready-%s-%s-1-0", restoreMGR.Restore.UID[:8], backupSet.Backup.Name), labels)
+			job.Spec.Template.Spec.Containers[0].Env = append(job.Spec.Template.Spec.Containers[0].Env,
+				corev1.EnvVar{Name: dptypes.DPBackupName, Value: backupSet.Backup.Name})
+			job.Annotations = map[string]string{
+				postReadyTargetIdentityAnnotationKey: "default/pod-0",
+			}
+			setPostReadyExecutionPolicy(job, dpv1alpha1.PostReadyExecutionPolicyParallel)
+			Expect(setPostReadyTargetPlan([]*batchv1.Job{job})).Should(Succeed())
+			Expect(k8sClient.Create(reqCtx.Ctx, job)).Should(Succeed())
+
+			completed, err := restoreMGR.ReconcileOrphanedPostReadyActions(reqCtx, k8sClient)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(completed).Should(BeFalse())
+			Expect(restoreMGR.Restore.Status.Actions.PostReady).Should(HaveLen(1))
+			Expect(restoreMGR.Restore.Status.Actions.PostReady[0].Name).Should(Equal("postReady-1"))
+		})
+
+		It("waits for persisted postReady jobs after readyConfig is removed", func() {
+			reqCtx := getReqCtx()
+			restoreMGR, backupSet := initResources(reqCtx, 0, false, func(f *testdp.MockRestoreFactory) {})
+			labels := map[string]string{
+				DataProtectionRestoreLabelKey:          restoreMGR.Restore.Name,
+				DataProtectionRestoreNamespaceLabelKey: restoreMGR.Restore.Namespace,
+			}
+			actionName := fmt.Sprintf("%s-0", dpv1alpha1.PostReady)
+			job := newRestoreJob(testCtx.DefaultNamespace, "restore-post-ready-ready-config-removed-0", labels)
+			job.Annotations = map[string]string{
+				postReadyTargetIdentityAnnotationKey: "default/pod-0",
+				postReadyActionContractAnnotationKey: "sha256:removed-ready-config",
+				postReadyBackupNameAnnotationKey:     backupSet.Backup.Name,
+				postReadyActionNameAnnotationKey:     actionName,
+			}
+			setPostReadyExecutionPolicy(job, dpv1alpha1.PostReadyExecutionPolicyParallel)
+			Expect(setPostReadyTargetPlan([]*batchv1.Job{job})).Should(Succeed())
+			Expect(k8sClient.Create(reqCtx.Ctx, job)).Should(Succeed())
+			restoreMGR.Restore.Spec.ReadyConfig = nil
+
+			completed, err := restoreMGR.ReconcileOrphanedPostReadyActions(reqCtx, k8sClient)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(completed).Should(BeFalse())
+			Expect(restoreMGR.Restore.Status.Actions.PostReady).Should(HaveLen(1))
+			Expect(restoreMGR.Restore.Status.Actions.PostReady[0].Status).Should(Equal(dpv1alpha1.RestoreActionProcessing))
 		})
 
 		It("preserves the OneToOne source mapping through the real Job builder after target insertion", func() {
@@ -885,7 +1122,10 @@ var _ = Describe("RestoreManager Test", func() {
 				DataProtectionRestoreNamespaceLabelKey: restoreMGR.Restore.Namespace,
 			}
 			desired := newRestoreJob(testCtx.DefaultNamespace, "restore-post-ready-race-0", labels)
-			desired.Annotations = map[string]string{postReadyTargetIdentityAnnotationKey: "default/pod-0"}
+			desired.Annotations = map[string]string{
+				postReadyTargetIdentityAnnotationKey: "default/pod-0",
+				postReadyActionContractAnnotationKey: "sha256:stable-action-contract",
+			}
 			setPostReadyExecutionPolicy(desired, dpv1alpha1.PostReadyExecutionPolicySerial)
 			Expect(setPostReadyTargetPlan([]*batchv1.Job{desired})).Should(Succeed())
 

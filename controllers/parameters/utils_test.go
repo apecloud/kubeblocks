@@ -92,7 +92,7 @@ func mockConfigResource() (*corev1.ConfigMap, *parametersv1alpha1.ParametersDefi
 	return configmap, paramsdef
 }
 
-func mockReconcileResource() (*corev1.ConfigMap, *appsv1.Cluster, *appsv1.Component, *component.SynthesizedComponent, *workloads.InstanceSet) {
+func mockReconcileResource(setupBeforeComponent ...func(*corev1.ConfigMap, *appsv1.ComponentDefinition)) (*corev1.ConfigMap, *appsv1.Cluster, *appsv1.Component, *component.SynthesizedComponent, *workloads.InstanceSet) {
 	configmap, paramsDef := mockConfigResource()
 
 	By("Create a component definition obj and mock to available")
@@ -126,6 +126,10 @@ func mockReconcileResource() (*corev1.ConfigMap, *appsv1.Cluster, *appsv1.Compon
 		g.Expect(configDescs[0].TemplateName).Should(BeEquivalentTo(configSpecName))
 		g.Expect(paramsDefs[0].Name).Should(BeEquivalentTo(paramsDef.Name))
 	}).Should(Succeed())
+
+	for _, setup := range setupBeforeComponent {
+		setup(configmap, compDefObj)
+	}
 
 	By("Creating a cluster")
 	clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").

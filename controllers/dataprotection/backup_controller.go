@@ -32,7 +32,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
@@ -72,9 +71,9 @@ type BackupReconciler struct {
 	clock      clock.RealClock
 }
 
-var errBackupNamespaceNotFound = errors.New("backup namespace not found")
+var errBackupNamespaceTerminating = errors.New("backup namespace terminating")
 
-const missingBackupNamespaceRetryInterval = 30 * time.Second
+const terminatingBackupNamespaceRetryInterval = 30 * time.Second
 
 // +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backups,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backups/status,verbs=get;update;patch
@@ -238,15 +237,15 @@ func (r *BackupReconciler) deleteBackupFiles(reqCtx intctrlutil.RequestCtx, back
 		return r.recordDeleteBackupFilesFailure(reqCtx, backup, err.Error())
 	case dpbackup.DeletionStatusDeleting,
 		dpbackup.DeletionStatusUnknown:
-		if errors.Is(err, errBackupNamespaceNotFound) {
+		if errors.Is(err, errBackupNamespaceTerminating) {
 			failureReason := fmt.Sprintf(
-				"backup namespace %q no longer exists, so worker resources cannot be created to delete backup files; the finalizer is retained to avoid silently orphaning backup files; change spec.deletionPolicy to Retain to explicitly keep the files and finish deleting the Backup: %v",
+				"backup namespace %q is terminating, so worker resources cannot be created to delete backup files; the Backup finalizer is retained to avoid discarding backup metadata or silently orphaning backup files: %v",
 				backup.Namespace, err)
 			if err := r.recordDeleteBackupFilesFailure(reqCtx, backup, failureReason); err != nil {
 				return err
 			}
-			return intctrlutil.NewRequeueError(missingBackupNamespaceRetryInterval,
-				"waiting for the backup namespace to be restored before deleting backup files")
+			return intctrlutil.NewRequeueError(terminatingBackupNamespaceRetryInterval,
+				"waiting with the Backup finalizer retained while the backup namespace is terminating")
 		}
 		// wait for the deletion job completed
 		return err
@@ -281,13 +280,10 @@ func (r *BackupReconciler) recordDeleteBackupFilesFailure(
 func (r *BackupReconciler) ensureWorkerServiceAccountForBackupDeletion(reqCtx intctrlutil.RequestCtx, namespace string) (string, error) {
 	ns := &corev1.Namespace{}
 	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Name: namespace}, ns); err != nil {
-		if apierrors.IsNotFound(err) {
-			return "", fmt.Errorf("%w: failed to get backup namespace %q before deleting backup files: %v", errBackupNamespaceNotFound, namespace, err)
-		}
 		return "", fmt.Errorf("failed to get backup namespace %q before deleting backup files: %w", namespace, err)
 	}
 	if !ns.DeletionTimestamp.IsZero() {
-		return "", fmt.Errorf("backup namespace %q is terminating; cannot create worker resources to delete backup files, delete the Backup and wait until it is gone before deleting the namespace", namespace)
+		return "", fmt.Errorf("%w: backup namespace %q is terminating; cannot create worker resources to delete backup files; delete the Backup and wait until it is gone before deleting the namespace", errBackupNamespaceTerminating, namespace)
 	}
 	// TODO: update the mcMgr param
 	return EnsureWorkerServiceAccount(reqCtx, r.Client, namespace, nil)
@@ -310,10 +306,7 @@ func (r *BackupReconciler) handleDeletingPhase(reqCtx intctrlutil.RequestCtx, ba
 
 	if backup.Spec.DeletionPolicy == dpv1alpha1.BackupDeletionPolicyRetain {
 		if r.Recorder != nil {
-			r.Recorder.Event(backup, corev1.EventTypeNormal, "Retain", "retaining backup files and deleting the Backup object")
-		}
-		if err := r.removeBackupFinalizer(reqCtx, backup); err != nil {
-			return intctrlutil.RequeueWithError(err, reqCtx.Log, "failed to remove finalizer from retained Backup")
+			r.Recorder.Event(backup, corev1.EventTypeWarning, "Retain", "can not delete the Backup while deletionPolicy is Retain; change the policy to Delete to remove its metadata and artifacts")
 		}
 		return intctrlutil.Reconciled()
 	}

@@ -1811,7 +1811,7 @@ var _ = Describe("Backup Controller test", func() {
 	})
 })
 
-func TestDeleteBackupFilesMissingNamespaceHoldsFinalizerAndSurfacesFailure(t *testing.T) {
+func TestDeleteBackupFilesTerminatingNamespaceHoldsFinalizerAndSurfacesFailure(t *testing.T) {
 	oldServiceAccount := viper.GetString(dptypes.CfgKeyWorkerServiceAccountName)
 	oldClusterRole := viper.GetString(dptypes.CfgKeyWorkerClusterRoleName)
 	viper.Set(dptypes.CfgKeyWorkerServiceAccountName, "test-dataprotection-worker")
@@ -1831,8 +1831,8 @@ func TestDeleteBackupFilesMissingNamespaceHoldsFinalizerAndSurfacesFailure(t *te
 	now := metav1.Now()
 	backup := &dpv1alpha1.Backup{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace:         "missing-namespace",
-			Name:              "backup-missing-namespace",
+			Namespace:         "terminating-namespace",
+			Name:              "backup-terminating-namespace",
 			UID:               types.UID("backup-uid"),
 			DeletionTimestamp: &now,
 			Finalizers:        []string{dptypes.DataProtectionFinalizerName},
@@ -1841,7 +1841,14 @@ func TestDeleteBackupFilesMissingNamespaceHoldsFinalizerAndSurfacesFailure(t *te
 		Status: dpv1alpha1.BackupStatus{
 			Phase:                     dpv1alpha1.BackupPhaseDeleting,
 			PersistentVolumeClaimName: "repo-pvc",
-			Path:                      "/backups/backup-missing-namespace",
+			Path:                      "/backups/backup-terminating-namespace",
+		},
+	}
+	namespace := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              backup.Namespace,
+			DeletionTimestamp: &now,
+			Finalizers:        []string{"kubernetes"},
 		},
 	}
 	repoPVC := &corev1.PersistentVolumeClaim{
@@ -1849,7 +1856,7 @@ func TestDeleteBackupFilesMissingNamespaceHoldsFinalizerAndSurfacesFailure(t *te
 	}
 	cli := fake.NewClientBuilder().WithScheme(scheme).
 		WithStatusSubresource(backup).
-		WithObjects(backup.DeepCopy(), repoPVC).
+		WithObjects(namespace, backup.DeepCopy(), repoPVC).
 		Build()
 	reconciler := &BackupReconciler{
 		Client:   cli,
@@ -1860,39 +1867,31 @@ func TestDeleteBackupFilesMissingNamespaceHoldsFinalizerAndSurfacesFailure(t *te
 	result, err := reconciler.handleDeletingPhase(intctrlutil.RequestCtx{Ctx: context.Background()}, backup)
 
 	require.NoError(t, err)
-	require.Equal(t, missingBackupNamespaceRetryInterval, result.RequeueAfter,
-		"a restored namespace has no watch edge to a deleting Backup, so the controller must retry")
+	require.Equal(t, 30*time.Second, result.RequeueAfter,
+		"a terminating Namespace has no state transition that can make worker creation safe, so retries must be bounded")
 	require.Greater(t, result.RequeueAfter, time.Second, "persistent namespace absence must not cause a hot loop")
 	current := &dpv1alpha1.Backup{}
 	require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(backup), current))
 	require.Contains(t, current.Finalizers, dptypes.DataProtectionFinalizerName)
-	require.Contains(t, current.Status.FailureReason, "finalizer is retained to avoid silently orphaning backup files")
-	require.Contains(t, current.Status.FailureReason, "deletionPolicy to Retain")
+	require.Contains(t, current.Status.FailureReason, "is terminating")
+	require.Contains(t, current.Status.FailureReason, "finalizer is retained")
 	jobs := &batchv1.JobList{}
 	require.NoError(t, cli.List(context.Background(), jobs, client.InNamespace(backup.Namespace)))
 	require.Empty(t, jobs.Items)
-
-	require.NoError(t, cli.Create(context.Background(), &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{Name: backup.Namespace},
-	}))
-	require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(backup), current))
-	result, err = reconciler.handleDeletingPhase(intctrlutil.RequestCtx{Ctx: context.Background()}, current)
-	require.NoError(t, err)
-	require.Zero(t, result.RequeueAfter, "the available namespace must continue into the deletion worker path")
-	require.NoError(t, cli.List(context.Background(), jobs, client.InNamespace(backup.Namespace)))
-	require.Len(t, jobs.Items, 1)
 }
 
-func TestDeletingRetainBackupReleasesFinalizerWithoutNamespaceOrDeleteWorker(t *testing.T) {
+func TestDeletingRetainBackupPreservesFinalizerAndControllerOwnedSnapshot(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, corev1.AddToScheme(scheme))
 	require.NoError(t, batchv1.AddToScheme(scheme))
 	require.NoError(t, appsv1.AddToScheme(scheme))
+	require.NoError(t, vsv1.AddToScheme(scheme))
 	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
 	now := metav1.Now()
+	controller := true
 	backup := &dpv1alpha1.Backup{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace:         "missing-namespace",
+			Namespace:         "default",
 			Name:              "retained-backup",
 			UID:               types.UID("retained-backup-uid"),
 			ResourceVersion:   "1",
@@ -1906,7 +1905,21 @@ func TestDeletingRetainBackupReleasesFinalizerWithoutNamespaceOrDeleteWorker(t *
 			Path:                      "/backups/retained-backup",
 		},
 	}
-	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(backup.DeepCopy()).Build()
+	snapshot := &vsv1.VolumeSnapshot{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:  backup.Namespace,
+			Name:       "retained-backup-data-0",
+			Finalizers: []string{dptypes.DataProtectionFinalizerName},
+			OwnerReferences: []metav1.OwnerReference{{
+				APIVersion: dpv1alpha1.GroupVersion.String(),
+				Kind:       "Backup",
+				Name:       backup.Name,
+				UID:        backup.UID,
+				Controller: &controller,
+			}},
+		},
+	}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(backup.DeepCopy(), snapshot).Build()
 	reconciler := &BackupReconciler{
 		Client:   cli,
 		Scheme:   scheme,
@@ -1917,14 +1930,17 @@ func TestDeletingRetainBackupReleasesFinalizerWithoutNamespaceOrDeleteWorker(t *
 
 	require.NoError(t, err)
 	require.False(t, result.Requeue)
-	require.Zero(t, result.RequeueAfter, "Retain must release the object without entering the missing-namespace retry")
+	require.Zero(t, result.RequeueAfter)
 	current := &dpv1alpha1.Backup{}
-	err = cli.Get(context.Background(), client.ObjectKeyFromObject(backup), current)
-	if err == nil {
-		require.NotContains(t, current.Finalizers, dptypes.DataProtectionFinalizerName)
-	} else {
-		require.True(t, apierrors.IsNotFound(err), "unexpected get error: %v", err)
-	}
+	require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(backup), current))
+	require.Contains(t, current.Finalizers, dptypes.DataProtectionFinalizerName,
+		"Retain must keep the Backup metadata that anchors repository and snapshot artifacts")
+	currentSnapshot := &vsv1.VolumeSnapshot{}
+	require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(snapshot), currentSnapshot))
+	require.Contains(t, currentSnapshot.Finalizers, dptypes.DataProtectionFinalizerName)
+	owner := metav1.GetControllerOf(currentSnapshot)
+	require.NotNil(t, owner)
+	require.Equal(t, backup.UID, owner.UID)
 	jobs := &batchv1.JobList{}
 	require.NoError(t, cli.List(context.Background(), jobs, client.InNamespace(backup.Namespace)))
 	require.Empty(t, jobs.Items)

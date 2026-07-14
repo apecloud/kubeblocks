@@ -1025,9 +1025,6 @@ func TestHorizontalScalingCreateRestoreReturnsFatalWhenNoRestoreBuilt(t *testing
 			},
 		},
 		expectError: "has no target volumes matching component",
-	}, {
-		name:        "backup method missing from backup status",
-		expectError: "status.backupMethod is empty",
 	}}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -1140,7 +1137,7 @@ func TestHorizontalScalingCreateRestorePropagatesRestoreEnv(t *testing.T) {
 	backup := &dpv1alpha1.Backup{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "xtrabackup-full",
-			Namespace: "default",
+			Namespace: "backup-source",
 		},
 		Status: dpv1alpha1.BackupStatus{
 			Phase: dpv1alpha1.BackupPhaseCompleted,
@@ -1186,5 +1183,41 @@ func TestHorizontalScalingCreateRestorePropagatesRestoreEnv(t *testing.T) {
 	}
 	if len(restoreList.Items[0].Spec.Env) != 1 || restoreList.Items[0].Spec.Env[0] != restoreEnv[0] {
 		t.Fatalf("expected restore env %v, got %v", restoreEnv, restoreList.Items[0].Spec.Env)
+	}
+	if restoreList.Items[0].Spec.Backup.Namespace != backup.Namespace {
+		t.Fatalf("expected source backup namespace %q, got %q", backup.Namespace, restoreList.Items[0].Spec.Backup.Namespace)
+	}
+}
+
+func TestHorizontalScalingCreateRestoreDefersBackupMethodValidationToRestorePlan(t *testing.T) {
+	ctx := context.Background()
+	scheme := runtime.NewScheme()
+	for _, addToScheme := range []func(*runtime.Scheme) error{
+		corev1.AddToScheme,
+		appsv1.AddToScheme,
+		dpv1alpha1.AddToScheme,
+		opsv1alpha1.AddToScheme,
+	} {
+		if err := addToScheme(scheme); err != nil {
+			t.Fatalf("add scheme: %v", err)
+		}
+	}
+	cluster := &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "mysql", Namespace: "default"}}
+	opsRequest := &opsv1alpha1.OpsRequest{ObjectMeta: metav1.ObjectMeta{Name: "scale-out", Namespace: "default"}}
+	backup := &dpv1alpha1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup", Namespace: "backup-source"}}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, opsRequest).Build()
+	restoreMGR := plan.NewRestoreManager(ctx, cli, cluster, scheme, nil, 1, 1)
+	opsRes := &OpsResource{Cluster: cluster, OpsRequest: opsRequest}
+
+	err := horizontalScalingOpsHandler{}.createRestore(intctrlutil.RequestCtx{Ctx: ctx}, cli, opsRes,
+		&component.SynthesizedComponent{}, restoreMGR, &appsv1.ClusterComponentSpec{}, backup, nil, "")
+	if err == nil {
+		t.Fatal("expected the restore plan to reject the incomplete Backup status")
+	}
+	if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal) {
+		t.Fatalf("Ops must not reclassify DataProtection BackupMethod state as fatal: %v", err)
+	}
+	if !strings.Contains(err.Error(), "status.backupMethod") {
+		t.Fatalf("unexpected restore plan error: %v", err)
 	}
 }

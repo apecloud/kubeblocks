@@ -604,6 +604,12 @@ func (r *BackupReconciler) handleRunningPhase(
 	if err = r.syncContinuousBackupEncryptionConfig(reqCtx, backup, request.BackupPolicy); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "sync continuous backup encryption config failed")
 	}
+	if completed, err := r.syncCompletedJobActions(reqCtx.Ctx, request.Backup); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "sync completed backup jobs failed")
+	} else if completed {
+		updateBackupStatusByActionStatus(&request.Status)
+		return r.completeBackup(reqCtx, backup, request.Backup)
+	}
 	var (
 		existFailedAction bool
 		waiting           bool
@@ -670,20 +676,119 @@ func (r *BackupReconciler) handleRunningPhase(
 		return r.updateStatusIfFailed(reqCtx, backup, request.Backup,
 			fmt.Errorf("there are failed actions, you can obtain the more information in the status.actions"))
 	}
-	// all actions completed, update backup status to completed
-	request.Status.Phase = dpv1alpha1.BackupPhaseCompleted
-	request.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
-	if !request.Status.StartTimestamp.IsZero() {
+	return r.completeBackup(reqCtx, backup, request.Backup)
+}
+
+func (r *BackupReconciler) syncCompletedJobActions(ctx context.Context, backup *dpv1alpha1.Backup) (bool, error) {
+	if len(backup.Status.Actions) == 0 {
+		return false, nil
+	}
+
+	jobs := make([]*batchv1.Job, len(backup.Status.Actions))
+	for i := range backup.Status.Actions {
+		actionStatus := &backup.Status.Actions[i]
+		if actionStatus.Phase == dpv1alpha1.ActionPhaseCompleted {
+			continue
+		}
+		if actionStatus.ActionType != dpv1alpha1.ActionTypeJob {
+			return false, nil
+		}
+
+		job, err := r.getJobForActionStatus(ctx, backup, actionStatus)
+		if err != nil {
+			return false, err
+		}
+		if job == nil {
+			return false, nil
+		}
+		_, finishedType, _ := dputils.IsJobFinished(job)
+		if finishedType != batchv1.JobComplete {
+			return false, nil
+		}
+		jobs[i] = job
+	}
+
+	for i := range backup.Status.Actions {
+		actionStatus := &backup.Status.Actions[i]
+		if actionStatus.Phase == dpv1alpha1.ActionPhaseCompleted {
+			continue
+		}
+		job := jobs[i]
+		actionStatus.Phase = dpv1alpha1.ActionPhaseCompleted
+		actionStatus.StartTimestamp = job.CreationTimestamp.DeepCopy()
+		if job.Status.CompletionTime != nil {
+			actionStatus.CompletionTimestamp = job.Status.CompletionTime.DeepCopy()
+		} else {
+			actionStatus.CompletionTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
+		}
+		actionStatus.ObjectRef = &corev1.ObjectReference{
+			APIVersion: batchv1.SchemeGroupVersion.String(),
+			Kind:       constant.JobKind,
+			Namespace:  job.Namespace,
+			Name:       job.Name,
+			UID:        job.UID,
+		}
+	}
+	return true, nil
+}
+
+func (r *BackupReconciler) getJobForActionStatus(ctx context.Context,
+	backup *dpv1alpha1.Backup,
+	actionStatus *dpv1alpha1.ActionStatus) (*batchv1.Job, error) {
+	var keys []client.ObjectKey
+	if actionStatus.ObjectRef != nil && actionStatus.ObjectRef.Kind == constant.JobKind {
+		keys = append(keys, client.ObjectKey{
+			Namespace: actionStatus.ObjectRef.Namespace,
+			Name:      actionStatus.ObjectRef.Name,
+		})
+	}
+
+	jobName := dpbackup.GenerateBackupJobName(backup, actionStatus.Name)
+	keys = append(keys, client.ObjectKey{Namespace: backup.Namespace, Name: jobName})
+	if namespace := viper.GetString(constant.CfgKeyCtrlrMgrNS); namespace != backup.Namespace {
+		keys = append(keys, client.ObjectKey{Namespace: namespace, Name: jobName})
+	}
+
+	checked := map[client.ObjectKey]struct{}{}
+	for _, key := range keys {
+		if _, ok := checked[key]; ok || key.Name == "" || key.Namespace == "" {
+			continue
+		}
+		checked[key] = struct{}{}
+
+		job := &batchv1.Job{}
+		if err := r.Client.Get(ctx, key, job); err != nil {
+			if client.IgnoreNotFound(err) == nil {
+				continue
+			}
+			return nil, err
+		}
+		if job.Labels[dptypes.BackupNameLabelKey] != backup.Name {
+			continue
+		}
+		if job.Namespace != backup.Namespace && job.Labels[dptypes.BackupNamespaceLabelKey] != backup.Namespace {
+			continue
+		}
+		return job, nil
+	}
+	return nil, nil
+}
+
+func (r *BackupReconciler) completeBackup(reqCtx intctrlutil.RequestCtx,
+	original *dpv1alpha1.Backup,
+	backup *dpv1alpha1.Backup) (ctrl.Result, error) {
+	backup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
+	backup.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
+	if !backup.Status.StartTimestamp.IsZero() {
 		// round the duration to a multiple of seconds.
-		duration := request.Status.CompletionTimestamp.Sub(request.Status.StartTimestamp.Time).Round(time.Second)
-		request.Status.Duration = &metav1.Duration{Duration: duration}
+		duration := backup.Status.CompletionTimestamp.Sub(backup.Status.StartTimestamp.Time).Round(time.Second)
+		backup.Status.Duration = &metav1.Duration{Duration: duration}
 	}
-	err = dpbackup.SetExpirationTime(request.Backup)
-	if err != nil {
-		return r.updateStatusIfFailed(reqCtx, backup, request.Backup, fmt.Errorf("failed to set expiration time, %v", err))
+	if err := dpbackup.SetExpirationTime(backup); err != nil {
+		return r.updateStatusIfFailed(reqCtx, original, backup, fmt.Errorf("failed to set expiration time, %v", err))
 	}
-	r.Recorder.Event(backup, corev1.EventTypeNormal, "CreatedBackup", "Completed backup")
-	if err = r.Client.Status().Patch(reqCtx.Ctx, request.Backup, client.MergeFrom(backup)); err != nil {
+	r.Recorder.Event(original, corev1.EventTypeNormal, "CreatedBackup", "Completed backup")
+	if err := r.Client.Status().Patch(reqCtx.Ctx, backup, client.MergeFrom(original)); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	return intctrlutil.Reconciled()

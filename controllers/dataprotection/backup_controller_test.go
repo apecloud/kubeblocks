@@ -355,6 +355,41 @@ var _ = Describe("Backup Controller test", func() {
 				Eventually(testapps.CheckObjExists(&testCtx, getJobKey(), &batchv1.Job{}, false)).Should(Succeed())
 			})
 
+			It("should succeed when the target pod disappears after the job completes", func() {
+				By("wait for the backup job to be created")
+				Eventually(testapps.CheckObjExists(&testCtx, getJobKey(), &batchv1.Job{}, true)).Should(Succeed())
+
+				By("pause backup reconciliation before completing the job")
+				Eventually(testapps.GetAndChangeObj(&testCtx, backupKey, func(fetched *dpv1alpha1.Backup) {
+					if fetched.Annotations == nil {
+						fetched.Annotations = map[string]string{}
+					}
+					fetched.Annotations[dptypes.SkipReconciliationAnnotationKey] = "true"
+				})).Should(Succeed())
+				Consistently(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseRunning))
+				}), time.Second).Should(Succeed())
+
+				testdp.PatchK8sJobStatus(&testCtx, getJobKey(), batchv1.JobComplete)
+				Consistently(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseRunning))
+				}), time.Second).Should(Succeed())
+
+				By("delete the selected target pod before the job result is observed")
+				Expect(k8sClient.Delete(ctx, targetPod)).Should(Succeed())
+				Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(targetPod), &corev1.Pod{}, false)).Should(Succeed())
+
+				By("resume backup reconciliation")
+				Eventually(testapps.GetAndChangeObj(&testCtx, backupKey, func(fetched *dpv1alpha1.Backup) {
+					delete(fetched.Annotations, dptypes.SkipReconciliationAnnotationKey)
+				})).Should(Succeed())
+
+				By("expect the completed job to win over the missing target pod")
+				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseCompleted))
+				})).Should(Succeed())
+			})
+
 			It("should fail after job fails", func() {
 				testdp.PatchK8sJobStatus(&testCtx, getJobKey(), batchv1.JobFailed)
 

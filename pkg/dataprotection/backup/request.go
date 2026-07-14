@@ -102,14 +102,14 @@ func (r *Request) BuildActions() (map[string][]action.Action, error) {
 		}
 
 		// 2. build backup data action
-		backupDataAction, err := r.buildBackupDataAction(r.TargetPods[i], fmt.Sprintf("%s-%s%d", BackupDataJobNamePrefix, r.getActionTargetPrefix(), i))
+		backupDataAction, err := r.buildBackupDataAction(r.TargetPods[i], r.backupDataActionName(i))
 		if err != nil {
 			return nil, err
 		}
 		podActions = appendIgnoreNil(podActions, backupDataAction)
 
 		// 3. build create volume snapshot action
-		createVolumeSnapshotAction, err := r.buildCreateVolumeSnapshotAction(r.TargetPods[i], fmt.Sprintf("createVolumeSnapshot-%s%d", r.getActionTargetPrefix(), i), i)
+		createVolumeSnapshotAction, err := r.buildCreateVolumeSnapshotAction(r.TargetPods[i], r.volumeSnapshotActionName(i), i)
 		if err != nil {
 			return nil, err
 		}
@@ -126,11 +126,105 @@ func (r *Request) BuildActions() (map[string][]action.Action, error) {
 	return actions, nil
 }
 
-func (r *Request) getActionTargetPrefix() string {
-	if r.Target != nil && r.Target.Name != "" {
-		return r.Target.Name + "-"
+// BuildActionStatusPlan builds the complete action inventory from the target
+// pods persisted in the Backup status. It does not require the target pods to
+// still exist.
+func (r *Request) BuildActionStatusPlan() ([]dpv1alpha1.ActionStatus, error) {
+	var statusTargets []*dpv1alpha1.BackupStatusTarget
+	if r.Status.Target != nil {
+		statusTargets = append(statusTargets, r.Status.Target)
+	} else {
+		for i := range r.Status.Targets {
+			statusTargets = append(statusTargets, &r.Status.Targets[i])
+		}
+	}
+	if len(statusTargets) == 0 {
+		return nil, fmt.Errorf("backup status target/targets can not be empty")
+	}
+
+	var plan []dpv1alpha1.ActionStatus
+	appendAction := func(name, targetPodName string, actionType dpv1alpha1.ActionType) {
+		plan = append(plan, dpv1alpha1.ActionStatus{
+			Name:          name,
+			TargetPodName: targetPodName,
+			Phase:         dpv1alpha1.ActionPhaseNew,
+			ActionType:    actionType,
+		})
+	}
+	for _, statusTarget := range statusTargets {
+		if len(statusTarget.SelectedTargetPods) == 0 {
+			return nil, fmt.Errorf("selected target pods for target %q can not be empty", statusTarget.Name)
+		}
+		for podIndex, targetPodName := range statusTarget.SelectedTargetPods {
+			if r.backupActionSetExists() {
+				for actionIndex := range r.ActionSet.Spec.Backup.PreBackup {
+					name := preBackupActionName(&statusTarget.BackupTarget, actionIndex, podIndex)
+					if err := validateActionSpec(name, &r.ActionSet.Spec.Backup.PreBackup[actionIndex]); err != nil {
+						return nil, err
+					}
+					appendAction(name, targetPodName, dpv1alpha1.ActionTypeJob)
+				}
+
+				if r.ActionSet.Spec.Backup.BackupData != nil {
+					actionType := dpv1alpha1.ActionTypeJob
+					switch r.ActionSet.Spec.BackupType {
+					case dpv1alpha1.BackupTypeFull, dpv1alpha1.BackupTypeIncremental, dpv1alpha1.BackupTypeSelective:
+					case dpv1alpha1.BackupTypeContinuous:
+						actionType = dpv1alpha1.ActionTypeStatefulSet
+					default:
+						return nil, fmt.Errorf("unsupported backup type %s", r.ActionSet.Spec.BackupType)
+					}
+					appendAction(backupDataActionName(&statusTarget.BackupTarget, podIndex), targetPodName, actionType)
+				}
+			}
+
+			if r.BackupMethod != nil && boolptr.IsSetToTrue(r.BackupMethod.SnapshotVolumes) {
+				appendAction(volumeSnapshotActionName(&statusTarget.BackupTarget, podIndex), targetPodName, dpv1alpha1.ActionTypeNone)
+			}
+
+			if r.backupActionSetExists() {
+				for actionIndex := range r.ActionSet.Spec.Backup.PostBackup {
+					name := postBackupActionName(&statusTarget.BackupTarget, actionIndex, podIndex)
+					if err := validateActionSpec(name, &r.ActionSet.Spec.Backup.PostBackup[actionIndex]); err != nil {
+						return nil, err
+					}
+					appendAction(name, targetPodName, dpv1alpha1.ActionTypeJob)
+				}
+			}
+		}
+	}
+	return plan, nil
+}
+
+func getActionTargetPrefix(target *dpv1alpha1.BackupTarget) string {
+	if target != nil && target.Name != "" {
+		return target.Name + "-"
 	}
 	return ""
+}
+
+func preBackupActionName(target *dpv1alpha1.BackupTarget, actionIndex, podIndex int) string {
+	return fmt.Sprintf("%s-%s%d-%d", prebackupJobNamePrefix, getActionTargetPrefix(target), actionIndex, podIndex)
+}
+
+func backupDataActionName(target *dpv1alpha1.BackupTarget, podIndex int) string {
+	return fmt.Sprintf("%s-%s%d", BackupDataJobNamePrefix, getActionTargetPrefix(target), podIndex)
+}
+
+func volumeSnapshotActionName(target *dpv1alpha1.BackupTarget, podIndex int) string {
+	return fmt.Sprintf("createVolumeSnapshot-%s%d", getActionTargetPrefix(target), podIndex)
+}
+
+func postBackupActionName(target *dpv1alpha1.BackupTarget, actionIndex, podIndex int) string {
+	return fmt.Sprintf("%s-%s%d-%d", postbackupJobNamePrefix, getActionTargetPrefix(target), actionIndex, podIndex)
+}
+
+func (r *Request) backupDataActionName(podIndex int) string {
+	return backupDataActionName(r.Target, podIndex)
+}
+
+func (r *Request) volumeSnapshotActionName(podIndex int) string {
+	return volumeSnapshotActionName(r.Target, podIndex)
 }
 
 func (r *Request) buildPreBackupActions(podActions *[]action.Action, targetPod *corev1.Pod, index int) error {
@@ -139,7 +233,7 @@ func (r *Request) buildPreBackupActions(podActions *[]action.Action, targetPod *
 		return nil
 	}
 	for i, preBackup := range r.ActionSet.Spec.Backup.PreBackup {
-		a, err := r.buildAction(targetPod, fmt.Sprintf("%s-%s%d-%d", prebackupJobNamePrefix, r.getActionTargetPrefix(), i, index), &preBackup)
+		a, err := r.buildAction(targetPod, preBackupActionName(r.Target, i, index), &preBackup)
 		if err != nil {
 			return err
 		}
@@ -155,7 +249,7 @@ func (r *Request) buildPostBackupActions(podActions *[]action.Action, targetPod 
 	}
 
 	for i, postBackup := range r.ActionSet.Spec.Backup.PostBackup {
-		a, err := r.buildAction(targetPod, fmt.Sprintf("%s-%s%d-%d", postbackupJobNamePrefix, r.getActionTargetPrefix(), i, index), &postBackup)
+		a, err := r.buildAction(targetPod, postBackupActionName(r.Target, i, index), &postBackup)
 		if err != nil {
 			return err
 		}
@@ -250,11 +344,8 @@ func (r *Request) buildCreateVolumeSnapshotAction(targetPod *corev1.Pod, name st
 func (r *Request) buildAction(targetPod *corev1.Pod,
 	name string,
 	act *dpv1alpha1.ActionSpec) (action.Action, error) {
-	if act.Exec == nil && act.Job == nil {
-		return nil, fmt.Errorf("action %s has no exec or job", name)
-	}
-	if act.Exec != nil && act.Job != nil {
-		return nil, fmt.Errorf("action %s should have only one of exec or job", name)
+	if err := validateActionSpec(name, act); err != nil {
+		return nil, err
 	}
 	switch {
 	case act.Exec != nil:
@@ -263,6 +354,16 @@ func (r *Request) buildAction(targetPod *corev1.Pod,
 		return r.buildJobAction(targetPod, name, act.Job)
 	}
 	return nil, nil
+}
+
+func validateActionSpec(name string, act *dpv1alpha1.ActionSpec) error {
+	if act.Exec == nil && act.Job == nil {
+		return fmt.Errorf("action %s has no exec or job", name)
+	}
+	if act.Exec != nil && act.Job != nil {
+		return fmt.Errorf("action %s should have only one of exec or job", name)
+	}
+	return nil
 }
 
 func (r *Request) buildExecAction(targetPod *corev1.Pod,

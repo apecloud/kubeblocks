@@ -161,6 +161,111 @@ func TestRequestBuildActionsIncludesPreAndPostHooks(t *testing.T) {
 	assert.Equal(t, dpv1alpha1.ActionTypeJob, actions[pod.Name][2].Type())
 }
 
+func newActionPlanTestRequest() *Request {
+	return &Request{
+		Backup:       &dpv1alpha1.Backup{},
+		BackupMethod: &dpv1alpha1.BackupMethod{},
+	}
+}
+
+func TestRequestBuildActionStatusPlanForMultipleTargets(t *testing.T) {
+	req := newActionPlanTestRequest()
+	req.ActionSet = &dpv1alpha1.ActionSet{Spec: dpv1alpha1.ActionSetSpec{
+		BackupType: dpv1alpha1.BackupTypeFull,
+		Backup: &dpv1alpha1.BackupActionSpec{
+			PreBackup:  []dpv1alpha1.ActionSpec{{Exec: &dpv1alpha1.ExecActionSpec{Command: []string{"pre"}}}},
+			BackupData: &dpv1alpha1.BackupDataActionSpec{JobActionSpec: dpv1alpha1.JobActionSpec{BaseJobActionSpec: dpv1alpha1.BaseJobActionSpec{Image: "busybox"}}},
+			PostBackup: []dpv1alpha1.ActionSpec{{Job: &dpv1alpha1.JobActionSpec{BaseJobActionSpec: dpv1alpha1.BaseJobActionSpec{Image: "busybox"}}}},
+		},
+	}}
+	req.Status.Targets = []dpv1alpha1.BackupStatusTarget{
+		{
+			BackupTarget:       dpv1alpha1.BackupTarget{Name: "target-0"},
+			SelectedTargetPods: []string{"pod-0"},
+		},
+		{
+			BackupTarget:       dpv1alpha1.BackupTarget{Name: "target-1"},
+			SelectedTargetPods: []string{"pod-1"},
+		},
+	}
+
+	plan, err := req.BuildActionStatusPlan()
+	assert.NoError(t, err)
+	assert.Equal(t, []dpv1alpha1.ActionStatus{
+		{Name: "dp-prebackup-target-0-0-0", TargetPodName: "pod-0", Phase: dpv1alpha1.ActionPhaseNew, ActionType: dpv1alpha1.ActionTypeJob},
+		{Name: "dp-backup-target-0-0", TargetPodName: "pod-0", Phase: dpv1alpha1.ActionPhaseNew, ActionType: dpv1alpha1.ActionTypeJob},
+		{Name: "dp-postbackup-target-0-0-0", TargetPodName: "pod-0", Phase: dpv1alpha1.ActionPhaseNew, ActionType: dpv1alpha1.ActionTypeJob},
+		{Name: "dp-prebackup-target-1-0-0", TargetPodName: "pod-1", Phase: dpv1alpha1.ActionPhaseNew, ActionType: dpv1alpha1.ActionTypeJob},
+		{Name: "dp-backup-target-1-0", TargetPodName: "pod-1", Phase: dpv1alpha1.ActionPhaseNew, ActionType: dpv1alpha1.ActionTypeJob},
+		{Name: "dp-postbackup-target-1-0-0", TargetPodName: "pod-1", Phase: dpv1alpha1.ActionPhaseNew, ActionType: dpv1alpha1.ActionTypeJob},
+	}, plan)
+}
+
+func TestRequestBuildActionStatusPlanTypesAndValidation(t *testing.T) {
+	t.Run("snapshot action", func(t *testing.T) {
+		req := newActionPlanTestRequest()
+		req.BackupMethod.SnapshotVolumes = boolptr.True()
+		req.Status.Target = &dpv1alpha1.BackupStatusTarget{
+			BackupTarget:       dpv1alpha1.BackupTarget{Name: "target"},
+			SelectedTargetPods: []string{"pod-0"},
+		}
+
+		plan, err := req.BuildActionStatusPlan()
+		assert.NoError(t, err)
+		assert.Equal(t, []dpv1alpha1.ActionStatus{{
+			Name:          "createVolumeSnapshot-target-0",
+			TargetPodName: "pod-0",
+			Phase:         dpv1alpha1.ActionPhaseNew,
+			ActionType:    dpv1alpha1.ActionTypeNone,
+		}}, plan)
+	})
+
+	t.Run("continuous action", func(t *testing.T) {
+		req := newActionPlanTestRequest()
+		req.ActionSet = &dpv1alpha1.ActionSet{Spec: dpv1alpha1.ActionSetSpec{
+			BackupType: dpv1alpha1.BackupTypeContinuous,
+			Backup: &dpv1alpha1.BackupActionSpec{
+				BackupData: &dpv1alpha1.BackupDataActionSpec{},
+			},
+		}}
+		req.Status.Target = &dpv1alpha1.BackupStatusTarget{
+			BackupTarget:       dpv1alpha1.BackupTarget{Name: "target"},
+			SelectedTargetPods: []string{"pod-0"},
+		}
+
+		plan, err := req.BuildActionStatusPlan()
+		assert.NoError(t, err)
+		assert.Equal(t, dpv1alpha1.ActionTypeStatefulSet, plan[0].ActionType)
+	})
+
+	t.Run("missing persisted target pod", func(t *testing.T) {
+		req := newActionPlanTestRequest()
+		req.Status.Target = &dpv1alpha1.BackupStatusTarget{
+			BackupTarget: dpv1alpha1.BackupTarget{Name: "target"},
+		}
+
+		_, err := req.BuildActionStatusPlan()
+		assert.Error(t, err)
+	})
+
+	t.Run("invalid hook action", func(t *testing.T) {
+		req := newActionPlanTestRequest()
+		req.ActionSet = &dpv1alpha1.ActionSet{Spec: dpv1alpha1.ActionSetSpec{
+			BackupType: dpv1alpha1.BackupTypeFull,
+			Backup: &dpv1alpha1.BackupActionSpec{
+				PreBackup: []dpv1alpha1.ActionSpec{{}},
+			},
+		}}
+		req.Status.Target = &dpv1alpha1.BackupStatusTarget{
+			BackupTarget:       dpv1alpha1.BackupTarget{Name: "target"},
+			SelectedTargetPods: []string{"pod-0"},
+		}
+
+		_, err := req.BuildActionStatusPlan()
+		assert.Error(t, err)
+	})
+}
+
 var _ = Describe("Request Test", func() {
 	buildRequest := func() *Request {
 		return &Request{

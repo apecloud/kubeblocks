@@ -542,21 +542,16 @@ func (r *BackupReconciler) patchBackupStatus(
 	} else if request.BackupPolicy.Spec.EncryptionConfig != nil {
 		request.Status.EncryptionConfig = request.BackupPolicy.Spec.EncryptionConfig
 	}
-	// init action status
-	actions, err := request.BuildActions()
+	// Keep the existing live target validation, then persist the complete action
+	// inventory for every selected target pod in the same status update.
+	if _, err := request.BuildActions(); err != nil {
+		return err
+	}
+	actionPlan, err := request.BuildActionStatusPlan()
 	if err != nil {
 		return err
 	}
-	for targetPodName, acts := range actions {
-		for _, act := range acts {
-			request.Status.Actions = append(request.Status.Actions, dpv1alpha1.ActionStatus{
-				Name:          act.GetName(),
-				TargetPodName: targetPodName,
-				Phase:         dpv1alpha1.ActionPhaseNew,
-				ActionType:    act.Type(),
-			})
-		}
-	}
+	request.Status.Actions = actionPlan
 
 	// update phase to running
 	request.Status.Phase = dpv1alpha1.BackupPhaseRunning
@@ -604,12 +599,13 @@ func (r *BackupReconciler) handleRunningPhase(
 	if err = r.syncContinuousBackupEncryptionConfig(reqCtx, backup, request.BackupPolicy); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "sync continuous backup encryption config failed")
 	}
-	if completed, err := r.syncCompletedJobActions(reqCtx.Ctx, request.Backup); err != nil {
+	if completed, err := r.syncCompletedJobActions(reqCtx.Ctx, request); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "sync completed backup jobs failed")
 	} else if completed {
 		updateBackupStatusByActionStatus(&request.Status)
 		return r.completeBackup(reqCtx, backup, request.Backup)
 	}
+	targets := dputils.GetBackupTargets(request.BackupPolicy, request.BackupMethod)
 	var (
 		existFailedAction bool
 		waiting           bool
@@ -620,7 +616,6 @@ func (r *BackupReconciler) handleRunningPhase(
 			Scheme:           r.Scheme,
 			RestClientConfig: r.RestConfig,
 		}
-		targets = dputils.GetBackupTargets(request.BackupPolicy, request.BackupMethod)
 	)
 	for i := range targets {
 		if err = r.prepareRequestTargetInfo(reqCtx, request, &targets[i]); err != nil {
@@ -679,22 +674,41 @@ func (r *BackupReconciler) handleRunningPhase(
 	return r.completeBackup(reqCtx, backup, request.Backup)
 }
 
-func (r *BackupReconciler) syncCompletedJobActions(ctx context.Context, backup *dpv1alpha1.Backup) (bool, error) {
-	if len(backup.Status.Actions) == 0 {
+func (r *BackupReconciler) syncCompletedJobActions(ctx context.Context, request *dpbackup.Request) (bool, error) {
+	actionPlan, err := request.BuildActionStatusPlan()
+	if err != nil {
+		return false, err
+	}
+	if len(actionPlan) == 0 {
 		return false, nil
 	}
 
-	jobs := make([]*batchv1.Job, len(backup.Status.Actions))
-	for i := range backup.Status.Actions {
-		actionStatus := &backup.Status.Actions[i]
+	type actionKey struct {
+		name          string
+		targetPodName string
+	}
+	existing := make(map[actionKey]*dpv1alpha1.ActionStatus, len(request.Status.Actions))
+	for i := range request.Status.Actions {
+		actionStatus := &request.Status.Actions[i]
+		existing[actionKey{name: actionStatus.Name, targetPodName: actionStatus.TargetPodName}] = actionStatus
+	}
+
+	for i := range actionPlan {
+		expected := actionPlan[i]
+		key := actionKey{name: expected.Name, targetPodName: expected.TargetPodName}
+		if actionStatus := existing[key]; actionStatus != nil {
+			actionPlan[i] = *actionStatus.DeepCopy()
+		}
+		actionStatus := &actionPlan[i]
 		if actionStatus.Phase == dpv1alpha1.ActionPhaseCompleted {
 			continue
 		}
-		if actionStatus.ActionType != dpv1alpha1.ActionTypeJob {
+		if expected.ActionType != dpv1alpha1.ActionTypeJob {
 			return false, nil
 		}
+		actionStatus.ActionType = expected.ActionType
 
-		job, err := r.getJobForActionStatus(ctx, backup, actionStatus)
+		job, err := r.getJobForActionStatus(ctx, request.Backup, actionStatus)
 		if err != nil {
 			return false, err
 		}
@@ -705,15 +719,6 @@ func (r *BackupReconciler) syncCompletedJobActions(ctx context.Context, backup *
 		if finishedType != batchv1.JobComplete {
 			return false, nil
 		}
-		jobs[i] = job
-	}
-
-	for i := range backup.Status.Actions {
-		actionStatus := &backup.Status.Actions[i]
-		if actionStatus.Phase == dpv1alpha1.ActionPhaseCompleted {
-			continue
-		}
-		job := jobs[i]
 		actionStatus.Phase = dpv1alpha1.ActionPhaseCompleted
 		actionStatus.StartTimestamp = job.CreationTimestamp.DeepCopy()
 		if job.Status.CompletionTime != nil {
@@ -729,6 +734,7 @@ func (r *BackupReconciler) syncCompletedJobActions(ctx context.Context, backup *
 			UID:        job.UID,
 		}
 	}
+	request.Status.Actions = actionPlan
 	return true, nil
 }
 

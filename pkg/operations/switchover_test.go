@@ -22,12 +22,14 @@ package operations
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -57,6 +59,21 @@ var _ = Describe("", func() {
 		}
 		return role
 	}
+
+	It("reads the cross-release switchover dispatch protocol fixture", func() {
+		claim, ok := parseSwitchoverDispatchClaim("switchover dispatch claimed before lifecycle call: SwitchoverDispatch/fixture-ops-uid/fixture-component/fixture-instance/fixture-candidate/fixture-token")
+		Expect(ok).Should(BeTrue())
+		Expect(claim).Should(Equal(switchoverDispatchProtocolIdentity{
+			opsRequestUID: "fixture-ops-uid",
+			componentName: "fixture-component",
+			instanceName:  "fixture-instance",
+			candidateName: "fixture-candidate",
+			token:         "fixture-token",
+		}))
+		outcome, ok := parseSwitchoverDispatchOutcomeMessage("switchover dispatch outcome persisted: SwitchoverDispatch/fixture-ops-uid/fixture-component/fixture-instance/fixture-candidate/fixture-token; doing switchover")
+		Expect(ok).Should(BeTrue())
+		Expect(outcome).Should(Equal(claim))
+	})
 
 	cleanEnv := func() {
 		// must wait till resources deleted and no longer existed before the testcases start,
@@ -153,6 +170,231 @@ var _ = Describe("", func() {
 				Cluster:  clusterObj,
 				Recorder: k8sManager.GetEventRecorderFor("opsrequest-controller"),
 			}
+		})
+
+		protocolMessage := func(prefix string, opsRequest *opsv1alpha1.OpsRequest, compName,
+			instanceName, candidateName, token, suffix string) string {
+			return fmt.Sprintf("%s%s/%s/%s/%s/%s%s", prefix, opsRequest.UID, compName,
+				instanceName, candidateName, token, suffix)
+		}
+		const (
+			readerClaimMessagePrefix   = "switchover dispatch claimed before lifecycle call: SwitchoverDispatch/"
+			readerOutcomeMessagePrefix = "switchover dispatch outcome persisted: SwitchoverDispatch/"
+		)
+
+		runPersistedProtocolReader := func(useComponentObjectName, useLegacyObjectKey, addLegacyObjectKey bool, candidateName string,
+			messageBuilder func(*opsv1alpha1.OpsRequest, string, string) string,
+			progressStatuses ...opsv1alpha1.ProgressStatus) (*opsv1alpha1.ProgressStatusDetail, int32, int32, error) {
+			ops := testops.NewOpsRequestObj("ops-switchover-reader-"+testCtx.GetRandomStr(), testCtx.DefaultNamespace,
+				clusterObj.Name, opsv1alpha1.SwitchoverType)
+			instanceName := fmt.Sprintf("%s-%s-%d", clusterObj.Name, defaultCompName, 1)
+			ops.Spec.SwitchoverList = []opsv1alpha1.Switchover{{
+				ComponentName: defaultCompName,
+				InstanceName:  instanceName,
+				CandidateName: candidateName,
+			}}
+			if useComponentObjectName {
+				ops.Spec.SwitchoverList[0].ComponentName = ""
+				ops.Spec.SwitchoverList[0].ComponentObjectName = compObj.Name
+			}
+
+			opsRes.OpsRequest = testops.CreateOpsRequest(ctx, testCtx, ops)
+			opsRes.OpsRequest.Status.Conditions = []metav1.Condition{{
+				Type:   opsv1alpha1.ConditionTypeSwitchover,
+				Status: metav1.ConditionTrue,
+			}}
+			progressComponentName := defaultCompName
+			if useLegacyObjectKey {
+				progressComponentName = compObj.Name
+			}
+			progressStatus := opsv1alpha1.ProcessingProgressStatus
+			if len(progressStatuses) > 0 {
+				progressStatus = progressStatuses[0]
+			}
+			opsRes.OpsRequest.Status.Components = map[string]opsv1alpha1.OpsRequestComponentStatus{
+				progressComponentName: {
+					Phase: appsv1.UpdatingComponentPhase,
+					ProgressDetails: []opsv1alpha1.ProgressStatusDetail{{
+						Group:     testapps.Follower,
+						ObjectKey: getProgressObjectKey(KBSwitchoverKey, progressComponentName),
+						Status:    progressStatus,
+						Message:   messageBuilder(opsRes.OpsRequest, instanceName, candidateName),
+					}},
+				},
+			}
+			if addLegacyObjectKey {
+				opsRes.OpsRequest.Status.Components[compObj.Name] = opsv1alpha1.OpsRequestComponentStatus{
+					Phase: appsv1.UpdatingComponentPhase,
+					ProgressDetails: []opsv1alpha1.ProgressStatusDetail{{
+						Group:     testapps.Follower,
+						ObjectKey: getProgressObjectKey(KBSwitchoverKey, compObj.Name),
+						Status:    opsv1alpha1.ProcessingProgressStatus,
+						Message:   "doing switchover",
+					}},
+				}
+			}
+
+			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).Times(0)
+			})
+			var completedCount, failedCount int32
+			err := handleSwitchover(reqCtx, k8sClient, opsRes, &opsRes.OpsRequest.Spec.SwitchoverList[0],
+				opsRes.OpsRequest, &completedCount, &failedCount)
+			progressDetail := findStatusProgressDetail(opsRes.OpsRequest.Status.Components[progressComponentName].ProgressDetails,
+				getProgressObjectKey(KBSwitchoverKey, progressComponentName))
+			return progressDetail, completedCount, failedCount, err
+		}
+
+		It("fails closed without replaying a retained no-candidate dispatch claim", func() {
+			progressDetail, completedCount, failedCount, err := runPersistedProtocolReader(false, false, false, "",
+				func(opsRequest *opsv1alpha1.OpsRequest, instanceName, candidateName string) string {
+					return protocolMessage(readerClaimMessagePrefix, opsRequest, defaultCompName,
+						instanceName, candidateName, "reader-token", "")
+				})
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(progressDetail).ShouldNot(BeNil())
+			Expect(progressDetail.Status).Should(Equal(opsv1alpha1.FailedProgressStatus))
+			Expect(progressDetail.Message).Should(ContainSubstring("outcome is unknown"))
+			Expect(completedCount).Should(Equal(int32(1)))
+			Expect(failedCount).Should(Equal(int32(1)))
+		})
+
+		It("continues candidate role observation without replaying a retained dispatch claim", func() {
+			candidateName := fmt.Sprintf("%s-%s-%d", clusterObj.Name, defaultCompName, 0)
+			progressDetail, completedCount, failedCount, err := runPersistedProtocolReader(false, false, false, candidateName,
+				func(opsRequest *opsv1alpha1.OpsRequest, instanceName, candidateName string) string {
+					return protocolMessage(readerClaimMessagePrefix, opsRequest, defaultCompName,
+						instanceName, candidateName, "candidate-token", "")
+				})
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(progressDetail).ShouldNot(BeNil())
+			Expect(progressDetail.Status).Should(Equal(opsv1alpha1.ProcessingProgressStatus))
+			Expect(completedCount).Should(BeZero())
+			Expect(failedCount).Should(BeZero())
+		})
+
+		It("accepts an exact persisted outcome without replaying the lifecycle action", func() {
+			progressDetail, completedCount, failedCount, err := runPersistedProtocolReader(false, false, false, "",
+				func(opsRequest *opsv1alpha1.OpsRequest, instanceName, candidateName string) string {
+					return protocolMessage(readerOutcomeMessagePrefix, opsRequest, defaultCompName,
+						instanceName, candidateName, "outcome-token", "; doing switchover")
+				})
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(progressDetail).ShouldNot(BeNil())
+			Expect(progressDetail.Status).Should(Equal(opsv1alpha1.SucceedProgressStatus))
+			Expect(completedCount).Should(Equal(int32(1)))
+			Expect(failedCount).Should(BeZero())
+		})
+
+		DescribeTable("fails closed on malformed or foreign persisted protocol identity without replay",
+			func(candidateName string, messageBuilder func(*opsv1alpha1.OpsRequest, string, string) string) {
+				progressDetail, completedCount, failedCount, err := runPersistedProtocolReader(false, false, false, candidateName, messageBuilder)
+				Expect(err).ShouldNot(HaveOccurred())
+				Expect(progressDetail).ShouldNot(BeNil())
+				Expect(progressDetail.Status).Should(Equal(opsv1alpha1.FailedProgressStatus))
+				Expect(progressDetail.Message).Should(ContainSubstring("protocol identity changed or is malformed"))
+				Expect(completedCount).Should(Equal(int32(1)))
+				Expect(failedCount).Should(Equal(int32(1)))
+			},
+			Entry("malformed claim", "", func(*opsv1alpha1.OpsRequest, string, string) string {
+				return readerClaimMessagePrefix + "malformed"
+			}),
+			Entry("malformed outcome", "", func(*opsv1alpha1.OpsRequest, string, string) string {
+				return readerOutcomeMessagePrefix + "malformed"
+			}),
+			Entry("foreign OpsRequest UID", "", func(opsRequest *opsv1alpha1.OpsRequest, instanceName, candidateName string) string {
+				message := protocolMessage(readerClaimMessagePrefix, opsRequest, defaultCompName,
+					instanceName, candidateName, "foreign-uid-token", "")
+				return strings.Replace(message, string(opsRequest.UID), "foreign-uid", 1)
+			}),
+			Entry("foreign component", "", func(opsRequest *opsv1alpha1.OpsRequest, instanceName, candidateName string) string {
+				return protocolMessage(readerClaimMessagePrefix, opsRequest, "foreign-component",
+					instanceName, candidateName, "foreign-component-token", "")
+			}),
+			Entry("foreign instance", "", func(opsRequest *opsv1alpha1.OpsRequest, _, candidateName string) string {
+				return protocolMessage(readerClaimMessagePrefix, opsRequest, defaultCompName,
+					"foreign-instance", candidateName, "foreign-instance-token", "")
+			}),
+			Entry("foreign candidate", "foreign-candidate", func(opsRequest *opsv1alpha1.OpsRequest, instanceName, _ string) string {
+				return protocolMessage(readerClaimMessagePrefix, opsRequest, defaultCompName,
+					instanceName, "different-candidate", "foreign-candidate-token", "")
+			}),
+		)
+
+		It("keeps the legacy Processing message path readable", func() {
+			progressDetail, completedCount, failedCount, err := runPersistedProtocolReader(false, false, false, "",
+				func(*opsv1alpha1.OpsRequest, string, string) string { return "doing switchover" })
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(progressDetail).ShouldNot(BeNil())
+			Expect(progressDetail.Status).Should(Equal(opsv1alpha1.SucceedProgressStatus))
+			Expect(completedCount).Should(Equal(int32(1)))
+			Expect(failedCount).Should(BeZero())
+		})
+
+		It("reads ComponentObjectName claims in the writer's logical component value domain", func() {
+			progressDetail, completedCount, failedCount, err := runPersistedProtocolReader(true, false, false, "",
+				func(opsRequest *opsv1alpha1.OpsRequest, instanceName, candidateName string) string {
+					return protocolMessage(readerClaimMessagePrefix, opsRequest, defaultCompName,
+						instanceName, candidateName, "component-object-token", "")
+				})
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(progressDetail).ShouldNot(BeNil())
+			Expect(progressDetail.Status).Should(Equal(opsv1alpha1.FailedProgressStatus))
+			Expect(progressDetail.Message).Should(ContainSubstring("outcome is unknown"))
+			Expect(completedCount).Should(Equal(int32(1)))
+			Expect(failedCount).Should(Equal(int32(1)))
+		})
+
+		It("continues a legacy ComponentObjectName progress stored under the object-name key", func() {
+			progressDetail, completedCount, failedCount, err := runPersistedProtocolReader(true, true, false, "",
+				func(*opsv1alpha1.OpsRequest, string, string) string { return "doing switchover" })
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(progressDetail).ShouldNot(BeNil())
+			Expect(progressDetail.Status).Should(Equal(opsv1alpha1.SucceedProgressStatus))
+			Expect(completedCount).Should(Equal(int32(1)))
+			Expect(failedCount).Should(BeZero())
+		})
+
+		It("fails closed on a protocol message stored under the legacy object-name key", func() {
+			progressDetail, completedCount, failedCount, err := runPersistedProtocolReader(true, true, false, "",
+				func(opsRequest *opsv1alpha1.OpsRequest, instanceName, candidateName string) string {
+					return protocolMessage(readerClaimMessagePrefix, opsRequest, defaultCompName,
+						instanceName, candidateName, "legacy-key-token", "")
+				})
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(progressDetail).ShouldNot(BeNil())
+			Expect(progressDetail.Status).Should(Equal(opsv1alpha1.FailedProgressStatus))
+			Expect(progressDetail.Message).Should(ContainSubstring("protocol identity changed or is malformed"))
+			Expect(completedCount).Should(Equal(int32(1)))
+			Expect(failedCount).Should(Equal(int32(1)))
+		})
+
+		It("fails closed before dispatch when a Pending legacy object-name key contains a protocol message", func() {
+			progressDetail, completedCount, failedCount, err := runPersistedProtocolReader(true, true, false, "",
+				func(opsRequest *opsv1alpha1.OpsRequest, instanceName, candidateName string) string {
+					return protocolMessage(readerClaimMessagePrefix, opsRequest, defaultCompName,
+						instanceName, candidateName, "pending-legacy-key-token", "")
+				}, opsv1alpha1.PendingProgressStatus)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(progressDetail).ShouldNot(BeNil())
+			Expect(progressDetail.Status).Should(Equal(opsv1alpha1.FailedProgressStatus))
+			Expect(progressDetail.Message).Should(ContainSubstring("protocol identity changed or is malformed"))
+			Expect(completedCount).Should(Equal(int32(1)))
+			Expect(failedCount).Should(Equal(int32(1)))
+		})
+
+		It("prefers the logical progress key when legacy and logical keys both exist", func() {
+			progressDetail, completedCount, failedCount, err := runPersistedProtocolReader(true, false, true, "",
+				func(opsRequest *opsv1alpha1.OpsRequest, instanceName, candidateName string) string {
+					return protocolMessage(readerClaimMessagePrefix, opsRequest, defaultCompName,
+						instanceName, candidateName, "logical-priority-token", "")
+				})
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(progressDetail).ShouldNot(BeNil())
+			Expect(progressDetail.Status).Should(Equal(opsv1alpha1.FailedProgressStatus))
+			Expect(progressDetail.Message).Should(ContainSubstring("outcome is unknown"))
+			Expect(completedCount).Should(Equal(int32(1)))
+			Expect(failedCount).Should(Equal(int32(1)))
 		})
 
 		It("Test switchover OpsRequest", func() {

@@ -23,6 +23,8 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"reflect"
+	"strings"
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -39,6 +41,8 @@ import (
 )
 
 type BackupOpsHandler struct{}
+
+const legacyBackupTimeLayout = "20060102150405"
 
 var _ OpsHandler = BackupOpsHandler{}
 
@@ -65,18 +69,9 @@ func (b BackupOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clien
 	opsRequest := opsRes.OpsRequest
 	cluster := opsRes.Cluster
 
-	backupIntent, err := normalizedBackupIntent(opsRequest)
-	if err != nil {
-		return err
-	}
-	existingBackup := &dpv1alpha1.Backup{}
-	backupKey := client.ObjectKey{Name: backupIntent.BackupName, Namespace: cluster.Namespace}
-	if err = cli.Get(reqCtx.Ctx, backupKey, existingBackup); err == nil {
-		if validateBackupOwnedByOpsRequest(existingBackup, opsRequest, cluster.Name) == nil {
-			return nil
-		}
-		return intctrlutil.NewFatalError(fmt.Sprintf(`backup "%s" already exists and is not created by this OpsRequest`, backupIntent.BackupName))
-	} else if !apierrors.IsNotFound(err) {
+	if _, retryable, err := findBackupForOpsRequest(reqCtx, cli, opsRes); err == nil {
+		return nil
+	} else if retryable || !apierrors.IsNotFound(err) {
 		return err
 	}
 
@@ -87,14 +82,12 @@ func (b BackupOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clien
 		if err = cli.Create(reqCtx.Ctx, backup); !apierrors.IsAlreadyExists(err) {
 			return err
 		}
-		if getErr := cli.Get(reqCtx.Ctx, client.ObjectKeyFromObject(backup), existingBackup); getErr != nil {
-			return getErr
-		}
-		if validateBackupOwnedByOpsRequest(existingBackup, opsRequest, cluster.Name) == nil {
+		if existingBackup, _, err := findBackupForOpsRequest(reqCtx, cli, opsRes); err == nil && existingBackup != nil {
 			// the backup has already been created by this OpsRequest.
 			return nil
+		} else {
+			return err
 		}
-		return intctrlutil.NewFatalError(fmt.Sprintf(`backup "%s" already exists and is not created by this OpsRequest`, backup.Name))
 	}
 }
 
@@ -103,28 +96,12 @@ func (b BackupOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clien
 // If the backup is completed, it will return OpsSuccess
 // If the backup is failed, it will return OpsFailed
 func (b BackupOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (opsv1alpha1.OpsPhase, time.Duration, error) {
-	opsRequest := opsRes.OpsRequest
-	cluster := opsRes.Cluster
-
-	backupIntent, err := normalizedBackupIntent(opsRequest)
+	backup, retryable, err := findBackupForOpsRequest(reqCtx, cli, opsRes)
 	if err != nil {
-		return opsv1alpha1.OpsFailedPhase, 0, err
-	}
-	backup := &dpv1alpha1.Backup{}
-	if err = cli.Get(reqCtx.Ctx, client.ObjectKey{Name: backupIntent.BackupName, Namespace: cluster.Namespace}, backup); err != nil {
-		if !apierrors.IsNotFound(err) || opsRes.APIReader == nil {
-			return opsv1alpha1.OpsFailedPhase, 0, err
-		}
-		if err = opsRes.APIReader.Get(reqCtx.Ctx,
-			client.ObjectKey{Name: backupIntent.BackupName, Namespace: cluster.Namespace}, backup); err != nil {
-			if apierrors.IsNotFound(err) {
-				return opsv1alpha1.OpsFailedPhase, 0, err
-			}
+		if retryable {
 			return opsv1alpha1.OpsRunningPhase, 0, err
 		}
-	}
-	if err = validateBackupOwnedByOpsRequest(backup, opsRequest, cluster.Name); err != nil {
-		return opsv1alpha1.OpsFailedPhase, 0, intctrlutil.NewFatalError(err.Error())
+		return opsv1alpha1.OpsFailedPhase, 0, err
 	}
 	// check backup status
 	phase := backup.Status.Phase
@@ -135,6 +112,277 @@ func (b BackupOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cli
 		return opsv1alpha1.OpsFailedPhase, 0, fmt.Errorf("backup failed")
 	}
 	return opsv1alpha1.OpsRunningPhase, 0, nil
+}
+
+// findBackupForOpsRequest preserves in-flight Backup OpsRequests across the
+// timestamp-name to UID-name protocol migration without restoring first-item lookup.
+func findBackupForOpsRequest(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (*dpv1alpha1.Backup, bool, error) {
+	opsRequest := opsRes.OpsRequest
+	cluster := opsRes.Cluster
+	intent, err := normalizedBackupIntent(opsRequest)
+	if err != nil {
+		return nil, false, err
+	}
+
+	backupKey := client.ObjectKey{Name: intent.BackupName, Namespace: cluster.Namespace}
+	backup := &dpv1alpha1.Backup{}
+	if err = cli.Get(reqCtx.Ctx, backupKey, backup); err == nil {
+		return validateFoundBackup(reqCtx, cli, opsRes, backup, false)
+	} else if !apierrors.IsNotFound(err) {
+		return nil, false, err
+	}
+	exactNotFound := err
+
+	if opsRes.APIReader != nil {
+		backup = &dpv1alpha1.Backup{}
+		if err = opsRes.APIReader.Get(reqCtx.Ctx, backupKey, backup); err == nil {
+			return validateFoundBackup(reqCtx, cli, opsRes, backup, true)
+		} else if !apierrors.IsNotFound(err) {
+			return nil, true, err
+		}
+		exactNotFound = err
+	}
+
+	rawIntent := opsRequest.Spec.GetBackup()
+	if rawIntent != nil && rawIntent.BackupName != "" {
+		return nil, false, exactNotFound
+	}
+	legacyBackup, retryable, err := findImplicitLegacyBackup(reqCtx, cli, opsRes)
+	if err != nil || legacyBackup != nil {
+		return legacyBackup, retryable, err
+	}
+	return nil, false, exactNotFound
+}
+
+func validateFoundBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource,
+	backup *dpv1alpha1.Backup, authoritative bool) (*dpv1alpha1.Backup, bool, error) {
+	if hasBackupOwnershipProtocol(backup) {
+		if err := validateBackupOwnedByOpsRequest(backup, opsRes.OpsRequest, opsRes.Cluster.Name); err != nil {
+			return nil, false, backupOwnershipError(backup.Name, err)
+		}
+		return backup, false, nil
+	}
+
+	if authoritative {
+		if err := validateLegacyBackup(backup, opsRes.OpsRequest, opsRes.Cluster, opsRes.OpsRequest.Spec.GetBackup()); err != nil {
+			return nil, false, backupOwnershipError(backup.Name, err)
+		}
+		return backup, false, nil
+	}
+	confirmed, retryable, err := confirmLegacyBackup(reqCtx, cli, opsRes, backup)
+	if err != nil {
+		if retryable {
+			return nil, true, err
+		}
+		return nil, false, backupOwnershipError(backup.Name, err)
+	}
+	return confirmed, false, nil
+}
+
+func findImplicitLegacyBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (*dpv1alpha1.Backup, bool, error) {
+	reader := authoritativeBackupReader(cli, opsRes)
+	backups := &dpv1alpha1.BackupList{}
+	if err := reader.List(reqCtx.Ctx, backups, client.InNamespace(opsRes.Cluster.Namespace),
+		client.MatchingLabels(getBackupLabels(opsRes.Cluster.Name, opsRes.OpsRequest.Name))); err != nil {
+		return nil, true, err
+	}
+
+	var candidate *dpv1alpha1.Backup
+	candidateUsesOwnershipProtocol := false
+	for i := range backups.Items {
+		backup := &backups.Items[i]
+		if hasCompleteBackupOwnershipProtocol(backup) &&
+			backup.Annotations[constant.OpsRequestUIDAnnotationKey] != string(opsRes.OpsRequest.UID) {
+			// A complete protocol proves this object belongs to an older
+			// same-name OpsRequest, even when API timestamps share a second.
+			continue
+		}
+		if !backup.CreationTimestamp.IsZero() && !opsRes.OpsRequest.CreationTimestamp.IsZero() &&
+			backup.CreationTimestamp.Before(&opsRes.OpsRequest.CreationTimestamp) {
+			continue
+		}
+		usesOwnershipProtocol := hasBackupOwnershipProtocol(backup)
+		if usesOwnershipProtocol {
+			if err := validateBackupOwnedByOpsRequest(backup, opsRes.OpsRequest, opsRes.Cluster.Name); err != nil {
+				return nil, false, intctrlutil.NewFatalError(fmt.Sprintf(
+					"invalid backup ownership protocol for %q: %v", backup.Name, err))
+			}
+		} else if err := validateLegacyBackup(backup, opsRes.OpsRequest, opsRes.Cluster,
+			opsRes.OpsRequest.Spec.GetBackup()); err != nil {
+			return nil, false, intctrlutil.NewFatalError(fmt.Sprintf("invalid legacy backup %q: %v", backup.Name, err))
+		}
+		if candidate != nil {
+			return nil, false, intctrlutil.NewFatalError(fmt.Sprintf(
+				"multiple legacy backups match OpsRequest %s/%s", opsRes.OpsRequest.Namespace, opsRes.OpsRequest.Name))
+		}
+		candidate = backup.DeepCopy()
+		candidateUsesOwnershipProtocol = usesOwnershipProtocol
+	}
+	if candidate == nil {
+		return nil, false, nil
+	}
+	if candidateUsesOwnershipProtocol {
+		confirmed := &dpv1alpha1.Backup{}
+		if err := reader.Get(reqCtx.Ctx, client.ObjectKeyFromObject(candidate), confirmed); err != nil {
+			return nil, true, err
+		}
+		if confirmed.UID != candidate.UID {
+			return nil, true, fmt.Errorf("backup %q changed identity during lookup", candidate.Name)
+		}
+		if err := validateBackupOwnedByOpsRequest(confirmed, opsRes.OpsRequest, opsRes.Cluster.Name); err != nil {
+			return nil, false, backupOwnershipError(candidate.Name, err)
+		}
+		return confirmed, false, nil
+	}
+	confirmed, retryable, err := confirmLegacyBackup(reqCtx, cli, opsRes, candidate)
+	if err != nil {
+		if retryable {
+			return nil, true, err
+		}
+		return nil, false, intctrlutil.NewFatalError(fmt.Sprintf("invalid legacy backup %q: %v", candidate.Name, err))
+	}
+	return confirmed, false, nil
+}
+
+func confirmLegacyBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource,
+	observed *dpv1alpha1.Backup) (*dpv1alpha1.Backup, bool, error) {
+	confirmed := &dpv1alpha1.Backup{}
+	if err := authoritativeBackupReader(cli, opsRes).Get(reqCtx.Ctx, client.ObjectKeyFromObject(observed), confirmed); err != nil {
+		return nil, true, err
+	}
+	if confirmed.UID != observed.UID {
+		return nil, true, fmt.Errorf("legacy backup %q changed identity during adoption", observed.Name)
+	}
+	if err := validateLegacyBackup(confirmed, opsRes.OpsRequest, opsRes.Cluster, opsRes.OpsRequest.Spec.GetBackup()); err != nil {
+		return nil, false, err
+	}
+	return confirmed, false, nil
+}
+
+func authoritativeBackupReader(cli client.Client, opsRes *OpsResource) client.Reader {
+	if opsRes.APIReader != nil {
+		return opsRes.APIReader
+	}
+	// The controller always supplies APIReader. The fallback keeps direct
+	// handler callers working when their client itself is authoritative.
+	return cli
+}
+
+func validateLegacyBackup(backup *dpv1alpha1.Backup, opsRequest *opsv1alpha1.OpsRequest,
+	cluster *appsv1.Cluster, rawIntent *opsv1alpha1.Backup) error {
+	if hasBackupOwnershipProtocol(backup) {
+		return fmt.Errorf("backup has a partial or unexpected ownership protocol")
+	}
+	if backup.UID == "" {
+		return fmt.Errorf("backup has no server identity")
+	}
+	if backup.DeletionTimestamp != nil {
+		return fmt.Errorf("backup is terminating")
+	}
+	if backup.Labels[constant.AppInstanceLabelKey] != cluster.Name ||
+		backup.Labels[constant.OpsRequestNameLabelKey] != opsRequest.Name ||
+		backup.Labels[constant.OpsRequestTypeLabelKey] != string(opsv1alpha1.BackupType) {
+		return fmt.Errorf("backup labels do not match OpsRequest")
+	}
+	if backup.CreationTimestamp.IsZero() || opsRequest.CreationTimestamp.IsZero() ||
+		backup.CreationTimestamp.Before(&opsRequest.CreationTimestamp) {
+		return fmt.Errorf("backup predates OpsRequest lifecycle")
+	}
+
+	if rawIntent != nil && rawIntent.BackupName != "" {
+		if backup.Name != rawIntent.BackupName {
+			return fmt.Errorf("backup name does not match explicit OpsRequest intent")
+		}
+	} else if !isLegacyGeneratedBackupName(backup.Name, cluster.Namespace, cluster.Name) {
+		return fmt.Errorf("backup name does not match legacy generated name shape")
+	}
+	if rawIntent == nil {
+		return nil
+	}
+	if rawIntent.BackupPolicyName != "" && backup.Spec.BackupPolicyName != rawIntent.BackupPolicyName {
+		return fmt.Errorf("backup policy does not match OpsRequest intent")
+	}
+	if rawIntent.BackupMethod != "" && backup.Spec.BackupMethod != rawIntent.BackupMethod {
+		return fmt.Errorf("backup method does not match OpsRequest intent")
+	}
+	if rawIntent.DeletionPolicy != "" && string(backup.Spec.DeletionPolicy) != rawIntent.DeletionPolicy {
+		return fmt.Errorf("backup deletion policy does not match OpsRequest intent")
+	}
+	if rawIntent.RetentionPeriod != "" && string(backup.Spec.RetentionPeriod) != rawIntent.RetentionPeriod {
+		return fmt.Errorf("backup retention period does not match OpsRequest intent")
+	}
+	if rawIntent.ParentBackupName != "" && backup.Spec.ParentBackupName != rawIntent.ParentBackupName {
+		return fmt.Errorf("backup parent does not match OpsRequest intent")
+	}
+	if len(rawIntent.Parameters) > 0 && !equalBackupParameters(backup.Spec.Parameters, rawIntent.Parameters) {
+		return fmt.Errorf("backup parameters do not match OpsRequest intent")
+	}
+	return nil
+}
+
+func equalBackupParameters(left, right []dpv1alpha1.ParameterPair) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	leftByName := make(map[string]string, len(left))
+	for _, parameter := range left {
+		leftByName[parameter.Name] = parameter.Value
+	}
+	rightByName := make(map[string]string, len(right))
+	for _, parameter := range right {
+		rightByName[parameter.Name] = parameter.Value
+	}
+	return reflect.DeepEqual(leftByName, rightByName)
+}
+
+func hasBackupOwnershipProtocol(backup *dpv1alpha1.Backup) bool {
+	if backup.Annotations == nil {
+		return false
+	}
+	for _, key := range []string{
+		constant.OpsRequestUIDAnnotationKey,
+		constant.OpsRequestBackupIntentHashAnnotationKey,
+		constant.OpsRequestBackupSpecHashAnnotationKey,
+	} {
+		if _, ok := backup.Annotations[key]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+func hasCompleteBackupOwnershipProtocol(backup *dpv1alpha1.Backup) bool {
+	if backup.Annotations == nil {
+		return false
+	}
+	for _, key := range []string{
+		constant.OpsRequestUIDAnnotationKey,
+		constant.OpsRequestBackupIntentHashAnnotationKey,
+		constant.OpsRequestBackupSpecHashAnnotationKey,
+	} {
+		if _, ok := backup.Annotations[key]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
+func isLegacyGeneratedBackupName(name, namespace, clusterName string) bool {
+	prefix := fmt.Sprintf("backup-%s-%s-", namespace, clusterName)
+	if !strings.HasPrefix(name, prefix) {
+		return false
+	}
+	timestamp := strings.TrimPrefix(name, prefix)
+	if len(timestamp) != len(legacyBackupTimeLayout) {
+		return false
+	}
+	_, err := time.Parse(legacyBackupTimeLayout, timestamp)
+	return err == nil
+}
+
+func backupOwnershipError(name string, cause error) error {
+	return intctrlutil.NewFatalError(fmt.Sprintf(
+		`backup "%s" already exists and is not created by this OpsRequest: %v`, name, cause))
 }
 
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration

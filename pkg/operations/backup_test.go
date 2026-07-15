@@ -21,6 +21,7 @@ package operations
 
 import (
 	"context"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -29,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -54,6 +56,12 @@ type backupReadErrorClient struct {
 	err error
 }
 
+type backupReplaceAfterListReader struct {
+	client.Reader
+	observed    *dpv1alpha1.Backup
+	replacement *dpv1alpha1.Backup
+}
+
 func (c *backupReadErrorClient) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
 	if _, ok := obj.(*dpv1alpha1.Backup); ok {
 		return c.err
@@ -67,6 +75,22 @@ func (c *backupCacheLagClient) Get(ctx context.Context, key client.ObjectKey, ob
 		return apierrors.NewNotFound(schema.GroupResource{Group: dpv1alpha1.GroupVersion.Group, Resource: "backups"}, key.Name)
 	}
 	return c.Client.Get(ctx, key, obj, opts...)
+}
+
+func (r *backupReplaceAfterListReader) List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
+	if backups, ok := list.(*dpv1alpha1.BackupList); ok {
+		backups.Items = []dpv1alpha1.Backup{*r.observed.DeepCopy()}
+		return nil
+	}
+	return r.Reader.List(ctx, list, opts...)
+}
+
+func (r *backupReplaceAfterListReader) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+	if backup, ok := obj.(*dpv1alpha1.Backup); ok && key == client.ObjectKeyFromObject(r.replacement) {
+		r.replacement.DeepCopyInto(backup)
+		return nil
+	}
+	return r.Reader.Get(ctx, key, obj, opts...)
 }
 
 var _ = Describe("Backup OpsRequest", func() {
@@ -522,6 +546,307 @@ var _ = Describe("Backup OpsRequest", func() {
 			reentryClient := fake.NewClientBuilder().WithScheme(fakeScheme).
 				WithObjects(policy, firstBackup).Build()
 			Expect(BackupOpsHandler{}.Action(reqCtx, reentryClient, opsRes)).Should(Succeed())
+		})
+
+		It("adopts an implicit legacy backup during Action re-entry", func() {
+			fakeScheme := runtime.NewScheme()
+			Expect(dpv1alpha1.AddToScheme(fakeScheme)).Should(Succeed())
+			policy := &dpv1alpha1.BackupPolicy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "default-policy",
+					Namespace: testCtx.DefaultNamespace,
+					Labels: map[string]string{
+						constant.AppInstanceLabelKey: opsRes.Cluster.Name,
+					},
+					Annotations: map[string]string{
+						dptypes.DefaultBackupPolicyAnnotationKey: "true",
+					},
+				},
+				Spec: dpv1alpha1.BackupPolicySpec{
+					BackupMethods: []dpv1alpha1.BackupMethod{{
+						Name:            "snapshot",
+						SnapshotVolumes: func() *bool { v := true; return &v }(),
+					}},
+				},
+			}
+			ops := createBackupOpsObj(clusterName, "backup-legacy-action-"+randomStr)
+			ops.Spec.Backup = &opsv1alpha1.Backup{}
+			opsRes.OpsRequest = ops
+			legacyBackup := &dpv1alpha1.Backup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "backup-" + ops.Namespace + "-" + opsRes.Cluster.Name + "-20260716060000",
+					Namespace:         opsRes.Cluster.Namespace,
+					UID:               types.UID("legacy-action-backup-uid"),
+					CreationTimestamp: metav1.NewTime(ops.CreationTimestamp.Add(time.Second)),
+					Labels:            getBackupLabels(opsRes.Cluster.Name, ops.Name),
+				},
+				Spec: dpv1alpha1.BackupSpec{
+					BackupPolicyName: policy.Name,
+					BackupMethod:     "snapshot",
+					DeletionPolicy:   dpv1alpha1.BackupDeletionPolicyDelete,
+				},
+			}
+			fakeClient := fake.NewClientBuilder().WithScheme(fakeScheme).
+				WithObjects(policy, legacyBackup).Build()
+			opsRes.APIReader = fakeClient
+
+			Expect(BackupOpsHandler{}.Action(reqCtx, fakeClient, opsRes)).Should(Succeed())
+			backups := &dpv1alpha1.BackupList{}
+			Expect(fakeClient.List(reqCtx.Ctx, backups)).Should(Succeed())
+			Expect(backups.Items).Should(HaveLen(1))
+			Expect(backups.Items[0].UID).Should(Equal(legacyBackup.UID))
+		})
+
+		It("does not create a modern backup when legacy adoption cannot be confirmed", func() {
+			fakeScheme := runtime.NewScheme()
+			Expect(dpv1alpha1.AddToScheme(fakeScheme)).Should(Succeed())
+			policy := &dpv1alpha1.BackupPolicy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "default-policy",
+					Namespace: testCtx.DefaultNamespace,
+					Labels: map[string]string{
+						constant.AppInstanceLabelKey: opsRes.Cluster.Name,
+					},
+					Annotations: map[string]string{
+						dptypes.DefaultBackupPolicyAnnotationKey: "true",
+					},
+				},
+				Spec: dpv1alpha1.BackupPolicySpec{
+					BackupMethods: []dpv1alpha1.BackupMethod{{
+						Name:            "snapshot",
+						SnapshotVolumes: func() *bool { v := true; return &v }(),
+					}},
+				},
+			}
+			ops := createBackupOpsObj(clusterName, "backup-legacy-unconfirmed-"+randomStr)
+			ops.Spec.Backup = &opsv1alpha1.Backup{}
+			opsRes.OpsRequest = ops
+			legacyBackup := &dpv1alpha1.Backup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "backup-" + ops.Namespace + "-" + opsRes.Cluster.Name + "-20260716060030",
+					Namespace:         opsRes.Cluster.Namespace,
+					UID:               types.UID("legacy-unconfirmed-backup-uid"),
+					CreationTimestamp: metav1.NewTime(ops.CreationTimestamp.Add(time.Second)),
+					Labels:            getBackupLabels(opsRes.Cluster.Name, ops.Name),
+				},
+				Spec: dpv1alpha1.BackupSpec{
+					BackupPolicyName: policy.Name,
+					BackupMethod:     "snapshot",
+					DeletionPolicy:   dpv1alpha1.BackupDeletionPolicyDelete,
+				},
+			}
+			fakeClient := fake.NewClientBuilder().WithScheme(fakeScheme).
+				WithObjects(policy, legacyBackup).Build()
+			opsRes.APIReader = &backupReadErrorClient{
+				Reader: fakeClient,
+				err: apierrors.NewNotFound(
+					schema.GroupResource{Group: dpv1alpha1.GroupVersion.Group, Resource: "backups"},
+					legacyBackup.Name),
+			}
+
+			err := BackupOpsHandler{}.Action(reqCtx, fakeClient, opsRes)
+			Expect(apierrors.IsNotFound(err)).Should(BeTrue())
+			backups := &dpv1alpha1.BackupList{}
+			Expect(fakeClient.List(reqCtx.Ctx, backups)).Should(Succeed())
+			Expect(backups.Items).Should(HaveLen(1))
+			Expect(backups.Items[0].UID).Should(Equal(legacyBackup.UID))
+		})
+
+		It("reconciles an implicit legacy backup created before controller upgrade", func() {
+			fakeScheme := runtime.NewScheme()
+			Expect(dpv1alpha1.AddToScheme(fakeScheme)).Should(Succeed())
+			ops := createBackupOpsObj(clusterName, "backup-legacy-reconcile-"+randomStr)
+			ops.Spec.Backup = &opsv1alpha1.Backup{}
+			opsRes.OpsRequest = ops
+			legacyBackup := &dpv1alpha1.Backup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "backup-" + ops.Namespace + "-" + opsRes.Cluster.Name + "-20260716060100",
+					Namespace:         opsRes.Cluster.Namespace,
+					UID:               types.UID("legacy-reconcile-backup-uid"),
+					CreationTimestamp: metav1.NewTime(ops.CreationTimestamp.Add(time.Second)),
+					Labels:            getBackupLabels(opsRes.Cluster.Name, ops.Name),
+				},
+				Status: dpv1alpha1.BackupStatus{Phase: dpv1alpha1.BackupPhaseCompleted},
+			}
+			fakeClient := fake.NewClientBuilder().WithScheme(fakeScheme).WithObjects(legacyBackup).Build()
+			opsRes.APIReader = fakeClient
+
+			phase, _, err := BackupOpsHandler{}.ReconcileAction(reqCtx, fakeClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(phase).Should(Equal(opsv1alpha1.OpsSucceedPhase))
+		})
+
+		It("adopts an explicitly named legacy backup", func() {
+			fakeScheme := runtime.NewScheme()
+			Expect(dpv1alpha1.AddToScheme(fakeScheme)).Should(Succeed())
+			ops := createBackupOpsObj(clusterName, "backup-explicit-legacy-"+randomStr)
+			ops.Spec.Backup = &opsv1alpha1.Backup{BackupName: "explicit-legacy-backup"}
+			opsRes.OpsRequest = ops
+			legacyBackup := &dpv1alpha1.Backup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              ops.Spec.Backup.BackupName,
+					Namespace:         opsRes.Cluster.Namespace,
+					UID:               types.UID("explicit-legacy-backup-uid"),
+					CreationTimestamp: metav1.NewTime(ops.CreationTimestamp.Add(time.Second)),
+					Labels:            getBackupLabels(opsRes.Cluster.Name, ops.Name),
+				},
+				Status: dpv1alpha1.BackupStatus{Phase: dpv1alpha1.BackupPhaseCompleted},
+			}
+			fakeClient := fake.NewClientBuilder().WithScheme(fakeScheme).WithObjects(legacyBackup).Build()
+			opsRes.APIReader = fakeClient
+
+			Expect(BackupOpsHandler{}.Action(reqCtx, fakeClient, opsRes)).Should(Succeed())
+			phase, _, err := BackupOpsHandler{}.ReconcileAction(reqCtx, fakeClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(phase).Should(Equal(opsv1alpha1.OpsSucceedPhase))
+		})
+
+		It("fails closed when multiple current legacy backups match", func() {
+			fakeScheme := runtime.NewScheme()
+			Expect(dpv1alpha1.AddToScheme(fakeScheme)).Should(Succeed())
+			ops := createBackupOpsObj(clusterName, "backup-legacy-multiple-"+randomStr)
+			ops.Spec.Backup = &opsv1alpha1.Backup{}
+			opsRes.OpsRequest = ops
+			legacyBackup := func(name, uid string) *dpv1alpha1.Backup {
+				return &dpv1alpha1.Backup{ObjectMeta: metav1.ObjectMeta{
+					Name:              name,
+					Namespace:         opsRes.Cluster.Namespace,
+					UID:               types.UID(uid),
+					CreationTimestamp: metav1.NewTime(ops.CreationTimestamp.Add(time.Second)),
+					Labels:            getBackupLabels(opsRes.Cluster.Name, ops.Name),
+				}}
+			}
+			first := legacyBackup("backup-"+ops.Namespace+"-"+opsRes.Cluster.Name+"-20260716060200", "legacy-first")
+			second := legacyBackup("backup-"+ops.Namespace+"-"+opsRes.Cluster.Name+"-20260716060300", "legacy-second")
+			fakeClient := fake.NewClientBuilder().WithScheme(fakeScheme).WithObjects(first, second).Build()
+			opsRes.APIReader = fakeClient
+
+			err := BackupOpsHandler{}.Action(reqCtx, fakeClient, opsRes)
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeTrue())
+			Expect(err.Error()).Should(ContainSubstring("multiple legacy backups"))
+		})
+
+		It("fails closed on a legacy candidate with a partial ownership protocol", func() {
+			fakeScheme := runtime.NewScheme()
+			Expect(dpv1alpha1.AddToScheme(fakeScheme)).Should(Succeed())
+			ops := createBackupOpsObj(clusterName, "backup-legacy-partial-"+randomStr)
+			ops.Spec.Backup = &opsv1alpha1.Backup{}
+			opsRes.OpsRequest = ops
+			legacyBackup := &dpv1alpha1.Backup{ObjectMeta: metav1.ObjectMeta{
+				Name:              "backup-" + ops.Namespace + "-" + opsRes.Cluster.Name + "-20260716060400",
+				Namespace:         opsRes.Cluster.Namespace,
+				UID:               types.UID("legacy-partial-backup-uid"),
+				CreationTimestamp: metav1.NewTime(ops.CreationTimestamp.Add(time.Second)),
+				Labels:            getBackupLabels(opsRes.Cluster.Name, ops.Name),
+				Annotations: map[string]string{
+					constant.OpsRequestUIDAnnotationKey: string(ops.UID),
+				},
+			}}
+			fakeClient := fake.NewClientBuilder().WithScheme(fakeScheme).WithObjects(legacyBackup).Build()
+			opsRes.APIReader = fakeClient
+
+			err := BackupOpsHandler{}.Action(reqCtx, fakeClient, opsRes)
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeTrue())
+			Expect(err.Error()).Should(ContainSubstring("ownership protocol"))
+		})
+
+		It("fails closed on a current candidate with a non-legacy generated name", func() {
+			fakeScheme := runtime.NewScheme()
+			Expect(dpv1alpha1.AddToScheme(fakeScheme)).Should(Succeed())
+			ops := createBackupOpsObj(clusterName, "backup-legacy-bad-name-"+randomStr)
+			ops.Spec.Backup = &opsv1alpha1.Backup{}
+			opsRes.OpsRequest = ops
+			badNameBackup := &dpv1alpha1.Backup{ObjectMeta: metav1.ObjectMeta{
+				Name:              "backup-not-a-legacy-timestamp",
+				Namespace:         opsRes.Cluster.Namespace,
+				UID:               types.UID("legacy-bad-name-backup-uid"),
+				CreationTimestamp: metav1.NewTime(ops.CreationTimestamp.Add(time.Second)),
+				Labels:            getBackupLabels(opsRes.Cluster.Name, ops.Name),
+			}}
+			fakeClient := fake.NewClientBuilder().WithScheme(fakeScheme).WithObjects(badNameBackup).Build()
+			opsRes.APIReader = fakeClient
+
+			err := BackupOpsHandler{}.Action(reqCtx, fakeClient, opsRes)
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeTrue())
+			Expect(err.Error()).Should(ContainSubstring("legacy generated name shape"))
+		})
+
+		It("ignores a legacy backup that predates the current same-name OpsRequest", func() {
+			fakeScheme := runtime.NewScheme()
+			Expect(dpv1alpha1.AddToScheme(fakeScheme)).Should(Succeed())
+			policy := &dpv1alpha1.BackupPolicy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "explicit-policy",
+					Namespace: testCtx.DefaultNamespace,
+					Labels: map[string]string{
+						constant.AppInstanceLabelKey: opsRes.Cluster.Name,
+					},
+				},
+				Spec: dpv1alpha1.BackupPolicySpec{BackupMethods: []dpv1alpha1.BackupMethod{{
+					Name:            "snapshot",
+					SnapshotVolumes: func() *bool { v := true; return &v }(),
+				}}},
+				Status: dpv1alpha1.BackupPolicyStatus{Phase: dpv1alpha1.AvailablePhase},
+			}
+			ops := createBackupOpsObj(clusterName, "backup-legacy-stale-"+randomStr)
+			ops.Spec.Backup = &opsv1alpha1.Backup{
+				BackupPolicyName: policy.Name,
+				BackupMethod:     "snapshot",
+			}
+			opsRes.OpsRequest = ops
+			staleBackup := &dpv1alpha1.Backup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "backup-" + ops.Namespace + "-" + opsRes.Cluster.Name + "-20260716050000",
+					Namespace:         opsRes.Cluster.Namespace,
+					UID:               types.UID("stale-legacy-backup-uid"),
+					CreationTimestamp: metav1.NewTime(ops.CreationTimestamp.Add(-time.Second)),
+					Labels:            getBackupLabels(opsRes.Cluster.Name, ops.Name),
+				},
+				Spec: dpv1alpha1.BackupSpec{
+					BackupPolicyName: policy.Name,
+					BackupMethod:     "snapshot",
+				},
+			}
+			fakeClient := fake.NewClientBuilder().WithScheme(fakeScheme).WithObjects(policy, staleBackup).Build()
+			opsRes.APIReader = fakeClient
+
+			Expect(BackupOpsHandler{}.Action(reqCtx, fakeClient, opsRes)).Should(Succeed())
+			modernIntent, err := normalizedBackupIntent(ops)
+			Expect(err).ShouldNot(HaveOccurred())
+			modernBackup := &dpv1alpha1.Backup{}
+			Expect(fakeClient.Get(reqCtx.Ctx, client.ObjectKey{
+				Namespace: opsRes.Cluster.Namespace,
+				Name:      modernIntent.BackupName,
+			}, modernBackup)).Should(Succeed())
+		})
+
+		It("retries when a legacy backup changes UID between List and direct Get", func() {
+			fakeScheme := runtime.NewScheme()
+			Expect(dpv1alpha1.AddToScheme(fakeScheme)).Should(Succeed())
+			ops := createBackupOpsObj(clusterName, "backup-legacy-replaced-"+randomStr)
+			ops.Spec.Backup = &opsv1alpha1.Backup{}
+			opsRes.OpsRequest = ops
+			observed := &dpv1alpha1.Backup{ObjectMeta: metav1.ObjectMeta{
+				Name:              "backup-" + ops.Namespace + "-" + opsRes.Cluster.Name + "-20260716060500",
+				Namespace:         opsRes.Cluster.Namespace,
+				UID:               types.UID("legacy-observed-backup-uid"),
+				CreationTimestamp: metav1.NewTime(ops.CreationTimestamp.Add(time.Second)),
+				Labels:            getBackupLabels(opsRes.Cluster.Name, ops.Name),
+			}}
+			replacement := observed.DeepCopy()
+			replacement.UID = types.UID("legacy-replacement-backup-uid")
+			baseReader := fake.NewClientBuilder().WithScheme(fakeScheme).Build()
+			reader := &backupReplaceAfterListReader{
+				Reader:      baseReader,
+				observed:    observed,
+				replacement: replacement,
+			}
+			opsRes.APIReader = reader
+
+			phase, _, err := BackupOpsHandler{}.ReconcileAction(reqCtx, baseReader, opsRes)
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring("changed identity"))
+			Expect(phase).Should(Equal(opsv1alpha1.OpsRunningPhase))
 		})
 
 		It("reconciles only the backup owned by the current OpsRequest UID", func() {

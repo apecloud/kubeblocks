@@ -1310,6 +1310,13 @@ func (r *VolumePopulatorReconciler) buildPostReadyRestore(reqCtx intctrlutil.Req
 			readyConfig.JobAction.Target.VolumeMounts = backup.Status.BackupMethod.TargetVolumes.VolumeMounts
 		}
 	}
+	cluster := &appsv1.Cluster{}
+	if err = r.Client.Get(reqCtx.Ctx, types.NamespacedName{
+		Namespace: pvc.Namespace,
+		Name:      clusterName,
+	}, cluster); err != nil {
+		return nil, err
+	}
 	restore := &dpv1alpha1.Restore{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      postReadyRestoreName(comp.UID),
@@ -1322,7 +1329,8 @@ func (r *VolumePopulatorReconciler) buildPostReadyRestore(reqCtx intctrlutil.Req
 				Namespace: backupNamespace,
 			},
 			RestoreTime: pvc.Annotations[constant.RestorePITRAnnotationKey],
-			Env:         restoreMgr.Restore.Spec.Env,
+			Env: buildPostReadyTargetEnv(restoreMgr.Restore.Spec.Env,
+				cluster.Spec.Topology, comp.Spec.ServiceVersion),
 			Parameters:  restoreParametersToPairs(restoreActionParameters(parameters)),
 			ReadyConfig: readyConfig,
 		},
@@ -1336,16 +1344,51 @@ func (r *VolumePopulatorReconciler) buildPostReadyRestore(reqCtx intctrlutil.Req
 	return restore, nil
 }
 
+func buildPostReadyTargetEnv(source []corev1.EnvVar, clusterTopology, componentServiceVersion string) []corev1.EnvVar {
+	env := make([]corev1.EnvVar, 0, len(source)+2)
+	for i := range source {
+		switch source[i].Name {
+		case dptypes.DPTargetClusterTopology, dptypes.DPTargetComponentServiceVersion:
+			continue
+		default:
+			env = append(env, source[i])
+		}
+	}
+	return append(env,
+		corev1.EnvVar{Name: dptypes.DPTargetClusterTopology, Value: clusterTopology},
+		corev1.EnvVar{Name: dptypes.DPTargetComponentServiceVersion, Value: componentServiceVersion})
+}
+
 func validatePostReadyRestore(existing, desired *dpv1alpha1.Restore, comp *appsv1.Component) error {
 	if !hasOwnerReference(existing.OwnerReferences, comp.UID) {
 		return intctrlutil.NewFatalError(fmt.Sprintf("postReady restore %s/%s is not owned by component %s/%s",
 			existing.Namespace, existing.Name, comp.Namespace, comp.Name))
 	}
-	if !reflect.DeepEqual(existing.Spec, desired.Spec) {
+	if !reflect.DeepEqual(existing.Spec, desired.Spec) && !legacyPostReadyRestoreMatches(existing, desired) {
 		return intctrlutil.NewFatalError(fmt.Sprintf("postReady restore %s/%s spec does not match current restore intent",
 			existing.Namespace, existing.Name))
 	}
 	return nil
+}
+
+func legacyPostReadyRestoreMatches(existing, desired *dpv1alpha1.Restore) bool {
+	for i := range existing.Spec.Env {
+		switch existing.Spec.Env[i].Name {
+		case dptypes.DPTargetClusterTopology, dptypes.DPTargetComponentServiceVersion:
+			return false
+		}
+	}
+	legacyDesired := desired.DeepCopy()
+	legacyDesired.Spec.Env = nil
+	for i := range desired.Spec.Env {
+		switch desired.Spec.Env[i].Name {
+		case dptypes.DPTargetClusterTopology, dptypes.DPTargetComponentServiceVersion:
+			continue
+		default:
+			legacyDesired.Spec.Env = append(legacyDesired.Spec.Env, desired.Spec.Env[i])
+		}
+	}
+	return reflect.DeepEqual(existing.Spec, legacyDesired.Spec)
 }
 
 func hasOwnerReference(ownerRefs []metav1.OwnerReference, uid types.UID) bool {

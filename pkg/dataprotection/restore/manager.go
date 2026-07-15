@@ -703,6 +703,7 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 				setCommand(actionSpec.Job.Command).
 				setToleration(targetPod.Spec.Tolerations).
 				addTargetPodAndCredentialEnv(targetPod, readyConfig.ConnectionCredential, &target.BackupTarget).
+				overridePostReadyTargetEnv().
 				setServiceAccount(r.WorkerServiceAccount).
 				build()
 		}

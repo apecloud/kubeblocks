@@ -1731,7 +1731,9 @@ func TestBuildPostReadyRestoreSelectsHighestPriorityRole(t *testing.T) {
 	pvc.Spec.DataSourceRef = &corev1.TypedObjectReference{Name: backup.Name}
 	pvc.Annotations[constant.RestoreSourceNamespaceAnnotationKey] = backup.Namespace
 	reconciler := &VolumePopulatorReconciler{
-		Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(backup, compDef).Build(),
+		Client: fake.NewClientBuilder().WithScheme(scheme).
+			WithObjects(backup, compDef, newClusterForPostReadyTest()).
+			Build(),
 		Scheme: scheme,
 	}
 	restoreMgr := dprestore.NewRestoreManager(&dpv1alpha1.Restore{}, nil, scheme, reconciler.Client)
@@ -1741,6 +1743,223 @@ func TestBuildPostReadyRestoreSelectsHighestPriorityRole(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "leader", restore.Spec.ReadyConfig.JobAction.Target.PodSelector.LabelSelector.MatchLabels[instanceset.RoleLabelKey])
 	require.NotContains(t, restore.Spec.ReadyConfig.ExecAction.Target.PodSelector.MatchLabels, instanceset.RoleLabelKey)
+}
+
+func TestBuildPostReadyRestoreWritesLiveTargetEnv(t *testing.T) {
+	const (
+		targetClusterTopologyEnv         = "DP_TARGET_CLUSTER_TOPOLOGY"
+		targetComponentServiceVersionEnv = "DP_TARGET_COMPONENT_SERVICE_VERSION"
+	)
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, kbappsv1.AddToScheme(scheme))
+	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
+	backup := newBackupForRestoreDecision([]string{"data"}, nil)
+	cluster := &kbappsv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "cluster"},
+		Spec:       kbappsv1.ClusterSpec{Topology: "shared-nothing"},
+	}
+	comp := &kbappsv1.Component{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      constant.GenerateClusterComponentName(cluster.Name, "mysql"),
+		},
+		Spec: kbappsv1.ComponentSpec{ServiceVersion: "3.3.2"},
+	}
+	pvc := newPVCForRestoreDecision("data", "mysql", "")
+	pvc.Spec.DataSourceRef = &corev1.TypedObjectReference{Name: backup.Name}
+	pvc.Annotations[constant.RestoreSourceNamespaceAnnotationKey] = backup.Namespace
+	sourceEnv := []corev1.EnvVar{
+		{Name: "KEEP_ME", Value: "kept"},
+		{Name: targetClusterTopologyEnv, Value: "caller-value-1"},
+		{Name: targetClusterTopologyEnv, Value: "caller-value-2"},
+		{Name: targetComponentServiceVersionEnv, Value: "caller-version"},
+	}
+	sourceRestore := &dpv1alpha1.Restore{Spec: dpv1alpha1.RestoreSpec{
+		Env: append([]corev1.EnvVar{}, sourceEnv...),
+	}}
+	reconciler := &VolumePopulatorReconciler{
+		Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(backup, cluster).Build(),
+		Scheme: scheme,
+	}
+	restoreMgr := dprestore.NewRestoreManager(sourceRestore, nil, scheme, reconciler.Client)
+
+	restore, err := reconciler.buildPostReadyRestore(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, restoreMgr, comp, "", nil)
+
+	require.NoError(t, err)
+	require.Equal(t, sourceEnv, sourceRestore.Spec.Env, "building the internal Restore must not mutate the source Restore")
+	require.Equal(t, "kept", envValue(restore.Spec.Env, "KEEP_ME"))
+	require.Equal(t, "shared-nothing", envValue(restore.Spec.Env, targetClusterTopologyEnv))
+	require.Equal(t, "3.3.2", envValue(restore.Spec.Env, targetComponentServiceVersionEnv))
+	require.Equal(t, 1, envNameCount(restore.Spec.Env, targetClusterTopologyEnv))
+	require.Equal(t, 1, envNameCount(restore.Spec.Env, targetComponentServiceVersionEnv))
+}
+
+func TestBuildPostReadyRestoreRequiresTargetCluster(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, kbappsv1.AddToScheme(scheme))
+	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
+	backup := newBackupForRestoreDecision([]string{"data"}, nil)
+	comp := &kbappsv1.Component{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      constant.GenerateClusterComponentName("cluster", "mysql"),
+		},
+	}
+	pvc := newPVCForRestoreDecision("data", "mysql", "")
+	pvc.Spec.DataSourceRef = &corev1.TypedObjectReference{Name: backup.Name}
+	pvc.Annotations[constant.RestoreSourceNamespaceAnnotationKey] = backup.Namespace
+	reconciler := &VolumePopulatorReconciler{
+		Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(backup).Build(),
+		Scheme: scheme,
+	}
+	restoreMgr := dprestore.NewRestoreManager(&dpv1alpha1.Restore{}, nil, scheme, reconciler.Client)
+
+	restore, err := reconciler.buildPostReadyRestore(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, restoreMgr, comp, "", nil)
+
+	require.Error(t, err)
+	require.Nil(t, restore)
+	require.True(t, apierrors.IsNotFound(err), err.Error())
+}
+
+func TestValidatePostReadyRestoreTargetEnvCompatibility(t *testing.T) {
+	comp := &kbappsv1.Component{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      "cluster-mysql",
+			UID:       "component-uid",
+		},
+	}
+	desired := &dpv1alpha1.Restore{Spec: dpv1alpha1.RestoreSpec{
+		Backup: dpv1alpha1.BackupRef{Name: "backup", Namespace: "default"},
+		Env: []corev1.EnvVar{
+			{Name: "KEEP_ME", Value: "kept"},
+			{Name: dptypes.DPTargetClusterTopology, Value: "shared-nothing"},
+			{Name: dptypes.DPTargetComponentServiceVersion, Value: "3.3.2"},
+		},
+	}}
+	newExisting := func(spec dpv1alpha1.RestoreSpec) *dpv1alpha1.Restore {
+		return &dpv1alpha1.Restore{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "default",
+				Name:      "post-ready",
+				OwnerReferences: []metav1.OwnerReference{{
+					UID: comp.UID,
+				}},
+			},
+			Spec: spec,
+		}
+	}
+
+	tests := []struct {
+		name    string
+		spec    dpv1alpha1.RestoreSpec
+		wantErr bool
+	}{
+		{
+			name: "exact current restore",
+			spec: *desired.Spec.DeepCopy(),
+		},
+		{
+			name: "legacy restore with both target envs absent",
+			spec: dpv1alpha1.RestoreSpec{
+				Backup: desired.Spec.Backup,
+				Env:    []corev1.EnvVar{{Name: "KEEP_ME", Value: "kept"}},
+			},
+		},
+		{
+			name: "partial target env",
+			spec: dpv1alpha1.RestoreSpec{
+				Backup: desired.Spec.Backup,
+				Env: []corev1.EnvVar{
+					{Name: "KEEP_ME", Value: "kept"},
+					{Name: dptypes.DPTargetClusterTopology, Value: "shared-nothing"},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "caller target env values",
+			spec: dpv1alpha1.RestoreSpec{
+				Backup: desired.Spec.Backup,
+				Env: []corev1.EnvVar{
+					{Name: "KEEP_ME", Value: "kept"},
+					{Name: dptypes.DPTargetClusterTopology, Value: "caller-topology"},
+					{Name: dptypes.DPTargetComponentServiceVersion, Value: "caller-version"},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "unrelated spec mismatch",
+			spec: dpv1alpha1.RestoreSpec{
+				Backup: dpv1alpha1.BackupRef{Name: "other", Namespace: "default"},
+				Env:    []corev1.EnvVar{{Name: "KEEP_ME", Value: "kept"}},
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validatePostReadyRestore(newExisting(tt.spec), desired, comp)
+			if tt.wantErr {
+				require.Error(t, err)
+				require.True(t, intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal), err.Error())
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestValidatePostReadyRestoreAllowsLegacyNilEnv(t *testing.T) {
+	comp := &kbappsv1.Component{
+		ObjectMeta: metav1.ObjectMeta{UID: "component-uid"},
+	}
+	desired := &dpv1alpha1.Restore{Spec: dpv1alpha1.RestoreSpec{
+		Backup: dpv1alpha1.BackupRef{Name: "backup", Namespace: "default"},
+		Env: []corev1.EnvVar{
+			{Name: dptypes.DPTargetClusterTopology, Value: "shared-nothing"},
+			{Name: dptypes.DPTargetComponentServiceVersion, Value: "3.3.2"},
+		},
+	}}
+	existing := &dpv1alpha1.Restore{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      "post-ready",
+			OwnerReferences: []metav1.OwnerReference{{
+				UID: comp.UID,
+			}},
+		},
+		Spec: dpv1alpha1.RestoreSpec{
+			Backup: desired.Spec.Backup,
+			Env:    nil,
+		},
+	}
+
+	require.NoError(t, validatePostReadyRestore(existing, desired, comp))
+}
+
+func envValue(env []corev1.EnvVar, name string) string {
+	for i := range env {
+		if env[i].Name == name {
+			return env[i].Value
+		}
+	}
+	return ""
+}
+
+func envNameCount(env []corev1.EnvVar, name string) int {
+	count := 0
+	for i := range env {
+		if env[i].Name == name {
+			count++
+		}
+	}
+	return count
 }
 
 func TestBuildPostReadyRestoreUsesInitAccountFromComponentDefinition(t *testing.T) {
@@ -1769,7 +1988,9 @@ func TestBuildPostReadyRestoreUsesInitAccountFromComponentDefinition(t *testing.
 	pvc.Spec.DataSourceRef = &corev1.TypedObjectReference{Name: backup.Name}
 	pvc.Annotations[constant.RestoreSourceNamespaceAnnotationKey] = backup.Namespace
 	reconciler := &VolumePopulatorReconciler{
-		Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(backup, compDef).Build(),
+		Client: fake.NewClientBuilder().WithScheme(scheme).
+			WithObjects(backup, compDef, newClusterForPostReadyTest()).
+			Build(),
 		Scheme: scheme,
 	}
 	restoreMgr := dprestore.NewRestoreManager(&dpv1alpha1.Restore{}, nil, scheme, reconciler.Client)
@@ -1820,7 +2041,7 @@ func TestEnsurePostReadyRestoreCompletedDoesNotReuseStaleRestore(t *testing.T) {
 	reconciler := &VolumePopulatorReconciler{
 		Client: fake.NewClientBuilder().WithScheme(scheme).
 			WithStatusSubresource(pvc).
-			WithObjects(backup, pvc, comp, staleRestore).
+			WithObjects(backup, pvc, comp, staleRestore, newClusterForPostReadyTest()).
 			Build(),
 		Scheme:   scheme,
 		Recorder: record.NewFakeRecorder(10),
@@ -1881,7 +2102,7 @@ func TestEnsurePostReadyRestoreCompletedUsesOneRestorePerComponent(t *testing.T)
 	reconciler := &VolumePopulatorReconciler{
 		Client: fake.NewClientBuilder().WithScheme(scheme).
 			WithStatusSubresource(pvc1, pvc2).
-			WithObjects(backup, pvc1, pvc2, comp).
+			WithObjects(backup, pvc1, pvc2, comp, newClusterForPostReadyTest()).
 			Build(),
 		Scheme:   scheme,
 		Recorder: record.NewFakeRecorder(10),
@@ -2045,7 +2266,7 @@ func TestCompleteBoundPVCContinuesPostReadyAfterPopulateReleased(t *testing.T) {
 	reconciler := &VolumePopulatorReconciler{
 		Client: fake.NewClientBuilder().WithScheme(scheme).
 			WithStatusSubresource(pvc).
-			WithObjects(backup, pvc, comp).
+			WithObjects(backup, pvc, comp, newClusterForPostReadyTest()).
 			Build(),
 		Scheme:   scheme,
 		Recorder: record.NewFakeRecorder(10),
@@ -2110,7 +2331,7 @@ func TestCompleteBoundPVCMarksRestoreSucceededAfterPostReadyCompleted(t *testing
 	reconciler := &VolumePopulatorReconciler{
 		Client: fake.NewClientBuilder().WithScheme(scheme).
 			WithStatusSubresource(pvc).
-			WithObjects(backup, pvc, comp).
+			WithObjects(backup, pvc, comp, newClusterForPostReadyTest()).
 			Build(),
 		Scheme:   scheme,
 		Recorder: record.NewFakeRecorder(10),
@@ -2193,7 +2414,7 @@ func TestEnsurePostReadyRestoreCompletedRejectsMismatchedExistingRestore(t *test
 	reconciler := &VolumePopulatorReconciler{
 		Client: fake.NewClientBuilder().WithScheme(scheme).
 			WithStatusSubresource(pvc).
-			WithObjects(backup, pvc, comp, existing).
+			WithObjects(backup, pvc, comp, existing, newClusterForPostReadyTest()).
 			Build(),
 		Scheme:   scheme,
 		Recorder: record.NewFakeRecorder(10),
@@ -2412,6 +2633,13 @@ func newPVCForRestoreDecision(volumeName, componentName, shardingName string) *c
 		pvc.Labels[constant.KBAppShardingNameLabelKey] = shardingName
 	}
 	return pvc
+}
+
+func newClusterForPostReadyTest() *kbappsv1.Cluster {
+	return &kbappsv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "cluster"},
+		Spec:       kbappsv1.ClusterSpec{Topology: "shared-nothing"},
+	}
 }
 
 func newClusterForShardingDecision(shards int32) *kbappsv1.Cluster {
@@ -2737,7 +2965,7 @@ func TestEnsurePostReadyRestore_MultiComponent_PostReadyOnly_ShouldNotSilentlySk
 	reconciler := &VolumePopulatorReconciler{
 		Client: fake.NewClientBuilder().WithScheme(scheme).
 			WithStatusSubresource(pdPVC, tikvPVC).
-			WithObjects(backup, pdPVC, tikvPVC, pdComp, tikvComp, tidbComp).
+			WithObjects(backup, pdPVC, tikvPVC, pdComp, tikvComp, tidbComp, newClusterForPostReadyTest()).
 			Build(),
 		Scheme:   scheme,
 		Recorder: record.NewFakeRecorder(10),
@@ -2871,7 +3099,7 @@ func TestEnsurePostReadyRestore_MultiComponent_PrepareDataAndPostReady_Redirects
 	reconciler := &VolumePopulatorReconciler{
 		Client: fake.NewClientBuilder().WithScheme(scheme).
 			WithStatusSubresource(pdPVC).
-			WithObjects(backup, pdPVC, pdComp, tidbComp).
+			WithObjects(backup, pdPVC, pdComp, tidbComp, newClusterForPostReadyTest()).
 			Build(),
 		Scheme:   scheme,
 		Recorder: record.NewFakeRecorder(10),
@@ -3092,7 +3320,7 @@ func TestEnsurePostReadyRestore_MultiComponent_PostReadyRedirectPreservesTargetE
 	reconciler := &VolumePopulatorReconciler{
 		Client: fake.NewClientBuilder().WithScheme(scheme).
 			WithStatusSubresource(pdPVC).
-			WithObjects(backup, pdPVC, pdComp, tidbComp).
+			WithObjects(backup, pdPVC, pdComp, tidbComp, newClusterForPostReadyTest()).
 			Build(),
 		Scheme:   scheme,
 		Recorder: record.NewFakeRecorder(10),
@@ -3424,7 +3652,7 @@ func TestEnsurePostReadyRestore_MultiComponent_PostReadyOnly_TargetsSlice(t *tes
 	reconciler := &VolumePopulatorReconciler{
 		Client: fake.NewClientBuilder().WithScheme(scheme).
 			WithStatusSubresource(pdPVC).
-			WithObjects(backup, pdPVC, pdComp, tidbComp).
+			WithObjects(backup, pdPVC, pdComp, tidbComp, newClusterForPostReadyTest()).
 			Build(),
 		Scheme:   scheme,
 		Recorder: record.NewFakeRecorder(10),

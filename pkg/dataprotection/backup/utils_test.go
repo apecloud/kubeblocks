@@ -245,6 +245,7 @@ func TestBackupNameAndPathHelpers(t *testing.T) {
 			UID:       types.UID("1234567890abcdef"),
 			Labels: map[string]string{
 				constant.KBAppComponentLabelKey: "excluded",
+				constant.AppManagedByLabelKey:   constant.AppName,
 				"keep":                          "value",
 			},
 		},
@@ -255,6 +256,12 @@ func TestBackupNameAndPathHelpers(t *testing.T) {
 	assert.Equal(t, "value", labels["keep"])
 	assert.NotContains(t, labels, constant.KBAppComponentLabelKey)
 	assert.Equal(t, backup.Name, labels[dptypes.BackupNameLabelKey])
+	assert.Equal(t, dptypes.AppName, labels[constant.AppManagedByLabelKey])
+	assert.Equal(t, constant.AppName, backup.Labels[constant.AppManagedByLabelKey])
+	unlabeledBackup := backup.DeepCopy()
+	unlabeledBackup.Labels = nil
+	assert.Equal(t, dptypes.AppName, BuildBackupWorkloadLabels(unlabeledBackup)[constant.AppManagedByLabelKey])
+	assert.Nil(t, unlabeledBackup.Labels)
 
 	assert.Equal(t, "dp-backup-backup-name-12345678", GenerateBackupJobName(backup, "dp-backup"))
 	longName := GenerateBackupJobName(&dpv1alpha1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "very-long-backup-name-that-should-be-trimmed-for-job-label-limits", UID: types.UID("1234567890abcdef")}}, "prefix")

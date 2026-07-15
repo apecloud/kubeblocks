@@ -62,6 +62,7 @@ type RestoreReconciler struct {
 // +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=restores/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=restores/finalizers,verbs=update
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=serviceaccounts,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings,verbs=get;list;watch;create;update;patch;delete
 
@@ -105,6 +106,7 @@ func (r *RestoreReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return intctrlutil.NewControllerManagedBy(mgr).
 		For(&dpv1alpha1.Restore{}).
 		Owns(&batchv1.Job{}).
+		Owns(&corev1.Secret{}).
 		Watches(&batchv1.Job{}, handler.EnqueueRequestsFromMapFunc(r.parseRestoreJob)).
 		// to watch the `restore` container if it is terminated
 		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.parseRestorePod)).
@@ -155,7 +157,11 @@ func (r *RestoreReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCt
 		viper.GetString(constant.CfgKeyCtrlrMgrNS): {},
 	}
 
-	return deleteRelatedObjectList(reqCtx, r.Client, &batchv1.JobList{}, namespaces, labels)
+	if err := deleteRelatedObjectList(reqCtx, r.Client, &batchv1.JobList{}, namespaces, labels); err != nil {
+		return err
+	}
+	return deleteRelatedObjectList(reqCtx, r.Client, &corev1.SecretList{},
+		map[string]sets.Empty{restore.Namespace: {}}, labels)
 }
 
 func CheckBackupRepoForRestore(reqCtx intctrlutil.RequestCtx, cli client.Client, restore *dpv1alpha1.Restore) (string, error) {
@@ -407,38 +413,31 @@ func (r *RestoreReconciler) prepareData(reqCtx intctrlutil.RequestCtx, restoreMg
 }
 
 func (r *RestoreReconciler) postReady(reqCtx intctrlutil.RequestCtx, restoreMgr *dprestore.RestoreManager) (bool, error) {
-	orphanedActionsCompleted, err := restoreMgr.ReconcileOrphanedPostReadyActions(reqCtx, r.Client)
-	if err != nil || !orphanedActionsCompleted {
+	foundStage, err := restoreMgr.EnsurePostReadyStagePlan(reqCtx, r.Client)
+	if err != nil {
 		return false, err
 	}
-	readyConfig := restoreMgr.Restore.Spec.ReadyConfig
-	if len(restoreMgr.PostReadyBackupSets) == 0 || readyConfig == nil {
-		return true, nil
+	if !foundStage {
+		if restoreMgr.Restore.Spec.ReadyConfig == nil || len(restoreMgr.PostReadyBackupSets) == 0 {
+			return true, nil
+		}
+		return false, intctrlutil.NewFatalError("postReady stage has actions but no committed execution plan")
 	}
 	if meta.IsStatusConditionTrue(restoreMgr.Restore.Status.Conditions, dprestore.ConditionTypeRestorePostReady) {
 		return true, nil
 	}
 	dprestore.SetRestoreStageCondition(restoreMgr.Restore, dpv1alpha1.PostReady, dprestore.ReasonProcessing, "processing postReady stage")
-	var isCompleted bool
 	defer func() {
 		r.handleRestoreStageError(restoreMgr.Restore, dpv1alpha1.PrepareData, err)
 	}()
-	if readyConfig.ReadinessProbe != nil && !meta.IsStatusConditionTrue(restoreMgr.Restore.Status.Conditions, dprestore.ConditionTypeReadinessProbe) {
+	readyConfig := restoreMgr.Restore.Spec.ReadyConfig
+	if readyConfig != nil && readyConfig.ReadinessProbe != nil && !meta.IsStatusConditionTrue(restoreMgr.Restore.Status.Conditions, dprestore.ConditionTypeReadinessProbe) {
 		// TODO: check readiness probe, use a job and kubectl exec?
 		_ = klog.TODO()
 	}
-	for _, v := range restoreMgr.PostReadyBackupSets {
-		// handle postReady actions
-		for i := range v.ActionSet.Spec.Restore.PostReady {
-			isCompleted, err = r.handleBackupActionSet(reqCtx, restoreMgr, v, dpv1alpha1.PostReady, i)
-			if err != nil {
-				return false, err
-			}
-			// waiting for restore jobs finished.
-			if !isCompleted {
-				return false, nil
-			}
-		}
+	isCompleted, err := restoreMgr.ReconcileOrphanedPostReadyActions(reqCtx, r.Client)
+	if err != nil || !isCompleted {
+		return false, err
 	}
 	dprestore.SetRestoreStageCondition(restoreMgr.Restore, dpv1alpha1.PostReady, dprestore.ReasonSucceed, "processing postReady stage successfully")
 	return true, nil
@@ -470,21 +469,39 @@ func (r *RestoreReconciler) handleBackupActionSet(reqCtx intctrlutil.RequestCtx,
 	}
 
 	actionName := fmt.Sprintf("%s-%d", stage, step)
+	var jobs []*batchv1.Job
+	var err error
+	expectedActionCount := 0
+	if stage == dpv1alpha1.PostReady {
+		// Load the immutable plan before interpreting mutable completion
+		// status. Otherwise one completed ordinal can make a partially
+		// created multi-Job action look complete.
+		jobs, err = restoreMgr.GetExistingActionJobs(reqCtx, r.Client, stage, backupSet.Backup.Name, actionName)
+		if err != nil {
+			return false, err
+		}
+		expectedActionCount, err = dprestore.PostReadyActionExpectedJobCount(jobs)
+		if err != nil {
+			return false, err
+		}
+	}
 	// 1. check if the restore actions are completed from status.actions firstly.
-	allActionsFinished, existFailedAction := restoreMgr.AnalysisRestoreActionsWithBackup(stage, backupSet.Backup.Name, actionName)
+	allActionsFinished, existFailedAction := restoreMgr.AnalysisRestoreActionsWithBackupExpected(
+		stage, backupSet.Backup.Name, actionName, expectedActionCount)
 	isCompleted, err := checkIsCompleted(allActionsFinished, existFailedAction)
 	if isCompleted || err != nil {
 		return isCompleted, err
 	}
 
-	var jobs []*batchv1.Job
 	// For in-flight actions, check the recorded Job before rebuilding the Job
 	// spec from the current target pod selector. The target pod may become
 	// unavailable after the Job is created, but the existing Job is still the
 	// action fact source that should drive convergence.
-	jobs, err = restoreMgr.GetExistingActionJobs(reqCtx, r.Client, stage, backupSet.Backup.Name, actionName)
-	if err != nil {
-		return false, err
+	if stage != dpv1alpha1.PostReady {
+		jobs, err = restoreMgr.GetExistingActionJobs(reqCtx, r.Client, stage, backupSet.Backup.Name, actionName)
+		if err != nil {
+			return false, err
+		}
 	}
 	switch stage {
 	case dpv1alpha1.PrepareData:
@@ -511,6 +528,22 @@ func (r *RestoreReconciler) handleBackupActionSet(reqCtx intctrlutil.RequestCtx,
 	if stage == dpv1alpha1.PostReady {
 		if jobs, err = restoreMgr.FreezePostReadyExecutionPlan(reqCtx, r.Client, jobs); err != nil {
 			return false, err
+		}
+		expectedActionCount, err = dprestore.PostReadyActionExpectedJobCount(jobs)
+		if err != nil {
+			return false, err
+		}
+		allActionsFinished, existFailedAction = restoreMgr.AnalysisRestoreActionsWithBackupExpected(
+			stage, backupSet.Backup.Name, actionName, expectedActionCount)
+		isCompleted, err = checkIsCompleted(allActionsFinished, existFailedAction)
+		if isCompleted || err != nil {
+			return isCompleted, err
+		}
+		jobs = restoreMgr.PendingPostReadyJobs(backupSet.Backup.Name, actionName, jobs)
+		if len(jobs) == 0 {
+			return false, intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue,
+				"postReady action %s for backup %s has no pending Job but is not complete",
+				actionName, backupSet.Backup.Name)
 		}
 	}
 	// 3. create jobs

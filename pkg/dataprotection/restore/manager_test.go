@@ -21,6 +21,7 @@ package restore
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -34,8 +35,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/pointer"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -64,10 +67,42 @@ type failNthCreateClient struct {
 	count int
 }
 
+type failNthJobCreateClient struct {
+	client.Client
+	n     int
+	count int
+}
+
+type persistSecretThenErrorClient struct {
+	client.Client
+	failed bool
+}
+
 func (c *failNthCreateClient) Create(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
 	c.count++
 	if c.count == c.n {
 		return fmt.Errorf("injected create failure at %d", c.n)
+	}
+	return c.Client.Create(ctx, obj, opts...)
+}
+
+func (c *failNthJobCreateClient) Create(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
+	if _, ok := obj.(*batchv1.Job); ok {
+		c.count++
+		if c.count == c.n {
+			return fmt.Errorf("injected Job create failure at %d", c.n)
+		}
+	}
+	return c.Client.Create(ctx, obj, opts...)
+}
+
+func (c *persistSecretThenErrorClient) Create(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
+	if _, ok := obj.(*corev1.Secret); ok && !c.failed {
+		c.failed = true
+		if err := c.Client.Create(ctx, obj, opts...); err != nil {
+			return err
+		}
+		return fmt.Errorf("injected lost Secret create response")
 	}
 	return c.Client.Create(ctx, obj, opts...)
 }
@@ -112,6 +147,7 @@ var _ = Describe("RestoreManager Test", func() {
 		Eventually(testapps.List(&testCtx, generics.BackupSignature, inNS)).Should(HaveLen(0))
 
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.JobSignature, true, inNS)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.SecretSignature, true, inNS)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.RestoreSignature, true, inNS)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS)
 
@@ -279,6 +315,32 @@ var _ = Describe("RestoreManager Test", func() {
 					},
 				},
 			}
+		}
+
+		newDurablePostReadyJobs := func(
+			restoreMGR *RestoreManager,
+			backupName, actionName, image string,
+		) []*batchv1.Job {
+			labels := map[string]string{
+				DataProtectionRestoreLabelKey:          restoreMGR.Restore.Name,
+				DataProtectionRestoreNamespaceLabelKey: restoreMGR.Restore.Namespace,
+			}
+			jobs := []*batchv1.Job{
+				newRestoreJob(testCtx.DefaultNamespace, "restore-post-ready-durable-0", labels),
+				newRestoreJob(testCtx.DefaultNamespace, "restore-post-ready-durable-1", labels),
+			}
+			for i := range jobs {
+				jobs[i].Spec.Template.Spec.Containers[0].Image = image
+				jobs[i].Annotations = map[string]string{
+					postReadyTargetIdentityAnnotationKey: fmt.Sprintf("default/pod-%d", i),
+					postReadyActionContractAnnotationKey: "sha256:stable-action-contract",
+					postReadyBackupNameAnnotationKey:     backupName,
+					postReadyActionNameAnnotationKey:     actionName,
+				}
+				setPostReadyExecutionPolicy(jobs[i], dpv1alpha1.PostReadyExecutionPolicySerial)
+			}
+			Expect(setPostReadyTargetPlan(jobs)).Should(Succeed())
+			return jobs
 		}
 
 		checkVolumes := func(job *batchv1.Job, volumeName string, exist bool) {
@@ -717,6 +779,464 @@ var _ = Describe("RestoreManager Test", func() {
 			Expect(*second.Spec.Suspend).Should(BeFalse())
 		})
 
+		It("persists the complete plan before the first Job and reuses it after drift", func() {
+			reqCtx := getReqCtx()
+			restoreMGR, backupSet := initResources(reqCtx, 0, false, func(f *testdp.MockRestoreFactory) {})
+			actionName := fmt.Sprintf("%s-0", dpv1alpha1.PostReady)
+			jobs := newDurablePostReadyJobs(restoreMGR, backupSet.Backup.Name, actionName, "image:v1")
+
+			frozen, err := restoreMGR.FreezePostReadyExecutionPlan(reqCtx, k8sClient, jobs)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(frozen).Should(HaveLen(2))
+			planName := frozen[0].Annotations[postReadyPlanNameAnnotationKey]
+			planDigest := frozen[0].Annotations[postReadyPlanDigestAnnotationKey]
+			Expect(planName).ShouldNot(BeEmpty())
+			Expect(planDigest).Should(HavePrefix("sha256:"))
+			planSecret := &corev1.Secret{}
+			Expect(k8sClient.Get(reqCtx.Ctx, types.NamespacedName{
+				Namespace: restoreMGR.Restore.Namespace,
+				Name:      planName,
+			}, planSecret)).Should(Succeed())
+			Expect(planSecret.Immutable).ShouldNot(BeNil())
+			Expect(*planSecret.Immutable).Should(BeTrue())
+
+			_, err = restoreMGR.CreateJobsIfNotExist(reqCtx,
+				&failNthJobCreateClient{Client: k8sClient, n: 1}, restoreMGR.Restore, frozen)
+			Expect(err).Should(MatchError(ContainSubstring("injected Job create failure at 1")))
+			for i := range frozen {
+				Expect(apierrors.IsNotFound(k8sClient.Get(reqCtx.Ctx,
+					client.ObjectKeyFromObject(frozen[i]), &batchv1.Job{}))).Should(BeTrue())
+			}
+
+			drifted := newDurablePostReadyJobs(restoreMGR, backupSet.Backup.Name, actionName, "image:v2")
+			resumed, err := restoreMGR.FreezePostReadyExecutionPlan(reqCtx, k8sClient, drifted)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(resumed).Should(HaveLen(2))
+			for i := range resumed {
+				Expect(resumed[i].Spec.Template.Spec.Containers[0].Image).Should(Equal("image:v1"))
+				Expect(resumed[i].Annotations[postReadyPlanNameAnnotationKey]).Should(Equal(planName))
+				Expect(resumed[i].Annotations[postReadyPlanDigestAnnotationKey]).Should(Equal(planDigest))
+			}
+		})
+
+		It("commits every BackupSet and action in order before creating the first Job", func() {
+			reqCtx := getReqCtx()
+			matchLabels := map[string]string{constant.AppInstanceLabelKey: testdp.ClusterName}
+			restoreMGR, backupSet := initResources(reqCtx, 0, false, func(f *testdp.MockRestoreFactory) {
+				f.SetConnectCredential(testdp.ClusterName).
+					SetJobActionConfig(matchLabels).
+					SetExecActionConfig(matchLabels)
+			})
+			testdp.NewFakeCluster(&testCtx)
+
+			second := *backupSet
+			second.Backup = backupSet.Backup.DeepCopy()
+			second.Backup.Name += "-second"
+			second.Backup.Status.Path += "-second"
+			restoreMGR.PostReadyBackupSets = []BackupActionSet{*backupSet, second}
+
+			found, err := restoreMGR.EnsurePostReadyStagePlan(reqCtx, k8sClient)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(found).Should(BeTrue())
+			jobList := &batchv1.JobList{}
+			Expect(k8sClient.List(reqCtx.Ctx, jobList,
+				client.InNamespace(restoreMGR.Restore.Namespace),
+				client.MatchingLabels{DataProtectionRestoreLabelKey: restoreMGR.Restore.Name})).Should(Succeed())
+			Expect(jobList.Items).Should(BeEmpty())
+
+			stage, found, err := restoreMGR.loadPostReadyExecutionPlanStage(reqCtx, k8sClient)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(found).Should(BeTrue())
+			Expect(stage.Actions).Should(HaveLen(4))
+			Expect(stage.Actions).Should(ConsistOf(
+				HaveField("Order", 0), HaveField("Order", 1), HaveField("Order", 2), HaveField("Order", 3)))
+			Expect([]string{
+				postReadyActionKey(stage.Actions[0].BackupName, stage.Actions[0].ActionName),
+				postReadyActionKey(stage.Actions[1].BackupName, stage.Actions[1].ActionName),
+				postReadyActionKey(stage.Actions[2].BackupName, stage.Actions[2].ActionName),
+				postReadyActionKey(stage.Actions[3].BackupName, stage.Actions[3].ActionName),
+			}).Should(Equal([]string{
+				postReadyActionKey(backupSet.Backup.Name, "postReady-0"),
+				postReadyActionKey(backupSet.Backup.Name, "postReady-1"),
+				postReadyActionKey(second.Backup.Name, "postReady-0"),
+				postReadyActionKey(second.Backup.Name, "postReady-1"),
+			}))
+		})
+
+		It("rejects a canonical subset Secret before the stage marker is committed", func() {
+			reqCtx := getReqCtx()
+			matchLabels := map[string]string{constant.AppInstanceLabelKey: testdp.ClusterName}
+			restoreMGR, backupSet := initResources(reqCtx, 0, false, func(f *testdp.MockRestoreFactory) {
+				f.SetConnectCredential(testdp.ClusterName).
+					SetJobActionConfig(matchLabels).
+					SetExecActionConfig(matchLabels)
+			})
+			testdp.NewFakeCluster(&testCtx)
+
+			second := *backupSet
+			second.Backup = backupSet.Backup.DeepCopy()
+			second.Backup.Name += "-second"
+			second.Backup.Status.Path += "-second"
+			restoreMGR.PostReadyBackupSets = []BackupActionSet{*backupSet, second}
+
+			found, err := restoreMGR.EnsurePostReadyStagePlan(reqCtx, k8sClient)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(found).Should(BeTrue())
+			secretKey := types.NamespacedName{
+				Namespace: restoreMGR.Restore.Namespace,
+				Name:      restoreMGR.postReadyPlanSecretName(),
+			}
+			secret := &corev1.Secret{}
+			Expect(k8sClient.Get(reqCtx.Ctx, secretKey, secret)).Should(Succeed())
+			Expect(k8sClient.Delete(reqCtx.Ctx, secret)).Should(Succeed())
+			Eventually(func() bool {
+				return apierrors.IsNotFound(k8sClient.Get(reqCtx.Ctx, secretKey, &corev1.Secret{}))
+			}).Should(BeTrue())
+
+			originalRestore := restoreMGR.Restore.DeepCopy()
+			delete(restoreMGR.Restore.Annotations, postReadyPlanMarkerAnnotationKey)
+			Expect(k8sClient.Patch(reqCtx.Ctx, restoreMGR.Restore,
+				client.MergeFrom(originalRestore))).Should(Succeed())
+
+			var subset postReadyExecutionPlan
+			Expect(json.Unmarshal(secret.Data[postReadyPlanDataKey], &subset)).Should(Succeed())
+			Expect(subset.Actions).Should(HaveLen(4))
+			subset.Actions = subset.Actions[:2]
+			payload, err := json.Marshal(subset)
+			Expect(err).ShouldNot(HaveOccurred())
+			forged := secret.DeepCopy()
+			forged.ResourceVersion = ""
+			forged.UID = ""
+			forged.CreationTimestamp = metav1.Time{}
+			forged.DeletionTimestamp = nil
+			forged.ManagedFields = nil
+			forged.Data[postReadyPlanDataKey] = payload
+			forged.Annotations[postReadyPlanDigestAnnotationKey] = postReadyPlanDigest(payload)
+			Expect(k8sClient.Create(reqCtx.Ctx, forged)).Should(Succeed())
+
+			found, err = restoreMGR.EnsurePostReadyStagePlan(reqCtx, k8sClient)
+			Expect(found).Should(BeFalse())
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring("does not match the complete expected stage"))
+			_, hasMarker := restoreMGR.postReadyPlanMarker()
+			Expect(hasMarker).Should(BeFalse())
+		})
+
+		It("creates no Job when the plan create response is lost", func() {
+			reqCtx := getReqCtx()
+			restoreMGR, backupSet := initResources(reqCtx, 0, false, func(f *testdp.MockRestoreFactory) {})
+			actionName := fmt.Sprintf("%s-0", dpv1alpha1.PostReady)
+			jobs := newDurablePostReadyJobs(restoreMGR, backupSet.Backup.Name, actionName, "image:v1")
+
+			_, err := restoreMGR.FreezePostReadyExecutionPlan(reqCtx,
+				&persistSecretThenErrorClient{Client: k8sClient}, jobs)
+			Expect(err).Should(MatchError(ContainSubstring("injected lost Secret create response")))
+			jobList := &batchv1.JobList{}
+			Expect(k8sClient.List(reqCtx.Ctx, jobList, client.InNamespace(restoreMGR.Restore.Namespace),
+				client.MatchingLabels{DataProtectionRestoreLabelKey: restoreMGR.Restore.Name})).Should(Succeed())
+			Expect(jobList.Items).Should(BeEmpty())
+
+			resumed, err := restoreMGR.FreezePostReadyExecutionPlan(reqCtx, k8sClient, jobs)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(resumed).Should(HaveLen(2))
+			Expect(resumed[0].Annotations[postReadyPlanDigestAnnotationKey]).Should(HavePrefix("sha256:"))
+		})
+
+		It("keeps completed ordinals outside the immutable plan and does not recreate a GCed Job", func() {
+			reqCtx := getReqCtx()
+			restoreMGR, backupSet := initResources(reqCtx, 0, false, func(f *testdp.MockRestoreFactory) {})
+			actionName := fmt.Sprintf("%s-0", dpv1alpha1.PostReady)
+			jobs := newDurablePostReadyJobs(restoreMGR, backupSet.Backup.Name, actionName, "image:v1")
+			frozen, err := restoreMGR.FreezePostReadyExecutionPlan(reqCtx, k8sClient, jobs)
+			Expect(err).ShouldNot(HaveOccurred())
+			planDigest := frozen[0].Annotations[postReadyPlanDigestAnnotationKey]
+			created, err := restoreMGR.CreateJobsIfNotExist(reqCtx, k8sClient, restoreMGR.Restore, frozen)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(created).Should(HaveLen(2))
+
+			SetRestoreStatusAction(&restoreMGR.Restore.Status.Actions.PostReady, dpv1alpha1.RestoreStatusAction{
+				Name:       actionName,
+				BackupName: backupSet.Backup.Name,
+				ObjectKey:  BuildJobKeyForActionStatus(created[0].Name),
+				Status:     dpv1alpha1.RestoreActionCompleted,
+			})
+			background := metav1.DeletePropagationBackground
+			zero := int64(0)
+			Expect(k8sClient.Delete(reqCtx.Ctx, created[0],
+				&client.DeleteOptions{PropagationPolicy: &background, GracePeriodSeconds: &zero})).Should(Succeed())
+
+			loaded, err := restoreMGR.GetExistingActionJobs(reqCtx, k8sClient, dpv1alpha1.PostReady,
+				backupSet.Backup.Name, actionName)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(loaded).Should(HaveLen(2))
+			Expect(loaded[0].Annotations[postReadyPlanDigestAnnotationKey]).Should(Equal(planDigest))
+			pending := restoreMGR.PendingPostReadyJobs(backupSet.Backup.Name, actionName, loaded)
+			Expect(pending).Should(HaveLen(1))
+			Expect(pending[0].Name).Should(Equal(created[1].Name))
+			_, err = restoreMGR.CreateJobsIfNotExist(reqCtx, k8sClient, restoreMGR.Restore, pending)
+			Expect(err).ShouldNot(HaveOccurred())
+			protected := &batchv1.Job{}
+			Expect(k8sClient.Get(reqCtx.Ctx, client.ObjectKeyFromObject(created[0]), protected)).Should(Succeed())
+			Expect(protected.DeletionTimestamp).ShouldNot(BeNil())
+			Expect(protected.Finalizers).Should(ContainElement(dptypes.DataProtectionFinalizerName))
+
+			By("release terminal-status protection only after the Restore fact is durable")
+			original := protected.DeepCopy()
+			controllerutil.RemoveFinalizer(protected, dptypes.DataProtectionFinalizerName)
+			Expect(k8sClient.Patch(reqCtx.Ctx, protected, client.MergeFrom(original))).Should(Succeed())
+			Eventually(func() bool {
+				return apierrors.IsNotFound(k8sClient.Get(reqCtx.Ctx,
+					client.ObjectKeyFromObject(created[0]), &batchv1.Job{}))
+			}).Should(BeTrue())
+
+			secret := &corev1.Secret{}
+			Expect(k8sClient.Get(reqCtx.Ctx, types.NamespacedName{
+				Namespace: restoreMGR.Restore.Namespace,
+				Name:      loaded[0].Annotations[postReadyPlanNameAnnotationKey],
+			}, secret)).Should(Succeed())
+			Expect(secret.Annotations[postReadyPlanDigestAnnotationKey]).Should(Equal(planDigest))
+		})
+
+		It("does not replay a failed Job after garbage collection", func() {
+			reqCtx := getReqCtx()
+			restoreMGR, backupSet := initResources(reqCtx, 0, false, func(f *testdp.MockRestoreFactory) {})
+			actionName := fmt.Sprintf("%s-0", dpv1alpha1.PostReady)
+			jobs := newDurablePostReadyJobs(restoreMGR, backupSet.Backup.Name, actionName, "image:v1")
+			_, err := restoreMGR.FreezePostReadyExecutionPlan(reqCtx, k8sClient, jobs)
+			Expect(err).ShouldNot(HaveOccurred())
+			SetRestoreStatusAction(&restoreMGR.Restore.Status.Actions.PostReady, dpv1alpha1.RestoreStatusAction{
+				Name:       actionName,
+				BackupName: backupSet.Backup.Name,
+				ObjectKey:  BuildJobKeyForActionStatus(jobs[0].Name),
+				Status:     dpv1alpha1.RestoreActionFailed,
+			})
+
+			completed, err := restoreMGR.ReconcileOrphanedPostReadyActions(reqCtx, k8sClient)
+			Expect(completed).Should(BeFalse())
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring("terminal failed Job"))
+			jobList := &batchv1.JobList{}
+			Expect(k8sClient.List(reqCtx.Ctx, jobList,
+				client.InNamespace(restoreMGR.Restore.Namespace),
+				client.MatchingLabels{DataProtectionRestoreLabelKey: restoreMGR.Restore.Name})).Should(Succeed())
+			Expect(jobList.Items).Should(BeEmpty())
+		})
+
+		It("re-observes a terminal Job when the Restore status patch response is lost", func() {
+			reqCtx := getReqCtx()
+			restoreMGR, backupSet := initResources(reqCtx, 0, false, func(f *testdp.MockRestoreFactory) {})
+			actionName := fmt.Sprintf("%s-0", dpv1alpha1.PostReady)
+			jobs := newDurablePostReadyJobs(restoreMGR, backupSet.Backup.Name, actionName, "image:v1")[:1]
+			Expect(setPostReadyTargetPlan(jobs)).Should(Succeed())
+			frozen, err := restoreMGR.FreezePostReadyExecutionPlan(reqCtx, k8sClient, jobs)
+			Expect(err).ShouldNot(HaveOccurred())
+			created, err := restoreMGR.CreateJobsIfNotExist(reqCtx, k8sClient, restoreMGR.Restore, frozen)
+			Expect(err).ShouldNot(HaveOccurred())
+			testdp.PatchK8sJobStatus(&testCtx, client.ObjectKeyFromObject(created[0]), batchv1.JobComplete)
+			Expect(k8sClient.Get(reqCtx.Ctx, client.ObjectKeyFromObject(created[0]), created[0])).Should(Succeed())
+
+			completed, failed, err := restoreMGR.CheckJobsDone(
+				dpv1alpha1.PostReady, actionName, *backupSet, created)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(completed).Should(BeTrue())
+			Expect(failed).Should(BeFalse())
+
+			originalRestore := restoreMGR.OriginalRestore.DeepCopy()
+			freshManager := NewRestoreManager(originalRestore, nil, restoreMGR.Schema, k8sClient)
+			freshJob := &batchv1.Job{}
+			Expect(k8sClient.Get(reqCtx.Ctx, client.ObjectKeyFromObject(created[0]), freshJob)).Should(Succeed())
+			Expect(freshJob.Finalizers).Should(ContainElement(dptypes.DataProtectionFinalizerName))
+			completed, failed, err = freshManager.CheckJobsDone(
+				dpv1alpha1.PostReady, actionName, *backupSet, []*batchv1.Job{freshJob})
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(completed).Should(BeTrue())
+			Expect(failed).Should(BeFalse())
+			Expect(freshManager.Restore.Status.Actions.PostReady).Should(ContainElement(
+				HaveField("Status", dpv1alpha1.RestoreActionCompleted)))
+		})
+
+		It("fails closed when the durable plan payload is corrupted", func() {
+			reqCtx := getReqCtx()
+			restoreMGR, backupSet := initResources(reqCtx, 0, false, func(f *testdp.MockRestoreFactory) {})
+			actionName := fmt.Sprintf("%s-0", dpv1alpha1.PostReady)
+			jobs := newDurablePostReadyJobs(restoreMGR, backupSet.Backup.Name, actionName, "image:v1")
+			frozen, err := restoreMGR.FreezePostReadyExecutionPlan(reqCtx, k8sClient, jobs)
+			Expect(err).ShouldNot(HaveOccurred())
+			secret := &corev1.Secret{}
+			secretKey := types.NamespacedName{
+				Namespace: restoreMGR.Restore.Namespace,
+				Name:      frozen[0].Annotations[postReadyPlanNameAnnotationKey],
+			}
+			Expect(k8sClient.Get(reqCtx.Ctx, secretKey, secret)).Should(Succeed())
+			Expect(k8sClient.Delete(reqCtx.Ctx, secret)).Should(Succeed())
+			Eventually(func() bool {
+				return apierrors.IsNotFound(k8sClient.Get(reqCtx.Ctx, secretKey, &corev1.Secret{}))
+			}).Should(BeTrue())
+			corrupted := secret.DeepCopy()
+			corrupted.ResourceVersion = ""
+			corrupted.UID = ""
+			corrupted.CreationTimestamp = metav1.Time{}
+			corrupted.Data[postReadyPlanDataKey] = []byte(`{"version":"v1","jobs":[]}`)
+			Expect(k8sClient.Create(reqCtx.Ctx, corrupted)).Should(Succeed())
+
+			_, err = restoreMGR.GetExistingActionJobs(reqCtx, k8sClient, dpv1alpha1.PostReady,
+				backupSet.Backup.Name, actionName)
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring("invalid payload digest"))
+		})
+
+		It("rejects untrusted, foreign, empty, and partial stage plans", func() {
+			reqCtx := getReqCtx()
+			restoreMGR, backupSet := initResources(reqCtx, 0, false, func(f *testdp.MockRestoreFactory) {})
+			actionName := fmt.Sprintf("%s-0", dpv1alpha1.PostReady)
+			jobs := newDurablePostReadyJobs(restoreMGR, backupSet.Backup.Name, actionName, "image:v1")
+			frozen, err := restoreMGR.FreezePostReadyExecutionPlan(reqCtx, k8sClient, jobs)
+			Expect(err).ShouldNot(HaveOccurred())
+			secretKey := types.NamespacedName{
+				Namespace: restoreMGR.Restore.Namespace,
+				Name:      frozen[0].Annotations[postReadyPlanNameAnnotationKey],
+			}
+			base := &corev1.Secret{}
+			Expect(k8sClient.Get(reqCtx.Ctx, secretKey, base)).Should(Succeed())
+
+			mutatePayload := func(secret *corev1.Secret, mutate func(*postReadyExecutionPlan)) {
+				var plan postReadyExecutionPlan
+				Expect(json.Unmarshal(secret.Data[postReadyPlanDataKey], &plan)).Should(Succeed())
+				mutate(&plan)
+				payload, err := json.Marshal(plan)
+				Expect(err).ShouldNot(HaveOccurred())
+				secret.Data[postReadyPlanDataKey] = payload
+				secret.Annotations[postReadyPlanDigestAnnotationKey] = postReadyPlanDigest(payload)
+			}
+			cases := []struct {
+				name   string
+				mutate func(*corev1.Secret)
+			}{
+				{name: "wrong owner", mutate: func(secret *corev1.Secret) {
+					secret.OwnerReferences = nil
+				}},
+				{name: "same UID wrong owner name", mutate: func(secret *corev1.Secret) {
+					secret.OwnerReferences[0].Name = "foreign-restore"
+				}},
+				{name: "same UID wrong owner kind", mutate: func(secret *corev1.Secret) {
+					secret.OwnerReferences[0].Kind = "Backup"
+				}},
+				{name: "same UID wrong owner API", mutate: func(secret *corev1.Secret) {
+					secret.OwnerReferences[0].APIVersion = "v1"
+				}},
+				{name: "same UID non-controller owner", mutate: func(secret *corev1.Secret) {
+					secret.OwnerReferences[0].Controller = pointer.Bool(false)
+				}},
+				{name: "same UID non-blocking owner", mutate: func(secret *corev1.Secret) {
+					secret.OwnerReferences[0].BlockOwnerDeletion = pointer.Bool(false)
+				}},
+				{name: "wrong restore UID", mutate: func(secret *corev1.Secret) {
+					secret.Annotations[postReadyPlanRestoreUIDAnnotationKey] = "foreign-restore"
+				}},
+				{name: "wrong digest", mutate: func(secret *corev1.Secret) {
+					secret.Annotations[postReadyPlanDigestAnnotationKey] = "sha256:forged"
+				}},
+				{name: "empty shell", mutate: func(secret *corev1.Secret) {
+					secret.Data[postReadyPlanDataKey] = nil
+					secret.Annotations[postReadyPlanDigestAnnotationKey] = postReadyPlanDigest(nil)
+				}},
+				{name: "foreign source backup", mutate: func(secret *corev1.Secret) {
+					mutatePayload(secret, func(plan *postReadyExecutionPlan) {
+						plan.SourceBackupName = "foreign-backup"
+					})
+				}},
+				{name: "partial action zero", mutate: func(secret *corev1.Secret) {
+					mutatePayload(secret, func(plan *postReadyExecutionPlan) {
+						plan.Actions[0].Jobs = nil
+					})
+				}},
+				{name: "no actions", mutate: func(secret *corev1.Secret) {
+					mutatePayload(secret, func(plan *postReadyExecutionPlan) {
+						plan.Actions = nil
+					})
+				}},
+			}
+			for _, tc := range cases {
+				By(tc.name)
+				current := &corev1.Secret{}
+				Expect(k8sClient.Get(reqCtx.Ctx, secretKey, current)).Should(Succeed())
+				Expect(k8sClient.Delete(reqCtx.Ctx, current)).Should(Succeed())
+				Eventually(func() bool {
+					return apierrors.IsNotFound(k8sClient.Get(reqCtx.Ctx, secretKey, &corev1.Secret{}))
+				}).Should(BeTrue())
+				forged := base.DeepCopy()
+				forged.ResourceVersion = ""
+				forged.UID = ""
+				forged.CreationTimestamp = metav1.Time{}
+				forged.DeletionTimestamp = nil
+				forged.ManagedFields = nil
+				tc.mutate(forged)
+				Expect(k8sClient.Create(reqCtx.Ctx, forged)).Should(Succeed())
+				_, found, err := restoreMGR.loadPostReadyExecutionPlanStage(reqCtx, k8sClient)
+				Expect(found).Should(BeTrue())
+				Expect(err).Should(HaveOccurred())
+			}
+		})
+
+		It("fails closed when a committed durable plan is missing", func() {
+			reqCtx := getReqCtx()
+			restoreMGR, backupSet := initResources(reqCtx, 0, false, func(f *testdp.MockRestoreFactory) {})
+			actionName := fmt.Sprintf("%s-0", dpv1alpha1.PostReady)
+			jobs := newDurablePostReadyJobs(restoreMGR, backupSet.Backup.Name, actionName, "image:v1")
+			frozen, err := restoreMGR.FreezePostReadyExecutionPlan(reqCtx, k8sClient, jobs)
+			Expect(err).ShouldNot(HaveOccurred())
+			marker, ok := restoreMGR.postReadyPlanMarker()
+			Expect(ok).Should(BeTrue())
+			Expect(marker).Should(ContainSubstring(frozen[0].Annotations[postReadyPlanNameAnnotationKey]))
+			secret := &corev1.Secret{}
+			secretKey := types.NamespacedName{
+				Namespace: restoreMGR.Restore.Namespace,
+				Name:      frozen[0].Annotations[postReadyPlanNameAnnotationKey],
+			}
+			Expect(k8sClient.Get(reqCtx.Ctx, secretKey, secret)).Should(Succeed())
+			background := metav1.DeletePropagationBackground
+			zero := int64(0)
+			Expect(k8sClient.Delete(reqCtx.Ctx, secret,
+				&client.DeleteOptions{PropagationPolicy: &background, GracePeriodSeconds: &zero})).Should(Succeed())
+			Eventually(func() bool {
+				return apierrors.IsNotFound(k8sClient.Get(reqCtx.Ctx, secretKey, &corev1.Secret{}))
+			}).Should(BeTrue())
+
+			_, err = restoreMGR.GetExistingActionJobs(reqCtx, k8sClient, dpv1alpha1.PostReady,
+				backupSet.Backup.Name, actionName)
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring("is missing"))
+		})
+
+		It("fails closed while the committed stage plan Secret is terminating", func() {
+			reqCtx := getReqCtx()
+			restoreMGR, backupSet := initResources(reqCtx, 0, false, func(f *testdp.MockRestoreFactory) {})
+			actionName := fmt.Sprintf("%s-0", dpv1alpha1.PostReady)
+			jobs := newDurablePostReadyJobs(restoreMGR, backupSet.Backup.Name, actionName, "image:v1")
+			frozen, err := restoreMGR.FreezePostReadyExecutionPlan(reqCtx, k8sClient, jobs)
+			Expect(err).ShouldNot(HaveOccurred())
+			secretKey := types.NamespacedName{
+				Namespace: restoreMGR.Restore.Namespace,
+				Name:      frozen[0].Annotations[postReadyPlanNameAnnotationKey],
+			}
+			secret := &corev1.Secret{}
+			Expect(k8sClient.Get(reqCtx.Ctx, secretKey, secret)).Should(Succeed())
+			original := secret.DeepCopy()
+			controllerutil.AddFinalizer(secret, "dataprotection.kubeblocks.io/test-hold")
+			Expect(k8sClient.Patch(reqCtx.Ctx, secret, client.MergeFrom(original))).Should(Succeed())
+			Expect(k8sClient.Delete(reqCtx.Ctx, secret)).Should(Succeed())
+			Eventually(func(g Gomega) {
+				terminating := &corev1.Secret{}
+				g.Expect(k8sClient.Get(reqCtx.Ctx, secretKey, terminating)).Should(Succeed())
+				g.Expect(terminating.DeletionTimestamp).ShouldNot(BeNil())
+			}).Should(Succeed())
+
+			_, found, err := restoreMGR.loadPostReadyExecutionPlanStage(reqCtx, k8sClient)
+			Expect(found).Should(BeTrue())
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring("is terminating"))
+		})
+
 		It("freezes target membership and serial policy across a partial creation retry", func() {
 			reqCtx := getReqCtx()
 			restoreMGR, _ := initResources(reqCtx, 0, false, func(f *testdp.MockRestoreFactory) {})
@@ -845,6 +1365,10 @@ var _ = Describe("RestoreManager Test", func() {
 			legacyFirst.Annotations = nil
 			legacyFirst.Spec.Suspend = nil
 			Expect(k8sClient.Create(reqCtx.Ctx, legacyFirst)).Should(Succeed())
+			testdp.PatchK8sJobStatus(&testCtx, client.ObjectKeyFromObject(legacyFirst), batchv1.JobComplete)
+			persistedLegacy := &batchv1.Job{}
+			Expect(k8sClient.Get(reqCtx.Ctx, client.ObjectKeyFromObject(legacyFirst), persistedLegacy)).Should(Succeed())
+			legacyUID := persistedLegacy.UID
 
 			continued, err := restoreMGR.FreezePostReadyExecutionPlan(reqCtx, k8sClient, desired)
 			Expect(err).ShouldNot(HaveOccurred())
@@ -859,6 +1383,10 @@ var _ = Describe("RestoreManager Test", func() {
 			continued, err = restoreMGR.CreateJobsIfNotExist(reqCtx, k8sClient, restoreMGR.Restore, continued)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(continued).Should(HaveLen(2))
+			Expect(continued[0].UID).Should(Equal(legacyUID))
+			done, condition, _ := utils.IsJobFinished(continued[0])
+			Expect(done).Should(BeTrue())
+			Expect(condition).Should(Equal(batchv1.JobComplete))
 		})
 
 		It("rejects executable drift while recovering a legacy Parallel partial creation", func() {
@@ -936,6 +1464,29 @@ var _ = Describe("RestoreManager Test", func() {
 			for i := range restoreMGR.Restore.Status.Actions.PostReady {
 				Expect(restoreMGR.Restore.Status.Actions.PostReady[i].Status).Should(Equal(dpv1alpha1.RestoreActionCompleted))
 			}
+		})
+
+		It("recovers a durable orphaned plan when no Job was ever created", func() {
+			reqCtx := getReqCtx()
+			restoreMGR, backupSet := initResources(reqCtx, 0, false, func(f *testdp.MockRestoreFactory) {})
+			actionName := fmt.Sprintf("%s-1", dpv1alpha1.PostReady)
+			jobs := newDurablePostReadyJobs(restoreMGR, backupSet.Backup.Name, actionName, "image:v1")
+			frozen, err := restoreMGR.FreezePostReadyExecutionPlan(reqCtx, k8sClient, jobs)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(frozen).Should(HaveLen(2))
+
+			restoreMGR.PostReadyBackupSets = nil
+			restoreMGR.Restore.Spec.ReadyConfig = nil
+			completed, err := restoreMGR.ReconcileOrphanedPostReadyActions(reqCtx, k8sClient)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(completed).Should(BeFalse())
+			for i := range frozen {
+				persisted := &batchv1.Job{}
+				Expect(k8sClient.Get(reqCtx.Ctx, client.ObjectKeyFromObject(frozen[i]), persisted)).Should(Succeed())
+				Expect(persisted.Annotations[postReadyPlanDigestAnnotationKey]).Should(
+					Equal(frozen[i].Annotations[postReadyPlanDigestAnnotationKey]))
+			}
+			Expect(restoreMGR.Restore.Status.Actions.PostReady).Should(HaveLen(2))
 		})
 
 		It("recovers an orphaned frozen-plan Job written before action-contract annotations", func() {
@@ -1136,6 +1687,89 @@ var _ = Describe("RestoreManager Test", func() {
 			Expect(err).Should(HaveOccurred())
 			Expect(jobs).Should(BeNil())
 			Expect(err.Error()).Should(ContainSubstring("does not belong to restore"))
+		})
+
+		It("rejects an existing Job whose executable spec differs from the durable plan", func() {
+			reqCtx := getReqCtx()
+			restoreMGR, backupSet := initResources(reqCtx, 0, false, func(f *testdp.MockRestoreFactory) {})
+			actionName := fmt.Sprintf("%s-0", dpv1alpha1.PostReady)
+			jobs := newDurablePostReadyJobs(restoreMGR, backupSet.Backup.Name, actionName, "image:v1")
+			frozen, err := restoreMGR.FreezePostReadyExecutionPlan(reqCtx, k8sClient, jobs)
+			Expect(err).ShouldNot(HaveOccurred())
+			forged := frozen[0].DeepCopy()
+			forged.Spec.Template.Spec.Containers[0].Image = "image:forged"
+			Expect(k8sClient.Create(reqCtx.Ctx, forged)).Should(Succeed())
+
+			_, err = restoreMGR.CreateJobsIfNotExist(reqCtx, k8sClient, restoreMGR.Restore, frozen)
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring("executable spec does not match its immutable execution plan"))
+			Expect(apierrors.IsNotFound(k8sClient.Get(reqCtx.Ctx,
+				client.ObjectKeyFromObject(frozen[1]), &batchv1.Job{}))).Should(BeTrue())
+		})
+
+		It("rejects missing committed references and executable superset drift", func() {
+			reqCtx := getReqCtx()
+			restoreMGR, backupSet := initResources(reqCtx, 0, false, func(f *testdp.MockRestoreFactory) {})
+			actionName := fmt.Sprintf("%s-0", dpv1alpha1.PostReady)
+			jobs := newDurablePostReadyJobs(restoreMGR, backupSet.Backup.Name, actionName, "image:v1")
+			frozen, err := restoreMGR.FreezePostReadyExecutionPlan(reqCtx, k8sClient, jobs)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			cases := []struct {
+				name   string
+				mutate func(*batchv1.Job)
+			}{
+				{name: "missing plan name", mutate: func(job *batchv1.Job) {
+					delete(job.Annotations, postReadyPlanNameAnnotationKey)
+				}},
+				{name: "missing plan digest", mutate: func(job *batchv1.Job) {
+					delete(job.Annotations, postReadyPlanDigestAnnotationKey)
+				}},
+				{name: "missing restore UID", mutate: func(job *batchv1.Job) {
+					delete(job.Annotations, postReadyPlanRestoreUIDAnnotationKey)
+				}},
+				{name: "missing committed backup identity", mutate: func(job *batchv1.Job) {
+					delete(job.Annotations, postReadyBackupNameAnnotationKey)
+				}},
+				{name: "missing committed action identity", mutate: func(job *batchv1.Job) {
+					delete(job.Annotations, postReadyActionNameAnnotationKey)
+				}},
+				{name: "wrong backup and missing action identity", mutate: func(job *batchv1.Job) {
+					job.Annotations[postReadyBackupNameAnnotationKey] = "foreign-backup"
+					delete(job.Annotations, postReadyActionNameAnnotationKey)
+				}},
+				{name: "missing terminal finalizer", mutate: func(job *batchv1.Job) {
+					controllerutil.RemoveFinalizer(job, dptypes.DataProtectionFinalizerName)
+				}},
+				{name: "extra init container", mutate: func(job *batchv1.Job) {
+					job.Spec.Template.Spec.InitContainers = append(job.Spec.Template.Spec.InitContainers,
+						corev1.Container{Name: "forged-init", Image: "busybox:1.36"})
+				}},
+				{name: "extra volume", mutate: func(job *batchv1.Job) {
+					job.Spec.Template.Spec.Volumes = append(job.Spec.Template.Spec.Volumes,
+						corev1.Volume{Name: "forged-volume", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}})
+				}},
+				{name: "extra environment", mutate: func(job *batchv1.Job) {
+					job.Spec.Template.Spec.Containers[0].Env = append(job.Spec.Template.Spec.Containers[0].Env,
+						corev1.EnvVar{Name: "FORGED", Value: "true"})
+				}},
+				{name: "manual selector", mutate: func(job *batchv1.Job) {
+					job.Spec.ManualSelector = pointer.Bool(true)
+				}},
+				{name: "forged selector", mutate: func(job *batchv1.Job) {
+					job.Spec.Selector = &metav1.LabelSelector{MatchLabels: map[string]string{"forged": "true"}}
+					if job.Spec.Template.Labels == nil {
+						job.Spec.Template.Labels = map[string]string{}
+					}
+					job.Spec.Template.Labels["forged"] = "true"
+				}},
+			}
+			for _, tc := range cases {
+				By(tc.name)
+				existing := frozen[0].DeepCopy()
+				tc.mutate(existing)
+				Expect(restoreMGR.validateExistingRestoreActionJob(frozen[0], existing)).Should(HaveOccurred())
+			}
 		})
 
 		It("keeps a fully persisted legacy postReady action on the Parallel path", func() {

@@ -21,6 +21,7 @@ package restore
 
 import (
 	"context"
+	"encoding/json"
 	"strconv"
 	"testing"
 	"time"
@@ -30,6 +31,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -318,6 +320,154 @@ func TestValidateAndInitRestoreMGRFullBackup(t *testing.T) {
 	assert.NoError(t, cli.Update(context.Background(), backup))
 	mgr = &RestoreManager{Restore: restoreObj}
 	assert.Error(t, ValidateAndInitRestoreMGR(reqCtx, cli, mgr))
+}
+
+func TestValidateAndInitRestoreMGRUsesPersistedPlanAfterActionSetDeletion(t *testing.T) {
+	scheme := runtime.NewScheme()
+	assert.NoError(t, dpv1alpha1.AddToScheme(scheme))
+	assert.NoError(t, corev1.AddToScheme(scheme))
+	assert.NoError(t, batchv1.AddToScheme(scheme))
+
+	backup := &dpv1alpha1.Backup{
+		ObjectMeta: metav1.ObjectMeta{Name: "backup", Namespace: "ns"},
+		Status: dpv1alpha1.BackupStatus{
+			Phase: dpv1alpha1.BackupPhaseCompleted,
+			BackupMethod: &dpv1alpha1.BackupMethod{
+				Name:          "full",
+				ActionSetName: "deleted-action-set",
+			},
+		},
+	}
+	restoreObj := &dpv1alpha1.Restore{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "restore",
+			Namespace: "ns",
+			UID:       types.UID("restore-uid"),
+		},
+		Spec: dpv1alpha1.RestoreSpec{Backup: dpv1alpha1.BackupRef{Name: "backup", Namespace: "ns"}},
+	}
+	mgr := NewRestoreManager(restoreObj, nil, scheme, nil)
+	job := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       "restore-post-ready-0",
+			Namespace:  "ns",
+			Finalizers: []string{dptypes.DataProtectionFinalizerName},
+			Labels: map[string]string{
+				DataProtectionRestoreLabelKey:          "restore",
+				DataProtectionRestoreNamespaceLabelKey: "ns",
+			},
+			Annotations: map[string]string{
+				postReadyTargetIdentityAnnotationKey: "ns/pod-0",
+				postReadyActionContractAnnotationKey: "sha256:contract",
+				postReadyBackupNameAnnotationKey:     "backup",
+				postReadyActionNameAnnotationKey:     "postReady-0",
+			},
+		},
+		Spec: batchv1.JobSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
+			RestartPolicy: corev1.RestartPolicyNever,
+			Containers:    []corev1.Container{{Name: Restore, Image: "busybox:1.36"}},
+		}}},
+	}
+	setPostReadyExecutionPolicy(job, dpv1alpha1.PostReadyExecutionPolicySerial)
+	assert.NoError(t, setPostReadyTargetPlan([]*batchv1.Job{job}))
+	stage, err := canonicalPostReadyStagePlan(postReadyExecutionPlan{
+		Version:               postReadyPlanVersion,
+		RestoreNamespace:      "ns",
+		RestoreName:           "restore",
+		RestoreUID:            "restore-uid",
+		SourceBackupNamespace: "ns",
+		SourceBackupName:      "backup",
+		Actions: []postReadyActionExecutionPlan{{
+			Order: 0, BackupName: "backup", ActionName: "postReady-0", Jobs: []batchv1.Job{*job},
+		}},
+	})
+	assert.NoError(t, err)
+	payload, err := json.Marshal(stage)
+	assert.NoError(t, err)
+	digest := postReadyPlanDigest(payload)
+	planName := mgr.postReadyPlanSecretName()
+	restoreObj.Annotations = map[string]string{
+		postReadyPlanMarkerAnnotationKey: postReadyPlanMarkerValue(planName, digest),
+	}
+	immutable := true
+	controller := true
+	planSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      planName,
+			Namespace: "ns",
+			Labels: map[string]string{
+				DataProtectionRestoreLabelKey: "restore",
+			},
+			Annotations: map[string]string{
+				postReadyPlanRestoreUIDAnnotationKey: "restore-uid",
+				postReadyPlanDigestAnnotationKey:     digest,
+			},
+			OwnerReferences: []metav1.OwnerReference{{
+				APIVersion:         dpv1alpha1.SchemeGroupVersion.String(),
+				Kind:               "Restore",
+				Name:               "restore",
+				UID:                types.UID("restore-uid"),
+				Controller:         &controller,
+				BlockOwnerDeletion: &controller,
+			}},
+		},
+		Immutable: &immutable,
+		Type:      postReadyPlanSecretType,
+		Data:      map[string][]byte{postReadyPlanDataKey: payload},
+	}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(backup, planSecret).Build()
+	reqCtx := intctrlutil.RequestCtx{
+		Ctx: context.Background(),
+		Req: ctrl.Request{NamespacedName: client.ObjectKey{Namespace: "ns", Name: "restore"}},
+	}
+	mgr = NewRestoreManager(restoreObj, nil, scheme, cli)
+
+	assert.NoError(t, ValidateAndInitRestoreMGR(reqCtx, cli, mgr))
+	assert.Empty(t, mgr.PrepareDataBackupSets)
+	assert.Empty(t, mgr.PostReadyBackupSets)
+}
+
+func TestValidateAndInitRestoreMGRRejectsUntrustedPlanShellAfterActionSetDeletion(t *testing.T) {
+	scheme := runtime.NewScheme()
+	assert.NoError(t, dpv1alpha1.AddToScheme(scheme))
+	assert.NoError(t, corev1.AddToScheme(scheme))
+
+	backup := &dpv1alpha1.Backup{
+		ObjectMeta: metav1.ObjectMeta{Name: "backup", Namespace: "ns"},
+		Status: dpv1alpha1.BackupStatus{
+			Phase: dpv1alpha1.BackupPhaseCompleted,
+			BackupMethod: &dpv1alpha1.BackupMethod{
+				Name: "full", ActionSetName: "deleted-action-set",
+			},
+		},
+	}
+	restoreObj := &dpv1alpha1.Restore{
+		ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: "ns", UID: types.UID("restore-uid")},
+		Spec:       dpv1alpha1.RestoreSpec{Backup: dpv1alpha1.BackupRef{Name: "backup", Namespace: "ns"}},
+	}
+	immutable := true
+	foreign := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "foreign-postready-plan",
+			Namespace: "ns",
+			Labels:    map[string]string{DataProtectionRestoreLabelKey: "restore"},
+			Annotations: map[string]string{
+				postReadyPlanRestoreUIDAnnotationKey: "restore-uid",
+			},
+		},
+		Immutable: &immutable,
+		Type:      postReadyPlanSecretType,
+	}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(backup, foreign).Build()
+	reqCtx := intctrlutil.RequestCtx{
+		Ctx: context.Background(),
+		Req: ctrl.Request{NamespacedName: client.ObjectKey{Namespace: "ns", Name: "restore"}},
+	}
+	mgr := NewRestoreManager(restoreObj, nil, scheme, cli)
+
+	err := ValidateAndInitRestoreMGR(reqCtx, cli, mgr)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "deleted-action-set")
 }
 
 func TestRestoreManagerStopsManagerContainer(t *testing.T) {

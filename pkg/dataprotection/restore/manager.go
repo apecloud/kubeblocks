@@ -59,16 +59,43 @@ const (
 	postReadyActionContractAnnotationKey  = "dataprotection.kubeblocks.io/post-ready-action-contract"
 	postReadyBackupNameAnnotationKey      = "dataprotection.kubeblocks.io/post-ready-backup-name"
 	postReadyActionNameAnnotationKey      = "dataprotection.kubeblocks.io/post-ready-action-name"
+	postReadyPlanNameAnnotationKey        = "dataprotection.kubeblocks.io/post-ready-plan-name"
+	postReadyPlanDigestAnnotationKey      = "dataprotection.kubeblocks.io/post-ready-plan-digest"
+	postReadyPlanRestoreUIDAnnotationKey  = "dataprotection.kubeblocks.io/post-ready-restore-uid"
+	postReadyPlanDataKey                  = "plan.json"
+	postReadyPlanVersion                  = "v2"
+	postReadyPlanMaxPayloadBytes          = 1 << 20
+	postReadyPlanMarkerAnnotationKey      = "dataprotection.kubeblocks.io/post-ready-stage-plan"
 )
+
+const postReadyPlanSecretType corev1.SecretType = "dataprotection.kubeblocks.io/post-ready-plan"
+
+type postReadyActionExecutionPlan struct {
+	Order      int           `json:"order"`
+	BackupName string        `json:"backupName"`
+	ActionName string        `json:"actionName"`
+	Jobs       []batchv1.Job `json:"jobs"`
+}
+
+type postReadyExecutionPlan struct {
+	Version               string                         `json:"version"`
+	RestoreNamespace      string                         `json:"restoreNamespace"`
+	RestoreName           string                         `json:"restoreName"`
+	RestoreUID            string                         `json:"restoreUID"`
+	SourceBackupNamespace string                         `json:"sourceBackupNamespace"`
+	SourceBackupName      string                         `json:"sourceBackupName"`
+	Actions               []postReadyActionExecutionPlan `json:"actions"`
+}
 
 type BackupActionSet struct {
 	Backup *dpv1alpha1.Backup
 	// set it when the backup relies on incremental backups, such as Incremental backup
 	AncestorIncrementalBackups []*dpv1alpha1.Backup
 	// set it when the backup relies on a base backup, such as Continuous backup
-	BaseBackup        *dpv1alpha1.Backup
-	ActionSet         *dpv1alpha1.ActionSet
-	UseVolumeSnapshot bool
+	BaseBackup              *dpv1alpha1.Backup
+	ActionSet               *dpv1alpha1.ActionSet
+	UseVolumeSnapshot       bool
+	UseDurablePostReadyPlan bool
 }
 
 type RestoreManager struct {
@@ -113,6 +140,17 @@ func (r *RestoreManager) GetBackupActionSetByNamespaced(reqCtx intctrlutil.Reque
 	useVolumeSnapshot := backupMethod.SnapshotVolumes != nil && *backupMethod.SnapshotVolumes
 	actionSet, err := utils.GetActionSetByName(reqCtx, cli, backup.Status.BackupMethod.ActionSetName)
 	if err != nil {
+		if apierrors.IsNotFound(err) {
+			_, foundPlan, planErr := r.loadPostReadyExecutionPlanStage(reqCtx, cli)
+			if planErr != nil {
+				return nil, planErr
+			}
+			if foundPlan {
+				return &BackupActionSet{
+					Backup: backup, UseVolumeSnapshot: useVolumeSnapshot, UseDurablePostReadyPlan: true,
+				}, nil
+			}
+		}
 		return nil, err
 	}
 	return &BackupActionSet{Backup: backup, ActionSet: actionSet, UseVolumeSnapshot: useVolumeSnapshot}, nil
@@ -333,6 +371,18 @@ func (r *RestoreManager) SetBackupSets(backupSets ...BackupActionSet) {
 // AnalysisRestoreActionsWithBackup analysis the restore actions progress group by backup.
 // check if the restore jobs are completed or failed or processing.
 func (r *RestoreManager) AnalysisRestoreActionsWithBackup(stage dpv1alpha1.RestoreStage, backupName string, actionName string) (bool, bool) {
+	return r.AnalysisRestoreActionsWithBackupExpected(stage, backupName, actionName, 0)
+}
+
+// AnalysisRestoreActionsWithBackupExpected prevents a partially recorded
+// postReady action from looking complete when its immutable plan contains more
+// Jobs than Restore status has observed so far.
+func (r *RestoreManager) AnalysisRestoreActionsWithBackupExpected(
+	stage dpv1alpha1.RestoreStage,
+	backupName string,
+	actionName string,
+	expectedActionCount int,
+) (bool, bool) {
 	var (
 		restoreActionCount  int
 		finishedActionCount int
@@ -359,6 +409,9 @@ func (r *RestoreManager) AnalysisRestoreActionsWithBackup(stage dpv1alpha1.Resto
 		case dpv1alpha1.RestoreActionCompleted:
 			finishedActionCount += 1
 		}
+	}
+	if stage == dpv1alpha1.PostReady && expectedActionCount > 0 {
+		restoreActionCount = expectedActionCount
 	}
 
 	allActionsFinished := restoreActionCount > 0 && finishedActionCount == restoreActionCount
@@ -619,16 +672,24 @@ func (r *RestoreManager) BuildVolumePopulateJob(
 }
 
 // GetExistingActionJobs returns jobs already recorded in Restore status for an in-flight action.
-// PostReady needs completed predecessors as well as processing jobs because the persisted set
-// carries the frozen serial plan across reconciles. PrepareData retains its processing-only path.
-// If any required recorded Job is missing, it returns an empty list so callers can follow the
-// original build/create path.
+// PostReady first loads its immutable plan Secret, including completed
+// predecessors, because the plan survives Job GC. Legacy restores retain the
+// status-recorded Job fallback. PrepareData keeps its processing-only path.
 func (r *RestoreManager) GetExistingActionJobs(
 	reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	stage dpv1alpha1.RestoreStage,
 	backupName string,
 	actionName string) ([]*batchv1.Job, error) {
+	if stage == dpv1alpha1.PostReady {
+		jobs, found, err := r.loadPostReadyExecutionPlan(reqCtx, cli, backupName, actionName)
+		if err != nil {
+			return nil, err
+		}
+		if found {
+			return jobs, nil
+		}
+	}
 	restoreActions := r.Restore.Status.Actions.PrepareData
 	if stage == dpv1alpha1.PostReady {
 		restoreActions = r.Restore.Status.Actions.PostReady
@@ -686,6 +747,74 @@ func (r *RestoreManager) ReconcileOrphanedPostReadyActions(
 	reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 ) (bool, error) {
+	stage, foundStage, err := r.loadPostReadyExecutionPlanStage(reqCtx, cli)
+	if err != nil {
+		return false, err
+	}
+	if foundStage {
+		secret := &corev1.Secret{}
+		if err := cli.Get(reqCtx.Ctx, types.NamespacedName{
+			Namespace: r.Restore.Namespace,
+			Name:      r.postReadyPlanSecretName(),
+		}, secret); err != nil {
+			return false, err
+		}
+		digest := secret.Annotations[postReadyPlanDigestAnnotationKey]
+		for i := range stage.Actions {
+			action := &stage.Actions[i]
+			jobs := attachPostReadyPlanReference(
+				action.Jobs, secret.Name, digest, string(r.Restore.UID))
+			expectedCount, err := PostReadyActionExpectedJobCount(jobs)
+			if err != nil {
+				return false, err
+			}
+			completed, failed := r.AnalysisRestoreActionsWithBackupExpected(
+				dpv1alpha1.PostReady, action.BackupName, action.ActionName, expectedCount)
+			if failed {
+				return false, intctrlutil.NewFatalError(fmt.Sprintf(
+					"postReady action %s for backup %s has a terminal failed Job",
+					action.ActionName, action.BackupName))
+			}
+			if completed {
+				continue
+			}
+			pending := r.PendingPostReadyJobs(action.BackupName, action.ActionName, jobs)
+			if len(pending) == 0 {
+				return false, intctrlutil.NewFatalError(fmt.Sprintf(
+					"postReady action %s for backup %s has no pending Job but is not complete",
+					action.ActionName, action.BackupName))
+			}
+			pending, err = r.CreateJobsIfNotExist(reqCtx, cli, r.Restore, pending)
+			if err != nil {
+				return false, err
+			}
+			if err := r.ResumeNextSerialPostReadyJob(reqCtx, cli, pending); err != nil {
+				return false, err
+			}
+			backupSet := BackupActionSet{Backup: &dpv1alpha1.Backup{
+				ObjectMeta: metav1.ObjectMeta{Name: action.BackupName},
+			}}
+			_, failed, err = r.CheckJobsDone(dpv1alpha1.PostReady, action.ActionName, backupSet, pending)
+			if err != nil {
+				return false, err
+			}
+			if failed {
+				return false, intctrlutil.NewFatalError(fmt.Sprintf(
+					"postReady action %s for backup %s has a terminal failed Job",
+					action.ActionName, action.BackupName))
+			}
+			completed, _ = r.AnalysisRestoreActionsWithBackupExpected(
+				dpv1alpha1.PostReady, action.BackupName, action.ActionName, expectedCount)
+			if !completed {
+				return false, nil
+			}
+		}
+		return true, nil
+	}
+
+	// Before the stage marker exists, retain the legacy recovery path for an
+	// upgrade with already-running frozen Jobs. New reconciles commit the full
+	// stage plan before creating any Job and therefore never enter this path.
 	currentActions := map[string]struct{}{}
 	if r.Restore.Spec.ReadyConfig != nil {
 		for i := range r.PostReadyBackupSets {
@@ -698,6 +827,7 @@ func (r *RestoreManager) ReconcileOrphanedPostReadyActions(
 			}
 		}
 	}
+	durablePlanKeys := map[string]struct{}{}
 
 	namespaces := []string{r.Restore.Namespace}
 	if controllerNamespace := viper.GetString(constant.CfgKeyCtrlrMgrNS); controllerNamespace != "" && controllerNamespace != r.Restore.Namespace {
@@ -723,6 +853,9 @@ func (r *RestoreManager) ReconcileOrphanedPostReadyActions(
 			}
 			key := postReadyActionKey(backupName, actionName)
 			if _, ok := currentActions[key]; ok {
+				continue
+			}
+			if _, ok := durablePlanKeys[key]; ok {
 				continue
 			}
 			orphaned[key] = append(orphaned[key], job.DeepCopy())
@@ -804,6 +937,662 @@ func splitPostReadyActionKey(key string) (string, string) {
 		return "", ""
 	}
 	return parts[0], parts[1]
+}
+
+func (r *RestoreManager) postReadyPlanSecretName() string {
+	identity := strings.Join([]string{
+		r.Restore.Namespace,
+		r.Restore.Name,
+		string(r.Restore.UID),
+		string(dpv1alpha1.PostReady),
+	}, "\x00")
+	digest := sha256.Sum256([]byte(identity))
+	return fmt.Sprintf("postready-stage-%x", digest[:16])
+}
+
+func postReadyPlanMarkerValue(planName, digest string) string {
+	return planName + "@" + digest
+}
+
+func (r *RestoreManager) postReadyPlanMarker() (string, bool) {
+	if r.Restore.Annotations == nil {
+		return "", false
+	}
+	value, ok := r.Restore.Annotations[postReadyPlanMarkerAnnotationKey]
+	return value, ok
+}
+
+func (r *RestoreManager) ensurePostReadyPlanMarker(
+	reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	planName, digest string,
+) error {
+	expected := postReadyPlanMarkerValue(planName, digest)
+	if current, ok := r.postReadyPlanMarker(); ok {
+		if current != expected {
+			return intctrlutil.NewFatalError(fmt.Sprintf(
+				"restore %s/%s has a conflicting postReady execution plan marker",
+				r.Restore.Namespace, r.Restore.Name))
+		}
+		return nil
+	}
+	original := r.Restore.DeepCopy()
+	if r.Restore.Annotations == nil {
+		r.Restore.Annotations = map[string]string{}
+	}
+	r.Restore.Annotations[postReadyPlanMarkerAnnotationKey] = expected
+	return cli.Patch(reqCtx.Ctx, r.Restore, client.MergeFrom(original))
+}
+
+func postReadyPlanIdentityForJobs(jobs []*batchv1.Job) (string, string, bool, error) {
+	if len(jobs) == 0 {
+		return "", "", false, nil
+	}
+	backupName, actionName := postReadyActionIdentity(jobs[0])
+	if backupName == "" && actionName == "" {
+		return "", "", false, nil
+	}
+	if backupName == "" || actionName == "" {
+		return "", "", false, intctrlutil.NewFatalError("postReady jobs have an incomplete action identity")
+	}
+	for i := 1; i < len(jobs); i++ {
+		jobBackupName, jobActionName := postReadyActionIdentity(jobs[i])
+		if jobBackupName != backupName || jobActionName != actionName {
+			return "", "", false, intctrlutil.NewFatalError("postReady jobs have inconsistent action identities")
+		}
+	}
+	return backupName, actionName, true, nil
+}
+
+func canonicalPostReadyPlanJobs(jobs []*batchv1.Job) ([]batchv1.Job, error) {
+	canonical := make([]batchv1.Job, 0, len(jobs))
+	for i := range jobs {
+		if jobs[i] == nil {
+			return nil, intctrlutil.NewFatalError("postReady execution plan contains a nil Job")
+		}
+		job := jobs[i].DeepCopy()
+		job.TypeMeta = metav1.TypeMeta{APIVersion: batchv1.SchemeGroupVersion.String(), Kind: "Job"}
+		job.ResourceVersion = ""
+		job.UID = ""
+		job.Generation = 0
+		job.CreationTimestamp = metav1.Time{}
+		job.DeletionTimestamp = nil
+		job.DeletionGracePeriodSeconds = nil
+		job.ManagedFields = nil
+		job.OwnerReferences = nil
+		job.Finalizers = []string{dptypes.DataProtectionFinalizerName}
+		job.Status = batchv1.JobStatus{}
+		if job.Annotations != nil {
+			delete(job.Annotations, postReadyPlanNameAnnotationKey)
+			delete(job.Annotations, postReadyPlanDigestAnnotationKey)
+			delete(job.Annotations, postReadyPlanRestoreUIDAnnotationKey)
+		}
+		canonical = append(canonical, *job)
+	}
+	sort.Slice(canonical, func(i, j int) bool {
+		return postReadyJobIndex(canonical[i].Name) < postReadyJobIndex(canonical[j].Name)
+	})
+	var expectedPolicy dpv1alpha1.PostReadyExecutionPolicy
+	var expectedContract string
+	var expectedTargetPlan string
+	for i := range canonical {
+		if postReadyJobIndex(canonical[i].Name) != i {
+			return nil, intctrlutil.NewFatalError(fmt.Sprintf(
+				"postReady execution plan has non-contiguous Job ordinal at %s/%s",
+				canonical[i].Namespace, canonical[i].Name))
+		}
+		policy, err := postReadyExecutionPolicyForJob(&canonical[i])
+		if err != nil {
+			return nil, err
+		}
+		plan, err := postReadyTargetPlan(&canonical[i])
+		if err != nil {
+			return nil, err
+		}
+		if len(plan) != len(canonical) || plan[i] != postReadyTargetIdentity(&canonical[i]) {
+			return nil, intctrlutil.NewFatalError(fmt.Sprintf(
+				"postReady job %s/%s target identity does not match the complete execution plan",
+				canonical[i].Namespace, canonical[i].Name))
+		}
+		contract := postReadyActionContractForJob(&canonical[i])
+		if contract == "" {
+			return nil, intctrlutil.NewFatalError(fmt.Sprintf(
+				"postReady job %s/%s has no frozen action contract",
+				canonical[i].Namespace, canonical[i].Name))
+		}
+		serializedTargetPlan := canonical[i].Annotations[postReadyTargetPlanAnnotationKey]
+		if i == 0 {
+			expectedPolicy = policy
+			expectedContract = contract
+			expectedTargetPlan = serializedTargetPlan
+		} else if policy != expectedPolicy || contract != expectedContract || serializedTargetPlan != expectedTargetPlan {
+			return nil, intctrlutil.NewFatalError("postReady execution plan contains inconsistent Job contracts")
+		}
+	}
+	return canonical, nil
+}
+
+func postReadyPlanDigest(payload []byte) string {
+	return fmt.Sprintf("sha256:%x", sha256.Sum256(payload))
+}
+
+func attachPostReadyPlanReference(jobs []batchv1.Job, planName, digest, restoreUID string) []*batchv1.Job {
+	result := make([]*batchv1.Job, 0, len(jobs))
+	for i := range jobs {
+		job := jobs[i].DeepCopy()
+		if job.Annotations == nil {
+			job.Annotations = map[string]string{}
+		}
+		job.Annotations[postReadyPlanNameAnnotationKey] = planName
+		job.Annotations[postReadyPlanDigestAnnotationKey] = digest
+		job.Annotations[postReadyPlanRestoreUIDAnnotationKey] = restoreUID
+		result = append(result, job)
+	}
+	return result
+}
+
+func canonicalPostReadyStagePlan(plan postReadyExecutionPlan) (postReadyExecutionPlan, error) {
+	if len(plan.Actions) == 0 {
+		return postReadyExecutionPlan{}, intctrlutil.NewFatalError("postReady stage execution plan has no actions")
+	}
+	seen := map[string]struct{}{}
+	canonicalActions := make([]postReadyActionExecutionPlan, 0, len(plan.Actions))
+	for i := range plan.Actions {
+		action := plan.Actions[i]
+		if action.Order != i || action.BackupName == "" || action.ActionName == "" || len(action.Jobs) == 0 {
+			return postReadyExecutionPlan{}, intctrlutil.NewFatalError(fmt.Sprintf(
+				"postReady stage action %d has an invalid ordered identity", i))
+		}
+		key := postReadyActionKey(action.BackupName, action.ActionName)
+		if _, ok := seen[key]; ok {
+			return postReadyExecutionPlan{}, intctrlutil.NewFatalError(fmt.Sprintf(
+				"postReady stage execution plan has duplicate action %s/%s", action.BackupName, action.ActionName))
+		}
+		seen[key] = struct{}{}
+		jobPointers := make([]*batchv1.Job, 0, len(action.Jobs))
+		for j := range action.Jobs {
+			jobPointers = append(jobPointers, action.Jobs[j].DeepCopy())
+		}
+		canonicalJobs, err := canonicalPostReadyPlanJobs(jobPointers)
+		if err != nil {
+			return postReadyExecutionPlan{}, err
+		}
+		for j := range canonicalJobs {
+			backupName, actionName := postReadyActionIdentity(&canonicalJobs[j])
+			if backupName != action.BackupName || actionName != action.ActionName {
+				return postReadyExecutionPlan{}, intctrlutil.NewFatalError(fmt.Sprintf(
+					"postReady stage action %s/%s contains a Job for another action",
+					action.BackupName, action.ActionName))
+			}
+		}
+		canonicalActions = append(canonicalActions, postReadyActionExecutionPlan{
+			Order: action.Order, BackupName: action.BackupName, ActionName: action.ActionName, Jobs: canonicalJobs,
+		})
+	}
+	plan.Actions = canonicalActions
+	return plan, nil
+}
+
+func (r *RestoreManager) findPostReadyStageAction(
+	plan *postReadyExecutionPlan,
+	backupName, actionName string,
+) (*postReadyActionExecutionPlan, bool) {
+	for i := range plan.Actions {
+		if plan.Actions[i].BackupName == backupName && plan.Actions[i].ActionName == actionName {
+			return &plan.Actions[i], true
+		}
+	}
+	return nil, false
+}
+
+func (r *RestoreManager) loadPostReadyExecutionPlanStage(
+	reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	expected ...*postReadyExecutionPlan,
+) (*postReadyExecutionPlan, bool, error) {
+	secretName := r.postReadyPlanSecretName()
+	marker, hasMarker := r.postReadyPlanMarker()
+	secret := &corev1.Secret{}
+	if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Namespace: r.Restore.Namespace, Name: secretName}, secret); err != nil {
+		if apierrors.IsNotFound(err) {
+			if hasMarker {
+				return nil, true, intctrlutil.NewFatalError(fmt.Sprintf(
+					"postReady stage execution plan %s/%s is missing", r.Restore.Namespace, secretName))
+			}
+			return nil, false, nil
+		}
+		return nil, false, err
+	}
+	if secret.DeletionTimestamp != nil {
+		return nil, true, intctrlutil.NewFatalError(fmt.Sprintf(
+			"postReady stage execution plan %s/%s is terminating", secret.Namespace, secret.Name))
+	}
+	if secret.Type != postReadyPlanSecretType || secret.Immutable == nil || !*secret.Immutable {
+		return nil, true, intctrlutil.NewFatalError(fmt.Sprintf(
+			"postReady stage execution plan %s/%s is not an immutable plan Secret", secret.Namespace, secret.Name))
+	}
+	controller := metav1.GetControllerOf(secret)
+	if controller == nil ||
+		controller.APIVersion != dpv1alpha1.SchemeGroupVersion.String() ||
+		controller.Kind != dptypes.RestoreKind ||
+		controller.Name != r.Restore.Name ||
+		controller.UID != r.Restore.UID ||
+		controller.Controller == nil || !*controller.Controller ||
+		controller.BlockOwnerDeletion == nil || !*controller.BlockOwnerDeletion ||
+		secret.Annotations[postReadyPlanRestoreUIDAnnotationKey] != string(r.Restore.UID) {
+		return nil, true, intctrlutil.NewFatalError(fmt.Sprintf(
+			"postReady stage execution plan %s/%s is not owned by restore %s/%s",
+			secret.Namespace, secret.Name, r.Restore.Namespace, r.Restore.Name))
+	}
+	payload := secret.Data[postReadyPlanDataKey]
+	if len(payload) == 0 {
+		return nil, true, intctrlutil.NewFatalError(fmt.Sprintf(
+			"postReady stage execution plan %s/%s has no canonical payload", secret.Namespace, secret.Name))
+	}
+	digest := postReadyPlanDigest(payload)
+	if secret.Annotations == nil || secret.Annotations[postReadyPlanDigestAnnotationKey] != digest {
+		return nil, true, intctrlutil.NewFatalError(fmt.Sprintf(
+			"postReady stage execution plan %s/%s has an invalid payload digest", secret.Namespace, secret.Name))
+	}
+	var plan postReadyExecutionPlan
+	if err := json.Unmarshal(payload, &plan); err != nil {
+		return nil, true, intctrlutil.NewFatalError(fmt.Sprintf(
+			"postReady stage execution plan %s/%s has an invalid payload: %v", secret.Namespace, secret.Name, err))
+	}
+	if plan.Version != postReadyPlanVersion ||
+		plan.RestoreNamespace != r.Restore.Namespace || plan.RestoreName != r.Restore.Name ||
+		plan.RestoreUID != string(r.Restore.UID) ||
+		plan.SourceBackupNamespace != r.Restore.Spec.Backup.Namespace ||
+		plan.SourceBackupName != r.Restore.Spec.Backup.Name {
+		return nil, true, intctrlutil.NewFatalError(fmt.Sprintf(
+			"postReady stage execution plan %s/%s does not match restore identity", secret.Namespace, secret.Name))
+	}
+	canonical, err := canonicalPostReadyStagePlan(plan)
+	if err != nil {
+		return nil, true, err
+	}
+	canonicalPayload, err := json.Marshal(canonical)
+	if err != nil {
+		return nil, true, err
+	}
+	if string(canonicalPayload) != string(payload) {
+		return nil, true, intctrlutil.NewFatalError(fmt.Sprintf(
+			"postReady stage execution plan %s/%s payload is not canonical", secret.Namespace, secret.Name))
+	}
+	expectedMarker := postReadyPlanMarkerValue(secret.Name, digest)
+	if hasMarker && marker != expectedMarker {
+		return nil, true, intctrlutil.NewFatalError(fmt.Sprintf(
+			"restore %s/%s postReady stage execution plan marker does not match %s/%s",
+			r.Restore.Namespace, r.Restore.Name, secret.Namespace, secret.Name))
+	}
+	if !hasMarker {
+		if len(expected) != 1 || expected[0] == nil {
+			return nil, true, intctrlutil.NewFatalError(fmt.Sprintf(
+				"postReady stage execution plan %s/%s has no committed marker and no complete expected stage",
+				secret.Namespace, secret.Name))
+		}
+		expectedCanonical, err := canonicalPostReadyStagePlan(*expected[0])
+		if err != nil {
+			return nil, true, err
+		}
+		expectedPayload, err := json.Marshal(expectedCanonical)
+		if err != nil {
+			return nil, true, err
+		}
+		if string(expectedPayload) != string(payload) {
+			return nil, true, intctrlutil.NewFatalError(fmt.Sprintf(
+				"postReady stage execution plan %s/%s does not match the complete expected stage",
+				secret.Namespace, secret.Name))
+		}
+		if err := r.migratePostReadyJobsBeforeStageCommit(reqCtx, cli, &canonical, secret.Name, digest); err != nil {
+			return nil, true, err
+		}
+	}
+	if err := r.ensurePostReadyPlanMarker(reqCtx, cli, secret.Name, digest); err != nil {
+		return nil, true, err
+	}
+	return &canonical, true, nil
+}
+
+func (r *RestoreManager) persistPostReadyExecutionPlanStage(
+	reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	actions []postReadyActionExecutionPlan,
+) (*postReadyExecutionPlan, error) {
+	canonical, err := canonicalPostReadyStagePlan(postReadyExecutionPlan{
+		Version:               postReadyPlanVersion,
+		RestoreNamespace:      r.Restore.Namespace,
+		RestoreName:           r.Restore.Name,
+		RestoreUID:            string(r.Restore.UID),
+		SourceBackupNamespace: r.Restore.Spec.Backup.Namespace,
+		SourceBackupName:      r.Restore.Spec.Backup.Name,
+		Actions:               actions,
+	})
+	if err != nil {
+		return nil, err
+	}
+	payload, err := json.Marshal(canonical)
+	if err != nil {
+		return nil, err
+	}
+	if len(payload) > postReadyPlanMaxPayloadBytes {
+		return nil, intctrlutil.NewFatalError(fmt.Sprintf(
+			"postReady stage execution plan payload is %d bytes and exceeds the Secret limit", len(payload)))
+	}
+	digest := postReadyPlanDigest(payload)
+	immutable := true
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: r.Restore.Namespace,
+			Name:      r.postReadyPlanSecretName(),
+			Labels: map[string]string{
+				DataProtectionRestoreLabelKey:          r.Restore.Name,
+				DataProtectionRestoreNamespaceLabelKey: r.Restore.Namespace,
+			},
+			Annotations: map[string]string{
+				postReadyPlanDigestAnnotationKey:     digest,
+				postReadyPlanRestoreUIDAnnotationKey: string(r.Restore.UID),
+			},
+		},
+		Immutable: &immutable,
+		Type:      postReadyPlanSecretType,
+		Data:      map[string][]byte{postReadyPlanDataKey: payload},
+	}
+	if err := controllerutil.SetControllerReference(r.Restore, secret, r.Schema); err != nil {
+		return nil, err
+	}
+	if err := cli.Create(reqCtx.Ctx, secret); err != nil {
+		if !apierrors.IsAlreadyExists(err) {
+			return nil, err
+		}
+		persisted, found, loadErr := r.loadPostReadyExecutionPlanStage(reqCtx, cli, &canonical)
+		if loadErr != nil {
+			return nil, loadErr
+		}
+		if !found {
+			return nil, intctrlutil.NewFatalError("postReady stage execution plan disappeared after AlreadyExists")
+		}
+		return persisted, nil
+	}
+	if err := r.migratePostReadyJobsBeforeStageCommit(reqCtx, cli, &canonical, secret.Name, digest); err != nil {
+		return nil, err
+	}
+	if err := r.ensurePostReadyPlanMarker(reqCtx, cli, secret.Name, digest); err != nil {
+		return nil, err
+	}
+	return &canonical, nil
+}
+
+func (r *RestoreManager) loadPostReadyExecutionPlan(
+	reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	backupName, actionName string,
+) ([]*batchv1.Job, bool, error) {
+	stage, found, err := r.loadPostReadyExecutionPlanStage(reqCtx, cli)
+	if err != nil || !found {
+		return nil, found, err
+	}
+	action, ok := r.findPostReadyStageAction(stage, backupName, actionName)
+	if !ok {
+		return nil, true, intctrlutil.NewFatalError(fmt.Sprintf(
+			"postReady stage execution plan does not contain action %s/%s", backupName, actionName))
+	}
+	secretName := r.postReadyPlanSecretName()
+	secret := &corev1.Secret{}
+	if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Namespace: r.Restore.Namespace, Name: secretName}, secret); err != nil {
+		return nil, true, err
+	}
+	digest := secret.Annotations[postReadyPlanDigestAnnotationKey]
+	return attachPostReadyPlanReference(action.Jobs, secret.Name, digest, string(r.Restore.UID)), true, nil
+}
+
+func (r *RestoreManager) persistPostReadyExecutionPlan(
+	reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	backupName, actionName string,
+	jobs []*batchv1.Job,
+) ([]*batchv1.Job, error) {
+	canonical, err := canonicalPostReadyPlanJobs(jobs)
+	if err != nil {
+		return nil, err
+	}
+	stage, err := r.persistPostReadyExecutionPlanStage(reqCtx, cli, []postReadyActionExecutionPlan{{
+		Order: 0, BackupName: backupName, ActionName: actionName, Jobs: canonical,
+	}})
+	if err != nil {
+		return nil, err
+	}
+	action, ok := r.findPostReadyStageAction(stage, backupName, actionName)
+	if !ok {
+		return nil, intctrlutil.NewFatalError(fmt.Sprintf(
+			"postReady stage execution plan does not contain action %s/%s", backupName, actionName))
+	}
+	secretName := r.postReadyPlanSecretName()
+	secret := &corev1.Secret{}
+	if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Namespace: r.Restore.Namespace, Name: secretName}, secret); err != nil {
+		return nil, err
+	}
+	return attachPostReadyPlanReference(
+		action.Jobs, secret.Name, secret.Annotations[postReadyPlanDigestAnnotationKey], string(r.Restore.UID)), nil
+}
+
+func normalizePostReadyJobSpec(job *batchv1.Job, scheme *runtime.Scheme) batchv1.JobSpec {
+	copy := job.DeepCopy()
+	if scheme != nil {
+		scheme.Default(copy)
+	}
+	if copy.Spec.Parallelism != nil && *copy.Spec.Parallelism == 1 {
+		copy.Spec.Parallelism = nil
+	}
+	if copy.Spec.Completions != nil && *copy.Spec.Completions == 1 {
+		copy.Spec.Completions = nil
+	}
+	if copy.Spec.BackoffLimit != nil && *copy.Spec.BackoffLimit == 6 {
+		copy.Spec.BackoffLimit = nil
+	}
+	if copy.Spec.CompletionMode != nil && *copy.Spec.CompletionMode == batchv1.NonIndexedCompletion {
+		copy.Spec.CompletionMode = nil
+	}
+	if copy.Spec.Suspend != nil && !*copy.Spec.Suspend {
+		copy.Spec.Suspend = nil
+	}
+	if copy.Spec.ManualSelector != nil && !*copy.Spec.ManualSelector {
+		copy.Spec.ManualSelector = nil
+	}
+	if isGeneratedPostReadyJobSelector(copy.Spec.Selector, string(copy.UID)) {
+		copy.Spec.Selector = nil
+	}
+	generatedLabels := map[string]string{
+		"batch.kubernetes.io/controller-uid": string(copy.UID),
+		"controller-uid":                     string(copy.UID),
+		"batch.kubernetes.io/job-name":       copy.Name,
+		"job-name":                           copy.Name,
+	}
+	for key, expected := range generatedLabels {
+		if expected != "" && copy.Spec.Template.Labels[key] == expected {
+			delete(copy.Spec.Template.Labels, key)
+		}
+	}
+	if len(copy.Spec.Template.Labels) == 0 {
+		copy.Spec.Template.Labels = nil
+	}
+	podSpec := &copy.Spec.Template.Spec
+	if podSpec.DeprecatedServiceAccount == podSpec.ServiceAccountName {
+		podSpec.DeprecatedServiceAccount = ""
+	}
+	for i := range podSpec.Volumes {
+		normalizePostReadyVolumeDefaults(&podSpec.Volumes[i])
+	}
+	if podSpec.TerminationGracePeriodSeconds != nil && *podSpec.TerminationGracePeriodSeconds == 30 {
+		podSpec.TerminationGracePeriodSeconds = nil
+	}
+	if podSpec.DNSPolicy == corev1.DNSClusterFirst {
+		podSpec.DNSPolicy = ""
+	}
+	if podSpec.SchedulerName == corev1.DefaultSchedulerName {
+		podSpec.SchedulerName = ""
+	}
+	if podSpec.SecurityContext != nil && apiequality.Semantic.DeepEqual(
+		podSpec.SecurityContext, &corev1.PodSecurityContext{}) {
+		podSpec.SecurityContext = nil
+	}
+	for i := range podSpec.InitContainers {
+		normalizePostReadyContainerDefaults(&podSpec.InitContainers[i])
+	}
+	for i := range podSpec.Containers {
+		normalizePostReadyContainerDefaults(&podSpec.Containers[i])
+	}
+	return copy.Spec
+}
+
+func isGeneratedPostReadyJobSelector(selector *metav1.LabelSelector, jobUID string) bool {
+	if selector == nil || jobUID == "" || len(selector.MatchExpressions) != 0 || len(selector.MatchLabels) != 1 {
+		return false
+	}
+	for key, value := range selector.MatchLabels {
+		return (key == "controller-uid" || key == "batch.kubernetes.io/controller-uid") && value == jobUID
+	}
+	return false
+}
+
+func normalizePostReadyContainerDefaults(container *corev1.Container) {
+	if container.TerminationMessagePath == corev1.TerminationMessagePathDefault {
+		container.TerminationMessagePath = ""
+	}
+	if container.TerminationMessagePolicy == corev1.TerminationMessageReadFile {
+		container.TerminationMessagePolicy = ""
+	}
+	imageName := container.Image
+	if slash := strings.LastIndexByte(imageName, '/'); slash >= 0 {
+		imageName = imageName[slash+1:]
+	}
+	defaultPullPolicy := corev1.PullIfNotPresent
+	if !strings.Contains(imageName, "@") {
+		colon := strings.LastIndexByte(imageName, ':')
+		if colon < 0 || imageName[colon+1:] == "latest" {
+			defaultPullPolicy = corev1.PullAlways
+		}
+	}
+	if container.ImagePullPolicy == defaultPullPolicy {
+		container.ImagePullPolicy = ""
+	}
+	for i := range container.Env {
+		if container.Env[i].ValueFrom != nil && container.Env[i].ValueFrom.FieldRef != nil &&
+			container.Env[i].ValueFrom.FieldRef.APIVersion == "v1" {
+			container.Env[i].ValueFrom.FieldRef.APIVersion = ""
+		}
+	}
+}
+
+func normalizePostReadyVolumeDefaults(volume *corev1.Volume) {
+	const defaultMode = int32(0o644)
+	if volume.DownwardAPI != nil {
+		if volume.DownwardAPI.DefaultMode != nil && *volume.DownwardAPI.DefaultMode == defaultMode {
+			volume.DownwardAPI.DefaultMode = nil
+		}
+		for i := range volume.DownwardAPI.Items {
+			if fieldRef := volume.DownwardAPI.Items[i].FieldRef; fieldRef != nil && fieldRef.APIVersion == "v1" {
+				fieldRef.APIVersion = ""
+			}
+		}
+	}
+	if volume.Secret != nil && volume.Secret.DefaultMode != nil && *volume.Secret.DefaultMode == defaultMode {
+		volume.Secret.DefaultMode = nil
+	}
+	if volume.ConfigMap != nil && volume.ConfigMap.DefaultMode != nil && *volume.ConfigMap.DefaultMode == defaultMode {
+		volume.ConfigMap.DefaultMode = nil
+	}
+	if volume.Projected != nil {
+		if volume.Projected.DefaultMode != nil && *volume.Projected.DefaultMode == defaultMode {
+			volume.Projected.DefaultMode = nil
+		}
+		for i := range volume.Projected.Sources {
+			downwardAPI := volume.Projected.Sources[i].DownwardAPI
+			if downwardAPI == nil {
+				continue
+			}
+			for j := range downwardAPI.Items {
+				if fieldRef := downwardAPI.Items[j].FieldRef; fieldRef != nil && fieldRef.APIVersion == "v1" {
+					fieldRef.APIVersion = ""
+				}
+			}
+		}
+	}
+}
+
+func (r *RestoreManager) postReadyJobSpecsEqual(desired, existing *batchv1.Job) bool {
+	desiredSpec := normalizePostReadyJobSpec(desired, r.Schema)
+	existingSpec := normalizePostReadyJobSpec(existing, r.Schema)
+	return apiequality.Semantic.DeepEqual(desiredSpec, existingSpec)
+}
+
+func (r *RestoreManager) migratePostReadyJobsBeforeStageCommit(
+	reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	stage *postReadyExecutionPlan,
+	planName, digest string,
+) error {
+	for i := range stage.Actions {
+		desiredJobs := attachPostReadyPlanReference(
+			stage.Actions[i].Jobs, planName, digest, string(r.Restore.UID))
+		for j := range desiredJobs {
+			existing := &batchv1.Job{}
+			if err := cli.Get(reqCtx.Ctx, client.ObjectKeyFromObject(desiredJobs[j]), existing); err != nil {
+				if apierrors.IsNotFound(err) {
+					continue
+				}
+				return err
+			}
+			if existing.DeletionTimestamp != nil || existing.UID == "" || !r.isJobForRestoreAction(existing) {
+				return intctrlutil.NewFatalError(fmt.Sprintf(
+					"legacy postReady job %s/%s has no stable restore ownership", existing.Namespace, existing.Name))
+			}
+			desiredBackupName, desiredActionName := postReadyActionIdentity(desiredJobs[j])
+			existingBackupName, existingActionName := postReadyActionIdentity(existing)
+			if existingBackupName != desiredBackupName || existingActionName != desiredActionName {
+				return intctrlutil.NewFatalError(fmt.Sprintf(
+					"legacy postReady job %s/%s action identity does not match the stage plan",
+					existing.Namespace, existing.Name))
+			}
+			controller := metav1.GetControllerOf(existing)
+			if existing.Namespace == r.Restore.Namespace && (controller == nil || controller.UID != r.Restore.UID) {
+				return intctrlutil.NewFatalError(fmt.Sprintf(
+					"legacy postReady job %s/%s is not owned by restore %s/%s",
+					existing.Namespace, existing.Name, r.Restore.Namespace, r.Restore.Name))
+			}
+			existingPlanName := existing.Annotations[postReadyPlanNameAnnotationKey]
+			existingDigest := existing.Annotations[postReadyPlanDigestAnnotationKey]
+			existingRestoreUID := existing.Annotations[postReadyPlanRestoreUIDAnnotationKey]
+			if existingPlanName != "" || existingDigest != "" || existingRestoreUID != "" {
+				if existingPlanName != planName || existingDigest != digest || existingRestoreUID != string(r.Restore.UID) {
+					return intctrlutil.NewFatalError(fmt.Sprintf(
+						"postReady job %s/%s has a conflicting committed stage reference",
+						existing.Namespace, existing.Name))
+				}
+				if err := r.validateExistingRestoreActionJob(desiredJobs[j], existing); err != nil {
+					return err
+				}
+				continue
+			}
+			if !r.postReadyJobSpecsEqual(desiredJobs[j], existing) {
+				return intctrlutil.NewFatalError(fmt.Sprintf(
+					"legacy postReady job %s/%s executable spec does not match the stage plan",
+					existing.Namespace, existing.Name))
+			}
+			original := existing.DeepCopy()
+			if existing.Annotations == nil {
+				existing.Annotations = map[string]string{}
+			}
+			existing.Annotations[postReadyPlanNameAnnotationKey] = planName
+			existing.Annotations[postReadyPlanDigestAnnotationKey] = digest
+			existing.Annotations[postReadyPlanRestoreUIDAnnotationKey] = string(r.Restore.UID)
+			controllerutil.AddFinalizer(existing, dptypes.DataProtectionFinalizerName)
+			if err := cli.Patch(reqCtx.Ctx, existing, client.MergeFrom(original)); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func postReadyActionIdentity(job *batchv1.Job) (string, string) {
@@ -1274,9 +2063,141 @@ func serialPostReadyJobs(jobs []*batchv1.Job) (bool, error) {
 	return policy == dpv1alpha1.PostReadyExecutionPolicySerial, nil
 }
 
-// FreezePostReadyExecutionPlan preserves the policy and ordered target set
-// chosen by the first created job across partial retries and ActionSet updates.
+// PostReadyActionExpectedJobCount returns the immutable plan cardinality when
+// available. This count belongs to the plan domain and does not change as
+// mutable completion status advances.
+func PostReadyActionExpectedJobCount(jobs []*batchv1.Job) (int, error) {
+	if len(jobs) == 0 {
+		return 0, nil
+	}
+	plan, err := postReadyTargetPlan(jobs[0])
+	if err != nil {
+		return 0, err
+	}
+	if len(plan) > 0 {
+		return len(plan), nil
+	}
+	return len(jobs), nil
+}
+
+// EnsurePostReadyStagePlan commits the ordered executable plan for every
+// postReady action before the first Job of the stage can be created.
+func (r *RestoreManager) EnsurePostReadyStagePlan(
+	reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+) (bool, error) {
+	if _, hasMarker := r.postReadyPlanMarker(); hasMarker {
+		if _, found, err := r.loadPostReadyExecutionPlanStage(reqCtx, cli); err != nil || found {
+			return found, err
+		}
+	}
+	if r.Restore.Spec.ReadyConfig == nil || len(r.PostReadyBackupSets) == 0 {
+		return false, nil
+	}
+	actions := make([]postReadyActionExecutionPlan, 0)
+	for i := range r.PostReadyBackupSets {
+		backupSet := r.PostReadyBackupSets[i]
+		if backupSet.Backup == nil || backupSet.ActionSet == nil || backupSet.ActionSet.Spec.Restore == nil {
+			return false, intctrlutil.NewFatalError("postReady stage has an incomplete Backup/ActionSet definition")
+		}
+		target := utils.GetBackupStatusTarget(backupSet.Backup, r.Restore.Spec.Backup.SourceTargetName)
+		if target == nil {
+			return false, intctrlutil.NewFatalError("can not found any source targe in backup " + backupSet.Backup.Name)
+		}
+		for step := range backupSet.ActionSet.Spec.Restore.PostReady {
+			actionName := fmt.Sprintf("%s-%d", dpv1alpha1.PostReady, step)
+			jobs, err := r.BuildPostReadyActionJobs(reqCtx, cli, backupSet, target, step)
+			if err != nil {
+				return false, err
+			}
+			jobs, err = r.freezeLegacyPostReadyExecutionPlan(reqCtx, cli, jobs)
+			if err != nil {
+				return false, err
+			}
+			canonical, err := canonicalPostReadyPlanJobs(jobs)
+			if err != nil {
+				return false, err
+			}
+			if len(canonical) == 0 {
+				return false, intctrlutil.NewFatalError(fmt.Sprintf(
+					"postReady stage action %s/%s has no executable Jobs", backupSet.Backup.Name, actionName))
+			}
+			actions = append(actions, postReadyActionExecutionPlan{
+				Order: len(actions), BackupName: backupSet.Backup.Name, ActionName: actionName, Jobs: canonical,
+			})
+		}
+	}
+	if len(actions) == 0 {
+		return false, nil
+	}
+	_, err := r.persistPostReadyExecutionPlanStage(reqCtx, cli, actions)
+	return err == nil, err
+}
+
+// PendingPostReadyJobs filters Jobs already recorded terminal in mutable
+// Restore status. A garbage-collected Completed or Failed Job is therefore
+// never recreated from the immutable plan.
+func (r *RestoreManager) PendingPostReadyJobs(backupName, actionName string, jobs []*batchv1.Job) []*batchv1.Job {
+	terminal := map[string]struct{}{}
+	for i := range r.Restore.Status.Actions.PostReady {
+		action := r.Restore.Status.Actions.PostReady[i]
+		if action.BackupName == backupName && action.Name == actionName &&
+			(action.Status == dpv1alpha1.RestoreActionCompleted || action.Status == dpv1alpha1.RestoreActionFailed) {
+			terminal[action.ObjectKey] = struct{}{}
+		}
+	}
+	pending := make([]*batchv1.Job, 0, len(jobs))
+	for i := range jobs {
+		if _, ok := terminal[BuildJobKeyForActionStatus(jobs[i].Name)]; ok {
+			continue
+		}
+		pending = append(pending, jobs[i])
+	}
+	return pending
+}
+
+// FreezePostReadyExecutionPlan persists the complete immutable executable plan
+// before any Job is created. Once present, that plan remains authoritative
+// across Job GC and ActionSet or ReadyConfig drift.
 func (r *RestoreManager) FreezePostReadyExecutionPlan(
+	reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	jobs []*batchv1.Job,
+) ([]*batchv1.Job, error) {
+	backupName, actionName, hasIdentity, err := postReadyPlanIdentityForJobs(jobs)
+	if err != nil {
+		return nil, err
+	}
+	if hasIdentity {
+		if _, hasMarker := r.postReadyPlanMarker(); hasMarker {
+			persisted, found, err := r.loadPostReadyExecutionPlan(reqCtx, cli, backupName, actionName)
+			if err != nil {
+				return nil, err
+			}
+			if found {
+				return persisted, nil
+			}
+		}
+	}
+
+	frozen, err := r.freezeLegacyPostReadyExecutionPlan(reqCtx, cli, jobs)
+	if err != nil || !hasIdentity {
+		return frozen, err
+	}
+	frozenBackupName, frozenActionName, frozenHasIdentity, err := postReadyPlanIdentityForJobs(frozen)
+	if err != nil {
+		return nil, err
+	}
+	if !frozenHasIdentity || frozenBackupName != backupName || frozenActionName != actionName {
+		return frozen, nil
+	}
+	return r.persistPostReadyExecutionPlan(reqCtx, cli, backupName, actionName, frozen)
+}
+
+// freezeLegacyPostReadyExecutionPlan preserves compatibility with Jobs created
+// before durable plan Secrets existed. It may migrate only a complete or
+// provably equivalent legacy plan; ambiguous legacy state still fails closed.
+func (r *RestoreManager) freezeLegacyPostReadyExecutionPlan(
 	reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	jobs []*batchv1.Job,
@@ -1455,6 +2376,36 @@ func (r *RestoreManager) validateExistingRestoreActionJob(desired, existing *bat
 			"postReady job %s/%s target identity does not match desired target",
 			existing.Namespace, existing.Name))
 	}
+	desiredHasPlanReference := desired.Annotations[postReadyPlanNameAnnotationKey] != "" ||
+		desired.Annotations[postReadyPlanDigestAnnotationKey] != "" ||
+		desired.Annotations[postReadyPlanRestoreUIDAnnotationKey] != ""
+	if desiredHasPlanReference {
+		desiredBackupName, hasDesiredBackupName := desired.Annotations[postReadyBackupNameAnnotationKey]
+		desiredActionName, hasDesiredActionName := desired.Annotations[postReadyActionNameAnnotationKey]
+		if !hasDesiredBackupName || desiredBackupName == "" || !hasDesiredActionName || desiredActionName == "" {
+			return intctrlutil.NewFatalError(fmt.Sprintf(
+				"postReady job %s/%s desired committed action identity is incomplete",
+				desired.Namespace, desired.Name))
+		}
+		existingBackupName, hasExistingBackupName := existing.Annotations[postReadyBackupNameAnnotationKey]
+		existingActionName, hasExistingActionName := existing.Annotations[postReadyActionNameAnnotationKey]
+		if !hasExistingBackupName || existingBackupName == "" ||
+			!hasExistingActionName || existingActionName == "" ||
+			existingBackupName != desiredBackupName || existingActionName != desiredActionName {
+			return intctrlutil.NewFatalError(fmt.Sprintf(
+				"postReady job %s/%s committed action identity does not match desired action",
+				existing.Namespace, existing.Name))
+		}
+	} else {
+		desiredBackupName, desiredActionName := postReadyActionIdentity(desired)
+		existingBackupName, existingActionName := postReadyActionIdentity(existing)
+		if (desiredBackupName != "" || desiredActionName != "") &&
+			(existingBackupName != desiredBackupName || existingActionName != desiredActionName) {
+			return intctrlutil.NewFatalError(fmt.Sprintf(
+				"postReady job %s/%s action identity does not match desired action",
+				existing.Namespace, existing.Name))
+		}
+	}
 	desiredPolicy, err := postReadyExecutionPolicyForJob(desired)
 	if err != nil {
 		return err
@@ -1485,6 +2436,54 @@ func (r *RestoreManager) validateExistingRestoreActionJob(desired, existing *bat
 	if desiredContract == "" || postReadyActionContractForJob(existing) != desiredContract {
 		return intctrlutil.NewFatalError(fmt.Sprintf(
 			"postReady job %s/%s executable action does not match desired contract",
+			existing.Namespace, existing.Name))
+	}
+	desiredPlanName := desired.Annotations[postReadyPlanNameAnnotationKey]
+	desiredPlanDigest := desired.Annotations[postReadyPlanDigestAnnotationKey]
+	desiredRestoreUID := desired.Annotations[postReadyPlanRestoreUIDAnnotationKey]
+	if desiredPlanName == "" && desiredPlanDigest == "" && desiredRestoreUID == "" {
+		if existing.Annotations[postReadyPlanNameAnnotationKey] != "" ||
+			existing.Annotations[postReadyPlanDigestAnnotationKey] != "" ||
+			existing.Annotations[postReadyPlanRestoreUIDAnnotationKey] != "" {
+			return intctrlutil.NewFatalError(fmt.Sprintf(
+				"postReady job %s/%s has an unexpected committed stage reference",
+				existing.Namespace, existing.Name))
+		}
+		if !r.postReadyJobSpecsEqual(desired, existing) {
+			return intctrlutil.NewFatalError(fmt.Sprintf(
+				"postReady job %s/%s executable spec does not match its frozen legacy plan",
+				existing.Namespace, existing.Name))
+		}
+		return nil
+	}
+	if desiredPlanName == "" || desiredPlanDigest == "" || desiredRestoreUID == "" {
+		return intctrlutil.NewFatalError(fmt.Sprintf(
+			"postReady job %s/%s desired execution plan reference is incomplete",
+			desired.Namespace, desired.Name))
+	}
+	if existingPlanName := existing.Annotations[postReadyPlanNameAnnotationKey]; existingPlanName != desiredPlanName {
+		return intctrlutil.NewFatalError(fmt.Sprintf(
+			"postReady job %s/%s has a missing or different immutable execution plan reference",
+			existing.Namespace, existing.Name))
+	}
+	if existingPlanDigest := existing.Annotations[postReadyPlanDigestAnnotationKey]; existingPlanDigest != desiredPlanDigest {
+		return intctrlutil.NewFatalError(fmt.Sprintf(
+			"postReady job %s/%s has a missing or different execution plan digest",
+			existing.Namespace, existing.Name))
+	}
+	if existingRestoreUID := existing.Annotations[postReadyPlanRestoreUIDAnnotationKey]; existingRestoreUID != desiredRestoreUID || existingRestoreUID != string(r.Restore.UID) {
+		return intctrlutil.NewFatalError(fmt.Sprintf(
+			"postReady job %s/%s has a missing or different restore UID reference",
+			existing.Namespace, existing.Name))
+	}
+	if !controllerutil.ContainsFinalizer(existing, dptypes.DataProtectionFinalizerName) {
+		return intctrlutil.NewFatalError(fmt.Sprintf(
+			"postReady job %s/%s is missing terminal-status protection",
+			existing.Namespace, existing.Name))
+	}
+	if !r.postReadyJobSpecsEqual(desired, existing) {
+		return intctrlutil.NewFatalError(fmt.Sprintf(
+			"postReady job %s/%s executable spec does not match its immutable execution plan",
 			existing.Namespace, existing.Name))
 	}
 	return nil

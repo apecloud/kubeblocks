@@ -123,7 +123,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	updatedInstances := 0
 	updatingInstances := 0
 	priorities := composeRolePriorityMap(its.Spec.Roles)
-	sortObjects(oldInstanceList, priorities, false)
+	sortInstanceObjects(oldInstanceList, priorities, false)
 
 	canBeUpdated := func(inst *workloads.Instance) bool {
 		if !intctrlutil.IsInstanceReady(inst) {

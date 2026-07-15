@@ -21,6 +21,7 @@ package dataprotection
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -69,6 +70,10 @@ type BackupReconciler struct {
 	RestConfig *rest.Config
 	clock      clock.RealClock
 }
+
+var errBackupNamespaceTerminating = errors.New("backup namespace terminating")
+
+const terminatingBackupNamespaceRetryInterval = 30 * time.Second
 
 // +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backups,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backups/status,verbs=get;update;patch
@@ -215,13 +220,6 @@ func (r *BackupReconciler) deleteBackupFiles(reqCtx intctrlutil.RequestCtx, back
 		return nil
 	}
 
-	deleteBackup := func() error {
-		// remove backup finalizers to delete it
-		patch := client.MergeFrom(backup.DeepCopy())
-		controllerutil.RemoveFinalizer(backup, dptypes.DataProtectionFinalizerName)
-		return r.Patch(reqCtx.Ctx, backup, patch)
-	}
-
 	deleter := &dpbackup.Deleter{
 		RequestCtx: reqCtx,
 		Client:     r.Client,
@@ -234,22 +232,49 @@ func (r *BackupReconciler) deleteBackupFiles(reqCtx intctrlutil.RequestCtx, back
 	status, err := deleter.DeleteBackupFiles(backup)
 	switch status {
 	case dpbackup.DeletionStatusSucceeded:
-		return deleteBackup()
+		return r.removeBackupFinalizer(reqCtx, backup)
 	case dpbackup.DeletionStatusFailed:
-		failureReason := err.Error()
-		if backup.Status.FailureReason == failureReason {
-			return nil
-		}
-		backupPatch := client.MergeFrom(backup.DeepCopy())
-		backup.Status.FailureReason = failureReason
-		r.Recorder.Event(backup, corev1.EventTypeWarning, "DeleteBackupFilesFailed", failureReason)
-		return r.Status().Patch(reqCtx.Ctx, backup, backupPatch)
+		return r.recordDeleteBackupFilesFailure(reqCtx, backup, err.Error())
 	case dpbackup.DeletionStatusDeleting,
 		dpbackup.DeletionStatusUnknown:
+		if errors.Is(err, errBackupNamespaceTerminating) {
+			failureReason := fmt.Sprintf(
+				"backup namespace %q is terminating, so worker resources cannot be created to delete backup files; the Backup finalizer is retained to avoid discarding backup metadata or silently orphaning backup files: %v",
+				backup.Namespace, err)
+			if err := r.recordDeleteBackupFilesFailure(reqCtx, backup, failureReason); err != nil {
+				return err
+			}
+			return intctrlutil.NewRequeueError(terminatingBackupNamespaceRetryInterval,
+				"waiting with the Backup finalizer retained while the backup namespace is terminating")
+		}
 		// wait for the deletion job completed
 		return err
 	}
 	return err
+}
+
+func (r *BackupReconciler) removeBackupFinalizer(reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) error {
+	if !controllerutil.ContainsFinalizer(backup, dptypes.DataProtectionFinalizerName) {
+		return nil
+	}
+	patch := client.MergeFromWithOptions(backup.DeepCopy(), client.MergeFromWithOptimisticLock{})
+	controllerutil.RemoveFinalizer(backup, dptypes.DataProtectionFinalizerName)
+	return r.Patch(reqCtx.Ctx, backup, patch)
+}
+
+func (r *BackupReconciler) recordDeleteBackupFilesFailure(
+	reqCtx intctrlutil.RequestCtx,
+	backup *dpv1alpha1.Backup,
+	failureReason string) error {
+	if backup.Status.FailureReason == failureReason {
+		return nil
+	}
+	backupPatch := client.MergeFrom(backup.DeepCopy())
+	backup.Status.FailureReason = failureReason
+	if r.Recorder != nil {
+		r.Recorder.Event(backup, corev1.EventTypeWarning, "DeleteBackupFilesFailed", failureReason)
+	}
+	return r.Status().Patch(reqCtx.Ctx, backup, backupPatch)
 }
 
 func (r *BackupReconciler) ensureWorkerServiceAccountForBackupDeletion(reqCtx intctrlutil.RequestCtx, namespace string) (string, error) {
@@ -258,7 +283,7 @@ func (r *BackupReconciler) ensureWorkerServiceAccountForBackupDeletion(reqCtx in
 		return "", fmt.Errorf("failed to get backup namespace %q before deleting backup files: %w", namespace, err)
 	}
 	if !ns.DeletionTimestamp.IsZero() {
-		return "", fmt.Errorf("backup namespace %q is terminating; cannot create worker resources to delete backup files, delete the Backup and wait until it is gone before deleting the namespace", namespace)
+		return "", fmt.Errorf("%w: backup namespace %q is terminating; cannot create worker resources to delete backup files; delete the Backup and wait until it is gone before deleting the namespace", errBackupNamespaceTerminating, namespace)
 	}
 	// TODO: update the mcMgr param
 	return EnsureWorkerServiceAccount(reqCtx, r.Client, namespace, nil)
@@ -280,7 +305,9 @@ func (r *BackupReconciler) handleDeletingPhase(reqCtx intctrlutil.RequestCtx, ba
 	}
 
 	if backup.Spec.DeletionPolicy == dpv1alpha1.BackupDeletionPolicyRetain {
-		r.Recorder.Event(backup, corev1.EventTypeWarning, "Retain", "can not delete the backup if deletionPolicy is Retain")
+		if r.Recorder != nil {
+			r.Recorder.Event(backup, corev1.EventTypeWarning, "Retain", "can not delete the Backup while deletionPolicy is Retain; change the policy to Delete to remove its metadata and artifacts")
+		}
 		return intctrlutil.Reconciled()
 	}
 
@@ -295,6 +322,10 @@ func (r *BackupReconciler) handleDeletingPhase(reqCtx intctrlutil.RequestCtx, ba
 	}
 
 	if err := r.deleteBackupFiles(reqCtx, backup); err != nil {
+		var requeueErr intctrlutil.RequeueError
+		if errors.As(err, &requeueErr) {
+			return intctrlutil.RequeueAfter(requeueErr.RequeueAfter(), reqCtx.Log, requeueErr.Reason())
+		}
 		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
 	}
 	return intctrlutil.Reconciled()

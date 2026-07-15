@@ -25,21 +25,25 @@ import (
 	"fmt"
 	"slices"
 	"strconv"
+	"testing"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/require"
 
 	vsv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/pointer"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -1806,3 +1810,165 @@ var _ = Describe("Backup Controller test", func() {
 		})
 	})
 })
+
+func TestDeleteBackupFilesTerminatingNamespaceHoldsFinalizerAndSurfacesFailure(t *testing.T) {
+	oldServiceAccount := viper.GetString(dptypes.CfgKeyWorkerServiceAccountName)
+	oldClusterRole := viper.GetString(dptypes.CfgKeyWorkerClusterRoleName)
+	viper.Set(dptypes.CfgKeyWorkerServiceAccountName, "test-dataprotection-worker")
+	viper.Set(dptypes.CfgKeyWorkerClusterRoleName, "test-dataprotection-worker-role")
+	t.Cleanup(func() {
+		viper.Set(dptypes.CfgKeyWorkerServiceAccountName, oldServiceAccount)
+		viper.Set(dptypes.CfgKeyWorkerClusterRoleName, oldClusterRole)
+	})
+
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, batchv1.AddToScheme(scheme))
+	require.NoError(t, appsv1.AddToScheme(scheme))
+	require.NoError(t, rbacv1.AddToScheme(scheme))
+	require.NoError(t, vsv1.AddToScheme(scheme))
+	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
+	now := metav1.Now()
+	backup := &dpv1alpha1.Backup{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:         "terminating-namespace",
+			Name:              "backup-terminating-namespace",
+			UID:               types.UID("backup-uid"),
+			DeletionTimestamp: &now,
+			Finalizers:        []string{dptypes.DataProtectionFinalizerName},
+		},
+		Spec: dpv1alpha1.BackupSpec{DeletionPolicy: dpv1alpha1.BackupDeletionPolicyDelete},
+		Status: dpv1alpha1.BackupStatus{
+			Phase:                     dpv1alpha1.BackupPhaseDeleting,
+			PersistentVolumeClaimName: "repo-pvc",
+			Path:                      "/backups/backup-terminating-namespace",
+		},
+	}
+	namespace := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              backup.Namespace,
+			DeletionTimestamp: &now,
+			Finalizers:        []string{"kubernetes"},
+		},
+	}
+	repoPVC := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{Namespace: backup.Namespace, Name: backup.Status.PersistentVolumeClaimName},
+	}
+	cli := fake.NewClientBuilder().WithScheme(scheme).
+		WithStatusSubresource(backup).
+		WithObjects(namespace, backup.DeepCopy(), repoPVC).
+		Build()
+	reconciler := &BackupReconciler{
+		Client:   cli,
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(10),
+	}
+
+	result, err := reconciler.handleDeletingPhase(intctrlutil.RequestCtx{Ctx: context.Background()}, backup)
+
+	require.NoError(t, err)
+	require.Equal(t, 30*time.Second, result.RequeueAfter,
+		"a terminating Namespace has no state transition that can make worker creation safe, so retries must be bounded")
+	require.Greater(t, result.RequeueAfter, time.Second, "persistent namespace absence must not cause a hot loop")
+	current := &dpv1alpha1.Backup{}
+	require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(backup), current))
+	require.Contains(t, current.Finalizers, dptypes.DataProtectionFinalizerName)
+	require.Contains(t, current.Status.FailureReason, "is terminating")
+	require.Contains(t, current.Status.FailureReason, "finalizer is retained")
+	jobs := &batchv1.JobList{}
+	require.NoError(t, cli.List(context.Background(), jobs, client.InNamespace(backup.Namespace)))
+	require.Empty(t, jobs.Items)
+}
+
+func TestDeletingRetainBackupPreservesFinalizerAndControllerOwnedSnapshot(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, batchv1.AddToScheme(scheme))
+	require.NoError(t, appsv1.AddToScheme(scheme))
+	require.NoError(t, vsv1.AddToScheme(scheme))
+	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
+	now := metav1.Now()
+	controller := true
+	backup := &dpv1alpha1.Backup{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:         "default",
+			Name:              "retained-backup",
+			UID:               types.UID("retained-backup-uid"),
+			ResourceVersion:   "1",
+			DeletionTimestamp: &now,
+			Finalizers:        []string{dptypes.DataProtectionFinalizerName},
+		},
+		Spec: dpv1alpha1.BackupSpec{DeletionPolicy: dpv1alpha1.BackupDeletionPolicyRetain},
+		Status: dpv1alpha1.BackupStatus{
+			Phase:                     dpv1alpha1.BackupPhaseDeleting,
+			PersistentVolumeClaimName: "repo-pvc",
+			Path:                      "/backups/retained-backup",
+		},
+	}
+	snapshot := &vsv1.VolumeSnapshot{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:  backup.Namespace,
+			Name:       "retained-backup-data-0",
+			Finalizers: []string{dptypes.DataProtectionFinalizerName},
+			OwnerReferences: []metav1.OwnerReference{{
+				APIVersion: dpv1alpha1.GroupVersion.String(),
+				Kind:       "Backup",
+				Name:       backup.Name,
+				UID:        backup.UID,
+				Controller: &controller,
+			}},
+		},
+	}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(backup.DeepCopy(), snapshot).Build()
+	reconciler := &BackupReconciler{
+		Client:   cli,
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(10),
+	}
+
+	result, err := reconciler.handleDeletingPhase(intctrlutil.RequestCtx{Ctx: context.Background()}, backup)
+
+	require.NoError(t, err)
+	require.False(t, result.Requeue)
+	require.Zero(t, result.RequeueAfter)
+	current := &dpv1alpha1.Backup{}
+	require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(backup), current))
+	require.Contains(t, current.Finalizers, dptypes.DataProtectionFinalizerName,
+		"Retain must keep the Backup metadata that anchors repository and snapshot artifacts")
+	currentSnapshot := &vsv1.VolumeSnapshot{}
+	require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(snapshot), currentSnapshot))
+	require.Contains(t, currentSnapshot.Finalizers, dptypes.DataProtectionFinalizerName)
+	owner := metav1.GetControllerOf(currentSnapshot)
+	require.NotNil(t, owner)
+	require.Equal(t, backup.UID, owner.UID)
+	jobs := &batchv1.JobList{}
+	require.NoError(t, cli.List(context.Background(), jobs, client.InNamespace(backup.Namespace)))
+	require.Empty(t, jobs.Items)
+}
+
+func TestRemoveBackupFinalizerRejectsStaleDeletionPolicyObservation(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
+	backup := &dpv1alpha1.Backup{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:  "default",
+			Name:       "policy-race",
+			Finalizers: []string{dptypes.DataProtectionFinalizerName},
+		},
+		Spec: dpv1alpha1.BackupSpec{DeletionPolicy: dpv1alpha1.BackupDeletionPolicyRetain},
+	}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(backup).Build()
+	stale := &dpv1alpha1.Backup{}
+	require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(backup), stale))
+	current := stale.DeepCopy()
+	current.Spec.DeletionPolicy = dpv1alpha1.BackupDeletionPolicyDelete
+	require.NoError(t, cli.Update(context.Background(), current))
+	reconciler := &BackupReconciler{Client: cli}
+
+	err := reconciler.removeBackupFinalizer(intctrlutil.RequestCtx{Ctx: context.Background()}, stale)
+
+	require.Error(t, err)
+	require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(backup), current))
+	require.Equal(t, dpv1alpha1.BackupDeletionPolicyDelete, current.Spec.DeletionPolicy)
+	require.Contains(t, current.Finalizers, dptypes.DataProtectionFinalizerName)
+}

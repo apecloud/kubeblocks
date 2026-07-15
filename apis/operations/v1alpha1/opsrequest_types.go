@@ -1004,6 +1004,7 @@ type OpsRequestStatus struct {
 }
 
 // +kubebuilder:validation:XValidation:rule="has(self.objectKey) || has(self.actionName)", message="at least one objectKey or actionName."
+// +kubebuilder:validation:XValidation:rule="!has(self.dispatchClaim) || self.dispatchClaim.state != 'Claimed' || self.status == 'Processing'", message="a Claimed dispatchClaim requires Processing status."
 
 type ProgressStatusDetail struct {
 	// Specifies the group to which the current object belongs to.
@@ -1024,6 +1025,13 @@ type ProgressStatusDetail struct {
 	// +optional
 	ActionTasks []ActionTask `json:"actionTasks,omitempty"`
 
+	// Records a durable claim for a non-idempotent external action dispatch.
+	// A controller that observes this field must not dispatch that action again.
+	// The claim is distinct from ActionTasks because it is controller state, not
+	// a Job, Pod, or other task carrying out the action.
+	// +optional
+	DispatchClaim *ActionDispatchClaim `json:"dispatchClaim,omitempty"`
+
 	// Represents the current processing state of the object, including "Processing", "Pending", "Failed", "Succeed"
 	// +kubebuilder:validation:Required
 	Status ProgressStatus `json:"status"`
@@ -1040,6 +1048,34 @@ type ProgressStatusDetail struct {
 	// +optional
 	EndTime metav1.Time `json:"endTime,omitempty"`
 }
+
+// ActionDispatchClaim records a durable, controller-owned dispatch identity
+// for a non-idempotent external action.
+type ActionDispatchClaim struct {
+	// ID uniquely identifies the claimed dispatch within the OpsRequest.
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=512
+	ID string `json:"id"`
+
+	// State records whether the external call is still unconfirmed, was resolved
+	// by the caller, or became unknowable across a process restart.
+	// +kubebuilder:validation:Enum=Claimed;Resolved;OutcomeUnknown
+	State ActionDispatchClaimState `json:"state"`
+}
+
+type ActionDispatchClaimState string
+
+const (
+	// DispatchClaimStateClaimed means the durable claim was committed before
+	// the external call, but no call result has been committed yet.
+	DispatchClaimStateClaimed ActionDispatchClaimState = "Claimed"
+	// DispatchClaimStateResolved means the external call returned and its result
+	// was committed together with the same dispatch identity.
+	DispatchClaimStateResolved ActionDispatchClaimState = "Resolved"
+	// DispatchClaimStateOutcomeUnknown means a restart crossed the external call
+	// and the controller must observe a positive fact or fail without replay.
+	DispatchClaimStateOutcomeUnknown ActionDispatchClaimState = "OutcomeUnknown"
+)
 
 type ActionTask struct {
 	// Represents the name of the task.

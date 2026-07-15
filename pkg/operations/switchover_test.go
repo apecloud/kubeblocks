@@ -28,6 +28,8 @@ import (
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -154,6 +156,103 @@ var _ = Describe("", func() {
 				Recorder: k8sManager.GetEventRecorderFor("opsrequest-controller"),
 			}
 		})
+
+		DescribeTable("reads a durable switchover dispatch claim without replaying an unconfirmed action",
+			func(uid, claimID string, state opsv1alpha1.ActionDispatchClaimState, status opsv1alpha1.ProgressStatus, expectedError string) {
+				opsRequest := &opsv1alpha1.OpsRequest{}
+				opsRequest.Namespace = testCtx.DefaultNamespace
+				opsRequest.Name = "reader-only"
+				opsRequest.UID = types.UID(uid)
+				progressDetail := &opsv1alpha1.ProgressStatusDetail{
+					ObjectKey: getProgressObjectKey(KBSwitchoverKey, defaultCompName),
+					Status:    status,
+					DispatchClaim: &opsv1alpha1.ActionDispatchClaim{
+						ID:    claimID,
+						State: state,
+					},
+				}
+
+				err := validateSwitchoverDispatchClaimForReader(opsRequest, defaultCompName, "instance-0", progressDetail)
+				if expectedError == "" {
+					Expect(err).ShouldNot(HaveOccurred())
+					return
+				}
+				Expect(err).Should(HaveOccurred())
+				Expect(err.Error()).Should(ContainSubstring(expectedError))
+			},
+			Entry("continues observing an exact resolved outcome", "uid", "SwitchoverDispatch/uid/default/instance-0",
+				opsv1alpha1.DispatchClaimStateResolved, opsv1alpha1.ProcessingProgressStatus, ""),
+			Entry("accepts an exact resolved terminal outcome", "uid", "SwitchoverDispatch/uid/default/instance-0",
+				opsv1alpha1.DispatchClaimStateResolved, opsv1alpha1.SucceedProgressStatus, ""),
+			Entry("rejects a resolved claim in Pending", "uid", "SwitchoverDispatch/uid/default/instance-0",
+				opsv1alpha1.DispatchClaimStateResolved, opsv1alpha1.PendingProgressStatus, "resolved switchover dispatch claim in Pending"),
+			Entry("blocks an unconfirmed Claimed outcome", "uid", "SwitchoverDispatch/uid/default/instance-0",
+				opsv1alpha1.DispatchClaimStateClaimed, opsv1alpha1.ProcessingProgressStatus, "no committed outcome"),
+			Entry("blocks an OutcomeUnknown outcome", "uid", "SwitchoverDispatch/uid/default/instance-0",
+				opsv1alpha1.DispatchClaimStateOutcomeUnknown, opsv1alpha1.ProcessingProgressStatus, "no committed outcome"),
+			Entry("rejects a foreign state", "uid", "SwitchoverDispatch/uid/default/instance-0",
+				opsv1alpha1.ActionDispatchClaimState("Foreign"), opsv1alpha1.ProcessingProgressStatus, "unknown state"),
+			Entry("rejects a mismatched identity", "uid", "SwitchoverDispatch/wrong",
+				opsv1alpha1.DispatchClaimStateResolved, opsv1alpha1.ProcessingProgressStatus, "does not match"),
+			Entry("rejects a claim when the OpsRequest UID is empty", "", "SwitchoverDispatch/uid/comp/instance-0",
+				opsv1alpha1.DispatchClaimStateResolved, opsv1alpha1.ProcessingProgressStatus, "UID is empty"),
+		)
+
+		It("keeps the legacy no-claim path readable", func() {
+			err := validateSwitchoverDispatchClaimForReader(&opsv1alpha1.OpsRequest{}, defaultCompName, "instance-0",
+				&opsv1alpha1.ProgressStatusDetail{Status: opsv1alpha1.PendingProgressStatus})
+			Expect(err).ShouldNot(HaveOccurred())
+		})
+
+		DescribeTable("reads ComponentObjectName claims in the writer's logical component value domain",
+			func(state opsv1alpha1.ActionDispatchClaimState, expectBlocked bool) {
+				ops := testops.NewOpsRequestObj("ops-switchover-reader-"+testCtx.GetRandomStr(), testCtx.DefaultNamespace,
+					clusterObj.Name, opsv1alpha1.SwitchoverType)
+				instanceName := fmt.Sprintf("%s-%s-%d", clusterObj.Name, defaultCompName, 1)
+				ops.Spec.SwitchoverList = []opsv1alpha1.Switchover{{
+					ComponentObjectName: compObj.Name,
+					InstanceName:        instanceName,
+				}}
+				opsRes.OpsRequest = testops.CreateOpsRequest(ctx, testCtx, ops)
+				opsRes.OpsRequest.Status.Conditions = []metav1.Condition{{
+					Type:   opsv1alpha1.ConditionTypeSwitchover,
+					Status: metav1.ConditionTrue,
+				}}
+				objectKey := getProgressObjectKey(KBSwitchoverKey, defaultCompName)
+				opsRes.OpsRequest.Status.Components = map[string]opsv1alpha1.OpsRequestComponentStatus{
+					defaultCompName: {
+						Phase: appsv1.UpdatingComponentPhase,
+						ProgressDetails: []opsv1alpha1.ProgressStatusDetail{{
+							Group:     defaultRole(1),
+							ObjectKey: objectKey,
+							Status:    opsv1alpha1.ProcessingProgressStatus,
+							DispatchClaim: &opsv1alpha1.ActionDispatchClaim{
+								ID: fmt.Sprintf("%s/%s/%s/%s", switchoverDispatchClaimKind,
+									opsRes.OpsRequest.UID, defaultCompName, instanceName),
+								State: state,
+							},
+						}},
+					},
+				}
+
+				var completedCount, failedCount int32
+				err := handleSwitchover(reqCtx, k8sClient, opsRes, &opsRes.OpsRequest.Spec.SwitchoverList[0],
+					opsRes.OpsRequest, &completedCount, &failedCount)
+				if expectBlocked {
+					Expect(err).Should(HaveOccurred())
+					Expect(err.Error()).Should(ContainSubstring("no committed outcome"))
+					Expect(completedCount).Should(BeZero())
+					Expect(failedCount).Should(BeZero())
+					return
+				}
+				Expect(err).ShouldNot(HaveOccurred())
+				Expect(completedCount).Should(Equal(int32(1)))
+				Expect(failedCount).Should(BeZero())
+			},
+			Entry("continues an exact Resolved claim without replay", opsv1alpha1.DispatchClaimStateResolved, false),
+			Entry("blocks an exact Claimed outcome without replay", opsv1alpha1.DispatchClaimStateClaimed, true),
+			Entry("blocks an exact OutcomeUnknown outcome without replay", opsv1alpha1.DispatchClaimStateOutcomeUnknown, true),
+		)
 
 		It("Test switchover OpsRequest", func() {
 			By("create switchover opsRequest")

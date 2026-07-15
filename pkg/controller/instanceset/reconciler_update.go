@@ -389,13 +389,13 @@ func parseReplicasNMaxUnavailable(updateStrategy *workloads.InstanceUpdateStrate
 	}
 	var err error
 	if rollingUpdate.Replicas != nil {
-		replicas, err = intstr.GetScaledValueFromIntOrPercent(rollingUpdate.Replicas, totalReplicas, false)
+		replicas, err = intstr.GetScaledValueFromIntOrPercent(rollingUpdate.Replicas, totalReplicas, true)
 		if err != nil {
 			return replicas, maxUnavailable, err
 		}
 	}
 	if rollingUpdate.MaxUnavailable != nil {
-		maxUnavailable, err = intstr.GetScaledValueFromIntOrPercent(intstr.ValueOrDefault(rollingUpdate.MaxUnavailable, intstr.FromInt32(1)), totalReplicas, false)
+		maxUnavailable, err = intstr.GetScaledValueFromIntOrPercent(intstr.ValueOrDefault(rollingUpdate.MaxUnavailable, intstr.FromInt32(1)), totalReplicas, true)
 		if err != nil {
 			return 0, 0, err
 		}

@@ -186,7 +186,7 @@ var _ = Describe("update reconciler test", func() {
 			Expect(res).Should(Equal(kubebuilderx.Continue))
 			expectUpdatedPods(defaultTree, []string{"bar-hello-0"})
 
-			By("reconcile with Partition=50% and MaxUnavailable=2")
+			By("reconcile with Replicas=3 and MaxUnavailable=2")
 			partitionTree, err := tree.DeepCopy()
 			Expect(err).Should(BeNil())
 			root, ok := partitionTree.GetRoot().(*workloads.InstanceSet)
@@ -228,7 +228,9 @@ var _ = Describe("update reconciler test", func() {
 			res, err = reconciler.Reconcile(partitionTree)
 			Expect(err).Should(BeNil())
 			Expect(res).Should(Equal(kubebuilderx.Continue))
-			expectUpdatedPods(partitionTree, []string{"bar-foo-0", "bar-3"})
+			// The first two pods already occupy two positions in the rolling-update
+			// window, so only one more pod can be updated.
+			expectUpdatedPods(partitionTree, []string{"bar-foo-0"})
 
 			By("reconcile with UpdateStrategy='OnDelete'")
 			onDeleteTree, err := tree.DeepCopy()

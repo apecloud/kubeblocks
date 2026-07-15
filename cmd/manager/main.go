@@ -559,9 +559,10 @@ func main() {
 		}
 
 		if err = (&opscontrollers.OpsRequestReconciler{
-			Client:   client,
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("ops-request-controller"),
+			Client:    client,
+			APIReader: mgr.GetAPIReader(),
+			Scheme:    mgr.GetScheme(),
+			Recorder:  mgr.GetEventRecorderFor("ops-request-controller"),
 		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "OpsRequest")
 			os.Exit(1)

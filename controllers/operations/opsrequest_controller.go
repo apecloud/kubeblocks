@@ -58,8 +58,9 @@ import (
 // OpsRequestReconciler reconciles a OpsRequest object
 type OpsRequestReconciler struct {
 	client.Client
-	Scheme   *runtime.Scheme
-	Recorder record.EventRecorder
+	APIReader client.Reader
+	Scheme    *runtime.Scheme
+	Recorder  record.EventRecorder
 }
 
 // +kubebuilder:rbac:groups=operations.kubeblocks.io,resources=opsrequests,verbs=get;list;watch;create;update;patch;delete
@@ -80,7 +81,7 @@ func (r *OpsRequestReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 	reqCtx.Log.Info("reconcile", "opsRequest", req.NamespacedName)
 	opsCtrlHandler := &opsControllerHandler{}
-	return opsCtrlHandler.Handle(reqCtx, &operations.OpsResource{Recorder: r.Recorder},
+	return opsCtrlHandler.Handle(reqCtx, &operations.OpsResource{Recorder: r.Recorder, APIReader: r.APIReader},
 		r.fetchOpsRequest,
 		r.fetchCluster,
 		r.handleDeletion,

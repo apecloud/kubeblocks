@@ -291,6 +291,52 @@ var _ = Describe("InstanceSet Controller 2", func() {
 			})).Should(Succeed())
 		})
 
+		It("limits rolling update to replicas", func() {
+			createITSObj(itsName, func(f *testapps.MockInstanceSetFactory) {
+				f.SetInstanceUpdateStrategy(&workloads.InstanceUpdateStrategy{
+					Type: kbappsv1.RollingUpdateStrategyType,
+					RollingUpdate: &workloads.RollingUpdate{
+						Replicas:       ptr.To(intstr.FromInt32(1)),
+						MaxUnavailable: ptr.To(intstr.FromInt32(2)),
+					},
+				})
+			})
+
+			mockPodsReady()
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(its.IsInstanceSetReady()).Should(BeTrue())
+			})).Should(Succeed())
+
+			beforeUpdate := time.Now()
+			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
+				its.Spec.Template.Spec.DNSPolicy = corev1.DNSClusterFirstWithHostNet
+			})()).ShouldNot(HaveOccurred())
+
+			updatedInstanceKey := types.NamespacedName{
+				Namespace: itsObj.Namespace,
+				Name:      podName(replicas - 1),
+			}
+			Eventually(testapps.CheckObj(&testCtx, updatedInstanceKey, func(g Gomega, inst *workloads.Instance) {
+				g.Expect(inst.Spec.Template.Spec.DNSPolicy).Should(Equal(corev1.DNSClusterFirstWithHostNet))
+			})).Should(Succeed())
+			Eventually(testapps.CheckObj(&testCtx, updatedInstanceKey, func(g Gomega, pod *corev1.Pod) {
+				g.Expect(pod.CreationTimestamp.After(beforeUpdate)).Should(BeTrue())
+			})).Should(Succeed())
+			mockPodReady(itsObj.Namespace, updatedInstanceKey.Name)
+			Eventually(testapps.CheckObj(&testCtx, updatedInstanceKey, func(g Gomega, inst *workloads.Instance) {
+				g.Expect(intctrlutil.IsInstanceReady(inst)).Should(BeTrue())
+			})).Should(Succeed())
+
+			Consistently(func(g Gomega) {
+				for i := int32(0); i < replicas-1; i++ {
+					inst := &workloads.Instance{}
+					key := types.NamespacedName{Namespace: itsObj.Namespace, Name: podName(i)}
+					g.Expect(testCtx.Cli.Get(testCtx.Ctx, key, inst)).Should(Succeed())
+					g.Expect(inst.Spec.Template.Spec.DNSPolicy).ShouldNot(Equal(corev1.DNSClusterFirstWithHostNet))
+				}
+			}).Should(Succeed())
+		})
+
 		It("reconfigure", func() {
 			var (
 				reconfigure string

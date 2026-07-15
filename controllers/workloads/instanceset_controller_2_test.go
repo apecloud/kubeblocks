@@ -337,6 +337,48 @@ var _ = Describe("InstanceSet Controller 2", func() {
 			}).Should(Succeed())
 		})
 
+		It("uses status role order for a roleful rolling-update window", func() {
+			createITSObj(itsName, func(f *testapps.MockInstanceSetFactory) {
+				f.SetRoles([]workloads.ReplicaRole{
+					{Name: "follower", UpdatePriority: 1, ParticipatesInQuorum: true},
+					{Name: "leader", UpdatePriority: 2, ParticipatesInQuorum: true},
+				}).SetInstanceUpdateStrategy(&workloads.InstanceUpdateStrategy{
+					Type: kbappsv1.RollingUpdateStrategyType,
+					RollingUpdate: &workloads.RollingUpdate{
+						Replicas:       ptr.To(intstr.FromInt32(1)),
+						MaxUnavailable: ptr.To(intstr.FromInt32(1)),
+					},
+				})
+			})
+
+			// The follower has the lowest name but the highest update precedence.
+			mockPodReadyNAvailableWithRole(itsObj.Namespace, podName(0), "follower", 0)
+			for i := int32(1); i < replicas; i++ {
+				mockPodReadyNAvailableWithRole(itsObj.Namespace, podName(i), "leader", 0)
+			}
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(its.IsInstanceSetReady()).Should(BeTrue())
+			})).Should(Succeed())
+
+			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
+				its.Spec.Template.Spec.DNSPolicy = corev1.DNSClusterFirstWithHostNet
+			})()).ShouldNot(HaveOccurred())
+
+			followerKey := types.NamespacedName{Namespace: itsObj.Namespace, Name: podName(0)}
+			Eventually(testapps.CheckObj(&testCtx, followerKey, func(g Gomega, inst *workloads.Instance) {
+				g.Expect(inst.Spec.Template.Spec.DNSPolicy).Should(Equal(corev1.DNSClusterFirstWithHostNet))
+			})).Should(Succeed())
+
+			Consistently(func(g Gomega) {
+				for i := int32(1); i < replicas; i++ {
+					inst := &workloads.Instance{}
+					key := types.NamespacedName{Namespace: itsObj.Namespace, Name: podName(i)}
+					g.Expect(testCtx.Cli.Get(testCtx.Ctx, key, inst)).Should(Succeed())
+					g.Expect(inst.Spec.Template.Spec.DNSPolicy).ShouldNot(Equal(corev1.DNSClusterFirstWithHostNet))
+				}
+			}).Should(Succeed())
+		})
+
 		It("reconfigure", func() {
 			var (
 				reconfigure string

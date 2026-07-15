@@ -43,6 +43,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/rollingupdate"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -556,9 +557,15 @@ func buildInstanceTemplateRevision(template *corev1.PodTemplateSpec, parent *wor
 		mutateTemplateFn(templateCopy)
 	}
 	podTemplate := filterInPlaceFields(templateCopy)
+	annotations := make(map[string]string, len(parent.Annotations))
+	for key, value := range parent.Annotations {
+		if key != rollingupdate.WindowAnnotationKey {
+			annotations[key] = value
+		}
+	}
 	its := builder.NewInstanceSetBuilder(parent.Namespace, parent.Name).
 		SetUID(parent.UID).
-		AddAnnotationsInMap(parent.Annotations).
+		AddAnnotationsInMap(annotations).
 		SetSelectorMatchLabel(parent.Labels).
 		SetTemplate(*podTemplate).
 		GetObject()

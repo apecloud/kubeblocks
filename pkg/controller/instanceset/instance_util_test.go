@@ -38,6 +38,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
+	"github.com/apecloud/kubeblocks/pkg/controller/rollingupdate"
 )
 
 var _ = Describe("instance util test", func() {
@@ -81,6 +82,21 @@ var _ = Describe("instance util test", func() {
 			revision := "revision"
 			pod = builder.NewPodBuilder(namespace, name).AddControllerRevisionHashLabel(revision).GetObject()
 			Expect(getPodRevision(pod)).Should(Equal(revision))
+		})
+	})
+
+	Context("buildInstanceTemplateRevision", func() {
+		It("ignores the internal rolling-update window annotation", func() {
+			before, err := buildInstanceTemplateRevision(&its.Spec.Template, its, nil)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			if its.Annotations == nil {
+				its.Annotations = make(map[string]string)
+			}
+			its.Annotations[rollingupdate.WindowAnnotationKey] = `{"rolloutID":"2","replicas":1,"participants":["pod-0"]}`
+			after, err := buildInstanceTemplateRevision(&its.Spec.Template, its, nil)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(after).Should(Equal(before))
 		})
 	})
 

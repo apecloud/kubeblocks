@@ -30,6 +30,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/rollingupdate"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -118,12 +119,14 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		updateCount = len(instancesToBeUpdated)
 	}
 
-	// updatedInstances tracks the positions already covered by the rolling-update
-	// window, while updatingInstances tracks actual updates admitted in this round.
-	updatedInstances := 0
 	updatingInstances := 0
 	priorities := composeRolePriorityMap(its.Spec.Roles)
 	sortInstanceObjects(oldInstanceList, priorities, false)
+	orderedNames := make([]string, len(oldInstanceList))
+	for i, inst := range oldInstanceList {
+		orderedNames[i] = inst.Name
+	}
+	participants := rollingupdate.Participants(its, fmt.Sprint(its.Generation), replicas, orderedNames)
 
 	canBeUpdated := func(inst *workloads.Instance) bool {
 		if !intctrlutil.IsInstanceReady(inst) {
@@ -142,8 +145,8 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 
 	for _, inst := range oldInstanceList {
-		if updatedInstances >= replicas {
-			break
+		if !participants.Has(inst.Name) {
+			continue
 		}
 		if updatingInstances >= min(unavailable, updateCount) {
 			break
@@ -165,7 +168,6 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			}
 			updatingInstances++
 		}
-		updatedInstances++
 	}
 	return kubebuilderx.Continue, nil
 }

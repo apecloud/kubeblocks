@@ -100,10 +100,18 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		return kubebuilderx.Continue, err
 	}
 	currentUnavailable := 0
+	updatedInstances := 0
 	for _, inst := range oldInstanceList {
 		if !intctrlutil.IsInstanceAvailable(inst) {
 			currentUnavailable++
 		}
+		if isInstanceUpdated(its, inst) {
+			updatedInstances++
+		}
+	}
+	replicas -= updatedInstances
+	if replicas < 0 {
+		replicas = 0
 	}
 	unavailable := maxUnavailable - currentUnavailable
 

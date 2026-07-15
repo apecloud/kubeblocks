@@ -118,38 +118,36 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	priorities := ComposeRolePriorityMap(its.Spec.Roles)
 	sortObjects(oldPodList, priorities, false)
 
-	// treat old and Pending pod as a special case, as they can be updated without a consequence
-	// PodUpdatePolicy is ignored here since in-place update for a pending pod doesn't make much sense.
-	for _, pod := range oldPodList {
-		updatePolicy, _, _, err := getPodUpdatePolicy(its, pod)
-		if err != nil {
-			return kubebuilderx.Continue, err
-		}
-		if isPodPending(pod) && updatePolicy != noOpsPolicy {
-			err = tree.Delete(pod)
-			// wait another reconciliation, so that the following update process won't be confused
-			return kubebuilderx.Continue, err
-		}
-	}
-
 	updatingPods := 0
 	isBlocked := false
 	needRetry := false
 	for _, pod := range oldPodList {
-		if updatingPods >= rollingUpdateQuota || updatingPods >= unavailableQuota {
+		if updatingPods >= rollingUpdateQuota {
 			break
 		}
 		if updatingPods >= memberUpdateQuota {
-			break
-		}
-		if canBeUpdated, retry := r.isPodCanBeUpdated(tree, its, pod); !canBeUpdated {
-			needRetry = retry
 			break
 		}
 
 		updatePolicy, specUpdatePolicy, recreateReason, err := getPodUpdatePolicy(its, pod)
 		if err != nil {
 			return kubebuilderx.Continue, err
+		}
+		if isPodPending(pod) && updatePolicy != noOpsPolicy {
+			// PodUpdatePolicy is ignored here since in-place update for a pending pod
+			// does not make much sense. The pod still consumes the rolling window,
+			// but it keeps the historical maxUnavailable bypass because it is
+			// already unavailable.
+			err = tree.Delete(pod)
+			// wait another reconciliation, so that the following update process won't be confused
+			return kubebuilderx.Continue, err
+		}
+		if updatingPods >= unavailableQuota {
+			break
+		}
+		if canBeUpdated, retry := r.isPodCanBeUpdated(tree, its, pod); !canBeUpdated {
+			needRetry = retry
+			break
 		}
 		if updatePolicy == recreatePolicy && specUpdatePolicy == kbappsv1.StrictInPlacePodUpdatePolicyType {
 			message := fmt.Sprintf("InstanceSet %s/%s blocks on update as the PodUpdatePolicy is %s and the pod %s can not inplace update",
@@ -233,10 +231,22 @@ func (r *updateReconciler) rollingUpdateQuota(its *workloads.InstanceSet, podLis
 		return -1, -1, err
 	}
 	currentUnavailable := 0
+	updatedReplicas := 0
 	for _, pod := range podList {
 		if !intctrlutil.IsPodAvailable(pod, its.Spec.MinReadySeconds) {
 			currentUnavailable++
 		}
+		updated, err := r.isInstUpdated(its, pod)
+		if err != nil {
+			return -1, -1, err
+		}
+		if updated {
+			updatedReplicas++
+		}
+	}
+	replicas -= updatedReplicas
+	if replicas < 0 {
+		replicas = 0
 	}
 	unavailable := maxUnavailable - currentUnavailable
 	return replicas, unavailable, nil

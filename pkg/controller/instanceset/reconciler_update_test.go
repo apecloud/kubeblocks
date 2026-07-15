@@ -228,7 +228,9 @@ var _ = Describe("update reconciler test", func() {
 			res, err = reconciler.Reconcile(partitionTree)
 			Expect(err).Should(BeNil())
 			Expect(res).Should(Equal(kubebuilderx.Continue))
-			expectUpdatedPods(partitionTree, []string{"bar-foo-0", "bar-3"})
+			// The first two pods already occupy two positions in the rolling-update
+			// window, so only one more pod can be updated.
+			expectUpdatedPods(partitionTree, []string{"bar-foo-0"})
 
 			By("reconcile with UpdateStrategy='OnDelete'")
 			onDeleteTree, err := tree.DeepCopy()
@@ -370,6 +372,104 @@ var _ = Describe("update reconciler test", func() {
 			Expect(err).Should(BeNil())
 			Expect(res).Should(Equal(kubebuilderx.Continue))
 			expectUpdatedPods(tree, []string{"bar-1"})
+		})
+
+		It("keeps pending pods outside the rolling-update replicas window", func() {
+			tree := kubebuilderx.NewObjectTree()
+			its.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
+			updateReplicas := intstr.FromInt32(1)
+			maxUnavailable := intstr.FromInt32(2)
+			its.Spec.InstanceUpdateStrategy = &workloads.InstanceUpdateStrategy{
+				RollingUpdate: &workloads.RollingUpdate{
+					Replicas:       &updateReplicas,
+					MaxUnavailable: &maxUnavailable,
+				},
+			}
+			tree.SetRoot(its)
+
+			prepareForUpdate(tree)
+			updateRevisions, err := GetRevisions(its.Status.UpdateRevisions)
+			Expect(err).Should(BeNil())
+
+			for _, object := range tree.List(&corev1.Pod{}) {
+				pod, ok := object.(*corev1.Pod)
+				Expect(ok).Should(BeTrue())
+				pod.Status.Conditions = append(pod.Status.Conditions, getPodReadyCondition())
+				switch pod.Name {
+				case "bar-2":
+					pod.Labels[appsv1.ControllerRevisionHashLabelKey] = updateRevisions[pod.Name]
+					pod.Status.Phase = corev1.PodRunning
+				case "bar-0":
+					pod.Labels[appsv1.ControllerRevisionHashLabelKey] = oldRevisionStr
+					pod.Status.Phase = corev1.PodPending
+				default:
+					pod.Labels[appsv1.ControllerRevisionHashLabelKey] = oldRevisionStr
+					pod.Status.Phase = corev1.PodRunning
+				}
+			}
+
+			reconciler = NewUpdateReconciler()
+			res, err := reconciler.Reconcile(tree)
+			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
+			expectUpdatedPods(tree, []string{})
+		})
+
+		It("does not admit a new pod after role changes move the updated pod outside the rolling-update window", func() {
+			tree := kubebuilderx.NewObjectTree()
+			its.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
+			its.Spec.Roles = []workloads.ReplicaRole{
+				{
+					Name:                 "follower",
+					UpdatePriority:       1,
+					ParticipatesInQuorum: true,
+				},
+				{
+					Name:                 "leader",
+					UpdatePriority:       2,
+					ParticipatesInQuorum: true,
+				},
+			}
+			updateReplicas := intstr.FromInt32(1)
+			maxUnavailable := intstr.FromInt32(2)
+			its.Spec.InstanceUpdateStrategy = &workloads.InstanceUpdateStrategy{
+				RollingUpdate: &workloads.RollingUpdate{
+					Replicas:       &updateReplicas,
+					MaxUnavailable: &maxUnavailable,
+				},
+			}
+			tree.SetRoot(its)
+
+			prepareForUpdate(tree)
+			updateRevisions, err := GetRevisions(its.Status.UpdateRevisions)
+			Expect(err).Should(BeNil())
+
+			for _, object := range tree.List(&corev1.Pod{}) {
+				pod, ok := object.(*corev1.Pod)
+				Expect(ok).Should(BeTrue())
+				pod.Status.Phase = corev1.PodRunning
+				pod.Status.Conditions = append(pod.Status.Conditions, getPodReadyCondition())
+				if pod.Labels == nil {
+					pod.Labels = map[string]string{}
+				}
+				switch pod.Name {
+				case "bar-2":
+					pod.Labels[appsv1.ControllerRevisionHashLabelKey] = updateRevisions[pod.Name]
+					pod.Labels[constant.RoleLabelKey] = "leader"
+				case "bar-1":
+					pod.Labels[appsv1.ControllerRevisionHashLabelKey] = oldRevisionStr
+					pod.Labels[constant.RoleLabelKey] = "follower"
+				default:
+					pod.Labels[appsv1.ControllerRevisionHashLabelKey] = oldRevisionStr
+					pod.Labels[constant.RoleLabelKey] = "leader"
+				}
+			}
+
+			reconciler = NewUpdateReconciler()
+			res, err := reconciler.Reconcile(tree)
+			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
+			expectUpdatedPods(tree, []string{})
 		})
 
 		testInplacePodVerticalScaling := func(useSubResource bool) {

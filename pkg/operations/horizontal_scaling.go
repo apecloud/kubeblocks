@@ -57,6 +57,7 @@ func init() {
 		QueueByCluster:    true,
 		OpsHandler:        hsHandler,
 		CancelFunc:        hsHandler.Cancel,
+		RollbackOnTimeout: true,
 	}
 	opsMgr := GetOpsManager()
 	opsMgr.RegisterOps(opsv1alpha1.HorizontalScalingType, horizontalScalingBehaviour)

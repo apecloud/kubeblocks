@@ -60,6 +60,9 @@ type OpsBehaviour struct {
 	// only update the opsRequest object, then opsRequest controller will update uniformly.
 	CancelFunc func(reqCtx intctrlutil.RequestCtx, cli client.Client, opsResource *OpsResource) error
 
+	// RollbackOnTimeout restores the last saved configuration before publishing the Aborted phase.
+	RollbackOnTimeout bool
+
 	// IsClusterCreation indicates whether the opsRequest will create a new cluster.
 	IsClusterCreation bool
 

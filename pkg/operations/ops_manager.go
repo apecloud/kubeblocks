@@ -192,7 +192,7 @@ func (opsMgr *OpsManager) Reconcile(reqCtx intctrlutil.RequestCtx, cli client.Cl
 		return 0, opsMgr.handleOpsCompleted(reqCtx, cli, opsRes, opsRequestPhase,
 			opsv1alpha1.NewCancelFailedCondition(opsRequest, err), opsv1alpha1.NewFailedCondition(opsRequest, err))
 	default:
-		return opsMgr.checkAndHandleOpsTimeout(reqCtx, cli, opsRes, requeueAfter)
+		return opsMgr.checkAndHandleOpsTimeout(reqCtx, cli, opsRes, opsBehaviour, requeueAfter)
 	}
 }
 
@@ -258,6 +258,7 @@ func (opsMgr *OpsManager) validateDependOnSuccessfulOps(reqCtx intctrlutil.Reque
 func (opsMgr *OpsManager) checkAndHandleOpsTimeout(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	opsRes *OpsResource,
+	opsBehaviour OpsBehaviour,
 	requeueAfter time.Duration) (time.Duration, error) {
 	timeoutSeconds := opsRes.OpsRequest.Spec.TimeoutSeconds
 	if timeoutSeconds == nil || *timeoutSeconds == 0 {
@@ -265,8 +266,20 @@ func (opsMgr *OpsManager) checkAndHandleOpsTimeout(reqCtx intctrlutil.RequestCtx
 	}
 	timeoutPoint := opsRes.OpsRequest.Status.StartTimestamp.Add(time.Duration(*timeoutSeconds) * time.Second)
 	if !time.Now().Before(timeoutPoint) {
+		rolledBack := false
+		if opsBehaviour.RollbackOnTimeout && opsBehaviour.CancelFunc != nil {
+			err := opsBehaviour.CancelFunc(reqCtx, cli, opsRes)
+			if err != nil && !intctrlutil.IsTargetError(err, intctrlutil.ErrorIgnoreCancel) {
+				return 0, err
+			}
+			rolledBack = err == nil
+		}
+		message := "Aborted due to exceeding the specified timeout period (timeoutSeconds)"
+		if rolledBack {
+			message += "; the original desired configuration has been restored"
+		}
 		return 0, PatchOpsStatus(reqCtx.Ctx, cli, opsRes, opsv1alpha1.OpsAbortedPhase,
-			opsv1alpha1.NewAbortedCondition("Aborted due to exceeding the specified timeout period (timeoutSeconds)"))
+			opsv1alpha1.NewAbortedCondition(message))
 	}
 	if requeueAfter != 0 {
 		return requeueAfter, nil

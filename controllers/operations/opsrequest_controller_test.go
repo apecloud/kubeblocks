@@ -762,6 +762,9 @@ var _ = Describe("OpsRequest Controller", func() {
 			}
 			testops.CreateOpsRequest(ctx, testCtx, ops)
 			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops))).Should(Equal(opsv1alpha1.OpsRunningPhase))
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterObj), func(g Gomega, cluster *appsv1.Cluster) {
+				g.Expect(cluster.Spec.ComponentSpecs[0].Replicas).Should(Equal(int32(4)))
+			})).Should(Succeed())
 
 			By("create a next opsRequest")
 			ops1 := createRestartOps(clusterObj.Name, 2, true)
@@ -770,6 +773,9 @@ var _ = Describe("OpsRequest Controller", func() {
 			By("mock timeout")
 			time.Sleep(time.Second)
 			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops))).Should(Equal(opsv1alpha1.OpsAbortedPhase))
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterObj), func(g Gomega, cluster *appsv1.Cluster) {
+				g.Expect(cluster.Spec.ComponentSpecs[0].Replicas).Should(Equal(replicas))
+			})).Should(Succeed())
 
 			By("expect for the next ops is running")
 			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops1))).ShouldNot(Equal(opsv1alpha1.OpsPendingPhase))

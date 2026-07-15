@@ -37,6 +37,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/rollingupdate"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -117,10 +118,18 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 
 	priorities := ComposeRolePriorityMap(its.Spec.Roles)
 	sortObjects(oldPodList, priorities, false)
+	orderedNames := make([]string, len(oldPodList))
+	for i, pod := range oldPodList {
+		orderedNames[i] = pod.Name
+	}
+	participants := rollingupdate.Participants(its, fmt.Sprint(its.Generation), rollingUpdateQuota, orderedNames)
 
 	// treat old and Pending pod as a special case, as they can be updated without a consequence
 	// PodUpdatePolicy is ignored here since in-place update for a pending pod doesn't make much sense.
 	for _, pod := range oldPodList {
+		if !participants.Has(pod.Name) {
+			continue
+		}
 		updatePolicy, _, _, err := getPodUpdatePolicy(its, pod)
 		if err != nil {
 			return kubebuilderx.Continue, err
@@ -132,15 +141,12 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		}
 	}
 
-	// updatedPods tracks the positions already covered by the rolling-update
-	// window, while updatingPods tracks actual updates admitted in this round.
-	updatedPods := 0
 	updatingPods := 0
 	isBlocked := false
 	needRetry := false
 	for _, pod := range oldPodList {
-		if updatedPods >= rollingUpdateQuota {
-			break
+		if !participants.Has(pod.Name) {
+			continue
 		}
 		if updatingPods >= unavailableQuota {
 			break
@@ -221,7 +227,6 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			}
 			updatingPods++
 		}
-		updatedPods++
 	}
 
 	if !isBlocked {

@@ -186,7 +186,7 @@ var _ = Describe("update reconciler test", func() {
 			Expect(res).Should(Equal(kubebuilderx.Continue))
 			expectUpdatedPods(defaultTree, []string{"bar-hello-0"})
 
-			By("reconcile with Partition=50% and MaxUnavailable=2")
+			By("reconcile with Replicas=3 and MaxUnavailable=2")
 			partitionTree, err := tree.DeepCopy()
 			Expect(err).Should(BeNil())
 			root, ok := partitionTree.GetRoot().(*workloads.InstanceSet)

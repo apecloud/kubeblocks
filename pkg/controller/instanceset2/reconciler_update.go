@@ -128,7 +128,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 
 	updatingInstances := 0
 	priorities := composeRolePriorityMap(its.Spec.Roles)
-	sortObjects(oldInstanceList, priorities, false)
+	sortInstanceObjects(oldInstanceList, priorities, false)
 
 	canBeUpdated := func(inst *workloads.Instance) bool {
 		if !intctrlutil.IsInstanceReady(inst) {
@@ -147,7 +147,10 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 
 	for _, inst := range oldInstanceList {
-		if updatingInstances >= min(replicas, unavailable, updateCount) {
+		if updatingInstances >= replicas {
+			break
+		}
+		if updatingInstances >= min(unavailable, updateCount) {
 			break
 		}
 

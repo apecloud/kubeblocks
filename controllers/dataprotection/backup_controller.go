@@ -520,36 +520,42 @@ func (r *BackupReconciler) prepareRequestTargetInfo(reqCtx intctrlutil.RequestCt
 func (r *BackupReconciler) patchBackupStatus(
 	original *dpv1alpha1.Backup,
 	request *dpbackup.Request) error {
-	request.Status.FormatVersion = dpbackup.FormatVersion
-	if !request.SnapshotVolumes {
-		request.Status.Path = dpbackup.BuildBaseBackupPath(
-			request.Backup, request.BackupRepo.Spec.PathPrefix, request.BackupPolicy.Spec.PathPrefix)
+	desiredRequest := *request
+	desiredRequest.Backup = request.Backup.DeepCopy()
+	desiredRequest.BackupMethod = request.BackupMethod.DeepCopy()
+	desiredRequest.BackupMethod.RestoreTargetIdentityFacts = dputils.CanonicalRestoreTargetIdentityFacts(
+		desiredRequest.BackupMethod.RestoreTargetIdentityFacts)
+
+	desiredRequest.Status.FormatVersion = dpbackup.FormatVersion
+	if !desiredRequest.SnapshotVolumes {
+		desiredRequest.Status.Path = dpbackup.BuildBaseBackupPath(
+			desiredRequest.Backup, desiredRequest.BackupRepo.Spec.PathPrefix, desiredRequest.BackupPolicy.Spec.PathPrefix)
 	}
-	request.Status.BackupMethod = request.BackupMethod
-	if request.BackupRepo != nil {
-		request.Status.BackupRepoName = request.BackupRepo.Name
+	desiredRequest.Status.BackupMethod = desiredRequest.BackupMethod
+	if desiredRequest.BackupRepo != nil {
+		desiredRequest.Status.BackupRepoName = desiredRequest.BackupRepo.Name
 	}
-	if request.BackupRepoPVC != nil {
-		request.Status.PersistentVolumeClaimName = request.BackupRepoPVC.Name
+	if desiredRequest.BackupRepoPVC != nil {
+		desiredRequest.Status.PersistentVolumeClaimName = desiredRequest.BackupRepoPVC.Name
 	}
-	if !request.SnapshotVolumes && request.BackupPolicy.Spec.UseKopia {
-		request.Status.KopiaRepoPath = dpbackup.BuildKopiaRepoPath(
-			request.Backup, request.BackupRepo.Spec.PathPrefix, request.BackupPolicy.Spec.PathPrefix)
+	if !desiredRequest.SnapshotVolumes && desiredRequest.BackupPolicy.Spec.UseKopia {
+		desiredRequest.Status.KopiaRepoPath = dpbackup.BuildKopiaRepoPath(
+			desiredRequest.Backup, desiredRequest.BackupRepo.Spec.PathPrefix, desiredRequest.BackupPolicy.Spec.PathPrefix)
 	}
-	if request.ParentBackup != nil {
+	if desiredRequest.ParentBackup != nil {
 		// inherit encryption config from parent backup
-		request.Status.EncryptionConfig = request.ParentBackup.Status.EncryptionConfig
-	} else if request.BackupPolicy.Spec.EncryptionConfig != nil {
-		request.Status.EncryptionConfig = request.BackupPolicy.Spec.EncryptionConfig
+		desiredRequest.Status.EncryptionConfig = desiredRequest.ParentBackup.Status.EncryptionConfig
+	} else if desiredRequest.BackupPolicy.Spec.EncryptionConfig != nil {
+		desiredRequest.Status.EncryptionConfig = desiredRequest.BackupPolicy.Spec.EncryptionConfig
 	}
 	// init action status
-	actions, err := request.BuildActions()
+	actions, err := desiredRequest.BuildActions()
 	if err != nil {
 		return err
 	}
 	for targetPodName, acts := range actions {
 		for _, act := range acts {
-			request.Status.Actions = append(request.Status.Actions, dpv1alpha1.ActionStatus{
+			desiredRequest.Status.Actions = append(desiredRequest.Status.Actions, dpv1alpha1.ActionStatus{
 				Name:          act.GetName(),
 				TargetPodName: targetPodName,
 				Phase:         dpv1alpha1.ActionPhaseNew,
@@ -559,21 +565,25 @@ func (r *BackupReconciler) patchBackupStatus(
 	}
 
 	// update phase to running
-	request.Status.Phase = dpv1alpha1.BackupPhaseRunning
-	request.Status.StartTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
+	desiredRequest.Status.Phase = dpv1alpha1.BackupPhaseRunning
+	desiredRequest.Status.StartTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
 
 	// set status parent backup and base backup name
-	if request.ParentBackup != nil {
-		request.Status.ParentBackupName = request.ParentBackup.Name
+	if desiredRequest.ParentBackup != nil {
+		desiredRequest.Status.ParentBackupName = desiredRequest.ParentBackup.Name
 	}
-	if request.BaseBackup != nil {
-		request.Status.BaseBackupName = request.BaseBackup.Name
+	if desiredRequest.BaseBackup != nil {
+		desiredRequest.Status.BaseBackupName = desiredRequest.BaseBackup.Name
 	}
 
-	if err = dpbackup.SetExpirationTime(request.Backup); err != nil {
+	if err = dpbackup.SetExpirationTime(desiredRequest.Backup); err != nil {
 		return err
 	}
-	return r.Client.Status().Patch(request.Ctx, request.Backup, client.MergeFrom(original))
+	if err = r.Client.Status().Patch(desiredRequest.Ctx, desiredRequest.Backup, client.MergeFrom(original)); err != nil {
+		return err
+	}
+	request.Backup.Status = *desiredRequest.Backup.Status.DeepCopy()
+	return nil
 }
 
 func (r *BackupReconciler) handleRunningPhase(

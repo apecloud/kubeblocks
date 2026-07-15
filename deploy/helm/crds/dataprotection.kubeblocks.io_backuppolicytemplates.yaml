@@ -134,6 +134,21 @@ spec:
                       description: The name of backup method.
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
+                    restoreTargetIdentityFacts:
+                      description: |-
+                        Specifies the target identity facts that the restore controller must resolve
+                        from the live target before running postReady Job actions.
+                      items:
+                        description: |-
+                          RestoreTargetIdentityFact identifies a controller-resolved target fact that
+                          a postReady Job action requires.
+                        enum:
+                        - ClusterTopology
+                        - ComponentServiceVersion
+                        type: string
+                      maxItems: 2
+                      type: array
+                      x-kubernetes-list-type: set
                     runtimeSettings:
                       description: Specifies runtime settings for the backup workload
                         container.

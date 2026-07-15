@@ -2258,6 +2258,21 @@ spec:
                                 type: boolean
                             type: object
                             x-kubernetes-map-type: atomic
+                          restoreTargetIdentityFacts:
+                            description: |-
+                              Specifies the target identity facts that the controller must resolve from
+                              the selected live target and inject into the postReady Job.
+                            items:
+                              description: |-
+                                RestoreTargetIdentityFact identifies a controller-resolved target fact that
+                                a postReady Job action requires.
+                              enum:
+                              - ClusterTopology
+                              - ComponentServiceVersion
+                              type: string
+                            maxItems: 2
+                            type: array
+                            x-kubernetes-list-type: set
                           volumeMounts:
                             description: Defines which volumes of the selected pod
                               need to be mounted on the restoring pod.
@@ -2434,6 +2449,17 @@ spec:
             x-kubernetes-validations:
             - message: forbidden to update spec.parameters
               rule: has(oldSelf.parameters) == has(self.parameters)
+            - message: forbidden to update spec.readyConfig.jobAction.target.restoreTargetIdentityFacts
+              rule: (has(self.readyConfig) && has(self.readyConfig.jobAction) && has(self.readyConfig.jobAction.target.restoreTargetIdentityFacts)
+                && size(self.readyConfig.jobAction.target.restoreTargetIdentityFacts)
+                > 0) == (has(oldSelf.readyConfig) && has(oldSelf.readyConfig.jobAction)
+                && has(oldSelf.readyConfig.jobAction.target.restoreTargetIdentityFacts)
+                && size(oldSelf.readyConfig.jobAction.target.restoreTargetIdentityFacts)
+                > 0) && (!(has(self.readyConfig) && has(self.readyConfig.jobAction)
+                && has(self.readyConfig.jobAction.target.restoreTargetIdentityFacts)
+                && size(self.readyConfig.jobAction.target.restoreTargetIdentityFacts)
+                > 0) || self.readyConfig.jobAction.target.restoreTargetIdentityFacts
+                == oldSelf.readyConfig.jobAction.target.restoreTargetIdentityFacts)
           status:
             description: RestoreStatus defines the observed state of Restore
             properties:

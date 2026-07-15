@@ -26,6 +26,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/pointer"
@@ -102,6 +103,57 @@ var _ = Describe("BackupPolicyDriver Controller test", func() {
 	})
 
 	Context("expect to create a backup policy", func() {
+		It("rejects unknown restore target identity facts at the API boundary", func() {
+			Eventually(func() bool {
+				invalid := &dpv1alpha1.BackupPolicyTemplate{}
+				if err := testCtx.Cli.Get(testCtx.Ctx, client.ObjectKeyFromObject(bpt), invalid); err != nil {
+					return false
+				}
+				invalid.Spec.BackupMethods[0].RestoreTargetIdentityFacts =
+					[]dpv1alpha1.RestoreTargetIdentityFact{"UnknownFact"}
+				return apierrors.IsInvalid(testCtx.Cli.Update(testCtx.Ctx, invalid))
+			}).Should(BeTrue())
+		})
+
+		It("copies restore target identity facts into the policy in canonical order", func() {
+			builder := &backupPolicyAndScheduleBuilder{
+				backupPolicyTPL: &dpv1alpha1.BackupPolicyTemplate{
+					Spec: dpv1alpha1.BackupPolicyTemplateSpec{
+						BackupMethods: []dpv1alpha1.BackupMethodTPL{{
+							Name: "full",
+							RestoreTargetIdentityFacts: []dpv1alpha1.RestoreTargetIdentityFact{
+								dpv1alpha1.RestoreTargetIdentityFactComponentServiceVersion,
+								dpv1alpha1.RestoreTargetIdentityFactClusterTopology,
+								dpv1alpha1.RestoreTargetIdentityFactComponentServiceVersion,
+							},
+						}},
+					},
+				},
+				compSpec: &appsv1.ClusterComponentSpec{},
+			}
+			policy := &dpv1alpha1.BackupPolicy{}
+
+			Expect(builder.buildBackupMethods(policy)).Should(Succeed())
+			Expect(policy.Spec.BackupMethods).Should(HaveLen(1))
+			Expect(policy.Spec.BackupMethods[0].RestoreTargetIdentityFacts).Should(Equal(
+				[]dpv1alpha1.RestoreTargetIdentityFact{
+					dpv1alpha1.RestoreTargetIdentityFactClusterTopology,
+					dpv1alpha1.RestoreTargetIdentityFactComponentServiceVersion,
+				}))
+
+			policy.Annotations = map[string]string{disableSyncFromTemplateAnnotation: "true"}
+			policy.Spec.BackupMethods[0].RestoreTargetIdentityFacts =
+				[]dpv1alpha1.RestoreTargetIdentityFact{dpv1alpha1.RestoreTargetIdentityFactComponentServiceVersion}
+			builder.backupPolicyTPL.Spec.BackupMethods[0].RestoreTargetIdentityFacts =
+				[]dpv1alpha1.RestoreTargetIdentityFact{dpv1alpha1.RestoreTargetIdentityFactClusterTopology}
+
+			Expect(builder.buildBackupMethods(policy)).Should(Succeed())
+			Expect(policy.Spec.BackupMethods[0].RestoreTargetIdentityFacts).Should(Equal(
+				[]dpv1alpha1.RestoreTargetIdentityFact{
+					dpv1alpha1.RestoreTargetIdentityFactComponentServiceVersion,
+				}))
+		})
+
 		It("resolves backup method env values by exact match before prefix match", func() {
 			exactValue := "tools:8.0.33"
 			prefixValue := "tools:8.0"

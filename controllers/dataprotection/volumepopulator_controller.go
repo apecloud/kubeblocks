@@ -1278,6 +1278,11 @@ func (r *VolumePopulatorReconciler) buildPostReadyRestore(reqCtx intctrlutil.Req
 	if roleName != "" {
 		jobActionLabels[instanceset.RoleLabelKey] = roleName
 	}
+	restoreTargetIdentityFacts, err := restoreTargetIdentityFactsFromPostReadyBackupSets(
+		restoreMgr.PostReadyBackupSets)
+	if err != nil {
+		return nil, err
+	}
 	readyConfig := &dpv1alpha1.ReadyConfig{
 		ExecAction: &dpv1alpha1.ExecAction{
 			Target: dpv1alpha1.ExecActionTarget{
@@ -1293,6 +1298,7 @@ func (r *VolumePopulatorReconciler) buildPostReadyRestore(reqCtx intctrlutil.Req
 						MatchLabels: jobActionLabels,
 					},
 				},
+				RestoreTargetIdentityFacts: restoreTargetIdentityFacts,
 			},
 		},
 		ConnectionCredential: connectionCredential,
@@ -1336,16 +1342,61 @@ func (r *VolumePopulatorReconciler) buildPostReadyRestore(reqCtx intctrlutil.Req
 	return restore, nil
 }
 
+func restoreTargetIdentityFactsFromPostReadyBackupSets(
+	backupSets []dprestore.BackupActionSet,
+) ([]dpv1alpha1.RestoreTargetIdentityFact, error) {
+	var facts []dpv1alpha1.RestoreTargetIdentityFact
+	for i := range backupSets {
+		backupSet := &backupSets[i]
+		if backupSet.Backup == nil || backupSet.Backup.Status.BackupMethod == nil {
+			continue
+		}
+		requested := backupSet.Backup.Status.BackupMethod.RestoreTargetIdentityFacts
+		if len(requested) == 0 {
+			continue
+		}
+		hasJobAction := false
+		if backupSet.ActionSet != nil && backupSet.ActionSet.Spec.Restore != nil {
+			for j := range backupSet.ActionSet.Spec.Restore.PostReady {
+				if backupSet.ActionSet.Spec.Restore.PostReady[j].Job != nil {
+					hasJobAction = true
+					break
+				}
+			}
+		}
+		if !hasJobAction {
+			return nil, intctrlutil.NewFatalError(fmt.Sprintf(
+				"restore target identity facts require a postReady Job action for backup %s",
+				backupSet.Backup.Name))
+		}
+		facts = append(facts, requested...)
+	}
+	return utils.CanonicalRestoreTargetIdentityFacts(facts), nil
+}
+
 func validatePostReadyRestore(existing, desired *dpv1alpha1.Restore, comp *appsv1.Component) error {
 	if !hasOwnerReference(existing.OwnerReferences, comp.UID) {
 		return intctrlutil.NewFatalError(fmt.Sprintf("postReady restore %s/%s is not owned by component %s/%s",
 			existing.Namespace, existing.Name, comp.Namespace, comp.Name))
 	}
-	if !reflect.DeepEqual(existing.Spec, desired.Spec) {
+	existingSpec := canonicalPostReadyRestoreSpecForIntentComparison(existing.Spec)
+	desiredSpec := canonicalPostReadyRestoreSpecForIntentComparison(desired.Spec)
+	if !reflect.DeepEqual(existingSpec, desiredSpec) {
 		return intctrlutil.NewFatalError(fmt.Sprintf("postReady restore %s/%s spec does not match current restore intent",
 			existing.Namespace, existing.Name))
 	}
 	return nil
+}
+
+func canonicalPostReadyRestoreSpecForIntentComparison(spec dpv1alpha1.RestoreSpec) *dpv1alpha1.RestoreSpec {
+	canonical := spec.DeepCopy()
+	if canonical.ReadyConfig == nil || canonical.ReadyConfig.JobAction == nil {
+		return canonical
+	}
+	canonical.ReadyConfig.JobAction.Target.RestoreTargetIdentityFacts =
+		utils.CanonicalRestoreTargetIdentityFacts(
+			canonical.ReadyConfig.JobAction.Target.RestoreTargetIdentityFacts)
+	return canonical
 }
 
 func hasOwnerReference(ownerRefs []metav1.OwnerReference, uid types.UID) bool {

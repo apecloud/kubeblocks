@@ -23,6 +23,7 @@ import (
 
 // RestoreSpec defines the desired state of Restore
 // +kubebuilder:validation:XValidation:rule="has(oldSelf.parameters) == has(self.parameters)",message="forbidden to update spec.parameters"
+// +kubebuilder:validation:XValidation:rule="(has(self.readyConfig) && has(self.readyConfig.jobAction) && has(self.readyConfig.jobAction.target.restoreTargetIdentityFacts) && size(self.readyConfig.jobAction.target.restoreTargetIdentityFacts) > 0) == (has(oldSelf.readyConfig) && has(oldSelf.readyConfig.jobAction) && has(oldSelf.readyConfig.jobAction.target.restoreTargetIdentityFacts) && size(oldSelf.readyConfig.jobAction.target.restoreTargetIdentityFacts) > 0) && (!(has(self.readyConfig) && has(self.readyConfig.jobAction) && has(self.readyConfig.jobAction.target.restoreTargetIdentityFacts) && size(self.readyConfig.jobAction.target.restoreTargetIdentityFacts) > 0) || self.readyConfig.jobAction.target.restoreTargetIdentityFacts == oldSelf.readyConfig.jobAction.target.restoreTargetIdentityFacts)",message="forbidden to update spec.readyConfig.jobAction.target.restoreTargetIdentityFacts"
 type RestoreSpec struct {
 	// Specifies the backup to be restored. The restore behavior is based on the backup type:
 	//
@@ -254,6 +255,20 @@ type ExecActionTarget struct {
 	PodSelector metav1.LabelSelector `json:"podSelector"`
 }
 
+// RestoreTargetIdentityFact identifies a controller-resolved target fact that
+// a postReady Job action requires.
+//
+// +enum
+// +kubebuilder:validation:Enum={ClusterTopology,ComponentServiceVersion}
+type RestoreTargetIdentityFact string
+
+const (
+	// RestoreTargetIdentityFactClusterTopology requests the target Cluster topology.
+	RestoreTargetIdentityFactClusterTopology RestoreTargetIdentityFact = "ClusterTopology"
+	// RestoreTargetIdentityFactComponentServiceVersion requests the target Component service version.
+	RestoreTargetIdentityFactComponentServiceVersion RestoreTargetIdentityFact = "ComponentServiceVersion"
+)
+
 type JobActionTarget struct {
 	// Selects one of the pods, identified by labels, to build the job spec.
 	// This includes mounting required volumes and injecting built-in environment variables of the selected pod.
@@ -267,6 +282,14 @@ type JobActionTarget struct {
 	// +patchStrategy=merge,retainKeys
 	// +optional
 	VolumeMounts []corev1.VolumeMount `json:"volumeMounts,omitempty"`
+
+	// Specifies the target identity facts that the controller must resolve from
+	// the selected live target and inject into the postReady Job.
+	//
+	// +optional
+	// +listType=set
+	// +kubebuilder:validation:MaxItems=2
+	RestoreTargetIdentityFacts []RestoreTargetIdentityFact `json:"restoreTargetIdentityFacts,omitempty"`
 }
 
 type VolumeConfig struct {

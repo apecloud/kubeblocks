@@ -22,6 +22,7 @@ package dataprotection
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"slices"
 	"strconv"
@@ -61,6 +62,154 @@ import (
 )
 
 var _ = Describe("Backup Controller test", func() {
+	It("publishes the selected backup method only after the Running status patch commits", func() {
+		method := &dpv1alpha1.BackupMethod{
+			Name:            "full",
+			SnapshotVolumes: pointer.Bool(true),
+			RestoreTargetIdentityFacts: []dpv1alpha1.RestoreTargetIdentityFact{
+				dpv1alpha1.RestoreTargetIdentityFactComponentServiceVersion,
+				dpv1alpha1.RestoreTargetIdentityFactClusterTopology,
+				dpv1alpha1.RestoreTargetIdentityFactComponentServiceVersion,
+			},
+		}
+		backup := &dpv1alpha1.Backup{
+			ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "backup"},
+			Spec:       dpv1alpha1.BackupSpec{RetentionPeriod: "1d"},
+		}
+		request := &dpbackup.Request{
+			Backup:          backup,
+			RequestCtx:      intctrlutil.RequestCtx{Ctx: context.Background()},
+			BackupPolicy:    &dpv1alpha1.BackupPolicy{},
+			BackupMethod:    method,
+			SnapshotVolumes: true,
+		}
+		writer := &recordingBackupStatusWriter{err: errors.New("injected status patch failure")}
+		reconciler := &BackupReconciler{Client: &recordingBackupStatusClient{writer: writer}}
+
+		err := reconciler.patchBackupStatus(backup.DeepCopy(), request)
+
+		Expect(err).Should(MatchError("injected status patch failure"))
+		Expect(writer.patched).ShouldNot(BeNil())
+		Expect(writer.patched.Status.Phase).Should(Equal(dpv1alpha1.BackupPhaseRunning))
+		Expect(writer.patched.Status.BackupMethod.RestoreTargetIdentityFacts).Should(Equal(
+			[]dpv1alpha1.RestoreTargetIdentityFact{
+				dpv1alpha1.RestoreTargetIdentityFactClusterTopology,
+				dpv1alpha1.RestoreTargetIdentityFactComponentServiceVersion,
+			}))
+		Expect(request.Status.Phase).Should(BeEmpty())
+		Expect(request.Status.BackupMethod).Should(BeNil())
+
+		writer.err = nil
+		Expect(reconciler.patchBackupStatus(backup.DeepCopy(), request)).Should(Succeed())
+		method.RestoreTargetIdentityFacts[0] = dpv1alpha1.RestoreTargetIdentityFactClusterTopology
+		Expect(request.Status.BackupMethod.RestoreTargetIdentityFacts).Should(Equal(
+			[]dpv1alpha1.RestoreTargetIdentityFact{
+				dpv1alpha1.RestoreTargetIdentityFactClusterTopology,
+				dpv1alpha1.RestoreTargetIdentityFactComponentServiceVersion,
+			}))
+	})
+
+	It("persists the selected backup method snapshot across policy and actionSet drift", func() {
+		method := dpv1alpha1.BackupMethod{
+			Name:            "full",
+			ActionSetName:   "identity-freeze-actionset",
+			SnapshotVolumes: pointer.Bool(true),
+			RestoreTargetIdentityFacts: []dpv1alpha1.RestoreTargetIdentityFact{
+				dpv1alpha1.RestoreTargetIdentityFactComponentServiceVersion,
+				dpv1alpha1.RestoreTargetIdentityFactClusterTopology,
+			},
+		}
+		policy := &dpv1alpha1.BackupPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: testCtx.DefaultNamespace,
+				Name:      "identity-freeze-policy",
+				Labels:    map[string]string{testCtx.TestObjLabelKey: "true"},
+				Annotations: map[string]string{
+					disableSyncFromTemplateAnnotation: "true",
+				},
+			},
+			Spec: dpv1alpha1.BackupPolicySpec{
+				Target:        &dpv1alpha1.BackupTarget{PodSelector: &dpv1alpha1.PodSelector{}},
+				BackupMethods: []dpv1alpha1.BackupMethod{method},
+			},
+		}
+		actionSet := &dpv1alpha1.ActionSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   method.ActionSetName,
+				Labels: map[string]string{testCtx.TestObjLabelKey: "true"},
+			},
+			Spec: dpv1alpha1.ActionSetSpec{BackupType: dpv1alpha1.BackupTypeFull},
+		}
+		backup := &dpv1alpha1.Backup{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: testCtx.DefaultNamespace,
+				Name:      "identity-freeze-backup",
+				Labels:    map[string]string{testCtx.TestObjLabelKey: "true"},
+				Annotations: map[string]string{
+					dptypes.SkipReconciliationAnnotationKey: "true",
+				},
+			},
+			Spec: dpv1alpha1.BackupSpec{
+				BackupPolicyName: policy.Name,
+				BackupMethod:     method.Name,
+				DeletionPolicy:   dpv1alpha1.BackupDeletionPolicyDelete,
+				RetentionPeriod:  "1d",
+			},
+		}
+		Expect(testCtx.Cli.Create(testCtx.Ctx, policy)).Should(Succeed())
+		Expect(testCtx.Cli.Create(testCtx.Ctx, actionSet)).Should(Succeed())
+		Expect(testCtx.Cli.Create(testCtx.Ctx, backup)).Should(Succeed())
+
+		persistedPolicy := &dpv1alpha1.BackupPolicy{}
+		persistedBackup := &dpv1alpha1.Backup{}
+		Expect(testCtx.Cli.Get(testCtx.Ctx, client.ObjectKeyFromObject(policy), persistedPolicy)).Should(Succeed())
+		Expect(testCtx.Cli.Get(testCtx.Ctx, client.ObjectKeyFromObject(backup), persistedBackup)).Should(Succeed())
+		request := &dpbackup.Request{
+			Backup:          persistedBackup,
+			RequestCtx:      intctrlutil.RequestCtx{Ctx: testCtx.Ctx},
+			BackupPolicy:    persistedPolicy,
+			BackupMethod:    &persistedPolicy.Spec.BackupMethods[0],
+			SnapshotVolumes: true,
+		}
+		reconciler := &BackupReconciler{Client: testCtx.Cli}
+		Expect(reconciler.patchBackupStatus(persistedBackup.DeepCopy(), request)).Should(Succeed())
+
+		committed := &dpv1alpha1.Backup{}
+		Expect(testCtx.Cli.Get(testCtx.Ctx, client.ObjectKeyFromObject(backup), committed)).Should(Succeed())
+		Expect(committed.Status.Phase).Should(Equal(dpv1alpha1.BackupPhaseRunning))
+		Expect(committed.Status.BackupMethod.RestoreTargetIdentityFacts).Should(Equal(
+			[]dpv1alpha1.RestoreTargetIdentityFact{
+				dpv1alpha1.RestoreTargetIdentityFactClusterTopology,
+				dpv1alpha1.RestoreTargetIdentityFactComponentServiceVersion,
+			}))
+
+		Eventually(func() error {
+			currentPolicy := &dpv1alpha1.BackupPolicy{}
+			if err := testCtx.Cli.Get(testCtx.Ctx, client.ObjectKeyFromObject(policy), currentPolicy); err != nil {
+				return err
+			}
+			currentPolicy.Spec.BackupMethods[0].RestoreTargetIdentityFacts =
+				[]dpv1alpha1.RestoreTargetIdentityFact{dpv1alpha1.RestoreTargetIdentityFactClusterTopology}
+			return testCtx.Cli.Update(testCtx.Ctx, currentPolicy)
+		}).Should(Succeed())
+		Eventually(func() error {
+			currentActionSet := &dpv1alpha1.ActionSet{}
+			if err := testCtx.Cli.Get(testCtx.Ctx, client.ObjectKeyFromObject(actionSet), currentActionSet); err != nil {
+				return err
+			}
+			currentActionSet.Spec.Env = []corev1.EnvVar{{Name: "POST_COMMIT_DRIFT", Value: "true"}}
+			return testCtx.Cli.Update(testCtx.Ctx, currentActionSet)
+		}).Should(Succeed())
+
+		committed = &dpv1alpha1.Backup{}
+		Expect(testCtx.Cli.Get(testCtx.Ctx, client.ObjectKeyFromObject(backup), committed)).Should(Succeed())
+		Expect(committed.Status.BackupMethod.RestoreTargetIdentityFacts).Should(Equal(
+			[]dpv1alpha1.RestoreTargetIdentityFact{
+				dpv1alpha1.RestoreTargetIdentityFactClusterTopology,
+				dpv1alpha1.RestoreTargetIdentityFactComponentServiceVersion,
+			}))
+	})
+
 	cleanEnv := func() {
 		// must wait till resources deleted and no longer existed before the testcases start,
 		// otherwise if later it needs to create some new resource objects with the same name,
@@ -1806,3 +1955,24 @@ var _ = Describe("Backup Controller test", func() {
 		})
 	})
 })
+
+type recordingBackupStatusClient struct {
+	client.Client
+	writer *recordingBackupStatusWriter
+}
+
+func (c *recordingBackupStatusClient) Status() client.SubResourceWriter {
+	return c.writer
+}
+
+type recordingBackupStatusWriter struct {
+	client.SubResourceWriter
+	patched *dpv1alpha1.Backup
+	err     error
+}
+
+func (w *recordingBackupStatusWriter) Patch(_ context.Context, obj client.Object, _ client.Patch,
+	_ ...client.SubResourcePatchOption) error {
+	w.patched = obj.(*dpv1alpha1.Backup).DeepCopy()
+	return w.err
+}

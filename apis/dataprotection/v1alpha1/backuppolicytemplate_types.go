@@ -122,6 +122,14 @@ type BackupMethodTPL struct {
 	// +optional
 	RuntimeSettings *RuntimeSettings `json:"runtimeSettings,omitempty"`
 
+	// Specifies the target identity facts that the restore controller must resolve
+	// from the live target before running postReady Job actions.
+	//
+	// +optional
+	// +listType=set
+	// +kubebuilder:validation:MaxItems=2
+	RestoreTargetIdentityFacts []RestoreTargetIdentityFact `json:"restoreTargetIdentityFacts,omitempty"`
+
 	// If set, specifies the method for selecting the replica to be backed up using the criteria defined here.
 	// If this field is not set, the selection method specified in `backupPolicy.target` is used.
 	//

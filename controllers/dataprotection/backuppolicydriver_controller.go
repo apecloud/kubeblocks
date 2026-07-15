@@ -425,6 +425,8 @@ func (r *backupPolicyAndScheduleBuilder) buildBackupMethods(backupPolicy *dpv1al
 			SnapshotVolumes:  backupMethodTPL.SnapshotVolumes,
 			TargetVolumes:    backupMethodTPL.TargetVolumes,
 			RuntimeSettings:  backupMethodTPL.RuntimeSettings,
+			RestoreTargetIdentityFacts: dputils.CanonicalRestoreTargetIdentityFacts(
+				backupMethodTPL.RestoreTargetIdentityFacts),
 		}
 		if backupMethodTPL.Target != nil {
 			if r.isSharding {

@@ -266,6 +266,14 @@ type BackupMethod struct {
 	// +optional
 	RuntimeSettings *RuntimeSettings `json:"runtimeSettings,omitempty"`
 
+	// Specifies the target identity facts that the restore controller must resolve
+	// from the live target before running postReady Job actions.
+	//
+	// +optional
+	// +listType=set
+	// +kubebuilder:validation:MaxItems=2
+	RestoreTargetIdentityFacts []RestoreTargetIdentityFact `json:"restoreTargetIdentityFacts,omitempty"`
+
 	// Specifies the target information to back up, it will override the target in backup policy.
 	//
 	// +optional

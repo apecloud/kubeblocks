@@ -383,6 +383,11 @@ func (in *BackupMethod) DeepCopyInto(out *BackupMethod) {
 		*out = new(RuntimeSettings)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.RestoreTargetIdentityFacts != nil {
+		in, out := &in.RestoreTargetIdentityFacts, &out.RestoreTargetIdentityFacts
+		*out = make([]RestoreTargetIdentityFact, len(*in))
+		copy(*out, *in)
+	}
 	if in.Target != nil {
 		in, out := &in.Target, &out.Target
 		*out = new(BackupTarget)
@@ -431,6 +436,11 @@ func (in *BackupMethodTPL) DeepCopyInto(out *BackupMethodTPL) {
 		in, out := &in.RuntimeSettings, &out.RuntimeSettings
 		*out = new(RuntimeSettings)
 		(*in).DeepCopyInto(*out)
+	}
+	if in.RestoreTargetIdentityFacts != nil {
+		in, out := &in.RestoreTargetIdentityFacts, &out.RestoreTargetIdentityFacts
+		*out = make([]RestoreTargetIdentityFact, len(*in))
+		copy(*out, *in)
 	}
 	if in.Target != nil {
 		in, out := &in.Target, &out.Target
@@ -1322,6 +1332,11 @@ func (in *JobActionTarget) DeepCopyInto(out *JobActionTarget) {
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
+	}
+	if in.RestoreTargetIdentityFacts != nil {
+		in, out := &in.RestoreTargetIdentityFacts, &out.RestoreTargetIdentityFacts
+		*out = make([]RestoreTargetIdentityFact, len(*in))
+		copy(*out, *in)
 	}
 }
 

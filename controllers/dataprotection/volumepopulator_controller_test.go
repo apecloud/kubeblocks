@@ -34,6 +34,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
@@ -47,6 +48,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	dpbackup "github.com/apecloud/kubeblocks/pkg/dataprotection/backup"
 	dprestore "github.com/apecloud/kubeblocks/pkg/dataprotection/restore"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	"github.com/apecloud/kubeblocks/pkg/generics"
@@ -94,6 +96,270 @@ var _ = Describe("Volume Populator Controller test", func() {
 
 	AfterEach(func() {
 		cleanEnv()
+	})
+
+	It("keeps synthesized restore target identity facts immutable with set semantics", func() {
+		newRestore := func(name string, facts []dpv1alpha1.RestoreTargetIdentityFact) *dpv1alpha1.Restore {
+			return &dpv1alpha1.Restore{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testCtx.DefaultNamespace,
+					Name:      name,
+					Labels:    map[string]string{testCtx.TestObjLabelKey: "true"},
+				},
+				Spec: dpv1alpha1.RestoreSpec{
+					Backup: dpv1alpha1.BackupRef{Name: "backup", Namespace: testCtx.DefaultNamespace},
+					ReadyConfig: &dpv1alpha1.ReadyConfig{JobAction: &dpv1alpha1.JobAction{
+						Target: dpv1alpha1.JobActionTarget{
+							PodSelector:                dpv1alpha1.PodSelector{},
+							RestoreTargetIdentityFacts: facts,
+						},
+					}},
+				},
+			}
+		}
+		withFacts := newRestore("immutable-target-facts", []dpv1alpha1.RestoreTargetIdentityFact{
+			dpv1alpha1.RestoreTargetIdentityFactClusterTopology,
+			dpv1alpha1.RestoreTargetIdentityFactComponentServiceVersion,
+		})
+		withoutFacts := newRestore("immutable-target-facts-absent", nil)
+		Expect(testCtx.Cli.Create(testCtx.Ctx, withFacts)).Should(Succeed())
+		Expect(testCtx.Cli.Create(testCtx.Ctx, withoutFacts)).Should(Succeed())
+
+		Eventually(func() bool {
+			current := &dpv1alpha1.Restore{}
+			if err := testCtx.Cli.Get(testCtx.Ctx, client.ObjectKeyFromObject(withFacts), current); err != nil {
+				return false
+			}
+			current.Spec.ReadyConfig.JobAction.Target.RestoreTargetIdentityFacts =
+				[]dpv1alpha1.RestoreTargetIdentityFact{dpv1alpha1.RestoreTargetIdentityFactClusterTopology}
+			return apierrors.IsInvalid(testCtx.Cli.Update(testCtx.Ctx, current))
+		}).Should(BeTrue())
+
+		Eventually(func() bool {
+			current := &dpv1alpha1.Restore{}
+			if err := testCtx.Cli.Get(testCtx.Ctx, client.ObjectKeyFromObject(withoutFacts), current); err != nil {
+				return false
+			}
+			current.Spec.ReadyConfig.JobAction.Target.RestoreTargetIdentityFacts =
+				[]dpv1alpha1.RestoreTargetIdentityFact{dpv1alpha1.RestoreTargetIdentityFactClusterTopology}
+			return apierrors.IsInvalid(testCtx.Cli.Update(testCtx.Ctx, current))
+		}).Should(BeTrue())
+	})
+
+	It("treats absent and explicit empty restore target identity facts as the same legacy state", func() {
+		newRestore := func(name string, facts []any, includeFacts bool) *unstructured.Unstructured {
+			target := map[string]any{"podSelector": map[string]any{}}
+			if includeFacts {
+				target["restoreTargetIdentityFacts"] = facts
+			}
+			return &unstructured.Unstructured{Object: map[string]any{
+				"apiVersion": dpv1alpha1.GroupVersion.String(),
+				"kind":       "Restore",
+				"metadata": map[string]any{
+					"namespace": testCtx.DefaultNamespace,
+					"name":      name,
+					"labels":    map[string]any{testCtx.TestObjLabelKey: "true"},
+				},
+				"spec": map[string]any{
+					"backup": map[string]any{"name": "backup", "namespace": testCtx.DefaultNamespace},
+					"readyConfig": map[string]any{
+						"jobAction": map[string]any{"target": target},
+					},
+				},
+			}}
+		}
+		updateFacts := func(restore *unstructured.Unstructured, facts []any, includeFacts bool) error {
+			current := &unstructured.Unstructured{}
+			current.SetAPIVersion(dpv1alpha1.GroupVersion.String())
+			current.SetKind("Restore")
+			if err := testCtx.Cli.Get(testCtx.Ctx, client.ObjectKeyFromObject(restore), current); err != nil {
+				return err
+			}
+			path := []string{"spec", "readyConfig", "jobAction", "target", "restoreTargetIdentityFacts"}
+			if includeFacts {
+				if err := unstructured.SetNestedSlice(current.Object, facts, path...); err != nil {
+					return err
+				}
+			} else {
+				unstructured.RemoveNestedField(current.Object, path...)
+			}
+			return testCtx.Cli.Update(testCtx.Ctx, current)
+		}
+		validateFactsIntent := func(restore *unstructured.Unstructured,
+			desiredFacts []dpv1alpha1.RestoreTargetIdentityFact,
+		) (*dpv1alpha1.Restore, error) {
+			current := &dpv1alpha1.Restore{}
+			if err := testCtx.Cli.Get(testCtx.Ctx, client.ObjectKeyFromObject(restore), current); err != nil {
+				return nil, err
+			}
+			component := &kbappsv1.Component{ObjectMeta: metav1.ObjectMeta{
+				Namespace: current.Namespace,
+				Name:      "intent-owner",
+				UID:       types.UID("intent-owner-uid"),
+			}}
+			current.OwnerReferences = []metav1.OwnerReference{{UID: component.UID}}
+			desired := current.DeepCopy()
+			if desiredFacts == nil {
+				desired.Spec.ReadyConfig.JobAction.Target.RestoreTargetIdentityFacts = nil
+			} else {
+				desired.Spec.ReadyConfig.JobAction.Target.RestoreTargetIdentityFacts =
+					append([]dpv1alpha1.RestoreTargetIdentityFact{}, desiredFacts...)
+			}
+			return current, validatePostReadyRestore(current, desired, component)
+		}
+
+		absent := newRestore("identity-facts-absent-to-empty", nil, false)
+		empty := newRestore("identity-facts-empty-to-absent", []any{}, true)
+		emptyToPresent := newRestore("identity-facts-empty-to-present", []any{}, true)
+		presentToEmpty := newRestore("identity-facts-present-to-empty", []any{
+			string(dpv1alpha1.RestoreTargetIdentityFactClusterTopology),
+		}, true)
+		presentToAbsent := newRestore("identity-facts-present-to-absent", []any{
+			string(dpv1alpha1.RestoreTargetIdentityFactClusterTopology),
+		}, true)
+		presentReordered := newRestore("identity-facts-present-reordered", []any{
+			string(dpv1alpha1.RestoreTargetIdentityFactClusterTopology),
+			string(dpv1alpha1.RestoreTargetIdentityFactComponentServiceVersion),
+		}, true)
+		Expect(testCtx.Cli.Create(testCtx.Ctx, absent)).Should(Succeed())
+		Expect(testCtx.Cli.Create(testCtx.Ctx, empty)).Should(Succeed())
+		Expect(testCtx.Cli.Create(testCtx.Ctx, emptyToPresent)).Should(Succeed())
+		Expect(testCtx.Cli.Create(testCtx.Ctx, presentToEmpty)).Should(Succeed())
+		Expect(testCtx.Cli.Create(testCtx.Ctx, presentToAbsent)).Should(Succeed())
+		Expect(testCtx.Cli.Create(testCtx.Ctx, presentReordered)).Should(Succeed())
+
+		Eventually(func() error {
+			return updateFacts(absent, []any{}, true)
+		}).Should(Succeed())
+		current, err := validateFactsIntent(absent, nil)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(current.Spec.ReadyConfig.JobAction.Target.RestoreTargetIdentityFacts).NotTo(BeNil())
+		Expect(current.Spec.ReadyConfig.JobAction.Target.RestoreTargetIdentityFacts).To(BeEmpty())
+
+		Eventually(func() error {
+			return updateFacts(empty, nil, false)
+		}).Should(Succeed())
+		_, err = validateFactsIntent(empty, []dpv1alpha1.RestoreTargetIdentityFact{})
+		Expect(err).NotTo(HaveOccurred())
+
+		Eventually(func() bool {
+			return apierrors.IsInvalid(updateFacts(emptyToPresent, []any{
+				string(dpv1alpha1.RestoreTargetIdentityFactClusterTopology),
+			}, true))
+		}).Should(BeTrue())
+		Eventually(func() bool {
+			return apierrors.IsInvalid(updateFacts(presentToEmpty, []any{}, true))
+		}).Should(BeTrue())
+		Eventually(func() bool {
+			return apierrors.IsInvalid(updateFacts(presentToAbsent, nil, false))
+		}).Should(BeTrue())
+		Eventually(func() error {
+			return updateFacts(presentReordered, []any{
+				string(dpv1alpha1.RestoreTargetIdentityFactComponentServiceVersion),
+				string(dpv1alpha1.RestoreTargetIdentityFactClusterTopology),
+			}, true)
+		}).Should(Succeed())
+		_, err = validateFactsIntent(presentReordered, []dpv1alpha1.RestoreTargetIdentityFact{
+			dpv1alpha1.RestoreTargetIdentityFactClusterTopology,
+			dpv1alpha1.RestoreTargetIdentityFactComponentServiceVersion,
+		})
+		Expect(err).NotTo(HaveOccurred())
+		_, err = validateFactsIntent(presentReordered, []dpv1alpha1.RestoreTargetIdentityFact{
+			dpv1alpha1.RestoreTargetIdentityFactClusterTopology,
+		})
+		Expect(err).To(HaveOccurred())
+	})
+
+	It("rejects adding restore target identity facts when readyConfig was absent", func() {
+		restore := &dpv1alpha1.Restore{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: testCtx.DefaultNamespace,
+				Name:      "immutable-target-facts-parent-absent",
+				Labels:    map[string]string{testCtx.TestObjLabelKey: "true"},
+			},
+			Spec: dpv1alpha1.RestoreSpec{
+				Backup: dpv1alpha1.BackupRef{Name: "backup", Namespace: testCtx.DefaultNamespace},
+			},
+		}
+		Expect(testCtx.Cli.Create(testCtx.Ctx, restore)).Should(Succeed())
+
+		Eventually(func() bool {
+			current := &dpv1alpha1.Restore{}
+			if err := testCtx.Cli.Get(testCtx.Ctx, client.ObjectKeyFromObject(restore), current); err != nil {
+				return false
+			}
+			current.Spec.ReadyConfig = &dpv1alpha1.ReadyConfig{JobAction: &dpv1alpha1.JobAction{
+				Target: dpv1alpha1.JobActionTarget{
+					PodSelector: dpv1alpha1.PodSelector{},
+					RestoreTargetIdentityFacts: []dpv1alpha1.RestoreTargetIdentityFact{
+						dpv1alpha1.RestoreTargetIdentityFactClusterTopology,
+					},
+				},
+			}}
+			return apierrors.IsInvalid(testCtx.Cli.Update(testCtx.Ctx, current))
+		}).Should(BeTrue())
+	})
+
+	It("rejects changing restore target identity facts through optional parent fields", func() {
+		newRestore := func(name string, readyConfig *dpv1alpha1.ReadyConfig) *dpv1alpha1.Restore {
+			return &dpv1alpha1.Restore{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testCtx.DefaultNamespace,
+					Name:      name,
+					Labels:    map[string]string{testCtx.TestObjLabelKey: "true"},
+				},
+				Spec: dpv1alpha1.RestoreSpec{
+					Backup:      dpv1alpha1.BackupRef{Name: "backup", Namespace: testCtx.DefaultNamespace},
+					ReadyConfig: readyConfig,
+				},
+			}
+		}
+		jobAction := func() *dpv1alpha1.JobAction {
+			return &dpv1alpha1.JobAction{Target: dpv1alpha1.JobActionTarget{
+				PodSelector: dpv1alpha1.PodSelector{},
+				RestoreTargetIdentityFacts: []dpv1alpha1.RestoreTargetIdentityFact{
+					dpv1alpha1.RestoreTargetIdentityFactClusterTopology,
+				},
+			}}
+		}
+		execAction := &dpv1alpha1.ExecAction{Target: dpv1alpha1.ExecActionTarget{
+			PodSelector: metav1.LabelSelector{},
+		}}
+
+		withoutJobAction := newRestore("immutable-target-facts-job-action-absent",
+			&dpv1alpha1.ReadyConfig{ExecAction: execAction})
+		withFacts := newRestore("immutable-target-facts-parent-removal",
+			&dpv1alpha1.ReadyConfig{JobAction: jobAction()})
+		Expect(testCtx.Cli.Create(testCtx.Ctx, withoutJobAction)).Should(Succeed())
+		Expect(testCtx.Cli.Create(testCtx.Ctx, withFacts)).Should(Succeed())
+
+		Eventually(func() bool {
+			current := &dpv1alpha1.Restore{}
+			if err := testCtx.Cli.Get(testCtx.Ctx, client.ObjectKeyFromObject(withoutJobAction), current); err != nil {
+				return false
+			}
+			current.Spec.ReadyConfig.JobAction = jobAction()
+			return apierrors.IsInvalid(testCtx.Cli.Update(testCtx.Ctx, current))
+		}).Should(BeTrue())
+
+		Eventually(func() bool {
+			current := &dpv1alpha1.Restore{}
+			if err := testCtx.Cli.Get(testCtx.Ctx, client.ObjectKeyFromObject(withFacts), current); err != nil {
+				return false
+			}
+			current.Spec.ReadyConfig = nil
+			return apierrors.IsInvalid(testCtx.Cli.Update(testCtx.Ctx, current))
+		}).Should(BeTrue())
+
+		Eventually(func() bool {
+			current := &dpv1alpha1.Restore{}
+			if err := testCtx.Cli.Get(testCtx.Ctx, client.ObjectKeyFromObject(withFacts), current); err != nil {
+				return false
+			}
+			current.Spec.ReadyConfig.JobAction = nil
+			current.Spec.ReadyConfig.ExecAction = execAction
+			return apierrors.IsInvalid(testCtx.Cli.Update(testCtx.Ctx, current))
+		}).Should(BeTrue())
 	})
 
 	Context("backup target selector helpers", func() {
@@ -1741,6 +2007,186 @@ func TestBuildPostReadyRestoreSelectsHighestPriorityRole(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "leader", restore.Spec.ReadyConfig.JobAction.Target.PodSelector.LabelSelector.MatchLabels[instanceset.RoleLabelKey])
 	require.NotContains(t, restore.Spec.ReadyConfig.ExecAction.Target.PodSelector.MatchLabels, instanceset.RoleLabelKey)
+}
+
+func TestRestoreTargetIdentityFactsWriterChainFromTemplateToDataSourceRestore(t *testing.T) {
+	policyBuilder := &backupPolicyAndScheduleBuilder{
+		backupPolicyTPL: &dpv1alpha1.BackupPolicyTemplate{Spec: dpv1alpha1.BackupPolicyTemplateSpec{
+			BackupMethods: []dpv1alpha1.BackupMethodTPL{{
+				Name:            "full",
+				SnapshotVolumes: ptr.To(true),
+				RestoreTargetIdentityFacts: []dpv1alpha1.RestoreTargetIdentityFact{
+					dpv1alpha1.RestoreTargetIdentityFactClusterTopology,
+				},
+			}},
+		}},
+		compSpec: &kbappsv1.ClusterComponentSpec{},
+	}
+	policy := &dpv1alpha1.BackupPolicy{}
+	require.NoError(t, policyBuilder.buildBackupMethods(policy))
+
+	// A policy change before the New -> Running status commit is an input to the
+	// new Backup. Later policy changes must not rewrite the committed snapshot.
+	policy.Spec.BackupMethods[0].RestoreTargetIdentityFacts = []dpv1alpha1.RestoreTargetIdentityFact{
+		dpv1alpha1.RestoreTargetIdentityFactComponentServiceVersion,
+	}
+	backup := &dpv1alpha1.Backup{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "backup"},
+		Spec:       dpv1alpha1.BackupSpec{RetentionPeriod: "1d"},
+	}
+	request := &dpbackup.Request{
+		Backup:          backup,
+		RequestCtx:      intctrlutil.RequestCtx{Ctx: context.Background()},
+		BackupPolicy:    policy,
+		BackupMethod:    &policy.Spec.BackupMethods[0],
+		SnapshotVolumes: true,
+	}
+	writer := &recordingBackupStatusWriter{}
+	backupReconciler := &BackupReconciler{Client: &recordingBackupStatusClient{writer: writer}}
+	require.NoError(t, backupReconciler.patchBackupStatus(backup.DeepCopy(), request))
+	policy.Spec.BackupMethods[0].RestoreTargetIdentityFacts = []dpv1alpha1.RestoreTargetIdentityFact{
+		dpv1alpha1.RestoreTargetIdentityFactClusterTopology,
+	}
+	require.Equal(t, []dpv1alpha1.RestoreTargetIdentityFact{
+		dpv1alpha1.RestoreTargetIdentityFactComponentServiceVersion,
+	}, request.Backup.Status.BackupMethod.RestoreTargetIdentityFacts)
+
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, kbappsv1.AddToScheme(scheme))
+	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
+	jobActionSet := &dpv1alpha1.ActionSet{Spec: dpv1alpha1.ActionSetSpec{
+		Restore: &dpv1alpha1.RestoreActionSpec{PostReady: []dpv1alpha1.ActionSpec{{
+			Job: &dpv1alpha1.JobActionSpec{},
+		}}},
+	}}
+	comp := &kbappsv1.Component{ObjectMeta: metav1.ObjectMeta{
+		Namespace: "default",
+		Name:      constant.GenerateClusterComponentName("cluster", "mysql"),
+	}}
+	pvc := newPVCForRestoreDecision("data", "mysql", "")
+	pvc.Spec.DataSourceRef = &corev1.TypedObjectReference{Name: request.Backup.Name}
+	pvc.Annotations[constant.RestoreSourceNamespaceAnnotationKey] = request.Backup.Namespace
+	volumeReconciler := &VolumePopulatorReconciler{
+		Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(request.Backup).Build(),
+		Scheme: scheme,
+	}
+	restoreMgr := dprestore.NewRestoreManager(&dpv1alpha1.Restore{}, nil, scheme, volumeReconciler.Client)
+	restoreMgr.PostReadyBackupSets = []dprestore.BackupActionSet{{
+		Backup: request.Backup, ActionSet: jobActionSet,
+	}}
+
+	restore, err := volumeReconciler.buildPostReadyRestore(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, restoreMgr, comp, "", nil)
+
+	require.NoError(t, err)
+	require.Equal(t, []dpv1alpha1.RestoreTargetIdentityFact{
+		dpv1alpha1.RestoreTargetIdentityFactComponentServiceVersion,
+	}, restore.Spec.ReadyConfig.JobAction.Target.RestoreTargetIdentityFacts)
+}
+
+func TestBuildPostReadyRestoreUnionsCommittedTargetIdentityFactsWithoutEffectiveTarget(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, kbappsv1.AddToScheme(scheme))
+	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
+	backup := newBackupForRestoreDecision([]string{"data"}, nil)
+	backup.Spec.ParentBackupName = "base-backup"
+	backup.Status.BackupMethod.ActionSetName = "differential-action"
+	backup.Status.BackupMethod.RestoreTargetIdentityFacts = []dpv1alpha1.RestoreTargetIdentityFact{
+		dpv1alpha1.RestoreTargetIdentityFactComponentServiceVersion,
+	}
+	baseBackup := backup.DeepCopy()
+	baseBackup.Name = "base-backup"
+	baseBackup.Spec.ParentBackupName = ""
+	baseBackup.Status.BackupMethod.ActionSetName = "full-action"
+	baseBackup.Status.BackupMethod.RestoreTargetIdentityFacts = []dpv1alpha1.RestoreTargetIdentityFact{
+		dpv1alpha1.RestoreTargetIdentityFactComponentServiceVersion,
+		dpv1alpha1.RestoreTargetIdentityFactClusterTopology,
+	}
+	fullActionSet := &dpv1alpha1.ActionSet{ObjectMeta: metav1.ObjectMeta{Name: "full-action"}, Spec: dpv1alpha1.ActionSetSpec{
+		BackupType: dpv1alpha1.BackupTypeFull,
+		Restore: &dpv1alpha1.RestoreActionSpec{PostReady: []dpv1alpha1.ActionSpec{{
+			Job: &dpv1alpha1.JobActionSpec{},
+		}}},
+	}}
+	differentialActionSet := fullActionSet.DeepCopy()
+	differentialActionSet.Name = "differential-action"
+	differentialActionSet.Spec.BackupType = dpv1alpha1.BackupTypeDifferential
+	comp := &kbappsv1.Component{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      constant.GenerateClusterComponentName("cluster", "mysql"),
+		},
+	}
+	pvc := newPVCForRestoreDecision("data", "mysql", "")
+	pvc.Spec.DataSourceRef = &corev1.TypedObjectReference{Name: backup.Name}
+	pvc.Annotations[constant.RestoreSourceNamespaceAnnotationKey] = backup.Namespace
+	reconciler := &VolumePopulatorReconciler{
+		Client: fake.NewClientBuilder().WithScheme(scheme).
+			WithObjects(backup, baseBackup, fullActionSet, differentialActionSet).Build(),
+		Scheme: scheme,
+	}
+	restoreMgr := dprestore.NewRestoreManager(&dpv1alpha1.Restore{}, nil, scheme, reconciler.Client)
+	reqCtx := intctrlutil.RequestCtx{Ctx: context.Background()}
+	require.NoError(t, restoreMgr.BuildDifferentialBackupActionSets(reqCtx, reconciler.Client,
+		dprestore.BackupActionSet{Backup: backup, ActionSet: differentialActionSet}))
+	require.Len(t, restoreMgr.PostReadyBackupSets, 2)
+	require.Equal(t, []string{"base-backup", "backup"}, []string{
+		restoreMgr.PostReadyBackupSets[0].Backup.Name,
+		restoreMgr.PostReadyBackupSets[1].Backup.Name,
+	})
+
+	restore, err := reconciler.buildPostReadyRestore(
+		reqCtx, pvc, restoreMgr, comp, "", nil)
+
+	require.NoError(t, err)
+	require.Equal(t, []dpv1alpha1.RestoreTargetIdentityFact{
+		dpv1alpha1.RestoreTargetIdentityFactClusterTopology,
+		dpv1alpha1.RestoreTargetIdentityFactComponentServiceVersion,
+	}, restore.Spec.ReadyConfig.JobAction.Target.RestoreTargetIdentityFacts)
+}
+
+func TestBuildPostReadyRestoreRejectsIdentityFactsForExecOnlyStage(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, kbappsv1.AddToScheme(scheme))
+	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
+	backup := newBackupForRestoreDecision([]string{"data"}, nil)
+	backup.Status.BackupMethod.RestoreTargetIdentityFacts = []dpv1alpha1.RestoreTargetIdentityFact{
+		dpv1alpha1.RestoreTargetIdentityFactClusterTopology,
+	}
+	execActionSet := &dpv1alpha1.ActionSet{Spec: dpv1alpha1.ActionSetSpec{
+		Restore: &dpv1alpha1.RestoreActionSpec{PostReady: []dpv1alpha1.ActionSpec{{
+			Exec: &dpv1alpha1.ExecActionSpec{Command: []string{"true"}},
+		}}},
+	}}
+	comp := &kbappsv1.Component{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      constant.GenerateClusterComponentName("cluster", "mysql"),
+		},
+	}
+	pvc := newPVCForRestoreDecision("data", "mysql", "")
+	pvc.Spec.DataSourceRef = &corev1.TypedObjectReference{Name: backup.Name}
+	pvc.Annotations[constant.RestoreSourceNamespaceAnnotationKey] = backup.Namespace
+	reconciler := &VolumePopulatorReconciler{
+		Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(backup).Build(),
+		Scheme: scheme,
+	}
+	restoreMgr := dprestore.NewRestoreManager(&dpv1alpha1.Restore{}, nil, scheme, reconciler.Client)
+	restoreMgr.PostReadyBackupSets = []dprestore.BackupActionSet{{Backup: backup, ActionSet: execActionSet}}
+
+	_, err := reconciler.buildPostReadyRestore(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, restoreMgr, comp, "", nil)
+
+	require.ErrorContains(t, err, "restore target identity facts require a postReady Job action")
+
+	backup.Status.BackupMethod.RestoreTargetIdentityFacts = nil
+	legacyRestore, err := reconciler.buildPostReadyRestore(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, restoreMgr, comp, "", nil)
+	require.NoError(t, err)
+	require.Empty(t, legacyRestore.Spec.ReadyConfig.JobAction.Target.RestoreTargetIdentityFacts)
 }
 
 func TestBuildPostReadyRestoreUsesInitAccountFromComponentDefinition(t *testing.T) {

@@ -2023,6 +2023,21 @@ RuntimeSettings
 </tr>
 <tr>
 <td>
+<code>restoreTargetIdentityFacts</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.RestoreTargetIdentityFact">
+[]RestoreTargetIdentityFact
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the target identity facts that the restore controller must resolve
+from the live target before running postReady Job actions.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>target</code><br/>
 <em>
 <a href="#dataprotection.kubeblocks.io/v1alpha1.BackupTarget">
@@ -2158,6 +2173,21 @@ RuntimeSettings
 <td>
 <em>(Optional)</em>
 <p>Specifies runtime settings for the backup workload container.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>restoreTargetIdentityFacts</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.RestoreTargetIdentityFact">
+[]RestoreTargetIdentityFact
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the target identity facts that the restore controller must resolve
+from the live target before running postReady Job actions.</p>
 </td>
 </tr>
 <tr>
@@ -4524,6 +4554,21 @@ This includes mounting required volumes and injecting built-in environment varia
 <p>Defines which volumes of the selected pod need to be mounted on the restoring pod.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>restoreTargetIdentityFacts</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.RestoreTargetIdentityFact">
+[]RestoreTargetIdentityFact
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the target identity facts that the controller must resolve from
+the selected live target and inject into the postReady Job.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.KubeResources">KubeResources
@@ -5711,6 +5756,30 @@ Kubernetes meta/v1.Time
 </td>
 </tr>
 </tbody>
+</table>
+<h3 id="dataprotection.kubeblocks.io/v1alpha1.RestoreTargetIdentityFact">RestoreTargetIdentityFact
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupMethod">BackupMethod</a>, <a href="#dataprotection.kubeblocks.io/v1alpha1.BackupMethodTPL">BackupMethodTPL</a>, <a href="#dataprotection.kubeblocks.io/v1alpha1.JobActionTarget">JobActionTarget</a>)
+</p>
+<div>
+<p>RestoreTargetIdentityFact identifies a controller-resolved target fact that
+a postReady Job action requires.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;ClusterTopology&#34;</p></td>
+<td><p>RestoreTargetIdentityFactClusterTopology requests the target Cluster topology.</p>
+</td>
+</tr><tr><td><p>&#34;ComponentServiceVersion&#34;</p></td>
+<td><p>RestoreTargetIdentityFactComponentServiceVersion requests the target Component service version.</p>
+</td>
+</tr></tbody>
 </table>
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.RestoreVolumeClaim">RestoreVolumeClaim
 </h3>

@@ -65,6 +65,28 @@ func AddTolerations(podSpec *corev1.PodSpec) (err error) {
 	return nil
 }
 
+// CanonicalRestoreTargetIdentityFacts returns a sorted, duplicate-free copy of
+// the requested restore target identity facts.
+func CanonicalRestoreTargetIdentityFacts(
+	facts []dpv1alpha1.RestoreTargetIdentityFact,
+) []dpv1alpha1.RestoreTargetIdentityFact {
+	if len(facts) == 0 {
+		return nil
+	}
+	set := make(map[dpv1alpha1.RestoreTargetIdentityFact]struct{}, len(facts))
+	for _, fact := range facts {
+		set[fact] = struct{}{}
+	}
+	canonical := make([]dpv1alpha1.RestoreTargetIdentityFact, 0, len(set))
+	for fact := range set {
+		canonical = append(canonical, fact)
+	}
+	sort.Slice(canonical, func(i, j int) bool {
+		return canonical[i] < canonical[j]
+	})
+	return canonical
+}
+
 // IsJobFinished if the job is completed or failed, return true.
 // if the job is failed, return the failed message.
 func IsJobFinished(job *batchv1.Job) (bool, batchv1.JobConditionType, string) {

@@ -308,6 +308,7 @@ var _ = Describe("InstanceSet Controller 2", func() {
 			})).Should(Succeed())
 
 			beforeUpdate := time.Now()
+			time.Sleep(1 * time.Second)
 			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
 				its.Spec.Template.Spec.DNSPolicy = corev1.DNSClusterFirstWithHostNet
 			})()).ShouldNot(HaveOccurred())

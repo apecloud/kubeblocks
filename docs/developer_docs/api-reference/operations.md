@@ -389,6 +389,78 @@ OpsRequestStatus
 </tr>
 </tbody>
 </table>
+<h3 id="operations.kubeblocks.io/v1alpha1.ActionDispatchClaim">ActionDispatchClaim
+</h3>
+<p>
+(<em>Appears on:</em><a href="#operations.kubeblocks.io/v1alpha1.ProgressStatusDetail">ProgressStatusDetail</a>)
+</p>
+<div>
+<p>ActionDispatchClaim records a durable, controller-owned dispatch identity
+for a non-idempotent external action.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>id</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>ID uniquely identifies the claimed dispatch within the OpsRequest.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>state</code><br/>
+<em>
+<a href="#operations.kubeblocks.io/v1alpha1.ActionDispatchClaimState">
+ActionDispatchClaimState
+</a>
+</em>
+</td>
+<td>
+<p>State records whether the external call is still unconfirmed, was resolved
+by the caller, or became unknowable across a process restart.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="operations.kubeblocks.io/v1alpha1.ActionDispatchClaimState">ActionDispatchClaimState
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#operations.kubeblocks.io/v1alpha1.ActionDispatchClaim">ActionDispatchClaim</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Claimed&#34;</p></td>
+<td><p>DispatchClaimStateClaimed means the durable claim was committed before
+the external call, but no call result has been committed yet.</p>
+</td>
+</tr><tr><td><p>&#34;OutcomeUnknown&#34;</p></td>
+<td><p>DispatchClaimStateOutcomeUnknown means a restart crossed the external call
+and the controller must observe a positive fact or fail without replay.</p>
+</td>
+</tr><tr><td><p>&#34;Resolved&#34;</p></td>
+<td><p>DispatchClaimStateResolved means the external call returned and its result
+was committed together with the same dispatch identity.</p>
+</td>
+</tr></tbody>
+</table>
 <h3 id="operations.kubeblocks.io/v1alpha1.ActionTask">ActionTask
 </h3>
 <p>
@@ -3608,6 +3680,23 @@ Either <code>objectKey</code> or <code>actionName</code> must be provided.</p>
 <td>
 <em>(Optional)</em>
 <p>Lists the tasks, such as Jobs or Pods, that carry out the action.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>dispatchClaim</code><br/>
+<em>
+<a href="#operations.kubeblocks.io/v1alpha1.ActionDispatchClaim">
+ActionDispatchClaim
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Records a durable claim for a non-idempotent external action dispatch.
+A controller that observes this field must not dispatch that action again.
+The claim is distinct from ActionTasks because it is controller state, not
+a Job, Pod, or other task carrying out the action.</p>
 </td>
 </tr>
 <tr>

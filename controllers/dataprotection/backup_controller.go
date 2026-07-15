@@ -599,12 +599,6 @@ func (r *BackupReconciler) handleRunningPhase(
 	if err = r.syncContinuousBackupEncryptionConfig(reqCtx, backup, request.BackupPolicy); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "sync continuous backup encryption config failed")
 	}
-	if completed, err := r.syncCompletedJobActions(reqCtx.Ctx, request); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "sync completed backup jobs failed")
-	} else if completed {
-		updateBackupStatusByActionStatus(&request.Status)
-		return r.completeBackup(reqCtx, backup, request.Backup)
-	}
 	targets := dputils.GetBackupTargets(request.BackupPolicy, request.BackupMethod)
 	var (
 		existFailedAction bool
@@ -619,6 +613,14 @@ func (r *BackupReconciler) handleRunningPhase(
 	)
 	for i := range targets {
 		if err = r.prepareRequestTargetInfo(reqCtx, request, &targets[i]); err != nil {
+			if intctrlutil.IsNotFound(err) {
+				if completed, syncErr := r.syncCompletedJobActions(reqCtx.Ctx, request); syncErr != nil {
+					return intctrlutil.CheckedRequeueWithError(syncErr, reqCtx.Log, "sync completed backup jobs failed")
+				} else if completed {
+					updateBackupStatusByActionStatus(&request.Status)
+					return r.completeBackup(reqCtx, backup, request.Backup)
+				}
+			}
 			return r.updateStatusIfFailed(reqCtx, backup, request.Backup, err)
 		}
 		// there are actions not completed, continue to handle following actions

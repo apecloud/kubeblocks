@@ -551,6 +551,28 @@ var _ = Describe("Backup Controller test", func() {
 					g.Expect(fetched.Status.Expiration.Second()).Should(Equal(fetched.Status.CompletionTimestamp.Add(time.Hour).Second()))
 				})).Should(Succeed())
 			})
+
+			It("returns not found when a previously selected target pod is missing", func() {
+				target := &dpv1alpha1.BackupTarget{
+					PodSelector: &dpv1alpha1.PodSelector{
+						LabelSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{
+								constant.AppInstanceLabelKey:    testdp.ClusterName,
+								constant.KBAppComponentLabelKey: testdp.ComponentName,
+							},
+						},
+					},
+				}
+				reqCtx := intctrlutil.RequestCtx{Ctx: ctx, Req: ctrl.Request{NamespacedName: client.ObjectKeyFromObject(backupPolicy)}}
+				for _, strategy := range []dpv1alpha1.PodSelectionStrategy{
+					dpv1alpha1.PodSelectionStrategyAny,
+					dpv1alpha1.PodSelectionStrategyAll,
+				} {
+					target.PodSelector.Strategy = strategy
+					_, err := GetTargetPods(reqCtx, k8sClient, []string{"missing-pod"}, backupPolicy, target, dpv1alpha1.BackupTypeFull)
+					Expect(intctrlutil.IsNotFound(err)).To(BeTrue())
+				}
+			})
 		})
 
 		It("create a backup with backupMethod and multi targets", func() {

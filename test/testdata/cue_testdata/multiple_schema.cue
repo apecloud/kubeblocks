@@ -28,3 +28,8 @@
 }
 
 #combined: #archA & #archB
+
+#embedded: {
+	#archA
+	#archB
+}

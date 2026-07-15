@@ -53,11 +53,12 @@ var _ = Describe("GenerateOpenAPISchema", func() {
 		},
 		Entry("test_import_type", "test_import_type.cue", "Exemplar", "test_import_type.json", false),
 		Entry("normal_test with mysql", "mysql_openapi.cue", "MysqlParameter", "mysql_openapi.json", false),
-		FEntry("normal_test with mysql2", "mysql_openapi_v2.cue", "MysqlSchema", "mysql_openapi_v2.json", false),
+		Entry("normal_test with mysql2", "mysql_openapi_v2.cue", "MysqlSchema", "mysql_openapi_v2.json", false),
 		Entry("normal_with_not_empty", "mysql_openapi.cue", "", "mysql_openapi.json", false),
 		Entry("pg14_openapi", "pg14.cue", "PGPameter", "pg14_openapi.json", false),
 		Entry("multiple_schema_arch_a", "multiple_schema.cue", "archA", "multiple_schema_arch_a.json", false),
 		Entry("multiple_schema_combined", "multiple_schema.cue", "combined", "multiple_schema_combined.json", false),
+		Entry("multiple_schema_embedded", "multiple_schema.cue", "embedded", "multiple_schema_combined.json", false),
 		Entry("failed_test", "mysql.cue", "NotType", "mysql_openapi_failed_not_exist", true),
 	)
 })

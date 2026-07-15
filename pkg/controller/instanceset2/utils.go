@@ -71,7 +71,7 @@ func sortInstancesByRole[T any](instances []T, instanceAt func(int) *workloads.I
 }
 
 func getInstanceRoleName(inst *workloads.Instance) string {
-	return inst.Status.Role
+	return strings.ToLower(inst.Status.Role)
 }
 
 func composeRoleMap(its workloads.InstanceSet) map[string]workloads.ReplicaRole {

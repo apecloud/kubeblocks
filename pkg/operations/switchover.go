@@ -44,7 +44,8 @@ import (
 
 // switchover constants
 const (
-	KBSwitchoverKey = "Switchover"
+	KBSwitchoverKey             = "Switchover"
+	switchoverDispatchClaimKind = "SwitchoverDispatch"
 )
 
 type switchoverOpsHandler struct{}
@@ -110,11 +111,14 @@ func switchoverPreCheck(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes
 	}
 
 	for _, switchover := range switchoverList {
+		compName, err := getSwitchoverClusterComponentName(reqCtx.Ctx, cli, opsRes.Cluster, switchover)
+		if err != nil {
+			return err
+		}
 		synthesizedComp, err := buildSynthesizedComp(reqCtx.Ctx, cli, opsRes, switchover)
 		if err != nil {
 			return err
 		}
-		compName := switchover.GetComponentName()
 		if synthesizedComp.LifecycleActions.ComponentLifecycleActions == nil || synthesizedComp.LifecycleActions.Switchover == nil {
 			return intctrlutil.NewFatalError(fmt.Sprintf(`the component "%s" does not define switchover lifecycle action`, compName))
 		}
@@ -229,11 +233,17 @@ func handleSwitchover(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *
 	if err != nil {
 		return err
 	}
-	compName := switchover.GetComponentName()
+	compName, err := getSwitchoverClusterComponentName(reqCtx.Ctx, cli, opsRes.Cluster, *switchover)
+	if err != nil {
+		return err
+	}
 	objectKey := getProgressObjectKey(KBSwitchoverKey, compName)
 	progressDetail := findStatusProgressDetail(opsRequest.Status.Components[compName].ProgressDetails, objectKey)
 	if progressDetail == nil {
 		return fmt.Errorf("progress detail not found for component %s", compName)
+	}
+	if err := validateSwitchoverDispatchClaimForReader(opsRequest, compName, switchover.InstanceName, progressDetail); err != nil {
+		return err
 	}
 	switch progressDetail.Status {
 	case opsv1alpha1.PendingProgressStatus:
@@ -266,6 +276,45 @@ func handleSwitchover(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *
 	}
 	handleProgressDetail(reqCtx, opsRequest, progressDetail, compName, completedCount, failedCount)
 	return nil
+}
+
+// validateSwitchoverDispatchClaimForReader is the rollback-safe Phase 1 reader
+// for the durable dispatch protocol. It never creates or changes a claim. A
+// release controller may only continue observing an outcome that the Phase 2
+// writer already committed as Resolved. An unconfirmed outcome must stay
+// blocked until a Phase 2 controller can classify it without replaying the
+// external action.
+func validateSwitchoverDispatchClaimForReader(
+	opsRequest *opsv1alpha1.OpsRequest,
+	compName,
+	instanceName string,
+	progressDetail *opsv1alpha1.ProgressStatusDetail) error {
+	dispatchClaim := progressDetail.DispatchClaim
+	if dispatchClaim == nil {
+		return nil
+	}
+	if opsRequest.UID == "" {
+		return fmt.Errorf("OpsRequest %s/%s UID is empty while reading switchover dispatch claim",
+			opsRequest.Namespace, opsRequest.Name)
+	}
+	expectedClaimID := fmt.Sprintf("%s/%s/%s/%s", switchoverDispatchClaimKind,
+		opsRequest.UID, compName, instanceName)
+	if dispatchClaim.ID != expectedClaimID {
+		return fmt.Errorf("component %s switchover dispatch claim %q does not match expected claim %q",
+			compName, dispatchClaim.ID, expectedClaimID)
+	}
+	switch dispatchClaim.State {
+	case opsv1alpha1.DispatchClaimStateResolved:
+		if progressDetail.Status == opsv1alpha1.PendingProgressStatus {
+			return fmt.Errorf("component %s has a resolved switchover dispatch claim in Pending status", compName)
+		}
+		return nil
+	case opsv1alpha1.DispatchClaimStateClaimed, opsv1alpha1.DispatchClaimStateOutcomeUnknown:
+		return fmt.Errorf("component %s switchover dispatch claim state %q has no committed outcome; refusing to replay or infer success",
+			compName, dispatchClaim.State)
+	default:
+		return fmt.Errorf("component %s switchover dispatch claim has unknown state %q", compName, dispatchClaim.State)
+	}
 }
 
 // We consider a switchover action succeeds if the action returns without error. We don't need to know if a switchover is actually executed.
@@ -339,6 +388,34 @@ func getCompSpecBySwitchover(ctx context.Context, cli client.Client, cluster *ap
 		clusterCompName = compObj.Labels[constant.KBAppComponentLabelKey]
 	}
 	return getClusterCompSpec(cluster, clusterCompName)
+}
+
+func getSwitchoverClusterComponentName(ctx context.Context, cli client.Client, cluster *appsv1.Cluster, switchover opsv1alpha1.Switchover) (string, error) {
+	if len(switchover.ComponentName) > 0 {
+		if cluster.Spec.GetComponentByName(switchover.ComponentName) != nil ||
+			cluster.Spec.GetShardingByName(switchover.ComponentName) != nil {
+			return switchover.ComponentName, nil
+		}
+		return "", fmt.Errorf(`component "%s" not found`, switchover.ComponentName)
+	}
+
+	compObj := &appsv1.Component{}
+	if err := cli.Get(ctx, client.ObjectKey{
+		Namespace: cluster.Namespace,
+		Name:      switchover.ComponentObjectName,
+	}, compObj); err != nil {
+		if apierrors.IsNotFound(err) {
+			return "", fmt.Errorf(`component object "%s" not found`, switchover.ComponentObjectName)
+		}
+		return "", err
+	}
+	if shardingName := compObj.Labels[constant.KBAppShardingNameLabelKey]; len(shardingName) > 0 {
+		return shardingName, nil
+	}
+	if compName := compObj.Labels[constant.KBAppComponentLabelKey]; len(compName) > 0 {
+		return compName, nil
+	}
+	return "", fmt.Errorf(`component object "%s" has no component label`, switchover.ComponentObjectName)
 }
 
 func buildSynthesizedComp(ctx context.Context, cli client.Client, opsRes *OpsResource, switchover opsv1alpha1.Switchover) (*component.SynthesizedComponent, error) {

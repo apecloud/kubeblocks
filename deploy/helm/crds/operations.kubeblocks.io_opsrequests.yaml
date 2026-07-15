@@ -3412,6 +3412,32 @@ spec:
                               - status
                               type: object
                             type: array
+                          dispatchClaim:
+                            description: |-
+                              Records a durable claim for a non-idempotent external action dispatch.
+                              A controller that observes this field must not dispatch that action again.
+                              The claim is distinct from ActionTasks because it is controller state, not
+                              a Job, Pod, or other task carrying out the action.
+                            properties:
+                              id:
+                                description: ID uniquely identifies the claimed dispatch
+                                  within the OpsRequest.
+                                maxLength: 512
+                                minLength: 1
+                                type: string
+                              state:
+                                description: |-
+                                  State records whether the external call is still unconfirmed, was resolved
+                                  by the caller, or became unknowable across a process restart.
+                                enum:
+                                - Claimed
+                                - Resolved
+                                - OutcomeUnknown
+                                type: string
+                            required:
+                            - id
+                            - state
+                            type: object
                           endTime:
                             description: Records the completion time of object processing.
                             format: date-time
@@ -3449,6 +3475,9 @@ spec:
                         x-kubernetes-validations:
                         - message: at least one objectKey or actionName.
                           rule: has(self.objectKey) || has(self.actionName)
+                        - message: a Claimed dispatchClaim requires Processing status.
+                          rule: '!has(self.dispatchClaim) || self.dispatchClaim.state
+                            != ''Claimed'' || self.status == ''Processing'''
                       type: array
                     reason:
                       description: Provides an explanation for the Component being

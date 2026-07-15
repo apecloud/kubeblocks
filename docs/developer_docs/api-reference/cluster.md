@@ -10976,12 +10976,16 @@ Kubernetes api utils intstr.IntOrString
 </td>
 <td>
 <em>(Optional)</em>
-<p>Indicates the number of instances that should be updated during a rolling update.
-The remaining instances will remain untouched. This is helpful in defining how many instances
-should participate in the update process.
+<p>Indicates the maximum number of instances that can be updated concurrently within a single
+reconciliation round, controlling the pace of a rolling update. Instances that are already
+up to date do not count against this limit, so the rolling update always proceeds, round by
+round, until all instances are updated; this field is not a partition-style gate and does not
+pause the rollout after a fixed number of instances. To pause a rollout for observation
+(e.g., canary-style upgrades), use the OnDelete strategy instead, where instances are updated
+only when they are manually deleted.
 Value can be an absolute number (ex: 5) or a percentage of desired instances (ex: 10%).
 Absolute number is calculated from percentage by rounding up.
-The default value is ComponentSpec.Replicas (i.e., update all instances).</p>
+The default value is ComponentSpec.Replicas (i.e., no concurrency limit beyond maxUnavailable).</p>
 </td>
 </tr>
 <tr>

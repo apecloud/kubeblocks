@@ -176,7 +176,7 @@ var _ = Describe("update reconciler test", func() {
 			}
 			reconciler = NewUpdateReconciler()
 
-			By("reconcile with default UpdateStrategy(RollingUpdate, no partition, MaxUnavailable=1)")
+			By("reconcile with default UpdateStrategy(RollingUpdate, no per-round update limit, MaxUnavailable=1)")
 			// order: bar-hello-0, bar-foo-1, bar-foo-0, bar-3, bar-2, bar-1, bar-0
 			// expected: bar-hello-0 being deleted
 			defaultTree, err := tree.DeepCopy()
@@ -186,7 +186,7 @@ var _ = Describe("update reconciler test", func() {
 			Expect(res).Should(Equal(kubebuilderx.Continue))
 			expectUpdatedPods(defaultTree, []string{"bar-hello-0"})
 
-			By("reconcile with Partition=50% and MaxUnavailable=2")
+			By("reconcile with per-round update limit Replicas=3 and MaxUnavailable=2")
 			partitionTree, err := tree.DeepCopy()
 			Expect(err).Should(BeNil())
 			root, ok := partitionTree.GetRoot().(*workloads.InstanceSet)

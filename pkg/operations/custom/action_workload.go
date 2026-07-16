@@ -224,7 +224,15 @@ func (w *WorkloadAction) buildPodSpec(actionCtx ActionContext,
 	default:
 		saKey := client.ObjectKey{Namespace: w.Cluster.Namespace,
 			Name: constant.GenerateDefaultServiceAccountName(w.Comp.ComponentDef)}
-		if exists, _ := intctrlutil.CheckResourceExists(actionCtx.ReqCtx.Ctx, actionCtx.Client, saKey, &corev1.ServiceAccount{}); exists {
+		saReader := client.Reader(actionCtx.Client)
+		if actionCtx.Action.Workload.Type == opsv1alpha1.ManagedJobWorkload {
+			saReader = inputReader
+		}
+		exists, err := intctrlutil.CheckResourceExists(actionCtx.ReqCtx.Ctx, saReader, saKey, &corev1.ServiceAccount{})
+		if err != nil && actionCtx.Action.Workload.Type == opsv1alpha1.ManagedJobWorkload {
+			return nil, err
+		}
+		if exists {
 			podSpec.ServiceAccountName = saKey.Name
 		}
 	}

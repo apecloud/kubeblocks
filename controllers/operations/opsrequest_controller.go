@@ -247,8 +247,12 @@ func (r *OpsRequestReconciler) handleSucceedOpsRequest(reqCtx intctrlutil.Reques
 	if err := r.annotateRelatedOps(reqCtx, opsRequest); err != nil {
 		return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
 	}
-	if err := r.deleteExternalJobs(reqCtx.Ctx, opsRequest); err != nil {
-		return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
+	managedJob := opsRequest.Spec.Type == opsv1alpha1.CustomType && opsRequest.Spec.CustomOps != nil &&
+		opsRequest.Spec.CustomOps.ExecutionSnapshot != nil
+	if !managedJob {
+		if err := r.deleteExternalJobs(reqCtx.Ctx, opsRequest); err != nil {
+			return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
+		}
 	}
 	if opsRequest.Status.CompletionTimestamp.IsZero() || opsRequest.Spec.TTLSecondsAfterSucceed == 0 {
 		return intctrlutil.ResultToP(intctrlutil.Reconciled())

@@ -264,6 +264,70 @@ var _ = Describe("OpsRequest Controller", func() {
 			Expect(podList.Items).Should(BeEmpty())
 		})
 
+		It("retains a snapshotted ManagedJob until its owning Cluster observes success", func() {
+			ops := testops.NewOpsRequestObj("managed-cleanup-ops", helperNamespace, helperClusterName, opsv1alpha1.CustomType)
+			ops.Spec.CustomOps = &opsv1alpha1.CustomOps{
+				ExecutionSnapshot: &opsv1alpha1.CustomOpsExecutionSnapshot{},
+			}
+			ops.Status.Phase = opsv1alpha1.OpsSucceedPhase
+			job := &batchv1.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "managed-cleanup-job",
+					Namespace: helperNamespace,
+					UID:       types.UID("managed-cleanup-job-uid"),
+					Labels: map[string]string{
+						constant.OpsRequestNameLabelKey: ops.Name,
+					},
+				},
+				Spec: batchv1.JobSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
+					RestartPolicy: corev1.RestartPolicyNever,
+					Containers:    []corev1.Container{{Name: "worker", Image: "redis:7"}},
+				}}},
+				Status: batchv1.JobStatus{Conditions: []batchv1.JobCondition{{
+					Type: batchv1.JobComplete, Status: corev1.ConditionTrue,
+				}}},
+			}
+			wantSpec := job.Spec.DeepCopy()
+			reconciler := newOpsRequestReconciler(job)
+			_, err := reconciler.handleSucceedOpsRequest(ctrlutil.RequestCtx{Ctx: ctx}, ops)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			live := &batchv1.Job{}
+			Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(job), live)).Should(Succeed())
+			Expect(live.UID).Should(Equal(job.UID))
+			Expect(&live.Spec).Should(Equal(wantSpec))
+		})
+
+		It("keeps ordinary successful OpsRequest external Job cleanup unchanged", func() {
+			ops := testops.NewOpsRequestObj("ordinary-cleanup-ops", helperNamespace, helperClusterName, opsv1alpha1.CustomType)
+			ops.Spec.CustomOps = &opsv1alpha1.CustomOps{}
+			ops.Status.Phase = opsv1alpha1.OpsSucceedPhase
+			job := &batchv1.Job{ObjectMeta: metav1.ObjectMeta{
+				Name: "ordinary-cleanup-job", Namespace: helperNamespace,
+				Labels: map[string]string{constant.OpsRequestNameLabelKey: ops.Name},
+			}}
+			reconciler := newOpsRequestReconciler(job)
+			_, err := reconciler.handleSucceedOpsRequest(ctrlutil.RequestCtx{Ctx: ctx}, ops)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(job), &batchv1.Job{})).ShouldNot(Succeed())
+		})
+
+		It("does not let an irrelevant snapshot field suppress non-Custom Job cleanup", func() {
+			ops := testops.NewOpsRequestObj("restart-cleanup-ops", helperNamespace, helperClusterName, opsv1alpha1.RestartType)
+			ops.Spec.CustomOps = &opsv1alpha1.CustomOps{
+				ExecutionSnapshot: &opsv1alpha1.CustomOpsExecutionSnapshot{},
+			}
+			ops.Status.Phase = opsv1alpha1.OpsSucceedPhase
+			job := &batchv1.Job{ObjectMeta: metav1.ObjectMeta{
+				Name: "restart-cleanup-job", Namespace: helperNamespace,
+				Labels: map[string]string{constant.OpsRequestNameLabelKey: ops.Name},
+			}}
+			reconciler := newOpsRequestReconciler(job)
+			_, err := reconciler.handleSucceedOpsRequest(ctrlutil.RequestCtx{Ctx: ctx}, ops)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(job), &batchv1.Job{})).ShouldNot(Succeed())
+		})
+
 		It("cleans deleted ops annotations and reconciles related ops requests", func() {
 			deletedOpsName := "deleted-ops"
 			firstCluster := &appsv1.Cluster{

@@ -50,12 +50,13 @@ import (
 )
 
 const (
-	managedShardAddMarkerVersion = "v1"
+	managedShardAddMarkerVersion      = "v1"
+	managedShardAddRetryAbsenceWindow = 5 * time.Second
 
-	managedShardAddTokenParameter       = "shardAddToken"
-	managedShardAddShardingParameter    = "shardingName"
-	managedShardAddMembersParameter     = "newShardComponentNames"
-	managedShardAddTargetCountParameter = "targetShardCount"
+	managedShardAddTokenParameter       = "KB_SHARD_ADD_TOKEN"
+	managedShardAddShardingParameter    = "KB_SHARDING_NAME"
+	managedShardAddMembersParameter     = "KB_SHARD_ADD_SHARDS"
+	managedShardAddTargetCountParameter = "KB_SHARD_COUNT"
 )
 
 type managedShardAddPlanIdentity struct {
@@ -234,6 +235,7 @@ func (h *clusterShardingHandler) failManagedShardAdd(status *appsv1.ShardingActi
 	status.Phase = appsv1.LifecycleActionFailed
 	status.Reason = reason
 	status.Message = message
+	status.RetryCleanupObservedAt = nil
 	if status.CompletionTime == nil {
 		status.CompletionTime = ptr.To(metav1.Now())
 	}
@@ -305,6 +307,66 @@ func (h *clusterShardingHandler) recoverManagedShardAddStatus(transCtx *clusterT
 	return status, true, nil
 }
 
+func validateManagedShardAddComponentIdentity(cluster *appsv1.Cluster, shardingName string,
+	comp *appsv1.Component) error {
+	if !comp.DeletionTimestamp.IsZero() {
+		return fmt.Errorf("component %q is terminating", comp.Name)
+	}
+	owner := metav1.GetControllerOf(comp)
+	if owner == nil || owner.APIVersion != appsv1.GroupVersion.String() || owner.Kind != appsv1.ClusterKind ||
+		owner.Name != cluster.Name || owner.UID != cluster.UID {
+		return fmt.Errorf("component %q is not controlled by the exact Cluster UID", comp.Name)
+	}
+	if comp.Labels[constant.AppInstanceLabelKey] != cluster.Name ||
+		comp.Labels[constant.KBAppShardingNameLabelKey] != shardingName {
+		return fmt.Errorf("component %q does not carry the exact Cluster and sharding labels", comp.Name)
+	}
+	componentName := comp.Labels[constant.KBAppComponentLabelKey]
+	if componentName == "" || constant.GenerateClusterComponentName(cluster.Name, componentName) != comp.Name {
+		return fmt.Errorf("component %q does not carry its exact component identity label", comp.Name)
+	}
+	return nil
+}
+
+func (h *clusterShardingHandler) listManagedShardAddRecoveryComponents(transCtx *clusterTransformContext,
+	shardingName string) (map[string]*appsv1.Component, error) {
+	if transCtx.APIReader == nil {
+		return nil, managedShardAddContractErrorf("managed shard-add marker recovery requires a direct API reader")
+	}
+	componentList := &appsv1.ComponentList{}
+	if err := transCtx.APIReader.List(transCtx.Context, componentList,
+		client.InNamespace(transCtx.Cluster.Namespace)); err != nil {
+		return nil, err
+	}
+	recoveryComponents := map[string]*appsv1.Component{}
+	for i := range componentList.Items {
+		comp := &componentList.Items[i]
+		owner := metav1.GetControllerOf(comp)
+		if owner == nil || owner.APIVersion != appsv1.GroupVersion.String() || owner.Kind != appsv1.ClusterKind ||
+			owner.Name != transCtx.Cluster.Name || owner.UID != transCtx.Cluster.UID {
+			continue
+		}
+		value := comp.Annotations[shardingAddShardKey]
+		if value == "" {
+			continue
+		}
+		marker, err := decodeManagedShardAddMarker(value)
+		if err != nil {
+			return nil, managedShardAddContractErrorf("component %q has an unsupported shard-add marker: %v", comp.Name, err)
+		}
+		if marker.ClusterUID != string(transCtx.Cluster.UID) {
+			return nil, managedShardAddContractErrorf("component %q marker does not belong to the exact Cluster UID", comp.Name)
+		}
+		if err := validateManagedShardAddComponentIdentity(transCtx.Cluster, marker.ShardingName, comp); err != nil {
+			return nil, managedShardAddContractErrorf("%v", err)
+		}
+		if marker.ShardingName == shardingName {
+			recoveryComponents[comp.Name] = comp
+		}
+	}
+	return recoveryComponents, nil
+}
+
 func (h *clusterShardingHandler) dispatchManagedShardAddMembers(transCtx *clusterTransformContext,
 	dag *graph.DAG, shardingName string, status *appsv1.ShardingActionStatus,
 	_ map[string]*appsv1.Component, protoComps map[string]*appsv1.Component) error {
@@ -345,13 +407,12 @@ func (h *clusterShardingHandler) dispatchManagedShardAddMembers(transCtx *cluste
 
 func validateManagedShardAddMember(cluster *appsv1.Cluster, comp *appsv1.Component,
 	member appsv1.ShardingActionMemberStatus, markerValue string) error {
-	if !comp.DeletionTimestamp.IsZero() {
-		return fmt.Errorf("component %q is terminating", comp.Name)
+	marker, err := decodeManagedShardAddMarker(markerValue)
+	if err != nil {
+		return fmt.Errorf("managed shard-add marker is invalid: %w", err)
 	}
-	owner := metav1.GetControllerOf(comp)
-	if owner == nil || owner.APIVersion != appsv1.GroupVersion.String() || owner.Kind != appsv1.ClusterKind ||
-		owner.Name != cluster.Name || owner.UID != cluster.UID {
-		return fmt.Errorf("component %q is not controlled by the exact Cluster UID", comp.Name)
+	if err := validateManagedShardAddComponentIdentity(cluster, marker.ShardingName, comp); err != nil {
+		return err
 	}
 	if comp.Annotations[shardingAddShardKey] != markerValue {
 		return fmt.Errorf("component %q does not carry the exact managed shard-add marker", comp.Name)
@@ -595,6 +656,43 @@ func managedJobName(task *opsv1alpha1.ActionTask) (string, error) {
 	return name, nil
 }
 
+func bindOrValidateManagedShardAddJobPlan(status *appsv1.ShardingActionStatus,
+	opsRequest *opsv1alpha1.OpsRequest, task *opsv1alpha1.ActionTask) (bool, error) {
+	if task.TaskIndex == nil || *task.TaskIndex != 0 || task.Namespace != opsRequest.Namespace ||
+		task.WorkloadSpecHash == "" {
+		return false, managedShardAddContractErrorf("managed shard-add action task has an invalid planned identity")
+	}
+	name, err := managedJobName(task)
+	if err != nil {
+		return false, managedShardAddContractErrorf("%v", err)
+	}
+	switch task.DispatchState {
+	case opsv1alpha1.PlannedActionTaskDispatchState:
+		if task.WorkloadUID != "" || status.JobUID != "" {
+			return false, managedShardAddContractErrorf("planned managed shard-add task already carries a Job UID")
+		}
+	case opsv1alpha1.CreatedActionTaskDispatchState:
+		if task.WorkloadUID == "" {
+			return false, managedShardAddContractErrorf("created managed shard-add task has no Job UID")
+		}
+	default:
+		return false, managedShardAddContractErrorf("managed shard-add action task has unsupported dispatch state %q", task.DispatchState)
+	}
+	if (status.JobName == "") != (status.JobSpecHash == "") ||
+		(status.JobUID != "" && status.JobName == "") {
+		return false, managedShardAddContractErrorf("persisted managed Job plan identity is incomplete")
+	}
+	if status.JobName == "" {
+		status.JobName = name
+		status.JobSpecHash = task.WorkloadSpecHash
+		return true, nil
+	}
+	if status.JobName != name || status.JobSpecHash != task.WorkloadSpecHash {
+		return false, managedShardAddContractErrorf("managed Job plan no longer matches the frozen Cluster status")
+	}
+	return false, nil
+}
+
 func validateManagedShardAddJob(transCtx *clusterTransformContext, status *appsv1.ShardingActionStatus,
 	opsRequest *opsv1alpha1.OpsRequest, task *opsv1alpha1.ActionTask) (*batchv1.Job, error) {
 	if task.DispatchState != opsv1alpha1.CreatedActionTaskDispatchState || task.WorkloadUID == "" ||
@@ -634,7 +732,8 @@ func validateManagedShardAddJob(transCtx *clusterTransformContext, status *appsv
 	if hash != task.WorkloadSpecHash {
 		return nil, managedShardAddContractErrorf("managed Job %s/%s spec does not match the Operations task", job.Namespace, job.Name)
 	}
-	if status.JobUID != "" && (status.JobName != job.Name || status.JobUID != string(job.UID) || status.JobSpecHash != hash) {
+	if status.JobName != job.Name || status.JobSpecHash != hash ||
+		(status.JobUID != "" && status.JobUID != string(job.UID)) {
 		return nil, managedShardAddContractErrorf("managed Job identity no longer matches the frozen Cluster status")
 	}
 	return job, nil
@@ -756,7 +855,7 @@ func validateManagedShardAddRetryJob(status *appsv1.ShardingActionStatus, job *b
 		owner.Name != status.OpsRequestName || string(owner.UID) != status.OpsRequestUID {
 		return fmt.Errorf("managed Job %s/%s is not controlled by the failed OpsRequest UID", job.Namespace, job.Name)
 	}
-	if job.Name != status.JobName || string(job.UID) != status.JobUID {
+	if job.Name != status.JobName || (status.JobUID != "" && string(job.UID) != status.JobUID) {
 		return fmt.Errorf("managed Job %s/%s no longer matches the failed attempt identity", job.Namespace, job.Name)
 	}
 	hash, err := opsutil.ManagedJobSpecHash(job.Spec)
@@ -783,11 +882,17 @@ func validateManagedShardAddRetryPod(status *appsv1.ShardingActionStatus, pod *c
 
 func (h *clusterShardingHandler) handleFailedManagedShardAdd(transCtx *clusterTransformContext,
 	status *appsv1.ShardingActionStatus) (bool, error) {
-	if status.Reason != "OpsRequestUnsuccessful" {
+	if status.Reason != "OpsRequestUnsuccessful" && status.Reason != "RetryCleanupObserved" {
 		return true, nil
 	}
 	if status.OpsRequestName == "" || status.OpsRequestUID == "" || status.OpsRequestSpecHash == "" {
 		h.failManagedShardAdd(status, "RetryStateInvalid", "failed managed shard-add attempt has no exact OpsRequest identity")
+		return true, nil
+	}
+	if (status.JobName == "") != (status.JobSpecHash == "") ||
+		(status.JobUID != "" && status.JobName == "") ||
+		((status.Reason == "RetryCleanupObserved") != (status.RetryCleanupObservedAt != nil)) {
+		h.failManagedShardAdd(status, "RetryStateInvalid", "failed managed shard-add retry state is incomplete")
 		return true, nil
 	}
 
@@ -800,9 +905,13 @@ func (h *clusterShardingHandler) handleFailedManagedShardAdd(transCtx *clusterTr
 			return true, nil
 		}
 		if opsRequest.DeletionTimestamp.IsZero() {
+			status.Reason = "OpsRequestUnsuccessful"
+			status.RetryCleanupObservedAt = nil
 			status.Message = "managed shard-add failed; preserve evidence, then delete the exact failed OpsRequest to request a retry"
 			return true, nil
 		}
+		status.Reason = "OpsRequestUnsuccessful"
+		status.RetryCleanupObservedAt = nil
 		status.Message = "waiting for the exact failed OpsRequest to become absent before retry"
 		return true, intctrlutil.NewDelayedRequeueError(time.Second, "waiting for failed managed OpsRequest deletion")
 	}
@@ -819,6 +928,8 @@ func (h *clusterShardingHandler) handleFailedManagedShardAdd(transCtx *clusterTr
 				h.failManagedShardAdd(status, "RetryIdentityMismatch", err.Error())
 				return true, nil
 			}
+			status.Reason = "OpsRequestUnsuccessful"
+			status.RetryCleanupObservedAt = nil
 			status.Message = "waiting for the exact failed managed Job to become absent before retry"
 			return true, intctrlutil.NewDelayedRequeueError(time.Second, "waiting for failed managed Job deletion")
 		}
@@ -841,8 +952,29 @@ func (h *clusterShardingHandler) handleFailedManagedShardAdd(transCtx *clusterTr
 		}
 	}
 	if len(pods.Items) > 0 {
+		status.Reason = "OpsRequestUnsuccessful"
+		status.RetryCleanupObservedAt = nil
 		status.Message = "waiting for every Pod from the failed managed Job to become absent before retry"
 		return true, intctrlutil.NewDelayedRequeueError(time.Second, "waiting for failed managed worker Pods")
+	}
+	if status.RetryCleanupObservedAt == nil {
+		status.Reason = "RetryCleanupObserved"
+		status.RetryCleanupObservedAt = ptr.To(metav1.Now())
+		status.Message = fmt.Sprintf("the failed attempt is absent; waiting for a continuous %s stability window before retry",
+			managedShardAddRetryAbsenceWindow)
+		return true, intctrlutil.NewDelayedRequeueError(managedShardAddRetryAbsenceWindow,
+			"waiting for failed managed workload absence to remain stable")
+	}
+	elapsed := time.Since(status.RetryCleanupObservedAt.Time)
+	if elapsed < managedShardAddRetryAbsenceWindow {
+		if elapsed < 0 {
+			elapsed = 0
+		}
+		status.Reason = "RetryCleanupObserved"
+		status.Message = fmt.Sprintf("the failed attempt remains absent; waiting for a continuous %s stability window before retry",
+			managedShardAddRetryAbsenceWindow)
+		return true, intctrlutil.NewDelayedRequeueError(managedShardAddRetryAbsenceWindow-elapsed,
+			"waiting for failed managed workload absence to remain stable")
 	}
 
 	status.Phase = appsv1.LifecycleActionRunning
@@ -854,6 +986,7 @@ func (h *clusterShardingHandler) handleFailedManagedShardAdd(transCtx *clusterTr
 	status.JobName = ""
 	status.JobUID = ""
 	status.JobSpecHash = ""
+	status.RetryCleanupObservedAt = nil
 	return true, intctrlutil.NewDelayedRequeueError(time.Second, "requeue after preparing an explicit managed shard-add retry")
 }
 
@@ -866,7 +999,23 @@ func (h *clusterShardingHandler) handleManagedShardAdd(transCtx *clusterTransfor
 		if action == nil {
 			return false, nil
 		}
-		recovered, found, err := h.recoverManagedShardAddStatus(transCtx, shardingName, runningComps)
+		recoveryComponents, err := h.listManagedShardAddRecoveryComponents(transCtx, shardingName)
+		if err != nil {
+			if isManagedShardAddContractError(err) {
+				targetCount, _ := h.targetShardCount(transCtx, shardingName)
+				status = &appsv1.ShardingActionStatus{
+					LifecycleActionStatus: appsv1.LifecycleActionStatus{StartTime: ptr.To(metav1.Now())},
+					ClusterGeneration:     transCtx.Cluster.Generation,
+					TargetShardCount:      targetCount,
+					OpsDefinitionName:     action.OpsDefinitionName,
+				}
+				h.failManagedShardAdd(status, "MarkerRecoveryFailed", err.Error())
+				h.setManagedShardAddStatus(transCtx, shardingName, status)
+				return true, nil
+			}
+			return true, err
+		}
+		recovered, found, err := h.recoverManagedShardAddStatus(transCtx, shardingName, recoveryComponents)
 		if err != nil {
 			targetCount, _ := h.targetShardCount(transCtx, shardingName)
 			status = &appsv1.ShardingActionStatus{
@@ -1074,6 +1223,19 @@ func (h *clusterShardingHandler) handleManagedShardAdd(transCtx *clusterTransfor
 		h.failManagedShardAdd(status, "ManagedJobStatusInvalid", err.Error())
 		return true, nil
 	}
+	if task != nil {
+		changed, err := bindOrValidateManagedShardAddJobPlan(status, liveOpsRequest, task)
+		if err != nil {
+			h.failManagedShardAdd(status, "ManagedJobStatusInvalid", err.Error())
+			return true, nil
+		}
+		if changed {
+			status.Reason = "ManagedJobPlanned"
+			status.Message = "persisted the deterministic managed Job name and defaulted spec hash before dispatch"
+			return true, intctrlutil.NewDelayedRequeueError(time.Second,
+				"requeue after persisting the managed Job plan identity")
+		}
+	}
 	var managedJob *batchv1.Job
 	if task != nil && task.DispatchState == opsv1alpha1.CreatedActionTaskDispatchState {
 		managedJob, err = validateManagedShardAddJob(transCtx, status, liveOpsRequest, task)
@@ -1093,7 +1255,11 @@ func (h *clusterShardingHandler) handleManagedShardAdd(transCtx *clusterTransfor
 			return true, intctrlutil.NewDelayedRequeueError(time.Second, "requeue after binding the managed Job identity")
 		}
 	}
-	if status.JobUID != "" && (task == nil || task.DispatchState != opsv1alpha1.CreatedActionTaskDispatchState || managedJob == nil) {
+	if status.JobName != "" && task == nil {
+		h.failManagedShardAdd(status, "ManagedJobStatusInvalid", "planned managed Job identity disappeared from the Operations task")
+		return true, nil
+	}
+	if status.JobUID != "" && (task.DispatchState != opsv1alpha1.CreatedActionTaskDispatchState || managedJob == nil) {
 		h.failManagedShardAdd(status, "ManagedJobStatusInvalid", "bound managed Job identity disappeared from the Operations task")
 		return true, nil
 	}

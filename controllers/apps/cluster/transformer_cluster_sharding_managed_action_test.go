@@ -26,9 +26,11 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -43,13 +45,29 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	customops "github.com/apecloud/kubeblocks/pkg/operations/custom"
 	opsutil "github.com/apecloud/kubeblocks/pkg/operations/util"
 )
 
 type managedShardAddReadErrorClient struct {
 	client.Client
-	objectType reflect.Type
-	err        error
+	objectType     reflect.Type
+	listObjectType reflect.Type
+	err            error
+}
+
+type managedShardAddDryRunCaptureClient struct {
+	client.Client
+	job *batchv1.Job
+}
+
+func (c *managedShardAddDryRunCaptureClient) Create(ctx context.Context, obj client.Object,
+	opts ...client.CreateOption) error {
+	err := c.Client.Create(ctx, obj, opts...)
+	if job, ok := obj.(*batchv1.Job); ok && len(opts) > 0 {
+		c.job = job.DeepCopy()
+	}
+	return err
 }
 
 func (c *managedShardAddReadErrorClient) Get(ctx context.Context, key client.ObjectKey,
@@ -60,10 +78,19 @@ func (c *managedShardAddReadErrorClient) Get(ctx context.Context, key client.Obj
 	return c.Client.Get(ctx, key, obj, opts...)
 }
 
+func (c *managedShardAddReadErrorClient) List(ctx context.Context, list client.ObjectList,
+	opts ...client.ListOption) error {
+	if reflect.TypeOf(list) == c.listObjectType {
+		return c.err
+	}
+	return c.Client.List(ctx, list, opts...)
+}
+
 const (
 	managedShardAddTestNamespace = "default"
 	managedShardAddTestCluster   = "redis"
 	managedShardAddTestSharding  = "redis-cluster"
+	managedShardAddTestComponent = "redis-cluster-abcde"
 	managedShardAddTestMember    = "redis-redis-cluster-abcde"
 	managedShardAddTestOpsDef    = "redis-shard-add"
 )
@@ -237,6 +264,11 @@ func TestManagedShardAddMemberDispatchRecoversPartialCreate(t *testing.T) {
 			Name:        managedShardAddTestMember,
 			UID:         types.UID("partially-created-uid"),
 			Annotations: map[string]string{shardingAddShardKey: marker},
+			Labels: map[string]string{
+				constant.AppInstanceLabelKey:       managedShardAddTestCluster,
+				constant.KBAppShardingNameLabelKey: managedShardAddTestSharding,
+				constant.KBAppComponentLabelKey:    managedShardAddTestComponent,
+			},
 			OwnerReferences: []metav1.OwnerReference{
 				*metav1.NewControllerRef(ctx.Cluster, appsv1.GroupVersion.WithKind(appsv1.ClusterKind)),
 			},
@@ -291,6 +323,11 @@ func managedShardAddReadyContext(t *testing.T) (*clusterTransformContext, model.
 			Annotations: map[string]string{
 				shardingAddShardKey: marker,
 			},
+			Labels: map[string]string{
+				constant.AppInstanceLabelKey:       managedShardAddTestCluster,
+				constant.KBAppShardingNameLabelKey: managedShardAddTestSharding,
+				constant.KBAppComponentLabelKey:    managedShardAddTestComponent,
+			},
 			OwnerReferences: []metav1.OwnerReference{
 				*metav1.NewControllerRef(cluster, appsv1.GroupVersion.WithKind(appsv1.ClusterKind)),
 			},
@@ -300,6 +337,115 @@ func managedShardAddReadyContext(t *testing.T) (*clusterTransformContext, model.
 	ctx, graphClient, fakeClient := managedShardAddTestContext(t, member, managedShardAddTestOpsDefinition())
 	ctx.Cluster.Status.Shardings[managedShardAddTestSharding] = appsv1.ClusterShardingStatus{ShardAdd: status}
 	return ctx, graphClient, fakeClient, &clusterShardingHandler{}, status
+}
+
+func TestManagedShardAddMarkerRecoveryUsesDirectInventory(t *testing.T) {
+	cluster := managedShardAddTestClusterObject()
+	status, err := buildManagedShardAddPlan(cluster, managedShardAddTestSharding, 4,
+		[]string{managedShardAddTestMember})
+	if err != nil {
+		t.Fatal(err)
+	}
+	status.OpsDefinitionName = managedShardAddTestOpsDef
+	marker, err := encodeManagedShardAddMarker(markerForManagedShardAdd(cluster, managedShardAddTestSharding, status))
+	if err != nil {
+		t.Fatal(err)
+	}
+	newLiveMember := func() *appsv1.Component {
+		return &appsv1.Component{
+			TypeMeta: metav1.TypeMeta{APIVersion: appsv1.GroupVersion.String(), Kind: appsv1.ComponentKind},
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: managedShardAddTestNamespace,
+				Name:      managedShardAddTestMember,
+				UID:       types.UID("component-uid"),
+				Annotations: map[string]string{
+					shardingAddShardKey: marker,
+				},
+				Labels: map[string]string{
+					constant.AppInstanceLabelKey:       managedShardAddTestCluster,
+					constant.KBAppShardingNameLabelKey: managedShardAddTestSharding,
+					constant.KBAppComponentLabelKey:    managedShardAddTestComponent,
+				},
+				OwnerReferences: []metav1.OwnerReference{
+					*metav1.NewControllerRef(cluster, appsv1.GroupVersion.WithKind(appsv1.ClusterKind)),
+				},
+			},
+		}
+	}
+
+	t.Run("cache omission cannot hide a live exact marker", func(t *testing.T) {
+		ctx, graphClient, _ := managedShardAddTestContext(t)
+		direct := fake.NewClientBuilder().WithScheme(managedShardAddTestScheme(t)).WithObjects(newLiveMember()).Build()
+		ctx.APIReader = direct
+		dag := managedShardAddTestDAG(graphClient, ctx.Cluster)
+		handled, err := (&clusterShardingHandler{}).handleManagedShardAdd(ctx, dag, managedShardAddTestSharding,
+			map[string]*appsv1.Component{}, map[string]*appsv1.Component{}, sets.New[string](managedShardAddTestMember))
+		if !handled || err != nil {
+			t.Fatalf("handled=%v err=%v, want terminal marker-only recovery", handled, err)
+		}
+		recovered := ctx.Cluster.Status.Shardings[managedShardAddTestSharding].ShardAdd
+		if recovered == nil || recovered.Phase != appsv1.LifecycleActionFailed || recovered.Reason != "AttemptStateLost" {
+			t.Fatalf("direct marker inventory did not fail closed: %#v", recovered)
+		}
+		if got := graphClient.FindAll(dag, &appsv1.Component{}); len(got) != 0 {
+			t.Fatalf("marker-only recovery scheduled %d Component writes", len(got))
+		}
+		if got := graphClient.FindAll(dag, &opsv1alpha1.OpsRequest{}); len(got) != 0 {
+			t.Fatalf("marker-only recovery scheduled %d OpsRequest writes", len(got))
+		}
+		if got := graphClient.FindAll(dag, &batchv1.Job{}); len(got) != 0 {
+			t.Fatalf("marker-only recovery scheduled %d Job writes", len(got))
+		}
+	})
+
+	t.Run("direct inventory error is retryable and cannot prove marker absence", func(t *testing.T) {
+		ctx, graphClient, baseClient := managedShardAddTestContext(t)
+		wantErr := errors.New("temporary Component list failure")
+		ctx.APIReader = &managedShardAddReadErrorClient{
+			Client: baseClient, listObjectType: reflect.TypeOf(&appsv1.ComponentList{}), err: wantErr,
+		}
+		dag := managedShardAddTestDAG(graphClient, ctx.Cluster)
+		handled, err := (&clusterShardingHandler{}).handleManagedShardAdd(ctx, dag, managedShardAddTestSharding,
+			map[string]*appsv1.Component{}, map[string]*appsv1.Component{}, sets.New[string](managedShardAddTestMember))
+		if !handled || !errors.Is(err, wantErr) {
+			t.Fatalf("handled=%v err=%v, want retryable direct List error", handled, err)
+		}
+		if recovered := ctx.Cluster.Status.Shardings[managedShardAddTestSharding].ShardAdd; recovered != nil {
+			t.Fatalf("direct List error persisted a false recovery decision: %#v", recovered)
+		}
+	})
+
+	for _, test := range []struct {
+		name   string
+		mutate func(*appsv1.Component)
+	}{
+		{name: "missing sharding label", mutate: func(member *appsv1.Component) {
+			delete(member.Labels, constant.KBAppShardingNameLabelKey)
+		}},
+		{name: "wrong sharding label", mutate: func(member *appsv1.Component) {
+			member.Labels[constant.KBAppShardingNameLabelKey] = "other-sharding"
+		}},
+	} {
+		t.Run(test.name+" fails loud", func(t *testing.T) {
+			member := newLiveMember()
+			test.mutate(member)
+			ctx, graphClient, _ := managedShardAddTestContext(t)
+			ctx.APIReader = fake.NewClientBuilder().WithScheme(managedShardAddTestScheme(t)).WithObjects(member).Build()
+			dag := managedShardAddTestDAG(graphClient, ctx.Cluster)
+			handled, err := (&clusterShardingHandler{}).handleManagedShardAdd(ctx, dag, managedShardAddTestSharding,
+				map[string]*appsv1.Component{}, map[string]*appsv1.Component{}, sets.New[string](managedShardAddTestMember))
+			if !handled || err != nil {
+				t.Fatalf("handled=%v err=%v, want terminal marker inventory failure", handled, err)
+			}
+			recovered := ctx.Cluster.Status.Shardings[managedShardAddTestSharding].ShardAdd
+			if recovered == nil || recovered.Phase != appsv1.LifecycleActionFailed || recovered.Reason != "MarkerRecoveryFailed" {
+				t.Fatalf("label drift did not fail marker recovery: %#v", recovered)
+			}
+			if got := graphClient.FindAll(dag, &appsv1.Component{}); len(got) != 0 {
+				t.Fatalf("label-drift recovery scheduled %d Component writes", len(got))
+			}
+		})
+	}
 }
 
 func TestManagedShardAddActivePlanFreezesLaterTopologyChanges(t *testing.T) {
@@ -685,7 +831,7 @@ func bindManagedShardAddTestOpsRequest(t *testing.T) (*clusterTransformContext, 
 }
 
 func attachManagedShardAddTestJob(t *testing.T, fakeClient client.Client, live *opsv1alpha1.OpsRequest,
-	phase opsv1alpha1.OpsPhase) *batchv1.Job {
+	status *appsv1.ShardingActionStatus, phase opsv1alpha1.OpsPhase) *batchv1.Job {
 	t.Helper()
 	job := &batchv1.Job{
 		TypeMeta: metav1.TypeMeta{APIVersion: batchv1.SchemeGroupVersion.String(), Kind: constant.JobKind},
@@ -706,6 +852,8 @@ func attachManagedShardAddTestJob(t *testing.T, fakeClient client.Client, live *
 	if err != nil {
 		t.Fatal(err)
 	}
+	status.JobName = job.Name
+	status.JobSpecHash = hash
 	taskIndex := int32(0)
 	live.Status.Phase = phase
 	live.Status.Components = map[string]opsv1alpha1.OpsRequestComponentStatus{
@@ -735,7 +883,7 @@ func attachManagedShardAddTestJob(t *testing.T, fakeClient client.Client, live *
 
 func TestManagedShardAddSuccessfulJobCleansExactMarkersBeforeClosing(t *testing.T) {
 	ctx, graphClient, fakeClient, handler, status, live := bindManagedShardAddTestOpsRequest(t)
-	job := attachManagedShardAddTestJob(t, fakeClient, live, opsv1alpha1.OpsRunningPhase)
+	job := attachManagedShardAddTestJob(t, fakeClient, live, status, opsv1alpha1.OpsRunningPhase)
 
 	dag := managedShardAddTestDAG(graphClient, ctx.Cluster)
 	handled, err := handler.handleManagedShardAdd(ctx, dag, managedShardAddTestSharding,
@@ -821,7 +969,7 @@ func TestManagedShardAddSuccessfulJobCleansExactMarkersBeforeClosing(t *testing.
 
 func TestManagedShardAddRejectsSuccessfulOpsRequestWithoutSuccessfulJob(t *testing.T) {
 	ctx, graphClient, fakeClient, handler, status, live := bindManagedShardAddTestOpsRequest(t)
-	job := attachManagedShardAddTestJob(t, fakeClient, live, opsv1alpha1.OpsRunningPhase)
+	job := attachManagedShardAddTestJob(t, fakeClient, live, status, opsv1alpha1.OpsRunningPhase)
 
 	dag := managedShardAddTestDAG(graphClient, ctx.Cluster)
 	_, err := handler.handleManagedShardAdd(ctx, dag, managedShardAddTestSharding,
@@ -867,7 +1015,7 @@ func TestManagedShardAddUnsuccessfulOpsRequestFailsWithoutMarkerCleanup(t *testi
 
 func TestManagedShardAddExplicitRetryWaitsForOldWorkloadAbsence(t *testing.T) {
 	ctx, graphClient, fakeClient, handler, status, live := bindManagedShardAddTestOpsRequest(t)
-	job := attachManagedShardAddTestJob(t, fakeClient, live, opsv1alpha1.OpsFailedPhase)
+	job := attachManagedShardAddTestJob(t, fakeClient, live, status, opsv1alpha1.OpsFailedPhase)
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: managedShardAddTestNamespace,
@@ -931,6 +1079,15 @@ func TestManagedShardAddExplicitRetryWaitsForOldWorkloadAbsence(t *testing.T) {
 	dag = managedShardAddTestDAG(graphClient, ctx.Cluster)
 	handled, err = handler.handleManagedShardAdd(ctx, dag, managedShardAddTestSharding,
 		map[string]*appsv1.Component{}, map[string]*appsv1.Component{}, sets.New[string]())
+	if !handled || !intctrlutil.IsDelayedRequeueError(err) || status.Phase != appsv1.LifecycleActionFailed ||
+		status.Reason != "RetryCleanupObserved" || status.RetryCleanupObservedAt == nil {
+		t.Fatalf("first clean observation handled=%v err=%v status=%#v", handled, err, status)
+	}
+	status.RetryCleanupObservedAt = ptr.To(metav1.NewTime(time.Now().Add(-managedShardAddRetryAbsenceWindow)))
+
+	dag = managedShardAddTestDAG(graphClient, ctx.Cluster)
+	handled, err = handler.handleManagedShardAdd(ctx, dag, managedShardAddTestSharding,
+		map[string]*appsv1.Component{}, map[string]*appsv1.Component{}, sets.New[string]())
 	if !handled || !intctrlutil.IsDelayedRequeueError(err) || status.Phase != appsv1.LifecycleActionRunning ||
 		status.Reason != "RetryPrepared" || status.OpsRequestUID != "" || status.JobUID != "" {
 		t.Fatalf("retry preparation handled=%v err=%v status=%#v", handled, err, status)
@@ -946,6 +1103,158 @@ func TestManagedShardAddExplicitRetryWaitsForOldWorkloadAbsence(t *testing.T) {
 	if len(created) != 1 || created[0].GetName() != live.Name ||
 		!graphClient.IsAction(dag, created[0], model.ActionCreatePtr()) {
 		t.Fatalf("retry OpsRequest creates=%#v, want one same-name new attempt", created)
+	}
+}
+
+func TestManagedShardAddPlannedJobBlocksRetryUntilStableAbsence(t *testing.T) {
+	ctx, graphClient, fakeClient, handler, status, live := bindManagedShardAddTestOpsRequest(t)
+	job := &batchv1.Job{
+		TypeMeta: metav1.TypeMeta{APIVersion: batchv1.SchemeGroupVersion.String(), Kind: constant.JobKind},
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:  managedShardAddTestNamespace,
+			Name:       "redis-planned-shard-add-job",
+			UID:        types.UID("planned-job-uid"),
+			Finalizers: []string{"test-finalizer"},
+			OwnerReferences: []metav1.OwnerReference{
+				*metav1.NewControllerRef(live, opsv1alpha1.GroupVersion.WithKind("OpsRequest")),
+			},
+		},
+		Spec: batchv1.JobSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
+			RestartPolicy: corev1.RestartPolicyNever,
+			Containers:    []corev1.Container{{Name: "worker", Image: "redis:7"}},
+		}}},
+	}
+	jobHash, err := opsutil.ManagedJobSpecHash(job.Spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	taskIndex := int32(0)
+	live.Status.Phase = opsv1alpha1.OpsFailedPhase
+	live.Status.Components = map[string]opsv1alpha1.OpsRequestComponentStatus{
+		managedShardAddTestSharding: {
+			ProgressDetails: []opsv1alpha1.ProgressStatusDetail{{
+				ActionName: "rebalance",
+				ActionTasks: []opsv1alpha1.ActionTask{{
+					ObjectKey:        constant.JobKind + "/" + job.Name,
+					Namespace:        job.Namespace,
+					Status:           opsv1alpha1.ProcessingActionTaskStatus,
+					TaskIndex:        &taskIndex,
+					DispatchState:    opsv1alpha1.PlannedActionTaskDispatchState,
+					WorkloadSpecHash: jobHash,
+				}},
+			}},
+		},
+	}
+	if err := fakeClient.Update(context.Background(), live); err != nil {
+		t.Fatal(err)
+	}
+	if err := fakeClient.Create(context.Background(), job); err != nil {
+		t.Fatal(err)
+	}
+
+	dag := managedShardAddTestDAG(graphClient, ctx.Cluster)
+	handled, err := handler.handleManagedShardAdd(ctx, dag, managedShardAddTestSharding,
+		map[string]*appsv1.Component{}, map[string]*appsv1.Component{}, sets.New[string]())
+	if !handled || !intctrlutil.IsDelayedRequeueError(err) || status.JobName != job.Name ||
+		status.JobSpecHash != jobHash || status.JobUID != "" {
+		t.Fatalf("planned Job identity handled=%v err=%v status=%#v", handled, err, status)
+	}
+
+	dag = managedShardAddTestDAG(graphClient, ctx.Cluster)
+	handled, err = handler.handleManagedShardAdd(ctx, dag, managedShardAddTestSharding,
+		map[string]*appsv1.Component{}, map[string]*appsv1.Component{}, sets.New[string]())
+	if !handled || err != nil || status.Phase != appsv1.LifecycleActionFailed ||
+		status.Reason != "OpsRequestUnsuccessful" {
+		t.Fatalf("failed planned attempt handled=%v err=%v status=%#v", handled, err, status)
+	}
+	if err := fakeClient.Delete(context.Background(), live); err != nil {
+		t.Fatal(err)
+	}
+
+	// A zero-Pod Job still blocks retry, including while background deletion is in progress.
+	dag = managedShardAddTestDAG(graphClient, ctx.Cluster)
+	handled, err = handler.handleManagedShardAdd(ctx, dag, managedShardAddTestSharding,
+		map[string]*appsv1.Component{}, map[string]*appsv1.Component{}, sets.New[string]())
+	if !handled || !intctrlutil.IsDelayedRequeueError(err) || status.Reason != "OpsRequestUnsuccessful" {
+		t.Fatalf("existing planned Job handled=%v err=%v status=%#v", handled, err, status)
+	}
+	if err := fakeClient.Delete(context.Background(), job); err != nil {
+		t.Fatal(err)
+	}
+	dag = managedShardAddTestDAG(graphClient, ctx.Cluster)
+	handled, err = handler.handleManagedShardAdd(ctx, dag, managedShardAddTestSharding,
+		map[string]*appsv1.Component{}, map[string]*appsv1.Component{}, sets.New[string]())
+	if !handled || !intctrlutil.IsDelayedRequeueError(err) || status.Reason != "OpsRequestUnsuccessful" {
+		t.Fatalf("terminating planned Job handled=%v err=%v status=%#v", handled, err, status)
+	}
+	liveJob := &batchv1.Job{}
+	if err := fakeClient.Get(context.Background(), client.ObjectKeyFromObject(job), liveJob); err != nil {
+		t.Fatal(err)
+	}
+	liveJob.Finalizers = nil
+	if err := fakeClient.Update(context.Background(), liveJob); err != nil {
+		t.Fatal(err)
+	}
+	if err := fakeClient.Delete(context.Background(), liveJob); err != nil && !apierrors.IsNotFound(err) {
+		t.Fatal(err)
+	}
+
+	// One empty Pod list is only a durable observation gate, not permission to launch a second attempt.
+	dag = managedShardAddTestDAG(graphClient, ctx.Cluster)
+	handled, err = handler.handleManagedShardAdd(ctx, dag, managedShardAddTestSharding,
+		map[string]*appsv1.Component{}, map[string]*appsv1.Component{}, sets.New[string]())
+	if !handled || !intctrlutil.IsDelayedRequeueError(err) || status.Phase != appsv1.LifecycleActionFailed ||
+		status.Reason != "RetryCleanupObserved" || status.RetryCleanupObservedAt == nil {
+		t.Fatalf("first absence observation handled=%v err=%v status=%#v", handled, err, status)
+	}
+	latePod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{
+		Namespace: managedShardAddTestNamespace,
+		Name:      "late-old-attempt-pod",
+		Labels: map[string]string{
+			constant.ManagedJobSelectorLabelKey: opsutil.ManagedJobSelectorValue(string(live.UID), 0),
+		},
+	}}
+	if err := fakeClient.Create(context.Background(), latePod); err != nil {
+		t.Fatal(err)
+	}
+	dag = managedShardAddTestDAG(graphClient, ctx.Cluster)
+	handled, err = handler.handleManagedShardAdd(ctx, dag, managedShardAddTestSharding,
+		map[string]*appsv1.Component{}, map[string]*appsv1.Component{}, sets.New[string]())
+	if !handled || !intctrlutil.IsDelayedRequeueError(err) || status.Phase != appsv1.LifecycleActionFailed ||
+		status.Reason != "OpsRequestUnsuccessful" || status.RetryCleanupObservedAt != nil {
+		t.Fatalf("late Pod reset handled=%v err=%v status=%#v", handled, err, status)
+	}
+	if err := fakeClient.Delete(context.Background(), latePod); err != nil {
+		t.Fatal(err)
+	}
+
+	dag = managedShardAddTestDAG(graphClient, ctx.Cluster)
+	handled, err = handler.handleManagedShardAdd(ctx, dag, managedShardAddTestSharding,
+		map[string]*appsv1.Component{}, map[string]*appsv1.Component{}, sets.New[string]())
+	if !handled || !intctrlutil.IsDelayedRequeueError(err) || status.Reason != "RetryCleanupObserved" ||
+		status.RetryCleanupObservedAt == nil {
+		t.Fatalf("restart absence window handled=%v err=%v status=%#v", handled, err, status)
+	}
+	dag = managedShardAddTestDAG(graphClient, ctx.Cluster)
+	handled, err = handler.handleManagedShardAdd(ctx, dag, managedShardAddTestSharding,
+		map[string]*appsv1.Component{}, map[string]*appsv1.Component{}, sets.New[string]())
+	if !handled || !intctrlutil.IsDelayedRequeueError(err) || status.Reason != "RetryCleanupObserved" ||
+		status.RetryCleanupObservedAt == nil {
+		t.Fatalf("short absence window handled=%v err=%v status=%#v", handled, err, status)
+	}
+	if managedShardAddRetryAbsenceWindow != 5*time.Second {
+		t.Fatalf("retry absence window=%s, want 5s", managedShardAddRetryAbsenceWindow)
+	}
+	status.RetryCleanupObservedAt = ptr.To(metav1.NewTime(time.Now().Add(-managedShardAddRetryAbsenceWindow)))
+	dag = managedShardAddTestDAG(graphClient, ctx.Cluster)
+	handled, err = handler.handleManagedShardAdd(ctx, dag, managedShardAddTestSharding,
+		map[string]*appsv1.Component{}, map[string]*appsv1.Component{}, sets.New[string]())
+	if !handled || !intctrlutil.IsDelayedRequeueError(err) || status.Reason != "RetryPrepared" ||
+		status.RetryCleanupObservedAt != nil {
+		t.Fatalf("full absence window handled=%v err=%v status=%#v", handled, err, status)
+	}
+	if got := graphClient.FindAll(dag, &opsv1alpha1.OpsRequest{}); len(got) != 0 {
+		t.Fatalf("full absence window created %d OpsRequests", len(got))
 	}
 }
 
@@ -1057,12 +1366,22 @@ func TestManagedShardAddRecoversOneExactMarkerSet(t *testing.T) {
 		t.Fatal(err)
 	}
 	member := &appsv1.Component{ObjectMeta: metav1.ObjectMeta{
-		Name: managedShardAddTestMember,
+		Namespace: managedShardAddTestNamespace,
+		Name:      managedShardAddTestMember,
+		UID:       types.UID("recovered-component-uid"),
 		Annotations: map[string]string{
 			shardingAddShardKey: marker,
 		},
+		Labels: map[string]string{
+			constant.AppInstanceLabelKey:       managedShardAddTestCluster,
+			constant.KBAppShardingNameLabelKey: managedShardAddTestSharding,
+			constant.KBAppComponentLabelKey:    managedShardAddTestComponent,
+		},
+		OwnerReferences: []metav1.OwnerReference{
+			*metav1.NewControllerRef(cluster, appsv1.GroupVersion.WithKind(appsv1.ClusterKind)),
+		},
 	}}
-	ctx, graphClient, _ := managedShardAddTestContext(t)
+	ctx, graphClient, _ := managedShardAddTestContext(t, member)
 	handler := &clusterShardingHandler{}
 	dag := managedShardAddTestDAG(graphClient, ctx.Cluster)
 	handled, err := handler.handleManagedShardAdd(ctx, dag, managedShardAddTestSharding,
@@ -1088,13 +1407,59 @@ func TestManagedShardAddOpsRequestParameterContract(t *testing.T) {
 	ctx, _, _, _, status, expected := advanceManagedShardAddToOpsRequestPlan(t)
 	parameters := expected.Spec.CustomOps.CustomOpsComponents[0].Parameters
 	want := []opsv1alpha1.Parameter{
-		{Name: "shardAddToken", Value: status.Token},
-		{Name: "shardingName", Value: managedShardAddTestSharding},
-		{Name: "newShardComponentNames", Value: managedShardAddTestMember},
-		{Name: "targetShardCount", Value: "4"},
+		{Name: "KB_SHARD_ADD_TOKEN", Value: status.Token},
+		{Name: "KB_SHARDING_NAME", Value: managedShardAddTestSharding},
+		{Name: "KB_SHARD_ADD_SHARDS", Value: managedShardAddTestMember},
+		{Name: "KB_SHARD_COUNT", Value: "4"},
 	}
 	if !reflect.DeepEqual(parameters, want) {
 		t.Fatalf("parameters=%#v, want %#v (cluster=%s)", parameters, want, ctx.Cluster.Name)
+	}
+}
+
+func TestManagedShardAddWorkerEnvContractEndToEnd(t *testing.T) {
+	ctx, _, baseClient, _, status, opsRequest := advanceManagedShardAddToOpsRequestPlan(t)
+	opsDef := managedShardAddTestOpsDefinition()
+	opsRequest.UID = types.UID("opsrequest-uid")
+	captureClient := &managedShardAddDryRunCaptureClient{Client: baseClient}
+	componentOps := &opsRequest.Spec.CustomOps.CustomOpsComponents[0]
+	action := &opsDef.Spec.Actions[0]
+	workloadAction := customops.NewWorkloadAction(
+		opsRequest,
+		ctx.Cluster,
+		opsDef,
+		componentOps,
+		&ctx.Cluster.Spec.Shardings[0].Template,
+		opsv1alpha1.ProgressStatusDetail{},
+	)
+
+	result, err := workloadAction.Execute(customops.ActionContext{
+		ReqCtx: intctrlutil.RequestCtx{Ctx: context.Background()},
+		Client: captureClient,
+		Reader: captureClient,
+		Action: action,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result == nil || len(result.ActionTasks) != 1 || captureClient.job == nil {
+		t.Fatalf("managed Job plan result=%#v capturedJob=%#v", result, captureClient.job)
+	}
+
+	env := map[string]string{}
+	for _, item := range captureClient.job.Spec.Template.Spec.Containers[0].Env {
+		env[item.Name] = item.Value
+	}
+	want := map[string]string{
+		"KB_SHARD_ADD_TOKEN":  status.Token,
+		"KB_SHARDING_NAME":    managedShardAddTestSharding,
+		"KB_SHARD_ADD_SHARDS": managedShardAddTestMember,
+		"KB_SHARD_COUNT":      "4",
+	}
+	for name, value := range want {
+		if env[name] != value {
+			t.Fatalf("defaulted managed Job env[%q]=%q, want %q; all env=%#v", name, env[name], value, env)
+		}
 	}
 }
 

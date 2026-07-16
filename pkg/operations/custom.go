@@ -388,6 +388,39 @@ func initOpsDefAndValidate(reqCtx intctrlutil.RequestCtx,
 	return nil
 }
 
+func validateManagedJobOpsRequestOwner(ctx context.Context, reader client.Reader, opsRes *OpsResource) error {
+	if opsRes == nil || opsRes.OpsRequest == nil || opsRes.OpsRequest.Spec.CustomOps == nil ||
+		opsRes.OpsRequest.Spec.CustomOps.ExecutionSnapshot == nil {
+		return nil
+	}
+	if reader == nil {
+		return intctrlutil.NewFatalError("ManagedJob requires a direct API reader for live Cluster authorization")
+	}
+	opsRequest := opsRes.OpsRequest
+	clusterName := opsRequest.Spec.GetClusterName()
+	if clusterName == "" {
+		return intctrlutil.NewFatalError("ManagedJob OpsRequest has no Cluster name")
+	}
+	liveCluster := &appsv1.Cluster{}
+	if err := reader.Get(ctx, client.ObjectKey{Namespace: opsRequest.Namespace, Name: clusterName}, liveCluster); err != nil {
+		if apierrors.IsNotFound(err) {
+			return intctrlutil.NewFatalError(fmt.Sprintf("ManagedJob Cluster %s/%s no longer exists", opsRequest.Namespace, clusterName))
+		}
+		return err
+	}
+	if liveCluster.UID == "" || !liveCluster.DeletionTimestamp.IsZero() {
+		return intctrlutil.NewFatalError(fmt.Sprintf("ManagedJob Cluster %s/%s identity is not current", liveCluster.Namespace, liveCluster.Name))
+	}
+	owner := metav1.GetControllerOf(opsRequest)
+	if owner == nil || owner.APIVersion != appsv1.GroupVersion.String() || owner.Kind != appsv1.ClusterKind ||
+		owner.Name != liveCluster.Name || owner.UID != liveCluster.UID {
+		return intctrlutil.NewFatalError(fmt.Sprintf("ManagedJob OpsRequest %s/%s is not controlled by the exact live Cluster UID",
+			opsRequest.Namespace, opsRequest.Name))
+	}
+	opsRes.Cluster = liveCluster
+	return nil
+}
+
 // ValidateManagedJobOpsDefinition validates the deliberately narrow v1 contract for snapshotted Custom
 // operations. Ordinary Custom operations remain on the legacy Pod and Job paths.
 func ValidateManagedJobOpsDefinition(customSpec *opsv1alpha1.CustomOps, opsDef *opsv1alpha1.OpsDefinition) error {

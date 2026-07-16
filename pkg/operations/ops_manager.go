@@ -60,6 +60,14 @@ func (opsMgr *OpsManager) Do(reqCtx intctrlutil.RequestCtx, cli client.Client, o
 	if opsBehaviour, ok = opsMgr.OpsMap[opsRequest.Spec.Type]; !ok || opsBehaviour.OpsHandler == nil {
 		return &ctrl.Result{}, PatchOpsHandlerNotSupported(reqCtx.Ctx, cli, opsRes)
 	}
+	if opsRequest.Spec.Type == opsv1alpha1.CustomType {
+		if err = validateManagedJobOpsRequestOwner(reqCtx.Ctx, opsRes.Reader, opsRes); err != nil {
+			if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal) {
+				return &ctrl.Result{}, patchValidateErrorCondition(reqCtx.Ctx, cli, opsRes, err.Error())
+			}
+			return nil, err
+		}
+	}
 	if err = opsMgr.initRuntime(reqCtx, cli, opsRes); err != nil {
 		return nil, err
 	}
@@ -166,6 +174,16 @@ func (opsMgr *OpsManager) Reconcile(reqCtx intctrlutil.RequestCtx, cli client.Cl
 
 	if opsBehaviour, ok = opsMgr.OpsMap[opsRes.OpsRequest.Spec.Type]; !ok || opsBehaviour.OpsHandler == nil {
 		return 0, PatchOpsHandlerNotSupported(reqCtx.Ctx, cli, opsRes)
+	}
+	if opsRequest.Spec.Type == opsv1alpha1.CustomType {
+		err = validateManagedJobOpsRequestOwner(reqCtx.Ctx, opsRes.Reader, opsRes)
+		if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal) {
+			return requeueAfter, opsMgr.handleOpsCompleted(reqCtx, cli, opsRes, opsv1alpha1.OpsFailedPhase,
+				opsv1alpha1.NewCancelFailedCondition(opsRequest, err), opsv1alpha1.NewValidateFailedCondition(opsv1alpha1.ReasonValidateFailed, err.Error()))
+		}
+		if err != nil {
+			return requeueAfter, err
+		}
 	}
 	if err = opsMgr.initRuntime(reqCtx, cli, opsRes); err != nil {
 		return 0, err

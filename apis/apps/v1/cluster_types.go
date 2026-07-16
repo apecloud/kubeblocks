@@ -1125,7 +1125,7 @@ type ShardingActionStatus struct {
 	// +optional
 	OpsRequestPhase string `json:"opsRequestPhase,omitempty"`
 
-	// JobName is the exact managed Job name derived from the bound OpsRequest UID.
+	// JobName is the deterministic managed Job name persisted from the Operations task before dispatch.
 	//
 	// +optional
 	JobName string `json:"jobName,omitempty"`
@@ -1135,10 +1135,17 @@ type ShardingActionStatus struct {
 	// +optional
 	JobUID string `json:"jobUID,omitempty"`
 
-	// JobSpecHash binds the API-server-defaulted Job spec accepted by the Operations controller.
+	// JobSpecHash binds the API-server-defaulted Job spec planned by the Operations controller.
 	//
 	// +optional
 	JobSpecHash string `json:"jobSpecHash,omitempty"`
+
+	// RetryCleanupObservedAt is the start of the current continuous interval in which the failed attempt's
+	// OpsRequest, planned Job, and worker Pods were all observed absent. Any reappearance resets this field.
+	// A retry is prepared only after this interval reaches the controller's bounded stability window.
+	//
+	// +optional
+	RetryCleanupObservedAt *metav1.Time `json:"retryCleanupObservedAt,omitempty"`
 
 	// CleanupStarted records that the exact OpsRequest and Job succeeded and that this terminal observation
 	// was persisted before any member marker is removed. Once true, reconciliation only advances the marker

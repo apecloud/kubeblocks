@@ -13068,7 +13068,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>JobName is the exact managed Job name derived from the bound OpsRequest UID.</p>
+<p>JobName is the deterministic managed Job name persisted from the Operations task before dispatch.</p>
 </td>
 </tr>
 <tr>
@@ -13092,7 +13092,23 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>JobSpecHash binds the API-server-defaulted Job spec accepted by the Operations controller.</p>
+<p>JobSpecHash binds the API-server-defaulted Job spec planned by the Operations controller.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>retryCleanupObservedAt</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#time-v1-meta">
+Kubernetes meta/v1.Time
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>RetryCleanupObservedAt is the start of the current continuous interval in which the failed attempt&rsquo;s
+OpsRequest, planned Job, and worker Pods were all observed absent. Any reappearance resets this field.
+A retry is prepared only after this interval reaches the controller&rsquo;s bounded stability window.</p>
 </td>
 </tr>
 <tr>

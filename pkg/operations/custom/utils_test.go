@@ -51,12 +51,18 @@ type jobUIDClient struct {
 	client.Client
 	jobCreates    int
 	dryRunCreates int
+	lastDryRunJob *batchv1.Job
 }
 
 type managedJobOnlyReader struct {
 	client.Reader
 	jobGets        int
 	unexpectedRead int
+}
+
+type managedJobServiceAccountErrorReader struct {
+	client.Reader
+	err error
 }
 
 func (r *managedJobOnlyReader) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
@@ -73,10 +79,19 @@ func (r *managedJobOnlyReader) List(context.Context, client.ObjectList, ...clien
 	return errors.New("dynamic managed Job input list is forbidden after the exact Job exists")
 }
 
+func (r *managedJobServiceAccountErrorReader) Get(ctx context.Context, key client.ObjectKey,
+	obj client.Object, opts ...client.GetOption) error {
+	if _, ok := obj.(*corev1.ServiceAccount); ok {
+		return r.err
+	}
+	return r.Reader.Get(ctx, key, obj, opts...)
+}
+
 func (c *jobUIDClient) Create(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
 	if job, ok := obj.(*batchv1.Job); ok {
 		if len(opts) > 0 {
 			c.dryRunCreates++
+			c.lastDryRunJob = job.DeepCopy()
 		} else {
 			c.jobCreates++
 		}
@@ -987,6 +1002,106 @@ var _ = Describe("custom ops helpers", func() {
 		jobList = &batchv1.JobList{}
 		Expect(cli.List(reqCtx.Ctx, jobList, client.InNamespace(namespace))).Should(Succeed())
 		Expect(jobList.Items).Should(BeEmpty())
+	})
+
+	It("uses only the direct API reader to select the managed Job default ServiceAccount", func() {
+		serviceAccountName := constant.GenerateDefaultServiceAccountName("cmpd")
+		serviceAccount := &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{
+			Name: serviceAccountName, Namespace: namespace,
+		}}
+		cases := []struct {
+			name       string
+			cacheObjs  []client.Object
+			apiObjs    []client.Object
+			wantSAName string
+		}{
+			{
+				name:       "API has ServiceAccount while cache misses it",
+				apiObjs:    []client.Object{serviceAccount},
+				wantSAName: serviceAccountName,
+			},
+			{
+				name:      "cache has deleted ServiceAccount while API does not",
+				cacheObjs: []client.Object{serviceAccount},
+			},
+		}
+		for _, test := range cases {
+			By(test.name)
+			opsRequest := newOpsRequest()
+			opsRequest.Spec.CustomOps.ExecutionSnapshot = &opsv1alpha1.CustomOpsExecutionSnapshot{
+				OpsDefinitionUID:        "opsdef-uid",
+				OpsDefinitionGeneration: 1,
+				OpsDefinitionSpecHash:   strings.Repeat("a", 64),
+				TargetSnapshotHash:      strings.Repeat("b", 64),
+			}
+			cacheClient := &jobUIDClient{Client: newFakeClient(test.cacheObjs...)}
+			workloadAction := NewWorkloadAction(
+				opsRequest,
+				newCluster(),
+				&opsv1alpha1.OpsDefinition{},
+				&opsv1alpha1.CustomOpsComponent{ComponentOps: opsv1alpha1.ComponentOps{ComponentName: compName}},
+				newComponentSpec(),
+				opsv1alpha1.ProgressStatusDetail{},
+			)
+			action := &opsv1alpha1.OpsAction{
+				Name: "managed-job",
+				Workload: &opsv1alpha1.OpsWorkloadAction{
+					Type: opsv1alpha1.ManagedJobWorkload,
+					PodSpec: corev1.PodSpec{
+						Containers: []corev1.Container{{Name: "runner", Image: "busybox"}},
+					},
+				},
+			}
+			_, err := workloadAction.Execute(ActionContext{
+				ReqCtx: reqCtx,
+				Client: cacheClient,
+				Reader: newFakeClient(test.apiObjs...),
+				Action: action,
+			})
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(cacheClient.lastDryRunJob).ShouldNot(BeNil())
+			Expect(cacheClient.lastDryRunJob.Spec.Template.Spec.ServiceAccountName).Should(Equal(test.wantSAName))
+		}
+	})
+
+	It("fails before managed Job dry-run when the direct ServiceAccount read fails", func() {
+		opsRequest := newOpsRequest()
+		opsRequest.Spec.CustomOps.ExecutionSnapshot = &opsv1alpha1.CustomOpsExecutionSnapshot{
+			OpsDefinitionUID:        "opsdef-uid",
+			OpsDefinitionGeneration: 1,
+			OpsDefinitionSpecHash:   strings.Repeat("a", 64),
+			TargetSnapshotHash:      strings.Repeat("b", 64),
+		}
+		cacheClient := &jobUIDClient{Client: newFakeClient()}
+		apiReader := &managedJobServiceAccountErrorReader{
+			Reader: newFakeClient(),
+			err:    errors.New("temporary API read failure"),
+		}
+		workloadAction := NewWorkloadAction(
+			opsRequest,
+			newCluster(),
+			&opsv1alpha1.OpsDefinition{},
+			&opsv1alpha1.CustomOpsComponent{ComponentOps: opsv1alpha1.ComponentOps{ComponentName: compName}},
+			newComponentSpec(),
+			opsv1alpha1.ProgressStatusDetail{},
+		)
+		_, err := workloadAction.Execute(ActionContext{
+			ReqCtx: reqCtx,
+			Client: cacheClient,
+			Reader: apiReader,
+			Action: &opsv1alpha1.OpsAction{
+				Name: "managed-job",
+				Workload: &opsv1alpha1.OpsWorkloadAction{
+					Type: opsv1alpha1.ManagedJobWorkload,
+					PodSpec: corev1.PodSpec{
+						Containers: []corev1.Container{{Name: "runner", Image: "busybox"}},
+					},
+				},
+			},
+		})
+		Expect(err).Should(MatchError("temporary API read failure"))
+		Expect(cacheClient.dryRunCreates).Should(BeZero())
+		Expect(cacheClient.jobCreates).Should(BeZero())
 	})
 
 	It("persists one exact source Pod before dispatching an extracted managed Job", func() {

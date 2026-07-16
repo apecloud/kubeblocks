@@ -17917,12 +17917,12 @@ spec:
                           format: date-time
                           type: string
                         jobName:
-                          description: JobName is the exact managed Job name derived
-                            from the bound OpsRequest UID.
+                          description: JobName is the deterministic managed Job name
+                            persisted from the Operations task before dispatch.
                           type: string
                         jobSpecHash:
                           description: JobSpecHash binds the API-server-defaulted
-                            Job spec accepted by the Operations controller.
+                            Job spec planned by the Operations controller.
                           type: string
                         jobUID:
                           description: JobUID identifies the exact managed Job accepted
@@ -18030,6 +18030,13 @@ spec:
                             Reason is a programmatic identifier indicating the reason for the current phase.
                             e.g., 'PreconditionNotMet' for Pending phase or 'PrerequisiteFailed' for Skipped phase.
                             It must not contain action output, parameter values, credentials, or other sensitive data.
+                          type: string
+                        retryCleanupObservedAt:
+                          description: |-
+                            RetryCleanupObservedAt is the start of the current continuous interval in which the failed attempt's
+                            OpsRequest, planned Job, and worker Pods were all observed absent. Any reappearance resets this field.
+                            A retry is prepared only after this interval reaches the controller's bounded stability window.
+                          format: date-time
                           type: string
                         startTime:
                           description: StartTime records the time when the action

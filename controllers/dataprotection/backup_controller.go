@@ -31,6 +31,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
@@ -637,13 +638,22 @@ func (r *BackupReconciler) handleRunningPhase(
 	)
 	for i := range targets {
 		if err = r.prepareRequestTargetInfo(reqCtx, request, &targets[i]); err != nil {
-			if intctrlutil.IsNotFound(err) {
-				if completed, syncErr := r.syncCompletedJobActions(reqCtx.Ctx, request.Backup); syncErr != nil {
-					return intctrlutil.CheckedRequeueWithError(syncErr, reqCtx.Log, "sync completed backup jobs failed")
-				} else if completed {
-					updateBackupStatusByActionStatus(&request.Status)
-					return r.completeBackup(reqCtx, backup, request.Backup)
-				}
+			jobPhase, syncErr := r.syncJobActions(reqCtx.Ctx, request.Backup)
+			if syncErr != nil {
+				return intctrlutil.CheckedRequeueWithError(syncErr, reqCtx.Log, "sync backup jobs failed")
+			}
+			updateBackupStatusByActionStatus(&request.Status)
+			switch jobPhase {
+			case dpv1alpha1.ActionPhaseCompleted:
+				return r.completeBackup(reqCtx, backup, request.Backup)
+			case dpv1alpha1.ActionPhaseFailed:
+				return r.updateStatusIfFailed(reqCtx, backup, request.Backup,
+					fmt.Errorf("there are failed actions, you can obtain the more information in the status.actions"))
+			case dpv1alpha1.ActionPhaseRunning:
+				waiting = true
+			}
+			if waiting {
+				break
 			}
 			return r.updateStatusIfFailed(reqCtx, backup, request.Backup, err)
 		}
@@ -700,48 +710,37 @@ func (r *BackupReconciler) handleRunningPhase(
 	return r.completeBackup(reqCtx, backup, request.Backup)
 }
 
-func (r *BackupReconciler) syncCompletedJobActions(ctx context.Context, backup *dpv1alpha1.Backup) (bool, error) {
+func (r *BackupReconciler) syncJobActions(ctx context.Context, backup *dpv1alpha1.Backup) (dpv1alpha1.ActionPhase, error) {
 	if len(backup.Status.Actions) == 0 {
-		return false, nil
+		return "", nil
 	}
 
-	jobs := make([]*batchv1.Job, len(backup.Status.Actions))
+	var waiting, existFailed bool
 	for i := range backup.Status.Actions {
 		actionStatus := &backup.Status.Actions[i]
 		objectRef := actionStatus.ObjectRef
 		if objectRef == nil || objectRef.APIVersion != batchv1.SchemeGroupVersion.String() ||
 			objectRef.Kind != constant.JobKind || objectRef.Namespace == "" || objectRef.Name == "" {
-			return false, nil
+			return "", nil
 		}
 
 		job := &batchv1.Job{}
 		if err := r.Client.Get(ctx, client.ObjectKey{Namespace: objectRef.Namespace, Name: objectRef.Name}, job); err != nil {
-			return false, client.IgnoreNotFound(err)
+			if apierrors.IsNotFound(err) {
+				return "", nil
+			}
+			return "", err
 		}
 		if objectRef.UID != "" && objectRef.UID != job.UID {
-			return false, nil
+			return "", nil
 		}
 		if job.Labels[dptypes.BackupNameLabelKey] != backup.Name {
-			return false, nil
+			return "", nil
 		}
-		_, finishedType, _ := dputils.IsJobFinished(job)
-		if finishedType != batchv1.JobComplete {
-			return false, nil
-		}
-		jobs[i] = job
-	}
 
-	for i := range backup.Status.Actions {
-		actionStatus := &backup.Status.Actions[i]
-		job := jobs[i]
-		actionStatus.Phase = dpv1alpha1.ActionPhaseCompleted
+		_, finishedType, failureReason := dputils.IsJobFinished(job)
 		actionStatus.ActionType = dpv1alpha1.ActionTypeJob
 		actionStatus.StartTimestamp = job.CreationTimestamp.DeepCopy()
-		if job.Status.CompletionTime != nil {
-			actionStatus.CompletionTimestamp = job.Status.CompletionTime.DeepCopy()
-		} else {
-			actionStatus.CompletionTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
-		}
 		actionStatus.ObjectRef = &corev1.ObjectReference{
 			APIVersion: batchv1.SchemeGroupVersion.String(),
 			Kind:       constant.JobKind,
@@ -749,8 +748,35 @@ func (r *BackupReconciler) syncCompletedJobActions(ctx context.Context, backup *
 			Name:       job.Name,
 			UID:        job.UID,
 		}
+		if !strings.HasPrefix(actionStatus.FailureReason, dptypes.LogCollectorOutput) {
+			actionStatus.FailureReason = failureReason
+		}
+
+		switch finishedType {
+		case batchv1.JobComplete:
+			actionStatus.Phase = dpv1alpha1.ActionPhaseCompleted
+		case batchv1.JobFailed:
+			actionStatus.Phase = dpv1alpha1.ActionPhaseFailed
+			existFailed = true
+		default:
+			actionStatus.Phase = dpv1alpha1.ActionPhaseRunning
+			actionStatus.CompletionTimestamp = nil
+			waiting = true
+			continue
+		}
+		if job.Status.CompletionTime != nil {
+			actionStatus.CompletionTimestamp = job.Status.CompletionTime.DeepCopy()
+		} else {
+			actionStatus.CompletionTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
+		}
 	}
-	return true, nil
+	if waiting {
+		return dpv1alpha1.ActionPhaseRunning, nil
+	}
+	if existFailed {
+		return dpv1alpha1.ActionPhaseFailed, nil
+	}
+	return dpv1alpha1.ActionPhaseCompleted, nil
 }
 
 func (r *BackupReconciler) completeBackup(reqCtx intctrlutil.RequestCtx,

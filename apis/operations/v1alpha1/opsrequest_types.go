@@ -34,6 +34,7 @@ import (
 // +kubebuilder:validation:XValidation:rule="!has(oldSelf.custom) || !has(oldSelf.custom.executionSnapshot) || (has(self.preConditionDeadlineSeconds) == has(oldSelf.preConditionDeadlineSeconds) && (!has(self.preConditionDeadlineSeconds) || self.preConditionDeadlineSeconds == oldSelf.preConditionDeadlineSeconds))",message="preConditionDeadlineSeconds is immutable for a snapshotted Custom operation"
 // +kubebuilder:validation:XValidation:rule="!has(oldSelf.custom) || !has(oldSelf.custom.executionSnapshot) || (has(self.timeoutSeconds) == has(oldSelf.timeoutSeconds) && (!has(self.timeoutSeconds) || self.timeoutSeconds == oldSelf.timeoutSeconds))",message="timeoutSeconds is immutable for a snapshotted Custom operation"
 // +kubebuilder:validation:XValidation:rule="!has(oldSelf.custom) || !has(oldSelf.custom.executionSnapshot) || self.enqueueOnForce == oldSelf.enqueueOnForce",message="enqueueOnForce is immutable for a snapshotted Custom operation"
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.custom) || !has(oldSelf.custom.executionSnapshot) || self.cancel == oldSelf.cancel",message="cancel is immutable for a snapshotted Custom operation"
 type OpsRequestSpec struct {
 	// Specifies the name of the Cluster resource that this operation is targeting.
 	//
@@ -586,7 +587,7 @@ type CustomOps struct {
 	// validated by its producer. The Operations controller revalidates this snapshot before executing or
 	// observing any action.
 	//
-	// When set, all Custom operation inputs and execution timing fields are immutable except spec.cancel.
+	// When set, all Custom operation inputs, execution timing fields, and spec.cancel are immutable.
 	// Ordinary user-created Custom operations may omit this field and retain the existing behavior.
 	//
 	// +optional
@@ -1107,6 +1108,12 @@ type ActionTask struct {
 	// The name of the Pod that the task is associated with or operates on.
 	// +optional
 	TargetPodName string `json:"targetPodName,omitempty"`
+
+	// TargetPodUID identifies the exact source Pod whose declared environment variables and volumes were
+	// snapshotted into a managed workload. It is empty for tasks that do not extract Pod inputs.
+	//
+	// +optional
+	TargetPodUID string `json:"targetPodUID,omitempty"`
 
 	// TaskIndex is the stable index used to derive the managed workload name.
 	//

@@ -20,6 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package custom
 
 import (
+	"fmt"
+	"reflect"
+
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -156,8 +159,13 @@ func (w *WorkloadAction) buildPodSpec(actionCtx ActionContext,
 		env            []corev1.EnvVar
 	)
 
-	env, err := buildActionPodEnv(actionCtx.ReqCtx, actionCtx.Client, w.Cluster, w.OpsDef, w.OpsRequest,
-		w.Comp, w.CustomCompOps, podInfoExtractor, targetPod)
+	inputReader := client.Reader(actionCtx.Client)
+	if actionCtx.Action.Workload.Type == opsv1alpha1.ManagedJobWorkload {
+		inputReader = actionCtx.directReader()
+	}
+	env, err := buildActionPodEnv(actionCtx.ReqCtx, inputReader, w.Cluster, w.OpsDef, w.OpsRequest,
+		w.Comp, w.CustomCompOps, podInfoExtractor, targetPod,
+		actionCtx.Action.Workload.Type == opsv1alpha1.ManagedJobWorkload)
 	if err != nil {
 		return nil, err
 	}
@@ -168,11 +176,18 @@ func (w *WorkloadAction) buildPodSpec(actionCtx ActionContext,
 				if volume.Name != volumeMount.Name {
 					continue
 				}
+				if actionCtx.Action.Workload.Type == opsv1alpha1.ManagedJobWorkload {
+					allowed := corev1.VolumeSource{Secret: volume.Secret}
+					if volume.Secret == nil || !reflect.DeepEqual(volume.VolumeSource, allowed) {
+						return nil, intctrlutil.NewFatalError(fmt.Sprintf(
+							"managed Job source Pod volume %q must be a Secret volume", volume.Name))
+					}
+				}
 				podSpec.Volumes = append(podSpec.Volumes, volume)
 				volumeMounts = append(volumeMounts, volumeMount)
 			}
 		}
-		if len(podInfoExtractor.VolumeMounts) > 0 {
+		if actionCtx.Action.Workload.Type != opsv1alpha1.ManagedJobWorkload && len(volumeMounts) > 0 {
 			podSpec.NodeSelector = map[string]string{
 				corev1.LabelHostname: targetPod.Spec.NodeName,
 			}

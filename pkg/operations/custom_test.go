@@ -112,6 +112,15 @@ var _ = Describe("CustomOps", func() {
 		}
 
 		Expect(ValidateManagedJobOpsDefinition(newSnapshottedCustom(), newManagedDefinition())).Should(Succeed())
+		withExtractor := newManagedDefinition()
+		withExtractor.Spec.PodInfoExtractors = []opsv1alpha1.PodInfoExtractor{{
+			Name: "source",
+			PodSelector: opsv1alpha1.PodSelector{
+				MultiPodSelectionPolicy: opsv1alpha1.Any,
+			},
+		}}
+		withExtractor.Spec.Actions[0].Workload.PodInfoExtractorName = "source"
+		Expect(ValidateManagedJobOpsDefinition(newSnapshottedCustom(), withExtractor)).Should(Succeed())
 
 		cases := []struct {
 			name   string
@@ -132,11 +141,64 @@ var _ = Describe("CustomOps", func() {
 			{name: "retry", mutate: func(def *opsv1alpha1.OpsDefinition, _ *opsv1alpha1.CustomOps) {
 				def.Spec.Actions[0].Workload.BackoffLimit = 1
 			}},
-			{name: "action extractor", mutate: func(def *opsv1alpha1.OpsDefinition, _ *opsv1alpha1.CustomOps) {
+			{name: "missing extractor definition", mutate: func(def *opsv1alpha1.OpsDefinition, _ *opsv1alpha1.CustomOps) {
 				def.Spec.Actions[0].Workload.PodInfoExtractorName = "pod"
 			}},
-			{name: "definition extractor", mutate: func(def *opsv1alpha1.OpsDefinition, _ *opsv1alpha1.CustomOps) {
-				def.Spec.PodInfoExtractors = []opsv1alpha1.PodInfoExtractor{{Name: "pod"}}
+			{name: "unreferenced extractor definition", mutate: func(def *opsv1alpha1.OpsDefinition, _ *opsv1alpha1.CustomOps) {
+				def.Spec.PodInfoExtractors = []opsv1alpha1.PodInfoExtractor{{
+					Name: "pod",
+					PodSelector: opsv1alpha1.PodSelector{
+						MultiPodSelectionPolicy: opsv1alpha1.Any,
+					},
+				}}
+			}},
+			{name: "all-pod extractor", mutate: func(def *opsv1alpha1.OpsDefinition, _ *opsv1alpha1.CustomOps) {
+				def.Spec.PodInfoExtractors = []opsv1alpha1.PodInfoExtractor{{
+					Name: "pod",
+					PodSelector: opsv1alpha1.PodSelector{
+						MultiPodSelectionPolicy: opsv1alpha1.All,
+					},
+				}}
+				def.Spec.Actions[0].Workload.PodInfoExtractorName = "pod"
+			}},
+			{name: "multiple extractor definitions", mutate: func(def *opsv1alpha1.OpsDefinition, _ *opsv1alpha1.CustomOps) {
+				def.Spec.PodInfoExtractors = []opsv1alpha1.PodInfoExtractor{
+					{Name: "pod", PodSelector: opsv1alpha1.PodSelector{MultiPodSelectionPolicy: opsv1alpha1.Any}},
+					{Name: "unused", PodSelector: opsv1alpha1.PodSelector{MultiPodSelectionPolicy: opsv1alpha1.Any}},
+				}
+				def.Spec.Actions[0].Workload.PodInfoExtractorName = "pod"
+			}},
+			{name: "role selector", mutate: func(def *opsv1alpha1.OpsDefinition, _ *opsv1alpha1.CustomOps) {
+				def.Spec.PodInfoExtractors = []opsv1alpha1.PodInfoExtractor{{
+					Name: "pod", PodSelector: opsv1alpha1.PodSelector{Role: "primary", MultiPodSelectionPolicy: opsv1alpha1.Any},
+				}}
+				def.Spec.Actions[0].Workload.PodInfoExtractorName = "pod"
+			}},
+			{name: "unsupported field path", mutate: func(def *opsv1alpha1.OpsDefinition, _ *opsv1alpha1.CustomOps) {
+				def.Spec.PodInfoExtractors = []opsv1alpha1.PodInfoExtractor{{
+					Name: "pod", PodSelector: opsv1alpha1.PodSelector{MultiPodSelectionPolicy: opsv1alpha1.Any},
+					Env: []opsv1alpha1.OpsEnvVar{{Name: "NODE", ValueFrom: &opsv1alpha1.OpsVarSource{
+						FieldRef: &corev1.ObjectFieldSelector{FieldPath: "spec.nodeName"},
+					}}},
+				}}
+				def.Spec.Actions[0].Workload.PodInfoExtractorName = "pod"
+			}},
+			{name: "duplicate env names", mutate: func(def *opsv1alpha1.OpsDefinition, _ *opsv1alpha1.CustomOps) {
+				env := opsv1alpha1.OpsEnvVar{Name: "DUP", ValueFrom: &opsv1alpha1.OpsVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.name"},
+				}}
+				def.Spec.PodInfoExtractors = []opsv1alpha1.PodInfoExtractor{{
+					Name: "pod", PodSelector: opsv1alpha1.PodSelector{MultiPodSelectionPolicy: opsv1alpha1.Any},
+					Env: []opsv1alpha1.OpsEnvVar{env, env},
+				}}
+				def.Spec.Actions[0].Workload.PodInfoExtractorName = "pod"
+			}},
+			{name: "writable volume mount", mutate: func(def *opsv1alpha1.OpsDefinition, _ *opsv1alpha1.CustomOps) {
+				def.Spec.PodInfoExtractors = []opsv1alpha1.PodInfoExtractor{{
+					Name: "pod", PodSelector: opsv1alpha1.PodSelector{MultiPodSelectionPolicy: opsv1alpha1.Any},
+					VolumeMounts: []corev1.VolumeMount{{Name: "tls", MountPath: "/tls"}},
+				}}
+				def.Spec.Actions[0].Workload.PodInfoExtractorName = "pod"
 			}},
 			{name: "component info", mutate: func(def *opsv1alpha1.OpsDefinition, _ *opsv1alpha1.CustomOps) {
 				def.Spec.ComponentInfos = []opsv1alpha1.ComponentInfo{{ComponentDefinitionName: "redis"}}
@@ -211,14 +273,13 @@ var _ = Describe("CustomOps", func() {
 		expectInvalidUpdate(func(current *opsv1alpha1.OpsRequest) {
 			current.Spec.CustomOps = nil
 		})
-
-		current := &opsv1alpha1.OpsRequest{}
-		Expect(k8sClient.Get(testCtx.Ctx, client.ObjectKeyFromObject(snapshotted), current)).Should(Succeed())
-		current.Spec.Cancel = true
-		Expect(k8sClient.Update(testCtx.Ctx, current)).Should(Succeed())
+		expectInvalidUpdate(func(current *opsv1alpha1.OpsRequest) {
+			current.Spec.Cancel = true
+		})
 
 		ordinary := newCustomOpsRequest("ordinary-custom-"+randomStr, false)
 		Expect(testCtx.CreateObj(testCtx.Ctx, ordinary)).Should(Succeed())
+		current := &opsv1alpha1.OpsRequest{}
 		Expect(k8sClient.Get(testCtx.Ctx, client.ObjectKeyFromObject(ordinary), current)).Should(Succeed())
 		current.Spec.CustomOps.CustomOpsComponents[0].Parameters[0].Value = "token-b"
 		Expect(k8sClient.Update(testCtx.Ctx, current)).Should(Succeed())

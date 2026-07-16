@@ -288,16 +288,15 @@ func (h *clusterShardingHandler) recoverManagedShardAddStatus(transCtx *clusterT
 	}
 	status := &appsv1.ShardingActionStatus{
 		LifecycleActionStatus: appsv1.LifecycleActionStatus{
-			Phase:     appsv1.LifecycleActionRunning,
+			Phase:     appsv1.LifecycleActionPending,
 			Reason:    "PlanRecovered",
-			Message:   "recovered the managed shard-add plan from exact member markers",
+			Message:   "recovered only the managed shard-add plan from exact member markers",
 			StartTime: ptr.To(metav1.Now()),
 		},
 		ClusterGeneration: recovered.ClusterGeneration,
 		Token:             recovered.Token,
 		TargetShardCount:  recovered.TargetShardCount,
 		PlanHash:          recovered.PlanHash,
-		MembersDispatched: true,
 		Members:           make([]appsv1.ShardingActionMemberStatus, len(recovered.Members)),
 	}
 	for i := range recovered.Members {
@@ -883,8 +882,13 @@ func (h *clusterShardingHandler) handleManagedShardAdd(transCtx *clusterTransfor
 		if found {
 			status = recovered
 			status.OpsDefinitionName = action.OpsDefinitionName
+			// Member markers can reconstruct only the plan. They do not carry a write-ahead
+			// OpsRequest/Job attempt identity or stage, so continuing could replay an effect
+			// whose status was lost.
+			h.failManagedShardAdd(status, "AttemptStateLost",
+				"member markers recovered the plan, but durable attempt/stage identity is missing; automatic replay is forbidden")
 			h.setManagedShardAddStatus(transCtx, shardingName, status)
-			return true, intctrlutil.NewDelayedRequeueError(time.Second, "requeue after recovering the managed shard-add plan")
+			return true, nil
 		}
 		if len(toCreate) == 0 {
 			return false, nil

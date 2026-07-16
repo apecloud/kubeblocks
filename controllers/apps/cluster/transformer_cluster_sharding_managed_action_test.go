@@ -1067,13 +1067,20 @@ func TestManagedShardAddRecoversOneExactMarkerSet(t *testing.T) {
 	dag := managedShardAddTestDAG(graphClient, ctx.Cluster)
 	handled, err := handler.handleManagedShardAdd(ctx, dag, managedShardAddTestSharding,
 		map[string]*appsv1.Component{member.Name: member}, map[string]*appsv1.Component{}, sets.New[string]())
-	if !handled || !intctrlutil.IsDelayedRequeueError(err) {
+	if !handled || err != nil {
 		t.Fatalf("recovery handled=%v err=%v", handled, err)
 	}
 	recovered := ctx.Cluster.Status.Shardings[managedShardAddTestSharding].ShardAdd
-	if recovered == nil || recovered.Reason != "PlanRecovered" || !recovered.MembersDispatched ||
+	if recovered == nil || recovered.Reason != "AttemptStateLost" || recovered.MembersDispatched ||
+		recovered.Phase != appsv1.LifecycleActionFailed || recovered.CompletionTime == nil ||
 		recovered.Token != status.Token || recovered.PlanHash != status.PlanHash {
 		t.Fatalf("recovered status=%#v, source=%#v", recovered, status)
+	}
+	if got := graphClient.FindAll(dag, &appsv1.Component{}); len(got) != 0 {
+		t.Fatalf("marker-only recovery scheduled %d Component writes", len(got))
+	}
+	if got := graphClient.FindAll(dag, &opsv1alpha1.OpsRequest{}); len(got) != 0 {
+		t.Fatalf("marker-only recovery scheduled %d OpsRequest writes", len(got))
 	}
 }
 

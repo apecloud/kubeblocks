@@ -453,6 +453,19 @@ string
 </tr>
 <tr>
 <td>
+<code>targetPodUID</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>TargetPodUID identifies the exact source Pod whose declared environment variables and volumes were
+snapshotted into a managed workload. It is empty for tasks that do not extract Pod inputs.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>taskIndex</code><br/>
 <em>
 int32
@@ -900,7 +913,7 @@ CustomOpsExecutionSnapshot
 <p>ExecutionSnapshot binds a managed Custom operation to the exact OpsDefinition and target identities
 validated by its producer. The Operations controller revalidates this snapshot before executing or
 observing any action.</p>
-<p>When set, all Custom operation inputs and execution timing fields are immutable except spec.cancel.
+<p>When set, all Custom operation inputs, execution timing fields, and spec.cancel are immutable.
 Ordinary user-created Custom operations may omit this field and retain the existing behavior.</p>
 </td>
 </tr>
@@ -3207,7 +3220,8 @@ OpsWorkloadType
 Note: unlike Jobs, manually deleting a Pod does not affect the <code>backoffLimit</code>.</li>
 <li>&ldquo;ManagedJob&rdquo;: Persists the expected Job identity before creating it, binds the exact Job UID after
 creation, and fails instead of recreating a missing or changed Job. ManagedJob requires an execution
-snapshot on the Custom OpsRequest and does not support PodInfoExtractor or retries.</li>
+snapshot on the Custom OpsRequest and does not support retries. It may use one PodInfoExtractor with
+MultiPodSelectionPolicy=Any; the exact source Pod identity is persisted before dispatch.</li>
 </ul>
 </td>
 </tr>

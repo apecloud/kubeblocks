@@ -21,6 +21,7 @@ package custom
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -40,6 +41,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	opsutil "github.com/apecloud/kubeblocks/pkg/operations/util"
@@ -49,6 +51,26 @@ type jobUIDClient struct {
 	client.Client
 	jobCreates    int
 	dryRunCreates int
+}
+
+type managedJobOnlyReader struct {
+	client.Reader
+	jobGets        int
+	unexpectedRead int
+}
+
+func (r *managedJobOnlyReader) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+	if _, ok := obj.(*batchv1.Job); !ok {
+		r.unexpectedRead++
+		return errors.New("dynamic managed Job input read is forbidden after the exact Job exists")
+	}
+	r.jobGets++
+	return r.Reader.Get(ctx, key, obj, opts...)
+}
+
+func (r *managedJobOnlyReader) List(context.Context, client.ObjectList, ...client.ListOption) error {
+	r.unexpectedRead++
+	return errors.New("dynamic managed Job input list is forbidden after the exact Job exists")
 }
 
 func (c *jobUIDClient) Create(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
@@ -88,6 +110,7 @@ var _ = Describe("custom ops helpers", func() {
 		Expect(batchv1.AddToScheme(scheme)).Should(Succeed())
 		Expect(appsv1.AddToScheme(scheme)).Should(Succeed())
 		Expect(opsv1alpha1.AddToScheme(scheme)).Should(Succeed())
+		Expect(workloads.AddToScheme(scheme)).Should(Succeed())
 		reqCtx = intctrlutil.RequestCtx{Ctx: context.Background()}
 	})
 
@@ -124,7 +147,7 @@ var _ = Describe("custom ops helpers", func() {
 
 	newCluster := func() *appsv1.Cluster {
 		return &appsv1.Cluster{
-			ObjectMeta: metav1.ObjectMeta{Name: cluster, Namespace: namespace},
+			ObjectMeta: metav1.ObjectMeta{Name: cluster, Namespace: namespace, UID: types.UID("cluster-uid")},
 			Spec: appsv1.ClusterSpec{
 				ComponentSpecs: []appsv1.ClusterComponentSpec{{
 					Name:         compName,
@@ -133,6 +156,35 @@ var _ = Describe("custom ops helpers", func() {
 				}},
 			},
 		}
+	}
+
+	managedSourceOwnerObjects := func(clusterObj *appsv1.Cluster, shardingName string, pod *corev1.Pod) []client.Object {
+		shortComponentName := pod.Labels[constant.KBAppComponentLabelKey]
+		component := &appsv1.Component{ObjectMeta: metav1.ObjectMeta{
+			Name:      constant.GenerateClusterComponentName(clusterObj.Name, shortComponentName),
+			Namespace: clusterObj.Namespace,
+			UID:       types.UID("component-" + pod.Name + "-uid"),
+			Labels: map[string]string{
+				constant.AppInstanceLabelKey:       clusterObj.Name,
+				constant.KBAppComponentLabelKey:    shortComponentName,
+				constant.KBAppShardingNameLabelKey: shardingName,
+			},
+			OwnerReferences: []metav1.OwnerReference{
+				*metav1.NewControllerRef(clusterObj, appsv1.GroupVersion.WithKind(appsv1.ClusterKind)),
+			},
+		}}
+		instanceSet := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{
+			Name:      component.Name,
+			Namespace: component.Namespace,
+			UID:       types.UID("instanceset-" + pod.Name + "-uid"),
+			OwnerReferences: []metav1.OwnerReference{
+				*metav1.NewControllerRef(component, appsv1.GroupVersion.WithKind(appsv1.ComponentKind)),
+			},
+		}}
+		pod.OwnerReferences = []metav1.OwnerReference{
+			*metav1.NewControllerRef(instanceSet, workloads.GroupVersion.WithKind(workloads.InstanceSetKind)),
+		}
+		return []client.Object{component, instanceSet, pod}
 	}
 
 	newComponentSpec := func() *appsv1.ClusterComponentSpec {
@@ -340,6 +392,7 @@ var _ = Describe("custom ops helpers", func() {
 			},
 			nil,
 			newTargetPod("target-0"),
+			false,
 		)
 
 		Expect(err).ShouldNot(HaveOccurred())
@@ -823,6 +876,14 @@ var _ = Describe("custom ops helpers", func() {
 		)
 		actionCtx := ActionContext{ReqCtx: reqCtx, Client: cli, Reader: cli, Action: action}
 
+		noReaderCtx := actionCtx
+		noReaderCtx.Reader = nil
+		_, err := workloadAction.Execute(noReaderCtx)
+		Expect(err).Should(HaveOccurred())
+		Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeTrue())
+		Expect(cli.dryRunCreates).Should(BeZero())
+		Expect(cli.jobCreates).Should(BeZero())
+
 		planned, err := workloadAction.Execute(actionCtx)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(planned.ActionTasks).Should(HaveLen(1))
@@ -836,6 +897,22 @@ var _ = Describe("custom ops helpers", func() {
 		jobList := &batchv1.JobList{}
 		Expect(cli.List(reqCtx.Ctx, jobList, client.InNamespace(namespace))).Should(Succeed())
 		Expect(jobList.Items).Should(BeEmpty())
+
+		workloadAction.progressDetail = opsv1alpha1.ProgressStatusDetail{ActionTasks: planned.ActionTasks}
+		_, err = workloadAction.CheckStatus(noReaderCtx)
+		Expect(err).Should(HaveOccurred())
+		Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeTrue())
+		Expect(cli.dryRunCreates).Should(Equal(1))
+		Expect(cli.jobCreates).Should(BeZero())
+
+		unexpectedSourceTasks := append([]opsv1alpha1.ActionTask(nil), planned.ActionTasks...)
+		unexpectedSourceTasks[0].TargetPodName = "unexpected"
+		unexpectedSourceTasks[0].TargetPodUID = "unexpected-uid"
+		workloadAction.progressDetail = opsv1alpha1.ProgressStatusDetail{ActionTasks: unexpectedSourceTasks}
+		_, err = workloadAction.CheckStatus(actionCtx)
+		Expect(err).Should(HaveOccurred())
+		Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeTrue())
+		Expect(cli.jobCreates).Should(BeZero())
 
 		workloadAction.progressDetail = opsv1alpha1.ProgressStatusDetail{ActionTasks: planned.ActionTasks}
 		created, err := workloadAction.CheckStatus(actionCtx)
@@ -912,6 +989,361 @@ var _ = Describe("custom ops helpers", func() {
 		Expect(jobList.Items).Should(BeEmpty())
 	})
 
+	It("persists one exact source Pod before dispatching an extracted managed Job", func() {
+		clusterObj := newCluster()
+		clusterObj.Spec.ComponentSpecs = nil
+		clusterObj.Spec.Shardings = []appsv1.ClusterSharding{{
+			Name: "shard",
+			Template: appsv1.ClusterComponentSpec{
+				Name: "redis", ComponentDef: "cmpd", Replicas: 2,
+			},
+		}}
+		newSourcePod := func(name, uid, componentName string) *corev1.Pod {
+			labels := constant.GetClusterLabels(cluster)
+			labels[constant.KBAppShardingNameLabelKey] = "shard"
+			labels[constant.KBAppComponentLabelKey] = componentName
+			return &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: name, Namespace: namespace, UID: types.UID(uid), Labels: labels,
+				},
+				Spec: corev1.PodSpec{
+					NodeName: "node-1",
+					Containers: []corev1.Container{{
+						Name: "redis",
+						Env: []corev1.EnvVar{
+							{
+								Name: "REDIS_DEFAULT_PASSWORD",
+								ValueFrom: &corev1.EnvVarSource{SecretKeyRef: &corev1.SecretKeySelector{
+									LocalObjectReference: corev1.LocalObjectReference{Name: "cluster-shard-default"},
+									Key:                  constant.AccountPasswdForSecret,
+								}},
+							},
+							{Name: "TLS_ENABLED", Value: "true"},
+						},
+					}},
+					Volumes: []corev1.Volume{{
+						Name: "tls",
+						VolumeSource: corev1.VolumeSource{Secret: &corev1.SecretVolumeSource{
+							SecretName: "cluster-shard-0-tls-certs",
+						}},
+					}},
+				},
+				Status: corev1.PodStatus{
+					Phase: corev1.PodRunning,
+					Conditions: []corev1.PodCondition{{
+						Type: corev1.PodReady, Status: corev1.ConditionTrue,
+					}},
+				},
+			}
+		}
+		sourceB := newSourcePod("source-b", "source-b-uid", "shard-1")
+		sourceA := newSourcePod("source-a", "source-a-uid", "shard-0")
+		spoofed := newSourcePod("source-0-spoofed", "spoofed-uid", "shard-spoofed")
+		opsDef := &opsv1alpha1.OpsDefinition{Spec: opsv1alpha1.OpsDefinitionSpec{
+			PodInfoExtractors: []opsv1alpha1.PodInfoExtractor{{
+				Name: "source",
+				PodSelector: opsv1alpha1.PodSelector{
+					MultiPodSelectionPolicy: opsv1alpha1.Any,
+				},
+				Env: []opsv1alpha1.OpsEnvVar{
+					{
+						Name: "REDIS_DEFAULT_PASSWORD",
+						ValueFrom: &opsv1alpha1.OpsVarSource{EnvVarRef: &opsv1alpha1.EnvVarRef{
+							TargetContainerName: "redis", EnvName: "REDIS_DEFAULT_PASSWORD",
+						}},
+					},
+					{
+						Name: "REDIS_TLS_ENABLED",
+						ValueFrom: &opsv1alpha1.OpsVarSource{EnvVarRef: &opsv1alpha1.EnvVarRef{
+							TargetContainerName: "redis", EnvName: "TLS_ENABLED",
+						}},
+					},
+					{
+						Name: "REDIS_SOURCE_POD_NAME",
+						ValueFrom: &opsv1alpha1.OpsVarSource{FieldRef: &corev1.ObjectFieldSelector{
+							FieldPath: "metadata.name",
+						}},
+					},
+				},
+				VolumeMounts: []corev1.VolumeMount{{Name: "tls", MountPath: "/etc/redis/tls", ReadOnly: true}},
+			}},
+		}}
+		action := &opsv1alpha1.OpsAction{
+			Name:          "managed-job",
+			FailurePolicy: opsv1alpha1.FailurePolicyFail,
+			Workload: &opsv1alpha1.OpsWorkloadAction{
+				Type:                 opsv1alpha1.ManagedJobWorkload,
+				PodInfoExtractorName: "source",
+				BackoffLimit:         0,
+				PodSpec: corev1.PodSpec{
+					Containers: []corev1.Container{{Name: "runner", Image: "redis:7"}},
+				},
+			},
+		}
+		opsDef.Spec.Actions = []opsv1alpha1.OpsAction{*action}
+		opsRequest := newOpsRequest()
+		opsRequest.Spec.CustomOps.ExecutionSnapshot = &opsv1alpha1.CustomOpsExecutionSnapshot{
+			OpsDefinitionUID:        "opsdef-uid",
+			OpsDefinitionGeneration: 1,
+			OpsDefinitionSpecHash:   strings.Repeat("a", 64),
+			TargetSnapshotHash:      strings.Repeat("b", 64),
+		}
+		objects := []client.Object{spoofed}
+		objects = append(objects, managedSourceOwnerObjects(clusterObj, "shard", sourceB)...)
+		objects = append(objects, managedSourceOwnerObjects(clusterObj, "shard", sourceA)...)
+		cli := &jobUIDClient{Client: newFakeClient(objects...)}
+		workloadAction := NewWorkloadAction(
+			opsRequest,
+			clusterObj,
+			opsDef,
+			&opsv1alpha1.CustomOpsComponent{
+				ComponentOps: opsv1alpha1.ComponentOps{ComponentName: "shard"},
+				Parameters:   []opsv1alpha1.Parameter{{Name: "shardAddToken", Value: "generation-7"}},
+			},
+			&clusterObj.Spec.Shardings[0].Template,
+			opsv1alpha1.ProgressStatusDetail{},
+		)
+		actionCtx := ActionContext{ReqCtx: reqCtx, Client: cli, Reader: cli, Action: action}
+
+		planned, err := workloadAction.Execute(actionCtx)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(planned.ActionTasks).Should(HaveLen(1))
+		Expect(planned.ActionTasks[0].TargetPodName).Should(Equal("source-a"))
+		Expect(planned.ActionTasks[0].TargetPodUID).Should(Equal("source-a-uid"))
+		Expect(planned.ActionTasks[0].DispatchState).Should(Equal(opsv1alpha1.PlannedActionTaskDispatchState))
+		Expect(cli.jobCreates).Should(BeZero())
+
+		workloadAction.progressDetail = opsv1alpha1.ProgressStatusDetail{ActionTasks: planned.ActionTasks}
+		created, err := workloadAction.CheckStatus(actionCtx)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(created.ActionTasks[0].TargetPodName).Should(Equal("source-a"))
+		Expect(created.ActionTasks[0].TargetPodUID).Should(Equal("source-a-uid"))
+		Expect(cli.jobCreates).Should(Equal(1))
+
+		job := &batchv1.Job{}
+		Expect(cli.Get(reqCtx.Ctx, client.ObjectKey{
+			Namespace: namespace,
+			Name:      getNameFromObjectKey(created.ActionTasks[0].ObjectKey),
+		}, job)).Should(Succeed())
+		envMap := envByName(job.Spec.Template.Spec.Containers[0].Env)
+		Expect(envMap["REDIS_DEFAULT_PASSWORD"].ValueFrom.SecretKeyRef.Name).Should(Equal("cluster-shard-default"))
+		Expect(envMap["REDIS_TLS_ENABLED"].Value).Should(Equal("true"))
+		Expect(envMap["REDIS_SOURCE_POD_NAME"].Value).Should(Equal("source-a"))
+		Expect(job.Spec.Template.Spec.Volumes).Should(ContainElement(sourceA.Spec.Volumes[0]))
+		Expect(job.Spec.Template.Spec.Containers[0].VolumeMounts).Should(ContainElement(
+			corev1.VolumeMount{Name: "tls", MountPath: "/etc/redis/tls", ReadOnly: true}))
+		Expect(job.Spec.Template.Spec.NodeSelector).Should(BeEmpty())
+	})
+
+	It("fails closed instead of changing an extracted managed Job source Pod", func() {
+		type fixture struct {
+			source         *corev1.Pod
+			alternate      *corev1.Pod
+			client         *jobUIDClient
+			workloadAction *WorkloadAction
+			actionCtx      ActionContext
+			planned        *ActionStatus
+		}
+		newFixture := func() *fixture {
+			clusterObj := newCluster()
+			clusterObj.Spec.ComponentSpecs = nil
+			clusterObj.Spec.Shardings = []appsv1.ClusterSharding{{
+				Name: "shard",
+				Template: appsv1.ClusterComponentSpec{
+					Name: "redis", ComponentDef: "cmpd", Replicas: 2,
+				},
+			}}
+			newSource := func(name, uid, componentName, credential string) *corev1.Pod {
+				labels := constant.GetClusterLabels(cluster)
+				labels[constant.KBAppShardingNameLabelKey] = "shard"
+				labels[constant.KBAppComponentLabelKey] = componentName
+				return &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: name, Namespace: namespace, UID: types.UID(uid), Labels: labels,
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{{
+							Name: "redis",
+							Env:  []corev1.EnvVar{{Name: "CREDENTIAL", Value: credential}},
+						}},
+					},
+					Status: corev1.PodStatus{
+						Phase: corev1.PodRunning,
+						Conditions: []corev1.PodCondition{{
+							Type: corev1.PodReady, Status: corev1.ConditionTrue,
+						}},
+					},
+				}
+			}
+			source := newSource("source-a", "source-a-uid", "shard-0", "credential-a")
+			alternate := newSource("source-b", "source-b-uid", "shard-1", "credential-b")
+			opsDef := &opsv1alpha1.OpsDefinition{Spec: opsv1alpha1.OpsDefinitionSpec{
+				PodInfoExtractors: []opsv1alpha1.PodInfoExtractor{{
+					Name: "source",
+					PodSelector: opsv1alpha1.PodSelector{
+						MultiPodSelectionPolicy: opsv1alpha1.Any,
+					},
+					Env: []opsv1alpha1.OpsEnvVar{{
+						Name: "CREDENTIAL",
+						ValueFrom: &opsv1alpha1.OpsVarSource{EnvVarRef: &opsv1alpha1.EnvVarRef{
+							TargetContainerName: "redis", EnvName: "CREDENTIAL",
+						}},
+					}},
+					VolumeMounts: []corev1.VolumeMount{{Name: "tls", MountPath: "/etc/pki/tls", ReadOnly: true}},
+				}},
+			}}
+			action := &opsv1alpha1.OpsAction{
+				Name:          "managed-job",
+				FailurePolicy: opsv1alpha1.FailurePolicyFail,
+				Workload: &opsv1alpha1.OpsWorkloadAction{
+					Type:                 opsv1alpha1.ManagedJobWorkload,
+					PodInfoExtractorName: "source",
+					PodSpec: corev1.PodSpec{
+						Containers: []corev1.Container{{Name: "runner", Image: "redis:7"}},
+					},
+				},
+			}
+			opsDef.Spec.Actions = []opsv1alpha1.OpsAction{*action}
+			opsRequest := newOpsRequest()
+			opsRequest.Spec.CustomOps.ExecutionSnapshot = &opsv1alpha1.CustomOpsExecutionSnapshot{
+				OpsDefinitionUID:        "opsdef-uid",
+				OpsDefinitionGeneration: 1,
+				OpsDefinitionSpecHash:   strings.Repeat("a", 64),
+				TargetSnapshotHash:      strings.Repeat("b", 64),
+			}
+			objects := managedSourceOwnerObjects(clusterObj, "shard", alternate)
+			objects = append(objects, managedSourceOwnerObjects(clusterObj, "shard", source)...)
+			cli := &jobUIDClient{Client: newFakeClient(objects...)}
+			workloadAction := NewWorkloadAction(
+				opsRequest,
+				clusterObj,
+				opsDef,
+				&opsv1alpha1.CustomOpsComponent{ComponentOps: opsv1alpha1.ComponentOps{ComponentName: "shard"}},
+				&clusterObj.Spec.Shardings[0].Template,
+				opsv1alpha1.ProgressStatusDetail{},
+			)
+			actionCtx := ActionContext{ReqCtx: reqCtx, Client: cli, Reader: cli, Action: action}
+			planned, err := workloadAction.Execute(actionCtx)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(planned.ActionTasks).Should(HaveLen(1))
+			Expect(planned.ActionTasks[0].TargetPodName).Should(Equal(source.Name))
+			Expect(planned.ActionTasks[0].TargetPodUID).Should(Equal(string(source.UID)))
+			return &fixture{
+				source: source, alternate: alternate, client: cli,
+				workloadAction: workloadAction, actionCtx: actionCtx, planned: planned,
+			}
+		}
+		dispatch := func(f *fixture) error {
+			f.workloadAction.progressDetail = opsv1alpha1.ProgressStatusDetail{ActionTasks: f.planned.ActionTasks}
+			_, err := f.workloadAction.CheckStatus(f.actionCtx)
+			return err
+		}
+		assertFatalWithoutJob := func(f *fixture, err error) {
+			Expect(err).Should(HaveOccurred())
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeTrue())
+			Expect(f.client.jobCreates).Should(BeZero())
+		}
+
+		By("failing when both the planned Job and exact source Pod are absent")
+		missing := newFixture()
+		Expect(missing.client.Delete(reqCtx.Ctx, missing.source)).Should(Succeed())
+		assertFatalWithoutJob(missing, dispatch(missing))
+
+		By("failing instead of accepting a same-name replacement source Pod")
+		replaced := newFixture()
+		Expect(replaced.client.Delete(reqCtx.Ctx, replaced.source)).Should(Succeed())
+		replacement := replaced.source.DeepCopy()
+		replacement.ResourceVersion = ""
+		replacement.UID = types.UID("replacement-uid")
+		Expect(replaced.client.Create(reqCtx.Ctx, replacement)).Should(Succeed())
+		assertFatalWithoutJob(replaced, dispatch(replaced))
+
+		By("failing when the persisted source Pod starts terminating")
+		terminating := newFixture()
+		liveTerminating := &corev1.Pod{}
+		Expect(terminating.client.Get(reqCtx.Ctx, client.ObjectKeyFromObject(terminating.source), liveTerminating)).Should(Succeed())
+		liveTerminating.Finalizers = []string{"test-finalizer"}
+		Expect(terminating.client.Update(reqCtx.Ctx, liveTerminating)).Should(Succeed())
+		Expect(terminating.client.Delete(reqCtx.Ctx, liveTerminating)).Should(Succeed())
+		assertFatalWithoutJob(terminating, dispatch(terminating))
+
+		By("failing when the persisted source identity tuple is incomplete")
+		malformed := newFixture()
+		malformed.planned.ActionTasks[0].TargetPodUID = ""
+		assertFatalWithoutJob(malformed, dispatch(malformed))
+
+		By("failing when extracted inputs change on the exact source Pod")
+		drifted := newFixture()
+		liveSource := &corev1.Pod{}
+		Expect(drifted.client.Get(reqCtx.Ctx, client.ObjectKeyFromObject(drifted.source), liveSource)).Should(Succeed())
+		liveSource.Spec.Containers[0].Env[0].Value = "credential-changed"
+		Expect(drifted.client.Update(reqCtx.Ctx, liveSource)).Should(Succeed())
+		assertFatalWithoutJob(drifted, dispatch(drifted))
+
+		By("rejecting ConfigMapKeyRef instead of copying its value")
+		configMapRef := newFixture()
+		liveSource = &corev1.Pod{}
+		Expect(configMapRef.client.Get(reqCtx.Ctx, client.ObjectKeyFromObject(configMapRef.source), liveSource)).Should(Succeed())
+		liveSource.Spec.Containers[0].Env[0] = corev1.EnvVar{
+			Name: "CREDENTIAL",
+			ValueFrom: &corev1.EnvVarSource{ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+				LocalObjectReference: corev1.LocalObjectReference{Name: "settings"}, Key: "credential",
+			}},
+		}
+		Expect(configMapRef.client.Update(reqCtx.Ctx, liveSource)).Should(Succeed())
+		assertFatalWithoutJob(configMapRef, dispatch(configMapRef))
+
+		By("rejecting envFrom instead of reading source objects")
+		envFrom := newFixture()
+		liveSource = &corev1.Pod{}
+		Expect(envFrom.client.Get(reqCtx.Ctx, client.ObjectKeyFromObject(envFrom.source), liveSource)).Should(Succeed())
+		liveSource.Spec.Containers[0].Env = nil
+		liveSource.Spec.Containers[0].EnvFrom = []corev1.EnvFromSource{{
+			ConfigMapRef: &corev1.ConfigMapEnvSource{LocalObjectReference: corev1.LocalObjectReference{Name: "settings"}},
+		}}
+		Expect(envFrom.client.Update(reqCtx.Ctx, liveSource)).Should(Succeed())
+		assertFatalWithoutJob(envFrom, dispatch(envFrom))
+
+		By("rejecting a non-Secret extracted volume")
+		pvcVolume := newFixture()
+		liveSource = &corev1.Pod{}
+		Expect(pvcVolume.client.Get(reqCtx.Ctx, client.ObjectKeyFromObject(pvcVolume.source), liveSource)).Should(Succeed())
+		liveSource.Spec.Volumes = []corev1.Volume{{
+			Name: "tls", VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: "data"}},
+		}}
+		Expect(pvcVolume.client.Update(reqCtx.Ctx, liveSource)).Should(Succeed())
+		assertFatalWithoutJob(pvcVolume, dispatch(pvcVolume))
+
+		By("binding a response-lost exact Job before consulting a disappeared source Pod")
+		responseLost := newFixture()
+		responseLost.workloadAction.progressDetail = opsv1alpha1.ProgressStatusDetail{ActionTasks: responseLost.planned.ActionTasks}
+		firstDispatch, err := responseLost.workloadAction.CheckStatus(responseLost.actionCtx)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(firstDispatch.ActionTasks[0].DispatchState).Should(Equal(opsv1alpha1.CreatedActionTaskDispatchState))
+		responseLostJob := &batchv1.Job{}
+		Expect(responseLost.client.Get(reqCtx.Ctx, client.ObjectKey{
+			Namespace: namespace,
+			Name:      getNameFromObjectKey(firstDispatch.ActionTasks[0].ObjectKey),
+		}, responseLostJob)).Should(Succeed())
+		Expect(responseLostJob.Spec.Template.Spec.NodeSelector).Should(BeEmpty())
+		Expect(responseLostJob.Spec.Template.Spec.Volumes).ShouldNot(ContainElement(HaveField("Name", "tls")))
+		Expect(responseLostJob.Spec.Template.Spec.Containers[0].VolumeMounts).ShouldNot(ContainElement(HaveField("Name", "tls")))
+		initialDryRuns := responseLost.client.dryRunCreates
+		initialCreates := responseLost.client.jobCreates
+		Expect(responseLost.client.Delete(reqCtx.Ctx, responseLost.source)).Should(Succeed())
+		jobOnlyReader := &managedJobOnlyReader{Reader: responseLost.client}
+		responseLost.actionCtx.Reader = jobOnlyReader
+		responseLost.workloadAction.progressDetail = opsv1alpha1.ProgressStatusDetail{ActionTasks: responseLost.planned.ActionTasks}
+		bound, err := responseLost.workloadAction.CheckStatus(responseLost.actionCtx)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(bound.ActionTasks[0].DispatchState).Should(Equal(opsv1alpha1.CreatedActionTaskDispatchState))
+		Expect(bound.ActionTasks[0].WorkloadUID).Should(Equal("managed-job-uid"))
+		Expect(responseLost.client.dryRunCreates).Should(Equal(initialDryRuns))
+		Expect(responseLost.client.jobCreates).Should(Equal(initialCreates))
+		Expect(jobOnlyReader.jobGets).Should(Equal(1))
+		Expect(jobOnlyReader.unexpectedRead).Should(BeZero())
+	})
+
 	It("binds a matching managed Job after create confirmation is lost without another dry-run or create", func() {
 		opsRequest := newOpsRequest()
 		opsRequest.Spec.CustomOps.ExecutionSnapshot = &opsv1alpha1.CustomOpsExecutionSnapshot{
@@ -951,7 +1383,7 @@ var _ = Describe("custom ops helpers", func() {
 		Expect(cli.jobCreates).Should(BeZero())
 
 		// Simulate a successful Create whose Created/UID status update was not observed.
-		live, err := workloadAction.buildExpectedManagedJob(actionCtx, 0)
+		live, err := workloadAction.buildExpectedManagedJob(actionCtx, 0, nil, nil)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(cli.Create(reqCtx.Ctx, live)).Should(Succeed())
 		Expect(cli.jobCreates).Should(Equal(1))

@@ -434,8 +434,25 @@ func ValidateManagedJobOpsDefinitionSpec(opsDef *opsv1alpha1.OpsDefinition) erro
 	if action.Workload.BackoffLimit != 0 {
 		return intctrlutil.NewFatalError("ManagedJob requires backoffLimit=0")
 	}
-	if action.Workload.PodInfoExtractorName != "" || len(opsDef.Spec.PodInfoExtractors) != 0 {
-		return intctrlutil.NewFatalError("ManagedJob does not support PodInfoExtractor")
+	extractorName := action.Workload.PodInfoExtractorName
+	if extractorName == "" {
+		if len(opsDef.Spec.PodInfoExtractors) != 0 {
+			return intctrlutil.NewFatalError("ManagedJob has unreferenced PodInfoExtractors")
+		}
+	} else {
+		if len(opsDef.Spec.PodInfoExtractors) != 1 || opsDef.Spec.PodInfoExtractors[0].Name != extractorName {
+			return intctrlutil.NewFatalError("ManagedJob requires exactly one referenced PodInfoExtractor")
+		}
+		extractor := &opsDef.Spec.PodInfoExtractors[0]
+		if extractor.PodSelector.MultiPodSelectionPolicy != opsv1alpha1.Any {
+			return intctrlutil.NewFatalError("ManagedJob PodInfoExtractor requires multiPodSelectionPolicy=Any")
+		}
+		if extractor.PodSelector.Role != "" {
+			return intctrlutil.NewFatalError("ManagedJob PodInfoExtractor does not support role selection")
+		}
+		if err := validateManagedJobPodInfoExtractor(extractor); err != nil {
+			return err
+		}
 	}
 	if len(opsDef.Spec.ComponentInfos) != 0 {
 		return intctrlutil.NewFatalError("ManagedJob does not support componentInfos")
@@ -444,6 +461,49 @@ func ValidateManagedJobOpsDefinitionSpec(opsDef *opsv1alpha1.OpsDefinition) erro
 		return intctrlutil.NewFatalError("ManagedJob does not support preConditions")
 	}
 	return nil
+}
+
+func validateManagedJobPodInfoExtractor(extractor *opsv1alpha1.PodInfoExtractor) error {
+	envNames := map[string]struct{}{}
+	for i := range extractor.Env {
+		env := &extractor.Env[i]
+		if _, ok := envNames[env.Name]; ok {
+			return intctrlutil.NewFatalError(fmt.Sprintf("ManagedJob PodInfoExtractor has duplicate env name %q", env.Name))
+		}
+		envNames[env.Name] = struct{}{}
+		if env.ValueFrom == nil || (env.ValueFrom.EnvVarRef == nil) == (env.ValueFrom.FieldRef == nil) {
+			return intctrlutil.NewFatalError(fmt.Sprintf("ManagedJob PodInfoExtractor env %q requires exactly one envRef or fieldPath", env.Name))
+		}
+		if env.ValueFrom.EnvVarRef != nil {
+			if env.ValueFrom.EnvVarRef.TargetContainerName == "" || env.ValueFrom.EnvVarRef.EnvName == "" {
+				return intctrlutil.NewFatalError(fmt.Sprintf("ManagedJob PodInfoExtractor env %q requires an exact container and env name", env.Name))
+			}
+			continue
+		}
+		if !isManagedJobPodFieldPath(env.ValueFrom.FieldRef.FieldPath) {
+			return intctrlutil.NewFatalError(fmt.Sprintf("ManagedJob PodInfoExtractor env %q supports only metadata.name or metadata.namespace fieldPath", env.Name))
+		}
+	}
+	if len(extractor.VolumeMounts) > 1 {
+		return intctrlutil.NewFatalError("ManagedJob PodInfoExtractor supports at most one Secret volume mount")
+	}
+	for i := range extractor.VolumeMounts {
+		mount := &extractor.VolumeMounts[i]
+		if mount.Name == "" || mount.MountPath == "" || !mount.ReadOnly || mount.SubPath != "" ||
+			mount.SubPathExpr != "" || mount.MountPropagation != nil {
+			return intctrlutil.NewFatalError("ManagedJob PodInfoExtractor requires one read-only Secret volume mount without subPath or mount propagation")
+		}
+	}
+	return nil
+}
+
+func isManagedJobPodFieldPath(fieldPath string) bool {
+	switch strings.TrimPrefix(fieldPath, ".") {
+	case "metadata.name", "metadata.namespace":
+		return true
+	default:
+		return false
+	}
 }
 
 func validateOpsDefinitionExecutionSnapshot(snapshot *opsv1alpha1.CustomOpsExecutionSnapshot,

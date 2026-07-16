@@ -254,7 +254,7 @@ spec:
                       validated by its producer. The Operations controller revalidates this snapshot before executing or
                       observing any action.
 
-                      When set, all Custom operation inputs and execution timing fields are immutable except spec.cancel.
+                      When set, all Custom operation inputs, execution timing fields, and spec.cancel are immutable.
                       Ordinary user-created Custom operations may omit this field and retain the existing behavior.
                     properties:
                       opsDefinitionGeneration:
@@ -3385,6 +3385,9 @@ spec:
             - message: enqueueOnForce is immutable for a snapshotted Custom operation
               rule: '!has(oldSelf.custom) || !has(oldSelf.custom.executionSnapshot)
                 || self.enqueueOnForce == oldSelf.enqueueOnForce'
+            - message: cancel is immutable for a snapshotted Custom operation
+              rule: '!has(oldSelf.custom) || !has(oldSelf.custom.executionSnapshot)
+                || self.cancel == oldSelf.cancel'
           status:
             description: OpsRequestStatus represents the observed state of an OpsRequest.
             properties:
@@ -3488,6 +3491,11 @@ spec:
                                 targetPodName:
                                   description: The name of the Pod that the task is
                                     associated with or operates on.
+                                  type: string
+                                targetPodUID:
+                                  description: |-
+                                    TargetPodUID identifies the exact source Pod whose declared environment variables and volumes were
+                                    snapshotted into a managed workload. It is empty for tasks that do not extract Pod inputs.
                                   type: string
                                 taskIndex:
                                   description: TaskIndex is the stable index used

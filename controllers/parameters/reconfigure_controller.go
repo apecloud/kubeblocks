@@ -557,6 +557,8 @@ func reconciled(status reconfigure.Status, policy string, phase parametersv1alph
 		SucceedCount:  status.SucceedCount,
 		Retry:         true,
 		Message:       status.Reason,
+		Code:          status.Code,
+		Retryable:     status.Retryable,
 	}
 	for _, option := range options {
 		option(&result)
@@ -583,8 +585,8 @@ func isReconciledResult(result parameters.Result) bool {
 func withFailed(err error, retry bool) options {
 	return func(result *parameters.Result) {
 		result.Retry = retry
+		result.Failed = !retry || err != nil
 		if err != nil {
-			result.Failed = true
 			result.Message = err.Error()
 		}
 	}

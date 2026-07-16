@@ -5273,6 +5273,33 @@ spec:
                           items:
                             type: string
                           type: array
+                        parameters:
+                          description: Records managed parameter assignments touched
+                            by a Reconfiguring OpsRequest.
+                          items:
+                            description: LastParameterAssignment records one managed
+                              parameter value before an OpsRequest changed it.
+                            properties:
+                              key:
+                                description: Key is the managed parameter key.
+                                type: string
+                              present:
+                                description: Present distinguishes an absent assignment
+                                  from a present assignment whose value is nil.
+                                type: boolean
+                              value:
+                                description: |-
+                                  Value records the previous value when the assignment was present.
+                                  A nil value with present=true represents an explicit parameter removal.
+                                type: string
+                            required:
+                            - key
+                            - present
+                            type: object
+                          type: array
+                          x-kubernetes-list-map-keys:
+                          - key
+                          x-kubernetes-list-type: map
                         replicas:
                           description: Records the `replicas` of the Component prior
                             to any changes.
@@ -5398,6 +5425,66 @@ spec:
                 description: Represents the progress of the OpsRequest.
                 pattern: ^(\d+|\-)/(\d+|\-)$
                 type: string
+              reconfigureRollback:
+                description: |-
+                  Records deterministic rollback progress for a Reconfiguring OpsRequest.
+                  It is populated only when the normalized Action result permits automatic rollback.
+                properties:
+                  clusterGeneration:
+                    description: ClusterGeneration binds the controlled restart write
+                      to one Cluster generation.
+                    format: int64
+                    type: integer
+                  code:
+                    description: Code is the normalized Action failure code that authorized
+                      automatic rollback.
+                    maxLength: 63
+                    pattern: ^[A-Z][A-Za-z0-9]*$
+                    type: string
+                  componentGenerations:
+                    additionalProperties:
+                      format: int64
+                      type: integer
+                    description: ComponentGenerations binds each rollback write to
+                      the resulting ComponentParameter generation.
+                    type: object
+                  message:
+                    description: Message describes the current rollback outcome without
+                      exposing raw Action stderr.
+                    maxLength: 1024
+                    type: string
+                  phase:
+                    description: Phase is the current durable rollback step.
+                    enum:
+                    - RollbackPending
+                    - RollingBack
+                    - RestartPending
+                    - Restarting
+                    - RolledBack
+                    - ManualCleanupRequired
+                    type: string
+                  restartAt:
+                    description: RestartAt is the stable timestamp used for an idempotent
+                      controlled restart.
+                    format: date-time
+                    type: string
+                  restartRequired:
+                    description: RestartRequired is true when H1 may have reached
+                      at least one runtime before rollback.
+                    type: boolean
+                  retryable:
+                    description: Retryable records the retry property associated with
+                      Code.
+                    type: boolean
+                  startTime:
+                    description: |-
+                      StartTime is the persisted start of automatic rollback. It anchors the
+                      rollback-specific timeout when the OpsRequest has no explicit timeout.
+                    format: date-time
+                    type: string
+                required:
+                - phase
+                type: object
               startTimestamp:
                 description: Records the time when the OpsRequest started processing.
                 format: date-time

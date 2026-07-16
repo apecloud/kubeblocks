@@ -31,6 +31,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -58,6 +59,53 @@ var _ = Describe("update reconciler test", func() {
 
 		It("uses nil options when reconfigure args are empty", func() {
 			Expect(reconfigureOptions(workloads.ConfigTemplate{})).Should(BeNil())
+		})
+
+		It("persists each reconfigure transition and does not redispatch a terminal failure", func() {
+			spy := &lifecycleCallSpy{reconfigureErr: lifecycle.ErrActionFailed}
+			origNewLifecycleAction := newLifecycleAction
+			newLifecycleAction = func(_ *workloads.InstanceSet, _ *kubebuilderx.ObjectTree, _ *corev1.Pod) (lifecycle.Lifecycle, error) {
+				return spy, nil
+			}
+			defer func() { newLifecycleAction = origNewLifecycleAction }()
+
+			workload := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Name: "mysql", Namespace: "default"}}
+			pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "mysql-0", UID: types.UID("pod-uid")}}
+			config := workloads.ConfigTemplate{
+				Name:       "mysql-config",
+				ConfigHash: ptr.To("target-hash"),
+				Reconfigure: &kbappsv1.Action{
+					Exec: &kbappsv1.ExecAction{Command: []string{"false"}},
+				},
+			}
+			tree := kubebuilderx.NewObjectTree()
+			tree.SetRoot(workload)
+			reconciler := &updateReconciler{}
+
+			for _, wantPhase := range []kbappsv1.LifecycleActionPhase{
+				kbappsv1.LifecycleActionPending,
+				kbappsv1.LifecycleActionRunning,
+				kbappsv1.LifecycleActionFailed,
+			} {
+				state, err := reconciler.reconfigureInst(tree, workload, pod, config)
+				Expect(err).ShouldNot(HaveOccurred())
+				Expect(state).Should(Equal(lifecycle.ActionObservationUpdated))
+				Expect(workload.Status.InstanceStatus).Should(HaveLen(1))
+				Expect(workload.Status.InstanceStatus[0].PodUID).Should(Equal(string(pod.UID)))
+				Expect(workload.Status.InstanceStatus[0].LifecycleActions).Should(HaveLen(1))
+				status := workload.Status.InstanceStatus[0].LifecycleActions[0]
+				Expect(status.Phase).Should(Equal(wantPhase))
+				Expect(status.Action).Should(Equal(kbappsv1.LifecycleActionReconfigure))
+				Expect(status.Subject).Should(Equal(config.Name))
+				Expect(status.Revision).Should(Equal(*config.ConfigHash))
+				Expect(status.Target).Should(Equal(&kbappsv1.LifecycleActionTarget{PodName: pod.Name, PodUID: string(pod.UID)}))
+			}
+
+			state, err := reconciler.reconfigureInst(tree, workload, pod, config)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(state).Should(Equal(lifecycle.ActionObservationFailed))
+			Expect(spy.reconfigureCalls).Should(Equal(1))
+			Expect(workload.Status.InstanceStatus[0].LifecycleActions[0].Message).Should(Equal("lifecycle action failed"))
 		})
 	})
 
@@ -584,6 +632,7 @@ var _ = Describe("update reconciler test", func() {
 type lifecycleCallSpy struct {
 	switchoverCalls  int
 	reconfigureCalls int
+	reconfigureErr   error
 }
 
 func (s *lifecycleCallSpy) PostProvision(_ context.Context, _ client.Reader, _ *lifecycle.Options) error {
@@ -613,7 +662,7 @@ func (s *lifecycleCallSpy) MemberLeave(_ context.Context, _ client.Reader, _ *li
 
 func (s *lifecycleCallSpy) Reconfigure(_ context.Context, _ client.Reader, _ *lifecycle.Options, _ map[string]string) error {
 	s.reconfigureCalls++
-	return nil
+	return s.reconfigureErr
 }
 
 func (s *lifecycleCallSpy) AccountProvision(_ context.Context, _ client.Reader, _ *lifecycle.Options, _, _, _ string) error {

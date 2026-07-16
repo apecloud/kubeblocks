@@ -138,9 +138,15 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			updatePolicy = recreatePolicy
 		}
 
-		allUpdated, err := r.reconfigure(tree, inst, pod)
+		allUpdated, actionState, err := r.reconfigure(tree, inst, pod)
 		if err != nil {
 			return kubebuilderx.Continue, err
+		}
+		switch actionState {
+		case lifecycle.ActionObservationUpdated:
+			return kubebuilderx.RetryAfter(time.Second), nil
+		case lifecycle.ActionObservationFailed:
+			return kubebuilderx.Continue, nil
 		}
 		if !allUpdated && updatePolicy == noOpsPolicy {
 			continue
@@ -213,22 +219,26 @@ func (r *updateReconciler) switchover(tree *kubebuilderx.ObjectTree, inst *workl
 	return nil
 }
 
-func (r *updateReconciler) reconfigure(tree *kubebuilderx.ObjectTree, inst *workloads.Instance, pod *corev1.Pod) (bool, error) {
+func (r *updateReconciler) reconfigure(tree *kubebuilderx.ObjectTree, inst *workloads.Instance, pod *corev1.Pod) (bool, lifecycle.ActionObservationState, error) {
 	toUpdate, err := configsToUpdate(inst, pod)
 	if err != nil {
-		return false, err
+		return false, "", err
 	}
 	for _, config := range toUpdate {
-		if err = r.reconfigureInst(tree, inst, pod, config); err != nil {
-			return false, err
+		state, err := r.reconfigureInst(tree, inst, pod, config)
+		if err != nil {
+			return false, "", err
+		}
+		if state != lifecycle.ActionObservationSucceeded {
+			return false, state, nil
 		}
 	}
-	return len(toUpdate) == 0, nil
+	return len(toUpdate) == 0, lifecycle.ActionObservationSucceeded, nil
 }
 
-func (r *updateReconciler) reconfigureInst(tree *kubebuilderx.ObjectTree, inst *workloads.Instance, pod *corev1.Pod, config workloads.ConfigTemplate) error {
+func (r *updateReconciler) reconfigureInst(tree *kubebuilderx.ObjectTree, inst *workloads.Instance, pod *corev1.Pod, config workloads.ConfigTemplate) (lifecycle.ActionObservationState, error) {
 	if config.Reconfigure == nil {
-		return nil
+		return lifecycle.ActionObservationSucceeded, nil
 	}
 
 	instCopy := inst.DeepCopy()
@@ -239,27 +249,25 @@ func (r *updateReconciler) reconfigureInst(tree *kubebuilderx.ObjectTree, inst *
 
 	lfa, err := newLifecycleAction(instCopy, []*corev1.Pod{pod}, pod)
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	opts := reconfigureOptions(config)
-	if len(config.ReconfigureActionName) == 0 {
-		err = lfa.Reconfigure(tree.Context, nil, opts, config.Parameters)
-	} else {
-		err = lfa.UserDefined(tree.Context, nil, opts, config.ReconfigureActionName, config.Reconfigure, config.Parameters)
-	}
-	if err != nil {
-		if errors.Is(err, lifecycle.ErrActionNotDefined) {
-			return nil
+	inst.Status.PodUID = string(pod.UID)
+	inst.Status.LifecycleActions = lifecycle.FilterActionObservationsForPod(inst.Status.LifecycleActions, pod)
+	key := lifecycle.NewActionObservationKey(kbappsv1.LifecycleActionReconfigure, config.Name, ptr.Deref(config.ConfigHash, ""), pod)
+	state, observationErr := lifecycle.ReconcileActionObservation(&inst.Status.LifecycleActions, key, func() error {
+		opts := reconfigureOptions(config)
+		if len(config.ReconfigureActionName) == 0 {
+			err = lfa.Reconfigure(tree.Context, nil, opts, config.Parameters)
+		} else {
+			err = lfa.UserDefined(tree.Context, nil, opts, config.ReconfigureActionName, config.Reconfigure, config.Parameters)
 		}
-		if errors.Is(err, lifecycle.ErrPreconditionFailed) {
-			return intctrlutil.NewDelayedRequeueError(time.Second,
-				fmt.Sprintf("replicas not up-to-date when reconfiguring: %s", err.Error()))
+		if err == nil {
+			tree.Logger.Info("successfully reconfigure the pod", "pod", pod.Name, "configHash", ptr.Deref(config.ConfigHash, ""))
 		}
 		return err
-	}
-	tree.Logger.Info("successfully reconfigure the pod", "pod", pod.Name, "configHash", ptr.Deref(config.ConfigHash, ""))
-	return nil
+	})
+	return state, observationErr
 }
 
 func reconfigureOptions(config workloads.ConfigTemplate) *lifecycle.Options {

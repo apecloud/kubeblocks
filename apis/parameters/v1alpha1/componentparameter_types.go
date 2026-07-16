@@ -348,4 +348,14 @@ type ReconcileDetail struct {
 	//
 	// +optional
 	ErrMessage string `json:"errMessage,omitempty"`
+
+	// Code is an optional normalized lifecycle Action failure code.
+	//
+	// +optional
+	Code appsv1.ActionResultCode `json:"code,omitempty"`
+
+	// Retryable reports the retry property declared for Code.
+	//
+	// +optional
+	Retryable *bool `json:"retryable,omitempty"`
 }

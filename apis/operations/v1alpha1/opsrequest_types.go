@@ -972,6 +972,11 @@ type OpsRequestStatus struct {
 	// +optional
 	LastConfiguration LastConfiguration `json:"lastConfiguration,omitempty"`
 
+	// Records deterministic rollback progress for a Reconfiguring OpsRequest.
+	// It is populated only when the normalized Action result permits automatic rollback.
+	// +optional
+	ReconfigureRollback *ReconfigureRollbackStatus `json:"reconfigureRollback,omitempty"`
+
 	// Records the status information of Components changed due to the OpsRequest.
 	// +optional
 	Components map[string]OpsRequestComponentStatus `json:"components,omitempty"`
@@ -1063,6 +1068,22 @@ type ActionTask struct {
 	Retries int32 `json:"retries,omitempty"`
 }
 
+// LastParameterAssignment records one managed parameter value before an OpsRequest changed it.
+type LastParameterAssignment struct {
+	// Key is the managed parameter key.
+	// +kubebuilder:validation:Required
+	Key string `json:"key"`
+
+	// Present distinguishes an absent assignment from a present assignment whose value is nil.
+	// +kubebuilder:validation:Required
+	Present bool `json:"present"`
+
+	// Value records the previous value when the assignment was present.
+	// A nil value with present=true represents an explicit parameter removal.
+	// +optional
+	Value *string `json:"value,omitempty"`
+}
+
 // LastComponentConfiguration can be used to track and compare the desired state of the Component over time.
 type LastComponentConfiguration struct {
 	// Records the `replicas` of the Component prior to any changes.
@@ -1101,6 +1122,14 @@ type LastComponentConfiguration struct {
 	// Records the name of the ComponentDefinition prior to any changes.
 	// +optional
 	ComponentDefinitionName string `json:"componentDefinitionName,omitempty"`
+
+	// Records managed parameter assignments touched by a Reconfiguring OpsRequest.
+	// +patchMergeKey=key
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=key
+	// +optional
+	Parameters []LastParameterAssignment `json:"parameters,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"key"`
 }
 
 type LastConfiguration struct {
@@ -1108,6 +1137,60 @@ type LastConfiguration struct {
 	// Records the configuration of each Component prior to any changes.
 	// +optional
 	Components map[string]LastComponentConfiguration `json:"components,omitempty"`
+}
+
+// ReconfigureRollbackPhase identifies a durable rollback step.
+// +enum
+type ReconfigureRollbackPhase string
+
+const (
+	ReconfigureRollbackPending       ReconfigureRollbackPhase = "RollbackPending"
+	ReconfigureRollingBack           ReconfigureRollbackPhase = "RollingBack"
+	ReconfigureRestartPending        ReconfigureRollbackPhase = "RestartPending"
+	ReconfigureRestarting            ReconfigureRollbackPhase = "Restarting"
+	ReconfigureRolledBack            ReconfigureRollbackPhase = "RolledBack"
+	ReconfigureManualCleanupRequired ReconfigureRollbackPhase = "ManualCleanupRequired"
+)
+
+// ReconfigureRollbackStatus records the persisted compensation state for a Reconfiguring OpsRequest.
+type ReconfigureRollbackStatus struct {
+	// Phase is the current durable rollback step.
+	// +kubebuilder:validation:Enum=RollbackPending;RollingBack;RestartPending;Restarting;RolledBack;ManualCleanupRequired
+	Phase ReconfigureRollbackPhase `json:"phase"`
+
+	// StartTime is the persisted start of automatic rollback. It anchors the
+	// rollback-specific timeout when the OpsRequest has no explicit timeout.
+	// +optional
+	StartTime *metav1.Time `json:"startTime,omitempty"`
+
+	// Code is the normalized Action failure code that authorized automatic rollback.
+	// +optional
+	Code appsv1.ActionResultCode `json:"code,omitempty"`
+
+	// Retryable records the retry property associated with Code.
+	// +optional
+	Retryable *bool `json:"retryable,omitempty"`
+
+	// ComponentGenerations binds each rollback write to the resulting ComponentParameter generation.
+	// +optional
+	ComponentGenerations map[string]int64 `json:"componentGenerations,omitempty"`
+
+	// RestartRequired is true when H1 may have reached at least one runtime before rollback.
+	// +optional
+	RestartRequired bool `json:"restartRequired,omitempty"`
+
+	// RestartAt is the stable timestamp used for an idempotent controlled restart.
+	// +optional
+	RestartAt *metav1.Time `json:"restartAt,omitempty"`
+
+	// ClusterGeneration binds the controlled restart write to one Cluster generation.
+	// +optional
+	ClusterGeneration int64 `json:"clusterGeneration,omitempty"`
+
+	// Message describes the current rollback outcome without exposing raw Action stderr.
+	// +kubebuilder:validation:MaxLength=1024
+	// +optional
+	Message string `json:"message,omitempty"`
 }
 
 type OpsRequestComponentStatus struct {

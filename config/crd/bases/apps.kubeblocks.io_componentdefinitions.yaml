@@ -4099,6 +4099,54 @@ spec:
 
                             This field cannot be updated.
                           type: string
+                        resultPolicy:
+                          description: |-
+                            ResultPolicy normalizes implementation-specific Action failures.
+
+                            The policy is optional. Existing Actions that omit it retain their current behavior.
+                            An unmapped failure remains generic and consumers must not infer semantics from stderr.
+
+                            This field cannot be updated.
+                          properties:
+                            failureCodes:
+                              description: |-
+                                FailureCodes maps implementation-specific failures to normalized codes.
+
+                                Each exec exit code can be declared at most once. Multiple exit codes may
+                                use the same normalized code by adding one entry for each exit code.
+                              items:
+                                description: ActionFailureCode maps an implementation-specific
+                                  failure to a normalized result code.
+                                properties:
+                                  code:
+                                    description: Code is the normalized result reported
+                                      to callers.
+                                    maxLength: 63
+                                    pattern: ^[A-Z][A-Za-z0-9]*$
+                                    type: string
+                                  execExitCode:
+                                    description: ExecExitCode is the non-zero process
+                                      exit code associated with code.
+                                    format: int32
+                                    maximum: 255
+                                    minimum: 1
+                                    type: integer
+                                  retry:
+                                    description: Retry indicates whether kbagent may
+                                      retry this normalized failure under the Action
+                                      retry policy.
+                                    type: boolean
+                                required:
+                                - code
+                                - execExitCode
+                                - retry
+                                type: object
+                              maxItems: 32
+                              type: array
+                              x-kubernetes-list-map-keys:
+                              - execExitCode
+                              x-kubernetes-list-type: map
+                          type: object
                         retryPolicy:
                           description: |-
                             Defines the strategy to be taken when retrying the Action after a failure.
@@ -4153,6 +4201,9 @@ spec:
                           format: int32
                           type: integer
                       type: object
+                      x-kubernetes-validations:
+                      - message: resultPolicy is only supported for exec actions
+                        rule: '!has(self.resultPolicy) || has(self.exec)'
                     restartOnFileChange:
                       description: Specifies whether to restart the workload when
                         the file changes.
@@ -4684,6 +4735,54 @@ spec:
 
                           This field cannot be updated.
                         type: string
+                      resultPolicy:
+                        description: |-
+                          ResultPolicy normalizes implementation-specific Action failures.
+
+                          The policy is optional. Existing Actions that omit it retain their current behavior.
+                          An unmapped failure remains generic and consumers must not infer semantics from stderr.
+
+                          This field cannot be updated.
+                        properties:
+                          failureCodes:
+                            description: |-
+                              FailureCodes maps implementation-specific failures to normalized codes.
+
+                              Each exec exit code can be declared at most once. Multiple exit codes may
+                              use the same normalized code by adding one entry for each exit code.
+                            items:
+                              description: ActionFailureCode maps an implementation-specific
+                                failure to a normalized result code.
+                              properties:
+                                code:
+                                  description: Code is the normalized result reported
+                                    to callers.
+                                  maxLength: 63
+                                  pattern: ^[A-Z][A-Za-z0-9]*$
+                                  type: string
+                                execExitCode:
+                                  description: ExecExitCode is the non-zero process
+                                    exit code associated with code.
+                                  format: int32
+                                  maximum: 255
+                                  minimum: 1
+                                  type: integer
+                                retry:
+                                  description: Retry indicates whether kbagent may
+                                    retry this normalized failure under the Action
+                                    retry policy.
+                                  type: boolean
+                              required:
+                              - code
+                              - execExitCode
+                              - retry
+                              type: object
+                            maxItems: 32
+                            type: array
+                            x-kubernetes-list-map-keys:
+                            - execExitCode
+                            x-kubernetes-list-type: map
+                        type: object
                       retryPolicy:
                         description: |-
                           Defines the strategy to be taken when retrying the Action after a failure.
@@ -4738,6 +4837,9 @@ spec:
                         format: int32
                         type: integer
                     type: object
+                    x-kubernetes-validations:
+                    - message: resultPolicy is only supported for exec actions
+                      rule: '!has(self.resultPolicy) || has(self.exec)'
                   availableProbe:
                     description: |-
                       Defines the procedure which is invoked regularly to assess the availability of the component.
@@ -5113,6 +5215,54 @@ spec:
 
                           This field cannot be updated.
                         type: string
+                      resultPolicy:
+                        description: |-
+                          ResultPolicy normalizes implementation-specific Action failures.
+
+                          The policy is optional. Existing Actions that omit it retain their current behavior.
+                          An unmapped failure remains generic and consumers must not infer semantics from stderr.
+
+                          This field cannot be updated.
+                        properties:
+                          failureCodes:
+                            description: |-
+                              FailureCodes maps implementation-specific failures to normalized codes.
+
+                              Each exec exit code can be declared at most once. Multiple exit codes may
+                              use the same normalized code by adding one entry for each exit code.
+                            items:
+                              description: ActionFailureCode maps an implementation-specific
+                                failure to a normalized result code.
+                              properties:
+                                code:
+                                  description: Code is the normalized result reported
+                                    to callers.
+                                  maxLength: 63
+                                  pattern: ^[A-Z][A-Za-z0-9]*$
+                                  type: string
+                                execExitCode:
+                                  description: ExecExitCode is the non-zero process
+                                    exit code associated with code.
+                                  format: int32
+                                  maximum: 255
+                                  minimum: 1
+                                  type: integer
+                                retry:
+                                  description: Retry indicates whether kbagent may
+                                    retry this normalized failure under the Action
+                                    retry policy.
+                                  type: boolean
+                              required:
+                              - code
+                              - execExitCode
+                              - retry
+                              type: object
+                            maxItems: 32
+                            type: array
+                            x-kubernetes-list-map-keys:
+                            - execExitCode
+                            x-kubernetes-list-type: map
+                        type: object
                       retryPolicy:
                         description: |-
                           Defines the strategy to be taken when retrying the Action after a failure.
@@ -5173,6 +5323,9 @@ spec:
                         format: int32
                         type: integer
                     type: object
+                    x-kubernetes-validations:
+                    - message: resultPolicy is only supported for exec actions
+                      rule: '!has(self.resultPolicy) || has(self.exec)'
                   dataDump:
                     description: |-
                       Defines the procedure for exporting the data from a replica.
@@ -5546,6 +5699,54 @@ spec:
 
                           This field cannot be updated.
                         type: string
+                      resultPolicy:
+                        description: |-
+                          ResultPolicy normalizes implementation-specific Action failures.
+
+                          The policy is optional. Existing Actions that omit it retain their current behavior.
+                          An unmapped failure remains generic and consumers must not infer semantics from stderr.
+
+                          This field cannot be updated.
+                        properties:
+                          failureCodes:
+                            description: |-
+                              FailureCodes maps implementation-specific failures to normalized codes.
+
+                              Each exec exit code can be declared at most once. Multiple exit codes may
+                              use the same normalized code by adding one entry for each exit code.
+                            items:
+                              description: ActionFailureCode maps an implementation-specific
+                                failure to a normalized result code.
+                              properties:
+                                code:
+                                  description: Code is the normalized result reported
+                                    to callers.
+                                  maxLength: 63
+                                  pattern: ^[A-Z][A-Za-z0-9]*$
+                                  type: string
+                                execExitCode:
+                                  description: ExecExitCode is the non-zero process
+                                    exit code associated with code.
+                                  format: int32
+                                  maximum: 255
+                                  minimum: 1
+                                  type: integer
+                                retry:
+                                  description: Retry indicates whether kbagent may
+                                    retry this normalized failure under the Action
+                                    retry policy.
+                                  type: boolean
+                              required:
+                              - code
+                              - execExitCode
+                              - retry
+                              type: object
+                            maxItems: 32
+                            type: array
+                            x-kubernetes-list-map-keys:
+                            - execExitCode
+                            x-kubernetes-list-type: map
+                        type: object
                       retryPolicy:
                         description: |-
                           Defines the strategy to be taken when retrying the Action after a failure.
@@ -5600,6 +5801,9 @@ spec:
                         format: int32
                         type: integer
                     type: object
+                    x-kubernetes-validations:
+                    - message: resultPolicy is only supported for exec actions
+                      rule: '!has(self.resultPolicy) || has(self.exec)'
                   dataLoad:
                     description: |-
                       Defines the procedure for importing data into a replica.
@@ -5968,6 +6172,54 @@ spec:
 
                           This field cannot be updated.
                         type: string
+                      resultPolicy:
+                        description: |-
+                          ResultPolicy normalizes implementation-specific Action failures.
+
+                          The policy is optional. Existing Actions that omit it retain their current behavior.
+                          An unmapped failure remains generic and consumers must not infer semantics from stderr.
+
+                          This field cannot be updated.
+                        properties:
+                          failureCodes:
+                            description: |-
+                              FailureCodes maps implementation-specific failures to normalized codes.
+
+                              Each exec exit code can be declared at most once. Multiple exit codes may
+                              use the same normalized code by adding one entry for each exit code.
+                            items:
+                              description: ActionFailureCode maps an implementation-specific
+                                failure to a normalized result code.
+                              properties:
+                                code:
+                                  description: Code is the normalized result reported
+                                    to callers.
+                                  maxLength: 63
+                                  pattern: ^[A-Z][A-Za-z0-9]*$
+                                  type: string
+                                execExitCode:
+                                  description: ExecExitCode is the non-zero process
+                                    exit code associated with code.
+                                  format: int32
+                                  maximum: 255
+                                  minimum: 1
+                                  type: integer
+                                retry:
+                                  description: Retry indicates whether kbagent may
+                                    retry this normalized failure under the Action
+                                    retry policy.
+                                  type: boolean
+                              required:
+                              - code
+                              - execExitCode
+                              - retry
+                              type: object
+                            maxItems: 32
+                            type: array
+                            x-kubernetes-list-map-keys:
+                            - execExitCode
+                            x-kubernetes-list-type: map
+                        type: object
                       retryPolicy:
                         description: |-
                           Defines the strategy to be taken when retrying the Action after a failure.
@@ -6022,6 +6274,9 @@ spec:
                         format: int32
                         type: integer
                     type: object
+                    x-kubernetes-validations:
+                    - message: resultPolicy is only supported for exec actions
+                      rule: '!has(self.resultPolicy) || has(self.exec)'
                   memberJoin:
                     description: "Defines the procedure to add a new replica to the
                       replication group.\n\nThis action is initiated after a replica
@@ -6393,6 +6648,54 @@ spec:
 
                           This field cannot be updated.
                         type: string
+                      resultPolicy:
+                        description: |-
+                          ResultPolicy normalizes implementation-specific Action failures.
+
+                          The policy is optional. Existing Actions that omit it retain their current behavior.
+                          An unmapped failure remains generic and consumers must not infer semantics from stderr.
+
+                          This field cannot be updated.
+                        properties:
+                          failureCodes:
+                            description: |-
+                              FailureCodes maps implementation-specific failures to normalized codes.
+
+                              Each exec exit code can be declared at most once. Multiple exit codes may
+                              use the same normalized code by adding one entry for each exit code.
+                            items:
+                              description: ActionFailureCode maps an implementation-specific
+                                failure to a normalized result code.
+                              properties:
+                                code:
+                                  description: Code is the normalized result reported
+                                    to callers.
+                                  maxLength: 63
+                                  pattern: ^[A-Z][A-Za-z0-9]*$
+                                  type: string
+                                execExitCode:
+                                  description: ExecExitCode is the non-zero process
+                                    exit code associated with code.
+                                  format: int32
+                                  maximum: 255
+                                  minimum: 1
+                                  type: integer
+                                retry:
+                                  description: Retry indicates whether kbagent may
+                                    retry this normalized failure under the Action
+                                    retry policy.
+                                  type: boolean
+                              required:
+                              - code
+                              - execExitCode
+                              - retry
+                              type: object
+                            maxItems: 32
+                            type: array
+                            x-kubernetes-list-map-keys:
+                            - execExitCode
+                            x-kubernetes-list-type: map
+                        type: object
                       retryPolicy:
                         description: |-
                           Defines the strategy to be taken when retrying the Action after a failure.
@@ -6447,6 +6750,9 @@ spec:
                         format: int32
                         type: integer
                     type: object
+                    x-kubernetes-validations:
+                    - message: resultPolicy is only supported for exec actions
+                      rule: '!has(self.resultPolicy) || has(self.exec)'
                   memberLeave:
                     description: "Defines the procedure to remove a replica from the
                       replication group.\n\nThis action is initiated before remove
@@ -6820,6 +7126,54 @@ spec:
 
                           This field cannot be updated.
                         type: string
+                      resultPolicy:
+                        description: |-
+                          ResultPolicy normalizes implementation-specific Action failures.
+
+                          The policy is optional. Existing Actions that omit it retain their current behavior.
+                          An unmapped failure remains generic and consumers must not infer semantics from stderr.
+
+                          This field cannot be updated.
+                        properties:
+                          failureCodes:
+                            description: |-
+                              FailureCodes maps implementation-specific failures to normalized codes.
+
+                              Each exec exit code can be declared at most once. Multiple exit codes may
+                              use the same normalized code by adding one entry for each exit code.
+                            items:
+                              description: ActionFailureCode maps an implementation-specific
+                                failure to a normalized result code.
+                              properties:
+                                code:
+                                  description: Code is the normalized result reported
+                                    to callers.
+                                  maxLength: 63
+                                  pattern: ^[A-Z][A-Za-z0-9]*$
+                                  type: string
+                                execExitCode:
+                                  description: ExecExitCode is the non-zero process
+                                    exit code associated with code.
+                                  format: int32
+                                  maximum: 255
+                                  minimum: 1
+                                  type: integer
+                                retry:
+                                  description: Retry indicates whether kbagent may
+                                    retry this normalized failure under the Action
+                                    retry policy.
+                                  type: boolean
+                              required:
+                              - code
+                              - execExitCode
+                              - retry
+                              type: object
+                            maxItems: 32
+                            type: array
+                            x-kubernetes-list-map-keys:
+                            - execExitCode
+                            x-kubernetes-list-type: map
+                        type: object
                       retryPolicy:
                         description: |-
                           Defines the strategy to be taken when retrying the Action after a failure.
@@ -6874,6 +7228,9 @@ spec:
                         format: int32
                         type: integer
                     type: object
+                    x-kubernetes-validations:
+                    - message: resultPolicy is only supported for exec actions
+                      rule: '!has(self.resultPolicy) || has(self.exec)'
                   postProvision:
                     description: |-
                       Specifies the hook to be executed after a component's creation.
@@ -7237,6 +7594,54 @@ spec:
 
                           This field cannot be updated.
                         type: string
+                      resultPolicy:
+                        description: |-
+                          ResultPolicy normalizes implementation-specific Action failures.
+
+                          The policy is optional. Existing Actions that omit it retain their current behavior.
+                          An unmapped failure remains generic and consumers must not infer semantics from stderr.
+
+                          This field cannot be updated.
+                        properties:
+                          failureCodes:
+                            description: |-
+                              FailureCodes maps implementation-specific failures to normalized codes.
+
+                              Each exec exit code can be declared at most once. Multiple exit codes may
+                              use the same normalized code by adding one entry for each exit code.
+                            items:
+                              description: ActionFailureCode maps an implementation-specific
+                                failure to a normalized result code.
+                              properties:
+                                code:
+                                  description: Code is the normalized result reported
+                                    to callers.
+                                  maxLength: 63
+                                  pattern: ^[A-Z][A-Za-z0-9]*$
+                                  type: string
+                                execExitCode:
+                                  description: ExecExitCode is the non-zero process
+                                    exit code associated with code.
+                                  format: int32
+                                  maximum: 255
+                                  minimum: 1
+                                  type: integer
+                                retry:
+                                  description: Retry indicates whether kbagent may
+                                    retry this normalized failure under the Action
+                                    retry policy.
+                                  type: boolean
+                              required:
+                              - code
+                              - execExitCode
+                              - retry
+                              type: object
+                            maxItems: 32
+                            type: array
+                            x-kubernetes-list-map-keys:
+                            - execExitCode
+                            x-kubernetes-list-type: map
+                        type: object
                       retryPolicy:
                         description: |-
                           Defines the strategy to be taken when retrying the Action after a failure.
@@ -7291,6 +7696,9 @@ spec:
                         format: int32
                         type: integer
                     type: object
+                    x-kubernetes-validations:
+                    - message: resultPolicy is only supported for exec actions
+                      rule: '!has(self.resultPolicy) || has(self.exec)'
                   preTerminate:
                     description: |-
                       Specifies the hook to be executed prior to terminating a component.
@@ -7654,6 +8062,54 @@ spec:
 
                           This field cannot be updated.
                         type: string
+                      resultPolicy:
+                        description: |-
+                          ResultPolicy normalizes implementation-specific Action failures.
+
+                          The policy is optional. Existing Actions that omit it retain their current behavior.
+                          An unmapped failure remains generic and consumers must not infer semantics from stderr.
+
+                          This field cannot be updated.
+                        properties:
+                          failureCodes:
+                            description: |-
+                              FailureCodes maps implementation-specific failures to normalized codes.
+
+                              Each exec exit code can be declared at most once. Multiple exit codes may
+                              use the same normalized code by adding one entry for each exit code.
+                            items:
+                              description: ActionFailureCode maps an implementation-specific
+                                failure to a normalized result code.
+                              properties:
+                                code:
+                                  description: Code is the normalized result reported
+                                    to callers.
+                                  maxLength: 63
+                                  pattern: ^[A-Z][A-Za-z0-9]*$
+                                  type: string
+                                execExitCode:
+                                  description: ExecExitCode is the non-zero process
+                                    exit code associated with code.
+                                  format: int32
+                                  maximum: 255
+                                  minimum: 1
+                                  type: integer
+                                retry:
+                                  description: Retry indicates whether kbagent may
+                                    retry this normalized failure under the Action
+                                    retry policy.
+                                  type: boolean
+                              required:
+                              - code
+                              - execExitCode
+                              - retry
+                              type: object
+                            maxItems: 32
+                            type: array
+                            x-kubernetes-list-map-keys:
+                            - execExitCode
+                            x-kubernetes-list-type: map
+                        type: object
                       retryPolicy:
                         description: |-
                           Defines the strategy to be taken when retrying the Action after a failure.
@@ -7708,6 +8164,9 @@ spec:
                         format: int32
                         type: integer
                     type: object
+                    x-kubernetes-validations:
+                    - message: resultPolicy is only supported for exec actions
+                      rule: '!has(self.resultPolicy) || has(self.exec)'
                   readonly:
                     description: |-
                       Defines the procedure to switch a replica into the read-only state.
@@ -8071,6 +8530,54 @@ spec:
 
                           This field cannot be updated.
                         type: string
+                      resultPolicy:
+                        description: |-
+                          ResultPolicy normalizes implementation-specific Action failures.
+
+                          The policy is optional. Existing Actions that omit it retain their current behavior.
+                          An unmapped failure remains generic and consumers must not infer semantics from stderr.
+
+                          This field cannot be updated.
+                        properties:
+                          failureCodes:
+                            description: |-
+                              FailureCodes maps implementation-specific failures to normalized codes.
+
+                              Each exec exit code can be declared at most once. Multiple exit codes may
+                              use the same normalized code by adding one entry for each exit code.
+                            items:
+                              description: ActionFailureCode maps an implementation-specific
+                                failure to a normalized result code.
+                              properties:
+                                code:
+                                  description: Code is the normalized result reported
+                                    to callers.
+                                  maxLength: 63
+                                  pattern: ^[A-Z][A-Za-z0-9]*$
+                                  type: string
+                                execExitCode:
+                                  description: ExecExitCode is the non-zero process
+                                    exit code associated with code.
+                                  format: int32
+                                  maximum: 255
+                                  minimum: 1
+                                  type: integer
+                                retry:
+                                  description: Retry indicates whether kbagent may
+                                    retry this normalized failure under the Action
+                                    retry policy.
+                                  type: boolean
+                              required:
+                              - code
+                              - execExitCode
+                              - retry
+                              type: object
+                            maxItems: 32
+                            type: array
+                            x-kubernetes-list-map-keys:
+                            - execExitCode
+                            x-kubernetes-list-type: map
+                        type: object
                       retryPolicy:
                         description: |-
                           Defines the strategy to be taken when retrying the Action after a failure.
@@ -8125,6 +8632,9 @@ spec:
                         format: int32
                         type: integer
                     type: object
+                    x-kubernetes-validations:
+                    - message: resultPolicy is only supported for exec actions
+                      rule: '!has(self.resultPolicy) || has(self.exec)'
                   readwrite:
                     description: |-
                       Defines the procedure to transition a replica from the read-only state back to the read-write state.
@@ -8490,6 +9000,54 @@ spec:
 
                           This field cannot be updated.
                         type: string
+                      resultPolicy:
+                        description: |-
+                          ResultPolicy normalizes implementation-specific Action failures.
+
+                          The policy is optional. Existing Actions that omit it retain their current behavior.
+                          An unmapped failure remains generic and consumers must not infer semantics from stderr.
+
+                          This field cannot be updated.
+                        properties:
+                          failureCodes:
+                            description: |-
+                              FailureCodes maps implementation-specific failures to normalized codes.
+
+                              Each exec exit code can be declared at most once. Multiple exit codes may
+                              use the same normalized code by adding one entry for each exit code.
+                            items:
+                              description: ActionFailureCode maps an implementation-specific
+                                failure to a normalized result code.
+                              properties:
+                                code:
+                                  description: Code is the normalized result reported
+                                    to callers.
+                                  maxLength: 63
+                                  pattern: ^[A-Z][A-Za-z0-9]*$
+                                  type: string
+                                execExitCode:
+                                  description: ExecExitCode is the non-zero process
+                                    exit code associated with code.
+                                  format: int32
+                                  maximum: 255
+                                  minimum: 1
+                                  type: integer
+                                retry:
+                                  description: Retry indicates whether kbagent may
+                                    retry this normalized failure under the Action
+                                    retry policy.
+                                  type: boolean
+                              required:
+                              - code
+                              - execExitCode
+                              - retry
+                              type: object
+                            maxItems: 32
+                            type: array
+                            x-kubernetes-list-map-keys:
+                            - execExitCode
+                            x-kubernetes-list-type: map
+                        type: object
                       retryPolicy:
                         description: |-
                           Defines the strategy to be taken when retrying the Action after a failure.
@@ -8544,6 +9102,9 @@ spec:
                         format: int32
                         type: integer
                     type: object
+                    x-kubernetes-validations:
+                    - message: resultPolicy is only supported for exec actions
+                      rule: '!has(self.resultPolicy) || has(self.exec)'
                   reconfigure:
                     description: |-
                       Defines the procedure that update a replica with new configuration.
@@ -8901,6 +9462,54 @@ spec:
 
                           This field cannot be updated.
                         type: string
+                      resultPolicy:
+                        description: |-
+                          ResultPolicy normalizes implementation-specific Action failures.
+
+                          The policy is optional. Existing Actions that omit it retain their current behavior.
+                          An unmapped failure remains generic and consumers must not infer semantics from stderr.
+
+                          This field cannot be updated.
+                        properties:
+                          failureCodes:
+                            description: |-
+                              FailureCodes maps implementation-specific failures to normalized codes.
+
+                              Each exec exit code can be declared at most once. Multiple exit codes may
+                              use the same normalized code by adding one entry for each exit code.
+                            items:
+                              description: ActionFailureCode maps an implementation-specific
+                                failure to a normalized result code.
+                              properties:
+                                code:
+                                  description: Code is the normalized result reported
+                                    to callers.
+                                  maxLength: 63
+                                  pattern: ^[A-Z][A-Za-z0-9]*$
+                                  type: string
+                                execExitCode:
+                                  description: ExecExitCode is the non-zero process
+                                    exit code associated with code.
+                                  format: int32
+                                  maximum: 255
+                                  minimum: 1
+                                  type: integer
+                                retry:
+                                  description: Retry indicates whether kbagent may
+                                    retry this normalized failure under the Action
+                                    retry policy.
+                                  type: boolean
+                              required:
+                              - code
+                              - execExitCode
+                              - retry
+                              type: object
+                            maxItems: 32
+                            type: array
+                            x-kubernetes-list-map-keys:
+                            - execExitCode
+                            x-kubernetes-list-type: map
+                        type: object
                       retryPolicy:
                         description: |-
                           Defines the strategy to be taken when retrying the Action after a failure.
@@ -8955,6 +9564,9 @@ spec:
                         format: int32
                         type: integer
                     type: object
+                    x-kubernetes-validations:
+                    - message: resultPolicy is only supported for exec actions
+                      rule: '!has(self.resultPolicy) || has(self.exec)'
                   roleProbe:
                     description: |-
                       Defines the procedure which is invoked regularly to assess the role of replicas.
@@ -9367,6 +9979,54 @@ spec:
 
                           This field cannot be updated.
                         type: string
+                      resultPolicy:
+                        description: |-
+                          ResultPolicy normalizes implementation-specific Action failures.
+
+                          The policy is optional. Existing Actions that omit it retain their current behavior.
+                          An unmapped failure remains generic and consumers must not infer semantics from stderr.
+
+                          This field cannot be updated.
+                        properties:
+                          failureCodes:
+                            description: |-
+                              FailureCodes maps implementation-specific failures to normalized codes.
+
+                              Each exec exit code can be declared at most once. Multiple exit codes may
+                              use the same normalized code by adding one entry for each exit code.
+                            items:
+                              description: ActionFailureCode maps an implementation-specific
+                                failure to a normalized result code.
+                              properties:
+                                code:
+                                  description: Code is the normalized result reported
+                                    to callers.
+                                  maxLength: 63
+                                  pattern: ^[A-Z][A-Za-z0-9]*$
+                                  type: string
+                                execExitCode:
+                                  description: ExecExitCode is the non-zero process
+                                    exit code associated with code.
+                                  format: int32
+                                  maximum: 255
+                                  minimum: 1
+                                  type: integer
+                                retry:
+                                  description: Retry indicates whether kbagent may
+                                    retry this normalized failure under the Action
+                                    retry policy.
+                                  type: boolean
+                              required:
+                              - code
+                              - execExitCode
+                              - retry
+                              type: object
+                            maxItems: 32
+                            type: array
+                            x-kubernetes-list-map-keys:
+                            - execExitCode
+                            x-kubernetes-list-type: map
+                        type: object
                       retryPolicy:
                         description: |-
                           Defines the strategy to be taken when retrying the Action after a failure.
@@ -9427,6 +10087,9 @@ spec:
                         format: int32
                         type: integer
                     type: object
+                    x-kubernetes-validations:
+                    - message: resultPolicy is only supported for exec actions
+                      rule: '!has(self.resultPolicy) || has(self.exec)'
                   switchover:
                     description: |-
                       Defines the procedure for a controlled transition of a role to a new replica.
@@ -9800,6 +10463,54 @@ spec:
 
                           This field cannot be updated.
                         type: string
+                      resultPolicy:
+                        description: |-
+                          ResultPolicy normalizes implementation-specific Action failures.
+
+                          The policy is optional. Existing Actions that omit it retain their current behavior.
+                          An unmapped failure remains generic and consumers must not infer semantics from stderr.
+
+                          This field cannot be updated.
+                        properties:
+                          failureCodes:
+                            description: |-
+                              FailureCodes maps implementation-specific failures to normalized codes.
+
+                              Each exec exit code can be declared at most once. Multiple exit codes may
+                              use the same normalized code by adding one entry for each exit code.
+                            items:
+                              description: ActionFailureCode maps an implementation-specific
+                                failure to a normalized result code.
+                              properties:
+                                code:
+                                  description: Code is the normalized result reported
+                                    to callers.
+                                  maxLength: 63
+                                  pattern: ^[A-Z][A-Za-z0-9]*$
+                                  type: string
+                                execExitCode:
+                                  description: ExecExitCode is the non-zero process
+                                    exit code associated with code.
+                                  format: int32
+                                  maximum: 255
+                                  minimum: 1
+                                  type: integer
+                                retry:
+                                  description: Retry indicates whether kbagent may
+                                    retry this normalized failure under the Action
+                                    retry policy.
+                                  type: boolean
+                              required:
+                              - code
+                              - execExitCode
+                              - retry
+                              type: object
+                            maxItems: 32
+                            type: array
+                            x-kubernetes-list-map-keys:
+                            - execExitCode
+                            x-kubernetes-list-type: map
+                        type: object
                       retryPolicy:
                         description: |-
                           Defines the strategy to be taken when retrying the Action after a failure.
@@ -9854,6 +10565,9 @@ spec:
                         format: int32
                         type: integer
                     type: object
+                    x-kubernetes-validations:
+                    - message: resultPolicy is only supported for exec actions
+                      rule: '!has(self.resultPolicy) || has(self.exec)'
                 type: object
               logConfigs:
                 description: |-
@@ -17941,6 +18655,54 @@ spec:
 
                             This field cannot be updated.
                           type: string
+                        resultPolicy:
+                          description: |-
+                            ResultPolicy normalizes implementation-specific Action failures.
+
+                            The policy is optional. Existing Actions that omit it retain their current behavior.
+                            An unmapped failure remains generic and consumers must not infer semantics from stderr.
+
+                            This field cannot be updated.
+                          properties:
+                            failureCodes:
+                              description: |-
+                                FailureCodes maps implementation-specific failures to normalized codes.
+
+                                Each exec exit code can be declared at most once. Multiple exit codes may
+                                use the same normalized code by adding one entry for each exit code.
+                              items:
+                                description: ActionFailureCode maps an implementation-specific
+                                  failure to a normalized result code.
+                                properties:
+                                  code:
+                                    description: Code is the normalized result reported
+                                      to callers.
+                                    maxLength: 63
+                                    pattern: ^[A-Z][A-Za-z0-9]*$
+                                    type: string
+                                  execExitCode:
+                                    description: ExecExitCode is the non-zero process
+                                      exit code associated with code.
+                                    format: int32
+                                    maximum: 255
+                                    minimum: 1
+                                    type: integer
+                                  retry:
+                                    description: Retry indicates whether kbagent may
+                                      retry this normalized failure under the Action
+                                      retry policy.
+                                    type: boolean
+                                required:
+                                - code
+                                - execExitCode
+                                - retry
+                                type: object
+                              maxItems: 32
+                              type: array
+                              x-kubernetes-list-map-keys:
+                              - execExitCode
+                              x-kubernetes-list-type: map
+                          type: object
                         retryPolicy:
                           description: |-
                             Defines the strategy to be taken when retrying the Action after a failure.
@@ -17995,6 +18757,9 @@ spec:
                           format: int32
                           type: integer
                       type: object
+                      x-kubernetes-validations:
+                      - message: resultPolicy is only supported for exec actions
+                        rule: '!has(self.resultPolicy) || has(self.exec)'
                     restartOnFileChange:
                       description: Specifies whether to restart the workload when
                         the file changes.

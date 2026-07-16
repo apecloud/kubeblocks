@@ -23,6 +23,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"time"
 
@@ -83,6 +84,78 @@ var _ = Describe("action", func() {
 			resp = &proto.ActionResponse{}
 			Expect(json.Unmarshal(data, resp)).Should(Succeed())
 			Expect(resp.Error).Should(Equal("notDefined"))
+		})
+
+		It("returns a declared semantic code while preserving the legacy error", func() {
+			svc, err := newActionService(logr.New(nil), []proto.Action{{
+				Name: "reconfigure",
+				Exec: &proto.ExecAction{Commands: []string{"/bin/sh", "-c", "exit 42"}},
+				ResultPolicy: &proto.ActionResultPolicy{FailureCodes: []proto.ActionFailureCode{{
+					Code:         "InvalidParameter",
+					ExecExitCode: 42,
+					Retry:        false,
+				}}},
+			}})
+			Expect(err).Should(BeNil())
+
+			data, err := svc.HandleRequest(ctx, []byte(`{"action":"reconfigure"}`))
+			Expect(err).Should(BeNil())
+			resp := &proto.ActionResponse{}
+			Expect(json.Unmarshal(data, resp)).Should(Succeed())
+			Expect(resp.Error).Should(Equal("failed"))
+			Expect(resp.Code).Should(Equal("InvalidParameter"))
+			Expect(resp.Retryable).ShouldNot(BeNil())
+			Expect(*resp.Retryable).Should(BeFalse())
+		})
+
+		It("rejects ambiguous or malformed result policies before serving actions", func() {
+			newAction := func(failureCodes ...proto.ActionFailureCode) proto.Action {
+				return proto.Action{
+					Name:         "reconfigure",
+					Exec:         &proto.ExecAction{Commands: []string{"true"}},
+					ResultPolicy: &proto.ActionResultPolicy{FailureCodes: failureCodes},
+				}
+			}
+
+			_, err := newActionService(logr.Discard(), []proto.Action{newAction(
+				proto.ActionFailureCode{Code: "InvalidParameter", ExecExitCode: 2},
+				proto.ActionFailureCode{Code: "UnsupportedParameter", ExecExitCode: 2},
+			)})
+			Expect(errors.Is(err, proto.ErrBadRequest)).Should(BeTrue())
+			Expect(err.Error()).Should(ContainSubstring("mapped to both"))
+
+			for _, action := range []proto.Action{
+				newAction(proto.ActionFailureCode{Code: "invalid-parameter", ExecExitCode: 2}),
+				newAction(proto.ActionFailureCode{Code: "InvalidParameter"}),
+				newAction(proto.ActionFailureCode{Code: "InvalidParameter", ExecExitCode: 256}),
+			} {
+				_, err = newActionService(logr.Discard(), []proto.Action{action})
+				Expect(errors.Is(err, proto.ErrBadRequest)).Should(BeTrue())
+			}
+
+			tooManyMappings := make([]proto.ActionFailureCode, maxActionFailureCodes+1)
+			for i := range tooManyMappings {
+				tooManyMappings[i] = proto.ActionFailureCode{
+					Code:         fmt.Sprintf("Failure%d", i),
+					ExecExitCode: int32(i + 1),
+				}
+			}
+			_, err = newActionService(logr.Discard(), []proto.Action{newAction(tooManyMappings...)})
+			Expect(errors.Is(err, proto.ErrBadRequest)).Should(BeTrue())
+
+			_, err = newActionService(logr.Discard(), []proto.Action{newAction(
+				proto.ActionFailureCode{Code: "InvalidParameter", ExecExitCode: 2},
+				proto.ActionFailureCode{Code: "InvalidParameter", ExecExitCode: 64},
+			)})
+			Expect(err).ShouldNot(HaveOccurred())
+
+			_, err = newActionService(logr.Discard(), []proto.Action{{
+				Name:         "http-action",
+				HTTP:         &proto.HTTPAction{Port: "8080"},
+				ResultPolicy: &proto.ActionResultPolicy{},
+			}})
+			Expect(errors.Is(err, proto.ErrBadRequest)).Should(BeTrue())
+			Expect(err.Error()).Should(ContainSubstring("only supported for exec actions"))
 		})
 
 		It("handles non-blocking in-progress and completion states", func() {
@@ -165,6 +238,54 @@ var _ = Describe("action", func() {
 			Expect(err).Should(BeNil())
 			Expect(output).Should(Equal([]byte("ok")))
 
+			counter, err := os.ReadFile(counterPath)
+			Expect(err).Should(BeNil())
+			Expect(string(counter)).Should(Equal("2\n"))
+		})
+
+		It("does not retry a failure explicitly declared non-retryable", func() {
+			f, err := os.CreateTemp("", "kbagent-action-no-retry-*")
+			Expect(err).Should(BeNil())
+			counterPath := f.Name()
+			Expect(f.Close()).Should(Succeed())
+			defer os.Remove(counterPath)
+
+			action := newRetryAction("no-retry", counterPath, 3)
+			action.ResultPolicy = &proto.ActionResultPolicy{FailureCodes: []proto.ActionFailureCode{{
+				Code:         "InvalidParameter",
+				ExecExitCode: 1,
+				Retry:        false,
+			}}}
+			svc, err := newActionService(logr.Discard(), []proto.Action{action})
+			Expect(err).Should(BeNil())
+
+			_, err = svc.handleRequest(ctx, &proto.ActionRequest{Action: "no-retry"})
+			Expect(err).ShouldNot(BeNil())
+			Expect(proto.ActionResultCode(err)).Should(Equal("InvalidParameter"))
+			counter, err := os.ReadFile(counterPath)
+			Expect(err).Should(BeNil())
+			Expect(string(counter)).Should(Equal("1\n"))
+		})
+
+		It("retries a failure explicitly declared retryable", func() {
+			f, err := os.CreateTemp("", "kbagent-action-declared-retry-*")
+			Expect(err).Should(BeNil())
+			counterPath := f.Name()
+			Expect(f.Close()).Should(Succeed())
+			defer os.Remove(counterPath)
+
+			action := newRetryAction("declared-retry", counterPath, 1)
+			action.ResultPolicy = &proto.ActionResultPolicy{FailureCodes: []proto.ActionFailureCode{{
+				Code:         "TransientFailure",
+				ExecExitCode: 1,
+				Retry:        true,
+			}}}
+			svc, err := newActionService(logr.Discard(), []proto.Action{action})
+			Expect(err).Should(BeNil())
+
+			out, err := svc.handleRequest(ctx, &proto.ActionRequest{Action: "declared-retry"})
+			Expect(err).Should(BeNil())
+			Expect(out).Should(Equal([]byte("ok")))
 			counter, err := os.ReadFile(counterPath)
 			Expect(err).Should(BeNil())
 			Expect(string(counter)).Should(Equal("2\n"))

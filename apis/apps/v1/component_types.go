@@ -394,6 +394,15 @@ type ComponentStatus struct {
 	//
 	// +optional
 	Message map[string]string `json:"message,omitempty"`
+
+	// Records lifecycle Action observations exposed by the Component controller.
+	//
+	// Each item identifies the logical action, the subject and revision that triggered it,
+	// and the exact target on which it ran. Consumers interpret result codes according to
+	// their own business contract.
+	//
+	// +optional
+	LifecycleActions []LifecycleActionStatus `json:"lifecycleActions,omitempty"`
 }
 
 type Sidecar struct {

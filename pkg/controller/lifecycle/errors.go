@@ -21,6 +21,8 @@ package lifecycle
 
 import (
 	"errors"
+
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
 var (
@@ -33,6 +35,49 @@ var (
 	ErrActionFailed         = errors.New("action failed")
 	ErrActionInternalError  = errors.New("action internal error")
 )
+
+type actionResultError struct {
+	code      appsv1.ActionResultCode
+	retryable *bool
+	err       error
+}
+
+func (e *actionResultError) Error() string {
+	return e.err.Error()
+}
+
+func (e *actionResultError) Unwrap() error {
+	return e.err
+}
+
+func (e *actionResultError) actionResultCode() appsv1.ActionResultCode {
+	return e.code
+}
+
+func (e *actionResultError) actionResultRetryable() *bool {
+	return e.retryable
+}
+
+// ActionErrorCode returns a stable semantic Action result only when every aggregated failure agrees.
+func ActionErrorCode(err error) (appsv1.ActionResultCode, bool) {
+	var coded interface {
+		actionResultCode() appsv1.ActionResultCode
+	}
+	if errors.As(err, &coded) {
+		code := coded.actionResultCode()
+		return code, code != ""
+	}
+	return "", false
+}
+
+// ActionErrorRetryable returns the retry property declared for a normalized Action result.
+func ActionErrorRetryable(err error) *bool {
+	var result interface{ actionResultRetryable() *bool }
+	if errors.As(err, &result) {
+		return result.actionResultRetryable()
+	}
+	return nil
+}
 
 func IgnoreNotDefined(err error) error {
 	if errors.Is(err, ErrActionNotDefined) {
@@ -71,4 +116,29 @@ func (e *actionAggregateError) Is(target error) bool {
 		}
 	}
 	return false
+}
+
+func (e *actionAggregateError) actionResultCode() appsv1.ActionResultCode {
+	var result appsv1.ActionResultCode
+	for _, err := range e.errs {
+		code, ok := ActionErrorCode(err)
+		if !ok || (result != "" && result != code) {
+			return ""
+		}
+		result = code
+	}
+	return result
+}
+
+func (e *actionAggregateError) actionResultRetryable() *bool {
+	var result *bool
+	for _, err := range e.errs {
+		retryable := ActionErrorRetryable(err)
+		if retryable == nil || (result != nil && *result != *retryable) {
+			return nil
+		}
+		value := *retryable
+		result = &value
+	}
+	return result
 }

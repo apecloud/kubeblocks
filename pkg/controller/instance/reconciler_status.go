@@ -31,6 +31,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
+	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -111,6 +112,8 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		return kubebuilderx.Continue, err
 	}
 	inst.Status.Configs = configs
+	inst.Status.PodUID = string(pod.UID)
+	inst.Status.LifecycleActions = lifecycle.FilterActionObservationsForPod(inst.Status.LifecycleActions, pod)
 
 	if inst.Spec.MinReadySeconds > 0 && !available {
 		return kubebuilderx.RetryAfter(time.Second), nil

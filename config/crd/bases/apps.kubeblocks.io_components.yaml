@@ -541,6 +541,54 @@ spec:
 
                             This field cannot be updated.
                           type: string
+                        resultPolicy:
+                          description: |-
+                            ResultPolicy normalizes implementation-specific Action failures.
+
+                            The policy is optional. Existing Actions that omit it retain their current behavior.
+                            An unmapped failure remains generic and consumers must not infer semantics from stderr.
+
+                            This field cannot be updated.
+                          properties:
+                            failureCodes:
+                              description: |-
+                                FailureCodes maps implementation-specific failures to normalized codes.
+
+                                Each exec exit code can be declared at most once. Multiple exit codes may
+                                use the same normalized code by adding one entry for each exit code.
+                              items:
+                                description: ActionFailureCode maps an implementation-specific
+                                  failure to a normalized result code.
+                                properties:
+                                  code:
+                                    description: Code is the normalized result reported
+                                      to callers.
+                                    maxLength: 63
+                                    pattern: ^[A-Z][A-Za-z0-9]*$
+                                    type: string
+                                  execExitCode:
+                                    description: ExecExitCode is the non-zero process
+                                      exit code associated with code.
+                                    format: int32
+                                    maximum: 255
+                                    minimum: 1
+                                    type: integer
+                                  retry:
+                                    description: Retry indicates whether kbagent may
+                                      retry this normalized failure under the Action
+                                      retry policy.
+                                    type: boolean
+                                required:
+                                - code
+                                - execExitCode
+                                - retry
+                                type: object
+                              maxItems: 32
+                              type: array
+                              x-kubernetes-list-map-keys:
+                              - execExitCode
+                              x-kubernetes-list-type: map
+                          type: object
                         retryPolicy:
                           description: |-
                             Defines the strategy to be taken when retrying the Action after a failure.
@@ -595,6 +643,9 @@ spec:
                           format: int32
                           type: integer
                       type: object
+                      x-kubernetes-validations:
+                      - message: resultPolicy is only supported for exec actions
+                        rule: '!has(self.resultPolicy) || has(self.exec)'
                     reconfigureArgs:
                       description: ReconfigureArgs is a list of runtime argument groups
                         for the reconfigure action.
@@ -976,6 +1027,54 @@ spec:
 
                             This field cannot be updated.
                           type: string
+                        resultPolicy:
+                          description: |-
+                            ResultPolicy normalizes implementation-specific Action failures.
+
+                            The policy is optional. Existing Actions that omit it retain their current behavior.
+                            An unmapped failure remains generic and consumers must not infer semantics from stderr.
+
+                            This field cannot be updated.
+                          properties:
+                            failureCodes:
+                              description: |-
+                                FailureCodes maps implementation-specific failures to normalized codes.
+
+                                Each exec exit code can be declared at most once. Multiple exit codes may
+                                use the same normalized code by adding one entry for each exit code.
+                              items:
+                                description: ActionFailureCode maps an implementation-specific
+                                  failure to a normalized result code.
+                                properties:
+                                  code:
+                                    description: Code is the normalized result reported
+                                      to callers.
+                                    maxLength: 63
+                                    pattern: ^[A-Z][A-Za-z0-9]*$
+                                    type: string
+                                  execExitCode:
+                                    description: ExecExitCode is the non-zero process
+                                      exit code associated with code.
+                                    format: int32
+                                    maximum: 255
+                                    minimum: 1
+                                    type: integer
+                                  retry:
+                                    description: Retry indicates whether kbagent may
+                                      retry this normalized failure under the Action
+                                      retry policy.
+                                    type: boolean
+                                required:
+                                - code
+                                - execExitCode
+                                - retry
+                                type: object
+                              maxItems: 32
+                              type: array
+                              x-kubernetes-list-map-keys:
+                              - execExitCode
+                              x-kubernetes-list-type: map
+                          type: object
                         retryPolicy:
                           description: |-
                             Defines the strategy to be taken when retrying the Action after a failure.
@@ -1030,6 +1129,9 @@ spec:
                           format: int32
                           type: integer
                       type: object
+                      x-kubernetes-validations:
+                      - message: resultPolicy is only supported for exec actions
+                        rule: '!has(self.resultPolicy) || has(self.exec)'
                     name:
                       description: |-
                         Name specifies the unique name of the custom action.
@@ -7078,6 +7180,80 @@ spec:
                   - reason
                   - status
                   - type
+                  type: object
+                type: array
+              lifecycleActions:
+                description: |-
+                  Records lifecycle Action observations exposed by the Component controller.
+
+                  Each item identifies the logical action, the subject and revision that triggered it,
+                  and the exact target on which it ran. Consumers interpret result codes according to
+                  their own business contract.
+                items:
+                  description: LifecycleActionStatus records the observed state of
+                    a lifecycle-related action.
+                  properties:
+                    action:
+                      description: Action is the logical lifecycle action, such as
+                        reconfigure, postProvision, or memberJoin.
+                      type: string
+                    code:
+                      description: |-
+                        Code is an optional normalized failure code declared by the Action result policy.
+                        Apps controllers expose the code without interpreting its business meaning.
+                      maxLength: 63
+                      pattern: ^[A-Z][A-Za-z0-9]*$
+                      type: string
+                    completionTime:
+                      description: CompletionTime records the time when the action
+                        reached a terminal state (Succeeded, Failed, or Skipped).
+                      format: date-time
+                      type: string
+                    message:
+                      description: Message is a human-readable message providing details
+                        about the current phase.
+                      type: string
+                    phase:
+                      description: Phase is the current phase of the lifecycle action.
+                      enum:
+                      - Pending
+                      - Running
+                      - Succeeded
+                      - Failed
+                      - Skipped
+                      type: string
+                    retryable:
+                      description: |-
+                        Retryable reports the retry property declared for Code. Nil means no normalized
+                        result policy matched the failure.
+                      type: boolean
+                    revision:
+                      description: |-
+                        Revision identifies the desired subject revision observed by this action invocation.
+                        Its value is opaque to the apps controllers.
+                      type: string
+                    startTime:
+                      description: StartTime records the time when the action started
+                        execution.
+                      format: date-time
+                      type: string
+                    subject:
+                      description: |-
+                        Subject identifies the action-specific object within the Component.
+                        For example, a reconfigure action uses the configuration template name.
+                      type: string
+                    target:
+                      description: Target identifies the exact runtime object on which
+                        the action was executed.
+                      properties:
+                        podName:
+                          description: PodName is the target Pod name.
+                          type: string
+                        podUID:
+                          description: PodUID binds the observation to the exact Pod
+                            incarnation.
+                          type: string
+                      type: object
                   type: object
                 type: array
               message:

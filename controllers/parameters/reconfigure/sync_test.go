@@ -528,7 +528,7 @@ func TestApplyChangesToClusterLegacyReconfigure(t *testing.T) {
 			}},
 		}}
 		config := &appsv1.ClusterComponentConfig{Name: ptr.To("my.cnf")}
-		applyChangesToCluster(ctx, config, map[string]string{"a": "b"}, false)
+		applyChangesToCluster(ctx, config, map[string]*string{"a": ptr.To("b")}, false)
 		if config.Reconfigure == nil || !*config.Reconfigure {
 			t.Fatalf("expected reconfigure intent to be true")
 		}
@@ -551,7 +551,7 @@ func TestApplyChangesToClusterLegacyReconfigure(t *testing.T) {
 		ctx := newContext()
 		ctx.ParametersDef.MergeReloadAndRestart = ptr.To(true)
 		config := &appsv1.ClusterComponentConfig{Name: ptr.To("my.cnf")}
-		applyChangesToCluster(ctx, config, map[string]string{"a": "b"}, true)
+		applyChangesToCluster(ctx, config, map[string]*string{"a": ptr.To("b")}, true)
 		if config.Reconfigure == nil || *config.Reconfigure {
 			t.Fatalf("expected reconfigure intent to be false")
 		}
@@ -658,7 +658,7 @@ func TestApplyChangesToClusterClearsHistoricalRestartFlag(t *testing.T) {
 		Restart: ptr.To(true),
 	}
 
-	applyChangesToCluster(ctx, config, map[string]string{"binlog_expire_logs_seconds": "259200"}, false)
+	applyChangesToCluster(ctx, config, map[string]*string{"binlog_expire_logs_seconds": ptr.To("259200")}, false)
 
 	if config.Restart == nil || *config.Restart {
 		t.Fatalf("expected restart to be cleared to false, got %v", config.Restart)
@@ -714,9 +714,9 @@ func TestApplyChangesToClusterTemplateReconfigureArgs(t *testing.T) {
 		},
 	}
 
-	applyChangesToCluster(ctx, config, map[string]string{
-		"timeout":   "30",
-		"maxmemory": "1gb",
+	applyChangesToCluster(ctx, config, map[string]*string{
+		"timeout":   ptr.To("30"),
+		"maxmemory": ptr.To("1gb"),
 	}, false)
 
 	if config.Reconfigure == nil || !*config.Reconfigure {
@@ -736,6 +736,21 @@ func TestApplyChangesToClusterTemplateReconfigureArgs(t *testing.T) {
 	expectedUpdated := fmt.Sprintf("/etc/conf/my.cnf:%x", checksum)
 	if got := config.Variables["KB_CONFIG_FILES_UPDATED"]; got != expectedUpdated {
 		t.Fatalf("expected updated file checksum %q, got %q", expectedUpdated, got)
+	}
+}
+
+func TestBuildReconfigureArgsPreservesRemovals(t *testing.T) {
+	empty := ""
+	value := "128"
+	changes := map[string]*string{
+		"remove_me": nil,
+		"empty_me":  &empty,
+		"set_me":    &value,
+	}
+
+	want := [][]string{{"empty_me", ""}, {"remove_me"}, {"set_me", "128"}}
+	if got := buildReconfigureArgs(changes); !reflect.DeepEqual(got, want) {
+		t.Fatalf("expected deterministic set/remove args %v, got %v", want, got)
 	}
 }
 
@@ -787,7 +802,7 @@ func TestApplyChangesToClusterTemplateReconfigureWithRestartSemantics(t *testing
 		}
 		config := &ctx.ClusterComponent.Configs[0]
 
-		applyChangesToCluster(ctx, config, map[string]string{"performance_schema": "ON"}, true)
+		applyChangesToCluster(ctx, config, map[string]*string{"performance_schema": ptr.To("ON")}, true)
 
 		if config.Reconfigure == nil || !*config.Reconfigure {
 			t.Fatalf("expected reconfigure intent to be true for reload-before-restart")
@@ -811,7 +826,7 @@ func TestApplyChangesToClusterTemplateReconfigureWithRestartSemantics(t *testing
 		}
 		config := &ctx.ClusterComponent.Configs[0]
 
-		applyChangesToCluster(ctx, config, map[string]string{"binlog_expire_logs_seconds": "432000"}, true)
+		applyChangesToCluster(ctx, config, map[string]*string{"binlog_expire_logs_seconds": ptr.To("432000")}, true)
 
 		if config.Reconfigure == nil || !*config.Reconfigure {
 			t.Fatalf("expected reconfigure intent to be true for split mixed update")
@@ -835,7 +850,7 @@ func TestApplyChangesToClusterTemplateReconfigureWithRestartSemantics(t *testing
 		}
 		config := &ctx.ClusterComponent.Configs[0]
 
-		applyChangesToCluster(ctx, config, map[string]string{"binlog_expire_logs_seconds": "432000"}, true)
+		applyChangesToCluster(ctx, config, map[string]*string{"binlog_expire_logs_seconds": ptr.To("432000")}, true)
 
 		if config.Reconfigure == nil || *config.Reconfigure {
 			t.Fatalf("expected reconfigure intent to be false when restart absorbs mixed update")
@@ -874,7 +889,7 @@ func TestApplyChangesToClusterTemplateReconfigureWithNonExecAction(t *testing.T)
 			ConfigHash: ptr.To(originalHash),
 		}
 
-		status := applyChangesToCluster(ctx, config, map[string]string{"maxmemory": "1gb"}, false)
+		status := applyChangesToCluster(ctx, config, map[string]*string{"maxmemory": ptr.To("1gb")}, false)
 
 		if status.Status != StatusFailed {
 			t.Fatalf("expected status %q, got %q", StatusFailed, status.Status)
@@ -901,7 +916,7 @@ func TestApplyChangesToClusterTemplateReconfigureWithNonExecAction(t *testing.T)
 		ctx.ParametersDef.ReloadStaticParamsBeforeRestart = ptr.To(true)
 		config := &appsv1.ClusterComponentConfig{Name: ptr.To("my.cnf")}
 
-		status := applyChangesToCluster(ctx, config, map[string]string{"maxmemory": "1gb"}, true)
+		status := applyChangesToCluster(ctx, config, map[string]*string{"maxmemory": ptr.To("1gb")}, true)
 
 		if status.Status != StatusFailed {
 			t.Fatalf("expected status %q, got %q", StatusFailed, status.Status)
@@ -919,7 +934,7 @@ func TestApplyChangesToClusterTemplateReconfigureWithNonExecAction(t *testing.T)
 		ctx.ParametersDef.MergeReloadAndRestart = ptr.To(true)
 		config := &appsv1.ClusterComponentConfig{Name: ptr.To("my.cnf")}
 
-		status := applyChangesToCluster(ctx, config, map[string]string{"maxmemory": "1gb"}, true)
+		status := applyChangesToCluster(ctx, config, map[string]*string{"maxmemory": ptr.To("1gb")}, true)
 
 		if status.Status != StatusRetry {
 			t.Fatalf("expected status %q, got %q", StatusRetry, status.Status)
@@ -937,4 +952,160 @@ func TestApplyChangesToClusterTemplateReconfigureWithNonExecAction(t *testing.T)
 			t.Fatalf("expected restart to remain true")
 		}
 	})
+}
+
+func TestSyncReconfigureStatusReturnsNormalizedActionFailure(t *testing.T) {
+	retryable := false
+	configHash := "target-hash"
+	ctx := Context{
+		ConfigTemplate: appsv1.ComponentFileTemplate{Name: "mysql"},
+		ConfigHash:     &configHash,
+		ClusterComponent: &appsv1.ClusterComponentSpec{
+			Replicas: 1,
+		},
+		ITS: &workloads.InstanceSet{
+			Status: workloads.InstanceSetStatus{
+				InstanceStatus: []workloads.InstanceStatus{{
+					PodName: "pod-0",
+					PodUID:  "pod-uid",
+					LifecycleActions: []appsv1.LifecycleActionStatus{{
+						Action:    appsv1.LifecycleActionReconfigure,
+						Subject:   "mysql",
+						Revision:  configHash,
+						Target:    &appsv1.LifecycleActionTarget{PodName: "pod-0", PodUID: "pod-uid"},
+						Phase:     appsv1.LifecycleActionFailed,
+						Code:      "InvalidParameter",
+						Retryable: &retryable,
+					}},
+				}},
+			},
+		},
+	}
+
+	status := syncReconfigureStatus(ctx)
+	if status.Status != StatusFailed || status.Code != "InvalidParameter" {
+		t.Fatalf("expected normalized terminal failure, got %+v", status)
+	}
+	if status.Retryable == nil || *status.Retryable {
+		t.Fatalf("expected non-retryable result, got %+v", status.Retryable)
+	}
+}
+
+func TestSyncReconfigureStatusFailureWinsOverMatchingConfigHash(t *testing.T) {
+	retryable := false
+	configHash := "target-hash"
+	ctx := Context{
+		ConfigTemplate:   appsv1.ComponentFileTemplate{Name: "mysql"},
+		ConfigHash:       &configHash,
+		ClusterComponent: &appsv1.ClusterComponentSpec{Replicas: 1},
+		ITS: &workloads.InstanceSet{Status: workloads.InstanceSetStatus{InstanceStatus: []workloads.InstanceStatus{{
+			PodName: "pod-0",
+			PodUID:  "pod-uid",
+			Configs: []workloads.InstanceConfigStatus{{
+				Name:       "mysql",
+				ConfigHash: &configHash,
+			}},
+			LifecycleActions: []appsv1.LifecycleActionStatus{{
+				Action:    appsv1.LifecycleActionReconfigure,
+				Subject:   "mysql",
+				Revision:  configHash,
+				Target:    &appsv1.LifecycleActionTarget{PodName: "pod-0", PodUID: "pod-uid"},
+				Phase:     appsv1.LifecycleActionFailed,
+				Code:      "InvalidParameter",
+				Retryable: &retryable,
+			}},
+		}}}},
+	}
+
+	status := syncReconfigureStatus(ctx)
+	if status.Status != StatusFailed || status.Code != "InvalidParameter" || status.SucceedCount != 0 {
+		t.Fatalf("expected the exact action failure to win over a matching config hash, got %+v", status)
+	}
+}
+
+func TestSyncReconfigureStatusIgnoresUnboundActionFailure(t *testing.T) {
+	configHash := "target-hash"
+	ctx := Context{
+		ConfigTemplate: appsv1.ComponentFileTemplate{Name: "mysql"},
+		ConfigHash:     &configHash,
+		ClusterComponent: &appsv1.ClusterComponentSpec{
+			Replicas: 1,
+		},
+		ITS: &workloads.InstanceSet{
+			Status: workloads.InstanceSetStatus{
+				InstanceStatus: []workloads.InstanceStatus{{
+					PodName: "pod-0",
+					PodUID:  "pod-uid",
+					LifecycleActions: []appsv1.LifecycleActionStatus{{
+						Action:   appsv1.LifecycleActionReconfigure,
+						Subject:  "mysql",
+						Revision: configHash,
+						Target:   &appsv1.LifecycleActionTarget{PodName: "pod-0"},
+						Phase:    appsv1.LifecycleActionFailed,
+					}},
+				}},
+			},
+		},
+	}
+
+	if status := syncReconfigureStatus(ctx); status.Status != StatusRetry {
+		t.Fatalf("expected an unbound result to be ignored, got %+v", status)
+	}
+}
+
+func TestSyncReconfigureStatusRejectsStaleActionIdentity(t *testing.T) {
+	configHash := "target-hash"
+	base := appsv1.LifecycleActionStatus{
+		Action:   appsv1.LifecycleActionReconfigure,
+		Subject:  "mysql",
+		Revision: configHash,
+		Target:   &appsv1.LifecycleActionTarget{PodName: "pod-0", PodUID: "pod-uid"},
+		Phase:    appsv1.LifecycleActionFailed,
+	}
+	tests := map[string]func(*appsv1.LifecycleActionStatus){
+		"other action":       func(status *appsv1.LifecycleActionStatus) { status.Action = "memberJoin" },
+		"other config":       func(status *appsv1.LifecycleActionStatus) { status.Subject = "other.cnf" },
+		"old revision":       func(status *appsv1.LifecycleActionStatus) { status.Revision = "old-hash" },
+		"other pod name":     func(status *appsv1.LifecycleActionStatus) { status.Target.PodName = "pod-1" },
+		"other pod uid":      func(status *appsv1.LifecycleActionStatus) { status.Target.PodUID = "old-pod-uid" },
+		"missing pod uid":    func(status *appsv1.LifecycleActionStatus) { status.Target.PodUID = "" },
+		"missing pod target": func(status *appsv1.LifecycleActionStatus) { status.Target = nil },
+	}
+	for name, mutate := range tests {
+		t.Run(name, func(t *testing.T) {
+			action := *base.DeepCopy()
+			mutate(&action)
+			ctx := Context{
+				ConfigTemplate: appsv1.ComponentFileTemplate{Name: "mysql"},
+				ConfigHash:     &configHash,
+				ClusterComponent: &appsv1.ClusterComponentSpec{
+					Replicas: 1,
+				},
+				ITS: &workloads.InstanceSet{Status: workloads.InstanceSetStatus{
+					InstanceStatus: []workloads.InstanceStatus{{
+						PodName:          "pod-0",
+						PodUID:           "pod-uid",
+						LifecycleActions: []appsv1.LifecycleActionStatus{action},
+					}},
+				}},
+			}
+
+			if status := syncReconfigureStatus(ctx); status.Status != StatusRetry {
+				t.Fatalf("expected stale result to be ignored, got %+v", status)
+			}
+		})
+	}
+
+	ctx := Context{
+		ConfigTemplate:   appsv1.ComponentFileTemplate{Name: "mysql"},
+		ConfigHash:       &configHash,
+		ClusterComponent: &appsv1.ClusterComponentSpec{Replicas: 1},
+		ITS: &workloads.InstanceSet{Status: workloads.InstanceSetStatus{InstanceStatus: []workloads.InstanceStatus{{
+			PodName:          "pod-0",
+			LifecycleActions: []appsv1.LifecycleActionStatus{base},
+		}}}},
+	}
+	if status := syncReconfigureStatus(ctx); status.Status != StatusRetry {
+		t.Fatalf("expected result without current Pod UID to be ignored, got %+v", status)
+	}
 }

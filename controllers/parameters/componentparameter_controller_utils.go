@@ -488,6 +488,8 @@ func syncImpl(taskCtx *taskContext,
 	failStatus := func(err error) error {
 		status.Message = pointer.String(err.Error())
 		status.Phase = parametersv1alpha1.CMergeFailedPhase
+		status.UpdateRevision = revision
+		status.ReconcileDetail = nil
 		return err
 	}
 
@@ -634,6 +636,8 @@ func updateRevision(revision configurationRevision, status *parametersv1alpha1.C
 			ExpectedCount:   revision.result.ExpectedCount,
 			ExecResult:      revision.result.ExecResult,
 			ErrMessage:      revision.result.Message,
+			Code:            revision.result.Code,
+			Retryable:       revision.result.Retryable,
 		}
 	}
 }

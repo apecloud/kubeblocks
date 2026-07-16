@@ -41,8 +41,20 @@ const (
 type Status struct {
 	Status        string
 	Reason        string
+	Code          appsv1.ActionResultCode
+	Retryable     *bool
 	ExpectedCount int32
 	SucceedCount  int32
+}
+
+func withActionResult(code appsv1.ActionResultCode, retryable *bool) func(status *Status) {
+	return func(status *Status) {
+		status.Code = code
+		if retryable != nil {
+			value := *retryable
+			status.Retryable = &value
+		}
+	}
 }
 
 func makeStatus(status string, ops ...func(status *Status)) Status {

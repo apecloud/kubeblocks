@@ -146,6 +146,11 @@ type InstanceSpec struct {
 
 // InstanceStatus2 defines the observed state of Instance
 type InstanceStatus2 struct {
+	// PodUID is the UID of the current Pod managed by this Instance.
+	//
+	// +optional
+	PodUID string `json:"podUID,omitempty"`
+
 	// observedGeneration is the most recent generation observed for this InstanceSet. It corresponds to the
 	// InstanceSet's generation, which is updated on mutation by the API Server.
 	//
@@ -197,6 +202,11 @@ type InstanceStatus2 struct {
 	//
 	// +optional
 	Configs []InstanceConfigStatus `json:"configs,omitempty"`
+
+	// Records lifecycle Action observations for this Pod.
+	//
+	// +optional
+	LifecycleActions []kbappsv1.LifecycleActionStatus `json:"lifecycleActions,omitempty"`
 }
 
 type InstanceAssistantObject struct {

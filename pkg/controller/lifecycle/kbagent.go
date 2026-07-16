@@ -412,7 +412,7 @@ func (a *kbagent) callActionWithSelector(ctx context.Context, spec *appsv1.Actio
 			continue
 		}
 		if len(rsp.Error) > 0 {
-			actionErr := a.formatError(lfa, rsp, pod.Name)
+			actionErr := a.formatError(spec, lfa, rsp, pod.Name)
 			if !aggregateErrors {
 				return nil, actionErr
 			}
@@ -447,7 +447,7 @@ func (a *kbagent) serverEndpoint(pod *corev1.Pod) (string, int32, error) {
 	return host, port, nil
 }
 
-func (a *kbagent) formatError(lfa lifecycleAction, rsp proto.ActionResponse, podName string) error {
+func (a *kbagent) formatError(spec *appsv1.Action, lfa lifecycleAction, rsp proto.ActionResponse, podName string) error {
 	wrapError := func(err error) error {
 		return errors.Wrapf(err, "action: %s, executed on pod: %s, error: %s", lfa.name(), podName, rsp.Message)
 	}
@@ -470,7 +470,16 @@ func (a *kbagent) formatError(lfa lifecycleAction, rsp proto.ActionResponse, pod
 	case errors.Is(err, proto.ErrTimedOut):
 		return wrapError(ErrActionTimedOut)
 	case errors.Is(err, proto.ErrFailed):
-		return wrapError(ErrActionFailed)
+		base := wrapError(ErrActionFailed)
+		if spec.ResultPolicy == nil {
+			return base
+		}
+		for _, mapping := range spec.ResultPolicy.FailureCodes {
+			if string(mapping.Code) == rsp.Code && rsp.Retryable != nil && *rsp.Retryable == mapping.Retry {
+				return &actionResultError{code: mapping.Code, retryable: rsp.Retryable, err: base}
+			}
+		}
+		return base
 	case errors.Is(err, proto.ErrInternalError):
 		return wrapError(ErrActionInternalError)
 	default:

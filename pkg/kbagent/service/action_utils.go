@@ -112,11 +112,14 @@ func blockingCallAction(ctx context.Context, action *kbaproto.Action, parameters
 	if err != nil {
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {
-			errMsg := fmt.Sprintf("exit code: %d", exitErr.ExitCode())
+			exitCode := exitErr.ExitCode()
+			errMsg := fmt.Sprintf("exit code: %d", exitCode)
 			if stderrMsg := result.stderr.String(); len(stderrMsg) > 0 {
 				errMsg += fmt.Sprintf(", stderr: %s", stderrMsg)
 			}
-			return nil, errors.Wrapf(kbaproto.ErrFailed, "%s", errMsg)
+			code, retryable := resolveActionResult(action, int32(exitCode))
+			return nil, kbaproto.NewActionResultError(code, retryable,
+				errors.Wrapf(kbaproto.ErrFailed, "%s", errMsg))
 		}
 		if errMsg := result.stderr.String(); len(errMsg) > 0 {
 			return nil, errors.Wrapf(err, "%s", errMsg)
@@ -124,6 +127,18 @@ func blockingCallAction(ctx context.Context, action *kbaproto.Action, parameters
 		return nil, err
 	}
 	return result.stdout.Bytes(), nil
+}
+
+func resolveActionResult(action *kbaproto.Action, exitCode int32) (string, *bool) {
+	if action.ResultPolicy == nil {
+		return "", nil
+	}
+	for _, mapping := range action.ResultPolicy.FailureCodes {
+		if mapping.ExecExitCode == exitCode {
+			return mapping.Code, ptr.To(mapping.Retry)
+		}
+	}
+	return "", nil
 }
 
 func nonBlockingCallAction(ctx context.Context, action *kbaproto.Action, parameters map[string]string, arguments []string, timeout *int32) (chan *asyncResult, error) {

@@ -36,6 +36,51 @@ var (
 	ErrUnknown            = errors.New("unknown")
 )
 
+type actionResultError struct {
+	code      string
+	retryable *bool
+	err       error
+}
+
+func (e *actionResultError) Error() string {
+	return e.err.Error()
+}
+
+func (e *actionResultError) Unwrap() error {
+	return e.err
+}
+
+func (e *actionResultError) actionResultCode() string {
+	return e.code
+}
+
+func (e *actionResultError) actionResultRetryable() *bool {
+	return e.retryable
+}
+
+// NewActionResultError preserves a semantic result code while retaining the original error chain.
+func NewActionResultError(code string, retryable *bool, err error) error {
+	return &actionResultError{code: code, retryable: retryable, err: err}
+}
+
+// ActionResultCode returns the semantic result code carried by err, if any.
+func ActionResultCode(err error) string {
+	var coded interface{ actionResultCode() string }
+	if errors.As(err, &coded) {
+		return coded.actionResultCode()
+	}
+	return ""
+}
+
+// ActionResultRetryable returns the retry property carried by err, if a result policy matched.
+func ActionResultRetryable(err error) *bool {
+	var result interface{ actionResultRetryable() *bool }
+	if errors.As(err, &result) {
+		return result.actionResultRetryable()
+	}
+	return nil
+}
+
 func Error2Type(err error) string {
 	switch {
 	case err == nil:

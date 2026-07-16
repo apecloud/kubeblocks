@@ -24,12 +24,23 @@ import (
 )
 
 type Action struct {
-	Name           string       `json:"name"`
-	Exec           *ExecAction  `json:"exec,omitempty"`
-	HTTP           *HTTPAction  `json:"http,omitempty"`
-	GRPC           *GRPCAction  `json:"grpc,omitempty"`
-	TimeoutSeconds int32        `json:"timeoutSeconds,omitempty"`
-	RetryPolicy    *RetryPolicy `json:"retryPolicy,omitempty"`
+	Name           string              `json:"name"`
+	Exec           *ExecAction         `json:"exec,omitempty"`
+	HTTP           *HTTPAction         `json:"http,omitempty"`
+	GRPC           *GRPCAction         `json:"grpc,omitempty"`
+	ResultPolicy   *ActionResultPolicy `json:"resultPolicy,omitempty"`
+	TimeoutSeconds int32               `json:"timeoutSeconds,omitempty"`
+	RetryPolicy    *RetryPolicy        `json:"retryPolicy,omitempty"`
+}
+
+type ActionResultPolicy struct {
+	FailureCodes []ActionFailureCode `json:"failureCodes,omitempty"`
+}
+
+type ActionFailureCode struct {
+	Code         string `json:"code"`
+	ExecExitCode int32  `json:"execExitCode"`
+	Retry        bool   `json:"retry"`
 }
 
 type ExecAction struct {
@@ -80,9 +91,11 @@ type ActionRequest struct {
 }
 
 type ActionResponse struct {
-	Error   string `json:"error,omitempty"`
-	Message string `json:"message,omitempty"`
-	Output  []byte `json:"output,omitempty"`
+	Error     string `json:"error,omitempty"`
+	Code      string `json:"code,omitempty"`
+	Retryable *bool  `json:"retryable,omitempty"`
+	Message   string `json:"message,omitempty"`
+	Output    []byte `json:"output,omitempty"`
 }
 
 // TODO: define the event spec for probe or async action

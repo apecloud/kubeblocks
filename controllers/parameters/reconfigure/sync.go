@@ -58,7 +58,7 @@ func createSyncPolicy(restart bool) func(Context) (Status, error) {
 			visualizedParams       = core.GenerateVisualizedParamsList(ctx.Patch,
 				[]parametersv1alpha1.ComponentConfigDescription{*ctx.ConfigDescription})
 		)
-		params := make(map[string]string)
+		changes := make(map[string]*string)
 		for _, key := range visualizedParams {
 			if key.UpdateType != core.UpdatedType {
 				continue
@@ -67,12 +67,10 @@ func createSyncPolicy(restart bool) func(Context) (Status, error) {
 				if dynamicAction && !needReloadStaticParams && !core.IsDynamicParameter(p.Key, paramDef) {
 					continue
 				}
-				if p.Value != nil {
-					params[p.Key] = *p.Value
-				}
+				changes[p.Key] = p.Value
 			}
 		}
-		if len(params) == 0 {
+		if len(changes) == 0 {
 			// Legacy reload generation in release-1.1 only happened when there were
 			// reloadable params left after filtering. Keep the same gate here for
 			// compatibility, even though "should invoke reload action" is not purely
@@ -86,16 +84,17 @@ func createSyncPolicy(restart bool) func(Context) (Status, error) {
 			}
 			return makeStatus(StatusNone, withReason("has NO updated parameters")), nil
 		}
+		params := parameterValues(changes)
 		if shouldBuildLegacyReconfigureAction(ctx, params, restart) {
 			if err := ValidateLegacyConfigManagerRuntime(ctx.ITS); err != nil {
 				return makeStatus(StatusFailed, withReason(err.Error())), nil
 			}
 		}
-		return submit(ctx, params, restart)
+		return submit(ctx, changes, restart)
 	}
 }
 
-func submit(ctx Context, parameters map[string]string, restart bool) (Status, error) {
+func submit(ctx Context, changes map[string]*string, restart bool) (Status, error) {
 	var config *appsv1.ClusterComponentConfig
 	for i, cfg := range ctx.ClusterComponent.Configs {
 		if ptr.Deref(cfg.Name, "") == ctx.ConfigTemplate.Name {
@@ -112,17 +111,18 @@ func submit(ctx Context, parameters map[string]string, restart bool) (Status, er
 		config = &ctx.ClusterComponent.Configs[len(ctx.ClusterComponent.Configs)-1]
 	}
 	if !ptr.Equal(config.ConfigHash, ctx.getTargetConfigHash()) {
-		return applyChangesToCluster(ctx, config, parameters, restart), nil
+		return applyChangesToCluster(ctx, config, changes, restart), nil
 	}
 	return syncReconfigureStatus(ctx), nil
 }
 
-func applyChangesToCluster(ctx Context, config *appsv1.ClusterComponentConfig, params map[string]string, restart bool) Status {
-	if !shouldBuildLegacyReconfigureAction(ctx, params, restart) && shouldRejectTemplateReconfigureAction(ctx, params, restart) {
+func applyChangesToCluster(ctx Context, config *appsv1.ClusterComponentConfig, changes map[string]*string, restart bool) Status {
+	params := parameterValues(changes)
+	if !shouldBuildLegacyReconfigureAction(ctx, params, restart) && shouldRejectTemplateReconfigureAction(ctx, changes, restart) {
 		return makeStatus(StatusFailed, withReason("parameter update reconfigure currently supports only exec actions"))
 	}
 	var systemParams map[string]string
-	if shouldUseTemplateReconfigureAction(ctx, params, restart) {
+	if shouldUseTemplateReconfigureAction(ctx, changes, restart) {
 		systemParams = buildUpdatedConfigFileChecksums(ctx)
 	}
 	config.ConfigHash = ctx.getTargetConfigHash()
@@ -135,10 +135,10 @@ func applyChangesToCluster(ctx Context, config *appsv1.ClusterComponentConfig, p
 	case shouldBuildLegacyReconfigureAction(ctx, params, restart):
 		config.Reconfigure = ptr.To(true)
 		config.ReconfigureAction = reloadActionToReconfigureAction(ctx, params)
-	case shouldUseTemplateReconfigureAction(ctx, params, restart):
+	case shouldUseTemplateReconfigureAction(ctx, changes, restart):
 		config.Reconfigure = ptr.To(true)
 		config.ReconfigureAction = nil
-		config.ReconfigureArgs = buildReconfigureArgs(params)
+		config.ReconfigureArgs = buildReconfigureArgs(changes)
 		config.Variables = mergeReconfigureSystemParameters(config.Variables, systemParams)
 	default:
 		config.ReconfigureAction = nil
@@ -146,7 +146,20 @@ func applyChangesToCluster(ctx Context, config *appsv1.ClusterComponentConfig, p
 	return makeStatus(StatusRetry, withReason("apply changes to cluster API"), withExpected(int32(ctx.getTargetReplicas())), withSucceed(0))
 }
 
-func buildReconfigureArgs(params map[string]string) [][]string {
+func parameterValues(changes map[string]*string) map[string]string {
+	if len(changes) == 0 {
+		return nil
+	}
+	values := make(map[string]string, len(changes))
+	for key, value := range changes {
+		if value != nil {
+			values[key] = *value
+		}
+	}
+	return values
+}
+
+func buildReconfigureArgs(params map[string]*string) [][]string {
 	if len(params) == 0 {
 		return nil
 	}
@@ -157,7 +170,11 @@ func buildReconfigureArgs(params map[string]string) [][]string {
 	sort.Strings(keys)
 	args := make([][]string, 0, len(keys))
 	for _, key := range keys {
-		args = append(args, []string{key, params[key]})
+		if params[key] == nil {
+			args = append(args, []string{key})
+			continue
+		}
+		args = append(args, []string{key, *params[key]})
 	}
 	return args
 }
@@ -243,16 +260,16 @@ func shouldBuildLegacyReconfigureAction(ctx Context, params map[string]string, r
 	return true
 }
 
-func shouldUseTemplateReconfigureAction(ctx Context, params map[string]string, restart bool) bool {
-	return shouldInvokeTemplateReconfigureAction(ctx, params, restart) && ctx.ConfigTemplate.Reconfigure.Exec != nil
+func shouldUseTemplateReconfigureAction(ctx Context, changes map[string]*string, restart bool) bool {
+	return shouldInvokeTemplateReconfigureAction(ctx, changes, restart) && ctx.ConfigTemplate.Reconfigure.Exec != nil
 }
 
-func shouldRejectTemplateReconfigureAction(ctx Context, params map[string]string, restart bool) bool {
-	return shouldInvokeTemplateReconfigureAction(ctx, params, restart) && ctx.ConfigTemplate.Reconfigure.Exec == nil
+func shouldRejectTemplateReconfigureAction(ctx Context, changes map[string]*string, restart bool) bool {
+	return shouldInvokeTemplateReconfigureAction(ctx, changes, restart) && ctx.ConfigTemplate.Reconfigure.Exec == nil
 }
 
-func shouldInvokeTemplateReconfigureAction(ctx Context, params map[string]string, restart bool) bool {
-	if len(params) == 0 || ctx.ConfigTemplate.Reconfigure == nil {
+func shouldInvokeTemplateReconfigureAction(ctx Context, changes map[string]*string, restart bool) bool {
+	if len(changes) == 0 || ctx.ConfigTemplate.Reconfigure == nil {
 		return false
 	}
 	if !restart {
@@ -312,8 +329,20 @@ func syncReconfigureStatus(ctx Context) Status {
 		configHash = ctx.getTargetConfigHash()
 	)
 	updated := int32(0)
+	failed := make([]appsv1.LifecycleActionStatus, 0)
 	if ctx.ITS != nil {
 		for _, inst := range ctx.ITS.Status.InstanceStatus {
+			instanceFailed := false
+			for _, action := range inst.LifecycleActions {
+				if isExactReconfigureActionResult(action, inst.PodName, inst.PodUID, ctx.ConfigTemplate.Name, ptr.Deref(configHash, "")) &&
+					action.Phase == appsv1.LifecycleActionFailed {
+					failed = append(failed, action)
+					instanceFailed = true
+				}
+			}
+			if instanceFailed {
+				continue
+			}
 			idx := slices.IndexFunc(inst.Configs, func(cfg workloads.InstanceConfigStatus) bool {
 				return cfg.Name == ctx.ConfigTemplate.Name
 			})
@@ -322,8 +351,47 @@ func syncReconfigureStatus(ctx Context) Status {
 			}
 		}
 	}
+	if len(failed) > 0 {
+		code, retryable := commonActionResult(failed)
+		reason := "reconfigure action failed"
+		if code != "" {
+			reason = fmt.Sprintf("reconfigure action failed: %s", code)
+		}
+		return makeStatus(StatusFailed,
+			withReason(reason),
+			withActionResult(code, retryable),
+			withExpected(replicas),
+			withSucceed(updated))
+	}
 	if updated == replicas {
 		return makeStatus(StatusNone, withReason("reconfigure completed"), withExpected(replicas), withSucceed(updated))
 	}
 	return makeStatus(StatusRetry, withReason("reconfiguring"), withExpected(replicas), withSucceed(updated))
+}
+
+func isExactReconfigureActionResult(action appsv1.LifecycleActionStatus, podName, podUID, configName, configHash string) bool {
+	return action.Action == appsv1.LifecycleActionReconfigure &&
+		action.Subject == configName &&
+		action.Revision == configHash &&
+		podUID != "" &&
+		action.Target != nil &&
+		action.Target.PodName == podName &&
+		action.Target.PodUID == podUID
+}
+
+func commonActionResult(failed []appsv1.LifecycleActionStatus) (appsv1.ActionResultCode, *bool) {
+	if len(failed) == 0 {
+		return "", nil
+	}
+	code := failed[0].Code
+	if code == "" || failed[0].Retryable == nil {
+		return "", nil
+	}
+	retryable := *failed[0].Retryable
+	for i := 1; i < len(failed); i++ {
+		if failed[i].Code != code || failed[i].Retryable == nil || *failed[i].Retryable != retryable {
+			return "", nil
+		}
+	}
+	return code, &retryable
 }

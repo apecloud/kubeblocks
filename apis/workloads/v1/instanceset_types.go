@@ -574,6 +574,11 @@ type InstanceStatus struct {
 	// +kubebuilder:default=Unknown
 	PodName string `json:"podName"`
 
+	// PodUID is the UID of the current Pod incarnation.
+	//
+	// +optional
+	PodUID string `json:"podUID,omitempty"`
+
 	// Represents the role of the instance observed.
 	//
 	// +optional
@@ -583,6 +588,11 @@ type InstanceStatus struct {
 	//
 	// +optional
 	Configs []InstanceConfigStatus `json:"configs,omitempty"`
+
+	// Records lifecycle Action observations for this Pod.
+	//
+	// +optional
+	LifecycleActions []kbappsv1.LifecycleActionStatus `json:"lifecycleActions,omitempty"`
 
 	// Represents whether the instance is in volume expansion.
 	//

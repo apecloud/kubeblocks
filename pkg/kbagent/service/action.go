@@ -25,6 +25,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -44,10 +45,45 @@ func newActionService(logger logr.Logger, actions []proto.Action) (*actionServic
 		runningActions: map[string]*runningAction{},
 	}
 	for i, action := range actions {
+		if err := validateActionResultPolicy(&action); err != nil {
+			return nil, errors.Wrapf(proto.ErrBadRequest, "invalid result policy for action %q: %v", action.Name, err)
+		}
 		sa.actions[action.Name] = &actions[i]
 	}
 	logger.Info(fmt.Sprintf("create service %s", sa.Kind()), "actions", strings.Join(maps.Keys(sa.actions), ","))
 	return sa, nil
+}
+
+const (
+	maxActionFailureCodes = 32
+)
+
+var actionResultCodePattern = regexp.MustCompile(`^[A-Z][A-Za-z0-9]*$`)
+
+func validateActionResultPolicy(action *proto.Action) error {
+	if action == nil || action.ResultPolicy == nil {
+		return nil
+	}
+	if action.Exec == nil {
+		return fmt.Errorf("result policy is only supported for exec actions")
+	}
+	if len(action.ResultPolicy.FailureCodes) > maxActionFailureCodes {
+		return fmt.Errorf("result policy has more than %d failure codes", maxActionFailureCodes)
+	}
+	seenExitCodes := make(map[int32]string)
+	for _, mapping := range action.ResultPolicy.FailureCodes {
+		if !actionResultCodePattern.MatchString(mapping.Code) || len(mapping.Code) > 63 {
+			return fmt.Errorf("result code %q is invalid", mapping.Code)
+		}
+		if mapping.ExecExitCode < 1 || mapping.ExecExitCode > 255 {
+			return fmt.Errorf("exec exit code %d for result code %q is outside [1, 255]", mapping.ExecExitCode, mapping.Code)
+		}
+		if existing, ok := seenExitCodes[mapping.ExecExitCode]; ok {
+			return fmt.Errorf("exec exit code %d is mapped to both %q and %q", mapping.ExecExitCode, existing, mapping.Code)
+		}
+		seenExitCodes[mapping.ExecExitCode] = mapping.Code
+	}
+	return nil
 }
 
 type actionService struct {
@@ -108,6 +144,8 @@ func (s *actionService) encode(out []byte, err error) []byte {
 		rsp.Output = out
 	} else {
 		rsp.Error = proto.Error2Type(err)
+		rsp.Code = proto.ActionResultCode(err)
+		rsp.Retryable = proto.ActionResultRetryable(err)
 		rsp.Message = err.Error()
 	}
 	data, _ := json.Marshal(rsp)
@@ -212,7 +250,7 @@ func nonBlockingCallActionWithRetry(ctx context.Context, action *proto.Action, p
 
 func callActionWithRetryOnce(ctx context.Context, action *proto.Action, parameters map[string]string, arguments []string, timeout *int32, retryPolicy *proto.RetryPolicy) ([]byte, error) {
 	output, err := blockingCallAction(ctx, action, parameters, arguments, timeout)
-	if err == nil || retryPolicy == nil || retryPolicy.MaxRetries <= 0 {
+	if err == nil || retryPolicy == nil || retryPolicy.MaxRetries <= 0 || explicitlyNonRetryable(err) {
 		return output, err
 	}
 
@@ -226,9 +264,14 @@ func callActionWithRetryOnce(ctx context.Context, action *proto.Action, paramete
 			}
 		}
 		output, err = blockingCallAction(ctx, action, parameters, arguments, timeout)
-		if err == nil {
-			return output, nil
+		if err == nil || explicitlyNonRetryable(err) {
+			return output, err
 		}
 	}
 	return output, err
+}
+
+func explicitlyNonRetryable(err error) bool {
+	retryable := proto.ActionResultRetryable(err)
+	return retryable != nil && !*retryable
 }

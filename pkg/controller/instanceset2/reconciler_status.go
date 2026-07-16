@@ -317,7 +317,9 @@ func syncInstanceConfigStatus(instanceStatus []workloads.InstanceStatus, instanc
 	for _, inst := range instances {
 		for i, status := range instanceStatus {
 			if status.PodName == inst.Name {
+				instanceStatus[i].PodUID = inst.Status.PodUID
 				instanceStatus[i].Configs = inst.Status.Configs
+				instanceStatus[i].LifecycleActions = inst.Status.LifecycleActions
 				break
 			}
 		}

@@ -54,6 +54,9 @@ type Result struct {
 	Retry   bool   `json:"retry"`
 	Failed  bool   `json:"failed"`
 	Message string `json:"message"`
+
+	Code      appsv1.ActionResultCode `json:"code,omitempty"`
+	Retryable *bool                   `json:"retryable,omitempty"`
 }
 
 // MergeAndValidateConfigs merges and validates configuration files

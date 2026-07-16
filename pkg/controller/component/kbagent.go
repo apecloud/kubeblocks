@@ -394,6 +394,16 @@ func buildAction4KBAgent(action *appsv1.Action, name string) *proto.Action {
 		Name:           name,
 		TimeoutSeconds: action.TimeoutSeconds,
 	}
+	if action.ResultPolicy != nil {
+		a.ResultPolicy = &proto.ActionResultPolicy{}
+		for _, mapping := range action.ResultPolicy.FailureCodes {
+			a.ResultPolicy.FailureCodes = append(a.ResultPolicy.FailureCodes, proto.ActionFailureCode{
+				Code:         string(mapping.Code),
+				ExecExitCode: mapping.ExecExitCode,
+				Retry:        mapping.Retry,
+			})
+		}
+	}
 	if action.Exec != nil {
 		a.Exec = &proto.ExecAction{
 			Commands: action.Exec.Command,

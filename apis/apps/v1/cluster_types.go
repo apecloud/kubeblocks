@@ -1016,10 +1016,44 @@ type ClusterShardingStatus struct {
 
 // LifecycleActionStatus records the observed state of a lifecycle-related action.
 type LifecycleActionStatus struct {
+	// Action is the logical lifecycle action, such as reconfigure, postProvision, or memberJoin.
+	//
+	// +optional
+	Action string `json:"action,omitempty"`
+
+	// Subject identifies the action-specific object within the Component.
+	// For example, a reconfigure action uses the configuration template name.
+	//
+	// +optional
+	Subject string `json:"subject,omitempty"`
+
+	// Revision identifies the desired subject revision observed by this action invocation.
+	// Its value is opaque to the apps controllers.
+	//
+	// +optional
+	Revision string `json:"revision,omitempty"`
+
+	// Target identifies the exact runtime object on which the action was executed.
+	//
+	// +optional
+	Target *LifecycleActionTarget `json:"target,omitempty"`
+
 	// Phase is the current phase of the lifecycle action.
 	//
 	// +optional
 	Phase LifecycleActionPhase `json:"phase,omitempty"`
+
+	// Code is an optional normalized failure code declared by the Action result policy.
+	// Apps controllers expose the code without interpreting its business meaning.
+	//
+	// +optional
+	Code ActionResultCode `json:"code,omitempty"`
+
+	// Retryable reports the retry property declared for Code. Nil means no normalized
+	// result policy matched the failure.
+	//
+	// +optional
+	Retryable *bool `json:"retryable,omitempty"`
 
 	// Reason is a programmatic identifier indicating the reason for the current phase.
 	// e.g., 'PreconditionNotMet' for Pending phase or 'PrerequisiteFailed' for Skipped phase.
@@ -1043,6 +1077,19 @@ type LifecycleActionStatus struct {
 	CompletionTime *metav1.Time `json:"completionTime,omitempty"`
 }
 
+// LifecycleActionTarget identifies one exact runtime target of a lifecycle Action.
+type LifecycleActionTarget struct {
+	// PodName is the target Pod name.
+	//
+	// +optional
+	PodName string `json:"podName,omitempty"`
+
+	// PodUID binds the observation to the exact Pod incarnation.
+	//
+	// +optional
+	PodUID string `json:"podUID,omitempty"`
+}
+
 // LifecycleActionPhase describes the current phase of a lifecycle-related action.
 //
 // +enum
@@ -1050,6 +1097,9 @@ type LifecycleActionStatus struct {
 type LifecycleActionPhase string
 
 const (
+	// LifecycleActionReconfigure identifies a configuration reload Action.
+	LifecycleActionReconfigure = "reconfigure"
+
 	// LifecycleActionPending indicates the action is registered and waiting to be triggered or
 	// waiting for its dynamic preconditions to be met.
 	LifecycleActionPending LifecycleActionPhase = "Pending"

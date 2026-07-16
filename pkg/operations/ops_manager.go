@@ -198,6 +198,11 @@ func (opsMgr *OpsManager) Reconcile(reqCtx intctrlutil.RequestCtx, cli client.Cl
 		return 0, opsMgr.handleOpsCompleted(reqCtx, cli, opsRes, opsRequestPhase,
 			opsv1alpha1.NewCancelFailedCondition(opsRequest, err), opsv1alpha1.NewFailedCondition(opsRequest, err))
 	default:
+		if opsRequest.Status.ReconfigureRollback != nil {
+			// Reconfigure compensation owns its deadline once rollback starts so a
+			// boundary crossing cannot replace Failed/ManualCleanupRequired with Aborted.
+			return requeueAfter, nil
+		}
 		return opsMgr.checkAndHandleOpsTimeout(reqCtx, cli, opsRes, requeueAfter)
 	}
 }

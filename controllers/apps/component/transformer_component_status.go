@@ -116,6 +116,7 @@ func (t *componentStatusTransformer) init(transCtx *componentTransformContext, d
 
 // reconcileStatus reconciles component status.
 func (t *componentStatusTransformer) reconcileStatus(transCtx *componentTransformContext) error {
+	t.syncLifecycleActionObservations()
 	if t.runningITS == nil {
 		return t.reconcileStatusCondition(transCtx)
 	}
@@ -186,6 +187,37 @@ func (t *componentStatusTransformer) reconcileStatus(transCtx *componentTransfor
 	}
 
 	return t.reconcileStatusCondition(transCtx)
+}
+
+func (t *componentStatusTransformer) syncLifecycleActionObservations() {
+	actions := make([]appsv1.LifecycleActionStatus, 0)
+	if t.runningITS != nil {
+		for _, instance := range t.runningITS.Status.InstanceStatus {
+			for i := range instance.LifecycleActions {
+				actions = append(actions, *instance.LifecycleActions[i].DeepCopy())
+			}
+		}
+	}
+	slices.SortFunc(actions, func(left, right appsv1.LifecycleActionStatus) int {
+		leftPod, rightPod := "", ""
+		if left.Target != nil {
+			leftPod = left.Target.PodName
+		}
+		if right.Target != nil {
+			rightPod = right.Target.PodName
+		}
+		if order := strings.Compare(leftPod, rightPod); order != 0 {
+			return order
+		}
+		if order := strings.Compare(left.Action, right.Action); order != 0 {
+			return order
+		}
+		if order := strings.Compare(left.Subject, right.Subject); order != 0 {
+			return order
+		}
+		return strings.Compare(left.Revision, right.Revision)
+	})
+	t.comp.Status.LifecycleActions = actions
 }
 
 func (t *componentStatusTransformer) workloadGeneration() (*int64, error) {

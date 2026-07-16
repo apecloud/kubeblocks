@@ -1851,6 +1851,8 @@ type ComponentLifecycleActions struct {
 //     or included in the HTTP response payload for HTTP actions.
 //   - If an action encounters any errors, error messages should be written to stderr,
 //     or detailed in the HTTP response with the appropriate non-2xx status code.
+//
+// +kubebuilder:validation:XValidation:rule="!has(self.resultPolicy) || has(self.exec)",message="resultPolicy is only supported for exec actions"
 type Action struct {
 	// Defines the command to run.
 	//
@@ -1872,6 +1874,16 @@ type Action struct {
 	//
 	// +optional
 	GRPC *GRPCAction `json:"grpc,omitempty"`
+
+	// ResultPolicy normalizes implementation-specific Action failures.
+	//
+	// The policy is optional. Existing Actions that omit it retain their current behavior.
+	// An unmapped failure remains generic and consumers must not infer semantics from stderr.
+	//
+	// This field cannot be updated.
+	//
+	// +optional
+	ResultPolicy *ActionResultPolicy `json:"resultPolicy,omitempty"`
 
 	// Defines the criteria used to select the target Pod(s) for executing the Action.
 	// This is useful when there is no default target replica identified.
@@ -1942,6 +1954,42 @@ type Action struct {
 	//
 	// +optional
 	PreCondition *PreConditionType `json:"preCondition,omitempty"`
+}
+
+// ActionResultCode is an opaque normalized result reported by an Action.
+// +kubebuilder:validation:MaxLength=63
+// +kubebuilder:validation:Pattern=`^[A-Z][A-Za-z0-9]*$`
+type ActionResultCode string
+
+// ActionResultPolicy defines normalized failure results for an Action.
+type ActionResultPolicy struct {
+	// FailureCodes maps implementation-specific failures to normalized codes.
+	//
+	// Each exec exit code can be declared at most once. Multiple exit codes may
+	// use the same normalized code by adding one entry for each exit code.
+	//
+	// +kubebuilder:validation:MaxItems=32
+	// +optional
+	// +listType=map
+	// +listMapKey=execExitCode
+	FailureCodes []ActionFailureCode `json:"failureCodes,omitempty"`
+}
+
+// ActionFailureCode maps an implementation-specific failure to a normalized result code.
+type ActionFailureCode struct {
+	// Code is the normalized result reported to callers.
+	//
+	// +kubebuilder:validation:Required
+	Code ActionResultCode `json:"code"`
+
+	// ExecExitCode is the non-zero process exit code associated with code.
+	//
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=255
+	ExecExitCode int32 `json:"execExitCode"`
+
+	// Retry indicates whether kbagent may retry this normalized failure under the Action retry policy.
+	Retry bool `json:"retry"`
 }
 
 func (a *Action) Defined() bool {

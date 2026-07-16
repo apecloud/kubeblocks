@@ -78,6 +78,23 @@ var _ = Describe("kb-agent", func() {
 	}
 
 	Context("build kb-agent", func() {
+		It("propagates declared exec result codes", func() {
+			action := &appsv1.Action{
+				Exec: &appsv1.ExecAction{Command: []string{"reconfigure"}},
+				ResultPolicy: &appsv1.ActionResultPolicy{FailureCodes: []appsv1.ActionFailureCode{
+					{Code: appsv1.ActionResultCode("InvalidParameter"), ExecExitCode: 2},
+					{Code: appsv1.ActionResultCode("InvalidParameter"), ExecExitCode: 64},
+				}},
+			}
+
+			got := buildAction4KBAgent(action, "reconfigure")
+			Expect(got).ShouldNot(BeNil())
+			Expect(got.ResultPolicy).Should(Equal(&proto.ActionResultPolicy{FailureCodes: []proto.ActionFailureCode{
+				{Code: "InvalidParameter", ExecExitCode: 2},
+				{Code: "InvalidParameter", ExecExitCode: 64},
+			}}))
+		})
+
 		BeforeEach(func() {
 			synthesizedComp = &SynthesizedComponent{
 				PodSpec: &corev1.PodSpec{

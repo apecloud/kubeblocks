@@ -384,6 +384,17 @@ var _ = Describe("Reconfigure Controller", func() {
 	})
 })
 
+func TestWithFailedMarksFailureWithoutGoError(t *testing.T) {
+	result := parameters.Result{Message: "normalized action failure"}
+	withFailed(nil, false)(&result)
+	if !result.Failed || result.Retry {
+		t.Fatalf("expected terminal failure even without a Go error, got %+v", result)
+	}
+	if result.Message != "normalized action failure" {
+		t.Fatalf("expected the normalized status reason to be preserved, got %q", result.Message)
+	}
+}
+
 func TestValidateLegacyReloadActionSupport(t *testing.T) {
 	newParamsDef := func(name string, withReload bool) *parametersv1alpha1.ParametersDefinition {
 		pd := &parametersv1alpha1.ParametersDefinition{}

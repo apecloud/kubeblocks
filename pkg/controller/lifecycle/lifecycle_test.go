@@ -379,6 +379,75 @@ var _ = Describe("lifecycle", func() {
 			Expect(err.Error()).Should(ContainSubstring("command not found"))
 		})
 
+		It("accepts only a result code declared by the action", func() {
+			lifecycleActions.PostProvision.ResultPolicy = &appsv1.ActionResultPolicy{FailureCodes: []appsv1.ActionFailureCode{{
+				Code:         appsv1.ActionResultCode("InvalidParameter"),
+				ExecExitCode: 42,
+				Retry:        false,
+			}}}
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods)
+			Expect(err).Should(BeNil())
+
+			retryable := false
+			mockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).Return(proto.ActionResponse{
+					Error:     proto.Error2Type(proto.ErrFailed),
+					Code:      "InvalidParameter",
+					Retryable: &retryable,
+				}, nil).Times(1)
+			})
+
+			err = lifecycle.PostProvision(ctx, k8sClient, nil)
+			Expect(errors.Is(err, ErrActionFailed)).Should(BeTrue())
+			code, ok := ActionErrorCode(err)
+			Expect(ok).Should(BeTrue())
+			Expect(code).Should(Equal(appsv1.ActionResultCode("InvalidParameter")))
+			Expect(ActionErrorRetryable(err)).ShouldNot(BeNil())
+			Expect(*ActionErrorRetryable(err)).Should(BeFalse())
+		})
+
+		It("matches the complete result code and retry tuple", func() {
+			lifecycleActions.PostProvision.ResultPolicy = &appsv1.ActionResultPolicy{FailureCodes: []appsv1.ActionFailureCode{
+				{Code: appsv1.ActionResultCode("InvalidParameter"), ExecExitCode: 41, Retry: false},
+				{Code: appsv1.ActionResultCode("InvalidParameter"), ExecExitCode: 42, Retry: true},
+			}}
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods)
+			Expect(err).Should(BeNil())
+
+			retryable := true
+			mockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).Return(proto.ActionResponse{
+					Error:     proto.Error2Type(proto.ErrFailed),
+					Code:      "InvalidParameter",
+					Retryable: &retryable,
+				}, nil).Times(1)
+			})
+
+			err = lifecycle.PostProvision(ctx, k8sClient, nil)
+			code, ok := ActionErrorCode(err)
+			Expect(ok).Should(BeTrue())
+			Expect(code).Should(Equal(appsv1.ActionResultCode("InvalidParameter")))
+			Expect(ActionErrorRetryable(err)).ShouldNot(BeNil())
+			Expect(*ActionErrorRetryable(err)).Should(BeTrue())
+		})
+
+		It("keeps an undeclared result code generic", func() {
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods)
+			Expect(err).Should(BeNil())
+
+			mockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).Return(proto.ActionResponse{
+					Error: proto.Error2Type(proto.ErrFailed),
+					Code:  "InvalidParameter",
+				}, nil).Times(1)
+			})
+
+			err = lifecycle.PostProvision(ctx, k8sClient, nil)
+			Expect(errors.Is(err, ErrActionFailed)).Should(BeTrue())
+			_, ok := ActionErrorCode(err)
+			Expect(ok).Should(BeFalse())
+		})
+
 		It("parameters", func() {
 			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods)
 			Expect(err).Should(BeNil())

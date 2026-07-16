@@ -158,6 +158,23 @@ var _ = Describe("component status transformer conditions", func() {
 		transformer.synthesizeComp = transCtx.SynthesizeComponent
 	})
 
+	It("projects workload lifecycle action observations in deterministic order", func() {
+		runningITS.Status.InstanceStatus = []workloads.InstanceStatus{
+			{PodName: "pod-1", LifecycleActions: []appsv1.LifecycleActionStatus{{
+				Action: appsv1.LifecycleActionReconfigure, Subject: "mysql", Revision: "hash-2",
+				Target: &appsv1.LifecycleActionTarget{PodName: "pod-1", PodUID: "uid-1"},
+			}}},
+			{PodName: "pod-0", LifecycleActions: []appsv1.LifecycleActionStatus{{
+				Action: appsv1.LifecycleActionReconfigure, Subject: "mysql", Revision: "hash-1",
+				Target: &appsv1.LifecycleActionTarget{PodName: "pod-0", PodUID: "uid-0"},
+			}}},
+		}
+		transformer.syncLifecycleActionObservations()
+		Expect(comp.Status.LifecycleActions).Should(HaveLen(2))
+		Expect(comp.Status.LifecycleActions[0].Target.PodName).Should(Equal("pod-0"))
+		Expect(comp.Status.LifecycleActions[1].Target.PodName).Should(Equal("pod-1"))
+	})
+
 	setExpectedRestoreVCT := func() {
 		transCtx.SynthesizeComponent.Replicas = 1
 		transCtx.SynthesizeComponent.VolumeClaimTemplates = []corev1.PersistentVolumeClaimTemplate{{

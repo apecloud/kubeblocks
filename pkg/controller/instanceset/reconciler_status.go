@@ -31,10 +31,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
+	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -434,10 +436,16 @@ func buildFailureCondition(its *workloads.InstanceSet, pods []*corev1.Pod) (*met
 }
 
 func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pods []*corev1.Pod) error {
+	previousActions := make(map[string][]kbappsv1.LifecycleActionStatus, len(its.Status.InstanceStatus))
+	for _, status := range its.Status.InstanceStatus {
+		previousActions[status.PodName] = status.LifecycleActions
+	}
 	instanceStatus := make([]workloads.InstanceStatus, 0)
 	for _, pod := range pods {
 		status := workloads.InstanceStatus{
-			PodName: pod.Name,
+			PodName:          pod.Name,
+			PodUID:           string(pod.UID),
+			LifecycleActions: lifecycle.FilterActionObservationsForPod(previousActions[pod.Name], pod),
 		}
 		instanceStatus = append(instanceStatus, status)
 	}

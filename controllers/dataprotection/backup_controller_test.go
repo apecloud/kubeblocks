@@ -479,6 +479,9 @@ var _ = Describe("Backup Controller test", func() {
 			})
 
 			It("should fail after job fails", func() {
+				By("wait for the backup job to be created")
+				Eventually(testapps.CheckObjExists(&testCtx, getJobKey(), &batchv1.Job{}, true)).Should(Succeed())
+
 				By("pause backup reconciliation before failing the job")
 				Eventually(testapps.GetAndChangeObj(&testCtx, backupKey, func(fetched *dpv1alpha1.Backup) {
 					if fetched.Annotations == nil {
@@ -731,19 +734,26 @@ var _ = Describe("Backup Controller test", func() {
 					{Name: testdp.ComponentName + "-1", PodSelector: podSelector},
 				}
 			})).Should(Succeed())
-			targets := backupPolicy.Spec.BackupMethods[0].Targets
 			backup := testdp.NewFakeBackup(&testCtx, nil)
 			backupKey := client.ObjectKeyFromObject(backup)
-			getJobKey := func(targetName string) client.ObjectKey {
-				return client.ObjectKey{
-					Name:      dpbackup.GenerateBackupJobName(backup, fmt.Sprintf("%s-%s-0", dpbackup.BackupDataJobNamePrefix, targetName)),
-					Namespace: backup.Namespace,
-				}
-			}
 
-			By("wait for both target jobs to be created")
-			Eventually(testapps.CheckObjExists(&testCtx, getJobKey(targets[0].Name), &batchv1.Job{}, true)).Should(Succeed())
-			Eventually(testapps.CheckObjExists(&testCtx, getJobKey(targets[1].Name), &batchv1.Job{}, true)).Should(Succeed())
+			By("wait for all target jobs to be recorded and created")
+			var jobKeys []client.ObjectKey
+			Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
+				g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseRunning))
+				g.Expect(fetched.Status.Actions).To(HaveLen(4))
+				jobKeys = jobKeys[:0]
+				for _, actionStatus := range fetched.Status.Actions {
+					g.Expect(actionStatus.ObjectRef).NotTo(BeNil())
+					jobKeys = append(jobKeys, client.ObjectKey{
+						Namespace: actionStatus.ObjectRef.Namespace,
+						Name:      actionStatus.ObjectRef.Name,
+					})
+				}
+			})).Should(Succeed())
+			for _, jobKey := range jobKeys {
+				Eventually(testapps.CheckObjExists(&testCtx, jobKey, &batchv1.Job{}, true)).Should(Succeed())
+			}
 
 			By("pause reconciliation")
 			Eventually(testapps.GetAndChangeObj(&testCtx, backupKey, func(fetched *dpv1alpha1.Backup) {
@@ -756,8 +766,9 @@ var _ = Describe("Backup Controller test", func() {
 				g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseRunning))
 			}), time.Second).Should(Succeed())
 
-			testdp.PatchK8sJobStatus(&testCtx, getJobKey(targets[0].Name), batchv1.JobComplete)
-			testdp.PatchK8sJobStatus(&testCtx, getJobKey(targets[1].Name), batchv1.JobComplete)
+			for _, jobKey := range jobKeys {
+				testdp.PatchK8sJobStatus(&testCtx, jobKey, batchv1.JobComplete)
+			}
 			Expect(k8sClient.Delete(ctx, targetPod)).Should(Succeed())
 			Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(targetPod), &corev1.Pod{}, false)).Should(Succeed())
 
@@ -767,7 +778,7 @@ var _ = Describe("Backup Controller test", func() {
 			})).Should(Succeed())
 			Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
 				g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseCompleted))
-				g.Expect(fetched.Status.Actions).To(HaveLen(2))
+				g.Expect(fetched.Status.Actions).To(HaveLen(len(jobKeys)))
 				for _, actionStatus := range fetched.Status.Actions {
 					g.Expect(actionStatus.Phase).To(Equal(dpv1alpha1.ActionPhaseCompleted))
 				}

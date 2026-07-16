@@ -638,15 +638,10 @@ func (r *BackupReconciler) handleRunningPhase(
 	)
 	for i := range targets {
 		if err = r.prepareRequestTargetInfo(reqCtx, request, &targets[i]); err != nil {
-			jobWaiting, jobFailed, syncErr := r.syncJobActions(reqCtx.Ctx, request.Backup)
-			if intctrlutil.IsTargetError(syncErr, intctrlutil.ErrorTypeFatal) {
+			waiting, existFailedAction, err = r.syncJobActions(reqCtx.Ctx, request.Backup, err)
+			if err != nil {
 				return r.updateStatusIfFailed(reqCtx, backup, request.Backup, err)
 			}
-			if syncErr != nil {
-				return intctrlutil.CheckedRequeueWithError(syncErr, reqCtx.Log, "sync backup jobs failed")
-			}
-			waiting = jobWaiting
-			existFailedAction = jobFailed
 			break
 		}
 		// there are actions not completed, continue to handle following actions
@@ -703,10 +698,10 @@ func (r *BackupReconciler) handleRunningPhase(
 }
 
 func (r *BackupReconciler) syncJobActions(ctx context.Context,
-	backup *dpv1alpha1.Backup) (waiting, failed bool, err error) {
-	notApplicableErr := intctrlutil.NewFatalError("backup job actions are not applicable")
+	backup *dpv1alpha1.Backup,
+	targetErr error) (waiting, failed bool, err error) {
 	if len(backup.Status.Actions) == 0 {
-		return false, false, notApplicableErr
+		return false, false, targetErr
 	}
 
 	for i := range backup.Status.Actions {
@@ -714,21 +709,22 @@ func (r *BackupReconciler) syncJobActions(ctx context.Context,
 		objectRef := actionStatus.ObjectRef
 		if objectRef == nil || objectRef.APIVersion != batchv1.SchemeGroupVersion.String() ||
 			objectRef.Kind != constant.JobKind || objectRef.Namespace == "" || objectRef.Name == "" {
-			return false, false, notApplicableErr
+			return false, false, targetErr
 		}
 
 		job := &batchv1.Job{}
 		if err := r.Client.Get(ctx, client.ObjectKey{Namespace: objectRef.Namespace, Name: objectRef.Name}, job); err != nil {
 			if apierrors.IsNotFound(err) {
-				return false, false, notApplicableErr
+				return false, false, targetErr
 			}
-			return false, false, err
+			return false, false, intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue,
+				"sync backup jobs failed: %v", err)
 		}
 		if objectRef.UID != "" && objectRef.UID != job.UID {
-			return false, false, notApplicableErr
+			return false, false, targetErr
 		}
 		if job.Labels[dptypes.BackupNameLabelKey] != backup.Name {
-			return false, false, notApplicableErr
+			return false, false, targetErr
 		}
 
 		_, finishedType, failureReason := dputils.IsJobFinished(job)

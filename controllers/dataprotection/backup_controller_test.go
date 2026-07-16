@@ -62,18 +62,32 @@ import (
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
+type getErrorClient struct {
+	client.Client
+}
+
+func (c *getErrorClient) Get(context.Context, client.ObjectKey, client.Object, ...client.GetOption) error {
+	return fmt.Errorf("get failed")
+}
+
 func TestSyncJobActions(t *testing.T) {
 	tests := []struct {
 		name           string
 		jobConditions  []batchv1.JobConditionType
-		fatal          bool
+		notApplicable  bool
+		getError       bool
 		waiting        bool
 		failed         bool
 		expectedAction []dpv1alpha1.ActionPhase
 	}{
 		{
-			name:  "no actions",
-			fatal: true,
+			name:          "no actions",
+			notApplicable: true,
+		},
+		{
+			name:          "job get error",
+			jobConditions: []batchv1.JobConditionType{""},
+			getError:      true,
 		},
 		{
 			name:           "all jobs completed",
@@ -139,13 +153,22 @@ func TestSyncJobActions(t *testing.T) {
 				})
 			}
 
+			var cli client.Client = fake.NewClientBuilder().WithScheme(testScheme).WithObjects(objects...).Build()
+			if tt.getError {
+				cli = &getErrorClient{Client: cli}
+			}
 			reconciler := &BackupReconciler{
-				Client: fake.NewClientBuilder().WithScheme(testScheme).WithObjects(objects...).Build(),
+				Client: cli,
 				clock:  clock.RealClock{},
 			}
-			waiting, failed, err := reconciler.syncJobActions(context.Background(), backup)
-			if tt.fatal {
-				g.Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).To(BeTrue())
+			targetErr := fmt.Errorf("target unavailable")
+			waiting, failed, err := reconciler.syncJobActions(context.Background(), backup, targetErr)
+			if tt.notApplicable {
+				g.Expect(err).To(MatchError(targetErr))
+				return
+			}
+			if tt.getError {
+				g.Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeRequeue)).To(BeTrue())
 				return
 			}
 			g.Expect(err).NotTo(HaveOccurred())

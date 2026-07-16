@@ -645,17 +645,14 @@ func (r *BackupReconciler) handleRunningPhase(
 			updateBackupStatusByActionStatus(&request.Status)
 			switch jobPhase {
 			case dpv1alpha1.ActionPhaseCompleted:
-				return r.completeBackup(reqCtx, backup, request.Backup)
 			case dpv1alpha1.ActionPhaseFailed:
-				return r.updateStatusIfFailed(reqCtx, backup, request.Backup,
-					fmt.Errorf("there are failed actions, you can obtain the more information in the status.actions"))
+				existFailedAction = true
 			case dpv1alpha1.ActionPhaseRunning:
 				waiting = true
+			default:
+				return r.updateStatusIfFailed(reqCtx, backup, request.Backup, err)
 			}
-			if waiting {
-				break
-			}
-			return r.updateStatusIfFailed(reqCtx, backup, request.Backup, err)
+			break
 		}
 		// there are actions not completed, continue to handle following actions
 		actions, err := request.BuildActions()

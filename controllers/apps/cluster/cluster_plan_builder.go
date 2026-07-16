@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"sort"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -388,6 +389,7 @@ func (c *clusterPlanBuilder) reconcileStatusObject(ctx context.Context, node *mo
 		oldCluster, _ := node.OriObj.(*appsv1.Cluster)
 		c.emitConditionUpdatingEvent(oldCluster.Status.Conditions, newCluster.Status.Conditions)
 		c.emitStatusUpdatingEvent(oldCluster.Status, newCluster.Status)
+		c.emitManagedShardAddFailureEvent(oldCluster.Status.Shardings, newCluster.Status.Shardings)
 	}
 	return nil
 }
@@ -428,5 +430,38 @@ func (c *clusterPlanBuilder) emitStatusUpdatingEvent(oldStatus, newStatus appsv1
 	}
 	if len(message) > 0 {
 		c.transCtx.EventRecorder.Event(cluster, eType, string(newPhase), message)
+	}
+}
+
+func (c *clusterPlanBuilder) emitManagedShardAddFailureEvent(
+	oldShardings, newShardings map[string]appsv1.ClusterShardingStatus) {
+	names := make([]string, 0, len(newShardings))
+	for name := range newShardings {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	for _, name := range names {
+		newAction := newShardings[name].ShardAdd
+		if newAction == nil || newAction.Phase != appsv1.LifecycleActionFailed {
+			continue
+		}
+		oldAction := oldShardings[name].ShardAdd
+		if oldAction != nil && oldAction.Phase == newAction.Phase &&
+			oldAction.Reason == newAction.Reason && oldAction.Message == newAction.Message {
+			continue
+		}
+
+		cluster := c.transCtx.Cluster
+		c.transCtx.Logger.Error(fmt.Errorf("managed shard-add failure: %s", newAction.Message),
+			"managed shard-add action failed",
+			"namespace", cluster.Namespace,
+			"cluster", cluster.Name,
+			"sharding", name,
+			"reason", newAction.Reason,
+			"statusMessage", newAction.Message)
+		if c.transCtx.EventRecorder != nil {
+			c.transCtx.EventRecorder.Event(cluster, corev1.EventTypeWarning, newAction.Reason, newAction.Message)
+		}
 	}
 }

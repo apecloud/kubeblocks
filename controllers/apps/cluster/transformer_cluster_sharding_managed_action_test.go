@@ -28,6 +28,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-logr/logr/funcr"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -36,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -60,6 +62,25 @@ type managedShardAddReadErrorClient struct {
 type managedShardAddDryRunCaptureClient struct {
 	client.Client
 	job *batchv1.Job
+}
+
+type managedShardAddStatusPatchErrorClient struct {
+	client.Client
+	err error
+}
+
+type managedShardAddStatusPatchErrorWriter struct {
+	client.SubResourceWriter
+	err error
+}
+
+func (c *managedShardAddStatusPatchErrorClient) Status() client.SubResourceWriter {
+	return &managedShardAddStatusPatchErrorWriter{SubResourceWriter: c.Client.Status(), err: c.err}
+}
+
+func (w *managedShardAddStatusPatchErrorWriter) Patch(ctx context.Context, obj client.Object,
+	patch client.Patch, opts ...client.SubResourcePatchOption) error {
+	return w.err
 }
 
 func (c *managedShardAddDryRunCaptureClient) Create(ctx context.Context, obj client.Object,
@@ -210,6 +231,179 @@ func managedShardAddTestProto(name, shardTemplateName string) *appsv1.Component 
 		Name:      name,
 		Labels:    labels,
 	}}
+}
+
+func TestManagedShardAddProductionTemplateLabelsReachPlan(t *testing.T) {
+	ctx, _, _ := managedShardAddTestContext(t)
+	ctx.Cluster.Spec.Shardings[0].Template = appsv1.ClusterComponentSpec{
+		ComponentDef: "redis",
+		Replicas:     1,
+	}
+	ctx.Cluster.Spec.Shardings[0].ShardTemplates = []appsv1.ShardTemplate{{
+		Name:   "hot",
+		Shards: ptr.To[int32](1),
+	}}
+	ctx.shardings = []*appsv1.ClusterSharding{&ctx.Cluster.Spec.Shardings[0]}
+	var err error
+	ctx.shardingComps, ctx.shardingCompsWithTpl, err =
+		(&clusterNormalizationTransformer{}).buildShardingComps(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	protoComps, err := (&clusterShardingHandler{}).buildComps(
+		ctx, &ctx.Cluster.Spec.Shardings[0], nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(protoComps) != int(ctx.Cluster.Spec.Shardings[0].Shards) {
+		t.Fatalf("production build returned %d Components, want %d", len(protoComps),
+			ctx.Cluster.Spec.Shardings[0].Shards)
+	}
+	protoMap := make(map[string]*appsv1.Component, len(protoComps))
+	members := make([]string, 0, len(protoComps))
+	templateCounts := map[string]int{}
+	for _, proto := range protoComps {
+		shardTemplateName, ok := proto.Labels[constant.KBAppShardTemplateLabelKey]
+		if !ok {
+			t.Fatalf("Component labels=%#v, want an explicit shard template identity", proto.Labels)
+		}
+		templateCounts[shardTemplateName]++
+		protoMap[proto.Name] = proto
+		members = append(members, proto.Name)
+	}
+	if templateCounts[""] != 3 || templateCounts["hot"] != 1 || len(templateCounts) != 2 {
+		t.Fatalf("production Component template identities=%#v, want default=3 hot=1", templateCounts)
+	}
+
+	status, err := buildManagedShardAddPlanFromComponents(ctx.Cluster, managedShardAddTestSharding, 4,
+		members, protoMap)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(status.Members) != len(protoComps) {
+		t.Fatalf("production default-template plan members=%#v", status.Members)
+	}
+	planTemplateCounts := map[string]int{}
+	for _, member := range status.Members {
+		if member.Name == "" {
+			t.Fatalf("production default-template plan members=%#v", status.Members)
+		}
+		planTemplateCounts[member.ShardTemplateName]++
+	}
+	if !reflect.DeepEqual(planTemplateCounts, templateCounts) {
+		t.Fatalf("plan template identities=%#v, production Components=%#v", planTemplateCounts, templateCounts)
+	}
+}
+
+func TestManagedShardAddFailureEventFollowsPersistedStatus(t *testing.T) {
+	const failureMessage = "planned member redis-redis-cluster-zjt is no longer present in the desired topology"
+	cluster := managedShardAddTestClusterObject()
+	recorder := record.NewFakeRecorder(2)
+	logs := make([]string, 0, 1)
+	logger := funcr.New(func(prefix, args string) {
+		logs = append(logs, prefix+args)
+	}, funcr.Options{})
+	builder := &clusterPlanBuilder{transCtx: &clusterTransformContext{
+		Cluster:       cluster,
+		EventRecorder: recorder,
+		Logger:        logger,
+	}}
+	oldShardings := map[string]appsv1.ClusterShardingStatus{
+		managedShardAddTestSharding: {ShardAdd: &appsv1.ShardingActionStatus{
+			LifecycleActionStatus: appsv1.LifecycleActionStatus{Phase: appsv1.LifecycleActionPending},
+		}},
+	}
+	newShardings := map[string]appsv1.ClusterShardingStatus{
+		managedShardAddTestSharding: {ShardAdd: &appsv1.ShardingActionStatus{
+			LifecycleActionStatus: appsv1.LifecycleActionStatus{
+				Phase:   appsv1.LifecycleActionFailed,
+				Reason:  "MemberDispatchFailed",
+				Message: failureMessage,
+			},
+		}},
+	}
+
+	builder.emitManagedShardAddFailureEvent(oldShardings, newShardings)
+	select {
+	case event := <-recorder.Events:
+		want := "Warning MemberDispatchFailed " + failureMessage
+		if event != want {
+			t.Fatalf("event=%q, want %q", event, want)
+		}
+	default:
+		t.Fatal("failed managed shard-add status produced no Kubernetes Event")
+	}
+	joinedLogs := strings.Join(logs, "\n")
+	for _, want := range []string{
+		"managed shard-add action failed",
+		managedShardAddTestNamespace,
+		managedShardAddTestCluster,
+		managedShardAddTestSharding,
+		"MemberDispatchFailed",
+		failureMessage,
+	} {
+		if !strings.Contains(joinedLogs, want) {
+			t.Fatalf("structured log %q does not contain %q", joinedLogs, want)
+		}
+	}
+
+	logs = nil
+	builder.emitManagedShardAddFailureEvent(newShardings, newShardings)
+	select {
+	case event := <-recorder.Events:
+		t.Fatalf("unchanged failed status emitted duplicate event %q", event)
+	default:
+	}
+	if len(logs) != 0 {
+		t.Fatalf("unchanged failed status emitted duplicate logs %#v", logs)
+	}
+}
+
+func TestManagedShardAddFailureEventRequiresSuccessfulStatusPatch(t *testing.T) {
+	oldCluster := managedShardAddTestClusterObject()
+	oldCluster.Status.Shardings = map[string]appsv1.ClusterShardingStatus{
+		managedShardAddTestSharding: {ShardAdd: &appsv1.ShardingActionStatus{
+			LifecycleActionStatus: appsv1.LifecycleActionStatus{Phase: appsv1.LifecycleActionPending},
+		}},
+	}
+	newCluster := oldCluster.DeepCopy()
+	newCluster.Status.Shardings[managedShardAddTestSharding] = appsv1.ClusterShardingStatus{
+		ShardAdd: &appsv1.ShardingActionStatus{LifecycleActionStatus: appsv1.LifecycleActionStatus{
+			Phase:   appsv1.LifecycleActionFailed,
+			Reason:  "MemberDispatchFailed",
+			Message: "planned member is no longer present in the desired topology",
+		}},
+	}
+	wantErr := errors.New("status patch failed")
+	baseClient := fake.NewClientBuilder().WithScheme(managedShardAddTestScheme(t)).Build()
+	patchClient := &managedShardAddStatusPatchErrorClient{Client: baseClient, err: wantErr}
+	recorder := record.NewFakeRecorder(1)
+	logs := make([]string, 0, 1)
+	builder := &clusterPlanBuilder{
+		cli: patchClient,
+		transCtx: &clusterTransformContext{
+			Cluster:       newCluster,
+			EventRecorder: recorder,
+			Logger: funcr.New(func(prefix, args string) {
+				logs = append(logs, prefix+args)
+			}, funcr.Options{}),
+		},
+	}
+
+	err := builder.reconcileStatusObject(context.Background(),
+		model.NewObjectVertex(oldCluster, newCluster, model.ActionStatusPtr()))
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("status patch error=%v, want %v", err, wantErr)
+	}
+	select {
+	case event := <-recorder.Events:
+		t.Fatalf("failed status patch emitted event %q", event)
+	default:
+	}
+	if len(logs) != 0 {
+		t.Fatalf("failed status patch emitted logs %#v", logs)
+	}
 }
 
 func buildManagedShardAddPlan(cluster *appsv1.Cluster, shardingName string, targetShardCount int32,

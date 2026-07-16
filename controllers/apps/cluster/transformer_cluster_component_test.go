@@ -498,6 +498,7 @@ var _ = Describe("cluster component transformer test", func() {
 		}
 		setters = append(setters, func(comp *appsv1.Component) {
 			comp.Labels[constant.KBAppShardingNameLabelKey] = shardingName
+			comp.Labels[constant.KBAppShardTemplateLabelKey] = ""
 			comp.Labels[constant.ShardingDefLabelKey] = shardingDefName
 		})
 		return newCompObj(transCtx, specs[0], setters...)

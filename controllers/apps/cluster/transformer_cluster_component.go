@@ -981,13 +981,11 @@ func (h *clusterShardingHandler) buildComps(transCtx *clusterTransformContext,
 
 func (h *clusterShardingHandler) buildLabels(sharding *appsv1.ClusterSharding, shardTplName string) map[string]string {
 	labels := map[string]string{
-		constant.KBAppShardingNameLabelKey: sharding.Name,
+		constant.KBAppShardingNameLabelKey:  sharding.Name,
+		constant.KBAppShardTemplateLabelKey: shardTplName,
 	}
 	if len(sharding.ShardingDef) > 0 {
 		labels[constant.ShardingDefLabelKey] = sharding.ShardingDef
-	}
-	if len(shardTplName) > 0 {
-		labels[constant.KBAppShardTemplateLabelKey] = shardTplName
 	}
 	return labels
 }

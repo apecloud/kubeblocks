@@ -4293,6 +4293,20 @@ LifecycleActionStatus
 <p>PreTerminate records the status of the sharding pre-terminate action.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>shardAdd</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingActionStatus">
+ShardingActionStatus
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ShardAdd records the active or most recently completed managed shard-add action.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1.ClusterSpec">ClusterSpec
@@ -9487,7 +9501,7 @@ Usually occurs if a prerequisite action failed or a permanent condition was not 
 <h3 id="apps.kubeblocks.io/v1.LifecycleActionStatus">LifecycleActionStatus
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterShardingStatus">ClusterShardingStatus</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterShardingStatus">ClusterShardingStatus</a>, <a href="#apps.kubeblocks.io/v1.ShardingActionStatus">ShardingActionStatus</a>)
 </p>
 <div>
 <p>LifecycleActionStatus records the observed state of a lifecycle-related action.</p>
@@ -9516,6 +9530,20 @@ LifecycleActionPhase
 </tr>
 <tr>
 <td>
+<code>reason</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Reason is a programmatic identifier indicating the reason for the current phase.
+e.g., &lsquo;PreconditionNotMet&rsquo; for Pending phase or &lsquo;PrerequisiteFailed&rsquo; for Skipped phase.
+It must not contain action output, parameter values, credentials, or other sensitive data.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>message</code><br/>
 <em>
 string
@@ -9523,7 +9551,8 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Message is a human-readable message providing details about the current phase.</p>
+<p>Message is a human-readable message providing details about the current phase.
+It must not contain action output, parameter values, credentials, or other sensitive data.</p>
 </td>
 </tr>
 <tr>
@@ -12710,6 +12739,23 @@ Action
 </tr>
 <tr>
 <td>
+<code>opsDefinitionName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the OpsDefinition used to execute shardAdd as a managed Custom OpsRequest.</p>
+<p>When set, the Cluster controller creates exactly one Custom OpsRequest for a group of shards added
+in the same Cluster generation. The Operations controller owns the resulting workload and reports its status.
+This field is supported only for shardAdd and is mutually exclusive with inline Action fields and
+targetShardSelector.</p>
+<p>This field cannot be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>targetShardSelector</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.TargetShardSelector">
@@ -12727,6 +12773,353 @@ It provides precise control over which shard(s) should be targeted.</p>
 2. Global Default: In other cases (where no specific shard context exists),
 one shard is selected randomly by default.</p>
 <p>This field cannot be updated.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ShardingActionMemberStatus">ShardingActionMemberStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ShardingActionStatus">ShardingActionStatus</a>)
+</p>
+<div>
+<p>ShardingActionMemberStatus records the immutable identity of a Component participating in a managed
+sharding action attempt.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Name is the full Component name.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>uid</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>UID identifies the exact Component object observed by the action.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>generation</code><br/>
+<em>
+int64
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Generation is the Component generation bound to the action.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>observedGeneration</code><br/>
+<em>
+int64
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ObservedGeneration is the Component generation observed by its controller when the action was bound.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ShardingActionStatus">ShardingActionStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterShardingStatus">ClusterShardingStatus</a>)
+</p>
+<div>
+<p>ShardingActionStatus records the durable plan and exact attempt identity of a managed sharding action.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>LifecycleActionStatus</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.LifecycleActionStatus">
+LifecycleActionStatus
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>LifecycleActionStatus</code> are embedded into this type.)
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>clusterGeneration</code><br/>
+<em>
+int64
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ClusterGeneration is the Cluster generation that created this durable action plan.
+Later desired topology changes are deferred until this plan is closed.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>token</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Token identifies the Cluster generation or legacy shard-add group handled by this action.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>targetShardCount</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>TargetShardCount is the desired number of shards after the action succeeds.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>members</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingActionMemberStatus">
+[]ShardingActionMemberStatus
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Members is the stable, ordered set of Components in this shard-add group.
+UIDs and generations are populated before an OpsRequest is created.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>memberSnapshotHash</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>MemberSnapshotHash binds the ordered member identities to the action attempt.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>planHash</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>PlanHash binds the ordered member names and target shard count selected before any member is created.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>membersDispatched</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>MembersDispatched records that creation of the exact planned member set was submitted successfully.
+Once true, a missing or replaced planned member is a terminal identity failure and is never recreated.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>opsDefinitionName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>OpsDefinitionName is the OpsDefinition selected for this action.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>opsDefinitionUID</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>OpsDefinitionUID identifies the exact OpsDefinition object selected for this action.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>opsDefinitionGeneration</code><br/>
+<em>
+int64
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>OpsDefinitionGeneration identifies the exact OpsDefinition generation selected for this action.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>opsDefinitionSpecHash</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>OpsDefinitionSpecHash binds the canonical OpsDefinition spec selected for this action.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>opsRequestName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>OpsRequestName is the deterministic name of the managed Custom OpsRequest.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>opsRequestUID</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>OpsRequestUID identifies the exact OpsRequest attempt. Reusing the same name for a retry produces a new UID.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>opsRequestSpecHash</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>OpsRequestSpecHash binds the exact OpsRequest inputs consumed by this action.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>opsRequestPhase</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>OpsRequestPhase records the last phase observed from the exact OpsRequest UID.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>jobName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>JobName is the exact managed Job name derived from the bound OpsRequest UID.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>jobUID</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>JobUID identifies the exact managed Job accepted by the Operations controller.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>jobSpecHash</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>JobSpecHash binds the API-server-defaulted Job spec accepted by the Operations controller.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>cleanupStarted</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>CleanupStarted records that the exact OpsRequest and Job succeeded and that this terminal observation
+was persisted before any member marker is removed. Once true, reconciliation only advances the marker
+cleanup reducer and never creates or reconsumes an OpsRequest or Job.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>markersCleaned</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>MarkersCleaned records that every member marker belonging to this attempt has been removed.
+A succeeded action remains topology-blocking until this field becomes true.</p>
 </td>
 </tr>
 </tbody>

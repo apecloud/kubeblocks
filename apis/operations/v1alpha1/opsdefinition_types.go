@@ -316,11 +316,14 @@ const (
 )
 
 type OpsWorkloadAction struct {
-	// Defines the workload type of the action. Valid values include "Job" and "Pod".
+	// Defines the workload type of the action. Valid values include "Job", "Pod", and "ManagedJob".
 	//
 	// - "Job": Creates a Job to execute the action.
 	// - "Pod": Creates a Pod to execute the action.
 	//    Note: unlike Jobs, manually deleting a Pod does not affect the `backoffLimit`.
+	// - "ManagedJob": Persists the expected Job identity before creating it, binds the exact Job UID after
+	//   creation, and fails instead of recreating a missing or changed Job. ManagedJob requires an execution
+	//   snapshot on the Custom OpsRequest and does not support PodInfoExtractor or retries.
 	//
 	// +kubebuilder:validation:Required
 	Type OpsWorkloadType `json:"type"`

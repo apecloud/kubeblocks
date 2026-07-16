@@ -81,6 +81,7 @@ type OpsResource struct {
 	OpsDef         *opsv1alpha1.OpsDefinition
 	OpsRequest     *opsv1alpha1.OpsRequest
 	Cluster        *appsv1.Cluster
+	Reader         client.Reader
 	Recorder       record.EventRecorder
 	ToClusterPhase appsv1.ClusterPhase
 	Runtimes       map[string]OpsRuntime

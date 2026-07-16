@@ -907,6 +907,9 @@ func (h *clusterShardingHandler) update(transCtx *clusterTransformContext, dag *
 	if err := h.handlePostProvision(transCtx, name, maps.Values(runningCompsMap)); err != nil {
 		return err
 	}
+	if managed, err := h.handleManagedShardAdd(transCtx, dag, name, runningCompsMap, protoCompsMap, toCreate); managed {
+		return err
+	}
 
 	errorSkip, err3 := h.handleShardAddNRemove(transCtx, name, runningCompsMap, protoCompsMap, toCreate, toDelete, toUpdate)
 
@@ -1110,7 +1113,7 @@ func (h *clusterShardingHandler) buildShardingActions(transCtx *clusterTransform
 	if shardingDef.Spec.LifecycleActions.PreTerminate != nil {
 		checkNAppend(shardingPreTerminateAction, &shardingDef.Spec.LifecycleActions.PreTerminate.Action)
 	}
-	if shardingDef.Spec.LifecycleActions.ShardAdd != nil {
+	if shardingDef.Spec.LifecycleActions.ShardAdd != nil && shardingDef.Spec.LifecycleActions.ShardAdd.OpsDefinitionName == "" {
 		checkNAppend(shardingAddShardAction, &shardingDef.Spec.LifecycleActions.ShardAdd.Action)
 	}
 	if shardingDef.Spec.LifecycleActions.ShardRemove != nil {

@@ -27,6 +27,13 @@ import (
 )
 
 // OpsRequestSpec defines the desired state of OpsRequest
+//
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.custom) || !has(oldSelf.custom.executionSnapshot) || (has(self.custom) && self.custom == oldSelf.custom)",message="custom operation inputs are immutable after an execution snapshot is set"
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.custom) || !has(oldSelf.custom.executionSnapshot) || (has(self.ttlSecondsAfterSucceed) == has(oldSelf.ttlSecondsAfterSucceed) && (!has(self.ttlSecondsAfterSucceed) || self.ttlSecondsAfterSucceed == oldSelf.ttlSecondsAfterSucceed))",message="ttlSecondsAfterSucceed is immutable for a snapshotted Custom operation"
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.custom) || !has(oldSelf.custom.executionSnapshot) || (has(self.ttlSecondsAfterUnsuccessfulCompletion) == has(oldSelf.ttlSecondsAfterUnsuccessfulCompletion) && (!has(self.ttlSecondsAfterUnsuccessfulCompletion) || self.ttlSecondsAfterUnsuccessfulCompletion == oldSelf.ttlSecondsAfterUnsuccessfulCompletion))",message="ttlSecondsAfterUnsuccessfulCompletion is immutable for a snapshotted Custom operation"
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.custom) || !has(oldSelf.custom.executionSnapshot) || (has(self.preConditionDeadlineSeconds) == has(oldSelf.preConditionDeadlineSeconds) && (!has(self.preConditionDeadlineSeconds) || self.preConditionDeadlineSeconds == oldSelf.preConditionDeadlineSeconds))",message="preConditionDeadlineSeconds is immutable for a snapshotted Custom operation"
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.custom) || !has(oldSelf.custom.executionSnapshot) || (has(self.timeoutSeconds) == has(oldSelf.timeoutSeconds) && (!has(self.timeoutSeconds) || self.timeoutSeconds == oldSelf.timeoutSeconds))",message="timeoutSeconds is immutable for a snapshotted Custom operation"
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.custom) || !has(oldSelf.custom.executionSnapshot) || self.enqueueOnForce == oldSelf.enqueueOnForce",message="enqueueOnForce is immutable for a snapshotted Custom operation"
 type OpsRequestSpec struct {
 	// Specifies the name of the Cluster resource that this operation is targeting.
 	//
@@ -568,11 +575,22 @@ type Reconfigure struct {
 	Parameters []ParameterPair `json:"parameters,omitempty"`
 }
 
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.executionSnapshot) || self == oldSelf",message="custom operation inputs are immutable after an execution snapshot is set"
 type CustomOps struct {
 	// Specifies the name of the OpsDefinition.
 	//
 	// +kubebuilder:validation:Required
 	OpsDefinitionName string `json:"opsDefinitionName"`
+
+	// ExecutionSnapshot binds a managed Custom operation to the exact OpsDefinition and target identities
+	// validated by its producer. The Operations controller revalidates this snapshot before executing or
+	// observing any action.
+	//
+	// When set, all Custom operation inputs and execution timing fields are immutable except spec.cancel.
+	// Ordinary user-created Custom operations may omit this field and retain the existing behavior.
+	//
+	// +optional
+	ExecutionSnapshot *CustomOpsExecutionSnapshot `json:"executionSnapshot,omitempty"`
 
 	// Specifies the name of the ServiceAccount to be used for executing the custom operation.
 	ServiceAccountName *string `json:"serviceAccountName,omitempty"`
@@ -602,6 +620,38 @@ type CustomOps struct {
 	// +listType=map
 	// +listMapKey=componentName
 	CustomOpsComponents []CustomOpsComponent `json:"components"  patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
+}
+
+// CustomOpsExecutionSnapshot binds a managed Custom operation to immutable execution inputs.
+type CustomOpsExecutionSnapshot struct {
+	// OpsDefinitionUID identifies the exact OpsDefinition object selected by the producer.
+	//
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:Required
+	OpsDefinitionUID string `json:"opsDefinitionUID"`
+
+	// OpsDefinitionGeneration identifies the exact OpsDefinition generation selected by the producer.
+	//
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Required
+	OpsDefinitionGeneration int64 `json:"opsDefinitionGeneration"`
+
+	// OpsDefinitionSpecHash is the lowercase SHA-256 hash of the canonical OpsDefinition spec.
+	//
+	// +kubebuilder:validation:MinLength=64
+	// +kubebuilder:validation:MaxLength=64
+	// +kubebuilder:validation:Pattern=`^[a-f0-9]{64}$`
+	// +kubebuilder:validation:Required
+	OpsDefinitionSpecHash string `json:"opsDefinitionSpecHash"`
+
+	// TargetSnapshotHash is the lowercase SHA-256 hash of the exact target identities bound by the producer.
+	// The Operations controller preserves this opaque value as part of the immutable Custom operation input.
+	//
+	// +kubebuilder:validation:MinLength=64
+	// +kubebuilder:validation:MaxLength=64
+	// +kubebuilder:validation:Pattern=`^[a-f0-9]{64}$`
+	// +kubebuilder:validation:Required
+	TargetSnapshotHash string `json:"targetSnapshotHash"`
 }
 
 type CustomOpsComponent struct {
@@ -1057,6 +1107,31 @@ type ActionTask struct {
 	// The name of the Pod that the task is associated with or operates on.
 	// +optional
 	TargetPodName string `json:"targetPodName,omitempty"`
+
+	// TaskIndex is the stable index used to derive the managed workload name.
+	//
+	// +optional
+	TaskIndex *int32 `json:"taskIndex,omitempty"`
+
+	// DispatchState records whether the expected managed workload is only planned or is bound to a live UID.
+	// Empty preserves the behavior of legacy Pod and Job action tasks.
+	//
+	// +optional
+	DispatchState ActionTaskDispatchState `json:"dispatchState,omitempty"`
+
+	// WorkloadUID identifies the exact managed workload object. It is populated only after its owner and spec
+	// have been verified against the persisted plan.
+	//
+	// +optional
+	WorkloadUID string `json:"workloadUID,omitempty"`
+
+	// WorkloadSpecHash binds the API-server-defaulted managed workload spec selected before dispatch.
+	//
+	// +kubebuilder:validation:MinLength=64
+	// +kubebuilder:validation:MaxLength=64
+	// +kubebuilder:validation:Pattern=`^[a-f0-9]{64}$`
+	// +optional
+	WorkloadSpecHash string `json:"workloadSpecHash,omitempty"`
 
 	// The count of retry attempts made for this task.
 	// +optional

@@ -21,6 +21,7 @@ package custom
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -28,6 +29,7 @@ import (
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -40,7 +42,28 @@ import (
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	opsutil "github.com/apecloud/kubeblocks/pkg/operations/util"
 )
+
+type jobUIDClient struct {
+	client.Client
+	jobCreates    int
+	dryRunCreates int
+}
+
+func (c *jobUIDClient) Create(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
+	if job, ok := obj.(*batchv1.Job); ok {
+		if len(opts) > 0 {
+			c.dryRunCreates++
+		} else {
+			c.jobCreates++
+		}
+		if job.UID == "" {
+			job.UID = types.UID("managed-job-uid")
+		}
+	}
+	return c.Client.Create(ctx, obj, opts...)
+}
 
 func TestCustom(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -765,6 +788,182 @@ var _ = Describe("custom ops helpers", func() {
 		_, err = workloadAction.CheckStatus(actionCtx)
 		Expect(err).Should(HaveOccurred())
 		Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeTrue())
+	})
+
+	It("persists a managed Job plan before dispatch and never recreates a missing bound Job", func() {
+		opsRequest := newOpsRequest()
+		opsRequest.Spec.CustomOps.ExecutionSnapshot = &opsv1alpha1.CustomOpsExecutionSnapshot{
+			OpsDefinitionUID:        "opsdef-uid",
+			OpsDefinitionGeneration: 1,
+			OpsDefinitionSpecHash:   strings.Repeat("a", 64),
+			TargetSnapshotHash:      strings.Repeat("b", 64),
+		}
+		cli := &jobUIDClient{Client: newFakeClient()}
+		action := &opsv1alpha1.OpsAction{
+			Name:          "managed-job",
+			FailurePolicy: opsv1alpha1.FailurePolicyFail,
+			Workload: &opsv1alpha1.OpsWorkloadAction{
+				Type:         opsv1alpha1.ManagedJobWorkload,
+				BackoffLimit: 0,
+				PodSpec: corev1.PodSpec{
+					Containers: []corev1.Container{{Name: "runner", Image: "busybox"}},
+				},
+			},
+		}
+		workloadAction := NewWorkloadAction(
+			opsRequest,
+			newCluster(),
+			&opsv1alpha1.OpsDefinition{},
+			&opsv1alpha1.CustomOpsComponent{
+				ComponentOps: opsv1alpha1.ComponentOps{ComponentName: compName},
+				Parameters:   []opsv1alpha1.Parameter{{Name: "TOKEN", Value: "generation-7"}},
+			},
+			newComponentSpec(),
+			opsv1alpha1.ProgressStatusDetail{},
+		)
+		actionCtx := ActionContext{ReqCtx: reqCtx, Client: cli, Reader: cli, Action: action}
+
+		planned, err := workloadAction.Execute(actionCtx)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(planned.ActionTasks).Should(HaveLen(1))
+		Expect(planned.ActionTasks[0].TaskIndex).Should(Equal(ptr.To[int32](0)))
+		Expect(planned.ActionTasks[0].DispatchState).Should(Equal(opsv1alpha1.PlannedActionTaskDispatchState))
+		Expect(planned.ActionTasks[0].WorkloadUID).Should(BeEmpty())
+		Expect(planned.ActionTasks[0].WorkloadSpecHash).Should(MatchRegexp("^[a-f0-9]{64}$"))
+		Expect(cli.dryRunCreates).Should(Equal(1))
+		Expect(cli.jobCreates).Should(BeZero())
+		Expect(cli.List(reqCtx.Ctx, &batchv1.JobList{}, client.InNamespace(namespace))).Should(Succeed())
+		jobList := &batchv1.JobList{}
+		Expect(cli.List(reqCtx.Ctx, jobList, client.InNamespace(namespace))).Should(Succeed())
+		Expect(jobList.Items).Should(BeEmpty())
+
+		workloadAction.progressDetail = opsv1alpha1.ProgressStatusDetail{ActionTasks: planned.ActionTasks}
+		created, err := workloadAction.CheckStatus(actionCtx)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(created.IsCompleted).Should(BeFalse())
+		Expect(created.ActionTasks).Should(HaveLen(1))
+		Expect(created.ActionTasks[0].DispatchState).Should(Equal(opsv1alpha1.CreatedActionTaskDispatchState))
+		Expect(created.ActionTasks[0].WorkloadUID).Should(Equal("managed-job-uid"))
+		Expect(cli.dryRunCreates).Should(Equal(2))
+		Expect(cli.jobCreates).Should(Equal(1))
+
+		job := &batchv1.Job{}
+		Expect(cli.Get(reqCtx.Ctx, client.ObjectKey{
+			Namespace: namespace,
+			Name:      getNameFromObjectKey(created.ActionTasks[0].ObjectKey),
+		}, job)).Should(Succeed())
+		Expect(job.Spec.BackoffLimit).Should(Equal(ptr.To[int32](0)))
+		selectorValue := job.Spec.Selector.MatchLabels[constant.ManagedJobSelectorLabelKey]
+		Expect(selectorValue).Should(MatchRegexp("^[a-z2-7]{52}$"))
+		Expect(job.Spec.Template.Labels).Should(HaveKeyWithValue(constant.ManagedJobSelectorLabelKey, selectorValue))
+		Expect(opsutil.ManagedJobSelectorValue("12345678-first-complete-uid", 0)).ShouldNot(
+			Equal(opsutil.ManagedJobSelectorValue("12345678-second-complete-uid", 0)))
+
+		job.Status.Conditions = []batchv1.JobCondition{{
+			Type:   batchv1.JobComplete,
+			Status: corev1.ConditionTrue,
+		}}
+		Expect(cli.Status().Update(reqCtx.Ctx, job)).Should(Succeed())
+		terminalTasks := append([]opsv1alpha1.ActionTask(nil), created.ActionTasks...)
+		terminalTasks[0].Status = opsv1alpha1.SucceedActionTaskStatus
+		workloadAction.progressDetail = opsv1alpha1.ProgressStatusDetail{ActionTasks: terminalTasks}
+		verified, err := workloadAction.CheckStatus(actionCtx)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(verified.IsCompleted).Should(BeTrue())
+		Expect(verified.ExistFailure).Should(BeFalse())
+
+		terminalTasks[0].Status = opsv1alpha1.FailedActionTaskStatus
+		workloadAction.progressDetail = opsv1alpha1.ProgressStatusDetail{ActionTasks: terminalTasks}
+		_, err = workloadAction.CheckStatus(actionCtx)
+		Expect(err).Should(HaveOccurred())
+		Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeTrue())
+
+		drifted := job.DeepCopy()
+		drifted.Spec.Template.Spec.Containers[0].Image = "busybox:changed"
+		Expect(workloadAction.validateManagedJob(&created.ActionTasks[0], drifted, job.Name)).Should(HaveOccurred())
+		replacement := job.DeepCopy()
+		replacement.UID = types.UID("managed-job-replacement-uid")
+		Expect(workloadAction.validateManagedJob(&created.ActionTasks[0], replacement, job.Name)).Should(HaveOccurred())
+
+		job.Finalizers = []string{"test-finalizer"}
+		Expect(cli.Update(reqCtx.Ctx, job)).Should(Succeed())
+		Expect(cli.Delete(reqCtx.Ctx, job)).Should(Succeed())
+		terminating := &batchv1.Job{}
+		Expect(cli.Get(reqCtx.Ctx, client.ObjectKeyFromObject(job), terminating)).Should(Succeed())
+		Expect(terminating.DeletionTimestamp.IsZero()).Should(BeFalse())
+		terminalTasks[0].Status = opsv1alpha1.SucceedActionTaskStatus
+		workloadAction.progressDetail = opsv1alpha1.ProgressStatusDetail{ActionTasks: terminalTasks}
+		_, err = workloadAction.CheckStatus(actionCtx)
+		Expect(err).Should(HaveOccurred())
+		Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeTrue())
+		Expect(err.Error()).Should(ContainSubstring("terminating"))
+
+		terminating.Finalizers = nil
+		Expect(cli.Update(reqCtx.Ctx, terminating)).Should(Succeed())
+		deleteErr := cli.Delete(reqCtx.Ctx, terminating)
+		Expect(deleteErr == nil || apierrors.IsNotFound(deleteErr)).Should(BeTrue())
+
+		workloadAction.progressDetail = opsv1alpha1.ProgressStatusDetail{ActionTasks: terminalTasks}
+		_, err = workloadAction.CheckStatus(actionCtx)
+		Expect(err).Should(HaveOccurred())
+		Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeTrue())
+		jobList = &batchv1.JobList{}
+		Expect(cli.List(reqCtx.Ctx, jobList, client.InNamespace(namespace))).Should(Succeed())
+		Expect(jobList.Items).Should(BeEmpty())
+	})
+
+	It("binds a matching managed Job after create confirmation is lost without another dry-run or create", func() {
+		opsRequest := newOpsRequest()
+		opsRequest.Spec.CustomOps.ExecutionSnapshot = &opsv1alpha1.CustomOpsExecutionSnapshot{
+			OpsDefinitionUID:        "opsdef-uid",
+			OpsDefinitionGeneration: 1,
+			OpsDefinitionSpecHash:   strings.Repeat("a", 64),
+			TargetSnapshotHash:      strings.Repeat("b", 64),
+		}
+		cli := &jobUIDClient{Client: newFakeClient()}
+		action := &opsv1alpha1.OpsAction{
+			Name:          "managed-job",
+			FailurePolicy: opsv1alpha1.FailurePolicyFail,
+			Workload: &opsv1alpha1.OpsWorkloadAction{
+				Type:         opsv1alpha1.ManagedJobWorkload,
+				BackoffLimit: 0,
+				PodSpec: corev1.PodSpec{
+					Containers: []corev1.Container{{Name: "runner", Image: "busybox"}},
+				},
+			},
+		}
+		workloadAction := NewWorkloadAction(
+			opsRequest,
+			newCluster(),
+			&opsv1alpha1.OpsDefinition{},
+			&opsv1alpha1.CustomOpsComponent{
+				ComponentOps: opsv1alpha1.ComponentOps{ComponentName: compName},
+				Parameters:   []opsv1alpha1.Parameter{{Name: "TOKEN", Value: "generation-7"}},
+			},
+			newComponentSpec(),
+			opsv1alpha1.ProgressStatusDetail{},
+		)
+		actionCtx := ActionContext{ReqCtx: reqCtx, Client: cli, Reader: cli, Action: action}
+
+		planned, err := workloadAction.Execute(actionCtx)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(cli.dryRunCreates).Should(Equal(1))
+		Expect(cli.jobCreates).Should(BeZero())
+
+		// Simulate a successful Create whose Created/UID status update was not observed.
+		live, err := workloadAction.buildExpectedManagedJob(actionCtx, 0)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(cli.Create(reqCtx.Ctx, live)).Should(Succeed())
+		Expect(cli.jobCreates).Should(Equal(1))
+
+		workloadAction.progressDetail = opsv1alpha1.ProgressStatusDetail{ActionTasks: planned.ActionTasks}
+		bound, err := workloadAction.CheckStatus(actionCtx)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(bound.ActionTasks).Should(HaveLen(1))
+		Expect(bound.ActionTasks[0].DispatchState).Should(Equal(opsv1alpha1.CreatedActionTaskDispatchState))
+		Expect(bound.ActionTasks[0].WorkloadUID).Should(Equal("managed-job-uid"))
+		Expect(cli.dryRunCreates).Should(Equal(1))
+		Expect(cli.jobCreates).Should(Equal(1))
 	})
 
 	It("executes workload actions for all selected target pods", func() {

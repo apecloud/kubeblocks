@@ -59,6 +59,14 @@ func (w *WorkloadAction) Execute(actionCtx ActionContext) (*ActionStatus, error)
 	if actionCtx.Action.Workload == nil {
 		return nil, nil
 	}
+	if actionCtx.Action.Workload.Type == opsv1alpha1.ManagedJobWorkload {
+		actionStatus := NewActiontatus()
+		task, err := w.planManagedJob(actionCtx)
+		if task != nil {
+			actionStatus.ActionTasks = append(actionStatus.ActionTasks, *task)
+		}
+		return actionStatus, err
+	}
 	var (
 		podInfoExtractorName = actionCtx.Action.Workload.PodInfoExtractorName
 		targetPods           []*corev1.Pod
@@ -114,6 +122,8 @@ func (w *WorkloadAction) CheckStatus(actionCtx ActionContext) (*ActionStatus, er
 	switch actionCtx.Action.Workload.Type {
 	case opsv1alpha1.JobWorkload:
 		return actionCtx.checkActionStatus(w.progressDetail, w.checkJobStatus)
+	case opsv1alpha1.ManagedJobWorkload:
+		return actionCtx.checkActionStatus(w.progressDetail, w.checkManagedJobStatus)
 	case opsv1alpha1.PodWorkload:
 		return actionCtx.checkActionStatus(w.progressDetail, w.checkPodStatus)
 	default:

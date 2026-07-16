@@ -23,6 +23,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -99,6 +100,46 @@ var _ = Describe("OpsDefinition Controller", func() {
 			Expect(fetched.Status.ObservedGeneration).Should(Equal(opsDef.Generation))
 			Expect(fetched.Status.Phase).Should(Equal(opsv1alpha1.UnavailablePhase))
 			Expect(fetched.Status.Message).Should(ContainSubstring("missing value for if"))
+		})
+
+		It("revalidates an existing available ManagedJob definition after a controller upgrade", func() {
+			scheme := newOperationsTestScheme()
+			opsDef := &opsv1alpha1.OpsDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "invalid-managed-job", Generation: 7},
+				Spec: opsv1alpha1.OpsDefinitionSpec{Actions: []opsv1alpha1.OpsAction{{
+					Name:          "managed",
+					FailurePolicy: opsv1alpha1.FailurePolicyIgnore,
+					Workload: &opsv1alpha1.OpsWorkloadAction{
+						Type: opsv1alpha1.ManagedJobWorkload,
+						PodSpec: corev1.PodSpec{Containers: []corev1.Container{{
+							Name: "worker", Image: "redis:7",
+						}}},
+					},
+				}}},
+				Status: opsv1alpha1.OpsDefinitionStatus{
+					ObservedGeneration: 7,
+					Phase:              opsv1alpha1.AvailablePhase,
+				},
+			}
+			reconciler := &OpsDefinitionReconciler{
+				Client: fake.NewClientBuilder().
+					WithScheme(scheme).
+					WithStatusSubresource(&opsv1alpha1.OpsDefinition{}).
+					WithObjects(opsDef).
+					Build(),
+				Scheme:   scheme,
+				Recorder: record.NewFakeRecorder(1),
+			}
+
+			result, err := reconciler.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(opsDef)})
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(result).Should(Equal(ctrl.Result{}))
+
+			fetched := &opsv1alpha1.OpsDefinition{}
+			Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(opsDef), fetched)).Should(Succeed())
+			Expect(fetched.Status.ObservedGeneration).Should(Equal(opsDef.Generation))
+			Expect(fetched.Status.Phase).Should(Equal(opsv1alpha1.UnavailablePhase))
+			Expect(fetched.Status.Message).Should(ContainSubstring("failurePolicy=Fail"))
 		})
 	})
 

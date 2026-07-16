@@ -55,19 +55,24 @@ func NewActiontatus() *ActionStatus {
 type ActionContext struct {
 	ReqCtx intctrlutil.RequestCtx
 	Client client.Client
+	Reader client.Reader
 	Action *opsv1alpha1.OpsAction
 	Images map[string]string
+}
+
+func (actionCtx ActionContext) directReader() client.Reader {
+	if actionCtx.Reader != nil {
+		return actionCtx.Reader
+	}
+	return actionCtx.Client
 }
 
 func (actionCtx ActionContext) createActionK8sWorkload(
 	opsRequest *opsv1alpha1.OpsRequest,
 	workload client.Object,
 	targetPodName string) (*opsv1alpha1.ActionTask, error) {
-	if workload.GetNamespace() == opsRequest.Namespace {
-		scheme, _ := opsv1alpha1.SchemeBuilder.Build()
-		if err := utils.SetControllerReference(opsRequest, workload, scheme); err != nil {
-			return nil, err
-		}
+	if err := actionCtx.prepareActionK8sWorkload(opsRequest, workload); err != nil {
+		return nil, err
 	}
 	objectKey := fmt.Sprintf("%s/%s", workload.GetObjectKind().GroupVersionKind().Kind, workload.GetName())
 	if err := actionCtx.Client.Create(actionCtx.ReqCtx.Ctx, workload); err != nil {
@@ -81,6 +86,18 @@ func (actionCtx ActionContext) createActionK8sWorkload(
 		TargetPodName: targetPodName,
 		Status:        opsv1alpha1.ProcessingActionTaskStatus,
 	}, nil
+}
+
+func (actionCtx ActionContext) prepareActionK8sWorkload(
+	opsRequest *opsv1alpha1.OpsRequest,
+	workload client.Object) error {
+	if workload.GetNamespace() == opsRequest.Namespace {
+		scheme, _ := opsv1alpha1.SchemeBuilder.Build()
+		if err := utils.SetControllerReference(opsRequest, workload, scheme); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (actionCtx ActionContext) checkActionStatus(progressDetail opsv1alpha1.ProgressStatusDetail,

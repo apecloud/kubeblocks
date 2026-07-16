@@ -35,6 +35,7 @@ import (
 
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	kboperations "github.com/apecloud/kubeblocks/pkg/operations"
 )
 
 // OpsDefinitionReconciler reconciles a OpsDefinition object
@@ -67,8 +68,9 @@ func (r *OpsDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return *res, err
 	}
 
+	managedJobValidationErr := kboperations.ValidateManagedJobOpsDefinitionSpec(opsDef)
 	if opsDef.Status.ObservedGeneration == opsDef.Generation &&
-		opsDef.Status.Phase == opsv1alpha1.AvailablePhase {
+		opsDef.Status.Phase == opsv1alpha1.AvailablePhase && managedJobValidationErr == nil {
 		return intctrlutil.Reconciled()
 	}
 
@@ -90,6 +92,9 @@ func (r *OpsDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		if err = validation.ConvertJSONSchemaPropsWithPostProcess(out, openapiSchema, validation.StripUnsupportedFormatsPostProcess); err != nil {
 			return r.updateStatusUnavailable(reqCtx, opsDef, err)
 		}
+	}
+	if managedJobValidationErr != nil {
+		return r.updateStatusUnavailable(reqCtx, opsDef, managedJobValidationErr)
 	}
 	// TODO: check serviceKind, connectionCredentialName and serviceName
 	statusPatch := client.MergeFrom(opsDef.DeepCopy())

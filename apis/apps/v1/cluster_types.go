@@ -1027,6 +1027,12 @@ type ShardingActionMemberStatus struct {
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
+	// ShardTemplateName identifies the exact shard template used to render this member.
+	// An empty value explicitly identifies the sharding's default template.
+	//
+	// +kubebuilder:validation:Required
+	ShardTemplateName string `json:"shardTemplateName"`
+
 	// UID identifies the exact Component object observed by the action.
 	//
 	// +optional

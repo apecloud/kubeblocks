@@ -12807,6 +12807,18 @@ string
 </tr>
 <tr>
 <td>
+<code>shardTemplateName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>ShardTemplateName identifies the exact shard template used to render this member.
+An empty value explicitly identifies the sharding&rsquo;s default template.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>uid</code><br/>
 <em>
 string

@@ -45,19 +45,43 @@ type shardIDGenerator struct {
 	running            []string
 	offline            []string
 	takeOverByTemplate []string
+	reservedByTemplate map[string][]string
+	reservedIndexes    map[string]int
+	reservedNames      sets.Set[string]
 	initialized        bool
 	ids                sets.Set[string]
 }
 
-func (g *shardIDGenerator) allocate() (string, error) {
+func (g *shardIDGenerator) allocate(shardTemplateName string) (string, error) {
 	if !g.initialized {
 		g.ids = sets.New(g.running...).Insert(g.offline...).Insert(g.takeOverByTemplate...)
+		g.reservedIndexes = map[string]int{}
+		g.reservedNames = sets.New[string]()
+		for _, names := range g.reservedByTemplate {
+			g.reservedNames.Insert(names...)
+		}
 		g.initialized = true
+	}
+	reserved := g.reservedByTemplate[shardTemplateName]
+	for g.reservedIndexes[shardTemplateName] < len(reserved) {
+		idx := g.reservedIndexes[shardTemplateName]
+		g.reservedIndexes[shardTemplateName]++
+		name := reserved[idx]
+		if g.ids.Has(name) {
+			continue
+		}
+		id, ok := strings.CutPrefix(name, fmt.Sprintf("%s-%s-", g.clusterName, g.shardingName))
+		if !ok || id == "" {
+			return "", fmt.Errorf("reserved shard name %q does not belong to cluster %q and sharding %q",
+				name, g.clusterName, g.shardingName)
+		}
+		g.ids.Insert(name)
+		return id, nil
 	}
 	for i := 0; i < generateShardIDMaxRetryTimes; i++ {
 		id := rand.String(ShardIDLength)
 		name := fmt.Sprintf("%s-%s-%s", g.clusterName, g.shardingName, id)
-		if !g.ids.Has(name) {
+		if !g.ids.Has(name) && !g.reservedNames.Has(name) {
 			g.ids.Insert(name)
 			return id, nil
 		}
@@ -86,7 +110,7 @@ func (t *shardTemplate) align(generator *shardIDGenerator) error {
 
 func (t *shardTemplate) create(generator *shardIDGenerator, cnt int) error {
 	for i := 0; i < cnt; i++ {
-		id, err := generator.allocate()
+		id, err := generator.allocate(t.name)
 		if err != nil {
 			return err
 		}

@@ -34,6 +34,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -196,13 +197,34 @@ func managedShardAddTestDAG(graphClient model.GraphClient, cluster *appsv1.Clust
 	return dag
 }
 
+func managedShardAddTestProto(name, shardTemplateName string) *appsv1.Component {
+	componentName, _ := strings.CutPrefix(name, managedShardAddTestCluster+"-")
+	labels := map[string]string{
+		constant.AppInstanceLabelKey:        managedShardAddTestCluster,
+		constant.KBAppShardingNameLabelKey:  managedShardAddTestSharding,
+		constant.KBAppComponentLabelKey:     componentName,
+		constant.KBAppShardTemplateLabelKey: shardTemplateName,
+	}
+	return &appsv1.Component{ObjectMeta: metav1.ObjectMeta{
+		Namespace: managedShardAddTestNamespace,
+		Name:      name,
+		Labels:    labels,
+	}}
+}
+
+func buildManagedShardAddPlan(cluster *appsv1.Cluster, shardingName string, targetShardCount int32,
+	members []string) (*appsv1.ShardingActionStatus, error) {
+	memberStatus := make([]appsv1.ShardingActionMemberStatus, len(members))
+	for i := range members {
+		memberStatus[i] = appsv1.ShardingActionMemberStatus{Name: members[i]}
+	}
+	return buildManagedShardAddPlanFromMembers(cluster, shardingName, targetShardCount, memberStatus)
+}
+
 func TestManagedShardAddPersistsPlanBeforeCreatingMembers(t *testing.T) {
 	ctx, graphClient, _ := managedShardAddTestContext(t)
 	handler := &clusterShardingHandler{}
-	proto := &appsv1.Component{ObjectMeta: metav1.ObjectMeta{
-		Namespace: managedShardAddTestNamespace,
-		Name:      managedShardAddTestMember,
-	}}
+	proto := managedShardAddTestProto(managedShardAddTestMember, "")
 	toCreate := sets.New[string](managedShardAddTestMember)
 
 	dag := managedShardAddTestDAG(graphClient, ctx.Cluster)
@@ -237,8 +259,384 @@ func TestManagedShardAddPersistsPlanBeforeCreatingMembers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("created Component marker is invalid: %v", err)
 	}
-	if !reflect.DeepEqual(marker.Members, []string{managedShardAddTestMember}) || marker.PlanHash != status.PlanHash {
+	if !reflect.DeepEqual(marker.Members, []managedShardAddMarkerMember{{
+		Name: managedShardAddTestMember, ShardTemplateName: ptr.To("")}}) ||
+		marker.PlanHash != status.PlanHash {
 		t.Fatalf("created Component marker=%#v, status=%#v", marker, status)
+	}
+}
+
+func TestManagedShardAddUndispatchedPlanPinsMemberNameAcrossNormalization(t *testing.T) {
+	existing := []client.Object{
+		&appsv1.Component{ObjectMeta: metav1.ObjectMeta{
+			Namespace: managedShardAddTestNamespace,
+			Name:      "redis-redis-cluster-existing-a",
+			Labels: map[string]string{
+				constant.AppInstanceLabelKey:       managedShardAddTestCluster,
+				constant.KBAppShardingNameLabelKey: managedShardAddTestSharding,
+			},
+		}},
+		&appsv1.Component{ObjectMeta: metav1.ObjectMeta{
+			Namespace: managedShardAddTestNamespace,
+			Name:      "redis-redis-cluster-existing-b",
+			Labels: map[string]string{
+				constant.AppInstanceLabelKey:       managedShardAddTestCluster,
+				constant.KBAppShardingNameLabelKey: managedShardAddTestSharding,
+			},
+		}},
+		&appsv1.Component{ObjectMeta: metav1.ObjectMeta{
+			Namespace: managedShardAddTestNamespace,
+			Name:      "redis-redis-cluster-existing-c",
+			Labels: map[string]string{
+				constant.AppInstanceLabelKey:       managedShardAddTestCluster,
+				constant.KBAppShardingNameLabelKey: managedShardAddTestSharding,
+			},
+		}},
+	}
+	ctx, _, _ := managedShardAddTestContext(t, existing...)
+	ctx.Cluster.Spec.Shardings[0].Template.Replicas = 1
+	ctx.shardings = []*appsv1.ClusterSharding{&ctx.Cluster.Spec.Shardings[0]}
+
+	generatedMember := func(seed int64) string {
+		t.Helper()
+		rand.Seed(seed)
+		_, byTemplate, err := (&clusterNormalizationTransformer{}).buildShardingComps(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		existingNames := sets.New[string]()
+		for _, obj := range existing {
+			existingNames.Insert(obj.GetName())
+		}
+		for _, spec := range byTemplate[managedShardAddTestSharding][""] {
+			name := constant.GenerateClusterComponentName(ctx.Cluster.Name, spec.Name)
+			if !existingNames.Has(name) {
+				return name
+			}
+		}
+		t.Fatal("normalization did not produce the fourth shard member")
+		return ""
+	}
+
+	plannedName := generatedMember(1670750000)
+	withoutPlan := generatedMember(1670750001)
+	if plannedName == withoutPlan {
+		t.Fatalf("test seeds unexpectedly generated the same shard member %q", plannedName)
+	}
+	status, err := buildManagedShardAddPlan(ctx.Cluster, managedShardAddTestSharding, 4, []string{plannedName})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx.Cluster.Status.Shardings[managedShardAddTestSharding] = appsv1.ClusterShardingStatus{ShardAdd: status}
+
+	if got := generatedMember(1670750001); got != plannedName {
+		t.Fatalf("second normalization generated member %q, want persisted plan member %q", got, plannedName)
+	}
+}
+
+func TestManagedShardAddPlanBindsShardTemplateIdentity(t *testing.T) {
+	const shardTemplateName = "hot"
+	ctx, _, _ := managedShardAddTestContext(t)
+	proto := managedShardAddTestProto(managedShardAddTestMember, shardTemplateName)
+	status, err := buildManagedShardAddPlanFromComponents(ctx.Cluster, managedShardAddTestSharding, 4,
+		[]string{proto.Name}, map[string]*appsv1.Component{proto.Name: proto})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(status.Members) != 1 || status.Members[0].Name != proto.Name ||
+		status.Members[0].ShardTemplateName != shardTemplateName {
+		t.Fatalf("plan members=%#v", status.Members)
+	}
+	marker, err := decodeManagedShardAddMarker(mustEncodeManagedShardAddMarker(t,
+		markerForManagedShardAdd(ctx.Cluster, managedShardAddTestSharding, status)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(marker.Members) != 1 || marker.Members[0].Name != proto.Name ||
+		marker.Members[0].ShardTemplateName == nil || *marker.Members[0].ShardTemplateName != shardTemplateName {
+		t.Fatalf("marker members=%#v", marker.Members)
+	}
+}
+
+func TestManagedShardAddMemberSnapshotBindsShardTemplateIdentity(t *testing.T) {
+	ctx, _, _ := managedShardAddTestContext(t)
+	component := &appsv1.Component{ObjectMeta: metav1.ObjectMeta{
+		Name:       managedShardAddTestMember,
+		UID:        types.UID("member-uid"),
+		Generation: 2,
+	}, Status: appsv1.ComponentStatus{ObservedGeneration: 2}}
+	buildStatus := func(shardTemplateName string) *appsv1.ShardingActionStatus {
+		t.Helper()
+		proto := managedShardAddTestProto(managedShardAddTestMember, shardTemplateName)
+		status, err := buildManagedShardAddPlanFromComponents(ctx.Cluster, managedShardAddTestSharding, 4,
+			[]string{proto.Name}, map[string]*appsv1.Component{proto.Name: proto})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return status
+	}
+	hot := buildStatus("hot")
+	cold := buildStatus("cold")
+	hotHash, err := bindManagedShardAddMembers(hot, []*appsv1.Component{component})
+	if err != nil {
+		t.Fatal(err)
+	}
+	coldHash, err := bindManagedShardAddMembers(cold, []*appsv1.Component{component})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if hotHash == coldHash {
+		t.Fatalf("member snapshot hash did not bind shard template identity: %s", hotHash)
+	}
+}
+
+func TestManagedShardAddPlanRejectsWrongProtoNamespace(t *testing.T) {
+	ctx, _, _ := managedShardAddTestContext(t)
+	proto := managedShardAddTestProto(managedShardAddTestMember, "")
+	proto.Namespace = "other"
+	if _, err := buildManagedShardAddPlanFromComponents(ctx.Cluster, managedShardAddTestSharding, 4,
+		[]string{proto.Name}, map[string]*appsv1.Component{proto.Name: proto}); err == nil {
+		t.Fatal("plan accepted a normalized Component from another namespace")
+	}
+}
+
+func TestManagedShardAddPlanRejectsMissingShardTemplateIdentity(t *testing.T) {
+	ctx, _, _ := managedShardAddTestContext(t)
+	proto := managedShardAddTestProto(managedShardAddTestMember, "")
+	delete(proto.Labels, constant.KBAppShardTemplateLabelKey)
+	if _, err := buildManagedShardAddPlanFromComponents(ctx.Cluster, managedShardAddTestSharding, 4,
+		[]string{proto.Name}, map[string]*appsv1.Component{proto.Name: proto}); err == nil {
+		t.Fatal("plan treated a missing shard template label as the explicit default template")
+	}
+}
+
+func TestManagedShardAddMemberRejectsMissingShardTemplateIdentity(t *testing.T) {
+	ctx, _, _ := managedShardAddTestContext(t)
+	status, err := buildManagedShardAddPlan(ctx.Cluster, managedShardAddTestSharding, 4,
+		[]string{managedShardAddTestMember})
+	if err != nil {
+		t.Fatal(err)
+	}
+	markerValue, err := encodeManagedShardAddMarker(markerForManagedShardAdd(
+		ctx.Cluster, managedShardAddTestSharding, status))
+	if err != nil {
+		t.Fatal(err)
+	}
+	live := managedShardAddTestProto(managedShardAddTestMember, "")
+	live.UID = types.UID("member-uid")
+	live.Annotations = map[string]string{shardingAddShardKey: markerValue}
+	live.OwnerReferences = []metav1.OwnerReference{
+		*metav1.NewControllerRef(ctx.Cluster, appsv1.GroupVersion.WithKind(appsv1.ClusterKind)),
+	}
+	delete(live.Labels, constant.KBAppShardTemplateLabelKey)
+
+	if err := validateManagedShardAddMember(ctx.Cluster, live, status.Members[0], markerValue); err == nil ||
+		!strings.Contains(err.Error(), "explicit shard template identity") {
+		t.Fatalf("missing shard template label error=%v", err)
+	}
+}
+
+func TestManagedShardAddMarkerRequiresExplicitShardTemplateIdentity(t *testing.T) {
+	ctx, _, _ := managedShardAddTestContext(t)
+	status, err := buildManagedShardAddPlan(ctx.Cluster, managedShardAddTestSharding, 4,
+		[]string{managedShardAddTestMember})
+	if err != nil {
+		t.Fatal(err)
+	}
+	marker := markerForManagedShardAdd(ctx.Cluster, managedShardAddTestSharding, status)
+	marker.Members[0].ShardTemplateName = nil
+	if _, err := decodeManagedShardAddMarker(mustEncodeManagedShardAddMarker(t, marker)); err == nil {
+		t.Fatal("marker without explicit shard template identity was accepted")
+	}
+}
+
+func TestManagedShardAddDispatchRejectsShardTemplateDrift(t *testing.T) {
+	ctx, graphClient, _ := managedShardAddTestContext(t)
+	handler := &clusterShardingHandler{}
+	proto := managedShardAddTestProto(managedShardAddTestMember, "hot")
+	status, err := buildManagedShardAddPlanFromComponents(ctx.Cluster, managedShardAddTestSharding, 4,
+		[]string{proto.Name}, map[string]*appsv1.Component{proto.Name: proto})
+	if err != nil {
+		t.Fatal(err)
+	}
+	status.OpsDefinitionName = managedShardAddTestOpsDef
+	ctx.Cluster.Status.Shardings[managedShardAddTestSharding] = appsv1.ClusterShardingStatus{ShardAdd: status}
+
+	drifted := managedShardAddTestProto(managedShardAddTestMember, "cold")
+	dag := managedShardAddTestDAG(graphClient, ctx.Cluster)
+	handled, err := handler.handleManagedShardAdd(ctx, dag, managedShardAddTestSharding,
+		map[string]*appsv1.Component{}, map[string]*appsv1.Component{drifted.Name: drifted},
+		sets.New[string](drifted.Name))
+	if !handled || err != nil {
+		t.Fatalf("handled=%v err=%v, want fail-loud status", handled, err)
+	}
+	if status.Phase != appsv1.LifecycleActionFailed || status.Reason != "MemberDispatchFailed" ||
+		!strings.Contains(status.Message, "changed shard template") {
+		t.Fatalf("status=%#v", status)
+	}
+	if got := graphClient.FindAll(dag, &appsv1.Component{}); len(got) != 0 {
+		t.Fatalf("template drift scheduled %d Component writes", len(got))
+	}
+}
+
+func mustEncodeManagedShardAddMarker(t *testing.T, marker managedShardAddMarker) string {
+	t.Helper()
+	encoded, err := encodeManagedShardAddMarker(marker)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return encoded
+}
+
+func TestManagedShardAddSupersedesUndispatchedPlanAfterGenerationChange(t *testing.T) {
+	const (
+		firstMember  = "redis-redis-cluster-first"
+		secondMember = "redis-redis-cluster-second"
+		thirdMember  = "redis-redis-cluster-third"
+	)
+	ctx, graphClient, _ := managedShardAddTestContext(t)
+	handler := &clusterShardingHandler{}
+	firstProto := managedShardAddTestProto(firstMember, "")
+	dag := managedShardAddTestDAG(graphClient, ctx.Cluster)
+	handled, err := handler.handleManagedShardAdd(ctx, dag, managedShardAddTestSharding,
+		map[string]*appsv1.Component{}, map[string]*appsv1.Component{firstMember: firstProto},
+		sets.New[string](firstMember))
+	if !handled || !intctrlutil.IsDelayedRequeueError(err) {
+		t.Fatalf("first plan handled=%v err=%v", handled, err)
+	}
+	oldStatus := ctx.Cluster.Status.Shardings[managedShardAddTestSharding].ShardAdd
+	oldToken := oldStatus.Token
+
+	ctx.Cluster.Generation++
+	ctx.Cluster.Spec.Shardings[0].Shards = 5
+	protoComps := map[string]*appsv1.Component{
+		secondMember: managedShardAddTestProto(secondMember, ""),
+		thirdMember:  managedShardAddTestProto(thirdMember, ""),
+	}
+	dag = managedShardAddTestDAG(graphClient, ctx.Cluster)
+	handled, err = handler.handleManagedShardAdd(ctx, dag, managedShardAddTestSharding,
+		map[string]*appsv1.Component{}, protoComps, sets.New[string](thirdMember, secondMember))
+	if !handled || !intctrlutil.IsDelayedRequeueError(err) {
+		t.Fatalf("supersede handled=%v err=%v", handled, err)
+	}
+	next := ctx.Cluster.Status.Shardings[managedShardAddTestSharding].ShardAdd
+	if next == oldStatus || next.ClusterGeneration != ctx.Cluster.Generation || next.Token == oldToken ||
+		next.Reason != "PlanSuperseded" || !strings.Contains(next.Message, managedShardAddTokenSummary(oldToken)) ||
+		!strings.Contains(next.Message, managedShardAddTokenSummary(next.Token)) || next.MembersDispatched {
+		t.Fatalf("superseded status=%#v", next)
+	}
+	if !reflect.DeepEqual([]string{next.Members[0].Name, next.Members[1].Name},
+		[]string{secondMember, thirdMember}) {
+		t.Fatalf("superseded plan members=%#v", next.Members)
+	}
+	if got := graphClient.FindAll(dag, &appsv1.Component{}); len(got) != 0 {
+		t.Fatalf("supersede created %d Components before persisting the replacement plan", len(got))
+	}
+}
+
+func TestManagedShardAddSupersedeRequiresDirectReader(t *testing.T) {
+	ctx, graphClient, _ := managedShardAddTestContext(t)
+	proto := managedShardAddTestProto(managedShardAddTestMember, "")
+	status, err := buildManagedShardAddPlanFromComponents(ctx.Cluster, managedShardAddTestSharding, 4,
+		[]string{proto.Name}, map[string]*appsv1.Component{proto.Name: proto})
+	if err != nil {
+		t.Fatal(err)
+	}
+	status.OpsDefinitionName = managedShardAddTestOpsDef
+	ctx.Cluster.Status.Shardings[managedShardAddTestSharding] = appsv1.ClusterShardingStatus{ShardAdd: status}
+	ctx.Cluster.Generation++
+	ctx.APIReader = nil
+
+	dag := managedShardAddTestDAG(graphClient, ctx.Cluster)
+	handled, err := (&clusterShardingHandler{}).handleManagedShardAdd(ctx, dag, managedShardAddTestSharding,
+		map[string]*appsv1.Component{}, map[string]*appsv1.Component{proto.Name: proto}, sets.New[string](proto.Name))
+	if !handled || !isManagedShardAddContractError(err) || !strings.Contains(err.Error(), "direct API reader") {
+		t.Fatalf("handled=%v err=%v, want direct-reader contract error", handled, err)
+	}
+	if status.Phase != appsv1.LifecycleActionPending || status.Reason != "PlanPersisted" {
+		t.Fatalf("reader failure mutated old plan: %#v", status)
+	}
+	if got := graphClient.FindAll(dag, &appsv1.Component{}); len(got) != 0 {
+		t.Fatalf("reader failure scheduled %d Component writes", len(got))
+	}
+}
+
+func TestManagedShardAddSupersededPlanWithoutScaleOutIsAuditable(t *testing.T) {
+	ctx, graphClient, _ := managedShardAddTestContext(t)
+	handler := &clusterShardingHandler{}
+	proto := managedShardAddTestProto(managedShardAddTestMember, "")
+	dag := managedShardAddTestDAG(graphClient, ctx.Cluster)
+	handled, err := handler.handleManagedShardAdd(ctx, dag, managedShardAddTestSharding,
+		map[string]*appsv1.Component{}, map[string]*appsv1.Component{proto.Name: proto},
+		sets.New[string](proto.Name))
+	if !handled || !intctrlutil.IsDelayedRequeueError(err) {
+		t.Fatalf("first plan handled=%v err=%v", handled, err)
+	}
+	status := ctx.Cluster.Status.Shardings[managedShardAddTestSharding].ShardAdd
+	oldToken := status.Token
+	ctx.Cluster.Generation++
+
+	dag = managedShardAddTestDAG(graphClient, ctx.Cluster)
+	handled, err = handler.handleManagedShardAdd(ctx, dag, managedShardAddTestSharding,
+		map[string]*appsv1.Component{}, map[string]*appsv1.Component{}, sets.New[string]())
+	if handled || err != nil {
+		t.Fatalf("no-op supersede handled=%v err=%v", handled, err)
+	}
+	if status.Phase != appsv1.LifecycleActionSucceeded || status.Reason != "PlanSupersededNoDispatch" ||
+		!status.CleanupStarted || !status.MarkersCleaned || status.CompletionTime == nil ||
+		!strings.Contains(status.Message, managedShardAddTokenSummary(oldToken)) {
+		t.Fatalf("no-op superseded status=%#v", status)
+	}
+	if got := graphClient.FindAll(dag, &appsv1.Component{}); len(got) != 0 {
+		t.Fatalf("no-op supersede scheduled %d Component writes", len(got))
+	}
+
+	completionTime := status.CompletionTime.DeepCopy()
+	dag = managedShardAddTestDAG(graphClient, ctx.Cluster)
+	handled, err = handler.handleManagedShardAdd(ctx, dag, managedShardAddTestSharding,
+		map[string]*appsv1.Component{}, map[string]*appsv1.Component{}, sets.New[string]())
+	if handled || err != nil {
+		t.Fatalf("settled no-op supersede handled=%v err=%v", handled, err)
+	}
+	if !status.CompletionTime.Equal(completionTime) {
+		t.Fatalf("settled no-op supersede completion time changed from %v to %v", completionTime, status.CompletionTime)
+	}
+}
+
+func TestManagedShardAddSupersedeRejectsPartialDispatchEvidence(t *testing.T) {
+	cluster := managedShardAddTestClusterObject()
+	status, err := buildManagedShardAddPlan(cluster, managedShardAddTestSharding, 4,
+		[]string{managedShardAddTestMember})
+	if err != nil {
+		t.Fatal(err)
+	}
+	status.OpsDefinitionName = managedShardAddTestOpsDef
+	marker, err := encodeManagedShardAddMarker(markerForManagedShardAdd(cluster, managedShardAddTestSharding, status))
+	if err != nil {
+		t.Fatal(err)
+	}
+	live := managedShardAddTestProto(managedShardAddTestMember, "")
+	live.UID = types.UID("partially-dispatched-uid")
+	live.Annotations = map[string]string{shardingAddShardKey: marker}
+	live.OwnerReferences = []metav1.OwnerReference{
+		*metav1.NewControllerRef(cluster, appsv1.GroupVersion.WithKind(appsv1.ClusterKind)),
+	}
+
+	ctx, graphClient, _ := managedShardAddTestContext(t, live)
+	ctx.Cluster.Status.Shardings[managedShardAddTestSharding] = appsv1.ClusterShardingStatus{ShardAdd: status}
+	ctx.Cluster.Generation++
+	dag := managedShardAddTestDAG(graphClient, ctx.Cluster)
+	handled, err := (&clusterShardingHandler{}).handleManagedShardAdd(ctx, dag, managedShardAddTestSharding,
+		map[string]*appsv1.Component{live.Name: live}, map[string]*appsv1.Component{}, sets.New[string]())
+	if !handled || err != nil {
+		t.Fatalf("handled=%v err=%v, want frozen terminal evidence", handled, err)
+	}
+	if status.Phase != appsv1.LifecycleActionFailed || status.Reason != "PlanSupersedeBlocked" ||
+		!strings.Contains(status.Message, "partially dispatched") || status.MarkersCleaned {
+		t.Fatalf("status=%#v", status)
+	}
+	if got := graphClient.FindAll(dag, &appsv1.Component{}); len(got) != 0 {
+		t.Fatalf("partial-dispatch supersede scheduled %d Component writes", len(got))
 	}
 }
 
@@ -265,9 +663,10 @@ func TestManagedShardAddMemberDispatchRecoversPartialCreate(t *testing.T) {
 			UID:         types.UID("partially-created-uid"),
 			Annotations: map[string]string{shardingAddShardKey: marker},
 			Labels: map[string]string{
-				constant.AppInstanceLabelKey:       managedShardAddTestCluster,
-				constant.KBAppShardingNameLabelKey: managedShardAddTestSharding,
-				constant.KBAppComponentLabelKey:    managedShardAddTestComponent,
+				constant.AppInstanceLabelKey:        managedShardAddTestCluster,
+				constant.KBAppShardingNameLabelKey:  managedShardAddTestSharding,
+				constant.KBAppComponentLabelKey:     managedShardAddTestComponent,
+				constant.KBAppShardTemplateLabelKey: "",
 			},
 			OwnerReferences: []metav1.OwnerReference{
 				*metav1.NewControllerRef(ctx.Cluster, appsv1.GroupVersion.WithKind(appsv1.ClusterKind)),
@@ -277,10 +676,7 @@ func TestManagedShardAddMemberDispatchRecoversPartialCreate(t *testing.T) {
 	if err := fakeClient.Create(context.Background(), existing); err != nil {
 		t.Fatal(err)
 	}
-	missing := &appsv1.Component{ObjectMeta: metav1.ObjectMeta{
-		Namespace: managedShardAddTestNamespace,
-		Name:      secondMember,
-	}}
+	missing := managedShardAddTestProto(secondMember, "")
 	dag := managedShardAddTestDAG(graphClient, ctx.Cluster)
 	handled, err := (&clusterShardingHandler{}).handleManagedShardAdd(ctx, dag, managedShardAddTestSharding,
 		map[string]*appsv1.Component{existing.Name: existing},
@@ -324,9 +720,10 @@ func managedShardAddReadyContext(t *testing.T) (*clusterTransformContext, model.
 				shardingAddShardKey: marker,
 			},
 			Labels: map[string]string{
-				constant.AppInstanceLabelKey:       managedShardAddTestCluster,
-				constant.KBAppShardingNameLabelKey: managedShardAddTestSharding,
-				constant.KBAppComponentLabelKey:    managedShardAddTestComponent,
+				constant.AppInstanceLabelKey:        managedShardAddTestCluster,
+				constant.KBAppShardingNameLabelKey:  managedShardAddTestSharding,
+				constant.KBAppComponentLabelKey:     managedShardAddTestComponent,
+				constant.KBAppShardTemplateLabelKey: "",
 			},
 			OwnerReferences: []metav1.OwnerReference{
 				*metav1.NewControllerRef(cluster, appsv1.GroupVersion.WithKind(appsv1.ClusterKind)),
@@ -362,9 +759,10 @@ func TestManagedShardAddMarkerRecoveryUsesDirectInventory(t *testing.T) {
 					shardingAddShardKey: marker,
 				},
 				Labels: map[string]string{
-					constant.AppInstanceLabelKey:       managedShardAddTestCluster,
-					constant.KBAppShardingNameLabelKey: managedShardAddTestSharding,
-					constant.KBAppComponentLabelKey:    managedShardAddTestComponent,
+					constant.AppInstanceLabelKey:        managedShardAddTestCluster,
+					constant.KBAppShardingNameLabelKey:  managedShardAddTestSharding,
+					constant.KBAppComponentLabelKey:     managedShardAddTestComponent,
+					constant.KBAppShardTemplateLabelKey: "",
 				},
 				OwnerReferences: []metav1.OwnerReference{
 					*metav1.NewControllerRef(cluster, appsv1.GroupVersion.WithKind(appsv1.ClusterKind)),
@@ -473,6 +871,7 @@ func TestManagedShardAddActivePlanFreezesLaterTopologyChanges(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			ctx, graphClient, _, handler, status := managedShardAddReadyContext(t)
+			ctx.Cluster.Generation = status.ClusterGeneration + 1
 			dag := managedShardAddTestDAG(graphClient, ctx.Cluster)
 			handled, err := handler.handleManagedShardAdd(ctx, dag, managedShardAddTestSharding,
 				map[string]*appsv1.Component{}, test.protoComps, test.toCreate)
@@ -516,8 +915,8 @@ func TestManagedShardAddStartsOneCoalescedPlanAfterCleanup(t *testing.T) {
 	}
 
 	protoComps := map[string]*appsv1.Component{
-		firstNewMember:  {ObjectMeta: metav1.ObjectMeta{Namespace: managedShardAddTestNamespace, Name: firstNewMember}},
-		secondNewMember: {ObjectMeta: metav1.ObjectMeta{Namespace: managedShardAddTestNamespace, Name: secondNewMember}},
+		firstNewMember:  managedShardAddTestProto(firstNewMember, ""),
+		secondNewMember: managedShardAddTestProto(secondNewMember, ""),
 	}
 	dag := managedShardAddTestDAG(graphClient, ctx.Cluster)
 	handled, err := handler.handleManagedShardAdd(ctx, dag, managedShardAddTestSharding,
@@ -546,8 +945,10 @@ func TestManagedShardAddDoesNotFallBackAfterManagedActionRemoval(t *testing.T) {
 	ctx.shardingDefs["redis-sharding"].Spec.LifecycleActions.ShardAdd = nil
 
 	dag := managedShardAddTestDAG(graphClient, ctx.Cluster)
+	nextMember := managedShardAddTestProto("redis-redis-cluster-next", "")
 	handled, err := handler.handleManagedShardAdd(ctx, dag, managedShardAddTestSharding,
-		map[string]*appsv1.Component{}, map[string]*appsv1.Component{}, sets.New[string]("redis-redis-cluster-next"))
+		map[string]*appsv1.Component{}, map[string]*appsv1.Component{nextMember.Name: nextMember},
+		sets.New[string](nextMember.Name))
 	if !handled || err != nil {
 		t.Fatalf("handled=%v err=%v, want fail-loud managed ownership", handled, err)
 	}
@@ -611,7 +1012,8 @@ func TestManagedShardAddMarkerRejectsTrailingData(t *testing.T) {
 		Token:             "token",
 		PlanHash:          "plan-hash",
 		TargetShardCount:  4,
-		Members:           []string{managedShardAddTestMember},
+		Members: []managedShardAddMarkerMember{{
+			Name: managedShardAddTestMember, ShardTemplateName: ptr.To("")}},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -1373,9 +1775,10 @@ func TestManagedShardAddRecoversOneExactMarkerSet(t *testing.T) {
 			shardingAddShardKey: marker,
 		},
 		Labels: map[string]string{
-			constant.AppInstanceLabelKey:       managedShardAddTestCluster,
-			constant.KBAppShardingNameLabelKey: managedShardAddTestSharding,
-			constant.KBAppComponentLabelKey:    managedShardAddTestComponent,
+			constant.AppInstanceLabelKey:        managedShardAddTestCluster,
+			constant.KBAppShardingNameLabelKey:  managedShardAddTestSharding,
+			constant.KBAppComponentLabelKey:     managedShardAddTestComponent,
+			constant.KBAppShardTemplateLabelKey: "",
 		},
 		OwnerReferences: []metav1.OwnerReference{
 			*metav1.NewControllerRef(cluster, appsv1.GroupVersion.WithKind(appsv1.ClusterKind)),

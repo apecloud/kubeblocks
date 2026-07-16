@@ -17959,12 +17959,18 @@ spec:
                                   observed by its controller when the action was bound.
                                 format: int64
                                 type: integer
+                              shardTemplateName:
+                                description: |-
+                                  ShardTemplateName identifies the exact shard template used to render this member.
+                                  An empty value explicitly identifies the sharding's default template.
+                                type: string
                               uid:
                                 description: UID identifies the exact Component object
                                   observed by the action.
                                 type: string
                             required:
                             - name
+                            - shardTemplateName
                             type: object
                           type: array
                         membersDispatched:

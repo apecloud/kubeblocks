@@ -50,7 +50,7 @@ import (
 )
 
 const (
-	managedShardAddMarkerVersion      = "v1"
+	managedShardAddMarkerVersion      = "v2"
 	managedShardAddRetryAbsenceWindow = 5 * time.Second
 
 	managedShardAddTokenParameter       = "KB_SHARD_ADD_TOKEN"
@@ -60,22 +60,32 @@ const (
 )
 
 type managedShardAddPlanIdentity struct {
-	ClusterUID        string   `json:"clusterUID"`
-	ClusterGeneration int64    `json:"clusterGeneration"`
-	ShardingName      string   `json:"shardingName"`
-	TargetShardCount  int32    `json:"targetShardCount"`
-	Members           []string `json:"members"`
+	ClusterUID        string                              `json:"clusterUID"`
+	ClusterGeneration int64                               `json:"clusterGeneration"`
+	ShardingName      string                              `json:"shardingName"`
+	TargetShardCount  int32                               `json:"targetShardCount"`
+	Members           []managedShardAddPlanMemberIdentity `json:"members"`
+}
+
+type managedShardAddPlanMemberIdentity struct {
+	Name              string `json:"name"`
+	ShardTemplateName string `json:"shardTemplateName"`
+}
+
+type managedShardAddMarkerMember struct {
+	Name              string  `json:"name"`
+	ShardTemplateName *string `json:"shardTemplateName"`
 }
 
 type managedShardAddMarker struct {
-	Version           string   `json:"version"`
-	ClusterUID        string   `json:"clusterUID"`
-	ClusterGeneration int64    `json:"clusterGeneration"`
-	ShardingName      string   `json:"shardingName"`
-	Token             string   `json:"token"`
-	PlanHash          string   `json:"planHash"`
-	TargetShardCount  int32    `json:"targetShardCount"`
-	Members           []string `json:"members"`
+	Version           string                        `json:"version"`
+	ClusterUID        string                        `json:"clusterUID"`
+	ClusterGeneration int64                         `json:"clusterGeneration"`
+	ShardingName      string                        `json:"shardingName"`
+	Token             string                        `json:"token"`
+	PlanHash          string                        `json:"planHash"`
+	TargetShardCount  int32                         `json:"targetShardCount"`
+	Members           []managedShardAddMarkerMember `json:"members"`
 }
 
 type managedShardAddContractError struct {
@@ -137,31 +147,82 @@ func (h *clusterShardingHandler) targetShardCount(transCtx *clusterTransformCont
 	return 0, fmt.Errorf("sharding %q is not present in the normalized Cluster spec", shardingName)
 }
 
-func buildManagedShardAddPlan(cluster *appsv1.Cluster, shardingName string, targetShardCount int32,
-	members []string) (*appsv1.ShardingActionStatus, error) {
+func buildManagedShardAddPlanFromComponents(cluster *appsv1.Cluster, shardingName string, targetShardCount int32,
+	members []string, protoComps map[string]*appsv1.Component) (*appsv1.ShardingActionStatus, error) {
+	memberStatus := make([]appsv1.ShardingActionMemberStatus, len(members))
+	for i, name := range members {
+		proto := protoComps[name]
+		if proto == nil {
+			return nil, fmt.Errorf("planned member %q has no normalized Component", name)
+		}
+		if err := validateManagedShardAddProtoIdentity(cluster, shardingName, name, proto); err != nil {
+			return nil, err
+		}
+		memberStatus[i] = appsv1.ShardingActionMemberStatus{
+			Name:              name,
+			ShardTemplateName: proto.Labels[constant.KBAppShardTemplateLabelKey],
+		}
+	}
+	return buildManagedShardAddPlanFromMembers(cluster, shardingName, targetShardCount, memberStatus)
+}
+
+func validateManagedShardAddProtoIdentity(cluster *appsv1.Cluster, shardingName, memberName string,
+	proto *appsv1.Component) error {
+	if proto.Namespace != cluster.Namespace || proto.Name != memberName ||
+		proto.Labels[constant.AppInstanceLabelKey] != cluster.Name ||
+		proto.Labels[constant.KBAppShardingNameLabelKey] != shardingName {
+		return fmt.Errorf("planned member %q does not carry the exact Cluster and sharding identity", memberName)
+	}
+	componentName := proto.Labels[constant.KBAppComponentLabelKey]
+	if componentName == "" || constant.GenerateClusterComponentName(cluster.Name, componentName) != memberName {
+		return fmt.Errorf("planned member %q does not carry its exact component identity label", memberName)
+	}
+	if _, ok := proto.Labels[constant.KBAppShardTemplateLabelKey]; !ok {
+		return fmt.Errorf("planned member %q does not carry an explicit shard template identity label", memberName)
+	}
+	return nil
+}
+
+func buildManagedShardAddPlanFromMembers(cluster *appsv1.Cluster, shardingName string, targetShardCount int32,
+	members []appsv1.ShardingActionMemberStatus) (*appsv1.ShardingActionStatus, error) {
 	if cluster.UID == "" {
 		return nil, fmt.Errorf("cluster %s/%s has no UID", cluster.Namespace, cluster.Name)
 	}
 	members = slices.Clone(members)
-	slices.Sort(members)
+	slices.SortFunc(members, func(a, b appsv1.ShardingActionMemberStatus) int {
+		return strings.Compare(a.Name, b.Name)
+	})
+	if len(members) == 0 || slices.ContainsFunc(members, func(member appsv1.ShardingActionMemberStatus) bool {
+		return member.Name == ""
+	}) {
+		return nil, fmt.Errorf("managed shard-add plan members must be non-empty")
+	}
+	for i := 1; i < len(members); i++ {
+		if members[i].Name == members[i-1].Name {
+			return nil, fmt.Errorf("managed shard-add plan contains duplicate member %q", members[i].Name)
+		}
+	}
+	memberIdentities := make([]managedShardAddPlanMemberIdentity, len(members))
+	for i := range members {
+		memberIdentities[i] = managedShardAddPlanMemberIdentity{
+			Name:              members[i].Name,
+			ShardTemplateName: members[i].ShardTemplateName,
+		}
+	}
 	identity := managedShardAddPlanIdentity{
 		ClusterUID:        string(cluster.UID),
 		ClusterGeneration: cluster.Generation,
 		ShardingName:      shardingName,
 		TargetShardCount:  targetShardCount,
-		Members:           members,
+		Members:           memberIdentities,
 	}
-	planHash, err := opsutil.CanonicalObjectHash("kubeblocks.io/managed-shard-add-plan/v1", identity)
+	planHash, err := opsutil.CanonicalObjectHash("kubeblocks.io/managed-shard-add-plan/v2", identity)
 	if err != nil {
 		return nil, err
 	}
-	token, err := opsutil.CanonicalObjectHash("kubeblocks.io/managed-shard-add-token/v1", identity)
+	token, err := opsutil.CanonicalObjectHash("kubeblocks.io/managed-shard-add-token/v2", identity)
 	if err != nil {
 		return nil, err
-	}
-	memberStatus := make([]appsv1.ShardingActionMemberStatus, len(members))
-	for i := range members {
-		memberStatus[i].Name = members[i]
 	}
 	return &appsv1.ShardingActionStatus{
 		LifecycleActionStatus: appsv1.LifecycleActionStatus{
@@ -173,16 +234,19 @@ func buildManagedShardAddPlan(cluster *appsv1.Cluster, shardingName string, targ
 		ClusterGeneration: cluster.Generation,
 		Token:             token,
 		TargetShardCount:  targetShardCount,
-		Members:           memberStatus,
+		Members:           members,
 		PlanHash:          planHash,
 	}, nil
 }
 
 func markerForManagedShardAdd(cluster *appsv1.Cluster, shardingName string,
 	status *appsv1.ShardingActionStatus) managedShardAddMarker {
-	members := make([]string, len(status.Members))
+	members := make([]managedShardAddMarkerMember, len(status.Members))
 	for i := range status.Members {
-		members[i] = status.Members[i].Name
+		members[i] = managedShardAddMarkerMember{
+			Name:              status.Members[i].Name,
+			ShardTemplateName: ptr.To(status.Members[i].ShardTemplateName),
+		}
 	}
 	return managedShardAddMarker{
 		Version:           managedShardAddMarkerVersion,
@@ -219,11 +283,15 @@ func decodeManagedShardAddMarker(value string) (*managedShardAddMarker, error) {
 		marker.TargetShardCount < 0 || len(marker.Members) == 0 {
 		return nil, fmt.Errorf("managed shard-add marker is incomplete")
 	}
-	if !slices.IsSorted(marker.Members) || slices.ContainsFunc(marker.Members, func(name string) bool { return name == "" }) {
+	if !slices.IsSortedFunc(marker.Members, func(a, b managedShardAddMarkerMember) int {
+		return strings.Compare(a.Name, b.Name)
+	}) || slices.ContainsFunc(marker.Members, func(member managedShardAddMarkerMember) bool {
+		return member.Name == "" || member.ShardTemplateName == nil
+	}) {
 		return nil, fmt.Errorf("managed shard-add marker members must be non-empty and sorted")
 	}
 	for i := 1; i < len(marker.Members); i++ {
-		if marker.Members[i] == marker.Members[i-1] {
+		if marker.Members[i].Name == marker.Members[i-1].Name {
 			return nil, fmt.Errorf("managed shard-add marker contains duplicate members")
 		}
 	}
@@ -267,21 +335,32 @@ func (h *clusterShardingHandler) recoverManagedShardAddStatus(transCtx *clusterT
 	if recovered.ClusterUID != string(transCtx.Cluster.UID) || recovered.ShardingName != shardingName {
 		return nil, true, fmt.Errorf("managed shard-add marker does not belong to this Cluster and sharding")
 	}
-	if !marked.Equal(sets.New[string](recovered.Members...)) {
+	recoveredNames := make([]string, len(recovered.Members))
+	for i := range recovered.Members {
+		recoveredNames[i] = recovered.Members[i].Name
+	}
+	if !marked.Equal(sets.New[string](recoveredNames...)) {
 		return nil, true, fmt.Errorf("managed shard-add marker set does not match its frozen member set")
+	}
+	recoveredMembers := make([]managedShardAddPlanMemberIdentity, len(recovered.Members))
+	for i := range recovered.Members {
+		recoveredMembers[i] = managedShardAddPlanMemberIdentity{
+			Name:              recovered.Members[i].Name,
+			ShardTemplateName: ptr.Deref(recovered.Members[i].ShardTemplateName, ""),
+		}
 	}
 	identity := managedShardAddPlanIdentity{
 		ClusterUID:        recovered.ClusterUID,
 		ClusterGeneration: recovered.ClusterGeneration,
 		ShardingName:      recovered.ShardingName,
 		TargetShardCount:  recovered.TargetShardCount,
-		Members:           recovered.Members,
+		Members:           recoveredMembers,
 	}
-	planHash, err := opsutil.CanonicalObjectHash("kubeblocks.io/managed-shard-add-plan/v1", identity)
+	planHash, err := opsutil.CanonicalObjectHash("kubeblocks.io/managed-shard-add-plan/v2", identity)
 	if err != nil {
 		return nil, true, err
 	}
-	token, err := opsutil.CanonicalObjectHash("kubeblocks.io/managed-shard-add-token/v1", identity)
+	token, err := opsutil.CanonicalObjectHash("kubeblocks.io/managed-shard-add-token/v2", identity)
 	if err != nil {
 		return nil, true, err
 	}
@@ -302,9 +381,59 @@ func (h *clusterShardingHandler) recoverManagedShardAddStatus(transCtx *clusterT
 		Members:           make([]appsv1.ShardingActionMemberStatus, len(recovered.Members)),
 	}
 	for i := range recovered.Members {
-		status.Members[i].Name = recovered.Members[i]
+		status.Members[i].Name = recovered.Members[i].Name
+		status.Members[i].ShardTemplateName = ptr.Deref(recovered.Members[i].ShardTemplateName, "")
 	}
 	return status, true, nil
+}
+
+func managedShardAddReservedNames(cluster *appsv1.Cluster, shardingName string) map[string][]string {
+	status := cluster.Status.Shardings[shardingName].ShardAdd
+	if status == nil || status.MembersDispatched || status.Phase != appsv1.LifecycleActionPending ||
+		status.ClusterGeneration != cluster.Generation {
+		return nil
+	}
+	reserved := map[string][]string{}
+	for _, member := range status.Members {
+		reserved[member.ShardTemplateName] = append(reserved[member.ShardTemplateName], member.Name)
+	}
+	return reserved
+}
+
+func managedShardAddTokenSummary(token string) string {
+	const summaryLength = 12
+	if len(token) <= summaryLength {
+		return token
+	}
+	return token[:summaryLength]
+}
+
+func managedShardAddSupersedeBlocker(transCtx *clusterTransformContext, shardingName string,
+	status *appsv1.ShardingActionStatus) (string, error) {
+	if transCtx.APIReader == nil {
+		return "", managedShardAddContractErrorf("managed shard-add plan supersede requires a direct API reader")
+	}
+	markerValue, err := encodeManagedShardAddMarker(markerForManagedShardAdd(transCtx.Cluster, shardingName, status))
+	if err != nil {
+		return "", err
+	}
+	for _, member := range status.Members {
+		live := &appsv1.Component{}
+		key := types.NamespacedName{Namespace: transCtx.Cluster.Namespace, Name: member.Name}
+		err := transCtx.APIReader.Get(transCtx.Context, key, live)
+		if apierrors.IsNotFound(err) {
+			continue
+		}
+		if err != nil {
+			return "", err
+		}
+		if err := validateManagedShardAddMember(transCtx.Cluster, live, member, markerValue); err != nil {
+			return fmt.Sprintf("planned member %q exists with conflicting dispatch identity: %v", member.Name, err), nil
+		}
+		return fmt.Sprintf("exact planned member %q already exists; the old plan may have been partially dispatched",
+			member.Name), nil
+	}
+	return "", nil
 }
 
 func validateManagedShardAddComponentIdentity(cluster *appsv1.Cluster, shardingName string,
@@ -392,6 +521,13 @@ func (h *clusterShardingHandler) dispatchManagedShardAddMembers(transCtx *cluste
 		if proto == nil {
 			return fmt.Errorf("planned member %q is no longer present in the desired topology", member.Name)
 		}
+		if err := validateManagedShardAddProtoIdentity(transCtx.Cluster, shardingName, member.Name, proto); err != nil {
+			return err
+		}
+		if got := proto.Labels[constant.KBAppShardTemplateLabelKey]; got != member.ShardTemplateName {
+			return fmt.Errorf("planned member %q changed shard template from %q to %q",
+				member.Name, member.ShardTemplateName, got)
+		}
 		if proto.Annotations == nil {
 			proto.Annotations = map[string]string{}
 		}
@@ -416,6 +552,13 @@ func validateManagedShardAddMember(cluster *appsv1.Cluster, comp *appsv1.Compone
 	}
 	if comp.Annotations[shardingAddShardKey] != markerValue {
 		return fmt.Errorf("component %q does not carry the exact managed shard-add marker", comp.Name)
+	}
+	got, ok := comp.Labels[constant.KBAppShardTemplateLabelKey]
+	if !ok {
+		return fmt.Errorf("component %q does not carry an explicit shard template identity", comp.Name)
+	}
+	if got != member.ShardTemplateName {
+		return fmt.Errorf("component %q changed shard template from %q to %q", comp.Name, member.ShardTemplateName, got)
 	}
 	if member.UID != "" && string(comp.UID) != member.UID {
 		return fmt.Errorf("component %q UID changed from %s to %s", comp.Name, member.UID, comp.UID)
@@ -472,7 +615,7 @@ func bindManagedShardAddMembers(status *appsv1.ShardingActionStatus, members []*
 		status.Members[i].Generation = comp.Generation
 		status.Members[i].ObservedGeneration = comp.Status.ObservedGeneration
 	}
-	return opsutil.CanonicalObjectHash("kubeblocks.io/managed-shard-add-members/v1", status.Members)
+	return opsutil.CanonicalObjectHash("kubeblocks.io/managed-shard-add-members/v2", status.Members)
 }
 
 func validateManagedShardAddSnapshot(status *appsv1.ShardingActionStatus, members []*appsv1.Component) error {
@@ -492,7 +635,7 @@ func validateManagedShardAddSnapshot(status *appsv1.ShardingActionStatus, member
 		}
 		observed[i] = frozen
 	}
-	hash, err := opsutil.CanonicalObjectHash("kubeblocks.io/managed-shard-add-members/v1", observed)
+	hash, err := opsutil.CanonicalObjectHash("kubeblocks.io/managed-shard-add-members/v2", observed)
 	if err != nil {
 		return err
 	}
@@ -1046,7 +1189,8 @@ func (h *clusterShardingHandler) handleManagedShardAdd(transCtx *clusterTransfor
 		if err != nil {
 			return true, err
 		}
-		status, err = buildManagedShardAddPlan(transCtx.Cluster, shardingName, targetCount, sets.List(toCreate))
+		status, err = buildManagedShardAddPlanFromComponents(transCtx.Cluster, shardingName, targetCount,
+			sets.List(toCreate), protoComps)
 		if err != nil {
 			return true, err
 		}
@@ -1057,6 +1201,49 @@ func (h *clusterShardingHandler) handleManagedShardAdd(transCtx *clusterTransfor
 
 	if status.Phase == appsv1.LifecycleActionFailed {
 		return h.handleFailedManagedShardAdd(transCtx, status)
+	}
+	if status.Phase == appsv1.LifecycleActionPending && !status.MembersDispatched &&
+		status.ClusterGeneration != transCtx.Cluster.Generation {
+		if action == nil {
+			h.failManagedShardAdd(status, "OpsDefinitionChanged",
+				"configured managed shard-add action was removed before the undispatched plan could be superseded")
+			return true, nil
+		}
+		blocker, err := managedShardAddSupersedeBlocker(transCtx, shardingName, status)
+		if err != nil {
+			return true, err
+		}
+		if blocker != "" {
+			h.failManagedShardAdd(status, "PlanSupersedeBlocked", blocker)
+			return true, nil
+		}
+		if len(toCreate) == 0 {
+			status.Phase = appsv1.LifecycleActionSucceeded
+			status.Reason = "PlanSupersededNoDispatch"
+			status.Message = fmt.Sprintf("undispatched plan %s from Cluster generation %d was superseded by generation %d with no shard members to create",
+				managedShardAddTokenSummary(status.Token), status.ClusterGeneration, transCtx.Cluster.Generation)
+			status.CleanupStarted = true
+			status.MarkersCleaned = true
+			status.CompletionTime = ptr.To(metav1.Now())
+			return false, nil
+		}
+		targetCount, err := h.targetShardCount(transCtx, shardingName)
+		if err != nil {
+			return true, err
+		}
+		nextStatus, err := buildManagedShardAddPlanFromComponents(transCtx.Cluster, shardingName, targetCount,
+			sets.List(toCreate), protoComps)
+		if err != nil {
+			return true, err
+		}
+		nextStatus.OpsDefinitionName = action.OpsDefinitionName
+		nextStatus.Reason = "PlanSuperseded"
+		nextStatus.Message = fmt.Sprintf("undispatched plan %s from Cluster generation %d was superseded by plan %s from generation %d",
+			managedShardAddTokenSummary(status.Token), status.ClusterGeneration,
+			managedShardAddTokenSummary(nextStatus.Token), nextStatus.ClusterGeneration)
+		h.setManagedShardAddStatus(transCtx, shardingName, nextStatus)
+		return true, intctrlutil.NewDelayedRequeueError(time.Second,
+			"requeue after superseding the undispatched managed shard-add plan")
 	}
 	if status.CleanupStarted && !status.MarkersCleaned {
 		return h.continueManagedShardAddMarkerCleanup(transCtx, dag, shardingName, status)
@@ -1070,7 +1257,8 @@ func (h *clusterShardingHandler) handleManagedShardAdd(transCtx *clusterTransfor
 			if err != nil {
 				return true, err
 			}
-			nextStatus, err := buildManagedShardAddPlan(transCtx.Cluster, shardingName, targetCount, sets.List(toCreate))
+			nextStatus, err := buildManagedShardAddPlanFromComponents(transCtx.Cluster, shardingName, targetCount,
+				sets.List(toCreate), protoComps)
 			if err != nil {
 				return true, err
 			}
@@ -1084,7 +1272,8 @@ func (h *clusterShardingHandler) handleManagedShardAdd(transCtx *clusterTransfor
 		if err != nil {
 			return true, err
 		}
-		status, err = buildManagedShardAddPlan(transCtx.Cluster, shardingName, targetCount, sets.List(toCreate))
+		status, err = buildManagedShardAddPlanFromComponents(transCtx.Cluster, shardingName, targetCount,
+			sets.List(toCreate), protoComps)
 		if err != nil {
 			return true, err
 		}

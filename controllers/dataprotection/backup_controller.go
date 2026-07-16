@@ -345,12 +345,6 @@ func (r *BackupReconciler) recordBackupStatusTargets(
 		return nil
 	}
 	if request.Backup.Status.Target != nil || len(request.Backup.Status.Targets) > 0 {
-		targets := dputils.GetBackupTargets(request.BackupPolicy, request.BackupMethod)
-		for i := range targets {
-			if err := prepareTarget(&targets[i]); err != nil {
-				return err
-			}
-		}
 		return nil
 	}
 	buildStatusTarget := func(target *dpv1alpha1.BackupTarget) (*dpv1alpha1.BackupStatusTarget, error) {
@@ -371,17 +365,21 @@ func (r *BackupReconciler) recordBackupStatusTargets(
 			return err
 		} else {
 			request.Status.Target = statusTarget
+			request.Status.Targets = nil
 		}
 		return nil
 	}
 	setStatusTargets := func(targets []dpv1alpha1.BackupTarget) error {
+		statusTargets := make([]dpv1alpha1.BackupStatusTarget, 0, len(targets))
 		for i := range targets {
 			if statusTarget, err := buildStatusTarget(&targets[i]); err != nil {
 				return err
 			} else {
-				request.Status.Targets = append(request.Status.Targets, *statusTarget)
+				statusTargets = append(statusTargets, *statusTarget)
 			}
 		}
+		request.Status.Target = nil
+		request.Status.Targets = statusTargets
 		return nil
 	}
 	var err error

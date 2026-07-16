@@ -175,6 +175,11 @@ var _ = Describe("component status transformer conditions", func() {
 		Expect(comp.Status.LifecycleActions[1].Target.PodName).Should(Equal("pod-1"))
 	})
 
+	It("keeps lifecycle action observations nil when the workload has none", func() {
+		transformer.syncLifecycleActionObservations()
+		Expect(comp.Status.LifecycleActions).Should(BeNil())
+	})
+
 	setExpectedRestoreVCT := func() {
 		transCtx.SynthesizeComponent.Replicas = 1
 		transCtx.SynthesizeComponent.VolumeClaimTemplates = []corev1.PersistentVolumeClaimTemplate{{

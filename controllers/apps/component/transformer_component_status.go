@@ -190,7 +190,7 @@ func (t *componentStatusTransformer) reconcileStatus(transCtx *componentTransfor
 }
 
 func (t *componentStatusTransformer) syncLifecycleActionObservations() {
-	actions := make([]appsv1.LifecycleActionStatus, 0)
+	var actions []appsv1.LifecycleActionStatus
 	if t.runningITS != nil {
 		for _, instance := range t.runningITS.Status.InstanceStatus {
 			for i := range instance.LifecycleActions {

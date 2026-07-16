@@ -1179,6 +1179,37 @@ func (r *VolumePopulatorReconciler) ensurePostReadyRestoreCompleted(reqCtx intct
 		}
 		return false, err
 	}
+	existing := &dpv1alpha1.Restore{}
+	existingKey := types.NamespacedName{
+		Namespace: pvc.Namespace,
+		Name:      postReadyRestoreName(comp.UID),
+	}
+	if err = r.Client.Get(reqCtx.Ctx, existingKey, existing); err == nil {
+		targetFacts, factsErr := postReadyTargetFactsFromRestore(existing)
+		if factsErr != nil {
+			return false, factsErr
+		}
+		desired, buildErr := r.buildPostReadyRestore(reqCtx, pvc, restoreMgr, comp, componentName, backupTarget, targetFacts)
+		if buildErr != nil {
+			return false, buildErr
+		}
+		if validateErr := validatePostReadyRestore(existing, desired, comp); validateErr != nil {
+			return false, validateErr
+		}
+		switch existing.Status.Phase {
+		case dpv1alpha1.RestorePhaseCompleted:
+			return true, nil
+		case dpv1alpha1.RestorePhaseFailed:
+			return false, intctrlutil.NewFatalError(fmt.Sprintf("postReady restore %s/%s failed", existing.Namespace, existing.Name))
+		default:
+			if err = r.updatePVCConditionsIfPopulateNotReleased(reqCtx, pvc, "Waiting for postReady restore to complete"); err != nil {
+				return false, err
+			}
+			return false, nil
+		}
+	} else if !apierrors.IsNotFound(err) {
+		return false, err
+	}
 	if comp.Generation != comp.Status.ObservedGeneration ||
 		comp.Status.Phase != appsv1.RunningComponentPhase || componentPostProvisionRunning(comp) {
 		if err = r.updatePVCConditionsIfPopulateNotReleased(reqCtx, pvc,
@@ -1187,10 +1218,7 @@ func (r *VolumePopulatorReconciler) ensurePostReadyRestoreCompleted(reqCtx intct
 		}
 		return false, nil
 	}
-	componentServiceVersion, err := postReadyComponentServiceVersion(comp)
-	if err != nil {
-		return false, err
-	}
+	componentServiceVersion := postReadyComponentServiceVersion(comp)
 	cluster := &appsv1.Cluster{}
 	if err = r.Client.Get(reqCtx.Ctx, types.NamespacedName{Namespace: pvc.Namespace, Name: clusterName}, cluster); err != nil {
 		if apierrors.IsForbidden(err) || apierrors.IsUnauthorized(err) {
@@ -1219,33 +1247,13 @@ func (r *VolumePopulatorReconciler) ensurePostReadyRestoreCompleted(reqCtx intct
 	if err != nil {
 		return false, err
 	}
-	existing := &dpv1alpha1.Restore{}
-	if err = r.Client.Get(reqCtx.Ctx, client.ObjectKeyFromObject(postReadyRestore), existing); err != nil {
-		if !apierrors.IsNotFound(err) {
-			return false, err
-		}
-		if err = r.Client.Create(reqCtx.Ctx, postReadyRestore); err != nil && !apierrors.IsAlreadyExists(err) {
-			return false, err
-		}
-		if err = r.updatePVCConditionsIfPopulateNotReleased(reqCtx, pvc, "Waiting for postReady restore to complete"); err != nil {
-			return false, err
-		}
-		return false, nil
-	}
-	if err = validatePostReadyRestore(existing, postReadyRestore, comp); err != nil {
+	if err = r.Client.Create(reqCtx.Ctx, postReadyRestore); err != nil && !apierrors.IsAlreadyExists(err) {
 		return false, err
 	}
-	switch existing.Status.Phase {
-	case dpv1alpha1.RestorePhaseCompleted:
-		return true, nil
-	case dpv1alpha1.RestorePhaseFailed:
-		return false, intctrlutil.NewFatalError(fmt.Sprintf("postReady restore %s/%s failed", existing.Namespace, existing.Name))
-	default:
-		if err = r.updatePVCConditionsIfPopulateNotReleased(reqCtx, pvc, "Waiting for postReady restore to complete"); err != nil {
-			return false, err
-		}
-		return false, nil
+	if err = r.updatePVCConditionsIfPopulateNotReleased(reqCtx, pvc, "Waiting for postReady restore to complete"); err != nil {
+		return false, err
 	}
+	return false, nil
 }
 
 func (r *VolumePopulatorReconciler) updatePVCConditionsIfPopulateNotReleased(reqCtx intctrlutil.RequestCtx,
@@ -1359,7 +1367,9 @@ func (r *VolumePopulatorReconciler) buildPostReadyRestore(reqCtx intctrlutil.Req
 	return restore, nil
 }
 
-func postReadyComponentServiceVersion(comp *appsv1.Component) (string, error) {
+// postReadyComponentServiceVersion returns an empty value when a legal Component
+// has multiple active versions that cannot be represented by this transitional string.
+func postReadyComponentServiceVersion(comp *appsv1.Component) string {
 	componentVersion := comp.Spec.ServiceVersion
 	versions := map[string]struct{}{}
 	remainingDefaultReplicas := comp.Spec.Replicas
@@ -1380,13 +1390,35 @@ func postReadyComponentServiceVersion(comp *appsv1.Component) (string, error) {
 		versions[componentVersion] = struct{}{}
 	}
 	if len(versions) != 1 {
-		return "", intctrlutil.NewFatalError(fmt.Sprintf(
-			"component %s/%s has no single serviceVersion across active instances", comp.Namespace, comp.Name))
+		return ""
 	}
 	for version := range versions {
-		return version, nil
+		return version
 	}
-	return "", nil
+	return ""
+}
+
+func postReadyTargetFactsFromRestore(restore *dpv1alpha1.Restore) (postReadyTargetFacts, error) {
+	var facts postReadyTargetFacts
+	var topologyCount, serviceVersionCount int
+	for i := range restore.Spec.Env {
+		switch restore.Spec.Env[i].Name {
+		case dptypes.DPTargetClusterTopology:
+			topologyCount++
+			facts.clusterTopology = restore.Spec.Env[i].Value
+		case dptypes.DPTargetComponentServiceVersion:
+			serviceVersionCount++
+			facts.componentServiceVersion = restore.Spec.Env[i].Value
+		}
+	}
+	if topologyCount == 0 && serviceVersionCount == 0 {
+		return facts, nil
+	}
+	if topologyCount != 1 || serviceVersionCount != 1 {
+		return postReadyTargetFacts{}, intctrlutil.NewFatalError(fmt.Sprintf(
+			"postReady restore %s/%s has an invalid target-fact snapshot", restore.Namespace, restore.Name))
+	}
+	return facts, nil
 }
 
 func buildPostReadyTargetEnv(source []corev1.EnvVar, clusterTopology, componentServiceVersion string) []corev1.EnvVar {

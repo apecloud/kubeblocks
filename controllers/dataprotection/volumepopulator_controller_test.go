@@ -1799,7 +1799,7 @@ func TestBuildPostReadyRestoreWritesLiveTargetEnv(t *testing.T) {
 	require.Equal(t, 1, envNameCount(restore.Spec.Env, targetComponentServiceVersionEnv))
 }
 
-func TestReconcileRetriesMissingTargetClusterAndCreatesPostReadyRestore(t *testing.T) {
+func TestReconcileRetriesMissingTargetClusterAndPropagatesInstanceVersionOverride(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, corev1.AddToScheme(scheme))
 	require.NoError(t, kbappsv1.AddToScheme(scheme))
@@ -1832,7 +1832,14 @@ func TestReconcileRetriesMissingTargetClusterAndCreatesPostReadyRestore(t *testi
 			Name:      constant.GenerateClusterComponentName("cluster", "mysql"),
 			UID:       "component-uid",
 		},
-		Spec: kbappsv1.ComponentSpec{ServiceVersion: "3.3.2"},
+		Spec: kbappsv1.ComponentSpec{
+			ServiceVersion: "3.3.2",
+			Replicas:       1,
+			Instances: []kbappsv1.InstanceTemplate{{
+				Name:           "replacement",
+				ServiceVersion: "3.4.0",
+			}},
+		},
 		Status: kbappsv1.ComponentStatus{
 			Phase: kbappsv1.RunningComponentPhase,
 		},
@@ -1884,7 +1891,7 @@ func TestReconcileRetriesMissingTargetClusterAndCreatesPostReadyRestore(t *testi
 		Name:      postReadyRestoreName(comp.UID),
 	}, restore))
 	require.Equal(t, "shared-nothing", envValue(restore.Spec.Env, dptypes.DPTargetClusterTopology))
-	require.Equal(t, "3.3.2", envValue(restore.Spec.Env, dptypes.DPTargetComponentServiceVersion))
+	require.Equal(t, "3.4.0", envValue(restore.Spec.Env, dptypes.DPTargetComponentServiceVersion))
 }
 
 func TestEnsurePostReadyRestoreWaitsForObservedComponentGeneration(t *testing.T) {
@@ -1962,14 +1969,13 @@ func TestEnsurePostReadyRestoreWaitsForObservedComponentGeneration(t *testing.T)
 	}, restore))
 }
 
-func TestPostReadyComponentServiceVersionRequiresOneActiveVersion(t *testing.T) {
+func TestPostReadyComponentServiceVersionPublishesOnlyOneActiveVersion(t *testing.T) {
 	zero := int32(0)
 	tests := []struct {
 		name      string
 		replicas  int32
 		instances []kbappsv1.InstanceTemplate
 		want      string
-		wantFatal bool
 	}{
 		{name: "component default", replicas: 1, want: "3.3.2"},
 		{
@@ -1994,7 +2000,7 @@ func TestPostReadyComponentServiceVersionRequiresOneActiveVersion(t *testing.T) 
 			name:      "different active versions",
 			replicas:  2,
 			instances: []kbappsv1.InstanceTemplate{{Name: "canary", ServiceVersion: "3.4.0"}},
-			wantFatal: true,
+			want:      "",
 		},
 	}
 	for _, tt := range tests {
@@ -2008,14 +2014,8 @@ func TestPostReadyComponentServiceVersionRequiresOneActiveVersion(t *testing.T) 
 				},
 			}
 
-			got, err := postReadyComponentServiceVersion(comp)
+			got := postReadyComponentServiceVersion(comp)
 
-			if tt.wantFatal {
-				require.Error(t, err)
-				require.True(t, intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal), err.Error())
-				return
-			}
-			require.NoError(t, err)
 			require.Equal(t, tt.want, got)
 		})
 	}
@@ -2107,6 +2107,65 @@ func TestValidatePostReadyRestoreTargetEnvCompatibility(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
+		})
+	}
+}
+
+func TestPostReadyTargetFactsFromRestoreRequiresOneCompleteSnapshot(t *testing.T) {
+	tests := []struct {
+		name    string
+		env     []corev1.EnvVar
+		want    postReadyTargetFacts
+		wantErr bool
+	}{
+		{name: "legacy snapshot absent"},
+		{
+			name: "complete snapshot",
+			env: []corev1.EnvVar{
+				{Name: dptypes.DPTargetClusterTopology, Value: "shared-nothing"},
+				{Name: dptypes.DPTargetComponentServiceVersion, Value: "3.3.2"},
+			},
+			want: postReadyTargetFacts{clusterTopology: "shared-nothing", componentServiceVersion: "3.3.2"},
+		},
+		{
+			name: "heterogeneous version snapshot is explicitly empty",
+			env: []corev1.EnvVar{
+				{Name: dptypes.DPTargetClusterTopology, Value: "shared-nothing"},
+				{Name: dptypes.DPTargetComponentServiceVersion, Value: ""},
+			},
+			want: postReadyTargetFacts{clusterTopology: "shared-nothing"},
+		},
+		{
+			name:    "partial snapshot",
+			env:     []corev1.EnvVar{{Name: dptypes.DPTargetClusterTopology, Value: "shared-nothing"}},
+			wantErr: true,
+		},
+		{
+			name: "duplicate snapshot key",
+			env: []corev1.EnvVar{
+				{Name: dptypes.DPTargetClusterTopology, Value: "shared-nothing"},
+				{Name: dptypes.DPTargetClusterTopology, Value: "shared-data"},
+				{Name: dptypes.DPTargetComponentServiceVersion, Value: "3.3.2"},
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			restore := &dpv1alpha1.Restore{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "post-ready"},
+				Spec:       dpv1alpha1.RestoreSpec{Env: tt.env},
+			}
+
+			got, err := postReadyTargetFactsFromRestore(restore)
+
+			if tt.wantErr {
+				require.Error(t, err)
+				require.True(t, intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal), err.Error())
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -2494,7 +2553,7 @@ func TestCompleteBoundPVCContinuesPostReadyAfterPopulateReleased(t *testing.T) {
 	require.Nil(t, restoreCondition)
 }
 
-func TestCompleteBoundPVCMarksRestoreSucceededAfterPostReadyCompleted(t *testing.T) {
+func TestCompleteBoundPVCUsesFrozenTargetFactsAfterPostReadyCompleted(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, corev1.AddToScheme(scheme))
 	require.NoError(t, batchv1.AddToScheme(scheme))
@@ -2519,11 +2578,16 @@ func TestCompleteBoundPVCMarksRestoreSucceededAfterPostReadyCompleted(t *testing
 	}}
 	comp := &kbappsv1.Component{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "default",
-			Name:      constant.GenerateClusterComponentName("cluster", "mysql"),
-			UID:       "component-uid",
+			Namespace:  "default",
+			Name:       constant.GenerateClusterComponentName("cluster", "mysql"),
+			UID:        "component-uid",
+			Generation: 2,
 		},
-		Status: kbappsv1.ComponentStatus{Phase: kbappsv1.RunningComponentPhase},
+		Spec: kbappsv1.ComponentSpec{ServiceVersion: "3.4.0"},
+		Status: kbappsv1.ComponentStatus{
+			ObservedGeneration: 1,
+			Phase:              kbappsv1.RunningComponentPhase,
+		},
 	}
 	reconciler := &VolumePopulatorReconciler{
 		Client: fake.NewClientBuilder().WithScheme(scheme).
@@ -2537,14 +2601,18 @@ func TestCompleteBoundPVCMarksRestoreSucceededAfterPostReadyCompleted(t *testing
 		Spec: dpv1alpha1.RestoreSpec{Backup: dpv1alpha1.BackupRef{Name: backup.Name, Namespace: backup.Namespace}},
 	}, nil, scheme, reconciler.Client)
 	restoreMgr.PostReadyBackupSets = []dprestore.BackupActionSet{{Backup: backup}}
+	creationComp := comp.DeepCopy()
+	creationComp.Generation = 1
+	creationComp.Spec.ServiceVersion = "3.3.2"
+	creationComp.Status.ObservedGeneration = 1
 	postReadyRestore, err := reconciler.buildPostReadyRestore(
 		intctrlutil.RequestCtx{Ctx: context.Background()},
 		pvc,
 		restoreMgr,
-		comp,
+		creationComp,
 		"",
 		nil,
-		postReadyTargetFacts{clusterTopology: "shared-nothing", componentServiceVersion: comp.Spec.ServiceVersion},
+		postReadyTargetFacts{clusterTopology: "shared-nothing", componentServiceVersion: "3.3.2"},
 	)
 	require.NoError(t, err)
 	postReadyRestore.Status.Phase = dpv1alpha1.RestorePhaseCompleted

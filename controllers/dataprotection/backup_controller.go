@@ -638,12 +638,12 @@ func (r *BackupReconciler) handleRunningPhase(
 	)
 	for i := range targets {
 		if err = r.prepareRequestTargetInfo(reqCtx, request, &targets[i]); err != nil {
-			jobPhase, syncErr := r.syncJobActions(reqCtx.Ctx, request.Backup)
+			jobActionPhase, syncErr := r.syncJobActions(reqCtx.Ctx, request.Backup)
 			if syncErr != nil {
 				return intctrlutil.CheckedRequeueWithError(syncErr, reqCtx.Log, "sync backup jobs failed")
 			}
 			updateBackupStatusByActionStatus(&request.Status)
-			switch jobPhase {
+			switch jobActionPhase {
 			case dpv1alpha1.ActionPhaseCompleted:
 			case dpv1alpha1.ActionPhaseFailed:
 				existFailedAction = true

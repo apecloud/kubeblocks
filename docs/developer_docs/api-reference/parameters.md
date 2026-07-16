@@ -3375,6 +3375,30 @@ string
 <p>Represents the error message generated when the execution of configuration changes fails.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>code</code><br/>
+<em>
+github.com/apecloud/kubeblocks/apis/apps/v1.ActionResultCode
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Code is an optional normalized lifecycle Action failure code.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>retryable</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Retryable reports the retry property declared for Code.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="parameters.kubeblocks.io/v1alpha1.ReconfiguringStatus">ReconfiguringStatus

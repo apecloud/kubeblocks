@@ -1593,6 +1593,20 @@ string
 <p>Records the name of the ComponentDefinition prior to any changes.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>parameters</code><br/>
+<em>
+<a href="#operations.kubeblocks.io/v1alpha1.LastParameterAssignment">
+[]LastParameterAssignment
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Records managed parameter assignments touched by a Reconfiguring OpsRequest.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="operations.kubeblocks.io/v1alpha1.LastConfiguration">LastConfiguration
@@ -1622,6 +1636,59 @@ map[string]github.com/apecloud/kubeblocks/apis/operations/v1alpha1.LastComponent
 <td>
 <em>(Optional)</em>
 <p>Records the configuration of each Component prior to any changes.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="operations.kubeblocks.io/v1alpha1.LastParameterAssignment">LastParameterAssignment
+</h3>
+<p>
+(<em>Appears on:</em><a href="#operations.kubeblocks.io/v1alpha1.LastComponentConfiguration">LastComponentConfiguration</a>)
+</p>
+<div>
+<p>LastParameterAssignment records one managed parameter value before an OpsRequest changed it.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>key</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Key is the managed parameter key.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>present</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<p>Present distinguishes an absent assignment from a present assignment whose value is nil.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>value</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Value records the previous value when the assignment was present.
+A nil value with present=true represents an explicit parameter removal.</p>
 </td>
 </tr>
 </tbody>
@@ -2512,6 +2579,21 @@ LastConfiguration
 <td>
 <em>(Optional)</em>
 <p>Records the configuration prior to any changes.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>reconfigureRollback</code><br/>
+<em>
+<a href="#operations.kubeblocks.io/v1alpha1.ReconfigureRollbackStatus">
+ReconfigureRollbackStatus
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Records deterministic rollback progress for a Reconfiguring OpsRequest.
+It is populated only when the normalized Action result permits automatic rollback.</p>
 </td>
 </tr>
 <tr>
@@ -3820,6 +3902,167 @@ ComponentOps
 <p>Specifies a list of key-value pairs representing parameters and their corresponding values
 within a single configuration file.
 This field is used to override or set the values of parameters without modifying the entire configuration file.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="operations.kubeblocks.io/v1alpha1.ReconfigureRollbackPhase">ReconfigureRollbackPhase
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#operations.kubeblocks.io/v1alpha1.ReconfigureRollbackStatus">ReconfigureRollbackStatus</a>)
+</p>
+<div>
+<p>ReconfigureRollbackPhase identifies a durable rollback step.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;ManualCleanupRequired&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;RestartPending&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Restarting&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;RollbackPending&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;RolledBack&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;RollingBack&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
+<h3 id="operations.kubeblocks.io/v1alpha1.ReconfigureRollbackStatus">ReconfigureRollbackStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#operations.kubeblocks.io/v1alpha1.OpsRequestStatus">OpsRequestStatus</a>)
+</p>
+<div>
+<p>ReconfigureRollbackStatus records the persisted compensation state for a Reconfiguring OpsRequest.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>phase</code><br/>
+<em>
+<a href="#operations.kubeblocks.io/v1alpha1.ReconfigureRollbackPhase">
+ReconfigureRollbackPhase
+</a>
+</em>
+</td>
+<td>
+<p>Phase is the current durable rollback step.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>startTime</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#time-v1-meta">
+Kubernetes meta/v1.Time
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>StartTime is the persisted start of automatic rollback. It anchors the
+rollback-specific timeout when the OpsRequest has no explicit timeout.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>code</code><br/>
+<em>
+github.com/apecloud/kubeblocks/apis/apps/v1.ActionResultCode
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Code is the normalized Action failure code that authorized automatic rollback.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>retryable</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Retryable records the retry property associated with Code.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>componentGenerations</code><br/>
+<em>
+map[string]int64
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ComponentGenerations binds each rollback write to the resulting ComponentParameter generation.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>restartRequired</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>RestartRequired is true when H1 may have reached at least one runtime before rollback.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>restartAt</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#time-v1-meta">
+Kubernetes meta/v1.Time
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>RestartAt is the stable timestamp used for an idempotent controlled restart.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>clusterGeneration</code><br/>
+<em>
+int64
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ClusterGeneration binds the controlled restart write to one Cluster generation.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>message</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Message describes the current rollback outcome without exposing raw Action stderr.</p>
 </td>
 </tr>
 </tbody>

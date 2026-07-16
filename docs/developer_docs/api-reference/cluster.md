@@ -2449,6 +2449,23 @@ GRPCAction
 </tr>
 <tr>
 <td>
+<code>resultPolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ActionResultPolicy">
+ActionResultPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ResultPolicy normalizes implementation-specific Action failures.</p>
+<p>The policy is optional. Existing Actions that omit it retain their current behavior.
+An unmapped failure remains generic and consumers must not infer semantics from stderr.</p>
+<p>This field cannot be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>targetPodSelector</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.TargetPodSelector">
@@ -2613,6 +2630,59 @@ ActionOutputMatcher
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1.ActionFailureCode">ActionFailureCode
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ActionResultPolicy">ActionResultPolicy</a>)
+</p>
+<div>
+<p>ActionFailureCode maps an implementation-specific failure to a normalized result code.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>code</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ActionResultCode">
+ActionResultCode
+</a>
+</em>
+</td>
+<td>
+<p>Code is the normalized result reported to callers.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>execExitCode</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>ExecExitCode is the non-zero process exit code associated with code.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>retry</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<p>Retry indicates whether kbagent may retry this normalized failure under the Action retry policy.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1.ActionOutputMatcher">ActionOutputMatcher
 </h3>
 <p>
@@ -2653,6 +2723,48 @@ string
 <em>(Optional)</em>
 <p>The output of the action should contain the specified value.</p>
 <p>This field is immutable once set.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ActionResultCode">ActionResultCode
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ActionFailureCode">ActionFailureCode</a>, <a href="#apps.kubeblocks.io/v1.LifecycleActionStatus">LifecycleActionStatus</a>)
+</p>
+<div>
+<p>ActionResultCode is an opaque normalized result reported by an Action.</p>
+</div>
+<h3 id="apps.kubeblocks.io/v1.ActionResultPolicy">ActionResultPolicy
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.Action">Action</a>)
+</p>
+<div>
+<p>ActionResultPolicy defines normalized failure results for an Action.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>failureCodes</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ActionFailureCode">
+[]ActionFailureCode
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>FailureCodes maps implementation-specific failures to normalized codes.</p>
+<p>Each exec exit code can be declared at most once. Multiple exit codes may
+use the same normalized code by adding one entry for each exit code.</p>
 </td>
 </tr>
 </tbody>
@@ -7404,6 +7516,23 @@ Each entry in the map provides insights into specific elements of the Component,
 and <code>Name</code> is the specific name of the object.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>lifecycleActions</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.LifecycleActionStatus">
+[]LifecycleActionStatus
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Records lifecycle Action observations exposed by the Component controller.</p>
+<p>Each item identifies the logical action, the subject and revision that triggered it,
+and the exact target on which it ran. Consumers interpret result codes according to
+their own business contract.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1.ComponentSystemAccount">ComponentSystemAccount
@@ -9487,7 +9616,7 @@ Usually occurs if a prerequisite action failed or a permanent condition was not 
 <h3 id="apps.kubeblocks.io/v1.LifecycleActionStatus">LifecycleActionStatus
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterShardingStatus">ClusterShardingStatus</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterShardingStatus">ClusterShardingStatus</a>, <a href="#apps.kubeblocks.io/v1.ComponentStatus">ComponentStatus</a>, <a href="#workloads.kubeblocks.io/v1.InstanceStatus">InstanceStatus</a>, <a href="#workloads.kubeblocks.io/v1.InstanceStatus2">InstanceStatus2</a>)
 </p>
 <div>
 <p>LifecycleActionStatus records the observed state of a lifecycle-related action.</p>
@@ -9502,6 +9631,58 @@ Usually occurs if a prerequisite action failed or a permanent condition was not 
 <tbody>
 <tr>
 <td>
+<code>action</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Action is the logical lifecycle action, such as reconfigure, postProvision, or memberJoin.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>subject</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Subject identifies the action-specific object within the Component.
+For example, a reconfigure action uses the configuration template name.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>revision</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Revision identifies the desired subject revision observed by this action invocation.
+Its value is opaque to the apps controllers.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>target</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.LifecycleActionTarget">
+LifecycleActionTarget
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Target identifies the exact runtime object on which the action was executed.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>phase</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.LifecycleActionPhase">
@@ -9512,6 +9693,34 @@ LifecycleActionPhase
 <td>
 <em>(Optional)</em>
 <p>Phase is the current phase of the lifecycle action.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>code</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ActionResultCode">
+ActionResultCode
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Code is an optional normalized failure code declared by the Action result policy.
+Apps controllers expose the code without interpreting its business meaning.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>retryable</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Retryable reports the retry property declared for Code. Nil means no normalized
+result policy matched the failure.</p>
 </td>
 </tr>
 <tr>
@@ -9552,6 +9761,48 @@ Kubernetes meta/v1.Time
 <td>
 <em>(Optional)</em>
 <p>CompletionTime records the time when the action reached a terminal state (Succeeded, Failed, or Skipped).</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.LifecycleActionTarget">LifecycleActionTarget
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.LifecycleActionStatus">LifecycleActionStatus</a>)
+</p>
+<div>
+<p>LifecycleActionTarget identifies one exact runtime target of a lifecycle Action.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>podName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>PodName is the target Pod name.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>podUID</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>PodUID binds the observation to the exact Pod incarnation.</p>
 </td>
 </tr>
 </tbody>
@@ -20507,6 +20758,18 @@ string
 </tr>
 <tr>
 <td>
+<code>podUID</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>PodUID is the UID of the current Pod incarnation.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>role</code><br/>
 <em>
 string
@@ -20529,6 +20792,20 @@ string
 <td>
 <em>(Optional)</em>
 <p>The status of configs.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>lifecycleActions</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.LifecycleActionStatus">
+[]LifecycleActionStatus
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Records lifecycle Action observations for this Pod.</p>
 </td>
 </tr>
 <tr>
@@ -20561,6 +20838,18 @@ bool
 </tr>
 </thead>
 <tbody>
+<tr>
+<td>
+<code>podUID</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>PodUID is the UID of the current Pod managed by this Instance.</p>
+</td>
+</tr>
 <tr>
 <td>
 <code>observedGeneration</code><br/>
@@ -20685,6 +20974,20 @@ bool
 <td>
 <em>(Optional)</em>
 <p>Represents the config status observed from the running pod of this instance.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>lifecycleActions</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.LifecycleActionStatus">
+[]LifecycleActionStatus
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Records lifecycle Action observations for this Pod.</p>
 </td>
 </tr>
 </tbody>

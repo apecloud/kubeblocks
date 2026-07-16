@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -1738,7 +1739,8 @@ func TestBuildPostReadyRestoreSelectsHighestPriorityRole(t *testing.T) {
 	}
 	restoreMgr := dprestore.NewRestoreManager(&dpv1alpha1.Restore{}, nil, scheme, reconciler.Client)
 
-	restore, err := reconciler.buildPostReadyRestore(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, restoreMgr, comp, "", nil)
+	restore, err := reconciler.buildPostReadyRestore(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, restoreMgr, comp, "", nil, postReadyTargetFacts{})
 
 	require.NoError(t, err)
 	require.Equal(t, "leader", restore.Spec.ReadyConfig.JobAction.Target.PodSelector.LabelSelector.MatchLabels[instanceset.RoleLabelKey])
@@ -1785,7 +1787,8 @@ func TestBuildPostReadyRestoreWritesLiveTargetEnv(t *testing.T) {
 	restoreMgr := dprestore.NewRestoreManager(sourceRestore, nil, scheme, reconciler.Client)
 
 	restore, err := reconciler.buildPostReadyRestore(
-		intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, restoreMgr, comp, "", nil)
+		intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, restoreMgr, comp, "", nil,
+		postReadyTargetFacts{clusterTopology: "shared-nothing", componentServiceVersion: "3.3.2"})
 
 	require.NoError(t, err)
 	require.Equal(t, sourceEnv, sourceRestore.Spec.Env, "building the internal Restore must not mutate the source Restore")
@@ -1796,33 +1799,226 @@ func TestBuildPostReadyRestoreWritesLiveTargetEnv(t *testing.T) {
 	require.Equal(t, 1, envNameCount(restore.Spec.Env, targetComponentServiceVersionEnv))
 }
 
-func TestBuildPostReadyRestoreRequiresTargetCluster(t *testing.T) {
+func TestReconcileRetriesMissingTargetClusterAndCreatesPostReadyRestore(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, corev1.AddToScheme(scheme))
 	require.NoError(t, kbappsv1.AddToScheme(scheme))
 	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
+	oldSAName := viper.GetString(dptypes.CfgKeyWorkerServiceAccountName)
+	oldClusterRoleName := viper.GetString(dptypes.CfgKeyWorkerClusterRoleName)
+	viper.Set(dptypes.CfgKeyWorkerServiceAccountName, "worker")
+	viper.Set(dptypes.CfgKeyWorkerClusterRoleName, "worker-role")
+	defer func() {
+		viper.Set(dptypes.CfgKeyWorkerServiceAccountName, oldSAName)
+		viper.Set(dptypes.CfgKeyWorkerClusterRoleName, oldClusterRoleName)
+	}()
+	actionSet := &dpv1alpha1.ActionSet{
+		ObjectMeta: metav1.ObjectMeta{Name: "post-ready"},
+		Spec: dpv1alpha1.ActionSetSpec{
+			BackupType: dpv1alpha1.BackupTypeFull,
+			Restore: &dpv1alpha1.RestoreActionSpec{
+				PostReady: []dpv1alpha1.ActionSpec{{
+					Exec: &dpv1alpha1.ExecActionSpec{Command: []string{"true"}},
+				}},
+			},
+		},
+	}
 	backup := newBackupForRestoreDecision([]string{"data"}, nil)
+	backup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
+	backup.Status.BackupMethod.ActionSetName = actionSet.Name
 	comp := &kbappsv1.Component{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "default",
 			Name:      constant.GenerateClusterComponentName("cluster", "mysql"),
+			UID:       "component-uid",
+		},
+		Spec: kbappsv1.ComponentSpec{ServiceVersion: "3.3.2"},
+		Status: kbappsv1.ComponentStatus{
+			Phase: kbappsv1.RunningComponentPhase,
 		},
 	}
 	pvc := newPVCForRestoreDecision("data", "mysql", "")
-	pvc.Spec.DataSourceRef = &corev1.TypedObjectReference{Name: backup.Name}
-	pvc.Annotations[constant.RestoreSourceNamespaceAnnotationKey] = backup.Namespace
-	reconciler := &VolumePopulatorReconciler{
-		Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(backup).Build(),
-		Scheme: scheme,
+	pvc.UID = "pvc-uid"
+	pvc.Spec.VolumeName = "target-pv"
+	apiGroup := dptypes.DataprotectionAPIGroup
+	pvc.Spec.DataSourceRef = &corev1.TypedObjectReference{
+		APIGroup: &apiGroup,
+		Kind:     dptypes.BackupKind,
+		Name:     backup.Name,
 	}
-	restoreMgr := dprestore.NewRestoreManager(&dpv1alpha1.Restore{}, nil, scheme, reconciler.Client)
+	pvc.Annotations[constant.RestoreSourceKindAnnotationKey] = dptypes.BackupKind
+	pvc.Annotations[constant.RestoreSourceNamespaceAnnotationKey] = backup.Namespace
+	pvc.Status.Conditions = []corev1.PersistentVolumeClaimCondition{{
+		Type:   PersistentVolumeClaimPopulating,
+		Status: corev1.ConditionTrue,
+		Reason: ReasonPopulatingSucceed,
+	}}
+	workerSA := &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Namespace: pvc.Namespace, Name: "worker"}}
+	reconciler := &VolumePopulatorReconciler{
+		Client: fake.NewClientBuilder().WithScheme(scheme).
+			WithStatusSubresource(pvc).
+			WithObjects(actionSet, backup, comp, pvc, workerSA).
+			Build(),
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(10),
+	}
 
-	restore, err := reconciler.buildPostReadyRestore(
-		intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, restoreMgr, comp, "", nil)
+	req := ctrl.Request{NamespacedName: client.ObjectKeyFromObject(pvc)}
+	result, err := reconciler.Reconcile(context.Background(), req)
 
-	require.Error(t, err)
-	require.Nil(t, restore)
-	require.True(t, apierrors.IsNotFound(err), err.Error())
+	require.NoError(t, err)
+	require.Equal(t, reconcileInterval, result.RequeueAfter)
+	restore := &dpv1alpha1.Restore{}
+	require.True(t, apierrors.IsNotFound(reconciler.Client.Get(context.Background(), client.ObjectKey{
+		Namespace: pvc.Namespace,
+		Name:      postReadyRestoreName(comp.UID),
+	}, restore)))
+	require.NoError(t, reconciler.Client.Create(context.Background(), newClusterForPostReadyTest()))
+
+	result, err = reconciler.Reconcile(context.Background(), req)
+
+	require.NoError(t, err)
+	require.Equal(t, reconcileInterval, result.RequeueAfter)
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKey{
+		Namespace: pvc.Namespace,
+		Name:      postReadyRestoreName(comp.UID),
+	}, restore))
+	require.Equal(t, "shared-nothing", envValue(restore.Spec.Env, dptypes.DPTargetClusterTopology))
+	require.Equal(t, "3.3.2", envValue(restore.Spec.Env, dptypes.DPTargetComponentServiceVersion))
+}
+
+func TestEnsurePostReadyRestoreWaitsForObservedComponentGeneration(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, kbappsv1.AddToScheme(scheme))
+	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
+	apiGroup := dptypes.DataprotectionAPIGroup
+	backup := newBackupForRestoreDecision([]string{"data"}, nil)
+	pvc := newPVCForRestoreDecision("data", "mysql", "")
+	pvc.UID = "pvc-uid"
+	pvc.Spec.VolumeName = "target-pv"
+	pvc.Spec.DataSourceRef = &corev1.TypedObjectReference{
+		APIGroup: &apiGroup,
+		Kind:     dptypes.BackupKind,
+		Name:     backup.Name,
+	}
+	pvc.Annotations[constant.RestoreSourceKindAnnotationKey] = dptypes.BackupKind
+	pvc.Annotations[constant.RestoreSourceNamespaceAnnotationKey] = backup.Namespace
+	pvc.Status.Conditions = []corev1.PersistentVolumeClaimCondition{{
+		Type:   PersistentVolumeClaimPopulating,
+		Status: corev1.ConditionTrue,
+		Reason: ReasonPopulatingSucceed,
+	}}
+	comp := &kbappsv1.Component{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:  pvc.Namespace,
+			Name:       constant.GenerateClusterComponentName("cluster", "mysql"),
+			UID:        "component-uid",
+			Generation: 2,
+		},
+		Spec: kbappsv1.ComponentSpec{ServiceVersion: "3.3.2"},
+		Status: kbappsv1.ComponentStatus{
+			ObservedGeneration: 1,
+			Phase:              kbappsv1.RunningComponentPhase,
+		},
+	}
+	reconciler := &VolumePopulatorReconciler{
+		Client: fake.NewClientBuilder().WithScheme(scheme).
+			WithStatusSubresource(pvc, comp).
+			WithObjects(backup, pvc, comp, newClusterForPostReadyTest()).
+			Build(),
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(10),
+	}
+	restoreMgr := dprestore.NewRestoreManager(&dpv1alpha1.Restore{
+		Spec: dpv1alpha1.RestoreSpec{Backup: dpv1alpha1.BackupRef{Name: backup.Name, Namespace: backup.Namespace}},
+	}, nil, scheme, reconciler.Client)
+	restoreMgr.PostReadyBackupSets = []dprestore.BackupActionSet{{Backup: backup}}
+	restoreCtx := &pvcRestoreContext{restoreMgr: restoreMgr, mode: pvcRestoreModeRestoreData}
+
+	completed, err := reconciler.ensurePostReadyRestoreCompleted(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, restoreCtx)
+
+	require.NoError(t, err)
+	require.False(t, completed)
+	restore := &dpv1alpha1.Restore{}
+	require.True(t, apierrors.IsNotFound(reconciler.Client.Get(context.Background(), client.ObjectKey{
+		Namespace: pvc.Namespace,
+		Name:      postReadyRestoreName(comp.UID),
+	}, restore)))
+	currentComp := &kbappsv1.Component{}
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(comp), currentComp))
+	currentComp.Status.ObservedGeneration = currentComp.Generation
+	require.NoError(t, reconciler.Client.Status().Update(context.Background(), currentComp))
+
+	completed, err = reconciler.ensurePostReadyRestoreCompleted(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, restoreCtx)
+
+	require.NoError(t, err)
+	require.False(t, completed)
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKey{
+		Namespace: pvc.Namespace,
+		Name:      postReadyRestoreName(comp.UID),
+	}, restore))
+}
+
+func TestPostReadyComponentServiceVersionRequiresOneActiveVersion(t *testing.T) {
+	zero := int32(0)
+	tests := []struct {
+		name      string
+		replicas  int32
+		instances []kbappsv1.InstanceTemplate
+		want      string
+		wantFatal bool
+	}{
+		{name: "component default", replicas: 1, want: "3.3.2"},
+		{
+			name:      "matching active override",
+			replicas:  1,
+			instances: []kbappsv1.InstanceTemplate{{Name: "same", ServiceVersion: "3.3.2"}},
+			want:      "3.3.2",
+		},
+		{
+			name:      "different inactive override",
+			replicas:  1,
+			instances: []kbappsv1.InstanceTemplate{{Name: "disabled", ServiceVersion: "3.4.0", Replicas: &zero}},
+			want:      "3.3.2",
+		},
+		{
+			name:      "single active override replaces all default instances",
+			replicas:  1,
+			instances: []kbappsv1.InstanceTemplate{{Name: "only", ServiceVersion: "3.4.0"}},
+			want:      "3.4.0",
+		},
+		{
+			name:      "different active versions",
+			replicas:  2,
+			instances: []kbappsv1.InstanceTemplate{{Name: "canary", ServiceVersion: "3.4.0"}},
+			wantFatal: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			comp := &kbappsv1.Component{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "cluster-mysql"},
+				Spec: kbappsv1.ComponentSpec{
+					ServiceVersion: "3.3.2",
+					Replicas:       tt.replicas,
+					Instances:      tt.instances,
+				},
+			}
+
+			got, err := postReadyComponentServiceVersion(comp)
+
+			if tt.wantFatal {
+				require.Error(t, err)
+				require.True(t, intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal), err.Error())
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tt.want, got)
+		})
+	}
 }
 
 func TestValidatePostReadyRestoreTargetEnvCompatibility(t *testing.T) {
@@ -1995,7 +2191,8 @@ func TestBuildPostReadyRestoreUsesInitAccountFromComponentDefinition(t *testing.
 	}
 	restoreMgr := dprestore.NewRestoreManager(&dpv1alpha1.Restore{}, nil, scheme, reconciler.Client)
 
-	restore, err := reconciler.buildPostReadyRestore(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, restoreMgr, comp, "", nil)
+	restore, err := reconciler.buildPostReadyRestore(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, restoreMgr, comp, "", nil, postReadyTargetFacts{})
 
 	require.NoError(t, err)
 	require.NotNil(t, restore.Spec.ReadyConfig.ConnectionCredential)
@@ -2347,6 +2544,7 @@ func TestCompleteBoundPVCMarksRestoreSucceededAfterPostReadyCompleted(t *testing
 		comp,
 		"",
 		nil,
+		postReadyTargetFacts{clusterTopology: "shared-nothing", componentServiceVersion: comp.Spec.ServiceVersion},
 	)
 	require.NoError(t, err)
 	postReadyRestore.Status.Phase = dpv1alpha1.RestorePhaseCompleted

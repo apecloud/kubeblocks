@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/component-helpers/storage/volume"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -82,8 +83,14 @@ type pvcRestoreDecision struct {
 	skipPostReady bool
 }
 
+type postReadyTargetFacts struct {
+	clusterTopology         string
+	componentServiceVersion string
+}
+
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims/finalizers,verbs=update
+// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusters,verbs=get;list;watch
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=components,verbs=get;list;watch
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=componentdefinitions,verbs=get;list;watch
 
@@ -1172,21 +1179,31 @@ func (r *VolumePopulatorReconciler) ensurePostReadyRestoreCompleted(reqCtx intct
 		}
 		return false, err
 	}
-	if comp.Status.Phase != appsv1.RunningComponentPhase || componentPostProvisionRunning(comp) {
-		if err = r.updatePVCConditionsIfPopulateNotReleased(reqCtx, pvc, "Waiting for component to finish post-provision"); err != nil {
+	if comp.Generation != comp.Status.ObservedGeneration ||
+		comp.Status.Phase != appsv1.RunningComponentPhase || componentPostProvisionRunning(comp) {
+		if err = r.updatePVCConditionsIfPopulateNotReleased(reqCtx, pvc,
+			"Waiting for component to observe the current generation and finish post-provision"); err != nil {
 			return false, err
 		}
 		return false, nil
+	}
+	componentServiceVersion, err := postReadyComponentServiceVersion(comp)
+	if err != nil {
+		return false, err
+	}
+	cluster := &appsv1.Cluster{}
+	if err = r.Client.Get(reqCtx.Ctx, types.NamespacedName{Namespace: pvc.Namespace, Name: clusterName}, cluster); err != nil {
+		if apierrors.IsForbidden(err) || apierrors.IsUnauthorized(err) {
+			return false, intctrlutil.NewFatalError(err.Error())
+		}
+		return false, intctrlutil.NewRequeueError(reconcileInterval,
+			fmt.Sprintf("waiting for target cluster %s/%s: %v", pvc.Namespace, clusterName, err))
 	}
 	parameters, err := restoreParametersMapFromPVC(pvc)
 	if err != nil {
 		return false, intctrlutil.NewFatalError(err.Error())
 	}
 	if parameters[dptypes.DeferPostReadyUntilClusterRunningParameterKey] == "true" {
-		cluster := &appsv1.Cluster{}
-		if err = r.Client.Get(reqCtx.Ctx, types.NamespacedName{Namespace: pvc.Namespace, Name: clusterName}, cluster); err != nil {
-			return false, err
-		}
 		if cluster.Status.Phase != appsv1.RunningClusterPhase {
 			if err = r.updatePVCConditionsIfPopulateNotReleased(reqCtx, pvc, "Waiting for cluster to run before postReady restore"); err != nil {
 				return false, err
@@ -1194,7 +1211,11 @@ func (r *VolumePopulatorReconciler) ensurePostReadyRestoreCompleted(reqCtx intct
 			return false, nil
 		}
 	}
-	postReadyRestore, err := r.buildPostReadyRestore(reqCtx, pvc, restoreMgr, comp, componentName, backupTarget)
+	postReadyRestore, err := r.buildPostReadyRestore(reqCtx, pvc, restoreMgr, comp, componentName, backupTarget,
+		postReadyTargetFacts{
+			clusterTopology:         cluster.Spec.Topology,
+			componentServiceVersion: componentServiceVersion,
+		})
 	if err != nil {
 		return false, err
 	}
@@ -1241,7 +1262,8 @@ func (r *VolumePopulatorReconciler) buildPostReadyRestore(reqCtx intctrlutil.Req
 	restoreMgr *dprestore.RestoreManager,
 	comp *appsv1.Component,
 	targetComponentName string,
-	redirectTarget *dpv1alpha1.BackupStatusTarget) (*dpv1alpha1.Restore, error) {
+	redirectTarget *dpv1alpha1.BackupStatusTarget,
+	targetFacts postReadyTargetFacts) (*dpv1alpha1.Restore, error) {
 	clusterName := pvc.Labels[constant.AppInstanceLabelKey]
 	componentName := targetComponentName
 	if componentName == "" {
@@ -1310,13 +1332,6 @@ func (r *VolumePopulatorReconciler) buildPostReadyRestore(reqCtx intctrlutil.Req
 			readyConfig.JobAction.Target.VolumeMounts = backup.Status.BackupMethod.TargetVolumes.VolumeMounts
 		}
 	}
-	cluster := &appsv1.Cluster{}
-	if err = r.Client.Get(reqCtx.Ctx, types.NamespacedName{
-		Namespace: pvc.Namespace,
-		Name:      clusterName,
-	}, cluster); err != nil {
-		return nil, err
-	}
 	restore := &dpv1alpha1.Restore{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      postReadyRestoreName(comp.UID),
@@ -1330,7 +1345,7 @@ func (r *VolumePopulatorReconciler) buildPostReadyRestore(reqCtx intctrlutil.Req
 			},
 			RestoreTime: pvc.Annotations[constant.RestorePITRAnnotationKey],
 			Env: buildPostReadyTargetEnv(restoreMgr.Restore.Spec.Env,
-				cluster.Spec.Topology, comp.Spec.ServiceVersion),
+				targetFacts.clusterTopology, targetFacts.componentServiceVersion),
 			Parameters:  restoreParametersToPairs(restoreActionParameters(parameters)),
 			ReadyConfig: readyConfig,
 		},
@@ -1342,6 +1357,36 @@ func (r *VolumePopulatorReconciler) buildPostReadyRestore(reqCtx intctrlutil.Req
 		return nil, err
 	}
 	return restore, nil
+}
+
+func postReadyComponentServiceVersion(comp *appsv1.Component) (string, error) {
+	componentVersion := comp.Spec.ServiceVersion
+	versions := map[string]struct{}{}
+	remainingDefaultReplicas := comp.Spec.Replicas
+	for i := range comp.Spec.Instances {
+		instance := &comp.Spec.Instances[i]
+		instanceReplicas := ptr.Deref(instance.Replicas, 1)
+		if instanceReplicas == 0 {
+			continue
+		}
+		remainingDefaultReplicas -= instanceReplicas
+		instanceVersion := instance.ServiceVersion
+		if instanceVersion == "" {
+			instanceVersion = componentVersion
+		}
+		versions[instanceVersion] = struct{}{}
+	}
+	if remainingDefaultReplicas > 0 || len(versions) == 0 {
+		versions[componentVersion] = struct{}{}
+	}
+	if len(versions) != 1 {
+		return "", intctrlutil.NewFatalError(fmt.Sprintf(
+			"component %s/%s has no single serviceVersion across active instances", comp.Namespace, comp.Name))
+	}
+	for version := range versions {
+		return version, nil
+	}
+	return "", nil
 }
 
 func buildPostReadyTargetEnv(source []corev1.EnvVar, clusterTopology, componentServiceVersion string) []corev1.EnvVar {

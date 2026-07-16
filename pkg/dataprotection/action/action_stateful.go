@@ -34,6 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 )
@@ -62,6 +63,15 @@ func (s *StatefulSetAction) Type() dpv1alpha1.ActionType {
 	return dpv1alpha1.ActionTypeStatefulSet
 }
 
+func (s *StatefulSetAction) BuildObjectRef() *corev1.ObjectReference {
+	return &corev1.ObjectReference{
+		APIVersion: appsv1.SchemeGroupVersion.String(),
+		Kind:       constant.StatefulSetKind,
+		Namespace:  s.ObjectMeta.Namespace,
+		Name:       s.ObjectMeta.Name,
+	}
+}
+
 func (s *StatefulSetAction) Execute(ctx ActionContext) (actionStatus *dpv1alpha1.ActionStatus, err error) {
 	defer func() {
 		if err != nil {
@@ -88,6 +98,7 @@ func (s *StatefulSetAction) Execute(ctx ActionContext) (actionStatus *dpv1alpha1
 			Name:           s.Name,
 			Phase:          dpv1alpha1.ActionPhaseRunning,
 			ActionType:     s.Type(),
+			ObjectRef:      s.BuildObjectRef(),
 			StartTimestamp: &metav1.Time{Time: time.Now()},
 		}, nil
 	}

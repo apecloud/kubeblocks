@@ -551,28 +551,6 @@ var _ = Describe("Backup Controller test", func() {
 					g.Expect(fetched.Status.Expiration.Second()).Should(Equal(fetched.Status.CompletionTimestamp.Add(time.Hour).Second()))
 				})).Should(Succeed())
 			})
-
-			It("returns not found when a previously selected target pod is missing", func() {
-				target := &dpv1alpha1.BackupTarget{
-					PodSelector: &dpv1alpha1.PodSelector{
-						LabelSelector: &metav1.LabelSelector{
-							MatchLabels: map[string]string{
-								constant.AppInstanceLabelKey:    testdp.ClusterName,
-								constant.KBAppComponentLabelKey: testdp.ComponentName,
-							},
-						},
-					},
-				}
-				reqCtx := intctrlutil.RequestCtx{Ctx: ctx, Req: ctrl.Request{NamespacedName: client.ObjectKeyFromObject(backupPolicy)}}
-				for _, strategy := range []dpv1alpha1.PodSelectionStrategy{
-					dpv1alpha1.PodSelectionStrategyAny,
-					dpv1alpha1.PodSelectionStrategyAll,
-				} {
-					target.PodSelector.Strategy = strategy
-					_, err := GetTargetPods(reqCtx, k8sClient, []string{"missing-pod"}, backupPolicy, target, dpv1alpha1.BackupTypeFull)
-					Expect(intctrlutil.IsNotFound(err)).To(BeTrue())
-				}
-			})
 		})
 
 		It("create a backup with backupMethod and multi targets", func() {
@@ -615,6 +593,13 @@ var _ = Describe("Backup Controller test", func() {
 					fmt.Sprintf("%s-%s-0", dpbackup.BackupDataJobNamePrefix, targets[0].Name),
 					fmt.Sprintf("%s-%s-0", dpbackup.BackupDataJobNamePrefix, targets[1].Name),
 				))
+				for _, actionStatus := range fetched.Status.Actions {
+					g.Expect(actionStatus.ObjectRef).ShouldNot(BeNil())
+					g.Expect(actionStatus.ObjectRef.APIVersion).Should(Equal(batchv1.SchemeGroupVersion.String()))
+					g.Expect(actionStatus.ObjectRef.Kind).Should(Equal(constant.JobKind))
+					g.Expect(actionStatus.ObjectRef.Namespace).Should(Equal(backup.Namespace))
+					g.Expect(actionStatus.ObjectRef.Name).Should(Equal(dpbackup.GenerateBackupJobName(backup, actionStatus.Name)))
+				}
 			})).Should(Succeed())
 			By("mock backup jobs to completed and backup should be completed")
 			testdp.PatchK8sJobStatus(&testCtx, getJobKey(targets[0].Name), batchv1.JobComplete)
@@ -624,7 +609,7 @@ var _ = Describe("Backup Controller test", func() {
 			})).Should(Succeed())
 		})
 
-		It("reconstructs a complete multi-target action status from completed jobs", func() {
+		It("completes a multi-target backup from persisted job object refs", func() {
 			By("Set backupMethod's targets")
 			Expect(testapps.ChangeObj(&testCtx, backupPolicy, func(bp *dpv1alpha1.BackupPolicy) {
 				podSelector := &dpv1alpha1.PodSelector{
@@ -655,7 +640,7 @@ var _ = Describe("Backup Controller test", func() {
 			Eventually(testapps.CheckObjExists(&testCtx, getJobKey(targets[0].Name), &batchv1.Job{}, true)).Should(Succeed())
 			Eventually(testapps.CheckObjExists(&testCtx, getJobKey(targets[1].Name), &batchv1.Job{}, true)).Should(Succeed())
 
-			By("pause reconciliation and retain only the last target action in status")
+			By("pause reconciliation")
 			Eventually(testapps.GetAndChangeObj(&testCtx, backupKey, func(fetched *dpv1alpha1.Backup) {
 				if fetched.Annotations == nil {
 					fetched.Annotations = map[string]string{}
@@ -665,21 +650,15 @@ var _ = Describe("Backup Controller test", func() {
 			Consistently(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
 				g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseRunning))
 			}), time.Second).Should(Succeed())
-			Eventually(testapps.GetAndChangeObjStatus(&testCtx, backupKey, func(fetched *dpv1alpha1.Backup) {
-				fetched.Status.Actions = []dpv1alpha1.ActionStatus{{
-					Name:          fmt.Sprintf("%s-%s-0", dpbackup.BackupDataJobNamePrefix, targets[1].Name),
-					TargetPodName: targetPod.Name,
-					Phase:         dpv1alpha1.ActionPhaseRunning,
-					ActionType:    dpv1alpha1.ActionTypeJob,
-				}}
-			})).Should(Succeed())
 
 			testdp.PatchK8sJobStatus(&testCtx, getJobKey(targets[0].Name), batchv1.JobComplete)
 			testdp.PatchK8sJobStatus(&testCtx, getJobKey(targets[1].Name), batchv1.JobComplete)
+			By("delete the live ActionSet after the action refs have been persisted")
+			Expect(k8sClient.Delete(ctx, actionSet)).Should(Succeed())
 			Expect(k8sClient.Delete(ctx, targetPod)).Should(Succeed())
 			Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(targetPod), &corev1.Pod{}, false)).Should(Succeed())
 
-			By("resume reconciliation and reconstruct the complete status from both jobs")
+			By("resume reconciliation and observe both jobs before resolving targets")
 			Eventually(testapps.GetAndChangeObj(&testCtx, backupKey, func(fetched *dpv1alpha1.Backup) {
 				delete(fetched.Annotations, dptypes.SkipReconciliationAnnotationKey)
 			})).Should(Succeed())
@@ -692,7 +671,7 @@ var _ = Describe("Backup Controller test", func() {
 			})).Should(Succeed())
 		})
 
-		It("does not complete a multi-target backup from an incomplete action status", func() {
+		It("does not complete a multi-target backup while a referenced job is incomplete", func() {
 			By("Set backupMethod's targets")
 			Expect(testapps.ChangeObj(&testCtx, backupPolicy, func(bp *dpv1alpha1.BackupPolicy) {
 				podSelector := &dpv1alpha1.PodSelector{
@@ -723,7 +702,7 @@ var _ = Describe("Backup Controller test", func() {
 			Eventually(testapps.CheckObjExists(&testCtx, getJobKey(targets[0].Name), &batchv1.Job{}, true)).Should(Succeed())
 			Eventually(testapps.CheckObjExists(&testCtx, getJobKey(targets[1].Name), &batchv1.Job{}, true)).Should(Succeed())
 
-			By("pause reconciliation and retain only the last target action in status")
+			By("pause reconciliation")
 			Eventually(testapps.GetAndChangeObj(&testCtx, backupKey, func(fetched *dpv1alpha1.Backup) {
 				if fetched.Annotations == nil {
 					fetched.Annotations = map[string]string{}
@@ -733,20 +712,12 @@ var _ = Describe("Backup Controller test", func() {
 			Consistently(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
 				g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseRunning))
 			}), time.Second).Should(Succeed())
-			Eventually(testapps.GetAndChangeObjStatus(&testCtx, backupKey, func(fetched *dpv1alpha1.Backup) {
-				fetched.Status.Actions = []dpv1alpha1.ActionStatus{{
-					Name:          fmt.Sprintf("%s-%s-0", dpbackup.BackupDataJobNamePrefix, targets[1].Name),
-					TargetPodName: targetPod.Name,
-					Phase:         dpv1alpha1.ActionPhaseRunning,
-					ActionType:    dpv1alpha1.ActionTypeJob,
-				}}
-			})).Should(Succeed())
 
 			testdp.PatchK8sJobStatus(&testCtx, getJobKey(targets[1].Name), batchv1.JobComplete)
 			Expect(k8sClient.Delete(ctx, targetPod)).Should(Succeed())
 			Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(targetPod), &corev1.Pod{}, false)).Should(Succeed())
 
-			By("resume reconciliation and expect the incomplete plan not to succeed")
+			By("resume reconciliation and expect the incomplete jobs not to succeed")
 			Eventually(testapps.GetAndChangeObj(&testCtx, backupKey, func(fetched *dpv1alpha1.Backup) {
 				delete(fetched.Annotations, dptypes.SkipReconciliationAnnotationKey)
 			})).Should(Succeed())

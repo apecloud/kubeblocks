@@ -36,14 +36,24 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 )
 
 func TestStatefulSetActionHelpers(t *testing.T) {
-	action := &StatefulSetAction{Name: "continuous"}
+	action := &StatefulSetAction{
+		Name:       "continuous",
+		ObjectMeta: metav1.ObjectMeta{Name: "backup-sts", Namespace: "ns"},
+	}
 
 	assert.Equal(t, "continuous", action.GetName())
 	assert.Equal(t, dpv1alpha1.ActionTypeStatefulSet, action.Type())
+	assert.Equal(t, &corev1.ObjectReference{
+		APIVersion: appsv1.SchemeGroupVersion.String(),
+		Kind:       constant.StatefulSetKind,
+		Namespace:  "ns",
+		Name:       "backup-sts",
+	}, action.BuildObjectRef())
 	assert.Equal(t, "60s", action.getIntervalSeconds("@hourly"))
 	assert.Equal(t, "300s", action.getIntervalSeconds("*/5 * * * *"))
 	assert.Equal(t, "7200s", action.getIntervalSeconds("CRON_TZ=UTC 0 */2 * * *"))

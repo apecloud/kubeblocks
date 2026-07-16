@@ -542,16 +542,29 @@ func (r *BackupReconciler) patchBackupStatus(
 	} else if request.BackupPolicy.Spec.EncryptionConfig != nil {
 		request.Status.EncryptionConfig = request.BackupPolicy.Spec.EncryptionConfig
 	}
-	// Keep the existing live target validation, then persist the complete action
-	// inventory for every selected target pod in the same status update.
-	if _, err := request.BuildActions(); err != nil {
-		return err
+	var actionStatuses []dpv1alpha1.ActionStatus
+	targets := dputils.GetBackupTargets(request.BackupPolicy, request.BackupMethod)
+	for i := range targets {
+		if err := r.prepareRequestTargetInfo(request.RequestCtx, request, &targets[i]); err != nil {
+			return err
+		}
+		actions, err := request.BuildActions()
+		if err != nil {
+			return err
+		}
+		for targetPodName, acts := range actions {
+			for _, act := range acts {
+				actionStatuses = append(actionStatuses, dpv1alpha1.ActionStatus{
+					Name:          act.GetName(),
+					TargetPodName: targetPodName,
+					Phase:         dpv1alpha1.ActionPhaseNew,
+					ActionType:    act.Type(),
+					ObjectRef:     act.BuildObjectRef(),
+				})
+			}
+		}
 	}
-	actionPlan, err := request.BuildActionStatusPlan()
-	if err != nil {
-		return err
-	}
-	request.Status.Actions = actionPlan
+	request.Status.Actions = actionStatuses
 
 	// update phase to running
 	request.Status.Phase = dpv1alpha1.BackupPhaseRunning
@@ -565,7 +578,7 @@ func (r *BackupReconciler) patchBackupStatus(
 		request.Status.BaseBackupName = request.BaseBackup.Name
 	}
 
-	if err = dpbackup.SetExpirationTime(request.Backup); err != nil {
+	if err := dpbackup.SetExpirationTime(request.Backup); err != nil {
 		return err
 	}
 	return r.Client.Status().Patch(request.Ctx, request.Backup, client.MergeFrom(original))
@@ -592,6 +605,13 @@ func (r *BackupReconciler) handleRunningPhase(
 			return intctrlutil.Reconciled()
 		}
 	}
+	observedBackup := backup.DeepCopy()
+	if completed, err := r.syncCompletedJobActions(reqCtx.Ctx, observedBackup); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "sync completed backup jobs failed")
+	} else if completed {
+		updateBackupStatusByActionStatus(&observedBackup.Status)
+		return r.completeBackup(reqCtx, backup, observedBackup)
+	}
 	request, err := r.prepareBackupRequest(reqCtx, backup)
 	if err != nil {
 		return r.updateStatusIfFailed(reqCtx, backup.DeepCopy(), backup, err)
@@ -613,14 +633,6 @@ func (r *BackupReconciler) handleRunningPhase(
 	)
 	for i := range targets {
 		if err = r.prepareRequestTargetInfo(reqCtx, request, &targets[i]); err != nil {
-			if intctrlutil.IsNotFound(err) {
-				if completed, syncErr := r.syncCompletedJobActions(reqCtx.Ctx, request); syncErr != nil {
-					return intctrlutil.CheckedRequeueWithError(syncErr, reqCtx.Log, "sync completed backup jobs failed")
-				} else if completed {
-					updateBackupStatusByActionStatus(&request.Status)
-					return r.completeBackup(reqCtx, backup, request.Backup)
-				}
-			}
 			return r.updateStatusIfFailed(reqCtx, backup, request.Backup, err)
 		}
 		// there are actions not completed, continue to handle following actions
@@ -676,52 +688,42 @@ func (r *BackupReconciler) handleRunningPhase(
 	return r.completeBackup(reqCtx, backup, request.Backup)
 }
 
-func (r *BackupReconciler) syncCompletedJobActions(ctx context.Context, request *dpbackup.Request) (bool, error) {
-	actionPlan, err := request.BuildActionStatusPlan()
-	if err != nil {
-		return false, err
-	}
-	if len(actionPlan) == 0 {
+func (r *BackupReconciler) syncCompletedJobActions(ctx context.Context, backup *dpv1alpha1.Backup) (bool, error) {
+	if len(backup.Status.Actions) == 0 {
 		return false, nil
 	}
 
-	type actionKey struct {
-		name          string
-		targetPodName string
-	}
-	existing := make(map[actionKey]*dpv1alpha1.ActionStatus, len(request.Status.Actions))
-	for i := range request.Status.Actions {
-		actionStatus := &request.Status.Actions[i]
-		existing[actionKey{name: actionStatus.Name, targetPodName: actionStatus.TargetPodName}] = actionStatus
-	}
-
-	for i := range actionPlan {
-		expected := actionPlan[i]
-		key := actionKey{name: expected.Name, targetPodName: expected.TargetPodName}
-		if actionStatus := existing[key]; actionStatus != nil {
-			actionPlan[i] = *actionStatus.DeepCopy()
-		}
-		actionStatus := &actionPlan[i]
-		if actionStatus.Phase == dpv1alpha1.ActionPhaseCompleted {
-			continue
-		}
-		if expected.ActionType != dpv1alpha1.ActionTypeJob {
+	jobs := make([]*batchv1.Job, len(backup.Status.Actions))
+	for i := range backup.Status.Actions {
+		actionStatus := &backup.Status.Actions[i]
+		objectRef := actionStatus.ObjectRef
+		if objectRef == nil || objectRef.APIVersion != batchv1.SchemeGroupVersion.String() ||
+			objectRef.Kind != constant.JobKind || objectRef.Namespace == "" || objectRef.Name == "" {
 			return false, nil
 		}
-		actionStatus.ActionType = expected.ActionType
 
-		job, err := r.getJobForActionStatus(ctx, request.Backup, actionStatus)
-		if err != nil {
-			return false, err
+		job := &batchv1.Job{}
+		if err := r.Client.Get(ctx, client.ObjectKey{Namespace: objectRef.Namespace, Name: objectRef.Name}, job); err != nil {
+			return false, client.IgnoreNotFound(err)
 		}
-		if job == nil {
+		if objectRef.UID != "" && objectRef.UID != job.UID {
+			return false, nil
+		}
+		if job.Labels[dptypes.BackupNameLabelKey] != backup.Name {
 			return false, nil
 		}
 		_, finishedType, _ := dputils.IsJobFinished(job)
 		if finishedType != batchv1.JobComplete {
 			return false, nil
 		}
+		jobs[i] = job
+	}
+
+	for i := range backup.Status.Actions {
+		actionStatus := &backup.Status.Actions[i]
+		job := jobs[i]
 		actionStatus.Phase = dpv1alpha1.ActionPhaseCompleted
+		actionStatus.ActionType = dpv1alpha1.ActionTypeJob
 		actionStatus.StartTimestamp = job.CreationTimestamp.DeepCopy()
 		if job.Status.CompletionTime != nil {
 			actionStatus.CompletionTimestamp = job.Status.CompletionTime.DeepCopy()
@@ -736,50 +738,7 @@ func (r *BackupReconciler) syncCompletedJobActions(ctx context.Context, request 
 			UID:        job.UID,
 		}
 	}
-	request.Status.Actions = actionPlan
 	return true, nil
-}
-
-func (r *BackupReconciler) getJobForActionStatus(ctx context.Context,
-	backup *dpv1alpha1.Backup,
-	actionStatus *dpv1alpha1.ActionStatus) (*batchv1.Job, error) {
-	var keys []client.ObjectKey
-	if actionStatus.ObjectRef != nil && actionStatus.ObjectRef.Kind == constant.JobKind {
-		keys = append(keys, client.ObjectKey{
-			Namespace: actionStatus.ObjectRef.Namespace,
-			Name:      actionStatus.ObjectRef.Name,
-		})
-	}
-
-	jobName := dpbackup.GenerateBackupJobName(backup, actionStatus.Name)
-	keys = append(keys, client.ObjectKey{Namespace: backup.Namespace, Name: jobName})
-	if namespace := viper.GetString(constant.CfgKeyCtrlrMgrNS); namespace != backup.Namespace {
-		keys = append(keys, client.ObjectKey{Namespace: namespace, Name: jobName})
-	}
-
-	checked := map[client.ObjectKey]struct{}{}
-	for _, key := range keys {
-		if _, ok := checked[key]; ok || key.Name == "" || key.Namespace == "" {
-			continue
-		}
-		checked[key] = struct{}{}
-
-		job := &batchv1.Job{}
-		if err := r.Client.Get(ctx, key, job); err != nil {
-			if client.IgnoreNotFound(err) == nil {
-				continue
-			}
-			return nil, err
-		}
-		if job.Labels[dptypes.BackupNameLabelKey] != backup.Name {
-			continue
-		}
-		if job.Namespace != backup.Namespace && job.Labels[dptypes.BackupNamespaceLabelKey] != backup.Namespace {
-			continue
-		}
-		return job, nil
-	}
-	return nil, nil
 }
 
 func (r *BackupReconciler) completeBackup(reqCtx intctrlutil.RequestCtx,

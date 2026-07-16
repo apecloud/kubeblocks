@@ -638,20 +638,15 @@ func (r *BackupReconciler) handleRunningPhase(
 	)
 	for i := range targets {
 		if err = r.prepareRequestTargetInfo(reqCtx, request, &targets[i]); err != nil {
-			jobActionPhase, syncErr := r.syncJobActions(reqCtx.Ctx, request.Backup)
+			jobWaiting, jobFailed, syncErr := r.syncJobActions(reqCtx.Ctx, request.Backup)
+			if intctrlutil.IsTargetError(syncErr, intctrlutil.ErrorTypeFatal) {
+				return r.updateStatusIfFailed(reqCtx, backup, request.Backup, err)
+			}
 			if syncErr != nil {
 				return intctrlutil.CheckedRequeueWithError(syncErr, reqCtx.Log, "sync backup jobs failed")
 			}
-			updateBackupStatusByActionStatus(&request.Status)
-			switch jobActionPhase {
-			case dpv1alpha1.ActionPhaseCompleted:
-			case dpv1alpha1.ActionPhaseFailed:
-				existFailedAction = true
-			case dpv1alpha1.ActionPhaseRunning:
-				waiting = true
-			default:
-				return r.updateStatusIfFailed(reqCtx, backup, request.Backup, err)
-			}
+			waiting = jobWaiting
+			existFailedAction = jobFailed
 			break
 		}
 		// there are actions not completed, continue to handle following actions
@@ -707,32 +702,33 @@ func (r *BackupReconciler) handleRunningPhase(
 	return r.completeBackup(reqCtx, backup, request.Backup)
 }
 
-func (r *BackupReconciler) syncJobActions(ctx context.Context, backup *dpv1alpha1.Backup) (dpv1alpha1.ActionPhase, error) {
+func (r *BackupReconciler) syncJobActions(ctx context.Context,
+	backup *dpv1alpha1.Backup) (waiting, failed bool, err error) {
+	notApplicableErr := intctrlutil.NewFatalError("backup job actions are not applicable")
 	if len(backup.Status.Actions) == 0 {
-		return "", nil
+		return false, false, notApplicableErr
 	}
 
-	var waiting, existFailed bool
 	for i := range backup.Status.Actions {
 		actionStatus := &backup.Status.Actions[i]
 		objectRef := actionStatus.ObjectRef
 		if objectRef == nil || objectRef.APIVersion != batchv1.SchemeGroupVersion.String() ||
 			objectRef.Kind != constant.JobKind || objectRef.Namespace == "" || objectRef.Name == "" {
-			return "", nil
+			return false, false, notApplicableErr
 		}
 
 		job := &batchv1.Job{}
 		if err := r.Client.Get(ctx, client.ObjectKey{Namespace: objectRef.Namespace, Name: objectRef.Name}, job); err != nil {
 			if apierrors.IsNotFound(err) {
-				return "", nil
+				return false, false, notApplicableErr
 			}
-			return "", err
+			return false, false, err
 		}
 		if objectRef.UID != "" && objectRef.UID != job.UID {
-			return "", nil
+			return false, false, notApplicableErr
 		}
 		if job.Labels[dptypes.BackupNameLabelKey] != backup.Name {
-			return "", nil
+			return false, false, notApplicableErr
 		}
 
 		_, finishedType, failureReason := dputils.IsJobFinished(job)
@@ -754,7 +750,7 @@ func (r *BackupReconciler) syncJobActions(ctx context.Context, backup *dpv1alpha
 			actionStatus.Phase = dpv1alpha1.ActionPhaseCompleted
 		case batchv1.JobFailed:
 			actionStatus.Phase = dpv1alpha1.ActionPhaseFailed
-			existFailed = true
+			failed = true
 		default:
 			actionStatus.Phase = dpv1alpha1.ActionPhaseRunning
 			actionStatus.CompletionTimestamp = nil
@@ -767,13 +763,8 @@ func (r *BackupReconciler) syncJobActions(ctx context.Context, backup *dpv1alpha
 			actionStatus.CompletionTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
 		}
 	}
-	if waiting {
-		return dpv1alpha1.ActionPhaseRunning, nil
-	}
-	if existFailed {
-		return dpv1alpha1.ActionPhaseFailed, nil
-	}
-	return dpv1alpha1.ActionPhaseCompleted, nil
+	updateBackupStatusByActionStatus(&backup.Status)
+	return waiting, failed, nil
 }
 
 func (r *BackupReconciler) completeBackup(reqCtx intctrlutil.RequestCtx,

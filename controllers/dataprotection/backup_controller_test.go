@@ -66,26 +66,38 @@ func TestSyncJobActions(t *testing.T) {
 	tests := []struct {
 		name           string
 		jobConditions  []batchv1.JobConditionType
-		expectedPhase  dpv1alpha1.ActionPhase
+		fatal          bool
+		waiting        bool
+		failed         bool
 		expectedAction []dpv1alpha1.ActionPhase
 	}{
 		{
+			name:  "no actions",
+			fatal: true,
+		},
+		{
 			name:           "all jobs completed",
 			jobConditions:  []batchv1.JobConditionType{batchv1.JobComplete, batchv1.JobComplete},
-			expectedPhase:  dpv1alpha1.ActionPhaseCompleted,
 			expectedAction: []dpv1alpha1.ActionPhase{dpv1alpha1.ActionPhaseCompleted, dpv1alpha1.ActionPhaseCompleted},
 		},
 		{
 			name:           "one job still running",
 			jobConditions:  []batchv1.JobConditionType{batchv1.JobComplete, ""},
-			expectedPhase:  dpv1alpha1.ActionPhaseRunning,
+			waiting:        true,
 			expectedAction: []dpv1alpha1.ActionPhase{dpv1alpha1.ActionPhaseCompleted, dpv1alpha1.ActionPhaseRunning},
 		},
 		{
 			name:           "job failed",
 			jobConditions:  []batchv1.JobConditionType{batchv1.JobFailed},
-			expectedPhase:  dpv1alpha1.ActionPhaseFailed,
+			failed:         true,
 			expectedAction: []dpv1alpha1.ActionPhase{dpv1alpha1.ActionPhaseFailed},
+		},
+		{
+			name:           "one job failed while another is running",
+			jobConditions:  []batchv1.JobConditionType{batchv1.JobFailed, ""},
+			waiting:        true,
+			failed:         true,
+			expectedAction: []dpv1alpha1.ActionPhase{dpv1alpha1.ActionPhaseFailed, dpv1alpha1.ActionPhaseRunning},
 		},
 	}
 
@@ -131,9 +143,14 @@ func TestSyncJobActions(t *testing.T) {
 				Client: fake.NewClientBuilder().WithScheme(testScheme).WithObjects(objects...).Build(),
 				clock:  clock.RealClock{},
 			}
-			phase, err := reconciler.syncJobActions(context.Background(), backup)
+			waiting, failed, err := reconciler.syncJobActions(context.Background(), backup)
+			if tt.fatal {
+				g.Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).To(BeTrue())
+				return
+			}
 			g.Expect(err).NotTo(HaveOccurred())
-			g.Expect(phase).To(Equal(tt.expectedPhase))
+			g.Expect(waiting).To(Equal(tt.waiting))
+			g.Expect(failed).To(Equal(tt.failed))
 			for i := range backup.Status.Actions {
 				actionStatus := backup.Status.Actions[i]
 				g.Expect(actionStatus.Phase).To(Equal(tt.expectedAction[i]))

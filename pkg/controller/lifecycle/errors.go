@@ -40,3 +40,35 @@ func IgnoreNotDefined(err error) error {
 	}
 	return err
 }
+
+type actionAggregateError struct {
+	errs []error
+}
+
+func newActionAggregateError(errs []error) error {
+	if len(errs) == 0 {
+		return nil
+	}
+	return &actionAggregateError{errs: append([]error(nil), errs...)}
+}
+
+func (e *actionAggregateError) Error() string {
+	return errors.Join(e.errs...).Error()
+}
+
+func (e *actionAggregateError) Is(target error) bool {
+	if target == ErrActionNotDefined {
+		for _, err := range e.errs {
+			if !errors.Is(err, target) {
+				return false
+			}
+		}
+		return true
+	}
+	for _, err := range e.errs {
+		if errors.Is(err, target) {
+			return true
+		}
+	}
+	return false
+}

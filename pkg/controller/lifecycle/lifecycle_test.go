@@ -679,6 +679,143 @@ var _ = Describe("lifecycle", func() {
 			Expect(err).Should(BeNil())
 		})
 
+		It("pod selector - all lets a later replica unblock an earlier primary", func() {
+			lifecycleActions.PostProvision.Exec.TargetPodSelector = appsv1.AllReplicas
+			pods = []*corev1.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "primary-0"}},
+				{ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "replica-0"}},
+			}
+
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods)
+			Expect(err).Should(BeNil())
+			Expect(lifecycle).ShouldNot(BeNil())
+
+			totalCallCount := 0
+			roundCallCount := 0
+			replicaAttached := false
+			mockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
+					totalCallCount++
+					roundCallCount++
+					// The stable selection order is primary first, replica second. The
+					// primary cannot finish until the replica has executed its own action.
+					if roundCallCount == 1 && !replicaAttached {
+						return proto.ActionResponse{Error: proto.Error2Type(proto.ErrFailed)}, nil
+					}
+					if roundCallCount == 2 {
+						replicaAttached = true
+					}
+					return proto.ActionResponse{}, nil
+				}).AnyTimes()
+			})
+
+			err = lifecycle.PostProvision(ctx, k8sClient, nil)
+			Expect(errors.Is(err, ErrActionFailed)).Should(BeTrue())
+			Expect(roundCallCount).Should(Equal(2))
+			Expect(replicaAttached).Should(BeTrue())
+
+			roundCallCount = 0
+			err = lifecycle.PostProvision(ctx, k8sClient, nil)
+			Expect(err).Should(BeNil())
+			Expect(roundCallCount).Should(Equal(2))
+			Expect(totalCallCount).Should(Equal(4))
+		})
+
+		It("pod selector - all aggregates every pod error with pod identity", func() {
+			lifecycleActions.PostProvision.Exec.TargetPodSelector = appsv1.AllReplicas
+			pods = []*corev1.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "pod-0"}},
+				{ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "pod-1"}},
+			}
+
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods)
+			Expect(err).Should(BeNil())
+			Expect(lifecycle).ShouldNot(BeNil())
+
+			callCount := 0
+			mockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
+					callCount++
+					if callCount == 1 {
+						return proto.ActionResponse{Error: proto.Error2Type(proto.ErrInProgress)}, nil
+					}
+					return proto.ActionResponse{Error: proto.Error2Type(proto.ErrBusy)}, nil
+				}).Times(2)
+			})
+
+			err = lifecycle.PostProvision(ctx, k8sClient, nil)
+			Expect(err).ShouldNot(BeNil())
+			Expect(errors.Is(err, ErrActionInProgress)).Should(BeTrue())
+			Expect(errors.Is(err, ErrActionBusy)).Should(BeTrue())
+			Expect(err.Error()).Should(ContainSubstring("pod-0"))
+			Expect(err.Error()).Should(ContainSubstring("pod-1"))
+			Expect(callCount).Should(Equal(2))
+		})
+
+		It("pod selector - all ignores NotDefined only when every pod is NotDefined", func() {
+			lifecycleActions.PostProvision.Exec.TargetPodSelector = appsv1.AllReplicas
+			pods = []*corev1.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "pod-0"}},
+				{ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "pod-1"}},
+			}
+
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods)
+			Expect(err).Should(BeNil())
+			Expect(lifecycle).ShouldNot(BeNil())
+
+			callCount := 0
+			mockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
+					callCount++
+					if callCount == 1 {
+						return proto.ActionResponse{Error: proto.Error2Type(proto.ErrNotDefined)}, nil
+					}
+					return proto.ActionResponse{Error: proto.Error2Type(proto.ErrFailed)}, nil
+				}).Times(2)
+			})
+
+			err = lifecycle.PostProvision(ctx, k8sClient, nil)
+			Expect(err).ShouldNot(BeNil())
+			Expect(errors.Is(err, ErrActionNotDefined)).Should(BeFalse())
+			Expect(errors.Is(err, ErrActionFailed)).Should(BeTrue())
+			Expect(IgnoreNotDefined(err)).ShouldNot(BeNil())
+			Expect(err.Error()).Should(ContainSubstring("pod-0"))
+			Expect(err.Error()).Should(ContainSubstring("pod-1"))
+
+			mockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).Return(proto.ActionResponse{Error: proto.Error2Type(proto.ErrNotDefined)}, nil).Times(2)
+			})
+
+			err = lifecycle.PostProvision(ctx, k8sClient, nil)
+			Expect(errors.Is(err, ErrActionNotDefined)).Should(BeTrue())
+			Expect(IgnoreNotDefined(err)).Should(BeNil())
+		})
+
+		It("pod selector - role keeps first-error behavior", func() {
+			lifecycleActions.PostProvision.Exec.TargetPodSelector = appsv1.RoleSelector
+			lifecycleActions.PostProvision.Exec.MatchingKey = "leader"
+			pods = []*corev1.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "pod-0", Labels: map[string]string{constant.RoleLabelKey: "leader"}}},
+				{ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "pod-1", Labels: map[string]string{constant.RoleLabelKey: "leader"}}},
+			}
+
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods)
+			Expect(err).Should(BeNil())
+			Expect(lifecycle).ShouldNot(BeNil())
+
+			callCount := 0
+			mockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
+					callCount++
+					return proto.ActionResponse{Error: proto.Error2Type(proto.ErrFailed)}, nil
+				}).Times(1)
+			})
+
+			err = lifecycle.PostProvision(ctx, k8sClient, nil)
+			Expect(errors.Is(err, ErrActionFailed)).Should(BeTrue())
+			Expect(callCount).Should(Equal(1))
+		})
+
 		It("pod selector - role", func() {
 			lifecycleActions.PostProvision.Exec.TargetPodSelector = appsv1.RoleSelector
 			lifecycleActions.PostProvision.Exec.MatchingKey = "leader"

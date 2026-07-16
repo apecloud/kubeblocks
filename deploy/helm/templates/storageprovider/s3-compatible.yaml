@@ -2,6 +2,8 @@ apiVersion: dataprotection.kubeblocks.io/v1alpha1
 kind: StorageProvider
 metadata:
   name: s3-compatible
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
 spec:
   csiDriverName: ru.yandex.s3.csi
   csiDriverSecretTemplate: |

@@ -132,11 +132,17 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		}
 	}
 
+	// updatedPods tracks the positions already covered by the rolling-update
+	// window, while updatingPods tracks actual updates admitted in this round.
+	updatedPods := 0
 	updatingPods := 0
 	isBlocked := false
 	needRetry := false
 	for _, pod := range oldPodList {
-		if updatingPods >= rollingUpdateQuota || updatingPods >= unavailableQuota {
+		if updatedPods >= rollingUpdateQuota {
+			break
+		}
+		if updatingPods >= unavailableQuota {
 			break
 		}
 		if updatingPods >= memberUpdateQuota {
@@ -215,6 +221,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			}
 			updatingPods++
 		}
+		updatedPods++
 	}
 
 	if !isBlocked {

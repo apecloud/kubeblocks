@@ -308,7 +308,54 @@ var _ = Describe("ComponentParameter Controller", func() {
 		})
 
 		It("should render both new PD and legacy PCR files in mixed mode", func() {
-			templateObj, _, compObj, _, _ := mockReconcileResource()
+			const legacyFile = "log.conf"
+			mockReconcileResource(func(templateObj *corev1.ConfigMap, compDefObj *appsv1.ComponentDefinition) {
+				By("prepare the legacy PCR compatibility resources before creating the Component")
+				Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(templateObj), func(tpl *corev1.ConfigMap) {
+					tpl.Data[legacyFile] = "slow_query_log=1\n"
+				})).Should(Succeed())
+
+				legacyPD := testparameters.NewParametersDefinitionFactory("legacy-log-params").
+					SetConfigFile(legacyFile).
+					Create(&testCtx).
+					GetObject()
+				Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(legacyPD), func(obj *parametersv1alpha1.ParametersDefinition) {
+					obj.Status.Phase = parametersv1alpha1.PDAvailablePhase
+				})()).Should(Succeed())
+
+				pcr := &parametersv1alpha1.ParamConfigRenderer{
+					ObjectMeta: metav1.ObjectMeta{Name: pdcrName + "-mixed"},
+					Spec: parametersv1alpha1.ParamConfigRendererSpec{
+						ComponentDef:   compDefObj.Name,
+						ServiceVersion: "8.0.30",
+						ParametersDefs: []string{legacyPD.Name},
+						Configs: []parametersv1alpha1.ComponentConfigDescription{{
+							Name:         legacyFile,
+							TemplateName: configSpecName,
+							FileFormatConfig: &parametersv1alpha1.FileFormatConfig{
+								Format: parametersv1alpha1.Properties,
+							},
+						}},
+					},
+				}
+				Expect(testCtx.CreateObj(testCtx.Ctx, pcr)).Should(Succeed())
+
+				By("wait until the controller cache resolves both new and legacy parameter bindings")
+				Eventually(func(g Gomega) {
+					cachedTemplate := &corev1.ConfigMap{}
+					g.Expect(testCtx.Cli.Get(testCtx.Ctx, client.ObjectKeyFromObject(templateObj), cachedTemplate)).Should(Succeed())
+					g.Expect(cachedTemplate.Data).Should(HaveKeyWithValue(legacyFile, "slow_query_log=1\n"))
+
+					cachedCompDef := &appsv1.ComponentDefinition{}
+					g.Expect(testCtx.Cli.Get(testCtx.Ctx, client.ObjectKeyFromObject(compDefObj), cachedCompDef)).Should(Succeed())
+					configDescs, paramsDefs, err := parameters.ResolveCmpdParametersDefs(testCtx.Ctx, testCtx.Cli, cachedCompDef)
+					g.Expect(err).ShouldNot(HaveOccurred())
+					g.Expect(configDescs).Should(HaveLen(2))
+					g.Expect(paramsDefs).Should(HaveLen(2))
+					g.Expect(configDescs).Should(ContainElement(HaveField("Name", legacyFile)))
+					g.Expect(paramsDefs).Should(ContainElement(HaveField("Name", legacyPD.Name)))
+				}).Should(Succeed())
+			})
 
 			cfgKey := client.ObjectKey{
 				Namespace: testCtx.DefaultNamespace,
@@ -316,46 +363,7 @@ var _ = Describe("ComponentParameter Controller", func() {
 			}
 			Eventually(testapps.CheckObj(&testCtx, cfgKey, func(g Gomega, cfg *parametersv1alpha1.ComponentParameter) {
 				g.Expect(cfg.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.CFinishedPhase))
-			})).Should(Succeed())
-
-			By("add a legacy-only file to the component template")
-			const legacyFile = "log.conf"
-			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(templateObj), func(tpl *corev1.ConfigMap) {
-				tpl.Data[legacyFile] = "slow_query_log=1\n"
-			})).Should(Succeed())
-
-			By("create a legacy-only ParametersDefinition and ParamConfigRenderer binding")
-			legacyPD := testparameters.NewParametersDefinitionFactory("legacy-log-params").
-				SetConfigFile(legacyFile).
-				Create(&testCtx).
-				GetObject()
-			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(legacyPD), func(obj *parametersv1alpha1.ParametersDefinition) {
-				obj.Status.Phase = parametersv1alpha1.PDAvailablePhase
-			})()).Should(Succeed())
-
-			pcr := &parametersv1alpha1.ParamConfigRenderer{
-				ObjectMeta: metav1.ObjectMeta{Name: pdcrName + "-mixed"},
-				Spec: parametersv1alpha1.ParamConfigRendererSpec{
-					ComponentDef:   compObj.Spec.CompDef,
-					ServiceVersion: "8.0.30",
-					ParametersDefs: []string{legacyPD.Name},
-					Configs: []parametersv1alpha1.ComponentConfigDescription{{
-						Name:         legacyFile,
-						TemplateName: configSpecName,
-						FileFormatConfig: &parametersv1alpha1.FileFormatConfig{
-							Format: parametersv1alpha1.Properties,
-						},
-					}},
-				},
-			}
-			Expect(testCtx.CreateObj(testCtx.Ctx, pcr)).Should(Succeed())
-
-			By("touch the component to regenerate ComponentParameter from mixed sources")
-			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(compObj), func(comp *appsv1.Component) {
-				if comp.Annotations == nil {
-					comp.Annotations = map[string]string{}
-				}
-				comp.Annotations["parameters.kubeblocks.io/mixed-mode-test"] = "true"
+				g.Expect(parameters.GetConfigTemplateItem(&cfg.Spec, configSpecName)).ShouldNot(BeNil())
 			})).Should(Succeed())
 
 			configKey := client.ObjectKey{

@@ -118,9 +118,12 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		updateCount = len(instancesToBeUpdated)
 	}
 
+	// updatedInstances tracks the positions already covered by the rolling-update
+	// window, while updatingInstances tracks actual updates admitted in this round.
+	updatedInstances := 0
 	updatingInstances := 0
 	priorities := composeRolePriorityMap(its.Spec.Roles)
-	sortObjects(oldInstanceList, priorities, false)
+	sortInstanceObjects(oldInstanceList, priorities, false)
 
 	canBeUpdated := func(inst *workloads.Instance) bool {
 		if !intctrlutil.IsInstanceReady(inst) {
@@ -139,7 +142,10 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 
 	for _, inst := range oldInstanceList {
-		if updatingInstances >= min(replicas, unavailable, updateCount) {
+		if updatedInstances >= replicas {
+			break
+		}
+		if updatingInstances >= min(unavailable, updateCount) {
 			break
 		}
 
@@ -159,6 +165,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			}
 			updatingInstances++
 		}
+		updatedInstances++
 	}
 	return kubebuilderx.Continue, nil
 }

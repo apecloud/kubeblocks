@@ -191,7 +191,7 @@ var _ = Describe("InstanceSet Controller", func() {
 					SetInstanceUpdateStrategy(&workloads.InstanceUpdateStrategy{
 						Type: kbappsv1.RollingUpdateStrategyType,
 						RollingUpdate: &workloads.RollingUpdate{
-							Replicas: &intstr.IntOrString{
+							MaxUnavailable: &intstr.IntOrString{
 								Type:   intstr.Int,
 								IntVal: 1, // one instance at a time
 							},

@@ -423,6 +423,33 @@ var _ = Describe("Backup Controller test", func() {
 					g.Expect(fetched.Status.Phase).To(BeEmpty())
 				})).Should(Succeed())
 			})
+
+			It("returns not found when a previously selected target pod is missing", func() {
+				target := &dpv1alpha1.BackupTarget{
+					PodSelector: &dpv1alpha1.PodSelector{
+						LabelSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{
+								constant.AppInstanceLabelKey:    testdp.ClusterName,
+								constant.KBAppComponentLabelKey: testdp.ComponentName,
+							},
+						},
+					},
+				}
+				reqCtx := intctrlutil.RequestCtx{Ctx: ctx, Req: ctrl.Request{NamespacedName: client.ObjectKeyFromObject(backupPolicy)}}
+				for _, strategy := range []dpv1alpha1.PodSelectionStrategy{
+					dpv1alpha1.PodSelectionStrategyAny,
+					dpv1alpha1.PodSelectionStrategyAll,
+				} {
+					target.PodSelector.Strategy = strategy
+					_, err := GetTargetPods(reqCtx, k8sClient, []string{"missing-pod"}, backupPolicy, target, dpv1alpha1.BackupTypeFull)
+					Expect(intctrlutil.IsNotFound(err)).To(BeTrue())
+				}
+
+				target.PodSelector.Strategy = dpv1alpha1.PodSelectionStrategyAll
+				target.PodSelector.LabelSelector.MatchLabels["missing"] = "true"
+				_, err := GetTargetPods(reqCtx, k8sClient, []string{"missing-pod"}, backupPolicy, target, dpv1alpha1.BackupTypeFull)
+				Expect(intctrlutil.IsNotFound(err)).To(BeTrue())
+			})
 		})
 
 		Context("create an invalid backup", func() {
@@ -653,12 +680,10 @@ var _ = Describe("Backup Controller test", func() {
 
 			testdp.PatchK8sJobStatus(&testCtx, getJobKey(targets[0].Name), batchv1.JobComplete)
 			testdp.PatchK8sJobStatus(&testCtx, getJobKey(targets[1].Name), batchv1.JobComplete)
-			By("delete the live ActionSet after the action refs have been persisted")
-			Expect(k8sClient.Delete(ctx, actionSet)).Should(Succeed())
 			Expect(k8sClient.Delete(ctx, targetPod)).Should(Succeed())
 			Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(targetPod), &corev1.Pod{}, false)).Should(Succeed())
 
-			By("resume reconciliation and observe both jobs before resolving targets")
+			By("resume reconciliation and fall back to the persisted job refs")
 			Eventually(testapps.GetAndChangeObj(&testCtx, backupKey, func(fetched *dpv1alpha1.Backup) {
 				delete(fetched.Annotations, dptypes.SkipReconciliationAnnotationKey)
 			})).Should(Succeed())

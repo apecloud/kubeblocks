@@ -622,13 +622,6 @@ func (r *BackupReconciler) handleRunningPhase(
 			return intctrlutil.Reconciled()
 		}
 	}
-	observedBackup := backup.DeepCopy()
-	if completed, err := r.syncCompletedJobActions(reqCtx.Ctx, observedBackup); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "sync completed backup jobs failed")
-	} else if completed {
-		updateBackupStatusByActionStatus(&observedBackup.Status)
-		return r.completeBackup(reqCtx, backup, observedBackup)
-	}
 	request, err := r.prepareBackupRequest(reqCtx, backup)
 	if err != nil {
 		return r.updateStatusIfFailed(reqCtx, backup.DeepCopy(), backup, err)
@@ -650,6 +643,14 @@ func (r *BackupReconciler) handleRunningPhase(
 	)
 	for i := range targets {
 		if err = r.prepareRequestTargetInfo(reqCtx, request, &targets[i]); err != nil {
+			if intctrlutil.IsNotFound(err) {
+				if completed, syncErr := r.syncCompletedJobActions(reqCtx.Ctx, request.Backup); syncErr != nil {
+					return intctrlutil.CheckedRequeueWithError(syncErr, reqCtx.Log, "sync completed backup jobs failed")
+				} else if completed {
+					updateBackupStatusByActionStatus(&request.Status)
+					return r.completeBackup(reqCtx, backup, request.Backup)
+				}
+			}
 			return r.updateStatusIfFailed(reqCtx, backup, request.Backup, err)
 		}
 		// there are actions not completed, continue to handle following actions

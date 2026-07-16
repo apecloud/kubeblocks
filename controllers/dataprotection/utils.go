@@ -168,6 +168,9 @@ func GetTargetPods(reqCtx intctrlutil.RequestCtx,
 				// If the target pods have already been selected and the backup type is not Continuous, we should reuse them.
 				pod = &corev1.Pod{}
 				if err = cli.Get(reqCtx.Ctx, client.ObjectKey{Name: selectedPodNames[0], Namespace: reqCtx.Req.Namespace}, pod); err != nil {
+					if apierrors.IsNotFound(err) {
+						return nil, intctrlutil.NewNotFound(`target pod %q not found`, selectedPodNames[0])
+					}
 					return nil, err
 				}
 			}
@@ -183,7 +186,7 @@ func GetTargetPods(reqCtx intctrlutil.RequestCtx,
 			}
 			// if already selected target pods and backupType is not Continuous, we should re-use them.
 			if len(pods.Items) == 0 {
-				return nil, fmt.Errorf("failed to find target pods by backup policy %s/%s",
+				return nil, intctrlutil.NewNotFound("failed to find target pods by backup policy %s/%s",
 					backupPolicy.Namespace, backupPolicy.Name)
 			}
 			podMap := map[string]*corev1.Pod{}
@@ -193,7 +196,7 @@ func GetTargetPods(reqCtx intctrlutil.RequestCtx,
 			for _, podName := range selectedPodNames {
 				pod, ok := podMap[podName]
 				if !ok {
-					return nil, intctrlutil.NewFatalError(fmt.Sprintf(`can not found the target pod "%s"`, podName))
+					return nil, intctrlutil.NewNotFound(`target pod %q not found`, podName)
 				}
 				targetPods = append(targetPods, pod)
 			}

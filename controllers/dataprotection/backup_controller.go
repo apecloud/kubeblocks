@@ -333,11 +333,28 @@ func (r *BackupReconciler) handleNewPhase(
 func (r *BackupReconciler) recordBackupStatusTargets(
 	reqCtx intctrlutil.RequestCtx,
 	request *dpbackup.Request) error {
+	prepareTarget := func(target *dpv1alpha1.BackupTarget) error {
+		if err := r.prepareRequestTargetInfo(reqCtx, request, target); err != nil {
+			return err
+		}
+		request.PreparedTargets = append(request.PreparedTargets, dpbackup.PreparedTarget{
+			Target:               target,
+			TargetPods:           request.TargetPods,
+			WorkerServiceAccount: request.WorkerServiceAccount,
+		})
+		return nil
+	}
 	if request.Backup.Status.Target != nil || len(request.Backup.Status.Targets) > 0 {
+		targets := dputils.GetBackupTargets(request.BackupPolicy, request.BackupMethod)
+		for i := range targets {
+			if err := prepareTarget(&targets[i]); err != nil {
+				return err
+			}
+		}
 		return nil
 	}
 	buildStatusTarget := func(target *dpv1alpha1.BackupTarget) (*dpv1alpha1.BackupStatusTarget, error) {
-		if err := r.prepareRequestTargetInfo(reqCtx, request, target); err != nil {
+		if err := prepareTarget(target); err != nil {
 			return nil, err
 		}
 		var selectedTargetPods []string
@@ -543,11 +560,11 @@ func (r *BackupReconciler) patchBackupStatus(
 		request.Status.EncryptionConfig = request.BackupPolicy.Spec.EncryptionConfig
 	}
 	var actionStatuses []dpv1alpha1.ActionStatus
-	targets := dputils.GetBackupTargets(request.BackupPolicy, request.BackupMethod)
-	for i := range targets {
-		if err := r.prepareRequestTargetInfo(request.RequestCtx, request, &targets[i]); err != nil {
-			return err
-		}
+	for i := range request.PreparedTargets {
+		preparedTarget := &request.PreparedTargets[i]
+		request.Target = preparedTarget.Target
+		request.TargetPods = preparedTarget.TargetPods
+		request.WorkerServiceAccount = preparedTarget.WorkerServiceAccount
 		actions, err := request.BuildActions()
 		if err != nil {
 			return err

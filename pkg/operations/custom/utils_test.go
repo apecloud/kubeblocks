@@ -948,6 +948,8 @@ var _ = Describe("custom ops helpers", func() {
 		selectorValue := job.Spec.Selector.MatchLabels[constant.ManagedJobSelectorLabelKey]
 		Expect(selectorValue).Should(MatchRegexp("^[a-z2-7]{52}$"))
 		Expect(job.Spec.Template.Labels).Should(HaveKeyWithValue(constant.ManagedJobSelectorLabelKey, selectorValue))
+		Expect(opsutil.ManagedJobSelectorValue("12345678-first-complete-uid", 0)).Should(Equal(
+			"oyz7sxlbxmph43ly7psakhuwu6f3t2ph3iltd7t5ydh4646jrkrq"))
 		Expect(opsutil.ManagedJobSelectorValue("12345678-first-complete-uid", 0)).ShouldNot(
 			Equal(opsutil.ManagedJobSelectorValue("12345678-second-complete-uid", 0)))
 

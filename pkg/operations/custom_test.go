@@ -103,15 +103,39 @@ var _ = Describe("CustomOps", func() {
 			}}
 		}
 		newSnapshottedCustom := func() *opsv1alpha1.CustomOps {
-			return &opsv1alpha1.CustomOps{ExecutionSnapshot: &opsv1alpha1.CustomOpsExecutionSnapshot{
-				OpsDefinitionUID:        "opsdef-uid",
-				OpsDefinitionGeneration: 1,
-				OpsDefinitionSpecHash:   "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-				TargetSnapshotHash:      "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-			}}
+			return &opsv1alpha1.CustomOps{
+				ExecutionSnapshot: &opsv1alpha1.CustomOpsExecutionSnapshot{
+					OpsDefinitionUID:        "opsdef-uid",
+					OpsDefinitionGeneration: 1,
+					OpsDefinitionSpecHash:   "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+					TargetSnapshotHash:      "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+				},
+				CustomOpsComponents: []opsv1alpha1.CustomOpsComponent{{
+					ComponentOps: opsv1alpha1.ComponentOps{ComponentName: "redis-a"},
+				}},
+			}
 		}
 
 		Expect(ValidateManagedJobOpsDefinition(newSnapshottedCustom(), newManagedDefinition())).Should(Succeed())
+		emptyManagedComponents := newSnapshottedCustom()
+		emptyManagedComponents.CustomOpsComponents = nil
+		err := ValidateManagedJobOpsDefinition(emptyManagedComponents, newManagedDefinition())
+		Expect(err).Should(MatchError("ManagedJob requires exactly one Custom OpsRequest component"))
+		Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeTrue())
+
+		multipleManagedComponents := newSnapshottedCustom()
+		multipleManagedComponents.CustomOpsComponents = append(multipleManagedComponents.CustomOpsComponents,
+			opsv1alpha1.CustomOpsComponent{ComponentOps: opsv1alpha1.ComponentOps{ComponentName: "redis-b"}})
+		err = ValidateManagedJobOpsDefinition(multipleManagedComponents, newManagedDefinition())
+		Expect(err).Should(MatchError("ManagedJob requires exactly one Custom OpsRequest component"))
+		Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeTrue())
+
+		ordinaryMultiComponent := multipleManagedComponents.DeepCopy()
+		ordinaryMultiComponent.ExecutionSnapshot = nil
+		ordinaryDefinition := newManagedDefinition()
+		ordinaryDefinition.Spec.Actions[0].Workload.Type = opsv1alpha1.JobWorkload
+		Expect(ValidateManagedJobOpsDefinition(ordinaryMultiComponent, ordinaryDefinition)).Should(Succeed())
+
 		withExtractor := newManagedDefinition()
 		withExtractor.Spec.PodInfoExtractors = []opsv1alpha1.PodInfoExtractor{{
 			Name: "source",
@@ -221,7 +245,7 @@ var _ = Describe("CustomOps", func() {
 				Name: "redis", ComponentDef: "redis",
 			},
 		}}}}
-		_, err := validateAndGetCompSpec(ordinaryCluster, &opsv1alpha1.OpsDefinition{}, "redis-shard", false)
+		_, err = validateAndGetCompSpec(ordinaryCluster, &opsv1alpha1.OpsDefinition{}, "redis-shard", false)
 		Expect(err).Should(HaveOccurred())
 		Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeTrue())
 		managedSpec, err := validateAndGetCompSpec(ordinaryCluster, &opsv1alpha1.OpsDefinition{}, "redis-shard", true)

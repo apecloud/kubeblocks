@@ -323,8 +323,9 @@ type OpsWorkloadAction struct {
 	//    Note: unlike Jobs, manually deleting a Pod does not affect the `backoffLimit`.
 	// - "ManagedJob": Persists the expected Job identity before creating it, binds the exact Job UID after
 	//   creation, and fails instead of recreating a missing or changed Job. ManagedJob requires an execution
-	//   snapshot on the Custom OpsRequest and does not support retries. It may use one PodInfoExtractor with
-	//   MultiPodSelectionPolicy=Any; the exact source Pod identity is persisted before dispatch.
+	//   snapshot with exactly one component on the Custom OpsRequest and does not support retries. It may use
+	//   one PodInfoExtractor with MultiPodSelectionPolicy=Any; the exact source Pod identity is persisted before
+	//   dispatch.
 	//
 	// +kubebuilder:validation:Required
 	Type OpsWorkloadType `json:"type"`

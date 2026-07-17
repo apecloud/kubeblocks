@@ -434,6 +434,9 @@ func ValidateManagedJobOpsDefinition(customSpec *opsv1alpha1.CustomOps, opsDef *
 	if !managedAction {
 		return intctrlutil.NewFatalError("a Custom OpsRequest executionSnapshot requires a ManagedJob action")
 	}
+	if len(customSpec.CustomOpsComponents) != 1 {
+		return intctrlutil.NewFatalError("ManagedJob requires exactly one Custom OpsRequest component")
+	}
 	return ValidateManagedJobOpsDefinitionSpec(opsDef)
 }
 

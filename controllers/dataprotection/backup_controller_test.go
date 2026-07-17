@@ -99,7 +99,7 @@ func (w *statusPatchCountingWriter) Patch(
 	patch client.Patch,
 	opts ...client.SubResourcePatchOption,
 ) error {
-	*w.count = *w.count + 1
+	(*w.count)++
 	if w.patchErr != nil {
 		return w.patchErr
 	}

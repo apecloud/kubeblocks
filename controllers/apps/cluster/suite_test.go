@@ -122,7 +122,6 @@ var _ = BeforeSuite(func() {
 
 	err = opsv1alpha1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
-	model.AddScheme(opsv1alpha1.AddToScheme)
 
 	err = snapshotv1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())

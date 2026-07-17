@@ -129,7 +129,6 @@ func managedShardAddTestScheme(t *testing.T) *runtime.Scheme {
 		if err := add(scheme); err != nil {
 			t.Fatal(err)
 		}
-		model.AddScheme(add)
 	}
 	return scheme
 }

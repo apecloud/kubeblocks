@@ -310,8 +310,171 @@ func TestAddTolerationsFromViper(t *testing.T) {
 	assert.Equal(t, "dedicated", podSpec.Tolerations[0].Key)
 	assert.Equal(t, "dp", podSpec.NodeSelector["node"])
 
+	// Preserve the legacy distinction between an explicitly configured empty
+	// list and an unset key: [] clears tolerations already present on the pod.
+	viper.Set(constant.CfgKeyCtrlrMgrTolerations, `[]`)
+	podSpec.Tolerations = []corev1.Toleration{{Key: "existing"}}
+	assert.NoError(t, AddTolerations(podSpec))
+	assert.Empty(t, podSpec.Tolerations)
+
 	viper.Set(constant.CfgKeyCtrlrMgrNodeSelector, `{invalid`)
 	assert.Error(t, AddTolerations(&corev1.PodSpec{}))
+}
+
+func TestApplyWorkerPlacementForRepoPVC(t *testing.T) {
+	oldTolerations := viper.GetString(constant.CfgKeyCtrlrMgrTolerations)
+	oldAffinity := viper.GetString(constant.CfgKeyCtrlrMgrAffinity)
+	oldNodeSelector := viper.GetString(constant.CfgKeyCtrlrMgrNodeSelector)
+	defer func() {
+		viper.Set(constant.CfgKeyCtrlrMgrTolerations, oldTolerations)
+		viper.Set(constant.CfgKeyCtrlrMgrAffinity, oldAffinity)
+		viper.Set(constant.CfgKeyCtrlrMgrNodeSelector, oldNodeSelector)
+	}()
+
+	scheme := runtime.NewScheme()
+	assert.NoError(t, corev1.AddToScheme(scheme))
+	boundPVC := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{Name: "repo", Namespace: "ns"},
+		Spec:       corev1.PersistentVolumeClaimSpec{VolumeName: "repo-pv"},
+		Status:     corev1.PersistentVolumeClaimStatus{Phase: corev1.ClaimBound},
+	}
+	localPV := &corev1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{Name: "repo-pv"},
+		Spec: corev1.PersistentVolumeSpec{
+			NodeAffinity: &corev1.VolumeNodeAffinity{Required: &corev1.NodeSelector{
+				NodeSelectorTerms: []corev1.NodeSelectorTerm{{MatchExpressions: []corev1.NodeSelectorRequirement{{
+					Key: corev1.LabelHostname, Operator: corev1.NodeSelectorOpIn, Values: []string{"node3"},
+				}}}},
+			}},
+		},
+	}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(localPV).Build()
+
+	t.Run("bound single-node PV drops only hard node placement", func(t *testing.T) {
+		viper.Set(constant.CfgKeyCtrlrMgrTolerations, `[{"key":"dedicated","operator":"Exists","effect":"NoSchedule"}]`)
+		viper.Set(constant.CfgKeyCtrlrMgrNodeSelector, `{"kubernetes.io/arch":"amd64","kubernetes.io/hostname":"node6"}`)
+		viper.Set(constant.CfgKeyCtrlrMgrAffinity, `{
+			"nodeAffinity":{
+				"requiredDuringSchedulingIgnoredDuringExecution":{"nodeSelectorTerms":[{"matchExpressions":[{"key":"pool","operator":"In","values":["dp"]}]}]},
+				"preferredDuringSchedulingIgnoredDuringExecution":[{"weight":1,"preference":{"matchExpressions":[{"key":"zone","operator":"In","values":["z1"]}]}}]
+			},
+			"podAntiAffinity":{"requiredDuringSchedulingIgnoredDuringExecution":[{"labelSelector":{},"topologyKey":"kubernetes.io/hostname"}]}
+		}`)
+
+		podSpec := &corev1.PodSpec{}
+		assert.NoError(t, ApplyWorkerPlacementForRepoPVC(context.Background(), cli, podSpec, boundPVC))
+		assert.Nil(t, podSpec.NodeSelector)
+		assert.Len(t, podSpec.Tolerations, 1)
+		assert.NotNil(t, podSpec.Affinity)
+		assert.NotNil(t, podSpec.Affinity.NodeAffinity)
+		assert.Nil(t, podSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution)
+		assert.Len(t, podSpec.Affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution, 1)
+		assert.NotNil(t, podSpec.Affinity.PodAntiAffinity)
+	})
+
+	t.Run("no hard node placement does not read the missing PV", func(t *testing.T) {
+		viper.Set(constant.CfgKeyCtrlrMgrTolerations, "")
+		viper.Set(constant.CfgKeyCtrlrMgrNodeSelector, "")
+		viper.Set(constant.CfgKeyCtrlrMgrAffinity, `{"nodeAffinity":{"preferredDuringSchedulingIgnoredDuringExecution":[{"weight":1,"preference":{"matchExpressions":[{"key":"zone","operator":"In","values":["z1"]}]}}]}}`)
+		pvc := boundPVC.DeepCopy()
+		pvc.Spec.VolumeName = "missing-pv"
+
+		podSpec := &corev1.PodSpec{}
+		assert.NoError(t, ApplyWorkerPlacementForRepoPVC(context.Background(), cli, podSpec, pvc))
+		assert.Len(t, podSpec.Affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution, 1)
+	})
+
+	t.Run("bound PV read error fails before mutating the pod spec", func(t *testing.T) {
+		viper.Set(constant.CfgKeyCtrlrMgrTolerations, `[{"key":"dedicated","operator":"Exists"}]`)
+		viper.Set(constant.CfgKeyCtrlrMgrNodeSelector, `{"kubernetes.io/hostname":"node6"}`)
+		viper.Set(constant.CfgKeyCtrlrMgrAffinity, "")
+		pvc := boundPVC.DeepCopy()
+		pvc.Spec.VolumeName = "missing-pv"
+		podSpec := &corev1.PodSpec{}
+
+		err := ApplyWorkerPlacementForRepoPVC(context.Background(), cli, podSpec, pvc)
+		assert.Error(t, err)
+		assert.True(t, intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeRequeue))
+		assert.Empty(t, podSpec.Tolerations)
+		assert.Empty(t, podSpec.NodeSelector)
+	})
+
+	t.Run("unbound PVC keeps all global placement", func(t *testing.T) {
+		viper.Set(constant.CfgKeyCtrlrMgrTolerations, "")
+		viper.Set(constant.CfgKeyCtrlrMgrNodeSelector, `{"kubernetes.io/hostname":"node6"}`)
+		viper.Set(constant.CfgKeyCtrlrMgrAffinity, `{"nodeAffinity":{"requiredDuringSchedulingIgnoredDuringExecution":{"nodeSelectorTerms":[{"matchExpressions":[{"key":"pool","operator":"In","values":["dp"]}]}]}}}`)
+		pvc := boundPVC.DeepCopy()
+		pvc.Spec.VolumeName = ""
+		pvc.Status.Phase = corev1.ClaimPending
+
+		podSpec := &corev1.PodSpec{}
+		assert.NoError(t, ApplyWorkerPlacementForRepoPVC(context.Background(), cli, podSpec, pvc))
+		assert.Equal(t, "node6", podSpec.NodeSelector[corev1.LabelHostname])
+		assert.NotNil(t, podSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution)
+	})
+
+	t.Run("readable multi-node PV keeps all global placement", func(t *testing.T) {
+		viper.Set(constant.CfgKeyCtrlrMgrTolerations, "")
+		viper.Set(constant.CfgKeyCtrlrMgrNodeSelector, `{"kubernetes.io/hostname":"node6"}`)
+		viper.Set(constant.CfgKeyCtrlrMgrAffinity, "")
+		pvc := boundPVC.DeepCopy()
+		pvc.Spec.VolumeName = "multi-node-pv"
+		pv := &corev1.PersistentVolume{
+			ObjectMeta: metav1.ObjectMeta{Name: pvc.Spec.VolumeName},
+			Spec: corev1.PersistentVolumeSpec{NodeAffinity: &corev1.VolumeNodeAffinity{Required: &corev1.NodeSelector{
+				NodeSelectorTerms: []corev1.NodeSelectorTerm{
+					{MatchExpressions: []corev1.NodeSelectorRequirement{{Key: corev1.LabelHostname, Operator: corev1.NodeSelectorOpIn, Values: []string{"node3"}}}},
+					{MatchExpressions: []corev1.NodeSelectorRequirement{{Key: corev1.LabelHostname, Operator: corev1.NodeSelectorOpIn, Values: []string{"node4"}}}},
+				},
+			}}},
+		}
+		multiNodeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(pv).Build()
+
+		podSpec := &corev1.PodSpec{}
+		assert.NoError(t, ApplyWorkerPlacementForRepoPVC(context.Background(), multiNodeClient, podSpec, pvc))
+		assert.Equal(t, "node6", podSpec.NodeSelector[corev1.LabelHostname])
+	})
+}
+
+func TestSingleNodeNameFromPV(t *testing.T) {
+	requirement := func(node string) corev1.NodeSelectorRequirement {
+		return corev1.NodeSelectorRequirement{
+			Key: corev1.LabelHostname, Operator: corev1.NodeSelectorOpIn, Values: []string{node},
+		}
+	}
+	pvWithTerms := func(terms ...corev1.NodeSelectorTerm) *corev1.PersistentVolume {
+		return &corev1.PersistentVolume{Spec: corev1.PersistentVolumeSpec{
+			NodeAffinity: &corev1.VolumeNodeAffinity{Required: &corev1.NodeSelector{NodeSelectorTerms: terms}},
+		}}
+	}
+
+	tests := []struct {
+		name string
+		pv   *corev1.PersistentVolume
+		node string
+		ok   bool
+	}{
+		{name: "one term", pv: pvWithTerms(corev1.NodeSelectorTerm{MatchExpressions: []corev1.NodeSelectorRequirement{requirement("node3")}}), node: "node3", ok: true},
+		{name: "same node in every OR term", pv: pvWithTerms(
+			corev1.NodeSelectorTerm{MatchExpressions: []corev1.NodeSelectorRequirement{requirement("node3"), {Key: "disk", Operator: corev1.NodeSelectorOpIn, Values: []string{"ssd"}}}},
+			corev1.NodeSelectorTerm{MatchExpressions: []corev1.NodeSelectorRequirement{requirement("node3")}},
+		), node: "node3", ok: true},
+		{name: "different nodes", pv: pvWithTerms(
+			corev1.NodeSelectorTerm{MatchExpressions: []corev1.NodeSelectorRequirement{requirement("node3")}},
+			corev1.NodeSelectorTerm{MatchExpressions: []corev1.NodeSelectorRequirement{requirement("node4")}},
+		)},
+		{name: "term without hostname", pv: pvWithTerms(corev1.NodeSelectorTerm{MatchExpressions: []corev1.NodeSelectorRequirement{{Key: "disk", Operator: corev1.NodeSelectorOpIn, Values: []string{"ssd"}}}})},
+		{name: "multiple hostname values", pv: pvWithTerms(corev1.NodeSelectorTerm{MatchExpressions: []corev1.NodeSelectorRequirement{{Key: corev1.LabelHostname, Operator: corev1.NodeSelectorOpIn, Values: []string{"node3", "node4"}}}})},
+		{name: "match fields unsupported", pv: pvWithTerms(corev1.NodeSelectorTerm{MatchExpressions: []corev1.NodeSelectorRequirement{requirement("node3")}, MatchFields: []corev1.NodeSelectorRequirement{{Key: "metadata.name", Operator: corev1.NodeSelectorOpIn, Values: []string{"node3"}}}})},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			node, ok := singleNodeNameFromPV(tt.pv)
+			assert.Equal(t, tt.ok, ok)
+			assert.Equal(t, tt.node, node)
+		})
+	}
 }
 
 func TestSetControllerReferenceNilOwner(t *testing.T) {

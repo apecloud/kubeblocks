@@ -98,6 +98,61 @@ func TestRequestGetBackupType(t *testing.T) {
 	assert.Equal(t, string(dpv1alpha1.BackupTypeIncremental), req.GetBackupType())
 }
 
+func TestBuildJobActionPodSpecUsesRepoPVCPlacementPolicy(t *testing.T) {
+	oldTolerations := viper.GetString(constant.CfgKeyCtrlrMgrTolerations)
+	oldAffinity := viper.GetString(constant.CfgKeyCtrlrMgrAffinity)
+	oldNodeSelector := viper.GetString(constant.CfgKeyCtrlrMgrNodeSelector)
+	defer func() {
+		viper.Set(constant.CfgKeyCtrlrMgrTolerations, oldTolerations)
+		viper.Set(constant.CfgKeyCtrlrMgrAffinity, oldAffinity)
+		viper.Set(constant.CfgKeyCtrlrMgrNodeSelector, oldNodeSelector)
+	}()
+	viper.Set(constant.CfgKeyCtrlrMgrTolerations, `[{"key":"dedicated","operator":"Exists"}]`)
+	viper.Set(constant.CfgKeyCtrlrMgrAffinity, "")
+	viper.Set(constant.CfgKeyCtrlrMgrNodeSelector, `{"kubernetes.io/hostname":"node6"}`)
+
+	req, targetPod := newRequestTestFixture(t)
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{Name: "repo-pvc", Namespace: "ns"},
+		Spec:       corev1.PersistentVolumeClaimSpec{VolumeName: "repo-pv"},
+		Status:     corev1.PersistentVolumeClaimStatus{Phase: corev1.ClaimBound},
+	}
+	pv := &corev1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{Name: "repo-pv"},
+		Spec: corev1.PersistentVolumeSpec{NodeAffinity: &corev1.VolumeNodeAffinity{Required: &corev1.NodeSelector{
+			NodeSelectorTerms: []corev1.NodeSelectorTerm{{MatchExpressions: []corev1.NodeSelectorRequirement{{
+				Key: corev1.LabelHostname, Operator: corev1.NodeSelectorOpIn, Values: []string{"node3"},
+			}}}},
+		}}},
+	}
+	req.BackupRepoPVC = pvc
+	req.Client = fake.NewClientBuilder().WithScheme(req.Client.Scheme()).Build()
+
+	// A transient PV lookup failure must remain retryable at the Request layer;
+	// otherwise the Backup controller persists it as a terminal Failed phase.
+	podSpec, err := req.BuildJobActionPodSpec(targetPod, "backup", &dpv1alpha1.JobActionSpec{
+		BaseJobActionSpec: dpv1alpha1.BaseJobActionSpec{Image: "backup:test"},
+	})
+	assert.Nil(t, podSpec)
+	assert.True(t, ctrlutil.IsTargetError(err, ctrlutil.ErrorTypeRequeue))
+	assert.NoError(t, req.Client.Create(context.Background(), pv))
+
+	podSpec, err = req.BuildJobActionPodSpec(targetPod, "backup", &dpv1alpha1.JobActionSpec{
+		BaseJobActionSpec: dpv1alpha1.BaseJobActionSpec{Image: "backup:test"},
+	})
+	assert.NoError(t, err)
+	assert.Nil(t, podSpec.NodeSelector)
+	assert.Len(t, podSpec.Tolerations, 1)
+
+	req.BackupRepo.Spec.AccessMethod = dpv1alpha1.AccessMethodTool
+	req.BackupRepoPVC = nil
+	podSpec, err = req.BuildJobActionPodSpec(targetPod, "backup-tool", &dpv1alpha1.JobActionSpec{
+		BaseJobActionSpec: dpv1alpha1.BaseJobActionSpec{Image: "backup:test"},
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, "node6", podSpec.NodeSelector[corev1.LabelHostname])
+}
+
 func TestRequestBuildActionBranches(t *testing.T) {
 	oldNamespace := viper.GetString(constant.CfgKeyCtrlrMgrNS)
 	oldServiceAccount := viper.GetString(dptypes.CfgKeyExecWorkerServiceAccountName)

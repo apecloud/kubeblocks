@@ -30,6 +30,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/assert"
 
 	vsv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -68,6 +69,90 @@ type getErrorClient struct {
 
 func (c *getErrorClient) Get(context.Context, client.ObjectKey, client.Object, ...client.GetOption) error {
 	return fmt.Errorf("get failed")
+}
+
+func TestUpdateStatusIfFailedKeepsBackupStatusForPlacementRequeue(t *testing.T) {
+	backup := &dpv1alpha1.Backup{Status: dpv1alpha1.BackupStatus{
+		Phase:         dpv1alpha1.BackupPhaseRunning,
+		FailureReason: "existing failure reason",
+	}}
+	original := backup.DeepCopy()
+	requeueErr := intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue,
+		"failed to get PV for bound repository PVC")
+
+	_, err := (&BackupReconciler{}).updateStatusIfFailed(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, original, backup, requeueErr)
+
+	assert.Error(t, err)
+	assert.True(t, intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeRequeue))
+	assert.Equal(t, dpv1alpha1.BackupPhaseRunning, backup.Status.Phase)
+	assert.Equal(t, "existing failure reason", backup.Status.FailureReason)
+}
+
+func TestDeleteBackupFilesRetriesMissingRepoPVC(t *testing.T) {
+	oldNodeSelector := viper.GetString(constant.CfgKeyCtrlrMgrNodeSelector)
+	defer func() {
+		viper.Set(constant.CfgKeyCtrlrMgrNodeSelector, oldNodeSelector)
+	}()
+	viper.Set(constant.CfgKeyCtrlrMgrNodeSelector, `{"kubernetes.io/hostname":"node6"}`)
+	viper.SetDefault(dptypes.CfgKeyWorkerServiceAccountName, "kubeblocks-dataprotection-worker")
+	viper.SetDefault(dptypes.CfgKeyWorkerClusterRoleName, "kubeblocks-dataprotection-worker-role")
+
+	scheme := runtime.NewScheme()
+	assert.NoError(t, corev1.AddToScheme(scheme))
+	assert.NoError(t, batchv1.AddToScheme(scheme))
+	assert.NoError(t, dpv1alpha1.AddToScheme(scheme))
+	repo := &dpv1alpha1.BackupRepo{
+		ObjectMeta: metav1.ObjectMeta{Name: "repo"},
+		Spec:       dpv1alpha1.BackupRepoSpec{AccessMethod: dpv1alpha1.AccessMethodMount},
+		Status:     dpv1alpha1.BackupRepoStatus{BackupPVCName: "repo-pvc"},
+	}
+	namespace := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "ns"}}
+	serviceAccount := &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{
+		Name: viper.GetString(dptypes.CfgKeyWorkerServiceAccountName), Namespace: namespace.Name,
+	}}
+	backup := &dpv1alpha1.Backup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "backup", Namespace: "ns", UID: types.UID("backup-uid"),
+			Finalizers: []string{dptypes.DataProtectionFinalizerName},
+		},
+		Status: dpv1alpha1.BackupStatus{
+			Path: "/backup/backup", BackupRepoName: repo.Name,
+			Phase: dpv1alpha1.BackupPhaseDeleting, FailureReason: "existing failure reason",
+		},
+	}
+	originalStatus := backup.Status.DeepCopy()
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(namespace, serviceAccount, repo).Build()
+	reconciler := &BackupReconciler{Client: cli, Scheme: scheme, clock: clock.RealClock{}}
+	reqCtx := intctrlutil.RequestCtx{Ctx: context.Background()}
+
+	result, err := reconciler.deleteBackupFiles(reqCtx, backup)
+	assert.Error(t, err)
+	assert.True(t, intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeRequeue))
+	assert.Empty(t, result)
+	jobKey := dpbackup.BuildDeleteBackupFilesJobKey(backup, false)
+	assert.Error(t, cli.Get(context.Background(), jobKey, &batchv1.Job{}))
+	assert.Equal(t, *originalStatus, backup.Status)
+
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{Name: repo.Status.BackupPVCName, Namespace: namespace.Name},
+		Spec:       corev1.PersistentVolumeClaimSpec{VolumeName: "repo-pv"},
+		Status:     corev1.PersistentVolumeClaimStatus{Phase: corev1.ClaimBound},
+	}
+	pv := &corev1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{Name: pvc.Spec.VolumeName},
+		Spec: corev1.PersistentVolumeSpec{NodeAffinity: &corev1.VolumeNodeAffinity{Required: &corev1.NodeSelector{
+			NodeSelectorTerms: []corev1.NodeSelectorTerm{{MatchExpressions: []corev1.NodeSelectorRequirement{{
+				Key: corev1.LabelHostname, Operator: corev1.NodeSelectorOpIn, Values: []string{"node3"},
+			}}}},
+		}}},
+	}
+	assert.NoError(t, cli.Create(context.Background(), pvc))
+	assert.NoError(t, cli.Create(context.Background(), pv))
+	result, err = reconciler.deleteBackupFiles(reqCtx, backup)
+	assert.NoError(t, err)
+	assert.True(t, result.Requeue)
+	assert.NoError(t, cli.Get(context.Background(), jobKey, &batchv1.Job{}))
 }
 
 func TestSyncJobActions(t *testing.T) {

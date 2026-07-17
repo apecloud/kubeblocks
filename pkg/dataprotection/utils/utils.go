@@ -47,22 +47,186 @@ import (
 )
 
 func AddTolerations(podSpec *corev1.PodSpec) (err error) {
-	if cmTolerations := viper.GetString(constant.CfgKeyCtrlrMgrTolerations); cmTolerations != "" {
-		if err = json.Unmarshal([]byte(cmTolerations), &podSpec.Tolerations); err != nil {
-			return err
-		}
+	placement, err := loadWorkerPlacement()
+	if err != nil {
+		return err
 	}
-	if cmAffinity := viper.GetString(constant.CfgKeyCtrlrMgrAffinity); cmAffinity != "" {
-		if err = json.Unmarshal([]byte(cmAffinity), &podSpec.Affinity); err != nil {
-			return err
-		}
-	}
-	if cmNodeSelector := viper.GetString(constant.CfgKeyCtrlrMgrNodeSelector); cmNodeSelector != "" {
-		if err = json.Unmarshal([]byte(cmNodeSelector), &podSpec.NodeSelector); err != nil {
-			return err
-		}
-	}
+	placement.apply(podSpec, false)
 	return nil
+}
+
+// workerPlacement is the controller-manager placement configuration inherited
+// by DataProtection worker pods. It is parsed before mutating a pod spec so an
+// invalid configuration or topology lookup error cannot leave a partial spec.
+type workerPlacement struct {
+	tolerations     []corev1.Toleration
+	affinity        *corev1.Affinity
+	nodeSelector    map[string]string
+	hasTolerations  bool
+	hasAffinity     bool
+	hasNodeSelector bool
+}
+
+func loadWorkerPlacement() (*workerPlacement, error) {
+	placement := &workerPlacement{}
+	if value := viper.GetString(constant.CfgKeyCtrlrMgrTolerations); value != "" {
+		placement.hasTolerations = true
+		if err := json.Unmarshal([]byte(value), &placement.tolerations); err != nil {
+			return nil, err
+		}
+	}
+	if value := viper.GetString(constant.CfgKeyCtrlrMgrAffinity); value != "" {
+		placement.hasAffinity = true
+		if err := json.Unmarshal([]byte(value), &placement.affinity); err != nil {
+			return nil, err
+		}
+	}
+	if value := viper.GetString(constant.CfgKeyCtrlrMgrNodeSelector); value != "" {
+		placement.hasNodeSelector = true
+		if err := json.Unmarshal([]byte(value), &placement.nodeSelector); err != nil {
+			return nil, err
+		}
+	}
+	return placement, nil
+}
+
+func (p *workerPlacement) hasHardNodePlacement() bool {
+	if len(p.nodeSelector) > 0 {
+		return true
+	}
+	return p.affinity != nil && p.affinity.NodeAffinity != nil &&
+		p.affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution != nil
+}
+
+func (p *workerPlacement) apply(podSpec *corev1.PodSpec, dropHardNodePlacement bool) {
+	if p.hasTolerations {
+		podSpec.Tolerations = p.tolerations
+	}
+
+	if p.hasAffinity {
+		affinity := p.affinity.DeepCopy()
+		if dropHardNodePlacement && affinity != nil && affinity.NodeAffinity != nil {
+			affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution = nil
+			if len(affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution) == 0 {
+				affinity.NodeAffinity = nil
+			}
+		}
+		if affinity != nil && (affinity.NodeAffinity != nil || affinity.PodAffinity != nil || affinity.PodAntiAffinity != nil) {
+			podSpec.Affinity = affinity
+		} else if !dropHardNodePlacement {
+			// Preserve the exact legacy behavior for an explicitly configured empty affinity.
+			podSpec.Affinity = affinity
+		}
+	}
+
+	if p.hasNodeSelector && !dropHardNodePlacement {
+		podSpec.NodeSelector = p.nodeSelector
+	}
+}
+
+// ApplyWorkerPlacementForRepoPVC applies the controller-manager placement to a
+// worker that mounts a repository PVC. A bound PV whose required node affinity
+// proves one exact hostname takes precedence over all global hard node
+// placement, including otherwise-compatible architecture or pool constraints;
+// tolerations and soft/pod affinity are retained. An unbound or non-single-node
+// PVC keeps the complete global placement.
+func ApplyWorkerPlacementForRepoPVC(ctx context.Context, cli client.Client, podSpec *corev1.PodSpec,
+	pvc *corev1.PersistentVolumeClaim, opts ...client.GetOption) error {
+	placement, err := loadWorkerPlacement()
+	if err != nil {
+		return err
+	}
+	return placement.applyForRepoPVC(ctx, cli, podSpec, pvc, opts...)
+}
+
+func (p *workerPlacement) applyForRepoPVC(ctx context.Context, cli client.Client, podSpec *corev1.PodSpec,
+	pvc *corev1.PersistentVolumeClaim, opts ...client.GetOption) error {
+	dropHardNodePlacement := false
+	// Do not introduce a PVC/PV read on the legacy path when there is no hard
+	// node placement to resolve.
+	if p.hasHardNodePlacement() {
+		if pvc == nil {
+			return fmt.Errorf("repository PVC is required to resolve hard worker placement")
+		}
+		if pvc.Status.Phase == corev1.ClaimBound {
+			if pvc.Spec.VolumeName == "" {
+				return fmt.Errorf("bound repository PVC %s/%s has an empty volumeName", pvc.Namespace, pvc.Name)
+			}
+			pv := &corev1.PersistentVolume{}
+			if err := cli.Get(ctx, client.ObjectKey{Name: pvc.Spec.VolumeName}, pv, opts...); err != nil {
+				return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue,
+					"failed to get PV %q for bound repository PVC %s/%s: %v",
+					pvc.Spec.VolumeName, pvc.Namespace, pvc.Name, err)
+			}
+			_, dropHardNodePlacement = singleNodeNameFromPV(pv)
+		}
+	}
+
+	p.apply(podSpec, dropHardNodePlacement)
+	return nil
+}
+
+// ApplyWorkerPlacementForRepoPVCRef is the identity-only variant used by
+// deletion workers. It deliberately resolves the PVC only when global hard
+// node placement exists, preserving the no-read legacy path otherwise.
+func ApplyWorkerPlacementForRepoPVCRef(ctx context.Context, cli client.Client, podSpec *corev1.PodSpec,
+	pvcKey client.ObjectKey, opts ...client.GetOption) error {
+	placement, err := loadWorkerPlacement()
+	if err != nil {
+		return err
+	}
+	if !placement.hasHardNodePlacement() {
+		placement.apply(podSpec, false)
+		return nil
+	}
+	pvc := &corev1.PersistentVolumeClaim{}
+	if err := cli.Get(ctx, pvcKey, pvc, opts...); err != nil {
+		return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue,
+			"failed to get repository PVC %s: %v", pvcKey, err)
+	}
+	return placement.applyForRepoPVC(ctx, cli, podSpec, pvc, opts...)
+}
+
+// singleNodeNameFromPV recognizes only the deliberately narrow v1 proof: every
+// OR term must contain the same singleton kubernetes.io/hostname In expression.
+// Other shapes are left to the scheduler and retain the full global placement.
+func singleNodeNameFromPV(pv *corev1.PersistentVolume) (string, bool) {
+	if pv == nil || pv.Spec.NodeAffinity == nil || pv.Spec.NodeAffinity.Required == nil {
+		return "", false
+	}
+	terms := pv.Spec.NodeAffinity.Required.NodeSelectorTerms
+	if len(terms) == 0 {
+		return "", false
+	}
+
+	var nodeName string
+	for _, term := range terms {
+		if len(term.MatchFields) > 0 {
+			return "", false
+		}
+		termNodeName := ""
+		for _, expression := range term.MatchExpressions {
+			if expression.Key != corev1.LabelHostname {
+				continue
+			}
+			if termNodeName != "" || expression.Operator != corev1.NodeSelectorOpIn || len(expression.Values) != 1 {
+				return "", false
+			}
+			termNodeName = expression.Values[0]
+			if termNodeName == "" {
+				return "", false
+			}
+		}
+		if termNodeName == "" {
+			return "", false
+		}
+		if nodeName == "" {
+			nodeName = termNodeName
+		} else if nodeName != termNodeName {
+			return "", false
+		}
+	}
+	return nodeName, true
 }
 
 // IsJobFinished if the job is completed or failed, return true.

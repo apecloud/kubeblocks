@@ -62,6 +62,13 @@ import (
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
+const (
+	deleteJobSchedulingConflictTimeout = 5 * time.Minute
+	deleteJobDiagnosticRefreshInterval = time.Minute
+	deletionSchedulingConflictReason   = "SchedulingConflict"
+	deletionDiagnosticMessageLimit     = 4 * 1024
+)
+
 // BackupReconciler reconciles a Backup object
 type BackupReconciler struct {
 	client.Client
@@ -208,12 +215,13 @@ func (r *BackupReconciler) parseBackupJob(_ context.Context, object client.Objec
 }
 
 // deleteBackupFiles deletes the backup files stored in backup repository.
-func (r *BackupReconciler) deleteBackupFiles(reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) error {
+func (r *BackupReconciler) deleteBackupFiles(reqCtx intctrlutil.RequestCtx,
+	backup *dpv1alpha1.Backup) (ctrl.Result, error) {
 	// If the dataprotection finalizer has already been removed, the deletion has succeeded.
 	// Skip creating a new deletion job to avoid a race condition with the garbage collector
 	// during foreground cascading deletion, which would cause an infinite loop of job creation.
 	if !controllerutil.ContainsFinalizer(backup, dptypes.DataProtectionFinalizerName) {
-		return nil
+		return intctrlutil.Reconciled()
 	}
 
 	deleteBackup := func() error {
@@ -233,24 +241,172 @@ func (r *BackupReconciler) deleteBackupFiles(reqCtx intctrlutil.RequestCtx, back
 	}
 
 	status, err := deleter.DeleteBackupFiles(backup)
-	switch status {
+	switch status.Status {
 	case dpbackup.DeletionStatusSucceeded:
-		return deleteBackup()
+		if err := deleteBackup(); err != nil {
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		}
+		return intctrlutil.Reconciled()
 	case dpbackup.DeletionStatusFailed:
 		failureReason := err.Error()
-		if backup.Status.FailureReason == failureReason {
-			return nil
+		if backup.Status.FailureReason == failureReason && backup.Status.DeletionDiagnostic == nil {
+			return intctrlutil.Reconciled()
 		}
 		backupPatch := client.MergeFrom(backup.DeepCopy())
 		backup.Status.FailureReason = failureReason
+		backup.Status.DeletionDiagnostic = nil
 		r.Recorder.Event(backup, corev1.EventTypeWarning, "DeleteBackupFilesFailed", failureReason)
-		return r.Status().Patch(reqCtx.Ctx, backup, backupPatch)
-	case dpbackup.DeletionStatusDeleting,
-		dpbackup.DeletionStatusUnknown:
-		// wait for the deletion job completed
-		return err
+		if err := r.Status().Patch(reqCtx.Ctx, backup, backupPatch); err != nil {
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		}
+		return intctrlutil.Reconciled()
+	case dpbackup.DeletionStatusDeleting:
+		if err != nil {
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		}
+		return r.reconcileDeleteJobSchedulingDiagnostic(reqCtx, backup, status.ActiveJob)
+	case dpbackup.DeletionStatusUnknown:
+		if err == nil {
+			return intctrlutil.Reconciled()
+		}
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
-	return err
+	if err == nil {
+		return intctrlutil.Reconciled()
+	}
+	return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+}
+
+func deletionDiagnosticRequeue(after time.Duration) (ctrl.Result, error) {
+	return ctrl.Result{Requeue: true, RequeueAfter: after}, nil
+}
+
+func truncateDeletionDiagnosticMessage(message string) string {
+	runes := []rune(message)
+	if len(runes) <= deletionDiagnosticMessageLimit {
+		return message
+	}
+	return string(runes[:deletionDiagnosticMessageLimit])
+}
+
+func podOwnedByJob(pod *corev1.Pod, job *batchv1.Job) bool {
+	for _, ref := range pod.OwnerReferences {
+		if ref.Kind == "Job" && ref.Name == job.Name && ref.UID == job.UID {
+			return true
+		}
+	}
+	return false
+}
+
+func podSchedulingCondition(pod *corev1.Pod) *corev1.PodCondition {
+	for i := range pod.Status.Conditions {
+		condition := &pod.Status.Conditions[i]
+		if condition.Type == corev1.PodScheduled {
+			return condition
+		}
+	}
+	return nil
+}
+
+func sameDeletionDiagnosticIdentity(a, b *dpv1alpha1.BackupDeletionDiagnostic) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return a.ActiveJobName == b.ActiveJobName &&
+		a.ActiveJobUID == b.ActiveJobUID &&
+		a.PodUID == b.PodUID &&
+		a.Reason == b.Reason &&
+		a.LastTransitionTime.Equal(&b.LastTransitionTime)
+}
+
+func (r *BackupReconciler) patchDeletionDiagnostic(ctx context.Context, backup *dpv1alpha1.Backup,
+	diagnostic *dpv1alpha1.BackupDeletionDiagnostic) (bool, error) {
+	if reflect.DeepEqual(backup.Status.DeletionDiagnostic, diagnostic) {
+		return false, nil
+	}
+	original := backup.DeepCopy()
+	backup.Status.DeletionDiagnostic = diagnostic
+	if err := r.Status().Patch(ctx, backup, client.MergeFrom(original)); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// reconcileDeleteJobSchedulingDiagnostic provides a persistent, bounded
+// diagnostic for an active pre-delete or delete Job. It never changes the
+// backup operation's FailureReason.
+func (r *BackupReconciler) reconcileDeleteJobSchedulingDiagnostic(reqCtx intctrlutil.RequestCtx,
+	backup *dpv1alpha1.Backup, activeJob *batchv1.Job) (ctrl.Result, error) {
+	clearAndRequeue := func() (ctrl.Result, error) {
+		if _, err := r.patchDeletionDiagnostic(reqCtx.Ctx, backup, nil); err != nil {
+			return ctrl.Result{}, err
+		}
+		return deletionDiagnosticRequeue(deleteJobDiagnosticRefreshInterval)
+	}
+	if activeJob == nil || activeJob.UID == "" {
+		return clearAndRequeue()
+	}
+
+	podList, err := dputils.GetAssociatedPodsOfJob(reqCtx.Ctx, r.Client, activeJob.Namespace, activeJob.Name)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	relevantPods := make([]*corev1.Pod, 0, len(podList.Items))
+	for i := range podList.Items {
+		pod := &podList.Items[i]
+		if pod.DeletionTimestamp.IsZero() && podOwnedByJob(pod, activeJob) {
+			relevantPods = append(relevantPods, pod)
+		}
+	}
+	if len(relevantPods) != 1 {
+		return clearAndRequeue()
+	}
+
+	pod := relevantPods[0]
+	condition := podSchedulingCondition(pod)
+	if condition == nil || condition.Status != corev1.ConditionFalse ||
+		condition.Reason != corev1.PodReasonUnschedulable || condition.LastTransitionTime.IsZero() {
+		return clearAndRequeue()
+	}
+
+	now := wallClock.Now().UTC()
+	elapsed := now.Sub(condition.LastTransitionTime.Time)
+	if elapsed < 0 {
+		elapsed = 0
+	}
+	if elapsed < deleteJobSchedulingConflictTimeout {
+		if _, err := r.patchDeletionDiagnostic(reqCtx.Ctx, backup, nil); err != nil {
+			return ctrl.Result{}, err
+		}
+		return deletionDiagnosticRequeue(deleteJobSchedulingConflictTimeout - elapsed)
+	}
+
+	message := truncateDeletionDiagnosticMessage(fmt.Sprintf(
+		"deletion worker Job %s/%s Pod %s remains Unschedulable: %s",
+		activeJob.Namespace, activeJob.Name, pod.Name, condition.Message))
+	diagnostic := &dpv1alpha1.BackupDeletionDiagnostic{
+		ActiveJobName:      activeJob.Name,
+		ActiveJobUID:       string(activeJob.UID),
+		PodUID:             string(pod.UID),
+		Reason:             deletionSchedulingConflictReason,
+		Message:            message,
+		FirstObservedTime:  metav1.NewTime(now),
+		LastTransitionTime: condition.LastTransitionTime,
+	}
+	isNewIdentity := !sameDeletionDiagnosticIdentity(backup.Status.DeletionDiagnostic, diagnostic)
+	if !isNewIdentity && backup.Status.DeletionDiagnostic != nil {
+		diagnostic.FirstObservedTime = backup.Status.DeletionDiagnostic.FirstObservedTime
+	}
+	changed, err := r.patchDeletionDiagnostic(reqCtx.Ctx, backup, diagnostic)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	// The persisted status is the source of truth. The Event is emitted only
+	// after the first successful transition and is intentionally best-effort.
+	if changed && isNewIdentity && r.Recorder != nil {
+		r.Recorder.Event(backup, corev1.EventTypeWarning, deletionSchedulingConflictReason, message)
+	}
+	return deletionDiagnosticRequeue(deleteJobDiagnosticRefreshInterval)
 }
 
 func (r *BackupReconciler) ensureWorkerServiceAccountForBackupDeletion(reqCtx intctrlutil.RequestCtx, namespace string) (string, error) {
@@ -295,10 +451,11 @@ func (r *BackupReconciler) handleDeletingPhase(reqCtx intctrlutil.RequestCtx, ba
 		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
 	}
 
-	if err := r.deleteBackupFiles(reqCtx, backup); err != nil {
-		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
+	result, err := r.deleteBackupFiles(reqCtx, backup)
+	if err != nil {
+		return result, err
 	}
-	return intctrlutil.Reconciled()
+	return result, nil
 }
 
 func (r *BackupReconciler) handleNewPhase(

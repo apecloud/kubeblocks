@@ -136,6 +136,13 @@ type BackupStatus struct {
 	// +optional
 	FailureReason string `json:"failureReason,omitempty"`
 
+	// DeletionDiagnostic records a persistent diagnostic for the active worker
+	// that is preventing deletion from progressing. It is independent from
+	// FailureReason, which continues to describe the backup operation itself.
+	//
+	// +optional
+	DeletionDiagnostic *BackupDeletionDiagnostic `json:"deletionDiagnostic,omitempty"`
+
 	// The name of the backup repository.
 	//
 	// +optional
@@ -210,6 +217,32 @@ type BackupStatus struct {
 	//
 	// +optional
 	Extras []map[string]string `json:"extras,omitempty"`
+}
+
+// BackupDeletionDiagnostic describes why the active deletion worker has not
+// progressed. The identity fields prevent observations from an old Job or Pod
+// from being carried into a replacement worker.
+type BackupDeletionDiagnostic struct {
+	// ActiveJobName is the pre-delete or delete Job currently being observed.
+	ActiveJobName string `json:"activeJobName"`
+
+	// ActiveJobUID identifies the exact Job incarnation.
+	ActiveJobUID string `json:"activeJobUID"`
+
+	// PodUID identifies the exact Pod incarnation that produced the diagnostic.
+	PodUID string `json:"podUID"`
+
+	// Reason is a stable machine-readable diagnostic category.
+	Reason string `json:"reason"`
+
+	// Message is a bounded human-readable diagnostic from the Pod scheduling condition.
+	Message string `json:"message,omitempty"`
+
+	// FirstObservedTime is when the controller first persisted this diagnostic.
+	FirstObservedTime metav1.Time `json:"firstObservedTime"`
+
+	// LastTransitionTime is copied from the observed Pod scheduling condition.
+	LastTransitionTime metav1.Time `json:"lastTransitionTime"`
 }
 
 // BackupTimeRange records the time range of backed up data, for PITR, this is the

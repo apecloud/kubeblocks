@@ -68,7 +68,7 @@ func TestDeleterDoPreDeleteActionCreatesAndReusesJob(t *testing.T) {
 
 	job, err := deleter.doPreDeleteAction(backup, repo, &dpv1alpha1.BaseJobActionSpec{Image: "deleter:$(IMAGE_TAG)", Command: []string{"delete"}}, "", "/backup/path")
 	assert.NoError(t, err)
-	assert.Empty(t, job.Name)
+	assert.Equal(t, BuildDeleteBackupFilesJobKey(backup, true).Name, job.Name)
 
 	got := &batchv1.Job{}
 	assert.NoError(t, cli.Get(context.Background(), BuildDeleteBackupFilesJobKey(backup, true), got))
@@ -84,6 +84,177 @@ func TestDeleterDoPreDeleteActionCreatesAndReusesJob(t *testing.T) {
 	job, err = deleter.doPreDeleteAction(backup, repo, &dpv1alpha1.BaseJobActionSpec{Image: "deleter:$(IMAGE_TAG)", Command: []string{"delete"}}, "", "/backup/path")
 	assert.NoError(t, err)
 	assert.Equal(t, got.Name, job.Name)
+}
+
+func TestDeleterDoesNotCreateJobWhenBoundRepoPVReadFails(t *testing.T) {
+	oldAffinity := viper.GetString(constant.CfgKeyCtrlrMgrAffinity)
+	oldNodeSelector := viper.GetString(constant.CfgKeyCtrlrMgrNodeSelector)
+	defer func() {
+		viper.Set(constant.CfgKeyCtrlrMgrAffinity, oldAffinity)
+		viper.Set(constant.CfgKeyCtrlrMgrNodeSelector, oldNodeSelector)
+	}()
+	viper.Set(constant.CfgKeyCtrlrMgrAffinity, "")
+	viper.Set(constant.CfgKeyCtrlrMgrNodeSelector, `{"kubernetes.io/hostname":"node6"}`)
+
+	scheme := runtime.NewScheme()
+	assert.NoError(t, corev1.AddToScheme(scheme))
+	assert.NoError(t, batchv1.AddToScheme(scheme))
+	assert.NoError(t, dpv1alpha1.AddToScheme(scheme))
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{Name: "repo-pvc", Namespace: "ns"},
+		Spec:       corev1.PersistentVolumeClaimSpec{VolumeName: "missing-pv"},
+		Status:     corev1.PersistentVolumeClaimStatus{Phase: corev1.ClaimBound},
+	}
+	backup := &dpv1alpha1.Backup{
+		ObjectMeta: metav1.ObjectMeta{Name: "backup", Namespace: "ns", UID: types.UID("backup-uid")},
+		Status: dpv1alpha1.BackupStatus{
+			Path:           "/backup/backup",
+			BackupRepoName: "repo",
+		},
+	}
+	repo := &dpv1alpha1.BackupRepo{
+		ObjectMeta: metav1.ObjectMeta{Name: backup.Status.BackupRepoName},
+		Spec:       dpv1alpha1.BackupRepoSpec{AccessMethod: dpv1alpha1.AccessMethodMount},
+		Status:     dpv1alpha1.BackupRepoStatus{BackupPVCName: pvc.Name},
+	}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(repo).Build()
+	deleter := &Deleter{
+		RequestCtx:           ctrlutil.RequestCtx{Ctx: context.Background()},
+		Client:               cli,
+		Scheme:               scheme,
+		WorkerServiceAccount: "worker",
+	}
+	jobKey := BuildDeleteBackupFilesJobKey(backup, false)
+	originalStatus := backup.Status.DeepCopy()
+
+	result, err := deleter.DeleteBackupFiles(backup)
+	assert.Error(t, err)
+	assert.True(t, ctrlutil.IsTargetError(err, ctrlutil.ErrorTypeRequeue))
+	assert.Equal(t, DeletionStatusUnknown, result.Status)
+	assert.Nil(t, result.ActiveJob)
+	assert.Equal(t, *originalStatus, backup.Status)
+	assert.Error(t, cli.Get(context.Background(), jobKey, &batchv1.Job{}))
+
+	assert.NoError(t, cli.Create(context.Background(), pvc))
+	result, err = deleter.DeleteBackupFiles(backup)
+	assert.Error(t, err)
+	assert.True(t, ctrlutil.IsTargetError(err, ctrlutil.ErrorTypeRequeue))
+	assert.Equal(t, DeletionStatusUnknown, result.Status)
+	assert.Nil(t, result.ActiveJob)
+	assert.Equal(t, *originalStatus, backup.Status)
+	assert.Error(t, cli.Get(context.Background(), jobKey, &batchv1.Job{}))
+
+	pv := &corev1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{Name: pvc.Spec.VolumeName},
+		Spec: corev1.PersistentVolumeSpec{NodeAffinity: &corev1.VolumeNodeAffinity{Required: &corev1.NodeSelector{
+			NodeSelectorTerms: []corev1.NodeSelectorTerm{{MatchExpressions: []corev1.NodeSelectorRequirement{{
+				Key: corev1.LabelHostname, Operator: corev1.NodeSelectorOpIn, Values: []string{"node3"},
+			}}}},
+		}}},
+	}
+	assert.NoError(t, cli.Create(context.Background(), pv))
+	result, err = deleter.DeleteBackupFiles(backup)
+	assert.NoError(t, err)
+	assert.Equal(t, DeletionStatusDeleting, result.Status)
+	assert.NoError(t, cli.Get(context.Background(), jobKey, &batchv1.Job{}))
+}
+
+func TestDeleterResultCarriesActivePreDeleteJob(t *testing.T) {
+	oldAffinity := viper.GetString(constant.CfgKeyCtrlrMgrAffinity)
+	oldNodeSelector := viper.GetString(constant.CfgKeyCtrlrMgrNodeSelector)
+	oldToolsImage := viper.GetString(constant.KBToolsImage)
+	defer func() {
+		viper.Set(constant.CfgKeyCtrlrMgrAffinity, oldAffinity)
+		viper.Set(constant.CfgKeyCtrlrMgrNodeSelector, oldNodeSelector)
+		viper.Set(constant.KBToolsImage, oldToolsImage)
+	}()
+	viper.Set(constant.CfgKeyCtrlrMgrAffinity, "")
+	viper.Set(constant.CfgKeyCtrlrMgrNodeSelector, "")
+	viper.Set(constant.KBToolsImage, "tools:test")
+
+	scheme := runtime.NewScheme()
+	assert.NoError(t, corev1.AddToScheme(scheme))
+	assert.NoError(t, batchv1.AddToScheme(scheme))
+	assert.NoError(t, dpv1alpha1.AddToScheme(scheme))
+	backup := &dpv1alpha1.Backup{
+		ObjectMeta: metav1.ObjectMeta{Name: "backup", Namespace: "ns", UID: types.UID("backup-uid")},
+		Status: dpv1alpha1.BackupStatus{
+			Path:           "/backup/backup",
+			BackupRepoName: "repo",
+			BackupMethod:   &dpv1alpha1.BackupMethod{ActionSetName: "action-set"},
+		},
+	}
+	repo := &dpv1alpha1.BackupRepo{
+		ObjectMeta: metav1.ObjectMeta{Name: "repo"},
+		Spec:       dpv1alpha1.BackupRepoSpec{AccessMethod: dpv1alpha1.AccessMethodMount},
+		Status:     dpv1alpha1.BackupRepoStatus{BackupPVCName: "repo-pvc"},
+	}
+	actionSet := &dpv1alpha1.ActionSet{
+		ObjectMeta: metav1.ObjectMeta{Name: "action-set"},
+		Spec: dpv1alpha1.ActionSetSpec{Backup: &dpv1alpha1.BackupActionSpec{
+			PreDeleteBackup: &dpv1alpha1.BaseJobActionSpec{Image: "pre-delete:test", Command: []string{"delete"}},
+		}},
+	}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(repo, actionSet).Build()
+	deleter := &Deleter{
+		RequestCtx:           ctrlutil.RequestCtx{Ctx: context.Background()},
+		Client:               cli,
+		Scheme:               scheme,
+		WorkerServiceAccount: "worker",
+	}
+
+	result, err := deleter.DeleteBackupFiles(backup)
+	assert.NoError(t, err)
+	assert.Equal(t, DeletionStatusDeleting, result.Status)
+	if assert.NotNil(t, result.ActiveJob) {
+		assert.Equal(t, BuildDeleteBackupFilesJobKey(backup, true).Name, result.ActiveJob.Name)
+	}
+}
+
+func TestDeleterAppliesLocalPVPlacementToLegacyPVC(t *testing.T) {
+	oldAffinity := viper.GetString(constant.CfgKeyCtrlrMgrAffinity)
+	oldNodeSelector := viper.GetString(constant.CfgKeyCtrlrMgrNodeSelector)
+	defer func() {
+		viper.Set(constant.CfgKeyCtrlrMgrAffinity, oldAffinity)
+		viper.Set(constant.CfgKeyCtrlrMgrNodeSelector, oldNodeSelector)
+	}()
+	viper.Set(constant.CfgKeyCtrlrMgrAffinity, "")
+	viper.Set(constant.CfgKeyCtrlrMgrNodeSelector, `{"kubernetes.io/hostname":"node6"}`)
+
+	scheme := runtime.NewScheme()
+	assert.NoError(t, corev1.AddToScheme(scheme))
+	assert.NoError(t, batchv1.AddToScheme(scheme))
+	assert.NoError(t, dpv1alpha1.AddToScheme(scheme))
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{Name: "legacy-pvc", Namespace: "ns"},
+		Spec:       corev1.PersistentVolumeClaimSpec{VolumeName: "legacy-pv"},
+		Status:     corev1.PersistentVolumeClaimStatus{Phase: corev1.ClaimBound},
+	}
+	pv := &corev1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{Name: pvc.Spec.VolumeName},
+		Spec: corev1.PersistentVolumeSpec{NodeAffinity: &corev1.VolumeNodeAffinity{Required: &corev1.NodeSelector{
+			NodeSelectorTerms: []corev1.NodeSelectorTerm{{MatchExpressions: []corev1.NodeSelectorRequirement{{
+				Key: corev1.LabelHostname, Operator: corev1.NodeSelectorOpIn, Values: []string{"node3"},
+			}}}},
+		}}},
+	}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(pvc, pv).Build()
+	backup := &dpv1alpha1.Backup{
+		ObjectMeta: metav1.ObjectMeta{Name: "backup", Namespace: "ns", UID: types.UID("backup-uid")},
+		Status:     dpv1alpha1.BackupStatus{Path: "/backup/backup"},
+	}
+	deleter := &Deleter{
+		RequestCtx:           ctrlutil.RequestCtx{Ctx: context.Background()},
+		Client:               cli,
+		Scheme:               scheme,
+		WorkerServiceAccount: "worker",
+	}
+
+	job, err := deleter.createDeleteBackupFilesJob(BuildDeleteBackupFilesJobKey(backup, false), backup, nil, pvc.Name)
+	assert.NoError(t, err)
+	if assert.NotNil(t, job) {
+		assert.Nil(t, job.Spec.Template.Spec.NodeSelector)
+	}
 }
 
 var _ = Describe("Backup Deleter Test", func() {
@@ -140,7 +311,7 @@ var _ = Describe("Backup Deleter Test", func() {
 			Expect(backup.Status.PersistentVolumeClaimName).Should(Equal(""))
 			status, err := deleter.DeleteBackupFiles(backup)
 			Expect(err).ShouldNot(HaveOccurred())
-			Expect(status).Should(Equal(DeletionStatusSucceeded))
+			Expect(status.Status).Should(Equal(DeletionStatusSucceeded))
 		})
 
 		It("should success when backup status path is empty", func() {
@@ -148,7 +319,7 @@ var _ = Describe("Backup Deleter Test", func() {
 			Expect(backup.Status.Path).Should(Equal(""))
 			status, err := deleter.DeleteBackupFiles(backup)
 			Expect(err).ShouldNot(HaveOccurred())
-			Expect(status).Should(Equal(DeletionStatusSucceeded))
+			Expect(status.Status).Should(Equal(DeletionStatusSucceeded))
 		})
 
 		It("should success when PVC does not exist", func() {
@@ -156,7 +327,7 @@ var _ = Describe("Backup Deleter Test", func() {
 			backup.Status.Path = backupPath
 			status, err := deleter.DeleteBackupFiles(backup)
 			Expect(err).ShouldNot(HaveOccurred())
-			Expect(status).Should(Equal(DeletionStatusSucceeded))
+			Expect(status.Status).Should(Equal(DeletionStatusSucceeded))
 		})
 
 		It("should ensure worker service account only when creating a deletion job", func() {
@@ -172,7 +343,7 @@ var _ = Describe("Backup Deleter Test", func() {
 			}
 			status, err := deleter.DeleteBackupFiles(backup)
 			Expect(err).ShouldNot(HaveOccurred())
-			Expect(status).Should(Equal(DeletionStatusSucceeded))
+			Expect(status.Status).Should(Equal(DeletionStatusSucceeded))
 			Expect(ensureWorkerServiceAccountCalls).Should(Equal(0))
 
 			By("creating worker service account when a deletion job is needed")
@@ -182,7 +353,8 @@ var _ = Describe("Backup Deleter Test", func() {
 			backup.Status.Path = backupPath
 			status, err = deleter.DeleteBackupFiles(backup)
 			Expect(err).ShouldNot(HaveOccurred())
-			Expect(status).Should(Equal(DeletionStatusDeleting))
+			Expect(status.Status).Should(Equal(DeletionStatusDeleting))
+			Expect(status.ActiveJob).ShouldNot(BeNil())
 			Expect(ensureWorkerServiceAccountCalls).Should(Equal(1))
 
 			key := BuildDeleteBackupFilesJobKey(backup, false)
@@ -200,7 +372,8 @@ var _ = Describe("Backup Deleter Test", func() {
 			backup.Status.Path = backupPath
 			status, err := deleter.DeleteBackupFiles(backup)
 			Expect(err).ShouldNot(HaveOccurred())
-			Expect(status).Should(Equal(DeletionStatusDeleting))
+			Expect(status.Status).Should(Equal(DeletionStatusDeleting))
+			Expect(status.ActiveJob).ShouldNot(BeNil())
 
 			By("check job exist")
 			job := &batchv1.Job{}
@@ -212,7 +385,8 @@ var _ = Describe("Backup Deleter Test", func() {
 			Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
 				status, err := deleter.DeleteBackupFiles(fetched)
 				Expect(err).ShouldNot(HaveOccurred())
-				Expect(status).Should(Equal(DeletionStatusDeleting))
+				Expect(status.Status).Should(Equal(DeletionStatusDeleting))
+				Expect(status.ActiveJob).ShouldNot(BeNil())
 			})).Should(Succeed())
 
 			By("delete backup with job succeed")
@@ -220,7 +394,7 @@ var _ = Describe("Backup Deleter Test", func() {
 			Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
 				status, err := deleter.DeleteBackupFiles(fetched)
 				Expect(err).ShouldNot(HaveOccurred())
-				Expect(status).Should(Equal(DeletionStatusSucceeded))
+				Expect(status.Status).Should(Equal(DeletionStatusSucceeded))
 			})).Should(Succeed())
 
 			By("delete backup with job failed")
@@ -228,7 +402,7 @@ var _ = Describe("Backup Deleter Test", func() {
 			Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
 				status, err := deleter.DeleteBackupFiles(fetched)
 				Expect(err).Should(HaveOccurred())
-				Expect(status).Should(Equal(DeletionStatusFailed))
+				Expect(status.Status).Should(Equal(DeletionStatusFailed))
 			})).Should(Succeed())
 		})
 
@@ -236,7 +410,7 @@ var _ = Describe("Backup Deleter Test", func() {
 			backup.Status.BackupRepoName = testdp.BackupRepoName
 			status, err := deleter.DeleteBackupFiles(backup)
 			Expect(err).ShouldNot(HaveOccurred())
-			Expect(status).Should(Equal(DeletionStatusSucceeded))
+			Expect(status.Status).Should(Equal(DeletionStatusSucceeded))
 		})
 	})
 

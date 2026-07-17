@@ -1891,6 +1891,107 @@ for synchronization in seconds.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="dataprotection.kubeblocks.io/v1alpha1.BackupDeletionDiagnostic">BackupDeletionDiagnostic
+</h3>
+<p>
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupStatus">BackupStatus</a>)
+</p>
+<div>
+<p>BackupDeletionDiagnostic describes why the active deletion worker has not
+progressed. The identity fields prevent observations from an old Job or Pod
+from being carried into a replacement worker.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>activeJobName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>ActiveJobName is the pre-delete or delete Job currently being observed.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>activeJobUID</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>ActiveJobUID identifies the exact Job incarnation.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>podUID</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>PodUID identifies the exact Pod incarnation that produced the diagnostic.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>reason</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Reason is a stable machine-readable diagnostic category.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>message</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Message is a bounded human-readable diagnostic from the Pod scheduling condition.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>firstObservedTime</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#time-v1-meta">
+Kubernetes meta/v1.Time
+</a>
+</em>
+</td>
+<td>
+<p>FirstObservedTime is when the controller first persisted this diagnostic.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>lastTransitionTime</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#time-v1-meta">
+Kubernetes meta/v1.Time
+</a>
+</em>
+</td>
+<td>
+<p>LastTransitionTime is copied from the observed Pod scheduling condition.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.BackupDeletionPolicy">BackupDeletionPolicy
 (<code>string</code> alias)</h3>
 <p>
@@ -3504,6 +3605,22 @@ string
 <td>
 <em>(Optional)</em>
 <p>Any error that caused the backup operation to fail.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>deletionDiagnostic</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.BackupDeletionDiagnostic">
+BackupDeletionDiagnostic
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>DeletionDiagnostic records a persistent diagnostic for the active worker
+that is preventing deletion from progressing. It is independent from
+FailureReason, which continues to describe the backup operation itself.</p>
 </td>
 </tr>
 <tr>

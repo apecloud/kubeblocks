@@ -796,7 +796,8 @@ func (r *BackupRepoReconciler) runPreCheckJobForMounting(reconCtx *reconcileCont
 			},
 			BackoffLimit: pointer.Int32(2),
 		}
-		if err := utils.AddTolerations(&job.Spec.Template.Spec); err != nil {
+		if err := utils.ApplyWorkerPlacementForRepoPVC(reconCtx.Ctx, r.Client,
+			&job.Spec.Template.Spec, pvc, multicluster.InControlContext()); err != nil {
 			return err
 		}
 		for i := range job.Spec.Template.Spec.Containers {

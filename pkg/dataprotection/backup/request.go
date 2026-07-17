@@ -474,8 +474,14 @@ func (r *Request) BuildJobActionPodSpec(targetPod *corev1.Pod,
 			corev1.LabelHostname: targetPod.Spec.NodeName,
 		}
 	} else {
-		if err := utils.AddTolerations(podSpec); err != nil {
-			return nil, err
+		var placementErr error
+		if r.BackupRepo != nil && r.BackupRepo.AccessByMount() {
+			placementErr = utils.ApplyWorkerPlacementForRepoPVC(r.Ctx, r.Client, podSpec, r.BackupRepoPVC)
+		} else {
+			placementErr = utils.AddTolerations(podSpec)
+		}
+		if placementErr != nil {
+			return nil, placementErr
 		}
 	}
 

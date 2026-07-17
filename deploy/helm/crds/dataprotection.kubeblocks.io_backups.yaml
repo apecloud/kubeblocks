@@ -1039,6 +1039,48 @@ spec:
                   The server's time is used for this timestamp.
                 format: date-time
                 type: string
+              deletionDiagnostic:
+                description: |-
+                  DeletionDiagnostic records a persistent diagnostic for the active worker
+                  that is preventing deletion from progressing. It is independent from
+                  FailureReason, which continues to describe the backup operation itself.
+                properties:
+                  activeJobName:
+                    description: ActiveJobName is the pre-delete or delete Job currently
+                      being observed.
+                    type: string
+                  activeJobUID:
+                    description: ActiveJobUID identifies the exact Job incarnation.
+                    type: string
+                  firstObservedTime:
+                    description: FirstObservedTime is when the controller first persisted
+                      this diagnostic.
+                    format: date-time
+                    type: string
+                  lastTransitionTime:
+                    description: LastTransitionTime is copied from the observed Pod
+                      scheduling condition.
+                    format: date-time
+                    type: string
+                  message:
+                    description: Message is a bounded human-readable diagnostic from
+                      the Pod scheduling condition.
+                    type: string
+                  podUID:
+                    description: PodUID identifies the exact Pod incarnation that
+                      produced the diagnostic.
+                    type: string
+                  reason:
+                    description: Reason is a stable machine-readable diagnostic category.
+                    type: string
+                required:
+                - activeJobName
+                - activeJobUID
+                - firstObservedTime
+                - lastTransitionTime
+                - podUID
+                - reason
+                type: object
               duration:
                 description: |-
                   Records the duration of the backup operation.

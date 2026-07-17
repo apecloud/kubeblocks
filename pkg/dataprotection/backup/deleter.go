@@ -57,6 +57,14 @@ const (
 	DeletionStatusUnknown   DeletionStatus = "Unknown"
 )
 
+// DeletionResult identifies both the deletion state and the exact active Job
+// whose progress the Backup reconciler must observe. ActiveJob can be either a
+// pre-delete Job or the final delete-files Job.
+type DeletionResult struct {
+	Status    DeletionStatus
+	ActiveJob *batchv1.Job
+}
+
 type Deleter struct {
 	ctrlutil.RequestCtx
 	Client                     client.Client
@@ -86,17 +94,17 @@ func (d *Deleter) ensureWorkerServiceAccount() error {
 // DeleteBackupFiles builds a job to delete backup files, and returns the deletion status.
 // If the deletion job exists, it will check the job status and return the corresponding
 // deletion status.
-func (d *Deleter) DeleteBackupFiles(backup *dpv1alpha1.Backup) (DeletionStatus, error) {
+func (d *Deleter) DeleteBackupFiles(backup *dpv1alpha1.Backup) (DeletionResult, error) {
 	backupMethod := backup.Status.BackupMethod
 	if backupMethod != nil && boolptr.IsSetToTrue(backupMethod.SnapshotVolumes) {
 		// if the backup is volume snapshot, ignore to delete files
-		return DeletionStatusSucceeded, nil
+		return DeletionResult{Status: DeletionStatusSucceeded}, nil
 	}
 	jobKey := BuildDeleteBackupFilesJobKey(backup, false)
 	job := &batchv1.Job{}
 	exists, err := ctrlutil.CheckResourceExists(d.Ctx, d.Client, jobKey, job)
 	if err != nil {
-		return DeletionStatusUnknown, err
+		return DeletionResult{Status: DeletionStatusUnknown}, err
 	}
 
 	// if deletion job exists, check its status
@@ -104,12 +112,12 @@ func (d *Deleter) DeleteBackupFiles(backup *dpv1alpha1.Backup) (DeletionStatus, 
 		_, finishedType, msg := utils.IsJobFinished(job)
 		switch finishedType {
 		case batchv1.JobComplete:
-			return DeletionStatusSucceeded, nil
+			return DeletionResult{Status: DeletionStatusSucceeded}, nil
 		case batchv1.JobFailed:
-			return DeletionStatusFailed,
+			return DeletionResult{Status: DeletionStatusFailed},
 				fmt.Errorf("deletion backup files job \"%s\" failed, you can delete it to re-delete the backup files, %s", job.Name, msg)
 		}
-		return DeletionStatusDeleting, nil
+		return DeletionResult{Status: DeletionStatusDeleting, ActiveJob: job}, nil
 	}
 
 	var backupRepo *dpv1alpha1.BackupRepo
@@ -117,9 +125,9 @@ func (d *Deleter) DeleteBackupFiles(backup *dpv1alpha1.Backup) (DeletionStatus, 
 		backupRepo = &dpv1alpha1.BackupRepo{}
 		if err = d.Client.Get(d.Ctx, client.ObjectKey{Name: backup.Status.BackupRepoName}, backupRepo); err != nil {
 			if apierrors.IsNotFound(err) {
-				return DeletionStatusSucceeded, nil
+				return DeletionResult{Status: DeletionStatusSucceeded}, nil
 			}
-			return DeletionStatusUnknown, err
+			return DeletionResult{Status: DeletionStatusUnknown}, err
 		}
 	}
 
@@ -130,16 +138,16 @@ func (d *Deleter) DeleteBackupFiles(backup *dpv1alpha1.Backup) (DeletionStatus, 
 		if legacyPVCName == "" {
 			d.Log.Info("skip deleting backup files because PersistentVolumeClaimName is empty",
 				"backup", backup.Name)
-			return DeletionStatusSucceeded, nil
+			return DeletionResult{Status: DeletionStatusSucceeded}, nil
 		}
 
 		// check if the backup PVC exists, if not, skip to delete backup files
 		pvcKey := client.ObjectKey{Namespace: backup.Namespace, Name: legacyPVCName}
 		if err = d.Client.Get(d.Ctx, pvcKey, &corev1.PersistentVolumeClaim{}); err != nil {
 			if apierrors.IsNotFound(err) {
-				return DeletionStatusSucceeded, nil
+				return DeletionResult{Status: DeletionStatusSucceeded}, nil
 			}
-			return DeletionStatusUnknown, err
+			return DeletionResult{Status: DeletionStatusUnknown}, err
 		}
 	}
 
@@ -151,7 +159,7 @@ func (d *Deleter) DeleteBackupFiles(backup *dpv1alpha1.Backup) (DeletionStatus, 
 		// the deletion command. For example, files belongs to other Backups can be deleted as well.
 		d.Log.Info("skip deleting backup files because backup file path is invalid",
 			"backupFilePath", backupFilePath, "backup", backup.Name)
-		return DeletionStatusSucceeded, nil
+		return DeletionResult{Status: DeletionStatusSucceeded}, nil
 	}
 
 	// make sure the path has a leading slash
@@ -161,23 +169,27 @@ func (d *Deleter) DeleteBackupFiles(backup *dpv1alpha1.Backup) (DeletionStatus, 
 	// do pre-delete action
 	preDeleteAction, err := d.getPreDeleteAction(backup.Status.BackupMethod)
 	if err != nil {
-		return DeletionStatusUnknown, err
+		return DeletionResult{Status: DeletionStatusUnknown}, err
 	}
 	if preDeleteAction != nil {
 		preJob, err := d.doPreDeleteAction(backup, backupRepo, preDeleteAction, legacyPVCName, backupFilePath)
 		if err != nil {
-			return DeletionStatusUnknown, err
+			return DeletionResult{Status: DeletionStatusUnknown}, err
 		}
 		_, finishedType, msg := utils.IsJobFinished(preJob)
 		if finishedType == batchv1.JobFailed {
-			return DeletionStatusFailed,
-				fmt.Errorf("pre-delete backup files job \"%s\" failed, you can delete it to re-delete the backup files, %s", job.Name, msg)
+			return DeletionResult{Status: DeletionStatusFailed},
+				fmt.Errorf("pre-delete backup files job \"%s\" failed, you can delete it to re-delete the backup files, %s", preJob.Name, msg)
 		} else if finishedType != batchv1.JobComplete {
-			return DeletionStatusDeleting, nil
+			return DeletionResult{Status: DeletionStatusDeleting, ActiveJob: preJob}, nil
 		}
 	}
 	// do delete action
-	return DeletionStatusDeleting, d.createDeleteBackupFilesJob(jobKey, backup, backupRepo, legacyPVCName)
+	activeJob, err := d.createDeleteBackupFilesJob(jobKey, backup, backupRepo, legacyPVCName)
+	if err != nil {
+		return DeletionResult{Status: DeletionStatusUnknown}, err
+	}
+	return DeletionResult{Status: DeletionStatusDeleting, ActiveJob: activeJob}, nil
 }
 
 func (d *Deleter) buildDeleteBackupFilesScript(backupPath string) string {
@@ -241,7 +253,7 @@ func (d *Deleter) createDeleteBackupFilesJob(
 	jobKey types.NamespacedName,
 	backup *dpv1alpha1.Backup,
 	backupRepo *dpv1alpha1.BackupRepo,
-	legacyPVCName string) error {
+	legacyPVCName string) (*batchv1.Job, error) {
 
 	runAsUser := int64(0)
 	container := corev1.Container{
@@ -262,9 +274,9 @@ func (d *Deleter) createDeleteJob(container corev1.Container,
 	jobKey types.NamespacedName,
 	backup *dpv1alpha1.Backup,
 	backupRepo *dpv1alpha1.BackupRepo,
-	legacyPVCName string) error {
+	legacyPVCName string) (*batchv1.Job, error) {
 	if err := d.ensureWorkerServiceAccount(); err != nil {
-		return err
+		return nil, err
 	}
 	ctrlutil.InjectZeroResourcesLimitsForDataProtection(&container)
 
@@ -274,8 +286,23 @@ func (d *Deleter) createDeleteJob(container corev1.Container,
 		RestartPolicy:      corev1.RestartPolicyNever,
 		ServiceAccountName: d.WorkerServiceAccount,
 	}
-	if err := utils.AddTolerations(&podSpec); err != nil {
-		return err
+	var placementErr error
+	switch {
+	case backupRepo != nil && backupRepo.AccessByMount():
+		placementErr = utils.ApplyWorkerPlacementForRepoPVCRef(d.Ctx, d.Client, &podSpec, client.ObjectKey{
+			Namespace: jobKey.Namespace,
+			Name:      backupRepo.Status.BackupPVCName,
+		})
+	case backupRepo == nil:
+		placementErr = utils.ApplyWorkerPlacementForRepoPVCRef(d.Ctx, d.Client, &podSpec, client.ObjectKey{
+			Namespace: jobKey.Namespace,
+			Name:      legacyPVCName,
+		})
+	default:
+		placementErr = utils.AddTolerations(&podSpec)
+	}
+	if placementErr != nil {
+		return nil, placementErr
 	}
 	kopiaRepoPath := backup.Status.KopiaRepoPath
 	encryptionConfig := backup.Status.EncryptionConfig
@@ -306,10 +333,20 @@ func (d *Deleter) createDeleteJob(container corev1.Container,
 		},
 	}
 	if err := utils.SetControllerReference(backup, job, d.Scheme); err != nil {
-		return err
+		return nil, err
 	}
 	d.Log.V(1).Info("create a job to delete backup files", "job", job)
-	return client.IgnoreAlreadyExists(d.Client.Create(d.Ctx, job))
+	if err := d.Client.Create(d.Ctx, job); err != nil {
+		if !apierrors.IsAlreadyExists(err) {
+			return nil, err
+		}
+		existing := &batchv1.Job{}
+		if getErr := d.Client.Get(d.Ctx, jobKey, existing); getErr != nil {
+			return nil, getErr
+		}
+		return existing, nil
+	}
+	return job, nil
 }
 
 func (d *Deleter) getPreDeleteAction(backupMethod *dpv1alpha1.BackupMethod) (*dpv1alpha1.BaseJobActionSpec, error) {
@@ -361,7 +398,7 @@ func (d *Deleter) doPreDeleteAction(
 			RunAsUser:                &runAsUser,
 		},
 	}
-	return preJob, d.createDeleteJob(container, preJobKey, backup, backupRepo, legacyPVCName)
+	return d.createDeleteJob(container, preJobKey, backup, backupRepo, legacyPVCName)
 }
 
 func (d *Deleter) DeleteVolumeSnapshots(backup *dpv1alpha1.Backup) error {

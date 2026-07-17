@@ -23,6 +23,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -129,8 +130,15 @@ var _ = Describe("Request Test", func() {
 				request.BackupMethod = &backupPolicy.Spec.BackupMethods[0]
 				request.BackupRepo = backupRepo
 				request.Target = backupPolicy.Spec.Target
-				_, err := request.BuildActions()
+				actions, err := request.BuildActions()
 				Expect(err).NotTo(HaveOccurred())
+				Expect(actions[targetPod.Name]).To(HaveLen(1))
+				objectRef := actions[targetPod.Name][0].BuildObjectRef()
+				Expect(objectRef).NotTo(BeNil())
+				Expect(objectRef.APIVersion).To(Equal(batchv1.SchemeGroupVersion.String()))
+				Expect(objectRef.Kind).To(Equal(constant.JobKind))
+				Expect(objectRef.Namespace).To(Equal(backup.Namespace))
+				Expect(objectRef.Name).To(Equal(GenerateBackupJobName(backup, actions[targetPod.Name][0].GetName())))
 			})
 
 			It("build create volume snapshot action", func() {

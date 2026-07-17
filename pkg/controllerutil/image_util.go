@@ -21,6 +21,7 @@ package controllerutil
 
 import (
 	//  Import these crypto algorithm so that the image parser can work with digest
+	"context"
 	_ "crypto/sha256"
 	_ "crypto/sha512"
 	"errors"
@@ -31,6 +32,9 @@ import (
 
 	"github.com/distribution/reference"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -61,9 +65,12 @@ type registryConfig struct {
 }
 
 type registriesConfig struct {
-	DefaultRegistry  string           `mapstructure:"defaultRegistry"`
-	DefaultNamespace string           `mapstructure:"defaultNamespace"`
-	RegistryConfig   []registryConfig `mapstructure:"registryConfig"`
+	DefaultRegistry  string                  `mapstructure:"defaultRegistry"`
+	DefaultNamespace string                  `mapstructure:"defaultNamespace"`
+	RegistryConfig   []registryConfig        `mapstructure:"registryConfig"`
+	ImageIndexProofs []imageIndexProofConfig `mapstructure:"imageIndexProofs"`
+
+	compiledImageIndexProofs imageIndexProofSet
 }
 
 // this lock protects r/w to this variable itself,
@@ -81,11 +88,11 @@ func getRegistriesConfig() *registriesConfig {
 
 func LoadRegistryConfig() error {
 	newRegistriesConfig := &registriesConfig{}
-	if err := viper.UnmarshalKey(constant.CfgRegistries, &newRegistriesConfig); err != nil {
+	if err := viper.UnmarshalKey(constant.CfgRegistries, newRegistriesConfig); err != nil {
 		return err
 	}
 
-	for _, registry := range registriesConfigInstance.RegistryConfig {
+	for _, registry := range newRegistriesConfig.RegistryConfig {
 		if len(registry.From) == 0 {
 			return errors.New("registries config invalid: from can't be empty")
 		}
@@ -94,6 +101,11 @@ func LoadRegistryConfig() error {
 			return errors.New("registries config invalid: to can't be empty")
 		}
 	}
+	proofs, err := compileImageIndexProofs(newRegistriesConfig.ImageIndexProofs)
+	if err != nil {
+		return fmt.Errorf("registries config invalid: %w", err)
+	}
+	newRegistriesConfig.compiledImageIndexProofs = proofs
 
 	registriesConfigMutex.Lock()
 	registriesConfigInstance = newRegistriesConfig
@@ -103,7 +115,11 @@ func LoadRegistryConfig() error {
 	// to replace it every time
 	viper.Set(constant.KBToolsImage, ReplaceImageRegistry(viper.GetString(constant.KBToolsImage)))
 
-	imageLogger.Info("registriesConfig reloaded", "registriesConfig", registriesConfigInstance)
+	imageLogger.Info("registriesConfig reloaded",
+		"defaultRegistry", newRegistriesConfig.DefaultRegistry,
+		"defaultNamespace", newRegistriesConfig.DefaultNamespace,
+		"registryMappings", len(newRegistriesConfig.RegistryConfig),
+		"imageIndexProofs", len(newRegistriesConfig.ImageIndexProofs))
 	return nil
 }
 
@@ -222,6 +238,102 @@ func MatchContainerImageInStatus(specImage, statusImage, statusImageID string) b
 		return false
 	}
 	return imageBaseName(specName) == imageBaseName(statusName)
+}
+
+// ImagePlatformProvider returns the operating system and architecture of the
+// Node that is actually running a Pod. It is called only when a configured,
+// self-validated image-index proof contains the observed digest pair.
+type ImagePlatformProvider func() (operatingSystem string, architecture string, err error)
+
+// MatchContainerImageInStatusWithPlatform extends MatchContainerImageInStatus
+// for an explicitly configured OCI/Docker image-index parent and platform child
+// relationship. Direct digest equality and tag matching always take precedence.
+func MatchContainerImageInStatusWithPlatform(
+	specImage, statusImage, statusImageID string,
+	platformProvider ImagePlatformProvider,
+) (bool, error) {
+	if MatchContainerImageInStatus(specImage, statusImage, statusImageID) {
+		return true, nil
+	}
+
+	_, _, specDigest := splitContainerImageRef(specImage)
+	_, _, statusDigest := splitContainerImageRef(statusImageID)
+	proofs := getRegistriesConfig().compiledImageIndexProofs
+	if !proofs.containsPair(specDigest, statusDigest) {
+		return false, nil
+	}
+	if platformProvider == nil {
+		return false, errors.New("image index proof match requires a Node platform provider")
+	}
+	operatingSystem, architecture, err := platformProvider()
+	if err != nil {
+		return false, err
+	}
+	if operatingSystem == "" || architecture == "" {
+		return false, nil
+	}
+	return proofs.matchPair(specDigest, statusDigest, operatingSystem, architecture), nil
+}
+
+// MatchPodContainerImages returns whether every reported container status
+// matches its PodSpec image. A missing status remains ignored for compatibility.
+// Node reads are lazy and cached within this call.
+func MatchPodContainerImages(ctx context.Context, reader client.Reader, pod *corev1.Pod) (bool, error) {
+	var (
+		platformLoaded  bool
+		operatingSystem string
+		architecture    string
+		platformErr     error
+	)
+	platformProvider := func() (string, string, error) {
+		if platformLoaded {
+			return operatingSystem, architecture, platformErr
+		}
+		platformLoaded = true
+		if pod.Spec.NodeName == "" {
+			return "", "", nil
+		}
+		if reader == nil {
+			platformErr = errors.New("image index proof match requires a Kubernetes reader")
+			return "", "", platformErr
+		}
+		node := &corev1.Node{}
+		if err := reader.Get(ctx, types.NamespacedName{Name: pod.Spec.NodeName}, node); err != nil {
+			if apierrors.IsNotFound(err) {
+				return "", "", nil
+			}
+			platformErr = fmt.Errorf("get Node %q for image index proof: %w", pod.Spec.NodeName, err)
+			return "", "", platformErr
+		}
+		if node.DeletionTimestamp != nil {
+			return "", "", nil
+		}
+		operatingSystem = node.Status.NodeInfo.OperatingSystem
+		architecture = node.Status.NodeInfo.Architecture
+		return operatingSystem, architecture, nil
+	}
+
+	for _, container := range pod.Spec.Containers {
+		var status *corev1.ContainerStatus
+		for i := range pod.Status.ContainerStatuses {
+			if pod.Status.ContainerStatuses[i].Name == container.Name {
+				status = &pod.Status.ContainerStatuses[i]
+				break
+			}
+		}
+		if status == nil {
+			continue
+		}
+		matched, err := MatchContainerImageInStatusWithPlatform(
+			container.Image, status.Image, status.ImageID, platformProvider)
+		if err != nil {
+			return false, err
+		}
+		if !matched {
+			return false, nil
+		}
+	}
+	return true, nil
 }
 
 // EqualContainerImageInSpec returns true if two PodSpec image references point to

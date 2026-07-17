@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -149,23 +150,8 @@ func isPodPending(pod *corev1.Pod) bool {
 }
 
 // isImageMatched returns true if all container statuses have same image as defined in pod spec
-func isImageMatched(pod *corev1.Pod) bool {
-	for _, container := range pod.Spec.Containers {
-		index := slices.IndexFunc(pod.Status.ContainerStatuses, func(status corev1.ContainerStatus) bool {
-			return status.Name == container.Name
-		})
-		if index == -1 {
-			continue
-		}
-		specImage := container.Image
-		status := pod.Status.ContainerStatuses[index]
-		// Image in status may not match the image used in the PodSpec.
-		// More info: https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#PodStatus
-		if !intctrlutil.MatchContainerImageInStatus(specImage, status.Image, status.ImageID) {
-			return false
-		}
-	}
-	return true
+func isImageMatched(ctx context.Context, reader client.Reader, pod *corev1.Pod) (bool, error) {
+	return intctrlutil.MatchPodContainerImages(ctx, reader, pod)
 }
 
 // getPodRevision gets the revision of Pod by inspecting the StatefulSetRevisionLabel. If pod has no revision the empty

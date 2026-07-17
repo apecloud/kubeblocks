@@ -321,6 +321,12 @@ affinity:
 # registryConfig:
 #   defaultRegistry: apecloud-registry.cn-zhangjiakou.cr.aliyuncs.com
 #   defaultNamespace: apecloud
+#   # Optional offline proof for runtimes that report an OCI/Docker index digest
+#   # instead of the platform manifest digest pinned in a PodSpec (or vice versa).
+#   # indexBase64 must contain the exact raw index bytes whose digest is indexDigest.
+#   imageIndexProofs:
+#   - indexDigest: sha256:<index-digest>
+#     indexBase64: <base64-exact-raw-index-bytes>
 registryConfig: {}
 
 # Add extra pod labels to KubeBlocks Deployment

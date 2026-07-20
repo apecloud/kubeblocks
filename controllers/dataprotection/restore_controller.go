@@ -64,6 +64,7 @@ type RestoreReconciler struct {
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=serviceaccounts,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=referencegrants,verbs=get;list;watch
 
 func (r *RestoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	reqCtx := intctrlutil.RequestCtx{
@@ -159,6 +160,9 @@ func (r *RestoreReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCt
 }
 
 func CheckBackupRepoForRestore(reqCtx intctrlutil.RequestCtx, cli client.Client, restore *dpv1alpha1.Restore) (string, error) {
+	if err := dprestore.ValidateBackupReferenceGrant(reqCtx, cli, restore); err != nil {
+		return "", err
+	}
 	backupName := restore.Spec.Backup.Name
 	backupNamespace := restore.Spec.Backup.Namespace
 	backup := &dpv1alpha1.Backup{}

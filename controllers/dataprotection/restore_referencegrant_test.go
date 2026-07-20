@@ -33,6 +33,29 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
+func newBackupReferenceGrant(name, backupNamespace, restoreNamespace, backupName string) *gatewayv1beta1.ReferenceGrant {
+	var grantedBackupName *gatewayv1beta1.ObjectName
+	if backupName != "" {
+		name := gatewayv1beta1.ObjectName(backupName)
+		grantedBackupName = &name
+	}
+	return &gatewayv1beta1.ReferenceGrant{
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: backupNamespace},
+		Spec: gatewayv1beta1.ReferenceGrantSpec{
+			From: []gatewayv1beta1.ReferenceGrantFrom{{
+				Group:     gatewayv1beta1.Group(dpv1alpha1.GroupVersion.Group),
+				Kind:      gatewayv1beta1.Kind("Restore"),
+				Namespace: gatewayv1beta1.Namespace(restoreNamespace),
+			}},
+			To: []gatewayv1beta1.ReferenceGrantTo{{
+				Group: gatewayv1beta1.Group(dpv1alpha1.GroupVersion.Group),
+				Kind:  gatewayv1beta1.Kind("Backup"),
+				Name:  grantedBackupName,
+			}},
+		},
+	}
+}
+
 func TestCheckBackupRepoForRestoreAuthorizesBeforeBackupRead(t *testing.T) {
 	scheme := runtime.NewScheme()
 	if err := dpv1alpha1.AddToScheme(scheme); err != nil {

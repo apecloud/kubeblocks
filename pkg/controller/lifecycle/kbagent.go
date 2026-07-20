@@ -47,6 +47,12 @@ type lifecycleAction interface {
 	parameters(ctx context.Context, cli client.Reader) (map[string]string, error)
 }
 
+// authoritativeActionParameters marks action parameters that are defined by
+// the runtime contract and therefore cannot be overridden by template vars.
+type authoritativeActionParameters interface {
+	authoritativeActionParameters()
+}
+
 type kbagent struct {
 	namespace        string
 	clusterName      string
@@ -302,10 +308,16 @@ func (a *kbagent) parameters(ctx context.Context, cli client.Reader, lfa lifecyc
 		return nil, err
 	}
 
-	for k, v := range sys {
-		// template vars take precedence
-		if _, ok := m[k]; !ok {
+	if _, authoritative := lfa.(authoritativeActionParameters); authoritative {
+		for k, v := range sys {
 			m[k] = v
+		}
+	} else {
+		for k, v := range sys {
+			// template vars take precedence for existing lifecycle actions.
+			if _, ok := m[k]; !ok {
+				m[k] = v
+			}
 		}
 	}
 	addShellSafeParameterAliases(m)

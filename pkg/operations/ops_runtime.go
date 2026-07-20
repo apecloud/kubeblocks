@@ -211,18 +211,18 @@ func (r *opsRuntime) doSwitchover(ctx context.Context, cli client.Reader, action
 		}
 	}
 	if pod.Name == "" {
-		return intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" not found`, switchover.InstanceName))
+		return intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" not found`, instanceName))
 	}
-	if switchover.CandidateName != "" {
-		candidate, err := r.GetInstance(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name, switchover.CandidateName)
+	if candidateName != "" {
+		candidate, err := r.GetInstance(actionCtx.Namespace, actionCtx.ClusterName, actionCtx.ComponentName, candidateName)
 		if err != nil {
 			if apierrors.IsNotFound(err) {
-				return intctrlutil.NewFatalError(fmt.Sprintf(`candidate instance "%s" not found`, switchover.CandidateName))
+				return intctrlutil.NewFatalError(fmt.Sprintf(`candidate instance "%s" not found`, candidateName))
 			}
 			return err
 		}
 		if !candidate.HasPod() {
-			return intctrlutil.NewFatalError(fmt.Sprintf(`candidate instance "%s" not found`, switchover.CandidateName))
+			return intctrlutil.NewFatalError(fmt.Sprintf(`candidate instance "%s" not found`, candidateName))
 		}
 	}
 

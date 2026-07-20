@@ -68,6 +68,8 @@ func (a *switchover) name() string {
 	return "switchover"
 }
 
+func (a *switchover) authoritativeActionParameters() {}
+
 func (a *switchover) parameters(ctx context.Context, cli client.Reader) (map[string]string, error) {
 	// refer to ComponentLifecycleActions.Switchover's documentation for explanation of each variable.
 	m := make(map[string]string)

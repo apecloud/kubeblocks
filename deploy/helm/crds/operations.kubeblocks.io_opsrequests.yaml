@@ -5445,9 +5445,9 @@ spec:
                     additionalProperties:
                       format: int64
                       type: integer
-                    description: ComponentGenerations identifies the exact Components
-                      selected for compensation and, once rollback writes begin, binds
-                      each write to the resulting ComponentParameter generation.
+                    description: |-
+                      ComponentGenerations identifies the exact Components selected for compensation and,
+                      once rollback writes begin, binds each write to the resulting ComponentParameter generation.
                     type: object
                   message:
                     description: Message describes the current rollback outcome without

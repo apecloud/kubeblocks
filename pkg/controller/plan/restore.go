@@ -50,16 +50,17 @@ type RestoreManager struct {
 	Cluster *appsv1.Cluster
 	Scheme  *k8sruntime.Scheme
 
+	RestoreTime       string
+	RestoreEnv        []corev1.EnvVar
+	RestoreNamePrefix string
+
 	// private
 	namespace           string
-	RestoreTime         string
-	env                 []corev1.EnvVar
 	parameters          []dpv1alpha1.ParameterPair
 	volumeRestorePolicy dpv1alpha1.VolumeClaimRestorePolicy
 	startingIndex       int32
 	replicas            int32
 	restoreLabels       map[string]string
-	RestoreNamePrefix   string
 }
 
 func NewRestoreManager(ctx context.Context,
@@ -188,7 +189,7 @@ func (r *RestoreManager) BuildPrepareDataRestore(comp *component.SynthesizedComp
 				SourceTargetName: sourceTargetName,
 			},
 			RestoreTime: r.RestoreTime,
-			Env:         r.env,
+			Env:         r.RestoreEnv,
 			Parameters:  r.parameters,
 			PrepareDataConfig: &dpv1alpha1.PrepareDataConfig{
 				RequiredPolicyForAllPodSelection: r.buildRequiredPolicy(sourceTarget),
@@ -250,7 +251,7 @@ func (r *RestoreManager) DoPostReady(comp *component.SynthesizedComponent,
 				SourceTargetName: sourceTargetName,
 			},
 			RestoreTime: r.RestoreTime,
-			Env:         r.env,
+			Env:         r.RestoreEnv,
 			Parameters:  r.parameters,
 			ReadyConfig: &dpv1alpha1.ReadyConfig{
 				ExecAction: &dpv1alpha1.ExecAction{

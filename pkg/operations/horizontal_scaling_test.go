@@ -1084,7 +1084,7 @@ func TestHorizontalScalingCreateRestoreReturnsFatalWhenNoRestoreBuilt(t *testing
 			}, 1, 3)
 
 			err := horizontalScalingOpsHandler{}.createRestore(intctrlutil.RequestCtx{Ctx: ctx}, cli, opsRes,
-				synthesizedComponent, restoreMGR, &appsv1.ClusterComponentSpec{Name: "tikv"}, backup, nil, "")
+				synthesizedComponent, restoreMGR, &appsv1.ClusterComponentSpec{Name: "tikv"}, backup, "")
 			if err == nil {
 				t.Fatal("expected fatal error when backup method cannot build prepareData restore")
 			}
@@ -1167,9 +1167,10 @@ func TestHorizontalScalingCreateRestorePropagatesRestoreEnv(t *testing.T) {
 		constant.OpsRequestNameLabelKey: opsRequest.Name,
 	}, 1, 3)
 	restoreEnv := []corev1.EnvVar{{Name: "RESTORE_ENV", Value: "true"}}
+	restoreMGR.RestoreEnv = restoreEnv
 
 	err := horizontalScalingOpsHandler{}.createRestore(intctrlutil.RequestCtx{Ctx: ctx, Recorder: record.NewFakeRecorder(1)}, cli, opsRes,
-		synthesizedComponent, restoreMGR, &appsv1.ClusterComponentSpec{Name: "mysql"}, backup, restoreEnv, "")
+		synthesizedComponent, restoreMGR, &appsv1.ClusterComponentSpec{Name: "mysql"}, backup, "")
 	if err != nil {
 		t.Fatalf("create restore: %v", err)
 	}
@@ -1210,7 +1211,7 @@ func TestHorizontalScalingCreateRestoreDefersBackupMethodValidationToRestorePlan
 	opsRes := &OpsResource{Cluster: cluster, OpsRequest: opsRequest}
 
 	err := horizontalScalingOpsHandler{}.createRestore(intctrlutil.RequestCtx{Ctx: ctx}, cli, opsRes,
-		&component.SynthesizedComponent{}, restoreMGR, &appsv1.ClusterComponentSpec{}, backup, nil, "")
+		&component.SynthesizedComponent{}, restoreMGR, &appsv1.ClusterComponentSpec{}, backup, "")
 	if err == nil {
 		t.Fatal("expected the restore plan to reject the incomplete Backup status")
 	}

@@ -89,9 +89,9 @@ var _ = Describe("cluster sharding shared transformers", func() {
 				SystemAccounts: []appsv1.SystemAccount{
 					{
 						Name: accountName,
-						PasswordGenerationPolicy: &appsv1.PasswordConfig{
+						PasswordGenerationPolicy: appsv1.PasswordConfig{
 							Length:    16,
-							NumDigits: ptr.To(int32(4)),
+							NumDigits: 4,
 						},
 					},
 				},
@@ -213,7 +213,7 @@ var _ = Describe("cluster sharding shared transformers", func() {
 				Name: accountName,
 				PasswordConfig: &appsv1.PasswordConfig{
 					Length:    12,
-					NumDigits: ptr.To(int32(2)),
+					NumDigits: 2,
 				},
 			},
 		}
@@ -225,7 +225,7 @@ var _ = Describe("cluster sharding shared transformers", func() {
 		Expect(account.Name).Should(Equal(accountName))
 		Expect(account.PasswordConfig).ShouldNot(BeNil())
 		Expect(account.PasswordConfig.Length).Should(Equal(int32(12)))
-		Expect(ptr.Deref(account.PasswordConfig.NumDigits, int32(-1))).Should(Equal(int32(2)))
+		Expect(account.PasswordConfig.NumDigits).Should(Equal(int32(2)))
 
 		transCtx.componentDefs = nil
 		_, err = transformer.definedSystemAccount(transCtx, sharding, accountName)
@@ -275,7 +275,7 @@ var _ = Describe("cluster sharding shared transformers", func() {
 		transformer := &clusterShardingAccountTransformer{}
 		sharding := newSharding()
 		compDef := newComponentDefinition()
-		compDef.Spec.SystemAccounts[0].PasswordGenerationPolicy = nil
+		compDef.Spec.SystemAccounts[0].PasswordGenerationPolicy = appsv1.PasswordConfig{}
 		transCtx := newTransformContext()
 		transCtx.componentDefs = map[string]*appsv1.ComponentDefinition{compDefName: compDef}
 
@@ -355,8 +355,9 @@ var _ = Describe("cluster sharding shared transformers", func() {
 		sharding.Template.SystemAccounts = []appsv1.ComponentSystemAccount{{
 			Name: accountName,
 			SecretRef: &appsv1.ProvisionSecretRef{
-				Name:     "custom-password-key",
-				Password: "minio-password",
+				Name:      "custom-password-key",
+				Namespace: namespace,
+				Password:  "minio-password",
 			},
 		}}
 		referenced := &corev1.Secret{
@@ -383,6 +384,27 @@ var _ = Describe("cluster sharding shared transformers", func() {
 			Expect(comp.SystemAccounts).Should(HaveLen(1))
 			Expect(comp.SystemAccounts[0].SecretRef.Password).Should(BeEmpty())
 		}
+	})
+
+	It("rejects a cross-namespace source secret for a shared account", func() {
+		transformer := &clusterShardingAccountTransformer{}
+		sharding := newSharding()
+		sharding.Template.SystemAccounts = []appsv1.ComponentSystemAccount{{
+			Name: accountName,
+			SecretRef: &appsv1.ProvisionSecretRef{
+				Name:      "cross-namespace-password",
+				Namespace: "restricted",
+			},
+		}}
+		referenced := &corev1.Secret{
+			ObjectMeta: metav1ObjectMeta("cross-namespace-password", "restricted"),
+			Data:       map[string][]byte{constant.AccountPasswdForSecret: []byte("shared-secret")},
+		}
+		transCtx := newTransformContext(referenced)
+		transCtx.componentDefs = map[string]*appsv1.ComponentDefinition{compDefName: newComponentDefinition()}
+
+		_, err := transformer.newSystemAccountSecret(transCtx, sharding, accountName)
+		Expect(err).Should(MatchError(ContainSubstring("cross-namespace secretRef is not supported for shared sharding system accounts")))
 	})
 
 	It("checks shared system account secret existence with a fake client", func() {

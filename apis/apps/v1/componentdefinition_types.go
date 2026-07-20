@@ -1218,7 +1218,7 @@ type SystemAccount struct {
 	Statement *SystemAccountStatement `json:"statement,omitempty"`
 
 	// Specifies the configuration for generating the account's password.
-	// If this field and passwordGenerationPolicy are both nil, the account is passwordless.
+	// If this field is nil and passwordGenerationPolicy is empty, the account is passwordless.
 	// This field takes precedence over the deprecated passwordGenerationPolicy field.
 	//
 	// This field is immutable once set.
@@ -1227,7 +1227,7 @@ type SystemAccount struct {
 	PasswordConfig *PasswordConfig `json:"passwordConfig,omitempty"`
 
 	// Specifies the legacy policy for generating the account's password.
-	// A non-nil value is used only when passwordConfig is nil.
+	// A non-empty value is used only when passwordConfig is nil.
 	//
 	// This field is immutable once set.
 	//
@@ -1236,7 +1236,7 @@ type SystemAccount struct {
 	//
 	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 1.2.0 and will be removed in 1.3.0. Use passwordConfig instead."
 	// +optional
-	PasswordGenerationPolicy *PasswordConfig `json:"passwordGenerationPolicy,omitempty"`
+	PasswordGenerationPolicy PasswordConfig `json:"passwordGenerationPolicy,omitzero"`
 }
 
 type SystemAccountStatement struct {

@@ -446,7 +446,7 @@ type PasswordConfig struct {
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:default=4
 	// +optional
-	NumDigits *int32 `json:"numDigits,omitempty"`
+	NumDigits int32 `json:"numDigits,omitempty"`
 
 	// The number of symbols in the password.
 	//

@@ -29,7 +29,6 @@ import (
 	"unicode"
 
 	"github.com/sethvargo/go-password/password"
-	"k8s.io/utils/ptr"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
@@ -37,7 +36,6 @@ import (
 const (
 	// defaultSymbols is the list of default symbols to generate password.
 	defaultSymbols                     = "!@#&*"
-	defaultPasswordNumDigits           = int32(4)
 	maximumSystemAccountPasswordLength = 64
 )
 
@@ -54,7 +52,7 @@ func (r *passwordReader) Seed(seed int64) {
 }
 
 func GeneratePasswordByConfig(config appsv1.PasswordConfig) (string, error) {
-	passwd, err := generatePassword((int)(config.Length), int(ptr.Deref(config.NumDigits, defaultPasswordNumDigits)), (int)(config.NumSymbols), config.Seed, config.SymbolCharacters)
+	passwd, err := generatePassword((int)(config.Length), (int)(config.NumDigits), (int)(config.NumSymbols), config.Seed, config.SymbolCharacters)
 	if err != nil {
 		return "", err
 	}
@@ -70,17 +68,16 @@ func GeneratePasswordByConfig(config appsv1.PasswordConfig) (string, error) {
 }
 
 // GenerateSystemAccountPassword resolves the ComponentDefinition-level
-// password contract. The pointer field preserves presence and takes precedence
+// password contract. The new field preserves presence and takes precedence
 // over the legacy field. No configuration means passwordless.
 func GenerateSystemAccountPassword(account appsv1.SystemAccount) (string, error) {
-	config := account.PasswordConfig
-	if config == nil {
-		config = account.PasswordGenerationPolicy
+	if account.PasswordConfig != nil {
+		return GeneratePasswordByConfig(*account.PasswordConfig)
 	}
-	if config == nil {
+	if account.PasswordGenerationPolicy == (appsv1.PasswordConfig{}) {
 		return "", nil
 	}
-	return GeneratePasswordByConfig(*config)
+	return GeneratePasswordByConfig(account.PasswordGenerationPolicy)
 }
 
 // ValidateSystemAccountPassword enforces the password contract shared by all

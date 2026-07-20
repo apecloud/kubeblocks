@@ -31,7 +31,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/utils/ptr"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -42,20 +41,12 @@ import (
 )
 
 var _ = Describe("component system account API contract", func() {
-	It("preserves omitted generation policy and an explicit zero digit count through the API", func() {
+	It("preserves an omitted legacy generation policy through the typed API", func() {
 		compDef := testapps.NewComponentDefinitionFactory("system-account-wire-contract").
 			SetDefaultSpec().
 			GetObject()
 		compDef.Spec.SystemAccounts = []appsv1.SystemAccount{
 			{Name: "passwordless"},
-			{
-				Name: "zero-digits",
-				PasswordConfig: &appsv1.PasswordConfig{
-					Length:     8,
-					NumDigits:  ptr.To(int32(0)),
-					LetterCase: appsv1.LowerCases,
-				},
-			},
 		}
 
 		Expect(k8sClient.Create(ctx, compDef)).To(Succeed())
@@ -70,12 +61,46 @@ var _ = Describe("component system account API contract", func() {
 		accounts, found, err := unstructured.NestedSlice(stored.Object, "spec", "systemAccounts")
 		Expect(err).NotTo(HaveOccurred())
 		Expect(found).To(BeTrue())
-		Expect(accounts).To(HaveLen(2))
+		Expect(accounts).To(HaveLen(1))
 		Expect(accounts[0]).To(HaveKey("name"))
 		Expect(accounts[0]).NotTo(HaveKey("passwordGenerationPolicy"))
+	})
+
+	It("preserves an explicit zero digit count from an unstructured API request", func() {
+		compDef := testapps.NewComponentDefinitionFactory("system-account-zero-digits").
+			SetDefaultSpec().
+			GetObject()
+		object, err := runtime.DefaultUnstructuredConverter.ToUnstructured(compDef)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(unstructured.SetNestedSlice(object, []interface{}{
+			map[string]interface{}{
+				"name": "zero-digits",
+				"passwordConfig": map[string]interface{}{
+					"length":     int64(8),
+					"numDigits":  int64(0),
+					"letterCase": string(appsv1.LowerCases),
+				},
+			},
+		}, "spec", "systemAccounts")).To(Succeed())
+		request := &unstructured.Unstructured{Object: object}
+		request.SetGroupVersionKind(appsv1.GroupVersion.WithKind("ComponentDefinition"))
+
+		Expect(k8sClient.Create(ctx, request)).To(Succeed())
+		DeferCleanup(func() {
+			Expect(ctrlclient.IgnoreNotFound(k8sClient.Delete(ctx, request))).To(Succeed())
+		})
+
+		stored := &unstructured.Unstructured{}
+		stored.SetGroupVersionKind(appsv1.GroupVersion.WithKind("ComponentDefinition"))
+		Expect(k8sClient.Get(ctx, ctrlclient.ObjectKeyFromObject(request), stored)).To(Succeed())
+
+		accounts, found, err := unstructured.NestedSlice(stored.Object, "spec", "systemAccounts")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(found).To(BeTrue())
+		Expect(accounts).To(HaveLen(1))
 
 		passwordConfig, found, err := unstructured.NestedMap(
-			accounts[1].(map[string]interface{}), "passwordConfig")
+			accounts[0].(map[string]interface{}), "passwordConfig")
 		Expect(err).NotTo(HaveOccurred())
 		Expect(found).To(BeTrue())
 		Expect(passwordConfig).To(HaveKeyWithValue("numDigits", BeEquivalentTo(0)))

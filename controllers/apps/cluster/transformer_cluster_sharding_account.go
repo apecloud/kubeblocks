@@ -178,10 +178,10 @@ func (t *clusterShardingAccountTransformer) buildPassword(transCtx *clusterTrans
 
 func (t *clusterShardingAccountTransformer) getPasswordFromSecret(transCtx *clusterTransformContext,
 	secretRef *appsv1.ProvisionSecretRef) ([]byte, error) {
-	secretKey := types.NamespacedName{Namespace: secretRef.Namespace, Name: secretRef.Name}
-	if secretKey.Namespace == "" {
-		secretKey.Namespace = transCtx.Cluster.Namespace
+	if secretRef.Namespace != "" && secretRef.Namespace != transCtx.Cluster.Namespace {
+		return nil, fmt.Errorf("cross-namespace secretRef is not supported for shared sharding system accounts")
 	}
+	secretKey := types.NamespacedName{Namespace: transCtx.Cluster.Namespace, Name: secretRef.Name}
 	secret := &corev1.Secret{}
 	if err := transCtx.GetClient().Get(transCtx.GetContext(), secretKey, secret); err != nil {
 		return nil, err

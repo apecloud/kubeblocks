@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	gatewayv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -229,10 +230,48 @@ func deleteRestoreJob(reqCtx intctrlutil.RequestCtx, cli client.Client, jobKey s
 	return intctrlutil.BackgroundDeleteObject(cli, reqCtx.Ctx, job)
 }
 
+// ValidateBackupReferenceGrant authorizes a cross-namespace Restore to read its referenced Backup.
+func ValidateBackupReferenceGrant(reqCtx intctrlutil.RequestCtx, cli client.Client, restore *dpv1alpha1.Restore) error {
+	backupRef := restore.Spec.Backup
+	if backupRef.Namespace == restore.Namespace {
+		return nil
+	}
+
+	grants := &gatewayv1beta1.ReferenceGrantList{}
+	if err := cli.List(reqCtx.Ctx, grants, client.InNamespace(backupRef.Namespace)); err != nil {
+		return fmt.Errorf("failed to evaluate ReferenceGrant for Backup %s/%s: %w", backupRef.Namespace, backupRef.Name, err)
+	}
+	group := dpv1alpha1.GroupVersion.Group
+	for i := range grants.Items {
+		fromAllowed := false
+		for _, from := range grants.Items[i].Spec.From {
+			if string(from.Group) == group && string(from.Kind) == "Restore" && string(from.Namespace) == restore.Namespace {
+				fromAllowed = true
+				break
+			}
+		}
+		if !fromAllowed {
+			continue
+		}
+		for _, to := range grants.Items[i].Spec.To {
+			if string(to.Group) != group || string(to.Kind) != "Backup" {
+				continue
+			}
+			if to.Name == nil || string(*to.Name) == backupRef.Name {
+				return nil
+			}
+		}
+	}
+	return intctrlutil.NewFatalError(fmt.Sprintf("cross-namespace Backup %s/%s requires a matching ReferenceGrant for Restore namespace %s", backupRef.Namespace, backupRef.Name, restore.Namespace))
+}
+
 // ValidateAndInitRestoreMGR validate if the restore CR is valid and init the restore manager.
 func ValidateAndInitRestoreMGR(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	restoreMgr *RestoreManager) error {
+	if err := ValidateBackupReferenceGrant(reqCtx, cli, restoreMgr.Restore); err != nil {
+		return err
+	}
 
 	// get backupActionSet based on the specified backup name.
 	backupName := restoreMgr.Restore.Spec.Backup.Name
@@ -248,7 +287,9 @@ func ValidateAndInitRestoreMGR(reqCtx intctrlutil.RequestCtx,
 		}
 	}
 
-	// TODO: check if there is permission for cross namespace recovery.
+	if backupSet.UseVolumeSnapshot && backupSet.Backup.Namespace != restoreMgr.Restore.Namespace {
+		return intctrlutil.NewFatalError(fmt.Sprintf("cross-namespace VolumeSnapshot restore from Backup %s/%s is not supported", backupSet.Backup.Namespace, backupName))
+	}
 
 	// check if the backup is completed exclude continuous backup.
 	backupType := utils.GetBackupType(backupSet.ActionSet, &backupSet.UseVolumeSnapshot)

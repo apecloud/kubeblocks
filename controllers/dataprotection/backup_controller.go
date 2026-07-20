@@ -247,11 +247,11 @@ func (r *BackupReconciler) deleteBackupFiles(reqCtx intctrlutil.RequestCtx, back
 		return deleteBackup()
 	case dpbackup.DeletionStatusFailed:
 		failureReason := err.Error()
-		if backup.Status.FailureReason == failureReason {
+		if backup.Status.DeletionFailureReason == failureReason {
 			return nil
 		}
 		backupPatch := client.MergeFrom(backup.DeepCopy())
-		backup.Status.FailureReason = failureReason
+		backup.Status.DeletionFailureReason = failureReason
 		r.Recorder.Event(backup, corev1.EventTypeWarning, "DeleteBackupFilesFailed", failureReason)
 		return r.Status().Patch(reqCtx.Ctx, backup, backupPatch)
 	case dpbackup.DeletionStatusDeleting,
@@ -272,12 +272,12 @@ func (r *BackupReconciler) recordBackupDeletionBlocker(
 		return err
 	}
 
-	failureReason := err.Error()
-	if backup.Status.FailureReason == failureReason {
+	deletionFailureReason := err.Error()
+	if backup.Status.DeletionFailureReason == deletionFailureReason {
 		return err
 	}
 	backupPatch := client.MergeFrom(backup.DeepCopy())
-	backup.Status.FailureReason = failureReason
+	backup.Status.DeletionFailureReason = deletionFailureReason
 	if patchErr := r.Status().Patch(reqCtx.Ctx, backup, backupPatch); patchErr != nil {
 		return patchErr
 	}

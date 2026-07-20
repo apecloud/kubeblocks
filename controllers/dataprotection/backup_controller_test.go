@@ -131,6 +131,7 @@ func TestDeleteBackupFilesRecordsTerminatingNamespaceBlockerWithoutStoppingRetry
 		Spec: dpv1alpha1.BackupSpec{DeletionPolicy: dpv1alpha1.BackupDeletionPolicyDelete},
 		Status: dpv1alpha1.BackupStatus{
 			Phase:          dpv1alpha1.BackupPhaseDeleting,
+			FailureReason:  "backup execution failed",
 			BackupRepoName: "repo",
 			Path:           "/backups/backup",
 		},
@@ -153,7 +154,8 @@ func TestDeleteBackupFilesRecordsTerminatingNamespaceBlockerWithoutStoppingRetry
 
 	stored := &dpv1alpha1.Backup{}
 	g.Expect(baseClient.Get(reqCtx.Ctx, client.ObjectKeyFromObject(backup), stored)).To(Succeed())
-	g.Expect(stored.Status.FailureReason).To(Equal(err.Error()))
+	g.Expect(stored.Status.FailureReason).To(Equal("backup execution failed"))
+	g.Expect(stored.Status.DeletionFailureReason).To(Equal(err.Error()))
 	g.Expect(controllerutil.ContainsFinalizer(stored, dptypes.DataProtectionFinalizerName)).To(BeTrue())
 
 	jobs := &batchv1.JobList{}
@@ -198,6 +200,7 @@ func TestDeleteBackupFilesDoesNotRecordOrdinaryDeletingError(t *testing.T) {
 	g.Expect(err).To(MatchError("get failed"))
 	g.Expect(countingClient.statusPatchCount).To(Equal(0))
 	g.Expect(backup.Status.FailureReason).To(BeEmpty())
+	g.Expect(backup.Status.DeletionFailureReason).To(BeEmpty())
 }
 
 func TestDeleteBackupFilesReturnsStatusPatchError(t *testing.T) {
@@ -243,6 +246,7 @@ func TestDeleteBackupFilesReturnsStatusPatchError(t *testing.T) {
 	stored := &dpv1alpha1.Backup{}
 	g.Expect(baseClient.Get(context.Background(), client.ObjectKeyFromObject(backup), stored)).To(Succeed())
 	g.Expect(stored.Status.FailureReason).To(BeEmpty())
+	g.Expect(stored.Status.DeletionFailureReason).To(BeEmpty())
 }
 
 func TestSyncJobActions(t *testing.T) {

@@ -62,8 +62,8 @@ const (
 // ReconcileActionObservation advances one durable Action observation.
 //
 // A new invocation is persisted as Pending and then Running before execute is
-// called. Action failures are normalized into status so the workload controller
-// can commit the result instead of losing it by returning an error.
+// called. Explicitly non-retryable normalized failures are committed as terminal
+// status; retryable and unclassified execution errors are returned for retry.
 func ReconcileActionObservation(statuses *[]appsv1.LifecycleActionStatus, key ActionObservationKey,
 	execute func() error) (ActionObservationState, error) {
 	if statuses == nil {

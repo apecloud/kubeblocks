@@ -21,6 +21,7 @@ package instanceset
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"time"
 
@@ -61,7 +62,7 @@ var _ = Describe("update reconciler test", func() {
 			Expect(reconfigureOptions(workloads.ConfigTemplate{})).Should(BeNil())
 		})
 
-		It("persists each reconfigure transition and does not redispatch a terminal failure", func() {
+		It("persists setup transitions and retries an unclassified failure", func() {
 			spy := &lifecycleCallSpy{reconfigureErr: lifecycle.ErrActionFailed}
 			origNewLifecycleAction := newLifecycleAction
 			newLifecycleAction = func(_ *workloads.InstanceSet, _ *kubebuilderx.ObjectTree, _ *corev1.Pod) (lifecycle.Lifecycle, error) {
@@ -85,7 +86,6 @@ var _ = Describe("update reconciler test", func() {
 			for _, wantPhase := range []kbappsv1.LifecycleActionPhase{
 				kbappsv1.LifecycleActionPending,
 				kbappsv1.LifecycleActionRunning,
-				kbappsv1.LifecycleActionFailed,
 			} {
 				state, err := reconciler.reconfigureInst(tree, workload, pod, config)
 				Expect(err).ShouldNot(HaveOccurred())
@@ -101,11 +101,59 @@ var _ = Describe("update reconciler test", func() {
 				Expect(status.Target).Should(Equal(&kbappsv1.LifecycleActionTarget{PodName: pod.Name, PodUID: string(pod.UID)}))
 			}
 
-			state, err := reconciler.reconfigureInst(tree, workload, pod, config)
+			for attempt := 1; attempt <= 2; attempt++ {
+				state, err := reconciler.reconfigureInst(tree, workload, pod, config)
+				Expect(errors.Is(err, lifecycle.ErrActionFailed)).Should(BeTrue())
+				Expect(state).Should(BeEmpty())
+				Expect(spy.reconfigureCalls).Should(Equal(attempt))
+				status := workload.Status.InstanceStatus[0].LifecycleActions[0]
+				Expect(status.Phase).Should(Equal(kbappsv1.LifecycleActionRunning))
+				Expect(status.CompletionTime).Should(BeNil())
+				Expect(status.Code).Should(BeEmpty())
+				Expect(status.Retryable).Should(BeNil())
+			}
+		})
+
+		It("does not redispatch a persisted terminal failure", func() {
+			spy := &lifecycleCallSpy{}
+			origNewLifecycleAction := newLifecycleAction
+			newLifecycleAction = func(_ *workloads.InstanceSet, _ *kubebuilderx.ObjectTree, _ *corev1.Pod) (lifecycle.Lifecycle, error) {
+				return spy, nil
+			}
+			defer func() { newLifecycleAction = origNewLifecycleAction }()
+
+			pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "mysql-0", UID: types.UID("pod-uid")}}
+			config := workloads.ConfigTemplate{
+				Name:       "mysql-config",
+				ConfigHash: ptr.To("target-hash"),
+				Reconfigure: &kbappsv1.Action{
+					Exec: &kbappsv1.ExecAction{Command: []string{"false"}},
+				},
+			}
+			workload := &workloads.InstanceSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "mysql", Namespace: "default"},
+				Status: workloads.InstanceSetStatus{InstanceStatus: []workloads.InstanceStatus{{
+					PodName: pod.Name,
+					PodUID:  string(pod.UID),
+					LifecycleActions: []kbappsv1.LifecycleActionStatus{{
+						Action:    kbappsv1.LifecycleActionReconfigure,
+						Subject:   config.Name,
+						Revision:  *config.ConfigHash,
+						Target:    &kbappsv1.LifecycleActionTarget{PodName: pod.Name, PodUID: string(pod.UID)},
+						Phase:     kbappsv1.LifecycleActionFailed,
+						Message:   "lifecycle action failed",
+						Code:      "InvalidParameter",
+						Retryable: ptr.To(false),
+					}},
+				}}},
+			}
+			tree := kubebuilderx.NewObjectTree()
+			tree.SetRoot(workload)
+
+			state, err := (&updateReconciler{}).reconfigureInst(tree, workload, pod, config)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(state).Should(Equal(lifecycle.ActionObservationFailed))
-			Expect(spy.reconfigureCalls).Should(Equal(1))
-			Expect(workload.Status.InstanceStatus[0].LifecycleActions[0].Message).Should(Equal("lifecycle action failed"))
+			Expect(spy.reconfigureCalls).Should(BeZero())
 		})
 	})
 

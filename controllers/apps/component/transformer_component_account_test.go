@@ -24,15 +24,63 @@ import (
 	"strings"
 	"testing"
 
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/utils/ptr"
+	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	pkgcomponent "github.com/apecloud/kubeblocks/pkg/controller/component"
+	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
+
+var _ = Describe("component system account API contract", func() {
+	It("preserves omitted generation policy and an explicit zero digit count through the API", func() {
+		compDef := testapps.NewComponentDefinitionFactory("system-account-wire-contract").
+			SetDefaultSpec().
+			GetObject()
+		compDef.Spec.SystemAccounts = []appsv1.SystemAccount{
+			{Name: "passwordless"},
+			{
+				Name: "zero-digits",
+				PasswordConfig: &appsv1.PasswordConfig{
+					Length:     8,
+					NumDigits:  ptr.To(int32(0)),
+					LetterCase: appsv1.LowerCases,
+				},
+			},
+		}
+
+		Expect(k8sClient.Create(ctx, compDef)).To(Succeed())
+		DeferCleanup(func() {
+			Expect(ctrlclient.IgnoreNotFound(k8sClient.Delete(ctx, compDef))).To(Succeed())
+		})
+
+		stored := &unstructured.Unstructured{}
+		stored.SetGroupVersionKind(appsv1.GroupVersion.WithKind("ComponentDefinition"))
+		Expect(k8sClient.Get(ctx, ctrlclient.ObjectKeyFromObject(compDef), stored)).To(Succeed())
+
+		accounts, found, err := unstructured.NestedSlice(stored.Object, "spec", "systemAccounts")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(found).To(BeTrue())
+		Expect(accounts).To(HaveLen(2))
+		Expect(accounts[0]).To(HaveKey("name"))
+		Expect(accounts[0]).NotTo(HaveKey("passwordGenerationPolicy"))
+
+		passwordConfig, found, err := unstructured.NestedMap(
+			accounts[1].(map[string]interface{}), "passwordConfig")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(found).To(BeTrue())
+		Expect(passwordConfig).To(HaveKeyWithValue("numDigits", BeEquivalentTo(0)))
+	})
+})
 
 func TestBuildAccountSecretPreservesEmptyReferencedPassword(t *testing.T) {
 	scheme := runtime.NewScheme()

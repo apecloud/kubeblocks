@@ -240,9 +240,6 @@ func (t *clusterShardingAccountTransformer) rewriteSystemAccount(transCtx *clust
 			for j, account := range sharding.Template.SystemAccounts {
 				if account.Name == accountName {
 					newAccount.Disabled = account.Disabled
-					if account.SecretRef != nil {
-						newAccount.SecretRef.Password = account.SecretRef.Password
-					}
 					transCtx.shardings[i].Template.SystemAccounts[j] = newAccount
 					exist = true
 					break

@@ -161,10 +161,7 @@ func switchoverPreCheck(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes
 	}
 
 	for _, switchover := range switchoverList {
-		compName, err := getSwitchoverClusterComponentName(reqCtx.Ctx, cli, opsRes.Cluster, switchover)
-		if err != nil {
-			return err
-		}
+		compName := switchover.GetComponentName()
 		synthesizedComp, err := buildSynthesizedComp(reqCtx.Ctx, cli, opsRes, switchover)
 		if err != nil {
 			return err

@@ -169,7 +169,8 @@ func (r *reconfigureAction) aggregatePhase(reqCtx intctrlutil.RequestCtx, cli cl
 	}
 
 	allFinished := true
-	failed := make([]*parametersv1alpha1.ComponentParameter, 0)
+	failedTargets := make([]reconfigureTarget, 0)
+	failedParameters := make([]*parametersv1alpha1.ComponentParameter, 0)
 	for _, target := range targets {
 		if target.parameter.Generation != target.parameter.Status.ObservedGeneration {
 			allFinished = false
@@ -177,30 +178,31 @@ func (r *reconfigureAction) aggregatePhase(reqCtx intctrlutil.RequestCtx, cli cl
 		}
 		switch target.parameter.Status.Phase {
 		case parametersv1alpha1.CMergeFailedPhase, parametersv1alpha1.CFailedAndPausePhase:
-			failed = append(failed, target.parameter)
+			failedTargets = append(failedTargets, target)
+			failedParameters = append(failedParameters, target.parameter)
 			allFinished = false
 		case parametersv1alpha1.CFinishedPhase:
 		default:
 			allFinished = false
 		}
 	}
-	if len(failed) == 0 {
+	if len(failedTargets) == 0 {
 		if allFinished {
 			return opsv1alpha1.OpsSucceedPhase, "", nil
 		}
 		return opsv1alpha1.OpsRunningPhase, "", nil
 	}
-	if !rollbackSnapshotsAvailable(resource.OpsRequest, targets) {
-		return opsv1alpha1.OpsFailedPhase, failed[0].Status.Message, nil
+	if !rollbackSnapshotsAvailable(resource.OpsRequest, failedTargets) {
+		return opsv1alpha1.OpsFailedPhase, failedTargets[0].parameter.Status.Message, nil
 	}
-	if !rollbackOwnershipCurrent(resource.OpsRequest, targets) {
+	if !rollbackOwnershipCurrent(resource.OpsRequest, failedTargets) {
 		resource.OpsRequest.Status.ReconfigureRollback = &opsv1alpha1.ReconfigureRollbackStatus{
 			Phase:   opsv1alpha1.ReconfigureManualCleanupRequired,
 			Message: reconfigureManualMessage,
 		}
 		return opsv1alpha1.OpsFailedPhase, reconfigureManualMessage, nil
 	}
-	code, retryable, deterministic := classifyDeterministicReconfigureFailure(failed)
+	code, retryable, deterministic := classifyDeterministicReconfigureFailure(failedParameters)
 	if !deterministic {
 		resource.OpsRequest.Status.ReconfigureRollback = &opsv1alpha1.ReconfigureRollbackStatus{
 			Phase:   opsv1alpha1.ReconfigureManualCleanupRequired,
@@ -210,12 +212,13 @@ func (r *reconfigureAction) aggregatePhase(reqCtx intctrlutil.RequestCtx, cli cl
 	}
 	now := metav1.Now()
 	resource.OpsRequest.Status.ReconfigureRollback = &opsv1alpha1.ReconfigureRollbackStatus{
-		Phase:           opsv1alpha1.ReconfigureRollbackPending,
-		StartTime:       &now,
-		Code:            code,
-		Retryable:       retryable,
-		RestartRequired: rollbackRestartRequired(targets),
-		Message:         "normalized reconfigure failure accepted for rollback",
+		Phase:                opsv1alpha1.ReconfigureRollbackPending,
+		StartTime:            &now,
+		Code:                 code,
+		Retryable:            retryable,
+		ComponentGenerations: rollbackTargetGenerations(failedTargets),
+		RestartRequired:      rollbackRestartRequired(failedTargets),
+		Message:              "normalized reconfigure failure accepted for rollback",
 	}
 	if reconfigureRollbackTimedOut(resource.OpsRequest) {
 		setReconfigureManualCleanup(resource.OpsRequest.Status.ReconfigureRollback,
@@ -488,9 +491,51 @@ func rollbackRestartRequired(targets []reconfigureTarget) bool {
 	return len(targets) > 0
 }
 
+func rollbackTargetGenerations(targets []reconfigureTarget) map[string]int64 {
+	result := make(map[string]int64, len(targets))
+	for _, target := range targets {
+		result[target.component] = target.parameter.Generation
+	}
+	return result
+}
+
+func selectRollbackTargets(status *opsv1alpha1.ReconfigureRollbackStatus,
+	targets []reconfigureTarget) ([]reconfigureTarget, string) {
+	if len(status.ComponentGenerations) == 0 {
+		return nil, "automatic rollback target set is missing"
+	}
+	selected := make([]reconfigureTarget, 0, len(status.ComponentGenerations))
+	for _, target := range targets {
+		if _, ok := status.ComponentGenerations[target.component]; ok {
+			selected = append(selected, target)
+		}
+	}
+	if len(selected) != len(status.ComponentGenerations) {
+		known := make(map[string]struct{}, len(selected))
+		for _, target := range selected {
+			known[target.component] = struct{}{}
+		}
+		missing := make([]string, 0)
+		for component := range status.ComponentGenerations {
+			if _, ok := known[component]; !ok {
+				missing = append(missing, component)
+			}
+		}
+		sort.Strings(missing)
+		return nil, fmt.Sprintf("rollback target components no longer exist: %v", missing)
+	}
+	return selected, ""
+}
+
 func (r *reconfigureAction) reconcileRollback(reqCtx intctrlutil.RequestCtx, cli client.Client,
 	resource *OpsResource, targets []reconfigureTarget) (opsv1alpha1.OpsPhase, string, error) {
 	status := resource.OpsRequest.Status.ReconfigureRollback
+	if status.Phase == opsv1alpha1.ReconfigureRolledBack {
+		return opsv1alpha1.OpsFailedPhase, reconfigureRolledBackMessage, nil
+	}
+	if status.Phase == opsv1alpha1.ReconfigureManualCleanupRequired {
+		return opsv1alpha1.OpsFailedPhase, reconfigureManualMessage, nil
+	}
 	if status.Phase != opsv1alpha1.ReconfigureRolledBack && status.Phase != opsv1alpha1.ReconfigureManualCleanupRequired &&
 		(status.StartTime == nil || status.StartTime.IsZero()) {
 		setReconfigureManualCleanup(status, "automatic rollback start time is missing")
@@ -501,9 +546,14 @@ func (r *reconfigureAction) reconcileRollback(reqCtx intctrlutil.RequestCtx, cli
 		setReconfigureManualCleanup(status, "automatic rollback exceeded the OpsRequest timeout")
 		return opsv1alpha1.OpsFailedPhase, reconfigureManualMessage, nil
 	}
+	rollbackTargets, manualReason := selectRollbackTargets(status, targets)
+	if manualReason != "" {
+		setReconfigureManualCleanup(status, manualReason)
+		return opsv1alpha1.OpsFailedPhase, reconfigureManualMessage, nil
+	}
 	switch status.Phase {
 	case opsv1alpha1.ReconfigureRollbackPending:
-		generations, manualReason, err := r.restoreParameterSnapshots(reqCtx, cli, resource, targets)
+		generations, manualReason, err := r.restoreParameterSnapshots(reqCtx, cli, resource, rollbackTargets)
 		if err != nil {
 			return "", "", err
 		}
@@ -517,14 +567,14 @@ func (r *reconfigureAction) reconcileRollback(reqCtx intctrlutil.RequestCtx, cli
 		return opsv1alpha1.OpsRunningPhase, "", nil
 
 	case opsv1alpha1.ReconfigureRollingBack:
-		ready, cleared, err := prepareRollbackFailureGates(reqCtx.Ctx, cli, resource.Cluster, targets, status.ComponentGenerations)
+		ready, cleared, err := prepareRollbackFailureGates(reqCtx.Ctx, cli, resource.Cluster, rollbackTargets, status.ComponentGenerations)
 		if err != nil {
 			return "", "", err
 		}
 		if !ready || cleared {
 			return opsv1alpha1.OpsRunningPhase, "", nil
 		}
-		completed, manualReason := rollbackParametersConverged(resource.OpsRequest, targets)
+		completed, manualReason := rollbackParametersConverged(resource.OpsRequest, rollbackTargets)
 		if manualReason != "" {
 			setReconfigureManualCleanup(status, manualReason)
 			return opsv1alpha1.OpsFailedPhase, reconfigureManualMessage, nil
@@ -533,6 +583,10 @@ func (r *reconfigureAction) reconcileRollback(reqCtx intctrlutil.RequestCtx, cli
 			return opsv1alpha1.OpsRunningPhase, "", nil
 		}
 		if status.RestartRequired {
+			if manualReason := validateRollbackRestartScope(rollbackTargets, targets); manualReason != "" {
+				setReconfigureManualCleanup(status, manualReason)
+				return opsv1alpha1.OpsFailedPhase, reconfigureManualMessage, nil
+			}
 			now := metav1.Now()
 			status.RestartAt = &now
 			status.Phase = opsv1alpha1.ReconfigureRestartPending
@@ -545,7 +599,7 @@ func (r *reconfigureAction) reconcileRollback(reqCtx intctrlutil.RequestCtx, cli
 		return opsv1alpha1.OpsRunningPhase, "", nil
 
 	case opsv1alpha1.ReconfigureRestartPending:
-		generation, manualReason, err := r.restartRollbackTargets(reqCtx, cli, resource, targets)
+		generation, manualReason, err := r.restartRollbackTargets(reqCtx, cli, resource, rollbackTargets)
 		if err != nil {
 			return "", "", err
 		}
@@ -559,7 +613,7 @@ func (r *reconfigureAction) reconcileRollback(reqCtx intctrlutil.RequestCtx, cli
 		return opsv1alpha1.OpsRunningPhase, "", nil
 
 	case opsv1alpha1.ReconfigureRestarting:
-		completed, manualReason, err := restartRollbackConverged(reqCtx.Ctx, cli, resource, targets)
+		completed, manualReason, err := restartRollbackConverged(reqCtx.Ctx, cli, resource, rollbackTargets)
 		if err != nil {
 			return "", "", err
 		}
@@ -582,6 +636,24 @@ func (r *reconfigureAction) reconcileRollback(reqCtx intctrlutil.RequestCtx, cli
 		setReconfigureManualCleanup(status, "unknown persisted rollback phase")
 		return opsv1alpha1.OpsFailedPhase, reconfigureManualMessage, nil
 	}
+}
+
+func validateRollbackRestartScope(rollbackTargets, allTargets []reconfigureTarget) string {
+	totalByRequest := make(map[string]int, len(allTargets))
+	for _, target := range allTargets {
+		totalByRequest[target.requestName]++
+	}
+	selectedByRequest := make(map[string]int, len(rollbackTargets))
+	for _, target := range rollbackTargets {
+		selectedByRequest[target.requestName]++
+	}
+	for _, target := range rollbackTargets {
+		if target.requestName != target.component && selectedByRequest[target.requestName] != totalByRequest[target.requestName] {
+			return fmt.Sprintf("automatic rollback cannot restart only failed component %s from sharding %s",
+				target.component, target.requestName)
+		}
+	}
+	return ""
 }
 
 func reconfigureRollbackTimedOut(opsRequest *opsv1alpha1.OpsRequest) bool {

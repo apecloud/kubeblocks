@@ -20,18 +20,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"context"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	parameterscore "github.com/apecloud/kubeblocks/pkg/parameters/core"
 )
 
 func TestSnapshotParameterAssignmentsPreservesPresenceAndNil(t *testing.T) {
@@ -307,6 +313,105 @@ func TestRollbackRestartRequiredIsConservativeAfterAnyDispatch(t *testing.T) {
 	require.True(t, rollbackRestartRequired([]reconfigureTarget{nonterminal}),
 		"a nonterminal item cannot prove that no instance applied H1")
 	require.False(t, rollbackRestartRequired(nil))
+}
+
+func TestAggregatePhaseScopesRollbackToFailedComponents(t *testing.T) {
+	const (
+		namespace     = "default"
+		clusterName   = "cluster"
+		failedComp    = "mysql"
+		succeededComp = "proxy"
+	)
+	uid := types.UID("ops-uid")
+	h1 := ptr.To("200")
+	newComponentParameter := func(component string, phase parametersv1alpha1.ParameterPhase) *parametersv1alpha1.ComponentParameter {
+		compParam := &parametersv1alpha1.ComponentParameter{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:   namespace,
+				Name:        parameterscore.GenerateComponentConfigurationName(clusterName, component),
+				UID:         types.UID(component + "-uid"),
+				Generation:  2,
+				Annotations: map[string]string{constant.OpsRequestUIDAnnotationKey: string(uid)},
+			},
+			Spec: parametersv1alpha1.ComponentParameterSpec{Desired: &parametersv1alpha1.ParameterInputs{
+				Assignments: map[string]*string{"max_connections": h1},
+			}},
+			Status: parametersv1alpha1.ComponentParameterStatus{ObservedGeneration: 2, Phase: phase},
+		}
+		if phase == parametersv1alpha1.CMergeFailedPhase {
+			compParam.Status.ConfigurationItemStatus = []parametersv1alpha1.ConfigTemplateItemDetailStatus{{
+				Phase:          parametersv1alpha1.CMergeFailedPhase,
+				UpdateRevision: "2",
+				ReconcileDetail: &parametersv1alpha1.ReconcileDetail{
+					CurrentRevision: "2",
+					Code:            invalidParameterActionResultCode,
+					Retryable:       ptr.To(false),
+				},
+			}}
+		}
+		return compParam
+	}
+	failed := newComponentParameter(failedComp, parametersv1alpha1.CMergeFailedPhase)
+	succeeded := newComponentParameter(succeededComp, parametersv1alpha1.CFinishedPhase)
+	cluster := &appsv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: clusterName},
+		Spec: appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{
+			{Name: failedComp},
+			{Name: succeededComp},
+		}},
+	}
+	opsRequest := &opsv1alpha1.OpsRequest{
+		ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "reconfigure", UID: uid},
+		Spec: opsv1alpha1.OpsRequestSpec{SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{
+			Reconfigures: []opsv1alpha1.Reconfigure{
+				{ComponentOps: opsv1alpha1.ComponentOps{ComponentName: failedComp}, Parameters: []opsv1alpha1.ParameterPair{{Key: "max_connections", Value: h1}}},
+				{ComponentOps: opsv1alpha1.ComponentOps{ComponentName: succeededComp}, Parameters: []opsv1alpha1.ParameterPair{{Key: "max_connections", Value: h1}}},
+			},
+		}},
+		Status: opsv1alpha1.OpsRequestStatus{LastConfiguration: opsv1alpha1.LastConfiguration{Components: map[string]opsv1alpha1.LastComponentConfiguration{
+			failedComp:    {Parameters: []opsv1alpha1.LastParameterAssignment{{Key: "max_connections", Present: true, Value: ptr.To("100")}}},
+			succeededComp: {Parameters: []opsv1alpha1.LastParameterAssignment{{Key: "max_connections", Present: true, Value: ptr.To("100")}}},
+		}}},
+	}
+	scheme := runtime.NewScheme()
+	require.NoError(t, parametersv1alpha1.AddToScheme(scheme))
+	objects := []client.Object{failed, succeeded}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).Build()
+	resource := &OpsResource{Cluster: cluster, OpsRequest: opsRequest}
+
+	phase, _, err := (&reconfigureAction{}).aggregatePhase(intctrlutil.RequestCtx{Ctx: context.Background()}, cli, resource)
+
+	require.NoError(t, err)
+	require.Equal(t, opsv1alpha1.OpsRunningPhase, phase)
+	require.NotNil(t, opsRequest.Status.ReconfigureRollback)
+	require.Equal(t, map[string]int64{failedComp: failed.Generation},
+		opsRequest.Status.ReconfigureRollback.ComponentGenerations,
+		"the persisted compensation target set must not include a successful independent component")
+	require.True(t, opsRequest.Status.ReconfigureRollback.RestartRequired)
+
+	phase, _, err = (&reconfigureAction{}).aggregatePhase(intctrlutil.RequestCtx{Ctx: context.Background()}, cli, resource)
+	require.NoError(t, err)
+	require.Equal(t, opsv1alpha1.OpsRunningPhase, phase)
+	currentFailed := &parametersv1alpha1.ComponentParameter{}
+	require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(failed), currentFailed))
+	require.Equal(t, ptr.To("100"), currentFailed.Spec.Desired.Assignments["max_connections"])
+	currentSucceeded := &parametersv1alpha1.ComponentParameter{}
+	require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(succeeded), currentSucceeded))
+	require.Equal(t, h1, currentSucceeded.Spec.Desired.Assignments["max_connections"],
+		"a successful independent component must retain its applied H1 value")
+}
+
+func TestValidateRollbackRestartScopeRejectsPartialShardingRestart(t *testing.T) {
+	allTargets := []reconfigureTarget{
+		{requestName: "redis", component: "redis-0"},
+		{requestName: "redis", component: "redis-1"},
+	}
+	require.Contains(t, validateRollbackRestartScope(allTargets[:1], allTargets), "cannot restart only failed component")
+	require.Empty(t, validateRollbackRestartScope(allTargets, allTargets))
+	require.Empty(t, validateRollbackRestartScope(
+		[]reconfigureTarget{{requestName: "mysql", component: "mysql"}},
+		[]reconfigureTarget{{requestName: "mysql", component: "mysql"}, {requestName: "proxy", component: "proxy"}},
+	))
 }
 
 func TestPreflightReconfigureTargets(t *testing.T) {

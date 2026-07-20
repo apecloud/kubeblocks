@@ -138,6 +138,9 @@ func ReconcileActionObservation(statuses *[]appsv1.LifecycleActionStatus, key Ac
 		*statuses = upsertActionObservation(*statuses, status)
 		return ActionObservationUpdated, nil
 	}
+	if err != nil && !isTerminalActionFailure(err) {
+		return "", err
+	}
 
 	now := metav1.Now()
 	status.CompletionTime = &now
@@ -156,6 +159,12 @@ func ReconcileActionObservation(statuses *[]appsv1.LifecycleActionStatus, key Ac
 	}
 	*statuses = upsertActionObservation(*statuses, status)
 	return ActionObservationUpdated, nil
+}
+
+func isTerminalActionFailure(err error) bool {
+	code, coded := ActionErrorCode(err)
+	retryable := ActionErrorRetryable(err)
+	return errors.Is(err, ErrActionFailed) && coded && code != "" && retryable != nil && !*retryable
 }
 
 // FilterActionObservationsForPod drops results from an older Pod incarnation.

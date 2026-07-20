@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package lifecycle
 
 import (
+	"errors"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -99,6 +100,55 @@ func TestReconcileActionObservationRejectsIncompleteExactKey(t *testing.T) {
 			if err == nil || state != "" || executed || len(statuses) != 0 {
 				t.Fatalf("expected incomplete %s to fail before persistence or execution, state=%q err=%v executed=%v statuses=%+v",
 					name, state, err, executed, statuses)
+			}
+		})
+	}
+}
+
+func TestReconcileActionObservationRetriesTransientAndUnclassifiedErrors(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+	}{
+		{
+			name: "normalized retryable failure",
+			err:  &actionResultError{code: "Busy", retryable: ptr.To(true), err: ErrActionFailed},
+		},
+		{
+			name: "normalized failure without code",
+			err:  &actionResultError{retryable: ptr.To(false), err: ErrActionFailed},
+		},
+		{name: "busy", err: ErrActionBusy},
+		{name: "timeout", err: ErrActionTimedOut},
+		{name: "internal", err: ErrActionInternalError},
+		{name: "transport", err: errors.New("connection reset")},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-0", UID: types.UID("pod-uid")}}
+			key := NewActionObservationKey(appsv1.LifecycleActionReconfigure, "mysql", "hash", pod)
+			start := metav1.Now()
+			statuses := []appsv1.LifecycleActionStatus{{
+				Action: key.Action, Subject: key.Subject, Revision: key.Revision,
+				Target: &appsv1.LifecycleActionTarget{PodName: key.PodName, PodUID: key.PodUID},
+				Phase:  appsv1.LifecycleActionRunning, StartTime: &start,
+			}}
+			executions := 0
+			execute := func() error {
+				executions++
+				return test.err
+			}
+
+			for attempt := 1; attempt <= 2; attempt++ {
+				state, err := ReconcileActionObservation(&statuses, key, execute)
+				if !errors.Is(err, test.err) || state != "" {
+					t.Fatalf("expected retry-path error on attempt %d, state=%q err=%v", attempt, state, err)
+				}
+				if executions != attempt || statuses[0].Phase != appsv1.LifecycleActionRunning ||
+					statuses[0].CompletionTime != nil || statuses[0].Code != "" || statuses[0].Retryable != nil {
+					t.Fatalf("transient failure must stay retryable on attempt %d, executions=%d status=%+v",
+						attempt, executions, statuses[0])
+				}
 			}
 		})
 	}

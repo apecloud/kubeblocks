@@ -4012,7 +4012,8 @@ map[string]int64
 </td>
 <td>
 <em>(Optional)</em>
-<p>ComponentGenerations binds each rollback write to the resulting ComponentParameter generation.</p>
+<p>ComponentGenerations identifies the exact Components selected for compensation and,
+once rollback writes begin, binds each write to the resulting ComponentParameter generation.</p>
 </td>
 </tr>
 <tr>

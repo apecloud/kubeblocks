@@ -1171,7 +1171,8 @@ type ReconfigureRollbackStatus struct {
 	// +optional
 	Retryable *bool `json:"retryable,omitempty"`
 
-	// ComponentGenerations binds each rollback write to the resulting ComponentParameter generation.
+	// ComponentGenerations identifies the exact Components selected for compensation and,
+	// once rollback writes begin, binds each write to the resulting ComponentParameter generation.
 	// +optional
 	ComponentGenerations map[string]int64 `json:"componentGenerations,omitempty"`
 

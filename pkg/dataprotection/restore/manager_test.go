@@ -487,7 +487,7 @@ var _ = Describe("RestoreManager Test", func() {
 			By("test with execAction and expect for creating 2 exec job")
 			target := utils.GetBackupStatusTarget(backupSet.Backup, restoreMGR.Restore.Spec.Backup.SourceTargetName)
 			// step 0 is the execAction in actionSet
-			jobs, err := restoreMGR.BuildPostReadyActionJobs(reqCtx, k8sClient, *backupSet, target, 0)
+			jobs, err := restoreMGR.BuildPostReadyActionJobs(reqCtx, k8sClient, k8sClient, *backupSet, target, 0)
 			Expect(err).ShouldNot(HaveOccurred())
 			// the count of exec jobs should equal to the pods count of cluster
 			Expect(len(jobs)).Should(Equal(2))
@@ -496,7 +496,7 @@ var _ = Describe("RestoreManager Test", func() {
 
 			By("test with jobAction and expect for creating 1 job")
 			// step 0 is the execAction in actionSet
-			jobs, err = restoreMGR.BuildPostReadyActionJobs(reqCtx, k8sClient, *backupSet, target, 1)
+			jobs, err = restoreMGR.BuildPostReadyActionJobs(reqCtx, k8sClient, k8sClient, *backupSet, target, 1)
 			Expect(err).ShouldNot(HaveOccurred())
 			// count of job should equal to 1
 			Expect(len(jobs)).Should(Equal(1))
@@ -510,12 +510,9 @@ var _ = Describe("RestoreManager Test", func() {
 				}
 				return values
 			}
-			Expect(envValues(dptypes.DPTargetClusterTopology)).Should(Equal([]corev1.EnvVar{{
-				Name: dptypes.DPTargetClusterTopology, Value: "shared-nothing",
-			}}))
-			Expect(envValues(dptypes.DPTargetComponentServiceVersion)).Should(Equal([]corev1.EnvVar{{
-				Name: dptypes.DPTargetComponentServiceVersion, Value: "3.3.2",
-			}}))
+			Expect(envValues(dptypes.DPTargetClusterTopology)).Should(BeEmpty())
+			Expect(envValues(dptypes.DPTargetComponentServiceVersion)).Should(BeEmpty())
+			Expect(envValues(dptypes.DPTargetComponentServiceVersionSelector)).Should(BeEmpty())
 			Expect(envValues("KEEP_POD_ENV")).Should(Equal([]corev1.EnvVar{{Name: "KEEP_POD_ENV", Value: "kept"}}))
 			Expect(envValues(dptypes.DPDBUser)).Should(HaveLen(1))
 			Expect(envValues(dptypes.DPDBPassword)).Should(HaveLen(1))

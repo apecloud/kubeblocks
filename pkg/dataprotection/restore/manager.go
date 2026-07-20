@@ -34,10 +34,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -50,6 +53,12 @@ import (
 const (
 	restoreManagerContainerName = "restore-manager"
 )
+
+// PostReadyRestoreName returns the deterministic name of the internal postReady
+// Restore owned by one Component UID.
+func PostReadyRestoreName(componentUID types.UID) string {
+	return constant.ShortenKubeName(fmt.Sprintf("restore-%s-post-ready", componentUID), constant.KubeNameMaxLength)
+}
 
 type BackupActionSet struct {
 	Backup *dpv1alpha1.Backup
@@ -638,8 +647,252 @@ func (r *RestoreManager) isJobForRestoreAction(job *batchv1.Job) bool {
 	return restoreNamespace == "" || restoreNamespace == r.Restore.Namespace
 }
 
+func targetFactReadError(kind string, key types.NamespacedName, err error) error {
+	if apierrors.IsForbidden(err) || apierrors.IsUnauthorized(err) {
+		return intctrlutil.NewFatalError(fmt.Sprintf("can not read target %s %s: %v", kind, key, err))
+	}
+	return intctrlutil.NewRequeueError(time.Second,
+		fmt.Sprintf("waiting to read target %s %s: %v", kind, key, err))
+}
+
+func controllerReferenceMatches(obj metav1.Object, apiVersion, kind string, uid types.UID) bool {
+	ref := metav1.GetControllerOf(obj)
+	return ref != nil && ref.APIVersion == apiVersion && ref.Kind == kind && ref.UID == uid
+}
+
+func (r *RestoreManager) internalPostReadyComponent(
+	reqCtx intctrlutil.RequestCtx,
+	reader client.Reader) (*appsv1.Component, bool, error) {
+	var componentRef *metav1.OwnerReference
+	for i := range r.Restore.OwnerReferences {
+		ref := &r.Restore.OwnerReferences[i]
+		if ref.APIVersion != appsv1.APIVersion ||
+			ref.Kind != appsv1.ComponentKind ||
+			r.Restore.Name != PostReadyRestoreName(ref.UID) {
+			continue
+		}
+		if componentRef != nil {
+			return nil, true, intctrlutil.NewFatalError(fmt.Sprintf(
+				"internal postReady restore %s/%s has multiple Component owners",
+				r.Restore.Namespace, r.Restore.Name))
+		}
+		componentRef = ref
+	}
+	if componentRef == nil {
+		return nil, false, nil
+	}
+
+	componentKey := types.NamespacedName{Namespace: r.Restore.Namespace, Name: componentRef.Name}
+	component := &appsv1.Component{}
+	if err := reader.Get(reqCtx.Ctx, componentKey, component); err != nil {
+		return nil, true, targetFactReadError("Component", componentKey, err)
+	}
+	if component.UID != componentRef.UID {
+		return nil, true, intctrlutil.NewFatalError(fmt.Sprintf(
+			"internal postReady restore %s/%s Component identity changed: expected UID %s, got %s",
+			r.Restore.Namespace, r.Restore.Name, componentRef.UID, component.UID))
+	}
+	if !component.DeletionTimestamp.IsZero() {
+		return nil, true, intctrlutil.NewFatalError(fmt.Sprintf(
+			"target Component %s/%s is terminating", component.Namespace, component.Name))
+	}
+	return component, true, nil
+}
+
+func validateTargetPodOwnership(
+	reqCtx intctrlutil.RequestCtx,
+	reader client.Reader,
+	pod *corev1.Pod,
+	component *appsv1.Component) error {
+	owner := metav1.GetControllerOf(pod)
+	if owner == nil || owner.APIVersion != workloadsv1.GroupVersion.String() {
+		return intctrlutil.NewFatalError(fmt.Sprintf(
+			"target Pod %s/%s is not controlled by a KubeBlocks workload", pod.Namespace, pod.Name))
+	}
+
+	instanceSet := &workloadsv1.InstanceSet{}
+	switch owner.Kind {
+	case workloadsv1.InstanceSetKind:
+		key := types.NamespacedName{Namespace: pod.Namespace, Name: owner.Name}
+		if err := reader.Get(reqCtx.Ctx, key, instanceSet); err != nil {
+			return targetFactReadError(workloadsv1.InstanceSetKind, key, err)
+		}
+		if instanceSet.UID != owner.UID {
+			return intctrlutil.NewFatalError(fmt.Sprintf(
+				"target Pod %s/%s InstanceSet identity changed", pod.Namespace, pod.Name))
+		}
+	case "Instance":
+		instanceKey := types.NamespacedName{Namespace: pod.Namespace, Name: owner.Name}
+		instance := &workloadsv1.Instance{}
+		if err := reader.Get(reqCtx.Ctx, instanceKey, instance); err != nil {
+			return targetFactReadError("Instance", instanceKey, err)
+		}
+		if instance.UID != owner.UID {
+			return intctrlutil.NewFatalError(fmt.Sprintf(
+				"target Pod %s/%s Instance identity changed", pod.Namespace, pod.Name))
+		}
+		instanceSetOwner := metav1.GetControllerOf(instance)
+		if instanceSetOwner == nil ||
+			instanceSetOwner.APIVersion != workloadsv1.GroupVersion.String() ||
+			instanceSetOwner.Kind != workloadsv1.InstanceSetKind {
+			return intctrlutil.NewFatalError(fmt.Sprintf(
+				"target Instance %s/%s is not controlled by an InstanceSet", instance.Namespace, instance.Name))
+		}
+		instanceSetKey := types.NamespacedName{Namespace: instance.Namespace, Name: instanceSetOwner.Name}
+		if err := reader.Get(reqCtx.Ctx, instanceSetKey, instanceSet); err != nil {
+			return targetFactReadError(workloadsv1.InstanceSetKind, instanceSetKey, err)
+		}
+		if instanceSet.UID != instanceSetOwner.UID {
+			return intctrlutil.NewFatalError(fmt.Sprintf(
+				"target Instance %s/%s InstanceSet identity changed", instance.Namespace, instance.Name))
+		}
+	default:
+		return intctrlutil.NewFatalError(fmt.Sprintf(
+			"target Pod %s/%s has unsupported controller kind %q", pod.Namespace, pod.Name, owner.Kind))
+	}
+
+	if !controllerReferenceMatches(instanceSet, appsv1.APIVersion, appsv1.ComponentKind, component.UID) {
+		return intctrlutil.NewFatalError(fmt.Sprintf(
+			"target Pod %s/%s workload is not controlled by Component %s/%s",
+			pod.Namespace, pod.Name, component.Namespace, component.Name))
+	}
+	return nil
+}
+
+func targetPodServiceVersionSelector(component *appsv1.Component, pod *corev1.Pod) (string, error) {
+	templateName, ok := pod.Labels[constant.KBAppInstanceTemplateLabelKey]
+	if !ok {
+		return "", intctrlutil.NewFatalError(fmt.Sprintf(
+			"target Pod %s/%s is missing label %s",
+			pod.Namespace, pod.Name, constant.KBAppInstanceTemplateLabelKey))
+	}
+
+	if templateName != "" {
+		for i := range component.Spec.Instances {
+			instance := &component.Spec.Instances[i]
+			if instance.Name != templateName {
+				continue
+			}
+			if ptr.Deref(instance.Replicas, int32(1)) <= 0 {
+				return "", intctrlutil.NewFatalError(fmt.Sprintf(
+					"target Pod %s/%s references inactive instance template %q",
+					pod.Namespace, pod.Name, templateName))
+			}
+			if instance.ServiceVersion != "" {
+				return instance.ServiceVersion, nil
+			}
+			return component.Spec.ServiceVersion, nil
+		}
+		return "", intctrlutil.NewFatalError(fmt.Sprintf(
+			"target Pod %s/%s references unknown instance template %q",
+			pod.Namespace, pod.Name, templateName))
+	}
+
+	remainingDefaultReplicas := component.Spec.Replicas
+	for i := range component.Spec.Instances {
+		remainingDefaultReplicas -= ptr.Deref(component.Spec.Instances[i].Replicas, int32(1))
+	}
+	if remainingDefaultReplicas <= 0 {
+		return "", intctrlutil.NewFatalError(fmt.Sprintf(
+			"target Pod %s/%s has an empty instance-template label but Component has no default instances",
+			pod.Namespace, pod.Name))
+	}
+	return component.Spec.ServiceVersion, nil
+}
+
+func (r *RestoreManager) postReadyTargetEnv(
+	reqCtx intctrlutil.RequestCtx,
+	reader client.Reader,
+	component *appsv1.Component,
+	targetPod *corev1.Pod) ([]corev1.EnvVar, error) {
+	componentKey := client.ObjectKeyFromObject(component)
+	liveComponent := &appsv1.Component{}
+	if err := reader.Get(reqCtx.Ctx, componentKey, liveComponent); err != nil {
+		return nil, targetFactReadError("Component", componentKey, err)
+	}
+	if liveComponent.UID != component.UID {
+		return nil, intctrlutil.NewFatalError(fmt.Sprintf(
+			"target Component %s changed identity before postReady dispatch", componentKey))
+	}
+	if !liveComponent.DeletionTimestamp.IsZero() {
+		return nil, intctrlutil.NewFatalError(fmt.Sprintf(
+			"target Component %s/%s is terminating", liveComponent.Namespace, liveComponent.Name))
+	}
+
+	podKey := client.ObjectKeyFromObject(targetPod)
+	livePod := &corev1.Pod{}
+	if err := reader.Get(reqCtx.Ctx, podKey, livePod); err != nil {
+		return nil, targetFactReadError("Pod", podKey, err)
+	}
+	if targetPod.UID == "" || livePod.UID != targetPod.UID {
+		return nil, intctrlutil.NewRequeueError(time.Second,
+			fmt.Sprintf("target Pod %s changed identity before postReady dispatch", podKey))
+	}
+	if !intctrlutil.IsPodAvailable(livePod, 0) {
+		return nil, intctrlutil.NewRequeueError(time.Second,
+			fmt.Sprintf("target Pod %s is not stably Ready", podKey))
+	}
+	if err := validateTargetPodOwnership(reqCtx, reader, livePod, liveComponent); err != nil {
+		return nil, err
+	}
+
+	clusterName, clusterNameOK := livePod.Labels[constant.AppInstanceLabelKey]
+	componentName, componentNameOK := livePod.Labels[constant.KBAppComponentLabelKey]
+	if !clusterNameOK || clusterName == "" || !componentNameOK || componentName == "" {
+		return nil, intctrlutil.NewFatalError(fmt.Sprintf(
+			"target Pod %s/%s is missing cluster/component identity labels", livePod.Namespace, livePod.Name))
+	}
+	if constant.GenerateClusterComponentName(clusterName, componentName) != liveComponent.Name {
+		return nil, intctrlutil.NewFatalError(fmt.Sprintf(
+			"target Pod %s/%s does not identify Component %s/%s",
+			livePod.Namespace, livePod.Name, liveComponent.Namespace, liveComponent.Name))
+	}
+	if liveComponent.Labels[constant.AppInstanceLabelKey] != clusterName ||
+		liveComponent.Labels[constant.KBAppComponentLabelKey] != componentName {
+		return nil, intctrlutil.NewFatalError(fmt.Sprintf(
+			"target Component %s/%s identity labels do not match target Pod %s/%s",
+			liveComponent.Namespace, liveComponent.Name, livePod.Namespace, livePod.Name))
+	}
+	if liveComponent.Generation != liveComponent.Status.ObservedGeneration ||
+		liveComponent.Status.Phase != appsv1.RunningComponentPhase {
+		return nil, intctrlutil.NewRequeueError(time.Second, fmt.Sprintf(
+			"waiting for target Component %s/%s to observe generation %d and become Running",
+			liveComponent.Namespace, liveComponent.Name, liveComponent.Generation))
+	}
+
+	clusterKey := types.NamespacedName{Namespace: livePod.Namespace, Name: clusterName}
+	cluster := &appsv1.Cluster{}
+	if err := reader.Get(reqCtx.Ctx, clusterKey, cluster); err != nil {
+		return nil, targetFactReadError("Cluster", clusterKey, err)
+	}
+	if !cluster.DeletionTimestamp.IsZero() {
+		return nil, intctrlutil.NewFatalError(fmt.Sprintf(
+			"target Cluster %s/%s is terminating", cluster.Namespace, cluster.Name))
+	}
+	if liveComponent.Annotations[constant.KBAppClusterUIDKey] != string(cluster.UID) {
+		return nil, intctrlutil.NewFatalError(fmt.Sprintf(
+			"target Component %s/%s does not belong to Cluster %s/%s",
+			liveComponent.Namespace, liveComponent.Name, cluster.Namespace, cluster.Name))
+	}
+
+	serviceVersionSelector, err := targetPodServiceVersionSelector(liveComponent, livePod)
+	if err != nil {
+		return nil, err
+	}
+	return []corev1.EnvVar{
+		{Name: dptypes.DPTargetClusterTopology, Value: cluster.Spec.Topology},
+		{Name: dptypes.DPTargetComponentServiceVersionSelector, Value: serviceVersionSelector},
+	}, nil
+}
+
 // BuildPostReadyActionJobs builds the post ready jobs.
-func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx, cli client.Client, backupSet BackupActionSet, target *dpv1alpha1.BackupStatusTarget, step int) ([]*batchv1.Job, error) {
+func (r *RestoreManager) BuildPostReadyActionJobs(
+	reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	reader client.Reader,
+	backupSet BackupActionSet,
+	target *dpv1alpha1.BackupStatusTarget,
+	step int) ([]*batchv1.Job, error) {
 	readyConfig := r.Restore.Spec.ReadyConfig
 	if readyConfig == nil {
 		return nil, nil
@@ -647,14 +900,31 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 	if !backupSet.ActionSet.HasPostReadyStage() {
 		return nil, nil
 	}
+	if reader == nil {
+		reader = cli
+	}
+	internalComponent, internalPostReady, err := r.internalPostReadyComponent(reqCtx, reader)
+	if err != nil {
+		return nil, err
+	}
 	backupRepo, err := r.prepareBackupRepo(reqCtx, cli, backupSet)
 	if err != nil {
 		return nil, err
 	}
 	actionSpec := backupSet.ActionSet.Spec.Restore.PostReady[step]
 	getTargetPodList := func(labelSelector metav1.LabelSelector, msgKey string) (*corev1.PodList, error) {
-		targetPodList, err := utils.GetPodListByLabelSelector(reqCtx, cli, &labelSelector)
+		selector, err := metav1.LabelSelectorAsSelector(&labelSelector)
 		if err != nil {
+			return nil, err
+		}
+		targetPodList := &corev1.PodList{}
+		targetReader := client.Reader(cli)
+		if internalPostReady {
+			targetReader = reader
+		}
+		if err = targetReader.List(reqCtx.Ctx, targetPodList,
+			client.InNamespace(r.Restore.Namespace),
+			client.MatchingLabelsSelector{Selector: selector}); err != nil {
 			return nil, err
 		}
 		if len(targetPodList.Items) == 0 {
@@ -682,7 +952,7 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 			return nil, err
 		}
 		sort.Sort(intctrlutil.ByPodName(targetPodList.Items))
-		buildJob := func(targetPod *corev1.Pod, sourceTargetPodName string, index int) *batchv1.Job {
+		buildJob := func(targetPod *corev1.Pod, sourceTargetPodName string, index int, targetEnv []corev1.EnvVar) *batchv1.Job {
 			if boolptr.IsSetToTrue(actionSpec.Job.RunOnTargetPodNode) {
 				jobBuilder.resetSpecificVolumesAndMounts()
 				jobBuilder.setNodeNameToNodeSelector(targetPod.Spec.NodeName)
@@ -703,7 +973,7 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 				setCommand(actionSpec.Job.Command).
 				setToleration(targetPod.Spec.Tolerations).
 				addTargetPodAndCredentialEnv(targetPod, readyConfig.ConnectionCredential, &target.BackupTarget).
-				overridePostReadyTargetEnv().
+				overridePostReadyTargetEnv(targetEnv).
 				setServiceAccount(r.WorkerServiceAccount).
 				build()
 		}
@@ -725,7 +995,14 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 				// no need to recover the volume when the pod selection policy is 'All' and sourceTargetPodName is not found.
 				continue
 			}
-			jobs = append(jobs, buildJob(&targetPodList.Items[i], sourceTargetPodName, i))
+			var targetEnv []corev1.EnvVar
+			if internalPostReady {
+				targetEnv, err = r.postReadyTargetEnv(reqCtx, reader, internalComponent, &targetPodList.Items[i])
+				if err != nil {
+					return nil, err
+				}
+			}
+			jobs = append(jobs, buildJob(&targetPodList.Items[i], sourceTargetPodName, i, targetEnv))
 		}
 		return jobs, nil
 	}

@@ -122,9 +122,15 @@ const (
 	DPTargetPodRole = "DP_TARGET_POD_ROLE"
 	// DPTargetClusterTopology is the topology of the restore target Cluster.
 	DPTargetClusterTopology = "DP_TARGET_CLUSTER_TOPOLOGY"
-	// DPTargetComponentServiceVersion is the single active service version of the restore target Component.
-	// It is empty when legal active instances use multiple versions that this transitional string cannot represent.
+	// DPTargetComponentServiceVersion is a superseded target version key. It remains
+	// reserved so caller values using the older name are stripped; the controller
+	// never emits it. New jobs use DPTargetComponentServiceVersionSelector.
 	DPTargetComponentServiceVersion = "DP_TARGET_COMPONENT_SERVICE_VERSION"
+	// DPTargetComponentServiceVersionSelector is the serviceVersion selector declared for
+	// the exact target Pod selected when the postReady Job is dispatched. It is empty when
+	// Apps does not expose a declared selector; it is not a claim about a runtime-discovered
+	// database version.
+	DPTargetComponentServiceVersionSelector = "DP_TARGET_COMPONENT_SERVICE_VERSION_SELECTOR"
 	// DPBackupBasePath the base path for backup data in the storage
 	// In a backup action pod, it equals ${DP_BACKUP_ROOT_PATH}/${DP_BACKUP_NAME}/${DP_TARGET_RELATIVE_PATH}
 	DPBackupBasePath = "DP_BACKUP_BASE_PATH"

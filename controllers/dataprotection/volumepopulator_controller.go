@@ -38,7 +38,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/component-helpers/storage/volume"
-	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -81,11 +80,6 @@ type pvcRestoreDecision struct {
 	mode          pvcRestoreMode
 	sourceTarget  *dpv1alpha1.BackupStatusTarget
 	skipPostReady bool
-}
-
-type postReadyTargetFacts struct {
-	clusterTopology         string
-	componentServiceVersion string
 }
 
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims/status,verbs=get;update;patch
@@ -1185,11 +1179,7 @@ func (r *VolumePopulatorReconciler) ensurePostReadyRestoreCompleted(reqCtx intct
 		Name:      postReadyRestoreName(comp.UID),
 	}
 	if err = r.Client.Get(reqCtx.Ctx, existingKey, existing); err == nil {
-		targetFacts, factsErr := postReadyTargetFactsFromRestore(existing)
-		if factsErr != nil {
-			return false, factsErr
-		}
-		desired, buildErr := r.buildPostReadyRestore(reqCtx, pvc, restoreMgr, comp, componentName, backupTarget, targetFacts)
+		desired, buildErr := r.buildPostReadyRestore(reqCtx, pvc, restoreMgr, comp, componentName, backupTarget)
 		if buildErr != nil {
 			return false, buildErr
 		}
@@ -1218,20 +1208,19 @@ func (r *VolumePopulatorReconciler) ensurePostReadyRestoreCompleted(reqCtx intct
 		}
 		return false, nil
 	}
-	componentServiceVersion := postReadyComponentServiceVersion(comp)
-	cluster := &appsv1.Cluster{}
-	if err = r.Client.Get(reqCtx.Ctx, types.NamespacedName{Namespace: pvc.Namespace, Name: clusterName}, cluster); err != nil {
-		if apierrors.IsForbidden(err) || apierrors.IsUnauthorized(err) {
-			return false, intctrlutil.NewFatalError(err.Error())
-		}
-		return false, intctrlutil.NewRequeueError(reconcileInterval,
-			fmt.Sprintf("waiting for target cluster %s/%s: %v", pvc.Namespace, clusterName, err))
-	}
 	parameters, err := restoreParametersMapFromPVC(pvc)
 	if err != nil {
 		return false, intctrlutil.NewFatalError(err.Error())
 	}
 	if parameters[dptypes.DeferPostReadyUntilClusterRunningParameterKey] == "true" {
+		cluster := &appsv1.Cluster{}
+		if err = r.Client.Get(reqCtx.Ctx, types.NamespacedName{Namespace: pvc.Namespace, Name: clusterName}, cluster); err != nil {
+			if apierrors.IsForbidden(err) || apierrors.IsUnauthorized(err) {
+				return false, intctrlutil.NewFatalError(err.Error())
+			}
+			return false, intctrlutil.NewRequeueError(reconcileInterval,
+				fmt.Sprintf("waiting for target cluster %s/%s: %v", pvc.Namespace, clusterName, err))
+		}
 		if cluster.Status.Phase != appsv1.RunningClusterPhase {
 			if err = r.updatePVCConditionsIfPopulateNotReleased(reqCtx, pvc, "Waiting for cluster to run before postReady restore"); err != nil {
 				return false, err
@@ -1239,11 +1228,7 @@ func (r *VolumePopulatorReconciler) ensurePostReadyRestoreCompleted(reqCtx intct
 			return false, nil
 		}
 	}
-	postReadyRestore, err := r.buildPostReadyRestore(reqCtx, pvc, restoreMgr, comp, componentName, backupTarget,
-		postReadyTargetFacts{
-			clusterTopology:         cluster.Spec.Topology,
-			componentServiceVersion: componentServiceVersion,
-		})
+	postReadyRestore, err := r.buildPostReadyRestore(reqCtx, pvc, restoreMgr, comp, componentName, backupTarget)
 	if err != nil {
 		return false, err
 	}
@@ -1270,8 +1255,7 @@ func (r *VolumePopulatorReconciler) buildPostReadyRestore(reqCtx intctrlutil.Req
 	restoreMgr *dprestore.RestoreManager,
 	comp *appsv1.Component,
 	targetComponentName string,
-	redirectTarget *dpv1alpha1.BackupStatusTarget,
-	targetFacts postReadyTargetFacts) (*dpv1alpha1.Restore, error) {
+	redirectTarget *dpv1alpha1.BackupStatusTarget) (*dpv1alpha1.Restore, error) {
 	clusterName := pvc.Labels[constant.AppInstanceLabelKey]
 	componentName := targetComponentName
 	if componentName == "" {
@@ -1352,8 +1336,7 @@ func (r *VolumePopulatorReconciler) buildPostReadyRestore(reqCtx intctrlutil.Req
 				Namespace: backupNamespace,
 			},
 			RestoreTime: pvc.Annotations[constant.RestorePITRAnnotationKey],
-			Env: buildPostReadyTargetEnv(restoreMgr.Restore.Spec.Env,
-				targetFacts.clusterTopology, targetFacts.componentServiceVersion),
+			Env:         stripPostReadyTargetEnv(restoreMgr.Restore.Spec.Env),
 			Parameters:  restoreParametersToPairs(restoreActionParameters(parameters)),
 			ReadyConfig: readyConfig,
 		},
@@ -1367,73 +1350,19 @@ func (r *VolumePopulatorReconciler) buildPostReadyRestore(reqCtx intctrlutil.Req
 	return restore, nil
 }
 
-// postReadyComponentServiceVersion returns an empty value when a legal Component
-// has multiple active versions that cannot be represented by this transitional string.
-func postReadyComponentServiceVersion(comp *appsv1.Component) string {
-	componentVersion := comp.Spec.ServiceVersion
-	versions := map[string]struct{}{}
-	remainingDefaultReplicas := comp.Spec.Replicas
-	for i := range comp.Spec.Instances {
-		instance := &comp.Spec.Instances[i]
-		instanceReplicas := ptr.Deref(instance.Replicas, 1)
-		if instanceReplicas == 0 {
-			continue
-		}
-		remainingDefaultReplicas -= instanceReplicas
-		instanceVersion := instance.ServiceVersion
-		if instanceVersion == "" {
-			instanceVersion = componentVersion
-		}
-		versions[instanceVersion] = struct{}{}
-	}
-	if remainingDefaultReplicas > 0 || len(versions) == 0 {
-		versions[componentVersion] = struct{}{}
-	}
-	if len(versions) != 1 {
-		return ""
-	}
-	for version := range versions {
-		return version
-	}
-	return ""
-}
-
-func postReadyTargetFactsFromRestore(restore *dpv1alpha1.Restore) (postReadyTargetFacts, error) {
-	var facts postReadyTargetFacts
-	var topologyCount, serviceVersionCount int
-	for i := range restore.Spec.Env {
-		switch restore.Spec.Env[i].Name {
-		case dptypes.DPTargetClusterTopology:
-			topologyCount++
-			facts.clusterTopology = restore.Spec.Env[i].Value
-		case dptypes.DPTargetComponentServiceVersion:
-			serviceVersionCount++
-			facts.componentServiceVersion = restore.Spec.Env[i].Value
-		}
-	}
-	if topologyCount == 0 && serviceVersionCount == 0 {
-		return facts, nil
-	}
-	if topologyCount != 1 || serviceVersionCount != 1 {
-		return postReadyTargetFacts{}, intctrlutil.NewFatalError(fmt.Sprintf(
-			"postReady restore %s/%s has an invalid target-fact snapshot", restore.Namespace, restore.Name))
-	}
-	return facts, nil
-}
-
-func buildPostReadyTargetEnv(source []corev1.EnvVar, clusterTopology, componentServiceVersion string) []corev1.EnvVar {
-	env := make([]corev1.EnvVar, 0, len(source)+2)
+func stripPostReadyTargetEnv(source []corev1.EnvVar) []corev1.EnvVar {
+	var env []corev1.EnvVar
 	for i := range source {
 		switch source[i].Name {
-		case dptypes.DPTargetClusterTopology, dptypes.DPTargetComponentServiceVersion:
+		case dptypes.DPTargetClusterTopology,
+			dptypes.DPTargetComponentServiceVersion,
+			dptypes.DPTargetComponentServiceVersionSelector:
 			continue
 		default:
 			env = append(env, source[i])
 		}
 	}
-	return append(env,
-		corev1.EnvVar{Name: dptypes.DPTargetClusterTopology, Value: clusterTopology},
-		corev1.EnvVar{Name: dptypes.DPTargetComponentServiceVersion, Value: componentServiceVersion})
+	return env
 }
 
 func validatePostReadyRestore(existing, desired *dpv1alpha1.Restore, comp *appsv1.Component) error {
@@ -1441,31 +1370,15 @@ func validatePostReadyRestore(existing, desired *dpv1alpha1.Restore, comp *appsv
 		return intctrlutil.NewFatalError(fmt.Sprintf("postReady restore %s/%s is not owned by component %s/%s",
 			existing.Namespace, existing.Name, comp.Namespace, comp.Name))
 	}
-	if !reflect.DeepEqual(existing.Spec, desired.Spec) && !legacyPostReadyRestoreMatches(existing, desired) {
+	existingSpec := existing.Spec.DeepCopy()
+	existingSpec.Env = stripPostReadyTargetEnv(existingSpec.Env)
+	desiredSpec := desired.Spec.DeepCopy()
+	desiredSpec.Env = stripPostReadyTargetEnv(desiredSpec.Env)
+	if !reflect.DeepEqual(existingSpec, desiredSpec) {
 		return intctrlutil.NewFatalError(fmt.Sprintf("postReady restore %s/%s spec does not match current restore intent",
 			existing.Namespace, existing.Name))
 	}
 	return nil
-}
-
-func legacyPostReadyRestoreMatches(existing, desired *dpv1alpha1.Restore) bool {
-	for i := range existing.Spec.Env {
-		switch existing.Spec.Env[i].Name {
-		case dptypes.DPTargetClusterTopology, dptypes.DPTargetComponentServiceVersion:
-			return false
-		}
-	}
-	legacyDesired := desired.DeepCopy()
-	legacyDesired.Spec.Env = nil
-	for i := range desired.Spec.Env {
-		switch desired.Spec.Env[i].Name {
-		case dptypes.DPTargetClusterTopology, dptypes.DPTargetComponentServiceVersion:
-			continue
-		default:
-			legacyDesired.Spec.Env = append(legacyDesired.Spec.Env, desired.Spec.Env[i])
-		}
-	}
-	return reflect.DeepEqual(existing.Spec, legacyDesired.Spec)
 }
 
 func hasOwnerReference(ownerRefs []metav1.OwnerReference, uid types.UID) bool {
@@ -1730,8 +1643,7 @@ func postReadyRestoreLabels(pvc *corev1.PersistentVolumeClaim, comp *appsv1.Comp
 }
 
 func postReadyRestoreName(componentUID types.UID) string {
-	// Backup dataSource restore is an initial, single-attempt restore for a Component UID.
-	return constant.ShortenKubeName(fmt.Sprintf("restore-%s-post-ready", componentUID), constant.KubeNameMaxLength)
+	return dprestore.PostReadyRestoreName(componentUID)
 }
 
 func (r *VolumePopulatorReconciler) Cleanup(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim) error {

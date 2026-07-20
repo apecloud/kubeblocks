@@ -1740,18 +1740,14 @@ func TestBuildPostReadyRestoreSelectsHighestPriorityRole(t *testing.T) {
 	restoreMgr := dprestore.NewRestoreManager(&dpv1alpha1.Restore{}, nil, scheme, reconciler.Client)
 
 	restore, err := reconciler.buildPostReadyRestore(
-		intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, restoreMgr, comp, "", nil, postReadyTargetFacts{})
+		intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, restoreMgr, comp, "", nil)
 
 	require.NoError(t, err)
 	require.Equal(t, "leader", restore.Spec.ReadyConfig.JobAction.Target.PodSelector.LabelSelector.MatchLabels[instanceset.RoleLabelKey])
 	require.NotContains(t, restore.Spec.ReadyConfig.ExecAction.Target.PodSelector.MatchLabels, instanceset.RoleLabelKey)
 }
 
-func TestBuildPostReadyRestoreWritesLiveTargetEnv(t *testing.T) {
-	const (
-		targetClusterTopologyEnv         = "DP_TARGET_CLUSTER_TOPOLOGY"
-		targetComponentServiceVersionEnv = "DP_TARGET_COMPONENT_SERVICE_VERSION"
-	)
+func TestBuildPostReadyRestoreStripsCallerTargetEnv(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, corev1.AddToScheme(scheme))
 	require.NoError(t, kbappsv1.AddToScheme(scheme))
@@ -1773,9 +1769,10 @@ func TestBuildPostReadyRestoreWritesLiveTargetEnv(t *testing.T) {
 	pvc.Annotations[constant.RestoreSourceNamespaceAnnotationKey] = backup.Namespace
 	sourceEnv := []corev1.EnvVar{
 		{Name: "KEEP_ME", Value: "kept"},
-		{Name: targetClusterTopologyEnv, Value: "caller-value-1"},
-		{Name: targetClusterTopologyEnv, Value: "caller-value-2"},
-		{Name: targetComponentServiceVersionEnv, Value: "caller-version"},
+		{Name: dptypes.DPTargetClusterTopology, Value: "caller-value-1"},
+		{Name: dptypes.DPTargetClusterTopology, Value: "caller-value-2"},
+		{Name: dptypes.DPTargetComponentServiceVersion, Value: "caller-version"},
+		{Name: dptypes.DPTargetComponentServiceVersionSelector, Value: "caller-selector"},
 	}
 	sourceRestore := &dpv1alpha1.Restore{Spec: dpv1alpha1.RestoreSpec{
 		Env: append([]corev1.EnvVar{}, sourceEnv...),
@@ -1787,19 +1784,17 @@ func TestBuildPostReadyRestoreWritesLiveTargetEnv(t *testing.T) {
 	restoreMgr := dprestore.NewRestoreManager(sourceRestore, nil, scheme, reconciler.Client)
 
 	restore, err := reconciler.buildPostReadyRestore(
-		intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, restoreMgr, comp, "", nil,
-		postReadyTargetFacts{clusterTopology: "shared-nothing", componentServiceVersion: "3.3.2"})
+		intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, restoreMgr, comp, "", nil)
 
 	require.NoError(t, err)
 	require.Equal(t, sourceEnv, sourceRestore.Spec.Env, "building the internal Restore must not mutate the source Restore")
 	require.Equal(t, "kept", envValue(restore.Spec.Env, "KEEP_ME"))
-	require.Equal(t, "shared-nothing", envValue(restore.Spec.Env, targetClusterTopologyEnv))
-	require.Equal(t, "3.3.2", envValue(restore.Spec.Env, targetComponentServiceVersionEnv))
-	require.Equal(t, 1, envNameCount(restore.Spec.Env, targetClusterTopologyEnv))
-	require.Equal(t, 1, envNameCount(restore.Spec.Env, targetComponentServiceVersionEnv))
+	require.Zero(t, envNameCount(restore.Spec.Env, dptypes.DPTargetClusterTopology))
+	require.Zero(t, envNameCount(restore.Spec.Env, dptypes.DPTargetComponentServiceVersion))
+	require.Zero(t, envNameCount(restore.Spec.Env, dptypes.DPTargetComponentServiceVersionSelector))
 }
 
-func TestReconcileRetriesMissingTargetClusterAndPropagatesInstanceVersionOverride(t *testing.T) {
+func TestReconcileCreatesPostReadyRestoreWithoutTargetClusterSnapshot(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, corev1.AddToScheme(scheme))
 	require.NoError(t, kbappsv1.AddToScheme(scheme))
@@ -1876,22 +1871,13 @@ func TestReconcileRetriesMissingTargetClusterAndPropagatesInstanceVersionOverrid
 	require.NoError(t, err)
 	require.Equal(t, reconcileInterval, result.RequeueAfter)
 	restore := &dpv1alpha1.Restore{}
-	require.True(t, apierrors.IsNotFound(reconciler.Client.Get(context.Background(), client.ObjectKey{
-		Namespace: pvc.Namespace,
-		Name:      postReadyRestoreName(comp.UID),
-	}, restore)))
-	require.NoError(t, reconciler.Client.Create(context.Background(), newClusterForPostReadyTest()))
-
-	result, err = reconciler.Reconcile(context.Background(), req)
-
-	require.NoError(t, err)
-	require.Equal(t, reconcileInterval, result.RequeueAfter)
 	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKey{
 		Namespace: pvc.Namespace,
 		Name:      postReadyRestoreName(comp.UID),
 	}, restore))
-	require.Equal(t, "shared-nothing", envValue(restore.Spec.Env, dptypes.DPTargetClusterTopology))
-	require.Equal(t, "3.4.0", envValue(restore.Spec.Env, dptypes.DPTargetComponentServiceVersion))
+	require.Zero(t, envNameCount(restore.Spec.Env, dptypes.DPTargetClusterTopology))
+	require.Zero(t, envNameCount(restore.Spec.Env, dptypes.DPTargetComponentServiceVersion))
+	require.Zero(t, envNameCount(restore.Spec.Env, dptypes.DPTargetComponentServiceVersionSelector))
 }
 
 func TestEnsurePostReadyRestoreWaitsForObservedComponentGeneration(t *testing.T) {
@@ -1969,58 +1955,6 @@ func TestEnsurePostReadyRestoreWaitsForObservedComponentGeneration(t *testing.T)
 	}, restore))
 }
 
-func TestPostReadyComponentServiceVersionPublishesOnlyOneActiveVersion(t *testing.T) {
-	zero := int32(0)
-	tests := []struct {
-		name      string
-		replicas  int32
-		instances []kbappsv1.InstanceTemplate
-		want      string
-	}{
-		{name: "component default", replicas: 1, want: "3.3.2"},
-		{
-			name:      "matching active override",
-			replicas:  1,
-			instances: []kbappsv1.InstanceTemplate{{Name: "same", ServiceVersion: "3.3.2"}},
-			want:      "3.3.2",
-		},
-		{
-			name:      "different inactive override",
-			replicas:  1,
-			instances: []kbappsv1.InstanceTemplate{{Name: "disabled", ServiceVersion: "3.4.0", Replicas: &zero}},
-			want:      "3.3.2",
-		},
-		{
-			name:      "single active override replaces all default instances",
-			replicas:  1,
-			instances: []kbappsv1.InstanceTemplate{{Name: "only", ServiceVersion: "3.4.0"}},
-			want:      "3.4.0",
-		},
-		{
-			name:      "different active versions",
-			replicas:  2,
-			instances: []kbappsv1.InstanceTemplate{{Name: "canary", ServiceVersion: "3.4.0"}},
-			want:      "",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			comp := &kbappsv1.Component{
-				ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "cluster-mysql"},
-				Spec: kbappsv1.ComponentSpec{
-					ServiceVersion: "3.3.2",
-					Replicas:       tt.replicas,
-					Instances:      tt.instances,
-				},
-			}
-
-			got := postReadyComponentServiceVersion(comp)
-
-			require.Equal(t, tt.want, got)
-		})
-	}
-}
-
 func TestValidatePostReadyRestoreTargetEnvCompatibility(t *testing.T) {
 	comp := &kbappsv1.Component{
 		ObjectMeta: metav1.ObjectMeta{
@@ -2031,11 +1965,7 @@ func TestValidatePostReadyRestoreTargetEnvCompatibility(t *testing.T) {
 	}
 	desired := &dpv1alpha1.Restore{Spec: dpv1alpha1.RestoreSpec{
 		Backup: dpv1alpha1.BackupRef{Name: "backup", Namespace: "default"},
-		Env: []corev1.EnvVar{
-			{Name: "KEEP_ME", Value: "kept"},
-			{Name: dptypes.DPTargetClusterTopology, Value: "shared-nothing"},
-			{Name: dptypes.DPTargetComponentServiceVersion, Value: "3.3.2"},
-		},
+		Env:    []corev1.EnvVar{{Name: "KEEP_ME", Value: "kept"}},
 	}}
 	newExisting := func(spec dpv1alpha1.RestoreSpec) *dpv1alpha1.Restore {
 		return &dpv1alpha1.Restore{
@@ -2060,7 +1990,7 @@ func TestValidatePostReadyRestoreTargetEnvCompatibility(t *testing.T) {
 			spec: *desired.Spec.DeepCopy(),
 		},
 		{
-			name: "legacy restore with both target envs absent",
+			name: "restore without target snapshot",
 			spec: dpv1alpha1.RestoreSpec{
 				Backup: desired.Spec.Backup,
 				Env:    []corev1.EnvVar{{Name: "KEEP_ME", Value: "kept"}},
@@ -2075,7 +2005,6 @@ func TestValidatePostReadyRestoreTargetEnvCompatibility(t *testing.T) {
 					{Name: dptypes.DPTargetClusterTopology, Value: "shared-nothing"},
 				},
 			},
-			wantErr: true,
 		},
 		{
 			name: "caller target env values",
@@ -2085,9 +2014,9 @@ func TestValidatePostReadyRestoreTargetEnvCompatibility(t *testing.T) {
 					{Name: "KEEP_ME", Value: "kept"},
 					{Name: dptypes.DPTargetClusterTopology, Value: "caller-topology"},
 					{Name: dptypes.DPTargetComponentServiceVersion, Value: "caller-version"},
+					{Name: dptypes.DPTargetComponentServiceVersionSelector, Value: "caller-selector"},
 				},
 			},
-			wantErr: true,
 		},
 		{
 			name: "unrelated spec mismatch",
@@ -2111,75 +2040,12 @@ func TestValidatePostReadyRestoreTargetEnvCompatibility(t *testing.T) {
 	}
 }
 
-func TestPostReadyTargetFactsFromRestoreRequiresOneCompleteSnapshot(t *testing.T) {
-	tests := []struct {
-		name    string
-		env     []corev1.EnvVar
-		want    postReadyTargetFacts
-		wantErr bool
-	}{
-		{name: "legacy snapshot absent"},
-		{
-			name: "complete snapshot",
-			env: []corev1.EnvVar{
-				{Name: dptypes.DPTargetClusterTopology, Value: "shared-nothing"},
-				{Name: dptypes.DPTargetComponentServiceVersion, Value: "3.3.2"},
-			},
-			want: postReadyTargetFacts{clusterTopology: "shared-nothing", componentServiceVersion: "3.3.2"},
-		},
-		{
-			name: "heterogeneous version snapshot is explicitly empty",
-			env: []corev1.EnvVar{
-				{Name: dptypes.DPTargetClusterTopology, Value: "shared-nothing"},
-				{Name: dptypes.DPTargetComponentServiceVersion, Value: ""},
-			},
-			want: postReadyTargetFacts{clusterTopology: "shared-nothing"},
-		},
-		{
-			name:    "partial snapshot",
-			env:     []corev1.EnvVar{{Name: dptypes.DPTargetClusterTopology, Value: "shared-nothing"}},
-			wantErr: true,
-		},
-		{
-			name: "duplicate snapshot key",
-			env: []corev1.EnvVar{
-				{Name: dptypes.DPTargetClusterTopology, Value: "shared-nothing"},
-				{Name: dptypes.DPTargetClusterTopology, Value: "shared-data"},
-				{Name: dptypes.DPTargetComponentServiceVersion, Value: "3.3.2"},
-			},
-			wantErr: true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			restore := &dpv1alpha1.Restore{
-				ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "post-ready"},
-				Spec:       dpv1alpha1.RestoreSpec{Env: tt.env},
-			}
-
-			got, err := postReadyTargetFactsFromRestore(restore)
-
-			if tt.wantErr {
-				require.Error(t, err)
-				require.True(t, intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal), err.Error())
-				return
-			}
-			require.NoError(t, err)
-			require.Equal(t, tt.want, got)
-		})
-	}
-}
-
 func TestValidatePostReadyRestoreAllowsLegacyNilEnv(t *testing.T) {
 	comp := &kbappsv1.Component{
 		ObjectMeta: metav1.ObjectMeta{UID: "component-uid"},
 	}
 	desired := &dpv1alpha1.Restore{Spec: dpv1alpha1.RestoreSpec{
 		Backup: dpv1alpha1.BackupRef{Name: "backup", Namespace: "default"},
-		Env: []corev1.EnvVar{
-			{Name: dptypes.DPTargetClusterTopology, Value: "shared-nothing"},
-			{Name: dptypes.DPTargetComponentServiceVersion, Value: "3.3.2"},
-		},
 	}}
 	existing := &dpv1alpha1.Restore{
 		ObjectMeta: metav1.ObjectMeta{
@@ -2251,7 +2117,7 @@ func TestBuildPostReadyRestoreUsesInitAccountFromComponentDefinition(t *testing.
 	restoreMgr := dprestore.NewRestoreManager(&dpv1alpha1.Restore{}, nil, scheme, reconciler.Client)
 
 	restore, err := reconciler.buildPostReadyRestore(
-		intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, restoreMgr, comp, "", nil, postReadyTargetFacts{})
+		intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, restoreMgr, comp, "", nil)
 
 	require.NoError(t, err)
 	require.NotNil(t, restore.Spec.ReadyConfig.ConnectionCredential)
@@ -2553,7 +2419,7 @@ func TestCompleteBoundPVCContinuesPostReadyAfterPopulateReleased(t *testing.T) {
 	require.Nil(t, restoreCondition)
 }
 
-func TestCompleteBoundPVCUsesFrozenTargetFactsAfterPostReadyCompleted(t *testing.T) {
+func TestCompleteBoundPVCUsesTerminalPostReadyResultAfterComponentChanges(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, corev1.AddToScheme(scheme))
 	require.NoError(t, batchv1.AddToScheme(scheme))
@@ -2612,7 +2478,6 @@ func TestCompleteBoundPVCUsesFrozenTargetFactsAfterPostReadyCompleted(t *testing
 		creationComp,
 		"",
 		nil,
-		postReadyTargetFacts{clusterTopology: "shared-nothing", componentServiceVersion: "3.3.2"},
 	)
 	require.NoError(t, err)
 	postReadyRestore.Status.Phase = dpv1alpha1.RestorePhaseCompleted

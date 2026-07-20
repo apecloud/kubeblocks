@@ -310,22 +310,13 @@ func (r *restoreJobBuilder) addTargetPodAndCredentialEnv(pod *corev1.Pod,
 	return r
 }
 
-func (r *restoreJobBuilder) overridePostReadyTargetEnv() *restoreJobBuilder {
-	var targetEnv []corev1.EnvVar
-	for i := range r.restore.Spec.Env {
-		switch r.restore.Spec.Env[i].Name {
-		case dptypes.DPTargetClusterTopology, dptypes.DPTargetComponentServiceVersion:
-			targetEnv = utils.MergeEnv(targetEnv, []corev1.EnvVar{r.restore.Spec.Env[i]})
-		}
-	}
-	if len(targetEnv) == 0 {
-		return r
-	}
-
+func (r *restoreJobBuilder) overridePostReadyTargetEnv(targetEnv []corev1.EnvVar) *restoreJobBuilder {
 	env := make([]corev1.EnvVar, 0, len(r.env))
 	for i := range r.env {
 		switch r.env[i].Name {
-		case dptypes.DPTargetClusterTopology, dptypes.DPTargetComponentServiceVersion:
+		case dptypes.DPTargetClusterTopology,
+			dptypes.DPTargetComponentServiceVersion,
+			dptypes.DPTargetComponentServiceVersionSelector:
 			continue
 		default:
 			env = append(env, r.env[i])

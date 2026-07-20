@@ -465,6 +465,14 @@ var _ = Describe("", func() {
 			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(meta.FindStatusCondition(opsRes.OpsRequest.Status.Conditions, opsv1alpha1.ConditionTypeFailed)).Should(BeNil())
+			progressComponentName := defaultCompName
+			if useComponentObjectName {
+				progressComponentName = compObj.Name
+				Expect(opsRes.OpsRequest.Status.Components).ShouldNot(HaveKey(defaultCompName))
+			}
+			Expect(opsRes.OpsRequest.Status.Components).Should(HaveKey(progressComponentName))
+			Expect(opsRes.OpsRequest.Status.Components[progressComponentName].ProgressDetails).Should(ContainElement(
+				HaveField("ObjectKey", getProgressObjectKey(KBSwitchoverKey, progressComponentName))))
 
 			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
 				recorder.Action(gomock.Any(), gomock.Any()).Times(1).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {

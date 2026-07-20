@@ -1322,6 +1322,11 @@ new-item=new-value
 			backup := createBackupSpec(func(backup *dpv1alpha1.Backup) {
 				backup.Namespace = testCtx.DefaultNamespace
 			})
+			grant := newBackupReferenceGrant("allow-backup-repo-restore", backup.Namespace, namespace2, backup.Name)
+			Expect(k8sClient.Create(ctx, grant)).Should(Succeed())
+			DeferCleanup(func() {
+				Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, grant))).Should(Succeed())
+			})
 			By("creating a Restore object in the namespace")
 			createRestoreSpec(func(restore *dpv1alpha1.Restore) {
 				restore.Namespace = namespace2

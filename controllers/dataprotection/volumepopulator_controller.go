@@ -1619,6 +1619,27 @@ func postReadyRestoreName(componentUID types.UID) string {
 }
 
 func (r *VolumePopulatorReconciler) Cleanup(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim) error {
+	if !pvc.DeletionTimestamp.IsZero() {
+		executionRestore := &dpv1alpha1.Restore{}
+		executionRestoreKey := types.NamespacedName{
+			Namespace: pvc.Namespace,
+			Name:      getPopulatePVCName(pvc.UID),
+		}
+		if err := r.Client.Get(reqCtx.Ctx, executionRestoreKey, executionRestore); err != nil {
+			if !apierrors.IsNotFound(err) {
+				return err
+			}
+		} else {
+			if executionRestore.DeletionTimestamp.IsZero() {
+				uid := executionRestore.UID
+				if err := r.Client.Delete(reqCtx.Ctx, executionRestore, client.Preconditions{UID: &uid}); err != nil && !apierrors.IsNotFound(err) {
+					return err
+				}
+			}
+			return intctrlutil.NewRequeueError(reconcileInterval, "waiting for execution restore to be deleted")
+		}
+	}
+
 	dependentsPending := false
 	jobs := &batchv1.JobList{}
 	if err := r.Client.List(reqCtx.Ctx, jobs,

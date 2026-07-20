@@ -2320,7 +2320,8 @@ func (r *VolumePopulatorReconciler) upsertSystemAccountSecret(reqCtx intctrlutil
 		if !secret.DeletionTimestamp.IsZero() {
 			return intctrlutil.NewRequeueError(reconcileInterval, fmt.Sprintf("waiting for immutable system account secret %s/%s to be deleted", secret.Namespace, secret.Name))
 		}
-		if err := r.Client.Delete(reqCtx.Ctx, secret); err != nil && !apierrors.IsNotFound(err) {
+		uid := secret.UID
+		if err := r.Client.Delete(reqCtx.Ctx, secret, client.Preconditions{UID: &uid}); err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
 		return intctrlutil.NewRequeueError(reconcileInterval, fmt.Sprintf("waiting for immutable system account secret %s/%s to be recreated", secret.Namespace, secret.Name))

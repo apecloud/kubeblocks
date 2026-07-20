@@ -40,6 +40,7 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -269,6 +270,83 @@ var _ = Describe("Volume Populator Controller test", func() {
 			Expect(recreated.Data[constant.AccountPasswdForSecret]).To(Equal([]byte("new-root-password")))
 			Expect(systemAccountSecretMatches(recreated, "root", []byte("new-root-password"))).To(BeTrue())
 			Expect(systemAccountSecretMatches(recreated, "root", []byte("old-password"))).To(BeFalse())
+		})
+
+		It("does not delete a recreated immutable system account secret", func() {
+			scheme := runtime.NewScheme()
+			Expect(corev1.AddToScheme(scheme)).Should(Succeed())
+			Expect(kbappsv1.AddToScheme(scheme)).Should(Succeed())
+
+			component := &kbappsv1.Component{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      constant.GenerateClusterComponentName("cluster", "mysql"),
+					UID:       types.UID("component-uid"),
+				},
+			}
+			immutable := true
+			oldSecret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      constant.GenerateAccountSecretName("cluster", "mysql", "root"),
+					UID:       types.UID("old-secret-uid"),
+				},
+				Immutable: &immutable,
+				Data: map[string][]byte{
+					constant.AccountNameForSecret:   []byte("root"),
+					constant.AccountPasswdForSecret: []byte("old-password"),
+				},
+			}
+			pvc := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{
+				Namespace: "default",
+				Name:      "data-target-0",
+			}}
+			baseClient := fake.NewClientBuilder().
+				WithScheme(scheme).
+				WithObjects(component, oldSecret).
+				Build()
+			replacementUID := types.UID("replacement-secret-uid")
+			deleteIntercepted := false
+			interceptedClient := interceptor.NewClient(baseClient, interceptor.Funcs{
+				Delete: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.DeleteOption) error {
+					if deleteIntercepted {
+						return c.Delete(ctx, obj, opts...)
+					}
+					deleteIntercepted = true
+					Expect(c.Delete(ctx, obj)).Should(Succeed())
+					replacement := &corev1.Secret{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: obj.GetNamespace(),
+							Name:      obj.GetName(),
+							UID:       replacementUID,
+						},
+						Data: map[string][]byte{constant.AccountPasswdForSecret: []byte("replacement-password")},
+					}
+					Expect(c.Create(ctx, replacement)).Should(Succeed())
+
+					deleteOptions := &client.DeleteOptions{}
+					deleteOptions.ApplyOptions(opts)
+					if deleteOptions.Preconditions != nil && deleteOptions.Preconditions.UID != nil {
+						current := &corev1.Secret{}
+						Expect(c.Get(ctx, client.ObjectKeyFromObject(replacement), current)).Should(Succeed())
+						if current.UID != *deleteOptions.Preconditions.UID {
+							return apierrors.NewConflict(corev1.Resource("secrets"), current.Name,
+								fmt.Errorf("UID precondition does not match"))
+						}
+					}
+					return c.Delete(ctx, obj, opts...)
+				},
+			})
+			reconciler := &VolumePopulatorReconciler{Client: interceptedClient, Scheme: scheme}
+
+			err := reconciler.upsertSystemAccountSecret(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc,
+				systemAccountSecretScopeComponent, "cluster", "mysql", "root", []byte("new-password"), nil)
+			Expect(err).To(HaveOccurred())
+			Expect(apierrors.IsConflict(err)).To(BeTrue(), "expected a UID-precondition conflict, got %v", err)
+			current := &corev1.Secret{}
+			Expect(baseClient.Get(context.Background(), client.ObjectKeyFromObject(oldSecret), current)).Should(Succeed())
+			Expect(current.UID).To(Equal(replacementUID))
+			Expect(current.Data[constant.AccountPasswdForSecret]).To(Equal([]byte("replacement-password")))
 		})
 
 		It("removes the cluster finalizer before replacing immutable sharding account secrets", func() {

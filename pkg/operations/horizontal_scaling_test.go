@@ -268,11 +268,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 		})
 
 		It("test to scale out replicas from a full backup", func() {
-			backupNamespace := "backup-source-" + randomStr
-			Expect(k8sClient.Create(ctx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: backupNamespace}})).Should(Succeed())
-			DeferCleanup(func() {
-				_ = k8sClient.Delete(ctx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: backupNamespace}})
-			})
+			backupNamespace := testCtx.DefaultNamespace
 			By("create Backup")
 			backupName := "backup-for-ops-" + randomStr
 			backup := testdp.NewBackupFactory(backupNamespace, backupName).
@@ -283,7 +279,8 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			Expect(testapps.ChangeObjStatus(&testCtx, backup, func() {
 				backup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
 				backup.Status.BackupMethod = &dpv1alpha1.BackupMethod{
-					Name: testdp.VSBackupMethodName,
+					Name:            testdp.VSBackupMethodName,
+					SnapshotVolumes: pointer.Bool(true),
 					TargetVolumes: &dpv1alpha1.TargetVolumeInfo{
 						Volumes: []string{"data"},
 					},
@@ -295,7 +292,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 					}},
 					{BackupTarget: dpv1alpha1.BackupTarget{
 						Name:        "target-b",
-						PodSelector: &dpv1alpha1.PodSelector{},
+						PodSelector: &dpv1alpha1.PodSelector{Strategy: dpv1alpha1.PodSelectionStrategyAll},
 					}},
 				}
 			})).Should(Succeed())
@@ -320,6 +317,9 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			for i := range restoreList.Items {
 				Expect(restoreList.Items[i].Spec.Backup.Namespace).Should(Equal(backupNamespace))
 				Expect(restoreList.Items[i].Spec.Backup.SourceTargetName).Should(Equal("target-b"))
+				Expect(restoreList.Items[i].Spec.PrepareDataConfig.RequiredPolicyForAllPodSelection).NotTo(BeNil())
+				Expect(restoreList.Items[i].Spec.PrepareDataConfig.RequiredPolicyForAllPodSelection.DataRestorePolicy).
+					Should(Equal(dpv1alpha1.OneToOneRestorePolicy))
 			}
 
 			By("mock restore phase to completed")

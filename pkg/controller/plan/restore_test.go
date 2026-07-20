@@ -31,6 +31,7 @@ import (
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 func newRestoreManagerForTest() *RestoreManager {
@@ -313,7 +314,7 @@ func TestRestoreManagerBuildPrepareDataRestoreWithExplicitSourceTarget(t *testin
 				}},
 				{BackupTarget: dpv1alpha1.BackupTarget{
 					Name:        "target-b",
-					PodSelector: &dpv1alpha1.PodSelector{},
+					PodSelector: &dpv1alpha1.PodSelector{Strategy: dpv1alpha1.PodSelectionStrategyAll},
 				}},
 			},
 			BackupMethod: &dpv1alpha1.BackupMethod{
@@ -335,9 +336,13 @@ func TestRestoreManagerBuildPrepareDataRestoreWithExplicitSourceTarget(t *testin
 	if restore.Spec.Backup.SourceTargetName != "target-b" {
 		t.Fatalf("source target name = %q, want target-b", restore.Spec.Backup.SourceTargetName)
 	}
+	policy := restore.Spec.PrepareDataConfig.RequiredPolicyForAllPodSelection
+	if policy == nil || policy.DataRestorePolicy != dpv1alpha1.OneToOneRestorePolicy {
+		t.Fatalf("required policy = %#v, want one-to-one policy for target-b", policy)
+	}
 }
 
-func TestRestoreManagerBuildPrepareDataRestorePassesUnknownSourceTargetToDataProtection(t *testing.T) {
+func TestRestoreManagerBuildPrepareDataRestoreRejectsUnknownSourceTarget(t *testing.T) {
 	manager := newRestoreManagerForTest()
 	manager.SourceTargetName = "missing-target"
 	comp := &component.SynthesizedComponent{
@@ -366,14 +371,11 @@ func TestRestoreManagerBuildPrepareDataRestorePassesUnknownSourceTargetToDataPro
 	}
 
 	restore, err := manager.BuildPrepareDataRestore(comp, backup, nil)
-	if err != nil {
-		t.Fatalf("BuildPrepareDataRestore() error = %v", err)
+	if err == nil {
+		t.Fatalf("BuildPrepareDataRestore() restore = %#v, want source-target validation error", restore)
 	}
-	if restore == nil {
-		t.Fatal("restore is nil")
-	}
-	if restore.Spec.Backup.SourceTargetName != "missing-target" {
-		t.Fatalf("source target = %q, want missing-target", restore.Spec.Backup.SourceTargetName)
+	if !intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal) {
+		t.Fatalf("error = %T %v, want fatal error", err, err)
 	}
 }
 

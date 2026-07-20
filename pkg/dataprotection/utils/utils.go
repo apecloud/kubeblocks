@@ -384,7 +384,10 @@ func GetBackupTargets(backupPolicy *dpv1alpha1.BackupPolicy, backupMethod *dpv1a
 
 func GetBackupStatusTarget(backupObj *dpv1alpha1.Backup, sourceTargetName string) *dpv1alpha1.BackupStatusTarget {
 	if backupObj.Status.Target != nil {
-		return backupObj.Status.Target
+		if sourceTargetName == "" || sourceTargetName == backupObj.Status.Target.Name {
+			return backupObj.Status.Target
+		}
+		return nil
 	}
 	for _, v := range backupObj.Status.Targets {
 		if sourceTargetName == v.Name {

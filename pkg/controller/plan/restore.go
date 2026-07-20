@@ -179,12 +179,9 @@ func (r *RestoreManager) BuildPrepareDataRestore(comp *component.SynthesizedComp
 	if len(templates) == 0 {
 		return nil, nil
 	}
-	sourceTargetName, sourceTarget := backupSourceTargetForRestore(backupObj)
-	if r.SourceTargetName != "" {
-		sourceTargetName = r.SourceTargetName
-		// Source-target validation and resolution belong to the DataProtection
-		// Restore path. This layer only carries the public Restore intent.
-		sourceTarget = nil
+	sourceTargetName, sourceTarget, err := r.resolveBackupSourceTarget(backupObj)
+	if err != nil {
+		return nil, err
 	}
 	restore := &dpv1alpha1.Restore{
 		ObjectMeta: r.GetRestoreObjectMeta(comp, dpv1alpha1.PrepareData, templateName),
@@ -247,7 +244,10 @@ func (r *RestoreManager) DoPostReady(comp *component.SynthesizedComponent,
 		}
 		jobActionLabels[instanceset.RoleLabelKey] = highestPriorityRole.Name
 	}
-	sourceTargetName, sourceTarget := backupSourceTargetForRestore(backupObj)
+	sourceTargetName, sourceTarget, err := r.resolveBackupSourceTarget(backupObj)
+	if err != nil {
+		return err
+	}
 	restore := &dpv1alpha1.Restore{
 		ObjectMeta: r.GetRestoreObjectMeta(comp, dpv1alpha1.PostReady, ""),
 		Spec: dpv1alpha1.RestoreSpec{
@@ -303,6 +303,18 @@ func backupSourceTargetForRestore(backupObj *dpv1alpha1.Backup) (string, *dpv1al
 		return backupObj.Status.Targets[0].Name, &backupObj.Status.Targets[0]
 	}
 	return "", nil
+}
+
+func (r *RestoreManager) resolveBackupSourceTarget(backupObj *dpv1alpha1.Backup) (string, *dpv1alpha1.BackupStatusTarget, error) {
+	if r.SourceTargetName == "" {
+		name, target := backupSourceTargetForRestore(backupObj)
+		return name, target, nil
+	}
+	target := dputils.GetBackupStatusTarget(backupObj, r.SourceTargetName)
+	if target == nil {
+		return "", nil, intctrlutil.NewFatalError(fmt.Sprintf("source target %q does not exist in Backup %s/%s status", r.SourceTargetName, backupObj.Namespace, backupObj.Name))
+	}
+	return r.SourceTargetName, target, nil
 }
 
 func (r *RestoreManager) buildRequiredPolicy(sourceTarget *dpv1alpha1.BackupStatusTarget) *dpv1alpha1.RequiredPolicyForAllPodSelection {

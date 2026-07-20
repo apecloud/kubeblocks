@@ -45,6 +45,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	gatewayv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -105,6 +106,8 @@ var _ = BeforeSuite(func() {
 			// resolved by ref: https://github.com/operator-framework/operator-sdk/issues/4434#issuecomment-786794418
 			filepath.Join(build.Default.GOPATH, "pkg", "mod", "github.com", "kubernetes-csi/external-snapshotter/",
 				"client/v6@v6.2.0", "config", "crd"),
+			filepath.Join(build.Default.GOPATH, "pkg", "mod", "sigs.k8s.io", "gateway-api@v1.0.0",
+				"config", "crd", "standard"),
 		},
 		ErrorIfCRDPathMissing: true,
 	}
@@ -127,6 +130,9 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 
 	err = dpv1alpha1.AddToScheme(scheme)
+	Expect(err).NotTo(HaveOccurred())
+
+	err = gatewayv1beta1.AddToScheme(scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	// +kubebuilder:scaffold:scheme

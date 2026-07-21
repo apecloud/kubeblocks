@@ -41,6 +41,31 @@ func IgnoreNotDefined(err error) error {
 	return err
 }
 
+// IsActionPending reports whether the complete lifecycle result contains
+// only states that should be retried without being surfaced as action
+// failures. Aggregated AllReplicas results are pending only when every
+// selected pod returned a pending state.
+func IsActionPending(err error) bool {
+	if err == nil {
+		return false
+	}
+	var aggregateErr *actionAggregateError
+	if errors.As(err, &aggregateErr) {
+		if len(aggregateErr.errs) == 0 {
+			return false
+		}
+		for _, childErr := range aggregateErr.errs {
+			if !IsActionPending(childErr) {
+				return false
+			}
+		}
+		return true
+	}
+	return errors.Is(err, ErrActionInProgress) ||
+		errors.Is(err, ErrActionBusy) ||
+		errors.Is(err, ErrPreconditionFailed)
+}
+
 type actionAggregateError struct {
 	errs []error
 }

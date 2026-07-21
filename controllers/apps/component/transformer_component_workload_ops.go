@@ -354,7 +354,7 @@ func (r *componentWorkloadOps) joinMember4ScaleOut() error {
 
 			if err := r.joinMemberForPod(pod, pods); err != nil {
 				joinErr := fmt.Errorf("pod %s: %w", pod.Name, err)
-				if errors.Is(err, lifecycle.ErrActionInProgress) || errors.Is(err, lifecycle.ErrActionBusy) {
+				if lifecycle.IsActionPending(err) {
 					retryErrors = append(retryErrors, joinErr)
 				} else {
 					joinErrors = append(joinErrors, joinErr)

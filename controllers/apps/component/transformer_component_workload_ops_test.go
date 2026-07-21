@@ -194,8 +194,9 @@ func TestJoinMember4ScaleOutPendingReplicaDoesNotReportFailure(t *testing.T) {
 
 func TestJoinMember4ScaleOutRetryableActionDoesNotReportFailure(t *testing.T) {
 	for name, actionErr := range map[string]error{
-		"in progress": lifecycle.ErrActionInProgress,
-		"busy":        lifecycle.ErrActionBusy,
+		"in progress":         lifecycle.ErrActionInProgress,
+		"busy":                lifecycle.ErrActionBusy,
+		"precondition failed": lifecycle.ErrPreconditionFailed,
 	} {
 		t.Run(name, func(t *testing.T) {
 			const (

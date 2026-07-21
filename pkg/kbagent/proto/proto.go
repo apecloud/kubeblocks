@@ -67,8 +67,47 @@ type GRPCResponse struct {
 
 type RetryPolicy struct {
 	MaxRetries int `json:"maxRetries,omitempty"`
-	// RetryInterval is the number of seconds to wait between retry attempts.
-	RetryInterval int64 `json:"retryInterval,omitempty"`
+	// RetryInterval retains the legacy time.Duration wire representation in nanoseconds.
+	RetryInterval time.Duration `json:"retryInterval,omitempty"`
+	// RetryIntervalSeconds is the explicit seconds representation. When present, it takes precedence over
+	// RetryInterval. RetryInterval is still populated with the equivalent duration for old kbagent readers.
+	RetryIntervalSeconds *int64 `json:"retryIntervalSeconds,omitempty"`
+}
+
+// NewRetryPolicy converts the public retry policy into a version-skew-safe kbagent wire policy.
+func NewRetryPolicy(maxRetries int, retryInterval time.Duration, retryIntervalSeconds *int64) *RetryPolicy {
+	policy := &RetryPolicy{
+		MaxRetries:    maxRetries,
+		RetryInterval: retryInterval,
+	}
+	if retryIntervalSeconds != nil {
+		seconds := *retryIntervalSeconds
+		policy.RetryIntervalSeconds = &seconds
+		policy.RetryInterval = durationFromSeconds(seconds)
+	}
+	return policy
+}
+
+// Interval returns the effective retry interval. The explicitly present seconds field wins over the legacy field.
+func (p *RetryPolicy) Interval() time.Duration {
+	if p == nil {
+		return 0
+	}
+	if p.RetryIntervalSeconds != nil {
+		return durationFromSeconds(*p.RetryIntervalSeconds)
+	}
+	return p.RetryInterval
+}
+
+func durationFromSeconds(seconds int64) time.Duration {
+	if seconds <= 0 {
+		return 0
+	}
+	const maxDuration = int64(1<<63 - 1)
+	if seconds > maxDuration/int64(time.Second) {
+		return time.Duration(maxDuration)
+	}
+	return time.Duration(seconds) * time.Second
 }
 
 type ActionRequest struct {

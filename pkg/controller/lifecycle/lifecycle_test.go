@@ -24,6 +24,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -114,6 +115,7 @@ var _ = Describe("lifecycle", func() {
 		namespace = "default"
 		clusterName = "test-cluster"
 		compName = "kbagent"
+		retryIntervalSeconds := int64(10)
 		lifecycleActions = &appsv1.ComponentLifecycleActions{
 			PostProvision: &appsv1.Action{
 				Exec: &appsv1.ExecAction{
@@ -121,8 +123,9 @@ var _ = Describe("lifecycle", func() {
 				},
 				TimeoutSeconds: 5,
 				RetryPolicy: &appsv1.RetryPolicy{
-					MaxRetries:    5,
-					RetryInterval: 10,
+					MaxRetries:           5,
+					RetryInterval:        10,
+					RetryIntervalSeconds: &retryIntervalSeconds,
 				},
 			},
 			RoleProbe: &appsv1.Probe{
@@ -144,8 +147,9 @@ var _ = Describe("lifecycle", func() {
 			},
 			TimeoutSeconds: 5,
 			RetryPolicy: &appsv1.RetryPolicy{
-				MaxRetries:    5,
-				RetryInterval: 10,
+				MaxRetries:           5,
+				RetryInterval:        10,
+				RetryIntervalSeconds: &retryIntervalSeconds,
 			},
 		}
 		pods = []*corev1.Pod{{}}
@@ -224,7 +228,9 @@ var _ = Describe("lifecycle", func() {
 					Expect(*req.TimeoutSeconds).Should(Equal(action.TimeoutSeconds))
 					Expect(req.RetryPolicy).ShouldNot(BeNil())
 					Expect(req.RetryPolicy.MaxRetries).Should(Equal(action.RetryPolicy.MaxRetries))
-					Expect(req.RetryPolicy.RetryInterval).Should(Equal(action.RetryPolicy.RetryInterval))
+					Expect(req.RetryPolicy.RetryInterval).Should(Equal(10 * time.Second))
+					Expect(req.RetryPolicy.RetryIntervalSeconds).ShouldNot(BeNil())
+					Expect(*req.RetryPolicy.RetryIntervalSeconds).Should(Equal(int64(10)))
 					return proto.ActionResponse{}, nil
 				}).AnyTimes()
 			})

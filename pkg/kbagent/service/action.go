@@ -216,7 +216,7 @@ func callActionWithRetryOnce(ctx context.Context, action *proto.Action, paramete
 		return output, err
 	}
 
-	interval := retryIntervalDuration(retryPolicy.RetryInterval)
+	interval := retryPolicy.Interval()
 	for i := 0; i < retryPolicy.MaxRetries; i++ {
 		if interval > 0 {
 			select {
@@ -231,15 +231,4 @@ func callActionWithRetryOnce(ctx context.Context, action *proto.Action, paramete
 		}
 	}
 	return output, err
-}
-
-func retryIntervalDuration(seconds int64) time.Duration {
-	if seconds <= 0 {
-		return 0
-	}
-	const maxDuration = int64(1<<63 - 1)
-	if seconds > maxDuration/int64(time.Second) {
-		return time.Duration(maxDuration)
-	}
-	return time.Duration(seconds) * time.Second
 }

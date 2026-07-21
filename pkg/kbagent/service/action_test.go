@@ -221,7 +221,7 @@ var _ = Describe("action", func() {
 			Expect(string(counter)).Should(Equal("2\n"))
 		})
 
-		DescribeTable("interprets retry intervals as seconds",
+		DescribeTable("honors the explicit retry interval in seconds",
 			func(requestOverride bool) {
 				f, err := os.CreateTemp("", "kbagent-retry-interval-*")
 				Expect(err).Should(BeNil())
@@ -230,7 +230,8 @@ var _ = Describe("action", func() {
 				defer os.Remove(counterPath)
 
 				action := newRetryAction("retry-interval", counterPath, 1)
-				policy := &proto.RetryPolicy{MaxRetries: 1, RetryInterval: 1}
+				seconds := int64(1)
+				policy := &proto.RetryPolicy{MaxRetries: 1, RetryIntervalSeconds: &seconds}
 				req := &proto.ActionRequest{Action: action.Name}
 				if requestOverride {
 					action.RetryPolicy = nil
@@ -255,11 +256,9 @@ var _ = Describe("action", func() {
 			Entry("from a request override", true),
 		)
 
-		It("converts seconds exactly without overflowing a very large retry interval", func() {
-			Expect(retryIntervalDuration(1)).Should(Equal(time.Second))
-
-			const maxDuration = int64(1<<63 - 1)
-			Expect(retryIntervalDuration(maxDuration)).Should(Equal(time.Duration(maxDuration)))
+		It("preserves the legacy duration wire contract", func() {
+			policy := &proto.RetryPolicy{RetryInterval: time.Second}
+			Expect(policy.Interval()).Should(Equal(time.Second))
 		})
 	})
 })

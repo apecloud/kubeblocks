@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package v1
 
 import (
+	"time"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -2193,12 +2195,20 @@ type RetryPolicy struct {
 	// +optional
 	MaxRetries int `json:"maxRetries,omitempty"`
 
-	// Specifies the number of seconds to wait between each retry attempt.
+	// Indicates the duration of time to wait between each retry attempt.
 	// This value is set to 0 by default, indicating that there will be no delay between retry attempts.
+	// Deprecated: use retryIntervalSeconds instead. This field uses the time.Duration representation in nanoseconds.
 	//
 	// +kubebuilder:default=0
 	// +optional
-	RetryInterval int64 `json:"retryInterval,omitempty"`
+	RetryInterval time.Duration `json:"retryInterval,omitempty"`
+
+	// Specifies the number of seconds to wait between each retry attempt.
+	// When set, this field takes precedence over retryInterval, including when set to 0.
+	//
+	// +kubebuilder:validation:Minimum=0
+	// +optional
+	RetryIntervalSeconds *int64 `json:"retryIntervalSeconds,omitempty"`
 }
 
 // PreConditionType defines the preCondition type of the action execution.

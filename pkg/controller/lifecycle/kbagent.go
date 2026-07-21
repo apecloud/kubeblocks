@@ -280,10 +280,10 @@ func (a *kbagent) buildActionRequest(ctx context.Context, cli client.Reader, lfa
 			req.TimeoutSeconds = opts.TimeoutSeconds
 		}
 		if opts.RetryPolicy != nil {
-			req.RetryPolicy = &proto.RetryPolicy{
-				MaxRetries:    opts.RetryPolicy.MaxRetries,
-				RetryInterval: opts.RetryPolicy.RetryInterval,
-			}
+			req.RetryPolicy = proto.NewRetryPolicy(
+				opts.RetryPolicy.MaxRetries,
+				opts.RetryPolicy.RetryInterval,
+				opts.RetryPolicy.RetryIntervalSeconds)
 		}
 		if len(opts.Arguments) > 0 {
 			req.Arguments = opts.Arguments

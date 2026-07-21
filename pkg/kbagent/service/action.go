@@ -216,7 +216,7 @@ func callActionWithRetryOnce(ctx context.Context, action *proto.Action, paramete
 		return output, err
 	}
 
-	interval := retryPolicy.RetryInterval
+	interval := retryIntervalDuration(retryPolicy.RetryInterval)
 	for i := 0; i < retryPolicy.MaxRetries; i++ {
 		if interval > 0 {
 			select {
@@ -231,4 +231,17 @@ func callActionWithRetryOnce(ctx context.Context, action *proto.Action, paramete
 		}
 	}
 	return output, err
+}
+
+func retryIntervalDuration(seconds time.Duration) time.Duration {
+	// RetryInterval is serialized as a unitless integer by the action API. Existing
+	// ComponentDefinition manifests and controller tests define that integer in seconds.
+	if seconds <= 0 {
+		return 0
+	}
+	const maxDuration = time.Duration(1<<63 - 1)
+	if seconds > maxDuration/time.Second {
+		return maxDuration
+	}
+	return seconds * time.Second
 }

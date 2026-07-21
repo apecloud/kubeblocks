@@ -39,6 +39,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
 )
@@ -188,5 +189,77 @@ func TestJoinMember4ScaleOutPendingReplicaDoesNotReportFailure(t *testing.T) {
 	case event := <-recorder.Events:
 		t.Fatalf("pending replica without a lifecycle invocation must not emit a failure event: %s", event)
 	default:
+	}
+}
+
+func TestJoinMember4ScaleOutRetryableActionDoesNotReportFailure(t *testing.T) {
+	for name, actionErr := range map[string]error{
+		"in progress": lifecycle.ErrActionInProgress,
+		"busy":        lifecycle.ErrActionBusy,
+	} {
+		t.Run(name, func(t *testing.T) {
+			const (
+				namespace   = "default"
+				clusterName = "test-cluster"
+				compName    = "mysql"
+			)
+			fullCompName := clusterName + "-" + compName
+			podName := fullCompName + "-1"
+
+			kbacli.SetMockClient(nil, actionErr)
+			defer kbacli.UnsetMockClient()
+
+			scheme := runtime.NewScheme()
+			require.NoError(t, clientgoscheme.AddToScheme(scheme))
+			pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace,
+				Name:      podName,
+				Labels:    constant.GetCompLabels(clusterName, compName),
+			}}
+			cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(pod).Build()
+			comp := &appsv1.Component{ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace,
+				Name:      fullCompName,
+				Labels: map[string]string{
+					constant.AppInstanceLabelKey:    clusterName,
+					constant.KBAppComponentLabelKey: compName,
+				},
+			}}
+			runningITS := &workloads.InstanceSet{
+				ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: fullCompName},
+				Spec:       workloads.InstanceSetSpec{Replicas: ptr.To[int32](2)},
+			}
+			protoITS := runningITS.DeepCopy()
+			require.NoError(t, component.NewReplicasStatus(protoITS, []string{podName}, true, false))
+			recorder := record.NewFakeRecorder(8)
+			synthesizedComp := &component.SynthesizedComponent{
+				Namespace: namespace, ClusterName: clusterName, Name: compName, Replicas: 2,
+				LifecycleActions: component.SynthesizedLifecycleActions{
+					ComponentLifecycleActions: &appsv1.ComponentLifecycleActions{
+						MemberJoin: &appsv1.Action{
+							Exec: &appsv1.ExecAction{Command: []string{"/scripts/member-join.sh"}},
+						},
+					},
+				},
+			}
+			transCtx := &componentTransformContext{
+				Context: context.Background(), Client: cli, EventRecorder: recorder, Logger: logr.Discard(),
+				Component: comp, SynthesizeComponent: synthesizedComp,
+				RunningWorkload: runningITS, ProtoWorkload: protoITS,
+			}
+			ops := &componentWorkloadOps{
+				transCtx: transCtx, cli: cli, component: comp, synthesizeComp: synthesizedComp,
+				runningITS: runningITS, protoITS: protoITS,
+			}
+
+			err := ops.joinMember4ScaleOut()
+			require.Error(t, err)
+			require.Truef(t, intctrlutil.IsDelayedRequeueError(err), "expected delayed requeue, got %T: %v", err, err)
+			select {
+			case event := <-recorder.Events:
+				t.Fatalf("retryable lifecycle state must not emit a failure event: %s", event)
+			default:
+			}
+		})
 	}
 }

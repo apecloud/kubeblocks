@@ -334,6 +334,7 @@ func (r *componentWorkloadOps) joinMember4ScaleOut() error {
 	}
 
 	joinErrors := make([]error, 0)
+	retryErrors := make([]error, 0)
 	notJoinedReplicas := make([]string, 0)
 	if err = component.UpdateReplicasStatusFunc(r.protoITS, func(replicas *component.ReplicasStatus) error {
 		for _, pod := range pods {
@@ -352,7 +353,12 @@ func (r *componentWorkloadOps) joinMember4ScaleOut() error {
 			// TODO: should wait for the data to be loaded before joining the member?
 
 			if err := r.joinMemberForPod(pod, pods); err != nil {
-				joinErrors = append(joinErrors, fmt.Errorf("pod %s: %w", pod.Name, err))
+				joinErr := fmt.Errorf("pod %s: %w", pod.Name, err)
+				if errors.Is(err, lifecycle.ErrActionInProgress) || errors.Is(err, lifecycle.ErrActionBusy) {
+					retryErrors = append(retryErrors, joinErr)
+				} else {
+					joinErrors = append(joinErrors, joinErr)
+				}
 			} else {
 				replicas.Status[i].MemberJoined = ptr.To(true)
 			}
@@ -374,6 +380,9 @@ func (r *componentWorkloadOps) joinMember4ScaleOut() error {
 			"member join for scale-out has not completed: %v", joinErrors)
 		// delayed requeue lets the status transformer still run so component phase/conditions stay live while the join retries
 		return intctrlutil.NewDelayedRequeueError(time.Second, fmt.Sprintf("%v", joinErrors))
+	}
+	if len(retryErrors) > 0 {
+		return intctrlutil.NewDelayedRequeueError(time.Second, fmt.Sprintf("%v", retryErrors))
 	}
 	if len(notJoinedReplicas) > 0 {
 		// A replica can be pending before its Pod exists, so no lifecycle action

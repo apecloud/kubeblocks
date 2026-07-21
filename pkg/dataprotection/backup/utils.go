@@ -142,7 +142,6 @@ func BuildBackupWorkloadLabels(backup *dpv1alpha1.Backup) map[string]string {
 		labels[k] = v
 	}
 	labels[types.BackupNameLabelKey] = backup.Name
-	labels[constant.AppManagedByLabelKey] = types.AppName
 	return labels
 }
 

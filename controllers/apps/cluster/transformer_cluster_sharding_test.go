@@ -225,7 +225,7 @@ var _ = Describe("cluster sharding shared transformers", func() {
 		Expect(account.Name).Should(Equal(accountName))
 		Expect(account.PasswordConfig).ShouldNot(BeNil())
 		Expect(account.PasswordConfig.Length).Should(Equal(int32(12)))
-		Expect(account.PasswordConfig.NumDigits).Should(Equal(int32(2)))
+		Expect(account.PasswordConfig.NumDigits).Should(HaveValue(Equal(int32(2))))
 
 		transCtx.componentDefs = nil
 		_, err = transformer.definedSystemAccount(transCtx, sharding, accountName)

@@ -151,8 +151,7 @@ func (t *clusterShardingAccountTransformer) definedSystemAccount(transCtx *clust
 		resolved := synthesizedShardingSystemAccount{SystemAccount: *account}
 		if compAccount != nil {
 			if compAccount.PasswordConfig != nil {
-				passwordConfig := *compAccount.PasswordConfig
-				resolved.PasswordConfig = &passwordConfig
+				resolved.PasswordConfig = common.ToSystemAccountPasswordConfig(*compAccount.PasswordConfig)
 			}
 			resolved.SecretRef = compAccount.SecretRef
 		}

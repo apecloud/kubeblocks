@@ -22,12 +22,11 @@ package operations
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"sort"
 	"strconv"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -56,8 +55,6 @@ type parameterAssignmentState struct {
 	present bool
 	value   *string
 }
-
-const invalidParameterActionResultCode appsv1.ActionResultCode = "InvalidParameter"
 
 const (
 	reconfigureRolledBackMessage      = "ActionRejectedRolledBack"
@@ -207,6 +204,13 @@ func (r *reconfigureAction) aggregatePhase(reqCtx intctrlutil.RequestCtx, cli cl
 		resource.OpsRequest.Status.ReconfigureRollback = &opsv1alpha1.ReconfigureRollbackStatus{
 			Phase:   opsv1alpha1.ReconfigureManualCleanupRequired,
 			Message: reconfigureManualMessage,
+		}
+		return opsv1alpha1.OpsFailedPhase, reconfigureManualMessage, nil
+	}
+	if manualReason := validateRollbackRestartScope(failedTargets, targets); manualReason != "" {
+		resource.OpsRequest.Status.ReconfigureRollback = &opsv1alpha1.ReconfigureRollbackStatus{
+			Phase:   opsv1alpha1.ReconfigureManualCleanupRequired,
+			Message: fmt.Sprintf("%s: %s", reconfigureManualMessage, manualReason),
 		}
 		return opsv1alpha1.OpsFailedPhase, reconfigureManualMessage, nil
 	}
@@ -456,6 +460,9 @@ func snapshotCoversParameters(snapshot []opsv1alpha1.LastParameterAssignment,
 }
 
 func classifyDeterministicReconfigureFailure(failed []*parametersv1alpha1.ComponentParameter) (appsv1.ActionResultCode, *bool, bool) {
+	var commonCode appsv1.ActionResultCode
+	codeObserved := false
+	codesAgree := true
 	for _, compParam := range failed {
 		expectedRevision := strconv.FormatInt(compParam.Generation, 10)
 		sawFailedItem := false
@@ -467,9 +474,14 @@ func classifyDeterministicReconfigureFailure(failed []*parametersv1alpha1.Compon
 			if item.ReconcileDetail == nil ||
 				item.UpdateRevision != expectedRevision ||
 				item.ReconcileDetail.CurrentRevision != expectedRevision ||
-				item.ReconcileDetail.Code != invalidParameterActionResultCode ||
 				item.ReconcileDetail.Retryable == nil || *item.ReconcileDetail.Retryable {
 				return "", nil, false
+			}
+			if !codeObserved {
+				commonCode = item.ReconcileDetail.Code
+				codeObserved = true
+			} else if commonCode != item.ReconcileDetail.Code {
+				codesAgree = false
 			}
 		}
 		if !sawFailedItem {
@@ -477,7 +489,10 @@ func classifyDeterministicReconfigureFailure(failed []*parametersv1alpha1.Compon
 		}
 	}
 	retryable := false
-	return invalidParameterActionResultCode, &retryable, true
+	if !codesAgree {
+		commonCode = ""
+	}
+	return commonCode, &retryable, true
 }
 
 func isTerminalParameterFailure(phase parametersv1alpha1.ParameterPhase) bool {
@@ -553,7 +568,7 @@ func (r *reconfigureAction) reconcileRollback(reqCtx intctrlutil.RequestCtx, cli
 	}
 	switch status.Phase {
 	case opsv1alpha1.ReconfigureRollbackPending:
-		generations, manualReason, err := r.restoreParameterSnapshots(reqCtx, cli, resource, rollbackTargets)
+		generations, manualReason, err := r.requestParameterRollbacks(reqCtx, cli, resource, rollbackTargets)
 		if err != nil {
 			return "", "", err
 		}
@@ -563,60 +578,11 @@ func (r *reconfigureAction) reconcileRollback(reqCtx intctrlutil.RequestCtx, cli
 		}
 		status.ComponentGenerations = generations
 		status.Phase = opsv1alpha1.ReconfigureRollingBack
-		status.Message = "waiting for restored parameter assignments to converge"
+		status.Message = "waiting for the Parameters controller to reconcile rollback"
 		return opsv1alpha1.OpsRunningPhase, "", nil
 
 	case opsv1alpha1.ReconfigureRollingBack:
-		ready, cleared, err := prepareRollbackFailureGates(reqCtx.Ctx, cli, resource.Cluster, rollbackTargets, status.ComponentGenerations)
-		if err != nil {
-			return "", "", err
-		}
-		if !ready || cleared {
-			return opsv1alpha1.OpsRunningPhase, "", nil
-		}
-		completed, manualReason := rollbackParametersConverged(resource.OpsRequest, rollbackTargets)
-		if manualReason != "" {
-			setReconfigureManualCleanup(status, manualReason)
-			return opsv1alpha1.OpsFailedPhase, reconfigureManualMessage, nil
-		}
-		if !completed {
-			return opsv1alpha1.OpsRunningPhase, "", nil
-		}
-		if status.RestartRequired {
-			if manualReason := validateRollbackRestartScope(rollbackTargets, targets); manualReason != "" {
-				setReconfigureManualCleanup(status, manualReason)
-				return opsv1alpha1.OpsFailedPhase, reconfigureManualMessage, nil
-			}
-			now := metav1.Now()
-			status.RestartAt = &now
-			status.Phase = opsv1alpha1.ReconfigureRestartPending
-			status.Message = "parameter assignments restored; controlled restart pending"
-		} else {
-			status.Phase = opsv1alpha1.ReconfigureRolledBack
-			status.Message = reconfigureRolledBackMessage
-			return opsv1alpha1.OpsFailedPhase, reconfigureRolledBackMessage, nil
-		}
-		return opsv1alpha1.OpsRunningPhase, "", nil
-
-	case opsv1alpha1.ReconfigureRestartPending:
-		generation, manualReason, err := r.restartRollbackTargets(reqCtx, cli, resource, rollbackTargets)
-		if err != nil {
-			return "", "", err
-		}
-		if manualReason != "" {
-			setReconfigureManualCleanup(status, manualReason)
-			return opsv1alpha1.OpsFailedPhase, reconfigureManualMessage, nil
-		}
-		status.ClusterGeneration = generation
-		status.Phase = opsv1alpha1.ReconfigureRestarting
-		status.Message = "waiting for controlled restart to complete"
-		return opsv1alpha1.OpsRunningPhase, "", nil
-
-	case opsv1alpha1.ReconfigureRestarting:
-		completed, manualReason, err := restartRollbackConverged(reqCtx.Ctx, cli, resource, rollbackTargets)
-		if err != nil {
-			return "", "", err
-		}
+		completed, manualReason := parameterRollbacksConverged(resource.OpsRequest, rollbackTargets)
 		if manualReason != "" {
 			setReconfigureManualCleanup(status, manualReason)
 			return opsv1alpha1.OpsFailedPhase, reconfigureManualMessage, nil
@@ -700,7 +666,7 @@ func setReconfigureManualCleanup(status *opsv1alpha1.ReconfigureRollbackStatus, 
 	status.Message = fmt.Sprintf("%s: %s", reconfigureManualMessage, reason)
 }
 
-func (r *reconfigureAction) restoreParameterSnapshots(reqCtx intctrlutil.RequestCtx, cli client.Client,
+func (r *reconfigureAction) requestParameterRollbacks(reqCtx intctrlutil.RequestCtx, cli client.Client,
 	resource *OpsResource, targets []reconfigureTarget) (map[string]int64, string, error) {
 	for _, target := range targets {
 		if target.parameter.Annotations[constant.OpsRequestUIDAnnotationKey] != string(resource.OpsRequest.UID) {
@@ -719,17 +685,41 @@ func (r *reconfigureAction) restoreParameterSnapshots(reqCtx intctrlutil.Request
 
 	generations := make(map[string]int64, len(targets))
 	for _, target := range targets {
-		last := resource.OpsRequest.Status.LastConfiguration.Components[target.component]
-		if assignmentsMatchSnapshot(componentParameterAssignments(target.parameter), last.Parameters) {
-			generations[target.component] = target.parameter.Generation
+		sourceGeneration, ok := resource.OpsRequest.Status.ReconfigureRollback.ComponentGenerations[target.component]
+		if !ok {
+			return nil, fmt.Sprintf("rollback source generation for component %s is missing", target.component), nil
+		}
+		if target.parameter.Status.Rollback != nil &&
+			target.parameter.Status.Rollback.RequestID == string(resource.OpsRequest.UID) &&
+			target.parameter.Status.Rollback.Phase == parametersv1alpha1.ParameterRollbackSucceeded {
+			generations[target.component] = sourceGeneration
 			continue
 		}
+		last := resource.OpsRequest.Status.LastConfiguration.Components[target.component]
+		desiredHolder := target.parameter.DeepCopy()
+		restoreParameterAssignments(desiredHolder, last.Parameters)
+		request := &parametersv1alpha1.ParameterRollbackRequest{
+			RequestID:        string(resource.OpsRequest.UID),
+			SourceGeneration: sourceGeneration,
+			Desired:          desiredHolder.Spec.Desired.DeepCopy(),
+			Restart:          true,
+		}
+		if target.parameter.Spec.Rollback != nil {
+			if !reflect.DeepEqual(target.parameter.Spec.Rollback, request) {
+				return nil, fmt.Sprintf("ComponentParameter %s has a different rollback request", target.parameter.Name), nil
+			}
+			generations[target.component] = sourceGeneration
+			continue
+		}
+		if target.parameter.Generation != sourceGeneration {
+			return nil, fmt.Sprintf("ComponentParameter %s generation changed before rollback intent was accepted", target.parameter.Name), nil
+		}
 		patch := client.MergeFromWithOptions(target.parameter.DeepCopy(), client.MergeFromWithOptimisticLock{})
-		restoreParameterAssignments(target.parameter, last.Parameters)
+		target.parameter.Spec.Rollback = request
 		if err := cli.Patch(reqCtx.Ctx, target.parameter, patch); err != nil {
 			return nil, "", err
 		}
-		generations[target.component] = target.parameter.Generation
+		generations[target.component] = sourceGeneration
 	}
 	return generations, "", nil
 }
@@ -809,163 +799,29 @@ func replaceParameterAssignments(compParam *parametersv1alpha1.ComponentParamete
 	inputs.Updates = updates
 }
 
-func prepareRollbackFailureGates(ctx context.Context, cli client.Client, cluster *appsv1.Cluster,
-	targets []reconfigureTarget, generations map[string]int64) (bool, bool, error) {
-	configMaps := make([]*corev1.ConfigMap, 0)
-	seen := map[string]struct{}{}
-	for _, target := range targets {
-		generation, ok := generations[target.component]
-		if !ok {
-			return false, false, fmt.Errorf("rollback generation for component %s is missing", target.component)
-		}
-		expectedRevision := strconv.FormatInt(generation, 10)
-		for _, item := range target.parameter.Spec.ConfigItemDetails {
-			name := parameterscore.GetComponentCfgName(cluster.Name, target.component, item.Name)
-			if _, ok := seen[name]; ok {
-				continue
-			}
-			seen[name] = struct{}{}
-			configMap := &corev1.ConfigMap{}
-			key := client.ObjectKey{Namespace: cluster.Namespace, Name: name}
-			if err := cli.Get(ctx, key, configMap); err != nil {
-				if apierrors.IsNotFound(err) {
-					return false, false, nil
-				}
-				return false, false, err
-			}
-			if configMap.Annotations[constant.ConfigurationRevision] != expectedRevision {
-				return false, false, nil
-			}
-			configMaps = append(configMaps, configMap)
-		}
-	}
-
-	cleared := false
-	for _, configMap := range configMaps {
-		if _, ok := configMap.Annotations[constant.DisableUpgradeInsConfigurationAnnotationKey]; !ok {
-			continue
-		}
-		patch := client.MergeFromWithOptions(configMap.DeepCopy(), client.MergeFromWithOptimisticLock{})
-		delete(configMap.Annotations, constant.DisableUpgradeInsConfigurationAnnotationKey)
-		if err := cli.Patch(ctx, configMap, patch); err != nil {
-			return false, cleared, err
-		}
-		cleared = true
-	}
-	return true, cleared, nil
-}
-
-func rollbackParametersConverged(opsRequest *opsv1alpha1.OpsRequest,
+func parameterRollbacksConverged(opsRequest *opsv1alpha1.OpsRequest,
 	targets []reconfigureTarget) (bool, string) {
-	status := opsRequest.Status.ReconfigureRollback
 	for _, target := range targets {
 		if target.parameter.Annotations[constant.OpsRequestUIDAnnotationKey] != string(opsRequest.UID) {
 			return false, fmt.Sprintf("ComponentParameter %s ownership changed during rollback", target.parameter.Name)
 		}
-		generation, ok := status.ComponentGenerations[target.component]
-		if !ok || target.parameter.Generation != generation {
-			return false, fmt.Sprintf("ComponentParameter %s generation changed during rollback", target.parameter.Name)
-		}
-		last, ok := opsRequest.Status.LastConfiguration.Components[target.component]
-		if !ok || !assignmentsMatchSnapshot(componentParameterAssignments(target.parameter), last.Parameters) {
-			return false, fmt.Sprintf("ComponentParameter %s no longer matches its rollback snapshot", target.parameter.Name)
-		}
-		if target.parameter.Status.ObservedGeneration != generation {
+		rollback := target.parameter.Status.Rollback
+		if rollback == nil || rollback.RequestID != string(opsRequest.UID) {
 			return false, ""
 		}
-		switch target.parameter.Status.Phase {
-		case parametersv1alpha1.CFinishedPhase:
-		case parametersv1alpha1.CMergeFailedPhase, parametersv1alpha1.CFailedAndPausePhase:
-			return false, fmt.Sprintf("restoring parameters for component %s failed", target.component)
+		switch rollback.Phase {
+		case parametersv1alpha1.ParameterRollbackSucceeded:
+		case parametersv1alpha1.ParameterRollbackFailed:
+			return false, fmt.Sprintf("Parameters rollback for component %s failed: %s", target.component, rollback.Message)
 		default:
+			if target.parameter.Spec.Rollback == nil ||
+				target.parameter.Spec.Rollback.RequestID != string(opsRequest.UID) {
+				return false, fmt.Sprintf("Parameters rollback intent for component %s disappeared before completion", target.component)
+			}
 			return false, ""
 		}
 	}
 	return true, ""
-}
-
-func (r *reconfigureAction) restartRollbackTargets(reqCtx intctrlutil.RequestCtx, cli client.Client,
-	resource *OpsResource, targets []reconfigureTarget) (int64, string, error) {
-	status := resource.OpsRequest.Status.ReconfigureRollback
-	if status.RestartAt == nil {
-		return 0, "controlled restart timestamp is missing", nil
-	}
-	cluster := &appsv1.Cluster{}
-	key := client.ObjectKeyFromObject(resource.Cluster)
-	if err := cli.Get(reqCtx.Ctx, key, cluster); err != nil {
-		return 0, "", err
-	}
-	if resource.Cluster.UID != "" && cluster.UID != resource.Cluster.UID {
-		return 0, "target Cluster identity changed before controlled restart", nil
-	}
-	patch := client.MergeFromWithOptions(cluster.DeepCopy(), client.MergeFromWithOptimisticLock{})
-	restartAt := status.RestartAt.Time.UTC().Format(time.RFC3339)
-	changed := false
-	seen := map[string]struct{}{}
-	for _, target := range targets {
-		if _, ok := seen[target.requestName]; ok {
-			continue
-		}
-		seen[target.requestName] = struct{}{}
-		if compSpec := cluster.Spec.GetComponentByName(target.requestName); compSpec != nil {
-			if compSpec.Annotations == nil {
-				compSpec.Annotations = map[string]string{}
-			}
-			if compSpec.Annotations[constant.RestartAnnotationKey] != restartAt {
-				compSpec.Annotations[constant.RestartAnnotationKey] = restartAt
-				changed = true
-			}
-			continue
-		}
-		shardingSpec := cluster.Spec.GetShardingByName(target.requestName)
-		if shardingSpec == nil {
-			return 0, fmt.Sprintf("restart target %s no longer exists in Cluster spec", target.requestName), nil
-		}
-		if shardingSpec.Template.Annotations == nil {
-			shardingSpec.Template.Annotations = map[string]string{}
-		}
-		if shardingSpec.Template.Annotations[constant.RestartAnnotationKey] != restartAt {
-			shardingSpec.Template.Annotations[constant.RestartAnnotationKey] = restartAt
-			changed = true
-		}
-	}
-	if changed {
-		if err := cli.Patch(reqCtx.Ctx, cluster, patch); err != nil {
-			return 0, "", err
-		}
-	}
-	return cluster.Generation, "", nil
-}
-
-func restartRollbackConverged(ctx context.Context, cli client.Client, resource *OpsResource,
-	targets []reconfigureTarget) (bool, string, error) {
-	status := resource.OpsRequest.Status.ReconfigureRollback
-	cluster := &appsv1.Cluster{}
-	if err := cli.Get(ctx, client.ObjectKeyFromObject(resource.Cluster), cluster); err != nil {
-		return false, "", err
-	}
-	if resource.Cluster.UID != "" && cluster.UID != resource.Cluster.UID {
-		return false, "target Cluster identity changed during controlled restart", nil
-	}
-	if cluster.Generation != status.ClusterGeneration {
-		return false, "target Cluster generation changed during controlled restart", nil
-	}
-	if cluster.Status.ObservedGeneration != status.ClusterGeneration {
-		return false, "", nil
-	}
-	for _, target := range targets {
-		componentStatus, ok := cluster.Status.Components[target.component]
-		if !ok {
-			return false, "", nil
-		}
-		if componentStatus.Phase == appsv1.FailedComponentPhase {
-			return false, fmt.Sprintf("component %s failed during controlled restart", target.component), nil
-		}
-		if componentStatus.Phase != appsv1.RunningComponentPhase || !componentStatus.UpToDate {
-			return false, "", nil
-		}
-	}
-	return true, "", nil
 }
 
 func (r *reconfigureAction) applyReconfigureToParameters(reqCtx intctrlutil.RequestCtx, cli client.Client,

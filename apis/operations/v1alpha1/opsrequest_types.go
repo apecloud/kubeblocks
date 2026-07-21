@@ -1146,8 +1146,6 @@ type ReconfigureRollbackPhase string
 const (
 	ReconfigureRollbackPending       ReconfigureRollbackPhase = "RollbackPending"
 	ReconfigureRollingBack           ReconfigureRollbackPhase = "RollingBack"
-	ReconfigureRestartPending        ReconfigureRollbackPhase = "RestartPending"
-	ReconfigureRestarting            ReconfigureRollbackPhase = "Restarting"
 	ReconfigureRolledBack            ReconfigureRollbackPhase = "RolledBack"
 	ReconfigureManualCleanupRequired ReconfigureRollbackPhase = "ManualCleanupRequired"
 )
@@ -1155,7 +1153,7 @@ const (
 // ReconfigureRollbackStatus records the persisted compensation state for a Reconfiguring OpsRequest.
 type ReconfigureRollbackStatus struct {
 	// Phase is the current durable rollback step.
-	// +kubebuilder:validation:Enum=RollbackPending;RollingBack;RestartPending;Restarting;RolledBack;ManualCleanupRequired
+	// +kubebuilder:validation:Enum=RollbackPending;RollingBack;RolledBack;ManualCleanupRequired
 	Phase ReconfigureRollbackPhase `json:"phase"`
 
 	// StartTime is the persisted start of automatic rollback. It anchors the
@@ -1163,30 +1161,24 @@ type ReconfigureRollbackStatus struct {
 	// +optional
 	StartTime *metav1.Time `json:"startTime,omitempty"`
 
-	// Code is the normalized Action failure code that authorized automatic rollback.
+	// Code is the common opaque Action result code observed across failed items.
+	// It is empty when failed items report different codes and is never used as
+	// the rollback eligibility discriminator.
 	// +optional
 	Code appsv1.ActionResultCode `json:"code,omitempty"`
 
-	// Retryable records the retry property associated with Code.
+	// Retryable records the public Action retry property that authorized rollback.
 	// +optional
 	Retryable *bool `json:"retryable,omitempty"`
 
-	// ComponentGenerations identifies the exact Components selected for compensation and,
-	// once rollback writes begin, binds each write to the resulting ComponentParameter generation.
+	// ComponentGenerations identifies the exact Components selected for compensation and
+	// binds each rollback intent to its failed ComponentParameter source generation.
 	// +optional
 	ComponentGenerations map[string]int64 `json:"componentGenerations,omitempty"`
 
 	// RestartRequired is true when H1 may have reached at least one runtime before rollback.
 	// +optional
 	RestartRequired bool `json:"restartRequired,omitempty"`
-
-	// RestartAt is the stable timestamp used for an idempotent controlled restart.
-	// +optional
-	RestartAt *metav1.Time `json:"restartAt,omitempty"`
-
-	// ClusterGeneration binds the controlled restart write to one Cluster generation.
-	// +optional
-	ClusterGeneration int64 `json:"clusterGeneration,omitempty"`
 
 	// Message describes the current rollback outcome without exposing raw Action stderr.
 	// +kubebuilder:validation:MaxLength=1024

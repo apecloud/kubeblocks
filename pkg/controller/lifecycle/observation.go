@@ -63,7 +63,8 @@ const (
 //
 // A new invocation is persisted as Pending and then Running before execute is
 // called. Explicitly non-retryable normalized failures are committed as terminal
-// status; retryable and unclassified execution errors are returned for retry.
+// status, and an undefined action is committed as Skipped; retryable and
+// unclassified execution errors are returned for retry.
 func ReconcileActionObservation(statuses *[]appsv1.LifecycleActionStatus, key ActionObservationKey,
 	execute func() error) (ActionObservationState, error) {
 	if statuses == nil {
@@ -138,6 +139,16 @@ func ReconcileActionObservation(statuses *[]appsv1.LifecycleActionStatus, key Ac
 		*statuses = upsertActionObservation(*statuses, status)
 		return ActionObservationUpdated, nil
 	}
+	if errors.Is(err, ErrActionNotDefined) {
+		now := metav1.Now()
+		status.Phase = appsv1.LifecycleActionSkipped
+		status.Message = "lifecycle action is not defined"
+		status.CompletionTime = &now
+		status.Code = ""
+		status.Retryable = nil
+		*statuses = upsertActionObservation(*statuses, status)
+		return ActionObservationUpdated, nil
+	}
 	if err != nil && !isTerminalActionFailure(err) {
 		return "", err
 	}
@@ -148,9 +159,6 @@ func ReconcileActionObservation(statuses *[]appsv1.LifecycleActionStatus, key Ac
 	case err == nil:
 		status.Phase = appsv1.LifecycleActionSucceeded
 		status.Message = "lifecycle action succeeded"
-	case errors.Is(err, ErrActionNotDefined):
-		status.Phase = appsv1.LifecycleActionSkipped
-		status.Message = "lifecycle action is not defined"
 	default:
 		status.Phase = appsv1.LifecycleActionFailed
 		status.Message = "lifecycle action failed"

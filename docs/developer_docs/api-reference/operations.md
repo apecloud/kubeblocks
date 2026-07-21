@@ -3923,10 +3923,6 @@ This field is used to override or set the values of parameters without modifying
 </thead>
 <tbody><tr><td><p>&#34;ManualCleanupRequired&#34;</p></td>
 <td></td>
-</tr><tr><td><p>&#34;RestartPending&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;Restarting&#34;</p></td>
-<td></td>
 </tr><tr><td><p>&#34;RollbackPending&#34;</p></td>
 <td></td>
 </tr><tr><td><p>&#34;RolledBack&#34;</p></td>
@@ -3988,7 +3984,9 @@ github.com/apecloud/kubeblocks/apis/apps/v1.ActionResultCode
 </td>
 <td>
 <em>(Optional)</em>
-<p>Code is the normalized Action failure code that authorized automatic rollback.</p>
+<p>Code is the common opaque Action result code observed across failed items.
+It is empty when failed items report different codes and is never used as
+the rollback eligibility discriminator.</p>
 </td>
 </tr>
 <tr>
@@ -4000,7 +3998,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Retryable records the retry property associated with Code.</p>
+<p>Retryable records the public Action retry property that authorized rollback.</p>
 </td>
 </tr>
 <tr>
@@ -4012,8 +4010,8 @@ map[string]int64
 </td>
 <td>
 <em>(Optional)</em>
-<p>ComponentGenerations identifies the exact Components selected for compensation and,
-once rollback writes begin, binds each write to the resulting ComponentParameter generation.</p>
+<p>ComponentGenerations identifies the exact Components selected for compensation and
+binds each rollback intent to its failed ComponentParameter source generation.</p>
 </td>
 </tr>
 <tr>
@@ -4026,32 +4024,6 @@ bool
 <td>
 <em>(Optional)</em>
 <p>RestartRequired is true when H1 may have reached at least one runtime before rollback.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>restartAt</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#time-v1-meta">
-Kubernetes meta/v1.Time
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>RestartAt is the stable timestamp used for an idempotent controlled restart.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>clusterGeneration</code><br/>
-<em>
-int64
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>ClusterGeneration binds the controlled restart write to one Cluster generation.</p>
 </td>
 </tr>
 <tr>

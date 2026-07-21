@@ -577,7 +577,10 @@ func updateReconcileObject(item parametersv1alpha1.ConfigTemplateItemDetail,
 				return err
 			}
 		}
-		return updateConfigLabels(cmObj, item, compGeneration, revision)
+		if err := updateConfigLabels(cmObj, item, compGeneration, revision); err != nil {
+			return err
+		}
+		return applyRollbackMetadata(owner, cmObj, revision)
 	}
 }
 

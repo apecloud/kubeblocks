@@ -57,6 +57,7 @@ func createSyncPolicy(restart bool) func(Context) (Status, error) {
 			needReloadStaticParams = parameters.ReloadStaticParameters(paramDef)
 			visualizedParams       = core.GenerateVisualizedParamsList(ctx.Patch,
 				[]parametersv1alpha1.ComponentConfigDescription{*ctx.ConfigDescription})
+			requestRestart = restart
 		)
 		changes := make(map[string]*string)
 		for _, key := range visualizedParams {
@@ -84,13 +85,20 @@ func createSyncPolicy(restart bool) func(Context) (Status, error) {
 			}
 			return makeStatus(StatusNone, withReason("has NO updated parameters")), nil
 		}
+		// The legacy config-manager request is a map[string]string and cannot
+		// represent removal. When no template-level action can carry the public
+		// one-argument removal form, use restart so the rendered file remains the
+		// source of truth instead of silently executing only the set operations.
+		if hasParameterRemovals(changes) && ctx.ConfigTemplate.Reconfigure == nil {
+			requestRestart = true
+		}
 		params := parameterValues(changes)
-		if shouldBuildLegacyReconfigureAction(ctx, params, restart) {
+		if !hasParameterRemovals(changes) && shouldBuildLegacyReconfigureAction(ctx, params, requestRestart) {
 			if err := ValidateLegacyConfigManagerRuntime(ctx.ITS); err != nil {
 				return makeStatus(StatusFailed, withReason(err.Error())), nil
 			}
 		}
-		return submit(ctx, changes, restart)
+		return submit(ctx, changes, requestRestart)
 	}
 }
 
@@ -118,7 +126,8 @@ func submit(ctx Context, changes map[string]*string, restart bool) (Status, erro
 
 func applyChangesToCluster(ctx Context, config *appsv1.ClusterComponentConfig, changes map[string]*string, restart bool) Status {
 	params := parameterValues(changes)
-	if !shouldBuildLegacyReconfigureAction(ctx, params, restart) && shouldRejectTemplateReconfigureAction(ctx, changes, restart) {
+	useLegacyAction := !hasParameterRemovals(changes) && shouldBuildLegacyReconfigureAction(ctx, params, restart)
+	if !useLegacyAction && shouldRejectTemplateReconfigureAction(ctx, changes, restart) {
 		return makeStatus(StatusFailed, withReason("parameter update reconfigure currently supports only exec actions"))
 	}
 	var systemParams map[string]string
@@ -132,7 +141,7 @@ func applyChangesToCluster(ctx Context, config *appsv1.ClusterComponentConfig, c
 	config.ReconfigureArgs = nil
 	config.Variables = clearReconfigureSystemParameters(config.Variables)
 	switch {
-	case shouldBuildLegacyReconfigureAction(ctx, params, restart):
+	case useLegacyAction:
 		config.Reconfigure = ptr.To(true)
 		config.ReconfigureAction = reloadActionToReconfigureAction(ctx, params)
 	case shouldUseTemplateReconfigureAction(ctx, changes, restart):
@@ -144,6 +153,15 @@ func applyChangesToCluster(ctx Context, config *appsv1.ClusterComponentConfig, c
 		config.ReconfigureAction = nil
 	}
 	return makeStatus(StatusRetry, withReason("apply changes to cluster API"), withExpected(int32(ctx.getTargetReplicas())), withSucceed(0))
+}
+
+func hasParameterRemovals(changes map[string]*string) bool {
+	for _, value := range changes {
+		if value == nil {
+			return true
+		}
+	}
+	return false
 }
 
 func parameterValues(changes map[string]*string) map[string]string {

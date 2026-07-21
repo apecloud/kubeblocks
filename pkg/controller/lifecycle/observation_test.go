@@ -154,6 +154,31 @@ func TestReconcileActionObservationRetriesTransientAndUnclassifiedErrors(t *test
 	}
 }
 
+func TestReconcileActionObservationSkipsUndefinedAction(t *testing.T) {
+	pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-0", UID: types.UID("pod-uid")}}
+	key := NewActionObservationKey(appsv1.LifecycleActionReconfigure, "mysql", "hash", pod)
+	start := metav1.Now()
+	statuses := []appsv1.LifecycleActionStatus{{
+		Action: key.Action, Subject: key.Subject, Revision: key.Revision,
+		Target: &appsv1.LifecycleActionTarget{PodName: key.PodName, PodUID: key.PodUID},
+		Phase:  appsv1.LifecycleActionRunning, StartTime: &start,
+		Code: "stale", Retryable: ptr.To(false),
+	}}
+
+	state, err := ReconcileActionObservation(&statuses, key, func() error {
+		return ErrActionNotDefined
+	})
+	if err != nil || state != ActionObservationUpdated {
+		t.Fatalf("expected undefined action to commit a skipped observation, state=%q err=%v", state, err)
+	}
+	if statuses[0].Phase != appsv1.LifecycleActionSkipped || statuses[0].CompletionTime == nil {
+		t.Fatalf("expected a terminal skipped observation, status=%+v", statuses[0])
+	}
+	if statuses[0].Code != "" || statuses[0].Retryable != nil {
+		t.Fatalf("undefined action must not be classified as an action failure, status=%+v", statuses[0])
+	}
+}
+
 func TestFilterActionObservationsForPodDropsOldPodIncarnation(t *testing.T) {
 	pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-0", UID: types.UID("new-uid")}}
 	statuses := []appsv1.LifecycleActionStatus{

@@ -300,6 +300,39 @@ var _ = ginkgo.Describe("syncPolicy test", func() {
 			Expect(*config.Restart).Should(BeFalse())
 		})
 
+		ginkgo.It("routes mixed set and remove through the template action", func() {
+			rctx.ConfigTemplate.Reconfigure = &appsv1.Action{
+				Exec: &appsv1.ExecAction{Command: []string{"bash", "-c", "reload"}},
+			}
+			rctx.Patch.UpdateConfig[cfgName] = []byte(`{"set_me":"value","remove_me":null}`)
+
+			status, err := syncPolicy(rctx)
+			Expect(err).Should(Succeed())
+			Expect(status.Status).Should(Equal(StatusRetry))
+			config := rctx.ClusterComponent.Configs[0]
+			Expect(config.Reconfigure).ShouldNot(BeNil())
+			Expect(*config.Reconfigure).Should(BeTrue())
+			Expect(config.ReconfigureAction).Should(BeNil())
+			Expect(config.ReconfigureArgs).Should(Equal([][]string{{"remove_me"}, {"set_me", "value"}}))
+			Expect(config.Restart).ShouldNot(BeNil())
+			Expect(*config.Restart).Should(BeFalse())
+		})
+
+		ginkgo.It("routes remove-only legacy changes through restart", func() {
+			rctx.Patch.UpdateConfig[cfgName] = []byte(`{"remove_me":null}`)
+
+			status, err := syncPolicy(rctx)
+			Expect(err).Should(Succeed())
+			Expect(status.Status).Should(Equal(StatusRetry))
+			config := rctx.ClusterComponent.Configs[0]
+			Expect(config.Reconfigure).ShouldNot(BeNil())
+			Expect(*config.Reconfigure).Should(BeFalse())
+			Expect(config.ReconfigureAction).Should(BeNil())
+			Expect(config.ReconfigureArgs).Should(BeNil())
+			Expect(config.Restart).ShouldNot(BeNil())
+			Expect(*config.Restart).Should(BeTrue())
+		})
+
 		ginkgo.It("use config manager port from workload template", func() {
 			rctx.ITS.Spec.Template.Spec.Containers = []corev1.Container{{
 				Name: "config-manager",

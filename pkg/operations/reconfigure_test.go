@@ -495,6 +495,9 @@ parameter: {
 			componentParameter.Spec.ConfigItemDetails = []parametersv1alpha1.ConfigTemplateItemDetail{{Name: "mysql-config"}}
 			Expect(testCtx.CreateObj(ctx, componentParameter)).Should(Succeed())
 			stale := componentParameter.DeepCopy()
+			opsRes.OpsRequest.Status.ReconfigureRollback = &opsv1alpha1.ReconfigureRollbackStatus{
+				ComponentGenerations: map[string]int64{defaultCompName: stale.Generation},
+			}
 
 			failureGate := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
 				Namespace: testCtx.DefaultNamespace,
@@ -510,7 +513,7 @@ parameter: {
 			current.Spec.Desired.Assignments["maxmemory-samples"] = pointer.String("7")
 			Expect(testCtx.Cli.Update(ctx, current)).Should(Succeed())
 
-			_, _, err := (&reconfigureAction{}).restoreParameterSnapshots(reqCtx, k8sClient, opsRes, []reconfigureTarget{{
+			_, _, err := (&reconfigureAction{}).requestParameterRollbacks(reqCtx, k8sClient, opsRes, []reconfigureTarget{{
 				requestName: defaultCompName,
 				component:   defaultCompName,
 				reconfigure: opsv1alpha1.Reconfigure{Parameters: []opsv1alpha1.ParameterPair{{
@@ -525,10 +528,10 @@ parameter: {
 			Expect(testCtx.Cli.Get(ctx, client.ObjectKeyFromObject(failureGate), failureGate)).Should(Succeed())
 			Expect(failureGate.Annotations).Should(HaveKeyWithValue(
 				constant.DisableUpgradeInsConfigurationAnnotationKey, "true"),
-				"the failure gate must remain closed until every ComponentParameter is restored")
+				"Ops must not mutate Parameters-owned failure gates")
 		})
 
-		It("rolls back a normalized invalid parameter and restarts an applied component", func() {
+		It("delegates normalized failure rollback through the Parameters API", func() {
 			By("init operations resources and the previous desired parameter state")
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
 			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
@@ -611,14 +614,16 @@ parameter: {
 				g.Expect(fetched.Status.ReconfigureRollback.RestartRequired).Should(BeTrue())
 			})).Should(Succeed())
 
-			By("restore H0 while keeping the parameter-controller failure gate closed")
+			By("publish H0 rollback intent through the Parameters API")
 			Expect(testCtx.Cli.Get(ctx, client.ObjectKeyFromObject(opsRes.OpsRequest), opsRes.OpsRequest)).Should(Succeed())
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
-			var rollbackGeneration int64
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentParameter), func(g Gomega, cp *parametersv1alpha1.ComponentParameter) {
-				g.Expect(cp.Spec.Desired.Assignments).Should(HaveKeyWithValue("maxmemory-samples", pointer.String("5")))
-				rollbackGeneration = cp.Generation
+				g.Expect(cp.Spec.Desired.Assignments).Should(HaveKeyWithValue("maxmemory-samples", pointer.String("0")))
+				g.Expect(cp.Spec.Rollback).ShouldNot(BeNil())
+				g.Expect(cp.Spec.Rollback.RequestID).Should(Equal(string(opsRes.OpsRequest.UID)))
+				g.Expect(cp.Spec.Rollback.Desired.Assignments).Should(HaveKeyWithValue("maxmemory-samples", pointer.String("5")))
+				g.Expect(cp.Spec.Rollback.Restart).Should(BeTrue())
 			})).Should(Succeed())
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(configMap), func(g Gomega, fetched *corev1.ConfigMap) {
 				g.Expect(fetched.Annotations).Should(HaveKeyWithValue(constant.DisableUpgradeInsConfigurationAnnotationKey, "true"))
@@ -627,63 +632,34 @@ parameter: {
 				g.Expect(fetched.Status.ReconfigureRollback.Phase).Should(Equal(opsv1alpha1.ReconfigureRollingBack))
 			})).Should(Succeed())
 
-			By("keep the failure gate closed until the ConfigMap carries the H0 revision")
+			By("observe Parameters-owned progress without touching ConfigMaps or Cluster restart fields")
+			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(componentParameter), func(cp *parametersv1alpha1.ComponentParameter) {
+				cp.Status.Rollback = &parametersv1alpha1.ParameterRollbackStatus{
+					RequestID:        string(opsRes.OpsRequest.UID),
+					Phase:            parametersv1alpha1.ParameterRollbackRunning,
+					TargetGeneration: cp.Generation + 1,
+					Message:          "Parameters controller is reconciling H0",
+				}
+			})()).Should(Succeed())
 			Expect(testCtx.Cli.Get(ctx, client.ObjectKeyFromObject(opsRes.OpsRequest), opsRes.OpsRequest)).Should(Succeed())
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(configMap), func(g Gomega, fetched *corev1.ConfigMap) {
 				g.Expect(fetched.Annotations).Should(HaveKeyWithValue(constant.DisableUpgradeInsConfigurationAnnotationKey, "true"))
 			})).Should(Succeed())
-
-			By("publish the H0 ConfigMap revision and only then reopen reconfigure")
-			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(configMap), func(fetched *corev1.ConfigMap) {
-				fetched.Annotations[constant.ConfigurationRevision] = strconv.FormatInt(rollbackGeneration, 10)
-			})()).Should(Succeed())
-			Expect(testCtx.Cli.Get(ctx, client.ObjectKeyFromObject(opsRes.OpsRequest), opsRes.OpsRequest)).Should(Succeed())
-			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
-			Expect(err).ShouldNot(HaveOccurred())
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(configMap), func(g Gomega, fetched *corev1.ConfigMap) {
-				g.Expect(fetched.Annotations).ShouldNot(HaveKey(constant.DisableUpgradeInsConfigurationAnnotationKey))
-			})).Should(Succeed())
-
-			By("observe H0 convergence and persist one controlled-restart timestamp")
-			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(componentParameter), func(cp *parametersv1alpha1.ComponentParameter) {
-				cp.Status.ObservedGeneration = cp.Generation
-				cp.Status.Phase = parametersv1alpha1.CFinishedPhase
-				cp.Status.ConfigurationItemStatus = []parametersv1alpha1.ConfigTemplateItemDetailStatus{{
-					Name:  "mysql-config",
-					Phase: parametersv1alpha1.CFinishedPhase,
-				}}
-			})()).Should(Succeed())
-			Expect(testCtx.Cli.Get(ctx, client.ObjectKeyFromObject(opsRes.OpsRequest), opsRes.OpsRequest)).Should(Succeed())
-			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
-			Expect(err).ShouldNot(HaveOccurred())
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest), func(g Gomega, fetched *opsv1alpha1.OpsRequest) {
-				g.Expect(fetched.Status.ReconfigureRollback.Phase).Should(Equal(opsv1alpha1.ReconfigureRestartPending))
-				g.Expect(fetched.Status.ReconfigureRollback.RestartAt).ShouldNot(BeNil())
-			})).Should(Succeed())
-
-			By("write the stable restart intent and wait for the Cluster to observe it")
-			Expect(testCtx.Cli.Get(ctx, client.ObjectKeyFromObject(opsRes.OpsRequest), opsRes.OpsRequest)).Should(Succeed())
-			restartAt := opsRes.OpsRequest.Status.ReconfigureRollback.RestartAt.Time.UTC().Format("2006-01-02T15:04:05Z07:00")
-			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
-			Expect(err).ShouldNot(HaveOccurred())
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.Cluster), func(g Gomega, cluster *appsv1.Cluster) {
-				g.Expect(cluster.Spec.GetComponentByName(defaultCompName).Annotations).Should(HaveKeyWithValue(constant.RestartAnnotationKey, restartAt))
-			})).Should(Succeed())
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest), func(g Gomega, fetched *opsv1alpha1.OpsRequest) {
-				g.Expect(fetched.Status.ReconfigureRollback.Phase).Should(Equal(opsv1alpha1.ReconfigureRestarting))
+				g.Expect(cluster.Spec.GetComponentByName(defaultCompName).Annotations).ShouldNot(HaveKey(constant.RestartAnnotationKey))
 			})).Should(Succeed())
 
-			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(opsRes.Cluster), func(cluster *appsv1.Cluster) {
-				cluster.Status.ObservedGeneration = cluster.Generation
-				cluster.Status.Phase = appsv1.RunningClusterPhase
-				cluster.Status.Components[defaultCompName] = appsv1.ClusterComponentStatus{
-					Phase:    appsv1.RunningComponentPhase,
-					UpToDate: true,
+			By("publish the terminal Parameters rollback result")
+			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(componentParameter), func(cp *parametersv1alpha1.ComponentParameter) {
+				cp.Status.Rollback = &parametersv1alpha1.ParameterRollbackStatus{
+					RequestID:        string(opsRes.OpsRequest.UID),
+					Phase:            parametersv1alpha1.ParameterRollbackSucceeded,
+					TargetGeneration: cp.Generation + 1,
+					Message:          "restored parameters and controlled restart converged",
 				}
 			})()).Should(Succeed())
-			Expect(testCtx.Cli.Get(ctx, client.ObjectKeyFromObject(opsRes.Cluster), opsRes.Cluster)).Should(Succeed())
 			Expect(testCtx.Cli.Get(ctx, client.ObjectKeyFromObject(opsRes.OpsRequest), opsRes.OpsRequest)).Should(Succeed())
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())

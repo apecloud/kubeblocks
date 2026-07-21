@@ -573,6 +573,9 @@ type ClusterComponentConfig struct {
 	ReconfigureAction *Action `json:"reconfigureAction,omitempty"`
 
 	// ReconfigureArgs is a list of runtime argument groups for the reconfigure action.
+	// Each group is either `[key, value]` to set a parameter (including an empty
+	// string value) or `[key]` to remove that parameter. Consumers must preserve
+	// the distinction between the one- and two-element forms.
 	//
 	// +optional
 	ReconfigureArgs [][]string `json:"reconfigureArgs,omitempty"`

@@ -213,9 +213,14 @@ func (r *ReconfigureReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *c
 	if err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(configMap, r.Recorder, err, reqCtx.Log)
 	}
+	if revision := configMap.Annotations[constant.ConfigurationRevision]; revision != "" &&
+		configMap.Annotations[constant.ParameterRollbackRevisionAnnotationKey] == revision &&
+		configMap.Annotations[constant.ParameterRollbackRestartAnnotationKey] == strconv.FormatBool(true) {
+		forceRestart = true
+	}
 
 	// No parameters updated
-	if configPatch != nil && !configPatch.IsModify {
+	if configPatch != nil && !configPatch.IsModify && !forceRestart {
 		reqCtx.Recorder.Event(configMap, corev1.EventTypeNormal, reasonReconfigureRunning, "nothing changed, skip reconfigure")
 		return r.updateConfigCMStatus(reqCtx, configMap, core.ReconfigureNoChangeType, nil)
 	}
@@ -627,6 +632,7 @@ func updateConfigPhaseWithResult(cli client.Client, ctx intctrlutil.RequestCtx, 
 	if result.Failed && !result.Retry {
 		ctx.Log.Info(fmt.Sprintf("failed to reconcile and disable retry for configmap[%+v]", client.ObjectKeyFromObject(config)))
 		config.ObjectMeta.Annotations[constant.DisableUpgradeInsConfigurationAnnotationKey] = strconv.FormatBool(true)
+		config.ObjectMeta.Annotations[constant.ReconfigureFailureRevisionAnnotationKey] = revision
 	}
 
 	gcConfigRevision(config)

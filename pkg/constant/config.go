@@ -40,6 +40,15 @@ const (
 	UpgradePolicyAnnotationKey                  = "config.kubeblocks.io/reconfigure-policy"
 	ConfigAppliedVersionAnnotationKey           = "config.kubeblocks.io/config-applied-version"
 	ParametersAppliedComponentGenerationKey     = "parameters.kubeblocks.io/latest-component-generation"
+	// ReconfigureFailureRevisionAnnotationKey marks a disable-reconfigure gate
+	// that was written by the Parameters controller for one exact failed revision.
+	ReconfigureFailureRevisionAnnotationKey = "parameters.kubeblocks.io/reconfigure-failure-revision"
+	// ParameterRollbackRevisionAnnotationKey asks the Parameters reconfigure
+	// controller to apply one exact rollback revision.
+	ParameterRollbackRevisionAnnotationKey = "parameters.kubeblocks.io/rollback-revision"
+	// ParameterRollbackRestartAnnotationKey records whether that rollback
+	// revision requires a controlled restart.
+	ParameterRollbackRestartAnnotationKey = "parameters.kubeblocks.io/rollback-restart"
 )
 
 const (

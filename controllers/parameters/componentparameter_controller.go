@@ -122,6 +122,14 @@ func (r *ComponentParameterReconciler) reconcile(reqCtx intctrlutil.RequestCtx, 
 	if fetcherTask.ClusterComObj == nil || fetcherTask.ComponentObj == nil {
 		return r.failWithInvalidComponent(reqCtx, compParam)
 	}
+	rollbackHandled, err := r.reconcileRollback(reqCtx, compParam)
+	if err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log,
+			errors.Wrap(err, "failed to reconcile parameter rollback").Error())
+	}
+	if rollbackHandled {
+		return intctrlutil.Reconciled()
+	}
 
 	// Reconcile the internal execution model in stages:
 	// 1. ensure the config item skeleton exists and is aligned with the current component definition;

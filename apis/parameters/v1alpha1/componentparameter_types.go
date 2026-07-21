@@ -94,6 +94,45 @@ type ComponentParameterSpec struct {
 	//
 	// +optional
 	Desired *ParameterInputs `json:"desired,omitempty"`
+
+	// Rollback requests that the Parameters controller restore an exact previous
+	// desired input state after a non-retryable reconfigure failure. The
+	// Parameters controller is the sole owner of applying this intent to
+	// Desired, reconciling its ConfigMaps, and reporting progress in status.
+	//
+	// +optional
+	Rollback *ParameterRollbackRequest `json:"rollback,omitempty"`
+}
+
+// ParameterRollbackRequest describes one exact, idempotent rollback intent.
+type ParameterRollbackRequest struct {
+	// RequestID identifies the controller request that owns this rollback.
+	// Replaying the same value is idempotent; a different value is a new request.
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=128
+	RequestID string `json:"requestID"`
+
+	// SourceGeneration is the failed ComponentParameter generation whose desired
+	// state is being compensated. The rollback is rejected if another spec write
+	// wins before the Parameters controller accepts this request.
+	//
+	// +kubebuilder:validation:Minimum=1
+	SourceGeneration int64 `json:"sourceGeneration"`
+
+	// Desired is the complete parameter input state to restore.
+	// A nil value restores the absence of desired parameter inputs.
+	//
+	// +optional
+	Desired *ParameterInputs `json:"desired,omitempty"`
+
+	// Restart requests a controlled restart after the restored configuration is
+	// rendered. This is used when the failed action may have partially changed
+	// runtime state before returning its result.
+	//
+	// +optional
+	Restart bool `json:"restart,omitempty"`
 }
 
 // Deprecated: It is retained for API compatibility with existing ComponentParameter objects.
@@ -257,6 +296,12 @@ type ComponentParameterStatus struct {
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
+	// Rollback reports the Parameters controller's progress for the latest
+	// accepted rollback request.
+	//
+	// +optional
+	Rollback *ParameterRollbackStatus `json:"rollback,omitempty"`
+
 	// Provides detailed status information for opsRequest.
 	// +optional
 	// +patchMergeKey=type
@@ -271,6 +316,49 @@ type ComponentParameterStatus struct {
 	// +listType=map
 	// +listMapKey=name
 	ConfigurationItemStatus []ConfigTemplateItemDetailStatus `json:"configurationStatus"`
+}
+
+// ParameterRollbackPhase is the Parameters-owned rollback phase.
+// +enum
+type ParameterRollbackPhase string
+
+const (
+	ParameterRollbackPending   ParameterRollbackPhase = "Pending"
+	ParameterRollbackRunning   ParameterRollbackPhase = "Running"
+	ParameterRollbackSucceeded ParameterRollbackPhase = "Succeeded"
+	ParameterRollbackFailed    ParameterRollbackPhase = "Failed"
+)
+
+// ParameterRollbackStatus reports progress for one exact rollback request.
+type ParameterRollbackStatus struct {
+	// RequestID is copied from the accepted rollback request.
+	//
+	// +kubebuilder:validation:Required
+	RequestID string `json:"requestID"`
+
+	// RequestHash is an opaque controller-computed digest that binds progress to
+	// the exact accepted rollback payload. Clients must not synthesize it.
+	//
+	// +optional
+	RequestHash string `json:"requestHash,omitempty"`
+
+	// Phase is the current Parameters-owned rollback phase.
+	//
+	// +kubebuilder:validation:Enum=Pending;Running;Succeeded;Failed
+	Phase ParameterRollbackPhase `json:"phase"`
+
+	// TargetGeneration is the ComponentParameter generation rendered for this
+	// rollback. It is set once the restored inputs have stabilized.
+	//
+	// +optional
+	TargetGeneration int64 `json:"targetGeneration,omitempty"`
+
+	// Message describes progress or a terminal failure without exposing raw
+	// lifecycle-action stderr.
+	//
+	// +kubebuilder:validation:MaxLength=1024
+	// +optional
+	Message string `json:"message,omitempty"`
 }
 
 type ConfigTemplateItemDetailStatus struct {

@@ -5430,14 +5430,11 @@ spec:
                   Records deterministic rollback progress for a Reconfiguring OpsRequest.
                   It is populated only when the normalized Action result permits automatic rollback.
                 properties:
-                  clusterGeneration:
-                    description: ClusterGeneration binds the controlled restart write
-                      to one Cluster generation.
-                    format: int64
-                    type: integer
                   code:
-                    description: Code is the normalized Action failure code that authorized
-                      automatic rollback.
+                    description: |-
+                      Code is the common opaque Action result code observed across failed items.
+                      It is empty when failed items report different codes and is never used as
+                      the rollback eligibility discriminator.
                     maxLength: 63
                     pattern: ^[A-Z][A-Za-z0-9]*$
                     type: string
@@ -5446,8 +5443,8 @@ spec:
                       format: int64
                       type: integer
                     description: |-
-                      ComponentGenerations identifies the exact Components selected for compensation and,
-                      once rollback writes begin, binds each write to the resulting ComponentParameter generation.
+                      ComponentGenerations identifies the exact Components selected for compensation and
+                      binds each rollback intent to its failed ComponentParameter source generation.
                     type: object
                   message:
                     description: Message describes the current rollback outcome without
@@ -5459,23 +5456,16 @@ spec:
                     enum:
                     - RollbackPending
                     - RollingBack
-                    - RestartPending
-                    - Restarting
                     - RolledBack
                     - ManualCleanupRequired
-                    type: string
-                  restartAt:
-                    description: RestartAt is the stable timestamp used for an idempotent
-                      controlled restart.
-                    format: date-time
                     type: string
                   restartRequired:
                     description: RestartRequired is true when H1 may have reached
                       at least one runtime before rollback.
                     type: boolean
                   retryable:
-                    description: Retryable records the retry property associated with
-                      Code.
+                    description: Retryable records the public Action retry property
+                      that authorized rollback.
                     type: boolean
                   startTime:
                     description: |-

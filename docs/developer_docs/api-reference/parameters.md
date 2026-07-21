@@ -148,6 +148,23 @@ ParameterInputs
 <p>Desired provides the current desired parameter inputs.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>rollback</code><br/>
+<em>
+<a href="#parameters.kubeblocks.io/v1alpha1.ParameterRollbackRequest">
+ParameterRollbackRequest
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Rollback requests that the Parameters controller restore an exact previous
+desired input state after a non-retryable reconfigure failure. The
+Parameters controller is the sole owner of applying this intent to
+Desired, reconciling its ConfigMaps, and reporting progress in status.</p>
+</td>
+</tr>
 </tbody>
 </table>
 </td>
@@ -1077,6 +1094,23 @@ ParameterInputs
 <p>Desired provides the current desired parameter inputs.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>rollback</code><br/>
+<em>
+<a href="#parameters.kubeblocks.io/v1alpha1.ParameterRollbackRequest">
+ParameterRollbackRequest
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Rollback requests that the Parameters controller restore an exact previous
+desired input state after a non-retryable reconfigure failure. The
+Parameters controller is the sole owner of applying this intent to
+Desired, reconciling its ConfigMaps, and reporting progress in status.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="parameters.kubeblocks.io/v1alpha1.ComponentParameterStatus">ComponentParameterStatus
@@ -1135,6 +1169,21 @@ int64
 <p>Represents the latest generation observed for this
 ClusterDefinition. It corresponds to the ConfigConstraint&rsquo;s generation, which is
 updated by the API Server.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>rollback</code><br/>
+<em>
+<a href="#parameters.kubeblocks.io/v1alpha1.ParameterRollbackStatus">
+ParameterRollbackStatus
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Rollback reports the Parameters controller&rsquo;s progress for the latest
+accepted rollback request.</p>
 </td>
 </tr>
 <tr>
@@ -1935,7 +1984,7 @@ SET configuration_parameter TO DEFAULT;</p>
 <h3 id="parameters.kubeblocks.io/v1alpha1.ParameterInputs">ParameterInputs
 </h3>
 <p>
-(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ComponentParameterSpec">ComponentParameterSpec</a>)
+(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ComponentParameterSpec">ComponentParameterSpec</a>, <a href="#parameters.kubeblocks.io/v1alpha1.ParameterRollbackRequest">ParameterRollbackRequest</a>)
 </p>
 <div>
 <p>ParameterInputs describes user-provided parameter inputs and template overrides.</p>
@@ -2042,6 +2091,184 @@ map[string]github.com/apecloud/kubeblocks/apis/parameters/v1alpha1.ConfigTemplat
 </tr><tr><td><p>&#34;Upgrading&#34;</p></td>
 <td></td>
 </tr></tbody>
+</table>
+<h3 id="parameters.kubeblocks.io/v1alpha1.ParameterRollbackPhase">ParameterRollbackPhase
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ParameterRollbackStatus">ParameterRollbackStatus</a>)
+</p>
+<div>
+<p>ParameterRollbackPhase is the Parameters-owned rollback phase.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Failed&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Pending&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Running&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Succeeded&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
+<h3 id="parameters.kubeblocks.io/v1alpha1.ParameterRollbackRequest">ParameterRollbackRequest
+</h3>
+<p>
+(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ComponentParameterSpec">ComponentParameterSpec</a>)
+</p>
+<div>
+<p>ParameterRollbackRequest describes one exact, idempotent rollback intent.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>requestID</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>RequestID identifies the controller request that owns this rollback.
+Replaying the same value is idempotent; a different value is a new request.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>sourceGeneration</code><br/>
+<em>
+int64
+</em>
+</td>
+<td>
+<p>SourceGeneration is the failed ComponentParameter generation whose desired
+state is being compensated. The rollback is rejected if another spec write
+wins before the Parameters controller accepts this request.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>desired</code><br/>
+<em>
+<a href="#parameters.kubeblocks.io/v1alpha1.ParameterInputs">
+ParameterInputs
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Desired is the complete parameter input state to restore.
+A nil value restores the absence of desired parameter inputs.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>restart</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Restart requests a controlled restart after the restored configuration is
+rendered. This is used when the failed action may have partially changed
+runtime state before returning its result.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="parameters.kubeblocks.io/v1alpha1.ParameterRollbackStatus">ParameterRollbackStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#parameters.kubeblocks.io/v1alpha1.ComponentParameterStatus">ComponentParameterStatus</a>)
+</p>
+<div>
+<p>ParameterRollbackStatus reports progress for one exact rollback request.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>requestID</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>RequestID is copied from the accepted rollback request.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>requestHash</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>RequestHash is an opaque controller-computed digest that binds progress to
+the exact accepted rollback payload. Clients must not synthesize it.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>phase</code><br/>
+<em>
+<a href="#parameters.kubeblocks.io/v1alpha1.ParameterRollbackPhase">
+ParameterRollbackPhase
+</a>
+</em>
+</td>
+<td>
+<p>Phase is the current Parameters-owned rollback phase.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>targetGeneration</code><br/>
+<em>
+int64
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>TargetGeneration is the ComponentParameter generation rendered for this
+rollback. It is set once the restored inputs have stabilized.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>message</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Message describes progress or a terminal failure without exposing raw
+lifecycle-action stderr.</p>
+</td>
+</tr>
+</tbody>
 </table>
 <h3 id="parameters.kubeblocks.io/v1alpha1.ParameterSpec">ParameterSpec
 </h3>

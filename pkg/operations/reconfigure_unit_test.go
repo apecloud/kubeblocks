@@ -40,6 +40,8 @@ import (
 	parameterscore "github.com/apecloud/kubeblocks/pkg/parameters/core"
 )
 
+const invalidParameterActionResultCode appsv1.ActionResultCode = "InvalidParameter"
+
 func TestSnapshotParameterAssignmentsPreservesPresenceAndNil(t *testing.T) {
 	oldValue := "old"
 	compParam := &parametersv1alpha1.ComponentParameter{
@@ -195,10 +197,31 @@ func TestClassifyDeterministicReconfigureFailure(t *testing.T) {
 	require.Equal(t, invalidParameterActionResultCode, code)
 	require.Equal(t, ptr.To(false), retryable)
 
+	code, retryable, ok = classifyDeterministicReconfigureFailure([]*parametersv1alpha1.ComponentParameter{
+		normalizedFailure("ParameterRejected", ptr.To(false)),
+	})
+	require.True(t, ok)
+	require.Equal(t, appsv1.ActionResultCode("ParameterRejected"), code)
+	require.Equal(t, ptr.To(false), retryable)
+
+	code, retryable, ok = classifyDeterministicReconfigureFailure([]*parametersv1alpha1.ComponentParameter{
+		normalizedFailure("", ptr.To(false)),
+	})
+	require.True(t, ok, "rollback eligibility is the public non-retryable property, not a private code registry")
+	require.Empty(t, code)
+	require.Equal(t, ptr.To(false), retryable)
+
+	code, retryable, ok = classifyDeterministicReconfigureFailure([]*parametersv1alpha1.ComponentParameter{
+		normalizedFailure("ParameterRejected", ptr.To(false)),
+		normalizedFailure("PolicyDenied", ptr.To(false)),
+	})
+	require.True(t, ok)
+	require.Empty(t, code, "different opaque result codes must not be collapsed into one status value")
+	require.Equal(t, ptr.To(false), retryable)
+
 	for _, failed := range []*parametersv1alpha1.ComponentParameter{
 		normalizedFailure("", nil),
 		normalizedFailure(invalidParameterActionResultCode, ptr.To(true)),
-		normalizedFailure("OtherFailure", ptr.To(false)),
 		{Status: parametersv1alpha1.ComponentParameterStatus{Phase: parametersv1alpha1.CMergeFailedPhase}},
 	} {
 		_, _, ok = classifyDeterministicReconfigureFailure([]*parametersv1alpha1.ComponentParameter{failed})
@@ -394,7 +417,13 @@ func TestAggregatePhaseScopesRollbackToFailedComponents(t *testing.T) {
 	require.Equal(t, opsv1alpha1.OpsRunningPhase, phase)
 	currentFailed := &parametersv1alpha1.ComponentParameter{}
 	require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(failed), currentFailed))
-	require.Equal(t, ptr.To("100"), currentFailed.Spec.Desired.Assignments["max_connections"])
+	require.Equal(t, h1, currentFailed.Spec.Desired.Assignments["max_connections"],
+		"Ops must not rewrite Parameters-owned desired state")
+	require.NotNil(t, currentFailed.Spec.Rollback)
+	require.Equal(t, string(uid), currentFailed.Spec.Rollback.RequestID)
+	require.Equal(t, failed.Generation, currentFailed.Spec.Rollback.SourceGeneration)
+	require.True(t, currentFailed.Spec.Rollback.Restart)
+	require.Equal(t, ptr.To("100"), currentFailed.Spec.Rollback.Desired.Assignments["max_connections"])
 	currentSucceeded := &parametersv1alpha1.ComponentParameter{}
 	require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(succeeded), currentSucceeded))
 	require.Equal(t, h1, currentSucceeded.Spec.Desired.Assignments["max_connections"],

@@ -23,7 +23,6 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -45,58 +44,8 @@ import (
 
 // switchover constants
 const (
-	KBSwitchoverKey                        = "Switchover"
-	switchoverDispatchClaimMessagePrefix   = "switchover dispatch claimed before lifecycle call: SwitchoverDispatch/"
-	switchoverDispatchOutcomeMessagePrefix = "switchover dispatch outcome persisted: SwitchoverDispatch/"
+	KBSwitchoverKey = "Switchover"
 )
-
-type switchoverDispatchProtocolIdentity struct {
-	opsRequestUID string
-	componentName string
-	instanceName  string
-	candidateName string
-	token         string
-}
-
-func parseSwitchoverDispatchClaim(message string) (switchoverDispatchProtocolIdentity, bool) {
-	if !strings.HasPrefix(message, switchoverDispatchClaimMessagePrefix) {
-		return switchoverDispatchProtocolIdentity{}, false
-	}
-	return parseSwitchoverDispatchProtocolIdentity(strings.TrimPrefix(message, switchoverDispatchClaimMessagePrefix))
-}
-
-func parseSwitchoverDispatchOutcomeMessage(message string) (switchoverDispatchProtocolIdentity, bool) {
-	if !strings.HasPrefix(message, switchoverDispatchOutcomeMessagePrefix) {
-		return switchoverDispatchProtocolIdentity{}, false
-	}
-	parts := strings.SplitN(strings.TrimPrefix(message, switchoverDispatchOutcomeMessagePrefix), "; ", 2)
-	if len(parts) != 2 || parts[1] == "" {
-		return switchoverDispatchProtocolIdentity{}, false
-	}
-	return parseSwitchoverDispatchProtocolIdentity(parts[0])
-}
-
-func parseSwitchoverDispatchProtocolIdentity(value string) (switchoverDispatchProtocolIdentity, bool) {
-	fields := strings.Split(value, "/")
-	if len(fields) != 5 || fields[0] == "" || fields[1] == "" || fields[2] == "" || fields[4] == "" {
-		return switchoverDispatchProtocolIdentity{}, false
-	}
-	return switchoverDispatchProtocolIdentity{
-		opsRequestUID: fields[0],
-		componentName: fields[1],
-		instanceName:  fields[2],
-		candidateName: fields[3],
-		token:         fields[4],
-	}, true
-}
-
-func (identity switchoverDispatchProtocolIdentity) matches(
-	opsRequest *opsv1alpha1.OpsRequest, compName string, switchover opsv1alpha1.Switchover) bool {
-	return identity.opsRequestUID == string(opsRequest.UID) &&
-		identity.componentName == compName &&
-		identity.instanceName == switchover.InstanceName &&
-		identity.candidateName == switchover.CandidateName
-}
 
 type switchoverOpsHandler struct{}
 
@@ -288,9 +237,8 @@ func handleSwitchover(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *
 	if progressDetail == nil {
 		return fmt.Errorf("progress detail not found for component %s", compName)
 	}
-	if legacyProgressKey && (strings.HasPrefix(progressDetail.Message, switchoverDispatchClaimMessagePrefix) ||
-		strings.HasPrefix(progressDetail.Message, switchoverDispatchOutcomeMessagePrefix)) {
-		progressDetail.Message = fmt.Sprintf("component %s switchover dispatch protocol identity changed or is malformed; outcome is unknown and lifecycle action will not be retried", compName)
+	if err := validateSwitchoverDispatchForReader(opsRequest, compName, *switchover, progressDetail, legacyProgressKey); err != nil {
+		progressDetail.Message = fmt.Sprintf("component %s switchover dispatch cannot be resumed: %v; lifecycle action will not be retried", compName, err)
 		progressDetail.Status = opsv1alpha1.FailedProgressStatus
 		handleProgressDetail(reqCtx, opsRequest, progressDetail, progressComponentName, completedCount, failedCount)
 		return nil
@@ -307,40 +255,64 @@ func handleSwitchover(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *
 		}
 		progressDetail.StartTime = metav1.Now()
 	case opsv1alpha1.ProcessingProgressStatus:
-		claim, hasClaim := parseSwitchoverDispatchClaim(progressDetail.Message)
-		outcome, hasOutcome := parseSwitchoverDispatchOutcomeMessage(progressDetail.Message)
-		claimProtocolMismatch := strings.HasPrefix(progressDetail.Message, switchoverDispatchClaimMessagePrefix) &&
-			(legacyProgressKey || !hasClaim || !claim.matches(opsRequest, compName, *switchover))
-		outcomeProtocolMismatch := strings.HasPrefix(progressDetail.Message, switchoverDispatchOutcomeMessagePrefix) &&
-			(legacyProgressKey || !hasOutcome || !outcome.matches(opsRequest, compName, *switchover))
-		switch {
-		case claimProtocolMismatch || outcomeProtocolMismatch:
-			progressDetail.Message = fmt.Sprintf("component %s switchover dispatch protocol identity changed or is malformed; outcome is unknown and lifecycle action will not be retried", compName)
-			progressDetail.Status = opsv1alpha1.FailedProgressStatus
-		case hasClaim && switchover.CandidateName == "":
-			progressDetail.Message = fmt.Sprintf("component %s switchover dispatch outcome is unknown; lifecycle action will not be retried", compName)
-			progressDetail.Status = opsv1alpha1.FailedProgressStatus
-		default:
-			targetRole := progressDetail.Group
-			if switchover.CandidateName != "" {
-				// if candidate specified, we consider switchover is done once the candidate becomes the target role.
-				candidatePod, err := getPod(reqCtx, cli, switchover.CandidateName, synthesizedComp.Namespace)
-				if err != nil {
-					return err
-				}
-				if targetRole == candidatePod.Labels[constant.RoleLabelKey] {
-					progressDetail.Message = "do switchover succeed"
-					progressDetail.Status = opsv1alpha1.SucceedProgressStatus
-				}
-			} else {
-				// if no candidate specified, we consider switchover is done once doSwitchover returns without error.
+		targetRole := progressDetail.Group
+		if switchover.CandidateName != "" {
+			// if candidate specified, we consider switchover is done once the candidate becomes the target role.
+			candidatePod, err := getPod(reqCtx, cli, switchover.CandidateName, synthesizedComp.Namespace)
+			if err != nil {
+				return err
+			}
+			if targetRole == candidatePod.Labels[constant.RoleLabelKey] {
 				progressDetail.Message = "do switchover succeed"
 				progressDetail.Status = opsv1alpha1.SucceedProgressStatus
 			}
+		} else {
+			// if no candidate specified, we consider switchover is done once doSwitchover returns without error.
+			progressDetail.Message = "do switchover succeed"
+			progressDetail.Status = opsv1alpha1.SucceedProgressStatus
 		}
 	}
 	handleProgressDetail(reqCtx, opsRequest, progressDetail, progressComponentName, completedCount, failedCount)
 	return nil
+}
+
+func validateSwitchoverDispatchForReader(
+	opsRequest *opsv1alpha1.OpsRequest,
+	compName string,
+	switchover opsv1alpha1.Switchover,
+	progressDetail *opsv1alpha1.ProgressStatusDetail,
+	legacyProgressKey bool) error {
+	dispatch := progressDetail.SwitchoverDispatch
+	if dispatch == nil {
+		return nil
+	}
+	if legacyProgressKey {
+		return errors.New("structured dispatch state is stored under the legacy component-object progress key")
+	}
+	if dispatch.Version != opsv1alpha1.SwitchoverDispatchProtocolVersionV1 {
+		return fmt.Errorf("unsupported protocol version %q", dispatch.Version)
+	}
+	if opsRequest.UID == "" {
+		return errors.New("OpsRequest UID is empty")
+	}
+	if dispatch.OpsRequestUID != string(opsRequest.UID) ||
+		dispatch.ComponentName != compName ||
+		dispatch.InstanceName != switchover.InstanceName ||
+		dispatch.CandidateName != switchover.CandidateName ||
+		dispatch.Token == "" {
+		return errors.New("protocol identity is incomplete or does not match the current request")
+	}
+	switch dispatch.State {
+	case opsv1alpha1.SwitchoverDispatchResolved:
+		if progressDetail.Status == opsv1alpha1.PendingProgressStatus {
+			return errors.New("resolved dispatch is paired with Pending progress")
+		}
+		return nil
+	case opsv1alpha1.SwitchoverDispatchClaimed, opsv1alpha1.SwitchoverDispatchOutcomeUnknown:
+		return fmt.Errorf("state %q has no committed outcome", dispatch.State)
+	default:
+		return fmt.Errorf("unknown state %q", dispatch.State)
+	}
 }
 
 func findSwitchoverProgressDetail(opsRequest *opsv1alpha1.OpsRequest, switchover opsv1alpha1.Switchover,

@@ -10903,8 +10903,8 @@ time.Duration
 <td>
 <em>(Optional)</em>
 <p>Indicates the duration of time to wait between each retry attempt.
-This value is set to 0 by default, indicating that there will be no delay between retry attempts.
-Deprecated: use retryIntervalSeconds instead. This field uses the time.Duration representation in nanoseconds.</p>
+This value is set to 0 by default, indicating that there will be no delay between retry attempts.</p>
+<p>Deprecated: use retryIntervalSeconds instead. This field uses the time.Duration representation in nanoseconds.</p>
 </td>
 </tr>
 <tr>

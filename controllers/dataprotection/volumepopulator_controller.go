@@ -124,6 +124,14 @@ func (r *VolumePopulatorReconciler) handleSyncPVCError(reqCtx intctrlutil.Reques
 	if requeueErr, ok := err.(intctrlutil.RequeueError); ok {
 		return intctrlutil.RequeueAfter(requeueErr.RequeueAfter(), reqCtx.Log, requeueErr.Reason())
 	}
+	if !pvc.DeletionTimestamp.IsZero() {
+		// Cleanup is selected from the PVC deletion state. Do not re-check the
+		// finalizer here: Cleanup may have removed it from this in-memory object
+		// immediately before its Patch failed. An existing Populating condition
+		// must not suppress the error because no other watch guarantees another
+		// cleanup attempt.
+		return RecorderEventAndRequeue(reqCtx, r.Recorder, pvc, err)
+	}
 	if r.ContainPopulatingCondition(pvc) {
 		// Ignore the error if an external controller handles this PVC.
 		return intctrlutil.Reconciled()

@@ -41,6 +41,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
@@ -2655,11 +2656,18 @@ func TestSyncPVCDeletionKeepsFinalizerOnCleanupAPIErrors(t *testing.T) {
 					return cli.Patch(ctx, obj, patch, opts...)
 				},
 			}).Build()
-			reconciler := &VolumePopulatorReconciler{Client: cli, Scheme: scheme}
+			reconciler := &VolumePopulatorReconciler{
+				Client:   cli,
+				Scheme:   scheme,
+				Recorder: record.NewFakeRecorder(10),
+			}
 
-			err := reconciler.syncPVC(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc)
+			result, err := reconciler.Reconcile(context.Background(), ctrl.Request{
+				NamespacedName: client.ObjectKeyFromObject(pvc),
+			})
 
 			require.ErrorIs(t, err, injectedErr)
+			require.Zero(t, result)
 			currentPVC := &corev1.PersistentVolumeClaim{}
 			require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(pvc), currentPVC))
 			require.Contains(t, currentPVC.Finalizers, dptypes.DataProtectionFinalizerName)

@@ -49,6 +49,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
+	"github.com/apecloud/kubeblocks/pkg/controller/systemaccount"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dprestore "github.com/apecloud/kubeblocks/pkg/dataprotection/restore"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
@@ -2285,91 +2286,132 @@ func (r *VolumePopulatorReconciler) upsertSystemAccountSecret(reqCtx intctrlutil
 	password []byte,
 	labels map[string]string) error {
 	secretName := systemAccountSecretName(scope, clusterName, ownerName, accountName)
-	secret := &corev1.Secret{}
 	key := types.NamespacedName{Namespace: pvc.Namespace, Name: secretName}
-	if err := r.Client.Get(reqCtx.Ctx, key, secret); err != nil {
+	request, err := r.newSystemAccountRestoreRequest(reqCtx, pvc.Namespace, secretName, scope,
+		clusterName, ownerName, accountName, password, labels)
+	if err != nil {
+		return newSystemAccountSecretRequeueError("build restore request for", key, err)
+	}
+
+	secret := &corev1.Secret{}
+	if err := r.Client.Get(reqCtx.Ctx, key, secret); err == nil {
+		if systemaccount.RestoreConverged(secret, request, systemAccountSecretFinalizer(scope)) {
+			return nil
+		}
+	} else {
 		if !apierrors.IsNotFound(err) {
-			return err
+			return newSystemAccountSecretRequeueError("get", key, err)
 		}
-		secret = &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      secretName,
-				Namespace: pvc.Namespace,
-				Labels:    labels,
-				Annotations: map[string]string{
-					constant.SystemAccountProvisionedAnnotationKey: "true",
-				},
-			},
-			Type: corev1.SecretTypeOpaque,
-			Data: map[string][]byte{
-				constant.AccountNameForSecret:   []byte(accountName),
-				constant.AccountPasswdForSecret: password,
-			},
+	}
+
+	existing := &corev1.Secret{}
+	requestKey := client.ObjectKeyFromObject(request)
+	if err := r.Client.Get(reqCtx.Ctx, requestKey, existing); err == nil {
+		if validationErr := validateSystemAccountRestoreRequest(existing, request); validationErr != nil {
+			return validationErr
 		}
-		if err := r.setSystemAccountSecretOwner(reqCtx, pvc.Namespace, secret, scope, clusterName, ownerName); err != nil {
-			return err
-		}
-		return r.Client.Create(reqCtx.Ctx, secret)
+		return intctrlutil.NewRequeueError(reconcileInterval,
+			fmt.Sprintf("waiting for system account restore request %s to converge target %s", requestKey, key))
+	} else if !apierrors.IsNotFound(err) {
+		return newSystemAccountSecretRequeueError("get restore request for", key, err)
 	}
-	if secret.Immutable != nil && *secret.Immutable && !systemAccountSecretMatches(secret, accountName, password) {
-		if controllerutil.RemoveFinalizer(secret, constant.DBClusterFinalizerName) {
-			if err := r.Client.Update(reqCtx.Ctx, secret); err != nil && !apierrors.IsNotFound(err) {
-				return err
-			}
-		}
-		if !secret.DeletionTimestamp.IsZero() {
-			return intctrlutil.NewRequeueError(reconcileInterval, fmt.Sprintf("waiting for immutable system account secret %s/%s to be deleted", secret.Namespace, secret.Name))
-		}
-		uid := secret.UID
-		if err := r.Client.Delete(reqCtx.Ctx, secret, client.Preconditions{UID: &uid}); err != nil && !apierrors.IsNotFound(err) {
-			return err
-		}
-		return intctrlutil.NewRequeueError(reconcileInterval, fmt.Sprintf("waiting for immutable system account secret %s/%s to be recreated", secret.Namespace, secret.Name))
+	if err := r.Client.Create(reqCtx.Ctx, request); err != nil {
+		return newSystemAccountSecretRequeueError("create", requestKey, err)
 	}
-	patch := client.MergeFrom(secret.DeepCopy())
-	if secret.Labels == nil {
-		secret.Labels = map[string]string{}
-	}
-	for k, v := range labels {
-		secret.Labels[k] = v
-	}
-	if secret.Annotations == nil {
-		secret.Annotations = map[string]string{}
-	}
-	secret.Annotations[constant.SystemAccountProvisionedAnnotationKey] = "true"
-	if secret.Data == nil {
-		secret.Data = map[string][]byte{}
-	}
-	secret.Data[constant.AccountNameForSecret] = []byte(accountName)
-	secret.Data[constant.AccountPasswdForSecret] = password
-	if err := r.setSystemAccountSecretOwner(reqCtx, pvc.Namespace, secret, scope, clusterName, ownerName); err != nil {
-		return err
-	}
-	return r.Client.Patch(reqCtx.Ctx, secret, patch)
+	return intctrlutil.NewRequeueError(reconcileInterval,
+		fmt.Sprintf("waiting for the Apps owner to converge system account Secret %s", key))
 }
 
-func (r *VolumePopulatorReconciler) setSystemAccountSecretOwner(reqCtx intctrlutil.RequestCtx,
+func (r *VolumePopulatorReconciler) newSystemAccountRestoreRequest(reqCtx intctrlutil.RequestCtx,
+	namespace, targetName string,
+	scope systemAccountSecretScope,
+	clusterName, ownerName, accountName string,
+	password []byte,
+	labels map[string]string) (*corev1.Secret, error) {
+	requestLabels := mapsClone(labels)
+	requestLabels[constant.SystemAccountRestoreRequestLabelKey] = "true"
+	request := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      systemaccount.RestoreRequestName(namespace, targetName),
+			Labels:    requestLabels,
+			Annotations: map[string]string{
+				constant.SystemAccountRestoreTargetAnnotationKey: targetName,
+				constant.SystemAccountProvisionedAnnotationKey:   "true",
+			},
+		},
+		Type: corev1.SecretTypeOpaque,
+		Data: map[string][]byte{
+			constant.AccountNameForSecret:   []byte(accountName),
+			constant.AccountPasswdForSecret: slices.Clone(password),
+		},
+	}
+	if scope == systemAccountSecretScopeSharding {
+		immutable := true
+		request.Immutable = &immutable
+	}
+	if err := r.setSystemAccountRestoreRequestOwner(reqCtx, namespace, request, scope, clusterName, ownerName); err != nil {
+		return nil, err
+	}
+	if err := systemaccount.SetRestoreRevision(request); err != nil {
+		return nil, err
+	}
+	return request, nil
+}
+
+func (r *VolumePopulatorReconciler) setSystemAccountRestoreRequestOwner(reqCtx intctrlutil.RequestCtx,
 	namespace string,
-	secret *corev1.Secret,
+	request *corev1.Secret,
 	scope systemAccountSecretScope,
 	clusterName, ownerName string) error {
-	switch scope {
-	case systemAccountSecretScopeSharding:
-		cluster := &appsv1.Cluster{}
-		if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Namespace: namespace, Name: clusterName}, cluster); err != nil {
+	var owner client.Object
+	if scope == systemAccountSecretScopeSharding {
+		owner = &appsv1.Cluster{}
+		if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Namespace: namespace, Name: clusterName}, owner); err != nil {
 			return err
 		}
-		return controllerutil.SetOwnerReference(cluster, secret, r.Scheme)
-	default:
-		component := &appsv1.Component{}
+	} else {
+		owner = &appsv1.Component{}
 		if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{
 			Namespace: namespace,
 			Name:      constant.GenerateClusterComponentName(clusterName, ownerName),
-		}, component); err != nil {
+		}, owner); err != nil {
 			return err
 		}
-		return controllerutil.SetOwnerReference(component, secret, r.Scheme)
 	}
+	return controllerutil.SetControllerReference(owner, request, r.Scheme)
+}
+
+func newSystemAccountSecretRequeueError(action string, key client.ObjectKey, err error) error {
+	return intctrlutil.NewRequeueError(reconcileInterval,
+		fmt.Sprintf("failed to %s system account Secret %s: %v", action, key, err))
+}
+
+func validateSystemAccountRestoreRequest(existing, desired *corev1.Secret) error {
+	if err := systemaccount.ValidateRestoreRequest(existing); err != nil {
+		return intctrlutil.NewFatalError(fmt.Sprintf("invalid system account restore request %s: %v",
+			client.ObjectKeyFromObject(existing), err))
+	}
+	existingOwner := metav1.GetControllerOf(existing)
+	desiredOwner := metav1.GetControllerOf(desired)
+	if existing.Annotations[constant.SystemAccountRestoreTargetAnnotationKey] !=
+		desired.Annotations[constant.SystemAccountRestoreTargetAnnotationKey] ||
+		existingOwner == nil || desiredOwner == nil ||
+		existingOwner.APIVersion != desiredOwner.APIVersion ||
+		existingOwner.Kind != desiredOwner.Kind ||
+		existingOwner.Name != desiredOwner.Name {
+		return intctrlutil.NewFatalError(fmt.Sprintf(
+			"system account restore request %s conflicts with desired request owner or target",
+			client.ObjectKeyFromObject(existing)))
+	}
+	return nil
+}
+
+func systemAccountSecretFinalizer(scope systemAccountSecretScope) string {
+	if scope == systemAccountSecretScopeSharding {
+		return constant.DBClusterFinalizerName
+	}
+	return constant.DBComponentFinalizerName
 }
 
 func systemAccountSecretName(scope systemAccountSecretScope, clusterName, ownerName, accountName string) string {
@@ -2377,11 +2419,6 @@ func systemAccountSecretName(scope systemAccountSecretScope, clusterName, ownerN
 		return fmt.Sprintf("%s-%s-%s", clusterName, ownerName, accountName)
 	}
 	return constant.GenerateAccountSecretName(clusterName, ownerName, accountName)
-}
-
-func systemAccountSecretMatches(secret *corev1.Secret, accountName string, password []byte) bool {
-	return string(secret.Data[constant.AccountNameForSecret]) == accountName &&
-		string(secret.Data[constant.AccountPasswdForSecret]) == string(password)
 }
 
 func upsertPVCCondition(conditions *[]corev1.PersistentVolumeClaimCondition, condition corev1.PersistentVolumeClaimCondition) {

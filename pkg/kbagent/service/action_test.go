@@ -255,9 +255,11 @@ var _ = Describe("action", func() {
 			Entry("from a request override", true),
 		)
 
-		It("does not overflow a very large retry interval into an immediate retry", func() {
-			const maxDuration = time.Duration(1<<63 - 1)
-			Expect(retryIntervalDuration(maxDuration)).Should(Equal(maxDuration))
+		It("converts seconds exactly without overflowing a very large retry interval", func() {
+			Expect(retryIntervalDuration(1)).Should(Equal(time.Second))
+
+			const maxDuration = int64(1<<63 - 1)
+			Expect(retryIntervalDuration(maxDuration)).Should(Equal(time.Duration(maxDuration)))
 		})
 	})
 })

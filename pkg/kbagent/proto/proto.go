@@ -66,8 +66,9 @@ type GRPCResponse struct {
 }
 
 type RetryPolicy struct {
-	MaxRetries    int           `json:"maxRetries,omitempty"`
-	RetryInterval time.Duration `json:"retryInterval,omitempty"`
+	MaxRetries int `json:"maxRetries,omitempty"`
+	// RetryInterval is the number of seconds to wait between retry attempts.
+	RetryInterval int64 `json:"retryInterval,omitempty"`
 }
 
 type ActionRequest struct {

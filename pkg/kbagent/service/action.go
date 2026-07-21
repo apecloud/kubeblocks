@@ -233,15 +233,13 @@ func callActionWithRetryOnce(ctx context.Context, action *proto.Action, paramete
 	return output, err
 }
 
-func retryIntervalDuration(seconds time.Duration) time.Duration {
-	// RetryInterval is serialized as a unitless integer by the action API. Existing
-	// ComponentDefinition manifests and controller tests define that integer in seconds.
+func retryIntervalDuration(seconds int64) time.Duration {
 	if seconds <= 0 {
 		return 0
 	}
-	const maxDuration = time.Duration(1<<63 - 1)
-	if seconds > maxDuration/time.Second {
-		return maxDuration
+	const maxDuration = int64(1<<63 - 1)
+	if seconds > maxDuration/int64(time.Second) {
+		return time.Duration(maxDuration)
 	}
-	return seconds * time.Second
+	return time.Duration(seconds) * time.Second
 }

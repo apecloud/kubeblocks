@@ -585,7 +585,7 @@ spec:
                                 retryInterval:
                                   default: 0
                                   description: |-
-                                    Indicates the duration of time to wait between each retry attempt.
+                                    Specifies the number of seconds to wait between each retry attempt.
                                     This value is set to 0 by default, indicating that there will be no delay between retry attempts.
                                   format: int64
                                   type: integer

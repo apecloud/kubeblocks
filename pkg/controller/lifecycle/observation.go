@@ -155,8 +155,8 @@ func ReconcileActionObservation(statuses *[]appsv1.LifecycleActionStatus, key Ac
 
 	now := metav1.Now()
 	status.CompletionTime = &now
-	switch {
-	case err == nil:
+	switch err {
+	case nil:
 		status.Phase = appsv1.LifecycleActionSucceeded
 		status.Message = "lifecycle action succeeded"
 	default:

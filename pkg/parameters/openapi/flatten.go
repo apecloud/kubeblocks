@@ -48,14 +48,28 @@ func flattenSchemaAdditionalProps(flattenProps map[string]apiextv1.JSONSchemaPro
 	}
 }
 
+func addFlattenedSchema(flattenProps map[string]apiextv1.JSONSchemaProps, prefix string, schema apiextv1.JSONSchemaProps) {
+	existing, ok := flattenProps[prefix]
+	if !ok {
+		flattenProps[prefix] = schema
+		return
+	}
+	// Keep the first schema's type available to value conversion while retaining every intersection.
+	existing.AllOf = append(existing.AllOf, schema)
+	flattenProps[prefix] = existing
+}
+
 func flattenSchemaProps(flattenProps map[string]apiextv1.JSONSchemaProps, m apiextv1.JSONSchemaProps, prefix string, delim string) {
 	if m.Type != SchemaStructType && m.Type != "" {
-		flattenProps[prefix] = m
+		addFlattenedSchema(flattenProps, prefix, m)
 		return
 	}
 
 	flattenSchemaAdditionalProps(flattenProps, m, prefix, delim)
 	for k, val := range m.Properties {
 		flattenSchemaProps(flattenProps, val, genFieldPrefix(prefix, delim, k), delim)
+	}
+	for _, schema := range m.AllOf {
+		flattenSchemaProps(flattenProps, schema, prefix, delim)
 	}
 }

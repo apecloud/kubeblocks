@@ -3,17 +3,44 @@
   "properties": {
     "spec": {
       "type": "object",
-      "properties": {
-        "a": {
-          "type": "string"
+      "allOf": [
+        {
+          "type": "object",
+          "allOf": [
+            {
+              "type": "object",
+              "properties": {
+                "a": {
+                  "type": "string"
+                }
+              }
+            }
+          ],
+          "properties": {
+            "b": {
+              "type": "string"
+            }
+          }
         },
-        "b": {
-          "type": "string"
-        },
-        "c": {
-          "type": "string"
+        {
+          "type": "object",
+          "allOf": [
+            {
+              "type": "object",
+              "properties": {
+                "a": {
+                  "type": "string"
+                }
+              }
+            }
+          ],
+          "properties": {
+            "c": {
+              "type": "string"
+            }
+          }
         }
-      }
+      ]
     }
   }
 }

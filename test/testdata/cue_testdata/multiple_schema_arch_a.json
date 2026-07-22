@@ -3,10 +3,17 @@
   "properties": {
     "spec": {
       "type": "object",
+      "allOf": [
+        {
+          "type": "object",
+          "properties": {
+            "a": {
+              "type": "string"
+            }
+          }
+        }
+      ],
       "properties": {
-        "a": {
-          "type": "string"
-        },
         "b": {
           "type": "string"
         }

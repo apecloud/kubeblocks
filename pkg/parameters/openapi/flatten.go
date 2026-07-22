@@ -54,9 +54,24 @@ func addFlattenedSchema(flattenProps map[string]apiextv1.JSONSchemaProps, prefix
 		flattenProps[prefix] = schema
 		return
 	}
-	// Keep the first schema's type available to value conversion while retaining every intersection.
+	intersectFlattenedSchemaType(&existing, schema)
 	existing.AllOf = append(existing.AllOf, schema)
 	flattenProps[prefix] = existing
+}
+
+func intersectFlattenedSchemaType(existing *apiextv1.JSONSchemaProps, schema apiextv1.JSONSchemaProps) {
+	switch {
+	case existing.Type == "":
+		existing.Type = schema.Type
+		existing.Format = schema.Format
+	case schema.Type == "" || existing.Type == schema.Type:
+		return
+	case existing.Type == "number" && schema.Type == "integer":
+		existing.Type = schema.Type
+		existing.Format = schema.Format
+	case existing.Type == "integer" && schema.Type == "number":
+		return
+	}
 }
 
 func flattenSchemaProps(flattenProps map[string]apiextv1.JSONSchemaProps, m apiextv1.JSONSchemaProps, prefix string, delim string) {

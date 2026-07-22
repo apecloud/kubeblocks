@@ -42,3 +42,14 @@
 }
 
 #combined: #lower & #upper
+
+#numberLower: {
+	x: >=0
+}
+
+#integerUpper: {
+	x: int & <=9223372036854775807
+}
+
+#numberThenInteger: #numberLower & #integerUpper
+#integerThenNumber: #integerUpper & #numberLower

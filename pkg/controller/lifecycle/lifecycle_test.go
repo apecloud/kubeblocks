@@ -24,6 +24,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -32,6 +33,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -114,6 +116,7 @@ var _ = Describe("lifecycle", func() {
 		namespace = "default"
 		clusterName = "test-cluster"
 		compName = "kbagent"
+		retryIntervalSeconds := int64(10)
 		lifecycleActions = &appsv1.ComponentLifecycleActions{
 			PostProvision: &appsv1.Action{
 				Exec: &appsv1.ExecAction{
@@ -121,8 +124,9 @@ var _ = Describe("lifecycle", func() {
 				},
 				TimeoutSeconds: 5,
 				RetryPolicy: &appsv1.RetryPolicy{
-					MaxRetries:    5,
-					RetryInterval: 10,
+					MaxRetries:           5,
+					RetryInterval:        10,
+					RetryIntervalSeconds: &retryIntervalSeconds,
 				},
 			},
 			RoleProbe: &appsv1.Probe{
@@ -144,8 +148,9 @@ var _ = Describe("lifecycle", func() {
 			},
 			TimeoutSeconds: 5,
 			RetryPolicy: &appsv1.RetryPolicy{
-				MaxRetries:    5,
-				RetryInterval: 10,
+				MaxRetries:           5,
+				RetryInterval:        10,
+				RetryIntervalSeconds: &retryIntervalSeconds,
 			},
 		}
 		pods = []*corev1.Pod{{}}
@@ -197,6 +202,34 @@ var _ = Describe("lifecycle", func() {
 		})
 	})
 
+	DescribeTable("normalizes retry policy at the Apps API-to-kbagent boundary",
+		func(policy *appsv1.RetryPolicy, expected time.Duration) {
+			wirePolicy := BuildKBAgentRetryPolicy(policy)
+			Expect(wirePolicy).ShouldNot(BeNil())
+			Expect(wirePolicy.MaxRetries).Should(Equal(policy.MaxRetries))
+			Expect(wirePolicy.RetryInterval).Should(Equal(expected))
+		},
+		Entry("preserves the legacy duration", &appsv1.RetryPolicy{
+			MaxRetries: 3, RetryInterval: 1500 * time.Millisecond,
+		}, 1500*time.Millisecond),
+		Entry("converts explicit seconds", &appsv1.RetryPolicy{
+			MaxRetries: 3, RetryIntervalSeconds: ptr.To[int64](1),
+		}, time.Second),
+		Entry("explicit seconds take precedence", &appsv1.RetryPolicy{
+			MaxRetries: 3, RetryInterval: time.Nanosecond, RetryIntervalSeconds: ptr.To[int64](1),
+		}, time.Second),
+		Entry("explicit zero takes precedence", &appsv1.RetryPolicy{
+			MaxRetries: 3, RetryInterval: time.Second, RetryIntervalSeconds: ptr.To[int64](0),
+		}, time.Duration(0)),
+		Entry("seconds overflow saturates", &appsv1.RetryPolicy{
+			MaxRetries: 3, RetryIntervalSeconds: ptr.To[int64](1<<63 - 1),
+		}, time.Duration(1<<63-1)),
+	)
+
+	It("keeps an absent retry policy absent at the kbagent boundary", func() {
+		Expect(BuildKBAgentRetryPolicy(nil)).Should(BeNil())
+	})
+
 	Context("call action", func() {
 		It("not defined", func() {
 			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods)
@@ -224,7 +257,7 @@ var _ = Describe("lifecycle", func() {
 					Expect(*req.TimeoutSeconds).Should(Equal(action.TimeoutSeconds))
 					Expect(req.RetryPolicy).ShouldNot(BeNil())
 					Expect(req.RetryPolicy.MaxRetries).Should(Equal(action.RetryPolicy.MaxRetries))
-					Expect(req.RetryPolicy.RetryInterval).Should(Equal(action.RetryPolicy.RetryInterval))
+					Expect(req.RetryPolicy.RetryInterval).Should(Equal(10 * time.Second))
 					return proto.ActionResponse{}, nil
 				}).AnyTimes()
 			})

@@ -30,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	ctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
@@ -58,6 +59,15 @@ func (j *JobAction) GetName() string {
 
 func (j *JobAction) Type() dpv1alpha1.ActionType {
 	return dpv1alpha1.ActionTypeJob
+}
+
+func (j *JobAction) BuildObjectRef() *corev1.ObjectReference {
+	return &corev1.ObjectReference{
+		APIVersion: batchv1.SchemeGroupVersion.String(),
+		Kind:       constant.JobKind,
+		Namespace:  j.ObjectMeta.Namespace,
+		Name:       j.ObjectMeta.Name,
+	}
 }
 
 func (j *JobAction) Execute(actCtx ActionContext) (*dpv1alpha1.ActionStatus, error) {

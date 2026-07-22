@@ -122,13 +122,21 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	for i, pod := range oldPodList {
 		orderedNames[i] = pod.Name
 	}
-	participants := rollingupdate.Participants(its, fmt.Sprint(its.Generation), rollingUpdateQuota, orderedNames)
+	updateRevisions, err := GetRevisions(its.Status.UpdateRevisions)
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
+	participants, windowChanged := rollingupdate.Participants(its,
+		rollingupdate.RolloutID(updateRevisions), rollingUpdateQuota, orderedNames)
+	if windowChanged {
+		return kubebuilderx.Commit, nil
+	}
 
 	// treat old and Pending pod as a special case, as they can be updated without a consequence
 	// PodUpdatePolicy is ignored here since in-place update for a pending pod doesn't make much sense.
-	for i, pod := range oldPodList {
-		if i >= rollingUpdateQuota {
-			break
+	for _, pod := range oldPodList {
+		if !participants.Has(pod.Name) {
+			continue
 		}
 		updatePolicy, _, _, err := getPodUpdatePolicy(its, pod)
 		if err != nil {

@@ -117,6 +117,28 @@ type progressResource struct {
 	componentPhase                      appsv1.ComponentPhase
 }
 
+// InstanceNamePlan is the desired instance naming result for a component spec.
+// Names keeps the ordering defined by instancetemplate.PodNameBuilder, while
+// TemplateByName records the instance template assigned to every name.
+type InstanceNamePlan struct {
+	Names                 []string
+	TemplateByName        map[string]string
+	OfflineTemplateByName map[string]string
+}
+
+func (p *InstanceNamePlan) NamesForTemplate(templateName string) []string {
+	if p == nil {
+		return nil
+	}
+	names := make([]string, 0)
+	for _, name := range p.Names {
+		if p.TemplateByName[name] == templateName {
+			names = append(names, name)
+		}
+	}
+	return names
+}
+
 // OpsRuntime abstracts the standard ops paths that only need workload/member views
 // plus a small set of runtime-owned actions.
 //
@@ -127,8 +149,7 @@ type OpsRuntime interface {
 	GetWorkload(namespace, clusterName, compName string) (Workload, error)
 	GetInstance(namespace, clusterName, compName, instanceName string) (Instance, error)
 	ListInstances(namespace, clusterName, compName string) ([]Instance, error)
-	GenerateInstanceNameSet(clusterName, compName string, compReplicas int32, instances []appsv1.InstanceTemplate, offlineInstances []string) (map[string]string, error)
-	GenerateTemplateInstanceNames(clusterName, compName, templateName string, replicas int32, offlineInstances []string, ordinals appsv1.Ordinals) ([]string, error)
+	GenerateInstanceNamePlan(namespace, clusterName, compName string, compSpec appsv1.ClusterComponentSpec) (*InstanceNamePlan, error)
 	Switchover(ctx context.Context, namespace, clusterName, compName, instanceName, candidateName string) error
 }
 

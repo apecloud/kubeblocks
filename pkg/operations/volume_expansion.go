@@ -43,13 +43,12 @@ type volumeExpansionOpsHandler struct {
 }
 
 type volumeExpansionHelper struct {
-	compOps              ComponentOpsInterface
-	fullComponentName    string
-	vctName              string
-	expectCount          int
-	offlineInstanceNames []string
-	templateName         string
-	ordinals             appsv1.Ordinals
+	compOps           ComponentOpsInterface
+	componentSpec     appsv1.ClusterComponentSpec
+	fullComponentName string
+	vctName           string
+	expectCount       int
+	templateName      string
 }
 
 var _ OpsHandler = volumeExpansionOpsHandler{}
@@ -132,22 +131,21 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 			expectReplicas := compSpec.Replicas - getTemplateReplicas(compSpec.Instances)
 			for _, vct := range volumeExpansion.VolumeClaimTemplates {
 				veHelpers = append(veHelpers, volumeExpansionHelper{
-					compOps:              compOps,
-					fullComponentName:    fullComponentName,
-					expectCount:          int(expectReplicas),
-					vctName:              vct.Name,
-					offlineInstanceNames: compSpec.OfflineInstances,
+					compOps:           compOps,
+					componentSpec:     compSpec,
+					fullComponentName: fullComponentName,
+					expectCount:       int(expectReplicas),
+					vctName:           vct.Name,
 				})
 				for _, template := range compSpec.Instances {
 					// todo: consider instance template with volumeClaimTemplates
 					veHelpers = append(veHelpers, volumeExpansionHelper{
-						compOps:              compOps,
-						fullComponentName:    fullComponentName,
-						expectCount:          int(*template.Replicas),
-						vctName:              vct.Name,
-						offlineInstanceNames: compSpec.OfflineInstances,
-						templateName:         template.Name,
-						ordinals:             template.Ordinals,
+						compOps:           compOps,
+						componentSpec:     compSpec,
+						fullComponentName: fullComponentName,
+						expectCount:       int(*template.Replicas),
+						vctName:           vct.Name,
+						templateName:      template.Name,
 					})
 				}
 			}
@@ -294,11 +292,12 @@ func (ve volumeExpansionOpsHandler) handleVCTExpansionProgress(reqCtx intctrluti
 	if err != nil {
 		return 0, 0, err
 	}
-	instanceNames, err := runtime.GenerateTemplateInstanceNames(
-		opsRes.Cluster.Name, veHelper.fullComponentName, veHelper.templateName, int32(veHelper.expectCount), veHelper.offlineInstanceNames, veHelper.ordinals)
+	plan, err := runtime.GenerateInstanceNamePlan(opsRes.Cluster.Namespace, opsRes.Cluster.Name,
+		veHelper.fullComponentName, veHelper.componentSpec)
 	if err != nil {
 		return 0, 0, err
 	}
+	instanceNames := plan.NamesForTemplate(veHelper.templateName)
 	instanceNameSet := sets.New(instanceNames...)
 	for instanceName := range instanceNameSet {
 		instance, getErr := runtime.GetInstance(opsRes.Cluster.Namespace, opsRes.Cluster.Name, veHelper.fullComponentName, instanceName)

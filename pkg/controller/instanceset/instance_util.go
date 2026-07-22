@@ -82,8 +82,7 @@ func parseParentNameAndOrdinal(s string) (string, int) {
 // reverse it if reverse==true
 func sortObjects[T client.Object](objects []T, rolePriorityMap map[string]int, reverse bool) {
 	getRolePriorityFunc := func(i int) int {
-		role := strings.ToLower(objects[i].GetLabels()[constant.RoleLabelKey])
-		return rolePriorityMap[role]
+		return getRolePriority(rolePriorityMap, objects[i].GetLabels()[constant.RoleLabelKey])
 	}
 
 	// cache the parent names and ordinals to accelerate the parsing process when there is a massive number of Pods.

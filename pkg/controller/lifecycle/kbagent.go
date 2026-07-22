@@ -264,7 +264,7 @@ func (a *kbagent) callAction(ctx context.Context, cli client.Reader, spec *appsv
 	return a.callActionWithSelector(ctx, spec, lfa, req)
 }
 
-// BuildKBAgentRetryPolicy normalizes the Apps API retry policy into the existing kbagent wire contract.
+// BuildKBAgentRetryPolicy normalizes the API retry policy into the kbagent wire contract.
 func BuildKBAgentRetryPolicy(retryPolicy *appsv1.RetryPolicy) *proto.RetryPolicy {
 	if retryPolicy == nil {
 		return nil

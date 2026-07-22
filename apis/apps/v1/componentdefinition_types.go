@@ -2169,8 +2169,6 @@ const (
 	OrdinalSelector TargetPodSelector = "Ordinal"
 )
 
-// RetryPolicy defines retry attempts and the interval between them for an Action.
-// +kubebuilder:validation:XValidation:rule="!has(self.retryIntervalSeconds) || self.retryInterval == self.retryIntervalSeconds * 1000000000",message="retryInterval must be set to the equivalent duration when retryIntervalSeconds is set"
 type RetryPolicy struct {
 	// Defines the maximum number of retry attempts that should be made for a given Action.
 	// This value is set to 0 by default, indicating that no retries will be made.
@@ -2190,10 +2188,8 @@ type RetryPolicy struct {
 	// Specifies the number of seconds to wait between each retry attempt.
 	// This is a convenient way to configure retryInterval in whole seconds.
 	// When set, this field takes precedence over retryInterval, including when set to 0.
-	// For rollback compatibility with earlier controller versions, retryInterval must also be set to the equivalent duration.
 	//
 	// +kubebuilder:validation:Minimum=0
-	// +kubebuilder:validation:Maximum=9223372036
 	// +optional
 	RetryIntervalSeconds *int64 `json:"retryIntervalSeconds,omitempty"`
 }

@@ -4286,17 +4286,10 @@ spec:
                               Specifies the number of seconds to wait between each retry attempt.
                               This is a convenient way to configure retryInterval in whole seconds.
                               When set, this field takes precedence over retryInterval, including when set to 0.
-                              For rollback compatibility with earlier controller versions, retryInterval must also be set to the equivalent duration.
                             format: int64
-                            maximum: 9223372036
                             minimum: 0
                             type: integer
                         type: object
-                        x-kubernetes-validations:
-                        - message: retryInterval must be set to the equivalent duration
-                            when retryIntervalSeconds is set
-                          rule: '!has(self.retryIntervalSeconds) || self.retryInterval
-                            == self.retryIntervalSeconds * 1000000000'
                       targetPodSelector:
                         description: |-
                           Defines the criteria used to select the target Pod(s) for executing the Action.
@@ -4731,17 +4724,10 @@ spec:
                               Specifies the number of seconds to wait between each retry attempt.
                               This is a convenient way to configure retryInterval in whole seconds.
                               When set, this field takes precedence over retryInterval, including when set to 0.
-                              For rollback compatibility with earlier controller versions, retryInterval must also be set to the equivalent duration.
                             format: int64
-                            maximum: 9223372036
                             minimum: 0
                             type: integer
                         type: object
-                        x-kubernetes-validations:
-                        - message: retryInterval must be set to the equivalent duration
-                            when retryIntervalSeconds is set
-                          rule: '!has(self.retryIntervalSeconds) || self.retryInterval
-                            == self.retryIntervalSeconds * 1000000000'
                       successThreshold:
                         description: |-
                           Minimum consecutive successes for the probe to be considered successful after having failed.
@@ -5180,17 +5166,10 @@ spec:
                               Specifies the number of seconds to wait between each retry attempt.
                               This is a convenient way to configure retryInterval in whole seconds.
                               When set, this field takes precedence over retryInterval, including when set to 0.
-                              For rollback compatibility with earlier controller versions, retryInterval must also be set to the equivalent duration.
                             format: int64
-                            maximum: 9223372036
                             minimum: 0
                             type: integer
                         type: object
-                        x-kubernetes-validations:
-                        - message: retryInterval must be set to the equivalent duration
-                            when retryIntervalSeconds is set
-                          rule: '!has(self.retryIntervalSeconds) || self.retryInterval
-                            == self.retryIntervalSeconds * 1000000000'
                       targetPodSelector:
                         description: |-
                           Defines the criteria used to select the target Pod(s) for executing the Action.
@@ -5618,17 +5597,10 @@ spec:
                               Specifies the number of seconds to wait between each retry attempt.
                               This is a convenient way to configure retryInterval in whole seconds.
                               When set, this field takes precedence over retryInterval, including when set to 0.
-                              For rollback compatibility with earlier controller versions, retryInterval must also be set to the equivalent duration.
                             format: int64
-                            maximum: 9223372036
                             minimum: 0
                             type: integer
                         type: object
-                        x-kubernetes-validations:
-                        - message: retryInterval must be set to the equivalent duration
-                            when retryIntervalSeconds is set
-                          rule: '!has(self.retryIntervalSeconds) || self.retryInterval
-                            == self.retryIntervalSeconds * 1000000000'
                       targetPodSelector:
                         description: |-
                           Defines the criteria used to select the target Pod(s) for executing the Action.
@@ -6059,17 +6031,10 @@ spec:
                               Specifies the number of seconds to wait between each retry attempt.
                               This is a convenient way to configure retryInterval in whole seconds.
                               When set, this field takes precedence over retryInterval, including when set to 0.
-                              For rollback compatibility with earlier controller versions, retryInterval must also be set to the equivalent duration.
                             format: int64
-                            maximum: 9223372036
                             minimum: 0
                             type: integer
                         type: object
-                        x-kubernetes-validations:
-                        - message: retryInterval must be set to the equivalent duration
-                            when retryIntervalSeconds is set
-                          rule: '!has(self.retryIntervalSeconds) || self.retryInterval
-                            == self.retryIntervalSeconds * 1000000000'
                       targetPodSelector:
                         description: |-
                           Defines the criteria used to select the target Pod(s) for executing the Action.
@@ -6502,17 +6467,10 @@ spec:
                               Specifies the number of seconds to wait between each retry attempt.
                               This is a convenient way to configure retryInterval in whole seconds.
                               When set, this field takes precedence over retryInterval, including when set to 0.
-                              For rollback compatibility with earlier controller versions, retryInterval must also be set to the equivalent duration.
                             format: int64
-                            maximum: 9223372036
                             minimum: 0
                             type: integer
                         type: object
-                        x-kubernetes-validations:
-                        - message: retryInterval must be set to the equivalent duration
-                            when retryIntervalSeconds is set
-                          rule: '!has(self.retryIntervalSeconds) || self.retryInterval
-                            == self.retryIntervalSeconds * 1000000000'
                       targetPodSelector:
                         description: |-
                           Defines the criteria used to select the target Pod(s) for executing the Action.
@@ -6935,17 +6893,10 @@ spec:
                               Specifies the number of seconds to wait between each retry attempt.
                               This is a convenient way to configure retryInterval in whole seconds.
                               When set, this field takes precedence over retryInterval, including when set to 0.
-                              For rollback compatibility with earlier controller versions, retryInterval must also be set to the equivalent duration.
                             format: int64
-                            maximum: 9223372036
                             minimum: 0
                             type: integer
                         type: object
-                        x-kubernetes-validations:
-                        - message: retryInterval must be set to the equivalent duration
-                            when retryIntervalSeconds is set
-                          rule: '!has(self.retryIntervalSeconds) || self.retryInterval
-                            == self.retryIntervalSeconds * 1000000000'
                       targetPodSelector:
                         description: |-
                           Defines the criteria used to select the target Pod(s) for executing the Action.
@@ -7368,17 +7319,10 @@ spec:
                               Specifies the number of seconds to wait between each retry attempt.
                               This is a convenient way to configure retryInterval in whole seconds.
                               When set, this field takes precedence over retryInterval, including when set to 0.
-                              For rollback compatibility with earlier controller versions, retryInterval must also be set to the equivalent duration.
                             format: int64
-                            maximum: 9223372036
                             minimum: 0
                             type: integer
                         type: object
-                        x-kubernetes-validations:
-                        - message: retryInterval must be set to the equivalent duration
-                            when retryIntervalSeconds is set
-                          rule: '!has(self.retryIntervalSeconds) || self.retryInterval
-                            == self.retryIntervalSeconds * 1000000000'
                       targetPodSelector:
                         description: |-
                           Defines the criteria used to select the target Pod(s) for executing the Action.
@@ -7801,17 +7745,10 @@ spec:
                               Specifies the number of seconds to wait between each retry attempt.
                               This is a convenient way to configure retryInterval in whole seconds.
                               When set, this field takes precedence over retryInterval, including when set to 0.
-                              For rollback compatibility with earlier controller versions, retryInterval must also be set to the equivalent duration.
                             format: int64
-                            maximum: 9223372036
                             minimum: 0
                             type: integer
                         type: object
-                        x-kubernetes-validations:
-                        - message: retryInterval must be set to the equivalent duration
-                            when retryIntervalSeconds is set
-                          rule: '!has(self.retryIntervalSeconds) || self.retryInterval
-                            == self.retryIntervalSeconds * 1000000000'
                       targetPodSelector:
                         description: |-
                           Defines the criteria used to select the target Pod(s) for executing the Action.
@@ -8236,17 +8173,10 @@ spec:
                               Specifies the number of seconds to wait between each retry attempt.
                               This is a convenient way to configure retryInterval in whole seconds.
                               When set, this field takes precedence over retryInterval, including when set to 0.
-                              For rollback compatibility with earlier controller versions, retryInterval must also be set to the equivalent duration.
                             format: int64
-                            maximum: 9223372036
                             minimum: 0
                             type: integer
                         type: object
-                        x-kubernetes-validations:
-                        - message: retryInterval must be set to the equivalent duration
-                            when retryIntervalSeconds is set
-                          rule: '!has(self.retryIntervalSeconds) || self.retryInterval
-                            == self.retryIntervalSeconds * 1000000000'
                       targetPodSelector:
                         description: |-
                           Defines the criteria used to select the target Pod(s) for executing the Action.
@@ -8665,17 +8595,10 @@ spec:
                               Specifies the number of seconds to wait between each retry attempt.
                               This is a convenient way to configure retryInterval in whole seconds.
                               When set, this field takes precedence over retryInterval, including when set to 0.
-                              For rollback compatibility with earlier controller versions, retryInterval must also be set to the equivalent duration.
                             format: int64
-                            maximum: 9223372036
                             minimum: 0
                             type: integer
                         type: object
-                        x-kubernetes-validations:
-                        - message: retryInterval must be set to the equivalent duration
-                            when retryIntervalSeconds is set
-                          rule: '!has(self.retryIntervalSeconds) || self.retryInterval
-                            == self.retryIntervalSeconds * 1000000000'
                       targetPodSelector:
                         description: |-
                           Defines the criteria used to select the target Pod(s) for executing the Action.
@@ -9147,17 +9070,10 @@ spec:
                               Specifies the number of seconds to wait between each retry attempt.
                               This is a convenient way to configure retryInterval in whole seconds.
                               When set, this field takes precedence over retryInterval, including when set to 0.
-                              For rollback compatibility with earlier controller versions, retryInterval must also be set to the equivalent duration.
                             format: int64
-                            maximum: 9223372036
                             minimum: 0
                             type: integer
                         type: object
-                        x-kubernetes-validations:
-                        - message: retryInterval must be set to the equivalent duration
-                            when retryIntervalSeconds is set
-                          rule: '!has(self.retryIntervalSeconds) || self.retryInterval
-                            == self.retryIntervalSeconds * 1000000000'
                       successThreshold:
                         description: |-
                           Minimum consecutive successes for the probe to be considered successful after having failed.
@@ -9596,17 +9512,10 @@ spec:
                               Specifies the number of seconds to wait between each retry attempt.
                               This is a convenient way to configure retryInterval in whole seconds.
                               When set, this field takes precedence over retryInterval, including when set to 0.
-                              For rollback compatibility with earlier controller versions, retryInterval must also be set to the equivalent duration.
                             format: int64
-                            maximum: 9223372036
                             minimum: 0
                             type: integer
                         type: object
-                        x-kubernetes-validations:
-                        - message: retryInterval must be set to the equivalent duration
-                            when retryIntervalSeconds is set
-                          rule: '!has(self.retryIntervalSeconds) || self.retryInterval
-                            == self.retryIntervalSeconds * 1000000000'
                       targetPodSelector:
                         description: |-
                           Defines the criteria used to select the target Pod(s) for executing the Action.

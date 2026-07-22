@@ -309,15 +309,22 @@ func (a *kbagent) parameters(ctx context.Context, cli client.Reader, lfa lifecyc
 	}
 
 	if _, authoritative := lfa.(authoritativeActionParameters); authoritative {
+		// Expand template aliases before applying runtime-owned parameters. An
+		// alias derived from a template variable must not fill an intentionally
+		// empty authoritative value later in the composition pipeline.
+		addShellSafeParameterAliases(m)
 		for k, v := range sys {
 			m[k] = v
-		}
-	} else {
-		for k, v := range sys {
-			// template vars take precedence for existing lifecycle actions.
-			if _, ok := m[k]; !ok {
-				m[k] = v
+			if alias := shellSafeParameterAlias(k); alias != "" && alias != k {
+				m[alias] = v
 			}
+		}
+		return m, nil
+	}
+	for k, v := range sys {
+		// template vars take precedence for existing lifecycle actions.
+		if _, ok := m[k]; !ok {
+			m[k] = v
 		}
 	}
 	addShellSafeParameterAliases(m)

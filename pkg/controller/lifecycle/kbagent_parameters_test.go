@@ -121,15 +121,17 @@ func TestSwitchoverRuntimeParametersOverrideTemplateVars(t *testing.T) {
 func TestSwitchoverEmptyCandidateOverridesTemplateVars(t *testing.T) {
 	action := &kbagent{
 		templateVars: map[string]string{
-			switchoverCandidateName: "spoofed-candidate",
-			switchoverCandidateFQDN: "spoofed-candidate-fqdn",
+			switchoverCandidateName:        "spoofed-candidate",
+			switchoverCandidateFQDN:        "spoofed-candidate-fqdn",
+			"kb_switchover_candidate_name": "alias-spoofed-candidate",
+			"kb_switchover_candidate_fqdn": "alias-spoofed-candidate-fqdn",
+			"kb_switchover_role":           "alias-spoofed-role",
 		},
 	}
 	runtime := &switchover{
 		namespace:   "default",
 		clusterName: "demo",
 		compName:    "redis",
-		role:        "primary",
 		currentPod:  "demo-redis-0",
 	}
 
@@ -137,7 +139,7 @@ func TestSwitchoverEmptyCandidateOverridesTemplateVars(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parameters returned error: %v", err)
 	}
-	for _, key := range []string{switchoverCandidateName, switchoverCandidateFQDN} {
+	for _, key := range []string{switchoverCandidateName, switchoverCandidateFQDN, switchoverRole} {
 		value, ok := parameters[key]
 		if !ok {
 			t.Fatalf("authoritative empty parameter %s is missing", key)

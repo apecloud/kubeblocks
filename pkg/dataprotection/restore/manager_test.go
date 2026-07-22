@@ -512,7 +512,7 @@ var _ = Describe("RestoreManager Test", func() {
 			}
 			Expect(envValues(dptypes.DPTargetClusterTopology)).Should(BeEmpty())
 			Expect(envValues(dptypes.DPTargetComponentServiceVersion)).Should(BeEmpty())
-			Expect(envValues(dptypes.DPTargetComponentServiceVersionSelector)).Should(BeEmpty())
+			Expect(envValues(deprecatedTargetComponentServiceVersionSelectorEnvName)).Should(BeEmpty())
 			Expect(envValues("KEEP_POD_ENV")).Should(Equal([]corev1.EnvVar{{Name: "KEEP_POD_ENV", Value: "kept"}}))
 			Expect(envValues(dptypes.DPDBUser)).Should(HaveLen(1))
 			Expect(envValues(dptypes.DPDBPassword)).Should(HaveLen(1))

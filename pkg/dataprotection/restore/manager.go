@@ -703,80 +703,97 @@ func validateTargetPodOwnership(
 	reqCtx intctrlutil.RequestCtx,
 	reader client.Reader,
 	pod *corev1.Pod,
-	component *appsv1.Component) error {
+	component *appsv1.Component) (string, error) {
 	owner := metav1.GetControllerOf(pod)
 	if owner == nil || owner.APIVersion != workloadsv1.GroupVersion.String() {
-		return intctrlutil.NewFatalError(fmt.Sprintf(
+		return "", intctrlutil.NewFatalError(fmt.Sprintf(
 			"target Pod %s/%s is not controlled by a KubeBlocks workload", pod.Namespace, pod.Name))
 	}
 
 	instanceSet := &workloadsv1.InstanceSet{}
+	instanceTemplateName := ""
 	switch owner.Kind {
 	case workloadsv1.InstanceSetKind:
 		key := types.NamespacedName{Namespace: pod.Namespace, Name: owner.Name}
 		if err := reader.Get(reqCtx.Ctx, key, instanceSet); err != nil {
-			return targetFactReadError(workloadsv1.InstanceSetKind, key, err)
+			return "", targetFactReadError(workloadsv1.InstanceSetKind, key, err)
 		}
 		if instanceSet.UID != owner.UID {
-			return intctrlutil.NewFatalError(fmt.Sprintf(
+			return "", intctrlutil.NewFatalError(fmt.Sprintf(
 				"target Pod %s/%s InstanceSet identity changed", pod.Namespace, pod.Name))
+		}
+		if !instanceSet.DeletionTimestamp.IsZero() {
+			return "", intctrlutil.NewRequeueError(time.Second, fmt.Sprintf(
+				"target InstanceSet %s/%s is terminating", instanceSet.Namespace, instanceSet.Name))
+		}
+		var ok bool
+		instanceTemplateName, ok = pod.Labels[constant.KBAppInstanceTemplateLabelKey]
+		if !ok {
+			return "", intctrlutil.NewFatalError(fmt.Sprintf(
+				"target Pod %s/%s is missing label %s",
+				pod.Namespace, pod.Name, constant.KBAppInstanceTemplateLabelKey))
 		}
 	case "Instance":
 		instanceKey := types.NamespacedName{Namespace: pod.Namespace, Name: owner.Name}
 		instance := &workloadsv1.Instance{}
 		if err := reader.Get(reqCtx.Ctx, instanceKey, instance); err != nil {
-			return targetFactReadError("Instance", instanceKey, err)
+			return "", targetFactReadError("Instance", instanceKey, err)
 		}
 		if instance.UID != owner.UID {
-			return intctrlutil.NewFatalError(fmt.Sprintf(
+			return "", intctrlutil.NewFatalError(fmt.Sprintf(
 				"target Pod %s/%s Instance identity changed", pod.Namespace, pod.Name))
 		}
+		if !instance.DeletionTimestamp.IsZero() {
+			return "", intctrlutil.NewRequeueError(time.Second, fmt.Sprintf(
+				"target Instance %s/%s is terminating", instance.Namespace, instance.Name))
+		}
+		instanceTemplateName = instance.Spec.InstanceTemplateName
 		instanceSetOwner := metav1.GetControllerOf(instance)
 		if instanceSetOwner == nil ||
 			instanceSetOwner.APIVersion != workloadsv1.GroupVersion.String() ||
 			instanceSetOwner.Kind != workloadsv1.InstanceSetKind {
-			return intctrlutil.NewFatalError(fmt.Sprintf(
+			return "", intctrlutil.NewFatalError(fmt.Sprintf(
 				"target Instance %s/%s is not controlled by an InstanceSet", instance.Namespace, instance.Name))
 		}
 		instanceSetKey := types.NamespacedName{Namespace: instance.Namespace, Name: instanceSetOwner.Name}
 		if err := reader.Get(reqCtx.Ctx, instanceSetKey, instanceSet); err != nil {
-			return targetFactReadError(workloadsv1.InstanceSetKind, instanceSetKey, err)
+			return "", targetFactReadError(workloadsv1.InstanceSetKind, instanceSetKey, err)
 		}
 		if instanceSet.UID != instanceSetOwner.UID {
-			return intctrlutil.NewFatalError(fmt.Sprintf(
+			return "", intctrlutil.NewFatalError(fmt.Sprintf(
 				"target Instance %s/%s InstanceSet identity changed", instance.Namespace, instance.Name))
 		}
+		if !instanceSet.DeletionTimestamp.IsZero() {
+			return "", intctrlutil.NewRequeueError(time.Second, fmt.Sprintf(
+				"target InstanceSet %s/%s is terminating", instanceSet.Namespace, instanceSet.Name))
+		}
 	default:
-		return intctrlutil.NewFatalError(fmt.Sprintf(
+		return "", intctrlutil.NewFatalError(fmt.Sprintf(
 			"target Pod %s/%s has unsupported controller kind %q", pod.Namespace, pod.Name, owner.Kind))
 	}
 
 	if !controllerReferenceMatches(instanceSet, appsv1.APIVersion, appsv1.ComponentKind, component.UID) {
-		return intctrlutil.NewFatalError(fmt.Sprintf(
+		return "", intctrlutil.NewFatalError(fmt.Sprintf(
 			"target Pod %s/%s workload is not controlled by Component %s/%s",
 			pod.Namespace, pod.Name, component.Namespace, component.Name))
 	}
-	return nil
+	return instanceTemplateName, nil
 }
 
-func targetPodServiceVersionSelector(component *appsv1.Component, pod *corev1.Pod) (string, error) {
-	templateName, ok := pod.Labels[constant.KBAppInstanceTemplateLabelKey]
-	if !ok {
-		return "", intctrlutil.NewFatalError(fmt.Sprintf(
-			"target Pod %s/%s is missing label %s",
-			pod.Namespace, pod.Name, constant.KBAppInstanceTemplateLabelKey))
-	}
-
-	if templateName != "" {
+func targetPodExpectedServiceVersion(
+	component *appsv1.Component,
+	pod *corev1.Pod,
+	instanceTemplateName string) (string, error) {
+	if instanceTemplateName != "" {
 		for i := range component.Spec.Instances {
 			instance := &component.Spec.Instances[i]
-			if instance.Name != templateName {
+			if instance.Name != instanceTemplateName {
 				continue
 			}
 			if ptr.Deref(instance.Replicas, int32(1)) <= 0 {
 				return "", intctrlutil.NewFatalError(fmt.Sprintf(
 					"target Pod %s/%s references inactive instance template %q",
-					pod.Namespace, pod.Name, templateName))
+					pod.Namespace, pod.Name, instanceTemplateName))
 			}
 			if instance.ServiceVersion != "" {
 				return instance.ServiceVersion, nil
@@ -785,7 +802,7 @@ func targetPodServiceVersionSelector(component *appsv1.Component, pod *corev1.Po
 		}
 		return "", intctrlutil.NewFatalError(fmt.Sprintf(
 			"target Pod %s/%s references unknown instance template %q",
-			pod.Namespace, pod.Name, templateName))
+			pod.Namespace, pod.Name, instanceTemplateName))
 	}
 
 	remainingDefaultReplicas := component.Spec.Replicas
@@ -794,7 +811,7 @@ func targetPodServiceVersionSelector(component *appsv1.Component, pod *corev1.Po
 	}
 	if remainingDefaultReplicas <= 0 {
 		return "", intctrlutil.NewFatalError(fmt.Sprintf(
-			"target Pod %s/%s has an empty instance-template label but Component has no default instances",
+			"target Pod %s/%s resolves to the default instance template but Component has no default instances",
 			pod.Namespace, pod.Name))
 	}
 	return component.Spec.ServiceVersion, nil
@@ -832,7 +849,8 @@ func (r *RestoreManager) postReadyTargetEnv(
 		return nil, intctrlutil.NewRequeueError(time.Second,
 			fmt.Sprintf("target Pod %s is not stably Ready", podKey))
 	}
-	if err := validateTargetPodOwnership(reqCtx, reader, livePod, liveComponent); err != nil {
+	instanceTemplateName, err := validateTargetPodOwnership(reqCtx, reader, livePod, liveComponent)
+	if err != nil {
 		return nil, err
 	}
 
@@ -875,13 +893,13 @@ func (r *RestoreManager) postReadyTargetEnv(
 			liveComponent.Namespace, liveComponent.Name, cluster.Namespace, cluster.Name))
 	}
 
-	serviceVersionSelector, err := targetPodServiceVersionSelector(liveComponent, livePod)
+	expectedServiceVersion, err := targetPodExpectedServiceVersion(liveComponent, livePod, instanceTemplateName)
 	if err != nil {
 		return nil, err
 	}
 	return []corev1.EnvVar{
 		{Name: dptypes.DPTargetClusterTopology, Value: cluster.Spec.Topology},
-		{Name: dptypes.DPTargetComponentServiceVersionSelector, Value: serviceVersionSelector},
+		{Name: dptypes.DPTargetComponentServiceVersion, Value: expectedServiceVersion},
 	}, nil
 }
 

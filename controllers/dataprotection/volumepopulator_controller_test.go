@@ -1772,7 +1772,7 @@ func TestBuildPostReadyRestoreStripsCallerTargetEnv(t *testing.T) {
 		{Name: dptypes.DPTargetClusterTopology, Value: "caller-value-1"},
 		{Name: dptypes.DPTargetClusterTopology, Value: "caller-value-2"},
 		{Name: dptypes.DPTargetComponentServiceVersion, Value: "caller-version"},
-		{Name: dptypes.DPTargetComponentServiceVersionSelector, Value: "caller-selector"},
+		{Name: "DP_TARGET_COMPONENT_SERVICE_VERSION_SELECTOR", Value: "caller-selector"},
 	}
 	sourceRestore := &dpv1alpha1.Restore{Spec: dpv1alpha1.RestoreSpec{
 		Env: append([]corev1.EnvVar{}, sourceEnv...),
@@ -1791,7 +1791,7 @@ func TestBuildPostReadyRestoreStripsCallerTargetEnv(t *testing.T) {
 	require.Equal(t, "kept", envValue(restore.Spec.Env, "KEEP_ME"))
 	require.Zero(t, envNameCount(restore.Spec.Env, dptypes.DPTargetClusterTopology))
 	require.Zero(t, envNameCount(restore.Spec.Env, dptypes.DPTargetComponentServiceVersion))
-	require.Zero(t, envNameCount(restore.Spec.Env, dptypes.DPTargetComponentServiceVersionSelector))
+	require.Zero(t, envNameCount(restore.Spec.Env, "DP_TARGET_COMPONENT_SERVICE_VERSION_SELECTOR"))
 }
 
 func TestReconcileCreatesPostReadyRestoreWithoutTargetClusterSnapshot(t *testing.T) {
@@ -1877,7 +1877,7 @@ func TestReconcileCreatesPostReadyRestoreWithoutTargetClusterSnapshot(t *testing
 	}, restore))
 	require.Zero(t, envNameCount(restore.Spec.Env, dptypes.DPTargetClusterTopology))
 	require.Zero(t, envNameCount(restore.Spec.Env, dptypes.DPTargetComponentServiceVersion))
-	require.Zero(t, envNameCount(restore.Spec.Env, dptypes.DPTargetComponentServiceVersionSelector))
+	require.Zero(t, envNameCount(restore.Spec.Env, "DP_TARGET_COMPONENT_SERVICE_VERSION_SELECTOR"))
 }
 
 func TestEnsurePostReadyRestoreWaitsForObservedComponentGeneration(t *testing.T) {
@@ -2014,7 +2014,7 @@ func TestValidatePostReadyRestoreTargetEnvCompatibility(t *testing.T) {
 					{Name: "KEEP_ME", Value: "kept"},
 					{Name: dptypes.DPTargetClusterTopology, Value: "caller-topology"},
 					{Name: dptypes.DPTargetComponentServiceVersion, Value: "caller-version"},
-					{Name: dptypes.DPTargetComponentServiceVersionSelector, Value: "caller-selector"},
+					{Name: "DP_TARGET_COMPONENT_SERVICE_VERSION_SELECTOR", Value: "caller-selector"},
 				},
 			},
 		},

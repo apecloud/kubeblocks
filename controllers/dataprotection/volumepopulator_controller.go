@@ -1353,14 +1353,10 @@ func (r *VolumePopulatorReconciler) buildPostReadyRestore(reqCtx intctrlutil.Req
 func stripPostReadyTargetEnv(source []corev1.EnvVar) []corev1.EnvVar {
 	var env []corev1.EnvVar
 	for i := range source {
-		switch source[i].Name {
-		case dptypes.DPTargetClusterTopology,
-			dptypes.DPTargetComponentServiceVersion,
-			dptypes.DPTargetComponentServiceVersionSelector:
+		if dptypes.IsPostReadyTargetEnv(source[i].Name) {
 			continue
-		default:
-			env = append(env, source[i])
 		}
+		env = append(env, source[i])
 	}
 	return env
 }

@@ -21,6 +21,7 @@ package dataprotection
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -31,6 +32,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
@@ -68,6 +70,14 @@ type BackupReconciler struct {
 	Recorder   record.EventRecorder
 	RestConfig *rest.Config
 	clock      clock.RealClock
+}
+
+type backupNamespaceTerminatingError struct {
+	namespace string
+}
+
+func (e *backupNamespaceTerminatingError) Error() string {
+	return fmt.Sprintf("backup namespace %q is terminating; cannot create worker resources to delete backup files, delete the Backup and wait until it is gone before deleting the namespace", e.namespace)
 }
 
 // +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backups,verbs=get;list;watch;create;update;patch;delete
@@ -237,17 +247,39 @@ func (r *BackupReconciler) deleteBackupFiles(reqCtx intctrlutil.RequestCtx, back
 		return deleteBackup()
 	case dpbackup.DeletionStatusFailed:
 		failureReason := err.Error()
-		if backup.Status.FailureReason == failureReason {
+		if backup.Status.DeletionFailureReason == failureReason {
 			return nil
 		}
 		backupPatch := client.MergeFrom(backup.DeepCopy())
-		backup.Status.FailureReason = failureReason
+		backup.Status.DeletionFailureReason = failureReason
 		r.Recorder.Event(backup, corev1.EventTypeWarning, "DeleteBackupFilesFailed", failureReason)
 		return r.Status().Patch(reqCtx.Ctx, backup, backupPatch)
 	case dpbackup.DeletionStatusDeleting,
 		dpbackup.DeletionStatusUnknown:
 		// wait for the deletion job completed
+		return r.recordBackupDeletionBlocker(reqCtx, backup, err)
+	}
+	return err
+}
+
+func (r *BackupReconciler) recordBackupDeletionBlocker(
+	reqCtx intctrlutil.RequestCtx,
+	backup *dpv1alpha1.Backup,
+	err error,
+) error {
+	var terminatingErr *backupNamespaceTerminatingError
+	if !errors.As(err, &terminatingErr) {
 		return err
+	}
+
+	deletionFailureReason := err.Error()
+	if backup.Status.DeletionFailureReason == deletionFailureReason {
+		return err
+	}
+	backupPatch := client.MergeFrom(backup.DeepCopy())
+	backup.Status.DeletionFailureReason = deletionFailureReason
+	if patchErr := r.Status().Patch(reqCtx.Ctx, backup, backupPatch); patchErr != nil {
+		return patchErr
 	}
 	return err
 }
@@ -258,7 +290,7 @@ func (r *BackupReconciler) ensureWorkerServiceAccountForBackupDeletion(reqCtx in
 		return "", fmt.Errorf("failed to get backup namespace %q before deleting backup files: %w", namespace, err)
 	}
 	if !ns.DeletionTimestamp.IsZero() {
-		return "", fmt.Errorf("backup namespace %q is terminating; cannot create worker resources to delete backup files, delete the Backup and wait until it is gone before deleting the namespace", namespace)
+		return "", &backupNamespaceTerminatingError{namespace: namespace}
 	}
 	// TODO: update the mcMgr param
 	return EnsureWorkerServiceAccount(reqCtx, r.Client, namespace, nil)
@@ -333,11 +365,22 @@ func (r *BackupReconciler) handleNewPhase(
 func (r *BackupReconciler) recordBackupStatusTargets(
 	reqCtx intctrlutil.RequestCtx,
 	request *dpbackup.Request) error {
+	prepareTarget := func(target *dpv1alpha1.BackupTarget) error {
+		if err := r.prepareRequestTargetInfo(reqCtx, request, target); err != nil {
+			return err
+		}
+		request.PreparedTargets = append(request.PreparedTargets, dpbackup.PreparedTarget{
+			Target:               target,
+			TargetPods:           request.TargetPods,
+			WorkerServiceAccount: request.WorkerServiceAccount,
+		})
+		return nil
+	}
 	if request.Backup.Status.Target != nil || len(request.Backup.Status.Targets) > 0 {
 		return nil
 	}
 	buildStatusTarget := func(target *dpv1alpha1.BackupTarget) (*dpv1alpha1.BackupStatusTarget, error) {
-		if err := r.prepareRequestTargetInfo(reqCtx, request, target); err != nil {
+		if err := prepareTarget(target); err != nil {
 			return nil, err
 		}
 		var selectedTargetPods []string
@@ -542,21 +585,29 @@ func (r *BackupReconciler) patchBackupStatus(
 	} else if request.BackupPolicy.Spec.EncryptionConfig != nil {
 		request.Status.EncryptionConfig = request.BackupPolicy.Spec.EncryptionConfig
 	}
-	// init action status
-	actions, err := request.BuildActions()
-	if err != nil {
-		return err
-	}
-	for targetPodName, acts := range actions {
-		for _, act := range acts {
-			request.Status.Actions = append(request.Status.Actions, dpv1alpha1.ActionStatus{
-				Name:          act.GetName(),
-				TargetPodName: targetPodName,
-				Phase:         dpv1alpha1.ActionPhaseNew,
-				ActionType:    act.Type(),
-			})
+	var actionStatuses []dpv1alpha1.ActionStatus
+	for i := range request.PreparedTargets {
+		preparedTarget := &request.PreparedTargets[i]
+		request.Target = preparedTarget.Target
+		request.TargetPods = preparedTarget.TargetPods
+		request.WorkerServiceAccount = preparedTarget.WorkerServiceAccount
+		actions, err := request.BuildActions()
+		if err != nil {
+			return err
+		}
+		for targetPodName, acts := range actions {
+			for _, act := range acts {
+				actionStatuses = append(actionStatuses, dpv1alpha1.ActionStatus{
+					Name:          act.GetName(),
+					TargetPodName: targetPodName,
+					Phase:         dpv1alpha1.ActionPhaseNew,
+					ActionType:    act.Type(),
+					ObjectRef:     act.BuildObjectRef(),
+				})
+			}
 		}
 	}
+	request.Status.Actions = actionStatuses
 
 	// update phase to running
 	request.Status.Phase = dpv1alpha1.BackupPhaseRunning
@@ -570,7 +621,7 @@ func (r *BackupReconciler) patchBackupStatus(
 		request.Status.BaseBackupName = request.BaseBackup.Name
 	}
 
-	if err = dpbackup.SetExpirationTime(request.Backup); err != nil {
+	if err := dpbackup.SetExpirationTime(request.Backup); err != nil {
 		return err
 	}
 	return r.Client.Status().Patch(request.Ctx, request.Backup, client.MergeFrom(original))
@@ -604,6 +655,7 @@ func (r *BackupReconciler) handleRunningPhase(
 	if err = r.syncContinuousBackupEncryptionConfig(reqCtx, backup, request.BackupPolicy); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "sync continuous backup encryption config failed")
 	}
+	targets := dputils.GetBackupTargets(request.BackupPolicy, request.BackupMethod)
 	var (
 		existFailedAction bool
 		waiting           bool
@@ -614,11 +666,14 @@ func (r *BackupReconciler) handleRunningPhase(
 			Scheme:           r.Scheme,
 			RestClientConfig: r.RestConfig,
 		}
-		targets = dputils.GetBackupTargets(request.BackupPolicy, request.BackupMethod)
 	)
 	for i := range targets {
 		if err = r.prepareRequestTargetInfo(reqCtx, request, &targets[i]); err != nil {
-			return r.updateStatusIfFailed(reqCtx, backup, request.Backup, err)
+			waiting, existFailedAction, err = r.syncJobActions(reqCtx.Ctx, request.Backup, err)
+			if err != nil {
+				return r.updateStatusIfFailed(reqCtx, backup, request.Backup, err)
+			}
+			break
 		}
 		// there are actions not completed, continue to handle following actions
 		actions, err := request.BuildActions()
@@ -670,20 +725,90 @@ func (r *BackupReconciler) handleRunningPhase(
 		return r.updateStatusIfFailed(reqCtx, backup, request.Backup,
 			fmt.Errorf("there are failed actions, you can obtain the more information in the status.actions"))
 	}
-	// all actions completed, update backup status to completed
-	request.Status.Phase = dpv1alpha1.BackupPhaseCompleted
-	request.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
-	if !request.Status.StartTimestamp.IsZero() {
+	return r.completeBackup(reqCtx, backup, request.Backup)
+}
+
+func (r *BackupReconciler) syncJobActions(ctx context.Context,
+	backup *dpv1alpha1.Backup,
+	targetErr error) (waiting, failed bool, err error) {
+	if len(backup.Status.Actions) == 0 {
+		return false, false, targetErr
+	}
+
+	for i := range backup.Status.Actions {
+		actionStatus := &backup.Status.Actions[i]
+		objectRef := actionStatus.ObjectRef
+		if objectRef == nil || objectRef.APIVersion != batchv1.SchemeGroupVersion.String() ||
+			objectRef.Kind != constant.JobKind || objectRef.Namespace == "" || objectRef.Name == "" {
+			return false, false, targetErr
+		}
+
+		job := &batchv1.Job{}
+		if err := r.Client.Get(ctx, client.ObjectKey{Namespace: objectRef.Namespace, Name: objectRef.Name}, job); err != nil {
+			if apierrors.IsNotFound(err) {
+				return false, false, targetErr
+			}
+			return false, false, intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue,
+				"sync backup jobs failed: %v", err)
+		}
+		if objectRef.UID != "" && objectRef.UID != job.UID {
+			return false, false, targetErr
+		}
+		if job.Labels[dptypes.BackupNameLabelKey] != backup.Name {
+			return false, false, targetErr
+		}
+
+		_, finishedType, failureReason := dputils.IsJobFinished(job)
+		actionStatus.ActionType = dpv1alpha1.ActionTypeJob
+		actionStatus.StartTimestamp = job.CreationTimestamp.DeepCopy()
+		actionStatus.ObjectRef = &corev1.ObjectReference{
+			APIVersion: batchv1.SchemeGroupVersion.String(),
+			Kind:       constant.JobKind,
+			Namespace:  job.Namespace,
+			Name:       job.Name,
+			UID:        job.UID,
+		}
+		if !strings.HasPrefix(actionStatus.FailureReason, dptypes.LogCollectorOutput) {
+			actionStatus.FailureReason = failureReason
+		}
+
+		switch finishedType {
+		case batchv1.JobComplete:
+			actionStatus.Phase = dpv1alpha1.ActionPhaseCompleted
+		case batchv1.JobFailed:
+			actionStatus.Phase = dpv1alpha1.ActionPhaseFailed
+			failed = true
+		default:
+			actionStatus.Phase = dpv1alpha1.ActionPhaseRunning
+			actionStatus.CompletionTimestamp = nil
+			waiting = true
+			continue
+		}
+		if job.Status.CompletionTime != nil {
+			actionStatus.CompletionTimestamp = job.Status.CompletionTime.DeepCopy()
+		} else {
+			actionStatus.CompletionTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
+		}
+	}
+	updateBackupStatusByActionStatus(&backup.Status)
+	return waiting, failed, nil
+}
+
+func (r *BackupReconciler) completeBackup(reqCtx intctrlutil.RequestCtx,
+	original *dpv1alpha1.Backup,
+	backup *dpv1alpha1.Backup) (ctrl.Result, error) {
+	backup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
+	backup.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
+	if !backup.Status.StartTimestamp.IsZero() {
 		// round the duration to a multiple of seconds.
-		duration := request.Status.CompletionTimestamp.Sub(request.Status.StartTimestamp.Time).Round(time.Second)
-		request.Status.Duration = &metav1.Duration{Duration: duration}
+		duration := backup.Status.CompletionTimestamp.Sub(backup.Status.StartTimestamp.Time).Round(time.Second)
+		backup.Status.Duration = &metav1.Duration{Duration: duration}
 	}
-	err = dpbackup.SetExpirationTime(request.Backup)
-	if err != nil {
-		return r.updateStatusIfFailed(reqCtx, backup, request.Backup, fmt.Errorf("failed to set expiration time, %v", err))
+	if err := dpbackup.SetExpirationTime(backup); err != nil {
+		return r.updateStatusIfFailed(reqCtx, original, backup, fmt.Errorf("failed to set expiration time, %v", err))
 	}
-	r.Recorder.Event(backup, corev1.EventTypeNormal, "CreatedBackup", "Completed backup")
-	if err = r.Client.Status().Patch(reqCtx.Ctx, request.Backup, client.MergeFrom(backup)); err != nil {
+	r.Recorder.Event(original, corev1.EventTypeNormal, "CreatedBackup", "Completed backup")
+	if err := r.Client.Status().Patch(reqCtx.Ctx, backup, client.MergeFrom(original)); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	return intctrlutil.Reconciled()

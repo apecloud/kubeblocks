@@ -315,6 +315,44 @@ var _ = Describe("update reconciler test", func() {
 			expectUpdatedPods(tree, []string{lastPod.GetName()})
 		})
 
+		It("keeps a pending pod outside the rolling-update window untouched", func() {
+			tree := kubebuilderx.NewObjectTree()
+			its.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
+			its.Spec.InstanceUpdateStrategy = &workloads.InstanceUpdateStrategy{
+				RollingUpdate: &workloads.RollingUpdate{
+					Replicas:       ptr.To(intstr.FromInt32(1)),
+					MaxUnavailable: ptr.To(intstr.FromInt32(2)),
+				},
+			}
+			tree.SetRoot(its)
+
+			prepareForUpdate(tree)
+
+			for _, object := range tree.List(&corev1.Pod{}) {
+				pod, ok := object.(*corev1.Pod)
+				Expect(ok).Should(BeTrue())
+				pod.Labels[appsv1.ControllerRevisionHashLabelKey] = "old-revision"
+				if pod.Name == "bar-0" {
+					pod.Status.Phase = corev1.PodPending
+					continue
+				}
+				pod.Status.Phase = corev1.PodRunning
+				pod.Status.Conditions = append(pod.Status.Conditions, getPodReadyCondition())
+			}
+
+			reconciler = NewUpdateReconciler()
+			res, err := reconciler.Reconcile(tree)
+			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
+			expectUpdatedPods(tree, []string{"bar-2"})
+
+			pending := builder.NewPodBuilder(namespace, "bar-0").GetObject()
+			object, err := tree.Get(pending)
+			Expect(err).Should(BeNil())
+			Expect(object).ShouldNot(BeNil())
+			Expect(object.(*corev1.Pod).Status.Phase).Should(Equal(corev1.PodPending))
+		})
+
 		It("respects maxUnavailable with pending pods", func() {
 			// update order: bar-2, bar-1, bar-0
 			tree := kubebuilderx.NewObjectTree()

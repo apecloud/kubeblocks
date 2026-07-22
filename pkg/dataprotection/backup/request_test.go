@@ -27,6 +27,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/stretchr/testify/assert"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -69,7 +70,12 @@ func newRequestTestFixture(t *testing.T) (*Request, *corev1.Pod) {
 		Backup: &dpv1alpha1.Backup{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "backup", Namespace: "ns", UID: types.UID("1234567890abcdef"),
-				Labels: map[string]string{dptypes.ClusterUIDLabelKey: "uid", constant.AppInstanceLabelKey: "cluster", constant.KBAppComponentLabelKey: "mysql"},
+				Labels: map[string]string{
+					dptypes.ClusterUIDLabelKey:      "uid",
+					constant.AppInstanceLabelKey:    "cluster",
+					constant.KBAppComponentLabelKey: "mysql",
+					constant.AppManagedByLabelKey:   constant.AppName,
+				},
 			},
 			Spec: dpv1alpha1.BackupSpec{RetentionPeriod: "7d"},
 		},
@@ -122,6 +128,7 @@ func TestRequestBuildActionBranches(t *testing.T) {
 	assert.NoError(t, err)
 	assert.IsType(t, &action.JobAction{}, jobAction)
 	assert.Equal(t, dpv1alpha1.ActionTypeJob, jobAction.Type())
+	assert.Equal(t, dptypes.AppName, jobAction.(*action.JobAction).ObjectMeta.Labels[constant.AppManagedByLabelKey])
 }
 
 func TestRequestBuildBackupDataActions(t *testing.T) {
@@ -130,11 +137,13 @@ func TestRequestBuildBackupDataActions(t *testing.T) {
 	backupDataAction, err := req.buildBackupDataAction(pod, "backup-data")
 	assert.NoError(t, err)
 	assert.IsType(t, &action.JobAction{}, backupDataAction)
+	assert.Equal(t, dptypes.AppName, backupDataAction.(*action.JobAction).ObjectMeta.Labels[constant.AppManagedByLabelKey])
 
 	req.ActionSet.Spec.BackupType = dpv1alpha1.BackupTypeContinuous
 	backupDataAction, err = req.buildBackupDataAction(pod, "continuous")
 	assert.NoError(t, err)
 	assert.IsType(t, &action.StatefulSetAction{}, backupDataAction)
+	assert.Equal(t, dptypes.AppName, backupDataAction.(*action.StatefulSetAction).ObjectMeta.Labels[constant.AppManagedByLabelKey])
 	assert.Contains(t, req.buildContinuousSyncProgressCommand(), "retryTimes")
 
 	req.ActionSet.Spec.BackupType = dpv1alpha1.BackupType("Unknown")
@@ -143,6 +152,10 @@ func TestRequestBuildBackupDataActions(t *testing.T) {
 }
 
 func TestRequestBuildActionsIncludesPreAndPostHooks(t *testing.T) {
+	oldNamespace := viper.GetString(constant.CfgKeyCtrlrMgrNS)
+	defer viper.Set(constant.CfgKeyCtrlrMgrNS, oldNamespace)
+	viper.Set(constant.CfgKeyCtrlrMgrNS, "kb-system")
+
 	req, pod := newRequestTestFixture(t)
 	req.ActionSet = &dpv1alpha1.ActionSet{Spec: dpv1alpha1.ActionSetSpec{
 		BackupType: dpv1alpha1.BackupTypeFull,
@@ -159,6 +172,18 @@ func TestRequestBuildActionsIncludesPreAndPostHooks(t *testing.T) {
 	assert.Equal(t, dpv1alpha1.ActionTypeJob, actions[pod.Name][0].Type())
 	assert.Equal(t, dpv1alpha1.ActionTypeJob, actions[pod.Name][1].Type())
 	assert.Equal(t, dpv1alpha1.ActionTypeJob, actions[pod.Name][2].Type())
+	for i, act := range actions[pod.Name] {
+		objectRef := act.BuildObjectRef()
+		assert.NotNil(t, objectRef)
+		assert.Equal(t, batchv1.SchemeGroupVersion.String(), objectRef.APIVersion)
+		assert.Equal(t, constant.JobKind, objectRef.Kind)
+		assert.Equal(t, GenerateBackupJobName(req.Backup, act.GetName()), objectRef.Name)
+		if i == 0 {
+			assert.Equal(t, "kb-system", objectRef.Namespace)
+		} else {
+			assert.Equal(t, req.Namespace, objectRef.Namespace)
+		}
+	}
 }
 
 var _ = Describe("Request Test", func() {

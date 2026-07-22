@@ -97,7 +97,7 @@ var _ = Describe("kb-agent", func() {
 						TimeoutSeconds: 5,
 						RetryPolicy: &appsv1.RetryPolicy{
 							MaxRetries:           5,
-							RetryInterval:        10 * time.Second,
+							RetryInterval:        10,
 							RetryIntervalSeconds: &retryIntervalSeconds,
 						},
 						PreCondition: &[]appsv1.PreConditionType{appsv1.ComponentReadyPreConditionType}[0],

@@ -322,8 +322,7 @@ func setMembersStatus(its *workloads.InstanceSet, pods []*corev1.Pod) {
 
 func sortMembersStatus(membersStatus []workloads.MemberStatus, rolePriorityMap map[string]int) {
 	getRolePriorityFunc := func(i int) int {
-		role := membersStatus[i].ReplicaRole.Name
-		return rolePriorityMap[role]
+		return getRolePriority(rolePriorityMap, membersStatus[i].ReplicaRole.Name)
 	}
 	getNameNOrdinalFunc := func(i int) (string, int) {
 		return ParseParentNameAndOrdinal(membersStatus[i].PodName)

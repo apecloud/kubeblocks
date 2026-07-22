@@ -441,5 +441,20 @@ var _ = Describe("status reconciler test", func() {
 				Expect(status.PodName).Should(Equal(expectedOrder[i]))
 			}
 		})
+
+		It("should normalize mixed-case role names", func() {
+			membersStatus := []workloads.MemberStatus{
+				{PodName: "pod-0", ReplicaRole: &workloads.ReplicaRole{Name: "Follower"}},
+				{PodName: "pod-1", ReplicaRole: &workloads.ReplicaRole{Name: "Leader"}},
+			}
+			mixedCasePriorityMap := ComposeRolePriorityMap([]workloads.ReplicaRole{
+				{Name: "Follower", UpdatePriority: 1},
+				{Name: "Leader", UpdatePriority: 2},
+			})
+
+			sortMembersStatus(membersStatus, mixedCasePriorityMap)
+			Expect(membersStatus[0].PodName).Should(Equal("pod-1"))
+			Expect(membersStatus[1].PodName).Should(Equal("pod-0"))
+		})
 	})
 })

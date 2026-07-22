@@ -170,6 +170,26 @@ var _ = Describe("update plan test.", func() {
 			checkPlan(expectedPlan, true)
 		})
 
+		It("should preserve best effort parallel layers with mixed-case roles", func() {
+			its.Spec.MemberUpdateStrategy = ptr.To(workloads.BestEffortParallelUpdateStrategy)
+			its.Spec.Roles = []workloads.ReplicaRole{
+				{Name: "Follower", ParticipatesInQuorum: true, UpdatePriority: 1},
+				{Name: "Leader", ParticipatesInQuorum: true, UpdatePriority: 2},
+			}
+			for _, pod := range []*corev1.Pod{pod0, pod3, pod6} {
+				pod.Labels[RoleLabelKey] = "Follower"
+			}
+			pod5.Labels[RoleLabelKey] = "Leader"
+
+			expectedPlan := [][]*corev1.Pod{
+				{pod4, pod2, pod1},
+				{pod6},
+				{pod3, pod0},
+				{pod5},
+			}
+			checkPlan(expectedPlan, true)
+		})
+
 		It("should work well with role-less and heterogeneous pods", func() {
 			By("build a serial plan with role-less and heterogeneous pods")
 			its.Spec.MemberUpdateStrategy = ptr.To(workloads.SerialUpdateStrategy)

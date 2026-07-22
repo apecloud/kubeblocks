@@ -2204,6 +2204,7 @@ type RetryPolicy struct {
 	RetryInterval time.Duration `json:"retryInterval,omitempty"`
 
 	// Specifies the number of seconds to wait between each retry attempt.
+	// This is a convenient way to configure retryInterval in whole seconds.
 	// When set, this field takes precedence over retryInterval, including when set to 0.
 	//
 	// +kubebuilder:validation:Minimum=0

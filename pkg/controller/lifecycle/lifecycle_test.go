@@ -21,6 +21,7 @@ package lifecycle
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
@@ -125,7 +126,7 @@ var _ = Describe("lifecycle", func() {
 				TimeoutSeconds: 5,
 				RetryPolicy: &appsv1.RetryPolicy{
 					MaxRetries:           5,
-					RetryInterval:        10,
+					RetryInterval:        10 * time.Second,
 					RetryIntervalSeconds: &retryIntervalSeconds,
 				},
 			},
@@ -149,7 +150,7 @@ var _ = Describe("lifecycle", func() {
 			TimeoutSeconds: 5,
 			RetryPolicy: &appsv1.RetryPolicy{
 				MaxRetries:           5,
-				RetryInterval:        10,
+				RetryInterval:        10 * time.Second,
 				RetryIntervalSeconds: &retryIntervalSeconds,
 			},
 		}
@@ -228,6 +229,62 @@ var _ = Describe("lifecycle", func() {
 
 	It("keeps an absent retry policy absent at the kbagent boundary", func() {
 		Expect(BuildKBAgentRetryPolicy(nil)).Should(BeNil())
+	})
+
+	DescribeTable("enforces the release-branch retry interval dual-write contract",
+		func(policy *appsv1.RetryPolicy, accepted bool) {
+			componentDefinition := &appsv1.ComponentDefinition{
+				ObjectMeta: metav1.ObjectMeta{GenerateName: "retry-policy-rollback-"},
+				Spec: appsv1.ComponentDefinitionSpec{
+					Runtime: corev1.PodSpec{Containers: []corev1.Container{{Name: "db", Image: "test"}}},
+					LifecycleActions: &appsv1.ComponentLifecycleActions{
+						PostProvision: &appsv1.Action{
+							Exec:        &appsv1.ExecAction{Command: []string{"true"}},
+							RetryPolicy: policy,
+						},
+					},
+				},
+			}
+			err := k8sClient.Create(ctx, componentDefinition)
+			if accepted {
+				Expect(err).ShouldNot(HaveOccurred())
+				Expect(k8sClient.Delete(ctx, componentDefinition)).Should(Succeed())
+				return
+			}
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring("retryInterval must be set to the equivalent duration"))
+		},
+		Entry("accepts an equivalent dual write", &appsv1.RetryPolicy{
+			RetryInterval: 10 * time.Second, RetryIntervalSeconds: ptr.To[int64](10),
+		}, true),
+		Entry("accepts legacy duration only", &appsv1.RetryPolicy{
+			RetryInterval: 10 * time.Second,
+		}, true),
+		Entry("accepts explicit zero because the legacy default is equivalent", &appsv1.RetryPolicy{
+			RetryIntervalSeconds: ptr.To[int64](0),
+		}, true),
+		Entry("rejects seconds without an equivalent legacy duration", &appsv1.RetryPolicy{
+			RetryIntervalSeconds: ptr.To[int64](10),
+		}, false),
+		Entry("rejects mismatched dual writes", &appsv1.RetryPolicy{
+			RetryInterval: time.Second, RetryIntervalSeconds: ptr.To[int64](10),
+		}, false),
+	)
+
+	It("preserves the interval when a pre-backport controller decodes a dual-written policy", func() {
+		policy := &appsv1.RetryPolicy{
+			MaxRetries: 3, RetryInterval: 10 * time.Second, RetryIntervalSeconds: ptr.To[int64](10),
+		}
+		payload, err := json.Marshal(policy)
+		Expect(err).ShouldNot(HaveOccurred())
+
+		var legacyPolicy struct {
+			MaxRetries    int           `json:"maxRetries,omitempty"`
+			RetryInterval time.Duration `json:"retryInterval,omitempty"`
+		}
+		Expect(json.Unmarshal(payload, &legacyPolicy)).Should(Succeed())
+		Expect(legacyPolicy.MaxRetries).Should(Equal(policy.MaxRetries))
+		Expect(legacyPolicy.RetryInterval).Should(Equal(10 * time.Second))
 	})
 
 	Context("call action", func() {

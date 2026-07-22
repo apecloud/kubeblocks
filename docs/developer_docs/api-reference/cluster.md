@@ -10687,7 +10687,8 @@ int64
 <em>(Optional)</em>
 <p>Specifies the number of seconds to wait between each retry attempt.
 This is a convenient way to configure retryInterval in whole seconds.
-When set, this field takes precedence over retryInterval, including when set to 0.</p>
+When set, this field takes precedence over retryInterval, including when set to 0.
+For rollback compatibility with earlier controller versions, retryInterval must also be set to the equivalent duration.</p>
 </td>
 </tr>
 </tbody>

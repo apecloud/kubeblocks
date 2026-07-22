@@ -2169,6 +2169,7 @@ const (
 	OrdinalSelector TargetPodSelector = "Ordinal"
 )
 
+// RetryPolicy defines retry attempts and the interval between them for an Action.
 // +kubebuilder:validation:XValidation:rule="!has(self.retryIntervalSeconds) || self.retryInterval == self.retryIntervalSeconds * 1000000000",message="retryInterval must be set to the equivalent duration when retryIntervalSeconds is set"
 type RetryPolicy struct {
 	// Defines the maximum number of retry attempts that should be made for a given Action.

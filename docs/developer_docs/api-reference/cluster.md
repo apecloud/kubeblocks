@@ -10640,6 +10640,7 @@ NamedVar
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.Action">Action</a>)
 </p>
 <div>
+<p>RetryPolicy defines retry attempts and the interval between them for an Action.</p>
 </div>
 <table>
 <thead>

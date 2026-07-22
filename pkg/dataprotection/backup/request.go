@@ -59,6 +59,7 @@ type Request struct {
 	BackupMethod         *dpv1alpha1.BackupMethod
 	ActionSet            *dpv1alpha1.ActionSet
 	TargetPods           []*corev1.Pod
+	PreparedTargets      []PreparedTarget
 	BackupRepoPVC        *corev1.PersistentVolumeClaim
 	BackupRepo           *dpv1alpha1.BackupRepo
 	ToolConfigSecret     *corev1.Secret
@@ -67,6 +68,12 @@ type Request struct {
 	Target               *dpv1alpha1.BackupTarget
 	ParentBackup         *dpv1alpha1.Backup
 	BaseBackup           *dpv1alpha1.Backup
+}
+
+type PreparedTarget struct {
+	Target               *dpv1alpha1.BackupTarget
+	TargetPods           []*corev1.Pod
+	WorkerServiceAccount string
 }
 
 func (r *Request) GetBackupType() string {

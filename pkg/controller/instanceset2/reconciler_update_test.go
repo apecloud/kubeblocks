@@ -26,8 +26,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
 
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
+	"github.com/apecloud/kubeblocks/pkg/controller/rollingupdate"
 )
 
 func TestUpdateReconcilerCommitsStableWindowBeforeUpdatingInstances(t *testing.T) {
@@ -127,5 +129,73 @@ func TestUpdateReconcilerCommitsStableWindowBeforeUpdatingInstances(t *testing.T
 	}
 	if revision := getInstanceRevision(second.(*workloads.Instance)); revision != "old-revision" {
 		t.Fatalf("newly prioritized instance %s escaped the persisted window", names[1])
+	}
+}
+
+func TestUpdateReconcilerResetsWindowWhenLeavingRollingUpdate(t *testing.T) {
+	its := &workloads.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-its",
+			Namespace: "default",
+			Annotations: map[string]string{
+				rollingupdate.WindowAnnotationKey: `{"rolloutID":"old","replicas":1,"participants":["test-its-0"]}`,
+			},
+		},
+		Spec: workloads.InstanceSetSpec{
+			Replicas: ptr.To[int32](2),
+			InstanceUpdateStrategy: &workloads.InstanceUpdateStrategy{
+				Type: kbappsv1.OnDeleteStrategyType,
+			},
+		},
+	}
+	tree := kubebuilderx.NewObjectTree()
+	tree.SetRoot(its)
+	desired, names, err := buildDesiredInstancesByName(tree, its)
+	if err != nil {
+		t.Fatalf("build desired instances: %v", err)
+	}
+	for _, name := range names {
+		if err := tree.Add(desired[name]); err != nil {
+			t.Fatalf("add instance %s: %v", name, err)
+		}
+	}
+
+	reconciler := NewUpdateReconciler()
+	result, err := reconciler.Reconcile(tree)
+	if err != nil {
+		t.Fatalf("reset window for OnDelete: %v", err)
+	}
+	if result != kubebuilderx.Commit {
+		t.Fatalf("expected window reset commit, got %#v", result)
+	}
+	if _, ok := its.Annotations[rollingupdate.WindowAnnotationKey]; ok {
+		t.Fatal("expected OnDelete to remove the persisted window")
+	}
+
+	result, err = reconciler.Reconcile(tree)
+	if err != nil {
+		t.Fatalf("reconcile OnDelete without window: %v", err)
+	}
+	if result != kubebuilderx.Continue {
+		t.Fatalf("expected OnDelete without window to continue, got %#v", result)
+	}
+
+	its.Spec.InstanceUpdateStrategy = &workloads.InstanceUpdateStrategy{
+		RollingUpdate: &workloads.RollingUpdate{
+			Replicas: ptr.To(intstr.FromInt32(1)),
+		},
+	}
+	if _, err := NewRevisionUpdateReconciler().Reconcile(tree); err != nil {
+		t.Fatalf("update desired revisions: %v", err)
+	}
+	result, err = reconciler.Reconcile(tree)
+	if err != nil {
+		t.Fatalf("start a fresh rolling-update window: %v", err)
+	}
+	if result != kubebuilderx.Commit {
+		t.Fatalf("expected fresh window commit, got %#v", result)
+	}
+	if _, ok := its.Annotations[rollingupdate.WindowAnnotationKey]; !ok {
+		t.Fatal("expected RollingUpdate to create a fresh window")
 	}
 }

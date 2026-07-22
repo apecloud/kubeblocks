@@ -28,7 +28,8 @@ import (
 
 func TestParticipantsRemainStable(t *testing.T) {
 	owner := &metav1.PartialObjectMetadata{}
-	got, changed := Participants(owner, "2", 1, []string{"a", "b", "c"})
+	revisions := map[string]string{"a": "2", "b": "2", "c": "2"}
+	got, changed := Participants(owner, revisions, 1, []string{"a", "b", "c"})
 	if !got.Equal(sets.New("a")) {
 		t.Fatalf("expected initial participant a, got %v", got)
 	}
@@ -36,7 +37,7 @@ func TestParticipantsRemainStable(t *testing.T) {
 		t.Fatal("expected initial window to require persistence")
 	}
 
-	got, changed = Participants(owner, "2", 1, []string{"b", "a", "c"})
+	got, changed = Participants(owner, revisions, 1, []string{"b", "a", "c"})
 	if !got.Equal(sets.New("a")) {
 		t.Fatalf("expected participant a after reorder, got %v", got)
 	}
@@ -44,7 +45,8 @@ func TestParticipantsRemainStable(t *testing.T) {
 		t.Fatal("expected a valid saved window to remain unchanged")
 	}
 
-	got, changed = Participants(owner, "3", 1, []string{"b", "a", "c"})
+	revisions["a"] = "3"
+	got, changed = Participants(owner, revisions, 1, []string{"b", "a", "c"})
 	if !got.Equal(sets.New("b")) {
 		t.Fatalf("expected new rollout to select b, got %v", got)
 	}
@@ -53,20 +55,79 @@ func TestParticipantsRemainStable(t *testing.T) {
 	}
 }
 
-func TestParticipantsResetForReplicaChangeAndInvalidState(t *testing.T) {
+func TestParticipantsPreserveAdmissionAcrossReplicaChanges(t *testing.T) {
 	owner := &metav1.PartialObjectMetadata{}
-	_, _ = Participants(owner, "2", 1, []string{"a", "b", "c"})
+	revisions := map[string]string{"a": "2", "b": "2", "c": "2"}
+	_, _ = Participants(owner, revisions, 1, []string{"a", "b", "c"})
 
-	got, changed := Participants(owner, "2", 2, []string{"b", "a", "c"})
-	if !got.Equal(sets.New("b", "a")) {
-		t.Fatalf("expected replica change to rebuild window, got %v", got)
+	got, changed := Participants(owner, revisions, 2, []string{"b", "c", "a"})
+	if !got.Equal(sets.New("a", "b")) {
+		t.Fatalf("expected quota increase to retain a and add b, got %v", got)
 	}
 	if !changed {
-		t.Fatal("expected replica change to require persistence")
+		t.Fatal("expected quota increase to require persistence")
 	}
 
+	got, changed = Participants(owner, revisions, 1, []string{"c", "b", "a"})
+	if !got.Equal(sets.New("a")) {
+		t.Fatalf("expected quota decrease not to admit c, got %v", got)
+	}
+	if !changed {
+		t.Fatal("expected quota decrease to require persistence")
+	}
+
+	got, changed = Participants(owner, revisions, 2, []string{"c", "b", "a"})
+	if !got.Equal(sets.New("a", "b")) {
+		t.Fatalf("expected quota increase to reuse admitted identities, got %v", got)
+	}
+	if !changed {
+		t.Fatal("expected quota increase to require persistence")
+	}
+}
+
+func TestParticipantsPreserveAdmissionAcrossNameSetChanges(t *testing.T) {
+	owner := &metav1.PartialObjectMetadata{}
+	revisions := map[string]string{"a": "2", "b": "2", "c": "2"}
+	_, _ = Participants(owner, revisions, 1, []string{"a", "b", "c"})
+
+	// Scale out and reorder without changing any surviving desired revision.
+	revisions["d"] = "2"
+	got, changed := Participants(owner, revisions, 1, []string{"b", "c", "d", "a"})
+	if !got.Equal(sets.New("a")) {
+		t.Fatalf("expected scale-out to retain a, got %v", got)
+	}
+	if !changed {
+		t.Fatal("expected scale-out revision snapshot to require persistence")
+	}
+
+	// Scale in an unrelated identity and reorder again.
+	delete(revisions, "b")
+	got, changed = Participants(owner, revisions, 1, []string{"c", "d", "a"})
+	if !got.Equal(sets.New("a")) {
+		t.Fatalf("expected scale-in to retain a, got %v", got)
+	}
+	if !changed {
+		t.Fatal("expected scale-in revision snapshot to require persistence")
+	}
+
+	// A desired revision change on a surviving identity starts a new rollout.
+	revisions["c"] = "3"
+	got, changed = Participants(owner, revisions, 1, []string{"c", "d", "a"})
+	if !got.Equal(sets.New("c")) {
+		t.Fatalf("expected revision change to rebuild the window with c, got %v", got)
+	}
+	if !changed {
+		t.Fatal("expected revision change to require persistence")
+	}
+}
+
+func TestParticipantsResetInvalidStateAndRemoveFullWindow(t *testing.T) {
+	owner := &metav1.PartialObjectMetadata{}
+	revisions := map[string]string{"a": "2", "b": "2", "c": "2"}
+	_, _ = Participants(owner, revisions, 1, []string{"a", "b", "c"})
+
 	owner.Annotations[WindowAnnotationKey] = "invalid"
-	got, changed = Participants(owner, "2", 1, []string{"c", "b", "a"})
+	got, changed := Participants(owner, revisions, 1, []string{"c", "b", "a"})
 	if !got.Equal(sets.New("c")) {
 		t.Fatalf("expected invalid state to be rebuilt, got %v", got)
 	}
@@ -74,7 +135,7 @@ func TestParticipantsResetForReplicaChangeAndInvalidState(t *testing.T) {
 		t.Fatal("expected invalid state to require persistence")
 	}
 
-	got, changed = Participants(owner, "2", 3, []string{"c", "b", "a"})
+	got, changed = Participants(owner, revisions, 3, []string{"c", "b", "a"})
 	if !got.Equal(sets.New("a", "b", "c")) {
 		t.Fatalf("expected all participants, got %v", got)
 	}
@@ -97,17 +158,28 @@ func TestRolloutIDUsesDesiredRevisionsInsteadOfGeneration(t *testing.T) {
 	}
 
 	owner := &metav1.PartialObjectMetadata{ObjectMeta: metav1.ObjectMeta{Generation: 1}}
-	got, changed := Participants(owner, rolloutID, 1, []string{"a", "b"})
+	got, changed := Participants(owner, revisions, 1, []string{"a", "b"})
 	if !got.Equal(sets.New("a")) || !changed {
 		t.Fatalf("expected initial participant a to require persistence, got %v, changed %t", got, changed)
 	}
 
 	owner.Generation = 2
-	got, changed = Participants(owner, RolloutID(revisions), 1, []string{"b", "a"})
+	got, changed = Participants(owner, revisions, 1, []string{"b", "a"})
 	if !got.Equal(sets.New("a")) {
 		t.Fatalf("expected generation-only change to keep participant a, got %v", got)
 	}
 	if changed {
 		t.Fatal("expected generation-only change not to reset the saved window")
+	}
+}
+
+func TestReset(t *testing.T) {
+	owner := &metav1.PartialObjectMetadata{}
+	_, _ = Participants(owner, map[string]string{"a": "2", "b": "2"}, 1, []string{"a", "b"})
+	if !Reset(owner) {
+		t.Fatal("expected a persisted window to be removed")
+	}
+	if Reset(owner) {
+		t.Fatal("expected resetting an absent window to be a no-op")
 	}
 }

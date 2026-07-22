@@ -48,6 +48,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
+	"github.com/apecloud/kubeblocks/pkg/controller/rollingupdate"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -256,10 +257,32 @@ var _ = Describe("update reconciler test", func() {
 			root.Spec.InstanceUpdateStrategy = &workloads.InstanceUpdateStrategy{
 				Type: kbappsv1.OnDeleteStrategyType,
 			}
+			if root.Annotations == nil {
+				root.Annotations = map[string]string{}
+			}
+			root.Annotations[rollingupdate.WindowAnnotationKey] = `{"rolloutID":"old","replicas":1,"participants":["bar-0"]}`
+			res, err = reconciler.Reconcile(onDeleteTree)
+			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Commit))
+			Expect(root.Annotations).ShouldNot(HaveKey(rollingupdate.WindowAnnotationKey))
+			expectUpdatedPods(onDeleteTree, []string{})
+
 			res, err = reconciler.Reconcile(onDeleteTree)
 			Expect(err).Should(BeNil())
 			Expect(res).Should(Equal(kubebuilderx.Continue))
 			expectUpdatedPods(onDeleteTree, []string{})
+
+			By("start a fresh window after switching back to RollingUpdate")
+			root.Spec.InstanceUpdateStrategy = &workloads.InstanceUpdateStrategy{
+				RollingUpdate: &workloads.RollingUpdate{
+					Replicas:       &updateReplicas,
+					MaxUnavailable: &maxUnavailable,
+				},
+			}
+			res, err = reconciler.Reconcile(onDeleteTree)
+			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Commit))
+			Expect(root.Annotations).Should(HaveKey(rollingupdate.WindowAnnotationKey))
 
 			// order: bar-hello-0, bar-foo-1, bar-foo-0, bar-3, bar-2, bar-1, bar-0
 			// expected: bar-hello-0 being deleted

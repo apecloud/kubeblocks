@@ -55,6 +55,14 @@ func (r *updateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 
 func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
+	// OnDelete ends the rolling-update lifecycle even while the instance set is
+	// temporarily unaligned (for example, during scaling).
+	if its.Spec.InstanceUpdateStrategy != nil && its.Spec.InstanceUpdateStrategy.Type == kbappsv1.OnDeleteStrategyType {
+		if rollingupdate.Reset(its) {
+			return kubebuilderx.Commit, nil
+		}
+		return kubebuilderx.Continue, nil
+	}
 	itsExt, err := instancetemplate.BuildInstanceSetExt(its, tree)
 	if err != nil {
 		return kubebuilderx.Continue, err
@@ -92,10 +100,6 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 
 	// 3. do update
 	instanceUpdateStrategy := its.Spec.InstanceUpdateStrategy
-	if instanceUpdateStrategy != nil && instanceUpdateStrategy.Type == kbappsv1.OnDeleteStrategyType {
-		instanceUpdateStrategy = nil
-	}
-
 	// handle 'RollingUpdate'
 	replicas, maxUnavailable, err := parseReplicasNMaxUnavailable(instanceUpdateStrategy, len(oldInstanceList))
 	if err != nil {
@@ -131,8 +135,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}
-	participants, windowChanged := rollingupdate.Participants(its,
-		rollingupdate.RolloutID(updateRevisions), replicas, orderedNames)
+	participants, windowChanged := rollingupdate.Participants(its, updateRevisions, replicas, orderedNames)
 	if windowChanged {
 		return kubebuilderx.Commit, nil
 	}

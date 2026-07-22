@@ -79,6 +79,7 @@ var _ = Describe("kb-agent", func() {
 
 	Context("build kb-agent", func() {
 		BeforeEach(func() {
+			retryIntervalSeconds := int64(10)
 			synthesizedComp = &SynthesizedComponent{
 				PodSpec: &corev1.PodSpec{
 					Containers: []corev1.Container{
@@ -96,8 +97,9 @@ var _ = Describe("kb-agent", func() {
 							},
 							TimeoutSeconds: 5,
 							RetryPolicy: &appsv1.RetryPolicy{
-								MaxRetries:    5,
-								RetryInterval: 10,
+								MaxRetries:           5,
+								RetryInterval:        10,
+								RetryIntervalSeconds: &retryIntervalSeconds,
 							},
 							PreCondition: &[]appsv1.PreConditionType{appsv1.ComponentReadyPreConditionType}[0],
 						},
@@ -171,6 +173,34 @@ var _ = Describe("kb-agent", func() {
 			c := kbAgentContainer()
 			Expect(c).ShouldNot(BeNil())
 			Expect(c.Env).Should(HaveLen(6)) // 4 + 2
+		})
+
+		It("normalizes explicit retry seconds before serializing kbagent actions", func() {
+			err := buildKBAgentContainer(synthesizedComp)
+			Expect(err).Should(BeNil())
+
+			c := kbAgentContainer()
+			Expect(c).ShouldNot(BeNil())
+			var actions []proto.Action
+			var actionsJSON string
+			for _, e := range c.Env {
+				if e.Name == "KB_AGENT_ACTION" {
+					actionsJSON = e.Value
+					Expect(json.Unmarshal([]byte(e.Value), &actions)).Should(Succeed())
+				}
+			}
+			Expect(actionsJSON).ShouldNot(ContainSubstring("retryIntervalSeconds"))
+
+			var postProvision *proto.Action
+			for i := range actions {
+				if actions[i].Name == "postProvision" {
+					postProvision = &actions[i]
+					break
+				}
+			}
+			Expect(postProvision).ShouldNot(BeNil())
+			Expect(postProvision.RetryPolicy).ShouldNot(BeNil())
+			Expect(postProvision.RetryPolicy.RetryInterval).Should(Equal(10 * time.Second))
 		})
 
 		It("role label downward api volume", func() {

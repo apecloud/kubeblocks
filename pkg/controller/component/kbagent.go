@@ -428,10 +428,7 @@ func buildAction4KBAgent(action *appsv1.Action, name string) *proto.Action {
 		}
 	}
 	if action.RetryPolicy != nil {
-		a.RetryPolicy = proto.NewRetryPolicy(
-			action.RetryPolicy.MaxRetries,
-			action.RetryPolicy.RetryInterval,
-			action.RetryPolicy.RetryIntervalSeconds)
+		a.RetryPolicy = lifecycle.BuildKBAgentRetryPolicy(action.RetryPolicy)
 	}
 	return a
 }

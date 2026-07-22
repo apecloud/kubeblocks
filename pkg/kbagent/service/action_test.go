@@ -220,45 +220,5 @@ var _ = Describe("action", func() {
 			Expect(err).Should(BeNil())
 			Expect(string(counter)).Should(Equal("2\n"))
 		})
-
-		DescribeTable("honors the explicit retry interval in seconds",
-			func(requestOverride bool) {
-				f, err := os.CreateTemp("", "kbagent-retry-interval-*")
-				Expect(err).Should(BeNil())
-				counterPath := f.Name()
-				Expect(f.Close()).Should(Succeed())
-				defer os.Remove(counterPath)
-
-				action := newRetryAction("retry-interval", counterPath, 1)
-				seconds := int64(1)
-				policy := &proto.RetryPolicy{MaxRetries: 1, RetryIntervalSeconds: &seconds}
-				req := &proto.ActionRequest{Action: action.Name}
-				if requestOverride {
-					action.RetryPolicy = nil
-					req.RetryPolicy = policy
-				} else {
-					action.RetryPolicy = policy
-				}
-
-				svc, err := newActionService(logr.Discard(), []proto.Action{action})
-				Expect(err).Should(BeNil())
-				requestCtx, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
-				defer cancel()
-
-				_, err = svc.handleRequest(requestCtx, req)
-				Expect(errors.Is(err, context.DeadlineExceeded)).Should(BeTrue())
-
-				counter, err := os.ReadFile(counterPath)
-				Expect(err).Should(BeNil())
-				Expect(string(counter)).Should(Equal("1\n"))
-			},
-			Entry("from the action policy", false),
-			Entry("from a request override", true),
-		)
-
-		It("preserves the legacy duration wire contract", func() {
-			policy := &proto.RetryPolicy{RetryInterval: time.Second}
-			Expect(policy.Interval()).Should(Equal(time.Second))
-		})
 	})
 })

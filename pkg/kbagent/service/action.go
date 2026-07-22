@@ -216,7 +216,7 @@ func callActionWithRetryOnce(ctx context.Context, action *proto.Action, paramete
 		return output, err
 	}
 
-	interval := retryPolicy.Interval()
+	interval := retryPolicy.RetryInterval
 	for i := 0; i < retryPolicy.MaxRetries; i++ {
 		if interval > 0 {
 			select {

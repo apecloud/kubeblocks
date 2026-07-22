@@ -175,18 +175,21 @@ var _ = Describe("kb-agent", func() {
 			Expect(c.Env).Should(HaveLen(6)) // 4 + 2
 		})
 
-		It("publishes explicit retry seconds with a legacy duration fallback", func() {
+		It("normalizes explicit retry seconds before serializing kbagent actions", func() {
 			err := buildKBAgentContainer(synthesizedComp)
 			Expect(err).Should(BeNil())
 
 			c := kbAgentContainer()
 			Expect(c).ShouldNot(BeNil())
 			var actions []proto.Action
+			var actionsJSON string
 			for _, e := range c.Env {
 				if e.Name == "KB_AGENT_ACTION" {
+					actionsJSON = e.Value
 					Expect(json.Unmarshal([]byte(e.Value), &actions)).Should(Succeed())
 				}
 			}
+			Expect(actionsJSON).ShouldNot(ContainSubstring("retryIntervalSeconds"))
 
 			var postProvision *proto.Action
 			for i := range actions {
@@ -198,8 +201,6 @@ var _ = Describe("kb-agent", func() {
 			Expect(postProvision).ShouldNot(BeNil())
 			Expect(postProvision.RetryPolicy).ShouldNot(BeNil())
 			Expect(postProvision.RetryPolicy.RetryInterval).Should(Equal(10 * time.Second))
-			Expect(postProvision.RetryPolicy.RetryIntervalSeconds).ShouldNot(BeNil())
-			Expect(*postProvision.RetryPolicy.RetryIntervalSeconds).Should(Equal(int64(10)))
 		})
 
 		It("role label downward api volume", func() {

@@ -113,7 +113,7 @@ func isUnsignedByBounds(prop apiextensionsv1.JSONSchemaProps) bool {
 		prop.Maximum != nil && *prop.Maximum > math.Exp2(63)
 }
 
-// stripIntegerOverflow removes Maximum from integer properties whose Maximum
+// stripIntegerOverflow removes Maximum from integer schemas whose Maximum
 // >= 2^63. kube-openapi internally converts float64 Maximum to int64;
 // float64(MaxInt64) rounds to 2^63 and float64(MaxUint64) rounds to 2^64,
 // both of which overflow int64. User-declared maximums that were stripped
@@ -122,25 +122,70 @@ func stripIntegerOverflow(schema *apiextensionsv1.JSONSchemaProps) *apiextension
 	if schema == nil {
 		return nil
 	}
-	needsCopy := false
-	for _, prop := range schema.Properties {
-		if prop.Type == "integer" && prop.Maximum != nil && *prop.Maximum >= math.Exp2(63) {
-			needsCopy = true
-			break
-		}
-	}
-	if !needsCopy {
+	if !hasIntegerOverflowMaximum(schema) {
 		return schema
 	}
 	out := schema.DeepCopy()
-	for k, prop := range out.Properties {
-		if prop.Type == "integer" && prop.Maximum != nil && *prop.Maximum >= math.Exp2(63) {
-			prop.Maximum = nil
-			prop.ExclusiveMaximum = false
-			out.Properties[k] = prop
+	stripIntegerOverflowMaximum(out)
+	return out
+}
+
+func hasIntegerOverflowMaximum(schema *apiextensionsv1.JSONSchemaProps) bool {
+	if schema.Type == "integer" && schema.Maximum != nil && *schema.Maximum >= math.Exp2(63) {
+		return true
+	}
+	for i := range schema.AllOf {
+		if hasIntegerOverflowMaximum(&schema.AllOf[i]) {
+			return true
 		}
 	}
-	return out
+	for k := range schema.Properties {
+		prop := schema.Properties[k]
+		if hasIntegerOverflowMaximum(&prop) {
+			return true
+		}
+	}
+	if schema.AdditionalProperties != nil && schema.AdditionalProperties.Schema != nil &&
+		hasIntegerOverflowMaximum(schema.AdditionalProperties.Schema) {
+		return true
+	}
+	if schema.Items != nil {
+		if schema.Items.Schema != nil && hasIntegerOverflowMaximum(schema.Items.Schema) {
+			return true
+		}
+		for i := range schema.Items.JSONSchemas {
+			if hasIntegerOverflowMaximum(&schema.Items.JSONSchemas[i]) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func stripIntegerOverflowMaximum(schema *apiextensionsv1.JSONSchemaProps) {
+	if schema.Type == "integer" && schema.Maximum != nil && *schema.Maximum >= math.Exp2(63) {
+		schema.Maximum = nil
+		schema.ExclusiveMaximum = false
+	}
+	for i := range schema.AllOf {
+		stripIntegerOverflowMaximum(&schema.AllOf[i])
+	}
+	for k := range schema.Properties {
+		prop := schema.Properties[k]
+		stripIntegerOverflowMaximum(&prop)
+		schema.Properties[k] = prop
+	}
+	if schema.AdditionalProperties != nil && schema.AdditionalProperties.Schema != nil {
+		stripIntegerOverflowMaximum(schema.AdditionalProperties.Schema)
+	}
+	if schema.Items != nil {
+		if schema.Items.Schema != nil {
+			stripIntegerOverflowMaximum(schema.Items.Schema)
+		}
+		for i := range schema.Items.JSONSchemas {
+			stripIntegerOverflowMaximum(&schema.Items.JSONSchemas[i])
+		}
+	}
 }
 
 // validateLargeIntegerBounds enforces original Maximum for integer properties
@@ -148,36 +193,87 @@ func stripIntegerOverflow(schema *apiextensionsv1.JSONSchemaProps) *apiextension
 // kube-openapi int64 overflow). CUE type extrema (2^63 for int64, 2^64 for
 // uint64) are skipped because ParseInt/ParseUint already enforce type range.
 func validateLargeIntegerBounds(schema *apiextensionsv1.JSONSchemaProps, data interface{}) error {
-	dataMap, ok := data.(map[string]interface{})
-	if !ok {
+	return validateLargeIntegerBoundsAt(schema, data, "")
+}
+
+func validateLargeIntegerBoundsAt(schema *apiextensionsv1.JSONSchemaProps, data interface{}, path string) error {
+	if schema == nil {
 		return nil
 	}
-	for k, prop := range schema.Properties {
-		if prop.Type != "integer" || prop.Maximum == nil || *prop.Maximum < math.Exp2(63) {
-			continue
-		}
-		if *prop.Maximum == math.Exp2(63) || *prop.Maximum == math.Exp2(64) {
-			continue
-		}
-		val, exists := dataMap[k]
-		if !exists {
-			continue
-		}
-		f, ok := toFloat64(val)
-		if !ok {
-			continue
-		}
-		if prop.ExclusiveMaximum {
-			if f >= *prop.Maximum {
-				return fmt.Errorf("%s: must be less than %g", k, *prop.Maximum)
+	if schema.Type == "integer" && schema.Maximum != nil && *schema.Maximum >= math.Exp2(63) &&
+		*schema.Maximum != math.Exp2(63) && *schema.Maximum != math.Exp2(64) {
+		if f, ok := toFloat64(data); ok {
+			if schema.ExclusiveMaximum && f >= *schema.Maximum {
+				return fmt.Errorf("%s: must be less than %g", schemaPath(path), *schema.Maximum)
 			}
-		} else {
-			if f > *prop.Maximum {
-				return fmt.Errorf("%s: must be less than or equal to %g", k, *prop.Maximum)
+			if !schema.ExclusiveMaximum && f > *schema.Maximum {
+				return fmt.Errorf("%s: must be less than or equal to %g", schemaPath(path), *schema.Maximum)
 			}
+		}
+	}
+	for i := range schema.AllOf {
+		if err := validateLargeIntegerBoundsAt(&schema.AllOf[i], data, path); err != nil {
+			return err
+		}
+	}
+	dataMap, ok := data.(map[string]interface{})
+	if ok {
+		for k := range schema.Properties {
+			val, exists := dataMap[k]
+			if !exists {
+				continue
+			}
+			prop := schema.Properties[k]
+			if err := validateLargeIntegerBoundsAt(&prop, val, childSchemaPath(path, k)); err != nil {
+				return err
+			}
+		}
+		if schema.AdditionalProperties != nil && schema.AdditionalProperties.Schema != nil {
+			for k, val := range dataMap {
+				if _, defined := schema.Properties[k]; defined {
+					continue
+				}
+				if err := validateLargeIntegerBoundsAt(schema.AdditionalProperties.Schema, val, childSchemaPath(path, k)); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	dataSlice, ok := data.([]interface{})
+	if !ok || schema.Items == nil {
+		return nil
+	}
+	if schema.Items.Schema != nil {
+		for i, val := range dataSlice {
+			if err := validateLargeIntegerBoundsAt(schema.Items.Schema, val, fmt.Sprintf("%s[%d]", schemaPath(path), i)); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	for i := range schema.Items.JSONSchemas {
+		if i >= len(dataSlice) {
+			break
+		}
+		if err := validateLargeIntegerBoundsAt(&schema.Items.JSONSchemas[i], dataSlice[i], fmt.Sprintf("%s[%d]", schemaPath(path), i)); err != nil {
+			return err
 		}
 	}
 	return nil
+}
+
+func childSchemaPath(path, child string) string {
+	if path == "" {
+		return child
+	}
+	return path + "." + child
+}
+
+func schemaPath(path string) string {
+	if path == "" {
+		return "value"
+	}
+	return path
 }
 
 func toFloat64(val interface{}) (float64, bool) {

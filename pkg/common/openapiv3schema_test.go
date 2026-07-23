@@ -166,6 +166,12 @@ func TestStripIntegerOverflow(t *testing.T) {
 				Type:    "integer",
 				Minimum: ptrFloat64(0),
 				Maximum: ptrFloat64(float64(math.MaxUint64)),
+				AllOf: []apiextensionsv1.JSONSchemaProps{
+					{
+						Type:    "integer",
+						Maximum: ptrFloat64(math.Exp2(64)),
+					},
+				},
 			},
 			"i64_field": {
 				Type:    "integer",
@@ -181,12 +187,29 @@ func TestStripIntegerOverflow(t *testing.T) {
 				Minimum: ptrFloat64(0),
 				Maximum: ptrFloat64(1000),
 			},
+			"array_field": {
+				Type: "array",
+				Items: &apiextensionsv1.JSONSchemaPropsOrArray{Schema: &apiextensionsv1.JSONSchemaProps{
+					Type:    "integer",
+					Maximum: ptrFloat64(math.Exp2(64)),
+				}},
+			},
+			"map_field": {
+				Type: "object",
+				AdditionalProperties: &apiextensionsv1.JSONSchemaPropsOrBool{Allows: true, Schema: &apiextensionsv1.JSONSchemaProps{
+					Type:    "integer",
+					Maximum: ptrFloat64(math.Exp2(64)),
+				}},
+			},
 		},
 	}
 
 	result := stripIntegerOverflow(schema)
 	if result.Properties["u64_field"].Maximum != nil {
 		t.Fatalf("expected u64_field Maximum to be stripped (overflow)")
+	}
+	if result.Properties["u64_field"].AllOf[0].Maximum != nil {
+		t.Fatalf("expected composed u64_field Maximum to be stripped (overflow)")
 	}
 	if result.Properties["i64_field"].Maximum == nil || *result.Properties["i64_field"].Maximum != 100 {
 		t.Fatalf("expected i64_field Maximum to be preserved")
@@ -197,8 +220,23 @@ func TestStripIntegerOverflow(t *testing.T) {
 	if result.Properties["custom_small"].Maximum == nil || *result.Properties["custom_small"].Maximum != 1000 {
 		t.Fatalf("expected custom_small Maximum to be preserved (below 2^63)")
 	}
+	if result.Properties["array_field"].Items.Schema.Maximum != nil {
+		t.Fatalf("expected array item Maximum to be stripped (overflow)")
+	}
+	if result.Properties["map_field"].AdditionalProperties.Schema.Maximum != nil {
+		t.Fatalf("expected map value Maximum to be stripped (overflow)")
+	}
 	if schema.Properties["u64_field"].Maximum == nil {
 		t.Fatalf("expected original schema to be unchanged")
+	}
+	if schema.Properties["u64_field"].AllOf[0].Maximum == nil {
+		t.Fatalf("expected original composed schema to be unchanged")
+	}
+	if schema.Properties["array_field"].Items.Schema.Maximum == nil {
+		t.Fatalf("expected original array schema to be unchanged")
+	}
+	if schema.Properties["map_field"].AdditionalProperties.Schema.Maximum == nil {
+		t.Fatalf("expected original map schema to be unchanged")
 	}
 }
 
@@ -267,6 +305,36 @@ func TestValidateLargeIntegerBounds(t *testing.T) {
 	if err := validateLargeIntegerBounds(schema, map[string]interface{}{"custom_max": int(100)}); err != nil {
 		t.Fatalf("expected int value within user max to pass, got %v", err)
 	}
+
+	nestedSchema := &apiextensionsv1.JSONSchemaProps{
+		Type: "object",
+		Properties: map[string]apiextensionsv1.JSONSchemaProps{
+			"values": {
+				Type: "array",
+				Items: &apiextensionsv1.JSONSchemaPropsOrArray{Schema: &apiextensionsv1.JSONSchemaProps{
+					Type:    "integer",
+					Maximum: &userMax,
+				}},
+			},
+			"labels": {
+				Type: "object",
+				AdditionalProperties: &apiextensionsv1.JSONSchemaPropsOrBool{Schema: &apiextensionsv1.JSONSchemaProps{
+					Type:    "integer",
+					Maximum: &userMax,
+				}},
+			},
+		},
+	}
+	if err := validateLargeIntegerBounds(nestedSchema, map[string]interface{}{
+		"values": []interface{}{uint64(11e18)},
+	}); err == nil {
+		t.Fatalf("expected nested array value above user max to be rejected")
+	}
+	if err := validateLargeIntegerBounds(nestedSchema, map[string]interface{}{
+		"labels": map[string]interface{}{"entry": uint64(11e18)},
+	}); err == nil {
+		t.Fatalf("expected nested map value above user max to be rejected")
+	}
 }
 
 func TestValidateDataWithSchemaUserDeclaredLargeMax(t *testing.T) {
@@ -289,6 +357,69 @@ func TestValidateDataWithSchemaUserDeclaredLargeMax(t *testing.T) {
 	// Value above user max fails end-to-end
 	if err := ValidateDataWithSchema(schema, map[string]interface{}{"max_items": uint64(11e18)}); err == nil {
 		t.Fatalf("expected value above user-declared max to be rejected")
+	}
+}
+
+func TestValidateDataWithSchemaNestedUserDeclaredLargeMax(t *testing.T) {
+	userMax := float64(1e19)
+	tests := []struct {
+		name    string
+		schema  *apiextensionsv1.JSONSchemaProps
+		valid   interface{}
+		invalid interface{}
+	}{
+		{
+			name: "allOf",
+			schema: &apiextensionsv1.JSONSchemaProps{
+				Type: "object",
+				Properties: map[string]apiextensionsv1.JSONSchemaProps{
+					"value": {
+						Type: "integer",
+						AllOf: []apiextensionsv1.JSONSchemaProps{{
+							Type:    "integer",
+							Maximum: &userMax,
+						}},
+					},
+				},
+			},
+			valid:   map[string]interface{}{"value": uint64(9e18)},
+			invalid: map[string]interface{}{"value": uint64(11e18)},
+		},
+		{
+			name: "array item",
+			schema: &apiextensionsv1.JSONSchemaProps{
+				Type: "array",
+				Items: &apiextensionsv1.JSONSchemaPropsOrArray{Schema: &apiextensionsv1.JSONSchemaProps{
+					Type:    "integer",
+					Maximum: &userMax,
+				}},
+			},
+			valid:   []interface{}{uint64(9e18)},
+			invalid: []interface{}{uint64(11e18)},
+		},
+		{
+			name: "map value",
+			schema: &apiextensionsv1.JSONSchemaProps{
+				Type: "object",
+				AdditionalProperties: &apiextensionsv1.JSONSchemaPropsOrBool{Allows: true, Schema: &apiextensionsv1.JSONSchemaProps{
+					Type:    "integer",
+					Maximum: &userMax,
+				}},
+			},
+			valid:   map[string]interface{}{"entry": uint64(9e18)},
+			invalid: map[string]interface{}{"entry": uint64(11e18)},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := ValidateDataWithSchema(tt.schema, tt.valid); err != nil {
+				t.Fatalf("expected value within user max to pass, got %v", err)
+			}
+			if err := ValidateDataWithSchema(tt.schema, tt.invalid); err == nil {
+				t.Fatalf("expected value above user max to be rejected")
+			}
+		})
 	}
 }
 

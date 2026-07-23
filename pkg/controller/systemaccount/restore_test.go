@@ -132,6 +132,10 @@ func TestClaimedRestoreRequestCreatesAppsOwnedTarget(t *testing.T) {
 	require.Equal(t, "true", target.Annotations[constant.SystemAccountProvisionedAnnotationKey])
 	require.Equal(t, fixture.request.Name, target.Annotations[RestoreRequestNameAnnotationKey])
 	require.Equal(t, string(fixture.request.UID), target.Annotations[RestoreRequestUIDAnnotationKey])
+	revision, revisionErr := TargetCommitRevision(target, constant.DBComponentFinalizerName)
+	require.NoError(t, revisionErr)
+	require.NotEmpty(t, target.Annotations[TargetCommitRevisionAnnotationKey])
+	require.Equal(t, revision, target.Annotations[TargetCommitRevisionAnnotationKey])
 	require.Contains(t, target.Finalizers, constant.DBComponentFinalizerName)
 	require.NotContains(t, target.Labels, constant.SystemAccountRestoreRequestLabelKey)
 }
@@ -407,6 +411,69 @@ func TestReconcileRestoreRequestsIgnoresDamagedForeignRequest(t *testing.T) {
 	foreign.ResourceVersion = "1"
 	foreign.Annotations[LogicalTargetDigestAnnotationKey] = "damaged"
 	fixture.objects = []client.Object{foreign}
+	graphCli, dag := fixture.graph()
+
+	handled, reconcileErr := ReconcileRestoreRequests(context.Background(), graphCli, dag, graphCli,
+		fixture.owner, constant.DBComponentFinalizerName, fixture.targetBuilder)
+
+	require.NoError(t, reconcileErr)
+	require.False(t, handled)
+	require.Empty(t, graphCli.FindAll(dag, &corev1.Secret{}))
+}
+
+func TestReconcileRestoreRequestsFailsClosedForOwnedDamagedRequest(t *testing.T) {
+	tests := map[string]func(*corev1.Secret){
+		"missing protocol mirror": func(request *corev1.Secret) {
+			delete(request.Annotations, RestoreProtocolAnnotationKey)
+		},
+		"foreign protocol mirror": func(request *corev1.Secret) {
+			request.Annotations[RestoreProtocolAnnotationKey] = "foreign"
+		},
+		"missing request label": func(request *corev1.Secret) {
+			delete(request.Labels, constant.SystemAccountRestoreRequestLabelKey)
+		},
+		"empty phase": func(request *corev1.Secret) {
+			delete(request.Annotations, RestoreRequestPhaseAnnotationKey)
+		},
+		"unknown phase": func(request *corev1.Secret) {
+			request.Annotations[RestoreRequestPhaseAnnotationKey] = "Unknown"
+		},
+		"missing protocol finalizer": func(request *corev1.Secret) {
+			request.Finalizers = nil
+		},
+	}
+	for name, damage := range tests {
+		t.Run(name, func(t *testing.T) {
+			fixture := newRestoreStateFixture(t)
+			damage(fixture.request)
+			graphCli, dag := fixture.graph()
+			builderCalled := false
+
+			handled, reconcileErr := ReconcileRestoreRequests(
+				context.Background(), graphCli, dag, graphCli,
+				fixture.owner, constant.DBComponentFinalizerName,
+				func(intent CredentialIntent) (*corev1.Secret, error) {
+					builderCalled = true
+					return fixture.targetBuilder(intent)
+				})
+
+			require.True(t, handled)
+			require.True(t, intctrlutil.IsRequeueError(reconcileErr), reconcileErr)
+			require.False(t, builderCalled)
+			require.Empty(t, graphCli.FindAll(dag, &corev1.Secret{}),
+				"damaged request must block normal target mutation without planning its own update")
+		})
+	}
+}
+
+func TestReconcileRestoreRequestsDoesNotTreatTargetReceiptAsRequest(t *testing.T) {
+	fixture := newRestoreStateFixture(t)
+	target, err := fixture.targetBuilder(fixture.intent)
+	require.NoError(t, err)
+	target.Annotations[RestoreProtocolAnnotationKey] = RestoreProtocolV2
+	target.Annotations[RestoreRequestNameAnnotationKey] = fixture.request.Name
+	target.Annotations[RestoreRequestUIDAnnotationKey] = string(fixture.request.UID)
+	fixture.objects = []client.Object{fixture.root, fixture.owner, target}
 	graphCli, dag := fixture.graph()
 
 	handled, reconcileErr := ReconcileRestoreRequests(context.Background(), graphCli, dag, graphCli,

@@ -374,6 +374,130 @@ func testCredentialIntent() CredentialIntent {
 	}
 }
 
+func TestShardingAuthorityWitnessIsSealedWithoutSplittingTheLogicalSlot(t *testing.T) {
+	first := testCredentialIntent()
+	first.Target.Owner = first.Target.Root
+	first.Target.Scope = SystemAccountScopeSharding
+	first.Target.ShardingName = "shard"
+	first.AuthorityWitness = &ObjectIdentity{
+		APIVersion: "apps.kubeblocks.io/v1",
+		Kind:       "Component",
+		Namespace:  "default",
+		Name:       "cluster-shard-0",
+		UID:        "shard-0-uid",
+	}
+	second := first
+	secondWitness := *first.AuthorityWitness
+	secondWitness.Name = "cluster-shard-1"
+	secondWitness.UID = "shard-1-uid"
+	second.AuthorityWitness = &secondWitness
+
+	firstRequest, err := BuildRestoreRequest(first)
+	require.NoError(t, err)
+	secondRequest, err := BuildRestoreRequest(second)
+	require.NoError(t, err)
+
+	require.Equal(t, firstRequest.Name, secondRequest.Name)
+	require.Equal(t,
+		firstRequest.Annotations[CredentialIntentRevisionAnnotationKey],
+		secondRequest.Annotations[CredentialIntentRevisionAnnotationKey])
+	firstEnvelope, err := DecodeRestoreIntentEnvelope(firstRequest)
+	require.NoError(t, err)
+	secondEnvelope, err := DecodeRestoreIntentEnvelope(secondRequest)
+	require.NoError(t, err)
+	require.Equal(t, first.AuthorityWitness, firstEnvelope.AuthorityWitness)
+	require.Equal(t, second.AuthorityWitness, secondEnvelope.AuthorityWitness)
+	require.NotEqual(t, firstEnvelope.AuthorityWitness, secondEnvelope.AuthorityWitness)
+}
+
+func TestComponentAuthorityWitnessMustMatchTargetOwner(t *testing.T) {
+	intent := testCredentialIntent()
+	intent.AuthorityWitness = &ObjectIdentity{
+		APIVersion: "apps.kubeblocks.io/v1",
+		Kind:       "Component",
+		Namespace:  "default",
+		Name:       "replacement",
+		UID:        "replacement-component-uid",
+	}
+
+	_, err := BuildRestoreRequest(intent)
+
+	require.ErrorContains(t, err, "component-scope authority witness must be absent")
+}
+
+func TestAuthorityWitnessPresenceAndIdentityAreScopeExact(t *testing.T) {
+	componentRequest, err := BuildRestoreRequest(testCredentialIntent())
+	require.NoError(t, err)
+	require.NotContains(t,
+		string(componentRequest.Data[RestoreIntentEnvelopeDataKey]),
+		"authorityWitness")
+
+	sharding := testCredentialIntent()
+	sharding.Target.Owner = sharding.Target.Root
+	sharding.Target.Scope = SystemAccountScopeSharding
+	sharding.Target.ShardingName = "shard"
+	_, err = BuildRestoreRequest(sharding)
+	require.ErrorContains(t, err, "sharding-scope authority witness is required")
+
+	complete := ObjectIdentity{
+		APIVersion: "apps.kubeblocks.io/v1",
+		Kind:       "Component",
+		Namespace:  "default",
+		Name:       "cluster-shard-0",
+		UID:        "shard-0-uid",
+	}
+	tests := map[string]func(*ObjectIdentity){
+		"apiVersion": func(identity *ObjectIdentity) { identity.APIVersion = "" },
+		"kind":       func(identity *ObjectIdentity) { identity.Kind = "" },
+		"namespace":  func(identity *ObjectIdentity) { identity.Namespace = "" },
+		"name":       func(identity *ObjectIdentity) { identity.Name = "" },
+		"uid":        func(identity *ObjectIdentity) { identity.UID = "" },
+	}
+	for name, clear := range tests {
+		t.Run(name, func(t *testing.T) {
+			intent := sharding
+			witness := complete
+			clear(&witness)
+			intent.AuthorityWitness = &witness
+			_, buildErr := BuildRestoreRequest(intent)
+			require.Error(t, buildErr)
+		})
+	}
+}
+
+func TestLifecycleCandidatesRequireTheirImmutableEnvelope(t *testing.T) {
+	request, err := BuildRestoreRequest(testCredentialIntent())
+	require.NoError(t, err)
+	require.True(t, IsRestoreRequestLifecycleCandidate(request))
+
+	target := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				RestoreProtocolAnnotationKey: RestoreProtocolV2,
+			},
+			Finalizers: []string{constant.DBComponentFinalizerName},
+		},
+		Data: map[string][]byte{
+			constant.AccountNameForSecret:   []byte("root"),
+			constant.AccountPasswdForSecret: []byte("password"),
+		},
+	}
+	require.False(t, IsRestoreRequestLifecycleCandidate(target))
+	ClearTargetRestoreReceipt(target)
+	require.Equal(t, RestoreProtocolV2, target.Annotations[RestoreProtocolAnnotationKey])
+	require.False(t, IsRestoreRequestLifecycleCandidate(target))
+
+	conflict := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				RestoreProtocolAnnotationKey: ConflictProtocolV1,
+			},
+			Finalizers: []string{RestoreProtocolFinalizer},
+		},
+	}
+	require.False(t, IsConflictReceiptLifecycleCandidate(conflict))
+}
+
 func TestRequestOwnerReferenceRequiresExactNonBlockingRoot(t *testing.T) {
 	request, err := BuildRestoreRequest(testCredentialIntent())
 	require.NoError(t, err)
@@ -402,6 +526,13 @@ func TestTargetOwnerIdentityCanRepresentShardingScope(t *testing.T) {
 	intent.Target.Scope = SystemAccountScopeSharding
 	intent.Target.ShardingName = "shard"
 	intent.Target.Owner = intent.Target.Root
+	intent.AuthorityWitness = &ObjectIdentity{
+		APIVersion: "apps.kubeblocks.io/v1",
+		Kind:       "Component",
+		Namespace:  "default",
+		Name:       "cluster-shard-0",
+		UID:        "shard-0-uid",
+	}
 	request, err := BuildRestoreRequest(intent)
 	require.NoError(t, err)
 	require.Equal(t, "shard", request.Annotations[ShardingNameAnnotationKey])

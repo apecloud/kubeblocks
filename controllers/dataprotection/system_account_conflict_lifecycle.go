@@ -65,9 +65,14 @@ func (r *SystemAccountConflictReceiptLifecycleReconciler) Reconcile(
 	if err := r.APIReader.Get(ctx, req.NamespacedName, receipt); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, log.FromContext(ctx), "")
 	}
+	if !systemaccount.IsConflictReceiptLifecycleCandidate(receipt) {
+		return controllerruntime.Result{}, nil
+	}
 	if receipt.Annotations[systemaccount.RestoreProtocolAnnotationKey] !=
 		systemaccount.ConflictProtocolV1 {
-		return controllerruntime.Result{}, nil
+		return r.reconcileInvalidConflictMetadata(ctx, receipt,
+			fmt.Errorf("conflict receipt %s has an unsupported protocol mirror",
+				client.ObjectKeyFromObject(receipt)))
 	}
 	envelope, err := systemaccount.DecodeAndValidateConflictReceipt(receipt, false)
 	if err != nil {
@@ -269,8 +274,8 @@ func (r *SystemAccountConflictReceiptLifecycleReconciler) SetupWithManager(
 		Named("system-account-conflict-receipt-lifecycle").
 		For(&corev1.Secret{}, builder.WithPredicates(predicate.NewPredicateFuncs(
 			func(object client.Object) bool {
-				return object.GetAnnotations()[systemaccount.RestoreProtocolAnnotationKey] ==
-					systemaccount.ConflictProtocolV1
+				secret, ok := object.(*corev1.Secret)
+				return ok && systemaccount.IsConflictReceiptLifecycleCandidate(secret)
 			}))).
 		Complete(r)
 }

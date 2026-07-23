@@ -2486,20 +2486,35 @@ func (r *VolumePopulatorReconciler) arbitrateSystemAccountRestoreRequest(
 	}
 	existingOperationDigest, _ := systemaccount.OperationDigest(existingIntent.Operation)
 	contenderOperationDigest, _ := systemaccount.OperationDigest(contender.Operation)
+	phase := systemaccount.RestoreRequestPhase(existing.Annotations[systemaccount.RestoreRequestPhaseAnnotationKey])
 	if !existing.DeletionTimestamp.IsZero() {
-		reason := systemaccount.PreviousRestoreIntentFinalizingReason
-		if existingOperationDigest == contenderOperationDigest {
-			reason = systemaccount.RequestDeletionRequestedReason
+		if existingOperationDigest != contenderOperationDigest {
+			return intctrlutil.NewRequeueError(reconcileInterval,
+				fmt.Sprintf("%s: waiting for request %s finalization",
+					systemaccount.PreviousRestoreIntentFinalizingReason,
+					client.ObjectKeyFromObject(existing)))
+		}
+		if validationErr := validateSystemAccountRestoreRequest(existing, desired); validationErr != nil {
+			return validationErr
+		}
+		if phase == systemaccount.RestoreRequestPhaseFailed &&
+			existing.Annotations[systemaccount.RestoreRequestReasonAnnotationKey] ==
+				systemaccount.RequestDeletionRequestedReason {
+			return intctrlutil.NewFatalError(fmt.Sprintf(
+				"%s: restore request %s failed",
+				systemaccount.RequestDeletionRequestedReason,
+				client.ObjectKeyFromObject(existing)))
 		}
 		return intctrlutil.NewRequeueError(reconcileInterval,
-			fmt.Sprintf("%s: waiting for request %s finalization", reason, client.ObjectKeyFromObject(existing)))
+			fmt.Sprintf("%s: waiting for request %s finalization",
+				systemaccount.RequestDeletionRequestedReason,
+				client.ObjectKeyFromObject(existing)))
 	}
 	if !slices.Contains(existing.Finalizers, systemaccount.RestoreProtocolFinalizer) {
 		return intctrlutil.NewRequeueError(reconcileInterval,
 			fmt.Sprintf("%s: waiting for request %s lifecycle cleanup",
 				systemaccount.PreviousRestoreIntentFinalizingReason, client.ObjectKeyFromObject(existing)))
 	}
-	phase := systemaccount.RestoreRequestPhase(existing.Annotations[systemaccount.RestoreRequestPhaseAnnotationKey])
 	if existingOperationDigest == contenderOperationDigest {
 		if validationErr := validateSystemAccountRestoreRequest(existing, desired); validationErr != nil {
 			return validationErr

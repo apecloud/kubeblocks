@@ -117,6 +117,7 @@ func (r *VolumePopulatorReconciler) buildSystemAccountCredentialIntent(
 		return systemaccount.CredentialIntent{}, err
 	}
 	targetOwner := objectIdentity(authority.component)
+	var authorityWitness *systemaccount.ObjectIdentity
 	shardingName := ""
 	switch scope {
 	case systemAccountSecretScopeComponent:
@@ -134,6 +135,8 @@ func (r *VolumePopulatorReconciler) buildSystemAccountCredentialIntent(
 				systemaccount.TargetSemanticUnavailableReason, err)
 		}
 		targetOwner = objectIdentity(authority.root)
+		witness := objectIdentity(authority.component)
+		authorityWitness = &witness
 		shardingName = ownerName
 	default:
 		return systemaccount.CredentialIntent{}, newSystemAccountRestoreContractError(
@@ -152,7 +155,8 @@ func (r *VolumePopulatorReconciler) buildSystemAccountCredentialIntent(
 			ShardingName: shardingName,
 			Account:      accountName,
 		},
-		ResolvedSource: objectIdentity(authority.source),
+		AuthorityWitness: authorityWitness,
+		ResolvedSource:   objectIdentity(authority.source),
 		Credentials: map[string][]byte{
 			constant.AccountNameForSecret:   []byte(accountName),
 			constant.AccountPasswdForSecret: append([]byte(nil), password...),

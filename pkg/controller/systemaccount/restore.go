@@ -208,11 +208,11 @@ func restoreRevision(request *corev1.Secret) (string, error) {
 // requests. The caller owns all target mutations, finalizer handling, and
 // delete/recreate operations; the request writer never performs them.
 //
-// A request is a Secret selected by SystemAccountRestoreRequestLabelKey,
-// controlled by the target Component or Cluster, and sealed by
-// SystemAccountRestoreRevisionAnnotationKey. Apps keeps the request until it
-// has copied that revision and the requested credentials to an owned target.
-// This makes the target revision the commit point and the request the durable
+// A request is discovered by its immutable restore-intent envelope, then
+// strong-read and matched to the target owner's sealed identity before any
+// mutable protocol metadata is trusted. Apps keeps the request until it has
+// copied the requested credentials and exact commit receipt to an owned target.
+// This makes the target receipt the commit point and the request the durable
 // retry state across delete/create races.
 func ReconcileRestoreRequests(ctx context.Context,
 	graphCli model.GraphClient,
@@ -230,8 +230,7 @@ func ReconcileRestoreRequests(ctx context.Context,
 	}
 	requests := &corev1.SecretList{}
 	if err := graphCli.List(ctx, requests,
-		client.InNamespace(owner.GetNamespace()),
-		client.MatchingLabels{constant.SystemAccountRestoreRequestLabelKey: "true"}); err != nil {
+		client.InNamespace(owner.GetNamespace())); err != nil {
 		return false, err
 	}
 	slices.SortFunc(requests.Items, func(a, b corev1.Secret) int {
@@ -241,7 +240,7 @@ func ReconcileRestoreRequests(ctx context.Context,
 	seenTargets := map[string]string{}
 	for i := range requests.Items {
 		request := &requests.Items[i]
-		if request.Annotations[RestoreProtocolAnnotationKey] != RestoreProtocolV2 {
+		if !HasRestoreIntentEnvelope(request) {
 			continue
 		}
 		liveRequest := &corev1.Secret{}
@@ -255,24 +254,15 @@ func ReconcileRestoreRequests(ctx context.Context,
 			continue
 		}
 		request = liveRequest
-		if request.Annotations[RestoreProtocolAnnotationKey] != RestoreProtocolV2 {
-			continue
-		}
 		envelope, err := DecodeRestoreIntentEnvelope(request)
 		if err != nil || !sameObjectIdentity(envelope.Target.Owner, owner) {
 			continue
 		}
-		intent, err := DecodeRestoreRequestV2(request)
+		handled = true
+		intent, err := ValidateRestoreRequestV2(request)
 		if err != nil {
-			return true, err
-		}
-		phase := RestoreRequestPhase(request.Annotations[RestoreRequestPhaseAnnotationKey])
-		if !phase.Valid() || !slices.Contains(request.Finalizers, RestoreProtocolFinalizer) {
-			// Invalid-phase and finalizer-release paths belong to the
-			// independent lifecycle controller.
 			continue
 		}
-		handled = true
 		targetDigest := request.Annotations[LogicalTargetDigestAnnotationKey]
 		if previous, ok := seenTargets[targetDigest]; ok {
 			return true, fmt.Errorf("multiple system account restore requests %s and %s target logical slot %s",
@@ -458,6 +448,11 @@ func reconcileClaimedRestoreRequestV2(
 			nil)
 	}
 	applyTargetReceipt(desired, request)
+	revision, err := TargetCommitRevision(desired, ownedFinalizer)
+	if err != nil {
+		return err
+	}
+	desired.Annotations[TargetCommitRevisionAnnotationKey] = revision
 
 	target := &corev1.Secret{}
 	key := client.ObjectKeyFromObject(desired)
@@ -497,7 +492,7 @@ func reconcileClaimedRestoreRequestV2(
 	desired.UID = target.UID
 	desired.CreationTimestamp = target.CreationTimestamp
 	desired.ManagedFields = target.ManagedFields
-	revision, err := TargetCommitRevision(desired, ownedFinalizer)
+	revision, err = TargetCommitRevision(desired, ownedFinalizer)
 	if err != nil {
 		return err
 	}

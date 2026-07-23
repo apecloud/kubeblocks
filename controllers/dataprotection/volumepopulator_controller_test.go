@@ -498,6 +498,122 @@ var _ = Describe("Volume Populator Controller test", func() {
 			Expect(apierrors.IsNotFound(err)).To(BeTrue(), err)
 		})
 
+		It("projects a same-operation deleting request failure before lifecycle release", func() {
+			scheme := runtime.NewScheme()
+			Expect(corev1.AddToScheme(scheme)).Should(Succeed())
+			Expect(kbappsv1.AddToScheme(scheme)).Should(Succeed())
+			pvc := &corev1.PersistentVolumeClaim{}
+			backup, cluster, component, instanceSet :=
+				prepareSystemAccountAuthorityFixture(Default, scheme, pvc)
+			cli := fake.NewClientBuilder().WithScheme(scheme).
+				WithObjects(backup, cluster, component, instanceSet, pvc).Build()
+			reconciler := &VolumePopulatorReconciler{
+				Client: cli, APIReader: cli, Scheme: scheme,
+				Recorder: record.NewFakeRecorder(10),
+			}
+			request, err := reconciler.newSystemAccountRestoreRequest(
+				intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, backup,
+				systemAccountSecretScopeComponent, "cluster", "mysql", "admin", []byte("password"))
+			Expect(err).ShouldNot(HaveOccurred())
+			request.UID = "request-uid"
+			Expect(cli.Create(context.Background(), request)).Should(Succeed())
+			Expect(cli.Delete(context.Background(), request)).Should(Succeed())
+			deleting := &corev1.Secret{}
+			Expect(cli.Get(context.Background(), client.ObjectKeyFromObject(request), deleting)).Should(Succeed())
+			failed, err := systemaccount.TransitionRestoreRequestV2(
+				deleting, systemaccount.RestoreRequestPhaseFailed,
+				systemaccount.RequestDeletionRequestedReason, nil, false)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(cli.Update(context.Background(), failed)).Should(Succeed())
+
+			currentPVC := &corev1.PersistentVolumeClaim{}
+			Expect(cli.Get(context.Background(), client.ObjectKeyFromObject(pvc), currentPVC)).Should(Succeed())
+			syncErr := reconciler.upsertSystemAccountSecret(
+				intctrlutil.RequestCtx{Ctx: context.Background()},
+				currentPVC, backup, systemAccountSecretScopeComponent,
+				"cluster", "mysql", "admin", []byte("password"))
+
+			Expect(intctrlutil.IsTargetError(syncErr, intctrlutil.ErrorTypeFatal)).To(BeTrue(), syncErr)
+			Expect(syncErr).To(MatchError(ContainSubstring(
+				systemaccount.RequestDeletionRequestedReason)))
+			_, err = reconciler.handleSyncPVCError(
+				intctrlutil.RequestCtx{Ctx: context.Background()}, currentPVC, syncErr)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			projected := &corev1.PersistentVolumeClaim{}
+			Expect(cli.Get(context.Background(), client.ObjectKeyFromObject(pvc), projected)).Should(Succeed())
+			condition := findPVCConditionByType(projected, kbappsv1.ConditionTypeRestore)
+			Expect(condition).NotTo(BeNil())
+			Expect(condition.Status).To(Equal(corev1.ConditionFalse))
+			Expect(condition.Reason).To(Equal(systemaccount.RequestDeletionRequestedReason))
+
+			secrets := &corev1.SecretList{}
+			Expect(cli.List(context.Background(), secrets)).Should(Succeed())
+			for i := range secrets.Items {
+				Expect(secrets.Items[i].Annotations[systemaccount.RestoreProtocolAnnotationKey]).
+					NotTo(Equal(systemaccount.ConflictProtocolV1))
+			}
+		})
+
+		It("projects post-write cancellation without consuming the target", func() {
+			scheme := runtime.NewScheme()
+			Expect(corev1.AddToScheme(scheme)).Should(Succeed())
+			Expect(kbappsv1.AddToScheme(scheme)).Should(Succeed())
+			pvc := &corev1.PersistentVolumeClaim{}
+			backup, cluster, component, instanceSet :=
+				prepareSystemAccountAuthorityFixture(Default, scheme, pvc)
+			cli := fake.NewClientBuilder().WithScheme(scheme).
+				WithObjects(backup, cluster, component, instanceSet, pvc).Build()
+			reconciler := &VolumePopulatorReconciler{
+				Client: cli, APIReader: cli, Scheme: scheme,
+				Recorder: record.NewFakeRecorder(10),
+			}
+			request, err := reconciler.newSystemAccountRestoreRequest(
+				intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, backup,
+				systemAccountSecretScopeComponent, "cluster", "mysql", "admin", []byte("password"))
+			Expect(err).ShouldNot(HaveOccurred())
+			request.UID = "request-uid"
+			failed, err := systemaccount.TransitionRestoreRequestV2(
+				request, systemaccount.RestoreRequestPhaseFailed,
+				systemaccount.PostWriteCancellationReason, nil, false)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(cli.Create(context.Background(), failed)).Should(Succeed())
+
+			currentPVC := &corev1.PersistentVolumeClaim{}
+			Expect(cli.Get(context.Background(), client.ObjectKeyFromObject(pvc), currentPVC)).Should(Succeed())
+			syncErr := reconciler.upsertSystemAccountSecret(
+				intctrlutil.RequestCtx{Ctx: context.Background()},
+				currentPVC, backup, systemAccountSecretScopeComponent,
+				"cluster", "mysql", "admin", []byte("password"))
+
+			Expect(intctrlutil.IsTargetError(syncErr, intctrlutil.ErrorTypeFatal)).To(BeTrue(), syncErr)
+			Expect(syncErr).To(MatchError(ContainSubstring(
+				systemaccount.PostWriteCancellationReason)))
+			_, err = reconciler.handleSyncPVCError(
+				intctrlutil.RequestCtx{Ctx: context.Background()}, currentPVC, syncErr)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			projected := &corev1.PersistentVolumeClaim{}
+			Expect(cli.Get(context.Background(), client.ObjectKeyFromObject(pvc), projected)).Should(Succeed())
+			condition := findPVCConditionByType(projected, kbappsv1.ConditionTypeRestore)
+			Expect(condition).NotTo(BeNil())
+			Expect(condition.Status).To(Equal(corev1.ConditionFalse))
+			Expect(condition.Reason).To(Equal(systemaccount.PostWriteCancellationReason))
+
+			secrets := &corev1.SecretList{}
+			Expect(cli.List(context.Background(), secrets)).Should(Succeed())
+			for i := range secrets.Items {
+				Expect(secrets.Items[i].Annotations[systemaccount.RestoreProtocolAnnotationKey]).
+					NotTo(Equal(systemaccount.ConflictProtocolV1))
+			}
+			target := &corev1.Secret{}
+			err = cli.Get(context.Background(), client.ObjectKey{
+				Namespace: "default",
+				Name:      constant.GenerateAccountSecretName("cluster", "mysql", "admin"),
+			}, target)
+			Expect(apierrors.IsNotFound(err)).To(BeTrue(), err)
+		})
+
 		It("preserves a same-operation request failure after the operation becomes terminal", func() {
 			scheme := runtime.NewScheme()
 			Expect(corev1.AddToScheme(scheme)).Should(Succeed())

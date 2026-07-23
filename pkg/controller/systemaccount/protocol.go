@@ -277,10 +277,11 @@ type LogicalTargetIdentity struct {
 }
 
 type CredentialIntent struct {
-	Operation      RestoreOperationIdentity `json:"operation"`
-	Target         LogicalTargetIdentity    `json:"target"`
-	ResolvedSource ObjectIdentity           `json:"resolvedSource"`
-	Credentials    map[string][]byte        `json:"credentials"`
+	Operation        RestoreOperationIdentity `json:"operation"`
+	Target           LogicalTargetIdentity    `json:"target"`
+	AuthorityWitness *ObjectIdentity          `json:"authorityWitness,omitempty"`
+	ResolvedSource   ObjectIdentity           `json:"resolvedSource"`
+	Credentials      map[string][]byte        `json:"credentials"`
 }
 
 type BlockingRequestSnapshot struct {
@@ -477,6 +478,27 @@ func DecodeRestoreIntentEnvelope(request *corev1.Secret) (CredentialIntent, erro
 		return intent, fmt.Errorf("restore request %s/%s envelope: %w", request.Namespace, request.Name, err)
 	}
 	return intent, nil
+}
+
+func HasRestoreIntentEnvelope(secret *corev1.Secret) bool {
+	return secret != nil && len(secret.Data[RestoreIntentEnvelopeDataKey]) > 0
+}
+
+func IsRestoreRequestLifecycleCandidate(secret *corev1.Secret) bool {
+	return HasRestoreIntentEnvelope(secret) &&
+		(slices.Contains(secret.Finalizers, RestoreProtocolFinalizer) ||
+			(secret.Annotations[RestoreProtocolAnnotationKey] == RestoreProtocolV2 &&
+				secret.Labels[constant.SystemAccountRestoreRequestLabelKey] == "true"))
+}
+
+func HasConflictEnvelope(secret *corev1.Secret) bool {
+	return secret != nil && len(secret.Data[RestoreConflictEnvelopeDataKey]) > 0
+}
+
+func IsConflictReceiptLifecycleCandidate(secret *corev1.Secret) bool {
+	return HasConflictEnvelope(secret) &&
+		(slices.Contains(secret.Finalizers, RestoreProtocolFinalizer) ||
+			secret.Annotations[RestoreProtocolAnnotationKey] == ConflictProtocolV1)
 }
 
 func RestoreConvergedV2(target, request *corev1.Secret, requiredFinalizer string) bool {
@@ -852,6 +874,24 @@ func validateCredentialIntent(intent CredentialIntent) error {
 	}
 	if intent.Operation.Root != intent.Target.Root {
 		return fmt.Errorf("operation root and logical-target root differ")
+	}
+	switch intent.Target.Scope {
+	case SystemAccountScopeComponent:
+		if intent.AuthorityWitness != nil {
+			return fmt.Errorf("component-scope authority witness must be absent")
+		}
+	case SystemAccountScopeSharding:
+		if intent.AuthorityWitness == nil {
+			return fmt.Errorf("sharding-scope authority witness is required")
+		}
+		if err := validateObjectIdentity("authority witness", *intent.AuthorityWitness); err != nil {
+			return err
+		}
+		if intent.AuthorityWitness.APIVersion != intent.Target.Root.APIVersion ||
+			intent.AuthorityWitness.Kind != "Component" ||
+			intent.AuthorityWitness.Namespace != intent.Target.Namespace {
+			return fmt.Errorf("authority witness must be an exact Component in the logical-target namespace")
+		}
 	}
 	if len(intent.Credentials) == 0 {
 		return fmt.Errorf("credential payload must not be empty")

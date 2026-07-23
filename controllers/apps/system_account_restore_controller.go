@@ -72,8 +72,13 @@ func (r *SystemAccountRestoreLifecycleReconciler) Reconcile(
 	if err := reader.Get(ctx, req.NamespacedName, request); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, log.FromContext(ctx), "")
 	}
-	if request.Annotations[systemaccount.RestoreProtocolAnnotationKey] != systemaccount.RestoreProtocolV2 {
+	if !systemaccount.IsRestoreRequestLifecycleCandidate(request) {
 		return controllerruntime.Result{}, nil
+	}
+	if request.Annotations[systemaccount.RestoreProtocolAnnotationKey] != systemaccount.RestoreProtocolV2 {
+		return r.reconcileInvalidRequestMetadata(ctx, request,
+			fmt.Errorf("restore request %s has an unsupported protocol mirror",
+				client.ObjectKeyFromObject(request)))
 	}
 	intent, err := systemaccount.DecodeRestoreRequestV2(request)
 	if err != nil {
@@ -145,16 +150,20 @@ func (r *SystemAccountRestoreLifecycleReconciler) Reconcile(
 		if err != nil {
 			return controllerruntime.Result{}, err
 		}
-		reason := systemaccount.TargetOwnerUnavailableReason
 		if phase == systemaccount.RestoreRequestPhaseClaimed && exact {
+			return r.transitionRequest(ctx, request, systemaccount.RestoreRequestPhaseFailed,
+				systemaccount.PostWriteCancellationReason, nil, false)
+		}
+		if phase == systemaccount.RestoreRequestPhaseFailed &&
+			request.Annotations[systemaccount.RestoreRequestReasonAnnotationKey] ==
+				systemaccount.PostWriteCancellationReason && exact {
 			if err := r.clearTargetReceipt(ctx, target); err != nil {
 				return controllerruntime.Result{}, err
 			}
-			reason = systemaccount.PostWriteCancellationReason
 		}
 		if phase != systemaccount.RestoreRequestPhaseFailed {
 			return r.transitionRequest(ctx, request, systemaccount.RestoreRequestPhaseFailed,
-				reason, nil, false)
+				systemaccount.TargetOwnerUnavailableReason, nil, false)
 		}
 		return r.lifecycleRequeue(request), nil
 	}
@@ -221,19 +230,19 @@ func (r *SystemAccountRestoreLifecycleReconciler) reconcileUnavailableRoot(
 	rootState restoreOperationState,
 ) (controllerruntime.Result, error) {
 	intent, _ := systemaccount.DecodeRestoreRequestV2(request)
-	target, exact, err := r.findExactTarget(ctx, request, intent)
-	if err != nil {
-		return controllerruntime.Result{}, err
-	}
 	reason := systemaccount.RootUnavailableReason
 	if !request.DeletionTimestamp.IsZero() {
 		reason = systemaccount.RequestDeletionRequestedReason
 	}
-	if phase == systemaccount.RestoreRequestPhaseClaimed && exact {
-		if err := r.clearTargetReceipt(ctx, target); err != nil {
+	if phase == systemaccount.RestoreRequestPhaseClaimed {
+		_, exact, err := r.findExactTarget(ctx, request, intent)
+		if err != nil {
 			return controllerruntime.Result{}, err
 		}
-		reason = systemaccount.PostWriteCancellationReason
+		if exact {
+			return r.transitionRequest(ctx, request, systemaccount.RestoreRequestPhaseFailed,
+				systemaccount.PostWriteCancellationReason, nil, false)
+		}
 	}
 	if phase == systemaccount.RestoreRequestPhaseCommitted {
 		receipt := committedReceipt(request)
@@ -256,6 +265,17 @@ func (r *SystemAccountRestoreLifecycleReconciler) reconcileUnavailableRoot(
 		storedReason := request.Annotations[systemaccount.RestoreRequestReasonAnnotationKey]
 		if !systemaccount.IsRestoreFailureReason(storedReason) {
 			storedReason = systemaccount.RootUnavailableReason
+		}
+		if storedReason == systemaccount.PostWriteCancellationReason {
+			target, exact, err := r.findExactTarget(ctx, request, intent)
+			if err != nil {
+				return controllerruntime.Result{}, err
+			}
+			if exact {
+				if err := r.clearTargetReceipt(ctx, target); err != nil {
+					return controllerruntime.Result{}, err
+				}
+			}
 		}
 		return r.transitionRequest(ctx, request, phase,
 			storedReason, nil, true)
@@ -486,8 +506,8 @@ func (r *SystemAccountRestoreLifecycleReconciler) SetupWithManager(mgr controlle
 		Named("system-account-restore-lifecycle").
 		For(&corev1.Secret{}, builder.WithPredicates(predicate.NewPredicateFuncs(
 			func(object client.Object) bool {
-				return object.GetAnnotations()[systemaccount.RestoreProtocolAnnotationKey] ==
-					systemaccount.RestoreProtocolV2
+				secret, ok := object.(*corev1.Secret)
+				return ok && systemaccount.IsRestoreRequestLifecycleCandidate(secret)
 			}))).
 		Complete(r)
 }

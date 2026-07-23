@@ -34,6 +34,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	shardingcontroller "github.com/apecloud/kubeblocks/pkg/controller/sharding"
 	"github.com/apecloud/kubeblocks/pkg/controller/systemaccount"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -53,6 +54,9 @@ func (t *clusterShardingAccountTransformer) Transform(ctx graph.TransformContext
 	handled, err := systemaccount.ReconcileRestoreRequests(transCtx.Context, graphCli, dag, transCtx.APIReader,
 		transCtx.Cluster, constant.DBClusterFinalizerName,
 		func(intent systemaccount.CredentialIntent) (*corev1.Secret, error) {
+			if err := t.validateLiveRestoreAuthority(transCtx, intent); err != nil {
+				return nil, err
+			}
 			var sharding *appsv1.ClusterSharding
 			for i := range transCtx.shardings {
 				if transCtx.shardings[i].Name == intent.Target.ShardingName {
@@ -64,9 +68,6 @@ func (t *clusterShardingAccountTransformer) Transform(ctx graph.TransformContext
 				return nil, systemaccount.NewTargetSemanticError(
 					systemaccount.TargetSemanticUnavailableReason,
 					fmt.Errorf("sharding %s is unavailable", intent.Target.ShardingName))
-			}
-			if err := t.validateRestoredSystemAccount(transCtx, sharding, intent.Target.Account); err != nil {
-				return nil, err
 			}
 			if _, err := t.definedSystemAccount(transCtx, sharding, intent.Target.Account); err != nil {
 				return nil, systemaccount.NewTargetSemanticError(
@@ -94,21 +95,82 @@ func (t *clusterShardingAccountTransformer) Transform(ctx graph.TransformContext
 	return t.reconcileShardingAccounts(transCtx, graphCli, dag)
 }
 
-func (t *clusterShardingAccountTransformer) validateRestoredSystemAccount(
+func (t *clusterShardingAccountTransformer) validateLiveRestoreAuthority(
 	transCtx *clusterTransformContext,
-	sharding *appsv1.ClusterSharding,
-	accountName string,
+	intent systemaccount.CredentialIntent,
 ) error {
-	shardingDef, ok := transCtx.shardingDefs[sharding.ShardingDef]
-	if !ok || shardingDef == nil {
+	reader := transCtx.APIReader
+	if reader == nil {
 		return systemaccount.NewTargetSemanticError(
 			systemaccount.TargetSemanticUnavailableReason,
-			fmt.Errorf("sharding definition %s is unavailable", sharding.ShardingDef))
+			fmt.Errorf("system account restore authority reader is not configured"))
+	}
+	witness := intent.AuthorityWitness
+	if witness == nil {
+		return systemaccount.NewTargetSemanticError(
+			systemaccount.TargetSemanticUnavailableReason,
+			fmt.Errorf("sharding restore authority witness is unavailable"))
+	}
+	cluster := &appsv1.Cluster{}
+	if err := reader.Get(transCtx.Context, client.ObjectKey{
+		Namespace: intent.Target.Root.Namespace,
+		Name:      intent.Target.Root.Name,
+	}, cluster); err != nil {
+		return systemaccount.NewTargetSemanticError(
+			systemaccount.TargetSemanticUnavailableReason, err)
+	}
+	if cluster.UID != intent.Target.Root.UID || !cluster.DeletionTimestamp.IsZero() {
+		return systemaccount.NewTargetSemanticError(
+			systemaccount.TargetSemanticUnavailableReason,
+			fmt.Errorf("root Cluster %s/%s no longer matches restore intent",
+				cluster.Namespace, cluster.Name))
+	}
+	var current *appsv1.ClusterSharding
+	for i := range cluster.Spec.Shardings {
+		if cluster.Spec.Shardings[i].Name == intent.Target.ShardingName {
+			current = &cluster.Spec.Shardings[i]
+			break
+		}
+	}
+	if current == nil {
+		return systemaccount.NewTargetSemanticError(
+			systemaccount.TargetSemanticUnavailableReason,
+			fmt.Errorf("sharding %s is unavailable", intent.Target.ShardingName))
+	}
+	components, err := shardingcontroller.ListShardingComponents(
+		transCtx.Context, reader, cluster, current.Name)
+	if err != nil {
+		return systemaccount.NewTargetSemanticError(
+			systemaccount.TargetSemanticUnavailableReason, err)
+	}
+	witnessLive := false
+	for i := range components {
+		component := &components[i]
+		if component.Name == witness.Name &&
+			component.UID == witness.UID &&
+			component.Namespace == witness.Namespace &&
+			component.DeletionTimestamp.IsZero() {
+			witnessLive = true
+			break
+		}
+	}
+	if !witnessLive {
+		return systemaccount.NewTargetSemanticError(
+			systemaccount.TargetSemanticUnavailableReason,
+			fmt.Errorf("authority witness Component %s/%s UID %s is not a current member of sharding %s",
+				witness.Namespace, witness.Name, witness.UID, current.Name))
+	}
+
+	definition, err := resolveShardingDefinition(
+		transCtx.Context, reader, current.ShardingDef)
+	if err != nil {
+		return systemaccount.NewTargetSemanticError(
+			systemaccount.TargetSemanticUnavailableReason, err)
 	}
 	shared := false
-	for i := range shardingDef.Spec.SystemAccounts {
-		account := &shardingDef.Spec.SystemAccounts[i]
-		if account.Name == accountName {
+	for i := range definition.Spec.SystemAccounts {
+		account := &definition.Spec.SystemAccounts[i]
+		if account.Name == intent.Target.Account {
 			shared = ptr.Deref(account.Shared, false)
 			break
 		}
@@ -116,16 +178,16 @@ func (t *clusterShardingAccountTransformer) validateRestoredSystemAccount(
 	if !shared {
 		return systemaccount.NewTargetSemanticError(
 			systemaccount.TargetSemanticUnavailableReason,
-			fmt.Errorf("system account %s is not shared by sharding definition %s",
-				accountName, sharding.ShardingDef))
+			fmt.Errorf("system account %s is not shared by live sharding definition %s",
+				intent.Target.Account, definition.Name))
 	}
-	for i := range sharding.Template.SystemAccounts {
-		account := &sharding.Template.SystemAccounts[i]
-		if account.Name == accountName && ptr.Deref(account.Disabled, false) {
+	for i := range current.Template.SystemAccounts {
+		account := &current.Template.SystemAccounts[i]
+		if account.Name == intent.Target.Account && ptr.Deref(account.Disabled, false) {
 			return systemaccount.NewTargetSemanticError(
 				systemaccount.AccountUnavailableReason,
-				fmt.Errorf("system account %s is disabled for sharding %s",
-					accountName, sharding.Name))
+				fmt.Errorf("system account %s is disabled for live sharding %s",
+					intent.Target.Account, current.Name))
 		}
 	}
 	return nil

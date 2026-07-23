@@ -95,6 +95,54 @@ func TestConflictReceiptLifecycleRetainsDeletingReceiptWhileRootLive(t *testing.
 	}
 }
 
+func TestSameOperationShardingParticipantsReuseWinnerRequest(t *testing.T) {
+	root := systemaccount.ObjectIdentity{
+		APIVersion: appsv1.GroupVersion.String(),
+		Kind:       appsv1.ClusterKind,
+		Namespace:  "default",
+		Name:       "cluster",
+		UID:        "cluster-uid",
+	}
+	target := systemaccount.LogicalTargetIdentity{
+		Protocol:     systemaccount.LogicalTargetProtocolV1,
+		Namespace:    root.Namespace,
+		Root:         root,
+		Owner:        root,
+		Scope:        systemaccount.SystemAccountScopeSharding,
+		ShardingName: "shard",
+		Account:      "admin",
+	}
+	first := conflictLifecycleIntent(root, target, "backup", "backup-uid")
+	first.AuthorityWitness = &systemaccount.ObjectIdentity{
+		APIVersion: appsv1.GroupVersion.String(),
+		Kind:       appsv1.ComponentKind,
+		Namespace:  "default",
+		Name:       "cluster-shard-0",
+		UID:        "shard-0-uid",
+	}
+	second := first
+	secondWitness := *first.AuthorityWitness
+	secondWitness.Name = "cluster-shard-1"
+	secondWitness.UID = "shard-1-uid"
+	second.AuthorityWitness = &secondWitness
+	firstRequest, err := systemaccount.BuildRestoreRequest(first)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondRequest, err := systemaccount.BuildRestoreRequest(second)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if firstRequest.Name != secondRequest.Name {
+		t.Fatalf("same operation participants split request slot: %s != %s",
+			firstRequest.Name, secondRequest.Name)
+	}
+	if err := validateSystemAccountRestoreRequest(firstRequest, secondRequest); err != nil {
+		t.Fatalf("same operation participants conflicted: %v", err)
+	}
+}
+
 func TestConflictReceiptLifecycleReleasesDamagedMetadataAfterRootGone(t *testing.T) {
 	scheme := newConflictLifecycleScheme(t)
 	receipt := newConflictLifecycleReceipt(t)
@@ -119,6 +167,38 @@ func TestConflictReceiptLifecycleReleasesDamagedMetadataAfterRootGone(t *testing
 	}
 }
 
+func TestConflictReceiptLifecycleRecoversDamagedProtocolMirror(t *testing.T) {
+	for _, protocol := range []string{"", "foreign"} {
+		t.Run(protocol, func(t *testing.T) {
+			scheme := newConflictLifecycleScheme(t)
+			receipt := newConflictLifecycleReceipt(t)
+			if protocol == "" {
+				delete(receipt.Annotations, systemaccount.RestoreProtocolAnnotationKey)
+			} else {
+				receipt.Annotations[systemaccount.RestoreProtocolAnnotationKey] = protocol
+			}
+			cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(receipt).Build()
+			reconciler := &SystemAccountConflictReceiptLifecycleReconciler{
+				Client: cli, APIReader: cli, Scheme: scheme,
+			}
+
+			if _, err := reconciler.Reconcile(context.Background(), ctrl.Request{
+				NamespacedName: client.ObjectKeyFromObject(receipt),
+			}); err != nil {
+				t.Fatal(err)
+			}
+
+			current := &corev1.Secret{}
+			if err := cli.Get(context.Background(), client.ObjectKeyFromObject(receipt), current); err != nil {
+				t.Fatal(err)
+			}
+			if slices.Contains(current.Finalizers, systemaccount.RestoreProtocolFinalizer) {
+				t.Fatalf("protocol %q kept finalizer after root disappeared", protocol)
+			}
+		})
+	}
+}
+
 func TestConflictReceiptLifecycleFailsClosedForDamagedMetadataWhileRootLive(t *testing.T) {
 	scheme := newConflictLifecycleScheme(t)
 	receipt := newConflictLifecycleReceipt(t)
@@ -137,6 +217,43 @@ func TestConflictReceiptLifecycleFailsClosedForDamagedMetadataWhileRootLive(t *t
 		NamespacedName: client.ObjectKeyFromObject(receipt),
 	}); err == nil {
 		t.Fatal("active root accepted damaged receipt metadata")
+	}
+}
+
+func TestConflictReceiptLifecycleDamagedProtocolMirrorFailsClosedWhileRootLive(t *testing.T) {
+	for _, protocol := range []string{"", "foreign"} {
+		t.Run(protocol, func(t *testing.T) {
+			scheme := newConflictLifecycleScheme(t)
+			receipt := newConflictLifecycleReceipt(t)
+			if protocol == "" {
+				delete(receipt.Annotations, systemaccount.RestoreProtocolAnnotationKey)
+			} else {
+				receipt.Annotations[systemaccount.RestoreProtocolAnnotationKey] = protocol
+			}
+			cluster := &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{
+				Namespace: "default",
+				Name:      "cluster",
+				UID:       "cluster-uid",
+			}}
+			cli := fake.NewClientBuilder().WithScheme(scheme).
+				WithObjects(cluster, receipt).Build()
+			reconciler := &SystemAccountConflictReceiptLifecycleReconciler{
+				Client: cli, APIReader: cli, Scheme: scheme,
+			}
+
+			if _, err := reconciler.Reconcile(context.Background(), ctrl.Request{
+				NamespacedName: client.ObjectKeyFromObject(receipt),
+			}); err == nil {
+				t.Fatalf("active root accepted protocol mirror %q", protocol)
+			}
+			current := &corev1.Secret{}
+			if err := cli.Get(context.Background(), client.ObjectKeyFromObject(receipt), current); err != nil {
+				t.Fatal(err)
+			}
+			if !slices.Contains(current.Finalizers, systemaccount.RestoreProtocolFinalizer) {
+				t.Fatalf("active root released finalizer for protocol mirror %q", protocol)
+			}
+		})
 	}
 }
 

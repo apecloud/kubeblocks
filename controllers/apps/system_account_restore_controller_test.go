@@ -21,6 +21,7 @@ package apps
 
 import (
 	"context"
+	"errors"
 	"reflect"
 	"slices"
 	"testing"
@@ -198,6 +199,38 @@ func TestSystemAccountRestoreLifecycleReleasesDamagedMetadataAfterRootGone(t *te
 	}
 }
 
+func TestSystemAccountRestoreLifecycleRecoversDamagedProtocolMirror(t *testing.T) {
+	for _, protocol := range []string{"", "foreign"} {
+		t.Run(protocol, func(t *testing.T) {
+			scheme := newSystemAccountLifecycleScheme(t)
+			request := newLifecycleRestoreRequest(t)
+			if protocol == "" {
+				delete(request.Annotations, systemaccount.RestoreProtocolAnnotationKey)
+			} else {
+				request.Annotations[systemaccount.RestoreProtocolAnnotationKey] = protocol
+			}
+			cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(request).Build()
+			reconciler := &SystemAccountRestoreLifecycleReconciler{
+				Client: cli, APIReader: cli, Scheme: scheme,
+			}
+
+			if _, err := reconciler.Reconcile(context.Background(), ctrl.Request{
+				NamespacedName: client.ObjectKeyFromObject(request),
+			}); err != nil {
+				t.Fatal(err)
+			}
+
+			current := &corev1.Secret{}
+			if err := cli.Get(context.Background(), client.ObjectKeyFromObject(request), current); err != nil {
+				t.Fatal(err)
+			}
+			if slices.Contains(current.Finalizers, systemaccount.RestoreProtocolFinalizer) {
+				t.Fatalf("protocol %q kept finalizer after root disappeared", protocol)
+			}
+		})
+	}
+}
+
 func TestSystemAccountRestoreLifecycleFailsClosedForDamagedMetadataWhileRootLive(t *testing.T) {
 	scheme := newSystemAccountLifecycleScheme(t)
 	request := newLifecycleRestoreRequest(t)
@@ -223,6 +256,235 @@ func TestSystemAccountRestoreLifecycleFailsClosedForDamagedMetadataWhileRootLive
 		NamespacedName: client.ObjectKeyFromObject(request),
 	}); err == nil {
 		t.Fatal("active root accepted damaged request metadata")
+	}
+}
+
+func TestSystemAccountRestoreLifecycleDamagedProtocolMirrorFailsClosedWhileRootLive(t *testing.T) {
+	for _, protocol := range []string{"", "foreign"} {
+		t.Run(protocol, func(t *testing.T) {
+			scheme := newSystemAccountLifecycleScheme(t)
+			request := newLifecycleRestoreRequest(t)
+			if protocol == "" {
+				delete(request.Annotations, systemaccount.RestoreProtocolAnnotationKey)
+			} else {
+				request.Annotations[systemaccount.RestoreProtocolAnnotationKey] = protocol
+			}
+			cluster := newLifecycleActiveCluster(request)
+			cli := fake.NewClientBuilder().WithScheme(scheme).
+				WithObjects(cluster, request).Build()
+			reconciler := &SystemAccountRestoreLifecycleReconciler{
+				Client: cli, APIReader: cli, Scheme: scheme,
+			}
+
+			if _, err := reconciler.Reconcile(context.Background(), ctrl.Request{
+				NamespacedName: client.ObjectKeyFromObject(request),
+			}); err == nil {
+				t.Fatalf("active root accepted protocol mirror %q", protocol)
+			}
+			current := &corev1.Secret{}
+			if err := cli.Get(context.Background(), client.ObjectKeyFromObject(request), current); err != nil {
+				t.Fatal(err)
+			}
+			if !slices.Contains(current.Finalizers, systemaccount.RestoreProtocolFinalizer) {
+				t.Fatalf("active root released finalizer for protocol mirror %q", protocol)
+			}
+		})
+	}
+}
+
+func TestSystemAccountRestoreLifecyclePersistsPostWriteCancellationBeforeReceiptClear(t *testing.T) {
+	scheme := newSystemAccountLifecycleScheme(t)
+	request := newLifecycleRestoreRequest(t)
+	request.Annotations[systemaccount.RestoreRequestPhaseAnnotationKey] =
+		string(systemaccount.RestoreRequestPhaseClaimed)
+	component := &appsv1.Component{ObjectMeta: metav1.ObjectMeta{
+		Namespace: "default",
+		Name:      "component",
+		UID:       "component-uid",
+	}}
+	target := newLifecycleExactTarget(t, scheme, request, component)
+	cli := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(component, request, target).Build()
+	reconciler := &SystemAccountRestoreLifecycleReconciler{
+		Client: cli, APIReader: cli, Scheme: scheme,
+	}
+	key := ctrl.Request{NamespacedName: client.ObjectKeyFromObject(request)}
+
+	if _, err := reconciler.Reconcile(context.Background(), key); err != nil {
+		t.Fatal(err)
+	}
+	currentRequest := &corev1.Secret{}
+	if err := cli.Get(context.Background(), client.ObjectKeyFromObject(request), currentRequest); err != nil {
+		t.Fatal(err)
+	}
+	if currentRequest.Annotations[systemaccount.RestoreRequestReasonAnnotationKey] !=
+		systemaccount.PostWriteCancellationReason {
+		t.Fatalf("reason = %q", currentRequest.Annotations[systemaccount.RestoreRequestReasonAnnotationKey])
+	}
+	currentTarget := &corev1.Secret{}
+	if err := cli.Get(context.Background(), client.ObjectKeyFromObject(target), currentTarget); err != nil {
+		t.Fatal(err)
+	}
+	if !systemaccount.TargetReceiptExactV2(
+		currentTarget, currentRequest, constant.DBComponentFinalizerName) {
+		t.Fatal("first pass cleared target receipt before durable cancellation")
+	}
+	if !slices.Contains(currentRequest.Finalizers, systemaccount.RestoreProtocolFinalizer) {
+		t.Fatal("first pass released protocol finalizer before receipt clear")
+	}
+
+	if _, err := reconciler.Reconcile(context.Background(), key); err != nil {
+		t.Fatal(err)
+	}
+	if err := cli.Get(context.Background(), client.ObjectKeyFromObject(request), currentRequest); err != nil {
+		t.Fatal(err)
+	}
+	if currentRequest.Annotations[systemaccount.RestoreRequestReasonAnnotationKey] !=
+		systemaccount.PostWriteCancellationReason {
+		t.Fatalf("second-pass reason = %q",
+			currentRequest.Annotations[systemaccount.RestoreRequestReasonAnnotationKey])
+	}
+	if slices.Contains(currentRequest.Finalizers, systemaccount.RestoreProtocolFinalizer) {
+		t.Fatal("gone-root second pass retained finalizer after receipt clear")
+	}
+	if err := cli.Get(context.Background(), client.ObjectKeyFromObject(target), currentTarget); err != nil {
+		t.Fatal(err)
+	}
+	if systemaccount.TargetReceiptExactV2(
+		currentTarget, currentRequest, constant.DBComponentFinalizerName) {
+		t.Fatal("second pass retained exact target receipt")
+	}
+}
+
+func TestSystemAccountRestoreLifecyclePersistsPostWriteCancellationForUnavailableOwner(t *testing.T) {
+	scheme := newSystemAccountLifecycleScheme(t)
+	request := newLifecycleRestoreRequest(t)
+	request.Annotations[systemaccount.RestoreRequestPhaseAnnotationKey] =
+		string(systemaccount.RestoreRequestPhaseClaimed)
+	cluster := newLifecycleActiveCluster(request)
+	component := &appsv1.Component{ObjectMeta: metav1.ObjectMeta{
+		Namespace: "default",
+		Name:      "component",
+		UID:       "component-uid",
+	}}
+	target := newLifecycleExactTarget(t, scheme, request, component)
+	originalData := target.DeepCopy().Data
+	cli := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(cluster, request, target).Build()
+	reconciler := &SystemAccountRestoreLifecycleReconciler{
+		Client: cli, APIReader: cli, Scheme: scheme,
+	}
+	key := ctrl.Request{NamespacedName: client.ObjectKeyFromObject(request)}
+
+	if _, err := reconciler.Reconcile(context.Background(), key); err != nil {
+		t.Fatal(err)
+	}
+	currentRequest := &corev1.Secret{}
+	if err := cli.Get(context.Background(), client.ObjectKeyFromObject(request), currentRequest); err != nil {
+		t.Fatal(err)
+	}
+	if currentRequest.Annotations[systemaccount.RestoreRequestReasonAnnotationKey] !=
+		systemaccount.PostWriteCancellationReason {
+		t.Fatalf("reason = %q", currentRequest.Annotations[systemaccount.RestoreRequestReasonAnnotationKey])
+	}
+	currentTarget := &corev1.Secret{}
+	if err := cli.Get(context.Background(), client.ObjectKeyFromObject(target), currentTarget); err != nil {
+		t.Fatal(err)
+	}
+	if !systemaccount.TargetReceiptExactV2(
+		currentTarget, currentRequest, constant.DBComponentFinalizerName) {
+		t.Fatal("first pass cleared target receipt before durable cancellation")
+	}
+
+	result, err := reconciler.Reconcile(context.Background(), key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.RequeueAfter == 0 {
+		t.Fatal("active root with unavailable owner lost its bounded lifecycle wake")
+	}
+	if err := cli.Get(context.Background(), client.ObjectKeyFromObject(request), currentRequest); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(currentRequest.Finalizers, systemaccount.RestoreProtocolFinalizer) {
+		t.Fatal("active root released request finalizer after target receipt clear")
+	}
+	if err := cli.Get(context.Background(), client.ObjectKeyFromObject(target), currentTarget); err != nil {
+		t.Fatal(err)
+	}
+	if systemaccount.TargetReceiptExactV2(
+		currentTarget, currentRequest, constant.DBComponentFinalizerName) {
+		t.Fatal("second pass retained exact target receipt")
+	}
+	if !reflect.DeepEqual(currentTarget.Data, originalData) {
+		t.Fatal("post-write cancellation changed target credential data")
+	}
+}
+
+func TestSystemAccountRestoreLifecycleRetainsPostWriteCancellationAcrossReleaseFailure(t *testing.T) {
+	scheme := newSystemAccountLifecycleScheme(t)
+	request := newLifecycleRestoreRequest(t)
+	request.Annotations[systemaccount.RestoreRequestPhaseAnnotationKey] =
+		string(systemaccount.RestoreRequestPhaseClaimed)
+	component := &appsv1.Component{ObjectMeta: metav1.ObjectMeta{
+		Namespace: "default",
+		Name:      "component",
+		UID:       "component-uid",
+	}}
+	target := newLifecycleExactTarget(t, scheme, request, component)
+	failRelease := false
+	base := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(component, request, target)
+	cli := base.WithInterceptorFuncs(interceptor.Funcs{
+		Update: func(ctx context.Context, cli client.WithWatch, object client.Object,
+			opts ...client.UpdateOption) error {
+			secret, ok := object.(*corev1.Secret)
+			if failRelease && ok && secret.Name == request.Name &&
+				!slices.Contains(secret.Finalizers, systemaccount.RestoreProtocolFinalizer) {
+				failRelease = false
+				return errors.New("injected request release failure")
+			}
+			return cli.Update(ctx, object, opts...)
+		},
+	}).Build()
+	reconciler := &SystemAccountRestoreLifecycleReconciler{
+		Client: cli, APIReader: cli, Scheme: scheme,
+	}
+	key := ctrl.Request{NamespacedName: client.ObjectKeyFromObject(request)}
+
+	if _, err := reconciler.Reconcile(context.Background(), key); err != nil {
+		t.Fatal(err)
+	}
+	failRelease = true
+	if _, err := reconciler.Reconcile(context.Background(), key); err == nil {
+		t.Fatal("injected request release failure was not observed")
+	}
+	currentRequest := &corev1.Secret{}
+	if err := cli.Get(context.Background(), client.ObjectKeyFromObject(request), currentRequest); err != nil {
+		t.Fatal(err)
+	}
+	if currentRequest.Annotations[systemaccount.RestoreRequestReasonAnnotationKey] !=
+		systemaccount.PostWriteCancellationReason {
+		t.Fatalf("reason after release failure = %q",
+			currentRequest.Annotations[systemaccount.RestoreRequestReasonAnnotationKey])
+	}
+	if !slices.Contains(currentRequest.Finalizers, systemaccount.RestoreProtocolFinalizer) {
+		t.Fatal("failed release unexpectedly removed finalizer")
+	}
+
+	if _, err := reconciler.Reconcile(context.Background(), key); err != nil {
+		t.Fatal(err)
+	}
+	if err := cli.Get(context.Background(), client.ObjectKeyFromObject(request), currentRequest); err != nil {
+		t.Fatal(err)
+	}
+	if currentRequest.Annotations[systemaccount.RestoreRequestReasonAnnotationKey] !=
+		systemaccount.PostWriteCancellationReason {
+		t.Fatalf("recovered reason = %q",
+			currentRequest.Annotations[systemaccount.RestoreRequestReasonAnnotationKey])
+	}
+	if slices.Contains(currentRequest.Finalizers, systemaccount.RestoreProtocolFinalizer) {
+		t.Fatal("recovered release retained finalizer")
 	}
 }
 

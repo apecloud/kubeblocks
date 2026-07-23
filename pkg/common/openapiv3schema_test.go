@@ -190,6 +190,9 @@ func TestValidateDataWithSchemaComposedConstraintOnlyIntegerMax(t *testing.T) {
 			if err := ValidateDataWithSchema(tt.schema, int64(math.MaxInt64)); err != nil {
 				t.Fatalf("expected MaxInt64 to satisfy the composed integer schema, got %v", err)
 			}
+			if err := ValidateDataWithSchema(tt.schema, uint64(1)<<63); err == nil {
+				t.Fatalf("expected 2^63 to violate the exclusive composed integer maximum")
+			}
 		})
 	}
 }
@@ -373,7 +376,7 @@ func TestValidateLargeIntegerBounds(t *testing.T) {
 		t.Fatalf("expected value above user max to be rejected")
 	}
 
-	// CUE uint64 extremum (2^64) should be skipped (not enforced manually)
+	// CUE uint64 extremum (2^64) should accept MaxUint64 exactly.
 	cueSchema := &apiextensionsv1.JSONSchemaProps{
 		Type: "object",
 		Properties: map[string]apiextensionsv1.JSONSchemaProps{
@@ -385,22 +388,26 @@ func TestValidateLargeIntegerBounds(t *testing.T) {
 		},
 	}
 	if err := validateLargeIntegerBounds(cueSchema, map[string]interface{}{"cue_u64": uint64(math.MaxUint64)}); err != nil {
-		t.Fatalf("expected CUE uint64 extremum to be skipped, got %v", err)
+		t.Fatalf("expected MaxUint64 below the CUE uint64 extremum to pass, got %v", err)
 	}
 
-	// CUE int64 extremum (2^63) should be skipped
+	// CUE int64 extremum (2^63 exclusive) should accept MaxInt64 and reject 2^63.
 	cueI64Schema := &apiextensionsv1.JSONSchemaProps{
 		Type: "object",
 		Properties: map[string]apiextensionsv1.JSONSchemaProps{
 			"cue_i64": {
-				Type:    "integer",
-				Minimum: ptrFloat64(-math.Exp2(63)),
-				Maximum: ptrFloat64(math.Exp2(63)),
+				Type:             "integer",
+				Minimum:          ptrFloat64(-math.Exp2(63)),
+				Maximum:          ptrFloat64(math.Exp2(63)),
+				ExclusiveMaximum: true,
 			},
 		},
 	}
 	if err := validateLargeIntegerBounds(cueI64Schema, map[string]interface{}{"cue_i64": int64(math.MaxInt64)}); err != nil {
-		t.Fatalf("expected CUE int64 extremum to be skipped, got %v", err)
+		t.Fatalf("expected MaxInt64 below the CUE int64 extremum to pass, got %v", err)
+	}
+	if err := validateLargeIntegerBounds(cueI64Schema, map[string]interface{}{"cue_i64": uint64(1) << 63}); err == nil {
+		t.Fatalf("expected 2^63 to violate the exclusive CUE int64 extremum")
 	}
 
 	// float64 value (JSON/YAML parser output) within user max should pass
@@ -449,24 +456,45 @@ func TestValidateLargeIntegerBounds(t *testing.T) {
 
 func TestValidateDataWithSchemaUserDeclaredLargeMax(t *testing.T) {
 	userMax := float64(1e19)
-	schema := &apiextensionsv1.JSONSchemaProps{
-		Type: "object",
-		Properties: map[string]apiextensionsv1.JSONSchemaProps{
-			"max_items": {
-				Type:    "integer",
-				Minimum: ptrFloat64(0),
-				Maximum: &userMax,
-			},
+	tests := []struct {
+		name            string
+		exclusive       bool
+		validBoundary   uint64
+		invalidBoundary uint64
+	}{
+		{
+			name:            "inclusive",
+			validBoundary:   uint64(1e19),
+			invalidBoundary: uint64(1e19) + 1,
+		},
+		{
+			name:            "exclusive",
+			exclusive:       true,
+			validBoundary:   uint64(1e19) - 1,
+			invalidBoundary: uint64(1e19),
 		},
 	}
 
-	// Value within user max passes end-to-end
-	if err := ValidateDataWithSchema(schema, map[string]interface{}{"max_items": uint64(9e18)}); err != nil {
-		t.Fatalf("expected value within user max to pass, got %v", err)
-	}
-	// Value above user max fails end-to-end
-	if err := ValidateDataWithSchema(schema, map[string]interface{}{"max_items": uint64(11e18)}); err == nil {
-		t.Fatalf("expected value above user-declared max to be rejected")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			schema := &apiextensionsv1.JSONSchemaProps{
+				Type: "object",
+				Properties: map[string]apiextensionsv1.JSONSchemaProps{
+					"max_items": {
+						Type:             "integer",
+						Minimum:          ptrFloat64(0),
+						Maximum:          &userMax,
+						ExclusiveMaximum: tt.exclusive,
+					},
+				},
+			}
+			if err := ValidateDataWithSchema(schema, map[string]interface{}{"max_items": tt.validBoundary}); err != nil {
+				t.Fatalf("expected exact value within user max to pass, got %v", err)
+			}
+			if err := ValidateDataWithSchema(schema, map[string]interface{}{"max_items": tt.invalidBoundary}); err == nil {
+				t.Fatalf("expected exact value outside user max to be rejected")
+			}
+		})
 	}
 }
 

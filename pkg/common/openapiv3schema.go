@@ -22,6 +22,7 @@ package common
 import (
 	"fmt"
 	"math"
+	"math/big"
 	"strconv"
 	"strings"
 
@@ -234,8 +235,7 @@ func intersectJSONSchemaType(left, right string) (string, bool) {
 
 // validateLargeIntegerBounds enforces original Maximum for integer properties
 // whose Maximum was >= 2^63 (stripped by stripIntegerOverflow to prevent
-// kube-openapi int64 overflow). CUE type extrema (2^63 for int64, 2^64 for
-// uint64) are skipped because ParseInt/ParseUint already enforce type range.
+// kube-openapi int64 overflow).
 func validateLargeIntegerBounds(schema *apiextensionsv1.JSONSchemaProps, data interface{}) error {
 	return validateLargeIntegerBoundsAt(schema, data, "", false)
 }
@@ -245,13 +245,12 @@ func validateLargeIntegerBoundsAt(schema *apiextensionsv1.JSONSchemaProps, data 
 		return nil
 	}
 	integerContext := hasEffectiveIntegerType(schema, inheritedInteger)
-	if integerContext && schema.Maximum != nil && *schema.Maximum >= math.Exp2(63) &&
-		*schema.Maximum != math.Exp2(63) && *schema.Maximum != math.Exp2(64) {
-		if f, ok := toFloat64(data); ok {
-			if schema.ExclusiveMaximum && f >= *schema.Maximum {
+	if integerContext && schema.Maximum != nil && *schema.Maximum >= math.Exp2(63) {
+		if cmp, ok := compareNumericValueToFloat64(data, *schema.Maximum); ok {
+			if schema.ExclusiveMaximum && cmp >= 0 {
 				return fmt.Errorf("%s: must be less than %g", schemaPath(path), *schema.Maximum)
 			}
-			if !schema.ExclusiveMaximum && f > *schema.Maximum {
+			if !schema.ExclusiveMaximum && cmp > 0 {
 				return fmt.Errorf("%s: must be less than or equal to %g", schemaPath(path), *schema.Maximum)
 			}
 		}
@@ -321,24 +320,51 @@ func schemaPath(path string) string {
 	return path
 }
 
-func toFloat64(val interface{}) (float64, bool) {
+func compareNumericValueToFloat64(val interface{}, bound float64) (int, bool) {
 	switch v := val.(type) {
 	case float64:
-		return v, true
+		return compareFloat64(v, bound)
 	case float32:
-		return float64(v), true
+		return compareFloat64(float64(v), bound)
 	case int64:
-		return float64(v), true
+		return compareIntegerToFloat64(big.NewInt(v), bound)
 	case uint64:
-		return float64(v), true
+		return compareIntegerToFloat64(new(big.Int).SetUint64(v), bound)
 	case int:
-		return float64(v), true
+		return compareIntegerToFloat64(big.NewInt(int64(v)), bound)
 	case int32:
-		return float64(v), true
+		return compareIntegerToFloat64(big.NewInt(int64(v)), bound)
 	case uint:
-		return float64(v), true
+		return compareIntegerToFloat64(new(big.Int).SetUint64(uint64(v)), bound)
 	case uint32:
-		return float64(v), true
+		return compareIntegerToFloat64(new(big.Int).SetUint64(uint64(v)), bound)
 	}
 	return 0, false
+}
+
+func compareIntegerToFloat64(value *big.Int, bound float64) (int, bool) {
+	boundValue := new(big.Rat).SetFloat64(bound)
+	if boundValue == nil {
+		if math.IsInf(bound, 1) {
+			return -1, true
+		}
+		if math.IsInf(bound, -1) {
+			return 1, true
+		}
+		return 0, false
+	}
+	return new(big.Rat).SetInt(value).Cmp(boundValue), true
+}
+
+func compareFloat64(value, bound float64) (int, bool) {
+	if math.IsNaN(value) || math.IsNaN(bound) {
+		return 0, false
+	}
+	if value < bound {
+		return -1, true
+	}
+	if value > bound {
+		return 1, true
+	}
+	return 0, true
 }

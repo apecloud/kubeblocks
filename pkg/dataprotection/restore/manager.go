@@ -386,7 +386,7 @@ func (r *RestoreManager) RestorePVCFromSnapshot(reqCtx intctrlutil.RequestCtx, c
 	if prepareDataConfig == nil {
 		return nil
 	}
-	createPVCWithSnapshot := func(claim dpv1alpha1.RestoreVolumeClaim) error {
+	createPVCWithSnapshot := func(claim dpv1alpha1.RestoreVolumeClaim, sourceIndex int) error {
 		if claim.VolumeSource == "" {
 			return intctrlutil.NewFatalError(fmt.Sprintf(`claim "%s"" volumeSource can not be empty if the backup uses volume snapshot`, claim.Name))
 		}
@@ -398,7 +398,7 @@ func (r *RestoreManager) RestorePVCFromSnapshot(reqCtx intctrlutil.RequestCtx, c
 			&vsv1.VolumeSnapshot{}); err != nil {
 			return err
 		} else if !exist {
-			sourceTargetPodName, err := GetSourcePodNameFromTarget(target, prepareDataConfig.RequiredPolicyForAllPodSelection, 0)
+			sourceTargetPodName, err := GetSourcePodNameFromTarget(target, prepareDataConfig.RequiredPolicyForAllPodSelection, sourceIndex)
 			if err != nil {
 				return err
 			}
@@ -422,7 +422,7 @@ func (r *RestoreManager) RestorePVCFromSnapshot(reqCtx intctrlutil.RequestCtx, c
 		return r.createPVCIfNotExist(reqCtx, cli, claim.ObjectMeta, claim.VolumeClaimSpec)
 	}
 	for i := range prepareDataConfig.RestoreVolumeClaims {
-		if err := createPVCWithSnapshot(prepareDataConfig.RestoreVolumeClaims[i]); err != nil {
+		if err := createPVCWithSnapshot(prepareDataConfig.RestoreVolumeClaims[i], 0); err != nil {
 			return err
 		}
 	}
@@ -437,7 +437,7 @@ func (r *RestoreManager) RestorePVCFromSnapshot(reqCtx intctrlutil.RequestCtx, c
 				// HACK: add InstanceSet related labels to the PVC,
 				// so that it can be managed by InstanceSet
 				addItsManagingLabels(&claim, index)
-				if err := createPVCWithSnapshot(claim); err != nil {
+				if err := createPVCWithSnapshot(claim, index); err != nil {
 					return err
 				}
 			}
@@ -550,7 +550,11 @@ func (r *RestoreManager) BuildPrepareDataJobs(reqCtx intctrlutil.RequestCtx, cli
 				jobBuilder.addToSpecificVolumesAndMounts(volume, volumeMount)
 			}
 		}
-		sourceTargetPodName, err := GetSourcePodNameFromTarget(target, prepareDataConfig.RequiredPolicyForAllPodSelection, i)
+		sourceIndex := i
+		if claimsTemplate != nil {
+			sourceIndex += int(claimsTemplate.StartingIndex)
+		}
+		sourceTargetPodName, err := GetSourcePodNameFromTarget(target, prepareDataConfig.RequiredPolicyForAllPodSelection, sourceIndex)
 		if err != nil {
 			return nil, err
 		}

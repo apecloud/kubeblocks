@@ -31,7 +31,6 @@ import (
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 func newRestoreManagerForTest() *RestoreManager {
@@ -116,6 +115,12 @@ func TestRestoreManagerBuildRequiredPolicy(t *testing.T) {
 	if got := manager.buildRequiredPolicy(nil); got != nil {
 		t.Fatalf("nil source target policy = %#v, want nil", got)
 	}
+	manager.SourceTargetName = "target-a"
+	if got := manager.buildRequiredPolicy(nil); got == nil ||
+		got.DataRestorePolicy != dpv1alpha1.OneToOneRestorePolicy {
+		t.Fatalf("explicit source target policy = %#v, want one-to-one", got)
+	}
+	manager.SourceTargetName = ""
 	if got := manager.buildRequiredPolicy(&dpv1alpha1.BackupStatusTarget{
 		BackupTarget: dpv1alpha1.BackupTarget{
 			PodSelector: &dpv1alpha1.PodSelector{Strategy: dpv1alpha1.PodSelectionStrategyAny},
@@ -342,7 +347,7 @@ func TestRestoreManagerBuildPrepareDataRestoreWithExplicitSourceTarget(t *testin
 	}
 }
 
-func TestRestoreManagerBuildPrepareDataRestoreRejectsUnknownSourceTarget(t *testing.T) {
+func TestRestoreManagerBuildPrepareDataRestorePropagatesUnknownSourceTarget(t *testing.T) {
 	manager := newRestoreManagerForTest()
 	manager.SourceTargetName = "missing-target"
 	comp := &component.SynthesizedComponent{
@@ -371,11 +376,15 @@ func TestRestoreManagerBuildPrepareDataRestoreRejectsUnknownSourceTarget(t *test
 	}
 
 	restore, err := manager.BuildPrepareDataRestore(comp, backup, nil)
-	if err == nil {
-		t.Fatalf("BuildPrepareDataRestore() restore = %#v, want source-target validation error", restore)
+	if err != nil {
+		t.Fatalf("BuildPrepareDataRestore() error = %v, want DataProtection to validate source target", err)
 	}
-	if !intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal) {
-		t.Fatalf("error = %T %v, want fatal error", err, err)
+	if restore.Spec.Backup.SourceTargetName != "missing-target" {
+		t.Fatalf("source target name = %q, want missing-target propagated", restore.Spec.Backup.SourceTargetName)
+	}
+	policy := restore.Spec.PrepareDataConfig.RequiredPolicyForAllPodSelection
+	if policy == nil || policy.DataRestorePolicy != dpv1alpha1.OneToOneRestorePolicy {
+		t.Fatalf("required policy = %#v, want one-to-one for explicit source target", policy)
 	}
 }
 

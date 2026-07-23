@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package openapi
 
 import (
+	"math"
 	"os"
 
 	"cuelang.org/go/cue"
@@ -183,6 +184,50 @@ var _ = Describe("CUE schema intersection semantics", func() {
 		},
 		Entry("generic integer then uint64", "genericThenUnsigned"),
 		Entry("uint64 then generic integer", "unsignedThenGeneric"),
+	)
+
+	DescribeTable("preserves signed integer ranges in mixed intersections",
+		func(definition string) {
+			const (
+				maxInt64      = "9223372036854775807"
+				aboveMaxInt64 = "9223372036854775808"
+			)
+
+			cueDefinition := runtime.Underlying().LookupPath(cue.MakePath(cue.Def(definition)))
+			Expect(cueDefinition.Unify(runtime.Context().Encode(map[string]interface{}{
+				"x": int64(9223372036854775807),
+			})).Validate(cue.Concrete(true))).To(Succeed())
+			Expect(cueDefinition.Unify(runtime.Context().Encode(map[string]interface{}{
+				"x": uint64(9223372036854775808),
+			})).Validate(cue.Concrete(true))).NotTo(Succeed())
+
+			schema, err := GenerateOpenAPISchema(cueTemplate, definition)
+			Expect(err).NotTo(HaveOccurred())
+			xSchema, ok := FlattenSchema(schema.Properties[DefaultSchemaName]).Properties["x"]
+			Expect(ok).To(BeTrue())
+			Expect(xSchema.Format).To(Equal("int64"))
+			Expect(xSchema.Minimum).NotTo(BeNil())
+			Expect(*xSchema.Minimum).To(Equal(float64(0)))
+			Expect(xSchema.Maximum).NotTo(BeNil())
+			Expect(*xSchema.Maximum).To(Equal(math.Exp2(63)))
+			Expect(xSchema.ExclusiveMaximum).To(BeTrue())
+			leafSchema := &apiextensionsv1.JSONSchemaProps{
+				Type:       SchemaStructType,
+				Properties: map[string]apiextensionsv1.JSONSchemaProps{"x": xSchema},
+			}
+
+			typedValue, err := common.ConvertStringToInterfaceBySchemaType(leafSchema, map[string]string{"x": maxInt64})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(typedValue["x"]).To(Equal(int64(9223372036854775807)))
+			Expect(common.ValidateDataWithSchema(leafSchema, typedValue)).To(Succeed())
+
+			typedValue, err = common.ConvertStringToInterfaceBySchemaType(leafSchema, map[string]string{"x": aboveMaxInt64})
+			if err == nil {
+				Expect(common.ValidateDataWithSchema(leafSchema, typedValue)).NotTo(Succeed())
+			}
+		},
+		Entry("int64 then uint64", "signed64ThenUnsigned"),
+		Entry("uint64 then int64", "unsignedThenSigned64"),
 	)
 
 	It("preserves conflicting leaf constraints when flattening", func() {

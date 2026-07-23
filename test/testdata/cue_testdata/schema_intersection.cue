@@ -64,3 +64,10 @@
 
 #genericThenUnsigned: #genericInteger & #unsignedInteger
 #unsignedThenGeneric: #unsignedInteger & #genericInteger
+
+#signed64Integer: {
+	x: int64
+}
+
+#signed64ThenUnsigned: #signed64Integer & #unsignedInteger
+#unsignedThenSigned64: #unsignedInteger & #signed64Integer

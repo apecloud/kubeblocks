@@ -35,6 +35,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/systemaccount"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 // clusterShardingAccountTransformer handles shared system accounts for sharding.
@@ -50,7 +51,32 @@ func (t *clusterShardingAccountTransformer) Transform(ctx graph.TransformContext
 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	handled, err := systemaccount.ReconcileRestoreRequests(transCtx.Context, graphCli, dag,
-		transCtx.Cluster, constant.DBClusterFinalizerName)
+		transCtx.Cluster, constant.DBClusterFinalizerName,
+		func(intent systemaccount.CredentialIntent) (*corev1.Secret, error) {
+			var sharding *appsv1.ClusterSharding
+			for i := range transCtx.shardings {
+				if transCtx.shardings[i].Name == intent.Target.ShardingName {
+					sharding = transCtx.shardings[i]
+					break
+				}
+			}
+			if sharding == nil {
+				return nil, systemaccount.NewTargetSemanticError(
+					systemaccount.TargetSemanticUnavailableReason,
+					fmt.Errorf("sharding %s is unavailable", intent.Target.ShardingName))
+			}
+			if _, err := t.definedSystemAccount(transCtx, sharding, intent.Target.Account); err != nil {
+				return nil, systemaccount.NewTargetSemanticError(
+					systemaccount.AccountUnavailableReason, err)
+			}
+			password := intent.Credentials[constant.AccountPasswdForSecret]
+			if len(password) == 0 {
+				return nil, systemaccount.NewTargetSemanticError(
+					systemaccount.TargetSemanticUnavailableReason,
+					fmt.Errorf("system account %s credential is unavailable", intent.Target.Account))
+			}
+			return t.newAccountSecretWithPassword(transCtx, sharding, intent.Target.Account, password)
+		})
 	if err != nil {
 		return err
 	}
@@ -189,6 +215,10 @@ func (t *clusterShardingAccountTransformer) newAccountSecretWithPassword(transCt
 		PutData(constant.AccountPasswdForSecret, password).
 		SetImmutable(true).
 		GetObject()
+	if err := intctrlutil.SetOwnership(cluster, secret, model.GetScheme(),
+		constant.DBClusterFinalizerName); err != nil {
+		return nil, err
+	}
 	return secret, nil
 }
 

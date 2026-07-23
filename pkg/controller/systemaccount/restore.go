@@ -25,6 +25,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"maps"
 	"reflect"
@@ -36,6 +37,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -47,6 +49,26 @@ import (
 const restoreRequestNamePrefix = "system-account-restore-"
 
 const restoreRequestRequeueAfter = time.Second
+
+type TargetSemanticError struct {
+	Reason string
+	Cause  error
+}
+
+func (e *TargetSemanticError) Error() string {
+	return fmt.Sprintf("%s: %v", e.Reason, e.Cause)
+}
+
+func (e *TargetSemanticError) Unwrap() error {
+	return e.Cause
+}
+
+func NewTargetSemanticError(reason string, cause error) error {
+	if reason != AccountUnavailableReason && reason != TargetSemanticUnavailableReason {
+		reason = TargetSemanticUnavailableReason
+	}
+	return &TargetSemanticError{Reason: reason, Cause: cause}
+}
 
 type restoreRequestControllerIdentity struct {
 	APIVersion string    `json:"apiVersion"`
@@ -196,7 +218,12 @@ func ReconcileRestoreRequests(ctx context.Context,
 	graphCli model.GraphClient,
 	dag *graph.DAG,
 	owner client.Object,
-	ownedFinalizer string) (bool, error) {
+	ownedFinalizer string,
+	targetBuilders ...func(CredentialIntent) (*corev1.Secret, error)) (bool, error) {
+	var targetBuilder func(CredentialIntent) (*corev1.Secret, error)
+	if len(targetBuilders) > 0 {
+		targetBuilder = targetBuilders[0]
+	}
 	requests := &corev1.SecretList{}
 	if err := graphCli.List(ctx, requests,
 		client.InNamespace(owner.GetNamespace()),
@@ -210,20 +237,32 @@ func ReconcileRestoreRequests(ctx context.Context,
 	seenTargets := map[string]string{}
 	for i := range requests.Items {
 		request := &requests.Items[i]
-		targetName := request.Annotations[constant.SystemAccountRestoreTargetAnnotationKey]
-		if !metav1.IsControlledBy(request, owner) {
+		if request.Annotations[RestoreProtocolAnnotationKey] != RestoreProtocolV2 {
+			continue
+		}
+		envelope, err := DecodeRestoreIntentEnvelope(request)
+		if err != nil || !sameObjectIdentity(envelope.Target.Owner, owner) {
+			continue
+		}
+		intent, err := DecodeRestoreRequestV2(request)
+		if err != nil {
+			return true, err
+		}
+		phase := RestoreRequestPhase(request.Annotations[RestoreRequestPhaseAnnotationKey])
+		if !phase.Valid() || !slices.Contains(request.Finalizers, RestoreProtocolFinalizer) {
+			// Invalid-phase and finalizer-release paths belong to the
+			// independent lifecycle controller.
 			continue
 		}
 		handled = true
-		if err := ValidateRestoreRequest(request); err != nil {
-			return true, err
+		targetDigest := request.Annotations[LogicalTargetDigestAnnotationKey]
+		if previous, ok := seenTargets[targetDigest]; ok {
+			return true, fmt.Errorf("multiple system account restore requests %s and %s target logical slot %s",
+				previous, request.Name, targetDigest)
 		}
-		if previous, ok := seenTargets[targetName]; ok {
-			return true, fmt.Errorf("multiple system account restore requests %s and %s target %s/%s",
-				previous, request.Name, request.Namespace, targetName)
-		}
-		seenTargets[targetName] = request.Name
-		if err := reconcileRestoreRequest(ctx, graphCli, dag, owner, ownedFinalizer, request, targetName); err != nil {
+		seenTargets[targetDigest] = request.Name
+		if err := reconcileRestoreRequestV2(ctx, graphCli, dag, owner, ownedFinalizer,
+			request, intent, targetBuilder); err != nil {
 			return true, err
 		}
 	}
@@ -234,39 +273,126 @@ func ReconcileRestoreRequests(ctx context.Context,
 	return handled, nil
 }
 
-func reconcileRestoreRequest(ctx context.Context,
+func reconcileRestoreRequestV2(
+	ctx context.Context,
 	graphCli model.GraphClient,
 	dag *graph.DAG,
 	owner client.Object,
 	ownedFinalizer string,
 	request *corev1.Secret,
-	targetName string) error {
+	intent CredentialIntent,
+	targetBuilder func(CredentialIntent) (*corev1.Secret, error),
+) error {
+	phase := RestoreRequestPhase(request.Annotations[RestoreRequestPhaseAnnotationKey])
 	if !request.DeletionTimestamp.IsZero() {
+		if phase == RestoreRequestPhaseClaimed || phase == RestoreRequestPhaseCommitted {
+			target, exact, err := findLinkedTarget(ctx, graphCli, request, intent, ownedFinalizer)
+			if err != nil {
+				return err
+			}
+			if exact {
+				updated := target.DeepCopy()
+				ClearTargetRestoreReceipt(updated)
+				graphCli.Update(dag, target, updated)
+			}
+		}
+		if phase != RestoreRequestPhaseFailed {
+			return updateRestoreRequestState(graphCli, dag, request,
+				RestoreRequestPhaseFailed, RequestDeletionRequestedReason, nil)
+		}
 		return nil
 	}
+	switch phase {
+	case RestoreRequestPhasePending:
+		if targetBuilder == nil {
+			return updateRestoreRequestState(graphCli, dag, request,
+				RestoreRequestPhaseFailed, TargetSemanticUnavailableReason, nil)
+		}
+		if _, err := targetBuilder(intent); err != nil {
+			return updateRestoreRequestState(graphCli, dag, request,
+				RestoreRequestPhaseFailed, targetSemanticFailureReason(err), nil)
+		}
+		return updateRestoreRequestState(graphCli, dag, request, RestoreRequestPhaseClaimed, "", nil)
+	case RestoreRequestPhaseClaimed, RestoreRequestPhaseCommitted:
+		return reconcileClaimedRestoreRequestV2(ctx, graphCli, dag, owner, ownedFinalizer,
+			request, intent, targetBuilder)
+	case RestoreRequestPhaseFailed:
+		return nil
+	default:
+		return fmt.Errorf("system account restore request %s/%s has invalid phase %q",
+			request.Namespace, request.Name, phase)
+	}
+}
+
+func reconcileClaimedRestoreRequestV2(
+	ctx context.Context,
+	graphCli model.GraphClient,
+	dag *graph.DAG,
+	owner client.Object,
+	ownedFinalizer string,
+	request *corev1.Secret,
+	intent CredentialIntent,
+	targetBuilder func(CredentialIntent) (*corev1.Secret, error),
+) error {
+	if targetBuilder == nil {
+		return updateRestoreRequestState(graphCli, dag, request,
+			RestoreRequestPhaseFailed, TargetSemanticUnavailableReason, nil)
+	}
+	desired, err := targetBuilder(intent)
+	if err != nil {
+		reason := targetSemanticFailureReason(err)
+		target, exact, findErr := findLinkedTarget(ctx, graphCli, request, intent, ownedFinalizer)
+		if findErr != nil {
+			return findErr
+		}
+		phase := RestoreRequestPhase(request.Annotations[RestoreRequestPhaseAnnotationKey])
+		if reason == AccountUnavailableReason && exact {
+			if phase == RestoreRequestPhaseCommitted {
+				return nil
+			}
+			// The independent lifecycle controller owns the final
+			// post-write operation/owner check and Committed transition.
+			return nil
+		}
+		if reason == AccountUnavailableReason && phase == RestoreRequestPhaseCommitted {
+			reason = CredentialContinuityLostReason
+		}
+		if reason == TargetSemanticUnavailableReason && exact {
+			updated := target.DeepCopy()
+			ClearTargetRestoreReceipt(updated)
+			graphCli.Update(dag, target, updated)
+		}
+		return updateRestoreRequestState(graphCli, dag, request,
+			RestoreRequestPhaseFailed, reason, nil)
+	}
+	if desired.Namespace != intent.Target.Namespace || desired.Name == "" {
+		return updateRestoreRequestState(graphCli, dag, request,
+			RestoreRequestPhaseFailed, TargetSemanticUnavailableReason,
+			nil)
+	}
+	if !sameControllerIdentity(metav1.GetControllerOf(desired), objectOwnerReference(intent.Target.Owner)) ||
+		!controllerutil.ContainsFinalizer(desired, ownedFinalizer) {
+		return updateRestoreRequestState(graphCli, dag, request,
+			RestoreRequestPhaseFailed, TargetSemanticUnavailableReason,
+			nil)
+	}
+	applyTargetReceipt(desired, request)
 
 	target := &corev1.Secret{}
-	key := client.ObjectKey{Namespace: request.Namespace, Name: targetName}
+	key := client.ObjectKeyFromObject(desired)
 	if err := graphCli.Get(ctx, key, target); err != nil {
 		if !apierrors.IsNotFound(err) {
-			return err
-		}
-		desired, err := desiredTarget(request, owner, ownedFinalizer)
-		if err != nil {
 			return err
 		}
 		graphCli.Create(dag, desired)
 		return nil
 	}
-
-	expectedOwner := metav1.GetControllerOf(request)
-	if expectedOwner == nil {
-		return fmt.Errorf("system account restore request %s/%s has no controller owner", request.Namespace, request.Name)
-	}
-	if !hasOwnerReference(target, expectedOwner) {
+	if !sameControllerIdentity(metav1.GetControllerOf(target),
+		objectOwnerReference(intent.Target.Owner)) {
 		if len(target.OwnerReferences) > 0 || !target.DeletionTimestamp.IsZero() {
-			return fmt.Errorf("system account restore target %s is not owned by %s %s",
-				key, expectedOwner.Kind, expectedOwner.Name)
+			return updateRestoreRequestState(graphCli, dag, request,
+				RestoreRequestPhaseFailed, TargetOwnerUnavailableReason,
+				nil)
 		}
 		adopted := target.DeepCopy()
 		if err := intctrlutil.SetOwnership(owner, adopted, model.GetScheme(), ownedFinalizer); err != nil {
@@ -275,7 +401,6 @@ func reconcileRestoreRequest(ctx context.Context,
 		graphCli.Update(dag, target, adopted)
 		return nil
 	}
-
 	if !target.DeletionTimestamp.IsZero() {
 		if controllerutil.ContainsFinalizer(target, ownedFinalizer) {
 			updated := target.DeepCopy()
@@ -285,60 +410,186 @@ func reconcileRestoreRequest(ctx context.Context,
 		return nil
 	}
 
-	desired := target.DeepCopy()
-	desired.Type = request.Type
-	desired.Immutable = request.Immutable
-	desired.Data = maps.Clone(request.Data)
-	mergeStringMap(requestTargetLabels(request), &desired.Labels)
-	delete(desired.Labels, constant.SystemAccountRestoreRequestLabelKey)
-	mergeStringMap(requestTargetAnnotations(request), &desired.Annotations)
-	delete(desired.Annotations, constant.SystemAccountRestoreTargetAnnotationKey)
-	if err := intctrlutil.SetOwnership(owner, desired, model.GetScheme(), ownedFinalizer); err != nil {
+	preserveUnownedTargetMetadata(target, desired)
+	applyTargetReceipt(desired, request)
+	desired.ResourceVersion = target.ResourceVersion
+	desired.UID = target.UID
+	desired.CreationTimestamp = target.CreationTimestamp
+	desired.ManagedFields = target.ManagedFields
+	revision, err := TargetCommitRevision(desired, ownedFinalizer)
+	if err != nil {
 		return err
 	}
-	if reflect.DeepEqual(target, desired) {
-		if controllerutil.ContainsFinalizer(request, ownedFinalizer) {
-			updated := request.DeepCopy()
-			controllerutil.RemoveFinalizer(updated, ownedFinalizer)
-			graphCli.Update(dag, request, updated)
-		} else {
-			graphCli.Delete(dag, request)
+	desired.Annotations[TargetCommitRevisionAnnotationKey] = revision
+	if !reflect.DeepEqual(target, desired) {
+		if target.Immutable != nil && *target.Immutable &&
+			(!reflect.DeepEqual(target.Data, desired.Data) ||
+				!reflect.DeepEqual(target.Immutable, desired.Immutable) ||
+				target.Type != desired.Type) {
+			return graphCli.Delete(dag, target, model.WithDeleteUID(target.UID))
 		}
+		graphCli.Update(dag, target, desired)
 		return nil
 	}
-	if target.Immutable != nil && *target.Immutable &&
-		(!reflect.DeepEqual(target.Data, desired.Data) ||
-			!reflect.DeepEqual(target.Immutable, desired.Immutable) ||
-			target.Type != desired.Type) {
-		graphCli.Delete(dag, target)
-		return nil
-	}
-	graphCli.Update(dag, target, desired)
+	// Target and receipt are exact. The lifecycle controller re-reads the
+	// operation and owner before it commits the request.
 	return nil
 }
 
-func desiredTarget(request *corev1.Secret, owner client.Object, ownedFinalizer string) (*corev1.Secret, error) {
-	targetName := request.Annotations[constant.SystemAccountRestoreTargetAnnotationKey]
-	if targetName == "" {
-		return nil, fmt.Errorf("system account restore request %s/%s has no target", request.Namespace, request.Name)
+func preserveUnownedTargetMetadata(current, desired *corev1.Secret) {
+	labels := maps.Clone(current.Labels)
+	if labels == nil {
+		labels = map[string]string{}
 	}
-	annotations := maps.Clone(request.Annotations)
-	delete(annotations, constant.SystemAccountRestoreTargetAnnotationKey)
-	target := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace:   request.Namespace,
-			Name:        targetName,
-			Labels:      requestTargetLabels(request),
-			Annotations: annotations,
-		},
-		Immutable: request.Immutable,
-		Type:      request.Type,
-		Data:      maps.Clone(request.Data),
+	maps.Copy(labels, desired.Labels)
+	desired.Labels = labels
+
+	annotations := maps.Clone(current.Annotations)
+	if annotations == nil {
+		annotations = map[string]string{}
 	}
-	if err := intctrlutil.SetOwnership(owner, target, model.GetScheme(), ownedFinalizer); err != nil {
-		return nil, err
+	maps.Copy(annotations, desired.Annotations)
+	desired.Annotations = annotations
+
+	finalizers := slices.Clone(current.Finalizers)
+	for _, finalizer := range desired.Finalizers {
+		if !slices.Contains(finalizers, finalizer) {
+			finalizers = append(finalizers, finalizer)
+		}
 	}
-	return target, nil
+	desired.Finalizers = finalizers
+
+	ownerReferences := slices.Clone(desired.OwnerReferences)
+	for _, ownerReference := range current.OwnerReferences {
+		if slices.ContainsFunc(ownerReferences, func(existing metav1.OwnerReference) bool {
+			return sameOwnerReferenceIdentity(existing, ownerReference)
+		}) {
+			continue
+		}
+		ownerReferences = append(ownerReferences, ownerReference)
+	}
+	desired.OwnerReferences = ownerReferences
+}
+
+func findLinkedTarget(
+	ctx context.Context,
+	graphCli model.GraphClient,
+	request *corev1.Secret,
+	intent CredentialIntent,
+	ownedFinalizer string,
+) (*corev1.Secret, bool, error) {
+	if name := request.Annotations[TargetSecretNameAnnotationKey]; name != "" {
+		target := &corev1.Secret{}
+		if err := graphCli.Get(ctx, client.ObjectKey{
+			Namespace: request.Namespace,
+			Name:      name,
+		}, target); err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil, false, nil
+			}
+			return nil, false, err
+		}
+		return target, TargetReceiptExactV2(target, request, ownedFinalizer), nil
+	}
+	targets := &corev1.SecretList{}
+	if err := graphCli.List(ctx, targets, client.InNamespace(intent.Target.Namespace)); err != nil {
+		return nil, false, err
+	}
+	var exactTarget *corev1.Secret
+	for i := range targets.Items {
+		target := &targets.Items[i]
+		if target.Annotations[RestoreRequestNameAnnotationKey] == request.Name &&
+			target.Annotations[RestoreRequestUIDAnnotationKey] == string(request.UID) &&
+			TargetReceiptExactV2(target, request, ownedFinalizer) {
+			if exactTarget != nil {
+				return nil, false, fmt.Errorf(
+					"multiple exact targets %s/%s and %s/%s link restore request %s/%s",
+					exactTarget.Namespace, exactTarget.Name, target.Namespace, target.Name,
+					request.Namespace, request.Name)
+			}
+			exactTarget = target
+		}
+	}
+	if exactTarget != nil {
+		return exactTarget, true, nil
+	}
+	return nil, false, nil
+}
+
+func targetSemanticFailureReason(err error) string {
+	var semanticErr *TargetSemanticError
+	if errors.As(err, &semanticErr) {
+		return semanticErr.Reason
+	}
+	return TargetSemanticUnavailableReason
+}
+
+func updateRestoreRequestState(
+	graphCli model.GraphClient,
+	dag *graph.DAG,
+	request *corev1.Secret,
+	phase RestoreRequestPhase,
+	reason string,
+	annotations map[string]string,
+) error {
+	var receipt *RestoreCommitReceipt
+	if phase == RestoreRequestPhaseCommitted {
+		receipt = &RestoreCommitReceipt{
+			TargetName:     annotations[TargetSecretNameAnnotationKey],
+			TargetUID:      types.UID(annotations[TargetSecretUIDAnnotationKey]),
+			CommitRevision: annotations[TargetCommitRevisionAnnotationKey],
+		}
+	}
+	updated, err := TransitionRestoreRequestV2(request, phase, reason, receipt, false)
+	if err != nil {
+		return err
+	}
+	graphCli.Update(dag, request, updated)
+	return nil
+}
+
+func applyTargetReceipt(target, request *corev1.Secret) {
+	if target.Annotations == nil {
+		target.Annotations = map[string]string{}
+	}
+	target.Annotations[constant.SystemAccountProvisionedAnnotationKey] = "true"
+	target.Annotations[RestoreProtocolAnnotationKey] = RestoreProtocolV2
+	target.Annotations[RestoreOperationDigestAnnotationKey] =
+		request.Annotations[RestoreOperationDigestAnnotationKey]
+	target.Annotations[CredentialIntentRevisionAnnotationKey] =
+		request.Annotations[CredentialIntentRevisionAnnotationKey]
+	target.Annotations[RestoreRequestNameAnnotationKey] = request.Name
+	target.Annotations[RestoreRequestUIDAnnotationKey] = string(request.UID)
+	delete(target.Annotations, constant.SystemAccountRestoreTargetAnnotationKey)
+	delete(target.Labels, constant.SystemAccountRestoreRequestLabelKey)
+}
+
+func objectOwnerReference(identity ObjectIdentity) *metav1.OwnerReference {
+	controller := true
+	blockOwnerDeletion := true
+	return &metav1.OwnerReference{
+		APIVersion:         identity.APIVersion,
+		Kind:               identity.Kind,
+		Name:               identity.Name,
+		UID:                identity.UID,
+		Controller:         &controller,
+		BlockOwnerDeletion: &blockOwnerDeletion,
+	}
+}
+
+func sameObjectIdentity(identity ObjectIdentity, object client.Object) bool {
+	if object == nil {
+		return false
+	}
+	gvk, err := apiutil.GVKForObject(object, model.GetScheme())
+	if err != nil {
+		return false
+	}
+	return identity.APIVersion == gvk.GroupVersion().String() &&
+		identity.Kind == gvk.Kind &&
+		identity.Namespace == object.GetNamespace() &&
+		identity.Name == object.GetName() &&
+		identity.UID == object.GetUID()
 }
 
 func requestTargetLabels(request *corev1.Secret) map[string]string {
@@ -355,29 +606,12 @@ func requestTargetAnnotations(request *corev1.Secret) map[string]string {
 
 func sameControllerIdentity(a, b *metav1.OwnerReference) bool {
 	return a != nil && b != nil &&
-		a.APIVersion == b.APIVersion &&
+		sameOwnerReferenceIdentity(*a, *b)
+}
+
+func sameOwnerReferenceIdentity(a, b metav1.OwnerReference) bool {
+	return a.APIVersion == b.APIVersion &&
 		a.Kind == b.Kind &&
 		a.Name == b.Name &&
 		a.UID == b.UID
-}
-
-func hasOwnerReference(object client.Object, expected *metav1.OwnerReference) bool {
-	return expected != nil && slices.ContainsFunc(object.GetOwnerReferences(), func(actual metav1.OwnerReference) bool {
-		return actual.APIVersion == expected.APIVersion &&
-			actual.Kind == expected.Kind &&
-			actual.Name == expected.Name &&
-			actual.UID == expected.UID
-	})
-}
-
-func mergeStringMap(from map[string]string, to *map[string]string) {
-	if len(from) == 0 {
-		return
-	}
-	if *to == nil {
-		*to = map[string]string{}
-	}
-	for key, value := range from {
-		(*to)[key] = value
-	}
 }

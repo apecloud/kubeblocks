@@ -48,6 +48,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	"github.com/apecloud/kubeblocks/pkg/testutil"
@@ -124,6 +125,9 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 
 	err = appsv1.AddToScheme(scheme)
+	Expect(err).NotTo(HaveOccurred())
+
+	err = workloadsv1.AddToScheme(scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	err = dpv1alpha1.AddToScheme(scheme)

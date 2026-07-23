@@ -39,309 +39,314 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-func TestReconcileRestoreRequestsKeepsFinalizerOwnership(t *testing.T) {
-	registerModelScheme(t)
-	testCases := []struct {
-		name      string
-		owner     client.Object
-		finalizer string
-	}{
-		{
-			name: "Component owner",
-			owner: &appsv1.Component{
-				TypeMeta:   metav1.TypeMeta{APIVersion: appsv1.GroupVersion.String(), Kind: "Component"},
-				ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "cluster-mysql", UID: types.UID("component-uid")},
-			},
-			finalizer: constant.DBComponentFinalizerName,
-		},
-		{
-			name: "Cluster owner",
-			owner: &appsv1.Cluster{
-				TypeMeta:   metav1.TypeMeta{APIVersion: appsv1.GroupVersion.String(), Kind: "Cluster"},
-				ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "cluster", UID: types.UID("cluster-uid")},
-			},
-			finalizer: constant.DBClusterFinalizerName,
-		},
-	}
+func TestRestoreRequestPendingClaimsBeforeTargetMutation(t *testing.T) {
+	fixture := newRestoreStateFixture(t)
+	graphCli, dag := fixture.graph()
 
-	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			scheme := runtime.NewScheme()
-			require.NoError(t, corev1.AddToScheme(scheme))
-			require.NoError(t, appsv1.AddToScheme(scheme))
-			deletionTime := metav1.Now()
-			target := &corev1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace:         "default",
-					Name:              "cluster-mysql-root",
-					DeletionTimestamp: &deletionTime,
-					Finalizers:        []string{testCase.finalizer, "another.example.io/finalizer"},
-				},
-				Immutable: boolPtr(true),
-				Data: map[string][]byte{
-					constant.AccountNameForSecret:   []byte("root"),
-					constant.AccountPasswdForSecret: []byte("old-password"),
-				},
-			}
-			request := newTestRestoreRequest(target.Name)
-			require.NoError(t, controllerutil.SetControllerReference(testCase.owner, target, scheme))
-			require.NoError(t, controllerutil.SetControllerReference(testCase.owner, request, scheme))
-			require.NoError(t, SetRestoreRevision(request))
-			graphCli := model.NewGraphClient(fake.NewClientBuilder().WithScheme(scheme).WithObjects(target, request).Build())
-			dag := graph.NewDAG()
-			graphCli.Root(dag, testCase.owner.DeepCopyObject().(client.Object), testCase.owner, model.ActionStatusPtr())
+	handled, err := ReconcileRestoreRequests(context.Background(), graphCli, dag,
+		fixture.owner, constant.DBComponentFinalizerName, fixture.targetBuilder)
 
-			handled, err := ReconcileRestoreRequests(context.Background(), graphCli, dag, testCase.owner, testCase.finalizer)
-
-			require.True(t, intctrlutil.IsRequeueError(err), err)
-			require.True(t, handled)
-			require.True(t, graphCli.IsAction(dag, target, model.ActionUpdatePtr()))
-			vertex := graphCli.FindMatchedVertex(dag, target).(*model.ObjectVertex)
-			updated := vertex.Obj.(*corev1.Secret)
-			require.NotContains(t, updated.Finalizers, testCase.finalizer)
-			require.Contains(t, updated.Finalizers, "another.example.io/finalizer")
-		})
-	}
+	require.True(t, handled)
+	require.True(t, intctrlutil.IsRequeueError(err), err)
+	require.True(t, graphCli.IsAction(dag, fixture.request, model.ActionUpdatePtr()))
+	updated := graphCli.FindMatchedVertex(dag, fixture.request).(*model.ObjectVertex).Obj.(*corev1.Secret)
+	require.Equal(t, string(RestoreRequestPhaseClaimed),
+		updated.Annotations[RestoreRequestPhaseAnnotationKey])
+	require.Len(t, graphCli.FindAll(dag, &corev1.Secret{}), 1,
+		"claim round must not mutate the target")
 }
 
-func TestReconcileRestoreRequestsCreatesTargetBeforeDeletingRequest(t *testing.T) {
-	registerModelScheme(t)
-	scheme := runtime.NewScheme()
-	require.NoError(t, corev1.AddToScheme(scheme))
-	require.NoError(t, appsv1.AddToScheme(scheme))
-	owner := &appsv1.Component{
-		TypeMeta:   metav1.TypeMeta{APIVersion: appsv1.GroupVersion.String(), Kind: "Component"},
-		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "cluster-mysql", UID: types.UID("component-uid")},
-	}
-	request := newTestRestoreRequest("cluster-mysql-root")
-	require.NoError(t, controllerutil.SetControllerReference(owner, request, scheme))
-	require.NoError(t, SetRestoreRevision(request))
-	graphCli := model.NewGraphClient(fake.NewClientBuilder().WithScheme(scheme).WithObjects(request).Build())
-	dag := graph.NewDAG()
-	graphCli.Root(dag, owner.DeepCopy(), owner, model.ActionStatusPtr())
+func TestClaimedRestoreRequestCreatesAppsOwnedTarget(t *testing.T) {
+	fixture := newRestoreStateFixture(t)
+	fixture.request.Annotations[RestoreRequestPhaseAnnotationKey] = string(RestoreRequestPhaseClaimed)
+	graphCli, dag := fixture.graph()
 
-	handled, err := ReconcileRestoreRequests(context.Background(), graphCli, dag, owner, constant.DBComponentFinalizerName)
+	handled, err := ReconcileRestoreRequests(context.Background(), graphCli, dag,
+		fixture.owner, constant.DBComponentFinalizerName, fixture.targetBuilder)
 
-	require.True(t, intctrlutil.IsRequeueError(err), err)
 	require.True(t, handled)
-	objects := graphCli.FindAll(dag, &corev1.Secret{})
-	require.Len(t, objects, 1)
-	target := objects[0].(*corev1.Secret)
-	require.Equal(t, "cluster-mysql-root", target.Name)
+	require.True(t, intctrlutil.IsRequeueError(err), err)
+	target := findTargetVertex(t, graphCli, dag, fixture.request)
 	require.True(t, graphCli.IsAction(dag, target, model.ActionCreatePtr()))
-	require.Contains(t, target.Finalizers, constant.DBComponentFinalizerName)
 	require.Equal(t, []byte("new-password"), target.Data[constant.AccountPasswdForSecret])
-	require.NotContains(t, target.Annotations, constant.SystemAccountRestoreTargetAnnotationKey)
-	require.NotContains(t, target.Labels, constant.SystemAccountRestoreRequestLabelKey)
-	require.Equal(t, request.Annotations[constant.SystemAccountRestoreRevisionAnnotationKey],
-		target.Annotations[constant.SystemAccountRestoreRevisionAnnotationKey])
-	require.False(t, graphCli.IsAction(dag, request, model.ActionDeletePtr()), "request must survive the target-create commit")
-}
-
-func TestReconcileRestoreRequestsDeletesImmutableTargetWithoutReleasingFinalizer(t *testing.T) {
-	registerModelScheme(t)
-	scheme := runtime.NewScheme()
-	require.NoError(t, corev1.AddToScheme(scheme))
-	require.NoError(t, appsv1.AddToScheme(scheme))
-	owner := &appsv1.Component{
-		TypeMeta:   metav1.TypeMeta{APIVersion: appsv1.GroupVersion.String(), Kind: "Component"},
-		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "cluster-mysql", UID: types.UID("component-uid")},
-	}
-	request := newTestRestoreRequest("cluster-mysql-root")
-	request.Immutable = nil
-	target := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace:  "default",
-			Name:       "cluster-mysql-root",
-			Finalizers: []string{constant.DBComponentFinalizerName},
-		},
-		Immutable: boolPtr(true),
-		Type:      corev1.SecretTypeOpaque,
-		Data: map[string][]byte{
-			constant.AccountNameForSecret:   []byte("root"),
-			constant.AccountPasswdForSecret: []byte("old-password"),
-		},
-	}
-	require.NoError(t, controllerutil.SetControllerReference(owner, request, scheme))
-	require.NoError(t, controllerutil.SetOwnerReference(owner, target, scheme))
-	require.NoError(t, SetRestoreRevision(request))
-	graphCli := model.NewGraphClient(fake.NewClientBuilder().WithScheme(scheme).WithObjects(target, request).Build())
-	dag := graph.NewDAG()
-	graphCli.Root(dag, owner.DeepCopy(), owner, model.ActionStatusPtr())
-
-	handled, err := ReconcileRestoreRequests(context.Background(), graphCli, dag, owner, constant.DBComponentFinalizerName)
-
-	require.True(t, intctrlutil.IsRequeueError(err), err)
-	require.True(t, handled)
-	require.True(t, graphCli.IsAction(dag, target, model.ActionDeletePtr()))
-	require.Contains(t, target.Finalizers, constant.DBComponentFinalizerName,
-		"the owner releases its finalizer only after deletion is observed")
-	require.False(t, graphCli.IsAction(dag, request, model.ActionDeletePtr()))
-}
-
-func TestReconcileRestoreRequestsAdoptsTargetBeforeMutatingIt(t *testing.T) {
-	registerModelScheme(t)
-	scheme := runtime.NewScheme()
-	require.NoError(t, corev1.AddToScheme(scheme))
-	require.NoError(t, appsv1.AddToScheme(scheme))
-	owner := &appsv1.Component{
-		TypeMeta:   metav1.TypeMeta{APIVersion: appsv1.GroupVersion.String(), Kind: "Component"},
-		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "cluster-mysql", UID: types.UID("component-uid")},
-	}
-	request := newTestRestoreRequest("cluster-mysql-root")
-	request.Immutable = nil
-	target := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "cluster-mysql-root"},
-		Type:       corev1.SecretTypeOpaque,
-		Data: map[string][]byte{
-			constant.AccountNameForSecret:   []byte("root"),
-			constant.AccountPasswdForSecret: []byte("old-password"),
-		},
-	}
-	require.NoError(t, controllerutil.SetControllerReference(owner, request, scheme))
-	require.NoError(t, SetRestoreRevision(request))
-	graphCli := model.NewGraphClient(fake.NewClientBuilder().WithScheme(scheme).WithObjects(target, request).Build())
-	dag := graph.NewDAG()
-	graphCli.Root(dag, owner.DeepCopy(), owner, model.ActionStatusPtr())
-
-	handled, err := ReconcileRestoreRequests(context.Background(), graphCli, dag, owner, constant.DBComponentFinalizerName)
-
-	require.True(t, intctrlutil.IsRequeueError(err), err)
-	require.True(t, handled)
-	require.True(t, graphCli.IsAction(dag, target, model.ActionUpdatePtr()))
-	updated := graphCli.FindMatchedVertex(dag, target).(*model.ObjectVertex).Obj.(*corev1.Secret)
-	require.Equal(t, []byte("old-password"), updated.Data[constant.AccountPasswdForSecret],
-		"the ownership commit must precede the credential mutation")
-	require.True(t, metav1.IsControlledBy(updated, owner))
-	require.Contains(t, updated.Finalizers, constant.DBComponentFinalizerName)
-}
-
-func TestReconcileRestoreRequestsDoesNotReleaseAnotherOwnersFinalizer(t *testing.T) {
-	registerModelScheme(t)
-	scheme := runtime.NewScheme()
-	require.NoError(t, corev1.AddToScheme(scheme))
-	require.NoError(t, appsv1.AddToScheme(scheme))
-	owner := &appsv1.Component{
-		TypeMeta:   metav1.TypeMeta{APIVersion: appsv1.GroupVersion.String(), Kind: "Component"},
-		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "cluster-mysql", UID: types.UID("component-uid")},
-	}
-	otherOwner := &appsv1.Component{
-		TypeMeta:   metav1.TypeMeta{APIVersion: appsv1.GroupVersion.String(), Kind: "Component"},
-		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "other-mysql", UID: types.UID("other-component-uid")},
-	}
-	request := newTestRestoreRequest("cluster-mysql-root")
-	deletionTime := metav1.Now()
-	target := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{
-		Namespace:         "default",
-		Name:              "cluster-mysql-root",
-		DeletionTimestamp: &deletionTime,
-		Finalizers:        []string{constant.DBComponentFinalizerName},
-	}}
-	require.NoError(t, controllerutil.SetControllerReference(owner, request, scheme))
-	require.NoError(t, controllerutil.SetControllerReference(otherOwner, target, scheme))
-	require.NoError(t, SetRestoreRevision(request))
-	graphCli := model.NewGraphClient(fake.NewClientBuilder().WithScheme(scheme).WithObjects(target, request).Build())
-	dag := graph.NewDAG()
-	graphCli.Root(dag, owner.DeepCopy(), owner, model.ActionStatusPtr())
-
-	handled, err := ReconcileRestoreRequests(context.Background(), graphCli, dag, owner, constant.DBComponentFinalizerName)
-
-	require.ErrorContains(t, err, "is not owned")
-	require.True(t, handled)
-	require.False(t, graphCli.IsAction(dag, target, model.ActionUpdatePtr()))
+	require.Equal(t, "true", target.Annotations[constant.SystemAccountProvisionedAnnotationKey])
+	require.Equal(t, fixture.request.Name, target.Annotations[RestoreRequestNameAnnotationKey])
+	require.Equal(t, string(fixture.request.UID), target.Annotations[RestoreRequestUIDAnnotationKey])
 	require.Contains(t, target.Finalizers, constant.DBComponentFinalizerName)
+	require.NotContains(t, target.Labels, constant.SystemAccountRestoreRequestLabelKey)
 }
 
-func TestReconcileRestoreRequestsDeletesRequestOnlyAfterTargetConverges(t *testing.T) {
-	registerModelScheme(t)
-	scheme := runtime.NewScheme()
-	require.NoError(t, corev1.AddToScheme(scheme))
-	require.NoError(t, appsv1.AddToScheme(scheme))
-	owner := &appsv1.Cluster{
-		TypeMeta:   metav1.TypeMeta{APIVersion: appsv1.GroupVersion.String(), Kind: "Cluster"},
-		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "cluster", UID: types.UID("cluster-uid")},
-	}
-	request := newTestRestoreRequest("cluster-shard-root")
-	target := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace:   "default",
-			Name:        "cluster-shard-root",
-			Labels:      map[string]string{"role": "root"},
-			Annotations: map[string]string{constant.SystemAccountProvisionedAnnotationKey: "true"},
-			Finalizers:  []string{constant.DBClusterFinalizerName},
-		},
-		Immutable: boolPtr(true),
-		Type:      corev1.SecretTypeOpaque,
-		Data: map[string][]byte{
-			constant.AccountNameForSecret:   []byte("root"),
-			constant.AccountPasswdForSecret: []byte("new-password"),
-		},
-	}
-	require.NoError(t, controllerutil.SetControllerReference(owner, request, scheme))
-	require.NoError(t, controllerutil.SetControllerReference(owner, target, scheme))
-	require.NoError(t, SetRestoreRevision(request))
-	target.Annotations[constant.SystemAccountRestoreRevisionAnnotationKey] =
-		request.Annotations[constant.SystemAccountRestoreRevisionAnnotationKey]
-	graphCli := model.NewGraphClient(fake.NewClientBuilder().WithScheme(scheme).WithObjects(target, request).Build())
-	dag := graph.NewDAG()
-	graphCli.Root(dag, owner.DeepCopy(), owner, model.ActionStatusPtr())
+func TestClaimedRestoreRequestLeavesExactTargetForLifecycleCommit(t *testing.T) {
+	fixture := newRestoreStateFixture(t)
+	fixture.request.Annotations[RestoreRequestPhaseAnnotationKey] = string(RestoreRequestPhaseClaimed)
+	target, err := fixture.targetBuilder(fixture.intent)
+	require.NoError(t, err)
+	target.UID = types.UID("target-uid")
+	target.ResourceVersion = "7"
+	applyTargetReceipt(target, fixture.request)
+	revision, err := TargetCommitRevision(target, constant.DBComponentFinalizerName)
+	require.NoError(t, err)
+	target.Annotations[TargetCommitRevisionAnnotationKey] = revision
+	fixture.objects = append(fixture.objects, target)
+	graphCli, dag := fixture.graph()
 
-	handled, err := ReconcileRestoreRequests(context.Background(), graphCli, dag, owner, constant.DBClusterFinalizerName)
+	handled, err := ReconcileRestoreRequests(context.Background(), graphCli, dag,
+		fixture.owner, constant.DBComponentFinalizerName, fixture.targetBuilder)
 
-	require.True(t, intctrlutil.IsRequeueError(err), err)
 	require.True(t, handled)
-	require.True(t, graphCli.IsAction(dag, request, model.ActionDeletePtr()))
+	require.True(t, intctrlutil.IsRequeueError(err), err)
+	require.False(t, graphCli.IsAction(dag, fixture.request, model.ActionUpdatePtr()),
+		"the target transformer must not commit before the lifecycle controller rechecks the operation")
+	require.Equal(t, string(RestoreRequestPhaseClaimed),
+		fixture.request.Annotations[RestoreRequestPhaseAnnotationKey])
+	require.Equal(t, revision, target.Annotations[TargetCommitRevisionAnnotationKey])
+}
+
+func TestClaimedRestoreRequestDeletesImmutableTargetWithObservedUID(t *testing.T) {
+	fixture := newRestoreStateFixture(t)
+	fixture.request.Annotations[RestoreRequestPhaseAnnotationKey] = string(RestoreRequestPhaseClaimed)
+	target, err := fixture.targetBuilder(fixture.intent)
+	require.NoError(t, err)
+	immutable := true
+	target.Immutable = &immutable
+	target.UID = types.UID("old-target-uid")
+	target.ResourceVersion = "8"
+	target.Data[constant.AccountPasswdForSecret] = []byte("old-password")
+	fixture.objects = append(fixture.objects, target)
+	graphCli, dag := fixture.graph()
+
+	handled, err := ReconcileRestoreRequests(context.Background(), graphCli, dag,
+		fixture.owner, constant.DBComponentFinalizerName, fixture.targetBuilder)
+
+	require.True(t, handled)
+	require.True(t, intctrlutil.IsRequeueError(err), err)
+	require.True(t, graphCli.IsAction(dag, target, model.ActionDeletePtr()))
+	vertex := graphCli.FindMatchedVertex(dag, target).(*model.ObjectVertex)
+	require.NotNil(t, vertex.DeletePreconditions)
+	require.NotNil(t, vertex.DeletePreconditions.UID)
+	require.Equal(t, target.UID, *vertex.DeletePreconditions.UID)
+	require.False(t, graphCli.IsAction(dag, fixture.request, model.ActionUpdatePtr()))
+}
+
+func TestClaimedRestoreRequestPreservesUnownedTargetMetadata(t *testing.T) {
+	fixture := newRestoreStateFixture(t)
+	fixture.request.Annotations[RestoreRequestPhaseAnnotationKey] = string(RestoreRequestPhaseClaimed)
+	target, err := fixture.targetBuilder(fixture.intent)
+	require.NoError(t, err)
+	target.UID = "target-uid"
+	target.ResourceVersion = "8"
+	target.Data[constant.AccountPasswdForSecret] = []byte("old-password")
+	target.Labels["external-label"] = "keep"
+	target.Annotations["external-annotation"] = "keep"
+	target.Finalizers = append(target.Finalizers, "external.example.io/protection")
+	notController := false
+	target.OwnerReferences = append(target.OwnerReferences, metav1.OwnerReference{
+		APIVersion: "example.io/v1",
+		Kind:       "Observer",
+		Name:       "observer",
+		UID:        "observer-uid",
+		Controller: &notController,
+	})
+	fixture.objects = append(fixture.objects, target)
+	graphCli, dag := fixture.graph()
+
+	handled, reconcileErr := ReconcileRestoreRequests(context.Background(), graphCli, dag,
+		fixture.owner, constant.DBComponentFinalizerName, fixture.targetBuilder)
+
+	require.True(t, handled)
+	require.True(t, intctrlutil.IsRequeueError(reconcileErr), reconcileErr)
+	vertex := graphCli.FindMatchedVertex(dag, target).(*model.ObjectVertex)
+	require.Equal(t, model.ActionUpdatePtr(), vertex.Action)
+	updated := vertex.Obj.(*corev1.Secret)
+	require.Equal(t, "keep", updated.Labels["external-label"])
+	require.Equal(t, "keep", updated.Annotations["external-annotation"])
+	require.Contains(t, updated.Finalizers, "external.example.io/protection")
+	require.Contains(t, updated.OwnerReferences, target.OwnerReferences[1])
+	require.Equal(t, []byte("new-password"), updated.Data[constant.AccountPasswdForSecret])
+}
+
+func TestDeletingRequestFailsWithoutTargetMutation(t *testing.T) {
+	fixture := newRestoreStateFixture(t)
+	fixture.request.Annotations[RestoreRequestPhaseAnnotationKey] = string(RestoreRequestPhaseClaimed)
+	now := metav1.Now()
+	fixture.request.DeletionTimestamp = &now
+	graphCli, dag := fixture.graph()
+
+	handled, err := ReconcileRestoreRequests(context.Background(), graphCli, dag,
+		fixture.owner, constant.DBComponentFinalizerName, fixture.targetBuilder)
+
+	require.True(t, handled)
+	require.True(t, intctrlutil.IsRequeueError(err), err)
+	updated := graphCli.FindMatchedVertex(dag, fixture.request).(*model.ObjectVertex).Obj.(*corev1.Secret)
+	require.Equal(t, string(RestoreRequestPhaseFailed),
+		updated.Annotations[RestoreRequestPhaseAnnotationKey])
+	require.Equal(t, "RequestDeletionRequested",
+		updated.Annotations[RestoreRequestReasonAnnotationKey])
+	require.Len(t, graphCli.FindAll(dag, &corev1.Secret{}), 1)
+}
+
+func TestUnavailableTargetSemanticFailsPendingRequest(t *testing.T) {
+	fixture := newRestoreStateFixture(t)
+	graphCli, dag := fixture.graph()
+
+	handled, err := ReconcileRestoreRequests(context.Background(), graphCli, dag,
+		fixture.owner, constant.DBComponentFinalizerName,
+		func(CredentialIntent) (*corev1.Secret, error) {
+			return nil, context.Canceled
+		})
+
+	require.True(t, handled)
+	require.True(t, intctrlutil.IsRequeueError(err), err)
+	updated := graphCli.FindMatchedVertex(dag, fixture.request).(*model.ObjectVertex).Obj.(*corev1.Secret)
+	require.Equal(t, string(RestoreRequestPhaseFailed),
+		updated.Annotations[RestoreRequestPhaseAnnotationKey])
+	require.Equal(t, "TargetSemanticUnavailable",
+		updated.Annotations[RestoreRequestReasonAnnotationKey])
+}
+
+func TestClaimedRestoreRequestRejectsMatchingNonControllerOwnerReference(t *testing.T) {
+	fixture := newRestoreStateFixture(t)
+	fixture.request.Annotations[RestoreRequestPhaseAnnotationKey] = string(RestoreRequestPhaseClaimed)
+	target, err := fixture.targetBuilder(fixture.intent)
+	require.NoError(t, err)
+	notController := false
+	target.OwnerReferences[0].Controller = &notController
+	controller := true
+	target.OwnerReferences = append(target.OwnerReferences, metav1.OwnerReference{
+		APIVersion: appsv1.GroupVersion.String(),
+		Kind:       appsv1.ComponentKind,
+		Name:       "foreign-component",
+		UID:        "foreign-component-uid",
+		Controller: &controller,
+	})
+	fixture.objects = append(fixture.objects, target)
+	graphCli, dag := fixture.graph()
+
+	handled, reconcileErr := ReconcileRestoreRequests(context.Background(), graphCli, dag,
+		fixture.owner, constant.DBComponentFinalizerName, fixture.targetBuilder)
+
+	require.True(t, handled)
+	require.True(t, intctrlutil.IsRequeueError(reconcileErr), reconcileErr)
+	updated := graphCli.FindMatchedVertex(dag, fixture.request).(*model.ObjectVertex).Obj.(*corev1.Secret)
+	require.Equal(t, string(RestoreRequestPhaseFailed),
+		updated.Annotations[RestoreRequestPhaseAnnotationKey])
+	require.Equal(t, TargetOwnerUnavailableReason,
+		updated.Annotations[RestoreRequestReasonAnnotationKey])
 	require.False(t, graphCli.IsAction(dag, target, model.ActionUpdatePtr()))
 }
 
-func TestValidateRestoreRequestRejectsTamperedPayload(t *testing.T) {
+func TestReconcileRestoreRequestsIgnoresDamagedForeignRequest(t *testing.T) {
+	fixture := newRestoreStateFixture(t)
+	foreignIntent := fixture.intent
+	foreignIntent.Target.Owner = ObjectIdentity{
+		APIVersion: appsv1.GroupVersion.String(),
+		Kind:       appsv1.ComponentKind,
+		Namespace:  fixture.owner.Namespace,
+		Name:       "foreign-component",
+		UID:        "foreign-component-uid",
+	}
+	foreign, err := BuildRestoreRequest(foreignIntent)
+	require.NoError(t, err)
+	foreign.UID = "foreign-request-uid"
+	foreign.ResourceVersion = "1"
+	foreign.Annotations[LogicalTargetDigestAnnotationKey] = "damaged"
+	fixture.objects = []client.Object{foreign}
+	graphCli, dag := fixture.graph()
+
+	handled, reconcileErr := ReconcileRestoreRequests(context.Background(), graphCli, dag,
+		fixture.owner, constant.DBComponentFinalizerName, fixture.targetBuilder)
+
+	require.NoError(t, reconcileErr)
+	require.False(t, handled)
+	require.Empty(t, graphCli.FindAll(dag, &corev1.Secret{}))
+}
+
+type restoreStateFixture struct {
+	t       *testing.T
+	scheme  *runtime.Scheme
+	root    *appsv1.Cluster
+	owner   *appsv1.Component
+	intent  CredentialIntent
+	request *corev1.Secret
+	objects []client.Object
+}
+
+func newRestoreStateFixture(t *testing.T) *restoreStateFixture {
+	t.Helper()
 	scheme := runtime.NewScheme()
 	require.NoError(t, corev1.AddToScheme(scheme))
 	require.NoError(t, appsv1.AddToScheme(scheme))
-	owner := &appsv1.Component{
-		TypeMeta:   metav1.TypeMeta{APIVersion: appsv1.GroupVersion.String(), Kind: "Component"},
-		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "cluster-mysql", UID: types.UID("component-uid")},
-	}
-	request := newTestRestoreRequest("cluster-mysql-root")
-	require.NoError(t, controllerutil.SetControllerReference(owner, request, scheme))
-	require.NoError(t, SetRestoreRevision(request))
-	request.Labels["admission.example.io/injected"] = "true"
-	request.Annotations["admission.example.io/injected"] = "true"
-	require.NoError(t, ValidateRestoreRequest(request), "admission metadata is outside the sealed credential payload")
-	request.Data[constant.AccountPasswdForSecret] = []byte("tampered-password")
-
-	require.ErrorContains(t, ValidateRestoreRequest(request), "invalid revision")
-}
-
-func newTestRestoreRequest(targetName string) *corev1.Secret {
-	return &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "default",
-			Name:      RestoreRequestName("default", targetName),
-			Labels: map[string]string{
-				"role": "root",
-				constant.SystemAccountRestoreRequestLabelKey: "true",
-			},
-			Annotations: map[string]string{
-				constant.SystemAccountRestoreTargetAnnotationKey: targetName,
-				constant.SystemAccountProvisionedAnnotationKey:   "true",
-			},
-		},
-		Immutable: boolPtr(true),
-		Type:      corev1.SecretTypeOpaque,
-		Data: map[string][]byte{
-			constant.AccountNameForSecret:   []byte("root"),
-			constant.AccountPasswdForSecret: []byte("new-password"),
-		},
-	}
-}
-
-func boolPtr(value bool) *bool {
-	return &value
-}
-
-func registerModelScheme(t *testing.T) {
-	t.Helper()
 	require.NoError(t, corev1.AddToScheme(model.GetScheme()))
 	require.NoError(t, appsv1.AddToScheme(model.GetScheme()))
+	root := &appsv1.Cluster{
+		TypeMeta: metav1.TypeMeta{APIVersion: appsv1.GroupVersion.String(), Kind: "Cluster"},
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      "cluster",
+			UID:       types.UID("cluster-uid"),
+		},
+	}
+	owner := &appsv1.Component{
+		TypeMeta: metav1.TypeMeta{APIVersion: appsv1.GroupVersion.String(), Kind: "Component"},
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      "cluster-mysql",
+			UID:       types.UID("component-uid"),
+		},
+	}
+	intent := testCredentialIntent()
+	request, err := BuildRestoreRequest(intent)
+	require.NoError(t, err)
+	request.UID = types.UID("request-uid")
+	request.ResourceVersion = "3"
+	return &restoreStateFixture{
+		t:       t,
+		scheme:  scheme,
+		root:    root,
+		owner:   owner,
+		intent:  intent,
+		request: request,
+		objects: []client.Object{request},
+	}
+}
+
+func (f *restoreStateFixture) graph() (model.GraphClient, *graph.DAG) {
+	f.t.Helper()
+	cli := fake.NewClientBuilder().WithScheme(f.scheme).WithObjects(f.objects...).Build()
+	graphCli := model.NewGraphClient(cli)
+	dag := graph.NewDAG()
+	graphCli.Root(dag, f.owner.DeepCopy(), f.owner, model.ActionStatusPtr())
+	return graphCli, dag
+}
+
+func (f *restoreStateFixture) targetBuilder(intent CredentialIntent) (*corev1.Secret, error) {
+	f.t.Helper()
+	target := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:   intent.Target.Namespace,
+			Name:        "cluster-mysql-root",
+			Labels:      map[string]string{"role": "root"},
+			Annotations: map[string]string{"semantic": "live"},
+			Finalizers:  []string{constant.DBComponentFinalizerName},
+		},
+		Type: corev1.SecretTypeOpaque,
+		Data: map[string][]byte{
+			constant.AccountNameForSecret:   append([]byte(nil), intent.Credentials[constant.AccountNameForSecret]...),
+			constant.AccountPasswdForSecret: append([]byte(nil), intent.Credentials[constant.AccountPasswdForSecret]...),
+		},
+	}
+	require.NoError(f.t, controllerutil.SetControllerReference(f.owner, target, f.scheme))
+	return target, nil
+}
+
+func findTargetVertex(t *testing.T, graphCli model.GraphClient, dag *graph.DAG, request *corev1.Secret) *corev1.Secret {
+	t.Helper()
+	for _, object := range graphCli.FindAll(dag, &corev1.Secret{}) {
+		secret := object.(*corev1.Secret)
+		if secret.Name != request.Name {
+			return secret
+		}
+	}
+	t.Fatal("target vertex not found")
+	return nil
 }

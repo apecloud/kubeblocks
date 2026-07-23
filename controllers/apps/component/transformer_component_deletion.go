@@ -109,7 +109,9 @@ func (t *componentDeletionTransformer) deleteCompResources(transCtx *componentTr
 	}
 	if len(workloads) > 0 {
 		for _, workload := range workloads {
-			graphCli.Delete(dag, workload)
+			if err := graphCli.Delete(dag, workload); err != nil {
+				return err
+			}
 		}
 		// wait for the workloads to be deleted to trigger the next reconcile
 		transCtx.Logger.Info(fmt.Sprintf("wait for the workloads to be deleted: %v", workloads))
@@ -134,7 +136,9 @@ func (t *componentDeletionTransformer) deleteCompResources(transCtx *componentTr
 					return fmt.Errorf("handle rbac deletion failed: %w", err)
 				}
 			default:
-				graphCli.Delete(dag, object)
+				if err := graphCli.Delete(dag, object); err != nil {
+					return err
+				}
 			}
 		}
 		graphCli.Status(dag, comp, transCtx.Component)
@@ -143,7 +147,9 @@ func (t *componentDeletionTransformer) deleteCompResources(transCtx *componentTr
 		if err = notifyDependents4CompDeletion(transCtx, dag); err != nil {
 			return intctrlutil.NewRequeueError(appsutil.RequeueDuration, fmt.Sprintf("notify dependent components error: %s", err.Error()))
 		}
-		graphCli.Delete(dag, comp)
+		if err := graphCli.Delete(dag, comp); err != nil {
+			return err
+		}
 	}
 
 	// release the allocated host-network ports for the component
@@ -162,8 +168,7 @@ func handleRBACResourceDeletion(obj client.Object, transCtx *componentTransformC
 	// rolebinding and serviceaccount have the same name
 	newName := constant.GenerateDefaultServiceAccountNameNew(comp.Name)
 	if obj.GetName() == newName {
-		graphCli.Delete(dag, obj)
-		return
+		return graphCli.Delete(dag, obj)
 	}
 
 	// orphan a rbac resource so that it can be adopted by another component

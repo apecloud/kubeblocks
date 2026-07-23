@@ -64,7 +64,28 @@ func (t *componentAccountTransformer) Transform(ctx graph.TransformContext, dag 
 	}
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	handled, err := systemaccount.ReconcileRestoreRequests(transCtx.Context, graphCli, dag,
-		transCtx.Component, constant.DBComponentFinalizerName)
+		transCtx.Component, constant.DBComponentFinalizerName,
+		func(intent systemaccount.CredentialIntent) (*corev1.Secret, error) {
+			accounts, err := synthesizeSystemAccounts(transCtx.CompDef.Spec.SystemAccounts,
+				transCtx.Component.Spec.SystemAccounts, false)
+			if err != nil {
+				return nil, systemaccount.NewTargetSemanticError(
+					systemaccount.TargetSemanticUnavailableReason, err)
+			}
+			account, ok := accounts[intent.Target.Account]
+			if !ok {
+				return nil, systemaccount.NewTargetSemanticError(
+					systemaccount.AccountUnavailableReason,
+					fmt.Errorf("system account %s is unavailable", intent.Target.Account))
+			}
+			password := intent.Credentials[constant.AccountPasswdForSecret]
+			if len(password) == 0 {
+				return nil, systemaccount.NewTargetSemanticError(
+					systemaccount.TargetSemanticUnavailableReason,
+					fmt.Errorf("system account %s credential is unavailable", intent.Target.Account))
+			}
+			return t.buildAccountSecretWithPassword(transCtx, account, password)
+		})
 	if err != nil {
 		return err
 	}
@@ -103,7 +124,9 @@ func (t *componentAccountTransformer) Transform(ctx graph.TransformContext, dag 
 	}
 
 	for _, name := range sets.List(deleteSet) {
-		t.deleteAccount(transCtx, dag, graphCli, secrets[name])
+		if err := t.deleteAccount(transCtx, dag, graphCli, secrets[name]); err != nil {
+			return err
+		}
 	}
 
 	for _, name := range sets.List(updateSet) {
@@ -139,8 +162,8 @@ func (t *componentAccountTransformer) createAccount(transCtx *componentTransform
 }
 
 func (t *componentAccountTransformer) deleteAccount(transCtx *componentTransformContext,
-	dag *graph.DAG, graphCli model.GraphClient, secret *corev1.Secret) {
-	graphCli.Delete(dag, secret)
+	dag *graph.DAG, graphCli model.GraphClient, secret *corev1.Secret) error {
+	return graphCli.Delete(dag, secret)
 }
 
 func (t *componentAccountTransformer) updateAccount(transCtx *componentTransformContext,
@@ -160,6 +183,8 @@ func (t *componentAccountTransformer) updateAccount(transCtx *componentTransform
 	}
 	ctrlutil.MergeMetadataMapInplace(secret.Labels, &runningCopy.Labels)
 	ctrlutil.MergeMetadataMapInplace(secret.Annotations, &runningCopy.Annotations)
+	systemaccount.ClearStaleTargetRestoreReceipt(
+		runningCopy, constant.DBComponentFinalizerName)
 	if !reflect.DeepEqual(running, runningCopy) {
 		graphCli.Update(dag, running, runningCopy)
 	}

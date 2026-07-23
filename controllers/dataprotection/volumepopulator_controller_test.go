@@ -42,6 +42,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -196,13 +197,6 @@ var _ = Describe("Volume Populator Controller test", func() {
 			Expect(corev1.AddToScheme(scheme)).Should(Succeed())
 			Expect(kbappsv1.AddToScheme(scheme)).Should(Succeed())
 
-			component := &kbappsv1.Component{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: "default",
-					Name:      constant.GenerateClusterComponentName("cluster", "mysql"),
-					UID:       types.UID("component-uid"),
-				},
-			}
 			mutableSecret := &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "default",
@@ -229,17 +223,18 @@ var _ = Describe("Volume Populator Controller test", func() {
 					Name:      "data-target-0",
 				},
 			}
+			backup, cluster, component, instanceSet := prepareSystemAccountAuthorityFixture(Default, scheme, pvc)
 			reconciler := &VolumePopulatorReconciler{
 				Client: fake.NewClientBuilder().
 					WithScheme(scheme).
-					WithObjects(component, mutableSecret, immutableSecret).
+					WithObjects(backup, cluster, component, instanceSet, pvc, mutableSecret, immutableSecret).
 					Build(),
 				Scheme: scheme,
 			}
 			reqCtx := intctrlutil.RequestCtx{Ctx: context.Background()}
 
-			err := reconciler.upsertSystemAccountSecret(reqCtx, pvc, systemAccountSecretScopeComponent,
-				"cluster", "mysql", "admin", []byte("new-password"), map[string]string{"role": "admin"})
+			err := reconciler.upsertSystemAccountSecret(reqCtx, pvc, backup, systemAccountSecretScopeComponent,
+				"cluster", "mysql", "admin", []byte("new-password"))
 			Expect(err).To(HaveOccurred())
 			Expect(intctrlutil.IsRequeueError(err)).To(BeTrue(), err.Error())
 			currentMutable := &corev1.Secret{}
@@ -252,8 +247,8 @@ var _ = Describe("Volume Populator Controller test", func() {
 			Expect(currentMutable.Data).To(BeEmpty())
 			Expect(currentMutable.OwnerReferences).To(BeEmpty())
 
-			err = reconciler.upsertSystemAccountSecret(reqCtx, pvc, systemAccountSecretScopeComponent,
-				"cluster", "mysql", "root", []byte("new-root-password"), map[string]string{"role": "root"})
+			err = reconciler.upsertSystemAccountSecret(reqCtx, pvc, backup, systemAccountSecretScopeComponent,
+				"cluster", "mysql", "root", []byte("new-root-password"))
 			Expect(err).To(HaveOccurred())
 			Expect(intctrlutil.IsRequeueError(err)).To(BeTrue(), err.Error())
 			currentImmutable := &corev1.Secret{}
@@ -269,10 +264,10 @@ var _ = Describe("Volume Populator Controller test", func() {
 			Expect(reconciler.Client.List(context.Background(), requests, client.InNamespace("default"))).Should(Succeed())
 			var mutableRequest, immutableRequest *corev1.Secret
 			for i := range requests.Items {
-				switch requests.Items[i].Annotations[constant.SystemAccountRestoreTargetAnnotationKey] {
-				case mutableSecret.Name:
+				switch requests.Items[i].Annotations[systemaccount.SystemAccountAnnotationKey] {
+				case "admin":
 					mutableRequest = &requests.Items[i]
-				case immutableSecret.Name:
+				case "root":
 					immutableRequest = &requests.Items[i]
 				}
 			}
@@ -282,87 +277,282 @@ var _ = Describe("Volume Populator Controller test", func() {
 			Expect(immutableRequest.Data[constant.AccountNameForSecret]).To(Equal([]byte("root")))
 			Expect(immutableRequest.Data[constant.AccountPasswdForSecret]).To(Equal([]byte("new-root-password")))
 			Expect(immutableRequest.OwnerReferences).To(HaveLen(1))
-			Expect(immutableRequest.OwnerReferences[0].Kind).To(Equal("Component"))
+			Expect(immutableRequest.OwnerReferences[0].Kind).To(Equal("Cluster"))
 			Expect(immutableRequest.OwnerReferences[0].Controller).NotTo(BeNil())
-			Expect(*immutableRequest.OwnerReferences[0].Controller).To(BeTrue())
+			Expect(*immutableRequest.OwnerReferences[0].Controller).To(BeFalse())
 			Expect(immutableRequest.Labels[constant.SystemAccountRestoreRequestLabelKey]).To(Equal("true"))
-			Expect(immutableRequest.Annotations[constant.SystemAccountRestoreRevisionAnnotationKey]).NotTo(BeEmpty())
+			Expect(immutableRequest.Annotations[systemaccount.CredentialIntentRevisionAnnotationKey]).NotTo(BeEmpty())
 		})
 
 		It("accepts only the Apps-committed restore revision as converged", func() {
 			scheme := runtime.NewScheme()
 			Expect(corev1.AddToScheme(scheme)).Should(Succeed())
 			Expect(kbappsv1.AddToScheme(scheme)).Should(Succeed())
-			component := &kbappsv1.Component{ObjectMeta: metav1.ObjectMeta{
-				Namespace: "default",
-				Name:      constant.GenerateClusterComponentName("cluster", "mysql"),
-				UID:       types.UID("component-uid"),
-			}}
 			pvc := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{
 				Namespace: "default",
 				Name:      "data-target-0",
 			}}
+			backup, cluster, component, instanceSet := prepareSystemAccountAuthorityFixture(Default, scheme, pvc)
 			reconciler := &VolumePopulatorReconciler{
-				Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(component).Build(),
+				Client: fake.NewClientBuilder().WithScheme(scheme).
+					WithObjects(backup, cluster, component, instanceSet, pvc).Build(),
 				Scheme: scheme,
 			}
 			request, err := reconciler.newSystemAccountRestoreRequest(
-				intctrlutil.RequestCtx{Ctx: context.Background()}, "default",
-				constant.GenerateAccountSecretName("cluster", "mysql", "admin"),
-				systemAccountSecretScopeComponent, "cluster", "mysql", "admin", []byte("restored-password"),
-				map[string]string{"role": "admin"})
+				intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, backup,
+				systemAccountSecretScopeComponent, "cluster", "mysql", "admin", []byte("restored-password"))
 			Expect(err).ShouldNot(HaveOccurred())
-			target := request.DeepCopy()
-			target.Name = request.Annotations[constant.SystemAccountRestoreTargetAnnotationKey]
-			delete(target.Labels, constant.SystemAccountRestoreRequestLabelKey)
-			delete(target.Annotations, constant.SystemAccountRestoreTargetAnnotationKey)
-			target.Finalizers = []string{constant.DBComponentFinalizerName}
+			request.UID = types.UID("request-uid")
+			Expect(reconciler.Client.Create(context.Background(), request)).Should(Succeed())
+			Expect(reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(request), request)).Should(Succeed())
+			target := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{
+				Namespace:  "default",
+				Name:       constant.GenerateAccountSecretName("cluster", "mysql", "admin"),
+				UID:        types.UID("target-uid"),
+				Finalizers: []string{constant.DBComponentFinalizerName},
+				Annotations: map[string]string{
+					constant.SystemAccountProvisionedAnnotationKey:      "true",
+					systemaccount.RestoreProtocolAnnotationKey:          systemaccount.RestoreProtocolV2,
+					systemaccount.RestoreOperationDigestAnnotationKey:   request.Annotations[systemaccount.RestoreOperationDigestAnnotationKey],
+					systemaccount.CredentialIntentRevisionAnnotationKey: request.Annotations[systemaccount.CredentialIntentRevisionAnnotationKey],
+					systemaccount.RestoreRequestNameAnnotationKey:       request.Name,
+					systemaccount.RestoreRequestUIDAnnotationKey:        string(request.UID),
+				},
+			}, Type: corev1.SecretTypeOpaque, Data: map[string][]byte{
+				constant.AccountNameForSecret:   []byte("admin"),
+				constant.AccountPasswdForSecret: []byte("restored-password"),
+			}}
+			Expect(controllerutil.SetControllerReference(component, target, scheme)).Should(Succeed())
+			revision, err := systemaccount.TargetCommitRevision(target, constant.DBComponentFinalizerName)
+			Expect(err).ShouldNot(HaveOccurred())
+			target.Annotations[systemaccount.TargetCommitRevisionAnnotationKey] = revision
+			request.Annotations[systemaccount.TargetSecretNameAnnotationKey] = target.Name
+			request.Annotations[systemaccount.TargetSecretUIDAnnotationKey] = string(target.UID)
+			request.Annotations[systemaccount.TargetCommitRevisionAnnotationKey] = revision
 			Expect(reconciler.Client.Create(context.Background(), target)).Should(Succeed())
+			persistedTarget := &corev1.Secret{}
+			Expect(reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(target), persistedTarget)).Should(Succeed())
+			request.Annotations[systemaccount.RestoreRequestPhaseAnnotationKey] =
+				string(systemaccount.RestoreRequestPhaseCommitted)
+			request.Annotations[systemaccount.TargetSecretUIDAnnotationKey] = string(persistedTarget.UID)
+			Expect(reconciler.Client.Update(context.Background(), request)).Should(Succeed())
+			persistedRequest := &corev1.Secret{}
+			Expect(reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(request), persistedRequest)).Should(Succeed())
+			Expect(systemaccount.RestoreConvergedV2(
+				persistedTarget, persistedRequest, constant.DBComponentFinalizerName,
+			)).To(BeTrue())
 
-			err = reconciler.upsertSystemAccountSecret(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc,
-				systemAccountSecretScopeComponent, "cluster", "mysql", "admin", []byte("restored-password"),
-				map[string]string{"role": "admin"})
+			err = reconciler.upsertSystemAccountSecret(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, backup,
+				systemAccountSecretScopeComponent, "cluster", "mysql", "admin", []byte("restored-password"))
 
 			Expect(err).ShouldNot(HaveOccurred())
 			requests := &corev1.SecretList{}
 			Expect(reconciler.Client.List(context.Background(), requests,
 				client.MatchingLabels{constant.SystemAccountRestoreRequestLabelKey: "true"})).Should(Succeed())
-			Expect(requests.Items).To(BeEmpty())
+			Expect(requests.Items).To(HaveLen(1))
 		})
 
 		It("serializes a new restore behind an older valid request", func() {
 			scheme := runtime.NewScheme()
 			Expect(corev1.AddToScheme(scheme)).Should(Succeed())
 			Expect(kbappsv1.AddToScheme(scheme)).Should(Succeed())
-			component := &kbappsv1.Component{ObjectMeta: metav1.ObjectMeta{
-				Namespace: "default",
-				Name:      constant.GenerateClusterComponentName("cluster", "mysql"),
-				UID:       types.UID("component-uid"),
-			}}
 			pvc := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{
 				Namespace: "default",
 				Name:      "data-target-0",
 			}}
+			backup, cluster, component, instanceSet := prepareSystemAccountAuthorityFixture(Default, scheme, pvc)
 			reconciler := &VolumePopulatorReconciler{
-				Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(component).Build(),
+				Client: fake.NewClientBuilder().WithScheme(scheme).
+					WithObjects(backup, cluster, component, instanceSet, pvc).Build(),
 				Scheme: scheme,
 			}
 			oldRequest, err := reconciler.newSystemAccountRestoreRequest(
-				intctrlutil.RequestCtx{Ctx: context.Background()}, "default",
-				constant.GenerateAccountSecretName("cluster", "mysql", "admin"),
-				systemAccountSecretScopeComponent, "cluster", "mysql", "admin", []byte("old-password"),
-				map[string]string{"role": "admin"})
+				intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, backup,
+				systemAccountSecretScopeComponent, "cluster", "mysql", "admin", []byte("old-password"))
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(reconciler.Client.Create(context.Background(), oldRequest)).Should(Succeed())
 
-			err = reconciler.upsertSystemAccountSecret(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc,
-				systemAccountSecretScopeComponent, "cluster", "mysql", "admin", []byte("new-password"),
-				map[string]string{"role": "admin"})
+			err = reconciler.upsertSystemAccountSecret(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, backup,
+				systemAccountSecretScopeComponent, "cluster", "mysql", "admin", []byte("new-password"))
 
-			Expect(intctrlutil.IsRequeueError(err)).To(BeTrue(), err)
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).To(BeTrue(), err)
+			Expect(err).To(MatchError(ContainSubstring("credential intent")))
 			persisted := &corev1.Secret{}
 			Expect(reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(oldRequest), persisted)).Should(Succeed())
 			Expect(persisted.Data[constant.AccountPasswdForSecret]).To(Equal([]byte("old-password")))
+		})
+
+		It("projects an exact conflict receipt identity before the PVC failure condition", func() {
+			scheme := runtime.NewScheme()
+			Expect(corev1.AddToScheme(scheme)).Should(Succeed())
+			Expect(kbappsv1.AddToScheme(scheme)).Should(Succeed())
+			pvc := &corev1.PersistentVolumeClaim{}
+			backup, cluster, component, instanceSet :=
+				prepareSystemAccountAuthorityFixture(Default, scheme, pvc)
+			cli := fake.NewClientBuilder().WithScheme(scheme).
+				WithStatusSubresource(pvc).
+				WithObjects(backup, cluster, component, instanceSet, pvc).Build()
+			reconciler := &VolumePopulatorReconciler{
+				Client:   cli,
+				Scheme:   scheme,
+				Recorder: record.NewFakeRecorder(10),
+			}
+			winner, err := reconciler.newSystemAccountRestoreRequest(
+				intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, backup,
+				systemAccountSecretScopeComponent, "cluster", "mysql", "admin", []byte("winner-password"))
+			Expect(err).ShouldNot(HaveOccurred())
+			winner.UID = "winner-request-uid"
+			Expect(cli.Create(context.Background(), winner)).Should(Succeed())
+			Expect(cli.Get(context.Background(), client.ObjectKeyFromObject(winner), winner)).Should(Succeed())
+
+			loserPVC := &corev1.PersistentVolumeClaim{}
+			Expect(cli.Get(context.Background(), client.ObjectKeyFromObject(pvc), loserPVC)).Should(Succeed())
+			loserPVC.Annotations[constant.RestorePITRAnnotationKey] = "2026-07-23T00:00:00Z"
+			Expect(cli.Update(context.Background(), loserPVC)).Should(Succeed())
+			Expect(cli.Get(context.Background(), client.ObjectKeyFromObject(pvc), loserPVC)).Should(Succeed())
+			loserRequest, err := reconciler.newSystemAccountRestoreRequest(
+				intctrlutil.RequestCtx{Ctx: context.Background()}, loserPVC, backup,
+				systemAccountSecretScopeComponent, "cluster", "mysql", "admin", []byte("loser-password"))
+			Expect(err).ShouldNot(HaveOccurred())
+			loserIntent, err := systemaccount.ValidateRestoreRequestV2(loserRequest)
+			Expect(err).ShouldNot(HaveOccurred())
+			receipt, err := systemaccount.BuildConflictReceipt(loserIntent, winner)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(cli.Create(context.Background(), receipt)).Should(Succeed())
+
+			syncErr := reconciler.upsertSystemAccountSecret(
+				intctrlutil.RequestCtx{Ctx: context.Background()}, loserPVC, backup,
+				systemAccountSecretScopeComponent, "cluster", "mysql", "admin", []byte("loser-password"))
+			Expect(intctrlutil.IsTargetError(syncErr, intctrlutil.ErrorTypeFatal)).To(BeTrue(), syncErr)
+			_, err = reconciler.handleSyncPVCError(
+				intctrlutil.RequestCtx{Ctx: context.Background()}, loserPVC, syncErr)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			projected := &corev1.PersistentVolumeClaim{}
+			Expect(cli.Get(context.Background(), client.ObjectKeyFromObject(pvc), projected)).Should(Succeed())
+			Expect(projected.Annotations[systemaccount.RestoreOperationDigestAnnotationKey]).
+				To(Equal(receipt.Annotations[systemaccount.RestoreOperationDigestAnnotationKey]))
+			Expect(projected.Annotations[systemaccount.BlockingRequestUIDAnnotationKey]).
+				To(Equal(receipt.Annotations[systemaccount.BlockingRequestUIDAnnotationKey]))
+			Expect(projected.Annotations[systemaccount.WinnerOperationDigestAnnotationKey]).
+				To(Equal(receipt.Annotations[systemaccount.WinnerOperationDigestAnnotationKey]))
+			restoreCondition := findPVCConditionByType(projected, kbappsv1.ConditionTypeRestore)
+			Expect(restoreCondition).NotTo(BeNil())
+			Expect(restoreCondition.Status).To(Equal(corev1.ConditionFalse))
+			Expect(restoreCondition.Reason).To(Equal(systemaccount.ConcurrentRestoreIntentReason))
+		})
+
+		It("does not arbitrate or create a receipt past a deleting request", func() {
+			scheme := runtime.NewScheme()
+			Expect(corev1.AddToScheme(scheme)).Should(Succeed())
+			Expect(kbappsv1.AddToScheme(scheme)).Should(Succeed())
+			pvc := &corev1.PersistentVolumeClaim{}
+			backup, cluster, component, instanceSet :=
+				prepareSystemAccountAuthorityFixture(Default, scheme, pvc)
+			cli := fake.NewClientBuilder().WithScheme(scheme).
+				WithObjects(backup, cluster, component, instanceSet, pvc).Build()
+			reconciler := &VolumePopulatorReconciler{Client: cli, Scheme: scheme}
+			oldRequest, err := reconciler.newSystemAccountRestoreRequest(
+				intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, backup,
+				systemAccountSecretScopeComponent, "cluster", "mysql", "admin", []byte("old-password"))
+			Expect(err).ShouldNot(HaveOccurred())
+			oldRequest.UID = "old-request-uid"
+			Expect(cli.Create(context.Background(), oldRequest)).Should(Succeed())
+			Expect(cli.Delete(context.Background(), oldRequest)).Should(Succeed())
+			deleting := &corev1.Secret{}
+			Expect(cli.Get(context.Background(), client.ObjectKeyFromObject(oldRequest), deleting)).Should(Succeed())
+			Expect(deleting.DeletionTimestamp.IsZero()).To(BeFalse())
+
+			persistedPVC := &corev1.PersistentVolumeClaim{}
+			Expect(cli.Get(context.Background(), client.ObjectKeyFromObject(pvc), persistedPVC)).Should(Succeed())
+			persistedPVC.Annotations[constant.RestorePITRAnnotationKey] = "2026-07-23T00:00:00Z"
+			Expect(cli.Update(context.Background(), persistedPVC)).Should(Succeed())
+
+			err = reconciler.upsertSystemAccountSecret(
+				intctrlutil.RequestCtx{Ctx: context.Background()},
+				persistedPVC, backup, systemAccountSecretScopeComponent,
+				"cluster", "mysql", "admin", []byte("new-password"))
+
+			Expect(intctrlutil.IsRequeueError(err)).To(BeTrue(), err)
+			Expect(err).To(MatchError(ContainSubstring(
+				systemaccount.PreviousRestoreIntentFinalizingReason)))
+			secrets := &corev1.SecretList{}
+			Expect(cli.List(context.Background(), secrets)).Should(Succeed())
+			conflictReceipts := 0
+			for i := range secrets.Items {
+				if secrets.Items[i].Annotations[systemaccount.RestoreProtocolAnnotationKey] ==
+					systemaccount.ConflictProtocolV1 {
+					conflictReceipts++
+				}
+			}
+			Expect(conflictReceipts).To(Equal(0))
+			target := &corev1.Secret{}
+			err = cli.Get(context.Background(), client.ObjectKey{
+				Namespace: "default",
+				Name:      constant.GenerateAccountSecretName("cluster", "mysql", "admin"),
+			}, target)
+			Expect(apierrors.IsNotFound(err)).To(BeTrue(), err)
+		})
+
+		It("preserves a same-operation request failure after the operation becomes terminal", func() {
+			scheme := runtime.NewScheme()
+			Expect(corev1.AddToScheme(scheme)).Should(Succeed())
+			Expect(kbappsv1.AddToScheme(scheme)).Should(Succeed())
+			pvc := &corev1.PersistentVolumeClaim{}
+			backup, cluster, component, instanceSet :=
+				prepareSystemAccountAuthorityFixture(Default, scheme, pvc)
+			cluster.Status.Conditions = []metav1.Condition{{
+				Type:               kbappsv1.ConditionTypeRestore,
+				Status:             metav1.ConditionFalse,
+				ObservedGeneration: cluster.Generation,
+			}}
+			cli := fake.NewClientBuilder().WithScheme(scheme).
+				WithObjects(backup, cluster, component, instanceSet, pvc).Build()
+			reconciler := &VolumePopulatorReconciler{Client: cli, Scheme: scheme}
+			request, err := reconciler.newSystemAccountRestoreRequest(
+				intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, backup,
+				systemAccountSecretScopeComponent, "cluster", "mysql", "admin", []byte("password"))
+			Expect(err).ShouldNot(HaveOccurred())
+			request.Annotations[systemaccount.RestoreRequestPhaseAnnotationKey] =
+				string(systemaccount.RestoreRequestPhaseFailed)
+			request.Annotations[systemaccount.RestoreRequestReasonAnnotationKey] =
+				systemaccount.AccountUnavailableReason
+			Expect(cli.Create(context.Background(), request)).Should(Succeed())
+
+			err = reconciler.upsertSystemAccountSecret(
+				intctrlutil.RequestCtx{Ctx: context.Background()},
+				pvc, backup, systemAccountSecretScopeComponent,
+				"cluster", "mysql", "admin", []byte("password"))
+
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).To(BeTrue(), err)
+			Expect(err).To(MatchError(ContainSubstring(systemaccount.AccountUnavailableReason)))
+		})
+
+		It("does not reuse a request whose protocol finalizer was already released", func() {
+			scheme := runtime.NewScheme()
+			Expect(corev1.AddToScheme(scheme)).Should(Succeed())
+			Expect(kbappsv1.AddToScheme(scheme)).Should(Succeed())
+			pvc := &corev1.PersistentVolumeClaim{}
+			backup, cluster, component, instanceSet :=
+				prepareSystemAccountAuthorityFixture(Default, scheme, pvc)
+			cli := fake.NewClientBuilder().WithScheme(scheme).
+				WithObjects(backup, cluster, component, instanceSet, pvc).Build()
+			reconciler := &VolumePopulatorReconciler{Client: cli, Scheme: scheme}
+			request, err := reconciler.newSystemAccountRestoreRequest(
+				intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, backup,
+				systemAccountSecretScopeComponent, "cluster", "mysql", "admin", []byte("password"))
+			Expect(err).ShouldNot(HaveOccurred())
+			request.Finalizers = nil
+			Expect(cli.Create(context.Background(), request)).Should(Succeed())
+
+			err = reconciler.upsertSystemAccountSecret(
+				intctrlutil.RequestCtx{Ctx: context.Background()},
+				pvc, backup, systemAccountSecretScopeComponent,
+				"cluster", "mysql", "admin", []byte("password"))
+
+			Expect(intctrlutil.IsRequeueError(err)).To(BeTrue(), err)
+			Expect(err).To(MatchError(ContainSubstring(
+				systemaccount.PreviousRestoreIntentFinalizingReason)))
 		})
 
 		It("requeues a restore request create race through the full reconciler", func() {
@@ -371,38 +561,23 @@ var _ = Describe("Volume Populator Controller test", func() {
 			Expect(kbappsv1.AddToScheme(scheme)).Should(Succeed())
 			Expect(dpv1alpha1.AddToScheme(scheme)).Should(Succeed())
 
-			apiGroup := dptypes.DataprotectionAPIGroup
-			backup := newBackupForRestoreDecision(nil, nil)
 			encryptor := intctrlutil.NewEncryptor(viper.GetString(constant.CfgKeyDPEncryptionKey))
 			encryptedPassword, err := encryptor.Encrypt([]byte("restored-password"))
 			Expect(err).ShouldNot(HaveOccurred())
-			backup.Annotations = map[string]string{
-				constant.EncryptedSystemAccountsAnnotationKey: fmt.Sprintf(`{"mysql":{"admin":"%s"}}`, encryptedPassword),
-			}
 			pvc := newPVCForRestoreDecision("data", "mysql", "")
-			pvc.UID = types.UID("target-pvc-uid")
-			pvc.Spec.DataSourceRef = &corev1.TypedObjectReference{
-				APIGroup: &apiGroup,
-				Kind:     dptypes.BackupKind,
-				Name:     backup.Name,
-			}
-			pvc.Annotations[constant.RestoreSourceKindAnnotationKey] = dptypes.BackupKind
-			pvc.Annotations[constant.RestoreSourceNamespaceAnnotationKey] = backup.Namespace
 			pvc.Status.Conditions = []corev1.PersistentVolumeClaimCondition{{
 				Type:   PersistentVolumeClaimPopulating,
 				Status: corev1.ConditionTrue,
 			}}
-			component := &kbappsv1.Component{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: "default",
-					Name:      constant.GenerateClusterComponentName("cluster", "mysql"),
-					UID:       types.UID("component-uid"),
-				},
+			backup, cluster, component, instanceSet := prepareSystemAccountAuthorityFixture(Default, scheme, pvc)
+			backup.Status = newBackupForRestoreDecision(nil, nil).Status
+			backup.Annotations = map[string]string{
+				constant.EncryptedSystemAccountsAnnotationKey: fmt.Sprintf(`{"mysql":{"admin":"%s"}}`, encryptedPassword),
 			}
 			baseClient := fake.NewClientBuilder().
 				WithScheme(scheme).
 				WithStatusSubresource(pvc, backup).
-				WithObjects(component, backup, pvc).
+				WithObjects(cluster, component, instanceSet, backup, pvc).
 				Build()
 			requestCreateAttempts := 0
 			interceptedClient := interceptor.NewClient(baseClient, interceptor.Funcs{
@@ -410,6 +585,9 @@ var _ = Describe("Volume Populator Controller test", func() {
 					if secret, ok := obj.(*corev1.Secret); ok &&
 						secret.Labels[constant.SystemAccountRestoreRequestLabelKey] == "true" {
 						requestCreateAttempts++
+						if err := c.Create(ctx, secret.DeepCopy(), opts...); err != nil {
+							return err
+						}
 						return apierrors.NewAlreadyExists(corev1.Resource("secrets"), secret.Name)
 					}
 					return c.Create(ctx, obj, opts...)
@@ -435,13 +613,6 @@ var _ = Describe("Volume Populator Controller test", func() {
 			Expect(corev1.AddToScheme(scheme)).Should(Succeed())
 			Expect(kbappsv1.AddToScheme(scheme)).Should(Succeed())
 
-			cluster := &kbappsv1.Cluster{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: "default",
-					Name:      "cluster",
-					UID:       types.UID("cluster-uid"),
-				},
-			}
 			immutable := true
 			secret := &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
@@ -459,20 +630,23 @@ var _ = Describe("Volume Populator Controller test", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "default",
 					Name:      "data-target-0",
+					Labels: map[string]string{
+						constant.KBAppShardingNameLabelKey: "shard",
+					},
 				},
 			}
+			backup, cluster, component, instanceSet := prepareSystemAccountAuthorityFixture(Default, scheme, pvc)
 			reconciler := &VolumePopulatorReconciler{
 				Client: fake.NewClientBuilder().
 					WithScheme(scheme).
-					WithObjects(cluster, secret).
+					WithObjects(backup, cluster, component, instanceSet, pvc, secret).
 					Build(),
 				Scheme: scheme,
 			}
 			reqCtx := intctrlutil.RequestCtx{Ctx: context.Background()}
 
-			err := reconciler.upsertSystemAccountSecret(reqCtx, pvc, systemAccountSecretScopeSharding,
-				"cluster", "shard", "root", []byte("new-password"),
-				map[string]string{constant.KBAppShardingNameLabelKey: "shard"})
+			err := reconciler.upsertSystemAccountSecret(reqCtx, pvc, backup, systemAccountSecretScopeSharding,
+				"cluster", "shard", "root", []byte("new-password"))
 			Expect(err).To(HaveOccurred())
 			Expect(intctrlutil.IsRequeueError(err)).To(BeTrue(), err.Error())
 			current := &corev1.Secret{}
@@ -487,7 +661,9 @@ var _ = Describe("Volume Populator Controller test", func() {
 			Expect(reconciler.Client.List(context.Background(), requests, client.InNamespace("default"))).Should(Succeed())
 			var request *corev1.Secret
 			for i := range requests.Items {
-				if requests.Items[i].Annotations[constant.SystemAccountRestoreTargetAnnotationKey] == secret.Name {
+				if requests.Items[i].Annotations[systemaccount.SystemAccountAnnotationKey] == "root" &&
+					requests.Items[i].Annotations[systemaccount.SystemAccountScopeAnnotationKey] ==
+						systemaccount.SystemAccountScopeSharding {
 					request = &requests.Items[i]
 					break
 				}
@@ -496,7 +672,7 @@ var _ = Describe("Volume Populator Controller test", func() {
 			Expect(request.OwnerReferences).To(HaveLen(1))
 			Expect(request.OwnerReferences[0].Kind).To(Equal("Cluster"))
 			Expect(request.OwnerReferences[0].Controller).NotTo(BeNil())
-			Expect(*request.OwnerReferences[0].Controller).To(BeTrue())
+			Expect(*request.OwnerReferences[0].Controller).To(BeFalse())
 			Expect(request.Data[constant.AccountPasswdForSecret]).To(Equal([]byte("new-password")))
 		})
 
@@ -524,24 +700,22 @@ var _ = Describe("Volume Populator Controller test", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "default",
 					Name:      "data-target-0",
+					Labels: map[string]string{
+						constant.KBAppShardingNameLabelKey: "shard",
+					},
 				},
 			}
-			cluster := &kbappsv1.Cluster{ObjectMeta: metav1.ObjectMeta{
-				Namespace: "default",
-				Name:      "cluster",
-				UID:       types.UID("cluster-uid"),
-			}}
+			backup, cluster, component, instanceSet := prepareSystemAccountAuthorityFixture(Default, scheme, pvc)
 			reconciler := &VolumePopulatorReconciler{
 				Client: fake.NewClientBuilder().
 					WithScheme(scheme).
-					WithObjects(cluster, secret).
+					WithObjects(backup, cluster, component, instanceSet, pvc, secret).
 					Build(),
 				Scheme: scheme,
 			}
 
-			err := reconciler.upsertSystemAccountSecret(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc,
-				systemAccountSecretScopeSharding, "cluster", "shard", "root", []byte("new-password"),
-				map[string]string{constant.KBAppShardingNameLabelKey: "shard"})
+			err := reconciler.upsertSystemAccountSecret(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, backup,
+				systemAccountSecretScopeSharding, "cluster", "shard", "root", []byte("new-password"))
 			Expect(err).To(HaveOccurred())
 			Expect(intctrlutil.IsRequeueError(err)).To(BeTrue(), err.Error())
 
@@ -557,8 +731,8 @@ var _ = Describe("Volume Populator Controller test", func() {
 			requests := &corev1.SecretList{}
 			Expect(reconciler.Client.List(context.Background(), requests, client.InNamespace("default"))).Should(Succeed())
 			Expect(requests.Items).To(ContainElement(WithTransform(func(item corev1.Secret) string {
-				return item.Annotations[constant.SystemAccountRestoreTargetAnnotationKey]
-			}, Equal(secret.Name))))
+				return item.Annotations[systemaccount.SystemAccountAnnotationKey]
+			}, Equal("root"))))
 		})
 
 		It("validates PVC names against instance volume templates", func() {
@@ -971,7 +1145,7 @@ var _ = Describe("Volume Populator Controller test", func() {
 
 			It("restores system account secrets before volume population", func() {
 				pvc := initResources(storagev1.VolumeBindingWaitForFirstConsumer, false, true)
-				Expect(testCtx.CreateObj(testCtx.Ctx, &kbappsv1.Cluster{
+				cluster := &kbappsv1.Cluster{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: testCtx.DefaultNamespace,
 						Name:      testdp.ClusterName,
@@ -979,19 +1153,57 @@ var _ = Describe("Volume Populator Controller test", func() {
 					Spec: kbappsv1.ClusterSpec{
 						TerminationPolicy: kbappsv1.Delete,
 					},
-				})).Should(Succeed())
-				Expect(testCtx.CreateObj(testCtx.Ctx, &kbappsv1.Component{
+				}
+				Expect(testCtx.CreateObj(testCtx.Ctx, cluster)).Should(Succeed())
+				component := &kbappsv1.Component{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: testCtx.DefaultNamespace,
 						Name:      constant.GenerateClusterComponentName(testdp.ClusterName, testdp.ComponentName),
+						Labels: map[string]string{
+							constant.AppInstanceLabelKey:    testdp.ClusterName,
+							constant.KBAppComponentLabelKey: testdp.ComponentName,
+						},
 					},
 					Spec: kbappsv1.ComponentSpec{
 						TerminationPolicy: kbappsv1.Delete,
 						CompDef:           testdp.ComponentName,
 						Replicas:          1,
 					},
-				})).Should(Succeed())
+				}
+				Expect(controllerutil.SetControllerReference(cluster, component, k8sManager.GetScheme())).Should(Succeed())
+				Expect(testCtx.CreateObj(testCtx.Ctx, component)).Should(Succeed())
+				instanceSet := &workloadsv1.InstanceSet{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: testCtx.DefaultNamespace,
+						Name:      constant.GenerateClusterComponentName(testdp.ClusterName, testdp.ComponentName),
+						Labels: map[string]string{
+							constant.AppInstanceLabelKey:    testdp.ClusterName,
+							constant.KBAppComponentLabelKey: testdp.ComponentName,
+						},
+					},
+					Spec: workloadsv1.InstanceSetSpec{
+						Selector: &metav1.LabelSelector{MatchLabels: map[string]string{
+							constant.AppInstanceLabelKey:    testdp.ClusterName,
+							constant.KBAppComponentLabelKey: testdp.ComponentName,
+						}},
+						Template: corev1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{
+								constant.AppInstanceLabelKey:    testdp.ClusterName,
+								constant.KBAppComponentLabelKey: testdp.ComponentName,
+							}},
+							Spec: corev1.PodSpec{Containers: []corev1.Container{{
+								Name:  "database",
+								Image: "example.invalid/database:test",
+							}}},
+						},
+					},
+				}
+				Expect(controllerutil.SetControllerReference(component, instanceSet, k8sManager.GetScheme())).Should(Succeed())
+				Expect(testCtx.CreateObj(testCtx.Ctx, instanceSet)).Should(Succeed())
 				pvcKey := client.ObjectKeyFromObject(pvc)
+				Eventually(testapps.GetAndChangeObj(&testCtx, pvcKey, func(claim *corev1.PersistentVolumeClaim) {
+					Expect(controllerutil.SetControllerReference(instanceSet, claim, k8sManager.GetScheme())).Should(Succeed())
+				})).Should(Succeed())
 				backupKey := types.NamespacedName{Namespace: testCtx.DefaultNamespace, Name: pvc.Spec.DataSourceRef.Name}
 				encryptor := intctrlutil.NewEncryptor(viper.GetString(constant.CfgKeyDPEncryptionKey))
 				encryptedPassword, err := encryptor.Encrypt([]byte("restored-password"))
@@ -1014,17 +1226,17 @@ var _ = Describe("Volume Populator Controller test", func() {
 					Namespace: testCtx.DefaultNamespace,
 					Name:      constant.GenerateAccountSecretName(testdp.ClusterName, testdp.ComponentName, "admin"),
 				}
-				requestKey := types.NamespacedName{
-					Namespace: testCtx.DefaultNamespace,
-					Name:      systemaccount.RestoreRequestName(testCtx.DefaultNamespace, secretKey.Name),
-				}
 				request := &corev1.Secret{}
 				Eventually(func(g Gomega) {
-					g.Expect(testCtx.Cli.Get(testCtx.Ctx, requestKey, request)).Should(Succeed())
+					requests := &corev1.SecretList{}
+					g.Expect(testCtx.Cli.List(testCtx.Ctx, requests, client.InNamespace(testCtx.DefaultNamespace),
+						client.MatchingLabels{constant.SystemAccountRestoreRequestLabelKey: "true"})).Should(Succeed())
+					g.Expect(requests.Items).To(HaveLen(1))
+					requests.Items[0].DeepCopyInto(request)
 					g.Expect(request.Data).Should(HaveKeyWithValue(constant.AccountNameForSecret, []byte("admin")))
 					g.Expect(request.Data).Should(HaveKeyWithValue(constant.AccountPasswdForSecret, []byte("restored-password")))
 					g.Expect(request.Labels).Should(HaveKeyWithValue(constant.SystemAccountRestoreRequestLabelKey, "true"))
-					g.Expect(request.Annotations[constant.SystemAccountRestoreRevisionAnnotationKey]).ShouldNot(BeEmpty())
+					g.Expect(request.Annotations[systemaccount.CredentialIntentRevisionAnnotationKey]).ShouldNot(BeEmpty())
 				}).Should(Succeed())
 				Expect(testCtx.Cli.Get(testCtx.Ctx, secretKey, &corev1.Secret{})).Should(Satisfy(apierrors.IsNotFound))
 				Expect(testCtx.Cli.Get(testCtx.Ctx, types.NamespacedName{
@@ -1034,17 +1246,38 @@ var _ = Describe("Volume Populator Controller test", func() {
 
 				// The Apps controller is not installed in this focused DP envtest. Commit
 				// its side of the public request contract before letting DP continue.
-				target := request.DeepCopy()
-				target.Name = secretKey.Name
-				target.ResourceVersion = ""
-				target.UID = ""
-				target.CreationTimestamp = metav1.Time{}
-				target.ManagedFields = nil
-				target.Finalizers = []string{constant.DBComponentFinalizerName}
-				delete(target.Labels, constant.SystemAccountRestoreRequestLabelKey)
-				delete(target.Annotations, constant.SystemAccountRestoreTargetAnnotationKey)
+				target := &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace:  secretKey.Namespace,
+						Name:       secretKey.Name,
+						Finalizers: []string{constant.DBComponentFinalizerName},
+						Annotations: map[string]string{
+							constant.SystemAccountProvisionedAnnotationKey:      "true",
+							systemaccount.RestoreProtocolAnnotationKey:          systemaccount.RestoreProtocolV2,
+							systemaccount.RestoreOperationDigestAnnotationKey:   request.Annotations[systemaccount.RestoreOperationDigestAnnotationKey],
+							systemaccount.CredentialIntentRevisionAnnotationKey: request.Annotations[systemaccount.CredentialIntentRevisionAnnotationKey],
+							systemaccount.RestoreRequestNameAnnotationKey:       request.Name,
+							systemaccount.RestoreRequestUIDAnnotationKey:        string(request.UID),
+						},
+					},
+					Type: corev1.SecretTypeOpaque,
+					Data: map[string][]byte{
+						constant.AccountNameForSecret:   []byte("admin"),
+						constant.AccountPasswdForSecret: []byte("restored-password"),
+					},
+				}
+				Expect(controllerutil.SetControllerReference(component, target, k8sManager.GetScheme())).Should(Succeed())
+				revision, err := systemaccount.TargetCommitRevision(target, constant.DBComponentFinalizerName)
+				Expect(err).ShouldNot(HaveOccurred())
+				target.Annotations[systemaccount.TargetCommitRevisionAnnotationKey] = revision
 				Expect(testCtx.Cli.Create(testCtx.Ctx, target)).Should(Succeed())
-				Expect(testCtx.Cli.Delete(testCtx.Ctx, request)).Should(Succeed())
+				Expect(testCtx.Cli.Get(testCtx.Ctx, secretKey, target)).Should(Succeed())
+				request.Annotations[systemaccount.RestoreRequestPhaseAnnotationKey] =
+					string(systemaccount.RestoreRequestPhaseCommitted)
+				request.Annotations[systemaccount.TargetSecretNameAnnotationKey] = target.Name
+				request.Annotations[systemaccount.TargetSecretUIDAnnotationKey] = string(target.UID)
+				request.Annotations[systemaccount.TargetCommitRevisionAnnotationKey] = revision
+				Expect(testCtx.Cli.Update(testCtx.Ctx, request)).Should(Succeed())
 
 				Eventually(testapps.CheckObj(&testCtx, secretKey, func(g Gomega, secret *corev1.Secret) {
 					g.Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountNameForSecret, []byte("admin")))
@@ -2847,60 +3080,41 @@ func TestRestoreSystemAccountSecretsRestoresComponentAndShardingSecrets(t *testi
 		},
 	})
 	require.NoError(t, err)
-	backup := &dpv1alpha1.Backup{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "default",
-			Name:      "backup",
-			Annotations: map[string]string{
-				constant.EncryptedSystemAccountsAnnotationKey: string(accounts),
-			},
-		},
-	}
-	cluster := &kbappsv1.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "default",
-			Name:      "cluster",
-			UID:       types.UID("cluster-uid"),
-		},
-	}
-	component := &kbappsv1.Component{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "default",
-			Name:      constant.GenerateClusterComponentName("cluster", "mysql"),
-			UID:       types.UID("component-uid"),
-		},
-	}
 	pvc := &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "default",
 			Name:      "data-target-0",
 			Labels: map[string]string{
-				constant.AppInstanceLabelKey:       "cluster",
-				constant.KBAppComponentLabelKey:    "mysql",
 				constant.KBAppShardingNameLabelKey: "shard",
 			},
 		},
-		Spec: corev1.PersistentVolumeClaimSpec{
-			DataSourceRef: &corev1.TypedObjectReference{Name: backup.Name},
-		},
+	}
+	g := NewWithT(t)
+	backup, cluster, component, instanceSet := prepareSystemAccountAuthorityFixture(g, scheme, pvc)
+	backup.Annotations = map[string]string{
+		constant.EncryptedSystemAccountsAnnotationKey: string(accounts),
 	}
 	reconciler := &VolumePopulatorReconciler{
-		Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(backup, cluster, component).Build(),
+		Client: fake.NewClientBuilder().WithScheme(scheme).
+			WithObjects(backup, cluster, component, instanceSet, pvc).Build(),
 		Scheme: scheme,
 	}
 
 	err = reconciler.restoreSystemAccountSecrets(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, backup.Namespace)
 	require.True(t, intctrlutil.IsRequeueError(err), err)
 	componentRequest := getSystemAccountRestoreRequest(t, reconciler.Client,
-		constant.GenerateAccountSecretName("cluster", "mysql", "admin"))
+		"admin", systemaccount.SystemAccountScopeComponent)
 	require.Equal(t, []byte("component-password"), componentRequest.Data[constant.AccountPasswdForSecret])
-	commitSystemAccountRestoreRequest(t, reconciler.Client, componentRequest, constant.DBComponentFinalizerName)
+	commitSystemAccountRestoreRequest(t, reconciler.Client, scheme, componentRequest, component,
+		constant.GenerateAccountSecretName("cluster", "mysql", "admin"), constant.DBComponentFinalizerName)
 
 	err = reconciler.restoreSystemAccountSecrets(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, backup.Namespace)
 	require.True(t, intctrlutil.IsRequeueError(err), err)
-	shardingRequest := getSystemAccountRestoreRequest(t, reconciler.Client, "cluster-shard-root")
+	shardingRequest := getSystemAccountRestoreRequest(t, reconciler.Client,
+		"root", systemaccount.SystemAccountScopeSharding)
 	require.Equal(t, []byte("sharding-password"), shardingRequest.Data[constant.AccountPasswdForSecret])
-	commitSystemAccountRestoreRequest(t, reconciler.Client, shardingRequest, constant.DBClusterFinalizerName)
+	commitSystemAccountRestoreRequest(t, reconciler.Client, scheme, shardingRequest, cluster,
+		"cluster-shard-root", constant.DBClusterFinalizerName)
 
 	err = reconciler.restoreSystemAccountSecrets(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, backup.Namespace)
 	require.NoError(t, err)
@@ -2926,34 +3140,429 @@ func TestRestoreSystemAccountSecretsRestoresComponentAndShardingSecrets(t *testi
 	require.Equal(t, cluster.Name, shardingSecret.OwnerReferences[0].Name)
 }
 
-func getSystemAccountRestoreRequest(t *testing.T, cli client.Client, targetName string) *corev1.Secret {
+func getSystemAccountRestoreRequest(t *testing.T, cli client.Client, account, scope string) *corev1.Secret {
 	t.Helper()
 	requests := &corev1.SecretList{}
 	require.NoError(t, cli.List(context.Background(), requests,
 		client.MatchingLabels{constant.SystemAccountRestoreRequestLabelKey: "true"}))
 	for i := range requests.Items {
 		request := &requests.Items[i]
-		if request.Annotations[constant.SystemAccountRestoreTargetAnnotationKey] == targetName {
+		if request.Annotations[systemaccount.SystemAccountAnnotationKey] == account &&
+			request.Annotations[systemaccount.SystemAccountScopeAnnotationKey] == scope {
 			return request.DeepCopy()
 		}
 	}
-	require.FailNow(t, "restore request not found", targetName)
+	require.FailNow(t, "restore request not found", "account=%s scope=%s", account, scope)
 	return nil
 }
 
-func commitSystemAccountRestoreRequest(t *testing.T, cli client.Client, request *corev1.Secret, finalizer string) {
+func commitSystemAccountRestoreRequest(
+	t *testing.T,
+	cli client.Client,
+	scheme *runtime.Scheme,
+	request *corev1.Secret,
+	owner client.Object,
+	targetName, finalizer string,
+) {
 	t.Helper()
-	target := request.DeepCopy()
-	target.Name = request.Annotations[constant.SystemAccountRestoreTargetAnnotationKey]
-	target.ResourceVersion = ""
-	target.UID = ""
-	target.CreationTimestamp = metav1.Time{}
-	target.ManagedFields = nil
-	target.Finalizers = []string{finalizer}
-	delete(target.Labels, constant.SystemAccountRestoreRequestLabelKey)
-	delete(target.Annotations, constant.SystemAccountRestoreTargetAnnotationKey)
+	if request.UID == "" {
+		request.UID = types.UID(request.Name + "-uid")
+		require.NoError(t, cli.Update(context.Background(), request))
+	}
+	intent, err := systemaccount.ValidateRestoreRequestV2(request)
+	require.NoError(t, err)
+	target := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:  request.Namespace,
+			Name:       targetName,
+			UID:        types.UID(targetName + "-uid"),
+			Finalizers: []string{finalizer},
+			Annotations: map[string]string{
+				constant.SystemAccountProvisionedAnnotationKey:      "true",
+				systemaccount.RestoreProtocolAnnotationKey:          systemaccount.RestoreProtocolV2,
+				systemaccount.RestoreOperationDigestAnnotationKey:   request.Annotations[systemaccount.RestoreOperationDigestAnnotationKey],
+				systemaccount.CredentialIntentRevisionAnnotationKey: request.Annotations[systemaccount.CredentialIntentRevisionAnnotationKey],
+				systemaccount.RestoreRequestNameAnnotationKey:       request.Name,
+				systemaccount.RestoreRequestUIDAnnotationKey:        string(request.UID),
+			},
+		},
+		Type: corev1.SecretTypeOpaque,
+		Data: map[string][]byte{
+			constant.AccountNameForSecret:   append([]byte(nil), intent.Credentials[constant.AccountNameForSecret]...),
+			constant.AccountPasswdForSecret: append([]byte(nil), intent.Credentials[constant.AccountPasswdForSecret]...),
+		},
+	}
+	require.NoError(t, controllerutil.SetControllerReference(owner, target, scheme))
+	revision, err := systemaccount.TargetCommitRevision(target, finalizer)
+	require.NoError(t, err)
+	target.Annotations[systemaccount.TargetCommitRevisionAnnotationKey] = revision
 	require.NoError(t, cli.Create(context.Background(), target))
-	require.NoError(t, cli.Delete(context.Background(), request))
+	request.Annotations[systemaccount.RestoreRequestPhaseAnnotationKey] =
+		string(systemaccount.RestoreRequestPhaseCommitted)
+	request.Annotations[systemaccount.TargetSecretNameAnnotationKey] = target.Name
+	request.Annotations[systemaccount.TargetSecretUIDAnnotationKey] = string(target.UID)
+	request.Annotations[systemaccount.TargetCommitRevisionAnnotationKey] = revision
+	require.NoError(t, cli.Update(context.Background(), request))
+}
+
+func prepareSystemAccountAuthorityFixture(
+	t Gomega,
+	scheme *runtime.Scheme,
+	pvc *corev1.PersistentVolumeClaim,
+) (*dpv1alpha1.Backup, *kbappsv1.Cluster, *kbappsv1.Component, *workloadsv1.InstanceSet) {
+	t.Expect(dpv1alpha1.AddToScheme(scheme)).Should(Succeed())
+	t.Expect(workloadsv1.AddToScheme(scheme)).Should(Succeed())
+	apiGroup := dptypes.DataprotectionAPIGroup
+	if pvc.Namespace == "" {
+		pvc.Namespace = "default"
+	}
+	if pvc.Name == "" {
+		pvc.Name = "data-cluster-mysql-0"
+	}
+	pvc.UID = types.UID("pvc-uid")
+	if pvc.Labels == nil {
+		pvc.Labels = map[string]string{}
+	}
+	pvc.Labels[constant.AppInstanceLabelKey] = "cluster"
+	pvc.Labels[constant.KBAppComponentLabelKey] = "mysql"
+	if pvc.Annotations == nil {
+		pvc.Annotations = map[string]string{}
+	}
+	pvc.Annotations[constant.RestoreSourceKindAnnotationKey] = dptypes.BackupKind
+	pvc.Annotations[constant.RestoreSourceNamespaceAnnotationKey] = pvc.Namespace
+	backup := &dpv1alpha1.Backup{
+		TypeMeta: metav1.TypeMeta{APIVersion: dpv1alpha1.GroupVersion.String(), Kind: "Backup"},
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: pvc.Namespace,
+			Name:      "backup",
+			UID:       types.UID("backup-uid"),
+		},
+	}
+	pvc.Spec.DataSourceRef = &corev1.TypedObjectReference{
+		APIGroup: &apiGroup,
+		Kind:     dptypes.BackupKind,
+		Name:     backup.Name,
+	}
+	cluster := &kbappsv1.Cluster{
+		TypeMeta: metav1.TypeMeta{APIVersion: kbappsv1.GroupVersion.String(), Kind: "Cluster"},
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: pvc.Namespace,
+			Name:      "cluster",
+			UID:       types.UID("cluster-uid"),
+		},
+	}
+	component := &kbappsv1.Component{
+		TypeMeta: metav1.TypeMeta{APIVersion: kbappsv1.GroupVersion.String(), Kind: "Component"},
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: pvc.Namespace,
+			Name:      constant.GenerateClusterComponentName("cluster", "mysql"),
+			UID:       types.UID("component-uid"),
+			Labels: map[string]string{
+				constant.AppInstanceLabelKey:    "cluster",
+				constant.KBAppComponentLabelKey: "mysql",
+			},
+		},
+	}
+	instanceSet := &workloadsv1.InstanceSet{
+		TypeMeta: metav1.TypeMeta{APIVersion: workloadsv1.GroupVersion.String(), Kind: workloadsv1.InstanceSetKind},
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: pvc.Namespace,
+			Name:      "cluster-mysql",
+			UID:       types.UID("instanceset-uid"),
+			Labels: map[string]string{
+				constant.AppInstanceLabelKey:    "cluster",
+				constant.KBAppComponentLabelKey: "mysql",
+			},
+		},
+	}
+	t.Expect(controllerutil.SetControllerReference(cluster, component, scheme)).Should(Succeed())
+	t.Expect(controllerutil.SetControllerReference(component, instanceSet, scheme)).Should(Succeed())
+	t.Expect(controllerutil.SetControllerReference(instanceSet, pvc, scheme)).Should(Succeed())
+	return backup, cluster, component, instanceSet
+}
+
+func TestSystemAccountRestoreAuthorityRejectsForeignIdentityWithoutCreatingRequest(t *testing.T) {
+	testCases := []struct {
+		name       string
+		wantReason string
+		mutate     func(
+			pvc *corev1.PersistentVolumeClaim,
+			backup *dpv1alpha1.Backup,
+			cluster *kbappsv1.Cluster,
+			component *kbappsv1.Component,
+			instanceSet *workloadsv1.InstanceSet,
+		)
+	}{
+		{
+			name:       "workload UID replacement",
+			wantReason: systemaccount.UnauthorizedRestoreProducerReason,
+			mutate: func(pvc *corev1.PersistentVolumeClaim, _ *dpv1alpha1.Backup,
+				_ *kbappsv1.Cluster, _ *kbappsv1.Component, _ *workloadsv1.InstanceSet) {
+				pvc.OwnerReferences[0].UID = "replacement-workload-uid"
+			},
+		},
+		{
+			name:       "Component UID mismatch",
+			wantReason: systemaccount.UnauthorizedRestoreProducerReason,
+			mutate: func(_ *corev1.PersistentVolumeClaim, _ *dpv1alpha1.Backup,
+				_ *kbappsv1.Cluster, _ *kbappsv1.Component, instanceSet *workloadsv1.InstanceSet) {
+				instanceSet.OwnerReferences[0].UID = "replacement-component-uid"
+			},
+		},
+		{
+			name:       "Cluster UID mismatch",
+			wantReason: systemaccount.UnauthorizedRestoreProducerReason,
+			mutate: func(_ *corev1.PersistentVolumeClaim, _ *dpv1alpha1.Backup,
+				_ *kbappsv1.Cluster, component *kbappsv1.Component, _ *workloadsv1.InstanceSet) {
+				component.OwnerReferences[0].UID = "replacement-cluster-uid"
+			},
+		},
+		{
+			name:       "terminating PVC",
+			wantReason: systemaccount.UnauthorizedRestoreProducerReason,
+			mutate: func(pvc *corev1.PersistentVolumeClaim, _ *dpv1alpha1.Backup,
+				_ *kbappsv1.Cluster, _ *kbappsv1.Component, _ *workloadsv1.InstanceSet) {
+				now := metav1.Now()
+				pvc.DeletionTimestamp = &now
+				pvc.Finalizers = []string{"test.kubeblocks.io/hold"}
+			},
+		},
+		{
+			name:       "terminating workload",
+			wantReason: systemaccount.UnauthorizedRestoreProducerReason,
+			mutate: func(_ *corev1.PersistentVolumeClaim, _ *dpv1alpha1.Backup,
+				_ *kbappsv1.Cluster, _ *kbappsv1.Component, instanceSet *workloadsv1.InstanceSet) {
+				now := metav1.Now()
+				instanceSet.DeletionTimestamp = &now
+				instanceSet.Finalizers = []string{"test.kubeblocks.io/hold"}
+			},
+		},
+		{
+			name:       "terminating Component",
+			wantReason: systemaccount.UnauthorizedRestoreProducerReason,
+			mutate: func(_ *corev1.PersistentVolumeClaim, _ *dpv1alpha1.Backup,
+				_ *kbappsv1.Cluster, component *kbappsv1.Component, _ *workloadsv1.InstanceSet) {
+				now := metav1.Now()
+				component.DeletionTimestamp = &now
+				component.Finalizers = []string{"test.kubeblocks.io/hold"}
+			},
+		},
+		{
+			name:       "terminating Cluster",
+			wantReason: systemaccount.UnauthorizedRestoreProducerReason,
+			mutate: func(_ *corev1.PersistentVolumeClaim, _ *dpv1alpha1.Backup,
+				cluster *kbappsv1.Cluster, _ *kbappsv1.Component, _ *workloadsv1.InstanceSet) {
+				now := metav1.Now()
+				cluster.DeletionTimestamp = &now
+				cluster.Finalizers = []string{"test.kubeblocks.io/hold"}
+			},
+		},
+		{
+			name:       "initial restore source mismatch",
+			wantReason: systemaccount.RestoreIntentMismatchReason,
+			mutate: func(_ *corev1.PersistentVolumeClaim, _ *dpv1alpha1.Backup,
+				cluster *kbappsv1.Cluster, _ *kbappsv1.Component, _ *workloadsv1.InstanceSet) {
+				cluster.Spec.Restore = &kbappsv1.ClusterRestore{
+					Source: kbappsv1.ClusterRestoreSource{
+						APIGroup:  dptypes.DataprotectionAPIGroup,
+						Kind:      dptypes.BackupKind,
+						Namespace: "default",
+						Name:      "other-backup",
+					},
+				}
+			},
+		},
+		{
+			name:       "cross namespace legacy source",
+			wantReason: systemaccount.UnsupportedRestoreSourceReason,
+			mutate: func(pvc *corev1.PersistentVolumeClaim, backup *dpv1alpha1.Backup,
+				_ *kbappsv1.Cluster, _ *kbappsv1.Component, _ *workloadsv1.InstanceSet) {
+				namespace := "backup"
+				backup.Namespace = namespace
+				pvc.Spec.DataSourceRef.Namespace = &namespace
+				pvc.Annotations[constant.RestoreSourceNamespaceAnnotationKey] = namespace
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			scheme := runtime.NewScheme()
+			require.NoError(t, corev1.AddToScheme(scheme))
+			require.NoError(t, kbappsv1.AddToScheme(scheme))
+			pvc := &corev1.PersistentVolumeClaim{}
+			backup, cluster, component, instanceSet :=
+				prepareSystemAccountAuthorityFixture(NewWithT(t), scheme, pvc)
+			testCase.mutate(pvc, backup, cluster, component, instanceSet)
+			cli := fake.NewClientBuilder().WithScheme(scheme).
+				WithObjects(pvc, backup, cluster, component, instanceSet).Build()
+			reconciler := &VolumePopulatorReconciler{Client: cli, Scheme: scheme}
+
+			err := reconciler.upsertSystemAccountSecret(
+				intctrlutil.RequestCtx{Ctx: context.Background()},
+				pvc, backup, systemAccountSecretScopeComponent,
+				"cluster", "mysql", "admin", []byte("password"))
+
+			require.True(t, intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal), err)
+			require.ErrorContains(t, err, testCase.wantReason)
+			requests := &corev1.SecretList{}
+			require.NoError(t, cli.List(context.Background(), requests,
+				client.MatchingLabels{constant.SystemAccountRestoreRequestLabelKey: "true"}))
+			require.Empty(t, requests.Items)
+		})
+	}
+}
+
+func TestSystemAccountProtocolMapperRevalidatesReplacementPVCAuthority(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, kbappsv1.AddToScheme(scheme))
+	pvc := &corev1.PersistentVolumeClaim{}
+	backup, cluster, component, instanceSet :=
+		prepareSystemAccountAuthorityFixture(NewWithT(t), scheme, pvc)
+	cli := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(pvc, backup, cluster, component, instanceSet).Build()
+	reconciler := &VolumePopulatorReconciler{Client: cli, Scheme: scheme}
+	request, err := reconciler.newSystemAccountRestoreRequest(
+		intctrlutil.RequestCtx{Ctx: context.Background()},
+		pvc, backup, systemAccountSecretScopeComponent,
+		"cluster", "mysql", "admin", []byte("password"))
+	require.NoError(t, err)
+
+	mapped := reconciler.mapSystemAccountProtocolSecret(context.Background(), request)
+	require.Equal(t, []ctrl.Request{{
+		NamespacedName: client.ObjectKeyFromObject(pvc),
+	}}, mapped)
+
+	require.NoError(t, cli.Delete(context.Background(), pvc))
+	replacement := pvc.DeepCopy()
+	replacement.ResourceVersion = ""
+	replacement.UID = "replacement-pvc-uid"
+	replacement.OwnerReferences[0].UID = "replacement-workload-uid"
+	require.NoError(t, cli.Create(context.Background(), replacement))
+
+	mapped = reconciler.mapSystemAccountProtocolSecret(context.Background(), request)
+	require.Empty(t, mapped)
+}
+
+func TestConflictReceiptCreateUncertainResponseUsesPersistedReceipt(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, kbappsv1.AddToScheme(scheme))
+	winnerPVC := &corev1.PersistentVolumeClaim{}
+	backup, cluster, component, instanceSet :=
+		prepareSystemAccountAuthorityFixture(NewWithT(t), scheme, winnerPVC)
+	loserPVC := winnerPVC.DeepCopy()
+	loserPVC.Name = "data-loser"
+	loserPVC.UID = "loser-pvc-uid"
+	loserPVC.ResourceVersion = ""
+	loserPVC.Annotations[constant.RestorePITRAnnotationKey] = "2026-07-23T00:00:00Z"
+	baseClient := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(winnerPVC, loserPVC, backup, cluster, component, instanceSet).Build()
+	reconciler := &VolumePopulatorReconciler{Client: baseClient, Scheme: scheme}
+	winner, err := reconciler.newSystemAccountRestoreRequest(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, winnerPVC, backup,
+		systemAccountSecretScopeComponent, "cluster", "mysql", "admin", []byte("winner-password"))
+	require.NoError(t, err)
+	winner.UID = "winner-request-uid"
+	require.NoError(t, baseClient.Create(context.Background(), winner))
+
+	createAttempts := 0
+	interceptedClient := interceptor.NewClient(baseClient, interceptor.Funcs{
+		Create: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
+			secret, ok := obj.(*corev1.Secret)
+			if !ok || secret.Annotations[systemaccount.RestoreProtocolAnnotationKey] !=
+				systemaccount.ConflictProtocolV1 {
+				return c.Create(ctx, obj, opts...)
+			}
+			createAttempts++
+			if err := c.Create(ctx, secret.DeepCopy(), opts...); err != nil {
+				return err
+			}
+			return context.DeadlineExceeded
+		},
+	})
+	reconciler.Client = interceptedClient
+
+	err = reconciler.upsertSystemAccountSecret(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, loserPVC, backup,
+		systemAccountSecretScopeComponent, "cluster", "mysql", "admin", []byte("loser-password"))
+
+	require.True(t, intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal), err)
+	require.ErrorContains(t, err, systemaccount.ConcurrentRestoreIntentReason)
+	require.Equal(t, 1, createAttempts)
+	receipts := &corev1.SecretList{}
+	require.NoError(t, baseClient.List(context.Background(), receipts))
+	var receipt *corev1.Secret
+	for i := range receipts.Items {
+		if receipts.Items[i].Annotations[systemaccount.RestoreProtocolAnnotationKey] ==
+			systemaccount.ConflictProtocolV1 {
+			receipt = &receipts.Items[i]
+			break
+		}
+	}
+	require.NotNil(t, receipt)
+	projected := &corev1.PersistentVolumeClaim{}
+	require.NoError(t, baseClient.Get(context.Background(), client.ObjectKeyFromObject(loserPVC), projected))
+	require.Equal(t, receipt.Annotations[systemaccount.RestoreOperationDigestAnnotationKey],
+		projected.Annotations[systemaccount.RestoreOperationDigestAnnotationKey])
+	require.Equal(t, receipt.Annotations[systemaccount.BlockingRequestUIDAnnotationKey],
+		projected.Annotations[systemaccount.BlockingRequestUIDAnnotationKey])
+	require.Equal(t, receipt.Annotations[systemaccount.WinnerOperationDigestAnnotationKey],
+		projected.Annotations[systemaccount.WinnerOperationDigestAnnotationKey])
+}
+
+func TestConflictReceiptMapperRepairsNonExactTerminalProjection(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, kbappsv1.AddToScheme(scheme))
+	pvc := &corev1.PersistentVolumeClaim{}
+	backup, cluster, component, instanceSet :=
+		prepareSystemAccountAuthorityFixture(NewWithT(t), scheme, pvc)
+	cli := fake.NewClientBuilder().WithScheme(scheme).
+		WithStatusSubresource(pvc).
+		WithObjects(pvc, backup, cluster, component, instanceSet).Build()
+	reconciler := &VolumePopulatorReconciler{Client: cli, Scheme: scheme}
+	winner, err := reconciler.newSystemAccountRestoreRequest(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, backup,
+		systemAccountSecretScopeComponent, "cluster", "mysql", "admin", []byte("winner-password"))
+	require.NoError(t, err)
+	winner.UID = "winner-request-uid"
+	winner.ResourceVersion = "17"
+
+	loserPVC := pvc.DeepCopy()
+	loserPVC.Annotations[constant.RestorePITRAnnotationKey] = "2026-07-23T00:00:00Z"
+	require.NoError(t, cli.Update(context.Background(), loserPVC))
+	require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(pvc), loserPVC))
+	loserRequest, err := reconciler.newSystemAccountRestoreRequest(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, loserPVC, backup,
+		systemAccountSecretScopeComponent, "cluster", "mysql", "admin", []byte("loser-password"))
+	require.NoError(t, err)
+	loserIntent, err := systemaccount.ValidateRestoreRequestV2(loserRequest)
+	require.NoError(t, err)
+	receipt, err := systemaccount.BuildConflictReceipt(loserIntent, winner)
+	require.NoError(t, err)
+
+	loserPVC.Status.Conditions = []corev1.PersistentVolumeClaimCondition{{
+		Type:   kbappsv1.ConditionTypeRestore,
+		Status: corev1.ConditionFalse,
+		Reason: systemaccount.AccountUnavailableReason,
+	}}
+	require.NoError(t, cli.Status().Update(context.Background(), loserPVC))
+	mapped := reconciler.mapSystemAccountProtocolSecret(context.Background(), receipt)
+	require.Equal(t, []ctrl.Request{{
+		NamespacedName: client.ObjectKeyFromObject(pvc),
+	}}, mapped)
+
+	envelope, err := systemaccount.ValidateConflictReceipt(receipt, loserIntent)
+	require.NoError(t, err)
+	require.NoError(t, reconciler.projectSystemAccountConflictIdentity(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, loserPVC, envelope))
+	loserPVC.Status.Conditions[0].Reason = systemaccount.ConcurrentRestoreIntentReason
+	require.NoError(t, cli.Status().Update(context.Background(), loserPVC))
+
+	mapped = reconciler.mapSystemAccountProtocolSecret(context.Background(), receipt)
+	require.Empty(t, mapped)
 }
 
 func TestRestoreSystemAccountSecretsReturnsFatalForInvalidAccountsPayload(t *testing.T) {

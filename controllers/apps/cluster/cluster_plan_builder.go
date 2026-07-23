@@ -356,6 +356,7 @@ func (c *clusterPlanBuilder) reconcileDeleteObject(ctx context.Context, node *mo
 		deletePropagation := metav1.DeletePropagationBackground
 		deleteOptions := &client.DeleteOptions{
 			PropagationPolicy: &deletePropagation,
+			Preconditions:     node.DeletePreconditions,
 		}
 		if err := c.cli.Delete(ctx, node.Obj, deleteOptions, clientOption(node)); err != nil {
 			return client.IgnoreNotFound(err)

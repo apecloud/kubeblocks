@@ -65,7 +65,5 @@ func (t *rolloutDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 
 	// TODO: rollback if the rollout is not succeed
 
-	graphCli.Delete(dag, rollout)
-
-	return nil
+	return graphCli.Delete(dag, rollout)
 }

@@ -320,6 +320,14 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err = (&dpcontrollers.SystemAccountConflictReceiptLifecycleReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "SystemAccountConflictReceiptLifecycle")
+		os.Exit(1)
+	}
+
 	if err = (&dpcontrollers.BackupPolicyReconciler{
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),

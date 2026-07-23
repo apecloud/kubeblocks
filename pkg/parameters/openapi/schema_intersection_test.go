@@ -155,6 +155,36 @@ var _ = Describe("CUE schema intersection semantics", func() {
 		Entry("integer then number", "integerThenNumber"),
 	)
 
+	DescribeTable("converts unsigned integer intersections independently of branch order",
+		func(definition string) {
+			const (
+				value        = "9223372036854775808"
+				integerValue = uint64(9223372036854775808)
+			)
+
+			cueDefinition := runtime.Underlying().LookupPath(cue.MakePath(cue.Def(definition)))
+			Expect(cueDefinition.Unify(runtime.Context().Encode(map[string]interface{}{
+				"x": integerValue,
+			})).Validate(cue.Concrete(true))).To(Succeed())
+
+			schema, err := GenerateOpenAPISchema(cueTemplate, definition)
+			Expect(err).NotTo(HaveOccurred())
+			xSchema, ok := FlattenSchema(schema.Properties[DefaultSchemaName]).Properties["x"]
+			Expect(ok).To(BeTrue())
+			leafSchema := &apiextensionsv1.JSONSchemaProps{
+				Type:       SchemaStructType,
+				Properties: map[string]apiextensionsv1.JSONSchemaProps{"x": xSchema},
+			}
+
+			typedValue, err := common.ConvertStringToInterfaceBySchemaType(leafSchema, map[string]string{"x": value})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(typedValue["x"]).To(Equal(integerValue))
+			Expect(common.ValidateDataWithSchema(leafSchema, typedValue)).To(Succeed())
+		},
+		Entry("generic integer then uint64", "genericThenUnsigned"),
+		Entry("uint64 then generic integer", "unsignedThenGeneric"),
+	)
+
 	It("preserves conflicting leaf constraints when flattening", func() {
 		objectSchema := apiextensionsv1.JSONSchemaProps{
 			Type: SchemaStructType,

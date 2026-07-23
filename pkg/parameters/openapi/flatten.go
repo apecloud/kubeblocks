@@ -55,6 +55,7 @@ func addFlattenedSchema(flattenProps map[string]apiextv1.JSONSchemaProps, prefix
 		return
 	}
 	intersectFlattenedSchemaType(&existing, schema)
+	intersectFlattenedSchemaConversionHints(&existing, schema)
 	existing.AllOf = append(existing.AllOf, schema)
 	flattenProps[prefix] = existing
 }
@@ -71,6 +72,63 @@ func intersectFlattenedSchemaType(existing *apiextv1.JSONSchemaProps, schema api
 		existing.Format = schema.Format
 	case existing.Type == "integer" && schema.Type == "number":
 		return
+	}
+}
+
+func intersectFlattenedSchemaConversionHints(existing *apiextv1.JSONSchemaProps, schema apiextv1.JSONSchemaProps) {
+	if existing.Type != "integer" {
+		return
+	}
+	intersectFlattenedSchemaFormat(existing, schema)
+	intersectFlattenedSchemaMinimum(existing, schema)
+	intersectFlattenedSchemaMaximum(existing, schema)
+}
+
+func intersectFlattenedSchemaFormat(existing *apiextv1.JSONSchemaProps, schema apiextv1.JSONSchemaProps) {
+	if isUnsignedIntegerFormat(existing.Format) {
+		return
+	}
+	if existing.Format == "" || isUnsignedIntegerFormat(schema.Format) {
+		existing.Format = schema.Format
+	}
+}
+
+func isUnsignedIntegerFormat(format string) bool {
+	switch format {
+	case "uint", "uint8", "uint16", "uint32", "uint64":
+		return true
+	default:
+		return false
+	}
+}
+
+func intersectFlattenedSchemaMinimum(existing *apiextv1.JSONSchemaProps, schema apiextv1.JSONSchemaProps) {
+	if schema.Minimum == nil {
+		return
+	}
+	if existing.Minimum == nil || *schema.Minimum > *existing.Minimum {
+		minimum := *schema.Minimum
+		existing.Minimum = &minimum
+		existing.ExclusiveMinimum = schema.ExclusiveMinimum
+		return
+	}
+	if *schema.Minimum == *existing.Minimum {
+		existing.ExclusiveMinimum = existing.ExclusiveMinimum || schema.ExclusiveMinimum
+	}
+}
+
+func intersectFlattenedSchemaMaximum(existing *apiextv1.JSONSchemaProps, schema apiextv1.JSONSchemaProps) {
+	if schema.Maximum == nil {
+		return
+	}
+	if existing.Maximum == nil || *schema.Maximum < *existing.Maximum {
+		maximum := *schema.Maximum
+		existing.Maximum = &maximum
+		existing.ExclusiveMaximum = schema.ExclusiveMaximum
+		return
+	}
+	if *schema.Maximum == *existing.Maximum {
+		existing.ExclusiveMaximum = existing.ExclusiveMaximum || schema.ExclusiveMaximum
 	}
 }
 

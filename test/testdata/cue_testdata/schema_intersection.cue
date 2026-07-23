@@ -53,3 +53,14 @@
 
 #numberThenInteger: #numberLower & #integerUpper
 #integerThenNumber: #integerUpper & #numberLower
+
+#genericInteger: {
+	x: int
+}
+
+#unsignedInteger: {
+	x: uint64
+}
+
+#genericThenUnsigned: #genericInteger & #unsignedInteger
+#unsignedThenGeneric: #unsignedInteger & #genericInteger

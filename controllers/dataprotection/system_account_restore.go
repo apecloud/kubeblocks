@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"slices"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -33,20 +34,50 @@ import (
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/sharding"
 	"github.com/apecloud/kubeblocks/pkg/controller/systemaccount"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 )
 
 type systemAccountRestoreAuthority struct {
+	pvc       *corev1.PersistentVolumeClaim
 	root      *appsv1.Cluster
 	component *appsv1.Component
+	workload  *workloads.InstanceSet
+	source    *dpv1alpha1.Backup
 	operation systemaccount.RestoreOperationIdentity
 }
+
+type systemAccountRestoreAuthorityMode uint8
+
+const (
+	systemAccountRestoreAuthorityForRequest systemAccountRestoreAuthorityMode = iota
+	systemAccountRestoreAuthorityForConflictProjection
+)
 
 type systemAccountRestoreContractError struct {
 	reason string
 	cause  error
+}
+
+type systemAccountRestoreAuthorityReadError struct {
+	cause error
+}
+
+func (e *systemAccountRestoreAuthorityReadError) Error() string {
+	return e.cause.Error()
+}
+
+func (e *systemAccountRestoreAuthorityReadError) Unwrap() error {
+	return e.cause
+}
+
+func systemAccountAuthorityReadError(err error) error {
+	if err == nil || apierrors.IsNotFound(err) {
+		return err
+	}
+	return &systemAccountRestoreAuthorityReadError{cause: err}
 }
 
 func (e *systemAccountRestoreContractError) Error() string {
@@ -74,8 +105,12 @@ func (r *VolumePopulatorReconciler) buildSystemAccountCredentialIntent(
 ) (systemaccount.CredentialIntent, error) {
 	authority, err := r.resolveSystemAccountRestoreAuthority(reqCtx, pvc, backup, clusterName)
 	if err != nil {
+		var readErr *systemAccountRestoreAuthorityReadError
+		if errors.As(err, &readErr) {
+			return systemaccount.CredentialIntent{}, err
+		}
 		var contractErr *systemAccountRestoreContractError
-		if !apierrors.IsNotFound(err) && !errors.As(err, &contractErr) {
+		if !errors.As(err, &contractErr) {
 			err = newSystemAccountRestoreContractError(
 				systemaccount.UnauthorizedRestoreProducerReason, err)
 		}
@@ -93,11 +128,10 @@ func (r *VolumePopulatorReconciler) buildSystemAccountCredentialIntent(
 					pvc.Namespace, pvc.Name, ownerName, authority.component.Namespace, authority.component.Name))
 		}
 	case systemAccountSecretScopeSharding:
-		if pvc.Labels[constant.KBAppShardingNameLabelKey] != ownerName {
+		if err := r.validateSystemAccountShardingAuthority(
+			reqCtx, authority, ownerName); err != nil {
 			return systemaccount.CredentialIntent{}, newSystemAccountRestoreContractError(
-				systemaccount.UnauthorizedRestoreProducerReason,
-				fmt.Errorf("PVC %s/%s sharding identity %q does not match %q",
-					pvc.Namespace, pvc.Name, ownerName, pvc.Labels[constant.KBAppShardingNameLabelKey]))
+				systemaccount.TargetSemanticUnavailableReason, err)
 		}
 		targetOwner = objectIdentity(authority.root)
 		shardingName = ownerName
@@ -118,7 +152,7 @@ func (r *VolumePopulatorReconciler) buildSystemAccountCredentialIntent(
 			ShardingName: shardingName,
 			Account:      accountName,
 		},
-		ResolvedSource: objectIdentity(backup),
+		ResolvedSource: objectIdentity(authority.source),
 		Credentials: map[string][]byte{
 			constant.AccountNameForSecret:   []byte(accountName),
 			constant.AccountPasswdForSecret: append([]byte(nil), password...),
@@ -132,16 +166,69 @@ func (r *VolumePopulatorReconciler) resolveSystemAccountRestoreAuthority(
 	backup *dpv1alpha1.Backup,
 	clusterName string,
 ) (*systemAccountRestoreAuthority, error) {
+	return r.resolveSystemAccountRestoreAuthorityWithMode(
+		reqCtx, pvc, backup, clusterName, systemAccountRestoreAuthorityForRequest)
+}
+
+func (r *VolumePopulatorReconciler) resolveSystemAccountRestoreAuthorityWithMode(
+	reqCtx intctrlutil.RequestCtx,
+	pvc *corev1.PersistentVolumeClaim,
+	backup *dpv1alpha1.Backup,
+	clusterName string,
+	mode systemAccountRestoreAuthorityMode,
+) (*systemAccountRestoreAuthority, error) {
 	if pvc == nil || backup == nil {
 		return nil, fmt.Errorf("PVC and Backup are required")
 	}
 	if pvc.Namespace == "" || pvc.UID == "" {
 		return nil, fmt.Errorf("PVC identity must include namespace and UID")
 	}
-	if !pvc.DeletionTimestamp.IsZero() {
-		return nil, fmt.Errorf("PVC %s/%s is terminating", pvc.Namespace, pvc.Name)
+	reader, err := r.systemAccountAuthorityReader()
+	if err != nil {
+		return nil, err
 	}
-	workload, err := r.resolveRestorePVCWorkload(reqCtx, pvc)
+	livePVC := &corev1.PersistentVolumeClaim{}
+	if err := reader.Get(reqCtx.Ctx, client.ObjectKeyFromObject(pvc), livePVC); err != nil {
+		return nil, systemAccountAuthorityReadError(err)
+	}
+	if livePVC.UID != pvc.UID {
+		return nil, fmt.Errorf("pvc %s/%s UID changed from %s to %s",
+			pvc.Namespace, pvc.Name, pvc.UID, livePVC.UID)
+	}
+	if !livePVC.DeletionTimestamp.IsZero() {
+		return nil, fmt.Errorf("PVC %s/%s is terminating", livePVC.Namespace, livePVC.Name)
+	}
+	pvc = livePVC
+	liveBackup := &dpv1alpha1.Backup{}
+	if err := reader.Get(reqCtx.Ctx, client.ObjectKeyFromObject(backup), liveBackup); err != nil {
+		return nil, systemAccountAuthorityReadError(err)
+	}
+	if backup.UID == "" || liveBackup.UID != backup.UID {
+		return nil, &systemAccountRestoreAuthorityReadError{
+			cause: fmt.Errorf("backup %s/%s UID changed from %s to %s",
+				backup.Namespace, backup.Name, backup.UID, liveBackup.UID),
+		}
+	}
+	if backup.Annotations[constant.EncryptedSystemAccountsAnnotationKey] !=
+		liveBackup.Annotations[constant.EncryptedSystemAccountsAnnotationKey] {
+		return nil, &systemAccountRestoreAuthorityReadError{
+			cause: fmt.Errorf("backup %s/%s system account payload changed during authority resolution",
+				backup.Namespace, backup.Name),
+		}
+	}
+	source := systemaccount.SourceIdentity{
+		APIGroup:  dptypes.DataprotectionAPIGroup,
+		Kind:      dptypes.BackupKind,
+		Namespace: liveBackup.Namespace,
+		Name:      liveBackup.Name,
+	}
+	if !pvcReferencesRestoreSource(pvc, source) {
+		return nil, newSystemAccountRestoreContractError(
+			systemaccount.RestoreIntentMismatchReason,
+			fmt.Errorf("PVC %s/%s declared restore source does not match Backup %s/%s",
+				pvc.Namespace, pvc.Name, liveBackup.Namespace, liveBackup.Name))
+	}
+	workload, err := r.resolveRestorePVCWorkload(reqCtx, reader, pvc)
 	if err != nil {
 		return nil, err
 	}
@@ -152,11 +239,11 @@ func (r *VolumePopulatorReconciler) resolveSystemAccountRestoreAuthority(
 			pvc.Namespace, pvc.Name, workload.GetNamespace(), workload.GetName())
 	}
 	component := &appsv1.Component{}
-	if err := r.Client.Get(reqCtx.Ctx, client.ObjectKey{
+	if err := reader.Get(reqCtx.Ctx, client.ObjectKey{
 		Namespace: pvc.Namespace,
 		Name:      componentRef.Name,
 	}, component); err != nil {
-		return nil, err
+		return nil, systemAccountAuthorityReadError(err)
 	}
 	if component.UID == "" || component.UID != componentRef.UID {
 		return nil, fmt.Errorf("PVC %s/%s Component owner UID mismatch", pvc.Namespace, pvc.Name)
@@ -171,28 +258,23 @@ func (r *VolumePopulatorReconciler) resolveSystemAccountRestoreAuthority(
 			component.Namespace, component.Name, clusterName)
 	}
 	cluster := &appsv1.Cluster{}
-	if err := r.Client.Get(reqCtx.Ctx, client.ObjectKey{
+	if err := reader.Get(reqCtx.Ctx, client.ObjectKey{
 		Namespace: pvc.Namespace,
 		Name:      clusterRef.Name,
 	}, cluster); err != nil {
-		return nil, err
+		return nil, systemAccountAuthorityReadError(err)
 	}
 	if cluster.UID == "" || cluster.UID != clusterRef.UID {
 		return nil, fmt.Errorf("component %s/%s Cluster owner UID mismatch", component.Namespace, component.Name)
 	}
-	if !cluster.DeletionTimestamp.IsZero() {
+	if !cluster.DeletionTimestamp.IsZero() &&
+		mode != systemAccountRestoreAuthorityForConflictProjection {
 		return nil, fmt.Errorf("component %s/%s Cluster owner is terminating", component.Namespace, component.Name)
 	}
 	if workload.GetLabels()[constant.AppInstanceLabelKey] != cluster.Name ||
 		pvc.Labels[constant.AppInstanceLabelKey] != cluster.Name {
 		return nil, fmt.Errorf("PVC %s/%s workload authority does not match Cluster %s/%s",
 			pvc.Namespace, pvc.Name, cluster.Namespace, cluster.Name)
-	}
-	source := systemaccount.SourceIdentity{
-		APIGroup:  dptypes.DataprotectionAPIGroup,
-		Kind:      dptypes.BackupKind,
-		Namespace: backup.Namespace,
-		Name:      backup.Name,
 	}
 	operation := systemaccount.RestoreOperationIdentity{
 		Protocol: systemaccount.RestoreProtocolV2,
@@ -213,6 +295,14 @@ func (r *VolumePopulatorReconciler) resolveSystemAccountRestoreAuthority(
 				fmt.Errorf("cluster %s/%s restore source does not match Backup %s/%s",
 					cluster.Namespace, cluster.Name, backup.Namespace, backup.Name))
 		}
+		if pvc.Annotations[constant.RestorePITRAnnotationKey] != cluster.Spec.Restore.PITR {
+			return nil, newSystemAccountRestoreContractError(
+				systemaccount.RestoreIntentMismatchReason,
+				fmt.Errorf("PVC %s/%s PITR %q does not match Cluster restore PITR %q",
+					pvc.Namespace, pvc.Name,
+					pvc.Annotations[constant.RestorePITRAnnotationKey],
+					cluster.Spec.Restore.PITR))
+		}
 		operation.Profile = systemaccount.RestoreProfileInitialCluster
 		operation.Source.Namespace = namespace
 		operation.PITR = cluster.Spec.Restore.PITR
@@ -227,43 +317,143 @@ func (r *VolumePopulatorReconciler) resolveSystemAccountRestoreAuthority(
 		operation.PITR = pvc.Annotations[constant.RestorePITRAnnotationKey]
 	}
 	return &systemAccountRestoreAuthority{
+		pvc:       pvc,
 		root:      cluster,
 		component: component,
+		workload:  workload,
+		source:    liveBackup,
 		operation: operation,
 	}, nil
 }
 
 func (r *VolumePopulatorReconciler) resolveRestorePVCWorkload(
 	reqCtx intctrlutil.RequestCtx,
+	reader client.Reader,
 	pvc *corev1.PersistentVolumeClaim,
-) (client.Object, error) {
+) (*workloads.InstanceSet, error) {
 	ownerRef := metav1.GetControllerOf(pvc)
 	if ownerRef == nil || ownerRef.APIVersion != workloads.GroupVersion.String() {
 		return nil, fmt.Errorf("PVC %s/%s has no supported workload controller owner", pvc.Namespace, pvc.Name)
 	}
-	var workload client.Object
 	switch ownerRef.Kind {
 	case workloads.InstanceSetKind:
-		workload = &workloads.InstanceSet{}
+		workload := &workloads.InstanceSet{}
+		if err := reader.Get(reqCtx.Ctx, client.ObjectKey{
+			Namespace: pvc.Namespace,
+			Name:      ownerRef.Name,
+		}, workload); err != nil {
+			return nil, systemAccountAuthorityReadError(err)
+		}
+		if workload.UID == "" || workload.UID != ownerRef.UID {
+			return nil, fmt.Errorf("PVC %s/%s workload owner UID mismatch", pvc.Namespace, pvc.Name)
+		}
+		if !workload.DeletionTimestamp.IsZero() {
+			return nil, fmt.Errorf("PVC %s/%s workload owner is terminating", pvc.Namespace, pvc.Name)
+		}
+		return workload, nil
 	case "Instance":
-		workload = &workloads.Instance{}
+		instance := &workloads.Instance{}
+		if err := reader.Get(reqCtx.Ctx, client.ObjectKey{
+			Namespace: pvc.Namespace,
+			Name:      ownerRef.Name,
+		}, instance); err != nil {
+			return nil, systemAccountAuthorityReadError(err)
+		}
+		if instance.UID == "" || instance.UID != ownerRef.UID {
+			return nil, fmt.Errorf("PVC %s/%s Instance owner UID mismatch", pvc.Namespace, pvc.Name)
+		}
+		if !instance.DeletionTimestamp.IsZero() {
+			return nil, fmt.Errorf("PVC %s/%s Instance owner is terminating", pvc.Namespace, pvc.Name)
+		}
+		parentRef := metav1.GetControllerOf(instance)
+		if parentRef == nil || parentRef.APIVersion != workloads.GroupVersion.String() ||
+			parentRef.Kind != workloads.InstanceSetKind {
+			return nil, fmt.Errorf("PVC %s/%s Instance owner has no parent InstanceSet controller owner",
+				pvc.Namespace, pvc.Name)
+		}
+		workload := &workloads.InstanceSet{}
+		if err := reader.Get(reqCtx.Ctx, client.ObjectKey{
+			Namespace: pvc.Namespace,
+			Name:      parentRef.Name,
+		}, workload); err != nil {
+			return nil, systemAccountAuthorityReadError(err)
+		}
+		if workload.UID == "" || workload.UID != parentRef.UID {
+			return nil, fmt.Errorf("PVC %s/%s InstanceSet owner UID mismatch", pvc.Namespace, pvc.Name)
+		}
+		if !workload.DeletionTimestamp.IsZero() {
+			return nil, fmt.Errorf("PVC %s/%s InstanceSet owner is terminating", pvc.Namespace, pvc.Name)
+		}
+		return workload, nil
 	default:
 		return nil, fmt.Errorf("PVC %s/%s has unsupported workload owner kind %q",
 			pvc.Namespace, pvc.Name, ownerRef.Kind)
 	}
-	if err := r.Client.Get(reqCtx.Ctx, client.ObjectKey{
-		Namespace: pvc.Namespace,
-		Name:      ownerRef.Name,
-	}, workload); err != nil {
-		return nil, err
+}
+
+func (r *VolumePopulatorReconciler) validateSystemAccountShardingAuthority(
+	reqCtx intctrlutil.RequestCtx,
+	authority *systemAccountRestoreAuthority,
+	shardingName string,
+) error {
+	pvc := authority.pvc
+	if pvc.Labels[constant.KBAppShardingNameLabelKey] != shardingName ||
+		authority.workload.Labels[constant.KBAppShardingNameLabelKey] != shardingName ||
+		authority.component.Labels[constant.KBAppShardingNameLabelKey] != shardingName {
+		return fmt.Errorf("PVC %s/%s sharding semantics do not match selector %q",
+			pvc.Namespace, pvc.Name, shardingName)
 	}
-	if workload.GetUID() == "" || workload.GetUID() != ownerRef.UID {
-		return nil, fmt.Errorf("PVC %s/%s workload owner UID mismatch", pvc.Namespace, pvc.Name)
+	if !slices.ContainsFunc(authority.root.Spec.Shardings, func(item appsv1.ClusterSharding) bool {
+		return item.Name == shardingName
+	}) {
+		return fmt.Errorf("cluster %s/%s has no sharding %q",
+			authority.root.Namespace, authority.root.Name, shardingName)
 	}
-	if !workload.GetDeletionTimestamp().IsZero() {
-		return nil, fmt.Errorf("PVC %s/%s workload owner is terminating", pvc.Namespace, pvc.Name)
+	reader, err := r.systemAccountAuthorityReader()
+	if err != nil {
+		return err
 	}
-	return workload, nil
+	members, err := sharding.ListShardingComponents(
+		reqCtx.Ctx, reader, authority.root, shardingName)
+	if err != nil {
+		return systemAccountAuthorityReadError(err)
+	}
+	if !slices.ContainsFunc(members, func(member appsv1.Component) bool {
+		return member.Name == authority.component.Name &&
+			member.UID == authority.component.UID &&
+			member.DeletionTimestamp.IsZero()
+	}) {
+		return fmt.Errorf("component %s/%s UID %s is not in current sharding %q member set",
+			authority.component.Namespace, authority.component.Name,
+			authority.component.UID, shardingName)
+	}
+	return nil
+}
+
+func pvcReferencesRestoreSource(
+	pvc *corev1.PersistentVolumeClaim,
+	source systemaccount.SourceIdentity,
+) bool {
+	if pvc == nil || pvc.Spec.DataSourceRef == nil || pvc.Spec.DataSourceRef.APIGroup == nil ||
+		*pvc.Spec.DataSourceRef.APIGroup != source.APIGroup ||
+		pvc.Spec.DataSourceRef.Kind != source.Kind ||
+		pvc.Spec.DataSourceRef.Name != source.Name {
+		return false
+	}
+	namespace := pvc.Namespace
+	if pvc.Spec.DataSourceRef.Namespace != nil {
+		namespace = *pvc.Spec.DataSourceRef.Namespace
+	}
+	return namespace == source.Namespace
+}
+
+func (r *VolumePopulatorReconciler) systemAccountAuthorityReader() (client.Reader, error) {
+	if r.APIReader == nil {
+		return nil, &systemAccountRestoreAuthorityReadError{
+			cause: fmt.Errorf("system account restore authority API reader is not configured"),
+		}
+	}
+	return r.APIReader, nil
 }
 
 func objectIdentity(object client.Object) systemaccount.ObjectIdentity {
@@ -301,7 +491,11 @@ func (r *VolumePopulatorReconciler) projectSystemAccountConflictIdentity(
 	}
 
 	current := &corev1.PersistentVolumeClaim{}
-	if err := r.Client.Get(reqCtx.Ctx, client.ObjectKeyFromObject(pvc), current); err != nil {
+	reader, err := r.systemAccountAuthorityReader()
+	if err != nil {
+		return err
+	}
+	if err := reader.Get(reqCtx.Ctx, client.ObjectKeyFromObject(pvc), current); err != nil {
 		return err
 	}
 	if current.UID != pvc.UID {
@@ -329,7 +523,7 @@ func (r *VolumePopulatorReconciler) projectSystemAccountConflictIdentity(
 	// An update response can be lost after the apiserver committed it. Accept
 	// only a fresh read of the same PVC UID with all three receipt identities.
 	fresh := &corev1.PersistentVolumeClaim{}
-	if getErr := r.Client.Get(reqCtx.Ctx, client.ObjectKeyFromObject(pvc), fresh); getErr == nil &&
+	if getErr := reader.Get(reqCtx.Ctx, client.ObjectKeyFromObject(pvc), fresh); getErr == nil &&
 		fresh.UID == pvc.UID && systemAccountConflictIdentityExact(fresh, expected) {
 		*pvc = *fresh
 		return nil
@@ -392,64 +586,28 @@ func (r *VolumePopulatorReconciler) systemAccountRestoreOperationState(
 	reqCtx intctrlutil.RequestCtx,
 	operation systemaccount.RestoreOperationIdentity,
 ) (systemAccountRestoreOperationState, error) {
-	cluster := &appsv1.Cluster{}
-	if err := r.Client.Get(reqCtx.Ctx, client.ObjectKey{
-		Namespace: operation.Root.Namespace,
-		Name:      operation.Root.Name,
-	}, cluster); err != nil {
-		if apierrors.IsNotFound(err) {
-			return systemAccountRestoreOperationGone, nil
-		}
+	reader, err := r.systemAccountAuthorityReader()
+	if err != nil {
 		return "", err
 	}
-	if cluster.UID != operation.Root.UID {
-		return systemAccountRestoreOperationGone, nil
+	state, err := systemaccount.ReadRestoreOperationState(reqCtx.Ctx, reader, operation)
+	if err != nil {
+		return "", err
 	}
-	if !cluster.DeletionTimestamp.IsZero() {
-		return systemAccountRestoreOperationTerminating, nil
-	}
-	if operation.Profile == systemaccount.RestoreProfileInitialCluster {
-		if cluster.Spec.Restore == nil {
-			return systemAccountRestoreOperationGone, nil
-		}
-		current := systemaccount.RestoreOperationIdentity{
-			Protocol: systemaccount.RestoreProtocolV2,
-			Profile:  systemaccount.RestoreProfileInitialCluster,
-			Root:     objectIdentity(cluster),
-			Source: systemaccount.SourceIdentity{
-				APIGroup:  cluster.Spec.Restore.Source.APIGroup,
-				Kind:      cluster.Spec.Restore.Source.Kind,
-				Namespace: cluster.Spec.Restore.Source.Namespace,
-				Name:      cluster.Spec.Restore.Source.Name,
-			},
-			PITR:       cluster.Spec.Restore.PITR,
-			Parameters: maps.Clone(cluster.Spec.Restore.Parameters),
-		}
-		if current.Source.Namespace == "" {
-			current.Source.Namespace = cluster.Namespace
-		}
-		currentDigest, err := systemaccount.OperationDigest(current)
-		if err != nil {
-			return "", err
-		}
-		expectedDigest, err := systemaccount.OperationDigest(operation)
-		if err != nil {
-			return "", err
-		}
-		if currentDigest != expectedDigest {
-			return systemAccountRestoreOperationGone, nil
-		}
-		condition := findClusterCondition(cluster.Status.Conditions, appsv1.ConditionTypeRestore)
-		if condition == nil || condition.ObservedGeneration != cluster.Generation ||
-			condition.Status == metav1.ConditionUnknown {
-			return systemAccountRestoreOperationActive, nil
-		}
-		if condition.Status == metav1.ConditionTrue {
-			return systemAccountRestoreOperationSucceeded, nil
-		}
+	switch state {
+	case systemaccount.RestoreOperationActive:
+		return systemAccountRestoreOperationActive, nil
+	case systemaccount.RestoreOperationSucceeded:
+		return systemAccountRestoreOperationSucceeded, nil
+	case systemaccount.RestoreOperationFailed:
 		return systemAccountRestoreOperationFailed, nil
+	case systemaccount.RestoreOperationTerminating:
+		return systemAccountRestoreOperationTerminating, nil
+	case systemaccount.RestoreOperationGone:
+		return systemAccountRestoreOperationGone, nil
+	default:
+		return "", fmt.Errorf("unsupported system account restore operation state %q", state)
 	}
-	return r.legacySystemAccountRestoreOperationState(reqCtx, operation)
 }
 
 type systemAccountRestoreOperationState string
@@ -461,71 +619,3 @@ const (
 	systemAccountRestoreOperationTerminating systemAccountRestoreOperationState = "Terminating"
 	systemAccountRestoreOperationGone        systemAccountRestoreOperationState = "Gone"
 )
-
-func (r *VolumePopulatorReconciler) legacySystemAccountRestoreOperationState(
-	reqCtx intctrlutil.RequestCtx,
-	operation systemaccount.RestoreOperationIdentity,
-) (systemAccountRestoreOperationState, error) {
-	pvcs := &corev1.PersistentVolumeClaimList{}
-	if err := r.Client.List(reqCtx.Ctx, pvcs,
-		client.InNamespace(operation.Root.Namespace),
-		client.MatchingLabels{constant.AppInstanceLabelKey: operation.Root.Name}); err != nil {
-		return "", err
-	}
-	found := false
-	allSucceeded := true
-	for i := range pvcs.Items {
-		pvc := &pvcs.Items[i]
-		if !pvcReferencesOperationSource(pvc, operation) {
-			continue
-		}
-		namespace, err := backupNamespaceFromPVC(pvc)
-		if err != nil || namespace != operation.Source.Namespace {
-			continue
-		}
-		workload, err := r.resolveRestorePVCWorkload(reqCtx, pvc)
-		if err != nil {
-			continue
-		}
-		componentRef := metav1.GetControllerOf(workload)
-		if componentRef == nil || componentRef.Kind != "Component" {
-			continue
-		}
-		component := &appsv1.Component{}
-		if err := r.Client.Get(reqCtx.Ctx, client.ObjectKey{
-			Namespace: pvc.Namespace,
-			Name:      componentRef.Name,
-		}, component); err != nil || component.UID != componentRef.UID {
-			continue
-		}
-		clusterRef := metav1.GetControllerOf(component)
-		if clusterRef == nil || clusterRef.UID != operation.Root.UID {
-			continue
-		}
-		found = true
-		condition := findPVCConditionByType(pvc, appsv1.ConditionTypeRestore)
-		if condition == nil || condition.Status == corev1.ConditionUnknown {
-			allSucceeded = false
-			continue
-		}
-		if condition.Status == corev1.ConditionFalse {
-			return systemAccountRestoreOperationFailed, nil
-		}
-	}
-	if !found {
-		return systemAccountRestoreOperationGone, nil
-	}
-	if allSucceeded {
-		return systemAccountRestoreOperationSucceeded, nil
-	}
-	return systemAccountRestoreOperationActive, nil
-}
-
-func findClusterCondition(conditions []metav1.Condition, conditionType string) *metav1.Condition {
-	for i := range conditions {
-		if conditions[i].Type == conditionType {
-			return &conditions[i]
-		}
-	}
-	return nil
-}

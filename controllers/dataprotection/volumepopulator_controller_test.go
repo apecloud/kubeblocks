@@ -231,6 +231,7 @@ var _ = Describe("Volume Populator Controller test", func() {
 					Build(),
 				Scheme: scheme,
 			}
+			reconciler.APIReader = reconciler.Client
 			reqCtx := intctrlutil.RequestCtx{Ctx: context.Background()}
 
 			err := reconciler.upsertSystemAccountSecret(reqCtx, pvc, backup, systemAccountSecretScopeComponent,
@@ -298,6 +299,7 @@ var _ = Describe("Volume Populator Controller test", func() {
 					WithObjects(backup, cluster, component, instanceSet, pvc).Build(),
 				Scheme: scheme,
 			}
+			reconciler.APIReader = reconciler.Client
 			request, err := reconciler.newSystemAccountRestoreRequest(
 				intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, backup,
 				systemAccountSecretScopeComponent, "cluster", "mysql", "admin", []byte("restored-password"))
@@ -366,6 +368,7 @@ var _ = Describe("Volume Populator Controller test", func() {
 					WithObjects(backup, cluster, component, instanceSet, pvc).Build(),
 				Scheme: scheme,
 			}
+			reconciler.APIReader = reconciler.Client
 			oldRequest, err := reconciler.newSystemAccountRestoreRequest(
 				intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, backup,
 				systemAccountSecretScopeComponent, "cluster", "mysql", "admin", []byte("old-password"))
@@ -393,9 +396,10 @@ var _ = Describe("Volume Populator Controller test", func() {
 				WithStatusSubresource(pvc).
 				WithObjects(backup, cluster, component, instanceSet, pvc).Build()
 			reconciler := &VolumePopulatorReconciler{
-				Client:   cli,
-				Scheme:   scheme,
-				Recorder: record.NewFakeRecorder(10),
+				Client:    cli,
+				APIReader: cli,
+				Scheme:    scheme,
+				Recorder:  record.NewFakeRecorder(10),
 			}
 			winner, err := reconciler.newSystemAccountRestoreRequest(
 				intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, backup,
@@ -451,7 +455,7 @@ var _ = Describe("Volume Populator Controller test", func() {
 				prepareSystemAccountAuthorityFixture(Default, scheme, pvc)
 			cli := fake.NewClientBuilder().WithScheme(scheme).
 				WithObjects(backup, cluster, component, instanceSet, pvc).Build()
-			reconciler := &VolumePopulatorReconciler{Client: cli, Scheme: scheme}
+			reconciler := &VolumePopulatorReconciler{Client: cli, APIReader: cli, Scheme: scheme}
 			oldRequest, err := reconciler.newSystemAccountRestoreRequest(
 				intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, backup,
 				systemAccountSecretScopeComponent, "cluster", "mysql", "admin", []byte("old-password"))
@@ -508,7 +512,7 @@ var _ = Describe("Volume Populator Controller test", func() {
 			}}
 			cli := fake.NewClientBuilder().WithScheme(scheme).
 				WithObjects(backup, cluster, component, instanceSet, pvc).Build()
-			reconciler := &VolumePopulatorReconciler{Client: cli, Scheme: scheme}
+			reconciler := &VolumePopulatorReconciler{Client: cli, APIReader: cli, Scheme: scheme}
 			request, err := reconciler.newSystemAccountRestoreRequest(
 				intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, backup,
 				systemAccountSecretScopeComponent, "cluster", "mysql", "admin", []byte("password"))
@@ -537,7 +541,7 @@ var _ = Describe("Volume Populator Controller test", func() {
 				prepareSystemAccountAuthorityFixture(Default, scheme, pvc)
 			cli := fake.NewClientBuilder().WithScheme(scheme).
 				WithObjects(backup, cluster, component, instanceSet, pvc).Build()
-			reconciler := &VolumePopulatorReconciler{Client: cli, Scheme: scheme}
+			reconciler := &VolumePopulatorReconciler{Client: cli, APIReader: cli, Scheme: scheme}
 			request, err := reconciler.newSystemAccountRestoreRequest(
 				intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, backup,
 				systemAccountSecretScopeComponent, "cluster", "mysql", "admin", []byte("password"))
@@ -594,9 +598,10 @@ var _ = Describe("Volume Populator Controller test", func() {
 				},
 			})
 			reconciler := &VolumePopulatorReconciler{
-				Client:   interceptedClient,
-				Scheme:   scheme,
-				Recorder: record.NewFakeRecorder(10),
+				Client:    interceptedClient,
+				APIReader: interceptedClient,
+				Scheme:    scheme,
+				Recorder:  record.NewFakeRecorder(10),
 			}
 
 			result, err := reconciler.Reconcile(context.Background(), ctrl.Request{
@@ -643,6 +648,7 @@ var _ = Describe("Volume Populator Controller test", func() {
 					Build(),
 				Scheme: scheme,
 			}
+			reconciler.APIReader = reconciler.Client
 			reqCtx := intctrlutil.RequestCtx{Ctx: context.Background()}
 
 			err := reconciler.upsertSystemAccountSecret(reqCtx, pvc, backup, systemAccountSecretScopeSharding,
@@ -713,6 +719,7 @@ var _ = Describe("Volume Populator Controller test", func() {
 					Build(),
 				Scheme: scheme,
 			}
+			reconciler.APIReader = reconciler.Client
 
 			err := reconciler.upsertSystemAccountSecret(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, backup,
 				systemAccountSecretScopeSharding, "cluster", "shard", "root", []byte("new-password"))
@@ -3060,6 +3067,88 @@ func TestRestoreSystemAccountSecretsUsesShardingSecretName(t *testing.T) {
 		systemAccountSecretName(systemAccountSecretScopeComponent, "cluster", "mysql", "admin"))
 }
 
+func TestRestoreSystemAccountSecretsUsesStrongBackupPayload(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, kbappsv1.AddToScheme(scheme))
+	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
+
+	encryptor := intctrlutil.NewEncryptor("")
+	stalePassword, err := encryptor.Encrypt([]byte("stale-password"))
+	require.NoError(t, err)
+	livePassword, err := encryptor.Encrypt([]byte("live-password"))
+	require.NoError(t, err)
+	accounts := func(password string) string {
+		payload, marshalErr := json.Marshal(map[string]map[string]string{
+			"mysql": {"admin": password},
+		})
+		require.NoError(t, marshalErr)
+		return string(payload)
+	}
+	pvc := &corev1.PersistentVolumeClaim{}
+	backup, cluster, component, instanceSet :=
+		prepareSystemAccountAuthorityFixture(NewWithT(t), scheme, pvc)
+	backup.Annotations = map[string]string{
+		constant.EncryptedSystemAccountsAnnotationKey: accounts(stalePassword),
+	}
+	liveBackup := backup.DeepCopy()
+	liveBackup.Annotations = map[string]string{
+		constant.EncryptedSystemAccountsAnnotationKey: accounts(livePassword),
+	}
+	writer := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(backup, cluster, component, instanceSet, pvc).Build()
+	authorityReader := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(liveBackup, cluster, component, instanceSet, pvc).Build()
+	reconciler := &VolumePopulatorReconciler{
+		Client: writer, APIReader: authorityReader, Scheme: scheme,
+	}
+
+	err = reconciler.restoreSystemAccountSecrets(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, backup.Namespace)
+
+	require.True(t, intctrlutil.IsRequeueError(err), err)
+	request := getSystemAccountRestoreRequest(t, writer,
+		"admin", systemaccount.SystemAccountScopeComponent)
+	require.Equal(t, []byte("live-password"),
+		request.Data[constant.AccountPasswdForSecret])
+	require.NotEqual(t, []byte("stale-password"),
+		request.Data[constant.AccountPasswdForSecret])
+}
+
+func TestSystemAccountRestoreAuthorityRejectsBackupPayloadChangeBetweenSnapshots(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, kbappsv1.AddToScheme(scheme))
+	pvc := &corev1.PersistentVolumeClaim{}
+	backup, cluster, component, instanceSet :=
+		prepareSystemAccountAuthorityFixture(NewWithT(t), scheme, pvc)
+	backup.Annotations = map[string]string{
+		constant.EncryptedSystemAccountsAnnotationKey: "cached-payload",
+	}
+	liveBackup := backup.DeepCopy()
+	liveBackup.Annotations[constant.EncryptedSystemAccountsAnnotationKey] = "live-payload"
+
+	cachedClient := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(pvc, backup, cluster, component, instanceSet).Build()
+	strongReader := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(pvc, liveBackup, cluster, component, instanceSet).Build()
+	reconciler := &VolumePopulatorReconciler{
+		Client: cachedClient, APIReader: strongReader, Scheme: scheme,
+	}
+
+	err := reconciler.upsertSystemAccountSecret(
+		intctrlutil.RequestCtx{Ctx: context.Background()},
+		pvc, backup, systemAccountSecretScopeComponent,
+		cluster.Name, "mysql", "admin", []byte("cached-password"))
+
+	require.True(t, intctrlutil.IsRequeueError(err), err)
+	require.ErrorContains(t, err, "system account payload changed")
+	requests := &corev1.SecretList{}
+	require.NoError(t, cachedClient.List(context.Background(), requests,
+		client.MatchingLabels{constant.SystemAccountRestoreRequestLabelKey: "true"}))
+	require.Empty(t, requests.Items)
+}
+
 func TestRestoreSystemAccountSecretsRestoresComponentAndShardingSecrets(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, corev1.AddToScheme(scheme))
@@ -3094,10 +3183,10 @@ func TestRestoreSystemAccountSecretsRestoresComponentAndShardingSecrets(t *testi
 	backup.Annotations = map[string]string{
 		constant.EncryptedSystemAccountsAnnotationKey: string(accounts),
 	}
+	cli := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(backup, cluster, component, instanceSet, pvc).Build()
 	reconciler := &VolumePopulatorReconciler{
-		Client: fake.NewClientBuilder().WithScheme(scheme).
-			WithObjects(backup, cluster, component, instanceSet, pvc).Build(),
-		Scheme: scheme,
+		Client: cli, APIReader: cli, Scheme: scheme,
 	}
 
 	err = reconciler.restoreSystemAccountSecrets(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, backup.Namespace)
@@ -3223,6 +3312,7 @@ func prepareSystemAccountAuthorityFixture(
 	if pvc.Labels == nil {
 		pvc.Labels = map[string]string{}
 	}
+	pvc.Labels[constant.AppManagedByLabelKey] = constant.AppName
 	pvc.Labels[constant.AppInstanceLabelKey] = "cluster"
 	pvc.Labels[constant.KBAppComponentLabelKey] = "mysql"
 	if pvc.Annotations == nil {
@@ -3258,6 +3348,7 @@ func prepareSystemAccountAuthorityFixture(
 			Name:      constant.GenerateClusterComponentName("cluster", "mysql"),
 			UID:       types.UID("component-uid"),
 			Labels: map[string]string{
+				constant.AppManagedByLabelKey:   constant.AppName,
 				constant.AppInstanceLabelKey:    "cluster",
 				constant.KBAppComponentLabelKey: "mysql",
 			},
@@ -3270,15 +3361,335 @@ func prepareSystemAccountAuthorityFixture(
 			Name:      "cluster-mysql",
 			UID:       types.UID("instanceset-uid"),
 			Labels: map[string]string{
+				constant.AppManagedByLabelKey:   constant.AppName,
 				constant.AppInstanceLabelKey:    "cluster",
 				constant.KBAppComponentLabelKey: "mysql",
 			},
 		},
 	}
+	if shardingName := pvc.Labels[constant.KBAppShardingNameLabelKey]; shardingName != "" {
+		cluster.Spec.Shardings = []kbappsv1.ClusterSharding{{
+			Name:   shardingName,
+			Shards: 1,
+		}}
+		component.Labels[constant.KBAppShardingNameLabelKey] = shardingName
+		instanceSet.Labels[constant.KBAppShardingNameLabelKey] = shardingName
+	}
 	t.Expect(controllerutil.SetControllerReference(cluster, component, scheme)).Should(Succeed())
 	t.Expect(controllerutil.SetControllerReference(component, instanceSet, scheme)).Should(Succeed())
 	t.Expect(controllerutil.SetControllerReference(instanceSet, pvc, scheme)).Should(Succeed())
 	return backup, cluster, component, instanceSet
+}
+
+func TestSystemAccountRestoreAuthorityResolvesInstanceParentInstanceSet(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, kbappsv1.AddToScheme(scheme))
+	pvc := &corev1.PersistentVolumeClaim{}
+	backup, cluster, component, instanceSet :=
+		prepareSystemAccountAuthorityFixture(NewWithT(t), scheme, pvc)
+	instance := &workloadsv1.Instance{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: workloadsv1.GroupVersion.String(),
+			Kind:       "Instance",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: pvc.Namespace,
+			Name:      "cluster-mysql-0",
+			UID:       "instance-uid",
+			Labels: map[string]string{
+				constant.AppInstanceLabelKey:    cluster.Name,
+				constant.KBAppComponentLabelKey: "mysql",
+			},
+		},
+	}
+	require.NoError(t, controllerutil.SetControllerReference(instanceSet, instance, scheme))
+	pvc.OwnerReferences = nil
+	require.NoError(t, controllerutil.SetControllerReference(instance, pvc, scheme))
+	cli := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(pvc, backup, cluster, component, instanceSet, instance).Build()
+	reconciler := &VolumePopulatorReconciler{Client: cli, APIReader: cli, Scheme: scheme}
+
+	err := reconciler.upsertSystemAccountSecret(
+		intctrlutil.RequestCtx{Ctx: context.Background()},
+		pvc, backup, systemAccountSecretScopeComponent,
+		cluster.Name, "mysql", "admin", []byte("password"))
+
+	require.True(t, intctrlutil.IsRequeueError(err), err)
+	requests := &corev1.SecretList{}
+	require.NoError(t, cli.List(context.Background(), requests,
+		client.MatchingLabels{constant.SystemAccountRestoreRequestLabelKey: "true"}))
+	require.Len(t, requests.Items, 1)
+}
+
+func TestSystemAccountRestoreAuthorityRejectsInstanceSetParentUIDMismatch(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, kbappsv1.AddToScheme(scheme))
+	pvc := &corev1.PersistentVolumeClaim{}
+	backup, cluster, component, instanceSet :=
+		prepareSystemAccountAuthorityFixture(NewWithT(t), scheme, pvc)
+	instance := &workloadsv1.Instance{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: workloadsv1.GroupVersion.String(),
+			Kind:       "Instance",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: pvc.Namespace,
+			Name:      "cluster-mysql-0",
+			UID:       "instance-uid",
+			Labels: map[string]string{
+				constant.AppInstanceLabelKey:    cluster.Name,
+				constant.KBAppComponentLabelKey: "mysql",
+			},
+		},
+	}
+	require.NoError(t, controllerutil.SetControllerReference(instanceSet, instance, scheme))
+	instance.OwnerReferences[0].UID = "replacement-instanceset-uid"
+	pvc.OwnerReferences = nil
+	require.NoError(t, controllerutil.SetControllerReference(instance, pvc, scheme))
+	cli := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(pvc, backup, cluster, component, instanceSet, instance).Build()
+	reconciler := &VolumePopulatorReconciler{Client: cli, APIReader: cli, Scheme: scheme}
+
+	err := reconciler.upsertSystemAccountSecret(
+		intctrlutil.RequestCtx{Ctx: context.Background()},
+		pvc, backup, systemAccountSecretScopeComponent,
+		cluster.Name, "mysql", "admin", []byte("password"))
+
+	require.True(t, intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal), err)
+	require.ErrorContains(t, err, systemaccount.UnauthorizedRestoreProducerReason)
+	require.ErrorContains(t, err, "InstanceSet owner UID mismatch")
+	requests := &corev1.SecretList{}
+	require.NoError(t, cli.List(context.Background(), requests,
+		client.MatchingLabels{constant.SystemAccountRestoreRequestLabelKey: "true"}))
+	require.Empty(t, requests.Items)
+}
+
+func TestSystemAccountRestoreAuthorityRejectsInvalidShardingMembership(t *testing.T) {
+	testCases := []struct {
+		name   string
+		mutate func(
+			pvc *corev1.PersistentVolumeClaim,
+			cluster *kbappsv1.Cluster,
+			component *kbappsv1.Component,
+		)
+		ownerName string
+	}{
+		{
+			name: "forged PVC sharding selector",
+			mutate: func(pvc *corev1.PersistentVolumeClaim, _ *kbappsv1.Cluster,
+				_ *kbappsv1.Component) {
+				pvc.Labels[constant.KBAppShardingNameLabelKey] = "forged"
+			},
+			ownerName: "forged",
+		},
+		{
+			name: "exact Component absent from current resolver member set",
+			mutate: func(_ *corev1.PersistentVolumeClaim, _ *kbappsv1.Cluster,
+				component *kbappsv1.Component) {
+				delete(component.Labels, constant.KBAppShardingNameLabelKey)
+			},
+			ownerName: "shard",
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			scheme := runtime.NewScheme()
+			require.NoError(t, corev1.AddToScheme(scheme))
+			require.NoError(t, kbappsv1.AddToScheme(scheme))
+			pvc := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{constant.KBAppShardingNameLabelKey: "shard"},
+			}}
+			backup, cluster, component, instanceSet :=
+				prepareSystemAccountAuthorityFixture(NewWithT(t), scheme, pvc)
+			testCase.mutate(pvc, cluster, component)
+			cli := fake.NewClientBuilder().WithScheme(scheme).
+				WithObjects(pvc, backup, cluster, component, instanceSet).Build()
+			reconciler := &VolumePopulatorReconciler{Client: cli, APIReader: cli, Scheme: scheme}
+
+			err := reconciler.upsertSystemAccountSecret(
+				intctrlutil.RequestCtx{Ctx: context.Background()},
+				pvc, backup, systemAccountSecretScopeSharding,
+				cluster.Name, testCase.ownerName, "root", []byte("password"))
+
+			require.True(t, intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal), err)
+			require.ErrorContains(t, err, systemaccount.TargetSemanticUnavailableReason)
+			requests := &corev1.SecretList{}
+			require.NoError(t, cli.List(context.Background(), requests,
+				client.MatchingLabels{constant.SystemAccountRestoreRequestLabelKey: "true"}))
+			require.Empty(t, requests.Items)
+		})
+	}
+}
+
+func TestSystemAccountRestoreAuthorityRejectsInitialPITRMismatch(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, kbappsv1.AddToScheme(scheme))
+	pvc := &corev1.PersistentVolumeClaim{}
+	backup, cluster, component, instanceSet :=
+		prepareSystemAccountAuthorityFixture(NewWithT(t), scheme, pvc)
+	cluster.Spec.Restore = &kbappsv1.ClusterRestore{
+		Source: kbappsv1.ClusterRestoreSource{
+			APIGroup:  dptypes.DataprotectionAPIGroup,
+			Kind:      dptypes.BackupKind,
+			Namespace: backup.Namespace,
+			Name:      backup.Name,
+		},
+		PITR: "2026-07-23T00:00:00Z",
+	}
+	pvc.Annotations[constant.RestorePITRAnnotationKey] = "2026-07-23T01:00:00Z"
+	cli := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(pvc, backup, cluster, component, instanceSet).Build()
+	reconciler := &VolumePopulatorReconciler{Client: cli, APIReader: cli, Scheme: scheme}
+
+	err := reconciler.upsertSystemAccountSecret(
+		intctrlutil.RequestCtx{Ctx: context.Background()},
+		pvc, backup, systemAccountSecretScopeComponent,
+		cluster.Name, "mysql", "admin", []byte("password"))
+
+	require.True(t, intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal), err)
+	require.ErrorContains(t, err, systemaccount.RestoreIntentMismatchReason)
+	requests := &corev1.SecretList{}
+	require.NoError(t, cli.List(context.Background(), requests,
+		client.MatchingLabels{constant.SystemAccountRestoreRequestLabelKey: "true"}))
+	require.Empty(t, requests.Items)
+}
+
+func TestSystemAccountRestoreAuthorityUsesStrongReaderAndClassifiesNotFound(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, kbappsv1.AddToScheme(scheme))
+	pvc := &corev1.PersistentVolumeClaim{}
+	backup, cluster, component, instanceSet :=
+		prepareSystemAccountAuthorityFixture(NewWithT(t), scheme, pvc)
+	cachedClient := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(pvc, backup, cluster, component, instanceSet).Build()
+	strongReader := fake.NewClientBuilder().WithScheme(scheme).Build()
+	reconciler := &VolumePopulatorReconciler{
+		Client: cachedClient, APIReader: strongReader, Scheme: scheme,
+	}
+
+	err := reconciler.upsertSystemAccountSecret(
+		intctrlutil.RequestCtx{Ctx: context.Background()},
+		pvc, backup, systemAccountSecretScopeComponent,
+		cluster.Name, "mysql", "admin", []byte("password"))
+
+	require.True(t, intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal), err)
+	require.ErrorContains(t, err, systemaccount.UnauthorizedRestoreProducerReason)
+	require.ErrorContains(t, err, "not found")
+	requests := &corev1.SecretList{}
+	require.NoError(t, cachedClient.List(context.Background(), requests,
+		client.MatchingLabels{constant.SystemAccountRestoreRequestLabelKey: "true"}))
+	require.Empty(t, requests.Items)
+}
+
+func TestSystemAccountRestoreAuthorityUsesStrongPVCIntent(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, kbappsv1.AddToScheme(scheme))
+	pvc := &corev1.PersistentVolumeClaim{}
+	backup, cluster, component, instanceSet :=
+		prepareSystemAccountAuthorityFixture(NewWithT(t), scheme, pvc)
+	cluster.Spec.Restore = &kbappsv1.ClusterRestore{
+		Source: kbappsv1.ClusterRestoreSource{
+			APIGroup:  dptypes.DataprotectionAPIGroup,
+			Kind:      dptypes.BackupKind,
+			Namespace: backup.Namespace,
+			Name:      backup.Name,
+		},
+		PITR: "2026-07-23T00:00:00Z",
+	}
+	pvc.Annotations[constant.RestorePITRAnnotationKey] = cluster.Spec.Restore.PITR
+	livePVC := pvc.DeepCopy()
+	livePVC.Annotations[constant.RestorePITRAnnotationKey] = "2026-07-23T01:00:00Z"
+
+	cachedClient := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(pvc, backup, cluster, component, instanceSet).Build()
+	strongReader := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(livePVC, backup, cluster, component, instanceSet).Build()
+	reconciler := &VolumePopulatorReconciler{
+		Client: cachedClient, APIReader: strongReader, Scheme: scheme,
+	}
+
+	err := reconciler.upsertSystemAccountSecret(
+		intctrlutil.RequestCtx{Ctx: context.Background()},
+		pvc, backup, systemAccountSecretScopeComponent,
+		cluster.Name, "mysql", "admin", []byte("password"))
+
+	require.True(t, intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal), err)
+	require.ErrorContains(t, err, systemaccount.RestoreIntentMismatchReason)
+	requests := &corev1.SecretList{}
+	require.NoError(t, cachedClient.List(context.Background(), requests,
+		client.MatchingLabels{constant.SystemAccountRestoreRequestLabelKey: "true"}))
+	require.Empty(t, requests.Items)
+}
+
+func TestSystemAccountRestoreAuthorityUsesStrongPVCSource(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, kbappsv1.AddToScheme(scheme))
+	pvc := &corev1.PersistentVolumeClaim{}
+	backup, cluster, component, instanceSet :=
+		prepareSystemAccountAuthorityFixture(NewWithT(t), scheme, pvc)
+	livePVC := pvc.DeepCopy()
+	livePVC.Spec.DataSourceRef.Name = "replacement-backup"
+
+	cachedClient := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(pvc, backup, cluster, component, instanceSet).Build()
+	strongReader := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(livePVC, backup, cluster, component, instanceSet).Build()
+	reconciler := &VolumePopulatorReconciler{
+		Client: cachedClient, APIReader: strongReader, Scheme: scheme,
+	}
+
+	err := reconciler.upsertSystemAccountSecret(
+		intctrlutil.RequestCtx{Ctx: context.Background()},
+		pvc, backup, systemAccountSecretScopeComponent,
+		cluster.Name, "mysql", "admin", []byte("password"))
+
+	require.True(t, intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal), err)
+	require.ErrorContains(t, err, systemaccount.RestoreIntentMismatchReason)
+	require.ErrorContains(t, err, "declared restore source")
+	requests := &corev1.SecretList{}
+	require.NoError(t, cachedClient.List(context.Background(), requests,
+		client.MatchingLabels{constant.SystemAccountRestoreRequestLabelKey: "true"}))
+	require.Empty(t, requests.Items)
+}
+
+func TestSystemAccountRestoreAuthorityUsesStrongPVCShardingIdentity(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, kbappsv1.AddToScheme(scheme))
+	pvc := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{
+		Labels: map[string]string{constant.KBAppShardingNameLabelKey: "shard"},
+	}}
+	backup, cluster, component, instanceSet :=
+		prepareSystemAccountAuthorityFixture(NewWithT(t), scheme, pvc)
+	livePVC := pvc.DeepCopy()
+	delete(livePVC.Labels, constant.KBAppShardingNameLabelKey)
+
+	cachedClient := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(pvc, backup, cluster, component, instanceSet).Build()
+	strongReader := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(livePVC, backup, cluster, component, instanceSet).Build()
+	reconciler := &VolumePopulatorReconciler{
+		Client: cachedClient, APIReader: strongReader, Scheme: scheme,
+	}
+
+	err := reconciler.upsertSystemAccountSecret(
+		intctrlutil.RequestCtx{Ctx: context.Background()},
+		pvc, backup, systemAccountSecretScopeSharding,
+		cluster.Name, "shard", "root", []byte("password"))
+
+	require.True(t, intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal), err)
+	require.ErrorContains(t, err, systemaccount.TargetSemanticUnavailableReason)
+	require.ErrorContains(t, err, "sharding semantics")
+	requests := &corev1.SecretList{}
+	require.NoError(t, cachedClient.List(context.Background(), requests,
+		client.MatchingLabels{constant.SystemAccountRestoreRequestLabelKey: "true"}))
+	require.Empty(t, requests.Items)
 }
 
 func TestSystemAccountRestoreAuthorityRejectsForeignIdentityWithoutCreatingRequest(t *testing.T) {
@@ -3396,7 +3807,7 @@ func TestSystemAccountRestoreAuthorityRejectsForeignIdentityWithoutCreatingReque
 			testCase.mutate(pvc, backup, cluster, component, instanceSet)
 			cli := fake.NewClientBuilder().WithScheme(scheme).
 				WithObjects(pvc, backup, cluster, component, instanceSet).Build()
-			reconciler := &VolumePopulatorReconciler{Client: cli, Scheme: scheme}
+			reconciler := &VolumePopulatorReconciler{Client: cli, APIReader: cli, Scheme: scheme}
 
 			err := reconciler.upsertSystemAccountSecret(
 				intctrlutil.RequestCtx{Ctx: context.Background()},
@@ -3422,7 +3833,7 @@ func TestSystemAccountProtocolMapperRevalidatesReplacementPVCAuthority(t *testin
 		prepareSystemAccountAuthorityFixture(NewWithT(t), scheme, pvc)
 	cli := fake.NewClientBuilder().WithScheme(scheme).
 		WithObjects(pvc, backup, cluster, component, instanceSet).Build()
-	reconciler := &VolumePopulatorReconciler{Client: cli, Scheme: scheme}
+	reconciler := &VolumePopulatorReconciler{Client: cli, APIReader: cli, Scheme: scheme}
 	request, err := reconciler.newSystemAccountRestoreRequest(
 		intctrlutil.RequestCtx{Ctx: context.Background()},
 		pvc, backup, systemAccountSecretScopeComponent,
@@ -3459,7 +3870,9 @@ func TestConflictReceiptCreateUncertainResponseUsesPersistedReceipt(t *testing.T
 	loserPVC.Annotations[constant.RestorePITRAnnotationKey] = "2026-07-23T00:00:00Z"
 	baseClient := fake.NewClientBuilder().WithScheme(scheme).
 		WithObjects(winnerPVC, loserPVC, backup, cluster, component, instanceSet).Build()
-	reconciler := &VolumePopulatorReconciler{Client: baseClient, Scheme: scheme}
+	reconciler := &VolumePopulatorReconciler{
+		Client: baseClient, APIReader: baseClient, Scheme: scheme,
+	}
 	winner, err := reconciler.newSystemAccountRestoreRequest(
 		intctrlutil.RequestCtx{Ctx: context.Background()}, winnerPVC, backup,
 		systemAccountSecretScopeComponent, "cluster", "mysql", "admin", []byte("winner-password"))
@@ -3522,7 +3935,7 @@ func TestConflictReceiptMapperRepairsNonExactTerminalProjection(t *testing.T) {
 	cli := fake.NewClientBuilder().WithScheme(scheme).
 		WithStatusSubresource(pvc).
 		WithObjects(pvc, backup, cluster, component, instanceSet).Build()
-	reconciler := &VolumePopulatorReconciler{Client: cli, Scheme: scheme}
+	reconciler := &VolumePopulatorReconciler{Client: cli, APIReader: cli, Scheme: scheme}
 	winner, err := reconciler.newSystemAccountRestoreRequest(
 		intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, backup,
 		systemAccountSecretScopeComponent, "cluster", "mysql", "admin", []byte("winner-password"))
@@ -3591,7 +4004,8 @@ func TestRestoreSystemAccountSecretsReturnsFatalForInvalidAccountsPayload(t *tes
 			DataSourceRef: &corev1.TypedObjectReference{Name: backup.Name},
 		},
 	}
-	reconciler := &VolumePopulatorReconciler{Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(backup).Build()}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(backup).Build()
+	reconciler := &VolumePopulatorReconciler{Client: cli, APIReader: cli}
 
 	err := reconciler.restoreSystemAccountSecrets(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, backup.Namespace)
 	require.Error(t, err)

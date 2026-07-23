@@ -38,6 +38,9 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	"github.com/apecloud/kubeblocks/controllers/apps/cluster"
+	"github.com/apecloud/kubeblocks/controllers/apps/component"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
@@ -60,14 +63,14 @@ var _ = Describe("reconciler_tree test", func() {
 
 	Context("Testing reconciler_tree", func() {
 		var (
-			mClient        client.Client
-			mRecorder      record.EventRecorder
-			reconcilerTree ReconcilerTree
+			mClient    client.Client
+			mRecorder  record.EventRecorder
+			treeRunner ReconcilerTree
 		)
 
 		reconcileN := func(n int) error {
 			for i := 0; i < n; i++ {
-				if err := reconcilerTree.Run(); err != nil {
+				if err := treeRunner.Run(); err != nil {
 					return err
 				}
 			}
@@ -85,12 +88,22 @@ var _ = Describe("reconciler_tree test", func() {
 			Expect(err).ToNot(HaveOccurred())
 			mRecorder = newMockEventRecorder(store)
 
-			reconcilerTree, err = newReconcilerTree(ctx, mClient, mRecorder, getKBOwnershipRules())
+			treeRunner, err = newReconcilerTree(ctx, mClient, mRecorder, getKBOwnershipRules())
 			Expect(err).ToNot(HaveOccurred())
 		})
 
 		It("reconcile with nothing", func() {
 			Expect(reconcileN(1)).Should(Succeed())
+		})
+
+		It("uses the isolated snapshot for authority reads", func() {
+			tree := treeRunner.(*reconcilerTree)
+
+			clusterReconciler := tree.reconcilers[objectType(kbappsv1.SchemeGroupVersion.String(), kbappsv1.ClusterKind)].(*cluster.ClusterReconciler)
+			Expect(clusterReconciler.APIReader).To(BeIdenticalTo(mClient))
+
+			componentReconciler := tree.reconcilers[objectType(kbappsv1.SchemeGroupVersion.String(), kbappsv1.ComponentKind)].(*component.ComponentReconciler)
+			Expect(componentReconciler.APIReader).To(BeIdenticalTo(mClient))
 		})
 
 		It("reconcile a Pod", func() {

@@ -65,8 +65,9 @@ import (
 // VolumePopulatorReconciler reconciles Backup dataSource PVCs.
 type VolumePopulatorReconciler struct {
 	client.Client
-	Scheme   *runtime.Scheme
-	Recorder record.EventRecorder
+	APIReader client.Reader
+	Scheme    *runtime.Scheme
+	Recorder  record.EventRecorder
 }
 
 type pvcRestoreMode string
@@ -147,6 +148,9 @@ func (r *VolumePopulatorReconciler) handleSyncPVCError(reqCtx intctrlutil.Reques
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *VolumePopulatorReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	if r.APIReader == nil {
+		r.APIReader = mgr.GetAPIReader()
+	}
 	return intctrlutil.NewControllerManagedBy(mgr).
 		For(&corev1.PersistentVolumeClaim{}).
 		Watches(&corev1.Secret{}, handler.EnqueueRequestsFromMapFunc(r.mapSystemAccountProtocolSecret),
@@ -194,8 +198,9 @@ func (r *VolumePopulatorReconciler) mapSystemAccountProtocolSecret(
 		return nil
 	}
 	lifecycle := &SystemAccountConflictReceiptLifecycleReconciler{
-		Client: r.Client,
-		Scheme: r.Scheme,
+		Client:    r.Client,
+		APIReader: r.APIReader,
+		Scheme:    r.Scheme,
 	}
 	pvcs, err := lifecycle.participantsForOperation(ctx, operation)
 	if err != nil {
@@ -204,8 +209,15 @@ func (r *VolumePopulatorReconciler) mapSystemAccountProtocolSecret(
 		return nil
 	}
 	if resolvedSource != nil {
+		reader, readerErr := r.systemAccountAuthorityReader()
+		if readerErr != nil {
+			log.FromContext(ctx).Error(readerErr,
+				"map system account restore request to participants",
+				"secret", client.ObjectKeyFromObject(secret))
+			return nil
+		}
 		backup := &dpv1alpha1.Backup{}
-		if err := r.Client.Get(ctx, client.ObjectKey{
+		if err := reader.Get(ctx, client.ObjectKey{
 			Namespace: resolvedSource.Namespace,
 			Name:      resolvedSource.Name,
 		}, backup); err != nil || backup.UID != resolvedSource.UID {
@@ -2300,8 +2312,15 @@ func (r *VolumePopulatorReconciler) restoreSystemAccountSecrets(reqCtx intctrlut
 	if pvc.Spec.DataSourceRef == nil || pvc.Spec.DataSourceRef.Name == "" {
 		return nil
 	}
+	reader, err := r.systemAccountAuthorityReader()
+	if err != nil {
+		return err
+	}
 	backup := &dpv1alpha1.Backup{}
-	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Namespace: backupNamespace, Name: pvc.Spec.DataSourceRef.Name}, backup); err != nil {
+	if err := reader.Get(reqCtx.Ctx, types.NamespacedName{
+		Namespace: backupNamespace,
+		Name:      pvc.Spec.DataSourceRef.Name,
+	}, backup); err != nil {
 		return err
 	}
 	encryptedAccounts := backup.Annotations[constant.EncryptedSystemAccountsAnnotationKey]
@@ -2386,13 +2405,17 @@ func (r *VolumePopulatorReconciler) upsertSystemAccountSecret(reqCtx intctrlutil
 	if err != nil {
 		return intctrlutil.NewFatalError(err.Error())
 	}
+	reader, err := r.systemAccountAuthorityReader()
+	if err != nil {
+		return newSystemAccountSecretRequeueError("get authority reader for", key, err)
+	}
 	receiptName, err := systemaccount.ConflictReceiptName(intent.Target, intent.Operation)
 	if err != nil {
 		return intctrlutil.NewFatalError(err.Error())
 	}
 	receipt := &corev1.Secret{}
 	receiptKey := client.ObjectKey{Namespace: request.Namespace, Name: receiptName}
-	if err := r.Client.Get(reqCtx.Ctx, receiptKey, receipt); err == nil {
+	if err := reader.Get(reqCtx.Ctx, receiptKey, receipt); err == nil {
 		envelope, validationErr := systemaccount.ValidateConflictReceipt(receipt, intent)
 		if validationErr != nil {
 			return intctrlutil.NewFatalError(validationErr.Error())
@@ -2411,7 +2434,7 @@ func (r *VolumePopulatorReconciler) upsertSystemAccountSecret(reqCtx intctrlutil
 	}
 	requestKey := client.ObjectKeyFromObject(request)
 	existing := &corev1.Secret{}
-	if err := r.Client.Get(reqCtx.Ctx, requestKey, existing); err == nil {
+	if err := reader.Get(reqCtx.Ctx, requestKey, existing); err == nil {
 		return r.arbitrateSystemAccountRestoreRequest(reqCtx, key, pvc, intent, request, existing)
 	} else if !apierrors.IsNotFound(err) {
 		return newSystemAccountSecretRequeueError("get restore request for", key, err)
@@ -2425,7 +2448,7 @@ func (r *VolumePopulatorReconciler) upsertSystemAccountSecret(reqCtx intctrlutil
 	}
 	if err := r.Client.Create(reqCtx.Ctx, request); err != nil {
 		fresh := &corev1.Secret{}
-		if getErr := r.Client.Get(reqCtx.Ctx, requestKey, fresh); getErr != nil {
+		if getErr := reader.Get(reqCtx.Ctx, requestKey, fresh); getErr != nil {
 			if apierrors.IsNotFound(getErr) {
 				return newSystemAccountSecretRequeueError("create", requestKey, err)
 			}
@@ -2444,6 +2467,10 @@ func (r *VolumePopulatorReconciler) arbitrateSystemAccountRestoreRequest(
 	contender systemaccount.CredentialIntent,
 	desired, existing *corev1.Secret,
 ) error {
+	reader, err := r.systemAccountAuthorityReader()
+	if err != nil {
+		return newSystemAccountSecretRequeueError("get authority reader for", targetKey, err)
+	}
 	existingIntent, err := systemaccount.DecodeRestoreRequestV2(existing)
 	if err != nil {
 		return intctrlutil.NewFatalError(fmt.Sprintf(
@@ -2487,7 +2514,7 @@ func (r *VolumePopulatorReconciler) arbitrateSystemAccountRestoreRequest(
 				reason, client.ObjectKeyFromObject(existing)))
 		}
 		target := &corev1.Secret{}
-		if getErr := r.Client.Get(reqCtx.Ctx, targetKey, target); getErr == nil {
+		if getErr := reader.Get(reqCtx.Ctx, targetKey, target); getErr == nil {
 			if systemaccount.RestoreConvergedV2(target, existing, systemAccountSecretFinalizer(
 				systemAccountSecretScope(contender.Target.Scope))) {
 				return nil
@@ -2510,7 +2537,7 @@ func (r *VolumePopulatorReconciler) arbitrateSystemAccountRestoreRequest(
 	}
 
 	fresh := &corev1.Secret{}
-	if err := r.Client.Get(reqCtx.Ctx, client.ObjectKeyFromObject(existing), fresh); err != nil {
+	if err := reader.Get(reqCtx.Ctx, client.ObjectKeyFromObject(existing), fresh); err != nil {
 		return newSystemAccountSecretRequeueError("re-read blocking restore request for", targetKey, err)
 	}
 	if fresh.UID != existing.UID || fresh.ResourceVersion != existing.ResourceVersion ||
@@ -2525,7 +2552,7 @@ func (r *VolumePopulatorReconciler) arbitrateSystemAccountRestoreRequest(
 	}
 	if err := r.Client.Create(reqCtx.Ctx, receipt); err != nil {
 		persisted := &corev1.Secret{}
-		if getErr := r.Client.Get(reqCtx.Ctx, client.ObjectKeyFromObject(receipt), persisted); getErr != nil {
+		if getErr := reader.Get(reqCtx.Ctx, client.ObjectKeyFromObject(receipt), persisted); getErr != nil {
 			if apierrors.IsNotFound(getErr) {
 				return newSystemAccountSecretRequeueError("create conflict receipt for", targetKey, err)
 			}

@@ -21,6 +21,7 @@ package cluster
 
 import (
 	"context"
+	"errors"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -28,6 +29,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -37,7 +39,11 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
+	"github.com/apecloud/kubeblocks/pkg/controller/systemaccount"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 var _ = Describe("cluster sharding shared transformers", func() {
@@ -128,6 +134,103 @@ var _ = Describe("cluster sharding shared transformers", func() {
 				},
 			},
 		}
+	}
+
+	newShardingRestoreContext := func(disabled, shared bool) (*clusterTransformContext, model.GraphClient, *graph.DAG, *corev1.Secret) {
+		cluster := &appsv1.Cluster{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: appsv1.GroupVersion.String(),
+				Kind:       appsv1.ClusterKind,
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace,
+				Name:      clusterName,
+				UID:       types.UID("cluster-uid"),
+			},
+			Spec: appsv1.ClusterSpec{
+				Restore: &appsv1.ClusterRestore{
+					Source: appsv1.ClusterRestoreSource{
+						APIGroup:  "dataprotection.kubeblocks.io",
+						Kind:      "Backup",
+						Namespace: namespace,
+						Name:      "backup",
+					},
+				},
+			},
+		}
+		root := systemaccount.ObjectIdentity{
+			APIVersion: appsv1.GroupVersion.String(),
+			Kind:       appsv1.ClusterKind,
+			Namespace:  namespace,
+			Name:       clusterName,
+			UID:        cluster.UID,
+		}
+		request, err := systemaccount.BuildRestoreRequest(systemaccount.CredentialIntent{
+			Operation: systemaccount.RestoreOperationIdentity{
+				Protocol: systemaccount.RestoreProtocolV2,
+				Profile:  systemaccount.RestoreProfileInitialCluster,
+				Root:     root,
+				Source: systemaccount.SourceIdentity{
+					APIGroup:  "dataprotection.kubeblocks.io",
+					Kind:      "Backup",
+					Namespace: namespace,
+					Name:      "backup",
+				},
+			},
+			Target: systemaccount.LogicalTargetIdentity{
+				Protocol:     systemaccount.LogicalTargetProtocolV1,
+				Namespace:    namespace,
+				Root:         root,
+				Owner:        root,
+				Scope:        systemaccount.SystemAccountScopeSharding,
+				ShardingName: shardingName,
+				Account:      accountName,
+			},
+			ResolvedSource: systemaccount.ObjectIdentity{
+				APIVersion: "dataprotection.kubeblocks.io/v1alpha1",
+				Kind:       "Backup",
+				Namespace:  namespace,
+				Name:       "backup",
+				UID:        types.UID("backup-uid"),
+			},
+			Credentials: map[string][]byte{
+				constant.AccountNameForSecret:   []byte(accountName),
+				constant.AccountPasswdForSecret: []byte("restored-password"),
+			},
+		})
+		Expect(err).ShouldNot(HaveOccurred())
+		request.UID = types.UID("request-uid")
+		request.ResourceVersion = "1"
+
+		sharding := newSharding()
+		sharding.Template.SystemAccounts = []appsv1.ComponentSystemAccount{{
+			Name:     accountName,
+			Disabled: ptr.To(disabled),
+		}}
+		shardingDef := newShardingDefinition()
+		shardingDef.Spec.SystemAccounts[0].Shared = ptr.To(shared)
+
+		graphCli := model.NewGraphClient(fake.NewClientBuilder().
+			WithScheme(newTestScheme()).
+			WithObjects(cluster, request).
+			Build())
+		dag := graph.NewDAG()
+		graphCli.Root(dag, cluster.DeepCopy(), cluster, model.ActionStatusPtr())
+		transCtx := &clusterTransformContext{
+			Context:     context.Background(),
+			Client:      graphCli,
+			APIReader:   graphCli,
+			Cluster:     cluster,
+			OrigCluster: cluster.DeepCopy(),
+			componentDefs: map[string]*appsv1.ComponentDefinition{
+				compDefName: newComponentDefinition(),
+			},
+			shardings: []*appsv1.ClusterSharding{sharding},
+			shardingDefs: map[string]*appsv1.ShardingDefinition{
+				sharding.ShardingDef: shardingDef,
+			},
+		}
+		return transCtx, graphCli, dag, request
 	}
 
 	It("builds deterministic shared TLS secret metadata and rewrites sharding TLS config", func() {
@@ -234,6 +337,63 @@ var _ = Describe("cluster sharding shared transformers", func() {
 		_, err = transformer.definedSystemAccount(transCtx, sharding, "monitor")
 		Expect(err).Should(MatchError(ContainSubstring("system account monitor not found")))
 	})
+
+	It("rejects disabled and non-shared restored sharding accounts", func() {
+		transformer := &clusterShardingAccountTransformer{}
+		sharding := newSharding()
+		sharding.Template.SystemAccounts = []appsv1.ComponentSystemAccount{{
+			Name:     accountName,
+			Disabled: ptr.To(true),
+		}}
+		transCtx := newTransformContext()
+		transCtx.componentDefs = map[string]*appsv1.ComponentDefinition{compDefName: newComponentDefinition()}
+		transCtx.shardingDefs = map[string]*appsv1.ShardingDefinition{
+			sharding.ShardingDef: newShardingDefinition(),
+		}
+
+		err := transformer.validateRestoredSystemAccount(transCtx, sharding, accountName)
+		semanticErr := &systemaccount.TargetSemanticError{}
+		Expect(errors.As(err, &semanticErr)).Should(BeTrue())
+		Expect(semanticErr.Reason).Should(Equal(systemaccount.AccountUnavailableReason))
+
+		sharding.Template.SystemAccounts[0].Disabled = ptr.To(false)
+		transCtx.shardingDefs[sharding.ShardingDef].Spec.SystemAccounts[0].Shared = ptr.To(false)
+		err = transformer.validateRestoredSystemAccount(transCtx, sharding, accountName)
+		semanticErr = &systemaccount.TargetSemanticError{}
+		Expect(errors.As(err, &semanticErr)).Should(BeTrue())
+		Expect(semanticErr.Reason).Should(Equal(systemaccount.TargetSemanticUnavailableReason))
+
+		transCtx.shardingDefs[sharding.ShardingDef].Spec.SystemAccounts = nil
+		err = transformer.validateRestoredSystemAccount(transCtx, sharding, accountName)
+		semanticErr = &systemaccount.TargetSemanticError{}
+		Expect(errors.As(err, &semanticErr)).Should(BeTrue())
+		Expect(semanticErr.Reason).Should(Equal(systemaccount.TargetSemanticUnavailableReason))
+	})
+
+	DescribeTable("projects invalid restored sharding accounts through the production transformer without target mutation",
+		func(disabled, shared bool, expectedReason string) {
+			transCtx, graphCli, dag, request := newShardingRestoreContext(disabled, shared)
+
+			err := (&clusterShardingAccountTransformer{}).Transform(transCtx, dag)
+
+			Expect(intctrlutil.IsRequeueError(err)).Should(BeTrue())
+			secrets := graphCli.FindAll(dag, &corev1.Secret{})
+			Expect(secrets).Should(HaveLen(1))
+			updatedRequest := secrets[0].(*corev1.Secret)
+			Expect(updatedRequest.Name).Should(Equal(request.Name))
+			Expect(graphCli.IsAction(dag, updatedRequest, model.ActionUpdatePtr())).Should(BeTrue())
+			Expect(updatedRequest.Annotations[systemaccount.RestoreRequestPhaseAnnotationKey]).
+				Should(Equal(string(systemaccount.RestoreRequestPhaseFailed)))
+			Expect(updatedRequest.Annotations[systemaccount.RestoreRequestReasonAnnotationKey]).
+				Should(Equal(expectedReason))
+			Expect(graphCli.FindAll(dag, &corev1.Secret{})).
+				ShouldNot(ContainElement(WithTransform(func(secret client.Object) string {
+					return secret.GetName()
+				}, Equal(shardingAccountSecretName(clusterName, shardingName, accountName)))))
+		},
+		Entry("disabled account", true, true, systemaccount.AccountUnavailableReason),
+		Entry("non-shared account", false, false, systemaccount.TargetSemanticUnavailableReason),
+	)
 
 	It("builds shared system account secrets with merged metadata and immutable data", func() {
 		transformer := &clusterShardingAccountTransformer{}

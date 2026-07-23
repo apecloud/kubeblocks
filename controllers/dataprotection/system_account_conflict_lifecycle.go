@@ -49,15 +49,20 @@ import (
 // terminating or is gone.
 type SystemAccountConflictReceiptLifecycleReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	APIReader client.Reader
+	Scheme    *runtime.Scheme
 }
 
 func (r *SystemAccountConflictReceiptLifecycleReconciler) Reconcile(
 	ctx context.Context,
 	req controllerruntime.Request,
 ) (controllerruntime.Result, error) {
+	if r.APIReader == nil {
+		return controllerruntime.Result{}, fmt.Errorf(
+			"system account conflict authority API reader is not configured")
+	}
 	receipt := &corev1.Secret{}
-	if err := r.Client.Get(ctx, req.NamespacedName, receipt); err != nil {
+	if err := r.APIReader.Get(ctx, req.NamespacedName, receipt); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, log.FromContext(ctx), "")
 	}
 	if receipt.Annotations[systemaccount.RestoreProtocolAnnotationKey] !=
@@ -134,12 +139,15 @@ func (r *SystemAccountConflictReceiptLifecycleReconciler) conflictRootState(
 	ctx context.Context,
 	envelope systemaccount.ConflictEnvelope,
 ) (bool, bool, error) {
+	if r.APIReader == nil {
+		return false, false, fmt.Errorf("system account conflict authority API reader is not configured")
+	}
 	root := &appsv1.Cluster{}
 	rootKey := client.ObjectKey{
 		Namespace: envelope.LoserOperation.Root.Namespace,
 		Name:      envelope.LoserOperation.Root.Name,
 	}
-	err := r.Client.Get(ctx, rootKey, root)
+	err := r.APIReader.Get(ctx, rootKey, root)
 	rootGone := apierrors.IsNotFound(err)
 	if err != nil && !rootGone {
 		return false, false, err
@@ -160,7 +168,11 @@ func (r *SystemAccountConflictReceiptLifecycleReconciler) projectConflictReceipt
 		return err
 	}
 	loserDigest, _ := systemaccount.OperationDigest(envelope.LoserOperation)
-	volumePopulator := &VolumePopulatorReconciler{Client: r.Client, Scheme: r.Scheme}
+	volumePopulator := &VolumePopulatorReconciler{
+		Client:    r.Client,
+		APIReader: r.APIReader,
+		Scheme:    r.Scheme,
+	}
 	var projectionErrors []error
 	for _, pvc := range pvcs {
 		if err := volumePopulator.projectSystemAccountConflictIdentity(
@@ -196,8 +208,11 @@ func (r *SystemAccountConflictReceiptLifecycleReconciler) participantsForOperati
 	ctx context.Context,
 	operation systemaccount.RestoreOperationIdentity,
 ) ([]*corev1.PersistentVolumeClaim, error) {
+	if r.APIReader == nil {
+		return nil, fmt.Errorf("system account conflict authority API reader is not configured")
+	}
 	pvcs := &corev1.PersistentVolumeClaimList{}
-	if err := r.Client.List(ctx, pvcs, client.InNamespace(operation.Root.Namespace),
+	if err := r.APIReader.List(ctx, pvcs, client.InNamespace(operation.Root.Namespace),
 		client.MatchingLabels{constant.AppInstanceLabelKey: operation.Root.Name}); err != nil {
 		return nil, err
 	}
@@ -205,7 +220,11 @@ func (r *SystemAccountConflictReceiptLifecycleReconciler) participantsForOperati
 	if err != nil {
 		return nil, err
 	}
-	volumePopulator := &VolumePopulatorReconciler{Client: r.Client, Scheme: r.Scheme}
+	volumePopulator := &VolumePopulatorReconciler{
+		Client:    r.Client,
+		APIReader: r.APIReader,
+		Scheme:    r.Scheme,
+	}
 	participants := make([]*corev1.PersistentVolumeClaim, 0, len(pvcs.Items))
 	for i := range pvcs.Items {
 		pvc := &pvcs.Items[i]
@@ -213,15 +232,23 @@ func (r *SystemAccountConflictReceiptLifecycleReconciler) participantsForOperati
 			continue
 		}
 		backup := &dpv1alpha1.Backup{}
-		if err := r.Client.Get(ctx, client.ObjectKey{
+		if err := r.APIReader.Get(ctx, client.ObjectKey{
 			Namespace: operation.Source.Namespace,
 			Name:      operation.Source.Name,
 		}, backup); err != nil {
+			if !apierrors.IsNotFound(err) {
+				return nil, err
+			}
 			continue
 		}
-		authority, err := volumePopulator.resolveSystemAccountRestoreAuthority(
-			intctrlutil.RequestCtx{Ctx: ctx}, pvc, backup, operation.Root.Name)
+		authority, err := volumePopulator.resolveSystemAccountRestoreAuthorityWithMode(
+			intctrlutil.RequestCtx{Ctx: ctx}, pvc, backup, operation.Root.Name,
+			systemAccountRestoreAuthorityForConflictProjection)
 		if err != nil {
+			var readErr *systemAccountRestoreAuthorityReadError
+			if errors.As(err, &readErr) {
+				return nil, err
+			}
 			continue
 		}
 		candidateDigest, err := systemaccount.OperationDigest(authority.operation)
@@ -235,6 +262,9 @@ func (r *SystemAccountConflictReceiptLifecycleReconciler) participantsForOperati
 func (r *SystemAccountConflictReceiptLifecycleReconciler) SetupWithManager(
 	mgr controllerruntime.Manager,
 ) error {
+	if r.APIReader == nil {
+		r.APIReader = mgr.GetAPIReader()
+	}
 	return intctrlutil.NewControllerManagedBy(mgr).
 		Named("system-account-conflict-receipt-lifecycle").
 		For(&corev1.Secret{}, builder.WithPredicates(predicate.NewPredicateFuncs(
@@ -258,16 +288,9 @@ func pvcReferencesOperationSource(
 	pvc *corev1.PersistentVolumeClaim,
 	operation systemaccount.RestoreOperationIdentity,
 ) bool {
-	if pvc.Spec.DataSourceRef == nil || pvc.Spec.DataSourceRef.APIGroup == nil ||
-		*pvc.Spec.DataSourceRef.APIGroup != operation.Source.APIGroup ||
-		pvc.Spec.DataSourceRef.Kind != operation.Source.Kind ||
-		pvc.Spec.DataSourceRef.Name != operation.Source.Name ||
+	if !pvcReferencesRestoreSource(pvc, operation.Source) ||
 		pvc.Annotations[constant.RestorePITRAnnotationKey] != operation.PITR {
 		return false
 	}
-	namespace := pvc.Namespace
-	if pvc.Spec.DataSourceRef.Namespace != nil {
-		namespace = *pvc.Spec.DataSourceRef.Namespace
-	}
-	return namespace == operation.Source.Namespace
+	return true
 }

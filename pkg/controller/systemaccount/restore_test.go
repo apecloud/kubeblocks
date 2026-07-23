@@ -43,7 +43,7 @@ func TestRestoreRequestPendingClaimsBeforeTargetMutation(t *testing.T) {
 	fixture := newRestoreStateFixture(t)
 	graphCli, dag := fixture.graph()
 
-	handled, err := ReconcileRestoreRequests(context.Background(), graphCli, dag,
+	handled, err := ReconcileRestoreRequests(context.Background(), graphCli, dag, graphCli,
 		fixture.owner, constant.DBComponentFinalizerName, fixture.targetBuilder)
 
 	require.True(t, handled)
@@ -56,12 +56,72 @@ func TestRestoreRequestPendingClaimsBeforeTargetMutation(t *testing.T) {
 		"claim round must not mutate the target")
 }
 
+func TestRestoreRequestPendingFailsBeforeClaimWhenOperationTerminal(t *testing.T) {
+	fixture := newRestoreStateFixture(t)
+	fixture.root.Status.Conditions = []metav1.Condition{{
+		Type:               appsv1.ConditionTypeRestore,
+		Status:             metav1.ConditionTrue,
+		ObservedGeneration: fixture.root.Generation,
+	}}
+	graphCli, dag := fixture.graph()
+
+	handled, err := ReconcileRestoreRequests(context.Background(), graphCli, dag, graphCli,
+		fixture.owner, constant.DBComponentFinalizerName, fixture.targetBuilder)
+
+	require.True(t, handled)
+	require.True(t, intctrlutil.IsRequeueError(err), err)
+	updated := graphCli.FindMatchedVertex(dag, fixture.request).(*model.ObjectVertex).Obj.(*corev1.Secret)
+	require.Equal(t, string(RestoreRequestPhaseFailed),
+		updated.Annotations[RestoreRequestPhaseAnnotationKey])
+	require.Equal(t, OperationTerminalReason,
+		updated.Annotations[RestoreRequestReasonAnnotationKey])
+	require.Len(t, graphCli.FindAll(dag, &corev1.Secret{}), 1)
+}
+
+func TestRestoreRequestPendingFailsBeforeClaimWhenTargetOwnerUnavailable(t *testing.T) {
+	fixture := newRestoreStateFixture(t)
+	replacementOwner := fixture.owner.DeepCopy()
+	replacementOwner.UID = types.UID("replacement-component-uid")
+	fixture.objects = []client.Object{fixture.root, replacementOwner, fixture.request}
+	graphCli, dag := fixture.graph()
+
+	handled, err := ReconcileRestoreRequests(context.Background(), graphCli, dag, graphCli,
+		fixture.owner, constant.DBComponentFinalizerName, fixture.targetBuilder)
+
+	require.True(t, handled)
+	require.True(t, intctrlutil.IsRequeueError(err), err)
+	updated := graphCli.FindMatchedVertex(dag, fixture.request).(*model.ObjectVertex).Obj.(*corev1.Secret)
+	require.Equal(t, string(RestoreRequestPhaseFailed),
+		updated.Annotations[RestoreRequestPhaseAnnotationKey])
+	require.Equal(t, TargetOwnerUnavailableReason,
+		updated.Annotations[RestoreRequestReasonAnnotationKey])
+	require.Len(t, graphCli.FindAll(dag, &corev1.Secret{}), 1)
+}
+
+func TestRestoreRequestUsesLivePhaseBeforePlanningMutation(t *testing.T) {
+	fixture := newRestoreStateFixture(t)
+	liveRequest := fixture.request.DeepCopy()
+	liveRequest.Annotations[RestoreRequestPhaseAnnotationKey] = string(RestoreRequestPhaseFailed)
+	liveRequest.Annotations[RestoreRequestReasonAnnotationKey] = OperationTerminalReason
+	authorityReader := fake.NewClientBuilder().WithScheme(fixture.scheme).
+		WithObjects(fixture.root, fixture.owner, liveRequest).Build()
+	graphCli, dag := fixture.graph()
+
+	handled, err := ReconcileRestoreRequests(context.Background(), graphCli, dag, authorityReader,
+		fixture.owner, constant.DBComponentFinalizerName, fixture.targetBuilder)
+
+	require.True(t, handled)
+	require.True(t, intctrlutil.IsRequeueError(err), err)
+	require.Empty(t, graphCli.FindAll(dag, &corev1.Secret{}),
+		"a stale cached Pending phase must not overwrite the live Failed request or create a target")
+}
+
 func TestClaimedRestoreRequestCreatesAppsOwnedTarget(t *testing.T) {
 	fixture := newRestoreStateFixture(t)
 	fixture.request.Annotations[RestoreRequestPhaseAnnotationKey] = string(RestoreRequestPhaseClaimed)
 	graphCli, dag := fixture.graph()
 
-	handled, err := ReconcileRestoreRequests(context.Background(), graphCli, dag,
+	handled, err := ReconcileRestoreRequests(context.Background(), graphCli, dag, graphCli,
 		fixture.owner, constant.DBComponentFinalizerName, fixture.targetBuilder)
 
 	require.True(t, handled)
@@ -74,6 +134,78 @@ func TestClaimedRestoreRequestCreatesAppsOwnedTarget(t *testing.T) {
 	require.Equal(t, string(fixture.request.UID), target.Annotations[RestoreRequestUIDAnnotationKey])
 	require.Contains(t, target.Finalizers, constant.DBComponentFinalizerName)
 	require.NotContains(t, target.Labels, constant.SystemAccountRestoreRequestLabelKey)
+}
+
+func TestClaimedRestoreRequestDoesNotMutateTargetWhenOwnerUnavailable(t *testing.T) {
+	fixture := newRestoreStateFixture(t)
+	fixture.request.Annotations[RestoreRequestPhaseAnnotationKey] = string(RestoreRequestPhaseClaimed)
+	replacementOwner := fixture.owner.DeepCopy()
+	replacementOwner.UID = types.UID("replacement-component-uid")
+	fixture.objects = []client.Object{fixture.root, replacementOwner, fixture.request}
+	graphCli, dag := fixture.graph()
+
+	handled, err := ReconcileRestoreRequests(context.Background(), graphCli, dag, graphCli,
+		fixture.owner, constant.DBComponentFinalizerName, fixture.targetBuilder)
+
+	require.True(t, handled)
+	require.True(t, intctrlutil.IsRequeueError(err), err)
+	require.Empty(t, graphCli.FindAll(dag, &corev1.Secret{}),
+		"unavailable target owner must prevent request and target mutations in the Apps plan")
+}
+
+func TestClaimedRestoreRequestFailsBeforeTargetMutationWhenOperationTerminal(t *testing.T) {
+	fixture := newRestoreStateFixture(t)
+	fixture.request.Annotations[RestoreRequestPhaseAnnotationKey] = string(RestoreRequestPhaseClaimed)
+	fixture.root.Status.Conditions = []metav1.Condition{{
+		Type:               appsv1.ConditionTypeRestore,
+		Status:             metav1.ConditionTrue,
+		ObservedGeneration: fixture.root.Generation,
+	}}
+	graphCli, dag := fixture.graph()
+
+	handled, err := ReconcileRestoreRequests(context.Background(), graphCli, dag, graphCli,
+		fixture.owner, constant.DBComponentFinalizerName, fixture.targetBuilder)
+
+	require.True(t, handled)
+	require.True(t, intctrlutil.IsRequeueError(err), err)
+	vertex := graphCli.FindMatchedVertex(dag, fixture.request)
+	require.NotNil(t, vertex, "terminal operation was not projected to the request")
+	updated := vertex.(*model.ObjectVertex).Obj.(*corev1.Secret)
+	require.Equal(t, string(RestoreRequestPhaseFailed),
+		updated.Annotations[RestoreRequestPhaseAnnotationKey])
+	require.Equal(t, OperationTerminalReason,
+		updated.Annotations[RestoreRequestReasonAnnotationKey])
+	require.Len(t, graphCli.FindAll(dag, &corev1.Secret{}), 1,
+		"terminal operation must not mutate a non-exact target")
+}
+
+func TestClaimedRestoreRequestLeavesExactTargetForTerminalLifecycleRepair(t *testing.T) {
+	fixture := newRestoreStateFixture(t)
+	fixture.request.Annotations[RestoreRequestPhaseAnnotationKey] = string(RestoreRequestPhaseClaimed)
+	fixture.root.Status.Conditions = []metav1.Condition{{
+		Type:               appsv1.ConditionTypeRestore,
+		Status:             metav1.ConditionTrue,
+		ObservedGeneration: fixture.root.Generation,
+	}}
+	target, err := fixture.targetBuilder(fixture.intent)
+	require.NoError(t, err)
+	target.UID = types.UID("target-uid")
+	target.ResourceVersion = "7"
+	applyTargetReceipt(target, fixture.request)
+	revision, err := TargetCommitRevision(target, constant.DBComponentFinalizerName)
+	require.NoError(t, err)
+	target.Annotations[TargetCommitRevisionAnnotationKey] = revision
+	fixture.objects = append(fixture.objects, target)
+	graphCli, dag := fixture.graph()
+
+	handled, err := ReconcileRestoreRequests(context.Background(), graphCli, dag, graphCli,
+		fixture.owner, constant.DBComponentFinalizerName, fixture.targetBuilder)
+
+	require.True(t, handled)
+	require.True(t, intctrlutil.IsRequeueError(err), err)
+	require.False(t, graphCli.IsAction(dag, fixture.request, model.ActionUpdatePtr()))
+	require.False(t, graphCli.IsAction(dag, target, model.ActionUpdatePtr()))
+	require.Equal(t, revision, target.Annotations[TargetCommitRevisionAnnotationKey])
 }
 
 func TestClaimedRestoreRequestLeavesExactTargetForLifecycleCommit(t *testing.T) {
@@ -90,7 +222,7 @@ func TestClaimedRestoreRequestLeavesExactTargetForLifecycleCommit(t *testing.T) 
 	fixture.objects = append(fixture.objects, target)
 	graphCli, dag := fixture.graph()
 
-	handled, err := ReconcileRestoreRequests(context.Background(), graphCli, dag,
+	handled, err := ReconcileRestoreRequests(context.Background(), graphCli, dag, graphCli,
 		fixture.owner, constant.DBComponentFinalizerName, fixture.targetBuilder)
 
 	require.True(t, handled)
@@ -100,6 +232,30 @@ func TestClaimedRestoreRequestLeavesExactTargetForLifecycleCommit(t *testing.T) 
 	require.Equal(t, string(RestoreRequestPhaseClaimed),
 		fixture.request.Annotations[RestoreRequestPhaseAnnotationKey])
 	require.Equal(t, revision, target.Annotations[TargetCommitRevisionAnnotationKey])
+}
+
+func TestClaimedRestoreRequestUsesAuthorityReaderForExactTarget(t *testing.T) {
+	fixture := newRestoreStateFixture(t)
+	fixture.request.Annotations[RestoreRequestPhaseAnnotationKey] = string(RestoreRequestPhaseClaimed)
+	target, err := fixture.targetBuilder(fixture.intent)
+	require.NoError(t, err)
+	target.UID = types.UID("target-uid")
+	target.ResourceVersion = "7"
+	applyTargetReceipt(target, fixture.request)
+	revision, err := TargetCommitRevision(target, constant.DBComponentFinalizerName)
+	require.NoError(t, err)
+	target.Annotations[TargetCommitRevisionAnnotationKey] = revision
+	authorityReader := fake.NewClientBuilder().WithScheme(fixture.scheme).
+		WithObjects(fixture.root, fixture.owner, fixture.request, target).Build()
+	graphCli, dag := fixture.graph()
+
+	handled, err := ReconcileRestoreRequests(context.Background(), graphCli, dag, authorityReader,
+		fixture.owner, constant.DBComponentFinalizerName, fixture.targetBuilder)
+
+	require.True(t, handled)
+	require.True(t, intctrlutil.IsRequeueError(err), err)
+	require.Empty(t, graphCli.FindAll(dag, &corev1.Secret{}),
+		"an exact strong-read target must not be recreated from a stale cache miss")
 }
 
 func TestClaimedRestoreRequestDeletesImmutableTargetWithObservedUID(t *testing.T) {
@@ -115,7 +271,7 @@ func TestClaimedRestoreRequestDeletesImmutableTargetWithObservedUID(t *testing.T
 	fixture.objects = append(fixture.objects, target)
 	graphCli, dag := fixture.graph()
 
-	handled, err := ReconcileRestoreRequests(context.Background(), graphCli, dag,
+	handled, err := ReconcileRestoreRequests(context.Background(), graphCli, dag, graphCli,
 		fixture.owner, constant.DBComponentFinalizerName, fixture.targetBuilder)
 
 	require.True(t, handled)
@@ -150,7 +306,7 @@ func TestClaimedRestoreRequestPreservesUnownedTargetMetadata(t *testing.T) {
 	fixture.objects = append(fixture.objects, target)
 	graphCli, dag := fixture.graph()
 
-	handled, reconcileErr := ReconcileRestoreRequests(context.Background(), graphCli, dag,
+	handled, reconcileErr := ReconcileRestoreRequests(context.Background(), graphCli, dag, graphCli,
 		fixture.owner, constant.DBComponentFinalizerName, fixture.targetBuilder)
 
 	require.True(t, handled)
@@ -172,7 +328,7 @@ func TestDeletingRequestFailsWithoutTargetMutation(t *testing.T) {
 	fixture.request.DeletionTimestamp = &now
 	graphCli, dag := fixture.graph()
 
-	handled, err := ReconcileRestoreRequests(context.Background(), graphCli, dag,
+	handled, err := ReconcileRestoreRequests(context.Background(), graphCli, dag, graphCli,
 		fixture.owner, constant.DBComponentFinalizerName, fixture.targetBuilder)
 
 	require.True(t, handled)
@@ -189,7 +345,7 @@ func TestUnavailableTargetSemanticFailsPendingRequest(t *testing.T) {
 	fixture := newRestoreStateFixture(t)
 	graphCli, dag := fixture.graph()
 
-	handled, err := ReconcileRestoreRequests(context.Background(), graphCli, dag,
+	handled, err := ReconcileRestoreRequests(context.Background(), graphCli, dag, graphCli,
 		fixture.owner, constant.DBComponentFinalizerName,
 		func(CredentialIntent) (*corev1.Secret, error) {
 			return nil, context.Canceled
@@ -222,7 +378,7 @@ func TestClaimedRestoreRequestRejectsMatchingNonControllerOwnerReference(t *test
 	fixture.objects = append(fixture.objects, target)
 	graphCli, dag := fixture.graph()
 
-	handled, reconcileErr := ReconcileRestoreRequests(context.Background(), graphCli, dag,
+	handled, reconcileErr := ReconcileRestoreRequests(context.Background(), graphCli, dag, graphCli,
 		fixture.owner, constant.DBComponentFinalizerName, fixture.targetBuilder)
 
 	require.True(t, handled)
@@ -253,7 +409,7 @@ func TestReconcileRestoreRequestsIgnoresDamagedForeignRequest(t *testing.T) {
 	fixture.objects = []client.Object{foreign}
 	graphCli, dag := fixture.graph()
 
-	handled, reconcileErr := ReconcileRestoreRequests(context.Background(), graphCli, dag,
+	handled, reconcileErr := ReconcileRestoreRequests(context.Background(), graphCli, dag, graphCli,
 		fixture.owner, constant.DBComponentFinalizerName, fixture.targetBuilder)
 
 	require.NoError(t, reconcileErr)
@@ -285,6 +441,17 @@ func newRestoreStateFixture(t *testing.T) *restoreStateFixture {
 			Name:      "cluster",
 			UID:       types.UID("cluster-uid"),
 		},
+		Spec: appsv1.ClusterSpec{
+			Restore: &appsv1.ClusterRestore{
+				Source: appsv1.ClusterRestoreSource{
+					APIGroup:  "dataprotection.kubeblocks.io",
+					Kind:      "Backup",
+					Namespace: "backup",
+					Name:      "backup-1",
+				},
+				Parameters: map[string]string{"restore": "all"},
+			},
+		},
 	}
 	owner := &appsv1.Component{
 		TypeMeta: metav1.TypeMeta{APIVersion: appsv1.GroupVersion.String(), Kind: "Component"},
@@ -306,7 +473,7 @@ func newRestoreStateFixture(t *testing.T) *restoreStateFixture {
 		owner:   owner,
 		intent:  intent,
 		request: request,
-		objects: []client.Object{request},
+		objects: []client.Object{root, owner, request},
 	}
 }
 

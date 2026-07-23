@@ -25,6 +25,7 @@ import (
 	"testing"
 	"time"
 
+	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -34,15 +35,20 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/systemaccount"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 func TestConflictReceiptLifecycleReleasesGoneRoot(t *testing.T) {
 	scheme := newConflictLifecycleScheme(t)
 	receipt := newConflictLifecycleReceipt(t)
 	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(receipt).Build()
-	reconciler := &SystemAccountConflictReceiptLifecycleReconciler{Client: cli, Scheme: scheme}
+	reconciler := &SystemAccountConflictReceiptLifecycleReconciler{
+		Client: cli, APIReader: cli, Scheme: scheme,
+	}
 
 	if _, err := reconciler.Reconcile(context.Background(), ctrl.Request{
 		NamespacedName: client.ObjectKeyFromObject(receipt),
@@ -70,7 +76,9 @@ func TestConflictReceiptLifecycleRetainsDeletingReceiptWhileRootLive(t *testing.
 		UID:       "cluster-uid",
 	}}
 	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, receipt).Build()
-	reconciler := &SystemAccountConflictReceiptLifecycleReconciler{Client: cli, Scheme: scheme}
+	reconciler := &SystemAccountConflictReceiptLifecycleReconciler{
+		Client: cli, APIReader: cli, Scheme: scheme,
+	}
 
 	if _, err := reconciler.Reconcile(context.Background(), ctrl.Request{
 		NamespacedName: client.ObjectKeyFromObject(receipt),
@@ -92,7 +100,9 @@ func TestConflictReceiptLifecycleReleasesDamagedMetadataAfterRootGone(t *testing
 	receipt := newConflictLifecycleReceipt(t)
 	receipt.OwnerReferences[0].UID = "replacement-root-uid"
 	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(receipt).Build()
-	reconciler := &SystemAccountConflictReceiptLifecycleReconciler{Client: cli, Scheme: scheme}
+	reconciler := &SystemAccountConflictReceiptLifecycleReconciler{
+		Client: cli, APIReader: cli, Scheme: scheme,
+	}
 
 	if _, err := reconciler.Reconcile(context.Background(), ctrl.Request{
 		NamespacedName: client.ObjectKeyFromObject(receipt),
@@ -119,12 +129,59 @@ func TestConflictReceiptLifecycleFailsClosedForDamagedMetadataWhileRootLive(t *t
 		UID:       "cluster-uid",
 	}}
 	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, receipt).Build()
-	reconciler := &SystemAccountConflictReceiptLifecycleReconciler{Client: cli, Scheme: scheme}
+	reconciler := &SystemAccountConflictReceiptLifecycleReconciler{
+		Client: cli, APIReader: cli, Scheme: scheme,
+	}
 
 	if _, err := reconciler.Reconcile(context.Background(), ctrl.Request{
 		NamespacedName: client.ObjectKeyFromObject(receipt),
 	}); err == nil {
 		t.Fatal("active root accepted damaged receipt metadata")
+	}
+}
+
+func TestConflictReceiptLifecycleProjectsVerifiedParticipantsForTerminatingRoot(t *testing.T) {
+	scheme := newConflictLifecycleScheme(t)
+	pvc := &corev1.PersistentVolumeClaim{}
+	backup, cluster, component, instanceSet :=
+		prepareSystemAccountAuthorityFixture(NewWithT(t), scheme, pvc)
+	cli := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(pvc, backup, cluster, component, instanceSet).Build()
+	volumePopulator := &VolumePopulatorReconciler{Client: cli, APIReader: cli, Scheme: scheme}
+	authority, err := volumePopulator.resolveSystemAccountRestoreAuthority(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, backup, cluster.Name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reconciler := &SystemAccountConflictReceiptLifecycleReconciler{
+		Client: cli, APIReader: cli, Scheme: scheme,
+	}
+
+	live, err := reconciler.participantsForOperation(context.Background(), authority.operation)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(live) != 1 || live[0].UID != pvc.UID {
+		t.Fatalf("live participants = %#v, want exact PVC UID %s", live, pvc.UID)
+	}
+
+	now := metav1.Now()
+	terminatingCluster := cluster.DeepCopy()
+	terminatingCluster.ResourceVersion = ""
+	terminatingCluster.DeletionTimestamp = &now
+	terminatingCluster.Finalizers = []string{"test.kubeblocks.io/hold"}
+	terminatingClient := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(pvc.DeepCopy(), backup.DeepCopy(), terminatingCluster,
+			component.DeepCopy(), instanceSet.DeepCopy()).Build()
+	reconciler.Client = terminatingClient
+	reconciler.APIReader = terminatingClient
+
+	terminating, err := reconciler.participantsForOperation(context.Background(), authority.operation)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(terminating) != 1 || terminating[0].UID != pvc.UID {
+		t.Fatalf("terminating-root participants = %#v, want exact PVC UID %s", terminating, pvc.UID)
 	}
 }
 
@@ -135,6 +192,12 @@ func newConflictLifecycleScheme(t *testing.T) *runtime.Scheme {
 		t.Fatal(err)
 	}
 	if err := appsv1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	if err := dpv1alpha1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	if err := workloads.AddToScheme(scheme); err != nil {
 		t.Fatal(err)
 	}
 	return scheme

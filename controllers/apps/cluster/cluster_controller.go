@@ -68,6 +68,7 @@ import (
 // ClusterReconciler reconciles a Cluster object
 type ClusterReconciler struct {
 	client.Client
+	APIReader       client.Reader
 	Scheme          *runtime.Scheme
 	Recorder        record.EventRecorder
 	MultiClusterMgr multicluster.Manager
@@ -90,7 +91,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	// the cluster reconciliation loop is a 3-stage model: plan Init, plan Build and plan Execute
 	// Init stage
-	planBuilder := newClusterPlanBuilder(reqCtx, r.Client)
+	planBuilder := newClusterPlanBuilder(reqCtx, r.Client, r.APIReader)
 	if err := planBuilder.Init(); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
@@ -164,6 +165,9 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	if r.APIReader == nil {
+		r.APIReader = mgr.GetAPIReader()
+	}
 	retryDurationMS := viper.GetInt(constant.CfgKeyCtrlrReconcileRetryDurationMS)
 	if retryDurationMS != 0 {
 		appsutil.RequeueDuration = time.Millisecond * time.Duration(retryDurationMS)

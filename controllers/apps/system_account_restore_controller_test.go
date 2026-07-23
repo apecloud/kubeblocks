@@ -33,6 +33,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -45,7 +46,7 @@ func TestSystemAccountRestoreLifecycleReleasesGoneRoot(t *testing.T) {
 	scheme := newSystemAccountLifecycleScheme(t)
 	request := newLifecycleRestoreRequest(t)
 	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(request).Build()
-	reconciler := &SystemAccountRestoreLifecycleReconciler{Client: cli, Scheme: scheme}
+	reconciler := &SystemAccountRestoreLifecycleReconciler{Client: cli, APIReader: cli, Scheme: scheme}
 
 	if _, err := reconciler.Reconcile(context.Background(), ctrl.Request{
 		NamespacedName: client.ObjectKeyFromObject(request),
@@ -93,7 +94,7 @@ func TestSystemAccountRestoreLifecyclePersistsDeletionFailureBeforeRelease(t *te
 		},
 	}
 	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, request).Build()
-	reconciler := &SystemAccountRestoreLifecycleReconciler{Client: cli, Scheme: scheme}
+	reconciler := &SystemAccountRestoreLifecycleReconciler{Client: cli, APIReader: cli, Scheme: scheme}
 
 	if _, err := reconciler.Reconcile(context.Background(), ctrl.Request{
 		NamespacedName: client.ObjectKeyFromObject(request),
@@ -131,7 +132,7 @@ func TestSystemAccountRestoreLifecycleClearsExactReceiptBeforeDeletionFailure(t 
 	originalData := target.DeepCopy().Data
 	cli := fake.NewClientBuilder().WithScheme(scheme).
 		WithObjects(cluster, component, request, target).Build()
-	reconciler := &SystemAccountRestoreLifecycleReconciler{Client: cli, Scheme: scheme}
+	reconciler := &SystemAccountRestoreLifecycleReconciler{Client: cli, APIReader: cli, Scheme: scheme}
 
 	if _, err := reconciler.Reconcile(context.Background(), ctrl.Request{
 		NamespacedName: client.ObjectKeyFromObject(request),
@@ -176,7 +177,7 @@ func TestSystemAccountRestoreLifecycleReleasesDamagedMetadataAfterRootGone(t *te
 	request := newLifecycleRestoreRequest(t)
 	request.OwnerReferences[0].UID = "replacement-root-uid"
 	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(request).Build()
-	reconciler := &SystemAccountRestoreLifecycleReconciler{Client: cli, Scheme: scheme}
+	reconciler := &SystemAccountRestoreLifecycleReconciler{Client: cli, APIReader: cli, Scheme: scheme}
 
 	if _, err := reconciler.Reconcile(context.Background(), ctrl.Request{
 		NamespacedName: client.ObjectKeyFromObject(request),
@@ -216,7 +217,7 @@ func TestSystemAccountRestoreLifecycleFailsClosedForDamagedMetadataWhileRootLive
 		},
 	}}
 	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, request).Build()
-	reconciler := &SystemAccountRestoreLifecycleReconciler{Client: cli, Scheme: scheme}
+	reconciler := &SystemAccountRestoreLifecycleReconciler{Client: cli, APIReader: cli, Scheme: scheme}
 
 	if _, err := reconciler.Reconcile(context.Background(), ctrl.Request{
 		NamespacedName: client.ObjectKeyFromObject(request),
@@ -268,7 +269,7 @@ func TestSystemAccountRestoreLifecycleCommitsExactTargetAfterActiveRecheck(t *te
 	target.Annotations[systemaccount.TargetCommitRevisionAnnotationKey] = revision
 	cli := fake.NewClientBuilder().WithScheme(scheme).
 		WithObjects(cluster, component, request, target).Build()
-	reconciler := &SystemAccountRestoreLifecycleReconciler{Client: cli, Scheme: scheme}
+	reconciler := &SystemAccountRestoreLifecycleReconciler{Client: cli, APIReader: cli, Scheme: scheme}
 
 	if _, err := reconciler.Reconcile(context.Background(), ctrl.Request{
 		NamespacedName: client.ObjectKeyFromObject(request),
@@ -294,6 +295,156 @@ func TestSystemAccountRestoreLifecycleCommitsExactTargetAfterActiveRecheck(t *te
 	}
 }
 
+func TestSystemAccountRestoreLifecycleRepairsCommittedReceiptFromExactTarget(t *testing.T) {
+	scheme := newSystemAccountLifecycleScheme(t)
+	request := newLifecycleRestoreRequest(t)
+	request.Annotations[systemaccount.RestoreRequestPhaseAnnotationKey] =
+		string(systemaccount.RestoreRequestPhaseCommitted)
+	request.Annotations[systemaccount.TargetSecretNameAnnotationKey] = "stale-target"
+	request.Annotations[systemaccount.TargetSecretUIDAnnotationKey] = "stale-uid"
+	request.Annotations[systemaccount.TargetCommitRevisionAnnotationKey] = "stale-revision"
+	cluster := newLifecycleActiveCluster(request)
+	component := &appsv1.Component{ObjectMeta: metav1.ObjectMeta{
+		Namespace: "default",
+		Name:      "component",
+		UID:       "component-uid",
+	}}
+	target := newLifecycleExactTarget(t, scheme, request, component)
+	expectedRevision := target.Annotations[systemaccount.TargetCommitRevisionAnnotationKey]
+	cli := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(cluster, component, request, target).Build()
+	reconciler := &SystemAccountRestoreLifecycleReconciler{Client: cli, APIReader: cli, Scheme: scheme}
+
+	if _, err := reconciler.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: client.ObjectKeyFromObject(request),
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	current := &corev1.Secret{}
+	if err := cli.Get(context.Background(), client.ObjectKeyFromObject(request), current); err != nil {
+		t.Fatal(err)
+	}
+	if current.Annotations[systemaccount.RestoreRequestPhaseAnnotationKey] !=
+		string(systemaccount.RestoreRequestPhaseCommitted) {
+		t.Fatalf("phase = %q", current.Annotations[systemaccount.RestoreRequestPhaseAnnotationKey])
+	}
+	if current.Annotations[systemaccount.TargetSecretNameAnnotationKey] != target.Name ||
+		current.Annotations[systemaccount.TargetSecretUIDAnnotationKey] != string(target.UID) ||
+		current.Annotations[systemaccount.TargetCommitRevisionAnnotationKey] != expectedRevision {
+		t.Fatalf("committed receipt was not repaired: %#v", current.Annotations)
+	}
+}
+
+func TestSystemAccountRestoreLifecycleInvalidPhaseDoesNotHotWrite(t *testing.T) {
+	scheme := newSystemAccountLifecycleScheme(t)
+	request := newLifecycleRestoreRequest(t)
+	request.Annotations[systemaccount.RestoreRequestPhaseAnnotationKey] = "Bogus"
+	cluster := newLifecycleActiveCluster(request)
+	updateCount := 0
+	cli := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(cluster, request).
+		WithInterceptorFuncs(interceptor.Funcs{
+			Update: func(ctx context.Context, cli client.WithWatch, obj client.Object,
+				opts ...client.UpdateOption) error {
+				updateCount++
+				return cli.Update(ctx, obj, opts...)
+			},
+		}).
+		Build()
+	reconciler := &SystemAccountRestoreLifecycleReconciler{Client: cli, APIReader: cli, Scheme: scheme}
+	key := ctrl.Request{NamespacedName: client.ObjectKeyFromObject(request)}
+
+	for i := 0; i < 2; i++ {
+		result, err := reconciler.Reconcile(context.Background(), key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if result.RequeueAfter == 0 {
+			t.Fatal("invalid phase with a live root lost its bounded wake")
+		}
+	}
+	if updateCount != 1 {
+		t.Fatalf("invalid phase update count = %d, want 1", updateCount)
+	}
+}
+
+func TestSystemAccountRestoreLifecycleDeletesCommittedRequestAfterFinalizerRelease(t *testing.T) {
+	scheme := newSystemAccountLifecycleScheme(t)
+	request := newLifecycleRestoreRequest(t)
+	request.Annotations[systemaccount.RestoreRequestPhaseAnnotationKey] =
+		string(systemaccount.RestoreRequestPhaseCommitted)
+	request.Annotations[systemaccount.TargetSecretNameAnnotationKey] = "target"
+	request.Annotations[systemaccount.TargetSecretUIDAnnotationKey] = "target-uid"
+	request.Annotations[systemaccount.TargetCommitRevisionAnnotationKey] = "revision"
+	request.Finalizers = nil
+	updateCount := 0
+	cli := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(request).
+		WithInterceptorFuncs(interceptor.Funcs{
+			Update: func(ctx context.Context, cli client.WithWatch, obj client.Object,
+				opts ...client.UpdateOption) error {
+				updateCount++
+				return cli.Update(ctx, obj, opts...)
+			},
+		}).
+		Build()
+	reconciler := &SystemAccountRestoreLifecycleReconciler{Client: cli, APIReader: cli, Scheme: scheme}
+
+	if _, err := reconciler.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: client.ObjectKeyFromObject(request),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if updateCount != 0 {
+		t.Fatalf("released committed request update count = %d, want 0", updateCount)
+	}
+	current := &corev1.Secret{}
+	if err := cli.Get(context.Background(), client.ObjectKeyFromObject(request), current); err == nil {
+		t.Fatal("released committed request was not deleted after root disappeared")
+	}
+}
+
+func TestSystemAccountRestoreLifecycleDeletesTerminalCommittedRequestWithExactTarget(t *testing.T) {
+	scheme := newSystemAccountLifecycleScheme(t)
+	request := newLifecycleRestoreRequest(t)
+	request.Annotations[systemaccount.RestoreRequestPhaseAnnotationKey] =
+		string(systemaccount.RestoreRequestPhaseCommitted)
+	request.Finalizers = nil
+	cluster := newLifecycleActiveCluster(request)
+	cluster.Status.Conditions = []metav1.Condition{{
+		Type:               appsv1.ConditionTypeRestore,
+		Status:             metav1.ConditionTrue,
+		ObservedGeneration: cluster.Generation,
+	}}
+	component := &appsv1.Component{ObjectMeta: metav1.ObjectMeta{
+		Namespace: "default",
+		Name:      "component",
+		UID:       "component-uid",
+	}}
+	target := newLifecycleExactTarget(t, scheme, request, component)
+	request.Annotations[systemaccount.TargetSecretNameAnnotationKey] = target.Name
+	request.Annotations[systemaccount.TargetSecretUIDAnnotationKey] = string(target.UID)
+	request.Annotations[systemaccount.TargetCommitRevisionAnnotationKey] =
+		target.Annotations[systemaccount.TargetCommitRevisionAnnotationKey]
+	cli := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(cluster, component, request, target).Build()
+	reconciler := &SystemAccountRestoreLifecycleReconciler{
+		Client: cli, APIReader: cli, Scheme: scheme,
+	}
+
+	if _, err := reconciler.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: client.ObjectKeyFromObject(request),
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	current := &corev1.Secret{}
+	if err := cli.Get(context.Background(), client.ObjectKeyFromObject(request), current); err == nil {
+		t.Fatal("terminal committed request with an exact target was not deleted")
+	}
+}
+
 func TestSystemAccountRestoreLifecycleDoesNotCommitTerminalTargetWithUnavailableOwner(t *testing.T) {
 	scheme := newSystemAccountLifecycleScheme(t)
 	request := newLifecycleRestoreRequest(t)
@@ -306,7 +457,7 @@ func TestSystemAccountRestoreLifecycleDoesNotCommitTerminalTargetWithUnavailable
 		ObservedGeneration: cluster.Generation,
 	}}
 	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, request).Build()
-	reconciler := &SystemAccountRestoreLifecycleReconciler{Client: cli, Scheme: scheme}
+	reconciler := &SystemAccountRestoreLifecycleReconciler{Client: cli, APIReader: cli, Scheme: scheme}
 
 	if _, err := reconciler.Reconcile(context.Background(), ctrl.Request{
 		NamespacedName: client.ObjectKeyFromObject(request),
@@ -379,7 +530,7 @@ func TestSystemAccountRestoreLifecycleRequiresExactAppsAuthorityGroup(t *testing
 	}}
 	cli := fake.NewClientBuilder().WithScheme(scheme).
 		WithObjects(cluster, component, workload, pvc).Build()
-	reconciler := &SystemAccountRestoreLifecycleReconciler{Client: cli, Scheme: scheme}
+	reconciler := &SystemAccountRestoreLifecycleReconciler{Client: cli, APIReader: cli, Scheme: scheme}
 
 	live, err := reconciler.targetOwnerLive(context.Background(), systemaccount.ObjectIdentity{
 		APIVersion: "apps.kubeblocks.io/v1alpha1",
@@ -394,15 +545,6 @@ func TestSystemAccountRestoreLifecycleRequiresExactAppsAuthorityGroup(t *testing
 	if live {
 		t.Fatal("target owner with a non-exact API version was accepted")
 	}
-	if reconciler.legacyPVCHasAuthority(context.Background(), pvc, systemaccount.ObjectIdentity{
-		APIVersion: appsv1.GroupVersion.String(),
-		Kind:       appsv1.ClusterKind,
-		Namespace:  cluster.Namespace,
-		Name:       cluster.Name,
-		UID:        cluster.UID,
-	}) {
-		t.Fatal("legacy workload chain with a non-exact Component API version was accepted")
-	}
 
 	workload.OwnerReferences[0].APIVersion = appsv1.GroupVersion.String()
 	if err := cli.Update(context.Background(), workload); err != nil {
@@ -411,15 +553,6 @@ func TestSystemAccountRestoreLifecycleRequiresExactAppsAuthorityGroup(t *testing
 	component.OwnerReferences[0].APIVersion = "apps.kubeblocks.io/v1alpha1"
 	if err := cli.Update(context.Background(), component); err != nil {
 		t.Fatal(err)
-	}
-	if reconciler.legacyPVCHasAuthority(context.Background(), pvc, systemaccount.ObjectIdentity{
-		APIVersion: appsv1.GroupVersion.String(),
-		Kind:       appsv1.ClusterKind,
-		Namespace:  cluster.Namespace,
-		Name:       cluster.Name,
-		UID:        cluster.UID,
-	}) {
-		t.Fatal("legacy workload chain with a non-exact Cluster API version was accepted")
 	}
 }
 

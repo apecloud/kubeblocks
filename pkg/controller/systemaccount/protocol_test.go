@@ -298,6 +298,17 @@ func TestClearStaleTargetRestoreReceiptPreservesMetadataOnlyChanges(t *testing.T
 	target.Labels = map[string]string{"metadata-only": "changed"}
 	require.False(t, ClearStaleTargetRestoreReceipt(target, constant.DBComponentFinalizerName))
 	require.Equal(t, revision, target.Annotations[TargetCommitRevisionAnnotationKey])
+	require.True(t, TargetReceiptExactV2(target, request, constant.DBComponentFinalizerName))
+
+	tamperedProtocol := target.DeepCopy()
+	delete(tamperedProtocol.Annotations, RestoreProtocolAnnotationKey)
+	tamperedRevision, err := TargetCommitRevision(tamperedProtocol, constant.DBComponentFinalizerName)
+	require.NoError(t, err)
+	require.NotEqual(t, revision, tamperedRevision)
+	require.False(t, TargetReceiptExactV2(
+		tamperedProtocol, request, constant.DBComponentFinalizerName))
+	require.True(t, ClearStaleTargetRestoreReceipt(
+		tamperedProtocol, constant.DBComponentFinalizerName))
 
 	target.Data[constant.AccountPasswdForSecret] = []byte("rotated-password")
 	require.True(t, ClearStaleTargetRestoreReceipt(target, constant.DBComponentFinalizerName))

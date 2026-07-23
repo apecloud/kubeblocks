@@ -85,7 +85,7 @@ var _ = Describe("cluster plan builder test", func() {
 				Req: req,
 				Log: log.FromContext(ctx).WithValues("cluster", req.NamespacedName),
 			}
-			planBuilder := newClusterPlanBuilder(reqCtx, testCtx.Cli)
+			planBuilder := newClusterPlanBuilder(reqCtx, testCtx.Cli, testCtx.Cli)
 			Expect(planBuilder.Init()).Should(Succeed())
 		})
 	})

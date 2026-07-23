@@ -50,7 +50,7 @@ func (t *clusterShardingAccountTransformer) Transform(ctx graph.TransformContext
 	}
 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
-	handled, err := systemaccount.ReconcileRestoreRequests(transCtx.Context, graphCli, dag,
+	handled, err := systemaccount.ReconcileRestoreRequests(transCtx.Context, graphCli, dag, transCtx.APIReader,
 		transCtx.Cluster, constant.DBClusterFinalizerName,
 		func(intent systemaccount.CredentialIntent) (*corev1.Secret, error) {
 			var sharding *appsv1.ClusterSharding
@@ -64,6 +64,9 @@ func (t *clusterShardingAccountTransformer) Transform(ctx graph.TransformContext
 				return nil, systemaccount.NewTargetSemanticError(
 					systemaccount.TargetSemanticUnavailableReason,
 					fmt.Errorf("sharding %s is unavailable", intent.Target.ShardingName))
+			}
+			if err := t.validateRestoredSystemAccount(transCtx, sharding, intent.Target.Account); err != nil {
+				return nil, err
 			}
 			if _, err := t.definedSystemAccount(transCtx, sharding, intent.Target.Account); err != nil {
 				return nil, systemaccount.NewTargetSemanticError(
@@ -89,6 +92,43 @@ func (t *clusterShardingAccountTransformer) Transform(ctx graph.TransformContext
 		return nil
 	}
 	return t.reconcileShardingAccounts(transCtx, graphCli, dag)
+}
+
+func (t *clusterShardingAccountTransformer) validateRestoredSystemAccount(
+	transCtx *clusterTransformContext,
+	sharding *appsv1.ClusterSharding,
+	accountName string,
+) error {
+	shardingDef, ok := transCtx.shardingDefs[sharding.ShardingDef]
+	if !ok || shardingDef == nil {
+		return systemaccount.NewTargetSemanticError(
+			systemaccount.TargetSemanticUnavailableReason,
+			fmt.Errorf("sharding definition %s is unavailable", sharding.ShardingDef))
+	}
+	shared := false
+	for i := range shardingDef.Spec.SystemAccounts {
+		account := &shardingDef.Spec.SystemAccounts[i]
+		if account.Name == accountName {
+			shared = ptr.Deref(account.Shared, false)
+			break
+		}
+	}
+	if !shared {
+		return systemaccount.NewTargetSemanticError(
+			systemaccount.TargetSemanticUnavailableReason,
+			fmt.Errorf("system account %s is not shared by sharding definition %s",
+				accountName, sharding.ShardingDef))
+	}
+	for i := range sharding.Template.SystemAccounts {
+		account := &sharding.Template.SystemAccounts[i]
+		if account.Name == accountName && ptr.Deref(account.Disabled, false) {
+			return systemaccount.NewTargetSemanticError(
+				systemaccount.AccountUnavailableReason,
+				fmt.Errorf("system account %s is disabled for sharding %s",
+					accountName, sharding.Name))
+		}
+	}
+	return nil
 }
 
 func (t *clusterShardingAccountTransformer) reconcileShardingAccounts(transCtx *clusterTransformContext,

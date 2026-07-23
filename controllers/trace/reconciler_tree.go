@@ -164,17 +164,23 @@ func newReconciler(mClient client.Client, recorder record.EventRecorder, objectT
 
 func newClusterReconciler(cli client.Client, recorder record.EventRecorder) reconcile.Reconciler {
 	return &cluster.ClusterReconciler{
-		Client:   cli,
-		Scheme:   cli.Scheme(),
-		Recorder: recorder,
+		Client: cli,
+		// ReconciliationTrace intentionally treats its isolated mock store as
+		// the authority snapshot for the simulated desired state.
+		APIReader: cli,
+		Scheme:    cli.Scheme(),
+		Recorder:  recorder,
 	}
 }
 
 func newComponentReconciler(cli client.Client, recorder record.EventRecorder) reconcile.Reconciler {
 	return &component.ComponentReconciler{
-		Client:   cli,
-		Scheme:   cli.Scheme(),
-		Recorder: recorder,
+		Client: cli,
+		// ReconciliationTrace intentionally treats its isolated mock store as
+		// the authority snapshot for the simulated desired state.
+		APIReader: cli,
+		Scheme:    cli.Scheme(),
+		Recorder:  recorder,
 	}
 }
 

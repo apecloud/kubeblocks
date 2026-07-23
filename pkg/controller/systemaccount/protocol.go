@@ -517,6 +517,7 @@ func TargetReceiptExactV2(target, request *corev1.Secret, requiredFinalizer stri
 		return false
 	}
 	if target.Namespace != intent.Target.Namespace ||
+		target.Annotations[RestoreProtocolAnnotationKey] != RestoreProtocolV2 ||
 		request.Name != target.Annotations[RestoreRequestNameAnnotationKey] ||
 		string(request.UID) != target.Annotations[RestoreRequestUIDAnnotationKey] ||
 		request.Annotations[RestoreOperationDigestAnnotationKey] !=
@@ -592,6 +593,7 @@ func TargetCommitRevision(target *corev1.Secret, requiredFinalizer string) (stri
 	}
 	encoder := newCanonicalEncoder()
 	encoder.writeVersion("sar-target-commit/v1")
+	encoder.writeString(target.Annotations[RestoreProtocolAnnotationKey])
 	encoder.writeString(target.Namespace)
 	encoder.writeString(target.Name)
 	encoder.writeString(string(target.Type))

@@ -217,12 +217,16 @@ func restoreRevision(request *corev1.Secret) (string, error) {
 func ReconcileRestoreRequests(ctx context.Context,
 	graphCli model.GraphClient,
 	dag *graph.DAG,
+	operationReader client.Reader,
 	owner client.Object,
 	ownedFinalizer string,
 	targetBuilders ...func(CredentialIntent) (*corev1.Secret, error)) (bool, error) {
 	var targetBuilder func(CredentialIntent) (*corev1.Secret, error)
 	if len(targetBuilders) > 0 {
 		targetBuilder = targetBuilders[0]
+	}
+	if operationReader == nil {
+		return false, fmt.Errorf("system account restore authority reader is not configured")
 	}
 	requests := &corev1.SecretList{}
 	if err := graphCli.List(ctx, requests,
@@ -237,6 +241,20 @@ func ReconcileRestoreRequests(ctx context.Context,
 	seenTargets := map[string]string{}
 	for i := range requests.Items {
 		request := &requests.Items[i]
+		if request.Annotations[RestoreProtocolAnnotationKey] != RestoreProtocolV2 {
+			continue
+		}
+		liveRequest := &corev1.Secret{}
+		if err := operationReader.Get(ctx, client.ObjectKeyFromObject(request), liveRequest); err != nil {
+			if apierrors.IsNotFound(err) {
+				continue
+			}
+			return true, err
+		}
+		if liveRequest.UID != request.UID {
+			continue
+		}
+		request = liveRequest
 		if request.Annotations[RestoreProtocolAnnotationKey] != RestoreProtocolV2 {
 			continue
 		}
@@ -261,7 +279,7 @@ func ReconcileRestoreRequests(ctx context.Context,
 				previous, request.Name, targetDigest)
 		}
 		seenTargets[targetDigest] = request.Name
-		if err := reconcileRestoreRequestV2(ctx, graphCli, dag, owner, ownedFinalizer,
+		if err := reconcileRestoreRequestV2(ctx, graphCli, dag, operationReader, owner, ownedFinalizer,
 			request, intent, targetBuilder); err != nil {
 			return true, err
 		}
@@ -277,6 +295,7 @@ func reconcileRestoreRequestV2(
 	ctx context.Context,
 	graphCli model.GraphClient,
 	dag *graph.DAG,
+	operationReader client.Reader,
 	owner client.Object,
 	ownedFinalizer string,
 	request *corev1.Secret,
@@ -286,7 +305,7 @@ func reconcileRestoreRequestV2(
 	phase := RestoreRequestPhase(request.Annotations[RestoreRequestPhaseAnnotationKey])
 	if !request.DeletionTimestamp.IsZero() {
 		if phase == RestoreRequestPhaseClaimed || phase == RestoreRequestPhaseCommitted {
-			target, exact, err := findLinkedTarget(ctx, graphCli, request, intent, ownedFinalizer)
+			target, exact, err := findLinkedTarget(ctx, operationReader, request, intent, ownedFinalizer)
 			if err != nil {
 				return err
 			}
@@ -304,6 +323,31 @@ func reconcileRestoreRequestV2(
 	}
 	switch phase {
 	case RestoreRequestPhasePending:
+		if operationReader == nil {
+			return fmt.Errorf("system account restore request %s/%s has no operation authority reader",
+				request.Namespace, request.Name)
+		}
+		operationState, err := ReadRestoreOperationState(ctx, operationReader, intent.Operation)
+		if err != nil {
+			return err
+		}
+		switch operationState {
+		case RestoreOperationSucceeded, RestoreOperationFailed:
+			return updateRestoreRequestState(graphCli, dag, request,
+				RestoreRequestPhaseFailed, OperationTerminalReason, nil)
+		case RestoreOperationGone, RestoreOperationTerminating:
+			// The lifecycle controller projects the stable root reason and
+			// releases the protocol finalizer without touching the target.
+			return nil
+		}
+		ownerLive, err := ReadRestoreTargetOwnerLive(ctx, operationReader, intent.Target.Owner)
+		if err != nil {
+			return err
+		}
+		if !ownerLive {
+			return updateRestoreRequestState(graphCli, dag, request,
+				RestoreRequestPhaseFailed, TargetOwnerUnavailableReason, nil)
+		}
 		if targetBuilder == nil {
 			return updateRestoreRequestState(graphCli, dag, request,
 				RestoreRequestPhaseFailed, TargetSemanticUnavailableReason, nil)
@@ -314,7 +358,7 @@ func reconcileRestoreRequestV2(
 		}
 		return updateRestoreRequestState(graphCli, dag, request, RestoreRequestPhaseClaimed, "", nil)
 	case RestoreRequestPhaseClaimed, RestoreRequestPhaseCommitted:
-		return reconcileClaimedRestoreRequestV2(ctx, graphCli, dag, owner, ownedFinalizer,
+		return reconcileClaimedRestoreRequestV2(ctx, graphCli, dag, operationReader, owner, ownedFinalizer,
 			request, intent, targetBuilder)
 	case RestoreRequestPhaseFailed:
 		return nil
@@ -328,12 +372,49 @@ func reconcileClaimedRestoreRequestV2(
 	ctx context.Context,
 	graphCli model.GraphClient,
 	dag *graph.DAG,
+	operationReader client.Reader,
 	owner client.Object,
 	ownedFinalizer string,
 	request *corev1.Secret,
 	intent CredentialIntent,
 	targetBuilder func(CredentialIntent) (*corev1.Secret, error),
 ) error {
+	if operationReader == nil {
+		return fmt.Errorf("system account restore request %s/%s has no operation authority reader",
+			request.Namespace, request.Name)
+	}
+	operationState, err := ReadRestoreOperationState(ctx, operationReader, intent.Operation)
+	if err != nil {
+		return err
+	}
+	if operationState != RestoreOperationActive {
+		_, exact, err := findLinkedTarget(ctx, operationReader, request, intent, ownedFinalizer)
+		if err != nil {
+			return err
+		}
+		if exact {
+			// The target already contains this exact committed write. The
+			// lifecycle controller repairs or commits the request receipt
+			// after its own operation-state recheck.
+			return nil
+		}
+		if operationState == RestoreOperationSucceeded || operationState == RestoreOperationFailed {
+			return updateRestoreRequestState(graphCli, dag, request,
+				RestoreRequestPhaseFailed, OperationTerminalReason, nil)
+		}
+		// Gone and Terminating roots are projected by the independent
+		// lifecycle controller. Do not create or update account data.
+		return nil
+	}
+	ownerLive, err := ReadRestoreTargetOwnerLive(ctx, operationReader, intent.Target.Owner)
+	if err != nil {
+		return err
+	}
+	if !ownerLive {
+		// The lifecycle controller distinguishes a pre-write owner loss from
+		// a post-write cancellation by checking the exact live target receipt.
+		return nil
+	}
 	if targetBuilder == nil {
 		return updateRestoreRequestState(graphCli, dag, request,
 			RestoreRequestPhaseFailed, TargetSemanticUnavailableReason, nil)
@@ -341,7 +422,7 @@ func reconcileClaimedRestoreRequestV2(
 	desired, err := targetBuilder(intent)
 	if err != nil {
 		reason := targetSemanticFailureReason(err)
-		target, exact, findErr := findLinkedTarget(ctx, graphCli, request, intent, ownedFinalizer)
+		target, exact, findErr := findLinkedTarget(ctx, operationReader, request, intent, ownedFinalizer)
 		if findErr != nil {
 			return findErr
 		}
@@ -380,7 +461,7 @@ func reconcileClaimedRestoreRequestV2(
 
 	target := &corev1.Secret{}
 	key := client.ObjectKeyFromObject(desired)
-	if err := graphCli.Get(ctx, key, target); err != nil {
+	if err := operationReader.Get(ctx, key, target); err != nil {
 		if !apierrors.IsNotFound(err) {
 			return err
 		}
@@ -473,26 +554,29 @@ func preserveUnownedTargetMetadata(current, desired *corev1.Secret) {
 
 func findLinkedTarget(
 	ctx context.Context,
-	graphCli model.GraphClient,
+	reader client.Reader,
 	request *corev1.Secret,
 	intent CredentialIntent,
 	ownedFinalizer string,
 ) (*corev1.Secret, bool, error) {
+	if reader == nil {
+		return nil, false, fmt.Errorf("system account restore target authority reader is not configured")
+	}
 	if name := request.Annotations[TargetSecretNameAnnotationKey]; name != "" {
 		target := &corev1.Secret{}
-		if err := graphCli.Get(ctx, client.ObjectKey{
+		if err := reader.Get(ctx, client.ObjectKey{
 			Namespace: request.Namespace,
 			Name:      name,
 		}, target); err != nil {
-			if apierrors.IsNotFound(err) {
-				return nil, false, nil
+			if !apierrors.IsNotFound(err) {
+				return nil, false, err
 			}
-			return nil, false, err
+		} else if TargetReceiptExactV2(target, request, ownedFinalizer) {
+			return target, true, nil
 		}
-		return target, TargetReceiptExactV2(target, request, ownedFinalizer), nil
 	}
 	targets := &corev1.SecretList{}
-	if err := graphCli.List(ctx, targets, client.InNamespace(intent.Target.Namespace)); err != nil {
+	if err := reader.List(ctx, targets, client.InNamespace(intent.Target.Namespace)); err != nil {
 		return nil, false, err
 	}
 	var exactTarget *corev1.Secret

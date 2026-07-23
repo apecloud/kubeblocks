@@ -63,7 +63,7 @@ func (t *componentAccountTransformer) Transform(ctx graph.TransformContext, dag 
 		return nil
 	}
 	graphCli, _ := transCtx.Client.(model.GraphClient)
-	handled, err := systemaccount.ReconcileRestoreRequests(transCtx.Context, graphCli, dag,
+	handled, err := systemaccount.ReconcileRestoreRequests(transCtx.Context, graphCli, dag, transCtx.APIReader,
 		transCtx.Component, constant.DBComponentFinalizerName,
 		func(intent systemaccount.CredentialIntent) (*corev1.Secret, error) {
 			accounts, err := synthesizeSystemAccounts(transCtx.CompDef.Spec.SystemAccounts,

@@ -42,7 +42,8 @@ import (
 // componentTransformContext a graph.TransformContext implementation for Component reconciliation
 type componentTransformContext struct {
 	context.Context
-	Client client.Reader
+	Client    client.Reader
+	APIReader client.Reader
 	record.EventRecorder
 	logr.Logger
 	CompDef             *appsv1.ComponentDefinition
@@ -131,13 +132,14 @@ func (p *componentPlan) Execute() error {
 }
 
 // newComponentPlanBuilder returns a componentPlanBuilder powered PlanBuilder
-func newComponentPlanBuilder(ctx intctrlutil.RequestCtx, cli client.Client) graph.PlanBuilder {
+func newComponentPlanBuilder(ctx intctrlutil.RequestCtx, cli client.Client, apiReader client.Reader) graph.PlanBuilder {
 	return &componentPlanBuilder{
 		req: ctx.Req,
 		cli: cli,
 		transCtx: &componentTransformContext{
 			Context:       ctx.Ctx,
 			Client:        model.NewGraphClient(cli),
+			APIReader:     apiReader,
 			EventRecorder: ctx.Recorder,
 			Logger:        ctx.Log,
 		},

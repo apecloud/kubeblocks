@@ -158,6 +158,42 @@ func TestValidateDataWithSchemaInt64(t *testing.T) {
 	}
 }
 
+func TestValidateDataWithSchemaComposedConstraintOnlyIntegerMax(t *testing.T) {
+	maximum := math.Exp2(63)
+	tests := []struct {
+		name   string
+		schema *apiextensionsv1.JSONSchemaProps
+	}{
+		{
+			name: "parent type",
+			schema: &apiextensionsv1.JSONSchemaProps{
+				Type: "integer",
+				AllOf: []apiextensionsv1.JSONSchemaProps{{
+					Maximum:          &maximum,
+					ExclusiveMaximum: true,
+				}},
+			},
+		},
+		{
+			name: "sibling type",
+			schema: &apiextensionsv1.JSONSchemaProps{
+				AllOf: []apiextensionsv1.JSONSchemaProps{
+					{Type: "integer"},
+					{Maximum: &maximum, ExclusiveMaximum: true},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := ValidateDataWithSchema(tt.schema, int64(math.MaxInt64)); err != nil {
+				t.Fatalf("expected MaxInt64 to satisfy the composed integer schema, got %v", err)
+			}
+		})
+	}
+}
+
 func TestStripIntegerOverflow(t *testing.T) {
 	schema := &apiextensionsv1.JSONSchemaProps{
 		Type: "object",
@@ -237,6 +273,80 @@ func TestStripIntegerOverflow(t *testing.T) {
 	}
 	if schema.Properties["map_field"].AdditionalProperties.Schema.Maximum == nil {
 		t.Fatalf("expected original map schema to be unchanged")
+	}
+}
+
+func TestStripIntegerOverflowComposedTypeContext(t *testing.T) {
+	maximum := math.Exp2(63)
+	tests := []struct {
+		name     string
+		schema   *apiextensionsv1.JSONSchemaProps
+		stripped bool
+	}{
+		{
+			name: "parent integer",
+			schema: &apiextensionsv1.JSONSchemaProps{
+				Type:  "integer",
+				AllOf: []apiextensionsv1.JSONSchemaProps{{Maximum: &maximum}},
+			},
+			stripped: true,
+		},
+		{
+			name: "sibling integer",
+			schema: &apiextensionsv1.JSONSchemaProps{
+				AllOf: []apiextensionsv1.JSONSchemaProps{{Type: "integer"}, {Maximum: &maximum}},
+			},
+			stripped: true,
+		},
+		{
+			name: "numeric intersection",
+			schema: &apiextensionsv1.JSONSchemaProps{
+				AllOf: []apiextensionsv1.JSONSchemaProps{{Type: "number"}, {Type: "integer"}, {Maximum: &maximum}},
+			},
+			stripped: true,
+		},
+		{
+			name: "nested integer",
+			schema: &apiextensionsv1.JSONSchemaProps{
+				AllOf: []apiextensionsv1.JSONSchemaProps{{
+					AllOf: []apiextensionsv1.JSONSchemaProps{{Type: "integer"}},
+				}, {Maximum: &maximum}},
+			},
+			stripped: true,
+		},
+		{
+			name: "number",
+			schema: &apiextensionsv1.JSONSchemaProps{
+				Type:  "number",
+				AllOf: []apiextensionsv1.JSONSchemaProps{{Maximum: &maximum}},
+			},
+		},
+		{
+			name:   "unknown type",
+			schema: &apiextensionsv1.JSONSchemaProps{AllOf: []apiextensionsv1.JSONSchemaProps{{Maximum: &maximum}}},
+		},
+		{
+			name: "conflicting type",
+			schema: &apiextensionsv1.JSONSchemaProps{
+				AllOf: []apiextensionsv1.JSONSchemaProps{{Type: "integer"}, {Type: "string"}, {Maximum: &maximum}},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := stripIntegerOverflow(tt.schema)
+			maximumAfter := result.AllOf[len(result.AllOf)-1].Maximum
+			if tt.stripped && maximumAfter != nil {
+				t.Fatalf("expected overflow maximum to be stripped")
+			}
+			if !tt.stripped && maximumAfter == nil {
+				t.Fatalf("expected maximum to be preserved without an effective integer type")
+			}
+			if tt.schema.AllOf[len(tt.schema.AllOf)-1].Maximum == nil {
+				t.Fatalf("expected original schema to be unchanged")
+			}
+		})
 	}
 }
 
@@ -369,16 +479,31 @@ func TestValidateDataWithSchemaNestedUserDeclaredLargeMax(t *testing.T) {
 		invalid interface{}
 	}{
 		{
-			name: "allOf",
+			name: "allOf parent type",
 			schema: &apiextensionsv1.JSONSchemaProps{
 				Type: "object",
 				Properties: map[string]apiextensionsv1.JSONSchemaProps{
 					"value": {
 						Type: "integer",
 						AllOf: []apiextensionsv1.JSONSchemaProps{{
-							Type:    "integer",
 							Maximum: &userMax,
 						}},
+					},
+				},
+			},
+			valid:   map[string]interface{}{"value": uint64(9e18)},
+			invalid: map[string]interface{}{"value": uint64(11e18)},
+		},
+		{
+			name: "allOf sibling type",
+			schema: &apiextensionsv1.JSONSchemaProps{
+				Type: "object",
+				Properties: map[string]apiextensionsv1.JSONSchemaProps{
+					"value": {
+						AllOf: []apiextensionsv1.JSONSchemaProps{
+							{Type: "integer"},
+							{Maximum: &userMax},
+						},
 					},
 				},
 			},

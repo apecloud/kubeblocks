@@ -50,6 +50,14 @@ const restoreRequestNamePrefix = "system-account-restore-"
 
 const restoreRequestRequeueAfter = time.Second
 
+// RestoreFailureRequiresReceiptCleanup identifies durable failures whose exact
+// target receipt must be cleared idempotently before request cleanup completes.
+func RestoreFailureRequiresReceiptCleanup(reason string) bool {
+	return reason == TargetSemanticUnavailableReason ||
+		reason == RequestDeletionRequestedReason ||
+		reason == PostWriteCancellationReason
+}
+
 type TargetSemanticError struct {
 	Reason string
 	Cause  error
@@ -293,24 +301,6 @@ func reconcileRestoreRequestV2(
 	targetBuilder func(CredentialIntent) (*corev1.Secret, error),
 ) error {
 	phase := RestoreRequestPhase(request.Annotations[RestoreRequestPhaseAnnotationKey])
-	if !request.DeletionTimestamp.IsZero() {
-		if phase == RestoreRequestPhaseClaimed || phase == RestoreRequestPhaseCommitted {
-			target, exact, err := findLinkedTarget(ctx, operationReader, request, intent, ownedFinalizer)
-			if err != nil {
-				return err
-			}
-			if exact {
-				updated := target.DeepCopy()
-				ClearTargetRestoreReceipt(updated)
-				graphCli.Update(dag, target, updated)
-			}
-		}
-		if phase != RestoreRequestPhaseFailed {
-			return updateRestoreRequestState(graphCli, dag, request,
-				RestoreRequestPhaseFailed, RequestDeletionRequestedReason, nil)
-		}
-		return nil
-	}
 	switch phase {
 	case RestoreRequestPhasePending:
 		if operationReader == nil {
@@ -329,6 +319,10 @@ func reconcileRestoreRequestV2(
 			// The lifecycle controller projects the stable root reason and
 			// releases the protocol finalizer without touching the target.
 			return nil
+		}
+		if !request.DeletionTimestamp.IsZero() {
+			return updateRestoreRequestState(graphCli, dag, request,
+				RestoreRequestPhaseFailed, RequestDeletionRequestedReason, nil)
 		}
 		ownerLive, err := ReadRestoreTargetOwnerLive(ctx, operationReader, intent.Target.Owner)
 		if err != nil {
@@ -351,6 +345,19 @@ func reconcileRestoreRequestV2(
 		return reconcileClaimedRestoreRequestV2(ctx, graphCli, dag, operationReader, owner, ownedFinalizer,
 			request, intent, targetBuilder)
 	case RestoreRequestPhaseFailed:
+		if RestoreFailureRequiresReceiptCleanup(
+			request.Annotations[RestoreRequestReasonAnnotationKey]) {
+			target, exact, err := findLinkedTarget(
+				ctx, operationReader, request, intent, ownedFinalizer)
+			if err != nil {
+				return err
+			}
+			if exact {
+				updated := target.DeepCopy()
+				ClearTargetRestoreReceipt(updated)
+				graphCli.Update(dag, target, updated)
+			}
+		}
 		return nil
 	default:
 		return fmt.Errorf("system account restore request %s/%s has invalid phase %q",
@@ -396,6 +403,10 @@ func reconcileClaimedRestoreRequestV2(
 		// lifecycle controller. Do not create or update account data.
 		return nil
 	}
+	if !request.DeletionTimestamp.IsZero() {
+		return updateRestoreRequestState(graphCli, dag, request,
+			RestoreRequestPhaseFailed, RequestDeletionRequestedReason, nil)
+	}
 	ownerLive, err := ReadRestoreTargetOwnerLive(ctx, operationReader, intent.Target.Owner)
 	if err != nil {
 		return err
@@ -412,26 +423,24 @@ func reconcileClaimedRestoreRequestV2(
 	desired, err := targetBuilder(intent)
 	if err != nil {
 		reason := targetSemanticFailureReason(err)
-		target, exact, findErr := findLinkedTarget(ctx, operationReader, request, intent, ownedFinalizer)
-		if findErr != nil {
-			return findErr
-		}
-		phase := RestoreRequestPhase(request.Annotations[RestoreRequestPhaseAnnotationKey])
-		if reason == AccountUnavailableReason && exact {
-			if phase == RestoreRequestPhaseCommitted {
+		if reason == AccountUnavailableReason {
+			_, exact, findErr := findLinkedTarget(
+				ctx, operationReader, request, intent, ownedFinalizer)
+			if findErr != nil {
+				return findErr
+			}
+			phase := RestoreRequestPhase(request.Annotations[RestoreRequestPhaseAnnotationKey])
+			if exact {
+				if phase == RestoreRequestPhaseCommitted {
+					return nil
+				}
+				// The independent lifecycle controller owns the final
+				// post-write operation/owner check and Committed transition.
 				return nil
 			}
-			// The independent lifecycle controller owns the final
-			// post-write operation/owner check and Committed transition.
-			return nil
-		}
-		if reason == AccountUnavailableReason && phase == RestoreRequestPhaseCommitted {
-			reason = CredentialContinuityLostReason
-		}
-		if reason == TargetSemanticUnavailableReason && exact {
-			updated := target.DeepCopy()
-			ClearTargetRestoreReceipt(updated)
-			graphCli.Update(dag, target, updated)
+			if phase == RestoreRequestPhaseCommitted {
+				reason = CredentialContinuityLostReason
+			}
 		}
 		return updateRestoreRequestState(graphCli, dag, request,
 			RestoreRequestPhaseFailed, reason, nil)

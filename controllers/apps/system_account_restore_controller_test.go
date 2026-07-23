@@ -28,6 +28,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -116,7 +117,7 @@ func TestSystemAccountRestoreLifecyclePersistsDeletionFailureBeforeRelease(t *te
 	}
 }
 
-func TestSystemAccountRestoreLifecycleClearsExactReceiptBeforeDeletionFailure(t *testing.T) {
+func TestSystemAccountRestoreLifecyclePersistsDeletionFailureBeforeExactReceiptCleanup(t *testing.T) {
 	scheme := newSystemAccountLifecycleScheme(t)
 	request := newLifecycleRestoreRequest(t)
 	request.Annotations[systemaccount.RestoreRequestPhaseAnnotationKey] =
@@ -160,6 +161,18 @@ func TestSystemAccountRestoreLifecycleClearsExactReceiptBeforeDeletionFailure(t 
 	if !reflect.DeepEqual(currentTarget.Data, originalData) {
 		t.Fatal("deleting request changed target credential data")
 	}
+	if currentTarget.Annotations[systemaccount.RestoreRequestUIDAnnotationKey] == "" {
+		t.Fatal("target receipt was cleared before deletion failure became durable")
+	}
+
+	if _, err := reconciler.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: client.ObjectKeyFromObject(request),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := cli.Get(context.Background(), client.ObjectKeyFromObject(target), currentTarget); err != nil {
+		t.Fatal(err)
+	}
 	for _, key := range []string{
 		systemaccount.RestoreOperationDigestAnnotationKey,
 		systemaccount.CredentialIntentRevisionAnnotationKey,
@@ -170,6 +183,307 @@ func TestSystemAccountRestoreLifecycleClearsExactReceiptBeforeDeletionFailure(t 
 		if currentTarget.Annotations[key] != "" {
 			t.Fatalf("target retained protocol receipt %s=%q", key, currentTarget.Annotations[key])
 		}
+	}
+}
+
+func TestSystemAccountRestoreLifecycleTerminalOperationPrecedesNewDeletionFailure(t *testing.T) {
+	for _, rootState := range []string{
+		"terminal-success",
+		"terminal-failure",
+		"gone",
+		"terminating",
+	} {
+		for _, initialPhase := range []systemaccount.RestoreRequestPhase{
+			systemaccount.RestoreRequestPhaseClaimed,
+			systemaccount.RestoreRequestPhaseCommitted,
+		} {
+			t.Run(rootState+"/"+string(initialPhase), func(t *testing.T) {
+				scheme := newSystemAccountLifecycleScheme(t)
+				request := newLifecycleRestoreRequest(t)
+				request.Annotations[systemaccount.RestoreRequestPhaseAnnotationKey] =
+					string(initialPhase)
+				now := metav1.NewTime(time.Now())
+				request.DeletionTimestamp = &now
+				component := &appsv1.Component{ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "component",
+					UID:       "component-uid",
+				}}
+				target := newLifecycleExactTarget(t, scheme, request, component)
+				objects := []client.Object{component, request, target}
+				switch rootState {
+				case "terminal-success", "terminal-failure":
+					cluster := newLifecycleActiveCluster(request)
+					status := metav1.ConditionTrue
+					if rootState == "terminal-failure" {
+						status = metav1.ConditionFalse
+					}
+					cluster.Status.Conditions = []metav1.Condition{{
+						Type:               appsv1.ConditionTypeRestore,
+						Status:             status,
+						ObservedGeneration: cluster.Generation,
+					}}
+					objects = append(objects, cluster)
+				case "terminating":
+					cluster := newLifecycleActiveCluster(request)
+					cluster.Finalizers = []string{"test.kubeblocks.io/hold"}
+					cluster.DeletionTimestamp = &now
+					objects = append(objects, cluster)
+				}
+				cli := fake.NewClientBuilder().WithScheme(scheme).
+					WithObjects(objects...).Build()
+				reconciler := &SystemAccountRestoreLifecycleReconciler{
+					Client: cli, APIReader: cli, Scheme: scheme,
+				}
+				key := ctrl.Request{NamespacedName: client.ObjectKeyFromObject(request)}
+
+				if _, err := reconciler.Reconcile(context.Background(), key); err != nil {
+					t.Fatal(err)
+				}
+				currentRequest := &corev1.Secret{}
+				requestErr := cli.Get(context.Background(),
+					client.ObjectKeyFromObject(request), currentRequest)
+				if requestErr == nil &&
+					currentRequest.Annotations[systemaccount.RestoreRequestReasonAnnotationKey] ==
+						systemaccount.RequestDeletionRequestedReason {
+					t.Fatal("terminal entry was rewritten as a manual-deletion failure")
+				}
+				if requestErr != nil && !apierrors.IsNotFound(requestErr) {
+					t.Fatal(requestErr)
+				}
+				currentTarget := &corev1.Secret{}
+				if err := cli.Get(context.Background(),
+					client.ObjectKeyFromObject(target), currentTarget); err != nil {
+					t.Fatal(err)
+				}
+				if !systemaccount.TargetReceiptExactV2(
+					currentTarget, request, constant.DBComponentFinalizerName) {
+					t.Fatal("terminal-first cleanup unexpectedly cleared the target receipt")
+				}
+			})
+		}
+	}
+}
+
+func TestSystemAccountRestoreLifecycleContinuesDurableDeletionFailureAfterOperationStops(t *testing.T) {
+	for _, rootState := range []string{
+		"terminal-success",
+		"terminal-failure",
+		"gone",
+		"terminating",
+	} {
+		t.Run(rootState, func(t *testing.T) {
+			scheme := newSystemAccountLifecycleScheme(t)
+			request := newLifecycleRestoreRequest(t)
+			request.Annotations[systemaccount.RestoreRequestPhaseAnnotationKey] =
+				string(systemaccount.RestoreRequestPhaseFailed)
+			request.Annotations[systemaccount.RestoreRequestReasonAnnotationKey] =
+				systemaccount.RequestDeletionRequestedReason
+			now := metav1.NewTime(time.Now())
+			request.DeletionTimestamp = &now
+			component := &appsv1.Component{ObjectMeta: metav1.ObjectMeta{
+				Namespace: "default",
+				Name:      "component",
+				UID:       "component-uid",
+			}}
+			target := newLifecycleExactTarget(t, scheme, request, component)
+			objects := []client.Object{component, request, target}
+			switch rootState {
+			case "terminal-success", "terminal-failure":
+				cluster := newLifecycleActiveCluster(request)
+				status := metav1.ConditionTrue
+				if rootState == "terminal-failure" {
+					status = metav1.ConditionFalse
+				}
+				cluster.Status.Conditions = []metav1.Condition{{
+					Type:               appsv1.ConditionTypeRestore,
+					Status:             status,
+					ObservedGeneration: cluster.Generation,
+				}}
+				objects = append(objects, cluster)
+			case "terminating":
+				cluster := newLifecycleActiveCluster(request)
+				cluster.Finalizers = []string{"test.kubeblocks.io/hold"}
+				cluster.DeletionTimestamp = &now
+				objects = append(objects, cluster)
+			}
+			cli := fake.NewClientBuilder().WithScheme(scheme).
+				WithObjects(objects...).Build()
+			reconciler := &SystemAccountRestoreLifecycleReconciler{
+				Client: cli, APIReader: cli, Scheme: scheme,
+			}
+
+			if _, err := reconciler.Reconcile(context.Background(), ctrl.Request{
+				NamespacedName: client.ObjectKeyFromObject(request),
+			}); err != nil {
+				t.Fatal(err)
+			}
+			currentTarget := &corev1.Secret{}
+			if err := cli.Get(context.Background(),
+				client.ObjectKeyFromObject(target), currentTarget); err != nil {
+				t.Fatal(err)
+			}
+			if currentTarget.Annotations[systemaccount.RestoreRequestUIDAnnotationKey] != "" {
+				t.Fatal("durable deletion failure retained exact target receipt")
+			}
+			currentRequest := &corev1.Secret{}
+			err := cli.Get(context.Background(),
+				client.ObjectKeyFromObject(request), currentRequest)
+			if err == nil && slices.Contains(currentRequest.Finalizers,
+				systemaccount.RestoreProtocolFinalizer) {
+				t.Fatal("durable deletion failure retained protocol finalizer")
+			}
+			if err != nil && !apierrors.IsNotFound(err) {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestSystemAccountRestoreLifecycleRetainsFinalizerAcrossReceiptClearFailure(t *testing.T) {
+	for _, mode := range []string{"write-failed", "response-lost"} {
+		t.Run(mode, func(t *testing.T) {
+			scheme := newSystemAccountLifecycleScheme(t)
+			request := newLifecycleRestoreRequest(t)
+			request.Annotations[systemaccount.RestoreRequestPhaseAnnotationKey] =
+				string(systemaccount.RestoreRequestPhaseFailed)
+			request.Annotations[systemaccount.RestoreRequestReasonAnnotationKey] =
+				systemaccount.RequestDeletionRequestedReason
+			now := metav1.NewTime(time.Now())
+			request.DeletionTimestamp = &now
+			cluster := newLifecycleActiveCluster(request)
+			cluster.Status.Conditions = []metav1.Condition{{
+				Type:               appsv1.ConditionTypeRestore,
+				Status:             metav1.ConditionTrue,
+				ObservedGeneration: cluster.Generation,
+			}}
+			component := &appsv1.Component{ObjectMeta: metav1.ObjectMeta{
+				Namespace: "default",
+				Name:      "component",
+				UID:       "component-uid",
+			}}
+			target := newLifecycleExactTarget(t, scheme, request, component)
+			originalData := target.DeepCopy().Data
+			injected := false
+			cli := fake.NewClientBuilder().WithScheme(scheme).
+				WithObjects(cluster, component, request, target).
+				WithInterceptorFuncs(interceptor.Funcs{
+					Update: func(ctx context.Context, cli client.WithWatch, object client.Object,
+						opts ...client.UpdateOption) error {
+						secret, ok := object.(*corev1.Secret)
+						if !injected && ok && secret.Name == target.Name &&
+							secret.Annotations[systemaccount.RestoreRequestUIDAnnotationKey] == "" {
+							injected = true
+							if mode == "response-lost" {
+								if err := cli.Update(ctx, object, opts...); err != nil {
+									return err
+								}
+							}
+							return errors.New("injected target receipt clear failure")
+						}
+						return cli.Update(ctx, object, opts...)
+					},
+				}).
+				Build()
+			reconciler := &SystemAccountRestoreLifecycleReconciler{
+				Client: cli, APIReader: cli, Scheme: scheme,
+			}
+			key := ctrl.Request{NamespacedName: client.ObjectKeyFromObject(request)}
+
+			if _, err := reconciler.Reconcile(context.Background(), key); err == nil {
+				t.Fatal("injected target receipt clear failure was not observed")
+			}
+			currentRequest := &corev1.Secret{}
+			if err := cli.Get(context.Background(),
+				client.ObjectKeyFromObject(request), currentRequest); err != nil {
+				t.Fatal(err)
+			}
+			if !slices.Contains(currentRequest.Finalizers,
+				systemaccount.RestoreProtocolFinalizer) {
+				t.Fatal("receipt clear error released protocol finalizer")
+			}
+
+			if _, err := reconciler.Reconcile(context.Background(), key); err != nil {
+				t.Fatal(err)
+			}
+			currentTarget := &corev1.Secret{}
+			if err := cli.Get(context.Background(),
+				client.ObjectKeyFromObject(target), currentTarget); err != nil {
+				t.Fatal(err)
+			}
+			if currentTarget.Annotations[systemaccount.RestoreRequestUIDAnnotationKey] != "" {
+				t.Fatal("retry retained exact target receipt")
+			}
+			if !reflect.DeepEqual(currentTarget.Data, originalData) {
+				t.Fatal("receipt cleanup changed credential data")
+			}
+			err := cli.Get(context.Background(),
+				client.ObjectKeyFromObject(request), currentRequest)
+			if err == nil && slices.Contains(currentRequest.Finalizers,
+				systemaccount.RestoreProtocolFinalizer) {
+				t.Fatal("successful retry retained protocol finalizer")
+			}
+			if err != nil && !apierrors.IsNotFound(err) {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestSystemAccountRestoreLifecycleDeletingStableFailureRetriesReceiptCleanup(t *testing.T) {
+	for _, reason := range []string{
+		systemaccount.TargetSemanticUnavailableReason,
+		systemaccount.RequestDeletionRequestedReason,
+		systemaccount.PostWriteCancellationReason,
+	} {
+		t.Run(reason, func(t *testing.T) {
+			scheme := newSystemAccountLifecycleScheme(t)
+			request := newLifecycleRestoreRequest(t)
+			request.Annotations[systemaccount.RestoreRequestPhaseAnnotationKey] =
+				string(systemaccount.RestoreRequestPhaseFailed)
+			request.Annotations[systemaccount.RestoreRequestReasonAnnotationKey] = reason
+			now := metav1.NewTime(time.Now())
+			request.DeletionTimestamp = &now
+			cluster := newLifecycleActiveCluster(request)
+			component := &appsv1.Component{ObjectMeta: metav1.ObjectMeta{
+				Namespace: "default",
+				Name:      "component",
+				UID:       "component-uid",
+			}}
+			target := newLifecycleExactTarget(t, scheme, request, component)
+			cli := fake.NewClientBuilder().WithScheme(scheme).
+				WithObjects(cluster, component, request, target).Build()
+			reconciler := &SystemAccountRestoreLifecycleReconciler{
+				Client: cli, APIReader: cli, Scheme: scheme,
+			}
+
+			if _, err := reconciler.Reconcile(context.Background(), ctrl.Request{
+				NamespacedName: client.ObjectKeyFromObject(request),
+			}); err != nil {
+				t.Fatal(err)
+			}
+			currentTarget := &corev1.Secret{}
+			if err := cli.Get(context.Background(),
+				client.ObjectKeyFromObject(target), currentTarget); err != nil {
+				t.Fatal(err)
+			}
+			if currentTarget.Annotations[systemaccount.RestoreRequestUIDAnnotationKey] != "" {
+				t.Fatal("deleting stable failure retained exact target receipt")
+			}
+			currentRequest := &corev1.Secret{}
+			if err := cli.Get(context.Background(),
+				client.ObjectKeyFromObject(request), currentRequest); err != nil {
+				t.Fatal(err)
+			}
+			if currentRequest.Annotations[systemaccount.RestoreRequestReasonAnnotationKey] != reason {
+				t.Fatalf("reason = %q",
+					currentRequest.Annotations[systemaccount.RestoreRequestReasonAnnotationKey])
+			}
+			if !slices.Contains(currentRequest.Finalizers,
+				systemaccount.RestoreProtocolFinalizer) {
+				t.Fatal("active operation released protocol finalizer")
+			}
+		})
 	}
 }
 
@@ -289,6 +603,53 @@ func TestSystemAccountRestoreLifecycleDamagedProtocolMirrorFailsClosedWhileRootL
 				t.Fatalf("active root released finalizer for protocol mirror %q", protocol)
 			}
 		})
+	}
+}
+
+func TestSystemAccountRestoreLifecycleDamagedProtocolMirrorReleasesAfterOperationTerminal(t *testing.T) {
+	for _, status := range []metav1.ConditionStatus{
+		metav1.ConditionTrue,
+		metav1.ConditionFalse,
+	} {
+		for _, protocol := range []string{"", "foreign"} {
+			t.Run(string(status)+"/"+protocol, func(t *testing.T) {
+				scheme := newSystemAccountLifecycleScheme(t)
+				request := newLifecycleRestoreRequest(t)
+				if protocol == "" {
+					delete(request.Annotations, systemaccount.RestoreProtocolAnnotationKey)
+				} else {
+					request.Annotations[systemaccount.RestoreProtocolAnnotationKey] = protocol
+				}
+				cluster := newLifecycleActiveCluster(request)
+				cluster.Status.Conditions = []metav1.Condition{{
+					Type:               appsv1.ConditionTypeRestore,
+					Status:             status,
+					ObservedGeneration: cluster.Generation,
+				}}
+				cli := fake.NewClientBuilder().WithScheme(scheme).
+					WithObjects(cluster, request).Build()
+				reconciler := &SystemAccountRestoreLifecycleReconciler{
+					Client: cli, APIReader: cli, Scheme: scheme,
+				}
+
+				if _, err := reconciler.Reconcile(context.Background(), ctrl.Request{
+					NamespacedName: client.ObjectKeyFromObject(request),
+				}); err != nil {
+					t.Fatal(err)
+				}
+				current := &corev1.Secret{}
+				if err := cli.Get(context.Background(), client.ObjectKeyFromObject(request), current); err != nil {
+					t.Fatal(err)
+				}
+				if slices.Contains(current.Finalizers, systemaccount.RestoreProtocolFinalizer) {
+					t.Fatalf("terminal operation retained finalizer for protocol mirror %q", protocol)
+				}
+				if current.Annotations[systemaccount.RestoreRequestReasonAnnotationKey] !=
+					systemaccount.InvalidPhaseReason {
+					t.Fatalf("reason = %q", current.Annotations[systemaccount.RestoreRequestReasonAnnotationKey])
+				}
+			})
+		}
 	}
 }
 
@@ -741,6 +1102,61 @@ func TestSystemAccountRestoreLifecycleDoesNotCommitTerminalTargetWithUnavailable
 	}
 	if slices.Contains(current.Finalizers, systemaccount.RestoreProtocolFinalizer) {
 		t.Fatal("terminal unavailable-owner request retained the protocol finalizer")
+	}
+}
+
+func TestSystemAccountRestoreLifecycleClearsStableFailureReceiptBeforeRelease(t *testing.T) {
+	for _, rootState := range []string{"terminal", "gone"} {
+		t.Run(rootState, func(t *testing.T) {
+			scheme := newSystemAccountLifecycleScheme(t)
+			request := newLifecycleRestoreRequest(t)
+			request.Annotations[systemaccount.RestoreRequestPhaseAnnotationKey] =
+				string(systemaccount.RestoreRequestPhaseFailed)
+			request.Annotations[systemaccount.RestoreRequestReasonAnnotationKey] =
+				systemaccount.TargetSemanticUnavailableReason
+			component := &appsv1.Component{ObjectMeta: metav1.ObjectMeta{
+				Namespace: "default",
+				Name:      "component",
+				UID:       "component-uid",
+			}}
+			target := newLifecycleExactTarget(t, scheme, request, component)
+			objects := []client.Object{component, request, target}
+			if rootState == "terminal" {
+				cluster := newLifecycleActiveCluster(request)
+				cluster.Status.Conditions = []metav1.Condition{{
+					Type:               appsv1.ConditionTypeRestore,
+					Status:             metav1.ConditionTrue,
+					ObservedGeneration: cluster.Generation,
+				}}
+				objects = append(objects, cluster)
+			}
+			cli := fake.NewClientBuilder().WithScheme(scheme).
+				WithObjects(objects...).Build()
+			reconciler := &SystemAccountRestoreLifecycleReconciler{
+				Client: cli, APIReader: cli, Scheme: scheme,
+			}
+
+			if _, err := reconciler.Reconcile(context.Background(), ctrl.Request{
+				NamespacedName: client.ObjectKeyFromObject(request),
+			}); err != nil {
+				t.Fatal(err)
+			}
+
+			currentTarget := &corev1.Secret{}
+			if err := cli.Get(context.Background(), client.ObjectKeyFromObject(target), currentTarget); err != nil {
+				t.Fatal(err)
+			}
+			if currentTarget.Annotations[systemaccount.RestoreRequestUIDAnnotationKey] != "" {
+				t.Fatal("stable failed request released before its exact target receipt was cleared")
+			}
+			currentRequest := &corev1.Secret{}
+			if err := cli.Get(context.Background(), client.ObjectKeyFromObject(request), currentRequest); err != nil {
+				t.Fatal(err)
+			}
+			if slices.Contains(currentRequest.Finalizers, systemaccount.RestoreProtocolFinalizer) {
+				t.Fatal("stable failed request retained protocol finalizer after exact receipt cleanup")
+			}
+		})
 	}
 }
 

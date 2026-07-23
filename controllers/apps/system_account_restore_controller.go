@@ -119,8 +119,12 @@ func (r *SystemAccountRestoreLifecycleReconciler) Reconcile(
 		return r.reconcileTerminalOperation(ctx, request, phase)
 	}
 	if !request.DeletionTimestamp.IsZero() {
-		if phase == systemaccount.RestoreRequestPhaseClaimed ||
-			phase == systemaccount.RestoreRequestPhaseCommitted {
+		if phase != systemaccount.RestoreRequestPhaseFailed {
+			return r.transitionRequest(ctx, request, systemaccount.RestoreRequestPhaseFailed,
+				systemaccount.RequestDeletionRequestedReason, nil, false)
+		}
+		if systemaccount.RestoreFailureRequiresReceiptCleanup(
+			request.Annotations[systemaccount.RestoreRequestReasonAnnotationKey]) {
 			target, exact, err := r.findExactTarget(ctx, request, intent)
 			if err != nil {
 				return controllerruntime.Result{}, err
@@ -130,10 +134,6 @@ func (r *SystemAccountRestoreLifecycleReconciler) Reconcile(
 					return controllerruntime.Result{}, err
 				}
 			}
-		}
-		if phase != systemaccount.RestoreRequestPhaseFailed {
-			return r.transitionRequest(ctx, request, systemaccount.RestoreRequestPhaseFailed,
-				systemaccount.RequestDeletionRequestedReason, nil, false)
 		}
 		return r.lifecycleRequeue(request), nil
 	}
@@ -203,7 +203,7 @@ func (r *SystemAccountRestoreLifecycleReconciler) reconcileInvalidRequestMetadat
 	if err != nil {
 		return controllerruntime.Result{}, err
 	}
-	if rootState != restoreOperationGone && rootState != restoreOperationTerminating {
+	if rootState == restoreOperationActive {
 		return controllerruntime.Result{}, validationErr
 	}
 	if !slices.Contains(request.Finalizers, systemaccount.RestoreProtocolFinalizer) {
@@ -266,7 +266,7 @@ func (r *SystemAccountRestoreLifecycleReconciler) reconcileUnavailableRoot(
 		if !systemaccount.IsRestoreFailureReason(storedReason) {
 			storedReason = systemaccount.RootUnavailableReason
 		}
-		if storedReason == systemaccount.PostWriteCancellationReason {
+		if systemaccount.RestoreFailureRequiresReceiptCleanup(storedReason) {
 			target, exact, err := r.findExactTarget(ctx, request, intent)
 			if err != nil {
 				return controllerruntime.Result{}, err
@@ -344,6 +344,18 @@ func (r *SystemAccountRestoreLifecycleReconciler) reconcileTerminalOperation(
 		if phase == systemaccount.RestoreRequestPhaseFailed &&
 			!systemaccount.IsRestoreFailureReason(reason) {
 			reason = systemaccount.OperationTerminalReason
+		}
+		if phase == systemaccount.RestoreRequestPhaseFailed &&
+			systemaccount.RestoreFailureRequiresReceiptCleanup(reason) {
+			target, exact, err := r.findExactTarget(ctx, request, intent)
+			if err != nil {
+				return controllerruntime.Result{}, err
+			}
+			if exact {
+				if err := r.clearTargetReceipt(ctx, target); err != nil {
+					return controllerruntime.Result{}, err
+				}
+			}
 		}
 		return r.transitionRequest(ctx, request, phase, reason, receipt, true)
 	}

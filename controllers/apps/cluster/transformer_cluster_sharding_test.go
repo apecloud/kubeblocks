@@ -84,8 +84,9 @@ var _ = Describe("cluster sharding shared transformers", func() {
 		return &appsv1.ComponentDefinition{
 			ObjectMeta: metav1ObjectMeta(compDefName, ""),
 			Spec: appsv1.ComponentDefinitionSpec{
-				Labels:      map[string]string{"def-label": "yes"},
-				Annotations: map[string]string{"def-annotation": "yes"},
+				Labels:         map[string]string{"def-label": "yes"},
+				Annotations:    map[string]string{"def-annotation": "yes"},
+				ServiceVersion: "8.0.30",
 				TLS: &appsv1.TLS{
 					CAFile:   &caFile,
 					CertFile: &certFile,
@@ -244,7 +245,7 @@ var _ = Describe("cluster sharding shared transformers", func() {
 
 		baseClient := fake.NewClientBuilder().
 			WithScheme(newTestScheme()).
-			WithObjects(cluster, request, shardingDef, witness).
+			WithObjects(cluster, request, shardingDef, witness, newComponentDefinition()).
 			Build()
 		graphCli := model.NewGraphClient(baseClient)
 		dag := graph.NewDAG()
@@ -516,7 +517,111 @@ var _ = Describe("cluster sharding shared transformers", func() {
 				cluster.Spec.Shardings[0].Template.SystemAccounts[0].Disabled = ptr.To(true)
 				Expect(baseClient.Update(context.Background(), cluster)).Should(Succeed())
 			}),
+		Entry("rejects a missing live component definition despite cached account semantics",
+			func(baseClient client.Client, _ *corev1.Secret) {
+				definition := &appsv1.ComponentDefinition{}
+				Expect(baseClient.Get(context.Background(),
+					client.ObjectKey{Name: compDefName}, definition)).Should(Succeed())
+				Expect(baseClient.Delete(context.Background(), definition)).Should(Succeed())
+			}),
+		Entry("rechecks a missing live component definition immediately before Claimed target mutation",
+			func(baseClient client.Client, request *corev1.Secret) {
+				liveRequest := &corev1.Secret{}
+				Expect(baseClient.Get(context.Background(),
+					client.ObjectKeyFromObject(request), liveRequest)).Should(Succeed())
+				liveRequest.Annotations[systemaccount.RestoreRequestPhaseAnnotationKey] =
+					string(systemaccount.RestoreRequestPhaseClaimed)
+				Expect(baseClient.Update(context.Background(), liveRequest)).Should(Succeed())
+
+				definition := &appsv1.ComponentDefinition{}
+				Expect(baseClient.Get(context.Background(),
+					client.ObjectKey{Name: compDefName}, definition)).Should(Succeed())
+				Expect(baseClient.Delete(context.Background(), definition)).Should(Succeed())
+			}),
+		Entry("rejects a terminating live component definition",
+			func(baseClient client.Client, _ *corev1.Secret) {
+				definition := &appsv1.ComponentDefinition{}
+				Expect(baseClient.Get(context.Background(),
+					client.ObjectKey{Name: compDefName}, definition)).Should(Succeed())
+				definition.Finalizers = []string{"test.kubeblocks.io/hold"}
+				Expect(baseClient.Update(context.Background(), definition)).Should(Succeed())
+				Expect(baseClient.Delete(context.Background(), definition)).Should(Succeed())
+			}),
+		Entry("rejects a live component definition pattern that resolves without the account",
+			func(baseClient client.Client, _ *corev1.Secret) {
+				cluster := &appsv1.Cluster{}
+				Expect(baseClient.Get(context.Background(), client.ObjectKey{
+					Namespace: namespace,
+					Name:      clusterName,
+				}, cluster)).Should(Succeed())
+				cluster.Spec.Shardings[0].Template.ComponentDef = compDefName + "-"
+				Expect(baseClient.Update(context.Background(), cluster)).Should(Succeed())
+
+				definition := &appsv1.ComponentDefinition{}
+				Expect(baseClient.Get(context.Background(),
+					client.ObjectKey{Name: compDefName}, definition)).Should(Succeed())
+				Expect(baseClient.Delete(context.Background(), definition)).Should(Succeed())
+				definition.ResourceVersion = ""
+				definition.Name = compDefName + "-2.0"
+				definition.Spec.SystemAccounts = nil
+				Expect(baseClient.Create(context.Background(), definition)).Should(Succeed())
+			}),
 	)
+
+	It("builds the restored target from the live sharding template and resolved definition", func() {
+		transCtx, graphCli, dag, request, baseClient :=
+			newShardingRestoreContext(false, true)
+
+		liveRequest := &corev1.Secret{}
+		Expect(baseClient.Get(context.Background(),
+			client.ObjectKeyFromObject(request), liveRequest)).Should(Succeed())
+		liveRequest.Annotations[systemaccount.RestoreRequestPhaseAnnotationKey] =
+			string(systemaccount.RestoreRequestPhaseClaimed)
+		Expect(baseClient.Update(context.Background(), liveRequest)).Should(Succeed())
+
+		cluster := &appsv1.Cluster{}
+		Expect(baseClient.Get(context.Background(), client.ObjectKey{
+			Namespace: namespace,
+			Name:      clusterName,
+		}, cluster)).Should(Succeed())
+		cluster.Spec.Shardings[0].Template.ComponentDef = compDefName + "-"
+		cluster.Spec.Shardings[0].Template.Labels =
+			map[string]string{"template-source": "live"}
+		cluster.Spec.Shardings[0].Template.Annotations =
+			map[string]string{"template-source": "live"}
+		Expect(baseClient.Update(context.Background(), cluster)).Should(Succeed())
+
+		definition := &appsv1.ComponentDefinition{}
+		Expect(baseClient.Get(context.Background(),
+			client.ObjectKey{Name: compDefName}, definition)).Should(Succeed())
+		Expect(baseClient.Delete(context.Background(), definition)).Should(Succeed())
+		definition.ResourceVersion = ""
+		definition.Name = compDefName + "-2.0"
+		definition.Spec.Labels = map[string]string{"definition-source": "live"}
+		definition.Spec.Annotations = map[string]string{"definition-source": "live"}
+		Expect(baseClient.Create(context.Background(), definition)).Should(Succeed())
+
+		err := (&clusterShardingAccountTransformer{}).Transform(transCtx, dag)
+
+		Expect(intctrlutil.IsRequeueError(err)).Should(BeTrue(), err)
+		var target *corev1.Secret
+		for _, object := range graphCli.FindAll(dag, &corev1.Secret{}) {
+			secret := object.(*corev1.Secret)
+			if secret.Name == shardingAccountSecretName(clusterName, shardingName, accountName) {
+				target = secret
+				break
+			}
+		}
+		Expect(target).ShouldNot(BeNil())
+		Expect(target.Labels).Should(HaveKeyWithValue("template-source", "live"))
+		Expect(target.Labels).Should(HaveKeyWithValue("definition-source", "live"))
+		Expect(target.Labels).ShouldNot(HaveKey("template-label"))
+		Expect(target.Labels).ShouldNot(HaveKey("def-label"))
+		Expect(target.Annotations).Should(HaveKeyWithValue("template-source", "live"))
+		Expect(target.Annotations).Should(HaveKeyWithValue("definition-source", "live"))
+		Expect(target.Annotations).ShouldNot(HaveKey("template-annotation"))
+		Expect(target.Annotations).ShouldNot(HaveKey("def-annotation"))
+	})
 
 	DescribeTable("fails closed in the production sharding transformer for damaged active requests",
 		func(damage func(*corev1.Secret)) {

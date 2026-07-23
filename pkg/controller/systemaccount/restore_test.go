@@ -345,6 +345,156 @@ func TestDeletingRequestFailsWithoutTargetMutation(t *testing.T) {
 	require.Len(t, graphCli.FindAll(dag, &corev1.Secret{}), 1)
 }
 
+func TestDeletingRequestPersistsFailureBeforeExactTargetReceiptCleanup(t *testing.T) {
+	for _, phase := range []RestoreRequestPhase{
+		RestoreRequestPhaseClaimed,
+		RestoreRequestPhaseCommitted,
+	} {
+		t.Run(string(phase), func(t *testing.T) {
+			fixture := newRestoreStateFixture(t)
+			fixture.request.Annotations[RestoreRequestPhaseAnnotationKey] = string(phase)
+			now := metav1.Now()
+			fixture.request.DeletionTimestamp = &now
+			target, err := fixture.targetBuilder(fixture.intent)
+			require.NoError(t, err)
+			target.UID = types.UID("target-uid")
+			target.ResourceVersion = "7"
+			applyTargetReceipt(target, fixture.request)
+			revision, err := TargetCommitRevision(target, constant.DBComponentFinalizerName)
+			require.NoError(t, err)
+			target.Annotations[TargetCommitRevisionAnnotationKey] = revision
+			fixture.objects = append(fixture.objects, target)
+			graphCli, dag := fixture.graph()
+
+			handled, reconcileErr := ReconcileRestoreRequests(
+				context.Background(), graphCli, dag, graphCli,
+				fixture.owner, constant.DBComponentFinalizerName, fixture.targetBuilder)
+
+			require.True(t, handled)
+			require.True(t, intctrlutil.IsRequeueError(reconcileErr), reconcileErr)
+			requestVertex := graphCli.FindMatchedVertex(dag, fixture.request)
+			require.NotNil(t, requestVertex)
+			updatedRequest := requestVertex.(*model.ObjectVertex).Obj.(*corev1.Secret)
+			require.Equal(t, string(RestoreRequestPhaseFailed),
+				updatedRequest.Annotations[RestoreRequestPhaseAnnotationKey])
+			require.Equal(t, RequestDeletionRequestedReason,
+				updatedRequest.Annotations[RestoreRequestReasonAnnotationKey])
+			require.False(t, graphCli.IsAction(dag, target, model.ActionUpdatePtr()),
+				"target receipt must remain until the deletion failure is durable")
+		})
+	}
+}
+
+func TestDeletingRequestDoesNotOverrideTerminalOperation(t *testing.T) {
+	for _, status := range []metav1.ConditionStatus{
+		metav1.ConditionTrue,
+		metav1.ConditionFalse,
+	} {
+		for _, phase := range []RestoreRequestPhase{
+			RestoreRequestPhaseClaimed,
+			RestoreRequestPhaseCommitted,
+		} {
+			t.Run(string(status)+"/"+string(phase), func(t *testing.T) {
+				fixture := newRestoreStateFixture(t)
+				fixture.request.Annotations[RestoreRequestPhaseAnnotationKey] = string(phase)
+				now := metav1.Now()
+				fixture.request.DeletionTimestamp = &now
+				fixture.root.Status.Conditions = []metav1.Condition{{
+					Type:               appsv1.ConditionTypeRestore,
+					Status:             status,
+					ObservedGeneration: fixture.root.Generation,
+				}}
+				target, err := fixture.targetBuilder(fixture.intent)
+				require.NoError(t, err)
+				target.UID = types.UID("target-uid")
+				target.ResourceVersion = "7"
+				applyTargetReceipt(target, fixture.request)
+				revision, err := TargetCommitRevision(target, constant.DBComponentFinalizerName)
+				require.NoError(t, err)
+				target.Annotations[TargetCommitRevisionAnnotationKey] = revision
+				fixture.objects = append(fixture.objects, target)
+				graphCli, dag := fixture.graph()
+
+				handled, reconcileErr := ReconcileRestoreRequests(
+					context.Background(), graphCli, dag, graphCli,
+					fixture.owner, constant.DBComponentFinalizerName, fixture.targetBuilder)
+
+				require.True(t, handled)
+				require.True(t, intctrlutil.IsRequeueError(reconcileErr), reconcileErr)
+				require.False(t, graphCli.IsAction(dag, fixture.request, model.ActionUpdatePtr()),
+					"an operation already observed terminal must not become RequestDeletionRequested")
+				require.False(t, graphCli.IsAction(dag, target, model.ActionUpdatePtr()))
+			})
+		}
+	}
+}
+
+func TestDeletingPendingRequestDoesNotOverrideTerminalOperation(t *testing.T) {
+	for _, status := range []metav1.ConditionStatus{
+		metav1.ConditionTrue,
+		metav1.ConditionFalse,
+	} {
+		t.Run(string(status), func(t *testing.T) {
+			fixture := newRestoreStateFixture(t)
+			now := metav1.Now()
+			fixture.request.DeletionTimestamp = &now
+			fixture.root.Status.Conditions = []metav1.Condition{{
+				Type:               appsv1.ConditionTypeRestore,
+				Status:             status,
+				ObservedGeneration: fixture.root.Generation,
+			}}
+			graphCli, dag := fixture.graph()
+
+			handled, reconcileErr := ReconcileRestoreRequests(
+				context.Background(), graphCli, dag, graphCli,
+				fixture.owner, constant.DBComponentFinalizerName, fixture.targetBuilder)
+
+			require.True(t, handled)
+			require.True(t, intctrlutil.IsRequeueError(reconcileErr), reconcileErr)
+			requestVertex := graphCli.FindMatchedVertex(dag, fixture.request)
+			require.NotNil(t, requestVertex)
+			updated := requestVertex.(*model.ObjectVertex).Obj.(*corev1.Secret)
+			require.Equal(t, string(RestoreRequestPhaseFailed),
+				updated.Annotations[RestoreRequestPhaseAnnotationKey])
+			require.Equal(t, OperationTerminalReason,
+				updated.Annotations[RestoreRequestReasonAnnotationKey])
+		})
+	}
+}
+
+func TestDeletingFailedRequestRetriesExactTargetReceiptCleanup(t *testing.T) {
+	fixture := newRestoreStateFixture(t)
+	fixture.request.Annotations[RestoreRequestPhaseAnnotationKey] =
+		string(RestoreRequestPhaseFailed)
+	fixture.request.Annotations[RestoreRequestReasonAnnotationKey] =
+		RequestDeletionRequestedReason
+	now := metav1.Now()
+	fixture.request.DeletionTimestamp = &now
+	target, err := fixture.targetBuilder(fixture.intent)
+	require.NoError(t, err)
+	target.UID = types.UID("target-uid")
+	target.ResourceVersion = "7"
+	applyTargetReceipt(target, fixture.request)
+	revision, err := TargetCommitRevision(target, constant.DBComponentFinalizerName)
+	require.NoError(t, err)
+	target.Annotations[TargetCommitRevisionAnnotationKey] = revision
+	fixture.objects = append(fixture.objects, target)
+	graphCli, dag := fixture.graph()
+
+	handled, reconcileErr := ReconcileRestoreRequests(
+		context.Background(), graphCli, dag, graphCli,
+		fixture.owner, constant.DBComponentFinalizerName, fixture.targetBuilder)
+
+	require.True(t, handled)
+	require.True(t, intctrlutil.IsRequeueError(reconcileErr), reconcileErr)
+	vertex := graphCli.FindMatchedVertex(dag, target)
+	require.NotNil(t, vertex,
+		"a durable Failed/RequestDeletionRequested request must retry clearing its exact target receipt")
+	updated := vertex.(*model.ObjectVertex).Obj.(*corev1.Secret)
+	require.Equal(t, model.ActionUpdatePtr(), vertex.(*model.ObjectVertex).Action)
+	require.Empty(t, updated.Annotations[RestoreRequestUIDAnnotationKey])
+}
+
 func TestUnavailableTargetSemanticFailsPendingRequest(t *testing.T) {
 	fixture := newRestoreStateFixture(t)
 	graphCli, dag := fixture.graph()
@@ -362,6 +512,110 @@ func TestUnavailableTargetSemanticFailsPendingRequest(t *testing.T) {
 		updated.Annotations[RestoreRequestPhaseAnnotationKey])
 	require.Equal(t, "TargetSemanticUnavailable",
 		updated.Annotations[RestoreRequestReasonAnnotationKey])
+}
+
+func TestSemanticFailurePersistsBeforeExactTargetReceiptCleanup(t *testing.T) {
+	for _, phase := range []RestoreRequestPhase{
+		RestoreRequestPhaseClaimed,
+		RestoreRequestPhaseCommitted,
+	} {
+		t.Run(string(phase), func(t *testing.T) {
+			fixture := newRestoreStateFixture(t)
+			fixture.request.Annotations[RestoreRequestPhaseAnnotationKey] = string(phase)
+			target, err := fixture.targetBuilder(fixture.intent)
+			require.NoError(t, err)
+			target.UID = types.UID("target-uid")
+			target.ResourceVersion = "7"
+			applyTargetReceipt(target, fixture.request)
+			revision, err := TargetCommitRevision(target, constant.DBComponentFinalizerName)
+			require.NoError(t, err)
+			target.Annotations[TargetCommitRevisionAnnotationKey] = revision
+			fixture.objects = append(fixture.objects, target)
+			graphCli, dag := fixture.graph()
+
+			handled, reconcileErr := ReconcileRestoreRequests(
+				context.Background(), graphCli, dag, graphCli,
+				fixture.owner, constant.DBComponentFinalizerName,
+				func(CredentialIntent) (*corev1.Secret, error) {
+					return nil, NewTargetSemanticError(
+						TargetSemanticUnavailableReason, context.Canceled)
+				})
+
+			require.True(t, handled)
+			require.True(t, intctrlutil.IsRequeueError(reconcileErr), reconcileErr)
+			requestVertex := graphCli.FindMatchedVertex(dag, fixture.request)
+			require.NotNil(t, requestVertex)
+			updatedRequest := requestVertex.(*model.ObjectVertex).Obj.(*corev1.Secret)
+			require.Equal(t, model.ActionUpdatePtr(), requestVertex.(*model.ObjectVertex).Action)
+			require.Equal(t, string(RestoreRequestPhaseFailed),
+				updatedRequest.Annotations[RestoreRequestPhaseAnnotationKey])
+			require.Equal(t, TargetSemanticUnavailableReason,
+				updatedRequest.Annotations[RestoreRequestReasonAnnotationKey])
+			require.False(t, graphCli.IsAction(dag, target, model.ActionUpdatePtr()),
+				"target receipt must remain until the Failed request state is durable")
+		})
+	}
+}
+
+func TestFailedSemanticRestoreRequestRetriesExactTargetReceiptCleanup(t *testing.T) {
+	for _, deleting := range []bool{false, true} {
+		for _, priorPhase := range []RestoreRequestPhase{
+			RestoreRequestPhaseClaimed,
+			RestoreRequestPhaseCommitted,
+		} {
+			name := string(priorPhase)
+			if deleting {
+				name += "/deleting"
+			}
+			t.Run(name, func(t *testing.T) {
+				fixture := newRestoreStateFixture(t)
+				fixture.request.Annotations[RestoreRequestPhaseAnnotationKey] =
+					string(RestoreRequestPhaseFailed)
+				fixture.request.Annotations[RestoreRequestReasonAnnotationKey] =
+					TargetSemanticUnavailableReason
+				if deleting {
+					now := metav1.Now()
+					fixture.request.DeletionTimestamp = &now
+				}
+				target, err := fixture.targetBuilder(fixture.intent)
+				require.NoError(t, err)
+				target.UID = types.UID("target-uid")
+				target.ResourceVersion = "7"
+				applyTargetReceipt(target, fixture.request)
+				revision, err := TargetCommitRevision(target, constant.DBComponentFinalizerName)
+				require.NoError(t, err)
+				target.Annotations[TargetCommitRevisionAnnotationKey] = revision
+				if priorPhase == RestoreRequestPhaseCommitted {
+					fixture.request.Annotations[TargetSecretNameAnnotationKey] = target.Name
+					fixture.request.Annotations[TargetSecretUIDAnnotationKey] = string(target.UID)
+					fixture.request.Annotations[TargetCommitRevisionAnnotationKey] = revision
+				}
+				fixture.objects = append(fixture.objects, target)
+				graphCli, dag := fixture.graph()
+
+				handled, reconcileErr := ReconcileRestoreRequests(
+					context.Background(), graphCli, dag, graphCli,
+					fixture.owner, constant.DBComponentFinalizerName, fixture.targetBuilder)
+
+				require.True(t, handled)
+				require.True(t, intctrlutil.IsRequeueError(reconcileErr), reconcileErr)
+				vertex := graphCli.FindMatchedVertex(dag, target)
+				require.NotNil(t, vertex,
+					"a durable Failed/TargetSemanticUnavailable request must retry clearing its exact target receipt")
+				updated := vertex.(*model.ObjectVertex).Obj.(*corev1.Secret)
+				require.Equal(t, model.ActionUpdatePtr(), vertex.(*model.ObjectVertex).Action)
+				for _, key := range []string{
+					RestoreOperationDigestAnnotationKey,
+					CredentialIntentRevisionAnnotationKey,
+					TargetCommitRevisionAnnotationKey,
+					RestoreRequestNameAnnotationKey,
+					RestoreRequestUIDAnnotationKey,
+				} {
+					require.Empty(t, updated.Annotations[key], "target retained protocol receipt %s", key)
+				}
+			})
+		}
+	}
 }
 
 func TestClaimedRestoreRequestRejectsMatchingNonControllerOwnerReference(t *testing.T) {

@@ -66,17 +66,10 @@ func (t *componentAccountTransformer) Transform(ctx graph.TransformContext, dag 
 	handled, err := systemaccount.ReconcileRestoreRequests(transCtx.Context, graphCli, dag, transCtx.APIReader,
 		transCtx.Component, constant.DBComponentFinalizerName,
 		func(intent systemaccount.CredentialIntent) (*corev1.Secret, error) {
-			accounts, err := synthesizeSystemAccounts(transCtx.CompDef.Spec.SystemAccounts,
-				transCtx.Component.Spec.SystemAccounts, false)
+			account, liveComponent, liveDefinition, err :=
+				t.liveRestoreSystemAccount(transCtx, intent)
 			if err != nil {
-				return nil, systemaccount.NewTargetSemanticError(
-					systemaccount.TargetSemanticUnavailableReason, err)
-			}
-			account, ok := accounts[intent.Target.Account]
-			if !ok {
-				return nil, systemaccount.NewTargetSemanticError(
-					systemaccount.AccountUnavailableReason,
-					fmt.Errorf("system account %s is unavailable", intent.Target.Account))
+				return nil, err
 			}
 			password := intent.Credentials[constant.AccountPasswdForSecret]
 			if len(password) == 0 {
@@ -84,7 +77,8 @@ func (t *componentAccountTransformer) Transform(ctx graph.TransformContext, dag 
 					systemaccount.TargetSemanticUnavailableReason,
 					fmt.Errorf("system account %s credential is unavailable", intent.Target.Account))
 			}
-			return t.buildAccountSecretWithPassword(transCtx, account, password)
+			return t.buildRestoreAccountSecretWithPassword(
+				liveComponent, liveDefinition, account, password)
 		})
 	if err != nil {
 		return err
@@ -146,6 +140,95 @@ func (t *componentAccountTransformer) Transform(ctx graph.TransformContext, dag 
 	}
 
 	return nil
+}
+
+func (t *componentAccountTransformer) liveRestoreSystemAccount(
+	transCtx *componentTransformContext,
+	intent systemaccount.CredentialIntent,
+) (synthesizedSystemAccount, *appsv1.Component, *appsv1.ComponentDefinition, error) {
+	reader := transCtx.APIReader
+	if reader == nil {
+		return synthesizedSystemAccount{}, nil, nil, systemaccount.NewTargetSemanticError(
+			systemaccount.TargetSemanticUnavailableReason,
+			fmt.Errorf("system account restore authority reader is not configured"))
+	}
+	liveComponent := &appsv1.Component{}
+	if err := reader.Get(transCtx.Context, client.ObjectKey{
+		Namespace: intent.Target.Owner.Namespace,
+		Name:      intent.Target.Owner.Name,
+	}, liveComponent); err != nil {
+		return synthesizedSystemAccount{}, nil, nil, systemaccount.NewTargetSemanticError(
+			systemaccount.TargetSemanticUnavailableReason, err)
+	}
+	if liveComponent.UID != intent.Target.Owner.UID ||
+		!liveComponent.DeletionTimestamp.IsZero() {
+		return synthesizedSystemAccount{}, nil, nil, systemaccount.NewTargetSemanticError(
+			systemaccount.TargetSemanticUnavailableReason,
+			fmt.Errorf("target Component %s/%s no longer matches restore intent",
+				liveComponent.Namespace, liveComponent.Name))
+	}
+	if liveComponent.Spec.CompDef == "" {
+		return synthesizedSystemAccount{}, nil, nil, systemaccount.NewTargetSemanticError(
+			systemaccount.AccountUnavailableReason,
+			fmt.Errorf("target Component %s/%s has no component definition",
+				liveComponent.Namespace, liveComponent.Name))
+	}
+	liveDefinition, err := component.GetCompDefByName(
+		transCtx.Context, reader, liveComponent.Spec.CompDef)
+	if err != nil {
+		return synthesizedSystemAccount{}, nil, nil, systemaccount.NewTargetSemanticError(
+			systemaccount.AccountUnavailableReason, err)
+	}
+	if !liveDefinition.DeletionTimestamp.IsZero() {
+		return synthesizedSystemAccount{}, nil, nil, systemaccount.NewTargetSemanticError(
+			systemaccount.AccountUnavailableReason,
+			fmt.Errorf("component definition %s is terminating", liveDefinition.Name))
+	}
+	accounts, err := synthesizeSystemAccounts(
+		liveDefinition.Spec.SystemAccounts, liveComponent.Spec.SystemAccounts, false)
+	if err != nil {
+		return synthesizedSystemAccount{}, nil, nil, systemaccount.NewTargetSemanticError(
+			systemaccount.AccountUnavailableReason, err)
+	}
+	account, ok := accounts[intent.Target.Account]
+	if !ok {
+		return synthesizedSystemAccount{}, nil, nil, systemaccount.NewTargetSemanticError(
+			systemaccount.AccountUnavailableReason,
+			fmt.Errorf("system account %s is unavailable", intent.Target.Account))
+	}
+	return account, liveComponent, liveDefinition, nil
+}
+
+func (t *componentAccountTransformer) buildRestoreAccountSecretWithPassword(
+	liveComponent *appsv1.Component,
+	liveDefinition *appsv1.ComponentDefinition,
+	account synthesizedSystemAccount,
+	password []byte,
+) (*corev1.Secret, error) {
+	clusterName, err := component.GetClusterName(liveComponent)
+	if err != nil {
+		return nil, err
+	}
+	componentName, err := component.GetComponentName(liveComponent)
+	if err != nil {
+		return nil, err
+	}
+	secret := builder.NewSecretBuilder(
+		liveComponent.Namespace,
+		constant.GenerateAccountSecretName(clusterName, componentName, account.Name)).
+		AddLabelsInMap(liveDefinition.Spec.Labels).
+		AddLabelsInMap(liveComponent.Spec.Labels).
+		AddLabelsInMap(constant.GetCompLabels(clusterName, componentName)).
+		AddLabels(systemAccountLabel, account.Name).
+		AddAnnotationsInMap(liveDefinition.Spec.Annotations).
+		AddAnnotationsInMap(liveComponent.Spec.Annotations).
+		PutData(constant.AccountNameForSecret, []byte(account.Name)).
+		PutData(constant.AccountPasswdForSecret, password).
+		GetObject()
+	if err := setCompOwnershipNFinalizer(liveComponent, secret); err != nil {
+		return nil, err
+	}
+	return secret, nil
 }
 
 func (t *componentAccountTransformer) createAccount(transCtx *componentTransformContext,

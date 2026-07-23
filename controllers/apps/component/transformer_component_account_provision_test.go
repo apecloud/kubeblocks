@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -188,6 +189,234 @@ func TestComponentAccountTransformerFailsClosedForDamagedActiveRestoreRequest(t 
 			require.NoError(t, baseClient.Get(
 				context.Background(), client.ObjectKeyFromObject(request), live))
 			require.Equal(t, request.ResourceVersion, live.ResourceVersion)
+		})
+	}
+}
+
+func TestComponentRestoreStrongReadsLiveDefinition(t *testing.T) {
+	tests := []struct {
+		name          string
+		phase         systemaccount.RestoreRequestPhase
+		liveDef       bool
+		accountExists bool
+		disabled      bool
+		expectTarget  bool
+	}{
+		{
+			name:  "pending/missing definition",
+			phase: systemaccount.RestoreRequestPhasePending,
+		},
+		{
+			name:  "claimed/missing definition",
+			phase: systemaccount.RestoreRequestPhaseClaimed,
+		},
+		{
+			name:    "pending/missing account",
+			phase:   systemaccount.RestoreRequestPhasePending,
+			liveDef: true,
+		},
+		{
+			name:    "claimed/missing account",
+			phase:   systemaccount.RestoreRequestPhaseClaimed,
+			liveDef: true,
+		},
+		{
+			name:          "pending/disabled account",
+			phase:         systemaccount.RestoreRequestPhasePending,
+			liveDef:       true,
+			accountExists: true,
+			disabled:      true,
+		},
+		{
+			name:          "claimed/live definition and component metadata",
+			phase:         systemaccount.RestoreRequestPhaseClaimed,
+			liveDef:       true,
+			accountExists: true,
+			expectTarget:  true,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			scheme := runtime.NewScheme()
+			require.NoError(t, corev1.AddToScheme(scheme))
+			require.NoError(t, appsv1.AddToScheme(scheme))
+			require.NoError(t, corev1.AddToScheme(model.GetScheme()))
+			require.NoError(t, appsv1.AddToScheme(model.GetScheme()))
+
+			root := &appsv1.Cluster{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: appsv1.GroupVersion.String(),
+					Kind:       appsv1.ClusterKind,
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "cluster",
+					UID:       "cluster-uid",
+				},
+				Spec: appsv1.ClusterSpec{Restore: &appsv1.ClusterRestore{
+					Source: appsv1.ClusterRestoreSource{
+						APIGroup:  "dataprotection.kubeblocks.io",
+						Kind:      "Backup",
+						Namespace: "default",
+						Name:      "backup",
+					},
+				}},
+			}
+			cachedComponent := &appsv1.Component{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: appsv1.GroupVersion.String(),
+					Kind:       appsv1.ComponentKind,
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "cluster-mysql",
+					UID:       "component-uid",
+					Labels: constant.GetCompLabels(
+						"cluster", "mysql"),
+				},
+				Spec: appsv1.ComponentSpec{
+					CompDef:     "mysql",
+					Labels:      map[string]string{"dynamic-source": "cached-component"},
+					Annotations: map[string]string{"dynamic-source": "cached-component"},
+				},
+			}
+			liveComponent := cachedComponent.DeepCopy()
+			liveComponent.Spec.Labels["dynamic-source"] = "live-component"
+			liveComponent.Spec.Annotations["dynamic-source"] = "live-component"
+			if test.disabled {
+				liveComponent.Spec.SystemAccounts = []appsv1.ComponentSystemAccount{{
+					Name:     "admin",
+					Disabled: ptr.To(true),
+				}}
+			}
+			cachedDefinition := &appsv1.ComponentDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "mysql"},
+				Spec: appsv1.ComponentDefinitionSpec{
+					SystemAccounts: []appsv1.SystemAccount{{Name: "admin"}},
+					Labels:         map[string]string{"static-source": "cached-definition"},
+					Annotations:    map[string]string{"static-source": "cached-definition"},
+				},
+			}
+			rootIdentity := systemaccount.ObjectIdentity{
+				APIVersion: appsv1.GroupVersion.String(),
+				Kind:       appsv1.ClusterKind,
+				Namespace:  root.Namespace,
+				Name:       root.Name,
+				UID:        root.UID,
+			}
+			ownerIdentity := systemaccount.ObjectIdentity{
+				APIVersion: appsv1.GroupVersion.String(),
+				Kind:       appsv1.ComponentKind,
+				Namespace:  cachedComponent.Namespace,
+				Name:       cachedComponent.Name,
+				UID:        cachedComponent.UID,
+			}
+			request, err := systemaccount.BuildRestoreRequest(systemaccount.CredentialIntent{
+				Operation: systemaccount.RestoreOperationIdentity{
+					Protocol: systemaccount.RestoreProtocolV2,
+					Profile:  systemaccount.RestoreProfileInitialCluster,
+					Root:     rootIdentity,
+					Source: systemaccount.SourceIdentity{
+						APIGroup:  "dataprotection.kubeblocks.io",
+						Kind:      "Backup",
+						Namespace: "default",
+						Name:      "backup",
+					},
+				},
+				Target: systemaccount.LogicalTargetIdentity{
+					Protocol:  systemaccount.LogicalTargetProtocolV1,
+					Namespace: "default",
+					Root:      rootIdentity,
+					Owner:     ownerIdentity,
+					Scope:     systemaccount.SystemAccountScopeComponent,
+					Account:   "admin",
+				},
+				ResolvedSource: systemaccount.ObjectIdentity{
+					APIVersion: "dataprotection.kubeblocks.io/v1alpha1",
+					Kind:       "Backup",
+					Namespace:  "default",
+					Name:       "backup",
+					UID:        types.UID("backup-uid"),
+				},
+				Credentials: map[string][]byte{
+					constant.AccountNameForSecret:   []byte("admin"),
+					constant.AccountPasswdForSecret: []byte("password"),
+				},
+			})
+			require.NoError(t, err)
+			request.UID = "request-uid"
+			request.ResourceVersion = "1"
+			request.Annotations[systemaccount.RestoreRequestPhaseAnnotationKey] =
+				string(test.phase)
+
+			objects := []client.Object{root, liveComponent, request}
+			if test.liveDef {
+				liveDefinition := cachedDefinition.DeepCopy()
+				if !test.accountExists {
+					liveDefinition.Spec.SystemAccounts = nil
+				}
+				liveDefinition.Spec.Labels["static-source"] = "live-definition"
+				liveDefinition.Spec.Annotations["static-source"] = "live-definition"
+				objects = append(objects, liveDefinition)
+			}
+			baseClient := fake.NewClientBuilder().WithScheme(scheme).
+				WithObjects(objects...).Build()
+			graphCli := model.NewGraphClient(baseClient)
+			dag := graph.NewDAG()
+			graphCli.Root(dag, cachedComponent.DeepCopy(), cachedComponent, model.ActionStatusPtr())
+			transCtx := &componentTransformContext{
+				Context:       context.Background(),
+				Client:        graphCli,
+				APIReader:     graphCli,
+				CompDef:       cachedDefinition,
+				Component:     cachedComponent,
+				ComponentOrig: cachedComponent.DeepCopy(),
+				SynthesizeComponent: &componentctrl.SynthesizedComponent{
+					Namespace:          cachedComponent.Namespace,
+					ClusterName:        root.Name,
+					Name:               "mysql",
+					StaticLabels:       map[string]string{"static-source": "cached-synthesized"},
+					DynamicLabels:      map[string]string{"dynamic-source": "cached-synthesized"},
+					StaticAnnotations:  map[string]string{"static-source": "cached-synthesized"},
+					DynamicAnnotations: map[string]string{"dynamic-source": "cached-synthesized"},
+				},
+			}
+
+			transformErr := (&componentAccountTransformer{}).Transform(transCtx, dag)
+
+			require.True(t, intctrlutil.IsRequeueError(transformErr), transformErr)
+			secrets := graphCli.FindAll(dag, &corev1.Secret{})
+			if test.expectTarget {
+				var target *corev1.Secret
+				for _, object := range secrets {
+					secret := object.(*corev1.Secret)
+					if secret.Name == constant.GenerateAccountSecretName(
+						root.Name, "mysql", "admin") {
+						target = secret
+					}
+				}
+				require.NotNil(t, target)
+				require.Equal(t, "live-definition", target.Labels["static-source"])
+				require.Equal(t, "live-component", target.Labels["dynamic-source"])
+				require.Equal(t, "live-definition", target.Annotations["static-source"])
+				require.Equal(t, "live-component", target.Annotations["dynamic-source"])
+				return
+			}
+			var updatedRequest *corev1.Secret
+			for _, object := range secrets {
+				secret := object.(*corev1.Secret)
+				if secret.Name == request.Name {
+					updatedRequest = secret
+				}
+				require.NotEqual(t,
+					constant.GenerateAccountSecretName(root.Name, "mysql", "admin"),
+					secret.Name, "unavailable live account authority must prevent target mutation")
+			}
+			require.NotNil(t, updatedRequest)
+			require.Equal(t, string(systemaccount.RestoreRequestPhaseFailed),
+				updatedRequest.Annotations[systemaccount.RestoreRequestPhaseAnnotationKey])
+			require.Equal(t, systemaccount.AccountUnavailableReason,
+				updatedRequest.Annotations[systemaccount.RestoreRequestReasonAnnotationKey])
 		})
 	}
 }

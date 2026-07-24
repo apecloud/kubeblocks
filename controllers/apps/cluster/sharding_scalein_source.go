@@ -30,6 +30,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -46,7 +47,10 @@ var (
 	errInvalidShardingScaleInMemberInventory = errors.New("invalid sharding scale-in member inventory")
 )
 
-const shardingScaleInDefaultShardTemplate = "@default"
+const (
+	shardingScaleInDefaultShardTemplate = "@default"
+	shardingScaleInInstanceKind         = "Instance"
+)
 
 type shardingScaleInDesiredComponent struct {
 	ShardTemplateName string
@@ -77,6 +81,7 @@ type shardingScaleInSourceMember struct {
 	Component         appsv1.Component
 	ShardTemplateName string
 	Workload          workloadsv1.InstanceSet
+	Instances         []workloadsv1.Instance
 	Pods              []shardingScaleInSourcePod
 }
 
@@ -235,11 +240,18 @@ func loadFreshShardingScaleInMembers(ctx context.Context, apiReader client.Reade
 	if err != nil {
 		return nil, err
 	}
-	podsBefore, err := listFreshShardingScaleInPods(ctx, apiReader, topologyBefore, workloadsBefore)
+	instancesBefore, err := listFreshShardingScaleInInstances(
+		ctx, apiReader, topologyBefore, workloadsBefore)
 	if err != nil {
 		return nil, err
 	}
-	inventory, err := buildFreshShardingScaleInMembers(topologyBefore, workloadsBefore, podsBefore)
+	podsBefore, err := listFreshShardingScaleInPods(
+		ctx, apiReader, topologyBefore, workloadsBefore, instancesBefore)
+	if err != nil {
+		return nil, err
+	}
+	inventory, err := buildFreshShardingScaleInMembers(
+		topologyBefore, workloadsBefore, instancesBefore, podsBefore)
 	if err != nil {
 		return nil, err
 	}
@@ -251,7 +263,16 @@ func loadFreshShardingScaleInMembers(ctx context.Context, apiReader client.Reade
 	if !sameShardingScaleInWorkloadSnapshot(workloadsBefore, workloadsAfter) {
 		return nil, invalid("InstanceSet snapshot changed while member identity was built")
 	}
-	podsAfter, err := listFreshShardingScaleInPods(ctx, apiReader, topologyBefore, workloadsAfter)
+	instancesAfter, err := listFreshShardingScaleInInstances(
+		ctx, apiReader, topologyBefore, workloadsAfter)
+	if err != nil {
+		return nil, err
+	}
+	if !sameShardingScaleInInstanceSnapshot(instancesBefore, instancesAfter) {
+		return nil, invalid("Instance snapshot changed while member identity was built")
+	}
+	podsAfter, err := listFreshShardingScaleInPods(
+		ctx, apiReader, topologyBefore, workloadsAfter, instancesAfter)
 	if err != nil {
 		return nil, err
 	}
@@ -302,18 +323,64 @@ func listFreshShardingScaleInWorkloads(ctx context.Context, apiReader client.Rea
 	return result, nil
 }
 
+func listFreshShardingScaleInInstances(ctx context.Context, apiReader client.Reader,
+	topology *shardingScaleInTopologyInventory, workloads []workloadsv1.InstanceSet,
+) ([]workloadsv1.Instance, error) {
+	list := &workloadsv1.InstanceList{}
+	if err := apiReader.List(ctx, list, client.InNamespace(topology.Cluster.Namespace)); err != nil {
+		return nil, err
+	}
+
+	workloadsByOwner := make(map[string]struct{}, len(workloads))
+	workloadsByName := make(map[string]struct{}, len(workloads))
+	componentsByShortName := make(map[string]struct{}, len(topology.Components))
+	for i := range workloads {
+		workloadsByOwner[objectOwnerIdentity(workloads[i].Name, workloads[i].UID)] = struct{}{}
+		workloadsByName[workloads[i].Name] = struct{}{}
+	}
+	for i := range topology.Components {
+		componentsByShortName[topology.Components[i].Labels[constant.KBAppComponentLabelKey]] =
+			struct{}{}
+	}
+
+	result := make([]workloadsv1.Instance, 0)
+	for i := range list.Items {
+		instance := &list.Items[i]
+		owner := metav1.GetControllerOf(instance)
+		_, ownerMatches := workloadsByOwner[ownerReferenceIdentity(owner)]
+		_, componentMatches := componentsByShortName[instance.Labels[constant.KBAppComponentLabelKey]]
+		labelMatches := instance.Labels[constant.AppInstanceLabelKey] ==
+			topology.Cluster.Name && componentMatches
+		_, workloadLabelMatches := workloadsByName[instance.Labels[instanceset.WorkloadsInstanceLabelKey]]
+		_, workloadSpecMatches := workloadsByName[instance.Spec.InstanceSetName]
+		if ownerMatches || labelMatches || workloadLabelMatches || workloadSpecMatches {
+			result = append(result, *instance.DeepCopy())
+		}
+	}
+	sortShardingScaleInInstances(result)
+	return result, nil
+}
+
 func listFreshShardingScaleInPods(ctx context.Context, apiReader client.Reader,
 	topology *shardingScaleInTopologyInventory, workloads []workloadsv1.InstanceSet,
+	instances []workloadsv1.Instance,
 ) ([]corev1.Pod, error) {
 	list := &corev1.PodList{}
 	if err := apiReader.List(ctx, list, client.InNamespace(topology.Cluster.Namespace)); err != nil {
 		return nil, err
 	}
 
-	workloadsByOwner := make(map[string]struct{}, len(workloads))
+	podOwners := make(map[string]struct{}, len(workloads)+len(instances))
+	workloadNames := make(map[string]struct{}, len(workloads))
+	instanceNames := make(map[string]struct{}, len(instances))
 	componentsByShortName := make(map[string]struct{}, len(topology.Components))
 	for i := range workloads {
-		workloadsByOwner[objectOwnerIdentity(workloads[i].Name, workloads[i].UID)] = struct{}{}
+		podOwners[objectOwnerIdentity(workloads[i].Name, workloads[i].UID)] = struct{}{}
+		workloadNames[workloads[i].Name] = struct{}{}
+	}
+	for i := range instances {
+		podOwners[objectOwnerIdentity(instances[i].Name, instances[i].UID)] = struct{}{}
+		instanceNames[instances[i].Name] = struct{}{}
 	}
 	for i := range topology.Components {
 		componentsByShortName[topology.Components[i].Labels[constant.KBAppComponentLabelKey]] = struct{}{}
@@ -323,11 +390,15 @@ func listFreshShardingScaleInPods(ctx context.Context, apiReader client.Reader,
 	for i := range list.Items {
 		pod := &list.Items[i]
 		owner := metav1.GetControllerOf(pod)
-		_, ownerMatches := workloadsByOwner[ownerReferenceIdentity(owner)]
+		_, ownerMatches := podOwners[ownerReferenceIdentity(owner)]
 		_, componentMatches := componentsByShortName[pod.Labels[constant.KBAppComponentLabelKey]]
 		labelMatches := pod.Labels[constant.AppInstanceLabelKey] == topology.Cluster.Name &&
 			componentMatches
-		if ownerMatches || labelMatches {
+		_, workloadLabelMatches := workloadNames[pod.Labels[instanceset.WorkloadsInstanceLabelKey]]
+		_, instanceLabelMatches := instanceNames[pod.Labels[constant.KBAppInstanceNameLabelKey]]
+		_, instanceNameMatches := instanceNames[pod.Name]
+		if ownerMatches || labelMatches || workloadLabelMatches ||
+			instanceLabelMatches || instanceNameMatches {
 			result = append(result, *pod.DeepCopy())
 		}
 	}
@@ -336,7 +407,7 @@ func listFreshShardingScaleInPods(ctx context.Context, apiReader client.Reader,
 }
 
 func buildFreshShardingScaleInMembers(topology *shardingScaleInTopologyInventory,
-	workloads []workloadsv1.InstanceSet, pods []corev1.Pod,
+	workloads []workloadsv1.InstanceSet, instances []workloadsv1.Instance, pods []corev1.Pod,
 ) (*shardingScaleInMemberInventory, error) {
 	invalid := func(format string, args ...any) error {
 		return fmt.Errorf("%w: %s", errInvalidShardingScaleInMemberInventory,
@@ -377,6 +448,10 @@ func buildFreshShardingScaleInMembers(topology *shardingScaleInTopologyInventory
 			owner.Kind != appsv1.ComponentKind || owner.Name != comp.Name || owner.UID != comp.UID {
 			return nil, invalid("InstanceSet controller owner does not identify the exact Component")
 		}
+		if ptr.Deref(workload.Spec.EnableInstanceAPI, false) !=
+			ptr.Deref(comp.Spec.EnableInstanceAPI, false) {
+			return nil, invalid("InstanceSet EnableInstanceAPI does not match the exact Component")
+		}
 		if workloadsByComponentUID[comp.UID] != nil {
 			return nil, invalid("Component %q has more than one InstanceSet", comp.Name)
 		}
@@ -393,7 +468,75 @@ func buildFreshShardingScaleInMembers(topology *shardingScaleInTopologyInventory
 		}
 	}
 
+	instancesByComponentUID := make(map[types.UID][]workloadsv1.Instance,
+		len(topology.Components))
+	instancesByName := make(map[string]*workloadsv1.Instance, len(instances))
+	instanceUIDs := make(map[types.UID]struct{}, len(instances))
+	for i := range instances {
+		instance := &instances[i]
+		if instance.Namespace != topology.Cluster.Namespace || instance.Name == "" ||
+			instance.UID == "" || instance.ResourceVersion == "" || instance.Generation <= 0 {
+			return nil, invalid("Instance identity, generation, and resourceVersion must be complete")
+		}
+		if !instance.DeletionTimestamp.IsZero() {
+			return nil, invalid("Instance is deleting: %s/%s", instance.Namespace, instance.Name)
+		}
+		shortName := instance.Labels[constant.KBAppComponentLabelKey]
+		comp := componentsByShortName[shortName]
+		if comp == nil || instance.Labels[constant.AppManagedByLabelKey] != constant.AppName ||
+			instance.Labels[constant.AppInstanceLabelKey] != topology.Cluster.Name ||
+			instance.Labels[constant.KBAppShardingNameLabelKey] !=
+				comp.Labels[constant.KBAppShardingNameLabelKey] ||
+			instance.Labels[constant.KBAppShardTemplateLabelKey] !=
+				comp.Labels[constant.KBAppShardTemplateLabelKey] {
+			return nil, invalid("Instance labels do not identify one exact Component")
+		}
+		workload := workloadsByComponentUID[comp.UID]
+		if workload == nil ||
+			instance.Labels[instanceset.WorkloadsManagedByLabelKey] !=
+				workloadsv1.InstanceSetKind ||
+			instance.Labels[instanceset.WorkloadsInstanceLabelKey] != workload.Name ||
+			instance.Spec.InstanceSetName != workload.Name {
+			return nil, invalid("Instance labels and spec do not identify the exact InstanceSet")
+		}
+		if !ptr.Deref(workload.Spec.EnableInstanceAPI, false) {
+			return nil, invalid("Instance exists while Instance API is disabled for %q", workload.Name)
+		}
+		owner := metav1.GetControllerOf(instance)
+		if owner == nil || owner.APIVersion != workloadsv1.GroupVersion.String() ||
+			owner.Kind != workloadsv1.InstanceSetKind || owner.Name != workload.Name ||
+			owner.UID != workload.UID {
+			return nil, invalid("Instance controller owner does not identify the exact InstanceSet")
+		}
+		if instancesByName[instance.Name] != nil {
+			return nil, invalid("Instance name %q is duplicated", instance.Name)
+		}
+		if _, ok := instanceUIDs[instance.UID]; ok {
+			return nil, invalid("Instance UID %q is duplicated", instance.UID)
+		}
+		instancesByName[instance.Name] = instance
+		instanceUIDs[instance.UID] = struct{}{}
+		instancesByComponentUID[comp.UID] = append(
+			instancesByComponentUID[comp.UID], *instance.DeepCopy())
+	}
+	for i := range topology.Components {
+		comp := &topology.Components[i]
+		workload := workloadsByComponentUID[comp.UID]
+		memberInstances := instancesByComponentUID[comp.UID]
+		if ptr.Deref(workload.Spec.EnableInstanceAPI, false) {
+			if len(memberInstances) < 1 || len(memberInstances) > 5 {
+				return nil, invalid("Component %q with Instance API must have between 1 and 5 Instances",
+					comp.Name)
+			}
+		} else if len(memberInstances) != 0 {
+			return nil, invalid("Component %q has Instances while Instance API is disabled", comp.Name)
+		}
+		sortShardingScaleInInstances(memberInstances)
+		instancesByComponentUID[comp.UID] = memberInstances
+	}
+
 	podsByComponentUID := make(map[types.UID][]shardingScaleInSourcePod, len(topology.Components))
+	podInstanceUIDs := make(map[types.UID]struct{}, len(pods))
 	podNames := make(map[string]struct{}, len(pods))
 	podUIDs := make(map[types.UID]struct{}, len(pods))
 	podFQDNs := make(map[string]struct{}, len(pods))
@@ -423,13 +566,34 @@ func buildFreshShardingScaleInMembers(topology *shardingScaleInTopologyInventory
 			return nil, invalid("Pod labels do not identify the exact InstanceSet")
 		}
 		owner := metav1.GetControllerOf(pod)
-		if owner == nil || owner.APIVersion != workloadsv1.GroupVersion.String() ||
+		if ptr.Deref(workload.Spec.EnableInstanceAPI, false) {
+			instance := instancesByName[pod.Name]
+			if instance == nil ||
+				instance.Spec.InstanceSetName != workload.Name ||
+				instance.Labels[constant.KBAppComponentLabelKey] != shortName ||
+				pod.Labels[constant.KBAppInstanceNameLabelKey] != instance.Name ||
+				owner == nil || owner.APIVersion != workloadsv1.GroupVersion.String() ||
+				owner.Kind != shardingScaleInInstanceKind || owner.Name != instance.Name ||
+				owner.UID != instance.UID {
+				return nil, invalid("Pod controller owner does not identify the exact Instance")
+			}
+			if _, ok := podInstanceUIDs[instance.UID]; ok {
+				return nil, invalid("Instance %q owns more than one Pod", instance.Name)
+			}
+			podInstanceUIDs[instance.UID] = struct{}{}
+		} else if owner == nil || owner.APIVersion != workloadsv1.GroupVersion.String() ||
 			owner.Kind != workloadsv1.InstanceSetKind || owner.Name != workload.Name ||
 			owner.UID != workload.UID {
 			return nil, invalid("Pod controller owner does not identify the exact InstanceSet")
 		}
 
-		fqdn := intctrlutil.PodFQDN(pod.Namespace, comp.Name, pod.Name)
+		expectedSubdomain := constant.GenerateDefaultComponentHeadlessServiceName(
+			topology.Cluster.Name, shortName)
+		if pod.Spec.Hostname != pod.Name || pod.Spec.Subdomain != expectedSubdomain {
+			return nil, invalid("Pod hostname and subdomain do not identify the exact headless Service")
+		}
+		fqdn := fmt.Sprintf("%s.%s", pod.Spec.Hostname,
+			intctrlutil.ServiceFQDN(pod.Namespace, pod.Spec.Subdomain))
 		if fqdn == "" {
 			return nil, invalid("Pod FQDN must not be empty")
 		}
@@ -453,6 +617,11 @@ func buildFreshShardingScaleInMembers(topology *shardingScaleInTopologyInventory
 		memberPods := podsByComponentUID[comp.UID]
 		if len(memberPods) < 1 || len(memberPods) > 5 {
 			return nil, invalid("Component %q must have between 1 and 5 Pods", comp.Name)
+		}
+		workload := workloadsByComponentUID[comp.UID]
+		if ptr.Deref(workload.Spec.EnableInstanceAPI, false) &&
+			len(memberPods) != len(instancesByComponentUID[comp.UID]) {
+			return nil, invalid("Component %q Instance API owner chain is incomplete", comp.Name)
 		}
 		sortShardingScaleInSourcePods(memberPods)
 		podsByComponentUID[comp.UID] = memberPods
@@ -481,6 +650,7 @@ func buildFreshShardingScaleInMembers(topology *shardingScaleInTopologyInventory
 			Component:         *comp.DeepCopy(),
 			ShardTemplateName: templateName,
 			Workload:          *workload.DeepCopy(),
+			Instances:         deepCopyShardingScaleInInstances(instancesByComponentUID[comp.UID]),
 			Pods:              deepCopyShardingScaleInSourcePods(podsByComponentUID[comp.UID]),
 		}, nil
 	}
@@ -713,6 +883,14 @@ func sameShardingScaleInPodSnapshot(a, b []corev1.Pod) bool {
 	return reflect.DeepEqual(aCopy, bCopy)
 }
 
+func sameShardingScaleInInstanceSnapshot(a, b []workloadsv1.Instance) bool {
+	aCopy := deepCopyShardingScaleInInstances(a)
+	bCopy := deepCopyShardingScaleInInstances(b)
+	sortShardingScaleInInstances(aCopy)
+	sortShardingScaleInInstances(bCopy)
+	return reflect.DeepEqual(aCopy, bCopy)
+}
+
 func deepCopyShardingScaleInTopologyInventory(
 	in *shardingScaleInTopologyInventory,
 ) *shardingScaleInTopologyInventory {
@@ -751,6 +929,14 @@ func deepCopyShardingScaleInWorkloads(in []workloadsv1.InstanceSet) []workloadsv
 	return out
 }
 
+func deepCopyShardingScaleInInstances(in []workloadsv1.Instance) []workloadsv1.Instance {
+	out := make([]workloadsv1.Instance, len(in))
+	for i := range in {
+		out[i] = *in[i].DeepCopy()
+	}
+	return out
+}
+
 func deepCopyShardingScaleInPods(in []corev1.Pod) []corev1.Pod {
 	out := make([]corev1.Pod, len(in))
 	for i := range in {
@@ -779,6 +965,7 @@ func deepCopyShardingScaleInSourceMembers(
 			Component:         *in[i].Component.DeepCopy(),
 			ShardTemplateName: in[i].ShardTemplateName,
 			Workload:          *in[i].Workload.DeepCopy(),
+			Instances:         deepCopyShardingScaleInInstances(in[i].Instances),
 			Pods:              deepCopyShardingScaleInSourcePods(in[i].Pods),
 		}
 	}
@@ -787,6 +974,12 @@ func deepCopyShardingScaleInSourceMembers(
 
 func sortShardingScaleInWorkloads(workloads []workloadsv1.InstanceSet) {
 	slices.SortFunc(workloads, func(a, b workloadsv1.InstanceSet) int {
+		return strings.Compare(a.Name, b.Name)
+	})
+}
+
+func sortShardingScaleInInstances(instances []workloadsv1.Instance) {
+	slices.SortFunc(instances, func(a, b workloadsv1.Instance) int {
 		return strings.Compare(a.Name, b.Name)
 	})
 }

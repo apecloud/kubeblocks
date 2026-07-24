@@ -23,11 +23,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/netip"
 	"reflect"
 	"slices"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
@@ -45,6 +48,7 @@ import (
 var (
 	errInvalidShardingScaleInTopology        = errors.New("invalid sharding scale-in topology")
 	errInvalidShardingScaleInMemberInventory = errors.New("invalid sharding scale-in member inventory")
+	errInvalidShardingScaleInDNSInventory    = errors.New("invalid sharding scale-in DNS inventory")
 )
 
 const (
@@ -92,6 +96,22 @@ type shardingScaleInMemberInventory struct {
 	Topology *shardingScaleInTopologyInventory
 	Leaving  []shardingScaleInSourceMember
 	Staying  []shardingScaleInSourceMember
+}
+
+type shardingScaleInSourceDNS struct {
+	Member         shardingScaleInSourceMember
+	Service        corev1.Service
+	Endpoints      *corev1.Endpoints
+	EndpointSlices []discoveryv1.EndpointSlice
+}
+
+// shardingScaleInDNSInventory proves the live DNS identity of every source
+// member. It remains source-only; no execution prerequisite or persisted plan
+// may be derived until later builders close the remaining live identities.
+type shardingScaleInDNSInventory struct {
+	Members *shardingScaleInMemberInventory
+	Leaving []shardingScaleInSourceDNS
+	Staying []shardingScaleInSourceDNS
 }
 
 func loadFreshShardingScaleInTopology(ctx context.Context, apiReader client.Reader,
@@ -289,6 +309,534 @@ func loadFreshShardingScaleInMembers(ctx context.Context, apiReader client.Reade
 		return nil, invalid("topology snapshot changed while member identity was built")
 	}
 	return deepCopyShardingScaleInMemberInventory(inventory), nil
+}
+
+func loadFreshShardingScaleInDNS(ctx context.Context, apiReader client.Reader,
+	clusterKey types.NamespacedName, expectedClusterUID types.UID, shardingName string,
+) (*shardingScaleInDNSInventory, error) {
+	invalid := func(format string, args ...any) error {
+		return fmt.Errorf("%w: %s", errInvalidShardingScaleInDNSInventory,
+			fmt.Sprintf(format, args...))
+	}
+	if apiReader == nil {
+		return nil, invalid("APIReader must not be nil")
+	}
+
+	membersBefore, err := loadFreshShardingScaleInMembers(
+		ctx, apiReader, clusterKey, expectedClusterUID, shardingName)
+	if err != nil {
+		return nil, err
+	}
+	dnsBefore, err := buildFreshShardingScaleInDNS(ctx, apiReader, membersBefore)
+	if err != nil {
+		return nil, err
+	}
+	dnsAfter, err := buildFreshShardingScaleInDNS(ctx, apiReader, membersBefore)
+	if err != nil {
+		return nil, err
+	}
+	if !sameShardingScaleInDNSSnapshot(dnsBefore, dnsAfter) {
+		return nil, invalid("Service snapshot changed, or Endpoints/EndpointSlice snapshot changed while DNS identity was built")
+	}
+
+	membersAfter, err := loadFreshShardingScaleInMembers(
+		ctx, apiReader, clusterKey, expectedClusterUID, shardingName)
+	if err != nil {
+		return nil, err
+	}
+	if !reflect.DeepEqual(membersBefore, membersAfter) {
+		return nil, invalid("member snapshot changed while DNS identity was built")
+	}
+	dnsBefore.Members = membersBefore
+	return deepCopyShardingScaleInDNSInventory(dnsBefore), nil
+}
+
+type shardingScaleInDNSRecordLocation struct {
+	leaving bool
+	index   int
+}
+
+func buildFreshShardingScaleInDNS(ctx context.Context, apiReader client.Reader,
+	members *shardingScaleInMemberInventory,
+) (*shardingScaleInDNSInventory, error) {
+	invalid := func(format string, args ...any) error {
+		return fmt.Errorf("%w: %s", errInvalidShardingScaleInDNSInventory,
+			fmt.Sprintf(format, args...))
+	}
+	if apiReader == nil || members == nil || members.Topology == nil ||
+		members.Topology.Cluster == nil {
+		return nil, invalid("APIReader and member inventory must be complete")
+	}
+
+	buildRecords := func(sourceMembers []shardingScaleInSourceMember) (
+		[]shardingScaleInSourceDNS, error,
+	) {
+		records := make([]shardingScaleInSourceDNS, 0, len(sourceMembers))
+		for i := range sourceMembers {
+			member := &sourceMembers[i]
+			serviceKey := types.NamespacedName{
+				Namespace: member.Workload.Namespace,
+				Name:      member.Workload.Name + "-headless",
+			}
+			service := &corev1.Service{}
+			if err := apiReader.Get(ctx, serviceKey, service); err != nil {
+				return nil, err
+			}
+
+			var endpoints *corev1.Endpoints
+			currentEndpoints := &corev1.Endpoints{}
+			if err := apiReader.Get(ctx, serviceKey, currentEndpoints); err != nil {
+				if !apierrors.IsNotFound(err) {
+					return nil, err
+				}
+			} else {
+				endpoints = currentEndpoints.DeepCopy()
+			}
+			records = append(records, shardingScaleInSourceDNS{
+				Member:    deepCopyShardingScaleInSourceMember(*member),
+				Service:   *service.DeepCopy(),
+				Endpoints: endpoints,
+			})
+		}
+		return records, nil
+	}
+
+	leaving, err := buildRecords(members.Leaving)
+	if err != nil {
+		return nil, err
+	}
+	staying, err := buildRecords(members.Staying)
+	if err != nil {
+		return nil, err
+	}
+	inventory := &shardingScaleInDNSInventory{
+		Members: members,
+		Leaving: leaving,
+		Staying: staying,
+	}
+
+	byName := make(map[string]shardingScaleInDNSRecordLocation, len(leaving)+len(staying))
+	byIdentity := make(map[string]shardingScaleInDNSRecordLocation, len(leaving)+len(staying))
+	indexRecords := func(records []shardingScaleInSourceDNS, isLeaving bool) error {
+		for i := range records {
+			service := &records[i].Service
+			location := shardingScaleInDNSRecordLocation{leaving: isLeaving, index: i}
+			if _, ok := byName[service.Name]; ok {
+				return invalid("Service name %q is duplicated", service.Name)
+			}
+			identity := objectOwnerIdentity(service.Name, service.UID)
+			if _, ok := byIdentity[identity]; ok {
+				return invalid("Service identity %q is duplicated", service.Name)
+			}
+			byName[service.Name] = location
+			byIdentity[identity] = location
+		}
+		return nil
+	}
+	if err := indexRecords(inventory.Leaving, true); err != nil {
+		return nil, err
+	}
+	if err := indexRecords(inventory.Staying, false); err != nil {
+		return nil, err
+	}
+
+	sliceList := &discoveryv1.EndpointSliceList{}
+	if err := apiReader.List(ctx, sliceList,
+		client.InNamespace(members.Topology.Cluster.Namespace)); err != nil {
+		return nil, err
+	}
+	recordAt := func(location shardingScaleInDNSRecordLocation) *shardingScaleInSourceDNS {
+		if location.leaving {
+			return &inventory.Leaving[location.index]
+		}
+		return &inventory.Staying[location.index]
+	}
+	for i := range sliceList.Items {
+		slice := &sliceList.Items[i]
+		labelLocation, labelMatches := byName[slice.Labels[discoveryv1.LabelServiceName]]
+		ownerLocation, ownerMatches := byIdentity[ownerReferenceIdentity(metav1.GetControllerOf(slice))]
+		if labelMatches && ownerMatches && labelLocation != ownerLocation {
+			return nil, invalid("EndpointSlice %q ambiguously refers to two Services", slice.Name)
+		}
+		if !labelMatches && !ownerMatches {
+			continue
+		}
+		location := labelLocation
+		if ownerMatches {
+			location = ownerLocation
+		}
+		record := recordAt(location)
+		record.EndpointSlices = append(record.EndpointSlices, *slice.DeepCopy())
+	}
+
+	validateRecords := func(records []shardingScaleInSourceDNS) error {
+		for i := range records {
+			if err := validateFreshShardingScaleInDNSRecord(&records[i]); err != nil {
+				return err
+			}
+			sortShardingScaleInEndpointSlices(records[i].EndpointSlices)
+		}
+		sortShardingScaleInDNSRecords(records)
+		return nil
+	}
+	if err := validateRecords(inventory.Leaving); err != nil {
+		return nil, err
+	}
+	if err := validateRecords(inventory.Staying); err != nil {
+		return nil, err
+	}
+	return inventory, nil
+}
+
+func validateFreshShardingScaleInDNSRecord(record *shardingScaleInSourceDNS) error {
+	invalid := func(format string, args ...any) error {
+		return fmt.Errorf("%w: %s", errInvalidShardingScaleInDNSInventory,
+			fmt.Sprintf(format, args...))
+	}
+	if record == nil {
+		return invalid("DNS record must not be nil")
+	}
+	member := &record.Member
+	service := &record.Service
+	workload := &member.Workload
+	expectedServiceName := workload.Name + "-headless"
+	if service.Namespace != workload.Namespace || service.Name != expectedServiceName ||
+		service.UID == "" || service.ResourceVersion == "" ||
+		!service.DeletionTimestamp.IsZero() {
+		return invalid("headless Service identity for InstanceSet %q is invalid", workload.Name)
+	}
+	if workload.Spec.DisableDefaultHeadlessService {
+		return invalid("InstanceSet %q disables its default headless Service", workload.Name)
+	}
+	if !hasExactControllerOwner(service, workloadsv1.GroupVersion.String(),
+		workloadsv1.InstanceSetKind, workload.Name, workload.UID) {
+		return invalid("Service controller owner for %q is not the exact InstanceSet", service.Name)
+	}
+	if service.Spec.Type != corev1.ServiceTypeClusterIP ||
+		service.Spec.ClusterIP != corev1.ClusterIPNone ||
+		!reflect.DeepEqual(service.Spec.ClusterIPs, []string{corev1.ClusterIPNone}) ||
+		!service.Spec.PublishNotReadyAddresses {
+		return invalid("headless Service %q contract is invalid", service.Name)
+	}
+	if workload.Spec.Selector == nil || len(workload.Spec.Selector.MatchLabels) == 0 ||
+		len(workload.Spec.Selector.MatchExpressions) != 0 {
+		return invalid("InstanceSet %q selector must be non-empty and exactly representable by a Service",
+			workload.Name)
+	}
+	if releasePhase, ok := workload.Spec.Selector.MatchLabels[constant.KBAppReleasePhaseKey]; ok &&
+		releasePhase != constant.ReleasePhaseStable {
+		return invalid("InstanceSet %q selector %q must be %q when present",
+			workload.Name, constant.KBAppReleasePhaseKey, constant.ReleasePhaseStable)
+	}
+	expectedSelector := make(map[string]string, len(workload.Spec.Selector.MatchLabels)+1)
+	for key, value := range workload.Spec.Selector.MatchLabels {
+		expectedSelector[key] = value
+	}
+	expectedSelector[constant.KBAppReleasePhaseKey] = constant.ReleasePhaseStable
+	if !reflect.DeepEqual(service.Spec.Selector, expectedSelector) {
+		return invalid("Service selector for %q is not exact", service.Name)
+	}
+	if err := validateShardingScaleInServiceFamilies(service); err != nil {
+		return err
+	}
+	for i := range member.Pods {
+		if member.Pods[i].Pod.Spec.Subdomain != service.Name {
+			return invalid("Pod %q subdomain does not match Service %q",
+				member.Pods[i].Pod.Name, service.Name)
+		}
+	}
+	if record.Endpoints != nil {
+		if err := validateShardingScaleInEndpoints(record); err != nil {
+			return err
+		}
+	}
+	if len(record.EndpointSlices) == 0 {
+		return invalid("EndpointSlice coverage for Service %q is empty", service.Name)
+	}
+	return validateShardingScaleInEndpointSlices(record)
+}
+
+func validateShardingScaleInServiceFamilies(service *corev1.Service) error {
+	invalid := func(format string, args ...any) error {
+		return fmt.Errorf("%w: %s", errInvalidShardingScaleInDNSInventory,
+			fmt.Sprintf(format, args...))
+	}
+	if len(service.Spec.IPFamilies) < 1 || len(service.Spec.IPFamilies) > 2 {
+		return invalid("Service %q must have one or two IP families", service.Name)
+	}
+	seen := map[corev1.IPFamily]struct{}{}
+	for _, family := range service.Spec.IPFamilies {
+		if family != corev1.IPv4Protocol && family != corev1.IPv6Protocol {
+			return invalid("Service %q has unsupported IP family %q", service.Name, family)
+		}
+		if _, ok := seen[family]; ok {
+			return invalid("Service %q duplicates IP family %q", service.Name, family)
+		}
+		seen[family] = struct{}{}
+	}
+	if len(service.Spec.IPFamilies) == 1 {
+		if service.Spec.IPFamilyPolicy != nil &&
+			*service.Spec.IPFamilyPolicy != corev1.IPFamilyPolicySingleStack &&
+			*service.Spec.IPFamilyPolicy != corev1.IPFamilyPolicyPreferDualStack {
+			return invalid("Service %q has an invalid single-family policy", service.Name)
+		}
+	} else if service.Spec.IPFamilyPolicy == nil ||
+		(*service.Spec.IPFamilyPolicy != corev1.IPFamilyPolicyRequireDualStack &&
+			*service.Spec.IPFamilyPolicy != corev1.IPFamilyPolicyPreferDualStack) {
+		return invalid("Service %q has an invalid dual-stack policy", service.Name)
+	}
+	return nil
+}
+
+func validateShardingScaleInEndpoints(record *shardingScaleInSourceDNS) error {
+	invalid := func(format string, args ...any) error {
+		return fmt.Errorf("%w: %s", errInvalidShardingScaleInDNSInventory,
+			fmt.Sprintf(format, args...))
+	}
+	endpoints := record.Endpoints
+	service := &record.Service
+	if endpoints.Namespace != service.Namespace || endpoints.Name != service.Name ||
+		endpoints.UID == "" || endpoints.ResourceVersion == "" ||
+		!endpoints.DeletionTimestamp.IsZero() {
+		return invalid("Endpoints identity for Service %q is invalid", service.Name)
+	}
+	if len(service.Spec.IPFamilies) == 0 {
+		return invalid("Service %q has no primary IP family", service.Name)
+	}
+	primaryFamily := service.Spec.IPFamilies[0]
+	podsByName := make(map[string]*corev1.Pod, len(record.Member.Pods))
+	primaryAddresses := make(map[string]string, len(record.Member.Pods))
+	for i := range record.Member.Pods {
+		pod := &record.Member.Pods[i].Pod
+		if _, ok := podsByName[pod.Name]; ok {
+			return invalid("Endpoints Pod %q is duplicated", pod.Name)
+		}
+		addresses, err := shardingScaleInPodAddresses(pod)
+		if err != nil {
+			return err
+		}
+		primaryAddress, ok := addresses[primaryFamily]
+		if !ok {
+			return invalid("Endpoints Pod %q has no address for Service primary IP family %q",
+				pod.Name, primaryFamily)
+		}
+		podsByName[pod.Name] = pod
+		primaryAddresses[pod.Name] = primaryAddress
+	}
+	seen := make(map[string]struct{}, len(podsByName))
+	validateAddress := func(address corev1.EndpointAddress) error {
+		if address.TargetRef == nil {
+			return invalid("Endpoints %q address has no Pod TargetRef", endpoints.Name)
+		}
+		pod, ok := podsByName[address.TargetRef.Name]
+		if !ok || address.TargetRef.Kind != "Pod" ||
+			(address.TargetRef.APIVersion != "" && address.TargetRef.APIVersion != "v1") ||
+			address.TargetRef.Namespace != pod.Namespace ||
+			address.TargetRef.Name != pod.Name || address.TargetRef.UID != pod.UID {
+			return invalid("Endpoints %q Pod TargetRef is not exact", endpoints.Name)
+		}
+		if _, ok := seen[pod.Name]; ok {
+			return invalid("Endpoints %q duplicates Pod %q", endpoints.Name, pod.Name)
+		}
+		if address.IP != primaryAddresses[pod.Name] {
+			return invalid("Endpoints %q address for Pod %q is not its Service primary IP family address",
+				endpoints.Name, pod.Name)
+		}
+		if address.Hostname != pod.Name {
+			return invalid("Endpoints %q hostname for Pod %q is not exact",
+				endpoints.Name, pod.Name)
+		}
+		seen[pod.Name] = struct{}{}
+		return nil
+	}
+	for i := range endpoints.Subsets {
+		for j := range endpoints.Subsets[i].Addresses {
+			if err := validateAddress(endpoints.Subsets[i].Addresses[j]); err != nil {
+				return err
+			}
+		}
+		for j := range endpoints.Subsets[i].NotReadyAddresses {
+			if err := validateAddress(endpoints.Subsets[i].NotReadyAddresses[j]); err != nil {
+				return err
+			}
+		}
+	}
+	if len(seen) != len(podsByName) {
+		return invalid("Endpoints %q Pod coverage is incomplete", endpoints.Name)
+	}
+	return nil
+}
+
+func validateShardingScaleInEndpointSlices(record *shardingScaleInSourceDNS) error {
+	invalid := func(format string, args ...any) error {
+		return fmt.Errorf("%w: %s", errInvalidShardingScaleInDNSInventory,
+			fmt.Sprintf(format, args...))
+	}
+	service := &record.Service
+	expectedByFamily := make(map[corev1.IPFamily]map[string]string,
+		len(service.Spec.IPFamilies))
+	for _, family := range service.Spec.IPFamilies {
+		expectedByFamily[family] = make(map[string]string, len(record.Member.Pods))
+	}
+	for i := range record.Member.Pods {
+		pod := &record.Member.Pods[i].Pod
+		byFamily, err := shardingScaleInPodAddresses(pod)
+		if err != nil {
+			return err
+		}
+		for _, family := range service.Spec.IPFamilies {
+			address, ok := byFamily[family]
+			if !ok {
+				return invalid("Pod %q has no address for Service IP family %q", pod.Name, family)
+			}
+			expectedByFamily[family][pod.Name] = address
+		}
+	}
+
+	seen := make(map[corev1.IPFamily]map[string]struct{}, len(expectedByFamily))
+	for family := range expectedByFamily {
+		seen[family] = map[string]struct{}{}
+	}
+	for i := range record.EndpointSlices {
+		slice := &record.EndpointSlices[i]
+		if slice.Namespace != service.Namespace || slice.Name == "" ||
+			slice.UID == "" || slice.ResourceVersion == "" ||
+			!slice.DeletionTimestamp.IsZero() {
+			return invalid("EndpointSlice identity for Service %q is invalid", service.Name)
+		}
+		if slice.Labels[discoveryv1.LabelServiceName] != service.Name {
+			return invalid("EndpointSlice service-name label for %q is not exact", slice.Name)
+		}
+		if !hasExactControllerOwner(slice, corev1.SchemeGroupVersion.String(),
+			"Service", service.Name, service.UID) {
+			return invalid("EndpointSlice controller owner for %q is not the exact Service",
+				slice.Name)
+		}
+		family, err := shardingScaleInEndpointSliceFamily(slice.AddressType)
+		if err != nil {
+			return err
+		}
+		expected, ok := expectedByFamily[family]
+		if !ok {
+			return invalid("EndpointSlice %q family is not served by Service %q",
+				slice.Name, service.Name)
+		}
+		for j := range slice.Endpoints {
+			endpoint := &slice.Endpoints[j]
+			if endpoint.TargetRef == nil || endpoint.Hostname == nil ||
+				len(endpoint.Addresses) != 1 {
+				return invalid("EndpointSlice %q endpoint identity is incomplete", slice.Name)
+			}
+			podName := endpoint.TargetRef.Name
+			expectedAddress, ok := expected[podName]
+			if !ok || endpoint.TargetRef.Kind != "Pod" ||
+				(endpoint.TargetRef.APIVersion != "" && endpoint.TargetRef.APIVersion != "v1") ||
+				endpoint.TargetRef.Namespace != service.Namespace ||
+				endpoint.TargetRef.UID == "" || *endpoint.Hostname != podName {
+				return invalid("EndpointSlice %q Pod identity is not exact", slice.Name)
+			}
+			var expectedUID types.UID
+			for k := range record.Member.Pods {
+				if record.Member.Pods[k].Pod.Name == podName {
+					expectedUID = record.Member.Pods[k].Pod.UID
+					break
+				}
+			}
+			if endpoint.TargetRef.UID != expectedUID {
+				return invalid("EndpointSlice %q Pod UID is not exact", slice.Name)
+			}
+			actualFamily, err := shardingScaleInIPFamily(endpoint.Addresses[0])
+			if err != nil || actualFamily != family ||
+				endpoint.Addresses[0] != expectedAddress {
+				return invalid("EndpointSlice %q Pod address is not exact", slice.Name)
+			}
+			if _, ok := seen[family][podName]; ok {
+				return invalid("EndpointSlice coverage duplicates Pod %q for family %q",
+					podName, family)
+			}
+			seen[family][podName] = struct{}{}
+		}
+	}
+	for family, expected := range expectedByFamily {
+		if len(seen[family]) != len(expected) {
+			return invalid("EndpointSlice Pod coverage for family %q is incomplete", family)
+		}
+	}
+	return nil
+}
+
+func shardingScaleInPodAddresses(pod *corev1.Pod) (
+	map[corev1.IPFamily]string, error,
+) {
+	invalid := func(format string, args ...any) error {
+		return fmt.Errorf("%w: %s", errInvalidShardingScaleInDNSInventory,
+			fmt.Sprintf(format, args...))
+	}
+	if pod == nil || pod.Status.PodIP == "" {
+		return nil, invalid("Pod primary PodIP must be non-empty")
+	}
+	primaryFamily, err := shardingScaleInIPFamily(pod.Status.PodIP)
+	if err != nil {
+		return nil, invalid("Pod %q has invalid primary PodIP %q", pod.Name, pod.Status.PodIP)
+	}
+	if len(pod.Status.PodIPs) == 0 {
+		return map[corev1.IPFamily]string{primaryFamily: pod.Status.PodIP}, nil
+	}
+	if pod.Status.PodIPs[0].IP != pod.Status.PodIP {
+		return nil, invalid("Pod %q primary PodIP does not match its first PodIPs entry", pod.Name)
+	}
+
+	byFamily := make(map[corev1.IPFamily]string, len(pod.Status.PodIPs))
+	for _, podIP := range pod.Status.PodIPs {
+		family, err := shardingScaleInIPFamily(podIP.IP)
+		if err != nil {
+			return nil, invalid("Pod %q has invalid PodIP %q", pod.Name, podIP.IP)
+		}
+		if _, ok := byFamily[family]; ok {
+			return nil, invalid("Pod %q has multiple addresses for IP family %q", pod.Name, family)
+		}
+		byFamily[family] = podIP.IP
+	}
+	return byFamily, nil
+}
+
+func shardingScaleInEndpointSliceFamily(addressType discoveryv1.AddressType) (
+	corev1.IPFamily, error,
+) {
+	switch addressType {
+	case discoveryv1.AddressTypeIPv4:
+		return corev1.IPv4Protocol, nil
+	case discoveryv1.AddressTypeIPv6:
+		return corev1.IPv6Protocol, nil
+	default:
+		return "", fmt.Errorf("%w: EndpointSlice address type %q is unsupported",
+			errInvalidShardingScaleInDNSInventory, addressType)
+	}
+}
+
+func shardingScaleInIPFamily(address string) (corev1.IPFamily, error) {
+	parsed, err := netip.ParseAddr(address)
+	if err != nil || parsed.Zone() != "" || parsed.Is4In6() {
+		if err == nil {
+			err = fmt.Errorf("address %q is not a canonical unzoned IP", address)
+		}
+		return "", err
+	}
+	if parsed.Is4() {
+		return corev1.IPv4Protocol, nil
+	}
+	if parsed.Is6() {
+		return corev1.IPv6Protocol, nil
+	}
+	return "", fmt.Errorf("address %q has no supported IP family", address)
+}
+
+func hasExactControllerOwner(object metav1.Object, apiVersion, kind, name string,
+	uid types.UID,
+) bool {
+	owner := metav1.GetControllerOf(object)
+	return owner != nil && owner.APIVersion == apiVersion && owner.Kind == kind &&
+		owner.Name == name && owner.UID == uid
 }
 
 func listFreshShardingScaleInWorkloads(ctx context.Context, apiReader client.Reader,
@@ -921,6 +1469,76 @@ func deepCopyShardingScaleInMemberInventory(
 	}
 }
 
+func deepCopyShardingScaleInDNSInventory(
+	in *shardingScaleInDNSInventory,
+) *shardingScaleInDNSInventory {
+	if in == nil {
+		return nil
+	}
+	return &shardingScaleInDNSInventory{
+		Members: deepCopyShardingScaleInMemberInventory(in.Members),
+		Leaving: deepCopyShardingScaleInDNSRecords(in.Leaving),
+		Staying: deepCopyShardingScaleInDNSRecords(in.Staying),
+	}
+}
+
+func deepCopyShardingScaleInDNSRecords(
+	in []shardingScaleInSourceDNS,
+) []shardingScaleInSourceDNS {
+	out := make([]shardingScaleInSourceDNS, len(in))
+	for i := range in {
+		out[i] = shardingScaleInSourceDNS{
+			Member:         deepCopyShardingScaleInSourceMember(in[i].Member),
+			Service:        *in[i].Service.DeepCopy(),
+			EndpointSlices: deepCopyShardingScaleInEndpointSlices(in[i].EndpointSlices),
+		}
+		if in[i].Endpoints != nil {
+			out[i].Endpoints = in[i].Endpoints.DeepCopy()
+		}
+	}
+	return out
+}
+
+func deepCopyShardingScaleInSourceMember(
+	in shardingScaleInSourceMember,
+) shardingScaleInSourceMember {
+	return shardingScaleInSourceMember{
+		Component:         *in.Component.DeepCopy(),
+		ShardTemplateName: in.ShardTemplateName,
+		Workload:          *in.Workload.DeepCopy(),
+		Instances:         deepCopyShardingScaleInInstances(in.Instances),
+		Pods:              deepCopyShardingScaleInSourcePods(in.Pods),
+	}
+}
+
+func deepCopyShardingScaleInEndpointSlices(
+	in []discoveryv1.EndpointSlice,
+) []discoveryv1.EndpointSlice {
+	out := make([]discoveryv1.EndpointSlice, len(in))
+	for i := range in {
+		out[i] = *in[i].DeepCopy()
+	}
+	return out
+}
+
+func sameShardingScaleInDNSSnapshot(
+	a, b *shardingScaleInDNSInventory,
+) bool {
+	aCopy := deepCopyShardingScaleInDNSInventory(a)
+	bCopy := deepCopyShardingScaleInDNSInventory(b)
+	if aCopy != nil {
+		aCopy.Members = nil
+		sortShardingScaleInDNSRecords(aCopy.Leaving)
+		sortShardingScaleInDNSRecords(aCopy.Staying)
+	}
+	if bCopy != nil {
+		bCopy.Members = nil
+		sortShardingScaleInDNSRecords(bCopy.Leaving)
+		sortShardingScaleInDNSRecords(bCopy.Staying)
+	}
+	return reflect.DeepEqual(aCopy, bCopy)
+}
+
 func deepCopyShardingScaleInWorkloads(in []workloadsv1.InstanceSet) []workloadsv1.InstanceSet {
 	out := make([]workloadsv1.InstanceSet, len(in))
 	for i := range in {
@@ -961,13 +1579,7 @@ func deepCopyShardingScaleInSourceMembers(
 ) []shardingScaleInSourceMember {
 	out := make([]shardingScaleInSourceMember, len(in))
 	for i := range in {
-		out[i] = shardingScaleInSourceMember{
-			Component:         *in[i].Component.DeepCopy(),
-			ShardTemplateName: in[i].ShardTemplateName,
-			Workload:          *in[i].Workload.DeepCopy(),
-			Instances:         deepCopyShardingScaleInInstances(in[i].Instances),
-			Pods:              deepCopyShardingScaleInSourcePods(in[i].Pods),
-		}
+		out[i] = deepCopyShardingScaleInSourceMember(in[i])
 	}
 	return out
 }
@@ -999,5 +1611,20 @@ func sortShardingScaleInSourcePods(pods []shardingScaleInSourcePod) {
 func sortShardingScaleInSourceMembers(members []shardingScaleInSourceMember) {
 	slices.SortFunc(members, func(a, b shardingScaleInSourceMember) int {
 		return strings.Compare(a.Component.Name, b.Component.Name)
+	})
+}
+
+func sortShardingScaleInDNSRecords(records []shardingScaleInSourceDNS) {
+	for i := range records {
+		sortShardingScaleInEndpointSlices(records[i].EndpointSlices)
+	}
+	slices.SortFunc(records, func(a, b shardingScaleInSourceDNS) int {
+		return strings.Compare(a.Service.Name, b.Service.Name)
+	})
+}
+
+func sortShardingScaleInEndpointSlices(endpointSlices []discoveryv1.EndpointSlice) {
+	slices.SortFunc(endpointSlices, func(a, b discoveryv1.EndpointSlice) int {
+		return strings.Compare(a.Name, b.Name)
 	})
 }

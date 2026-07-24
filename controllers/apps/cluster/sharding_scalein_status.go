@@ -299,21 +299,19 @@ func reduceShardingScaleInStatus(current *appsv1.ShardingScaleInStatus,
 		return nil, fmt.Errorf("%w: topologyFenceToken is immutable",
 			errInvalidShardingScaleInStatusTransition)
 	}
-	if (current.PlanMaterial == nil) != (next.PlanMaterial == nil) {
-		return nil, fmt.Errorf("%w: planMaterial presence is immutable",
+	if current.PlanMaterial == nil || next.PlanMaterial == nil {
+		return nil, fmt.Errorf("%w: current and next planMaterial must not be nil",
 			errInvalidShardingScaleInStatusTransition)
 	}
-	if current.PlanMaterial != nil {
-		if err := validateShardingScaleInPlanMaterialBinding(current); err != nil {
-			return nil, err
-		}
-		if err := validateShardingScaleInPlanMaterialBinding(next); err != nil {
-			return nil, err
-		}
-		if !equality.Semantic.DeepEqual(current.PlanMaterial, next.PlanMaterial) {
-			return nil, fmt.Errorf("%w: planMaterial is immutable",
-				errInvalidShardingScaleInStatusTransition)
-		}
+	if err := validateShardingScaleInPlanMaterialBinding(current); err != nil {
+		return nil, err
+	}
+	if err := validateShardingScaleInPlanMaterialBinding(next); err != nil {
+		return nil, err
+	}
+	if !equality.Semantic.DeepEqual(current.PlanMaterial, next.PlanMaterial) {
+		return nil, fmt.Errorf("%w: planMaterial is immutable",
+			errInvalidShardingScaleInStatusTransition)
 	}
 	if current.ExternalWriteAuthorized && !next.ExternalWriteAuthorized {
 		return nil, fmt.Errorf("%w: externalWriteAuthorized cannot be revoked",
@@ -335,7 +333,8 @@ func reduceShardingScaleInStatus(current *appsv1.ShardingScaleInStatus,
 
 func validateShardingScaleInPlanMaterialBinding(status *appsv1.ShardingScaleInStatus) error {
 	if status.PlanMaterial == nil {
-		return nil
+		return fmt.Errorf("%w: planMaterial must not be nil",
+			errInvalidShardingScaleInStatusTransition)
 	}
 	canonical, planID, err := buildShardingScaleInPlanMaterial(status.PlanMaterial)
 	if err != nil {

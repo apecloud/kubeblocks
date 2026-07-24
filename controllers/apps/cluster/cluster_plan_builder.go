@@ -29,6 +29,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -218,7 +219,25 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 // Plan implementation
 
 func (p *clusterPlan) Execute() error {
-	err := p.dag.WalkReverseTopoOrder(p.walkFunc, nil)
+	if err := p.dag.Validate(); err != nil {
+		return err
+	}
+	statusCAS, err := findExclusiveClusterStatusCASVertex(p.dag)
+	if err != nil {
+		return err
+	}
+	if statusCAS != nil {
+		if statusCAS.cluster == nil {
+			return fmt.Errorf("invalid exclusive Cluster status CAS intent")
+		}
+		if err := validateClusterStatusCASPatch(statusCAS.cluster, statusCAS.patch); err != nil {
+			return err
+		}
+		return p.cli.Status().Patch(p.transCtx.Context, statusCAS.cluster,
+			client.RawPatch(types.JSONPatchType, statusCAS.patch))
+	}
+
+	err = p.dag.WalkReverseTopoOrder(p.walkFunc, nil)
 	if err != nil {
 		if hErr := p.handlePlanExecutionError(err); hErr != nil {
 			return hErr

@@ -57,22 +57,41 @@ var _ = Describe("sharding scale-in status reducer", func() {
 		}
 	}
 
-	newStatus := func(planID string, phase appsv1.ShardingScaleInPhase) *appsv1.ShardingScaleInStatus {
+	planID := func(planKey string) string {
+		material := newShardingScaleInPlanMaterialFixture()
+		if planKey != "" {
+			material.Source.OptionalOpsRequestName = "ops-" + planKey
+			material.Source.OptionalOpsRequestUID = types.UID("ops-uid-" + planKey)
+		}
+		_, id, err := buildShardingScaleInPlanMaterial(material)
+		Expect(err).ShouldNot(HaveOccurred())
+		return id
+	}
+
+	newStatus := func(planKey string, phase appsv1.ShardingScaleInPhase) *appsv1.ShardingScaleInStatus {
+		material := newShardingScaleInPlanMaterialFixture()
+		if planKey != "" {
+			material.Source.OptionalOpsRequestName = "ops-" + planKey
+			material.Source.OptionalOpsRequestUID = types.UID("ops-uid-" + planKey)
+		}
+		canonical, id, err := buildShardingScaleInPlanMaterial(material)
+		Expect(err).ShouldNot(HaveOccurred())
 		return &appsv1.ShardingScaleInStatus{
 			ProtocolVersion:    appsv1.ShardingScaleInResultProtocolV2,
-			PlanID:             planID,
+			PlanID:             id,
 			Phase:              phase,
 			TopologyFenceToken: "fence-1",
+			PlanMaterial:       canonical,
 		}
 	}
 
-	newLock := func(planID string) *appsv1.TopologyMutationLockStatus {
+	newLock := func(planKey string) *appsv1.TopologyMutationLockStatus {
 		return &appsv1.TopologyMutationLockStatus{
 			Version:               appsv1.TopologyMutationLockVersionV1,
 			FenceToken:            "fence-1",
 			ClusterUID:            types.UID("cluster-uid"),
 			OwnerKind:             appsv1.TopologyMutationLockOwnerShardingScaleIn,
-			OwnerPlanID:           planID,
+			OwnerPlanID:           planID(planKey),
 			State:                 appsv1.TopologyMutationLockStateInstallingAuthority,
 			AcquiredAt:            &metav1.Time{Time: time.Unix(1, 0).UTC()},
 			AffectedComponentUIDs: []types.UID{"component-1", "component-2"},
@@ -98,6 +117,7 @@ var _ = Describe("sharding scale-in status reducer", func() {
 		Expect(reduced).ShouldNot(BeIdenticalTo(next))
 		Expect(reducedLock).Should(Equal(lock))
 		Expect(reducedLock).ShouldNot(BeIdenticalTo(lock))
+		Expect(validateClusterStatusCASPatch(cluster, patch)).Should(Succeed())
 
 		operations := decodePatch(patch)
 		Expect(operations).Should(HaveLen(4))
@@ -138,7 +158,7 @@ var _ = Describe("sharding scale-in status reducer", func() {
 			func(lock *appsv1.TopologyMutationLockStatus) { lock.FenceToken = "other-fence" },
 			func(lock *appsv1.TopologyMutationLockStatus) { lock.ClusterUID = "other-cluster" },
 			func(lock *appsv1.TopologyMutationLockStatus) { lock.OwnerKind = "" },
-			func(lock *appsv1.TopologyMutationLockStatus) { lock.OwnerPlanID = "other-plan" },
+			func(lock *appsv1.TopologyMutationLockStatus) { lock.OwnerPlanID = planID("other-plan") },
 			func(lock *appsv1.TopologyMutationLockStatus) { lock.State = appsv1.TopologyMutationLockStateHeld },
 			func(lock *appsv1.TopologyMutationLockStatus) { lock.AcquiredAt = nil },
 			func(lock *appsv1.TopologyMutationLockStatus) { lock.AffectedComponentUIDs = nil },
@@ -168,7 +188,7 @@ var _ = Describe("sharding scale-in status reducer", func() {
 		reduced, patch, err := buildShardingScaleInStatusPatch(cluster, shardingName,
 			shardingScaleInStatusTransition{
 				ExpectedProtocolVersion: appsv1.ShardingScaleInResultProtocolV2,
-				ExpectedPlanID:          "plan-1",
+				ExpectedPlanID:          planID("plan-1"),
 				ExpectedPhase:           appsv1.ShardingScaleInPhasePlanned,
 				Next:                    next,
 			})
@@ -182,7 +202,8 @@ var _ = Describe("sharding scale-in status reducer", func() {
 			"value": string(appsv1.ShardingScaleInResultProtocolV2),
 		}))
 		Expect(operations[3]).Should(Equal(map[string]any{
-			"op": "test", "path": "/status/shardings/redis~1shards/scaleIn/planID", "value": "plan-1",
+			"op": "test", "path": "/status/shardings/redis~1shards/scaleIn/planID",
+			"value": planID("plan-1"),
 		}))
 		Expect(operations[4]).Should(Equal(map[string]any{
 			"op": "test", "path": "/status/shardings/redis~1shards/scaleIn/phase",
@@ -207,7 +228,7 @@ var _ = Describe("sharding scale-in status reducer", func() {
 		_, _, err = buildShardingScaleInStatusPatch(cluster, shardingName,
 			shardingScaleInStatusTransition{
 				ExpectedProtocolVersion: appsv1.ShardingScaleInResultProtocolV2,
-				ExpectedPlanID:          "plan-1",
+				ExpectedPlanID:          planID("plan-1"),
 				ExpectedPhase:           appsv1.ShardingScaleInPhasePlanned,
 				Next:                    newStatus("plan-2", appsv1.ShardingScaleInPhaseDraining),
 			})
@@ -218,7 +239,7 @@ var _ = Describe("sharding scale-in status reducer", func() {
 		_, _, err = buildShardingScaleInStatusPatch(cluster, shardingName,
 			shardingScaleInStatusTransition{
 				ExpectedProtocolVersion: appsv1.ShardingScaleInResultProtocolV2,
-				ExpectedPlanID:          "plan-1",
+				ExpectedPlanID:          planID("plan-1"),
 				ExpectedPhase:           appsv1.ShardingScaleInPhasePlanned,
 				Next:                    next,
 			})
@@ -229,7 +250,7 @@ var _ = Describe("sharding scale-in status reducer", func() {
 		_, _, err = buildShardingScaleInStatusPatch(cluster, shardingName,
 			shardingScaleInStatusTransition{
 				ExpectedProtocolVersion: appsv1.ShardingScaleInResultProtocolV2,
-				ExpectedPlanID:          "plan-1",
+				ExpectedPlanID:          planID("plan-1"),
 				ExpectedPhase:           appsv1.ShardingScaleInPhasePlanned,
 				Next:                    next,
 			})
@@ -240,13 +261,14 @@ var _ = Describe("sharding scale-in status reducer", func() {
 		_, _, err = buildShardingScaleInStatusPatch(newCluster(current), shardingName,
 			shardingScaleInStatusTransition{
 				ExpectedProtocolVersion: appsv1.ShardingScaleInResultProtocolV2,
-				ExpectedPlanID:          "plan-1",
+				ExpectedPlanID:          planID("plan-1"),
 				ExpectedPhase:           appsv1.ShardingScaleInPhasePlanned,
 				Next:                    next,
 			})
 		Expect(errors.Is(err, errInvalidShardingScaleInStatusTransition)).Should(BeTrue())
 
 		malformed := newStatus("", appsv1.ShardingScaleInPhasePlanned)
+		malformed.PlanID = ""
 		cluster = newCluster(malformed)
 		_, _, err = buildShardingScaleInStatusPatch(cluster, shardingName,
 			shardingScaleInStatusTransition{
@@ -265,7 +287,7 @@ var _ = Describe("sharding scale-in status reducer", func() {
 		_, _, err := buildShardingScaleInStatusPatch(cluster, shardingName,
 			shardingScaleInStatusTransition{
 				ExpectedProtocolVersion: appsv1.ShardingScaleInResultProtocolV2,
-				ExpectedPlanID:          "plan-1",
+				ExpectedPlanID:          planID("plan-1"),
 				ExpectedPhase:           appsv1.ShardingScaleInPhasePlanned,
 				Next:                    newStatus("plan-1", appsv1.ShardingScaleInPhaseVerified),
 			})
@@ -283,7 +305,7 @@ var _ = Describe("sharding scale-in status reducer", func() {
 		_, _, err := buildShardingScaleInStatusPatch(cluster, shardingName,
 			shardingScaleInStatusTransition{
 				ExpectedProtocolVersion: appsv1.ShardingScaleInResultProtocolV2,
-				ExpectedPlanID:          "plan-1",
+				ExpectedPlanID:          planID("plan-1"),
 				ExpectedPhase:           appsv1.ShardingScaleInPhaseDraining,
 				Next:                    blocked,
 			})
@@ -293,7 +315,7 @@ var _ = Describe("sharding scale-in status reducer", func() {
 		_, _, err = buildShardingScaleInStatusPatch(cluster, shardingName,
 			shardingScaleInStatusTransition{
 				ExpectedProtocolVersion: appsv1.ShardingScaleInResultProtocolV2,
-				ExpectedPlanID:          "plan-1",
+				ExpectedPlanID:          planID("plan-1"),
 				ExpectedPhase:           appsv1.ShardingScaleInPhaseDraining,
 				Next:                    blocked,
 			})
@@ -304,7 +326,7 @@ var _ = Describe("sharding scale-in status reducer", func() {
 		_, _, err = buildShardingScaleInStatusPatch(blockedCluster, shardingName,
 			shardingScaleInStatusTransition{
 				ExpectedProtocolVersion: appsv1.ShardingScaleInResultProtocolV2,
-				ExpectedPlanID:          "plan-1",
+				ExpectedPlanID:          planID("plan-1"),
 				ExpectedPhase:           appsv1.ShardingScaleInPhaseBlocked,
 				Next:                    recovered,
 			})
@@ -315,7 +337,7 @@ var _ = Describe("sharding scale-in status reducer", func() {
 		_, _, err = buildShardingScaleInStatusPatch(blockedCluster, shardingName,
 			shardingScaleInStatusTransition{
 				ExpectedProtocolVersion: appsv1.ShardingScaleInResultProtocolV2,
-				ExpectedPlanID:          "plan-1",
+				ExpectedPlanID:          planID("plan-1"),
 				ExpectedPhase:           appsv1.ShardingScaleInPhaseBlocked,
 				Next:                    recovered,
 			})
@@ -385,7 +407,7 @@ var _ = Describe("sharding scale-in status reducer", func() {
 
 		readback := &appsv1.Cluster{}
 		Expect(testCtx.Cli.Get(testCtx.Ctx, client.ObjectKeyFromObject(cluster), readback)).Should(Succeed())
-		Expect(readback.Status.Shardings["redis"].ScaleIn.PlanID).Should(Equal("other-plan"))
-		Expect(readback.Status.TopologyMutationLock.OwnerPlanID).Should(Equal("other-plan"))
+		Expect(readback.Status.Shardings["redis"].ScaleIn.PlanID).Should(Equal(planID("other-plan")))
+		Expect(readback.Status.TopologyMutationLock.OwnerPlanID).Should(Equal(planID("other-plan")))
 	})
 })

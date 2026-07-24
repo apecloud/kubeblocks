@@ -23,6 +23,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"math/rand"
 	"reflect"
@@ -45,6 +46,14 @@ var _ = Describe("sharding scale-in immutable plan material", func() {
 	encodedValue := func(value string) (string, string) {
 		sum := sha256.Sum256([]byte(value))
 		return base64.StdEncoding.EncodeToString([]byte(value)), hex.EncodeToString(sum[:])
+	}
+	encodedBaseRecord := func(entries ...shardingScaleInBaseParameter) (string, string) {
+		data, err := json.Marshal(shardingScaleInBaseParameterRecord{
+			Version:    shardingScaleInBaseParameterRecordVersionV1,
+			Parameters: entries,
+		})
+		Expect(err).ShouldNot(HaveOccurred())
+		return encodedValue(string(data))
 	}
 	newPod := func(name, uid string) appsv1.ShardingScaleInPlanPod {
 		return appsv1.ShardingScaleInPlanPod{
@@ -78,8 +87,21 @@ var _ = Describe("sharding scale-in immutable plan material", func() {
 			ProjectionDigest: digestA,
 		}
 	}
-	newExecutorTemplate := func(podUID, componentUID, base string) appsv1.ShardingScaleInExecutorTemplate {
-		encoded, digest := encodedValue(base)
+	newExecutorTemplate := func(podUID, componentUID string) appsv1.ShardingScaleInExecutorTemplate {
+		encoded, digest := encodedBaseRecord(
+			shardingScaleInBaseParameter{
+				Name:     shardingScaleInBaseParameterRemoveShardName,
+				ValueB64: base64.StdEncoding.EncodeToString([]byte("demo-redis-2")),
+			},
+			shardingScaleInBaseParameter{
+				Name:     shardingScaleInBaseParameterProtocolVersion,
+				ValueB64: base64.StdEncoding.EncodeToString([]byte(appsv1.ShardingScaleInResultProtocolV2)),
+			},
+			shardingScaleInBaseParameter{
+				Name:     shardingScaleInBaseParameterServicePort,
+				ValueB64: base64.StdEncoding.EncodeToString([]byte("6379")),
+			},
+		)
 		return appsv1.ShardingScaleInExecutorTemplate{
 			ExecutorPodUID:         types.UID(podUID),
 			ExecutorComponentUID:   types.UID(componentUID),
@@ -154,9 +176,9 @@ var _ = Describe("sharding scale-in immutable plan material", func() {
 					},
 				},
 				ExecutorTemplates: []appsv1.ShardingScaleInExecutorTemplate{
-					newExecutorTemplate("pod-0", "component-0", "base-0"),
-					newExecutorTemplate("pod-2", "component-2", "base-2"),
-					newExecutorTemplate("pod-1", "component-1", "base-1"),
+					newExecutorTemplate("pod-0", "component-0"),
+					newExecutorTemplate("pod-2", "component-2"),
+					newExecutorTemplate("pod-1", "component-1"),
 				},
 			},
 			Leaving: []appsv1.ShardingScaleInPlanMember{
@@ -218,8 +240,8 @@ var _ = Describe("sharding scale-in immutable plan material", func() {
 			})
 		material.RequestAuthority.ExecutorTemplates = append(
 			material.RequestAuthority.ExecutorTemplates,
-			newExecutorTemplate("pod-3", "component-3", "base-3"),
-			newExecutorTemplate("pod-1b", "component-1", "base-1b"))
+			newExecutorTemplate("pod-3", "component-3"),
+			newExecutorTemplate("pod-1b", "component-1"))
 		material.ExecutorPrerequisites = append(material.ExecutorPrerequisites,
 			appsv1.ShardingScaleInExecutorPrerequisite{
 				APIVersion:         "v1",
@@ -336,9 +358,29 @@ var _ = Describe("sharding scale-in immutable plan material", func() {
 			{
 				name: "executor base record",
 				mutate: func(material *appsv1.ShardingScaleInPlanMaterial) {
-					encoded, digest := encodedValue("changed-base")
-					material.RequestAuthority.ExecutorTemplates[0].BaseParameterRecordB64 = encoded
-					material.RequestAuthority.ExecutorTemplates[0].BaseParameterDigest = digest
+					encoded, digest := encodedValue("6380")
+					material.RequestAuthority.VarSources[0].ResolvedNonSecretValueB64 = encoded
+					material.RequestAuthority.VarSources[0].ResolvedNonSecretValueDigest = digest
+					for i := range material.RequestAuthority.ExecutorTemplates {
+						recordB64, recordDigest := encodedBaseRecord(
+							shardingScaleInBaseParameter{
+								Name: shardingScaleInBaseParameterRemoveShardName,
+								ValueB64: base64.StdEncoding.EncodeToString(
+									[]byte("demo-redis-2")),
+							},
+							shardingScaleInBaseParameter{
+								Name: shardingScaleInBaseParameterProtocolVersion,
+								ValueB64: base64.StdEncoding.EncodeToString(
+									[]byte(appsv1.ShardingScaleInResultProtocolV2)),
+							},
+							shardingScaleInBaseParameter{
+								Name:     shardingScaleInBaseParameterServicePort,
+								ValueB64: base64.StdEncoding.EncodeToString([]byte("6380")),
+							},
+						)
+						material.RequestAuthority.ExecutorTemplates[i].BaseParameterRecordB64 = recordB64
+						material.RequestAuthority.ExecutorTemplates[i].BaseParameterDigest = recordDigest
+					}
 				},
 			},
 		}
@@ -428,6 +470,84 @@ var _ = Describe("sharding scale-in immutable plan material", func() {
 		Expect(errors.Is(err, errInvalidShardingScaleInPlanMaterial)).Should(BeTrue())
 	})
 
+	It("rejects TypedBase and base-record allow-list bypasses", func() {
+		encodedSecret, secretDigest := encodedValue("super-secret")
+
+		staticSecret := newMaterial()
+		staticSecret.RequestAuthority.VarSources = append(staticSecret.RequestAuthority.VarSources,
+			appsv1.ShardingScaleInVarSource{
+				VariableName:                 "DEFAULT_PASSWORD",
+				ResolverKind:                 appsv1.ShardingScaleInVarResolverStaticValue,
+				Consumption:                  appsv1.ShardingScaleInVarConsumptionTypedBase,
+				ResolvedNonSecretValueB64:    encodedSecret,
+				ResolvedNonSecretValueDigest: secretDigest,
+			})
+		_, _, err := buildShardingScaleInPlanMaterial(staticSecret)
+		Expect(errors.Is(err, errInvalidShardingScaleInPlanMaterial)).Should(BeTrue())
+
+		cases := []struct {
+			name    string
+			entries []shardingScaleInBaseParameter
+			want    string
+		}{
+			{
+				name: "secret key",
+				entries: []shardingScaleInBaseParameter{
+					{Name: shardingScaleInBaseParameterRemoveShardName,
+						ValueB64: base64.StdEncoding.EncodeToString([]byte("demo-redis-2"))},
+					{Name: shardingScaleInBaseParameterServicePort,
+						ValueB64: base64.StdEncoding.EncodeToString([]byte("6379"))},
+					{Name: "DEFAULT_PASSWORD", ValueB64: encodedSecret},
+				},
+				want: `base parameter "DEFAULT_PASSWORD" is not allowed`,
+			},
+			{
+				name: "unknown key",
+				entries: []shardingScaleInBaseParameter{
+					{Name: shardingScaleInBaseParameterRemoveShardName,
+						ValueB64: base64.StdEncoding.EncodeToString([]byte("demo-redis-2"))},
+					{Name: shardingScaleInBaseParameterServicePort,
+						ValueB64: base64.StdEncoding.EncodeToString([]byte("6379"))},
+					{Name: "EXTRA", ValueB64: base64.StdEncoding.EncodeToString([]byte("value"))},
+				},
+				want: `base parameter "EXTRA" is not allowed`,
+			},
+			{
+				name: "duplicate key",
+				entries: []shardingScaleInBaseParameter{
+					{Name: shardingScaleInBaseParameterRemoveShardName,
+						ValueB64: base64.StdEncoding.EncodeToString([]byte("demo-redis-2"))},
+					{Name: shardingScaleInBaseParameterServicePort,
+						ValueB64: base64.StdEncoding.EncodeToString([]byte("6379"))},
+					{Name: shardingScaleInBaseParameterServicePort,
+						ValueB64: base64.StdEncoding.EncodeToString([]byte("6380"))},
+				},
+				want: `base parameter "SERVICE_PORT" is duplicated`,
+			},
+			{
+				name: "reserved identity key",
+				entries: []shardingScaleInBaseParameter{
+					{Name: shardingScaleInBaseParameterRemoveShardName,
+						ValueB64: base64.StdEncoding.EncodeToString([]byte("demo-redis-2"))},
+					{Name: shardingScaleInBaseParameterServicePort,
+						ValueB64: base64.StdEncoding.EncodeToString([]byte("6379"))},
+					{Name: "POD_UID", ValueB64: base64.StdEncoding.EncodeToString([]byte("pod-0"))},
+				},
+				want: `base parameter "POD_UID" is not allowed`,
+			},
+		}
+		for _, testCase := range cases {
+			By(testCase.name)
+			material := newMaterial()
+			recordB64, recordDigest := encodedBaseRecord(testCase.entries...)
+			material.RequestAuthority.ExecutorTemplates[0].BaseParameterRecordB64 = recordB64
+			material.RequestAuthority.ExecutorTemplates[0].BaseParameterDigest = recordDigest
+			_, _, err = buildShardingScaleInPlanMaterial(material)
+			Expect(errors.Is(err, errInvalidShardingScaleInPlanMaterial)).Should(BeTrue())
+			Expect(err.Error()).Should(ContainSubstring(testCase.want))
+		}
+	})
+
 	It("rejects a tag-only executor image identity", func() {
 		material := newMaterial()
 		material.Staying[0].Pods[0].AgentImageID = "apecloud/kbagent:latest"
@@ -477,6 +597,21 @@ var _ = Describe("sharding scale-in immutable plan material", func() {
 				TopologyFenceToken: digestC,
 				PlanMaterial:       nonCanonical,
 			},
+		})
+		Expect(errors.Is(err, errInvalidShardingScaleInStatusTransition)).Should(BeTrue())
+
+		withoutMaterial := current.DeepCopy()
+		withoutMaterial.PlanMaterial = nil
+		_, err = reduceShardingScaleInStatus(nil, shardingScaleInStatusTransition{Next: withoutMaterial})
+		Expect(errors.Is(err, errInvalidShardingScaleInStatusTransition)).Should(BeTrue())
+
+		nextWithoutMaterial := withoutMaterial.DeepCopy()
+		nextWithoutMaterial.Phase = appsv1.ShardingScaleInPhaseDraining
+		_, err = reduceShardingScaleInStatus(withoutMaterial, shardingScaleInStatusTransition{
+			ExpectedProtocolVersion: withoutMaterial.ProtocolVersion,
+			ExpectedPlanID:          withoutMaterial.PlanID,
+			ExpectedPhase:           withoutMaterial.Phase,
+			Next:                    nextWithoutMaterial,
 		})
 		Expect(errors.Is(err, errInvalidShardingScaleInStatusTransition)).Should(BeTrue())
 	})

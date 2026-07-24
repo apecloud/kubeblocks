@@ -365,6 +365,10 @@ func buildFreshShardingScaleInMembers(topology *shardingScaleInTopologyInventory
 		comp := componentsByShortName[shortName]
 		if comp == nil || workload.Labels[constant.AppManagedByLabelKey] != constant.AppName ||
 			workload.Labels[constant.AppInstanceLabelKey] != topology.Cluster.Name ||
+			workload.Labels[constant.KBAppShardingNameLabelKey] !=
+				comp.Labels[constant.KBAppShardingNameLabelKey] ||
+			workload.Labels[constant.KBAppShardTemplateLabelKey] !=
+				comp.Labels[constant.KBAppShardTemplateLabelKey] ||
 			workload.Name != comp.Name {
 			return nil, invalid("InstanceSet labels and name do not identify one exact Component")
 		}
@@ -405,7 +409,11 @@ func buildFreshShardingScaleInMembers(topology *shardingScaleInTopologyInventory
 		shortName := pod.Labels[constant.KBAppComponentLabelKey]
 		comp := componentsByShortName[shortName]
 		if comp == nil || pod.Labels[constant.AppManagedByLabelKey] != constant.AppName ||
-			pod.Labels[constant.AppInstanceLabelKey] != topology.Cluster.Name {
+			pod.Labels[constant.AppInstanceLabelKey] != topology.Cluster.Name ||
+			pod.Labels[constant.KBAppShardingNameLabelKey] !=
+				comp.Labels[constant.KBAppShardingNameLabelKey] ||
+			pod.Labels[constant.KBAppShardTemplateLabelKey] !=
+				comp.Labels[constant.KBAppShardTemplateLabelKey] {
 			return nil, invalid("Pod labels do not identify one exact Component")
 		}
 		workload := workloadsByComponentUID[comp.UID]

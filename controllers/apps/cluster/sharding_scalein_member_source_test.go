@@ -123,12 +123,12 @@ func TestLoadFreshShardingScaleInMembers(t *testing.T) {
 					UID:             types.UID(fmt.Sprintf("instanceset-uid-%d", i)),
 					ResourceVersion: fmt.Sprintf("%d", 40+i),
 					Generation:      int64(i + 1),
-					Labels:          constant.GetCompLabels(clusterName, shortName),
+					Labels:          constant.GetCompLabels(clusterName, shortName, labels),
 					OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(
 						comp, appsv1.SchemeGroupVersion.WithKind(appsv1.ComponentKind))},
 				},
 			}
-			podLabels := constant.GetCompLabels(clusterName, shortName)
+			podLabels := constant.GetCompLabels(clusterName, shortName, labels)
 			podLabels[instanceset.WorkloadsManagedByLabelKey] = workloadsv1.InstanceSetKind
 			podLabels[instanceset.WorkloadsInstanceLabelKey] = workload.Name
 			pod := &corev1.Pod{
@@ -186,6 +186,13 @@ func TestLoadFreshShardingScaleInMembers(t *testing.T) {
 		reader = fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).Build()
 		_, err = load(t, reader, cluster)
 		require.ErrorContains(t, err, "Pod controller owner")
+
+		cluster, objects = newObjects()
+		pod = objects[4].(*corev1.Pod)
+		pod.Labels[constant.KBAppShardingNameLabelKey] = "other-sharding"
+		reader = fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).Build()
+		_, err = load(t, reader, cluster)
+		require.ErrorContains(t, err, "Pod labels")
 	})
 
 	t.Run("rejects missing exact workload ownership or a deleting object", func(t *testing.T) {
@@ -195,6 +202,13 @@ func TestLoadFreshShardingScaleInMembers(t *testing.T) {
 		reader := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).Build()
 		_, err := load(t, reader, cluster)
 		require.ErrorContains(t, err, "InstanceSet controller owner")
+
+		cluster, objects = newObjects()
+		workload = objects[3].(*workloadsv1.InstanceSet)
+		workload.Labels[constant.KBAppShardTemplateLabelKey] = "wrong-template"
+		reader = fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).Build()
+		_, err = load(t, reader, cluster)
+		require.ErrorContains(t, err, "InstanceSet labels")
 
 		cluster, objects = newObjects()
 		now := metav1.Now()
@@ -267,6 +281,25 @@ func TestLoadFreshShardingScaleInMembers(t *testing.T) {
 		require.ErrorContains(t, err, "Pod snapshot changed")
 	})
 
+	t.Run("rejects an InstanceSet snapshot that changes during inventory construction", func(t *testing.T) {
+		cluster, objects := newObjects()
+		base := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).Build()
+		reader := &shardingScaleInWorkloadMutatingReader{
+			Client: base,
+			mutateBeforeSecondWorkloadList: func(ctx context.Context) error {
+				workload := &workloadsv1.InstanceSet{}
+				if err := base.Get(ctx, client.ObjectKeyFromObject(objects[3]), workload); err != nil {
+					return err
+				}
+				workload.Annotations = map[string]string{"changed": "true"}
+				return base.Update(ctx, workload)
+			},
+		}
+
+		_, err := load(t, reader, cluster)
+		require.ErrorContains(t, err, "InstanceSet snapshot changed")
+	})
+
 	t.Run("returns detached member, workload, and Pod copies", func(t *testing.T) {
 		cluster, objects := newObjects()
 		reader := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).Build()
@@ -306,3 +339,25 @@ func (r *shardingScaleInPodMutatingReader) List(ctx context.Context, list client
 }
 
 var _ client.Reader = (*shardingScaleInPodMutatingReader)(nil)
+
+type shardingScaleInWorkloadMutatingReader struct {
+	client.Client
+	workloadListCalls              int
+	mutateBeforeSecondWorkloadList func(context.Context) error
+}
+
+func (r *shardingScaleInWorkloadMutatingReader) List(ctx context.Context, list client.ObjectList,
+	opts ...client.ListOption,
+) error {
+	if _, ok := list.(*workloadsv1.InstanceSetList); ok {
+		r.workloadListCalls++
+		if r.workloadListCalls == 2 && r.mutateBeforeSecondWorkloadList != nil {
+			if err := r.mutateBeforeSecondWorkloadList(ctx); err != nil {
+				return err
+			}
+		}
+	}
+	return r.Client.List(ctx, list, opts...)
+}
+
+var _ client.Reader = (*shardingScaleInWorkloadMutatingReader)(nil)

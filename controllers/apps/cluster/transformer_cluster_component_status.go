@@ -216,6 +216,7 @@ func (t *clusterComponentStatusTransformer) buildClusterShardingStatus(transCtx 
 	status.ShardingDef = oldStatus.ShardingDef
 	status.PostProvision = oldStatus.PostProvision
 	status.PreTerminate = oldStatus.PreTerminate
+	status.ScaleIn = oldStatus.ScaleIn
 
 	return status
 }

@@ -428,6 +428,13 @@ spec:
 
                           This field cannot be updated.
                         type: string
+                      resultProtocol:
+                        description: |-
+                          ResultProtocol specifies the typed result protocol returned by the action.
+                          When omitted, the action uses the legacy result contract.
+                        enum:
+                        - kb.sharding.scalein/v2
+                        type: string
                       retryPolicy:
                         description: |-
                           Defines the strategy to be taken when retrying the Action after a failure.
@@ -864,6 +871,13 @@ spec:
 
                           This field cannot be updated.
                         type: string
+                      resultProtocol:
+                        description: |-
+                          ResultProtocol specifies the typed result protocol returned by the action.
+                          When omitted, the action uses the legacy result contract.
+                        enum:
+                        - kb.sharding.scalein/v2
+                        type: string
                       retryPolicy:
                         description: |-
                           Defines the strategy to be taken when retrying the Action after a failure.
@@ -1295,6 +1309,13 @@ spec:
 
                           This field cannot be updated.
                         type: string
+                      resultProtocol:
+                        description: |-
+                          ResultProtocol specifies the typed result protocol returned by the action.
+                          When omitted, the action uses the legacy result contract.
+                        enum:
+                        - kb.sharding.scalein/v2
+                        type: string
                       retryPolicy:
                         description: |-
                           Defines the strategy to be taken when retrying the Action after a failure.
@@ -1725,6 +1746,13 @@ spec:
                             This execution does not alter the Component or the Cluster's state of readiness.
 
                           This field cannot be updated.
+                        type: string
+                      resultProtocol:
+                        description: |-
+                          ResultProtocol specifies the typed result protocol returned by the action.
+                          When omitted, the action uses the legacy result contract.
+                        enum:
+                        - kb.sharding.scalein/v2
                         type: string
                       retryPolicy:
                         description: |-

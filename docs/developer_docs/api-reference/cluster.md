@@ -4293,6 +4293,20 @@ LifecycleActionStatus
 <p>PreTerminate records the status of the sharding pre-terminate action.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>scaleIn</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingScaleInStatus">
+ShardingScaleInStatus
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ScaleIn records the authoritative state of a compound shard scale-in plan.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1.ClusterSpec">ClusterSpec
@@ -12710,6 +12724,21 @@ Action
 </tr>
 <tr>
 <td>
+<code>resultProtocol</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingActionResultProtocol">
+ShardingActionResultProtocol
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ResultProtocol specifies the typed result protocol returned by the action.
+When omitted, the action uses the legacy result contract.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>targetShardSelector</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.TargetShardSelector">
@@ -12730,6 +12759,26 @@ one shard is selected randomly by default.</p>
 </td>
 </tr>
 </tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ShardingActionResultProtocol">ShardingActionResultProtocol
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ShardingAction">ShardingAction</a>, <a href="#apps.kubeblocks.io/v1.ShardingScaleInStatus">ShardingScaleInStatus</a>)
+</p>
+<div>
+<p>ShardingActionResultProtocol defines the typed result protocol of a sharding action.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;kb.sharding.scalein/v2&#34;</p></td>
+<td><p>ShardingScaleInResultProtocolV2 is the typed result protocol for compound shard scale-in.</p>
+</td>
+</tr></tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1.ShardingDefinitionSpec">ShardingDefinitionSpec
 </h3>
@@ -13002,6 +13051,326 @@ ShardingAction
 <li>KB_REMOVE_SHARD_NAME: The name of the shard being removed.</li>
 </ul>
 <p>Note: This field is immutable once it has been set.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ShardingScaleInBlockClass">ShardingScaleInBlockClass
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ShardingScaleInStatus">ShardingScaleInStatus</a>)
+</p>
+<div>
+<p>ShardingScaleInBlockClass defines how a blocked scale-in plan may be resumed.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Recoverable&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Terminal&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ShardingScaleInHolder">ShardingScaleInHolder
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ShardingScaleInStatus">ShardingScaleInStatus</a>)
+</p>
+<div>
+<p>ShardingScaleInHolder identifies a shard participating in a scale-in plan.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Name is the Component name.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>uid</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>UID is the full Component UID.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ShardingScaleInPhase">ShardingScaleInPhase
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ShardingScaleInStatus">ShardingScaleInStatus</a>)
+</p>
+<div>
+<p>ShardingScaleInPhase defines the durable phase of a compound shard scale-in plan.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Blocked&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Completed&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;DeleteCommitted&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Deleting&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Draining&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Forgetting&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;HolderPlanned&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Planned&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;PurgePrepared&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Resetting&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Superseded&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Verified&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ShardingScaleInProgress">ShardingScaleInProgress
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ShardingScaleInStatus">ShardingScaleInStatus</a>)
+</p>
+<div>
+<p>ShardingScaleInProgress records bounded progress for the current holder.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>stage</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Stage identifies the current stage within the plan phase.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>reason</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Reason is a programmatic identifier for the latest progress.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>beforeSlots</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>BeforeSlots is the number of slots owned by the holder before the latest batch.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>afterSlots</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>AfterSlots is the number of slots owned by the holder after the latest batch.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>retryAfterSeconds</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>RetryAfterSeconds is the bounded delay before the next observation.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ShardingScaleInStatus">ShardingScaleInStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterShardingStatus">ClusterShardingStatus</a>)
+</p>
+<div>
+<p>ShardingScaleInStatus records the authoritative state of a compound shard scale-in plan.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>protocolVersion</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingActionResultProtocol">
+ShardingActionResultProtocol
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ProtocolVersion identifies the scale-in status contract.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>planID</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>PlanID uniquely identifies the immutable scale-in plan.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>phase</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingScaleInPhase">
+ShardingScaleInPhase
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Phase is the current phase of the scale-in plan.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>holder</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingScaleInHolder">
+ShardingScaleInHolder
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Holder identifies the shard currently being removed.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>progress</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingScaleInProgress">
+ShardingScaleInProgress
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Progress records the latest committed progress of the current holder.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>blockedFrom</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingScaleInPhase">
+ShardingScaleInPhase
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>BlockedFrom records the phase from which the plan became blocked.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>blockClass</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingScaleInBlockClass">
+ShardingScaleInBlockClass
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>BlockClass classifies whether a blocked plan may recover automatically.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>reason</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Reason is a programmatic identifier for the current phase.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>message</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Message provides human-readable details about the current phase.</p>
 </td>
 </tr>
 </tbody>

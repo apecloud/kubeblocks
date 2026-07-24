@@ -17881,6 +17881,109 @@ spec:
                           format: date-time
                           type: string
                       type: object
+                    scaleIn:
+                      description: ScaleIn records the authoritative state of a compound
+                        shard scale-in plan.
+                      properties:
+                        blockClass:
+                          description: BlockClass classifies whether a blocked plan
+                            may recover automatically.
+                          enum:
+                          - Recoverable
+                          - Terminal
+                          type: string
+                        blockedFrom:
+                          description: BlockedFrom records the phase from which the
+                            plan became blocked.
+                          enum:
+                          - Planned
+                          - Superseded
+                          - Draining
+                          - PurgePrepared
+                          - Resetting
+                          - Forgetting
+                          - Verified
+                          - DeleteCommitted
+                          - Deleting
+                          - HolderPlanned
+                          - Blocked
+                          - Completed
+                          type: string
+                        holder:
+                          description: Holder identifies the shard currently being
+                            removed.
+                          properties:
+                            name:
+                              description: Name is the Component name.
+                              type: string
+                            uid:
+                              description: UID is the full Component UID.
+                              type: string
+                          type: object
+                        message:
+                          description: Message provides human-readable details about
+                            the current phase.
+                          type: string
+                        phase:
+                          description: Phase is the current phase of the scale-in
+                            plan.
+                          enum:
+                          - Planned
+                          - Superseded
+                          - Draining
+                          - PurgePrepared
+                          - Resetting
+                          - Forgetting
+                          - Verified
+                          - DeleteCommitted
+                          - Deleting
+                          - HolderPlanned
+                          - Blocked
+                          - Completed
+                          type: string
+                        planID:
+                          description: PlanID uniquely identifies the immutable scale-in
+                            plan.
+                          type: string
+                        progress:
+                          description: Progress records the latest committed progress
+                            of the current holder.
+                          properties:
+                            afterSlots:
+                              description: AfterSlots is the number of slots owned
+                                by the holder after the latest batch.
+                              format: int32
+                              type: integer
+                            beforeSlots:
+                              description: BeforeSlots is the number of slots owned
+                                by the holder before the latest batch.
+                              format: int32
+                              type: integer
+                            reason:
+                              description: Reason is a programmatic identifier for
+                                the latest progress.
+                              type: string
+                            retryAfterSeconds:
+                              description: RetryAfterSeconds is the bounded delay
+                                before the next observation.
+                              format: int32
+                              type: integer
+                            stage:
+                              description: Stage identifies the current stage within
+                                the plan phase.
+                              type: string
+                          type: object
+                        protocolVersion:
+                          description: ProtocolVersion identifies the scale-in status
+                            contract.
+                          enum:
+                          - kb.sharding.scalein/v2
+                          type: string
+                        reason:
+                          description: Reason is a programmatic identifier for the
+                            current phase.
+                          type: string
+                      type: object
                     shardingDef:
                       description: Records the name of the sharding definition used.
                       type: string

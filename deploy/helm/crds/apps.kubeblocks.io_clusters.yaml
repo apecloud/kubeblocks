@@ -18174,6 +18174,7 @@ spec:
                                     the only request builder allowed by a plan.
                                   enum:
                                   - TypedShardScaleInV1
+                                  - TypedShardScaleInV2
                                   type: string
                                 componentDefinitionSources:
                                   items:
@@ -18202,6 +18203,47 @@ spec:
                                     type: object
                                   minItems: 1
                                   type: array
+                                credentialSources:
+                                  items:
+                                    description: |-
+                                      ShardingScaleInCredentialSource records one canonical Secret identity and
+                                      the exact union of key names used by executor bindings. It never contains
+                                      Secret values or value digests.
+                                    properties:
+                                      apiVersion:
+                                        type: string
+                                      credentialSourceDigest:
+                                        type: string
+                                      keyNames:
+                                        items:
+                                          type: string
+                                        minItems: 1
+                                        type: array
+                                      kind:
+                                        type: string
+                                      name:
+                                        type: string
+                                      namespace:
+                                        type: string
+                                      sourceID:
+                                        type: string
+                                      uid:
+                                        description: |-
+                                          UID is a type that holds unique ID values, including UUIDs.  Because we
+                                          don't ONLY use UUIDs, this is an alias to string.  Being a type captures
+                                          intent and helps make sure that UIDs and names do not get conflated.
+                                        type: string
+                                    required:
+                                    - apiVersion
+                                    - credentialSourceDigest
+                                    - keyNames
+                                    - kind
+                                    - name
+                                    - namespace
+                                    - sourceID
+                                    - uid
+                                    type: object
+                                  type: array
                                 executorTemplates:
                                   items:
                                     description: ShardingScaleInExecutorTemplate records
@@ -18213,6 +18255,35 @@ spec:
                                         type: string
                                       cancelSchemaDigest:
                                         type: string
+                                      credentialBindings:
+                                        items:
+                                          description: ShardingScaleInExecutorCredentialBinding
+                                            binds one declared variable to a canonical
+                                            Secret source.
+                                          properties:
+                                            bindingDigest:
+                                              type: string
+                                            credentialSourceDigest:
+                                              type: string
+                                            credentialSourceID:
+                                              type: string
+                                            requiredKeyNames:
+                                              items:
+                                                type: string
+                                              type: array
+                                            resolverProjectionDigest:
+                                              type: string
+                                            variableName:
+                                              type: string
+                                          required:
+                                          - bindingDigest
+                                          - credentialSourceDigest
+                                          - credentialSourceID
+                                          - requiredKeyNames
+                                          - resolverProjectionDigest
+                                          - variableName
+                                          type: object
+                                        type: array
                                       executorComponentUID:
                                         description: |-
                                           UID is a type that holds unique ID values, including UUIDs.  Because we
@@ -18300,9 +18371,9 @@ spec:
                                         - CredentialVarRef
                                         type: string
                                       secretSource:
-                                        description: ShardingScaleInSecretSource records
-                                          Secret identity and key names without secret
-                                          values.
+                                        description: |-
+                                          SecretSource is retained only to decode legacy v1 material so v2
+                                          validation can reject it explicitly.
                                         properties:
                                           apiVersion:
                                             type: string
@@ -18387,6 +18458,7 @@ spec:
                                     identifies a request-authority contract.
                                   enum:
                                   - kb.sharding.scalein.request-authority/v1
+                                  - kb.sharding.scalein.request-authority/v2
                                   type: string
                               required:
                               - actionDefinitionDigest

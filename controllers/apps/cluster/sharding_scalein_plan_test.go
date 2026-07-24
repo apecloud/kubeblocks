@@ -87,12 +87,53 @@ var _ = Describe("sharding scale-in immutable plan material", func() {
 			ProjectionDigest: digestA,
 		}
 	}
+	newCredentialSource := func(componentUID, name, uid string, keyNames ...string,
+	) appsv1.ShardingScaleInCredentialSource {
+		_ = componentUID
+		source := appsv1.ShardingScaleInCredentialSource{
+			APIVersion: "v1",
+			Kind:       "Secret",
+			Namespace:  "default",
+			Name:       name,
+			UID:        types.UID(uid),
+			KeyNames:   keyNames,
+		}
+		source.SourceID, _ = digestShardingScaleInCredentialSourceID(source)
+		source.CredentialSourceDigest, _ = digestShardingScaleInCredentialSource(source)
+		return source
+	}
+	newCredentialBinding := func(
+		podUID, componentUID, variableName string,
+		source appsv1.ShardingScaleInCredentialSource,
+		keyNames ...string,
+	) appsv1.ShardingScaleInExecutorCredentialBinding {
+		binding := appsv1.ShardingScaleInExecutorCredentialBinding{
+			VariableName:             variableName,
+			CredentialSourceID:       source.SourceID,
+			CredentialSourceDigest:   source.CredentialSourceDigest,
+			RequiredKeyNames:         keyNames,
+			ResolverProjectionDigest: digestC,
+		}
+		binding.BindingDigest, _ = digestShardingScaleInExecutorCredentialBinding(
+			binding, types.UID(podUID), types.UID(componentUID))
+		return binding
+	}
+	refreshServerConfigurationDigest := func(template *appsv1.ShardingScaleInExecutorTemplate) {
+		digest, err := digestShardingScaleInServerConfiguration(
+			template.ExecutorPodUID,
+			template.ServerRuntimeBinding.RegisteredActionDigest,
+			template.ServerRuntimeBinding.StartupEnvironmentSchemaDigest,
+			template.BaseParameterDigest,
+			template.LaunchSchemaDigest,
+			template.PollSchemaDigest,
+			template.CancelSchemaDigest,
+			template.CredentialBindings,
+		)
+		Expect(err).ShouldNot(HaveOccurred())
+		template.ServerRuntimeBinding.ServerConfigurationDigest = digest
+	}
 	newExecutorTemplate := func(podUID, componentUID string) appsv1.ShardingScaleInExecutorTemplate {
 		encoded, digest := encodedBaseRecord(
-			shardingScaleInBaseParameter{
-				Name:     shardingScaleInBaseParameterRemoveShardName,
-				ValueB64: base64.StdEncoding.EncodeToString([]byte("demo-redis-2")),
-			},
 			shardingScaleInBaseParameter{
 				Name:     shardingScaleInBaseParameterProtocolVersion,
 				ValueB64: base64.StdEncoding.EncodeToString([]byte(appsv1.ShardingScaleInResultProtocolV2)),
@@ -102,7 +143,7 @@ var _ = Describe("sharding scale-in immutable plan material", func() {
 				ValueB64: base64.StdEncoding.EncodeToString([]byte("6379")),
 			},
 		)
-		return appsv1.ShardingScaleInExecutorTemplate{
+		template := appsv1.ShardingScaleInExecutorTemplate{
 			ExecutorPodUID:         types.UID(podUID),
 			ExecutorComponentUID:   types.UID(componentUID),
 			BaseParameterRecordB64: encoded,
@@ -115,9 +156,10 @@ var _ = Describe("sharding scale-in immutable plan material", func() {
 				AgentImageID:                   "sha256:" + digestA,
 				RegisteredActionDigest:         digestB,
 				StartupEnvironmentSchemaDigest: digestC,
-				ServerConfigurationDigest:      digestA,
 			},
 		}
+		refreshServerConfigurationDigest(&template)
+		return template
 	}
 	newMaterial := func() *appsv1.ShardingScaleInPlanMaterial {
 		return &appsv1.ShardingScaleInPlanMaterial{
@@ -145,8 +187,8 @@ var _ = Describe("sharding scale-in immutable plan material", func() {
 				ConfigurationDigest: digestC,
 			},
 			RequestAuthority: appsv1.ShardingScaleInRequestAuthority{
-				Version:                            appsv1.ShardingScaleInRequestAuthorityVersionV1,
-				Builder:                            appsv1.ShardingScaleInRequestBuilderTypedV1,
+				Version:                            appsv1.ShardingScaleInRequestAuthorityVersionV2,
+				Builder:                            appsv1.ShardingScaleInRequestBuilderTypedV2,
 				GenericLifecycleSynthesisForbidden: true,
 				ActionName:                         shardingRemoveShardAction,
 				ActionDefinitionDigest:             digestB,
@@ -229,19 +271,34 @@ var _ = Describe("sharding scale-in immutable plan material", func() {
 				VariableName: "DEFAULT_PASSWORD",
 				ResolverKind: appsv1.ShardingScaleInVarResolverCredentialVarRef,
 				Consumption:  appsv1.ShardingScaleInVarConsumptionServerStartupSecret,
-				SecretSource: &appsv1.ShardingScaleInSecretSource{
-					APIVersion: "v1",
-					Kind:       "Secret",
-					Namespace:  "default",
-					Name:       "demo-redis-account",
-					UID:        "secret-uid",
-					KeyNames:   []string{"username", "password"},
-				},
 			})
 		material.RequestAuthority.ExecutorTemplates = append(
 			material.RequestAuthority.ExecutorTemplates,
 			newExecutorTemplate("pod-3", "component-3"),
 			newExecutorTemplate("pod-1b", "component-1"))
+		credentialSources := map[types.UID]appsv1.ShardingScaleInCredentialSource{}
+		for _, members := range [][]appsv1.ShardingScaleInPlanMember{material.Leaving, material.Staying} {
+			for _, member := range members {
+				source := newCredentialSource(
+					string(member.ComponentUID),
+					member.ComponentName+"-account-default",
+					"secret-"+string(member.ComponentUID),
+					"password")
+				credentialSources[member.ComponentUID] = source
+				material.RequestAuthority.CredentialSources = append(
+					material.RequestAuthority.CredentialSources, source)
+			}
+		}
+		for i := range material.RequestAuthority.ExecutorTemplates {
+			template := &material.RequestAuthority.ExecutorTemplates[i]
+			source := credentialSources[template.ExecutorComponentUID]
+			template.CredentialBindings = []appsv1.ShardingScaleInExecutorCredentialBinding{
+				newCredentialBinding(
+					string(template.ExecutorPodUID), string(template.ExecutorComponentUID),
+					"DEFAULT_PASSWORD", source, "password"),
+			}
+			refreshServerConfigurationDigest(template)
+		}
 		material.ExecutorPrerequisites = append(material.ExecutorPrerequisites,
 			appsv1.ShardingScaleInExecutorPrerequisite{
 				APIVersion:         "v1",
@@ -292,17 +349,34 @@ var _ = Describe("sharding scale-in immutable plan material", func() {
 					source.SourceObjects[left], source.SourceObjects[right] =
 						source.SourceObjects[right], source.SourceObjects[left]
 				})
-				if source.SecretSource != nil {
-					random.Shuffle(len(source.SecretSource.KeyNames), func(left, right int) {
-						source.SecretSource.KeyNames[left], source.SecretSource.KeyNames[right] =
-							source.SecretSource.KeyNames[right], source.SecretSource.KeyNames[left]
-					})
-				}
 			}
+			for i := range permuted.RequestAuthority.CredentialSources {
+				source := &permuted.RequestAuthority.CredentialSources[i]
+				random.Shuffle(len(source.KeyNames), func(left, right int) {
+					source.KeyNames[left], source.KeyNames[right] =
+						source.KeyNames[right], source.KeyNames[left]
+				})
+			}
+			random.Shuffle(len(permuted.RequestAuthority.CredentialSources), func(i, j int) {
+				sources := permuted.RequestAuthority.CredentialSources
+				sources[i], sources[j] = sources[j], sources[i]
+			})
 			random.Shuffle(len(permuted.RequestAuthority.VarSources), func(i, j int) {
 				sources := permuted.RequestAuthority.VarSources
 				sources[i], sources[j] = sources[j], sources[i]
 			})
+			for i := range permuted.RequestAuthority.ExecutorTemplates {
+				bindings := permuted.RequestAuthority.ExecutorTemplates[i].CredentialBindings
+				for j := range bindings {
+					random.Shuffle(len(bindings[j].RequiredKeyNames), func(left, right int) {
+						bindings[j].RequiredKeyNames[left], bindings[j].RequiredKeyNames[right] =
+							bindings[j].RequiredKeyNames[right], bindings[j].RequiredKeyNames[left]
+					})
+				}
+				random.Shuffle(len(bindings), func(left, right int) {
+					bindings[left], bindings[right] = bindings[right], bindings[left]
+				})
+			}
 			random.Shuffle(len(permuted.RequestAuthority.ExecutorTemplates), func(i, j int) {
 				templates := permuted.RequestAuthority.ExecutorTemplates
 				templates[i], templates[j] = templates[j], templates[i]
@@ -364,11 +438,6 @@ var _ = Describe("sharding scale-in immutable plan material", func() {
 					for i := range material.RequestAuthority.ExecutorTemplates {
 						recordB64, recordDigest := encodedBaseRecord(
 							shardingScaleInBaseParameter{
-								Name: shardingScaleInBaseParameterRemoveShardName,
-								ValueB64: base64.StdEncoding.EncodeToString(
-									[]byte("demo-redis-2")),
-							},
-							shardingScaleInBaseParameter{
 								Name: shardingScaleInBaseParameterProtocolVersion,
 								ValueB64: base64.StdEncoding.EncodeToString(
 									[]byte(appsv1.ShardingScaleInResultProtocolV2)),
@@ -380,6 +449,8 @@ var _ = Describe("sharding scale-in immutable plan material", func() {
 						)
 						material.RequestAuthority.ExecutorTemplates[i].BaseParameterRecordB64 = recordB64
 						material.RequestAuthority.ExecutorTemplates[i].BaseParameterDigest = recordDigest
+						refreshServerConfigurationDigest(
+							&material.RequestAuthority.ExecutorTemplates[i])
 					}
 				},
 			},
@@ -442,14 +513,6 @@ var _ = Describe("sharding scale-in immutable plan material", func() {
 				Consumption:                  appsv1.ShardingScaleInVarConsumptionTypedBase,
 				ResolvedNonSecretValueB64:    encoded,
 				ResolvedNonSecretValueDigest: digest,
-				SecretSource: &appsv1.ShardingScaleInSecretSource{
-					APIVersion: "v1",
-					Kind:       "Secret",
-					Namespace:  "default",
-					Name:       "demo-redis-account",
-					UID:        "secret-uid",
-					KeyNames:   []string{"password"},
-				},
 			})
 
 		_, _, err := buildShardingScaleInPlanMaterial(material)
@@ -468,6 +531,167 @@ var _ = Describe("sharding scale-in immutable plan material", func() {
 			}
 		_, _, err = buildShardingScaleInPlanMaterial(disguisedSecret)
 		Expect(errors.Is(err, errInvalidShardingScaleInPlanMaterial)).Should(BeTrue())
+	})
+
+	It("binds credential provenance per executor and keeps the compound holder out of base parameters", func() {
+		material := newMaterial()
+		material.Leaving = append(material.Leaving, material.Staying[0])
+		material.Staying = material.Staying[1:]
+		material.Source.DesiredShards = 1
+		material.RequestAuthority.VarSources = append(
+			material.RequestAuthority.VarSources,
+			appsv1.ShardingScaleInVarSource{
+				VariableName: "DEFAULT_PASSWORD",
+				ResolverKind: appsv1.ShardingScaleInVarResolverCredentialVarRef,
+				Consumption:  appsv1.ShardingScaleInVarConsumptionServerStartupSecret,
+			})
+
+		credentialSources := map[types.UID]appsv1.ShardingScaleInCredentialSource{
+			"component-0": newCredentialSource(
+				"component-0", "demo-redis-0-account-default", "secret-component-0", "password"),
+			"component-1": newCredentialSource(
+				"component-1", "demo-redis-1-account-default", "secret-component-1", "password"),
+			"component-2": newCredentialSource(
+				"component-2", "demo-redis-2-account-default", "secret-component-2", "password"),
+		}
+		for _, source := range credentialSources {
+			material.RequestAuthority.CredentialSources = append(
+				material.RequestAuthority.CredentialSources, source)
+		}
+		for i := range material.RequestAuthority.ExecutorTemplates {
+			template := &material.RequestAuthority.ExecutorTemplates[i]
+			source := credentialSources[template.ExecutorComponentUID]
+			template.CredentialBindings = []appsv1.ShardingScaleInExecutorCredentialBinding{
+				newCredentialBinding(
+					string(template.ExecutorPodUID), string(template.ExecutorComponentUID),
+					"DEFAULT_PASSWORD", source, "password"),
+			}
+			refreshServerConfigurationDigest(template)
+		}
+
+		canonical, _, err := buildShardingScaleInPlanMaterial(material)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(canonical.Leaving).Should(HaveLen(2))
+		for _, template := range canonical.RequestAuthority.ExecutorTemplates {
+			_, _, values, err := canonicalizeShardingScaleInBaseParameterRecord(
+				template.BaseParameterRecordB64, template.BaseParameterDigest)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(values.protocolVersion).Should(Equal(string(appsv1.ShardingScaleInResultProtocolV2)))
+			Expect(values.servicePort).Should(Equal("6379"))
+			Expect(template.CredentialBindings).Should(HaveLen(1))
+		}
+
+		missing := material.DeepCopy()
+		missing.RequestAuthority.ExecutorTemplates[0].CredentialBindings = nil
+		_, _, err = buildShardingScaleInPlanMaterial(missing)
+		Expect(err).Should(MatchError(ContainSubstring("credential bindings must cover")))
+
+		extra := material.DeepCopy()
+		extraTemplate := &extra.RequestAuthority.ExecutorTemplates[0]
+		extraBinding := newCredentialBinding(
+			string(extraTemplate.ExecutorPodUID), string(extraTemplate.ExecutorComponentUID),
+			"UNDECLARED", credentialSources[extraTemplate.ExecutorComponentUID], "password")
+		extraTemplate.CredentialBindings = append(
+			extraTemplate.CredentialBindings, extraBinding)
+		refreshServerConfigurationDigest(extraTemplate)
+		_, _, err = buildShardingScaleInPlanMaterial(extra)
+		Expect(err).Should(MatchError(ContainSubstring("credential bindings must cover")))
+
+		duplicate := material.DeepCopy()
+		duplicate.RequestAuthority.ExecutorTemplates[0].CredentialBindings = append(
+			duplicate.RequestAuthority.ExecutorTemplates[0].CredentialBindings,
+			duplicate.RequestAuthority.ExecutorTemplates[0].CredentialBindings[0])
+		_, _, err = buildShardingScaleInPlanMaterial(duplicate)
+		Expect(err).Should(MatchError(ContainSubstring("credential variable")))
+
+		unused := material.DeepCopy()
+		unused.RequestAuthority.CredentialSources = append(
+			unused.RequestAuthority.CredentialSources,
+			newCredentialSource("component-0", "unused", "unused-secret", "password"))
+		_, _, err = buildShardingScaleInPlanMaterial(unused)
+		Expect(err).Should(MatchError(ContainSubstring("credential source is not referenced")))
+
+		wrongUnion := material.DeepCopy()
+		wrongUnionSource := &wrongUnion.RequestAuthority.CredentialSources[0]
+		wrongUnionSource.KeyNames = append(wrongUnionSource.KeyNames, "username")
+		wrongUnionSource.CredentialSourceDigest, _ =
+			digestShardingScaleInCredentialSource(*wrongUnionSource)
+		for i := range wrongUnion.RequestAuthority.ExecutorTemplates {
+			template := &wrongUnion.RequestAuthority.ExecutorTemplates[i]
+			for j := range template.CredentialBindings {
+				binding := &template.CredentialBindings[j]
+				if binding.CredentialSourceID != wrongUnionSource.SourceID {
+					continue
+				}
+				binding.CredentialSourceDigest = wrongUnionSource.CredentialSourceDigest
+				binding.BindingDigest, _ = digestShardingScaleInExecutorCredentialBinding(
+					*binding, template.ExecutorPodUID, template.ExecutorComponentUID)
+			}
+			refreshServerConfigurationDigest(template)
+		}
+		_, _, err = buildShardingScaleInPlanMaterial(wrongUnion)
+		Expect(err).Should(MatchError(ContainSubstring("exact binding union")))
+
+		crossComponent := material.DeepCopy()
+		crossTemplate := &crossComponent.RequestAuthority.ExecutorTemplates[0]
+		crossTemplate.CredentialBindings[0] = newCredentialBinding(
+			string(crossTemplate.ExecutorPodUID), string(crossTemplate.ExecutorComponentUID),
+			"DEFAULT_PASSWORD", credentialSources["component-2"], "password")
+		refreshServerConfigurationDigest(crossTemplate)
+		_, _, err = buildShardingScaleInPlanMaterial(crossComponent)
+		Expect(err).Should(MatchError(ContainSubstring("credential source is not referenced")))
+
+		shared := material.DeepCopy()
+		sharedSource := newCredentialSource(
+			"", "shared-account-default", "shared-secret", "password")
+		shared.RequestAuthority.CredentialSources =
+			[]appsv1.ShardingScaleInCredentialSource{sharedSource}
+		for i := range shared.RequestAuthority.ExecutorTemplates {
+			template := &shared.RequestAuthority.ExecutorTemplates[i]
+			template.CredentialBindings = []appsv1.ShardingScaleInExecutorCredentialBinding{
+				newCredentialBinding(
+					string(template.ExecutorPodUID), string(template.ExecutorComponentUID),
+					"DEFAULT_PASSWORD", sharedSource, "password"),
+			}
+			refreshServerConfigurationDigest(template)
+		}
+		canonicalShared, _, err := buildShardingScaleInPlanMaterial(shared)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(canonicalShared.RequestAuthority.CredentialSources).Should(HaveLen(1))
+	})
+
+	It("rejects legacy request-authority and builder contracts", func() {
+		legacyAuthority := newMaterial()
+		legacyAuthority.RequestAuthority.Version =
+			appsv1.ShardingScaleInRequestAuthorityVersionV1
+		_, _, err := buildShardingScaleInPlanMaterial(legacyAuthority)
+		Expect(err).Should(MatchError(ContainSubstring("request authority contract")))
+
+		legacyBuilder := newMaterial()
+		legacyBuilder.RequestAuthority.Builder =
+			appsv1.ShardingScaleInRequestBuilderTypedV1
+		_, _, err = buildShardingScaleInPlanMaterial(legacyBuilder)
+		Expect(err).Should(MatchError(ContainSubstring("request authority contract")))
+
+		legacySecretSource := newMaterial()
+		legacySecretSource.RequestAuthority.VarSources[0].SecretSource =
+			&appsv1.ShardingScaleInSecretSource{
+				APIVersion: "v1",
+				Kind:       "Secret",
+				Namespace:  "default",
+				Name:       "legacy-secret",
+				UID:        types.UID("legacy-secret-uid"),
+				KeyNames:   []string{"password"},
+			}
+		encoded, err := json.Marshal(legacySecretSource)
+		Expect(err).ShouldNot(HaveOccurred())
+		decoded := &appsv1.ShardingScaleInPlanMaterial{}
+		Expect(json.Unmarshal(encoded, decoded)).Should(Succeed())
+		Expect(decoded.RequestAuthority.VarSources[0].SecretSource).ShouldNot(BeNil())
+
+		_, _, err = buildShardingScaleInPlanMaterial(decoded)
+		Expect(err).Should(MatchError(ContainSubstring(
+			"legacy secretSource is forbidden in request authority v2")))
 	})
 
 	It("rejects TypedBase and base-record allow-list bypasses", func() {
@@ -493,8 +717,9 @@ var _ = Describe("sharding scale-in immutable plan material", func() {
 			{
 				name: "secret key",
 				entries: []shardingScaleInBaseParameter{
-					{Name: shardingScaleInBaseParameterRemoveShardName,
-						ValueB64: base64.StdEncoding.EncodeToString([]byte("demo-redis-2"))},
+					{Name: shardingScaleInBaseParameterProtocolVersion,
+						ValueB64: base64.StdEncoding.EncodeToString(
+							[]byte(appsv1.ShardingScaleInResultProtocolV2))},
 					{Name: shardingScaleInBaseParameterServicePort,
 						ValueB64: base64.StdEncoding.EncodeToString([]byte("6379"))},
 					{Name: "DEFAULT_PASSWORD", ValueB64: encodedSecret},
@@ -504,8 +729,9 @@ var _ = Describe("sharding scale-in immutable plan material", func() {
 			{
 				name: "unknown key",
 				entries: []shardingScaleInBaseParameter{
-					{Name: shardingScaleInBaseParameterRemoveShardName,
-						ValueB64: base64.StdEncoding.EncodeToString([]byte("demo-redis-2"))},
+					{Name: shardingScaleInBaseParameterProtocolVersion,
+						ValueB64: base64.StdEncoding.EncodeToString(
+							[]byte(appsv1.ShardingScaleInResultProtocolV2))},
 					{Name: shardingScaleInBaseParameterServicePort,
 						ValueB64: base64.StdEncoding.EncodeToString([]byte("6379"))},
 					{Name: "EXTRA", ValueB64: base64.StdEncoding.EncodeToString([]byte("value"))},
@@ -515,8 +741,9 @@ var _ = Describe("sharding scale-in immutable plan material", func() {
 			{
 				name: "duplicate key",
 				entries: []shardingScaleInBaseParameter{
-					{Name: shardingScaleInBaseParameterRemoveShardName,
-						ValueB64: base64.StdEncoding.EncodeToString([]byte("demo-redis-2"))},
+					{Name: shardingScaleInBaseParameterProtocolVersion,
+						ValueB64: base64.StdEncoding.EncodeToString(
+							[]byte(appsv1.ShardingScaleInResultProtocolV2))},
 					{Name: shardingScaleInBaseParameterServicePort,
 						ValueB64: base64.StdEncoding.EncodeToString([]byte("6379"))},
 					{Name: shardingScaleInBaseParameterServicePort,
@@ -527,8 +754,9 @@ var _ = Describe("sharding scale-in immutable plan material", func() {
 			{
 				name: "reserved identity key",
 				entries: []shardingScaleInBaseParameter{
-					{Name: shardingScaleInBaseParameterRemoveShardName,
-						ValueB64: base64.StdEncoding.EncodeToString([]byte("demo-redis-2"))},
+					{Name: shardingScaleInBaseParameterProtocolVersion,
+						ValueB64: base64.StdEncoding.EncodeToString(
+							[]byte(appsv1.ShardingScaleInResultProtocolV2))},
 					{Name: shardingScaleInBaseParameterServicePort,
 						ValueB64: base64.StdEncoding.EncodeToString([]byte("6379"))},
 					{Name: "POD_UID", ValueB64: base64.StdEncoding.EncodeToString([]byte("pod-0"))},

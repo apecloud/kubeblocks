@@ -43,7 +43,6 @@ var errInvalidShardingScaleInPlanMaterial = errors.New("invalid sharding scale-i
 const (
 	shardingScaleInBaseParameterRecordVersionV1 = "kb.sharding.scalein.base-parameters/v1"
 
-	shardingScaleInBaseParameterRemoveShardName = "KB_REMOVE_SHARD_NAME"
 	shardingScaleInBaseParameterProtocolVersion = "KB_SHARD_SCALE_IN_PROTOCOL_VERSION"
 	shardingScaleInBaseParameterServicePort     = "SERVICE_PORT"
 )
@@ -59,7 +58,6 @@ type shardingScaleInBaseParameter struct {
 }
 
 type shardingScaleInBaseParameterValues struct {
-	removeShardName string
 	protocolVersion string
 	servicePort     string
 }
@@ -68,6 +66,13 @@ type shardingScaleInRequestSourceSnapshot struct {
 	Version                    string                                            `json:"version"`
 	ComponentDefinitionSources []appsv1.ShardingScaleInComponentDefinitionSource `json:"componentDefinitionSources"`
 	VarSources                 []appsv1.ShardingScaleInVarSource                 `json:"varSources"`
+	CredentialSources          []appsv1.ShardingScaleInCredentialSource          `json:"credentialSources"`
+	ExecutorCredentialBindings []shardingScaleInExecutorCredentialSnapshot       `json:"executorCredentialBindings"`
+}
+
+type shardingScaleInExecutorCredentialSnapshot struct {
+	ExecutorPodUID     types.UID                                         `json:"executorPodUID"`
+	CredentialBindings []appsv1.ShardingScaleInExecutorCredentialBinding `json:"credentialBindings"`
 }
 
 func buildShardingScaleInPlanMaterial(input *appsv1.ShardingScaleInPlanMaterial,
@@ -87,6 +92,16 @@ func buildShardingScaleInPlanMaterial(input *appsv1.ShardingScaleInPlanMaterial,
 		Version:                    "kb.sharding.scalein.request-source-snapshot/v1",
 		ComponentDefinitionSources: material.RequestAuthority.ComponentDefinitionSources,
 		VarSources:                 material.RequestAuthority.VarSources,
+		CredentialSources:          material.RequestAuthority.CredentialSources,
+		ExecutorCredentialBindings: make([]shardingScaleInExecutorCredentialSnapshot, 0,
+			len(material.RequestAuthority.ExecutorTemplates)),
+	}
+	for _, template := range material.RequestAuthority.ExecutorTemplates {
+		sourceSnapshot.ExecutorCredentialBindings = append(sourceSnapshot.ExecutorCredentialBindings,
+			shardingScaleInExecutorCredentialSnapshot{
+				ExecutorPodUID:     template.ExecutorPodUID,
+				CredentialBindings: template.CredentialBindings,
+			})
 	}
 	sourceDigest, err := digestShardingScaleInCanonicalJSON(sourceSnapshot)
 	if err != nil {
@@ -133,13 +148,40 @@ func canonicalizeShardingScaleInPlanMaterial(material *appsv1.ShardingScaleInPla
 			source.SourceObjects = []appsv1.ShardingScaleInRequestSourceObject{}
 		}
 		slices.SortFunc(source.SourceObjects, compareShardingScaleInRequestSourceObjects)
-		if source.SecretSource != nil {
-			slices.Sort(source.SecretSource.KeyNames)
-		}
 	}
 	slices.SortFunc(material.RequestAuthority.VarSources,
 		func(a, b appsv1.ShardingScaleInVarSource) int {
 			return strings.Compare(a.VariableName, b.VariableName)
+		})
+	if len(material.RequestAuthority.CredentialSources) == 0 {
+		material.RequestAuthority.CredentialSources = nil
+	}
+	credentialSourceIDRewrites := map[string]string{}
+	credentialSourceDigests := map[string]string{}
+	for i := range material.RequestAuthority.CredentialSources {
+		source := &material.RequestAuthority.CredentialSources[i]
+		oldSourceID := source.SourceID
+		slices.Sort(source.KeyNames)
+		sourceID, err := digestShardingScaleInCredentialSourceID(*source)
+		if err != nil {
+			return err
+		}
+		if previous, ok := credentialSourceIDRewrites[oldSourceID]; ok && previous != sourceID {
+			return fmt.Errorf("%w: credential source ID %q is ambiguous",
+				errInvalidShardingScaleInPlanMaterial, oldSourceID)
+		}
+		credentialSourceIDRewrites[oldSourceID] = sourceID
+		source.SourceID = sourceID
+		sourceDigest, err := digestShardingScaleInCredentialSource(*source)
+		if err != nil {
+			return err
+		}
+		source.CredentialSourceDigest = sourceDigest
+		credentialSourceDigests[sourceID] = sourceDigest
+	}
+	slices.SortFunc(material.RequestAuthority.CredentialSources,
+		func(a, b appsv1.ShardingScaleInCredentialSource) int {
+			return strings.Compare(a.SourceID, b.SourceID)
 		})
 	slices.SortFunc(material.RequestAuthority.ExecutorTemplates,
 		func(a, b appsv1.ShardingScaleInExecutorTemplate) int {
@@ -148,6 +190,31 @@ func canonicalizeShardingScaleInPlanMaterial(material *appsv1.ShardingScaleInPla
 		})
 	for i := range material.RequestAuthority.ExecutorTemplates {
 		template := &material.RequestAuthority.ExecutorTemplates[i]
+		if len(template.CredentialBindings) == 0 {
+			template.CredentialBindings = nil
+		}
+		for j := range template.CredentialBindings {
+			binding := &template.CredentialBindings[j]
+			slices.Sort(binding.RequiredKeyNames)
+			if sourceID, ok := credentialSourceIDRewrites[binding.CredentialSourceID]; ok {
+				binding.CredentialSourceID = sourceID
+			}
+			if sourceDigest, ok := credentialSourceDigests[binding.CredentialSourceID]; ok {
+				binding.CredentialSourceDigest = sourceDigest
+			}
+			bindingDigest, err := digestShardingScaleInExecutorCredentialBinding(
+				*binding, template.ExecutorPodUID, template.ExecutorComponentUID)
+			if err != nil {
+				return err
+			}
+			binding.BindingDigest = bindingDigest
+		}
+		slices.SortFunc(template.CredentialBindings,
+			func(a, b appsv1.ShardingScaleInExecutorCredentialBinding) int {
+				return strings.Compare(
+					a.VariableName+"\x00"+a.CredentialSourceID,
+					b.VariableName+"\x00"+b.CredentialSourceID)
+			})
 		encoded, digest, _, err := canonicalizeShardingScaleInBaseParameterRecord(
 			template.BaseParameterRecordB64, template.BaseParameterDigest)
 		if err != nil {
@@ -215,7 +282,6 @@ func validateShardingScaleInPlanMaterial(material *appsv1.ShardingScaleInPlanMat
 	componentNames := map[string]struct{}{}
 	componentUIDs := map[types.UID]struct{}{}
 	componentShortNames := map[string]struct{}{}
-	leavingComponentNames := map[string]struct{}{}
 	podNames := map[string]struct{}{}
 	podUIDs := map[types.UID]types.UID{}
 	podFQDNs := map[string]struct{}{}
@@ -266,9 +332,6 @@ func validateShardingScaleInPlanMaterial(material *appsv1.ShardingScaleInPlanMat
 	if err := validateMembers(material.Leaving); err != nil {
 		return err
 	}
-	for _, member := range material.Leaving {
-		leavingComponentNames[member.ComponentName] = struct{}{}
-	}
 	if err := validateMembers(material.Staying); err != nil {
 		return err
 	}
@@ -290,7 +353,7 @@ func validateShardingScaleInPlanMaterial(material *appsv1.ShardingScaleInPlanMat
 		return err
 	}
 	if err := validateShardingScaleInExecutorTemplates(
-		material, componentPods, podUIDs, leavingComponentNames, servicePort); err != nil {
+		material, componentPods, podUIDs, servicePort); err != nil {
 		return err
 	}
 	return nil
@@ -301,8 +364,8 @@ func validateShardingScaleInRequestAuthority(material *appsv1.ShardingScaleInPla
 		return fmt.Errorf("%w: %s", errInvalidShardingScaleInPlanMaterial, fmt.Sprintf(format, args...))
 	}
 	authority := material.RequestAuthority
-	if authority.Version != appsv1.ShardingScaleInRequestAuthorityVersionV1 ||
-		authority.Builder != appsv1.ShardingScaleInRequestBuilderTypedV1 ||
+	if authority.Version != appsv1.ShardingScaleInRequestAuthorityVersionV2 ||
+		authority.Builder != appsv1.ShardingScaleInRequestBuilderTypedV2 ||
 		!authority.GenericLifecycleSynthesisForbidden ||
 		authority.ActionName != shardingRemoveShardAction ||
 		authority.ActionDefinitionDigest != material.Action.ActionDigest {
@@ -337,7 +400,12 @@ func validateShardingScaleInRequestAuthority(material *appsv1.ShardingScaleInPla
 		return "", invalid("request authority variable sources must not be empty")
 	}
 	var servicePort string
+	credentialVariables := map[string]struct{}{}
 	for i, source := range authority.VarSources {
+		if source.SecretSource != nil {
+			return "", invalid("variable %q legacy secretSource is forbidden in request authority v2",
+				source.VariableName)
+		}
 		if source.VariableName == "" {
 			return "", invalid("variable name must not be empty")
 		}
@@ -380,17 +448,13 @@ func validateShardingScaleInRequestAuthority(material *appsv1.ShardingScaleInPla
 		switch source.ResolverKind {
 		case appsv1.ShardingScaleInVarResolverCredentialVarRef:
 			if source.Consumption != appsv1.ShardingScaleInVarConsumptionServerStartupSecret ||
-				source.SecretSource == nil || len(source.SecretSource.KeyNames) == 0 ||
 				len(source.SourceObjects) != 0 {
-				return "", invalid("credential variable %q must have a Secret source", source.VariableName)
+				return "", invalid("credential variable %q must be a server startup secret", source.VariableName)
 			}
+			credentialVariables[source.VariableName] = struct{}{}
 		case appsv1.ShardingScaleInVarResolverStaticValue:
-			if source.SecretSource != nil || len(source.SourceObjects) != 0 {
+			if len(source.SourceObjects) != 0 {
 				return "", invalid("static variable %q must not have live source objects", source.VariableName)
-			}
-		default:
-			if source.SecretSource != nil {
-				return "", invalid("non-credential variable %q must not have a Secret source", source.VariableName)
 			}
 		}
 		if source.Consumption == appsv1.ShardingScaleInVarConsumptionServerStartupSecret &&
@@ -406,20 +470,6 @@ func validateShardingScaleInRequestAuthority(material *appsv1.ShardingScaleInPla
 			material.Source.ClusterNamespace); err != nil {
 			return "", err
 		}
-		if source.SecretSource != nil {
-			secret := source.SecretSource
-			if secret.APIVersion != "v1" || secret.Kind != "Secret" ||
-				secret.Namespace != material.Source.ClusterNamespace ||
-				secret.Name == "" || secret.UID == "" {
-				return "", invalid("credential variable %q Secret identity must be exact", source.VariableName)
-			}
-			for j, key := range secret.KeyNames {
-				if key == "" || (j > 0 && secret.KeyNames[j-1] >= key) {
-					return "", invalid("credential variable %q Secret keys must be sorted, unique, and non-empty",
-						source.VariableName)
-				}
-			}
-		}
 	}
 	if servicePort == "" {
 		return "", invalid("%q must be the only TypedBase variable", shardingScaleInBaseParameterServicePort)
@@ -427,7 +477,75 @@ func validateShardingScaleInRequestAuthority(material *appsv1.ShardingScaleInPla
 	if err := validateShardingScaleInServicePort(servicePort); err != nil {
 		return "", invalid("%q is invalid: %v", shardingScaleInBaseParameterServicePort, err)
 	}
+	if err := validateShardingScaleInCredentialSources(
+		authority.CredentialSources, material.Source.ClusterNamespace); err != nil {
+		return "", err
+	}
+	if len(credentialVariables) == 0 && len(authority.CredentialSources) != 0 {
+		return "", invalid("credential sources must be empty when no credential variables are declared")
+	}
 	return servicePort, nil
+}
+
+func validateShardingScaleInCredentialSources(
+	sources []appsv1.ShardingScaleInCredentialSource,
+	clusterNamespace string,
+) error {
+	invalid := func(format string, args ...any) error {
+		return fmt.Errorf("%w: %s", errInvalidShardingScaleInPlanMaterial, fmt.Sprintf(format, args...))
+	}
+	sourceIDs := map[string]struct{}{}
+	secretKeys := map[string]struct{}{}
+	secretUIDs := map[types.UID]struct{}{}
+	for i, source := range sources {
+		if source.SourceID == "" || !isShardingScaleInSHA256(source.SourceID) {
+			return invalid("credential source ID must be a SHA256 digest")
+		}
+		if i > 0 && sources[i-1].SourceID >= source.SourceID {
+			return invalid("credential sources must be sorted and unique")
+		}
+		if _, ok := sourceIDs[source.SourceID]; ok {
+			return invalid("credential source %q is duplicated", source.SourceID)
+		}
+		if source.APIVersion != "v1" || source.Kind != "Secret" ||
+			source.Namespace != clusterNamespace || source.Name == "" || source.UID == "" ||
+			len(source.KeyNames) == 0 {
+			return invalid("credential source %q Secret identity must be exact", source.SourceID)
+		}
+		for j, key := range source.KeyNames {
+			if key == "" || (j > 0 && source.KeyNames[j-1] >= key) {
+				return invalid("credential source %q Secret keys must be sorted, unique, and non-empty",
+					source.SourceID)
+			}
+		}
+		secretKey := strings.Join([]string{
+			source.APIVersion, source.Kind, source.Namespace, source.Name,
+		}, "\x00")
+		if _, ok := secretKeys[secretKey]; ok {
+			return invalid("credential Secret %q is duplicated", source.Name)
+		}
+		if _, ok := secretUIDs[source.UID]; ok {
+			return invalid("credential Secret UID %q is duplicated", source.UID)
+		}
+		expectedID, err := digestShardingScaleInCredentialSourceID(source)
+		if err != nil {
+			return err
+		}
+		if source.SourceID != expectedID {
+			return invalid("credential source %q digest does not match its identity", source.SourceID)
+		}
+		expectedDigest, err := digestShardingScaleInCredentialSource(source)
+		if err != nil {
+			return err
+		}
+		if source.CredentialSourceDigest != expectedDigest {
+			return invalid("credential source %q content digest does not match", source.SourceID)
+		}
+		sourceIDs[source.SourceID] = struct{}{}
+		secretKeys[secretKey] = struct{}{}
+		secretUIDs[source.UID] = struct{}{}
+	}
+	return nil
 }
 
 func validateShardingScaleInRequestSourceObjects(
@@ -527,7 +645,7 @@ func validateShardingScaleInExecutorPrerequisites(material *appsv1.ShardingScale
 
 func validateShardingScaleInExecutorTemplates(material *appsv1.ShardingScaleInPlanMaterial,
 	componentPods map[types.UID][]appsv1.ShardingScaleInPlanPod, podUIDs map[types.UID]types.UID,
-	leavingComponentNames map[string]struct{}, servicePort string,
+	servicePort string,
 ) error {
 	invalid := func(format string, args ...any) error {
 		return fmt.Errorf("%w: %s", errInvalidShardingScaleInPlanMaterial, fmt.Sprintf(format, args...))
@@ -536,6 +654,18 @@ func validateShardingScaleInExecutorTemplates(material *appsv1.ShardingScaleInPl
 	if len(templates) != len(podUIDs) {
 		return invalid("executor templates must cover every plan Pod exactly once")
 	}
+	credentialVariables := map[string]struct{}{}
+	for _, source := range material.RequestAuthority.VarSources {
+		if source.ResolverKind == appsv1.ShardingScaleInVarResolverCredentialVarRef {
+			credentialVariables[source.VariableName] = struct{}{}
+		}
+	}
+	credentialSources := map[string]appsv1.ShardingScaleInCredentialSource{}
+	for _, source := range material.RequestAuthority.CredentialSources {
+		credentialSources[source.SourceID] = source
+	}
+	usedCredentialSources := map[string]struct{}{}
+	requiredKeysBySource := map[string]map[string]struct{}{}
 	seen := map[types.UID]struct{}{}
 	for _, template := range templates {
 		componentUID, ok := podUIDs[template.ExecutorPodUID]
@@ -546,14 +676,71 @@ func validateShardingScaleInExecutorTemplates(material *appsv1.ShardingScaleInPl
 			return invalid("executor Pod UID %q is duplicated", template.ExecutorPodUID)
 		}
 		seen[template.ExecutorPodUID] = struct{}{}
+		if len(template.CredentialBindings) != len(credentialVariables) {
+			return invalid("executor %q credential bindings must cover every credential variable exactly once",
+				template.ExecutorPodUID)
+		}
+		boundVariables := map[string]struct{}{}
+		for i, binding := range template.CredentialBindings {
+			if binding.VariableName == "" ||
+				!isShardingScaleInSHA256(binding.CredentialSourceID) ||
+				!isShardingScaleInSHA256(binding.CredentialSourceDigest) ||
+				!isShardingScaleInSHA256(binding.ResolverProjectionDigest) ||
+				!isShardingScaleInSHA256(binding.BindingDigest) ||
+				len(binding.RequiredKeyNames) == 0 {
+				return invalid("executor %q credential binding must be complete", template.ExecutorPodUID)
+			}
+			if i > 0 && template.CredentialBindings[i-1].VariableName >= binding.VariableName {
+				return invalid("executor %q credential variables must be sorted and unique",
+					template.ExecutorPodUID)
+			}
+			if _, ok := credentialVariables[binding.VariableName]; !ok {
+				return invalid("executor %q credential variable %q is not declared",
+					template.ExecutorPodUID, binding.VariableName)
+			}
+			if _, ok := boundVariables[binding.VariableName]; ok {
+				return invalid("executor %q credential variable %q is duplicated",
+					template.ExecutorPodUID, binding.VariableName)
+			}
+			source, ok := credentialSources[binding.CredentialSourceID]
+			if !ok {
+				return invalid("executor %q credential source %q is not declared",
+					template.ExecutorPodUID, binding.CredentialSourceID)
+			}
+			if binding.CredentialSourceDigest != source.CredentialSourceDigest {
+				return invalid("executor %q credential source digest does not match",
+					template.ExecutorPodUID)
+			}
+			for j, keyName := range binding.RequiredKeyNames {
+				if keyName == "" || (j > 0 && binding.RequiredKeyNames[j-1] >= keyName) {
+					return invalid("executor %q credential keys must be sorted, unique, and non-empty",
+						template.ExecutorPodUID)
+				}
+				if !slices.Contains(source.KeyNames, keyName) {
+					return invalid("executor %q credential key %q is not declared by its source",
+						template.ExecutorPodUID, keyName)
+				}
+				if requiredKeysBySource[source.SourceID] == nil {
+					requiredKeysBySource[source.SourceID] = map[string]struct{}{}
+				}
+				requiredKeysBySource[source.SourceID][keyName] = struct{}{}
+			}
+			expectedBindingDigest, err := digestShardingScaleInExecutorCredentialBinding(
+				binding, template.ExecutorPodUID, template.ExecutorComponentUID)
+			if err != nil {
+				return err
+			}
+			if binding.BindingDigest != expectedBindingDigest {
+				return invalid("executor %q credential binding digest does not match",
+					template.ExecutorPodUID)
+			}
+			boundVariables[binding.VariableName] = struct{}{}
+			usedCredentialSources[binding.CredentialSourceID] = struct{}{}
+		}
 		_, _, values, err := canonicalizeShardingScaleInBaseParameterRecord(
 			template.BaseParameterRecordB64, template.BaseParameterDigest)
 		if err != nil {
 			return invalid("executor %q base parameter record is invalid: %v", template.ExecutorPodUID, err)
-		}
-		if _, ok := leavingComponentNames[values.removeShardName]; !ok {
-			return invalid("executor %q base parameter target must be a leaving Component",
-				template.ExecutorPodUID)
 		}
 		if values.protocolVersion != string(appsv1.ShardingScaleInResultProtocolV2) {
 			return invalid("executor %q base parameter protocol must be %q",
@@ -575,6 +762,23 @@ func validateShardingScaleInExecutorTemplates(material *appsv1.ShardingScaleInPl
 			!isShardingScaleInSHA256(binding.ServerConfigurationDigest) {
 			return invalid("executor %q server runtime binding must be complete", template.ExecutorPodUID)
 		}
+		expectedServerDigest, err := digestShardingScaleInServerConfiguration(
+			template.ExecutorPodUID,
+			binding.RegisteredActionDigest,
+			binding.StartupEnvironmentSchemaDigest,
+			template.BaseParameterDigest,
+			template.LaunchSchemaDigest,
+			template.PollSchemaDigest,
+			template.CancelSchemaDigest,
+			template.CredentialBindings,
+		)
+		if err != nil {
+			return err
+		}
+		if binding.ServerConfigurationDigest != expectedServerDigest {
+			return invalid("executor %q server configuration digest does not match",
+				template.ExecutorPodUID)
+		}
 		pods := componentPods[componentUID]
 		idx := slices.IndexFunc(pods, func(pod appsv1.ShardingScaleInPlanPod) bool {
 			return pod.UID == template.ExecutorPodUID
@@ -582,6 +786,20 @@ func validateShardingScaleInExecutorTemplates(material *appsv1.ShardingScaleInPl
 		if idx < 0 || pods[idx].AgentImageID != binding.AgentImageID ||
 			pods[idx].AgentProcessUID != binding.AgentProcessUID {
 			return invalid("executor %q server binding must match the plan Pod", template.ExecutorPodUID)
+		}
+	}
+	for _, source := range material.RequestAuthority.CredentialSources {
+		if _, ok := usedCredentialSources[source.SourceID]; !ok {
+			return invalid("credential source is not referenced: %q", source.SourceID)
+		}
+		requiredKeys := make([]string, 0, len(requiredKeysBySource[source.SourceID]))
+		for keyName := range requiredKeysBySource[source.SourceID] {
+			requiredKeys = append(requiredKeys, keyName)
+		}
+		slices.Sort(requiredKeys)
+		if !slices.Equal(source.KeyNames, requiredKeys) {
+			return invalid("credential source %q key set must equal the exact binding union",
+				source.SourceID)
 		}
 	}
 	return nil
@@ -611,10 +829,6 @@ func canonicalizeShardingScaleInBaseParameterRecord(encoded, digest string,
 		return "", "", values, fmt.Errorf("version must be %q",
 			shardingScaleInBaseParameterRecordVersionV1)
 	}
-	if len(record.Parameters) != 3 {
-		return "", "", values, errors.New("base parameter key set must contain exactly three keys")
-	}
-
 	seen := map[string]struct{}{}
 	for _, parameter := range record.Parameters {
 		if _, ok := seen[parameter.Name]; ok {
@@ -627,8 +841,6 @@ func canonicalizeShardingScaleInBaseParameterRecord(encoded, digest string,
 				parameter.Name)
 		}
 		switch parameter.Name {
-		case shardingScaleInBaseParameterRemoveShardName:
-			values.removeShardName = string(value)
 		case shardingScaleInBaseParameterProtocolVersion:
 			values.protocolVersion = string(value)
 		case shardingScaleInBaseParameterServicePort:
@@ -637,7 +849,10 @@ func canonicalizeShardingScaleInBaseParameterRecord(encoded, digest string,
 			return "", "", values, fmt.Errorf("base parameter %q is not allowed", parameter.Name)
 		}
 	}
-	if values.removeShardName == "" || values.protocolVersion == "" || values.servicePort == "" {
+	if len(record.Parameters) != 2 {
+		return "", "", values, errors.New("base parameter key set must contain exactly two keys")
+	}
+	if values.protocolVersion == "" || values.servicePort == "" {
 		return "", "", values, errors.New("base parameter key set is incomplete")
 	}
 	if err := validateShardingScaleInServicePort(values.servicePort); err != nil {
@@ -683,6 +898,58 @@ func digestShardingScaleInPrerequisiteIdentity(
 ) (string, error) {
 	prerequisite.IdentityDigest = ""
 	return digestShardingScaleInCanonicalJSON(prerequisite)
+}
+
+func digestShardingScaleInCredentialSourceID(
+	source appsv1.ShardingScaleInCredentialSource,
+) (string, error) {
+	return digestShardingScaleInCanonicalJSON(struct {
+		Version    string    `json:"version"`
+		APIVersion string    `json:"apiVersion"`
+		Kind       string    `json:"kind"`
+		Namespace  string    `json:"namespace"`
+		Name       string    `json:"name"`
+		UID        types.UID `json:"uid"`
+	}{
+		Version:    "kb.sharding.scalein.credential-source-id/v1",
+		APIVersion: source.APIVersion,
+		Kind:       source.Kind,
+		Namespace:  source.Namespace,
+		Name:       source.Name,
+		UID:        source.UID,
+	})
+}
+
+func digestShardingScaleInCredentialSource(
+	source appsv1.ShardingScaleInCredentialSource,
+) (string, error) {
+	return digestShardingScaleInCanonicalJSON(struct {
+		Version  string   `json:"version"`
+		SourceID string   `json:"sourceID"`
+		KeyNames []string `json:"keyNames"`
+	}{
+		Version:  "kb.sharding.scalein.credential-source/v1",
+		SourceID: source.SourceID,
+		KeyNames: source.KeyNames,
+	})
+}
+
+func digestShardingScaleInExecutorCredentialBinding(
+	binding appsv1.ShardingScaleInExecutorCredentialBinding,
+	executorPodUID, executorComponentUID types.UID,
+) (string, error) {
+	binding.BindingDigest = ""
+	return digestShardingScaleInCanonicalJSON(struct {
+		Version              string                                          `json:"version"`
+		ExecutorPodUID       types.UID                                       `json:"executorPodUID"`
+		ExecutorComponentUID types.UID                                       `json:"executorComponentUID"`
+		Binding              appsv1.ShardingScaleInExecutorCredentialBinding `json:"binding"`
+	}{
+		Version:              "kb.sharding.scalein.credential-binding/v1",
+		ExecutorPodUID:       executorPodUID,
+		ExecutorComponentUID: executorComponentUID,
+		Binding:              binding,
+	})
 }
 
 func digestShardingScaleInCanonicalJSON(value any) (string, error) {

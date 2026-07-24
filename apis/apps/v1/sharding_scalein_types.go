@@ -127,6 +127,9 @@ type ShardingScaleInRequestAuthority struct {
 
 	VarSources []ShardingScaleInVarSource `json:"varSources"`
 
+	// +optional
+	CredentialSources []ShardingScaleInCredentialSource `json:"credentialSources,omitempty"`
+
 	// +kubebuilder:validation:MinItems=1
 	ExecutorTemplates []ShardingScaleInExecutorTemplate `json:"executorTemplates"`
 
@@ -136,21 +139,23 @@ type ShardingScaleInRequestAuthority struct {
 // ShardingScaleInRequestAuthorityVersion identifies a request-authority contract.
 //
 // +enum
-// +kubebuilder:validation:Enum={kb.sharding.scalein.request-authority/v1}
+// +kubebuilder:validation:Enum={kb.sharding.scalein.request-authority/v1,kb.sharding.scalein.request-authority/v2}
 type ShardingScaleInRequestAuthorityVersion string
 
 const (
 	ShardingScaleInRequestAuthorityVersionV1 ShardingScaleInRequestAuthorityVersion = "kb.sharding.scalein.request-authority/v1"
+	ShardingScaleInRequestAuthorityVersionV2 ShardingScaleInRequestAuthorityVersion = "kb.sharding.scalein.request-authority/v2"
 )
 
 // ShardingScaleInRequestBuilder identifies the only request builder allowed by a plan.
 //
 // +enum
-// +kubebuilder:validation:Enum={TypedShardScaleInV1}
+// +kubebuilder:validation:Enum={TypedShardScaleInV1,TypedShardScaleInV2}
 type ShardingScaleInRequestBuilder string
 
 const (
 	ShardingScaleInRequestBuilderTypedV1 ShardingScaleInRequestBuilder = "TypedShardScaleInV1"
+	ShardingScaleInRequestBuilderTypedV2 ShardingScaleInRequestBuilder = "TypedShardScaleInV2"
 )
 
 // ShardingScaleInComponentDefinitionSource identifies ComponentDefinition vars used at plan time.
@@ -173,6 +178,8 @@ type ShardingScaleInVarSource struct {
 
 	SourceObjects []ShardingScaleInRequestSourceObject `json:"sourceObjects"`
 
+	// SecretSource is retained only to decode legacy v1 material so v2
+	// validation can reject it explicitly.
 	// +optional
 	SecretSource *ShardingScaleInSecretSource `json:"secretSource,omitempty"`
 }
@@ -228,7 +235,7 @@ const (
 	ShardingScaleInSourceProjectionInstanceSetSpec   ShardingScaleInSourceProjectionKind = "InstanceSetSpec"
 )
 
-// ShardingScaleInSecretSource records Secret identity and key names without secret values.
+// ShardingScaleInSecretSource is the legacy v1 inline credential source shape.
 type ShardingScaleInSecretSource struct {
 	APIVersion string    `json:"apiVersion"`
 	Kind       string    `json:"kind"`
@@ -240,10 +247,41 @@ type ShardingScaleInSecretSource struct {
 	KeyNames []string `json:"keyNames"`
 }
 
+// ShardingScaleInCredentialSource records one canonical Secret identity and
+// the exact union of key names used by executor bindings. It never contains
+// Secret values or value digests.
+type ShardingScaleInCredentialSource struct {
+	SourceID string `json:"sourceID"`
+
+	APIVersion string    `json:"apiVersion"`
+	Kind       string    `json:"kind"`
+	Namespace  string    `json:"namespace"`
+	Name       string    `json:"name"`
+	UID        types.UID `json:"uid"`
+
+	// +kubebuilder:validation:MinItems=1
+	KeyNames []string `json:"keyNames"`
+
+	CredentialSourceDigest string `json:"credentialSourceDigest"`
+}
+
+// ShardingScaleInExecutorCredentialBinding binds one declared variable to a canonical Secret source.
+type ShardingScaleInExecutorCredentialBinding struct {
+	VariableName             string   `json:"variableName"`
+	CredentialSourceID       string   `json:"credentialSourceID"`
+	CredentialSourceDigest   string   `json:"credentialSourceDigest"`
+	RequiredKeyNames         []string `json:"requiredKeyNames"`
+	ResolverProjectionDigest string   `json:"resolverProjectionDigest"`
+	BindingDigest            string   `json:"bindingDigest"`
+}
+
 // ShardingScaleInExecutorTemplate records an immutable request base for one executor.
 type ShardingScaleInExecutorTemplate struct {
 	ExecutorPodUID       types.UID `json:"executorPodUID"`
 	ExecutorComponentUID types.UID `json:"executorComponentUID"`
+
+	// +optional
+	CredentialBindings []ShardingScaleInExecutorCredentialBinding `json:"credentialBindings,omitempty"`
 
 	BaseParameterRecordB64 string `json:"baseParameterRecordB64"`
 	BaseParameterDigest    string `json:"baseParameterDigest"`

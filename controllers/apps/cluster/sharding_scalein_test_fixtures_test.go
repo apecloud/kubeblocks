@@ -66,10 +66,6 @@ func newShardingScaleInPlanMaterialFixture() *appsv1.ShardingScaleInPlanMaterial
 			Version: shardingScaleInBaseParameterRecordVersionV1,
 			Parameters: []shardingScaleInBaseParameter{
 				{
-					Name:     shardingScaleInBaseParameterRemoveShardName,
-					ValueB64: base64.StdEncoding.EncodeToString([]byte("demo-redis-2")),
-				},
-				{
 					Name: shardingScaleInBaseParameterProtocolVersion,
 					ValueB64: base64.StdEncoding.EncodeToString(
 						[]byte(appsv1.ShardingScaleInResultProtocolV2)),
@@ -85,7 +81,7 @@ func newShardingScaleInPlanMaterialFixture() *appsv1.ShardingScaleInPlanMaterial
 			panic(err)
 		}
 		sum := sha256.Sum256(data)
-		return appsv1.ShardingScaleInExecutorTemplate{
+		template := appsv1.ShardingScaleInExecutorTemplate{
 			ExecutorPodUID:         types.UID(podUID),
 			ExecutorComponentUID:   types.UID(componentUID),
 			BaseParameterRecordB64: base64.StdEncoding.EncodeToString(data),
@@ -98,9 +94,23 @@ func newShardingScaleInPlanMaterialFixture() *appsv1.ShardingScaleInPlanMaterial
 				AgentImageID:                   "sha256:" + shardingScaleInTestDigestA,
 				RegisteredActionDigest:         shardingScaleInTestDigestB,
 				StartupEnvironmentSchemaDigest: shardingScaleInTestDigestC,
-				ServerConfigurationDigest:      shardingScaleInTestDigestA,
 			},
 		}
+		template.ServerRuntimeBinding.ServerConfigurationDigest, err =
+			digestShardingScaleInServerConfiguration(
+				template.ExecutorPodUID,
+				template.ServerRuntimeBinding.RegisteredActionDigest,
+				template.ServerRuntimeBinding.StartupEnvironmentSchemaDigest,
+				template.BaseParameterDigest,
+				template.LaunchSchemaDigest,
+				template.PollSchemaDigest,
+				template.CancelSchemaDigest,
+				template.CredentialBindings,
+			)
+		if err != nil {
+			panic(err)
+		}
+		return template
 	}
 
 	return &appsv1.ShardingScaleInPlanMaterial{
@@ -128,8 +138,8 @@ func newShardingScaleInPlanMaterialFixture() *appsv1.ShardingScaleInPlanMaterial
 			ConfigurationDigest: shardingScaleInTestDigestC,
 		},
 		RequestAuthority: appsv1.ShardingScaleInRequestAuthority{
-			Version:                            appsv1.ShardingScaleInRequestAuthorityVersionV1,
-			Builder:                            appsv1.ShardingScaleInRequestBuilderTypedV1,
+			Version:                            appsv1.ShardingScaleInRequestAuthorityVersionV2,
+			Builder:                            appsv1.ShardingScaleInRequestBuilderTypedV2,
 			GenericLifecycleSynthesisForbidden: true,
 			ActionName:                         shardingRemoveShardAction,
 			ActionDefinitionDigest:             shardingScaleInTestDigestB,

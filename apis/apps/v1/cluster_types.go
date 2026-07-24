@@ -1050,6 +1050,11 @@ type ShardingScaleInStatus struct {
 	// ExternalWriteAuthorized records whether the plan may invoke an external topology write.
 	ExternalWriteAuthorized bool `json:"externalWriteAuthorized"`
 
+	// PlanMaterial contains the immutable source and executor identities hashed by PlanID.
+	//
+	// +optional
+	PlanMaterial *ShardingScaleInPlanMaterial `json:"planMaterial,omitempty"`
+
 	// Holder identifies the shard currently being removed.
 	//
 	// +optional

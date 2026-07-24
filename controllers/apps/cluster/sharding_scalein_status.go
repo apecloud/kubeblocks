@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -49,15 +50,6 @@ type shardingScaleInJSONPatchOperation struct {
 	Operation string `json:"op"`
 	Path      string `json:"path"`
 	Value     any    `json:"value,omitempty"`
-}
-
-func patchShardingScaleInStatus(ctx context.Context, cli client.Client, cluster *appsv1.Cluster,
-	shardingName string, transition shardingScaleInStatusTransition) error {
-	_, patch, err := buildShardingScaleInStatusPatch(cluster, shardingName, transition)
-	if err != nil {
-		return err
-	}
-	return cli.Status().Patch(ctx, cluster, client.RawPatch(types.JSONPatchType, patch))
 }
 
 func patchInitialShardingScaleInPlan(ctx context.Context, cli client.Client, cluster *appsv1.Cluster,
@@ -277,6 +269,9 @@ func reduceShardingScaleInStatus(current *appsv1.ShardingScaleInStatus,
 			return nil, fmt.Errorf("%w: initial phase must be %q",
 				errInvalidShardingScaleInStatusTransition, appsv1.ShardingScaleInPhasePlanned)
 		}
+		if err := validateShardingScaleInPlanMaterialBinding(next); err != nil {
+			return nil, err
+		}
 		if err := validateShardingScaleInBlockState(next); err != nil {
 			return nil, err
 		}
@@ -304,6 +299,22 @@ func reduceShardingScaleInStatus(current *appsv1.ShardingScaleInStatus,
 		return nil, fmt.Errorf("%w: topologyFenceToken is immutable",
 			errInvalidShardingScaleInStatusTransition)
 	}
+	if (current.PlanMaterial == nil) != (next.PlanMaterial == nil) {
+		return nil, fmt.Errorf("%w: planMaterial presence is immutable",
+			errInvalidShardingScaleInStatusTransition)
+	}
+	if current.PlanMaterial != nil {
+		if err := validateShardingScaleInPlanMaterialBinding(current); err != nil {
+			return nil, err
+		}
+		if err := validateShardingScaleInPlanMaterialBinding(next); err != nil {
+			return nil, err
+		}
+		if !equality.Semantic.DeepEqual(current.PlanMaterial, next.PlanMaterial) {
+			return nil, fmt.Errorf("%w: planMaterial is immutable",
+				errInvalidShardingScaleInStatusTransition)
+		}
+	}
 	if current.ExternalWriteAuthorized && !next.ExternalWriteAuthorized {
 		return nil, fmt.Errorf("%w: externalWriteAuthorized cannot be revoked",
 			errInvalidShardingScaleInStatusTransition)
@@ -320,6 +331,25 @@ func reduceShardingScaleInStatus(current *appsv1.ShardingScaleInStatus,
 		return nil, err
 	}
 	return next, nil
+}
+
+func validateShardingScaleInPlanMaterialBinding(status *appsv1.ShardingScaleInStatus) error {
+	if status.PlanMaterial == nil {
+		return nil
+	}
+	canonical, planID, err := buildShardingScaleInPlanMaterial(status.PlanMaterial)
+	if err != nil {
+		return fmt.Errorf("%w: %v", errInvalidShardingScaleInStatusTransition, err)
+	}
+	if planID != status.PlanID {
+		return fmt.Errorf("%w: planMaterial digest must match planID",
+			errInvalidShardingScaleInStatusTransition)
+	}
+	if !equality.Semantic.DeepEqual(canonical, status.PlanMaterial) {
+		return fmt.Errorf("%w: planMaterial must be canonical",
+			errInvalidShardingScaleInStatusTransition)
+	}
+	return nil
 }
 
 func shardingScaleInPhaseTransitionAllowed(current, next *appsv1.ShardingScaleInStatus) bool {

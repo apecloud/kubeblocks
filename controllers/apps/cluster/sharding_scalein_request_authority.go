@@ -370,7 +370,7 @@ func loadShardingScaleInPodCapabilitySources(
 			}
 			if err := validateShardingScaleInAgentCapability(
 				capabilityBefore, sourcePod.Pod.UID, actionDigest); err != nil {
-				return nil, fmt.Errorf("Pod %q capability is invalid: %w",
+				return nil, fmt.Errorf("pod %q capability is invalid: %w",
 					sourcePod.Pod.Name, err)
 			}
 			after, err := readShardingScaleInLivePodRuntime(ctx, apiReader, key, sourcePod.Pod.UID)

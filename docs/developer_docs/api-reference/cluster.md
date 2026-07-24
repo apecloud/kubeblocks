@@ -13150,6 +13150,108 @@ string
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1.ShardingScaleInCredentialSource">ShardingScaleInCredentialSource
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ShardingScaleInRequestAuthority">ShardingScaleInRequestAuthority</a>)
+</p>
+<div>
+<p>ShardingScaleInCredentialSource records one canonical Secret identity and
+the exact union of key names used by executor bindings. It never contains
+Secret values or value digests.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>sourceID</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>apiVersion</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>kind</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>namespace</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>uid</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/types#UID">
+k8s.io/apimachinery/pkg/types.UID
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>keyNames</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>credentialSourceDigest</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1.ShardingScaleInDeletionGuardIdentity">ShardingScaleInDeletionGuardIdentity
 </h3>
 <p>
@@ -13230,6 +13332,84 @@ string
 <tbody><tr><td><p>&#34;scale-in-deletion-guard/v1&#34;</p></td>
 <td></td>
 </tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ShardingScaleInExecutorCredentialBinding">ShardingScaleInExecutorCredentialBinding
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ShardingScaleInExecutorTemplate">ShardingScaleInExecutorTemplate</a>)
+</p>
+<div>
+<p>ShardingScaleInExecutorCredentialBinding binds one declared variable to a canonical Secret source.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>variableName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>credentialSourceID</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>credentialSourceDigest</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>requiredKeyNames</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>resolverProjectionDigest</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>bindingDigest</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1.ShardingScaleInExecutorPrerequisite">ShardingScaleInExecutorPrerequisite
 </h3>
@@ -13396,6 +13576,19 @@ k8s.io/apimachinery/pkg/types.UID
 </em>
 </td>
 <td>
+</td>
+</tr>
+<tr>
+<td>
+<code>credentialBindings</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingScaleInExecutorCredentialBinding">
+[]ShardingScaleInExecutorCredentialBinding
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
 </td>
 </tr>
 <tr>
@@ -14307,6 +14500,19 @@ string
 </tr>
 <tr>
 <td>
+<code>credentialSources</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingScaleInCredentialSource">
+[]ShardingScaleInCredentialSource
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+<tr>
+<td>
 <code>executorTemplates</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.ShardingScaleInExecutorTemplate">
@@ -14346,6 +14552,8 @@ string
 </thead>
 <tbody><tr><td><p>&#34;kb.sharding.scalein.request-authority/v1&#34;</p></td>
 <td></td>
+</tr><tr><td><p>&#34;kb.sharding.scalein.request-authority/v2&#34;</p></td>
+<td></td>
 </tr></tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1.ShardingScaleInRequestBuilder">ShardingScaleInRequestBuilder
@@ -14364,6 +14572,8 @@ string
 </tr>
 </thead>
 <tbody><tr><td><p>&#34;TypedShardScaleInV1&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;TypedShardScaleInV2&#34;</p></td>
 <td></td>
 </tr></tbody>
 </table>
@@ -14465,7 +14675,7 @@ string
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ShardingScaleInVarSource">ShardingScaleInVarSource</a>)
 </p>
 <div>
-<p>ShardingScaleInSecretSource records Secret identity and key names without secret values.</p>
+<p>ShardingScaleInSecretSource is the legacy v1 inline credential source shape.</p>
 </div>
 <table>
 <thead>
@@ -14952,6 +15162,8 @@ ShardingScaleInSecretSource
 </td>
 <td>
 <em>(Optional)</em>
+<p>SecretSource is retained only to decode legacy v1 material so v2
+validation can reject it explicitly.</p>
 </td>
 </tr>
 </tbody>

@@ -22,6 +22,7 @@ package cluster
 import (
 	"encoding/json"
 	"errors"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -58,9 +59,23 @@ var _ = Describe("sharding scale-in status reducer", func() {
 
 	newStatus := func(planID string, phase appsv1.ShardingScaleInPhase) *appsv1.ShardingScaleInStatus {
 		return &appsv1.ShardingScaleInStatus{
-			ProtocolVersion: appsv1.ShardingScaleInResultProtocolV2,
-			PlanID:          planID,
-			Phase:           phase,
+			ProtocolVersion:    appsv1.ShardingScaleInResultProtocolV2,
+			PlanID:             planID,
+			Phase:              phase,
+			TopologyFenceToken: "fence-1",
+		}
+	}
+
+	newLock := func(planID string) *appsv1.TopologyMutationLockStatus {
+		return &appsv1.TopologyMutationLockStatus{
+			Version:               appsv1.TopologyMutationLockVersionV1,
+			FenceToken:            "fence-1",
+			ClusterUID:            types.UID("cluster-uid"),
+			OwnerKind:             appsv1.TopologyMutationLockOwnerShardingScaleIn,
+			OwnerPlanID:           planID,
+			State:                 appsv1.TopologyMutationLockStateInstallingAuthority,
+			AcquiredAt:            &metav1.Time{Time: time.Unix(1, 0).UTC()},
+			AffectedComponentUIDs: []types.UID{"component-1", "component-2"},
 		}
 	}
 
@@ -70,21 +85,22 @@ var _ = Describe("sharding scale-in status reducer", func() {
 		return operations
 	}
 
-	It("builds an absent-to-Planned CAS without invoking an action", func() {
-		actionCalls := 0
+	It("builds one absent-to-Planned CAS with the topology lock", func() {
 		cluster := newCluster(nil)
 		next := newStatus("plan-1", appsv1.ShardingScaleInPhasePlanned)
+		lock := newLock("plan-1")
 
-		reduced, patch, err := buildShardingScaleInStatusPatch(cluster, shardingName,
-			shardingScaleInStatusTransition{Next: next})
+		reduced, reducedLock, patch, err := buildInitialShardingScaleInPlanPatch(
+			cluster, shardingName, next, lock)
 
 		Expect(err).Should(BeNil())
 		Expect(reduced).Should(Equal(next))
 		Expect(reduced).ShouldNot(BeIdenticalTo(next))
-		Expect(actionCalls).Should(Equal(0))
+		Expect(reducedLock).Should(Equal(lock))
+		Expect(reducedLock).ShouldNot(BeIdenticalTo(lock))
 
 		operations := decodePatch(patch)
-		Expect(operations).Should(HaveLen(3))
+		Expect(operations).Should(HaveLen(4))
 		Expect(operations[0]).Should(Equal(map[string]any{
 			"op": "test", "path": "/metadata/uid", "value": "cluster-uid",
 		}))
@@ -93,6 +109,55 @@ var _ = Describe("sharding scale-in status reducer", func() {
 		}))
 		Expect(operations[2]["op"]).Should(Equal("add"))
 		Expect(operations[2]["path"]).Should(Equal("/status/shardings/redis~1shards/scaleIn"))
+		Expect(operations[3]["op"]).Should(Equal("add"))
+		Expect(operations[3]["path"]).Should(Equal("/status/topologyMutationLock"))
+	})
+
+	It("rejects initial plan creation when any topology lock already exists", func() {
+		cluster := newCluster(nil)
+		cluster.Status.TopologyMutationLock = newLock("other-plan")
+
+		_, _, _, err := buildInitialShardingScaleInPlanPatch(
+			cluster, shardingName, newStatus("plan-1", appsv1.ShardingScaleInPhasePlanned), newLock("plan-1"))
+
+		Expect(errors.Is(err, errShardingScaleInStatusCASConflict)).Should(BeTrue())
+	})
+
+	It("rejects standalone initial status creation without the topology lock", func() {
+		_, _, err := buildShardingScaleInStatusPatch(newCluster(nil), shardingName,
+			shardingScaleInStatusTransition{
+				Next: newStatus("plan-1", appsv1.ShardingScaleInPhasePlanned),
+			})
+
+		Expect(errors.Is(err, errInvalidShardingScaleInStatusTransition)).Should(BeTrue())
+	})
+
+	It("rejects malformed or mismatched initial topology locks", func() {
+		cases := []func(*appsv1.TopologyMutationLockStatus){
+			func(lock *appsv1.TopologyMutationLockStatus) { lock.Version = "" },
+			func(lock *appsv1.TopologyMutationLockStatus) { lock.FenceToken = "other-fence" },
+			func(lock *appsv1.TopologyMutationLockStatus) { lock.ClusterUID = "other-cluster" },
+			func(lock *appsv1.TopologyMutationLockStatus) { lock.OwnerKind = "" },
+			func(lock *appsv1.TopologyMutationLockStatus) { lock.OwnerPlanID = "other-plan" },
+			func(lock *appsv1.TopologyMutationLockStatus) { lock.State = appsv1.TopologyMutationLockStateHeld },
+			func(lock *appsv1.TopologyMutationLockStatus) { lock.AcquiredAt = nil },
+			func(lock *appsv1.TopologyMutationLockStatus) { lock.AffectedComponentUIDs = nil },
+			func(lock *appsv1.TopologyMutationLockStatus) {
+				lock.AffectedComponentUIDs = []types.UID{"component-2", "component-1"}
+			},
+			func(lock *appsv1.TopologyMutationLockStatus) {
+				lock.AffectedComponentUIDs = []types.UID{"component-1", "component-1"}
+			},
+		}
+
+		for _, mutate := range cases {
+			lock := newLock("plan-1")
+			mutate(lock)
+			_, _, _, err := buildInitialShardingScaleInPlanPatch(
+				newCluster(nil), shardingName,
+				newStatus("plan-1", appsv1.ShardingScaleInPhasePlanned), lock)
+			Expect(errors.Is(err, errInvalidTopologyMutationLock)).Should(BeTrue())
+		}
 	})
 
 	It("tests the exact current plan and phase before advancing", func() {
@@ -145,6 +210,39 @@ var _ = Describe("sharding scale-in status reducer", func() {
 				ExpectedPlanID:          "plan-1",
 				ExpectedPhase:           appsv1.ShardingScaleInPhasePlanned,
 				Next:                    newStatus("plan-2", appsv1.ShardingScaleInPhaseDraining),
+			})
+		Expect(errors.Is(err, errInvalidShardingScaleInStatusTransition)).Should(BeTrue())
+
+		next := newStatus("plan-1", appsv1.ShardingScaleInPhaseDraining)
+		next.TopologyFenceToken = "other-fence"
+		_, _, err = buildShardingScaleInStatusPatch(cluster, shardingName,
+			shardingScaleInStatusTransition{
+				ExpectedProtocolVersion: appsv1.ShardingScaleInResultProtocolV2,
+				ExpectedPlanID:          "plan-1",
+				ExpectedPhase:           appsv1.ShardingScaleInPhasePlanned,
+				Next:                    next,
+			})
+		Expect(errors.Is(err, errInvalidShardingScaleInStatusTransition)).Should(BeTrue())
+
+		next = newStatus("plan-1", appsv1.ShardingScaleInPhaseDraining)
+		next.ExternalWriteAuthorized = true
+		_, _, err = buildShardingScaleInStatusPatch(cluster, shardingName,
+			shardingScaleInStatusTransition{
+				ExpectedProtocolVersion: appsv1.ShardingScaleInResultProtocolV2,
+				ExpectedPlanID:          "plan-1",
+				ExpectedPhase:           appsv1.ShardingScaleInPhasePlanned,
+				Next:                    next,
+			})
+		Expect(errors.Is(err, errInvalidShardingScaleInStatusTransition)).Should(BeTrue())
+
+		current.ExternalWriteAuthorized = true
+		next = newStatus("plan-1", appsv1.ShardingScaleInPhaseDraining)
+		_, _, err = buildShardingScaleInStatusPatch(newCluster(current), shardingName,
+			shardingScaleInStatusTransition{
+				ExpectedProtocolVersion: appsv1.ShardingScaleInResultProtocolV2,
+				ExpectedPlanID:          "plan-1",
+				ExpectedPhase:           appsv1.ShardingScaleInPhasePlanned,
+				Next:                    next,
 			})
 		Expect(errors.Is(err, errInvalidShardingScaleInStatusTransition)).Should(BeTrue())
 
@@ -234,23 +332,30 @@ var _ = Describe("sharding scale-in status reducer", func() {
 		})
 
 		next := newStatus("plan-1", appsv1.ShardingScaleInPhasePlanned)
+		lock := newLock("plan-1")
 		Eventually(func() error {
 			fresh := &appsv1.Cluster{}
 			if err := testCtx.Cli.Get(testCtx.Ctx, client.ObjectKeyFromObject(cluster), fresh); err != nil {
 				return err
 			}
-			return patchShardingScaleInStatus(testCtx.Ctx, testCtx.Cli, fresh, "redis",
-				shardingScaleInStatusTransition{Next: next})
+			lock.ClusterUID = fresh.UID
+			return patchInitialShardingScaleInPlan(testCtx.Ctx, testCtx.Cli, fresh, "redis", next, lock)
 		}).Should(Succeed())
 
 		Eventually(func(g Gomega) {
 			readback := &appsv1.Cluster{}
 			g.Expect(testCtx.Cli.Get(testCtx.Ctx, client.ObjectKeyFromObject(cluster), readback)).Should(Succeed())
 			g.Expect(readback.Status.Shardings["redis"].ScaleIn).Should(Equal(next))
+			readLock := readback.Status.TopologyMutationLock.DeepCopy()
+			expectedLock := lock.DeepCopy()
+			g.Expect(readLock.AcquiredAt.Time.Equal(expectedLock.AcquiredAt.Time)).Should(BeTrue())
+			readLock.AcquiredAt = nil
+			expectedLock.AcquiredAt = nil
+			g.Expect(readLock).Should(Equal(expectedLock))
 		}).Should(Succeed())
 	})
 
-	It("rejects a stale API object without overwriting another status writer", func() {
+	It("rejects a stale initial plan without overwriting another plan and lock", func() {
 		cluster := testapps.NewClusterFactory(testCtx.DefaultNamespace, "scalein-cas", "").
 			AddSharding("redis", "", "redis").
 			GetObject()
@@ -266,18 +371,21 @@ var _ = Describe("sharding scale-in status reducer", func() {
 				return err
 			}
 			stale = live.DeepCopy()
-			live.Status.Message = "written-by-another-controller"
-			return testCtx.Cli.Status().Update(testCtx.Ctx, live)
+			otherLock := newLock("other-plan")
+			otherLock.ClusterUID = live.UID
+			return patchInitialShardingScaleInPlan(testCtx.Ctx, testCtx.Cli, live, "redis",
+				newStatus("other-plan", appsv1.ShardingScaleInPhasePlanned), otherLock)
 		}).Should(Succeed())
 
-		err := patchShardingScaleInStatus(testCtx.Ctx, testCtx.Cli, stale, "redis",
-			shardingScaleInStatusTransition{
-				Next: newStatus("plan-1", appsv1.ShardingScaleInPhasePlanned),
-			})
+		lock := newLock("plan-1")
+		lock.ClusterUID = stale.UID
+		err := patchInitialShardingScaleInPlan(testCtx.Ctx, testCtx.Cli, stale, "redis",
+			newStatus("plan-1", appsv1.ShardingScaleInPhasePlanned), lock)
 		Expect(err).Should(HaveOccurred())
 
 		readback := &appsv1.Cluster{}
 		Expect(testCtx.Cli.Get(testCtx.Ctx, client.ObjectKeyFromObject(cluster), readback)).Should(Succeed())
-		Expect(readback.Status.Shardings["redis"].ScaleIn).Should(BeNil())
+		Expect(readback.Status.Shardings["redis"].ScaleIn.PlanID).Should(Equal("other-plan"))
+		Expect(readback.Status.TopologyMutationLock.OwnerPlanID).Should(Equal("other-plan"))
 	})
 })

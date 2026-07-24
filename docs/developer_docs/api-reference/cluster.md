@@ -4586,6 +4586,20 @@ map[string]github.com/apecloud/kubeblocks/apis/apps/v1.ClusterShardingStatus
 </tr>
 <tr>
 <td>
+<code>topologyMutationLock</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.TopologyMutationLockStatus">
+TopologyMutationLockStatus
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>TopologyMutationLock serializes cluster-wide topology mutations.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>conditions</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#condition-v1-meta">
@@ -13295,6 +13309,29 @@ ShardingScaleInPhase
 </tr>
 <tr>
 <td>
+<code>topologyFenceToken</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>TopologyFenceToken binds the plan to its cluster-wide topology mutation lock.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>externalWriteAuthorized</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<p>ExternalWriteAuthorized records whether the plan may invoke an external topology write.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>holder</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.ShardingScaleInHolder">
@@ -14266,6 +14303,195 @@ VarOption
 </td>
 </tr><tr><td><p>&#34;WipeOut&#34;</p></td>
 <td><p>WipeOut is based on Delete and wipe out all volume snapshots and snapshot data from backup storage location.</p>
+</td>
+</tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.TopologyMutationLockOwnerKind">TopologyMutationLockOwnerKind
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.TopologyMutationLockStatus">TopologyMutationLockStatus</a>)
+</p>
+<div>
+<p>TopologyMutationLockOwnerKind identifies a topology mutation owner.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;ShardingScaleIn&#34;</p></td>
+<td><p>TopologyMutationLockOwnerShardingScaleIn identifies a compound shard scale-in plan.</p>
+</td>
+</tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.TopologyMutationLockState">TopologyMutationLockState
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.TopologyMutationLockStatus">TopologyMutationLockStatus</a>)
+</p>
+<div>
+<p>TopologyMutationLockState defines the topology mutation lock lifecycle.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;DeletionCloseout&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;DeletionSafe&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;DeletionDependentsGone&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Held&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;InstallingAuthority&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;ReleaseReady&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;ReleasingMembers&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.TopologyMutationLockStatus">TopologyMutationLockStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterStatus">ClusterStatus</a>)
+</p>
+<div>
+<p>TopologyMutationLockStatus serializes a cluster-wide topology mutation.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>version</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.TopologyMutationLockVersion">
+TopologyMutationLockVersion
+</a>
+</em>
+</td>
+<td>
+<p>Version identifies the topology lock contract.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>fenceToken</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>FenceToken is the immutable token owned by the current plan.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>clusterUID</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/types#UID">
+k8s.io/apimachinery/pkg/types.UID
+</a>
+</em>
+</td>
+<td>
+<p>ClusterUID binds the lock to the exact Cluster object.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>ownerKind</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.TopologyMutationLockOwnerKind">
+TopologyMutationLockOwnerKind
+</a>
+</em>
+</td>
+<td>
+<p>OwnerKind identifies the topology operation that owns the lock.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>ownerPlanID</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>OwnerPlanID is the immutable plan identity that owns the lock.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>state</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.TopologyMutationLockState">
+TopologyMutationLockState
+</a>
+</em>
+</td>
+<td>
+<p>State is the current lock lifecycle state.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>acquiredAt</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#time-v1-meta">
+Kubernetes meta/v1.Time
+</a>
+</em>
+</td>
+<td>
+<p>AcquiredAt records when the lock was first persisted.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>affectedComponentUIDs</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/types#UID">
+[]k8s.io/apimachinery/pkg/types.UID
+</a>
+</em>
+</td>
+<td>
+<p>AffectedComponentUIDs lists the exact Components fenced by the lock.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.TopologyMutationLockVersion">TopologyMutationLockVersion
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.TopologyMutationLockStatus">TopologyMutationLockStatus</a>)
+</p>
+<div>
+<p>TopologyMutationLockVersion identifies a topology mutation lock contract.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;kb.topology-lock/v1&#34;</p></td>
+<td><p>TopologyMutationLockVersionV1 is the first topology mutation lock contract.</p>
 </td>
 </tr></tbody>
 </table>

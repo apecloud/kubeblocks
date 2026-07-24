@@ -35,6 +35,7 @@ import (
 var (
 	errShardingScaleInStatusCASConflict       = errors.New("sharding scale-in status compare-and-set conflict")
 	errInvalidShardingScaleInStatusTransition = errors.New("invalid sharding scale-in status transition")
+	errInvalidTopologyMutationLock            = errors.New("invalid topology mutation lock")
 )
 
 type shardingScaleInStatusTransition struct {
@@ -59,8 +60,60 @@ func patchShardingScaleInStatus(ctx context.Context, cli client.Client, cluster 
 	return cli.Status().Patch(ctx, cluster, client.RawPatch(types.JSONPatchType, patch))
 }
 
+func patchInitialShardingScaleInPlan(ctx context.Context, cli client.Client, cluster *appsv1.Cluster,
+	shardingName string, next *appsv1.ShardingScaleInStatus, lock *appsv1.TopologyMutationLockStatus) error {
+	_, _, patch, err := buildInitialShardingScaleInPlanPatch(cluster, shardingName, next, lock)
+	if err != nil {
+		return err
+	}
+	return cli.Status().Patch(ctx, cluster, client.RawPatch(types.JSONPatchType, patch))
+}
+
 func buildShardingScaleInStatusPatch(cluster *appsv1.Cluster, shardingName string,
 	transition shardingScaleInStatusTransition) (*appsv1.ShardingScaleInStatus, []byte, error) {
+	return buildShardingScaleInStatusPatchInternal(cluster, shardingName, transition, false)
+}
+
+func buildInitialShardingScaleInPlanPatch(cluster *appsv1.Cluster, shardingName string,
+	next *appsv1.ShardingScaleInStatus, lock *appsv1.TopologyMutationLockStatus,
+) (*appsv1.ShardingScaleInStatus, *appsv1.TopologyMutationLockStatus, []byte, error) {
+	if cluster == nil {
+		return nil, nil, nil, fmt.Errorf("%w: cluster must not be nil", errInvalidTopologyMutationLock)
+	}
+	if cluster.Status.TopologyMutationLock != nil {
+		return nil, nil, nil, fmt.Errorf("%w: topology mutation lock already exists",
+			errShardingScaleInStatusCASConflict)
+	}
+
+	reduced, patch, err := buildShardingScaleInStatusPatchInternal(cluster, shardingName,
+		shardingScaleInStatusTransition{Next: next}, true)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	reducedLock, err := validateInitialTopologyMutationLock(cluster, reduced, lock)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	var operations []shardingScaleInJSONPatchOperation
+	if err := json.Unmarshal(patch, &operations); err != nil {
+		return nil, nil, nil, err
+	}
+	operations = append(operations, shardingScaleInJSONPatchOperation{
+		Operation: "add",
+		Path:      "/status/topologyMutationLock",
+		Value:     reducedLock,
+	})
+	patch, err = json.Marshal(operations)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	return reduced, reducedLock, patch, nil
+}
+
+func buildShardingScaleInStatusPatchInternal(cluster *appsv1.Cluster, shardingName string,
+	transition shardingScaleInStatusTransition, allowInitial bool,
+) (*appsv1.ShardingScaleInStatus, []byte, error) {
 	if cluster == nil {
 		return nil, nil, fmt.Errorf("%w: cluster must not be nil", errInvalidShardingScaleInStatusTransition)
 	}
@@ -74,6 +127,10 @@ func buildShardingScaleInStatusPatch(cluster *appsv1.Cluster, shardingName strin
 	}
 
 	shardingStatus, shardingExists := cluster.Status.Shardings[shardingName]
+	if shardingStatus.ScaleIn == nil && !allowInitial {
+		return nil, nil, fmt.Errorf("%w: initial plan must be created with its topology mutation lock",
+			errInvalidShardingScaleInStatusTransition)
+	}
 	reduced, err := reduceShardingScaleInStatus(shardingStatus.ScaleIn, transition)
 	if err != nil {
 		return nil, nil, err
@@ -141,6 +198,54 @@ func buildShardingScaleInStatusPatch(cluster *appsv1.Cluster, shardingName strin
 	return reduced, patch, nil
 }
 
+func validateInitialTopologyMutationLock(cluster *appsv1.Cluster, status *appsv1.ShardingScaleInStatus,
+	lock *appsv1.TopologyMutationLockStatus) (*appsv1.TopologyMutationLockStatus, error) {
+	if lock == nil {
+		return nil, fmt.Errorf("%w: lock must not be nil", errInvalidTopologyMutationLock)
+	}
+	reduced := lock.DeepCopy()
+	if reduced.Version != appsv1.TopologyMutationLockVersionV1 {
+		return nil, fmt.Errorf("%w: version must be %q",
+			errInvalidTopologyMutationLock, appsv1.TopologyMutationLockVersionV1)
+	}
+	if reduced.FenceToken == "" || reduced.FenceToken != status.TopologyFenceToken {
+		return nil, fmt.Errorf("%w: fence token must be non-empty and match the plan",
+			errInvalidTopologyMutationLock)
+	}
+	if reduced.ClusterUID == "" || reduced.ClusterUID != cluster.UID {
+		return nil, fmt.Errorf("%w: cluster UID must be non-empty and match the Cluster",
+			errInvalidTopologyMutationLock)
+	}
+	if reduced.OwnerKind != appsv1.TopologyMutationLockOwnerShardingScaleIn {
+		return nil, fmt.Errorf("%w: owner kind must be %q",
+			errInvalidTopologyMutationLock, appsv1.TopologyMutationLockOwnerShardingScaleIn)
+	}
+	if reduced.OwnerPlanID == "" || reduced.OwnerPlanID != status.PlanID {
+		return nil, fmt.Errorf("%w: owner plan ID must be non-empty and match the plan",
+			errInvalidTopologyMutationLock)
+	}
+	if reduced.State != appsv1.TopologyMutationLockStateInstallingAuthority {
+		return nil, fmt.Errorf("%w: initial state must be %q",
+			errInvalidTopologyMutationLock, appsv1.TopologyMutationLockStateInstallingAuthority)
+	}
+	if reduced.AcquiredAt == nil || reduced.AcquiredAt.IsZero() {
+		return nil, fmt.Errorf("%w: acquiredAt must not be empty", errInvalidTopologyMutationLock)
+	}
+	if len(reduced.AffectedComponentUIDs) == 0 {
+		return nil, fmt.Errorf("%w: affected Component UIDs must not be empty", errInvalidTopologyMutationLock)
+	}
+	for i, uid := range reduced.AffectedComponentUIDs {
+		if uid == "" {
+			return nil, fmt.Errorf("%w: affected Component UID must not be empty", errInvalidTopologyMutationLock)
+		}
+		if i > 0 && reduced.AffectedComponentUIDs[i-1] >= uid {
+			return nil, fmt.Errorf("%w: affected Component UIDs must be sorted and unique",
+				errInvalidTopologyMutationLock)
+		}
+	}
+	return reduced, nil
+}
+
 func reduceShardingScaleInStatus(current *appsv1.ShardingScaleInStatus,
 	transition shardingScaleInStatusTransition) (*appsv1.ShardingScaleInStatus, error) {
 	if transition.Next == nil {
@@ -160,6 +265,14 @@ func reduceShardingScaleInStatus(current *appsv1.ShardingScaleInStatus,
 			return nil, fmt.Errorf("%w: initial planID must not be empty",
 				errInvalidShardingScaleInStatusTransition)
 		}
+		if next.TopologyFenceToken == "" {
+			return nil, fmt.Errorf("%w: initial topologyFenceToken must not be empty",
+				errInvalidShardingScaleInStatusTransition)
+		}
+		if next.ExternalWriteAuthorized {
+			return nil, fmt.Errorf("%w: initial plan must not authorize external writes",
+				errInvalidShardingScaleInStatusTransition)
+		}
 		if next.Phase != appsv1.ShardingScaleInPhasePlanned {
 			return nil, fmt.Errorf("%w: initial phase must be %q",
 				errInvalidShardingScaleInStatusTransition, appsv1.ShardingScaleInPhasePlanned)
@@ -171,8 +284,8 @@ func reduceShardingScaleInStatus(current *appsv1.ShardingScaleInStatus,
 	}
 
 	if current.ProtocolVersion != appsv1.ShardingScaleInResultProtocolV2 ||
-		current.PlanID == "" || current.Phase == "" {
-		return nil, fmt.Errorf("%w: persisted protocolVersion, planID, and phase must be valid and non-empty",
+		current.PlanID == "" || current.Phase == "" || current.TopologyFenceToken == "" {
+		return nil, fmt.Errorf("%w: persisted protocolVersion, planID, phase, and topologyFenceToken must be valid and non-empty",
 			errInvalidShardingScaleInStatusTransition)
 	}
 	if transition.ExpectedProtocolVersion != current.ProtocolVersion ||
@@ -185,6 +298,18 @@ func reduceShardingScaleInStatus(current *appsv1.ShardingScaleInStatus,
 	}
 	if next.ProtocolVersion != current.ProtocolVersion || next.PlanID != current.PlanID {
 		return nil, fmt.Errorf("%w: protocolVersion and planID are immutable",
+			errInvalidShardingScaleInStatusTransition)
+	}
+	if next.TopologyFenceToken != current.TopologyFenceToken {
+		return nil, fmt.Errorf("%w: topologyFenceToken is immutable",
+			errInvalidShardingScaleInStatusTransition)
+	}
+	if current.ExternalWriteAuthorized && !next.ExternalWriteAuthorized {
+		return nil, fmt.Errorf("%w: externalWriteAuthorized cannot be revoked",
+			errInvalidShardingScaleInStatusTransition)
+	}
+	if !current.ExternalWriteAuthorized && next.ExternalWriteAuthorized {
+		return nil, fmt.Errorf("%w: external writes require a lock-bound authority transition",
 			errInvalidShardingScaleInStatusTransition)
 	}
 	if !shardingScaleInPhaseTransitionAllowed(current, next) {

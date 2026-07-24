@@ -366,6 +366,21 @@ var _ = Describe("cluster component status transformer", func() {
 	})
 
 	Context("sharding", func() {
+		It("preserves the topology mutation lock while rebuilding status", func() {
+			lock := &appsv1.TopologyMutationLockStatus{
+				Version:     appsv1.TopologyMutationLockVersionV1,
+				FenceToken:  "fence-1",
+				OwnerKind:   appsv1.TopologyMutationLockOwnerShardingScaleIn,
+				OwnerPlanID: "plan-1",
+				State:       appsv1.TopologyMutationLockStateInstallingAuthority,
+			}
+			transCtx.Cluster.Status.TopologyMutationLock = lock
+
+			transformer := &clusterComponentStatusTransformer{}
+			Expect(transformer.Transform(transCtx, dag)).Should(Succeed())
+			Expect(transCtx.Cluster.Status.TopologyMutationLock).Should(BeIdenticalTo(lock))
+		})
+
 		It("exposes the typed sharding action result protocol", func() {
 			field, ok := reflect.TypeOf(appsv1.ShardingAction{}).FieldByName("ResultProtocol")
 			Expect(ok).Should(BeTrue(), "ShardingAction must expose ResultProtocol")

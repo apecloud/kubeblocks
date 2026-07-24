@@ -17909,6 +17909,10 @@ spec:
                           - Blocked
                           - Completed
                           type: string
+                        externalWriteAuthorized:
+                          description: ExternalWriteAuthorized records whether the
+                            plan may invoke an external topology write.
+                          type: boolean
                         holder:
                           description: Holder identifies the shard currently being
                             removed.
@@ -17983,6 +17987,12 @@ spec:
                           description: Reason is a programmatic identifier for the
                             current phase.
                           type: string
+                        topologyFenceToken:
+                          description: TopologyFenceToken binds the plan to its cluster-wide
+                            topology mutation lock.
+                          type: string
+                      required:
+                      - externalWriteAuthorized
                       type: object
                     shardingDef:
                       description: Records the name of the sharding definition used.
@@ -17994,6 +18004,68 @@ spec:
                   type: object
                 description: Records the current status information of all shardings
                   within the Cluster.
+                type: object
+              topologyMutationLock:
+                description: TopologyMutationLock serializes cluster-wide topology
+                  mutations.
+                properties:
+                  acquiredAt:
+                    description: AcquiredAt records when the lock was first persisted.
+                    format: date-time
+                    type: string
+                  affectedComponentUIDs:
+                    description: AffectedComponentUIDs lists the exact Components
+                      fenced by the lock.
+                    items:
+                      description: |-
+                        UID is a type that holds unique ID values, including UUIDs.  Because we
+                        don't ONLY use UUIDs, this is an alias to string.  Being a type captures
+                        intent and helps make sure that UIDs and names do not get conflated.
+                      type: string
+                    minItems: 1
+                    type: array
+                  clusterUID:
+                    description: ClusterUID binds the lock to the exact Cluster object.
+                    type: string
+                  fenceToken:
+                    description: FenceToken is the immutable token owned by the current
+                      plan.
+                    type: string
+                  ownerKind:
+                    description: OwnerKind identifies the topology operation that
+                      owns the lock.
+                    enum:
+                    - ShardingScaleIn
+                    type: string
+                  ownerPlanID:
+                    description: OwnerPlanID is the immutable plan identity that owns
+                      the lock.
+                    type: string
+                  state:
+                    description: State is the current lock lifecycle state.
+                    enum:
+                    - InstallingAuthority
+                    - Held
+                    - ReleasingMembers
+                    - DeletionCloseout
+                    - DeletionSafe
+                    - DeletionDependentsGone
+                    - ReleaseReady
+                    type: string
+                  version:
+                    description: Version identifies the topology lock contract.
+                    enum:
+                    - kb.topology-lock/v1
+                    type: string
+                required:
+                - acquiredAt
+                - affectedComponentUIDs
+                - clusterUID
+                - fenceToken
+                - ownerKind
+                - ownerPlanID
+                - state
+                - version
                 type: object
             type: object
         type: object

@@ -143,7 +143,7 @@ func (e *ExecAction) buildExecPodSpec(actionCtx ActionContext,
 	targetPod *corev1.Pod) (*corev1.PodSpec, error) {
 	// inject component and componentDef envs
 	env, err := buildActionPodEnv(actionCtx.ReqCtx, actionCtx.Client, e.Cluster, e.OpsDef,
-		e.OpsRequest, e.Comp, e.CustomCompOps, podInfoExtractor, targetPod)
+		e.OpsRequest, e.Comp, e.CustomCompOps, podInfoExtractor, targetPod, false)
 	if err != nil {
 		return nil, err
 	}

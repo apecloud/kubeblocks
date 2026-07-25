@@ -410,6 +410,19 @@ spec:
 
                           This field cannot be updated.
                         type: string
+                      opsDefinitionName:
+                        description: |-
+                          Specifies the OpsDefinition used to execute shardAdd as a managed Custom OpsRequest.
+
+                          When set, the Cluster controller creates exactly one Custom OpsRequest for a group of shards added
+                          in the same Cluster generation. The Operations controller owns the resulting workload and reports its status.
+                          This field is supported only for shardAdd and is mutually exclusive with inline Action fields and
+                          targetShardSelector.
+
+                          This field cannot be updated.
+                        maxLength: 253
+                        minLength: 1
+                        type: string
                       preCondition:
                         description: |-
                           Specifies the state that the cluster must reach before the Action is executed.
@@ -507,6 +520,27 @@ spec:
                         format: int32
                         type: integer
                     type: object
+                    x-kubernetes-validations:
+                    - message: opsDefinitionName is mutually exclusive with exec,
+                        http and grpc
+                      rule: '!has(self.opsDefinitionName) || (!has(self.exec) && !has(self.http)
+                        && !has(self.grpc))'
+                    - message: targetShardSelector is not supported with opsDefinitionName
+                      rule: '!has(self.opsDefinitionName) || !has(self.targetShardSelector)'
+                    - message: targetPodSelector is not supported with opsDefinitionName
+                      rule: '!has(self.opsDefinitionName) || !has(self.targetPodSelector)'
+                    - message: matchingKey is not supported with opsDefinitionName
+                      rule: '!has(self.opsDefinitionName) || !has(self.matchingKey)'
+                    - message: retryPolicy is not supported with opsDefinitionName
+                      rule: '!has(self.opsDefinitionName) || !has(self.retryPolicy)'
+                    - message: preCondition is not supported with opsDefinitionName
+                      rule: '!has(self.opsDefinitionName) || !has(self.preCondition)'
+                    - message: timeoutSeconds is managed by the referenced OpsDefinition
+                      rule: '!has(self.opsDefinitionName) || !has(self.timeoutSeconds)
+                        || self.timeoutSeconds == 0'
+                    - message: opsDefinitionName is immutable once set
+                      rule: '!has(oldSelf.opsDefinitionName) || (has(self.opsDefinitionName)
+                        && self.opsDefinitionName == oldSelf.opsDefinitionName)'
                   preTerminate:
                     description: |-
                       Specifies the hook to be executed prior to terminating a sharding.
@@ -855,6 +889,19 @@ spec:
 
                           This field cannot be updated.
                         type: string
+                      opsDefinitionName:
+                        description: |-
+                          Specifies the OpsDefinition used to execute shardAdd as a managed Custom OpsRequest.
+
+                          When set, the Cluster controller creates exactly one Custom OpsRequest for a group of shards added
+                          in the same Cluster generation. The Operations controller owns the resulting workload and reports its status.
+                          This field is supported only for shardAdd and is mutually exclusive with inline Action fields and
+                          targetShardSelector.
+
+                          This field cannot be updated.
+                        maxLength: 253
+                        minLength: 1
+                        type: string
                       preCondition:
                         description: |-
                           Specifies the state that the cluster must reach before the Action is executed.
@@ -952,6 +999,27 @@ spec:
                         format: int32
                         type: integer
                     type: object
+                    x-kubernetes-validations:
+                    - message: opsDefinitionName is mutually exclusive with exec,
+                        http and grpc
+                      rule: '!has(self.opsDefinitionName) || (!has(self.exec) && !has(self.http)
+                        && !has(self.grpc))'
+                    - message: targetShardSelector is not supported with opsDefinitionName
+                      rule: '!has(self.opsDefinitionName) || !has(self.targetShardSelector)'
+                    - message: targetPodSelector is not supported with opsDefinitionName
+                      rule: '!has(self.opsDefinitionName) || !has(self.targetPodSelector)'
+                    - message: matchingKey is not supported with opsDefinitionName
+                      rule: '!has(self.opsDefinitionName) || !has(self.matchingKey)'
+                    - message: retryPolicy is not supported with opsDefinitionName
+                      rule: '!has(self.opsDefinitionName) || !has(self.retryPolicy)'
+                    - message: preCondition is not supported with opsDefinitionName
+                      rule: '!has(self.opsDefinitionName) || !has(self.preCondition)'
+                    - message: timeoutSeconds is managed by the referenced OpsDefinition
+                      rule: '!has(self.opsDefinitionName) || !has(self.timeoutSeconds)
+                        || self.timeoutSeconds == 0'
+                    - message: opsDefinitionName is immutable once set
+                      rule: '!has(oldSelf.opsDefinitionName) || (has(self.opsDefinitionName)
+                        && self.opsDefinitionName == oldSelf.opsDefinitionName)'
                   shardAdd:
                     description: |-
                       Specifies the hook to be executed after a shard added.
@@ -1295,6 +1363,19 @@ spec:
 
                           This field cannot be updated.
                         type: string
+                      opsDefinitionName:
+                        description: |-
+                          Specifies the OpsDefinition used to execute shardAdd as a managed Custom OpsRequest.
+
+                          When set, the Cluster controller creates exactly one Custom OpsRequest for a group of shards added
+                          in the same Cluster generation. The Operations controller owns the resulting workload and reports its status.
+                          This field is supported only for shardAdd and is mutually exclusive with inline Action fields and
+                          targetShardSelector.
+
+                          This field cannot be updated.
+                        maxLength: 253
+                        minLength: 1
+                        type: string
                       preCondition:
                         description: |-
                           Specifies the state that the cluster must reach before the Action is executed.
@@ -1392,6 +1473,27 @@ spec:
                         format: int32
                         type: integer
                     type: object
+                    x-kubernetes-validations:
+                    - message: opsDefinitionName is mutually exclusive with exec,
+                        http and grpc
+                      rule: '!has(self.opsDefinitionName) || (!has(self.exec) && !has(self.http)
+                        && !has(self.grpc))'
+                    - message: targetShardSelector is not supported with opsDefinitionName
+                      rule: '!has(self.opsDefinitionName) || !has(self.targetShardSelector)'
+                    - message: targetPodSelector is not supported with opsDefinitionName
+                      rule: '!has(self.opsDefinitionName) || !has(self.targetPodSelector)'
+                    - message: matchingKey is not supported with opsDefinitionName
+                      rule: '!has(self.opsDefinitionName) || !has(self.matchingKey)'
+                    - message: retryPolicy is not supported with opsDefinitionName
+                      rule: '!has(self.opsDefinitionName) || !has(self.retryPolicy)'
+                    - message: preCondition is not supported with opsDefinitionName
+                      rule: '!has(self.opsDefinitionName) || !has(self.preCondition)'
+                    - message: timeoutSeconds is managed by the referenced OpsDefinition
+                      rule: '!has(self.opsDefinitionName) || !has(self.timeoutSeconds)
+                        || self.timeoutSeconds == 0'
+                    - message: opsDefinitionName is immutable once set
+                      rule: '!has(oldSelf.opsDefinitionName) || (has(self.opsDefinitionName)
+                        && self.opsDefinitionName == oldSelf.opsDefinitionName)'
                   shardRemove:
                     description: |-
                       Specifies the hook to be executed prior to remove a shard.
@@ -1735,6 +1837,19 @@ spec:
 
                           This field cannot be updated.
                         type: string
+                      opsDefinitionName:
+                        description: |-
+                          Specifies the OpsDefinition used to execute shardAdd as a managed Custom OpsRequest.
+
+                          When set, the Cluster controller creates exactly one Custom OpsRequest for a group of shards added
+                          in the same Cluster generation. The Operations controller owns the resulting workload and reports its status.
+                          This field is supported only for shardAdd and is mutually exclusive with inline Action fields and
+                          targetShardSelector.
+
+                          This field cannot be updated.
+                        maxLength: 253
+                        minLength: 1
+                        type: string
                       preCondition:
                         description: |-
                           Specifies the state that the cluster must reach before the Action is executed.
@@ -1832,7 +1947,35 @@ spec:
                         format: int32
                         type: integer
                     type: object
+                    x-kubernetes-validations:
+                    - message: opsDefinitionName is mutually exclusive with exec,
+                        http and grpc
+                      rule: '!has(self.opsDefinitionName) || (!has(self.exec) && !has(self.http)
+                        && !has(self.grpc))'
+                    - message: targetShardSelector is not supported with opsDefinitionName
+                      rule: '!has(self.opsDefinitionName) || !has(self.targetShardSelector)'
+                    - message: targetPodSelector is not supported with opsDefinitionName
+                      rule: '!has(self.opsDefinitionName) || !has(self.targetPodSelector)'
+                    - message: matchingKey is not supported with opsDefinitionName
+                      rule: '!has(self.opsDefinitionName) || !has(self.matchingKey)'
+                    - message: retryPolicy is not supported with opsDefinitionName
+                      rule: '!has(self.opsDefinitionName) || !has(self.retryPolicy)'
+                    - message: preCondition is not supported with opsDefinitionName
+                      rule: '!has(self.opsDefinitionName) || !has(self.preCondition)'
+                    - message: timeoutSeconds is managed by the referenced OpsDefinition
+                      rule: '!has(self.opsDefinitionName) || !has(self.timeoutSeconds)
+                        || self.timeoutSeconds == 0'
+                    - message: opsDefinitionName is immutable once set
+                      rule: '!has(oldSelf.opsDefinitionName) || (has(self.opsDefinitionName)
+                        && self.opsDefinitionName == oldSelf.opsDefinitionName)'
                 type: object
+                x-kubernetes-validations:
+                - message: opsDefinitionName is only supported by shardAdd
+                  rule: '!has(self.postProvision) || !has(self.postProvision.opsDefinitionName)'
+                - message: opsDefinitionName is only supported by shardAdd
+                  rule: '!has(self.preTerminate) || !has(self.preTerminate.opsDefinitionName)'
+                - message: opsDefinitionName is only supported by shardAdd
+                  rule: '!has(self.shardRemove) || !has(self.shardRemove.opsDefinitionName)'
               provisionStrategy:
                 default: Serial
                 description: |-
@@ -1932,6 +2075,13 @@ spec:
             required:
             - template
             type: object
+            x-kubernetes-validations:
+            - message: lifecycleActions.shardAdd.opsDefinitionName is immutable once
+                set
+              rule: '!has(oldSelf.lifecycleActions) || !has(oldSelf.lifecycleActions.shardAdd)
+                || !has(oldSelf.lifecycleActions.shardAdd.opsDefinitionName) || (has(self.lifecycleActions)
+                && has(self.lifecycleActions.shardAdd) && has(self.lifecycleActions.shardAdd.opsDefinitionName)
+                && self.lifecycleActions.shardAdd.opsDefinitionName == oldSelf.lifecycleActions.shardAdd.opsDefinitionName)'
           status:
             description: ShardingDefinitionStatus defines the observed state of ShardingDefinition
             properties:

@@ -907,6 +907,9 @@ func (h *clusterShardingHandler) update(transCtx *clusterTransformContext, dag *
 	if err := h.handlePostProvision(transCtx, name, maps.Values(runningCompsMap)); err != nil {
 		return err
 	}
+	if managed, err := h.handleManagedShardAdd(transCtx, dag, name, runningCompsMap, protoCompsMap, toCreate); managed {
+		return err
+	}
 
 	errorSkip, err3 := h.handleShardAddNRemove(transCtx, name, runningCompsMap, protoCompsMap, toCreate, toDelete, toUpdate)
 
@@ -978,13 +981,11 @@ func (h *clusterShardingHandler) buildComps(transCtx *clusterTransformContext,
 
 func (h *clusterShardingHandler) buildLabels(sharding *appsv1.ClusterSharding, shardTplName string) map[string]string {
 	labels := map[string]string{
-		constant.KBAppShardingNameLabelKey: sharding.Name,
+		constant.KBAppShardingNameLabelKey:  sharding.Name,
+		constant.KBAppShardTemplateLabelKey: shardTplName,
 	}
 	if len(sharding.ShardingDef) > 0 {
 		labels[constant.ShardingDefLabelKey] = sharding.ShardingDef
-	}
-	if len(shardTplName) > 0 {
-		labels[constant.KBAppShardTemplateLabelKey] = shardTplName
 	}
 	return labels
 }
@@ -1110,7 +1111,7 @@ func (h *clusterShardingHandler) buildShardingActions(transCtx *clusterTransform
 	if shardingDef.Spec.LifecycleActions.PreTerminate != nil {
 		checkNAppend(shardingPreTerminateAction, &shardingDef.Spec.LifecycleActions.PreTerminate.Action)
 	}
-	if shardingDef.Spec.LifecycleActions.ShardAdd != nil {
+	if shardingDef.Spec.LifecycleActions.ShardAdd != nil && shardingDef.Spec.LifecycleActions.ShardAdd.OpsDefinitionName == "" {
 		checkNAppend(shardingAddShardAction, &shardingDef.Spec.LifecycleActions.ShardAdd.Action)
 	}
 	if shardingDef.Spec.LifecycleActions.ShardRemove != nil {

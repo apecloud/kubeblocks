@@ -33,6 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
@@ -49,6 +50,10 @@ import (
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=components,verbs=get;list;watch;create;update;patch;delete;deletecollection
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=components/status,verbs=get
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=components/finalizers,verbs=update
+
+// +kubebuilder:rbac:groups=operations.kubeblocks.io,resources=opsdefinitions,verbs=get;list;watch
+// +kubebuilder:rbac:groups=operations.kubeblocks.io,resources=opsrequests,verbs=get;list;watch;create
+// +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch
 
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete;deletecollection
 // +kubebuilder:rbac:groups=core,resources=secrets/finalizers,verbs=update
@@ -68,6 +73,7 @@ import (
 // ClusterReconciler reconciles a Cluster object
 type ClusterReconciler struct {
 	client.Client
+	APIReader       client.Reader
 	Scheme          *runtime.Scheme
 	Recorder        record.EventRecorder
 	MultiClusterMgr multicluster.Manager
@@ -90,7 +96,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	// the cluster reconciliation loop is a 3-stage model: plan Init, plan Build and plan Execute
 	// Init stage
-	planBuilder := newClusterPlanBuilder(reqCtx, r.Client)
+	planBuilder := newClusterPlanBuilder(reqCtx, r.Client, r.APIReader)
 	if err := planBuilder.Init(); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
@@ -164,6 +170,9 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	if r.APIReader == nil {
+		r.APIReader = mgr.GetAPIReader()
+	}
 	retryDurationMS := viper.GetInt(constant.CfgKeyCtrlrReconcileRetryDurationMS)
 	if retryDurationMS != 0 {
 		appsutil.RequeueDuration = time.Millisecond * time.Duration(retryDurationMS)
@@ -174,6 +183,7 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			MaxConcurrentReconciles: viper.GetInt(constant.CfgKBReconcileWorkers),
 		}).
 		Owns(&appsv1.Component{}).
+		Owns(&opsv1alpha1.OpsRequest{}).
 		Owns(&corev1.Service{}). // cluster services
 		Owns(&corev1.Secret{}).  // sharding account secret
 		Complete(r)

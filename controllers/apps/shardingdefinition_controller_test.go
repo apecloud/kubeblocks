@@ -26,6 +26,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -269,6 +270,36 @@ var _ = Describe("ShardingDefinition Controller", func() {
 				f.AddAnnotations(constant.SkipImmutableCheckAnnotationKey, "true")
 			})
 		}
+
+		It("rejects changing or removing a managed shardAdd OpsDefinition at admission", func() {
+			shardingDefObj := testapps.NewShardingDefinitionFactory(shardingDefName, compDefObj.GetName()).
+				SetLifecycleActions(&appsv1.ShardingLifecycleActions{
+					ShardAdd: &appsv1.ShardingAction{OpsDefinitionName: "redis-shard-add"},
+				}).GetObject()
+			Expect(testCtx.CreateObj(testCtx.Ctx, shardingDefObj)).Should(Succeed())
+
+			expectInvalidUpdate := func(mutate func(*appsv1.ShardingDefinition)) {
+				var updateErr error
+				Eventually(func() bool {
+					current := &appsv1.ShardingDefinition{}
+					Expect(k8sClient.Get(testCtx.Ctx, client.ObjectKeyFromObject(shardingDefObj), current)).Should(Succeed())
+					mutate(current)
+					updateErr = k8sClient.Update(testCtx.Ctx, current)
+					return !apierrors.IsConflict(updateErr)
+				}).Should(BeTrue())
+				Expect(apierrors.IsInvalid(updateErr)).Should(BeTrue(), "update error: %v", updateErr)
+			}
+
+			expectInvalidUpdate(func(current *appsv1.ShardingDefinition) {
+				current.Spec.LifecycleActions.ShardAdd.OpsDefinitionName = "redis-shard-add-v2"
+			})
+			expectInvalidUpdate(func(current *appsv1.ShardingDefinition) {
+				current.Spec.LifecycleActions.ShardAdd.OpsDefinitionName = ""
+			})
+			expectInvalidUpdate(func(current *appsv1.ShardingDefinition) {
+				current.Spec.LifecycleActions = nil
+			})
+		})
 
 		It("update immutable fields - w/ skip annotation", func() {
 			shardingDefObj := newSddSkipImmutableCheck()

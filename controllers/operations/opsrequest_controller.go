@@ -58,8 +58,9 @@ import (
 // OpsRequestReconciler reconciles a OpsRequest object
 type OpsRequestReconciler struct {
 	client.Client
-	Scheme   *runtime.Scheme
-	Recorder record.EventRecorder
+	APIReader client.Reader
+	Scheme    *runtime.Scheme
+	Recorder  record.EventRecorder
 }
 
 // +kubebuilder:rbac:groups=operations.kubeblocks.io,resources=opsrequests,verbs=get;list;watch;create;update;patch;delete
@@ -80,7 +81,7 @@ func (r *OpsRequestReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 	reqCtx.Log.Info("reconcile", "opsRequest", req.NamespacedName)
 	opsCtrlHandler := &opsControllerHandler{}
-	return opsCtrlHandler.Handle(reqCtx, &operations.OpsResource{Recorder: r.Recorder},
+	return opsCtrlHandler.Handle(reqCtx, &operations.OpsResource{Reader: r.APIReader, Recorder: r.Recorder},
 		r.fetchOpsRequest,
 		r.fetchCluster,
 		r.handleDeletion,
@@ -92,6 +93,9 @@ func (r *OpsRequestReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *OpsRequestReconciler) SetupWithManager(mgr ctrl.Manager, multiClusterMgr multicluster.Manager) error {
+	if r.APIReader == nil {
+		r.APIReader = mgr.GetAPIReader()
+	}
 	b := intctrlutil.NewControllerManagedBy(mgr).
 		For(&opsv1alpha1.OpsRequest{}).
 		WithOptions(controller.Options{
@@ -243,8 +247,12 @@ func (r *OpsRequestReconciler) handleSucceedOpsRequest(reqCtx intctrlutil.Reques
 	if err := r.annotateRelatedOps(reqCtx, opsRequest); err != nil {
 		return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
 	}
-	if err := r.deleteExternalJobs(reqCtx.Ctx, opsRequest); err != nil {
-		return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
+	managedJob := opsRequest.Spec.Type == opsv1alpha1.CustomType && opsRequest.Spec.CustomOps != nil &&
+		opsRequest.Spec.CustomOps.ExecutionSnapshot != nil
+	if !managedJob {
+		if err := r.deleteExternalJobs(reqCtx.Ctx, opsRequest); err != nil {
+			return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
+		}
 	}
 	if opsRequest.Status.CompletionTimestamp.IsZero() || opsRequest.Spec.TTLSecondsAfterSucceed == 0 {
 		return intctrlutil.ResultToP(intctrlutil.Reconciled())

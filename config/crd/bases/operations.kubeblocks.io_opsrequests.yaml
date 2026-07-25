@@ -248,6 +248,47 @@ spec:
                     x-kubernetes-list-map-keys:
                     - componentName
                     x-kubernetes-list-type: map
+                  executionSnapshot:
+                    description: |-
+                      ExecutionSnapshot binds a managed Custom operation to the exact OpsDefinition and target identities
+                      validated by its producer. The Operations controller revalidates this snapshot before executing or
+                      observing any action.
+
+                      When set, all Custom operation inputs, execution timing fields, and spec.cancel are immutable.
+                      Ordinary user-created Custom operations may omit this field and retain the existing behavior.
+                    properties:
+                      opsDefinitionGeneration:
+                        description: OpsDefinitionGeneration identifies the exact
+                          OpsDefinition generation selected by the producer.
+                        format: int64
+                        minimum: 1
+                        type: integer
+                      opsDefinitionSpecHash:
+                        description: OpsDefinitionSpecHash is the lowercase SHA-256
+                          hash of the canonical OpsDefinition spec.
+                        maxLength: 64
+                        minLength: 64
+                        pattern: ^[a-f0-9]{64}$
+                        type: string
+                      opsDefinitionUID:
+                        description: OpsDefinitionUID identifies the exact OpsDefinition
+                          object selected by the producer.
+                        minLength: 1
+                        type: string
+                      targetSnapshotHash:
+                        description: |-
+                          TargetSnapshotHash is the lowercase SHA-256 hash of the exact target identities bound by the producer.
+                          The Operations controller preserves this opaque value as part of the immutable Custom operation input.
+                        maxLength: 64
+                        minLength: 64
+                        pattern: ^[a-f0-9]{64}$
+                        type: string
+                    required:
+                    - opsDefinitionGeneration
+                    - opsDefinitionSpecHash
+                    - opsDefinitionUID
+                    - targetSnapshotHash
+                    type: object
                   maxConcurrentComponents:
                     anyOf:
                     - type: integer
@@ -275,6 +316,10 @@ spec:
                 - components
                 - opsDefinitionName
                 type: object
+                x-kubernetes-validations:
+                - message: custom operation inputs are immutable after an execution
+                    snapshot is set
+                  rule: '!has(oldSelf.executionSnapshot) || self == oldSelf'
               enqueueOnForce:
                 default: false
                 description: Indicates whether opsRequest should continue to queue
@@ -3310,6 +3355,39 @@ spec:
             required:
             - type
             type: object
+            x-kubernetes-validations:
+            - message: custom operation inputs are immutable after an execution snapshot
+                is set
+              rule: '!has(oldSelf.custom) || !has(oldSelf.custom.executionSnapshot)
+                || (has(self.custom) && self.custom == oldSelf.custom)'
+            - message: ttlSecondsAfterSucceed is immutable for a snapshotted Custom
+                operation
+              rule: '!has(oldSelf.custom) || !has(oldSelf.custom.executionSnapshot)
+                || (has(self.ttlSecondsAfterSucceed) == has(oldSelf.ttlSecondsAfterSucceed)
+                && (!has(self.ttlSecondsAfterSucceed) || self.ttlSecondsAfterSucceed
+                == oldSelf.ttlSecondsAfterSucceed))'
+            - message: ttlSecondsAfterUnsuccessfulCompletion is immutable for a snapshotted
+                Custom operation
+              rule: '!has(oldSelf.custom) || !has(oldSelf.custom.executionSnapshot)
+                || (has(self.ttlSecondsAfterUnsuccessfulCompletion) == has(oldSelf.ttlSecondsAfterUnsuccessfulCompletion)
+                && (!has(self.ttlSecondsAfterUnsuccessfulCompletion) || self.ttlSecondsAfterUnsuccessfulCompletion
+                == oldSelf.ttlSecondsAfterUnsuccessfulCompletion))'
+            - message: preConditionDeadlineSeconds is immutable for a snapshotted
+                Custom operation
+              rule: '!has(oldSelf.custom) || !has(oldSelf.custom.executionSnapshot)
+                || (has(self.preConditionDeadlineSeconds) == has(oldSelf.preConditionDeadlineSeconds)
+                && (!has(self.preConditionDeadlineSeconds) || self.preConditionDeadlineSeconds
+                == oldSelf.preConditionDeadlineSeconds))'
+            - message: timeoutSeconds is immutable for a snapshotted Custom operation
+              rule: '!has(oldSelf.custom) || !has(oldSelf.custom.executionSnapshot)
+                || (has(self.timeoutSeconds) == has(oldSelf.timeoutSeconds) && (!has(self.timeoutSeconds)
+                || self.timeoutSeconds == oldSelf.timeoutSeconds))'
+            - message: enqueueOnForce is immutable for a snapshotted Custom operation
+              rule: '!has(oldSelf.custom) || !has(oldSelf.custom.executionSnapshot)
+                || self.enqueueOnForce == oldSelf.enqueueOnForce'
+            - message: cancel is immutable for a snapshotted Custom operation
+              rule: '!has(oldSelf.custom) || !has(oldSelf.custom.executionSnapshot)
+                || self.cancel == oldSelf.cancel'
           status:
             description: OpsRequestStatus represents the observed state of an OpsRequest.
             properties:
@@ -3382,6 +3460,14 @@ spec:
                               carry out the action.
                             items:
                               properties:
+                                dispatchState:
+                                  description: |-
+                                    DispatchState records whether the expected managed workload is only planned or is bound to a live UID.
+                                    Empty preserves the behavior of legacy Pod and Job action tasks.
+                                  enum:
+                                  - Planned
+                                  - Created
+                                  type: string
                                 namespace:
                                   description: Represents the namespace where the
                                     task is deployed.
@@ -3405,6 +3491,28 @@ spec:
                                 targetPodName:
                                   description: The name of the Pod that the task is
                                     associated with or operates on.
+                                  type: string
+                                targetPodUID:
+                                  description: |-
+                                    TargetPodUID identifies the exact source Pod whose declared environment variables and volumes were
+                                    snapshotted into a managed workload. It is empty for tasks that do not extract Pod inputs.
+                                  type: string
+                                taskIndex:
+                                  description: TaskIndex is the stable index used
+                                    to derive the managed workload name.
+                                  format: int32
+                                  type: integer
+                                workloadSpecHash:
+                                  description: WorkloadSpecHash binds the API-server-defaulted
+                                    managed workload spec selected before dispatch.
+                                  maxLength: 64
+                                  minLength: 64
+                                  pattern: ^[a-f0-9]{64}$
+                                  type: string
+                                workloadUID:
+                                  description: |-
+                                    WorkloadUID identifies the exact managed workload object. It is populated only after its owner and spec
+                                    have been verified against the persisted plan.
                                   type: string
                               required:
                               - namespace

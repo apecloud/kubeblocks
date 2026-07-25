@@ -1012,6 +1012,159 @@ type ClusterShardingStatus struct {
 	//
 	// +optional
 	PreTerminate *LifecycleActionStatus `json:"preTerminate,omitempty"`
+
+	// ShardAdd records the active or most recently completed managed shard-add action.
+	//
+	// +optional
+	ShardAdd *ShardingActionStatus `json:"shardAdd,omitempty"`
+}
+
+// ShardingActionMemberStatus records the immutable identity of a Component participating in a managed
+// sharding action attempt.
+type ShardingActionMemberStatus struct {
+	// Name is the full Component name.
+	//
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// ShardTemplateName identifies the exact shard template used to render this member.
+	// An empty value explicitly identifies the sharding's default template.
+	//
+	// +kubebuilder:validation:Required
+	ShardTemplateName string `json:"shardTemplateName"`
+
+	// UID identifies the exact Component object observed by the action.
+	//
+	// +optional
+	UID string `json:"uid,omitempty"`
+
+	// Generation is the Component generation bound to the action.
+	//
+	// +optional
+	Generation int64 `json:"generation,omitempty"`
+
+	// ObservedGeneration is the Component generation observed by its controller when the action was bound.
+	//
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+}
+
+// ShardingActionStatus records the durable plan and exact attempt identity of a managed sharding action.
+type ShardingActionStatus struct {
+	LifecycleActionStatus `json:",inline"`
+
+	// ClusterGeneration is the Cluster generation that created this durable action plan.
+	// Later desired topology changes are deferred until this plan is closed.
+	//
+	// +optional
+	ClusterGeneration int64 `json:"clusterGeneration,omitempty"`
+
+	// Token identifies the Cluster generation or legacy shard-add group handled by this action.
+	//
+	// +optional
+	Token string `json:"token,omitempty"`
+
+	// TargetShardCount is the desired number of shards after the action succeeds.
+	//
+	// +optional
+	TargetShardCount int32 `json:"targetShardCount,omitempty"`
+
+	// Members is the stable, ordered set of Components in this shard-add group.
+	// UIDs and generations are populated before an OpsRequest is created.
+	//
+	// +optional
+	Members []ShardingActionMemberStatus `json:"members,omitempty"`
+
+	// MemberSnapshotHash binds the ordered member identities to the action attempt.
+	//
+	// +optional
+	MemberSnapshotHash string `json:"memberSnapshotHash,omitempty"`
+
+	// PlanHash binds the ordered member names and target shard count selected before any member is created.
+	//
+	// +optional
+	PlanHash string `json:"planHash,omitempty"`
+
+	// MembersDispatched records that creation of the exact planned member set was submitted successfully.
+	// Once true, a missing or replaced planned member is a terminal identity failure and is never recreated.
+	//
+	// +optional
+	MembersDispatched bool `json:"membersDispatched,omitempty"`
+
+	// OpsDefinitionName is the OpsDefinition selected for this action.
+	//
+	// +optional
+	OpsDefinitionName string `json:"opsDefinitionName,omitempty"`
+
+	// OpsDefinitionUID identifies the exact OpsDefinition object selected for this action.
+	//
+	// +optional
+	OpsDefinitionUID string `json:"opsDefinitionUID,omitempty"`
+
+	// OpsDefinitionGeneration identifies the exact OpsDefinition generation selected for this action.
+	//
+	// +optional
+	OpsDefinitionGeneration int64 `json:"opsDefinitionGeneration,omitempty"`
+
+	// OpsDefinitionSpecHash binds the canonical OpsDefinition spec selected for this action.
+	//
+	// +optional
+	OpsDefinitionSpecHash string `json:"opsDefinitionSpecHash,omitempty"`
+
+	// OpsRequestName is the deterministic name of the managed Custom OpsRequest.
+	//
+	// +optional
+	OpsRequestName string `json:"opsRequestName,omitempty"`
+
+	// OpsRequestUID identifies the exact OpsRequest attempt. Reusing the same name for a retry produces a new UID.
+	//
+	// +optional
+	OpsRequestUID string `json:"opsRequestUID,omitempty"`
+
+	// OpsRequestSpecHash binds the exact OpsRequest inputs consumed by this action.
+	//
+	// +optional
+	OpsRequestSpecHash string `json:"opsRequestSpecHash,omitempty"`
+
+	// OpsRequestPhase records the last phase observed from the exact OpsRequest UID.
+	//
+	// +optional
+	OpsRequestPhase string `json:"opsRequestPhase,omitempty"`
+
+	// JobName is the deterministic managed Job name persisted from the Operations task before dispatch.
+	//
+	// +optional
+	JobName string `json:"jobName,omitempty"`
+
+	// JobUID identifies the exact managed Job accepted by the Operations controller.
+	//
+	// +optional
+	JobUID string `json:"jobUID,omitempty"`
+
+	// JobSpecHash binds the API-server-defaulted Job spec planned by the Operations controller.
+	//
+	// +optional
+	JobSpecHash string `json:"jobSpecHash,omitempty"`
+
+	// RetryCleanupObservedAt is the start of the current continuous interval in which the failed attempt's
+	// OpsRequest, planned Job, and worker Pods were all observed absent. Any reappearance resets this field.
+	// A retry is prepared only after this interval reaches the controller's bounded stability window.
+	//
+	// +optional
+	RetryCleanupObservedAt *metav1.Time `json:"retryCleanupObservedAt,omitempty"`
+
+	// CleanupStarted records that the exact OpsRequest and Job succeeded and that this terminal observation
+	// was persisted before any member marker is removed. Once true, reconciliation only advances the marker
+	// cleanup reducer and never creates or reconsumes an OpsRequest or Job.
+	//
+	// +optional
+	CleanupStarted bool `json:"cleanupStarted,omitempty"`
+
+	// MarkersCleaned records that every member marker belonging to this attempt has been removed.
+	// A succeeded action remains topology-blocking until this field becomes true.
+	//
+	// +optional
+	MarkersCleaned bool `json:"markersCleaned,omitempty"`
 }
 
 // LifecycleActionStatus records the observed state of a lifecycle-related action.
@@ -1023,11 +1176,13 @@ type LifecycleActionStatus struct {
 
 	// Reason is a programmatic identifier indicating the reason for the current phase.
 	// e.g., 'PreconditionNotMet' for Pending phase or 'PrerequisiteFailed' for Skipped phase.
+	// It must not contain action output, parameter values, credentials, or other sensitive data.
 	//
 	// +optional
-	// Reason string `json:"reason,omitempty"`
+	Reason string `json:"reason,omitempty"`
 
 	// Message is a human-readable message providing details about the current phase.
+	// It must not contain action output, parameter values, credentials, or other sensitive data.
 	//
 	// +optional
 	Message string `json:"message,omitempty"`

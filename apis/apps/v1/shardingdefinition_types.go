@@ -56,6 +56,8 @@ func init() {
 }
 
 // ShardingDefinitionSpec defines the desired state of ShardingDefinition
+//
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.lifecycleActions) || !has(oldSelf.lifecycleActions.shardAdd) || !has(oldSelf.lifecycleActions.shardAdd.opsDefinitionName) || (has(self.lifecycleActions) && has(self.lifecycleActions.shardAdd) && has(self.lifecycleActions.shardAdd.opsDefinitionName) && self.lifecycleActions.shardAdd.opsDefinitionName == oldSelf.lifecycleActions.shardAdd.opsDefinitionName)",message="lifecycleActions.shardAdd.opsDefinitionName is immutable once set"
 type ShardingDefinitionSpec struct {
 	// This field is immutable.
 	//
@@ -157,6 +159,10 @@ type ShardsLimit struct {
 }
 
 // ShardingLifecycleActions defines a collection of Actions for customizing the behavior of a sharding.
+//
+// +kubebuilder:validation:XValidation:rule="!has(self.postProvision) || !has(self.postProvision.opsDefinitionName)",message="opsDefinitionName is only supported by shardAdd"
+// +kubebuilder:validation:XValidation:rule="!has(self.preTerminate) || !has(self.preTerminate.opsDefinitionName)",message="opsDefinitionName is only supported by shardAdd"
+// +kubebuilder:validation:XValidation:rule="!has(self.shardRemove) || !has(self.shardRemove.opsDefinitionName)",message="opsDefinitionName is only supported by shardAdd"
 type ShardingLifecycleActions struct {
 	// Specifies the hook to be executed after a sharding's creation.
 	//
@@ -233,8 +239,30 @@ type ShardingTLS struct {
 	Shared *bool `json:"shared,omitempty"`
 }
 
+// +kubebuilder:validation:XValidation:rule="!has(self.opsDefinitionName) || (!has(self.exec) && !has(self.http) && !has(self.grpc))",message="opsDefinitionName is mutually exclusive with exec, http and grpc"
+// +kubebuilder:validation:XValidation:rule="!has(self.opsDefinitionName) || !has(self.targetShardSelector)",message="targetShardSelector is not supported with opsDefinitionName"
+// +kubebuilder:validation:XValidation:rule="!has(self.opsDefinitionName) || !has(self.targetPodSelector)",message="targetPodSelector is not supported with opsDefinitionName"
+// +kubebuilder:validation:XValidation:rule="!has(self.opsDefinitionName) || !has(self.matchingKey)",message="matchingKey is not supported with opsDefinitionName"
+// +kubebuilder:validation:XValidation:rule="!has(self.opsDefinitionName) || !has(self.retryPolicy)",message="retryPolicy is not supported with opsDefinitionName"
+// +kubebuilder:validation:XValidation:rule="!has(self.opsDefinitionName) || !has(self.preCondition)",message="preCondition is not supported with opsDefinitionName"
+// +kubebuilder:validation:XValidation:rule="!has(self.opsDefinitionName) || !has(self.timeoutSeconds) || self.timeoutSeconds == 0",message="timeoutSeconds is managed by the referenced OpsDefinition"
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.opsDefinitionName) || (has(self.opsDefinitionName) && self.opsDefinitionName == oldSelf.opsDefinitionName)",message="opsDefinitionName is immutable once set"
 type ShardingAction struct {
 	Action `json:",inline"`
+
+	// Specifies the OpsDefinition used to execute shardAdd as a managed Custom OpsRequest.
+	//
+	// When set, the Cluster controller creates exactly one Custom OpsRequest for a group of shards added
+	// in the same Cluster generation. The Operations controller owns the resulting workload and reports its status.
+	// This field is supported only for shardAdd and is mutually exclusive with inline Action fields and
+	// targetShardSelector.
+	//
+	// This field cannot be updated.
+	//
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
+	// +optional
+	OpsDefinitionName string `json:"opsDefinitionName,omitempty"`
 
 	// Defines the criteria used to select the target shard(s) for executing the Action.
 	// It provides precise control over which shard(s) should be targeted.

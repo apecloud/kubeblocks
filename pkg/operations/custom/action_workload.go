@@ -20,6 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package custom
 
 import (
+	"fmt"
+	"reflect"
+
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -58,6 +61,14 @@ func NewWorkloadAction(opsRequest *opsv1alpha1.OpsRequest,
 func (w *WorkloadAction) Execute(actionCtx ActionContext) (*ActionStatus, error) {
 	if actionCtx.Action.Workload == nil {
 		return nil, nil
+	}
+	if actionCtx.Action.Workload.Type == opsv1alpha1.ManagedJobWorkload {
+		actionStatus := NewActiontatus()
+		task, err := w.planManagedJob(actionCtx)
+		if task != nil {
+			actionStatus.ActionTasks = append(actionStatus.ActionTasks, *task)
+		}
+		return actionStatus, err
 	}
 	var (
 		podInfoExtractorName = actionCtx.Action.Workload.PodInfoExtractorName
@@ -114,6 +125,8 @@ func (w *WorkloadAction) CheckStatus(actionCtx ActionContext) (*ActionStatus, er
 	switch actionCtx.Action.Workload.Type {
 	case opsv1alpha1.JobWorkload:
 		return actionCtx.checkActionStatus(w.progressDetail, w.checkJobStatus)
+	case opsv1alpha1.ManagedJobWorkload:
+		return actionCtx.checkActionStatus(w.progressDetail, w.checkManagedJobStatus)
 	case opsv1alpha1.PodWorkload:
 		return actionCtx.checkActionStatus(w.progressDetail, w.checkPodStatus)
 	default:
@@ -146,8 +159,13 @@ func (w *WorkloadAction) buildPodSpec(actionCtx ActionContext,
 		env            []corev1.EnvVar
 	)
 
-	env, err := buildActionPodEnv(actionCtx.ReqCtx, actionCtx.Client, w.Cluster, w.OpsDef, w.OpsRequest,
-		w.Comp, w.CustomCompOps, podInfoExtractor, targetPod)
+	inputReader := client.Reader(actionCtx.Client)
+	if actionCtx.Action.Workload.Type == opsv1alpha1.ManagedJobWorkload {
+		inputReader = actionCtx.directReader()
+	}
+	env, err := buildActionPodEnv(actionCtx.ReqCtx, inputReader, w.Cluster, w.OpsDef, w.OpsRequest,
+		w.Comp, w.CustomCompOps, podInfoExtractor, targetPod,
+		actionCtx.Action.Workload.Type == opsv1alpha1.ManagedJobWorkload)
 	if err != nil {
 		return nil, err
 	}
@@ -158,11 +176,18 @@ func (w *WorkloadAction) buildPodSpec(actionCtx ActionContext,
 				if volume.Name != volumeMount.Name {
 					continue
 				}
+				if actionCtx.Action.Workload.Type == opsv1alpha1.ManagedJobWorkload {
+					allowed := corev1.VolumeSource{Secret: volume.Secret}
+					if volume.Secret == nil || !reflect.DeepEqual(volume.VolumeSource, allowed) {
+						return nil, intctrlutil.NewFatalError(fmt.Sprintf(
+							"managed Job source Pod volume %q must be a Secret volume", volume.Name))
+					}
+				}
 				podSpec.Volumes = append(podSpec.Volumes, volume)
 				volumeMounts = append(volumeMounts, volumeMount)
 			}
 		}
-		if len(podInfoExtractor.VolumeMounts) > 0 {
+		if actionCtx.Action.Workload.Type != opsv1alpha1.ManagedJobWorkload && len(volumeMounts) > 0 {
 			podSpec.NodeSelector = map[string]string{
 				corev1.LabelHostname: targetPod.Spec.NodeName,
 			}
@@ -199,7 +224,15 @@ func (w *WorkloadAction) buildPodSpec(actionCtx ActionContext,
 	default:
 		saKey := client.ObjectKey{Namespace: w.Cluster.Namespace,
 			Name: constant.GenerateDefaultServiceAccountName(w.Comp.ComponentDef)}
-		if exists, _ := intctrlutil.CheckResourceExists(actionCtx.ReqCtx.Ctx, actionCtx.Client, saKey, &corev1.ServiceAccount{}); exists {
+		saReader := client.Reader(actionCtx.Client)
+		if actionCtx.Action.Workload.Type == opsv1alpha1.ManagedJobWorkload {
+			saReader = inputReader
+		}
+		exists, err := intctrlutil.CheckResourceExists(actionCtx.ReqCtx.Ctx, saReader, saKey, &corev1.ServiceAccount{})
+		if err != nil && actionCtx.Action.Workload.Type == opsv1alpha1.ManagedJobWorkload {
+			return nil, err
+		}
+		if exists {
 			podSpec.ServiceAccountName = saKey.Name
 		}
 	}

@@ -25,6 +25,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
@@ -32,6 +33,7 @@ func init() {
 	model.AddScheme(clientgoscheme.AddToScheme)
 	model.AddScheme(appsv1alpha1.AddToScheme)
 	model.AddScheme(appsv1.AddToScheme)
+	model.AddScheme(opsv1alpha1.AddToScheme)
 	model.AddScheme(snapshotv1.AddToScheme)
 	// model.AddScheme(snapshotv1beta1.AddToScheme)
 	// model.AddScheme(extensionsv1alpha1.AddToScheme)

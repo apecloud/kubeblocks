@@ -28,6 +28,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -38,6 +39,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/sharding"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	opsutil "github.com/apecloud/kubeblocks/pkg/operations/util"
 )
 
 // CustomOpsHandler is intentionally not covered by OpsRuntime.
@@ -295,7 +297,8 @@ func resolveParameterValue(ctx context.Context,
 	return "", nil
 }
 
-func validateAndGetCompSpec(cluster *appsv1.Cluster, opsDef *opsv1alpha1.OpsDefinition, componentName string) (*appsv1.ClusterComponentSpec, error) {
+func validateAndGetCompSpec(cluster *appsv1.Cluster, opsDef *opsv1alpha1.OpsDefinition,
+	componentName string, managedJob bool) (*appsv1.ClusterComponentSpec, error) {
 	compSpec := cluster.Spec.GetComponentByName(componentName)
 	if compSpec != nil {
 		return compSpec, nil
@@ -304,7 +307,7 @@ func validateAndGetCompSpec(cluster *appsv1.Cluster, opsDef *opsv1alpha1.OpsDefi
 	if shardingSpec == nil {
 		return nil, intctrlutil.NewFatalError(fmt.Sprintf(`cannot find the component "%s" in cluster "%s"`, componentName, cluster.Name))
 	}
-	if len(opsDef.Spec.PodInfoExtractors) == 0 {
+	if len(opsDef.Spec.PodInfoExtractors) == 0 && !managedJob {
 		return nil, intctrlutil.NewFatalError(fmt.Sprintf(`podInfoExtractors cannot be empty in opsDef "%s" when the component "%s" is a shard component`, opsDef.Name, componentName))
 	}
 	return &shardingSpec.Template, nil
@@ -319,10 +322,24 @@ func initOpsDefAndValidate(reqCtx intctrlutil.RequestCtx,
 		return intctrlutil.NewFatalError("spec.custom can not be empty if opsType is Custom.")
 	}
 	opsDef := &opsv1alpha1.OpsDefinition{}
-	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: customSpec.OpsDefinitionName}, opsDef); err != nil {
+	reader := opsRes.Reader
+	if reader == nil {
+		reader = cli
+	}
+	if err := reader.Get(reqCtx.Ctx, client.ObjectKey{Name: customSpec.OpsDefinitionName}, opsDef); err != nil {
+		if customSpec.ExecutionSnapshot != nil && apierrors.IsNotFound(err) {
+			return intctrlutil.NewFatalError(fmt.Sprintf("snapshotted OpsDefinition %q no longer exists", customSpec.OpsDefinitionName))
+		}
+		return err
+	}
+	if err := validateOpsDefinitionExecutionSnapshot(customSpec.ExecutionSnapshot, opsDef); err != nil {
+		return err
+	}
+	if err := ValidateManagedJobOpsDefinition(customSpec, opsDef); err != nil {
 		return err
 	}
 	opsRes.OpsDef = opsDef
+	managedJob := customSpec.ExecutionSnapshot != nil
 
 	parametersSchema := opsDef.Spec.ParametersSchema
 	for _, v := range customSpec.CustomOpsComponents {
@@ -344,7 +361,7 @@ func initOpsDefAndValidate(reqCtx intctrlutil.RequestCtx,
 			}
 		}
 		// 2. validate component and componentDef
-		compSpec, err := validateAndGetCompSpec(opsRes.Cluster, opsDef, v.ComponentName)
+		compSpec, err := validateAndGetCompSpec(opsRes.Cluster, opsDef, v.ComponentName, managedJob)
 		if err != nil {
 			return err
 		}
@@ -367,6 +384,187 @@ func initOpsDefAndValidate(reqCtx intctrlutil.RequestCtx,
 				}
 			}
 		}
+	}
+	return nil
+}
+
+func validateManagedJobOpsRequestOwner(ctx context.Context, reader client.Reader, opsRes *OpsResource) error {
+	if opsRes == nil || opsRes.OpsRequest == nil || opsRes.OpsRequest.Spec.CustomOps == nil ||
+		opsRes.OpsRequest.Spec.CustomOps.ExecutionSnapshot == nil {
+		return nil
+	}
+	if reader == nil {
+		return intctrlutil.NewFatalError("ManagedJob requires a direct API reader for live Cluster authorization")
+	}
+	opsRequest := opsRes.OpsRequest
+	clusterName := opsRequest.Spec.GetClusterName()
+	if clusterName == "" {
+		return intctrlutil.NewFatalError("ManagedJob OpsRequest has no Cluster name")
+	}
+	liveCluster := &appsv1.Cluster{}
+	if err := reader.Get(ctx, client.ObjectKey{Namespace: opsRequest.Namespace, Name: clusterName}, liveCluster); err != nil {
+		if apierrors.IsNotFound(err) {
+			return intctrlutil.NewFatalError(fmt.Sprintf("ManagedJob Cluster %s/%s no longer exists", opsRequest.Namespace, clusterName))
+		}
+		return err
+	}
+	if liveCluster.UID == "" || !liveCluster.DeletionTimestamp.IsZero() {
+		return intctrlutil.NewFatalError(fmt.Sprintf("ManagedJob Cluster %s/%s identity is not current", liveCluster.Namespace, liveCluster.Name))
+	}
+	owner := metav1.GetControllerOf(opsRequest)
+	if owner == nil || owner.APIVersion != appsv1.GroupVersion.String() || owner.Kind != appsv1.ClusterKind ||
+		owner.Name != liveCluster.Name || owner.UID != liveCluster.UID {
+		return intctrlutil.NewFatalError(fmt.Sprintf("ManagedJob OpsRequest %s/%s is not controlled by the exact live Cluster UID",
+			opsRequest.Namespace, opsRequest.Name))
+	}
+	opsRes.Cluster = liveCluster
+	return nil
+}
+
+// ValidateManagedJobOpsDefinition validates the deliberately narrow v1 contract for snapshotted Custom
+// operations. Ordinary Custom operations remain on the legacy Pod and Job paths.
+func ValidateManagedJobOpsDefinition(customSpec *opsv1alpha1.CustomOps, opsDef *opsv1alpha1.OpsDefinition) error {
+	managedAction := hasManagedJobAction(opsDef)
+	if customSpec.ExecutionSnapshot == nil {
+		if managedAction {
+			return intctrlutil.NewFatalError("ManagedJob requires a Custom OpsRequest executionSnapshot")
+		}
+		return nil
+	}
+	if !managedAction {
+		return intctrlutil.NewFatalError("a Custom OpsRequest executionSnapshot requires a ManagedJob action")
+	}
+	if len(customSpec.CustomOpsComponents) != 1 {
+		return intctrlutil.NewFatalError("ManagedJob requires exactly one Custom OpsRequest component")
+	}
+	return ValidateManagedJobOpsDefinitionSpec(opsDef)
+}
+
+func hasManagedJobAction(opsDef *opsv1alpha1.OpsDefinition) bool {
+	for i := range opsDef.Spec.Actions {
+		workload := opsDef.Spec.Actions[i].Workload
+		if workload != nil && workload.Type == opsv1alpha1.ManagedJobWorkload {
+			return true
+		}
+	}
+	return false
+}
+
+// ValidateManagedJobOpsDefinitionSpec validates the deliberately narrow ManagedJob v1 contract without
+// requiring an OpsRequest. It is shared by the OpsDefinition controller and trusted API producers.
+func ValidateManagedJobOpsDefinitionSpec(opsDef *opsv1alpha1.OpsDefinition) error {
+	if !hasManagedJobAction(opsDef) {
+		return nil
+	}
+	if len(opsDef.Spec.Actions) != 1 {
+		return intctrlutil.NewFatalError("ManagedJob requires exactly one action")
+	}
+	action := opsDef.Spec.Actions[0]
+	if action.Workload == nil || action.Workload.Type != opsv1alpha1.ManagedJobWorkload ||
+		action.Exec != nil || action.ResourceModifier != nil {
+		return intctrlutil.NewFatalError("ManagedJob supports only one workload action")
+	}
+	if action.FailurePolicy != opsv1alpha1.FailurePolicyFail {
+		return intctrlutil.NewFatalError("ManagedJob requires failurePolicy=Fail")
+	}
+	if action.Workload.BackoffLimit != 0 {
+		return intctrlutil.NewFatalError("ManagedJob requires backoffLimit=0")
+	}
+	extractorName := action.Workload.PodInfoExtractorName
+	if extractorName == "" {
+		if len(opsDef.Spec.PodInfoExtractors) != 0 {
+			return intctrlutil.NewFatalError("ManagedJob has unreferenced PodInfoExtractors")
+		}
+	} else {
+		if len(opsDef.Spec.PodInfoExtractors) != 1 || opsDef.Spec.PodInfoExtractors[0].Name != extractorName {
+			return intctrlutil.NewFatalError("ManagedJob requires exactly one referenced PodInfoExtractor")
+		}
+		extractor := &opsDef.Spec.PodInfoExtractors[0]
+		if extractor.PodSelector.MultiPodSelectionPolicy != opsv1alpha1.Any {
+			return intctrlutil.NewFatalError("ManagedJob PodInfoExtractor requires multiPodSelectionPolicy=Any")
+		}
+		if extractor.PodSelector.Role != "" {
+			return intctrlutil.NewFatalError("ManagedJob PodInfoExtractor does not support role selection")
+		}
+		if err := validateManagedJobPodInfoExtractor(extractor); err != nil {
+			return err
+		}
+	}
+	if len(opsDef.Spec.ComponentInfos) != 0 {
+		return intctrlutil.NewFatalError("ManagedJob does not support componentInfos")
+	}
+	if len(opsDef.Spec.PreConditions) != 0 {
+		return intctrlutil.NewFatalError("ManagedJob does not support preConditions")
+	}
+	return nil
+}
+
+func validateManagedJobPodInfoExtractor(extractor *opsv1alpha1.PodInfoExtractor) error {
+	envNames := map[string]struct{}{}
+	for i := range extractor.Env {
+		env := &extractor.Env[i]
+		if _, ok := envNames[env.Name]; ok {
+			return intctrlutil.NewFatalError(fmt.Sprintf("ManagedJob PodInfoExtractor has duplicate env name %q", env.Name))
+		}
+		envNames[env.Name] = struct{}{}
+		if env.ValueFrom == nil || (env.ValueFrom.EnvVarRef == nil) == (env.ValueFrom.FieldRef == nil) {
+			return intctrlutil.NewFatalError(fmt.Sprintf("ManagedJob PodInfoExtractor env %q requires exactly one envRef or fieldPath", env.Name))
+		}
+		if env.ValueFrom.EnvVarRef != nil {
+			if env.ValueFrom.EnvVarRef.TargetContainerName == "" || env.ValueFrom.EnvVarRef.EnvName == "" {
+				return intctrlutil.NewFatalError(fmt.Sprintf("ManagedJob PodInfoExtractor env %q requires an exact container and env name", env.Name))
+			}
+			continue
+		}
+		if !isManagedJobPodFieldPath(env.ValueFrom.FieldRef.FieldPath) {
+			return intctrlutil.NewFatalError(fmt.Sprintf("ManagedJob PodInfoExtractor env %q supports only metadata.name or metadata.namespace fieldPath", env.Name))
+		}
+	}
+	if len(extractor.VolumeMounts) > 1 {
+		return intctrlutil.NewFatalError("ManagedJob PodInfoExtractor supports at most one Secret volume mount")
+	}
+	for i := range extractor.VolumeMounts {
+		mount := &extractor.VolumeMounts[i]
+		if mount.Name == "" || mount.MountPath == "" || !mount.ReadOnly || mount.SubPath != "" ||
+			mount.SubPathExpr != "" || mount.MountPropagation != nil {
+			return intctrlutil.NewFatalError("ManagedJob PodInfoExtractor requires one read-only Secret volume mount without subPath or mount propagation")
+		}
+	}
+	return nil
+}
+
+func isManagedJobPodFieldPath(fieldPath string) bool {
+	switch strings.TrimPrefix(fieldPath, ".") {
+	case "metadata.name", "metadata.namespace":
+		return true
+	default:
+		return false
+	}
+}
+
+func validateOpsDefinitionExecutionSnapshot(snapshot *opsv1alpha1.CustomOpsExecutionSnapshot,
+	opsDef *opsv1alpha1.OpsDefinition) error {
+	if snapshot == nil {
+		return nil
+	}
+	if !opsDef.DeletionTimestamp.IsZero() {
+		return intctrlutil.NewFatalError(fmt.Sprintf("OpsDefinition %q is terminating", opsDef.Name))
+	}
+	if string(opsDef.UID) != snapshot.OpsDefinitionUID {
+		return intctrlutil.NewFatalError(fmt.Sprintf("OpsDefinition %q UID no longer matches the execution snapshot", opsDef.Name))
+	}
+	if opsDef.Generation != snapshot.OpsDefinitionGeneration {
+		return intctrlutil.NewFatalError(fmt.Sprintf("OpsDefinition %q generation no longer matches the execution snapshot", opsDef.Name))
+	}
+	hash, err := opsutil.OpsDefinitionSpecHash(opsDef.Spec)
+	if err != nil {
+		return intctrlutil.NewFatalError(fmt.Sprintf("failed to hash OpsDefinition %q: %v", opsDef.Name, err))
+	}
+	if hash != snapshot.OpsDefinitionSpecHash {
+		return intctrlutil.NewFatalError(fmt.Sprintf("OpsDefinition %q spec no longer matches the execution snapshot", opsDef.Name))
+	}
+	if opsDef.Status.Phase != opsv1alpha1.AvailablePhase || opsDef.Status.ObservedGeneration != opsDef.Generation {
+		return intctrlutil.NewFatalError(fmt.Sprintf("OpsDefinition %q is not available at the snapshotted generation", opsDef.Name))
 	}
 	return nil
 }

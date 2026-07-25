@@ -36,11 +36,19 @@ import (
 
 func BuildShardingCompSpecs(ctx context.Context, cli client.Reader,
 	namespace, clusterName string, sharding *appsv1.ClusterSharding) (map[string][]*appsv1.ClusterComponentSpec, error) {
+	return BuildShardingCompSpecsWithReservedNames(ctx, cli, namespace, clusterName, sharding, nil)
+}
+
+// BuildShardingCompSpecsWithReservedNames builds sharding component specs while preserving exact names
+// that were durably planned before the Components were submitted.
+func BuildShardingCompSpecsWithReservedNames(ctx context.Context, cli client.Reader,
+	namespace, clusterName string, sharding *appsv1.ClusterSharding,
+	reservedByTemplate map[string][]string) (map[string][]*appsv1.ClusterComponentSpec, error) {
 	shardingComps, err := listShardingComponents(ctx, cli, namespace, clusterName, sharding.Name)
 	if err != nil {
 		return nil, err
 	}
-	return buildShardingCompSpecs(clusterName, sharding, shardingComps)
+	return buildShardingCompSpecsWithReservedNames(clusterName, sharding, shardingComps, reservedByTemplate)
 }
 
 func ListShardingComponents(ctx context.Context, cli client.Reader, cluster *appsv1.Cluster, shardingName string) ([]appsv1.Component, error) {
@@ -57,7 +65,16 @@ func listShardingComponents(ctx context.Context, cli client.Reader, namespace, c
 }
 
 func buildShardingCompSpecs(clusterName string, sharding *appsv1.ClusterSharding, shardingComps []appsv1.Component) (map[string][]*appsv1.ClusterComponentSpec, error) {
+	return buildShardingCompSpecsWithReservedNames(clusterName, sharding, shardingComps, nil)
+}
+
+func buildShardingCompSpecsWithReservedNames(clusterName string, sharding *appsv1.ClusterSharding,
+	shardingComps []appsv1.Component, reservedByTemplate map[string][]string) (map[string][]*appsv1.ClusterComponentSpec, error) {
 	if err := precheck(sharding); err != nil {
+		return nil, err
+	}
+	reservedByTemplate, err := validateReservedShardNames(clusterName, sharding.Name, reservedByTemplate)
+	if err != nil {
 		return nil, err
 	}
 
@@ -71,9 +88,19 @@ func buildShardingCompSpecs(clusterName string, sharding *appsv1.ClusterSharding
 		running:            compNames,
 		offline:            sharding.Offline,
 		takeOverByTemplate: shardNamesTakeOverByTemplate(clusterName, sharding),
+		reservedByTemplate: reservedByTemplate,
 	}
 
 	templates := buildShardTemplates(clusterName, sharding, shardingComps)
+	templateNames := sets.New[string]()
+	for _, template := range templates {
+		templateNames.Insert(template.name)
+	}
+	for templateName := range reservedByTemplate {
+		if !templateNames.Has(templateName) {
+			return nil, fmt.Errorf("reserved shard template %q is not present in sharding %q", templateName, sharding.Name)
+		}
+	}
 	for i := range templates {
 		if err := templates[i].align(generator); err != nil {
 			return nil, err
@@ -84,7 +111,46 @@ func buildShardingCompSpecs(clusterName string, sharding *appsv1.ClusterSharding
 	for i, tpl := range templates {
 		shards[tpl.name] = templates[i].shards
 	}
+	generatedNames := sets.New[string]()
+	for _, specs := range shards {
+		for _, spec := range specs {
+			generatedNames.Insert(fmt.Sprintf("%s-%s", clusterName, spec.Name))
+		}
+	}
+	for _, names := range reservedByTemplate {
+		for _, name := range names {
+			if !generatedNames.Has(name) {
+				return nil, fmt.Errorf("reserved shard name %q is not present in the normalized topology", name)
+			}
+		}
+	}
 	return shards, nil
+}
+
+func validateReservedShardNames(clusterName, shardingName string,
+	reservedByTemplate map[string][]string) (map[string][]string, error) {
+	if len(reservedByTemplate) == 0 {
+		return nil, nil
+	}
+	prefix := fmt.Sprintf("%s-%s-", clusterName, shardingName)
+	seen := sets.New[string]()
+	result := make(map[string][]string, len(reservedByTemplate))
+	for templateName, names := range reservedByTemplate {
+		result[templateName] = slices.Clone(names)
+		slices.Sort(result[templateName])
+		for _, name := range result[templateName] {
+			id, ok := strings.CutPrefix(name, prefix)
+			if !ok || len(id) != ShardIDLength {
+				return nil, fmt.Errorf("reserved shard name %q does not belong to cluster %q and sharding %q",
+					name, clusterName, shardingName)
+			}
+			if seen.Has(name) {
+				return nil, fmt.Errorf("reserved shard name %q is duplicated", name)
+			}
+			seen.Insert(name)
+		}
+	}
+	return result, nil
 }
 
 func precheck(sharding *appsv1.ClusterSharding) error {

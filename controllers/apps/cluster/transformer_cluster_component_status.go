@@ -216,6 +216,19 @@ func (t *clusterComponentStatusTransformer) buildClusterShardingStatus(transCtx 
 	status.ShardingDef = oldStatus.ShardingDef
 	status.PostProvision = oldStatus.PostProvision
 	status.PreTerminate = oldStatus.PreTerminate
+	status.ShardAdd = oldStatus.ShardAdd
+	if status.ShardAdd != nil && !status.ShardAdd.MarkersCleaned {
+		status.UpToDate = false
+		status.Message = map[string]string{
+			"reason":  status.ShardAdd.Reason,
+			"message": status.ShardAdd.Message,
+		}
+		if status.ShardAdd.Phase == appsv1.LifecycleActionFailed {
+			status.Phase = appsv1.FailedComponentPhase
+		} else {
+			status.Phase = appsv1.UpdatingComponentPhase
+		}
+	}
 
 	return status
 }

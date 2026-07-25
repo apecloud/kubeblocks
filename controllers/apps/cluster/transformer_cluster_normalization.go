@@ -494,7 +494,9 @@ func (t *clusterNormalizationTransformer) buildShardingComps(transCtx *clusterTr
 	shardingComps := make(map[string][]*appsv1.ClusterComponentSpec)
 	shardingCompsWithTpl := make(map[string]map[string][]*appsv1.ClusterComponentSpec)
 	for _, spec := range transCtx.shardings {
-		tplComps, err := sharding.BuildShardingCompSpecs(transCtx.Context, transCtx.Client, cluster.Namespace, cluster.Name, spec)
+		reservedNames := managedShardAddReservedNames(cluster, spec.Name)
+		tplComps, err := sharding.BuildShardingCompSpecsWithReservedNames(transCtx.Context, transCtx.Client,
+			cluster.Namespace, cluster.Name, spec, reservedNames)
 		if err != nil {
 			return nil, nil, err
 		}

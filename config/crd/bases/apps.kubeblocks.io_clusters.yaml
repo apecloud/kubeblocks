@@ -17851,8 +17851,9 @@ spec:
                           format: date-time
                           type: string
                         message:
-                          description: Message is a human-readable message providing
-                            details about the current phase.
+                          description: |-
+                            Message is a human-readable message providing details about the current phase.
+                            It must not contain action output, parameter values, credentials, or other sensitive data.
                           type: string
                         phase:
                           description: Phase is the current phase of the lifecycle
@@ -17863,6 +17864,12 @@ spec:
                           - Succeeded
                           - Failed
                           - Skipped
+                          type: string
+                        reason:
+                          description: |-
+                            Reason is a programmatic identifier indicating the reason for the current phase.
+                            e.g., 'PreconditionNotMet' for Pending phase or 'PrerequisiteFailed' for Skipped phase.
+                            It must not contain action output, parameter values, credentials, or other sensitive data.
                           type: string
                         startTime:
                           description: StartTime records the time when the action
@@ -17880,8 +17887,9 @@ spec:
                           format: date-time
                           type: string
                         message:
-                          description: Message is a human-readable message providing
-                            details about the current phase.
+                          description: |-
+                            Message is a human-readable message providing details about the current phase.
+                            It must not contain action output, parameter values, credentials, or other sensitive data.
                           type: string
                         phase:
                           description: Phase is the current phase of the lifecycle
@@ -17893,10 +17901,180 @@ spec:
                           - Failed
                           - Skipped
                           type: string
+                        reason:
+                          description: |-
+                            Reason is a programmatic identifier indicating the reason for the current phase.
+                            e.g., 'PreconditionNotMet' for Pending phase or 'PrerequisiteFailed' for Skipped phase.
+                            It must not contain action output, parameter values, credentials, or other sensitive data.
+                          type: string
                         startTime:
                           description: StartTime records the time when the action
                             started execution.
                           format: date-time
+                          type: string
+                      type: object
+                    shardAdd:
+                      description: ShardAdd records the active or most recently completed
+                        managed shard-add action.
+                      properties:
+                        cleanupStarted:
+                          description: |-
+                            CleanupStarted records that the exact OpsRequest and Job succeeded and that this terminal observation
+                            was persisted before any member marker is removed. Once true, reconciliation only advances the marker
+                            cleanup reducer and never creates or reconsumes an OpsRequest or Job.
+                          type: boolean
+                        clusterGeneration:
+                          description: |-
+                            ClusterGeneration is the Cluster generation that created this durable action plan.
+                            Later desired topology changes are deferred until this plan is closed.
+                          format: int64
+                          type: integer
+                        completionTime:
+                          description: CompletionTime records the time when the action
+                            reached a terminal state (Succeeded, Failed, or Skipped).
+                          format: date-time
+                          type: string
+                        jobName:
+                          description: JobName is the deterministic managed Job name
+                            persisted from the Operations task before dispatch.
+                          type: string
+                        jobSpecHash:
+                          description: JobSpecHash binds the API-server-defaulted
+                            Job spec planned by the Operations controller.
+                          type: string
+                        jobUID:
+                          description: JobUID identifies the exact managed Job accepted
+                            by the Operations controller.
+                          type: string
+                        markersCleaned:
+                          description: |-
+                            MarkersCleaned records that every member marker belonging to this attempt has been removed.
+                            A succeeded action remains topology-blocking until this field becomes true.
+                          type: boolean
+                        memberSnapshotHash:
+                          description: MemberSnapshotHash binds the ordered member
+                            identities to the action attempt.
+                          type: string
+                        members:
+                          description: |-
+                            Members is the stable, ordered set of Components in this shard-add group.
+                            UIDs and generations are populated before an OpsRequest is created.
+                          items:
+                            description: |-
+                              ShardingActionMemberStatus records the immutable identity of a Component participating in a managed
+                              sharding action attempt.
+                            properties:
+                              generation:
+                                description: Generation is the Component generation
+                                  bound to the action.
+                                format: int64
+                                type: integer
+                              name:
+                                description: Name is the full Component name.
+                                type: string
+                              observedGeneration:
+                                description: ObservedGeneration is the Component generation
+                                  observed by its controller when the action was bound.
+                                format: int64
+                                type: integer
+                              shardTemplateName:
+                                description: |-
+                                  ShardTemplateName identifies the exact shard template used to render this member.
+                                  An empty value explicitly identifies the sharding's default template.
+                                type: string
+                              uid:
+                                description: UID identifies the exact Component object
+                                  observed by the action.
+                                type: string
+                            required:
+                            - name
+                            - shardTemplateName
+                            type: object
+                          type: array
+                        membersDispatched:
+                          description: |-
+                            MembersDispatched records that creation of the exact planned member set was submitted successfully.
+                            Once true, a missing or replaced planned member is a terminal identity failure and is never recreated.
+                          type: boolean
+                        message:
+                          description: |-
+                            Message is a human-readable message providing details about the current phase.
+                            It must not contain action output, parameter values, credentials, or other sensitive data.
+                          type: string
+                        opsDefinitionGeneration:
+                          description: OpsDefinitionGeneration identifies the exact
+                            OpsDefinition generation selected for this action.
+                          format: int64
+                          type: integer
+                        opsDefinitionName:
+                          description: OpsDefinitionName is the OpsDefinition selected
+                            for this action.
+                          type: string
+                        opsDefinitionSpecHash:
+                          description: OpsDefinitionSpecHash binds the canonical OpsDefinition
+                            spec selected for this action.
+                          type: string
+                        opsDefinitionUID:
+                          description: OpsDefinitionUID identifies the exact OpsDefinition
+                            object selected for this action.
+                          type: string
+                        opsRequestName:
+                          description: OpsRequestName is the deterministic name of
+                            the managed Custom OpsRequest.
+                          type: string
+                        opsRequestPhase:
+                          description: OpsRequestPhase records the last phase observed
+                            from the exact OpsRequest UID.
+                          type: string
+                        opsRequestSpecHash:
+                          description: OpsRequestSpecHash binds the exact OpsRequest
+                            inputs consumed by this action.
+                          type: string
+                        opsRequestUID:
+                          description: OpsRequestUID identifies the exact OpsRequest
+                            attempt. Reusing the same name for a retry produces a
+                            new UID.
+                          type: string
+                        phase:
+                          description: Phase is the current phase of the lifecycle
+                            action.
+                          enum:
+                          - Pending
+                          - Running
+                          - Succeeded
+                          - Failed
+                          - Skipped
+                          type: string
+                        planHash:
+                          description: PlanHash binds the ordered member names and
+                            target shard count selected before any member is created.
+                          type: string
+                        reason:
+                          description: |-
+                            Reason is a programmatic identifier indicating the reason for the current phase.
+                            e.g., 'PreconditionNotMet' for Pending phase or 'PrerequisiteFailed' for Skipped phase.
+                            It must not contain action output, parameter values, credentials, or other sensitive data.
+                          type: string
+                        retryCleanupObservedAt:
+                          description: |-
+                            RetryCleanupObservedAt is the start of the current continuous interval in which the failed attempt's
+                            OpsRequest, planned Job, and worker Pods were all observed absent. Any reappearance resets this field.
+                            A retry is prepared only after this interval reaches the controller's bounded stability window.
+                          format: date-time
+                          type: string
+                        startTime:
+                          description: StartTime records the time when the action
+                            started execution.
+                          format: date-time
+                          type: string
+                        targetShardCount:
+                          description: TargetShardCount is the desired number of shards
+                            after the action succeeds.
+                          format: int32
+                          type: integer
+                        token:
+                          description: Token identifies the Cluster generation or
+                            legacy shard-add group handled by this action.
                           type: string
                       type: object
                     shardingDef:

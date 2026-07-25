@@ -21,14 +21,17 @@ package operations
 
 import (
 	"fmt"
+	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -82,6 +85,229 @@ var _ = Describe("CustomOps", func() {
 	BeforeEach(cleanEnv)
 
 	AfterEach(cleanEnv)
+
+	It("keeps ManagedJob validation narrow without relaxing ordinary sharding Custom Ops", func() {
+		newManagedDefinition := func() *opsv1alpha1.OpsDefinition {
+			return &opsv1alpha1.OpsDefinition{Spec: opsv1alpha1.OpsDefinitionSpec{
+				Actions: []opsv1alpha1.OpsAction{{
+					Name:          "managed",
+					FailurePolicy: opsv1alpha1.FailurePolicyFail,
+					Workload: &opsv1alpha1.OpsWorkloadAction{
+						Type:         opsv1alpha1.ManagedJobWorkload,
+						BackoffLimit: 0,
+						PodSpec: corev1.PodSpec{Containers: []corev1.Container{{
+							Name: "runner", Image: "busybox",
+						}}},
+					},
+				}},
+			}}
+		}
+		newSnapshottedCustom := func() *opsv1alpha1.CustomOps {
+			return &opsv1alpha1.CustomOps{
+				ExecutionSnapshot: &opsv1alpha1.CustomOpsExecutionSnapshot{
+					OpsDefinitionUID:        "opsdef-uid",
+					OpsDefinitionGeneration: 1,
+					OpsDefinitionSpecHash:   "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+					TargetSnapshotHash:      "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+				},
+				CustomOpsComponents: []opsv1alpha1.CustomOpsComponent{{
+					ComponentOps: opsv1alpha1.ComponentOps{ComponentName: "redis-a"},
+				}},
+			}
+		}
+
+		Expect(ValidateManagedJobOpsDefinition(newSnapshottedCustom(), newManagedDefinition())).Should(Succeed())
+		emptyManagedComponents := newSnapshottedCustom()
+		emptyManagedComponents.CustomOpsComponents = nil
+		err := ValidateManagedJobOpsDefinition(emptyManagedComponents, newManagedDefinition())
+		Expect(err).Should(MatchError("ManagedJob requires exactly one Custom OpsRequest component"))
+		Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeTrue())
+
+		multipleManagedComponents := newSnapshottedCustom()
+		multipleManagedComponents.CustomOpsComponents = append(multipleManagedComponents.CustomOpsComponents,
+			opsv1alpha1.CustomOpsComponent{ComponentOps: opsv1alpha1.ComponentOps{ComponentName: "redis-b"}})
+		err = ValidateManagedJobOpsDefinition(multipleManagedComponents, newManagedDefinition())
+		Expect(err).Should(MatchError("ManagedJob requires exactly one Custom OpsRequest component"))
+		Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeTrue())
+
+		ordinaryMultiComponent := multipleManagedComponents.DeepCopy()
+		ordinaryMultiComponent.ExecutionSnapshot = nil
+		ordinaryDefinition := newManagedDefinition()
+		ordinaryDefinition.Spec.Actions[0].Workload.Type = opsv1alpha1.JobWorkload
+		Expect(ValidateManagedJobOpsDefinition(ordinaryMultiComponent, ordinaryDefinition)).Should(Succeed())
+
+		withExtractor := newManagedDefinition()
+		withExtractor.Spec.PodInfoExtractors = []opsv1alpha1.PodInfoExtractor{{
+			Name: "source",
+			PodSelector: opsv1alpha1.PodSelector{
+				MultiPodSelectionPolicy: opsv1alpha1.Any,
+			},
+		}}
+		withExtractor.Spec.Actions[0].Workload.PodInfoExtractorName = "source"
+		Expect(ValidateManagedJobOpsDefinition(newSnapshottedCustom(), withExtractor)).Should(Succeed())
+
+		cases := []struct {
+			name   string
+			mutate func(*opsv1alpha1.OpsDefinition, *opsv1alpha1.CustomOps)
+		}{
+			{name: "missing snapshot", mutate: func(_ *opsv1alpha1.OpsDefinition, custom *opsv1alpha1.CustomOps) {
+				custom.ExecutionSnapshot = nil
+			}},
+			{name: "ordinary Job with snapshot", mutate: func(def *opsv1alpha1.OpsDefinition, _ *opsv1alpha1.CustomOps) {
+				def.Spec.Actions[0].Workload.Type = opsv1alpha1.JobWorkload
+			}},
+			{name: "multiple actions", mutate: func(def *opsv1alpha1.OpsDefinition, _ *opsv1alpha1.CustomOps) {
+				def.Spec.Actions = append(def.Spec.Actions, def.Spec.Actions[0])
+			}},
+			{name: "ignore failures", mutate: func(def *opsv1alpha1.OpsDefinition, _ *opsv1alpha1.CustomOps) {
+				def.Spec.Actions[0].FailurePolicy = opsv1alpha1.FailurePolicyIgnore
+			}},
+			{name: "retry", mutate: func(def *opsv1alpha1.OpsDefinition, _ *opsv1alpha1.CustomOps) {
+				def.Spec.Actions[0].Workload.BackoffLimit = 1
+			}},
+			{name: "missing extractor definition", mutate: func(def *opsv1alpha1.OpsDefinition, _ *opsv1alpha1.CustomOps) {
+				def.Spec.Actions[0].Workload.PodInfoExtractorName = "pod"
+			}},
+			{name: "unreferenced extractor definition", mutate: func(def *opsv1alpha1.OpsDefinition, _ *opsv1alpha1.CustomOps) {
+				def.Spec.PodInfoExtractors = []opsv1alpha1.PodInfoExtractor{{
+					Name: "pod",
+					PodSelector: opsv1alpha1.PodSelector{
+						MultiPodSelectionPolicy: opsv1alpha1.Any,
+					},
+				}}
+			}},
+			{name: "all-pod extractor", mutate: func(def *opsv1alpha1.OpsDefinition, _ *opsv1alpha1.CustomOps) {
+				def.Spec.PodInfoExtractors = []opsv1alpha1.PodInfoExtractor{{
+					Name: "pod",
+					PodSelector: opsv1alpha1.PodSelector{
+						MultiPodSelectionPolicy: opsv1alpha1.All,
+					},
+				}}
+				def.Spec.Actions[0].Workload.PodInfoExtractorName = "pod"
+			}},
+			{name: "multiple extractor definitions", mutate: func(def *opsv1alpha1.OpsDefinition, _ *opsv1alpha1.CustomOps) {
+				def.Spec.PodInfoExtractors = []opsv1alpha1.PodInfoExtractor{
+					{Name: "pod", PodSelector: opsv1alpha1.PodSelector{MultiPodSelectionPolicy: opsv1alpha1.Any}},
+					{Name: "unused", PodSelector: opsv1alpha1.PodSelector{MultiPodSelectionPolicy: opsv1alpha1.Any}},
+				}
+				def.Spec.Actions[0].Workload.PodInfoExtractorName = "pod"
+			}},
+			{name: "role selector", mutate: func(def *opsv1alpha1.OpsDefinition, _ *opsv1alpha1.CustomOps) {
+				def.Spec.PodInfoExtractors = []opsv1alpha1.PodInfoExtractor{{
+					Name: "pod", PodSelector: opsv1alpha1.PodSelector{Role: "primary", MultiPodSelectionPolicy: opsv1alpha1.Any},
+				}}
+				def.Spec.Actions[0].Workload.PodInfoExtractorName = "pod"
+			}},
+			{name: "unsupported field path", mutate: func(def *opsv1alpha1.OpsDefinition, _ *opsv1alpha1.CustomOps) {
+				def.Spec.PodInfoExtractors = []opsv1alpha1.PodInfoExtractor{{
+					Name: "pod", PodSelector: opsv1alpha1.PodSelector{MultiPodSelectionPolicy: opsv1alpha1.Any},
+					Env: []opsv1alpha1.OpsEnvVar{{Name: "NODE", ValueFrom: &opsv1alpha1.OpsVarSource{
+						FieldRef: &corev1.ObjectFieldSelector{FieldPath: "spec.nodeName"},
+					}}},
+				}}
+				def.Spec.Actions[0].Workload.PodInfoExtractorName = "pod"
+			}},
+			{name: "duplicate env names", mutate: func(def *opsv1alpha1.OpsDefinition, _ *opsv1alpha1.CustomOps) {
+				env := opsv1alpha1.OpsEnvVar{Name: "DUP", ValueFrom: &opsv1alpha1.OpsVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.name"},
+				}}
+				def.Spec.PodInfoExtractors = []opsv1alpha1.PodInfoExtractor{{
+					Name: "pod", PodSelector: opsv1alpha1.PodSelector{MultiPodSelectionPolicy: opsv1alpha1.Any},
+					Env: []opsv1alpha1.OpsEnvVar{env, env},
+				}}
+				def.Spec.Actions[0].Workload.PodInfoExtractorName = "pod"
+			}},
+			{name: "writable volume mount", mutate: func(def *opsv1alpha1.OpsDefinition, _ *opsv1alpha1.CustomOps) {
+				def.Spec.PodInfoExtractors = []opsv1alpha1.PodInfoExtractor{{
+					Name: "pod", PodSelector: opsv1alpha1.PodSelector{MultiPodSelectionPolicy: opsv1alpha1.Any},
+					VolumeMounts: []corev1.VolumeMount{{Name: "tls", MountPath: "/tls"}},
+				}}
+				def.Spec.Actions[0].Workload.PodInfoExtractorName = "pod"
+			}},
+			{name: "component info", mutate: func(def *opsv1alpha1.OpsDefinition, _ *opsv1alpha1.CustomOps) {
+				def.Spec.ComponentInfos = []opsv1alpha1.ComponentInfo{{ComponentDefinitionName: "redis"}}
+			}},
+			{name: "precondition", mutate: func(def *opsv1alpha1.OpsDefinition, _ *opsv1alpha1.CustomOps) {
+				def.Spec.PreConditions = []opsv1alpha1.PreCondition{{}}
+			}},
+		}
+		for _, test := range cases {
+			By(test.name)
+			def := newManagedDefinition()
+			custom := newSnapshottedCustom()
+			test.mutate(def, custom)
+			Expect(ValidateManagedJobOpsDefinition(custom, def)).Should(HaveOccurred())
+		}
+
+		ordinaryCluster := &appsv1.Cluster{Spec: appsv1.ClusterSpec{Shardings: []appsv1.ClusterSharding{{
+			Name: "redis-shard",
+			Template: appsv1.ClusterComponentSpec{
+				Name: "redis", ComponentDef: "redis",
+			},
+		}}}}
+		_, err = validateAndGetCompSpec(ordinaryCluster, &opsv1alpha1.OpsDefinition{}, "redis-shard", false)
+		Expect(err).Should(HaveOccurred())
+		Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeTrue())
+		managedSpec, err := validateAndGetCompSpec(ordinaryCluster, &opsv1alpha1.OpsDefinition{}, "redis-shard", true)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(managedSpec.Name).Should(Equal("redis"))
+	})
+
+	It("makes snapshotted Custom operation inputs immutable at admission", func() {
+		newCustomOpsRequest := func(name string, snapshotted bool) *opsv1alpha1.OpsRequest {
+			opsRequest := testops.NewOpsRequestObj(name, testCtx.DefaultNamespace, clusterName, opsv1alpha1.CustomType)
+			opsRequest.Spec.CustomOps = &opsv1alpha1.CustomOps{
+				OpsDefinitionName: "managed-shard-add",
+				CustomOpsComponents: []opsv1alpha1.CustomOpsComponent{{
+					ComponentOps: opsv1alpha1.ComponentOps{ComponentName: "redis-shard"},
+					Parameters:   []opsv1alpha1.Parameter{{Name: "shardAddToken", Value: "token-a"}},
+				}},
+			}
+			if snapshotted {
+				opsRequest.Spec.CustomOps.ExecutionSnapshot = &opsv1alpha1.CustomOpsExecutionSnapshot{
+					OpsDefinitionUID:        "opsdef-uid",
+					OpsDefinitionGeneration: 1,
+					OpsDefinitionSpecHash:   strings.Repeat("a", 64),
+					TargetSnapshotHash:      strings.Repeat("b", 64),
+				}
+			}
+			return opsRequest
+		}
+
+		snapshotted := newCustomOpsRequest("snapshotted-custom-"+randomStr, true)
+		Expect(testCtx.CreateObj(testCtx.Ctx, snapshotted)).Should(Succeed())
+
+		expectInvalidUpdate := func(mutate func(*opsv1alpha1.OpsRequest)) {
+			var updateErr error
+			Eventually(func() bool {
+				current := &opsv1alpha1.OpsRequest{}
+				Expect(k8sClient.Get(testCtx.Ctx, client.ObjectKeyFromObject(snapshotted), current)).Should(Succeed())
+				mutate(current)
+				updateErr = k8sClient.Update(testCtx.Ctx, current)
+				return !apierrors.IsConflict(updateErr)
+			}).Should(BeTrue())
+			Expect(apierrors.IsInvalid(updateErr)).Should(BeTrue(), "update error: %v", updateErr)
+		}
+		expectInvalidUpdate(func(current *opsv1alpha1.OpsRequest) {
+			current.Spec.CustomOps.CustomOpsComponents[0].Parameters[0].Value = "token-b"
+		})
+		expectInvalidUpdate(func(current *opsv1alpha1.OpsRequest) {
+			current.Spec.TimeoutSeconds = ptr.To[int32](30)
+		})
+		expectInvalidUpdate(func(current *opsv1alpha1.OpsRequest) {
+			current.Spec.CustomOps = nil
+		})
+		expectInvalidUpdate(func(current *opsv1alpha1.OpsRequest) {
+			current.Spec.Cancel = true
+		})
+
+		ordinary := newCustomOpsRequest("ordinary-custom-"+randomStr, false)
+		Expect(testCtx.CreateObj(testCtx.Ctx, ordinary)).Should(Succeed())
+		current := &opsv1alpha1.OpsRequest{}
+		Expect(k8sClient.Get(testCtx.Ctx, client.ObjectKeyFromObject(ordinary), current)).Should(Succeed())
+		current.Spec.CustomOps.CustomOpsComponents[0].Parameters[0].Value = "token-b"
+		Expect(k8sClient.Update(testCtx.Ctx, current)).Should(Succeed())
+	})
 
 	It("runs workflow status transitions without executing new actions", func() {
 		opsRequest := testops.NewOpsRequestObj("workflow-ops-"+randomStr, testCtx.DefaultNamespace,

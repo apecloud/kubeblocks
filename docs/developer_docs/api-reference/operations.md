@@ -453,6 +453,71 @@ string
 </tr>
 <tr>
 <td>
+<code>targetPodUID</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>TargetPodUID identifies the exact source Pod whose declared environment variables and volumes were
+snapshotted into a managed workload. It is empty for tasks that do not extract Pod inputs.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>taskIndex</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>TaskIndex is the stable index used to derive the managed workload name.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>dispatchState</code><br/>
+<em>
+<a href="#operations.kubeblocks.io/v1alpha1.ActionTaskDispatchState">
+ActionTaskDispatchState
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>DispatchState records whether the expected managed workload is only planned or is bound to a live UID.
+Empty preserves the behavior of legacy Pod and Job action tasks.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>workloadUID</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>WorkloadUID identifies the exact managed workload object. It is populated only after its owner and spec
+have been verified against the persisted plan.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>workloadSpecHash</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>WorkloadSpecHash binds the API-server-defaulted managed workload spec selected before dispatch.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>retries</code><br/>
 <em>
 int32
@@ -464,6 +529,28 @@ int32
 </td>
 </tr>
 </tbody>
+</table>
+<h3 id="operations.kubeblocks.io/v1alpha1.ActionTaskDispatchState">ActionTaskDispatchState
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#operations.kubeblocks.io/v1alpha1.ActionTask">ActionTask</a>)
+</p>
+<div>
+<p>ActionTaskDispatchState describes whether a managed action workload has only been planned or has been
+bound to an exact live object.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Created&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Planned&#34;</p></td>
+<td></td>
+</tr></tbody>
 </table>
 <h3 id="operations.kubeblocks.io/v1alpha1.ActionTaskStatus">ActionTaskStatus
 (<code>string</code> alias)</h3>
@@ -814,6 +901,24 @@ string
 </tr>
 <tr>
 <td>
+<code>executionSnapshot</code><br/>
+<em>
+<a href="#operations.kubeblocks.io/v1alpha1.CustomOpsExecutionSnapshot">
+CustomOpsExecutionSnapshot
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ExecutionSnapshot binds a managed Custom operation to the exact OpsDefinition and target identities
+validated by its producer. The Operations controller revalidates this snapshot before executing or
+observing any action.</p>
+<p>When set, all Custom operation inputs, execution timing fields, and spec.cancel are immutable.
+Ordinary user-created Custom operations may omit this field and retain the existing behavior.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>serviceAccountName</code><br/>
 <em>
 string
@@ -902,6 +1007,69 @@ ComponentOps
 <td>
 <em>(Optional)</em>
 <p>Specifies the parameters that match the schema specified in the <code>opsDefinition.spec.parametersSchema</code>.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="operations.kubeblocks.io/v1alpha1.CustomOpsExecutionSnapshot">CustomOpsExecutionSnapshot
+</h3>
+<p>
+(<em>Appears on:</em><a href="#operations.kubeblocks.io/v1alpha1.CustomOps">CustomOps</a>)
+</p>
+<div>
+<p>CustomOpsExecutionSnapshot binds a managed Custom operation to immutable execution inputs.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>opsDefinitionUID</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>OpsDefinitionUID identifies the exact OpsDefinition object selected by the producer.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>opsDefinitionGeneration</code><br/>
+<em>
+int64
+</em>
+</td>
+<td>
+<p>OpsDefinitionGeneration identifies the exact OpsDefinition generation selected by the producer.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>opsDefinitionSpecHash</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>OpsDefinitionSpecHash is the lowercase SHA-256 hash of the canonical OpsDefinition spec.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>targetSnapshotHash</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>TargetSnapshotHash is the lowercase SHA-256 hash of the exact target identities bound by the producer.
+The Operations controller preserves this opaque value as part of the immutable Custom operation input.</p>
 </td>
 </tr>
 </tbody>
@@ -3045,11 +3213,16 @@ OpsWorkloadType
 </em>
 </td>
 <td>
-<p>Defines the workload type of the action. Valid values include &ldquo;Job&rdquo; and &ldquo;Pod&rdquo;.</p>
+<p>Defines the workload type of the action. Valid values include &ldquo;Job&rdquo;, &ldquo;Pod&rdquo;, and &ldquo;ManagedJob&rdquo;.</p>
 <ul>
 <li>&ldquo;Job&rdquo;: Creates a Job to execute the action.</li>
 <li>&ldquo;Pod&rdquo;: Creates a Pod to execute the action.
 Note: unlike Jobs, manually deleting a Pod does not affect the <code>backoffLimit</code>.</li>
+<li>&ldquo;ManagedJob&rdquo;: Persists the expected Job identity before creating it, binds the exact Job UID after
+creation, and fails instead of recreating a missing or changed Job. ManagedJob requires an execution
+snapshot with exactly one component on the Custom OpsRequest and does not support retries. It may use
+one PodInfoExtractor with MultiPodSelectionPolicy=Any; the exact source Pod identity is persisted before
+dispatch.</li>
 </ul>
 </td>
 </tr>
@@ -3108,6 +3281,9 @@ Kubernetes core/v1.PodSpec
 </thead>
 <tbody><tr><td><p>&#34;Job&#34;</p></td>
 <td></td>
+</tr><tr><td><p>&#34;ManagedJob&#34;</p></td>
+<td><p>ManagedJobWorkload persists the expected Job identity before creating it and never recreates a missing Job.</p>
+</td>
 </tr><tr><td><p>&#34;Pod&#34;</p></td>
 <td></td>
 </tr></tbody>

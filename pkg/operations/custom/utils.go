@@ -67,7 +67,7 @@ func getComponentInfo(opsDef *opsv1alpha1.OpsDefinition, compDefName string) *op
 
 // buildComponentDefEnvs builds the env vars by the opsDefinition.spec.componentDefinitionRef
 func buildComponentEnvs(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
+	cli client.Reader,
 	cluster *appsv1.Cluster,
 	opsDef *opsv1alpha1.OpsDefinition,
 	env *[]corev1.EnvVar,
@@ -133,7 +133,7 @@ func buildComponentEnvs(reqCtx intctrlutil.RequestCtx,
 
 // BuildEnvVars builds the env vars by the vars of the targetPodTemplate.
 func buildEnvVars(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
+	cli client.Reader,
 	targetPod *corev1.Pod,
 	vars []opsv1alpha1.OpsEnvVar) ([]corev1.EnvVar, error) {
 	if len(vars) == 0 {
@@ -187,6 +187,80 @@ func buildEnvVars(reqCtx intctrlutil.RequestCtx,
 	return envVars, nil
 }
 
+func buildManagedJobEnvVars(targetPod *corev1.Pod, vars []opsv1alpha1.OpsEnvVar) ([]corev1.EnvVar, error) {
+	envVars := make([]corev1.EnvVar, 0, len(vars))
+	for i := range vars {
+		item := &vars[i]
+		if item.ValueFrom == nil || (item.ValueFrom.EnvVarRef == nil) == (item.ValueFrom.FieldRef == nil) {
+			return nil, intctrlutil.NewFatalError(fmt.Sprintf("managed Job extracted env %q requires exactly one envRef or fieldPath", item.Name))
+		}
+		if item.ValueFrom.FieldRef != nil {
+			if !isAllowedManagedJobFieldPath(item.ValueFrom.FieldRef.FieldPath) {
+				return nil, intctrlutil.NewFatalError(fmt.Sprintf("managed Job extracted env %q uses an unsupported fieldPath", item.Name))
+			}
+			value, err := common.GetFieldRef(targetPod, &corev1.EnvVarSource{FieldRef: item.ValueFrom.FieldRef})
+			if err != nil {
+				return nil, intctrlutil.NewFatalError(fmt.Sprintf("managed Job extracted env %q fieldPath is invalid: %v", item.Name, err))
+			}
+			envVars = append(envVars, corev1.EnvVar{Name: item.Name, Value: value})
+			continue
+		}
+
+		ref := item.ValueFrom.EnvVarRef
+		container := intctrlutil.GetPodContainer(targetPod, ref.TargetContainerName)
+		if container == nil {
+			return nil, intctrlutil.NewFatalError(fmt.Sprintf("managed Job source Pod %q has no container %q", targetPod.Name, ref.TargetContainerName))
+		}
+		var source *corev1.EnvVar
+		for j := range container.Env {
+			if container.Env[j].Name == ref.EnvName {
+				source = &container.Env[j]
+				break
+			}
+		}
+		if source == nil {
+			if item.Optional != nil && *item.Optional {
+				continue
+			}
+			return nil, intctrlutil.NewFatalError(fmt.Sprintf("managed Job source Pod %q container %q has no direct env %q", targetPod.Name, ref.TargetContainerName, ref.EnvName))
+		}
+		result := corev1.EnvVar{Name: item.Name}
+		if source.ValueFrom == nil {
+			result.Value = source.Value
+			envVars = append(envVars, result)
+			continue
+		}
+		switch {
+		case source.ValueFrom.SecretKeyRef != nil && source.ValueFrom.FieldRef == nil &&
+			source.ValueFrom.ResourceFieldRef == nil && source.ValueFrom.ConfigMapKeyRef == nil:
+			result.ValueFrom = &corev1.EnvVarSource{SecretKeyRef: source.ValueFrom.SecretKeyRef.DeepCopy()}
+		case source.ValueFrom.FieldRef != nil && source.ValueFrom.SecretKeyRef == nil &&
+			source.ValueFrom.ResourceFieldRef == nil && source.ValueFrom.ConfigMapKeyRef == nil:
+			if !isAllowedManagedJobFieldPath(source.ValueFrom.FieldRef.FieldPath) {
+				return nil, intctrlutil.NewFatalError(fmt.Sprintf("managed Job source env %q uses an unsupported fieldRef", ref.EnvName))
+			}
+			value, err := common.GetFieldRef(targetPod, source.ValueFrom)
+			if err != nil {
+				return nil, intctrlutil.NewFatalError(fmt.Sprintf("managed Job source env %q fieldRef is invalid: %v", ref.EnvName, err))
+			}
+			result.Value = value
+		default:
+			return nil, intctrlutil.NewFatalError(fmt.Sprintf("managed Job source env %q must be a literal, SecretKeyRef, or supported fieldRef", ref.EnvName))
+		}
+		envVars = append(envVars, result)
+	}
+	return envVars, nil
+}
+
+func isAllowedManagedJobFieldPath(fieldPath string) bool {
+	switch strings.TrimPrefix(fieldPath, ".") {
+	case "metadata.name", "metadata.namespace":
+		return true
+	default:
+		return false
+	}
+}
+
 // BuildVarWithFieldPath builds the env var by field jsonpath of the pod.
 func buildVarWithFieldPath(targetPod *corev1.Pod, fieldPath string) (*corev1.EnvVar, error) {
 	path := jsonpath.New("jsonpath")
@@ -203,7 +277,7 @@ func buildVarWithFieldPath(targetPod *corev1.Pod, fieldPath string) (*corev1.Env
 }
 
 // GetEnvVarsFromEnvFrom gets the env var by the container envFrom.
-func getEnvVarsFromEnvFrom(ctx context.Context, cli client.Client, podNamespace string, container *corev1.Container) (map[string]*corev1.EnvVar, error) {
+func getEnvVarsFromEnvFrom(ctx context.Context, cli client.Reader, podNamespace string, container *corev1.Container) (map[string]*corev1.EnvVar, error) {
 	envMap := map[string]*corev1.EnvVar{}
 	for _, env := range container.EnvFrom {
 		prefix := env.Prefix
@@ -251,14 +325,15 @@ func buildVarWithEnv(targetPod *corev1.Pod, container *corev1.Container, envName
 }
 
 func buildActionPodEnv(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
+	cli client.Reader,
 	cluster *appsv1.Cluster,
 	opsDef *opsv1alpha1.OpsDefinition,
 	ops *opsv1alpha1.OpsRequest,
 	comp *appsv1.ClusterComponentSpec,
 	compCustomItem *opsv1alpha1.CustomOpsComponent,
 	podInfoExtractor *opsv1alpha1.PodInfoExtractor,
-	targetPod *corev1.Pod) ([]corev1.EnvVar, error) {
+	targetPod *corev1.Pod,
+	managedJob bool) ([]corev1.EnvVar, error) {
 	var env = []corev1.EnvVar{
 		{
 			Name:  KBEnvOpsName,
@@ -284,7 +359,13 @@ func buildActionPodEnv(reqCtx intctrlutil.RequestCtx,
 
 	if podInfoExtractor != nil {
 		// inject vars
-		envVars, err := buildEnvVars(reqCtx, cli, targetPod, podInfoExtractor.Env)
+		var envVars []corev1.EnvVar
+		var err error
+		if managedJob {
+			envVars, err = buildManagedJobEnvVars(targetPod, podInfoExtractor.Env)
+		} else {
+			envVars, err = buildEnvVars(reqCtx, cli, targetPod, podInfoExtractor.Env)
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -352,7 +433,7 @@ func getTargetTemplateAndPod(ctx context.Context,
 // getTargetPods gets the target pods by podSelector of the targetPodTemplate.
 func getTargetPods(
 	ctx context.Context,
-	cli client.Client,
+	cli client.Reader,
 	cluster *appsv1.Cluster,
 	podSelector opsv1alpha1.PodSelector,
 	compName string) ([]*corev1.Pod, error) {
@@ -387,13 +468,9 @@ func getTargetPods(
 	if len(pods) == 0 {
 		return nil, intctrlutil.NewFatalError("can not find any pod which matches the podSelector for the component " + compName)
 	}
-	sort.Sort(intctrlutil.ByPodName(func() []corev1.Pod {
-		l := make([]corev1.Pod, 0)
-		for i := range pods {
-			l = append(l, *pods[i])
-		}
-		return l
-	}()))
+	sort.SliceStable(pods, func(i, j int) bool {
+		return pods[i].Name < pods[j].Name
+	})
 	var targetPods []*corev1.Pod
 	for i := range pods {
 		pod := pods[i]

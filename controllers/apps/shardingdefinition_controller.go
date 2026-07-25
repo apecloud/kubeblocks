@@ -29,6 +29,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -261,6 +262,41 @@ func (r *ShardingDefinitionReconciler) requireParallelProvision() bool {
 
 func (r *ShardingDefinitionReconciler) validateLifecycleActions(ctx context.Context, cli client.Client,
 	shardingDef *appsv1.ShardingDefinition) error {
+	actions := shardingDef.Spec.LifecycleActions
+	if actions == nil {
+		return nil
+	}
+
+	for _, item := range []struct {
+		name   string
+		action *appsv1.ShardingAction
+	}{
+		{name: "postProvision", action: actions.PostProvision},
+		{name: "preTerminate", action: actions.PreTerminate},
+		{name: "shardRemove", action: actions.ShardRemove},
+	} {
+		if item.action != nil && item.action.OpsDefinitionName != "" {
+			return fmt.Errorf("lifecycleActions.%s.opsDefinitionName is not supported; managed OpsDefinition execution is only available for shardAdd", item.name)
+		}
+	}
+
+	shardAdd := actions.ShardAdd
+	if shardAdd == nil || shardAdd.OpsDefinitionName == "" {
+		return nil
+	}
+	if errs := validation.IsDNS1123Subdomain(shardAdd.OpsDefinitionName); len(errs) > 0 {
+		return fmt.Errorf("invalid lifecycleActions.shardAdd.opsDefinitionName %q: %s", shardAdd.OpsDefinitionName, strings.Join(errs, ", "))
+	}
+	if shardAdd.Action.Defined() {
+		return fmt.Errorf("lifecycleActions.shardAdd.opsDefinitionName is mutually exclusive with exec, http and grpc")
+	}
+	if shardAdd.TargetShardSelector != "" {
+		return fmt.Errorf("lifecycleActions.shardAdd.targetShardSelector is not supported with opsDefinitionName")
+	}
+	if shardAdd.TargetPodSelector != "" || shardAdd.MatchingKey != "" || shardAdd.RetryPolicy != nil ||
+		shardAdd.PreCondition != nil || shardAdd.TimeoutSeconds != 0 {
+		return fmt.Errorf("lifecycleActions.shardAdd inline action settings are not supported with opsDefinitionName")
+	}
 	return nil
 }
 

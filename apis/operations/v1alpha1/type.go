@@ -32,12 +32,14 @@ const (
 
 // OpsWorkloadType policy after action failure.
 // +enum
-// +kubebuilder:validation:Enum={Job,Pod}
+// +kubebuilder:validation:Enum={Job,Pod,ManagedJob}
 type OpsWorkloadType string
 
 const (
 	PodWorkload OpsWorkloadType = "Pod"
 	JobWorkload OpsWorkloadType = "Job"
+	// ManagedJobWorkload persists the expected Job identity before creating it and never recreates a missing Job.
+	ManagedJobWorkload OpsWorkloadType = "ManagedJob"
 )
 
 // OpsPhase defines opsRequest phase.
@@ -113,6 +115,17 @@ const (
 	ProcessingActionTaskStatus ActionTaskStatus = "Processing"
 	FailedActionTaskStatus     ActionTaskStatus = "Failed"
 	SucceedActionTaskStatus    ActionTaskStatus = "Succeed"
+)
+
+// ActionTaskDispatchState describes whether a managed action workload has only been planned or has been
+// bound to an exact live object.
+// +enum
+// +kubebuilder:validation:Enum={Planned,Created}
+type ActionTaskDispatchState string
+
+const (
+	PlannedActionTaskDispatchState ActionTaskDispatchState = "Planned"
+	CreatedActionTaskDispatchState ActionTaskDispatchState = "Created"
 )
 
 type OpsRequestBehaviour struct {

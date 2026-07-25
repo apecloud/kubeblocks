@@ -98,7 +98,8 @@ steps:
 				err = intctrlutil.NewFatalError("the action type is not implement for action " + actions[i].Name)
 				return nil, err
 			}
-			actionStatus, err = ac.Execute(custom.ActionContext{ReqCtx: w.reqCtx, Client: w.Cli, Action: &actions[i], Images: images})
+			actionStatus, err = ac.Execute(custom.ActionContext{ReqCtx: w.reqCtx, Client: w.Cli,
+				Reader: w.OpsRes.Reader, Action: &actions[i], Images: images})
 			if err != nil {
 				return nil, err
 			}
@@ -115,7 +116,8 @@ steps:
 				err = intctrlutil.NewFatalError("the action type is not implement for action " + actions[i].Name)
 				return nil, err
 			}
-			actionStatus, err = ac.CheckStatus(custom.ActionContext{ReqCtx: w.reqCtx, Client: w.Cli, Action: &actions[i]})
+			actionStatus, err = ac.CheckStatus(custom.ActionContext{ReqCtx: w.reqCtx, Client: w.Cli,
+				Reader: w.OpsRes.Reader, Action: &actions[i]})
 			if err != nil {
 				return nil, err
 			}

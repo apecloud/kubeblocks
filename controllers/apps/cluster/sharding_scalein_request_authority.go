@@ -32,6 +32,8 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -42,7 +44,10 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/kbagent"
 )
 
-var errInvalidShardingScaleInRequestAuthoritySource = errors.New("invalid sharding scale-in request authority source")
+var (
+	errInvalidShardingScaleInRequestAuthoritySource = errors.New("invalid sharding scale-in request authority source")
+	errShardingScaleInRequestAuthorityChanged       = errors.New("sharding scale-in request authority changed")
+)
 
 const shardingScaleInRequestSourceProjectionVersionV1 = "kb.sharding.scalein.request-source-projection/v1"
 
@@ -113,6 +118,572 @@ type shardingScaleInLivePodRuntime struct {
 	UID             types.UID
 	ResourceVersion string
 	AgentImageID    string
+}
+
+type shardingScaleInPersistedPrerequisiteKey struct {
+	ComponentUID types.UID
+	APIVersion   string
+	Kind         string
+	Namespace    string
+	Name         string
+}
+
+type shardingScaleInEndpointSliceProjection struct {
+	AddressType discoveryv1.AddressType    `json:"addressType"`
+	Ports       []discoveryv1.EndpointPort `json:"ports"`
+	Endpoints   []discoveryv1.Endpoint     `json:"endpoints"`
+}
+
+// validateFreshShardingScaleInRequestAuthority reruns the read-only source
+// projection immediately before authorization. It never writes API state or
+// dispatches an external action.
+func validateFreshShardingScaleInRequestAuthority(
+	ctx context.Context,
+	apiReader client.Reader,
+	inventory *shardingScaleInDNSInventory,
+	capabilityReader shardingScaleInAgentCapabilityReader,
+	persisted *appsv1.ShardingScaleInPlanMaterial,
+) error {
+	changed := func(format string, args ...any) error {
+		return fmt.Errorf("%w: %s", errShardingScaleInRequestAuthorityChanged,
+			fmt.Sprintf(format, args...))
+	}
+	if persisted == nil {
+		return changed("persisted plan material must not be nil")
+	}
+	canonical, _, err := buildShardingScaleInPlanMaterial(persisted)
+	if err != nil {
+		return changed("persisted plan material is invalid: %v", err)
+	}
+	if !reflect.DeepEqual(canonical, persisted) {
+		return changed("persisted plan material is not canonical")
+	}
+	if inventory == nil || inventory.Members == nil ||
+		inventory.Members.Topology == nil ||
+		inventory.Members.Topology.Cluster == nil ||
+		inventory.Members.Topology.ShardingDefinition == nil {
+		return changed("provided source inventory must be complete")
+	}
+	expectedCluster := inventory.Members.Topology.Cluster
+	expectedDefinition := inventory.Members.Topology.ShardingDefinition
+	if expectedCluster.Namespace != persisted.Source.ClusterNamespace ||
+		expectedCluster.Name != persisted.Source.ClusterName ||
+		expectedCluster.UID != persisted.Source.ClusterUID ||
+		expectedCluster.Generation != persisted.Source.ClusterGeneration ||
+		expectedDefinition.Name != persisted.Action.ShardingDefinitionName ||
+		expectedDefinition.UID != persisted.Action.ShardingDefinitionUID ||
+		expectedDefinition.Generation != persisted.Action.ShardingDefinitionGeneration {
+		return changed("provided root source identities do not match the persisted plan")
+	}
+
+	expectedBindings := shardingScaleInPlanRuntimeBindings(persisted)
+	expectedSource, err := buildShardingScaleInSourceMaterial(inventory, expectedBindings)
+	if err != nil || !shardingScaleInSourceMaterialMatchesPlan(expectedSource, persisted) {
+		return changed("provided source inventory does not match the persisted plan: %v", err)
+	}
+
+	freshInventory, err := loadFreshShardingScaleInRequestAuthorityInventory(
+		ctx, apiReader, inventory, persisted)
+	if err != nil {
+		return changed("live source inventory rebuild failed: %v", err)
+	}
+	fresh, err := loadFreshShardingScaleInRequestAuthority(
+		ctx, apiReader, freshInventory, persisted.Action.ActionDigest, capabilityReader)
+	if err != nil {
+		return changed("live request authority rebuild failed: %v", err)
+	}
+	recheckedInventory, err := loadFreshShardingScaleInRequestAuthorityInventory(
+		ctx, apiReader, inventory, persisted)
+	if err != nil {
+		return changed("live source inventory recheck failed: %v", err)
+	}
+	if !reflect.DeepEqual(freshInventory, recheckedInventory) {
+		return changed("live source inventory changed while request authority was rebuilt")
+	}
+	expectedAuthority := persisted.RequestAuthority.DeepCopy()
+	expectedAuthority.SourceSnapshotDigest = ""
+	expectedAuthority.RequestAuthorityDigest = ""
+	freshAuthority := fresh.RequestAuthority.DeepCopy()
+	freshAuthority.SourceSnapshotDigest = ""
+	freshAuthority.RequestAuthorityDigest = ""
+	if !reflect.DeepEqual(expectedAuthority, freshAuthority) {
+		return changed("live request authority differs from the persisted plan")
+	}
+	freshSource, err := buildShardingScaleInSourceMaterial(
+		freshInventory, fresh.PodRuntimeBindings)
+	if err != nil || !shardingScaleInSourceMaterialMatchesPlan(freshSource, persisted) {
+		return changed("live source material differs from the persisted plan: %v", err)
+	}
+	if !reflect.DeepEqual(expectedBindings, fresh.PodRuntimeBindings) {
+		return changed("live Pod runtime bindings differ from the persisted plan")
+	}
+	return nil
+}
+
+func loadFreshShardingScaleInRequestAuthorityInventory(
+	ctx context.Context,
+	apiReader client.Reader,
+	expected *shardingScaleInDNSInventory,
+	persisted *appsv1.ShardingScaleInPlanMaterial,
+) (*shardingScaleInDNSInventory, error) {
+	invalid := func(format string, args ...any) error {
+		return fmt.Errorf("%w: %s", errInvalidShardingScaleInRequestAuthoritySource,
+			fmt.Sprintf(format, args...))
+	}
+	if apiReader == nil || expected == nil || expected.Members == nil ||
+		expected.Members.Topology == nil || expected.Members.Topology.Cluster == nil ||
+		expected.Members.Topology.ShardingDefinition == nil || persisted == nil {
+		return nil, invalid("APIReader, source inventory, and persisted plan must be complete")
+	}
+	if expected.Members.Topology.Sharding.Name != persisted.ShardingName {
+		return nil, invalid("source sharding name does not match the persisted plan")
+	}
+	expectedCluster := expected.Members.Topology.Cluster
+	clusterKey := types.NamespacedName{
+		Namespace: persisted.Source.ClusterNamespace,
+		Name:      persisted.Source.ClusterName,
+	}
+	result, err := loadFreshShardingScaleInDNS(
+		ctx, apiReader, clusterKey, persisted.Source.ClusterUID, persisted.ShardingName)
+	if err != nil {
+		return nil, invalid("complete live source collection rebuild failed: %v", err)
+	}
+	cluster := result.Members.Topology.Cluster
+	if cluster.UID != persisted.Source.ClusterUID ||
+		cluster.Generation != persisted.Source.ClusterGeneration ||
+		cluster.ResourceVersion != expectedCluster.ResourceVersion ||
+		!cluster.DeletionTimestamp.IsZero() ||
+		!reflect.DeepEqual(cluster.Spec, expectedCluster.Spec) {
+		return nil, invalid("fresh Cluster identity, generation, resourceVersion, or spec changed")
+	}
+
+	expectedDefinition := expected.Members.Topology.ShardingDefinition
+	definition := result.Members.Topology.ShardingDefinition
+	if definition.UID != persisted.Action.ShardingDefinitionUID ||
+		definition.Generation != persisted.Action.ShardingDefinitionGeneration ||
+		definition.ResourceVersion != expectedDefinition.ResourceVersion ||
+		!definition.DeletionTimestamp.IsZero() ||
+		!reflect.DeepEqual(definition.Spec, expectedDefinition.Spec) {
+		return nil, invalid("fresh ShardingDefinition identity, generation, resourceVersion, or spec changed")
+	}
+
+	planMembers := make(map[types.UID]appsv1.ShardingScaleInPlanMember,
+		len(persisted.Leaving)+len(persisted.Staying))
+	for _, members := range [][]appsv1.ShardingScaleInPlanMember{
+		persisted.Leaving, persisted.Staying,
+	} {
+		for _, member := range members {
+			planMembers[member.ComponentUID] = member
+		}
+	}
+	prerequisites := make(map[shardingScaleInPersistedPrerequisiteKey]appsv1.ShardingScaleInExecutorPrerequisite,
+		len(persisted.ExecutorPrerequisites))
+	for _, prerequisite := range persisted.ExecutorPrerequisites {
+		if prerequisite.ComponentUID == "" || prerequisite.APIVersion == "" ||
+			prerequisite.Kind == "" || prerequisite.Namespace == "" ||
+			prerequisite.Name == "" || prerequisite.UID == "" ||
+			prerequisite.Scope != appsv1.ShardingScaleInPrerequisiteScopeComponent {
+			return nil, invalid("persisted prerequisite identity and component scope must be complete")
+		}
+		key := shardingScaleInPersistedPrerequisiteKey{
+			ComponentUID: prerequisite.ComponentUID,
+			APIVersion:   prerequisite.APIVersion,
+			Kind:         prerequisite.Kind,
+			Namespace:    prerequisite.Namespace,
+			Name:         prerequisite.Name,
+		}
+		if _, ok := prerequisites[key]; ok {
+			return nil, invalid("persisted prerequisite %s %q is duplicated",
+				prerequisite.Kind, prerequisite.Name)
+		}
+		prerequisites[key] = prerequisite
+	}
+	usedPrerequisites := make(map[shardingScaleInPersistedPrerequisiteKey]struct{},
+		len(prerequisites))
+	takePrerequisite := func(componentUID types.UID, apiVersion, kind string,
+		role appsv1.ShardingScaleInPrerequisiteRole, expected metav1.Object,
+	) (appsv1.ShardingScaleInExecutorPrerequisite, error) {
+		if expected == nil || expected.GetNamespace() == "" || expected.GetName() == "" ||
+			expected.GetUID() == "" {
+			return appsv1.ShardingScaleInExecutorPrerequisite{},
+				invalid("expected %s prerequisite identity must be complete", kind)
+		}
+		key := shardingScaleInPersistedPrerequisiteKey{
+			ComponentUID: componentUID,
+			APIVersion:   apiVersion,
+			Kind:         kind,
+			Namespace:    expected.GetNamespace(),
+			Name:         expected.GetName(),
+		}
+		prerequisite, ok := prerequisites[key]
+		if !ok || prerequisite.UID != expected.GetUID() ||
+			prerequisite.Role != role {
+			return appsv1.ShardingScaleInExecutorPrerequisite{},
+				invalid("persisted %s prerequisite does not match its source object", kind)
+		}
+		if _, ok := usedPrerequisites[key]; ok {
+			return appsv1.ShardingScaleInExecutorPrerequisite{},
+				invalid("persisted %s prerequisite %q was consumed more than once",
+					kind, prerequisite.Name)
+		}
+		usedPrerequisites[key] = struct{}{}
+		return prerequisite, nil
+	}
+
+	expectedRecords := make(map[types.UID]*shardingScaleInSourceDNS,
+		len(expected.Leaving)+len(expected.Staying))
+	for _, records := range [][]shardingScaleInSourceDNS{expected.Leaving, expected.Staying} {
+		for i := range records {
+			record := &records[i]
+			componentUID := record.Member.Component.UID
+			if componentUID == "" || expectedRecords[componentUID] != nil {
+				return nil, invalid("expected source Component identity must be complete and unique")
+			}
+			expectedRecords[componentUID] = record
+		}
+	}
+	usedExpectedRecords := make(map[types.UID]struct{}, len(expectedRecords))
+	freshComponents := make(map[types.UID]appsv1.Component, len(planMembers))
+	freshenRecords := func(records []shardingScaleInSourceDNS) error {
+		for i := range records {
+			record := &records[i]
+			componentUID := record.Member.Component.UID
+			expectedRecord := expectedRecords[componentUID]
+			if expectedRecord == nil {
+				return invalid("live source contains an unpersisted Component %q",
+					record.Member.Component.Name)
+			}
+			if _, ok := usedExpectedRecords[componentUID]; ok {
+				return invalid("live source Component %q is duplicated",
+					record.Member.Component.Name)
+			}
+			usedExpectedRecords[componentUID] = struct{}{}
+			expectedMember := &expectedRecord.Member
+			planMember, ok := planMembers[componentUID]
+			if !ok || expectedMember.Component.Name != planMember.ComponentName ||
+				expectedMember.Component.Generation != planMember.ComponentGeneration {
+				return invalid("source Component does not match a persisted plan member")
+			}
+			componentKey := types.NamespacedName{
+				Namespace: persisted.Source.ClusterNamespace,
+				Name:      planMember.ComponentName,
+			}
+			liveComponent := &appsv1.Component{}
+			if err := apiReader.Get(ctx, componentKey, liveComponent); err != nil {
+				return invalid("fresh Component %q read failed: %v", componentKey.Name, err)
+			}
+			if liveComponent.UID != planMember.ComponentUID ||
+				liveComponent.Generation != planMember.ComponentGeneration ||
+				liveComponent.ResourceVersion != expectedMember.Component.ResourceVersion ||
+				!liveComponent.DeletionTimestamp.IsZero() ||
+				!reflect.DeepEqual(liveComponent.Spec, expectedMember.Component.Spec) {
+				return invalid("fresh Component %q identity, generation, resourceVersion, or spec changed",
+					componentKey.Name)
+			}
+
+			prerequisite, err := takePrerequisite(
+				planMember.ComponentUID, workloadsv1.GroupVersion.String(),
+				workloadsv1.InstanceSetKind,
+				appsv1.ShardingScaleInPrerequisiteRolePodOwnerWorkload,
+				&expectedMember.Workload)
+			if err != nil {
+				return err
+			}
+			liveWorkload := &workloadsv1.InstanceSet{}
+			workloadKey := types.NamespacedName{
+				Namespace: prerequisite.Namespace,
+				Name:      prerequisite.Name,
+			}
+			if err := apiReader.Get(ctx, workloadKey, liveWorkload); err != nil {
+				return invalid("fresh InstanceSet %q read failed: %v", workloadKey.Name, err)
+			}
+			workloadProjection := liveWorkload.DeepCopy()
+			canonicalizeShardingScaleInInstanceSetSpec(&workloadProjection.Spec)
+			if err := validateFreshShardingScaleInPrerequisiteSnapshot(
+				&expectedMember.Workload, liveWorkload, prerequisite,
+				workloadProjection.Spec); err != nil {
+				return err
+			}
+
+			expectedInstances := make(map[string]*workloadsv1.Instance,
+				len(expectedMember.Instances))
+			for instanceIndex := range expectedMember.Instances {
+				expectedInstance := &expectedMember.Instances[instanceIndex]
+				if expectedInstance.Name == "" || expectedInstances[expectedInstance.Name] != nil {
+					return invalid("expected Instance identity must be complete and unique")
+				}
+				expectedInstances[expectedInstance.Name] = expectedInstance
+			}
+			freshInstances := make([]workloadsv1.Instance, len(record.Member.Instances))
+			for instanceIndex := range record.Member.Instances {
+				listedInstance := &record.Member.Instances[instanceIndex]
+				expectedInstance := expectedInstances[listedInstance.Name]
+				if expectedInstance == nil {
+					return invalid("live source contains an unpersisted Instance %q",
+						listedInstance.Name)
+				}
+				instancePrerequisite, err := takePrerequisite(
+					planMember.ComponentUID, workloadsv1.GroupVersion.String(),
+					shardingScaleInInstanceKind,
+					appsv1.ShardingScaleInPrerequisiteRolePodOwnerWorkload,
+					expectedInstance)
+				if err != nil {
+					return err
+				}
+				liveInstance := &workloadsv1.Instance{}
+				instanceKey := types.NamespacedName{
+					Namespace: instancePrerequisite.Namespace,
+					Name:      instancePrerequisite.Name,
+				}
+				if err := apiReader.Get(ctx, instanceKey, liveInstance); err != nil {
+					return invalid("fresh Instance %q read failed: %v", instanceKey.Name, err)
+				}
+				instanceProjection := liveInstance.DeepCopy()
+				canonicalizeShardingScaleInInstanceSpec(&instanceProjection.Spec)
+				if err := validateFreshShardingScaleInPrerequisiteSnapshot(
+					expectedInstance, liveInstance, instancePrerequisite,
+					instanceProjection.Spec); err != nil {
+					return err
+				}
+				freshInstances[instanceIndex] = *liveInstance.DeepCopy()
+				delete(expectedInstances, listedInstance.Name)
+			}
+			if len(expectedInstances) != 0 {
+				return invalid("live source is missing persisted Instances")
+			}
+
+			servicePrerequisite, err := takePrerequisite(
+				planMember.ComponentUID, corev1.SchemeGroupVersion.String(), "Service",
+				appsv1.ShardingScaleInPrerequisiteRoleClusterDNS,
+				&expectedRecord.Service)
+			if err != nil {
+				return err
+			}
+			liveService := &corev1.Service{}
+			serviceKey := types.NamespacedName{
+				Namespace: servicePrerequisite.Namespace,
+				Name:      servicePrerequisite.Name,
+			}
+			if err := apiReader.Get(ctx, serviceKey, liveService); err != nil {
+				return invalid("fresh Service %q read failed: %v", serviceKey.Name, err)
+			}
+			serviceProjection := liveService.DeepCopy()
+			canonicalizeShardingScaleInServiceSpec(&serviceProjection.Spec)
+			if err := validateFreshShardingScaleInPrerequisiteSnapshot(
+				&expectedRecord.Service, liveService, servicePrerequisite,
+				serviceProjection.Spec); err != nil {
+				return err
+			}
+
+			var freshEndpoints *corev1.Endpoints
+			if (expectedRecord.Endpoints == nil) != (record.Endpoints == nil) {
+				return invalid("live Endpoints presence differs from the persisted source")
+			}
+			if expectedRecord.Endpoints != nil {
+				endpointsPrerequisite, err := takePrerequisite(
+					planMember.ComponentUID, corev1.SchemeGroupVersion.String(), "Endpoints",
+					appsv1.ShardingScaleInPrerequisiteRoleClusterDNS,
+					expectedRecord.Endpoints)
+				if err != nil {
+					return err
+				}
+				liveEndpoints := &corev1.Endpoints{}
+				endpointsKey := types.NamespacedName{
+					Namespace: endpointsPrerequisite.Namespace,
+					Name:      endpointsPrerequisite.Name,
+				}
+				if err := apiReader.Get(ctx, endpointsKey, liveEndpoints); err != nil {
+					return invalid("fresh Endpoints %q read failed: %v", endpointsKey.Name, err)
+				}
+				endpointsProjection := liveEndpoints.DeepCopy()
+				canonicalizeShardingScaleInEndpointSubsets(endpointsProjection.Subsets)
+				if err := validateFreshShardingScaleInPrerequisiteSnapshot(
+					expectedRecord.Endpoints, liveEndpoints, endpointsPrerequisite,
+					endpointsProjection.Subsets); err != nil {
+					return err
+				}
+				freshEndpoints = liveEndpoints.DeepCopy()
+			}
+
+			expectedSlices := make(map[string]*discoveryv1.EndpointSlice,
+				len(expectedRecord.EndpointSlices))
+			for sliceIndex := range expectedRecord.EndpointSlices {
+				expectedSlice := &expectedRecord.EndpointSlices[sliceIndex]
+				if expectedSlice.Name == "" || expectedSlices[expectedSlice.Name] != nil {
+					return invalid("expected EndpointSlice identity must be complete and unique")
+				}
+				expectedSlices[expectedSlice.Name] = expectedSlice
+			}
+			freshEndpointSlices := make([]discoveryv1.EndpointSlice, len(record.EndpointSlices))
+			for sliceIndex := range record.EndpointSlices {
+				listedSlice := &record.EndpointSlices[sliceIndex]
+				expectedSlice := expectedSlices[listedSlice.Name]
+				if expectedSlice == nil {
+					return invalid("live source contains an unpersisted EndpointSlice %q",
+						listedSlice.Name)
+				}
+				slicePrerequisite, err := takePrerequisite(
+					planMember.ComponentUID, discoveryv1.SchemeGroupVersion.String(),
+					"EndpointSlice", appsv1.ShardingScaleInPrerequisiteRoleClusterDNS,
+					expectedSlice)
+				if err != nil {
+					return err
+				}
+				liveSlice := &discoveryv1.EndpointSlice{}
+				sliceKey := types.NamespacedName{
+					Namespace: slicePrerequisite.Namespace,
+					Name:      slicePrerequisite.Name,
+				}
+				if err := apiReader.Get(ctx, sliceKey, liveSlice); err != nil {
+					return invalid("fresh EndpointSlice %q read failed: %v", sliceKey.Name, err)
+				}
+				sliceProjection := liveSlice.DeepCopy()
+				canonicalizeShardingScaleInEndpointSlice(sliceProjection)
+				if err := validateFreshShardingScaleInPrerequisiteSnapshot(
+					expectedSlice, liveSlice, slicePrerequisite,
+					shardingScaleInEndpointSliceProjection{
+						AddressType: sliceProjection.AddressType,
+						Ports:       sliceProjection.Ports,
+						Endpoints:   sliceProjection.Endpoints,
+					}); err != nil {
+					return err
+				}
+				freshEndpointSlices[sliceIndex] = *liveSlice.DeepCopy()
+				delete(expectedSlices, listedSlice.Name)
+			}
+			if len(expectedSlices) != 0 {
+				return invalid("live source is missing persisted EndpointSlices")
+			}
+
+			record.Member.Component = *liveComponent.DeepCopy()
+			record.Member.Workload = *liveWorkload.DeepCopy()
+			record.Member.Instances = freshInstances
+			record.Service = *liveService.DeepCopy()
+			record.Endpoints = freshEndpoints
+			record.EndpointSlices = freshEndpointSlices
+			freshComponents[liveComponent.UID] = *liveComponent.DeepCopy()
+		}
+		return nil
+	}
+	if err := freshenRecords(result.Leaving); err != nil {
+		return nil, err
+	}
+	if err := freshenRecords(result.Staying); err != nil {
+		return nil, err
+	}
+	if len(usedExpectedRecords) != len(expectedRecords) {
+		return nil, invalid("live source is missing persisted Components")
+	}
+	result.Members.Leaving = shardingScaleInMembersFromDNSRecords(result.Leaving)
+	result.Members.Staying = shardingScaleInMembersFromDNSRecords(result.Staying)
+
+	replaceComponents := func(components []appsv1.Component) error {
+		for i := range components {
+			fresh, ok := freshComponents[components[i].UID]
+			if !ok {
+				return invalid("topology Component %q is not present in the persisted plan",
+					components[i].Name)
+			}
+			components[i] = *fresh.DeepCopy()
+		}
+		return nil
+	}
+	if err := replaceComponents(result.Members.Topology.Components); err != nil {
+		return nil, err
+	}
+	if err := replaceComponents(result.Members.Topology.Leaving); err != nil {
+		return nil, err
+	}
+	if err := replaceComponents(result.Members.Topology.Staying); err != nil {
+		return nil, err
+	}
+	if len(usedPrerequisites) != len(prerequisites) {
+		return nil, invalid("persisted prerequisites are not exhausted by the source inventory")
+	}
+	return result, nil
+}
+
+func validateFreshShardingScaleInPrerequisiteSnapshot(
+	expected metav1.Object,
+	live metav1.Object,
+	prerequisite appsv1.ShardingScaleInExecutorPrerequisite,
+	criticalProjection any,
+) error {
+	invalid := func(format string, args ...any) error {
+		return fmt.Errorf("%w: %s", errInvalidShardingScaleInRequestAuthoritySource,
+			fmt.Sprintf(format, args...))
+	}
+	if expected == nil || live == nil ||
+		expected.GetNamespace() != prerequisite.Namespace ||
+		expected.GetName() != prerequisite.Name ||
+		expected.GetUID() != prerequisite.UID ||
+		live.GetNamespace() != prerequisite.Namespace ||
+		live.GetName() != prerequisite.Name ||
+		live.GetUID() != prerequisite.UID ||
+		expected.GetGeneration() != live.GetGeneration() ||
+		expected.GetResourceVersion() == "" ||
+		expected.GetResourceVersion() != live.GetResourceVersion() ||
+		!expected.GetDeletionTimestamp().IsZero() ||
+		!live.GetDeletionTimestamp().IsZero() {
+		return invalid("fresh %s %q identity, generation, resourceVersion, or deletion state changed",
+			prerequisite.Kind, prerequisite.Name)
+	}
+	digest, err := digestShardingScaleInCriticalProjection(
+		live.GetOwnerReferences(), criticalProjection)
+	if err != nil {
+		return err
+	}
+	if digest != prerequisite.CriticalSpecDigest {
+		return invalid("fresh %s %q owner or critical projection changed",
+			prerequisite.Kind, prerequisite.Name)
+	}
+	return nil
+}
+
+func shardingScaleInMembersFromDNSRecords(
+	records []shardingScaleInSourceDNS,
+) []shardingScaleInSourceMember {
+	members := make([]shardingScaleInSourceMember, len(records))
+	for i := range records {
+		members[i] = deepCopyShardingScaleInSourceMember(records[i].Member)
+	}
+	return members
+}
+
+func shardingScaleInPlanRuntimeBindings(
+	persisted *appsv1.ShardingScaleInPlanMaterial,
+) []shardingScaleInPodRuntimeBinding {
+	bindings := make([]shardingScaleInPodRuntimeBinding, 0,
+		len(persisted.Leaving)+len(persisted.Staying))
+	for _, members := range [][]appsv1.ShardingScaleInPlanMember{
+		persisted.Leaving, persisted.Staying,
+	} {
+		for _, member := range members {
+			for _, pod := range member.Pods {
+				bindings = append(bindings, shardingScaleInPodRuntimeBinding{
+					PodUID:                pod.UID,
+					AgentImageID:          pod.AgentImageID,
+					AgentProcessUID:       pod.AgentProcessUID,
+					AgentCapabilityDigest: pod.AgentCapabilityDigest,
+				})
+			}
+		}
+	}
+	slices.SortFunc(bindings, func(a, b shardingScaleInPodRuntimeBinding) int {
+		return strings.Compare(string(a.PodUID), string(b.PodUID))
+	})
+	return bindings
+}
+
+func shardingScaleInSourceMaterialMatchesPlan(
+	source *shardingScaleInSourceMaterial,
+	persisted *appsv1.ShardingScaleInPlanMaterial,
+) bool {
+	return source != nil && persisted != nil &&
+		reflect.DeepEqual(source.Leaving, persisted.Leaving) &&
+		reflect.DeepEqual(source.Staying, persisted.Staying) &&
+		reflect.DeepEqual(source.ProofExecutor, persisted.ProofExecutor) &&
+		reflect.DeepEqual(source.ExecutorPrerequisites, persisted.ExecutorPrerequisites)
 }
 
 func loadFreshShardingScaleInRequestAuthority(

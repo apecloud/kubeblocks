@@ -24,9 +24,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/equality"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -39,6 +41,8 @@ var (
 	errInvalidTopologyMutationLock            = errors.New("invalid topology mutation lock")
 )
 
+const shardingScaleInTopologyFenceNonceBytes = 32
+
 type shardingScaleInStatusTransition struct {
 	ExpectedProtocolVersion appsv1.ShardingActionResultProtocol
 	ExpectedPlanID          string
@@ -50,6 +54,62 @@ type shardingScaleInJSONPatchOperation struct {
 	Operation string `json:"op"`
 	Path      string `json:"path"`
 	Value     any    `json:"value,omitempty"`
+}
+
+func buildInitialShardingScaleInState(material *appsv1.ShardingScaleInPlanMaterial, fenceNonce []byte,
+	acquiredAt *metav1.Time,
+) (*appsv1.ShardingScaleInStatus, *appsv1.TopologyMutationLockStatus, error) {
+	if len(fenceNonce) != shardingScaleInTopologyFenceNonceBytes {
+		return nil, nil, fmt.Errorf("%w: topology fence nonce must be exactly %d bytes",
+			errInvalidTopologyMutationLock, shardingScaleInTopologyFenceNonceBytes)
+	}
+	if acquiredAt == nil || acquiredAt.IsZero() {
+		return nil, nil, fmt.Errorf("%w: acquiredAt must not be empty", errInvalidTopologyMutationLock)
+	}
+
+	canonical, planID, err := buildShardingScaleInPlanMaterial(material)
+	if err != nil {
+		return nil, nil, err
+	}
+	fenceToken, err := digestShardingScaleInCanonicalJSON(struct {
+		Version    string    `json:"version"`
+		ClusterUID types.UID `json:"clusterUID"`
+		PlanID     string    `json:"planID"`
+		Nonce      []byte    `json:"nonce"`
+	}{
+		Version:    string(appsv1.TopologyMutationLockVersionV1),
+		ClusterUID: canonical.Source.ClusterUID,
+		PlanID:     planID,
+		Nonce:      fenceNonce,
+	})
+	if err != nil {
+		return nil, nil, fmt.Errorf("%w: build topology fence token: %v",
+			errInvalidTopologyMutationLock, err)
+	}
+
+	holder := canonical.Leaving[0]
+	status := &appsv1.ShardingScaleInStatus{
+		ProtocolVersion:    appsv1.ShardingScaleInResultProtocolV2,
+		PlanID:             planID,
+		Phase:              appsv1.ShardingScaleInPhasePlanned,
+		TopologyFenceToken: fenceToken,
+		PlanMaterial:       canonical,
+		Holder: &appsv1.ShardingScaleInHolder{
+			Name: holder.ComponentName,
+			UID:  string(holder.ComponentUID),
+		},
+	}
+	lock := &appsv1.TopologyMutationLockStatus{
+		Version:               appsv1.TopologyMutationLockVersionV1,
+		FenceToken:            fenceToken,
+		ClusterUID:            canonical.Source.ClusterUID,
+		OwnerKind:             appsv1.TopologyMutationLockOwnerShardingScaleIn,
+		OwnerPlanID:           planID,
+		State:                 appsv1.TopologyMutationLockStateInstallingAuthority,
+		AcquiredAt:            acquiredAt.DeepCopy(),
+		AffectedComponentUIDs: shardingScaleInPlanComponentUIDs(canonical),
+	}
+	return status, lock, nil
 }
 
 func patchInitialShardingScaleInPlan(ctx context.Context, cli client.Client, cluster *appsv1.Cluster,
@@ -126,6 +186,10 @@ func buildShardingScaleInStatusPatchInternal(cluster *appsv1.Cluster, shardingNa
 	reduced, err := reduceShardingScaleInStatus(shardingStatus.ScaleIn, transition)
 	if err != nil {
 		return nil, nil, err
+	}
+	if reduced.PlanMaterial.ShardingName != shardingName {
+		return nil, nil, fmt.Errorf("%w: plan material sharding name %q must match status sharding key %q",
+			errInvalidShardingScaleInStatusTransition, reduced.PlanMaterial.ShardingName, shardingName)
 	}
 
 	escapedName := escapeJSONPointerToken(shardingName)
@@ -204,6 +268,10 @@ func validateInitialTopologyMutationLock(cluster *appsv1.Cluster, status *appsv1
 		return nil, fmt.Errorf("%w: fence token must be non-empty and match the plan",
 			errInvalidTopologyMutationLock)
 	}
+	if !isShardingScaleInSHA256(reduced.FenceToken) {
+		return nil, fmt.Errorf("%w: fence token must be a SHA256 digest",
+			errInvalidTopologyMutationLock)
+	}
 	if reduced.ClusterUID == "" || reduced.ClusterUID != cluster.UID {
 		return nil, fmt.Errorf("%w: cluster UID must be non-empty and match the Cluster",
 			errInvalidTopologyMutationLock)
@@ -234,6 +302,10 @@ func validateInitialTopologyMutationLock(cluster *appsv1.Cluster, status *appsv1
 			return nil, fmt.Errorf("%w: affected Component UIDs must be sorted and unique",
 				errInvalidTopologyMutationLock)
 		}
+	}
+	if !slices.Equal(reduced.AffectedComponentUIDs, shardingScaleInPlanComponentUIDs(status.PlanMaterial)) {
+		return nil, fmt.Errorf("%w: affected Component UIDs must exactly match the plan",
+			errInvalidTopologyMutationLock)
 	}
 	return reduced, nil
 }
@@ -270,6 +342,9 @@ func reduceShardingScaleInStatus(current *appsv1.ShardingScaleInStatus,
 				errInvalidShardingScaleInStatusTransition, appsv1.ShardingScaleInPhasePlanned)
 		}
 		if err := validateShardingScaleInPlanMaterialBinding(next); err != nil {
+			return nil, err
+		}
+		if err := validateInitialShardingScaleInHolder(next); err != nil {
 			return nil, err
 		}
 		if err := validateShardingScaleInBlockState(next); err != nil {
@@ -349,6 +424,28 @@ func validateShardingScaleInPlanMaterialBinding(status *appsv1.ShardingScaleInSt
 			errInvalidShardingScaleInStatusTransition)
 	}
 	return nil
+}
+
+func validateInitialShardingScaleInHolder(status *appsv1.ShardingScaleInStatus) error {
+	expected := status.PlanMaterial.Leaving[0]
+	if status.Holder == nil ||
+		status.Holder.Name != expected.ComponentName ||
+		status.Holder.UID != string(expected.ComponentUID) {
+		return fmt.Errorf("%w: initial holder must match the first canonical leaving Component",
+			errInvalidShardingScaleInStatusTransition)
+	}
+	return nil
+}
+
+func shardingScaleInPlanComponentUIDs(material *appsv1.ShardingScaleInPlanMaterial) []types.UID {
+	uids := make([]types.UID, 0, len(material.Leaving)+len(material.Staying))
+	for _, members := range [][]appsv1.ShardingScaleInPlanMember{material.Leaving, material.Staying} {
+		for _, member := range members {
+			uids = append(uids, member.ComponentUID)
+		}
+	}
+	slices.Sort(uids)
+	return uids
 }
 
 func shardingScaleInPhaseTransitionAllowed(current, next *appsv1.ShardingScaleInStatus) bool {

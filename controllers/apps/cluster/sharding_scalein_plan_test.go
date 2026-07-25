@@ -799,6 +799,10 @@ var _ = Describe("sharding scale-in immutable plan material", func() {
 			Phase:              appsv1.ShardingScaleInPhasePlanned,
 			TopologyFenceToken: digestC,
 			PlanMaterial:       canonical,
+			Holder: &appsv1.ShardingScaleInHolder{
+				Name: canonical.Leaving[0].ComponentName,
+				UID:  string(canonical.Leaving[0].ComponentUID),
+			},
 		}
 		reduced, err := reduceShardingScaleInStatus(nil, shardingScaleInStatusTransition{Next: current})
 		Expect(err).ShouldNot(HaveOccurred())

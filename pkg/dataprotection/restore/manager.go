@@ -749,9 +749,8 @@ func (r *RestoreManager) ensurePostReadyAdmission(
 		if err := cli.Update(reqCtx.Ctx, current); err != nil {
 			return nil, err
 		}
-		if err := cli.Get(reqCtx.Ctx, key, current); err != nil {
-			return nil, err
-		}
+		// The cached client has no read-after-write guarantee. Update returns the
+		// server object, including its resourceVersion and committed annotations.
 		annotations = current.GetAnnotations()
 		state = annotations[stateAnnotation]
 	}

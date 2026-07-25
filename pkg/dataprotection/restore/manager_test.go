@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package restore
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
@@ -47,6 +48,51 @@ import (
 	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
+
+type staleRestoreReadAfterUpdateClient struct {
+	client.Client
+	staleRestore *dpv1alpha1.Restore
+	returnStale  bool
+	staleReads   int
+}
+
+func (c *staleRestoreReadAfterUpdateClient) Update(
+	ctx context.Context,
+	obj client.Object,
+	opts ...client.UpdateOption,
+) error {
+	restore, ok := obj.(*dpv1alpha1.Restore)
+	if !ok {
+		return c.Client.Update(ctx, obj, opts...)
+	}
+	c.staleRestore = restore.DeepCopy()
+	for key := range c.staleRestore.Annotations {
+		if strings.HasPrefix(key, "dataprotection.kubeblocks.io/restore-admission-") {
+			delete(c.staleRestore.Annotations, key)
+		}
+	}
+	if err := c.Client.Update(ctx, obj, opts...); err != nil {
+		return err
+	}
+	c.returnStale = true
+	return nil
+}
+
+func (c *staleRestoreReadAfterUpdateClient) Get(
+	ctx context.Context,
+	key client.ObjectKey,
+	obj client.Object,
+	opts ...client.GetOption,
+) error {
+	restore, ok := obj.(*dpv1alpha1.Restore)
+	if c.returnStale && ok && client.ObjectKeyFromObject(c.staleRestore) == key {
+		c.staleRestore.DeepCopyInto(restore)
+		c.returnStale = false
+		c.staleReads++
+		return nil
+	}
+	return c.Client.Get(ctx, key, obj, opts...)
+}
 
 var _ = Describe("RestoreManager Test", func() {
 
@@ -590,6 +636,29 @@ var _ = Describe("RestoreManager Test", func() {
 			current := &dpv1alpha1.Restore{}
 			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(restoreMGR.Restore), current)).Should(Succeed())
 			Expect(current.Annotations).ShouldNot(HaveKey(restoreAdmissionAnnotation(restoreAdmissionStateAnnotation, "1")))
+		})
+
+		It("does not read a stale cache entry after committing admission", func() {
+			reqCtx := getReqCtx()
+			matchLabels := map[string]string{
+				constant.AppInstanceLabelKey: testdp.ClusterName,
+			}
+			restoreMGR, backupSet := initResources(reqCtx, 0, false, func(f *testdp.MockRestoreFactory) {
+				f.SetConnectCredential(testdp.ClusterName).
+					SetJobActionConfig(matchLabels).
+					SetExecActionConfig(matchLabels)
+			})
+			testdp.NewFakeCluster(&testCtx)
+			target := utils.GetBackupStatusTarget(backupSet.Backup, restoreMGR.Restore.Spec.Backup.SourceTargetName)
+			staleClient := &staleRestoreReadAfterUpdateClient{Client: k8sClient}
+
+			jobs, err := restoreMGR.BuildPostReadyActionJobs(reqCtx, staleClient, *backupSet, target, 1)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(jobs).Should(HaveLen(1))
+			Expect(staleClient.staleReads).Should(BeZero())
+			Expect(restoreMGR.Restore.ResourceVersion).ShouldNot(BeEmpty())
+			Expect(restoreMGR.Restore.Annotations[restoreAdmissionAnnotation(
+				restoreAdmissionStateAnnotation, "1")]).Should(Equal(restoreAdmissionAuthorized))
 		})
 
 		It("rejects a stale authorization generation", func() {

@@ -21,6 +21,9 @@ package restore
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"sort"
 	"strings"
@@ -49,7 +52,64 @@ import (
 
 const (
 	restoreManagerContainerName = "restore-manager"
+
+	restoreAdmissionStateAnnotation      = "dataprotection.kubeblocks.io/restore-admission-state"
+	restoreAdmissionGenerationAnnotation = "dataprotection.kubeblocks.io/restore-admission-generation"
+	restoreAdmissionNonceAnnotation      = "dataprotection.kubeblocks.io/restore-admission-nonce"
+	restoreAdmissionIdentityAnnotation   = "dataprotection.kubeblocks.io/restore-admission-identity"
+	restoreAdmissionActionAnnotation     = "dataprotection.kubeblocks.io/restore-admission-action"
+	restoreAdmissionOrdinalAnnotation    = "dataprotection.kubeblocks.io/restore-admission-ordinal"
+
+	restoreAdmissionAuthorized      = "Authorized"
+	restoreAdmissionCancelRequested = "CancelRequested"
+	restoreAdmissionActionPostReady = "postReady"
+
+	restoreEnvName           = "KB_DP_RESTORE_NAME"
+	restoreEnvNamespace      = "KB_DP_RESTORE_NAMESPACE"
+	restoreEnvUID            = "KB_DP_RESTORE_UID"
+	restoreEnvAction         = "KB_DP_RESTORE_ACTION"
+	restoreEnvActionOrdinal  = "KB_DP_RESTORE_ACTION_ORDINAL"
+	restoreEnvAuthGeneration = "KB_DP_AUTHORIZATION_GENERATION"
+	restoreEnvAuthNonce      = "KB_DP_AUTHORIZATION_NONCE"
+	restoreEnvIdentitySHA    = "KB_DP_RESTORE_IDENTITY_SHA"
+	restoreEnvJobName        = "KB_DP_JOB_NAME"
+	restoreEnvJobUID         = "KB_DP_JOB_UID"
+	restoreEnvPodName        = "KB_DP_POD_NAME"
+	restoreEnvPodUID         = "KB_DP_POD_UID"
 )
+
+type restoreActionAdmission struct {
+	State            string
+	Generation       string
+	Nonce            string
+	IdentitySHA      string
+	Action           string
+	Ordinal          string
+	WinnerReadbackRV string
+}
+
+func restoreActionIdentity(restore *dpv1alpha1.Restore, action, ordinal string) string {
+	sum := sha256.Sum256([]byte(strings.Join([]string{
+		string(restore.UID),
+		restore.Namespace,
+		restore.Name,
+		action,
+		ordinal,
+	}, "\x00")))
+	return hex.EncodeToString(sum[:])
+}
+
+func restoreAdmissionAnnotation(base, ordinal string) string {
+	return fmt.Sprintf("%s-%s", base, ordinal)
+}
+
+func randomRestoreAdmissionNonce() (string, error) {
+	value := make([]byte, 32)
+	if _, err := rand.Read(value); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(value), nil
+}
 
 type BackupActionSet struct {
 	Backup *dpv1alpha1.Backup
@@ -638,6 +698,245 @@ func (r *RestoreManager) isJobForRestoreAction(job *batchv1.Job) bool {
 	return restoreNamespace == "" || restoreNamespace == r.Restore.Namespace
 }
 
+func (r *RestoreManager) ensurePostReadyAdmission(
+	reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	step int,
+) (*restoreActionAdmission, error) {
+	current := &dpv1alpha1.Restore{}
+	key := client.ObjectKeyFromObject(r.Restore)
+	if err := cli.Get(reqCtx.Ctx, key, current); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, intctrlutil.NewFatalError("restore disappeared before post-ready authorization")
+		}
+		return nil, err
+	}
+	if current.UID != r.Restore.UID {
+		return nil, intctrlutil.NewFatalError("restore UID changed before post-ready authorization")
+	}
+
+	ordinal := fmt.Sprintf("%d", step)
+	identitySHA := restoreActionIdentity(current, restoreAdmissionActionPostReady, ordinal)
+	stateAnnotation := restoreAdmissionAnnotation(restoreAdmissionStateAnnotation, ordinal)
+	generationAnnotation := restoreAdmissionAnnotation(restoreAdmissionGenerationAnnotation, ordinal)
+	nonceAnnotation := restoreAdmissionAnnotation(restoreAdmissionNonceAnnotation, ordinal)
+	identityAnnotation := restoreAdmissionAnnotation(restoreAdmissionIdentityAnnotation, ordinal)
+	actionAnnotation := restoreAdmissionAnnotation(restoreAdmissionActionAnnotation, ordinal)
+	ordinalAnnotation := restoreAdmissionAnnotation(restoreAdmissionOrdinalAnnotation, ordinal)
+	annotations := current.GetAnnotations()
+	if annotations == nil {
+		annotations = map[string]string{}
+	}
+	state := annotations[stateAnnotation]
+	if state == "" {
+		state = restoreAdmissionAuthorized
+		if current.DeletionTimestamp != nil {
+			state = restoreAdmissionCancelRequested
+		}
+		annotations[stateAnnotation] = state
+		annotations[actionAnnotation] = restoreAdmissionActionPostReady
+		annotations[ordinalAnnotation] = ordinal
+		annotations[identityAnnotation] = identitySHA
+		if state == restoreAdmissionAuthorized {
+			nonce, err := randomRestoreAdmissionNonce()
+			if err != nil {
+				return nil, err
+			}
+			annotations[generationAnnotation] = fmt.Sprintf("%d", current.Generation)
+			annotations[nonceAnnotation] = nonce
+		}
+		current.SetAnnotations(annotations)
+		if err := cli.Update(reqCtx.Ctx, current); err != nil {
+			return nil, err
+		}
+		if err := cli.Get(reqCtx.Ctx, key, current); err != nil {
+			return nil, err
+		}
+		annotations = current.GetAnnotations()
+		state = annotations[stateAnnotation]
+	}
+
+	admission := &restoreActionAdmission{
+		State:            state,
+		Generation:       annotations[generationAnnotation],
+		Nonce:            annotations[nonceAnnotation],
+		IdentitySHA:      annotations[identityAnnotation],
+		Action:           annotations[actionAnnotation],
+		Ordinal:          annotations[ordinalAnnotation],
+		WinnerReadbackRV: current.ResourceVersion,
+	}
+	if admission.Action != restoreAdmissionActionPostReady ||
+		admission.Ordinal != ordinal ||
+		admission.IdentitySHA != identitySHA {
+		return nil, intctrlutil.NewFatalError("restore post-ready admission identity mismatch")
+	}
+	if admission.State == restoreAdmissionCancelRequested {
+		if err := r.ensurePostReadyAdmissionMirror(reqCtx, cli, current, admission); err != nil {
+			return nil, err
+		}
+		return nil, intctrlutil.NewFatalError("restore post-ready admission was canceled")
+	}
+	if admission.State != restoreAdmissionAuthorized ||
+		admission.Generation != fmt.Sprintf("%d", current.Generation) ||
+		admission.Nonce == "" ||
+		admission.WinnerReadbackRV == "" {
+		return nil, intctrlutil.NewFatalError("restore post-ready admission is incomplete")
+	}
+
+	if err := r.ensurePostReadyAdmissionMirror(reqCtx, cli, current, admission); err != nil {
+		return nil, err
+	}
+	r.Restore = current
+	return admission, nil
+}
+
+func (r *RestoreManager) ensurePostReadyAdmissionMirror(
+	reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	restore *dpv1alpha1.Restore,
+	admission *restoreActionAdmission,
+) error {
+	name := fmt.Sprintf("restore-admission-%s", admission.IdentitySHA[:16])
+	expected := map[string]string{
+		"restoreNamespace": restore.Namespace,
+		"restoreName":      restore.Name,
+		"restoreUID":       string(restore.UID),
+		"state":            admission.State,
+		"generation":       admission.Generation,
+		"nonce":            admission.Nonce,
+		"identitySHA":      admission.IdentitySHA,
+		"action":           admission.Action,
+		"ordinal":          admission.Ordinal,
+		"winnerReadbackRV": admission.WinnerReadbackRV,
+	}
+	immutable := true
+	mirror := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: restore.Namespace,
+			Name:      name,
+			Labels: map[string]string{
+				DataProtectionRestoreLabelKey: restore.Name,
+			},
+		},
+		Immutable: &immutable,
+		Data:      expected,
+	}
+	if err := cli.Create(reqCtx.Ctx, mirror); err != nil {
+		if !apierrors.IsAlreadyExists(err) {
+			return err
+		}
+		existing := &corev1.ConfigMap{}
+		if err := cli.Get(reqCtx.Ctx, client.ObjectKeyFromObject(mirror), existing); err != nil {
+			return err
+		}
+		if existing.Immutable == nil ||
+			!*existing.Immutable ||
+			len(existing.OwnerReferences) != 0 ||
+			len(existing.Data) != len(expected) ||
+			existing.Labels[DataProtectionRestoreLabelKey] != restore.Name {
+			return intctrlutil.NewFatalError("restore post-ready admission mirror metadata mismatch")
+		}
+		for key, value := range expected {
+			if key == "winnerReadbackRV" {
+				continue
+			}
+			if existing.Data[key] != value {
+				return intctrlutil.NewFatalError("restore post-ready admission mirror mismatch")
+			}
+		}
+		if existing.Data["winnerReadbackRV"] == "" {
+			return intctrlutil.NewFatalError("restore post-ready admission mirror is incomplete")
+		}
+		admission.WinnerReadbackRV = existing.Data["winnerReadbackRV"]
+	}
+	return nil
+}
+
+func validateReservedRestoreAdmissionEnv(job *batchv1.Job) error {
+	if len(job.Spec.Template.Spec.Containers) == 0 {
+		return intctrlutil.NewFatalError("restore job has no restore container")
+	}
+	reserved := map[string]struct{}{
+		restoreEnvName: {}, restoreEnvNamespace: {}, restoreEnvUID: {}, restoreEnvAction: {}, restoreEnvActionOrdinal: {},
+		restoreEnvAuthGeneration: {}, restoreEnvAuthNonce: {}, restoreEnvIdentitySHA: {},
+		restoreEnvJobName: {}, restoreEnvJobUID: {}, restoreEnvPodName: {}, restoreEnvPodUID: {},
+	}
+	env := job.Spec.Template.Spec.Containers[0].Env
+	for _, item := range env {
+		if _, ok := reserved[item.Name]; ok {
+			return intctrlutil.NewFatalError(fmt.Sprintf("reserved restore identity env %q already exists", item.Name))
+		}
+	}
+	return nil
+}
+
+func injectRestoreAdmissionEnv(job *batchv1.Job, restore *dpv1alpha1.Restore, admission *restoreActionAdmission) error {
+	if err := validateReservedRestoreAdmissionEnv(job); err != nil {
+		return err
+	}
+	env := job.Spec.Template.Spec.Containers[0].Env
+	env = append(env,
+		corev1.EnvVar{Name: restoreEnvName, Value: restore.Name},
+		corev1.EnvVar{Name: restoreEnvNamespace, Value: restore.Namespace},
+		corev1.EnvVar{Name: restoreEnvUID, Value: string(restore.UID)},
+		corev1.EnvVar{Name: restoreEnvAction, Value: admission.Action},
+		corev1.EnvVar{Name: restoreEnvActionOrdinal, Value: admission.Ordinal},
+		corev1.EnvVar{Name: restoreEnvAuthGeneration, Value: admission.Generation},
+		corev1.EnvVar{Name: restoreEnvAuthNonce, Value: admission.Nonce},
+		corev1.EnvVar{Name: restoreEnvIdentitySHA, Value: admission.IdentitySHA},
+		corev1.EnvVar{Name: restoreEnvJobName, Value: job.Name},
+		corev1.EnvVar{Name: restoreEnvJobUID, ValueFrom: &corev1.EnvVarSource{
+			FieldRef: &corev1.ObjectFieldSelector{
+				FieldPath: "metadata.labels['batch.kubernetes.io/controller-uid']",
+			},
+		}},
+		corev1.EnvVar{Name: restoreEnvPodName, ValueFrom: &corev1.EnvVarSource{
+			FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.name"},
+		}},
+		corev1.EnvVar{Name: restoreEnvPodUID, ValueFrom: &corev1.EnvVarSource{
+			FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.uid"},
+		}},
+	)
+	job.Spec.Template.Spec.Containers[0].Env = env
+	return nil
+}
+
+func validateRestoreAdmissionOwner(job *batchv1.Job, ownerObj client.Object) error {
+	if len(job.Spec.Template.Spec.Containers) == 0 {
+		return nil
+	}
+	envByName := map[string]corev1.EnvVar{}
+	for _, env := range job.Spec.Template.Spec.Containers[0].Env {
+		envByName[env.Name] = env
+	}
+	restoreUID := envByName[restoreEnvUID].Value
+	if restoreUID == "" {
+		return nil
+	}
+	restoreName := envByName[restoreEnvName].Value
+	if restoreName == "" ||
+		restoreUID != string(ownerObj.GetUID()) ||
+		restoreName != ownerObj.GetName() ||
+		job.Labels[DataProtectionRestoreLabelKey] != restoreName {
+		return intctrlutil.NewFatalError("restore job admission owner identity mismatch")
+	}
+	controllerRefs := 0
+	for _, ref := range job.OwnerReferences {
+		if ref.Controller != nil && *ref.Controller {
+			controllerRefs++
+			if ref.Kind != "Restore" ||
+				ref.Name != restoreName ||
+				string(ref.UID) != restoreUID {
+				return intctrlutil.NewFatalError("restore job admission controller reference mismatch")
+			}
+		}
+	}
+	if controllerRefs != 1 {
+		return intctrlutil.NewFatalError("restore job admission requires exactly one controller reference")
+	}
+	return nil
+}
+
 // BuildPostReadyActionJobs builds the post ready jobs.
 func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx, cli client.Client, backupSet BackupActionSet, target *dpv1alpha1.BackupStatusTarget, step int) ([]*batchv1.Job, error) {
 	readyConfig := r.Restore.Spec.ReadyConfig
@@ -682,7 +981,7 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 			return nil, err
 		}
 		sort.Sort(intctrlutil.ByPodName(targetPodList.Items))
-		buildJob := func(targetPod *corev1.Pod, sourceTargetPodName string, index int) *batchv1.Job {
+		buildJob := func(targetPod *corev1.Pod, sourceTargetPodName string, index int) (*batchv1.Job, error) {
 			if boolptr.IsSetToTrue(actionSpec.Job.RunOnTargetPodNode) {
 				jobBuilder.resetSpecificVolumesAndMounts()
 				jobBuilder.setNodeNameToNodeSelector(targetPod.Spec.NodeName)
@@ -696,7 +995,7 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 					}
 				}
 			}
-			return jobBuilder.setImage(actionSpec.Job.Image).
+			job := jobBuilder.setImage(actionSpec.Job.Image).
 				setJobName(buildJobName(index)).
 				addCommonEnv(sourceTargetPodName).
 				attachBackupRepo().
@@ -705,6 +1004,7 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 				addTargetPodAndCredentialEnv(targetPod, readyConfig.ConnectionCredential, &target.BackupTarget).
 				setServiceAccount(r.WorkerServiceAccount).
 				build()
+			return job, nil
 		}
 
 		if podSelector.Strategy == dpv1alpha1.PodSelectionStrategyAny {
@@ -724,7 +1024,11 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 				// no need to recover the volume when the pod selection policy is 'All' and sourceTargetPodName is not found.
 				continue
 			}
-			jobs = append(jobs, buildJob(&targetPodList.Items[i], sourceTargetPodName, i))
+			job, err := buildJob(&targetPodList.Items[i], sourceTargetPodName, i)
+			if err != nil {
+				return nil, err
+			}
+			jobs = append(jobs, job)
 		}
 		return jobs, nil
 	}
@@ -763,7 +1067,25 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 	}
 
 	if actionSpec.Job != nil {
-		return buildJobsForJobAction()
+		jobs, err := buildJobsForJobAction()
+		if err != nil {
+			return nil, err
+		}
+		for _, job := range jobs {
+			if err := validateReservedRestoreAdmissionEnv(job); err != nil {
+				return nil, err
+			}
+		}
+		admission, err := r.ensurePostReadyAdmission(reqCtx, cli, step)
+		if err != nil {
+			return nil, err
+		}
+		for _, job := range jobs {
+			if err := injectRestoreAdmissionEnv(job, r.Restore, admission); err != nil {
+				return nil, err
+			}
+		}
+		return jobs, nil
 	}
 	return buildJobsForExecAction()
 }
@@ -813,6 +1135,9 @@ func (r *RestoreManager) CreateJobsIfNotExist(reqCtx intctrlutil.RequestCtx,
 					return nil, err
 				}
 			}
+			if err = validateRestoreAdmissionOwner(objs[i], ownerObj); err != nil {
+				return nil, err
+			}
 			if err = cli.Create(reqCtx.Ctx, objs[i]); err != nil && !apierrors.IsAlreadyExists(err) {
 				return nil, err
 			}
@@ -824,6 +1149,9 @@ func (r *RestoreManager) CreateJobsIfNotExist(reqCtx intctrlutil.RequestCtx,
 				err := fmt.Sprintf("restore job name collision: existing job %s/%s does not belong to restore %s/%s",
 					fetchedJob.Namespace, fetchedJob.Name, r.Restore.Namespace, r.Restore.Name)
 				return nil, intctrlutil.NewFatalError(err)
+			}
+			if err := validateRestoreAdmissionOwner(fetchedJob, ownerObj); err != nil {
+				return nil, err
 			}
 			fetchedJobs = append(fetchedJobs, fetchedJob)
 		}

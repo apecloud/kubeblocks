@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -490,6 +491,60 @@ var _ = Describe("RestoreManager Test", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 			// count of job should equal to 1
 			Expect(len(jobs)).Should(Equal(1))
+			envByName := map[string]corev1.EnvVar{}
+			for _, env := range jobs[0].Spec.Template.Spec.Containers[0].Env {
+				envByName[env.Name] = env
+			}
+			Expect(envByName[restoreEnvNamespace].Value).Should(Equal(restoreMGR.Restore.Namespace))
+			Expect(envByName[restoreEnvName].Value).Should(Equal(restoreMGR.Restore.Name))
+			Expect(envByName[restoreEnvUID].Value).Should(Equal(string(restoreMGR.Restore.UID)))
+			Expect(envByName[restoreEnvAction].Value).Should(Equal(restoreAdmissionActionPostReady))
+			Expect(envByName[restoreEnvActionOrdinal].Value).Should(Equal("1"))
+			Expect(envByName[restoreEnvAuthGeneration].Value).ShouldNot(BeEmpty())
+			Expect(envByName[restoreEnvAuthNonce].Value).Should(HaveLen(64))
+			Expect(envByName[restoreEnvIdentitySHA].Value).Should(HaveLen(64))
+			Expect(envByName[restoreEnvJobName].Value).Should(Equal(jobs[0].Name))
+			Expect(envByName[restoreEnvJobUID].ValueFrom.FieldRef.FieldPath).
+				Should(Equal("metadata.labels['batch.kubernetes.io/controller-uid']"))
+			Expect(envByName[restoreEnvPodName].ValueFrom.FieldRef.FieldPath).Should(Equal("metadata.name"))
+			Expect(envByName[restoreEnvPodUID].ValueFrom.FieldRef.FieldPath).Should(Equal("metadata.uid"))
+			Expect(restoreMGR.Restore.Annotations[restoreAdmissionAnnotation(restoreAdmissionStateAnnotation, "1")]).
+				Should(Equal(restoreAdmissionAuthorized))
+
+			mirror := &corev1.ConfigMap{}
+			mirrorName := fmt.Sprintf("restore-admission-%s", envByName[restoreEnvIdentitySHA].Value[:16])
+			Expect(k8sClient.Get(ctx, client.ObjectKey{
+				Namespace: restoreMGR.Restore.Namespace,
+				Name:      mirrorName,
+			}, mirror)).Should(Succeed())
+			Expect(mirror.OwnerReferences).Should(BeEmpty())
+			Expect(mirror.Immutable).ShouldNot(BeNil())
+			Expect(*mirror.Immutable).Should(BeTrue())
+			Expect(mirror.Data["restoreUID"]).Should(Equal(string(restoreMGR.Restore.UID)))
+			Expect(mirror.Data["state"]).Should(Equal(restoreAdmissionAuthorized))
+
+			retryJobs, err := restoreMGR.BuildPostReadyActionJobs(reqCtx, k8sClient, *backupSet, target, 1)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(retryJobs).Should(HaveLen(1))
+			retryEnvByName := map[string]corev1.EnvVar{}
+			for _, env := range retryJobs[0].Spec.Template.Spec.Containers[0].Env {
+				retryEnvByName[env.Name] = env
+			}
+			Expect(retryEnvByName[restoreEnvAuthNonce].Value).
+				Should(Equal(envByName[restoreEnvAuthNonce].Value))
+			Expect(retryEnvByName[restoreEnvIdentitySHA].Value).
+				Should(Equal(envByName[restoreEnvIdentitySHA].Value))
+			createdJobs, err := restoreMGR.CreateJobsIfNotExist(
+				reqCtx, k8sClient, restoreMGR.Restore, retryJobs)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(createdJobs).Should(HaveLen(1))
+			Expect(createdJobs[0].OwnerReferences).Should(HaveLen(1))
+			Expect(createdJobs[0].OwnerReferences[0].UID).Should(Equal(restoreMGR.Restore.UID))
+			fetchedJobs, err := restoreMGR.CreateJobsIfNotExist(
+				reqCtx, k8sClient, restoreMGR.Restore, retryJobs)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(fetchedJobs).Should(HaveLen(1))
+			Expect(fetchedJobs[0].UID).Should(Equal(createdJobs[0].UID))
 			// test timeZone transform
 			var backupStopTimeEnv string
 			for _, v := range jobs[0].Spec.Template.Spec.Containers[0].Env {
@@ -512,6 +567,122 @@ var _ = Describe("RestoreManager Test", func() {
 				actionSet.Spec.Restore.PostReady[1].Job.RunOnTargetPodNode = &runTargetPodNode
 			})).Should(Succeed())
 			testPostReady(false)
+		})
+
+		It("fails before admission mutation when a reserved identity env already exists", func() {
+			reqCtx := getReqCtx()
+			matchLabels := map[string]string{
+				constant.AppInstanceLabelKey: testdp.ClusterName,
+			}
+			restoreMGR, backupSet := initResources(reqCtx, 0, false, func(f *testdp.MockRestoreFactory) {
+				f.SetConnectCredential(testdp.ClusterName).
+					SetJobActionConfig(matchLabels).
+					SetExecActionConfig(matchLabels).
+					AddEnv(corev1.EnvVar{Name: restoreEnvUID, Value: "spoofed"})
+			})
+			testdp.NewFakeCluster(&testCtx)
+			target := utils.GetBackupStatusTarget(backupSet.Backup, restoreMGR.Restore.Spec.Backup.SourceTargetName)
+
+			jobs, err := restoreMGR.BuildPostReadyActionJobs(reqCtx, k8sClient, *backupSet, target, 1)
+			Expect(err).Should(MatchError(ContainSubstring("reserved restore identity env")))
+			Expect(jobs).Should(BeNil())
+
+			current := &dpv1alpha1.Restore{}
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(restoreMGR.Restore), current)).Should(Succeed())
+			Expect(current.Annotations).ShouldNot(HaveKey(restoreAdmissionAnnotation(restoreAdmissionStateAnnotation, "1")))
+		})
+
+		It("rejects a stale authorization generation", func() {
+			reqCtx := getReqCtx()
+			matchLabels := map[string]string{
+				constant.AppInstanceLabelKey: testdp.ClusterName,
+			}
+			restoreMGR, backupSet := initResources(reqCtx, 0, false, func(f *testdp.MockRestoreFactory) {
+				f.SetConnectCredential(testdp.ClusterName).
+					SetJobActionConfig(matchLabels).
+					SetExecActionConfig(matchLabels)
+			})
+			testdp.NewFakeCluster(&testCtx)
+			target := utils.GetBackupStatusTarget(backupSet.Backup, restoreMGR.Restore.Spec.Backup.SourceTargetName)
+
+			jobs, err := restoreMGR.BuildPostReadyActionJobs(reqCtx, k8sClient, *backupSet, target, 1)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(jobs).Should(HaveLen(1))
+
+			current := &dpv1alpha1.Restore{}
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(restoreMGR.Restore), current)).Should(Succeed())
+			generationAnnotation := restoreAdmissionAnnotation(restoreAdmissionGenerationAnnotation, "1")
+			current.Annotations[generationAnnotation] = "0"
+			Expect(k8sClient.Update(ctx, current)).Should(Succeed())
+
+			jobs, err = restoreMGR.BuildPostReadyActionJobs(reqCtx, k8sClient, *backupSet, target, 1)
+			Expect(err).Should(MatchError(ContainSubstring("admission is incomplete")))
+			Expect(jobs).Should(BeNil())
+		})
+
+		It("rejects a tampered Restore UID before job creation", func() {
+			reqCtx := getReqCtx()
+			matchLabels := map[string]string{
+				constant.AppInstanceLabelKey: testdp.ClusterName,
+			}
+			restoreMGR, backupSet := initResources(reqCtx, 0, false, func(f *testdp.MockRestoreFactory) {
+				f.SetConnectCredential(testdp.ClusterName).
+					SetJobActionConfig(matchLabels).
+					SetExecActionConfig(matchLabels)
+			})
+			testdp.NewFakeCluster(&testCtx)
+			target := utils.GetBackupStatusTarget(backupSet.Backup, restoreMGR.Restore.Spec.Backup.SourceTargetName)
+
+			jobs, err := restoreMGR.BuildPostReadyActionJobs(reqCtx, k8sClient, *backupSet, target, 1)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(jobs).Should(HaveLen(1))
+			Expect(controllerutil.SetControllerReference(restoreMGR.Restore, jobs[0], restoreMGR.Schema)).Should(Succeed())
+			for i := range jobs[0].Spec.Template.Spec.Containers[0].Env {
+				if jobs[0].Spec.Template.Spec.Containers[0].Env[i].Name == restoreEnvUID {
+					jobs[0].Spec.Template.Spec.Containers[0].Env[i].Value = "tampered"
+				}
+			}
+
+			Expect(validateRestoreAdmissionOwner(jobs[0], restoreMGR.Restore)).
+				Should(MatchError(ContainSubstring("owner identity mismatch")))
+		})
+
+		It("records CancelRequested and creates no job when deletion wins admission", func() {
+			reqCtx := getReqCtx()
+			matchLabels := map[string]string{
+				constant.AppInstanceLabelKey: testdp.ClusterName,
+			}
+			restoreMGR, backupSet := initResources(reqCtx, 0, false, func(f *testdp.MockRestoreFactory) {
+				f.SetConnectCredential(testdp.ClusterName).
+					SetJobActionConfig(matchLabels).
+					SetExecActionConfig(matchLabels)
+			})
+			testdp.NewFakeCluster(&testCtx)
+
+			current := &dpv1alpha1.Restore{}
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(restoreMGR.Restore), current)).Should(Succeed())
+			controllerutil.AddFinalizer(current, "restore.test/deletion-hold")
+			Expect(k8sClient.Update(ctx, current)).Should(Succeed())
+			Expect(k8sClient.Delete(ctx, current)).Should(Succeed())
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(current), current)).Should(Succeed())
+			Expect(current.DeletionTimestamp).ShouldNot(BeNil())
+
+			target := utils.GetBackupStatusTarget(backupSet.Backup, restoreMGR.Restore.Spec.Backup.SourceTargetName)
+			jobs, err := restoreMGR.BuildPostReadyActionJobs(reqCtx, k8sClient, *backupSet, target, 1)
+			Expect(err).Should(MatchError(ContainSubstring("admission was canceled")))
+			Expect(jobs).Should(BeNil())
+
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(current), current)).Should(Succeed())
+			Expect(current.Annotations[restoreAdmissionAnnotation(restoreAdmissionStateAnnotation, "1")]).
+				Should(Equal(restoreAdmissionCancelRequested))
+			identity := restoreActionIdentity(current, restoreAdmissionActionPostReady, "1")
+			mirror := &corev1.ConfigMap{}
+			Expect(k8sClient.Get(ctx, client.ObjectKey{
+				Namespace: current.Namespace,
+				Name:      fmt.Sprintf("restore-admission-%s", identity[:16]),
+			}, mirror)).Should(Succeed())
+			Expect(mirror.Data["state"]).Should(Equal(restoreAdmissionCancelRequested))
+			Expect(mirror.OwnerReferences).Should(BeEmpty())
 		})
 
 		Context("BuildContinuousRestoreManager", func() {

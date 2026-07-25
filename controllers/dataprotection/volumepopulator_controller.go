@@ -22,6 +22,7 @@ package dataprotection
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
 	"slices"
@@ -61,6 +62,25 @@ type VolumePopulatorReconciler struct {
 	client.Client
 	Scheme   *runtime.Scheme
 	Recorder record.EventRecorder
+}
+
+type pvcStatusPatchError struct {
+	cause error
+}
+
+func (e *pvcStatusPatchError) Error() string {
+	return fmt.Sprintf("failed to patch PVC status: %v", e.cause)
+}
+
+func (e *pvcStatusPatchError) Unwrap() error {
+	return e.cause
+}
+
+func wrapPVCStatusPatchError(err error) error {
+	if err == nil {
+		return nil
+	}
+	return &pvcStatusPatchError{cause: err}
 }
 
 type pvcRestoreMode string
@@ -119,6 +139,10 @@ func (r *VolumePopulatorReconciler) handleSyncPVCError(reqCtx intctrlutil.Reques
 			return intctrlutil.RequeueWithError(patchErr, reqCtx.Log, "")
 		}
 		return intctrlutil.Reconciled()
+	}
+	var statusPatchErr *pvcStatusPatchError
+	if errors.As(err, &statusPatchErr) {
+		return RecorderEventAndRequeue(reqCtx, r.Recorder, pvc, err)
 	}
 	if requeueErr, ok := err.(intctrlutil.RequeueError); ok {
 		return intctrlutil.RequeueAfter(requeueErr.RequeueAfter(), reqCtx.Log, requeueErr.Reason())
@@ -1869,7 +1893,7 @@ func (r *VolumePopulatorReconciler) syncTargetPVCBoundStatus(reqCtx intctrlutil.
 	pvc.Status.Phase = corev1.ClaimBound
 	pvc.Status.Capacity = capacity
 	pvc.Status.AccessModes = accessModes
-	return r.Client.Status().Patch(reqCtx.Ctx, pvc, patch)
+	return wrapPVCStatusPatchError(r.Client.Status().Patch(reqCtx.Ctx, pvc, patch))
 }
 
 func (r *VolumePopulatorReconciler) UpdatePVCConditions(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim, reason, message string) error {
@@ -1928,7 +1952,7 @@ func (r *VolumePopulatorReconciler) UpdatePVCConditions(reqCtx intctrlutil.Reque
 	case ReasonPopulatingSucceed, ReasonPopulatingProvisioned:
 		r.Recorder.Event(pvc, corev1.EventTypeNormal, ReasonVolumePopulateSucceed, message)
 	}
-	return r.Client.Status().Patch(reqCtx.Ctx, pvc, pvcPatch)
+	return wrapPVCStatusPatchError(r.Client.Status().Patch(reqCtx.Ctx, pvc, pvcPatch))
 }
 
 func (r *VolumePopulatorReconciler) updatePVCPopulatingCondition(reqCtx intctrlutil.RequestCtx,
@@ -1948,7 +1972,7 @@ func (r *VolumePopulatorReconciler) updatePVCPopulatingCondition(reqCtx intctrlu
 	case ReasonPopulatingSucceed, ReasonPopulatingProvisioned:
 		r.Recorder.Event(pvc, corev1.EventTypeNormal, ReasonVolumePopulateSucceed, message)
 	}
-	return r.Client.Status().Patch(reqCtx.Ctx, pvc, pvcPatch)
+	return wrapPVCStatusPatchError(r.Client.Status().Patch(reqCtx.Ctx, pvc, pvcPatch))
 }
 
 func (r *VolumePopulatorReconciler) ContainPopulatingCondition(pvc *corev1.PersistentVolumeClaim) bool {

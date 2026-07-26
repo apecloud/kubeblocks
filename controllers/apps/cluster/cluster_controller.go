@@ -135,6 +135,9 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			&clusterNormalizationTransformer{},
 			// placement replicas across data-plane k8s clusters
 			&clusterPlacementTransformer{multiClusterMgr: r.MultiClusterMgr},
+			// bind or reject an existing topology authority before any
+			// sharding-account, Service, or Component write intent is built
+			&clusterTopologyReconcileAuthorityTransformer{},
 			// handle cluster shared account
 			&clusterShardingAccountTransformer{},
 			// handle cluster services

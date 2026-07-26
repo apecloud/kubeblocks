@@ -16077,7 +16077,10 @@ VarOption
 <th>Description</th>
 </tr>
 </thead>
-<tbody><tr><td><p>&#34;ShardingScaleIn&#34;</p></td>
+<tbody><tr><td><p>&#34;ClusterTopologyReconcile&#34;</p></td>
+<td><p>TopologyMutationLockOwnerClusterTopologyReconcile identifies ordinary topology reconciliation.</p>
+</td>
+</tr><tr><td><p>&#34;ShardingScaleIn&#34;</p></td>
 <td><p>TopologyMutationLockOwnerShardingScaleIn identifies a compound shard scale-in plan.</p>
 </td>
 </tr></tbody>
@@ -16103,11 +16106,15 @@ VarOption
 <td></td>
 </tr><tr><td><p>&#34;DeletionDependentsGone&#34;</p></td>
 <td></td>
+</tr><tr><td><p>&#34;Executing&#34;</p></td>
+<td></td>
 </tr><tr><td><p>&#34;Held&#34;</p></td>
 <td></td>
 </tr><tr><td><p>&#34;InstallingAuthority&#34;</p></td>
 <td></td>
 </tr><tr><td><p>&#34;ReleaseReady&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Released&#34;</p></td>
 <td></td>
 </tr><tr><td><p>&#34;ReleasingMembers&#34;</p></td>
 <td></td>

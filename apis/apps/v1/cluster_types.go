@@ -1087,6 +1087,10 @@ type ShardingScaleInStatus struct {
 }
 
 // TopologyMutationLockStatus serializes a cluster-wide topology mutation.
+// +kubebuilder:validation:XValidation:rule="self.ownerKind != 'ShardingScaleIn' || size(self.affectedComponentUIDs) > 0",message="ShardingScaleIn locks must contain at least one affected Component UID"
+// +kubebuilder:validation:XValidation:rule="self.ownerKind != 'ShardingScaleIn' || self.state != 'Released'",message="Released is reserved for ClusterTopologyReconcile locks"
+// +kubebuilder:validation:XValidation:rule="self.ownerKind != 'ClusterTopologyReconcile' || self.state in ['Held', 'Executing', 'Released']",message="ClusterTopologyReconcile locks must use an ordinary reconcile state"
+// +kubebuilder:validation:XValidation:rule="self.ownerKind != 'ClusterTopologyReconcile' || size(self.affectedComponentUIDs) == 0",message="ClusterTopologyReconcile locks must use cluster-wide scope"
 type TopologyMutationLockStatus struct {
 	// Version identifies the topology lock contract.
 	Version TopologyMutationLockVersion `json:"version"`
@@ -1111,7 +1115,6 @@ type TopologyMutationLockStatus struct {
 
 	// AffectedComponentUIDs lists the exact Components fenced by the lock.
 	//
-	// +kubebuilder:validation:MinItems=1
 	AffectedComponentUIDs []types.UID `json:"affectedComponentUIDs"`
 }
 
@@ -1129,23 +1132,27 @@ const (
 // TopologyMutationLockOwnerKind identifies a topology mutation owner.
 //
 // +enum
-// +kubebuilder:validation:Enum={ShardingScaleIn}
+// +kubebuilder:validation:Enum={ShardingScaleIn,ClusterTopologyReconcile}
 type TopologyMutationLockOwnerKind string
 
 const (
 	// TopologyMutationLockOwnerShardingScaleIn identifies a compound shard scale-in plan.
 	TopologyMutationLockOwnerShardingScaleIn TopologyMutationLockOwnerKind = "ShardingScaleIn"
+	// TopologyMutationLockOwnerClusterTopologyReconcile identifies ordinary topology reconciliation.
+	TopologyMutationLockOwnerClusterTopologyReconcile TopologyMutationLockOwnerKind = "ClusterTopologyReconcile"
 )
 
 // TopologyMutationLockState defines the topology mutation lock lifecycle.
 //
 // +enum
-// +kubebuilder:validation:Enum={InstallingAuthority,Held,ReleasingMembers,DeletionCloseout,DeletionSafe,DeletionDependentsGone,ReleaseReady}
+// +kubebuilder:validation:Enum={InstallingAuthority,Held,Executing,Released,ReleasingMembers,DeletionCloseout,DeletionSafe,DeletionDependentsGone,ReleaseReady}
 type TopologyMutationLockState string
 
 const (
 	TopologyMutationLockStateInstallingAuthority TopologyMutationLockState = "InstallingAuthority"
 	TopologyMutationLockStateHeld                TopologyMutationLockState = "Held"
+	TopologyMutationLockStateExecuting           TopologyMutationLockState = "Executing"
+	TopologyMutationLockStateReleased            TopologyMutationLockState = "Released"
 	TopologyMutationLockStateReleasingMembers    TopologyMutationLockState = "ReleasingMembers"
 	TopologyMutationLockStateDeletionCloseout    TopologyMutationLockState = "DeletionCloseout"
 	TopologyMutationLockStateDeletionSafe        TopologyMutationLockState = "DeletionSafe"

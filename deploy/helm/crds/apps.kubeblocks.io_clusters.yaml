@@ -18670,7 +18670,6 @@ spec:
                         don't ONLY use UUIDs, this is an alias to string.  Being a type captures
                         intent and helps make sure that UIDs and names do not get conflated.
                       type: string
-                    minItems: 1
                     type: array
                   clusterUID:
                     description: ClusterUID binds the lock to the exact Cluster object.
@@ -18684,6 +18683,7 @@ spec:
                       owns the lock.
                     enum:
                     - ShardingScaleIn
+                    - ClusterTopologyReconcile
                     type: string
                   ownerPlanID:
                     description: OwnerPlanID is the immutable plan identity that owns
@@ -18694,6 +18694,8 @@ spec:
                     enum:
                     - InstallingAuthority
                     - Held
+                    - Executing
+                    - Released
                     - ReleasingMembers
                     - DeletionCloseout
                     - DeletionSafe
@@ -18715,6 +18717,20 @@ spec:
                 - state
                 - version
                 type: object
+                x-kubernetes-validations:
+                - message: ShardingScaleIn locks must contain at least one affected
+                    Component UID
+                  rule: self.ownerKind != 'ShardingScaleIn' || size(self.affectedComponentUIDs)
+                    > 0
+                - message: Released is reserved for ClusterTopologyReconcile locks
+                  rule: self.ownerKind != 'ShardingScaleIn' || self.state != 'Released'
+                - message: ClusterTopologyReconcile locks must use an ordinary reconcile
+                    state
+                  rule: self.ownerKind != 'ClusterTopologyReconcile' || self.state
+                    in ['Held', 'Executing', 'Released']
+                - message: ClusterTopologyReconcile locks must use cluster-wide scope
+                  rule: self.ownerKind != 'ClusterTopologyReconcile' || size(self.affectedComponentUIDs)
+                    == 0
             type: object
         type: object
     served: true

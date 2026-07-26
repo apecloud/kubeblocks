@@ -153,12 +153,11 @@ func newPostReadyTargetEnvFixture(t *testing.T) postReadyTargetEnvFixture {
 			Namespace: namespace,
 			Name:      PostReadyRestoreName(component.UID),
 			UID:       "restore-uid-1234",
-			OwnerReferences: []metav1.OwnerReference{{
-				APIVersion: appsv1.APIVersion,
-				Kind:       appsv1.ComponentKind,
-				Name:       component.Name,
-				UID:        component.UID,
-			}},
+			Labels: map[string]string{
+				DataProtectionInternalPostReadyLabelKey: DataProtectionInternalPostReadyLabelValue,
+			},
+			OwnerReferences: []metav1.OwnerReference{postReadyControllerRef(
+				appsv1.APIVersion, appsv1.ComponentKind, component.Name, component.UID)},
 		},
 		Spec: dpv1alpha1.RestoreSpec{
 			Backup: dpv1alpha1.BackupRef{Name: "backup", Namespace: namespace},
@@ -271,6 +270,100 @@ func TestBuildPostReadyActionJobsResolvesTargetFactsAtDispatch(t *testing.T) {
 	require.Equal(t, []string{"shared-nothing"}, postReadyJobEnvValues(env, dptypes.DPTargetClusterTopology))
 	require.Equal(t, []string{"3.5.0"}, postReadyJobEnvValues(env, dptypes.DPTargetComponentServiceVersion))
 	require.Empty(t, postReadyJobEnvValues(env, deprecatedTargetComponentServiceVersionSelectorEnvName))
+}
+
+func TestBuildPostReadyActionJobsFailsClosedWhenInternalRestoreOwnerIsMissing(t *testing.T) {
+	fixture := newPostReadyTargetEnvFixture(t)
+	fixture.manager.Restore.OwnerReferences = nil
+
+	jobs, err := fixture.manager.BuildPostReadyActionJobs(
+		intctrlutil.RequestCtx{Ctx: context.Background()},
+		fixture.client,
+		fixture.client,
+		fixture.backupSet,
+		fixture.target,
+		0)
+
+	require.Error(t, err)
+	require.True(t, intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal), err.Error())
+	require.Empty(t, jobs)
+}
+
+func TestBuildPostReadyActionJobsRejectsInvalidInternalRestoreIdentity(t *testing.T) {
+	tests := []struct {
+		name   string
+		mutate func(*dpv1alpha1.Restore)
+	}{
+		{
+			name: "marker missing",
+			mutate: func(restore *dpv1alpha1.Restore) {
+				delete(restore.Labels, DataProtectionInternalPostReadyLabelKey)
+			},
+		},
+		{
+			name: "marker conflict",
+			mutate: func(restore *dpv1alpha1.Restore) {
+				restore.Labels[DataProtectionInternalPostReadyLabelKey] = "false"
+			},
+		},
+		{
+			name: "marker and owner missing",
+			mutate: func(restore *dpv1alpha1.Restore) {
+				delete(restore.Labels, DataProtectionInternalPostReadyLabelKey)
+				restore.OwnerReferences = nil
+			},
+		},
+		{
+			name: "wrong owner apiVersion",
+			mutate: func(restore *dpv1alpha1.Restore) {
+				restore.OwnerReferences[0].APIVersion = "v1"
+			},
+		},
+		{
+			name: "wrong owner kind",
+			mutate: func(restore *dpv1alpha1.Restore) {
+				restore.OwnerReferences[0].Kind = "Secret"
+			},
+		},
+		{
+			name: "wrong owner name",
+			mutate: func(restore *dpv1alpha1.Restore) {
+				restore.OwnerReferences[0].Name = "not-the-component"
+			},
+		},
+		{
+			name: "owner is not controller",
+			mutate: func(restore *dpv1alpha1.Restore) {
+				restore.OwnerReferences[0].Controller = nil
+			},
+		},
+		{
+			name: "wrong owner uid",
+			mutate: func(restore *dpv1alpha1.Restore) {
+				restore.OwnerReferences[0].UID = "wrong-component-uid"
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fixture := newPostReadyTargetEnvFixture(t)
+			tt.mutate(fixture.manager.Restore)
+
+			jobs, err := fixture.manager.BuildPostReadyActionJobs(
+				intctrlutil.RequestCtx{Ctx: context.Background()},
+				fixture.client,
+				fixture.client,
+				fixture.backupSet,
+				fixture.target,
+				0,
+			)
+
+			require.Error(t, err)
+			require.True(t, intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal), err.Error())
+			require.Empty(t, jobs)
+		})
+	}
 }
 
 func TestBuildPostReadyActionJobsIgnoresMutatedRestoreTargetEnv(t *testing.T) {

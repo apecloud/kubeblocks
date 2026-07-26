@@ -1725,6 +1725,7 @@ func TestBuildPostReadyRestoreSelectsHighestPriorityRole(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "default",
 			Name:      constant.GenerateClusterComponentName("cluster", "mysql"),
+			UID:       "component-uid",
 		},
 		Spec: kbappsv1.ComponentSpec{CompDef: compDef.Name},
 	}
@@ -1761,6 +1762,7 @@ func TestBuildPostReadyRestoreStripsCallerTargetEnv(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "default",
 			Name:      constant.GenerateClusterComponentName(cluster.Name, "mysql"),
+			UID:       "component-uid",
 		},
 		Spec: kbappsv1.ComponentSpec{ServiceVersion: "3.3.2"},
 	}
@@ -1953,6 +1955,59 @@ func TestEnsurePostReadyRestoreWaitsForObservedComponentGeneration(t *testing.T)
 		Namespace: pvc.Namespace,
 		Name:      postReadyRestoreName(comp.UID),
 	}, restore))
+	require.Equal(t, dprestore.DataProtectionInternalPostReadyLabelValue,
+		restore.Labels[dprestore.DataProtectionInternalPostReadyLabelKey])
+	require.Len(t, restore.OwnerReferences, 1)
+	require.Equal(t, kbappsv1.APIVersion, restore.OwnerReferences[0].APIVersion)
+	require.Equal(t, kbappsv1.ComponentKind, restore.OwnerReferences[0].Kind)
+	require.Equal(t, comp.Name, restore.OwnerReferences[0].Name)
+	require.Equal(t, comp.UID, restore.OwnerReferences[0].UID)
+	require.Equal(t, ptr.To(true), restore.OwnerReferences[0].Controller)
+}
+
+func strictPostReadyRestoreObjectMeta(comp *kbappsv1.Component) metav1.ObjectMeta {
+	return metav1.ObjectMeta{
+		Namespace: comp.Namespace,
+		Name:      postReadyRestoreName(comp.UID),
+		Labels: map[string]string{
+			dprestore.DataProtectionInternalPostReadyLabelKey: dprestore.DataProtectionInternalPostReadyLabelValue,
+		},
+		OwnerReferences: []metav1.OwnerReference{{
+			APIVersion: kbappsv1.APIVersion,
+			Kind:       kbappsv1.ComponentKind,
+			Name:       comp.Name,
+			UID:        comp.UID,
+			Controller: ptr.To(true),
+		}},
+	}
+}
+
+func TestValidatePostReadyRestoreRejectsUIDOnlyNonComponentOwner(t *testing.T) {
+	comp := &kbappsv1.Component{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      "cluster-mysql",
+			UID:       "component-uid",
+		},
+	}
+	desired := &dpv1alpha1.Restore{
+		ObjectMeta: strictPostReadyRestoreObjectMeta(comp),
+		Spec: dpv1alpha1.RestoreSpec{
+			Backup: dpv1alpha1.BackupRef{Name: "backup", Namespace: "default"},
+		},
+	}
+	existing := desired.DeepCopy()
+	existing.OwnerReferences = []metav1.OwnerReference{{
+		APIVersion: "v1",
+		Kind:       "Secret",
+		Name:       "not-the-component",
+		UID:        comp.UID,
+	}}
+
+	err := validatePostReadyRestore(existing, desired, comp)
+
+	require.Error(t, err)
+	require.True(t, intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal), err.Error())
 }
 
 func TestValidatePostReadyRestoreTargetEnvCompatibility(t *testing.T) {
@@ -1963,20 +2018,17 @@ func TestValidatePostReadyRestoreTargetEnvCompatibility(t *testing.T) {
 			UID:       "component-uid",
 		},
 	}
-	desired := &dpv1alpha1.Restore{Spec: dpv1alpha1.RestoreSpec{
-		Backup: dpv1alpha1.BackupRef{Name: "backup", Namespace: "default"},
-		Env:    []corev1.EnvVar{{Name: "KEEP_ME", Value: "kept"}},
-	}}
+	desired := &dpv1alpha1.Restore{
+		ObjectMeta: strictPostReadyRestoreObjectMeta(comp),
+		Spec: dpv1alpha1.RestoreSpec{
+			Backup: dpv1alpha1.BackupRef{Name: "backup", Namespace: "default"},
+			Env:    []corev1.EnvVar{{Name: "KEEP_ME", Value: "kept"}},
+		},
+	}
 	newExisting := func(spec dpv1alpha1.RestoreSpec) *dpv1alpha1.Restore {
 		return &dpv1alpha1.Restore{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: "default",
-				Name:      "post-ready",
-				OwnerReferences: []metav1.OwnerReference{{
-					UID: comp.UID,
-				}},
-			},
-			Spec: spec,
+			ObjectMeta: strictPostReadyRestoreObjectMeta(comp),
+			Spec:       spec,
 		}
 	}
 
@@ -2042,19 +2094,20 @@ func TestValidatePostReadyRestoreTargetEnvCompatibility(t *testing.T) {
 
 func TestValidatePostReadyRestoreAllowsLegacyNilEnv(t *testing.T) {
 	comp := &kbappsv1.Component{
-		ObjectMeta: metav1.ObjectMeta{UID: "component-uid"},
-	}
-	desired := &dpv1alpha1.Restore{Spec: dpv1alpha1.RestoreSpec{
-		Backup: dpv1alpha1.BackupRef{Name: "backup", Namespace: "default"},
-	}}
-	existing := &dpv1alpha1.Restore{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "default",
-			Name:      "post-ready",
-			OwnerReferences: []metav1.OwnerReference{{
-				UID: comp.UID,
-			}},
+			Name:      "cluster-mysql",
+			UID:       "component-uid",
 		},
+	}
+	desired := &dpv1alpha1.Restore{
+		ObjectMeta: strictPostReadyRestoreObjectMeta(comp),
+		Spec: dpv1alpha1.RestoreSpec{
+			Backup: dpv1alpha1.BackupRef{Name: "backup", Namespace: "default"},
+		},
+	}
+	existing := &dpv1alpha1.Restore{
+		ObjectMeta: strictPostReadyRestoreObjectMeta(comp),
 		Spec: dpv1alpha1.RestoreSpec{
 			Backup: desired.Spec.Backup,
 			Env:    nil,
@@ -2102,6 +2155,7 @@ func TestBuildPostReadyRestoreUsesInitAccountFromComponentDefinition(t *testing.
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "default",
 			Name:      constant.GenerateClusterComponentName("cluster", "mysql"),
+			UID:       "component-uid",
 		},
 		Spec: kbappsv1.ComponentSpec{CompDef: compDef.Name},
 	}

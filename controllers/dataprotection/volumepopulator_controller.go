@@ -1344,7 +1344,10 @@ func (r *VolumePopulatorReconciler) buildPostReadyRestore(reqCtx intctrlutil.Req
 	if effectiveTarget != nil {
 		restore.Spec.Backup.SourceTargetName = effectiveTarget.Name
 	}
-	if err = controllerutil.SetOwnerReference(comp, restore, r.Scheme); err != nil {
+	if err = controllerutil.SetControllerReference(comp, restore, r.Scheme); err != nil {
+		return nil, err
+	}
+	if err = dprestore.ValidateInternalPostReadyRestoreComponent(restore, comp); err != nil {
 		return nil, err
 	}
 	return restore, nil
@@ -1362,9 +1365,11 @@ func stripPostReadyTargetEnv(source []corev1.EnvVar) []corev1.EnvVar {
 }
 
 func validatePostReadyRestore(existing, desired *dpv1alpha1.Restore, comp *appsv1.Component) error {
-	if !hasOwnerReference(existing.OwnerReferences, comp.UID) {
-		return intctrlutil.NewFatalError(fmt.Sprintf("postReady restore %s/%s is not owned by component %s/%s",
-			existing.Namespace, existing.Name, comp.Namespace, comp.Name))
+	if err := dprestore.ValidateInternalPostReadyRestoreComponent(existing, comp); err != nil {
+		return err
+	}
+	if err := dprestore.ValidateInternalPostReadyRestoreComponent(desired, comp); err != nil {
+		return err
 	}
 	existingSpec := existing.Spec.DeepCopy()
 	existingSpec.Env = stripPostReadyTargetEnv(existingSpec.Env)
@@ -1375,15 +1380,6 @@ func validatePostReadyRestore(existing, desired *dpv1alpha1.Restore, comp *appsv
 			existing.Namespace, existing.Name))
 	}
 	return nil
-}
-
-func hasOwnerReference(ownerRefs []metav1.OwnerReference, uid types.UID) bool {
-	for _, ownerRef := range ownerRefs {
-		if ownerRef.UID == uid {
-			return true
-		}
-	}
-	return false
 }
 
 func (r *VolumePopulatorReconciler) highestPriorityRoleName(reqCtx intctrlutil.RequestCtx, comp *appsv1.Component) (string, error) {
@@ -1620,8 +1616,9 @@ func postReadyRequiredPolicy(sourceTarget *dpv1alpha1.BackupStatusTarget) *dpv1a
 func postReadyRestoreLabels(pvc *corev1.PersistentVolumeClaim, comp *appsv1.Component) map[string]string {
 	restoreName := postReadyRestoreName(comp.UID)
 	labels := map[string]string{
-		dprestore.DataProtectionRestoreLabelKey:          restoreName,
-		dprestore.DataProtectionRestoreNamespaceLabelKey: pvc.Namespace,
+		dprestore.DataProtectionRestoreLabelKey:           restoreName,
+		dprestore.DataProtectionRestoreNamespaceLabelKey:  pvc.Namespace,
+		dprestore.DataProtectionInternalPostReadyLabelKey: dprestore.DataProtectionInternalPostReadyLabelValue,
 	}
 	for _, key := range []string{
 		constant.AppInstanceLabelKey,

@@ -663,20 +663,9 @@ func controllerReferenceMatches(obj metav1.Object, apiVersion, kind string, uid 
 func (r *RestoreManager) internalPostReadyComponent(
 	reqCtx intctrlutil.RequestCtx,
 	reader client.Reader) (*appsv1.Component, bool, error) {
-	var componentRef *metav1.OwnerReference
-	for i := range r.Restore.OwnerReferences {
-		ref := &r.Restore.OwnerReferences[i]
-		if ref.APIVersion != appsv1.APIVersion ||
-			ref.Kind != appsv1.ComponentKind ||
-			r.Restore.Name != PostReadyRestoreName(ref.UID) {
-			continue
-		}
-		if componentRef != nil {
-			return nil, true, intctrlutil.NewFatalError(fmt.Sprintf(
-				"internal postReady restore %s/%s has multiple Component owners",
-				r.Restore.Namespace, r.Restore.Name))
-		}
-		componentRef = ref
+	componentRef, internal, err := InternalPostReadyRestoreComponentOwner(r.Restore)
+	if err != nil || !internal {
+		return nil, internal, err
 	}
 	if componentRef == nil {
 		return nil, false, nil
@@ -685,12 +674,15 @@ func (r *RestoreManager) internalPostReadyComponent(
 	componentKey := types.NamespacedName{Namespace: r.Restore.Namespace, Name: componentRef.Name}
 	component := &appsv1.Component{}
 	if err := reader.Get(reqCtx.Ctx, componentKey, component); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, true, intctrlutil.NewFatalError(fmt.Sprintf(
+				"internal postReady restore %s/%s references missing Component %s",
+				r.Restore.Namespace, r.Restore.Name, componentKey))
+		}
 		return nil, true, targetFactReadError("Component", componentKey, err)
 	}
-	if component.UID != componentRef.UID {
-		return nil, true, intctrlutil.NewFatalError(fmt.Sprintf(
-			"internal postReady restore %s/%s Component identity changed: expected UID %s, got %s",
-			r.Restore.Namespace, r.Restore.Name, componentRef.UID, component.UID))
+	if err := ValidateInternalPostReadyRestoreComponent(r.Restore, component); err != nil {
+		return nil, true, err
 	}
 	if !component.DeletionTimestamp.IsZero() {
 		return nil, true, intctrlutil.NewFatalError(fmt.Sprintf(

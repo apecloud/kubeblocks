@@ -22,6 +22,7 @@ package v1
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
@@ -231,6 +232,11 @@ type ClusterStatus struct {
 	//
 	// +optional
 	Shardings map[string]ClusterShardingStatus `json:"shardings,omitempty"`
+
+	// TopologyMutationLock serializes cluster-wide topology mutations.
+	//
+	// +optional
+	TopologyMutationLock *TopologyMutationLockStatus `json:"topologyMutationLock,omitempty"`
 
 	// Represents a list of detailed status of the Cluster object.
 	// Each condition in the list provides real-time information about certain aspect of the Cluster object.
@@ -1012,7 +1018,218 @@ type ClusterShardingStatus struct {
 	//
 	// +optional
 	PreTerminate *LifecycleActionStatus `json:"preTerminate,omitempty"`
+
+	// ScaleIn records the authoritative state of a compound shard scale-in plan.
+	//
+	// +optional
+	ScaleIn *ShardingScaleInStatus `json:"scaleIn,omitempty"`
 }
+
+// ShardingScaleInStatus records the authoritative state of a compound shard scale-in plan.
+type ShardingScaleInStatus struct {
+	// ProtocolVersion identifies the scale-in status contract.
+	//
+	// +optional
+	ProtocolVersion ShardingActionResultProtocol `json:"protocolVersion,omitempty"`
+
+	// PlanID uniquely identifies the immutable scale-in plan.
+	//
+	// +optional
+	PlanID string `json:"planID,omitempty"`
+
+	// Phase is the current phase of the scale-in plan.
+	//
+	// +optional
+	Phase ShardingScaleInPhase `json:"phase,omitempty"`
+
+	// TopologyFenceToken binds the plan to its cluster-wide topology mutation lock.
+	//
+	// +optional
+	TopologyFenceToken string `json:"topologyFenceToken,omitempty"`
+
+	// ExternalWriteAuthorized records whether the plan may invoke an external topology write.
+	ExternalWriteAuthorized bool `json:"externalWriteAuthorized"`
+
+	// PlanMaterial contains the immutable source and executor identities hashed by PlanID.
+	//
+	// +optional
+	PlanMaterial *ShardingScaleInPlanMaterial `json:"planMaterial,omitempty"`
+
+	// Holder identifies the shard currently being removed.
+	//
+	// +optional
+	Holder *ShardingScaleInHolder `json:"holder,omitempty"`
+
+	// Progress records the latest committed progress of the current holder.
+	//
+	// +optional
+	Progress *ShardingScaleInProgress `json:"progress,omitempty"`
+
+	// BlockedFrom records the phase from which the plan became blocked.
+	//
+	// +optional
+	BlockedFrom ShardingScaleInPhase `json:"blockedFrom,omitempty"`
+
+	// BlockClass classifies whether a blocked plan may recover automatically.
+	//
+	// +optional
+	BlockClass ShardingScaleInBlockClass `json:"blockClass,omitempty"`
+
+	// Reason is a programmatic identifier for the current phase.
+	//
+	// +optional
+	Reason string `json:"reason,omitempty"`
+
+	// Message provides human-readable details about the current phase.
+	//
+	// +optional
+	Message string `json:"message,omitempty"`
+}
+
+// TopologyMutationLockStatus serializes a cluster-wide topology mutation.
+// +kubebuilder:validation:XValidation:rule="self.ownerKind != 'ShardingScaleIn' || size(self.affectedComponentUIDs) > 0",message="ShardingScaleIn locks must contain at least one affected Component UID"
+// +kubebuilder:validation:XValidation:rule="self.ownerKind != 'ShardingScaleIn' || self.state != 'Released'",message="Released is reserved for ClusterTopologyReconcile locks"
+// +kubebuilder:validation:XValidation:rule="self.ownerKind != 'ClusterTopologyReconcile' || self.state in ['Held', 'Executing', 'Released']",message="ClusterTopologyReconcile locks must use an ordinary reconcile state"
+// +kubebuilder:validation:XValidation:rule="self.ownerKind != 'ClusterTopologyReconcile' || size(self.affectedComponentUIDs) == 0",message="ClusterTopologyReconcile locks must use cluster-wide scope"
+type TopologyMutationLockStatus struct {
+	// Version identifies the topology lock contract.
+	Version TopologyMutationLockVersion `json:"version"`
+
+	// FenceToken is the immutable token owned by the current plan.
+	FenceToken string `json:"fenceToken"`
+
+	// ClusterUID binds the lock to the exact Cluster object.
+	ClusterUID types.UID `json:"clusterUID"`
+
+	// OwnerKind identifies the topology operation that owns the lock.
+	OwnerKind TopologyMutationLockOwnerKind `json:"ownerKind"`
+
+	// OwnerPlanID is the immutable plan identity that owns the lock.
+	OwnerPlanID string `json:"ownerPlanID"`
+
+	// State is the current lock lifecycle state.
+	State TopologyMutationLockState `json:"state"`
+
+	// AcquiredAt records when the lock was first persisted.
+	AcquiredAt *metav1.Time `json:"acquiredAt"`
+
+	// AffectedComponentUIDs lists the exact Components fenced by the lock.
+	//
+	AffectedComponentUIDs []types.UID `json:"affectedComponentUIDs"`
+}
+
+// TopologyMutationLockVersion identifies a topology mutation lock contract.
+//
+// +enum
+// +kubebuilder:validation:Enum={kb.topology-lock/v1}
+type TopologyMutationLockVersion string
+
+const (
+	// TopologyMutationLockVersionV1 is the first topology mutation lock contract.
+	TopologyMutationLockVersionV1 TopologyMutationLockVersion = "kb.topology-lock/v1"
+)
+
+// TopologyMutationLockOwnerKind identifies a topology mutation owner.
+//
+// +enum
+// +kubebuilder:validation:Enum={ShardingScaleIn,ClusterTopologyReconcile}
+type TopologyMutationLockOwnerKind string
+
+const (
+	// TopologyMutationLockOwnerShardingScaleIn identifies a compound shard scale-in plan.
+	TopologyMutationLockOwnerShardingScaleIn TopologyMutationLockOwnerKind = "ShardingScaleIn"
+	// TopologyMutationLockOwnerClusterTopologyReconcile identifies ordinary topology reconciliation.
+	TopologyMutationLockOwnerClusterTopologyReconcile TopologyMutationLockOwnerKind = "ClusterTopologyReconcile"
+)
+
+// TopologyMutationLockState defines the topology mutation lock lifecycle.
+//
+// +enum
+// +kubebuilder:validation:Enum={InstallingAuthority,Held,Executing,Released,ReleasingMembers,DeletionCloseout,DeletionSafe,DeletionDependentsGone,ReleaseReady}
+type TopologyMutationLockState string
+
+const (
+	TopologyMutationLockStateInstallingAuthority TopologyMutationLockState = "InstallingAuthority"
+	TopologyMutationLockStateHeld                TopologyMutationLockState = "Held"
+	TopologyMutationLockStateExecuting           TopologyMutationLockState = "Executing"
+	TopologyMutationLockStateReleased            TopologyMutationLockState = "Released"
+	TopologyMutationLockStateReleasingMembers    TopologyMutationLockState = "ReleasingMembers"
+	TopologyMutationLockStateDeletionCloseout    TopologyMutationLockState = "DeletionCloseout"
+	TopologyMutationLockStateDeletionSafe        TopologyMutationLockState = "DeletionSafe"
+	TopologyMutationLockStateDependentsGone      TopologyMutationLockState = "DeletionDependentsGone"
+	TopologyMutationLockStateReleaseReady        TopologyMutationLockState = "ReleaseReady"
+)
+
+// ShardingScaleInHolder identifies a shard participating in a scale-in plan.
+type ShardingScaleInHolder struct {
+	// Name is the Component name.
+	//
+	// +optional
+	Name string `json:"name,omitempty"`
+
+	// UID is the full Component UID.
+	//
+	// +optional
+	UID string `json:"uid,omitempty"`
+}
+
+// ShardingScaleInProgress records bounded progress for the current holder.
+type ShardingScaleInProgress struct {
+	// Stage identifies the current stage within the plan phase.
+	//
+	// +optional
+	Stage string `json:"stage,omitempty"`
+
+	// Reason is a programmatic identifier for the latest progress.
+	//
+	// +optional
+	Reason string `json:"reason,omitempty"`
+
+	// BeforeSlots is the number of slots owned by the holder before the latest batch.
+	//
+	// +optional
+	BeforeSlots int32 `json:"beforeSlots,omitempty"`
+
+	// AfterSlots is the number of slots owned by the holder after the latest batch.
+	//
+	// +optional
+	AfterSlots int32 `json:"afterSlots,omitempty"`
+
+	// RetryAfterSeconds is the bounded delay before the next observation.
+	//
+	// +optional
+	RetryAfterSeconds int32 `json:"retryAfterSeconds,omitempty"`
+}
+
+// ShardingScaleInPhase defines the durable phase of a compound shard scale-in plan.
+// +enum
+// +kubebuilder:validation:Enum={Planned,Superseded,Draining,PurgePrepared,Resetting,Forgetting,Verified,DeleteCommitted,Deleting,HolderPlanned,Blocked,Completed}
+type ShardingScaleInPhase string
+
+const (
+	ShardingScaleInPhasePlanned         ShardingScaleInPhase = "Planned"
+	ShardingScaleInPhaseSuperseded      ShardingScaleInPhase = "Superseded"
+	ShardingScaleInPhaseDraining        ShardingScaleInPhase = "Draining"
+	ShardingScaleInPhasePurgePrepared   ShardingScaleInPhase = "PurgePrepared"
+	ShardingScaleInPhaseResetting       ShardingScaleInPhase = "Resetting"
+	ShardingScaleInPhaseForgetting      ShardingScaleInPhase = "Forgetting"
+	ShardingScaleInPhaseVerified        ShardingScaleInPhase = "Verified"
+	ShardingScaleInPhaseDeleteCommitted ShardingScaleInPhase = "DeleteCommitted"
+	ShardingScaleInPhaseDeleting        ShardingScaleInPhase = "Deleting"
+	ShardingScaleInPhaseHolderPlanned   ShardingScaleInPhase = "HolderPlanned"
+	ShardingScaleInPhaseBlocked         ShardingScaleInPhase = "Blocked"
+	ShardingScaleInPhaseCompleted       ShardingScaleInPhase = "Completed"
+)
+
+// ShardingScaleInBlockClass defines how a blocked scale-in plan may be resumed.
+// +enum
+// +kubebuilder:validation:Enum={Recoverable,Terminal}
+type ShardingScaleInBlockClass string
+
+const (
+	ShardingScaleInBlockClassRecoverable ShardingScaleInBlockClass = "Recoverable"
+	ShardingScaleInBlockClassTerminal    ShardingScaleInBlockClass = "Terminal"
+)
 
 // LifecycleActionStatus records the observed state of a lifecycle-related action.
 type LifecycleActionStatus struct {

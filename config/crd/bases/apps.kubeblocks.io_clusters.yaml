@@ -17881,6 +17881,767 @@ spec:
                           format: date-time
                           type: string
                       type: object
+                    scaleIn:
+                      description: ScaleIn records the authoritative state of a compound
+                        shard scale-in plan.
+                      properties:
+                        blockClass:
+                          description: BlockClass classifies whether a blocked plan
+                            may recover automatically.
+                          enum:
+                          - Recoverable
+                          - Terminal
+                          type: string
+                        blockedFrom:
+                          description: BlockedFrom records the phase from which the
+                            plan became blocked.
+                          enum:
+                          - Planned
+                          - Superseded
+                          - Draining
+                          - PurgePrepared
+                          - Resetting
+                          - Forgetting
+                          - Verified
+                          - DeleteCommitted
+                          - Deleting
+                          - HolderPlanned
+                          - Blocked
+                          - Completed
+                          type: string
+                        externalWriteAuthorized:
+                          description: ExternalWriteAuthorized records whether the
+                            plan may invoke an external topology write.
+                          type: boolean
+                        holder:
+                          description: Holder identifies the shard currently being
+                            removed.
+                          properties:
+                            name:
+                              description: Name is the Component name.
+                              type: string
+                            uid:
+                              description: UID is the full Component UID.
+                              type: string
+                          type: object
+                        message:
+                          description: Message provides human-readable details about
+                            the current phase.
+                          type: string
+                        phase:
+                          description: Phase is the current phase of the scale-in
+                            plan.
+                          enum:
+                          - Planned
+                          - Superseded
+                          - Draining
+                          - PurgePrepared
+                          - Resetting
+                          - Forgetting
+                          - Verified
+                          - DeleteCommitted
+                          - Deleting
+                          - HolderPlanned
+                          - Blocked
+                          - Completed
+                          type: string
+                        planID:
+                          description: PlanID uniquely identifies the immutable scale-in
+                            plan.
+                          type: string
+                        planMaterial:
+                          description: PlanMaterial contains the immutable source
+                            and executor identities hashed by PlanID.
+                          properties:
+                            action:
+                              description: Action identifies the exact ShardingDefinition
+                                action contract.
+                              properties:
+                                actionDigest:
+                                  type: string
+                                resultProtocol:
+                                  description: ShardingActionResultProtocol defines
+                                    the typed result protocol of a sharding action.
+                                  enum:
+                                  - kb.sharding.scalein/v2
+                                  type: string
+                                shardingDefinitionGeneration:
+                                  format: int64
+                                  minimum: 1
+                                  type: integer
+                                shardingDefinitionName:
+                                  type: string
+                                shardingDefinitionUID:
+                                  description: |-
+                                    UID is a type that holds unique ID values, including UUIDs.  Because we
+                                    don't ONLY use UUIDs, this is an alias to string.  Being a type captures
+                                    intent and helps make sure that UIDs and names do not get conflated.
+                                  type: string
+                              required:
+                              - actionDigest
+                              - resultProtocol
+                              - shardingDefinitionGeneration
+                              - shardingDefinitionName
+                              - shardingDefinitionUID
+                              type: object
+                            deletionGuard:
+                              description: DeletionGuard identifies the exact deletion-guard
+                                capability required by the plan.
+                              properties:
+                                configurationDigest:
+                                  type: string
+                                installationUID:
+                                  description: |-
+                                    UID is a type that holds unique ID values, including UUIDs.  Because we
+                                    don't ONLY use UUIDs, this is an alias to string.  Being a type captures
+                                    intent and helps make sure that UIDs and names do not get conflated.
+                                  type: string
+                                policyRevision:
+                                  type: string
+                                protocol:
+                                  description: ShardingScaleInDeletionGuardProtocol
+                                    identifies the deletion-guard capability contract.
+                                  enum:
+                                  - scale-in-deletion-guard/v1
+                                  type: string
+                              required:
+                              - configurationDigest
+                              - installationUID
+                              - policyRevision
+                              - protocol
+                              type: object
+                            executorPrerequisites:
+                              description: ExecutorPrerequisites lists exact deletion-critical
+                                objects used by plan executors.
+                              items:
+                                description: ShardingScaleInExecutorPrerequisite identifies
+                                  one deletion-critical executor object.
+                                properties:
+                                  apiVersion:
+                                    type: string
+                                  componentUID:
+                                    description: |-
+                                      UID is a type that holds unique ID values, including UUIDs.  Because we
+                                      don't ONLY use UUIDs, this is an alias to string.  Being a type captures
+                                      intent and helps make sure that UIDs and names do not get conflated.
+                                    type: string
+                                  criticalSpecDigest:
+                                    type: string
+                                  identityDigest:
+                                    type: string
+                                  kind:
+                                    type: string
+                                  name:
+                                    type: string
+                                  namespace:
+                                    type: string
+                                  role:
+                                    description: ShardingScaleInPrerequisiteRole identifies
+                                      a reviewed executor prerequisite role.
+                                    enum:
+                                    - PodOwnerWorkload
+                                    - ClusterDNS
+                                    - KBAgentEndpoint
+                                    type: string
+                                  scope:
+                                    description: ShardingScaleInPrerequisiteScope
+                                      identifies whether a prerequisite is Component-local
+                                      or shared.
+                                    enum:
+                                    - Component
+                                    - Shared
+                                    type: string
+                                  uid:
+                                    description: |-
+                                      UID is a type that holds unique ID values, including UUIDs.  Because we
+                                      don't ONLY use UUIDs, this is an alias to string.  Being a type captures
+                                      intent and helps make sure that UIDs and names do not get conflated.
+                                    type: string
+                                required:
+                                - apiVersion
+                                - criticalSpecDigest
+                                - identityDigest
+                                - kind
+                                - name
+                                - namespace
+                                - role
+                                - scope
+                                - uid
+                                type: object
+                              minItems: 1
+                              type: array
+                            leaving:
+                              description: Leaving lists the exact Components removed
+                                by the plan.
+                              items:
+                                description: ShardingScaleInPlanMember identifies
+                                  one immutable Component and its Pods.
+                                properties:
+                                  componentGeneration:
+                                    format: int64
+                                    minimum: 1
+                                    type: integer
+                                  componentName:
+                                    type: string
+                                  componentShortName:
+                                    type: string
+                                  componentSpecDigest:
+                                    type: string
+                                  componentUID:
+                                    description: |-
+                                      UID is a type that holds unique ID values, including UUIDs.  Because we
+                                      don't ONLY use UUIDs, this is an alias to string.  Being a type captures
+                                      intent and helps make sure that UIDs and names do not get conflated.
+                                    type: string
+                                  pods:
+                                    items:
+                                      description: ShardingScaleInPlanPod identifies
+                                        one immutable Pod and its kbagent runtime
+                                        binding.
+                                      properties:
+                                        agentCapabilityDigest:
+                                          type: string
+                                        agentImageID:
+                                          type: string
+                                        agentProcessUID:
+                                          type: string
+                                        fqdn:
+                                          type: string
+                                        name:
+                                          type: string
+                                        uid:
+                                          description: |-
+                                            UID is a type that holds unique ID values, including UUIDs.  Because we
+                                            don't ONLY use UUIDs, this is an alias to string.  Being a type captures
+                                            intent and helps make sure that UIDs and names do not get conflated.
+                                          type: string
+                                      required:
+                                      - agentCapabilityDigest
+                                      - agentImageID
+                                      - agentProcessUID
+                                      - fqdn
+                                      - name
+                                      - uid
+                                      type: object
+                                    maxItems: 5
+                                    minItems: 1
+                                    type: array
+                                  shardTemplateName:
+                                    type: string
+                                required:
+                                - componentGeneration
+                                - componentName
+                                - componentShortName
+                                - componentSpecDigest
+                                - componentUID
+                                - pods
+                                - shardTemplateName
+                                type: object
+                              minItems: 1
+                              type: array
+                            proofExecutor:
+                              description: ProofExecutor is the immutable first canonical
+                                Pod in Staying.
+                              properties:
+                                podName:
+                                  type: string
+                                podUID:
+                                  description: |-
+                                    UID is a type that holds unique ID values, including UUIDs.  Because we
+                                    don't ONLY use UUIDs, this is an alias to string.  Being a type captures
+                                    intent and helps make sure that UIDs and names do not get conflated.
+                                  type: string
+                              required:
+                              - podName
+                              - podUID
+                              type: object
+                            protocolVersion:
+                              description: ProtocolVersion identifies the typed shard
+                                scale-in contract.
+                              enum:
+                              - kb.sharding.scalein/v2
+                              type: string
+                            requestAuthority:
+                              description: RequestAuthority closes every source and
+                                executor identity used to build action requests.
+                              properties:
+                                actionDefinitionDigest:
+                                  type: string
+                                actionName:
+                                  type: string
+                                builder:
+                                  description: ShardingScaleInRequestBuilder identifies
+                                    the only request builder allowed by a plan.
+                                  enum:
+                                  - TypedShardScaleInV1
+                                  - TypedShardScaleInV2
+                                  type: string
+                                componentDefinitionSources:
+                                  items:
+                                    description: ShardingScaleInComponentDefinitionSource
+                                      identifies ComponentDefinition vars used at
+                                      plan time.
+                                    properties:
+                                      generation:
+                                        format: int64
+                                        type: integer
+                                      name:
+                                        type: string
+                                      uid:
+                                        description: |-
+                                          UID is a type that holds unique ID values, including UUIDs.  Because we
+                                          don't ONLY use UUIDs, this is an alias to string.  Being a type captures
+                                          intent and helps make sure that UIDs and names do not get conflated.
+                                        type: string
+                                      varsProjectionDigest:
+                                        type: string
+                                    required:
+                                    - generation
+                                    - name
+                                    - uid
+                                    - varsProjectionDigest
+                                    type: object
+                                  minItems: 1
+                                  type: array
+                                credentialSources:
+                                  items:
+                                    description: |-
+                                      ShardingScaleInCredentialSource records one canonical Secret identity and
+                                      the exact union of key names used by executor bindings. It never contains
+                                      Secret values or value digests.
+                                    properties:
+                                      apiVersion:
+                                        type: string
+                                      credentialSourceDigest:
+                                        type: string
+                                      keyNames:
+                                        items:
+                                          type: string
+                                        minItems: 1
+                                        type: array
+                                      kind:
+                                        type: string
+                                      name:
+                                        type: string
+                                      namespace:
+                                        type: string
+                                      sourceID:
+                                        type: string
+                                      uid:
+                                        description: |-
+                                          UID is a type that holds unique ID values, including UUIDs.  Because we
+                                          don't ONLY use UUIDs, this is an alias to string.  Being a type captures
+                                          intent and helps make sure that UIDs and names do not get conflated.
+                                        type: string
+                                    required:
+                                    - apiVersion
+                                    - credentialSourceDigest
+                                    - keyNames
+                                    - kind
+                                    - name
+                                    - namespace
+                                    - sourceID
+                                    - uid
+                                    type: object
+                                  type: array
+                                executorTemplates:
+                                  items:
+                                    description: ShardingScaleInExecutorTemplate records
+                                      an immutable request base for one executor.
+                                    properties:
+                                      baseParameterDigest:
+                                        type: string
+                                      baseParameterRecordB64:
+                                        type: string
+                                      cancelSchemaDigest:
+                                        type: string
+                                      credentialBindings:
+                                        items:
+                                          description: ShardingScaleInExecutorCredentialBinding
+                                            binds one declared variable to a canonical
+                                            Secret source.
+                                          properties:
+                                            bindingDigest:
+                                              type: string
+                                            credentialSourceDigest:
+                                              type: string
+                                            credentialSourceID:
+                                              type: string
+                                            requiredKeyNames:
+                                              items:
+                                                type: string
+                                              type: array
+                                            resolverProjectionDigest:
+                                              type: string
+                                            variableName:
+                                              type: string
+                                          required:
+                                          - bindingDigest
+                                          - credentialSourceDigest
+                                          - credentialSourceID
+                                          - requiredKeyNames
+                                          - resolverProjectionDigest
+                                          - variableName
+                                          type: object
+                                        type: array
+                                      executorComponentUID:
+                                        description: |-
+                                          UID is a type that holds unique ID values, including UUIDs.  Because we
+                                          don't ONLY use UUIDs, this is an alias to string.  Being a type captures
+                                          intent and helps make sure that UIDs and names do not get conflated.
+                                        type: string
+                                      executorPodUID:
+                                        description: |-
+                                          UID is a type that holds unique ID values, including UUIDs.  Because we
+                                          don't ONLY use UUIDs, this is an alias to string.  Being a type captures
+                                          intent and helps make sure that UIDs and names do not get conflated.
+                                        type: string
+                                      launchSchemaDigest:
+                                        type: string
+                                      pollSchemaDigest:
+                                        type: string
+                                      serverRuntimeBinding:
+                                        description: ShardingScaleInServerRuntimeBinding
+                                          identifies the exact kbagent process and
+                                          server configuration.
+                                        properties:
+                                          agentImageID:
+                                            type: string
+                                          agentProcessUID:
+                                            type: string
+                                          registeredActionDigest:
+                                            type: string
+                                          serverConfigurationDigest:
+                                            type: string
+                                          startupEnvironmentSchemaDigest:
+                                            type: string
+                                        required:
+                                        - agentImageID
+                                        - agentProcessUID
+                                        - registeredActionDigest
+                                        - serverConfigurationDigest
+                                        - startupEnvironmentSchemaDigest
+                                        type: object
+                                    required:
+                                    - baseParameterDigest
+                                    - baseParameterRecordB64
+                                    - cancelSchemaDigest
+                                    - executorComponentUID
+                                    - executorPodUID
+                                    - launchSchemaDigest
+                                    - pollSchemaDigest
+                                    - serverRuntimeBinding
+                                    type: object
+                                  minItems: 1
+                                  type: array
+                                genericLifecycleSynthesisForbidden:
+                                  type: boolean
+                                requestAuthorityDigest:
+                                  type: string
+                                sourceSnapshotDigest:
+                                  type: string
+                                varSources:
+                                  items:
+                                    description: ShardingScaleInVarSource records
+                                      one declared variable and its exact provenance.
+                                    properties:
+                                      consumption:
+                                        description: ShardingScaleInVarConsumption
+                                          classifies where a resolved variable may
+                                          be consumed.
+                                        enum:
+                                        - TypedBase
+                                        - DurableEnvelope
+                                        - ServerStartupSecret
+                                        - ServerReservedIdentity
+                                        - ForbiddenForTypedScaleIn
+                                        type: string
+                                      resolvedNonSecretValueB64:
+                                        type: string
+                                      resolvedNonSecretValueDigest:
+                                        type: string
+                                      resolverKind:
+                                        description: ShardingScaleInVarResolverKind
+                                          identifies a reviewed variable resolver.
+                                        enum:
+                                        - StaticValue
+                                        - ClusterVarRef
+                                        - ComponentVarRef
+                                        - ResourceVarRef
+                                        - CredentialVarRef
+                                        type: string
+                                      secretSource:
+                                        description: |-
+                                          SecretSource is retained only to decode legacy v1 material so v2
+                                          validation can reject it explicitly.
+                                        properties:
+                                          apiVersion:
+                                            type: string
+                                          keyNames:
+                                            items:
+                                              type: string
+                                            minItems: 1
+                                            type: array
+                                          kind:
+                                            type: string
+                                          name:
+                                            type: string
+                                          namespace:
+                                            type: string
+                                          uid:
+                                            description: |-
+                                              UID is a type that holds unique ID values, including UUIDs.  Because we
+                                              don't ONLY use UUIDs, this is an alias to string.  Being a type captures
+                                              intent and helps make sure that UIDs and names do not get conflated.
+                                            type: string
+                                        required:
+                                        - apiVersion
+                                        - keyNames
+                                        - kind
+                                        - name
+                                        - namespace
+                                        - uid
+                                        type: object
+                                      sourceObjects:
+                                        items:
+                                          description: ShardingScaleInRequestSourceObject
+                                            records one exact non-secret request source.
+                                          properties:
+                                            apiVersion:
+                                              type: string
+                                            kind:
+                                              type: string
+                                            name:
+                                              type: string
+                                            namespace:
+                                              type: string
+                                            projectionDigest:
+                                              type: string
+                                            projectionKind:
+                                              description: ShardingScaleInSourceProjectionKind
+                                                identifies a reviewed request-source
+                                                projection.
+                                              enum:
+                                              - ClusterIdentity
+                                              - ComponentIdentity
+                                              - InstanceSetSpec
+                                              type: string
+                                            uid:
+                                              description: |-
+                                                UID is a type that holds unique ID values, including UUIDs.  Because we
+                                                don't ONLY use UUIDs, this is an alias to string.  Being a type captures
+                                                intent and helps make sure that UIDs and names do not get conflated.
+                                              type: string
+                                          required:
+                                          - apiVersion
+                                          - kind
+                                          - name
+                                          - namespace
+                                          - projectionDigest
+                                          - projectionKind
+                                          - uid
+                                          type: object
+                                        type: array
+                                      variableName:
+                                        type: string
+                                    required:
+                                    - consumption
+                                    - resolvedNonSecretValueB64
+                                    - resolvedNonSecretValueDigest
+                                    - resolverKind
+                                    - sourceObjects
+                                    - variableName
+                                    type: object
+                                  type: array
+                                version:
+                                  description: ShardingScaleInRequestAuthorityVersion
+                                    identifies a request-authority contract.
+                                  enum:
+                                  - kb.sharding.scalein.request-authority/v1
+                                  - kb.sharding.scalein.request-authority/v2
+                                  type: string
+                              required:
+                              - actionDefinitionDigest
+                              - actionName
+                              - builder
+                              - componentDefinitionSources
+                              - executorTemplates
+                              - genericLifecycleSynthesisForbidden
+                              - requestAuthorityDigest
+                              - sourceSnapshotDigest
+                              - varSources
+                              - version
+                              type: object
+                            shardingName:
+                              description: ShardingName is the exact Cluster sharding
+                                name.
+                              type: string
+                            source:
+                              description: Source identifies the exact Cluster intent
+                                that produced this plan.
+                              properties:
+                                clusterGeneration:
+                                  format: int64
+                                  minimum: 1
+                                  type: integer
+                                clusterName:
+                                  type: string
+                                clusterNamespace:
+                                  type: string
+                                clusterUID:
+                                  description: |-
+                                    UID is a type that holds unique ID values, including UUIDs.  Because we
+                                    don't ONLY use UUIDs, this is an alias to string.  Being a type captures
+                                    intent and helps make sure that UIDs and names do not get conflated.
+                                  type: string
+                                desiredDigest:
+                                  type: string
+                                desiredShards:
+                                  format: int32
+                                  minimum: 1
+                                  type: integer
+                                optionalOpsRequestName:
+                                  type: string
+                                optionalOpsRequestUID:
+                                  description: |-
+                                    UID is a type that holds unique ID values, including UUIDs.  Because we
+                                    don't ONLY use UUIDs, this is an alias to string.  Being a type captures
+                                    intent and helps make sure that UIDs and names do not get conflated.
+                                  type: string
+                              required:
+                              - clusterGeneration
+                              - clusterName
+                              - clusterNamespace
+                              - clusterUID
+                              - desiredDigest
+                              - desiredShards
+                              type: object
+                            staying:
+                              description: Staying lists the exact Components retained
+                                by the plan.
+                              items:
+                                description: ShardingScaleInPlanMember identifies
+                                  one immutable Component and its Pods.
+                                properties:
+                                  componentGeneration:
+                                    format: int64
+                                    minimum: 1
+                                    type: integer
+                                  componentName:
+                                    type: string
+                                  componentShortName:
+                                    type: string
+                                  componentSpecDigest:
+                                    type: string
+                                  componentUID:
+                                    description: |-
+                                      UID is a type that holds unique ID values, including UUIDs.  Because we
+                                      don't ONLY use UUIDs, this is an alias to string.  Being a type captures
+                                      intent and helps make sure that UIDs and names do not get conflated.
+                                    type: string
+                                  pods:
+                                    items:
+                                      description: ShardingScaleInPlanPod identifies
+                                        one immutable Pod and its kbagent runtime
+                                        binding.
+                                      properties:
+                                        agentCapabilityDigest:
+                                          type: string
+                                        agentImageID:
+                                          type: string
+                                        agentProcessUID:
+                                          type: string
+                                        fqdn:
+                                          type: string
+                                        name:
+                                          type: string
+                                        uid:
+                                          description: |-
+                                            UID is a type that holds unique ID values, including UUIDs.  Because we
+                                            don't ONLY use UUIDs, this is an alias to string.  Being a type captures
+                                            intent and helps make sure that UIDs and names do not get conflated.
+                                          type: string
+                                      required:
+                                      - agentCapabilityDigest
+                                      - agentImageID
+                                      - agentProcessUID
+                                      - fqdn
+                                      - name
+                                      - uid
+                                      type: object
+                                    maxItems: 5
+                                    minItems: 1
+                                    type: array
+                                  shardTemplateName:
+                                    type: string
+                                required:
+                                - componentGeneration
+                                - componentName
+                                - componentShortName
+                                - componentSpecDigest
+                                - componentUID
+                                - pods
+                                - shardTemplateName
+                                type: object
+                              minItems: 1
+                              type: array
+                          required:
+                          - action
+                          - deletionGuard
+                          - executorPrerequisites
+                          - leaving
+                          - proofExecutor
+                          - protocolVersion
+                          - requestAuthority
+                          - shardingName
+                          - source
+                          - staying
+                          type: object
+                        progress:
+                          description: Progress records the latest committed progress
+                            of the current holder.
+                          properties:
+                            afterSlots:
+                              description: AfterSlots is the number of slots owned
+                                by the holder after the latest batch.
+                              format: int32
+                              type: integer
+                            beforeSlots:
+                              description: BeforeSlots is the number of slots owned
+                                by the holder before the latest batch.
+                              format: int32
+                              type: integer
+                            reason:
+                              description: Reason is a programmatic identifier for
+                                the latest progress.
+                              type: string
+                            retryAfterSeconds:
+                              description: RetryAfterSeconds is the bounded delay
+                                before the next observation.
+                              format: int32
+                              type: integer
+                            stage:
+                              description: Stage identifies the current stage within
+                                the plan phase.
+                              type: string
+                          type: object
+                        protocolVersion:
+                          description: ProtocolVersion identifies the scale-in status
+                            contract.
+                          enum:
+                          - kb.sharding.scalein/v2
+                          type: string
+                        reason:
+                          description: Reason is a programmatic identifier for the
+                            current phase.
+                          type: string
+                        topologyFenceToken:
+                          description: TopologyFenceToken binds the plan to its cluster-wide
+                            topology mutation lock.
+                          type: string
+                      required:
+                      - externalWriteAuthorized
+                      type: object
                     shardingDef:
                       description: Records the name of the sharding definition used.
                       type: string
@@ -17892,6 +18653,84 @@ spec:
                 description: Records the current status information of all shardings
                   within the Cluster.
                 type: object
+              topologyMutationLock:
+                description: TopologyMutationLock serializes cluster-wide topology
+                  mutations.
+                properties:
+                  acquiredAt:
+                    description: AcquiredAt records when the lock was first persisted.
+                    format: date-time
+                    type: string
+                  affectedComponentUIDs:
+                    description: AffectedComponentUIDs lists the exact Components
+                      fenced by the lock.
+                    items:
+                      description: |-
+                        UID is a type that holds unique ID values, including UUIDs.  Because we
+                        don't ONLY use UUIDs, this is an alias to string.  Being a type captures
+                        intent and helps make sure that UIDs and names do not get conflated.
+                      type: string
+                    type: array
+                  clusterUID:
+                    description: ClusterUID binds the lock to the exact Cluster object.
+                    type: string
+                  fenceToken:
+                    description: FenceToken is the immutable token owned by the current
+                      plan.
+                    type: string
+                  ownerKind:
+                    description: OwnerKind identifies the topology operation that
+                      owns the lock.
+                    enum:
+                    - ShardingScaleIn
+                    - ClusterTopologyReconcile
+                    type: string
+                  ownerPlanID:
+                    description: OwnerPlanID is the immutable plan identity that owns
+                      the lock.
+                    type: string
+                  state:
+                    description: State is the current lock lifecycle state.
+                    enum:
+                    - InstallingAuthority
+                    - Held
+                    - Executing
+                    - Released
+                    - ReleasingMembers
+                    - DeletionCloseout
+                    - DeletionSafe
+                    - DeletionDependentsGone
+                    - ReleaseReady
+                    type: string
+                  version:
+                    description: Version identifies the topology lock contract.
+                    enum:
+                    - kb.topology-lock/v1
+                    type: string
+                required:
+                - acquiredAt
+                - affectedComponentUIDs
+                - clusterUID
+                - fenceToken
+                - ownerKind
+                - ownerPlanID
+                - state
+                - version
+                type: object
+                x-kubernetes-validations:
+                - message: ShardingScaleIn locks must contain at least one affected
+                    Component UID
+                  rule: self.ownerKind != 'ShardingScaleIn' || size(self.affectedComponentUIDs)
+                    > 0
+                - message: Released is reserved for ClusterTopologyReconcile locks
+                  rule: self.ownerKind != 'ShardingScaleIn' || self.state != 'Released'
+                - message: ClusterTopologyReconcile locks must use an ordinary reconcile
+                    state
+                  rule: self.ownerKind != 'ClusterTopologyReconcile' || self.state
+                    in ['Held', 'Executing', 'Released']
+                - message: ClusterTopologyReconcile locks must use cluster-wide scope
+                  rule: self.ownerKind != 'ClusterTopologyReconcile' || size(self.affectedComponentUIDs)
+                    == 0
             type: object
         type: object
     served: true

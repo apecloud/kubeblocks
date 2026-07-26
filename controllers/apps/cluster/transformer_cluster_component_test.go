@@ -449,11 +449,20 @@ var _ = Describe("cluster component transformer test", func() {
 			f.SetReplicas(1)
 		}
 		cluster := f.GetObject()
+		cluster.UID = "test-cluster-uid"
+		cluster.ResourceVersion = "17"
+		cluster.Generation = 7
+		// These cases exercise effect building after a prior reconciliation
+		// has acquired the ordinary topology lock.
+		lock, err := buildClusterTopologyReconcileLock(cluster)
+		Expect(err).Should(BeNil())
+		cluster.Status.TopologyMutationLock = lock
 
 		graphCli := model.NewGraphClient(k8sClient)
 		transCtx := &clusterTransformContext{
 			Context:       ctx,
 			Client:        graphCli,
+			APIReader:     &appsutil.MockReader{Objects: []client.Object{cluster.DeepCopy()}},
 			EventRecorder: nil,
 			Logger:        logger,
 			Cluster:       cluster,
@@ -2391,9 +2400,21 @@ var _ = Describe("cluster component transformer test", func() {
 
 		Context("shard-remove", func() {
 			BeforeEach(func() {
-				transCtx.shardingDefs[shardingDefName].Spec.LifecycleActions = &appsv1.ShardingLifecycleActions{
+				transCtx.Cluster.UID = "test-cluster-uid"
+				transCtx.Cluster.ResourceVersion = "17"
+				transCtx.Cluster.Generation = 7
+				transCtx.OrigCluster = transCtx.Cluster.DeepCopy()
+				cachedShardingDef := transCtx.shardingDefs[shardingDefName]
+				cachedShardingDef.UID = "test-sharding-definition-uid"
+				cachedShardingDef.ResourceVersion = "19"
+				cachedShardingDef.Generation = 3
+				cachedShardingDef.Spec.LifecycleActions = &appsv1.ShardingLifecycleActions{
 					ShardRemove: mockShardingAction("shard-remove"),
 				}
+				transCtx.APIReader = &appsutil.MockReader{Objects: []client.Object{
+					transCtx.Cluster.DeepCopy(),
+					cachedShardingDef,
+				}}
 			})
 
 			It("succeed", func() {

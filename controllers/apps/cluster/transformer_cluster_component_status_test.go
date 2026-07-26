@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package cluster
 
 import (
+	"reflect"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -364,6 +366,59 @@ var _ = Describe("cluster component status transformer", func() {
 	})
 
 	Context("sharding", func() {
+		It("preserves the topology mutation lock while rebuilding status", func() {
+			lock := &appsv1.TopologyMutationLockStatus{
+				Version:     appsv1.TopologyMutationLockVersionV1,
+				FenceToken:  "fence-1",
+				OwnerKind:   appsv1.TopologyMutationLockOwnerShardingScaleIn,
+				OwnerPlanID: "plan-1",
+				State:       appsv1.TopologyMutationLockStateInstallingAuthority,
+			}
+			transCtx.Cluster.Status.TopologyMutationLock = lock
+
+			transformer := &clusterComponentStatusTransformer{}
+			Expect(transformer.Transform(transCtx, dag)).Should(Succeed())
+			Expect(transCtx.Cluster.Status.TopologyMutationLock).Should(BeIdenticalTo(lock))
+		})
+
+		It("exposes the typed sharding action result protocol", func() {
+			field, ok := reflect.TypeOf(appsv1.ShardingAction{}).FieldByName("ResultProtocol")
+			Expect(ok).Should(BeTrue(), "ShardingAction must expose ResultProtocol")
+			if !ok {
+				return
+			}
+			Expect(field.Tag.Get("json")).Should(Equal("resultProtocol,omitempty"))
+		})
+
+		It("preserves scale-in status when rebuilding sharding status", func() {
+			statusType := reflect.TypeOf(appsv1.ClusterShardingStatus{})
+			field, ok := statusType.FieldByName("ScaleIn")
+			Expect(ok).Should(BeTrue(), "ClusterShardingStatus must expose ScaleIn")
+			if !ok {
+				return
+			}
+			Expect(field.Type.Kind()).Should(Equal(reflect.Pointer))
+			Expect(field.Tag.Get("json")).Should(Equal("scaleIn,omitempty"))
+			if field.Type.Kind() != reflect.Pointer {
+				return
+			}
+
+			oldStatus := appsv1.ClusterShardingStatus{
+				Phase: appsv1.CreatingComponentPhase,
+			}
+			scaleIn := reflect.New(field.Type.Elem())
+			reflect.ValueOf(&oldStatus).Elem().FieldByIndex(field.Index).Set(scaleIn)
+			transCtx.Cluster.Status.Shardings = map[string]appsv1.ClusterShardingStatus{
+				"sharding1": oldStatus,
+			}
+
+			transformer := &clusterComponentStatusTransformer{}
+			status := transformer.buildClusterShardingStatus(transCtx, "sharding1", nil)
+			got := reflect.ValueOf(status).FieldByIndex(field.Index)
+			Expect(got.IsNil()).Should(BeFalse())
+			Expect(got.Pointer()).Should(Equal(scaleIn.Pointer()))
+		})
+
 		It("empty", func() {
 			transCtx.shardings = nil
 

@@ -29,6 +29,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -64,6 +65,13 @@ type clusterTransformContext struct {
 	shardingComps        map[string][]*appsv1.ClusterComponentSpec // comp specs for each sharding
 	shardingCompsWithTpl map[string]map[string][]*appsv1.ClusterComponentSpec
 
+	// A typed scale-in must fail closed until the complete uncached source is installed.
+	shardingScaleInInitialPlanSource shardingScaleInInitialPlanMaterialSource
+
+	clusterTopologyReconcileLockAcquisitionPending bool
+	clusterTopologyReconcileLockAuthority          *appsv1.TopologyMutationLockStatus
+	clusterTopologyReconcileLockRelease            *appsv1.TopologyMutationLockStatus
+
 	// TODO: remove this, annotations to be added to components for sharding, mapping with @allComps.
 	annotations map[string]map[string]string
 }
@@ -82,6 +90,7 @@ type clusterPlan struct {
 	walkFunc graph.WalkFunc
 	cli      client.Client
 	transCtx *clusterTransformContext
+	buildErr error
 }
 
 var _ graph.TransformContext = &clusterTransformContext{}
@@ -211,6 +220,7 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 		walkFunc: c.defaultWalkFuncWithLogging,
 		cli:      c.cli,
 		transCtx: c.transCtx,
+		buildErr: err,
 	}
 	return plan, err
 }
@@ -218,13 +228,103 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 // Plan implementation
 
 func (p *clusterPlan) Execute() error {
-	err := p.dag.WalkReverseTopoOrder(p.walkFunc, nil)
+	if isClusterTopologyExecutionBarrierError(p.buildErr) {
+		return p.buildErr
+	}
+	if p.buildErr != nil && !intctrlutil.IsDelayedRequeueError(p.buildErr) {
+		if err := p.persistBuildFailureConditions(); err != nil {
+			return err
+		}
+		return p.buildErr
+	}
+	if err := p.dag.Validate(); err != nil {
+		return err
+	}
+	statusCAS, err := findExclusiveClusterStatusCASVertex(p.dag)
+	if err != nil {
+		return err
+	}
+	if statusCAS != nil {
+		if statusCAS.cluster == nil {
+			return fmt.Errorf("invalid exclusive Cluster status CAS intent")
+		}
+		if err := validateClusterStatusCASPatch(statusCAS.cluster, statusCAS.patch); err != nil {
+			return err
+		}
+		return p.cli.Status().Patch(p.transCtx.Context, statusCAS.cluster,
+			client.RawPatch(types.JSONPatchType, statusCAS.patch))
+	}
+
+	if p.transCtx.clusterTopologyReconcileLockAuthority != nil {
+		executionLock, err := activateClusterTopologyReconcileLock(
+			p.transCtx.Context,
+			p.cli,
+			p.transCtx.Cluster,
+			p.transCtx.clusterTopologyReconcileLockAuthority,
+		)
+		if err != nil {
+			return err
+		}
+		p.transCtx.clusterTopologyReconcileLockAuthority = executionLock
+		if p.transCtx.clusterTopologyReconcileLockRelease != nil {
+			p.transCtx.clusterTopologyReconcileLockRelease = executionLock.DeepCopy()
+		}
+	}
+
+	err = p.dag.WalkReverseTopoOrder(p.walkFunc, nil)
 	if err != nil {
 		if hErr := p.handlePlanExecutionError(err); hErr != nil {
 			return hErr
 		}
+		return err
 	}
-	return err
+	if p.buildErr != nil || p.transCtx.clusterTopologyReconcileLockRelease == nil {
+		return nil
+	}
+	return releaseClusterTopologyReconcileLock(
+		p.transCtx.Context,
+		p.transCtx.APIReader,
+		p.cli,
+		p.transCtx.Cluster,
+		p.transCtx.clusterTopologyReconcileLockRelease,
+	)
+}
+
+func (p *clusterPlan) persistBuildFailureConditions() error {
+	if p.transCtx == nil || p.transCtx.Cluster == nil || p.transCtx.OrigCluster == nil {
+		return nil
+	}
+	conditions := append(
+		[]metav1.Condition(nil),
+		p.transCtx.OrigCluster.Status.Conditions...,
+	)
+	for _, conditionType := range []string{
+		appsv1.ConditionTypeProvisioningStarted,
+		appsv1.ConditionTypeApplyResources,
+	} {
+		condition := meta.FindStatusCondition(
+			p.transCtx.Cluster.Status.Conditions,
+			conditionType,
+		)
+		if condition == nil || condition.Status != metav1.ConditionFalse {
+			continue
+		}
+		meta.SetStatusCondition(&conditions, *condition)
+	}
+	if reflect.DeepEqual(p.transCtx.OrigCluster.Status.Conditions, conditions) {
+		return nil
+	}
+
+	statusOnly := p.transCtx.OrigCluster.DeepCopy()
+	statusOnly.Status.Conditions = conditions
+	return p.cli.Status().Patch(
+		p.transCtx.Context,
+		statusOnly,
+		client.MergeFromWithOptions(
+			p.transCtx.OrigCluster,
+			client.MergeFromWithOptimisticLock{},
+		),
+	)
 }
 
 func (p *clusterPlan) handlePlanExecutionError(err error) error {

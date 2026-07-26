@@ -4293,6 +4293,20 @@ LifecycleActionStatus
 <p>PreTerminate records the status of the sharding pre-terminate action.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>scaleIn</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingScaleInStatus">
+ShardingScaleInStatus
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ScaleIn records the authoritative state of a compound shard scale-in plan.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1.ClusterSpec">ClusterSpec
@@ -4568,6 +4582,20 @@ map[string]github.com/apecloud/kubeblocks/apis/apps/v1.ClusterShardingStatus
 <td>
 <em>(Optional)</em>
 <p>Records the current status information of all shardings within the Cluster.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>topologyMutationLock</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.TopologyMutationLockStatus">
+TopologyMutationLockStatus
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>TopologyMutationLock serializes cluster-wide topology mutations.</p>
 </td>
 </tr>
 <tr>
@@ -12710,6 +12738,21 @@ Action
 </tr>
 <tr>
 <td>
+<code>resultProtocol</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingActionResultProtocol">
+ShardingActionResultProtocol
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ResultProtocol specifies the typed result protocol returned by the action.
+When omitted, the action uses the legacy result contract.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>targetShardSelector</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.TargetShardSelector">
@@ -12730,6 +12773,26 @@ one shard is selected randomly by default.</p>
 </td>
 </tr>
 </tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ShardingActionResultProtocol">ShardingActionResultProtocol
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ShardingAction">ShardingAction</a>, <a href="#apps.kubeblocks.io/v1.ShardingScaleInPlanAction">ShardingScaleInPlanAction</a>, <a href="#apps.kubeblocks.io/v1.ShardingScaleInPlanMaterial">ShardingScaleInPlanMaterial</a>, <a href="#apps.kubeblocks.io/v1.ShardingScaleInStatus">ShardingScaleInStatus</a>)
+</p>
+<div>
+<p>ShardingActionResultProtocol defines the typed result protocol of a sharding action.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;kb.sharding.scalein/v2&#34;</p></td>
+<td><p>ShardingScaleInResultProtocolV2 is the typed result protocol for compound shard scale-in.</p>
+</td>
+</tr></tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1.ShardingDefinitionSpec">ShardingDefinitionSpec
 </h3>
@@ -13002,6 +13065,2105 @@ ShardingAction
 <li>KB_REMOVE_SHARD_NAME: The name of the shard being removed.</li>
 </ul>
 <p>Note: This field is immutable once it has been set.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ShardingScaleInBlockClass">ShardingScaleInBlockClass
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ShardingScaleInStatus">ShardingScaleInStatus</a>)
+</p>
+<div>
+<p>ShardingScaleInBlockClass defines how a blocked scale-in plan may be resumed.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Recoverable&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Terminal&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ShardingScaleInComponentDefinitionSource">ShardingScaleInComponentDefinitionSource
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ShardingScaleInRequestAuthority">ShardingScaleInRequestAuthority</a>)
+</p>
+<div>
+<p>ShardingScaleInComponentDefinitionSource identifies ComponentDefinition vars used at plan time.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>uid</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/types#UID">
+k8s.io/apimachinery/pkg/types.UID
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>generation</code><br/>
+<em>
+int64
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>varsProjectionDigest</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ShardingScaleInCredentialSource">ShardingScaleInCredentialSource
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ShardingScaleInRequestAuthority">ShardingScaleInRequestAuthority</a>)
+</p>
+<div>
+<p>ShardingScaleInCredentialSource records one canonical Secret identity and
+the exact union of key names used by executor bindings. It never contains
+Secret values or value digests.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>sourceID</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>apiVersion</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>kind</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>namespace</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>uid</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/types#UID">
+k8s.io/apimachinery/pkg/types.UID
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>keyNames</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>credentialSourceDigest</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ShardingScaleInDeletionGuardIdentity">ShardingScaleInDeletionGuardIdentity
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ShardingScaleInPlanMaterial">ShardingScaleInPlanMaterial</a>)
+</p>
+<div>
+<p>ShardingScaleInDeletionGuardIdentity identifies the exact deletion-guard capability.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>protocol</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingScaleInDeletionGuardProtocol">
+ShardingScaleInDeletionGuardProtocol
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>installationUID</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/types#UID">
+k8s.io/apimachinery/pkg/types.UID
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>policyRevision</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>configurationDigest</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ShardingScaleInDeletionGuardProtocol">ShardingScaleInDeletionGuardProtocol
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ShardingScaleInDeletionGuardIdentity">ShardingScaleInDeletionGuardIdentity</a>)
+</p>
+<div>
+<p>ShardingScaleInDeletionGuardProtocol identifies the deletion-guard capability contract.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;scale-in-deletion-guard/v1&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ShardingScaleInExecutorCredentialBinding">ShardingScaleInExecutorCredentialBinding
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ShardingScaleInExecutorTemplate">ShardingScaleInExecutorTemplate</a>)
+</p>
+<div>
+<p>ShardingScaleInExecutorCredentialBinding binds one declared variable to a canonical Secret source.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>variableName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>credentialSourceID</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>credentialSourceDigest</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>requiredKeyNames</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>resolverProjectionDigest</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>bindingDigest</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ShardingScaleInExecutorPrerequisite">ShardingScaleInExecutorPrerequisite
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ShardingScaleInPlanMaterial">ShardingScaleInPlanMaterial</a>)
+</p>
+<div>
+<p>ShardingScaleInExecutorPrerequisite identifies one deletion-critical executor object.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>apiVersion</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>kind</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>namespace</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>uid</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/types#UID">
+k8s.io/apimachinery/pkg/types.UID
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>role</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingScaleInPrerequisiteRole">
+ShardingScaleInPrerequisiteRole
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>scope</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingScaleInPrerequisiteScope">
+ShardingScaleInPrerequisiteScope
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>componentUID</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/types#UID">
+k8s.io/apimachinery/pkg/types.UID
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+<tr>
+<td>
+<code>criticalSpecDigest</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>identityDigest</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ShardingScaleInExecutorTemplate">ShardingScaleInExecutorTemplate
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ShardingScaleInRequestAuthority">ShardingScaleInRequestAuthority</a>)
+</p>
+<div>
+<p>ShardingScaleInExecutorTemplate records an immutable request base for one executor.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>executorPodUID</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/types#UID">
+k8s.io/apimachinery/pkg/types.UID
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>executorComponentUID</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/types#UID">
+k8s.io/apimachinery/pkg/types.UID
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>credentialBindings</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingScaleInExecutorCredentialBinding">
+[]ShardingScaleInExecutorCredentialBinding
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+<tr>
+<td>
+<code>baseParameterRecordB64</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>baseParameterDigest</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>launchSchemaDigest</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>pollSchemaDigest</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>cancelSchemaDigest</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverRuntimeBinding</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingScaleInServerRuntimeBinding">
+ShardingScaleInServerRuntimeBinding
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ShardingScaleInHolder">ShardingScaleInHolder
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ShardingScaleInStatus">ShardingScaleInStatus</a>)
+</p>
+<div>
+<p>ShardingScaleInHolder identifies a shard participating in a scale-in plan.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Name is the Component name.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>uid</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>UID is the full Component UID.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ShardingScaleInPhase">ShardingScaleInPhase
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ShardingScaleInStatus">ShardingScaleInStatus</a>)
+</p>
+<div>
+<p>ShardingScaleInPhase defines the durable phase of a compound shard scale-in plan.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Blocked&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Completed&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;DeleteCommitted&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Deleting&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Draining&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Forgetting&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;HolderPlanned&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Planned&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;PurgePrepared&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Resetting&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Superseded&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Verified&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ShardingScaleInPlanAction">ShardingScaleInPlanAction
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ShardingScaleInPlanMaterial">ShardingScaleInPlanMaterial</a>)
+</p>
+<div>
+<p>ShardingScaleInPlanAction identifies the exact ShardingDefinition action.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>shardingDefinitionName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>shardingDefinitionUID</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/types#UID">
+k8s.io/apimachinery/pkg/types.UID
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>shardingDefinitionGeneration</code><br/>
+<em>
+int64
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>actionDigest</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>resultProtocol</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingActionResultProtocol">
+ShardingActionResultProtocol
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ShardingScaleInPlanMaterial">ShardingScaleInPlanMaterial
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ShardingScaleInStatus">ShardingScaleInStatus</a>)
+</p>
+<div>
+<p>ShardingScaleInPlanMaterial is the immutable, map-free input hashed by a scale-in plan ID.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>protocolVersion</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingActionResultProtocol">
+ShardingActionResultProtocol
+</a>
+</em>
+</td>
+<td>
+<p>ProtocolVersion identifies the typed shard scale-in contract.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>shardingName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>ShardingName is the exact Cluster sharding name.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>source</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingScaleInPlanSource">
+ShardingScaleInPlanSource
+</a>
+</em>
+</td>
+<td>
+<p>Source identifies the exact Cluster intent that produced this plan.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>action</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingScaleInPlanAction">
+ShardingScaleInPlanAction
+</a>
+</em>
+</td>
+<td>
+<p>Action identifies the exact ShardingDefinition action contract.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>deletionGuard</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingScaleInDeletionGuardIdentity">
+ShardingScaleInDeletionGuardIdentity
+</a>
+</em>
+</td>
+<td>
+<p>DeletionGuard identifies the exact deletion-guard capability required by the plan.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>requestAuthority</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingScaleInRequestAuthority">
+ShardingScaleInRequestAuthority
+</a>
+</em>
+</td>
+<td>
+<p>RequestAuthority closes every source and executor identity used to build action requests.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>leaving</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingScaleInPlanMember">
+[]ShardingScaleInPlanMember
+</a>
+</em>
+</td>
+<td>
+<p>Leaving lists the exact Components removed by the plan.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>staying</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingScaleInPlanMember">
+[]ShardingScaleInPlanMember
+</a>
+</em>
+</td>
+<td>
+<p>Staying lists the exact Components retained by the plan.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>proofExecutor</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingScaleInProofExecutor">
+ShardingScaleInProofExecutor
+</a>
+</em>
+</td>
+<td>
+<p>ProofExecutor is the immutable first canonical Pod in Staying.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>executorPrerequisites</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingScaleInExecutorPrerequisite">
+[]ShardingScaleInExecutorPrerequisite
+</a>
+</em>
+</td>
+<td>
+<p>ExecutorPrerequisites lists exact deletion-critical objects used by plan executors.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ShardingScaleInPlanMember">ShardingScaleInPlanMember
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ShardingScaleInPlanMaterial">ShardingScaleInPlanMaterial</a>)
+</p>
+<div>
+<p>ShardingScaleInPlanMember identifies one immutable Component and its Pods.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>componentName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>componentUID</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/types#UID">
+k8s.io/apimachinery/pkg/types.UID
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>componentGeneration</code><br/>
+<em>
+int64
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>componentSpecDigest</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>componentShortName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>shardTemplateName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>pods</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingScaleInPlanPod">
+[]ShardingScaleInPlanPod
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ShardingScaleInPlanPod">ShardingScaleInPlanPod
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ShardingScaleInPlanMember">ShardingScaleInPlanMember</a>)
+</p>
+<div>
+<p>ShardingScaleInPlanPod identifies one immutable Pod and its kbagent runtime binding.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>uid</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/types#UID">
+k8s.io/apimachinery/pkg/types.UID
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>fqdn</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>agentImageID</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>agentProcessUID</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>agentCapabilityDigest</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ShardingScaleInPlanSource">ShardingScaleInPlanSource
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ShardingScaleInPlanMaterial">ShardingScaleInPlanMaterial</a>)
+</p>
+<div>
+<p>ShardingScaleInPlanSource identifies the Cluster intent that produced a plan.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>clusterNamespace</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>clusterName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>clusterUID</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/types#UID">
+k8s.io/apimachinery/pkg/types.UID
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>clusterGeneration</code><br/>
+<em>
+int64
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>desiredDigest</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>desiredShards</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>optionalOpsRequestName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+<tr>
+<td>
+<code>optionalOpsRequestUID</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/types#UID">
+k8s.io/apimachinery/pkg/types.UID
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ShardingScaleInPrerequisiteRole">ShardingScaleInPrerequisiteRole
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ShardingScaleInExecutorPrerequisite">ShardingScaleInExecutorPrerequisite</a>)
+</p>
+<div>
+<p>ShardingScaleInPrerequisiteRole identifies a reviewed executor prerequisite role.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;ClusterDNS&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;KBAgentEndpoint&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;PodOwnerWorkload&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ShardingScaleInPrerequisiteScope">ShardingScaleInPrerequisiteScope
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ShardingScaleInExecutorPrerequisite">ShardingScaleInExecutorPrerequisite</a>)
+</p>
+<div>
+<p>ShardingScaleInPrerequisiteScope identifies whether a prerequisite is Component-local or shared.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Component&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Shared&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ShardingScaleInProgress">ShardingScaleInProgress
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ShardingScaleInStatus">ShardingScaleInStatus</a>)
+</p>
+<div>
+<p>ShardingScaleInProgress records bounded progress for the current holder.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>stage</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Stage identifies the current stage within the plan phase.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>reason</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Reason is a programmatic identifier for the latest progress.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>beforeSlots</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>BeforeSlots is the number of slots owned by the holder before the latest batch.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>afterSlots</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>AfterSlots is the number of slots owned by the holder after the latest batch.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>retryAfterSeconds</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>RetryAfterSeconds is the bounded delay before the next observation.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ShardingScaleInProofExecutor">ShardingScaleInProofExecutor
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ShardingScaleInPlanMaterial">ShardingScaleInPlanMaterial</a>)
+</p>
+<div>
+<p>ShardingScaleInProofExecutor identifies the immutable read-only proof executor.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>podName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>podUID</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/types#UID">
+k8s.io/apimachinery/pkg/types.UID
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ShardingScaleInRequestAuthority">ShardingScaleInRequestAuthority
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ShardingScaleInPlanMaterial">ShardingScaleInPlanMaterial</a>)
+</p>
+<div>
+<p>ShardingScaleInRequestAuthority closes every source used to construct typed action requests.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>version</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingScaleInRequestAuthorityVersion">
+ShardingScaleInRequestAuthorityVersion
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>builder</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingScaleInRequestBuilder">
+ShardingScaleInRequestBuilder
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>genericLifecycleSynthesisForbidden</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>actionName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>actionDefinitionDigest</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>sourceSnapshotDigest</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>componentDefinitionSources</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingScaleInComponentDefinitionSource">
+[]ShardingScaleInComponentDefinitionSource
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>varSources</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingScaleInVarSource">
+[]ShardingScaleInVarSource
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>credentialSources</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingScaleInCredentialSource">
+[]ShardingScaleInCredentialSource
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+<tr>
+<td>
+<code>executorTemplates</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingScaleInExecutorTemplate">
+[]ShardingScaleInExecutorTemplate
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>requestAuthorityDigest</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ShardingScaleInRequestAuthorityVersion">ShardingScaleInRequestAuthorityVersion
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ShardingScaleInRequestAuthority">ShardingScaleInRequestAuthority</a>)
+</p>
+<div>
+<p>ShardingScaleInRequestAuthorityVersion identifies a request-authority contract.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;kb.sharding.scalein.request-authority/v1&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;kb.sharding.scalein.request-authority/v2&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ShardingScaleInRequestBuilder">ShardingScaleInRequestBuilder
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ShardingScaleInRequestAuthority">ShardingScaleInRequestAuthority</a>)
+</p>
+<div>
+<p>ShardingScaleInRequestBuilder identifies the only request builder allowed by a plan.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;TypedShardScaleInV1&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;TypedShardScaleInV2&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ShardingScaleInRequestSourceObject">ShardingScaleInRequestSourceObject
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ShardingScaleInVarSource">ShardingScaleInVarSource</a>)
+</p>
+<div>
+<p>ShardingScaleInRequestSourceObject records one exact non-secret request source.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>apiVersion</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>kind</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>namespace</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>uid</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/types#UID">
+k8s.io/apimachinery/pkg/types.UID
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>projectionKind</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingScaleInSourceProjectionKind">
+ShardingScaleInSourceProjectionKind
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>projectionDigest</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ShardingScaleInSecretSource">ShardingScaleInSecretSource
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ShardingScaleInVarSource">ShardingScaleInVarSource</a>)
+</p>
+<div>
+<p>ShardingScaleInSecretSource is the legacy v1 inline credential source shape.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>apiVersion</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>kind</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>namespace</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>uid</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/types#UID">
+k8s.io/apimachinery/pkg/types.UID
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>keyNames</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ShardingScaleInServerRuntimeBinding">ShardingScaleInServerRuntimeBinding
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ShardingScaleInExecutorTemplate">ShardingScaleInExecutorTemplate</a>)
+</p>
+<div>
+<p>ShardingScaleInServerRuntimeBinding identifies the exact kbagent process and server configuration.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>agentProcessUID</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>agentImageID</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>registeredActionDigest</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>startupEnvironmentSchemaDigest</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>serverConfigurationDigest</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ShardingScaleInSourceProjectionKind">ShardingScaleInSourceProjectionKind
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ShardingScaleInRequestSourceObject">ShardingScaleInRequestSourceObject</a>)
+</p>
+<div>
+<p>ShardingScaleInSourceProjectionKind identifies a reviewed request-source projection.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;ClusterIdentity&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;ComponentIdentity&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;InstanceSetSpec&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ShardingScaleInStatus">ShardingScaleInStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterShardingStatus">ClusterShardingStatus</a>)
+</p>
+<div>
+<p>ShardingScaleInStatus records the authoritative state of a compound shard scale-in plan.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>protocolVersion</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingActionResultProtocol">
+ShardingActionResultProtocol
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ProtocolVersion identifies the scale-in status contract.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>planID</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>PlanID uniquely identifies the immutable scale-in plan.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>phase</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingScaleInPhase">
+ShardingScaleInPhase
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Phase is the current phase of the scale-in plan.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>topologyFenceToken</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>TopologyFenceToken binds the plan to its cluster-wide topology mutation lock.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>externalWriteAuthorized</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<p>ExternalWriteAuthorized records whether the plan may invoke an external topology write.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>planMaterial</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingScaleInPlanMaterial">
+ShardingScaleInPlanMaterial
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>PlanMaterial contains the immutable source and executor identities hashed by PlanID.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>holder</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingScaleInHolder">
+ShardingScaleInHolder
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Holder identifies the shard currently being removed.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>progress</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingScaleInProgress">
+ShardingScaleInProgress
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Progress records the latest committed progress of the current holder.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>blockedFrom</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingScaleInPhase">
+ShardingScaleInPhase
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>BlockedFrom records the phase from which the plan became blocked.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>blockClass</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingScaleInBlockClass">
+ShardingScaleInBlockClass
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>BlockClass classifies whether a blocked plan may recover automatically.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>reason</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Reason is a programmatic identifier for the current phase.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>message</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Message provides human-readable details about the current phase.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ShardingScaleInVarConsumption">ShardingScaleInVarConsumption
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ShardingScaleInVarSource">ShardingScaleInVarSource</a>)
+</p>
+<div>
+<p>ShardingScaleInVarConsumption classifies where a resolved variable may be consumed.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;DurableEnvelope&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;ForbiddenForTypedScaleIn&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;ServerReservedIdentity&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;ServerStartupSecret&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;TypedBase&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ShardingScaleInVarResolverKind">ShardingScaleInVarResolverKind
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ShardingScaleInVarSource">ShardingScaleInVarSource</a>)
+</p>
+<div>
+<p>ShardingScaleInVarResolverKind identifies a reviewed variable resolver.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;ClusterVarRef&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;ComponentVarRef&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;CredentialVarRef&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;ResourceVarRef&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;StaticValue&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ShardingScaleInVarSource">ShardingScaleInVarSource
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ShardingScaleInRequestAuthority">ShardingScaleInRequestAuthority</a>)
+</p>
+<div>
+<p>ShardingScaleInVarSource records one declared variable and its exact provenance.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>variableName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>resolverKind</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingScaleInVarResolverKind">
+ShardingScaleInVarResolverKind
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>consumption</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingScaleInVarConsumption">
+ShardingScaleInVarConsumption
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>resolvedNonSecretValueB64</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>resolvedNonSecretValueDigest</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>sourceObjects</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingScaleInRequestSourceObject">
+[]ShardingScaleInRequestSourceObject
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>secretSource</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingScaleInSecretSource">
+ShardingScaleInSecretSource
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>SecretSource is retained only to decode legacy v1 material so v2
+validation can reject it explicitly.</p>
 </td>
 </tr>
 </tbody>
@@ -13897,6 +16059,202 @@ VarOption
 </td>
 </tr><tr><td><p>&#34;WipeOut&#34;</p></td>
 <td><p>WipeOut is based on Delete and wipe out all volume snapshots and snapshot data from backup storage location.</p>
+</td>
+</tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.TopologyMutationLockOwnerKind">TopologyMutationLockOwnerKind
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.TopologyMutationLockStatus">TopologyMutationLockStatus</a>)
+</p>
+<div>
+<p>TopologyMutationLockOwnerKind identifies a topology mutation owner.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;ClusterTopologyReconcile&#34;</p></td>
+<td><p>TopologyMutationLockOwnerClusterTopologyReconcile identifies ordinary topology reconciliation.</p>
+</td>
+</tr><tr><td><p>&#34;ShardingScaleIn&#34;</p></td>
+<td><p>TopologyMutationLockOwnerShardingScaleIn identifies a compound shard scale-in plan.</p>
+</td>
+</tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.TopologyMutationLockState">TopologyMutationLockState
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.TopologyMutationLockStatus">TopologyMutationLockStatus</a>)
+</p>
+<div>
+<p>TopologyMutationLockState defines the topology mutation lock lifecycle.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;DeletionCloseout&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;DeletionSafe&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;DeletionDependentsGone&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Executing&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Held&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;InstallingAuthority&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;ReleaseReady&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Released&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;ReleasingMembers&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.TopologyMutationLockStatus">TopologyMutationLockStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterStatus">ClusterStatus</a>)
+</p>
+<div>
+<p>TopologyMutationLockStatus serializes a cluster-wide topology mutation.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>version</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.TopologyMutationLockVersion">
+TopologyMutationLockVersion
+</a>
+</em>
+</td>
+<td>
+<p>Version identifies the topology lock contract.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>fenceToken</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>FenceToken is the immutable token owned by the current plan.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>clusterUID</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/types#UID">
+k8s.io/apimachinery/pkg/types.UID
+</a>
+</em>
+</td>
+<td>
+<p>ClusterUID binds the lock to the exact Cluster object.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>ownerKind</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.TopologyMutationLockOwnerKind">
+TopologyMutationLockOwnerKind
+</a>
+</em>
+</td>
+<td>
+<p>OwnerKind identifies the topology operation that owns the lock.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>ownerPlanID</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>OwnerPlanID is the immutable plan identity that owns the lock.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>state</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.TopologyMutationLockState">
+TopologyMutationLockState
+</a>
+</em>
+</td>
+<td>
+<p>State is the current lock lifecycle state.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>acquiredAt</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#time-v1-meta">
+Kubernetes meta/v1.Time
+</a>
+</em>
+</td>
+<td>
+<p>AcquiredAt records when the lock was first persisted.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>affectedComponentUIDs</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/types#UID">
+[]k8s.io/apimachinery/pkg/types.UID
+</a>
+</em>
+</td>
+<td>
+<p>AffectedComponentUIDs lists the exact Components fenced by the lock.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.TopologyMutationLockVersion">TopologyMutationLockVersion
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.TopologyMutationLockStatus">TopologyMutationLockStatus</a>)
+</p>
+<div>
+<p>TopologyMutationLockVersion identifies a topology mutation lock contract.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;kb.topology-lock/v1&#34;</p></td>
+<td><p>TopologyMutationLockVersionV1 is the first topology mutation lock contract.</p>
 </td>
 </tr></tbody>
 </table>

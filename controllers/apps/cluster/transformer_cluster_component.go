@@ -58,7 +58,8 @@ var _ graph.Transformer = &clusterComponentTransformer{}
 func (t *clusterComponentTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*clusterTransformContext)
 	if transCtx.OrigCluster.IsDeleting() {
-		return nil
+		_, err := requestCachedClusterTopologyReconcileLockReleaseIfPresent(transCtx)
+		return err
 	}
 
 	updateToDate, err := checkAllCompsUpToDate(transCtx, transCtx.Cluster)
@@ -68,7 +69,8 @@ func (t *clusterComponentTransformer) Transform(ctx graph.TransformContext, dag 
 
 	// if the cluster is not updating and all components are up-to-date, skip the reconciliation
 	if !transCtx.OrigCluster.IsUpdating() && updateToDate {
-		return nil
+		_, err := requestCachedClusterTopologyReconcileLockReleaseIfPresent(transCtx)
+		return err
 	}
 
 	return t.transform(transCtx, dag)
@@ -901,6 +903,10 @@ func (h *clusterShardingHandler) update(transCtx *clusterTransformContext, dag *
 	}
 
 	toCreate, toDelete, toUpdate := mapDiff(runningCompsMap, protoCompsMap)
+
+	if handled, err := h.reconcileTypedScaleInInitialPlan(transCtx, dag, name, toDelete); handled {
+		return err
+	}
 
 	if err := h.handlePostProvision(transCtx, name, maps.Values(runningCompsMap)); err != nil {
 		return err

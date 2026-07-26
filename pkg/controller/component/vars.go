@@ -21,6 +21,7 @@ package component
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"regexp"
 	"slices"
@@ -710,6 +711,53 @@ func resolveCredentialVarRef(ctx context.Context, cli client.Reader, synthesized
 		return nil, nil, nil
 	}
 	return checkNBuildVars(resolveFunc(ctx, cli, synthesizedComp, defineKey, selector))
+}
+
+// CredentialVarRefProvenance exposes the object edge selected by the standard
+// credential resolver without exposing the Secret value.
+type CredentialVarRefProvenance struct {
+	Namespace  string
+	SecretName string
+	KeyName    string
+}
+
+// ResolveCredentialVarRefProvenance runs the standard credential resolver and
+// returns only its exact Secret reference. It is intended for immutable
+// authority builders that must persist provenance instead of credential bytes.
+func ResolveCredentialVarRefProvenance(
+	ctx context.Context,
+	cli client.Reader,
+	synthesizedComp *SynthesizedComponent,
+	defineKey string,
+	selector appsv1.CredentialVarSelector,
+) (*CredentialVarRefProvenance, error) {
+	if synthesizedComp == nil || synthesizedComp.Namespace == "" ||
+		synthesizedComp.ClusterName == "" || synthesizedComp.Name == "" ||
+		defineKey == "" {
+		return nil, errors.New("credential provenance input is incomplete")
+	}
+	nonCredentialVars, credentialVars, err :=
+		resolveCredentialVarRef(ctx, cli, synthesizedComp, defineKey, selector)
+	if err != nil {
+		return nil, err
+	}
+	if len(nonCredentialVars) != 0 || len(credentialVars) != 1 {
+		return nil, errors.New("credential resolver must return exactly one credential variable")
+	}
+	variable := credentialVars[0]
+	if variable.Name != defineKey || variable.Value != "" ||
+		variable.ValueFrom == nil || variable.ValueFrom.SecretKeyRef == nil ||
+		variable.ValueFrom.SecretKeyRef.Name == "" ||
+		variable.ValueFrom.SecretKeyRef.Key == "" ||
+		(variable.ValueFrom.SecretKeyRef.Optional != nil &&
+			*variable.ValueFrom.SecretKeyRef.Optional) {
+		return nil, errors.New("credential resolver returned an incomplete Secret reference")
+	}
+	return &CredentialVarRefProvenance{
+		Namespace:  synthesizedComp.Namespace,
+		SecretName: variable.ValueFrom.SecretKeyRef.Name,
+		KeyName:    variable.ValueFrom.SecretKeyRef.Key,
+	}, nil
 }
 
 func resolveCredentialUsernameRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,

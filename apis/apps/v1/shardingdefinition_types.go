@@ -236,6 +236,12 @@ type ShardingTLS struct {
 type ShardingAction struct {
 	Action `json:",inline"`
 
+	// ResultProtocol specifies the typed result protocol returned by the action.
+	// When omitted, the action uses the legacy result contract.
+	//
+	// +optional
+	ResultProtocol ShardingActionResultProtocol `json:"resultProtocol,omitempty"`
+
 	// Defines the criteria used to select the target shard(s) for executing the Action.
 	// It provides precise control over which shard(s) should be targeted.
 	//
@@ -250,6 +256,16 @@ type ShardingAction struct {
 	// +optional
 	TargetShardSelector TargetShardSelector `json:"targetShardSelector,omitempty"`
 }
+
+// ShardingActionResultProtocol defines the typed result protocol of a sharding action.
+// +enum
+// +kubebuilder:validation:Enum={kb.sharding.scalein/v2}
+type ShardingActionResultProtocol string
+
+const (
+	// ShardingScaleInResultProtocolV2 is the typed result protocol for compound shard scale-in.
+	ShardingScaleInResultProtocolV2 ShardingActionResultProtocol = "kb.sharding.scalein/v2"
+)
 
 // TargetShardSelector defines how to select shard(s) to execute an Action.
 // +enum

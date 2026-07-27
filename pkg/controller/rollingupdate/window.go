@@ -30,16 +30,21 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
-const WindowAnnotationKey = "workloads.kubeblocks.io/rolling-update-window"
+const (
+	WindowAnnotationKey = "workloads.kubeblocks.io/rolling-update-window"
+	windowVersion       = 1
+)
 
 type window struct {
-	RolloutID    string            `json:"rolloutID"`
-	Replicas     int               `json:"replicas"`
-	Participants []string          `json:"participants"`
-	Revisions    map[string]string `json:"revisions,omitempty"`
+	Version      int      `json:"version"`
+	Ended        bool     `json:"ended,omitempty"`
+	RolloutID    string   `json:"rolloutID"`
+	Replicas     int      `json:"replicas"`
+	Participants []string `json:"participants"`
 }
 
-// RolloutID returns a stable identifier for a desired set of instance revisions.
+// RolloutID returns a stable identifier for desired revisions keyed by their
+// stable workload template names.
 func RolloutID(revisions map[string]string) string {
 	names := make([]string, 0, len(revisions))
 	for name := range revisions {
@@ -59,6 +64,19 @@ func RolloutID(revisions map[string]string) string {
 // The second return value reports whether the persisted window was changed.
 // Callers must commit that change before admitting any child update.
 func Participants(owner metav1.Object, revisions map[string]string, replicas int, orderedNames []string) (sets.Set[string], bool) {
+	return participants(owner, RolloutID(revisions), replicas, orderedNames, nil)
+}
+
+// ParticipantsWithInitial behaves like Participants, but initializes a missing
+// window with identities known to have already reached the desired revision.
+// It is used when upgrading an already-running legacy rollout.
+func ParticipantsWithInitial(owner metav1.Object, revisions map[string]string, replicas int,
+	orderedNames []string, initial sets.Set[string]) (sets.Set[string], bool) {
+	return participants(owner, RolloutID(revisions), replicas, orderedNames, initial)
+}
+
+func participants(owner metav1.Object, rolloutID string, replicas int,
+	orderedNames []string, initial sets.Set[string]) (sets.Set[string], bool) {
 	if replicas < 0 {
 		replicas = 0
 	}
@@ -66,17 +84,23 @@ func Participants(owner metav1.Object, revisions map[string]string, replicas int
 		return sets.New(orderedNames...), removeWindow(owner)
 	}
 
-	rolloutID := RolloutID(revisions)
 	saved, ok := loadWindow(owner)
-	if !ok || !sameRollout(saved, revisions, rolloutID) {
-		participants := append([]string(nil), orderedNames[:replicas]...)
+	if !ok || saved.Ended || saved.RolloutID != rolloutID {
+		participants := initialParticipants(replicas, orderedNames, nil)
+		if !hasWindow(owner) {
+			participants = initialParticipants(replicas, orderedNames, initial)
+		}
 		saveWindow(owner, window{
+			Version:      windowVersion,
 			RolloutID:    rolloutID,
 			Replicas:     replicas,
 			Participants: participants,
-			Revisions:    cloneRevisions(revisions),
 		})
-		return sets.New(participants...), true
+		active := participants
+		if len(active) > replicas {
+			active = active[:replicas]
+		}
+		return sets.New(active...), true
 	}
 
 	validNames := sets.New(orderedNames...)
@@ -107,10 +131,10 @@ func Participants(owner metav1.Object, revisions map[string]string, replicas int
 	}
 
 	state := window{
+		Version:      windowVersion,
 		RolloutID:    rolloutID,
 		Replicas:     replicas,
 		Participants: participants,
-		Revisions:    cloneRevisions(revisions),
 	}
 	changed := !reflect.DeepEqual(saved, state)
 	if changed {
@@ -121,6 +145,27 @@ func Participants(owner metav1.Object, revisions map[string]string, replicas int
 		active = active[:replicas]
 	}
 	return sets.New(active...), changed
+}
+
+func initialParticipants(replicas int, orderedNames []string, initial sets.Set[string]) []string {
+	participants := make([]string, 0, replicas)
+	admitted := sets.New[string]()
+	for _, name := range orderedNames {
+		if initial != nil && initial.Has(name) {
+			participants = append(participants, name)
+			admitted.Insert(name)
+		}
+	}
+	for _, name := range orderedNames {
+		if len(participants) >= replicas {
+			break
+		}
+		if admitted.Has(name) {
+			continue
+		}
+		participants = append(participants, name)
+	}
+	return participants
 }
 
 func loadWindow(owner metav1.Object) (window, bool) {
@@ -134,7 +179,16 @@ func loadWindow(owner metav1.Object) (window, bool) {
 	}
 
 	var saved window
-	if json.Unmarshal([]byte(raw), &saved) != nil || saved.RolloutID == "" || saved.Replicas < 0 {
+	if json.Unmarshal([]byte(raw), &saved) != nil || saved.Version != windowVersion {
+		return window{}, false
+	}
+	if saved.Ended {
+		if saved.RolloutID != "" || saved.Replicas != 0 || len(saved.Participants) != 0 {
+			return window{}, false
+		}
+		return saved, true
+	}
+	if saved.RolloutID == "" || saved.Replicas < 0 {
 		return window{}, false
 	}
 
@@ -148,34 +202,9 @@ func loadWindow(owner metav1.Object) (window, bool) {
 	return saved, true
 }
 
-func sameRollout(saved window, revisions map[string]string, rolloutID string) bool {
-	// Windows written before the revision snapshot was introduced can only be
-	// reused when their exact rollout ID still matches.
-	if saved.Revisions == nil {
-		return saved.RolloutID == rolloutID
-	}
-
-	common := false
-	for name, revision := range saved.Revisions {
-		if current, ok := revisions[name]; ok {
-			common = true
-			if current != revision {
-				return false
-			}
-		}
-	}
-	return common || len(saved.Revisions) == 0 && len(revisions) == 0
-}
-
-func cloneRevisions(revisions map[string]string) map[string]string {
-	if len(revisions) == 0 {
-		return nil
-	}
-	cloned := make(map[string]string, len(revisions))
-	for name, revision := range revisions {
-		cloned[name] = revision
-	}
-	return cloned
+func hasWindow(owner metav1.Object) bool {
+	_, ok := owner.GetAnnotations()[WindowAnnotationKey]
+	return ok
 }
 
 func saveWindow(owner metav1.Object, state window) {
@@ -204,7 +233,14 @@ func removeWindow(owner metav1.Object) bool {
 	return true
 }
 
-// Reset ends any persisted rolling-update admission window.
+// Reset explicitly ends the rolling-update lifecycle. The marker distinguishes
+// an intentional strategy transition from a legacy object that has never
+// persisted a window and may need participant recovery.
 func Reset(owner metav1.Object) bool {
-	return removeWindow(owner)
+	ended := window{Version: windowVersion, Ended: true}
+	if saved, ok := loadWindow(owner); ok && reflect.DeepEqual(saved, ended) {
+		return false
+	}
+	saveWindow(owner, ended)
+	return true
 }

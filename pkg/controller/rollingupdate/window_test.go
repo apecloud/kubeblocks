@@ -87,31 +87,29 @@ func TestParticipantsPreserveAdmissionAcrossReplicaChanges(t *testing.T) {
 
 func TestParticipantsPreserveAdmissionAcrossNameSetChanges(t *testing.T) {
 	owner := &metav1.PartialObjectMetadata{}
-	revisions := map[string]string{"a": "2", "b": "2", "c": "2"}
+	revisions := map[string]string{"default": "2"}
 	_, _ = Participants(owner, revisions, 1, []string{"a", "b", "c"})
 
 	// Scale out and reorder without changing any surviving desired revision.
-	revisions["d"] = "2"
 	got, changed := Participants(owner, revisions, 1, []string{"b", "c", "d", "a"})
 	if !got.Equal(sets.New("a")) {
 		t.Fatalf("expected scale-out to retain a, got %v", got)
 	}
-	if !changed {
-		t.Fatal("expected scale-out revision snapshot to require persistence")
+	if changed {
+		t.Fatal("expected scale-out alone not to change the window")
 	}
 
 	// Scale in an unrelated identity and reorder again.
-	delete(revisions, "b")
 	got, changed = Participants(owner, revisions, 1, []string{"c", "d", "a"})
 	if !got.Equal(sets.New("a")) {
 		t.Fatalf("expected scale-in to retain a, got %v", got)
 	}
-	if !changed {
-		t.Fatal("expected scale-in revision snapshot to require persistence")
+	if changed {
+		t.Fatal("expected scale-in alone not to change the window")
 	}
 
 	// A desired revision change on a surviving identity starts a new rollout.
-	revisions["c"] = "3"
+	revisions["default"] = "3"
 	got, changed = Participants(owner, revisions, 1, []string{"c", "d", "a"})
 	if !got.Equal(sets.New("c")) {
 		t.Fatalf("expected revision change to rebuild the window with c, got %v", got)
@@ -135,6 +133,16 @@ func TestParticipantsResetInvalidStateAndRemoveFullWindow(t *testing.T) {
 		t.Fatal("expected invalid state to require persistence")
 	}
 
+	owner.Annotations[WindowAnnotationKey] = `{"rolloutID":"` + RolloutID(revisions) +
+		`","replicas":1,"participants":["a"]}`
+	got, changed = Participants(owner, revisions, 1, []string{"b", "a", "c"})
+	if !got.Equal(sets.New("b")) {
+		t.Fatalf("expected an unversioned window to be rebuilt, got %v", got)
+	}
+	if !changed {
+		t.Fatal("expected an unversioned window to require persistence")
+	}
+
 	got, changed = Participants(owner, revisions, 3, []string{"c", "b", "a"})
 	if !got.Equal(sets.New("a", "b", "c")) {
 		t.Fatalf("expected all participants, got %v", got)
@@ -156,6 +164,9 @@ func TestRolloutIDUsesDesiredRevisionsInsteadOfGeneration(t *testing.T) {
 	if rolloutID == RolloutID(map[string]string{"a": "revision-a", "b": "revision-c"}) {
 		t.Fatal("expected a desired revision change to alter the rollout ID")
 	}
+	if rolloutID == RolloutID(map[string]string{"c": "revision-a", "b": "revision-b"}) {
+		t.Fatal("expected a stable template identity change to alter the rollout ID")
+	}
 
 	owner := &metav1.PartialObjectMetadata{ObjectMeta: metav1.ObjectMeta{Generation: 1}}
 	got, changed := Participants(owner, revisions, 1, []string{"a", "b"})
@@ -173,13 +184,43 @@ func TestRolloutIDUsesDesiredRevisionsInsteadOfGeneration(t *testing.T) {
 	}
 }
 
+func TestParticipantsInitializeFromExistingRollout(t *testing.T) {
+	owner := &metav1.PartialObjectMetadata{}
+	revisions := map[string]string{"a": "2", "b": "2", "c": "2"}
+	got, changed := ParticipantsWithInitial(owner, revisions, 1,
+		[]string{"b", "c", "a"}, sets.New("a"))
+	if !got.Equal(sets.New("a")) {
+		t.Fatalf("expected existing participant a to be recovered, got %v", got)
+	}
+	if !changed {
+		t.Fatal("expected recovered window to require persistence")
+	}
+
+	got, changed = Participants(owner, revisions, 1, []string{"c", "b", "a"})
+	if !got.Equal(sets.New("a")) {
+		t.Fatalf("expected recovered participant a to remain stable, got %v", got)
+	}
+	if changed {
+		t.Fatal("expected recovered window to remain unchanged")
+	}
+}
+
 func TestReset(t *testing.T) {
 	owner := &metav1.PartialObjectMetadata{}
 	_, _ = Participants(owner, map[string]string{"a": "2", "b": "2"}, 1, []string{"a", "b"})
 	if !Reset(owner) {
-		t.Fatal("expected a persisted window to be removed")
+		t.Fatal("expected a persisted window to be ended")
 	}
 	if Reset(owner) {
-		t.Fatal("expected resetting an absent window to be a no-op")
+		t.Fatal("expected ending an ended window to be a no-op")
+	}
+
+	got, changed := ParticipantsWithInitial(owner, map[string]string{"a": "2", "b": "2"}, 1,
+		[]string{"b", "a"}, sets.New("a"))
+	if !got.Equal(sets.New("b")) {
+		t.Fatalf("expected an ended window to start fresh with b, got %v", got)
+	}
+	if !changed {
+		t.Fatal("expected restarting RollingUpdate to replace the end marker")
 	}
 }

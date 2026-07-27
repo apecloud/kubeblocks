@@ -264,7 +264,7 @@ var _ = Describe("update reconciler test", func() {
 			res, err = reconciler.Reconcile(onDeleteTree)
 			Expect(err).Should(BeNil())
 			Expect(res).Should(Equal(kubebuilderx.Commit))
-			Expect(root.Annotations).ShouldNot(HaveKey(rollingupdate.WindowAnnotationKey))
+			Expect(root.Annotations).Should(HaveKey(rollingupdate.WindowAnnotationKey))
 			expectUpdatedPods(onDeleteTree, []string{})
 
 			res, err = reconciler.Reconcile(onDeleteTree)
@@ -409,6 +409,53 @@ var _ = Describe("update reconciler test", func() {
 			Expect(err).Should(BeNil())
 			Expect(object).ShouldNot(BeNil())
 			Expect(object.(*corev1.Pod).Status.Phase).Should(Equal(corev1.PodPending))
+		})
+
+		It("recovers an existing participant when upgraded during a rollout", func() {
+			tree := kubebuilderx.NewObjectTree()
+			its.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
+			its.Spec.Roles = []workloads.ReplicaRole{
+				{Name: "follower", UpdatePriority: 1},
+				{Name: "leader", UpdatePriority: 2},
+			}
+			its.Spec.InstanceUpdateStrategy = &workloads.InstanceUpdateStrategy{
+				RollingUpdate: &workloads.RollingUpdate{
+					Replicas:       ptr.To(intstr.FromInt32(1)),
+					MaxUnavailable: ptr.To(intstr.FromInt32(2)),
+				},
+			}
+			tree.SetRoot(its)
+			prepareForUpdate(tree)
+
+			updateRevisions, err := GetRevisions(its.Status.UpdateRevisions)
+			Expect(err).ShouldNot(HaveOccurred())
+			for _, object := range tree.List(&corev1.Pod{}) {
+				pod := object.(*corev1.Pod)
+				pod.Labels[appsv1.ControllerRevisionHashLabelKey] = "old-revision"
+				pod.Labels[RoleLabelKey] = "leader"
+				pod.Status.Phase = corev1.PodRunning
+				pod.Status.Conditions = append(pod.Status.Conditions, getPodReadyCondition())
+			}
+
+			// bar-2 was updated by the old controller, then role drift makes
+			// outdated bar-1 the first member in the current update order.
+			updated, err := tree.Get(builder.NewPodBuilder(namespace, "bar-2").GetObject())
+			Expect(err).ShouldNot(HaveOccurred())
+			updated.(*corev1.Pod).Labels[appsv1.ControllerRevisionHashLabelKey] = updateRevisions["bar-2"]
+			next, err := tree.Get(builder.NewPodBuilder(namespace, "bar-1").GetObject())
+			Expect(err).ShouldNot(HaveOccurred())
+			next.(*corev1.Pod).Labels[RoleLabelKey] = "follower"
+
+			reconciler = NewUpdateReconciler()
+			res, err := reconciler.Reconcile(tree)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(res).Should(Equal(kubebuilderx.Commit))
+			expectUpdatedPods(tree, []string{})
+
+			res, err = reconciler.Reconcile(tree)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
+			expectUpdatedPods(tree, []string{})
 		})
 
 		It("does not update a child when the participant window patch conflicts", func() {

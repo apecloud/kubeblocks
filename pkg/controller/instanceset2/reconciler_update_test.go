@@ -168,8 +168,8 @@ func TestUpdateReconcilerResetsWindowWhenLeavingRollingUpdate(t *testing.T) {
 	if result != kubebuilderx.Commit {
 		t.Fatalf("expected window reset commit, got %#v", result)
 	}
-	if _, ok := its.Annotations[rollingupdate.WindowAnnotationKey]; ok {
-		t.Fatal("expected OnDelete to remove the persisted window")
+	if _, ok := its.Annotations[rollingupdate.WindowAnnotationKey]; !ok {
+		t.Fatal("expected OnDelete to persist the ended window state")
 	}
 
 	result, err = reconciler.Reconcile(tree)

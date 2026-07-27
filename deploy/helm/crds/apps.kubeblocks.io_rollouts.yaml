@@ -535,7 +535,16 @@ spec:
                                               description: |-
                                                 Indicates the duration of time to wait between each retry attempt.
                                                 This value is set to 0 by default, indicating that there will be no delay between retry attempts.
+                                                Values use the time.Duration integer and JSON representation in nanoseconds.
                                               format: int64
+                                              type: integer
+                                            retryIntervalSeconds:
+                                              description: |-
+                                                Specifies the number of seconds to wait between each retry attempt.
+                                                This is a convenient way to configure retryInterval in whole seconds.
+                                                When set, this field takes precedence over retryInterval, including when set to 0.
+                                              format: int64
+                                              minimum: 0
                                               type: integer
                                           type: object
                                         targetPodSelector:
@@ -965,7 +974,16 @@ spec:
                                               description: |-
                                                 Indicates the duration of time to wait between each retry attempt.
                                                 This value is set to 0 by default, indicating that there will be no delay between retry attempts.
+                                                Values use the time.Duration integer and JSON representation in nanoseconds.
                                               format: int64
+                                              type: integer
+                                            retryIntervalSeconds:
+                                              description: |-
+                                                Specifies the number of seconds to wait between each retry attempt.
+                                                This is a convenient way to configure retryInterval in whole seconds.
+                                                When set, this field takes precedence over retryInterval, including when set to 0.
+                                              format: int64
+                                              minimum: 0
                                               type: integer
                                           type: object
                                         targetPodSelector:
@@ -3872,7 +3890,16 @@ spec:
                                               description: |-
                                                 Indicates the duration of time to wait between each retry attempt.
                                                 This value is set to 0 by default, indicating that there will be no delay between retry attempts.
+                                                Values use the time.Duration integer and JSON representation in nanoseconds.
                                               format: int64
+                                              type: integer
+                                            retryIntervalSeconds:
+                                              description: |-
+                                                Specifies the number of seconds to wait between each retry attempt.
+                                                This is a convenient way to configure retryInterval in whole seconds.
+                                                When set, this field takes precedence over retryInterval, including when set to 0.
+                                              format: int64
+                                              minimum: 0
                                               type: integer
                                           type: object
                                         targetPodSelector:
@@ -4302,7 +4329,16 @@ spec:
                                               description: |-
                                                 Indicates the duration of time to wait between each retry attempt.
                                                 This value is set to 0 by default, indicating that there will be no delay between retry attempts.
+                                                Values use the time.Duration integer and JSON representation in nanoseconds.
                                               format: int64
+                                              type: integer
+                                            retryIntervalSeconds:
+                                              description: |-
+                                                Specifies the number of seconds to wait between each retry attempt.
+                                                This is a convenient way to configure retryInterval in whole seconds.
+                                                When set, this field takes precedence over retryInterval, including when set to 0.
+                                              format: int64
+                                              minimum: 0
                                               type: integer
                                           type: object
                                         targetPodSelector:

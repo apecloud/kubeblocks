@@ -10903,7 +10903,22 @@ time.Duration
 <td>
 <em>(Optional)</em>
 <p>Indicates the duration of time to wait between each retry attempt.
-This value is set to 0 by default, indicating that there will be no delay between retry attempts.</p>
+This value is set to 0 by default, indicating that there will be no delay between retry attempts.
+Values use the time.Duration integer and JSON representation in nanoseconds.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>retryIntervalSeconds</code><br/>
+<em>
+int64
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the number of seconds to wait between each retry attempt.
+This is a convenient way to configure retryInterval in whole seconds.
+When set, this field takes precedence over retryInterval, including when set to 0.</p>
 </td>
 </tr>
 </tbody>

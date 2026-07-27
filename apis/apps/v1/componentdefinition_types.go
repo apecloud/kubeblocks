@@ -2197,10 +2197,19 @@ type RetryPolicy struct {
 
 	// Indicates the duration of time to wait between each retry attempt.
 	// This value is set to 0 by default, indicating that there will be no delay between retry attempts.
+	// Values use the time.Duration integer and JSON representation in nanoseconds.
 	//
 	// +kubebuilder:default=0
 	// +optional
 	RetryInterval time.Duration `json:"retryInterval,omitempty"`
+
+	// Specifies the number of seconds to wait between each retry attempt.
+	// This is a convenient way to configure retryInterval in whole seconds.
+	// When set, this field takes precedence over retryInterval, including when set to 0.
+	//
+	// +kubebuilder:validation:Minimum=0
+	// +optional
+	RetryIntervalSeconds *int64 `json:"retryIntervalSeconds,omitempty"`
 }
 
 // PreConditionType defines the preCondition type of the action execution.

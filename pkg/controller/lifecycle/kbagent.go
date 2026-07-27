@@ -25,6 +25,7 @@ import (
 	"math/rand"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -263,6 +264,32 @@ func (a *kbagent) callAction(ctx context.Context, cli client.Reader, spec *appsv
 	return a.callActionWithSelector(ctx, spec, lfa, req)
 }
 
+// BuildKBAgentRetryPolicy normalizes the API retry policy into the kbagent wire contract.
+func BuildKBAgentRetryPolicy(retryPolicy *appsv1.RetryPolicy) *proto.RetryPolicy {
+	if retryPolicy == nil {
+		return nil
+	}
+
+	interval := retryPolicy.RetryInterval
+	if retryPolicy.RetryIntervalSeconds != nil {
+		seconds := *retryPolicy.RetryIntervalSeconds
+		interval = 0
+		if seconds > 0 {
+			const maxDuration = time.Duration(1<<63 - 1)
+			if seconds > int64(maxDuration/time.Second) {
+				interval = maxDuration
+			} else {
+				interval = time.Duration(seconds) * time.Second
+			}
+		}
+	}
+
+	return &proto.RetryPolicy{
+		MaxRetries:    retryPolicy.MaxRetries,
+		RetryInterval: interval,
+	}
+}
+
 func (a *kbagent) buildActionRequest(ctx context.Context, cli client.Reader, lfa lifecycleAction, opts *Options) (*proto.ActionRequest, error) {
 	parameters, err := a.parameters(ctx, cli, lfa)
 	if err != nil {
@@ -280,10 +307,7 @@ func (a *kbagent) buildActionRequest(ctx context.Context, cli client.Reader, lfa
 			req.TimeoutSeconds = opts.TimeoutSeconds
 		}
 		if opts.RetryPolicy != nil {
-			req.RetryPolicy = &proto.RetryPolicy{
-				MaxRetries:    opts.RetryPolicy.MaxRetries,
-				RetryInterval: opts.RetryPolicy.RetryInterval,
-			}
+			req.RetryPolicy = BuildKBAgentRetryPolicy(opts.RetryPolicy)
 		}
 		if len(opts.Arguments) > 0 {
 			req.Arguments = opts.Arguments

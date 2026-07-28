@@ -411,7 +411,7 @@ var _ = Describe("update reconciler test", func() {
 			Expect(object.(*corev1.Pod).Status.Phase).Should(Equal(corev1.PodPending))
 		})
 
-		It("recovers an existing participant when upgraded during a rollout", func() {
+		It("defers stable admission when upgraded during an active rollout", func() {
 			tree := kubebuilderx.NewObjectTree()
 			its.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
 			its.Spec.Roles = []workloads.ReplicaRole{
@@ -426,6 +426,11 @@ var _ = Describe("update reconciler test", func() {
 			}
 			tree.SetRoot(its)
 			prepareForUpdate(tree)
+			delete(its.Annotations, rollingupdate.RolloutIDAnnotationKey)
+			delete(its.Annotations, rollingupdate.RolloutBasisAnnotationKey)
+			migrationRes, migrationErr := NewRevisionUpdateReconciler().Reconcile(tree)
+			Expect(migrationErr).ShouldNot(HaveOccurred())
+			Expect(migrationRes).Should(Equal(kubebuilderx.Continue))
 
 			updateRevisions, err := GetRevisions(its.Status.UpdateRevisions)
 			Expect(err).ShouldNot(HaveOccurred())
@@ -437,8 +442,9 @@ var _ = Describe("update reconciler test", func() {
 				pod.Status.Conditions = append(pod.Status.Conditions, getPodReadyCondition())
 			}
 
-			// bar-2 was updated by the old controller, then role drift makes
-			// outdated bar-1 the first member in the current update order.
+			// bar-2 already matches the desired revision, while role drift makes
+			// outdated bar-1 the current first member. Revision equality must not
+			// consume the new admission window.
 			updated, err := tree.Get(builder.NewPodBuilder(namespace, "bar-2").GetObject())
 			Expect(err).ShouldNot(HaveOccurred())
 			updated.(*corev1.Pod).Labels[appsv1.ControllerRevisionHashLabelKey] = updateRevisions["bar-2"]
@@ -455,7 +461,74 @@ var _ = Describe("update reconciler test", func() {
 			res, err = reconciler.Reconcile(tree)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(res).Should(Equal(kubebuilderx.Continue))
-			expectUpdatedPods(tree, []string{})
+			expectUpdatedPods(tree, []string{"bar-1"})
+		})
+
+		It("leaves deferred admission on the next in-place rollout", func() {
+			origSupportResize := intctrlutil.SupportResizeSubResource
+			intctrlutil.SupportResizeSubResource = func() (bool, error) { return false, nil }
+			defer func() { intctrlutil.SupportResizeSubResource = origSupportResize }()
+
+			tree := kubebuilderx.NewObjectTree()
+			its.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
+			its.Spec.Roles = []workloads.ReplicaRole{
+				{Name: "follower", UpdatePriority: 1},
+				{Name: "leader", UpdatePriority: 2},
+			}
+			its.Spec.InstanceUpdateStrategy = &workloads.InstanceUpdateStrategy{
+				RollingUpdate: &workloads.RollingUpdate{
+					Replicas:       ptr.To(intstr.FromInt32(1)),
+					MaxUnavailable: ptr.To(intstr.FromInt32(2)),
+				},
+			}
+			tree.SetRoot(its)
+			prepareForUpdate(tree)
+
+			delete(its.Annotations, rollingupdate.RolloutIDAnnotationKey)
+			delete(its.Annotations, rollingupdate.RolloutBasisAnnotationKey)
+
+			for _, object := range tree.List(&corev1.Pod{}) {
+				pod := object.(*corev1.Pod)
+				pod.Labels[RoleLabelKey] = "leader"
+				pod.Status.Phase = corev1.PodRunning
+				pod.Status.Conditions = append(pod.Status.Conditions, getPodReadyCondition())
+			}
+			first, err := tree.Get(builder.NewPodBuilder(namespace, "bar-2").GetObject())
+			Expect(err).ShouldNot(HaveOccurred())
+			first.(*corev1.Pod).Labels[RoleLabelKey] = "follower"
+
+			reconciler = NewUpdateReconciler()
+			res, err := reconciler.Reconcile(tree)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(res).Should(Equal(kubebuilderx.Commit))
+			deferredRolloutID := its.Annotations[rollingupdate.RolloutIDAnnotationKey]
+			Expect(its.Annotations[rollingupdate.RolloutBasisAnnotationKey]).ShouldNot(BeEmpty())
+
+			its.Spec.Template.Spec.Containers[0].Image = "next-image"
+			_, err = NewRevisionUpdateReconciler().Reconcile(tree)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(its.Annotations[rollingupdate.RolloutIDAnnotationKey]).ShouldNot(Equal(deferredRolloutID))
+
+			res, err = reconciler.Reconcile(tree)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(res).Should(Equal(kubebuilderx.Commit))
+
+			// Role drift changes the current first member, but the next rollout
+			// has already persisted bar-2 as its stable participant.
+			first.(*corev1.Pod).Labels[RoleLabelKey] = "leader"
+			outside, err := tree.Get(builder.NewPodBuilder(namespace, "bar-1").GetObject())
+			Expect(err).ShouldNot(HaveOccurred())
+			outside.(*corev1.Pod).Labels[RoleLabelKey] = "follower"
+
+			res, err = reconciler.Reconcile(tree)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
+			first, err = tree.Get(builder.NewPodBuilder(namespace, "bar-2").GetObject())
+			Expect(err).ShouldNot(HaveOccurred())
+			outside, err = tree.Get(builder.NewPodBuilder(namespace, "bar-1").GetObject())
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(first.(*corev1.Pod).Spec.Containers[0].Image).Should(Equal("next-image"))
+			Expect(outside.(*corev1.Pod).Spec.Containers[0].Image).ShouldNot(Equal("next-image"))
 		})
 
 		It("does not update a child when the participant window patch conflicts", func() {

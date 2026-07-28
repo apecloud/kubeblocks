@@ -86,7 +86,7 @@ var _ = Describe("instance util test", func() {
 	})
 
 	Context("buildInstanceTemplateRevision", func() {
-		It("ignores the internal rolling-update window annotation", func() {
+		It("ignores internal rolling-update annotations", func() {
 			before, err := buildInstanceTemplateRevision(&its.Spec.Template, its, nil)
 			Expect(err).ShouldNot(HaveOccurred())
 
@@ -94,6 +94,8 @@ var _ = Describe("instance util test", func() {
 				its.Annotations = make(map[string]string)
 			}
 			its.Annotations[rollingupdate.WindowAnnotationKey] = `{"rolloutID":"2","replicas":1,"participants":["pod-0"]}`
+			its.Annotations[rollingupdate.RolloutIDAnnotationKey] = "2"
+			its.Annotations[rollingupdate.RolloutBasisAnnotationKey] = "basis-2"
 			after, err := buildInstanceTemplateRevision(&its.Spec.Template, its, nil)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(after).Should(Equal(before))

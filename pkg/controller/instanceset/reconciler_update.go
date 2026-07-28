@@ -128,18 +128,17 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}
-	alreadyUpdated := sets.New[string]()
-	rolloutRevisions := make(map[string]string)
-	for _, pod := range oldPodList {
-		if revision, ok := updateRevisions[pod.Name]; ok && getPodRevision(pod) == revision {
-			alreadyUpdated.Insert(pod.Name)
+	rolloutID := its.Annotations[rollingupdate.RolloutIDAnnotationKey]
+	if rolloutID == "" {
+		rolloutRevisions, rolloutBasis, err := buildLegacyRolloutState(its, itsExt, nameToTemplateMap)
+		if err != nil {
+			return kubebuilderx.Continue, err
 		}
-		if revision, ok := updateRevisions[pod.Name]; ok {
-			rolloutRevisions[nameToTemplateMap[pod.Name].Name] = revision
-		}
+		rolloutID = rollingupdate.CurrentLegacyRolloutID(
+			its, updateRevisions, rolloutRevisions, rolloutBasis)
 	}
-	participants, windowChanged := rollingupdate.ParticipantsWithInitial(
-		its, rolloutRevisions, rollingUpdateQuota, orderedNames, alreadyUpdated)
+	participants, windowChanged := rollingupdate.Participants(
+		its, rolloutID, rollingUpdateQuota, orderedNames)
 	if windowChanged {
 		return kubebuilderx.Commit, nil
 	}

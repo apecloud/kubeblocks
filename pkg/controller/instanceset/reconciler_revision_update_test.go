@@ -25,7 +25,9 @@ import (
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
+	"github.com/apecloud/kubeblocks/pkg/controller/rollingupdate"
 )
 
 var _ = Describe("revision update reconciler test", func() {
@@ -61,6 +63,41 @@ var _ = Describe("revision update reconciler test", func() {
 			Expect(updateRevisions).Should(HaveKey(its.Name + "-1"))
 			Expect(updateRevisions).Should(HaveKey(its.Name + "-2"))
 			Expect(newITS.Status.UpdateRevision).Should(Equal(updateRevisions[its.Name+"-2"]))
+			rolloutID := newITS.Annotations[rollingupdate.RolloutIDAnnotationKey]
+			Expect(rolloutID).ShouldNot(BeEmpty())
+
+			By("preserving the rollout ID for a name-set-only change")
+			*its.Spec.Replicas = 4
+			_, err = reconciler.Reconcile(tree)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(newITS.Annotations[rollingupdate.RolloutIDAnnotationKey]).Should(Equal(rolloutID))
+			scaledRevisions, err := GetRevisions(newITS.Status.UpdateRevisions)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			By("advancing the rollout ID for a filtered in-place update")
+			its.Spec.Template.Spec.Containers[0].Image += "-changed"
+			_, err = reconciler.Reconcile(tree)
+			Expect(err).ShouldNot(HaveOccurred())
+			updatedRevisions, err := GetRevisions(newITS.Status.UpdateRevisions)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(updatedRevisions).Should(Equal(scaledRevisions))
+			Expect(newITS.Annotations[rollingupdate.RolloutIDAnnotationKey]).ShouldNot(Equal(rolloutID))
+		})
+
+		It("detects only surviving flat ordinal reassignment", func() {
+			previous := map[string]workloads.Ordinals{
+				"a": {Discrete: []int32{0}},
+				"b": {Discrete: []int32{1}},
+			}
+			Expect(hasReassignedOrdinal(previous, map[string]*instancetemplate.InstanceTemplateExt{
+				"test-0": {Name: "a"},
+				"test-1": {Name: "b"},
+				"test-2": {Name: "b"},
+			})).Should(BeFalse())
+			Expect(hasReassignedOrdinal(previous, map[string]*instancetemplate.InstanceTemplateExt{
+				"test-0": {Name: "b"},
+				"test-1": {Name: "a"},
+			})).Should(BeTrue())
 		})
 	})
 })

@@ -30,6 +30,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/revisionmap"
 	"github.com/apecloud/kubeblocks/pkg/controller/rollingupdate"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -130,19 +131,13 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	for i, inst := range oldInstanceList {
 		orderedNames[i] = inst.Name
 	}
-	rolloutRevisions := make(map[string]string)
-	for _, template := range nameToTemplateMap {
-		if _, ok := rolloutRevisions[template.Name]; ok {
-			continue
-		}
-		canonical, err := buildInstanceByTemplate(tree, its.Name, template, its)
-		if err != nil {
-			return kubebuilderx.Continue, err
-		}
-		rolloutRevisions[template.Name] = getInstanceRevision(canonical)
+	updateRevisions, err := revisionmap.Decode(its.Status.UpdateRevisions)
+	if err != nil {
+		return kubebuilderx.Continue, err
 	}
+	rolloutID := rollingupdate.CurrentRolloutID(its, updateRevisions)
 	participants, windowChanged := rollingupdate.Participants(
-		its, rolloutRevisions, replicas, orderedNames)
+		its, rolloutID, replicas, orderedNames)
 	if windowChanged {
 		return kubebuilderx.Commit, nil
 	}

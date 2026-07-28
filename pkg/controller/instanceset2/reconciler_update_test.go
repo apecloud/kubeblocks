@@ -85,6 +85,10 @@ func TestUpdateReconcilerCommitsStableWindowBeforeUpdatingInstances(t *testing.T
 	if _, err := NewRevisionUpdateReconciler().Reconcile(tree); err != nil {
 		t.Fatalf("update desired revisions: %v", err)
 	}
+	rolloutID := its.Annotations[rollingupdate.RolloutIDAnnotationKey]
+	if rolloutID == "" {
+		t.Fatal("expected desired revision reconciliation to persist a rollout ID")
+	}
 	reconciler := NewUpdateReconciler()
 	result, err := reconciler.Reconcile(tree)
 	if err != nil {
@@ -113,6 +117,9 @@ func TestUpdateReconcilerCommitsStableWindowBeforeUpdatingInstances(t *testing.T
 	second.(*workloads.Instance).Status.Role = "follower"
 	if _, err := NewRevisionUpdateReconciler().Reconcile(tree); err != nil {
 		t.Fatalf("refresh desired revisions after generation change: %v", err)
+	}
+	if got := its.Annotations[rollingupdate.RolloutIDAnnotationKey]; got != rolloutID {
+		t.Fatalf("control-only generation change reset rollout ID: got %q, want %q", got, rolloutID)
 	}
 
 	result, err = reconciler.Reconcile(tree)

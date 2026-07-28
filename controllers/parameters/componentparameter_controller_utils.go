@@ -60,10 +60,14 @@ func reconcileConfigItemDetailsIntoSpec(ctx context.Context, cli client.Client, 
 	if err != nil {
 		return false, err
 	}
+	if err = applyRerenderPayloads(configItemDetails, &fetchTask.ComponentObj.Spec, configDescs); err != nil {
+		return false, err
+	}
 	expected := compParam.DeepCopy()
 	expected.Spec.ConfigItemDetails = configItemDetails
 	merged := parameters.MergeComponentParameter(expected, compParam, func(dest, expected *parametersv1alpha1.ConfigTemplateItemDetail) {
 		mergeMissingConfigFileParams(dest, expected)
+		mergeManagedPayload(dest, expected, constant.VolumeClaimTemplatesPayload)
 		if dest.CustomTemplates == nil && expected.CustomTemplates != nil {
 			dest.CustomTemplates = expected.CustomTemplates
 		}
@@ -91,6 +95,103 @@ func mergeMissingConfigFileParams(dest, expected *parametersv1alpha1.ConfigTempl
 		}
 		dest.ConfigFileParams[file] = *params.DeepCopy()
 	}
+}
+
+type volumeClaimTemplatePayload struct {
+	Name    string `json:"name"`
+	Storage string `json:"storage,omitempty"`
+}
+
+func applyRerenderPayloads(items []parametersv1alpha1.ConfigTemplateItemDetail,
+	componentSpec *appsv1.ComponentSpec,
+	configDescs []parametersv1alpha1.ComponentConfigDescription) error {
+	if componentSpec == nil {
+		return nil
+	}
+	for i := range items {
+		descs := parameters.GetComponentConfigDescriptions(configDescs, items[i].Name)
+		if !rerenderConfigEnabled(descs, parametersv1alpha1.ComponentVolumeExpansionType) {
+			if err := patchConfigItemPayload(&items[i], constant.VolumeClaimTemplatesPayload, nil); err != nil {
+				return err
+			}
+			continue
+		}
+		payload := volumeClaimTemplatesPayload(componentSpec.VolumeClaimTemplates)
+		if len(payload) == 0 {
+			if err := patchConfigItemPayload(&items[i], constant.VolumeClaimTemplatesPayload, nil); err != nil {
+				return err
+			}
+			continue
+		}
+		if err := patchConfigItemPayload(&items[i], constant.VolumeClaimTemplatesPayload, payload); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func rerenderConfigEnabled(configDescs []parametersv1alpha1.ComponentConfigDescription, rerenderType parametersv1alpha1.RerenderResourceType) bool {
+	for _, desc := range configDescs {
+		if slices.Contains(desc.ReRenderResourceTypes, rerenderType) {
+			return true
+		}
+	}
+	return false
+}
+
+func volumeClaimTemplatesPayload(vcts []appsv1.PersistentVolumeClaimTemplate) []volumeClaimTemplatePayload {
+	payload := make([]volumeClaimTemplatePayload, 0, len(vcts))
+	for _, vct := range vcts {
+		storage := vct.Spec.Resources.Requests[corev1.ResourceStorage]
+		payload = append(payload, volumeClaimTemplatePayload{
+			Name:    vct.Name,
+			Storage: storage.String(),
+		})
+	}
+	return payload
+}
+
+func patchConfigItemPayload(item *parametersv1alpha1.ConfigTemplateItemDetail, payloadID string, payload any) error {
+	if item == nil {
+		return nil
+	}
+	if payload == nil {
+		if item.Payload != nil {
+			delete(item.Payload, payloadID)
+			if len(item.Payload) == 0 {
+				item.Payload = nil
+			}
+		}
+		return nil
+	}
+	newPayload, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	if item.Payload == nil {
+		item.Payload = parametersv1alpha1.Payload{}
+	}
+	item.Payload[payloadID] = newPayload
+	return nil
+}
+
+func mergeManagedPayload(dest, expected *parametersv1alpha1.ConfigTemplateItemDetail, payloadID string) {
+	if expected == nil {
+		return
+	}
+	if expected.Payload == nil {
+		_ = patchConfigItemPayload(dest, payloadID, nil)
+		return
+	}
+	payload, ok := expected.Payload[payloadID]
+	if !ok {
+		_ = patchConfigItemPayload(dest, payloadID, nil)
+		return
+	}
+	if dest.Payload == nil {
+		dest.Payload = parametersv1alpha1.Payload{}
+	}
+	dest.Payload[payloadID] = slices.Clone(payload)
 }
 
 func reconcileParameterValuesIntoSpec(ctx context.Context, cli client.Client, compParam *parametersv1alpha1.ComponentParameter, fetchTask *Task) (bool, error) {

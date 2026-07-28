@@ -174,7 +174,7 @@ type ComponentConfigSpec struct {
 	// +optional
 	InjectEnvTo []string `json:"injectEnvTo,omitempty"`
 
-	// Specifies whether the configuration needs to be re-rendered after v-scale or h-scale operations to reflect changes.
+	// Specifies whether the configuration needs to be re-rendered after scaling, TLS, or volume expansion operations to reflect changes.
 	//
 	// In some scenarios, the configuration may need to be updated to reflect the changes in resource allocation
 	// or cluster topology. Examples:
@@ -182,6 +182,7 @@ type ComponentConfigSpec struct {
 	// - Redis: adjust maxmemory after v-scale operation.
 	// - MySQL: increase max connections after v-scale operation.
 	// - Zookeeper: update zoo.cfg with new node addresses after h-scale operation.
+	// - Doris: update file cache capacity after volume expansion operation.
 	//
 	// +listType=set
 	// +optional
@@ -193,15 +194,16 @@ type ComponentConfigSpec struct {
 	AsSecret *bool `json:"asSecret,omitempty"`
 }
 
-// RerenderResourceType defines the resource requirements for a component.
+// RerenderResourceType defines the resource changes that can trigger configuration re-rendering.
 // +enum
-// +kubebuilder:validation:Enum={vscale,hscale,tls,shardingHScale}
+// +kubebuilder:validation:Enum={vscale,hscale,tls,shardingHScale,volumeExpansion}
 type RerenderResourceType string
 
 const (
-	ComponentVScaleType         RerenderResourceType = "vscale"
-	ComponentHScaleType         RerenderResourceType = "hscale"
-	ShardingComponentHScaleType RerenderResourceType = "shardingHScale"
+	ComponentVScaleType          RerenderResourceType = "vscale"
+	ComponentHScaleType          RerenderResourceType = "hscale"
+	ShardingComponentHScaleType  RerenderResourceType = "shardingHScale"
+	ComponentVolumeExpansionType RerenderResourceType = "volumeExpansion"
 )
 
 // MergedPolicy defines how to merge external imported templates into component templates.

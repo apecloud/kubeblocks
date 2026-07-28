@@ -60,16 +60,17 @@ const (
 
 // Deprecated: It is retained for API compatibility with existing ParamConfigRenderer objects.
 //
-// RerenderResourceType defines the resource requirements for a component.
+// RerenderResourceType defines the resource changes that can trigger configuration re-rendering.
 // +enum
-// +kubebuilder:validation:Enum={vscale,hscale,tls,shardingHScale}
+// +kubebuilder:validation:Enum={vscale,hscale,tls,shardingHScale,volumeExpansion}
 type RerenderResourceType string
 
 const (
-	ComponentVScaleType         RerenderResourceType = "vscale"
-	ComponentHScaleType         RerenderResourceType = "hscale"
-	ComponentTLSType            RerenderResourceType = "tls"
-	ShardingComponentHScaleType RerenderResourceType = "shardingHScale"
+	ComponentVScaleType          RerenderResourceType = "vscale"
+	ComponentHScaleType          RerenderResourceType = "hscale"
+	ComponentTLSType             RerenderResourceType = "tls"
+	ShardingComponentHScaleType  RerenderResourceType = "shardingHScale"
+	ComponentVolumeExpansionType RerenderResourceType = "volumeExpansion"
 )
 
 // ParameterPhase defines the Configuration FSM phase

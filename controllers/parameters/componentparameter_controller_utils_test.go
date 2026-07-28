@@ -20,11 +20,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package parameters
 
 import (
+	"encoding/json"
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/utils/ptr"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	parampkg "github.com/apecloud/kubeblocks/pkg/parameters"
 )
 
@@ -146,6 +151,90 @@ func TestMergeMissingConfigFileParams(t *testing.T) {
 	*expected.ConfigFileParams["log.conf"].Parameters["slow_query_log"] = "0"
 	if got := dest.ConfigFileParams["log.conf"].Parameters["slow_query_log"]; got == nil || *got != "1" {
 		t.Fatalf("expected merged params to be deep-copied, got %#v", got)
+	}
+}
+
+func TestApplyRerenderPayloads(t *testing.T) {
+	items := []parametersv1alpha1.ConfigTemplateItemDetail{
+		{Name: "be-cm"},
+		{
+			Name: "fe-cm",
+			Payload: parametersv1alpha1.Payload{
+				"external": json.RawMessage(`"keep"`),
+			},
+		},
+	}
+	componentSpec := &appsv1.ComponentSpec{
+		VolumeClaimTemplates: []appsv1.PersistentVolumeClaimTemplate{{
+			Name: "data",
+			Spec: corev1.PersistentVolumeClaimSpec{
+				Resources: corev1.VolumeResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceStorage: resource.MustParse("5Gi"),
+					},
+				},
+			},
+		}},
+	}
+	configDescs := []parametersv1alpha1.ComponentConfigDescription{{
+		Name:         "be.conf",
+		TemplateName: "be-cm",
+		ReRenderResourceTypes: []parametersv1alpha1.RerenderResourceType{
+			parametersv1alpha1.ComponentVolumeExpansionType,
+		},
+	}}
+
+	if err := applyRerenderPayloads(items, componentSpec, configDescs); err != nil {
+		t.Fatalf("applyRerenderPayloads() error = %v", err)
+	}
+
+	payload, ok := items[0].Payload[constant.VolumeClaimTemplatesPayload]
+	if !ok {
+		t.Fatalf("expected volume claim template payload on opted-in item")
+	}
+	var decoded []volumeClaimTemplatePayload
+	if err := json.Unmarshal(payload, &decoded); err != nil {
+		t.Fatalf("failed to decode payload: %v", err)
+	}
+	if len(decoded) != 1 || decoded[0].Name != "data" || decoded[0].Storage != "5Gi" {
+		t.Fatalf("unexpected payload: %#v", decoded)
+	}
+	if _, ok = items[1].Payload[constant.VolumeClaimTemplatesPayload]; ok {
+		t.Fatalf("did not expect managed payload on item without volumeExpansion trigger")
+	}
+	if string(items[1].Payload["external"]) != `"keep"` {
+		t.Fatalf("expected unrelated payload key to be preserved, got %s", string(items[1].Payload["external"]))
+	}
+}
+
+func TestMergeManagedPayload(t *testing.T) {
+	dest := &parametersv1alpha1.ConfigTemplateItemDetail{
+		Payload: parametersv1alpha1.Payload{
+			constant.VolumeClaimTemplatesPayload: json.RawMessage(`[{"name":"data","storage":"5Gi"}]`),
+			"external":                           json.RawMessage(`"keep"`),
+		},
+	}
+	expected := &parametersv1alpha1.ConfigTemplateItemDetail{
+		Payload: parametersv1alpha1.Payload{
+			constant.VolumeClaimTemplatesPayload: json.RawMessage(`[{"name":"data","storage":"8Gi"}]`),
+		},
+	}
+
+	mergeManagedPayload(dest, expected, constant.VolumeClaimTemplatesPayload)
+
+	if got := string(dest.Payload[constant.VolumeClaimTemplatesPayload]); got != `[{"name":"data","storage":"8Gi"}]` {
+		t.Fatalf("expected managed payload to be updated, got %s", got)
+	}
+	if got := string(dest.Payload["external"]); got != `"keep"` {
+		t.Fatalf("expected external payload key to be preserved, got %s", got)
+	}
+
+	mergeManagedPayload(dest, &parametersv1alpha1.ConfigTemplateItemDetail{}, constant.VolumeClaimTemplatesPayload)
+	if _, ok := dest.Payload[constant.VolumeClaimTemplatesPayload]; ok {
+		t.Fatalf("expected managed payload key to be removed when trigger is absent")
+	}
+	if got := string(dest.Payload["external"]); got != `"keep"` {
+		t.Fatalf("expected external payload key to remain after managed removal, got %s", got)
 	}
 }
 

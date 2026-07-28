@@ -2491,6 +2491,24 @@ The selector is considered ambiguous and the action fails if multiple Pods share
 </tr>
 <tr>
 <td>
+<code>nonBlocking</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies whether KubeBlocks should ask kb-agent to execute the Action without
+waiting for the underlying command or request to complete.</p>
+<p>When false, an Action call waits for completion and returns the final result.
+When true, kb-agent starts the Action in the background and returns an
+in-progress result until it completes. Equivalent subsequent calls return the
+same in-progress or cached terminal result.</p>
+<p>This field cannot be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>timeoutSeconds</code><br/>
 <em>
 int32
@@ -2500,7 +2518,9 @@ int32
 <em>(Optional)</em>
 <p>Specifies the maximum duration in seconds that the Action is allowed to run.</p>
 <p>Behavior based on the value:
-- Positive (&gt; 0): The action will be terminated after this many seconds. The maximum allowed value is 60.
+- Positive (&gt; 0): The action will be terminated after this many seconds.
+  Blocking Actions are capped at 60 seconds. Non-blocking Actions use the
+  configured value as their total execution timeout without the 60-second cap.
 - Zero (= 0): The timeout is managed by the system, defaulting to 30 seconds typically.
 - Negative (&lt; 0): No timeout is applied; the action runs until the command completes.</p>
 <p>This field cannot be updated.</p>

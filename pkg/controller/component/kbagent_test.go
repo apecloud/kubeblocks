@@ -203,6 +203,46 @@ var _ = Describe("kb-agent", func() {
 			Expect(postProvision.RetryPolicy.RetryInterval).Should(Equal(10 * time.Second))
 		})
 
+		It("configures a dedicated state volume for non-blocking actions", func() {
+			synthesizedComp.LifecycleActions.CustomActions[0].Action.NonBlocking = true
+
+			Expect(buildKBAgentContainer(synthesizedComp)).Should(Succeed())
+
+			c := kbAgentContainer()
+			Expect(c).ShouldNot(BeNil())
+			Expect(c.Args).Should(ContainElements("--action-state-dir", actionStateMountPath))
+			Expect(c.VolumeMounts).Should(ContainElement(corev1.VolumeMount{
+				Name:      actionStateVolumeName,
+				MountPath: actionStateMountPath,
+			}))
+			Expect(synthesizedComp.PodSpec.Volumes).Should(ContainElement(corev1.Volume{
+				Name: actionStateVolumeName,
+				VolumeSource: corev1.VolumeSource{
+					EmptyDir: &corev1.EmptyDirVolumeSource{},
+				},
+			}))
+
+			var actions []proto.Action
+			for _, e := range c.Env {
+				if e.Name == "KB_AGENT_ACTION" {
+					Expect(json.Unmarshal([]byte(e.Value), &actions)).Should(Succeed())
+				}
+			}
+			Expect(actions).Should(ContainElement(And(
+				HaveField("Name", "udf-shardAdd"),
+				HaveField("NonBlocking", true),
+			)))
+		})
+
+		It("does not configure Action state storage for blocking-only actions", func() {
+			Expect(buildKBAgentContainer(synthesizedComp)).Should(Succeed())
+
+			c := kbAgentContainer()
+			Expect(c.Args).ShouldNot(ContainElement("--action-state-dir"))
+			Expect(c.VolumeMounts).ShouldNot(ContainElement(HaveField("Name", actionStateVolumeName)))
+			Expect(synthesizedComp.PodSpec.Volumes).ShouldNot(ContainElement(HaveField("Name", actionStateVolumeName)))
+		})
+
 		It("role label downward api volume", func() {
 			err := buildKBAgentContainer(synthesizedComp)
 			Expect(err).Should(BeNil())

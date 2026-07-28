@@ -130,7 +130,7 @@ func Launch(logger logr.Logger, config server.Config) (bool, error) {
 	envVars := util.EnvL2M(os.Environ())
 
 	// initialize kb-agent
-	services, err := initialize(logger, envVars)
+	services, err := initializeWithActionStateDir(logger, envVars, config.ActionStateDir)
 	if err != nil {
 		return false, errors.Wrap(err, "init action handlers failed")
 	}
@@ -141,6 +141,10 @@ func Launch(logger logr.Logger, config server.Config) (bool, error) {
 }
 
 func initialize(logger logr.Logger, envVars map[string]string) ([]service.Service, error) {
+	return initializeWithActionStateDir(logger, envVars, "")
+}
+
+func initializeWithActionStateDir(logger logr.Logger, envVars map[string]string, actionStateDir string) ([]service.Service, error) {
 	da, dp, ds := getActionProbeNStreamingEnvValues(envVars)
 	if len(da) == 0 {
 		return nil, nil
@@ -155,7 +159,7 @@ func initialize(logger logr.Logger, envVars map[string]string) ([]service.Servic
 	if len(ds) > 0 {
 		streaming = strings.Split(ds, ",")
 	}
-	return service.New(logger, actions, probes, streaming)
+	return service.New(logger, actions, probes, streaming, actionStateDir)
 }
 
 func getActionProbeNStreamingEnvValues(envVars map[string]string) (string, string, string) {

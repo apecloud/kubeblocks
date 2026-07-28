@@ -28,6 +28,7 @@ type Action struct {
 	Exec           *ExecAction  `json:"exec,omitempty"`
 	HTTP           *HTTPAction  `json:"http,omitempty"`
 	GRPC           *GRPCAction  `json:"grpc,omitempty"`
+	NonBlocking    bool         `json:"nonBlocking,omitempty"`
 	TimeoutSeconds int32        `json:"timeoutSeconds,omitempty"`
 	RetryPolicy    *RetryPolicy `json:"retryPolicy,omitempty"`
 }
@@ -74,9 +75,11 @@ type ActionRequest struct {
 	Action         string            `json:"action"`
 	Parameters     map[string]string `json:"parameters,omitempty"`
 	Arguments      [][]string        `json:"arguments,omitempty"`
-	NonBlocking    *bool             `json:"nonBlocking,omitempty"`
 	TimeoutSeconds *int32            `json:"timeoutSeconds,omitempty"`
 	RetryPolicy    *RetryPolicy      `json:"retryPolicy,omitempty"`
+	// Rerun discards a cached terminal result for an equivalent request and
+	// executes the Action again. It never interrupts a running Action.
+	Rerun bool `json:"rerun,omitempty"`
 }
 
 type ActionResponse struct {

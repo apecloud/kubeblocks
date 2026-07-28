@@ -251,8 +251,7 @@ var _ = Describe("lifecycle", func() {
 				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
 					Expect(req.Action).Should(Equal("postProvision"))
 					Expect(req.Parameters).Should(BeEmpty())
-					Expect(req.NonBlocking).ShouldNot(BeNil())
-					Expect(*req.NonBlocking).Should(BeTrue())
+					Expect(req.Rerun).Should(BeTrue())
 					Expect(req.TimeoutSeconds).ShouldNot(BeNil())
 					Expect(*req.TimeoutSeconds).Should(Equal(action.TimeoutSeconds))
 					Expect(req.RetryPolicy).ShouldNot(BeNil())
@@ -263,7 +262,7 @@ var _ = Describe("lifecycle", func() {
 			})
 
 			opts := &Options{
-				NonBlocking:    &[]bool{true}[0],
+				Rerun:          true,
 				TimeoutSeconds: &action.TimeoutSeconds,
 				RetryPolicy:    action.RetryPolicy,
 			}
@@ -357,6 +356,11 @@ var _ = Describe("lifecycle", func() {
 				}).MaxTimes(1)
 				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
 					return proto.ActionResponse{
+						Error: proto.Error2Type(proto.ErrInterrupted),
+					}, nil
+				}).MaxTimes(1)
+				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
+					return proto.ActionResponse{
 						Error: proto.Error2Type(proto.ErrTimedOut),
 					}, nil
 				}).MaxTimes(1)
@@ -381,6 +385,7 @@ var _ = Describe("lifecycle", func() {
 				ErrActionInternalError,
 				ErrActionInProgress,
 				ErrActionBusy,
+				ErrActionInterrupted,
 				ErrActionTimedOut,
 				ErrActionFailed,
 				ErrActionInternalError,

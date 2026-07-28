@@ -21,6 +21,7 @@ package client
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -64,12 +65,19 @@ func TestHTTPClientAction(t *testing.T) {
 		if r.URL.Path != proto.ServiceAction.URI || r.Method != http.MethodPost {
 			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
 		}
+		request := &proto.ActionRequest{}
+		if err := json.NewDecoder(r.Body).Decode(request); err != nil {
+			t.Fatalf("decode Action request: %v", err)
+		}
+		if request.Action != "backup" || !request.Rerun {
+			t.Fatalf("unexpected Action request: %#v", request)
+		}
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"message":"done","output":"b2s="}`))
 	})
 	defer closeServer()
 
-	resp, err := cli.Action(context.Background(), proto.ActionRequest{Action: "backup"})
+	resp, err := cli.Action(context.Background(), proto.ActionRequest{Action: "backup", Rerun: true})
 	if err != nil {
 		t.Fatalf("Action() error = %v", err)
 	}

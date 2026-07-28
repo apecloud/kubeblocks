@@ -39,8 +39,8 @@ type Service interface {
 	HandleRequest(ctx context.Context, payload []byte) ([]byte, error)
 }
 
-func New(logger logr.Logger, actions []proto.Action, probes []proto.Probe, streaming []string) ([]Service, error) {
-	sa, err := newActionService(logger, actions)
+func New(logger logr.Logger, actions []proto.Action, probes []proto.Probe, streaming []string, actionStateDir string) ([]Service, error) {
+	sa, err := newActionServiceWithStateDir(logger, actions, actionStateDir)
 	if err != nil {
 		return nil, err
 	}

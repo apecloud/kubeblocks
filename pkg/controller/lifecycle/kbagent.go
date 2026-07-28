@@ -300,9 +300,7 @@ func (a *kbagent) buildActionRequest(ctx context.Context, cli client.Reader, lfa
 		Parameters: parameters,
 	}
 	if opts != nil {
-		if opts.NonBlocking != nil {
-			req.NonBlocking = opts.NonBlocking
-		}
+		req.Rerun = opts.Rerun
 		if opts.TimeoutSeconds != nil {
 			req.TimeoutSeconds = opts.TimeoutSeconds
 		}
@@ -491,6 +489,8 @@ func (a *kbagent) formatError(lfa lifecycleAction, rsp proto.ActionResponse, pod
 		return wrapError(ErrActionInProgress)
 	case errors.Is(err, proto.ErrBusy):
 		return wrapError(ErrActionBusy)
+	case errors.Is(err, proto.ErrInterrupted):
+		return wrapError(ErrActionInterrupted)
 	case errors.Is(err, proto.ErrTimedOut):
 		return wrapError(ErrActionTimedOut)
 	case errors.Is(err, proto.ErrFailed):

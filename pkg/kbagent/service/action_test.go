@@ -20,10 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package service
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"os"
+	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -87,24 +88,28 @@ var _ = Describe("action", func() {
 
 		It("handles non-blocking in-progress and completion states", func() {
 			svc, err := newActionService(logr.New(nil), []proto.Action{{
-				Name: "async",
-				Exec: &proto.ExecAction{Commands: []string{"/bin/bash", "-c", "echo -n unused"}},
+				Name:        "async",
+				NonBlocking: true,
+				Exec:        &proto.ExecAction{Commands: []string{"/bin/bash", "-c", "sleep 0.05; echo -n done"}},
 			}})
 			Expect(err).Should(BeNil())
 
-			resultChan := make(chan *asyncResult, 1)
-			svc.runningActions["async"] = &runningAction{resultChan: resultChan}
 			req := &proto.ActionRequest{Action: "async"}
-
-			out, err := svc.handleRequestNonBlocking(ctx, req, svc.actions["async"], nil, nil)
+			out, err := svc.handleRequest(ctx, req)
 			Expect(out).Should(BeNil())
 			Expect(errors.Is(err, proto.ErrInProgress)).Should(BeTrue())
 
-			resultChan <- &asyncResult{stdout: bytes.NewBufferString("done"), stderr: bytes.NewBuffer(nil)}
-			out, err = svc.handleRequestNonBlocking(ctx, req, svc.actions["async"], nil, nil)
+			Eventually(func() error {
+				out, err = svc.handleRequest(ctx, req)
+				return err
+			}, 2*time.Second, 10*time.Millisecond).Should(Succeed())
 			Expect(err).Should(BeNil())
 			Expect(string(out)).Should(Equal("done"))
-			Expect(svc.runningActions).ShouldNot(HaveKey("async"))
+
+			out, err = svc.handleRequest(ctx, req)
+			Expect(err).Should(BeNil())
+			Expect(string(out)).Should(Equal("done"))
+			Expect(svc.actionRecords).Should(HaveKey("async"))
 		})
 
 		It("rejects runtime arguments for non-exec actions in blocking and non-blocking calls", func() {
@@ -133,6 +138,240 @@ var _ = Describe("action", func() {
 			remaining := time.Until(deadline)
 			Expect(remaining).Should(BeNumerically(">", 59*time.Second))
 			Expect(remaining).Should(BeNumerically("<=", 60*time.Second))
+		})
+
+		It("does not cap non-blocking Action timeouts", func() {
+			timeout := int32(180)
+			timedCtx, cancel := actionCallTimeoutContextWithCap(context.Background(), &timeout, false)
+			defer cancel()
+
+			deadline, ok := timedCtx.Deadline()
+			Expect(ok).Should(BeTrue())
+			remaining := time.Until(deadline)
+			Expect(remaining).Should(BeNumerically(">", 179*time.Second))
+			Expect(remaining).Should(BeNumerically("<=", 180*time.Second))
+		})
+
+		It("normalizes equivalent requests when calculating their identity", func() {
+			timeout := int32(0)
+			first := &proto.ActionRequest{
+				Action:     "shardAdd",
+				Parameters: map[string]string{"second": "2", "first": "1"},
+			}
+			second := &proto.ActionRequest{
+				Action:     "shardAdd",
+				Parameters: map[string]string{"first": "1", "second": "2"},
+				Arguments:  [][]string{},
+			}
+
+			firstHash, err := actionRequestHash(first, &timeout, nil)
+			Expect(err).ShouldNot(HaveOccurred())
+			secondHash, err := actionRequestHash(second, &timeout, &proto.RetryPolicy{})
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(firstHash).Should(Equal(secondHash))
+
+			second.TimeoutSeconds = func() *int32 {
+				value := int32(30)
+				return &value
+			}()
+			explicitDefaultHash, err := actionRequestHash(second, second.TimeoutSeconds, nil)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(explicitDefaultHash).Should(Equal(firstHash))
+
+			*second.TimeoutSeconds = 31
+			differentHash, err := actionRequestHash(second, second.TimeoutSeconds, nil)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(differentHash).ShouldNot(Equal(firstHash))
+		})
+
+		It("serializes a single running request and honors rerun after completion", func() {
+			dir, err := os.MkdirTemp("", "kbagent-action-state-*")
+			Expect(err).ShouldNot(HaveOccurred())
+			DeferCleanup(os.RemoveAll, dir)
+			counterPath := filepath.Join(dir, "counter")
+			action := proto.Action{
+				Name:        "async",
+				NonBlocking: true,
+				Exec: &proto.ExecAction{Commands: []string{
+					"/bin/bash", "-c",
+					`n=0; [ -f "$0" ] && n=$(cat "$0"); n=$((n+1)); echo "$n" > "$0"; sleep 0.1; printf "$n"`,
+					counterPath,
+				}},
+			}
+			svc, err := newActionService(logr.Discard(), []proto.Action{action})
+			Expect(err).ShouldNot(HaveOccurred())
+			req := &proto.ActionRequest{Action: "async"}
+
+			_, err = svc.handleRequest(ctx, req)
+			Expect(errors.Is(err, proto.ErrInProgress)).Should(BeTrue())
+			_, err = svc.handleRequest(ctx, req)
+			Expect(errors.Is(err, proto.ErrInProgress)).Should(BeTrue())
+			_, err = svc.handleRequest(ctx, &proto.ActionRequest{Action: "async", Rerun: true})
+			Expect(errors.Is(err, proto.ErrBusy)).Should(BeTrue())
+			_, err = svc.handleRequest(ctx, &proto.ActionRequest{
+				Action: "async", Parameters: map[string]string{"different": "request"},
+			})
+			Expect(errors.Is(err, proto.ErrBusy)).Should(BeTrue())
+
+			Eventually(func() string {
+				output, callErr := svc.handleRequest(ctx, req)
+				if callErr != nil {
+					return callErr.Error()
+				}
+				return string(output)
+			}, 2*time.Second, 10*time.Millisecond).Should(Equal("1"))
+
+			output, err := svc.handleRequest(ctx, req)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(string(output)).Should(Equal("1"))
+
+			_, err = svc.handleRequest(ctx, &proto.ActionRequest{Action: "async", Rerun: true})
+			Expect(errors.Is(err, proto.ErrInProgress)).Should(BeTrue())
+			Eventually(func() string {
+				output, callErr := svc.handleRequest(ctx, req)
+				if callErr != nil {
+					return callErr.Error()
+				}
+				return string(output)
+			}, 2*time.Second, 10*time.Millisecond).Should(Equal("2"))
+
+			differentReq := &proto.ActionRequest{
+				Action:     "async",
+				Parameters: map[string]string{"different": "request"},
+			}
+			_, err = svc.handleRequest(ctx, differentReq)
+			Expect(errors.Is(err, proto.ErrInProgress)).Should(BeTrue())
+			Eventually(func() string {
+				output, callErr := svc.handleRequest(ctx, differentReq)
+				if callErr != nil {
+					return callErr.Error()
+				}
+				return string(output)
+			}, 2*time.Second, 10*time.Millisecond).Should(Equal("3"))
+		})
+
+		It("starts only one process for concurrent equivalent requests", func() {
+			dir, err := os.MkdirTemp("", "kbagent-action-concurrent-*")
+			Expect(err).ShouldNot(HaveOccurred())
+			DeferCleanup(os.RemoveAll, dir)
+			counterPath := filepath.Join(dir, "counter")
+			svc, err := newActionService(logr.Discard(), []proto.Action{{
+				Name:        "async",
+				NonBlocking: true,
+				Exec: &proto.ExecAction{Commands: []string{
+					"/bin/bash", "-c", `echo start >> "$0"; sleep 0.2; printf done`, counterPath,
+				}},
+			}})
+			Expect(err).ShouldNot(HaveOccurred())
+
+			const callers = 16
+			errs := make(chan error, callers)
+			var wg sync.WaitGroup
+			for range callers {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					_, callErr := svc.handleRequest(ctx, &proto.ActionRequest{Action: "async"})
+					errs <- callErr
+				}()
+			}
+			wg.Wait()
+			close(errs)
+			for callErr := range errs {
+				Expect(errors.Is(callErr, proto.ErrInProgress)).Should(BeTrue())
+			}
+
+			Eventually(func() string {
+				output, callErr := svc.handleRequest(ctx, &proto.ActionRequest{Action: "async"})
+				if callErr != nil {
+					return callErr.Error()
+				}
+				return string(output)
+			}, 2*time.Second, 10*time.Millisecond).Should(Equal("done"))
+			counter, err := os.ReadFile(counterPath)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(string(counter)).Should(Equal("start\n"))
+		})
+
+		It("persists terminal results without persisting request parameters", func() {
+			dir, err := os.MkdirTemp("", "kbagent-action-persist-*")
+			Expect(err).ShouldNot(HaveOccurred())
+			DeferCleanup(os.RemoveAll, dir)
+			action := proto.Action{
+				Name:        "async",
+				NonBlocking: true,
+				Exec:        &proto.ExecAction{Commands: []string{"/bin/bash", "-c", "printf persisted"}},
+			}
+			svc, err := newActionServiceWithStateDir(logr.Discard(), []proto.Action{action}, dir)
+			Expect(err).ShouldNot(HaveOccurred())
+			req := &proto.ActionRequest{
+				Action:     "async",
+				Parameters: map[string]string{"PASSWORD": "do-not-persist-this-secret"},
+			}
+			_, err = svc.handleRequest(ctx, req)
+			Expect(errors.Is(err, proto.ErrInProgress)).Should(BeTrue())
+			Eventually(func() string {
+				output, callErr := svc.handleRequest(ctx, req)
+				if callErr != nil {
+					return callErr.Error()
+				}
+				return string(output)
+			}, 2*time.Second, 10*time.Millisecond).Should(Equal("persisted"))
+
+			stateData, err := os.ReadFile(svc.stateStore.path("async"))
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(string(stateData)).ShouldNot(ContainSubstring("do-not-persist-this-secret"))
+			info, err := os.Stat(svc.stateStore.path("async"))
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(info.Mode().Perm()).Should(Equal(os.FileMode(actionStateFileMode)))
+			dirInfo, err := os.Stat(dir)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(dirInfo.Mode().Perm()).Should(Equal(os.FileMode(actionStateDirMode)))
+
+			restarted, err := newActionServiceWithStateDir(logr.Discard(), []proto.Action{action}, dir)
+			Expect(err).ShouldNot(HaveOccurred())
+			output, err := restarted.handleRequest(ctx, req)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(string(output)).Should(Equal("persisted"))
+		})
+
+		It("restores a running record as interrupted and requires rerun", func() {
+			dir, err := os.MkdirTemp("", "kbagent-action-interrupted-*")
+			Expect(err).ShouldNot(HaveOccurred())
+			DeferCleanup(os.RemoveAll, dir)
+			action := proto.Action{
+				Name:        "async",
+				NonBlocking: true,
+				Exec:        &proto.ExecAction{Commands: []string{"/bin/bash", "-c", "printf recovered"}},
+			}
+			req := &proto.ActionRequest{Action: "async"}
+			requestHash, err := actionRequestHash(req, &action.TimeoutSeconds, action.RetryPolicy)
+			Expect(err).ShouldNot(HaveOccurred())
+			store, err := newActionStateStore(dir)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(store.save("async", &actionRecord{
+				RequestHash: requestHash,
+				Running:     true,
+				StartedAt:   time.Now(),
+			})).Should(Succeed())
+
+			svc, err := newActionServiceWithStateDir(logr.Discard(), []proto.Action{action}, dir)
+			Expect(err).ShouldNot(HaveOccurred())
+			_, err = svc.handleRequest(ctx, req)
+			Expect(errors.Is(err, proto.ErrInterrupted)).Should(BeTrue())
+			Expect(err.Error()).Should(Equal("kb-agent restarted while the Action was running: interrupted"))
+			_, err = svc.handleRequest(ctx, req)
+			Expect(errors.Is(err, proto.ErrInterrupted)).Should(BeTrue())
+
+			_, err = svc.handleRequest(ctx, &proto.ActionRequest{Action: "async", Rerun: true})
+			Expect(errors.Is(err, proto.ErrInProgress)).Should(BeTrue())
+			Eventually(func() string {
+				output, callErr := svc.handleRequest(ctx, req)
+				if callErr != nil {
+					return callErr.Error()
+				}
+				return string(output)
+			}, 2*time.Second, 10*time.Millisecond).Should(Equal("recovered"))
 		})
 
 		newRetryAction := func(name string, counterPath string, maxRetries int) proto.Action {
@@ -205,9 +444,9 @@ var _ = Describe("action", func() {
 				newRetryAction("retry", counterPath, 1),
 			})
 			Expect(err).Should(BeNil())
+			svc.actions["retry"].NonBlocking = true
 
-			nonBlocking := true
-			req := &proto.ActionRequest{Action: "retry", NonBlocking: &nonBlocking}
+			req := &proto.ActionRequest{Action: "retry"}
 			Eventually(func() string {
 				output, err := svc.handleRequest(ctx, req)
 				if err != nil {

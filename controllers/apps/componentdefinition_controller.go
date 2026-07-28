@@ -516,6 +516,29 @@ func (r *ComponentDefinitionReconciler) validatePolicyRules(cli client.Client, r
 
 func (r *ComponentDefinitionReconciler) validateLifecycleActions(cli client.Client, reqCtx intctrlutil.RequestCtx,
 	cmpd *appsv1.ComponentDefinition) error {
+	actions := cmpd.Spec.LifecycleActions
+	if actions == nil {
+		return nil
+	}
+	type namedAction struct {
+		name   string
+		action *appsv1.Action
+	}
+	unsupported := make([]namedAction, 0, 4)
+	if actions.RoleProbe != nil {
+		unsupported = append(unsupported, namedAction{name: "roleProbe", action: &actions.RoleProbe.Action})
+	}
+	if actions.AvailableProbe != nil {
+		unsupported = append(unsupported, namedAction{name: "availableProbe", action: &actions.AvailableProbe.Action})
+	}
+	unsupported = append(unsupported,
+		namedAction{name: "dataDump", action: actions.DataDump},
+		namedAction{name: "dataLoad", action: actions.DataLoad})
+	for _, item := range unsupported {
+		if item.action != nil && item.action.NonBlocking {
+			return fmt.Errorf("lifecycle action %s does not support non-blocking execution", item.name)
+		}
+	}
 	return nil
 }
 

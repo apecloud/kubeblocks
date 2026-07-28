@@ -39,11 +39,12 @@ const (
 )
 
 type actionRecord struct {
-	RequestHash string              `json:"requestHash"`
-	Running     bool                `json:"running"`
-	Result      *storedActionResult `json:"result,omitempty"`
-	StartedAt   time.Time           `json:"startedAt"`
-	CompletedAt *time.Time          `json:"completedAt,omitempty"`
+	RequestHash            string              `json:"requestHash"`
+	Running                bool                `json:"running"`
+	Result                 *storedActionResult `json:"result,omitempty"`
+	StartedAt              time.Time           `json:"startedAt"`
+	CompletedAt            *time.Time          `json:"completedAt,omitempty"`
+	ResultPersistenceError error               `json:"-"`
 }
 
 type storedActionResult struct {

@@ -25,6 +25,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -380,6 +381,65 @@ var _ = Describe("action", func() {
 			output, err := restarted.handleRequest(ctx, req)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(string(output)).Should(Equal("persisted"))
+		})
+
+		It("does not expose a terminal result until it is durable", func() {
+			dir, err := os.MkdirTemp("", "kbagent-action-durability-*")
+			Expect(err).ShouldNot(HaveOccurred())
+			DeferCleanup(os.RemoveAll, dir)
+			action := proto.Action{
+				Name:        "async",
+				NonBlocking: true,
+				Exec:        &proto.ExecAction{Commands: []string{"/bin/bash", "-c", "printf durable"}},
+			}
+			svc, err := newActionServiceWithStateDir(logr.Discard(), []proto.Action{action}, dir)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			var failTerminalSave atomic.Bool
+			failTerminalSave.Store(true)
+			var failedSaves atomic.Int32
+			saveRecord := svc.saveRecord
+			svc.saveRecord = func(action string, record *actionRecord) error {
+				if !record.Running && failTerminalSave.Load() {
+					failedSaves.Add(1)
+					return errors.New("state storage unavailable")
+				}
+				return saveRecord(action, record)
+			}
+
+			req := &proto.ActionRequest{Action: "async"}
+			_, err = svc.handleRequest(ctx, req)
+			Expect(errors.Is(err, proto.ErrInProgress)).Should(BeTrue())
+			Eventually(failedSaves.Load, 2*time.Second).Should(BeNumerically(">", 0))
+			_, err = svc.handleRequest(ctx, req)
+			Expect(errors.Is(err, proto.ErrInternalError)).Should(BeTrue())
+			Expect(err).Should(MatchError(ContainSubstring("state storage unavailable")))
+
+			persistedRecord, err := svc.stateStore.load("async")
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(persistedRecord.Running).Should(BeTrue())
+			_, err = svc.handleRequest(ctx, &proto.ActionRequest{Action: "async", Rerun: true})
+			Expect(errors.Is(err, proto.ErrBusy)).Should(BeTrue())
+			_, err = svc.handleRequest(ctx, &proto.ActionRequest{
+				Action: "async", Parameters: map[string]string{"different": "request"},
+			})
+			Expect(errors.Is(err, proto.ErrBusy)).Should(BeTrue())
+
+			failTerminalSave.Store(false)
+			Eventually(func() string {
+				output, callErr := svc.handleRequest(ctx, req)
+				if callErr != nil {
+					return callErr.Error()
+				}
+				return string(output)
+			}, 3*time.Second, 20*time.Millisecond).Should(Equal("durable"))
+
+			persistedRecord, err = svc.stateStore.load("async")
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(persistedRecord.Running).Should(BeFalse())
+			output, err := persistedRecord.Result.response()
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(string(output)).Should(Equal("durable"))
 		})
 
 		It("restores a running record as interrupted and requires rerun", func() {

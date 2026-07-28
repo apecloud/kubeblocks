@@ -272,7 +272,28 @@ func nonBlockingCallActionWithRetry(ctx context.Context, action *proto.Action, p
 }
 
 func nonBlockingCallActionWithRetryUncapped(ctx context.Context, action *proto.Action, parameters map[string]string, arguments [][]string, timeout *int32, retryPolicy *proto.RetryPolicy) (chan *asyncResult, error) {
-	return nonBlockingCallActionWithRetryCap(ctx, action, parameters, arguments, timeout, retryPolicy, false)
+	if err := validateActionArguments(action, arguments); err != nil {
+		return nil, err
+	}
+	actionCtx, cancel := actionCallTimeoutContextWithCap(ctx, timeout, false)
+	resultChan := make(chan *asyncResult, 1)
+	go func() {
+		defer cancel()
+		// actionCtx owns the timeout for the complete Action. Individual attempts
+		// only inherit that deadline and must not start a new timeout budget.
+		noAttemptTimeout := int32(-1)
+		stdout, err := callActionWithRetryCap(
+			actionCtx, action, parameters, arguments, &noAttemptTimeout, retryPolicy, false)
+		if err != nil && errors.Is(actionCtx.Err(), context.DeadlineExceeded) {
+			err = proto.ErrTimedOut
+		}
+		resultChan <- &asyncResult{
+			err:    err,
+			stdout: bytes.NewBuffer(stdout),
+			stderr: bytes.NewBuffer(nil),
+		}
+	}()
+	return resultChan, nil
 }
 
 func nonBlockingCallActionWithRetryCap(ctx context.Context, action *proto.Action, parameters map[string]string,

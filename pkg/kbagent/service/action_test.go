@@ -152,6 +152,53 @@ var _ = Describe("action", func() {
 			Expect(remaining).Should(BeNumerically("<=", 180*time.Second))
 		})
 
+		It("applies one timeout to the complete non-blocking argument sequence", func() {
+			action := &proto.Action{
+				Exec: &proto.ExecAction{
+					Commands: []string{"/bin/bash", "-c", `sleep "$0"; printf x`},
+				},
+			}
+			timeout := int32(1)
+			startedAt := time.Now()
+			resultChan, err := nonBlockingCallActionWithRetryUncapped(
+				ctx, action, nil, [][]string{{"0.25"}, {"1"}}, &timeout, nil)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			result := <-resultChan
+			Expect(errors.Is(result.err, proto.ErrTimedOut)).Should(BeTrue())
+			Expect(time.Since(startedAt)).Should(BeNumerically("<", 1500*time.Millisecond))
+			Expect(result.stdout.String()).Should(Equal("x"))
+		})
+
+		It("counts retry intervals against the non-blocking Action timeout", func() {
+			dir, err := os.MkdirTemp("", "kbagent-action-total-timeout-*")
+			Expect(err).ShouldNot(HaveOccurred())
+			DeferCleanup(os.RemoveAll, dir)
+			counterPath := filepath.Join(dir, "counter")
+			action := &proto.Action{
+				Exec: &proto.ExecAction{
+					Commands: []string{
+						"/bin/bash", "-c",
+						`n=0; [ -f "$0" ] && n=$(cat "$0"); n=$((n+1)); echo "$n" > "$0"; exit 1`,
+						counterPath,
+					},
+				},
+			}
+			timeout := int32(1)
+			retryPolicy := &proto.RetryPolicy{MaxRetries: 1, RetryInterval: 2 * time.Second}
+			startedAt := time.Now()
+			resultChan, err := nonBlockingCallActionWithRetryUncapped(
+				ctx, action, nil, nil, &timeout, retryPolicy)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			result := <-resultChan
+			Expect(errors.Is(result.err, proto.ErrTimedOut)).Should(BeTrue())
+			Expect(time.Since(startedAt)).Should(BeNumerically("<", 1500*time.Millisecond))
+			counter, err := os.ReadFile(counterPath)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(string(counter)).Should(Equal("1\n"))
+		})
+
 		It("normalizes equivalent requests when calculating their identity", func() {
 			timeout := int32(0)
 			first := &proto.ActionRequest{

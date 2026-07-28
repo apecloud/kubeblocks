@@ -2520,7 +2520,9 @@ int32
 <p>Behavior based on the value:
 - Positive (&gt; 0): The action will be terminated after this many seconds.
   Blocking Actions are capped at 60 seconds. Non-blocking Actions use the
-  configured value as their total execution timeout without the 60-second cap.
+  configured value as their total execution timeout, including all runtime
+  argument invocations, retry attempts, and retry intervals, without the
+  60-second cap.
 - Zero (= 0): The timeout is managed by the system, defaulting to 30 seconds typically.
 - Negative (&lt; 0): No timeout is applied; the action runs until the command completes.</p>
 <p>This field cannot be updated.</p>

@@ -2498,12 +2498,11 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies whether KubeBlocks should ask kb-agent to execute the Action without
-waiting for the underlying command or request to complete.</p>
-<p>When false, an Action call waits for completion and returns the final result.
-When true, kb-agent starts the Action in the background and returns an
-in-progress result until it completes. Equivalent subsequent calls return the
-same in-progress or cached terminal result.</p>
+<p>Specifies whether the Action runs in non-blocking mode.</p>
+<p>When false, the Action runs in blocking mode and the call waits for completion.
+When true, the Action runs in non-blocking mode and the call returns an
+in-progress result while the Action continues to run. Equivalent subsequent
+calls return the same in-progress or cached terminal result.</p>
 <p>This field cannot be updated.</p>
 </td>
 </tr>

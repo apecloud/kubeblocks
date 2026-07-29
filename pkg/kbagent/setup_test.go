@@ -23,6 +23,8 @@ import (
 	"context"
 	"errors"
 	"net"
+	"os"
+	"path/filepath"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -163,6 +165,40 @@ func TestInitializeAndEnvAccessors(t *testing.T) {
 	da, dp, ds = getActionProbeNStreamingEnvValues(map[string]string{probeEnvName: "p"})
 	if da != "" || dp != "" || ds != "" {
 		t.Fatalf("unexpected missing action values: %q %q %q", da, dp, ds)
+	}
+}
+
+func TestInitializeActionStateDir(t *testing.T) {
+	logger := ktesting.NewLogger(t, ktesting.NewConfig())
+	stateDir := filepath.Join(t.TempDir(), "actions")
+	envFor := func(nonBlocking bool) map[string]string {
+		actionsEnv, _, err := serializeActionNProbe([]proto.Action{{
+			Name:        "action",
+			NonBlocking: nonBlocking,
+			Exec:        &proto.ExecAction{Commands: []string{"echo"}},
+		}}, nil)
+		if err != nil {
+			t.Fatalf("serialize action: %v", err)
+		}
+		return map[string]string{actionEnvName: actionsEnv}
+	}
+
+	if _, err := initializeWithActionStateDir(logger, envFor(false), stateDir); err != nil {
+		t.Fatalf("initialize blocking Action: %v", err)
+	}
+	if _, err := os.Stat(stateDir); !os.IsNotExist(err) {
+		t.Fatalf("blocking Action unexpectedly created state directory: %v", err)
+	}
+
+	if _, err := initializeWithActionStateDir(logger, envFor(true), stateDir); err != nil {
+		t.Fatalf("initialize non-blocking Action: %v", err)
+	}
+	info, err := os.Stat(stateDir)
+	if err != nil {
+		t.Fatalf("stat non-blocking Action state directory: %v", err)
+	}
+	if !info.IsDir() {
+		t.Fatalf("non-blocking Action state path is not a directory")
 	}
 }
 

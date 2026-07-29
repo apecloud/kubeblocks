@@ -37,7 +37,6 @@ type Config struct {
 	Server           bool
 	Address          string
 	UnixDomainSocket string
-	ActionStateDir   string
 	Port             int
 	StreamingPort    int
 	Concurrency      int

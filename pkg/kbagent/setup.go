@@ -46,10 +46,13 @@ const (
 	DefaultHTTPPort      = 3501
 	DefaultStreamingPort = 3502
 
+	RuntimeDir = "/var/run/kbagent"
+
 	actionEnvName    = "KB_AGENT_ACTION"
 	probeEnvName     = "KB_AGENT_PROBE"
 	streamingEnvName = "KB_AGENT_STREAMING"
 	taskEnvName      = "KB_AGENT_TASK"
+	actionStateDir   = RuntimeDir + "/actions"
 )
 
 func BuildEnv4Server(actions []proto.Action, probes []proto.Probe, streaming []string) ([]corev1.EnvVar, error) {
@@ -130,7 +133,7 @@ func Launch(logger logr.Logger, config server.Config) (bool, error) {
 	envVars := util.EnvL2M(os.Environ())
 
 	// initialize kb-agent
-	services, err := initializeWithActionStateDir(logger, envVars, config.ActionStateDir)
+	services, err := initializeWithActionStateDir(logger, envVars, actionStateDir)
 	if err != nil {
 		return false, errors.Wrap(err, "init action handlers failed")
 	}
@@ -159,7 +162,19 @@ func initializeWithActionStateDir(logger logr.Logger, envVars map[string]string,
 	if len(ds) > 0 {
 		streaming = strings.Split(ds, ",")
 	}
+	if !hasNonBlockingAction(actions) {
+		actionStateDir = ""
+	}
 	return service.New(logger, actions, probes, streaming, actionStateDir)
+}
+
+func hasNonBlockingAction(actions []proto.Action) bool {
+	for i := range actions {
+		if actions[i].NonBlocking {
+			return true
+		}
+	}
+	return false
 }
 
 func getActionProbeNStreamingEnvValues(envVars map[string]string) (string, string, string) {

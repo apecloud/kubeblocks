@@ -55,7 +55,6 @@ const (
 	podRoleLabelFileName = "role"
 
 	actionStateVolumeName = "kubeblocks-action-state"
-	actionStateMountPath  = "/var/lib/kbagent/actions"
 )
 
 var (
@@ -205,7 +204,6 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 		if err = mountActionStateDir(synthesizedComp, container); err != nil {
 			return err
 		}
-		container.Args = append(container.Args, "--action-state-dir", actionStateMountPath)
 	}
 
 	// set kb-agent container ports to host network
@@ -254,13 +252,13 @@ func mountActionStateDir(synthesizedComp *SynthesizedComponent, container *corev
 		synthesizedComp.PodSpec.Volumes = append(synthesizedComp.PodSpec.Volumes, volume)
 	}
 
-	mount := corev1.VolumeMount{Name: actionStateVolumeName, MountPath: actionStateMountPath}
+	mount := corev1.VolumeMount{Name: actionStateVolumeName, MountPath: kbagent.RuntimeDir}
 	for _, existing := range container.VolumeMounts {
 		if reflect.DeepEqual(existing, mount) {
 			return nil
 		}
-		if existing.MountPath == actionStateMountPath {
-			return fmt.Errorf("volumeMount path %s conflicts with kbagent Action state volume mount", actionStateMountPath)
+		if existing.MountPath == kbagent.RuntimeDir {
+			return fmt.Errorf("volumeMount path %s conflicts with kbagent runtime volume mount", kbagent.RuntimeDir)
 		}
 	}
 	container.VolumeMounts = append(container.VolumeMounts, mount)

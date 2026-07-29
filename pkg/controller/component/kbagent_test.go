@@ -210,10 +210,10 @@ var _ = Describe("kb-agent", func() {
 
 			c := kbAgentContainer()
 			Expect(c).ShouldNot(BeNil())
-			Expect(c.Args).Should(ContainElements("--action-state-dir", actionStateMountPath))
+			Expect(c.Args).ShouldNot(ContainElement("--action-state-dir"))
 			Expect(c.VolumeMounts).Should(ContainElement(corev1.VolumeMount{
 				Name:      actionStateVolumeName,
-				MountPath: actionStateMountPath,
+				MountPath: kbagent.RuntimeDir,
 			}))
 			Expect(synthesizedComp.PodSpec.Volumes).Should(ContainElement(corev1.Volume{
 				Name: actionStateVolumeName,

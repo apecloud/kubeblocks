@@ -38,10 +38,10 @@ import (
 
 func newActionService(logger logr.Logger, actions []proto.Action) (*actionService, error) {
 	sa := &actionService{
-		logger:        logger,
-		actions:       make(map[string]*proto.Action),
-		mutex:         sync.Mutex{},
-		actionRecords: map[string]*actionRecord{},
+		logger:  logger,
+		actions: make(map[string]*proto.Action),
+		mutex:   sync.Mutex{},
+		calls:   map[string]*actionCall{},
 	}
 	for i, action := range actions {
 		sa.actions[action.Name] = &actions[i]
@@ -54,8 +54,8 @@ type actionService struct {
 	logger  logr.Logger
 	actions map[string]*proto.Action
 
-	mutex         sync.Mutex
-	actionRecords map[string]*actionRecord
+	mutex sync.Mutex
+	calls map[string]*actionCall
 }
 
 var _ Service = &actionService{}
@@ -134,7 +134,7 @@ func (s *actionService) handleRequestNonBlocking(ctx context.Context, req *proto
 	if err := validateActionArguments(action, req.Arguments); err != nil {
 		return nil, err
 	}
-	requestHash, err := actionRequestHash(req, timeout, retryPolicy)
+	fingerprint, err := fingerprintActionRequest(req, timeout, retryPolicy)
 	if err != nil {
 		return nil, errors.Wrap(proto.ErrInternalError, err.Error())
 	}
@@ -142,49 +142,45 @@ func (s *actionService) handleRequestNonBlocking(ctx context.Context, req *proto
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	if record, ok := s.actionRecords[req.Action]; ok {
-		if record.Running {
-			if record.RequestHash != requestHash || req.Rerun {
+	if call, ok := s.calls[req.Action]; ok {
+		if call.running {
+			if call.requestFingerprint != fingerprint || req.Rerun {
 				return nil, proto.ErrBusy
 			}
 			return nil, proto.ErrInProgress
 		}
-		if record.RequestHash == requestHash && !req.Rerun {
-			return record.Result.response()
+		if call.requestFingerprint == fingerprint && !req.Rerun {
+			return call.result.response()
 		}
 	}
 
-	record := &actionRecord{
-		RequestHash: requestHash,
-		Running:     true,
+	call := &actionCall{
+		requestFingerprint: fingerprint,
+		running:            true,
 	}
-	resultChan, err := nonBlockingCallActionWithRetryUncapped(
-		context.Background(), action, req.Parameters, req.Arguments, timeout, retryPolicy)
+	resultChan, err := startNonBlockingActionCall(
+		context.WithoutCancel(ctx), action, req.Parameters, req.Arguments, timeout, retryPolicy)
 	if err != nil {
 		resultChan = make(chan *asyncResult, 1)
 		resultChan <- &asyncResult{err: err}
 	}
-	s.actionRecords[req.Action] = record
-	go s.completeNonBlockingAction(req.Action, record, resultChan)
+	s.calls[req.Action] = call
+	go s.completeNonBlockingCall(req.Action, call, resultChan)
 	return nil, proto.ErrInProgress
 }
 
-func (s *actionService) completeNonBlockingAction(action string, record *actionRecord, resultChan chan *asyncResult) {
+func (s *actionService) completeNonBlockingCall(actionName string, call *actionCall, resultChan chan *asyncResult) {
 	result := <-resultChan
 	var output []byte
 	if result.stdout != nil {
 		output = result.stdout.Bytes()
 	}
-	terminalRecord := &actionRecord{
-		RequestHash: record.RequestHash,
-		Running:     false,
-		Result:      newCachedActionResult(output, result.err),
-	}
 
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-	if current, ok := s.actionRecords[action]; ok && current == record {
-		*record = *terminalRecord
+	if current, ok := s.calls[actionName]; ok && current == call {
+		call.running = false
+		call.result = newActionResult(output, result.err)
 	}
 }
 
@@ -222,11 +218,7 @@ func callActionWithRetry(ctx context.Context, action *proto.Action, parameters m
 	return output.Bytes(), nil
 }
 
-func nonBlockingCallActionWithRetry(ctx context.Context, action *proto.Action, parameters map[string]string, arguments [][]string, timeout *int32, retryPolicy *proto.RetryPolicy) (chan *asyncResult, error) {
-	return nonBlockingCallActionWithRetryCap(ctx, action, parameters, arguments, timeout, retryPolicy, true)
-}
-
-func nonBlockingCallActionWithRetryUncapped(ctx context.Context, action *proto.Action, parameters map[string]string, arguments [][]string, timeout *int32, retryPolicy *proto.RetryPolicy) (chan *asyncResult, error) {
+func startNonBlockingActionCall(ctx context.Context, action *proto.Action, parameters map[string]string, arguments [][]string, timeout *int32, retryPolicy *proto.RetryPolicy) (chan *asyncResult, error) {
 	if err := validateActionArguments(action, arguments); err != nil {
 		return nil, err
 	}
@@ -234,31 +226,14 @@ func nonBlockingCallActionWithRetryUncapped(ctx context.Context, action *proto.A
 	resultChan := make(chan *asyncResult, 1)
 	go func() {
 		defer cancel()
-		// actionCtx owns the timeout for the complete Action. Individual attempts
-		// only inherit that deadline and must not start a new timeout budget.
+		// actionCtx owns the timeout for the complete non-blocking call. Individual
+		// attempts inherit that deadline instead of starting a new timeout budget.
 		noAttemptTimeout := int32(-1)
 		stdout, err := callActionWithRetryCap(
 			actionCtx, action, parameters, arguments, &noAttemptTimeout, retryPolicy, false)
 		if err != nil && errors.Is(actionCtx.Err(), context.DeadlineExceeded) {
 			err = proto.ErrTimedOut
 		}
-		resultChan <- &asyncResult{
-			err:    err,
-			stdout: bytes.NewBuffer(stdout),
-			stderr: bytes.NewBuffer(nil),
-		}
-	}()
-	return resultChan, nil
-}
-
-func nonBlockingCallActionWithRetryCap(ctx context.Context, action *proto.Action, parameters map[string]string,
-	arguments [][]string, timeout *int32, retryPolicy *proto.RetryPolicy, capTimeout bool) (chan *asyncResult, error) {
-	if err := validateActionArguments(action, arguments); err != nil {
-		return nil, err
-	}
-	resultChan := make(chan *asyncResult, 1)
-	go func() {
-		stdout, err := callActionWithRetryCap(ctx, action, parameters, arguments, timeout, retryPolicy, capTimeout)
 		resultChan <- &asyncResult{
 			err:    err,
 			stdout: bytes.NewBuffer(stdout),

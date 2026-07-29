@@ -77,8 +77,8 @@ type ActionRequest struct {
 	Arguments      [][]string        `json:"arguments,omitempty"`
 	TimeoutSeconds *int32            `json:"timeoutSeconds,omitempty"`
 	RetryPolicy    *RetryPolicy      `json:"retryPolicy,omitempty"`
-	// Rerun discards a cached terminal result for an equivalent request and
-	// executes the Action again. It never interrupts a running Action.
+	// Rerun requests a new run instead of returning the previous terminal result.
+	// It does not interrupt a running Action.
 	Rerun bool `json:"rerun,omitempty"`
 }
 

@@ -69,6 +69,16 @@ var _ = Describe("action", func() {
 			Expect(resp.Message).Should(ContainSubstring(proto.ErrNotDefined.Error()))
 		})
 
+		It("keeps the original terminal error in memory", func() {
+			original := errors.Wrap(proto.ErrFailed, "action failed")
+			result := newActionResult(nil, original)
+
+			output, err := result.response()
+			Expect(output).Should(BeNil())
+			Expect(err).Should(Equal(original))
+			Expect(errors.Is(err, proto.ErrFailed)).Should(BeTrue())
+		})
+
 		It("handles request errors through encoded responses", func() {
 			svc, err := newActionService(logr.New(nil), nil)
 			Expect(err).Should(BeNil())
@@ -86,7 +96,7 @@ var _ = Describe("action", func() {
 			Expect(resp.Error).Should(Equal("notDefined"))
 		})
 
-		It("handles non-blocking in-progress and completion states", func() {
+		It("returns in-progress and terminal results for a non-blocking Action", func() {
 			svc, err := newActionService(logr.New(nil), []proto.Action{{
 				Name:        "async",
 				NonBlocking: true,
@@ -109,7 +119,29 @@ var _ = Describe("action", func() {
 			out, err = svc.handleRequest(ctx, req)
 			Expect(err).Should(BeNil())
 			Expect(string(out)).Should(Equal("done"))
-			Expect(svc.actionRecords).Should(HaveKey("async"))
+			Expect(svc.calls).Should(HaveKey("async"))
+		})
+
+		It("continues a non-blocking Action after the request is canceled", func() {
+			svc, err := newActionService(logr.Discard(), []proto.Action{{
+				Name:        "async",
+				NonBlocking: true,
+				Exec:        &proto.ExecAction{Commands: []string{"/bin/bash", "-c", "sleep 0.05; echo -n done"}},
+			}})
+			Expect(err).ShouldNot(HaveOccurred())
+
+			requestCtx, cancel := context.WithCancel(ctx)
+			_, err = svc.handleRequest(requestCtx, &proto.ActionRequest{Action: "async"})
+			Expect(errors.Is(err, proto.ErrInProgress)).Should(BeTrue())
+			cancel()
+
+			Eventually(func() string {
+				output, callErr := svc.handleRequest(ctx, &proto.ActionRequest{Action: "async"})
+				if callErr != nil {
+					return callErr.Error()
+				}
+				return string(output)
+			}, 2*time.Second, 10*time.Millisecond).Should(Equal("done"))
 		})
 
 		It("rejects runtime arguments for non-exec actions in blocking and non-blocking calls", func() {
@@ -117,7 +149,7 @@ var _ = Describe("action", func() {
 			_, err := callActionWithRetry(ctx, action, nil, [][]string{{"arg"}}, nil, nil)
 			Expect(errors.Is(err, proto.ErrBadRequest)).Should(BeTrue())
 
-			_, err = nonBlockingCallActionWithRetry(ctx, action, nil, [][]string{{"arg"}}, nil, nil)
+			_, err = startNonBlockingActionCall(ctx, action, nil, [][]string{{"arg"}}, nil, nil)
 			Expect(errors.Is(err, proto.ErrBadRequest)).Should(BeTrue())
 		})
 
@@ -160,7 +192,7 @@ var _ = Describe("action", func() {
 			}
 			timeout := int32(1)
 			startedAt := time.Now()
-			resultChan, err := nonBlockingCallActionWithRetryUncapped(
+			resultChan, err := startNonBlockingActionCall(
 				ctx, action, nil, [][]string{{"0.25"}, {"1"}}, &timeout, nil)
 			Expect(err).ShouldNot(HaveOccurred())
 
@@ -187,7 +219,7 @@ var _ = Describe("action", func() {
 			timeout := int32(1)
 			retryPolicy := &proto.RetryPolicy{MaxRetries: 1, RetryInterval: 2 * time.Second}
 			startedAt := time.Now()
-			resultChan, err := nonBlockingCallActionWithRetryUncapped(
+			resultChan, err := startNonBlockingActionCall(
 				ctx, action, nil, nil, &timeout, retryPolicy)
 			Expect(err).ShouldNot(HaveOccurred())
 
@@ -199,7 +231,7 @@ var _ = Describe("action", func() {
 			Expect(string(counter)).Should(Equal("1\n"))
 		})
 
-		It("normalizes equivalent requests when calculating their identity", func() {
+		It("normalizes equivalent requests when calculating their fingerprint", func() {
 			timeout := int32(0)
 			first := &proto.ActionRequest{
 				Action:     "shardAdd",
@@ -211,28 +243,28 @@ var _ = Describe("action", func() {
 				Arguments:  [][]string{},
 			}
 
-			firstHash, err := actionRequestHash(first, &timeout, nil)
+			firstFingerprint, err := fingerprintActionRequest(first, &timeout, nil)
 			Expect(err).ShouldNot(HaveOccurred())
-			secondHash, err := actionRequestHash(second, &timeout, &proto.RetryPolicy{})
+			secondFingerprint, err := fingerprintActionRequest(second, &timeout, &proto.RetryPolicy{})
 			Expect(err).ShouldNot(HaveOccurred())
-			Expect(firstHash).Should(Equal(secondHash))
+			Expect(firstFingerprint).Should(Equal(secondFingerprint))
 
 			second.TimeoutSeconds = func() *int32 {
 				value := int32(30)
 				return &value
 			}()
-			explicitDefaultHash, err := actionRequestHash(second, second.TimeoutSeconds, nil)
+			explicitDefaultFingerprint, err := fingerprintActionRequest(second, second.TimeoutSeconds, nil)
 			Expect(err).ShouldNot(HaveOccurred())
-			Expect(explicitDefaultHash).Should(Equal(firstHash))
+			Expect(explicitDefaultFingerprint).Should(Equal(firstFingerprint))
 
 			*second.TimeoutSeconds = 31
-			differentHash, err := actionRequestHash(second, second.TimeoutSeconds, nil)
+			differentFingerprint, err := fingerprintActionRequest(second, second.TimeoutSeconds, nil)
 			Expect(err).ShouldNot(HaveOccurred())
-			Expect(differentHash).ShouldNot(Equal(firstHash))
+			Expect(differentFingerprint).ShouldNot(Equal(firstFingerprint))
 		})
 
 		It("serializes a single running request and honors rerun after completion", func() {
-			dir, err := os.MkdirTemp("", "kbagent-action-state-*")
+			dir, err := os.MkdirTemp("", "kbagent-action-rerun-*")
 			Expect(err).ShouldNot(HaveOccurred())
 			DeferCleanup(os.RemoveAll, dir)
 			counterPath := filepath.Join(dir, "counter")

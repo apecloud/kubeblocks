@@ -30,68 +30,48 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
 
-type actionRecord struct {
-	RequestHash string
-	Running     bool
-	Result      *cachedActionResult
+type actionCall struct {
+	requestFingerprint string
+	running            bool
+	result             *actionResult
 }
 
-type cachedActionResult struct {
-	Error   string
-	Message string
-	Output  []byte
+type actionResult struct {
+	output []byte
+	err    error
 }
 
-func newCachedActionResult(output []byte, err error) *cachedActionResult {
-	result := &cachedActionResult{Output: append([]byte(nil), output...)}
-	if err != nil {
-		result.Error = proto.Error2Type(err)
-		result.Message = err.Error()
+func newActionResult(output []byte, err error) *actionResult {
+	return &actionResult{
+		output: append([]byte(nil), output...),
+		err:    err,
 	}
-	return result
 }
 
-func (r *cachedActionResult) response() ([]byte, error) {
-	if r == nil || r.Error == "" {
-		if r == nil {
-			return nil, nil
-		}
-		return append([]byte(nil), r.Output...), nil
+func (r *actionResult) response() ([]byte, error) {
+	if r == nil {
+		return nil, nil
 	}
-	base := proto.Type2Error(r.Error)
-	if r.Message == "" {
-		return nil, base
+	if r.err != nil {
+		return nil, r.err
 	}
-	return nil, &cachedResponseError{message: r.Message, cause: base}
+	return append([]byte(nil), r.output...), nil
 }
 
-type cachedResponseError struct {
-	message string
-	cause   error
+type actionRequestFingerprintInput struct {
+	Action         string                       `json:"action"`
+	Parameters     map[string]string            `json:"parameters"`
+	Arguments      [][]string                   `json:"arguments"`
+	TimeoutSeconds int32                        `json:"timeoutSeconds"`
+	RetryPolicy    *retryPolicyFingerprintInput `json:"retryPolicy"`
 }
 
-func (e *cachedResponseError) Error() string {
-	return e.message
-}
-
-func (e *cachedResponseError) Unwrap() error {
-	return e.cause
-}
-
-type actionRequestIdentity struct {
-	Action         string             `json:"action"`
-	Parameters     map[string]string  `json:"parameters"`
-	Arguments      [][]string         `json:"arguments"`
-	TimeoutSeconds int32              `json:"timeoutSeconds"`
-	RetryPolicy    *requestRetryState `json:"retryPolicy"`
-}
-
-type requestRetryState struct {
+type retryPolicyFingerprintInput struct {
 	MaxRetries    int   `json:"maxRetries"`
 	RetryInterval int64 `json:"retryInterval"`
 }
 
-func actionRequestHash(req *proto.ActionRequest, timeout *int32, retryPolicy *proto.RetryPolicy) (string, error) {
+func fingerprintActionRequest(req *proto.ActionRequest, timeout *int32, retryPolicy *proto.RetryPolicy) (string, error) {
 	parameters := req.Parameters
 	if parameters == nil {
 		parameters = map[string]string{}
@@ -107,23 +87,23 @@ func actionRequestHash(req *proto.ActionRequest, timeout *int32, retryPolicy *pr
 			}
 		}
 	}
-	var retry *requestRetryState
+	var retry *retryPolicyFingerprintInput
 	if retryPolicy != nil && retryPolicy.MaxRetries > 0 {
-		retry = &requestRetryState{
+		retry = &retryPolicyFingerprintInput{
 			MaxRetries:    retryPolicy.MaxRetries,
 			RetryInterval: int64(max(retryPolicy.RetryInterval, 0)),
 		}
 	}
-	identity := actionRequestIdentity{
+	input := actionRequestFingerprintInput{
 		Action:         req.Action,
 		Parameters:     parameters,
 		Arguments:      arguments,
 		TimeoutSeconds: effectiveTimeoutSeconds(timeout),
 		RetryPolicy:    retry,
 	}
-	data, err := json.Marshal(identity)
+	data, err := json.Marshal(input)
 	if err != nil {
-		return "", errors.Wrap(err, "marshal Action request identity")
+		return "", errors.Wrap(err, "marshal Action request fingerprint input")
 	}
 	sum := sha256.Sum256(data)
 	return hex.EncodeToString(sum[:]), nil

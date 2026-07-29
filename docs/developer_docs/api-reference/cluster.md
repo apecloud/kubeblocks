@@ -2502,7 +2502,8 @@ bool
 <p>When false, the Action runs in blocking mode and the call waits for completion.
 When true, the Action runs in non-blocking mode and the call returns an
 in-progress result while the Action continues to run. Equivalent subsequent
-calls return the same in-progress or cached terminal result.</p>
+calls return an in-progress result until the Action finishes, and then return
+the same terminal result.</p>
 <p>This field cannot be updated.</p>
 </td>
 </tr>
@@ -2519,7 +2520,7 @@ int32
 <p>Behavior based on the value:
 - Positive (&gt; 0): The action will be terminated after this many seconds.
   Blocking Actions are capped at 60 seconds. Non-blocking Actions use the
-  configured value as their total execution timeout, including all runtime
+  configured value as their total run timeout, including all runtime
   argument invocations, retry attempts, and retry intervals, without the
   60-second cap.
 - Zero (= 0): The timeout is managed by the system, defaulting to 30 seconds typically.

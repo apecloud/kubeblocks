@@ -36,51 +36,15 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
 
-const (
-	initialActionResultPersistenceRetryInterval = time.Second
-	maxActionResultPersistenceRetryInterval     = 30 * time.Second
-)
-
 func newActionService(logger logr.Logger, actions []proto.Action) (*actionService, error) {
-	return newActionServiceWithStateDir(logger, actions, "")
-}
-
-func newActionServiceWithStateDir(logger logr.Logger, actions []proto.Action, stateDir string) (*actionService, error) {
-	store, err := newActionStateStore(stateDir)
-	if err != nil {
-		return nil, err
-	}
 	sa := &actionService{
 		logger:        logger,
 		actions:       make(map[string]*proto.Action),
 		mutex:         sync.Mutex{},
 		actionRecords: map[string]*actionRecord{},
-		stateStore:    store,
-		saveRecord:    store.save,
 	}
 	for i, action := range actions {
 		sa.actions[action.Name] = &actions[i]
-		if !action.NonBlocking {
-			continue
-		}
-		record, err := store.load(action.Name)
-		if err != nil {
-			return nil, err
-		}
-		if record == nil {
-			continue
-		}
-		if record.Running {
-			now := time.Now()
-			record.Running = false
-			record.CompletedAt = &now
-			record.Result = newStoredActionResult(nil,
-				errors.Wrap(proto.ErrInterrupted, "kb-agent restarted while the Action was running"))
-			if err := sa.saveRecord(action.Name, record); err != nil {
-				return nil, err
-			}
-		}
-		sa.actionRecords[action.Name] = record
 	}
 	logger.Info(fmt.Sprintf("create service %s", sa.Kind()), "actions", strings.Join(maps.Keys(sa.actions), ","))
 	return sa, nil
@@ -92,8 +56,6 @@ type actionService struct {
 
 	mutex         sync.Mutex
 	actionRecords map[string]*actionRecord
-	stateStore    *actionStateStore
-	saveRecord    func(string, *actionRecord) error
 }
 
 var _ Service = &actionService{}
@@ -185,10 +147,6 @@ func (s *actionService) handleRequestNonBlocking(ctx context.Context, req *proto
 			if record.RequestHash != requestHash || req.Rerun {
 				return nil, proto.ErrBusy
 			}
-			if record.ResultPersistenceError != nil {
-				return nil, errors.Wrapf(proto.ErrInternalError,
-					"persist terminal Action result: %v", record.ResultPersistenceError)
-			}
 			return nil, proto.ErrInProgress
 		}
 		if record.RequestHash == requestHash && !req.Rerun {
@@ -199,10 +157,6 @@ func (s *actionService) handleRequestNonBlocking(ctx context.Context, req *proto
 	record := &actionRecord{
 		RequestHash: requestHash,
 		Running:     true,
-		StartedAt:   time.Now(),
-	}
-	if err := s.saveRecord(req.Action, record); err != nil {
-		return nil, errors.Wrap(proto.ErrInternalError, err.Error())
 	}
 	resultChan, err := nonBlockingCallActionWithRetryUncapped(
 		context.Background(), action, req.Parameters, req.Arguments, timeout, retryPolicy)
@@ -217,7 +171,6 @@ func (s *actionService) handleRequestNonBlocking(ctx context.Context, req *proto
 
 func (s *actionService) completeNonBlockingAction(action string, record *actionRecord, resultChan chan *asyncResult) {
 	result := <-resultChan
-	now := time.Now()
 	var output []byte
 	if result.stdout != nil {
 		output = result.stdout.Bytes()
@@ -225,43 +178,13 @@ func (s *actionService) completeNonBlockingAction(action string, record *actionR
 	terminalRecord := &actionRecord{
 		RequestHash: record.RequestHash,
 		Running:     false,
-		Result:      newStoredActionResult(output, result.err),
-		StartedAt:   record.StartedAt,
-		CompletedAt: &now,
+		Result:      newCachedActionResult(output, result.err),
 	}
 
-	retryInterval := initialActionResultPersistenceRetryInterval
-	for {
-		s.mutex.Lock()
-		current, ok := s.actionRecords[action]
-		s.mutex.Unlock()
-		if !ok || current != record {
-			return
-		}
-
-		err := s.saveRecord(action, terminalRecord)
-		if err == nil {
-			s.mutex.Lock()
-			current, ok = s.actionRecords[action]
-			if ok && current == record {
-				*record = *terminalRecord
-			}
-			s.mutex.Unlock()
-			return
-		}
-
-		s.mutex.Lock()
-		current, ok = s.actionRecords[action]
-		if ok && current == record {
-			record.ResultPersistenceError = err
-		}
-		s.mutex.Unlock()
-		if !ok || current != record {
-			return
-		}
-		s.logger.Error(err, "failed to persist terminal Action result; retrying", "action", action)
-		time.Sleep(retryInterval)
-		retryInterval = min(retryInterval*2, maxActionResultPersistenceRetryInterval)
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	if current, ok := s.actionRecords[action]; ok && current == record {
+		*record = *terminalRecord
 	}
 }
 

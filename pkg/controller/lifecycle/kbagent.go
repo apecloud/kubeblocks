@@ -489,8 +489,6 @@ func (a *kbagent) formatError(lfa lifecycleAction, rsp proto.ActionResponse, pod
 		return wrapError(ErrActionInProgress)
 	case errors.Is(err, proto.ErrBusy):
 		return wrapError(ErrActionBusy)
-	case errors.Is(err, proto.ErrInterrupted):
-		return wrapError(ErrActionInterrupted)
 	case errors.Is(err, proto.ErrTimedOut):
 		return wrapError(ErrActionTimedOut)
 	case errors.Is(err, proto.ErrFailed):

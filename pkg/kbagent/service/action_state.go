@@ -23,9 +23,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
-	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/pkg/errors"
@@ -33,28 +30,20 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
 
-const (
-	actionStateDirMode  = 0700
-	actionStateFileMode = 0600
-)
-
 type actionRecord struct {
-	RequestHash            string              `json:"requestHash"`
-	Running                bool                `json:"running"`
-	Result                 *storedActionResult `json:"result,omitempty"`
-	StartedAt              time.Time           `json:"startedAt"`
-	CompletedAt            *time.Time          `json:"completedAt,omitempty"`
-	ResultPersistenceError error               `json:"-"`
+	RequestHash string
+	Running     bool
+	Result      *cachedActionResult
 }
 
-type storedActionResult struct {
-	Error   string `json:"error,omitempty"`
-	Message string `json:"message,omitempty"`
-	Output  []byte `json:"output,omitempty"`
+type cachedActionResult struct {
+	Error   string
+	Message string
+	Output  []byte
 }
 
-func newStoredActionResult(output []byte, err error) *storedActionResult {
-	result := &storedActionResult{Output: append([]byte(nil), output...)}
+func newCachedActionResult(output []byte, err error) *cachedActionResult {
+	result := &cachedActionResult{Output: append([]byte(nil), output...)}
 	if err != nil {
 		result.Error = proto.Error2Type(err)
 		result.Message = err.Error()
@@ -62,7 +51,7 @@ func newStoredActionResult(output []byte, err error) *storedActionResult {
 	return result
 }
 
-func (r *storedActionResult) response() ([]byte, error) {
+func (r *cachedActionResult) response() ([]byte, error) {
 	if r == nil || r.Error == "" {
 		if r == nil {
 			return nil, nil
@@ -73,19 +62,19 @@ func (r *storedActionResult) response() ([]byte, error) {
 	if r.Message == "" {
 		return nil, base
 	}
-	return nil, &storedResponseError{message: r.Message, cause: base}
+	return nil, &cachedResponseError{message: r.Message, cause: base}
 }
 
-type storedResponseError struct {
+type cachedResponseError struct {
 	message string
 	cause   error
 }
 
-func (e *storedResponseError) Error() string {
+func (e *cachedResponseError) Error() string {
 	return e.message
 }
 
-func (e *storedResponseError) Unwrap() error {
+func (e *cachedResponseError) Unwrap() error {
 	return e.cause
 }
 
@@ -148,103 +137,4 @@ func effectiveTimeoutSeconds(timeout *int32) int32 {
 		return -1
 	}
 	return *timeout
-}
-
-type actionStateStore struct {
-	dir string
-}
-
-func newActionStateStore(dir string) (*actionStateStore, error) {
-	store := &actionStateStore{dir: dir}
-	if dir == "" {
-		return store, nil
-	}
-	if err := os.MkdirAll(dir, actionStateDirMode); err != nil {
-		return nil, errors.Wrap(err, "create Action state directory")
-	}
-	if err := os.Chmod(dir, actionStateDirMode); err != nil {
-		return nil, errors.Wrap(err, "set Action state directory permissions")
-	}
-	return store, nil
-}
-
-func (s *actionStateStore) enabled() bool {
-	return s != nil && s.dir != ""
-}
-
-func (s *actionStateStore) load(action string) (*actionRecord, error) {
-	if !s.enabled() {
-		return nil, nil
-	}
-	data, err := os.ReadFile(s.path(action))
-	if os.IsNotExist(err) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, errors.Wrapf(err, "read state for Action %s", action)
-	}
-	record := &actionRecord{}
-	if err := json.Unmarshal(data, record); err != nil {
-		return nil, errors.Wrapf(err, "decode state for Action %s", action)
-	}
-	if record.RequestHash == "" {
-		return nil, fmt.Errorf("state for Action %s has an empty request hash", action)
-	}
-	if !record.Running && record.Result == nil {
-		return nil, fmt.Errorf("terminal state for Action %s has no result", action)
-	}
-	return record, nil
-}
-
-func (s *actionStateStore) save(action string, record *actionRecord) error {
-	if !s.enabled() {
-		return nil
-	}
-	data, err := json.Marshal(record)
-	if err != nil {
-		return errors.Wrapf(err, "encode state for Action %s", action)
-	}
-	file, err := os.CreateTemp(s.dir, ".action-state-*")
-	if err != nil {
-		return errors.Wrapf(err, "create temporary state for Action %s", action)
-	}
-	tmp := file.Name()
-	defer os.Remove(tmp)
-
-	if err := file.Chmod(actionStateFileMode); err != nil {
-		_ = file.Close()
-		return errors.Wrapf(err, "set state permissions for Action %s", action)
-	}
-	if _, err := file.Write(data); err != nil {
-		_ = file.Close()
-		return errors.Wrapf(err, "write state for Action %s", action)
-	}
-	if err := file.Sync(); err != nil {
-		_ = file.Close()
-		return errors.Wrapf(err, "sync state for Action %s", action)
-	}
-	if err := file.Close(); err != nil {
-		return errors.Wrapf(err, "close state for Action %s", action)
-	}
-	if err := os.Rename(tmp, s.path(action)); err != nil {
-		return errors.Wrapf(err, "replace state for Action %s", action)
-	}
-	return syncDirectory(s.dir)
-}
-
-func (s *actionStateStore) path(action string) string {
-	sum := sha256.Sum256([]byte(action))
-	return filepath.Join(s.dir, hex.EncodeToString(sum[:])+".json")
-}
-
-func syncDirectory(dir string) error {
-	handle, err := os.Open(dir)
-	if err != nil {
-		return errors.Wrap(err, "open Action state directory")
-	}
-	defer handle.Close()
-	if err := handle.Sync(); err != nil {
-		return errors.Wrap(err, "sync Action state directory")
-	}
-	return nil
 }

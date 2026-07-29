@@ -31,7 +31,7 @@ import (
 var _ = Describe("service", func() {
 	Context("new", func() {
 		It("empty", func() {
-			services, err := New(logr.New(nil), nil, nil, nil, "")
+			services, err := New(logr.New(nil), nil, nil, nil)
 			Expect(err).Should(BeNil())
 			Expect(services).Should(HaveLen(3))
 			Expect(services[0]).ShouldNot(BeNil())
@@ -45,24 +45,12 @@ var _ = Describe("service", func() {
 					Name: "action",
 				},
 			}
-			services, err := New(logr.New(nil), actions, nil, nil, "")
+			services, err := New(logr.New(nil), actions, nil, nil)
 			Expect(err).Should(BeNil())
 			Expect(services).Should(HaveLen(3))
 			Expect(services[0]).ShouldNot(BeNil())
 			Expect(services[1]).ShouldNot(BeNil())
 			Expect(services[2]).ShouldNot(BeNil())
-		})
-
-		It("passes the non-blocking Action state directory to the Action service", func() {
-			stateDir := GinkgoT().TempDir()
-			services, err := New(logr.New(nil), []proto.Action{{
-				Name:        "action",
-				NonBlocking: true,
-			}}, nil, nil, stateDir)
-			Expect(err).ShouldNot(HaveOccurred())
-			actionSvc, ok := services[0].(*actionService)
-			Expect(ok).Should(BeTrue())
-			Expect(actionSvc.stateStore.dir).Should(Equal(stateDir))
 		})
 
 		It("probe", func() {
@@ -76,7 +64,7 @@ var _ = Describe("service", func() {
 					Action: "action",
 				},
 			}
-			services, err := New(logr.New(nil), actions, probes, nil, "")
+			services, err := New(logr.New(nil), actions, probes, nil)
 			Expect(err).Should(BeNil())
 			Expect(services).Should(HaveLen(3))
 			Expect(services[0]).ShouldNot(BeNil())
@@ -93,7 +81,7 @@ var _ = Describe("service", func() {
 			streamingActions := []string{
 				"action",
 			}
-			services, err := New(logr.New(nil), actions, nil, streamingActions, "")
+			services, err := New(logr.New(nil), actions, nil, streamingActions)
 			Expect(err).Should(BeNil())
 			Expect(services).Should(HaveLen(3))
 			Expect(services[0]).ShouldNot(BeNil())
@@ -115,7 +103,7 @@ var _ = Describe("service", func() {
 					Action: "not-defined",
 				},
 			}
-			_, err := New(logr.New(nil), actions, probes, nil, "")
+			_, err := New(logr.New(nil), actions, probes, nil)
 			Expect(err).ShouldNot(BeNil())
 		})
 
@@ -129,7 +117,7 @@ var _ = Describe("service", func() {
 				"action",
 				"not-defined",
 			}
-			_, err := New(logr.New(nil), actions, nil, streamingActions, "")
+			_, err := New(logr.New(nil), actions, nil, streamingActions)
 			Expect(err).ShouldNot(BeNil())
 		})
 	})

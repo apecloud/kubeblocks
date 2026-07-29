@@ -53,8 +53,6 @@ const (
 	roleLabelVolumeName  = "kubeblocks-role-label"
 	podMetadataMountPath = "/etc/kubeblocks/pod-metadata"
 	podRoleLabelFileName = "role"
-
-	actionStateVolumeName = "kubeblocks-action-state"
 )
 
 var (
@@ -200,11 +198,6 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 	if err = mountPodRoleLabelFile(synthesizedComp, container); err != nil {
 		return err
 	}
-	if hasNonBlockingAction(synthesizedComp) {
-		if err = mountActionStateDir(synthesizedComp, container); err != nil {
-			return err
-		}
-	}
 
 	// set kb-agent container ports to host network
 	if synthesizedComp.HostNetwork != nil {
@@ -228,40 +221,6 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 	synthesizedComp.PodSpec.Containers = append(synthesizedComp.PodSpec.Containers, *container)
 	synthesizedComp.PodSpec.InitContainers = append(synthesizedComp.PodSpec.InitContainers, *workerContainer)
 
-	return nil
-}
-
-func mountActionStateDir(synthesizedComp *SynthesizedComponent, container *corev1.Container) error {
-	volume := corev1.Volume{
-		Name: actionStateVolumeName,
-		VolumeSource: corev1.VolumeSource{
-			EmptyDir: &corev1.EmptyDirVolumeSource{},
-		},
-	}
-	for _, existing := range synthesizedComp.PodSpec.Volumes {
-		if existing.Name != actionStateVolumeName {
-			continue
-		}
-		if !reflect.DeepEqual(existing, volume) {
-			return fmt.Errorf("volume %s conflicts with kbagent Action state volume", actionStateVolumeName)
-		}
-		volume = corev1.Volume{}
-		break
-	}
-	if volume.Name != "" {
-		synthesizedComp.PodSpec.Volumes = append(synthesizedComp.PodSpec.Volumes, volume)
-	}
-
-	mount := corev1.VolumeMount{Name: actionStateVolumeName, MountPath: kbagent.RuntimeDir}
-	for _, existing := range container.VolumeMounts {
-		if reflect.DeepEqual(existing, mount) {
-			return nil
-		}
-		if existing.MountPath == kbagent.RuntimeDir {
-			return fmt.Errorf("volumeMount path %s conflicts with kbagent runtime volume mount", kbagent.RuntimeDir)
-		}
-	}
-	container.VolumeMounts = append(container.VolumeMounts, mount)
 	return nil
 }
 
@@ -644,41 +603,6 @@ func hasActionDefined(synthesizedComp *SynthesizedComponent) bool {
 		}
 	}
 	return false
-}
-
-func hasNonBlockingAction(synthesizedComp *SynthesizedComponent) bool {
-	found := false
-	check := func(action *appsv1.Action) {
-		found = found || action != nil && action.NonBlocking
-	}
-	if synthesizedComp.LifecycleActions.ComponentLifecycleActions != nil {
-		actions := synthesizedComp.LifecycleActions.ComponentLifecycleActions
-		for _, action := range []*appsv1.Action{
-			actions.PostProvision,
-			actions.PreTerminate,
-			actions.Switchover,
-			actions.MemberJoin,
-			actions.MemberLeave,
-			actions.Readonly,
-			actions.Readwrite,
-			actions.DataDump,
-			actions.DataLoad,
-			actions.Reconfigure,
-			actions.AccountProvision,
-		} {
-			check(action)
-		}
-		if actions.RoleProbe != nil {
-			check(&actions.RoleProbe.Action)
-		}
-		if actions.AvailableProbe != nil {
-			check(&actions.AvailableProbe.Action)
-		}
-	}
-	traverseUserDefinedActions(synthesizedComp, func(_ string, action *appsv1.Action) {
-		check(action)
-	})
-	return found
 }
 
 func traverseUserDefinedActions(synthesizedComp *SynthesizedComponent, f func(name string, action *appsv1.Action)) {

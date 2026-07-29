@@ -29,7 +29,6 @@ var (
 	ErrPreconditionFailed   = errors.New("action precondition is not met")
 	ErrActionInProgress     = errors.New("action is in progress")
 	ErrActionBusy           = errors.New("action is busy")
-	ErrActionInterrupted    = errors.New("action was interrupted")
 	ErrActionTimedOut       = errors.New("action timed-out")
 	ErrActionFailed         = errors.New("action failed")
 	ErrActionInternalError  = errors.New("action internal error")

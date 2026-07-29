@@ -356,11 +356,6 @@ var _ = Describe("lifecycle", func() {
 				}).MaxTimes(1)
 				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
 					return proto.ActionResponse{
-						Error: proto.Error2Type(proto.ErrInterrupted),
-					}, nil
-				}).MaxTimes(1)
-				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
-					return proto.ActionResponse{
 						Error: proto.Error2Type(proto.ErrTimedOut),
 					}, nil
 				}).MaxTimes(1)
@@ -385,7 +380,6 @@ var _ = Describe("lifecycle", func() {
 				ErrActionInternalError,
 				ErrActionInProgress,
 				ErrActionBusy,
-				ErrActionInterrupted,
 				ErrActionTimedOut,
 				ErrActionFailed,
 				ErrActionInternalError,

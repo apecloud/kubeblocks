@@ -30,7 +30,6 @@ var (
 	ErrBadRequest         = errors.New("badRequest")
 	ErrInProgress         = errors.New("inProgress")
 	ErrBusy               = errors.New("busy")
-	ErrInterrupted        = errors.New("interrupted")
 	ErrTimedOut           = errors.New("timedOut")
 	ErrFailed             = errors.New("failed")
 	ErrInternalError      = errors.New("internalError")
@@ -53,8 +52,6 @@ func Error2Type(err error) string {
 		return "inProgress"
 	case errors.Is(err, ErrBusy):
 		return "busy"
-	case errors.Is(err, ErrInterrupted):
-		return "interrupted"
 	case errors.Is(err, ErrTimedOut):
 		return "timedOut"
 	case errors.Is(err, ErrFailed):
@@ -82,8 +79,6 @@ func Type2Error(errType string) error {
 		return ErrInProgress
 	case "busy":
 		return ErrBusy
-	case "interrupted":
-		return ErrInterrupted
 	case "timedOut":
 		return ErrTimedOut
 	case "failed":

@@ -4088,9 +4088,8 @@ spec:
 
                             When false, the Action runs in blocking mode and the call waits for completion.
                             When true, the Action runs in non-blocking mode and the call returns an
-                            in-progress result while the Action continues to run. Equivalent subsequent
-                            calls return an in-progress result until the Action finishes, and then return
-                            the same terminal result.
+                            in-progress result while the Action continues to run. Callers can invoke the
+                            Action again to observe its result.
 
                             This field cannot be updated.
                           type: boolean
@@ -4699,9 +4698,8 @@ spec:
 
                           When false, the Action runs in blocking mode and the call waits for completion.
                           When true, the Action runs in non-blocking mode and the call returns an
-                          in-progress result while the Action continues to run. Equivalent subsequent
-                          calls return an in-progress result until the Action finishes, and then return
-                          the same terminal result.
+                          in-progress result while the Action continues to run. Callers can invoke the
+                          Action again to observe its result.
 
                           This field cannot be updated.
                         type: boolean
@@ -5148,9 +5146,8 @@ spec:
 
                           When false, the Action runs in blocking mode and the call waits for completion.
                           When true, the Action runs in non-blocking mode and the call returns an
-                          in-progress result while the Action continues to run. Equivalent subsequent
-                          calls return an in-progress result until the Action finishes, and then return
-                          the same terminal result.
+                          in-progress result while the Action continues to run. Callers can invoke the
+                          Action again to observe its result.
 
                           This field cannot be updated.
                         type: boolean
@@ -5613,9 +5610,8 @@ spec:
 
                           When false, the Action runs in blocking mode and the call waits for completion.
                           When true, the Action runs in non-blocking mode and the call returns an
-                          in-progress result while the Action continues to run. Equivalent subsequent
-                          calls return an in-progress result until the Action finishes, and then return
-                          the same terminal result.
+                          in-progress result while the Action continues to run. Callers can invoke the
+                          Action again to observe its result.
 
                           This field cannot be updated.
                         type: boolean
@@ -6061,9 +6057,8 @@ spec:
 
                           When false, the Action runs in blocking mode and the call waits for completion.
                           When true, the Action runs in non-blocking mode and the call returns an
-                          in-progress result while the Action continues to run. Equivalent subsequent
-                          calls return an in-progress result until the Action finishes, and then return
-                          the same terminal result.
+                          in-progress result while the Action continues to run. Callers can invoke the
+                          Action again to observe its result.
 
                           This field cannot be updated.
                         type: boolean
@@ -6512,9 +6507,8 @@ spec:
 
                           When false, the Action runs in blocking mode and the call waits for completion.
                           When true, the Action runs in non-blocking mode and the call returns an
-                          in-progress result while the Action continues to run. Equivalent subsequent
-                          calls return an in-progress result until the Action finishes, and then return
-                          the same terminal result.
+                          in-progress result while the Action continues to run. Callers can invoke the
+                          Action again to observe its result.
 
                           This field cannot be updated.
                         type: boolean
@@ -6965,9 +6959,8 @@ spec:
 
                           When false, the Action runs in blocking mode and the call waits for completion.
                           When true, the Action runs in non-blocking mode and the call returns an
-                          in-progress result while the Action continues to run. Equivalent subsequent
-                          calls return an in-progress result until the Action finishes, and then return
-                          the same terminal result.
+                          in-progress result while the Action continues to run. Callers can invoke the
+                          Action again to observe its result.
 
                           This field cannot be updated.
                         type: boolean
@@ -7408,9 +7401,8 @@ spec:
 
                           When false, the Action runs in blocking mode and the call waits for completion.
                           When true, the Action runs in non-blocking mode and the call returns an
-                          in-progress result while the Action continues to run. Equivalent subsequent
-                          calls return an in-progress result until the Action finishes, and then return
-                          the same terminal result.
+                          in-progress result while the Action continues to run. Callers can invoke the
+                          Action again to observe its result.
 
                           This field cannot be updated.
                         type: boolean
@@ -7851,9 +7843,8 @@ spec:
 
                           When false, the Action runs in blocking mode and the call waits for completion.
                           When true, the Action runs in non-blocking mode and the call returns an
-                          in-progress result while the Action continues to run. Equivalent subsequent
-                          calls return an in-progress result until the Action finishes, and then return
-                          the same terminal result.
+                          in-progress result while the Action continues to run. Callers can invoke the
+                          Action again to observe its result.
 
                           This field cannot be updated.
                         type: boolean
@@ -8294,9 +8285,8 @@ spec:
 
                           When false, the Action runs in blocking mode and the call waits for completion.
                           When true, the Action runs in non-blocking mode and the call returns an
-                          in-progress result while the Action continues to run. Equivalent subsequent
-                          calls return an in-progress result until the Action finishes, and then return
-                          the same terminal result.
+                          in-progress result while the Action continues to run. Callers can invoke the
+                          Action again to observe its result.
 
                           This field cannot be updated.
                         type: boolean
@@ -8739,9 +8729,8 @@ spec:
 
                           When false, the Action runs in blocking mode and the call waits for completion.
                           When true, the Action runs in non-blocking mode and the call returns an
-                          in-progress result while the Action continues to run. Equivalent subsequent
-                          calls return an in-progress result until the Action finishes, and then return
-                          the same terminal result.
+                          in-progress result while the Action continues to run. Callers can invoke the
+                          Action again to observe its result.
 
                           This field cannot be updated.
                         type: boolean
@@ -9176,9 +9165,8 @@ spec:
 
                           When false, the Action runs in blocking mode and the call waits for completion.
                           When true, the Action runs in non-blocking mode and the call returns an
-                          in-progress result while the Action continues to run. Equivalent subsequent
-                          calls return an in-progress result until the Action finishes, and then return
-                          the same terminal result.
+                          in-progress result while the Action continues to run. Callers can invoke the
+                          Action again to observe its result.
 
                           This field cannot be updated.
                         type: boolean
@@ -9662,9 +9650,8 @@ spec:
 
                           When false, the Action runs in blocking mode and the call waits for completion.
                           When true, the Action runs in non-blocking mode and the call returns an
-                          in-progress result while the Action continues to run. Equivalent subsequent
-                          calls return an in-progress result until the Action finishes, and then return
-                          the same terminal result.
+                          in-progress result while the Action continues to run. Callers can invoke the
+                          Action again to observe its result.
 
                           This field cannot be updated.
                         type: boolean
@@ -10127,9 +10114,8 @@ spec:
 
                           When false, the Action runs in blocking mode and the call waits for completion.
                           When true, the Action runs in non-blocking mode and the call returns an
-                          in-progress result while the Action continues to run. Equivalent subsequent
-                          calls return an in-progress result until the Action finishes, and then return
-                          the same terminal result.
+                          in-progress result while the Action continues to run. Callers can invoke the
+                          Action again to observe its result.
 
                           This field cannot be updated.
                         type: boolean
@@ -18294,9 +18280,8 @@ spec:
 
                             When false, the Action runs in blocking mode and the call waits for completion.
                             When true, the Action runs in non-blocking mode and the call returns an
-                            in-progress result while the Action continues to run. Equivalent subsequent
-                            calls return an in-progress result until the Action finishes, and then return
-                            the same terminal result.
+                            in-progress result while the Action continues to run. Callers can invoke the
+                            Action again to observe its result.
 
                             This field cannot be updated.
                           type: boolean

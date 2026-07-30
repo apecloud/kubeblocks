@@ -2501,9 +2501,8 @@ bool
 <p>Specifies whether the Action runs in non-blocking mode.</p>
 <p>When false, the Action runs in blocking mode and the call waits for completion.
 When true, the Action runs in non-blocking mode and the call returns an
-in-progress result while the Action continues to run. Equivalent subsequent
-calls return an in-progress result until the Action finishes, and then return
-the same terminal result.</p>
+in-progress result while the Action continues to run. Callers can invoke the
+Action again to observe its result.</p>
 <p>This field cannot be updated.</p>
 </td>
 </tr>

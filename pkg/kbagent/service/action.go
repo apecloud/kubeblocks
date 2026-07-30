@@ -55,6 +55,8 @@ type actionService struct {
 	actions map[string]*proto.Action
 
 	mutex sync.Mutex
+	// TODO: preserve non-blocking call tracking across service restarts without
+	// changing the Action API semantics.
 	calls map[string]*actionCall
 }
 

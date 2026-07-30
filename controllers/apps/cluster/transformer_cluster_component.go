@@ -21,7 +21,6 @@ package cluster
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -176,6 +175,9 @@ func checkAllCompsUpToDate(transCtx *clusterTransformContext, cluster *appsv1.Cl
 		return false, nil
 	}
 	for _, comp := range compList.Items {
+		if hasPendingShardingAction(&comp) {
+			return false, nil
+		}
 		generation, ok := comp.Annotations[constant.KubeBlocksGenerationKey]
 		if !ok {
 			return false, nil
@@ -185,6 +187,15 @@ func checkAllCompsUpToDate(transCtx *clusterTransformContext, cluster *appsv1.Cl
 		}
 	}
 	return true, nil
+}
+
+func hasPendingShardingAction(comp *appsv1.Component) bool {
+	if comp == nil || comp.Annotations == nil {
+		return false
+	}
+	return comp.Annotations[shardingAddShardKey] != "" ||
+		comp.Annotations[shardingAddActionStateKey] != "" ||
+		comp.Annotations[shardingRemoveActionStateKey] != ""
 }
 
 // copyAndMergeComponent merges two component objects for updating:
@@ -817,9 +828,9 @@ type clusterShardingHandler struct {
 }
 
 const (
-	shardingAddShardKey            = "kubeblocks.io/sharding-add-shard"
-	shardingAddActionTargetsKey    = "kubeblocks.io/sharding-add-action-targets"
-	shardingRemoveActionTargetsKey = "kubeblocks.io/sharding-remove-action-targets"
+	shardingAddShardKey          = "kubeblocks.io/sharding-add-shard"
+	shardingAddActionStateKey    = "kubeblocks.io/sharding-add-action-state"
+	shardingRemoveActionStateKey = "kubeblocks.io/sharding-remove-action-state"
 
 	shardingPostProvisionAction = "shardingPostProvision"
 	shardingPreTerminateAction  = "shardingPreTerminate"
@@ -932,7 +943,8 @@ func (h *clusterShardingHandler) update(transCtx *clusterTransformContext, dag *
 		return err
 	}
 
-	errorSkip, err3 := h.handleShardAddNRemove(transCtx, name, runningCompsMap, protoCompsMap, toCreate, toDelete, toUpdate)
+	errorSkip, err3 := h.handleShardAddNRemove(transCtx, dag, name,
+		runningCompsMap, protoCompsMap, toCreate, toDelete, toUpdate)
 
 	// TODO: update strategy
 	h.updateSkippedDeleteComps(transCtx, dag, originalCompsMap, runningCompsMap, toDelete.Intersection(errorSkip))
@@ -995,8 +1007,8 @@ func (h *clusterShardingHandler) updateSkippedDeleteComps(transCtx *clusterTrans
 func syncShardingActionAnnotations(from, to *appsv1.Component) {
 	for _, key := range []string{
 		shardingAddShardKey,
-		shardingAddActionTargetsKey,
-		shardingRemoveActionTargetsKey,
+		shardingAddActionStateKey,
+		shardingRemoveActionStateKey,
 	} {
 		value, ok := from.Annotations[key]
 		if !ok {
@@ -1410,7 +1422,7 @@ func (h *clusterShardingHandler) updateActionStatus(transCtx *clusterTransformCo
 	transCtx.Cluster.Status.Shardings[shardingName] = shardingStatus
 }
 
-func (h *clusterShardingHandler) handleShardAddNRemove(transCtx *clusterTransformContext, shardingName string,
+func (h *clusterShardingHandler) handleShardAddNRemove(transCtx *clusterTransformContext, dag *graph.DAG, shardingName string,
 	runningCompsMap map[string]*appsv1.Component, protoCompsMap map[string]*appsv1.Component,
 	toCreate, toDelete, toUpdate sets.Set[string]) (sets.Set[string], error) {
 	var (
@@ -1433,10 +1445,34 @@ func (h *clusterShardingHandler) handleShardAddNRemove(transCtx *clusterTransfor
 
 		update = func() error {
 			var failure, delayed error
-			names := sortedShardingActionSources(toUpdate, runningCompsMap, shardingAddActionTargetsKey)
+			candidates := toUpdate.Clone()
+			for name, comp := range runningCompsMap {
+				if comp.Annotations[shardingAddShardKey] != "" ||
+					comp.Annotations[shardingAddActionStateKey] != "" {
+					candidates.Insert(name)
+				}
+			}
+			names := sortedShardingActionSources(candidates, runningCompsMap, shardingAddActionStateKey)
 			for _, name := range names {
-				err1 := h.handleShardAdd(transCtx, shardingName, maps.Values(runningCompsMap),
+				err1 := h.handleShardAdd(transCtx, dag, shardingName, maps.Values(runningCompsMap),
 					runningCompsMap[name], claimed)
+				if toDelete.Has(name) &&
+					(runningCompsMap[name].Annotations[shardingAddShardKey] != "" ||
+						runningCompsMap[name].Annotations[shardingAddActionStateKey] != "" || err1 == nil) {
+					// An obsolete shardAdd must reach a terminal result before shardRemove
+					// can run. Keep the source Component for at least one more reconcile
+					// after success so the inverse action starts in a later round.
+					errorSkip.Insert(name)
+					if err1 == nil {
+						actions := h.shardingDef(transCtx, shardingName).Spec.LifecycleActions
+						if actions == nil || actions.ShardRemove == nil {
+							err1 = fmt.Errorf("cannot remove shard %s after shard add completed: shardRemove action is not defined", name)
+						} else {
+							err1 = ictrlutil.NewDelayedRequeueError(3*time.Second,
+								fmt.Sprintf("shard add action for %s completed before removal", name))
+						}
+					}
+				}
 				if err1 != nil {
 					if ictrlutil.IsDelayedRequeueError(err1) {
 						if delayed == nil {
@@ -1458,10 +1494,28 @@ func (h *clusterShardingHandler) handleShardAddNRemove(transCtx *clusterTransfor
 
 		_delete = func() error {
 			var failure, delayed error
-			names := sortedShardingActionSources(toDelete, runningCompsMap, shardingRemoveActionTargetsKey)
+			candidates := toDelete.Clone()
+			for name, comp := range runningCompsMap {
+				if comp.Annotations[shardingRemoveActionStateKey] != "" {
+					candidates.Insert(name)
+				}
+			}
+			names := sortedShardingActionSources(candidates, runningCompsMap, shardingRemoveActionStateKey)
 			for _, name := range names {
-				err1 := h.handleShardRemove(transCtx, shardingName, maps.Values(runningCompsMap),
+				err1 := h.handleShardRemove(transCtx, dag, shardingName, maps.Values(runningCompsMap),
 					runningCompsMap[name], claimed)
+				if err1 == nil && !toDelete.Has(name) {
+					// The desired shard count was restored while shardRemove was
+					// running. Finish the already-issued remove first, then add the
+					// shard back using the normal shardAdd path.
+					if actions := h.shardingDef(transCtx, shardingName).Spec.LifecycleActions; actions != nil && actions.ShardAdd != nil {
+						runningCompsMap[name].Annotations[shardingAddShardKey] = time.Now().Format(time.RFC3339Nano)
+						err1 = ictrlutil.NewDelayedRequeueError(3*time.Second,
+							fmt.Sprintf("shard remove action for %s completed before restoration", name))
+					} else {
+						err1 = fmt.Errorf("cannot restore shard %s after shard remove completed: shardAdd action is not defined", name)
+					}
+				}
 				if err1 != nil {
 					if ictrlutil.IsDelayedRequeueError(err1) {
 						if delayed == nil {
@@ -1473,7 +1527,9 @@ func (h *clusterShardingHandler) handleShardAddNRemove(transCtx *clusterTransfor
 							failure = err1
 						}
 					}
-					errorSkip.Insert(name)
+					if toDelete.Has(name) {
+						errorSkip.Insert(name)
+					}
 				}
 			}
 			if failure != nil {
@@ -1485,7 +1541,15 @@ func (h *clusterShardingHandler) handleShardAddNRemove(transCtx *clusterTransfor
 
 	create()
 	err1 := update()
-	err2 := _delete()
+	var err2 error
+	if err1 == nil {
+		err2 = _delete()
+	} else {
+		// No shard may be deleted while an earlier shardAdd request is still
+		// running or failed. The action may target any shard in the sharding,
+		// including one that is otherwise ready for removal.
+		errorSkip.Insert(toDelete.UnsortedList()...)
+	}
 
 	if err1 != nil && !ictrlutil.IsDelayedRequeueError(err1) {
 		return errorSkip, err1
@@ -1499,20 +1563,20 @@ func (h *clusterShardingHandler) handleShardAddNRemove(transCtx *clusterTransfor
 	return errorSkip, err2
 }
 
-func (h *clusterShardingHandler) handleShardAdd(transCtx *clusterTransformContext,
+func (h *clusterShardingHandler) handleShardAdd(transCtx *clusterTransformContext, dag *graph.DAG,
 	shardingName string, runningComps []*appsv1.Component, runningComp *appsv1.Component,
 	claimed sets.Set[string]) error {
 	var (
 		shardingDef = h.shardingDef(transCtx, shardingName)
 
 		pending = func() bool {
-			return runningComp.Annotations[shardingAddShardKey] != ""
+			return runningComp.Annotations[shardingAddShardKey] != "" ||
+				runningComp.Annotations[shardingAddActionStateKey] != ""
 		}
 
 		succeed = func() error {
 			delete(runningComp.Annotations, shardingAddShardKey)
-			delete(runningComp.Annotations, shardingAddActionTargetsKey)
-			return nil
+			return deleteShardingActionState(transCtx, dag, runningComp, shardingAddActionStateKey)
 		}
 	)
 
@@ -1528,8 +1592,8 @@ func (h *clusterShardingHandler) handleShardAdd(transCtx *clusterTransformContex
 			call = func(transCtx *clusterTransformContext, shardingName, actionName string,
 				action *appsv1.ShardingAction, args map[string]string, runningComps []*appsv1.Component,
 				comp *appsv1.Component) error {
-				return h.nonBlockingShardingAction(transCtx, shardingName, actionName,
-					shardingAddActionTargetsKey, action, args, runningComps, comp, claimed)
+				return h.nonBlockingShardingAction(transCtx, dag, shardingName, actionName,
+					shardingAddActionStateKey, action, args, runningComps, comp, claimed)
 			}
 		}
 		if err := call(transCtx, shardingName, shardingAddShardAction,
@@ -1540,7 +1604,7 @@ func (h *clusterShardingHandler) handleShardAdd(transCtx *clusterTransformContex
 	return succeed()
 }
 
-func (h *clusterShardingHandler) handleShardRemove(transCtx *clusterTransformContext,
+func (h *clusterShardingHandler) handleShardRemove(transCtx *clusterTransformContext, dag *graph.DAG,
 	shardingName string, runningComps []*appsv1.Component, runningComp *appsv1.Component,
 	claimed sets.Set[string]) error {
 	var (
@@ -1560,7 +1624,8 @@ func (h *clusterShardingHandler) handleShardRemove(transCtx *clusterTransformCon
 	}
 
 	if skipIfShardAddNotDone() {
-		return nil
+		return ictrlutil.NewDelayedRequeueError(3*time.Second,
+			fmt.Sprintf("waiting for shard add action on %s", runningComp.Name))
 	}
 
 	if pending() {
@@ -1571,8 +1636,8 @@ func (h *clusterShardingHandler) handleShardRemove(transCtx *clusterTransformCon
 			call = func(transCtx *clusterTransformContext, shardingName, actionName string,
 				action *appsv1.ShardingAction, args map[string]string, runningComps []*appsv1.Component,
 				comp *appsv1.Component) error {
-				return h.nonBlockingShardingAction(transCtx, shardingName, actionName,
-					shardingRemoveActionTargetsKey, action, args, runningComps, comp, claimed)
+				return h.nonBlockingShardingAction(transCtx, dag, shardingName, actionName,
+					shardingRemoveActionStateKey, action, args, runningComps, comp, claimed)
 			}
 		}
 		if err := call(transCtx, shardingName, shardingRemoveShardAction,
@@ -1580,16 +1645,16 @@ func (h *clusterShardingHandler) handleShardRemove(transCtx *clusterTransformCon
 			return err
 		}
 	}
-	return nil
+	return deleteShardingActionState(transCtx, dag, runningComp, shardingRemoveActionStateKey)
 }
 
 func sortedShardingActionSources(names sets.Set[string], comps map[string]*appsv1.Component,
-	targetsAnnotation string) []string {
+	stateAnnotation string) []string {
 	sorted := names.UnsortedList()
 	sort.SliceStable(sorted, func(i, j int) bool {
 		left, right := comps[sorted[i]], comps[sorted[j]]
-		leftSelected := left != nil && left.Annotations != nil && left.Annotations[targetsAnnotation] != ""
-		rightSelected := right != nil && right.Annotations != nil && right.Annotations[targetsAnnotation] != ""
+		leftSelected := left != nil && left.Annotations != nil && left.Annotations[stateAnnotation] != ""
+		rightSelected := right != nil && right.Annotations != nil && right.Annotations[stateAnnotation] != ""
 		if leftSelected != rightSelected {
 			return leftSelected
 		}
@@ -1598,38 +1663,25 @@ func sortedShardingActionSources(names sets.Set[string], comps map[string]*appsv
 	return sorted
 }
 
-func (h *clusterShardingHandler) nonBlockingShardingAction(transCtx *clusterTransformContext,
-	shardingName, actionName, targetsAnnotation string, action *appsv1.ShardingAction,
+func (h *clusterShardingHandler) nonBlockingShardingAction(transCtx *clusterTransformContext, dag *graph.DAG,
+	shardingName, actionName, stateAnnotation string, action *appsv1.ShardingAction,
 	args map[string]string, runningComps []*appsv1.Component, sourceComp *appsv1.Component,
 	claimed sets.Set[string]) error {
+	claimKey := "sharding-topology-action"
+	if claimed.Has(claimKey) {
+		return ictrlutil.NewDelayedRequeueError(3*time.Second,
+			fmt.Sprintf("waiting to execute action %s for shard %s", actionName, sourceComp.Name))
+	}
+	claimed.Insert(claimKey)
+
 	targets, changed, err := h.resolveShardingActionTargets(
-		transCtx, action, targetsAnnotation, runningComps, sourceComp)
+		transCtx, dag, action, stateAnnotation, runningComps, sourceComp)
 	if err != nil {
 		return err
 	}
 
-	for _, target := range targets.Targets {
-		for _, pod := range target.Pods {
-			key := shardingActionClaimKey(actionName, pod.Name)
-			if claimed.Has(key) {
-				if changed {
-					if err := setShardingActionTargets(sourceComp, targetsAnnotation, targets); err != nil {
-						return err
-					}
-				}
-				return ictrlutil.NewDelayedRequeueError(3*time.Second,
-					fmt.Sprintf("waiting to execute action %s on pod %s", actionName, pod.Name))
-			}
-		}
-	}
-	for _, target := range targets.Targets {
-		for _, pod := range target.Pods {
-			claimed.Insert(shardingActionClaimKey(actionName, pod.Name))
-		}
-	}
-
 	if changed {
-		if err := setShardingActionTargets(sourceComp, targetsAnnotation, targets); err != nil {
+		if err := setShardingActionState(transCtx, dag, sourceComp, stateAnnotation, targets); err != nil {
 			return err
 		}
 		return ictrlutil.NewDelayedRequeueError(3*time.Second,
@@ -1641,25 +1693,17 @@ func (h *clusterShardingHandler) nonBlockingShardingAction(transCtx *clusterTran
 		compByName[comp.Name] = comp
 	}
 
-	var terminalErrors, otherErrors []error
-	pending := false
 	targetsChanged := false
 	for i := range targets.Targets {
 		target := &targets.Targets[i]
 		targetComp := compByName[target.Component]
 		lfa, err := h.newLifecycle(transCtx, targetComp)
 		if err != nil {
-			otherErrors = append(otherErrors,
-				fmt.Errorf("prepare action %s for shard %s: %w", actionName, target.Component, err))
-			continue
+			return fmt.Errorf("prepare action %s for shard %s: %w", actionName, target.Component, err)
 		}
 		for j := range target.Pods {
 			pod := &target.Pods[j]
 			rerun := pod.Rerun
-			if rerun {
-				pod.Rerun = false
-				targetsChanged = true
-			}
 			opts := &lifecycle.Options{
 				Rerun:         rerun,
 				TargetPodName: pod.Name,
@@ -1668,33 +1712,49 @@ func (h *clusterShardingHandler) nonBlockingShardingAction(transCtx *clusterTran
 			}
 			err := lfa.UserDefined(transCtx.Context, transCtx.Client, opts, actionName, &action.Action, args)
 			if lifecycle.IgnoreNotDefined(err) == nil {
+				if pod.Rerun {
+					pod.Rerun = false
+					targetsChanged = true
+				}
 				continue
 			}
 			wrapped := fmt.Errorf("action %s on pod %s: %w", actionName, pod.Name, err)
 			switch {
-			case errors.Is(err, lifecycle.ErrActionInProgress), errors.Is(err, lifecycle.ErrActionBusy):
-				pending = true
+			case errors.Is(err, lifecycle.ErrActionInProgress):
+				if pod.Rerun {
+					pod.Rerun = false
+					targetsChanged = true
+				}
+				if targetsChanged {
+					if err := setShardingActionState(transCtx, dag, sourceComp, stateAnnotation, targets); err != nil {
+						return err
+					}
+				}
+				return ictrlutil.NewDelayedRequeueError(3*time.Second,
+					fmt.Sprintf("action %s is still running on pod %s", actionName, pod.Name))
+			case errors.Is(err, lifecycle.ErrActionBusy):
+				// A rerun request has not been accepted while the previous call is
+				// still running. Keep Rerun set and try again after that call reaches
+				// a terminal result.
+				return ictrlutil.NewDelayedRequeueError(3*time.Second,
+					fmt.Sprintf("action %s is busy on pod %s", actionName, pod.Name))
 			case isTerminalShardingActionError(err):
 				pod.Rerun = true
 				targetsChanged = true
-				terminalErrors = append(terminalErrors, wrapped)
+				if err := setShardingActionState(transCtx, dag, sourceComp, stateAnnotation, targets); err != nil {
+					return err
+				}
+				return wrapped
 			default:
-				otherErrors = append(otherErrors, wrapped)
+				return wrapped
 			}
 		}
 	}
 
 	if targetsChanged {
-		if err := setShardingActionTargets(sourceComp, targetsAnnotation, targets); err != nil {
+		if err := setShardingActionState(transCtx, dag, sourceComp, stateAnnotation, targets); err != nil {
 			return err
 		}
-	}
-	if len(terminalErrors) > 0 || len(otherErrors) > 0 {
-		return errors.Join(append(terminalErrors, otherErrors...)...)
-	}
-	if pending {
-		return ictrlutil.NewDelayedRequeueError(3*time.Second,
-			fmt.Sprintf("action %s is still running", actionName))
 	}
 	return nil
 }
@@ -1705,14 +1765,10 @@ func isTerminalShardingActionError(err error) bool {
 		errors.Is(err, lifecycle.ErrActionInternalError)
 }
 
-func shardingActionClaimKey(actionName, podName string) string {
-	return actionName + "\x00" + podName
-}
-
-func (h *clusterShardingHandler) resolveShardingActionTargets(transCtx *clusterTransformContext,
-	action *appsv1.ShardingAction, targetsAnnotation string, runningComps []*appsv1.Component,
+func (h *clusterShardingHandler) resolveShardingActionTargets(transCtx *clusterTransformContext, dag *graph.DAG,
+	action *appsv1.ShardingAction, stateAnnotation string, runningComps []*appsv1.Component,
 	sourceComp *appsv1.Component) (*shardingActionTargets, bool, error) {
-	targets, found, err := getShardingActionTargets(sourceComp, targetsAnnotation)
+	targets, found, err := getShardingActionState(transCtx, dag, sourceComp, stateAnnotation)
 	if err != nil {
 		return nil, false, err
 	}
@@ -1730,12 +1786,8 @@ func (h *clusterShardingHandler) resolveShardingActionTargets(transCtx *clusterT
 		target := &targets.Targets[i]
 		targetComp := compByName[target.Component]
 		if targetComp == nil {
-			selected, err := h.selectShardingActionTargets(transCtx, action, runningComps, sourceComp)
-			if err != nil {
-				return nil, false, err
-			}
-			carryShardingActionRerun(targets, selected)
-			return selected, true, nil
+			return nil, false, ictrlutil.NewDelayedRequeueError(3*time.Second,
+				fmt.Sprintf("waiting for target shard %s to be available", target.Component))
 		}
 
 		pods, err := component.ListOwnedInstances(transCtx.Context, transCtx.Client, targetComp)
@@ -1746,24 +1798,37 @@ func (h *clusterShardingHandler) resolveShardingActionTargets(transCtx *clusterT
 		for _, pod := range pods {
 			existing.Insert(pod.Name)
 		}
-		missing := false
+		present := make([]shardingActionTargetPod, 0, len(target.Pods))
 		for _, pod := range target.Pods {
-			if !existing.Has(pod.Name) {
-				missing = true
-				break
+			if existing.Has(pod.Name) {
+				present = append(present, pod)
 			}
 		}
-		if !missing {
+		missing := len(target.Pods) - len(present)
+		if missing == 0 {
 			continue
 		}
 
 		selectedPods, err := selectShardingActionPods(action, pods, targetComp.Name)
 		if err != nil {
-			return nil, false, err
+			return nil, false, ictrlutil.NewDelayedRequeueError(3*time.Second,
+				fmt.Sprintf("waiting to restore targets for shard %s: %v", targetComp.Name, err))
 		}
-		reselect := shardingActionTarget{Component: target.Component, Pods: selectedPods}
-		carryShardingActionTargetRerun(*target, &reselect)
-		*target = reselect
+		presentNames := sets.New[string]()
+		for _, pod := range present {
+			presentNames.Insert(pod.Name)
+		}
+		replacements := make([]shardingActionTargetPod, 0, missing)
+		for _, pod := range selectedPods {
+			if !presentNames.Has(pod.Name) {
+				replacements = append(replacements, pod)
+			}
+		}
+		if len(replacements) < missing {
+			return nil, false, ictrlutil.NewDelayedRequeueError(3*time.Second,
+				fmt.Sprintf("waiting to restore %d target pods for shard %s", missing, targetComp.Name))
+		}
+		target.Pods = append(present, replacements[:missing]...)
 		changed = true
 	}
 	return targets, changed, nil
@@ -1812,27 +1877,14 @@ func selectShardingActionPods(action *appsv1.ShardingAction, pods []*corev1.Pod,
 	}
 	targets := make([]shardingActionTargetPod, 0, len(selected))
 	for _, pod := range selected {
-		targets = append(targets, shardingActionTargetPod{Name: pod.Name})
+		// A newly snapshotted participant represents a new controller request,
+		// so it must not reuse a terminal result cached for an older request.
+		targets = append(targets, shardingActionTargetPod{Name: pod.Name, Rerun: true})
 	}
 	sort.Slice(targets, func(i, j int) bool {
 		return targets[i].Name < targets[j].Name
 	})
 	return targets, nil
-}
-
-func getShardingActionTargets(comp *appsv1.Component, annotation string) (*shardingActionTargets, bool, error) {
-	value, found := comp.Annotations[annotation]
-	if !found {
-		return nil, false, nil
-	}
-	targets := &shardingActionTargets{}
-	if err := json.Unmarshal([]byte(value), targets); err != nil {
-		return nil, false, fmt.Errorf("invalid %s annotation on component %s: %w", annotation, comp.Name, err)
-	}
-	if err := validateShardingActionTargets(targets); err != nil {
-		return nil, false, fmt.Errorf("invalid %s annotation on component %s: %w", annotation, comp.Name, err)
-	}
-	return targets, true, nil
 }
 
 func validateShardingActionTargets(targets *shardingActionTargets) error {
@@ -1866,51 +1918,6 @@ func validateShardingActionTargets(targets *shardingActionTargets) error {
 		}
 	}
 	return nil
-}
-
-func setShardingActionTargets(comp *appsv1.Component, annotation string,
-	targets *shardingActionTargets) error {
-	sort.Slice(targets.Targets, func(i, j int) bool {
-		return targets.Targets[i].Component < targets.Targets[j].Component
-	})
-	for i := range targets.Targets {
-		sort.Slice(targets.Targets[i].Pods, func(j, k int) bool {
-			return targets.Targets[i].Pods[j].Name < targets.Targets[i].Pods[k].Name
-		})
-	}
-	data, err := json.Marshal(targets)
-	if err != nil {
-		return err
-	}
-	if comp.Annotations == nil {
-		comp.Annotations = map[string]string{}
-	}
-	comp.Annotations[annotation] = string(data)
-	return nil
-}
-
-func carryShardingActionRerun(from, to *shardingActionTargets) {
-	oldTargets := make(map[string]shardingActionTarget, len(from.Targets))
-	for _, target := range from.Targets {
-		oldTargets[target.Component] = target
-	}
-	for i := range to.Targets {
-		if old, ok := oldTargets[to.Targets[i].Component]; ok {
-			carryShardingActionTargetRerun(old, &to.Targets[i])
-		}
-	}
-}
-
-func carryShardingActionTargetRerun(from shardingActionTarget, to *shardingActionTarget) {
-	rerun := sets.New[string]()
-	for _, pod := range from.Pods {
-		if pod.Rerun {
-			rerun.Insert(pod.Name)
-		}
-	}
-	for i := range to.Pods {
-		to.Pods[i].Rerun = rerun.Has(to.Pods[i].Name)
-	}
 }
 
 func (h *clusterShardingHandler) shardingDef(transCtx *clusterTransformContext, name string) *appsv1.ShardingDefinition {

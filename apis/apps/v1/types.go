@@ -562,6 +562,7 @@ type ClusterComponentConfig struct {
 	Reconfigure *bool `json:"reconfigure,omitempty"`
 
 	// The custom reconfigure action to apply the updated configuration.
+	// Reconfigure actions support blocking mode only.
 	//
 	// The container executing this action has access to following variables:
 	//

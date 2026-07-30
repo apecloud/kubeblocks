@@ -352,6 +352,7 @@ type ComponentSpec struct {
 	EnableInstanceAPI *bool `json:"enableInstanceAPI,omitempty"`
 
 	// Specifies custom actions that can be performed on the Component.
+	// User-defined custom actions support blocking mode only.
 	//
 	// +optional
 	CustomActions []CustomAction `json:"customActions,omitempty"`

@@ -195,6 +195,10 @@ type ShardingLifecycleActions struct {
 	//
 	// - KB_ADD_SHARD_NAME: The name of the shard being added.
 	//
+	// This Action supports both blocking and non-blocking modes. KubeBlocks does
+	// not finish adding the shard until the Action has succeeded on every
+	// selected target shard and Pod.
+	//
 	// Note: This field is immutable once it has been set.
 	//
 	// +optional
@@ -205,6 +209,10 @@ type ShardingLifecycleActions struct {
 	// The container executing this action has access to following variables:
 	//
 	// - KB_REMOVE_SHARD_NAME: The name of the shard being removed.
+	//
+	// This Action supports both blocking and non-blocking modes. KubeBlocks does
+	// not remove the shard until the Action has succeeded on every selected
+	// target shard and Pod.
 	//
 	// Note: This field is immutable once it has been set.
 	//

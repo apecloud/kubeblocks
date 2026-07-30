@@ -34,6 +34,7 @@ import (
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	ctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
@@ -99,6 +100,69 @@ var _ = Describe("ComponentDefinition Controller", func() {
 					g.Expect(cmpd.Status.ObservedGeneration).Should(Equal(cmpd.GetGeneration()))
 					g.Expect(cmpd.Status.Phase).Should(Equal(kbappsv1.AvailablePhase))
 				})).Should(Succeed())
+		})
+	})
+
+	Context("non-blocking actions", func() {
+		It("rejects non-blocking mode from every ComponentDefinition action entry", func() {
+			testCases := []struct {
+				path string
+				set  func(*kbappsv1.ComponentDefinitionSpec)
+			}{
+				{"spec.lifecycleActions.postProvision", func(spec *kbappsv1.ComponentDefinitionSpec) {
+					spec.LifecycleActions = &kbappsv1.ComponentLifecycleActions{PostProvision: &kbappsv1.Action{NonBlocking: true}}
+				}},
+				{"spec.lifecycleActions.preTerminate", func(spec *kbappsv1.ComponentDefinitionSpec) {
+					spec.LifecycleActions = &kbappsv1.ComponentLifecycleActions{PreTerminate: &kbappsv1.Action{NonBlocking: true}}
+				}},
+				{"spec.lifecycleActions.roleProbe", func(spec *kbappsv1.ComponentDefinitionSpec) {
+					spec.LifecycleActions = &kbappsv1.ComponentLifecycleActions{RoleProbe: &kbappsv1.Probe{Action: kbappsv1.Action{NonBlocking: true}}}
+				}},
+				{"spec.lifecycleActions.availableProbe", func(spec *kbappsv1.ComponentDefinitionSpec) {
+					spec.LifecycleActions = &kbappsv1.ComponentLifecycleActions{AvailableProbe: &kbappsv1.Probe{Action: kbappsv1.Action{NonBlocking: true}}}
+				}},
+				{"spec.lifecycleActions.switchover", func(spec *kbappsv1.ComponentDefinitionSpec) {
+					spec.LifecycleActions = &kbappsv1.ComponentLifecycleActions{Switchover: &kbappsv1.Action{NonBlocking: true}}
+				}},
+				{"spec.lifecycleActions.memberJoin", func(spec *kbappsv1.ComponentDefinitionSpec) {
+					spec.LifecycleActions = &kbappsv1.ComponentLifecycleActions{MemberJoin: &kbappsv1.Action{NonBlocking: true}}
+				}},
+				{"spec.lifecycleActions.memberLeave", func(spec *kbappsv1.ComponentDefinitionSpec) {
+					spec.LifecycleActions = &kbappsv1.ComponentLifecycleActions{MemberLeave: &kbappsv1.Action{NonBlocking: true}}
+				}},
+				{"spec.lifecycleActions.readonly", func(spec *kbappsv1.ComponentDefinitionSpec) {
+					spec.LifecycleActions = &kbappsv1.ComponentLifecycleActions{Readonly: &kbappsv1.Action{NonBlocking: true}}
+				}},
+				{"spec.lifecycleActions.readwrite", func(spec *kbappsv1.ComponentDefinitionSpec) {
+					spec.LifecycleActions = &kbappsv1.ComponentLifecycleActions{Readwrite: &kbappsv1.Action{NonBlocking: true}}
+				}},
+				{"spec.lifecycleActions.dataDump", func(spec *kbappsv1.ComponentDefinitionSpec) {
+					spec.LifecycleActions = &kbappsv1.ComponentLifecycleActions{DataDump: &kbappsv1.Action{NonBlocking: true}}
+				}},
+				{"spec.lifecycleActions.dataLoad", func(spec *kbappsv1.ComponentDefinitionSpec) {
+					spec.LifecycleActions = &kbappsv1.ComponentLifecycleActions{DataLoad: &kbappsv1.Action{NonBlocking: true}}
+				}},
+				{"spec.lifecycleActions.reconfigure", func(spec *kbappsv1.ComponentDefinitionSpec) {
+					spec.LifecycleActions = &kbappsv1.ComponentLifecycleActions{Reconfigure: &kbappsv1.Action{NonBlocking: true}}
+				}},
+				{"spec.lifecycleActions.accountProvision", func(spec *kbappsv1.ComponentDefinitionSpec) {
+					spec.LifecycleActions = &kbappsv1.ComponentLifecycleActions{AccountProvision: &kbappsv1.Action{NonBlocking: true}}
+				}},
+				{"spec.configs[0].reconfigure", func(spec *kbappsv1.ComponentDefinitionSpec) {
+					spec.Configs = []kbappsv1.ComponentFileTemplate{{Reconfigure: &kbappsv1.Action{NonBlocking: true}}}
+				}},
+				{"spec.scripts[0].reconfigure", func(spec *kbappsv1.ComponentDefinitionSpec) {
+					spec.Scripts = []kbappsv1.ComponentFileTemplate{{Reconfigure: &kbappsv1.Action{NonBlocking: true}}}
+				}},
+			}
+
+			reconciler := &ComponentDefinitionReconciler{}
+			for _, testCase := range testCases {
+				cmpd := &kbappsv1.ComponentDefinition{}
+				testCase.set(&cmpd.Spec)
+				err := reconciler.validateLifecycleActions(nil, ctrlutil.RequestCtx{}, cmpd)
+				Expect(err).Should(MatchError(ContainSubstring(testCase.path)), testCase.path)
+			}
 		})
 	})
 

@@ -30,7 +30,12 @@ import (
 )
 
 type Options struct {
-	Rerun                      bool
+	Rerun bool
+
+	// TargetPodName, when set, executes the Action only on the named Pod and
+	// bypasses the Action's targetPodSelector. It is used internally after a
+	// controller has persisted the selected target.
+	TargetPodName              string
 	TimeoutSeconds             *int32
 	RetryPolicy                *appsv1.RetryPolicy
 	Arguments                  [][]string

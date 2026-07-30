@@ -300,9 +300,7 @@ func (a *kbagent) buildActionRequest(ctx context.Context, cli client.Reader, lfa
 		Parameters: parameters,
 	}
 	if opts != nil {
-		if opts.NonBlocking != nil {
-			req.NonBlocking = opts.NonBlocking
-		}
+		req.Rerun = opts.Rerun
 		if opts.TimeoutSeconds != nil {
 			req.TimeoutSeconds = opts.TimeoutSeconds
 		}

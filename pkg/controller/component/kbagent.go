@@ -392,6 +392,7 @@ func buildAction4KBAgent(action *appsv1.Action, name string) *proto.Action {
 	}
 	a := &proto.Action{
 		Name:           name,
+		NonBlocking:    action.NonBlocking,
 		TimeoutSeconds: action.TimeoutSeconds,
 	}
 	if action.Exec != nil {

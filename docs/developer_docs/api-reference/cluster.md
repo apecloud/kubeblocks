@@ -2491,6 +2491,24 @@ The selector is considered ambiguous and the action fails if multiple Pods share
 </tr>
 <tr>
 <td>
+<code>nonBlocking</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies how KubeBlocks runs the Action.</p>
+<p>When false, KubeBlocks runs the Action in blocking mode. This mode is suitable
+for Actions that are expected to complete quickly.</p>
+<p>When true, KubeBlocks runs the Action in non-blocking mode. This mode is
+suitable for long-running Actions, such as data migration, rebalancing, or
+draining, whose duration depends on data volume or runtime conditions.</p>
+<p>This field cannot be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>timeoutSeconds</code><br/>
 <em>
 int32
@@ -2500,7 +2518,11 @@ int32
 <em>(Optional)</em>
 <p>Specifies the maximum duration in seconds that the Action is allowed to run.</p>
 <p>Behavior based on the value:
-- Positive (&gt; 0): The action will be terminated after this many seconds. The maximum allowed value is 60.
+- Positive (&gt; 0): The action will be terminated after this many seconds.
+  Blocking Actions are capped at 60 seconds. Non-blocking Actions use the
+  configured value as their total run timeout, including all runtime
+  argument invocations, retry attempts, and retry intervals, without the
+  60-second cap.
 - Zero (= 0): The timeout is managed by the system, defaulting to 30 seconds typically.
 - Negative (&lt; 0): No timeout is applied; the action runs until the command completes.</p>
 <p>This field cannot be updated.</p>

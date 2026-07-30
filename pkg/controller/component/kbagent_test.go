@@ -203,6 +203,26 @@ var _ = Describe("kb-agent", func() {
 			Expect(postProvision.RetryPolicy.RetryInterval).Should(Equal(10 * time.Second))
 		})
 
+		It("configures non-blocking actions", func() {
+			synthesizedComp.LifecycleActions.CustomActions[0].Action.NonBlocking = true
+
+			Expect(buildKBAgentContainer(synthesizedComp)).Should(Succeed())
+
+			c := kbAgentContainer()
+			Expect(c).ShouldNot(BeNil())
+
+			var actions []proto.Action
+			for _, e := range c.Env {
+				if e.Name == "KB_AGENT_ACTION" {
+					Expect(json.Unmarshal([]byte(e.Value), &actions)).Should(Succeed())
+				}
+			}
+			Expect(actions).Should(ContainElement(And(
+				HaveField("Name", "udf-shardAdd"),
+				HaveField("NonBlocking", true),
+			)))
+		})
+
 		It("role label downward api volume", func() {
 			err := buildKBAgentContainer(synthesizedComp)
 			Expect(err).Should(BeNil())

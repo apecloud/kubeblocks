@@ -1901,10 +1901,29 @@ type Action struct {
 	// +optional
 	MatchingKey string `json:"matchingKey,omitempty"`
 
+	// Specifies how KubeBlocks runs the Action.
+	//
+	// When false, KubeBlocks runs the Action in blocking mode. This mode is suitable
+	// for Actions that are expected to complete quickly.
+	//
+	// When true, KubeBlocks runs the Action in non-blocking mode. This mode is
+	// suitable for long-running Actions, such as data migration, rebalancing, or
+	// draining, whose duration depends on data volume or runtime conditions.
+	//
+	// This field cannot be updated.
+	//
+	// +kubebuilder:default=false
+	// +optional
+	NonBlocking bool `json:"nonBlocking,omitempty"`
+
 	// Specifies the maximum duration in seconds that the Action is allowed to run.
 	//
 	// Behavior based on the value:
-	// - Positive (> 0): The action will be terminated after this many seconds. The maximum allowed value is 60.
+	// - Positive (> 0): The action will be terminated after this many seconds.
+	//   Blocking Actions are capped at 60 seconds. Non-blocking Actions use the
+	//   configured value as their total run timeout, including all runtime
+	//   argument invocations, retry attempts, and retry intervals, without the
+	//   60-second cap.
 	// - Zero (= 0): The timeout is managed by the system, defaulting to 30 seconds typically.
 	// - Negative (< 0): No timeout is applied; the action runs until the command completes.
 	//

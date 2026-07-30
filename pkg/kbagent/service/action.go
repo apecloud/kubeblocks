@@ -276,12 +276,18 @@ func callActionWithRetryOnceCap(ctx context.Context, action *proto.Action, param
 
 	interval := retryPolicy.RetryInterval
 	for i := 0; i < retryPolicy.MaxRetries; i++ {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		if interval > 0 {
 			select {
 			case <-ctx.Done():
 				return nil, ctx.Err()
 			case <-time.After(interval):
 			}
+		}
+		if err := ctx.Err(); err != nil {
+			return nil, err
 		}
 		output, err = blockingCallActionWithTimeoutCap(ctx, action, parameters, arguments, timeout, capTimeout)
 		if err == nil {

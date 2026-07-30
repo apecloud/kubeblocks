@@ -231,6 +231,20 @@ var _ = Describe("action", func() {
 			Expect(string(counter)).Should(Equal("1\n"))
 		})
 
+		It("stops zero-interval retries after the context is canceled", func() {
+			action := &proto.Action{
+				Exec: &proto.ExecAction{
+					Commands: []string{"/bin/false"},
+				},
+			}
+			retryPolicy := &proto.RetryPolicy{MaxRetries: 3}
+			canceledCtx, cancel := context.WithCancel(ctx)
+			cancel()
+
+			_, err := callActionWithRetry(canceledCtx, action, nil, nil, nil, retryPolicy)
+			Expect(errors.Is(err, context.Canceled)).Should(BeTrue())
+		})
+
 		It("normalizes equivalent requests when calculating their fingerprint", func() {
 			timeout := int32(0)
 			first := &proto.ActionRequest{

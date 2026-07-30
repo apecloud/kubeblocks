@@ -2498,11 +2498,12 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies whether the Action runs in non-blocking mode.</p>
-<p>When false, the Action runs in blocking mode and the call waits for completion.
-When true, the Action runs in non-blocking mode and the call returns an
-in-progress result while the Action continues to run. Callers can invoke the
-Action again to observe its result.</p>
+<p>Specifies how KubeBlocks runs the Action.</p>
+<p>When false, KubeBlocks runs the Action in blocking mode. This mode is suitable
+for Actions that are expected to complete quickly.</p>
+<p>When true, KubeBlocks runs the Action in non-blocking mode. This mode is
+suitable for long-running Actions, such as data migration, rebalancing, or
+draining, whose duration depends on data volume or runtime conditions.</p>
 <p>This field cannot be updated.</p>
 </td>
 </tr>

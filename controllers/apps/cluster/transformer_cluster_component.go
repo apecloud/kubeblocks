@@ -251,7 +251,13 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1.Component) *appsv1.Com
 	}
 
 	// Merge metadata
-	ictrlutil.MergeMetadataMapInplace(compProto.Annotations, &compObjCopy.Annotations)
+	protoAnnotations := compProto.Annotations
+	if oldCompObj.Annotations[constant.RestoreDoneAnnotationKey] == "true" {
+		// the component has finished the restore, don't inherit the restore annotation from the cluster anymore,
+		// otherwise the restore flow will be re-triggered repeatedly and cause a reconcile loop
+		delete(protoAnnotations, constant.RestoreFromBackupAnnotationKey)
+	}
+	ictrlutil.MergeMetadataMapInplace(protoAnnotations, &compObjCopy.Annotations)
 	ictrlutil.MergeMetadataMapInplace(compProto.Labels, &compObjCopy.Labels)
 
 	// Merge all spec fields

@@ -707,6 +707,10 @@ func (r *BackupReconciler) handleRunningPhase(
 			}
 		}
 	}
+	if existFailedAction {
+		return r.updateStatusIfFailed(reqCtx, backup, request.Backup,
+			fmt.Errorf("there are failed actions, you can obtain the more information in the status.actions"))
+	}
 	if waiting {
 		// reset time related fields for continuous backup
 		request.Status.CompletionTimestamp = nil
@@ -720,10 +724,6 @@ func (r *BackupReconciler) handleRunningPhase(
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		}
 		return intctrlutil.Reconciled()
-	}
-	if existFailedAction {
-		return r.updateStatusIfFailed(reqCtx, backup, request.Backup,
-			fmt.Errorf("there are failed actions, you can obtain the more information in the status.actions"))
 	}
 	return r.completeBackup(reqCtx, backup, request.Backup)
 }
@@ -779,6 +779,14 @@ func (r *BackupReconciler) syncJobActions(ctx context.Context,
 			actionStatus.Phase = dpv1alpha1.ActionPhaseFailed
 			failed = true
 		default:
+			canContinue, err := r.jobHasRunningOrSucceededPod(ctx, job)
+			if err != nil {
+				return false, false, intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue,
+					"sync backup job pods failed: %v", err)
+			}
+			if !canContinue {
+				return false, false, targetErr
+			}
 			actionStatus.Phase = dpv1alpha1.ActionPhaseRunning
 			actionStatus.CompletionTimestamp = nil
 			waiting = true
@@ -792,6 +800,23 @@ func (r *BackupReconciler) syncJobActions(ctx context.Context,
 	}
 	updateBackupStatusByActionStatus(&backup.Status)
 	return waiting, failed, nil
+}
+
+func (r *BackupReconciler) jobHasRunningOrSucceededPod(ctx context.Context, job *batchv1.Job) (bool, error) {
+	pods, err := dputils.GetAssociatedPodsOfJob(ctx, r.Client, job.Namespace, job.Name)
+	if err != nil {
+		return false, err
+	}
+	for i := range pods.Items {
+		pod := &pods.Items[i]
+		if !metav1.IsControlledBy(pod, job) {
+			continue
+		}
+		if pod.Status.Phase == corev1.PodRunning || pod.Status.Phase == corev1.PodSucceeded {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func (r *BackupReconciler) completeBackup(reqCtx intctrlutil.RequestCtx,

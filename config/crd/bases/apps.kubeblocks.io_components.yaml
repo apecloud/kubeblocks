@@ -645,6 +645,9 @@ spec:
                         managed configuration templates.
                       type: object
                   type: object
+                  x-kubernetes-validations:
+                  - message: reconfigureAction does not support non-blocking mode
+                    rule: '!has(self.reconfigureAction) || !self.reconfigureAction.nonBlocking'
                 type: array
               customActions:
                 description: |-
@@ -1102,6 +1105,10 @@ spec:
                   - action
                   - name
                   type: object
+                  x-kubernetes-validations:
+                  - message: custom actions do not support non-blocking mode
+                    rule: self.name in ['shardingShardAdd', 'shardingShardRemove']
+                      || !self.action.nonBlocking
                 type: array
               disableExporter:
                 description: |-

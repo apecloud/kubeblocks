@@ -418,6 +418,7 @@ type Sidecar struct {
 	SidecarDef string `json:"sidecarDef"`
 }
 
+// +kubebuilder:validation:XValidation:rule="self.name in ['shardingShardAdd', 'shardingShardRemove'] || !self.action.nonBlocking",message="custom actions do not support non-blocking mode"
 type CustomAction struct {
 	// Name specifies the unique name of the custom action.
 	//

@@ -763,6 +763,10 @@ spec:
                               render managed configuration templates.
                             type: object
                         type: object
+                        x-kubernetes-validations:
+                        - message: reconfigureAction does not support non-blocking
+                            mode
+                          rule: '!has(self.reconfigureAction) || !self.reconfigureAction.nonBlocking'
                       type: array
                     disableExporter:
                       description: |-
@@ -12018,6 +12022,10 @@ spec:
                                   to render managed configuration templates.
                                 type: object
                             type: object
+                            x-kubernetes-validations:
+                            - message: reconfigureAction does not support non-blocking
+                                mode
+                              rule: '!has(self.reconfigureAction) || !self.reconfigureAction.nonBlocking'
                           type: array
                         disableExporter:
                           description: |-

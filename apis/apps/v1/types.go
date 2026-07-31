@@ -514,6 +514,8 @@ type ProvisionSecretRef struct {
 }
 
 // ClusterComponentConfig represents a configuration for a component.
+//
+// +kubebuilder:validation:XValidation:rule="!has(self.reconfigureAction) || !self.reconfigureAction.nonBlocking",message="reconfigureAction does not support non-blocking mode"
 type ClusterComponentConfig struct {
 	// The name of the config.
 	//

@@ -20,6 +20,9 @@ along with KubeBlocks.  If not, see <http://www.gnu.org/licenses/>.
 package cluster
 
 import (
+	"bytes"
+	"compress/gzip"
+	"encoding/base64"
 	"fmt"
 	"strings"
 	"testing"
@@ -87,5 +90,27 @@ func TestShardingActionTargetsAnnotationKeepsSmallSnapshotsReadable(t *testing.T
 	}
 	if value := comp.Annotations[shardingAddActionTargetsKey]; strings.HasPrefix(value, shardingActionTargetsGZIPPrefix) {
 		t.Fatalf("small target snapshot should remain readable: %q", value)
+	}
+}
+
+func TestShardingActionTargetsAnnotationRejectsOversizedDecodedData(t *testing.T) {
+	var compressed bytes.Buffer
+	writer := gzip.NewWriter(&compressed)
+	if _, err := writer.Write(bytes.Repeat([]byte("x"), shardingActionTargetsMaxDecodedSize+1)); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	comp := &appsv1.Component{}
+	comp.Name = "source"
+	comp.Annotations = map[string]string{
+		shardingAddActionTargetsKey: shardingActionTargetsGZIPPrefix +
+			base64.StdEncoding.EncodeToString(compressed.Bytes()),
+	}
+	_, _, err := getShardingActionTargets(comp, shardingAddActionTargetsKey)
+	if err == nil || !strings.Contains(err.Error(), "decoded data exceeds") {
+		t.Fatalf("getShardingActionTargets() error = %v", err)
 	}
 }

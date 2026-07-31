@@ -34,7 +34,10 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
-const shardingActionTargetsGZIPPrefix = "gzip:"
+const (
+	shardingActionTargetsGZIPPrefix     = "gzip:"
+	shardingActionTargetsMaxDecodedSize = 16 << 20
+)
 
 func getShardingActionTargets(comp *appsv1.Component, annotation string) (*shardingActionTargets, bool, error) {
 	value, found := comp.Annotations[annotation]
@@ -52,13 +55,17 @@ func getShardingActionTargets(comp *appsv1.Component, annotation string) (*shard
 		if err != nil {
 			return nil, false, fmt.Errorf("invalid %s annotation on component %s: %w", annotation, comp.Name, err)
 		}
-		data, err = io.ReadAll(reader)
+		data, err = io.ReadAll(io.LimitReader(reader, shardingActionTargetsMaxDecodedSize+1))
 		closeErr := reader.Close()
 		if err != nil {
 			return nil, false, fmt.Errorf("invalid %s annotation on component %s: %w", annotation, comp.Name, err)
 		}
 		if closeErr != nil {
 			return nil, false, fmt.Errorf("invalid %s annotation on component %s: %w", annotation, comp.Name, closeErr)
+		}
+		if len(data) > shardingActionTargetsMaxDecodedSize {
+			return nil, false, fmt.Errorf("invalid %s annotation on component %s: decoded data exceeds %d bytes",
+				annotation, comp.Name, shardingActionTargetsMaxDecodedSize)
 		}
 	}
 

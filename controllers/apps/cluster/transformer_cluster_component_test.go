@@ -2625,7 +2625,7 @@ var _ = Describe("cluster component transformer test", func() {
 					[]shardingActionTargetPod{{Name: "replacement-0", Rerun: true}}))
 			})
 
-			It("reselects only a missing shard target", func() {
+			It("keeps the snapshotted shard identity while the target is missing", func() {
 				retained, retainedPods := buildShard("shard-0", "shard-0-0")
 				replacement, replacementPods := buildShard("shard-2", "shard-2-0")
 				source := retained
@@ -2652,18 +2652,16 @@ var _ = Describe("cluster component transformer test", func() {
 				resolved, changed, err := (&clusterShardingHandler{}).resolveShardingActionTargets(
 					transCtx, shardAction, shardingAddActionTargetsKey,
 					[]*appsv1.Component{replacement, retained}, source)
+				Expect(ictrlutil.IsDelayedRequeueError(err)).Should(BeTrue())
+				Expect(changed).Should(BeFalse())
+				Expect(resolved).Should(BeNil())
+
+				persisted, _, err := getShardingActionTargets(source, shardingAddActionTargetsKey)
 				Expect(err).Should(BeNil())
-				Expect(changed).Should(BeTrue())
-				Expect(resolved.Targets).Should(ConsistOf(
-					shardingActionTarget{
-						Component: retained.Name,
-						Pods:      []shardingActionTargetPod{{Name: retainedPods[0].Name}},
-					},
-					shardingActionTarget{
-						Component: replacement.Name,
-						Pods:      []shardingActionTargetPod{{Name: replacementPods[0].Name, Rerun: true}},
-					},
-				))
+				Expect([]string{
+					persisted.Targets[0].Component,
+					persisted.Targets[1].Component,
+				}).Should(ConsistOf(retained.Name, "shard-1"))
 			})
 
 			It("does not shrink participants while a replacement pod is unavailable", func() {
@@ -2729,6 +2727,42 @@ var _ = Describe("cluster component transformer test", func() {
 				for _, obj := range graphCli.FindAll(dag, &appsv1.Component{}) {
 					Expect(obj.(*appsv1.Component).Spec.Replicas).ShouldNot(Equal(int32(1)))
 				}
+			})
+
+			It("recreates a desired snapshotted target while other topology updates remain frozen", func() {
+				source, pod := mockShardCompWithPod(appsv1.RunningComponentPhase, map[string]string{
+					constant.KBAppClusterUIDKey: "test-uid",
+					shardingAddShardKey:         "pending",
+				})
+				missingSpec := transCtx.shardingCompsWithTpl[sharding1aName][""][0].DeepCopy()
+				missingSpec.Name = "missing"
+				transCtx.shardingCompsWithTpl[sharding1aName][""] =
+					append(transCtx.shardingCompsWithTpl[sharding1aName][""], missingSpec)
+				missingName := component.FullName(transCtx.Cluster.Name, missingSpec.Name)
+				Expect(setShardingActionTargets(source, shardingAddActionTargetsKey, &shardingActionTargets{
+					Version: shardingActionTargetsVersion,
+					Targets: []shardingActionTarget{{
+						Component: missingName,
+						Pods:      []shardingActionTargetPod{{Name: missingName + "-0"}},
+					}},
+				})).Should(Succeed())
+				transCtx.Client = model.NewGraphClient(&appsutil.MockReader{
+					Objects: []client.Object{source, pod},
+				})
+				transCtx.shardingDefs[shardingDefName].Spec.LifecycleActions = &appsv1.ShardingLifecycleActions{
+					ShardAdd: action(),
+				}
+
+				err := transformer.Transform(transCtx, dag)
+				Expect(ictrlutil.IsDelayedRequeueError(err)).Should(BeTrue())
+				graphCli := transCtx.Client.(model.GraphClient)
+				created := false
+				for _, obj := range graphCli.FindAll(dag, &appsv1.Component{}) {
+					if obj.(*appsv1.Component).Name == missingName {
+						created = true
+					}
+				}
+				Expect(created).Should(BeTrue())
 			})
 
 			It("keeps rerun set while the previous request is busy", func() {
@@ -2871,7 +2905,7 @@ var _ = Describe("cluster component transformer test", func() {
 				Expect(callCount).Should(Equal(1))
 			})
 
-			It("allows requests with disjoint target pods to progress together", func() {
+			It("serializes source-shard requests even when their execution pods are disjoint", func() {
 				target0, pods0 := buildShard("target-0", "target-0-0")
 				target1, pods1 := buildShard("target-1", "target-1-0")
 				source0, _ := buildShard("source-0")
@@ -2901,7 +2935,7 @@ var _ = Describe("cluster component transformer test", func() {
 							return kbagentproto.ActionResponse{
 								Error: kbagentproto.Error2Type(kbagentproto.ErrInProgress),
 							}, nil
-						}).Times(2)
+						}).Times(1)
 				})
 
 				claimed := sets.New[string]()
@@ -2914,7 +2948,7 @@ var _ = Describe("cluster component transformer test", func() {
 					transCtx, sharding1aName, shardingAddShardAction, shardingAddActionTargetsKey,
 					action(), nil, []*appsv1.Component{target0, target1}, source1, claimed)
 				Expect(ictrlutil.IsDelayedRequeueError(err)).Should(BeTrue())
-				Expect(callCount).Should(Equal(2))
+				Expect(callCount).Should(Equal(1))
 			})
 
 			It("prioritizes persisted requests and preserves shard business gates", func() {

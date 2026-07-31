@@ -831,6 +831,7 @@ const (
 	shardingAddShardKey            = "kubeblocks.io/sharding-add-shard"
 	shardingAddActionTargetsKey    = "kubeblocks.io/sharding-add-action-targets"
 	shardingRemoveActionTargetsKey = "kubeblocks.io/sharding-remove-action-targets"
+	shardingActionRequestClaimKey  = "sharding-action-request"
 
 	shardingPostProvisionAction = "shardingPostProvision"
 	shardingPreTerminateAction  = "shardingPreTerminate"
@@ -948,7 +949,11 @@ func (h *clusterShardingHandler) update(transCtx *clusterTransformContext, dag *
 	if err3 != nil && hasPersistedNonBlockingShardingAction(runningCompsMap) {
 		// Keep the participant set stable while a shard topology Action is
 		// pending or failed. Persist only the Action annotations and defer
-		// ordinary Component creates, deletes, and spec updates.
+		// ordinary Component creates, deletes, and spec updates. A snapshotted
+		// target that was deleted unexpectedly is the exception: recreate the
+		// same desired Component so the existing request can continue.
+		recoveryTargets := persistedShardingActionTargetComponents(runningCompsMap)
+		h.createComps(transCtx, dag, protoCompsMap, toCreate.Intersection(recoveryTargets))
 		h.updateShardingActionAnnotations(transCtx, dag, originalCompsMap, runningCompsMap,
 			sets.KeySet(runningCompsMap))
 		return err3
@@ -973,6 +978,25 @@ func hasPersistedNonBlockingShardingAction(comps map[string]*appsv1.Component) b
 		}
 	}
 	return false
+}
+
+func persistedShardingActionTargetComponents(comps map[string]*appsv1.Component) sets.Set[string] {
+	result := sets.New[string]()
+	for _, comp := range comps {
+		for _, annotation := range []string{
+			shardingAddActionTargetsKey,
+			shardingRemoveActionTargetsKey,
+		} {
+			targets, found, err := getShardingActionTargets(comp, annotation)
+			if err != nil || !found {
+				continue
+			}
+			for _, target := range targets.Targets {
+				result.Insert(target.Component)
+			}
+		}
+	}
+	return result
 }
 
 func (h *clusterShardingHandler) createComps(transCtx *clusterTransformContext, dag *graph.DAG,
@@ -1673,30 +1697,19 @@ func (h *clusterShardingHandler) nonBlockingShardingAction(transCtx *clusterTran
 	shardingName, actionName, targetsAnnotation string, action *appsv1.ShardingAction,
 	args map[string]string, runningComps []*appsv1.Component, sourceComp *appsv1.Component,
 	claimed sets.Set[string]) error {
+	if claimed.Has(shardingActionRequestClaimKey) {
+		return ictrlutil.NewDelayedRequeueError(3*time.Second,
+			fmt.Sprintf("waiting to execute action %s for shard %s", actionName, sourceComp.Name))
+	}
+	// The target Pod is only where the command runs; it does not define the
+	// database topology affected by the command. Preserve the blocking path's
+	// business ordering by advancing one source-shard request at a time.
+	claimed.Insert(shardingActionRequestClaimKey)
+
 	targets, changed, err := h.resolveShardingActionTargets(
 		transCtx, action, targetsAnnotation, runningComps, sourceComp)
 	if err != nil {
 		return err
-	}
-
-	for _, target := range targets.Targets {
-		for _, pod := range target.Pods {
-			key := shardingActionClaimKey(actionName, pod.Name)
-			if claimed.Has(key) {
-				if changed {
-					if err := setShardingActionTargets(sourceComp, targetsAnnotation, targets); err != nil {
-						return err
-					}
-				}
-				return ictrlutil.NewDelayedRequeueError(3*time.Second,
-					fmt.Sprintf("waiting to execute action %s on pod %s", actionName, pod.Name))
-			}
-		}
-	}
-	for _, target := range targets.Targets {
-		for _, pod := range target.Pods {
-			claimed.Insert(shardingActionClaimKey(actionName, pod.Name))
-		}
 	}
 
 	if changed {
@@ -1779,10 +1792,6 @@ func (h *clusterShardingHandler) nonBlockingShardingAction(transCtx *clusterTran
 	return nil
 }
 
-func shardingActionClaimKey(actionName, podName string) string {
-	return actionName + "\x00" + podName
-}
-
 func isTerminalShardingActionError(err error) bool {
 	return errors.Is(err, lifecycle.ErrActionFailed) ||
 		errors.Is(err, lifecycle.ErrActionTimedOut) ||
@@ -1806,52 +1815,10 @@ func (h *clusterShardingHandler) resolveShardingActionTargets(transCtx *clusterT
 		compByName[comp.Name] = comp
 	}
 	changed := false
-	selectedComponents := sets.New[string]()
-	missingComponents := make([]int, 0)
-	for i := range targets.Targets {
-		if compByName[targets.Targets[i].Component] == nil {
-			missingComponents = append(missingComponents, i)
-			continue
-		}
-		selectedComponents.Insert(targets.Targets[i].Component)
-	}
-	if len(missingComponents) > 0 {
-		selectedShards, err := h.selectTargetShard(action, runningComps, sourceComp)
-		if err != nil {
+	for _, target := range targets.Targets {
+		if compByName[target.Component] == nil {
 			return nil, false, ictrlutil.NewDelayedRequeueError(3*time.Second,
-				fmt.Sprintf("waiting to restore target shards: %v", err))
-		}
-		sort.Slice(selectedShards, func(i, j int) bool {
-			return selectedShards[i].Name < selectedShards[j].Name
-		})
-		replacements := make([]*appsv1.Component, 0, len(missingComponents))
-		for _, shard := range selectedShards {
-			if !selectedComponents.Has(shard.Name) {
-				replacements = append(replacements, shard)
-			}
-		}
-		if len(replacements) < len(missingComponents) {
-			return nil, false, ictrlutil.NewDelayedRequeueError(3*time.Second,
-				fmt.Sprintf("waiting to restore %d target shards", len(missingComponents)))
-		}
-		for i, targetIndex := range missingComponents {
-			shard := replacements[i]
-			pods, err := component.ListOwnedInstances(transCtx.Context, transCtx.Client, shard)
-			if err != nil {
-				return nil, false, err
-			}
-			selectedPods, err := selectShardingActionPods(action, pods, shard.Name)
-			if err != nil {
-				return nil, false, ictrlutil.NewDelayedRequeueError(3*time.Second,
-					fmt.Sprintf("waiting to restore target shard %s: %v", shard.Name, err))
-			}
-			targets.Targets[targetIndex] = shardingActionTarget{
-				Component: shard.Name,
-				Pods:      selectedPods,
-			}
-			compByName[shard.Name] = shard
-			selectedComponents.Insert(shard.Name)
-			changed = true
+				fmt.Sprintf("waiting for target shard %s to be restored", target.Component))
 		}
 	}
 

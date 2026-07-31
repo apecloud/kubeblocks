@@ -1101,7 +1101,7 @@ var _ = Describe("Backup Controller test", func() {
 			})).Should(Succeed())
 		})
 
-		It("keeps reconciling a multi-target backup while a referenced job is incomplete", func() {
+		It("keeps reconciling a multi-target backup while a referenced job pod is running", func() {
 			By("Set backupMethod's targets")
 			Expect(testapps.ChangeObj(&testCtx, backupPolicy, func(bp *dpv1alpha1.BackupPolicy) {
 				podSelector := &dpv1alpha1.PodSelector{
@@ -1145,6 +1145,25 @@ var _ = Describe("Backup Controller test", func() {
 
 			completedJobKey := getJobKey(targets[0].Name)
 			testdp.PatchK8sJobStatus(&testCtx, completedJobKey, batchv1.JobComplete)
+			runningJob := &batchv1.Job{}
+			Expect(k8sClient.Get(ctx, getJobKey(targets[1].Name), runningJob)).Should(Succeed())
+			runningPod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      runningJob.Name + "-running",
+					Namespace: runningJob.Namespace,
+					Labels:    map[string]string{"job-name": runningJob.Name},
+					OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(
+						runningJob, batchv1.SchemeGroupVersion.WithKind(constant.JobKind))},
+				},
+				Spec: corev1.PodSpec{
+					Containers:    []corev1.Container{{Name: "backup", Image: testapps.ApeCloudMySQLImage}},
+					RestartPolicy: corev1.RestartPolicyNever,
+				},
+			}
+			Expect(testCtx.CreateObj(ctx, runningPod)).Should(Succeed())
+			Expect(testapps.ChangeObjStatus(&testCtx, runningPod, func() {
+				runningPod.Status.Phase = corev1.PodRunning
+			})).Should(Succeed())
 			Expect(k8sClient.Delete(ctx, targetPod)).Should(Succeed())
 			Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(targetPod), &corev1.Pod{}, false)).Should(Succeed())
 

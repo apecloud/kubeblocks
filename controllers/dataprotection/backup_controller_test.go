@@ -22,6 +22,7 @@ package dataprotection
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"slices"
 	"strconv"
@@ -35,6 +36,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -46,6 +48,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -68,6 +71,182 @@ type getErrorClient struct {
 
 func (c *getErrorClient) Get(context.Context, client.ObjectKey, client.Object, ...client.GetOption) error {
 	return fmt.Errorf("get failed")
+}
+
+type statusPatchCountingClient struct {
+	client.Client
+	statusPatchCount int
+	statusPatchErr   error
+}
+
+func (c *statusPatchCountingClient) Status() client.SubResourceWriter {
+	return &statusPatchCountingWriter{
+		SubResourceWriter: c.Client.Status(),
+		count:             &c.statusPatchCount,
+		patchErr:          c.statusPatchErr,
+	}
+}
+
+type statusPatchCountingWriter struct {
+	client.SubResourceWriter
+	count    *int
+	patchErr error
+}
+
+func (w *statusPatchCountingWriter) Patch(
+	ctx context.Context,
+	obj client.Object,
+	patch client.Patch,
+	opts ...client.SubResourcePatchOption,
+) error {
+	(*w.count)++
+	if w.patchErr != nil {
+		return w.patchErr
+	}
+	return w.SubResourceWriter.Patch(ctx, obj, patch, opts...)
+}
+
+func TestDeleteBackupFilesRecordsTerminatingNamespaceBlockerWithoutStoppingRetry(t *testing.T) {
+	g := NewWithT(t)
+	scheme := runtime.NewScheme()
+	g.Expect(corev1.AddToScheme(scheme)).To(Succeed())
+	g.Expect(batchv1.AddToScheme(scheme)).To(Succeed())
+	g.Expect(rbacv1.AddToScheme(scheme)).To(Succeed())
+	g.Expect(dpv1alpha1.AddToScheme(scheme)).To(Succeed())
+
+	now := metav1.Now()
+	namespace := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
+		Name:              "terminating-backup",
+		DeletionTimestamp: &now,
+		Finalizers:        []string{"test.kubeblocks.io/finalizer"},
+	}}
+	backup := &dpv1alpha1.Backup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "backup",
+			Namespace:         namespace.Name,
+			UID:               types.UID("backup-uid"),
+			DeletionTimestamp: &now,
+			Finalizers:        []string{dptypes.DataProtectionFinalizerName},
+		},
+		Spec: dpv1alpha1.BackupSpec{DeletionPolicy: dpv1alpha1.BackupDeletionPolicyDelete},
+		Status: dpv1alpha1.BackupStatus{
+			Phase:          dpv1alpha1.BackupPhaseDeleting,
+			FailureReason:  "backup execution failed",
+			BackupRepoName: "repo",
+			Path:           "/backups/backup",
+		},
+	}
+	repo := &dpv1alpha1.BackupRepo{ObjectMeta: metav1.ObjectMeta{Name: backup.Status.BackupRepoName}}
+	baseClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithStatusSubresource(&dpv1alpha1.Backup{}).
+		WithObjects(namespace, backup, repo).
+		Build()
+	countingClient := &statusPatchCountingClient{Client: baseClient}
+	reconciler := &BackupReconciler{Client: countingClient, Scheme: scheme}
+	reqCtx := intctrlutil.RequestCtx{Ctx: context.Background()}
+
+	err := reconciler.deleteBackupFiles(reqCtx, backup.DeepCopy())
+	var terminatingErr *backupNamespaceTerminatingError
+	g.Expect(errors.As(err, &terminatingErr)).To(BeTrue())
+	g.Expect(err.Error()).To(ContainSubstring("is terminating; cannot create worker resources to delete backup files"))
+	g.Expect(countingClient.statusPatchCount).To(Equal(1))
+
+	stored := &dpv1alpha1.Backup{}
+	g.Expect(baseClient.Get(reqCtx.Ctx, client.ObjectKeyFromObject(backup), stored)).To(Succeed())
+	g.Expect(stored.Status.FailureReason).To(Equal("backup execution failed"))
+	g.Expect(stored.Status.DeletionFailureReason).To(Equal(err.Error()))
+	g.Expect(controllerutil.ContainsFinalizer(stored, dptypes.DataProtectionFinalizerName)).To(BeTrue())
+
+	jobs := &batchv1.JobList{}
+	g.Expect(baseClient.List(reqCtx.Ctx, jobs, client.InNamespace(namespace.Name))).To(Succeed())
+	g.Expect(jobs.Items).To(BeEmpty())
+	serviceAccounts := &corev1.ServiceAccountList{}
+	g.Expect(baseClient.List(reqCtx.Ctx, serviceAccounts, client.InNamespace(namespace.Name))).To(Succeed())
+	g.Expect(serviceAccounts.Items).To(BeEmpty())
+	roleBindings := &rbacv1.RoleBindingList{}
+	g.Expect(baseClient.List(reqCtx.Ctx, roleBindings, client.InNamespace(namespace.Name))).To(Succeed())
+	g.Expect(roleBindings.Items).To(BeEmpty())
+
+	err = reconciler.deleteBackupFiles(reqCtx, stored.DeepCopy())
+	g.Expect(errors.As(err, &terminatingErr)).To(BeTrue())
+	g.Expect(countingClient.statusPatchCount).To(Equal(1))
+}
+
+func TestDeleteBackupFilesDoesNotRecordOrdinaryDeletingError(t *testing.T) {
+	g := NewWithT(t)
+	scheme := runtime.NewScheme()
+	g.Expect(batchv1.AddToScheme(scheme)).To(Succeed())
+	g.Expect(dpv1alpha1.AddToScheme(scheme)).To(Succeed())
+
+	backup := &dpv1alpha1.Backup{ObjectMeta: metav1.ObjectMeta{
+		Name:       "backup",
+		Namespace:  "default",
+		UID:        types.UID("backup-uid"),
+		Finalizers: []string{dptypes.DataProtectionFinalizerName},
+	}}
+	baseClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithStatusSubresource(&dpv1alpha1.Backup{}).
+		WithObjects(backup).
+		Build()
+	countingClient := &statusPatchCountingClient{Client: baseClient}
+	reconciler := &BackupReconciler{
+		Client: &getErrorClient{Client: countingClient},
+		Scheme: scheme,
+	}
+
+	err := reconciler.deleteBackupFiles(intctrlutil.RequestCtx{Ctx: context.Background()}, backup.DeepCopy())
+	g.Expect(err).To(MatchError("get failed"))
+	g.Expect(countingClient.statusPatchCount).To(Equal(0))
+	g.Expect(backup.Status.FailureReason).To(BeEmpty())
+	g.Expect(backup.Status.DeletionFailureReason).To(BeEmpty())
+}
+
+func TestDeleteBackupFilesReturnsStatusPatchError(t *testing.T) {
+	g := NewWithT(t)
+	scheme := runtime.NewScheme()
+	g.Expect(corev1.AddToScheme(scheme)).To(Succeed())
+	g.Expect(batchv1.AddToScheme(scheme)).To(Succeed())
+	g.Expect(dpv1alpha1.AddToScheme(scheme)).To(Succeed())
+
+	now := metav1.Now()
+	namespace := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
+		Name:              "terminating-backup",
+		DeletionTimestamp: &now,
+		Finalizers:        []string{"test.kubeblocks.io/finalizer"},
+	}}
+	backup := &dpv1alpha1.Backup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       "backup",
+			Namespace:  namespace.Name,
+			UID:        types.UID("backup-uid"),
+			Finalizers: []string{dptypes.DataProtectionFinalizerName},
+		},
+		Status: dpv1alpha1.BackupStatus{
+			Phase:          dpv1alpha1.BackupPhaseDeleting,
+			BackupRepoName: "repo",
+			Path:           "/backups/backup",
+		},
+	}
+	repo := &dpv1alpha1.BackupRepo{ObjectMeta: metav1.ObjectMeta{Name: backup.Status.BackupRepoName}}
+	baseClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithStatusSubresource(&dpv1alpha1.Backup{}).
+		WithObjects(namespace, backup, repo).
+		Build()
+	patchErr := errors.New("status patch failed")
+	countingClient := &statusPatchCountingClient{Client: baseClient, statusPatchErr: patchErr}
+	reconciler := &BackupReconciler{Client: countingClient, Scheme: scheme}
+
+	err := reconciler.deleteBackupFiles(intctrlutil.RequestCtx{Ctx: context.Background()}, backup.DeepCopy())
+	g.Expect(err).To(MatchError(patchErr))
+	g.Expect(countingClient.statusPatchCount).To(Equal(1))
+
+	stored := &dpv1alpha1.Backup{}
+	g.Expect(baseClient.Get(context.Background(), client.ObjectKeyFromObject(backup), stored)).To(Succeed())
+	g.Expect(stored.Status.FailureReason).To(BeEmpty())
+	g.Expect(stored.Status.DeletionFailureReason).To(BeEmpty())
 }
 
 func TestSyncJobActions(t *testing.T) {

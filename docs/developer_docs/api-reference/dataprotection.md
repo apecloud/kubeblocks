@@ -3508,6 +3508,20 @@ string
 </tr>
 <tr>
 <td>
+<code>deletionFailureReason</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Any error or blocker encountered while deleting the Backup and its data.
+This field does not replace FailureReason, which records a failure of the
+backup operation itself.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>backupRepoName</code><br/>
 <em>
 string

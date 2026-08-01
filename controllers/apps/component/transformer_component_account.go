@@ -38,6 +38,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/systemaccount"
 	ctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -61,13 +62,22 @@ func (t *componentAccountTransformer) Transform(ctx graph.TransformContext, dag 
 	if isCompDeleting(transCtx.ComponentOrig) {
 		return nil
 	}
+	graphCli, _ := transCtx.Client.(model.GraphClient)
+	handled, err := systemaccount.ReconcileRestoreRequests(transCtx.Context, graphCli, dag,
+		transCtx.Component, constant.DBComponentFinalizerName)
+	if err != nil {
+		return err
+	}
+	if handled {
+		return nil
+	}
+
 	if common.IsCompactMode(transCtx.ComponentOrig.Annotations) {
 		transCtx.V(1).Info("Component is in compact mode, no need to create account related objects", "component", client.ObjectKeyFromObject(transCtx.ComponentOrig))
 		return nil
 	}
 
 	synthesizedComp := transCtx.SynthesizeComponent
-	graphCli, _ := transCtx.Client.(model.GraphClient)
 
 	// exist account objects
 	secrets, err := listSystemAccountObjects(ctx, synthesizedComp)

@@ -21,6 +21,7 @@ package dataprotection
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -69,6 +70,14 @@ type BackupReconciler struct {
 	Recorder   record.EventRecorder
 	RestConfig *rest.Config
 	clock      clock.RealClock
+}
+
+type backupNamespaceTerminatingError struct {
+	namespace string
+}
+
+func (e *backupNamespaceTerminatingError) Error() string {
+	return fmt.Sprintf("backup namespace %q is terminating; cannot create worker resources to delete backup files, delete the Backup and wait until it is gone before deleting the namespace", e.namespace)
 }
 
 // +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backups,verbs=get;list;watch;create;update;patch;delete
@@ -238,17 +247,39 @@ func (r *BackupReconciler) deleteBackupFiles(reqCtx intctrlutil.RequestCtx, back
 		return deleteBackup()
 	case dpbackup.DeletionStatusFailed:
 		failureReason := err.Error()
-		if backup.Status.FailureReason == failureReason {
+		if backup.Status.DeletionFailureReason == failureReason {
 			return nil
 		}
 		backupPatch := client.MergeFrom(backup.DeepCopy())
-		backup.Status.FailureReason = failureReason
+		backup.Status.DeletionFailureReason = failureReason
 		r.Recorder.Event(backup, corev1.EventTypeWarning, "DeleteBackupFilesFailed", failureReason)
 		return r.Status().Patch(reqCtx.Ctx, backup, backupPatch)
 	case dpbackup.DeletionStatusDeleting,
 		dpbackup.DeletionStatusUnknown:
 		// wait for the deletion job completed
+		return r.recordBackupDeletionBlocker(reqCtx, backup, err)
+	}
+	return err
+}
+
+func (r *BackupReconciler) recordBackupDeletionBlocker(
+	reqCtx intctrlutil.RequestCtx,
+	backup *dpv1alpha1.Backup,
+	err error,
+) error {
+	var terminatingErr *backupNamespaceTerminatingError
+	if !errors.As(err, &terminatingErr) {
 		return err
+	}
+
+	deletionFailureReason := err.Error()
+	if backup.Status.DeletionFailureReason == deletionFailureReason {
+		return err
+	}
+	backupPatch := client.MergeFrom(backup.DeepCopy())
+	backup.Status.DeletionFailureReason = deletionFailureReason
+	if patchErr := r.Status().Patch(reqCtx.Ctx, backup, backupPatch); patchErr != nil {
+		return patchErr
 	}
 	return err
 }
@@ -259,7 +290,7 @@ func (r *BackupReconciler) ensureWorkerServiceAccountForBackupDeletion(reqCtx in
 		return "", fmt.Errorf("failed to get backup namespace %q before deleting backup files: %w", namespace, err)
 	}
 	if !ns.DeletionTimestamp.IsZero() {
-		return "", fmt.Errorf("backup namespace %q is terminating; cannot create worker resources to delete backup files, delete the Backup and wait until it is gone before deleting the namespace", namespace)
+		return "", &backupNamespaceTerminatingError{namespace: namespace}
 	}
 	// TODO: update the mcMgr param
 	return EnsureWorkerServiceAccount(reqCtx, r.Client, namespace, nil)

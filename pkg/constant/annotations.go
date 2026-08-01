@@ -46,6 +46,14 @@ const (
 
 	// SystemAccountProvisionedAnnotationKey marks a system account secret whose account has already been prepared externally.
 	SystemAccountProvisionedAnnotationKey = "apps.kubeblocks.io/system-account-provisioned"
+	// SystemAccountRestoreTargetAnnotationKey names the system account Secret
+	// that an Apps-owned temporary request must converge. DataProtection writes
+	// the request; the Component or Cluster owner is the only controller allowed
+	// to mutate/delete/recreate the target or release its finalizer.
+	SystemAccountRestoreTargetAnnotationKey = "apps.kubeblocks.io/system-account-restore-target"
+	// SystemAccountRestoreRevisionAnnotationKey is the content-addressed
+	// revision that Apps copies from a restore request to the converged target.
+	SystemAccountRestoreRevisionAnnotationKey = "apps.kubeblocks.io/system-account-restore-revision"
 
 	// SkipPreTerminateAnnotationKey specifies to skip the pre-terminate action for a component.
 	SkipPreTerminateAnnotationKey = "apps.kubeblocks.io/skip-pre-terminate"

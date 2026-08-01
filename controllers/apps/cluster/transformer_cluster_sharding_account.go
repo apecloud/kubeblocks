@@ -34,6 +34,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/systemaccount"
 )
 
 // clusterShardingAccountTransformer handles shared system accounts for sharding.
@@ -47,12 +48,20 @@ func (t *clusterShardingAccountTransformer) Transform(ctx graph.TransformContext
 		return nil
 	}
 
+	graphCli, _ := transCtx.Client.(model.GraphClient)
+	handled, err := systemaccount.ReconcileRestoreRequests(transCtx.Context, graphCli, dag,
+		transCtx.Cluster, constant.DBClusterFinalizerName)
+	if err != nil {
+		return err
+	}
+	if handled {
+		return nil
+	}
+
 	if common.IsCompactMode(transCtx.Cluster.Annotations) {
 		transCtx.V(1).Info("Cluster is in compact mode, no need to create account related objects", "cluster", client.ObjectKeyFromObject(transCtx.Cluster))
 		return nil
 	}
-
-	graphCli, _ := transCtx.Client.(model.GraphClient)
 	return t.reconcileShardingAccounts(transCtx, graphCli, dag)
 }
 

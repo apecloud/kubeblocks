@@ -136,6 +136,13 @@ type BackupStatus struct {
 	// +optional
 	FailureReason string `json:"failureReason,omitempty"`
 
+	// Any error or blocker encountered while deleting the Backup and its data.
+	// This field does not replace FailureReason, which records a failure of the
+	// backup operation itself.
+	//
+	// +optional
+	DeletionFailureReason string `json:"deletionFailureReason,omitempty"`
+
 	// The name of the backup repository.
 	//
 	// +optional

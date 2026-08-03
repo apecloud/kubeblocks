@@ -69,12 +69,12 @@ var _ = Describe("resolve CompDefinition and ServiceVersion", func() {
 		cleanEnv()
 	})
 
-	createCompDefinitionObjs := func(serviceVersion string) []*appsv1.ComponentDefinition {
+	createCompDefinitionObjs := func() []*appsv1.ComponentDefinition {
 		By("create default ComponentDefinition objs")
 		objs := make([]*appsv1.ComponentDefinition, 0)
 		for _, name := range compDefNames {
 			f := testapps.NewComponentDefinitionFactory(name).
-				SetServiceVersion(serviceVersion)
+				SetServiceVersion(testapps.ServiceVersion("v0")) // use v0 as init service version
 			for _, app := range []string{testapps.AppName, testapps.AppNameSamePrefix} {
 				// use empty revision as init image tag
 				f = f.SetRuntime(&corev1.Container{Name: app, Image: testapps.AppImage(app, testapps.ReleaseID(""))})
@@ -193,7 +193,7 @@ var _ = Describe("resolve CompDefinition and ServiceVersion", func() {
 
 	Context("resolve component definition, service version and images", func() {
 		BeforeEach(func() {
-			createCompDefinitionObjs(testapps.ServiceVersion("v0"))
+			createCompDefinitionObjs()
 			compVersionObj = createCompVersionObj()
 		})
 
@@ -633,7 +633,13 @@ var _ = Describe("resolve CompDefinition and ServiceVersion", func() {
 
 	Context("resolve component definition, service version without serviceVersion in componentDefinition", func() {
 		BeforeEach(func() {
-			createCompDefinitionObjs("")
+			compDefs := createCompDefinitionObjs()
+			for _, compDef := range compDefs {
+				compDefKey := client.ObjectKeyFromObject(compDef)
+				Eventually(testapps.GetAndChangeObj(&testCtx, compDefKey, func(compDef *appsv1.ComponentDefinition) {
+					compDef.Spec.ServiceVersion = ""
+				})).Should(Succeed())
+			}
 			compVersionObj = createCompVersionObj()
 		})
 

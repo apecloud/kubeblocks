@@ -1906,12 +1906,6 @@ var _ = Describe("cluster component transformer test", func() {
 				Action: *testapps.NewLifecycleAction(name),
 			}
 		}
-		availableShardingDef := func() *appsv1.ShardingDefinition {
-			shardingDef := testapps.NewShardingDefinitionFactory(shardingDefName, compDefName).GetObject()
-			shardingDef.Status.ObservedGeneration = shardingDef.Generation
-			shardingDef.Status.Phase = appsv1.AvailablePhase
-			return shardingDef
-		}
 
 		mockShardCompWithPod := func(phase appsv1.ComponentPhase, annotation map[string]string) (*appsv1.Component, *corev1.Pod) {
 			shardComp := mockShardingCompObj(transCtx, sharding1aName, func(comp *appsv1.Component) {
@@ -2100,26 +2094,11 @@ var _ = Describe("cluster component transformer test", func() {
 				transCtx.shardingDefs = nil
 			})
 
-			It("rejects an unavailable sharding definition", func() {
-				shardComp, pod := mockShardCompWithPod(appsv1.RunningComponentPhase, map[string]string{
-					constant.KBAppClusterUIDKey: "test-uid",
-				})
-				shardingDef := availableShardingDef()
-				shardingDef.Status.Phase = appsv1.UnavailablePhase
-				transCtx.Client = model.NewGraphClient(&appsutil.MockReader{
-					Objects: []client.Object{shardComp, pod, shardingDef},
-				})
-
-				err := transformer.Transform(transCtx, dag)
-				Expect(err).Should(MatchError(ContainSubstring("referenced ShardingDefinition is unavailable")))
-				Expect(actionDone).Should(BeFalse())
-			})
-
 			It("not defined", func() {
 				shardComp, pod := mockShardCompWithPod(appsv1.RunningComponentPhase, map[string]string{
 					constant.KBAppClusterUIDKey: "test-uid",
 				})
-				shardingDef := availableShardingDef()
+				shardingDef := testapps.NewShardingDefinitionFactory(shardingDefName, compDefName).GetObject()
 				shardingDef.Spec.LifecycleActions = nil
 				reader := &appsutil.MockReader{Objects: func(transCtx *clusterTransformContext) []client.Object {
 					return []client.Object{shardComp, pod, shardingDef}
@@ -2147,7 +2126,7 @@ var _ = Describe("cluster component transformer test", func() {
 				shardComp, pod := mockShardCompWithPod(appsv1.RunningComponentPhase, map[string]string{
 					constant.KBAppClusterUIDKey: "test-uid",
 				})
-				shardingDef := availableShardingDef()
+				shardingDef := testapps.NewShardingDefinitionFactory(shardingDefName, compDefName).GetObject()
 				shardingDef.Spec.LifecycleActions = &appsv1.ShardingLifecycleActions{
 					PreTerminate: mockShardingAction("pre-terminate"),
 				}
@@ -2177,7 +2156,7 @@ var _ = Describe("cluster component transformer test", func() {
 				shardComp, pod := mockShardCompWithPod(appsv1.RunningComponentPhase, map[string]string{
 					constant.KBAppClusterUIDKey: "test-uid",
 				})
-				shardingDef := availableShardingDef()
+				shardingDef := testapps.NewShardingDefinitionFactory(shardingDefName, compDefName).GetObject()
 				shardingDef.Spec.LifecycleActions = &appsv1.ShardingLifecycleActions{
 					PreTerminate: mockShardingAction("pre-terminate"),
 				}
@@ -2207,7 +2186,7 @@ var _ = Describe("cluster component transformer test", func() {
 				shardComp, pod := mockShardCompWithPod(appsv1.RunningComponentPhase, map[string]string{
 					constant.KBAppClusterUIDKey: "test-uid",
 				})
-				shardingDef := availableShardingDef()
+				shardingDef := testapps.NewShardingDefinitionFactory(shardingDefName, compDefName).GetObject()
 				shardingDef.Spec.LifecycleActions = &appsv1.ShardingLifecycleActions{
 					PostProvision: mockShardingAction("post-provision"),
 					PreTerminate:  mockShardingAction("pre-terminate"),
@@ -2248,7 +2227,7 @@ var _ = Describe("cluster component transformer test", func() {
 				shardComp, pod := mockShardCompWithPod(appsv1.RunningComponentPhase, map[string]string{
 					constant.KBAppClusterUIDKey: "test-uid",
 				})
-				shardingDef := availableShardingDef()
+				shardingDef := testapps.NewShardingDefinitionFactory(shardingDefName, compDefName).GetObject()
 				shardingDef.Spec.LifecycleActions = &appsv1.ShardingLifecycleActions{
 					PostProvision: mockShardingAction("post-provision"),
 					PreTerminate:  mockShardingAction("pre-terminate"),
@@ -2289,7 +2268,7 @@ var _ = Describe("cluster component transformer test", func() {
 				shardComp, pod := mockShardCompWithPod(appsv1.RunningComponentPhase, map[string]string{
 					constant.KBAppClusterUIDKey: "test-uid",
 				})
-				shardingDef := availableShardingDef()
+				shardingDef := testapps.NewShardingDefinitionFactory(shardingDefName, compDefName).GetObject()
 				shardingDef.Spec.LifecycleActions = &appsv1.ShardingLifecycleActions{
 					PostProvision: mockShardingAction("post-provision"),
 					PreTerminate:  mockShardingAction("pre-terminate"),

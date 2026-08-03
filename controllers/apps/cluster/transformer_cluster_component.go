@@ -1317,10 +1317,6 @@ func (h *clusterShardingHandler) handlePreTerminate(transCtx *clusterTransformCo
 			if err := transCtx.Client.Get(transCtx.Context, types.NamespacedName{Name: shardingStatus.ShardingDef}, obj); err != nil {
 				return nil, client.IgnoreNotFound(err)
 			}
-			if err := validateDefinitionAvailability("ShardingDefinition", obj.Name,
-				obj.Generation, obj.Status.ObservedGeneration, obj.Status.Phase); err != nil {
-				return nil, err
-			}
 			return obj, nil
 		}()
 

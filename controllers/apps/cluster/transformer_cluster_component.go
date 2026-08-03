@@ -175,7 +175,7 @@ func checkAllCompsUpToDate(transCtx *clusterTransformContext, cluster *appsv1.Cl
 		return false, nil
 	}
 	for _, comp := range compList.Items {
-		if hasPendingShardingAction(&comp) {
+		if hasPendingNonBlockingAction(&comp) {
 			return false, nil
 		}
 		generation, ok := comp.Annotations[constant.KubeBlocksGenerationKey]
@@ -189,13 +189,20 @@ func checkAllCompsUpToDate(transCtx *clusterTransformContext, cluster *appsv1.Cl
 	return true, nil
 }
 
-func hasPendingShardingAction(comp *appsv1.Component) bool {
+func hasPendingNonBlockingAction(comp *appsv1.Component) bool {
 	if comp == nil || comp.Annotations == nil {
 		return false
 	}
-	return comp.Annotations[shardingAddShardKey] != "" ||
-		comp.Annotations[shardingAddActionTargetsKey] != "" ||
-		comp.Annotations[shardingRemoveActionTargetsKey] != ""
+	if comp.Annotations[shardingAddActionTargetsKey] != "" ||
+		comp.Annotations[shardingRemoveActionTargetsKey] != "" {
+		return true
+	}
+	if comp.Annotations[shardingAddShardKey] == "" {
+		return false
+	}
+	return slices.ContainsFunc(comp.Spec.CustomActions, func(action appsv1.CustomAction) bool {
+		return action.Name == shardingAddShardAction && action.Action != nil && action.Action.NonBlocking
+	})
 }
 
 // copyAndMergeComponent merges two component objects for updating:

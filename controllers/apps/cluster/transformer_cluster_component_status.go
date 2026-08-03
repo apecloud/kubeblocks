@@ -144,7 +144,7 @@ func (t *clusterComponentStatusTransformer) clusterCompStatus(cluster *appsv1.Cl
 		status.ObservedGeneration = ig
 		status.UpToDate = comp.Generation == comp.Status.ObservedGeneration && ig == cluster.Generation
 	}
-	if hasPendingShardingAction(comp) {
+	if hasPendingNonBlockingAction(comp) {
 		status.UpToDate = false
 	}
 	return status

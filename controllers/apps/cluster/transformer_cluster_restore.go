@@ -146,6 +146,16 @@ func (c *clusterRestoreTransformer) Transform(ctx graph.TransformContext, dag *g
 	return nil
 }
 
+// mergeComponentAnnotations merges the proto annotations into the component object, but excludes
+// the restore annotation when the component has finished the restore, otherwise the restore flow
+// will be re-triggered repeatedly and cause a reconcile loop.
+func mergeComponentAnnotations(compObjCopy *appsv1.Component, protoAnnotations map[string]string) {
+	if compObjCopy.Annotations[constant.RestoreDoneAnnotationKey] == "true" {
+		delete(protoAnnotations, constant.RestoreFromBackupAnnotationKey)
+	}
+	intctrlutil.MergeMetadataMapInplace(protoAnnotations, &compObjCopy.Annotations)
+}
+
 func (c *clusterRestoreTransformer) initClusterAnnotations(compName string) map[string]string {
 	if c.annotations == nil {
 		c.annotations = make(map[string]map[string]string)

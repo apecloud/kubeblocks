@@ -1747,6 +1747,25 @@ var _ = Describe("cluster component transformer test", func() {
 			Expect(result.Spec.VolumeClaimTemplates).To(HaveLen(1))
 		})
 
+		It("should not inherit the restore annotation when the component has finished the restore", func() {
+			oldCompObj.Annotations = map[string]string{constant.RestoreDoneAnnotationKey: "true"}
+			newCompObj.Annotations = map[string]string{
+				constant.RestoreFromBackupAnnotationKey: `{"shard":{"name":"test-backup"}}`,
+			}
+			result := copyAndMergeComponent(oldCompObj, newCompObj)
+			Expect(result).To(BeNil())
+		})
+
+		It("should inherit the restore annotation when the restore is not done", func() {
+			oldCompObj.Annotations = map[string]string{}
+			newCompObj.Annotations = map[string]string{
+				constant.RestoreFromBackupAnnotationKey: `{"shard":{"name":"test-backup"}}`,
+			}
+			result := copyAndMergeComponent(oldCompObj, newCompObj)
+			Expect(result).NotTo(BeNil())
+			Expect(result.Annotations).To(HaveKey(constant.RestoreFromBackupAnnotationKey))
+		})
+
 		It("should normalize CPU resources", func() {
 			// 1000m is equivalent to 1
 			oldCompObj.Spec.Resources.Limits[corev1.ResourceCPU] = resource.MustParse("1")

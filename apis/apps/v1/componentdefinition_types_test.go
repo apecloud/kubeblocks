@@ -21,15 +21,13 @@ package v1
 
 import "testing"
 
-func TestSystemAccountLegacyGoAPICompatibility(t *testing.T) {
-	legacyConfig := PasswordConfig{NumDigits: 4}
-	legacyAccount := SystemAccount{PasswordGenerationPolicy: legacyConfig}
-
-	var digits int32 = 2
-	legacyConfig.NumDigits = digits
-	legacyAccount.PasswordGenerationPolicy = legacyConfig
-
-	if legacyAccount.PasswordGenerationPolicy.NumDigits != digits {
-		t.Fatalf("expected legacy assignment to preserve numDigits=%d", digits)
+func TestPasswordConfigNumDigitsPresence(t *testing.T) {
+	zero := int32(0)
+	config := PasswordConfig{NumDigits: &zero}
+	if config.NumDigits == nil || *config.NumDigits != 0 {
+		t.Fatalf("expected explicit numDigits=0 to be preserved")
+	}
+	if (PasswordConfig{}).NumDigits != nil {
+		t.Fatalf("expected omitted numDigits to remain nil")
 	}
 }

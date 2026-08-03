@@ -207,7 +207,7 @@ func TestGenerateSystemAccountPassword(t *testing.T) {
 			account: appsv1.SystemAccount{
 				PasswordGenerationPolicy: appsv1.PasswordConfig{
 					Length:     12,
-					NumDigits:  2,
+					NumDigits:  ptr.To[int32](2),
 					LetterCase: appsv1.MixedCases,
 				},
 			},
@@ -216,14 +216,14 @@ func TestGenerateSystemAccountPassword(t *testing.T) {
 		{
 			name: "new configuration takes precedence over legacy",
 			account: appsv1.SystemAccount{
-				PasswordConfig: &appsv1.SystemAccountPasswordConfig{
+				PasswordConfig: &appsv1.PasswordConfig{
 					Length:     20,
 					NumDigits:  ptr.To[int32](0),
 					LetterCase: appsv1.LowerCases,
 				},
 				PasswordGenerationPolicy: appsv1.PasswordConfig{
 					Length:     8,
-					NumDigits:  8,
+					NumDigits:  ptr.To[int32](8),
 					LetterCase: appsv1.UpperCases,
 				},
 			},
@@ -246,14 +246,14 @@ func TestGenerateSystemAccountPassword(t *testing.T) {
 
 func TestGenerateSystemAccountPasswordNewConfigurationPreservesExplicitValues(t *testing.T) {
 	generated, err := GenerateSystemAccountPassword(appsv1.SystemAccount{
-		PasswordConfig: &appsv1.SystemAccountPasswordConfig{
+		PasswordConfig: &appsv1.PasswordConfig{
 			Length:     20,
 			NumDigits:  ptr.To[int32](0),
 			LetterCase: appsv1.LowerCases,
 		},
 		PasswordGenerationPolicy: appsv1.PasswordConfig{
 			Length:     8,
-			NumDigits:  8,
+			NumDigits:  ptr.To[int32](8),
 			LetterCase: appsv1.UpperCases,
 		},
 	})
@@ -270,7 +270,7 @@ func TestGenerateSystemAccountPasswordNewConfigurationPreservesExplicitValues(t 
 
 func TestGenerateSystemAccountPasswordNewConfigurationDefaultsOmittedDigits(t *testing.T) {
 	generated, err := GenerateSystemAccountPassword(appsv1.SystemAccount{
-		PasswordConfig: &appsv1.SystemAccountPasswordConfig{
+		PasswordConfig: &appsv1.PasswordConfig{
 			Length:     12,
 			LetterCase: appsv1.LowerCases,
 			Seed:       "omitted-digits",

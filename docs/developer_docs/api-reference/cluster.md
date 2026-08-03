@@ -9427,7 +9427,7 @@ It is required when the issuer is set to <code>UserProvided</code>.</p>
 <h3 id="apps.kubeblocks.io/v1.LetterCase">LetterCase
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.PasswordConfig">PasswordConfig</a>, <a href="#apps.kubeblocks.io/v1.SystemAccountPasswordConfig">SystemAccountPasswordConfig</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.PasswordConfig">PasswordConfig</a>)
 </p>
 <div>
 <p>LetterCase defines the available cases to be used in password generation.</p>
@@ -13457,8 +13457,8 @@ SystemAccountStatement
 <td>
 <code>passwordConfig</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.SystemAccountPasswordConfig">
-SystemAccountPasswordConfig
+<a href="#apps.kubeblocks.io/v1.PasswordConfig">
+PasswordConfig
 </a>
 </em>
 </td>
@@ -13486,102 +13486,6 @@ A non-empty value is used only when passwordConfig is nil.</p>
 <p>This field is immutable once set.</p>
 <p>Deprecated: passwordGenerationPolicy has been deprecated since 1.2.0 and will be removed in 1.3.0.
 Use passwordConfig instead.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1.SystemAccountPasswordConfig">SystemAccountPasswordConfig
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.SystemAccount">SystemAccount</a>)
-</p>
-<div>
-<p>SystemAccountPasswordConfig customizes the password generated for a system account.</p>
-<p>It is separate from PasswordConfig so the typed API can distinguish an omitted numDigits
-value from an explicitly configured zero.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>length</code><br/>
-<em>
-int32
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>The length of the password.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>numDigits</code><br/>
-<em>
-int32
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>The number of digits in the password.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>numSymbols</code><br/>
-<em>
-int32
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>The number of symbols in the password.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>symbolCharacters</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>The set of symbols allowed when generating the password. If empty, KubeBlocks uses
-the default symbol set, which is &ldquo;!@#&amp;*&rdquo;.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>letterCase</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.LetterCase">
-LetterCase
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>The case of the letters in the password.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>seed</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Seed to generate the account&rsquo;s password.
-Cannot be updated.</p>
 </td>
 </tr>
 </tbody>

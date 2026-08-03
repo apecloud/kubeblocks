@@ -91,7 +91,7 @@ var _ = Describe("cluster sharding shared transformers", func() {
 						Name: accountName,
 						PasswordGenerationPolicy: appsv1.PasswordConfig{
 							Length:    16,
-							NumDigits: 4,
+							NumDigits: ptr.To[int32](4),
 						},
 					},
 				},
@@ -213,7 +213,7 @@ var _ = Describe("cluster sharding shared transformers", func() {
 				Name: accountName,
 				PasswordConfig: &appsv1.PasswordConfig{
 					Length:    12,
-					NumDigits: 2,
+					NumDigits: ptr.To[int32](2),
 				},
 			},
 		}

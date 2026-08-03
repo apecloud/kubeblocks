@@ -53,7 +53,11 @@ func (r *passwordReader) Seed(seed int64) {
 }
 
 func GeneratePasswordByConfig(config appsv1.PasswordConfig) (string, error) {
-	passwd, err := generatePassword((int)(config.Length), (int)(config.NumDigits), (int)(config.NumSymbols), config.Seed, config.SymbolCharacters)
+	numDigits := defaultSystemAccountPasswordDigits
+	if config.NumDigits != nil {
+		numDigits = *config.NumDigits
+	}
+	passwd, err := generatePassword((int)(config.Length), (int)(numDigits), (int)(config.NumSymbols), config.Seed, config.SymbolCharacters)
 	if err != nil {
 		return "", err
 	}
@@ -73,41 +77,12 @@ func GeneratePasswordByConfig(config appsv1.PasswordConfig) (string, error) {
 // over the legacy field. No configuration means passwordless.
 func GenerateSystemAccountPassword(account appsv1.SystemAccount) (string, error) {
 	if account.PasswordConfig != nil {
-		return GeneratePasswordByConfig(systemAccountPasswordConfig(*account.PasswordConfig))
+		return GeneratePasswordByConfig(*account.PasswordConfig)
 	}
 	if account.PasswordGenerationPolicy == (appsv1.PasswordConfig{}) {
 		return "", nil
 	}
 	return GeneratePasswordByConfig(account.PasswordGenerationPolicy)
-}
-
-// ToSystemAccountPasswordConfig converts an existing component-level override into the
-// presence-aware ComponentDefinition contract.
-func ToSystemAccountPasswordConfig(config appsv1.PasswordConfig) *appsv1.SystemAccountPasswordConfig {
-	numDigits := config.NumDigits
-	return &appsv1.SystemAccountPasswordConfig{
-		Length:           config.Length,
-		NumDigits:        &numDigits,
-		NumSymbols:       config.NumSymbols,
-		SymbolCharacters: config.SymbolCharacters,
-		LetterCase:       config.LetterCase,
-		Seed:             config.Seed,
-	}
-}
-
-func systemAccountPasswordConfig(config appsv1.SystemAccountPasswordConfig) appsv1.PasswordConfig {
-	numDigits := defaultSystemAccountPasswordDigits
-	if config.NumDigits != nil {
-		numDigits = *config.NumDigits
-	}
-	return appsv1.PasswordConfig{
-		Length:           config.Length,
-		NumDigits:        numDigits,
-		NumSymbols:       config.NumSymbols,
-		SymbolCharacters: config.SymbolCharacters,
-		LetterCase:       config.LetterCase,
-		Seed:             config.Seed,
-	}
 }
 
 // ValidateSystemAccountPassword enforces the password contract shared by all

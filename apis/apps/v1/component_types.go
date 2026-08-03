@@ -352,7 +352,9 @@ type ComponentSpec struct {
 	EnableInstanceAPI *bool `json:"enableInstanceAPI,omitempty"`
 
 	// Specifies custom actions that can be performed on the Component.
-	// User-defined custom actions support blocking mode only.
+	//
+	// The API or controller that owns an Action determines and validates its
+	// supported execution modes.
 	//
 	// +optional
 	CustomActions []CustomAction `json:"customActions,omitempty"`
@@ -418,7 +420,6 @@ type Sidecar struct {
 	SidecarDef string `json:"sidecarDef"`
 }
 
-// +kubebuilder:validation:XValidation:rule="self.name in ['shardingShardAdd', 'shardingShardRemove'] || !self.action.nonBlocking",message="custom actions do not support non-blocking mode"
 type CustomAction struct {
 	// Name specifies the unique name of the custom action.
 	//

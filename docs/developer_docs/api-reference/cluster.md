@@ -1002,8 +1002,9 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies custom actions that can be performed on the Component.
-User-defined custom actions support blocking mode only.</p>
+<p>Specifies custom actions that can be performed on the Component.</p>
+<p>The API or controller that owns an Action determines and validates its
+supported execution modes.</p>
 </td>
 </tr>
 </tbody>
@@ -7341,8 +7342,9 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies custom actions that can be performed on the Component.
-User-defined custom actions support blocking mode only.</p>
+<p>Specifies custom actions that can be performed on the Component.</p>
+<p>The API or controller that owns an Action determines and validates its
+supported execution modes.</p>
 </td>
 </tr>
 </tbody>

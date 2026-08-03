@@ -62,7 +62,7 @@ func (t *componentValidationTransformer) Transform(ctx graph.TransformContext, d
 	if err = validateExternalManagedConfigSources(transCtx); err != nil {
 		return intctrlutil.NewRequeueError(appsutil.RequeueDuration, err.Error())
 	}
-	if err = validateNonBlockingActions(comp); err != nil {
+	if err = validateNonBlockingReconfigureActions(comp); err != nil {
 		return intctrlutil.NewRequeueError(appsutil.RequeueDuration, err.Error())
 	}
 	// if err = validateSidecarContainers(comp, transCtx.CompDef); err != nil {
@@ -71,23 +71,10 @@ func (t *componentValidationTransformer) Transform(ctx graph.TransformContext, d
 	return nil
 }
 
-func validateNonBlockingActions(comp *appsv1.Component) error {
+func validateNonBlockingReconfigureActions(comp *appsv1.Component) error {
 	for i, config := range comp.Spec.Configs {
 		if config.ReconfigureAction != nil && config.ReconfigureAction.NonBlocking {
 			return fmt.Errorf("spec.configs[%d].reconfigureAction does not support non-blocking mode", i)
-		}
-	}
-	for i, custom := range comp.Spec.CustomActions {
-		if custom.Action == nil || !custom.Action.NonBlocking {
-			continue
-		}
-		// These two names are synthesized from the explicitly supported
-		// ShardingDefinition shardAdd and shardRemove fields. Other Component
-		// custom actions remain blocking-only.
-		shardingAction := comp.Labels[constant.KBAppShardingNameLabelKey] != "" &&
-			(custom.Name == "shardingShardAdd" || custom.Name == "shardingShardRemove")
-		if !shardingAction {
-			return fmt.Errorf("spec.customActions[%d].action does not support non-blocking mode", i)
 		}
 	}
 	return nil

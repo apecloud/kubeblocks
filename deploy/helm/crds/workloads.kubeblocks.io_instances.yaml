@@ -541,9 +541,6 @@ spec:
                   required:
                   - name
                   type: object
-                  x-kubernetes-validations:
-                  - message: reconfigure does not support non-blocking mode
-                    rule: '!has(self.reconfigure) || !self.reconfigure.nonBlocking'
                 type: array
               instanceAssistantObjects:
                 description: Assistant objects that are necessary to run the instance.
@@ -2421,11 +2418,6 @@ spec:
                     description: Provides variables which are used to call Actions.
                     type: object
                 type: object
-                x-kubernetes-validations:
-                - message: switchover does not support non-blocking mode
-                  rule: '!has(self.switchover) || !self.switchover.nonBlocking'
-                - message: reconfigure does not support non-blocking mode
-                  rule: '!has(self.reconfigure) || !self.reconfigure.nonBlocking'
               minReadySeconds:
                 default: 0
                 description: |-

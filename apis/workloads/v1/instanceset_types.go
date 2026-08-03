@@ -513,8 +513,6 @@ type ReplicaRole = kbappsv1.ReplicaRole
 // +kubebuilder:object:generate=false
 type Action = kbappsv1.Action
 
-// +kubebuilder:validation:XValidation:rule="!has(self.switchover) || !self.switchover.nonBlocking",message="switchover does not support non-blocking mode"
-// +kubebuilder:validation:XValidation:rule="!has(self.reconfigure) || !self.reconfigure.nonBlocking",message="reconfigure does not support non-blocking mode"
 type LifecycleActions struct {
 	// Provides variables which are used to call Actions.
 	//
@@ -532,7 +530,6 @@ type LifecycleActions struct {
 	Reconfigure *Action `json:"reconfigure,omitempty"`
 }
 
-// +kubebuilder:validation:XValidation:rule="!has(self.reconfigure) || !self.reconfigure.nonBlocking",message="reconfigure does not support non-blocking mode"
 type ConfigTemplate struct {
 	// The name of the config.
 	Name string `json:"name"`

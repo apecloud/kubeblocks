@@ -181,7 +181,7 @@ func TestValidateExternalManagedConfigSources(t *testing.T) {
 	}
 }
 
-func TestValidateNonBlockingActions(t *testing.T) {
+func TestValidateNonBlockingReconfigureActions(t *testing.T) {
 	tests := []struct {
 		name    string
 		comp    *appsv1.Component
@@ -197,35 +197,20 @@ func TestValidateNonBlockingActions(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "rejects user custom action",
+			name: "does not validate custom actions owned by higher-level APIs",
 			comp: &appsv1.Component{Spec: appsv1.ComponentSpec{
 				CustomActions: []appsv1.CustomAction{{
 					Name:   "custom",
 					Action: &appsv1.Action{NonBlocking: true},
 				}},
 			}},
-			wantErr: true,
-		},
-		{
-			name: "accepts synthesized shard actions",
-			comp: &appsv1.Component{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{constant.KBAppShardingNameLabelKey: "sharding"},
-				},
-				Spec: appsv1.ComponentSpec{
-					CustomActions: []appsv1.CustomAction{
-						{Name: "shardingShardAdd", Action: &appsv1.Action{NonBlocking: true}},
-						{Name: "shardingShardRemove", Action: &appsv1.Action{NonBlocking: true}},
-					},
-				},
-			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateNonBlockingActions(tt.comp)
+			err := validateNonBlockingReconfigureActions(tt.comp)
 			if (err != nil) != tt.wantErr {
-				t.Fatalf("validateNonBlockingActions() error = %v, wantErr %v", err, tt.wantErr)
+				t.Fatalf("validateNonBlockingReconfigureActions() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

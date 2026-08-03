@@ -618,7 +618,22 @@ func resolveShardingDefinition(ctx context.Context, cli client.Reader, shardingD
 	slices.Sort(names)
 	latestName := names[len(names)-1]
 
-	return shardingDefs[m[latestName]], nil
+	shardingDef := shardingDefs[m[latestName]]
+	if err := validateDefinitionAvailability("ShardingDefinition", shardingDef.Name,
+		shardingDef.Generation, shardingDef.Status.ObservedGeneration, shardingDef.Status.Phase); err != nil {
+		return nil, err
+	}
+	return shardingDef, nil
+}
+
+func validateDefinitionAvailability(kind, name string, generation, observedGeneration int64, phase appsv1.Phase) error {
+	if observedGeneration != generation {
+		return fmt.Errorf("the referenced %s is not up to date: %s", kind, name)
+	}
+	if phase != appsv1.AvailablePhase {
+		return fmt.Errorf("the referenced %s is unavailable: %s", kind, name)
+	}
+	return nil
 }
 
 // listShardingDefinitionsWithPattern returns all sharding definitions whose names match the given pattern
@@ -694,7 +709,12 @@ func resolveCompDefinitionNServiceVersion(ctx context.Context, cli client.Reader
 	slices.Sort(compatibleCompDefNames)
 	compatibleCompDefName := compatibleCompDefNames[len(compatibleCompDefNames)-1]
 
-	return compatibleCompDefs[compatibleCompDefName], serviceVersion, nil
+	compDef = compatibleCompDefs[compatibleCompDefName]
+	if err := validateDefinitionAvailability("ComponentDefinition", compDef.Name,
+		compDef.Generation, compDef.Status.ObservedGeneration, compDef.Status.Phase); err != nil {
+		return nil, serviceVersion, err
+	}
+	return compDef, serviceVersion, nil
 }
 
 // listCompDefinitionsWithPattern returns all component definitions whose names match the given pattern

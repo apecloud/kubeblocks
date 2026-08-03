@@ -144,6 +144,20 @@ var _ = Describe("", func() {
 				g.Expect(pobj.Status.Phase).To(Equal(dpv1alpha1.AvailablePhase))
 				g.Expect(pobj.Status.Message).To(BeEmpty())
 			})).Should(Succeed())
+
+			By("remove stale component definition labels while preserving custom labels")
+			Expect(testapps.ChangeObj(&testCtx, bpt, func(pobj *dpv1alpha1.BackupPolicyTemplate) {
+				pobj.Spec.CompDefs = []string{compDef2}
+				if pobj.Labels == nil {
+					pobj.Labels = map[string]string{}
+				}
+				pobj.Labels["custom-label"] = "custom-value"
+			})).Should(Succeed())
+			Eventually(testapps.CheckObj(&testCtx, key, func(g Gomega, pobj *dpv1alpha1.BackupPolicyTemplate) {
+				g.Expect(pobj.Labels).NotTo(HaveKey(compDef1))
+				g.Expect(pobj.Labels[compDef2]).To(Equal(compDef2))
+				g.Expect(pobj.Labels["custom-label"]).To(Equal("custom-value"))
+			})).Should(Succeed())
 		})
 		It("test BackupPolicyTemplate schedule parameters", func() {
 			const (

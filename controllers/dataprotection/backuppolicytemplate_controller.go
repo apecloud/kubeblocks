@@ -80,11 +80,20 @@ func (r *BackupPolicyTemplateReconciler) setComponentDefLabels(reqCtx intctrluti
 		bpt.Labels = map[string]string{}
 	}
 	for _, item := range compDefList.Items {
+		matched := false
 		for _, compDef := range bpt.Spec.CompDefs {
 			// set componentDef labels
 			if component.PrefixOrRegexMatched(item.Name, compDef) {
-				bpt.Labels[item.Name] = item.Name
+				matched = true
+				break
 			}
+		}
+		if matched {
+			bpt.Labels[item.Name] = item.Name
+		} else if bpt.Labels[item.Name] == item.Name {
+			// ComponentDefinition labels are maintained by this controller. Remove
+			// stale labels when spec.compDefs no longer matches the component.
+			delete(bpt.Labels, item.Name)
 		}
 	}
 	if !reflect.DeepEqual(oldBPT.Labels, bpt.Labels) {

@@ -20,24 +20,31 @@ along with KubeBlocks.  If not, see <http://www.gnu.org/licenses/>.
 package cluster
 
 import (
-	"bytes"
-	"compress/gzip"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io"
 	"sort"
-	"strings"
 
-	apivalidation "k8s.io/apimachinery/pkg/api/validation"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
-const (
-	shardingActionTargetsGZIPPrefix     = "gzip:"
-	shardingActionTargetsMaxDecodedSize = 16 << 20
-)
+const shardingActionTargetsVersion = 1
+
+type shardingActionTargets struct {
+	Version int                    `json:"version"`
+	Targets []shardingActionTarget `json:"targets"`
+}
+
+type shardingActionTarget struct {
+	Component string                    `json:"component"`
+	Pods      []shardingActionTargetPod `json:"pods"`
+}
+
+type shardingActionTargetPod struct {
+	Name  string `json:"name"`
+	Rerun bool   `json:"rerun,omitempty"`
+}
 
 func getShardingActionTargets(comp *appsv1.Component, annotation string) (*shardingActionTargets, bool, error) {
 	value, found := comp.Annotations[annotation]
@@ -45,32 +52,8 @@ func getShardingActionTargets(comp *appsv1.Component, annotation string) (*shard
 		return nil, false, nil
 	}
 
-	data := []byte(value)
-	if strings.HasPrefix(value, shardingActionTargetsGZIPPrefix) {
-		compressed, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(value, shardingActionTargetsGZIPPrefix))
-		if err != nil {
-			return nil, false, fmt.Errorf("invalid %s annotation on component %s: %w", annotation, comp.Name, err)
-		}
-		reader, err := gzip.NewReader(bytes.NewReader(compressed))
-		if err != nil {
-			return nil, false, fmt.Errorf("invalid %s annotation on component %s: %w", annotation, comp.Name, err)
-		}
-		data, err = io.ReadAll(io.LimitReader(reader, shardingActionTargetsMaxDecodedSize+1))
-		closeErr := reader.Close()
-		if err != nil {
-			return nil, false, fmt.Errorf("invalid %s annotation on component %s: %w", annotation, comp.Name, err)
-		}
-		if closeErr != nil {
-			return nil, false, fmt.Errorf("invalid %s annotation on component %s: %w", annotation, comp.Name, closeErr)
-		}
-		if len(data) > shardingActionTargetsMaxDecodedSize {
-			return nil, false, fmt.Errorf("invalid %s annotation on component %s: decoded data exceeds %d bytes",
-				annotation, comp.Name, shardingActionTargetsMaxDecodedSize)
-		}
-	}
-
 	targets := &shardingActionTargets{}
-	if err := json.Unmarshal(data, targets); err != nil {
+	if err := json.Unmarshal([]byte(value), targets); err != nil {
 		return nil, false, fmt.Errorf("invalid %s annotation on component %s: %w", annotation, comp.Name, err)
 	}
 	if err := validateShardingActionTargets(targets); err != nil {
@@ -85,40 +68,11 @@ func setShardingActionTargets(comp *appsv1.Component, annotation string, targets
 	if err != nil {
 		return err
 	}
-
-	withValue := func(value string) map[string]string {
-		annotations := make(map[string]string, len(comp.Annotations)+1)
-		for key, current := range comp.Annotations {
-			annotations[key] = current
-		}
-		annotations[annotation] = value
-		return annotations
+	if comp.Annotations == nil {
+		comp.Annotations = map[string]string{}
 	}
-	if annotations := withValue(string(data)); apivalidation.ValidateAnnotationsSize(annotations) == nil {
-		comp.Annotations = annotations
-		return nil
-	}
-
-	var compressed bytes.Buffer
-	writer := gzip.NewWriter(&compressed)
-	if _, err := writer.Write(data); err != nil {
-		return err
-	}
-	if err := writer.Close(); err != nil {
-		return err
-	}
-	value := shardingActionTargetsGZIPPrefix + base64.StdEncoding.EncodeToString(compressed.Bytes())
-
-	annotations := withValue(value)
-	if err := apivalidation.ValidateAnnotationsSize(annotations); err != nil {
-		return fmt.Errorf("cannot persist targets for component %s: %w", comp.Name, err)
-	}
-	comp.Annotations = annotations
+	comp.Annotations[annotation] = string(data)
 	return nil
-}
-
-func deleteShardingActionTargets(comp *appsv1.Component, annotation string) {
-	delete(comp.Annotations, annotation)
 }
 
 func sortShardingActionTargets(targets *shardingActionTargets) {
@@ -130,4 +84,37 @@ func sortShardingActionTargets(targets *shardingActionTargets) {
 	sort.Slice(targets.Targets, func(i, j int) bool {
 		return targets.Targets[i].Component < targets.Targets[j].Component
 	})
+}
+
+func validateShardingActionTargets(targets *shardingActionTargets) error {
+	if targets.Version != shardingActionTargetsVersion {
+		return fmt.Errorf("unsupported version %d", targets.Version)
+	}
+	if len(targets.Targets) == 0 {
+		return fmt.Errorf("targets must not be empty")
+	}
+	components := sets.New[string]()
+	pods := sets.New[string]()
+	for _, target := range targets.Targets {
+		if target.Component == "" {
+			return fmt.Errorf("target component must not be empty")
+		}
+		if components.Has(target.Component) {
+			return fmt.Errorf("duplicate target component %s", target.Component)
+		}
+		components.Insert(target.Component)
+		if len(target.Pods) == 0 {
+			return fmt.Errorf("target component %s has no pods", target.Component)
+		}
+		for _, pod := range target.Pods {
+			if pod.Name == "" {
+				return fmt.Errorf("target pod name must not be empty")
+			}
+			if pods.Has(pod.Name) {
+				return fmt.Errorf("duplicate target pod %s", pod.Name)
+			}
+			pods.Insert(pod.Name)
+		}
+	}
+	return nil
 }

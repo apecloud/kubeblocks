@@ -2577,7 +2577,7 @@ var _ = Describe("cluster component transformer test", func() {
 				shardAction.TargetPodSelector = appsv1.AllReplicas
 				err := (&clusterShardingHandler{}).nonBlockingShardingAction(
 					transCtx, sharding1aName, shardingAddShardAction, shardingAddActionTargetsKey,
-					shardAction, nil, []*appsv1.Component{shard1, shard0}, source, sets.New[string]())
+					shardAction, nil, []*appsv1.Component{shard1, shard0}, source, new(bool))
 				Expect(ictrlutil.IsDelayedRequeueError(err)).Should(BeTrue())
 
 				targets, found, err := getShardingActionTargets(source, shardingAddActionTargetsKey)
@@ -2616,7 +2616,7 @@ var _ = Describe("cluster component transformer test", func() {
 
 				err := (&clusterShardingHandler{}).nonBlockingShardingAction(
 					transCtx, sharding1aName, shardingAddShardAction, shardingAddActionTargetsKey,
-					action(), nil, []*appsv1.Component{shard}, source, sets.New[string]())
+					action(), nil, []*appsv1.Component{shard}, source, new(bool))
 				Expect(ictrlutil.IsDelayedRequeueError(err)).Should(BeTrue())
 
 				targets, _, err := getShardingActionTargets(source, shardingAddActionTargetsKey)
@@ -2664,7 +2664,7 @@ var _ = Describe("cluster component transformer test", func() {
 				}).Should(ConsistOf(retained.Name, "shard-1"))
 			})
 
-			It("does not shrink participants while a replacement pod is unavailable", func() {
+			It("does not shrink targets while a replacement pod is unavailable", func() {
 				shard, pods := buildShard("shard-0", "pod-0")
 				source := shard
 				reader := &appsutil.MockReader{Objects: []client.Object{shard, pods[0]}}
@@ -2695,7 +2695,7 @@ var _ = Describe("cluster component transformer test", func() {
 				Expect(persisted.Targets[0].Pods).Should(HaveLen(2))
 			})
 
-			It("defers ordinary replica updates while participants are pending", func() {
+			It("defers ordinary replica updates while targets are pending", func() {
 				shard, pod := mockShardCompWithPod(appsv1.RunningComponentPhase, map[string]string{
 					constant.KBAppClusterUIDKey: "test-uid",
 					shardingAddShardKey:         "pending",
@@ -2789,7 +2789,7 @@ var _ = Describe("cluster component transformer test", func() {
 
 				err := (&clusterShardingHandler{}).nonBlockingShardingAction(
 					transCtx, sharding1aName, shardingAddShardAction, shardingAddActionTargetsKey,
-					action(), nil, []*appsv1.Component{shard}, source, sets.New[string]())
+					action(), nil, []*appsv1.Component{shard}, source, new(bool))
 				Expect(ictrlutil.IsDelayedRequeueError(err)).Should(BeTrue())
 				persisted, _, err := getShardingActionTargets(source, shardingAddActionTargetsKey)
 				Expect(err).Should(BeNil())
@@ -2845,7 +2845,7 @@ var _ = Describe("cluster component transformer test", func() {
 				handler := &clusterShardingHandler{}
 				err := handler.nonBlockingShardingAction(
 					transCtx, sharding1aName, shardingAddShardAction, shardingAddActionTargetsKey,
-					action(), nil, []*appsv1.Component{shard}, source, sets.New[string]())
+					action(), nil, []*appsv1.Component{shard}, source, new(bool))
 				Expect(errors.Is(err, lifecycle.ErrActionFailed)).Should(BeTrue())
 				targets, _, err := getShardingActionTargets(source, shardingAddActionTargetsKey)
 				Expect(err).Should(BeNil())
@@ -2854,7 +2854,7 @@ var _ = Describe("cluster component transformer test", func() {
 
 				err = handler.nonBlockingShardingAction(
 					transCtx, sharding1aName, shardingAddShardAction, shardingAddActionTargetsKey,
-					action(), nil, []*appsv1.Component{shard}, source, sets.New[string]())
+					action(), nil, []*appsv1.Component{shard}, source, new(bool))
 				Expect(ictrlutil.IsDelayedRequeueError(err)).Should(BeTrue())
 				Expect(callCount).Should(Equal(4))
 				Expect(rerunCount).Should(Equal(1))
@@ -2892,20 +2892,20 @@ var _ = Describe("cluster component transformer test", func() {
 						}).Times(1)
 				})
 
-				claimed := sets.New[string]()
+				requestHandled := false
 				handler := &clusterShardingHandler{}
 				err := handler.nonBlockingShardingAction(
 					transCtx, sharding1aName, shardingAddShardAction, shardingAddActionTargetsKey,
-					action(), nil, []*appsv1.Component{target}, source0, claimed)
+					action(), nil, []*appsv1.Component{target}, source0, &requestHandled)
 				Expect(ictrlutil.IsDelayedRequeueError(err)).Should(BeTrue())
 				err = handler.nonBlockingShardingAction(
 					transCtx, sharding1aName, shardingAddShardAction, shardingAddActionTargetsKey,
-					action(), nil, []*appsv1.Component{target}, source1, claimed)
+					action(), nil, []*appsv1.Component{target}, source1, &requestHandled)
 				Expect(ictrlutil.IsDelayedRequeueError(err)).Should(BeTrue())
 				Expect(callCount).Should(Equal(1))
 			})
 
-			It("serializes source-shard requests even when their execution pods are disjoint", func() {
+			It("serializes source-shard requests even when their target pods are disjoint", func() {
 				target0, pods0 := buildShard("target-0", "target-0-0")
 				target1, pods1 := buildShard("target-1", "target-1-0")
 				source0, _ := buildShard("source-0")
@@ -2938,15 +2938,15 @@ var _ = Describe("cluster component transformer test", func() {
 						}).Times(1)
 				})
 
-				claimed := sets.New[string]()
+				requestHandled := false
 				handler := &clusterShardingHandler{}
 				err := handler.nonBlockingShardingAction(
 					transCtx, sharding1aName, shardingAddShardAction, shardingAddActionTargetsKey,
-					action(), nil, []*appsv1.Component{target0, target1}, source0, claimed)
+					action(), nil, []*appsv1.Component{target0, target1}, source0, &requestHandled)
 				Expect(ictrlutil.IsDelayedRequeueError(err)).Should(BeTrue())
 				err = handler.nonBlockingShardingAction(
 					transCtx, sharding1aName, shardingAddShardAction, shardingAddActionTargetsKey,
-					action(), nil, []*appsv1.Component{target0, target1}, source1, claimed)
+					action(), nil, []*appsv1.Component{target0, target1}, source1, &requestHandled)
 				Expect(ictrlutil.IsDelayedRequeueError(err)).Should(BeTrue())
 				Expect(callCount).Should(Equal(1))
 			})
@@ -2979,7 +2979,7 @@ var _ = Describe("cluster component transformer test", func() {
 				})
 
 				err := (&clusterShardingHandler{}).handleShardAdd(
-					transCtx, sharding1aName, []*appsv1.Component{shard}, shard, sets.New[string]())
+					transCtx, sharding1aName, []*appsv1.Component{shard}, shard, new(bool))
 				Expect(err).Should(BeNil())
 				Expect(shard.Annotations).ShouldNot(HaveKey(shardingAddShardKey))
 				Expect(shard.Annotations).ShouldNot(HaveKey(shardingAddActionTargetsKey))

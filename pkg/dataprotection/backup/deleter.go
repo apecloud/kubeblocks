@@ -33,6 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -323,6 +324,11 @@ func (d *Deleter) doPreDeleteAction(
 		{Name: dptypes.DPBackupBasePath, Value: backupFilePath},
 		{Name: dptypes.DPBackupName, Value: backup.Name},
 	}
+	connectionEnv, err := d.buildEnvFromTarget(backup)
+	if err != nil {
+		return nil, err
+	}
+	envVars = append(envVars, connectionEnv...)
 	if d.actionSet != nil {
 		envVars = append(envVars, d.actionSet.Spec.Env...)
 	}
@@ -342,6 +348,63 @@ func (d *Deleter) doPreDeleteAction(
 		},
 	}
 	return preJob, d.createDeleteJob(container, preJobKey, backup, backupRepo, legacyPVCName)
+}
+
+func (d *Deleter) buildEnvFromTarget(backup *dpv1alpha1.Backup) ([]corev1.EnvVar, error) {
+	clusterName := backup.Labels[constant.AppInstanceLabelKey]
+	clusterUID := backup.Labels[dptypes.ClusterUIDLabelKey]
+	if clusterName == "" || clusterUID == "" {
+		return nil, nil
+	}
+
+	cluster := &appsv1.Cluster{}
+	err := d.Client.Get(d.Ctx, client.ObjectKey{Namespace: backup.Namespace, Name: clusterName}, cluster)
+	if apierrors.IsNotFound(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if string(cluster.UID) != clusterUID {
+		return nil, nil
+	}
+
+	target := backup.Status.Target
+	if target == nil && len(backup.Status.Targets) > 0 {
+		target = &backup.Status.Targets[0]
+	}
+	if target == nil || target.PodSelector == nil || target.PodSelector.LabelSelector == nil {
+		return nil, nil
+	}
+
+	targetPod, err := d.selectAvailableTargetPod(backup.Namespace, target.PodSelector)
+	if err != nil || targetPod == nil {
+		return nil, err
+	}
+	envVars := targetPod.Spec.Containers[0].Env
+	envVarsFromTarget, err := utils.BuildEnvByTarget(targetPod, target.ConnectionCredential, target.ContainerPort)
+	if err != nil {
+		return nil, err
+	}
+	return append(envVars, envVarsFromTarget...), nil
+}
+
+func (d *Deleter) selectAvailableTargetPod(namespace string, selector *dpv1alpha1.PodSelector) (*corev1.Pod, error) {
+	selectPod := func(labelSelector *metav1.LabelSelector) (*corev1.Pod, error) {
+		reqCtx := d.RequestCtx
+		reqCtx.Req.Namespace = namespace
+		pods, err := utils.GetPodListByLabelSelector(reqCtx, d.Client, labelSelector)
+		if err != nil {
+			return nil, err
+		}
+		return utils.GetFirstIndexRunningPod(pods), nil
+	}
+
+	targetPod, err := selectPod(selector.LabelSelector)
+	if err != nil || targetPod != nil || selector.Strategy != dpv1alpha1.PodSelectionStrategyAny || selector.FallbackLabelSelector == nil {
+		return targetPod, err
+	}
+	return selectPod(selector.FallbackLabelSelector)
 }
 
 func (d *Deleter) DeleteVolumeSnapshots(backup *dpv1alpha1.Backup) error {

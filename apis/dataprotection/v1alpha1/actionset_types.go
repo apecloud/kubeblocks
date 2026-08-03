@@ -119,7 +119,10 @@ type BackupActionSpec struct {
 	PostBackup []ActionSpec `json:"postBackup,omitempty"`
 
 	// Represents a custom deletion action that can be executed before the built-in deletion action.
-	// Note: The preDelete action job will ignore the env/envFrom.
+	//
+	// If the original cluster and an available target pod still exist, the controller injects the
+	// current connection information through DP_DB_* environment variables. It will also target pod's env/envFrom.
+	// Otherwise, these environment variables are omitted.
 	//
 	// +optional
 	PreDeleteBackup *BaseJobActionSpec `json:"preDelete,omitempty"`

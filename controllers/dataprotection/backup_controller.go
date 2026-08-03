@@ -666,10 +666,6 @@ func (r *BackupReconciler) handleRunningPhase(
 			}
 		}
 	}
-	if existFailedAction {
-		return r.updateStatusIfFailed(reqCtx, backup, request.Backup,
-			fmt.Errorf("there are failed actions, you can obtain the more information in the status.actions"))
-	}
 	if waiting {
 		// reset time related fields for continuous backup
 		request.Status.CompletionTimestamp = nil
@@ -683,6 +679,10 @@ func (r *BackupReconciler) handleRunningPhase(
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		}
 		return intctrlutil.Reconciled()
+	}
+	if existFailedAction {
+		return r.updateStatusIfFailed(reqCtx, backup, request.Backup,
+			fmt.Errorf("there are failed actions, you can obtain the more information in the status.actions"))
 	}
 	return r.completeBackup(reqCtx, backup, request.Backup)
 }

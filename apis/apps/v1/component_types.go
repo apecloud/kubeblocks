@@ -353,9 +353,6 @@ type ComponentSpec struct {
 
 	// Specifies custom actions that can be performed on the Component.
 	//
-	// The API or controller that owns an Action determines and validates its
-	// supported execution modes.
-	//
 	// +optional
 	CustomActions []CustomAction `json:"customActions,omitempty"`
 }

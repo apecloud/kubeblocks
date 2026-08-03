@@ -1003,8 +1003,6 @@ bool
 <td>
 <em>(Optional)</em>
 <p>Specifies custom actions that can be performed on the Component.</p>
-<p>The API or controller that owns an Action determines and validates its
-supported execution modes.</p>
 </td>
 </tr>
 </tbody>
@@ -2957,8 +2955,7 @@ Action
 </td>
 <td>
 <em>(Optional)</em>
-<p>The custom reconfigure action to apply the updated configuration.
-Reconfigure actions support blocking mode only.</p>
+<p>The custom reconfigure action to apply the updated configuration.</p>
 <p>The container executing this action has access to following variables:</p>
 <ul>
 <li>KB_CONFIG_FILES_CREATED: file1,file2&hellip;</li>
@@ -7343,8 +7340,6 @@ bool
 <td>
 <em>(Optional)</em>
 <p>Specifies custom actions that can be performed on the Component.</p>
-<p>The API or controller that owns an Action determines and validates its
-supported execution modes.</p>
 </td>
 </tr>
 </tbody>

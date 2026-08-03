@@ -181,7 +181,6 @@ spec:
                     reconfigureAction:
                       description: |-
                         The custom reconfigure action to apply the updated configuration.
-                        Reconfigure actions support blocking mode only.
 
                         The container executing this action has access to following variables:
 
@@ -647,11 +646,8 @@ spec:
                   type: object
                 type: array
               customActions:
-                description: |-
-                  Specifies custom actions that can be performed on the Component.
-
-                  The API or controller that owns an Action determines and validates its
-                  supported execution modes.
+                description: Specifies custom actions that can be performed on the
+                  Component.
                 items:
                   properties:
                     action:

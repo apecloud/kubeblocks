@@ -514,7 +514,6 @@ type ProvisionSecretRef struct {
 }
 
 // ClusterComponentConfig represents a configuration for a component.
-//
 type ClusterComponentConfig struct {
 	// The name of the config.
 	//
@@ -563,7 +562,6 @@ type ClusterComponentConfig struct {
 	Reconfigure *bool `json:"reconfigure,omitempty"`
 
 	// The custom reconfigure action to apply the updated configuration.
-	// Reconfigure actions support blocking mode only.
 	//
 	// The container executing this action has access to following variables:
 	//

@@ -415,6 +415,7 @@ var _ = Describe("Backup Controller test", func() {
 
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ClusterSignature, true, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.PodSignature, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupScheduleSignature, true, inNS)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupSignature, true, inNS)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupRepoSignature, true, ml)
 
@@ -2216,6 +2217,101 @@ var _ = Describe("Backup Controller test", func() {
 				By("check backup phase")
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
 					g.Expect(fetched.Status.Phase).Should(Equal(dpv1alpha1.BackupPhaseFailed))
+				})).Should(Succeed())
+			})
+
+			It("fails a multi-target continuous backup when a sibling action is still running", func() {
+				By("create the continuous action set, backup repository, and two backup targets")
+				actionSet := testdp.NewFakeActionSet(&testCtx, func(actionSet *dpv1alpha1.ActionSet) {
+					actionSet.Spec.BackupType = dpv1alpha1.BackupTypeContinuous
+				})
+				_ = testdp.NewFakeStorageProvider(&testCtx, nil)
+				_, _ = testdp.NewFakeBackupRepo(&testCtx, nil)
+				backupPolicy = testdp.NewFakeBackupPolicy(&testCtx, func(fetched *dpv1alpha1.BackupPolicy) {
+					podSelector := &dpv1alpha1.PodSelector{
+						LabelSelector: &metav1.LabelSelector{MatchLabels: map[string]string{
+							constant.AppInstanceLabelKey:    testdp.ClusterName,
+							constant.KBAppComponentLabelKey: testdp.ComponentName,
+						}},
+						Strategy: dpv1alpha1.PodSelectionStrategyAny,
+					}
+					fetched.Spec.BackupMethods[0].Targets = []dpv1alpha1.BackupTarget{
+						{Name: testdp.ComponentName + "-0", PodSelector: podSelector},
+						{Name: testdp.ComponentName + "-1", PodSelector: podSelector},
+					}
+				})
+				Expect(actionSet.Spec.BackupType).To(Equal(dpv1alpha1.BackupTypeContinuous))
+
+				By("enable the continuous schedule and wait for both stateful actions")
+				backupSchedule := testdp.NewFakeBackupSchedule(&testCtx, func(schedule *dpv1alpha1.BackupSchedule) {
+					schedule.Spec.Schedules[0].Enabled = pointer.Bool(true)
+				})
+				backupName := dpbackup.GenerateCRNameByBackupSchedule(backupSchedule, testdp.BackupMethodName)
+				backupKey := client.ObjectKey{Name: backupName, Namespace: testCtx.DefaultNamespace}
+				backup := &dpv1alpha1.Backup{}
+				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseRunning))
+					backup = fetched.DeepCopy()
+				})).Should(Succeed())
+				targets := backupPolicy.Spec.BackupMethods[0].Targets
+				getStatefulSetKey := func(targetName string) client.ObjectKey {
+					return client.ObjectKey{
+						Name:      dpbackup.GenerateBackupStatefulSetName(backup, targetName, dpbackup.BackupDataJobNamePrefix),
+						Namespace: backup.Namespace,
+					}
+				}
+				failedStatefulSetKey := getStatefulSetKey(targets[0].Name)
+				runningStatefulSetKey := getStatefulSetKey(targets[1].Name)
+				Eventually(testapps.CheckObjExists(&testCtx, failedStatefulSetKey, &appsv1.StatefulSet{}, true)).Should(Succeed())
+				Eventually(testapps.CheckObjExists(&testCtx, runningStatefulSetKey, &appsv1.StatefulSet{}, true)).Should(Succeed())
+
+				By("pause reconciliation and make one stateful action fail permanently")
+				Eventually(testapps.GetAndChangeObj(&testCtx, backupKey, func(fetched *dpv1alpha1.Backup) {
+					if fetched.Annotations == nil {
+						fetched.Annotations = map[string]string{}
+					}
+					fetched.Annotations[dptypes.SkipReconciliationAnnotationKey] = "true"
+				})).Should(Succeed())
+				failedPod := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      failedStatefulSetKey.Name + "-0",
+						Namespace: failedStatefulSetKey.Namespace,
+						Labels:    map[string]string{testCtx.TestObjLabelKey: "true"},
+					},
+					Spec: corev1.PodSpec{
+						Containers:    []corev1.Container{{Name: "backup", Image: testapps.ApeCloudMySQLImage}},
+						RestartPolicy: corev1.RestartPolicyAlways,
+					},
+				}
+				Expect(testCtx.CreateObj(ctx, failedPod)).Should(Succeed())
+				Expect(testapps.ChangeObjStatus(&testCtx, failedPod, func() {
+					failedPod.Status.ContainerStatuses = []corev1.ContainerStatus{{
+						Name: "backup",
+						State: corev1.ContainerState{Waiting: &corev1.ContainerStateWaiting{
+							Reason:  "CrashLoopBackOff",
+							Message: "archive action failed",
+						}},
+					}}
+					failedPod.Status.Conditions = []corev1.PodCondition{{
+						Type:               corev1.ContainersReady,
+						Status:             corev1.ConditionFalse,
+						LastTransitionTime: metav1.NewTime(time.Now().Add(-intctrlutil.PodContainerFailedTimeout - time.Second)),
+					}}
+				})).Should(Succeed())
+
+				By("resume reconciliation and expose the failed continuous target")
+				Eventually(testapps.GetAndChangeObj(&testCtx, backupKey, func(fetched *dpv1alpha1.Backup) {
+					delete(fetched.Annotations, dptypes.SkipReconciliationAnnotationKey)
+				})).Should(Succeed())
+				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseFailed))
+					g.Expect(fetched.Status.Actions).To(HaveLen(2))
+					phases := map[string]dpv1alpha1.ActionPhase{}
+					for _, actionStatus := range fetched.Status.Actions {
+						phases[actionStatus.ObjectRef.Name] = actionStatus.Phase
+					}
+					g.Expect(phases[failedStatefulSetKey.Name]).To(Equal(dpv1alpha1.ActionPhaseFailed))
+					g.Expect(phases[runningStatefulSetKey.Name]).To(Equal(dpv1alpha1.ActionPhaseRunning))
 				})).Should(Succeed())
 			})
 

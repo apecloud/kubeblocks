@@ -65,6 +65,10 @@ type clusterTransformContext struct {
 
 	// TODO: remove this, annotations to be added to components for sharding, mapping with @allComps.
 	annotations map[string]map[string]string
+
+	// system account source revisions and their managed Secret dependencies, keyed by component name.
+	shardingAccountSecretRevisions    map[string]map[string]string
+	shardingAccountSecretDependencies map[string]map[client.ObjectKey]struct{}
 }
 
 // clusterPlanBuilder a graph.PlanBuilder implementation for Cluster reconciliation

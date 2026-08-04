@@ -67,11 +67,13 @@ func (t *clusterComponentTransformer) Transform(ctx graph.TransformContext, dag 
 	}
 
 	// if the cluster is not updating and all components are up-to-date, skip the reconciliation
-	if !transCtx.OrigCluster.IsUpdating() && updateToDate {
+	if !transCtx.OrigCluster.IsUpdating() && updateToDate && len(transCtx.shardingAccountSecretRevisions) == 0 {
 		return nil
 	}
 
-	return t.transform(transCtx, dag)
+	err = t.transform(transCtx, dag)
+	dependOnShardingAccountSecrets(transCtx, dag)
+	return err
 }
 
 func (t *clusterComponentTransformer) transform(transCtx *clusterTransformContext, dag *graph.DAG) error {

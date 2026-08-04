@@ -13481,8 +13481,7 @@ PasswordConfig
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the legacy policy for generating the account&rsquo;s password.
-A non-empty value is used only when passwordConfig is nil.</p>
+<p>Specifies the policy for generating the account&rsquo;s password.</p>
 <p>This field is immutable once set.</p>
 <p>Deprecated: passwordGenerationPolicy has been deprecated since 1.2.0 and will be removed in 1.3.0.
 Use passwordConfig instead.</p>

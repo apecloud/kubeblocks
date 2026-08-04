@@ -1226,8 +1226,7 @@ type SystemAccount struct {
 	// +optional
 	PasswordConfig *PasswordConfig `json:"passwordConfig,omitempty"`
 
-	// Specifies the legacy policy for generating the account's password.
-	// A non-empty value is used only when passwordConfig is nil.
+	// Specifies the policy for generating the account's password.
 	//
 	// This field is immutable once set.
 	//

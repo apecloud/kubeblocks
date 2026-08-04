@@ -18704,8 +18704,7 @@ spec:
                       type: object
                     passwordGenerationPolicy:
                       description: |-
-                        Specifies the legacy policy for generating the account's password.
-                        A non-empty value is used only when passwordConfig is nil.
+                        Specifies the policy for generating the account's password.
 
                         This field is immutable once set.
 

@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package cluster
 
 import (
+	"bytes"
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
@@ -35,6 +36,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 // clusterShardingAccountTransformer handles shared system accounts for sharding.
@@ -76,27 +78,28 @@ func (t *clusterShardingAccountTransformer) reconcileShardingAccounts(transCtx *
 
 func (t *clusterShardingAccountTransformer) reconcileShardingAccount(transCtx *clusterTransformContext,
 	graphCli model.GraphClient, dag *graph.DAG, sharding *appsv1.ClusterSharding, accountName string) error {
-	exist, err := t.checkSystemAccountSecret(transCtx, sharding, accountName)
+	running, err := t.getSystemAccountSecret(transCtx, sharding, accountName)
 	if err != nil {
 		return err
 	}
-	if !exist {
+	if running == nil {
 		obj, err := t.newSystemAccountSecret(transCtx, sharding, accountName)
 		if err != nil {
 			return err
 		}
 		graphCli.Create(dag, obj)
+	} else if err = t.updateSystemAccountSecret(transCtx, graphCli, dag, sharding, accountName, running); err != nil &&
+		!intctrlutil.IsDelayedRequeueError(err) {
+		return err
 	}
-
-	// TODO: update
 
 	t.rewriteSystemAccount(transCtx, sharding.Name, accountName)
 
-	return nil
+	return err
 }
 
-func (t *clusterShardingAccountTransformer) checkSystemAccountSecret(transCtx *clusterTransformContext,
-	sharding *appsv1.ClusterSharding, accountName string) (bool, error) {
+func (t *clusterShardingAccountTransformer) getSystemAccountSecret(transCtx *clusterTransformContext,
+	sharding *appsv1.ClusterSharding, accountName string) (*corev1.Secret, error) {
 	var (
 		cluster = transCtx.Cluster
 	)
@@ -106,10 +109,48 @@ func (t *clusterShardingAccountTransformer) checkSystemAccountSecret(transCtx *c
 	}
 	secret := &corev1.Secret{}
 	err := transCtx.GetClient().Get(transCtx.GetContext(), secretKey, secret)
-	if err != nil && !apierrors.IsNotFound(err) {
-		return false, err
+	if apierrors.IsNotFound(err) {
+		return nil, nil
 	}
-	return !apierrors.IsNotFound(err), nil
+	return secret, err
+}
+
+func (t *clusterShardingAccountTransformer) updateSystemAccountSecret(transCtx *clusterTransformContext,
+	graphCli model.GraphClient, dag *graph.DAG, sharding *appsv1.ClusterSharding,
+	accountName string, running *corev1.Secret) error {
+	account, err := t.definedSystemAccount(transCtx, sharding, accountName)
+	if err != nil {
+		return err
+	}
+	if account.SecretRef == nil {
+		return nil
+	}
+
+	password, err := t.getPasswordFromSecret(transCtx, account.SecretRef)
+	if err != nil {
+		return err
+	}
+	if err := common.ValidateSystemAccountPassword(password); err != nil {
+		return err
+	}
+	runningPassword, ok := running.Data[constant.AccountPasswdForSecret]
+	if ok && bytes.Equal(runningPassword, password) {
+		return nil
+	}
+
+	if ptr.Deref(running.Immutable, false) {
+		graphCli.Delete(dag, running)
+		return intctrlutil.NewDelayedRequeueError(0,
+			fmt.Sprintf("recreate immutable shared system account secret %s/%s", running.Namespace, running.Name))
+	}
+
+	updated := running.DeepCopy()
+	if updated.Data == nil {
+		updated.Data = map[string][]byte{}
+	}
+	updated.Data[constant.AccountPasswdForSecret] = password
+	graphCli.Update(dag, running, updated)
+	return nil
 }
 
 func (t *clusterShardingAccountTransformer) newSystemAccountSecret(transCtx *clusterTransformContext,
@@ -223,7 +264,6 @@ func (t *clusterShardingAccountTransformer) newAccountSecretWithPassword(transCt
 		AddAnnotationsInMap(compDef.Spec.Annotations).
 		PutData(constant.AccountNameForSecret, []byte(accountName)).
 		PutData(constant.AccountPasswdForSecret, password).
-		SetImmutable(true).
 		GetObject()
 	return secret, nil
 }

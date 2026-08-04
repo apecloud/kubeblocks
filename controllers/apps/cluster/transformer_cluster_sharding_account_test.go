@@ -36,6 +36,8 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -90,6 +92,7 @@ var _ = Describe("cluster sharding shared system account password contract", fun
 			newSystemAccountSecret(transCtx, shardingSpec, accountName)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(secret.Data[constant.AccountPasswdForSecret]).To(HaveLen(16))
+		Expect(secret.Immutable).To(BeNil())
 	})
 
 	It("keeps the deprecated generation policy compatible", func() {
@@ -175,5 +178,101 @@ var _ = Describe("cluster sharding shared system account password contract", fun
 		_, err := (&clusterShardingAccountTransformer{}).
 			newSystemAccountSecret(transCtx, shardingSpec, accountName)
 		Expect(err).To(MatchError("cross-namespace secretRef is not supported for shared sharding system accounts"))
+	})
+
+	newSourceSecretReconcile := func(sourcePassword, managedPassword []byte, immutable bool) (
+		*clusterShardingAccountTransformer, *clusterTransformContext, model.GraphClient, *graph.DAG,
+		*appsv1.ClusterSharding, *corev1.Secret) {
+		transCtx, shardingSpec := newContext(appsv1.SystemAccount{Name: accountName})
+		shardingSpec.Template.SystemAccounts = []appsv1.ComponentSystemAccount{{
+			Name: accountName,
+			SecretRef: &appsv1.ProvisionSecretRef{
+				Name: "source-account",
+			},
+		}}
+		source := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "source-account"},
+			Data:       map[string][]byte{constant.AccountPasswdForSecret: sourcePassword},
+		}
+		managed := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace,
+				Name:      shardingAccountSecretName(clusterName, sharding, accountName),
+			},
+			Data: map[string][]byte{
+				constant.AccountNameForSecret:   []byte(accountName),
+				constant.AccountPasswdForSecret: managedPassword,
+			},
+		}
+		if immutable {
+			managed.Immutable = ptr.To(true)
+		}
+		writer := transCtx.Client.(client.Client)
+		Expect(writer.Create(context.Background(), source)).To(Succeed())
+		Expect(writer.Create(context.Background(), managed)).To(Succeed())
+		graphCli := model.NewGraphClient(transCtx.Client)
+		transCtx.Client = graphCli
+		transCtx.shardings = []*appsv1.ClusterSharding{shardingSpec}
+		transCtx.shardingComps = map[string][]*appsv1.ClusterComponentSpec{
+			sharding: {{Name: "shard-0"}, {Name: "shard-1"}},
+		}
+		dag := graph.NewDAG()
+		graphCli.Root(dag, transCtx.Cluster, transCtx.Cluster, model.ActionStatusPtr())
+		return &clusterShardingAccountTransformer{}, transCtx, graphCli, dag, shardingSpec, managed
+	}
+
+	It("keeps an immutable shared account secret when the source password is unchanged", func() {
+		transformer, transCtx, graphCli, dag, shardingSpec, managed :=
+			newSourceSecretReconcile([]byte("same-password"), []byte("same-password"), true)
+
+		Expect(transformer.reconcileShardingAccount(transCtx, graphCli, dag, shardingSpec, accountName)).To(Succeed())
+		Expect(graphCli.FindMatchedVertex(dag, managed)).To(BeNil())
+	})
+
+	It("updates a mutable shared account secret when the source password rotates", func() {
+		transformer, transCtx, graphCli, dag, shardingSpec, managed :=
+			newSourceSecretReconcile([]byte("new-password"), []byte("old-password"), false)
+
+		Expect(transformer.reconcileShardingAccount(transCtx, graphCli, dag, shardingSpec, accountName)).To(Succeed())
+		Expect(graphCli.IsAction(dag, managed, model.ActionUpdatePtr())).To(BeTrue())
+		vertex := graphCli.FindMatchedVertex(dag, managed).(*model.ObjectVertex)
+		updated := vertex.Obj.(*corev1.Secret)
+		Expect(updated.Data).To(HaveKeyWithValue(constant.AccountPasswdForSecret, []byte("new-password")))
+		for _, comp := range transCtx.shardingComps[sharding] {
+			Expect(comp.SystemAccounts[0].SecretRef.Name).To(Equal(managed.Name))
+		}
+	})
+
+	It("preserves an empty password when the shared source secret rotates to empty", func() {
+		transformer, transCtx, graphCli, dag, shardingSpec, managed :=
+			newSourceSecretReconcile([]byte{}, []byte("old-password"), false)
+
+		Expect(transformer.reconcileShardingAccount(transCtx, graphCli, dag, shardingSpec, accountName)).To(Succeed())
+		vertex := graphCli.FindMatchedVertex(dag, managed).(*model.ObjectVertex)
+		updated := vertex.Obj.(*corev1.Secret)
+		Expect(updated.Data).To(HaveKey(constant.AccountPasswdForSecret))
+		Expect(updated.Data[constant.AccountPasswdForSecret]).To(BeEmpty())
+	})
+
+	It("rejects an overlong rotated shared source password without updating the managed secret", func() {
+		transformer, transCtx, graphCli, dag, shardingSpec, managed := newSourceSecretReconcile(
+			[]byte("12345678901234567890123456789012345678901234567890123456789012345"),
+			[]byte("old-password"), false)
+
+		err := transformer.reconcileShardingAccount(transCtx, graphCli, dag, shardingSpec, accountName)
+		Expect(err).To(MatchError("password length exceeds 64 bytes"))
+		Expect(graphCli.FindMatchedVertex(dag, managed)).To(BeNil())
+	})
+
+	It("deletes a stale immutable shared account secret and requests recreation", func() {
+		transformer, transCtx, graphCli, dag, shardingSpec, managed :=
+			newSourceSecretReconcile([]byte("new-password"), []byte("old-password"), true)
+
+		err := transformer.reconcileShardingAccount(transCtx, graphCli, dag, shardingSpec, accountName)
+		Expect(intctrlutil.IsDelayedRequeueError(err)).To(BeTrue())
+		Expect(graphCli.IsAction(dag, managed, model.ActionDeletePtr())).To(BeTrue())
+		for _, comp := range transCtx.shardingComps[sharding] {
+			Expect(comp.SystemAccounts[0].SecretRef.Name).To(Equal(managed.Name))
+		}
 	})
 })

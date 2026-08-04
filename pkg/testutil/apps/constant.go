@@ -186,7 +186,7 @@ var (
 				InitAccount: true,
 				PasswordGenerationPolicy: appsv1.PasswordConfig{
 					Length:     16,
-					NumDigits:  8,
+					NumDigits:  ptr.To[int32](8),
 					NumSymbols: 8,
 					LetterCase: appsv1.MixedCases,
 				},
@@ -200,7 +200,7 @@ var (
 				},
 				PasswordGenerationPolicy: appsv1.PasswordConfig{
 					Length:     10,
-					NumDigits:  5,
+					NumDigits:  ptr.To[int32](5),
 					NumSymbols: 0,
 					LetterCase: appsv1.MixedCases,
 				},

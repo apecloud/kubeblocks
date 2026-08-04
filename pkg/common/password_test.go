@@ -22,8 +22,12 @@ package common
 import (
 	"strings"
 	"testing"
+	"unicode"
 
 	"github.com/sethvargo/go-password/password"
+	"k8s.io/utils/ptr"
+
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
 const (
@@ -185,4 +189,131 @@ func TestGeneratorEnsureMixedCase(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestGenerateSystemAccountPassword(t *testing.T) {
+	tests := []struct {
+		name       string
+		account    appsv1.SystemAccount
+		wantLength int
+	}{
+		{
+			name:       "no configuration means passwordless",
+			account:    appsv1.SystemAccount{},
+			wantLength: 0,
+		},
+		{
+			name: "legacy configuration remains supported",
+			account: appsv1.SystemAccount{
+				PasswordGenerationPolicy: appsv1.PasswordConfig{
+					Length:     12,
+					NumDigits:  ptr.To[int32](2),
+					LetterCase: appsv1.MixedCases,
+				},
+			},
+			wantLength: 12,
+		},
+		{
+			name: "new configuration takes precedence over legacy",
+			account: appsv1.SystemAccount{
+				PasswordConfig: &appsv1.PasswordConfig{
+					Length:     20,
+					NumDigits:  ptr.To[int32](0),
+					LetterCase: appsv1.LowerCases,
+				},
+				PasswordGenerationPolicy: appsv1.PasswordConfig{
+					Length:     8,
+					NumDigits:  ptr.To[int32](8),
+					LetterCase: appsv1.UpperCases,
+				},
+			},
+			wantLength: 20,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			generated, err := GenerateSystemAccountPassword(tt.account)
+			if err != nil {
+				t.Fatalf("generate password: %v", err)
+			}
+			if len(generated) != tt.wantLength {
+				t.Fatalf("expected password length %d, got %d", tt.wantLength, len(generated))
+			}
+		})
+	}
+}
+
+func TestGenerateSystemAccountPasswordNewConfigurationPreservesExplicitValues(t *testing.T) {
+	generated, err := GenerateSystemAccountPassword(appsv1.SystemAccount{
+		PasswordConfig: &appsv1.PasswordConfig{
+			Length:     20,
+			NumDigits:  ptr.To[int32](0),
+			LetterCase: appsv1.LowerCases,
+		},
+		PasswordGenerationPolicy: appsv1.PasswordConfig{
+			Length:     8,
+			NumDigits:  ptr.To[int32](8),
+			LetterCase: appsv1.UpperCases,
+		},
+	})
+	if err != nil {
+		t.Fatalf("generate password: %v", err)
+	}
+	if strings.ContainsFunc(generated, unicode.IsUpper) {
+		t.Fatalf("expected new lower-case configuration to take precedence, got %q", generated)
+	}
+	if strings.ContainsFunc(generated, unicode.IsDigit) {
+		t.Fatalf("expected explicit numDigits=0 to be preserved, got %q", generated)
+	}
+}
+
+func TestGenerateSystemAccountPasswordNewConfigurationDefaultsOmittedDigits(t *testing.T) {
+	generated, err := GenerateSystemAccountPassword(appsv1.SystemAccount{
+		PasswordConfig: &appsv1.PasswordConfig{
+			Length:     12,
+			LetterCase: appsv1.LowerCases,
+			Seed:       "omitted-digits",
+		},
+	})
+	if err != nil {
+		t.Fatalf("generate password: %v", err)
+	}
+	digits := 0
+	for _, character := range generated {
+		if unicode.IsDigit(character) {
+			digits++
+		}
+	}
+	if digits != int(defaultSystemAccountPasswordDigits) {
+		t.Fatalf("expected omitted numDigits to default to %d, got %d in %q",
+			defaultSystemAccountPasswordDigits, digits, generated)
+	}
+}
+
+func TestValidateSystemAccountPassword(t *testing.T) {
+	tests := []struct {
+		name     string
+		password []byte
+		wantErr  string
+	}{
+		{name: "empty password is valid", password: nil},
+		{name: "maximum length is valid", password: []byte(strings.Repeat("a", 64))},
+		{name: "over maximum length is invalid", password: []byte(strings.Repeat("a", 65)), wantErr: "password length exceeds 64 bytes"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateSystemAccountPassword(tt.password)
+			if tt.wantErr == "" {
+				if err != nil {
+					t.Fatalf("validate password: %v", err)
+				}
+				return
+			}
+			if err == nil || err.Error() != tt.wantErr {
+				t.Fatalf("expected error %q, got %v", tt.wantErr, err)
+			}
+		})
+	}
 }

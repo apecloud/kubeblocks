@@ -22,6 +22,7 @@ package common
 import (
 	"crypto/sha256"
 	"encoding/binary"
+	"fmt"
 	"math/rand"
 	"strings"
 	"time"
@@ -34,7 +35,9 @@ import (
 
 const (
 	// defaultSymbols is the list of default symbols to generate password.
-	defaultSymbols = "!@#&*"
+	defaultSymbols                     = "!@#&*"
+	defaultSystemAccountPasswordDigits = int32(4)
+	maximumSystemAccountPasswordLength = 64
 )
 
 type passwordReader struct {
@@ -50,7 +53,11 @@ func (r *passwordReader) Seed(seed int64) {
 }
 
 func GeneratePasswordByConfig(config appsv1.PasswordConfig) (string, error) {
-	passwd, err := generatePassword((int)(config.Length), (int)(config.NumDigits), (int)(config.NumSymbols), config.Seed, config.SymbolCharacters)
+	numDigits := defaultSystemAccountPasswordDigits
+	if config.NumDigits != nil {
+		numDigits = *config.NumDigits
+	}
+	passwd, err := generatePassword((int)(config.Length), (int)(numDigits), (int)(config.NumSymbols), config.Seed, config.SymbolCharacters)
 	if err != nil {
 		return "", err
 	}
@@ -63,6 +70,28 @@ func GeneratePasswordByConfig(config appsv1.PasswordConfig) (string, error) {
 		passwd, err = ensureMixedCase(passwd, config.Seed)
 	}
 	return passwd, err
+}
+
+// GenerateSystemAccountPassword resolves the ComponentDefinition-level
+// password contract. The new field preserves presence and takes precedence
+// over the legacy field. No configuration means passwordless.
+func GenerateSystemAccountPassword(account appsv1.SystemAccount) (string, error) {
+	if account.PasswordConfig != nil {
+		return GeneratePasswordByConfig(*account.PasswordConfig)
+	}
+	if account.PasswordGenerationPolicy == (appsv1.PasswordConfig{}) {
+		return "", nil
+	}
+	return GeneratePasswordByConfig(account.PasswordGenerationPolicy)
+}
+
+// ValidateSystemAccountPassword enforces the password contract shared by all
+// ComponentSystemAccount provisioning paths.
+func ValidateSystemAccountPassword(password []byte) error {
+	if len(password) > maximumSystemAccountPasswordLength {
+		return fmt.Errorf("password length exceeds %d bytes", maximumSystemAccountPasswordLength)
+	}
+	return nil
 }
 
 // generatePassword generates a password with the given requirements and seed in lowercase.

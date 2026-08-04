@@ -122,11 +122,19 @@ func (t *clusterShardingAccountTransformer) newSystemAccountSecret(transCtx *clu
 	if err != nil {
 		return nil, err
 	}
+	if err := common.ValidateSystemAccountPassword(password); err != nil {
+		return nil, err
+	}
 	return t.newAccountSecretWithPassword(transCtx, sharding, accountName, password)
 }
 
+type synthesizedShardingSystemAccount struct {
+	appsv1.SystemAccount
+	SecretRef *appsv1.ProvisionSecretRef
+}
+
 func (t *clusterShardingAccountTransformer) definedSystemAccount(transCtx *clusterTransformContext,
-	sharding *appsv1.ClusterSharding, accountName string) (appsv1.SystemAccount, error) {
+	sharding *appsv1.ClusterSharding, accountName string) (synthesizedShardingSystemAccount, error) {
 	var compAccount *appsv1.ComponentSystemAccount
 	for i := range sharding.Template.SystemAccounts {
 		if sharding.Template.SystemAccounts[i].Name == accountName {
@@ -137,16 +145,18 @@ func (t *clusterShardingAccountTransformer) definedSystemAccount(transCtx *clust
 
 	compDef, ok := transCtx.componentDefs[sharding.Template.ComponentDef]
 	if !ok || compDef == nil {
-		return appsv1.SystemAccount{}, fmt.Errorf("component definition %s not found for sharding %s", sharding.Template.ComponentDef, sharding.Name)
+		return synthesizedShardingSystemAccount{}, fmt.Errorf("component definition %s not found for sharding %s", sharding.Template.ComponentDef, sharding.Name)
 	}
 
-	override := func(account *appsv1.SystemAccount) appsv1.SystemAccount {
+	override := func(account *appsv1.SystemAccount) synthesizedShardingSystemAccount {
+		resolved := synthesizedShardingSystemAccount{SystemAccount: *account}
 		if compAccount != nil {
 			if compAccount.PasswordConfig != nil {
-				account.PasswordGenerationPolicy = *compAccount.PasswordConfig
+				resolved.PasswordConfig = compAccount.PasswordConfig.DeepCopy()
 			}
+			resolved.SecretRef = compAccount.SecretRef
 		}
-		return *account
+		return resolved
 	}
 
 	for i, account := range compDef.Spec.SystemAccounts {
@@ -154,17 +164,44 @@ func (t *clusterShardingAccountTransformer) definedSystemAccount(transCtx *clust
 			return override(compDef.Spec.SystemAccounts[i].DeepCopy()), nil
 		}
 	}
-	return appsv1.SystemAccount{}, fmt.Errorf("system account %s not found in component definition %s", accountName, compDef.Name)
+	return synthesizedShardingSystemAccount{}, fmt.Errorf("system account %s not found in component definition %s", accountName, compDef.Name)
 }
 
-func (t *clusterShardingAccountTransformer) buildPassword(transCtx *clusterTransformContext, account appsv1.SystemAccount, shardingName string) ([]byte, error) {
-	password, err := appsutil.GetRestoreSystemAccountPassword(transCtx.Context, transCtx.Client, transCtx.Cluster.Annotations, shardingName, account.Name)
+func (t *clusterShardingAccountTransformer) buildPassword(transCtx *clusterTransformContext,
+	account synthesizedShardingSystemAccount, shardingName string) ([]byte, error) {
+	if account.SecretRef != nil {
+		return t.getPasswordFromSecret(transCtx, account.SecretRef)
+	}
+	password, err := appsutil.GetRestoreSystemAccountPassword(transCtx.Context, transCtx.Client,
+		transCtx.Cluster.Annotations, shardingName, account.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to restore password for system account %s of shard %s from annotation, err: %w", account.Name, shardingName, err)
 	}
 	if len(password) == 0 {
-		password, err := common.GeneratePasswordByConfig(account.PasswordGenerationPolicy)
+		password, err := common.GenerateSystemAccountPassword(account.SystemAccount)
 		return []byte(password), err
+	}
+	return password, nil
+}
+
+func (t *clusterShardingAccountTransformer) getPasswordFromSecret(transCtx *clusterTransformContext,
+	secretRef *appsv1.ProvisionSecretRef) ([]byte, error) {
+	if secretRef.Namespace != "" && secretRef.Namespace != transCtx.Cluster.Namespace {
+		return nil, fmt.Errorf("cross-namespace secretRef is not supported for shared sharding system accounts")
+	}
+	secretKey := types.NamespacedName{Namespace: transCtx.Cluster.Namespace, Name: secretRef.Name}
+	secret := &corev1.Secret{}
+	if err := transCtx.GetClient().Get(transCtx.GetContext(), secretKey, secret); err != nil {
+		return nil, err
+	}
+
+	passwordKey := constant.AccountPasswdForSecret
+	if secretRef.Password != "" {
+		passwordKey = secretRef.Password
+	}
+	password, ok := secret.Data[passwordKey]
+	if !ok {
+		return nil, fmt.Errorf("referenced account secret has no required credential field: %s", passwordKey)
 	}
 	return password, nil
 }
@@ -211,9 +248,6 @@ func (t *clusterShardingAccountTransformer) rewriteSystemAccount(transCtx *clust
 			for j, account := range sharding.Template.SystemAccounts {
 				if account.Name == accountName {
 					newAccount.Disabled = account.Disabled
-					if account.SecretRef != nil {
-						newAccount.SecretRef.Password = account.SecretRef.Password
-					}
 					transCtx.shardings[i].Template.SystemAccounts[j] = newAccount
 					exist = true
 					break

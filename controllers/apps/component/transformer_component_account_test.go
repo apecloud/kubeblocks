@@ -21,6 +21,7 @@ package component
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -36,9 +37,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	pkgcomponent "github.com/apecloud/kubeblocks/pkg/controller/component"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 var _ = Describe("component system account API contract", func() {
@@ -206,5 +210,58 @@ func TestBuildAccountSecretWithoutGenerationConfigurationIsPasswordless(t *testi
 	}
 	if len(password) != 0 {
 		t.Fatalf("expected passwordless account, got %d password bytes", len(password))
+	}
+}
+
+func TestBuildAccountSecretPreservesEmptyRestorePassword(t *testing.T) {
+	const (
+		componentName = "comp"
+		accountName   = "root"
+	)
+	encryptedPassword, err := intctrlutil.NewEncryptor(viper.GetString(constant.CfgKeyDPEncryptionKey)).Encrypt(nil)
+	if err != nil {
+		t.Fatalf("encrypt empty password: %v", err)
+	}
+	backup := &dpv1alpha1.Backup{ObjectMeta: metav1.ObjectMeta{
+		Name:      "backup",
+		Namespace: "default",
+		Annotations: map[string]string{
+			constant.EncryptedSystemAccountsAnnotationKey: fmt.Sprintf(`{"%s":{"%s":"%s"}}`, componentName, accountName, encryptedPassword),
+		},
+	}}
+	scheme := runtime.NewScheme()
+	if err := dpv1alpha1.AddToScheme(scheme); err != nil {
+		t.Fatalf("add backup scheme: %v", err)
+	}
+	transCtx := &componentTransformContext{
+		Context: context.Background(),
+		Client:  fake.NewClientBuilder().WithScheme(scheme).WithObjects(backup).Build(),
+		Component: &appsv1.Component{ObjectMeta: metav1.ObjectMeta{
+			Name:      "cluster-comp",
+			Namespace: "default",
+		}},
+		SynthesizeComponent: &pkgcomponent.SynthesizedComponent{
+			Namespace:   "default",
+			ClusterName: "cluster",
+			Name:        componentName,
+			Annotations: map[string]string{
+				constant.RestoreFromBackupAnnotationKey: `{"comp":{"name":"backup","namespace":"default"}}`,
+			},
+		},
+	}
+	account := synthesizedSystemAccount{SystemAccount: appsv1.SystemAccount{
+		Name:        accountName,
+		InitAccount: true,
+		PasswordConfig: &appsv1.PasswordConfig{
+			Length: 16,
+		},
+	}}
+
+	secret, err := (&componentAccountTransformer{}).buildAccountSecret(transCtx, account)
+	if err != nil {
+		t.Fatalf("build account secret: %v", err)
+	}
+	if password := secret.Data[constant.AccountPasswdForSecret]; len(password) != 0 {
+		t.Fatalf("expected restored empty password, got %d bytes", len(password))
 	}
 }

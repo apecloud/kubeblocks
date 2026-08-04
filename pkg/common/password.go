@@ -22,6 +22,7 @@ package common
 import (
 	"crypto/sha256"
 	"encoding/binary"
+	"fmt"
 	"math/rand"
 	"strings"
 	"time"
@@ -34,7 +35,8 @@ import (
 
 const (
 	// defaultSymbols is the list of default symbols to generate password.
-	defaultSymbols = "!@#&*"
+	defaultSymbols                     = "!@#&*"
+	maximumSystemAccountPasswordLength = 64
 )
 
 type passwordReader struct {
@@ -63,6 +65,29 @@ func GeneratePasswordByConfig(config appsv1.PasswordConfig) (string, error) {
 		passwd, err = ensureMixedCase(passwd, config.Seed)
 	}
 	return passwd, err
+}
+
+// GenerateSystemAccountPassword resolves the ComponentDefinition-level
+// password contract. The pointer field preserves presence and takes precedence
+// over the legacy non-pointer field. No configuration means passwordless.
+func GenerateSystemAccountPassword(account appsv1.SystemAccount) (string, error) {
+	config := account.PasswordConfig
+	if config == nil && account.PasswordGenerationPolicy != (appsv1.PasswordConfig{}) {
+		config = &account.PasswordGenerationPolicy
+	}
+	if config == nil {
+		return "", nil
+	}
+	return GeneratePasswordByConfig(*config)
+}
+
+// ValidateSystemAccountPassword enforces the password contract shared by all
+// ComponentSystemAccount provisioning paths.
+func ValidateSystemAccountPassword(password []byte) error {
+	if len(password) > maximumSystemAccountPasswordLength {
+		return fmt.Errorf("password length exceeds %d bytes", maximumSystemAccountPasswordLength)
+	}
+	return nil
 }
 
 // generatePassword generates a password with the given requirements and seed in lowercase.

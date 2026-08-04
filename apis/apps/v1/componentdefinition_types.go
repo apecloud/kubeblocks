@@ -1197,11 +1197,23 @@ type SystemAccount struct {
 	// +optional
 	Statement *SystemAccountStatement `json:"statement,omitempty"`
 
-	// Specifies the policy for generating the account's password.
+	// Specifies the configuration for generating the account's password.
+	// If this field is nil and passwordGenerationPolicy is zero-valued, the account is passwordless.
+	// This field takes precedence over the deprecated passwordGenerationPolicy field.
 	//
 	// This field is immutable once set.
 	//
 	// +optional
+	PasswordConfig *PasswordConfig `json:"passwordConfig,omitempty"`
+
+	// Specifies the legacy policy for generating the account's password.
+	// A non-zero value is used only when passwordConfig is nil.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	//
+	// Deprecated: use passwordConfig instead.
 	PasswordGenerationPolicy PasswordConfig `json:"passwordGenerationPolicy"`
 }
 

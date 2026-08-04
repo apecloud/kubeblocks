@@ -210,17 +210,17 @@ func (t *componentAccountTransformer) getPasswordFromSecret(transCtx *componentT
 func (t *componentAccountTransformer) buildPassword(transCtx *componentTransformContext, account synthesizedSystemAccount) ([]byte, error) {
 	synthesizedComp := transCtx.SynthesizeComponent
 	// get restore password if exists during recovery.
-	password, err := appsutil.GetRestoreSystemAccountPassword(transCtx.Context, transCtx.Client,
+	password, found, err := appsutil.GetRestoreSystemAccountPassword(transCtx.Context, transCtx.Client,
 		synthesizedComp.Annotations, synthesizedComp.Name, account.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to restore password for system account %s of component %s from annotation, err: %w", account.Name, synthesizedComp.Name, err)
 	}
-	if account.InitAccount && len(password) == 0 {
+	if account.InitAccount && !found {
 		// initAccount can also restore from factory.GetRestoreSystemAccountPassword(synthesizedComp, account).
 		// This is compatibility processing.
 		password = []byte(factory.GetRestorePassword(synthesizedComp))
 	}
-	if len(password) == 0 {
+	if !found && len(password) == 0 {
 		password, err := common.GeneratePasswordByConfig(account.PasswordGenerationPolicy)
 		return []byte(password), err
 	}

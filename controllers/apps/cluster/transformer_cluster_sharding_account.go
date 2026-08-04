@@ -158,11 +158,11 @@ func (t *clusterShardingAccountTransformer) definedSystemAccount(transCtx *clust
 }
 
 func (t *clusterShardingAccountTransformer) buildPassword(transCtx *clusterTransformContext, account appsv1.SystemAccount, shardingName string) ([]byte, error) {
-	password, err := appsutil.GetRestoreSystemAccountPassword(transCtx.Context, transCtx.Client, transCtx.Cluster.Annotations, shardingName, account.Name)
+	password, found, err := appsutil.GetRestoreSystemAccountPassword(transCtx.Context, transCtx.Client, transCtx.Cluster.Annotations, shardingName, account.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to restore password for system account %s of shard %s from annotation, err: %w", account.Name, shardingName, err)
 	}
-	if len(password) == 0 {
+	if !found {
 		password, err := common.GeneratePasswordByConfig(account.PasswordGenerationPolicy)
 		return []byte(password), err
 	}

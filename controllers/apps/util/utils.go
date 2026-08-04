@@ -134,41 +134,41 @@ func GetRestoreSystemAccountPassword(
 	annotations map[string]string,
 	componentName,
 	accountName string,
-) ([]byte, error) {
+) ([]byte, bool, error) {
 	valueString := annotations[constant.RestoreFromBackupAnnotationKey]
 	if len(valueString) == 0 {
-		return nil, nil
+		return nil, false, nil
 	}
 	backupMap := map[string]map[string]string{}
 	err := json.Unmarshal([]byte(valueString), &backupMap)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	backupSource, ok := backupMap[componentName]
 	if !ok {
-		return nil, nil
+		return nil, false, nil
 	}
 	name, ok := backupSource[constant.BackupNameKeyForRestore]
 	if !ok || len(name) == 0 {
-		return nil, fmt.Errorf("backup name not found in restore annotation")
+		return nil, false, fmt.Errorf("backup name not found in restore annotation")
 	}
 	namespace, ok := backupSource[constant.BackupNamespaceKeyForRestore]
 	if !ok || len(namespace) == 0 {
-		return nil, fmt.Errorf("backup namespace not found in restore annotation")
+		return nil, false, fmt.Errorf("backup namespace not found in restore annotation")
 	}
 	backup := &dpv1alpha1.Backup{}
 	if err := cli.Get(ctx, client.ObjectKey{
 		Name:      name,
 		Namespace: namespace,
 	}, backup); err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	systemAccountsMap := map[string]string{}
 	encryptedSystemAccountsString := backup.Annotations[constant.EncryptedSystemAccountsAnnotationKey]
 	if encryptedSystemAccountsString != "" {
 		encryptedSystemAccountsMap := map[string]map[string]string{}
 		if err = json.Unmarshal([]byte(encryptedSystemAccountsString), &encryptedSystemAccountsMap); err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		if val, ok := encryptedSystemAccountsMap[componentName]; ok {
 			systemAccountsMap = val
@@ -178,8 +178,11 @@ func GetRestoreSystemAccountPassword(
 	e := intctrlutil.NewEncryptor(viper.GetString(constant.CfgKeyDPEncryptionKey))
 	encryptedPwd, ok := systemAccountsMap[accountName]
 	if !ok {
-		return nil, nil
+		return nil, false, nil
 	}
 	password, err := e.Decrypt([]byte(encryptedPwd))
-	return []byte(password), err
+	if err != nil {
+		return nil, false, err
+	}
+	return []byte(password), true, nil
 }

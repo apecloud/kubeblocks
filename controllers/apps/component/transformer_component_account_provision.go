@@ -214,9 +214,13 @@ func (t *componentAccountProvisionTransformer) updateAccount(transCtx *component
 
 func (t *componentAccountProvisionTransformer) provision(transCtx *componentTransformContext,
 	lfa lifecycle.Lifecycle, statement string, secret *corev1.Secret) error {
-	username, password := secret.Data[constant.AccountNameForSecret], secret.Data[constant.AccountPasswdForSecret]
-	if len(username) == 0 || len(password) == 0 {
-		return nil
+	username, ok := secret.Data[constant.AccountNameForSecret]
+	if !ok || len(username) == 0 {
+		return fmt.Errorf("system account secret %s/%s has no account name", secret.Namespace, secret.Name)
+	}
+	password, ok := secret.Data[constant.AccountPasswdForSecret]
+	if !ok {
+		return fmt.Errorf("system account secret %s/%s has no password field", secret.Namespace, secret.Name)
 	}
 	err := lfa.AccountProvision(transCtx.Context, transCtx.Client, nil, statement, string(username), string(password))
 	return lifecycle.IgnoreNotDefined(err)

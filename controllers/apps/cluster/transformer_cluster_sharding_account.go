@@ -21,10 +21,12 @@ package cluster
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -111,7 +113,24 @@ func (t *clusterShardingAccountTransformer) getSystemAccountSecret(transCtx *clu
 	if apierrors.IsNotFound(err) {
 		return nil, nil
 	}
-	return secret, err
+	if err != nil {
+		return nil, err
+	}
+
+	managedLabels := constant.GetClusterLabels(cluster.Name, map[string]string{
+		constant.KBAppShardingNameLabelKey: sharding.Name,
+	})
+	for key, value := range managedLabels {
+		if secret.Labels[key] != value {
+			return nil, fmt.Errorf("secret %s/%s already exists but is not managed by sharding %s",
+				secret.Namespace, secret.Name, sharding.Name)
+		}
+	}
+	if value, ok := secret.Labels[constant.SystemAccountLabelKey]; ok && value != accountName {
+		return nil, fmt.Errorf("secret %s/%s is managed for system account %s, not %s",
+			secret.Namespace, secret.Name, value, accountName)
+	}
+	return secret, nil
 }
 
 func (t *clusterShardingAccountTransformer) updateSystemAccountSecret(transCtx *clusterTransformContext,
@@ -125,7 +144,7 @@ func (t *clusterShardingAccountTransformer) updateSystemAccountSecret(transCtx *
 		return nil
 	}
 
-	password, err := t.getPasswordFromSecret(transCtx, account.SecretRef)
+	password, source, passwordKey, err := t.getPasswordSource(transCtx, account.SecretRef)
 	if err != nil {
 		return err
 	}
@@ -134,6 +153,7 @@ func (t *clusterShardingAccountTransformer) updateSystemAccountSecret(transCtx *
 	}
 	runningPassword, ok := running.Data[constant.AccountPasswdForSecret]
 	if ok && bytes.Equal(runningPassword, password) {
+		t.recordSourceSecretRevision(transCtx, sharding, accountName, source, passwordKey)
 		return nil
 	}
 
@@ -143,6 +163,7 @@ func (t *clusterShardingAccountTransformer) updateSystemAccountSecret(transCtx *
 			fmt.Sprintf("recreate immutable shared system account secret %s/%s", running.Namespace, running.Name))
 	}
 
+	t.recordSourceSecretRevision(transCtx, sharding, accountName, source, passwordKey)
 	updated := running.DeepCopy()
 	if updated.Data == nil {
 		updated.Data = map[string][]byte{}
@@ -158,12 +179,15 @@ func (t *clusterShardingAccountTransformer) newSystemAccountSecret(transCtx *clu
 	if err != nil {
 		return nil, err
 	}
-	password, err := t.buildPassword(transCtx, account)
+	password, source, passwordKey, err := t.buildPassword(transCtx, account)
 	if err != nil {
 		return nil, err
 	}
 	if err := common.ValidateSystemAccountPassword(password); err != nil {
 		return nil, err
+	}
+	if source != nil {
+		t.recordSourceSecretRevision(transCtx, sharding, accountName, source, passwordKey)
 	}
 	return t.newAccountSecretWithPassword(transCtx, sharding, accountName, password)
 }
@@ -208,23 +232,23 @@ func (t *clusterShardingAccountTransformer) definedSystemAccount(transCtx *clust
 }
 
 func (t *clusterShardingAccountTransformer) buildPassword(transCtx *clusterTransformContext,
-	account synthesizedShardingSystemAccount) ([]byte, error) {
+	account synthesizedShardingSystemAccount) ([]byte, *corev1.Secret, string, error) {
 	if account.SecretRef != nil {
-		return t.getPasswordFromSecret(transCtx, account.SecretRef)
+		return t.getPasswordSource(transCtx, account.SecretRef)
 	}
 	password, err := common.GenerateSystemAccountPassword(account.SystemAccount)
-	return []byte(password), err
+	return []byte(password), nil, "", err
 }
 
-func (t *clusterShardingAccountTransformer) getPasswordFromSecret(transCtx *clusterTransformContext,
-	secretRef *appsv1.ProvisionSecretRef) ([]byte, error) {
+func (t *clusterShardingAccountTransformer) getPasswordSource(transCtx *clusterTransformContext,
+	secretRef *appsv1.ProvisionSecretRef) ([]byte, *corev1.Secret, string, error) {
 	if secretRef.Namespace != "" && secretRef.Namespace != transCtx.Cluster.Namespace {
-		return nil, fmt.Errorf("cross-namespace secretRef is not supported for shared sharding system accounts")
+		return nil, nil, "", fmt.Errorf("cross-namespace secretRef is not supported for shared sharding system accounts")
 	}
 	secretKey := types.NamespacedName{Namespace: transCtx.Cluster.Namespace, Name: secretRef.Name}
 	secret := &corev1.Secret{}
 	if err := transCtx.GetClient().Get(transCtx.GetContext(), secretKey, secret); err != nil {
-		return nil, err
+		return nil, nil, "", err
 	}
 
 	passwordKey := constant.AccountPasswdForSecret
@@ -233,9 +257,9 @@ func (t *clusterShardingAccountTransformer) getPasswordFromSecret(transCtx *clus
 	}
 	password, ok := secret.Data[passwordKey]
 	if !ok {
-		return nil, fmt.Errorf("referenced account secret has no required credential field: %s", passwordKey)
+		return nil, nil, "", fmt.Errorf("referenced account secret has no required credential field: %s", passwordKey)
 	}
-	return password, nil
+	return password, secret, passwordKey, nil
 }
 
 func (t *clusterShardingAccountTransformer) newAccountSecretWithPassword(transCtx *clusterTransformContext,
@@ -249,6 +273,7 @@ func (t *clusterShardingAccountTransformer) newAccountSecretWithPassword(transCt
 	}
 	secret := builder.NewSecretBuilder(cluster.Namespace, shardingAccountSecretName(cluster.Name, sharding.Name, accountName)).
 		AddLabelsInMap(constant.GetClusterLabels(cluster.Name, shardingLabels)).
+		AddLabels(constant.SystemAccountLabelKey, accountName).
 		AddLabelsInMap(sharding.Template.Labels).
 		AddLabelsInMap(compDef.Spec.Labels).
 		AddAnnotationsInMap(sharding.Template.Annotations).
@@ -257,6 +282,63 @@ func (t *clusterShardingAccountTransformer) newAccountSecretWithPassword(transCt
 		PutData(constant.AccountPasswdForSecret, password).
 		GetObject()
 	return secret, nil
+}
+
+func (t *clusterShardingAccountTransformer) recordSourceSecretRevision(transCtx *clusterTransformContext,
+	sharding *appsv1.ClusterSharding, accountName string, source *corev1.Secret, passwordKey string) {
+	if source == nil {
+		return
+	}
+	revision := fmt.Sprintf("%s/%s@%s/%s#%s", source.Namespace, source.Name,
+		source.UID, source.ResourceVersion, passwordKey)
+	managedSecretKey := client.ObjectKey{
+		Namespace: transCtx.Cluster.Namespace,
+		Name:      shardingAccountSecretName(transCtx.Cluster.Name, sharding.Name, accountName),
+	}
+	for _, comp := range transCtx.shardingComps[sharding.Name] {
+		if transCtx.shardingAccountSecretRevisions == nil {
+			transCtx.shardingAccountSecretRevisions = map[string]map[string]string{}
+		}
+		if transCtx.shardingAccountSecretRevisions[comp.Name] == nil {
+			transCtx.shardingAccountSecretRevisions[comp.Name] = map[string]string{}
+		}
+		transCtx.shardingAccountSecretRevisions[comp.Name][accountName] = revision
+
+		encoded, _ := json.Marshal(transCtx.shardingAccountSecretRevisions[comp.Name])
+		if transCtx.annotations == nil {
+			transCtx.annotations = map[string]map[string]string{}
+		}
+		if transCtx.annotations[comp.Name] == nil {
+			transCtx.annotations[comp.Name] = map[string]string{}
+		}
+		transCtx.annotations[comp.Name][constant.SystemAccountSecretRevisionsAnnotationKey] = string(encoded)
+
+		if transCtx.shardingAccountSecretDependencies == nil {
+			transCtx.shardingAccountSecretDependencies = map[string]map[client.ObjectKey]struct{}{}
+		}
+		if transCtx.shardingAccountSecretDependencies[comp.Name] == nil {
+			transCtx.shardingAccountSecretDependencies[comp.Name] = map[client.ObjectKey]struct{}{}
+		}
+		transCtx.shardingAccountSecretDependencies[comp.Name][managedSecretKey] = struct{}{}
+	}
+}
+
+func dependOnShardingAccountSecrets(transCtx *clusterTransformContext, dag *graph.DAG) {
+	graphCli, _ := transCtx.Client.(model.GraphClient)
+	for compName, secretKeys := range transCtx.shardingAccountSecretDependencies {
+		comp := &appsv1.Component{ObjectMeta: metav1.ObjectMeta{
+			Namespace: transCtx.Cluster.Namespace,
+			Name:      constant.GenerateClusterComponentName(transCtx.Cluster.Name, compName),
+		}}
+		dependencies := make([]client.Object, 0, len(secretKeys))
+		for key := range secretKeys {
+			dependencies = append(dependencies, &corev1.Secret{ObjectMeta: metav1.ObjectMeta{
+				Namespace: key.Namespace,
+				Name:      key.Name,
+			}})
+		}
+		graphCli.DependOn(dag, comp, dependencies...)
+	}
 }
 
 func (t *clusterShardingAccountTransformer) rewriteSystemAccount(transCtx *clusterTransformContext, shardingName, accountName string) {

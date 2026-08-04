@@ -42,7 +42,7 @@ import (
 )
 
 const (
-	systemAccountLabel          = "apps.kubeblocks.io/system-account"
+	systemAccountLabel          = constant.SystemAccountLabelKey
 	systemAccountHashAnnotation = "apps.kubeblocks.io/system-account-hash"
 )
 

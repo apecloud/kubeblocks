@@ -46,6 +46,9 @@ const (
 
 	// SystemAccountProvisionedAnnotationKey marks a system account secret whose account has already been prepared externally.
 	SystemAccountProvisionedAnnotationKey = "apps.kubeblocks.io/system-account-provisioned"
+	// SystemAccountSecretRevisionsAnnotationKey notifies a Component that one or more referenced
+	// system account Secrets have changed and should be reconciled.
+	SystemAccountSecretRevisionsAnnotationKey = "apps.kubeblocks.io/system-account-secret-revisions"
 
 	// SkipPreTerminateAnnotationKey specifies to skip the pre-terminate action for a component.
 	SkipPreTerminateAnnotationKey = "apps.kubeblocks.io/skip-pre-terminate"

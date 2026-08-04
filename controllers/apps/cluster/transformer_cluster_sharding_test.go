@@ -89,7 +89,7 @@ var _ = Describe("cluster sharding shared transformers", func() {
 				SystemAccounts: []appsv1.SystemAccount{
 					{
 						Name: accountName,
-						PasswordGenerationPolicy: appsv1.PasswordConfig{
+						PasswordConfig: &appsv1.PasswordConfig{
 							Length:    16,
 							NumDigits: ptr.To[int32](4),
 						},
@@ -275,7 +275,7 @@ var _ = Describe("cluster sharding shared transformers", func() {
 		transformer := &clusterShardingAccountTransformer{}
 		sharding := newSharding()
 		compDef := newComponentDefinition()
-		compDef.Spec.SystemAccounts[0].PasswordGenerationPolicy = appsv1.PasswordConfig{}
+		compDef.Spec.SystemAccounts[0].PasswordConfig = nil
 		transCtx := newTransformContext()
 		transCtx.componentDefs = map[string]*appsv1.ComponentDefinition{compDefName: compDef}
 

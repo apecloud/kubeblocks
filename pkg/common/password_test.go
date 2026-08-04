@@ -203,28 +203,12 @@ func TestGenerateSystemAccountPassword(t *testing.T) {
 			wantLength: 0,
 		},
 		{
-			name: "legacy configuration remains supported",
-			account: appsv1.SystemAccount{
-				PasswordGenerationPolicy: appsv1.PasswordConfig{
-					Length:     12,
-					NumDigits:  ptr.To[int32](2),
-					LetterCase: appsv1.MixedCases,
-				},
-			},
-			wantLength: 12,
-		},
-		{
-			name: "new configuration takes precedence over legacy",
+			name: "configured password",
 			account: appsv1.SystemAccount{
 				PasswordConfig: &appsv1.PasswordConfig{
 					Length:     20,
 					NumDigits:  ptr.To[int32](0),
 					LetterCase: appsv1.LowerCases,
-				},
-				PasswordGenerationPolicy: appsv1.PasswordConfig{
-					Length:     8,
-					NumDigits:  ptr.To[int32](8),
-					LetterCase: appsv1.UpperCases,
 				},
 			},
 			wantLength: 20,
@@ -251,17 +235,12 @@ func TestGenerateSystemAccountPasswordNewConfigurationPreservesExplicitValues(t 
 			NumDigits:  ptr.To[int32](0),
 			LetterCase: appsv1.LowerCases,
 		},
-		PasswordGenerationPolicy: appsv1.PasswordConfig{
-			Length:     8,
-			NumDigits:  ptr.To[int32](8),
-			LetterCase: appsv1.UpperCases,
-		},
 	})
 	if err != nil {
 		t.Fatalf("generate password: %v", err)
 	}
 	if strings.ContainsFunc(generated, unicode.IsUpper) {
-		t.Fatalf("expected new lower-case configuration to take precedence, got %q", generated)
+		t.Fatalf("expected configured lower-case password, got %q", generated)
 	}
 	if strings.ContainsFunc(generated, unicode.IsDigit) {
 		t.Fatalf("expected explicit numDigits=0 to be preserved, got %q", generated)

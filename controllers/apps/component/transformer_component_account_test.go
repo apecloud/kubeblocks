@@ -42,7 +42,7 @@ import (
 )
 
 var _ = Describe("component system account API contract", func() {
-	It("preserves an omitted legacy generation policy through the typed API", func() {
+	It("preserves an omitted password configuration through the typed API", func() {
 		compDef := testapps.NewComponentDefinitionFactory("system-account-wire-contract").
 			SetDefaultSpec().
 			GetObject()
@@ -64,7 +64,7 @@ var _ = Describe("component system account API contract", func() {
 		Expect(found).To(BeTrue())
 		Expect(accounts).To(HaveLen(1))
 		Expect(accounts[0]).To(HaveKey("name"))
-		Expect(accounts[0]).NotTo(HaveKey("passwordGenerationPolicy"))
+		Expect(accounts[0]).NotTo(HaveKey("passwordConfig"))
 	})
 
 	It("preserves an explicit zero digit count from a typed API request", func() {

@@ -13465,26 +13465,8 @@ PasswordConfig
 <td>
 <em>(Optional)</em>
 <p>Specifies the configuration for generating the account&rsquo;s password.
-If this field is nil and passwordGenerationPolicy is empty, the account is passwordless.
-This field takes precedence over the deprecated passwordGenerationPolicy field.</p>
+If this field is nil, the account is passwordless.</p>
 <p>This field is immutable once set.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>passwordGenerationPolicy</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.PasswordConfig">
-PasswordConfig
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the policy for generating the account&rsquo;s password.</p>
-<p>This field is immutable once set.</p>
-<p>Deprecated: passwordGenerationPolicy has been deprecated since 1.1.0 and will be removed in 1.2.0.
-Use passwordConfig instead.</p>
 </td>
 </tr>
 </tbody>

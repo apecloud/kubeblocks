@@ -73,16 +73,12 @@ func GeneratePasswordByConfig(config appsv1.PasswordConfig) (string, error) {
 }
 
 // GenerateSystemAccountPassword resolves the ComponentDefinition-level
-// password contract. The new field preserves presence and takes precedence
-// over the legacy field. No configuration means passwordless.
+// password contract. No configuration means passwordless.
 func GenerateSystemAccountPassword(account appsv1.SystemAccount) (string, error) {
-	if account.PasswordConfig != nil {
-		return GeneratePasswordByConfig(*account.PasswordConfig)
-	}
-	if account.PasswordGenerationPolicy == (appsv1.PasswordConfig{}) {
+	if account.PasswordConfig == nil {
 		return "", nil
 	}
-	return GeneratePasswordByConfig(account.PasswordGenerationPolicy)
+	return GeneratePasswordByConfig(*account.PasswordConfig)
 }
 
 // ValidateSystemAccountPassword enforces the password contract shared by all

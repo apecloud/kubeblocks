@@ -311,7 +311,7 @@ func synthesizeSystemAccounts(compDefAccounts []appsv1.SystemAccount,
 
 	merge := func(account synthesizedSystemAccount, compAccount appsv1.ComponentSystemAccount) synthesizedSystemAccount {
 		if compAccount.PasswordConfig != nil {
-			account.PasswordConfig = common.ToSystemAccountPasswordConfig(*compAccount.PasswordConfig)
+			account.PasswordConfig = compAccount.PasswordConfig.DeepCopy()
 		}
 		account.Disabled = compAccount.Disabled
 		account.SecretRef = compAccount.SecretRef

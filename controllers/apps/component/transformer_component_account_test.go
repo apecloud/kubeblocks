@@ -74,7 +74,7 @@ var _ = Describe("component system account API contract", func() {
 		compDef.Spec.SystemAccounts = []appsv1.SystemAccount{
 			{
 				Name: "zero-digits",
-				PasswordConfig: &appsv1.SystemAccountPasswordConfig{
+				PasswordConfig: &appsv1.PasswordConfig{
 					Length:     8,
 					NumDigits:  ptr.To[int32](0),
 					LetterCase: appsv1.LowerCases,

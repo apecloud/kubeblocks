@@ -184,9 +184,9 @@ var (
 			{
 				Name:        "root",
 				InitAccount: true,
-				PasswordGenerationPolicy: &appsv1.PasswordConfig{
+				PasswordGenerationPolicy: appsv1.PasswordConfig{
 					Length:     16,
-					NumDigits:  ptr.To(int32(8)),
+					NumDigits:  8,
 					NumSymbols: 8,
 					LetterCase: appsv1.MixedCases,
 				},
@@ -198,9 +198,9 @@ var (
 					Delete: "DROP USER '$(USERNAME)'@'%';",
 					Update: "ALTER USER '$(USERNAME)'@'%' IDENTIFIED BY '$(PASSWORD)';",
 				},
-				PasswordGenerationPolicy: &appsv1.PasswordConfig{
+				PasswordGenerationPolicy: appsv1.PasswordConfig{
 					Length:     10,
-					NumDigits:  ptr.To(int32(5)),
+					NumDigits:  5,
 					NumSymbols: 0,
 					LetterCase: appsv1.MixedCases,
 				},

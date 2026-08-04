@@ -17924,7 +17924,7 @@ spec:
                     passwordConfig:
                       description: |-
                         Specifies the configuration for generating the account's password.
-                        If this field and passwordGenerationPolicy are both nil, the account is passwordless.
+                        If this field is nil and passwordGenerationPolicy is empty, the account is passwordless.
                         This field takes precedence over the deprecated passwordGenerationPolicy field.
 
                         This field is immutable once set.
@@ -17972,7 +17972,7 @@ spec:
                     passwordGenerationPolicy:
                       description: |-
                         Specifies the legacy policy for generating the account's password.
-                        A non-nil value is used only when passwordConfig is nil.
+                        A non-empty value is used only when passwordConfig is nil.
 
                         This field is immutable once set.
 

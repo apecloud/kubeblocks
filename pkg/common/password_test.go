@@ -25,7 +25,6 @@ import (
 	"unicode"
 
 	"github.com/sethvargo/go-password/password"
-	"k8s.io/utils/ptr"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
@@ -205,9 +204,9 @@ func TestGenerateSystemAccountPassword(t *testing.T) {
 		{
 			name: "legacy configuration remains supported",
 			account: appsv1.SystemAccount{
-				PasswordGenerationPolicy: &appsv1.PasswordConfig{
+				PasswordGenerationPolicy: appsv1.PasswordConfig{
 					Length:     12,
-					NumDigits:  ptr.To(int32(2)),
+					NumDigits:  2,
 					LetterCase: appsv1.MixedCases,
 				},
 			},
@@ -218,12 +217,12 @@ func TestGenerateSystemAccountPassword(t *testing.T) {
 			account: appsv1.SystemAccount{
 				PasswordConfig: &appsv1.PasswordConfig{
 					Length:     20,
-					NumDigits:  ptr.To(int32(0)),
+					NumDigits:  0,
 					LetterCase: appsv1.LowerCases,
 				},
-				PasswordGenerationPolicy: &appsv1.PasswordConfig{
+				PasswordGenerationPolicy: appsv1.PasswordConfig{
 					Length:     8,
-					NumDigits:  ptr.To(int32(8)),
+					NumDigits:  8,
 					LetterCase: appsv1.UpperCases,
 				},
 			},
@@ -248,12 +247,12 @@ func TestGenerateSystemAccountPasswordNewConfigurationPreservesExplicitValues(t 
 	generated, err := GenerateSystemAccountPassword(appsv1.SystemAccount{
 		PasswordConfig: &appsv1.PasswordConfig{
 			Length:     20,
-			NumDigits:  ptr.To(int32(0)),
+			NumDigits:  0,
 			LetterCase: appsv1.LowerCases,
 		},
-		PasswordGenerationPolicy: &appsv1.PasswordConfig{
+		PasswordGenerationPolicy: appsv1.PasswordConfig{
 			Length:     8,
-			NumDigits:  ptr.To(int32(8)),
+			NumDigits:  8,
 			LetterCase: appsv1.UpperCases,
 		},
 	})

@@ -1204,7 +1204,7 @@ type SystemAccount struct {
 	// This field is immutable once set.
 	//
 	// +optional
-	PasswordConfig *PasswordConfig `json:"passwordConfig,omitempty"`
+	PasswordConfig *SystemAccountPasswordConfig `json:"passwordConfig,omitempty"`
 
 	// Specifies the legacy policy for generating the account's password.
 	// A non-empty value is used only when passwordConfig is nil.
@@ -1217,6 +1217,54 @@ type SystemAccount struct {
 	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 1.2.0 and will be removed in 1.3.0. Use passwordConfig instead."
 	// +optional
 	PasswordGenerationPolicy PasswordConfig `json:"passwordGenerationPolicy,omitzero"`
+}
+
+// SystemAccountPasswordConfig customizes the password generated for a system account.
+//
+// It is separate from PasswordConfig so the typed API can distinguish an omitted numDigits
+// value from an explicitly configured zero.
+type SystemAccountPasswordConfig struct {
+	// The length of the password.
+	//
+	// +kubebuilder:validation:Maximum=32
+	// +kubebuilder:validation:Minimum=8
+	// +kubebuilder:default=16
+	// +optional
+	Length int32 `json:"length,omitempty"`
+
+	// The number of digits in the password.
+	//
+	// +kubebuilder:validation:Maximum=8
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:default=4
+	// +optional
+	NumDigits *int32 `json:"numDigits,omitempty"`
+
+	// The number of symbols in the password.
+	//
+	// +kubebuilder:validation:Maximum=8
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:default=0
+	// +optional
+	NumSymbols int32 `json:"numSymbols,omitempty"`
+
+	// The set of symbols allowed when generating the password. If empty, KubeBlocks uses
+	// the default symbol set, which is "!@#&*".
+	//
+	// +optional
+	SymbolCharacters string `json:"symbolCharacters,omitempty"`
+
+	// The case of the letters in the password.
+	//
+	// +kubebuilder:default=MixedCases
+	// +optional
+	LetterCase LetterCase `json:"letterCase,omitempty"`
+
+	// Seed to generate the account's password.
+	// Cannot be updated.
+	//
+	// +optional
+	Seed string `json:"seed,omitempty"`
 }
 
 type SystemAccountStatement struct {

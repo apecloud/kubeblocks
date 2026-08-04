@@ -25,6 +25,7 @@ import (
 	"unicode"
 
 	"github.com/sethvargo/go-password/password"
+	"k8s.io/utils/ptr"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
@@ -215,9 +216,9 @@ func TestGenerateSystemAccountPassword(t *testing.T) {
 		{
 			name: "new configuration takes precedence over legacy",
 			account: appsv1.SystemAccount{
-				PasswordConfig: &appsv1.PasswordConfig{
+				PasswordConfig: &appsv1.SystemAccountPasswordConfig{
 					Length:     20,
-					NumDigits:  0,
+					NumDigits:  ptr.To[int32](0),
 					LetterCase: appsv1.LowerCases,
 				},
 				PasswordGenerationPolicy: appsv1.PasswordConfig{
@@ -245,9 +246,9 @@ func TestGenerateSystemAccountPassword(t *testing.T) {
 
 func TestGenerateSystemAccountPasswordNewConfigurationPreservesExplicitValues(t *testing.T) {
 	generated, err := GenerateSystemAccountPassword(appsv1.SystemAccount{
-		PasswordConfig: &appsv1.PasswordConfig{
+		PasswordConfig: &appsv1.SystemAccountPasswordConfig{
 			Length:     20,
-			NumDigits:  0,
+			NumDigits:  ptr.To[int32](0),
 			LetterCase: appsv1.LowerCases,
 		},
 		PasswordGenerationPolicy: appsv1.PasswordConfig{
@@ -264,6 +265,29 @@ func TestGenerateSystemAccountPasswordNewConfigurationPreservesExplicitValues(t 
 	}
 	if strings.ContainsFunc(generated, unicode.IsDigit) {
 		t.Fatalf("expected explicit numDigits=0 to be preserved, got %q", generated)
+	}
+}
+
+func TestGenerateSystemAccountPasswordNewConfigurationDefaultsOmittedDigits(t *testing.T) {
+	generated, err := GenerateSystemAccountPassword(appsv1.SystemAccount{
+		PasswordConfig: &appsv1.SystemAccountPasswordConfig{
+			Length:     12,
+			LetterCase: appsv1.LowerCases,
+			Seed:       "omitted-digits",
+		},
+	})
+	if err != nil {
+		t.Fatalf("generate password: %v", err)
+	}
+	digits := 0
+	for _, character := range generated {
+		if unicode.IsDigit(character) {
+			digits++
+		}
+	}
+	if digits != int(defaultSystemAccountPasswordDigits) {
+		t.Fatalf("expected omitted numDigits to default to %d, got %d in %q",
+			defaultSystemAccountPasswordDigits, digits, generated)
 	}
 }
 

@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/utils/ptr"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -66,33 +67,29 @@ var _ = Describe("component system account API contract", func() {
 		Expect(accounts[0]).NotTo(HaveKey("passwordGenerationPolicy"))
 	})
 
-	It("preserves an explicit zero digit count from an unstructured API request", func() {
+	It("preserves an explicit zero digit count from a typed API request", func() {
 		compDef := testapps.NewComponentDefinitionFactory("system-account-zero-digits").
 			SetDefaultSpec().
 			GetObject()
-		object, err := runtime.DefaultUnstructuredConverter.ToUnstructured(compDef)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(unstructured.SetNestedSlice(object, []interface{}{
-			map[string]interface{}{
-				"name": "zero-digits",
-				"passwordConfig": map[string]interface{}{
-					"length":     int64(8),
-					"numDigits":  int64(0),
-					"letterCase": string(appsv1.LowerCases),
+		compDef.Spec.SystemAccounts = []appsv1.SystemAccount{
+			{
+				Name: "zero-digits",
+				PasswordConfig: &appsv1.SystemAccountPasswordConfig{
+					Length:     8,
+					NumDigits:  ptr.To[int32](0),
+					LetterCase: appsv1.LowerCases,
 				},
 			},
-		}, "spec", "systemAccounts")).To(Succeed())
-		request := &unstructured.Unstructured{Object: object}
-		request.SetGroupVersionKind(appsv1.GroupVersion.WithKind("ComponentDefinition"))
+		}
 
-		Expect(k8sClient.Create(ctx, request)).To(Succeed())
+		Expect(k8sClient.Create(ctx, compDef)).To(Succeed())
 		DeferCleanup(func() {
-			Expect(ctrlclient.IgnoreNotFound(k8sClient.Delete(ctx, request))).To(Succeed())
+			Expect(ctrlclient.IgnoreNotFound(k8sClient.Delete(ctx, compDef))).To(Succeed())
 		})
 
 		stored := &unstructured.Unstructured{}
 		stored.SetGroupVersionKind(appsv1.GroupVersion.WithKind("ComponentDefinition"))
-		Expect(k8sClient.Get(ctx, ctrlclient.ObjectKeyFromObject(request), stored)).To(Succeed())
+		Expect(k8sClient.Get(ctx, ctrlclient.ObjectKeyFromObject(compDef), stored)).To(Succeed())
 
 		accounts, found, err := unstructured.NestedSlice(stored.Object, "spec", "systemAccounts")
 		Expect(err).NotTo(HaveOccurred())

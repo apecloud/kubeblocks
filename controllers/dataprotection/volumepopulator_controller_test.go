@@ -2505,11 +2505,14 @@ func TestRestoreSystemAccountSecretsRestoresComponentAndShardingSecrets(t *testi
 	encryptor := intctrlutil.NewEncryptor("")
 	componentPassword, err := encryptor.Encrypt([]byte("component-password"))
 	require.NoError(t, err)
+	emptyPassword, err := encryptor.Encrypt(nil)
+	require.NoError(t, err)
 	shardingPassword, err := encryptor.Encrypt([]byte("sharding-password"))
 	require.NoError(t, err)
 	accounts, err := json.Marshal(map[string]map[string]string{
 		"mysql": {
-			"admin": componentPassword,
+			"admin":        componentPassword,
+			"passwordless": emptyPassword,
 		},
 		"shard": {
 			"root": shardingPassword,
@@ -2570,6 +2573,14 @@ func TestRestoreSystemAccountSecretsRestoresComponentAndShardingSecrets(t *testi
 	require.Len(t, componentSecret.OwnerReferences, 1)
 	require.Equal(t, "Component", componentSecret.OwnerReferences[0].Kind)
 	require.Equal(t, component.Name, componentSecret.OwnerReferences[0].Name)
+
+	emptyPasswordSecret := &corev1.Secret{}
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKey{
+		Namespace: "default",
+		Name:      constant.GenerateAccountSecretName("cluster", "mysql", "passwordless"),
+	}, emptyPasswordSecret))
+	require.Contains(t, emptyPasswordSecret.Data, constant.AccountPasswdForSecret)
+	require.Equal(t, []byte{}, emptyPasswordSecret.Data[constant.AccountPasswdForSecret])
 
 	shardingSecret := &corev1.Secret{}
 	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKey{

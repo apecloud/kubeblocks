@@ -1230,10 +1230,10 @@ type SystemAccount struct {
 	//
 	// This field is immutable once set.
 	//
-	// Deprecated: passwordGenerationPolicy has been deprecated since 1.2.0 and will be removed in 1.3.0.
+	// Deprecated: passwordGenerationPolicy has been deprecated since 1.1.0 and will be removed in 1.2.0.
 	// Use passwordConfig instead.
 	//
-	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 1.2.0 and will be removed in 1.3.0. Use passwordConfig instead."
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 1.1.0 and will be removed in 1.2.0. Use passwordConfig instead."
 	// +optional
 	PasswordGenerationPolicy PasswordConfig `json:"passwordGenerationPolicy,omitzero"`
 }

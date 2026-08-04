@@ -21,6 +21,7 @@ package cluster
 
 import (
 	"context"
+	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -33,7 +34,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 var _ = Describe("cluster sharding shared system account password contract", func() {
@@ -48,6 +52,7 @@ var _ = Describe("cluster sharding shared system account password contract", fun
 	newContext := func(account appsv1.SystemAccount, objects ...client.Object) (*clusterTransformContext, *appsv1.ClusterSharding) {
 		scheme := runtime.NewScheme()
 		Expect(corev1.AddToScheme(scheme)).To(Succeed())
+		Expect(dpv1alpha1.AddToScheme(scheme)).To(Succeed())
 		compDef := &appsv1.ComponentDefinition{
 			ObjectMeta: metav1.ObjectMeta{Name: compDefName},
 			Spec: appsv1.ComponentDefinitionSpec{
@@ -109,6 +114,32 @@ var _ = Describe("cluster sharding shared system account password contract", fun
 			newSystemAccountSecret(transCtx, shardingSpec, accountName)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(secret.Data).To(HaveKey(constant.AccountPasswdForSecret))
+		Expect(secret.Data[constant.AccountPasswdForSecret]).To(BeEmpty())
+	})
+
+	It("preserves an empty password restored from backup", func() {
+		encryptedPassword, err := intctrlutil.NewEncryptor(viper.GetString(constant.CfgKeyDPEncryptionKey)).Encrypt(nil)
+		Expect(err).NotTo(HaveOccurred())
+		backup := &dpv1alpha1.Backup{ObjectMeta: metav1.ObjectMeta{
+			Name:      "backup",
+			Namespace: namespace,
+			Annotations: map[string]string{
+				constant.EncryptedSystemAccountsAnnotationKey: fmt.Sprintf(`{"%s":{"%s":"%s"}}`, sharding, accountName, encryptedPassword),
+			},
+		}}
+		transCtx, shardingSpec := newContext(appsv1.SystemAccount{
+			Name: accountName,
+			PasswordConfig: &appsv1.PasswordConfig{
+				Length: 16,
+			},
+		}, backup)
+		transCtx.Cluster.Annotations = map[string]string{
+			constant.RestoreFromBackupAnnotationKey: `{"sharding":{"name":"backup","namespace":"default"}}`,
+		}
+
+		secret, err := (&clusterShardingAccountTransformer{}).
+			newSystemAccountSecret(transCtx, shardingSpec, accountName)
+		Expect(err).NotTo(HaveOccurred())
 		Expect(secret.Data[constant.AccountPasswdForSecret]).To(BeEmpty())
 	})
 

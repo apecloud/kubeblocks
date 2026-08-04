@@ -74,7 +74,6 @@ func (h *clusterShardingHandler) nonBlockingShardingAction(transCtx *clusterTran
 
 	var callErrors []error
 	pending := false
-	terminalFailure := false
 	for i := range targets.Targets {
 		target := &targets.Targets[i]
 		lfa, err := h.newLifecycle(transCtx, comps[target.Component])
@@ -103,7 +102,6 @@ func (h *clusterShardingHandler) nonBlockingShardingAction(transCtx *clusterTran
 				pending = true
 			case isTerminalShardingActionError(err):
 				pod.Rerun = true
-				terminalFailure = true
 				callErrors = append(callErrors, err)
 			default:
 				callErrors = append(callErrors, err)
@@ -114,12 +112,6 @@ func (h *clusterShardingHandler) nonBlockingShardingAction(transCtx *clusterTran
 		return err
 	}
 	if len(callErrors) > 0 {
-		if terminalFailure {
-			// Rerun is part of the persisted request state. Make the error delayed so
-			// the graph update is applied before the next attempt.
-			return errors.Join(errors.Join(callErrors...),
-				pendingShardingAction(actionName, "failed and will be retried"))
-		}
 		return errors.Join(callErrors...)
 	}
 	if pending {

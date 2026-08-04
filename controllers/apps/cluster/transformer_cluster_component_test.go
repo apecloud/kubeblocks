@@ -2683,7 +2683,7 @@ var _ = Describe("cluster component transformer test", func() {
 					transCtx, sharding1aName, shardingAddShardAction, shardingAddActionTargetsKey,
 					action(), nil, []*appsv1.Component{shard}, shard)
 				Expect(errors.Is(err, lifecycle.ErrActionFailed)).Should(BeTrue())
-				Expect(ictrlutil.IsDelayedRequeueError(err)).Should(BeTrue())
+				Expect(ictrlutil.IsDelayedRequeueError(err)).Should(BeFalse())
 				targets, _, err := getShardingActionTargets(shard, shardingAddActionTargetsKey)
 				Expect(err).Should(BeNil())
 				Expect(targets.Targets[0].Pods[0].Rerun).Should(BeTrue())

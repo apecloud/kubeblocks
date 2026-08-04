@@ -766,9 +766,7 @@ func (h *clusterComponentHandler) delete(transCtx *clusterTransformContext, dag 
 
 	transCtx.Logger.Info(fmt.Sprintf("deleting component %s", comp.Name))
 	graphCli, _ := transCtx.Client.(model.GraphClient)
-	graphCli.Delete(dag, comp)
-
-	return nil
+	return graphCli.Delete(dag, comp)
 }
 
 func (h *clusterComponentHandler) update(transCtx *clusterTransformContext, dag *graph.DAG, name string) error {

@@ -45,8 +45,9 @@ import (
 // ComponentReconciler reconciles a Component object
 type ComponentReconciler struct {
 	client.Client
-	Scheme   *runtime.Scheme
-	Recorder record.EventRecorder
+	APIReader client.Reader
+	Scheme    *runtime.Scheme
+	Recorder  record.EventRecorder
 }
 
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=components,verbs=get;list;watch;create;update;patch;delete
@@ -112,7 +113,7 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	reqCtx.Log.V(1).Info("reconcile", "component", req.NamespacedName)
 
-	planBuilder := newComponentPlanBuilder(reqCtx, r.Client)
+	planBuilder := newComponentPlanBuilder(reqCtx, r.Client, r.APIReader)
 	if err := planBuilder.Init(); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
@@ -188,6 +189,9 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ComponentReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	if r.APIReader == nil {
+		r.APIReader = mgr.GetAPIReader()
+	}
 	retryDurationMS := viper.GetInt(constant.CfgKeyCtrlrReconcileRetryDurationMS)
 	if retryDurationMS != 0 {
 		appsutil.RequeueDuration = time.Millisecond * time.Duration(retryDurationMS)

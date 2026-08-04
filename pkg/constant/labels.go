@@ -48,6 +48,9 @@ const (
 	KBAppInstanceTemplateLabelKey   = "apps.kubeblocks.io/instance-template"
 	KBAppPodNameLabelKey            = "apps.kubeblocks.io/pod-name"
 	VolumeClaimTemplateNameLabelKey = "apps.kubeblocks.io/vct-name"
+	// SystemAccountRestoreRequestLabelKey selects temporary credential
+	// requests that must be reconciled by their Apps controller owner.
+	SystemAccountRestoreRequestLabelKey = "apps.kubeblocks.io/system-account-restore-request"
 
 	KBAppServiceVersionKey = "apps.kubeblocks.io/service-version"
 	KBAppReleasePhaseKey   = "apps.kubeblocks.io/release-phase" // TODO: release or service phase?

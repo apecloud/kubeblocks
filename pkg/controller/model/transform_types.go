@@ -25,6 +25,7 @@ import (
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	batchv1 "k8s.io/api/batch/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -66,12 +67,13 @@ type GVKNObjKey struct {
 // the root vertex(i.e. the cluster vertex) will be treated specially:
 // as all its meta, spec and status can be updated in one reconciliation loop
 type ObjectVertex struct {
-	Obj               client.Object
-	OriObj            client.Object
-	Action            *Action
-	SubResource       string
-	ClientOpt         any
-	PropagationPolicy client.PropagationPolicy
+	Obj                 client.Object
+	OriObj              client.Object
+	Action              *Action
+	SubResource         string
+	ClientOpt           any
+	PropagationPolicy   client.PropagationPolicy
+	DeletePreconditions *metav1.Preconditions
 }
 
 func (v *ObjectVertex) String() string {
@@ -87,11 +89,12 @@ func NewObjectVertex(oldObj, newObj client.Object, action *Action, opts ...Graph
 		opt.ApplyTo(graphOpts)
 	}
 	return &ObjectVertex{
-		Obj:         newObj,
-		OriObj:      oldObj,
-		Action:      action,
-		SubResource: graphOpts.subResource,
-		ClientOpt:   graphOpts.clientOpt,
+		Obj:                 newObj,
+		OriObj:              oldObj,
+		Action:              action,
+		SubResource:         graphOpts.subResource,
+		ClientOpt:           graphOpts.clientOpt,
+		DeletePreconditions: graphOpts.deletePreconditions,
 	}
 }
 

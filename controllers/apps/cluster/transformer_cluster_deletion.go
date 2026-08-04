@@ -116,13 +116,17 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 		if isOwnedByComp(o) || appsutil.IsOwnedByInstanceSet(o) {
 			continue
 		}
-		graphCli.Delete(dag, o)
+		if err := graphCli.Delete(dag, o); err != nil {
+			return err
+		}
 	}
 
 	// set cluster action to status until all the sub-resources deleted
 	if len(delObjs) == 0 {
 		transCtx.Logger.Info(fmt.Sprintf("deleting cluster %v", klog.KObj(cluster)))
-		graphCli.Delete(dag, cluster)
+		if err := graphCli.Delete(dag, cluster); err != nil {
+			return err
+		}
 	} else {
 		transCtx.Logger.Info(fmt.Sprintf("deleting the sub-resource kinds: %v", maps.Keys(delKindMap)))
 		graphCli.Status(dag, cluster, transCtx.Cluster)

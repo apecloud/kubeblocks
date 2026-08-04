@@ -75,7 +75,9 @@ func (t *clusterServiceTransformer) Transform(ctx graph.TransformContext, dag *g
 		t.updateService(dag, graphCli, services[svc], protoServices[svc])
 	}
 	for svc := range toDeleteServices {
-		graphCli.Delete(dag, services[svc], inDataContext4G())
+		if err := graphCli.Delete(dag, services[svc], inDataContext4G()); err != nil {
+			return err
+		}
 	}
 	return nil
 }

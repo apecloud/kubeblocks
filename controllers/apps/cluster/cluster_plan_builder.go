@@ -45,7 +45,8 @@ import (
 // clusterTransformContext a graph.TransformContext implementation for Cluster reconciliation
 type clusterTransformContext struct {
 	context.Context
-	Client client.Reader
+	Client    client.Reader
+	APIReader client.Reader
 	record.EventRecorder
 	logr.Logger
 
@@ -236,13 +237,14 @@ func (p *clusterPlan) handlePlanExecutionError(err error) error {
 // Do the real works
 
 // newClusterPlanBuilder returns a clusterPlanBuilder powered PlanBuilder
-func newClusterPlanBuilder(ctx intctrlutil.RequestCtx, cli client.Client) graph.PlanBuilder {
+func newClusterPlanBuilder(ctx intctrlutil.RequestCtx, cli client.Client, apiReader client.Reader) graph.PlanBuilder {
 	return &clusterPlanBuilder{
 		req: ctx.Req,
 		cli: cli,
 		transCtx: &clusterTransformContext{
 			Context:       ctx.Ctx,
 			Client:        model.NewGraphClient(cli),
+			APIReader:     apiReader,
 			EventRecorder: ctx.Recorder,
 			Logger:        ctx.Log,
 		},
@@ -356,6 +358,7 @@ func (c *clusterPlanBuilder) reconcileDeleteObject(ctx context.Context, node *mo
 		deletePropagation := metav1.DeletePropagationBackground
 		deleteOptions := &client.DeleteOptions{
 			PropagationPolicy: &deletePropagation,
+			Preconditions:     node.DeletePreconditions,
 		}
 		if err := c.cli.Delete(ctx, node.Obj, deleteOptions, clientOption(node)); err != nil {
 			return client.IgnoreNotFound(err)

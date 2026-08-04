@@ -22,6 +22,7 @@ package dataprotection
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
 	"slices"
@@ -39,9 +40,13 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/component-helpers/storage/volume"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -49,6 +54,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
+	"github.com/apecloud/kubeblocks/pkg/controller/systemaccount"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dprestore "github.com/apecloud/kubeblocks/pkg/dataprotection/restore"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
@@ -59,8 +65,9 @@ import (
 // VolumePopulatorReconciler reconciles Backup dataSource PVCs.
 type VolumePopulatorReconciler struct {
 	client.Client
-	Scheme   *runtime.Scheme
-	Recorder record.EventRecorder
+	APIReader client.Reader
+	Scheme    *runtime.Scheme
+	Recorder  record.EventRecorder
 }
 
 type pvcRestoreMode string
@@ -115,7 +122,16 @@ func (r *VolumePopulatorReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 func (r *VolumePopulatorReconciler) handleSyncPVCError(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim, err error) (ctrl.Result, error) {
 	if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal) {
 		r.Recorder.Event(pvc, corev1.EventTypeWarning, ReasonVolumePopulateFailed, err.Error())
-		if patchErr := r.UpdatePVCConditions(reqCtx, pvc, ReasonPopulatingFailed, err.Error()); patchErr != nil {
+		reason := systemAccountRestoreFailureReason(err)
+		if reason == "" {
+			reason = ReasonPopulatingFailed
+		}
+		if reason == systemaccount.ConcurrentRestoreIntentReason &&
+			!systemAccountConflictIdentityPresent(pvc) {
+			return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log,
+				"waiting for exact system account conflict identity projection")
+		}
+		if patchErr := r.UpdatePVCConditions(reqCtx, pvc, reason, err.Error()); patchErr != nil {
 			return intctrlutil.RequeueWithError(patchErr, reqCtx.Log, "")
 		}
 		return intctrlutil.Reconciled()
@@ -132,9 +148,107 @@ func (r *VolumePopulatorReconciler) handleSyncPVCError(reqCtx intctrlutil.Reques
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *VolumePopulatorReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	if r.APIReader == nil {
+		r.APIReader = mgr.GetAPIReader()
+	}
 	return intctrlutil.NewControllerManagedBy(mgr).
 		For(&corev1.PersistentVolumeClaim{}).
+		Watches(&corev1.Secret{}, handler.EnqueueRequestsFromMapFunc(r.mapSystemAccountProtocolSecret),
+			builder.WithPredicates(predicate.NewPredicateFuncs(func(object client.Object) bool {
+				protocol := object.GetAnnotations()[systemaccount.RestoreProtocolAnnotationKey]
+				return protocol == systemaccount.RestoreProtocolV2 ||
+					protocol == systemaccount.ConflictProtocolV1
+			}))).
 		Complete(r)
+}
+
+func (r *VolumePopulatorReconciler) mapSystemAccountProtocolSecret(
+	ctx context.Context,
+	object client.Object,
+) []reconcile.Request {
+	secret, ok := object.(*corev1.Secret)
+	if !ok {
+		return nil
+	}
+	var (
+		operation      systemaccount.RestoreOperationIdentity
+		resolvedSource *systemaccount.ObjectIdentity
+		conflict       *systemaccount.ConflictEnvelope
+	)
+	switch secret.Annotations[systemaccount.RestoreProtocolAnnotationKey] {
+	case systemaccount.RestoreProtocolV2:
+		intent, err := systemaccount.DecodeRestoreRequestV2(secret)
+		if err != nil {
+			log.FromContext(ctx).Error(err, "ignore invalid system account restore request event",
+				"request", client.ObjectKeyFromObject(secret))
+			return nil
+		}
+		operation = intent.Operation
+		resolvedSource = &intent.ResolvedSource
+	case systemaccount.ConflictProtocolV1:
+		envelope, err := systemaccount.DecodeAndValidateConflictReceipt(secret, false)
+		if err != nil {
+			log.FromContext(ctx).Error(err, "ignore invalid system account conflict receipt event",
+				"receipt", client.ObjectKeyFromObject(secret))
+			return nil
+		}
+		operation = envelope.LoserOperation
+		conflict = &envelope
+	default:
+		return nil
+	}
+	lifecycle := &SystemAccountConflictReceiptLifecycleReconciler{
+		Client:    r.Client,
+		APIReader: r.APIReader,
+		Scheme:    r.Scheme,
+	}
+	pvcs, err := lifecycle.participantsForOperation(ctx, operation)
+	if err != nil {
+		log.FromContext(ctx).Error(err, "map system account protocol Secret to participants",
+			"secret", client.ObjectKeyFromObject(secret))
+		return nil
+	}
+	if resolvedSource != nil {
+		reader, readerErr := r.systemAccountAuthorityReader()
+		if readerErr != nil {
+			log.FromContext(ctx).Error(readerErr,
+				"map system account restore request to participants",
+				"secret", client.ObjectKeyFromObject(secret))
+			return nil
+		}
+		backup := &dpv1alpha1.Backup{}
+		if err := reader.Get(ctx, client.ObjectKey{
+			Namespace: resolvedSource.Namespace,
+			Name:      resolvedSource.Name,
+		}, backup); err != nil || backup.UID != resolvedSource.UID {
+			return nil
+		}
+	}
+	var conflictIdentity map[string]string
+	if conflict != nil {
+		conflictIdentity, err = systemAccountConflictExpectedIdentity(*conflict)
+		if err != nil {
+			log.FromContext(ctx).Error(err, "ignore invalid system account conflict projection identity",
+				"receipt", client.ObjectKeyFromObject(secret))
+			return nil
+		}
+	}
+	requests := make([]reconcile.Request, 0, len(pvcs))
+	for _, pvc := range pvcs {
+		condition := findPVCConditionByType(pvc, appsv1.ConditionTypeRestore)
+		if conflict != nil {
+			if condition != nil &&
+				condition.Status == corev1.ConditionFalse &&
+				condition.Reason == systemaccount.ConcurrentRestoreIntentReason &&
+				systemAccountConflictIdentityExact(pvc, conflictIdentity) {
+				continue
+			}
+		} else if condition != nil && condition.Status != corev1.ConditionUnknown {
+			continue
+		}
+		requests = append(requests, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(pvc)})
+	}
+	return requests
 }
 
 func (r *VolumePopulatorReconciler) MatchToPopulate(pvc *corev1.PersistentVolumeClaim) (bool, error) {
@@ -1892,6 +2006,10 @@ func (r *VolumePopulatorReconciler) UpdatePVCConditions(reqCtx intctrlutil.Reque
 		restoreCondition.Status = corev1.ConditionTrue
 	case ReasonPopulatingFailed:
 		restoreCondition.Status = corev1.ConditionFalse
+	default:
+		if systemaccount.IsRestoreFailureReason(reason) {
+			restoreCondition.Status = corev1.ConditionFalse
+		}
 	}
 	pvcPatch := client.MergeFrom(pvc.DeepCopy())
 	var existPopulating bool
@@ -2194,8 +2312,15 @@ func (r *VolumePopulatorReconciler) restoreSystemAccountSecrets(reqCtx intctrlut
 	if pvc.Spec.DataSourceRef == nil || pvc.Spec.DataSourceRef.Name == "" {
 		return nil
 	}
+	reader, err := r.systemAccountAuthorityReader()
+	if err != nil {
+		return err
+	}
 	backup := &dpv1alpha1.Backup{}
-	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Namespace: backupNamespace, Name: pvc.Spec.DataSourceRef.Name}, backup); err != nil {
+	if err := reader.Get(reqCtx.Ctx, types.NamespacedName{
+		Namespace: backupNamespace,
+		Name:      pvc.Spec.DataSourceRef.Name,
+	}, backup); err != nil {
 		return err
 	}
 	encryptedAccounts := backup.Annotations[constant.EncryptedSystemAccountsAnnotationKey]
@@ -2216,24 +2341,14 @@ func (r *VolumePopulatorReconciler) restoreSystemAccountSecrets(reqCtx intctrlut
 	}
 	encryptor := intctrlutil.NewEncryptor(viper.GetString(constant.CfgKeyDPEncryptionKey))
 	if componentName != "" {
-		labels := map[string]string{
-			constant.AppInstanceLabelKey:        clusterName,
-			constant.KBAppComponentLabelKey:     componentName,
-			"apps.kubeblocks.io/system-account": "",
-		}
-		if err := r.restoreSystemAccountSecretSet(reqCtx, pvc, encryptor, accountsByComponent[componentName],
-			systemAccountSecretScopeComponent, clusterName, componentName, labels); err != nil {
+		if err := r.restoreSystemAccountSecretSet(reqCtx, pvc, backup, encryptor, accountsByComponent[componentName],
+			systemAccountSecretScopeComponent, clusterName, componentName); err != nil {
 			return err
 		}
 	}
 	if shardingName := pvc.Labels[constant.KBAppShardingNameLabelKey]; shardingName != "" {
-		labels := map[string]string{
-			constant.AppInstanceLabelKey:        clusterName,
-			constant.KBAppShardingNameLabelKey:  shardingName,
-			"apps.kubeblocks.io/system-account": "",
-		}
-		if err := r.restoreSystemAccountSecretSet(reqCtx, pvc, encryptor, accountsByComponent[shardingName],
-			systemAccountSecretScopeSharding, clusterName, shardingName, labels); err != nil {
+		if err := r.restoreSystemAccountSecretSet(reqCtx, pvc, backup, encryptor, accountsByComponent[shardingName],
+			systemAccountSecretScopeSharding, clusterName, shardingName); err != nil {
 			return err
 		}
 	}
@@ -2249,139 +2364,284 @@ const (
 
 func (r *VolumePopulatorReconciler) restoreSystemAccountSecretSet(reqCtx intctrlutil.RequestCtx,
 	pvc *corev1.PersistentVolumeClaim,
+	backup *dpv1alpha1.Backup,
 	encryptor interface {
 		Decrypt([]byte) (string, error)
 	},
 	accounts map[string]string,
 	scope systemAccountSecretScope,
-	clusterName, ownerName string,
-	labels map[string]string) error {
+	clusterName, ownerName string) error {
 	for accountName, encryptedPassword := range accounts {
 		password, err := encryptor.Decrypt([]byte(encryptedPassword))
 		if err != nil {
 			return intctrlutil.NewFatalError(err.Error())
 		}
-		accountLabels := mapsClone(labels)
-		accountLabels["apps.kubeblocks.io/system-account"] = accountName
-		if err = r.upsertSystemAccountSecret(reqCtx, pvc, scope, clusterName, ownerName, accountName, []byte(password), accountLabels); err != nil {
+		if err = r.upsertSystemAccountSecret(reqCtx, pvc, backup, scope,
+			clusterName, ownerName, accountName, []byte(password)); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func mapsClone(in map[string]string) map[string]string {
-	out := make(map[string]string, len(in))
-	for k, v := range in {
-		out[k] = v
-	}
-	return out
-}
-
 func (r *VolumePopulatorReconciler) upsertSystemAccountSecret(reqCtx intctrlutil.RequestCtx,
 	pvc *corev1.PersistentVolumeClaim,
+	backup *dpv1alpha1.Backup,
 	scope systemAccountSecretScope,
 	clusterName, ownerName, accountName string,
-	password []byte,
-	labels map[string]string) error {
+	password []byte) error {
 	secretName := systemAccountSecretName(scope, clusterName, ownerName, accountName)
-	secret := &corev1.Secret{}
 	key := types.NamespacedName{Namespace: pvc.Namespace, Name: secretName}
-	if err := r.Client.Get(reqCtx.Ctx, key, secret); err != nil {
-		if !apierrors.IsNotFound(err) {
-			return err
+	request, err := r.newSystemAccountRestoreRequest(reqCtx, pvc, backup, scope,
+		clusterName, ownerName, accountName, password)
+	if err != nil {
+		var contractErr *systemAccountRestoreContractError
+		if errors.As(err, &contractErr) {
+			return intctrlutil.NewFatalError(contractErr.Error())
 		}
-		secret = &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      secretName,
-				Namespace: pvc.Namespace,
-				Labels:    labels,
-				Annotations: map[string]string{
-					constant.SystemAccountProvisionedAnnotationKey: "true",
-				},
-			},
-			Type: corev1.SecretTypeOpaque,
-			Data: map[string][]byte{
-				constant.AccountNameForSecret:   []byte(accountName),
-				constant.AccountPasswdForSecret: password,
-			},
-		}
-		if err := r.setSystemAccountSecretOwner(reqCtx, pvc.Namespace, secret, scope, clusterName, ownerName); err != nil {
-			return err
-		}
-		return r.Client.Create(reqCtx.Ctx, secret)
+		return newSystemAccountSecretRequeueError("build restore request for", key, err)
 	}
-	if secret.Immutable != nil && *secret.Immutable && !systemAccountSecretMatches(secret, accountName, password) {
-		if err := r.Client.Delete(reqCtx.Ctx, secret); err != nil && !apierrors.IsNotFound(err) {
-			return err
+	intent, err := systemaccount.ValidateRestoreRequestV2(request)
+	if err != nil {
+		return intctrlutil.NewFatalError(err.Error())
+	}
+	reader, err := r.systemAccountAuthorityReader()
+	if err != nil {
+		return newSystemAccountSecretRequeueError("get authority reader for", key, err)
+	}
+	receiptName, err := systemaccount.ConflictReceiptName(intent.Target, intent.Operation)
+	if err != nil {
+		return intctrlutil.NewFatalError(err.Error())
+	}
+	receipt := &corev1.Secret{}
+	receiptKey := client.ObjectKey{Namespace: request.Namespace, Name: receiptName}
+	if err := reader.Get(reqCtx.Ctx, receiptKey, receipt); err == nil {
+		envelope, validationErr := systemaccount.ValidateConflictReceipt(receipt, intent)
+		if validationErr != nil {
+			return intctrlutil.NewFatalError(validationErr.Error())
 		}
-		secret = &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      secretName,
-				Namespace: pvc.Namespace,
-				Labels:    labels,
-				Annotations: map[string]string{
-					constant.SystemAccountProvisionedAnnotationKey: "true",
-				},
-			},
-			Type: corev1.SecretTypeOpaque,
-			Data: map[string][]byte{
-				constant.AccountNameForSecret:   []byte(accountName),
-				constant.AccountPasswdForSecret: password,
-			},
+		if projectionErr := r.projectSystemAccountConflictIdentity(reqCtx, pvc, envelope); projectionErr != nil {
+			return newSystemAccountSecretRequeueError(
+				"project conflict receipt identity to", client.ObjectKeyFromObject(pvc), projectionErr)
 		}
-		if err := r.setSystemAccountSecretOwner(reqCtx, pvc.Namespace, secret, scope, clusterName, ownerName); err != nil {
-			return err
-		}
-		if err := r.Client.Create(reqCtx.Ctx, secret); err != nil {
-			return err
-		}
+		return intctrlutil.NewFatalError(fmt.Sprintf(
+			"%s: restore operation is blocked by request %s/%s",
+			systemaccount.ConcurrentRestoreIntentReason,
+			receipt.Annotations[systemaccount.BlockingRequestNamespaceAnnotationKey],
+			receipt.Annotations[systemaccount.BlockingRequestNameAnnotationKey]))
+	} else if !apierrors.IsNotFound(err) {
+		return newSystemAccountSecretRequeueError("get conflict receipt for", key, err)
+	}
+	requestKey := client.ObjectKeyFromObject(request)
+	existing := &corev1.Secret{}
+	if err := reader.Get(reqCtx.Ctx, requestKey, existing); err == nil {
+		return r.arbitrateSystemAccountRestoreRequest(reqCtx, key, pvc, intent, request, existing)
+	} else if !apierrors.IsNotFound(err) {
+		return newSystemAccountSecretRequeueError("get restore request for", key, err)
+	}
+	operationState, err := r.systemAccountRestoreOperationState(reqCtx, intent.Operation)
+	if err != nil {
+		return newSystemAccountSecretRequeueError("read restore operation for", key, err)
+	}
+	if operationState != systemAccountRestoreOperationActive {
 		return nil
 	}
-	patch := client.MergeFrom(secret.DeepCopy())
-	if secret.Labels == nil {
-		secret.Labels = map[string]string{}
+	if err := r.Client.Create(reqCtx.Ctx, request); err != nil {
+		fresh := &corev1.Secret{}
+		if getErr := reader.Get(reqCtx.Ctx, requestKey, fresh); getErr != nil {
+			if apierrors.IsNotFound(getErr) {
+				return newSystemAccountSecretRequeueError("create", requestKey, err)
+			}
+			return newSystemAccountSecretRequeueError("fresh-read competing restore request for", key, getErr)
+		}
+		return r.arbitrateSystemAccountRestoreRequest(reqCtx, key, pvc, intent, request, fresh)
 	}
-	for k, v := range labels {
-		secret.Labels[k] = v
-	}
-	if secret.Annotations == nil {
-		secret.Annotations = map[string]string{}
-	}
-	secret.Annotations[constant.SystemAccountProvisionedAnnotationKey] = "true"
-	if secret.Data == nil {
-		secret.Data = map[string][]byte{}
-	}
-	secret.Data[constant.AccountNameForSecret] = []byte(accountName)
-	secret.Data[constant.AccountPasswdForSecret] = password
-	if err := r.setSystemAccountSecretOwner(reqCtx, pvc.Namespace, secret, scope, clusterName, ownerName); err != nil {
-		return err
-	}
-	return r.Client.Patch(reqCtx.Ctx, secret, patch)
+	return intctrlutil.NewRequeueError(reconcileInterval,
+		fmt.Sprintf("waiting for the Apps owner to converge system account Secret %s", key))
 }
 
-func (r *VolumePopulatorReconciler) setSystemAccountSecretOwner(reqCtx intctrlutil.RequestCtx,
-	namespace string,
-	secret *corev1.Secret,
-	scope systemAccountSecretScope,
-	clusterName, ownerName string) error {
-	switch scope {
-	case systemAccountSecretScopeSharding:
-		cluster := &appsv1.Cluster{}
-		if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Namespace: namespace, Name: clusterName}, cluster); err != nil {
-			return err
-		}
-		return controllerutil.SetOwnerReference(cluster, secret, r.Scheme)
-	default:
-		component := &appsv1.Component{}
-		if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{
-			Namespace: namespace,
-			Name:      constant.GenerateClusterComponentName(clusterName, ownerName),
-		}, component); err != nil {
-			return err
-		}
-		return controllerutil.SetOwnerReference(component, secret, r.Scheme)
+func (r *VolumePopulatorReconciler) arbitrateSystemAccountRestoreRequest(
+	reqCtx intctrlutil.RequestCtx,
+	targetKey client.ObjectKey,
+	pvc *corev1.PersistentVolumeClaim,
+	contender systemaccount.CredentialIntent,
+	desired, existing *corev1.Secret,
+) error {
+	reader, err := r.systemAccountAuthorityReader()
+	if err != nil {
+		return newSystemAccountSecretRequeueError("get authority reader for", targetKey, err)
 	}
+	existingIntent, err := systemaccount.DecodeRestoreRequestV2(existing)
+	if err != nil {
+		return intctrlutil.NewFatalError(fmt.Sprintf(
+			"%s: invalid existing request %s: %v",
+			systemaccount.OperationCredentialConflictReason, client.ObjectKeyFromObject(existing), err))
+	}
+	existingTargetDigest, _ := systemaccount.LogicalTargetDigest(existingIntent.Target)
+	contenderTargetDigest, _ := systemaccount.LogicalTargetDigest(contender.Target)
+	if existingTargetDigest != contenderTargetDigest {
+		return intctrlutil.NewFatalError(fmt.Sprintf(
+			"%s: request name collision at %s",
+			systemaccount.OperationCredentialConflictReason, client.ObjectKeyFromObject(existing)))
+	}
+	existingOperationDigest, _ := systemaccount.OperationDigest(existingIntent.Operation)
+	contenderOperationDigest, _ := systemaccount.OperationDigest(contender.Operation)
+	phase := systemaccount.RestoreRequestPhase(existing.Annotations[systemaccount.RestoreRequestPhaseAnnotationKey])
+	if !existing.DeletionTimestamp.IsZero() {
+		if existingOperationDigest != contenderOperationDigest {
+			return intctrlutil.NewRequeueError(reconcileInterval,
+				fmt.Sprintf("%s: waiting for request %s finalization",
+					systemaccount.PreviousRestoreIntentFinalizingReason,
+					client.ObjectKeyFromObject(existing)))
+		}
+		if validationErr := validateSystemAccountRestoreRequest(existing, desired); validationErr != nil {
+			return validationErr
+		}
+		if phase == systemaccount.RestoreRequestPhaseFailed &&
+			existing.Annotations[systemaccount.RestoreRequestReasonAnnotationKey] ==
+				systemaccount.RequestDeletionRequestedReason {
+			return intctrlutil.NewFatalError(fmt.Sprintf(
+				"%s: restore request %s failed",
+				systemaccount.RequestDeletionRequestedReason,
+				client.ObjectKeyFromObject(existing)))
+		}
+		return intctrlutil.NewRequeueError(reconcileInterval,
+			fmt.Sprintf("%s: waiting for request %s finalization",
+				systemaccount.RequestDeletionRequestedReason,
+				client.ObjectKeyFromObject(existing)))
+	}
+	if !slices.Contains(existing.Finalizers, systemaccount.RestoreProtocolFinalizer) {
+		return intctrlutil.NewRequeueError(reconcileInterval,
+			fmt.Sprintf("%s: waiting for request %s lifecycle cleanup",
+				systemaccount.PreviousRestoreIntentFinalizingReason, client.ObjectKeyFromObject(existing)))
+	}
+	if existingOperationDigest == contenderOperationDigest {
+		if validationErr := validateSystemAccountRestoreRequest(existing, desired); validationErr != nil {
+			return validationErr
+		}
+		if phase == systemaccount.RestoreRequestPhaseFailed {
+			reason := existing.Annotations[systemaccount.RestoreRequestReasonAnnotationKey]
+			if !systemaccount.IsRestoreFailureReason(reason) {
+				reason = systemaccount.OperationCredentialConflictReason
+			}
+			return intctrlutil.NewFatalError(fmt.Sprintf(
+				"%s: restore request %s failed",
+				reason, client.ObjectKeyFromObject(existing)))
+		}
+		target := &corev1.Secret{}
+		if getErr := reader.Get(reqCtx.Ctx, targetKey, target); getErr == nil {
+			if systemaccount.RestoreConvergedV2(target, existing, systemAccountSecretFinalizer(
+				systemAccountSecretScope(contender.Target.Scope))) {
+				return nil
+			}
+		} else if !apierrors.IsNotFound(getErr) {
+			return newSystemAccountSecretRequeueError("get", targetKey, getErr)
+		}
+		return intctrlutil.NewRequeueError(reconcileInterval,
+			fmt.Sprintf("waiting for system account restore request %s to converge target %s",
+				client.ObjectKeyFromObject(existing), targetKey))
+	}
+	winnerState, err := r.systemAccountRestoreOperationState(reqCtx, existingIntent.Operation)
+	if err != nil {
+		return newSystemAccountSecretRequeueError("read blocking restore operation for", targetKey, err)
+	}
+	if !phase.Active() || winnerState != systemAccountRestoreOperationActive {
+		return intctrlutil.NewRequeueError(reconcileInterval,
+			fmt.Sprintf("%s: waiting for request %s lifecycle cleanup",
+				systemaccount.PreviousRestoreIntentFinalizingReason, client.ObjectKeyFromObject(existing)))
+	}
+
+	fresh := &corev1.Secret{}
+	if err := reader.Get(reqCtx.Ctx, client.ObjectKeyFromObject(existing), fresh); err != nil {
+		return newSystemAccountSecretRequeueError("re-read blocking restore request for", targetKey, err)
+	}
+	if fresh.UID != existing.UID || fresh.ResourceVersion != existing.ResourceVersion ||
+		fresh.Annotations[systemaccount.RestoreRequestPhaseAnnotationKey] != string(phase) {
+		return intctrlutil.NewRequeueError(reconcileInterval,
+			fmt.Sprintf("blocking restore request %s changed during arbitration", client.ObjectKeyFromObject(existing)))
+	}
+	receipt, err := systemaccount.BuildConflictReceipt(contender, fresh)
+	if err != nil {
+		return intctrlutil.NewFatalError(fmt.Sprintf(
+			"%s: %v", systemaccount.OperationCredentialConflictReason, err))
+	}
+	if err := r.Client.Create(reqCtx.Ctx, receipt); err != nil {
+		persisted := &corev1.Secret{}
+		if getErr := reader.Get(reqCtx.Ctx, client.ObjectKeyFromObject(receipt), persisted); getErr != nil {
+			if apierrors.IsNotFound(getErr) {
+				return newSystemAccountSecretRequeueError("create conflict receipt for", targetKey, err)
+			}
+			return newSystemAccountSecretRequeueError("fresh-read conflict receipt for", targetKey, getErr)
+		}
+		if _, validationErr := systemaccount.ValidateConflictReceipt(persisted, contender); validationErr != nil {
+			return intctrlutil.NewFatalError(fmt.Sprintf(
+				"%s: %v", systemaccount.OperationCredentialConflictReason, validationErr))
+		}
+		receipt = persisted
+	}
+	envelope, validationErr := systemaccount.ValidateConflictReceipt(receipt, contender)
+	if validationErr != nil {
+		return intctrlutil.NewFatalError(fmt.Sprintf(
+			"%s: %v", systemaccount.OperationCredentialConflictReason, validationErr))
+	}
+	if projectionErr := r.projectSystemAccountConflictIdentity(reqCtx, pvc, envelope); projectionErr != nil {
+		return newSystemAccountSecretRequeueError(
+			"project conflict receipt identity to", client.ObjectKeyFromObject(pvc), projectionErr)
+	}
+	return intctrlutil.NewFatalError(fmt.Sprintf(
+		"%s: restore operation is blocked by request %s",
+		systemaccount.ConcurrentRestoreIntentReason, client.ObjectKeyFromObject(existing)))
+}
+
+func (r *VolumePopulatorReconciler) newSystemAccountRestoreRequest(reqCtx intctrlutil.RequestCtx,
+	pvc *corev1.PersistentVolumeClaim,
+	backup *dpv1alpha1.Backup,
+	scope systemAccountSecretScope,
+	clusterName, ownerName, accountName string,
+	password []byte) (*corev1.Secret, error) {
+	intent, err := r.buildSystemAccountCredentialIntent(reqCtx, pvc, backup, scope,
+		clusterName, ownerName, accountName, password)
+	if err != nil {
+		return nil, err
+	}
+	return systemaccount.BuildRestoreRequest(intent)
+}
+
+func newSystemAccountSecretRequeueError(action string, key client.ObjectKey, err error) error {
+	return intctrlutil.NewRequeueError(reconcileInterval,
+		fmt.Sprintf("failed to %s system account Secret %s: %v", action, key, err))
+}
+
+func validateSystemAccountRestoreRequest(existing, desired *corev1.Secret) error {
+	existingIntent, err := systemaccount.ValidateRestoreRequestV2(existing)
+	if err != nil {
+		return intctrlutil.NewFatalError(fmt.Sprintf("invalid system account restore request %s: %v",
+			client.ObjectKeyFromObject(existing), err))
+	}
+	desiredIntent, err := systemaccount.ValidateRestoreRequestV2(desired)
+	if err != nil {
+		return intctrlutil.NewFatalError(fmt.Sprintf("invalid desired system account restore request %s: %v",
+			client.ObjectKeyFromObject(desired), err))
+	}
+	existingRevision := existing.Annotations[systemaccount.CredentialIntentRevisionAnnotationKey]
+	desiredRevision := desired.Annotations[systemaccount.CredentialIntentRevisionAnnotationKey]
+	if !reflect.DeepEqual(existingIntent.Operation, desiredIntent.Operation) ||
+		existingIntent.Target != desiredIntent.Target ||
+		existingIntent.ResolvedSource != desiredIntent.ResolvedSource ||
+		existingRevision != desiredRevision {
+		return intctrlutil.NewFatalError(fmt.Sprintf(
+			"%s: system account restore request %s conflicts with desired restore operation or credential intent",
+			systemaccount.OperationCredentialConflictReason,
+			client.ObjectKeyFromObject(existing)))
+	}
+	return nil
+}
+
+func systemAccountSecretFinalizer(scope systemAccountSecretScope) string {
+	if scope == systemAccountSecretScopeSharding {
+		return constant.DBClusterFinalizerName
+	}
+	return constant.DBComponentFinalizerName
 }
 
 func systemAccountSecretName(scope systemAccountSecretScope, clusterName, ownerName, accountName string) string {
@@ -2389,11 +2649,6 @@ func systemAccountSecretName(scope systemAccountSecretScope, clusterName, ownerN
 		return fmt.Sprintf("%s-%s-%s", clusterName, ownerName, accountName)
 	}
 	return constant.GenerateAccountSecretName(clusterName, ownerName, accountName)
-}
-
-func systemAccountSecretMatches(secret *corev1.Secret, accountName string, password []byte) bool {
-	return string(secret.Data[constant.AccountNameForSecret]) == accountName &&
-		string(secret.Data[constant.AccountPasswdForSecret]) == string(password)
 }
 
 func upsertPVCCondition(conditions *[]corev1.PersistentVolumeClaimCondition, condition corev1.PersistentVolumeClaimCondition) {
@@ -2404,4 +2659,19 @@ func upsertPVCCondition(conditions *[]corev1.PersistentVolumeClaimCondition, con
 		}
 	}
 	*conditions = append(*conditions, condition)
+}
+
+func systemAccountRestoreFailureReason(err error) string {
+	if err == nil {
+		return ""
+	}
+	message := err.Error()
+	if index := strings.IndexByte(message, ':'); index >= 0 {
+		message = message[:index]
+	}
+	message = strings.TrimSpace(message)
+	if systemaccount.IsRestoreFailureReason(message) {
+		return message
+	}
+	return ""
 }

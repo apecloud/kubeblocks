@@ -19,13 +19,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package model
 
-import "sigs.k8s.io/controller-runtime/pkg/client"
+import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+)
 
 type GraphOptions struct {
 	replaceIfExisting     bool
 	haveDifferentTypeWith bool
 	clientOpt             any
 	propagationPolicy     client.PropagationPolicy
+	deletePreconditions   *metav1.Preconditions
 	subResource           string
 }
 
@@ -81,6 +86,22 @@ var _ GraphOption = &propagationPolicyOption{}
 func WithPropagationPolicy(policy client.PropagationPolicy) GraphOption {
 	return &propagationPolicyOption{
 		propagationPolicy: policy,
+	}
+}
+
+type deletePreconditionsOption struct {
+	deletePreconditions *metav1.Preconditions
+}
+
+func (o *deletePreconditionsOption) ApplyTo(opts *GraphOptions) {
+	opts.deletePreconditions = o.deletePreconditions
+}
+
+var _ GraphOption = &deletePreconditionsOption{}
+
+func WithDeleteUID(uid types.UID) GraphOption {
+	return &deletePreconditionsOption{
+		deletePreconditions: &metav1.Preconditions{UID: &uid},
 	}
 }
 

@@ -28,6 +28,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -37,7 +38,11 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
+	"github.com/apecloud/kubeblocks/pkg/controller/systemaccount"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 var _ = Describe("cluster sharding shared transformers", func() {
@@ -79,8 +84,9 @@ var _ = Describe("cluster sharding shared transformers", func() {
 		return &appsv1.ComponentDefinition{
 			ObjectMeta: metav1ObjectMeta(compDefName, ""),
 			Spec: appsv1.ComponentDefinitionSpec{
-				Labels:      map[string]string{"def-label": "yes"},
-				Annotations: map[string]string{"def-annotation": "yes"},
+				Labels:         map[string]string{"def-label": "yes"},
+				Annotations:    map[string]string{"def-annotation": "yes"},
+				ServiceVersion: "8.0.30",
 				TLS: &appsv1.TLS{
 					CAFile:   &caFile,
 					CertFile: &certFile,
@@ -128,6 +134,137 @@ var _ = Describe("cluster sharding shared transformers", func() {
 				},
 			},
 		}
+	}
+
+	newShardingRestoreContext := func(disabled, shared bool) (
+		*clusterTransformContext,
+		model.GraphClient,
+		*graph.DAG,
+		*corev1.Secret,
+		client.Client,
+	) {
+		cluster := &appsv1.Cluster{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: appsv1.GroupVersion.String(),
+				Kind:       appsv1.ClusterKind,
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace,
+				Name:      clusterName,
+				UID:       types.UID("cluster-uid"),
+			},
+			Spec: appsv1.ClusterSpec{
+				Restore: &appsv1.ClusterRestore{
+					Source: appsv1.ClusterRestoreSource{
+						APIGroup:  "dataprotection.kubeblocks.io",
+						Kind:      "Backup",
+						Namespace: namespace,
+						Name:      "backup",
+					},
+				},
+			},
+		}
+		root := systemaccount.ObjectIdentity{
+			APIVersion: appsv1.GroupVersion.String(),
+			Kind:       appsv1.ClusterKind,
+			Namespace:  namespace,
+			Name:       clusterName,
+			UID:        cluster.UID,
+		}
+		request, err := systemaccount.BuildRestoreRequest(systemaccount.CredentialIntent{
+			Operation: systemaccount.RestoreOperationIdentity{
+				Protocol: systemaccount.RestoreProtocolV2,
+				Profile:  systemaccount.RestoreProfileInitialCluster,
+				Root:     root,
+				Source: systemaccount.SourceIdentity{
+					APIGroup:  "dataprotection.kubeblocks.io",
+					Kind:      "Backup",
+					Namespace: namespace,
+					Name:      "backup",
+				},
+			},
+			Target: systemaccount.LogicalTargetIdentity{
+				Protocol:     systemaccount.LogicalTargetProtocolV1,
+				Namespace:    namespace,
+				Root:         root,
+				Owner:        root,
+				Scope:        systemaccount.SystemAccountScopeSharding,
+				ShardingName: shardingName,
+				Account:      accountName,
+			},
+			AuthorityWitness: &systemaccount.ObjectIdentity{
+				APIVersion: appsv1.GroupVersion.String(),
+				Kind:       appsv1.ComponentKind,
+				Namespace:  namespace,
+				Name:       clusterName + "-" + shardingName + "-0",
+				UID:        types.UID("shard-component-uid"),
+			},
+			ResolvedSource: systemaccount.ObjectIdentity{
+				APIVersion: "dataprotection.kubeblocks.io/v1alpha1",
+				Kind:       "Backup",
+				Namespace:  namespace,
+				Name:       "backup",
+				UID:        types.UID("backup-uid"),
+			},
+			Credentials: map[string][]byte{
+				constant.AccountNameForSecret:   []byte(accountName),
+				constant.AccountPasswdForSecret: []byte("restored-password"),
+			},
+		})
+		Expect(err).ShouldNot(HaveOccurred())
+		request.UID = types.UID("request-uid")
+		request.ResourceVersion = "1"
+
+		sharding := newSharding()
+		sharding.Template.SystemAccounts = []appsv1.ComponentSystemAccount{{
+			Name:     accountName,
+			Disabled: ptr.To(disabled),
+		}}
+		cluster.Spec.Shardings = []appsv1.ClusterSharding{*sharding.DeepCopy()}
+		shardingDef := newShardingDefinition()
+		shardingDef.TypeMeta = metav1.TypeMeta{
+			APIVersion: appsv1.GroupVersion.String(),
+			Kind:       "ShardingDefinition",
+		}
+		shardingDef.Name = sharding.ShardingDef
+		shardingDef.Spec.SystemAccounts[0].Shared = ptr.To(shared)
+		witness := &appsv1.Component{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: appsv1.GroupVersion.String(),
+				Kind:       appsv1.ComponentKind,
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace,
+				Name:      clusterName + "-" + shardingName + "-0",
+				UID:       types.UID("shard-component-uid"),
+				Labels: constant.GetClusterLabels(clusterName, map[string]string{
+					constant.KBAppShardingNameLabelKey: shardingName,
+				}),
+			},
+		}
+
+		baseClient := fake.NewClientBuilder().
+			WithScheme(newTestScheme()).
+			WithObjects(cluster, request, shardingDef, witness, newComponentDefinition()).
+			Build()
+		graphCli := model.NewGraphClient(baseClient)
+		dag := graph.NewDAG()
+		graphCli.Root(dag, cluster.DeepCopy(), cluster, model.ActionStatusPtr())
+		transCtx := &clusterTransformContext{
+			Context:     context.Background(),
+			Client:      graphCli,
+			APIReader:   graphCli,
+			Cluster:     cluster,
+			OrigCluster: cluster.DeepCopy(),
+			componentDefs: map[string]*appsv1.ComponentDefinition{
+				compDefName: newComponentDefinition(),
+			},
+			shardings: []*appsv1.ClusterSharding{sharding},
+			shardingDefs: map[string]*appsv1.ShardingDefinition{
+				sharding.ShardingDef: shardingDef,
+			},
+		}
+		return transCtx, graphCli, dag, request, baseClient
 	}
 
 	It("builds deterministic shared TLS secret metadata and rewrites sharding TLS config", func() {
@@ -234,6 +371,293 @@ var _ = Describe("cluster sharding shared transformers", func() {
 		_, err = transformer.definedSystemAccount(transCtx, sharding, "monitor")
 		Expect(err).Should(MatchError(ContainSubstring("system account monitor not found")))
 	})
+
+	DescribeTable("projects invalid restored sharding accounts through the production transformer without target mutation",
+		func(disabled, shared bool, expectedReason string) {
+			transCtx, graphCli, dag, request, _ := newShardingRestoreContext(disabled, shared)
+
+			err := (&clusterShardingAccountTransformer{}).Transform(transCtx, dag)
+
+			Expect(intctrlutil.IsRequeueError(err)).Should(BeTrue())
+			secrets := graphCli.FindAll(dag, &corev1.Secret{})
+			Expect(secrets).Should(HaveLen(1))
+			updatedRequest := secrets[0].(*corev1.Secret)
+			Expect(updatedRequest.Name).Should(Equal(request.Name))
+			Expect(graphCli.IsAction(dag, updatedRequest, model.ActionUpdatePtr())).Should(BeTrue())
+			Expect(updatedRequest.Annotations[systemaccount.RestoreRequestPhaseAnnotationKey]).
+				Should(Equal(string(systemaccount.RestoreRequestPhaseFailed)))
+			Expect(updatedRequest.Annotations[systemaccount.RestoreRequestReasonAnnotationKey]).
+				Should(Equal(expectedReason))
+			Expect(graphCli.FindAll(dag, &corev1.Secret{})).
+				ShouldNot(ContainElement(WithTransform(func(secret client.Object) string {
+					return secret.GetName()
+				}, Equal(shardingAccountSecretName(clusterName, shardingName, accountName)))))
+		},
+		Entry("disabled account", true, true, systemaccount.AccountUnavailableReason),
+		Entry("non-shared account", false, false, systemaccount.TargetSemanticUnavailableReason),
+	)
+
+	It("resolves the live sharding definition pattern without trusting cached semantics", func() {
+		transCtx, graphCli, dag, request, baseClient :=
+			newShardingRestoreContext(false, true)
+		cluster := &appsv1.Cluster{}
+		Expect(baseClient.Get(context.Background(), client.ObjectKey{
+			Namespace: namespace,
+			Name:      clusterName,
+		}, cluster)).Should(Succeed())
+		cluster.Spec.Shardings[0].ShardingDef = "sharddef-"
+		Expect(baseClient.Update(context.Background(), cluster)).Should(Succeed())
+
+		liveDefinition := &appsv1.ShardingDefinition{}
+		Expect(baseClient.Get(context.Background(),
+			client.ObjectKey{Name: "sharddef"}, liveDefinition)).Should(Succeed())
+		Expect(baseClient.Delete(context.Background(), liveDefinition)).Should(Succeed())
+		liveDefinition.ResourceVersion = ""
+		liveDefinition.Name = "sharddef-2.0"
+		Expect(baseClient.Create(context.Background(), liveDefinition)).Should(Succeed())
+
+		transCtx.shardingDefs["sharddef"].Spec.SystemAccounts[0].Shared = ptr.To(false)
+		err := (&clusterShardingAccountTransformer{}).Transform(transCtx, dag)
+
+		Expect(intctrlutil.IsRequeueError(err)).Should(BeTrue(), err)
+		secrets := graphCli.FindAll(dag, &corev1.Secret{})
+		Expect(secrets).Should(HaveLen(1))
+		updatedRequest := secrets[0].(*corev1.Secret)
+		Expect(updatedRequest.Name).Should(Equal(request.Name))
+		Expect(updatedRequest.Annotations[systemaccount.RestoreRequestPhaseAnnotationKey]).
+			Should(Equal(string(systemaccount.RestoreRequestPhaseClaimed)))
+		Expect(updatedRequest.Annotations[systemaccount.RestoreRequestReasonAnnotationKey]).Should(BeEmpty())
+	})
+
+	DescribeTable("strong-reads sharding restore authority before target mutation",
+		func(mutate func(client.Client, *corev1.Secret)) {
+			transCtx, graphCli, dag, request, baseClient :=
+				newShardingRestoreContext(false, true)
+			mutate(baseClient, request)
+
+			err := (&clusterShardingAccountTransformer{}).Transform(transCtx, dag)
+
+			Expect(intctrlutil.IsRequeueError(err)).Should(BeTrue(), err)
+			secrets := graphCli.FindAll(dag, &corev1.Secret{})
+			Expect(secrets).Should(HaveLen(1))
+			updatedRequest := secrets[0].(*corev1.Secret)
+			Expect(updatedRequest.Name).Should(Equal(request.Name))
+			Expect(updatedRequest.Annotations[systemaccount.RestoreRequestPhaseAnnotationKey]).
+				Should(Equal(string(systemaccount.RestoreRequestPhaseFailed)))
+			Expect(updatedRequest.Annotations[systemaccount.RestoreRequestReasonAnnotationKey]).
+				Should(Or(
+					Equal(systemaccount.TargetSemanticUnavailableReason),
+					Equal(systemaccount.AccountUnavailableReason)))
+			Expect(graphCli.FindAll(dag, &corev1.Secret{})).
+				ShouldNot(ContainElement(WithTransform(func(secret client.Object) string {
+					return secret.GetName()
+				}, Equal(shardingAccountSecretName(clusterName, shardingName, accountName)))))
+		},
+		Entry("rejects a removed winner witness", func(baseClient client.Client, _ *corev1.Secret) {
+			witness := &appsv1.Component{}
+			Expect(baseClient.Get(context.Background(), client.ObjectKey{
+				Namespace: namespace,
+				Name:      clusterName + "-" + shardingName + "-0",
+			}, witness)).Should(Succeed())
+			Expect(baseClient.Delete(context.Background(), witness)).Should(Succeed())
+		}),
+		Entry("rejects a same-name replacement witness", func(baseClient client.Client, _ *corev1.Secret) {
+			witness := &appsv1.Component{}
+			key := client.ObjectKey{
+				Namespace: namespace,
+				Name:      clusterName + "-" + shardingName + "-0",
+			}
+			Expect(baseClient.Get(context.Background(), key, witness)).Should(Succeed())
+			Expect(baseClient.Delete(context.Background(), witness)).Should(Succeed())
+			witness.ResourceVersion = ""
+			witness.UID = "replacement-shard-component-uid"
+			Expect(baseClient.Create(context.Background(), witness)).Should(Succeed())
+		}),
+		Entry("rejects a terminating winner witness", func(baseClient client.Client, _ *corev1.Secret) {
+			witness := &appsv1.Component{}
+			key := client.ObjectKey{
+				Namespace: namespace,
+				Name:      clusterName + "-" + shardingName + "-0",
+			}
+			Expect(baseClient.Get(context.Background(), key, witness)).Should(Succeed())
+			witness.Finalizers = []string{"test.kubeblocks.io/hold"}
+			Expect(baseClient.Update(context.Background(), witness)).Should(Succeed())
+			Expect(baseClient.Delete(context.Background(), witness)).Should(Succeed())
+		}),
+		Entry("rechecks a removed winner witness immediately before Claimed target mutation",
+			func(baseClient client.Client, request *corev1.Secret) {
+				liveRequest := &corev1.Secret{}
+				Expect(baseClient.Get(context.Background(),
+					client.ObjectKeyFromObject(request), liveRequest)).Should(Succeed())
+				liveRequest.Annotations[systemaccount.RestoreRequestPhaseAnnotationKey] =
+					string(systemaccount.RestoreRequestPhaseClaimed)
+				Expect(baseClient.Update(context.Background(), liveRequest)).Should(Succeed())
+				witness := &appsv1.Component{}
+				Expect(baseClient.Get(context.Background(), client.ObjectKey{
+					Namespace: namespace,
+					Name:      clusterName + "-" + shardingName + "-0",
+				}, witness)).Should(Succeed())
+				Expect(baseClient.Delete(context.Background(), witness)).Should(Succeed())
+			}),
+		Entry("rejects a live non-shared account despite cached shared semantics",
+			func(baseClient client.Client, _ *corev1.Secret) {
+				definition := &appsv1.ShardingDefinition{}
+				Expect(baseClient.Get(context.Background(),
+					client.ObjectKey{Name: "sharddef"}, definition)).Should(Succeed())
+				definition.Spec.SystemAccounts[0].Shared = ptr.To(false)
+				Expect(baseClient.Update(context.Background(), definition)).Should(Succeed())
+			}),
+		Entry("rejects a live disabled account despite cached enabled semantics",
+			func(baseClient client.Client, _ *corev1.Secret) {
+				cluster := &appsv1.Cluster{}
+				Expect(baseClient.Get(context.Background(), client.ObjectKey{
+					Namespace: namespace,
+					Name:      clusterName,
+				}, cluster)).Should(Succeed())
+				cluster.Spec.Shardings[0].Template.SystemAccounts[0].Disabled = ptr.To(true)
+				Expect(baseClient.Update(context.Background(), cluster)).Should(Succeed())
+			}),
+		Entry("rejects a missing live component definition despite cached account semantics",
+			func(baseClient client.Client, _ *corev1.Secret) {
+				definition := &appsv1.ComponentDefinition{}
+				Expect(baseClient.Get(context.Background(),
+					client.ObjectKey{Name: compDefName}, definition)).Should(Succeed())
+				Expect(baseClient.Delete(context.Background(), definition)).Should(Succeed())
+			}),
+		Entry("rechecks a missing live component definition immediately before Claimed target mutation",
+			func(baseClient client.Client, request *corev1.Secret) {
+				liveRequest := &corev1.Secret{}
+				Expect(baseClient.Get(context.Background(),
+					client.ObjectKeyFromObject(request), liveRequest)).Should(Succeed())
+				liveRequest.Annotations[systemaccount.RestoreRequestPhaseAnnotationKey] =
+					string(systemaccount.RestoreRequestPhaseClaimed)
+				Expect(baseClient.Update(context.Background(), liveRequest)).Should(Succeed())
+
+				definition := &appsv1.ComponentDefinition{}
+				Expect(baseClient.Get(context.Background(),
+					client.ObjectKey{Name: compDefName}, definition)).Should(Succeed())
+				Expect(baseClient.Delete(context.Background(), definition)).Should(Succeed())
+			}),
+		Entry("rejects a terminating live component definition",
+			func(baseClient client.Client, _ *corev1.Secret) {
+				definition := &appsv1.ComponentDefinition{}
+				Expect(baseClient.Get(context.Background(),
+					client.ObjectKey{Name: compDefName}, definition)).Should(Succeed())
+				definition.Finalizers = []string{"test.kubeblocks.io/hold"}
+				Expect(baseClient.Update(context.Background(), definition)).Should(Succeed())
+				Expect(baseClient.Delete(context.Background(), definition)).Should(Succeed())
+			}),
+		Entry("rejects a live component definition pattern that resolves without the account",
+			func(baseClient client.Client, _ *corev1.Secret) {
+				cluster := &appsv1.Cluster{}
+				Expect(baseClient.Get(context.Background(), client.ObjectKey{
+					Namespace: namespace,
+					Name:      clusterName,
+				}, cluster)).Should(Succeed())
+				cluster.Spec.Shardings[0].Template.ComponentDef = compDefName + "-"
+				Expect(baseClient.Update(context.Background(), cluster)).Should(Succeed())
+
+				definition := &appsv1.ComponentDefinition{}
+				Expect(baseClient.Get(context.Background(),
+					client.ObjectKey{Name: compDefName}, definition)).Should(Succeed())
+				Expect(baseClient.Delete(context.Background(), definition)).Should(Succeed())
+				definition.ResourceVersion = ""
+				definition.Name = compDefName + "-2.0"
+				definition.Spec.SystemAccounts = nil
+				Expect(baseClient.Create(context.Background(), definition)).Should(Succeed())
+			}),
+	)
+
+	It("builds the restored target from the live sharding template and resolved definition", func() {
+		transCtx, graphCli, dag, request, baseClient :=
+			newShardingRestoreContext(false, true)
+
+		liveRequest := &corev1.Secret{}
+		Expect(baseClient.Get(context.Background(),
+			client.ObjectKeyFromObject(request), liveRequest)).Should(Succeed())
+		liveRequest.Annotations[systemaccount.RestoreRequestPhaseAnnotationKey] =
+			string(systemaccount.RestoreRequestPhaseClaimed)
+		Expect(baseClient.Update(context.Background(), liveRequest)).Should(Succeed())
+
+		cluster := &appsv1.Cluster{}
+		Expect(baseClient.Get(context.Background(), client.ObjectKey{
+			Namespace: namespace,
+			Name:      clusterName,
+		}, cluster)).Should(Succeed())
+		cluster.Spec.Shardings[0].Template.ComponentDef = compDefName + "-"
+		cluster.Spec.Shardings[0].Template.Labels =
+			map[string]string{"template-source": "live"}
+		cluster.Spec.Shardings[0].Template.Annotations =
+			map[string]string{"template-source": "live"}
+		Expect(baseClient.Update(context.Background(), cluster)).Should(Succeed())
+
+		definition := &appsv1.ComponentDefinition{}
+		Expect(baseClient.Get(context.Background(),
+			client.ObjectKey{Name: compDefName}, definition)).Should(Succeed())
+		Expect(baseClient.Delete(context.Background(), definition)).Should(Succeed())
+		definition.ResourceVersion = ""
+		definition.Name = compDefName + "-2.0"
+		definition.Spec.Labels = map[string]string{"definition-source": "live"}
+		definition.Spec.Annotations = map[string]string{"definition-source": "live"}
+		Expect(baseClient.Create(context.Background(), definition)).Should(Succeed())
+
+		err := (&clusterShardingAccountTransformer{}).Transform(transCtx, dag)
+
+		Expect(intctrlutil.IsRequeueError(err)).Should(BeTrue(), err)
+		var target *corev1.Secret
+		for _, object := range graphCli.FindAll(dag, &corev1.Secret{}) {
+			secret := object.(*corev1.Secret)
+			if secret.Name == shardingAccountSecretName(clusterName, shardingName, accountName) {
+				target = secret
+				break
+			}
+		}
+		Expect(target).ShouldNot(BeNil())
+		Expect(target.Labels).Should(HaveKeyWithValue("template-source", "live"))
+		Expect(target.Labels).Should(HaveKeyWithValue("definition-source", "live"))
+		Expect(target.Labels).ShouldNot(HaveKey("template-label"))
+		Expect(target.Labels).ShouldNot(HaveKey("def-label"))
+		Expect(target.Annotations).Should(HaveKeyWithValue("template-source", "live"))
+		Expect(target.Annotations).Should(HaveKeyWithValue("definition-source", "live"))
+		Expect(target.Annotations).ShouldNot(HaveKey("template-annotation"))
+		Expect(target.Annotations).ShouldNot(HaveKey("def-annotation"))
+	})
+
+	DescribeTable("fails closed in the production sharding transformer for damaged active requests",
+		func(damage func(*corev1.Secret)) {
+			transCtx, graphCli, dag, request, baseClient :=
+				newShardingRestoreContext(false, true)
+			live := &corev1.Secret{}
+			Expect(baseClient.Get(context.Background(),
+				client.ObjectKeyFromObject(request), live)).Should(Succeed())
+			damage(live)
+			Expect(baseClient.Update(context.Background(), live)).Should(Succeed())
+
+			err := (&clusterShardingAccountTransformer{}).Transform(transCtx, dag)
+
+			Expect(intctrlutil.IsRequeueError(err)).Should(BeTrue(), err)
+			Expect(graphCli.FindAll(dag, &corev1.Secret{})).Should(BeEmpty(),
+				"damaged active request must block normal target and lifecycle-owned request mutations")
+		},
+		Entry("missing protocol mirror", func(request *corev1.Secret) {
+			delete(request.Annotations, systemaccount.RestoreProtocolAnnotationKey)
+		}),
+		Entry("foreign protocol mirror", func(request *corev1.Secret) {
+			request.Annotations[systemaccount.RestoreProtocolAnnotationKey] = "foreign"
+		}),
+		Entry("missing request label", func(request *corev1.Secret) {
+			delete(request.Labels, constant.SystemAccountRestoreRequestLabelKey)
+		}),
+		Entry("empty phase", func(request *corev1.Secret) {
+			delete(request.Annotations, systemaccount.RestoreRequestPhaseAnnotationKey)
+		}),
+		Entry("unknown phase", func(request *corev1.Secret) {
+			request.Annotations[systemaccount.RestoreRequestPhaseAnnotationKey] = "Unknown"
+		}),
+		Entry("missing protocol finalizer", func(request *corev1.Secret) {
+			request.Finalizers = nil
+		}),
+	)
 
 	It("builds shared system account secrets with merged metadata and immutable data", func() {
 		transformer := &clusterShardingAccountTransformer{}

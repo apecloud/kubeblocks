@@ -73,7 +73,9 @@ func (t *componentFileTemplateTransformer) Transform(ctx graph.TransformContext,
 
 	toCreate, toDelete, toUpdate := mapDiff(runningObjs, protoObjs)
 
-	t.handleTemplateObjectChanges(transCtx, dag, runningObjs, protoObjs, toCreate, toDelete, toUpdate)
+	if err := t.handleTemplateObjectChanges(transCtx, dag, runningObjs, protoObjs, toCreate, toDelete, toUpdate); err != nil {
+		return err
+	}
 
 	for _, tpl := range transCtx.SynthesizeComponent.FileTemplates {
 		if obj := t.instanceAssistantObject(transCtx, tpl, protoObjs); obj != nil {
@@ -120,13 +122,15 @@ func (t *componentFileTemplateTransformer) precheck(transCtx *componentTransform
 }
 
 func (t *componentFileTemplateTransformer) handleTemplateObjectChanges(transCtx *componentTransformContext,
-	dag *graph.DAG, runningObjs, protoObjs map[string]*corev1.ConfigMap, toCreate, toDelete, toUpdate sets.Set[string]) {
+	dag *graph.DAG, runningObjs, protoObjs map[string]*corev1.ConfigMap, toCreate, toDelete, toUpdate sets.Set[string]) error {
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	for name := range toCreate {
 		graphCli.Create(dag, protoObjs[name])
 	}
 	for name := range toDelete {
-		graphCli.Delete(dag, runningObjs[name])
+		if err := graphCli.Delete(dag, runningObjs[name]); err != nil {
+			return err
+		}
 	}
 	for name := range toUpdate {
 		runningObj, protoObj := runningObjs[name], protoObjs[name]
@@ -136,6 +140,7 @@ func (t *componentFileTemplateTransformer) handleTemplateObjectChanges(transCtx 
 			graphCli.Update(dag, runningObj, protoObj)
 		}
 	}
+	return nil
 }
 
 func (t *componentFileTemplateTransformer) buildPodVolumes(transCtx *componentTransformContext) error {

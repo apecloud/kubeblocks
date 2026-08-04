@@ -174,7 +174,7 @@ func (t *componentTLSTransformer) handleDelete(ctx context.Context, cli client.R
 	}
 	if secret != nil {
 		graphCli, _ := cli.(model.GraphClient)
-		graphCli.Delete(dag, secret) // TODO: notify the pods
+		return graphCli.Delete(dag, secret) // TODO: notify the pods
 	}
 	return nil
 }

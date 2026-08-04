@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
@@ -36,7 +37,7 @@ type GraphWriter interface {
 	Create(dag *graph.DAG, obj client.Object, opts ...GraphOption)
 
 	// Delete deletes the given obj from the underlying DAG.
-	Delete(dag *graph.DAG, obj client.Object, opts ...GraphOption)
+	Delete(dag *graph.DAG, obj client.Object, opts ...GraphOption) error
 
 	// Update updates the given obj in the underlying DAG.
 	Update(dag *graph.DAG, objOld, objNew client.Object, opts ...GraphOption)
@@ -73,6 +74,23 @@ type GraphClient interface {
 	GraphWriter
 }
 
+// DeleteUIDConflict reports an invalid or conflicting UID-bound delete plan.
+// Callers can use errors.As to distinguish this fail-closed contract from
+// ordinary plan construction errors.
+type DeleteUIDConflict struct {
+	ObjectType   string
+	Namespace    string
+	Name         string
+	ExistingUID  string
+	RequestedUID string
+	Reason       string
+}
+
+func (e *DeleteUIDConflict) Error() string {
+	return fmt.Sprintf("delete UID conflict for %s %s/%s: %s (existing UID %q, requested UID %q)",
+		e.ObjectType, e.Namespace, e.Name, e.Reason, e.ExistingUID, e.RequestedUID)
+}
+
 // TODO(free6om): make DAG a member of realGraphClient
 type realGraphClient struct {
 	client.Reader
@@ -101,23 +119,23 @@ func (r *realGraphClient) Root(dag *graph.DAG, objOld, objNew client.Object, act
 }
 
 func (r *realGraphClient) Create(dag *graph.DAG, obj client.Object, opts ...GraphOption) {
-	r.doWrite(dag, nil, obj, ActionCreatePtr(), opts...)
+	_ = r.doWrite(dag, nil, obj, ActionCreatePtr(), opts...)
 }
 
 func (r *realGraphClient) Update(dag *graph.DAG, objOld, objNew client.Object, opts ...GraphOption) {
-	r.doWrite(dag, objOld, objNew, ActionUpdatePtr(), opts...)
+	_ = r.doWrite(dag, objOld, objNew, ActionUpdatePtr(), opts...)
 }
 
 func (r *realGraphClient) Patch(dag *graph.DAG, objOld, objNew client.Object, opts ...GraphOption) {
-	r.doWrite(dag, objOld, objNew, ActionPatchPtr(), opts...)
+	_ = r.doWrite(dag, objOld, objNew, ActionPatchPtr(), opts...)
 }
 
-func (r *realGraphClient) Delete(dag *graph.DAG, obj client.Object, opts ...GraphOption) {
-	r.doWrite(dag, nil, obj, ActionDeletePtr(), opts...)
+func (r *realGraphClient) Delete(dag *graph.DAG, obj client.Object, opts ...GraphOption) error {
+	return r.doWrite(dag, nil, obj, ActionDeletePtr(), opts...)
 }
 
 func (r *realGraphClient) Status(dag *graph.DAG, objOld, objNew client.Object, opts ...GraphOption) {
-	r.doWrite(dag, objOld, objNew, ActionStatusPtr(), opts...)
+	_ = r.doWrite(dag, objOld, objNew, ActionStatusPtr(), opts...)
 }
 
 func (r *realGraphClient) Do(dag *graph.DAG, objOld, objNew client.Object, action *Action, parent *ObjectVertex, opts ...GraphOption) *ObjectVertex {
@@ -131,11 +149,12 @@ func (r *realGraphClient) Do(dag *graph.DAG, objOld, objNew client.Object, actio
 	}
 
 	vertex := &ObjectVertex{
-		OriObj:            objOld,
-		Obj:               objNew,
-		Action:            action,
-		ClientOpt:         graphOpts.clientOpt,
-		PropagationPolicy: graphOpts.propagationPolicy,
+		OriObj:              objOld,
+		Obj:                 objNew,
+		Action:              action,
+		ClientOpt:           graphOpts.clientOpt,
+		PropagationPolicy:   graphOpts.propagationPolicy,
+		DeletePreconditions: graphOpts.deletePreconditions,
 	}
 	switch parent {
 	case nil:
@@ -206,30 +225,92 @@ func (r *realGraphClient) FindAll(dag *graph.DAG, obj interface{}, opts ...Graph
 	return objects
 }
 
-func (r *realGraphClient) doWrite(dag *graph.DAG, objOld, objNew client.Object, action *Action, opts ...GraphOption) {
+func (r *realGraphClient) doWrite(dag *graph.DAG, objOld, objNew client.Object, action *Action, opts ...GraphOption) error {
 	graphOpts := &GraphOptions{}
 	for _, opt := range opts {
 		opt.ApplyTo(graphOpts)
 	}
 
 	vertex := r.FindMatchedVertex(dag, objNew)
+	if *action == DELETE {
+		if graphOpts.deletePreconditions == nil && vertex != nil {
+			existing := vertex.(*ObjectVertex)
+			if existing.DeletePreconditions != nil {
+				graphOpts.deletePreconditions = existing.DeletePreconditions.DeepCopy()
+			}
+		}
+		if err := validateDeletePreconditions(vertex, objNew, graphOpts); err != nil {
+			return err
+		}
+	} else {
+		graphOpts.deletePreconditions = nil
+	}
 	switch {
 	case vertex != nil:
 		objVertex, _ := vertex.(*ObjectVertex)
 		objVertex.Action = action
+		objVertex.DeletePreconditions = graphOpts.deletePreconditions
 		if graphOpts.replaceIfExisting {
 			objVertex.Obj = objNew
 			objVertex.OriObj = objOld
 		}
 	default:
 		vertex = &ObjectVertex{
-			Obj:       objNew,
-			OriObj:    objOld,
-			Action:    action,
-			ClientOpt: graphOpts.clientOpt,
+			Obj:                 objNew,
+			OriObj:              objOld,
+			Action:              action,
+			ClientOpt:           graphOpts.clientOpt,
+			DeletePreconditions: graphOpts.deletePreconditions,
 		}
 		dag.AddConnectRoot(vertex)
 	}
+	return nil
+}
+
+func validateDeletePreconditions(vertex graph.Vertex, obj client.Object, opts *GraphOptions) error {
+	if opts.deletePreconditions == nil {
+		return nil
+	}
+	requested := opts.deletePreconditions.UID
+	if requested == nil || *requested == "" {
+		return newDeleteUIDConflict(obj, "", valueOrEmpty(requested), "delete UID must not be empty")
+	}
+	if obj.GetUID() != "" && obj.GetUID() != *requested {
+		return newDeleteUIDConflict(obj, string(obj.GetUID()), string(*requested),
+			"object UID differs from requested UID")
+	}
+	if vertex == nil {
+		return nil
+	}
+	existing := vertex.(*ObjectVertex)
+	if existing.DeletePreconditions != nil && existing.DeletePreconditions.UID != nil &&
+		*existing.DeletePreconditions.UID != "" && *existing.DeletePreconditions.UID != *requested {
+		return newDeleteUIDConflict(obj, string(*existing.DeletePreconditions.UID), string(*requested),
+			"existing delete UID differs from requested UID")
+	}
+	if opts.replaceIfExisting && obj.GetUID() != *requested {
+		return newDeleteUIDConflict(obj, string(obj.GetUID()), string(*requested),
+			"replacement object UID differs from requested UID")
+	}
+	return nil
+}
+
+func newDeleteUIDConflict(obj client.Object, existingUID, requestedUID, reason string) error {
+	return &DeleteUIDConflict{
+		ObjectType:   fmt.Sprintf("%T", obj),
+		Namespace:    obj.GetNamespace(),
+		Name:         obj.GetName(),
+		ExistingUID:  existingUID,
+		RequestedUID: requestedUID,
+		Reason:       reason,
+	}
+}
+
+func valueOrEmpty(uid *types.UID) string {
+	if uid == nil {
+		return ""
+	}
+	return string(*uid)
 }
 
 func (r *realGraphClient) FindMatchedVertex(dag *graph.DAG, object client.Object) graph.Vertex {

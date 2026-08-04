@@ -34,6 +34,9 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	shardingcontroller "github.com/apecloud/kubeblocks/pkg/controller/sharding"
+	"github.com/apecloud/kubeblocks/pkg/controller/systemaccount"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 // clusterShardingAccountTransformer handles shared system accounts for sharding.
@@ -41,9 +44,41 @@ type clusterShardingAccountTransformer struct{}
 
 var _ graph.Transformer = &clusterShardingAccountTransformer{}
 
+type liveShardingRestoreAuthority struct {
+	cluster             *appsv1.Cluster
+	sharding            *appsv1.ClusterSharding
+	componentDefinition *appsv1.ComponentDefinition
+	account             appsv1.SystemAccount
+}
+
 func (t *clusterShardingAccountTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*clusterTransformContext)
 	if transCtx.OrigCluster.IsDeleting() {
+		return nil
+	}
+
+	graphCli, _ := transCtx.Client.(model.GraphClient)
+	handled, err := systemaccount.ReconcileRestoreRequests(transCtx.Context, graphCli, dag, transCtx.APIReader,
+		transCtx.Cluster, constant.DBClusterFinalizerName,
+		func(intent systemaccount.CredentialIntent) (*corev1.Secret, error) {
+			authority, err := t.validateLiveRestoreAuthority(transCtx, intent)
+			if err != nil {
+				return nil, err
+			}
+			password := intent.Credentials[constant.AccountPasswdForSecret]
+			if len(password) == 0 {
+				return nil, systemaccount.NewTargetSemanticError(
+					systemaccount.TargetSemanticUnavailableReason,
+					fmt.Errorf("system account %s credential is unavailable", intent.Target.Account))
+			}
+			return t.newAccountSecretWithPasswordFor(
+				authority.cluster, authority.sharding, authority.componentDefinition,
+				authority.account.Name, password)
+		})
+	if err != nil {
+		return err
+	}
+	if handled {
 		return nil
 	}
 
@@ -51,9 +86,128 @@ func (t *clusterShardingAccountTransformer) Transform(ctx graph.TransformContext
 		transCtx.V(1).Info("Cluster is in compact mode, no need to create account related objects", "cluster", client.ObjectKeyFromObject(transCtx.Cluster))
 		return nil
 	}
-
-	graphCli, _ := transCtx.Client.(model.GraphClient)
 	return t.reconcileShardingAccounts(transCtx, graphCli, dag)
+}
+
+func (t *clusterShardingAccountTransformer) validateLiveRestoreAuthority(
+	transCtx *clusterTransformContext,
+	intent systemaccount.CredentialIntent,
+) (*liveShardingRestoreAuthority, error) {
+	reader := transCtx.APIReader
+	if reader == nil {
+		return nil, systemaccount.NewTargetSemanticError(
+			systemaccount.TargetSemanticUnavailableReason,
+			fmt.Errorf("system account restore authority reader is not configured"))
+	}
+	witness := intent.AuthorityWitness
+	if witness == nil {
+		return nil, systemaccount.NewTargetSemanticError(
+			systemaccount.TargetSemanticUnavailableReason,
+			fmt.Errorf("sharding restore authority witness is unavailable"))
+	}
+	cluster := &appsv1.Cluster{}
+	if err := reader.Get(transCtx.Context, client.ObjectKey{
+		Namespace: intent.Target.Root.Namespace,
+		Name:      intent.Target.Root.Name,
+	}, cluster); err != nil {
+		return nil, systemaccount.NewTargetSemanticError(
+			systemaccount.TargetSemanticUnavailableReason, err)
+	}
+	if cluster.UID != intent.Target.Root.UID || !cluster.DeletionTimestamp.IsZero() {
+		return nil, systemaccount.NewTargetSemanticError(
+			systemaccount.TargetSemanticUnavailableReason,
+			fmt.Errorf("root Cluster %s/%s no longer matches restore intent",
+				cluster.Namespace, cluster.Name))
+	}
+	var current *appsv1.ClusterSharding
+	for i := range cluster.Spec.Shardings {
+		if cluster.Spec.Shardings[i].Name == intent.Target.ShardingName {
+			current = &cluster.Spec.Shardings[i]
+			break
+		}
+	}
+	if current == nil {
+		return nil, systemaccount.NewTargetSemanticError(
+			systemaccount.TargetSemanticUnavailableReason,
+			fmt.Errorf("sharding %s is unavailable", intent.Target.ShardingName))
+	}
+	components, err := shardingcontroller.ListShardingComponents(
+		transCtx.Context, reader, cluster, current.Name)
+	if err != nil {
+		return nil, systemaccount.NewTargetSemanticError(
+			systemaccount.TargetSemanticUnavailableReason, err)
+	}
+	witnessLive := false
+	for i := range components {
+		component := &components[i]
+		if component.Name == witness.Name &&
+			component.UID == witness.UID &&
+			component.Namespace == witness.Namespace &&
+			component.DeletionTimestamp.IsZero() {
+			witnessLive = true
+			break
+		}
+	}
+	if !witnessLive {
+		return nil, systemaccount.NewTargetSemanticError(
+			systemaccount.TargetSemanticUnavailableReason,
+			fmt.Errorf("authority witness Component %s/%s UID %s is not a current member of sharding %s",
+				witness.Namespace, witness.Name, witness.UID, current.Name))
+	}
+
+	definition, err := resolveShardingDefinition(
+		transCtx.Context, reader, current.ShardingDef)
+	if err != nil {
+		return nil, systemaccount.NewTargetSemanticError(
+			systemaccount.TargetSemanticUnavailableReason, err)
+	}
+	shared := false
+	for i := range definition.Spec.SystemAccounts {
+		account := &definition.Spec.SystemAccounts[i]
+		if account.Name == intent.Target.Account {
+			shared = ptr.Deref(account.Shared, false)
+			break
+		}
+	}
+	if !shared {
+		return nil, systemaccount.NewTargetSemanticError(
+			systemaccount.TargetSemanticUnavailableReason,
+			fmt.Errorf("system account %s is not shared by live sharding definition %s",
+				intent.Target.Account, definition.Name))
+	}
+	componentDefinition, _, err := resolveCompDefinitionNServiceVersion(
+		transCtx.Context, reader,
+		current.Template.ComponentDef, current.Template.ServiceVersion)
+	if err != nil {
+		return nil, systemaccount.NewTargetSemanticError(
+			systemaccount.AccountUnavailableReason, err)
+	}
+	if !componentDefinition.DeletionTimestamp.IsZero() {
+		return nil, systemaccount.NewTargetSemanticError(
+			systemaccount.AccountUnavailableReason,
+			fmt.Errorf("component definition %s is terminating", componentDefinition.Name))
+	}
+	for i := range current.Template.SystemAccounts {
+		account := &current.Template.SystemAccounts[i]
+		if account.Name == intent.Target.Account && ptr.Deref(account.Disabled, false) {
+			return nil, systemaccount.NewTargetSemanticError(
+				systemaccount.AccountUnavailableReason,
+				fmt.Errorf("system account %s is disabled for live sharding %s",
+					intent.Target.Account, current.Name))
+		}
+	}
+	account, err := definedSystemAccountWithDefinition(
+		current, componentDefinition, intent.Target.Account)
+	if err != nil {
+		return nil, systemaccount.NewTargetSemanticError(
+			systemaccount.AccountUnavailableReason, err)
+	}
+	return &liveShardingRestoreAuthority{
+		cluster:             cluster,
+		sharding:            current,
+		componentDefinition: componentDefinition,
+		account:             account,
+	}, nil
 }
 
 func (t *clusterShardingAccountTransformer) reconcileShardingAccounts(transCtx *clusterTransformContext,
@@ -126,17 +280,24 @@ func (t *clusterShardingAccountTransformer) newSystemAccountSecret(transCtx *clu
 
 func (t *clusterShardingAccountTransformer) definedSystemAccount(transCtx *clusterTransformContext,
 	sharding *appsv1.ClusterSharding, accountName string) (appsv1.SystemAccount, error) {
+	compDef, ok := transCtx.componentDefs[sharding.Template.ComponentDef]
+	if !ok || compDef == nil {
+		return appsv1.SystemAccount{}, fmt.Errorf("component definition %s not found for sharding %s", sharding.Template.ComponentDef, sharding.Name)
+	}
+	return definedSystemAccountWithDefinition(sharding, compDef, accountName)
+}
+
+func definedSystemAccountWithDefinition(
+	sharding *appsv1.ClusterSharding,
+	compDef *appsv1.ComponentDefinition,
+	accountName string,
+) (appsv1.SystemAccount, error) {
 	var compAccount *appsv1.ComponentSystemAccount
 	for i := range sharding.Template.SystemAccounts {
 		if sharding.Template.SystemAccounts[i].Name == accountName {
 			compAccount = &sharding.Template.SystemAccounts[i]
 			break
 		}
-	}
-
-	compDef, ok := transCtx.componentDefs[sharding.Template.ComponentDef]
-	if !ok || compDef == nil {
-		return appsv1.SystemAccount{}, fmt.Errorf("component definition %s not found for sharding %s", sharding.Template.ComponentDef, sharding.Name)
 	}
 
 	override := func(account *appsv1.SystemAccount) appsv1.SystemAccount {
@@ -163,10 +324,21 @@ func (t *clusterShardingAccountTransformer) buildPassword(transCtx *clusterTrans
 
 func (t *clusterShardingAccountTransformer) newAccountSecretWithPassword(transCtx *clusterTransformContext,
 	sharding *appsv1.ClusterSharding, accountName string, password []byte) (*corev1.Secret, error) {
-	var (
-		cluster = transCtx.Cluster
-	)
 	compDef := transCtx.componentDefs[sharding.Template.ComponentDef]
+	return t.newAccountSecretWithPasswordFor(
+		transCtx.Cluster, sharding, compDef, accountName, password)
+}
+
+func (t *clusterShardingAccountTransformer) newAccountSecretWithPasswordFor(
+	cluster *appsv1.Cluster,
+	sharding *appsv1.ClusterSharding,
+	compDef *appsv1.ComponentDefinition,
+	accountName string,
+	password []byte,
+) (*corev1.Secret, error) {
+	if compDef == nil {
+		return nil, fmt.Errorf("component definition is unavailable for sharding %s", sharding.Name)
+	}
 	shardingLabels := map[string]string{
 		constant.KBAppShardingNameLabelKey: sharding.Name,
 	}
@@ -180,6 +352,10 @@ func (t *clusterShardingAccountTransformer) newAccountSecretWithPassword(transCt
 		PutData(constant.AccountPasswdForSecret, password).
 		SetImmutable(true).
 		GetObject()
+	if err := intctrlutil.SetOwnership(cluster, secret, model.GetScheme(),
+		constant.DBClusterFinalizerName); err != nil {
+		return nil, err
+	}
 	return secret, nil
 }
 

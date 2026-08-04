@@ -312,11 +312,21 @@ func main() {
 	}
 
 	if err = (&dpcontrollers.VolumePopulatorReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("volume-populator-controller"),
+		Client:    mgr.GetClient(),
+		APIReader: mgr.GetAPIReader(),
+		Scheme:    mgr.GetScheme(),
+		Recorder:  mgr.GetEventRecorderFor("volume-populator-controller"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "VolumePopulator")
+		os.Exit(1)
+	}
+
+	if err = (&dpcontrollers.SystemAccountConflictReceiptLifecycleReconciler{
+		Client:    mgr.GetClient(),
+		APIReader: mgr.GetAPIReader(),
+		Scheme:    mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "SystemAccountConflictReceiptLifecycle")
 		os.Exit(1)
 	}
 

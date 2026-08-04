@@ -98,7 +98,9 @@ func (t *componentServiceTransformer) Transform(ctx graph.TransformContext, dag 
 	}
 
 	for svc := range runningServices {
-		graphCli.Delete(dag, runningServices[svc])
+		if err := graphCli.Delete(dag, runningServices[svc]); err != nil {
+			return err
+		}
 	}
 
 	return nil

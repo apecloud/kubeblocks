@@ -73,7 +73,7 @@ var _ = Describe("component plan builder test", func() {
 				Req: req,
 				Log: log.FromContext(ctx).WithValues("component", req.NamespacedName),
 			}
-			planBuilder := newComponentPlanBuilder(reqCtx, testCtx.Cli)
+			planBuilder := newComponentPlanBuilder(reqCtx, testCtx.Cli, testCtx.Cli)
 			Expect(planBuilder.Init()).Should(Succeed())
 		})
 	})

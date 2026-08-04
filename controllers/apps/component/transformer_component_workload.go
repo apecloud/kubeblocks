@@ -80,7 +80,7 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 		}
 	} else {
 		if protoITS == nil {
-			graphCli.Delete(dag, runningITS)
+			err = graphCli.Delete(dag, runningITS)
 		} else {
 			err = t.handleUpdate(transCtx, graphCli, dag, synthesizeComp, comp, runningITS, protoITS)
 		}

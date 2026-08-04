@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package model
 
 import (
+	"errors"
 	"slices"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -27,6 +28,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -72,7 +74,7 @@ var _ = Describe("graph client test.", func() {
 			By("update&delete&status object")
 			graphCli.Status(dag, obj0, obj0.DeepCopy())
 			graphCli.Update(dag, obj1, obj1.DeepCopy())
-			graphCli.Delete(dag, obj2)
+			Expect(graphCli.Delete(dag, obj2)).Should(Succeed())
 			v0.Action = ActionStatusPtr()
 			v1.Action = ActionUpdatePtr()
 			v2.Action = ActionDeletePtr()
@@ -174,6 +176,63 @@ var _ = Describe("graph client test.", func() {
 			graphCli.Root(dag, obj, obj, nil)
 			Expect(graphCli.IsAction(dag, obj, nil)).Should(BeTrue())
 			Expect(graphCli.IsAction(dag, obj, ActionCreatePtr())).Should(BeFalse())
+		})
+
+		It("preserves delete UID preconditions when replacing an existing vertex", func() {
+			graphCli := NewGraphClient(nil)
+			dag := graph.NewDAG()
+			root := builder.NewInstanceSetBuilder(namespace, name).GetObject()
+			obj := builder.NewPodBuilder(namespace, name+"0").GetObject()
+			uid := types.UID("observed-pod-uid")
+
+			graphCli.Root(dag, root.DeepCopy(), root, ActionStatusPtr())
+			graphCli.Create(dag, obj)
+			Expect(graphCli.Delete(dag, obj, WithDeleteUID(uid))).Should(Succeed())
+
+			vertex, ok := graphCli.FindMatchedVertex(dag, obj).(*ObjectVertex)
+			Expect(ok).Should(BeTrue())
+			Expect(vertex.Action).Should(Equal(ActionDeletePtr()))
+			Expect(vertex.DeletePreconditions).ShouldNot(BeNil())
+			Expect(vertex.DeletePreconditions.UID).ShouldNot(BeNil())
+			Expect(*vertex.DeletePreconditions.UID).Should(Equal(uid))
+
+			By("accepting the same UID idempotently")
+			Expect(graphCli.Delete(dag, obj, WithDeleteUID(uid))).Should(Succeed())
+
+			By("preserving the UID when a later delete omits the optional contract")
+			Expect(graphCli.Delete(dag, obj)).Should(Succeed())
+			Expect(vertex.DeletePreconditions).ShouldNot(BeNil())
+			Expect(*vertex.DeletePreconditions.UID).Should(Equal(uid))
+
+			By("rejecting a different UID without overwriting the first precondition")
+			err := graphCli.Delete(dag, obj, WithDeleteUID(types.UID("replacement-pod-uid")))
+			Expect(err).Should(MatchError(ContainSubstring("delete UID conflict")))
+			var conflict *DeleteUIDConflict
+			Expect(errors.As(err, &conflict)).Should(BeTrue())
+			Expect(conflict.ExistingUID).Should(Equal(string(uid)))
+			Expect(conflict.RequestedUID).Should(Equal("replacement-pod-uid"))
+			Expect(*vertex.DeletePreconditions.UID).Should(Equal(uid))
+
+			By("rejecting an empty UID")
+			Expect(graphCli.Delete(dag, obj, WithDeleteUID(""))).
+				Should(MatchError(ContainSubstring("delete UID must not be empty")))
+
+			By("rejecting a replacement object whose UID differs from the precondition")
+			replacement := obj.DeepCopy()
+			replacement.UID = types.UID("replacement-pod-uid")
+			err = graphCli.Delete(dag, replacement, WithDeleteUID(uid), &ReplaceIfExistingOption{})
+			Expect(err).Should(MatchError(ContainSubstring("delete UID conflict")))
+			Expect(vertex.Obj).Should(BeIdenticalTo(obj))
+
+			By("ignoring delete preconditions on non-delete actions")
+			other := builder.NewPodBuilder(namespace, name+"1").GetObject()
+			graphCli.Update(dag, nil, other, WithDeleteUID(uid))
+			otherVertex := graphCli.FindMatchedVertex(dag, other).(*ObjectVertex)
+			Expect(otherVertex.DeletePreconditions).Should(BeNil())
+
+			By("clearing a stale delete precondition when the same vertex changes action")
+			graphCli.Update(dag, obj, obj.DeepCopy())
+			Expect(vertex.DeletePreconditions).Should(BeNil())
 		})
 	})
 })

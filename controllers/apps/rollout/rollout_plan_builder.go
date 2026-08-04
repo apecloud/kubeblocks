@@ -222,6 +222,9 @@ func (c *rolloutPlanBuilder) reconcileDeleteObject(ctx context.Context, vertex *
 		if len(vertex.PropagationPolicy) > 0 {
 			opts = append(opts, vertex.PropagationPolicy)
 		}
+		if vertex.DeletePreconditions != nil {
+			opts = append(opts, client.Preconditions(*vertex.DeletePreconditions))
+		}
 		err := c.cli.Delete(ctx, vertex.Obj, opts...)
 		if err != nil && !apierrors.IsNotFound(err) {
 			return err

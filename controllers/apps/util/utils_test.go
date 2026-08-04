@@ -91,6 +91,7 @@ func TestGetRestoreSystemAccountPassword(t *testing.T) {
 	encryptor := intctrlutil.NewEncryptor(viper.GetString(constant.CfgKeyDPEncryptionKey))
 	pwd := []byte("test-password")
 	encryptedPwd, _ := encryptor.Encrypt(pwd)
+	encryptedEmptyPwd, _ := encryptor.Encrypt(nil)
 
 	tests := []struct {
 		name        string
@@ -99,6 +100,7 @@ func TestGetRestoreSystemAccountPassword(t *testing.T) {
 		component   string
 		account     string
 		wantPwd     []byte
+		wantFound   bool
 		wantErr     bool
 	}{
 		{
@@ -118,6 +120,27 @@ func TestGetRestoreSystemAccountPassword(t *testing.T) {
 			component: "comp1",
 			account:   "account1",
 			wantPwd:   pwd,
+			wantFound: true,
+			wantErr:   false,
+		},
+		{
+			name: "empty password found in backup",
+			annotations: map[string]string{
+				constant.RestoreFromBackupAnnotationKey: `{"comp1":{"name":"backup1","namespace":"default"}}`,
+			},
+			backup: &dpv1alpha1.Backup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "backup1",
+					Namespace: "default",
+					Annotations: map[string]string{
+						constant.EncryptedSystemAccountsAnnotationKey: fmt.Sprintf(`{"comp1":{"account1":"%s"}}`, encryptedEmptyPwd),
+					},
+				},
+			},
+			component: "comp1",
+			account:   "account1",
+			wantPwd:   []byte{},
+			wantFound: true,
 			wantErr:   false,
 		},
 		{
@@ -238,6 +261,7 @@ func TestGetRestoreSystemAccountPassword(t *testing.T) {
 			component: "comp1",
 			account:   "account1",
 			wantPwd:   pwd,
+			wantFound: true,
 			wantErr:   false,
 		},
 	}
@@ -251,9 +275,10 @@ func TestGetRestoreSystemAccountPassword(t *testing.T) {
 				cli = cli.WithObjects(tt.backup)
 			}
 
-			pwd, err := GetRestoreSystemAccountPassword(context.Background(), cli.Build(),
+			pwd, found, err := GetRestoreSystemAccountPassword(context.Background(), cli.Build(),
 				tt.annotations, tt.component, tt.account)
 
+			assert.Equal(t, tt.wantFound, found)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {

@@ -2683,6 +2683,7 @@ var _ = Describe("cluster component transformer test", func() {
 					transCtx, sharding1aName, shardingAddShardAction, shardingAddActionTargetsKey,
 					action(), nil, []*appsv1.Component{shard}, shard)
 				Expect(errors.Is(err, lifecycle.ErrActionFailed)).Should(BeTrue())
+				Expect(ictrlutil.IsDelayedRequeueError(err)).Should(BeTrue())
 				targets, _, err := getShardingActionTargets(shard, shardingAddActionTargetsKey)
 				Expect(err).Should(BeNil())
 				Expect(targets.Targets[0].Pods[0].Rerun).Should(BeTrue())
@@ -2800,6 +2801,149 @@ var _ = Describe("cluster component transformer test", func() {
 				Expect(errorSkip.Has(shard.Name)).Should(BeTrue())
 				Expect(shard.Annotations).ShouldNot(HaveKey(shardingAddShardKey))
 				Expect(shard.Annotations).Should(HaveKey(shardingRemoveActionTargetsKey))
+			})
+
+			It("resumes shard add before delete when shard remove is not defined", func() {
+				shard, pods := buildShard("shard-0", "shard-0-0")
+				shard.Annotations[shardingAddShardKey] = "pending"
+				Expect(setShardingActionTargets(shard, shardingAddActionTargetsKey, &shardingActionTargets{
+					Version: shardingActionTargetsVersion,
+					Targets: []shardingActionTarget{{
+						Component: shard.Name,
+						Pods:      []shardingActionTargetPod{{Name: pods[0].Name, Rerun: true}},
+					}},
+				})).Should(Succeed())
+				transCtx.Client = model.NewGraphClient(&appsutil.MockReader{
+					Objects: []client.Object{shard, pods[0]},
+				})
+				transCtx.shardingDefs[shardingDefName].Spec.LifecycleActions = &appsv1.ShardingLifecycleActions{
+					ShardAdd: action(),
+				}
+				calls := 0
+				testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+					recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(
+						func(_ context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+							calls++
+							Expect(req.Action).Should(Equal("udf-" + shardingAddShardAction))
+							if calls == 1 {
+								return kbagentproto.ActionResponse{
+									Error: kbagentproto.Error2Type(kbagentproto.ErrInProgress),
+								}, nil
+							}
+							return kbagentproto.ActionResponse{}, nil
+						}).Times(2)
+				})
+
+				handle := func() (sets.Set[string], error) {
+					return (&clusterShardingHandler{}).handleShardAddNRemove(
+						transCtx, sharding1aName,
+						map[string]*appsv1.Component{shard.Name: shard}, map[string]*appsv1.Component{},
+						sets.New[string](), sets.New(shard.Name), sets.New[string]())
+				}
+
+				errorSkip, err := handle()
+				Expect(ictrlutil.IsDelayedRequeueError(err)).Should(BeTrue())
+				Expect(errorSkip.Has(shard.Name)).Should(BeTrue())
+				Expect(shard.Annotations).ShouldNot(HaveKey(shardingRemoveActionTargetsKey))
+				targets, found, err := getShardingActionTargets(shard, shardingAddActionTargetsKey)
+				Expect(err).Should(BeNil())
+				Expect(found).Should(BeTrue())
+				Expect(targets.Targets[0].Pods[0].Rerun).Should(BeFalse())
+
+				errorSkip, err = handle()
+				Expect(err).Should(BeNil())
+				Expect(errorSkip.Has(shard.Name)).Should(BeFalse())
+				Expect(shard.Annotations).ShouldNot(HaveKey(shardingAddActionTargetsKey))
+				Expect(shard.Annotations).ShouldNot(HaveKey(shardingAddShardKey))
+				Expect(calls).Should(Equal(2))
+			})
+
+			It("finishes reversed shard remove before persisting and dispatching shard add", func() {
+				shard, pods := buildShard("shard-0", "shard-0-0")
+				Expect(setShardingActionTargets(shard, shardingRemoveActionTargetsKey, &shardingActionTargets{
+					Version: shardingActionTargetsVersion,
+					Targets: []shardingActionTarget{{
+						Component: shard.Name,
+						Pods:      []shardingActionTargetPod{{Name: pods[0].Name}},
+					}},
+				})).Should(Succeed())
+				transCtx.Client = model.NewGraphClient(&appsutil.MockReader{
+					Objects: []client.Object{shard, pods[0]},
+				})
+				transCtx.shardingDefs[shardingDefName].Spec.LifecycleActions = &appsv1.ShardingLifecycleActions{
+					ShardAdd:    action(),
+					ShardRemove: action(),
+				}
+				calls := 0
+				testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+					recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(
+						func(_ context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+							calls++
+							Expect(req.Action).Should(Equal("udf-" + shardingRemoveShardAction))
+							if calls == 1 {
+								return kbagentproto.ActionResponse{
+									Error: kbagentproto.Error2Type(kbagentproto.ErrInProgress),
+								}, nil
+							}
+							return kbagentproto.ActionResponse{}, nil
+						}).Times(2)
+				})
+				handle := func() error {
+					_, err := (&clusterShardingHandler{}).handleShardAddNRemove(
+						transCtx, sharding1aName,
+						map[string]*appsv1.Component{shard.Name: shard},
+						map[string]*appsv1.Component{shard.Name: shard.DeepCopy()},
+						sets.New[string](), sets.New[string](), sets.New(shard.Name))
+					return err
+				}
+
+				Expect(ictrlutil.IsDelayedRequeueError(handle())).Should(BeTrue())
+				Expect(shard.Annotations).ShouldNot(HaveKey(shardingAddShardKey))
+				Expect(shard.Annotations).Should(HaveKey(shardingRemoveActionTargetsKey))
+
+				Expect(ictrlutil.IsDelayedRequeueError(handle())).Should(BeTrue())
+				Expect(shard.Annotations).ShouldNot(HaveKey(shardingRemoveActionTargetsKey))
+				Expect(shard.Annotations).Should(HaveKey(shardingAddShardKey))
+				Expect(shard.Annotations).ShouldNot(HaveKey(shardingAddActionTargetsKey))
+
+				// The next reconciliation persists fresh add targets without invoking
+				// shardAdd; its invocation can only happen on a later poll.
+				Expect(ictrlutil.IsDelayedRequeueError(handle())).Should(BeTrue())
+				Expect(shard.Annotations).Should(HaveKey(shardingAddActionTargetsKey))
+				Expect(calls).Should(Equal(2))
+			})
+
+			It("resumes shard remove after retain intent when shard add is not defined", func() {
+				shard, pods := buildShard("shard-0", "shard-0-0")
+				Expect(setShardingActionTargets(shard, shardingRemoveActionTargetsKey, &shardingActionTargets{
+					Version: shardingActionTargetsVersion,
+					Targets: []shardingActionTarget{{
+						Component: shard.Name,
+						Pods:      []shardingActionTargetPod{{Name: pods[0].Name}},
+					}},
+				})).Should(Succeed())
+				transCtx.Client = model.NewGraphClient(&appsutil.MockReader{
+					Objects: []client.Object{shard, pods[0]},
+				})
+				transCtx.shardingDefs[shardingDefName].Spec.LifecycleActions = &appsv1.ShardingLifecycleActions{
+					ShardRemove: action(),
+				}
+				testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+					recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(
+						func(_ context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+							Expect(req.Action).Should(Equal("udf-" + shardingRemoveShardAction))
+							return kbagentproto.ActionResponse{}, nil
+						}).Times(1)
+				})
+
+				_, err := (&clusterShardingHandler{}).handleShardAddNRemove(
+					transCtx, sharding1aName,
+					map[string]*appsv1.Component{shard.Name: shard},
+					map[string]*appsv1.Component{shard.Name: shard.DeepCopy()},
+					sets.New[string](), sets.New[string](), sets.New(shard.Name))
+				Expect(err).Should(BeNil())
+				Expect(shard.Annotations).ShouldNot(HaveKey(shardingRemoveActionTargetsKey))
+				Expect(shard.Annotations).ShouldNot(HaveKey(shardingAddShardKey))
 			})
 
 			It("rejects malformed persisted targets", func() {

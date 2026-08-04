@@ -47,9 +47,10 @@ func (h *clusterShardingHandler) nonBlockingShardingAction(transCtx *clusterTran
 	shardingName, actionName, targetsAnnotation string, action *appsv1.ShardingAction,
 	args map[string]string, runningComps []*appsv1.Component, sourceComp *appsv1.Component) error {
 	for _, comp := range runningComps {
-		if comp.Name != sourceComp.Name &&
-			(comp.Annotations[shardingAddActionTargetsKey] != "" ||
-				comp.Annotations[shardingRemoveActionTargetsKey] != "") {
+		addStarted := comp.Annotations[shardingAddActionTargetsKey] != ""
+		removeStarted := comp.Annotations[shardingRemoveActionTargetsKey] != ""
+		if (addStarted && (comp.Name != sourceComp.Name || targetsAnnotation != shardingAddActionTargetsKey)) ||
+			(removeStarted && (comp.Name != sourceComp.Name || targetsAnnotation != shardingRemoveActionTargetsKey)) {
 			return pendingShardingAction(actionName, "waiting for another sharding action")
 		}
 	}
@@ -73,6 +74,7 @@ func (h *clusterShardingHandler) nonBlockingShardingAction(transCtx *clusterTran
 
 	var callErrors []error
 	pending := false
+	terminalFailure := false
 	for i := range targets.Targets {
 		target := &targets.Targets[i]
 		lfa, err := h.newLifecycle(transCtx, comps[target.Component])
@@ -101,6 +103,7 @@ func (h *clusterShardingHandler) nonBlockingShardingAction(transCtx *clusterTran
 				pending = true
 			case isTerminalShardingActionError(err):
 				pod.Rerun = true
+				terminalFailure = true
 				callErrors = append(callErrors, err)
 			default:
 				callErrors = append(callErrors, err)
@@ -111,6 +114,12 @@ func (h *clusterShardingHandler) nonBlockingShardingAction(transCtx *clusterTran
 		return err
 	}
 	if len(callErrors) > 0 {
+		if terminalFailure {
+			// Rerun is part of the persisted request state. Make the error delayed so
+			// the graph update is applied before the next attempt.
+			return errors.Join(errors.Join(callErrors...),
+				pendingShardingAction(actionName, "failed and will be retried"))
+		}
 		return errors.Join(callErrors...)
 	}
 	if pending {

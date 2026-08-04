@@ -46,6 +46,14 @@ type shardingActionTargets struct {
 func (h *clusterShardingHandler) nonBlockingShardingAction(transCtx *clusterTransformContext,
 	shardingName, actionName, targetsAnnotation string, action *appsv1.ShardingAction,
 	args map[string]string, runningComps []*appsv1.Component, sourceComp *appsv1.Component) error {
+	for _, comp := range runningComps {
+		if comp.Name != sourceComp.Name &&
+			(comp.Annotations[shardingAddActionTargetsKey] != "" ||
+				comp.Annotations[shardingRemoveActionTargetsKey] != "") {
+			return pendingShardingAction(actionName, "waiting for another sharding action")
+		}
+	}
+
 	targets, changed, err := h.resolveShardingActionTargets(
 		transCtx, action, targetsAnnotation, runningComps, sourceComp)
 	if err != nil {
@@ -129,66 +137,70 @@ func (h *clusterShardingHandler) resolveShardingActionTargets(transCtx *clusterT
 	if err != nil {
 		return nil, false, err
 	}
-	if found {
-		exist, err := shardingActionTargetsExist(transCtx, runningComps, targets)
-		if err != nil {
-			return nil, false, err
-		}
-		if exist {
-			return targets, false, nil
-		}
+	if !found {
+		targets, err = h.selectShardingActionTargets(transCtx, action, runningComps, sourceComp)
+		return targets, true, err
 	}
 
-	selected, err := h.selectShardingActionTargets(transCtx, action, runningComps, sourceComp)
-	if err != nil {
-		return nil, false, err
+	comps := make(map[string]*appsv1.Component, len(runningComps))
+	for _, comp := range runningComps {
+		comps[comp.Name] = comp
 	}
-	if found {
-		rerun := map[string]bool{}
-		for _, target := range targets.Targets {
-			for _, pod := range target.Pods {
-				rerun[target.Component+"/"+pod.Name] = pod.Rerun
-			}
-		}
-		for i := range selected.Targets {
-			for j := range selected.Targets[i].Pods {
-				pod := &selected.Targets[i].Pods[j]
-				if value, ok := rerun[selected.Targets[i].Component+"/"+pod.Name]; ok {
-					pod.Rerun = value
-				}
-			}
-		}
-	}
-	return selected, true, nil
-}
-
-func shardingActionTargetsExist(transCtx *clusterTransformContext, comps []*appsv1.Component,
-	targets *shardingActionTargets) (bool, error) {
-	byName := make(map[string]*appsv1.Component, len(comps))
-	for _, comp := range comps {
-		byName[comp.Name] = comp
-	}
-	for _, target := range targets.Targets {
-		comp := byName[target.Component]
+	changed := false
+	for i := range targets.Targets {
+		target := &targets.Targets[i]
+		comp := comps[target.Component]
 		if comp == nil {
-			return false, nil
+			return nil, false, pendingShardingAction("sharding",
+				fmt.Sprintf("waiting for target shard %s", target.Component))
 		}
 		pods, err := component.ListOwnedInstances(transCtx.Context, transCtx.Client, comp)
 		if err != nil {
-			return false, err
+			return nil, false, err
 		}
-		names := sets.New[string]()
+		existing := sets.New[string]()
 		for _, pod := range pods {
-			names.Insert(pod.Name)
+			existing.Insert(pod.Name)
 		}
+		surviving := sets.New[string]()
+		missing := 0
 		for _, pod := range target.Pods {
-			if !names.Has(pod.Name) {
-				return false, nil
+			if existing.Has(pod.Name) {
+				surviving.Insert(pod.Name)
+			} else {
+				missing++
 			}
 		}
+		if missing == 0 {
+			continue
+		}
+		selected, err := selectShardingActionPods(action, pods, comp.Name)
+		if err != nil {
+			return nil, false, pendingShardingAction("sharding",
+				fmt.Sprintf("waiting for replacement pods on shard %s", comp.Name))
+		}
+		replacements := make([]shardingActionTargetPod, 0, missing)
+		for _, pod := range selected {
+			if !surviving.Has(pod.Name) {
+				replacements = append(replacements, pod)
+			}
+		}
+		if len(replacements) < missing {
+			return nil, false, pendingShardingAction("sharding",
+				fmt.Sprintf("waiting for %d replacement pods on shard %s", missing, comp.Name))
+		}
+		next := 0
+		for j := range target.Pods {
+			if !existing.Has(target.Pods[j].Name) {
+				target.Pods[j] = replacements[next]
+				next++
+			}
+		}
+		changed = true
 	}
-	return true, nil
+	return targets, changed, nil
 }
+
 func (h *clusterShardingHandler) selectShardingActionTargets(transCtx *clusterTransformContext,
 	action *appsv1.ShardingAction, runningComps []*appsv1.Component,
 	sourceComp *appsv1.Component) (*shardingActionTargets, error) {

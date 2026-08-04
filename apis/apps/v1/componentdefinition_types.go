@@ -1217,12 +1217,13 @@ type SystemAccount struct {
 	// +optional
 	Statement *SystemAccountStatement `json:"statement,omitempty"`
 
-	// Specifies the policy for generating the account's password.
+	// Specifies the configuration for generating the account's password.
+	// If this field is nil, the account is passwordless.
 	//
 	// This field is immutable once set.
 	//
 	// +optional
-	PasswordGenerationPolicy PasswordConfig `json:"passwordGenerationPolicy"`
+	PasswordConfig *PasswordConfig `json:"passwordConfig,omitempty"`
 }
 
 type SystemAccountStatement struct {

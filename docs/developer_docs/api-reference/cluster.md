@@ -13492,7 +13492,7 @@ SystemAccountStatement
 </tr>
 <tr>
 <td>
-<code>passwordGenerationPolicy</code><br/>
+<code>passwordConfig</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.PasswordConfig">
 PasswordConfig
@@ -13501,7 +13501,8 @@ PasswordConfig
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the policy for generating the account&rsquo;s password.</p>
+<p>Specifies the configuration for generating the account&rsquo;s password.
+If this field is nil, the account is passwordless.</p>
 <p>This field is immutable once set.</p>
 </td>
 </tr>

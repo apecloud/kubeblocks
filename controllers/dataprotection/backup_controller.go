@@ -599,7 +599,8 @@ func (r *BackupReconciler) handleRunningPhase(
 		return intctrlutil.Requeue(reqCtx.Log, msg)
 	}
 
-	if backup.Labels[dptypes.BackupTypeLabelKey] == string(dpv1alpha1.BackupTypeContinuous) {
+	continuousBackup := backup.Labels[dptypes.BackupTypeLabelKey] == string(dpv1alpha1.BackupTypeContinuous)
+	if continuousBackup {
 		// check if the continuous backup is completed.
 		if completed, err := r.checkIsCompletedDuringRunning(reqCtx, backup); err != nil {
 			return RecorderEventAndRequeue(reqCtx, r.Recorder, backup, err)
@@ -666,7 +667,7 @@ func (r *BackupReconciler) handleRunningPhase(
 			}
 		}
 	}
-	if existFailedAction {
+	if continuousBackup && existFailedAction {
 		return r.updateStatusIfFailed(reqCtx, backup, request.Backup,
 			fmt.Errorf("there are failed actions, you can obtain the more information in the status.actions"))
 	}
@@ -683,6 +684,10 @@ func (r *BackupReconciler) handleRunningPhase(
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		}
 		return intctrlutil.Reconciled()
+	}
+	if existFailedAction {
+		return r.updateStatusIfFailed(reqCtx, backup, request.Backup,
+			fmt.Errorf("there are failed actions, you can obtain the more information in the status.actions"))
 	}
 	return r.completeBackup(reqCtx, backup, request.Backup)
 }

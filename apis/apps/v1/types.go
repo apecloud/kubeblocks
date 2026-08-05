@@ -401,6 +401,7 @@ type ComponentService struct {
 	DisableAutoProvision *bool `json:"disableAutoProvision,omitempty"`
 }
 
+// +kubebuilder:validation:XValidation:rule="!has(self.secretRefRevision) || self.secretRefRevision == '' || has(self.secretRef)",message="secretRef must be specified when secretRefRevision is non-empty"
 type ComponentSystemAccount struct {
 	// The name of the system account.
 	//

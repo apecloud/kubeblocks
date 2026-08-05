@@ -96,6 +96,57 @@ var _ = Describe("cluster sharding shared system account password contract", fun
 		Expect(secret.Labels).To(HaveKeyWithValue(constant.SystemAccountLabelKey, accountName))
 	})
 
+	It("keeps built-in labels authoritative over shared account metadata", func() {
+		transCtx, shardingSpec := newContext(appsv1.SystemAccount{Name: accountName})
+		shardingSpec.Template.Labels = map[string]string{
+			"precedence":                       "dynamic",
+			constant.AppManagedByLabelKey:      "dynamic-managed-by",
+			constant.AppInstanceLabelKey:       "dynamic-cluster",
+			constant.KBAppShardingNameLabelKey: "dynamic-sharding",
+			constant.SystemAccountLabelKey:     "dynamic-account",
+		}
+		transCtx.componentDefs[compDefName].Spec.Labels = map[string]string{
+			"precedence":                       "static",
+			constant.AppManagedByLabelKey:      "static-managed-by",
+			constant.AppInstanceLabelKey:       "static-cluster",
+			constant.KBAppShardingNameLabelKey: "static-sharding",
+			constant.SystemAccountLabelKey:     "static-account",
+		}
+
+		secret, err := (&clusterShardingAccountTransformer{}).
+			newAccountSecretWithPassword(transCtx, shardingSpec, accountName, []byte("password"))
+		Expect(err).NotTo(HaveOccurred())
+		Expect(secret.Labels).To(HaveKeyWithValue("precedence", "dynamic"))
+		Expect(secret.Labels).To(HaveKeyWithValue(constant.AppManagedByLabelKey, constant.AppName))
+		Expect(secret.Labels).To(HaveKeyWithValue(constant.AppInstanceLabelKey, clusterName))
+		Expect(secret.Labels).To(HaveKeyWithValue(constant.KBAppShardingNameLabelKey, sharding))
+		Expect(secret.Labels).To(HaveKeyWithValue(constant.SystemAccountLabelKey, accountName))
+	})
+
+	It("recognizes a created shared account Secret on the next reconcile", func() {
+		transCtx, shardingSpec := newContext(appsv1.SystemAccount{Name: accountName})
+		shardingSpec.Template.Labels = map[string]string{
+			constant.AppInstanceLabelKey:       "user-cluster",
+			constant.KBAppShardingNameLabelKey: "user-sharding",
+			constant.SystemAccountLabelKey:     "user-account",
+		}
+		transCtx.componentDefs[compDefName].Spec.Labels = map[string]string{
+			constant.AppInstanceLabelKey:       "definition-cluster",
+			constant.KBAppShardingNameLabelKey: "definition-sharding",
+			constant.SystemAccountLabelKey:     "definition-account",
+		}
+
+		created, err := (&clusterShardingAccountTransformer{}).
+			newAccountSecretWithPassword(transCtx, shardingSpec, accountName, []byte("password"))
+		Expect(err).NotTo(HaveOccurred())
+		Expect(transCtx.Client.(client.Client).Create(context.Background(), created)).To(Succeed())
+		found, err := (&clusterShardingAccountTransformer{}).
+			getSystemAccountSecret(transCtx, shardingSpec, accountName)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(found).NotTo(BeNil())
+		Expect(found.Name).To(Equal(created.Name))
+	})
+
 	It("keeps the deprecated generation policy compatible", func() {
 		transCtx, shardingSpec := newContext(appsv1.SystemAccount{
 			Name: accountName,

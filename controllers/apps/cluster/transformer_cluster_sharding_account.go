@@ -281,10 +281,11 @@ func (t *clusterShardingAccountTransformer) newAccountSecretWithPassword(transCt
 		constant.KBAppShardingNameLabelKey: sharding.Name,
 	}
 	secret := builder.NewSecretBuilder(cluster.Namespace, shardingAccountSecretName(cluster.Name, sharding.Name, accountName)).
+		// Priority: static < dynamic < built-in
+		AddLabelsInMap(compDef.Spec.Labels).
+		AddLabelsInMap(sharding.Template.Labels).
 		AddLabelsInMap(constant.GetClusterLabels(cluster.Name, shardingLabels)).
 		AddLabels(constant.SystemAccountLabelKey, accountName).
-		AddLabelsInMap(sharding.Template.Labels).
-		AddLabelsInMap(compDef.Spec.Labels).
 		AddAnnotationsInMap(sharding.Template.Annotations).
 		AddAnnotationsInMap(compDef.Spec.Annotations).
 		PutData(constant.AccountNameForSecret, []byte(accountName)).

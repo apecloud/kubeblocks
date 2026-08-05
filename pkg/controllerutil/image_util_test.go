@@ -21,6 +21,7 @@ package controllerutil
 
 import (
 	"fmt"
+	"testing"
 
 	corev1 "k8s.io/api/core/v1"
 
@@ -30,6 +31,50 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
+
+func TestOnlyKBManagedPodImagesChangedIgnoresLiveOnlyContainerState(t *testing.T) {
+	oldToolsImage := viper.GetString(constant.KBToolsImage)
+	defer viper.Set(constant.KBToolsImage, oldToolsImage)
+	viper.Set(constant.KBToolsImage, "docker.io/apecloud/kubeblocks-tools:1.0.0")
+
+	desired := &corev1.Pod{Spec: corev1.PodSpec{
+		InitContainers: []corev1.Container{{
+			Name: "init-kbagent", Image: "mirror.local/apecloud/kubeblocks-tools:1.1.0",
+		}},
+		Containers: []corev1.Container{
+			{Name: "app", Image: "docker.io/apecloud/redis:7.2"},
+			{Name: "kbagent", Image: "mirror.local/apecloud/kubeblocks-tools:1.1.0"},
+		},
+	}}
+	live := desired.DeepCopy()
+	live.Spec.InitContainers[0].Image = "docker.io/apecloud/kubeblocks-tools:1.0.0"
+	live.Spec.InitContainers[0].ImagePullPolicy = corev1.PullIfNotPresent
+	live.Spec.Containers[1].Image = "docker.io/apecloud/kubeblocks-tools:1.0.0"
+	live.Spec.Containers[1].Env = []corev1.EnvVar{{Name: "ADMISSION_INJECTED", Value: "true"}}
+	live.Spec.Containers[1].VolumeMounts = []corev1.VolumeMount{{
+		Name:      "kube-api-access",
+		MountPath: "/var/run/secrets/kubernetes.io/serviceaccount",
+		ReadOnly:  true,
+	}}
+	live.Spec.Containers = append(live.Spec.Containers, corev1.Container{
+		Name: "injected-sidecar", Image: "example.com/mesh-sidecar:1.0",
+	})
+	if !OnlyKBManagedPodImagesChanged(live, desired) {
+		t.Fatal("live-only defaults, fields, and containers must not block a tools image-only update")
+	}
+
+	appChanged := desired.DeepCopy()
+	appChanged.Spec.Containers[0].Image = "docker.io/apecloud/redis:7.4"
+	if OnlyKBManagedPodImagesChanged(live, appChanged) {
+		t.Fatal("application image changes must not be classified as KB-managed tools image changes")
+	}
+
+	missingLiveContainer := desired.DeepCopy()
+	missingLiveContainer.Spec.Containers = missingLiveContainer.Spec.Containers[:1]
+	if OnlyKBManagedPodImagesChanged(missingLiveContainer, desired) {
+		t.Fatal("a desired container missing from the live Pod must not be classified as an image-only update")
+	}
+}
 
 var _ = Describe("image util test", func() {
 	imageList := [][]string{
@@ -121,6 +166,19 @@ var _ = Describe("image util test", func() {
 		changed, ok = OnlyKBManagedContainerImageChanged(basePod.Spec.Containers, newPod.Spec.Containers)
 		Expect(ok).Should(BeTrue())
 		Expect(changed).Should(BeTrue())
+		Expect(OnlyKBManagedPodImagesChanged(basePod, newPod)).Should(BeTrue())
+
+		liveDefaultedPod := basePod.DeepCopy()
+		liveDefaultedPod.Spec.InitContainers[0].ImagePullPolicy = corev1.PullIfNotPresent
+		liveDefaultedPod.Spec.InitContainers[0].TerminationMessagePath = corev1.TerminationMessagePathDefault
+		liveDefaultedPod.Spec.Containers[1].Env = []corev1.EnvVar{{Name: "ADMISSION_INJECTED", Value: "true"}}
+		liveDefaultedPod.Spec.Containers[1].VolumeMounts = []corev1.VolumeMount{{
+			Name:      "kube-api-access",
+			MountPath: "/var/run/secrets/kubernetes.io/serviceaccount",
+			ReadOnly:  true,
+		}}
+		Expect(OnlyKBManagedPodImagesChanged(liveDefaultedPod, newPod)).Should(BeTrue(),
+			"live-only defaults and injected fields must not affect image classification")
 
 		appChangedPod := basePod.DeepCopy()
 		appChangedPod.Spec.Containers[0].Image = "docker.io/apecloud/redis:7.4"
@@ -138,10 +196,15 @@ var _ = Describe("image util test", func() {
 		_, ok = OnlyKBManagedContainerImageChanged(basePod.Spec.Containers, agentEnvChangedPod.Spec.Containers)
 		Expect(ok).Should(BeFalse())
 
-		removedContainerPod := basePod.DeepCopy()
-		removedContainerPod.Spec.Containers = removedContainerPod.Spec.Containers[:len(removedContainerPod.Spec.Containers)-1]
-		_, ok = OnlyKBManagedContainerImageChanged(basePod.Spec.Containers, removedContainerPod.Spec.Containers)
+		addedDesiredContainerPod := newPod.DeepCopy()
+		addedDesiredContainerPod.Spec.Containers = append(addedDesiredContainerPod.Spec.Containers, corev1.Container{
+			Name:  "new-template-sidecar",
+			Image: "example.com/template:1.0",
+		})
+		_, ok = OnlyKBManagedContainerImageChanged(basePod.Spec.Containers, addedDesiredContainerPod.Spec.Containers)
 		Expect(ok).Should(BeFalse())
+
+		Expect(OnlyKBManagedPodImagesChanged(basePod, basePod.DeepCopy())).Should(BeFalse())
 	})
 
 	It("only expands image when config does not exist", func() {

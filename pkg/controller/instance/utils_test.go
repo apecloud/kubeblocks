@@ -23,6 +23,7 @@ import (
 	"reflect"
 	"testing"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,6 +34,8 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -76,6 +79,15 @@ func TestGetPodUpdatePolicyInSpecForKBManagedToolsImage(t *testing.T) {
 	newPod.Spec.InitContainers[0].Image = "mirror.local/apecloud/kubeblocks-tools:1.1.0"
 	newPod.Spec.Containers[1].Image = "mirror.local/apecloud/kubeblocks-tools:1.1.0"
 
+	// Simulate fields added only to the admitted live Pod. They are absent
+	// from the template-built desired Pod and must survive an image patch.
+	oldPod.Spec.InitContainers[0].ImagePullPolicy = corev1.PullIfNotPresent
+	oldPod.Spec.Containers[1].Env = []corev1.EnvVar{{Name: "ADMISSION_INJECTED", Value: "true"}}
+	oldPod.Spec.Containers[1].VolumeMounts = []corev1.VolumeMount{{
+		Name:      "kube-api-access",
+		MountPath: "/var/run/secrets/kubernetes.io/serviceaccount",
+		ReadOnly:  true,
+	}}
 	inst := builder.NewInstanceBuilder("default", "inst-0").
 		SetPodUpdatePolicy(kbappsv1.ReCreatePodUpdatePolicyType).
 		SetPodUpgradePolicy(kbappsv1.ReCreatePodUpdatePolicyType).
@@ -92,7 +104,7 @@ func TestGetPodUpdatePolicyInSpecForKBManagedToolsImage(t *testing.T) {
 		t.Fatalf("expected StrictInPlace for KB-managed tools image change with StrictInPlace policy, got %s", policy)
 	}
 	if !safeKBManagedImageOnlyInPlaceUpdate(oldPod, newPod) {
-		t.Fatalf("expected KB-managed tools image-only change to skip switchover")
+		t.Fatalf("expected live-only admitted fields not to block the KB-managed tools image update")
 	}
 
 	labelChangedPod := newPod.DeepCopy()
@@ -108,6 +120,125 @@ func TestGetPodUpdatePolicyInSpecForKBManagedToolsImage(t *testing.T) {
 	appChangedPod.Spec.Containers[0].Image = "docker.io/apecloud/redis:7.4"
 	if policy := getPodUpdatePolicyInSpec(inst, oldPod, appChangedPod); policy != kbappsv1.ReCreatePodUpdatePolicyType {
 		t.Fatalf("expected ReCreate for app image change, got %s", policy)
+	}
+
+	revisionChangedPod := newPod.DeepCopy()
+	revisionChangedPod.Spec.Containers[1].Env = []corev1.EnvVar{{Name: "TEMPLATE_CHANGE", Value: "true"}}
+	revisionChangedInst := builder.NewInstanceBuilder("default", "inst-0").
+		SetPodTemplate(corev1.PodTemplateSpec{Spec: revisionChangedPod.Spec}).
+		SetPodUpdatePolicy(kbappsv1.ReCreatePodUpdatePolicyType).
+		SetPodUpgradePolicy(kbappsv1.ReCreatePodUpdatePolicyType).
+		GetObject()
+	revisionChangedInst.Status.UpdateRevision = "desired-revision"
+	oldPod.Labels = map[string]string{appsv1.ControllerRevisionHashLabelKey: "live-revision"}
+	policy, _, err := getPodUpdatePolicy(revisionChangedInst, oldPod)
+	if err != nil {
+		t.Fatalf("getPodUpdatePolicy() error = %v", err)
+	}
+	if policy != recreatePolicy {
+		t.Fatalf("expected revision-classified non-image template change to recreate, got %s", policy)
+	}
+
+	removedContainerSpec := *newPod.Spec.DeepCopy()
+	removedContainerSpec.Containers = removedContainerSpec.Containers[1:]
+	containerRemovedInst := builder.NewInstanceBuilder("default", "inst-0").
+		SetPodTemplate(corev1.PodTemplateSpec{Spec: removedContainerSpec}).
+		SetPodUpdatePolicy(kbappsv1.ReCreatePodUpdatePolicyType).
+		SetPodUpgradePolicy(kbappsv1.ReCreatePodUpdatePolicyType).
+		GetObject()
+	containerRemovedInst.Status.UpdateRevision = "desired-revision"
+	policy, _, err = getPodUpdatePolicy(containerRemovedInst, oldPod)
+	if err != nil {
+		t.Fatalf("getPodUpdatePolicy() for removed container error = %v", err)
+	}
+	if policy != recreatePolicy {
+		t.Fatalf("expected a template-owned container removal to recreate, got %s", policy)
+	}
+}
+
+func TestUpdateReconcilerPatchesKBManagedToolsImagesOnAdmittedPod(t *testing.T) {
+	oldToolsImage := viper.GetString(constant.KBToolsImage)
+	defer viper.Set(constant.KBToolsImage, oldToolsImage)
+	viper.Set(constant.KBToolsImage, "docker.io/apecloud/kubeblocks-tools:1.0.0")
+	origSupportResize := intctrlutil.SupportResizeSubResource
+	defer func() { intctrlutil.SupportResizeSubResource = origSupportResize }()
+	intctrlutil.SupportResizeSubResource = func() (bool, error) { return false, nil }
+
+	inst := builder.NewInstanceBuilder("default", "inst-0").
+		SetInitContainers([]corev1.Container{{
+			Name: "init-kbagent", Image: "docker.io/apecloud/kubeblocks-tools:1.0.0", Command: []string{"cp"},
+		}}).
+		SetContainers([]corev1.Container{
+			{Name: "app", Image: "docker.io/apecloud/redis:7.2"},
+			{Name: "kbagent", Image: "docker.io/apecloud/kubeblocks-tools:1.0.0", Command: []string{"/bin/kbagent"}},
+		}).
+		SetPodUpdatePolicy(kbappsv1.ReCreatePodUpdatePolicyType).
+		SetPodUpgradePolicy(kbappsv1.ReCreatePodUpdatePolicyType).
+		GetObject()
+	revision, err := buildInstancePodRevision(&inst.Spec.Template, inst)
+	if err != nil {
+		t.Fatalf("buildInstancePodRevision() error = %v", err)
+	}
+	inst.Status.UpdateRevision = revision
+	pod, err := buildInstancePod(inst, revision)
+	if err != nil {
+		t.Fatalf("buildInstancePod() error = %v", err)
+	}
+	pod.UID = "live-pod-uid"
+	pod.Spec.InitContainers[0].ImagePullPolicy = corev1.PullIfNotPresent
+	pod.Spec.InitContainers[0].TerminationMessagePath = corev1.TerminationMessagePathDefault
+	pod.Spec.Containers[1].Env = []corev1.EnvVar{{Name: "ADMISSION_INJECTED", Value: "true"}}
+	pod.Spec.Containers[1].VolumeMounts = []corev1.VolumeMount{{
+		Name:      "kube-api-access",
+		MountPath: "/var/run/secrets/kubernetes.io/serviceaccount",
+		ReadOnly:  true,
+	}}
+	pod.Spec.Containers = append(pod.Spec.Containers, corev1.Container{
+		Name: "injected-sidecar", Image: "example.com/mesh-sidecar:1.0",
+	})
+	pod.Status.Phase = corev1.PodRunning
+	pod.Status.Conditions = []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}}
+
+	inst.Spec.Template.Spec.InitContainers[0].Image = "mirror.local/apecloud/kubeblocks-tools:1.1.0"
+	inst.Spec.Template.Spec.Containers[1].Image = "mirror.local/apecloud/kubeblocks-tools:1.1.0"
+	tree := kubebuilderx.NewObjectTree()
+	tree.SetRoot(inst)
+	if err = tree.Add(pod); err != nil {
+		t.Fatalf("ObjectTree.Add() error = %v", err)
+	}
+
+	if _, err = NewUpdateReconciler().Reconcile(tree); err != nil {
+		t.Fatalf("Reconcile() error = %v", err)
+	}
+	postPods := tree.List(&corev1.Pod{})
+	if len(postPods) != 1 {
+		t.Fatalf("expected Pod to be patched in place, got %d Pods", len(postPods))
+	}
+	updatedPod := postPods[0].(*corev1.Pod)
+	if updatedPod.UID != pod.UID {
+		t.Fatalf("expected Pod UID %q to be preserved, got %q", pod.UID, updatedPod.UID)
+	}
+	_, updatedInitKBAgent := intctrlutil.GetContainerByName(updatedPod.Spec.InitContainers, "init-kbagent")
+	if updatedInitKBAgent == nil || updatedInitKBAgent.Image != "mirror.local/apecloud/kubeblocks-tools:1.1.0" ||
+		updatedInitKBAgent.ImagePullPolicy != corev1.PullIfNotPresent {
+		t.Fatalf("unexpected updated init-kbagent: %#v", updatedInitKBAgent)
+	}
+	_, updatedKBAgent := intctrlutil.GetContainerByName(updatedPod.Spec.Containers, "kbagent")
+	if updatedKBAgent == nil || updatedKBAgent.Image != "mirror.local/apecloud/kubeblocks-tools:1.1.0" ||
+		len(updatedKBAgent.Env) != 1 || updatedKBAgent.Env[0].Name != "ADMISSION_INJECTED" ||
+		len(updatedKBAgent.VolumeMounts) != 1 || updatedKBAgent.VolumeMounts[0].Name != "kube-api-access" {
+		t.Fatalf("unexpected updated kbagent: %#v", updatedKBAgent)
+	}
+	_, injectedSidecar := intctrlutil.GetContainerByName(updatedPod.Spec.Containers, "injected-sidecar")
+	if injectedSidecar == nil || injectedSidecar.Image != "example.com/mesh-sidecar:1.0" {
+		t.Fatalf("injected sidecar was not preserved: %#v", injectedSidecar)
+	}
+	_, option, err := tree.GetWithOption(updatedPod)
+	if err != nil {
+		t.Fatalf("ObjectTree.GetWithOption() error = %v", err)
+	}
+	if !option.Patch {
+		t.Fatal("expected KB-managed image-only update to use a patch")
 	}
 }
 

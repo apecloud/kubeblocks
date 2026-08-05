@@ -424,6 +424,10 @@ type ComponentSystemAccount struct {
 	//
 	// For user-specified passwords, the maximum length is limited to 64 bytes.
 	//
+	// Updates to the referenced Secret do not automatically trigger reconciliation.
+	// To apply updated credentials immediately, update the `kubeblocks.io/reconcile` annotation
+	// on the Component, or on the Cluster when the account is shared by a sharding.
+	//
 	// This field is immutable once set.
 	//
 	// +optional

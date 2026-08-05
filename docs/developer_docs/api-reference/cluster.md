@@ -7494,6 +7494,9 @@ ProvisionSecretRef
 <em>(Optional)</em>
 <p>Refers to the secret from which data will be copied to create the new account.</p>
 <p>For user-specified passwords, the maximum length is limited to 64 bytes.</p>
+<p>Updates to the referenced Secret do not automatically trigger reconciliation.
+To apply updated credentials immediately, update the <code>kubeblocks.io/reconcile</code> annotation
+on the Component, or on the Cluster when the account is shared by a sharding.</p>
 <p>This field is immutable once set.</p>
 </td>
 </tr>

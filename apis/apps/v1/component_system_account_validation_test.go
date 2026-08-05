@@ -46,11 +46,18 @@ func TestComponentSystemAccountSecretRefRevisionValidation(t *testing.T) {
 	if err := yaml.Unmarshal(data, &crd); err != nil {
 		t.Fatalf("decode Component CRD: %v", err)
 	}
-	if len(crd.Spec.Versions) != 1 || crd.Spec.Versions[0].Schema == nil {
-		t.Fatalf("expected one Component CRD version with a schema, got %#v", crd.Spec.Versions)
+	var validation *apiextensionsv1.CustomResourceValidation
+	for _, version := range crd.Spec.Versions {
+		if version.Name == "v1" {
+			validation = version.Schema
+			break
+		}
+	}
+	if validation == nil {
+		t.Fatalf("Component CRD v1 schema is missing: %#v", crd.Spec.Versions)
 	}
 
-	root := crd.Spec.Versions[0].Schema.OpenAPIV3Schema
+	root := validation.OpenAPIV3Schema
 	spec := root.Properties["spec"]
 	systemAccounts := spec.Properties["systemAccounts"]
 	if systemAccounts.Items == nil || systemAccounts.Items.Schema == nil {

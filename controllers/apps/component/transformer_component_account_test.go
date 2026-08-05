@@ -38,6 +38,7 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	pkgcomponent "github.com/apecloud/kubeblocks/pkg/controller/component"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 
@@ -143,6 +144,69 @@ func TestBuildAccountSecretPreservesEmptyReferencedPassword(t *testing.T) {
 	}
 	if len(password) != 0 {
 		t.Fatalf("expected referenced empty password to be preserved, got %d bytes", len(password))
+	}
+}
+
+func TestBuildAccountSecretWaitsForReferencedSecretRevision(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatalf("add core scheme: %v", err)
+	}
+	referenced := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:   "default",
+			Name:        "shared-account",
+			Annotations: map[string]string{constant.SecretRevisionAnnotationKey: "old-revision"},
+		},
+		Data: map[string][]byte{constant.AccountPasswdForSecret: []byte("password")},
+	}
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(referenced).Build()
+	transCtx := &componentTransformContext{
+		Context: context.Background(),
+		Client:  fakeClient,
+		Component: &appsv1.Component{
+			ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "demo-comp"},
+		},
+		SynthesizeComponent: &pkgcomponent.SynthesizedComponent{
+			Namespace: "default", ClusterName: "demo", Name: "comp",
+		},
+	}
+	account := synthesizedSystemAccount{
+		SystemAccount:     appsv1.SystemAccount{Name: "default"},
+		SecretRef:         &appsv1.ProvisionSecretRef{Name: referenced.Name},
+		SecretRefRevision: "new-revision",
+	}
+
+	_, err := (&componentAccountTransformer{}).buildAccountSecret(transCtx, account)
+	if !intctrlutil.IsDelayedRequeueError(err) {
+		t.Fatalf("expected delayed requeue for mismatched Secret revision, got %v", err)
+	}
+
+	if err = fakeClient.Delete(context.Background(), referenced); err != nil {
+		t.Fatalf("delete referenced Secret: %v", err)
+	}
+	_, err = (&componentAccountTransformer{}).buildAccountSecret(transCtx, account)
+	if !intctrlutil.IsDelayedRequeueError(err) {
+		t.Fatalf("expected delayed requeue for missing referenced Secret, got %v", err)
+	}
+
+	referenced.ResourceVersion = ""
+	referenced.Annotations = nil
+	if err = fakeClient.Create(context.Background(), referenced); err != nil {
+		t.Fatalf("recreate referenced Secret: %v", err)
+	}
+	account.SecretRefRevision = ""
+	if _, err = (&componentAccountTransformer{}).buildAccountSecret(transCtx, account); err != nil {
+		t.Fatalf("empty expected revision should retain legacy behavior: %v", err)
+	}
+
+	referenced.Annotations = map[string]string{constant.SecretRevisionAnnotationKey: "old-revision"}
+	if err = fakeClient.Update(context.Background(), referenced); err != nil {
+		t.Fatalf("update referenced Secret revision: %v", err)
+	}
+	account.SecretRefRevision = "old-revision"
+	if _, err = (&componentAccountTransformer{}).buildAccountSecret(transCtx, account); err != nil {
+		t.Fatalf("matching Secret revision should reconcile: %v", err)
 	}
 }
 

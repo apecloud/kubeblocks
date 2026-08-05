@@ -326,6 +326,7 @@ var _ = Describe("cluster sharding shared transformers", func() {
 		Expect(secret.Name).Should(Equal(shardingAccountSecretName(clusterName, shardingName, accountName)))
 		Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountNameForSecret, []byte(accountName)))
 		Expect(secret.Data[constant.AccountPasswdForSecret]).Should(HaveLen(16))
+		Expect(secret.Annotations[constant.SecretRevisionAnnotationKey]).ShouldNot(BeEmpty())
 	})
 
 	It("creates a passwordless shared system account when no generation configuration is supplied", func() {
@@ -433,7 +434,7 @@ var _ = Describe("cluster sharding shared transformers", func() {
 		Expect(managed.Data).Should(HaveKeyWithValue(constant.AccountPasswdForSecret, []byte("shared-secret")))
 		Expect(managed.Data).ShouldNot(HaveKey("minio-password"))
 
-		transformer.rewriteSystemAccount(transCtx, shardingName, accountName)
+		transformer.rewriteSystemAccount(transCtx, shardingName, accountName, "revision")
 		rewritten := transCtx.shardings[0].Template.SystemAccounts[0]
 		Expect(rewritten.SecretRef.Name).Should(Equal(managed.Name))
 		Expect(rewritten.SecretRef.Password).Should(BeEmpty())
@@ -541,9 +542,46 @@ var _ = Describe("cluster sharding shared transformers", func() {
 	It("keeps an immutable shared account secret when the source password is unchanged", func() {
 		transformer, transCtx, graphCli, dag, sharding, managed :=
 			newSourceSecretReconcile([]byte("same-password"), []byte("same-password"), true)
+		oldRevision := sourceSecretRevision(&corev1.Secret{ObjectMeta: metav1.ObjectMeta{
+			UID: "source-uid", ResourceVersion: "41",
+		}}, constant.AccountPasswdForSecret)
+		managed.Annotations = map[string]string{constant.SecretRevisionAnnotationKey: oldRevision}
+
+		Expect(transformer.reconcileShardingAccount(transCtx, graphCli, dag, sharding, accountName)).Should(Succeed())
+		Expect(graphCli.IsAction(dag, managed, model.ActionUpdatePtr())).Should(BeTrue())
+		Expect(graphCli.IsAction(dag, managed, model.ActionDeletePtr())).Should(BeFalse())
+		updated := graphCli.FindMatchedVertex(dag, managed).(*model.ObjectVertex).Obj.(*corev1.Secret)
+		Expect(updated.Data).Should(HaveKeyWithValue(constant.AccountPasswdForSecret, []byte("same-password")))
+		Expect(updated.Annotations[constant.SecretRevisionAnnotationKey]).Should(Equal(
+			sourceSecretRevision(&corev1.Secret{ObjectMeta: metav1.ObjectMeta{
+				UID: "source-uid", ResourceVersion: "42",
+			}}, constant.AccountPasswdForSecret)))
+	})
+
+	It("keeps a generated shared account revision stable", func() {
+		transformer := &clusterShardingAccountTransformer{}
+		sharding := newSharding()
+		managed := &corev1.Secret{ObjectMeta: metav1ObjectMeta(
+			shardingAccountSecretName(clusterName, shardingName, accountName), namespace)}
+		managed.Labels = constant.GetClusterLabels(clusterName, map[string]string{
+			constant.KBAppShardingNameLabelKey: shardingName,
+		})
+		managed.Annotations = map[string]string{constant.SecretRevisionAnnotationKey: "stable-revision"}
+		transCtx := newTransformContext(managed)
+		transCtx.componentDefs = map[string]*appsv1.ComponentDefinition{compDefName: newComponentDefinition()}
+		transCtx.shardings = []*appsv1.ClusterSharding{sharding}
+		transCtx.shardingComps = map[string][]*appsv1.ClusterComponentSpec{
+			shardingName: {{Name: "shard-0"}},
+		}
+		graphCli := model.NewGraphClient(transCtx.Client)
+		transCtx.Client = graphCli
+		dag := graph.NewDAG()
+		graphCli.Root(dag, transCtx.OrigCluster, transCtx.Cluster, model.ActionStatusPtr())
 
 		Expect(transformer.reconcileShardingAccount(transCtx, graphCli, dag, sharding, accountName)).Should(Succeed())
 		Expect(graphCli.FindMatchedVertex(dag, managed)).Should(BeNil())
+		Expect(transCtx.shardingComps[shardingName][0].SystemAccounts[0].SecretRefRevision).
+			Should(Equal("stable-revision"))
 	})
 
 	It("updates a mutable shared account secret when the source password rotates", func() {
@@ -557,37 +595,25 @@ var _ = Describe("cluster sharding shared transformers", func() {
 		Expect(updated.Data).Should(HaveKeyWithValue(constant.AccountPasswdForSecret, []byte("new-password")))
 		for _, comp := range transCtx.shardingComps[shardingName] {
 			Expect(comp.SystemAccounts[0].SecretRef.Name).Should(Equal(managed.Name))
-			Expect(transCtx.annotations[comp.Name]).Should(HaveKeyWithValue(
-				constant.SystemAccountSecretRevisionsAnnotationKey,
-				ContainSubstring("source-uid/42")))
+			Expect(comp.SystemAccounts[0].SecretRefRevision).ShouldNot(BeEmpty())
+			Expect(comp.SystemAccounts[0].SecretRefRevision).Should(Equal(
+				updated.Annotations[constant.SecretRevisionAnnotationKey]))
 		}
 	})
 
-	It("updates the managed Secret before notifying shard Components", func() {
+	It("uses a source-derived revision without password material", func() {
 		transformer, transCtx, graphCli, dag, sharding, managed :=
 			newSourceSecretReconcile([]byte("new-password"), []byte("old-password"), false)
 		Expect(transformer.reconcileShardingAccount(transCtx, graphCli, dag, sharding, accountName)).Should(Succeed())
-
-		comp := &appsv1.Component{ObjectMeta: metav1ObjectMeta(
-			constant.GenerateClusterComponentName(clusterName, "shard-0"), namespace)}
-		graphCli.Update(dag, comp, comp.DeepCopy())
-		dependOnShardingAccountSecrets(transCtx, dag)
-
-		order := make([]string, 0, 3)
-		Expect(dag.WalkReverseTopoOrder(func(vertex graph.Vertex) error {
-			objectVertex := vertex.(*model.ObjectVertex)
-			switch object := objectVertex.Obj.(type) {
-			case *corev1.Secret:
-				order = append(order, "secret:"+object.Name)
-			case *appsv1.Component:
-				order = append(order, "component:"+object.Name)
-			}
-			return nil
-		}, nil)).Should(Succeed())
-		Expect(order[:2]).Should(Equal([]string{
-			"secret:" + managed.Name,
-			"component:" + comp.Name,
-		}))
+		updated := graphCli.FindMatchedVertex(dag, managed).(*model.ObjectVertex).Obj.(*corev1.Secret)
+		revision := updated.Annotations[constant.SecretRevisionAnnotationKey]
+		Expect(revision).Should(Equal(sourceSecretRevision(&corev1.Secret{ObjectMeta: metav1.ObjectMeta{
+			UID: "source-uid", ResourceVersion: "42",
+		}}, constant.AccountPasswdForSecret)))
+		Expect(revision).ShouldNot(ContainSubstring("new-password"))
+		Expect(revision).ShouldNot(Equal(sourceSecretRevision(&corev1.Secret{ObjectMeta: metav1.ObjectMeta{
+			UID: "source-uid", ResourceVersion: "42",
+		}}, "alternate-password-key")))
 	})
 
 	It("preserves an empty password when the shared source secret rotates to empty", func() {
@@ -618,9 +644,9 @@ var _ = Describe("cluster sharding shared transformers", func() {
 		err := transformer.reconcileShardingAccount(transCtx, graphCli, dag, sharding, accountName)
 		Expect(intctrlutil.IsDelayedRequeueError(err)).Should(BeTrue())
 		Expect(graphCli.IsAction(dag, managed, model.ActionDeletePtr())).Should(BeTrue())
-		Expect(transCtx.shardingAccountSecretRevisions).Should(BeEmpty())
 		for _, comp := range transCtx.shardingComps[shardingName] {
 			Expect(comp.SystemAccounts[0].SecretRef.Name).Should(Equal(managed.Name))
+			Expect(comp.SystemAccounts[0].SecretRefRevision).ShouldNot(BeEmpty())
 		}
 	})
 
@@ -646,18 +672,19 @@ var _ = Describe("cluster sharding shared transformers", func() {
 			},
 		}
 
-		transformer.rewriteSystemAccount(transCtx, shardingName, accountName)
+		transformer.rewriteSystemAccount(transCtx, shardingName, accountName, "revision")
 		rewritten := transCtx.shardings[0].Template.SystemAccounts[0]
 		Expect(ptr.Deref(rewritten.Disabled, false)).Should(BeTrue())
 		Expect(rewritten.SecretRef.Name).Should(Equal(shardingAccountSecretName(clusterName, shardingName, accountName)))
 		Expect(rewritten.SecretRef.Namespace).Should(Equal(namespace))
 		Expect(rewritten.SecretRef.Password).Should(BeEmpty())
+		Expect(rewritten.SecretRefRevision).Should(Equal("revision"))
 		for _, comp := range transCtx.shardingComps[shardingName] {
 			Expect(comp.SystemAccounts).Should(HaveLen(1))
 			Expect(comp.SystemAccounts[0].SecretRef.Name).Should(Equal(rewritten.SecretRef.Name))
 		}
 
-		transformer.rewriteSystemAccount(transCtx, shardingName, "monitor")
+		transformer.rewriteSystemAccount(transCtx, shardingName, "monitor", "monitor-revision")
 		Expect(transCtx.shardings[0].Template.SystemAccounts).Should(HaveLen(2))
 		Expect(transCtx.shardings[0].Template.SystemAccounts[1].Name).Should(Equal("monitor"))
 		Expect(ptr.Deref(transCtx.shardings[0].Template.SystemAccounts[1].Disabled, true)).Should(BeFalse())
@@ -670,6 +697,7 @@ var _ = Describe("cluster sharding shared transformers", func() {
 		existing.Labels = constant.GetClusterLabels(clusterName, map[string]string{
 			constant.KBAppShardingNameLabelKey: shardingName,
 		})
+		existing.Annotations = map[string]string{constant.SecretRevisionAnnotationKey: "stable-revision"}
 		transCtx := newTransformContext(existing)
 		transCtx.componentDefs = map[string]*appsv1.ComponentDefinition{compDefName: newComponentDefinition()}
 		transCtx.shardings = []*appsv1.ClusterSharding{

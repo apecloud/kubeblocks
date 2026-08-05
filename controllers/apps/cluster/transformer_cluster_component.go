@@ -71,9 +71,7 @@ func (t *clusterComponentTransformer) Transform(ctx graph.TransformContext, dag 
 		return nil
 	}
 
-	err = t.transform(transCtx, dag)
-	dependOnShardingAccountSecrets(transCtx, dag)
-	return err
+	return t.transform(transCtx, dag)
 }
 
 func (t *clusterComponentTransformer) transform(transCtx *clusterTransformContext, dag *graph.DAG) error {
@@ -182,13 +180,47 @@ func checkAllCompsUpToDate(transCtx *clusterTransformContext, cluster *appsv1.Cl
 		if comp.Generation != comp.Status.ObservedGeneration || generation != strconv.FormatInt(cluster.Generation, 10) {
 			return false, nil
 		}
-		for key, value := range transCtx.annotations[comp.Labels[constant.KBAppComponentLabelKey]] {
-			if runningValue, ok := comp.Annotations[key]; !ok || runningValue != value {
-				return false, nil
-			}
+		desired := findClusterComponentSpec(transCtx, comp.Labels[constant.KBAppComponentLabelKey])
+		if desired != nil && !systemAccountRevisionsMatch(desired.SystemAccounts, comp.Spec.SystemAccounts) {
+			return false, nil
 		}
 	}
 	return true, nil
+}
+
+func findClusterComponentSpec(transCtx *clusterTransformContext, name string) *appsv1.ClusterComponentSpec {
+	for _, comp := range transCtx.components {
+		if comp.Name == name {
+			return comp
+		}
+	}
+	for _, comps := range transCtx.shardingComps {
+		for _, comp := range comps {
+			if comp.Name == name {
+				return comp
+			}
+		}
+	}
+	return nil
+}
+
+func systemAccountRevisionsMatch(desired, running []appsv1.ComponentSystemAccount) bool {
+	for _, desiredAccount := range desired {
+		if desiredAccount.SecretRefRevision == "" {
+			continue
+		}
+		matched := false
+		for _, runningAccount := range running {
+			if runningAccount.Name == desiredAccount.Name {
+				matched = runningAccount.SecretRefRevision == desiredAccount.SecretRefRevision
+				break
+			}
+		}
+		if !matched {
+			return false
+		}
+	}
+	return true
 }
 
 // copyAndMergeComponent merges two component objects for updating:
@@ -998,9 +1030,6 @@ func (h *clusterShardingHandler) buildLabels(sharding *appsv1.ClusterSharding, s
 
 func (h *clusterShardingHandler) buildAnnotations(transCtx *clusterTransformContext, shardingName, compName string) map[string]string {
 	var annotations map[string]string
-	if compAnnotations := transCtx.annotations[compName]; len(compAnnotations) > 0 {
-		annotations = maps.Clone(compAnnotations)
-	}
 
 	// convert the sharding hostNetwork annotation to the component annotation
 	if hnKey, ok := transCtx.Cluster.Annotations[constant.HostNetworkAnnotationKey]; ok {

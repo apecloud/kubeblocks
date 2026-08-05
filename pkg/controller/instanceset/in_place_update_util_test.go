@@ -155,13 +155,19 @@ var _ = Describe("instance util test", func() {
 			newPod := oldPod.DeepCopy()
 			newPod.Spec.Containers[1].Image = "mirror.local/apecloud/kubeblocks-tools:1.1.0"
 			newPod.Spec.InitContainers[0].Image = "mirror.local/apecloud/kubeblocks-tools:1.1.0"
-
+			oldPod.Spec.InitContainers[0].TerminationMessagePath = corev1.TerminationMessagePathDefault
+			oldPod.Spec.Containers[1].VolumeMounts = []corev1.VolumeMount{{
+				Name:      "kube-api-access",
+				MountPath: "/var/run/secrets/kubernetes.io/serviceaccount",
+				ReadOnly:  true,
+			}}
 			its := builder.NewInstanceSetBuilder(namespace, name).
 				SetPodUpdatePolicy(kbappsv1.ReCreatePodUpdatePolicyType).
 				SetPodUpgradePolicy(kbappsv1.ReCreatePodUpdatePolicyType).
 				GetObject()
 
 			Expect(getPodUpdatePolicyInSpec(its, oldPod, newPod)).Should(Equal(kbappsv1.PreferInPlacePodUpdatePolicyType))
+			Expect(safeKBManagedImageOnlyInPlaceUpdate(oldPod, newPod)).Should(BeTrue())
 
 			strictInPlaceITS := builder.NewInstanceSetBuilder(namespace, name).
 				SetPodUpdatePolicy(kbappsv1.ReCreatePodUpdatePolicyType).

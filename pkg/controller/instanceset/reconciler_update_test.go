@@ -563,6 +563,12 @@ var _ = Describe("update reconciler test", func() {
 			its.Spec.Replicas = ptr.To[int32](1)
 			its.Spec.PodUpdatePolicy = kbappsv1.ReCreatePodUpdatePolicyType
 			its.Spec.PodUpgradePolicy = kbappsv1.ReCreatePodUpdatePolicyType
+			its.Spec.Template.Spec.ServiceAccountName = "current-sa"
+			its.Spec.Template.Spec.InitContainers = append(its.Spec.Template.Spec.InitContainers, corev1.Container{
+				Name:    "init-kbagent",
+				Image:   "docker.io/apecloud/kubeblocks-tools:1.0.0",
+				Command: []string{"cp"},
+			})
 			its.Spec.Template.Spec.Containers = append(its.Spec.Template.Spec.Containers, corev1.Container{
 				Name:    "kbagent",
 				Image:   "docker.io/apecloud/kubeblocks-tools:1.0.0",
@@ -581,13 +587,48 @@ var _ = Describe("update reconciler test", func() {
 			pods := tree.List(&corev1.Pod{})
 			Expect(pods).Should(HaveLen(1))
 			pod := pods[0].(*corev1.Pod)
+			pod.UID = "live-pod-uid"
+			pod.Spec.AutomountServiceAccountToken = ptr.To(true)
+			pod.Spec.Volumes = append(pod.Spec.Volumes, corev1.Volume{
+				Name: "kube-api-access",
+				VolumeSource: corev1.VolumeSource{Projected: &corev1.ProjectedVolumeSource{
+					Sources: []corev1.VolumeProjection{{ServiceAccountToken: &corev1.ServiceAccountTokenProjection{
+						Path: "token",
+					}}},
+				}},
+			})
+			for i := range pod.Spec.InitContainers {
+				if pod.Spec.InitContainers[i].Name == "init-kbagent" {
+					pod.Spec.InitContainers[i].ImagePullPolicy = corev1.PullIfNotPresent
+					pod.Spec.InitContainers[i].TerminationMessagePath = corev1.TerminationMessagePathDefault
+				}
+			}
+			for i := range pod.Spec.Containers {
+				if pod.Spec.Containers[i].Name == "kbagent" {
+					pod.Spec.Containers[i].Env = []corev1.EnvVar{{Name: "ADMISSION_INJECTED", Value: "true"}}
+					pod.Spec.Containers[i].VolumeMounts = []corev1.VolumeMount{{
+						Name:      "kube-api-access",
+						MountPath: "/var/run/secrets/kubernetes.io/serviceaccount",
+						ReadOnly:  true,
+					}}
+				}
+			}
 			pod.Status.Phase = corev1.PodRunning
 			pod.Status.Conditions = append(pod.Status.Conditions, corev1.PodCondition{
 				Type:               corev1.PodReady,
 				Status:             corev1.ConditionTrue,
 				LastTransitionTime: metav1.NewTime(time.Now().Add(-1 * minReadySeconds * time.Second)),
 			})
+			if its.Annotations == nil {
+				its.Annotations = map[string]string{}
+			}
+			its.Annotations[constant.ProposedServiceAccountNameAnnotationKey] = "proposed-sa"
 
+			for i := range its.Spec.Template.Spec.InitContainers {
+				if its.Spec.Template.Spec.InitContainers[i].Name == "init-kbagent" {
+					its.Spec.Template.Spec.InitContainers[i].Image = "mirror.local/apecloud/kubeblocks-tools:1.1.0"
+				}
+			}
 			for i := range its.Spec.Template.Spec.Containers {
 				if its.Spec.Template.Spec.Containers[i].Name == "kbagent" {
 					its.Spec.Template.Spec.Containers[i].Image = "mirror.local/apecloud/kubeblocks-tools:1.1.0"
@@ -603,9 +644,20 @@ var _ = Describe("update reconciler test", func() {
 			Expect(postPods).Should(HaveLen(1),
 				"pod should be in-place updated, not deleted/recreated")
 			updatedPod := postPods[0].(*corev1.Pod)
+			Expect(updatedPod.UID).Should(Equal(pod.UID), "an image-only update must preserve Pod identity")
+			Expect(updatedPod.Spec.ServiceAccountName).Should(Equal("current-sa"),
+				"the proposed immutable service account must not be applied by the image patch")
+			Expect(updatedPod.Spec.AutomountServiceAccountToken).Should(Equal(ptr.To(true)))
+			Expect(updatedPod.Spec.Volumes).Should(ContainElement(HaveField("Name", "kube-api-access")))
+			_, updatedInitKBAgent := intctrlutil.GetContainerByName(updatedPod.Spec.InitContainers, "init-kbagent")
+			Expect(updatedInitKBAgent).ShouldNot(BeNil())
+			Expect(updatedInitKBAgent.Image).Should(Equal("mirror.local/apecloud/kubeblocks-tools:1.1.0"))
+			Expect(updatedInitKBAgent.ImagePullPolicy).Should(Equal(corev1.PullIfNotPresent))
 			_, updatedKBAgent := intctrlutil.GetContainerByName(updatedPod.Spec.Containers, "kbagent")
 			Expect(updatedKBAgent).ShouldNot(BeNil())
 			Expect(updatedKBAgent.Image).Should(Equal("mirror.local/apecloud/kubeblocks-tools:1.1.0"))
+			Expect(updatedKBAgent.Env).Should(ContainElement(corev1.EnvVar{Name: "ADMISSION_INJECTED", Value: "true"}))
+			Expect(updatedKBAgent.VolumeMounts).Should(ContainElement(HaveField("Name", "kube-api-access")))
 			_, option, err := tree.GetWithOption(updatedPod)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(option.Patch).Should(BeTrue(),
@@ -613,6 +665,61 @@ var _ = Describe("update reconciler test", func() {
 			Expect(spy.switchoverCalls).Should(Equal(0),
 				"switchover must not be invoked when only KB-managed tools images differ")
 		})
+
+		DescribeTable("keeps recreation policy for revision and application image changes",
+			func(mutateTemplate func(*workloads.InstanceSet)) {
+				oldToolsImage := viper.GetString(constant.KBToolsImage)
+				defer viper.Set(constant.KBToolsImage, oldToolsImage)
+				viper.Set(constant.KBToolsImage, "docker.io/apecloud/kubeblocks-tools:1.0.0")
+
+				its.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
+				its.Spec.Replicas = ptr.To[int32](1)
+				its.Spec.PodUpdatePolicy = kbappsv1.ReCreatePodUpdatePolicyType
+				its.Spec.PodUpgradePolicy = kbappsv1.ReCreatePodUpdatePolicyType
+				its.Spec.Template.Spec.Containers = append(its.Spec.Template.Spec.Containers, corev1.Container{
+					Name:    "kbagent",
+					Image:   "docker.io/apecloud/kubeblocks-tools:1.0.0",
+					Command: []string{"/bin/kbagent"},
+				})
+
+				tree := kubebuilderx.NewObjectTree()
+				tree.SetRoot(its)
+				prepareForUpdate(tree)
+				mutateTemplate(its)
+
+				res, err := NewRevisionUpdateReconciler().Reconcile(tree)
+				Expect(err).Should(BeNil())
+				Expect(res).Should(Equal(kubebuilderx.Continue))
+
+				pod := tree.List(&corev1.Pod{})[0].(*corev1.Pod)
+				pod.Status.Phase = corev1.PodRunning
+				pod.Status.Conditions = append(pod.Status.Conditions, corev1.PodCondition{
+					Type:               corev1.PodReady,
+					Status:             corev1.ConditionTrue,
+					LastTransitionTime: metav1.NewTime(time.Now().Add(-1 * minReadySeconds * time.Second)),
+				})
+
+				res, err = NewUpdateReconciler().Reconcile(tree)
+				Expect(err).Should(BeNil())
+				Expect(res).Should(Equal(kubebuilderx.Continue))
+				Expect(tree.List(&corev1.Pod{})).Should(BeEmpty(), "the Pod must be recreated, not patched")
+			},
+			Entry("non-image template changes despite a simultaneous tools image update", func(its *workloads.InstanceSet) {
+				for i := range its.Spec.Template.Spec.Containers {
+					if its.Spec.Template.Spec.Containers[i].Name == "kbagent" {
+						its.Spec.Template.Spec.Containers[i].Image = "mirror.local/apecloud/kubeblocks-tools:1.1.0"
+						its.Spec.Template.Spec.Containers[i].Env = []corev1.EnvVar{{Name: "TEMPLATE_CHANGE", Value: "true"}}
+					}
+				}
+			}),
+			Entry("application image changes", func(its *workloads.InstanceSet) {
+				its.Spec.Template.Spec.Containers[0].Image = "example.com/application:new"
+			}),
+			Entry("a template-owned container is removed while tools images change", func(its *workloads.InstanceSet) {
+				its.Spec.Template.Spec.Containers = its.Spec.Template.Spec.Containers[1:]
+				its.Spec.Template.Spec.Containers[0].Image = "mirror.local/apecloud/kubeblocks-tools:1.1.0"
+			}),
+		)
 	})
 })
 

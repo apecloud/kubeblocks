@@ -4394,6 +4394,11 @@ spec:
                         required:
                         - name
                         type: object
+                        x-kubernetes-validations:
+                        - message: secretRef must be specified when secretRefRevision
+                            is non-empty
+                          rule: '!has(self.secretRefRevision) || self.secretRefRevision
+                            == '''' || has(self.secretRef)'
                       type: array
                     tls:
                       description: |-
@@ -15612,6 +15617,11 @@ spec:
                             required:
                             - name
                             type: object
+                            x-kubernetes-validations:
+                            - message: secretRef must be specified when secretRefRevision
+                                is non-empty
+                              rule: '!has(self.secretRefRevision) || self.secretRefRevision
+                                == '''' || has(self.secretRef)'
                           type: array
                         tls:
                           description: |-

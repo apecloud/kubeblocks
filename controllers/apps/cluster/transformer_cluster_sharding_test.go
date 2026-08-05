@@ -261,6 +261,60 @@ var _ = Describe("cluster sharding shared transformers", func() {
 		Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountPasswdForSecret, []byte("password")))
 	})
 
+	It("keeps built-in labels authoritative over shared account metadata", func() {
+		transformer := &clusterShardingAccountTransformer{}
+		sharding := newSharding()
+		sharding.Template.Labels = map[string]string{
+			"precedence":                       "dynamic",
+			constant.AppManagedByLabelKey:      "dynamic-managed-by",
+			constant.AppInstanceLabelKey:       "dynamic-cluster",
+			constant.KBAppShardingNameLabelKey: "dynamic-sharding",
+			constant.SystemAccountLabelKey:     "dynamic-account",
+		}
+		compDef := newComponentDefinition()
+		compDef.Spec.Labels = map[string]string{
+			"precedence":                       "static",
+			constant.AppManagedByLabelKey:      "static-managed-by",
+			constant.AppInstanceLabelKey:       "static-cluster",
+			constant.KBAppShardingNameLabelKey: "static-sharding",
+			constant.SystemAccountLabelKey:     "static-account",
+		}
+		transCtx := newTransformContext()
+		transCtx.componentDefs = map[string]*appsv1.ComponentDefinition{compDefName: compDef}
+
+		secret, err := transformer.newAccountSecretWithPassword(transCtx, sharding, accountName, []byte("password"))
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(secret.Labels).Should(HaveKeyWithValue("precedence", "dynamic"))
+		Expect(secret.Labels).Should(HaveKeyWithValue(constant.AppManagedByLabelKey, constant.AppName))
+		Expect(secret.Labels).Should(HaveKeyWithValue(constant.AppInstanceLabelKey, clusterName))
+		Expect(secret.Labels).Should(HaveKeyWithValue(constant.KBAppShardingNameLabelKey, shardingName))
+		Expect(secret.Labels).Should(HaveKeyWithValue(constant.SystemAccountLabelKey, accountName))
+	})
+
+	It("recognizes a created shared account Secret on the next reconcile", func() {
+		transformer := &clusterShardingAccountTransformer{}
+		sharding := newSharding()
+		sharding.Template.Labels = map[string]string{
+			constant.AppInstanceLabelKey:       "user-cluster",
+			constant.KBAppShardingNameLabelKey: "user-sharding",
+			constant.SystemAccountLabelKey:     "user-account",
+		}
+		compDef := newComponentDefinition()
+		compDef.Spec.Labels = map[string]string{
+			constant.AppInstanceLabelKey:       "definition-cluster",
+			constant.KBAppShardingNameLabelKey: "definition-sharding",
+			constant.SystemAccountLabelKey:     "definition-account",
+		}
+		createCtx := newTransformContext()
+		createCtx.componentDefs = map[string]*appsv1.ComponentDefinition{compDefName: compDef}
+		created, err := transformer.newAccountSecretWithPassword(createCtx, sharding, accountName, []byte("password"))
+		Expect(err).ShouldNot(HaveOccurred())
+		found, err := transformer.getSystemAccountSecret(newTransformContext(created), sharding, accountName)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(found).ShouldNot(BeNil())
+		Expect(found.Name).Should(Equal(created.Name))
+	})
+
 	It("generates shared system account secrets from component definitions", func() {
 		transformer := &clusterShardingAccountTransformer{}
 		sharding := newSharding()

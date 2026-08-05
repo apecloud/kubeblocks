@@ -503,6 +503,49 @@ var _ = Describe("cluster component transformer test", func() {
 		return newCompObj(transCtx, specs[0], setters...)
 	}
 
+	Context("component up-to-date check", func() {
+		const desiredRevision = `{"admin":"default/source@uid/2#password"}`
+
+		checkWithAnnotation := func(runningAnnotation *string) bool {
+			_, transCtx, _ := newTransformerNCtx(clusterTopologyDefault)
+			transCtx.annotations = map[string]map[string]string{
+				comp1aName: {
+					constant.SystemAccountSecretRevisionsAnnotationKey: desiredRevision,
+				},
+			}
+
+			objects := make([]client.Object, 0, len(transCtx.components))
+			for _, compSpec := range transCtx.components {
+				comp := newCompObj(transCtx, compSpec, func(comp *appsv1.Component) {
+					comp.Status.ObservedGeneration = comp.Generation
+				})
+				if compSpec.Name == comp1aName && runningAnnotation != nil {
+					comp.Annotations[constant.SystemAccountSecretRevisionsAnnotationKey] = *runningAnnotation
+				}
+				objects = append(objects, comp)
+			}
+			transCtx.Client = &appsutil.MockReader{Objects: objects}
+
+			upToDate, err := checkAllCompsUpToDate(transCtx, transCtx.Cluster)
+			Expect(err).ShouldNot(HaveOccurred())
+			return upToDate
+		}
+
+		It("is not up-to-date when an injected annotation is missing", func() {
+			Expect(checkWithAnnotation(nil)).Should(BeFalse())
+		})
+
+		It("is not up-to-date when an injected annotation differs", func() {
+			mismatchedRevision := `{"admin":"default/source@uid/1#password"}`
+			Expect(checkWithAnnotation(&mismatchedRevision)).Should(BeFalse())
+		})
+
+		It("is up-to-date when injected annotations match", func() {
+			matchingRevision := desiredRevision
+			Expect(checkWithAnnotation(&matchingRevision)).Should(BeTrue())
+		})
+	})
+
 	Context("component orders", func() {
 		It("w/o orders", func() {
 			transformer, transCtx, dag := newTransformerNCtx(clusterTopologyNoOrders)

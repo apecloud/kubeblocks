@@ -67,7 +67,7 @@ func (t *clusterComponentTransformer) Transform(ctx graph.TransformContext, dag 
 	}
 
 	// if the cluster is not updating and all components are up-to-date, skip the reconciliation
-	if !transCtx.OrigCluster.IsUpdating() && updateToDate && len(transCtx.shardingAccountSecretRevisions) == 0 {
+	if !transCtx.OrigCluster.IsUpdating() && updateToDate {
 		return nil
 	}
 
@@ -181,6 +181,11 @@ func checkAllCompsUpToDate(transCtx *clusterTransformContext, cluster *appsv1.Cl
 		}
 		if comp.Generation != comp.Status.ObservedGeneration || generation != strconv.FormatInt(cluster.Generation, 10) {
 			return false, nil
+		}
+		for key, value := range transCtx.annotations[comp.Labels[constant.KBAppComponentLabelKey]] {
+			if runningValue, ok := comp.Annotations[key]; !ok || runningValue != value {
+				return false, nil
+			}
 		}
 	}
 	return true, nil

@@ -44,7 +44,6 @@ import (
 )
 
 const (
-	systemAccountLabel          = constant.SystemAccountLabelKey
 	systemAccountHashAnnotation = "apps.kubeblocks.io/system-account-hash"
 )
 
@@ -242,7 +241,7 @@ func (t *componentAccountTransformer) buildAccountSecretWithPassword(ctx *compon
 		AddLabelsInMap(synthesizedComp.StaticLabels).
 		AddLabelsInMap(synthesizedComp.DynamicLabels).
 		AddLabelsInMap(constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name)).
-		AddLabels(systemAccountLabel, account.Name).
+		AddLabels(constant.SystemAccountLabelKey, account.Name).
 		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
 		AddAnnotationsInMap(synthesizedComp.DynamicAnnotations).
 		PutData(constant.AccountNameForSecret, []byte(account.Name)).
@@ -268,7 +267,7 @@ func listSystemAccountObjects(ctx graph.TransformContext,
 
 	m := make(map[string]*corev1.Secret)
 	for i, secret := range secretList.Items {
-		if accountName, ok := secret.Labels[systemAccountLabel]; ok {
+		if accountName, ok := secret.Labels[constant.SystemAccountLabelKey]; ok {
 			m[accountName] = &secretList.Items[i]
 		}
 	}

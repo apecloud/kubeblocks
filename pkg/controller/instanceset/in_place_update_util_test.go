@@ -140,6 +140,59 @@ var _ = Describe("instance util test", func() {
 		})
 	})
 
+	Context("KB-managed tools image update", func() {
+		It("ignores live-only admission state and keeps other upgrade changes strict", func() {
+			oldToolsImage := viper.GetString(constant.KBToolsImage)
+			defer viper.Set(constant.KBToolsImage, oldToolsImage)
+			viper.Set(constant.KBToolsImage, "docker.io/apecloud/kubeblocks-tools:1.0.0")
+
+			oldPod := &corev1.Pod{Spec: corev1.PodSpec{
+				InitContainers: []corev1.Container{{
+					Name: "init-kbagent", Image: "docker.io/apecloud/kubeblocks-tools:1.0.0", Command: []string{"cp"},
+				}},
+				Containers: []corev1.Container{
+					{Name: "app", Image: "docker.io/apecloud/redis:7.2"},
+					{Name: "kbagent", Image: "docker.io/apecloud/kubeblocks-tools:1.0.0", Command: []string{"/bin/kbagent"}},
+				},
+			}}
+			newPod := oldPod.DeepCopy()
+			newPod.Spec.InitContainers[0].Image = "mirror.local/apecloud/kubeblocks-tools:1.1.0"
+			newPod.Spec.Containers[1].Image = "mirror.local/apecloud/kubeblocks-tools:1.1.0"
+			oldPod.Spec.InitContainers[0].TerminationMessagePath = corev1.TerminationMessagePathDefault
+			oldPod.Spec.Containers[1].Env = []corev1.EnvVar{{Name: "ADMISSION_INJECTED", Value: "true"}}
+			oldPod.Spec.Containers[1].VolumeMounts = []corev1.VolumeMount{{
+				Name:      "kube-api-access",
+				MountPath: "/var/run/secrets/kubernetes.io/serviceaccount",
+				ReadOnly:  true,
+			}}
+			oldPod.Spec.Containers = append(oldPod.Spec.Containers, corev1.Container{
+				Name: "injected-sidecar", Image: "example.com/mesh-sidecar:1.0",
+			})
+
+			its := builder.NewInstanceSetBuilder(namespace, name).
+				SetPodUpdatePolicy(kbappsv1.ReCreatePodUpdatePolicyType).
+				SetPodUpgradePolicy(kbappsv1.ReCreatePodUpdatePolicyType).
+				GetObject()
+			Expect(getPodUpdatePolicyInSpec(its, oldPod, newPod)).Should(Equal(kbappsv1.PreferInPlacePodUpdatePolicyType))
+			Expect(safeKBManagedImageOnlyInPlaceUpdate(oldPod, newPod)).Should(BeTrue())
+
+			strictInPlaceITS := builder.NewInstanceSetBuilder(namespace, name).
+				SetPodUpdatePolicy(kbappsv1.ReCreatePodUpdatePolicyType).
+				SetPodUpgradePolicy(kbappsv1.StrictInPlacePodUpdatePolicyType).
+				GetObject()
+			Expect(getPodUpdatePolicyInSpec(strictInPlaceITS, oldPod, newPod)).Should(Equal(kbappsv1.StrictInPlacePodUpdatePolicyType))
+
+			labelChangedPod := newPod.DeepCopy()
+			labelChangedPod.Labels = map[string]string{"extra": "true"}
+			Expect(getPodUpdatePolicyInSpec(its, oldPod, labelChangedPod)).Should(Equal(kbappsv1.ReCreatePodUpdatePolicyType))
+			Expect(safeKBManagedImageOnlyInPlaceUpdate(oldPod, labelChangedPod)).Should(BeFalse())
+
+			appChangedPod := newPod.DeepCopy()
+			appChangedPod.Spec.Containers[0].Image = "docker.io/apecloud/redis:7.4"
+			Expect(getPodUpdatePolicyInSpec(its, oldPod, appChangedPod)).Should(Equal(kbappsv1.ReCreatePodUpdatePolicyType))
+		})
+	})
+
 	Context("getPodUpdatePolicy", func() {
 		It("should work well", func() {
 			By("build an updated pod")

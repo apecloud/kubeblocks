@@ -51,7 +51,6 @@ require (
 	k8s.io/api v0.29.14
 	k8s.io/apiextensions-apiserver v0.29.14
 	k8s.io/apimachinery v0.29.14
-	k8s.io/apiserver v0.29.14
 	k8s.io/client-go v0.29.14
 	k8s.io/code-generator v0.29.14
 	k8s.io/component-helpers v0.29.14
@@ -154,6 +153,7 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260414002931-afd174a4e478 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
+	k8s.io/apiserver v0.29.14 // indirect
 	k8s.io/cli-runtime v0.29.14 // indirect
 	k8s.io/component-base v0.29.14 // indirect
 	k8s.io/gengo v0.0.0-20250604051438-85fd79dbfd9f // indirect

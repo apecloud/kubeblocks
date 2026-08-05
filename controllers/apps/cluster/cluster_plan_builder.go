@@ -63,12 +63,7 @@ type clusterTransformContext struct {
 	shardingComps        map[string][]*appsv1.ClusterComponentSpec // comp specs for each sharding
 	shardingCompsWithTpl map[string]map[string][]*appsv1.ClusterComponentSpec
 
-	// TODO: remove this, annotations to be added to components for sharding, mapping with @allComps.
-	annotations map[string]map[string]string
-
-	// system account source revisions and their managed Secret dependencies, keyed by component name.
-	shardingAccountSecretRevisions    map[string]map[string]string
-	shardingAccountSecretDependencies map[string]map[client.ObjectKey]struct{}
+	restoreAnnotations map[string]map[string]string
 }
 
 // clusterPlanBuilder a graph.PlanBuilder implementation for Cluster reconciliation

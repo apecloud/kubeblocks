@@ -424,13 +424,24 @@ type ComponentSystemAccount struct {
 	// For user-specified passwords, the maximum length is limited to 64 bytes.
 	//
 	// Updates to the referenced Secret do not automatically trigger reconciliation.
-	// To apply updated credentials immediately, update the `kubeblocks.io/reconcile` annotation
-	// on the Component, or on the Cluster when the account is shared by a sharding.
+	// When SecretRefRevision is not used, apply updated credentials immediately by updating
+	// the `kubeblocks.io/reconcile` annotation on the Component, or on the Cluster when the
+	// account is shared by a sharding.
 	//
 	// This field is immutable once set.
 	//
 	// +optional
 	SecretRef *ProvisionSecretRef `json:"secretRef,omitempty"`
+
+	// Specifies the expected revision of the referenced Secret.
+	//
+	// To use this mechanism, set the `apps.kubeblocks.io/secret-revision` annotation
+	// on the referenced Secret and set this field to the same value. Account
+	// reconciliation waits until both revisions match. The value is treated as an
+	// opaque token and is not parsed by KubeBlocks.
+	//
+	// +optional
+	SecretRefRevision string `json:"secretRefRevision,omitempty"`
 }
 
 // PasswordConfig helps provide to customize complexity of password generation pattern.

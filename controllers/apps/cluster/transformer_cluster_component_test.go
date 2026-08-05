@@ -504,14 +504,16 @@ var _ = Describe("cluster component transformer test", func() {
 	}
 
 	Context("component up-to-date check", func() {
-		const desiredRevision = `{"admin":"default/source@uid/2#password"}`
+		const desiredRevision = "desired-revision"
 
-		checkWithAnnotation := func(runningAnnotation *string) bool {
+		checkWithRevision := func(runningRevision *string) bool {
 			_, transCtx, _ := newTransformerNCtx(clusterTopologyDefault)
-			transCtx.annotations = map[string]map[string]string{
-				comp1aName: {
-					constant.SystemAccountSecretRevisionsAnnotationKey: desiredRevision,
-				},
+			for _, compSpec := range transCtx.components {
+				if compSpec.Name == comp1aName {
+					compSpec.SystemAccounts = []appsv1.ComponentSystemAccount{{
+						Name: "admin", SecretRefRevision: desiredRevision,
+					}}
+				}
 			}
 
 			objects := make([]client.Object, 0, len(transCtx.components))
@@ -519,8 +521,13 @@ var _ = Describe("cluster component transformer test", func() {
 				comp := newCompObj(transCtx, compSpec, func(comp *appsv1.Component) {
 					comp.Status.ObservedGeneration = comp.Generation
 				})
-				if compSpec.Name == comp1aName && runningAnnotation != nil {
-					comp.Annotations[constant.SystemAccountSecretRevisionsAnnotationKey] = *runningAnnotation
+				if compSpec.Name == comp1aName {
+					comp.Spec.SystemAccounts = nil
+					if runningRevision != nil {
+						comp.Spec.SystemAccounts = []appsv1.ComponentSystemAccount{{
+							Name: "admin", SecretRefRevision: *runningRevision,
+						}}
+					}
 				}
 				objects = append(objects, comp)
 			}
@@ -531,18 +538,24 @@ var _ = Describe("cluster component transformer test", func() {
 			return upToDate
 		}
 
-		It("is not up-to-date when an injected annotation is missing", func() {
-			Expect(checkWithAnnotation(nil)).Should(BeFalse())
+		It("is not up-to-date when an account revision is missing", func() {
+			Expect(checkWithRevision(nil)).Should(BeFalse())
 		})
 
-		It("is not up-to-date when an injected annotation differs", func() {
-			mismatchedRevision := `{"admin":"default/source@uid/1#password"}`
-			Expect(checkWithAnnotation(&mismatchedRevision)).Should(BeFalse())
+		It("is not up-to-date when an account revision differs", func() {
+			mismatchedRevision := "stale-revision"
+			Expect(checkWithRevision(&mismatchedRevision)).Should(BeFalse())
 		})
 
-		It("is up-to-date when injected annotations match", func() {
+		It("is up-to-date when account revisions match by name", func() {
 			matchingRevision := desiredRevision
-			Expect(checkWithAnnotation(&matchingRevision)).Should(BeTrue())
+			Expect(checkWithRevision(&matchingRevision)).Should(BeTrue())
+			Expect(systemAccountRevisionsMatch(
+				[]appsv1.ComponentSystemAccount{{Name: "admin", SecretRefRevision: desiredRevision}},
+				[]appsv1.ComponentSystemAccount{
+					{Name: "monitor", SecretRefRevision: "unrelated"},
+					{Name: "admin", SecretRefRevision: desiredRevision},
+				})).Should(BeTrue())
 		})
 	})
 

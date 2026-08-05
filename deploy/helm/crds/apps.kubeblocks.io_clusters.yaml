@@ -4397,8 +4397,8 @@ spec:
                         x-kubernetes-validations:
                         - message: secretRef must be specified when secretRefRevision
                             is non-empty
-                          rule: '!has(self.secretRefRevision) || self.secretRefRevision
-                            == '''' || has(self.secretRef)'
+                          rule: '!has(self.secretRefRevision) || size(self.secretRefRevision)
+                            == 0 || has(self.secretRef)'
                       type: array
                     tls:
                       description: |-
@@ -15620,8 +15620,8 @@ spec:
                             x-kubernetes-validations:
                             - message: secretRef must be specified when secretRefRevision
                                 is non-empty
-                              rule: '!has(self.secretRefRevision) || self.secretRefRevision
-                                == '''' || has(self.secretRef)'
+                              rule: '!has(self.secretRefRevision) || size(self.secretRefRevision)
+                                == 0 || has(self.secretRef)'
                           type: array
                         tls:
                           description: |-

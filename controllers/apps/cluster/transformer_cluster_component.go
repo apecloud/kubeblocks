@@ -180,47 +180,8 @@ func checkAllCompsUpToDate(transCtx *clusterTransformContext, cluster *appsv1.Cl
 		if comp.Generation != comp.Status.ObservedGeneration || generation != strconv.FormatInt(cluster.Generation, 10) {
 			return false, nil
 		}
-		desired := findClusterComponentSpec(transCtx, comp.Labels[constant.KBAppComponentLabelKey])
-		if desired != nil && !systemAccountRevisionsMatch(desired.SystemAccounts, comp.Spec.SystemAccounts) {
-			return false, nil
-		}
 	}
 	return true, nil
-}
-
-func findClusterComponentSpec(transCtx *clusterTransformContext, name string) *appsv1.ClusterComponentSpec {
-	for _, comp := range transCtx.components {
-		if comp.Name == name {
-			return comp
-		}
-	}
-	for _, comps := range transCtx.shardingComps {
-		for _, comp := range comps {
-			if comp.Name == name {
-				return comp
-			}
-		}
-	}
-	return nil
-}
-
-func systemAccountRevisionsMatch(desired, running []appsv1.ComponentSystemAccount) bool {
-	for _, desiredAccount := range desired {
-		if desiredAccount.SecretRefRevision == "" {
-			continue
-		}
-		matched := false
-		for _, runningAccount := range running {
-			if runningAccount.Name == desiredAccount.Name {
-				matched = runningAccount.SecretRefRevision == desiredAccount.SecretRefRevision
-				break
-			}
-		}
-		if !matched {
-			return false
-		}
-	}
-	return true
 }
 
 // copyAndMergeComponent merges two component objects for updating:

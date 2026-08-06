@@ -5050,9 +5050,8 @@ spec:
                         For user-specified passwords, the maximum length is limited to 64 bytes.
 
                         Updates to the referenced Secret do not automatically trigger reconciliation.
-                        When SecretRefRevision is not used, apply updated credentials immediately by updating
-                        the `kubeblocks.io/reconcile` annotation on the Component, or on the Cluster when the
-                        account is shared by a sharding.
+                        To apply updated credentials, update the referenced Secret first and then change
+                        SecretRefRevision to a new value.
 
                         This field is immutable once set.
                       properties:
@@ -5075,12 +5074,13 @@ spec:
                       type: object
                     secretRefRevision:
                       description: |-
-                        Specifies the expected revision of the referenced Secret.
+                        Specifies an opaque revision that triggers reconciliation of the referenced Secret.
 
-                        To use this mechanism, set the `apps.kubeblocks.io/secret-revision` annotation
-                        on the referenced Secret and set this field to the same value. Account
-                        reconciliation waits until both revisions match. The value is treated as an
-                        opaque token and is not parsed by KubeBlocks.
+                        After updating a user-provided Secret, change this field to any new value to apply
+                        the updated credentials. KubeBlocks-managed Secrets carry the same revision in the
+                        `apps.kubeblocks.io/secret-revision` annotation; when that annotation is present,
+                        account reconciliation waits until it matches this field. Users are not required to
+                        add this annotation to user-provided Secrets. The value is treated as an opaque token.
                       type: string
                   required:
                   - name

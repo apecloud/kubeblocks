@@ -24,7 +24,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -95,15 +94,6 @@ func (t *clusterShardingAccountTransformer) reconcileShardingAccount(transCtx *c
 	if running == nil {
 		obj, err := t.newSystemAccountSecret(transCtx, sharding, accountName)
 		if err != nil {
-			if intctrlutil.IsDelayedRequeueError(err) {
-				account, resolveErr := t.definedSystemAccount(transCtx, sharding, accountName)
-				if resolveErr != nil {
-					return resolveErr
-				}
-				// Keep the generated Components on the managed Secret while its source is pending. The source
-				// revision is only a placeholder here; the managed revision replaces it when the Secret is created.
-				t.rewriteSystemAccount(transCtx, sharding.Name, accountName, account.SecretRefRevision)
-			}
 			return err
 		}
 		revision = obj.Annotations[constant.SecretRevisionAnnotationKey]
@@ -165,17 +155,17 @@ func (t *clusterShardingAccountTransformer) updateSystemAccountSecret(transCtx *
 		return t.ensureSecretRevision(graphCli, dag, running), nil
 	}
 
-	password, source, passwordKey, err := t.getPasswordSource(transCtx, account.SecretRef, account.SecretRefRevision)
+	password, source, passwordKey, err := t.getPasswordSource(transCtx, account.SecretRef)
 	if err != nil {
-		if intctrlutil.IsDelayedRequeueError(err) {
-			return t.ensureSecretRevision(graphCli, dag, running), err
-		}
 		return "", err
 	}
 	if err := common.ValidateSystemAccountPassword(password); err != nil {
 		return "", err
 	}
-	revision := sourceSecretRevision(source, passwordKey)
+	revision := account.SecretRefRevision
+	if revision == "" {
+		revision = sourceSecretRevision(source, passwordKey)
+	}
 	runningPassword, ok := running.Data[constant.AccountPasswdForSecret]
 	passwordChanged := !ok || !bytes.Equal(runningPassword, password)
 
@@ -226,7 +216,10 @@ func (t *clusterShardingAccountTransformer) newSystemAccountSecret(transCtx *clu
 	}
 	revision := string(uuid.NewUUID())
 	if source != nil {
-		revision = sourceSecretRevision(source, passwordKey)
+		revision = account.SecretRefRevision
+		if revision == "" {
+			revision = sourceSecretRevision(source, passwordKey)
+		}
 	}
 	secret, err := t.newAccountSecretWithPassword(transCtx, sharding, accountName, password)
 	if err != nil {
@@ -280,30 +273,21 @@ func (t *clusterShardingAccountTransformer) definedSystemAccount(transCtx *clust
 func (t *clusterShardingAccountTransformer) buildPassword(transCtx *clusterTransformContext,
 	account synthesizedShardingSystemAccount) ([]byte, *corev1.Secret, string, error) {
 	if account.SecretRef != nil {
-		return t.getPasswordSource(transCtx, account.SecretRef, account.SecretRefRevision)
+		return t.getPasswordSource(transCtx, account.SecretRef)
 	}
 	password, err := common.GenerateSystemAccountPassword(account.SystemAccount)
 	return []byte(password), nil, "", err
 }
 
 func (t *clusterShardingAccountTransformer) getPasswordSource(transCtx *clusterTransformContext,
-	secretRef *appsv1.ProvisionSecretRef, expectedRevision string) ([]byte, *corev1.Secret, string, error) {
+	secretRef *appsv1.ProvisionSecretRef) ([]byte, *corev1.Secret, string, error) {
 	if secretRef.Namespace != "" && secretRef.Namespace != transCtx.Cluster.Namespace {
 		return nil, nil, "", fmt.Errorf("cross-namespace secretRef is not supported for shared sharding system accounts")
 	}
 	secretKey := types.NamespacedName{Namespace: transCtx.Cluster.Namespace, Name: secretRef.Name}
 	secret := &corev1.Secret{}
 	if err := transCtx.GetClient().Get(transCtx.GetContext(), secretKey, secret); err != nil {
-		if expectedRevision != "" && apierrors.IsNotFound(err) {
-			return nil, nil, "", intctrlutil.NewDelayedRequeueError(time.Second,
-				fmt.Sprintf("wait for referenced account secret %s revision %s", secretKey, expectedRevision))
-		}
 		return nil, nil, "", err
-	}
-	if expectedRevision != "" && secret.Annotations[constant.SecretRevisionAnnotationKey] != expectedRevision {
-		return nil, nil, "", intctrlutil.NewDelayedRequeueError(time.Second,
-			fmt.Sprintf("wait for referenced account secret %s/%s revision %s",
-				secret.Namespace, secret.Name, expectedRevision))
 	}
 
 	passwordKey := constant.AccountPasswdForSecret

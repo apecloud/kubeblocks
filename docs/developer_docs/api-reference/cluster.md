@@ -7251,9 +7251,8 @@ ProvisionSecretRef
 <p>Refers to the secret from which data will be copied to create the new account.</p>
 <p>For user-specified passwords, the maximum length is limited to 64 bytes.</p>
 <p>Updates to the referenced Secret do not automatically trigger reconciliation.
-When SecretRefRevision is not used, apply updated credentials immediately by updating
-the <code>kubeblocks.io/reconcile</code> annotation on the Component, or on the Cluster when the
-account is shared by a sharding.</p>
+To apply updated credentials, update the referenced Secret first and then change
+SecretRefRevision to a new value.</p>
 <p>This field is immutable once set.</p>
 </td>
 </tr>
@@ -7266,11 +7265,12 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the expected revision of the referenced Secret.</p>
-<p>To use this mechanism, set the <code>apps.kubeblocks.io/secret-revision</code> annotation
-on the referenced Secret and set this field to the same value. Account
-reconciliation waits until both revisions match. The value is treated as an
-opaque token and is not parsed by KubeBlocks.</p>
+<p>Specifies an opaque revision that triggers reconciliation of the referenced Secret.</p>
+<p>After updating a user-provided Secret, change this field to any new value to apply
+the updated credentials. KubeBlocks-managed Secrets carry the same revision in the
+<code>apps.kubeblocks.io/secret-revision</code> annotation; when that annotation is present,
+account reconciliation waits until it matches this field. Users are not required to
+add this annotation to user-provided Secrets. The value is treated as an opaque token.</p>
 </td>
 </tr>
 </tbody>

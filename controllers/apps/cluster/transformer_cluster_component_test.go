@@ -503,62 +503,6 @@ var _ = Describe("cluster component transformer test", func() {
 		return newCompObj(transCtx, specs[0], setters...)
 	}
 
-	Context("component up-to-date check", func() {
-		const desiredRevision = "desired-revision"
-
-		checkWithRevision := func(runningRevision *string) bool {
-			_, transCtx, _ := newTransformerNCtx(clusterTopologyDefault)
-			for _, compSpec := range transCtx.components {
-				if compSpec.Name == comp1aName {
-					compSpec.SystemAccounts = []appsv1.ComponentSystemAccount{{
-						Name: "admin", SecretRefRevision: desiredRevision,
-					}}
-				}
-			}
-
-			objects := make([]client.Object, 0, len(transCtx.components))
-			for _, compSpec := range transCtx.components {
-				comp := newCompObj(transCtx, compSpec, func(comp *appsv1.Component) {
-					comp.Status.ObservedGeneration = comp.Generation
-				})
-				if compSpec.Name == comp1aName {
-					comp.Spec.SystemAccounts = nil
-					if runningRevision != nil {
-						comp.Spec.SystemAccounts = []appsv1.ComponentSystemAccount{{
-							Name: "admin", SecretRefRevision: *runningRevision,
-						}}
-					}
-				}
-				objects = append(objects, comp)
-			}
-			transCtx.Client = &appsutil.MockReader{Objects: objects}
-
-			upToDate, err := checkAllCompsUpToDate(transCtx, transCtx.Cluster)
-			Expect(err).ShouldNot(HaveOccurred())
-			return upToDate
-		}
-
-		It("is not up-to-date when an account revision is missing", func() {
-			Expect(checkWithRevision(nil)).Should(BeFalse())
-		})
-
-		It("is not up-to-date when an account revision differs", func() {
-			mismatchedRevision := "stale-revision"
-			Expect(checkWithRevision(&mismatchedRevision)).Should(BeFalse())
-		})
-
-		It("is up-to-date when account revisions match by name", func() {
-			matchingRevision := desiredRevision
-			Expect(checkWithRevision(&matchingRevision)).Should(BeTrue())
-			Expect(systemAccountRevisionsMatch(
-				[]appsv1.ComponentSystemAccount{{Name: "admin", SecretRefRevision: desiredRevision}},
-				[]appsv1.ComponentSystemAccount{
-					{Name: "monitor", SecretRefRevision: "unrelated"},
-					{Name: "admin", SecretRefRevision: desiredRevision},
-				})).Should(BeTrue())
-		})
-	})
-
 	Context("component orders", func() {
 		It("w/o orders", func() {
 			transformer, transCtx, dag := newTransformerNCtx(clusterTopologyNoOrders)

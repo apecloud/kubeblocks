@@ -7265,12 +7265,9 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies an opaque revision that triggers reconciliation of the referenced Secret.</p>
-<p>After updating a user-provided Secret, change this field to any new value to apply
-the updated credentials. KubeBlocks-managed Secrets carry the same revision in the
-<code>apps.kubeblocks.io/secret-revision</code> annotation; when that annotation is present,
-account reconciliation waits until it matches this field. Users are not required to
-add this annotation to user-provided Secrets. The value is treated as an opaque token.</p>
+<p>Specifies an opaque revision of the referenced Secret.</p>
+<p>After updating the referenced Secret, change this field to a new value to apply
+the updated credentials. The value is treated as an opaque token.</p>
 </td>
 </tr>
 </tbody>

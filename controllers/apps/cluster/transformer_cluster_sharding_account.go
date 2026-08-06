@@ -159,6 +159,7 @@ func (t *clusterShardingAccountTransformer) updateSystemAccountSecret(transCtx *
 		if revision != "" {
 			return nil, false, nil
 		}
+		// Backfill a stable revision for managed Secrets created before the revision handshake.
 		revision = string(uuid.NewUUID())
 		updated := running.DeepCopy()
 		setSecretRevision(updated, revision)
@@ -172,7 +173,6 @@ func (t *clusterShardingAccountTransformer) updateSystemAccountSecret(transCtx *
 	if err := common.ValidateSystemAccountPassword(password); err != nil {
 		return nil, false, err
 	}
-	revision := sourceSecretRevision(source, passwordKey)
 	runningPassword, ok := running.Data[constant.AccountPasswdForSecret]
 	passwordChanged := !ok || !bytes.Equal(runningPassword, password)
 
@@ -180,6 +180,7 @@ func (t *clusterShardingAccountTransformer) updateSystemAccountSecret(transCtx *
 		return nil, true, nil
 	}
 
+	revision := sourceSecretRevision(source, passwordKey)
 	updated := running.DeepCopy()
 	setSecretRevision(updated, revision)
 	if passwordChanged {

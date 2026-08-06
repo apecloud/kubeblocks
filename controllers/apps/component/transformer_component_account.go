@@ -27,7 +27,6 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -201,14 +200,10 @@ func (t *componentAccountTransformer) getPasswordFromSecret(transCtx *componentT
 	}
 	secret := &corev1.Secret{}
 	if err := transCtx.GetClient().Get(transCtx.GetContext(), secretKey, secret); err != nil {
-		if account.SecretRefRevision != "" && apierrors.IsNotFound(err) {
-			return nil, ctrlutil.NewDelayedRequeueError(time.Second,
-				fmt.Sprintf("wait for referenced account secret %s revision %s", secretKey, account.SecretRefRevision))
-		}
 		return nil, err
 	}
 	if revision, ok := secret.Annotations[constant.SecretRevisionAnnotationKey]; ok && revision != account.SecretRefRevision {
-		return nil, ctrlutil.NewDelayedRequeueError(time.Second,
+		return nil, ctrlutil.NewRequeueError(time.Second,
 			fmt.Sprintf("wait for referenced account secret %s/%s revision %s",
 				secret.Namespace, secret.Name, account.SecretRefRevision))
 	}

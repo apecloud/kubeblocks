@@ -148,13 +148,13 @@ func (c *clusterRestoreTransformer) Transform(ctx graph.TransformContext, dag *g
 }
 
 func (c *clusterRestoreTransformer) initClusterAnnotations(compName string) map[string]string {
-	if c.restoreAnnotations == nil {
-		c.restoreAnnotations = make(map[string]map[string]string)
+	if c.annotations == nil {
+		c.annotations = make(map[string]map[string]string)
 	}
-	if c.restoreAnnotations[compName] == nil {
-		c.restoreAnnotations[compName] = make(map[string]string)
+	if c.annotations[compName] == nil {
+		c.annotations[compName] = make(map[string]string)
 	}
-	return c.restoreAnnotations[compName]
+	return c.annotations[compName]
 }
 
 func (c *clusterRestoreTransformer) cleanupRestoreAnnotationForSharding(dag *graph.DAG,

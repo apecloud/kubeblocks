@@ -55,6 +55,7 @@ var _ = Describe("cluster sharding shared system account password contract", fun
 	newContext := func(account appsv1.SystemAccount, objects ...client.Object) (*clusterTransformContext, *appsv1.ClusterSharding) {
 		scheme := runtime.NewScheme()
 		Expect(corev1.AddToScheme(scheme)).To(Succeed())
+		Expect(appsv1.AddToScheme(scheme)).To(Succeed())
 		Expect(dpv1alpha1.AddToScheme(scheme)).To(Succeed())
 		compDef := &appsv1.ComponentDefinition{
 			ObjectMeta: metav1.ObjectMeta{Name: compDefName},
@@ -313,9 +314,45 @@ var _ = Describe("cluster sharding shared system account password contract", fun
 		Expect(err).To(MatchError(ContainSubstring("is not managed by sharding")))
 	})
 
-	newSourceSecretReconcile := func(sourcePassword, managedPassword []byte, immutable bool, sourceExists ...bool) (
+	setShardingComps := func(transCtx *clusterTransformContext, shardingSpec *appsv1.ClusterSharding) {
+		shard0 := shardingSpec.Template.DeepCopy()
+		shard0.Name = "shard-0"
+		shard1 := shardingSpec.Template.DeepCopy()
+		shard1.Name = "shard-1"
+		comps := []*appsv1.ClusterComponentSpec{shard0, shard1}
+		transCtx.shardingComps = map[string][]*appsv1.ClusterComponentSpec{
+			sharding: comps,
+		}
+		transCtx.shardingCompsWithTpl = map[string]map[string][]*appsv1.ClusterComponentSpec{
+			sharding: {"": comps},
+		}
+	}
+
+	expectBuiltShardsUseManagedSecret := func(transCtx *clusterTransformContext,
+		shardingSpec *appsv1.ClusterSharding, revision string) {
+		comps, err := (&clusterShardingHandler{}).buildComps(transCtx, shardingSpec, nil)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(comps).To(HaveLen(2))
+		for _, comp := range comps {
+			Expect(comp.Spec.SystemAccounts).To(HaveLen(1))
+			Expect(comp.Spec.SystemAccounts[0].SecretRef.Name).
+				To(Equal(shardingAccountSecretName(clusterName, sharding, accountName)))
+			Expect(comp.Spec.SystemAccounts[0].SecretRefRevision).To(Equal(revision))
+		}
+	}
+
+	type sourceSecretReconcileOptions struct {
+		sourceMissing bool
+		legacyManaged bool
+	}
+	newSourceSecretReconcile := func(sourcePassword, managedPassword []byte, immutable bool,
+		options ...sourceSecretReconcileOptions) (
 		*clusterShardingAccountTransformer, *clusterTransformContext, model.GraphClient, *graph.DAG,
 		*appsv1.ClusterSharding, *corev1.Secret) {
+		option := sourceSecretReconcileOptions{}
+		if len(options) > 0 {
+			option = options[0]
+		}
 		transCtx, shardingSpec := newContext(appsv1.SystemAccount{Name: accountName})
 		shardingSpec.Template.SystemAccounts = []appsv1.ComponentSystemAccount{{
 			Name: accountName,
@@ -347,26 +384,27 @@ var _ = Describe("cluster sharding shared system account password contract", fun
 		managed.Labels = constant.GetClusterLabels(clusterName, map[string]string{
 			constant.KBAppShardingNameLabelKey: sharding,
 		})
+		if !option.legacyManaged {
+			managed.Annotations = map[string]string{constant.SecretRevisionAnnotationKey: "managed-revision"}
+		}
 		if immutable {
 			managed.Immutable = ptr.To(true)
 		}
 		writer := transCtx.Client.(client.Client)
-		if len(sourceExists) == 0 || sourceExists[0] {
+		if !option.sourceMissing {
 			Expect(writer.Create(context.Background(), source)).To(Succeed())
 		}
 		Expect(writer.Create(context.Background(), managed)).To(Succeed())
 		graphCli := model.NewGraphClient(transCtx.Client)
 		transCtx.Client = graphCli
 		transCtx.shardings = []*appsv1.ClusterSharding{shardingSpec}
-		transCtx.shardingComps = map[string][]*appsv1.ClusterComponentSpec{
-			sharding: {{Name: "shard-0"}, {Name: "shard-1"}},
-		}
+		setShardingComps(transCtx, shardingSpec)
 		dag := graph.NewDAG()
 		graphCli.Root(dag, transCtx.Cluster, transCtx.Cluster, model.ActionStatusPtr())
 		return &clusterShardingAccountTransformer{}, transCtx, graphCli, dag, shardingSpec, managed
 	}
 
-	It("does not update or rewrite shared credentials while the source revision mismatches", func() {
+	It("keeps shard Components on the current managed revision while the source revision mismatches", func() {
 		transformer, transCtx, graphCli, dag, shardingSpec, managed :=
 			newSourceSecretReconcile([]byte("new-password"), []byte("old-password"), false)
 		shardingSpec.Template.SystemAccounts[0].SecretRefRevision = "expected-source-revision"
@@ -375,15 +413,19 @@ var _ = Describe("cluster sharding shared system account password contract", fun
 		Expect(intctrlutil.IsDelayedRequeueError(err)).To(BeTrue())
 		Expect(graphCli.FindMatchedVertex(dag, managed)).To(BeNil())
 		Expect(managed.Data).To(HaveKeyWithValue(constant.AccountPasswdForSecret, []byte("old-password")))
-		Expect(shardingSpec.Template.SystemAccounts[0].SecretRef.Name).To(Equal("source-account"))
+		Expect(shardingSpec.Template.SystemAccounts[0].SecretRef.Name).To(Equal(managed.Name))
+		Expect(shardingSpec.Template.SystemAccounts[0].SecretRefRevision).To(Equal("managed-revision"))
 		for _, comp := range transCtx.shardingComps[sharding] {
-			Expect(comp.SystemAccounts).To(BeEmpty())
+			Expect(comp.SystemAccounts[0].SecretRef.Name).To(Equal(managed.Name))
+			Expect(comp.SystemAccounts[0].SecretRefRevision).To(Equal("managed-revision"))
 		}
+		expectBuiltShardsUseManagedSecret(transCtx, shardingSpec, "managed-revision")
 	})
 
-	It("does not update shared credentials while an expected source Secret is missing", func() {
+	It("keeps shard Components on the current managed revision while an expected source Secret is missing", func() {
 		transformer, transCtx, graphCli, dag, shardingSpec, managed :=
-			newSourceSecretReconcile([]byte("new-password"), []byte("old-password"), false, false)
+			newSourceSecretReconcile([]byte("new-password"), []byte("old-password"), false,
+				sourceSecretReconcileOptions{sourceMissing: true})
 		shardingSpec.Template.SystemAccounts[0].SecretRefRevision = "expected-source-revision"
 
 		err := transformer.reconcileShardingAccount(transCtx, graphCli, dag, shardingSpec, accountName)
@@ -391,7 +433,125 @@ var _ = Describe("cluster sharding shared system account password contract", fun
 		Expect(graphCli.FindMatchedVertex(dag, managed)).To(BeNil())
 		Expect(managed.Data).To(HaveKeyWithValue(constant.AccountPasswdForSecret, []byte("old-password")))
 		for _, comp := range transCtx.shardingComps[sharding] {
-			Expect(comp.SystemAccounts).To(BeEmpty())
+			Expect(comp.SystemAccounts[0].SecretRef.Name).To(Equal(managed.Name))
+			Expect(comp.SystemAccounts[0].SecretRefRevision).To(Equal("managed-revision"))
+		}
+		expectBuiltShardsUseManagedSecret(transCtx, shardingSpec, "managed-revision")
+	})
+
+	It("initializes a legacy managed revision while the source revision is pending", func() {
+		transformer, transCtx, graphCli, dag, shardingSpec, managed :=
+			newSourceSecretReconcile([]byte("new-password"), []byte("old-password"), false,
+				sourceSecretReconcileOptions{legacyManaged: true})
+		shardingSpec.Template.SystemAccounts[0].SecretRefRevision = "expected-source-revision"
+
+		err := transformer.reconcileShardingAccount(transCtx, graphCli, dag, shardingSpec, accountName)
+		Expect(intctrlutil.IsDelayedRequeueError(err)).To(BeTrue())
+		updated := graphCli.FindMatchedVertex(dag, managed).(*model.ObjectVertex).Obj.(*corev1.Secret)
+		revision := updated.Annotations[constant.SecretRevisionAnnotationKey]
+		Expect(revision).NotTo(BeEmpty())
+		Expect(updated.Data).To(HaveKeyWithValue(constant.AccountPasswdForSecret, []byte("old-password")))
+		expectBuiltShardsUseManagedSecret(transCtx, shardingSpec, revision)
+	})
+
+	It("points new shard Components at the pending managed Secret instead of the source Secret", func() {
+		source := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "source-account",
+				Namespace: namespace,
+				Annotations: map[string]string{
+					constant.SecretRevisionAnnotationKey: "other-source-revision",
+				},
+			},
+			Data: map[string][]byte{constant.AccountPasswdForSecret: []byte("new-password")},
+		}
+		transCtx, shardingSpec := newContext(appsv1.SystemAccount{Name: accountName}, source)
+		shardingSpec.Template.SystemAccounts = []appsv1.ComponentSystemAccount{{
+			Name:              accountName,
+			SecretRef:         &appsv1.ProvisionSecretRef{Name: "source-account"},
+			SecretRefRevision: "expected-source-revision",
+		}}
+		transCtx.shardings = []*appsv1.ClusterSharding{shardingSpec}
+		setShardingComps(transCtx, shardingSpec)
+		graphCli := model.NewGraphClient(transCtx.Client)
+		transCtx.Client = graphCli
+		dag := graph.NewDAG()
+		graphCli.Root(dag, transCtx.Cluster, transCtx.Cluster, model.ActionStatusPtr())
+
+		err := (&clusterShardingAccountTransformer{}).
+			reconcileShardingAccount(transCtx, graphCli, dag, shardingSpec, accountName)
+		Expect(intctrlutil.IsDelayedRequeueError(err)).To(BeTrue())
+		managed := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      shardingAccountSecretName(clusterName, sharding, accountName),
+		}}
+		Expect(graphCli.FindMatchedVertex(dag, managed)).To(BeNil())
+		expectBuiltShardsUseManagedSecret(transCtx, shardingSpec, "expected-source-revision")
+	})
+
+	It("rewrites every shared account when an earlier source revision is pending", func() {
+		const monitorAccount = "monitor"
+		source := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "source-account",
+				Namespace: namespace,
+				Annotations: map[string]string{
+					constant.SecretRevisionAnnotationKey: "other-source-revision",
+				},
+			},
+			Data: map[string][]byte{constant.AccountPasswdForSecret: []byte("new-password")},
+		}
+		monitorSecret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace,
+				Name:      shardingAccountSecretName(clusterName, sharding, monitorAccount),
+			},
+			Data: map[string][]byte{constant.AccountPasswdForSecret: []byte("monitor-password")},
+		}
+		monitorSecret.Labels = constant.GetClusterLabels(clusterName, map[string]string{
+			constant.KBAppShardingNameLabelKey: sharding,
+		})
+		monitorSecret.Annotations = map[string]string{constant.SecretRevisionAnnotationKey: "monitor-revision"}
+		transCtx, shardingSpec := newContext(appsv1.SystemAccount{Name: accountName}, source, monitorSecret)
+		transCtx.componentDefs[compDefName].Spec.SystemAccounts = append(
+			transCtx.componentDefs[compDefName].Spec.SystemAccounts, appsv1.SystemAccount{Name: monitorAccount})
+		shardingSpec.ShardingDef = "sharddef"
+		shardingSpec.Template.SystemAccounts = []appsv1.ComponentSystemAccount{{
+			Name:              accountName,
+			SecretRef:         &appsv1.ProvisionSecretRef{Name: "source-account"},
+			SecretRefRevision: "expected-source-revision",
+		}}
+		transCtx.shardingDefs = map[string]*appsv1.ShardingDefinition{
+			"sharddef": {
+				Spec: appsv1.ShardingDefinitionSpec{SystemAccounts: []appsv1.ShardingSystemAccount{
+					{Name: accountName, Shared: ptr.To(true)},
+					{Name: monitorAccount, Shared: ptr.To(true)},
+				}},
+			},
+		}
+		transCtx.shardings = []*appsv1.ClusterSharding{shardingSpec}
+		setShardingComps(transCtx, shardingSpec)
+		graphCli := model.NewGraphClient(transCtx.Client)
+		transCtx.Client = graphCli
+		dag := graph.NewDAG()
+		graphCli.Root(dag, transCtx.Cluster, transCtx.Cluster, model.ActionStatusPtr())
+
+		err := (&clusterShardingAccountTransformer{}).reconcileShardingAccounts(transCtx, graphCli, dag)
+		Expect(intctrlutil.IsDelayedRequeueError(err)).To(BeTrue())
+		comps, err := (&clusterShardingHandler{}).buildComps(transCtx, shardingSpec, nil)
+		Expect(err).NotTo(HaveOccurred())
+		for _, comp := range comps {
+			Expect(comp.Spec.SystemAccounts).To(HaveLen(2))
+			accounts := map[string]appsv1.ComponentSystemAccount{}
+			for _, account := range comp.Spec.SystemAccounts {
+				accounts[account.Name] = account
+			}
+			Expect(accounts[accountName].SecretRef.Name).
+				To(Equal(shardingAccountSecretName(clusterName, sharding, accountName)))
+			Expect(accounts[accountName].SecretRefRevision).To(Equal("expected-source-revision"))
+			Expect(accounts[monitorAccount].SecretRef.Name).
+				To(Equal(shardingAccountSecretName(clusterName, sharding, monitorAccount)))
+			Expect(accounts[monitorAccount].SecretRefRevision).To(Equal("monitor-revision"))
 		}
 	})
 

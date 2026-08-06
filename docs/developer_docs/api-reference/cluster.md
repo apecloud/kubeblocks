@@ -7494,7 +7494,24 @@ ProvisionSecretRef
 <em>(Optional)</em>
 <p>Refers to the secret from which data will be copied to create the new account.</p>
 <p>For user-specified passwords, the maximum length is limited to 64 bytes.</p>
+<p>Updates to the referenced Secret do not automatically trigger reconciliation.
+To apply updated credentials, update the referenced Secret first and then change
+SecretRefRevision to a new value.</p>
 <p>This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>secretRefRevision</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies an opaque revision of the referenced Secret.</p>
+<p>After updating the referenced Secret, change this field to a new value to apply
+the updated credentials. The value is treated as an opaque token.</p>
 </td>
 </tr>
 </tbody>

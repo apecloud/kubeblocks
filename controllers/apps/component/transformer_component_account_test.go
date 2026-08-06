@@ -28,6 +28,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -38,6 +39,7 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	pkgcomponent "github.com/apecloud/kubeblocks/pkg/controller/component"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 
@@ -143,6 +145,64 @@ func TestBuildAccountSecretPreservesEmptyReferencedPassword(t *testing.T) {
 	}
 	if len(password) != 0 {
 		t.Fatalf("expected referenced empty password to be preserved, got %d bytes", len(password))
+	}
+}
+
+func TestBuildAccountSecretRevisionContract(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatalf("add core scheme: %v", err)
+	}
+	referenced := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "shared-account"},
+		Data:       map[string][]byte{constant.AccountPasswdForSecret: []byte("password")},
+	}
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(referenced).Build()
+	transCtx := &componentTransformContext{
+		Context: context.Background(),
+		Client:  fakeClient,
+		Component: &appsv1.Component{
+			ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "demo-comp"},
+		},
+		SynthesizeComponent: &pkgcomponent.SynthesizedComponent{
+			Namespace: "default", ClusterName: "demo", Name: "comp",
+		},
+	}
+	account := synthesizedSystemAccount{
+		SystemAccount:     appsv1.SystemAccount{Name: "default"},
+		SecretRef:         &appsv1.ProvisionSecretRef{Name: referenced.Name},
+		SecretRefRevision: "new-revision",
+	}
+
+	secret, err := (&componentAccountTransformer{}).buildAccountSecret(transCtx, account)
+	if err != nil {
+		t.Fatalf("a user-managed Secret without a revision annotation should be read directly: %v", err)
+	}
+	if got := string(secret.Data[constant.AccountPasswdForSecret]); got != "password" {
+		t.Fatalf("expected referenced password, got %q", got)
+	}
+
+	referenced.Annotations = map[string]string{constant.SecretRevisionAnnotationKey: "old-revision"}
+	if err = fakeClient.Update(context.Background(), referenced); err != nil {
+		t.Fatalf("update referenced Secret revision: %v", err)
+	}
+	if _, err = (&componentAccountTransformer{}).buildAccountSecret(transCtx, account); !intctrlutil.IsRequeueError(err) || intctrlutil.IsDelayedRequeueError(err) {
+		t.Fatalf("a managed Secret with a mismatched revision should stop and requeue, got %v", err)
+	}
+
+	referenced.Annotations[constant.SecretRevisionAnnotationKey] = "new-revision"
+	if err = fakeClient.Update(context.Background(), referenced); err != nil {
+		t.Fatalf("update referenced Secret revision: %v", err)
+	}
+	if _, err = (&componentAccountTransformer{}).buildAccountSecret(transCtx, account); err != nil {
+		t.Fatalf("a managed Secret with a matching revision should be read: %v", err)
+	}
+
+	if err = fakeClient.Delete(context.Background(), referenced); err != nil {
+		t.Fatalf("delete referenced Secret: %v", err)
+	}
+	if _, err = (&componentAccountTransformer{}).buildAccountSecret(transCtx, account); !apierrors.IsNotFound(err) || intctrlutil.IsRequeueError(err) {
+		t.Fatalf("a missing referenced Secret should return the Get error directly, got %v", err)
 	}
 }
 

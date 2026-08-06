@@ -457,7 +457,7 @@ var _ = Describe("Backup Controller test", func() {
 
 			labels := constant.GetClusterLabels(cluster.Name)
 			componentLabels := constant.GetCompLabels(cluster.Name, testdp.ComponentName)
-			componentLabels[systemAccountSecretLabel] = "admin"
+			componentLabels[constant.SystemAccountLabelKey] = "admin"
 			shardingLabels := constant.GetClusterLabels(cluster.Name, map[string]string{
 				constant.KBAppShardingNameLabelKey: "shard",
 			})

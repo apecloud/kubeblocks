@@ -1132,8 +1132,6 @@ func updateBackupStatusByActionStatus(backupStatus *dpv1alpha1.BackupStatus) {
 	}
 }
 
-const systemAccountSecretLabel = "apps.kubeblocks.io/system-account"
-
 func setEncryptedSystemAccountsAnnotation(request *dpbackup.Request, cluster *kbappsv1.Cluster) error {
 	usernameKey := constant.AccountNameForSecret
 	passwordKey := constant.AccountPasswdForSecret
@@ -1143,7 +1141,7 @@ func setEncryptedSystemAccountsAnnotation(request *dpbackup.Request, cluster *kb
 		if username == nil || password == nil {
 			return false
 		}
-		if secret.Labels[systemAccountSecretLabel] != "" {
+		if secret.Labels[constant.SystemAccountLabelKey] != "" {
 			return true
 		}
 		shardingName := secret.Labels[constant.KBAppShardingNameLabelKey]

@@ -29,6 +29,7 @@ import (
 	"strings"
 
 	vsv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -123,6 +124,14 @@ func (r *VolumePopulatorReconciler) handleSyncPVCError(reqCtx intctrlutil.Reques
 	if requeueErr, ok := err.(intctrlutil.RequeueError); ok {
 		return intctrlutil.RequeueAfter(requeueErr.RequeueAfter(), reqCtx.Log, requeueErr.Reason())
 	}
+	if !pvc.DeletionTimestamp.IsZero() {
+		// Cleanup is selected from the PVC deletion state. Do not re-check the
+		// finalizer here: Cleanup may have removed it from this in-memory object
+		// immediately before its Patch failed. An existing Populating condition
+		// must not suppress the error because no other watch guarantees another
+		// cleanup attempt.
+		return RecorderEventAndRequeue(reqCtx, r.Recorder, pvc, err)
+	}
 	if r.ContainPopulatingCondition(pvc) {
 		// Ignore the error if an external controller handles this PVC.
 		return intctrlutil.Reconciled()
@@ -166,15 +175,18 @@ func (r *VolumePopulatorReconciler) MatchToPopulate(pvc *corev1.PersistentVolume
 }
 
 func (r *VolumePopulatorReconciler) syncPVC(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim) error {
+	if !pvc.DeletionTimestamp.IsZero() {
+		if slices.Contains(pvc.Finalizers, dptypes.DataProtectionFinalizerName) {
+			return r.Cleanup(reqCtx, pvc)
+		}
+		return nil
+	}
 	matched, err := r.MatchToPopulate(pvc)
 	if err != nil {
 		return err
 	}
 	if !matched {
 		return nil
-	}
-	if !pvc.DeletionTimestamp.IsZero() {
-		return r.Cleanup(reqCtx, pvc)
 	}
 	var restoreCtx *pvcRestoreContext
 	if pvc.Spec.DataSourceRef.Kind == dptypes.RestoreKind {
@@ -1615,21 +1627,77 @@ func postReadyRestoreName(componentUID types.UID) string {
 }
 
 func (r *VolumePopulatorReconciler) Cleanup(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim) error {
+	if !pvc.DeletionTimestamp.IsZero() {
+		executionRestore := &dpv1alpha1.Restore{}
+		executionRestoreKey := types.NamespacedName{
+			Namespace: pvc.Namespace,
+			Name:      getPopulatePVCName(pvc.UID),
+		}
+		if err := r.Client.Get(reqCtx.Ctx, executionRestoreKey, executionRestore); err != nil {
+			if !apierrors.IsNotFound(err) {
+				return err
+			}
+		} else {
+			if executionRestore.DeletionTimestamp.IsZero() {
+				uid := executionRestore.UID
+				if err := r.Client.Delete(reqCtx.Ctx, executionRestore, client.Preconditions{UID: &uid}); err != nil && !apierrors.IsNotFound(err) {
+					return err
+				}
+			}
+			return intctrlutil.NewRequeueError(reconcileInterval, "waiting for execution restore to be deleted")
+		}
+	}
+
+	dependentsPending := false
+	jobs := &batchv1.JobList{}
+	if err := r.Client.List(reqCtx.Ctx, jobs,
+		client.InNamespace(pvc.Namespace), client.MatchingLabels(map[string]string{
+			dprestore.DataProtectionPopulatePVCLabelKey: getPopulatePVCName(pvc.UID),
+		})); err != nil {
+		return err
+	}
+
+	for i := range jobs.Items {
+		job := &jobs.Items[i]
+		dependentsPending = true
+		if controllerutil.ContainsFinalizer(job, dptypes.DataProtectionFinalizerName) {
+			patch := client.MergeFrom(job.DeepCopy())
+			controllerutil.RemoveFinalizer(job, dptypes.DataProtectionFinalizerName)
+			if err := r.Patch(reqCtx.Ctx, job, patch); err != nil {
+				return err
+			}
+		}
+		if !job.DeletionTimestamp.IsZero() {
+			continue
+		}
+		if err := intctrlutil.BackgroundDeleteObject(r.Client, reqCtx.Ctx, job); err != nil {
+			return err
+		}
+	}
+
 	populatePVC := &corev1.PersistentVolumeClaim{}
 	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Name: getPopulatePVCName(pvc.UID),
 		Namespace: pvc.Namespace}, populatePVC); err != nil {
 		if !apierrors.IsNotFound(err) {
 			return err
 		}
-	} else if err = r.Client.Delete(reqCtx.Ctx, populatePVC); err != nil && !apierrors.IsNotFound(err) {
-		return err
+	} else {
+		dependentsPending = true
+		if populatePVC.DeletionTimestamp.IsZero() {
+			if err := r.Client.Delete(reqCtx.Ctx, populatePVC); err != nil && !apierrors.IsNotFound(err) {
+				return err
+			}
+		}
+	}
+	if dependentsPending && !pvc.DeletionTimestamp.IsZero() {
+		return intctrlutil.NewRequeueError(reconcileInterval, "waiting for volume populate dependents to be deleted")
 	}
 
 	if slices.Contains(pvc.Finalizers, dptypes.DataProtectionFinalizerName) {
 		pvcPatch := client.MergeFrom(pvc.DeepCopy())
 		controllerutil.RemoveFinalizer(pvc, dptypes.DataProtectionFinalizerName)
-		if err := r.Client.Patch(reqCtx.Ctx, pvc, pvcPatch); err != nil {
-			return client.IgnoreNotFound(err)
+		if err := r.Client.Patch(reqCtx.Ctx, pvc, pvcPatch); err != nil && !apierrors.IsNotFound(err) {
+			return err
 		}
 	}
 	return nil

@@ -117,13 +117,14 @@ var _ = Describe("cluster sharding shared system account password contract", fun
 		}
 
 		secret, err := (&clusterShardingAccountTransformer{}).
-			newAccountSecretWithPassword(transCtx, shardingSpec, accountName, []byte("password"))
+			newAccountSecretWithPassword(transCtx, shardingSpec, accountName, []byte("password"), "managed-revision")
 		Expect(err).NotTo(HaveOccurred())
 		Expect(secret.Labels).To(HaveKeyWithValue("precedence", "dynamic"))
 		Expect(secret.Labels).To(HaveKeyWithValue(constant.AppManagedByLabelKey, constant.AppName))
 		Expect(secret.Labels).To(HaveKeyWithValue(constant.AppInstanceLabelKey, clusterName))
 		Expect(secret.Labels).To(HaveKeyWithValue(constant.KBAppShardingNameLabelKey, sharding))
 		Expect(secret.Labels).To(HaveKeyWithValue(constant.SystemAccountLabelKey, accountName))
+		Expect(secret.Annotations).To(HaveKeyWithValue(constant.SecretRevisionAnnotationKey, "managed-revision"))
 	})
 
 	It("recognizes a created shared account Secret on the next reconcile", func() {
@@ -140,7 +141,7 @@ var _ = Describe("cluster sharding shared system account password contract", fun
 		}
 
 		created, err := (&clusterShardingAccountTransformer{}).
-			newAccountSecretWithPassword(transCtx, shardingSpec, accountName, []byte("password"))
+			newAccountSecretWithPassword(transCtx, shardingSpec, accountName, []byte("password"), "managed-revision")
 		Expect(err).NotTo(HaveOccurred())
 		Expect(transCtx.Client.(client.Client).Create(context.Background(), created)).To(Succeed())
 		found, err := (&clusterShardingAccountTransformer{}).
@@ -282,7 +283,9 @@ var _ = Describe("cluster sharding shared system account password contract", fun
 			secret, err := (&clusterShardingAccountTransformer{}).
 				newSystemAccountSecret(transCtx, shardingSpec, accountName)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(secret.Annotations[constant.SecretRevisionAnnotationKey]).To(Equal("opaque-revision"))
+			managedRevision := sourceSecretRevision(source, constant.AccountPasswdForSecret)
+			Expect(secret.Annotations[constant.SecretRevisionAnnotationKey]).To(Equal(managedRevision))
+			Expect(managedRevision).NotTo(Equal("opaque-revision"))
 			Expect(secret.Data[constant.AccountPasswdForSecret]).To(Equal([]byte("new-password")))
 		}
 	})
@@ -402,7 +405,7 @@ var _ = Describe("cluster sharding shared system account password contract", fun
 		return &clusterShardingAccountTransformer{}, transCtx, graphCli, dag, shardingSpec, managed
 	}
 
-	It("propagates a non-empty opaque revision to the managed Secret and shard Components", func() {
+	It("derives the managed revision independently from the opaque source revision", func() {
 		transformer, transCtx, graphCli, dag, shardingSpec, managed :=
 			newSourceSecretReconcile([]byte("new-password"), []byte("old-password"), false)
 		shardingSpec.Template.SystemAccounts[0].SecretRefRevision = "opaque-revision"
@@ -410,12 +413,16 @@ var _ = Describe("cluster sharding shared system account password contract", fun
 		Expect(transformer.reconcileShardingAccount(transCtx, graphCli, dag, shardingSpec, accountName)).To(Succeed())
 		updated := graphCli.FindMatchedVertex(dag, managed).(*model.ObjectVertex).Obj.(*corev1.Secret)
 		managedRevision := updated.Annotations[constant.SecretRevisionAnnotationKey]
-		Expect(managedRevision).To(Equal("opaque-revision"))
-		Expect(shardingSpec.Template.SystemAccounts[0].SecretRefRevision).To(Equal("opaque-revision"))
+		_, source, passwordKey, err := transformer.getPasswordSource(
+			transCtx, &appsv1.ProvisionSecretRef{Name: "source-account"})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(managedRevision).To(Equal(sourceSecretRevision(source, passwordKey)))
+		Expect(managedRevision).NotTo(Equal("opaque-revision"))
+		Expect(shardingSpec.Template.SystemAccounts[0].SecretRefRevision).To(Equal(managedRevision))
 		for _, comp := range transCtx.shardingComps[sharding] {
-			Expect(comp.SystemAccounts[0].SecretRefRevision).To(Equal("opaque-revision"))
+			Expect(comp.SystemAccounts[0].SecretRefRevision).To(Equal(managedRevision))
 		}
-		expectBuiltShardsUseManagedSecret(transCtx, shardingSpec, "opaque-revision")
+		expectBuiltShardsUseManagedSecret(transCtx, shardingSpec, managedRevision)
 	})
 
 	It("initializes a legacy managed Secret revision", func() {
@@ -524,11 +531,8 @@ var _ = Describe("cluster sharding shared system account password contract", fun
 			newSourceSecretReconcile([]byte("new-password"), []byte("old-password"), true)
 
 		err := transformer.reconcileShardingAccount(transCtx, graphCli, dag, shardingSpec, accountName)
-		Expect(intctrlutil.IsDelayedRequeueError(err)).To(BeTrue())
+		Expect(intctrlutil.IsRequeueError(err)).To(BeTrue())
+		Expect(intctrlutil.IsDelayedRequeueError(err)).To(BeFalse())
 		Expect(graphCli.IsAction(dag, managed, model.ActionDeletePtr())).To(BeTrue())
-		for _, comp := range transCtx.shardingComps[sharding] {
-			Expect(comp.SystemAccounts[0].SecretRef.Name).To(Equal(managed.Name))
-			Expect(comp.SystemAccounts[0].SecretRefRevision).NotTo(BeEmpty())
-		}
 	})
 })

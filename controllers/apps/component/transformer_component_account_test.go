@@ -28,6 +28,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -185,8 +186,8 @@ func TestBuildAccountSecretRevisionContract(t *testing.T) {
 	if err = fakeClient.Update(context.Background(), referenced); err != nil {
 		t.Fatalf("update referenced Secret revision: %v", err)
 	}
-	if _, err = (&componentAccountTransformer{}).buildAccountSecret(transCtx, account); !intctrlutil.IsDelayedRequeueError(err) {
-		t.Fatalf("a managed Secret with a mismatched revision should wait, got %v", err)
+	if _, err = (&componentAccountTransformer{}).buildAccountSecret(transCtx, account); !intctrlutil.IsRequeueError(err) || intctrlutil.IsDelayedRequeueError(err) {
+		t.Fatalf("a managed Secret with a mismatched revision should stop and requeue, got %v", err)
 	}
 
 	referenced.Annotations[constant.SecretRevisionAnnotationKey] = "new-revision"
@@ -200,8 +201,8 @@ func TestBuildAccountSecretRevisionContract(t *testing.T) {
 	if err = fakeClient.Delete(context.Background(), referenced); err != nil {
 		t.Fatalf("delete referenced Secret: %v", err)
 	}
-	if _, err = (&componentAccountTransformer{}).buildAccountSecret(transCtx, account); !intctrlutil.IsDelayedRequeueError(err) {
-		t.Fatalf("a missing referenced Secret with a revision should wait, got %v", err)
+	if _, err = (&componentAccountTransformer{}).buildAccountSecret(transCtx, account); !apierrors.IsNotFound(err) || intctrlutil.IsRequeueError(err) {
+		t.Fatalf("a missing referenced Secret should return the Get error directly, got %v", err)
 	}
 }
 

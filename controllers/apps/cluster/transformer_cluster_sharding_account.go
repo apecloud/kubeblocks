@@ -64,19 +64,25 @@ func (t *clusterShardingAccountTransformer) Transform(ctx graph.TransformContext
 
 func (t *clusterShardingAccountTransformer) reconcileShardingAccounts(transCtx *clusterTransformContext,
 	graphCli model.GraphClient, dag *graph.DAG) error {
+	var delayedErr error
 	for _, sharding := range transCtx.shardings {
 		shardDef, ok := transCtx.shardingDefs[sharding.ShardingDef]
 		if ok {
 			for _, account := range shardDef.Spec.SystemAccounts {
 				if ptr.Deref(account.Shared, false) {
 					if err := t.reconcileShardingAccount(transCtx, graphCli, dag, sharding, account.Name); err != nil {
-						return err
+						if !intctrlutil.IsDelayedRequeueError(err) {
+							return err
+						}
+						if delayedErr == nil {
+							delayedErr = err
+						}
 					}
 				}
 			}
 		}
 	}
-	return nil
+	return delayedErr
 }
 
 func (t *clusterShardingAccountTransformer) reconcileShardingAccount(transCtx *clusterTransformContext,
@@ -89,13 +95,21 @@ func (t *clusterShardingAccountTransformer) reconcileShardingAccount(transCtx *c
 	if running == nil {
 		obj, err := t.newSystemAccountSecret(transCtx, sharding, accountName)
 		if err != nil {
+			if intctrlutil.IsDelayedRequeueError(err) {
+				account, resolveErr := t.definedSystemAccount(transCtx, sharding, accountName)
+				if resolveErr != nil {
+					return resolveErr
+				}
+				// Keep the generated Components on the managed Secret while its source is pending. The source
+				// revision is only a placeholder here; the managed revision replaces it when the Secret is created.
+				t.rewriteSystemAccount(transCtx, sharding.Name, accountName, account.SecretRefRevision)
+			}
 			return err
 		}
 		revision = obj.Annotations[constant.SecretRevisionAnnotationKey]
 		graphCli.Create(dag, obj)
 	} else if revision, err = t.updateSystemAccountSecret(transCtx, graphCli, dag, sharding, accountName, running); err != nil {
-		// Source revision gates fail before a managed revision is derived. Do not rewrite shard references in that case.
-		// Immutable Secret recreation still returns its managed revision and keeps the existing rewrite behavior.
+		// Delayed paths return a revision that keeps shard references synchronized with the managed Secret.
 		if !intctrlutil.IsDelayedRequeueError(err) || revision == "" {
 			return err
 		}
@@ -148,18 +162,14 @@ func (t *clusterShardingAccountTransformer) updateSystemAccountSecret(transCtx *
 		return "", err
 	}
 	if account.SecretRef == nil {
-		revision := running.Annotations[constant.SecretRevisionAnnotationKey]
-		if revision == "" {
-			revision = string(uuid.NewUUID())
-			updated := running.DeepCopy()
-			setSecretRevision(updated, revision)
-			graphCli.Update(dag, running, updated)
-		}
-		return revision, nil
+		return t.ensureSecretRevision(graphCli, dag, running), nil
 	}
 
 	password, source, passwordKey, err := t.getPasswordSource(transCtx, account.SecretRef, account.SecretRefRevision)
 	if err != nil {
+		if intctrlutil.IsDelayedRequeueError(err) {
+			return t.ensureSecretRevision(graphCli, dag, running), err
+		}
 		return "", err
 	}
 	if err := common.ValidateSystemAccountPassword(password); err != nil {
@@ -187,6 +197,18 @@ func (t *clusterShardingAccountTransformer) updateSystemAccountSecret(transCtx *
 		graphCli.Update(dag, running, updated)
 	}
 	return revision, nil
+}
+
+func (t *clusterShardingAccountTransformer) ensureSecretRevision(graphCli model.GraphClient,
+	dag *graph.DAG, running *corev1.Secret) string {
+	revision := running.Annotations[constant.SecretRevisionAnnotationKey]
+	if revision == "" {
+		revision = string(uuid.NewUUID())
+		updated := running.DeepCopy()
+		setSecretRevision(updated, revision)
+		graphCli.Update(dag, running, updated)
+	}
+	return revision
 }
 
 func (t *clusterShardingAccountTransformer) newSystemAccountSecret(transCtx *clusterTransformContext,
@@ -352,19 +374,14 @@ func (t *clusterShardingAccountTransformer) rewriteSystemAccount(transCtx *clust
 	// update sharding
 	for i, sharding := range transCtx.shardings {
 		if sharding.Name == shardingName {
-			exist := false
-			for j, account := range sharding.Template.SystemAccounts {
+			for _, account := range sharding.Template.SystemAccounts {
 				if account.Name == accountName {
 					newAccount.Disabled = account.Disabled
-					transCtx.shardings[i].Template.SystemAccounts[j] = newAccount
-					exist = true
 					break
 				}
 			}
-			if !exist {
-				transCtx.shardings[i].Template.SystemAccounts =
-					append(transCtx.shardings[i].Template.SystemAccounts, newAccount)
-			}
+			transCtx.shardings[i].Template.SystemAccounts =
+				upsertSystemAccount(transCtx.shardings[i].Template.SystemAccounts, newAccount)
 			break
 		}
 	}
@@ -372,9 +389,20 @@ func (t *clusterShardingAccountTransformer) rewriteSystemAccount(transCtx *clust
 	// update sharding components
 	shardingComps := transCtx.shardingComps[shardingName]
 	for i := range shardingComps {
-		shardingComps[i].SystemAccounts = append(shardingComps[i].SystemAccounts, newAccount)
+		shardingComps[i].SystemAccounts = upsertSystemAccount(shardingComps[i].SystemAccounts, newAccount)
 	}
 	transCtx.shardingComps[shardingName] = shardingComps
+}
+
+func upsertSystemAccount(accounts []appsv1.ComponentSystemAccount,
+	account appsv1.ComponentSystemAccount) []appsv1.ComponentSystemAccount {
+	for i := range accounts {
+		if accounts[i].Name == account.Name {
+			accounts[i] = account
+			return accounts
+		}
+	}
+	return append(accounts, account)
 }
 
 func shardingAccountSecretName(cluster, sharding, account string) string {

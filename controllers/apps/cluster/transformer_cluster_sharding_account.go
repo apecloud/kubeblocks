@@ -180,16 +180,16 @@ func (t *clusterShardingAccountTransformer) updateSystemAccountSecret(transCtx *
 		return nil, true, nil
 	}
 
-	revision := sourceSecretRevision(source, passwordKey)
 	updated := running.DeepCopy()
-	setSecretRevision(updated, revision)
+	setSecretRevision(updated, sourceSecretRevision(source, passwordKey))
 	if passwordChanged {
 		if updated.Data == nil {
 			updated.Data = map[string][]byte{}
 		}
 		updated.Data[constant.AccountPasswdForSecret] = password
 	}
-	if passwordChanged || running.Annotations[constant.SecretRevisionAnnotationKey] != revision {
+	if passwordChanged || running.Annotations[constant.SecretRevisionAnnotationKey] !=
+		updated.Annotations[constant.SecretRevisionAnnotationKey] {
 		return updated, false, nil
 	}
 	return nil, false, nil

@@ -115,6 +115,12 @@ func TestRestoreManagerBuildRequiredPolicy(t *testing.T) {
 	if got := manager.buildRequiredPolicy(nil); got != nil {
 		t.Fatalf("nil source target policy = %#v, want nil", got)
 	}
+	manager.SourceTargetName = "target-a"
+	if got := manager.buildRequiredPolicy(nil); got == nil ||
+		got.DataRestorePolicy != dpv1alpha1.OneToOneRestorePolicy {
+		t.Fatalf("explicit source target policy = %#v, want one-to-one", got)
+	}
+	manager.SourceTargetName = ""
 	if got := manager.buildRequiredPolicy(&dpv1alpha1.BackupStatusTarget{
 		BackupTarget: dpv1alpha1.BackupTarget{
 			PodSelector: &dpv1alpha1.PodSelector{Strategy: dpv1alpha1.PodSelectionStrategyAny},
@@ -234,7 +240,7 @@ func TestRestoreManagerBuildPrepareDataRestore(t *testing.T) {
 		SchedulingPolicy: &appsv1.SchedulingPolicy{NodeName: "node-a"},
 	}
 	backup := &dpv1alpha1.Backup{
-		ObjectMeta: metav1.ObjectMeta{Name: "backup"},
+		ObjectMeta: metav1.ObjectMeta{Name: "backup", Namespace: "backup-source"},
 		Status: dpv1alpha1.BackupStatus{
 			Targets: []dpv1alpha1.BackupStatusTarget{{
 				BackupTarget: dpv1alpha1.BackupTarget{
@@ -262,7 +268,7 @@ func TestRestoreManagerBuildPrepareDataRestore(t *testing.T) {
 		return
 	}
 	if restore.Spec.Backup.Name != "backup" ||
-		restore.Spec.Backup.Namespace != "default" ||
+		restore.Spec.Backup.Namespace != "backup-source" ||
 		restore.Spec.Backup.SourceTargetName != "target-a" {
 		t.Fatalf("unexpected backup ref: %#v", restore.Spec.Backup)
 	}
@@ -290,6 +296,95 @@ func TestRestoreManagerBuildPrepareDataRestore(t *testing.T) {
 		labels["static-label"] != "true" ||
 		labels["dynamic-label"] != "true" {
 		t.Fatalf("unexpected restore pvc labels: %#v", labels)
+	}
+}
+
+func TestRestoreManagerBuildPrepareDataRestoreWithExplicitSourceTarget(t *testing.T) {
+	manager := newRestoreManagerForTest()
+	manager.SourceTargetName = "target-b"
+	comp := &component.SynthesizedComponent{
+		Name:     "mysql",
+		Replicas: 1,
+		VolumeClaimTemplates: []corev1.PersistentVolumeClaimTemplate{{
+			ObjectMeta: metav1.ObjectMeta{Name: "data"},
+		}},
+	}
+	backup := &dpv1alpha1.Backup{
+		ObjectMeta: metav1.ObjectMeta{Name: "backup"},
+		Status: dpv1alpha1.BackupStatus{
+			Targets: []dpv1alpha1.BackupStatusTarget{
+				{BackupTarget: dpv1alpha1.BackupTarget{
+					Name:        "target-a",
+					PodSelector: &dpv1alpha1.PodSelector{},
+				}},
+				{BackupTarget: dpv1alpha1.BackupTarget{
+					Name:        "target-b",
+					PodSelector: &dpv1alpha1.PodSelector{Strategy: dpv1alpha1.PodSelectionStrategyAll},
+				}},
+			},
+			BackupMethod: &dpv1alpha1.BackupMethod{
+				Name: "snapshot",
+				TargetVolumes: &dpv1alpha1.TargetVolumeInfo{
+					Volumes: []string{"data"},
+				},
+			},
+		},
+	}
+
+	restore, err := manager.BuildPrepareDataRestore(comp, backup, nil)
+	if err != nil {
+		t.Fatalf("BuildPrepareDataRestore() error = %v", err)
+	}
+	if restore == nil {
+		t.Fatal("restore is nil")
+	}
+	if restore.Spec.Backup.SourceTargetName != "target-b" {
+		t.Fatalf("source target name = %q, want target-b", restore.Spec.Backup.SourceTargetName)
+	}
+	policy := restore.Spec.PrepareDataConfig.RequiredPolicyForAllPodSelection
+	if policy == nil || policy.DataRestorePolicy != dpv1alpha1.OneToOneRestorePolicy {
+		t.Fatalf("required policy = %#v, want one-to-one policy for target-b", policy)
+	}
+}
+
+func TestRestoreManagerBuildPrepareDataRestorePropagatesUnknownSourceTarget(t *testing.T) {
+	manager := newRestoreManagerForTest()
+	manager.SourceTargetName = "missing-target"
+	comp := &component.SynthesizedComponent{
+		Name:     "mysql",
+		Replicas: 1,
+		VolumeClaimTemplates: []corev1.PersistentVolumeClaimTemplate{{
+			ObjectMeta: metav1.ObjectMeta{Name: "data"},
+		}},
+	}
+	backup := &dpv1alpha1.Backup{
+		ObjectMeta: metav1.ObjectMeta{Name: "backup"},
+		Status: dpv1alpha1.BackupStatus{
+			Targets: []dpv1alpha1.BackupStatusTarget{{
+				BackupTarget: dpv1alpha1.BackupTarget{
+					Name:        "target-a",
+					PodSelector: &dpv1alpha1.PodSelector{},
+				},
+			}},
+			BackupMethod: &dpv1alpha1.BackupMethod{
+				Name: "snapshot",
+				TargetVolumes: &dpv1alpha1.TargetVolumeInfo{
+					Volumes: []string{"data"},
+				},
+			},
+		},
+	}
+
+	restore, err := manager.BuildPrepareDataRestore(comp, backup, nil)
+	if err != nil {
+		t.Fatalf("BuildPrepareDataRestore() error = %v, want DataProtection to validate source target", err)
+	}
+	if restore.Spec.Backup.SourceTargetName != "missing-target" {
+		t.Fatalf("source target name = %q, want missing-target propagated", restore.Spec.Backup.SourceTargetName)
+	}
+	policy := restore.Spec.PrepareDataConfig.RequiredPolicyForAllPodSelection
+	if policy == nil || policy.DataRestorePolicy != dpv1alpha1.OneToOneRestorePolicy {
+		t.Fatalf("required policy = %#v, want one-to-one for explicit source target", policy)
 	}
 }
 

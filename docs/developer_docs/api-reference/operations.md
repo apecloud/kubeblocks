@@ -1087,8 +1087,25 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the namespace of the Backup namespace.
-If not specified, the namespace of the OpsRequest will be used.</p>
+<p>Specifies the namespace of the Backup.
+If not specified, the namespace of the OpsRequest will be used.
+Cross-namespace references require a Gateway API ReferenceGrant in the Backup
+namespace that allows Restores from the OpsRequest namespace to reference the
+Backup. Cross-namespace VolumeSnapshot restores are not supported.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>sourceTargetName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the backup source target name to restore from.
+This field is required when the referenced Backup has multiple source targets.
+It is propagated to Restore.spec.backup.sourceTargetName.</p>
 </td>
 </tr>
 <tr>

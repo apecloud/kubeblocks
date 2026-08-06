@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -46,6 +47,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/plan"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	dprestore "github.com/apecloud/kubeblocks/pkg/dataprotection/restore"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	opsutil "github.com/apecloud/kubeblocks/pkg/operations/util"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -268,9 +270,10 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 		})
 
 		It("test to scale out replicas from a full backup", func() {
+			backupNamespace := testCtx.DefaultNamespace
 			By("create Backup")
 			backupName := "backup-for-ops-" + randomStr
-			backup := testdp.NewBackupFactory(testCtx.DefaultNamespace, backupName).
+			backup := testdp.NewBackupFactory(backupNamespace, backupName).
 				SetBackupPolicyName(testdp.BackupPolicyName).
 				SetBackupMethod(testdp.VSBackupMethodName).
 				Create(&testCtx).GetObject()
@@ -278,23 +281,48 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			Expect(testapps.ChangeObjStatus(&testCtx, backup, func() {
 				backup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
 				backup.Status.BackupMethod = &dpv1alpha1.BackupMethod{
-					Name: testdp.VSBackupMethodName,
+					Name:            testdp.VSBackupMethodName,
+					SnapshotVolumes: pointer.Bool(true),
 					TargetVolumes: &dpv1alpha1.TargetVolumeInfo{
 						Volumes: []string{"data"},
 					},
+				}
+				backup.Status.Targets = []dpv1alpha1.BackupStatusTarget{
+					{BackupTarget: dpv1alpha1.BackupTarget{
+						Name:        "target-a",
+						PodSelector: &dpv1alpha1.PodSelector{},
+					}},
+					{BackupTarget: dpv1alpha1.BackupTarget{
+						Name:        "target-b",
+						PodSelector: &dpv1alpha1.PodSelector{Strategy: dpv1alpha1.PodSelectionStrategyAll},
+					}},
 				}
 			})).Should(Succeed())
 
 			By("scale out replicas from a full backup")
 			horizontalScaling := opsv1alpha1.HorizontalScaling{ScaleOut: &opsv1alpha1.ScaleOut{
 				FromBackup: &opsv1alpha1.FromBackup{
-					Name: backupName,
+					Name:             backupName,
+					Namespace:        backupNamespace,
+					SourceTargetName: "target-b",
 				},
 			}}
 
 			horizontalScaling.ScaleOut.ReplicaChanges = pointer.Int32(2)
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx, Recorder: eventRecorder}
 			opsRes, _ := commonHScaleConsensusCompTest(reqCtx, nil, horizontalScaling, false, true)
+			restoreList := &dpv1alpha1.RestoreList{}
+			Expect(k8sClient.List(ctx, restoreList, client.MatchingLabels{
+				constant.OpsRequestNameLabelKey: opsRes.OpsRequest.Name,
+			}, client.InNamespace(opsRes.OpsRequest.Namespace))).Should(Succeed())
+			Expect(restoreList.Items).Should(HaveLen(2))
+			for i := range restoreList.Items {
+				Expect(restoreList.Items[i].Spec.Backup.Namespace).Should(Equal(backupNamespace))
+				Expect(restoreList.Items[i].Spec.Backup.SourceTargetName).Should(Equal("target-b"))
+				Expect(restoreList.Items[i].Spec.PrepareDataConfig.RequiredPolicyForAllPodSelection).NotTo(BeNil())
+				Expect(restoreList.Items[i].Spec.PrepareDataConfig.RequiredPolicyForAllPodSelection.DataRestorePolicy).
+					Should(Equal(dpv1alpha1.OneToOneRestorePolicy))
+			}
 
 			By("mock restore phase to completed")
 			comp, compDef, err := component.GetCompNCompDefByName(reqCtx.Ctx, k8sClient, opsRes.Cluster.Namespace, constant.GenerateClusterComponentName(opsRes.Cluster.Name, defaultCompName))
@@ -1099,5 +1127,118 @@ func TestHorizontalScalingCreateRestoreReturnsFatalWhenNoRestoreBuilt(t *testing
 				t.Fatalf("expected no restore to be created, got %d", len(restoreList.Items))
 			}
 		})
+	}
+}
+
+func TestHorizontalScalingCreateRestorePreservesPerPodStartingIndex(t *testing.T) {
+	ctx := context.Background()
+	scheme := runtime.NewScheme()
+	for _, addToScheme := range []func(*runtime.Scheme) error{
+		corev1.AddToScheme,
+		appsv1.AddToScheme,
+		dpv1alpha1.AddToScheme,
+		opsv1alpha1.AddToScheme,
+	} {
+		if err := addToScheme(scheme); err != nil {
+			t.Fatalf("add scheme: %v", err)
+		}
+	}
+
+	cluster := &appsv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "redis",
+			Namespace: "default",
+			UID:       types.UID("cluster1"),
+		},
+	}
+	opsRequest := &opsv1alpha1.OpsRequest{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "scale-out-from-backup",
+			Namespace: "default",
+			UID:       types.UID("opsreq1"),
+		},
+	}
+	backup := &dpv1alpha1.Backup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "redis-backup",
+			Namespace: "default",
+		},
+		Status: dpv1alpha1.BackupStatus{
+			Phase: dpv1alpha1.BackupPhaseCompleted,
+			BackupMethod: &dpv1alpha1.BackupMethod{
+				Name: "snapshot",
+				TargetVolumes: &dpv1alpha1.TargetVolumeInfo{
+					Volumes: []string{"data"},
+				},
+			},
+			Targets: []dpv1alpha1.BackupStatusTarget{{
+				BackupTarget: dpv1alpha1.BackupTarget{
+					Name: "redis",
+					PodSelector: &dpv1alpha1.PodSelector{
+						Strategy: dpv1alpha1.PodSelectionStrategyAll,
+					},
+				},
+				SelectedTargetPods: []string{"redis-0", "redis-1", "redis-2", "redis-3", "redis-4"},
+			}},
+		},
+	}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, opsRequest, backup).Build()
+	opsRes := &OpsResource{
+		Cluster:    cluster,
+		OpsRequest: opsRequest,
+	}
+	synthesizedComponent := &component.SynthesizedComponent{
+		Name: "redis",
+		VolumeClaimTemplates: []corev1.PersistentVolumeClaimTemplate{{
+			ObjectMeta: metav1.ObjectMeta{Name: "data"},
+		}},
+	}
+	componentSpec := &appsv1.ClusterComponentSpec{
+		Name: "redis",
+		Instances: []appsv1.InstanceTemplate{{
+			Name: "az-a",
+			Ordinals: appsv1.Ordinals{
+				Ranges: []appsv1.Range{{Start: 3, End: 4}},
+			},
+		}},
+	}
+	for _, ordinal := range []int32{3, 4} {
+		restoreMGR := plan.NewRestoreManager(ctx, cli, cluster, scheme, map[string]string{
+			constant.OpsRequestNameLabelKey: opsRequest.Name,
+		}, 1, ordinal)
+		err := horizontalScalingOpsHandler{}.createRestore(intctrlutil.RequestCtx{Ctx: ctx, Recorder: record.NewFakeRecorder(1)}, cli, opsRes,
+			synthesizedComponent, restoreMGR, componentSpec, backup, "az-a")
+		if err != nil {
+			t.Fatalf("create restore for ordinal %d: %v", ordinal, err)
+		}
+	}
+
+	restoreList := &dpv1alpha1.RestoreList{}
+	if err := cli.List(ctx, restoreList, client.InNamespace("default")); err != nil {
+		t.Fatalf("list restores: %v", err)
+	}
+	if len(restoreList.Items) != 2 {
+		t.Fatalf("expected two restores, got %d", len(restoreList.Items))
+	}
+	restoresByOrdinal := map[int32]dpv1alpha1.Restore{}
+	for i := range restoreList.Items {
+		restore := restoreList.Items[i]
+		startingIndex := restore.Spec.PrepareDataConfig.RestoreVolumeClaimsTemplate.StartingIndex
+		restoresByOrdinal[startingIndex] = restore
+	}
+	for _, ordinal := range []int32{3, 4} {
+		restore, ok := restoresByOrdinal[ordinal]
+		if !ok {
+			t.Fatalf("missing restore for actual scale-out pod ordinal %d", ordinal)
+		}
+		requiredPolicy := restore.Spec.PrepareDataConfig.RequiredPolicyForAllPodSelection
+		sourcePod, err := dprestore.GetSourcePodNameFromTarget(&backup.Status.Targets[0], requiredPolicy, int(ordinal))
+		if err != nil {
+			t.Fatalf("resolve source pod for ordinal %d: %v", ordinal, err)
+		}
+		expectedSourcePod := fmt.Sprintf("redis-%d", ordinal)
+		if sourcePod != expectedSourcePod {
+			t.Fatalf("source pod = %q, want %q for actual scale-out pod ordinal %d", sourcePod, expectedSourcePod, ordinal)
+		}
 	}
 }

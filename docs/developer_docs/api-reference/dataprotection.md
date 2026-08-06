@@ -2841,7 +2841,10 @@ string
 </em>
 </td>
 <td>
-<p>Specifies the backup namespace.</p>
+<p>Specifies the backup namespace. When this differs from the Restore namespace,
+a Gateway API ReferenceGrant in the backup namespace must allow Restores from
+the Restore namespace to reference the Backup. Cross-namespace VolumeSnapshot
+restores are not supported.</p>
 </td>
 </tr>
 <tr>

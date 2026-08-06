@@ -1589,6 +1589,7 @@ func TestPopulateCreatesExecutionRestoreAndPolls(t *testing.T) {
 		Recorder: record.NewFakeRecorder(10),
 	}
 	backup := newBackupForRestoreDecision([]string{"data"}, nil)
+	backup.Status.Target.Name = "source"
 	backup.Status.Target.PodSelector = &dpv1alpha1.PodSelector{Strategy: dpv1alpha1.PodSelectionStrategyAny}
 	actionSet := &dpv1alpha1.ActionSet{
 		Spec: dpv1alpha1.ActionSetSpec{

@@ -310,10 +310,10 @@ func (t *clusterShardingAccountTransformer) newAccountSecretWithPassword(transCt
 		AddLabels(constant.SystemAccountLabelKey, accountName).
 		AddAnnotationsInMap(sharding.Template.Annotations).
 		AddAnnotationsInMap(compDef.Spec.Annotations).
+		AddAnnotations(constant.SecretRevisionAnnotationKey, revision).
 		PutData(constant.AccountNameForSecret, []byte(accountName)).
 		PutData(constant.AccountPasswdForSecret, password).
 		GetObject()
-	setSecretRevision(secret, revision)
 	return secret, nil
 }
 

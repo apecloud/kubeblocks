@@ -63,25 +63,19 @@ func (t *clusterShardingAccountTransformer) Transform(ctx graph.TransformContext
 
 func (t *clusterShardingAccountTransformer) reconcileShardingAccounts(transCtx *clusterTransformContext,
 	graphCli model.GraphClient, dag *graph.DAG) error {
-	var delayedErr error
 	for _, sharding := range transCtx.shardings {
 		shardDef, ok := transCtx.shardingDefs[sharding.ShardingDef]
 		if ok {
 			for _, account := range shardDef.Spec.SystemAccounts {
 				if ptr.Deref(account.Shared, false) {
 					if err := t.reconcileShardingAccount(transCtx, graphCli, dag, sharding, account.Name); err != nil {
-						if !intctrlutil.IsDelayedRequeueError(err) {
-							return err
-						}
-						if delayedErr == nil {
-							delayedErr = err
-						}
+						return err
 					}
 				}
 			}
 		}
 	}
-	return delayedErr
+	return nil
 }
 
 func (t *clusterShardingAccountTransformer) reconcileShardingAccount(transCtx *clusterTransformContext,
@@ -98,16 +92,26 @@ func (t *clusterShardingAccountTransformer) reconcileShardingAccount(transCtx *c
 		}
 		revision = obj.Annotations[constant.SecretRevisionAnnotationKey]
 		graphCli.Create(dag, obj)
-	} else if revision, err = t.updateSystemAccountSecret(transCtx, graphCli, dag, sharding, accountName, running); err != nil {
-		// Delayed paths return a revision that keeps shard references synchronized with the managed Secret.
-		if !intctrlutil.IsDelayedRequeueError(err) || revision == "" {
+	} else {
+		updated, recreate, err := t.updateSystemAccountSecret(transCtx, sharding, accountName, running)
+		if err != nil {
 			return err
+		}
+		if recreate {
+			graphCli.Delete(dag, running)
+			return intctrlutil.NewRequeueError(0,
+				fmt.Sprintf("recreate immutable shared system account secret %s/%s", running.Namespace, running.Name))
+		}
+		revision = running.Annotations[constant.SecretRevisionAnnotationKey]
+		if updated != nil {
+			revision = updated.Annotations[constant.SecretRevisionAnnotationKey]
+			graphCli.Update(dag, running, updated)
 		}
 	}
 
 	t.rewriteSystemAccount(transCtx, sharding.Name, accountName, revision)
 
-	return err
+	return nil
 }
 
 func (t *clusterShardingAccountTransformer) getSystemAccountSecret(transCtx *clusterTransformContext,
@@ -145,34 +149,35 @@ func (t *clusterShardingAccountTransformer) getSystemAccountSecret(transCtx *clu
 }
 
 func (t *clusterShardingAccountTransformer) updateSystemAccountSecret(transCtx *clusterTransformContext,
-	graphCli model.GraphClient, dag *graph.DAG, sharding *appsv1.ClusterSharding,
-	accountName string, running *corev1.Secret) (string, error) {
+	sharding *appsv1.ClusterSharding, accountName string, running *corev1.Secret) (*corev1.Secret, bool, error) {
 	account, err := t.definedSystemAccount(transCtx, sharding, accountName)
 	if err != nil {
-		return "", err
+		return nil, false, err
 	}
 	if account.SecretRef == nil {
-		return t.ensureSecretRevision(graphCli, dag, running), nil
+		revision := running.Annotations[constant.SecretRevisionAnnotationKey]
+		if revision != "" {
+			return nil, false, nil
+		}
+		revision = string(uuid.NewUUID())
+		updated := running.DeepCopy()
+		setSecretRevision(updated, revision)
+		return updated, false, nil
 	}
 
 	password, source, passwordKey, err := t.getPasswordSource(transCtx, account.SecretRef)
 	if err != nil {
-		return "", err
+		return nil, false, err
 	}
 	if err := common.ValidateSystemAccountPassword(password); err != nil {
-		return "", err
+		return nil, false, err
 	}
-	revision := account.SecretRefRevision
-	if revision == "" {
-		revision = sourceSecretRevision(source, passwordKey)
-	}
+	revision := sourceSecretRevision(source, passwordKey)
 	runningPassword, ok := running.Data[constant.AccountPasswdForSecret]
 	passwordChanged := !ok || !bytes.Equal(runningPassword, password)
 
 	if passwordChanged && ptr.Deref(running.Immutable, false) {
-		graphCli.Delete(dag, running)
-		return revision, intctrlutil.NewDelayedRequeueError(0,
-			fmt.Sprintf("recreate immutable shared system account secret %s/%s", running.Namespace, running.Name))
+		return nil, true, nil
 	}
 
 	updated := running.DeepCopy()
@@ -184,21 +189,9 @@ func (t *clusterShardingAccountTransformer) updateSystemAccountSecret(transCtx *
 		updated.Data[constant.AccountPasswdForSecret] = password
 	}
 	if passwordChanged || running.Annotations[constant.SecretRevisionAnnotationKey] != revision {
-		graphCli.Update(dag, running, updated)
+		return updated, false, nil
 	}
-	return revision, nil
-}
-
-func (t *clusterShardingAccountTransformer) ensureSecretRevision(graphCli model.GraphClient,
-	dag *graph.DAG, running *corev1.Secret) string {
-	revision := running.Annotations[constant.SecretRevisionAnnotationKey]
-	if revision == "" {
-		revision = string(uuid.NewUUID())
-		updated := running.DeepCopy()
-		setSecretRevision(updated, revision)
-		graphCli.Update(dag, running, updated)
-	}
-	return revision
+	return nil, false, nil
 }
 
 func (t *clusterShardingAccountTransformer) newSystemAccountSecret(transCtx *clusterTransformContext,
@@ -216,23 +209,14 @@ func (t *clusterShardingAccountTransformer) newSystemAccountSecret(transCtx *clu
 	}
 	revision := string(uuid.NewUUID())
 	if source != nil {
-		revision = account.SecretRefRevision
-		if revision == "" {
-			revision = sourceSecretRevision(source, passwordKey)
-		}
+		revision = sourceSecretRevision(source, passwordKey)
 	}
-	secret, err := t.newAccountSecretWithPassword(transCtx, sharding, accountName, password)
-	if err != nil {
-		return nil, err
-	}
-	setSecretRevision(secret, revision)
-	return secret, nil
+	return t.newAccountSecretWithPassword(transCtx, sharding, accountName, password, revision)
 }
 
 type synthesizedShardingSystemAccount struct {
 	appsv1.SystemAccount
-	SecretRef         *appsv1.ProvisionSecretRef
-	SecretRefRevision string
+	SecretRef *appsv1.ProvisionSecretRef
 }
 
 func (t *clusterShardingAccountTransformer) definedSystemAccount(transCtx *clusterTransformContext,
@@ -257,7 +241,6 @@ func (t *clusterShardingAccountTransformer) definedSystemAccount(transCtx *clust
 				resolved.PasswordConfig = compAccount.PasswordConfig.DeepCopy()
 			}
 			resolved.SecretRef = compAccount.SecretRef
-			resolved.SecretRefRevision = compAccount.SecretRefRevision
 		}
 		return resolved
 	}
@@ -302,7 +285,7 @@ func (t *clusterShardingAccountTransformer) getPasswordSource(transCtx *clusterT
 }
 
 func (t *clusterShardingAccountTransformer) newAccountSecretWithPassword(transCtx *clusterTransformContext,
-	sharding *appsv1.ClusterSharding, accountName string, password []byte) (*corev1.Secret, error) {
+	sharding *appsv1.ClusterSharding, accountName string, password []byte, revision string) (*corev1.Secret, error) {
 	var (
 		cluster = transCtx.Cluster
 	)
@@ -321,6 +304,7 @@ func (t *clusterShardingAccountTransformer) newAccountSecretWithPassword(transCt
 		PutData(constant.AccountNameForSecret, []byte(accountName)).
 		PutData(constant.AccountPasswdForSecret, password).
 		GetObject()
+	setSecretRevision(secret, revision)
 	return secret, nil
 }
 
@@ -346,13 +330,13 @@ func (t *clusterShardingAccountTransformer) rewriteSystemAccount(transCtx *clust
 		cluster = transCtx.Cluster
 	)
 	newAccount := appsv1.ComponentSystemAccount{
-		Name:              accountName,
-		Disabled:          ptr.To(false), // default to false
-		SecretRefRevision: revision,
+		Name:     accountName,
+		Disabled: ptr.To(false), // default to false
 		SecretRef: &appsv1.ProvisionSecretRef{
 			Name:      shardingAccountSecretName(cluster.Name, shardingName, accountName),
 			Namespace: cluster.Namespace,
 		},
+		SecretRefRevision: revision,
 	}
 
 	// update sharding

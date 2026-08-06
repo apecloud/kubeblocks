@@ -155,15 +155,7 @@ func (t *clusterShardingAccountTransformer) updateSystemAccountSecret(transCtx *
 		return nil, false, err
 	}
 	if account.SecretRef == nil {
-		revision := running.Annotations[constant.SecretRevisionAnnotationKey]
-		if revision != "" {
-			return nil, false, nil
-		}
-		// Backfill a stable revision for managed Secrets created before the revision handshake.
-		revision = string(uuid.NewUUID())
-		updated := running.DeepCopy()
-		setSecretRevision(updated, revision)
-		return updated, false, nil
+		return nil, false, nil
 	}
 
 	password, source, passwordKey, err := t.getPasswordSource(transCtx, account.SecretRef)

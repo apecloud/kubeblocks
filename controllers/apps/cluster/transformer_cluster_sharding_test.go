@@ -673,30 +673,34 @@ var _ = Describe("cluster sharding shared transformers", func() {
 			}}, constant.AccountPasswdForSecret)))
 	})
 
-	It("keeps a generated shared account revision stable", func() {
-		transformer := &clusterShardingAccountTransformer{}
-		sharding := newSharding()
-		managed := &corev1.Secret{ObjectMeta: metav1ObjectMeta(
-			shardingAccountSecretName(clusterName, shardingName, accountName), namespace)}
-		managed.Labels = constant.GetClusterLabels(clusterName, map[string]string{
-			constant.KBAppShardingNameLabelKey: shardingName,
-		})
-		managed.Annotations = map[string]string{constant.SecretRevisionAnnotationKey: "stable-revision"}
-		transCtx := newTransformContext(managed)
-		transCtx.componentDefs = map[string]*appsv1.ComponentDefinition{compDefName: newComponentDefinition()}
-		transCtx.shardings = []*appsv1.ClusterSharding{sharding}
-		transCtx.shardingComps = map[string][]*appsv1.ClusterComponentSpec{
-			shardingName: {{Name: "shard-0"}},
-		}
-		graphCli := model.NewGraphClient(transCtx.Client)
-		transCtx.Client = graphCli
-		dag := graph.NewDAG()
-		graphCli.Root(dag, transCtx.OrigCluster, transCtx.Cluster, model.ActionStatusPtr())
+	It("preserves generated shared account revisions, including legacy absence", func() {
+		for _, revision := range []string{"", "stable-revision"} {
+			transformer := &clusterShardingAccountTransformer{}
+			sharding := newSharding()
+			managed := &corev1.Secret{ObjectMeta: metav1ObjectMeta(
+				shardingAccountSecretName(clusterName, shardingName, accountName), namespace)}
+			managed.Labels = constant.GetClusterLabels(clusterName, map[string]string{
+				constant.KBAppShardingNameLabelKey: shardingName,
+			})
+			if revision != "" {
+				managed.Annotations = map[string]string{constant.SecretRevisionAnnotationKey: revision}
+			}
+			transCtx := newTransformContext(managed)
+			transCtx.componentDefs = map[string]*appsv1.ComponentDefinition{compDefName: newComponentDefinition()}
+			transCtx.shardings = []*appsv1.ClusterSharding{sharding}
+			transCtx.shardingComps = map[string][]*appsv1.ClusterComponentSpec{
+				shardingName: {{Name: "shard-0"}},
+			}
+			graphCli := model.NewGraphClient(transCtx.Client)
+			transCtx.Client = graphCli
+			dag := graph.NewDAG()
+			graphCli.Root(dag, transCtx.OrigCluster, transCtx.Cluster, model.ActionStatusPtr())
 
-		Expect(transformer.reconcileShardingAccount(transCtx, graphCli, dag, sharding, accountName)).Should(Succeed())
-		Expect(graphCli.FindMatchedVertex(dag, managed)).Should(BeNil())
-		Expect(transCtx.shardingComps[shardingName][0].SystemAccounts[0].SecretRefRevision).
-			Should(Equal("stable-revision"))
+			Expect(transformer.reconcileShardingAccount(transCtx, graphCli, dag, sharding, accountName)).Should(Succeed())
+			Expect(graphCli.FindMatchedVertex(dag, managed)).Should(BeNil())
+			Expect(transCtx.shardingComps[shardingName][0].SystemAccounts[0].SecretRefRevision).
+				Should(Equal(revision))
+		}
 	})
 
 	It("updates a mutable shared account secret when the source password rotates", func() {

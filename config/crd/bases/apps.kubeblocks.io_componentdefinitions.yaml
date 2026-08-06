@@ -19104,9 +19104,10 @@ spec:
 
                         This field is immutable once set.
                       type: string
-                    passwordGenerationPolicy:
+                    passwordConfig:
                       description: |-
-                        Specifies the policy for generating the account's password.
+                        Specifies the configuration for generating the account's password.
+                        If this field is nil, the account is passwordless.
 
                         This field is immutable once set.
                       properties:

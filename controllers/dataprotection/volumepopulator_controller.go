@@ -2217,9 +2217,9 @@ func (r *VolumePopulatorReconciler) restoreSystemAccountSecrets(reqCtx intctrlut
 	encryptor := intctrlutil.NewEncryptor(viper.GetString(constant.CfgKeyDPEncryptionKey))
 	if componentName != "" {
 		labels := map[string]string{
-			constant.AppInstanceLabelKey:        clusterName,
-			constant.KBAppComponentLabelKey:     componentName,
-			"apps.kubeblocks.io/system-account": "",
+			constant.AppInstanceLabelKey:    clusterName,
+			constant.KBAppComponentLabelKey: componentName,
+			constant.SystemAccountLabelKey:  "",
 		}
 		if err := r.restoreSystemAccountSecretSet(reqCtx, pvc, encryptor, accountsByComponent[componentName],
 			systemAccountSecretScopeComponent, clusterName, componentName, labels); err != nil {
@@ -2228,9 +2228,9 @@ func (r *VolumePopulatorReconciler) restoreSystemAccountSecrets(reqCtx intctrlut
 	}
 	if shardingName := pvc.Labels[constant.KBAppShardingNameLabelKey]; shardingName != "" {
 		labels := map[string]string{
-			constant.AppInstanceLabelKey:        clusterName,
-			constant.KBAppShardingNameLabelKey:  shardingName,
-			"apps.kubeblocks.io/system-account": "",
+			constant.AppInstanceLabelKey:       clusterName,
+			constant.KBAppShardingNameLabelKey: shardingName,
+			constant.SystemAccountLabelKey:     "",
 		}
 		if err := r.restoreSystemAccountSecretSet(reqCtx, pvc, encryptor, accountsByComponent[shardingName],
 			systemAccountSecretScopeSharding, clusterName, shardingName, labels); err != nil {
@@ -2262,7 +2262,7 @@ func (r *VolumePopulatorReconciler) restoreSystemAccountSecretSet(reqCtx intctrl
 			return intctrlutil.NewFatalError(err.Error())
 		}
 		accountLabels := mapsClone(labels)
-		accountLabels["apps.kubeblocks.io/system-account"] = accountName
+		accountLabels[constant.SystemAccountLabelKey] = accountName
 		if err = r.upsertSystemAccountSecret(reqCtx, pvc, scope, clusterName, ownerName, accountName, []byte(password), accountLabels); err != nil {
 			return err
 		}

@@ -48,6 +48,7 @@ const (
 	KBAppInstanceTemplateLabelKey   = "apps.kubeblocks.io/instance-template"
 	KBAppPodNameLabelKey            = "apps.kubeblocks.io/pod-name"
 	VolumeClaimTemplateNameLabelKey = "apps.kubeblocks.io/vct-name"
+	SystemAccountLabelKey           = "apps.kubeblocks.io/system-account"
 
 	KBAppServiceVersionKey = "apps.kubeblocks.io/service-version"
 	KBAppReleasePhaseKey   = "apps.kubeblocks.io/release-phase" // TODO: release or service phase?

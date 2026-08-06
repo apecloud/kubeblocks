@@ -1056,9 +1056,6 @@ func (h *clusterShardingHandler) buildLabels(sharding *appsv1.ClusterSharding, s
 
 func (h *clusterShardingHandler) buildAnnotations(transCtx *clusterTransformContext, shardingName, compName string) map[string]string {
 	var annotations map[string]string
-	if compAnnotations := transCtx.annotations[compName]; len(compAnnotations) > 0 {
-		annotations = maps.Clone(compAnnotations)
-	}
 
 	// convert the sharding hostNetwork annotation to the component annotation
 	if hnKey, ok := transCtx.Cluster.Annotations[constant.HostNetworkAnnotationKey]; ok {

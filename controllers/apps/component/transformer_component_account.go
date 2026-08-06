@@ -22,6 +22,7 @@ package component
 import (
 	"fmt"
 	"reflect"
+	"time"
 
 	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/exp/maps"
@@ -44,7 +45,6 @@ import (
 )
 
 const (
-	systemAccountLabel          = "apps.kubeblocks.io/system-account"
 	systemAccountHashAnnotation = "apps.kubeblocks.io/system-account-hash"
 )
 
@@ -202,6 +202,11 @@ func (t *componentAccountTransformer) getPasswordFromSecret(transCtx *componentT
 	if err := transCtx.GetClient().Get(transCtx.GetContext(), secretKey, secret); err != nil {
 		return nil, err
 	}
+	if revision, ok := secret.Annotations[constant.SecretRevisionAnnotationKey]; ok && revision != account.SecretRefRevision {
+		return nil, ctrlutil.NewRequeueError(time.Second,
+			fmt.Sprintf("wait for referenced account secret %s/%s revision %s",
+				secret.Namespace, secret.Name, account.SecretRefRevision))
+	}
 
 	passwordKey := constant.AccountPasswdForSecret
 	if len(account.SecretRef.Password) > 0 {
@@ -242,7 +247,7 @@ func (t *componentAccountTransformer) buildAccountSecretWithPassword(ctx *compon
 		AddLabelsInMap(synthesizedComp.StaticLabels).
 		AddLabelsInMap(synthesizedComp.DynamicLabels).
 		AddLabelsInMap(constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name)).
-		AddLabels(systemAccountLabel, account.Name).
+		AddLabels(constant.SystemAccountLabelKey, account.Name).
 		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
 		AddAnnotationsInMap(synthesizedComp.DynamicAnnotations).
 		PutData(constant.AccountNameForSecret, []byte(account.Name)).
@@ -268,7 +273,7 @@ func listSystemAccountObjects(ctx graph.TransformContext,
 
 	m := make(map[string]*corev1.Secret)
 	for i, secret := range secretList.Items {
-		if accountName, ok := secret.Labels[systemAccountLabel]; ok {
+		if accountName, ok := secret.Labels[constant.SystemAccountLabelKey]; ok {
 			m[accountName] = &secretList.Items[i]
 		}
 	}
@@ -296,8 +301,9 @@ func verifySystemAccountPassword(secret *corev1.Secret, hashedPassword []byte) b
 
 type synthesizedSystemAccount struct {
 	appsv1.SystemAccount
-	Disabled  *bool
-	SecretRef *appsv1.ProvisionSecretRef
+	Disabled          *bool
+	SecretRef         *appsv1.ProvisionSecretRef
+	SecretRefRevision string
 }
 
 func synthesizeSystemAccounts(compDefAccounts []appsv1.SystemAccount,
@@ -315,6 +321,7 @@ func synthesizeSystemAccounts(compDefAccounts []appsv1.SystemAccount,
 		}
 		account.Disabled = compAccount.Disabled
 		account.SecretRef = compAccount.SecretRef
+		account.SecretRefRevision = compAccount.SecretRefRevision
 		return account
 	}
 

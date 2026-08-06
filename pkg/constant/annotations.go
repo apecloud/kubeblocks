@@ -51,6 +51,9 @@ const (
 	LastRoleAuthoritativeVersionAnnotationKey = "apps.kubeblocks.io/last-role-authoritative-version"
 	ComponentScaleInAnnotationKey             = "apps.kubeblocks.io/component-scale-in" // ComponentScaleInAnnotationKey specifies whether the component is scaled in
 
+	// SecretRevisionAnnotationKey identifies the revision of Secret data consumed by another object.
+	SecretRevisionAnnotationKey = "apps.kubeblocks.io/secret-revision"
+
 	// SkipPreTerminateAnnotationKey specifies to skip the pre-terminate action for a component.
 	SkipPreTerminateAnnotationKey = "apps.kubeblocks.io/skip-pre-terminate"
 

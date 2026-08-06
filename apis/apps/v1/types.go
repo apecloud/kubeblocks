@@ -400,6 +400,7 @@ type ComponentService struct {
 	DisableAutoProvision *bool `json:"disableAutoProvision,omitempty"`
 }
 
+// +kubebuilder:validation:XValidation:rule="!has(self.secretRefRevision) || size(self.secretRefRevision) == 0 || has(self.secretRef)",message="secretRef must be specified when secretRefRevision is non-empty"
 type ComponentSystemAccount struct {
 	// The name of the system account.
 	//
@@ -423,10 +424,22 @@ type ComponentSystemAccount struct {
 	//
 	// For user-specified passwords, the maximum length is limited to 64 bytes.
 	//
+	// Updates to the referenced Secret do not automatically trigger reconciliation.
+	// To apply updated credentials, update the referenced Secret first and then change
+	// SecretRefRevision to a new value.
+	//
 	// This field is immutable once set.
 	//
 	// +optional
 	SecretRef *ProvisionSecretRef `json:"secretRef,omitempty"`
+
+	// Specifies an opaque revision of the referenced Secret.
+	//
+	// After updating the referenced Secret, change this field to a new value to apply
+	// the updated credentials. The value is treated as an opaque token.
+	//
+	// +optional
+	SecretRefRevision string `json:"secretRefRevision,omitempty"`
 }
 
 // PasswordConfig helps provide to customize complexity of password generation pattern.

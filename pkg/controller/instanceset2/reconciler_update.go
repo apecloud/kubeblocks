@@ -30,6 +30,8 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/revisionmap"
+	"github.com/apecloud/kubeblocks/pkg/controller/rollingupdate"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -53,6 +55,14 @@ func (r *updateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 
 func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
+	// OnDelete ends the rolling-update lifecycle even while the instance set is
+	// temporarily unaligned (for example, during scaling).
+	if its.Spec.InstanceUpdateStrategy != nil && its.Spec.InstanceUpdateStrategy.Type == kbappsv1.OnDeleteStrategyType {
+		if rollingupdate.Reset(its) {
+			return kubebuilderx.Commit, nil
+		}
+		return kubebuilderx.Continue, nil
+	}
 	itsExt, err := instancetemplate.BuildInstanceSetExt(its, tree)
 	if err != nil {
 		return kubebuilderx.Continue, err
@@ -90,10 +100,6 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 
 	// 3. do update
 	instanceUpdateStrategy := its.Spec.InstanceUpdateStrategy
-	if instanceUpdateStrategy != nil && instanceUpdateStrategy.Type == kbappsv1.OnDeleteStrategyType {
-		instanceUpdateStrategy = nil
-	}
-
 	// handle 'RollingUpdate'
 	replicas, maxUnavailable, err := parseReplicasNMaxUnavailable(instanceUpdateStrategy, len(oldInstanceList))
 	if err != nil {
@@ -118,12 +124,23 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		updateCount = len(instancesToBeUpdated)
 	}
 
-	// updatedInstances tracks the positions already covered by the rolling-update
-	// window, while updatingInstances tracks actual updates admitted in this round.
-	updatedInstances := 0
 	updatingInstances := 0
 	priorities := composeRolePriorityMap(its.Spec.Roles)
 	sortInstanceObjects(oldInstanceList, priorities, false)
+	orderedNames := make([]string, len(oldInstanceList))
+	for i, inst := range oldInstanceList {
+		orderedNames[i] = inst.Name
+	}
+	updateRevisions, err := revisionmap.Decode(its.Status.UpdateRevisions)
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
+	rolloutID := rollingupdate.CurrentRolloutID(its, updateRevisions)
+	participants, windowChanged := rollingupdate.Participants(
+		its, rolloutID, replicas, orderedNames)
+	if windowChanged {
+		return kubebuilderx.Commit, nil
+	}
 
 	canBeUpdated := func(inst *workloads.Instance) bool {
 		if !intctrlutil.IsInstanceReady(inst) {
@@ -142,8 +159,8 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 
 	for _, inst := range oldInstanceList {
-		if updatedInstances >= replicas {
-			break
+		if !participants.Has(inst.Name) {
+			continue
 		}
 		if updatingInstances >= min(unavailable, updateCount) {
 			break
@@ -165,7 +182,6 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			}
 			updatingInstances++
 		}
-		updatedInstances++
 	}
 	return kubebuilderx.Continue, nil
 }

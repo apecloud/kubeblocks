@@ -26,6 +26,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/revisionmap"
+	"github.com/apecloud/kubeblocks/pkg/controller/rollingupdate"
 )
 
 func NewRevisionUpdateReconciler() kubebuilderx.Reconciler {
@@ -55,6 +56,11 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kub
 	for _, name := range names {
 		updateRevisions[name] = getInstanceRevision(desiredInstances[name])
 	}
+	previousRevisions, err := revisionmap.Decode(its.Status.UpdateRevisions)
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
+	rollingupdate.UpdateRolloutID(its, previousRevisions, updateRevisions)
 	revisions, err := revisionmap.Encode(updateRevisions)
 	if err != nil {
 		return kubebuilderx.Continue, err

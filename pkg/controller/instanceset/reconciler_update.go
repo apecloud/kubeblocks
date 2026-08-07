@@ -37,6 +37,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/rollingupdate"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -62,6 +63,14 @@ func (r *updateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 
 func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
+	// OnDelete ends the rolling-update lifecycle even while the instance set is
+	// temporarily unaligned (for example, during scaling).
+	if its.Spec.InstanceUpdateStrategy != nil && its.Spec.InstanceUpdateStrategy.Type == kbappsv1.OnDeleteStrategyType {
+		if rollingupdate.Reset(its) {
+			return kubebuilderx.Commit, nil
+		}
+		return kubebuilderx.Continue, nil
+	}
 	itsExt, err := instancetemplate.BuildInstanceSetExt(its, tree)
 	if err != nil {
 		return kubebuilderx.Continue, err
@@ -97,13 +106,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		return kubebuilderx.Continue, nil
 	}
 
-	// 3. do update
-	// do nothing if update strategy type is 'OnDelete'
-	if its.Spec.InstanceUpdateStrategy != nil && its.Spec.InstanceUpdateStrategy.Type == kbappsv1.OnDeleteStrategyType {
-		return kubebuilderx.Continue, nil
-	}
-
-	// handle 'RollingUpdate'
+	// 3. handle 'RollingUpdate'
 	rollingUpdateQuota, unavailableQuota, err := r.rollingUpdateQuota(its, oldPodList)
 	if err != nil {
 		return kubebuilderx.Continue, err
@@ -117,12 +120,34 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 
 	priorities := ComposeRolePriorityMap(its.Spec.Roles)
 	sortObjects(oldPodList, priorities, false)
+	orderedNames := make([]string, len(oldPodList))
+	for i, pod := range oldPodList {
+		orderedNames[i] = pod.Name
+	}
+	updateRevisions, err := GetRevisions(its.Status.UpdateRevisions)
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
+	rolloutID := its.Annotations[rollingupdate.RolloutIDAnnotationKey]
+	if rolloutID == "" {
+		rolloutRevisions, rolloutBasis, err := buildLegacyRolloutState(its, itsExt, nameToTemplateMap)
+		if err != nil {
+			return kubebuilderx.Continue, err
+		}
+		rolloutID = rollingupdate.CurrentLegacyRolloutID(
+			its, updateRevisions, rolloutRevisions, rolloutBasis)
+	}
+	participants, windowChanged := rollingupdate.Participants(
+		its, rolloutID, rollingUpdateQuota, orderedNames)
+	if windowChanged {
+		return kubebuilderx.Commit, nil
+	}
 
 	// treat old and Pending pod as a special case, as they can be updated without a consequence
 	// PodUpdatePolicy is ignored here since in-place update for a pending pod doesn't make much sense.
-	for i, pod := range oldPodList {
-		if i >= rollingUpdateQuota {
-			break
+	for _, pod := range oldPodList {
+		if !participants.Has(pod.Name) {
+			continue
 		}
 		updatePolicy, _, _, err := getPodUpdatePolicy(its, pod)
 		if err != nil {
@@ -135,15 +160,12 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		}
 	}
 
-	// updatedPods tracks the positions already covered by the rolling-update
-	// window, while updatingPods tracks actual updates admitted in this round.
-	updatedPods := 0
 	updatingPods := 0
 	isBlocked := false
 	needRetry := false
 	for _, pod := range oldPodList {
-		if updatedPods >= rollingUpdateQuota {
-			break
+		if !participants.Has(pod.Name) {
+			continue
 		}
 		if updatingPods >= unavailableQuota {
 			break
@@ -224,7 +246,6 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			}
 			updatingPods++
 		}
-		updatedPods++
 	}
 
 	if !isBlocked {

@@ -2806,6 +2806,18 @@ string
 <p>Provides additional information about the current phase.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>matchedCompDefs</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the names of component definitions that match the <code>spec.compDefs</code> of the BackupPolicyTemplate.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.BackupRef">BackupRef

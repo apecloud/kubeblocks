@@ -23,6 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -116,13 +117,13 @@ func (r *BackupPolicyDriverReconciler) reconcile(reqCtx intctrlutil.RequestCtx, 
 
 func (r *BackupPolicyDriverReconciler) getBackupPolicyTemplate(reqCtx intctrlutil.RequestCtx, componentDef string) (*dpv1alpha1.BackupPolicyTemplate, error) {
 	bptList := &dpv1alpha1.BackupPolicyTemplateList{}
-	if err := r.Client.List(reqCtx.Ctx, bptList, client.MatchingLabels{
-		componentDef: componentDef,
-	}); err != nil {
+	if err := r.Client.List(reqCtx.Ctx, bptList); err != nil {
 		return nil, err
 	}
-	if len(bptList.Items) > 0 {
-		return &bptList.Items[0], nil
+	for _, bpt := range bptList.Items {
+		if slices.Contains(bpt.Status.MatchedCompDefs, componentDef) {
+			return &bpt, nil
+		}
 	}
 	return nil, nil
 }

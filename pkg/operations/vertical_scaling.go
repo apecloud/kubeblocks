@@ -114,28 +114,23 @@ func (vs verticalScalingHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, 
 			if err != nil {
 				return 0, 0, err
 			}
+			plan, err := runtime.GenerateInstanceNamePlan(opsRes.Cluster.Namespace, opsRes.Cluster.Name,
+				pgRes.fullComponentName, *pgRes.clusterComponent)
+			if err != nil {
+				return 0, 0, err
+			}
 			for _, template := range pgRes.clusterComponent.Instances {
 				replicas := template.GetReplicas()
 				insVS := vsInsMap[template.Name]
 				if vs.verticalScalingInsTemplate(verticalScaling, template, insVS) {
-					templatePodNames, err := runtime.GenerateTemplateInstanceNames(
-						opsRes.Cluster.Name, pgRes.fullComponentName, template.Name, replicas, pgRes.clusterComponent.OfflineInstances, template.Ordinals)
-					if err != nil {
-						return 0, 0, err
-					}
-					for _, podName := range templatePodNames {
+					for _, podName := range plan.NamesForTemplate(template.Name) {
 						updatedPodSet[podName] = template.Name
 					}
 				}
 				templateReplicasCnt += replicas
 			}
 			if vs.verticalScalingComp(verticalScaling) && templateReplicasCnt < pgRes.clusterComponent.Replicas {
-				podNames, err := runtime.GenerateTemplateInstanceNames(
-					opsRes.Cluster.Name, pgRes.fullComponentName, "", pgRes.clusterComponent.Replicas-templateReplicasCnt, pgRes.clusterComponent.OfflineInstances, appsv1.Ordinals{})
-				if err != nil {
-					return 0, 0, err
-				}
-				for _, podName := range podNames {
+				for _, podName := range plan.NamesForTemplate("") {
 					updatedPodSet[podName] = ""
 				}
 			} else {

@@ -278,6 +278,87 @@ func TestOpsRuntimeBuildsInstanceAPIView(t *testing.T) {
 	}
 }
 
+func TestOpsRuntimeGeneratesFlatInstanceNamePlan(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatalf("add core scheme: %v", err)
+	}
+	if err := workloads.AddToScheme(scheme); err != nil {
+		t.Fatalf("add workloads scheme: %v", err)
+	}
+
+	const (
+		namespace   = "default"
+		clusterName = "test-cluster"
+		component   = "mysql"
+		workload    = "test-cluster-mysql"
+	)
+	runningITS := &workloads.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: workload},
+		Status: workloads.InstanceSetStatus{AssignedOrdinals: map[string]workloads.Ordinals{
+			"":    {Discrete: []int32{0, 1}},
+			"big": {Discrete: []int32{5}},
+		}},
+	}
+	offlinePVC := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{
+		Namespace: namespace,
+		Name:      "data-test-cluster-mysql-7",
+		Labels: map[string]string{
+			constant.AppInstanceLabelKey:           clusterName,
+			constant.KBAppComponentLabelKey:        component,
+			constant.KBAppPodNameLabelKey:          "test-cluster-mysql-7",
+			constant.KBAppInstanceTemplateLabelKey: "big",
+		},
+	}}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(runningITS, offlinePVC).Build()
+	rt := newOpsRuntime(context.Background(), cli, "")
+	bigReplicas := int32(1)
+	compSpec := appsv1.ClusterComponentSpec{
+		Name:                component,
+		Replicas:            3,
+		FlatInstanceOrdinal: true,
+		Instances: []appsv1.InstanceTemplate{{
+			Name:     "big",
+			Replicas: &bigReplicas,
+		}},
+		OfflineInstances: []string{"test-cluster-mysql-7"},
+	}
+	plan, err := rt.GenerateInstanceNamePlan(namespace, clusterName, component, compSpec)
+	if err != nil {
+		t.Fatalf("generate instance name plan: %v", err)
+	}
+
+	expectedNames := []string{"test-cluster-mysql-0", "test-cluster-mysql-1", "test-cluster-mysql-5"}
+	if len(plan.Names) != len(expectedNames) {
+		t.Fatalf("unexpected names: %v", plan.Names)
+	}
+	for i := range expectedNames {
+		if plan.Names[i] != expectedNames[i] {
+			t.Fatalf("unexpected names: %v", plan.Names)
+		}
+	}
+	if got := plan.TemplateByName["test-cluster-mysql-5"]; got != "big" {
+		t.Fatalf("unexpected template for flat instance: %q", got)
+	}
+	if got := plan.NamesForTemplate("big"); len(got) != 1 || got[0] != "test-cluster-mysql-5" {
+		t.Fatalf("unexpected names for big template: %v", got)
+	}
+	if got := plan.OfflineTemplateByName["test-cluster-mysql-7"]; got != "big" {
+		t.Fatalf("unexpected template for offline flat instance: %q", got)
+	}
+
+	scaledBigReplicas := int32(2)
+	compSpec.Replicas = 4
+	compSpec.Instances[0].Replicas = &scaledBigReplicas
+	scaledPlan, err := rt.GenerateInstanceNamePlan(namespace, clusterName, component, compSpec)
+	if err != nil {
+		t.Fatalf("generate scaled instance name plan: %v", err)
+	}
+	if got := scaledPlan.TemplateByName["test-cluster-mysql-2"]; got != "big" {
+		t.Fatalf("unexpected template for newly assigned flat instance: %q", got)
+	}
+}
+
 func TestDefaultInstanceAndVolumeNilBranches(t *testing.T) {
 	instance := &defaultInstance{name: "missing", componentName: "mysql"}
 	if instance.GetComponentName() != "mysql" {

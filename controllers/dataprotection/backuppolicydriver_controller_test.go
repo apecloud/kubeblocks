@@ -86,7 +86,8 @@ var _ = Describe("BackupPolicyDriver Controller test", func() {
 		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(bpt),
 			func(g Gomega, bpt *dpv1alpha1.BackupPolicyTemplate) {
 				g.Expect(bpt.Status.Phase).Should(Equal(dpv1alpha1.AvailablePhase))
-				g.Expect(bpt.Labels[compDefObj.Name]).Should(Equal(compDefObj.Name))
+				g.Expect(bpt.Status.MatchedCompDefs).Should(ContainElement(compDefObj.Name))
+				g.Expect(bpt.Labels).ShouldNot(HaveKey(compDefObj.Name))
 			})).Should(Succeed())
 	}
 

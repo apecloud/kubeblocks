@@ -46,7 +46,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	// +kubebuilder:scaffold:imports
 
@@ -138,7 +137,6 @@ func init() {
 	viper.AutomaticEnv()
 
 	viper.SetDefault(constant.CfgKeyCtrlrReconcileRetryDurationMS, 1000)
-	viper.SetDefault("CERT_DIR", "/tmp/k8s-webhook-server/serving-certs")
 	viper.SetDefault(constant.EnableRBACManager, true)
 	viper.SetDefault("VOLUMESNAPSHOT_API_BETA", false)
 	viper.SetDefault(constant.KBToolsImage, "apecloud/kubeblocks-tools:latest")
@@ -383,10 +381,6 @@ func main() {
 		RenewDeadline:                 ptr.To(time.Duration(viper.GetInt(leaderElectRenewDeadlineFlagKey.viperName())) * time.Second),
 		RetryPeriod:                   ptr.To(time.Duration(viper.GetInt(leaderElectRetryPeriodFlagKey.viperName())) * time.Second),
 
-		WebhookServer: webhook.NewServer(webhook.Options{
-			Port:    9443,
-			CertDir: viper.GetString("cert_dir"),
-		}),
 		Client: client.Options{
 			Cache: &client.CacheOptions{
 				DisableFor: append(intctrlutil.GetUncachedObjects(), &parametersv1alpha1.ComponentParameter{}),

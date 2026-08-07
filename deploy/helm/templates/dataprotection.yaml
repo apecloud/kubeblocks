@@ -167,9 +167,6 @@ spec:
           image: "{{ .Values.dataProtection.image.registry | default $dataProtectionImageRegistry }}/{{ .Values.dataProtection.image.repository }}:{{ .Values.dataProtection.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.dataProtection.image.pullPolicy }}
           ports:
-            - name: webhook-server
-              containerPort: 9443
-              protocol: TCP
             - name: health
               containerPort: 8081
               protocol: TCP

@@ -216,9 +216,6 @@ spec:
           image: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
-            - name: webhook-server
-              containerPort: 9443
-              protocol: TCP
             - name: health
               containerPort: 8081
               protocol: TCP

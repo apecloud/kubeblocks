@@ -217,14 +217,8 @@ podSecurityContext:
 ## Service settings
 ##
 ## @param service.type
-## @param service.port
-## @param service.nodePort
 service:
   type: ClusterIP
-  port: 9443
-  # -- Service node port.
-  # Only used if `service.type` is `NodePort`.
-  nodePort:
 
 
 ## Metrics serviceMonitor parameters

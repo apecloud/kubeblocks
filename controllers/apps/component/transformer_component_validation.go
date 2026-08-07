@@ -62,9 +62,21 @@ func (t *componentValidationTransformer) Transform(ctx graph.TransformContext, d
 	if err = validateExternalManagedConfigSources(transCtx); err != nil {
 		return intctrlutil.NewRequeueError(appsutil.RequeueDuration, err.Error())
 	}
+	if err = validateNonBlockingReconfigureActions(comp); err != nil {
+		return intctrlutil.NewRequeueError(appsutil.RequeueDuration, err.Error())
+	}
 	// if err = validateSidecarContainers(comp, transCtx.CompDef); err != nil {
 	// 	return newRequeueError(requeueDuration, err.Error())
 	// }
+	return nil
+}
+
+func validateNonBlockingReconfigureActions(comp *appsv1.Component) error {
+	for i, config := range comp.Spec.Configs {
+		if config.ReconfigureAction != nil && config.ReconfigureAction.NonBlocking {
+			return fmt.Errorf("spec.configs[%d].reconfigureAction does not support non-blocking mode", i)
+		}
+	}
 	return nil
 }
 

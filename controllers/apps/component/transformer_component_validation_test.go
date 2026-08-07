@@ -181,6 +181,41 @@ func TestValidateExternalManagedConfigSources(t *testing.T) {
 	}
 }
 
+func TestValidateNonBlockingReconfigureActions(t *testing.T) {
+	tests := []struct {
+		name    string
+		comp    *appsv1.Component
+		wantErr bool
+	}{
+		{
+			name: "rejects config reconfigure action",
+			comp: &appsv1.Component{Spec: appsv1.ComponentSpec{
+				Configs: []appsv1.ClusterComponentConfig{{
+					ReconfigureAction: &appsv1.Action{NonBlocking: true},
+				}},
+			}},
+			wantErr: true,
+		},
+		{
+			name: "does not validate custom actions owned by higher-level APIs",
+			comp: &appsv1.Component{Spec: appsv1.ComponentSpec{
+				CustomActions: []appsv1.CustomAction{{
+					Name:   "custom",
+					Action: &appsv1.Action{NonBlocking: true},
+				}},
+			}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateNonBlockingReconfigureActions(tt.comp)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("validateNonBlockingReconfigureActions() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
 func externalManagedConfig(name, cmName string) appsv1.ClusterComponentConfig {
 	return appsv1.ClusterComponentConfig{
 		Name: ptr.To(name),

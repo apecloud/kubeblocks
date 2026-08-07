@@ -289,6 +289,35 @@ var _ = Describe("lifecycle", func() {
 			Expect(err).Should(BeNil())
 		})
 
+		It("executes on an exact target pod", func() {
+			pods = []*corev1.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "pod-0"}},
+				{ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "pod-1"}},
+			}
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods)
+			Expect(err).Should(BeNil())
+			selected, err := lifecycle.(*kbagent).selectTargetPods(
+				lifecycleActions.PostProvision, &Options{TargetPodName: "pod-1"})
+			Expect(err).Should(BeNil())
+			Expect(selected).Should(HaveLen(1))
+			Expect(selected[0].Name).Should(Equal("pod-1"))
+
+			mockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).Return(proto.ActionResponse{}, nil).Times(1)
+			})
+
+			err = lifecycle.PostProvision(ctx, k8sClient, &Options{TargetPodName: "pod-1"})
+			Expect(err).Should(BeNil())
+		})
+
+		It("rejects an unavailable exact target pod", func() {
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods)
+			Expect(err).Should(BeNil())
+
+			err = lifecycle.PostProvision(ctx, k8sClient, &Options{TargetPodName: "missing"})
+			Expect(err).Should(MatchError(ContainSubstring("target pod missing is not available")))
+		})
+
 		It("succeed", func() {
 			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods)
 			Expect(err).Should(BeNil())

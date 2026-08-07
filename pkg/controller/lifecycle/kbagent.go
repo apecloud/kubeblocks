@@ -261,7 +261,7 @@ func (a *kbagent) callAction(ctx context.Context, cli client.Reader, spec *appsv
 	if err1 != nil {
 		return nil, err1
 	}
-	return a.callActionWithSelector(ctx, spec, lfa, req)
+	return a.callActionWithSelector(ctx, spec, lfa, req, opts)
 }
 
 // BuildKBAgentRetryPolicy normalizes the API retry policy into the kbagent wire contract.
@@ -378,8 +378,9 @@ func (a *kbagent) templateVarsParameters() (map[string]string, error) {
 	return m, nil
 }
 
-func (a *kbagent) callActionWithSelector(ctx context.Context, spec *appsv1.Action, lfa lifecycleAction, req *proto.ActionRequest) ([]byte, error) {
-	pods, err := a.selectTargetPods(spec)
+func (a *kbagent) callActionWithSelector(ctx context.Context, spec *appsv1.Action, lfa lifecycleAction,
+	req *proto.ActionRequest, opts *Options) ([]byte, error) {
+	pods, err := a.selectTargetPods(spec, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -387,7 +388,7 @@ func (a *kbagent) callActionWithSelector(ctx context.Context, spec *appsv1.Actio
 		return nil, fmt.Errorf("no available pod to execute action %s", lfa.name())
 	}
 	selector, _ := resolveTargetPodSelector(spec)
-	aggregateErrors := selector == appsv1.AllReplicas
+	aggregateErrors := (opts == nil || opts.TargetPodName == "") && selector == appsv1.AllReplicas
 
 	// TODO: impl
 	//  - back-off to retry
@@ -452,7 +453,15 @@ func (a *kbagent) callActionWithSelector(ctx context.Context, spec *appsv1.Actio
 	return output, nil
 }
 
-func (a *kbagent) selectTargetPods(spec *appsv1.Action) ([]*corev1.Pod, error) {
+func (a *kbagent) selectTargetPods(spec *appsv1.Action, opts *Options) ([]*corev1.Pod, error) {
+	if opts != nil && opts.TargetPodName != "" {
+		for _, pod := range a.pods {
+			if pod.Name == opts.TargetPodName {
+				return []*corev1.Pod{pod}, nil
+			}
+		}
+		return nil, fmt.Errorf("target pod %s is not available to execute action", opts.TargetPodName)
+	}
 	return SelectTargetPods(a.pods, a.pod, spec)
 }
 

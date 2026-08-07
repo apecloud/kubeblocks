@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package dataprotection
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -489,6 +490,37 @@ var _ = Describe("Restore Controller test", func() {
 				_ = testdp.NewFakeCluster(&testCtx)
 			})
 
+			expectCommittedFullStage := func(restore *dpv1alpha1.Restore) {
+				Eventually(func(g Gomega) {
+					secrets := &corev1.SecretList{}
+					g.Expect(k8sClient.List(ctx, secrets,
+						client.InNamespace(restore.Namespace),
+						client.MatchingLabels{dprestore.DataProtectionRestoreLabelKey: restore.Name})).Should(Succeed())
+					var payload []byte
+					for i := range secrets.Items {
+						if secrets.Items[i].Type == corev1.SecretType("dataprotection.kubeblocks.io/post-ready-plan") {
+							payload = secrets.Items[i].Data["plan.json"]
+							break
+						}
+					}
+					g.Expect(payload).ShouldNot(BeEmpty())
+					var stage struct {
+						Actions []struct {
+							Order      int    `json:"order"`
+							BackupName string `json:"backupName"`
+							ActionName string `json:"actionName"`
+						} `json:"actions"`
+					}
+					g.Expect(json.Unmarshal(payload, &stage)).Should(Succeed())
+					g.Expect(stage.Actions).Should(HaveLen(2))
+					g.Expect(stage.Actions[0].Order).Should(Equal(0))
+					g.Expect(stage.Actions[0].ActionName).Should(Equal("postReady-0"))
+					g.Expect(stage.Actions[1].Order).Should(Equal(1))
+					g.Expect(stage.Actions[1].ActionName).Should(Equal("postReady-1"))
+					g.Expect(stage.Actions[1].BackupName).Should(Equal(stage.Actions[0].BackupName))
+				}).Should(Succeed())
+			}
+
 			It("test post ready actions", func() {
 				By("remove the prepareData stage for testing post ready actions")
 				Expect(testapps.ChangeObj(&testCtx, actionSet, func(set *dpv1alpha1.ActionSet) {
@@ -507,6 +539,7 @@ var _ = Describe("Restore Controller test", func() {
 				Eventually(testapps.List(&testCtx, generics.JobSignature,
 					client.MatchingLabels{dprestore.DataProtectionRestoreLabelKey: restore.Name},
 					client.InNamespace(testCtx.DefaultNamespace))).Should(HaveLen(2))
+				expectCommittedFullStage(restore)
 
 				checkJobSA(restore, viper.GetString(dptypes.CfgKeyExecWorkerServiceAccountName))
 
@@ -524,6 +557,82 @@ var _ = Describe("Restore Controller test", func() {
 				By("test deleting restore")
 				Expect(k8sClient.Delete(ctx, restore)).Should(Succeed())
 				Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(restore), restore, false)).Should(Succeed())
+			})
+
+			It("keeps running persisted postReady jobs after the ActionSet removes them", func() {
+				By("remove the prepareData stage for testing post ready actions")
+				Expect(testapps.ChangeObj(&testCtx, actionSet, func(set *dpv1alpha1.ActionSet) {
+					set.Spec.Restore.PrepareData = nil
+				})).Should(Succeed())
+
+				matchLabels := map[string]string{
+					constant.AppInstanceLabelKey: testdp.ClusterName,
+				}
+				restore := initResourcesAndWaitRestore(true, false, false, "", dpv1alpha1.RestorePhaseRunning,
+					func(f *testdp.MockRestoreFactory) {
+						f.SetConnectCredential(testdp.ClusterName).SetJobActionConfig(matchLabels).SetExecActionConfig(matchLabels)
+					}, nil)
+
+				By("wait for the first postReady step to create its Jobs")
+				Eventually(testapps.List(&testCtx, generics.JobSignature,
+					client.MatchingLabels{dprestore.DataProtectionRestoreLabelKey: restore.Name},
+					client.InNamespace(testCtx.DefaultNamespace))).Should(HaveLen(2))
+				expectCommittedFullStage(restore)
+
+				By("remove postReady from the mutable ActionSet while those Jobs are running")
+				Expect(testapps.ChangeObj(&testCtx, actionSet, func(set *dpv1alpha1.ActionSet) {
+					set.Spec.Restore.PostReady = nil
+				})).Should(Succeed())
+				Consistently(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(restore), func(g Gomega, r *dpv1alpha1.Restore) {
+					g.Expect(r.Status.Phase).Should(Equal(dpv1alpha1.RestorePhaseRunning))
+				}), 2*time.Second, 100*time.Millisecond).Should(Succeed())
+
+				By("complete action zero and continue from the frozen action one")
+				mockRestoreJobsCompleted(restore)
+				Eventually(testapps.List(&testCtx, generics.JobSignature,
+					client.MatchingLabels{dprestore.DataProtectionRestoreLabelKey: restore.Name},
+					client.InNamespace(testCtx.DefaultNamespace))).Should(HaveLen(3))
+				mockRestoreJobsCompleted(restore)
+				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(restore), func(g Gomega, r *dpv1alpha1.Restore) {
+					g.Expect(r.Status.Phase).Should(Equal(dpv1alpha1.RestorePhaseCompleted))
+				})).Should(Succeed())
+			})
+
+			It("finishes a committed postReady plan after the ActionSet is deleted", func() {
+				By("remove the prepareData stage for testing post ready actions")
+				Expect(testapps.ChangeObj(&testCtx, actionSet, func(set *dpv1alpha1.ActionSet) {
+					set.Spec.Restore.PrepareData = nil
+				})).Should(Succeed())
+
+				matchLabels := map[string]string{
+					constant.AppInstanceLabelKey: testdp.ClusterName,
+				}
+				restore := initResourcesAndWaitRestore(true, false, false, "", dpv1alpha1.RestorePhaseRunning,
+					func(f *testdp.MockRestoreFactory) {
+						f.SetConnectCredential(testdp.ClusterName).SetJobActionConfig(matchLabels).SetExecActionConfig(matchLabels)
+					}, nil)
+
+				By("wait for the immutable plan and first postReady Jobs")
+				Eventually(testapps.List(&testCtx, generics.JobSignature,
+					client.MatchingLabels{dprestore.DataProtectionRestoreLabelKey: restore.Name},
+					client.InNamespace(testCtx.DefaultNamespace))).Should(HaveLen(2))
+				expectCommittedFullStage(restore)
+
+				By("delete the mutable ActionSet while the committed Jobs are running")
+				Expect(k8sClient.Delete(ctx, actionSet)).Should(Succeed())
+				Consistently(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(restore), func(g Gomega, r *dpv1alpha1.Restore) {
+					g.Expect(r.Status.Phase).Should(Equal(dpv1alpha1.RestorePhaseRunning))
+				}), 2*time.Second, 100*time.Millisecond).Should(Succeed())
+
+				By("complete action zero and create frozen action one without the deleted ActionSet")
+				mockRestoreJobsCompleted(restore)
+				Eventually(testapps.List(&testCtx, generics.JobSignature,
+					client.MatchingLabels{dprestore.DataProtectionRestoreLabelKey: restore.Name},
+					client.InNamespace(testCtx.DefaultNamespace))).Should(HaveLen(3))
+				mockRestoreJobsCompleted(restore)
+				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(restore), func(g Gomega, r *dpv1alpha1.Restore) {
+					g.Expect(r.Status.Phase).Should(Equal(dpv1alpha1.RestorePhaseCompleted))
+				})).Should(Succeed())
 			})
 
 			It("should complete an existing postReady job when target pod is no longer ready", func() {

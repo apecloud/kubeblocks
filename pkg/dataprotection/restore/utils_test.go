@@ -21,6 +21,8 @@ package restore
 
 import (
 	"context"
+	"encoding/json"
+	"strconv"
 	"testing"
 	"time"
 
@@ -29,6 +31,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -320,6 +323,154 @@ func TestValidateAndInitRestoreMGRFullBackup(t *testing.T) {
 	assert.Error(t, ValidateAndInitRestoreMGR(reqCtx, cli, mgr))
 }
 
+func TestValidateAndInitRestoreMGRUsesPersistedPlanAfterActionSetDeletion(t *testing.T) {
+	scheme := runtime.NewScheme()
+	assert.NoError(t, dpv1alpha1.AddToScheme(scheme))
+	assert.NoError(t, corev1.AddToScheme(scheme))
+	assert.NoError(t, batchv1.AddToScheme(scheme))
+
+	backup := &dpv1alpha1.Backup{
+		ObjectMeta: metav1.ObjectMeta{Name: "backup", Namespace: "ns"},
+		Status: dpv1alpha1.BackupStatus{
+			Phase: dpv1alpha1.BackupPhaseCompleted,
+			BackupMethod: &dpv1alpha1.BackupMethod{
+				Name:          "full",
+				ActionSetName: "deleted-action-set",
+			},
+		},
+	}
+	restoreObj := &dpv1alpha1.Restore{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "restore",
+			Namespace: "ns",
+			UID:       types.UID("restore-uid"),
+		},
+		Spec: dpv1alpha1.RestoreSpec{Backup: dpv1alpha1.BackupRef{Name: "backup", Namespace: "ns"}},
+	}
+	mgr := NewRestoreManager(restoreObj, nil, scheme, nil)
+	job := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       "restore-post-ready-0",
+			Namespace:  "ns",
+			Finalizers: []string{dptypes.DataProtectionFinalizerName},
+			Labels: map[string]string{
+				DataProtectionRestoreLabelKey:          "restore",
+				DataProtectionRestoreNamespaceLabelKey: "ns",
+			},
+			Annotations: map[string]string{
+				postReadyTargetIdentityAnnotationKey: "ns/pod-0",
+				postReadyActionContractAnnotationKey: "sha256:contract",
+				postReadyBackupNameAnnotationKey:     "backup",
+				postReadyActionNameAnnotationKey:     "postReady-0",
+			},
+		},
+		Spec: batchv1.JobSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
+			RestartPolicy: corev1.RestartPolicyNever,
+			Containers:    []corev1.Container{{Name: Restore, Image: "busybox:1.36"}},
+		}}},
+	}
+	setPostReadyExecutionPolicy(job, dpv1alpha1.PostReadyExecutionPolicySerial)
+	assert.NoError(t, setPostReadyTargetPlan([]*batchv1.Job{job}))
+	stage, err := canonicalPostReadyStagePlan(postReadyExecutionPlan{
+		Version:               postReadyPlanVersion,
+		RestoreNamespace:      "ns",
+		RestoreName:           "restore",
+		RestoreUID:            "restore-uid",
+		SourceBackupNamespace: "ns",
+		SourceBackupName:      "backup",
+		Actions: []postReadyActionExecutionPlan{{
+			Order: 0, BackupName: "backup", ActionName: "postReady-0", Jobs: []batchv1.Job{*job},
+		}},
+	})
+	assert.NoError(t, err)
+	payload, err := json.Marshal(stage)
+	assert.NoError(t, err)
+	digest := postReadyPlanDigest(payload)
+	planName := mgr.postReadyPlanSecretName()
+	restoreObj.Annotations = map[string]string{
+		postReadyPlanMarkerAnnotationKey: postReadyPlanMarkerValue(planName, digest),
+	}
+	immutable := true
+	controller := true
+	planSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      planName,
+			Namespace: "ns",
+			Labels: map[string]string{
+				DataProtectionRestoreLabelKey: "restore",
+			},
+			Annotations: map[string]string{
+				postReadyPlanRestoreUIDAnnotationKey: "restore-uid",
+				postReadyPlanDigestAnnotationKey:     digest,
+			},
+			OwnerReferences: []metav1.OwnerReference{{
+				APIVersion:         dpv1alpha1.SchemeGroupVersion.String(),
+				Kind:               "Restore",
+				Name:               "restore",
+				UID:                types.UID("restore-uid"),
+				Controller:         &controller,
+				BlockOwnerDeletion: &controller,
+			}},
+		},
+		Immutable: &immutable,
+		Type:      postReadyPlanSecretType,
+		Data:      map[string][]byte{postReadyPlanDataKey: payload},
+	}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(backup, planSecret).Build()
+	reqCtx := intctrlutil.RequestCtx{
+		Ctx: context.Background(),
+		Req: ctrl.Request{NamespacedName: client.ObjectKey{Namespace: "ns", Name: "restore"}},
+	}
+	mgr = NewRestoreManager(restoreObj, nil, scheme, cli)
+
+	assert.NoError(t, ValidateAndInitRestoreMGR(reqCtx, cli, mgr))
+	assert.Empty(t, mgr.PrepareDataBackupSets)
+	assert.Empty(t, mgr.PostReadyBackupSets)
+}
+
+func TestValidateAndInitRestoreMGRRejectsUntrustedPlanShellAfterActionSetDeletion(t *testing.T) {
+	scheme := runtime.NewScheme()
+	assert.NoError(t, dpv1alpha1.AddToScheme(scheme))
+	assert.NoError(t, corev1.AddToScheme(scheme))
+
+	backup := &dpv1alpha1.Backup{
+		ObjectMeta: metav1.ObjectMeta{Name: "backup", Namespace: "ns"},
+		Status: dpv1alpha1.BackupStatus{
+			Phase: dpv1alpha1.BackupPhaseCompleted,
+			BackupMethod: &dpv1alpha1.BackupMethod{
+				Name: "full", ActionSetName: "deleted-action-set",
+			},
+		},
+	}
+	restoreObj := &dpv1alpha1.Restore{
+		ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: "ns", UID: types.UID("restore-uid")},
+		Spec:       dpv1alpha1.RestoreSpec{Backup: dpv1alpha1.BackupRef{Name: "backup", Namespace: "ns"}},
+	}
+	immutable := true
+	foreign := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "foreign-postready-plan",
+			Namespace: "ns",
+			Labels:    map[string]string{DataProtectionRestoreLabelKey: "restore"},
+			Annotations: map[string]string{
+				postReadyPlanRestoreUIDAnnotationKey: "restore-uid",
+			},
+		},
+		Immutable: &immutable,
+		Type:      postReadyPlanSecretType,
+	}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(backup, foreign).Build()
+	reqCtx := intctrlutil.RequestCtx{
+		Ctx: context.Background(),
+		Req: ctrl.Request{NamespacedName: client.ObjectKey{Namespace: "ns", Name: "restore"}},
+	}
+	mgr := NewRestoreManager(restoreObj, nil, scheme, cli)
+
+	err := ValidateAndInitRestoreMGR(reqCtx, cli, mgr)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "deleted-action-set")
+}
+
 func TestRestoreManagerStopsManagerContainer(t *testing.T) {
 	scheme := runtime.NewScheme()
 	assert.NoError(t, corev1.AddToScheme(scheme))
@@ -345,4 +496,100 @@ func TestRestoreManagerStopsManagerContainer(t *testing.T) {
 	assert.Equal(t, "true", got.Annotations[DataProtectionStopRestoreManagerAnnotationKey])
 	assert.NoError(t, mgr.StopManagerContainer(got))
 	assert.NoError(t, mgr.StopManagerContainerByJob(job))
+}
+
+func TestSerialPostReadyNormalExitHandsOffToNextJob(t *testing.T) {
+	scheme := runtime.NewScheme()
+	assert.NoError(t, corev1.AddToScheme(scheme))
+	assert.NoError(t, batchv1.AddToScheme(scheme))
+
+	jobs := []*batchv1.Job{
+		{ObjectMeta: metav1.ObjectMeta{Name: "restore-post-ready-0", Namespace: "ns"}},
+		{ObjectMeta: metav1.ObjectMeta{Name: "restore-post-ready-1", Namespace: "ns"}},
+	}
+	for i := range jobs {
+		jobs[i].Annotations = map[string]string{postReadyTargetIdentityAnnotationKey: "ns/pod-" + strconv.Itoa(i)}
+		setPostReadyExecutionPolicy(jobs[i], dpv1alpha1.PostReadyExecutionPolicySerial)
+	}
+	assert.NoError(t, setPostReadyTargetPlan(jobs))
+	jobs[0].Spec.Suspend = func() *bool { v := false; return &v }()
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "restore-post-ready-0-pod",
+			Namespace: "ns",
+			Labels:    map[string]string{"job-name": jobs[0].Name},
+		},
+		Status: corev1.PodStatus{ContainerStatuses: []corev1.ContainerStatus{{
+			Name:  Restore,
+			State: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{ExitCode: 0}},
+		}}},
+	}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(jobs[0], jobs[1], pod).Build()
+	mgr := &RestoreManager{
+		Restore: &dpv1alpha1.Restore{},
+		Client:  cli,
+	}
+	backupSet := BackupActionSet{Backup: &dpv1alpha1.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup"}}}
+
+	allDone, failed, err := mgr.CheckJobsDone(dpv1alpha1.PostReady, "postready-0", backupSet, jobs)
+	assert.NoError(t, err)
+	assert.False(t, allDone)
+	assert.False(t, failed)
+	gotPod := &corev1.Pod{}
+	assert.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(pod), gotPod))
+	assert.Equal(t, "true", gotPod.Annotations[DataProtectionStopRestoreManagerAnnotationKey])
+
+	jobs[0].Status.Conditions = []batchv1.JobCondition{{Type: batchv1.JobComplete, Status: corev1.ConditionTrue}}
+	reqCtx := intctrlutil.RequestCtx{Ctx: context.Background()}
+	assert.NoError(t, mgr.ResumeNextSerialPostReadyJob(reqCtx, cli, jobs))
+	second := &batchv1.Job{}
+	assert.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(jobs[1]), second))
+	assert.NotNil(t, second.Spec.Suspend)
+	assert.False(t, *second.Spec.Suspend)
+}
+
+func TestSerialPostReadyUsesNumericOrderForElevenJobs(t *testing.T) {
+	scheme := runtime.NewScheme()
+	assert.NoError(t, batchv1.AddToScheme(scheme))
+	jobs := make([]*batchv1.Job, 11)
+	for i := range jobs {
+		jobs[i] = &batchv1.Job{ObjectMeta: metav1.ObjectMeta{
+			Name:        "restore-post-ready-" + strconv.Itoa(i),
+			Namespace:   "ns",
+			Annotations: map[string]string{postReadyTargetIdentityAnnotationKey: "ns/pod-" + strconv.Itoa(i)},
+		}}
+		setPostReadyExecutionPolicy(jobs[i], dpv1alpha1.PostReadyExecutionPolicySerial)
+		if i < 3 {
+			jobs[i].Status.Conditions = []batchv1.JobCondition{{Type: batchv1.JobComplete, Status: corev1.ConditionTrue}}
+		}
+	}
+	assert.NoError(t, setPostReadyTargetPlan(jobs))
+	objects := make([]client.Object, 0, len(jobs))
+	for i := range jobs {
+		objects = append(objects, jobs[i])
+	}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).Build()
+	shuffled := []*batchv1.Job{jobs[10], jobs[4], jobs[2], jobs[8], jobs[0], jobs[6], jobs[1], jobs[9], jobs[5], jobs[3], jobs[7]}
+	assert.NoError(t, (&RestoreManager{}).ResumeNextSerialPostReadyJob(intctrlutil.RequestCtx{Ctx: context.Background()}, cli, shuffled))
+	for i := 3; i < len(jobs); i++ {
+		got := &batchv1.Job{}
+		assert.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(jobs[i]), got))
+		assert.NotNil(t, got.Spec.Suspend)
+		assert.Equal(t, i != 3, *got.Spec.Suspend)
+	}
+}
+
+func TestSerialPostReadyRejectsInvalidAndMixedFrozenPolicies(t *testing.T) {
+	invalid := &batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "invalid", Annotations: map[string]string{
+		postReadyExecutionPolicyAnnotationKey: "Unknown",
+	}}}
+	_, err := serialPostReadyJobs([]*batchv1.Job{invalid})
+	assert.Error(t, err)
+
+	parallel := &batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "parallel"}}
+	serial := &batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "serial"}}
+	setPostReadyExecutionPolicy(parallel, dpv1alpha1.PostReadyExecutionPolicyParallel)
+	setPostReadyExecutionPolicy(serial, dpv1alpha1.PostReadyExecutionPolicySerial)
+	_, err = serialPostReadyJobs([]*batchv1.Job{parallel, serial})
+	assert.Error(t, err)
 }

@@ -1,10 +1,12 @@
-apiVersion: apps.kubeblocks.io/v1alpha1
+apiVersion: operations.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
   generateName: mysql-upgrade-
   namespace: default
 spec:
-  clusterRef: wesql
+  clusterName: wesql
   type: Upgrade
   upgrade:
-    clusterVersionRef: wesql-8.0.32
+    components:
+    - componentName: wesql
+      serviceVersion: 8.0.32

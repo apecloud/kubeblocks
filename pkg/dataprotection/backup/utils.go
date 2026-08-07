@@ -201,12 +201,6 @@ func GenerateCRNameByScheduleNameAndMethod(backupSchedule *dpv1alpha1.BackupSche
 	return GenerateCRNameByBackupSchedule(backupSchedule, suffix)
 }
 
-// GenerateLegacyCRNameByBackupSchedule generate a legacy CR name which is created by BackupSchedule, such as CronJob.
-func GenerateLegacyCRNameByBackupSchedule(backupSchedule *dpv1alpha1.BackupSchedule, method string) string {
-	uniqueNameWithBackupSchedule := fmt.Sprintf("%s-%s", backupSchedule.UID[:8], backupSchedule.Name)
-	return generateBaseCRNameByBackupSchedule(uniqueNameWithBackupSchedule, backupSchedule.Namespace, method)
-}
-
 // BuildBaseBackupPath builds the path to storage backup data in backup repository.
 func BuildBaseBackupPath(backup *dpv1alpha1.Backup, repoPathPrefix, pathPrefix string) string {
 	backupRootPath := BuildBackupRootPath(backup, repoPathPrefix, pathPrefix)

@@ -28,7 +28,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
@@ -162,9 +161,9 @@ func GetCompNCompDefByName(ctx context.Context, cli client.Reader, namespace, fu
 	return comp, compDef, nil
 }
 
-func GetExporter(componentDef appsv1.ComponentDefinitionSpec) *common.Exporter {
+func GetExporter(componentDef appsv1.ComponentDefinitionSpec) *appsv1.Exporter {
 	if componentDef.Exporter != nil {
-		return &common.Exporter{Exporter: *componentDef.Exporter}
+		return componentDef.Exporter.DeepCopy()
 	}
 	return nil
 }

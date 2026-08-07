@@ -83,8 +83,10 @@ var _ = Describe("Volume Populator Controller test", func() {
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ClusterSignature, true, inNS)
 
 		// non-namespaced
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupRepoSignature, true, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ActionSetSignature, true, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.StorageClassSignature, true, ml)
+		testapps.ClearResources(&testCtx, generics.StorageProviderSignature, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeSignature, true, ml)
 	}
 
@@ -313,6 +315,8 @@ var _ = Describe("Volume Populator Controller test", func() {
 	When("volume populator controller test", func() {
 		var (
 			actionSet   *dpv1alpha1.ActionSet
+			repo        *dpv1alpha1.BackupRepo
+			repoPVCName string
 			pvcName     = "data-mysql-mysql-0"
 			storageSize = "20Gi"
 			// intreeProvisioner = "kubernetes.io/no-provisioner"
@@ -334,6 +338,12 @@ var _ = Describe("Volume Populator Controller test", func() {
 		BeforeEach(func() {
 			By("create actionSet")
 			actionSet = testdp.NewFakeActionSet(&testCtx, nil)
+
+			By("create storage provider")
+			_ = testdp.NewFakeStorageProvider(&testCtx, nil)
+
+			By("create backup repo")
+			repo, repoPVCName = testdp.NewFakeBackupRepo(&testCtx, nil)
 		})
 
 		initResources := func(volumeBinding storagev1.VolumeBindingMode, useVolumeSnapshotBackup, mockBackupCompleted bool) *corev1.PersistentVolumeClaim {
@@ -341,7 +351,7 @@ var _ = Describe("Volume Populator Controller test", func() {
 			createStorageClass(volumeBinding)
 
 			By("create backup")
-			backup := mockBackupForRestore(actionSet.Name, "", "", mockBackupCompleted, useVolumeSnapshotBackup, "")
+			backup := mockBackupForRestore(actionSet.Name, repo.Name, repoPVCName, mockBackupCompleted, useVolumeSnapshotBackup, "")
 
 			By("create PVC and set spec.dataSourceRef to backup")
 			pvc := testapps.NewPersistentVolumeClaimFactory(
@@ -530,7 +540,7 @@ var _ = Describe("Volume Populator Controller test", func() {
 
 			It("infers source target from PVC labels for multi-target backups", func() {
 				createStorageClass(storagev1.VolumeBindingImmediate)
-				backup := mockBackupForRestore(actionSet.Name, "", "", true, false, "")
+				backup := mockBackupForRestore(actionSet.Name, repo.Name, repoPVCName, true, false, "")
 				Expect(testapps.ChangeObjStatus(&testCtx, backup, func() {
 					backup.Status.Target = nil
 					backup.Status.Targets = []dpv1alpha1.BackupStatusTarget{
@@ -584,7 +594,7 @@ var _ = Describe("Volume Populator Controller test", func() {
 
 			It("infers source target pod for all-pod target backups", func() {
 				createStorageClass(storagev1.VolumeBindingImmediate)
-				backup := mockBackupForRestore(actionSet.Name, "", "", true, false, "")
+				backup := mockBackupForRestore(actionSet.Name, repo.Name, repoPVCName, true, false, "")
 				Expect(testapps.ChangeObjStatus(&testCtx, backup, func() {
 					backup.Status.Target = nil
 					backup.Status.Targets = []dpv1alpha1.BackupStatusTarget{{
@@ -628,7 +638,7 @@ var _ = Describe("Volume Populator Controller test", func() {
 
 			It("uses explicit source target pod annotation when instance template ordinals overlap", func() {
 				createStorageClass(storagev1.VolumeBindingImmediate)
-				backup := mockBackupForRestore(actionSet.Name, "", "", true, false, "")
+				backup := mockBackupForRestore(actionSet.Name, repo.Name, repoPVCName, true, false, "")
 				Expect(testapps.ChangeObjStatus(&testCtx, backup, func() {
 					backup.Status.Target = nil
 					backup.Status.Targets = []dpv1alpha1.BackupStatusTarget{{

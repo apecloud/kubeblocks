@@ -14776,26 +14776,6 @@ and ConfigConstraint applies to all keys.</p>
 </tr>
 <tr>
 <td>
-<code>legacyRenderedConfigSpec</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.LegacyRenderedTemplateSpec">
-LegacyRenderedTemplateSpec
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the secondary rendered config spec for pod-specific customization.</p>
-<p>The template is rendered inside the pod (by the &ldquo;config-manager&rdquo; sidecar container) and merged with the main
-template&rsquo;s render result to generate the final configuration file.</p>
-<p>This field is intended to handle scenarios where different pods within the same Component have
-varying configurations. It allows for pod-specific customization of the configuration.</p>
-<p>Note: This field will be deprecated in future versions, and the functionality will be moved to
-<code>cluster.spec.componentSpecs[*].instances[*]</code>.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>constraintRef</code><br/>
 <em>
 string
@@ -14804,25 +14784,6 @@ string
 <td>
 <em>(Optional)</em>
 <p>Specifies the name of the referenced configuration constraints object.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>asEnvFrom</code><br/>
-<em>
-[]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the containers to inject the ConfigMap parameters as environment variables.</p>
-<p>This is useful when application images accept parameters through environment variables and
-generate the final configuration file in the startup script based on these variables.</p>
-<p>This field allows users to specify a list of container names, and KubeBlocks will inject the environment
-variables converted from the ConfigMap into these designated containers. This provides a flexible way to
-pass the configuration items from the ConfigMap to the container without modifying the image.</p>
-<p>Deprecated: <code>asEnvFrom</code> has been deprecated since 0.9.0 and will be removed in 0.10.0.
-Use <code>injectEnvTo</code> instead.</p>
 </td>
 </tr>
 <tr>
@@ -15324,7 +15285,7 @@ map[string]*string
 <h3 id="apps.kubeblocks.io/v1alpha1.ConfigTemplateExtension">ConfigTemplateExtension
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ConfigurationItemDetail">ConfigurationItemDetail</a>, <a href="#apps.kubeblocks.io/v1alpha1.LegacyRenderedTemplateSpec">LegacyRenderedTemplateSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ConfigurationItemDetail">ConfigurationItemDetail</a>)
 </p>
 <div>
 </div>
@@ -15404,18 +15365,6 @@ string
 <p>It must be a string of maximum 63 characters, and can only include lowercase alphanumeric characters,
 hyphens, and periods.
 The name must start and end with an alphanumeric character.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>version</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Deprecated: No longer used. Please use &lsquo;Payload&rsquo; instead. Previously represented the version of the configuration template.</p>
 </td>
 </tr>
 <tr>
@@ -15841,41 +15790,6 @@ map[string]string
 </td>
 <td>
 <em>(Optional)</em>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.LegacyRenderedTemplateSpec">LegacyRenderedTemplateSpec
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentConfigSpec">ComponentConfigSpec</a>)
-</p>
-<div>
-<p>LegacyRenderedTemplateSpec describes the configuration extension for the lazy rendered template.</p>
-<p>Deprecated: LegacyRenderedTemplateSpec has been deprecated since 0.9.0 and will be removed in 0.10.0</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>ConfigTemplateExtension</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ConfigTemplateExtension">
-ConfigTemplateExtension
-</a>
-</em>
-</td>
-<td>
-<p>
-(Members of <code>ConfigTemplateExtension</code> are embedded into this type.)
-</p>
-<p>Extends the configuration template.</p>
 </td>
 </tr>
 </tbody>

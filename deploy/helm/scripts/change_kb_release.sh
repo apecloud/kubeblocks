@@ -60,23 +60,7 @@ done
 takeOverResources ClusterRole "${release}"
 takeOverResources ClusterRole "kubeblocks-cluster-pod-role"
 
-# 2. change addons
-addons=(
-    "apecloud-mysql"
-    "etcd"
-    "kafka"
-    "mongodb"
-    "mysql"
-    "postgresql"
-    "qdrant"
-    "redis"
-)
-
-for addon in "${addons[@]}"; do
-    takeOverResources Addon "$addon"
-done
-
-# 3. change storageProvider
+# 2. change storageProvider
 storageProviders=(
     "cos"
     "ftp"
@@ -93,8 +77,8 @@ for sp in "${storageProviders[@]}"; do
     takeOverResources StorageProviders "$sp"
 done
 
-# 4. change backupRepo
+# 3. change backupRepo
 takeOverResources BackupRepo ${release}-backuprepo
 
-# 5. takeover StorageClass
+# 4. takeover StorageClass
 takeOverResources StorageClass kb-default-sc

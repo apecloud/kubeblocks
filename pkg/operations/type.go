@@ -129,7 +129,18 @@ type OpsRuntime interface {
 	ListInstances(namespace, clusterName, compName string) ([]Instance, error)
 	GenerateInstanceNameSet(clusterName, compName string, compReplicas int32, instances []appsv1.InstanceTemplate, offlineInstances []string) (map[string]string, error)
 	GenerateTemplateInstanceNames(clusterName, compName, templateName string, replicas int32, offlineInstances []string, ordinals appsv1.Ordinals) ([]string, error)
-	Switchover(ctx context.Context, namespace, clusterName, compName, instanceName, candidateName string) error
+	Switchover(ctx context.Context, actionCtx SwitchoverActionContext, instanceName, candidateName string) error
+}
+
+// SwitchoverActionContext is the resolved, stable input needed to dispatch a
+// switchover lifecycle action. It deliberately excludes the controller's
+// synthesized component implementation details.
+type SwitchoverActionContext struct {
+	Namespace        string
+	ClusterName      string
+	ComponentName    string
+	LifecycleActions *appsv1.ComponentLifecycleActions
+	TemplateVars     map[string]string
 }
 
 type Workload interface {

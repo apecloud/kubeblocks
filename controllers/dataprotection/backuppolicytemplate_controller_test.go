@@ -124,10 +124,9 @@ var _ = Describe("", func() {
 				Create(&testCtx).GetObject()
 			key := client.ObjectKeyFromObject(bpt)
 
-			By("check labels")
+			By("check matched component definitions")
 			Eventually(testapps.CheckObj(&testCtx, key, func(g Gomega, pobj *dpv1alpha1.BackupPolicyTemplate) {
-				g.Expect(pobj.Labels[compDef1]).To(Equal(compDef1))
-				g.Expect(pobj.Labels[compDef2]).To(Equal(compDef2))
+				g.Expect(pobj.Status.MatchedCompDefs).To(ConsistOf(compDef1, compDef2))
 			})).Should(Succeed())
 
 			By("should be unavailable")
@@ -145,18 +144,13 @@ var _ = Describe("", func() {
 				g.Expect(pobj.Status.Message).To(BeEmpty())
 			})).Should(Succeed())
 
-			By("remove stale component definition labels while preserving custom labels")
+			By("update compDefs")
 			Expect(testapps.ChangeObj(&testCtx, bpt, func(pobj *dpv1alpha1.BackupPolicyTemplate) {
-				pobj.Spec.CompDefs = []string{compDef2}
-				if pobj.Labels == nil {
-					pobj.Labels = map[string]string{}
-				}
-				pobj.Labels["custom-label"] = "custom-value"
+				pobj.Spec.CompDefs = []string{compDef1}
 			})).Should(Succeed())
 			Eventually(testapps.CheckObj(&testCtx, key, func(g Gomega, pobj *dpv1alpha1.BackupPolicyTemplate) {
-				g.Expect(pobj.Labels).NotTo(HaveKey(compDef1))
-				g.Expect(pobj.Labels[compDef2]).To(Equal(compDef2))
-				g.Expect(pobj.Labels["custom-label"]).To(Equal("custom-value"))
+				g.Expect(pobj.Status.MatchedCompDefs).To(ConsistOf(compDef1))
+
 			})).Should(Succeed())
 		})
 		It("test BackupPolicyTemplate schedule parameters", func() {

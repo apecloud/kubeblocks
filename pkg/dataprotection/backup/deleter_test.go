@@ -66,7 +66,7 @@ func TestDeleterDoPreDeleteActionCreatesAndReusesJob(t *testing.T) {
 		actionSet:            &dpv1alpha1.ActionSet{Spec: dpv1alpha1.ActionSetSpec{Env: []corev1.EnvVar{{Name: "ACTION_ENV", Value: "set"}}}},
 	}
 
-	job, err := deleter.doPreDeleteAction(backup, repo, &dpv1alpha1.BaseJobActionSpec{Image: "deleter:$(IMAGE_TAG)", Command: []string{"delete"}}, "", "/backup/path")
+	job, err := deleter.doPreDeleteAction(backup, repo, &dpv1alpha1.BaseJobActionSpec{Image: "deleter:$(IMAGE_TAG)", Command: []string{"delete"}}, "/backup/path")
 	assert.NoError(t, err)
 	assert.Empty(t, job.Name)
 
@@ -81,7 +81,7 @@ func TestDeleterDoPreDeleteActionCreatesAndReusesJob(t *testing.T) {
 	assert.Equal(t, "/backup/path", envMap[dptypes.DPBackupBasePath])
 	assert.Equal(t, "set", envMap["ACTION_ENV"])
 
-	job, err = deleter.doPreDeleteAction(backup, repo, &dpv1alpha1.BaseJobActionSpec{Image: "deleter:$(IMAGE_TAG)", Command: []string{"delete"}}, "", "/backup/path")
+	job, err = deleter.doPreDeleteAction(backup, repo, &dpv1alpha1.BaseJobActionSpec{Image: "deleter:$(IMAGE_TAG)", Command: []string{"delete"}}, "/backup/path")
 	assert.NoError(t, err)
 	assert.Equal(t, got.Name, job.Name)
 }
@@ -109,10 +109,12 @@ var _ = Describe("Backup Deleter Test", func() {
 	cleanEnv := func() {
 		By("clean resources")
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
+		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupSignature, true, inNS)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.JobSignature, true, inNS)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS)
 		testapps.ClearResources(&testCtx, generics.VolumeSnapshotSignature, inNS)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupRepoSignature, true, ml)
 	}
 
 	BeforeEach(func() {
@@ -136,23 +138,33 @@ var _ = Describe("Backup Deleter Test", func() {
 			deleter = buildDeleter()
 		})
 
-		It("should success when backup status PVC is empty", func() {
-			Expect(backup.Status.PersistentVolumeClaimName).Should(Equal(""))
+		createBackupRepo := func() {
+			repo := testdp.NewBackupRepoFactory("", testdp.BackupRepoName).
+				SetStorageProviderRef(testdp.StorageProviderName).
+				Create(&testCtx).GetObject()
+			Expect(testapps.ChangeObjStatus(&testCtx, repo, func() {
+				repo.Status.BackupPVCName = backupRepoPVCName
+			})).Should(Succeed())
+			backup.Status.BackupRepoName = repo.Name
+		}
+
+		It("should success when backup repository name is empty", func() {
+			Expect(backup.Status.BackupRepoName).Should(Equal(""))
 			status, err := deleter.DeleteBackupFiles(backup)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(status).Should(Equal(DeletionStatusSucceeded))
 		})
 
 		It("should success when backup status path is empty", func() {
-			backup.Status.PersistentVolumeClaimName = backupRepoPVCName
+			createBackupRepo()
 			Expect(backup.Status.Path).Should(Equal(""))
 			status, err := deleter.DeleteBackupFiles(backup)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(status).Should(Equal(DeletionStatusSucceeded))
 		})
 
-		It("should success when PVC does not exist", func() {
-			backup.Status.PersistentVolumeClaimName = backupRepoPVCName
+		It("should success when backup repository does not exist", func() {
+			backup.Status.BackupRepoName = "missing-repo"
 			backup.Status.Path = backupPath
 			status, err := deleter.DeleteBackupFiles(backup)
 			Expect(err).ShouldNot(HaveOccurred())
@@ -177,8 +189,7 @@ var _ = Describe("Backup Deleter Test", func() {
 
 			By("creating worker service account when a deletion job is needed")
 			backup.Status.BackupMethod = nil
-			backupRepoPVC := testdp.NewFakePVC(&testCtx, backupRepoPVCName)
-			backup.Status.PersistentVolumeClaimName = backupRepoPVC.Name
+			createBackupRepo()
 			backup.Status.Path = backupPath
 			status, err = deleter.DeleteBackupFiles(backup)
 			Expect(err).ShouldNot(HaveOccurred())
@@ -192,11 +203,10 @@ var _ = Describe("Backup Deleter Test", func() {
 		})
 
 		It("should create job to delete backup file", func() {
-			By("mock backup repo PVC")
-			backupRepoPVC := testdp.NewFakePVC(&testCtx, backupRepoPVCName)
+			By("mock backup repository")
+			createBackupRepo()
 
 			By("delete backup file")
-			backup.Status.PersistentVolumeClaimName = backupRepoPVC.Name
 			backup.Status.Path = backupPath
 			status, err := deleter.DeleteBackupFiles(backup)
 			Expect(err).ShouldNot(HaveOccurred())

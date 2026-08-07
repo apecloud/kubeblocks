@@ -432,14 +432,8 @@ func (r *restoreJobBuilder) build() *batchv1.Job {
 		mountPath := "/backupdata"
 		kopiaRepoPath := r.backupSet.Backup.Status.KopiaRepoPath
 		encryptionConfig := r.backupSet.Backup.Status.EncryptionConfig
-		if r.backupRepo != nil {
-			utils.InjectDatasafed(&job.Spec.Template.Spec, r.backupRepo, mountPath,
-				encryptionConfig, kopiaRepoPath)
-		} else if pvcName := r.backupSet.Backup.Status.PersistentVolumeClaimName; pvcName != "" {
-			// If the backup object was created in an old version that doesn't have the backupRepo field,
-			// use the PVC name field as a fallback.
-			utils.InjectDatasafedWithPVC(&job.Spec.Template.Spec, pvcName, mountPath, kopiaRepoPath)
-		}
+		utils.InjectDatasafed(&job.Spec.Template.Spec, r.backupRepo, mountPath,
+			encryptionConfig, kopiaRepoPath)
 	}
 	return job
 }

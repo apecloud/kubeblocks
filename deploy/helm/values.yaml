@@ -332,14 +332,6 @@ deployAnnotations: {}
 # Add extra pod envs to KubeBlocks Deployment
 extraEnvs: []
 
-## webhooks settings
-##
-## @param webhooks.conversionEnabled
-## @param webhooks.createSelfSignedCert
-webhooks:
-  conversionEnabled: false
-  createSelfSignedCert: true
-
 ## manager server settings
 manager:
   ## leader election

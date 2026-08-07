@@ -75,7 +75,6 @@ func TestGetBackupStatusTarget(t *testing.T) {
 
 func TestDataprotectionUtilityHelpers(t *testing.T) {
 	assert.Equal(t, "backup-0-data", GetBackupVolumeSnapshotName("backup", "data", 0))
-	assert.Equal(t, "backup-data", GetOldBackupVolumeSnapshotName("backup", "data"))
 
 	env := MergeEnv([]corev1.EnvVar{{Name: "A", Value: "1"}, {Name: "B", Value: "2"}}, []corev1.EnvVar{{Name: "B", Value: "override"}, {Name: "C", Value: "3"}})
 	assert.Equal(t, map[string]string{"A": "1", "B": "override", "C": "3"}, CovertEnvToMap(env))

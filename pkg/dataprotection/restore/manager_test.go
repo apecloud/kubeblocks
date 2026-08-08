@@ -477,16 +477,26 @@ var _ = Describe("RestoreManager Test", func() {
 				constant.AppInstanceLabelKey: testdp.ClusterName,
 			}
 			restoreMGR, backupSet := initResources(reqCtx, 0, false, func(f *testdp.MockRestoreFactory) {
-				f.SetConnectCredential(testdp.ClusterName).SetJobActionConfig(matchLabels).SetExecActionConfig(matchLabels)
+				f.SetConnectCredential(testdp.ClusterName).
+					SetJobActionConfig(matchLabels).
+					SetExecActionConfig(matchLabels).
+					AddEnv(corev1.EnvVar{Name: dptypes.DPTargetClusterTopology, Value: "shared-nothing"}).
+					AddEnv(corev1.EnvVar{Name: dptypes.DPTargetComponentServiceVersion, Value: "3.3.2"})
 			})
 
 			By("create cluster to restore")
-			testdp.NewFakeCluster(&testCtx)
+			testdp.NewFakeCluster(&testCtx,
+				corev1.EnvVar{Name: "KEEP_POD_ENV", Value: "kept"},
+				corev1.EnvVar{Name: dptypes.DPTargetClusterTopology, Value: "fake-pod-topology-1"},
+				corev1.EnvVar{Name: dptypes.DPTargetClusterTopology, Value: "fake-pod-topology-2"},
+				corev1.EnvVar{Name: dptypes.DPTargetComponentServiceVersion, Value: "fake-pod-service-version-1"},
+				corev1.EnvVar{Name: dptypes.DPTargetComponentServiceVersion, Value: "fake-pod-service-version-2"},
+			)
 
 			By("test with execAction and expect for creating 2 exec job")
 			target := utils.GetBackupStatusTarget(backupSet.Backup, restoreMGR.Restore.Spec.Backup.SourceTargetName)
 			// step 0 is the execAction in actionSet
-			jobs, err := restoreMGR.BuildPostReadyActionJobs(reqCtx, k8sClient, *backupSet, target, 0)
+			jobs, err := restoreMGR.BuildPostReadyActionJobs(reqCtx, k8sClient, k8sClient, *backupSet, target, 0)
 			Expect(err).ShouldNot(HaveOccurred())
 			// the count of exec jobs should equal to the pods count of cluster
 			Expect(len(jobs)).Should(Equal(2))
@@ -495,10 +505,26 @@ var _ = Describe("RestoreManager Test", func() {
 
 			By("test with jobAction and expect for creating 1 job")
 			// step 0 is the execAction in actionSet
-			jobs, err = restoreMGR.BuildPostReadyActionJobs(reqCtx, k8sClient, *backupSet, target, 1)
+			jobs, err = restoreMGR.BuildPostReadyActionJobs(reqCtx, k8sClient, k8sClient, *backupSet, target, 1)
 			Expect(err).ShouldNot(HaveOccurred())
 			// count of job should equal to 1
 			Expect(len(jobs)).Should(Equal(1))
+			jobEnv := jobs[0].Spec.Template.Spec.Containers[0].Env
+			envValues := func(name string) []corev1.EnvVar {
+				var values []corev1.EnvVar
+				for i := range jobEnv {
+					if jobEnv[i].Name == name {
+						values = append(values, jobEnv[i])
+					}
+				}
+				return values
+			}
+			Expect(envValues(dptypes.DPTargetClusterTopology)).Should(BeEmpty())
+			Expect(envValues(dptypes.DPTargetComponentServiceVersion)).Should(BeEmpty())
+			Expect(envValues(deprecatedTargetComponentServiceVersionSelectorEnvName)).Should(BeEmpty())
+			Expect(envValues("KEEP_POD_ENV")).Should(Equal([]corev1.EnvVar{{Name: "KEEP_POD_ENV", Value: "kept"}}))
+			Expect(envValues(dptypes.DPDBUser)).Should(HaveLen(1))
+			Expect(envValues(dptypes.DPDBPassword)).Should(HaveLen(1))
 			// test timeZone transform
 			var backupStopTimeEnv string
 			for _, v := range jobs[0].Spec.Template.Spec.Containers[0].Env {

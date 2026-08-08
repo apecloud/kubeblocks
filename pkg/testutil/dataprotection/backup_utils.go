@@ -160,7 +160,7 @@ func NewFakeBackup(testCtx *testutil.TestContext,
 	return backup
 }
 
-func NewFakeCluster(testCtx *testutil.TestContext) *BackupClusterInfo {
+func NewFakeCluster(testCtx *testutil.TestContext, targetEnv ...corev1.EnvVar) *BackupClusterInfo {
 	createPVCAndPV := func(name string) *corev1.PersistentVolumeClaim {
 		pvName := "pv-" + name
 		pvc := testapps.NewPersistentVolumeClaimFactory(
@@ -180,7 +180,11 @@ func NewFakeCluster(testCtx *testutil.TestContext) *BackupClusterInfo {
 		return testapps.NewPodFactory(testCtx.DefaultNamespace, name).
 			AddAppInstanceLabel(ClusterName).
 			AddAppComponentLabel(ComponentName).
-			AddContainer(corev1.Container{Name: ContainerName, Image: testapps.ApeCloudMySQLImage})
+			AddContainer(corev1.Container{
+				Name:  ContainerName,
+				Image: testapps.ApeCloudMySQLImage,
+				Env:   append([]corev1.EnvVar(nil), targetEnv...),
+			})
 	}
 
 	By("mocking a cluster")

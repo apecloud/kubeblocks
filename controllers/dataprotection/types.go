@@ -23,6 +23,8 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 const (
@@ -87,12 +89,12 @@ const (
 	ReasonVolumePopulateFailed  = "VolumePopulateFailed"
 
 	// pvc condition type and reason
-	ReasonPopulatingFailed      = "Failed"
+	ReasonPopulatingFailed      = constant.DataProtectionPVCConditionReasonPopulatingFailed
 	ReasonPopulatingProcessing  = "Processing"
-	ReasonPopulatingSucceed     = "Succeed"
-	ReasonPopulatingProvisioned = "Provisioned"
+	ReasonPopulatingSucceed     = constant.DataProtectionPVCConditionReasonPopulatingSucceed
+	ReasonPopulatingProvisioned = constant.DataProtectionPVCConditionReasonPopulatingProvision
 
-	PersistentVolumeClaimPopulating corev1.PersistentVolumeClaimConditionType = "Populating"
+	PersistentVolumeClaimPopulating corev1.PersistentVolumeClaimConditionType = constant.DataProtectionPVCConditionPopulating
 )
 
 var reconcileInterval = time.Second

@@ -26,6 +26,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -125,7 +126,8 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 			break
 		}
 		predecessor := getPredecessor(i)
-		if isOrderedReady && predecessor != nil && !intctrlutil.IsInstanceAvailable(predecessor) {
+		if isOrderedReady && predecessor != nil && !intctrlutil.IsInstanceAvailable(predecessor) &&
+			!restorePVCInitialStepCompletedForInstance(predecessor, nameToTemplateMap[predecessor.Name]) {
 			break
 		}
 		newInst, err := buildInstanceByTemplate(tree, name, nameToTemplateMap[name], its)
@@ -177,4 +179,21 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 	}
 
 	return kubebuilderx.Continue, nil
+}
+
+func restorePVCInitialStepCompletedForInstance(inst *workloads.Instance, template *instancetemplate.InstanceTemplateExt) bool {
+	if template == nil {
+		return false
+	}
+	hasRestoreVCT := false
+	for _, vct := range template.VolumeClaimTemplates {
+		if vct.Annotations[constant.RestoreSourceKindAnnotationKey] != "" {
+			hasRestoreVCT = true
+			break
+		}
+	}
+	if !hasRestoreVCT {
+		return false
+	}
+	return inst.Annotations[constant.RestorePVCInitialStepCompletedAnnotationKey] == "true"
 }

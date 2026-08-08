@@ -32,6 +32,7 @@ import (
 	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -40,9 +41,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
+	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/sharding"
@@ -365,6 +369,7 @@ func newOrderedHandler(topology appsv1.ClusterTopology, orders []string, op int)
 				topology:       topology,
 				orders:         orders,
 				ignoreNotExist: op == updateOp,
+				op:             op,
 			},
 			clusterCompNShardingHandler: clusterCompNShardingHandler{op: op},
 		}
@@ -534,6 +539,7 @@ type phasePrecondition struct {
 	topology       appsv1.ClusterTopology
 	orders         []string
 	ignoreNotExist bool
+	op             int
 }
 
 func (c *phasePrecondition) match(transCtx *clusterTransformContext, dag *graph.DAG, name string) (bool, error) {
@@ -585,7 +591,11 @@ func (c *phasePrecondition) compMatch(transCtx *clusterTransformContext, dag *gr
 	if err := transCtx.Client.Get(transCtx.Context, compKey, comp); err != nil {
 		return c.ignoreNotExist, client.IgnoreNotFound(err)
 	}
-	if !c.expected(comp) {
+	expected, err := c.expected(transCtx, comp)
+	if err != nil {
+		return false, err
+	}
+	if !expected {
 		transCtx.Logger.Info("waiting for predecessor component in expected phase",
 			"component", comp.Name, "predecessor", name)
 		return false, nil
@@ -626,7 +636,11 @@ func (c *phasePrecondition) shardingMatch(transCtx *clusterTransformContext, dag
 		return false, nil
 	}
 	for _, comp := range comps {
-		if !c.expected(&comp) {
+		expected, err := c.expected(transCtx, &comp)
+		if err != nil {
+			return false, err
+		}
+		if !expected {
 			transCtx.Logger.Info("waiting for predecessor sharding in expected phase",
 				"shard", comp.Name, "predecessor sharding", name)
 			return false, nil
@@ -641,13 +655,112 @@ func (c *phasePrecondition) shardingMatch(transCtx *clusterTransformContext, dag
 	return true, nil
 }
 
-func (c *phasePrecondition) expected(comp *appsv1.Component) bool {
-	if comp.Generation == comp.Status.ObservedGeneration {
-		expect := appsv1.RunningComponentPhase
-		if comp.Spec.Stop != nil && *comp.Spec.Stop {
-			expect = appsv1.StoppedComponentPhase
+func (c *phasePrecondition) expected(transCtx *clusterTransformContext, comp *appsv1.Component) (bool, error) {
+	if comp.Generation != comp.Status.ObservedGeneration {
+		return false, nil
+	}
+	expect := appsv1.RunningComponentPhase
+	if comp.Spec.Stop != nil && *comp.Spec.Stop {
+		expect = appsv1.StoppedComponentPhase
+	}
+	if comp.Status.Phase == expect {
+		return true, nil
+	}
+	if c.op != createOp {
+		return false, nil
+	}
+	return restorePVCInitialStepCompletedForComponent(transCtx, comp)
+}
+
+func restorePVCInitialStepCompletedForComponent(transCtx *clusterTransformContext, comp *appsv1.Component) (bool, error) {
+	cond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ConditionTypeRestore)
+	if cond == nil || cond.Status != metav1.ConditionUnknown || cond.Reason != ReasonRestoreRunning {
+		return false, nil
+	}
+	expected := expectedRestorePVCCountForComponentSpec(comp.Spec.Replicas, comp.Spec.VolumeClaimTemplates, comp.Spec.Instances)
+	if expected == 0 {
+		return false, nil
+	}
+	pvcNames, err := expectedRestorePVCNamesForComponent(transCtx, comp)
+	if err != nil {
+		return false, err
+	}
+	// The ITS spec may not have converged to the component spec yet; keep the
+	// strict phase gate until both agree on the restore PVC set, so that stale
+	// or leftover PVCs cannot substitute for expected ones.
+	if len(pvcNames) != expected {
+		return false, nil
+	}
+	for _, pvcName := range pvcNames {
+		pvc := &corev1.PersistentVolumeClaim{}
+		pvcKey := types.NamespacedName{Namespace: comp.Namespace, Name: pvcName}
+		if err := transCtx.Client.Get(transCtx.Context, pvcKey, pvc); err != nil {
+			return false, client.IgnoreNotFound(err)
 		}
-		return comp.Status.Phase == expect
+		if !pvc.DeletionTimestamp.IsZero() || !restorePVCInitialStepCompleted(pvc) {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+func expectedRestorePVCNamesForComponent(transCtx *clusterTransformContext, comp *appsv1.Component) ([]string, error) {
+	its := &workloads.InstanceSet{}
+	if err := transCtx.Client.Get(transCtx.Context, client.ObjectKeyFromObject(comp), its); err != nil {
+		return nil, client.IgnoreNotFound(err)
+	}
+	if its.Spec.Replicas == nil {
+		return nil, nil
+	}
+	// The empty tree makes compressed instance templates unresolvable; name
+	// generation then comes up short and the caller falls back to the strict
+	// phase gate.
+	itsExt, err := instancetemplate.BuildInstanceSetExt(its, kubebuilderx.NewObjectTree())
+	if err != nil {
+		return nil, err
+	}
+	nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt, nil)
+	if err != nil {
+		return nil, err
+	}
+	name2TemplateMap, err := nameBuilder.BuildInstanceName2TemplateMap()
+	if err != nil {
+		return nil, err
+	}
+	var pvcNames []string
+	for podName, template := range name2TemplateMap {
+		for i := range template.VolumeClaimTemplates {
+			claimTemplate := template.VolumeClaimTemplates[i]
+			if claimTemplate.Annotations[constant.RestoreSourceKindAnnotationKey] == "" {
+				continue
+			}
+			pvcNames = append(pvcNames, ictrlutil.ComposePVCName(claimTemplate, its.Name, podName))
+		}
+	}
+	return pvcNames, nil
+}
+
+func restorePVCInitialStepCompleted(pvc *corev1.PersistentVolumeClaim) bool {
+	for i := range pvc.Status.Conditions {
+		condition := pvc.Status.Conditions[i]
+		if string(condition.Type) != appsv1.ConditionTypeRestore {
+			continue
+		}
+		// A terminal Restore condition means the PVC is out of the initial-step
+		// window: False is a failed restore, True means the full restore has
+		// already completed and ordering reverts to the regular phase gate.
+		if condition.Status != corev1.ConditionUnknown {
+			return false
+		}
+	}
+	for i := range pvc.Status.Conditions {
+		condition := pvc.Status.Conditions[i]
+		if string(condition.Type) != constant.DataProtectionPVCConditionPopulating {
+			continue
+		}
+		return condition.Status == corev1.ConditionTrue &&
+			(condition.Reason == constant.DataProtectionPVCConditionReasonPopulatingSucceed ||
+				condition.Reason == constant.DataProtectionPVCConditionReasonPopulatingProvision)
 	}
 	return false
 }

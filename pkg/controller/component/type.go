@@ -30,6 +30,7 @@ import (
 )
 
 type SynthesizedComponent struct {
+	grandfatherKBAgentPortNames      bool
 	Namespace                        string            `json:"namespace,omitempty"`
 	ClusterName                      string            `json:"clusterName,omitempty"`
 	ClusterUID                       string            `json:"clusterUID,omitempty"`

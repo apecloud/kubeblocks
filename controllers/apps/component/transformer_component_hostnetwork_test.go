@@ -20,11 +20,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
+	"strconv"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
@@ -32,6 +36,10 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/kbagent"
+	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 var _ = Describe("component hostnetwork transformer test", func() {
@@ -165,6 +173,63 @@ var _ = Describe("component hostnetwork transformer test", func() {
 			Expect(transCtx.SynthesizeComponent.PodSpec.Containers[0].Ports[0].ContainerPort).ShouldNot(Equal(int32(3306)))
 			Expect(transCtx.SynthesizeComponent.PodSpec.Containers[1].Ports[0].ContainerPort).ShouldNot(Equal(int32(3501)))
 			Expect(transCtx.SynthesizeComponent.PodSpec.Containers[1].Ports[1].ContainerPort).ShouldNot(Equal(int32(3502)))
+		})
+
+		It("dynamically allocates legacy kbagent ports and rewrites args and probe", func() {
+			dataCM := map[string]string{}
+			oldPortRange := viper.GetString(constant.CfgHostPortIncludeRanges)
+			mockClient := testutil.NewK8sMockClient()
+			DeferCleanup(func() {
+				viper.Set(constant.CfgHostPortIncludeRanges, oldPortRange)
+				restoreErr := intctrlutil.InitDefaultHostPortManager(k8sClient)
+				mockClient.Finish()
+				Expect(restoreErr).Should(Succeed())
+			})
+			mockClient.MockCreateMethod(testutil.WithCreateReturned(func(obj client.Object) error {
+				dataCM = obj.(*corev1.ConfigMap).Data
+				return nil
+			}, testutil.WithAnyTimes()))
+			mockClient.MockGetMethod(testutil.WithGetReturned(testutil.WithConstructSimpleGetResult([]client.Object{
+				&corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS),
+						Name:      viper.GetString(constant.CfgHostPortConfigMapName),
+					},
+					Data: dataCM,
+				},
+			}), testutil.WithAnyTimes()))
+			mockClient.MockUpdateMethod(testutil.WithCreateReturned(func(obj client.Object) error {
+				dataCM = obj.(*corev1.ConfigMap).Data
+				return nil
+			}, testutil.WithAnyTimes()))
+			viper.Set(constant.CfgHostPortIncludeRanges, "14000-14010")
+			Expect(intctrlutil.InitDefaultHostPortManager(mockClient.Client())).Should(Succeed())
+
+			transCtx.SynthesizeComponent.Annotations = map[string]string{
+				constant.HostNetworkAnnotationKey: compName,
+			}
+			transCtx.SynthesizeComponent.Network.HostPorts = []appsv1.HostPort{{Name: "mysql", Port: 13306}}
+			agent := &transCtx.SynthesizeComponent.PodSpec.Containers[1]
+			agent.Args = []string{"--port", "3501", "--streaming-port", "3502"}
+			agent.StartupProbe = &corev1.Probe{
+				ProbeHandler: corev1.ProbeHandler{
+					TCPSocket: &corev1.TCPSocketAction{Port: intstr.FromInt(3501)},
+				},
+			}
+
+			transformer := &componentHostNetworkTransformer{}
+			Expect(transformer.Transform(transCtx, dag)).Should(Succeed())
+
+			agent = &transCtx.SynthesizeComponent.PodSpec.Containers[1]
+			Expect(agent.Ports[0].Name).Should(Equal(kbagent.LegacyHTTPPortName))
+			Expect(agent.Ports[1].Name).Should(Equal(kbagent.LegacyStreamingPortName))
+			httpPort, streamingPort := agent.Ports[0].ContainerPort, agent.Ports[1].ContainerPort
+			Expect(httpPort).Should(BeNumerically(">=", 14000))
+			Expect(streamingPort).Should(BeNumerically(">=", 14000))
+			Expect(streamingPort).ShouldNot(Equal(httpPort))
+			Expect(agent.Args).Should(ContainElements("--port", strconv.Itoa(int(httpPort)),
+				"--streaming-port", strconv.Itoa(int(streamingPort))))
+			Expect(agent.StartupProbe.TCPSocket.Port.IntValue()).Should(Equal(int(httpPort)))
 		})
 
 		It("skips allocation when the original component is deleting", func() {

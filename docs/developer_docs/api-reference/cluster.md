@@ -1265,6 +1265,9 @@ They should be specified in the <code>cluster.spec.componentSpecs</code> (Cluste
 or modifying environment variable values.
 These instance-specific overrides can be specified in <code>cluster.spec.componentSpecs[*].instances</code>.</p>
 <p>This field is immutable and cannot be updated once set.</p>
+<p>The container port names &ldquo;kba-http&rdquo; and &ldquo;kba-streaming&rdquo; are reserved by KubeBlocks for kbagent
+and must not be used by user-defined containers, regardless of whether this definition currently
+declares lifecycle or reconfiguration actions.</p>
 </td>
 </tr>
 <tr>
@@ -5520,6 +5523,9 @@ They should be specified in the <code>cluster.spec.componentSpecs</code> (Cluste
 or modifying environment variable values.
 These instance-specific overrides can be specified in <code>cluster.spec.componentSpecs[*].instances</code>.</p>
 <p>This field is immutable and cannot be updated once set.</p>
+<p>The container port names &ldquo;kba-http&rdquo; and &ldquo;kba-streaming&rdquo; are reserved by KubeBlocks for kbagent
+and must not be used by user-defined containers, regardless of whether this definition currently
+declares lifecycle or reconfiguration actions.</p>
 </td>
 </tr>
 <tr>
@@ -6020,6 +6026,21 @@ int64
 <td>
 <em>(Optional)</em>
 <p>Refers to the most recent generation that has been observed for the ComponentDefinition.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>legacyKBAgentPortNames</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>LegacyKBAgentPortNames records that this definition was already accepted
+before kba-http and kba-streaming became reserved names. The controller
+uses the durable status bit to preserve a compatible injected port name
+across later phase transitions without allowing new definitions to opt in.</p>
 </td>
 </tr>
 <tr>
@@ -6649,8 +6670,11 @@ The behavior varies based on the HostNetwork setting:</p>
 <li>If this field is empty: All ports are automatically allocated by the host-port manager.</li>
 <li>If this field is specified:
 a) Mappings for all ports defined in <code>cmpd.spec.hostNetwork</code> are MANDATORY.
-b) Mappings for kbagent ports (&ldquo;http&rdquo;, &ldquo;streaming&rdquo;) are OPTIONAL.
-You can explicitly map them here, or leave them omitted to be allocated by the host-port manager.</li>
+b) Mappings for kbagent ports (&ldquo;kba-http&rdquo;, &ldquo;kba-streaming&rdquo;) are OPTIONAL.
+You can explicitly map them here, or leave them omitted to be allocated by the host-port manager.
+The legacy names &ldquo;http&rdquo; and &ldquo;streaming&rdquo; are accepted as aliases only when no non-kbagent
+container declares the same port name. When a component owns that name, its mapping takes
+precedence; use the &ldquo;kba-*&rdquo; name to map kbagent explicitly, or omit it for automatic allocation.</li>
 </ul></li>
 <li><p>When HostNetwork is disabled:
 It allows optional mapping for container ports to host ports.</p>

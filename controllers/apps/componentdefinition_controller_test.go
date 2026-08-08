@@ -28,13 +28,17 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/utils/pointer"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	controllerutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/generics"
+	"github.com/apecloud/kubeblocks/pkg/kbagent"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 
@@ -99,6 +103,150 @@ var _ = Describe("ComponentDefinition Controller", func() {
 					g.Expect(cmpd.Status.ObservedGeneration).Should(Equal(cmpd.GetGeneration()))
 					g.Expect(cmpd.Status.Phase).Should(Equal(kbappsv1.AvailablePhase))
 				})).Should(Succeed())
+		})
+	})
+
+	Context("runtime", func() {
+		newReservedPortDefinition := func() *kbappsv1.ComponentDefinition {
+			return testapps.NewComponentDefinitionFactory(componentDefName).
+				SetRuntime(&corev1.Container{
+					Name: "database",
+					Ports: []corev1.ContainerPort{{
+						Name:          kbagent.DefaultHTTPPortName,
+						ContainerPort: 9200,
+					}},
+				}).
+				SetLifecycleAction("PostProvision", &kbappsv1.Action{}).
+				GetObject()
+		}
+
+		It("reserves kbagent port names even when the definition has no actions", func() {
+			componentDefObj := newReservedPortDefinition()
+			componentDefObj.Spec.LifecycleActions = nil
+
+			reconciler := &ComponentDefinitionReconciler{}
+			Expect(reconciler.validateRuntime(nil, controllerutil.RequestCtx{}, componentDefObj)).Should(
+				MatchError(ContainSubstring("reserved for the injected kbagent container")))
+		})
+
+		It("reserves kbagent port names when a file reconfigure action injects kbagent", func() {
+			componentDefObj := newReservedPortDefinition()
+			componentDefObj.Spec.LifecycleActions = nil
+			componentDefObj.Spec.Configs = []kbappsv1.ComponentFileTemplate{{
+				Name:        "config",
+				Reconfigure: &kbappsv1.Action{},
+			}}
+
+			reconciler := &ComponentDefinitionReconciler{}
+			Expect(reconciler.validateRuntime(nil, controllerutil.RequestCtx{}, componentDefObj)).Should(
+				MatchError(ContainSubstring("reserved for the injected kbagent container")))
+		})
+
+		newStatusClient := func(obj *kbappsv1.ComponentDefinition) (client.Client, *kbappsv1.ComponentDefinition) {
+			cli := fake.NewClientBuilder().
+				WithScheme(scheme.Scheme).
+				WithStatusSubresource(&kbappsv1.ComponentDefinition{}).
+				WithObjects(obj).
+				Build()
+			current := &kbappsv1.ComponentDefinition{}
+			Expect(cli.Get(ctx, client.ObjectKeyFromObject(obj), current)).Should(Succeed())
+			return cli, current
+		}
+
+		It("rejects port names reserved for the injected kbagent container", func() {
+			componentDefObj := newReservedPortDefinition()
+			Expect(testCtx.CreateObj(testCtx.Ctx, componentDefObj)).Should(Succeed())
+
+			checkObjectStatus(componentDefObj, kbappsv1.UnavailablePhase)
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentDefObj),
+				func(g Gomega, cmpd *kbappsv1.ComponentDefinition) {
+					g.Expect(cmpd.Status.Message).Should(ContainSubstring("reserved for the injected kbagent container"))
+				})).Should(Succeed())
+		})
+
+		It("keeps a current-generation available definition valid across the reserved-name upgrade", func() {
+			componentDefObj := newReservedPortDefinition()
+			componentDefObj.Generation = 3
+			componentDefObj.Status.ObservedGeneration = 3
+			componentDefObj.Status.Phase = kbappsv1.AvailablePhase
+
+			reconciler := &ComponentDefinitionReconciler{}
+			Expect(reconciler.validateRuntime(nil, controllerutil.RequestCtx{}, componentDefObj)).Should(Succeed())
+		})
+
+		It("keeps the compatibility proof after an unrelated phase transition", func() {
+			componentDefObj := newReservedPortDefinition()
+			componentDefObj.Generation = 3
+			componentDefObj.Status.ObservedGeneration = 3
+			componentDefObj.Status.LegacyKBAgentPortNames = true
+			componentDefObj.Status.Phase = kbappsv1.UnavailablePhase
+
+			reconciler := &ComponentDefinitionReconciler{}
+			Expect(reconciler.validateRuntime(nil, controllerutil.RequestCtx{}, componentDefObj)).Should(Succeed())
+		})
+
+		It("persists the compatibility proof for an old available current-generation definition", func() {
+			componentDefObj := newReservedPortDefinition()
+			componentDefObj.Generation = 3
+			componentDefObj.Status.ObservedGeneration = 3
+			componentDefObj.Status.Phase = kbappsv1.AvailablePhase
+			cli, current := newStatusClient(componentDefObj)
+
+			reconciler := &ComponentDefinitionReconciler{}
+			Expect(reconciler.status(cli, controllerutil.RequestCtx{Ctx: ctx}, current, kbappsv1.AvailablePhase, "")).Should(Succeed())
+			Expect(cli.Get(ctx, client.ObjectKeyFromObject(componentDefObj), current)).Should(Succeed())
+			Expect(current.Status.LegacyKBAgentPortNames).Should(BeTrue())
+			Expect(current.Status.ObservedGeneration).Should(Equal(int64(3)))
+		})
+
+		It("preserves the compatibility proof across a same-generation phase change", func() {
+			componentDefObj := newReservedPortDefinition()
+			componentDefObj.Generation = 3
+			componentDefObj.Status.ObservedGeneration = 3
+			componentDefObj.Status.LegacyKBAgentPortNames = true
+			componentDefObj.Status.Phase = kbappsv1.AvailablePhase
+			cli, current := newStatusClient(componentDefObj)
+
+			reconciler := &ComponentDefinitionReconciler{}
+			Expect(reconciler.status(cli, controllerutil.RequestCtx{Ctx: ctx}, current, kbappsv1.UnavailablePhase, "unrelated")).Should(Succeed())
+			Expect(cli.Get(ctx, client.ObjectKeyFromObject(componentDefObj), current)).Should(Succeed())
+			Expect(current.Status.LegacyKBAgentPortNames).Should(BeTrue())
+			Expect(current.Status.Phase).Should(Equal(kbappsv1.UnavailablePhase))
+		})
+
+		It("rejects a generation change and clears the compatibility proof", func() {
+			componentDefObj := newReservedPortDefinition()
+			componentDefObj.Generation = 4
+			componentDefObj.Status.ObservedGeneration = 3
+			componentDefObj.Status.LegacyKBAgentPortNames = true
+			componentDefObj.Status.Phase = kbappsv1.AvailablePhase
+			cli, current := newStatusClient(componentDefObj)
+
+			reconciler := &ComponentDefinitionReconciler{}
+			err := reconciler.validateRuntime(nil, controllerutil.RequestCtx{}, current)
+			Expect(err).Should(MatchError(ContainSubstring("reserved for the injected kbagent container")))
+			Expect(reconciler.status(cli, controllerutil.RequestCtx{Ctx: ctx}, current, kbappsv1.UnavailablePhase, err.Error())).Should(Succeed())
+			Expect(cli.Get(ctx, client.ObjectKeyFromObject(componentDefObj), current)).Should(Succeed())
+			Expect(current.Status.LegacyKBAgentPortNames).Should(BeFalse())
+			Expect(current.Status.ObservedGeneration).Should(Equal(int64(4)))
+		})
+
+		It("continues rejecting after the failed generation is written to status", func() {
+			componentDefObj := newReservedPortDefinition()
+			componentDefObj.Generation = 4
+			componentDefObj.Status.ObservedGeneration = 3
+			componentDefObj.Status.LegacyKBAgentPortNames = true
+			componentDefObj.Status.Phase = kbappsv1.AvailablePhase
+			cli, current := newStatusClient(componentDefObj)
+
+			reconciler := &ComponentDefinitionReconciler{}
+			firstErr := reconciler.validateRuntime(nil, controllerutil.RequestCtx{}, current)
+			Expect(firstErr).Should(HaveOccurred())
+			Expect(reconciler.status(cli, controllerutil.RequestCtx{Ctx: ctx}, current, kbappsv1.UnavailablePhase, firstErr.Error())).Should(Succeed())
+			Expect(cli.Get(ctx, client.ObjectKeyFromObject(componentDefObj), current)).Should(Succeed())
+			Expect(reconciler.validateRuntime(nil, controllerutil.RequestCtx{}, current)).Should(
+				MatchError(ContainSubstring("reserved for the injected kbagent container")))
+			Expect(current.Status.LegacyKBAgentPortNames).Should(BeFalse())
 		})
 	})
 

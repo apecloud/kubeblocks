@@ -78,6 +78,7 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 	}
 	compDefObj := compDef.DeepCopy()
 	synthesizeComp := &SynthesizedComponent{
+		grandfatherKBAgentPortNames:      KBAgentPortNamesGrandfathered(compDef),
 		Namespace:                        comp.Namespace,
 		ClusterName:                      clusterName,
 		ClusterUID:                       clusterUID,

@@ -40,8 +40,17 @@ const (
 	ContainerName4Worker = "kbagent-worker"
 	InitContainerName    = "init-kbagent"
 
-	DefaultHTTPPortName      = "http"
-	DefaultStreamingPortName = "streaming"
+	// Injected container port names are prefixed to keep port names unique
+	// within the pod, as required by the Kubernetes API contract for
+	// ContainerPort.Name; generic names like "http" collide with engine
+	// runtime container ports (e.g. Elasticsearch).
+	DefaultHTTPPortName      = "kba-http"
+	DefaultStreamingPortName = "kba-streaming"
+
+	// Legacy port names carried by pods created before the rename; consumers
+	// that resolve ports from live pod specs fall back to them during upgrade.
+	LegacyHTTPPortName      = "http"
+	LegacyStreamingPortName = "streaming"
 
 	DefaultHTTPPort      = 3501
 	DefaultStreamingPort = 3502

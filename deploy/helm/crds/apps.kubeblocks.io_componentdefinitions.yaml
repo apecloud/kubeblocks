@@ -10533,6 +10533,10 @@ spec:
                   These instance-specific overrides can be specified in `cluster.spec.componentSpecs[*].instances`.
 
                   This field is immutable and cannot be updated once set.
+
+                  The container port names "kba-http" and "kba-streaming" are reserved by KubeBlocks for kbagent
+                  and must not be used by user-defined containers, regardless of whether this definition currently
+                  declares lifecycle or reconfiguration actions.
                 properties:
                   activeDeadlineSeconds:
                     description: |-
@@ -20135,6 +20139,13 @@ spec:
           status:
             description: ComponentDefinitionStatus defines the observed state of ComponentDefinition.
             properties:
+              legacyKBAgentPortNames:
+                description: |-
+                  LegacyKBAgentPortNames records that this definition was already accepted
+                  before kba-http and kba-streaming became reserved names. The controller
+                  uses the durable status bit to preserve a compatible injected port name
+                  across later phase transitions without allowing new definitions to opt in.
+                type: boolean
               message:
                 description: Provides additional information about the current phase.
                 type: string

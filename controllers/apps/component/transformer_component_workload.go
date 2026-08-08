@@ -38,6 +38,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/kbagent"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -278,6 +279,11 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet, legacyConfigManagerP
 
 	intctrlutil.ResolvePodSpecDefaultFields(oldITS.Spec.Template.Spec, &itsObjCopy.Spec.Template.Spec)
 
+	// Defer the kbagent port rename on existing workloads while their legacy
+	// aliases remain valid. A preferred name still wins when it repairs a
+	// collision that already makes the live template invalid.
+	deferKBAgentPortRename(oldITS, itsObjCopy)
+
 	isSpecUpdated := !reflect.DeepEqual(&oldITS.Spec, &itsObjCopy.Spec)
 	isLabelsUpdated := !reflect.DeepEqual(oldITS.Labels, itsObjCopy.Labels)
 	isAnnotationsUpdated := !reflect.DeepEqual(oldITS.Annotations, itsObjCopy.Annotations)
@@ -285,6 +291,58 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet, legacyConfigManagerP
 		return nil
 	}
 	return itsObjCopy
+}
+
+// deferKBAgentPortRename keeps the legacy kbagent port names on an existing
+// workload whose live template still carries them. Port names are pure
+// identifiers inside the template (kbagent probes and args reference numeric
+// ports) but they are not in-place updatable. The apps controller must not
+// predict whether InstanceSet will roll a concrete Pod: that decision also
+// depends on InstanceSet-owned state and feature gates. Existing workloads
+// therefore retain the legacy aliases until InstanceSet owns an explicit
+// migration contract.
+func deferKBAgentPortRename(oldITS, mergedITS *workloads.InstanceSet) {
+	if oldITS == nil || mergedITS == nil {
+		return
+	}
+	_, oldAgent := intctrlutil.GetContainerByName(oldITS.Spec.Template.Spec.Containers, kbagent.ContainerName)
+	if oldAgent == nil {
+		return
+	}
+	oldNames := sets.New[string]()
+	for _, p := range oldAgent.Ports {
+		oldNames.Insert(p.Name)
+	}
+	idx, agent := intctrlutil.GetContainerByName(mergedITS.Spec.Template.Spec.Containers, kbagent.ContainerName)
+	if agent == nil {
+		return
+	}
+	occupied := sets.New[string]()
+	for _, containers := range [][]corev1.Container{
+		mergedITS.Spec.Template.Spec.InitContainers,
+		mergedITS.Spec.Template.Spec.Containers,
+	} {
+		for i := range containers {
+			if component.IsKBAgentContainer(&containers[i]) {
+				continue
+			}
+			for _, port := range containers[i].Ports {
+				occupied.Insert(port.Name)
+			}
+		}
+	}
+	legacyNames := map[string]string{
+		kbagent.DefaultHTTPPortName:      kbagent.LegacyHTTPPortName,
+		kbagent.DefaultStreamingPortName: kbagent.LegacyStreamingPortName,
+	}
+	ports := mergedITS.Spec.Template.Spec.Containers[idx].Ports
+	for i, p := range ports {
+		legacy, ok := legacyNames[p.Name]
+		if !ok || oldNames.Has(p.Name) || !oldNames.Has(legacy) || occupied.Has(legacy) {
+			continue
+		}
+		ports[i].Name = legacy
+	}
 }
 
 const (

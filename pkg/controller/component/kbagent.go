@@ -64,6 +64,27 @@ func IsKBAgentContainer(c *corev1.Container) bool {
 	return c.Name == kbagent.ContainerName || c.Name == kbagent.ContainerName4Worker || c.Name == kbagent.InitContainerName
 }
 
+// NonKBAgentPortNames returns the port names declared by the component's own
+// containers, excluding the injected kbagent containers.
+func NonKBAgentPortNames(synthesizedComp *SynthesizedComponent) sets.Set[string] {
+	names := sets.New[string]()
+	if synthesizedComp == nil || synthesizedComp.PodSpec == nil {
+		return names
+	}
+	for i := range synthesizedComp.PodSpec.Containers {
+		c := &synthesizedComp.PodSpec.Containers[i]
+		if IsKBAgentContainer(c) {
+			continue
+		}
+		for _, p := range c.Ports {
+			if p.Name != "" {
+				names.Insert(p.Name)
+			}
+		}
+	}
+	return names
+}
+
 func UpdateKBAgentContainer4HostNetwork(synthesizedComp *SynthesizedComponent) {
 	idx, c := intctrlutil.GetContainerByName(synthesizedComp.PodSpec.Containers, kbagent.ContainerName)
 	if c == nil {
@@ -80,7 +101,14 @@ func UpdateKBAgentContainer4HostNetwork(synthesizedComp *SynthesizedComponent) {
 	}
 	httpPort := port(kbagent.DefaultHTTPPortName)
 	if httpPort == 0 {
+		httpPort = port(kbagent.LegacyHTTPPortName)
+	}
+	if httpPort == 0 {
 		return
+	}
+	streamingPort := port(kbagent.DefaultStreamingPortName)
+	if streamingPort == 0 {
+		streamingPort = port(kbagent.LegacyStreamingPortName)
 	}
 
 	updatePortInArgs := func(arg string, port int) {
@@ -92,7 +120,7 @@ func UpdateKBAgentContainer4HostNetwork(synthesizedComp *SynthesizedComponent) {
 		}
 	}
 	updatePortInArgs("--port", httpPort)
-	updatePortInArgs("--streaming-port", port(kbagent.DefaultStreamingPortName))
+	updatePortInArgs("--streaming-port", streamingPort)
 
 	// update startup probe
 	if c.StartupProbe != nil && c.StartupProbe.TCPSocket != nil {
@@ -128,6 +156,10 @@ func updateKBAgentTaskEnv(envVars map[string]string, f func(proto.Task) *proto.T
 func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 	if !hasActionDefined(synthesizedComp) {
 		return nil
+	}
+	httpPortName, streamingPortName, err := kbagentContainerPortNames(synthesizedComp)
+	if err != nil {
+		return err
 	}
 
 	envVars, err := buildKBAgentStartupEnvs(synthesizedComp)
@@ -165,12 +197,12 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 			AddPorts(
 				corev1.ContainerPort{
 					ContainerPort: int32(httpPort),
-					Name:          kbagent.DefaultHTTPPortName,
+					Name:          httpPortName,
 					Protocol:      corev1.ProtocolTCP,
 				},
 				corev1.ContainerPort{
 					ContainerPort: int32(streamingPort),
-					Name:          kbagent.DefaultStreamingPortName,
+					Name:          streamingPortName,
 					Protocol:      corev1.ProtocolTCP,
 				}).
 			SetStartupProbe(corev1.Probe{
@@ -209,11 +241,11 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 			[]appsv1.HostNetworkContainerPort{
 				{
 					Container: container.Name,
-					Ports:     []string{kbagent.DefaultHTTPPortName},
+					Ports:     []string{httpPortName},
 				},
 				{
 					Container: container.Name,
-					Ports:     []string{kbagent.DefaultStreamingPortName},
+					Ports:     []string{streamingPortName},
 				},
 			}...)
 	}
@@ -221,6 +253,104 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 	synthesizedComp.PodSpec.Containers = append(synthesizedComp.PodSpec.Containers, *container)
 	synthesizedComp.PodSpec.InitContainers = append(synthesizedComp.PodSpec.InitContainers, *workerContainer)
 
+	return nil
+}
+
+// KBAgentPortNamesGrandfathered reports whether the controller persisted a
+// compatibility proof for the ComponentDefinition's current generation.
+func KBAgentPortNamesGrandfathered(cmpd *appsv1.ComponentDefinition) bool {
+	return kbagentPortNamesStatusCurrent(cmpd) && cmpd.Status.LegacyKBAgentPortNames
+}
+
+// KBAgentPortNamesUpgradeEligible reports whether an old, already available
+// current-generation definition may have its compatibility proof persisted.
+// This transitional signal is valid only during validation/status migration;
+// synthesis must rely on KBAgentPortNamesGrandfathered instead.
+func KBAgentPortNamesUpgradeEligible(cmpd *appsv1.ComponentDefinition) bool {
+	return kbagentPortNamesStatusCurrent(cmpd) && cmpd.Status.Phase == appsv1.AvailablePhase
+}
+
+func kbagentPortNamesStatusCurrent(cmpd *appsv1.ComponentDefinition) bool {
+	return cmpd != nil && cmpd.Status.ObservedGeneration > 0 && cmpd.Status.ObservedGeneration == cmpd.Generation
+}
+
+func kbagentContainerPortNames(synthesizedComp *SynthesizedComponent) (string, string, error) {
+	if !synthesizedComp.grandfatherKBAgentPortNames {
+		if err := validateKBAgentPortNames(
+			sets.New(kbagent.ContainerName),
+			synthesizedComp.PodSpec.InitContainers,
+			synthesizedComp.PodSpec.Containers); err != nil {
+			return "", "", err
+		}
+		return kbagent.DefaultHTTPPortName, kbagent.DefaultStreamingPortName, nil
+	}
+
+	occupied := sets.New[string]()
+	for _, containers := range [][]corev1.Container{
+		synthesizedComp.PodSpec.InitContainers,
+		synthesizedComp.PodSpec.Containers,
+	} {
+		for i := range containers {
+			if IsKBAgentContainer(&containers[i]) {
+				continue
+			}
+			for _, port := range containers[i].Ports {
+				if port.Name != "" {
+					occupied.Insert(port.Name)
+				}
+			}
+		}
+	}
+
+	choose := func(preferred, legacy string) (string, error) {
+		if !occupied.Has(preferred) {
+			return preferred, nil
+		}
+		if occupied.Has(legacy) {
+			return "", fmt.Errorf("container port names %q and %q are both in use; no compatible name remains for the injected kbagent container",
+				preferred, legacy)
+		}
+		return legacy, nil
+	}
+
+	httpName, err := choose(kbagent.DefaultHTTPPortName, kbagent.LegacyHTTPPortName)
+	if err != nil {
+		return "", "", err
+	}
+	streamingName, err := choose(kbagent.DefaultStreamingPortName, kbagent.LegacyStreamingPortName)
+	if err != nil {
+		return "", "", err
+	}
+	return httpName, streamingName, nil
+}
+
+// ValidateKBAgentPortNames rejects user-defined ports that would collide with
+// the fixed names of the injected kbagent container. ContainerPort.Name is
+// pod-wide, so moving from the legacy generic names to prefixed names is only a
+// complete uniqueness contract when those prefixed names are reserved.
+func ValidateKBAgentPortNames(containerGroups ...[]corev1.Container) error {
+	return validateKBAgentPortNames(nil, containerGroups...)
+}
+
+func validateKBAgentPortNames(ignoredContainerNames sets.Set[string], containerGroups ...[]corev1.Container) error {
+	reserved := sets.New(kbagent.DefaultHTTPPortName, kbagent.DefaultStreamingPortName)
+	for _, containers := range containerGroups {
+		for _, container := range containers {
+			// BuildSynthesizedComponent may be called again with a PodSpec that
+			// already contains the controller-injected kbagent container. The API
+			// validator still checks every user runtime container; only this
+			// synthesis-time defense skips the already-injected container itself.
+			if ignoredContainerNames.Has(container.Name) {
+				continue
+			}
+			for _, port := range container.Ports {
+				if reserved.Has(port.Name) {
+					return fmt.Errorf("container port name %q in container %q is reserved for the injected kbagent container",
+						port.Name, container.Name)
+				}
+			}
+		}
+	}
 	return nil
 }
 

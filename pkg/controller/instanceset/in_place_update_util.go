@@ -54,6 +54,9 @@ func supportPodVerticalScaling() bool {
 	return viper.GetBool(constant.FeatureGateInPlacePodVerticalScaling)
 }
 
+// filterInPlaceFields strips the fields that the InstanceSet controller can
+// update without recreating pods, leaving only the recreate-relevant part of
+// the template for comparison.
 func filterInPlaceFields(src *corev1.PodTemplateSpec) *corev1.PodTemplateSpec {
 	template := src.DeepCopy()
 	// filter annotations
@@ -414,6 +417,10 @@ func getPodUpdatePolicy(its *workloads.InstanceSet, pod *corev1.Pod) (podUpdateP
 	return noOpsPolicy, "", "", nil
 }
 
+// getPodUpdatePolicyInSpec returns the policy selected by the InstanceSet
+// controller for a concrete old/new Pod pair. Container image changes use the
+// upgrade policy; command, port, resource, and other template changes use the
+// regular update policy.
 func getPodUpdatePolicyInSpec(its *workloads.InstanceSet, old, new *corev1.Pod) workloads.PodUpdatePolicyType {
 	if !equalField(old.Spec.InitContainers, new.Spec.InitContainers) || !equalField(old.Spec.Containers, new.Spec.Containers) {
 		if its.Spec.PodUpgradePolicy == kbappsv1.ReCreatePodUpdatePolicyType && safeKBManagedImageOnlyInPlaceUpdate(old, new) {

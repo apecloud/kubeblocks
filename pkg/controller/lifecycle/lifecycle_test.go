@@ -38,6 +38,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	kbagt "github.com/apecloud/kubeblocks/pkg/kbagent"
 	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
@@ -1035,6 +1036,48 @@ var _ = Describe("lifecycle", func() {
 
 		It("timeout", func() {
 			// TODO: impl
+		})
+	})
+
+	Context("kbagent server endpoint", func() {
+		endpointPod := func(portName string, port int32) *corev1.Pod {
+			return &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "pod-endpoint-0",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{{
+						Name: kbagt.ContainerName,
+						Ports: []corev1.ContainerPort{
+							{Name: portName, ContainerPort: port},
+						},
+					}},
+				},
+				Status: corev1.PodStatus{PodIP: "10.0.0.1"},
+			}
+		}
+
+		It("resolves the current port name", func() {
+			pod := endpointPod(kbagt.DefaultHTTPPortName, 3501)
+			_, port, err := (&kbagent{}).serverEndpoint(pod)
+			Expect(err).Should(BeNil())
+			Expect(port).Should(Equal(int32(3501)))
+		})
+
+		It("falls back to the legacy port name for pods created before the rename", func() {
+			pod := endpointPod(kbagt.LegacyHTTPPortName, 3501)
+			_, port, err := (&kbagent{}).serverEndpoint(pod)
+			Expect(err).Should(BeNil())
+			Expect(port).Should(Equal(int32(3501)))
+		})
+
+		It("treats pods without kbagent ports as agent-less", func() {
+			pod := endpointPod("other", 3501)
+			host, port, err := (&kbagent{}).serverEndpoint(pod)
+			Expect(err).Should(BeNil())
+			Expect(host).Should(BeEmpty())
+			Expect(port).Should(Equal(int32(0)))
 		})
 	})
 })

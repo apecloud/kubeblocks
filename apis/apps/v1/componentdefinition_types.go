@@ -213,6 +213,10 @@ type ComponentDefinitionSpec struct {
 	//
 	// This field is immutable and cannot be updated once set.
 	//
+	// The container port names "kba-http" and "kba-streaming" are reserved by KubeBlocks for kbagent
+	// and must not be used by user-defined containers, regardless of whether this definition currently
+	// declares lifecycle or reconfiguration actions.
+	//
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +kubebuilder:validation:Required
 	Runtime corev1.PodSpec `json:"runtime"`
@@ -551,6 +555,14 @@ type ComponentDefinitionStatus struct {
 	//
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
+	// LegacyKBAgentPortNames records that this definition was already accepted
+	// before kba-http and kba-streaming became reserved names. The controller
+	// uses the durable status bit to preserve a compatible injected port name
+	// across later phase transitions without allowing new definitions to opt in.
+	//
+	// +optional
+	LegacyKBAgentPortNames bool `json:"legacyKBAgentPortNames,omitempty"`
 
 	// Represents the current status of the ComponentDefinition. Valid values include ``, `Available`, and `Unavailable`.
 	// When the status is `Available`, the ComponentDefinition is ready and can be utilized by related objects.

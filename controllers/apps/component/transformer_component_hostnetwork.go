@@ -65,7 +65,7 @@ func (t *componentHostNetworkTransformer) allocateHostPorts(synthesizedComp *com
 		}
 	}
 
-	pm := intctrlutil.GetPortManager(synthesizedComp.Network)
+	pm := intctrlutil.GetPortManager(synthesizedComp.Network, component.NonKBAgentPortNames(synthesizedComp))
 	needAllocate := func(c string, p string) bool {
 		containerPorts, ok := ports[c]
 		if !ok {

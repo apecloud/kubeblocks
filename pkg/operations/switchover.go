@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -31,7 +32,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -43,8 +46,97 @@ import (
 
 // switchover constants
 const (
-	KBSwitchoverKey = "Switchover"
+	KBSwitchoverKey                        = "Switchover"
+	switchoverDispatchClaimMessagePrefix   = "switchover dispatch claimed before lifecycle call: SwitchoverDispatch/"
+	switchoverDispatchClaimMessageFmt      = switchoverDispatchClaimMessagePrefix + "%s/%s/%s/%s/%s"
+	switchoverDispatchOutcomeMessagePrefix = "switchover dispatch outcome persisted: SwitchoverDispatch/"
+	switchoverDispatchOutcomeMessageFmt    = switchoverDispatchOutcomeMessagePrefix + "%s/%s/%s/%s/%s; %s"
 )
+
+var errSwitchoverDispatchClaimLost = errors.New("switchover dispatch claim was lost")
+
+type switchoverDispatchClaim struct {
+	opsRequestUID string
+	componentName string
+	instanceName  string
+	candidateName string
+	token         string
+}
+
+func newSwitchoverDispatchClaim(opsRequest *opsv1alpha1.OpsRequest, compName string,
+	switchover opsv1alpha1.Switchover) switchoverDispatchClaim {
+	return switchoverDispatchClaim{
+		opsRequestUID: string(opsRequest.UID),
+		componentName: compName,
+		instanceName:  switchover.InstanceName,
+		candidateName: switchover.CandidateName,
+		token:         string(uuid.NewUUID()),
+	}
+}
+
+func parseSwitchoverDispatchClaim(message string) (switchoverDispatchClaim, bool) {
+	if !strings.HasPrefix(message, switchoverDispatchClaimMessagePrefix) {
+		return switchoverDispatchClaim{}, false
+	}
+	fields := strings.Split(strings.TrimPrefix(message, switchoverDispatchClaimMessagePrefix), "/")
+	if len(fields) != 5 || fields[0] == "" || fields[1] == "" || fields[2] == "" || fields[4] == "" {
+		return switchoverDispatchClaim{}, false
+	}
+	return switchoverDispatchClaim{
+		opsRequestUID: fields[0],
+		componentName: fields[1],
+		instanceName:  fields[2],
+		candidateName: fields[3],
+		token:         fields[4],
+	}, true
+}
+
+func (claim switchoverDispatchClaim) message() string {
+	return fmt.Sprintf(switchoverDispatchClaimMessageFmt, claim.opsRequestUID, claim.componentName,
+		claim.instanceName, claim.candidateName, claim.token)
+}
+
+func (claim switchoverDispatchClaim) outcomeMessage(message string) string {
+	return fmt.Sprintf(switchoverDispatchOutcomeMessageFmt, claim.opsRequestUID, claim.componentName,
+		claim.instanceName, claim.candidateName, claim.token, message)
+}
+
+func parseSwitchoverDispatchOutcomeMessage(message string) (switchoverDispatchClaim, string, bool) {
+	if !strings.HasPrefix(message, switchoverDispatchOutcomeMessagePrefix) {
+		return switchoverDispatchClaim{}, "", false
+	}
+	parts := strings.SplitN(strings.TrimPrefix(message, switchoverDispatchOutcomeMessagePrefix), "; ", 2)
+	if len(parts) != 2 || parts[1] == "" {
+		return switchoverDispatchClaim{}, "", false
+	}
+	fields := strings.Split(parts[0], "/")
+	if len(fields) != 5 || fields[0] == "" || fields[1] == "" || fields[2] == "" || fields[4] == "" {
+		return switchoverDispatchClaim{}, "", false
+	}
+	return switchoverDispatchClaim{
+		opsRequestUID: fields[0],
+		componentName: fields[1],
+		instanceName:  fields[2],
+		candidateName: fields[3],
+		token:         fields[4],
+	}, parts[1], true
+}
+
+func (claim switchoverDispatchClaim) matchesIdentity(opsRequest *opsv1alpha1.OpsRequest, compName string,
+	switchover opsv1alpha1.Switchover) bool {
+	return claim.opsRequestUID == string(opsRequest.UID) &&
+		claim.componentName == compName &&
+		claim.instanceName == switchover.InstanceName &&
+		claim.candidateName == switchover.CandidateName
+}
+
+func (claim switchoverDispatchClaim) equal(other switchoverDispatchClaim) bool {
+	return claim.opsRequestUID == other.opsRequestUID &&
+		claim.componentName == other.componentName &&
+		claim.instanceName == other.instanceName &&
+		claim.candidateName == other.candidateName &&
+		claim.token == other.token
+}
 
 type switchoverOpsHandler struct{}
 
@@ -174,17 +266,16 @@ func handleSwitchovers(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes 
 	var completedCount, failedCount int32
 
 	opsRequest := opsRes.OpsRequest
-	oldOpsRequestStatus := opsRequest.Status.DeepCopy()
-	patch := client.MergeFrom(opsRequest.DeepCopy())
-
 	for _, switchover := range opsRequest.Spec.SwitchoverList {
 		if err := handleSwitchover(reqCtx, cli, opsRes, &switchover, opsRequest, &completedCount, &failedCount); err != nil {
 			return expectCount, completedCount, failedCount, err
 		}
 	}
 
-	opsRequest.Status.Progress = fmt.Sprintf("%d/%d", completedCount, expectCount)
-	if !reflect.DeepEqual(*oldOpsRequestStatus, opsRequest.Status) {
+	progress := fmt.Sprintf("%d/%d", completedCount, expectCount)
+	if opsRequest.Status.Progress != progress {
+		patch := client.MergeFromWithOptions(opsRequest.DeepCopy(), client.MergeFromWithOptimisticLock{})
+		opsRequest.Status.Progress = progress
 		if err := cli.Status().Patch(reqCtx.Ctx, opsRequest, patch); err != nil {
 			return expectCount, completedCount, failedCount, err
 		}
@@ -229,38 +320,249 @@ func handleSwitchover(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *
 
 	switch progressDetail.Status {
 	case opsv1alpha1.PendingProgressStatus:
-		if err = runtime.Switchover(reqCtx.Ctx, synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name, switchover.InstanceName, switchover.CandidateName); err != nil {
-			progressDetail.Status = opsv1alpha1.FailedProgressStatus
-			progressDetail.Message = fmt.Sprintf("component %s %s", compName, err.Error())
-		} else {
-			progressDetail.Message = "doing switchover"
-			progressDetail.Status = opsv1alpha1.ProcessingProgressStatus
+		if opsRes.APIReader == nil {
+			return errors.New("APIReader is required to confirm a switchover dispatch claim")
 		}
-		progressDetail.StartTime = metav1.Now()
+		if opsRequest.UID == "" {
+			return errors.New("OpsRequest UID is required to create a switchover dispatch claim")
+		}
+		claim := newSwitchoverDispatchClaim(opsRequest, compName, *switchover)
+		claimMessage := claim.message()
+		patchErr := patchSwitchoverProgressStatus(reqCtx.Ctx, cli, opsRequest, compName, objectKey,
+			func(detail *opsv1alpha1.ProgressStatusDetail) {
+				detail.Status = opsv1alpha1.ProcessingProgressStatus
+				detail.Message = claimMessage
+				detail.StartTime = metav1.Now()
+			})
+		ownsClaim, confirmErr := confirmSwitchoverDispatchClaim(reqCtx.Ctx, opsRes, opsRequest, compName, objectKey, claim)
+		if confirmErr != nil {
+			if patchErr != nil {
+				return errors.Wrapf(patchErr, "failed to confirm switchover dispatch claim: %v", confirmErr)
+			}
+			return confirmErr
+		}
+		if !ownsClaim {
+			if patchErr != nil {
+				return patchErr
+			}
+			return fmt.Errorf("switchover dispatch claim belongs to another writer for component %s", compName)
+		}
+
+		actionErr := runtime.Switchover(reqCtx.Ctx, synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name, switchover.InstanceName, switchover.CandidateName)
+		outcomeStatus := opsv1alpha1.ProcessingProgressStatus
+		outcomeMessage := "doing switchover"
+		if actionErr != nil {
+			outcomeStatus = opsv1alpha1.FailedProgressStatus
+			outcomeMessage = fmt.Sprintf("component %s %s", compName, actionErr.Error())
+		} else if !progressDetail.StartTime.IsZero() && time.Now().After(progressDetail.StartTime.Add(5*time.Minute)) {
+			// StartTime is committed before the lifecycle call. A successful response that arrives after
+			// this deadline remains a fail-closed timeout instead of being treated as a fresh success.
+			outcomeStatus = opsv1alpha1.FailedProgressStatus
+			outcomeMessage = "switchover timeout after 5 minutes"
+		}
+		progressDetail, err = persistKnownSwitchoverDispatchOutcome(reqCtx, cli, opsRes.APIReader, opsRequest,
+			compName, objectKey, claim, outcomeStatus, outcomeMessage)
+		if err != nil {
+			return err
+		}
+		if isCompletedProgressStatus(progressDetail.Status) {
+			*completedCount++
+			if progressDetail.Status == opsv1alpha1.FailedProgressStatus {
+				*failedCount++
+			}
+		}
+		return nil
 	case opsv1alpha1.ProcessingProgressStatus:
-		targetRole := progressDetail.Group
-		if switchover.CandidateName != "" {
-			candidateInstance, err := getSwitchoverPodBackedInstance(runtime, synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name, switchover.CandidateName)
-			switch {
-			case err != nil && !apierrors.IsNotFound(err):
-				return err
-			case err != nil:
-				progressDetail.Message = fmt.Sprintf(`component %s candidate instance "%s" not found`, compName, switchover.CandidateName)
-				progressDetail.Status = opsv1alpha1.FailedProgressStatus
-			case targetRole == candidateInstance.GetRole():
+		oldOpsRequestStatus := opsRequest.Status.DeepCopy()
+		patch := client.MergeFromWithOptions(opsRequest.DeepCopy(), client.MergeFromWithOptimisticLock{})
+		claim, hasClaim := parseSwitchoverDispatchClaim(progressDetail.Message)
+		outcomeClaim, _, hasOutcome := parseSwitchoverDispatchOutcomeMessage(progressDetail.Message)
+		claimProtocolMismatch := strings.HasPrefix(progressDetail.Message, switchoverDispatchClaimMessagePrefix) &&
+			(!hasClaim || !claim.matchesIdentity(opsRequest, compName, *switchover))
+		outcomeProtocolMismatch := strings.HasPrefix(progressDetail.Message, switchoverDispatchOutcomeMessagePrefix) &&
+			(!hasOutcome || !outcomeClaim.matchesIdentity(opsRequest, compName, *switchover))
+		protocolIdentityMismatch := claimProtocolMismatch || outcomeProtocolMismatch
+		switch {
+		case protocolIdentityMismatch:
+			progressDetail.Message = fmt.Sprintf("component %s switchover dispatch protocol identity changed or is malformed; outcome is unknown and lifecycle action will not be retried", compName)
+			progressDetail.Status = opsv1alpha1.FailedProgressStatus
+		case hasClaim && switchover.CandidateName == "":
+			progressDetail.Message = fmt.Sprintf("component %s switchover dispatch outcome is unknown; lifecycle action will not be retried", compName)
+			progressDetail.Status = opsv1alpha1.FailedProgressStatus
+		default:
+			targetRole := progressDetail.Group
+			if switchover.CandidateName != "" {
+				candidateInstance, err := getSwitchoverPodBackedInstance(runtime, synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name, switchover.CandidateName)
+				switch {
+				case err != nil && !apierrors.IsNotFound(err):
+					return err
+				case err != nil:
+					progressDetail.Message = fmt.Sprintf(`component %s candidate instance "%s" not found`, compName, switchover.CandidateName)
+					progressDetail.Status = opsv1alpha1.FailedProgressStatus
+				case targetRole == candidateInstance.GetRole():
+					progressDetail.Message = "do switchover succeed"
+					progressDetail.Status = opsv1alpha1.SucceedProgressStatus
+				default:
+					progressDetail.Message = fmt.Sprintf("component %s is waiting for candidate pod %s role change, current role %q, expected role %q",
+						compName, switchover.CandidateName, candidateInstance.GetRole(), targetRole)
+				}
+			} else {
 				progressDetail.Message = "do switchover succeed"
 				progressDetail.Status = opsv1alpha1.SucceedProgressStatus
-			default:
-				progressDetail.Message = fmt.Sprintf("component %s is waiting for candidate pod %s role change, current role %q, expected role %q",
-					compName, switchover.CandidateName, candidateInstance.GetRole(), targetRole)
 			}
-		} else {
-			progressDetail.Message = "do switchover succeed"
-			progressDetail.Status = opsv1alpha1.SucceedProgressStatus
 		}
+		handleProgressDetail(reqCtx, opsRequest, progressDetail, compName, completedCount, failedCount)
+		if !reflect.DeepEqual(*oldOpsRequestStatus, opsRequest.Status) {
+			if err := cli.Status().Patch(reqCtx.Ctx, opsRequest, patch); err != nil {
+				return err
+			}
+		}
+		return nil
 	}
 	handleProgressDetail(reqCtx, opsRequest, progressDetail, compName, completedCount, failedCount)
 	return nil
+}
+
+func patchSwitchoverProgressStatus(ctx context.Context, cli client.Client, opsRequest *opsv1alpha1.OpsRequest,
+	compName, objectKey string, mutate func(*opsv1alpha1.ProgressStatusDetail)) error {
+	patch := client.MergeFromWithOptions(opsRequest.DeepCopy(), client.MergeFromWithOptimisticLock{})
+	progressDetail := findStatusProgressDetail(opsRequest.Status.Components[compName].ProgressDetails, objectKey)
+	if progressDetail == nil {
+		return fmt.Errorf("progress detail not found for component %s", compName)
+	}
+	mutate(progressDetail)
+	return cli.Status().Patch(ctx, opsRequest, patch)
+}
+
+func confirmSwitchoverDispatchClaim(ctx context.Context, opsRes *OpsResource,
+	opsRequest *opsv1alpha1.OpsRequest, compName, objectKey string, expected switchoverDispatchClaim) (bool, error) {
+	reader := opsRes.APIReader
+	if reader == nil {
+		return false, errors.New("APIReader is required to confirm a switchover dispatch claim")
+	}
+	var confirmed *opsv1alpha1.OpsRequest
+	var live switchoverDispatchClaim
+	err := retry.OnError(retry.DefaultBackoff, shouldRetrySwitchoverStatusError, func() error {
+		fresh := &opsv1alpha1.OpsRequest{}
+		if err := reader.Get(ctx, client.ObjectKeyFromObject(opsRequest), fresh); err != nil {
+			return err
+		}
+		progressDetail := findStatusProgressDetail(fresh.Status.Components[compName].ProgressDetails, objectKey)
+		if progressDetail == nil || progressDetail.Status != opsv1alpha1.ProcessingProgressStatus {
+			return errors.Wrapf(errSwitchoverDispatchClaimLost, "claim was not committed for component %s", compName)
+		}
+		parsed, ok := parseSwitchoverDispatchClaim(progressDetail.Message)
+		if !ok || parsed.opsRequestUID != expected.opsRequestUID || parsed.componentName != expected.componentName ||
+			parsed.instanceName != expected.instanceName || parsed.candidateName != expected.candidateName {
+			return errors.Wrapf(errSwitchoverDispatchClaimLost, "claim identity does not match component %s", compName)
+		}
+		confirmed = fresh
+		live = parsed
+		return nil
+	})
+	if err != nil {
+		return false, err
+	}
+	confirmed.DeepCopyInto(opsRequest)
+	return live.token == expected.token, nil
+}
+
+func shouldRetrySwitchoverStatusError(err error) bool {
+	if errors.Is(err, errSwitchoverDispatchClaimLost) ||
+		errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return false
+	}
+	return !apierrors.IsNotFound(err) && !apierrors.IsForbidden(err) &&
+		!apierrors.IsUnauthorized(err) && !apierrors.IsInvalid(err) &&
+		!apierrors.IsRequestEntityTooLargeError(err) && !apierrors.IsBadRequest(err) &&
+		!apierrors.IsMethodNotSupported(err) && !apierrors.IsUnsupportedMediaType(err) &&
+		!apierrors.IsNotAcceptable(err)
+}
+
+func retryKnownSwitchoverOutcomeUntilContextDone(ctx context.Context, fn func() error) error {
+	delay := 10 * time.Millisecond
+	const maxDelay = time.Second
+	for {
+		err := fn()
+		if err == nil || !shouldRetrySwitchoverStatusError(err) {
+			return err
+		}
+		select {
+		case <-ctx.Done():
+			return errors.Wrapf(ctx.Err(), "stopped persisting the known switchover outcome after retryable error: %v", err)
+		case <-time.After(delay):
+		}
+		if delay < maxDelay {
+			delay *= 2
+			if delay > maxDelay {
+				delay = maxDelay
+			}
+		}
+	}
+}
+
+func persistKnownSwitchoverDispatchOutcome(
+	reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	reader client.Reader,
+	opsRequest *opsv1alpha1.OpsRequest,
+	compName,
+	objectKey string,
+	expected switchoverDispatchClaim,
+	status opsv1alpha1.ProgressStatus,
+	message string) (*opsv1alpha1.ProgressStatusDetail, error) {
+	var persisted *opsv1alpha1.OpsRequest
+	persistedMessage := expected.outcomeMessage(message)
+	err := retryKnownSwitchoverOutcomeUntilContextDone(reqCtx.Ctx, func() error {
+		fresh := &opsv1alpha1.OpsRequest{}
+		if err := reader.Get(reqCtx.Ctx, client.ObjectKeyFromObject(opsRequest), fresh); err != nil {
+			return err
+		}
+		componentStatus, ok := fresh.Status.Components[compName]
+		if !ok {
+			return errors.Wrapf(errSwitchoverDispatchClaimLost, "component %s status is missing", compName)
+		}
+		progressDetail := findStatusProgressDetail(componentStatus.ProgressDetails, objectKey)
+		if progressDetail == nil {
+			return errors.Wrapf(errSwitchoverDispatchClaimLost, "component %s progress detail is missing", compName)
+		}
+		persistedClaim, persistedOutcome, hasPersistedOutcome := parseSwitchoverDispatchOutcomeMessage(progressDetail.Message)
+		if progressDetail.Status == status && hasPersistedOutcome && persistedClaim.equal(expected) && persistedOutcome == message {
+			persisted = fresh
+			return nil
+		}
+		live, ok := parseSwitchoverDispatchClaim(progressDetail.Message)
+		if !ok || progressDetail.Status != opsv1alpha1.ProcessingProgressStatus || !live.equal(expected) {
+			return errors.Wrapf(errSwitchoverDispatchClaimLost, "component %s", compName)
+		}
+
+		old := fresh.DeepCopy()
+		progressDetail.Status = status
+		progressDetail.Message = persistedMessage
+		updateProgressDetailTime(progressDetail)
+		componentStatus.Phase = appsv1.UpdatingComponentPhase
+		componentStatus.ProgressDetails = append([]opsv1alpha1.ProgressStatusDetail(nil), componentStatus.ProgressDetails...)
+		fresh.Status.Components[compName] = componentStatus
+		patch := client.MergeFromWithOptions(old, client.MergeFromWithOptimisticLock{})
+		if err := cli.Status().Patch(reqCtx.Ctx, fresh, patch); err != nil {
+			return err
+		}
+		persisted = fresh
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	if persisted == nil {
+		return nil, errors.New("switchover dispatch outcome was not persisted")
+	}
+	persisted.DeepCopyInto(opsRequest)
+	progressDetail := findStatusProgressDetail(opsRequest.Status.Components[compName].ProgressDetails, objectKey)
+	if progressDetail == nil {
+		return nil, fmt.Errorf("progress detail not found for component %s after persisting switchover outcome", compName)
+	}
+	sendProgressDetailEvent(reqCtx.Recorder, opsRequest, *progressDetail)
+	return progressDetail, nil
 }
 
 func getSwitchoverPodBackedInstance(runtime OpsRuntime, namespace, clusterName, compName, instanceName string) (Instance, error) {

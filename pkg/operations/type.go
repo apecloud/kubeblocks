@@ -82,6 +82,7 @@ type OpsResource struct {
 	OpsRequest     *opsv1alpha1.OpsRequest
 	Cluster        *appsv1.Cluster
 	Recorder       record.EventRecorder
+	APIReader      client.Reader
 	ToClusterPhase appsv1.ClusterPhase
 	Runtimes       map[string]OpsRuntime
 }

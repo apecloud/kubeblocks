@@ -215,9 +215,10 @@ var _ = BeforeSuite(func() {
 	Expect(err).ToNot(HaveOccurred())
 
 	err = (&OpsRequestReconciler{
-		Client:   k8sManager.GetClient(),
-		Scheme:   k8sManager.GetScheme(),
-		Recorder: k8sManager.GetEventRecorderFor("ops-request-controller"),
+		Client:    k8sManager.GetClient(),
+		APIReader: k8sManager.GetAPIReader(),
+		Scheme:    k8sManager.GetScheme(),
+		Recorder:  k8sManager.GetEventRecorderFor("ops-request-controller"),
 	}).SetupWithManager(k8sManager, nil)
 	Expect(err).ToNot(HaveOccurred())
 

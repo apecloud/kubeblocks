@@ -22,6 +22,7 @@ package operations
 import (
 	"context"
 	"fmt"
+	"net/http"
 
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo/v2"
@@ -29,6 +30,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -41,6 +45,53 @@ import (
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testops "github.com/apecloud/kubeblocks/pkg/testutil/operations"
 )
+
+type interceptStatusClient struct {
+	client.Client
+	patch func(context.Context, client.Object, client.Patch, ...client.SubResourcePatchOption) error
+}
+
+type interceptReader struct {
+	client.Reader
+	get func(context.Context, client.ObjectKey, client.Object, ...client.GetOption) error
+}
+
+func (r *interceptReader) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+	if r.get != nil {
+		return r.get(ctx, key, obj, opts...)
+	}
+	return r.Reader.Get(ctx, key, obj, opts...)
+}
+
+func (c *interceptStatusClient) Status() client.SubResourceWriter {
+	return &interceptStatusWriter{
+		SubResourceWriter: c.Client.Status(),
+		patch:             c.patch,
+	}
+}
+
+type interceptStatusWriter struct {
+	client.SubResourceWriter
+	patch func(context.Context, client.Object, client.Patch, ...client.SubResourcePatchOption) error
+}
+
+func (w *interceptStatusWriter) Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {
+	if w.patch != nil {
+		return w.patch(ctx, obj, patch, opts...)
+	}
+	return w.SubResourceWriter.Patch(ctx, obj, patch, opts...)
+}
+
+func switchoverDispatchClaimMessageForTest(opsRequest *opsv1alpha1.OpsRequest, componentName string,
+	switchover opsv1alpha1.Switchover, token string) string {
+	return switchoverDispatchClaim{
+		opsRequestUID: string(opsRequest.UID),
+		componentName: componentName,
+		instanceName:  switchover.InstanceName,
+		candidateName: switchover.CandidateName,
+		token:         token,
+	}.message()
+}
 
 var _ = Describe("", func() {
 	var (
@@ -152,9 +203,671 @@ var _ = Describe("", func() {
 			}
 
 			opsRes = &OpsResource{
-				Cluster:  clusterObj,
-				Recorder: k8sManager.GetEventRecorderFor("opsrequest-controller"),
+				Cluster:   clusterObj,
+				Recorder:  k8sManager.GetEventRecorderFor("opsrequest-controller"),
+				APIReader: k8sClient,
 			}
+		})
+
+		preparePendingSwitchover := func(candidateName string) (client.ObjectKey, string) {
+			ops := testops.NewOpsRequestObj("ops-switchover-"+testCtx.GetRandomStr(), testCtx.DefaultNamespace,
+				clusterObj.Name, opsv1alpha1.SwitchoverType)
+			instanceName := fmt.Sprintf("%s-%s-%d", clusterObj.Name, defaultCompName, 1)
+			ops.Spec.SwitchoverList = []opsv1alpha1.Switchover{{
+				ComponentName: defaultCompName,
+				InstanceName:  instanceName,
+				CandidateName: candidateName,
+			}}
+			opsRes.OpsRequest = testops.CreateOpsRequest(ctx, testCtx, ops)
+			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsPendingPhase
+
+			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			key := client.ObjectKeyFromObject(opsRes.OpsRequest)
+			stored := &opsv1alpha1.OpsRequest{}
+			Expect(k8sClient.Get(ctx, key, stored)).Should(Succeed())
+			patch := client.MergeFrom(stored.DeepCopy())
+			stored.Status = opsRes.OpsRequest.DeepCopy().Status
+			stored.Status.Phase = opsv1alpha1.OpsRunningPhase
+			Expect(k8sClient.Status().Patch(ctx, stored, patch)).Should(Succeed())
+			opsRes.OpsRequest = stored
+			return key, instanceName
+		}
+
+		It("persists the Processing dispatch claim before the lifecycle call", func() {
+			key, instanceName := preparePendingSwitchover("")
+			actionCalls := 0
+			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).AnyTimes().DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+					actionCalls++
+					Expect(req.Parameters["KB_SWITCHOVER_CURRENT_NAME"]).Should(Equal(instanceName))
+					claimed := &opsv1alpha1.OpsRequest{}
+					Expect(k8sClient.Get(ctx, key, claimed)).Should(Succeed())
+					progressDetail := findStatusProgressDetail(claimed.Status.Components[defaultCompName].ProgressDetails,
+						getProgressObjectKey(KBSwitchoverKey, defaultCompName))
+					Expect(progressDetail).ShouldNot(BeNil())
+					Expect(progressDetail.Status).Should(Equal(opsv1alpha1.ProcessingProgressStatus))
+					claim, ok := parseSwitchoverDispatchClaim(progressDetail.Message)
+					Expect(ok).Should(BeTrue())
+					Expect(claim.matchesIdentity(claimed, defaultCompName, claimed.Spec.SwitchoverList[0])).Should(BeTrue())
+					Expect(claim.token).ShouldNot(BeEmpty())
+					return kbagentproto.ActionResponse{Message: "mock success"}, nil
+				})
+			})
+
+			_, _, _, err := handleSwitchovers(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(actionCalls).Should(Equal(1))
+		})
+
+		It("retries a transient direct-read failure after the dispatch claim commits", func() {
+			preparePendingSwitchover("")
+			actionCalls := 0
+			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).AnyTimes().DoAndReturn(func(context.Context, kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+					actionCalls++
+					return kbagentproto.ActionResponse{Message: "mock success"}, nil
+				})
+			})
+
+			injectedErr := fmt.Errorf("injected transient direct-read failure")
+			failedReads := 0
+			opsRes.APIReader = &interceptReader{
+				Reader: k8sClient,
+				get: func(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+					if _, ok := obj.(*opsv1alpha1.OpsRequest); ok && failedReads == 0 {
+						failedReads++
+						return injectedErr
+					}
+					return k8sClient.Get(ctx, key, obj, opts...)
+				},
+			}
+
+			_, _, _, err := handleSwitchovers(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(failedReads).Should(Equal(1))
+			Expect(actionCalls).Should(Equal(1))
+		})
+
+		It("does not call the lifecycle action when the Processing claim loses a resource-version race", func() {
+			key, _ := preparePendingSwitchover("")
+			actionCalls := 0
+			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).AnyTimes().DoAndReturn(func(context.Context, kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+					actionCalls++
+					return kbagentproto.ActionResponse{Message: "mock success"}, nil
+				})
+			})
+
+			injected := false
+			conflictingClient := &interceptStatusClient{
+				Client: k8sClient,
+				patch: func(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {
+					if _, ok := obj.(*opsv1alpha1.OpsRequest); ok && !injected {
+						injected = true
+						concurrent := &opsv1alpha1.OpsRequest{}
+						Expect(k8sClient.Get(ctx, key, concurrent)).Should(Succeed())
+						concurrentPatch := client.MergeFrom(concurrent.DeepCopy())
+						concurrent.Status.Progress = "99/99"
+						Expect(k8sClient.Status().Patch(ctx, concurrent, concurrentPatch)).Should(Succeed())
+					}
+					return k8sClient.Status().Patch(ctx, obj, patch, opts...)
+				},
+			}
+
+			_, _, _, err := handleSwitchovers(reqCtx, conflictingClient, opsRes)
+			Expect(apierrors.IsConflict(err)).Should(BeTrue())
+			Expect(actionCalls).Should(Equal(0))
+		})
+
+		It("lets only the writer whose unique token was committed dispatch after ambiguous patch responses", func() {
+			preparePendingSwitchover("")
+			writerOneOps := *opsRes
+			writerOneOps.OpsRequest = opsRes.OpsRequest.DeepCopy()
+			writerTwoOps := *opsRes
+			writerTwoOps.OpsRequest = opsRes.OpsRequest.DeepCopy()
+
+			writerOneResponseLoss := fmt.Errorf("writer one claim response lost")
+			writerTwoResponseLoss := fmt.Errorf("writer two conflict response lost")
+			var writerOneClaim, writerTwoClaim string
+			actionCalls := 0
+			var writerTwoErr error
+
+			writerTwoClient := &interceptStatusClient{
+				Client: k8sClient,
+				patch: func(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {
+					if writerTwoClaim == "" {
+						opsRequest := obj.(*opsv1alpha1.OpsRequest)
+						progressDetail := findStatusProgressDetail(opsRequest.Status.Components[defaultCompName].ProgressDetails,
+							getProgressObjectKey(KBSwitchoverKey, defaultCompName))
+						Expect(progressDetail).ShouldNot(BeNil())
+						writerTwoClaim = progressDetail.Message
+						conflictErr := k8sClient.Status().Patch(ctx, obj, patch, opts...)
+						Expect(apierrors.IsConflict(conflictErr)).Should(BeTrue())
+						return writerTwoResponseLoss
+					}
+					return k8sClient.Status().Patch(ctx, obj, patch, opts...)
+				},
+			}
+			writerOneClient := &interceptStatusClient{
+				Client: k8sClient,
+				patch: func(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {
+					if writerOneClaim == "" {
+						opsRequest := obj.(*opsv1alpha1.OpsRequest)
+						progressDetail := findStatusProgressDetail(opsRequest.Status.Components[defaultCompName].ProgressDetails,
+							getProgressObjectKey(KBSwitchoverKey, defaultCompName))
+						Expect(progressDetail).ShouldNot(BeNil())
+						writerOneClaim = progressDetail.Message
+						Expect(k8sClient.Status().Patch(ctx, obj, patch, opts...)).Should(Succeed())
+						return writerOneResponseLoss
+					}
+					return k8sClient.Status().Patch(ctx, obj, patch, opts...)
+				},
+			}
+
+			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).AnyTimes().DoAndReturn(func(context.Context, kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+					actionCalls++
+					if actionCalls == 1 {
+						_, _, _, writerTwoErr = handleSwitchovers(reqCtx, writerTwoClient, &writerTwoOps)
+						live := &opsv1alpha1.OpsRequest{}
+						Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(writerOneOps.OpsRequest), live)).Should(Succeed())
+						progressDetail := findStatusProgressDetail(live.Status.Components[defaultCompName].ProgressDetails,
+							getProgressObjectKey(KBSwitchoverKey, defaultCompName))
+						Expect(progressDetail).ShouldNot(BeNil())
+						Expect(progressDetail.Message).Should(Equal(writerOneClaim))
+						Expect(progressDetail.Message).ShouldNot(Equal(writerTwoClaim))
+					}
+					return kbagentproto.ActionResponse{Message: "mock success"}, nil
+				})
+			})
+
+			_, _, _, writerOneErr := handleSwitchovers(reqCtx, writerOneClient, &writerOneOps)
+			Expect(writerOneErr).ShouldNot(HaveOccurred())
+			Expect(writerTwoErr).Should(MatchError(writerTwoResponseLoss))
+			Expect(actionCalls).Should(Equal(1))
+			Expect(writerOneClaim).Should(HavePrefix(switchoverDispatchClaimMessagePrefix))
+			Expect(writerTwoClaim).Should(HavePrefix(switchoverDispatchClaimMessagePrefix))
+			Expect(writerOneClaim).ShouldNot(Equal(writerTwoClaim))
+		})
+
+		It("fails closed after restart when a no-candidate dispatch outcome is unknown", func() {
+			key, _ := preparePendingSwitchover("")
+			fresh := &opsv1alpha1.OpsRequest{}
+			Expect(k8sClient.Get(ctx, key, fresh)).Should(Succeed())
+			patch := client.MergeFrom(fresh.DeepCopy())
+			progressDetail := findStatusProgressDetail(fresh.Status.Components[defaultCompName].ProgressDetails,
+				getProgressObjectKey(KBSwitchoverKey, defaultCompName))
+			Expect(progressDetail).ShouldNot(BeNil())
+			progressDetail.Status = opsv1alpha1.ProcessingProgressStatus
+			progressDetail.Message = switchoverDispatchClaimMessageForTest(fresh, defaultCompName,
+				fresh.Spec.SwitchoverList[0], "restart-token")
+			progressDetail.StartTime = metav1.Now()
+			Expect(k8sClient.Status().Patch(ctx, fresh, patch)).Should(Succeed())
+			opsRes.OpsRequest = fresh
+
+			actionCalls := 0
+			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).AnyTimes().DoAndReturn(func(context.Context, kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+					actionCalls++
+					return kbagentproto.ActionResponse{}, fmt.Errorf("unexpected redispatch")
+				})
+			})
+
+			_, completedCount, failedCount, err := handleSwitchovers(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(actionCalls).Should(Equal(0))
+			Expect(completedCount).Should(Equal(int32(1)))
+			Expect(failedCount).Should(Equal(int32(1)))
+
+			Expect(k8sClient.Get(ctx, key, fresh)).Should(Succeed())
+			progressDetail = findStatusProgressDetail(fresh.Status.Components[defaultCompName].ProgressDetails,
+				getProgressObjectKey(KBSwitchoverKey, defaultCompName))
+			Expect(progressDetail.Status).Should(Equal(opsv1alpha1.FailedProgressStatus))
+			Expect(progressDetail.Message).Should(ContainSubstring("outcome is unknown"))
+		})
+
+		It("continues candidate role observation without redispatch after restart with a retained dispatch claim", func() {
+			candidateName := fmt.Sprintf("%s-%s-%d", clusterObj.Name, defaultCompName, 0)
+			key, _ := preparePendingSwitchover(candidateName)
+			fresh := &opsv1alpha1.OpsRequest{}
+			Expect(k8sClient.Get(ctx, key, fresh)).Should(Succeed())
+			patch := client.MergeFrom(fresh.DeepCopy())
+			progressDetail := findStatusProgressDetail(fresh.Status.Components[defaultCompName].ProgressDetails,
+				getProgressObjectKey(KBSwitchoverKey, defaultCompName))
+			Expect(progressDetail).ShouldNot(BeNil())
+			progressDetail.Status = opsv1alpha1.ProcessingProgressStatus
+			progressDetail.Message = switchoverDispatchClaimMessageForTest(fresh, defaultCompName,
+				fresh.Spec.SwitchoverList[0], "restart-with-candidate-token")
+			progressDetail.StartTime = metav1.Now()
+			Expect(k8sClient.Status().Patch(ctx, fresh, patch)).Should(Succeed())
+			opsRes.OpsRequest = fresh
+
+			candidatePod := &corev1.Pod{}
+			Expect(k8sClient.Get(ctx, client.ObjectKey{Namespace: testCtx.DefaultNamespace, Name: candidateName}, candidatePod)).Should(Succeed())
+			candidatePod.Labels[constant.RoleLabelKey] = "unexpected-role"
+			Expect(k8sClient.Update(ctx, candidatePod)).Should(Succeed())
+
+			actionCalls := 0
+			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).AnyTimes().DoAndReturn(func(context.Context, kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+					actionCalls++
+					return kbagentproto.ActionResponse{}, fmt.Errorf("unexpected redispatch")
+				})
+			})
+
+			_, completedCount, failedCount, err := handleSwitchovers(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(actionCalls).Should(Equal(0))
+			Expect(completedCount).Should(Equal(int32(0)))
+			Expect(failedCount).Should(Equal(int32(0)))
+
+			Expect(k8sClient.Get(ctx, key, fresh)).Should(Succeed())
+			progressDetail = findStatusProgressDetail(fresh.Status.Components[defaultCompName].ProgressDetails,
+				getProgressObjectKey(KBSwitchoverKey, defaultCompName))
+			Expect(progressDetail.Status).Should(Equal(opsv1alpha1.ProcessingProgressStatus))
+			Expect(progressDetail.Message).Should(ContainSubstring("waiting for candidate pod"))
+			Expect(progressDetail.Message).Should(ContainSubstring("unexpected-role"))
+		})
+
+		It("fails closed when a persisted dispatch claim no longer matches the request identity", func() {
+			key, _ := preparePendingSwitchover("")
+			fresh := &opsv1alpha1.OpsRequest{}
+			Expect(k8sClient.Get(ctx, key, fresh)).Should(Succeed())
+			patch := client.MergeFrom(fresh.DeepCopy())
+			progressDetail := findStatusProgressDetail(fresh.Status.Components[defaultCompName].ProgressDetails,
+				getProgressObjectKey(KBSwitchoverKey, defaultCompName))
+			Expect(progressDetail).ShouldNot(BeNil())
+			progressDetail.Status = opsv1alpha1.ProcessingProgressStatus
+			progressDetail.Message = switchoverDispatchClaimMessagePrefix + "different-request/default/instance/candidate/foreign-token"
+			progressDetail.StartTime = metav1.Now()
+			Expect(k8sClient.Status().Patch(ctx, fresh, patch)).Should(Succeed())
+			opsRes.OpsRequest = fresh
+
+			actionCalls := 0
+			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).AnyTimes().DoAndReturn(func(context.Context, kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+					actionCalls++
+					return kbagentproto.ActionResponse{}, fmt.Errorf("unexpected redispatch")
+				})
+			})
+
+			_, completedCount, failedCount, err := handleSwitchovers(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(actionCalls).Should(Equal(0))
+			Expect(completedCount).Should(Equal(int32(1)))
+			Expect(failedCount).Should(Equal(int32(1)))
+			Expect(k8sClient.Get(ctx, key, fresh)).Should(Succeed())
+			progressDetail = findStatusProgressDetail(fresh.Status.Components[defaultCompName].ProgressDetails,
+				getProgressObjectKey(KBSwitchoverKey, defaultCompName))
+			Expect(progressDetail.Message).Should(ContainSubstring("protocol identity changed or is malformed"))
+		})
+
+		DescribeTable("fails closed after restart on invalid persisted outcome markers", func(buildMessage func(*opsv1alpha1.OpsRequest) string) {
+			key, _ := preparePendingSwitchover("")
+			fresh := &opsv1alpha1.OpsRequest{}
+			Expect(k8sClient.Get(ctx, key, fresh)).Should(Succeed())
+			patch := client.MergeFrom(fresh.DeepCopy())
+			progressDetail := findStatusProgressDetail(fresh.Status.Components[defaultCompName].ProgressDetails,
+				getProgressObjectKey(KBSwitchoverKey, defaultCompName))
+			Expect(progressDetail).ShouldNot(BeNil())
+			progressDetail.Status = opsv1alpha1.ProcessingProgressStatus
+			progressDetail.Message = buildMessage(fresh)
+			progressDetail.StartTime = metav1.Now()
+			Expect(k8sClient.Status().Patch(ctx, fresh, patch)).Should(Succeed())
+			opsRes.OpsRequest = fresh
+
+			actionCalls := 0
+			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).AnyTimes().DoAndReturn(func(context.Context, kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+					actionCalls++
+					return kbagentproto.ActionResponse{}, fmt.Errorf("unexpected redispatch")
+				})
+			})
+
+			_, completedCount, failedCount, err := handleSwitchovers(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(completedCount).Should(Equal(int32(1)))
+			Expect(failedCount).Should(Equal(int32(1)))
+			Expect(actionCalls).Should(Equal(0))
+
+			Expect(k8sClient.Get(ctx, key, fresh)).Should(Succeed())
+			progressDetail = findStatusProgressDetail(fresh.Status.Components[defaultCompName].ProgressDetails,
+				getProgressObjectKey(KBSwitchoverKey, defaultCompName))
+			Expect(progressDetail.Status).Should(Equal(opsv1alpha1.FailedProgressStatus))
+			Expect(progressDetail.Message).Should(ContainSubstring("protocol identity changed or is malformed"))
+		},
+			Entry("malformed outcome", func(*opsv1alpha1.OpsRequest) string {
+				return switchoverDispatchOutcomeMessagePrefix + "malformed"
+			}),
+			Entry("foreign outcome identity and token", func(fresh *opsv1alpha1.OpsRequest) string {
+				claim := switchoverDispatchClaim{
+					opsRequestUID: "different-request",
+					componentName: defaultCompName,
+					instanceName:  fresh.Spec.SwitchoverList[0].InstanceName,
+					token:         "foreign-token",
+				}
+				return claim.outcomeMessage("doing switchover")
+			}),
+		)
+
+		It("does not call the lifecycle action without a live API reader", func() {
+			key, _ := preparePendingSwitchover("")
+			before := &opsv1alpha1.OpsRequest{}
+			Expect(k8sClient.Get(ctx, key, before)).Should(Succeed())
+			opsRes.APIReader = nil
+			actionCalls := 0
+			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).AnyTimes().DoAndReturn(func(context.Context, kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+					actionCalls++
+					return kbagentproto.ActionResponse{}, fmt.Errorf("unexpected dispatch")
+				})
+			})
+
+			_, _, _, err := handleSwitchovers(reqCtx, k8sClient, opsRes)
+			Expect(err).Should(MatchError("APIReader is required to confirm a switchover dispatch claim"))
+			Expect(actionCalls).Should(Equal(0))
+
+			after := &opsv1alpha1.OpsRequest{}
+			Expect(k8sClient.Get(ctx, key, after)).Should(Succeed())
+			Expect(after.ResourceVersion).Should(Equal(before.ResourceVersion))
+			Expect(after.Status).Should(Equal(before.Status))
+		})
+
+		It("does not write a dispatch claim without a complete OpsRequest UID", func() {
+			key, _ := preparePendingSwitchover("")
+			before := &opsv1alpha1.OpsRequest{}
+			Expect(k8sClient.Get(ctx, key, before)).Should(Succeed())
+			opsRes.OpsRequest.UID = ""
+			actionCalls := 0
+			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).AnyTimes().DoAndReturn(func(context.Context, kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+					actionCalls++
+					return kbagentproto.ActionResponse{}, fmt.Errorf("unexpected dispatch")
+				})
+			})
+
+			_, _, _, err := handleSwitchovers(reqCtx, k8sClient, opsRes)
+			Expect(err).Should(MatchError("OpsRequest UID is required to create a switchover dispatch claim"))
+			Expect(actionCalls).Should(Equal(0))
+
+			after := &opsv1alpha1.OpsRequest{}
+			Expect(k8sClient.Get(ctx, key, after)).Should(Succeed())
+			Expect(after.ResourceVersion).Should(Equal(before.ResourceVersion))
+			Expect(after.Status).Should(Equal(before.Status))
+		})
+
+		It("refetches and retries a known successful outcome after a status conflict", func() {
+			key, _ := preparePendingSwitchover("")
+			actionCalls := 0
+			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).AnyTimes().DoAndReturn(func(context.Context, kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+					actionCalls++
+					return kbagentproto.ActionResponse{Message: "mock success"}, nil
+				})
+			})
+
+			conflicted := false
+			conflictingClient := &interceptStatusClient{
+				Client: k8sClient,
+				patch: func(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {
+					if _, ok := obj.(*opsv1alpha1.OpsRequest); ok && actionCalls > 0 && !conflicted {
+						conflicted = true
+						concurrent := &opsv1alpha1.OpsRequest{}
+						Expect(k8sClient.Get(ctx, key, concurrent)).Should(Succeed())
+						concurrentPatch := client.MergeFromWithOptions(concurrent.DeepCopy(), client.MergeFromWithOptimisticLock{})
+						concurrent.Status.Progress = "99/99"
+						Expect(k8sClient.Status().Patch(ctx, concurrent, concurrentPatch)).Should(Succeed())
+						conflictErr := k8sClient.Status().Patch(ctx, obj, patch, opts...)
+						Expect(apierrors.IsConflict(conflictErr)).Should(BeTrue())
+						return conflictErr
+					}
+					return k8sClient.Status().Patch(ctx, obj, patch, opts...)
+				},
+			}
+
+			_, _, _, err := handleSwitchovers(reqCtx, conflictingClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(actionCalls).Should(Equal(1))
+			Expect(conflicted).Should(BeTrue())
+
+			fresh := &opsv1alpha1.OpsRequest{}
+			Expect(k8sClient.Get(ctx, key, fresh)).Should(Succeed())
+			progressDetail := findStatusProgressDetail(fresh.Status.Components[defaultCompName].ProgressDetails,
+				getProgressObjectKey(KBSwitchoverKey, defaultCompName))
+			Expect(progressDetail).ShouldNot(BeNil())
+			Expect(progressDetail.Status).Should(Equal(opsv1alpha1.ProcessingProgressStatus))
+			outcomeClaim, outcome, ok := parseSwitchoverDispatchOutcomeMessage(progressDetail.Message)
+			Expect(ok).Should(BeTrue())
+			Expect(outcomeClaim.matchesIdentity(fresh, defaultCompName, fresh.Spec.SwitchoverList[0])).Should(BeTrue())
+			Expect(outcomeClaim.token).ShouldNot(BeEmpty())
+			Expect(outcome).Should(Equal("doing switchover"))
+		})
+
+		It("keeps retrying a known failed outcome beyond the default bounded backoff", func() {
+			key, _ := preparePendingSwitchover("")
+			actionCalls := 0
+			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).AnyTimes().DoAndReturn(func(context.Context, kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+					actionCalls++
+					return kbagentproto.ActionResponse{}, fmt.Errorf("injected lifecycle failure")
+				})
+			})
+
+			injectedErr := fmt.Errorf("injected failed-outcome status failure")
+			failuresRemaining := retry.DefaultBackoff.Steps + 2
+			failedAttempts := 0
+			failingClient := &interceptStatusClient{
+				Client: k8sClient,
+				patch: func(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {
+					if _, ok := obj.(*opsv1alpha1.OpsRequest); ok && actionCalls > 0 && failuresRemaining > 0 {
+						failuresRemaining--
+						failedAttempts++
+						return injectedErr
+					}
+					return k8sClient.Status().Patch(ctx, obj, patch, opts...)
+				},
+			}
+
+			_, completedCount, failedCount, err := handleSwitchovers(reqCtx, failingClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(actionCalls).Should(Equal(1))
+			Expect(failedAttempts).Should(Equal(retry.DefaultBackoff.Steps + 2))
+			Expect(completedCount).Should(Equal(int32(1)))
+			Expect(failedCount).Should(Equal(int32(1)))
+
+			fresh := &opsv1alpha1.OpsRequest{}
+			Expect(k8sClient.Get(ctx, key, fresh)).Should(Succeed())
+			progressDetail := findStatusProgressDetail(fresh.Status.Components[defaultCompName].ProgressDetails,
+				getProgressObjectKey(KBSwitchoverKey, defaultCompName))
+			Expect(progressDetail).ShouldNot(BeNil())
+			Expect(progressDetail.Status).Should(Equal(opsv1alpha1.FailedProgressStatus))
+			outcomeClaim, outcome, ok := parseSwitchoverDispatchOutcomeMessage(progressDetail.Message)
+			Expect(ok).Should(BeTrue())
+			Expect(outcomeClaim.matchesIdentity(fresh, defaultCompName, fresh.Spec.SwitchoverList[0])).Should(BeTrue())
+			Expect(outcome).Should(ContainSubstring("injected lifecycle failure"))
+		})
+
+		It("stops retrying a known outcome when the caller context ends", func() {
+			retryCtx, cancel := context.WithCancel(context.Background())
+			calls := 0
+			err := retryKnownSwitchoverOutcomeUntilContextDone(retryCtx, func() error {
+				calls++
+				if calls == 2 {
+					cancel()
+				}
+				return fmt.Errorf("injected retryable status failure")
+			})
+
+			Expect(err).Should(MatchError(ContainSubstring("context canceled")))
+			Expect(calls).Should(Equal(2))
+		})
+
+		DescribeTable("does not retry a known outcome after a permanent API response", func(statusCode int) {
+			calls := 0
+			permanentErr := apierrors.NewGenericServerResponse(statusCode, "PATCH", schema.GroupResource{
+				Group: "apps.kubeblocks.io", Resource: "opsrequests",
+			}, "ops", "injected permanent status failure", 0, false)
+			err := retryKnownSwitchoverOutcomeUntilContextDone(context.Background(), func() error {
+				calls++
+				return permanentErr
+			})
+
+			Expect(err).Should(MatchError(permanentErr))
+			Expect(calls).Should(Equal(1))
+		},
+			Entry("413 request entity too large", http.StatusRequestEntityTooLarge),
+			Entry("400 bad request", http.StatusBadRequest),
+			Entry("405 method not supported", http.StatusMethodNotAllowed),
+			Entry("415 unsupported media type", http.StatusUnsupportedMediaType),
+			Entry("406 not acceptable", http.StatusNotAcceptable),
+		)
+
+		It("accepts a known outcome after its committed status response is lost", func() {
+			key, _ := preparePendingSwitchover("")
+			actionCalls := 0
+			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).AnyTimes().DoAndReturn(func(context.Context, kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+					actionCalls++
+					return kbagentproto.ActionResponse{Message: "mock success"}, nil
+				})
+			})
+
+			injectedErr := fmt.Errorf("injected committed status response loss")
+			lost := false
+			responseLossClient := &interceptStatusClient{
+				Client: k8sClient,
+				patch: func(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {
+					if _, ok := obj.(*opsv1alpha1.OpsRequest); ok && actionCalls > 0 && !lost {
+						lost = true
+						Expect(k8sClient.Status().Patch(ctx, obj, patch, opts...)).Should(Succeed())
+						return injectedErr
+					}
+					return k8sClient.Status().Patch(ctx, obj, patch, opts...)
+				},
+			}
+
+			_, _, _, err := handleSwitchovers(reqCtx, responseLossClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(actionCalls).Should(Equal(1))
+			Expect(lost).Should(BeTrue())
+
+			fresh := &opsv1alpha1.OpsRequest{}
+			Expect(k8sClient.Get(ctx, key, fresh)).Should(Succeed())
+			progressDetail := findStatusProgressDetail(fresh.Status.Components[defaultCompName].ProgressDetails,
+				getProgressObjectKey(KBSwitchoverKey, defaultCompName))
+			Expect(progressDetail).ShouldNot(BeNil())
+			Expect(progressDetail.Status).Should(Equal(opsv1alpha1.ProcessingProgressStatus))
+			outcomeClaim, outcome, ok := parseSwitchoverDispatchOutcomeMessage(progressDetail.Message)
+			Expect(ok).Should(BeTrue())
+			Expect(outcomeClaim.matchesIdentity(fresh, defaultCompName, fresh.Spec.SwitchoverList[0])).Should(BeTrue())
+			Expect(outcome).Should(Equal("doing switchover"))
+		})
+
+		It("does not accept matching status and outcome text without the exact token", func() {
+			key, _ := preparePendingSwitchover("")
+			actionCalls := 0
+			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).AnyTimes().DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+					actionCalls++
+					fresh := &opsv1alpha1.OpsRequest{}
+					Expect(k8sClient.Get(ctx, key, fresh)).Should(Succeed())
+					patch := client.MergeFromWithOptions(fresh.DeepCopy(), client.MergeFromWithOptimisticLock{})
+					progressDetail := findStatusProgressDetail(fresh.Status.Components[defaultCompName].ProgressDetails,
+						getProgressObjectKey(KBSwitchoverKey, defaultCompName))
+					Expect(progressDetail).ShouldNot(BeNil())
+					progressDetail.Status = opsv1alpha1.ProcessingProgressStatus
+					progressDetail.Message = "doing switchover"
+					Expect(k8sClient.Status().Patch(ctx, fresh, patch)).Should(Succeed())
+					return kbagentproto.ActionResponse{Message: "mock success"}, nil
+				})
+			})
+
+			_, _, _, err := handleSwitchovers(reqCtx, k8sClient, opsRes)
+			Expect(err).Should(MatchError(ContainSubstring("switchover dispatch claim was lost")))
+			Expect(actionCalls).Should(Equal(1))
+
+			fresh := &opsv1alpha1.OpsRequest{}
+			Expect(k8sClient.Get(ctx, key, fresh)).Should(Succeed())
+			progressDetail := findStatusProgressDetail(fresh.Status.Components[defaultCompName].ProgressDetails,
+				getProgressObjectKey(KBSwitchoverKey, defaultCompName))
+			Expect(progressDetail).ShouldNot(BeNil())
+			Expect(progressDetail.Status).Should(Equal(opsv1alpha1.ProcessingProgressStatus))
+			Expect(progressDetail.Message).Should(Equal("doing switchover"))
+		})
+
+		It("does not accept a matching failed outcome persisted by a foreign token", func() {
+			key, _ := preparePendingSwitchover("")
+			actionCalls := 0
+			foreignMessage := ""
+			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).AnyTimes().DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+					actionCalls++
+					fresh := &opsv1alpha1.OpsRequest{}
+					Expect(k8sClient.Get(ctx, key, fresh)).Should(Succeed())
+					patch := client.MergeFromWithOptions(fresh.DeepCopy(), client.MergeFromWithOptimisticLock{})
+					progressDetail := findStatusProgressDetail(fresh.Status.Components[defaultCompName].ProgressDetails,
+						getProgressObjectKey(KBSwitchoverKey, defaultCompName))
+					Expect(progressDetail).ShouldNot(BeNil())
+					foreignClaim, ok := parseSwitchoverDispatchClaim(progressDetail.Message)
+					Expect(ok).Should(BeTrue())
+					foreignClaim.token = "foreign-token"
+					foreignMessage = foreignClaim.outcomeMessage("component " + defaultCompName + " injected lifecycle failure")
+					progressDetail.Status = opsv1alpha1.FailedProgressStatus
+					progressDetail.Message = foreignMessage
+					Expect(k8sClient.Status().Patch(ctx, fresh, patch)).Should(Succeed())
+					return kbagentproto.ActionResponse{}, fmt.Errorf("injected lifecycle failure")
+				})
+			})
+
+			_, _, _, err := handleSwitchovers(reqCtx, k8sClient, opsRes)
+			Expect(err).Should(MatchError(ContainSubstring("switchover dispatch claim was lost")))
+			Expect(actionCalls).Should(Equal(1))
+
+			fresh := &opsv1alpha1.OpsRequest{}
+			Expect(k8sClient.Get(ctx, key, fresh)).Should(Succeed())
+			progressDetail := findStatusProgressDetail(fresh.Status.Components[defaultCompName].ProgressDetails,
+				getProgressObjectKey(KBSwitchoverKey, defaultCompName))
+			Expect(progressDetail).ShouldNot(BeNil())
+			Expect(progressDetail.Status).Should(Equal(opsv1alpha1.FailedProgressStatus))
+			Expect(progressDetail.Message).Should(Equal(foreignMessage))
+		})
+
+		It("does not overwrite a foreign token while persisting a known outcome", func() {
+			key, _ := preparePendingSwitchover("")
+			actionCalls := 0
+			foreignMessage := ""
+			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).AnyTimes().DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+					actionCalls++
+					fresh := &opsv1alpha1.OpsRequest{}
+					Expect(k8sClient.Get(ctx, key, fresh)).Should(Succeed())
+					patch := client.MergeFromWithOptions(fresh.DeepCopy(), client.MergeFromWithOptimisticLock{})
+					progressDetail := findStatusProgressDetail(fresh.Status.Components[defaultCompName].ProgressDetails,
+						getProgressObjectKey(KBSwitchoverKey, defaultCompName))
+					Expect(progressDetail).ShouldNot(BeNil())
+					foreignMessage = switchoverDispatchClaimMessageForTest(fresh, defaultCompName,
+						fresh.Spec.SwitchoverList[0], "foreign-token")
+					progressDetail.Message = foreignMessage
+					Expect(k8sClient.Status().Patch(ctx, fresh, patch)).Should(Succeed())
+					return kbagentproto.ActionResponse{Message: "mock success"}, nil
+				})
+			})
+
+			_, _, _, err := handleSwitchovers(reqCtx, k8sClient, opsRes)
+			Expect(err).Should(MatchError(ContainSubstring("switchover dispatch claim was lost")))
+			Expect(actionCalls).Should(Equal(1))
+
+			fresh := &opsv1alpha1.OpsRequest{}
+			Expect(k8sClient.Get(ctx, key, fresh)).Should(Succeed())
+			progressDetail := findStatusProgressDetail(fresh.Status.Components[defaultCompName].ProgressDetails,
+				getProgressObjectKey(KBSwitchoverKey, defaultCompName))
+			Expect(progressDetail).ShouldNot(BeNil())
+			Expect(progressDetail.Status).Should(Equal(opsv1alpha1.ProcessingProgressStatus))
+			Expect(progressDetail.Message).Should(Equal(foreignMessage))
 		})
 
 		It("Test switchover OpsRequest", func() {

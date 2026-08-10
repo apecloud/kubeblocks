@@ -43,7 +43,7 @@ func TestRevisionUpdatePublishesCompleteInstanceViewBeforeObservedGeneration(t *
 		t.Fatalf("complete InstanceStatus was not published: %#v", its.Status.InstanceStatus)
 	}
 	status := its.Status.InstanceStatus[0]
-	if status.TemplateName == nil || *status.TemplateName != "" || status.DesiredState != workloads.InstanceDesiredStateActive || status.CurrentPodState != workloads.CurrentPodStateAbsent {
+	if status.TemplateName == nil || *status.TemplateName != "" || status.DesiredState != workloads.InstanceDesiredStateActive || status.CurrentState != workloads.InstanceCurrentStateAbsent {
 		t.Fatalf("unexpected InstanceStatus: %#v", status)
 	}
 }

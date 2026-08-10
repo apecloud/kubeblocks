@@ -59,10 +59,10 @@ func MockInstanceSetReady(its *workloads.InstanceSet, pods ...*corev1.Pod) {
 			continue
 		}
 		status := workloads.InstanceStatus{
-			PodName:         pod.Name,
-			Role:            role.Name,
-			DesiredState:    workloads.InstanceDesiredStateActive,
-			CurrentPodState: workloads.CurrentPodStatePresent,
+			PodName:      pod.Name,
+			Role:         role.Name,
+			DesiredState: workloads.InstanceDesiredStateActive,
+			CurrentState: workloads.InstanceCurrentStatePresent,
 		}
 		templateName := pod.Labels[constant.KBAppInstanceTemplateLabelKey]
 		status.TemplateName = &templateName

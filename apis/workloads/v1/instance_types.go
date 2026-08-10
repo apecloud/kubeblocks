@@ -152,6 +152,12 @@ type InstanceStatus2 struct {
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
+	// Represents the observed current state of this instance.
+	//
+	// +optional
+	// +kubebuilder:validation:Enum=Present;Terminating;Absent
+	CurrentState InstanceCurrentState `json:"currentState,omitempty"`
+
 	// Represents the latest available observations of an instance's current state.
 	// Known .status.conditions.type are: "InstanceFailure", "InstanceReady", "InstanceAvailable"
 	//

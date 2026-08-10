@@ -32,7 +32,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/revisionmap"
 )
 
-func TestSetInstanceStatusObservesPodIndependentlyFromInstance(t *testing.T) {
+func TestSetInstanceStatusReadsCurrentStateFromInstance(t *testing.T) {
 	its := &workloads.InstanceSet{
 		ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default"},
 		Spec: workloads.InstanceSetSpec{
@@ -46,45 +46,46 @@ func TestSetInstanceStatusObservesPodIndependentlyFromInstance(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "demo-0"},
 		Spec:       workloads.InstanceSpec{InstanceTemplateName: ""},
 		Status: workloads.InstanceStatus2{
+			CurrentState:    workloads.InstanceCurrentStateAbsent,
 			Configs:         []workloads.InstanceConfigStatus{{Name: "config"}},
 			VolumeExpansion: true,
 		},
 	}
 
-	if err := setInstanceStatus(tree, its, []*workloads.Instance{inst}, nil); err != nil {
+	if err := setInstanceStatus(tree, its, []*workloads.Instance{inst}); err != nil {
 		t.Fatal(err)
 	}
 	if len(its.Status.InstanceStatus) != 1 {
 		t.Fatalf("unexpected status: %#v", its.Status.InstanceStatus)
 	}
 	status := its.Status.InstanceStatus[0]
-	if status.TemplateName == nil || *status.TemplateName != "" || status.DesiredState != workloads.InstanceDesiredStateActive || status.CurrentPodState != workloads.CurrentPodStateAbsent {
-		t.Fatalf("Instance without Pod was not Active+Absent: %#v", status)
+	if status.TemplateName == nil || *status.TemplateName != "" || status.DesiredState != workloads.InstanceDesiredStateActive || status.CurrentState != workloads.InstanceCurrentStateAbsent {
+		t.Fatalf("Instance was not Active+Absent: %#v", status)
 	}
 	if status.Configs != nil || status.VolumeExpansion {
-		t.Fatalf("Instance status leaked runtime fields without a Pod: %#v", status)
+		t.Fatalf("Absent Instance retained runtime fields: %#v", status)
 	}
 
-	pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "demo-0"}}
-	if err := setInstanceStatus(tree, its, []*workloads.Instance{inst}, []*corev1.Pod{pod}); err != nil {
+	inst.Status.CurrentState = workloads.InstanceCurrentStatePresent
+	if err := setInstanceStatus(tree, its, []*workloads.Instance{inst}); err != nil {
 		t.Fatal(err)
 	}
 	status = its.Status.InstanceStatus[0]
-	if status.CurrentPodState != workloads.CurrentPodStatePresent || len(status.Configs) != 1 || !status.VolumeExpansion {
-		t.Fatalf("present Pod did not refresh runtime fields: %#v", status)
+	if status.CurrentState != workloads.InstanceCurrentStatePresent || len(status.Configs) != 1 || !status.VolumeExpansion {
+		t.Fatalf("Present Instance did not refresh runtime fields: %#v", status)
 	}
 
-	pod.DeletionTimestamp = &metav1.Time{Time: metav1.Now().Time}
-	if err := setInstanceStatus(tree, its, []*workloads.Instance{inst}, []*corev1.Pod{pod}); err != nil {
+	inst.Status.CurrentState = workloads.InstanceCurrentStateTerminating
+	if err := setInstanceStatus(tree, its, []*workloads.Instance{inst}); err != nil {
 		t.Fatal(err)
 	}
 	status = its.Status.InstanceStatus[0]
-	if status.CurrentPodState != workloads.CurrentPodStateTerminating || status.Configs != nil || status.VolumeExpansion {
-		t.Fatalf("terminating Pod retained current runtime fields: %#v", status)
+	if status.CurrentState != workloads.InstanceCurrentStateTerminating || status.Configs != nil || status.VolumeExpansion {
+		t.Fatalf("Terminating Instance retained current runtime fields: %#v", status)
 	}
 }
 
-func TestSetInstanceStatusRetainsOfflineWithoutInstanceOrPod(t *testing.T) {
+func TestSetInstanceStatusRetainsOfflineWithoutInstance(t *testing.T) {
 	its := &workloads.InstanceSet{
 		ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default"},
 		Spec: workloads.InstanceSetSpec{
@@ -103,11 +104,11 @@ func TestSetInstanceStatusRetainsOfflineWithoutInstanceOrPod(t *testing.T) {
 	}
 	tree := kubebuilderx.NewObjectTree()
 	tree.SetRoot(its)
-	if err := setInstanceStatus(tree, its, nil, nil); err != nil {
+	if err := setInstanceStatus(tree, its, nil); err != nil {
 		t.Fatal(err)
 	}
 	status := its.Status.InstanceStatus[0]
-	if status.PodName != "demo-fast-0" || status.TemplateName == nil || *status.TemplateName != "fast" || status.DesiredState != workloads.InstanceDesiredStateOffline || status.CurrentPodState != workloads.CurrentPodStateAbsent {
+	if status.PodName != "demo-fast-0" || status.TemplateName == nil || *status.TemplateName != "fast" || status.DesiredState != workloads.InstanceDesiredStateOffline || status.CurrentState != workloads.InstanceCurrentStateAbsent {
 		t.Fatalf("offline identity was not retained: %#v", status)
 	}
 }
@@ -503,6 +504,7 @@ func TestStatusReconcilerReadsCurrentRevisionFromInstanceAnnotation(t *testing.T
 	inst.Generation = 2
 	inst.Status = workloads.InstanceStatus2{
 		ObservedGeneration: 2,
+		CurrentState:       workloads.InstanceCurrentStatePresent,
 		UpToDate:           true,
 		Conditions: []metav1.Condition{
 			{Type: string(workloads.InstanceReady), Status: metav1.ConditionTrue},
@@ -581,6 +583,7 @@ func TestStatusReconcilerDoesNotFallbackToLiveHashWhenRevisionAnnotationMissing(
 	inst.Generation = 2
 	inst.Status = workloads.InstanceStatus2{
 		ObservedGeneration: 2,
+		CurrentState:       workloads.InstanceCurrentStatePresent,
 		UpToDate:           true,
 		Conditions: []metav1.Condition{
 			{Type: string(workloads.InstanceReady), Status: metav1.ConditionTrue},

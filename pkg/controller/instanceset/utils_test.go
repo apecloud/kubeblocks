@@ -208,19 +208,19 @@ var _ = Describe("utils test", func() {
 			By("set instanceStatus to ready")
 			its.Status.InstanceStatus = []workloads.InstanceStatus{
 				{
-					PodName:         name + "-0",
-					Role:            roles[0].Name,
-					CurrentPodState: workloads.CurrentPodStatePresent,
+					PodName:      name + "-0",
+					Role:         roles[0].Name,
+					CurrentState: workloads.InstanceCurrentStatePresent,
 				},
 				{
-					PodName:         name + "-1",
-					Role:            roles[1].Name,
-					CurrentPodState: workloads.CurrentPodStatePresent,
+					PodName:      name + "-1",
+					Role:         roles[1].Name,
+					CurrentState: workloads.InstanceCurrentStatePresent,
 				},
 				{
-					PodName:         name + "-2",
-					Role:            roles[2].Name,
-					CurrentPodState: workloads.CurrentPodStatePresent,
+					PodName:      name + "-2",
+					Role:         roles[2].Name,
+					CurrentState: workloads.InstanceCurrentStatePresent,
 				},
 			}
 			Expect(its.IsInstanceSetReady()).Should(BeTrue())

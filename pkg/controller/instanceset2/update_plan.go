@@ -97,7 +97,7 @@ func (p *realUpdatePlan) planWalkFunc(vertex graph.Vertex) error {
 			serialUpdate := memberUpdateStrategy == workloads.SerialUpdateStrategy
 			hasRoleProbed := func() bool {
 				for _, status := range p.its.ActiveInstanceStatuses() {
-					if status.EffectiveCurrentPodState() == workloads.CurrentPodStatePresent && len(status.Role) > 0 {
+					if status.EffectiveCurrentState() == workloads.InstanceCurrentStatePresent && len(status.Role) > 0 {
 						return true
 					}
 				}

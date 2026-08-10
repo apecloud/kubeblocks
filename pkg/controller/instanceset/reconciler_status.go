@@ -449,21 +449,21 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 		active = nil
 	}
 
-	observations := make([]instancesetstatus.PodObservation, 0, len(pods))
+	observations := make([]instancesetstatus.CurrentObservation, 0, len(pods))
 	runtime := make(map[string]instancesetstatus.RuntimeStatus, len(pods))
 	roleMap := composeRoleMap(*its)
 	for _, pod := range pods {
-		state := workloads.CurrentPodStatePresent
+		state := workloads.InstanceCurrentStatePresent
 		if !pod.DeletionTimestamp.IsZero() {
-			state = workloads.CurrentPodStateTerminating
+			state = workloads.InstanceCurrentStateTerminating
 		}
-		observations = append(observations, instancesetstatus.PodObservation{PodName: pod.Name, State: state})
+		observations = append(observations, instancesetstatus.CurrentObservation{InstanceName: pod.Name, State: state})
 		if templateName, ok, err := instancesetstatus.TemplateNameFromLabels(pod.Labels); err != nil {
 			return fmt.Errorf("pod %q: %w", pod.Name, err)
 		} else if ok {
 			hints = append(hints, instancesetstatus.Allocation{PodName: pod.Name, TemplateName: templateName})
 		}
-		if state != workloads.CurrentPodStatePresent {
+		if state != workloads.InstanceCurrentStatePresent {
 			continue
 		}
 		status := instancesetstatus.RuntimeStatus{}
@@ -495,7 +495,7 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 		Previous:      its.Status.InstanceStatus,
 		Active:        active,
 		Offline:       offline,
-		Pods:          observations,
+		Current:       observations,
 		TemplateHints: hints,
 		Runtime:       runtime,
 	})
@@ -507,10 +507,10 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 	return nil
 }
 
-func podObservationNames(observations []instancesetstatus.PodObservation) []string {
+func podObservationNames(observations []instancesetstatus.CurrentObservation) []string {
 	names := make([]string, 0, len(observations))
 	for _, observation := range observations {
-		names = append(names, observation.PodName)
+		names = append(names, observation.InstanceName)
 	}
 	return names
 }

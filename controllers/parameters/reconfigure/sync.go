@@ -314,7 +314,7 @@ func syncReconfigureStatus(ctx Context) Status {
 	updated := int32(0)
 	if ctx.ITS != nil {
 		for _, inst := range ctx.ITS.ActiveInstanceStatuses() {
-			if inst.EffectiveCurrentPodState() != workloads.CurrentPodStatePresent {
+			if inst.EffectiveCurrentState() != workloads.InstanceCurrentStatePresent {
 				continue
 			}
 			idx := slices.IndexFunc(inst.Configs, func(cfg workloads.InstanceConfigStatus) bool {

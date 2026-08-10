@@ -17,17 +17,21 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package v1
+package instancesetstatus
 
-import "testing"
+import (
+	"testing"
+
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+)
 
 func TestInstanceStatusViewHelpers(t *testing.T) {
-	its := &InstanceSet{Status: InstanceSetStatus{InstanceStatus: []InstanceStatus{
+	its := &workloads.InstanceSet{Status: workloads.InstanceSetStatus{InstanceStatus: []workloads.InstanceStatus{
 		{PodName: "legacy-active"},
-		{PodName: "active-absent", DesiredState: InstanceDesiredStateActive, CurrentPodState: CurrentPodStateAbsent},
-		{PodName: "active-present", DesiredState: InstanceDesiredStateActive, CurrentPodState: CurrentPodStatePresent},
-		{PodName: "offline", DesiredState: InstanceDesiredStateOffline, CurrentPodState: CurrentPodStateAbsent},
-		{PodName: "released", DesiredState: InstanceDesiredStateReleased, CurrentPodState: CurrentPodStatePresent},
+		{PodName: "active-absent", DesiredState: workloads.InstanceDesiredStateActive, CurrentState: workloads.InstanceCurrentStateAbsent},
+		{PodName: "active-present", DesiredState: workloads.InstanceDesiredStateActive, CurrentState: workloads.InstanceCurrentStatePresent},
+		{PodName: "offline", DesiredState: workloads.InstanceDesiredStateOffline, CurrentState: workloads.InstanceCurrentStateAbsent},
+		{PodName: "released", DesiredState: workloads.InstanceDesiredStateReleased, CurrentState: workloads.InstanceCurrentStatePresent},
 	}}}
 	if got := len(its.ActiveInstanceStatuses()); got != 3 {
 		t.Fatalf("expected 3 Active entries including legacy empty desiredState, got %d", got)
@@ -41,13 +45,13 @@ func TestInstanceStatusViewHelpers(t *testing.T) {
 	if got := len(its.PresentInstanceStatuses()); got != 2 {
 		t.Fatalf("expected 2 Present entries, got %d", got)
 	}
-	if !its.HasPresentPod("active-present") || !its.HasPresentPod("released") || its.HasPresentPod("active-absent") {
-		t.Fatal("HasPresentPod does not reflect the current Pod dimension")
+	if !its.HasPresentInstance("active-present") || !its.HasPresentInstance("released") || its.HasPresentInstance("active-absent") {
+		t.Fatal("HasPresentInstance does not reflect the current instance dimension")
 	}
 	if its.FindInstanceStatus("offline") == nil || its.FindInstanceStatus("missing") != nil {
 		t.Fatal("FindInstanceStatus returned an unexpected result")
 	}
-	if its.FindInstanceStatus("legacy-active").EffectiveCurrentPodState() != CurrentPodStateUnknown {
-		t.Fatal("legacy empty currentPodState must remain Unknown")
+	if its.FindInstanceStatus("legacy-active").EffectiveCurrentState() != workloads.InstanceCurrentStateUnknown {
+		t.Fatal("legacy empty currentState must remain Unknown")
 	}
 }

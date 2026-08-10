@@ -278,8 +278,8 @@ type InstanceSetSpec struct {
 
 // InstanceSetStatus defines the observed state of InstanceSet
 type InstanceSetStatus struct {
-	// observedGeneration is the most recent generation for which revisions and the complete instance identity,
-	// desired-state, template, and current Pod view have been published. It does not imply that the Pods are Ready.
+	// observedGeneration is the most recent generation observed for this InstanceSet. It corresponds to the
+	// InstanceSet's generation, which is updated on mutation by the API Server.
 	//
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
@@ -591,12 +591,12 @@ type InstanceStatus struct {
 	// +kubebuilder:validation:Enum=Active;Offline;Released
 	DesiredState InstanceDesiredState `json:"desiredState,omitempty"`
 
-	// CurrentPodState describes the observed state of the Pod with PodName.
+	// CurrentState describes the observed current state of this instance.
 	// An empty value from an older object is treated as Unknown.
 	//
 	// +optional
 	// +kubebuilder:validation:Enum=Present;Terminating;Absent
-	CurrentPodState CurrentPodState `json:"currentPodState,omitempty"`
+	CurrentState InstanceCurrentState `json:"currentState,omitempty"`
 
 	// Represents the role of the instance observed.
 	//
@@ -622,13 +622,13 @@ const (
 	InstanceDesiredStateReleased InstanceDesiredState = "Released"
 )
 
-type CurrentPodState string
+type InstanceCurrentState string
 
 const (
-	CurrentPodStateUnknown     CurrentPodState = "Unknown"
-	CurrentPodStatePresent     CurrentPodState = "Present"
-	CurrentPodStateTerminating CurrentPodState = "Terminating"
-	CurrentPodStateAbsent      CurrentPodState = "Absent"
+	InstanceCurrentStateUnknown     InstanceCurrentState = "Unknown"
+	InstanceCurrentStatePresent     InstanceCurrentState = "Present"
+	InstanceCurrentStateTerminating InstanceCurrentState = "Terminating"
+	InstanceCurrentStateAbsent      InstanceCurrentState = "Absent"
 )
 
 // EffectiveDesiredState returns the backward-compatible desired state.
@@ -639,12 +639,12 @@ func (s *InstanceStatus) EffectiveDesiredState() InstanceDesiredState {
 	return s.DesiredState
 }
 
-// EffectiveCurrentPodState returns the backward-compatible current Pod state.
-func (s *InstanceStatus) EffectiveCurrentPodState() CurrentPodState {
-	if s == nil || s.CurrentPodState == "" {
-		return CurrentPodStateUnknown
+// EffectiveCurrentState returns the backward-compatible current instance state.
+func (s *InstanceStatus) EffectiveCurrentState() InstanceCurrentState {
+	if s == nil || s.CurrentState == "" {
+		return InstanceCurrentStateUnknown
 	}
-	return s.CurrentPodState
+	return s.CurrentState
 }
 
 type InstanceConfigStatus struct {
@@ -793,7 +793,7 @@ func (r *InstanceSet) IsRoleProbeDone() bool {
 	}
 	cnt := 0
 	for _, inst := range r.ActiveInstanceStatuses() {
-		if inst.EffectiveCurrentPodState() == CurrentPodStatePresent && len(inst.Role) > 0 {
+		if inst.EffectiveCurrentState() == InstanceCurrentStatePresent && len(inst.Role) > 0 {
 			cnt++
 		}
 	}
@@ -838,7 +838,7 @@ func (r *InstanceSet) RetainedInstanceStatuses() []*InstanceStatus {
 	return result
 }
 
-// PresentInstanceStatuses returns instances whose actual Pod currently exists and is not terminating.
+// PresentInstanceStatuses returns instances whose current state is Present.
 func (r *InstanceSet) PresentInstanceStatuses() []*InstanceStatus {
 	if r == nil {
 		return nil
@@ -846,17 +846,17 @@ func (r *InstanceSet) PresentInstanceStatuses() []*InstanceStatus {
 	result := make([]*InstanceStatus, 0, len(r.Status.InstanceStatus))
 	for i := range r.Status.InstanceStatus {
 		status := &r.Status.InstanceStatus[i]
-		if status.EffectiveCurrentPodState() == CurrentPodStatePresent {
+		if status.EffectiveCurrentState() == InstanceCurrentStatePresent {
 			result = append(result, status)
 		}
 	}
 	return result
 }
 
-// HasPresentPod reports whether podName currently identifies an existing, non-terminating Pod.
-func (r *InstanceSet) HasPresentPod(podName string) bool {
-	status := r.FindInstanceStatus(podName)
-	return status != nil && status.EffectiveCurrentPodState() == CurrentPodStatePresent
+// HasPresentInstance reports whether instanceName currently identifies a Present instance.
+func (r *InstanceSet) HasPresentInstance(instanceName string) bool {
+	status := r.FindInstanceStatus(instanceName)
+	return status != nil && status.EffectiveCurrentState() == InstanceCurrentStatePresent
 }
 
 func (r *InstanceSet) instanceStatusesByDesiredState(desiredState InstanceDesiredState) []*InstanceStatus {

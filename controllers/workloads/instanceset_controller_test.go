@@ -469,10 +469,10 @@ var _ = Describe("InstanceSet Controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
 				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
-					PodName:         fmt.Sprintf("%s-0", itsObj.Name),
-					TemplateName:    ptr.To(""),
-					DesiredState:    workloads.InstanceDesiredStateActive,
-					CurrentPodState: workloads.CurrentPodStatePresent,
+					PodName:      fmt.Sprintf("%s-0", itsObj.Name),
+					TemplateName: ptr.To(""),
+					DesiredState: workloads.InstanceDesiredStateActive,
+					CurrentState: workloads.InstanceCurrentStatePresent,
 					Configs: []workloads.InstanceConfigStatus{
 						{
 							Name:       "log",
@@ -530,10 +530,10 @@ var _ = Describe("InstanceSet Controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
 				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
-					PodName:         fmt.Sprintf("%s-0", itsObj.Name),
-					TemplateName:    ptr.To(""),
-					DesiredState:    workloads.InstanceDesiredStateActive,
-					CurrentPodState: workloads.CurrentPodStatePresent,
+					PodName:      fmt.Sprintf("%s-0", itsObj.Name),
+					TemplateName: ptr.To(""),
+					DesiredState: workloads.InstanceDesiredStateActive,
+					CurrentState: workloads.InstanceCurrentStatePresent,
 					Configs: []workloads.InstanceConfigStatus{
 						{
 							Name:       "log",
@@ -566,10 +566,10 @@ var _ = Describe("InstanceSet Controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
 				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
-					PodName:         fmt.Sprintf("%s-0", itsObj.Name),
-					TemplateName:    ptr.To(""),
-					DesiredState:    workloads.InstanceDesiredStateActive,
-					CurrentPodState: workloads.CurrentPodStatePresent,
+					PodName:      fmt.Sprintf("%s-0", itsObj.Name),
+					TemplateName: ptr.To(""),
+					DesiredState: workloads.InstanceDesiredStateActive,
+					CurrentState: workloads.InstanceCurrentStatePresent,
 					Configs: []workloads.InstanceConfigStatus{
 						{
 							Name:       "log",
@@ -627,10 +627,10 @@ var _ = Describe("InstanceSet Controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
 				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
-					PodName:         fmt.Sprintf("%s-0", itsObj.Name),
-					TemplateName:    ptr.To(""),
-					DesiredState:    workloads.InstanceDesiredStateActive,
-					CurrentPodState: workloads.CurrentPodStatePresent,
+					PodName:      fmt.Sprintf("%s-0", itsObj.Name),
+					TemplateName: ptr.To(""),
+					DesiredState: workloads.InstanceDesiredStateActive,
+					CurrentState: workloads.InstanceCurrentStatePresent,
 					Configs: []workloads.InstanceConfigStatus{
 						{
 							Name:       "log",
@@ -663,10 +663,10 @@ var _ = Describe("InstanceSet Controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
 				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
-					PodName:         fmt.Sprintf("%s-0", itsObj.Name),
-					TemplateName:    ptr.To(""),
-					DesiredState:    workloads.InstanceDesiredStateActive,
-					CurrentPodState: workloads.CurrentPodStatePresent,
+					PodName:      fmt.Sprintf("%s-0", itsObj.Name),
+					TemplateName: ptr.To(""),
+					DesiredState: workloads.InstanceDesiredStateActive,
+					CurrentState: workloads.InstanceCurrentStatePresent,
 					Configs: []workloads.InstanceConfigStatus{
 						{
 							Name:       "log",
@@ -704,10 +704,10 @@ var _ = Describe("InstanceSet Controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
 				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
-					PodName:         fmt.Sprintf("%s-0", itsObj.Name),
-					TemplateName:    ptr.To(""),
-					DesiredState:    workloads.InstanceDesiredStateActive,
-					CurrentPodState: workloads.CurrentPodStatePresent,
+					PodName:      fmt.Sprintf("%s-0", itsObj.Name),
+					TemplateName: ptr.To(""),
+					DesiredState: workloads.InstanceDesiredStateActive,
+					CurrentState: workloads.InstanceCurrentStatePresent,
 					Configs: []workloads.InstanceConfigStatus{
 						{
 							Name:       "log",
@@ -737,10 +737,10 @@ var _ = Describe("InstanceSet Controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
 				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
-					PodName:         fmt.Sprintf("%s-0", itsObj.Name),
-					TemplateName:    ptr.To(""),
-					DesiredState:    workloads.InstanceDesiredStateActive,
-					CurrentPodState: workloads.CurrentPodStatePresent,
+					PodName:      fmt.Sprintf("%s-0", itsObj.Name),
+					TemplateName: ptr.To(""),
+					DesiredState: workloads.InstanceDesiredStateActive,
+					CurrentState: workloads.InstanceCurrentStatePresent,
 					Configs: []workloads.InstanceConfigStatus{
 						{
 							Name:       "log",
@@ -802,10 +802,10 @@ var _ = Describe("InstanceSet Controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
 				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
-					PodName:         fmt.Sprintf("%s-0", itsObj.Name),
-					TemplateName:    ptr.To(""),
-					DesiredState:    workloads.InstanceDesiredStateActive,
-					CurrentPodState: workloads.CurrentPodStatePresent,
+					PodName:      fmt.Sprintf("%s-0", itsObj.Name),
+					TemplateName: ptr.To(""),
+					DesiredState: workloads.InstanceDesiredStateActive,
+					CurrentState: workloads.InstanceCurrentStatePresent,
 					Configs: []workloads.InstanceConfigStatus{
 						{
 							Name:       "log",
@@ -847,10 +847,10 @@ var _ = Describe("InstanceSet Controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
 				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
-					PodName:         fmt.Sprintf("%s-0", itsObj.Name),
-					TemplateName:    ptr.To(""),
-					DesiredState:    workloads.InstanceDesiredStateActive,
-					CurrentPodState: workloads.CurrentPodStatePresent,
+					PodName:      fmt.Sprintf("%s-0", itsObj.Name),
+					TemplateName: ptr.To(""),
+					DesiredState: workloads.InstanceDesiredStateActive,
+					CurrentState: workloads.InstanceCurrentStatePresent,
 					Configs: []workloads.InstanceConfigStatus{
 						{
 							Name:       "log",
@@ -919,10 +919,10 @@ var _ = Describe("InstanceSet Controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
 				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
-					PodName:         fmt.Sprintf("%s-0", itsObj.Name),
-					TemplateName:    ptr.To(""),
-					DesiredState:    workloads.InstanceDesiredStateActive,
-					CurrentPodState: workloads.CurrentPodStatePresent,
+					PodName:      fmt.Sprintf("%s-0", itsObj.Name),
+					TemplateName: ptr.To(""),
+					DesiredState: workloads.InstanceDesiredStateActive,
+					CurrentState: workloads.InstanceCurrentStatePresent,
 					Configs: []workloads.InstanceConfigStatus{
 						{
 							Name:       "client",
@@ -975,10 +975,10 @@ var _ = Describe("InstanceSet Controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
 				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
-					PodName:         fmt.Sprintf("%s-0", itsObj.Name),
-					TemplateName:    ptr.To(""),
-					DesiredState:    workloads.InstanceDesiredStateActive,
-					CurrentPodState: workloads.CurrentPodStatePresent,
+					PodName:      fmt.Sprintf("%s-0", itsObj.Name),
+					TemplateName: ptr.To(""),
+					DesiredState: workloads.InstanceDesiredStateActive,
+					CurrentState: workloads.InstanceCurrentStatePresent,
 					Configs: []workloads.InstanceConfigStatus{
 						{
 							Name:       "client",

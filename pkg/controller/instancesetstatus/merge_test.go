@@ -34,9 +34,9 @@ func TestBuildDesiredAndCurrentDimensions(t *testing.T) {
 			{PodName: "demo-fast-0", TemplateName: "fast"},
 			{PodName: "demo-2", TemplateName: "flat"},
 		},
-		Pods: []PodObservation{
-			{PodName: "demo-0", State: workloads.CurrentPodStatePresent},
-			{PodName: "demo-fast-0", State: workloads.CurrentPodStatePresent},
+		Current: []CurrentObservation{
+			{InstanceName: "demo-0", State: workloads.InstanceCurrentStatePresent},
+			{InstanceName: "demo-fast-0", State: workloads.InstanceCurrentStatePresent},
 		},
 		Runtime: map[string]RuntimeStatus{
 			"demo-0": {Role: "leader"},
@@ -48,28 +48,28 @@ func TestBuildDesiredAndCurrentDimensions(t *testing.T) {
 	if len(result.Statuses) != 3 {
 		t.Fatalf("expected 3 statuses, got %#v", result.Statuses)
 	}
-	assertStatus(t, result.Statuses[0], "demo-0", "", workloads.InstanceDesiredStateActive, workloads.CurrentPodStatePresent)
-	assertStatus(t, result.Statuses[1], "demo-2", "flat", workloads.InstanceDesiredStateActive, workloads.CurrentPodStateAbsent)
-	assertStatus(t, result.Statuses[2], "demo-fast-0", "fast", workloads.InstanceDesiredStateActive, workloads.CurrentPodStatePresent)
+	assertStatus(t, result.Statuses[0], "demo-0", "", workloads.InstanceDesiredStateActive, workloads.InstanceCurrentStatePresent)
+	assertStatus(t, result.Statuses[1], "demo-2", "flat", workloads.InstanceDesiredStateActive, workloads.InstanceCurrentStateAbsent)
+	assertStatus(t, result.Statuses[2], "demo-fast-0", "fast", workloads.InstanceDesiredStateActive, workloads.InstanceCurrentStatePresent)
 }
 
 func TestBuildOfflineLifecycleRetainsIdentityAndTemplate(t *testing.T) {
 	previous := []workloads.InstanceStatus{{
-		PodName:         "demo-fast-0",
-		TemplateName:    ptr.To("fast"),
-		DesiredState:    workloads.InstanceDesiredStateActive,
-		CurrentPodState: workloads.CurrentPodStatePresent,
-		Role:            "leader",
+		PodName:      "demo-fast-0",
+		TemplateName: ptr.To("fast"),
+		DesiredState: workloads.InstanceDesiredStateActive,
+		CurrentState: workloads.InstanceCurrentStatePresent,
+		Role:         "leader",
 	}}
-	states := []workloads.CurrentPodState{
-		workloads.CurrentPodStatePresent,
-		workloads.CurrentPodStateTerminating,
-		workloads.CurrentPodStateAbsent,
+	states := []workloads.InstanceCurrentState{
+		workloads.InstanceCurrentStatePresent,
+		workloads.InstanceCurrentStateTerminating,
+		workloads.InstanceCurrentStateAbsent,
 	}
 	for _, state := range states {
 		input := BuildInput{Previous: previous, Offline: []string{"demo-fast-0"}}
-		if state != workloads.CurrentPodStateAbsent {
-			input.Pods = []PodObservation{{PodName: "demo-fast-0", State: state}}
+		if state != workloads.InstanceCurrentStateAbsent {
+			input.Current = []CurrentObservation{{InstanceName: "demo-fast-0", State: state}}
 		}
 		result, err := Build(input)
 		if err != nil {
@@ -93,9 +93,9 @@ func TestBuildReleasedCleanupIsBounded(t *testing.T) {
 	}
 	result, err := Build(BuildInput{
 		Previous: previous,
-		Pods: []PodObservation{
-			{PodName: "demo-0", State: workloads.CurrentPodStatePresent},
-			{PodName: "demo-1", State: workloads.CurrentPodStateTerminating},
+		Current: []CurrentObservation{
+			{InstanceName: "demo-0", State: workloads.InstanceCurrentStatePresent},
+			{InstanceName: "demo-1", State: workloads.InstanceCurrentStateTerminating},
 		},
 	})
 	if err != nil {
@@ -130,7 +130,7 @@ func TestBuildRecomputesRuntimeForSameNamePod(t *testing.T) {
 		PodName:         "demo-0",
 		TemplateName:    ptr.To(""),
 		DesiredState:    workloads.InstanceDesiredStateActive,
-		CurrentPodState: workloads.CurrentPodStatePresent,
+		CurrentState:    workloads.InstanceCurrentStatePresent,
 		Role:            "old-role",
 		Configs:         []workloads.InstanceConfigStatus{{Name: "old"}},
 		VolumeExpansion: true,
@@ -138,7 +138,7 @@ func TestBuildRecomputesRuntimeForSameNamePod(t *testing.T) {
 	result, err := Build(BuildInput{
 		Previous: previous,
 		Active:   []Allocation{{PodName: "demo-0", TemplateName: ""}},
-		Pods:     []PodObservation{{PodName: "demo-0", State: workloads.CurrentPodStatePresent}},
+		Current:  []CurrentObservation{{InstanceName: "demo-0", State: workloads.InstanceCurrentStatePresent}},
 		Runtime: map[string]RuntimeStatus{
 			"demo-0": {Role: "new-role", Configs: []workloads.InstanceConfigStatus{{Name: "new"}}},
 		},
@@ -156,7 +156,7 @@ func TestBuildRecomputesRuntimeForSameNamePod(t *testing.T) {
 		t.Fatal(err)
 	}
 	status = result.Statuses[0]
-	if status.CurrentPodState != workloads.CurrentPodStateAbsent || status.Role != "" || status.Configs != nil || status.VolumeExpansion {
+	if status.CurrentState != workloads.InstanceCurrentStateAbsent || status.Role != "" || status.Configs != nil || status.VolumeExpansion {
 		t.Fatalf("Absent Pod retained runtime state: %#v", status)
 	}
 }
@@ -193,7 +193,7 @@ func TestBuildLegacyStatusMigration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertStatus(t, result.Statuses[0], "demo-0", "", workloads.InstanceDesiredStateActive, workloads.CurrentPodStateAbsent)
+	assertStatus(t, result.Statuses[0], "demo-0", "", workloads.InstanceDesiredStateActive, workloads.InstanceCurrentStateAbsent)
 	if result.Statuses[0].Role != "" {
 		t.Fatalf("legacy runtime field was retained: %#v", result.Statuses[0])
 	}
@@ -225,9 +225,9 @@ func TestBuildDoesNotInventUnknownHistoricalTemplate(t *testing.T) {
 	}
 }
 
-func assertStatus(t *testing.T, status workloads.InstanceStatus, name, template string, desired workloads.InstanceDesiredState, current workloads.CurrentPodState) {
+func assertStatus(t *testing.T, status workloads.InstanceStatus, name, template string, desired workloads.InstanceDesiredState, current workloads.InstanceCurrentState) {
 	t.Helper()
-	if status.PodName != name || status.TemplateName == nil || *status.TemplateName != template || status.DesiredState != desired || status.CurrentPodState != current {
+	if status.PodName != name || status.TemplateName == nil || *status.TemplateName != template || status.DesiredState != desired || status.CurrentState != current {
 		t.Fatalf("unexpected status: %#v", status)
 	}
 }

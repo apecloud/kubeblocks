@@ -10341,6 +10341,13 @@ spec:
                 description: currentRevision, if not empty, indicates the version
                   of the Instance used to generate pod.
                 type: string
+              currentState:
+                description: Represents the observed current state of this instance.
+                enum:
+                - Present
+                - Terminating
+                - Absent
+                type: string
               observedGeneration:
                 description: |-
                   observedGeneration is the most recent generation observed for this InstanceSet. It corresponds to the

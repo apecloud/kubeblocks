@@ -25,7 +25,6 @@ import (
 	"sort"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -64,13 +63,6 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		inst, _ := object.(*workloads.Instance)
 		instanceList = append(instanceList, inst)
 	}
-	pods := tree.List(&corev1.Pod{})
-	var podList []*corev1.Pod
-	for _, object := range pods {
-		pod, _ := object.(*corev1.Pod)
-		podList = append(podList, pod)
-	}
-
 	replicas := int32(0)
 	currentReplicas, updatedReplicas := int32(0), int32(0)
 	readyReplicas, availableReplicas := int32(0), int32(0)
@@ -173,7 +165,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 
 	// 4. set instance status
-	if err := setInstanceStatus(tree, its, instanceList, podList); err != nil {
+	if err := setInstanceStatus(tree, its, instanceList); err != nil {
 		return kubebuilderx.Continue, err
 	}
 
@@ -275,13 +267,13 @@ func buildFailureCondition(its *workloads.InstanceSet, instances []*workloads.In
 	}, nil
 }
 
-func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, instances []*workloads.Instance, pods []*corev1.Pod) error {
+func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, instances []*workloads.Instance) error {
 	active, templateNames, err := instancesetstatus.BuildActiveAllocations(tree, its)
 	if err != nil {
 		return err
 	}
 	offline := append([]string(nil), its.Spec.OfflineInstances...)
-	hints := make([]instancesetstatus.Allocation, 0, len(active)+len(instances)+len(pods)+len(offline))
+	hints := make([]instancesetstatus.Allocation, 0, len(active)+len(instances)+len(offline))
 	if its.Spec.Stop != nil && *its.Spec.Stop {
 		for _, allocation := range active {
 			offline = append(offline, allocation.PodName)
@@ -290,20 +282,7 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 		active = nil
 	}
 
-	observations := make([]instancesetstatus.PodObservation, 0, len(pods))
-	for _, pod := range pods {
-		state := workloads.CurrentPodStatePresent
-		if !pod.DeletionTimestamp.IsZero() {
-			state = workloads.CurrentPodStateTerminating
-		}
-		observations = append(observations, instancesetstatus.PodObservation{PodName: pod.Name, State: state})
-		if templateName, ok, err := instancesetstatus.TemplateNameFromLabels(pod.Labels); err != nil {
-			return fmt.Errorf("pod %q: %w", pod.Name, err)
-		} else if ok {
-			hints = append(hints, instancesetstatus.Allocation{PodName: pod.Name, TemplateName: templateName})
-		}
-	}
-
+	observations := make([]instancesetstatus.CurrentObservation, 0, len(instances))
 	runtime := make(map[string]instancesetstatus.RuntimeStatus, len(instances))
 	seenInstances := make(map[string]struct{}, len(instances))
 	for _, inst := range instances {
@@ -317,7 +296,19 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 		} else if ok {
 			hints = append(hints, instancesetstatus.Allocation{PodName: inst.Name, TemplateName: templateName})
 		}
-		if !podIsPresent(observations, inst.Name) {
+		switch inst.Status.CurrentState {
+		case workloads.InstanceCurrentStatePresent, workloads.InstanceCurrentStateTerminating:
+			observations = append(observations, instancesetstatus.CurrentObservation{
+				InstanceName: inst.Name,
+				State:        inst.Status.CurrentState,
+			})
+		case workloads.InstanceCurrentStateAbsent:
+		case "":
+			return fmt.Errorf("instance %q has not reported current state", inst.Name)
+		default:
+			return fmt.Errorf("instance %q has invalid current state %q", inst.Name, inst.Status.CurrentState)
+		}
+		if inst.Status.CurrentState != workloads.InstanceCurrentStatePresent {
 			continue
 		}
 		status := instancesetstatus.RuntimeStatus{Configs: inst.Status.Configs, VolumeExpansion: inst.Status.VolumeExpansion}
@@ -341,7 +332,7 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 		Previous:      its.Status.InstanceStatus,
 		Active:        active,
 		Offline:       offline,
-		Pods:          observations,
+		Current:       observations,
 		TemplateHints: hints,
 		Runtime:       runtime,
 	})
@@ -353,19 +344,10 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 	return nil
 }
 
-func podIsPresent(observations []instancesetstatus.PodObservation, name string) bool {
-	for _, observation := range observations {
-		if observation.PodName == name {
-			return observation.State == workloads.CurrentPodStatePresent
-		}
-	}
-	return false
-}
-
-func observationNames(observations []instancesetstatus.PodObservation) []string {
+func observationNames(observations []instancesetstatus.CurrentObservation) []string {
 	names := make([]string, 0, len(observations))
 	for _, observation := range observations {
-		names = append(names, observation.PodName)
+		names = append(names, observation.InstanceName)
 	}
 	return names
 }

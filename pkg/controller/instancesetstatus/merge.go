@@ -34,10 +34,10 @@ type Allocation struct {
 	TemplateName string
 }
 
-// PodObservation is the current state of an actual Pod object.
-type PodObservation struct {
-	PodName string
-	State   workloads.CurrentPodState
+// CurrentObservation is the observed current state of an instance.
+type CurrentObservation struct {
+	InstanceName string
+	State        workloads.InstanceCurrentState
 }
 
 // RuntimeStatus contains fields that are meaningful only for a current, non-terminating Pod.
@@ -52,7 +52,7 @@ type BuildInput struct {
 	Previous      []workloads.InstanceStatus
 	Active        []Allocation
 	Offline       []string
-	Pods          []PodObservation
+	Current       []CurrentObservation
 	TemplateHints []Allocation
 	Runtime       map[string]RuntimeStatus
 }
@@ -87,36 +87,36 @@ func Build(input BuildInput) (BuildResult, error) {
 		}
 	}
 
-	pods := make(map[string]workloads.CurrentPodState, len(input.Pods))
-	for _, observation := range input.Pods {
-		if observation.PodName == "" {
-			return BuildResult{}, fmt.Errorf("pod observation has an empty PodName")
+	current := make(map[string]workloads.InstanceCurrentState, len(input.Current))
+	for _, observation := range input.Current {
+		if observation.InstanceName == "" {
+			return BuildResult{}, fmt.Errorf("current observation has an empty instance name")
 		}
-		if _, ok := pods[observation.PodName]; ok {
-			return BuildResult{}, fmt.Errorf("duplicate pod observation for %q", observation.PodName)
+		if _, ok := current[observation.InstanceName]; ok {
+			return BuildResult{}, fmt.Errorf("duplicate current observation for %q", observation.InstanceName)
 		}
-		if observation.State != workloads.CurrentPodStatePresent && observation.State != workloads.CurrentPodStateTerminating {
-			return BuildResult{}, fmt.Errorf("pod observation for %q has invalid state %q", observation.PodName, observation.State)
+		if observation.State != workloads.InstanceCurrentStatePresent && observation.State != workloads.InstanceCurrentStateTerminating {
+			return BuildResult{}, fmt.Errorf("current observation for %q has invalid state %q", observation.InstanceName, observation.State)
 		}
-		pods[observation.PodName] = observation.State
+		current[observation.InstanceName] = observation.State
 	}
 
-	names := make(map[string]struct{}, len(active)+len(offline)+len(pods))
+	names := make(map[string]struct{}, len(active)+len(offline)+len(current))
 	for name := range active {
 		names[name] = struct{}{}
 	}
 	for name := range offline {
 		names[name] = struct{}{}
 	}
-	for name := range pods {
+	for name := range current {
 		names[name] = struct{}{}
 	}
 
 	result := BuildResult{Statuses: make([]workloads.InstanceStatus, 0, len(names))}
 	for name := range names {
-		status := workloads.InstanceStatus{PodName: name, CurrentPodState: workloads.CurrentPodStateAbsent}
-		if state, ok := pods[name]; ok {
-			status.CurrentPodState = state
+		status := workloads.InstanceStatus{PodName: name, CurrentState: workloads.InstanceCurrentStateAbsent}
+		if state, ok := current[name]; ok {
+			status.CurrentState = state
 		}
 
 		switch {
@@ -143,7 +143,7 @@ func Build(input BuildInput) (BuildResult, error) {
 		if status.TemplateName == nil {
 			result.UnknownTemplateNames = append(result.UnknownTemplateNames, name)
 		}
-		if status.CurrentPodState == workloads.CurrentPodStatePresent {
+		if status.CurrentState == workloads.InstanceCurrentStatePresent {
 			if runtime, ok := input.Runtime[name]; ok {
 				status.Role = runtime.Role
 				status.Configs = copyConfigs(runtime.Configs)

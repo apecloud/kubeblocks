@@ -58,9 +58,15 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		return kubebuilderx.Continue, err
 	}
 	if obj == nil {
+		r.setPodUnavailableStatus(inst, workloads.InstanceCurrentStateAbsent, inst.Name)
 		return kubebuilderx.Continue, nil
 	}
 	pod := obj.(*corev1.Pod)
+	if isTerminating(pod) {
+		r.setPodUnavailableStatus(inst, workloads.InstanceCurrentStateTerminating, pod.Name)
+		return kubebuilderx.Continue, nil
+	}
+	inst.Status.CurrentState = workloads.InstanceCurrentStatePresent
 
 	ready, available, updated := false, false, false
 	notReadyName, notAvailableName := "", ""
@@ -116,6 +122,20 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		return kubebuilderx.RetryAfter(time.Second), nil
 	}
 	return kubebuilderx.Continue, nil
+}
+
+func (r *statusReconciler) setPodUnavailableStatus(inst *workloads.Instance, state workloads.InstanceCurrentState, name string) {
+	inst.Status.CurrentState = state
+	inst.Status.CurrentRevision = ""
+	inst.Status.UpToDate = false
+	inst.Status.Ready = false
+	inst.Status.Available = false
+	inst.Status.Role = ""
+	inst.Status.VolumeExpansion = false
+	inst.Status.Configs = nil
+	meta.SetStatusCondition(&inst.Status.Conditions, *r.buildReadyCondition(inst, false, name))
+	meta.SetStatusCondition(&inst.Status.Conditions, *r.buildAvailableCondition(inst, false, name))
+	meta.RemoveStatusCondition(&inst.Status.Conditions, string(workloads.InstanceFailure))
 }
 
 func (r *statusReconciler) buildReadyCondition(inst *workloads.Instance, ready bool, notReadyName string) *metav1.Condition {

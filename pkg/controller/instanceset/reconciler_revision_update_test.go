@@ -64,7 +64,7 @@ var _ = Describe("revision update reconciler test", func() {
 			Expect(newITS.Status.InstanceStatus).Should(HaveLen(3))
 			for _, status := range newITS.Status.InstanceStatus {
 				Expect(status.DesiredState).Should(Equal(workloads.InstanceDesiredStateActive))
-				Expect(status.CurrentPodState).Should(Equal(workloads.CurrentPodStateAbsent))
+				Expect(status.CurrentState).Should(Equal(workloads.InstanceCurrentStateAbsent))
 				Expect(status.TemplateName).ShouldNot(BeNil())
 			}
 		})

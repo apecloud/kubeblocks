@@ -19327,6 +19327,9 @@ Or, a NotReady reason with not ready instances encoded in the Message filed will
 </tr><tr><td><p>&#34;Restore&#34;</p></td>
 <td><p>InstanceRestore indicates whether the initial data restore for this InstanceSet has completed.</p>
 </td>
+</tr><tr><td><p>&#34;InstanceStatusIncomplete&#34;</p></td>
+<td><p>InstanceStatusIncomplete indicates that retained historical instances have unknown template assignments.</p>
+</td>
 </tr><tr><td><p>&#34;InstanceUpdateRestricted&#34;</p></td>
 <td><p>InstanceUpdateRestricted represents a ConditionType that indicates updates to an InstanceSet are blocked(when the
 PodUpdatePolicy is set to StrictInPlace but the pods cannot be updated in-place).</p>
@@ -19564,6 +19567,52 @@ string
 </td>
 </tr>
 </tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1.InstanceCurrentState">InstanceCurrentState
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceStatus">InstanceStatus</a>, <a href="#workloads.kubeblocks.io/v1.InstanceStatus2">InstanceStatus2</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Absent&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Present&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Terminating&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Unknown&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1.InstanceDesiredState">InstanceDesiredState
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceStatus">InstanceStatus</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Active&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Offline&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Released&#34;</p></td>
+<td></td>
+</tr></tbody>
 </table>
 <h3 id="workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec
 </h3>
@@ -20476,6 +20525,49 @@ string
 </tr>
 <tr>
 <td>
+<code>templateName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>TemplateName is the instance template assigned to this instance.
+nil means that the template is unknown, while an empty string identifies the default template.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>desiredState</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.InstanceDesiredState">
+InstanceDesiredState
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>DesiredState describes the state the InstanceSet controller expects for this instance.
+An empty value from an older object is treated as Active.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>currentState</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.InstanceCurrentState">
+InstanceCurrentState
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>CurrentState describes the observed current state of this instance.
+An empty value from an older object is treated as Unknown.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>role</code><br/>
 <em>
 string
@@ -20541,6 +20633,20 @@ int64
 <em>(Optional)</em>
 <p>observedGeneration is the most recent generation observed for this InstanceSet. It corresponds to the
 InstanceSet&rsquo;s generation, which is updated on mutation by the API Server.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>currentState</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.InstanceCurrentState">
+InstanceCurrentState
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents the observed current state of this instance.</p>
 </td>
 </tr>
 <tr>

@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset2
 
 import (
-	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -74,13 +73,7 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kub
 		instance, _ := object.(*workloads.Instance)
 		instanceList = append(instanceList, instance)
 	}
-	pods := tree.List(&corev1.Pod{})
-	podList := make([]*corev1.Pod, 0, len(pods))
-	for _, object := range pods {
-		pod, _ := object.(*corev1.Pod)
-		podList = append(podList, pod)
-	}
-	if err := setInstanceStatus(tree, its, instanceList, podList); err != nil {
+	if err := setInstanceStatus(tree, its, instanceList); err != nil {
 		return kubebuilderx.Continue, err
 	}
 

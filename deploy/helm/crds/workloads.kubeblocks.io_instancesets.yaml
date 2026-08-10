@@ -11675,9 +11675,9 @@ spec:
                         - name
                         type: object
                       type: array
-                    currentPodState:
+                    currentState:
                       description: |-
-                        CurrentPodState describes the observed state of the Pod with PodName.
+                        CurrentState describes the observed current state of this instance.
                         An empty value from an older object is treated as Unknown.
                       enum:
                       - Present
@@ -11717,8 +11717,8 @@ spec:
                 x-kubernetes-list-type: map
               observedGeneration:
                 description: |-
-                  observedGeneration is the most recent generation for which revisions and the complete instance identity,
-                  desired-state, template, and current Pod view have been published. It does not imply that the Pods are Ready.
+                  observedGeneration is the most recent generation observed for this InstanceSet. It corresponds to the
+                  InstanceSet's generation, which is updated on mutation by the API Server.
                 format: int64
                 type: integer
               readyInitReplicas:

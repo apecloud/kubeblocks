@@ -72,7 +72,6 @@ func (r *InstanceSetReconciler2) SetupWithManager(mgr ctrl.Manager, multiCluster
 }
 
 func (r *InstanceSetReconciler2) setupWithManager(mgr ctrl.Manager) error {
-	eventHandler := handler.EnqueueRequestsFromMapFunc(r.instanceFilter)
 	return intctrlutil.NewControllerManagedBy(mgr).
 		For(&workloads.InstanceSet{}).
 		WithOptions(controller.Options{
@@ -80,7 +79,6 @@ func (r *InstanceSetReconciler2) setupWithManager(mgr ctrl.Manager) error {
 		}).
 		Owns(&workloads.Instance{}).
 		Owns(&corev1.Service{}). // headless service
-		Watches(&corev1.Pod{}, eventHandler).
 		Complete(r)
 }
 
@@ -94,7 +92,6 @@ func (r *InstanceSetReconciler2) setupWithMultiClusterManager(mgr ctrl.Manager, 
 
 	eventHandler := handler.EnqueueRequestsFromMapFunc(r.instanceFilter)
 	multiClusterMgr.Watch(b, &workloads.Instance{}, eventHandler)
-	multiClusterMgr.Watch(b, &corev1.Pod{}, eventHandler)
 
 	return b.Complete(r)
 }

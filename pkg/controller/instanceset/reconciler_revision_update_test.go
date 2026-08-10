@@ -61,6 +61,23 @@ var _ = Describe("revision update reconciler test", func() {
 			Expect(updateRevisions).Should(HaveKey(its.Name + "-1"))
 			Expect(updateRevisions).Should(HaveKey(its.Name + "-2"))
 			Expect(newITS.Status.UpdateRevision).Should(Equal(updateRevisions[its.Name+"-2"]))
+			Expect(newITS.Status.InstanceStatus).Should(HaveLen(3))
+			for _, status := range newITS.Status.InstanceStatus {
+				Expect(status.DesiredState).Should(Equal(workloads.InstanceDesiredStateActive))
+				Expect(status.CurrentPodState).Should(Equal(workloads.CurrentPodStateAbsent))
+				Expect(status.TemplateName).ShouldNot(BeNil())
+			}
+		})
+
+		It("does not advance ObservedGeneration when the complete instance view is invalid", func() {
+			its.Generation = 2
+			its.Status.InstanceStatus = []workloads.InstanceStatus{{PodName: its.Name + "-0"}, {PodName: its.Name + "-0"}}
+			tree := kubebuilderx.NewObjectTree()
+			tree.SetRoot(its)
+			_, err := NewRevisionUpdateReconciler().Reconcile(tree)
+			Expect(err).Should(HaveOccurred())
+			Expect(its.Status.ObservedGeneration).ShouldNot(Equal(its.Generation))
+			Expect(its.Status.InstanceStatus).Should(HaveLen(2))
 		})
 	})
 })

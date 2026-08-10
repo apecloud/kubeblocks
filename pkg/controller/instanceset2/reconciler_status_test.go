@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset2
 
 import (
-	"reflect"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -33,67 +32,83 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/revisionmap"
 )
 
-func TestSyncInstanceConfigStatus(t *testing.T) {
-	instanceStatus := []workloads.InstanceStatus{
-		{PodName: "test-its-0"},
-		{PodName: "test-its-1"},
-	}
-	instances := []*workloads.Instance{
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "test-its-0"},
-			Status: workloads.InstanceStatus2{
-				Configs: []workloads.InstanceConfigStatus{
-					{Name: "log", ConfigHash: ptr.To("hash-0")},
-				},
-			},
+func TestSetInstanceStatusObservesPodIndependentlyFromInstance(t *testing.T) {
+	its := &workloads.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default"},
+		Spec: workloads.InstanceSetSpec{
+			Replicas: ptr.To[int32](1),
+			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "demo"}},
 		},
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "test-its-1"},
-			Status: workloads.InstanceStatus2{
-				Configs: []workloads.InstanceConfigStatus{
-					{Name: "log", ConfigHash: ptr.To("hash-1")},
-					{Name: "server", ConfigHash: ptr.To("hash-2")},
-				},
-			},
+	}
+	tree := kubebuilderx.NewObjectTree()
+	tree.SetRoot(its)
+	inst := &workloads.Instance{
+		ObjectMeta: metav1.ObjectMeta{Name: "demo-0"},
+		Spec:       workloads.InstanceSpec{InstanceTemplateName: ""},
+		Status: workloads.InstanceStatus2{
+			Configs:         []workloads.InstanceConfigStatus{{Name: "config"}},
+			VolumeExpansion: true,
 		},
 	}
 
-	syncInstanceConfigStatus(instanceStatus, instances)
-
-	expected := []workloads.InstanceStatus{
-		{
-			PodName: "test-its-0",
-			Configs: []workloads.InstanceConfigStatus{
-				{Name: "log", ConfigHash: ptr.To("hash-0")},
-			},
-		},
-		{
-			PodName: "test-its-1",
-			Configs: []workloads.InstanceConfigStatus{
-				{Name: "log", ConfigHash: ptr.To("hash-1")},
-				{Name: "server", ConfigHash: ptr.To("hash-2")},
-			},
-		},
+	if err := setInstanceStatus(tree, its, []*workloads.Instance{inst}, nil); err != nil {
+		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(expected, instanceStatus) {
-		t.Fatalf("unexpected instance status: %#v", instanceStatus)
+	if len(its.Status.InstanceStatus) != 1 {
+		t.Fatalf("unexpected status: %#v", its.Status.InstanceStatus)
+	}
+	status := its.Status.InstanceStatus[0]
+	if status.TemplateName == nil || *status.TemplateName != "" || status.DesiredState != workloads.InstanceDesiredStateActive || status.CurrentPodState != workloads.CurrentPodStateAbsent {
+		t.Fatalf("Instance without Pod was not Active+Absent: %#v", status)
+	}
+	if status.Configs != nil || status.VolumeExpansion {
+		t.Fatalf("Instance status leaked runtime fields without a Pod: %#v", status)
+	}
+
+	pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "demo-0"}}
+	if err := setInstanceStatus(tree, its, []*workloads.Instance{inst}, []*corev1.Pod{pod}); err != nil {
+		t.Fatal(err)
+	}
+	status = its.Status.InstanceStatus[0]
+	if status.CurrentPodState != workloads.CurrentPodStatePresent || len(status.Configs) != 1 || !status.VolumeExpansion {
+		t.Fatalf("present Pod did not refresh runtime fields: %#v", status)
+	}
+
+	pod.DeletionTimestamp = &metav1.Time{Time: metav1.Now().Time}
+	if err := setInstanceStatus(tree, its, []*workloads.Instance{inst}, []*corev1.Pod{pod}); err != nil {
+		t.Fatal(err)
+	}
+	status = its.Status.InstanceStatus[0]
+	if status.CurrentPodState != workloads.CurrentPodStateTerminating || status.Configs != nil || status.VolumeExpansion {
+		t.Fatalf("terminating Pod retained current runtime fields: %#v", status)
 	}
 }
 
-func TestSyncInstanceConfigStatusKeepsEmptyWhenInstanceHasNotReported(t *testing.T) {
-	instanceStatus := []workloads.InstanceStatus{
-		{PodName: "test-its-0"},
-	}
-	instances := []*workloads.Instance{
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "test-its-0"},
+func TestSetInstanceStatusRetainsOfflineWithoutInstanceOrPod(t *testing.T) {
+	its := &workloads.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default"},
+		Spec: workloads.InstanceSetSpec{
+			Replicas:         ptr.To[int32](1),
+			Selector:         &metav1.LabelSelector{},
+			OfflineInstances: []string{"demo-fast-0"},
+			Instances: []workloads.InstanceTemplate{{
+				Name:     "fast",
+				Replicas: ptr.To[int32](1),
+			}},
 		},
+		Status: workloads.InstanceSetStatus{InstanceStatus: []workloads.InstanceStatus{{
+			PodName:      "demo-fast-0",
+			TemplateName: ptr.To("fast"),
+		}}},
 	}
-
-	syncInstanceConfigStatus(instanceStatus, instances)
-
-	if instanceStatus[0].Configs != nil {
-		t.Fatalf("expected empty configs, got %#v", instanceStatus[0].Configs)
+	tree := kubebuilderx.NewObjectTree()
+	tree.SetRoot(its)
+	if err := setInstanceStatus(tree, its, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	status := its.Status.InstanceStatus[0]
+	if status.PodName != "demo-fast-0" || status.TemplateName == nil || *status.TemplateName != "fast" || status.DesiredState != workloads.InstanceDesiredStateOffline || status.CurrentPodState != workloads.CurrentPodStateAbsent {
+		t.Fatalf("offline identity was not retained: %#v", status)
 	}
 }
 

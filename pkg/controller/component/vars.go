@@ -1293,7 +1293,7 @@ func componentVarPodsWithRoleGetter(ctx context.Context, cli client.Reader,
 	targetRoles := strings.Split(roles, ",")
 
 	names := make([]string, 0)
-	for _, inst := range its.Status.InstanceStatus {
+	for _, inst := range its.PresentInstanceStatuses() {
 		role := inst.Role
 		if slices.Index(targetRoles, role) >= 0 {
 			names = append(names, inst.PodName)

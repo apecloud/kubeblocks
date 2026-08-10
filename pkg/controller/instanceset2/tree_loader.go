@@ -24,6 +24,8 @@ import (
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -59,6 +61,9 @@ func (r *treeLoader) Load(ctx context.Context, reader client.Reader, req ctrl.Re
 	if err = loadInstanceAssistantObjects(ctx, reader, tree); err != nil {
 		return nil, err
 	}
+	if err = loadInstancePods(ctx, reader, tree); err != nil {
+		return nil, err
+	}
 
 	tree.Context = ctx
 	tree.EventRecorder = recorder
@@ -66,6 +71,54 @@ func (r *treeLoader) Load(ctx context.Context, reader client.Reader, req ctrl.Re
 	tree.SetFinalizer(finalizer)
 
 	return tree, err
+}
+
+func loadInstancePods(ctx context.Context, reader client.Reader, tree *kubebuilderx.ObjectTree) error {
+	its, ok := tree.GetRoot().(*workloads.InstanceSet)
+	if !ok || its == nil || model.IsObjectDeleting(its) {
+		return nil
+	}
+	selector, err := metav1.LabelSelectorAsSelector(its.Spec.Selector)
+	if err != nil {
+		return err
+	}
+	pods := &corev1.PodList{}
+	if err := reader.List(ctx, pods, client.InNamespace(its.Namespace), client.MatchingLabelsSelector{Selector: selector}); err != nil {
+		return err
+	}
+	loaded := make(map[string]struct{}, len(pods.Items))
+	for i := range pods.Items {
+		if err := tree.AddWithOption(&pods.Items[i], kubebuilderx.SkipToReconcile(true)); err != nil {
+			return err
+		}
+		loaded[pods.Items[i].Name] = struct{}{}
+	}
+	candidates := make(map[string]struct{}, len(its.Status.InstanceStatus)+len(its.Spec.OfflineInstances))
+	for _, status := range its.Status.InstanceStatus {
+		candidates[status.PodName] = struct{}{}
+	}
+	for _, name := range its.Spec.OfflineInstances {
+		candidates[name] = struct{}{}
+	}
+	for _, object := range tree.List(&workloads.Instance{}) {
+		candidates[object.GetName()] = struct{}{}
+	}
+	for name := range candidates {
+		if _, ok := loaded[name]; ok {
+			continue
+		}
+		pod := &corev1.Pod{}
+		if err := reader.Get(ctx, types.NamespacedName{Namespace: its.Namespace, Name: name}, pod); err != nil {
+			if apierrors.IsNotFound(err) {
+				continue
+			}
+			return err
+		}
+		if err := tree.AddWithOption(pod, kubebuilderx.SkipToReconcile(true)); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func ownedKinds() []client.ObjectList {

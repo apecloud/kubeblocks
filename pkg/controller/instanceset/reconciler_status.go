@@ -33,6 +33,7 @@ import (
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/instancesetstatus"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -49,7 +50,7 @@ func NewStatusReconciler() kubebuilderx.Reconciler {
 }
 
 func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
-	if tree.GetRoot() == nil || !model.IsObjectStatusUpdating(tree.GetRoot()) {
+	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) {
 		return kubebuilderx.ConditionUnsatisfied
 	}
 	return kubebuilderx.ConditionSatisfied
@@ -434,81 +435,90 @@ func buildFailureCondition(its *workloads.InstanceSet, pods []*corev1.Pod) (*met
 }
 
 func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pods []*corev1.Pod) error {
-	instanceStatus := make([]workloads.InstanceStatus, 0)
-	for _, pod := range pods {
-		status := workloads.InstanceStatus{
-			PodName: pod.Name,
-		}
-		instanceStatus = append(instanceStatus, status)
-	}
-
-	syncMemberStatus(its, instanceStatus, pods)
-
-	if err := syncInstanceConfigStatus(its, instanceStatus, pods); err != nil {
+	active, templateNames, err := instancesetstatus.BuildActiveAllocations(tree, its)
+	if err != nil {
 		return err
 	}
-
-	if tree != nil {
-		syncInstancePVCStatus(tree, its, instanceStatus)
+	offline := append([]string(nil), its.Spec.OfflineInstances...)
+	hints := make([]instancesetstatus.Allocation, 0, len(active)+len(pods)+len(offline))
+	if isStopRequested(its) {
+		for _, allocation := range active {
+			offline = append(offline, allocation.PodName)
+			hints = append(hints, allocation)
+		}
+		active = nil
 	}
 
-	sortInstanceStatus(instanceStatus)
-	its.Status.InstanceStatus = instanceStatus
-
-	return nil
-}
-
-func sortInstanceStatus(instanceStatus []workloads.InstanceStatus) {
-	getNameNOrdinalFunc := func(i int) (string, int) {
-		return parseParentNameAndOrdinal(instanceStatus[i].PodName)
-	}
-	baseSort(instanceStatus, getNameNOrdinalFunc, nil, true)
-}
-
-func syncMemberStatus(its *workloads.InstanceSet, instanceStatus []workloads.InstanceStatus, pods []*corev1.Pod) {
-	if its.Spec.Roles != nil {
-		roleMap := composeRoleMap(*its)
-		for _, pod := range pods {
-			if !intctrlutil.PodIsReadyWithLabel(*pod) {
-				continue
-			}
-			roleName := getRoleName(pod)
-			role, ok := roleMap[roleName]
-			if !ok {
-				continue
-			}
-			for i, inst := range instanceStatus {
-				if inst.PodName == pod.Name {
-					instanceStatus[i].Role = role.Name
-					break
-				}
+	observations := make([]instancesetstatus.PodObservation, 0, len(pods))
+	runtime := make(map[string]instancesetstatus.RuntimeStatus, len(pods))
+	roleMap := composeRoleMap(*its)
+	for _, pod := range pods {
+		state := workloads.CurrentPodStatePresent
+		if !pod.DeletionTimestamp.IsZero() {
+			state = workloads.CurrentPodStateTerminating
+		}
+		observations = append(observations, instancesetstatus.PodObservation{PodName: pod.Name, State: state})
+		if templateName, ok, err := instancesetstatus.TemplateNameFromLabels(pod.Labels); err != nil {
+			return fmt.Errorf("pod %q: %w", pod.Name, err)
+		} else if ok {
+			hints = append(hints, instancesetstatus.Allocation{PodName: pod.Name, TemplateName: templateName})
+		}
+		if state != workloads.CurrentPodStatePresent {
+			continue
+		}
+		status := instancesetstatus.RuntimeStatus{}
+		if intctrlutil.PodIsReadyWithLabel(*pod) {
+			if role, ok := roleMap[getRoleName(pod)]; ok {
+				status.Role = role.Name
 			}
 		}
-	}
-}
-
-func syncInstanceConfigStatus(_ *workloads.InstanceSet, instanceStatus []workloads.InstanceStatus, pods []*corev1.Pod) error {
-	for _, pod := range pods {
 		configs, err := configsFromPod(pod)
 		if err != nil {
 			return err
 		}
-		for i, inst := range instanceStatus {
-			if inst.PodName == pod.Name {
-				for _, config := range configs {
-					instanceStatus[i].Configs = append(instanceStatus[i].Configs, workloads.InstanceConfigStatus{
-						Name:       config.Name,
-						ConfigHash: config.ConfigHash,
-					})
-				}
-				break
-			}
+		for _, config := range configs {
+			status.Configs = append(status.Configs, workloads.InstanceConfigStatus{Name: config.Name, ConfigHash: config.ConfigHash})
+		}
+		runtime[pod.Name] = status
+	}
+
+	for _, name := range append(append([]string(nil), offline...), podObservationNames(observations)...) {
+		if templateName, ok, err := instancesetstatus.HistoricalTemplateHint(its, name, templateNames); err != nil {
+			return err
+		} else if ok {
+			hints = append(hints, instancesetstatus.Allocation{PodName: name, TemplateName: templateName})
 		}
 	}
+	syncRuntimePVCStatus(tree, its, runtime)
+
+	result, err := instancesetstatus.Build(instancesetstatus.BuildInput{
+		Previous:      its.Status.InstanceStatus,
+		Active:        active,
+		Offline:       offline,
+		Pods:          observations,
+		TemplateHints: hints,
+		Runtime:       runtime,
+	})
+	if err != nil {
+		return err
+	}
+	its.Status.InstanceStatus = result.Statuses
+	setInstanceStatusIncompleteCondition(its, result.UnknownTemplateNames)
 	return nil
 }
 
-func syncInstancePVCStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, instanceStatus []workloads.InstanceStatus) {
+func podObservationNames(observations []instancesetstatus.PodObservation) []string {
+	names := make([]string, 0, len(observations))
+	for _, observation := range observations {
+		names = append(names, observation.PodName)
+	}
+	return names
+}
+
+func syncRuntimePVCStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, runtime map[string]instancesetstatus.RuntimeStatus) {
+	if tree == nil {
+		return
+	}
 	pvcs := tree.List(&corev1.PersistentVolumeClaim{})
 	var pvcList []*corev1.PersistentVolumeClaim
 	for _, obj := range pvcs {
@@ -529,14 +539,27 @@ func syncInstancePVCStatus(tree *kubebuilderx.ObjectTree, its *workloads.Instanc
 				instName = pvc.Labels[constant.KBAppPodNameLabelKey]
 			}
 			if len(instName) > 0 {
-				for i, inst := range instanceStatus {
-					if inst.PodName == instName {
-						// TODO: how to check the expansion failed?
-						instanceStatus[i].VolumeExpansion = true
-						break
-					}
+				if status, ok := runtime[instName]; ok {
+					// TODO: how to check the expansion failed?
+					status.VolumeExpansion = true
+					runtime[instName] = status
 				}
 			}
 		}
 	}
+}
+
+func setInstanceStatusIncompleteCondition(its *workloads.InstanceSet, names []string) {
+	if len(names) == 0 {
+		meta.RemoveStatusCondition(&its.Status.Conditions, string(workloads.InstanceStatusIncomplete))
+		return
+	}
+	message, _ := json.Marshal(names)
+	meta.SetStatusCondition(&its.Status.Conditions, metav1.Condition{
+		Type:               string(workloads.InstanceStatusIncomplete),
+		Status:             metav1.ConditionTrue,
+		ObservedGeneration: its.Generation,
+		Reason:             workloads.ReasonTemplateNameUnknown,
+		Message:            string(message),
+	})
 }

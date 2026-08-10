@@ -11675,12 +11675,35 @@ spec:
                         - name
                         type: object
                       type: array
+                    currentPodState:
+                      description: |-
+                        CurrentPodState describes the observed state of the Pod with PodName.
+                        An empty value from an older object is treated as Unknown.
+                      enum:
+                      - Present
+                      - Terminating
+                      - Absent
+                      type: string
+                    desiredState:
+                      description: |-
+                        DesiredState describes the state the InstanceSet controller expects for this instance.
+                        An empty value from an older object is treated as Active.
+                      enum:
+                      - Active
+                      - Offline
+                      - Released
+                      type: string
                     podName:
                       default: Unknown
                       description: Represents the name of the pod.
                       type: string
                     role:
                       description: Represents the role of the instance observed.
+                      type: string
+                    templateName:
+                      description: |-
+                        TemplateName is the instance template assigned to this instance.
+                        nil means that the template is unknown, while an empty string identifies the default template.
                       type: string
                     volumeExpansion:
                       description: Represents whether the instance is in volume expansion.
@@ -11689,10 +11712,13 @@ spec:
                   - podName
                   type: object
                 type: array
+                x-kubernetes-list-map-keys:
+                - podName
+                x-kubernetes-list-type: map
               observedGeneration:
                 description: |-
-                  observedGeneration is the most recent generation observed for this InstanceSet. It corresponds to the
-                  InstanceSet's generation, which is updated on mutation by the API Server.
+                  observedGeneration is the most recent generation for which revisions and the complete instance identity,
+                  desired-state, template, and current Pod view have been published. It does not imply that the Pods are Ready.
                 format: int64
                 type: integer
               readyInitReplicas:

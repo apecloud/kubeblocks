@@ -278,8 +278,8 @@ type InstanceSetSpec struct {
 
 // InstanceSetStatus defines the observed state of InstanceSet
 type InstanceSetStatus struct {
-	// observedGeneration is the most recent generation observed for this InstanceSet. It corresponds to the
-	// InstanceSet's generation, which is updated on mutation by the API Server.
+	// observedGeneration is the most recent generation for which revisions and the complete instance identity,
+	// desired-state, template, and current Pod view have been published. It does not imply that the Pods are Ready.
 	//
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
@@ -338,7 +338,11 @@ type InstanceSetStatus struct {
 	// Provides the status of each instance in the ITS.
 	//
 	// +optional
-	InstanceStatus []InstanceStatus `json:"instanceStatus,omitempty"`
+	// +patchMergeKey=podName
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=podName
+	InstanceStatus []InstanceStatus `json:"instanceStatus,omitempty" patchStrategy:"merge" patchMergeKey:"podName"`
 
 	// currentRevisions, if not empty, indicates the old version of the InstanceSet used to generate the underlying workload.
 	// key is the pod name, value is the revision.
@@ -574,6 +578,26 @@ type InstanceStatus struct {
 	// +kubebuilder:default=Unknown
 	PodName string `json:"podName"`
 
+	// TemplateName is the instance template assigned to this instance.
+	// nil means that the template is unknown, while an empty string identifies the default template.
+	//
+	// +optional
+	TemplateName *string `json:"templateName,omitempty"`
+
+	// DesiredState describes the state the InstanceSet controller expects for this instance.
+	// An empty value from an older object is treated as Active.
+	//
+	// +optional
+	// +kubebuilder:validation:Enum=Active;Offline;Released
+	DesiredState InstanceDesiredState `json:"desiredState,omitempty"`
+
+	// CurrentPodState describes the observed state of the Pod with PodName.
+	// An empty value from an older object is treated as Unknown.
+	//
+	// +optional
+	// +kubebuilder:validation:Enum=Present;Terminating;Absent
+	CurrentPodState CurrentPodState `json:"currentPodState,omitempty"`
+
 	// Represents the role of the instance observed.
 	//
 	// +optional
@@ -588,6 +612,39 @@ type InstanceStatus struct {
 	//
 	// +optional
 	VolumeExpansion bool `json:"volumeExpansion,omitempty"`
+}
+
+type InstanceDesiredState string
+
+const (
+	InstanceDesiredStateActive   InstanceDesiredState = "Active"
+	InstanceDesiredStateOffline  InstanceDesiredState = "Offline"
+	InstanceDesiredStateReleased InstanceDesiredState = "Released"
+)
+
+type CurrentPodState string
+
+const (
+	CurrentPodStateUnknown     CurrentPodState = "Unknown"
+	CurrentPodStatePresent     CurrentPodState = "Present"
+	CurrentPodStateTerminating CurrentPodState = "Terminating"
+	CurrentPodStateAbsent      CurrentPodState = "Absent"
+)
+
+// EffectiveDesiredState returns the backward-compatible desired state.
+func (s *InstanceStatus) EffectiveDesiredState() InstanceDesiredState {
+	if s == nil || s.DesiredState == "" {
+		return InstanceDesiredStateActive
+	}
+	return s.DesiredState
+}
+
+// EffectiveCurrentPodState returns the backward-compatible current Pod state.
+func (s *InstanceStatus) EffectiveCurrentPodState() CurrentPodState {
+	if s == nil || s.CurrentPodState == "" {
+		return CurrentPodStateUnknown
+	}
+	return s.CurrentPodState
 }
 
 type InstanceConfigStatus struct {
@@ -650,6 +707,9 @@ const (
 	// InstanceUpdateRestricted represents a ConditionType that indicates updates to an InstanceSet are blocked(when the
 	// PodUpdatePolicy is set to StrictInPlace but the pods cannot be updated in-place).
 	InstanceUpdateRestricted ConditionType = "InstanceUpdateRestricted"
+
+	// InstanceStatusIncomplete indicates that retained historical instances have unknown template assignments.
+	InstanceStatusIncomplete ConditionType = "InstanceStatusIncomplete"
 )
 
 const (
@@ -679,6 +739,9 @@ const (
 
 	// ReasonInstanceUpdateRestricted is a reason for condition InstanceUpdateRestricted.
 	ReasonInstanceUpdateRestricted = "InstanceUpdateRestricted"
+
+	// ReasonTemplateNameUnknown indicates that a retained historical instance has no reliable template assignment.
+	ReasonTemplateNameUnknown = "TemplateNameUnknown"
 )
 
 // IsInstancesReady gives Instance level 'ready' state when all instances are available
@@ -729,10 +792,83 @@ func (r *InstanceSet) IsRoleProbeDone() bool {
 		replicas = 0
 	}
 	cnt := 0
-	for _, inst := range r.Status.InstanceStatus {
-		if len(inst.Role) > 0 {
+	for _, inst := range r.ActiveInstanceStatuses() {
+		if inst.EffectiveCurrentPodState() == CurrentPodStatePresent && len(inst.Role) > 0 {
 			cnt++
 		}
 	}
 	return cnt == replicas
+}
+
+// FindInstanceStatus returns the status entry for podName.
+func (r *InstanceSet) FindInstanceStatus(podName string) *InstanceStatus {
+	if r == nil {
+		return nil
+	}
+	for i := range r.Status.InstanceStatus {
+		if r.Status.InstanceStatus[i].PodName == podName {
+			return &r.Status.InstanceStatus[i]
+		}
+	}
+	return nil
+}
+
+// ActiveInstanceStatuses returns the allocated instances that should be online.
+func (r *InstanceSet) ActiveInstanceStatuses() []*InstanceStatus {
+	return r.instanceStatusesByDesiredState(InstanceDesiredStateActive)
+}
+
+// OfflineInstanceStatuses returns the allocated instances retained offline.
+func (r *InstanceSet) OfflineInstanceStatuses() []*InstanceStatus {
+	return r.instanceStatusesByDesiredState(InstanceDesiredStateOffline)
+}
+
+// RetainedInstanceStatuses returns all instances whose identity is retained by the InstanceSet.
+func (r *InstanceSet) RetainedInstanceStatuses() []*InstanceStatus {
+	if r == nil {
+		return nil
+	}
+	result := make([]*InstanceStatus, 0, len(r.Status.InstanceStatus))
+	for i := range r.Status.InstanceStatus {
+		status := &r.Status.InstanceStatus[i]
+		if desired := status.EffectiveDesiredState(); desired == InstanceDesiredStateActive || desired == InstanceDesiredStateOffline {
+			result = append(result, status)
+		}
+	}
+	return result
+}
+
+// PresentInstanceStatuses returns instances whose actual Pod currently exists and is not terminating.
+func (r *InstanceSet) PresentInstanceStatuses() []*InstanceStatus {
+	if r == nil {
+		return nil
+	}
+	result := make([]*InstanceStatus, 0, len(r.Status.InstanceStatus))
+	for i := range r.Status.InstanceStatus {
+		status := &r.Status.InstanceStatus[i]
+		if status.EffectiveCurrentPodState() == CurrentPodStatePresent {
+			result = append(result, status)
+		}
+	}
+	return result
+}
+
+// HasPresentPod reports whether podName currently identifies an existing, non-terminating Pod.
+func (r *InstanceSet) HasPresentPod(podName string) bool {
+	status := r.FindInstanceStatus(podName)
+	return status != nil && status.EffectiveCurrentPodState() == CurrentPodStatePresent
+}
+
+func (r *InstanceSet) instanceStatusesByDesiredState(desiredState InstanceDesiredState) []*InstanceStatus {
+	if r == nil {
+		return nil
+	}
+	result := make([]*InstanceStatus, 0, len(r.Status.InstanceStatus))
+	for i := range r.Status.InstanceStatus {
+		status := &r.Status.InstanceStatus[i]
+		if status.EffectiveDesiredState() == desiredState {
+			result = append(result, status)
+		}
+	}
+	return result
 }

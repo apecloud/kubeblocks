@@ -122,9 +122,16 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kub
 		return kubebuilderx.Continue, err
 	}
 	its.Status.UpdatedReplicas = updatedReplicas
-	// The 'ObservedGeneration' field is used to indicate whether the revisions have been updated.
-	// Computing these revisions in each reconciliation loop can be time-consuming, so we optimize it by
-	// performing the computation only when the 'spec' is updated.
+	pods := tree.List(&corev1.Pod{})
+	podList := make([]*corev1.Pod, 0, len(pods))
+	for _, object := range pods {
+		pod, _ := object.(*corev1.Pod)
+		podList = append(podList, pod)
+	}
+	if err := setInstanceStatus(tree, its, podList); err != nil {
+		return kubebuilderx.Continue, err
+	}
+	// ObservedGeneration is advanced only after revisions and the complete instance identity view are published.
 	its.Status.ObservedGeneration = its.Generation
 
 	return kubebuilderx.Continue, nil

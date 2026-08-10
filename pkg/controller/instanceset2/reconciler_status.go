@@ -21,15 +21,18 @@ package instanceset2
 
 import (
 	"encoding/json"
+	"fmt"
 	"sort"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/instancesetstatus"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -46,7 +49,7 @@ type statusReconciler struct{}
 var _ kubebuilderx.Reconciler = &statusReconciler{}
 
 func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
-	if tree.GetRoot() == nil || !model.IsObjectStatusUpdating(tree.GetRoot()) {
+	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) {
 		return kubebuilderx.ConditionUnsatisfied
 	}
 	return kubebuilderx.ConditionSatisfied
@@ -60,6 +63,12 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	for _, object := range instances {
 		inst, _ := object.(*workloads.Instance)
 		instanceList = append(instanceList, inst)
+	}
+	pods := tree.List(&corev1.Pod{})
+	var podList []*corev1.Pod
+	for _, object := range pods {
+		pod, _ := object.(*corev1.Pod)
+		podList = append(podList, pod)
 	}
 
 	replicas := int32(0)
@@ -164,7 +173,9 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 
 	// 4. set instance status
-	setInstanceStatus(its, instanceList)
+	if err := setInstanceStatus(tree, its, instanceList, podList); err != nil {
+		return kubebuilderx.Continue, err
+	}
 
 	if its.Spec.MinReadySeconds > 0 && availableReplicas != readyReplicas {
 		return kubebuilderx.RetryAfter(time.Second), nil
@@ -264,73 +275,112 @@ func buildFailureCondition(its *workloads.InstanceSet, instances []*workloads.In
 	}, nil
 }
 
-func setInstanceStatus(its *workloads.InstanceSet, instances []*workloads.Instance) {
-	// compose new instance status
-	instanceStatus := make([]workloads.InstanceStatus, 0)
+func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, instances []*workloads.Instance, pods []*corev1.Pod) error {
+	active, templateNames, err := instancesetstatus.BuildActiveAllocations(tree, its)
+	if err != nil {
+		return err
+	}
+	offline := append([]string(nil), its.Spec.OfflineInstances...)
+	hints := make([]instancesetstatus.Allocation, 0, len(active)+len(instances)+len(pods)+len(offline))
+	if its.Spec.Stop != nil && *its.Spec.Stop {
+		for _, allocation := range active {
+			offline = append(offline, allocation.PodName)
+			hints = append(hints, allocation)
+		}
+		active = nil
+	}
+
+	observations := make([]instancesetstatus.PodObservation, 0, len(pods))
+	for _, pod := range pods {
+		state := workloads.CurrentPodStatePresent
+		if !pod.DeletionTimestamp.IsZero() {
+			state = workloads.CurrentPodStateTerminating
+		}
+		observations = append(observations, instancesetstatus.PodObservation{PodName: pod.Name, State: state})
+		if templateName, ok, err := instancesetstatus.TemplateNameFromLabels(pod.Labels); err != nil {
+			return fmt.Errorf("pod %q: %w", pod.Name, err)
+		} else if ok {
+			hints = append(hints, instancesetstatus.Allocation{PodName: pod.Name, TemplateName: templateName})
+		}
+	}
+
+	runtime := make(map[string]instancesetstatus.RuntimeStatus, len(instances))
+	seenInstances := make(map[string]struct{}, len(instances))
 	for _, inst := range instances {
-		status := workloads.InstanceStatus{
-			PodName: inst.Name,
+		if _, ok := seenInstances[inst.Name]; ok {
+			return fmt.Errorf("duplicate Instance object for %q", inst.Name)
 		}
-		instanceStatus = append(instanceStatus, status)
-	}
-
-	syncMemberStatus(its, instanceStatus, instances)
-
-	syncInstanceConfigStatus(instanceStatus, instances)
-
-	syncInstancePVCStatus(its, instanceStatus, instances)
-
-	sortInstanceStatus(instanceStatus)
-	its.Status.InstanceStatus = instanceStatus
-}
-
-func sortInstanceStatus(instanceStatus []workloads.InstanceStatus) {
-	getNameNOrdinalFunc := func(i int) (string, int) {
-		return parseParentNameAndOrdinal(instanceStatus[i].PodName)
-	}
-	baseSort(instanceStatus, getNameNOrdinalFunc, nil, true)
-}
-
-func syncMemberStatus(its *workloads.InstanceSet, instanceStatus []workloads.InstanceStatus, instances []*workloads.Instance) {
-	if its.Spec.Roles != nil {
-		roleMap := composeRoleMap(*its)
-		for _, inst := range instances {
-			if !intctrlutil.IsInstanceReadyWithRole(inst) {
-				continue
-			}
-			roleName := getInstanceRoleName(inst)
-			role, ok := roleMap[roleName]
-			if !ok {
-				continue
-			}
-			for i, status := range instanceStatus {
-				if status.PodName == inst.Name {
-					instanceStatus[i].Role = role.Name
-					break
-				}
+		seenInstances[inst.Name] = struct{}{}
+		hints = append(hints, instancesetstatus.Allocation{PodName: inst.Name, TemplateName: inst.Spec.InstanceTemplateName})
+		if templateName, ok, err := instancesetstatus.TemplateNameFromLabels(inst.Labels); err != nil {
+			return fmt.Errorf("instance %q: %w", inst.Name, err)
+		} else if ok {
+			hints = append(hints, instancesetstatus.Allocation{PodName: inst.Name, TemplateName: templateName})
+		}
+		if !podIsPresent(observations, inst.Name) {
+			continue
+		}
+		status := instancesetstatus.RuntimeStatus{Configs: inst.Status.Configs, VolumeExpansion: inst.Status.VolumeExpansion}
+		if intctrlutil.IsInstanceReadyWithRole(inst) {
+			if role, ok := composeRoleMap(*its)[getInstanceRoleName(inst)]; ok {
+				status.Role = role.Name
 			}
 		}
+		runtime[inst.Name] = status
 	}
-}
 
-func syncInstanceConfigStatus(instanceStatus []workloads.InstanceStatus, instances []*workloads.Instance) {
-	for _, inst := range instances {
-		for i, status := range instanceStatus {
-			if status.PodName == inst.Name {
-				instanceStatus[i].Configs = inst.Status.Configs
-				break
-			}
+	for _, name := range append(append([]string(nil), offline...), observationNames(observations)...) {
+		if templateName, ok, err := instancesetstatus.HistoricalTemplateHint(its, name, templateNames); err != nil {
+			return err
+		} else if ok {
+			hints = append(hints, instancesetstatus.Allocation{PodName: name, TemplateName: templateName})
 		}
 	}
+
+	result, err := instancesetstatus.Build(instancesetstatus.BuildInput{
+		Previous:      its.Status.InstanceStatus,
+		Active:        active,
+		Offline:       offline,
+		Pods:          observations,
+		TemplateHints: hints,
+		Runtime:       runtime,
+	})
+	if err != nil {
+		return err
+	}
+	its.Status.InstanceStatus = result.Statuses
+	setIncompleteInstanceStatusCondition(its, result.UnknownTemplateNames)
+	return nil
 }
 
-func syncInstancePVCStatus(_ *workloads.InstanceSet, instanceStatus []workloads.InstanceStatus, instances []*workloads.Instance) {
-	for _, inst := range instances {
-		for i, status := range instanceStatus {
-			if status.PodName == inst.Name {
-				instanceStatus[i].VolumeExpansion = inst.Status.VolumeExpansion
-				break
-			}
+func podIsPresent(observations []instancesetstatus.PodObservation, name string) bool {
+	for _, observation := range observations {
+		if observation.PodName == name {
+			return observation.State == workloads.CurrentPodStatePresent
 		}
 	}
+	return false
+}
+
+func observationNames(observations []instancesetstatus.PodObservation) []string {
+	names := make([]string, 0, len(observations))
+	for _, observation := range observations {
+		names = append(names, observation.PodName)
+	}
+	return names
+}
+
+func setIncompleteInstanceStatusCondition(its *workloads.InstanceSet, names []string) {
+	if len(names) == 0 {
+		meta.RemoveStatusCondition(&its.Status.Conditions, string(workloads.InstanceStatusIncomplete))
+		return
+	}
+	message, _ := json.Marshal(names)
+	meta.SetStatusCondition(&its.Status.Conditions, metav1.Condition{
+		Type:               string(workloads.InstanceStatusIncomplete),
+		Status:             metav1.ConditionTrue,
+		ObservedGeneration: its.Generation,
+		Reason:             workloads.ReasonTemplateNameUnknown,
+		Message:            string(message),
+	})
 }

@@ -47,6 +47,9 @@ func (s *defaultNameBuilder) BuildInstanceName2TemplateMap() (map[string]*Instan
 			return nil, err
 		}
 		for _, name := range instanceNames {
+			if existing, ok := allNameTemplateMap[name]; ok {
+				return nil, fmt.Errorf("instance name %q is allocated by both templates %q and %q", name, existing.Name, template.Name)
+			}
 			allNameTemplateMap[name] = template
 		}
 	}

@@ -1,3 +1,4 @@
+{{- if .Values.serviceMonitor.enabled }}
 apiVersion: v1
 kind: Service
 metadata:
@@ -9,22 +10,14 @@ metadata:
 spec:
   type: {{ .Values.service.type }}
   ports:
-    - port: {{ .Values.service.port }}
-      targetPort: webhook-server
-      protocol: TCP
-      name: webhook-server
-      {{- if and (eq .Values.service.type "NodePort") (not (empty .Values.service.nodePort)) }}
-      nodePort: {{ .Values.service.nodePort }}
-      {{- end }}
-    {{- if .Values.serviceMonitor.enabled }}
     - port: {{ .Values.serviceMonitor.port }}
       targetPort: metrics
       protocol: TCP
       name: metrics
-      {{- if and (eq .Values.serviceMonitor.type "NodePort") (not (empty .Values.serviceMonitor.nodePort)) }}
+      {{- if and (eq .Values.service.type "NodePort") (not (empty .Values.serviceMonitor.nodePort)) }}
       nodePort: {{ .Values.serviceMonitor.nodePort }}
       {{- end }}
-    {{- end }}
   selector:
     app.kubernetes.io/component: "apps"
     {{- include "kubeblocks.selectorLabels" . | nindent 4 }}
+{{- end }}

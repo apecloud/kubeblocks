@@ -28,7 +28,6 @@ import (
 	"strconv"
 	"strings"
 
-	vsv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -1707,29 +1706,19 @@ func (r *VolumePopulatorReconciler) getPopulatePVC(reqCtx intctrlutil.RequestCtx
 		}
 
 		if backupSet.UseVolumeSnapshot {
-			// TODO: will be removed in 0.10.0, compatibility handling for version 0.8.
 			prepareDataConfig := restore.Spec.PrepareDataConfig
-			vsName := utils.GetOldBackupVolumeSnapshotName(backupSet.Backup.Name, prepareDataConfig.DataSourceRef.VolumeSource)
-			vsCli := utils.NewCompatClient(r.Client)
-			exist, err := intctrlutil.CheckResourceExists(reqCtx.Ctx, vsCli,
-				types.NamespacedName{Namespace: backupSet.Backup.Namespace, Name: vsName},
-				&vsv1.VolumeSnapshot{})
+			sourceTargetPodName, err := dprestore.GetSourcePodNameFromTarget(target, prepareDataConfig.RequiredPolicyForAllPodSelection, 0)
 			if err != nil {
 				return nil, err
 			}
-			if !exist {
-				sourceTargetPodName, err := dprestore.GetSourcePodNameFromTarget(target, prepareDataConfig.RequiredPolicyForAllPodSelection, 0)
-				if err != nil {
-					return nil, err
+			var vsName string
+			if target.PodSelector.Strategy == dpv1alpha1.PodSelectionStrategyAny || sourceTargetPodName != "" {
+				snapshotGroup := dprestore.GetVolumeSnapshotsBySourcePod(backupSet.Backup, target, sourceTargetPodName)
+				if snapshotGroup == nil {
+					message := fmt.Sprintf(`can not found the volumeSnapshot in status.actions, sourceTargetPod is "%s"`, sourceTargetPodName)
+					return nil, intctrlutil.NewFatalError(message)
 				}
-				if target.PodSelector.Strategy == dpv1alpha1.PodSelectionStrategyAny || sourceTargetPodName != "" {
-					snapshotGroup := dprestore.GetVolumeSnapshotsBySourcePod(backupSet.Backup, target, sourceTargetPodName)
-					if snapshotGroup == nil {
-						message := fmt.Sprintf(`can not found the volumeSnapshot in status.actions, sourceTargetPod is "%s"`, sourceTargetPodName)
-						return nil, intctrlutil.NewFatalError(message)
-					}
-					vsName = snapshotGroup[prepareDataConfig.DataSourceRef.VolumeSource]
-				}
+				vsName = snapshotGroup[prepareDataConfig.DataSourceRef.VolumeSource]
 			}
 			// restore from volume snapshot.
 			populatePVC.Spec.DataSourceRef = &corev1.TypedObjectReference{
@@ -2217,9 +2206,9 @@ func (r *VolumePopulatorReconciler) restoreSystemAccountSecrets(reqCtx intctrlut
 	encryptor := intctrlutil.NewEncryptor(viper.GetString(constant.CfgKeyDPEncryptionKey))
 	if componentName != "" {
 		labels := map[string]string{
-			constant.AppInstanceLabelKey:        clusterName,
-			constant.KBAppComponentLabelKey:     componentName,
-			"apps.kubeblocks.io/system-account": "",
+			constant.AppInstanceLabelKey:    clusterName,
+			constant.KBAppComponentLabelKey: componentName,
+			constant.SystemAccountLabelKey:  "",
 		}
 		if err := r.restoreSystemAccountSecretSet(reqCtx, pvc, encryptor, accountsByComponent[componentName],
 			systemAccountSecretScopeComponent, clusterName, componentName, labels); err != nil {
@@ -2228,9 +2217,9 @@ func (r *VolumePopulatorReconciler) restoreSystemAccountSecrets(reqCtx intctrlut
 	}
 	if shardingName := pvc.Labels[constant.KBAppShardingNameLabelKey]; shardingName != "" {
 		labels := map[string]string{
-			constant.AppInstanceLabelKey:        clusterName,
-			constant.KBAppShardingNameLabelKey:  shardingName,
-			"apps.kubeblocks.io/system-account": "",
+			constant.AppInstanceLabelKey:       clusterName,
+			constant.KBAppShardingNameLabelKey: shardingName,
+			constant.SystemAccountLabelKey:     "",
 		}
 		if err := r.restoreSystemAccountSecretSet(reqCtx, pvc, encryptor, accountsByComponent[shardingName],
 			systemAccountSecretScopeSharding, clusterName, shardingName, labels); err != nil {
@@ -2262,7 +2251,7 @@ func (r *VolumePopulatorReconciler) restoreSystemAccountSecretSet(reqCtx intctrl
 			return intctrlutil.NewFatalError(err.Error())
 		}
 		accountLabels := mapsClone(labels)
-		accountLabels["apps.kubeblocks.io/system-account"] = accountName
+		accountLabels[constant.SystemAccountLabelKey] = accountName
 		if err = r.upsertSystemAccountSecret(reqCtx, pvc, scope, clusterName, ownerName, accountName, []byte(password), accountLabels); err != nil {
 			return err
 		}

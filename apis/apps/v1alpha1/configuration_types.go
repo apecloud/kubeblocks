@@ -42,11 +42,6 @@ type ConfigurationItemDetail struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Name string `json:"name"`
 
-	// Deprecated: No longer used. Please use 'Payload' instead. Previously represented the version of the configuration template.
-	//
-	// +optional
-	Version string `json:"version,omitempty"`
-
 	// External controllers can trigger a configuration rerender by modifying this field.
 	//
 	// Note: Currently, the `payload` field is opaque and its content is not interpreted by the system.

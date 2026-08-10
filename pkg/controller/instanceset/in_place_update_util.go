@@ -302,12 +302,7 @@ func safeMetadataOnlyInPlaceUpdate(old, new *corev1.Pod) bool {
 // revision state; already-completed init containers are not re-run, so any
 // init-time copied tools refresh on the next natural Pod recreation.
 func safeKBManagedImageOnlyInPlaceUpdate(old, new *corev1.Pod) bool {
-	initChanged, ok := intctrlutil.OnlyKBManagedContainerImageChanged(old.Spec.InitContainers, new.Spec.InitContainers)
-	if !ok {
-		return false
-	}
-	containerChanged, ok := intctrlutil.OnlyKBManagedContainerImageChanged(old.Spec.Containers, new.Spec.Containers)
-	if !ok || (!initChanged && !containerChanged) {
+	if !intctrlutil.OnlyKBManagedPodImagesChanged(old, new) {
 		return false
 	}
 

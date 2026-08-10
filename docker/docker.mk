@@ -56,7 +56,6 @@ BUILDX_PLATFORMS ?= linux/amd64,linux/arm64
 IMG ?= docker.io/apecloud/$(APP_NAME)
 TOOL_IMG ?= docker.io/apecloud/$(APP_NAME)-tools
 CLI_IMG ?= docker.io/apecloud/kbcli
-CHARTS_IMG ?= docker.io/apecloud/$(APP_NAME)-charts
 CLI_TAG ?= v$(CLI_VERSION)
 DATAPROTECTION_IMG ?= docker.io/apecloud/$(APP_NAME)-dataprotection
 
@@ -158,35 +157,6 @@ ifeq ($(TAG_LATEST), true)
 	$(DOCKER) buildx build . $(DOCKER_BUILD_ARGS) --file $(DOCKERFILE_DIR)/Dockerfile-tools --platform $(BUILDX_PLATFORMS) --tag ${TOOL_IMG}:latest --push
 else
 	$(DOCKER) buildx build . $(DOCKER_BUILD_ARGS) --file $(DOCKERFILE_DIR)/Dockerfile-tools --platform $(BUILDX_PLATFORMS) --tag ${TOOL_IMG}:${VERSION} --push
-endif
-endif
-
-.PHONY: build-charts-image
-build-charts-image: install-docker-buildx helm-package ## Build helm charts container image.
-ifneq ($(BUILDX_ENABLED), true)
-	$(DOCKER) build . $(DOCKER_BUILD_ARGS) --file $(DOCKERFILE_DIR)/Dockerfile-charts --tag ${CHARTS_IMG}:${VERSION} --tag ${CHARTS_IMG}:latest
-else
-ifeq ($(TAG_LATEST), true)
-	$(DOCKER) buildx build . $(DOCKER_BUILD_ARGS) --file $(DOCKERFILE_DIR)/Dockerfile-charts --platform $(BUILDX_PLATFORMS) --tag ${CHARTS_IMG}:latest
-else
-	$(DOCKER) buildx build . $(DOCKER_BUILD_ARGS) --file $(DOCKERFILE_DIR)/Dockerfile-charts --platform $(BUILDX_PLATFORMS) --tag ${CHARTS_IMG}:${VERSION}
-endif
-endif
-
-
-.PHONY: push-charts-image
-push-charts-image: install-docker-buildx helm-package ## Push helm charts container image.
-ifneq ($(BUILDX_ENABLED), true)
-ifeq ($(TAG_LATEST), true)
-	$(DOCKER) push ${CHARTS_IMG}:latest
-else
-	$(DOCKER) push ${CHARTS_IMG}:${VERSION}
-endif
-else
-ifeq ($(TAG_LATEST), true)
-	$(DOCKER) buildx build . $(DOCKER_BUILD_ARGS) --file $(DOCKERFILE_DIR)/Dockerfile-charts --platform $(BUILDX_PLATFORMS) --tag ${CHARTS_IMG}:latest --push
-else
-	$(DOCKER) buildx build . $(DOCKER_BUILD_ARGS) --file $(DOCKERFILE_DIR)/Dockerfile-charts --platform $(BUILDX_PLATFORMS) --tag ${CHARTS_IMG}:${VERSION} --push
 endif
 endif
 

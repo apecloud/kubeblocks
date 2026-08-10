@@ -30,7 +30,7 @@ import (
 )
 
 type Options struct {
-	NonBlocking                *bool
+	Rerun                      bool
 	TimeoutSeconds             *int32
 	RetryPolicy                *appsv1.RetryPolicy
 	Arguments                  [][]string

@@ -45,7 +45,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	// +kubebuilder:scaffold:imports
 
@@ -109,7 +108,6 @@ func init() {
 
 	viper.SetDefault(constant.CfgKeyCtrlrReconcileRetryDurationMS, 1000)
 	viper.SetDefault(constant.CfgKeyDataProtectionZeroResourceForUnset, true)
-	viper.SetDefault("CERT_DIR", "/tmp/k8s-webhook-server/serving-certs")
 	viper.SetDefault("VOLUMESNAPSHOT_API_BETA", false)
 	viper.SetDefault(constant.KBToolsImage, "apecloud/kubeblocks-tools:latest")
 	viper.SetDefault("KUBEBLOCKS_SERVICEACCOUNT_NAME", "kubeblocks")
@@ -242,10 +240,6 @@ func main() {
 		// after the manager stops then its usage might be unsafe.
 		LeaderElectionReleaseOnCancel: true,
 
-		WebhookServer: webhook.NewServer(webhook.Options{
-			Port:    9443,
-			CertDir: viper.GetString("cert_dir"),
-		}),
 		Client: client.Options{
 			Cache: &client.CacheOptions{
 				DisableFor: intctrlutil.GetUncachedObjects(),

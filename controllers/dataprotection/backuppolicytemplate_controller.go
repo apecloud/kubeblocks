@@ -18,8 +18,10 @@ package dataprotection
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
+	"slices"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
@@ -62,38 +64,41 @@ func (r *BackupPolicyTemplateReconciler) Reconcile(ctx context.Context, req reco
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	oldBPT := backupPolicyTemplate.DeepCopy()
-	if err := r.setComponentDefLabels(reqCtx, oldBPT, backupPolicyTemplate); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	err1 := r.setComponentDefStatus(reqCtx, backupPolicyTemplate)
+	err2 := r.validateAvailable(reqCtx, backupPolicyTemplate)
+	if !reflect.DeepEqual(oldBPT.Status, backupPolicyTemplate.Status) {
+		if err := r.Client.Status().Patch(reqCtx.Ctx, backupPolicyTemplate, client.MergeFrom(oldBPT)); err != nil {
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		}
 	}
-	if err := r.validateAvailable(reqCtx, oldBPT, backupPolicyTemplate); err != nil {
+	err := errors.Join(err1, err2)
+	if err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	return intctrlutil.Reconciled()
 }
 
-func (r *BackupPolicyTemplateReconciler) setComponentDefLabels(reqCtx intctrlutil.RequestCtx, oldBPT, bpt *dpv1alpha1.BackupPolicyTemplate) error {
+func (r *BackupPolicyTemplateReconciler) setComponentDefStatus(reqCtx intctrlutil.RequestCtx, bpt *dpv1alpha1.BackupPolicyTemplate) error {
 	compDefList := &appsv1.ComponentDefinitionList{}
 	if err := r.Client.List(reqCtx.Ctx, compDefList); err != nil {
 		return err
 	}
-	if bpt.Labels == nil {
-		bpt.Labels = map[string]string{}
-	}
+	newMatchedCompDefs := []string{}
 	for _, item := range compDefList.Items {
 		for _, compDef := range bpt.Spec.CompDefs {
-			// set componentDef labels
 			if component.PrefixOrRegexMatched(item.Name, compDef) {
-				bpt.Labels[item.Name] = item.Name
+				newMatchedCompDefs = append(newMatchedCompDefs, item.Name)
+				break
 			}
 		}
 	}
-	if !reflect.DeepEqual(oldBPT.Labels, bpt.Labels) {
-		return r.Client.Update(reqCtx.Ctx, bpt)
+	if !slices.Equal(newMatchedCompDefs, bpt.Status.MatchedCompDefs) {
+		bpt.Status.MatchedCompDefs = newMatchedCompDefs
 	}
 	return nil
 }
 
-func (r *BackupPolicyTemplateReconciler) validateAvailable(reqCtx intctrlutil.RequestCtx, oldBPT, bpt *dpv1alpha1.BackupPolicyTemplate) error {
+func (r *BackupPolicyTemplateReconciler) validateAvailable(reqCtx intctrlutil.RequestCtx, bpt *dpv1alpha1.BackupPolicyTemplate) error {
 	message := ""
 	backupMethodMap := map[string]*dpv1alpha1.ActionSet{}
 	actionSetNotFound := false
@@ -145,11 +150,6 @@ func (r *BackupPolicyTemplateReconciler) validateAvailable(reqCtx intctrlutil.Re
 		bpt.Status.Phase = dpv1alpha1.UnavailablePhase
 	} else {
 		bpt.Status.Phase = dpv1alpha1.AvailablePhase
-	}
-	if !reflect.DeepEqual(oldBPT.Status, bpt.Status) {
-		if err := r.Client.Status().Patch(reqCtx.Ctx, bpt, client.MergeFrom(oldBPT)); err != nil {
-			return err
-		}
 	}
 	if actionSetNotFound {
 		return fmt.Errorf("some ActionSets not found")

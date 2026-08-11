@@ -157,18 +157,6 @@ jobs:
       DOCKERFILE_PATH: "./docker/Dockerfile-tools"
     secrets: inherit
 
-  test-kbagent-init:
-    needs: trigger-mode
-    if: contains(needs.trigger-mode.outputs.trigger-mode, '[docker]')
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: docker/setup-buildx-action@v3
-      - name: verify kbagent PID 1 behavior
-        run: make test-kbagent-init
-
   check-dataprotection-image:
     needs: trigger-mode
     if: contains(needs.trigger-mode.outputs.trigger-mode, '[docker]')

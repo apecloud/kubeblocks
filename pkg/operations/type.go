@@ -111,10 +111,6 @@ type progressResource struct {
 	// checks if it needs to wait the component to complete.
 	// if only updates a part of pods, set it to false.
 	noWaitComponentCompleted bool
-	// lets ops types such as restart defer pod-level failure signals until the
-	// workload/component reaches a terminal failure state.
-	deferInstanceFailureToWorkloadPhase bool
-	componentPhase                      appsv1.ComponentPhase
 }
 
 // OpsRuntime abstracts the standard ops paths that only need workload/member views
@@ -133,9 +129,14 @@ type OpsRuntime interface {
 }
 
 type Workload interface {
+	Exists() bool
+	IsStatusObserved() bool
 	GetMinReadySeconds() int32
+	GetDesiredReplicas() int32
+	GetCurrentReplicas() int32
 	GetInstanceNameSet() sets.Set[string]
 	GetCurrentRevisionMap() map[string]string
+	GetUpdateRevisionMap() map[string]string
 	GetNotReadyInstanceNameSet() sets.Set[string]
 	GetNotAvailableInstanceNameSet() sets.Set[string]
 	GetFailedInstanceNameSet() sets.Set[string]
@@ -144,15 +145,11 @@ type Workload interface {
 type Instance interface {
 	GetName() string
 	GetComponentName() string
-	GetCreationTimestamp() metav1.Time
 	HasPod() bool
 	IsDeleting() bool
 	GetRole() string
 	IsAvailable(minReadySeconds int32, roleAware bool) bool
 	IsFailedAndTimedOut() bool
-	GetImage(containerName string) string
-	GetStatusImage(containerName string) string
-	GetResources(containerName string) corev1.ResourceRequirements
 	GetNodeName() string
 	GetTolerations() []corev1.Toleration
 	GetAffinity() *corev1.Affinity

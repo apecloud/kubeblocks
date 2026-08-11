@@ -255,15 +255,11 @@ var _ = Describe("Upgrade OpsRequest", func() {
 				g.Expect(ops.Status.LastConfiguration.Components[defaultCompName].ComponentDefinitionName).Should(Equal(compDef1.Name))
 			})).Should(Succeed())
 
-			By("the ops is expected to be Running when the component phase is in a terminal state but progress is not completed")
+			By("the ops succeeds from the current Cluster status without inspecting Pod images")
 			mockComponentIsOperating(opsRes.Cluster, appsv1.RunningComponentPhase, defaultCompName)
 			_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
-			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsRunningPhase))
-
-			By("expect upgrade successfully with the image that is provided in the specified componentDefinition")
-			mockPodsAppliedImage(opsRes.Cluster, release2)
-			expectOpsSucceed(reqCtx, opsRes, defaultCompName)
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsSucceedPhase))
 		})
 
 		It("Test upgrade OpsRequest with ComponentDef and ComponentVersion", func() {

@@ -53,6 +53,7 @@ func TestOpsRuntimeBuildsInstanceAPIView(t *testing.T) {
 		instanceName = "test-cluster-mysql-0"
 	)
 	enableInstanceAPI := true
+	replicas := int32(1)
 	its := &workloads.InstanceSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
@@ -61,10 +62,15 @@ func TestOpsRuntimeBuildsInstanceAPIView(t *testing.T) {
 		},
 		Spec: workloads.InstanceSetSpec{
 			MinReadySeconds: 15,
+			Replicas:        &replicas,
 		},
 		Status: workloads.InstanceSetStatus{
+			Replicas: 1,
 			CurrentRevisions: map[string]string{
 				instanceName: "rev-a",
+			},
+			UpdateRevisions: map[string]string{
+				instanceName: "rev-b",
 			},
 		},
 	}
@@ -191,8 +197,17 @@ func TestOpsRuntimeBuildsInstanceAPIView(t *testing.T) {
 	if workload.GetMinReadySeconds() != 15 {
 		t.Fatalf("unexpected minReadySeconds: %d", workload.GetMinReadySeconds())
 	}
+	if !workload.Exists() || !workload.IsStatusObserved() {
+		t.Fatal("expected an observed InstanceSet workload")
+	}
+	if workload.GetDesiredReplicas() != 1 || workload.GetCurrentReplicas() != 1 {
+		t.Fatalf("unexpected desired/current replicas: %d/%d", workload.GetDesiredReplicas(), workload.GetCurrentReplicas())
+	}
 	if got := workload.GetCurrentRevisionMap()[instanceName]; got != "rev-a" {
 		t.Fatalf("unexpected current revision: %s", got)
+	}
+	if got := workload.GetUpdateRevisionMap()[instanceName]; got != "rev-b" {
+		t.Fatalf("unexpected update revision: %s", got)
 	}
 
 	instance, err := rt.GetInstance(namespace, clusterName, component, instanceName)
@@ -201,24 +216,6 @@ func TestOpsRuntimeBuildsInstanceAPIView(t *testing.T) {
 	}
 	if instance.GetRole() != "leader" {
 		t.Fatalf("unexpected role: %s", instance.GetRole())
-	}
-	if instance.GetImage("mysql") != "mysql:8.0.36" {
-		t.Fatalf("unexpected image: %s", instance.GetImage("mysql"))
-	}
-	if instance.GetStatusImage("mysql") != "mysql@sha256:abc" {
-		t.Fatalf("unexpected status image: %s", instance.GetStatusImage("mysql"))
-	}
-	if instance.GetStatusImage("") != "mysql@sha256:abc" {
-		t.Fatalf("unexpected default status image: %s", instance.GetStatusImage(""))
-	}
-	if instance.GetStatusImage("missing") != "" {
-		t.Fatalf("expected empty missing status image")
-	}
-	if instance.GetImage("") != "mysql:8.0.36" {
-		t.Fatalf("unexpected default image: %s", instance.GetImage(""))
-	}
-	if instance.GetImage("missing") != "" {
-		t.Fatalf("expected empty missing image")
 	}
 	if instance.GetNodeName() != "node-a" {
 		t.Fatalf("unexpected node name: %s", instance.GetNodeName())
@@ -240,17 +237,6 @@ func TestOpsRuntimeBuildsInstanceAPIView(t *testing.T) {
 	}
 	if instance.GetVolumeMounts("missing") != nil {
 		t.Fatalf("expected nil missing container volume mounts")
-	}
-	resources := instance.GetResources("mysql")
-	if resources.Requests.Cpu().String() != "100m" {
-		t.Fatalf("unexpected resources")
-	}
-	if len(instance.GetResources("missing").Requests) != 0 {
-		t.Fatalf("expected empty missing container resources")
-	}
-	creationTimestamp := instance.GetCreationTimestamp()
-	if creationTimestamp.IsZero() {
-		t.Fatalf("expected creation timestamp")
 	}
 	if !instance.IsAvailable(15, true) {
 		t.Fatalf("expected instance to be available")
@@ -278,30 +264,65 @@ func TestOpsRuntimeBuildsInstanceAPIView(t *testing.T) {
 	}
 }
 
-func TestUpgradeInstanceImageAppliedIgnoresAbsentContainers(t *testing.T) {
-	instance := &defaultInstance{pod: &corev1.Pod{
-		Spec: corev1.PodSpec{Containers: []corev1.Container{{
-			Name:  "database",
-			Image: "example.com/database:2.0",
-		}}},
-		Status: corev1.PodStatus{ContainerStatuses: []corev1.ContainerStatus{{
-			Name:  "database",
-			Image: "example.com/database:2.0",
-		}}},
-	}}
-	expectContainers := []corev1.Container{
-		{Name: "database", Image: "example.com/database:2.0"},
-		{Name: "metrics", Image: "example.com/exporter:1.0"},
+func TestOpsRuntimeWorkloadMissingAndInvalidRevisionMap(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
 	}
-	handler := upgradeOpsHandler{}
+	if err := workloads.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	const (
+		namespace   = "default"
+		clusterName = "cluster"
+		component   = "mysql"
+	)
 
-	if !handler.instanceImageApplied(instance, expectContainers) {
-		t.Fatal("expected absent optional container to be ignored")
+	cli := fake.NewClientBuilder().WithScheme(scheme).Build()
+	rt := newOpsRuntime(context.Background(), cli, "")
+	workload, err := rt.GetWorkload(namespace, clusterName, component)
+	if err != nil {
+		t.Fatalf("get missing workload: %v", err)
+	}
+	if workload.Exists() || workload.IsStatusObserved() {
+		t.Fatal("missing InstanceSet must remain an unobserved workload")
 	}
 
-	instance.pod.Spec.Containers[0].Image = "example.com/database:1.0"
-	if handler.instanceImageApplied(instance, expectContainers) {
-		t.Fatal("expected an outdated existing container to be rejected")
+	its := &workloads.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      constant.GenerateClusterComponentName(clusterName, component),
+		},
+		Status: workloads.InstanceSetStatus{
+			CurrentRevisions: map[string]string{"zstd": "not-base64"},
+		},
+	}
+	cli = fake.NewClientBuilder().WithScheme(scheme).WithObjects(its).Build()
+	rt = newOpsRuntime(context.Background(), cli, "")
+	if _, err = rt.GetWorkload(namespace, clusterName, component); err == nil {
+		t.Fatal("expected invalid revision map to return an error")
+	}
+}
+
+func TestGetInstanceNamesFromCondition(t *testing.T) {
+	its := &workloads.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{Name: "cluster-mysql"},
+		Status: workloads.InstanceSetStatus{Conditions: []metav1.Condition{
+			{Type: string(workloads.InstanceReady), Status: metav1.ConditionFalse, Message: `["pod-0"]`},
+			{Type: string(workloads.InstanceFailure), Status: metav1.ConditionTrue, Message: `["pod-1"]`},
+		}},
+	}
+	notReady, err := getInstanceNamesFromCondition(its, workloads.InstanceReady, metav1.ConditionFalse)
+	if err != nil || !notReady.Has("pod-0") {
+		t.Fatalf("not-ready condition: names=%v err=%v", notReady, err)
+	}
+	failed, err := getInstanceNamesFromCondition(its, workloads.InstanceFailure, metav1.ConditionTrue)
+	if err != nil || !failed.Has("pod-1") {
+		t.Fatalf("failure condition: names=%v err=%v", failed, err)
+	}
+	its.Status.Conditions[0].Message = "not-json"
+	if _, err = getInstanceNamesFromCondition(its, workloads.InstanceReady, metav1.ConditionFalse); err == nil {
+		t.Fatal("expected an invalid condition message to return an error")
 	}
 }
 
@@ -312,10 +333,6 @@ func TestDefaultInstanceAndVolumeNilBranches(t *testing.T) {
 	}
 	if instance.GetName() != "missing" {
 		t.Fatalf("unexpected instance name: %s", instance.GetName())
-	}
-	creationTimestamp := instance.GetCreationTimestamp()
-	if !creationTimestamp.IsZero() {
-		t.Fatalf("expected zero creation timestamp")
 	}
 	if instance.IsDeleting() {
 		t.Fatalf("nil pod should not be deleting")

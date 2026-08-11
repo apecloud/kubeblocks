@@ -268,8 +268,34 @@ func mockComponentIsOperating(cluster *appsv1.Cluster, expectPhase appsv1.Compon
 		for _, v := range compNames {
 			compStatus := cluster.Status.Components[v]
 			compStatus.Phase = expectPhase
+			compStatus.ObservedGeneration = cluster.Generation
+			compStatus.UpToDate = true
 			cluster.Status.Components[v] = compStatus
 		}
+	})).Should(Succeed())
+}
+
+func mockRollingRevisionStatus(cluster *appsv1.Cluster, compName, targetRevision string, appliedNames ...string) {
+	testapps.MockInstanceSetStatus(testCtx, cluster, compName)
+	its := &workloads.InstanceSet{}
+	key := client.ObjectKey{
+		Namespace: cluster.Namespace,
+		Name:      constant.GenerateClusterComponentName(cluster.Name, compName),
+	}
+	Expect(k8sClient.Get(ctx, key, its)).Should(Succeed())
+	applied := map[string]struct{}{}
+	for _, name := range appliedNames {
+		applied[name] = struct{}{}
+	}
+	Expect(testapps.ChangeObjStatus(&testCtx, its, func() {
+		for name := range its.Status.UpdateRevisions {
+			its.Status.UpdateRevisions[name] = targetRevision
+			its.Status.CurrentRevisions[name] = "previous-revision"
+			if _, ok := applied[name]; ok {
+				its.Status.CurrentRevisions[name] = targetRevision
+			}
+		}
+		its.Status.ObservedGeneration = its.Generation
 	})).Should(Succeed())
 }
 

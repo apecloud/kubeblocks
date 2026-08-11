@@ -83,6 +83,7 @@ var _ = Describe("Ops ProgressDetails", func() {
 		By("mock pod of InstanceSet updating by deleting the pod")
 		pod := pods[0]
 		testk8s.MockPodIsTerminating(ctx, testCtx, pod)
+		mockRollingRevisionStatus(opsRes.Cluster, defaultCompName, "restart-revision")
 		_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 		Expect(getProgressDetailStatus(opsRes, defaultCompName, pod)).Should(Equal(opsv1alpha1.ProcessingProgressStatus))
 
@@ -90,6 +91,7 @@ var _ = Describe("Ops ProgressDetails", func() {
 		testk8s.RemovePodFinalizer(ctx, testCtx, pod)
 		testapps.MockInstanceSetPod(&testCtx, nil, clusterName, defaultCompName,
 			pod.Name, "leader")
+		mockRollingRevisionStatus(opsRes.Cluster, defaultCompName, "restart-revision", pod.Name)
 
 		_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 		Expect(getProgressDetailStatus(opsRes, defaultCompName, pod)).Should(Equal(opsv1alpha1.SucceedProgressStatus))
@@ -101,6 +103,7 @@ var _ = Describe("Ops ProgressDetails", func() {
 			By("init operations resources ")
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
 			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
+			testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
 
 			By("create restart ops and pods of component")
 			opsRes.OpsRequest = createRestartOpsObj(clusterName, "restart-"+randomStr)

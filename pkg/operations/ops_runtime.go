@@ -21,11 +21,13 @@ package operations
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -100,26 +102,52 @@ func enabledMultiCluster(obj client.Object) bool {
 func (r *opsRuntime) GetWorkload(namespace, clusterName, compName string) (Workload, error) {
 	itsName := constant.GenerateClusterComponentName(clusterName, compName)
 	its := &workloads.InstanceSet{}
-	if err := r.cli.Get(r.ctx, client.ObjectKey{Name: itsName, Namespace: namespace}, its); err != nil && !apierrors.IsNotFound(err) {
-		return nil, err
+	if err := r.cli.Get(r.dataContext(), client.ObjectKey{Name: itsName, Namespace: namespace}, its, r.dataGetOpts...); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return nil, err
+		}
 	}
 	workload := &defaultWorkload{
 		currentRevisionMap: map[string]string{},
+		updateRevisionMap:  map[string]string{},
 		notReadySet:        sets.New[string](),
 		notAvailableSet:    sets.New[string](),
 		failedSet:          sets.New[string](),
 		instanceNames:      sets.New[string](),
 	}
 	if its.Name != "" {
-		currRevisionMap, _ := instanceset.GetRevisions(its.Status.CurrentRevisions)
+		currRevisionMap, err := instanceset.GetRevisions(its.Status.CurrentRevisions)
+		if err != nil {
+			return nil, fmt.Errorf("decode InstanceSet %s current revisions: %w", its.Name, err)
+		}
+		updateRevisionMap, err := instanceset.GetRevisions(its.Status.UpdateRevisions)
+		if err != nil {
+			return nil, fmt.Errorf("decode InstanceSet %s update revisions: %w", its.Name, err)
+		}
+		workload.exists = true
+		workload.statusObserved = its.Status.ObservedGeneration == its.Generation
 		workload.minReadySeconds = its.Spec.MinReadySeconds
+		if its.Spec.Replicas != nil {
+			workload.desiredReplicas = *its.Spec.Replicas
+		}
+		workload.currentReplicas = its.Status.Replicas
 		workload.currentRevisionMap = currRevisionMap
+		workload.updateRevisionMap = updateRevisionMap
 		workload.instanceNames = sets.KeySet(currRevisionMap)
-		workload.notReadySet = instanceset.GetPodNameSetFromInstanceSetCondition(its, workloads.InstanceReady)
-		workload.notAvailableSet = instanceset.GetPodNameSetFromInstanceSetCondition(its, workloads.InstanceAvailable)
-		workload.failedSet = instanceset.GetPodNameSetFromInstanceSetCondition(its, workloads.InstanceFailure)
+		if workload.notReadySet, err = getInstanceNamesFromCondition(its, workloads.InstanceReady, metav1.ConditionFalse); err != nil {
+			return nil, err
+		}
+		if workload.notAvailableSet, err = getInstanceNamesFromCondition(its, workloads.InstanceAvailable, metav1.ConditionFalse); err != nil {
+			return nil, err
+		}
+		if workload.failedSet, err = getInstanceNamesFromCondition(its, workloads.InstanceFailure, metav1.ConditionTrue); err != nil {
+			return nil, err
+		}
 		return workload, nil
 	}
+
+	// Keep the legacy Pod snapshot for non-rolling operations. Rolling operations
+	// check Exists first and therefore wait for the InstanceSet status contract.
 	pods, err := component.ListOwnedPods(r.dataContext(), r.cli, namespace, clusterName, compName, r.dataListOpts...)
 	if err != nil {
 		return nil, err
@@ -147,6 +175,20 @@ func (r *opsRuntime) GetWorkload(namespace, clusterName, compName string) (Workl
 		}
 	}
 	return workload, nil
+}
+
+func getInstanceNamesFromCondition(its *workloads.InstanceSet, conditionType workloads.ConditionType,
+	conditionStatus metav1.ConditionStatus) (sets.Set[string], error) {
+	result := sets.New[string]()
+	condition := meta.FindStatusCondition(its.Status.Conditions, string(conditionType))
+	if condition == nil || condition.Status != conditionStatus || condition.Message == "" {
+		return result, nil
+	}
+	var names []string
+	if err := json.Unmarshal([]byte(condition.Message), &names); err != nil {
+		return nil, fmt.Errorf("decode InstanceSet %s condition %s: %w", its.Name, conditionType, err)
+	}
+	return sets.New(names...), nil
 }
 
 func (r *opsRuntime) GetInstance(namespace, clusterName, compName, instanceName string) (Instance, error) {
@@ -348,17 +390,32 @@ func (r *opsRuntime) dataContext() context.Context {
 }
 
 type defaultWorkload struct {
+	exists             bool
+	statusObserved     bool
 	minReadySeconds    int32
+	desiredReplicas    int32
+	currentReplicas    int32
 	currentRevisionMap map[string]string
+	updateRevisionMap  map[string]string
 	notReadySet        sets.Set[string]
 	notAvailableSet    sets.Set[string]
 	failedSet          sets.Set[string]
 	instanceNames      sets.Set[string]
 }
 
+func (w *defaultWorkload) Exists() bool { return w.exists }
+
+func (w *defaultWorkload) IsStatusObserved() bool { return w.statusObserved }
+
 func (w *defaultWorkload) GetMinReadySeconds() int32 { return w.minReadySeconds }
 
+func (w *defaultWorkload) GetDesiredReplicas() int32 { return w.desiredReplicas }
+
+func (w *defaultWorkload) GetCurrentReplicas() int32 { return w.currentReplicas }
+
 func (w *defaultWorkload) GetCurrentRevisionMap() map[string]string { return w.currentRevisionMap }
+
+func (w *defaultWorkload) GetUpdateRevisionMap() map[string]string { return w.updateRevisionMap }
 
 func (w *defaultWorkload) GetNotReadyInstanceNameSet() sets.Set[string] {
 	return w.notReadySet.Clone()
@@ -384,13 +441,6 @@ type defaultInstance struct {
 func (i *defaultInstance) GetComponentName() string { return i.componentName }
 
 func (i *defaultInstance) GetName() string { return i.name }
-
-func (i *defaultInstance) GetCreationTimestamp() metav1.Time {
-	if i.pod == nil {
-		return metav1.Time{}
-	}
-	return i.pod.CreationTimestamp
-}
 
 func (i *defaultInstance) HasPod() bool {
 	return i.pod != nil
@@ -423,37 +473,6 @@ func (i *defaultInstance) IsFailedAndTimedOut() bool {
 	}
 	isFailed, isTimeout, _ := intctrlutil.IsPodFailedAndTimedOut(i.pod)
 	return isFailed && isTimeout
-}
-
-func (i *defaultInstance) GetImage(containerName string) string {
-	container := i.getContainer(containerName)
-	if container == nil {
-		return ""
-	}
-	return container.Image
-}
-
-func (i *defaultInstance) GetStatusImage(containerName string) string {
-	if i.pod == nil {
-		return ""
-	}
-	for _, status := range i.pod.Status.ContainerStatuses {
-		if status.Name == containerName {
-			return status.Image
-		}
-	}
-	if containerName == "" && len(i.pod.Status.ContainerStatuses) > 0 {
-		return i.pod.Status.ContainerStatuses[0].Image
-	}
-	return ""
-}
-
-func (i *defaultInstance) GetResources(containerName string) corev1.ResourceRequirements {
-	container := i.getContainer(containerName)
-	if container == nil {
-		return corev1.ResourceRequirements{}
-	}
-	return container.Resources
 }
 
 func (i *defaultInstance) GetNodeName() string {

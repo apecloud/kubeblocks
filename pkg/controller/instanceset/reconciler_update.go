@@ -178,6 +178,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			if err != nil {
 				return kubebuilderx.Continue, err
 			}
+			newInstance.pod, _ = podForDeferredKBAgentInitMigration(pod, newInstance.pod)
 			newPod := copyAndMerge(pod, newInstance.pod)
 			supportResizeSubResource, err := intctrlutil.SupportResizeSubResource()
 			if err != nil {

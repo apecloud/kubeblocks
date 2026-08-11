@@ -634,7 +634,79 @@ var _ = Describe("update reconciler test", func() {
 			Expect(spy.switchoverCalls).Should(Equal(0))
 		})
 
-		DescribeTable("keeps recreation policy for non-tools-image changes",
+		It("defers the custom-image init migration only for existing pods", func() {
+			oldToolsImage := viper.GetString(constant.KBToolsImage)
+			defer viper.Set(constant.KBToolsImage, oldToolsImage)
+			viper.Set(constant.KBToolsImage, "mirror.local/apecloud/kubeblocks-tools:1.1.0")
+
+			its.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
+			its.Spec.Replicas = ptr.To[int32](1)
+			its.Spec.PodUpdatePolicy = kbappsv1.ReCreatePodUpdatePolicyType
+			its.Spec.PodUpgradePolicy = kbappsv1.ReCreatePodUpdatePolicyType
+			its.Spec.Template.Spec.InitContainers = []corev1.Container{{
+				Name:    "init-kbagent",
+				Image:   "docker.io/apecloud/kubeblocks-tools:1.0.0",
+				Command: append([]string(nil), legacyKBAgentInitCopyCommand...),
+			}}
+			its.Spec.Template.Spec.Containers = []corev1.Container{
+				{Name: "app", Image: "mysql:8.0"},
+				{Name: "kbagent", Image: "custom-action:1.0", Command: []string{"/kubeblocks/kbagent"}},
+			}
+
+			tree := kubebuilderx.NewObjectTree()
+			tree.SetRoot(its)
+			prepareForUpdate(tree)
+			pods := tree.List(&corev1.Pod{})
+			Expect(pods).Should(HaveLen(1))
+			pod := pods[0].(*corev1.Pod)
+			pod.UID = "custom-image-pod-uid"
+			pod.Status.Phase = corev1.PodRunning
+			pod.Status.Conditions = append(pod.Status.Conditions, corev1.PodCondition{
+				Type:               corev1.PodReady,
+				Status:             corev1.ConditionTrue,
+				LastTransitionTime: metav1.NewTime(time.Now().Add(-1 * minReadySeconds * time.Second)),
+			})
+
+			its.Spec.Template.Spec.InitContainers[0].Image = "mirror.local/apecloud/kubeblocks-tools:1.1.0"
+			its.Spec.Template.Spec.InitContainers[0].Command = append([]string(nil), kbAgentInitCopyCommand...)
+			Expect(its.Spec.Template.Spec.InitContainers[0].Command).Should(Equal(kbAgentInitCopyCommand),
+				"the desired template must retain the new command")
+
+			reconciler := NewUpdateReconciler()
+			res, err := reconciler.Reconcile(tree)
+			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
+
+			postPods := tree.List(&corev1.Pod{})
+			Expect(postPods).Should(HaveLen(1))
+			livePod := postPods[0].(*corev1.Pod)
+			Expect(livePod.UID).Should(Equal(pod.UID), "the existing Pod must not be recreated")
+			Expect(livePod.Spec.InitContainers[0].Image).Should(Equal("docker.io/apecloud/kubeblocks-tools:1.0.0"))
+			Expect(livePod.Spec.InitContainers[0].Command).Should(Equal(legacyKBAgentInitCopyCommand),
+				"the existing Pod must keep the old image and command as one pair")
+
+			itsExt, err := buildInstanceSetExt(its, nil)
+			Expect(err).ShouldNot(HaveOccurred())
+			templates := buildInstanceTemplateExts(itsExt)
+			Expect(templates).Should(HaveLen(1))
+			replacement, err := buildInstanceByTemplate(pod.Name, templates[0], its, "")
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(replacement.pod.Spec.InitContainers[0].Image).Should(Equal("mirror.local/apecloud/kubeblocks-tools:1.1.0"))
+			Expect(replacement.pod.Spec.InitContainers[0].Command).Should(Equal(kbAgentInitCopyCommand),
+				"a recreated Pod must copy both kbagent and tini-static")
+
+			if its.Spec.Template.Annotations == nil {
+				its.Spec.Template.Annotations = map[string]string{}
+			}
+			its.Spec.Template.Annotations[constant.RestartAnnotationKey] = "2026-08-11T12:00:00Z"
+			_, err = NewRevisionUpdateReconciler().Reconcile(tree)
+			Expect(err).ShouldNot(HaveOccurred())
+			policy, _, err := getPodUpdatePolicy(its, livePod)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(policy).Should(Equal(recreatePolicy), "an explicit restart must still recreate the Pod")
+		})
+
+		DescribeTable("keeps recreation policy for revision and application image changes",
 			func(mutateTemplate func(*workloads.InstanceSet)) {
 				oldToolsImage := viper.GetString(constant.KBToolsImage)
 				defer viper.Set(constant.KBToolsImage, oldToolsImage)

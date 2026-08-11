@@ -70,6 +70,36 @@ var _ = Describe("instance util test", func() {
 			Expect(result.Spec.Containers[0].Resources.Limits).ShouldNot(HaveKey(corev1.ResourceCPU))
 			Expect(result.Spec.Containers[0].Resources.Limits).ShouldNot(HaveKey(corev1.ResourceMemory))
 		})
+
+		It("keeps the custom-image tini copy migration revision-compatible", func() {
+			oldTemplate := &corev1.PodTemplateSpec{Spec: corev1.PodSpec{
+				InitContainers: []corev1.Container{{
+					Name:    "init-kbagent",
+					Image:   "docker.io/apecloud/kubeblocks-tools:1.0.0",
+					Command: append([]string(nil), legacyKBAgentInitCopyCommand...),
+				}},
+				Containers: []corev1.Container{
+					{Name: "app", Image: "mysql:8.0"},
+					{Name: "kbagent", Image: "custom-action:1.0", Command: []string{"/kubeblocks/kbagent"}},
+				},
+			}}
+			newTemplate := oldTemplate.DeepCopy()
+			newTemplate.Spec.InitContainers[0].Image = "mirror.local/apecloud/kubeblocks-tools:1.1.0"
+			newTemplate.Spec.InitContainers[0].Command = append([]string(nil), kbAgentInitCopyCommand...)
+
+			oldFiltered := filterInPlaceFields(oldTemplate)
+			newFiltered := filterInPlaceFields(newTemplate)
+			Expect(newFiltered).Should(Equal(oldFiltered))
+			Expect(newTemplate.Spec.InitContainers[0].Command).Should(Equal(kbAgentInitCopyCommand),
+				"revision normalization must not modify the desired template")
+
+			parent := builder.NewInstanceSetBuilder(namespace, name).SetUID(uid).GetObject()
+			oldRevision, err := buildInstanceTemplateRevision(oldTemplate, parent, nil)
+			Expect(err).ShouldNot(HaveOccurred())
+			newRevision, err := buildInstanceTemplateRevision(newTemplate, parent, nil)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(newRevision).Should(Equal(oldRevision))
+		})
 	})
 
 	Context("mergeInPlaceFields & equalXFields", func() {
@@ -96,6 +126,44 @@ var _ = Describe("instance util test", func() {
 	})
 
 	Context("container image comparison", func() {
+		It("defers the custom-image init command and tools image as one pair", func() {
+			oldToolsImage := viper.GetString(constant.KBToolsImage)
+			defer viper.Set(constant.KBToolsImage, oldToolsImage)
+			viper.Set(constant.KBToolsImage, "docker.io/apecloud/kubeblocks-tools:1.0.0")
+
+			oldPod := &corev1.Pod{Spec: corev1.PodSpec{
+				InitContainers: []corev1.Container{{
+					Name:    "init-kbagent",
+					Image:   "docker.io/apecloud/kubeblocks-tools:1.0.0",
+					Command: append([]string(nil), legacyKBAgentInitCopyCommand...),
+				}},
+				Containers: []corev1.Container{
+					{Name: "app", Image: "mysql:8.0"},
+					{Name: "kbagent", Image: "custom-action:1.0", Command: []string{"/kubeblocks/kbagent"}},
+				},
+			}}
+			desiredPod := oldPod.DeepCopy()
+			desiredPod.Spec.InitContainers[0].Image = "mirror.local/apecloud/kubeblocks-tools:1.1.0"
+			desiredPod.Spec.InitContainers[0].Command = append([]string(nil), kbAgentInitCopyCommand...)
+
+			normalized, ok := podForDeferredKBAgentInitMigration(oldPod, desiredPod)
+			Expect(ok).Should(BeTrue())
+			Expect(normalized.Spec.InitContainers[0].Image).Should(Equal(oldPod.Spec.InitContainers[0].Image))
+			Expect(normalized.Spec.InitContainers[0].Command).Should(Equal(legacyKBAgentInitCopyCommand))
+			Expect(desiredPod.Spec.InitContainers[0].Image).Should(Equal("mirror.local/apecloud/kubeblocks-tools:1.1.0"))
+			Expect(desiredPod.Spec.InitContainers[0].Command).Should(Equal(kbAgentInitCopyCommand))
+
+			appUpgrade := desiredPod.DeepCopy()
+			appUpgrade.Spec.Containers[0].Image = "mysql:8.4"
+			_, ok = podForDeferredKBAgentInitMigration(oldPod, appUpgrade)
+			Expect(ok).Should(BeFalse(), "application image changes must not be deferred")
+
+			defaultImagePod := desiredPod.DeepCopy()
+			defaultImagePod.Spec.Containers[1].Command = []string{"/bin/kbagent"}
+			_, ok = podForDeferredKBAgentInitMigration(oldPod, defaultImagePod)
+			Expect(ok).Should(BeFalse(), "the compatibility path is only for custom-image workloads")
+		})
+
 		It("ignores registry rewrites but keeps tag, digest, and basename strict", func() {
 			oldPod := buildRandomPod()
 			newPod := oldPod.DeepCopy()

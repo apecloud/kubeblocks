@@ -20,8 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset
 
 import (
+	"fmt"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
@@ -82,5 +87,64 @@ var _ = Describe("revision update reconciler test", func() {
 			Expect(its.Status.InstanceStatusObservedGeneration).Should(Equal(int64(1)))
 			Expect(its.Status.InstanceStatus).Should(HaveLen(2))
 		})
+
+		It("preserves the published view and allows alignment during a transient flat ordinal reassignment", func() {
+			its = transientFlatReassignmentInstanceSet()
+			previous := its.DeepCopy().Status.InstanceStatus
+			tree := kubebuilderx.NewObjectTree()
+			tree.SetRoot(its)
+			for ordinal := 0; ordinal < 2; ordinal++ {
+				pod := builder.NewPodBuilder(its.Namespace, its.Name+fmt.Sprintf("-%d", ordinal)).GetObject()
+				pod.Status.Conditions = []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}}
+				Expect(tree.Add(pod)).Should(Succeed())
+			}
+
+			res, err := NewStatusReconciler().Reconcile(tree)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
+			Expect(its.Status.InstanceStatus).Should(Equal(previous))
+			Expect(its.Status.InstanceStatusObservedGeneration).Should(Equal(int64(1)))
+
+			res, err = NewRevisionUpdateReconciler().Reconcile(tree)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
+			Expect(its.Status.ObservedGeneration).Should(Equal(int64(1)))
+			Expect(its.Status.InstanceStatusObservedGeneration).Should(Equal(int64(1)))
+			Expect(its.Status.InstanceStatus).Should(Equal(previous))
+
+			res, err = NewReplicasAlignmentReconciler().Reconcile(tree)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
+			Expect(tree.List(&corev1.Pod{})).Should(HaveLen(1))
+		})
 	})
 })
+
+func transientFlatReassignmentInstanceSet() *workloads.InstanceSet {
+	replicas, templateReplicas := int32(2), int32(1)
+	templateA, templateB := "a", "b"
+	return &workloads.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default", Generation: 2},
+		Spec: workloads.InstanceSetSpec{
+			Replicas:            &replicas,
+			FlatInstanceOrdinal: true,
+			Template:            corev1.PodTemplateSpec{},
+			Instances: []workloads.InstanceTemplate{
+				{Name: templateA, Replicas: &templateReplicas, Ordinals: workloads.Ordinals{Discrete: []int32{1}}},
+				{Name: templateB, Replicas: &templateReplicas, Ordinals: workloads.Ordinals{Discrete: []int32{0}}},
+			},
+		},
+		Status: workloads.InstanceSetStatus{
+			ObservedGeneration:               1,
+			InstanceStatusObservedGeneration: 1,
+			AssignedOrdinals: map[string]workloads.Ordinals{
+				templateA: {Discrete: []int32{0}},
+				templateB: {Discrete: []int32{1}},
+			},
+			InstanceStatus: []workloads.InstanceStatus{
+				{PodName: "demo-0", TemplateName: &templateA, DesiredState: workloads.InstanceDesiredStateActive, CurrentState: workloads.InstanceCurrentStatePresent},
+				{PodName: "demo-1", TemplateName: &templateB, DesiredState: workloads.InstanceDesiredStateActive, CurrentState: workloads.InstanceCurrentStatePresent},
+			},
+		},
+	}
+}

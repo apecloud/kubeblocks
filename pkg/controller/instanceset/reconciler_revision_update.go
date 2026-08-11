@@ -28,6 +28,7 @@ import (
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/instancesetstatus"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -129,6 +130,9 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kub
 		podList = append(podList, pod)
 	}
 	if err := setInstanceStatus(tree, its, podList); err != nil {
+		if instancesetstatus.IsActiveAllocationIncomplete(err) {
+			return kubebuilderx.Continue, nil
+		}
 		return kubebuilderx.Continue, err
 	}
 	its.Status.ObservedGeneration = its.Generation

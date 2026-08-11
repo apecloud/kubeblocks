@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instancesetstatus
 
 import (
+	"errors"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -31,6 +32,31 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 )
+
+func TestBuildActiveAllocationsReportsTransientFlatOrdinalReassignment(t *testing.T) {
+	its := &workloads.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default"},
+		Spec: workloads.InstanceSetSpec{
+			Replicas:            ptr.To[int32](2),
+			FlatInstanceOrdinal: true,
+			Template:            corev1.PodTemplateSpec{},
+			Instances: []workloads.InstanceTemplate{
+				{Name: "a", Replicas: ptr.To[int32](1), Ordinals: workloads.Ordinals{Discrete: []int32{1}}},
+				{Name: "b", Replicas: ptr.To[int32](1), Ordinals: workloads.Ordinals{Discrete: []int32{0}}},
+			},
+		},
+		Status: workloads.InstanceSetStatus{AssignedOrdinals: map[string]workloads.Ordinals{
+			"a": {Discrete: []int32{0}},
+			"b": {Discrete: []int32{1}},
+		}},
+	}
+	tree := kubebuilderx.NewObjectTree()
+	tree.SetRoot(its)
+	_, _, err := BuildActiveAllocations(tree, its)
+	if !errors.Is(err, ErrActiveAllocationIncomplete) {
+		t.Fatalf("expected a temporary incomplete allocation, got %v", err)
+	}
+}
 
 func TestBuildActiveAllocationsUsesFlatOrdinalAssignment(t *testing.T) {
 	its := &workloads.InstanceSet{

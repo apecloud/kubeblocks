@@ -166,6 +166,9 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 
 	// 4. set instance status
 	if err := setInstanceStatus(tree, its, instanceList); err != nil {
+		if instancesetstatus.IsActiveAllocationIncomplete(err) {
+			return kubebuilderx.Continue, nil
+		}
 		return kubebuilderx.Continue, err
 	}
 

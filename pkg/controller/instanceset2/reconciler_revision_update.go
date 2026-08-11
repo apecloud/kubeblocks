@@ -23,6 +23,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/controller/instancesetstatus"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/revisionmap"
@@ -74,6 +75,9 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kub
 		instanceList = append(instanceList, instance)
 	}
 	if err := setInstanceStatus(tree, its, instanceList); err != nil {
+		if instancesetstatus.IsActiveAllocationIncomplete(err) {
+			return kubebuilderx.Continue, nil
+		}
 		return kubebuilderx.Continue, err
 	}
 

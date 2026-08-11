@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instancesetstatus
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 	"strconv"
@@ -30,6 +31,15 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 )
+
+// ErrActiveAllocationIncomplete indicates that the allocator has returned a temporary partial view while workload
+// reconciliation is releasing or moving instance names. Callers must not publish the partial view.
+var ErrActiveAllocationIncomplete = errors.New("active instance allocation is incomplete")
+
+// IsActiveAllocationIncomplete reports whether err represents a temporary partial allocation.
+func IsActiveAllocationIncomplete(err error) bool {
+	return errors.Is(err, ErrActiveAllocationIncomplete)
+}
 
 // BuildActiveAllocations obtains the authoritative active name-to-template view used by InstanceSet reconciliation.
 func BuildActiveAllocations(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet) ([]Allocation, []string, error) {
@@ -54,6 +64,9 @@ func BuildActiveAllocations(tree *kubebuilderx.ObjectTree, its *workloads.Instan
 		expected = *its.Spec.Replicas
 	}
 	if len(nameMap) != int(expected) {
+		if its.Spec.FlatInstanceOrdinal {
+			return nil, nil, fmt.Errorf("%w: expected %d names, got %d", ErrActiveAllocationIncomplete, expected, len(nameMap))
+		}
 		return nil, nil, fmt.Errorf("incomplete active instance allocation: expected %d names, got %d", expected, len(nameMap))
 	}
 

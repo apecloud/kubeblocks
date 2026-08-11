@@ -62,7 +62,7 @@ Create the name of the service account to use
 {{- end }}
 
 {{/*
-Create the name of the webhook service.
+Create the name of the metrics service.
 */}}
 {{- define "kubeblocks.svcName" -}}
 {{ include "kubeblocks.fullname" . }}

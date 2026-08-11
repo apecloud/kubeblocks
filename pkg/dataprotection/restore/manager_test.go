@@ -71,6 +71,7 @@ var _ = Describe("RestoreManager Test", func() {
 
 		// non-namespaced
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ActionSetSignature, true, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupRepoSignature, true, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.StorageClassSignature, true, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeSignature, true, ml)
 	}
@@ -92,6 +93,13 @@ var _ = Describe("RestoreManager Test", func() {
 		)
 
 		BeforeEach(func() {
+			By("create backup repo")
+			repo := testdp.NewBackupRepoFactory("", testdp.BackupRepoName).
+				SetStorageProviderRef(testdp.StorageProviderName).
+				Create(&testCtx).GetObject()
+			Expect(testapps.ChangeObjStatus(&testCtx, repo, func() {
+				repo.Status.BackupPVCName = testdp.BackupPVCName
+			})).Should(Succeed())
 
 			By("create actionSet")
 			actionSet = testapps.CreateCustomizedObj(&testCtx, "backup/actionset.yaml",
@@ -134,6 +142,7 @@ var _ = Describe("RestoreManager Test", func() {
 						start = &metav1.Time{Time: startTime}
 					}
 					backup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
+					backup.Status.BackupRepoName = testdp.BackupRepoName
 					backup.Status.PersistentVolumeClaimName = backupPVCName
 					testdp.MockBackupStatusTarget(backup, dpv1alpha1.PodSelectionStrategyAny)
 					if useVolumeSnapshotBackup {

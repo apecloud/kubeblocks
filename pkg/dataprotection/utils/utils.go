@@ -163,10 +163,6 @@ func GetBackupVolumeSnapshotName(backupName, volumeSource string, index int) str
 	return fmt.Sprintf("%s-%d-%s", backupName, index, volumeSource)
 }
 
-func GetOldBackupVolumeSnapshotName(backupName, volumeSource string) string {
-	return fmt.Sprintf("%s-%s", backupName, volumeSource)
-}
-
 // MergeEnv merges the targetEnv to original env. if original env exist the same name var, it will be replaced.
 func MergeEnv(originalEnv, targetEnv []corev1.EnvVar) []corev1.EnvVar {
 	if len(targetEnv) == 0 {

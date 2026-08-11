@@ -291,7 +291,6 @@ func TestBackupScheduleNameHelpers(t *testing.T) {
 	assert.Equal(t, "owneruid-schedule-namespace-full", GenerateCRNameByBackupSchedule(schedule, "full"))
 	assert.Equal(t, "owneruid-schedule-namespace-cron", GenerateCRNameByScheduleNameAndMethod(schedule, "full", "cron"))
 	assert.Equal(t, "owneruid-schedule-namespace-full", GenerateCRNameByScheduleNameAndMethod(schedule, "full", ""))
-	assert.Equal(t, "schedule-schedule-namespace-full", GenerateLegacyCRNameByBackupSchedule(schedule, "full"))
 	assert.Equal(t, "daily", GetSchedulePolicyByMethod(schedule, "full").Name)
 	assert.Nil(t, GetSchedulePolicyByMethod(schedule, "missing"))
 }

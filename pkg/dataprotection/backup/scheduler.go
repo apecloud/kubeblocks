@@ -333,18 +333,9 @@ func (s *Scheduler) generateBackupName(schedulePolicy *dpv1alpha1.SchedulePolicy
 func (s *Scheduler) getGenerateContinuousBackup(schedulePolicy *dpv1alpha1.SchedulePolicy) (*dpv1alpha1.Backup, error) {
 	backup := &dpv1alpha1.Backup{}
 	backupName := GenerateCRNameByBackupSchedule(s.BackupSchedule, schedulePolicy.BackupMethod)
-	exists, err := intctrlutil.CheckResourceExists(s.Ctx, s.Client, client.ObjectKey{Name: backupName,
+	_, err := intctrlutil.CheckResourceExists(s.Ctx, s.Client, client.ObjectKey{Name: backupName,
 		Namespace: s.BackupSchedule.Namespace}, backup)
 	if err != nil {
-		return nil, err
-	}
-	if exists {
-		return backup, nil
-	}
-	// if no backup found, check if existing legacy backup.
-	backupName = GenerateLegacyCRNameByBackupSchedule(s.BackupSchedule, schedulePolicy.BackupMethod)
-	if _, err = intctrlutil.CheckResourceExists(s.Ctx, s.Client, client.ObjectKey{Name: backupName,
-		Namespace: s.BackupSchedule.Namespace}, backup); err != nil {
 		return nil, err
 	}
 	return backup, nil

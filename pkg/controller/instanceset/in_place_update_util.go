@@ -35,6 +35,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/kbagent"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -48,7 +49,12 @@ const (
 
 var (
 	errTemplateNotFound = fmt.Errorf("no template found for pod")
+
+	legacyKBAgentInitCopyCommand = []string{"cp", "-r", "/bin/kbagent", "/kubeblocks/"}
+	kbAgentInitCopyCommand       = []string{"cp", "-r", "/bin/kbagent", "/bin/tini-static", "/kubeblocks/"}
 )
+
+const kbAgentCommandOnSharedMount = "/kubeblocks/kbagent"
 
 func supportPodVerticalScaling() bool {
 	return viper.GetBool(constant.FeatureGateInPlacePodVerticalScaling)
@@ -76,6 +82,7 @@ func filterInPlaceFields(src *corev1.PodTemplateSpec) *corev1.PodTemplateSpec {
 	for i := range template.Spec.InitContainers {
 		template.Spec.InitContainers[i].Image = ""
 	}
+	normalizeKBAgentInitCommandForRevision(template)
 	// filter spec.activeDeadlineSeconds
 	template.Spec.ActiveDeadlineSeconds = nil
 	// filter spec.tolerations
@@ -89,6 +96,71 @@ func filterInPlaceFields(src *corev1.PodTemplateSpec) *corev1.PodTemplateSpec {
 	}
 
 	return template
+}
+
+// normalizeKBAgentInitCommandForRevision keeps the one-time addition of tini-static
+// from changing existing custom-image Pod revisions. The actual InstanceSet template
+// remains untouched, so every newly created Pod uses the new copy command.
+func normalizeKBAgentInitCommandForRevision(template *corev1.PodTemplateSpec) {
+	if template == nil || !hasSharedKBAgentCommand(template.Spec.Containers) {
+		return
+	}
+	for i := range template.Spec.InitContainers {
+		initContainer := &template.Spec.InitContainers[i]
+		if initContainer.Name == kbagent.InitContainerName && reflect.DeepEqual(initContainer.Command, kbAgentInitCopyCommand) {
+			initContainer.Command = append([]string(nil), legacyKBAgentInitCopyCommand...)
+			return
+		}
+	}
+}
+
+func hasSharedKBAgentCommand(containers []corev1.Container) bool {
+	index := slices.IndexFunc(containers, func(container corev1.Container) bool {
+		return container.Name == kbagent.ContainerName
+	})
+	return index >= 0 && reflect.DeepEqual(containers[index].Command, []string{kbAgentCommandOnSharedMount})
+}
+
+// podForDeferredKBAgentInitMigration returns a desired Pod view that retains the
+// live init-kbagent image and command. This lets existing custom-image Pods keep
+// running without applying an immutable init command change, while the real
+// InstanceSet template stays on the new image and two-file copy command.
+func podForDeferredKBAgentInitMigration(old, desired *corev1.Pod) (*corev1.Pod, bool) {
+	if old == nil || desired == nil ||
+		!hasSharedKBAgentCommand(old.Spec.Containers) || !hasSharedKBAgentCommand(desired.Spec.Containers) {
+		return desired, false
+	}
+	oldIndex := slices.IndexFunc(old.Spec.InitContainers, func(container corev1.Container) bool {
+		return container.Name == kbagent.InitContainerName
+	})
+	desiredIndex := slices.IndexFunc(desired.Spec.InitContainers, func(container corev1.Container) bool {
+		return container.Name == kbagent.InitContainerName
+	})
+	if oldIndex < 0 || desiredIndex < 0 {
+		return desired, false
+	}
+	oldInit := &old.Spec.InitContainers[oldIndex]
+	desiredInit := &desired.Spec.InitContainers[desiredIndex]
+	if !reflect.DeepEqual(oldInit.Command, legacyKBAgentInitCopyCommand) ||
+		!reflect.DeepEqual(desiredInit.Command, kbAgentInitCopyCommand) {
+		return desired, false
+	}
+
+	// If the image also changed, it must be a KB-managed tools image update.
+	// Normalize the command first so the existing image-only classifier can
+	// validate that no application image is being deferred.
+	if !intctrlutil.EqualContainerImageInSpec(oldInit.Image, desiredInit.Image) {
+		commandNormalized := desired.DeepCopy()
+		commandNormalized.Spec.InitContainers[desiredIndex].Command = append([]string(nil), oldInit.Command...)
+		if !intctrlutil.OnlyKBManagedPodImagesChanged(old, commandNormalized) {
+			return desired, false
+		}
+	}
+
+	normalized := desired.DeepCopy()
+	normalized.Spec.InitContainers[desiredIndex].Image = oldInit.Image
+	normalized.Spec.InitContainers[desiredIndex].Command = append([]string(nil), oldInit.Command...)
+	return normalized, true
 }
 
 func copyRequestsNLimitsFields(container *corev1.Container) (corev1.ResourceList, corev1.ResourceList) {
@@ -386,6 +458,7 @@ func getPodUpdatePolicy(its *workloads.InstanceSet, pod *corev1.Pod) (podUpdateP
 	if err != nil {
 		return noOpsPolicy, "", "", err
 	}
+	newPod, _ = podForDeferredKBAgentInitMigration(pod, newPod)
 
 	specUpdatePolicy := getPodUpdatePolicyInSpec(its, pod, newPod)
 	if getPodRevision(pod) != updateRevisions[pod.Name] && getPodRevision(pod) != proposedRevisions[pod.Name] {

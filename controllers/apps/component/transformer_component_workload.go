@@ -239,7 +239,6 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet, legacyConfigManagerP
 	// Preserve the legacy config-manager only for existing workloads that still have it in their live template.
 	// This avoids an upgrade-only template diff from forcing all old Pods to restart after config-manager moved to kbagent.
 	preserveLegacyConfigManagerPodSpec(oldITS, itsProto, itsObjCopy, legacyConfigManagerPolicy)
-	preserveLegacyKBAgentInitCommand(oldITS, itsProto, itsObjCopy)
 	itsObjCopy.Spec.Replicas = itsProto.Spec.Replicas
 	itsObjCopy.Spec.Roles = itsProto.Spec.Roles
 	itsObjCopy.Spec.LifecycleActions = itsProto.Spec.LifecycleActions
@@ -292,13 +291,6 @@ const (
 	legacyConfigManagerContainerName   = "config-manager"
 	legacyConfigManagerToolsInitName   = "install-config-manager-tool"
 	legacyConfigManagerToolsVolumeName = "kb-tools"
-
-	kbAgentInitContainerName = "init-kbagent"
-)
-
-var (
-	legacyKBAgentInitCommand = []string{"cp", "-r", "/bin/kbagent", "/kubeblocks/"}
-	kbAgentInitCommand       = []string{"cp", "-r", "/bin/kbagent", "/bin/tini-static", "/kubeblocks/"}
 )
 
 type legacyConfigManagerPolicy string
@@ -337,60 +329,6 @@ func preserveLegacyConfigManagerPodSpec(oldITS, desiredITS, mergedITS *workloads
 		mergeVolumeMountsByVolumeName(oldSpec.Containers, &newSpec.Containers, legacyConfigManagerToolsVolumeName)
 		mergeVolumeMountsByVolumeName(oldSpec.InitContainers, &newSpec.InitContainers, legacyConfigManagerToolsVolumeName)
 	}
-}
-
-// preserveLegacyKBAgentInitCommand prevents the one-time addition of tini-static to the
-// custom-action-image copy command from forcing an otherwise unnecessary Pod rollout.
-// The new command is adopted as soon as another change already requires Pod recreation.
-func preserveLegacyKBAgentInitCommand(oldITS, desiredITS, mergedITS *workloads.InstanceSet) {
-	if oldITS == nil || desiredITS == nil || mergedITS == nil {
-		return
-	}
-	_, oldInit := intctrlutil.GetContainerByName(oldITS.Spec.Template.Spec.InitContainers, kbAgentInitContainerName)
-	_, desiredInit := intctrlutil.GetContainerByName(desiredITS.Spec.Template.Spec.InitContainers, kbAgentInitContainerName)
-	_, mergedInit := intctrlutil.GetContainerByName(mergedITS.Spec.Template.Spec.InitContainers, kbAgentInitContainerName)
-	if oldInit == nil || desiredInit == nil || mergedInit == nil ||
-		!reflect.DeepEqual(oldInit.Command, legacyKBAgentInitCommand) ||
-		!reflect.DeepEqual(desiredInit.Command, kbAgentInitCommand) {
-		return
-	}
-	if shouldAdoptKBAgentInitCommand(oldITS, desiredITS) {
-		return
-	}
-	mergedInit.Command = append([]string(nil), oldInit.Command...)
-}
-
-func shouldAdoptKBAgentInitCommand(oldITS, desiredITS *workloads.InstanceSet) bool {
-	oldTemplate := *oldITS.Spec.Template.DeepCopy()
-	newTemplate := *desiredITS.Spec.Template.DeepCopy()
-	_, newInit := intctrlutil.GetContainerByName(newTemplate.Spec.InitContainers, kbAgentInitContainerName)
-	if newInit == nil {
-		return false
-	}
-	newInit.Command = append([]string(nil), legacyKBAgentInitCommand...)
-
-	// A tools image change is already handled as an image-only in-place update.
-	// Normalize it before deciding whether some other change will recreate the Pod.
-	if _, ok := intctrlutil.OnlyKBManagedContainerImageChanged(oldTemplate.Spec.InitContainers, newTemplate.Spec.InitContainers); ok {
-		oldTemplate.Spec.InitContainers = newTemplate.Spec.InitContainers
-	}
-	if _, ok := intctrlutil.OnlyKBManagedContainerImageChanged(oldTemplate.Spec.Containers, newTemplate.Spec.Containers); ok {
-		oldTemplate.Spec.Containers = newTemplate.Spec.Containers
-	}
-
-	if oldTemplate.Annotations[constant.RestartAnnotationKey] != newTemplate.Annotations[constant.RestartAnnotationKey] {
-		return true
-	}
-	if hasPodUpgradeTemplateChanges(oldTemplate, newTemplate) {
-		return desiredITS.Spec.PodUpgradePolicy == appsv1.ReCreatePodUpdatePolicyType
-	}
-	if hasPodResourceChanges(oldTemplate.Spec, newTemplate.Spec) {
-		return !viper.GetBool(constant.FeatureGateInPlacePodVerticalScaling)
-	}
-	if hasPodUpdateTemplateChanges(oldTemplate, newTemplate) {
-		return desiredITS.Spec.PodUpdatePolicy == appsv1.ReCreatePodUpdatePolicyType
-	}
-	return false
 }
 
 func legacyConfigManagerRequired(comp *appsv1.Component) legacyConfigManagerPolicy {

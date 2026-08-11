@@ -1201,62 +1201,6 @@ var _ = Describe("Component Workload Operations Test", func() {
 			Expect(shouldCleanupLegacyConfigManager(oldITS, updateITS)).Should(BeTrue())
 		})
 
-		It("defers the custom-image tini copy migration until a planned Pod recreation", func() {
-			oldToolsImage := viper.GetString(constant.KBToolsImage)
-			defer viper.Set(constant.KBToolsImage, oldToolsImage)
-			viper.Set(constant.KBToolsImage, "docker.io/apecloud/kubeblocks-tools:1.0.0")
-
-			oldITS := &workloads.InstanceSet{
-				Spec: workloads.InstanceSetSpec{
-					PodUpgradePolicy: appsv1.ReCreatePodUpdatePolicyType,
-					PodUpdatePolicy:  appsv1.ReCreatePodUpdatePolicyType,
-					Template: corev1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{}},
-						Spec: corev1.PodSpec{
-							InitContainers: []corev1.Container{{
-								Name:    kbAgentInitContainerName,
-								Image:   "docker.io/apecloud/kubeblocks-tools:1.0.0",
-								Command: append([]string(nil), legacyKBAgentInitCommand...),
-							}},
-							Containers: []corev1.Container{
-								{Name: "mysql", Image: "mysql:8.0"},
-								{Name: "kbagent", Image: "custom-action:1.0", Command: []string{"/kubeblocks/kbagent"}},
-							},
-						},
-					},
-				},
-			}
-			desiredITS := oldITS.DeepCopy()
-			desiredITS.Spec.Template.Spec.InitContainers[0].Image = "mirror.local/apecloud/kubeblocks-tools:1.1.0"
-			desiredITS.Spec.Template.Spec.InitContainers[0].Command = append([]string(nil), kbAgentInitCommand...)
-
-			mergedITS := desiredITS.DeepCopy()
-			preserveLegacyKBAgentInitCommand(oldITS, desiredITS, mergedITS)
-			Expect(mergedITS.Spec.Template.Spec.InitContainers[0].Command).Should(Equal(legacyKBAgentInitCommand))
-			Expect(mergedITS.Spec.Template.Spec.Containers[1].Command).Should(Equal([]string{"/kubeblocks/kbagent"}))
-			mergedByUpdate := copyAndMergeITS(oldITS, desiredITS.DeepCopy(), legacyConfigManagerPolicyKeep)
-			Expect(mergedByUpdate).ShouldNot(BeNil())
-			Expect(mergedByUpdate.Spec.Template.Spec.InitContainers[0].Command).Should(Equal(legacyKBAgentInitCommand))
-
-			restartITS := desiredITS.DeepCopy()
-			restartITS.Spec.Template.Annotations[constant.RestartAnnotationKey] = "2026-08-11T12:00:00Z"
-			restartMerged := restartITS.DeepCopy()
-			preserveLegacyKBAgentInitCommand(oldITS, restartITS, restartMerged)
-			Expect(restartMerged.Spec.Template.Spec.InitContainers[0].Command).Should(Equal(kbAgentInitCommand))
-
-			upgradeITS := desiredITS.DeepCopy()
-			upgradeITS.Spec.Template.Spec.Containers[0].Image = "mysql:8.4"
-			upgradeMerged := upgradeITS.DeepCopy()
-			preserveLegacyKBAgentInitCommand(oldITS, upgradeITS, upgradeMerged)
-			Expect(upgradeMerged.Spec.Template.Spec.InitContainers[0].Command).Should(Equal(kbAgentInitCommand))
-
-			inPlaceUpgradeITS := upgradeITS.DeepCopy()
-			inPlaceUpgradeITS.Spec.PodUpgradePolicy = appsv1.PreferInPlacePodUpdatePolicyType
-			inPlaceMerged := inPlaceUpgradeITS.DeepCopy()
-			preserveLegacyKBAgentInitCommand(oldITS, inPlaceUpgradeITS, inPlaceMerged)
-			Expect(inPlaceMerged.Spec.Template.Spec.InitContainers[0].Command).Should(Equal(legacyKBAgentInitCommand))
-		})
-
 		It("copies multi-cluster placement annotation to generated InstanceSet only when present", func() {
 			transformer := &componentWorkloadTransformer{}
 			its := &workloads.InstanceSet{}

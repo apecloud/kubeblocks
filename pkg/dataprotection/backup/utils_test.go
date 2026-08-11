@@ -230,3 +230,43 @@ func TestSetExpirationTime(t *testing.T) {
 		})
 	}
 }
+
+func TestBuildBackupWorkloadLabelsNormalizesManagedBy(t *testing.T) {
+	tests := []struct {
+		name   string
+		labels map[string]string
+	}{
+		{
+			name: "overrides an inherited managed-by label",
+			labels: map[string]string{
+				constant.AppManagedByLabelKey: "fixture-owner",
+				"keep":                        "value",
+			},
+		},
+		{
+			name: "adds a missing managed-by label",
+			labels: map[string]string{
+				"keep": "value",
+			},
+		},
+		{
+			name: "adds managed-by when backup labels are nil",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			backup := &dpv1alpha1.Backup{ObjectMeta: metav1.ObjectMeta{
+				Name:   "backup",
+				Labels: tt.labels,
+			}}
+			original := backup.DeepCopy()
+
+			labels := BuildBackupWorkloadLabels(backup)
+
+			assert.Equal(t, dptypes.AppName, labels[constant.AppManagedByLabelKey])
+			assert.Equal(t, backup.Name, labels[dptypes.BackupNameLabelKey])
+			assert.Equal(t, original.Labels, backup.Labels)
+		})
+	}
+}

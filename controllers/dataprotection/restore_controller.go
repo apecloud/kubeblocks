@@ -155,7 +155,7 @@ func (r *RestoreReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCt
 		viper.GetString(constant.CfgKeyCtrlrMgrNS): {},
 	}
 
-	return deleteRelatedObjectList(reqCtx, r.Client, &batchv1.JobList{}, namespaces, labels)
+	return deleteRelatedObjectList(reqCtx, r.Client, &batchv1.JobList{}, namespaces, labels, nil)
 }
 
 func CheckBackupRepoForRestore(reqCtx intctrlutil.RequestCtx, cli client.Client, restore *dpv1alpha1.Restore) (string, error) {

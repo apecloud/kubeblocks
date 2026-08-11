@@ -829,8 +829,7 @@ func (r *BackupReconciler) waitForBackupPodsDeleted(reqCtx intctrlutil.RequestCt
 func (r *BackupReconciler) deleteExternalResources(
 	reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) error {
 	labels := map[string]string{
-		dptypes.BackupNameLabelKey:    backup.Name,
-		constant.AppManagedByLabelKey: dptypes.AppName,
+		dptypes.BackupNameLabelKey: backup.Name,
 	}
 
 	if clusterUID, ok := backup.Labels[dptypes.ClusterUIDLabelKey]; ok {
@@ -844,12 +843,12 @@ func (r *BackupReconciler) deleteExternalResources(
 	}
 
 	// delete the external jobs.
-	if err := deleteRelatedObjectList(reqCtx, r.Client, &batchv1.JobList{}, namespaces, labels); err != nil {
+	if err := deleteRelatedObjectList(reqCtx, r.Client, &batchv1.JobList{}, namespaces, labels, backup); err != nil {
 		return err
 	}
 
 	// delete the external statefulSets.
-	return deleteRelatedObjectList(reqCtx, r.Client, &appsv1.StatefulSetList{}, namespaces, labels)
+	return deleteRelatedObjectList(reqCtx, r.Client, &appsv1.StatefulSetList{}, namespaces, labels, backup)
 }
 
 // deleteRelatedBackups deletes the related backups.

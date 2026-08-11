@@ -210,11 +210,6 @@ func TestRollingComponentAndShardingTerminalStatus(t *testing.T) {
 	})
 
 	t.Run("current sharding failure is terminal", func(t *testing.T) {
-		labels := constant.GetClusterLabels(clusterName, map[string]string{constant.KBAppShardingNameLabelKey: "shard"})
-		labels[constant.KBAppComponentLabelKey] = "cluster-shard-0"
-		component := &appsv1.Component{ObjectMeta: metav1.ObjectMeta{
-			Namespace: namespace, Name: "cluster-shard-0", Labels: labels,
-		}}
 		cluster := &appsv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: clusterName, Generation: 9},
 			Spec: appsv1.ClusterSpec{Shardings: []appsv1.ClusterSharding{{
@@ -228,7 +223,7 @@ func TestRollingComponentAndShardingTerminalStatus(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "upgrade-shard"},
 			Status:     opsv1alpha1.OpsRequestStatus{ClusterGeneration: 9},
 		}
-		cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&opsv1alpha1.OpsRequest{}).WithObjects(cluster, ops, component).Build()
+		cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&opsv1alpha1.OpsRequest{}).WithObjects(cluster, ops).Build()
 		helper := newComponentOpsHelper([]opsv1alpha1.UpgradeComponent{{
 			ComponentOps: opsv1alpha1.ComponentOps{ComponentName: "shard"},
 		}})

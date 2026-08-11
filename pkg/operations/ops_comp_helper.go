@@ -286,21 +286,13 @@ func (c componentOpsHelper) reconcileActionWithComponentOpsPolicy(reqCtx intctrl
 	existFailure := false
 	for i := range progressResources {
 		pgResource := progressResources[i]
-		var (
-			componentPhase     appsv1.ComponentPhase
-			observedGeneration int64
-			upToDate           bool
-		)
+		var componentPhase appsv1.ComponentPhase
 		if pgResource.shards == nil {
 			status := opsRes.Cluster.Status.Components[pgResource.compOps.GetComponentName()]
 			componentPhase = status.Phase
-			observedGeneration = status.ObservedGeneration
-			upToDate = status.UpToDate
 		} else {
 			status := opsRes.Cluster.Status.Shardings[pgResource.compOps.GetComponentName()]
 			componentPhase = status.Phase
-			observedGeneration = status.ObservedGeneration
-			upToDate = status.UpToDate
 		}
 		opsCompStatus := opsRequest.Status.Components[pgResource.compOps.GetComponentName()]
 		expectCount, completedCount, err := handleStatusProgress(reqCtx, cli, opsRes, &pgResource, &opsCompStatus)
@@ -309,19 +301,7 @@ func (c componentOpsHelper) reconcileActionWithComponentOpsPolicy(reqCtx intctrl
 		}
 		expectProgressCount += expectCount
 		completedProgressCount += completedCount
-		if clusterStatusAuthoritative {
-			statusIsCurrent := rollingTargetStatusIsCurrent(
-				opsRes.Cluster.Generation, opsRequest.Status.ClusterGeneration, observedGeneration, upToDate)
-			switch {
-			case statusIsCurrent && componentPhase == appsv1.FailedComponentPhase:
-				existFailure = true
-				opsIsCompleted = false
-			case statusIsCurrent && (componentPhase == appsv1.RunningComponentPhase ||
-				componentPhase == appsv1.StoppedComponentPhase):
-			default:
-				opsIsCompleted = false
-			}
-		} else {
+		if !clusterStatusAuthoritative {
 			componentFailureCount := componentStatusFailureCount(opsCompStatus)
 			if componentFailureCount > 0 {
 				existFailure = true
@@ -341,6 +321,9 @@ func (c componentOpsHelper) reconcileActionWithComponentOpsPolicy(reqCtx intctrl
 		opsCompStatus.Phase = componentPhase
 		opsRequest.Status.Components[pgResource.compOps.GetComponentName()] = opsCompStatus
 	}
+	if clusterStatusAuthoritative {
+		opsIsCompleted, existFailure = c.rollingTargetsState(opsRes)
+	}
 	if clusterStatusAuthoritative && opsIsCompleted {
 		completedProgressCount = expectProgressCount
 	}
@@ -357,6 +340,53 @@ func (c componentOpsHelper) reconcileActionWithComponentOpsPolicy(reqCtx intctrl
 		return opsRequestPhase, 0, nil
 	}
 	return opsv1alpha1.OpsSucceedPhase, 0, nil
+}
+
+func (c componentOpsHelper) rollingTargetsState(opsRes *OpsResource) (completed, failed bool) {
+	completed = true
+	for targetName := range c.componentOpsSet {
+		var (
+			phase              appsv1.ComponentPhase
+			observedGeneration int64
+			upToDate           bool
+			found              bool
+		)
+		for i := range opsRes.Cluster.Spec.ComponentSpecs {
+			if opsRes.Cluster.Spec.ComponentSpecs[i].Name != targetName {
+				continue
+			}
+			status := opsRes.Cluster.Status.Components[targetName]
+			phase, observedGeneration, upToDate = status.Phase, status.ObservedGeneration, status.UpToDate
+			found = true
+			break
+		}
+		if !found {
+			for i := range opsRes.Cluster.Spec.Shardings {
+				if opsRes.Cluster.Spec.Shardings[i].Name != targetName {
+					continue
+				}
+				status := opsRes.Cluster.Status.Shardings[targetName]
+				phase, observedGeneration, upToDate = status.Phase, status.ObservedGeneration, status.UpToDate
+				found = true
+				break
+			}
+		}
+
+		opsCompStatus := opsRes.OpsRequest.Status.Components[targetName]
+		opsCompStatus.Phase = phase
+		opsRes.OpsRequest.Status.Components[targetName] = opsCompStatus
+		statusIsCurrent := found && rollingTargetStatusIsCurrent(
+			opsRes.Cluster.Generation, opsRes.OpsRequest.Status.ClusterGeneration, observedGeneration, upToDate)
+		switch {
+		case statusIsCurrent && phase == appsv1.FailedComponentPhase:
+			failed = true
+			completed = false
+		case statusIsCurrent && (phase == appsv1.RunningComponentPhase || phase == appsv1.StoppedComponentPhase):
+		default:
+			completed = false
+		}
+	}
+	return completed, failed
 }
 
 func rollingTargetStatusIsCurrent(clusterGeneration, opsClusterGeneration, observedGeneration int64, upToDate bool) bool {

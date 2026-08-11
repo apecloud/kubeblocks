@@ -306,8 +306,10 @@ type objectList interface {
 	client.ObjectList
 }
 
+type relatedObjectFilter func(client.Object) bool
+
 func deleteRelatedObjectList[T objectList](reqCtx intctrlutil.RequestCtx, cli client.Client, list T,
-	namespaces map[string]sets.Empty, labels map[string]string, owner client.Object) error {
+	namespaces map[string]sets.Empty, labels map[string]string, filter relatedObjectFilter) error {
 	if labels == nil || len(namespaces) == 0 {
 		return nil
 	}
@@ -321,7 +323,7 @@ func deleteRelatedObjectList[T objectList](reqCtx intctrlutil.RequestCtx, cli cl
 		if !objs.IsZero() {
 			for i := 0; i < objs.Len(); i++ {
 				obj := objs.Index(i).Addr().Interface().(client.Object)
-				if owner != nil && !metav1.IsControlledBy(obj, owner) {
+				if filter != nil && !filter(obj) {
 					continue
 				}
 				if err := dputils.RemoveDataProtectionFinalizer(reqCtx.Ctx, cli, obj); err != nil {

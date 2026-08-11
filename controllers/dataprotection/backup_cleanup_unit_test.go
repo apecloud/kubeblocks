@@ -47,8 +47,9 @@ import (
 )
 
 const (
-	cleanupTestNamespace  = "backup-cleanup"
-	cleanupTestClusterUID = "cluster-uid"
+	cleanupTestNamespace           = "backup-cleanup"
+	cleanupTestControllerNamespace = "dataprotection-system"
+	cleanupTestClusterUID          = "cluster-uid"
 )
 
 type transientCleanupErrorClient struct {
@@ -135,6 +136,37 @@ func newCleanupJob(backup *dpv1alpha1.Backup, managedBy *string, ownerUID types.
 	}
 }
 
+func newExecCleanupJob(backup *dpv1alpha1.Backup, namespace string, managedBy *string,
+	backupNamespaceLabel *string, controllerUID *types.UID) *batchv1.Job {
+	labels := map[string]string{
+		dptypes.BackupNameLabelKey: backup.Name,
+		dptypes.ClusterUIDLabelKey: cleanupTestClusterUID,
+	}
+	if managedBy != nil {
+		labels[constant.AppManagedByLabelKey] = *managedBy
+	}
+	if backupNamespaceLabel != nil {
+		labels[dptypes.BackupNamespaceLabelKey] = *backupNamespaceLabel
+	}
+	job := &batchv1.Job{ObjectMeta: metav1.ObjectMeta{
+		Name:       "exec-backup-job",
+		Namespace:  namespace,
+		UID:        types.UID("exec0123456789ab"),
+		Labels:     labels,
+		Finalizers: []string{dptypes.DataProtectionFinalizerName},
+	}}
+	if controllerUID != nil {
+		job.OwnerReferences = []metav1.OwnerReference{{
+			APIVersion: "batch/v1",
+			Kind:       "Job",
+			Name:       "foreign-controller",
+			UID:        *controllerUID,
+			Controller: pointer.Bool(true),
+		}}
+	}
+	return job
+}
+
 func newCleanupReconciler(t *testing.T, objects ...client.Object) (*BackupReconciler, client.Client) {
 	t.Helper()
 	runtimeScheme := runtime.NewScheme()
@@ -151,7 +183,12 @@ func newCleanupReconciler(t *testing.T, objects ...client.Object) (*BackupReconc
 
 func setCleanupControllerNamespace(t *testing.T) {
 	t.Helper()
-	setCleanupViperValue(t, constant.CfgKeyCtrlrMgrNS, cleanupTestNamespace)
+	setCleanupControllerNamespaceTo(t, cleanupTestNamespace)
+}
+
+func setCleanupControllerNamespaceTo(t *testing.T, namespace string) {
+	t.Helper()
+	setCleanupViperValue(t, constant.CfgKeyCtrlrMgrNS, namespace)
 }
 
 func setCleanupViperValue(t *testing.T, key, value string) {
@@ -181,6 +218,93 @@ func TestBackupExternalResourceCleanupSupportsLegacyWorkloadLabels(t *testing.T)
 
 			err := cli.Get(context.Background(), client.ObjectKeyFromObject(job), &batchv1.Job{})
 			require.True(t, apierrors.IsNotFound(err), "owned backup job should be deleted")
+		})
+	}
+}
+
+func TestBackupExternalResourceCleanupSupportsCrossNamespaceExecJobs(t *testing.T) {
+	setCleanupControllerNamespaceTo(t, cleanupTestControllerNamespace)
+	for _, tt := range []struct {
+		name      string
+		managedBy *string
+	}{
+		{name: "wrong inherited managed-by", managedBy: pointer.String("fixture-owner")},
+		{name: "missing managed-by"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			backup := newCleanupBackup()
+			job := newExecCleanupJob(backup, cleanupTestControllerNamespace, tt.managedBy,
+				pointer.String(backup.Namespace), nil)
+			reconciler, cli := newCleanupReconciler(t, backup, job)
+
+			require.NoError(t, reconciler.deleteExternalResources(newCleanupRequestContext(), backup))
+
+			err := cli.Get(context.Background(), client.ObjectKeyFromObject(job), &batchv1.Job{})
+			require.True(t, apierrors.IsNotFound(err), "cross-namespace ExecAction job should be deleted")
+		})
+	}
+}
+
+func TestBackupExternalResourceCleanupRejectsForeignExecJobs(t *testing.T) {
+	setCleanupControllerNamespaceTo(t, cleanupTestControllerNamespace)
+	backup := newCleanupBackup()
+	foreignControllerUID := types.UID("foreign-controller")
+	wrongBackupName := newExecCleanupJob(backup, cleanupTestControllerNamespace, pointer.String(dptypes.AppName),
+		pointer.String(backup.Namespace), nil)
+	wrongBackupName.Labels[dptypes.BackupNameLabelKey] = "foreign-backup"
+	wrongClusterUID := newExecCleanupJob(backup, cleanupTestControllerNamespace, pointer.String(dptypes.AppName),
+		pointer.String(backup.Namespace), nil)
+	wrongClusterUID.Labels[dptypes.ClusterUIDLabelKey] = "foreign-cluster"
+	missingClusterUID := newExecCleanupJob(backup, cleanupTestControllerNamespace, pointer.String(dptypes.AppName),
+		pointer.String(backup.Namespace), nil)
+	delete(missingClusterUID.Labels, dptypes.ClusterUIDLabelKey)
+	tests := []struct {
+		name string
+		job  *batchv1.Job
+	}{
+		{
+			name: "job is outside the controller namespace",
+			job: newExecCleanupJob(backup, "foreign-system", pointer.String(dptypes.AppName),
+				pointer.String(backup.Namespace), nil),
+		},
+		{
+			name: "backup name label is wrong",
+			job:  wrongBackupName,
+		},
+		{
+			name: "cluster UID label is wrong",
+			job:  wrongClusterUID,
+		},
+		{
+			name: "cluster UID label is missing",
+			job:  missingClusterUID,
+		},
+		{
+			name: "backup namespace label is wrong",
+			job: newExecCleanupJob(backup, cleanupTestControllerNamespace, pointer.String(dptypes.AppName),
+				pointer.String("foreign-backup"), nil),
+		},
+		{
+			name: "backup namespace label is missing",
+			job: newExecCleanupJob(backup, cleanupTestControllerNamespace, pointer.String(dptypes.AppName),
+				nil, nil),
+		},
+		{
+			name: "job has an unexpected controller owner",
+			job: newExecCleanupJob(backup, cleanupTestControllerNamespace, pointer.String(dptypes.AppName),
+				pointer.String(backup.Namespace), &foreignControllerUID),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reconciler, cli := newCleanupReconciler(t, backup.DeepCopy(), tt.job)
+
+			require.NoError(t, reconciler.deleteExternalResources(newCleanupRequestContext(), backup))
+
+			fetched := &batchv1.Job{}
+			require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(tt.job), fetched))
+			require.Equal(t, []string{dptypes.DataProtectionFinalizerName}, fetched.Finalizers)
 		})
 	}
 }
@@ -231,7 +355,7 @@ func TestBackupExternalResourceCleanupRetriesTransientErrors(t *testing.T) {
 }
 
 func TestBackupDeletingReconcileRemovesFinalizerAndJob(t *testing.T) {
-	setCleanupControllerNamespace(t)
+	setCleanupControllerNamespaceTo(t, cleanupTestControllerNamespace)
 	setCleanupViperValue(t, dptypes.CfgKeyWorkerServiceAccountName, "worker")
 	setCleanupViperValue(t, dptypes.CfgKeyWorkerClusterRoleName, "worker-role")
 	backup := newCleanupBackup()
@@ -239,7 +363,9 @@ func TestBackupDeletingReconcileRemovesFinalizerAndJob(t *testing.T) {
 	backup.DeletionTimestamp = &deletionTimestamp
 	jobLabels := dpbackup.BuildBackupWorkloadLabels(backup)
 	job := newCleanupJob(backup, pointer.String(jobLabels[constant.AppManagedByLabelKey]), backup.UID)
-	reconciler, cli := newCleanupReconciler(t, backup, job)
+	execJob := newExecCleanupJob(backup, cleanupTestControllerNamespace, pointer.String("fixture-owner"),
+		pointer.String(backup.Namespace), nil)
+	reconciler, cli := newCleanupReconciler(t, backup, job, execJob)
 
 	_, err := reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(backup)})
 	require.NoError(t, err)
@@ -248,6 +374,8 @@ func TestBackupDeletingReconcileRemovesFinalizerAndJob(t *testing.T) {
 	require.True(t, apierrors.IsNotFound(err), "backup should disappear after its finalizer is removed")
 	err = cli.Get(context.Background(), client.ObjectKeyFromObject(job), &batchv1.Job{})
 	require.True(t, apierrors.IsNotFound(err), "normal deleting reconciliation should delete the owned job")
+	err = cli.Get(context.Background(), client.ObjectKeyFromObject(execJob), &batchv1.Job{})
+	require.True(t, apierrors.IsNotFound(err), "normal deleting reconciliation should delete the ExecAction job")
 }
 
 func newCleanupRequestContext() intctrlutil.RequestCtx {

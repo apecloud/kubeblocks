@@ -836,19 +836,32 @@ func (r *BackupReconciler) deleteExternalResources(
 		labels[dptypes.ClusterUIDLabelKey] = clusterUID
 	}
 
-	// use map to avoid duplicate deletion of the same namespace.
-	namespaces := map[string]sets.Empty{
-		backup.Namespace: {},
-		viper.GetString(constant.CfgKeyCtrlrMgrNS): {},
+	backupNamespace := map[string]sets.Empty{backup.Namespace: {}}
+	isControlledByBackup := func(obj client.Object) bool {
+		return metav1.IsControlledBy(obj, backup)
 	}
-
-	// delete the external jobs.
-	if err := deleteRelatedObjectList(reqCtx, r.Client, &batchv1.JobList{}, namespaces, labels, backup); err != nil {
+	if err := deleteRelatedObjectList(reqCtx, r.Client, &batchv1.JobList{},
+		backupNamespace, labels, isControlledByBackup); err != nil {
+		return err
+	}
+	if err := deleteRelatedObjectList(reqCtx, r.Client, &appsv1.StatefulSetList{},
+		backupNamespace, labels, isControlledByBackup); err != nil {
 		return err
 	}
 
-	// delete the external statefulSets.
-	return deleteRelatedObjectList(reqCtx, r.Client, &appsv1.StatefulSetList{}, namespaces, labels, backup)
+	controllerNamespace := viper.GetString(constant.CfgKeyCtrlrMgrNS)
+	if controllerNamespace == "" || controllerNamespace == backup.Namespace {
+		return nil
+	}
+	execLabels := make(map[string]string, len(labels)+1)
+	for key, value := range labels {
+		execLabels[key] = value
+	}
+	execLabels[dptypes.BackupNamespaceLabelKey] = backup.Namespace
+	return deleteRelatedObjectList(reqCtx, r.Client, &batchv1.JobList{},
+		map[string]sets.Empty{controllerNamespace: {}}, execLabels, func(obj client.Object) bool {
+			return metav1.GetControllerOf(obj) == nil
+		})
 }
 
 // deleteRelatedBackups deletes the related backups.

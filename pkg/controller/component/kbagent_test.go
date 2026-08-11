@@ -289,6 +289,7 @@ var _ = Describe("kb-agent", func() {
 
 			ic := kbAgentInitContainer()
 			Expect(ic).ShouldNot(BeNil())
+			Expect(ic.Command).Should(Equal([]string{"cp", "-r", kbAgentCommand, kbAgentInitCommand, kbAgentSharedMountPath + "/"}))
 
 			c := kbAgentContainer()
 			Expect(c).ShouldNot(BeNil())

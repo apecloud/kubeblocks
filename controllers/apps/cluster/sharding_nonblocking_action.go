@@ -36,7 +36,11 @@ import (
 	ictrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-const shardingActionTargetsVersion = 1
+const (
+	shardingActionTargetsVersion   = 1
+	shardingAddActionTargetsKey    = "kubeblocks.io/sharding-add-action-targets"
+	shardingRemoveActionTargetsKey = "kubeblocks.io/sharding-remove-action-targets"
+)
 
 type shardingActionTargets struct {
 	Version int                    `json:"version"`

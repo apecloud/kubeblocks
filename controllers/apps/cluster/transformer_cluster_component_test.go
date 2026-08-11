@@ -2564,6 +2564,13 @@ var _ = Describe("cluster component transformer test", func() {
 				result.NonBlocking = true
 				return result
 			}
+			reconcileActions := func(runningComps, protoComps map[string]*appsv1.Component,
+				toCreate, toDelete, toUpdate sets.Set[string]) (sets.Set[string], error) {
+				handler := newNonBlockingShardingHandler(&clusterShardingHandler{}, transCtx, nil,
+					sharding1aName, runningComps, protoComps, toCreate, toDelete, toUpdate)
+				Expect(handler).ShouldNot(BeNil())
+				return handler.reconcileActions()
+			}
 
 			It("persists the selected targets before invoking the action", func() {
 				shard0, pods0 := buildShard("shard-0", "shard-0-0", "shard-0-1")
@@ -2711,8 +2718,7 @@ var _ = Describe("cluster component transformer test", func() {
 					}, nil).Times(1)
 				})
 
-				errorSkip, err := (&clusterShardingHandler{}).handleShardAddNRemove(
-					transCtx, sharding1aName,
+				errorSkip, err := reconcileActions(
 					map[string]*appsv1.Component{shard.Name: shard},
 					map[string]*appsv1.Component{},
 					sets.New[string](), sets.New(shard.Name), sets.New[string]())
@@ -2744,8 +2750,7 @@ var _ = Describe("cluster component transformer test", func() {
 					}, nil).Times(1)
 				})
 
-				_, err := (&clusterShardingHandler{}).handleShardAddNRemove(
-					transCtx, sharding1aName,
+				_, err := reconcileActions(
 					map[string]*appsv1.Component{persisted.Name: persisted, fresh.Name: fresh},
 					map[string]*appsv1.Component{}, sets.New[string](), sets.New[string](),
 					sets.New(persisted.Name, fresh.Name))
@@ -2786,8 +2791,7 @@ var _ = Describe("cluster component transformer test", func() {
 				})
 
 				handle := func() (sets.Set[string], error) {
-					return (&clusterShardingHandler{}).handleShardAddNRemove(
-						transCtx, sharding1aName,
+					return reconcileActions(
 						map[string]*appsv1.Component{shard.Name: shard}, map[string]*appsv1.Component{},
 						sets.New[string](), sets.New(shard.Name), sets.New[string]())
 				}
@@ -2835,8 +2839,7 @@ var _ = Describe("cluster component transformer test", func() {
 				})
 
 				handle := func() (sets.Set[string], error) {
-					return (&clusterShardingHandler{}).handleShardAddNRemove(
-						transCtx, sharding1aName,
+					return reconcileActions(
 						map[string]*appsv1.Component{shard.Name: shard}, map[string]*appsv1.Component{},
 						sets.New[string](), sets.New(shard.Name), sets.New[string]())
 				}
@@ -2889,8 +2892,7 @@ var _ = Describe("cluster component transformer test", func() {
 						}).Times(2)
 				})
 				handle := func() error {
-					_, err := (&clusterShardingHandler{}).handleShardAddNRemove(
-						transCtx, sharding1aName,
+					_, err := reconcileActions(
 						map[string]*appsv1.Component{shard.Name: shard},
 						map[string]*appsv1.Component{shard.Name: shard.DeepCopy()},
 						sets.New[string](), sets.New[string](), sets.New(shard.Name))
@@ -2936,8 +2938,7 @@ var _ = Describe("cluster component transformer test", func() {
 						}).Times(1)
 				})
 
-				_, err := (&clusterShardingHandler{}).handleShardAddNRemove(
-					transCtx, sharding1aName,
+				_, err := reconcileActions(
 					map[string]*appsv1.Component{shard.Name: shard},
 					map[string]*appsv1.Component{shard.Name: shard.DeepCopy()},
 					sets.New[string](), sets.New[string](), sets.New(shard.Name))

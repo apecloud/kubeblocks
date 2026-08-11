@@ -371,6 +371,8 @@ var _ = Describe("status reconciler test", func() {
 
 	Context("setInstanceStatus function", func() {
 		It("should work well", func() {
+			its.Generation = 3
+			its.Status.ObservedGeneration = 3
 			pods := []*corev1.Pod{
 				builder.NewPodBuilder(namespace, "bar-0").AddLabels(RoleLabelKey, "follower").GetObject(),
 				builder.NewPodBuilder(namespace, "bar-1").AddLabels(RoleLabelKey, "leader").GetObject(),
@@ -400,6 +402,7 @@ var _ = Describe("status reconciler test", func() {
 			its.Spec.Replicas = &replicas
 			its.Status.InstanceStatus = oldInstanceStatus
 			Expect(setInstanceStatus(nil, its, pods)).Should(Succeed())
+			Expect(its.Status.InstanceStatusObservedGeneration).Should(Equal(int64(3)))
 
 			Expect(its.Status.InstanceStatus).Should(HaveLen(3))
 			Expect(its.Status.InstanceStatus[0].PodName).Should(Equal("bar-0"))

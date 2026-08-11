@@ -313,10 +313,7 @@ func syncReconfigureStatus(ctx Context) Status {
 	)
 	updated := int32(0)
 	if ctx.ITS != nil {
-		for _, inst := range ctx.ITS.ActiveInstanceStatuses() {
-			if inst.EffectiveCurrentState() != workloads.InstanceCurrentStatePresent {
-				continue
-			}
+		for _, inst := range ctx.ITS.ActiveRunningInstanceStatuses() {
 			idx := slices.IndexFunc(inst.Configs, func(cfg workloads.InstanceConfigStatus) bool {
 				return cfg.Name == ctx.ConfigTemplate.Name
 			})

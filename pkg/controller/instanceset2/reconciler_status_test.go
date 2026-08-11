@@ -34,11 +34,12 @@ import (
 
 func TestSetInstanceStatusReadsCurrentStateFromInstance(t *testing.T) {
 	its := &workloads.InstanceSet{
-		ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default"},
+		ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default", Generation: 3},
 		Spec: workloads.InstanceSetSpec{
 			Replicas: ptr.To[int32](1),
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "demo"}},
 		},
+		Status: workloads.InstanceSetStatus{ObservedGeneration: 3},
 	}
 	tree := kubebuilderx.NewObjectTree()
 	tree.SetRoot(its)
@@ -57,6 +58,9 @@ func TestSetInstanceStatusReadsCurrentStateFromInstance(t *testing.T) {
 	}
 	if len(its.Status.InstanceStatus) != 1 {
 		t.Fatalf("unexpected status: %#v", its.Status.InstanceStatus)
+	}
+	if its.Status.InstanceStatusObservedGeneration != its.Generation {
+		t.Fatalf("instance status generation was not published: %#v", its.Status)
 	}
 	status := its.Status.InstanceStatus[0]
 	if status.TemplateName == nil || *status.TemplateName != "" || status.DesiredState != workloads.InstanceDesiredStateActive || status.CurrentState != workloads.InstanceCurrentStateAbsent {

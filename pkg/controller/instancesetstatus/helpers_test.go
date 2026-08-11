@@ -30,7 +30,7 @@ func TestInstanceStatusViewHelpers(t *testing.T) {
 		{PodName: "legacy-active"},
 		{PodName: "active-absent", DesiredState: workloads.InstanceDesiredStateActive, CurrentState: workloads.InstanceCurrentStateAbsent},
 		{PodName: "active-present", DesiredState: workloads.InstanceDesiredStateActive, CurrentState: workloads.InstanceCurrentStatePresent},
-		{PodName: "offline", DesiredState: workloads.InstanceDesiredStateOffline, CurrentState: workloads.InstanceCurrentStateAbsent},
+		{PodName: "offline", DesiredState: workloads.InstanceDesiredStateOffline, CurrentState: workloads.InstanceCurrentStatePresent},
 		{PodName: "released", DesiredState: workloads.InstanceDesiredStateReleased, CurrentState: workloads.InstanceCurrentStatePresent},
 	}}}
 	if got := len(its.ActiveInstanceStatuses()); got != 3 {
@@ -42,10 +42,13 @@ func TestInstanceStatusViewHelpers(t *testing.T) {
 	if got := len(its.RetainedInstanceStatuses()); got != 4 {
 		t.Fatalf("expected 4 retained entries, got %d", got)
 	}
-	if got := len(its.PresentInstanceStatuses()); got != 2 {
-		t.Fatalf("expected 2 Present entries, got %d", got)
+	if got := len(its.ActiveRunningInstanceStatuses()); got != 2 {
+		t.Fatalf("expected legacy Active and explicit Active+Present entries, got %d", got)
 	}
-	if !its.HasPresentInstance("active-present") || !its.HasPresentInstance("released") || its.HasPresentInstance("active-absent") {
+	if got := len(its.PresentInstanceStatuses()); got != 3 {
+		t.Fatalf("expected 3 Present entries regardless of desired state, got %d", got)
+	}
+	if !its.HasPresentInstance("active-present") || !its.HasPresentInstance("offline") || !its.HasPresentInstance("released") || its.HasPresentInstance("active-absent") {
 		t.Fatal("HasPresentInstance does not reflect the current instance dimension")
 	}
 	if its.FindInstanceStatus("offline") == nil || its.FindInstanceStatus("missing") != nil {

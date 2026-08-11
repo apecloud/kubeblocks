@@ -39,6 +39,9 @@ func TestRevisionUpdatePublishesCompleteInstanceViewBeforeObservedGeneration(t *
 	if its.Status.ObservedGeneration != its.Generation {
 		t.Fatalf("ObservedGeneration was not advanced: %#v", its.Status)
 	}
+	if its.Status.InstanceStatusObservedGeneration != its.Generation {
+		t.Fatalf("InstanceStatusObservedGeneration was not advanced: %#v", its.Status)
+	}
 	if len(its.Status.InstanceStatus) != 1 {
 		t.Fatalf("complete InstanceStatus was not published: %#v", its.Status.InstanceStatus)
 	}
@@ -50,6 +53,7 @@ func TestRevisionUpdatePublishesCompleteInstanceViewBeforeObservedGeneration(t *
 
 func TestRevisionUpdateDoesNotAdvanceObservedGenerationOnInvalidInstanceView(t *testing.T) {
 	its := revisionTestInstanceSet()
+	its.Status.InstanceStatusObservedGeneration = 1
 	its.Status.InstanceStatus = []workloads.InstanceStatus{{PodName: "demo-0"}, {PodName: "demo-0"}}
 	tree := kubebuilderx.NewObjectTree()
 	tree.SetRoot(its)
@@ -58,6 +62,9 @@ func TestRevisionUpdateDoesNotAdvanceObservedGenerationOnInvalidInstanceView(t *
 	}
 	if its.Status.ObservedGeneration == its.Generation {
 		t.Fatal("ObservedGeneration advanced despite an incomplete instance view")
+	}
+	if its.Status.InstanceStatusObservedGeneration != 1 {
+		t.Fatal("InstanceStatusObservedGeneration advanced despite an incomplete instance view")
 	}
 	if len(its.Status.InstanceStatus) != 2 {
 		t.Fatal("invalid build partially replaced InstanceStatus")

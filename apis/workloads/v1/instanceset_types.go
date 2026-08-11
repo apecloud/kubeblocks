@@ -284,6 +284,12 @@ type InstanceSetStatus struct {
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
+	// instanceStatusObservedGeneration is the most recent generation for which the complete instance status view
+	// has been published.
+	//
+	// +optional
+	InstanceStatusObservedGeneration int64 `json:"instanceStatusObservedGeneration,omitempty"`
+
 	// replicas is the number of instances created by the InstanceSet controller.
 	Replicas int32 `json:"replicas"`
 
@@ -572,7 +578,7 @@ type ConfigTemplate struct {
 }
 
 type InstanceStatus struct {
-	// Represents the name of the pod.
+	// PodName is the stable instance identity allocated by the InstanceSet and the name used by its Pod when present.
 	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=Unknown
@@ -792,8 +798,8 @@ func (r *InstanceSet) IsRoleProbeDone() bool {
 		replicas = 0
 	}
 	cnt := 0
-	for _, inst := range r.ActiveInstanceStatuses() {
-		if inst.EffectiveCurrentState() == InstanceCurrentStatePresent && len(inst.Role) > 0 {
+	for _, inst := range r.ActiveRunningInstanceStatuses() {
+		if len(inst.Role) > 0 {
 			cnt++
 		}
 	}
@@ -832,6 +838,23 @@ func (r *InstanceSet) RetainedInstanceStatuses() []*InstanceStatus {
 	for i := range r.Status.InstanceStatus {
 		status := &r.Status.InstanceStatus[i]
 		if desired := status.EffectiveDesiredState(); desired == InstanceDesiredStateActive || desired == InstanceDesiredStateOffline {
+			result = append(result, status)
+		}
+	}
+	return result
+}
+
+// ActiveRunningInstanceStatuses returns Active instances with current runtime information. An empty CurrentState is
+// included for backward compatibility because legacy InstanceStatus entries were produced only from observed objects.
+func (r *InstanceSet) ActiveRunningInstanceStatuses() []*InstanceStatus {
+	if r == nil {
+		return nil
+	}
+	result := make([]*InstanceStatus, 0, len(r.Status.InstanceStatus))
+	for i := range r.Status.InstanceStatus {
+		status := &r.Status.InstanceStatus[i]
+		if status.EffectiveDesiredState() == InstanceDesiredStateActive &&
+			(status.CurrentState == "" || status.CurrentState == InstanceCurrentStatePresent) {
 			result = append(result, status)
 		}
 	}

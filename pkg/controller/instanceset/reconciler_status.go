@@ -503,6 +503,7 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 		return err
 	}
 	its.Status.InstanceStatus = result.Statuses
+	its.Status.InstanceStatusObservedGeneration = its.Generation
 	setInstanceStatusIncompleteCondition(its, result.UnknownTemplateNames)
 	return nil
 }

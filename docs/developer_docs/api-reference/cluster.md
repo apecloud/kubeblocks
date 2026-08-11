@@ -20058,6 +20058,19 @@ InstanceSet&rsquo;s generation, which is updated on mutation by the API Server.<
 </tr>
 <tr>
 <td>
+<code>instanceStatusObservedGeneration</code><br/>
+<em>
+int64
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>instanceStatusObservedGeneration is the most recent generation for which the complete instance status view
+has been published.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>replicas</code><br/>
 <em>
 int32
@@ -20520,7 +20533,7 @@ string
 </em>
 </td>
 <td>
-<p>Represents the name of the pod.</p>
+<p>PodName is the stable instance identity allocated by the InstanceSet and the name used by its Pod when present.</p>
 </td>
 </tr>
 <tr>

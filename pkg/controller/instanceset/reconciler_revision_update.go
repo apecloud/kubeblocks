@@ -131,7 +131,6 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kub
 	if err := setInstanceStatus(tree, its, podList); err != nil {
 		return kubebuilderx.Continue, err
 	}
-	// ObservedGeneration is advanced only after revisions and the complete instance identity view are published.
 	its.Status.ObservedGeneration = its.Generation
 
 	return kubebuilderx.Continue, nil

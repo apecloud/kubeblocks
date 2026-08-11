@@ -190,7 +190,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 
 	// 4. set instance status
-	if err = setInstanceStatus(tree, its, podList); err != nil {
+	if err = setInstanceStatus(tree, its, podList, currentRevisions, updateRevisions); err != nil {
 		return kubebuilderx.Continue, err
 	}
 
@@ -403,17 +403,7 @@ func buildAvailableCondition(its *workloads.InstanceSet, available bool, notAvai
 func buildFailureCondition(its *workloads.InstanceSet, pods []*corev1.Pod) (*metav1.Condition, error) {
 	var failureNames []string
 	for _, pod := range pods {
-		if isTerminating(pod) {
-			continue
-		}
-		// Kubernetes says the Pod is 'Failed'
-		if pod.Status.Phase == corev1.PodFailed {
-			failureNames = append(failureNames, pod.Name)
-			continue
-		}
-		// KubeBlocks says the Pod is 'Failed'
-		isFailed, isTimedOut, _ := intctrlutil.IsPodFailedAndTimedOut(pod)
-		if isFailed && isTimedOut {
+		if instancePodFailed(pod) {
 			failureNames = append(failureNames, pod.Name)
 		}
 	}
@@ -433,13 +423,45 @@ func buildFailureCondition(its *workloads.InstanceSet, pods []*corev1.Pod) (*met
 	}, nil
 }
 
-func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pods []*corev1.Pod) error {
-	instanceStatus := make([]workloads.InstanceStatus, 0)
+func instancePodFailed(pod *corev1.Pod) bool {
+	if isTerminating(pod) {
+		return false
+	}
+	if pod.Status.Phase == corev1.PodFailed {
+		return true
+	}
+	isFailed, isTimedOut, _ := intctrlutil.IsPodFailedAndTimedOut(pod)
+	return isFailed && isTimedOut
+}
+
+func setInstanceStatus(tree *kubebuilderx.ObjectTree,
+	its *workloads.InstanceSet,
+	pods []*corev1.Pod,
+	currentRevisions,
+	updateRevisions map[string]string) error {
+	instanceStatus := make([]workloads.InstanceStatus, 0, len(updateRevisions))
+	observedNames := sets.New[string]()
 	for _, pod := range pods {
+		ready := isImageMatched(pod) && intctrlutil.IsPodReady(pod)
 		status := workloads.InstanceStatus{
-			PodName: pod.Name,
+			PodName:         pod.Name,
+			CurrentRevision: currentRevisions[pod.Name],
+			UpdateRevision:  updateRevisions[pod.Name],
+			Ready:           ready,
+			Available:       ready && intctrlutil.IsPodAvailable(pod, its.Spec.MinReadySeconds),
+			Failed:          instancePodFailed(pod),
 		}
 		instanceStatus = append(instanceStatus, status)
+		observedNames.Insert(pod.Name)
+	}
+	for name, revision := range updateRevisions {
+		if observedNames.Has(name) {
+			continue
+		}
+		instanceStatus = append(instanceStatus, workloads.InstanceStatus{
+			PodName:        name,
+			UpdateRevision: revision,
+		})
 	}
 
 	syncMemberStatus(its, instanceStatus, pods)

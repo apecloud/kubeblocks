@@ -22,6 +22,7 @@ package operations
 import (
 	"context"
 	"testing"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -48,6 +49,7 @@ func TestRollingTargetStatusGenerationFence(t *testing.T) {
 		{name: "current", clusterGeneration: 8, opsGeneration: 8, observed: 8, upToDate: true, want: true},
 		{name: "older than operation", clusterGeneration: 8, opsGeneration: 8, observed: 7, upToDate: true},
 		{name: "cluster changed again", clusterGeneration: 9, opsGeneration: 8, observed: 8, upToDate: true},
+		{name: "later generation converged", clusterGeneration: 9, opsGeneration: 8, observed: 9, upToDate: true},
 		{name: "not up to date", clusterGeneration: 8, opsGeneration: 8, observed: 8},
 	}
 	for _, tt := range tests {
@@ -56,6 +58,32 @@ func TestRollingTargetStatusGenerationFence(t *testing.T) {
 				t.Fatalf("got %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestRestartIntentUsesNanosecondPrecision(t *testing.T) {
+	const component = "mysql"
+	base := time.Date(2026, time.August, 11, 8, 0, 0, 123, time.UTC)
+	compSpec := &appsv1.ClusterComponentSpec{Name: component}
+	helper := newComponentOpsHelper([]opsv1alpha1.ComponentOps{{ComponentName: component}})
+	handler := restartOpsHandler{compOpsHelper: helper}
+
+	first := &OpsResource{OpsRequest: &opsv1alpha1.OpsRequest{Status: opsv1alpha1.OpsRequestStatus{
+		StartTimestamp: metav1.NewTime(base),
+	}}}
+	handler.doRestart(first, compSpec, component)
+	firstIntent := compSpec.Annotations[constant.RestartAnnotationKey]
+	if firstIntent != base.Format(time.RFC3339Nano) {
+		t.Fatalf("restart intent=%q, want %q", firstIntent, base.Format(time.RFC3339Nano))
+	}
+
+	secondTime := base.Add(time.Nanosecond)
+	second := &OpsResource{OpsRequest: &opsv1alpha1.OpsRequest{Status: opsv1alpha1.OpsRequestStatus{
+		StartTimestamp: metav1.NewTime(secondTime),
+	}}}
+	handler.doRestart(second, compSpec, component)
+	if got := compSpec.Annotations[constant.RestartAnnotationKey]; got == firstIntent {
+		t.Fatalf("two restart operations in one second reused intent %q", got)
 	}
 }
 
@@ -185,12 +213,16 @@ func TestRollingComponentAndShardingTerminalStatus(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "upgrade"},
 			Status:     opsv1alpha1.OpsRequestStatus{ClusterGeneration: 7},
 		}
-		cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&opsv1alpha1.OpsRequest{}).WithObjects(cluster, ops).Build()
 		opsRes := &OpsResource{Cluster: cluster, OpsRequest: ops}
 		helper := newComponentOpsHelper([]opsv1alpha1.ComponentOps{{ComponentName: "a"}, {ComponentName: "b"}})
-		handler := func(_ intctrlutil.RequestCtx, _ client.Client, _ *OpsResource, _ *progressResource,
+		if err := helper.recordRollingTargetSpecs(opsRes); err != nil {
+			t.Fatal(err)
+		}
+		cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&opsv1alpha1.OpsRequest{}).WithObjects(cluster, ops).Build()
+		handler := func(_ intctrlutil.RequestCtx, _ client.Client, _ *OpsResource, pg *progressResource,
 			_ *opsv1alpha1.OpsRequestComponentStatus) (int32, int32, error) {
-			return 1, 0, nil
+			pg.rollingProgressCompleted = true
+			return 1, 1, nil
 		}
 		phase, _, err := helper.reconcileRollingActionWithComponentOps(intctrlutil.RequestCtx{Ctx: context.Background()}, cli, opsRes, "upgrade", handler)
 		if err != nil || phase != opsv1alpha1.OpsRunningPhase {
@@ -223,18 +255,71 @@ func TestRollingComponentAndShardingTerminalStatus(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "upgrade-shard"},
 			Status:     opsv1alpha1.OpsRequestStatus{ClusterGeneration: 9},
 		}
-		cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&opsv1alpha1.OpsRequest{}).WithObjects(cluster, ops).Build()
 		helper := newComponentOpsHelper([]opsv1alpha1.UpgradeComponent{{
 			ComponentOps: opsv1alpha1.ComponentOps{ComponentName: "shard"},
 		}})
+		opsRes := &OpsResource{Cluster: cluster, OpsRequest: ops}
+		if err := helper.recordRollingTargetSpecs(opsRes); err != nil {
+			t.Fatal(err)
+		}
+		cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&opsv1alpha1.OpsRequest{}).WithObjects(cluster, ops).Build()
 		handler := func(_ intctrlutil.RequestCtx, _ client.Client, _ *OpsResource, _ *progressResource,
 			_ *opsv1alpha1.OpsRequestComponentStatus) (int32, int32, error) {
 			return 1, 0, nil
 		}
 		phase, _, err := helper.reconcileRollingActionWithComponentOps(intctrlutil.RequestCtx{Ctx: context.Background()}, cli,
-			&OpsResource{Cluster: cluster, OpsRequest: ops}, "upgrade", handler)
+			opsRes, "upgrade", handler)
 		if err != nil || phase != opsv1alpha1.OpsFailedPhase {
 			t.Fatalf("phase=%s err=%v, want Failed", phase, err)
+		}
+	})
+
+	t.Run("later cluster generation supersedes the operation", func(t *testing.T) {
+		cluster := &appsv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: clusterName, Generation: 8},
+			Spec:       appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{{Name: "mysql"}}},
+			Status: appsv1.ClusterStatus{Components: map[string]appsv1.ClusterComponentStatus{
+				"mysql": {Phase: appsv1.RunningComponentPhase, ObservedGeneration: 8, UpToDate: true},
+			}},
+		}
+		ops := &opsv1alpha1.OpsRequest{Status: opsv1alpha1.OpsRequestStatus{ClusterGeneration: 8}}
+		helper := newComponentOpsHelper([]opsv1alpha1.ComponentOps{{ComponentName: "mysql"}})
+		opsRes := &OpsResource{Cluster: cluster, OpsRequest: ops}
+		if err := helper.recordRollingTargetSpecs(opsRes); err != nil {
+			t.Fatal(err)
+		}
+		cluster.Generation = 9
+		cluster.Status.Components["mysql"] = appsv1.ClusterComponentStatus{
+			Phase: appsv1.RunningComponentPhase, ObservedGeneration: 9, UpToDate: true,
+		}
+		completed, failed := helper.rollingTargetsState(opsRes, nil)
+		if completed || !failed {
+			t.Fatalf("completed=%v failed=%v, want superseded failure", completed, failed)
+		}
+		if got := ops.Status.Components["mysql"].Reason; got != "ClusterSpecSuperseded" {
+			t.Fatalf("reason=%q, want ClusterSpecSuperseded", got)
+		}
+	})
+
+	t.Run("partial target success ignores unrelated component failure", func(t *testing.T) {
+		cluster := &appsv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{Generation: 5},
+			Spec:       appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{{Name: "mysql"}}},
+			Status: appsv1.ClusterStatus{Components: map[string]appsv1.ClusterComponentStatus{
+				"mysql": {Phase: appsv1.FailedComponentPhase, ObservedGeneration: 5, UpToDate: true},
+			}},
+		}
+		ops := &opsv1alpha1.OpsRequest{Status: opsv1alpha1.OpsRequestStatus{ClusterGeneration: 5}}
+		helper := newComponentOpsHelper([]opsv1alpha1.ComponentOps{{ComponentName: "mysql"}})
+		opsRes := &OpsResource{Cluster: cluster, OpsRequest: ops}
+		if err := helper.recordRollingTargetSpecs(opsRes); err != nil {
+			t.Fatal(err)
+		}
+		completed, failed := helper.rollingTargetsState(opsRes, map[string]rollingTargetProgressState{
+			"mysql": {resources: 1, completed: true, partial: true},
+		})
+		if !completed || failed {
+			t.Fatalf("completed=%v failed=%v, want participant-scoped success", completed, failed)
 		}
 	})
 }

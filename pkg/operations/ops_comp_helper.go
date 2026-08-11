@@ -21,6 +21,8 @@ package operations
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"slices"
@@ -81,6 +83,48 @@ func (c componentOpsHelper) updateClusterComponentsAndShardings(cluster *appsv1.
 	return nil
 }
 
+func rollingTargetSpecHash(target any) (string, error) {
+	data, err := json.Marshal(target)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%x", sha256.Sum256(data)), nil
+}
+
+func findRollingTargetSpec(cluster *appsv1.Cluster, targetName string) (any, bool) {
+	for i := range cluster.Spec.ComponentSpecs {
+		if cluster.Spec.ComponentSpecs[i].Name == targetName {
+			return cluster.Spec.ComponentSpecs[i], true
+		}
+	}
+	for i := range cluster.Spec.Shardings {
+		if cluster.Spec.Shardings[i].Name == targetName {
+			return cluster.Spec.Shardings[i], true
+		}
+	}
+	return nil, false
+}
+
+func (c componentOpsHelper) recordRollingTargetSpecs(opsRes *OpsResource) error {
+	if opsRes.OpsRequest.Status.Components == nil {
+		opsRes.OpsRequest.Status.Components = map[string]opsv1alpha1.OpsRequestComponentStatus{}
+	}
+	for targetName := range c.componentOpsSet {
+		target, found := findRollingTargetSpec(opsRes.Cluster, targetName)
+		if !found {
+			return fmt.Errorf("rolling operation target %q not found in Cluster spec", targetName)
+		}
+		hash, err := rollingTargetSpecHash(target)
+		if err != nil {
+			return fmt.Errorf("hash rolling operation target %q: %w", targetName, err)
+		}
+		status := opsRes.OpsRequest.Status.Components[targetName]
+		status.TargetSpecHash = hash
+		opsRes.OpsRequest.Status.Components[targetName] = status
+	}
+	return nil
+}
+
 func (c componentOpsHelper) saveLastConfigurations(opsRes *OpsResource,
 	buildLastCompConfiguration func(compSpec appsv1.ClusterComponentSpec, obj ComponentOpsInterface) opsv1alpha1.LastComponentConfiguration) {
 	setLastCompConfiguration := func(compSpec appsv1.ClusterComponentSpec,
@@ -132,7 +176,10 @@ func (c componentOpsHelper) cancelComponentOps(ctx context.Context,
 		sharding := &opsRes.Cluster.Spec.Shardings[index]
 		rollBackCompSpec(&sharding.Template, lastCompInfos, sharding.Name)
 	}
-	return cli.Update(ctx, opsRes.Cluster)
+	if err := cli.Update(ctx, opsRes.Cluster); err != nil {
+		return err
+	}
+	return c.recordRollingTargetSpecs(opsRes)
 }
 
 func componentStatusFailureCount(compStatus opsv1alpha1.OpsRequestComponentStatus) int32 {
@@ -238,8 +285,9 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 	return c.reconcileActionWithComponentOpsPolicy(reqCtx, cli, opsRes, opsMessageKey, handleStatusProgress, false)
 }
 
-// reconcileRollingActionWithComponentOps reconciles rolling operations using the
-// Cluster component/sharding status contract as the only terminal-state authority.
+// reconcileRollingActionWithComponentOps fences rolling operations with the exact
+// Cluster target generation and intent. Full-component operations use Cluster
+// phase as their terminal result; partial operations use participating instances.
 func (c componentOpsHelper) reconcileRollingActionWithComponentOps(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	opsRes *OpsResource,
@@ -266,6 +314,7 @@ func (c componentOpsHelper) reconcileActionWithComponentOpsPolicy(reqCtx intctrl
 		completedProgressCount int32
 		err                    error
 		clusterDef             *appsv1.ClusterDefinition
+		rollingProgress        = map[string]rollingTargetProgressState{}
 	)
 	if !clusterStatusAuthoritative && opsRes.Cluster.Spec.ClusterDef != "" {
 		if clusterDef, err = getClusterDefByName(reqCtx.Ctx, cli, opsRes.Cluster.Spec.ClusterDef); err != nil {
@@ -301,7 +350,18 @@ func (c componentOpsHelper) reconcileActionWithComponentOpsPolicy(reqCtx intctrl
 		}
 		expectProgressCount += expectCount
 		completedProgressCount += completedCount
-		if !clusterStatusAuthoritative {
+		if clusterStatusAuthoritative {
+			targetName := pgResource.compOps.GetComponentName()
+			state := rollingProgress[targetName]
+			if state.resources == 0 {
+				state.completed = true
+			}
+			state.resources++
+			state.completed = state.completed && pgResource.rollingProgressCompleted
+			state.failed = state.failed || pgResource.rollingProgressFailed
+			state.partial = state.partial || pgResource.partialRollingTarget
+			rollingProgress[targetName] = state
+		} else {
 			componentFailureCount := componentStatusFailureCount(opsCompStatus)
 			if componentFailureCount > 0 {
 				existFailure = true
@@ -322,7 +382,7 @@ func (c componentOpsHelper) reconcileActionWithComponentOpsPolicy(reqCtx intctrl
 		opsRequest.Status.Components[pgResource.compOps.GetComponentName()] = opsCompStatus
 	}
 	if clusterStatusAuthoritative {
-		opsIsCompleted, existFailure = c.rollingTargetsState(opsRes)
+		opsIsCompleted, existFailure = c.rollingTargetsState(opsRes, rollingProgress)
 	}
 	if clusterStatusAuthoritative && opsIsCompleted {
 		completedProgressCount = expectProgressCount
@@ -342,7 +402,16 @@ func (c componentOpsHelper) reconcileActionWithComponentOpsPolicy(reqCtx intctrl
 	return opsv1alpha1.OpsSucceedPhase, 0, nil
 }
 
-func (c componentOpsHelper) rollingTargetsState(opsRes *OpsResource) (completed, failed bool) {
+type rollingTargetProgressState struct {
+	resources int
+	completed bool
+	failed    bool
+	partial   bool
+}
+
+func (c componentOpsHelper) rollingTargetsState(
+	opsRes *OpsResource,
+	progress map[string]rollingTargetProgressState) (completed, failed bool) {
 	completed = true
 	for targetName := range c.componentOpsSet {
 		var (
@@ -375,13 +444,57 @@ func (c componentOpsHelper) rollingTargetsState(opsRes *OpsResource) (completed,
 		opsCompStatus := opsRes.OpsRequest.Status.Components[targetName]
 		opsCompStatus.Phase = phase
 		opsRes.OpsRequest.Status.Components[targetName] = opsCompStatus
-		statusIsCurrent := found && rollingTargetStatusIsCurrent(
-			opsRes.Cluster.Generation, opsRes.OpsRequest.Status.ClusterGeneration, observedGeneration, upToDate)
-		switch {
-		case statusIsCurrent && phase == appsv1.FailedComponentPhase:
+
+		if opsRes.Cluster.Generation > opsRes.OpsRequest.Status.ClusterGeneration {
+			opsCompStatus.Reason = "ClusterSpecSuperseded"
+			opsCompStatus.Message = fmt.Sprintf(
+				"Cluster generation %d superseded operation target generation %d",
+				opsRes.Cluster.Generation, opsRes.OpsRequest.Status.ClusterGeneration)
+			opsRes.OpsRequest.Status.Components[targetName] = opsCompStatus
 			failed = true
 			completed = false
-		case statusIsCurrent && (phase == appsv1.RunningComponentPhase || phase == appsv1.StoppedComponentPhase):
+			continue
+		}
+		if opsRes.Cluster.Generation < opsRes.OpsRequest.Status.ClusterGeneration {
+			completed = false
+			continue
+		}
+
+		targetSpec, targetFound := findRollingTargetSpec(opsRes.Cluster, targetName)
+		if !targetFound || opsCompStatus.TargetSpecHash == "" {
+			completed = false
+			continue
+		}
+		currentSpecHash, err := rollingTargetSpecHash(targetSpec)
+		if err != nil || currentSpecHash != opsCompStatus.TargetSpecHash {
+			opsCompStatus.Reason = "ClusterSpecSuperseded"
+			opsCompStatus.Message = "Cluster target spec no longer matches the intent submitted by this operation"
+			opsRes.OpsRequest.Status.Components[targetName] = opsCompStatus
+			failed = true
+			completed = false
+			continue
+		}
+
+		statusIsCurrent := found && rollingTargetStatusIsCurrent(
+			opsRes.Cluster.Generation, opsRes.OpsRequest.Status.ClusterGeneration, observedGeneration, upToDate)
+		if !statusIsCurrent {
+			completed = false
+			continue
+		}
+
+		progressState, hasProgress := progress[targetName]
+		switch {
+		case hasProgress && progressState.partial && progressState.failed:
+			failed = true
+			completed = false
+		case hasProgress && progressState.partial && progressState.completed:
+			// Aggregate Component health can include instances outside a partial operation.
+		case hasProgress && progressState.partial:
+			completed = false
+		case phase == appsv1.FailedComponentPhase:
+			failed = true
+			completed = false
+		case phase == appsv1.RunningComponentPhase || phase == appsv1.StoppedComponentPhase:
 		default:
 			completed = false
 		}
@@ -390,8 +503,8 @@ func (c componentOpsHelper) rollingTargetsState(opsRes *OpsResource) (completed,
 }
 
 func rollingTargetStatusIsCurrent(clusterGeneration, opsClusterGeneration, observedGeneration int64, upToDate bool) bool {
-	return observedGeneration >= opsClusterGeneration &&
-		observedGeneration == clusterGeneration && upToDate
+	return clusterGeneration == opsClusterGeneration &&
+		observedGeneration == opsClusterGeneration && upToDate
 }
 
 func noAnyProgressCompleted(replicas, completedCount int32) bool {

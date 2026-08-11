@@ -295,7 +295,24 @@ func mockRollingRevisionStatus(cluster *appsv1.Cluster, compName, targetRevision
 				its.Status.CurrentRevisions[name] = targetRevision
 			}
 		}
+		for i := range its.Status.InstanceStatus {
+			status := &its.Status.InstanceStatus[i]
+			status.UpdateRevision = targetRevision
+			status.CurrentRevision = "previous-revision"
+			if _, ok := applied[status.PodName]; ok {
+				status.CurrentRevision = targetRevision
+			}
+		}
 		its.Status.ObservedGeneration = its.Generation
+	})).Should(Succeed())
+}
+
+func mockRollingOpsTargetStatus(opsRes *OpsResource, helper componentOpsHelper) {
+	Expect(helper.recordRollingTargetSpecs(opsRes)).Should(Succeed())
+	opsRes.OpsRequest.Status.ClusterGeneration = opsRes.Cluster.Generation
+	targetStatus := opsRes.OpsRequest.DeepCopy().Status
+	Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest), func(ops *opsv1alpha1.OpsRequest) {
+		ops.Status = targetStatus
 	})).Should(Succeed())
 }
 

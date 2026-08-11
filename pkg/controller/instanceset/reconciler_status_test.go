@@ -399,15 +399,23 @@ var _ = Describe("status reconciler test", func() {
 			replicas := int32(3)
 			its.Spec.Replicas = &replicas
 			its.Status.InstanceStatus = oldInstanceStatus
-			Expect(setInstanceStatus(nil, its, pods)).Should(Succeed())
+			currentRevisions := map[string]string{"pod-0": "rev-a", "pod-1": "rev-a", "pod-2": "rev-a"}
+			updateRevisions := map[string]string{"pod-0": "rev-b", "pod-1": "rev-b", "pod-2": "rev-b", "pod-3": "rev-b"}
+			Expect(setInstanceStatus(nil, its, pods, currentRevisions, updateRevisions)).Should(Succeed())
 
-			Expect(its.Status.InstanceStatus).Should(HaveLen(3))
+			Expect(its.Status.InstanceStatus).Should(HaveLen(4))
 			Expect(its.Status.InstanceStatus[0].PodName).Should(Equal("pod-0"))
 			Expect(its.Status.InstanceStatus[0].Role).Should(Equal("follower"))
+			Expect(its.Status.InstanceStatus[0].CurrentRevision).Should(Equal("rev-a"))
+			Expect(its.Status.InstanceStatus[0].UpdateRevision).Should(Equal("rev-b"))
 			Expect(its.Status.InstanceStatus[1].PodName).Should(Equal("pod-1"))
 			Expect(its.Status.InstanceStatus[1].Role).Should(Equal("leader"))
 			Expect(its.Status.InstanceStatus[2].PodName).Should(Equal("pod-2"))
 			Expect(its.Status.InstanceStatus[2].Role).Should(Equal(""))
+			Expect(its.Status.InstanceStatus[3]).Should(Equal(workloads.InstanceStatus{
+				PodName:        "pod-3",
+				UpdateRevision: "rev-b",
+			}))
 		})
 
 		Context("restore condition", func() {

@@ -78,9 +78,16 @@ var _ = Describe("Upgrade OpsRequest", func() {
 		// do upgrade
 		_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 		Expect(err).ShouldNot(HaveOccurred())
+		Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(opsv1alpha1.OpsCreatingPhase))
+		Expect(opsRes.OpsRequest.Status.Components[defaultCompName].TargetSpecHash).ShouldNot(BeEmpty())
+		targetComponents := opsRes.OpsRequest.Status.Components
 		mockComponentIsOperating(opsRes.Cluster, appsv1.UpdatingComponentPhase, defaultCompName)
-		Expect(testapps.ChangeObjStatus(&testCtx, opsRes.OpsRequest, func() {
-			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsRunningPhase
+		opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsRunningPhase
+		opsRes.OpsRequest.Status.ClusterGeneration = opsRes.Cluster.Generation
+		Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest), func(ops *opsv1alpha1.OpsRequest) {
+			ops.Status.Phase = opsv1alpha1.OpsRunningPhase
+			ops.Status.ClusterGeneration = opsRes.Cluster.Generation
+			ops.Status.Components = targetComponents
 		})).Should(Succeed())
 	}
 
@@ -257,6 +264,14 @@ var _ = Describe("Upgrade OpsRequest", func() {
 
 			By("the ops succeeds from the current Cluster status without inspecting Pod images")
 			mockComponentIsOperating(opsRes.Cluster, appsv1.RunningComponentPhase, defaultCompName)
+			Expect(opsRes.OpsRequest.Status.ClusterGeneration).Should(Equal(opsRes.Cluster.Generation))
+			targetStatus := opsRes.OpsRequest.Status.Components[defaultCompName]
+			Expect(targetStatus.TargetSpecHash).ShouldNot(BeEmpty())
+			targetSpec, found := findRollingTargetSpec(opsRes.Cluster, defaultCompName)
+			Expect(found).Should(BeTrue())
+			currentHash, hashErr := rollingTargetSpecHash(targetSpec)
+			Expect(hashErr).ShouldNot(HaveOccurred())
+			Expect(currentHash).Should(Equal(targetStatus.TargetSpecHash))
 			_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsSucceedPhase))

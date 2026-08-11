@@ -128,6 +128,7 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 			By("test vertical scale action function")
 			vsHandler := verticalScalingHandler{}
 			Expect(vsHandler.Action(reqCtx, k8sClient, opsRes)).Should(Succeed())
+			mockRollingOpsTargetStatus(opsRes, newComponentOpsHelper(verticalScaling))
 			_, _, err = vsHandler.ReconcileAction(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 			return opsRes

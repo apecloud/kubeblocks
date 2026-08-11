@@ -77,22 +77,18 @@ func (r restartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		shardingSpec := &opsRes.Cluster.Spec.Shardings[i]
 		r.doRestart(opsRes, &shardingSpec.Template, shardingSpec.Name)
 	}
-	return cli.Update(reqCtx.Ctx, opsRes.Cluster)
+	if err := cli.Update(reqCtx.Ctx, opsRes.Cluster); err != nil {
+		return err
+	}
+	return r.compOpsHelper.recordRollingTargetSpecs(opsRes)
 }
 
 // ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
 // the Reconcile function for restart opsRequest.
 func (r restartOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (opsv1alpha1.OpsPhase, time.Duration, error) {
 	r.compOpsHelper = newComponentOpsHelper(opsRes.OpsRequest.Spec.RestartList)
-	handleRestartProgress := func(reqCtx intctrlutil.RequestCtx,
-		cli client.Client,
-		opsRes *OpsResource,
-		pgRes *progressResource,
-		compStatus *opsv1alpha1.OpsRequestComponentStatus) (expectProgressCount int32, completedCount int32, err error) {
-		return handleRollingProgressByRevision(reqCtx, cli, opsRes, pgRes, compStatus)
-	}
 	return r.compOpsHelper.reconcileRollingActionWithComponentOps(reqCtx, cli, opsRes,
-		"restart", handleRestartProgress)
+		"restart", handleRollingProgressByRevision)
 }
 
 // SaveLastConfiguration this operation only restart the pods of the component, no changes for Cluster.spec.
@@ -110,7 +106,7 @@ func (r restartOpsHandler) doRestart(opsRes *OpsResource, compSpec *appsv1.Clust
 	}
 	startTimestamp := opsRes.OpsRequest.Status.StartTimestamp
 	workloadRestartTimeStamp := compSpec.Annotations[constant.RestartAnnotationKey]
-	if res, _ := time.Parse(time.RFC3339, workloadRestartTimeStamp); startTimestamp.After(res) {
-		compSpec.Annotations[constant.RestartAnnotationKey] = startTimestamp.Format(time.RFC3339)
+	if res, _ := time.Parse(time.RFC3339Nano, workloadRestartTimeStamp); startTimestamp.After(res) {
+		compSpec.Annotations[constant.RestartAnnotationKey] = startTimestamp.Format(time.RFC3339Nano)
 	}
 }

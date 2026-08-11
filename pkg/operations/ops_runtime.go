@@ -21,13 +21,11 @@ package operations
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -116,14 +114,6 @@ func (r *opsRuntime) GetWorkload(namespace, clusterName, compName string) (Workl
 		instanceNames:      sets.New[string](),
 	}
 	if its.Name != "" {
-		currRevisionMap, err := instanceset.GetRevisions(its.Status.CurrentRevisions)
-		if err != nil {
-			return nil, fmt.Errorf("decode InstanceSet %s current revisions: %w", its.Name, err)
-		}
-		updateRevisionMap, err := instanceset.GetRevisions(its.Status.UpdateRevisions)
-		if err != nil {
-			return nil, fmt.Errorf("decode InstanceSet %s update revisions: %w", its.Name, err)
-		}
 		workload.exists = true
 		workload.statusObserved = its.Status.ObservedGeneration == its.Generation
 		workload.minReadySeconds = its.Spec.MinReadySeconds
@@ -131,17 +121,19 @@ func (r *opsRuntime) GetWorkload(namespace, clusterName, compName string) (Workl
 			workload.desiredReplicas = *its.Spec.Replicas
 		}
 		workload.currentReplicas = its.Status.Replicas
-		workload.currentRevisionMap = currRevisionMap
-		workload.updateRevisionMap = updateRevisionMap
-		workload.instanceNames = sets.KeySet(currRevisionMap)
-		if workload.notReadySet, err = getInstanceNamesFromCondition(its, workloads.InstanceReady, metav1.ConditionFalse); err != nil {
-			return nil, err
-		}
-		if workload.notAvailableSet, err = getInstanceNamesFromCondition(its, workloads.InstanceAvailable, metav1.ConditionFalse); err != nil {
-			return nil, err
-		}
-		if workload.failedSet, err = getInstanceNamesFromCondition(its, workloads.InstanceFailure, metav1.ConditionTrue); err != nil {
-			return nil, err
+		for _, status := range its.Status.InstanceStatus {
+			workload.instanceNames.Insert(status.PodName)
+			workload.currentRevisionMap[status.PodName] = status.CurrentRevision
+			workload.updateRevisionMap[status.PodName] = status.UpdateRevision
+			if !status.Ready {
+				workload.notReadySet.Insert(status.PodName)
+			}
+			if !status.Available {
+				workload.notAvailableSet.Insert(status.PodName)
+			}
+			if status.Failed {
+				workload.failedSet.Insert(status.PodName)
+			}
 		}
 		return workload, nil
 	}
@@ -175,20 +167,6 @@ func (r *opsRuntime) GetWorkload(namespace, clusterName, compName string) (Workl
 		}
 	}
 	return workload, nil
-}
-
-func getInstanceNamesFromCondition(its *workloads.InstanceSet, conditionType workloads.ConditionType,
-	conditionStatus metav1.ConditionStatus) (sets.Set[string], error) {
-	result := sets.New[string]()
-	condition := meta.FindStatusCondition(its.Status.Conditions, string(conditionType))
-	if condition == nil || condition.Status != conditionStatus || condition.Message == "" {
-		return result, nil
-	}
-	var names []string
-	if err := json.Unmarshal([]byte(condition.Message), &names); err != nil {
-		return nil, fmt.Errorf("decode InstanceSet %s condition %s: %w", its.Name, conditionType, err)
-	}
-	return sets.New(names...), nil
 }
 
 func (r *opsRuntime) GetInstance(namespace, clusterName, compName, instanceName string) (Instance, error) {

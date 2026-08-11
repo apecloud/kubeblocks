@@ -154,7 +154,7 @@ func updateProgressDetailTime(progressDetail *opsv1alpha1.ProgressStatusDetail) 
 }
 
 // handleRollingProgressByRevision reports rolling progress from the InstanceSet status contract.
-// Cluster component/sharding status remains the authority for the operation's terminal phase.
+// Its participant summary also supplies the terminal result for partial operations.
 func handleRollingProgressByRevision(
 	reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
@@ -181,6 +181,9 @@ func handleRollingProgressByRevisionWithWorkload(
 	workload Workload,
 	pgRes *progressResource,
 	compStatus *opsv1alpha1.OpsRequestComponentStatus) (int32, int32) {
+	pgRes.rollingProgressCompleted = false
+	pgRes.rollingProgressFailed = false
+	pgRes.partialRollingTarget = pgRes.updatedPodSet != nil
 	currentRevisions := workload.GetCurrentRevisionMap()
 	updateRevisions := workload.GetUpdateRevisionMap()
 	targetNames := make([]string, 0)
@@ -222,6 +225,7 @@ func handleRollingProgressByRevisionWithWorkload(
 		targetApplied := hasTargetRevision && targetRevision != "" && currentRevisions[name] == targetRevision
 		switch {
 		case targetApplied && failed.Has(name):
+			pgRes.rollingProgressFailed = true
 			detail.SetStatusAndMessage(opsv1alpha1.FailedProgressStatus,
 				getProgressFailedMessage(messageKey, objectKey, componentName,
 					getFailedPodMessage(opsRes.Cluster, componentName, name)))
@@ -238,6 +242,7 @@ func handleRollingProgressByRevisionWithWorkload(
 		setComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest,
 			&compStatus.ProgressDetails, detail)
 	}
+	pgRes.rollingProgressCompleted = !pgRes.rollingProgressFailed && completedCount == expectedCount
 	return expectedCount, completedCount
 }
 

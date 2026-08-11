@@ -81,7 +81,10 @@ func (u upgradeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		}); err != nil {
 		return err
 	}
-	return cli.Update(reqCtx.Ctx, opsRes.Cluster)
+	if err := cli.Update(reqCtx.Ctx, opsRes.Cluster); err != nil {
+		return err
+	}
+	return compOpsHelper.recordRollingTargetSpecs(opsRes)
 }
 
 // ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
@@ -89,14 +92,8 @@ func (u upgradeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (opsv1alpha1.OpsPhase, time.Duration, error) {
 	upgradeSpec := opsRes.OpsRequest.Spec.Upgrade
 	compOpsHelper := newComponentOpsHelper(upgradeSpec.Components)
-	handleUpgradeProgress := func(reqCtx intctrlutil.RequestCtx,
-		cli client.Client,
-		opsRes *OpsResource,
-		pgRes *progressResource,
-		compStatus *opsv1alpha1.OpsRequestComponentStatus) (expectProgressCount int32, completedCount int32, err error) {
-		return handleRollingProgressByRevision(reqCtx, cli, opsRes, pgRes, compStatus)
-	}
-	return compOpsHelper.reconcileRollingActionWithComponentOps(reqCtx, cli, opsRes, "upgrade", handleUpgradeProgress)
+	return compOpsHelper.reconcileRollingActionWithComponentOps(
+		reqCtx, cli, opsRes, "upgrade", handleRollingProgressByRevision)
 }
 
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration

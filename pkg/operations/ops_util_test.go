@@ -169,19 +169,12 @@ var _ = Describe("OpsUtil functions", func() {
 			opsRes.Cluster.Status.SetComponentStatus(defaultCompName, clusterComp)
 
 			By("expect for opsRequest is running")
-			handleRestartProgress := func(reqCtx intctrlutil.RequestCtx,
-				cli client.Client,
-				opsRes *OpsResource,
-				pgRes *progressResource,
-				compStatus *opsv1alpha1.OpsRequestComponentStatus) (expectProgressCount int32, completedCount int32, err error) {
-				return handleRollingProgressByRevision(reqCtx, cli, opsRes, pgRes, compStatus)
-			}
-
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
 			compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.RestartList)
+			mockRollingOpsTargetStatus(opsRes, compOpsHelper)
 
 			opsPhase, _, err := compOpsHelper.reconcileRollingActionWithComponentOps(reqCtx, k8sClient, opsRes,
-				"test", handleRestartProgress)
+				"test", handleRollingProgressByRevision)
 			Expect(err).Should(BeNil())
 			Expect(opsPhase).Should(Equal(opsv1alpha1.OpsRunningPhase))
 
@@ -195,7 +188,7 @@ var _ = Describe("OpsUtil functions", func() {
 			clusterComp.ObservedGeneration = opsRes.Cluster.Generation
 			clusterComp.UpToDate = true
 			opsRes.Cluster.Status.SetComponentStatus(defaultCompName, clusterComp)
-			opsPhase, _, err = compOpsHelper.reconcileRollingActionWithComponentOps(reqCtx, k8sClient, opsRes, "test", handleRestartProgress)
+			opsPhase, _, err = compOpsHelper.reconcileRollingActionWithComponentOps(reqCtx, k8sClient, opsRes, "test", handleRollingProgressByRevision)
 			Expect(err).Should(BeNil())
 			Expect(opsPhase).Should(Equal(opsv1alpha1.OpsFailedPhase))
 		})
@@ -217,14 +210,6 @@ var _ = Describe("OpsUtil functions", func() {
 			Expect(err).Should(BeNil())
 			opsRes.Runtimes = runtimes
 
-			handleRestartProgress := func(reqCtx intctrlutil.RequestCtx,
-				cli client.Client,
-				opsRes *OpsResource,
-				pgRes *progressResource,
-				compStatus *opsv1alpha1.OpsRequestComponentStatus) (expectProgressCount int32, completedCount int32, err error) {
-				return handleRollingProgressByRevision(reqCtx, cli, opsRes, pgRes, compStatus)
-			}
-
 			recreatePod := func(pod *corev1.Pod) *corev1.Pod {
 				testk8s.MockPodIsTerminating(ctx, testCtx, pod)
 				testk8s.RemovePodFinalizer(ctx, testCtx, pod)
@@ -238,8 +223,9 @@ var _ = Describe("OpsUtil functions", func() {
 
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
 			compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.RestartList)
+			mockRollingOpsTargetStatus(opsRes, compOpsHelper)
 			opsPhase, requeueAfter, err := compOpsHelper.reconcileRollingActionWithComponentOps(reqCtx, k8sClient, opsRes,
-				"test", handleRestartProgress)
+				"test", handleRollingProgressByRevision)
 			Expect(err).Should(BeNil())
 			Expect(opsPhase).Should(Equal(opsv1alpha1.OpsRunningPhase))
 			Expect(requeueAfter).Should(BeZero())
@@ -275,7 +261,7 @@ var _ = Describe("OpsUtil functions", func() {
 			mockComponentIsOperating(opsRes.Cluster, appsv1.RunningComponentPhase, defaultCompName)
 
 			opsPhase, _, err = compOpsHelper.reconcileRollingActionWithComponentOps(reqCtx, k8sClient, opsRes,
-				"test", handleRestartProgress)
+				"test", handleRollingProgressByRevision)
 			Expect(err).Should(BeNil())
 			Expect(opsPhase).Should(Equal(opsv1alpha1.OpsSucceedPhase))
 			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("3/3"))
@@ -298,14 +284,6 @@ var _ = Describe("OpsUtil functions", func() {
 			Expect(err).Should(BeNil())
 			opsRes.Runtimes = runtimes
 
-			handleRestartProgress := func(reqCtx intctrlutil.RequestCtx,
-				cli client.Client,
-				opsRes *OpsResource,
-				pgRes *progressResource,
-				compStatus *opsv1alpha1.OpsRequestComponentStatus) (expectProgressCount int32, completedCount int32, err error) {
-				return handleRollingProgressByRevision(reqCtx, cli, opsRes, pgRes, compStatus)
-			}
-
 			recreatePod := func(pod *corev1.Pod) *corev1.Pod {
 				testk8s.MockPodIsTerminating(ctx, testCtx, pod)
 				testk8s.RemovePodFinalizer(ctx, testCtx, pod)
@@ -319,8 +297,9 @@ var _ = Describe("OpsUtil functions", func() {
 
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
 			compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.RestartList)
+			mockRollingOpsTargetStatus(opsRes, compOpsHelper)
 			opsPhase, requeueAfter, err := compOpsHelper.reconcileRollingActionWithComponentOps(reqCtx, k8sClient, opsRes,
-				"test", handleRestartProgress)
+				"test", handleRollingProgressByRevision)
 			Expect(err).Should(BeNil())
 			Expect(opsPhase).Should(Equal(opsv1alpha1.OpsRunningPhase))
 			Expect(requeueAfter).Should(BeZero())
@@ -329,7 +308,7 @@ var _ = Describe("OpsUtil functions", func() {
 			mockComponentIsOperating(opsRes.Cluster, appsv1.FailedComponentPhase, defaultCompName)
 
 			opsPhase, requeueAfter, err = compOpsHelper.reconcileRollingActionWithComponentOps(reqCtx, k8sClient, opsRes,
-				"test", handleRestartProgress)
+				"test", handleRollingProgressByRevision)
 			Expect(err).Should(BeNil())
 			Expect(requeueAfter).Should(BeZero())
 			Expect(opsPhase).Should(Equal(opsv1alpha1.OpsFailedPhase))
@@ -376,6 +355,7 @@ var _ = Describe("OpsUtil functions", func() {
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
 			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
+			mockRollingOpsTargetStatus(opsRes, newComponentOpsHelper(opsRes.OpsRequest.Spec.RestartList))
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(haConfig), func(g Gomega, cm *corev1.ConfigMap) {
 				cm.Annotations["enable"] = "false"
 			})).Should(Succeed())

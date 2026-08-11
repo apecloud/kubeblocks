@@ -111,6 +111,11 @@ type progressResource struct {
 	// checks if it needs to wait the component to complete.
 	// if only updates a part of pods, set it to false.
 	noWaitComponentCompleted bool
+	// rollingProgressCompleted and rollingProgressFailed summarize only the
+	// instances participating in this rolling operation.
+	rollingProgressCompleted bool
+	rollingProgressFailed    bool
+	partialRollingTarget     bool
 }
 
 // OpsRuntime abstracts the standard ops paths that only need workload/member views

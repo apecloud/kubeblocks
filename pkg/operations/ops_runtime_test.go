@@ -72,6 +72,13 @@ func TestOpsRuntimeBuildsInstanceAPIView(t *testing.T) {
 			UpdateRevisions: map[string]string{
 				instanceName: "rev-b",
 			},
+			InstanceStatus: []workloads.InstanceStatus{{
+				PodName:         instanceName,
+				CurrentRevision: "rev-a",
+				UpdateRevision:  "rev-b",
+				Ready:           true,
+				Available:       true,
+			}},
 		},
 	}
 	pod := &corev1.Pod{
@@ -264,7 +271,7 @@ func TestOpsRuntimeBuildsInstanceAPIView(t *testing.T) {
 	}
 }
 
-func TestOpsRuntimeWorkloadMissingAndInvalidRevisionMap(t *testing.T) {
+func TestOpsRuntimeWorkloadMissingAndUsesPublicInstanceStatus(t *testing.T) {
 	scheme := runtime.NewScheme()
 	if err := corev1.AddToScheme(scheme); err != nil {
 		t.Fatal(err)
@@ -295,34 +302,25 @@ func TestOpsRuntimeWorkloadMissingAndInvalidRevisionMap(t *testing.T) {
 		},
 		Status: workloads.InstanceSetStatus{
 			CurrentRevisions: map[string]string{"zstd": "not-base64"},
+			UpdateRevisions:  map[string]string{"zstd": "not-base64"},
+			InstanceStatus: []workloads.InstanceStatus{{
+				PodName:         "cluster-mysql-0",
+				CurrentRevision: "rev-a",
+				UpdateRevision:  "rev-b",
+				Failed:          true,
+			}},
 		},
 	}
 	cli = fake.NewClientBuilder().WithScheme(scheme).WithObjects(its).Build()
 	rt = newOpsRuntime(context.Background(), cli, "")
-	if _, err = rt.GetWorkload(namespace, clusterName, component); err == nil {
-		t.Fatal("expected invalid revision map to return an error")
+	workload, err = rt.GetWorkload(namespace, clusterName, component)
+	if err != nil {
+		t.Fatalf("get workload from public instance status: %v", err)
 	}
-}
-
-func TestGetInstanceNamesFromCondition(t *testing.T) {
-	its := &workloads.InstanceSet{
-		ObjectMeta: metav1.ObjectMeta{Name: "cluster-mysql"},
-		Status: workloads.InstanceSetStatus{Conditions: []metav1.Condition{
-			{Type: string(workloads.InstanceReady), Status: metav1.ConditionFalse, Message: `["pod-0"]`},
-			{Type: string(workloads.InstanceFailure), Status: metav1.ConditionTrue, Message: `["pod-1"]`},
-		}},
-	}
-	notReady, err := getInstanceNamesFromCondition(its, workloads.InstanceReady, metav1.ConditionFalse)
-	if err != nil || !notReady.Has("pod-0") {
-		t.Fatalf("not-ready condition: names=%v err=%v", notReady, err)
-	}
-	failed, err := getInstanceNamesFromCondition(its, workloads.InstanceFailure, metav1.ConditionTrue)
-	if err != nil || !failed.Has("pod-1") {
-		t.Fatalf("failure condition: names=%v err=%v", failed, err)
-	}
-	its.Status.Conditions[0].Message = "not-json"
-	if _, err = getInstanceNamesFromCondition(its, workloads.InstanceReady, metav1.ConditionFalse); err == nil {
-		t.Fatal("expected an invalid condition message to return an error")
+	if workload.GetCurrentRevisionMap()["cluster-mysql-0"] != "rev-a" ||
+		workload.GetUpdateRevisionMap()["cluster-mysql-0"] != "rev-b" ||
+		!workload.GetFailedInstanceNameSet().Has("cluster-mysql-0") {
+		t.Fatal("workload did not use explicit InstanceStatus fields")
 	}
 }
 

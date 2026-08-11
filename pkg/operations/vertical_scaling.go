@@ -89,7 +89,10 @@ func (vs verticalScalingHandler) Action(reqCtx intctrlutil.RequestCtx, cli clien
 	if err := compOpsSet.updateClusterComponentsAndShardings(opsRes.Cluster, applyVerticalScaling); err != nil {
 		return err
 	}
-	return cli.Update(reqCtx.Ctx, opsRes.Cluster)
+	if err := cli.Update(reqCtx.Ctx, opsRes.Cluster); err != nil {
+		return err
+	}
+	return compOpsSet.recordRollingTargetSpecs(opsRes)
 }
 
 // ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.

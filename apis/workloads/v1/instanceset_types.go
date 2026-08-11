@@ -574,6 +574,31 @@ type InstanceStatus struct {
 	// +kubebuilder:default=Unknown
 	PodName string `json:"podName"`
 
+	// CurrentRevision identifies the revision currently used by the instance.
+	//
+	// +optional
+	CurrentRevision string `json:"currentRevision,omitempty"`
+
+	// UpdateRevision identifies the desired revision of the instance.
+	//
+	// +optional
+	UpdateRevision string `json:"updateRevision,omitempty"`
+
+	// Ready indicates whether the instance is ready to serve requests.
+	//
+	// +optional
+	Ready bool `json:"ready,omitempty"`
+
+	// Available indicates whether the instance has remained ready for at least MinReadySeconds.
+	//
+	// +optional
+	Available bool `json:"available,omitempty"`
+
+	// Failed indicates whether the instance has reached a terminal failure state.
+	//
+	// +optional
+	Failed bool `json:"failed,omitempty"`
+
 	// Represents the role of the instance observed.
 	//
 	// +optional

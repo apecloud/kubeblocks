@@ -11660,6 +11660,10 @@ spec:
                 description: Provides the status of each instance in the ITS.
                 items:
                   properties:
+                    available:
+                      description: Available indicates whether the instance has remained
+                        ready for at least MinReadySeconds.
+                      type: boolean
                     configs:
                       description: The status of configs.
                       items:
@@ -11675,12 +11679,28 @@ spec:
                         - name
                         type: object
                       type: array
+                    currentRevision:
+                      description: CurrentRevision identifies the revision currently
+                        used by the instance.
+                      type: string
+                    failed:
+                      description: Failed indicates whether the instance has reached
+                        a terminal failure state.
+                      type: boolean
                     podName:
                       default: Unknown
                       description: Represents the name of the pod.
                       type: string
+                    ready:
+                      description: Ready indicates whether the instance is ready to
+                        serve requests.
+                      type: boolean
                     role:
                       description: Represents the role of the instance observed.
+                      type: string
+                    updateRevision:
+                      description: UpdateRevision identifies the desired revision
+                        of the instance.
                       type: string
                     volumeExpansion:
                       description: Represents whether the instance is in volume expansion.

@@ -217,8 +217,8 @@ func TestOpsRuntimeBuildsInstanceAPIView(t *testing.T) {
 	if instance.GetImage("") != "mysql:8.0.36" {
 		t.Fatalf("unexpected default image: %s", instance.GetImage(""))
 	}
-	if instance.GetImage("missing") != "mysql:8.0.36" {
-		t.Fatalf("expected missing image lookup to fall back to first container")
+	if instance.GetImage("missing") != "" {
+		t.Fatalf("expected empty missing image")
 	}
 	if instance.GetNodeName() != "node-a" {
 		t.Fatalf("unexpected node name: %s", instance.GetNodeName())
@@ -238,15 +238,15 @@ func TestOpsRuntimeBuildsInstanceAPIView(t *testing.T) {
 	if len(instance.GetVolumeMounts("mysql")) != 1 {
 		t.Fatalf("expected mysql volume mounts")
 	}
-	if len(instance.GetVolumeMounts("missing")) != 1 {
-		t.Fatalf("expected missing container volume mounts to fall back to first container")
+	if instance.GetVolumeMounts("missing") != nil {
+		t.Fatalf("expected nil missing container volume mounts")
 	}
 	resources := instance.GetResources("mysql")
 	if resources.Requests.Cpu().String() != "100m" {
 		t.Fatalf("unexpected resources")
 	}
-	if len(instance.GetResources("missing").Requests) == 0 {
-		t.Fatalf("expected missing container resources to fall back to first container")
+	if len(instance.GetResources("missing").Requests) != 0 {
+		t.Fatalf("expected empty missing container resources")
 	}
 	creationTimestamp := instance.GetCreationTimestamp()
 	if creationTimestamp.IsZero() {
@@ -275,6 +275,33 @@ func TestOpsRuntimeBuildsInstanceAPIView(t *testing.T) {
 	}
 	if volume.IsExpanding() {
 		t.Fatalf("did not expect volume to be expanding")
+	}
+}
+
+func TestUpgradeInstanceImageAppliedIgnoresAbsentContainers(t *testing.T) {
+	instance := &defaultInstance{pod: &corev1.Pod{
+		Spec: corev1.PodSpec{Containers: []corev1.Container{{
+			Name:  "database",
+			Image: "example.com/database:2.0",
+		}}},
+		Status: corev1.PodStatus{ContainerStatuses: []corev1.ContainerStatus{{
+			Name:  "database",
+			Image: "example.com/database:2.0",
+		}}},
+	}}
+	expectContainers := []corev1.Container{
+		{Name: "database", Image: "example.com/database:2.0"},
+		{Name: "metrics", Image: "example.com/exporter:1.0"},
+	}
+	handler := upgradeOpsHandler{}
+
+	if !handler.instanceImageApplied(instance, expectContainers) {
+		t.Fatal("expected absent optional container to be ignored")
+	}
+
+	instance.pod.Spec.Containers[0].Image = "example.com/database:1.0"
+	if handler.instanceImageApplied(instance, expectContainers) {
+		t.Fatal("expected an outdated existing container to be rejected")
 	}
 }
 

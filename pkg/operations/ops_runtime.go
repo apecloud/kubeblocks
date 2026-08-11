@@ -514,6 +514,7 @@ func (i *defaultInstance) getContainer(containerName string) *corev1.Container {
 				return &i.pod.Spec.Containers[idx]
 			}
 		}
+		return nil
 	}
 	if len(i.pod.Spec.Containers) == 0 {
 		return nil

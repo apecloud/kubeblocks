@@ -230,6 +230,10 @@ dataprotection: generate build-checks ## Build dataprotection binary.
 kbagent: generate build-checks
 	$(GO) build -ldflags=${LD_FLAGS} -o bin/kbagent ./cmd/kbagent/main.go
 
+.PHONY: test-kbagent-init
+test-kbagent-init: ## Build the tools image and verify PID 1 orphan reaping.
+	hack/test-kbagent-init.sh
+
 .PHONY: helmhook
 helmhook:
 	$(GO) build -o bin/helmhook ./cmd/helmhook/main.go

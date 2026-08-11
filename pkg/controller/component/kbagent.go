@@ -41,6 +41,7 @@ import (
 
 const (
 	kbAgentCommand              = "/bin/kbagent"
+	kbAgentInitCommand          = "/bin/tini-static"
 	kbAgentSharedMountPath      = "/kubeblocks"
 	kbAgentCommandOnSharedMount = "/kubeblocks/kbagent"
 
@@ -461,7 +462,7 @@ func handleCustomImageNContainerDefined(synthesizedComp *SynthesizedComponent, c
 		initContainer := builder.NewContainerBuilder(kbagent.InitContainerName).
 			SetImage(viper.GetString(constant.KBToolsImage)).
 			SetImagePullPolicy(corev1.PullIfNotPresent).
-			AddCommands([]string{"cp", "-r", kbAgentCommand, kbAgentSharedMountPath + "/"}...).
+			AddCommands([]string{"cp", "-r", kbAgentCommand, kbAgentInitCommand, kbAgentSharedMountPath + "/"}...).
 			AddVolumeMounts(sharedVolumeMount).
 			GetObject()
 		synthesizedComp.PodSpec.InitContainers = append(synthesizedComp.PodSpec.InitContainers, *initContainer)

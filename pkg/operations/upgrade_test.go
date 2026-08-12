@@ -270,7 +270,7 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			Expect(targetStatus.TargetSpecHash).ShouldNot(BeEmpty())
 			targetSpec, found := findRollingTargetSpec(opsRes.Cluster, defaultCompName)
 			Expect(found).Should(BeTrue())
-			currentHash, hashErr := rollingTargetSpecHash(targetSpec)
+			currentHash, hashErr := rollingTargetSpecHash(targetSpec, opsRes.OpsRequest.Spec.Upgrade.Components[0])
 			Expect(hashErr).ShouldNot(HaveOccurred())
 			Expect(currentHash).Should(Equal(targetStatus.TargetSpecHash))
 			_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)

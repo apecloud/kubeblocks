@@ -20004,7 +20004,8 @@ int64
 <td>
 <em>(Optional)</em>
 <p>observedGeneration is the most recent generation observed for this InstanceSet. It corresponds to the
-InstanceSet&rsquo;s generation, which is updated on mutation by the API Server.</p>
+InstanceSet&rsquo;s generation, which is updated on mutation by the API Server. When it matches metadata.generation,
+UpdateRevisions and InstanceStatus form one consistent snapshot computed for that generation.</p>
 </td>
 </tr>
 <tr>
@@ -20142,7 +20143,8 @@ This value remains constant once it equals InitReplicas.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Provides the status of each instance in the ITS.</p>
+<p>Provides the status of every desired or observed instance in the ITS. Revision, readiness, availability,
+and failure fields are published atomically with ObservedGeneration.</p>
 </td>
 </tr>
 <tr>
@@ -20472,6 +20474,67 @@ string
 </td>
 <td>
 <p>Represents the name of the pod.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>currentRevision</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>CurrentRevision identifies the revision currently used by the instance.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>updateRevision</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>UpdateRevision identifies the desired revision of the instance.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>ready</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Ready indicates whether the instance is ready to serve requests.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>available</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Available indicates whether the instance has remained ready for at least MinReadySeconds.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>failed</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Failed indicates whether the instance reports a terminal failure state. It is independent of revision
+convergence; consumers must compare CurrentRevision and UpdateRevision when attributing a failure to a rollout.</p>
 </td>
 </tr>
 <tr>

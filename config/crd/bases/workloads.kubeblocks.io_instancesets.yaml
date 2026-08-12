@@ -11686,8 +11686,9 @@ spec:
                         used by the instance.
                       type: string
                     failed:
-                      description: Failed indicates whether the instance has reached
-                        a terminal failure state.
+                      description: |-
+                        Failed indicates whether the instance reports a terminal failure state. It is independent of revision
+                        convergence; consumers must compare CurrentRevision and UpdateRevision when attributing a failure to a rollout.
                       type: boolean
                     podName:
                       default: Unknown

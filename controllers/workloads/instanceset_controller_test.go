@@ -52,6 +52,19 @@ import (
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
+// legacyInstanceStatusFields keeps the reconfigure assertions focused on the
+// role/config/volume fields they were written to cover. Revision, readiness,
+// availability, and failure are validated by the InstanceStatus contract tests
+// in both workload controller implementations.
+func legacyInstanceStatusFields(status workloads.InstanceStatus) workloads.InstanceStatus {
+	status.CurrentRevision = ""
+	status.UpdateRevision = ""
+	status.Ready = false
+	status.Available = false
+	status.Failed = false
+	return status
+}
+
 var _ = Describe("InstanceSet Controller", func() {
 	var (
 		itsName = "test-instance-set"
@@ -468,7 +481,7 @@ var _ = Describe("InstanceSet Controller", func() {
 			By("check instance status")
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
-				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
+				g.Expect(legacyInstanceStatusFields(its.Status.InstanceStatus[0])).Should(Equal(workloads.InstanceStatus{
 					PodName: fmt.Sprintf("%s-0", itsObj.Name),
 					Configs: []workloads.InstanceConfigStatus{
 						{
@@ -526,7 +539,7 @@ var _ = Describe("InstanceSet Controller", func() {
 			By("check the init instance status")
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
-				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
+				g.Expect(legacyInstanceStatusFields(its.Status.InstanceStatus[0])).Should(Equal(workloads.InstanceStatus{
 					PodName: fmt.Sprintf("%s-0", itsObj.Name),
 					Configs: []workloads.InstanceConfigStatus{
 						{
@@ -559,7 +572,7 @@ var _ = Describe("InstanceSet Controller", func() {
 			By("check the instance status updated")
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
-				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
+				g.Expect(legacyInstanceStatusFields(its.Status.InstanceStatus[0])).Should(Equal(workloads.InstanceStatus{
 					PodName: fmt.Sprintf("%s-0", itsObj.Name),
 					Configs: []workloads.InstanceConfigStatus{
 						{
@@ -617,7 +630,7 @@ var _ = Describe("InstanceSet Controller", func() {
 			By("check the init instance status")
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
-				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
+				g.Expect(legacyInstanceStatusFields(its.Status.InstanceStatus[0])).Should(Equal(workloads.InstanceStatus{
 					PodName: fmt.Sprintf("%s-0", itsObj.Name),
 					Configs: []workloads.InstanceConfigStatus{
 						{
@@ -650,7 +663,7 @@ var _ = Describe("InstanceSet Controller", func() {
 			By("check the instance status updated")
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
-				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
+				g.Expect(legacyInstanceStatusFields(its.Status.InstanceStatus[0])).Should(Equal(workloads.InstanceStatus{
 					PodName: fmt.Sprintf("%s-0", itsObj.Name),
 					Configs: []workloads.InstanceConfigStatus{
 						{
@@ -688,7 +701,7 @@ var _ = Describe("InstanceSet Controller", func() {
 			By("check the init instance status")
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
-				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
+				g.Expect(legacyInstanceStatusFields(its.Status.InstanceStatus[0])).Should(Equal(workloads.InstanceStatus{
 					PodName: fmt.Sprintf("%s-0", itsObj.Name),
 					Configs: []workloads.InstanceConfigStatus{
 						{
@@ -718,7 +731,7 @@ var _ = Describe("InstanceSet Controller", func() {
 			By("check the instance status updated")
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
-				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
+				g.Expect(legacyInstanceStatusFields(its.Status.InstanceStatus[0])).Should(Equal(workloads.InstanceStatus{
 					PodName: fmt.Sprintf("%s-0", itsObj.Name),
 					Configs: []workloads.InstanceConfigStatus{
 						{
@@ -780,7 +793,7 @@ var _ = Describe("InstanceSet Controller", func() {
 			By("check the init instance status")
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
-				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
+				g.Expect(legacyInstanceStatusFields(its.Status.InstanceStatus[0])).Should(Equal(workloads.InstanceStatus{
 					PodName: fmt.Sprintf("%s-0", itsObj.Name),
 					Configs: []workloads.InstanceConfigStatus{
 						{
@@ -822,7 +835,7 @@ var _ = Describe("InstanceSet Controller", func() {
 			By("check the instance status updated")
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
-				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
+				g.Expect(legacyInstanceStatusFields(its.Status.InstanceStatus[0])).Should(Equal(workloads.InstanceStatus{
 					PodName: fmt.Sprintf("%s-0", itsObj.Name),
 					Configs: []workloads.InstanceConfigStatus{
 						{
@@ -891,7 +904,7 @@ var _ = Describe("InstanceSet Controller", func() {
 			By("check the init instance status")
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
-				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
+				g.Expect(legacyInstanceStatusFields(its.Status.InstanceStatus[0])).Should(Equal(workloads.InstanceStatus{
 					PodName: fmt.Sprintf("%s-0", itsObj.Name),
 					Configs: []workloads.InstanceConfigStatus{
 						{
@@ -944,7 +957,7 @@ var _ = Describe("InstanceSet Controller", func() {
 			By("check the instance status updated")
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
-				g.Expect(its.Status.InstanceStatus[0]).Should(Equal(workloads.InstanceStatus{
+				g.Expect(legacyInstanceStatusFields(its.Status.InstanceStatus[0])).Should(Equal(workloads.InstanceStatus{
 					PodName: fmt.Sprintf("%s-0", itsObj.Name),
 					Configs: []workloads.InstanceConfigStatus{
 						{

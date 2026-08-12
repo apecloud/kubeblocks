@@ -416,6 +416,7 @@ var _ = Describe("status reconciler test", func() {
 			}
 			pods[0].Status.Conditions = append(pods[0].Status.Conditions, readyCondition)
 			pods[1].Status.Conditions = append(pods[1].Status.Conditions, readyCondition)
+			pods[2].Status.Phase = corev1.PodFailed
 			oldInstanceStatus := []workloads.InstanceStatus{
 				{
 					PodName: "pod-0",
@@ -446,6 +447,7 @@ var _ = Describe("status reconciler test", func() {
 			Expect(its.Status.InstanceStatus[1].Role).Should(Equal("leader"))
 			Expect(its.Status.InstanceStatus[2].PodName).Should(Equal("pod-2"))
 			Expect(its.Status.InstanceStatus[2].Role).Should(Equal(""))
+			Expect(its.Status.InstanceStatus[2].Failed).Should(BeTrue())
 			Expect(its.Status.InstanceStatus[3]).Should(Equal(workloads.InstanceStatus{
 				PodName:        "pod-3",
 				UpdateRevision: "rev-b",

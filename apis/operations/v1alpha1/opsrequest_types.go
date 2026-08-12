@@ -955,8 +955,9 @@ type Restore struct {
 
 // OpsRequestStatus represents the observed state of an OpsRequest.
 type OpsRequestStatus struct {
-	// Records the exact Cluster generation produced by the OpsRequest action.
-	// A later generation does not satisfy this operation and is treated as superseding its target.
+	// Records the Cluster generation produced by the OpsRequest action. A later generation may satisfy
+	// this operation only when the operation-owned target intent is still present and that later generation
+	// has been observed by the target status.
 	// +optional
 	ClusterGeneration int64 `json:"clusterGeneration,omitempty"`
 
@@ -1116,8 +1117,9 @@ type OpsRequestComponentStatus struct {
 	// +optional
 	Phase appsv1.ComponentPhase `json:"phase,omitempty"`
 
-	// TargetSpecHash identifies the exact Cluster component or sharding spec submitted by this operation.
-	// It binds no-op actions to an explicit desired-state intent and detects a changed target spec.
+	// TargetSpecHash identifies the operation-owned portion of the Cluster component or sharding spec.
+	// It binds no-op actions to an explicit desired-state intent and detects when a later change overwrites
+	// that intent, while allowing unrelated Cluster changes to converge concurrently.
 	//
 	// +optional
 	TargetSpecHash string `json:"targetSpecHash,omitempty"`

@@ -24,6 +24,8 @@ import (
 	"testing"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -50,7 +52,7 @@ func TestRollingTargetStatusGenerationFence(t *testing.T) {
 		{name: "current", clusterGeneration: 8, opsGeneration: 8, observed: 8, upToDate: true, want: true},
 		{name: "older than operation", clusterGeneration: 8, opsGeneration: 8, observed: 7, upToDate: true},
 		{name: "cluster changed again", clusterGeneration: 9, opsGeneration: 8, observed: 8, upToDate: true},
-		{name: "later generation converged", clusterGeneration: 9, opsGeneration: 8, observed: 9, upToDate: true},
+		{name: "later compatible generation converged", clusterGeneration: 9, opsGeneration: 8, observed: 9, upToDate: true, want: true},
 		{name: "not up to date", clusterGeneration: 8, opsGeneration: 8, observed: 8},
 	}
 	for _, tt := range tests {
@@ -86,6 +88,79 @@ func TestRestartIntentUsesNanosecondPrecision(t *testing.T) {
 	if got := compSpec.Annotations[constant.RestartAnnotationKey]; got == firstIntent {
 		t.Fatalf("two restart operations in one second reused intent %q", got)
 	}
+}
+
+func TestRollingTargetSpecHashScopesOperationIntent(t *testing.T) {
+	resources := func(cpu string) *corev1.ResourceRequirements {
+		return &corev1.ResourceRequirements{Requests: corev1.ResourceList{
+			corev1.ResourceCPU: resource.MustParse(cpu),
+		}}
+	}
+	hash := func(target *appsv1.ClusterComponentSpec, op ComponentOpsInterface) string {
+		t.Helper()
+		value, err := rollingTargetSpecHash(target, op)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return value
+	}
+
+	t.Run("upgrade ignores unrelated target fields but detects version overwrite", func(t *testing.T) {
+		target := &appsv1.ClusterComponentSpec{
+			ComponentDef:   "mysql",
+			ServiceVersion: "8.0.36",
+			Annotations: map[string]string{
+				constant.UpgradeIntentAnnotationKey: "upgrade-a",
+			},
+		}
+		op := opsv1alpha1.UpgradeComponent{ComponentOps: opsv1alpha1.ComponentOps{ComponentName: "mysql"}}
+		original := hash(target, op)
+		target.Labels = map[string]string{"expose": "enabled"}
+		target.Resources = *resources("1")
+		if got := hash(target, op); got != original {
+			t.Fatalf("unrelated fields changed upgrade intent hash: %s != %s", got, original)
+		}
+		target.ServiceVersion = "8.4.0"
+		if got := hash(target, op); got == original {
+			t.Fatal("serviceVersion overwrite did not change upgrade intent hash")
+		}
+	})
+
+	t.Run("restart is bound only to its receipt", func(t *testing.T) {
+		target := &appsv1.ClusterComponentSpec{Annotations: map[string]string{
+			constant.RestartAnnotationKey: "2026-08-12T00:00:00.000000001Z",
+		}}
+		op := opsv1alpha1.ComponentOps{ComponentName: "mysql"}
+		original := hash(target, op)
+		target.Resources = *resources("2")
+		if got := hash(target, op); got != original {
+			t.Fatalf("resource change changed restart intent hash: %s != %s", got, original)
+		}
+		target.Annotations[constant.RestartAnnotationKey] = "2026-08-12T00:00:00.000000002Z"
+		if got := hash(target, op); got == original {
+			t.Fatal("restart receipt overwrite did not change intent hash")
+		}
+	})
+
+	t.Run("partial vertical scaling tracks only selected templates", func(t *testing.T) {
+		target := &appsv1.ClusterComponentSpec{Instances: []appsv1.InstanceTemplate{
+			{Name: "selected", Resources: resources("1")},
+			{Name: "other", Resources: resources("1")},
+		}}
+		op := opsv1alpha1.VerticalScaling{
+			ComponentOps: opsv1alpha1.ComponentOps{ComponentName: "mysql"},
+			Instances:    []opsv1alpha1.InstanceResourceTemplate{{Name: "selected"}},
+		}
+		original := hash(target, op)
+		target.Instances[1].Resources = resources("2")
+		if got := hash(target, op); got != original {
+			t.Fatalf("unselected template changed vertical-scaling intent hash: %s != %s", got, original)
+		}
+		target.Instances[0].Resources = resources("2")
+		if got := hash(target, op); got == original {
+			t.Fatal("selected template overwrite did not change vertical-scaling intent hash")
+		}
+	})
 }
 
 func TestLatestUpgradeRequiresItsOwnObservedIntent(t *testing.T) {
@@ -348,10 +423,12 @@ func TestRollingComponentAndShardingTerminalStatus(t *testing.T) {
 		}
 	})
 
-	t.Run("later cluster generation supersedes the operation", func(t *testing.T) {
+	t.Run("later generation that overwrites the operation intent supersedes it", func(t *testing.T) {
 		cluster := &appsv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: clusterName, Generation: 8},
-			Spec:       appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{{Name: "mysql"}}},
+			Spec: appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{{
+				Name: "mysql", Annotations: map[string]string{constant.RestartAnnotationKey: "intent-a"},
+			}}},
 			Status: appsv1.ClusterStatus{Components: map[string]appsv1.ClusterComponentStatus{
 				"mysql": {Phase: appsv1.RunningComponentPhase, ObservedGeneration: 8, UpToDate: true},
 			}},
@@ -363,6 +440,7 @@ func TestRollingComponentAndShardingTerminalStatus(t *testing.T) {
 			t.Fatal(err)
 		}
 		cluster.Generation = 9
+		cluster.Spec.ComponentSpecs[0].Annotations[constant.RestartAnnotationKey] = "intent-b"
 		cluster.Status.Components["mysql"] = appsv1.ClusterComponentStatus{
 			Phase: appsv1.RunningComponentPhase, ObservedGeneration: 9, UpToDate: true,
 		}
@@ -372,6 +450,45 @@ func TestRollingComponentAndShardingTerminalStatus(t *testing.T) {
 		}
 		if got := ops.Status.Components["mysql"].Reason; got != "ClusterSpecSuperseded" {
 			t.Fatalf("reason=%q, want ClusterSpecSuperseded", got)
+		}
+	})
+
+	t.Run("later generation with unchanged operation intent is accepted", func(t *testing.T) {
+		cluster := &appsv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: clusterName, Generation: 8},
+			Spec: appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{{
+				Name: "mysql", Annotations: map[string]string{constant.RestartAnnotationKey: "intent-a"},
+			}}},
+			Status: appsv1.ClusterStatus{Components: map[string]appsv1.ClusterComponentStatus{
+				"mysql": {Phase: appsv1.RunningComponentPhase, ObservedGeneration: 8, UpToDate: true},
+			}},
+		}
+		ops := &opsv1alpha1.OpsRequest{Status: opsv1alpha1.OpsRequestStatus{ClusterGeneration: 8}}
+		helper := newComponentOpsHelper([]opsv1alpha1.ComponentOps{{ComponentName: "mysql"}})
+		opsRes := &OpsResource{Cluster: cluster, OpsRequest: ops}
+		if err := helper.recordRollingTargetSpecs(opsRes); err != nil {
+			t.Fatal(err)
+		}
+
+		// An unrelated concurrent operation changes only a top-level Cluster
+		// field. The rolling target intent is still intact, so the newer
+		// observed generation may satisfy this operation.
+		cluster.Generation = 9
+		cluster.Spec.Services = []appsv1.ClusterService{{Service: appsv1.Service{Name: "external"}}}
+		cluster.Status.Components["mysql"] = appsv1.ClusterComponentStatus{
+			Phase: appsv1.RunningComponentPhase, ObservedGeneration: 8, UpToDate: true,
+		}
+		completed, failed := helper.rollingTargetsState(opsRes, nil)
+		if completed || failed {
+			t.Fatalf("stale status completed=%v failed=%v, want processing", completed, failed)
+		}
+
+		cluster.Status.Components["mysql"] = appsv1.ClusterComponentStatus{
+			Phase: appsv1.RunningComponentPhase, ObservedGeneration: 9, UpToDate: true,
+		}
+		completed, failed = helper.rollingTargetsState(opsRes, nil)
+		if !completed || failed {
+			t.Fatalf("compatible generation completed=%v failed=%v, want success", completed, failed)
 		}
 	})
 

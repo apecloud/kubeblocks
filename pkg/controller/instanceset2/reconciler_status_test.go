@@ -641,10 +641,13 @@ func TestStatusReconcilerPublishesAtomicPerInstanceContract(t *testing.T) {
 		},
 	}
 	failed := desired[names[1]].DeepCopy()
-	failed.Generation = 1
+	// A failure from the previous revision remains part of the public status
+	// snapshot. Rolling consumers decide whether it applies to the target by
+	// comparing CurrentRevision and UpdateRevision.
+	failed.Generation = 2
 	failed.Status = workloads.InstanceStatus2{
 		ObservedGeneration: 1,
-		UpToDate:           true,
+		UpToDate:           false,
 		Conditions: []metav1.Condition{
 			{Type: string(workloads.InstanceFailure), Status: metav1.ConditionTrue},
 		},

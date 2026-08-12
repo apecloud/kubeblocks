@@ -26,8 +26,10 @@ import (
 	"fmt"
 	"reflect"
 	"slices"
+	"strings"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -83,23 +85,87 @@ func (c componentOpsHelper) updateClusterComponentsAndShardings(cluster *appsv1.
 	return nil
 }
 
-func rollingTargetSpecHash(target any) (string, error) {
-	data, err := json.Marshal(target)
+type rollingUpgradeIntent struct {
+	ComponentDef   string `json:"componentDef,omitempty"`
+	ServiceVersion string `json:"serviceVersion,omitempty"`
+	Receipt        string `json:"receipt,omitempty"`
+}
+
+type rollingRestartIntent struct {
+	RestartAt string `json:"restartAt,omitempty"`
+}
+
+type rollingInstanceResources struct {
+	Name      string                       `json:"name"`
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+}
+
+type rollingVerticalScalingIntent struct {
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+	Instances []rollingInstanceResources   `json:"instances,omitempty"`
+}
+
+// rollingTargetSpecHash fingerprints only the part of the Cluster target owned
+// by this operation. A later, compatible operation may advance Cluster
+// generation or change unrelated fields without invalidating the rolling
+// operation. Changes that overwrite its submitted intent still produce a
+// different hash and are treated as superseding it.
+func rollingTargetSpecHash(target *appsv1.ClusterComponentSpec, compOps ComponentOpsInterface) (string, error) {
+	var intent any
+	switch op := compOps.(type) {
+	case opsv1alpha1.UpgradeComponent:
+		intent = rollingUpgradeIntent{
+			ComponentDef:   target.ComponentDef,
+			ServiceVersion: target.ServiceVersion,
+			Receipt:        target.Annotations[constant.UpgradeIntentAnnotationKey],
+		}
+	case opsv1alpha1.VerticalScaling:
+		vsIntent := rollingVerticalScalingIntent{}
+		if len(op.Requests) > 0 || len(op.Limits) > 0 {
+			resources := target.Resources.DeepCopy()
+			vsIntent.Resources = resources
+		}
+		instanceNames := make(map[string]struct{}, len(op.Instances))
+		for _, instance := range op.Instances {
+			instanceNames[instance.Name] = struct{}{}
+		}
+		for i := range target.Instances {
+			instance := &target.Instances[i]
+			if _, ok := instanceNames[instance.Name]; !ok {
+				continue
+			}
+			vsIntent.Instances = append(vsIntent.Instances, rollingInstanceResources{
+				Name:      instance.Name,
+				Resources: instance.Resources.DeepCopy(),
+			})
+		}
+		slices.SortFunc(vsIntent.Instances, func(a, b rollingInstanceResources) int {
+			return strings.Compare(a.Name, b.Name)
+		})
+		intent = vsIntent
+	case opsv1alpha1.ComponentOps:
+		intent = rollingRestartIntent{RestartAt: target.Annotations[constant.RestartAnnotationKey]}
+	default:
+		// Some non-rolling cancellation paths share recordRollingTargetSpecs.
+		// Preserve their existing behavior until they provide a narrower intent.
+		intent = target
+	}
+	data, err := json.Marshal(intent)
 	if err != nil {
 		return "", err
 	}
 	return fmt.Sprintf("%x", sha256.Sum256(data)), nil
 }
 
-func findRollingTargetSpec(cluster *appsv1.Cluster, targetName string) (any, bool) {
+func findRollingTargetSpec(cluster *appsv1.Cluster, targetName string) (*appsv1.ClusterComponentSpec, bool) {
 	for i := range cluster.Spec.ComponentSpecs {
 		if cluster.Spec.ComponentSpecs[i].Name == targetName {
-			return cluster.Spec.ComponentSpecs[i], true
+			return &cluster.Spec.ComponentSpecs[i], true
 		}
 	}
 	for i := range cluster.Spec.Shardings {
 		if cluster.Spec.Shardings[i].Name == targetName {
-			return cluster.Spec.Shardings[i], true
+			return &cluster.Spec.Shardings[i].Template, true
 		}
 	}
 	return nil, false
@@ -109,12 +175,12 @@ func (c componentOpsHelper) recordRollingTargetSpecs(opsRes *OpsResource) error 
 	if opsRes.OpsRequest.Status.Components == nil {
 		opsRes.OpsRequest.Status.Components = map[string]opsv1alpha1.OpsRequestComponentStatus{}
 	}
-	for targetName := range c.componentOpsSet {
+	for targetName, compOps := range c.componentOpsSet {
 		target, found := findRollingTargetSpec(opsRes.Cluster, targetName)
 		if !found {
 			return fmt.Errorf("rolling operation target %q not found in Cluster spec", targetName)
 		}
-		hash, err := rollingTargetSpecHash(target)
+		hash, err := rollingTargetSpecHash(target, compOps)
 		if err != nil {
 			return fmt.Errorf("hash rolling operation target %q: %w", targetName, err)
 		}
@@ -445,27 +511,25 @@ func (c componentOpsHelper) rollingTargetsState(
 		opsCompStatus.Phase = phase
 		opsRes.OpsRequest.Status.Components[targetName] = opsCompStatus
 
-		if opsRes.Cluster.Generation > opsRes.OpsRequest.Status.ClusterGeneration {
-			opsCompStatus.Reason = "ClusterSpecSuperseded"
-			opsCompStatus.Message = fmt.Sprintf(
-				"Cluster generation %d superseded operation target generation %d",
-				opsRes.Cluster.Generation, opsRes.OpsRequest.Status.ClusterGeneration)
-			opsRes.OpsRequest.Status.Components[targetName] = opsCompStatus
-			failed = true
-			completed = false
-			continue
-		}
 		if opsRes.Cluster.Generation < opsRes.OpsRequest.Status.ClusterGeneration {
 			completed = false
 			continue
 		}
 
 		targetSpec, targetFound := findRollingTargetSpec(opsRes.Cluster, targetName)
-		if !targetFound || opsCompStatus.TargetSpecHash == "" {
+		if opsCompStatus.TargetSpecHash == "" {
 			completed = false
 			continue
 		}
-		currentSpecHash, err := rollingTargetSpecHash(targetSpec)
+		if !targetFound {
+			opsCompStatus.Reason = "ClusterSpecSuperseded"
+			opsCompStatus.Message = "Cluster target submitted by this operation no longer exists"
+			opsRes.OpsRequest.Status.Components[targetName] = opsCompStatus
+			failed = true
+			completed = false
+			continue
+		}
+		currentSpecHash, err := rollingTargetSpecHash(targetSpec, c.componentOpsSet[targetName])
 		if err != nil || currentSpecHash != opsCompStatus.TargetSpecHash {
 			opsCompStatus.Reason = "ClusterSpecSuperseded"
 			opsCompStatus.Message = "Cluster target spec no longer matches the intent submitted by this operation"
@@ -503,8 +567,8 @@ func (c componentOpsHelper) rollingTargetsState(
 }
 
 func rollingTargetStatusIsCurrent(clusterGeneration, opsClusterGeneration, observedGeneration int64, upToDate bool) bool {
-	return clusterGeneration == opsClusterGeneration &&
-		observedGeneration == opsClusterGeneration && upToDate
+	return clusterGeneration >= opsClusterGeneration &&
+		observedGeneration == clusterGeneration && upToDate
 }
 
 func noAnyProgressCompleted(replicas, completedCount int32) bool {

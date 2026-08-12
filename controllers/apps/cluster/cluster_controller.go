@@ -134,6 +134,8 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			&clusterNormalizationTransformer{},
 			// placement replicas across data-plane k8s clusters
 			&clusterPlacementTransformer{multiClusterMgr: r.MultiClusterMgr},
+			// handle cluster shared TLS
+			&clusterShardingTLSTransformer{},
 			// handle cluster shared account
 			&clusterShardingAccountTransformer{},
 			// handle cluster services

@@ -139,6 +139,14 @@ var _ = Describe("cluster sharding shared transformers", func() {
 		transCtx := newTransformContext()
 		sharding := newSharding()
 		compDef := newComponentDefinition()
+		flattenedComp := sharding.Template.DeepCopy()
+		templatedComp := sharding.Template.DeepCopy()
+		transCtx.shardingComps = map[string][]*appsv1.ClusterComponentSpec{
+			sharding.Name: {flattenedComp},
+		}
+		transCtx.shardingCompsWithTpl = map[string]map[string][]*appsv1.ClusterComponentSpec{
+			sharding.Name: {"template": {templatedComp}},
+		}
 
 		secret := transformer.newTLSSecret(transCtx, sharding, compDef)
 		Expect(secret.Namespace).Should(Equal(namespace))
@@ -158,6 +166,26 @@ var _ = Describe("cluster sharding shared transformers", func() {
 		Expect(sharding.Template.Issuer.SecretRef.CA).Should(Equal("ca.pem"))
 		Expect(sharding.Template.Issuer.SecretRef.Cert).Should(Equal("tls.crt"))
 		Expect(sharding.Template.Issuer.SecretRef.Key).Should(Equal("tls.key"))
+		for _, comp := range []*appsv1.ClusterComponentSpec{flattenedComp, templatedComp} {
+			Expect(comp.Issuer.Name).Should(Equal(appsv1.IssuerUserProvided))
+			Expect(comp.Issuer.SecretRef.Name).Should(Equal(shardingTLSSecretName(clusterName, shardingName)))
+			Expect(comp.Issuer.SecretRef.CA).Should(Equal("ca.pem"))
+			Expect(comp.Issuer.SecretRef.Cert).Should(Equal("tls.crt"))
+			Expect(comp.Issuer.SecretRef.Key).Should(Equal("tls.key"))
+		}
+	})
+
+	It("keeps managed labels authoritative on the shared TLS secret", func() {
+		transformer := &clusterShardingTLSTransformer{}
+		transCtx := newTransformContext()
+		sharding := newSharding()
+		compDef := newComponentDefinition()
+		sharding.Template.Labels[constant.AppInstanceLabelKey] = "other-cluster"
+		compDef.Spec.Labels[constant.KBAppShardingNameLabelKey] = "other-sharding"
+
+		secret := transformer.newTLSSecret(transCtx, sharding, compDef)
+		Expect(secret.Labels).Should(HaveKeyWithValue(constant.AppInstanceLabelKey, clusterName))
+		Expect(secret.Labels).Should(HaveKeyWithValue(constant.KBAppShardingNameLabelKey, shardingName))
 	})
 
 	It("handles stable shared TLS reconciliation guard branches", func() {
@@ -203,10 +231,35 @@ var _ = Describe("cluster sharding shared transformers", func() {
 		Expect(secret).Should(BeNil())
 
 		existing := &corev1.Secret{ObjectMeta: metav1ObjectMeta(shardingTLSSecretName(clusterName, shardingName), namespace)}
+		existing.Labels = constant.GetClusterLabels(clusterName, map[string]string{
+			constant.KBAppShardingNameLabelKey: shardingName,
+		})
 		secret, err = transformer.checkTLSSecret(newTransformContext(existing), sharding)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(secret).ShouldNot(BeNil())
 		Expect(secret.Name).Should(Equal(existing.Name))
+
+		unmanaged := existing.DeepCopy()
+		unmanaged.Labels = nil
+		secret, err = transformer.checkTLSSecret(newTransformContext(unmanaged), sharding)
+		Expect(err).Should(MatchError(ContainSubstring("is not managed by sharding")))
+		Expect(secret).Should(BeNil())
+	})
+
+	It("rejects shared TLS before dereferencing an unavailable TLS definition", func() {
+		transformer := &clusterShardingTLSTransformer{}
+		sharding := newSharding()
+		transCtx := newTransformContext()
+		transCtx.componentDefs = map[string]*appsv1.ComponentDefinition{}
+
+		Expect(transformer.reconcileShardingTLS(transCtx, nil, nil, sharding)).Should(
+			MatchError(ContainSubstring("component definition \"compdef\" not found")))
+
+		compDef := newComponentDefinition()
+		compDef.Spec.TLS = nil
+		transCtx.componentDefs[compDefName] = compDef
+		Expect(transformer.reconcileShardingTLS(transCtx, nil, nil, sharding)).Should(
+			MatchError(ContainSubstring("doesn't support it")))
 	})
 
 	It("resolves shared system accounts and applies cluster-level overrides", func() {

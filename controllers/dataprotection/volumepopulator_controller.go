@@ -327,34 +327,52 @@ func (r *VolumePopulatorReconciler) validateBoundPVCForCompletion(reqCtx intctrl
 	}
 
 	if artifacts.targetPV == nil {
-		message := "waiting for target PV to become observable before validating restore binding; preserving restore artifacts: " + details
-		if err := r.UpdatePVCConditions(reqCtx, pvc, ReasonPopulatingProcessing, message); err != nil {
-			return err
-		}
-		return intctrlutil.NewRequeueError(reconcileInterval, message)
+		return r.waitForBoundPVCObservation(reqCtx, pvc,
+			"target PV to become observable before validating restore binding", details)
 	}
 	if !pvClaimRefMatchesPVC(artifacts.targetPV.Spec.ClaimRef, pvc) {
+		if helperPVCBindingMayBeOutOfOrder(artifacts) {
+			return r.waitForBoundPVCObservation(reqCtx, pvc,
+				"target PV ClaimRef cache to reflect the completed helper-to-target rebind", details)
+		}
 		return intctrlutil.NewFatalError("target PV ClaimRef does not match target PVC; preserving restore artifacts: " + details)
 	}
 	expectedSource := pvc.Spec.DataSourceRef.Name
 	if artifacts.targetPV.Annotations[AnnPopulateFrom] != expectedSource {
+		if helperPVCBindingMayBeOutOfOrder(artifacts) {
+			return r.waitForBoundPVCObservation(reqCtx, pvc,
+				fmt.Sprintf("target PV annotation %s cache to reflect the completed helper-to-target rebind", AnnPopulateFrom), details)
+		}
 		return intctrlutil.NewFatalError(fmt.Sprintf(
 			"target PV %s annotation %s does not identify restore source %q; preserving restore artifacts: %s",
 			artifacts.targetPV.Name, AnnPopulateFrom, expectedSource, details))
 	}
 	if artifacts.populatePVC != nil {
 		if artifacts.populatePVC.Spec.VolumeName == "" {
-			message := "waiting for helper PVC binding state to catch up before releasing restore artifacts: " + details
-			if err := r.UpdatePVCConditions(reqCtx, pvc, ReasonPopulatingProcessing, message); err != nil {
-				return err
-			}
-			return intctrlutil.NewRequeueError(reconcileInterval, message)
+			return r.waitForBoundPVCObservation(reqCtx, pvc,
+				"helper PVC binding state to catch up before releasing restore artifacts", details)
 		}
 		if artifacts.populatePVC.Spec.VolumeName != artifacts.targetPV.Name {
 			return intctrlutil.NewFatalError("helper PVC and target PVC refer to different PVs; preserving restore artifacts: " + details)
 		}
 	}
 	return nil
+}
+
+func helperPVCBindingMayBeOutOfOrder(artifacts *boundPVCArtifacts) bool {
+	return artifacts.populatePVC != nil && artifacts.targetPV != nil &&
+		(artifacts.populatePVC.Spec.VolumeName == "" || artifacts.populatePVC.Spec.VolumeName == artifacts.targetPV.Name)
+}
+
+func (r *VolumePopulatorReconciler) waitForBoundPVCObservation(reqCtx intctrlutil.RequestCtx,
+	pvc *corev1.PersistentVolumeClaim,
+	observation,
+	details string) error {
+	message := fmt.Sprintf("waiting for %s; preserving restore artifacts: %s", observation, details)
+	if err := r.UpdatePVCConditions(reqCtx, pvc, ReasonPopulatingProcessing, message); err != nil {
+		return err
+	}
+	return intctrlutil.NewRequeueError(reconcileInterval, message)
 }
 
 // dispatchUnboundPVC routes an unbound PVC to either Populate or ProvisionOnly.
@@ -1245,7 +1263,7 @@ func (r *VolumePopulatorReconciler) waitForSerialPredecessors(reqCtx intctrlutil
 		if cond != nil && cond.Status == corev1.ConditionFalse {
 			return intctrlutil.NewFatalError(fmt.Sprintf("previous restore PVC %s/%s failed: %s", item.Namespace, item.Name, cond.Message))
 		}
-		if item.Spec.VolumeName != "" {
+		if pvcPopulateReleased(item) {
 			continue
 		}
 		if err = r.UpdatePVCConditions(reqCtx, pvc, ReasonPopulatingProcessing,
@@ -1550,7 +1568,7 @@ func (r *VolumePopulatorReconciler) allRestorePVCsForComponentBound(reqCtx intct
 		if cond != nil && cond.Status == corev1.ConditionFalse {
 			return false, intctrlutil.NewFatalError(fmt.Sprintf("restore PVC %s/%s failed: %s", item.Namespace, item.Name, cond.Message))
 		}
-		if item.Spec.VolumeName == "" {
+		if !pvcPopulateReleased(item) {
 			return false, nil
 		}
 	}
@@ -1568,7 +1586,7 @@ func (r *VolumePopulatorReconciler) allRestorePVCsForClusterBound(reqCtx intctrl
 		if cond != nil && cond.Status == corev1.ConditionFalse {
 			return false, intctrlutil.NewFatalError(fmt.Sprintf("restore PVC %s/%s failed: %s", item.Namespace, item.Name, cond.Message))
 		}
-		if item.Spec.VolumeName == "" {
+		if !pvcPopulateReleased(item) {
 			return false, nil
 		}
 	}
@@ -1620,9 +1638,7 @@ func findPVCConditionByType(pvc *corev1.PersistentVolumeClaim, conditionType str
 }
 
 func pvcPopulateReleased(pvc *corev1.PersistentVolumeClaim) bool {
-	cond := findPVCConditionByType(pvc, string(PersistentVolumeClaimPopulating))
-	return cond != nil && cond.Status == corev1.ConditionTrue &&
-		(cond.Reason == ReasonPopulatingSucceed || cond.Reason == ReasonPopulatingProvisioned)
+	return dptypes.IsPVCPopulationCompleted(pvc)
 }
 
 func (r *VolumePopulatorReconciler) listRestorePVCsForComponent(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim) ([]corev1.PersistentVolumeClaim, error) {
@@ -1786,7 +1802,7 @@ func (r *VolumePopulatorReconciler) cleanupDeletingPVC(reqCtx intctrlutil.Reques
 		if !apierrors.IsNotFound(err) {
 			return err
 		}
-	} else if metav1.IsControlledBy(executionRestore, pvc) {
+	} else if hasOwnerReference(executionRestore.OwnerReferences, pvc.UID) {
 		if executionRestore.DeletionTimestamp.IsZero() {
 			if err := r.Client.Delete(reqCtx.Ctx, executionRestore); err != nil && !apierrors.IsNotFound(err) {
 				return err
@@ -1795,6 +1811,10 @@ func (r *VolumePopulatorReconciler) cleanupDeletingPVC(reqCtx intctrlutil.Reques
 		return intctrlutil.NewRequeueError(reconcileInterval,
 			fmt.Sprintf("waiting for execution Restore %s/%s to be deleted before cleaning target PVC %s/%s",
 				executionRestore.Namespace, executionRestore.Name, pvc.Namespace, pvc.Name))
+	} else {
+		return intctrlutil.NewFatalError(fmt.Sprintf(
+			"execution Restore %s/%s is not owned by deleting target PVC %s/%s uid=%s; refusing to release helper resources",
+			executionRestore.Namespace, executionRestore.Name, pvc.Namespace, pvc.Name, pvc.UID))
 	}
 	return r.releasePopulateResources(reqCtx, pvc)
 }

@@ -22,7 +22,7 @@ package dataprotection
 import (
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
+	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 )
 
 const (
@@ -89,10 +89,10 @@ const (
 	// pvc condition type and reason
 	ReasonPopulatingFailed      = "Failed"
 	ReasonPopulatingProcessing  = "Processing"
-	ReasonPopulatingSucceed     = "Succeed"
-	ReasonPopulatingProvisioned = "Provisioned"
+	ReasonPopulatingSucceed     = dptypes.ReasonPopulatingSucceed
+	ReasonPopulatingProvisioned = dptypes.ReasonPopulatingProvisioned
 
-	PersistentVolumeClaimPopulating corev1.PersistentVolumeClaimConditionType = "Populating"
+	PersistentVolumeClaimPopulating = dptypes.PersistentVolumeClaimPopulating
 )
 
 var reconcileInterval = time.Second

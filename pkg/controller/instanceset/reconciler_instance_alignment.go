@@ -31,6 +31,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 )
 
 // instanceAlignmentReconciler is responsible for aligning the actual instances(pods) with the desired replicas specified in the spec,
@@ -89,6 +90,32 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		pod, _ := object.(*corev1.Pod)
 		oldInstanceMap[object.GetName()] = pod
 	}
+	// A Pod is needed to select a node for WaitForFirstConsumer storage. Keep it
+	// while the restore PVC is unbound, but remove it from the desired tree as
+	// soon as an unverified binding is observed. It will be recreated only after
+	// the populator has verified prepareData/provisioning completion.
+	for name, pod := range oldInstanceMap {
+		template, desired := nameToTemplateMap[name]
+		if !desired {
+			continue
+		}
+		restoreReady, err := instanceRestoreReadyForPod(tree, name, template, its)
+		if err != nil {
+			return kubebuilderx.Continue, err
+		}
+		if restoreReady {
+			continue
+		}
+		if err := tree.Delete(pod); err != nil {
+			return kubebuilderx.Continue, err
+		}
+		oldNameSet.Delete(name)
+		delete(oldInstanceMap, name)
+		if tree.EventRecorder != nil {
+			tree.EventRecorder.Eventf(its, corev1.EventTypeWarning,
+				"Waiting for restore PVC population to complete before starting Pod %s", name)
+		}
+	}
 	createNameSet := newNameSet.Difference(oldNameSet)
 	deleteNameSet := oldNameSet.Difference(newNameSet)
 
@@ -137,6 +164,21 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		predecessor := getPredecessor(i)
 		if isOrderedReady && predecessor != nil && !intctrlutil.IsPodAvailable(predecessor, its.Spec.MinReadySeconds) {
 			break
+		}
+		restoreReady, err := instanceRestoreReadyForPod(tree, name, nameToTemplateMap[name], its)
+		if err != nil {
+			return kubebuilderx.Continue, err
+		}
+		if !restoreReady {
+			// Include the instance in PVC alignment so its restore PVCs are
+			// created, but do not create the Pod until prepareData has been
+			// verified. This prevents a prematurely bound empty PV from being
+			// mounted and served as a healthy database.
+			currentAlignedNameList = append(currentAlignedNameList, name)
+			if isOrderedReady {
+				break
+			}
+			continue
 		}
 		newPod, err := buildInstancePodByTemplate(name, nameToTemplateMap[name], its, "")
 		if err != nil {
@@ -225,6 +267,40 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 	}
 
 	return kubebuilderx.Continue, nil
+}
+
+func instanceRestoreReadyForPod(tree *kubebuilderx.ObjectTree,
+	instanceName string,
+	template *instancetemplate.InstanceTemplateExt,
+	its *workloads.InstanceSet) (bool, error) {
+	pvcs, err := buildInstancePVCByTemplate(instanceName, template, its)
+	if err != nil {
+		return false, err
+	}
+	for _, desiredPVC := range pvcs {
+		if desiredPVC.Spec.DataSourceRef == nil || desiredPVC.Annotations[constant.RestoreSourceKindAnnotationKey] == "" {
+			continue
+		}
+		current, err := tree.Get(desiredPVC)
+		if err != nil {
+			return false, err
+		}
+		if current == nil {
+			// The Pod may be required for WaitForFirstConsumer storage to select
+			// a node. It cannot mount the restore volume before the PVC exists.
+			continue
+		}
+		currentPVC := current.(*corev1.PersistentVolumeClaim)
+		if currentPVC.Spec.VolumeName == "" {
+			// Keep the unscheduled Pod as the first consumer. Once the PVC is
+			// bound, the next PVC event will either verify it or remove the Pod.
+			continue
+		}
+		if !dptypes.IsPVCPopulationCompleted(currentPVC) {
+			return false, nil
+		}
+	}
+	return true, nil
 }
 
 var _ kubebuilderx.Reconciler = &instanceAlignmentReconciler{}

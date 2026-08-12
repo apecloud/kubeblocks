@@ -19,7 +19,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package types
 
+import corev1 "k8s.io/api/core/v1"
+
+const (
+	PersistentVolumeClaimPopulating corev1.PersistentVolumeClaimConditionType = "Populating"
+	ReasonPopulatingSucceed                                                   = "Succeed"
+	ReasonPopulatingProvisioned                                               = "Provisioned"
+)
+
 var (
 	// DefaultBackOffLimit is the default backoff limit for jobs.
 	DefaultBackOffLimit = int32(2)
 )
+
+// IsPVCPopulationCompleted reports whether the volume populator has verified
+// the prepareData/provisioning result and released the helper PVC. A bound PVC
+// alone is not sufficient because it may have been bound before restore data
+// was prepared.
+func IsPVCPopulationCompleted(pvc *corev1.PersistentVolumeClaim) bool {
+	if pvc == nil {
+		return false
+	}
+	for i := range pvc.Status.Conditions {
+		condition := &pvc.Status.Conditions[i]
+		if condition.Type != PersistentVolumeClaimPopulating || condition.Status != corev1.ConditionTrue {
+			continue
+		}
+		return condition.Reason == ReasonPopulatingSucceed || condition.Reason == ReasonPopulatingProvisioned
+	}
+	return false
+}

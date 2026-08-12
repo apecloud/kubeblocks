@@ -32,8 +32,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
+	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 )
 
 var _ = Describe("replicas alignment reconciler test", func() {
@@ -180,6 +182,52 @@ var _ = Describe("replicas alignment reconciler test", func() {
 					}))
 				}
 			}
+		})
+
+		It("removes Pods bound to restore PVCs until population is verified", func() {
+			replicas := int32(1)
+			its.Spec.Replicas = &replicas
+			its.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{
+				*its.Spec.VolumeClaimTemplates[0].DeepCopy(),
+			}
+			its.Spec.VolumeClaimTemplates[0].Annotations = map[string]string{
+				constant.RestoreSourceKindAnnotationKey: "Backup",
+			}
+			apiGroup := "dataprotection.kubeblocks.io"
+			its.Spec.VolumeClaimTemplates[0].Spec.DataSourceRef = &corev1.TypedObjectReference{
+				APIGroup: &apiGroup,
+				Kind:     "Backup",
+				Name:     "backup",
+			}
+			tree := kubebuilderx.NewObjectTree()
+			tree.SetRoot(its)
+			reconciler = NewReplicasAlignmentReconciler()
+
+			By("creating the restore PVC and a Pod for WaitForFirstConsumer scheduling")
+			res, err := reconciler.Reconcile(tree)
+			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
+			Expect(tree.List(&corev1.PersistentVolumeClaim{})).Should(HaveLen(1))
+			Expect(tree.List(&corev1.Pod{})).Should(HaveLen(1))
+
+			By("removing the Pod when its PVC is prematurely bound while prepareData is processing")
+			pvc := tree.List(&corev1.PersistentVolumeClaim{})[0].(*corev1.PersistentVolumeClaim)
+			pvc.Spec.VolumeName = "empty-pv"
+			pvc.Status.Conditions = []corev1.PersistentVolumeClaimCondition{{
+				Type:   dptypes.PersistentVolumeClaimPopulating,
+				Status: corev1.ConditionTrue,
+				Reason: "Processing",
+			}}
+			_, err = reconciler.Reconcile(tree)
+			Expect(err).Should(BeNil())
+			Expect(tree.List(&corev1.Pod{})).Should(BeEmpty())
+
+			By("creating the Pod only after population completion is verified")
+			pvc = tree.List(&corev1.PersistentVolumeClaim{})[0].(*corev1.PersistentVolumeClaim)
+			pvc.Status.Conditions[0].Reason = dptypes.ReasonPopulatingSucceed
+			_, err = reconciler.Reconcile(tree)
+			Expect(err).Should(BeNil())
+			Expect(tree.List(&corev1.Pod{})).Should(HaveLen(1))
 		})
 	})
 })

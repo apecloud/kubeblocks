@@ -1810,6 +1810,7 @@ func TestEnsurePostReadyRestoreCompletedDoesNotReuseStaleRestore(t *testing.T) {
 	}
 	pvc.Annotations[constant.RestoreSourceKindAnnotationKey] = dptypes.BackupKind
 	pvc.Annotations[constant.RestoreSourceNamespaceAnnotationKey] = backup.Namespace
+	markPVCPopulationCompleted(pvc, ReasonPopulatingSucceed)
 	comp := &kbappsv1.Component{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "default",
@@ -1876,12 +1877,14 @@ func TestEnsurePostReadyRestoreCompletedUsesOneRestorePerComponent(t *testing.T)
 	}
 	pvc1.Annotations[constant.RestoreSourceKindAnnotationKey] = dptypes.BackupKind
 	pvc1.Annotations[constant.RestoreSourceNamespaceAnnotationKey] = backup.Namespace
+	markPVCPopulationCompleted(pvc1, ReasonPopulatingSucceed)
 	pvc2 := newPVCForRestoreDecision("logs", "mysql", "")
 	pvc2.UID = types.UID("logs-pvc")
 	pvc2.Spec.VolumeName = "logs-pv"
 	pvc2.Spec.DataSourceRef = pvc1.Spec.DataSourceRef.DeepCopy()
 	pvc2.Annotations[constant.RestoreSourceKindAnnotationKey] = dptypes.BackupKind
 	pvc2.Annotations[constant.RestoreSourceNamespaceAnnotationKey] = backup.Namespace
+	markPVCPopulationCompleted(pvc2, ReasonPopulatingSucceed)
 	comp := &kbappsv1.Component{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "default",
@@ -2227,6 +2230,30 @@ func TestValidateBoundPVCCompletedRestoreRejectsForeignPV(t *testing.T) {
 	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(job), &batchv1.Job{}))
 }
 
+func TestValidateBoundPVCRequeuesForOutOfOrderPVClaimRefAndAnnotation(t *testing.T) {
+	reconciler, pvc, populatePVC, pv, _, _, restoreCtx := newBoundPVCLifecycleTest(
+		t, dpv1alpha1.RestorePhaseCompleted, true, false)
+	pv.Spec.ClaimRef = &corev1.ObjectReference{
+		Namespace: populatePVC.Namespace,
+		Name:      populatePVC.Name,
+		UID:       populatePVC.UID,
+	}
+	delete(pv.Annotations, AnnPopulateFrom)
+	require.NoError(t, reconciler.Client.Update(context.Background(), pv))
+
+	err := reconciler.validateBoundPVCForCompletion(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, restoreCtx)
+
+	require.Error(t, err)
+	require.True(t, intctrlutil.IsRequeueError(err), err.Error())
+	currentPVC := &corev1.PersistentVolumeClaim{}
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(pvc), currentPVC))
+	restoreCondition := findPVCConditionByType(currentPVC, kbappsv1.ConditionTypeRestore)
+	require.NotNil(t, restoreCondition)
+	require.Equal(t, corev1.ConditionUnknown, restoreCondition.Status)
+	require.Contains(t, restoreCondition.Message, "ClaimRef cache")
+}
+
 func TestValidateBoundPVCFailedRestorePreservesArtifacts(t *testing.T) {
 	reconciler, pvc, populatePVC, _, executionRestore, job, restoreCtx := newBoundPVCLifecycleTest(
 		t, dpv1alpha1.RestorePhaseFailed, true, true)
@@ -2357,6 +2384,20 @@ func TestCleanupDeletingPVCStopsExecutionRestoreBeforeReleasingHelper(t *testing
 	require.NotContains(t, currentPVC.Finalizers, dptypes.DataProtectionFinalizerName)
 }
 
+func TestCleanupDeletingPVCRejectsExecutionRestoreOwnedByAnotherPVC(t *testing.T) {
+	reconciler, pvc, populatePVC, _, executionRestore, _, _ := newBoundPVCLifecycleTest(
+		t, dpv1alpha1.RestorePhaseRunning, false, false)
+	executionRestore.OwnerReferences[0].UID = "another-pvc-uid"
+	require.NoError(t, reconciler.Client.Update(context.Background(), executionRestore))
+
+	err := reconciler.cleanupDeletingPVC(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc)
+
+	require.Error(t, err)
+	require.True(t, intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal), err.Error())
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(executionRestore), &dpv1alpha1.Restore{}))
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(populatePVC), &corev1.PersistentVolumeClaim{}))
+}
+
 func newBoundPVCLifecycleTest(t *testing.T,
 	phase dpv1alpha1.RestorePhase,
 	validProvenance bool,
@@ -2393,6 +2434,9 @@ func newBoundPVCLifecycleTest(t *testing.T,
 		ObjectMeta: metav1.ObjectMeta{Namespace: pvc.Namespace, Name: getPopulatePVCName(pvc.UID)},
 		Spec:       corev1.PersistentVolumeClaimSpec{VolumeName: pvc.Spec.VolumeName},
 	}
+	if !validProvenance {
+		populatePVC.Spec.VolumeName = "restored-helper-pv"
+	}
 	pv := &corev1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{Name: pvc.Spec.VolumeName},
 		Spec: corev1.PersistentVolumeSpec{
@@ -2408,7 +2452,6 @@ func newBoundPVCLifecycleTest(t *testing.T,
 	if validProvenance {
 		pv.Annotations = map[string]string{AnnPopulateFrom: pvc.Spec.DataSourceRef.Name}
 	}
-	controller := true
 	executionRestore := &dpv1alpha1.Restore{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: pvc.Namespace,
@@ -2418,7 +2461,6 @@ func newBoundPVCLifecycleTest(t *testing.T,
 				Kind:       "PersistentVolumeClaim",
 				Name:       pvc.Name,
 				UID:        pvc.UID,
-				Controller: &controller,
 			}},
 		},
 		Status: dpv1alpha1.RestoreStatus{Phase: phase},
@@ -2462,6 +2504,7 @@ func TestEnsurePostReadyRestoreCompletedRejectsMismatchedExistingRestore(t *test
 	}
 	pvc.Annotations[constant.RestoreSourceKindAnnotationKey] = dptypes.BackupKind
 	pvc.Annotations[constant.RestoreSourceNamespaceAnnotationKey] = backup.Namespace
+	markPVCPopulationCompleted(pvc, ReasonPopulatingSucceed)
 	comp := &kbappsv1.Component{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "default",
@@ -2587,11 +2630,41 @@ func TestWaitForSerialPredecessorsWaitsForEarlierUnboundPVC(t *testing.T) {
 	require.True(t, intctrlutil.IsRequeueError(err), err.Error())
 }
 
-func TestWaitForSerialPredecessorsAllowsAfterEarlierBoundPVC(t *testing.T) {
+func TestWaitForSerialPredecessorsWaitsForEarlierBoundButUnverifiedPVC(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, corev1.AddToScheme(scheme))
 	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
 	previous := newRestorePVCForSerialTest("data-target-0", "pv-0")
+	current := newRestorePVCForSerialTest("data-target-1", "")
+	backup := newBackupForRestoreDecision([]string{"data"}, nil)
+	reconciler := &VolumePopulatorReconciler{
+		Client:   fake.NewClientBuilder().WithScheme(scheme).WithObjects(previous, current, backup).Build(),
+		Recorder: record.NewFakeRecorder(10),
+	}
+	restoreMgr := dprestore.NewRestoreManager(&dpv1alpha1.Restore{
+		Spec: dpv1alpha1.RestoreSpec{
+			PrepareDataConfig: &dpv1alpha1.PrepareDataConfig{
+				VolumeClaimRestorePolicy: dpv1alpha1.VolumeClaimRestorePolicySerial,
+			},
+		},
+	}, nil, scheme, reconciler.Client)
+
+	err := reconciler.waitForSerialPredecessors(intctrlutil.RequestCtx{Ctx: context.Background()}, current, restoreMgr)
+
+	require.Error(t, err)
+	require.True(t, intctrlutil.IsRequeueError(err), err.Error())
+}
+
+func TestWaitForSerialPredecessorsAllowsAfterEarlierValidatedPVC(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
+	previous := newRestorePVCForSerialTest("data-target-0", "pv-0")
+	previous.Status.Conditions = append(previous.Status.Conditions, corev1.PersistentVolumeClaimCondition{
+		Type:   PersistentVolumeClaimPopulating,
+		Status: corev1.ConditionTrue,
+		Reason: ReasonPopulatingSucceed,
+	})
 	current := newRestorePVCForSerialTest("data-target-1", "")
 	backup := newBackupForRestoreDecision([]string{"data"}, nil)
 	reconciler := &VolumePopulatorReconciler{Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(previous, current, backup).Build()}
@@ -2631,6 +2704,23 @@ func TestWaitForSerialPredecessorsSkipsProvisionOnlyPVC(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestPostReadyGatesIgnoreBoundButUnverifiedPVC(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	pvc := newRestorePVCForSerialTest("data-mysql-0", "premature-empty-pv")
+	reconciler := &VolumePopulatorReconciler{
+		Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(pvc).Build(),
+	}
+	reqCtx := intctrlutil.RequestCtx{Ctx: context.Background()}
+
+	componentReady, err := reconciler.allRestorePVCsForComponentBound(reqCtx, pvc)
+	require.NoError(t, err)
+	require.False(t, componentReady)
+	clusterReady, err := reconciler.allRestorePVCsForClusterBound(reqCtx, pvc)
+	require.NoError(t, err)
+	require.False(t, clusterReady)
+}
+
 func newRestorePVCForSerialTest(name, volumeName string) *corev1.PersistentVolumeClaim {
 	apiGroup := dptypes.DataprotectionAPIGroup
 	return &corev1.PersistentVolumeClaim{
@@ -2659,6 +2749,14 @@ func newRestorePVCForSerialTest(name, volumeName string) *corev1.PersistentVolum
 			},
 		},
 	}
+}
+
+func markPVCPopulationCompleted(pvc *corev1.PersistentVolumeClaim, reason string) {
+	upsertPVCCondition(&pvc.Status.Conditions, corev1.PersistentVolumeClaimCondition{
+		Type:   PersistentVolumeClaimPopulating,
+		Status: corev1.ConditionTrue,
+		Reason: reason,
+	})
 }
 
 func newBackupForRestoreDecision(targetVolumes []string, targets []string) *dpv1alpha1.Backup {
@@ -3002,6 +3100,7 @@ func TestEnsurePostReadyRestore_MultiComponent_PostReadyOnly_ShouldNotSilentlySk
 	}
 	pdPVC.Annotations[constant.RestoreSourceKindAnnotationKey] = dptypes.BackupKind
 	pdPVC.Annotations[constant.RestoreSourceNamespaceAnnotationKey] = backup.Namespace
+	markPVCPopulationCompleted(pdPVC, ReasonPopulatingProvisioned)
 
 	// TiKV data PVC
 	tikvPVC := newPVCForRestoreDecision("data", "tikv", "")
@@ -3014,6 +3113,7 @@ func TestEnsurePostReadyRestore_MultiComponent_PostReadyOnly_ShouldNotSilentlySk
 	}
 	tikvPVC.Annotations[constant.RestoreSourceKindAnnotationKey] = dptypes.BackupKind
 	tikvPVC.Annotations[constant.RestoreSourceNamespaceAnnotationKey] = backup.Namespace
+	markPVCPopulationCompleted(tikvPVC, ReasonPopulatingProvisioned)
 
 	// All three components: pd, tikv, tidb (backup target)
 	pdComp := &kbappsv1.Component{
@@ -3157,6 +3257,7 @@ func TestEnsurePostReadyRestore_MultiComponent_PrepareDataAndPostReady_Redirects
 	}
 	pdPVC.Annotations[constant.RestoreSourceKindAnnotationKey] = dptypes.BackupKind
 	pdPVC.Annotations[constant.RestoreSourceNamespaceAnnotationKey] = backup.Namespace
+	markPVCPopulationCompleted(pdPVC, ReasonPopulatingSucceed)
 
 	pdComp := &kbappsv1.Component{
 		ObjectMeta: metav1.ObjectMeta{
@@ -3378,6 +3479,7 @@ func TestEnsurePostReadyRestore_MultiComponent_PostReadyRedirectPreservesTargetE
 	}
 	pdPVC.Annotations[constant.RestoreSourceKindAnnotationKey] = dptypes.BackupKind
 	pdPVC.Annotations[constant.RestoreSourceNamespaceAnnotationKey] = backup.Namespace
+	markPVCPopulationCompleted(pdPVC, ReasonPopulatingProvisioned)
 
 	pdComp := &kbappsv1.Component{
 		ObjectMeta: metav1.ObjectMeta{
@@ -3506,6 +3608,7 @@ func TestEnsurePostReadyRestore_MultiComponent_PostReadyOnly_TargetComponentNotY
 	}
 	pdPVC.Annotations[constant.RestoreSourceKindAnnotationKey] = dptypes.BackupKind
 	pdPVC.Annotations[constant.RestoreSourceNamespaceAnnotationKey] = backup.Namespace
+	markPVCPopulationCompleted(pdPVC, ReasonPopulatingProvisioned)
 
 	// Only PD and TiKV components exist — tidb NOT yet created (sequential creation)
 	pdComp := &kbappsv1.Component{
@@ -3710,6 +3813,7 @@ func TestEnsurePostReadyRestore_MultiComponent_PostReadyOnly_TargetsSlice(t *tes
 	}
 	pdPVC.Annotations[constant.RestoreSourceKindAnnotationKey] = dptypes.BackupKind
 	pdPVC.Annotations[constant.RestoreSourceNamespaceAnnotationKey] = backup.Namespace
+	markPVCPopulationCompleted(pdPVC, ReasonPopulatingProvisioned)
 
 	pdComp := &kbappsv1.Component{
 		ObjectMeta: metav1.ObjectMeta{

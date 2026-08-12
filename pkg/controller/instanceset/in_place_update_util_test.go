@@ -150,8 +150,12 @@ var _ = Describe("instance util test", func() {
 
 			appUpgrade := desiredPod.DeepCopy()
 			appUpgrade.Spec.Containers[0].Image = "mysql:8.4"
-			_, ok = podForDeferredKBAgentInitMigration(oldPod, appUpgrade)
-			Expect(ok).Should(BeFalse(), "application image changes must not be deferred")
+			normalized, ok = podForDeferredKBAgentInitMigration(oldPod, appUpgrade)
+			Expect(ok).Should(BeTrue(), "application image changes must not prevent deferring the init pair")
+			Expect(normalized.Spec.InitContainers[0].Image).Should(Equal(oldPod.Spec.InitContainers[0].Image))
+			Expect(normalized.Spec.InitContainers[0].Command).Should(Equal(legacyKBAgentInitCopyCommand))
+			Expect(normalized.Spec.Containers[0].Image).Should(Equal("mysql:8.4"),
+				"the application image must remain at its desired value")
 
 			defaultImagePod := desiredPod.DeepCopy()
 			defaultImagePod.Spec.Containers[1].Command = []string{"/bin/kbagent"}

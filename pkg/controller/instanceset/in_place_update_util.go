@@ -146,13 +146,16 @@ func podForDeferredKBAgentInitMigration(old, desired *corev1.Pod) (*corev1.Pod, 
 		return desired, false
 	}
 
-	// If the image also changed, it must be a KB-managed tools image update.
-	// Normalize the command first so the existing image-only classifier can
-	// validate that no application image is being deferred.
+	// If the image also changed, validate the init-kbagent image transition in
+	// isolation. Other containers may have legitimate image updates of their own;
+	// they must not prevent this init image and command from being retained as a
+	// pair on the live Pod.
 	if !intctrlutil.EqualContainerImageInSpec(oldInit.Image, desiredInit.Image) {
-		commandNormalized := desired.DeepCopy()
-		commandNormalized.Spec.InitContainers[desiredIndex].Command = append([]string(nil), oldInit.Command...)
-		if !intctrlutil.OnlyKBManagedPodImagesChanged(old, commandNormalized) {
+		oldInitPod := &corev1.Pod{Spec: corev1.PodSpec{InitContainers: []corev1.Container{*oldInit.DeepCopy()}}}
+		desiredInitCopy := desiredInit.DeepCopy()
+		desiredInitCopy.Command = append([]string(nil), oldInit.Command...)
+		desiredInitPod := &corev1.Pod{Spec: corev1.PodSpec{InitContainers: []corev1.Container{*desiredInitCopy}}}
+		if !intctrlutil.OnlyKBManagedPodImagesChanged(oldInitPod, desiredInitPod) {
 			return desired, false
 		}
 	}

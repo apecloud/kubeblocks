@@ -59,6 +59,7 @@ import (
 func legacyInstanceStatusFields(status workloads.InstanceStatus) workloads.InstanceStatus {
 	status.CurrentRevision = ""
 	status.UpdateRevision = ""
+	status.UpToDate = false
 	status.Ready = false
 	status.Available = false
 	status.Failed = false

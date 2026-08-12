@@ -142,6 +142,7 @@ type Workload interface {
 	GetInstanceNameSet() sets.Set[string]
 	GetCurrentRevisionMap() map[string]string
 	GetUpdateRevisionMap() map[string]string
+	GetUpToDateInstanceNameSet() sets.Set[string]
 	GetNotReadyInstanceNameSet() sets.Set[string]
 	GetNotAvailableInstanceNameSet() sets.Set[string]
 	GetFailedInstanceNameSet() sets.Set[string]

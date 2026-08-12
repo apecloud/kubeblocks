@@ -394,6 +394,7 @@ func MockInstanceSetStatus(testCtx testutil.TestContext, cluster *appsv1.Cluster
 			PodName:         pod.Name,
 			CurrentRevision: "revision",
 			UpdateRevision:  "revision",
+			UpToDate:        true,
 			Ready:           ready,
 			Available:       ready,
 			Failed:          failed,

@@ -283,7 +283,6 @@ var _ = Describe("instance util test", func() {
 			Expect(policy).Should(Equal(recreatePolicy))
 			Expect(specPolicy).Should(Equal(kbappsv1.ReCreatePodUpdatePolicyType))
 			Expect(reason).Should(Equal("resource update"))
-
 			By("build a pod without revision updated, with resources fields updated")
 			pod5 := pod1.DeepCopy()
 			randInt = rand.Int()
@@ -296,6 +295,9 @@ var _ = Describe("instance util test", func() {
 			Expect(policy).Should(Equal(recreatePolicy))
 			Expect(specPolicy).Should(Equal(kbappsv1.ReCreatePodUpdatePolicyType))
 			Expect(reason).Should(Equal("resource update"))
+			updated, err := isPodUpdated(its, pod5)
+			Expect(err).Should(BeNil())
+			Expect(updated).Should(BeFalse())
 
 			By("build a pod without revision updated, with resources fields updated, with IgnorePodVerticalScaling enabled")
 			ignorePodVerticalScaling := viper.GetBool(FeatureGateIgnorePodVerticalScaling)

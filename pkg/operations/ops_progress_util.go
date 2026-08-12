@@ -208,6 +208,7 @@ func handleRollingProgressByRevisionWithWorkload(
 	notReady := workload.GetNotReadyInstanceNameSet()
 	notAvailable := workload.GetNotAvailableInstanceNameSet()
 	failed := workload.GetFailedInstanceNameSet()
+	upToDate := workload.GetUpToDateInstanceNameSet()
 	componentName := pgRes.clusterComponent.Name
 	if pgRes.fullComponentName != "" {
 		componentName = pgRes.fullComponentName
@@ -222,9 +223,10 @@ func handleRollingProgressByRevisionWithWorkload(
 		objectKey := getProgressObjectKey(constant.PodKind, name)
 		detail := opsv1alpha1.ProgressStatusDetail{ObjectKey: objectKey}
 		targetRevision, hasTargetRevision := updateRevisions[name]
-		targetApplied := hasTargetRevision && targetRevision != "" && currentRevisions[name] == targetRevision
+		targetRevisionApplied := hasTargetRevision && targetRevision != "" && currentRevisions[name] == targetRevision
+		targetApplied := targetRevisionApplied && upToDate.Has(name)
 		switch {
-		case targetApplied && failed.Has(name):
+		case targetRevisionApplied && failed.Has(name):
 			pgRes.rollingProgressFailed = true
 			detail.SetStatusAndMessage(opsv1alpha1.FailedProgressStatus,
 				getProgressFailedMessage(messageKey, objectKey, componentName,

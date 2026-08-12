@@ -108,6 +108,7 @@ func (r *opsRuntime) GetWorkload(namespace, clusterName, compName string) (Workl
 	workload := &defaultWorkload{
 		currentRevisionMap: map[string]string{},
 		updateRevisionMap:  map[string]string{},
+		upToDateSet:        sets.New[string](),
 		notReadySet:        sets.New[string](),
 		notAvailableSet:    sets.New[string](),
 		failedSet:          sets.New[string](),
@@ -125,6 +126,9 @@ func (r *opsRuntime) GetWorkload(namespace, clusterName, compName string) (Workl
 			workload.instanceNames.Insert(status.PodName)
 			workload.currentRevisionMap[status.PodName] = status.CurrentRevision
 			workload.updateRevisionMap[status.PodName] = status.UpdateRevision
+			if status.UpToDate {
+				workload.upToDateSet.Insert(status.PodName)
+			}
 			if !status.Ready {
 				workload.notReadySet.Insert(status.PodName)
 			}
@@ -375,6 +379,7 @@ type defaultWorkload struct {
 	currentReplicas    int32
 	currentRevisionMap map[string]string
 	updateRevisionMap  map[string]string
+	upToDateSet        sets.Set[string]
 	notReadySet        sets.Set[string]
 	notAvailableSet    sets.Set[string]
 	failedSet          sets.Set[string]
@@ -394,6 +399,10 @@ func (w *defaultWorkload) GetCurrentReplicas() int32 { return w.currentReplicas 
 func (w *defaultWorkload) GetCurrentRevisionMap() map[string]string { return w.currentRevisionMap }
 
 func (w *defaultWorkload) GetUpdateRevisionMap() map[string]string { return w.updateRevisionMap }
+
+func (w *defaultWorkload) GetUpToDateInstanceNameSet() sets.Set[string] {
+	return w.upToDateSet.Clone()
+}
 
 func (w *defaultWorkload) GetNotReadyInstanceNameSet() sets.Set[string] {
 	return w.notReadySet.Clone()

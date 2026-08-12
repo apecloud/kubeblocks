@@ -278,6 +278,7 @@ func setInstanceStatus(its *workloads.InstanceSet,
 			PodName:         inst.Name,
 			CurrentRevision: currentRevisions[inst.Name],
 			UpdateRevision:  updateRevisions[inst.Name],
+			UpToDate:        isInstanceUpdatedWithRevisions(inst, currentRevisions[inst.Name], updateRevisions),
 			Ready:           intctrlutil.IsInstanceReady(inst),
 			Available:       intctrlutil.IsInstanceAvailable(inst),
 			// Publish the observed failure independently of whether this

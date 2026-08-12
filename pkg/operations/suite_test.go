@@ -299,8 +299,10 @@ func mockRollingRevisionStatus(cluster *appsv1.Cluster, compName, targetRevision
 			status := &its.Status.InstanceStatus[i]
 			status.UpdateRevision = targetRevision
 			status.CurrentRevision = "previous-revision"
+			status.UpToDate = false
 			if _, ok := applied[status.PodName]; ok {
 				status.CurrentRevision = targetRevision
+				status.UpToDate = true
 			}
 		}
 		its.Status.ObservedGeneration = its.Generation

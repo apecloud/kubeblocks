@@ -20143,8 +20143,8 @@ This value remains constant once it equals InitReplicas.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Provides the status of every desired or observed instance in the ITS. Revision, readiness, availability,
-and failure fields are published atomically with ObservedGeneration.</p>
+<p>Provides the status of every desired or observed instance in the ITS. Revision, desired-state convergence,
+readiness, availability, and failure fields are published atomically with ObservedGeneration.</p>
 </td>
 </tr>
 <tr>
@@ -20498,6 +20498,19 @@ string
 <td>
 <em>(Optional)</em>
 <p>UpdateRevision identifies the desired revision of the instance.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>upToDate</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>UpToDate indicates that the workload owner has observed the instance fully applied the current
+InstanceSet desired state, including changes that are intentionally excluded from revision hashes.</p>
 </td>
 </tr>
 <tr>

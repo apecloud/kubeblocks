@@ -74,6 +74,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	readyReplicas, availableReplicas := int32(0), int32(0)
 	notReadyNames := sets.New[string]()
 	notAvailableNames := sets.New[string]()
+	upToDateNames := sets.New[string]()
 	currentRevisions := map[string]string{}
 
 	template2TemplatesStatus := map[string]*workloads.InstanceTemplateStatus{}
@@ -127,6 +128,9 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			default:
 				updatedReplicas++
 				template2TemplatesStatus[templateName].UpdatedReplicas++
+			}
+			if updated {
+				upToDateNames.Insert(pod.Name)
 			}
 		}
 
@@ -192,7 +196,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	// 4. publish the per-instance contract from the same revision snapshot used
 	// above. RevisionUpdateReconciler runs before this reconciler, so advancing
 	// ObservedGeneration and publishing InstanceStatus are atomic at commit time.
-	if err = setInstanceStatus(tree, its, podList, currentRevisions, updateRevisions); err != nil {
+	if err = setInstanceStatus(tree, its, podList, currentRevisions, updateRevisions, upToDateNames); err != nil {
 		return kubebuilderx.Continue, err
 	}
 
@@ -440,7 +444,8 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree,
 	its *workloads.InstanceSet,
 	pods []*corev1.Pod,
 	currentRevisions,
-	updateRevisions map[string]string) error {
+	updateRevisions map[string]string,
+	upToDateNames sets.Set[string]) error {
 	instanceStatus := make([]workloads.InstanceStatus, 0, len(updateRevisions))
 	observedNames := sets.New[string]()
 	for _, pod := range pods {
@@ -449,6 +454,7 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree,
 			PodName:         pod.Name,
 			CurrentRevision: currentRevisions[pod.Name],
 			UpdateRevision:  updateRevisions[pod.Name],
+			UpToDate:        upToDateNames.Has(pod.Name),
 			Ready:           ready,
 			Available:       ready && intctrlutil.IsPodAvailable(pod, its.Spec.MinReadySeconds),
 			Failed:          instancePodFailed(pod),

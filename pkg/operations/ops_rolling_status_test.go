@@ -251,6 +251,7 @@ func TestRollingRevisionProgress(t *testing.T) {
 			currentReplicas:    2,
 			currentRevisionMap: map[string]string{pod0: "new", pod1: "new"},
 			updateRevisionMap:  map[string]string{pod0: "new", pod1: "new"},
+			upToDateSet:        sets.New(pod0, pod1),
 			notReadySet:        sets.New[string](),
 			notAvailableSet:    sets.New[string](),
 			failedSet:          sets.New[string](),
@@ -284,6 +285,13 @@ func TestRollingRevisionProgress(t *testing.T) {
 		{name: "revision mismatch", mutate: func(w *defaultWorkload, _ *progressResource) {
 			w.currentRevisionMap[pod0] = "old"
 		}, wantExpected: 2, wantCompleted: 1, wantPod0: opsv1alpha1.ProcessingProgressStatus},
+		{name: "desired state not applied despite equal revision", mutate: func(w *defaultWorkload, _ *progressResource) {
+			w.upToDateSet.Delete(pod0)
+		}, wantExpected: 2, wantCompleted: 1, wantPod0: opsv1alpha1.ProcessingProgressStatus},
+		{name: "partial vertical scaling waits when resources are not applied", mutate: func(w *defaultWorkload, pg *progressResource) {
+			w.upToDateSet.Delete(pod0)
+			pg.updatedPodSet = map[string]string{pod0: "template"}
+		}, wantExpected: 1, wantCompleted: 0, wantPod0: opsv1alpha1.ProcessingProgressStatus},
 		{name: "not ready", mutate: func(w *defaultWorkload, _ *progressResource) {
 			w.notReadySet.Insert(pod0)
 		}, wantExpected: 2, wantCompleted: 1, wantPod0: opsv1alpha1.ProcessingProgressStatus},

@@ -336,8 +336,8 @@ type InstanceSetStatus struct {
 	// +optional
 	ReadyInitReplicas int32 `json:"readyInitReplicas,omitempty"`
 
-	// Provides the status of every desired or observed instance in the ITS. Revision, readiness, availability,
-	// and failure fields are published atomically with ObservedGeneration.
+	// Provides the status of every desired or observed instance in the ITS. Revision, desired-state convergence,
+	// readiness, availability, and failure fields are published atomically with ObservedGeneration.
 	//
 	// +optional
 	InstanceStatus []InstanceStatus `json:"instanceStatus,omitempty"`
@@ -585,6 +585,12 @@ type InstanceStatus struct {
 	//
 	// +optional
 	UpdateRevision string `json:"updateRevision,omitempty"`
+
+	// UpToDate indicates that the workload owner has observed the instance fully applied the current
+	// InstanceSet desired state, including changes that are intentionally excluded from revision hashes.
+	//
+	// +optional
+	UpToDate bool `json:"upToDate,omitempty"`
 
 	// Ready indicates whether the instance is ready to serve requests.
 	//

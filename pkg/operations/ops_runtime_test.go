@@ -307,6 +307,7 @@ func TestOpsRuntimeWorkloadMissingAndUsesPublicInstanceStatus(t *testing.T) {
 				PodName:         "cluster-mysql-0",
 				CurrentRevision: "rev-a",
 				UpdateRevision:  "rev-b",
+				UpToDate:        true,
 				Failed:          true,
 			}},
 		},
@@ -319,6 +320,7 @@ func TestOpsRuntimeWorkloadMissingAndUsesPublicInstanceStatus(t *testing.T) {
 	}
 	if workload.GetCurrentRevisionMap()["cluster-mysql-0"] != "rev-a" ||
 		workload.GetUpdateRevisionMap()["cluster-mysql-0"] != "rev-b" ||
+		!workload.GetUpToDateInstanceNameSet().Has("cluster-mysql-0") ||
 		!workload.GetFailedInstanceNameSet().Has("cluster-mysql-0") {
 		t.Fatal("workload did not use explicit InstanceStatus fields")
 	}

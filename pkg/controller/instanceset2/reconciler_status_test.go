@@ -678,17 +678,17 @@ func TestStatusReconcilerPublishesAtomicPerInstanceContract(t *testing.T) {
 	}
 	readyStatus := byName[ready.Name]
 	if readyStatus.CurrentRevision == "" || readyStatus.CurrentRevision != readyStatus.UpdateRevision ||
-		!readyStatus.Ready || !readyStatus.Available || readyStatus.Failed {
+		!readyStatus.UpToDate || !readyStatus.Ready || !readyStatus.Available || readyStatus.Failed {
 		t.Fatalf("unexpected ready instance contract: %#v", readyStatus)
 	}
 	failedStatus := byName[failed.Name]
 	if failedStatus.CurrentRevision == "" || failedStatus.CurrentRevision != failedStatus.UpdateRevision ||
-		failedStatus.Ready || failedStatus.Available || !failedStatus.Failed {
+		failedStatus.UpToDate || failedStatus.Ready || failedStatus.Available || !failedStatus.Failed {
 		t.Fatalf("unexpected failed instance contract: %#v", failedStatus)
 	}
 	missingStatus := byName[names[2]]
 	if missingStatus.CurrentRevision != "" || missingStatus.UpdateRevision == "" ||
-		missingStatus.Ready || missingStatus.Available || missingStatus.Failed {
+		missingStatus.UpToDate || missingStatus.Ready || missingStatus.Available || missingStatus.Failed {
 		t.Fatalf("unexpected missing instance contract: %#v", missingStatus)
 	}
 }

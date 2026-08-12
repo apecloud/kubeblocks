@@ -11658,8 +11658,8 @@ spec:
                 type: integer
               instanceStatus:
                 description: |-
-                  Provides the status of every desired or observed instance in the ITS. Revision, readiness, availability,
-                  and failure fields are published atomically with ObservedGeneration.
+                  Provides the status of every desired or observed instance in the ITS. Revision, desired-state convergence,
+                  readiness, availability, and failure fields are published atomically with ObservedGeneration.
                 items:
                   properties:
                     available:
@@ -11701,6 +11701,11 @@ spec:
                     role:
                       description: Represents the role of the instance observed.
                       type: string
+                    upToDate:
+                      description: |-
+                        UpToDate indicates that the workload owner has observed the instance fully applied the current
+                        InstanceSet desired state, including changes that are intentionally excluded from revision hashes.
+                      type: boolean
                     updateRevision:
                       description: UpdateRevision identifies the desired revision
                         of the instance.

@@ -22,6 +22,7 @@ package dataprotection
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"testing"
 
@@ -40,6 +41,7 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -2157,6 +2159,290 @@ func TestCompleteBoundPVCMarksRestoreSucceededAfterPostReadyCompleted(t *testing
 	require.NotNil(t, restoreCondition)
 	require.Equal(t, corev1.ConditionTrue, restoreCondition.Status)
 	require.Equal(t, ReasonPopulatingSucceed, restoreCondition.Reason)
+}
+
+func TestValidateBoundPVCRunningRestorePreservesArtifacts(t *testing.T) {
+	reconciler, pvc, populatePVC, _, executionRestore, job, restoreCtx := newBoundPVCLifecycleTest(
+		t, dpv1alpha1.RestorePhaseRunning, false, true)
+
+	err := reconciler.validateBoundPVCForCompletion(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, restoreCtx)
+
+	require.Error(t, err)
+	require.True(t, intctrlutil.IsRequeueError(err), err.Error())
+	currentPVC := &corev1.PersistentVolumeClaim{}
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(pvc), currentPVC))
+	restoreCondition := findPVCConditionByType(currentPVC, kbappsv1.ConditionTypeRestore)
+	require.NotNil(t, restoreCondition)
+	require.Equal(t, corev1.ConditionUnknown, restoreCondition.Status)
+	require.Contains(t, restoreCondition.Message, pvc.Spec.VolumeName)
+	require.Contains(t, restoreCondition.Message, populatePVC.Name)
+	require.Contains(t, restoreCondition.Message, executionRestore.Name)
+	require.Contains(t, restoreCondition.Message, string(dpv1alpha1.RestorePhaseRunning))
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(populatePVC), &corev1.PersistentVolumeClaim{}))
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(job), &batchv1.Job{}))
+}
+
+func TestValidateBoundPVCCompletedRestoreReleasesOnlyProvenBinding(t *testing.T) {
+	reconciler, pvc, populatePVC, _, _, _, restoreCtx := newBoundPVCLifecycleTest(
+		t, dpv1alpha1.RestorePhaseCompleted, true, false)
+
+	err := reconciler.validateBoundPVCForCompletion(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, restoreCtx)
+	require.NoError(t, err)
+	require.NoError(t, reconciler.completeBoundPVCIfNeeded(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, restoreCtx))
+
+	currentPVC := &corev1.PersistentVolumeClaim{}
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(pvc), currentPVC))
+	require.NotContains(t, currentPVC.Finalizers, dptypes.DataProtectionFinalizerName)
+	restoreCondition := findPVCConditionByType(currentPVC, kbappsv1.ConditionTypeRestore)
+	require.NotNil(t, restoreCondition)
+	require.Equal(t, corev1.ConditionTrue, restoreCondition.Status)
+	err = reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(populatePVC), &corev1.PersistentVolumeClaim{})
+	require.True(t, apierrors.IsNotFound(err), "helper PVC should be released after verified completion, got: %v", err)
+}
+
+func TestValidateBoundPVCCompletedRestoreRejectsForeignPV(t *testing.T) {
+	reconciler, pvc, populatePVC, pv, _, job, restoreCtx := newBoundPVCLifecycleTest(
+		t, dpv1alpha1.RestorePhaseCompleted, false, true)
+
+	err := reconciler.validateBoundPVCForCompletion(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, restoreCtx)
+
+	require.Error(t, err)
+	require.True(t, intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal), err.Error())
+	require.Contains(t, err.Error(), AnnPopulateFrom)
+	require.Contains(t, err.Error(), populatePVC.Name)
+	_, reconcileErr := reconciler.handleSyncPVCError(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, err)
+	require.NoError(t, reconcileErr)
+	currentPVC := &corev1.PersistentVolumeClaim{}
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(pvc), currentPVC))
+	restoreCondition := findPVCConditionByType(currentPVC, kbappsv1.ConditionTypeRestore)
+	require.NotNil(t, restoreCondition)
+	require.Equal(t, corev1.ConditionFalse, restoreCondition.Status)
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(populatePVC), &corev1.PersistentVolumeClaim{}))
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(pv), &corev1.PersistentVolume{}))
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(job), &batchv1.Job{}))
+}
+
+func TestValidateBoundPVCFailedRestorePreservesArtifacts(t *testing.T) {
+	reconciler, pvc, populatePVC, _, executionRestore, job, restoreCtx := newBoundPVCLifecycleTest(
+		t, dpv1alpha1.RestorePhaseFailed, true, true)
+
+	err := reconciler.validateBoundPVCForCompletion(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, restoreCtx)
+
+	require.Error(t, err)
+	require.True(t, intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal), err.Error())
+	require.Contains(t, err.Error(), executionRestore.Name)
+	require.Contains(t, err.Error(), string(dpv1alpha1.RestorePhaseFailed))
+	_, reconcileErr := reconciler.handleSyncPVCError(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, err)
+	require.NoError(t, reconcileErr)
+	currentPVC := &corev1.PersistentVolumeClaim{}
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(pvc), currentPVC))
+	restoreCondition := findPVCConditionByType(currentPVC, kbappsv1.ConditionTypeRestore)
+	require.NotNil(t, restoreCondition)
+	require.Equal(t, corev1.ConditionFalse, restoreCondition.Status)
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(populatePVC), &corev1.PersistentVolumeClaim{}))
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(job), &batchv1.Job{}))
+}
+
+func TestValidateBoundPVCWaitsForTargetPVObservation(t *testing.T) {
+	reconciler, pvc, populatePVC, pv, _, _, restoreCtx := newBoundPVCLifecycleTest(
+		t, dpv1alpha1.RestorePhaseCompleted, true, false)
+	require.NoError(t, reconciler.Client.Delete(context.Background(), pv))
+
+	err := reconciler.validateBoundPVCForCompletion(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, restoreCtx)
+
+	require.Error(t, err)
+	require.True(t, intctrlutil.IsRequeueError(err), err.Error())
+	currentPVC := &corev1.PersistentVolumeClaim{}
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(pvc), currentPVC))
+	restoreCondition := findPVCConditionByType(currentPVC, kbappsv1.ConditionTypeRestore)
+	require.NotNil(t, restoreCondition)
+	require.Equal(t, corev1.ConditionUnknown, restoreCondition.Status)
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(populatePVC), &corev1.PersistentVolumeClaim{}))
+}
+
+func TestValidateBoundPVCRequeuesAfterTransientPVReadFailure(t *testing.T) {
+	reconciler, pvc, populatePVC, _, executionRestore, _, restoreCtx := newBoundPVCLifecycleTest(
+		t, dpv1alpha1.RestorePhaseCompleted, true, false)
+	baseClient := reconciler.Client.(client.WithWatch)
+	reconciler.Client = interceptor.NewClient(baseClient, interceptor.Funcs{
+		Get: func(ctx context.Context, delegated client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+			if _, ok := obj.(*corev1.PersistentVolume); ok && key.Name == pvc.Spec.VolumeName {
+				return errors.New("temporary PV cache read failure")
+			}
+			return delegated.Get(ctx, key, obj, opts...)
+		},
+	})
+
+	err := reconciler.validateBoundPVCForCompletion(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, restoreCtx)
+
+	require.Error(t, err)
+	require.True(t, intctrlutil.IsRequeueError(err), err.Error())
+	require.Contains(t, err.Error(), pvc.Spec.VolumeName)
+	require.Contains(t, err.Error(), populatePVC.Name)
+	require.Contains(t, err.Error(), executionRestore.Name)
+	require.Contains(t, err.Error(), string(dpv1alpha1.RestorePhaseCompleted))
+	result, reconcileErr := reconciler.handleSyncPVCError(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, err)
+	require.NoError(t, reconcileErr)
+	require.Equal(t, reconcileInterval, result.RequeueAfter)
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(populatePVC), &corev1.PersistentVolumeClaim{}))
+}
+
+func TestValidateBoundPVCWaitsForOutOfOrderHelperPVCObservation(t *testing.T) {
+	reconciler, pvc, populatePVC, _, _, _, restoreCtx := newBoundPVCLifecycleTest(
+		t, dpv1alpha1.RestorePhaseCompleted, true, false)
+	populatePVC.Spec.VolumeName = ""
+	require.NoError(t, reconciler.Client.Update(context.Background(), populatePVC))
+
+	err := reconciler.validateBoundPVCForCompletion(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, restoreCtx)
+
+	require.Error(t, err)
+	require.True(t, intctrlutil.IsRequeueError(err), err.Error())
+	currentPVC := &corev1.PersistentVolumeClaim{}
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(pvc), currentPVC))
+	restoreCondition := findPVCConditionByType(currentPVC, kbappsv1.ConditionTypeRestore)
+	require.NotNil(t, restoreCondition)
+	require.Equal(t, corev1.ConditionUnknown, restoreCondition.Status)
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(populatePVC), &corev1.PersistentVolumeClaim{}))
+}
+
+func TestValidateBoundPVCProvisionOnlyUsesBindingProvenance(t *testing.T) {
+	reconciler, pvc, populatePVC, _, executionRestore, _, restoreCtx := newBoundPVCLifecycleTest(
+		t, dpv1alpha1.RestorePhaseRunning, true, false)
+	restoreCtx.mode = pvcRestoreModeProvisionOnly
+	require.NoError(t, reconciler.Client.Delete(context.Background(), executionRestore))
+
+	err := reconciler.validateBoundPVCForCompletion(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, restoreCtx)
+	require.NoError(t, err)
+	require.NoError(t, reconciler.completeBoundPVCIfNeeded(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, restoreCtx))
+
+	currentPVC := &corev1.PersistentVolumeClaim{}
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(pvc), currentPVC))
+	restoreCondition := findPVCConditionByType(currentPVC, kbappsv1.ConditionTypeRestore)
+	require.NotNil(t, restoreCondition)
+	require.Equal(t, corev1.ConditionTrue, restoreCondition.Status)
+	require.Equal(t, ReasonPopulatingProvisioned, restoreCondition.Reason)
+	err = reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(populatePVC), &corev1.PersistentVolumeClaim{})
+	require.True(t, apierrors.IsNotFound(err), "provision-only helper PVC should be released, got: %v", err)
+}
+
+func TestCleanupDeletingPVCStopsExecutionRestoreBeforeReleasingHelper(t *testing.T) {
+	reconciler, pvc, populatePVC, _, _, _, _ := newBoundPVCLifecycleTest(
+		t, dpv1alpha1.RestorePhaseRunning, false, false)
+	now := metav1.Now()
+	pvc.DeletionTimestamp = &now
+
+	err := reconciler.cleanupDeletingPVC(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc)
+	require.Error(t, err)
+	require.True(t, intctrlutil.IsRequeueError(err), err.Error())
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(populatePVC), &corev1.PersistentVolumeClaim{}))
+
+	require.NoError(t, reconciler.cleanupDeletingPVC(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc))
+	err = reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(populatePVC), &corev1.PersistentVolumeClaim{})
+	require.True(t, apierrors.IsNotFound(err), "helper PVC should be deleted after execution Restore, got: %v", err)
+	currentPVC := &corev1.PersistentVolumeClaim{}
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(pvc), currentPVC))
+	require.NotContains(t, currentPVC.Finalizers, dptypes.DataProtectionFinalizerName)
+}
+
+func newBoundPVCLifecycleTest(t *testing.T,
+	phase dpv1alpha1.RestorePhase,
+	validProvenance bool,
+	withJob bool) (*VolumePopulatorReconciler,
+	*corev1.PersistentVolumeClaim,
+	*corev1.PersistentVolumeClaim,
+	*corev1.PersistentVolume,
+	*dpv1alpha1.Restore,
+	*batchv1.Job,
+	*pvcRestoreContext) {
+	t.Helper()
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, batchv1.AddToScheme(scheme))
+	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
+	apiGroup := dptypes.DataprotectionAPIGroup
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:  "default",
+			Name:       "data-mysql-0",
+			UID:        "target-pvc-uid",
+			Finalizers: []string{dptypes.DataProtectionFinalizerName},
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			VolumeName: "target-pv",
+			DataSourceRef: &corev1.TypedObjectReference{
+				APIGroup: &apiGroup,
+				Kind:     dptypes.BackupKind,
+				Name:     "backup",
+			},
+		},
+	}
+	populatePVC := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{Namespace: pvc.Namespace, Name: getPopulatePVCName(pvc.UID)},
+		Spec:       corev1.PersistentVolumeClaimSpec{VolumeName: pvc.Spec.VolumeName},
+	}
+	pv := &corev1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{Name: pvc.Spec.VolumeName},
+		Spec: corev1.PersistentVolumeSpec{
+			Capacity:    corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("1Gi")},
+			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+			ClaimRef: &corev1.ObjectReference{
+				Namespace: pvc.Namespace,
+				Name:      pvc.Name,
+				UID:       pvc.UID,
+			},
+		},
+	}
+	if validProvenance {
+		pv.Annotations = map[string]string{AnnPopulateFrom: pvc.Spec.DataSourceRef.Name}
+	}
+	controller := true
+	executionRestore := &dpv1alpha1.Restore{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: pvc.Namespace,
+			Name:      getPopulatePVCName(pvc.UID),
+			OwnerReferences: []metav1.OwnerReference{{
+				APIVersion: "v1",
+				Kind:       "PersistentVolumeClaim",
+				Name:       pvc.Name,
+				UID:        pvc.UID,
+				Controller: &controller,
+			}},
+		},
+		Status: dpv1alpha1.RestoreStatus{Phase: phase},
+	}
+	job := &batchv1.Job{ObjectMeta: metav1.ObjectMeta{Namespace: pvc.Namespace, Name: "restore-job"}}
+	objects := []client.Object{pvc, populatePVC, pv, executionRestore}
+	if withJob {
+		objects = append(objects, job)
+	}
+	reconciler := &VolumePopulatorReconciler{
+		Client: fake.NewClientBuilder().WithScheme(scheme).
+			WithStatusSubresource(pvc, executionRestore).
+			WithObjects(objects...).
+			Build(),
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(10),
+	}
+	restoreMgr := dprestore.NewRestoreManager(&dpv1alpha1.Restore{
+		Spec: dpv1alpha1.RestoreSpec{Backup: dpv1alpha1.BackupRef{Name: "backup", Namespace: "default"}},
+	}, nil, scheme, reconciler.Client)
+	return reconciler, pvc, populatePVC, pv, executionRestore, job, &pvcRestoreContext{
+		mode:       pvcRestoreModeRestoreData,
+		restoreMgr: restoreMgr,
+	}
 }
 
 func TestEnsurePostReadyRestoreCompletedRejectsMismatchedExistingRestore(t *testing.T) {

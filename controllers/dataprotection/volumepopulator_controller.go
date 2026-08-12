@@ -173,7 +173,7 @@ func (r *VolumePopulatorReconciler) syncPVC(reqCtx intctrlutil.RequestCtx, pvc *
 		return nil
 	}
 	if !pvc.DeletionTimestamp.IsZero() {
-		return r.Cleanup(reqCtx, pvc)
+		return r.cleanupDeletingPVC(reqCtx, pvc)
 	}
 	var restoreCtx *pvcRestoreContext
 	if pvc.Spec.DataSourceRef.Kind == dptypes.RestoreKind {
@@ -188,10 +188,173 @@ func (r *VolumePopulatorReconciler) syncPVC(reqCtx intctrlutil.RequestCtx, pvc *
 	if pvc.Spec.VolumeName == "" {
 		return r.dispatchUnboundPVC(reqCtx, pvc, restoreCtx)
 	}
-	if err = r.completeBoundPVCIfNeeded(reqCtx, pvc, restoreCtx); err != nil {
+	if err = r.validateBoundPVCForCompletion(reqCtx, pvc, restoreCtx); err != nil {
 		return err
 	}
-	return r.Cleanup(reqCtx, pvc)
+	return r.completeBoundPVCIfNeeded(reqCtx, pvc, restoreCtx)
+}
+
+type boundPVCArtifacts struct {
+	targetPV         *corev1.PersistentVolume
+	populatePVC      *corev1.PersistentVolumeClaim
+	populatePV       *corev1.PersistentVolume
+	executionRestore *dpv1alpha1.Restore
+}
+
+func (a *boundPVCArtifacts) describe(pvc *corev1.PersistentVolumeClaim) string {
+	claimRefDescription := func(claimRef *corev1.ObjectReference) string {
+		if claimRef == nil {
+			return "<nil>"
+		}
+		return fmt.Sprintf("%s/%s uid=%s", claimRef.Namespace, claimRef.Name, claimRef.UID)
+	}
+	targetPVDescription := fmt.Sprintf("target PV %q not found", pvc.Spec.VolumeName)
+	if a.targetPV != nil {
+		targetPVDescription = fmt.Sprintf("target PV %q claimRef=%s %s=%q", a.targetPV.Name,
+			claimRefDescription(a.targetPV.Spec.ClaimRef), AnnPopulateFrom, a.targetPV.Annotations[AnnPopulateFrom])
+	}
+	populatePVCName := getPopulatePVCName(pvc.UID)
+	populatePVCDescription := fmt.Sprintf("helper PVC %s/%s not found", pvc.Namespace, populatePVCName)
+	if a.populatePVC != nil {
+		populatePVCDescription = fmt.Sprintf("helper PVC %s/%s volumeName=%q deleting=%t", a.populatePVC.Namespace,
+			a.populatePVC.Name, a.populatePVC.Spec.VolumeName, !a.populatePVC.DeletionTimestamp.IsZero())
+	}
+	populatePVDescription := "helper PV not found"
+	if a.populatePV != nil {
+		populatePVDescription = fmt.Sprintf("helper PV %q claimRef=%s %s=%q", a.populatePV.Name,
+			claimRefDescription(a.populatePV.Spec.ClaimRef), AnnPopulateFrom, a.populatePV.Annotations[AnnPopulateFrom])
+	}
+	restoreDescription := fmt.Sprintf("execution Restore %s/%s not found", pvc.Namespace, populatePVCName)
+	if a.executionRestore != nil {
+		restoreDescription = fmt.Sprintf("execution Restore %s/%s phase=%q", a.executionRestore.Namespace,
+			a.executionRestore.Name, a.executionRestore.Status.Phase)
+	}
+	return strings.Join([]string{
+		fmt.Sprintf("target PVC %s/%s volumeName=%q", pvc.Namespace, pvc.Name, pvc.Spec.VolumeName),
+		targetPVDescription,
+		populatePVCDescription,
+		populatePVDescription,
+		restoreDescription,
+	}, "; ")
+}
+
+func (r *VolumePopulatorReconciler) inspectBoundPVCArtifacts(reqCtx intctrlutil.RequestCtx,
+	pvc *corev1.PersistentVolumeClaim,
+	restoreCtx *pvcRestoreContext) (*boundPVCArtifacts, error) {
+	artifacts := &boundPVCArtifacts{}
+	populatePVCName := getPopulatePVCName(pvc.UID)
+	inspectionError := func(operation string, err error) error {
+		return intctrlutil.NewRequeueError(reconcileInterval, fmt.Sprintf(
+			"transient error while %s; will retry without releasing restore artifacts: %v; %s",
+			operation, err, artifacts.describe(pvc)))
+	}
+	if restoreCtx.mode == pvcRestoreModeRestoreData {
+		executionRestore := &dpv1alpha1.Restore{}
+		if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Namespace: pvc.Namespace, Name: populatePVCName}, executionRestore); err != nil {
+			if !apierrors.IsNotFound(err) {
+				return nil, inspectionError(fmt.Sprintf("getting execution Restore %s/%s", pvc.Namespace, populatePVCName), err)
+			}
+		} else {
+			artifacts.executionRestore = executionRestore
+		}
+	}
+
+	populatePVC := &corev1.PersistentVolumeClaim{}
+	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Namespace: pvc.Namespace, Name: populatePVCName}, populatePVC); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return nil, inspectionError(fmt.Sprintf("getting helper PVC %s/%s", pvc.Namespace, populatePVCName), err)
+		}
+	} else {
+		artifacts.populatePVC = populatePVC
+	}
+
+	targetPV := &corev1.PersistentVolume{}
+	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Name: pvc.Spec.VolumeName}, targetPV); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return nil, inspectionError(fmt.Sprintf("getting target PV %q for target PVC %s/%s",
+				pvc.Spec.VolumeName, pvc.Namespace, pvc.Name), err)
+		}
+	} else {
+		artifacts.targetPV = targetPV
+	}
+
+	if artifacts.populatePVC != nil && artifacts.populatePVC.Spec.VolumeName != "" {
+		if artifacts.targetPV != nil && artifacts.populatePVC.Spec.VolumeName == artifacts.targetPV.Name {
+			artifacts.populatePV = artifacts.targetPV
+		} else {
+			populatePV := &corev1.PersistentVolume{}
+			if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Name: artifacts.populatePVC.Spec.VolumeName}, populatePV); err != nil {
+				if !apierrors.IsNotFound(err) {
+					return nil, inspectionError(fmt.Sprintf("getting helper PV %q for helper PVC %s/%s",
+						artifacts.populatePVC.Spec.VolumeName, artifacts.populatePVC.Namespace, artifacts.populatePVC.Name), err)
+				}
+			} else {
+				artifacts.populatePV = populatePV
+			}
+		}
+	}
+	return artifacts, nil
+}
+
+// validateBoundPVCForCompletion proves that a bound target PVC was bound by this
+// populator and that its prepareData Restore has finished. volumeName alone is
+// insufficient: another provisioner may have bound an empty PV first.
+func (r *VolumePopulatorReconciler) validateBoundPVCForCompletion(reqCtx intctrlutil.RequestCtx,
+	pvc *corev1.PersistentVolumeClaim,
+	restoreCtx *pvcRestoreContext) error {
+	artifacts, err := r.inspectBoundPVCArtifacts(reqCtx, pvc, restoreCtx)
+	if err != nil {
+		return err
+	}
+	details := artifacts.describe(pvc)
+
+	if restoreCtx.mode == pvcRestoreModeRestoreData {
+		if artifacts.executionRestore == nil {
+			return intctrlutil.NewFatalError("bound target PVC has no execution Restore; refusing to treat restore as completed: " + details)
+		}
+		switch artifacts.executionRestore.Status.Phase {
+		case dpv1alpha1.RestorePhaseCompleted:
+			// Continue with binding provenance validation.
+		case dpv1alpha1.RestorePhaseFailed:
+			return intctrlutil.NewFatalError("execution Restore failed; preserving restore artifacts: " + details)
+		default:
+			message := "waiting for execution Restore before accepting target PVC binding; preserving restore artifacts: " + details
+			if err := r.UpdatePVCConditions(reqCtx, pvc, ReasonPopulatingProcessing, message); err != nil {
+				return err
+			}
+			return intctrlutil.NewRequeueError(reconcileInterval, message)
+		}
+	}
+
+	if artifacts.targetPV == nil {
+		message := "waiting for target PV to become observable before validating restore binding; preserving restore artifacts: " + details
+		if err := r.UpdatePVCConditions(reqCtx, pvc, ReasonPopulatingProcessing, message); err != nil {
+			return err
+		}
+		return intctrlutil.NewRequeueError(reconcileInterval, message)
+	}
+	if !pvClaimRefMatchesPVC(artifacts.targetPV.Spec.ClaimRef, pvc) {
+		return intctrlutil.NewFatalError("target PV ClaimRef does not match target PVC; preserving restore artifacts: " + details)
+	}
+	expectedSource := pvc.Spec.DataSourceRef.Name
+	if artifacts.targetPV.Annotations[AnnPopulateFrom] != expectedSource {
+		return intctrlutil.NewFatalError(fmt.Sprintf(
+			"target PV %s annotation %s does not identify restore source %q; preserving restore artifacts: %s",
+			artifacts.targetPV.Name, AnnPopulateFrom, expectedSource, details))
+	}
+	if artifacts.populatePVC != nil {
+		if artifacts.populatePVC.Spec.VolumeName == "" {
+			message := "waiting for helper PVC binding state to catch up before releasing restore artifacts: " + details
+			if err := r.UpdatePVCConditions(reqCtx, pvc, ReasonPopulatingProcessing, message); err != nil {
+				return err
+			}
+			return intctrlutil.NewRequeueError(reconcileInterval, message)
+		}
+		if artifacts.populatePVC.Spec.VolumeName != artifacts.targetPV.Name {
+			return intctrlutil.NewFatalError("helper PVC and target PVC refer to different PVs; preserving restore artifacts: " + details)
+		}
+	}
+	return nil
 }
 
 // dispatchUnboundPVC routes an unbound PVC to either Populate or ProvisionOnly.
@@ -1014,7 +1177,7 @@ func (r *VolumePopulatorReconciler) completeBoundPVCIfNeeded(reqCtx intctrlutil.
 		// actions may need the workload pod to start, which cannot happen while
 		// the populate PVC still owns the restored PV or while the target PVC is
 		// still marked as being populated.
-		if err := r.Cleanup(reqCtx, pvc); err != nil {
+		if err := r.releasePopulateResources(reqCtx, pvc); err != nil {
 			return err
 		}
 		reason := ReasonPopulatingSucceed
@@ -1613,7 +1776,33 @@ func postReadyRestoreName(componentUID types.UID) string {
 	return constant.ShortenKubeName(fmt.Sprintf("restore-%s-post-ready", componentUID), constant.KubeNameMaxLength)
 }
 
-func (r *VolumePopulatorReconciler) Cleanup(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim) error {
+// cleanupDeletingPVC stops the per-PVC execution Restore before releasing its
+// helper PVC and the target finalizer. This lets the Restore controller finish
+// deleting its Jobs before the target PVC disappears.
+func (r *VolumePopulatorReconciler) cleanupDeletingPVC(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim) error {
+	executionRestore := &dpv1alpha1.Restore{}
+	key := types.NamespacedName{Namespace: pvc.Namespace, Name: getPopulatePVCName(pvc.UID)}
+	if err := r.Client.Get(reqCtx.Ctx, key, executionRestore); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return err
+		}
+	} else if metav1.IsControlledBy(executionRestore, pvc) {
+		if executionRestore.DeletionTimestamp.IsZero() {
+			if err := r.Client.Delete(reqCtx.Ctx, executionRestore); err != nil && !apierrors.IsNotFound(err) {
+				return err
+			}
+		}
+		return intctrlutil.NewRequeueError(reconcileInterval,
+			fmt.Sprintf("waiting for execution Restore %s/%s to be deleted before cleaning target PVC %s/%s",
+				executionRestore.Namespace, executionRestore.Name, pvc.Namespace, pvc.Name))
+	}
+	return r.releasePopulateResources(reqCtx, pvc)
+}
+
+// releasePopulateResources is used only after binding provenance and Restore
+// completion have been verified, or after cleanupDeletingPVC has stopped the
+// execution Restore.
+func (r *VolumePopulatorReconciler) releasePopulateResources(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim) error {
 	populatePVC := &corev1.PersistentVolumeClaim{}
 	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Name: getPopulatePVCName(pvc.UID),
 		Namespace: pvc.Namespace}, populatePVC); err != nil {

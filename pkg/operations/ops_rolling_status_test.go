@@ -26,6 +26,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -84,6 +85,79 @@ func TestRestartIntentUsesNanosecondPrecision(t *testing.T) {
 	handler.doRestart(second, compSpec, component)
 	if got := compSpec.Annotations[constant.RestartAnnotationKey]; got == firstIntent {
 		t.Fatalf("two restart operations in one second reused intent %q", got)
+	}
+}
+
+func TestLatestUpgradeRequiresItsOwnObservedIntent(t *testing.T) {
+	const (
+		namespace   = "default"
+		clusterName = "cluster"
+		component   = "mysql"
+	)
+	scheme := runtime.NewScheme()
+	if err := appsv1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	if err := opsv1alpha1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	cluster := &appsv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: clusterName, Generation: 8},
+		Spec: appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{{
+			Name: component,
+		}}},
+		Status: appsv1.ClusterStatus{Components: map[string]appsv1.ClusterComponentStatus{
+			component: {Phase: appsv1.RunningComponentPhase, ObservedGeneration: 8, UpToDate: true},
+		}},
+	}
+	latest := ""
+	ops := &opsv1alpha1.OpsRequest{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      "upgrade-latest",
+			UID:       types.UID("upgrade-intent-a"),
+		},
+		Spec: opsv1alpha1.OpsRequestSpec{
+			Type:        opsv1alpha1.UpgradeType,
+			ClusterName: clusterName,
+			SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{
+				Upgrade: &opsv1alpha1.Upgrade{Components: []opsv1alpha1.UpgradeComponent{{
+					ComponentOps:   opsv1alpha1.ComponentOps{ComponentName: component},
+					ServiceVersion: &latest,
+				}}},
+			},
+		},
+	}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, ops).Build()
+	if err := cli.Get(context.Background(), client.ObjectKeyFromObject(cluster), cluster); err != nil {
+		t.Fatal(err)
+	}
+	opsRes := &OpsResource{Cluster: cluster, OpsRequest: ops}
+	if err := (upgradeOpsHandler{}).Action(intctrlutil.RequestCtx{Ctx: context.Background()}, cli, opsRes); err != nil {
+		t.Fatalf("upgrade action: %v", err)
+	}
+	if got := cluster.Spec.ComponentSpecs[0].Annotations[constant.UpgradeIntentAnnotationKey]; got != string(ops.UID) {
+		t.Fatalf("upgrade intent=%q, want %q", got, ops.UID)
+	}
+	if ops.Status.Components[component].TargetSpecHash == "" {
+		t.Fatal("latest upgrade did not record the intent in its target hash")
+	}
+
+	// The API server advances generation because the unique intent changed the
+	// component spec. The pre-operation status must not satisfy that generation.
+	cluster.Generation = 9
+	ops.Status.ClusterGeneration = 9
+	helper := newComponentOpsHelper(ops.Spec.Upgrade.Components)
+	completed, failed := helper.rollingTargetsState(opsRes, nil)
+	if completed || failed {
+		t.Fatalf("old status completed=%v failed=%v, want processing", completed, failed)
+	}
+	cluster.Status.Components[component] = appsv1.ClusterComponentStatus{
+		Phase: appsv1.RunningComponentPhase, ObservedGeneration: 9, UpToDate: true,
+	}
+	completed, failed = helper.rollingTargetsState(opsRes, nil)
+	if !completed || failed {
+		t.Fatalf("observed intent completed=%v failed=%v, want success", completed, failed)
 	}
 }
 

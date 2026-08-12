@@ -597,3 +597,95 @@ func TestStatusReconcilerDoesNotFallbackToLiveHashWhenRevisionAnnotationMissing(
 		t.Fatalf("unexpected template status: %#v", got.Status.TemplatesStatus)
 	}
 }
+
+func TestStatusReconcilerPublishesAtomicPerInstanceContract(t *testing.T) {
+	its := &workloads.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       "test-its",
+			Namespace:  "default",
+			Generation: 4,
+		},
+		Spec: workloads.InstanceSetSpec{
+			Replicas:            ptr.To[int32](3),
+			FlatInstanceOrdinal: true,
+			Instances: []workloads.InstanceTemplate{{
+				Name:     "tpl",
+				Replicas: ptr.To[int32](3),
+			}},
+		},
+		Status: workloads.InstanceSetStatus{
+			ObservedGeneration: 3,
+			UpdateRevisions: map[string]string{
+				"stale": "previous-generation",
+			},
+		},
+	}
+	tree := kubebuilderx.NewObjectTree()
+	tree.SetRoot(its)
+	desired, names, err := buildDesiredInstancesByName(tree, its)
+	if err != nil {
+		t.Fatalf("build desired instances: %v", err)
+	}
+	if len(names) != 3 {
+		t.Fatalf("desired names=%v, want 3", names)
+	}
+
+	ready := desired[names[0]].DeepCopy()
+	ready.Generation = 1
+	ready.Status = workloads.InstanceStatus2{
+		ObservedGeneration: 1,
+		UpToDate:           true,
+		Conditions: []metav1.Condition{
+			{Type: string(workloads.InstanceReady), Status: metav1.ConditionTrue},
+			{Type: string(workloads.InstanceAvailable), Status: metav1.ConditionTrue},
+		},
+	}
+	failed := desired[names[1]].DeepCopy()
+	failed.Generation = 1
+	failed.Status = workloads.InstanceStatus2{
+		ObservedGeneration: 1,
+		UpToDate:           true,
+		Conditions: []metav1.Condition{
+			{Type: string(workloads.InstanceFailure), Status: metav1.ConditionTrue},
+		},
+	}
+	if err := tree.Add(ready); err != nil {
+		t.Fatalf("add ready instance: %v", err)
+	}
+	if err := tree.Add(failed); err != nil {
+		t.Fatalf("add failed instance: %v", err)
+	}
+
+	if _, err := NewRevisionUpdateReconciler().Reconcile(tree); err != nil {
+		t.Fatalf("reconcile revisions: %v", err)
+	}
+	if its.Status.ObservedGeneration != its.Generation {
+		t.Fatalf("observedGeneration=%d, want %d", its.Status.ObservedGeneration, its.Generation)
+	}
+	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+		t.Fatalf("reconcile status: %v", err)
+	}
+
+	byName := make(map[string]workloads.InstanceStatus, len(its.Status.InstanceStatus))
+	for _, status := range its.Status.InstanceStatus {
+		byName[status.PodName] = status
+	}
+	if len(byName) != 3 {
+		t.Fatalf("instance status=%#v, want every desired instance", its.Status.InstanceStatus)
+	}
+	readyStatus := byName[ready.Name]
+	if readyStatus.CurrentRevision == "" || readyStatus.CurrentRevision != readyStatus.UpdateRevision ||
+		!readyStatus.Ready || !readyStatus.Available || readyStatus.Failed {
+		t.Fatalf("unexpected ready instance contract: %#v", readyStatus)
+	}
+	failedStatus := byName[failed.Name]
+	if failedStatus.CurrentRevision == "" || failedStatus.CurrentRevision != failedStatus.UpdateRevision ||
+		failedStatus.Ready || failedStatus.Available || !failedStatus.Failed {
+		t.Fatalf("unexpected failed instance contract: %#v", failedStatus)
+	}
+	missingStatus := byName[names[2]]
+	if missingStatus.CurrentRevision != "" || missingStatus.UpdateRevision == "" ||
+		missingStatus.Ready || missingStatus.Available || missingStatus.Failed {
+		t.Fatalf("unexpected missing instance contract: %#v", missingStatus)
+	}
+}

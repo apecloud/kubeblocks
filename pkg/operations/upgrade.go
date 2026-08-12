@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"fmt"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,6 +28,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -58,6 +60,14 @@ func (u upgradeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	compOpsHelper = newComponentOpsHelper(upgradeSpec.Components)
 	if err := compOpsHelper.updateClusterComponentsAndShardings(opsRes.Cluster, func(compSpec *appsv1.ClusterComponentSpec, obj ComponentOpsInterface) error {
 		upgradeComp := obj.(opsv1alpha1.UpgradeComponent)
+		if compSpec.Annotations == nil {
+			compSpec.Annotations = map[string]string{}
+		}
+		// Bind even a semantic no-op (for example, "" meaning latest) to this
+		// specific Upgrade. The unique intent changes Cluster generation and is
+		// propagated by the Apps owner before it can report that generation as
+		// observed and up-to-date.
+		compSpec.Annotations[constant.UpgradeIntentAnnotationKey] = upgradeIntent(opsRes.OpsRequest)
 		if u.needUpdateCompDef(upgradeComp, opsRes.Cluster) {
 			compSpec.ComponentDef = *upgradeComp.ComponentDefinitionName
 		}
@@ -85,6 +95,16 @@ func (u upgradeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		return err
 	}
 	return compOpsHelper.recordRollingTargetSpecs(opsRes)
+}
+
+func upgradeIntent(opsRequest *opsv1alpha1.OpsRequest) string {
+	if opsRequest.UID != "" {
+		return string(opsRequest.UID)
+	}
+	// UID is always assigned for a persisted OpsRequest. The fallback keeps
+	// direct handler tests and migration tools deterministic before persistence.
+	return fmt.Sprintf("%s/%s@%s", opsRequest.Namespace, opsRequest.Name,
+		opsRequest.Status.StartTimestamp.Format(time.RFC3339Nano))
 }
 
 // ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.

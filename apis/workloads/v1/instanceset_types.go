@@ -279,7 +279,8 @@ type InstanceSetSpec struct {
 // InstanceSetStatus defines the observed state of InstanceSet
 type InstanceSetStatus struct {
 	// observedGeneration is the most recent generation observed for this InstanceSet. It corresponds to the
-	// InstanceSet's generation, which is updated on mutation by the API Server.
+	// InstanceSet's generation, which is updated on mutation by the API Server. When it matches metadata.generation,
+	// UpdateRevisions and InstanceStatus form one consistent snapshot computed for that generation.
 	//
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
@@ -335,7 +336,8 @@ type InstanceSetStatus struct {
 	// +optional
 	ReadyInitReplicas int32 `json:"readyInitReplicas,omitempty"`
 
-	// Provides the status of each instance in the ITS.
+	// Provides the status of every desired or observed instance in the ITS. Revision, readiness, availability,
+	// and failure fields are published atomically with ObservedGeneration.
 	//
 	// +optional
 	InstanceStatus []InstanceStatus `json:"instanceStatus,omitempty"`

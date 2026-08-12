@@ -104,6 +104,40 @@ var _ = Describe("status reconciler test", func() {
 			}
 		}
 
+		It("publishes revisions and per-instance status as one observed snapshot", func() {
+			its.Generation = 2
+			its.Status.ObservedGeneration = 1
+			staleRevisions, err := buildRevisions(map[string]string{"stale": "previous-generation"})
+			Expect(err).ShouldNot(HaveOccurred())
+			its.Status.UpdateRevisions = staleRevisions
+			tree := kubebuilderx.NewObjectTree()
+			tree.SetRoot(its)
+
+			revisionReconciler := NewRevisionUpdateReconciler()
+			Expect(revisionReconciler.PreCondition(tree)).Should(Equal(kubebuilderx.ConditionSatisfied))
+			_, err = revisionReconciler.Reconcile(tree)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(its.Status.ObservedGeneration).Should(Equal(its.Generation))
+
+			statusReconciler := NewStatusReconciler()
+			Expect(statusReconciler.PreCondition(tree)).Should(Equal(kubebuilderx.ConditionSatisfied))
+			_, err = statusReconciler.Reconcile(tree)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			updateRevisions, err := GetRevisions(its.Status.UpdateRevisions)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(updateRevisions).Should(HaveLen(int(*its.Spec.Replicas)))
+			Expect(its.Status.InstanceStatus).Should(HaveLen(int(*its.Spec.Replicas)))
+			for _, status := range its.Status.InstanceStatus {
+				Expect(status.UpdateRevision).Should(Equal(updateRevisions[status.PodName]))
+				Expect(status.UpdateRevision).ShouldNot(BeEmpty())
+				Expect(status.CurrentRevision).Should(BeEmpty())
+				Expect(status.Ready).Should(BeFalse())
+				Expect(status.Available).Should(BeFalse())
+				Expect(status.Failed).Should(BeFalse())
+			}
+		})
+
 		It("should work well", func() {
 			By("PreCondition")
 			its.Generation = 1

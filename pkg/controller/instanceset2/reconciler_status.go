@@ -163,8 +163,10 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		meta.RemoveStatusCondition(&its.Status.Conditions, string(workloads.InstanceFailure))
 	}
 
-	// 4. set instance status
-	setInstanceStatus(its, instanceList)
+	// 4. publish the per-instance contract from the same revision snapshot used
+	// above. RevisionUpdateReconciler runs before this reconciler, so advancing
+	// ObservedGeneration and publishing InstanceStatus are atomic at commit time.
+	setInstanceStatus(its, instanceList, currentRevisions, updateRevisions)
 
 	if its.Spec.MinReadySeconds > 0 && availableReplicas != readyReplicas {
 		return kubebuilderx.RetryAfter(time.Second), nil
@@ -264,14 +266,33 @@ func buildFailureCondition(its *workloads.InstanceSet, instances []*workloads.In
 	}, nil
 }
 
-func setInstanceStatus(its *workloads.InstanceSet, instances []*workloads.Instance) {
+func setInstanceStatus(its *workloads.InstanceSet,
+	instances []*workloads.Instance,
+	currentRevisions,
+	updateRevisions map[string]string) {
 	// compose new instance status
-	instanceStatus := make([]workloads.InstanceStatus, 0)
+	instanceStatus := make([]workloads.InstanceStatus, 0, len(updateRevisions))
+	observedNames := sets.New[string]()
 	for _, inst := range instances {
 		status := workloads.InstanceStatus{
-			PodName: inst.Name,
+			PodName:         inst.Name,
+			CurrentRevision: currentRevisions[inst.Name],
+			UpdateRevision:  updateRevisions[inst.Name],
+			Ready:           intctrlutil.IsInstanceReady(inst),
+			Available:       intctrlutil.IsInstanceAvailable(inst),
+			Failed:          intctrlutil.IsInstanceFailure(inst),
 		}
 		instanceStatus = append(instanceStatus, status)
+		observedNames.Insert(inst.Name)
+	}
+	for name, revision := range updateRevisions {
+		if observedNames.Has(name) {
+			continue
+		}
+		instanceStatus = append(instanceStatus, workloads.InstanceStatus{
+			PodName:        name,
+			UpdateRevision: revision,
+		})
 	}
 
 	syncMemberStatus(its, instanceStatus, instances)

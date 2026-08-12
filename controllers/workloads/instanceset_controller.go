@@ -83,8 +83,9 @@ func (r *InstanceSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		Do(instanceset.NewFixMetaReconciler()).
 		Do(instanceset.NewDeletionReconciler()).
 		Do(instanceset.NewValidationReconciler()).
-		Do(instanceset.NewStatusReconciler()).
+		// Revision must precede status so ObservedGeneration, revisions, and InstanceStatus commit as one snapshot.
 		Do(instanceset.NewRevisionUpdateReconciler()).
+		Do(instanceset.NewStatusReconciler()).
 		Do(instanceset.NewAssistantObjectReconciler()).
 		Do(instanceset.NewReplicasAlignmentReconciler()).
 		Do(instanceset.NewUpdateReconciler()).

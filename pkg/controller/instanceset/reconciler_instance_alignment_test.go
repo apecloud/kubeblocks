@@ -25,7 +25,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/spf13/viper"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -36,7 +35,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
-	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 )
 
 var _ = Describe("replicas alignment reconciler test", func() {
@@ -185,10 +183,7 @@ var _ = Describe("replicas alignment reconciler test", func() {
 			}
 		})
 
-		It("uses a scheduling bootstrap Pod until restore population is verified", func() {
-			oldToolsImage := viper.GetString(constant.KBToolsImage)
-			DeferCleanup(func() { viper.Set(constant.KBToolsImage, oldToolsImage) })
-			viper.Set(constant.KBToolsImage, "kubeblocks-tools:test")
+		It("gates workload Pods on the restore data readiness condition", func() {
 			replicas := int32(1)
 			its.Spec.Replicas = &replicas
 			its.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{
@@ -207,49 +202,40 @@ var _ = Describe("replicas alignment reconciler test", func() {
 			tree.SetRoot(its)
 			reconciler = NewReplicasAlignmentReconciler()
 
-			By("creating the restore PVC and a blocked Pod for WaitForFirstConsumer scheduling")
+			By("creating the restore PVC without creating a workload Pod")
 			res, err := reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())
 			Expect(res).Should(Equal(kubebuilderx.Continue))
 			Expect(tree.List(&corev1.PersistentVolumeClaim{})).Should(HaveLen(1))
-			Expect(tree.List(&corev1.Pod{})).Should(HaveLen(1))
-			bootstrapPod := tree.List(&corev1.Pod{})[0].(*corev1.Pod)
-			Expect(bootstrapPod.Annotations).Should(HaveKeyWithValue(restoreBootstrapAnnotationKey, "true"))
-			Expect(bootstrapPod.Spec.InitContainers).Should(ContainElement(Satisfy(func(container corev1.Container) bool {
-				return container.Name == restoreBootstrapContainerName && container.Image == "kubeblocks-tools:test"
-			})))
-			Expect(bootstrapPod.Spec.ReadinessGates).Should(ContainElement(corev1.PodReadinessGate{
-				ConditionType: restoreBootstrapReadinessGate,
-			}))
+			Expect(tree.List(&corev1.Pod{})).Should(BeEmpty())
 
-			By("keeping the database blocked when its PVC binds while prepareData is processing")
+			By("removing an unsafe workload Pod while restore data is not ready")
 			pvc := tree.List(&corev1.PersistentVolumeClaim{})[0].(*corev1.PersistentVolumeClaim)
 			pvc.Spec.VolumeName = "empty-pv"
 			pvc.Status.Conditions = []corev1.PersistentVolumeClaimCondition{{
-				Type:   dptypes.PersistentVolumeClaimPopulating,
-				Status: corev1.ConditionTrue,
-				Reason: "Processing",
+				Type:   corev1.PersistentVolumeClaimConditionType(constant.RestoreDataReadyConditionType),
+				Status: corev1.ConditionUnknown,
 			}}
-			_, err = reconciler.Reconcile(tree)
-			Expect(err).Should(BeNil())
-			Expect(tree.List(&corev1.Pod{})).Should(HaveLen(1))
-
-			By("deleting the bootstrap Pod after population completion is verified")
-			pvc = tree.List(&corev1.PersistentVolumeClaim{})[0].(*corev1.PersistentVolumeClaim)
-			pvc.Status.Conditions[0].Reason = dptypes.ReasonPopulatingSucceed
+			instanceName := pvc.Labels[constant.KBAppPodNameLabelKey]
+			unsafePod := builder.NewPodBuilder(its.Namespace, instanceName).
+				AddContainer(corev1.Container{Name: "database", Image: "database:test"}).
+				GetObject()
+			Expect(tree.Add(unsafePod)).Should(Succeed())
 			_, err = reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())
 			Expect(tree.List(&corev1.Pod{})).Should(BeEmpty())
 
-			By("creating the real Pod after the bootstrap Pod is gone")
+			By("creating the real Pod only after the stable readiness condition is True")
+			pvc = tree.List(&corev1.PersistentVolumeClaim{})[0].(*corev1.PersistentVolumeClaim)
+			pvc.Status.Conditions[0].Status = corev1.ConditionTrue
 			_, err = reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())
 			Expect(tree.List(&corev1.Pod{})).Should(HaveLen(1))
-			realPod := tree.List(&corev1.Pod{})[0].(*corev1.Pod)
-			Expect(realPod.Annotations).ShouldNot(HaveKey(restoreBootstrapAnnotationKey))
-			Expect(realPod.Spec.InitContainers).ShouldNot(ContainElement(Satisfy(func(container corev1.Container) bool {
-				return container.Name == restoreBootstrapContainerName
-			})))
+
+			By("surviving the update reconciler in the full reconcile chain")
+			_, err = NewUpdateReconciler().Reconcile(tree)
+			Expect(err).Should(BeNil())
+			Expect(tree.List(&corev1.Pod{})).Should(HaveLen(1))
 		})
 	})
 })

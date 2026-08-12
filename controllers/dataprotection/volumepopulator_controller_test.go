@@ -2721,6 +2721,92 @@ func TestPostReadyGatesIgnoreBoundButUnverifiedPVC(t *testing.T) {
 	require.False(t, clusterReady)
 }
 
+func TestWaitForPVCSelectedNodeUsesDedicatedSchedulingPod(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, storagev1.AddToScheme(scheme))
+	mode := storagev1.VolumeBindingWaitForFirstConsumer
+	storageClassName := "wait-for-consumer"
+	storageClass := &storagev1.StorageClass{
+		ObjectMeta:        metav1.ObjectMeta{Name: storageClassName},
+		Provisioner:       "example.csi.k8s.io",
+		VolumeBindingMode: &mode,
+	}
+	pvc := newRestorePVCForSerialTest("data-mysql-0", "")
+	pvc.UID = types.UID("12345678-1234-1234-1234-123456789abc")
+	pvc.Spec.StorageClassName = &storageClassName
+	oldToolsImage := viper.GetString(constant.KBToolsImage)
+	t.Cleanup(func() { viper.Set(constant.KBToolsImage, oldToolsImage) })
+	viper.Set(constant.KBToolsImage, "kubeblocks-tools:test")
+	reconciler := &VolumePopulatorReconciler{
+		Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(storageClass, pvc).Build(),
+		Scheme: scheme,
+	}
+	reqCtx := intctrlutil.RequestCtx{Ctx: context.Background()}
+
+	wait, nodeName, err := reconciler.waitForPVCSelectedNode(reqCtx, pvc)
+	require.NoError(t, err)
+	require.True(t, wait)
+	require.Empty(t, nodeName)
+	schedulingPod := &corev1.Pod{}
+	require.NoError(t, reconciler.Client.Get(context.Background(), types.NamespacedName{
+		Namespace: pvc.Namespace,
+		Name:      getRestoreSchedulingPodName(pvc.UID),
+	}, schedulingPod))
+	require.Equal(t, "kubeblocks-tools:test", schedulingPod.Spec.Containers[0].Image)
+	require.Equal(t, pvc.Name, schedulingPod.Spec.Volumes[0].PersistentVolumeClaim.ClaimName)
+	require.Empty(t, schedulingPod.Labels[constant.AppInstanceLabelKey])
+	require.Len(t, schedulingPod.OwnerReferences, 1)
+	require.Equal(t, pvc.UID, schedulingPod.OwnerReferences[0].UID)
+
+	currentPVC := &corev1.PersistentVolumeClaim{}
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(pvc), currentPVC))
+	if currentPVC.Annotations == nil {
+		currentPVC.Annotations = map[string]string{}
+	}
+	currentPVC.Annotations[AnnSelectedNode] = "node-1"
+	require.NoError(t, reconciler.Client.Update(context.Background(), currentPVC))
+	wait, nodeName, err = reconciler.waitForPVCSelectedNode(reqCtx, currentPVC)
+	require.NoError(t, err)
+	require.False(t, wait)
+	require.Equal(t, "node-1", nodeName)
+	err = reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(schedulingPod), &corev1.Pod{})
+	require.True(t, apierrors.IsNotFound(err), err)
+}
+
+func TestPVCDataReadyConditionContract(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	pvc := newRestorePVCForSerialTest("data-mysql-0", "")
+	reconciler := &VolumePopulatorReconciler{
+		Client:   fake.NewClientBuilder().WithScheme(scheme).WithObjects(pvc).Build(),
+		Recorder: record.NewFakeRecorder(10),
+	}
+	reqCtx := intctrlutil.RequestCtx{Ctx: context.Background()}
+
+	require.NoError(t, reconciler.UpdatePVCConditions(reqCtx, pvc, ReasonPopulatingProcessing, "preparing data"))
+	currentPVC := &corev1.PersistentVolumeClaim{}
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(pvc), currentPVC))
+	dataReady := findPVCConditionByType(currentPVC, constant.RestoreDataReadyConditionType)
+	require.NotNil(t, dataReady)
+	require.Equal(t, corev1.ConditionUnknown, dataReady.Status)
+
+	require.NoError(t, reconciler.updatePVCPopulatingCondition(reqCtx, currentPVC, ReasonPopulatingSucceed, "data ready"))
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(pvc), currentPVC))
+	dataReady = findPVCConditionByType(currentPVC, constant.RestoreDataReadyConditionType)
+	require.NotNil(t, dataReady)
+	require.Equal(t, corev1.ConditionTrue, dataReady.Status)
+
+	require.NoError(t, reconciler.UpdatePVCConditions(reqCtx, currentPVC, ReasonPopulatingFailed, "postReady failed"))
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(pvc), currentPVC))
+	dataReady = findPVCConditionByType(currentPVC, constant.RestoreDataReadyConditionType)
+	require.NotNil(t, dataReady)
+	require.Equal(t, corev1.ConditionTrue, dataReady.Status)
+	restoreCondition := findPVCConditionByType(currentPVC, kbappsv1.ConditionTypeRestore)
+	require.NotNil(t, restoreCondition)
+	require.Equal(t, corev1.ConditionFalse, restoreCondition.Status)
+}
+
 func newRestorePVCForSerialTest(name, volumeName string) *corev1.PersistentVolumeClaim {
 	apiGroup := dptypes.DataprotectionAPIGroup
 	return &corev1.PersistentVolumeClaim{

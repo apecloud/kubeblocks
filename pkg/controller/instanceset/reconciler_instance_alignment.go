@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset
 
 import (
-	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -32,7 +31,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 )
 
 // instanceAlignmentReconciler is responsible for aligning the actual instances(pods) with the desired replicas specified in the spec,
@@ -41,12 +39,6 @@ import (
 //
 // TODO(free6om): support membership reconfiguration
 type instanceAlignmentReconciler struct{}
-
-const (
-	restoreBootstrapAnnotationKey = "workloads.kubeblocks.io/restore-bootstrap"
-	restoreBootstrapContainerName = "restore-bootstrap"
-	restoreBootstrapReadinessGate = corev1.PodConditionType("workloads.kubeblocks.io/restore-ready")
-)
 
 func NewReplicasAlignmentReconciler() kubebuilderx.Reconciler {
 	return &instanceAlignmentReconciler{}
@@ -97,11 +89,9 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		pod, _ := object.(*corev1.Pod)
 		oldInstanceMap[object.GetName()] = pod
 	}
-	replacingNameSet := sets.New[string]()
-	// A Pod is needed to select a node for WaitForFirstConsumer storage. Before
-	// restore completion, use a bootstrap Pod whose init container prevents the
-	// database containers from starting. Replace it with the real Pod only after
-	// the populator has verified prepareData/provisioning completion.
+	// Remove a workload Pod if its restore PVC has not reached the explicit data
+	// readiness contract. The dataprotection controller uses a separate,
+	// non-workload scheduling Pod for WaitForFirstConsumer storage.
 	for name, pod := range oldInstanceMap {
 		template, desired := nameToTemplateMap[name]
 		if !desired {
@@ -111,8 +101,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		if err != nil {
 			return kubebuilderx.Continue, err
 		}
-		bootstrap := pod.Annotations[restoreBootstrapAnnotationKey] == "true"
-		if bootstrap == !restoreReady {
+		if restoreReady {
 			continue
 		}
 		if err := tree.Delete(pod); err != nil {
@@ -120,10 +109,9 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		}
 		oldNameSet.Delete(name)
 		delete(oldInstanceMap, name)
-		replacingNameSet.Insert(name)
 		if tree.EventRecorder != nil {
-			tree.EventRecorder.Eventf(its, corev1.EventTypeNormal,
-				"Replacing restore bootstrap Pod %s after PVC population state changed", name)
+			tree.EventRecorder.Eventf(its, corev1.EventTypeWarning,
+				"Waiting for restore data readiness before starting Pod %s", name)
 		}
 	}
 	createNameSet := newNameSet.Difference(oldNameSet)
@@ -171,15 +159,6 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		if !isOrderedReady && concurrency <= 0 {
 			break
 		}
-		if replacingNameSet.Has(name) {
-			// Wait until the old Pod has actually disappeared before creating a
-			// replacement whose immutable Pod spec differs.
-			currentAlignedNameList = append(currentAlignedNameList, name)
-			if isOrderedReady {
-				break
-			}
-			continue
-		}
 		predecessor := getPredecessor(i)
 		if isOrderedReady && predecessor != nil && !intctrlutil.IsPodAvailable(predecessor, its.Spec.MinReadySeconds) {
 			break
@@ -188,14 +167,19 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		if err != nil {
 			return kubebuilderx.Continue, err
 		}
+		if !restoreReady {
+			// Align PVCs, but leave workload Pod creation gated. A dedicated
+			// dataprotection Pod handles WaitForFirstConsumer node selection.
+			currentAlignedNameList = append(currentAlignedNameList, name)
+			if isOrderedReady {
+				break
+			}
+			continue
+		}
 		newPod, err := buildInstancePodByTemplate(name, nameToTemplateMap[name], its, "")
 		if err != nil {
 			return kubebuilderx.Continue, err
 		}
-		if !restoreReady {
-			makeRestoreBootstrapPod(newPod)
-		}
-
 		if err := tree.Add(newPod); err != nil {
 			return kubebuilderx.Continue, err
 		}
@@ -303,33 +287,21 @@ func instanceRestoreReadyForPod(tree *kubebuilderx.ObjectTree,
 		if currentPVC.Spec.VolumeName == "" {
 			return false, nil
 		}
-		if !dptypes.IsPVCPopulationCompleted(currentPVC) {
+		if !pvcRestoreDataReady(currentPVC) {
 			return false, nil
 		}
 	}
 	return true, nil
 }
 
-func makeRestoreBootstrapPod(pod *corev1.Pod) {
-	if pod.Annotations == nil {
-		pod.Annotations = map[string]string{}
+func pvcRestoreDataReady(pvc *corev1.PersistentVolumeClaim) bool {
+	for i := range pvc.Status.Conditions {
+		condition := &pvc.Status.Conditions[i]
+		if string(condition.Type) == constant.RestoreDataReadyConditionType {
+			return condition.Status == corev1.ConditionTrue
+		}
 	}
-	pod.Annotations[restoreBootstrapAnnotationKey] = "true"
-	image := viper.GetString(constant.KBToolsImage)
-	if image == "" && len(pod.Spec.Containers) > 0 {
-		// Keep the Pod valid if the tools image configuration is missing. The
-		// command is intentionally blocking (or repeatedly failing if the image
-		// lacks a shell), so application containers still cannot start.
-		image = pod.Spec.Containers[0].Image
-	}
-	pod.Spec.InitContainers = append(pod.Spec.InitContainers, corev1.Container{
-		Name:    restoreBootstrapContainerName,
-		Image:   image,
-		Command: []string{"sh", "-c", "while true; do sleep 3600; done"},
-	})
-	pod.Spec.ReadinessGates = append(pod.Spec.ReadinessGates, corev1.PodReadinessGate{
-		ConditionType: restoreBootstrapReadinessGate,
-	})
+	return false
 }
 
 var _ kubebuilderx.Reconciler = &instanceAlignmentReconciler{}

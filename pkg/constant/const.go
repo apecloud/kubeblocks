@@ -69,6 +69,11 @@ const InvalidContainerPort int32 = 0
 
 const EmptyInsTemplateName = ""
 
+// RestoreDataReadyConditionType is the PVC condition contract between the
+// dataprotection and workload controllers. True means prepareData (or
+// ProvisionOnly) is complete and workload containers may mount the target PVC.
+const RestoreDataReadyConditionType = "RestoreDataReady"
+
 type Key string
 
 // DryRunContextKey tells the KB Controllers to do dry-run reconciliations

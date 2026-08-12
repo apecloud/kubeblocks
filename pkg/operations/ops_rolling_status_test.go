@@ -288,6 +288,10 @@ func TestRollingRevisionProgress(t *testing.T) {
 		{name: "desired state not applied despite equal revision", mutate: func(w *defaultWorkload, _ *progressResource) {
 			w.upToDateSet.Delete(pod0)
 		}, wantExpected: 2, wantCompleted: 1, wantPod0: opsv1alpha1.ProcessingProgressStatus},
+		{name: "failure before desired state is applied is ignored", mutate: func(w *defaultWorkload, _ *progressResource) {
+			w.upToDateSet.Delete(pod0)
+			w.failedSet.Insert(pod0)
+		}, wantExpected: 2, wantCompleted: 1, wantPod0: opsv1alpha1.ProcessingProgressStatus},
 		{name: "partial vertical scaling waits when resources are not applied", mutate: func(w *defaultWorkload, pg *progressResource) {
 			w.upToDateSet.Delete(pod0)
 			pg.updatedPodSet = map[string]string{pod0: "template"}

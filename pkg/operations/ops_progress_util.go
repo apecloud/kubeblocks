@@ -226,7 +226,7 @@ func handleRollingProgressByRevisionWithWorkload(
 		targetRevisionApplied := hasTargetRevision && targetRevision != "" && currentRevisions[name] == targetRevision
 		targetApplied := targetRevisionApplied && upToDate.Has(name)
 		switch {
-		case targetRevisionApplied && failed.Has(name):
+		case targetApplied && failed.Has(name):
 			pgRes.rollingProgressFailed = true
 			detail.SetStatusAndMessage(opsv1alpha1.FailedProgressStatus,
 				getProgressFailedMessage(messageKey, objectKey, componentName,

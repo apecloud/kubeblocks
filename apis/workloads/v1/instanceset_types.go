@@ -602,8 +602,8 @@ type InstanceStatus struct {
 	// +optional
 	Available bool `json:"available,omitempty"`
 
-	// Failed indicates whether the instance reports a terminal failure state. It is independent of revision
-	// convergence; consumers must compare CurrentRevision and UpdateRevision when attributing a failure to a rollout.
+	// Failed indicates whether the instance reports a terminal failure state. It is independent of desired-state
+	// convergence; consumers must also verify matching revisions and UpToDate when attributing a failure to a rollout.
 	//
 	// +optional
 	Failed bool `json:"failed,omitempty"`

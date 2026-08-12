@@ -20546,8 +20546,8 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Failed indicates whether the instance reports a terminal failure state. It is independent of revision
-convergence; consumers must compare CurrentRevision and UpdateRevision when attributing a failure to a rollout.</p>
+<p>Failed indicates whether the instance reports a terminal failure state. It is independent of desired-state
+convergence; consumers must also verify matching revisions and UpToDate when attributing a failure to a rollout.</p>
 </td>
 </tr>
 <tr>

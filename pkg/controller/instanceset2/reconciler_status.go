@@ -281,10 +281,9 @@ func setInstanceStatus(its *workloads.InstanceSet,
 			UpToDate:        isInstanceUpdatedWithRevisions(inst, currentRevisions[inst.Name], updateRevisions),
 			Ready:           intctrlutil.IsInstanceReady(inst),
 			Available:       intctrlutil.IsInstanceAvailable(inst),
-			// Publish the observed failure independently of whether this
-			// Instance has reached its desired revision. Consumers combine
-			// Failed with CurrentRevision == UpdateRevision when deciding
-			// whether the failure belongs to the current rollout.
+			// Publish the observed failure independently of whether this Instance
+			// has applied its desired state. Consumers combine Failed with matching
+			// revisions and UpToDate when attributing it to the current rollout.
 			Failed: !intctrlutil.IsInstanceTerminating(inst) && meta.IsStatusConditionTrue(
 				inst.Status.Conditions, string(workloads.InstanceFailure)),
 		}

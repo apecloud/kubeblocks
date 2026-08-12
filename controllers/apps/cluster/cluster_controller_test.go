@@ -890,6 +890,65 @@ var _ = Describe("Cluster Controller", func() {
 			})).Should(Succeed())
 		})
 
+		It("applies shared TLS per shard template ShardingDefinition", func() {
+			createShardingDef := func(prefix string, shared bool) *appsv1.ShardingDefinition {
+				factory := testapps.NewShardingDefinitionFactory(prefix, compDefObj.Name).WithRandomName()
+				factory.Get().Spec.TLS = &appsv1.ShardingTLS{Shared: ptr.To(shared)}
+				obj := factory.Create(&testCtx).GetObject()
+				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(obj),
+					func(g Gomega, definition *appsv1.ShardingDefinition) {
+						g.Expect(definition.Status.Phase).Should(Equal(appsv1.AvailablePhase))
+					})).Should(Succeed())
+				return obj
+			}
+			plainDef := createShardingDef("plain-tls-sharding", false)
+			sharedDef := createShardingDef("shared-tls-sharding", true)
+
+			createClusterObjNoWait("", func(factory *testapps.MockClusterFactory) {
+				factory.AddSharding(defaultCompName, plainDef.Name, "").SetShards(2)
+				sharding := &factory.Get().Spec.Shardings[len(factory.Get().Spec.Shardings)-1]
+				sharding.Template.TLS = true
+				sharding.Template.Issuer = &appsv1.Issuer{Name: appsv1.IssuerKubeBlocks}
+				sharding.ShardTemplates = []appsv1.ShardTemplate{
+					{Name: "private", ShardingDef: ptr.To(plainDef.Name), Shards: ptr.To[int32](1)},
+					{Name: "shared", ShardingDef: ptr.To(sharedDef.Name), Shards: ptr.To[int32](1)},
+				}
+			})
+
+			Eventually(func(g Gomega) {
+				components := &appsv1.ComponentList{}
+				g.Expect(testCtx.Cli.List(testCtx.Ctx, components,
+					client.InNamespace(clusterKey.Namespace),
+					client.MatchingLabels{
+						constant.AppInstanceLabelKey:       clusterKey.Name,
+						constant.KBAppShardingNameLabelKey: defaultCompName,
+					})).Should(Succeed())
+				g.Expect(components.Items).Should(HaveLen(2))
+				seen := map[string]bool{}
+				for i := range components.Items {
+					component := &components.Items[i]
+					templateName := component.Labels[constant.KBAppShardTemplateLabelKey]
+					seen[templateName] = true
+					g.Expect(component.Spec.TLSConfig).ShouldNot(BeNil())
+					g.Expect(component.Spec.TLSConfig.Issuer).ShouldNot(BeNil())
+					switch templateName {
+					case "private":
+						g.Expect(component.Spec.TLSConfig.Issuer.Name).Should(Equal(appsv1.IssuerKubeBlocks))
+					case "shared":
+						g.Expect(component.Spec.TLSConfig.Issuer.Name).Should(Equal(appsv1.IssuerUserProvided))
+						g.Expect(component.Spec.TLSConfig.Issuer.SecretRef.Name).Should(
+							Equal(shardingTLSSecretName(clusterKey.Name, defaultCompName)))
+					}
+				}
+				g.Expect(seen).Should(HaveKeyWithValue("private", true))
+				g.Expect(seen).Should(HaveKeyWithValue("shared", true))
+			}).Should(Succeed())
+
+			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
+				g.Expect(cluster.Spec.Shardings[0].Template.Issuer.Name).Should(Equal(appsv1.IssuerKubeBlocks))
+			})).Should(Succeed())
+		})
+
 		It("create cluster with default topology", func() {
 			testClusterComponentWithTopology("", defaultCompName, nil, compDefObj.Name, latestServiceVersion)
 		})

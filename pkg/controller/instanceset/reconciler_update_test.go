@@ -634,15 +634,18 @@ var _ = Describe("update reconciler test", func() {
 			Expect(spy.switchoverCalls).Should(Equal(0))
 		})
 
-		It("defers the custom-image init migration only for existing pods", func() {
+		It("defers the custom-image init pair while updating the application image in place", func() {
 			oldToolsImage := viper.GetString(constant.KBToolsImage)
 			defer viper.Set(constant.KBToolsImage, oldToolsImage)
 			viper.Set(constant.KBToolsImage, "mirror.local/apecloud/kubeblocks-tools:1.1.0")
+			origSupportResize := intctrlutil.SupportResizeSubResource
+			intctrlutil.SupportResizeSubResource = func() (bool, error) { return false, nil }
+			defer func() { intctrlutil.SupportResizeSubResource = origSupportResize }()
 
 			its.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
 			its.Spec.Replicas = ptr.To[int32](1)
 			its.Spec.PodUpdatePolicy = kbappsv1.ReCreatePodUpdatePolicyType
-			its.Spec.PodUpgradePolicy = kbappsv1.ReCreatePodUpdatePolicyType
+			its.Spec.PodUpgradePolicy = kbappsv1.PreferInPlacePodUpdatePolicyType
 			its.Spec.Template.Spec.InitContainers = []corev1.Container{{
 				Name:    "init-kbagent",
 				Image:   "docker.io/apecloud/kubeblocks-tools:1.0.0",
@@ -669,6 +672,7 @@ var _ = Describe("update reconciler test", func() {
 
 			its.Spec.Template.Spec.InitContainers[0].Image = "mirror.local/apecloud/kubeblocks-tools:1.1.0"
 			its.Spec.Template.Spec.InitContainers[0].Command = append([]string(nil), kbAgentInitCopyCommand...)
+			its.Spec.Template.Spec.Containers[0].Image = "mysql:8.4"
 			Expect(its.Spec.Template.Spec.InitContainers[0].Command).Should(Equal(kbAgentInitCopyCommand),
 				"the desired template must retain the new command")
 
@@ -684,6 +688,8 @@ var _ = Describe("update reconciler test", func() {
 			Expect(livePod.Spec.InitContainers[0].Image).Should(Equal("docker.io/apecloud/kubeblocks-tools:1.0.0"))
 			Expect(livePod.Spec.InitContainers[0].Command).Should(Equal(legacyKBAgentInitCopyCommand),
 				"the existing Pod must keep the old image and command as one pair")
+			Expect(livePod.Spec.Containers[0].Image).Should(Equal("mysql:8.4"),
+				"the application image must still be updated in place")
 
 			itsExt, err := buildInstanceSetExt(its, nil)
 			Expect(err).ShouldNot(HaveOccurred())

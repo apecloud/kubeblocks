@@ -827,6 +827,7 @@ var _ = Describe("Cluster Controller", func() {
 		It("creates one KubeBlocks TLS source shared by every shard", func() {
 			shardingDef := testapps.NewShardingDefinitionFactory("shared-tls-sharding", compDefObj.Name).
 				WithRandomName()
+			shardingDef.AddAnnotations(constant.CRDAPIVersionAnnotationKey, appsv1.GroupVersion.String())
 			shardingDef.Get().Spec.TLS = &appsv1.ShardingTLS{Shared: ptr.To(true)}
 			shardingDefObj := shardingDef.Create(&testCtx).GetObject()
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(shardingDefObj),
@@ -893,6 +894,7 @@ var _ = Describe("Cluster Controller", func() {
 		It("applies shared TLS per shard template ShardingDefinition", func() {
 			createShardingDef := func(prefix string, shared bool) *appsv1.ShardingDefinition {
 				factory := testapps.NewShardingDefinitionFactory(prefix, compDefObj.Name).WithRandomName()
+				factory.AddAnnotations(constant.CRDAPIVersionAnnotationKey, appsv1.GroupVersion.String())
 				factory.Get().Spec.TLS = &appsv1.ShardingTLS{Shared: ptr.To(shared)}
 				obj := factory.Create(&testCtx).GetObject()
 				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(obj),

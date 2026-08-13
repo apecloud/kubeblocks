@@ -457,11 +457,10 @@ func getPodUpdatePolicy(its *workloads.InstanceSet, pod *corev1.Pod) (podUpdateP
 	if index < 0 {
 		return noOpsPolicy, "", "", errors.Wrapf(errTemplateNotFound, "pod: %s/%s", pod.Namespace, pod.Name)
 	}
-	newPod, err := buildInstancePodByTemplate(pod.Name, templateList[index], its, getPodRevision(pod))
+	newPod, err := buildInstancePodByTemplateForUpdate(pod, templateList[index], its)
 	if err != nil {
 		return noOpsPolicy, "", "", err
 	}
-	newPod, _ = podForDeferredKBAgentInitMigration(pod, newPod)
 
 	specUpdatePolicy := getPodUpdatePolicyInSpec(its, pod, newPod)
 	if getPodRevision(pod) != updateRevisions[pod.Name] && getPodRevision(pod) != proposedRevisions[pod.Name] {

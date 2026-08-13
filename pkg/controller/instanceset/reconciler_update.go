@@ -186,11 +186,10 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 
 		switch updatePolicy {
 		case inPlaceUpdatePolicy:
-			newPod, err := buildInstancePodByTemplate(pod.Name, nameToTemplateMap[pod.Name], its, getPodRevision(pod))
+			newPod, err := buildInstancePodByTemplateForUpdate(pod, nameToTemplateMap[pod.Name], its)
 			if err != nil {
 				return kubebuilderx.Continue, err
 			}
-			newPod, _ = podForDeferredKBAgentInitMigration(pod, newPod)
 			newMergedPod := copyAndMerge(pod, newPod)
 			supportResizeSubResource, err := intctrlutil.SupportResizeSubResource()
 			if err != nil {

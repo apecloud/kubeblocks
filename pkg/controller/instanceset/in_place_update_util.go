@@ -47,7 +47,9 @@ const (
 	inPlaceUpdatePolicy podUpdatePolicy = "inPlaceUpdate"
 )
 
-var errTemplateNotFound = fmt.Errorf("no template found for pod")
+var (
+	errTemplateNotFound = fmt.Errorf("no template found for pod")
+)
 
 func supportPodVerticalScaling() bool {
 	return viper.GetBool(constant.FeatureGateInPlacePodVerticalScaling)
@@ -108,8 +110,8 @@ func normalizeKBAgentInitCommandForRevision(template *corev1.PodTemplateSpec) {
 	}
 	for i := range template.Spec.InitContainers {
 		initContainer := &template.Spec.InitContainers[i]
-		if initContainer.Name == kbagent.InitContainerName && kbagent.IsCurrentInitCopyCommand(initContainer.Command) {
-			initContainer.Command = kbagent.LegacyInitCopyCommand()
+		if initContainer.Name == kbagent.InitContainerName && kbagent.IsInitCommand(initContainer.Command) {
+			initContainer.Command = kbagent.LegacyInitCommand()
 			return
 		}
 	}
@@ -135,8 +137,8 @@ func podForDeferredKBAgentInitMigration(old, desired *corev1.Pod) (*corev1.Pod, 
 	}
 	oldInit := &old.Spec.InitContainers[oldIndex]
 	desiredInit := &desired.Spec.InitContainers[desiredIndex]
-	if !kbagent.IsLegacyInitCopyCommand(oldInit.Command) ||
-		!kbagent.IsCurrentInitCopyCommand(desiredInit.Command) {
+	if !kbagent.IsLegacyInitCommand(oldInit.Command) ||
+		!kbagent.IsInitCommand(desiredInit.Command) {
 		return desired, false
 	}
 

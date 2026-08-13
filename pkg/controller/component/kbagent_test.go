@@ -302,7 +302,7 @@ var _ = Describe("kb-agent", func() {
 
 			ic := kbAgentInitContainer()
 			Expect(ic).ShouldNot(BeNil())
-			Expect(ic.Command).Should(Equal(kbagent.CurrentInitCopyCommand()))
+			Expect(ic.Command).Should(Equal(kbagent.InitCommand()))
 
 			c := kbAgentContainer()
 			Expect(c).ShouldNot(BeNil())

@@ -51,7 +51,9 @@ const (
 	podRoleLabelFileName = "role"
 )
 
-var roleLabelVolumeMount = corev1.VolumeMount{Name: roleLabelVolumeName, MountPath: podMetadataMountPath, ReadOnly: true}
+var (
+	roleLabelVolumeMount = corev1.VolumeMount{Name: roleLabelVolumeName, MountPath: podMetadataMountPath, ReadOnly: true}
+)
 
 func UpdateKBAgentContainer4HostNetwork(synthesizedComp *SynthesizedComponent) {
 	idx, c := intctrlutil.GetContainerByName(synthesizedComp.PodSpec.Containers, kbagent.ContainerName)
@@ -449,7 +451,7 @@ func handleCustomImageNContainerDefined(synthesizedComp *SynthesizedComponent, c
 		initContainer := builder.NewContainerBuilder(kbagent.InitContainerName).
 			SetImage(viper.GetString(constant.KBToolsImage)).
 			SetImagePullPolicy(corev1.PullIfNotPresent).
-			AddCommands(kbagent.CurrentInitCopyCommand()...).
+			AddCommands(kbagent.InitCommand()...).
 			AddVolumeMounts(kbagent.SharedVolumeMount()).
 			GetObject()
 		synthesizedComp.PodSpec.InitContainers = append(synthesizedComp.PodSpec.InitContainers, *initContainer)

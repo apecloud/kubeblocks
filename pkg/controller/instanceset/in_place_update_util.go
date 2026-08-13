@@ -47,14 +47,7 @@ const (
 	inPlaceUpdatePolicy podUpdatePolicy = "inPlaceUpdate"
 )
 
-var (
-	errTemplateNotFound = fmt.Errorf("no template found for pod")
-
-	legacyKBAgentInitCopyCommand = []string{"cp", "-r", "/bin/kbagent", "/kubeblocks/"}
-	kbAgentInitCopyCommand       = []string{"cp", "-r", "/bin/kbagent", "/bin/tini-static", "/kubeblocks/"}
-)
-
-const kbAgentCommandOnSharedMount = "/kubeblocks/kbagent"
+var errTemplateNotFound = fmt.Errorf("no template found for pod")
 
 func supportPodVerticalScaling() bool {
 	return viper.GetBool(constant.FeatureGateInPlacePodVerticalScaling)
@@ -110,23 +103,16 @@ func filterInPlaceFields(src *corev1.PodTemplateSpec) *corev1.PodTemplateSpec {
 // from changing existing custom-image Pod revisions. The actual InstanceSet template
 // remains untouched, so every newly created Pod uses the new copy command.
 func normalizeKBAgentInitCommandForRevision(template *corev1.PodTemplateSpec) {
-	if template == nil || !hasSharedKBAgentCommand(template.Spec.Containers) {
+	if template == nil || !kbagent.UsesSharedBinary(template.Spec.Containers) {
 		return
 	}
 	for i := range template.Spec.InitContainers {
 		initContainer := &template.Spec.InitContainers[i]
-		if initContainer.Name == kbagent.InitContainerName && reflect.DeepEqual(initContainer.Command, kbAgentInitCopyCommand) {
-			initContainer.Command = append([]string(nil), legacyKBAgentInitCopyCommand...)
+		if initContainer.Name == kbagent.InitContainerName && kbagent.IsCurrentInitCopyCommand(initContainer.Command) {
+			initContainer.Command = kbagent.LegacyInitCopyCommand()
 			return
 		}
 	}
-}
-
-func hasSharedKBAgentCommand(containers []corev1.Container) bool {
-	index := slices.IndexFunc(containers, func(container corev1.Container) bool {
-		return container.Name == kbagent.ContainerName
-	})
-	return index >= 0 && reflect.DeepEqual(containers[index].Command, []string{kbAgentCommandOnSharedMount})
 }
 
 // podForDeferredKBAgentInitMigration returns a desired Pod view that retains the
@@ -135,7 +121,7 @@ func hasSharedKBAgentCommand(containers []corev1.Container) bool {
 // InstanceSet template stays on the new image and two-file copy command.
 func podForDeferredKBAgentInitMigration(old, desired *corev1.Pod) (*corev1.Pod, bool) {
 	if old == nil || desired == nil ||
-		!hasSharedKBAgentCommand(old.Spec.Containers) || !hasSharedKBAgentCommand(desired.Spec.Containers) {
+		!kbagent.UsesSharedBinary(old.Spec.Containers) || !kbagent.UsesSharedBinary(desired.Spec.Containers) {
 		return desired, false
 	}
 	oldIndex := slices.IndexFunc(old.Spec.InitContainers, func(container corev1.Container) bool {
@@ -149,8 +135,8 @@ func podForDeferredKBAgentInitMigration(old, desired *corev1.Pod) (*corev1.Pod, 
 	}
 	oldInit := &old.Spec.InitContainers[oldIndex]
 	desiredInit := &desired.Spec.InitContainers[desiredIndex]
-	if !reflect.DeepEqual(oldInit.Command, legacyKBAgentInitCopyCommand) ||
-		!reflect.DeepEqual(desiredInit.Command, kbAgentInitCopyCommand) {
+	if !kbagent.IsLegacyInitCopyCommand(oldInit.Command) ||
+		!kbagent.IsCurrentInitCopyCommand(desiredInit.Command) {
 		return desired, false
 	}
 

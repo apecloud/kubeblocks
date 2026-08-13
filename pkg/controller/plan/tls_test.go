@@ -49,7 +49,7 @@ var _ = Describe("TLS test", func() {
 			},
 			Data: map[string][]byte{},
 		}
-		_, err := ComposeTLSCertsWithSecret(keys, synthesizedComp, secret)
+		_, err := ComposeTLSCertsWithSecret(synthesizedComp, keys, secret)
 		Expect(err).Should(BeNil())
 		Expect(secret.Data).ShouldNot(BeNil())
 		Expect(secret.Data[*keys.CA]).ShouldNot(BeZero())

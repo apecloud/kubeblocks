@@ -80,8 +80,8 @@ func (t *clusterShardingTLSTransformer) reconcileShardingTLSs(
 	return nil
 }
 
-func (t *clusterShardingTLSTransformer) sharedShardTemplates(
-	transCtx *clusterTransformContext, sharding *appsv1.ClusterSharding) sets.Set[string] {
+func (t *clusterShardingTLSTransformer) sharedShardTemplates(transCtx *clusterTransformContext,
+	sharding *appsv1.ClusterSharding) sets.Set[string] {
 	shared := func(shardingDefName string) bool {
 		shardingDef, ok := transCtx.shardingDefs[shardingDefName]
 		if !ok || shardingDef.Spec.TLS == nil {
@@ -105,8 +105,7 @@ func (t *clusterShardingTLSTransformer) sharedShardTemplates(
 }
 
 func (t *clusterShardingTLSTransformer) reconcileShardingTLS(transCtx *clusterTransformContext,
-	graphCli model.GraphClient, dag *graph.DAG, sharding *appsv1.ClusterSharding,
-	sharedTemplates sets.Set[string]) error {
+	graphCli model.GraphClient, dag *graph.DAG, sharding *appsv1.ClusterSharding, sharedTemplates sets.Set[string]) error {
 	if !sharding.Template.TLS {
 		return nil
 	}
@@ -220,7 +219,7 @@ func (t *clusterShardingTLSTransformer) buildTLSSecret(transCtx *clusterTransfor
 	secret := t.newTLSSecret(transCtx, sharding)
 	caFile, certFile, keyFile := shardingTLSCAKey, shardingTLSCertKey, shardingTLSKeyKey
 	keys := plan.TLSSecretKeys{CA: &caFile, Cert: &certFile, Key: &keyFile}
-	return plan.ComposeTLSCertsWithSecret(keys, synthesizedComp, secret)
+	return plan.ComposeTLSCertsWithSecret(synthesizedComp, keys, secret)
 }
 
 func (t *clusterShardingTLSTransformer) newTLSSecret(transCtx *clusterTransformContext,
@@ -242,8 +241,8 @@ func (t *clusterShardingTLSTransformer) newTLSSecret(transCtx *clusterTransformC
 		GetObject()
 }
 
-func (t *clusterShardingTLSTransformer) rewriteTLSConfig(
-	transCtx *clusterTransformContext, sharding *appsv1.ClusterSharding, sharedTemplates sets.Set[string]) {
+func (t *clusterShardingTLSTransformer) rewriteTLSConfig(transCtx *clusterTransformContext,
+	sharding *appsv1.ClusterSharding, sharedTemplates sets.Set[string]) {
 	newIssuer := func() *appsv1.Issuer {
 		return &appsv1.Issuer{
 			Name: appsv1.IssuerUserProvided,

@@ -40,16 +40,16 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/plan"
 )
 
-// clusterShardingTLSTransformer handles shared TLS for sharding.
-type clusterShardingTLSTransformer struct{}
-
-var _ graph.Transformer = &clusterShardingTLSTransformer{}
-
 const (
 	shardingTLSCAKey   = "ca.crt"
 	shardingTLSCertKey = "tls.crt"
 	shardingTLSKeyKey  = "tls.key"
 )
+
+var _ graph.Transformer = &clusterShardingTLSTransformer{}
+
+// clusterShardingTLSTransformer handles shared TLS for sharding.
+type clusterShardingTLSTransformer struct{}
 
 func (t *clusterShardingTLSTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*clusterTransformContext)
@@ -113,10 +113,12 @@ func (t *clusterShardingTLSTransformer) reconcileShardingTLS(transCtx *clusterTr
 	if sharding.Template.Issuer == nil {
 		return fmt.Errorf("issuer shouldn't be nil when tls enabled")
 	}
-	if sharding.Template.Issuer.Name == appsv1.IssuerUserProvided {
+	switch sharding.Template.Issuer.Name {
+	case appsv1.IssuerUserProvided:
 		return nil // all components will share the same secret
-	}
-	if sharding.Template.Issuer.Name != appsv1.IssuerKubeBlocks {
+	case appsv1.IssuerKubeBlocks:
+		// generate and distribute a shared certificate below
+	default:
 		return fmt.Errorf("unsupported TLS issuer %q", sharding.Template.Issuer.Name)
 	}
 

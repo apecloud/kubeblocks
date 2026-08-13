@@ -172,6 +172,10 @@ var _ = Describe("cluster sharding shared TLS transformer", func() {
 		Expect(transformer.reconcileShardingTLS(transCtx, nil, nil, sharding, sets.New(""))).Should(
 			MatchError("issuer shouldn't be nil when tls enabled"))
 
+		sharding.Template.Issuer = &appsv1.Issuer{Name: appsv1.IssuerName("unsupported")}
+		Expect(transformer.reconcileShardingTLS(transCtx, nil, nil, sharding, sets.New(""))).Should(
+			MatchError(`unsupported TLS issuer "unsupported"`))
+
 		sharding.Template.Issuer = &appsv1.Issuer{Name: appsv1.IssuerUserProvided}
 		Expect(transformer.reconcileShardingTLS(transCtx, nil, nil, sharding, sets.New(""))).Should(Succeed())
 	})

@@ -40,10 +40,6 @@ import (
 )
 
 const (
-	kbAgentCommand              = "/bin/kbagent"
-	kbAgentSharedMountPath      = "/kubeblocks"
-	kbAgentCommandOnSharedMount = "/kubeblocks/kbagent"
-
 	minAvailablePort = 1025
 	maxAvailablePort = 65535
 
@@ -56,13 +52,8 @@ const (
 )
 
 var (
-	sharedVolumeMount    = corev1.VolumeMount{Name: "kubeblocks", MountPath: kbAgentSharedMountPath}
 	roleLabelVolumeMount = corev1.VolumeMount{Name: roleLabelVolumeName, MountPath: podMetadataMountPath, ReadOnly: true}
 )
-
-func IsKBAgentContainer(c *corev1.Container) bool {
-	return c.Name == kbagent.ContainerName || c.Name == kbagent.ContainerName4Worker || c.Name == kbagent.InitContainerName
-}
 
 func UpdateKBAgentContainer4HostNetwork(synthesizedComp *SynthesizedComponent) {
 	idx, c := intctrlutil.GetContainerByName(synthesizedComp.PodSpec.Containers, kbagent.ContainerName)
@@ -139,7 +130,7 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 		b := builder.NewContainerBuilder(name).
 			SetImage(viper.GetString(constant.KBToolsImage)).
 			SetImagePullPolicy(corev1.PullIfNotPresent).
-			AddCommands(kbAgentCommand).
+			AddCommands(kbagent.BinaryPath).
 			AddEnv(mergedActionEnv4KBAgent(synthesizedComp)...).
 			AddEnv(envVars...).
 			SetSecurityContext(corev1.SecurityContext{
@@ -460,15 +451,15 @@ func handleCustomImageNContainerDefined(synthesizedComp *SynthesizedComponent, c
 		initContainer := builder.NewContainerBuilder(kbagent.InitContainerName).
 			SetImage(viper.GetString(constant.KBToolsImage)).
 			SetImagePullPolicy(corev1.PullIfNotPresent).
-			AddCommands([]string{"cp", "-r", kbAgentCommand, kbAgentSharedMountPath + "/"}...).
-			AddVolumeMounts(sharedVolumeMount).
+			AddCommands(kbagent.InitCommand()...).
+			AddVolumeMounts(kbagent.SharedVolumeMount()).
 			GetObject()
 		synthesizedComp.PodSpec.InitContainers = append(synthesizedComp.PodSpec.InitContainers, *initContainer)
 
 		for _, container := range containers {
 			container.Image = image
-			container.Command[0] = kbAgentCommandOnSharedMount
-			container.VolumeMounts = append(container.VolumeMounts, sharedVolumeMount)
+			container.Command[0] = kbagent.SharedBinaryPath
+			container.VolumeMounts = append(container.VolumeMounts, kbagent.SharedVolumeMount())
 		}
 	}
 

@@ -38,6 +38,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/kbagent"
 )
 
 // componentWorkloadTransformer handles component workload generation
@@ -327,7 +328,7 @@ func checkNRollbackProtoImages(itsObj, itsProto *workloads.InstanceSet) {
 		images[i] = make(map[string]string)
 		for _, c := range cc {
 			// skip the kb-agent container
-			if component.IsKBAgentContainer(&c) {
+			if kbagent.IsContainer(&c) {
 				continue
 			}
 			images[i][c.Name] = c.Image

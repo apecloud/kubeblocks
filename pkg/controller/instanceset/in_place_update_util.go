@@ -35,6 +35,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/kbagent"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -95,8 +96,70 @@ func filterInPlaceFields(src *corev1.PodTemplateSpec) *corev1.PodTemplateSpec {
 		delete(template.Spec.Containers[i].Resources.Limits, corev1.ResourceCPU)
 		delete(template.Spec.Containers[i].Resources.Limits, corev1.ResourceMemory)
 	}
+	normalizeKBAgentInitCommandForRevision(template)
 
 	return template
+}
+
+// normalizeKBAgentInitCommandForRevision keeps the one-time addition of tini-static
+// from changing existing custom-image Pod revisions. The actual InstanceSet template
+// remains untouched, so every newly created Pod uses the new copy command.
+func normalizeKBAgentInitCommandForRevision(template *corev1.PodTemplateSpec) {
+	if template == nil || !kbagent.UsesSharedBinary(template.Spec.Containers) {
+		return
+	}
+	for i := range template.Spec.InitContainers {
+		initContainer := &template.Spec.InitContainers[i]
+		if initContainer.Name == kbagent.InitContainerName && kbagent.IsInitCommand(initContainer.Command) {
+			initContainer.Command = kbagent.LegacyInitCommand()
+			return
+		}
+	}
+}
+
+// podForDeferredKBAgentInitMigration returns a desired Pod view that retains the
+// live init-kbagent image and command. This lets existing custom-image Pods keep
+// running without applying an immutable init command change, while the real
+// InstanceSet template stays on the new image and two-file copy command.
+func podForDeferredKBAgentInitMigration(old, desired *corev1.Pod) (*corev1.Pod, bool) {
+	if old == nil || desired == nil ||
+		!kbagent.UsesSharedBinary(old.Spec.Containers) || !kbagent.UsesSharedBinary(desired.Spec.Containers) {
+		return desired, false
+	}
+	oldIndex := slices.IndexFunc(old.Spec.InitContainers, func(container corev1.Container) bool {
+		return container.Name == kbagent.InitContainerName
+	})
+	desiredIndex := slices.IndexFunc(desired.Spec.InitContainers, func(container corev1.Container) bool {
+		return container.Name == kbagent.InitContainerName
+	})
+	if oldIndex < 0 || desiredIndex < 0 {
+		return desired, false
+	}
+	oldInit := &old.Spec.InitContainers[oldIndex]
+	desiredInit := &desired.Spec.InitContainers[desiredIndex]
+	if !kbagent.IsLegacyInitCommand(oldInit.Command) ||
+		!kbagent.IsInitCommand(desiredInit.Command) {
+		return desired, false
+	}
+
+	// If the image also changed, validate the init-kbagent image transition in
+	// isolation. Other containers may have legitimate image updates of their own;
+	// they must not prevent this init image and command from being retained as a
+	// pair on the live Pod.
+	if !intctrlutil.EqualContainerImageInSpec(oldInit.Image, desiredInit.Image) {
+		oldInitPod := &corev1.Pod{Spec: corev1.PodSpec{InitContainers: []corev1.Container{*oldInit.DeepCopy()}}}
+		desiredInitCopy := desiredInit.DeepCopy()
+		desiredInitCopy.Command = append([]string(nil), oldInit.Command...)
+		desiredInitPod := &corev1.Pod{Spec: corev1.PodSpec{InitContainers: []corev1.Container{*desiredInitCopy}}}
+		if !intctrlutil.OnlyKBManagedPodImagesChanged(oldInitPod, desiredInitPod) {
+			return desired, false
+		}
+	}
+
+	normalized := desired.DeepCopy()
+	normalized.Spec.InitContainers[desiredIndex].Image = oldInit.Image
+	normalized.Spec.InitContainers[desiredIndex].Command = append([]string(nil), oldInit.Command...)
+	return normalized, true
 }
 
 func copyRequestsNLimitsFields(container *corev1.Container) (corev1.ResourceList, corev1.ResourceList) {
@@ -417,7 +480,7 @@ func getPodUpdatePolicy(its *workloads.InstanceSet, pod *corev1.Pod) (podUpdateP
 	if index < 0 {
 		return noOpsPolicy, "", errors.Wrapf(errTemplateNotFound, "pod: %s/%s", pod.Namespace, pod.Name)
 	}
-	newPod, err := buildInstancePodByTemplate(pod.Name, templateList[index], its, getPodRevision(pod))
+	newPod, err := buildInstancePodByTemplateForUpdate(pod, templateList[index], its)
 	if err != nil {
 		return noOpsPolicy, "", err
 	}

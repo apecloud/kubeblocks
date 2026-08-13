@@ -261,20 +261,15 @@ func (t *clusterShardingTLSTransformer) rewriteTLSConfig(
 
 	// Normalization expands a sharding into component specs before this transformer
 	// runs. Rewrite only the expanded specs whose effective ShardingDefinition
-	// enables sharing. Keep the Cluster spec unchanged so template-specific
-	// opt-outs continue to inherit the user's original KubeBlocks issuer.
-	sharedComponentNames := sets.New[string]()
+	// enables sharing. shardingCompsWithTpl and shardingComps contain the same
+	// component pointers, so updating the grouped view also updates the flat view.
+	// Keep the Cluster spec unchanged so template-specific opt-outs continue to
+	// inherit the user's original KubeBlocks issuer.
 	for templateName, comps := range transCtx.shardingCompsWithTpl[sharding.Name] {
 		if !sharedTemplates.Has(templateName) {
 			continue
 		}
 		for _, comp := range comps {
-			comp.Issuer = newIssuer()
-			sharedComponentNames.Insert(comp.Name)
-		}
-	}
-	for _, comp := range transCtx.shardingComps[sharding.Name] {
-		if sharedComponentNames.Has(comp.Name) {
 			comp.Issuer = newIssuer()
 		}
 	}

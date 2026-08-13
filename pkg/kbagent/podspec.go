@@ -33,27 +33,27 @@ const (
 	SharedVolumeName = "kubeblocks"
 )
 
-// CurrentInitCopyCommand returns the current init-kbagent copy command.
-func CurrentInitCopyCommand() []string {
+// InitCommand returns the current init-kbagent copy command.
+func InitCommand() []string {
 	return []string{"cp", "-r", BinaryPath, TiniPath, SharedMountPath + "/"}
 }
 
-// LegacyInitCopyCommand returns the init-kbagent copy command used before
+// LegacyInitCommand returns the init-kbagent copy command used before
 // tini-static became part of the shared kbagent runtime contract.
-func LegacyInitCopyCommand() []string {
+func LegacyInitCommand() []string {
 	return []string{"cp", "-r", BinaryPath, SharedMountPath + "/"}
 }
 
-// IsCurrentInitCopyCommand reports whether command implements the current
-// init-kbagent copy contract.
-func IsCurrentInitCopyCommand(command []string) bool {
-	return slices.Equal(command, CurrentInitCopyCommand())
+// IsInitCommand reports whether command implements the current init-kbagent
+// copy contract.
+func IsInitCommand(command []string) bool {
+	return slices.Equal(command, InitCommand())
 }
 
-// IsLegacyInitCopyCommand reports whether command implements the legacy
+// IsLegacyInitCommand reports whether command implements the legacy
 // init-kbagent copy contract.
-func IsLegacyInitCopyCommand(command []string) bool {
-	return slices.Equal(command, LegacyInitCopyCommand())
+func IsLegacyInitCommand(command []string) bool {
+	return slices.Equal(command, LegacyInitCommand())
 }
 
 // IsContainer reports whether container belongs to the kbagent runtime.

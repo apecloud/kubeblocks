@@ -27,25 +27,25 @@ import (
 )
 
 func TestInitCopyCommandContract(t *testing.T) {
-	current := CurrentInitCopyCommand()
+	current := InitCommand()
 	if !slices.Equal(current, []string{"cp", "-r", BinaryPath, TiniPath, SharedMountPath + "/"}) {
 		t.Fatalf("unexpected current copy command: %v", current)
 	}
-	if !IsCurrentInitCopyCommand(current) || IsLegacyInitCopyCommand(current) {
+	if !IsInitCommand(current) || IsLegacyInitCommand(current) {
 		t.Fatalf("current copy command was not recognized correctly: %v", current)
 	}
 
-	legacy := LegacyInitCopyCommand()
+	legacy := LegacyInitCommand()
 	if !slices.Equal(legacy, []string{"cp", "-r", BinaryPath, SharedMountPath + "/"}) {
 		t.Fatalf("unexpected legacy copy command: %v", legacy)
 	}
-	if !IsLegacyInitCopyCommand(legacy) || IsCurrentInitCopyCommand(legacy) {
+	if !IsLegacyInitCommand(legacy) || IsInitCommand(legacy) {
 		t.Fatalf("legacy copy command was not recognized correctly: %v", legacy)
 	}
 
 	current[0] = "changed"
 	legacy[0] = "changed"
-	if CurrentInitCopyCommand()[0] != "cp" || LegacyInitCopyCommand()[0] != "cp" {
+	if InitCommand()[0] != "cp" || LegacyInitCommand()[0] != "cp" {
 		t.Fatal("copy command constructors returned shared mutable slices")
 	}
 }

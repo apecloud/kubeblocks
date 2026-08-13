@@ -72,7 +72,7 @@ var _ = Describe("instance util test", func() {
 				InitContainers: []corev1.Container{{
 					Name:    "init-kbagent",
 					Image:   "docker.io/apecloud/kubeblocks-tools:1.0.0",
-					Command: kbagent.LegacyInitCopyCommand(),
+					Command: kbagent.LegacyInitCommand(),
 				}},
 				Containers: []corev1.Container{
 					{Name: "app", Image: "mysql:8.0"},
@@ -81,12 +81,12 @@ var _ = Describe("instance util test", func() {
 			}}
 			newTemplate := oldTemplate.DeepCopy()
 			newTemplate.Spec.InitContainers[0].Image = "mirror.local/apecloud/kubeblocks-tools:1.1.0"
-			newTemplate.Spec.InitContainers[0].Command = kbagent.CurrentInitCopyCommand()
+			newTemplate.Spec.InitContainers[0].Command = kbagent.InitCommand()
 
 			oldFiltered := filterInPlaceFields(oldTemplate)
 			newFiltered := filterInPlaceFields(newTemplate)
 			Expect(newFiltered).Should(Equal(oldFiltered))
-			Expect(newTemplate.Spec.InitContainers[0].Command).Should(Equal(kbagent.CurrentInitCopyCommand()),
+			Expect(newTemplate.Spec.InitContainers[0].Command).Should(Equal(kbagent.InitCommand()),
 				"revision normalization must not modify the desired template")
 
 			parent := builder.NewInstanceSetBuilder(namespace, name).SetUID(uid).GetObject()
@@ -131,7 +131,7 @@ var _ = Describe("instance util test", func() {
 				InitContainers: []corev1.Container{{
 					Name:    "init-kbagent",
 					Image:   "docker.io/apecloud/kubeblocks-tools:1.0.0",
-					Command: kbagent.LegacyInitCopyCommand(),
+					Command: kbagent.LegacyInitCommand(),
 				}},
 				Containers: []corev1.Container{
 					{Name: "app", Image: "mysql:8.0"},
@@ -140,21 +140,21 @@ var _ = Describe("instance util test", func() {
 			}}
 			desiredPod := oldPod.DeepCopy()
 			desiredPod.Spec.InitContainers[0].Image = "mirror.local/apecloud/kubeblocks-tools:1.1.0"
-			desiredPod.Spec.InitContainers[0].Command = kbagent.CurrentInitCopyCommand()
+			desiredPod.Spec.InitContainers[0].Command = kbagent.InitCommand()
 
 			normalized, ok := podForDeferredKBAgentInitMigration(oldPod, desiredPod)
 			Expect(ok).Should(BeTrue())
 			Expect(normalized.Spec.InitContainers[0].Image).Should(Equal(oldPod.Spec.InitContainers[0].Image))
-			Expect(normalized.Spec.InitContainers[0].Command).Should(Equal(kbagent.LegacyInitCopyCommand()))
+			Expect(normalized.Spec.InitContainers[0].Command).Should(Equal(kbagent.LegacyInitCommand()))
 			Expect(desiredPod.Spec.InitContainers[0].Image).Should(Equal("mirror.local/apecloud/kubeblocks-tools:1.1.0"))
-			Expect(desiredPod.Spec.InitContainers[0].Command).Should(Equal(kbagent.CurrentInitCopyCommand()))
+			Expect(desiredPod.Spec.InitContainers[0].Command).Should(Equal(kbagent.InitCommand()))
 
 			appUpgrade := desiredPod.DeepCopy()
 			appUpgrade.Spec.Containers[0].Image = "mysql:8.4"
 			normalized, ok = podForDeferredKBAgentInitMigration(oldPod, appUpgrade)
 			Expect(ok).Should(BeTrue(), "application image changes must not prevent deferring the init pair")
 			Expect(normalized.Spec.InitContainers[0].Image).Should(Equal(oldPod.Spec.InitContainers[0].Image))
-			Expect(normalized.Spec.InitContainers[0].Command).Should(Equal(kbagent.LegacyInitCopyCommand()))
+			Expect(normalized.Spec.InitContainers[0].Command).Should(Equal(kbagent.LegacyInitCommand()))
 			Expect(normalized.Spec.Containers[0].Image).Should(Equal("mysql:8.4"),
 				"the application image must remain at its desired value")
 

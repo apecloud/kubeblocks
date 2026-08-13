@@ -21,11 +21,12 @@ package types
 
 import corev1 "k8s.io/api/core/v1"
 
-const PersistentVolumeClaimPopulating corev1.PersistentVolumeClaimConditionType = "Populating"
-
 const (
-	ReasonPopulatingSucceed     = "Succeed"
-	ReasonPopulatingProvisioned = "Provisioned"
+	PersistentVolumeClaimPopulating corev1.PersistentVolumeClaimConditionType = "Populating"
+	ReasonPopulatingFailed          string                                    = "Failed"
+	ReasonPopulatingProcessing      string                                    = "Processing"
+	ReasonPopulatingSucceed         string                                    = "Succeed"
+	ReasonPopulatingProvisioned     string                                    = "Provisioned"
 )
 
 var (

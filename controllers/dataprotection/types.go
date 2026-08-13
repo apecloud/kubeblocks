@@ -87,8 +87,8 @@ const (
 	ReasonVolumePopulateFailed  = "VolumePopulateFailed"
 
 	// pvc condition type and reason
-	ReasonPopulatingFailed      = "Failed"
-	ReasonPopulatingProcessing  = "Processing"
+	ReasonPopulatingFailed      = dptypes.ReasonPopulatingFailed
+	ReasonPopulatingProcessing  = dptypes.ReasonPopulatingProcessing
 	ReasonPopulatingSucceed     = dptypes.ReasonPopulatingSucceed
 	ReasonPopulatingProvisioned = dptypes.ReasonPopulatingProvisioned
 

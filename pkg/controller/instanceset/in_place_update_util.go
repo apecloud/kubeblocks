@@ -86,7 +86,6 @@ func filterInPlaceFields(src *corev1.PodTemplateSpec) *corev1.PodTemplateSpec {
 	for i := range template.Spec.InitContainers {
 		template.Spec.InitContainers[i].Image = ""
 	}
-	normalizeKBAgentInitCommandForRevision(template)
 	// filter spec.activeDeadlineSeconds
 	template.Spec.ActiveDeadlineSeconds = nil
 	// filter spec.tolerations
@@ -98,6 +97,7 @@ func filterInPlaceFields(src *corev1.PodTemplateSpec) *corev1.PodTemplateSpec {
 		delete(template.Spec.Containers[i].Resources.Limits, corev1.ResourceCPU)
 		delete(template.Spec.Containers[i].Resources.Limits, corev1.ResourceMemory)
 	}
+	normalizeKBAgentInitCommandForRevision(template)
 
 	return template
 }

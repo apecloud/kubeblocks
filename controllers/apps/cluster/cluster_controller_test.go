@@ -880,11 +880,13 @@ var _ = Describe("Cluster Controller", func() {
 				}).Should(Succeed())
 			}
 			checkComponents(defaultShardCount)
+			Eventually(testapps.ClusterReconciled(&testCtx, clusterKey)).Should(BeTrue())
 
 			By("scaling out without rotating the shared CA")
 			Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1.Cluster) {
 				cluster.Spec.Shardings[0].Shards++
 			})()).Should(Succeed())
+			Eventually(testapps.ClusterReconciled(&testCtx, clusterKey)).Should(BeTrue())
 			checkComponents(defaultShardCount + 1)
 			Eventually(testapps.CheckObj(&testCtx, sharedSecretKey, func(g Gomega, secret *corev1.Secret) {
 				g.Expect(secret.Data["ca.crt"]).Should(Equal(originalCA))

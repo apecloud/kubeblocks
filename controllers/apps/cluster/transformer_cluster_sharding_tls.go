@@ -46,10 +46,10 @@ const (
 	shardingTLSKeyKey  = "tls.key"
 )
 
-var _ graph.Transformer = &clusterShardingTLSTransformer{}
-
 // clusterShardingTLSTransformer handles shared TLS for sharding.
 type clusterShardingTLSTransformer struct{}
+
+var _ graph.Transformer = &clusterShardingTLSTransformer{}
 
 func (t *clusterShardingTLSTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*clusterTransformContext)

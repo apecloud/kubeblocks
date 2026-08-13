@@ -1638,7 +1638,17 @@ func findPVCConditionByType(pvc *corev1.PersistentVolumeClaim, conditionType str
 }
 
 func pvcPopulateReleased(pvc *corev1.PersistentVolumeClaim) bool {
-	return dptypes.IsPVCPopulationCompleted(pvc)
+	if pvc == nil {
+		return false
+	}
+	for i := range pvc.Status.Conditions {
+		condition := &pvc.Status.Conditions[i]
+		if condition.Type != PersistentVolumeClaimPopulating || condition.Status != corev1.ConditionTrue {
+			continue
+		}
+		return condition.Reason == ReasonPopulatingSucceed || condition.Reason == ReasonPopulatingProvisioned
+	}
+	return false
 }
 
 func (r *VolumePopulatorReconciler) listRestorePVCsForComponent(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim) ([]corev1.PersistentVolumeClaim, error) {

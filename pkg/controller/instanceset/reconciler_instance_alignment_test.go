@@ -32,7 +32,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 )
@@ -181,61 +180,6 @@ var _ = Describe("replicas alignment reconciler test", func() {
 					}))
 				}
 			}
-		})
-
-		It("gates workload Pods on the restore data readiness condition", func() {
-			replicas := int32(1)
-			its.Spec.Replicas = &replicas
-			its.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{
-				*its.Spec.VolumeClaimTemplates[0].DeepCopy(),
-			}
-			its.Spec.VolumeClaimTemplates[0].Annotations = map[string]string{
-				constant.RestoreSourceKindAnnotationKey: "Backup",
-			}
-			apiGroup := "dataprotection.kubeblocks.io"
-			its.Spec.VolumeClaimTemplates[0].Spec.DataSourceRef = &corev1.TypedObjectReference{
-				APIGroup: &apiGroup,
-				Kind:     "Backup",
-				Name:     "backup",
-			}
-			tree := kubebuilderx.NewObjectTree()
-			tree.SetRoot(its)
-			reconciler = NewReplicasAlignmentReconciler()
-
-			By("creating the restore PVC without creating a workload Pod")
-			res, err := reconciler.Reconcile(tree)
-			Expect(err).Should(BeNil())
-			Expect(res).Should(Equal(kubebuilderx.Continue))
-			Expect(tree.List(&corev1.PersistentVolumeClaim{})).Should(HaveLen(1))
-			Expect(tree.List(&corev1.Pod{})).Should(BeEmpty())
-
-			By("removing an unsafe workload Pod while restore data is not ready")
-			pvc := tree.List(&corev1.PersistentVolumeClaim{})[0].(*corev1.PersistentVolumeClaim)
-			pvc.Spec.VolumeName = "empty-pv"
-			pvc.Status.Conditions = []corev1.PersistentVolumeClaimCondition{{
-				Type:   corev1.PersistentVolumeClaimConditionType(constant.RestoreDataReadyConditionType),
-				Status: corev1.ConditionUnknown,
-			}}
-			instanceName := pvc.Labels[constant.KBAppPodNameLabelKey]
-			unsafePod := builder.NewPodBuilder(its.Namespace, instanceName).
-				AddContainer(corev1.Container{Name: "database", Image: "database:test"}).
-				GetObject()
-			Expect(tree.Add(unsafePod)).Should(Succeed())
-			_, err = reconciler.Reconcile(tree)
-			Expect(err).Should(BeNil())
-			Expect(tree.List(&corev1.Pod{})).Should(BeEmpty())
-
-			By("creating the real Pod only after the stable readiness condition is True")
-			pvc = tree.List(&corev1.PersistentVolumeClaim{})[0].(*corev1.PersistentVolumeClaim)
-			pvc.Status.Conditions[0].Status = corev1.ConditionTrue
-			_, err = reconciler.Reconcile(tree)
-			Expect(err).Should(BeNil())
-			Expect(tree.List(&corev1.Pod{})).Should(HaveLen(1))
-
-			By("surviving the update reconciler in the full reconcile chain")
-			_, err = NewUpdateReconciler().Reconcile(tree)
-			Expect(err).Should(BeNil())
-			Expect(tree.List(&corev1.Pod{})).Should(HaveLen(1))
 		})
 	})
 })

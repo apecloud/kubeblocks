@@ -83,7 +83,6 @@ type pvcRestoreDecision struct {
 
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims/finalizers,verbs=update
-// +kubebuilder:rbac:groups=core,resources=pods,verbs=get;create;delete
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=components,verbs=get;list;watch
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=componentdefinitions,verbs=get;list;watch
 
@@ -1824,9 +1823,6 @@ func (r *VolumePopulatorReconciler) cleanupDeletingPVC(reqCtx intctrlutil.Reques
 // completion have been verified, or after cleanupDeletingPVC has stopped the
 // execution Restore.
 func (r *VolumePopulatorReconciler) releasePopulateResources(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim) error {
-	if err := r.deleteRestoreSchedulingPod(reqCtx, pvc); err != nil {
-		return err
-	}
 	populatePVC := &corev1.PersistentVolumeClaim{}
 	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Name: getPopulatePVCName(pvc.UID),
 		Namespace: pvc.Namespace}, populatePVC); err != nil {
@@ -1878,137 +1874,13 @@ func (r *VolumePopulatorReconciler) waitForPVCSelectedNode(reqCtx intctrlutil.Re
 		if storageClass.VolumeBindingMode != nil && storagev1.VolumeBindingWaitForFirstConsumer == *storageClass.VolumeBindingMode {
 			nodeName = pvc.Annotations[AnnSelectedNode]
 			if nodeName == "" {
-				if err := r.ensureRestoreSchedulingPod(reqCtx, pvc); err != nil {
-					return false, nodeName, err
-				}
-				// The dedicated Pod is only a scheduler consumer. It has no
-				// InstanceSet/Component labels and cannot start database containers.
+				// Wait for the workload Pod to select a node. The target PVC remains
+				// unbound, so the Pod cannot start before population completes.
 				return true, nodeName, nil
-			}
-			if err := r.deleteRestoreSchedulingPod(reqCtx, pvc); err != nil {
-				return false, nodeName, err
 			}
 		}
 	}
 	return false, nodeName, nil
-}
-
-func (r *VolumePopulatorReconciler) ensureRestoreSchedulingPod(reqCtx intctrlutil.RequestCtx,
-	pvc *corev1.PersistentVolumeClaim) error {
-	pod := &corev1.Pod{}
-	key := types.NamespacedName{Namespace: pvc.Namespace, Name: getRestoreSchedulingPodName(pvc.UID)}
-	if err := r.Client.Get(reqCtx.Ctx, key, pod); err == nil {
-		return nil
-	} else if !apierrors.IsNotFound(err) {
-		return err
-	}
-	image := viper.GetString(constant.KBToolsImage)
-	if image == "" {
-		return fmt.Errorf("%s is empty; cannot create restore scheduling Pod for PVC %s/%s",
-			constant.KBToolsImage, pvc.Namespace, pvc.Name)
-	}
-	controller := true
-	schedulingSpec, err := r.restoreSchedulingPodSpec(reqCtx, pvc)
-	if err != nil {
-		return err
-	}
-	pod = &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: pvc.Namespace,
-			Name:      key.Name,
-			OwnerReferences: []metav1.OwnerReference{{
-				APIVersion: corev1.SchemeGroupVersion.String(),
-				Kind:       constant.PersistentVolumeClaimKind,
-				Name:       pvc.Name,
-				UID:        pvc.UID,
-				Controller: &controller,
-			}},
-		},
-		Spec: corev1.PodSpec{
-			NodeSelector:              schedulingSpec.NodeSelector,
-			Affinity:                  schedulingSpec.Affinity,
-			Tolerations:               schedulingSpec.Tolerations,
-			SchedulerName:             schedulingSpec.SchedulerName,
-			PriorityClassName:         schedulingSpec.PriorityClassName,
-			Priority:                  schedulingSpec.Priority,
-			PreemptionPolicy:          schedulingSpec.PreemptionPolicy,
-			TopologySpreadConstraints: schedulingSpec.TopologySpreadConstraints,
-			RuntimeClassName:          schedulingSpec.RuntimeClassName,
-			Overhead:                  schedulingSpec.Overhead,
-			RestartPolicy:             corev1.RestartPolicyNever,
-			Containers: []corev1.Container{{
-				Name:            "scheduler",
-				Image:           image,
-				ImagePullPolicy: corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy)),
-				Command:         []string{"sh", "-c", "while true; do sleep 3600; done"},
-				VolumeMounts: []corev1.VolumeMount{{
-					Name:      "target",
-					MountPath: "/var/lib/kubeblocks/restore-target",
-				}},
-			}},
-			Volumes: []corev1.Volume{{
-				Name: "target",
-				VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-					ClaimName: pvc.Name,
-				}},
-			}},
-		},
-	}
-	return client.IgnoreAlreadyExists(r.Client.Create(reqCtx.Ctx, pod))
-}
-
-func (r *VolumePopulatorReconciler) restoreSchedulingPodSpec(reqCtx intctrlutil.RequestCtx,
-	pvc *corev1.PersistentVolumeClaim) (*corev1.PodSpec, error) {
-	owner := metav1.GetControllerOf(pvc)
-	if owner == nil || owner.APIVersion != workloads.GroupVersion.String() {
-		return &corev1.PodSpec{}, nil
-	}
-	switch owner.Kind {
-	case workloads.InstanceSetKind:
-		its := &workloads.InstanceSet{}
-		if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Namespace: pvc.Namespace, Name: owner.Name}, its); err != nil {
-			return nil, err
-		}
-		itsExt, err := instancetemplate.BuildInstanceSetExt(its, nil)
-		if err != nil {
-			return nil, err
-		}
-		nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt, nil)
-		if err != nil {
-			return nil, err
-		}
-		nameTemplateMap, err := nameBuilder.BuildInstanceName2TemplateMap()
-		if err != nil {
-			return nil, err
-		}
-		template, ok := nameTemplateMap[pvc.Labels[constant.KBAppPodNameLabelKey]]
-		if !ok {
-			return nil, fmt.Errorf("PVC %s/%s does not identify an expected InstanceSet member", pvc.Namespace, pvc.Name)
-		}
-		return template.Spec.DeepCopy(), nil
-	case "Instance":
-		instance := &workloads.Instance{}
-		if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Namespace: pvc.Namespace, Name: owner.Name}, instance); err != nil {
-			return nil, err
-		}
-		return instance.Spec.Template.Spec.DeepCopy(), nil
-	default:
-		return &corev1.PodSpec{}, nil
-	}
-}
-
-func (r *VolumePopulatorReconciler) deleteRestoreSchedulingPod(reqCtx intctrlutil.RequestCtx,
-	pvc *corev1.PersistentVolumeClaim) error {
-	pod := &corev1.Pod{}
-	key := types.NamespacedName{Namespace: pvc.Namespace, Name: getRestoreSchedulingPodName(pvc.UID)}
-	if err := r.Client.Get(reqCtx.Ctx, key, pod); err != nil {
-		return client.IgnoreNotFound(err)
-	}
-	return client.IgnoreNotFound(r.Client.Delete(reqCtx.Ctx, pod))
-}
-
-func getRestoreSchedulingPodName(pvcUID types.UID) string {
-	return fmt.Sprintf("kb-restore-scheduler-%s", pvcUID)
 }
 
 func (r *VolumePopulatorReconciler) getPopulatePVC(reqCtx intctrlutil.RequestCtx,
@@ -2214,27 +2086,11 @@ func (r *VolumePopulatorReconciler) UpdatePVCConditions(reqCtx intctrlutil.Reque
 		Reason:             reason,
 		Message:            message,
 	}
-	dataReadyCondition := corev1.PersistentVolumeClaimCondition{
-		Type:               corev1.PersistentVolumeClaimConditionType(constant.RestoreDataReadyConditionType),
-		Status:             corev1.ConditionUnknown,
-		LastTransitionTime: metav1.Now(),
-		Reason:             reason,
-		Message:            message,
-	}
 	switch reason {
 	case ReasonPopulatingSucceed, ReasonPopulatingProvisioned:
 		restoreCondition.Status = corev1.ConditionTrue
-		dataReadyCondition.Status = corev1.ConditionTrue
 	case ReasonPopulatingFailed:
 		restoreCondition.Status = corev1.ConditionFalse
-		if existing := findPVCConditionByType(pvc, constant.RestoreDataReadyConditionType); existing != nil &&
-			existing.Status == corev1.ConditionTrue {
-			// A postReady failure must not revoke the already verified
-			// prepareData contract or tear down a running workload.
-			dataReadyCondition = *existing
-		} else {
-			dataReadyCondition.Status = corev1.ConditionFalse
-		}
 	}
 	pvcPatch := client.MergeFrom(pvc.DeepCopy())
 	var existPopulating bool
@@ -2243,8 +2099,7 @@ func (r *VolumePopulatorReconciler) UpdatePVCConditions(reqCtx intctrlutil.Reque
 			continue
 		}
 		if reason == v.Reason {
-			if pvcConditionMatches(pvc.Status.Conditions, restoreCondition) &&
-				pvcConditionMatches(pvc.Status.Conditions, dataReadyCondition) {
+			if pvcConditionMatches(pvc.Status.Conditions, restoreCondition) {
 				return nil
 			}
 			existPopulating = true
@@ -2253,8 +2108,7 @@ func (r *VolumePopulatorReconciler) UpdatePVCConditions(reqCtx intctrlutil.Reque
 		}
 		if v.Reason == ReasonPopulatingSucceed {
 			// ignore succeed condition
-			if pvcConditionMatches(pvc.Status.Conditions, restoreCondition) &&
-				pvcConditionMatches(pvc.Status.Conditions, dataReadyCondition) {
+			if pvcConditionMatches(pvc.Status.Conditions, restoreCondition) {
 				return nil
 			}
 			existPopulating = true
@@ -2267,7 +2121,6 @@ func (r *VolumePopulatorReconciler) UpdatePVCConditions(reqCtx intctrlutil.Reque
 		pvc.Status.Conditions = append(pvc.Status.Conditions, progressCondition)
 	}
 	upsertPVCCondition(&pvc.Status.Conditions, restoreCondition)
-	upsertPVCCondition(&pvc.Status.Conditions, dataReadyCondition)
 	switch reason {
 	case ReasonPopulatingProcessing:
 		r.Recorder.Event(pvc, corev1.EventTypeNormal, ReasonStartToVolumePopulate, message)
@@ -2290,13 +2143,6 @@ func (r *VolumePopulatorReconciler) updatePVCPopulatingCondition(reqCtx intctrlu
 	}
 	pvcPatch := client.MergeFrom(pvc.DeepCopy())
 	upsertPVCCondition(&pvc.Status.Conditions, progressCondition)
-	upsertPVCCondition(&pvc.Status.Conditions, corev1.PersistentVolumeClaimCondition{
-		Type:               corev1.PersistentVolumeClaimConditionType(constant.RestoreDataReadyConditionType),
-		Status:             corev1.ConditionTrue,
-		LastTransitionTime: metav1.Now(),
-		Reason:             reason,
-		Message:            message,
-	})
 	switch reason {
 	case ReasonPopulatingSucceed, ReasonPopulatingProvisioned:
 		r.Recorder.Event(pvc, corev1.EventTypeNormal, ReasonVolumePopulateSucceed, message)

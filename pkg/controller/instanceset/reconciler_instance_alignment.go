@@ -89,31 +89,6 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		pod, _ := object.(*corev1.Pod)
 		oldInstanceMap[object.GetName()] = pod
 	}
-	// Remove a workload Pod if its restore PVC has not reached the explicit data
-	// readiness contract. The dataprotection controller uses a separate,
-	// non-workload scheduling Pod for WaitForFirstConsumer storage.
-	for name, pod := range oldInstanceMap {
-		template, desired := nameToTemplateMap[name]
-		if !desired {
-			continue
-		}
-		restoreReady, err := instanceRestoreReadyForPod(tree, name, template, its)
-		if err != nil {
-			return kubebuilderx.Continue, err
-		}
-		if restoreReady {
-			continue
-		}
-		if err := tree.Delete(pod); err != nil {
-			return kubebuilderx.Continue, err
-		}
-		oldNameSet.Delete(name)
-		delete(oldInstanceMap, name)
-		if tree.EventRecorder != nil {
-			tree.EventRecorder.Eventf(its, corev1.EventTypeWarning,
-				"Waiting for restore data readiness before starting Pod %s", name)
-		}
-	}
 	createNameSet := newNameSet.Difference(oldNameSet)
 	deleteNameSet := oldNameSet.Difference(newNameSet)
 
@@ -163,23 +138,11 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		if isOrderedReady && predecessor != nil && !intctrlutil.IsPodAvailable(predecessor, its.Spec.MinReadySeconds) {
 			break
 		}
-		restoreReady, err := instanceRestoreReadyForPod(tree, name, nameToTemplateMap[name], its)
-		if err != nil {
-			return kubebuilderx.Continue, err
-		}
-		if !restoreReady {
-			// Align PVCs, but leave workload Pod creation gated. A dedicated
-			// dataprotection Pod handles WaitForFirstConsumer node selection.
-			currentAlignedNameList = append(currentAlignedNameList, name)
-			if isOrderedReady {
-				break
-			}
-			continue
-		}
 		newPod, err := buildInstancePodByTemplate(name, nameToTemplateMap[name], its, "")
 		if err != nil {
 			return kubebuilderx.Continue, err
 		}
+
 		if err := tree.Add(newPod); err != nil {
 			return kubebuilderx.Continue, err
 		}
@@ -262,46 +225,6 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 	}
 
 	return kubebuilderx.Continue, nil
-}
-
-func instanceRestoreReadyForPod(tree *kubebuilderx.ObjectTree,
-	instanceName string,
-	template *instancetemplate.InstanceTemplateExt,
-	its *workloads.InstanceSet) (bool, error) {
-	pvcs, err := buildInstancePVCByTemplate(instanceName, template, its)
-	if err != nil {
-		return false, err
-	}
-	for _, desiredPVC := range pvcs {
-		if desiredPVC.Spec.DataSourceRef == nil || desiredPVC.Annotations[constant.RestoreSourceKindAnnotationKey] == "" {
-			continue
-		}
-		current, err := tree.Get(desiredPVC)
-		if err != nil {
-			return false, err
-		}
-		if current == nil {
-			return false, nil
-		}
-		currentPVC := current.(*corev1.PersistentVolumeClaim)
-		if currentPVC.Spec.VolumeName == "" {
-			return false, nil
-		}
-		if !pvcRestoreDataReady(currentPVC) {
-			return false, nil
-		}
-	}
-	return true, nil
-}
-
-func pvcRestoreDataReady(pvc *corev1.PersistentVolumeClaim) bool {
-	for i := range pvc.Status.Conditions {
-		condition := &pvc.Status.Conditions[i]
-		if string(condition.Type) == constant.RestoreDataReadyConditionType {
-			return condition.Status == corev1.ConditionTrue
-		}
-	}
-	return false
 }
 
 var _ kubebuilderx.Reconciler = &instanceAlignmentReconciler{}

@@ -58,8 +58,9 @@ import (
 // VolumePopulatorReconciler reconciles Backup dataSource PVCs.
 type VolumePopulatorReconciler struct {
 	client.Client
-	Scheme   *runtime.Scheme
-	Recorder record.EventRecorder
+	APIReader client.Reader
+	Scheme    *runtime.Scheme
+	Recorder  record.EventRecorder
 }
 
 type pvcRestoreMode string
@@ -131,6 +132,9 @@ func (r *VolumePopulatorReconciler) handleSyncPVCError(reqCtx intctrlutil.Reques
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *VolumePopulatorReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	if r.APIReader == nil {
+		r.APIReader = mgr.GetAPIReader()
+	}
 	return intctrlutil.NewControllerManagedBy(mgr).
 		For(&corev1.PersistentVolumeClaim{}).
 		Complete(r)
@@ -998,6 +1002,9 @@ func (r *VolumePopulatorReconciler) ProvisionOnly(reqCtx intctrlutil.RequestCtx,
 func (r *VolumePopulatorReconciler) completeBoundPVCIfNeeded(reqCtx intctrlutil.RequestCtx,
 	pvc *corev1.PersistentVolumeClaim,
 	restoreCtx *pvcRestoreContext) error {
+	if err := r.validateBoundTargetPV(reqCtx, pvc); err != nil {
+		return err
+	}
 	populateReleased := pvcPopulateReleased(pvc)
 	for i := range pvc.Status.Conditions {
 		condition := pvc.Status.Conditions[i]
@@ -1044,6 +1051,49 @@ func (r *VolumePopulatorReconciler) completeBoundPVCIfNeeded(reqCtx intctrlutil.
 		message = "PVC provisioned without data restore"
 	}
 	return r.UpdatePVCConditions(reqCtx, pvc, reason, message)
+}
+
+// validateBoundTargetPV verifies that an already-bound target PVC points to
+// the PV rebound by this populator. Use the direct API reader when available so
+// informer ordering between the PV and PVC updates cannot create a permanent
+// false failure.
+func (r *VolumePopulatorReconciler) validateBoundTargetPV(reqCtx intctrlutil.RequestCtx,
+	pvc *corev1.PersistentVolumeClaim) error {
+	if pvc.Spec.VolumeName == "" {
+		return intctrlutil.NewRequeueError(reconcileInterval, "waiting for target PVC to bind")
+	}
+	reader := client.Reader(r.Client)
+	if r.APIReader != nil {
+		reader = r.APIReader
+	}
+	pv := &corev1.PersistentVolume{}
+	if err := reader.Get(reqCtx.Ctx, types.NamespacedName{Name: pvc.Spec.VolumeName}, pv); err != nil {
+		if apierrors.IsNotFound(err) {
+			return intctrlutil.NewRequeueError(reconcileInterval,
+				fmt.Sprintf("waiting for target PV %s for PVC %s/%s", pvc.Spec.VolumeName, pvc.Namespace, pvc.Name))
+		}
+		return err
+	}
+	claimRef := pv.Spec.ClaimRef
+	claimMatches := claimRef != nil && claimRef.Namespace == pvc.Namespace && claimRef.Name == pvc.Name
+	if claimMatches && pvc.UID != "" {
+		claimMatches = claimRef.UID == pvc.UID
+	}
+	if !claimMatches {
+		return intctrlutil.NewFatalError(fmt.Sprintf(
+			"target PVC %s/%s is bound to PV %s whose claimRef does not identify the restore target",
+			pvc.Namespace, pvc.Name, pv.Name))
+	}
+	expectedSource := ""
+	if pvc.Spec.DataSourceRef != nil {
+		expectedSource = pvc.Spec.DataSourceRef.Name
+	}
+	if expectedSource == "" || pv.Annotations[AnnPopulateFrom] != expectedSource {
+		return intctrlutil.NewFatalError(fmt.Sprintf(
+			"target PVC %s/%s is bound to PV %s without expected restore provenance %s=%q",
+			pvc.Namespace, pvc.Name, pv.Name, AnnPopulateFrom, expectedSource))
+	}
+	return nil
 }
 
 func (r *VolumePopulatorReconciler) waitForSerialPredecessors(reqCtx intctrlutil.RequestCtx,

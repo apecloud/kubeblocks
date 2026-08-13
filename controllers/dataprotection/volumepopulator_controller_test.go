@@ -1947,7 +1947,10 @@ func TestCompleteBoundPVCReleasesPopulatePVCBeforeWaitingForPostReady(t *testing
 		},
 	}
 	pv := &corev1.PersistentVolume{
-		ObjectMeta: metav1.ObjectMeta{Name: "data-pv"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "data-pv",
+			Annotations: map[string]string{AnnPopulateFrom: backup.Name},
+		},
 		Spec: corev1.PersistentVolumeSpec{
 			Capacity: corev1.ResourceList{
 				corev1.ResourceStorage: resource.MustParse("1Gi"),
@@ -2019,6 +2022,67 @@ func TestCompleteBoundPVCReleasesPopulatePVCBeforeWaitingForPostReady(t *testing
 	require.Error(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(populatePVC), currentPopulatePVC))
 }
 
+func TestCompleteBoundPVCRejectsForeignPVAndPreservesPopulateResources(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	apiGroup := dptypes.DataprotectionAPIGroup
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:  "default",
+			Name:       "target",
+			UID:        "target-uid",
+			Finalizers: []string{dptypes.DataProtectionFinalizerName},
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			VolumeName: "foreign-pv",
+			DataSourceRef: &corev1.TypedObjectReference{
+				APIGroup: &apiGroup,
+				Kind:     dptypes.BackupKind,
+				Name:     "backup",
+			},
+		},
+	}
+	helper := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{
+		Namespace: pvc.Namespace,
+		Name:      getPopulatePVCName(pvc.UID),
+	}}
+	foreignPV := &corev1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{Name: pvc.Spec.VolumeName},
+		Spec: corev1.PersistentVolumeSpec{ClaimRef: &corev1.ObjectReference{
+			Namespace: pvc.Namespace,
+			Name:      pvc.Name,
+			UID:       "another-pvc-uid",
+		}},
+	}
+	reconciler := &VolumePopulatorReconciler{
+		Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(pvc, helper, foreignPV).Build(),
+	}
+
+	err := reconciler.completeBoundPVCIfNeeded(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, &pvcRestoreContext{})
+
+	require.Error(t, err)
+	require.True(t, intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal), err)
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(helper), &corev1.PersistentVolumeClaim{}))
+	currentPVC := &corev1.PersistentVolumeClaim{}
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(pvc), currentPVC))
+	require.Contains(t, currentPVC.Finalizers, dptypes.DataProtectionFinalizerName)
+}
+
+func TestValidateBoundTargetPVRequeuesWhenPVIsNotVisible(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "target", UID: "target-uid"},
+		Spec:       corev1.PersistentVolumeClaimSpec{VolumeName: "restored-pv"},
+	}
+	reconciler := &VolumePopulatorReconciler{Client: fake.NewClientBuilder().WithScheme(scheme).Build()}
+
+	err := reconciler.validateBoundTargetPV(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc)
+
+	require.Error(t, err)
+	require.True(t, intctrlutil.IsRequeueError(err), err)
+}
+
 func TestCompleteBoundPVCContinuesPostReadyAfterPopulateReleased(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, corev1.AddToScheme(scheme))
@@ -2055,7 +2119,7 @@ func TestCompleteBoundPVCContinuesPostReadyAfterPopulateReleased(t *testing.T) {
 	reconciler := &VolumePopulatorReconciler{
 		Client: fake.NewClientBuilder().WithScheme(scheme).
 			WithStatusSubresource(pvc).
-			WithObjects(backup, pvc, comp).
+			WithObjects(backup, pvc, comp, newValidReboundPV(pvc)).
 			Build(),
 		Scheme:   scheme,
 		Recorder: record.NewFakeRecorder(10),
@@ -2120,7 +2184,7 @@ func TestCompleteBoundPVCMarksRestoreSucceededAfterPostReadyCompleted(t *testing
 	reconciler := &VolumePopulatorReconciler{
 		Client: fake.NewClientBuilder().WithScheme(scheme).
 			WithStatusSubresource(pvc).
-			WithObjects(backup, pvc, comp).
+			WithObjects(backup, pvc, comp, newValidReboundPV(pvc)).
 			Build(),
 		Scheme:   scheme,
 		Recorder: record.NewFakeRecorder(10),
@@ -2372,6 +2436,20 @@ func newRestorePVCForSerialTest(name, volumeName string) *corev1.PersistentVolum
 				Name:     "backup",
 			},
 		},
+	}
+}
+
+func newValidReboundPV(pvc *corev1.PersistentVolumeClaim) *corev1.PersistentVolume {
+	return &corev1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        pvc.Spec.VolumeName,
+			Annotations: map[string]string{AnnPopulateFrom: pvc.Spec.DataSourceRef.Name},
+		},
+		Spec: corev1.PersistentVolumeSpec{ClaimRef: &corev1.ObjectReference{
+			Namespace: pvc.Namespace,
+			Name:      pvc.Name,
+			UID:       pvc.UID,
+		}},
 	}
 }
 

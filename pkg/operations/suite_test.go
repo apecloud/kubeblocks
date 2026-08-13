@@ -306,6 +306,7 @@ func mockRollingRevisionStatus(cluster *appsv1.Cluster, compName, targetRevision
 			}
 		}
 		its.Status.ObservedGeneration = its.Generation
+		its.Status.InstanceStatusObservedGeneration = its.Generation
 	})).Should(Succeed())
 }
 

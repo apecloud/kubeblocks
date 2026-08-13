@@ -56,16 +56,19 @@ func TestOpsRuntimeBuildsInstanceAPIView(t *testing.T) {
 	replicas := int32(1)
 	its := &workloads.InstanceSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: namespace,
-			Name:      constant.GenerateClusterComponentName(clusterName, component),
-			Labels:    constant.GetCompLabels(clusterName, component),
+			Namespace:  namespace,
+			Name:       constant.GenerateClusterComponentName(clusterName, component),
+			Labels:     constant.GetCompLabels(clusterName, component),
+			Generation: 2,
 		},
 		Spec: workloads.InstanceSetSpec{
 			MinReadySeconds: 15,
 			Replicas:        &replicas,
 		},
 		Status: workloads.InstanceSetStatus{
-			Replicas: 1,
+			ObservedGeneration:               2,
+			InstanceStatusObservedGeneration: 2,
+			Replicas:                         1,
 			CurrentRevisions: map[string]string{
 				instanceName: "rev-a",
 			},
@@ -297,12 +300,15 @@ func TestOpsRuntimeWorkloadMissingAndUsesPublicInstanceStatus(t *testing.T) {
 
 	its := &workloads.InstanceSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: namespace,
-			Name:      constant.GenerateClusterComponentName(clusterName, component),
+			Namespace:  namespace,
+			Name:       constant.GenerateClusterComponentName(clusterName, component),
+			Generation: 2,
 		},
 		Status: workloads.InstanceSetStatus{
-			CurrentRevisions: map[string]string{"zstd": "not-base64"},
-			UpdateRevisions:  map[string]string{"zstd": "not-base64"},
+			ObservedGeneration:               2,
+			InstanceStatusObservedGeneration: 1,
+			CurrentRevisions:                 map[string]string{"zstd": "not-base64"},
+			UpdateRevisions:                  map[string]string{"zstd": "not-base64"},
 			InstanceStatus: []workloads.InstanceStatus{{
 				PodName:         "cluster-mysql-0",
 				CurrentRevision: "rev-a",
@@ -317,6 +323,9 @@ func TestOpsRuntimeWorkloadMissingAndUsesPublicInstanceStatus(t *testing.T) {
 	workload, err = rt.GetWorkload(namespace, clusterName, component)
 	if err != nil {
 		t.Fatalf("get workload from public instance status: %v", err)
+	}
+	if workload.IsStatusObserved() {
+		t.Fatal("stale per-instance snapshot must remain unobserved even when revisions observed the generation")
 	}
 	if workload.GetCurrentRevisionMap()["cluster-mysql-0"] != "rev-a" ||
 		workload.GetUpdateRevisionMap()["cluster-mysql-0"] != "rev-b" ||

@@ -456,7 +456,8 @@ func TestStatusReconcilerReadsCurrentRevisionFromInstanceAnnotation(t *testing.T
 			},
 		},
 		Status: workloads.InstanceSetStatus{
-			ObservedGeneration: 3,
+			ObservedGeneration:               3,
+			InstanceStatusObservedGeneration: 3,
 		},
 	}
 
@@ -598,7 +599,7 @@ func TestStatusReconcilerDoesNotFallbackToLiveHashWhenRevisionAnnotationMissing(
 	}
 }
 
-func TestStatusReconcilerPublishesAtomicPerInstanceContract(t *testing.T) {
+func TestStatusReconcilerPublishesFencedPerInstanceContract(t *testing.T) {
 	its := &workloads.InstanceSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:       "test-its",
@@ -614,7 +615,8 @@ func TestStatusReconcilerPublishesAtomicPerInstanceContract(t *testing.T) {
 			}},
 		},
 		Status: workloads.InstanceSetStatus{
-			ObservedGeneration: 3,
+			ObservedGeneration:               3,
+			InstanceStatusObservedGeneration: 3,
 			UpdateRevisions: map[string]string{
 				"stale": "previous-generation",
 			},
@@ -641,9 +643,9 @@ func TestStatusReconcilerPublishesAtomicPerInstanceContract(t *testing.T) {
 		},
 	}
 	failed := desired[names[1]].DeepCopy()
-	// A failure from the previous revision remains part of the public status
-	// snapshot. Rolling consumers decide whether it applies to the target by
-	// comparing CurrentRevision and UpdateRevision.
+	// A failure from before the desired state was applied remains part of the
+	// public status snapshot. Rolling consumers require matching revisions and
+	// UpToDate before attributing it to the target.
 	failed.Generation = 2
 	failed.Status = workloads.InstanceStatus2{
 		ObservedGeneration: 1,
@@ -659,14 +661,29 @@ func TestStatusReconcilerPublishesAtomicPerInstanceContract(t *testing.T) {
 		t.Fatalf("add failed instance: %v", err)
 	}
 
+	statusReconciler := NewStatusReconciler()
+	if statusReconciler.PreCondition(tree) != kubebuilderx.ConditionUnsatisfied {
+		t.Fatal("status must be skipped until revisions observe the new generation")
+	}
 	if _, err := NewRevisionUpdateReconciler().Reconcile(tree); err != nil {
 		t.Fatalf("reconcile revisions: %v", err)
 	}
 	if its.Status.ObservedGeneration != its.Generation {
 		t.Fatalf("observedGeneration=%d, want %d", its.Status.ObservedGeneration, its.Generation)
 	}
-	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+	if its.Status.InstanceStatusObservedGeneration != 3 {
+		t.Fatalf("instanceStatusObservedGeneration=%d, want stale generation 3",
+			its.Status.InstanceStatusObservedGeneration)
+	}
+	if statusReconciler.PreCondition(tree) != kubebuilderx.ConditionSatisfied {
+		t.Fatal("status must run after revisions observe the generation")
+	}
+	if _, err := statusReconciler.Reconcile(tree); err != nil {
 		t.Fatalf("reconcile status: %v", err)
+	}
+	if its.Status.InstanceStatusObservedGeneration != its.Generation {
+		t.Fatalf("instanceStatusObservedGeneration=%d, want %d",
+			its.Status.InstanceStatusObservedGeneration, its.Generation)
 	}
 
 	byName := make(map[string]workloads.InstanceStatus, len(its.Status.InstanceStatus))

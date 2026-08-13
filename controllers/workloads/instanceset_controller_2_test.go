@@ -96,6 +96,7 @@ var _ = Describe("InstanceSet Controller 2", func() {
 
 		Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, set *workloads.InstanceSet) {
 			g.Expect(set.Status.ObservedGeneration).Should(BeEquivalentTo(1))
+			g.Expect(set.Status.InstanceStatusObservedGeneration).Should(BeEquivalentTo(1))
 		}),
 		).Should(Succeed())
 	}

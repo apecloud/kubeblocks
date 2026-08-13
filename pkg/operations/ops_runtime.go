@@ -116,7 +116,8 @@ func (r *opsRuntime) GetWorkload(namespace, clusterName, compName string) (Workl
 	}
 	if its.Name != "" {
 		workload.exists = true
-		workload.statusObserved = its.Status.ObservedGeneration == its.Generation
+		workload.statusObserved = its.Status.ObservedGeneration == its.Generation &&
+			its.Status.InstanceStatusObservedGeneration == its.Generation
 		workload.minReadySeconds = its.Spec.MinReadySeconds
 		if its.Spec.Replicas != nil {
 			workload.desiredReplicas = *its.Spec.Replicas

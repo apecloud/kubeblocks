@@ -11659,7 +11659,7 @@ spec:
               instanceStatus:
                 description: |-
                   Provides the status of every desired or observed instance in the ITS. Revision, desired-state convergence,
-                  readiness, availability, and failure fields are published atomically with ObservedGeneration.
+                  readiness, availability, and failure fields form one snapshot fenced by InstanceStatusObservedGeneration.
                 items:
                   properties:
                     available:
@@ -11717,6 +11717,12 @@ spec:
                   - podName
                   type: object
                 type: array
+              instanceStatusObservedGeneration:
+                description: |-
+                  InstanceStatusObservedGeneration is the most recent generation observed when publishing InstanceStatus.
+                  Consumers must use InstanceStatus only when this value matches metadata.generation.
+                format: int64
+                type: integer
               observedGeneration:
                 description: |-
                   observedGeneration is the most recent generation observed for this InstanceSet. It corresponds to the

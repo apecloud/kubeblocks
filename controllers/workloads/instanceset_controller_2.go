@@ -56,9 +56,11 @@ func (r *InstanceSetReconciler2) Reconcile(ctx context.Context, req ctrl.Request
 		Do(instanceset2.NewFixMetaReconciler()).
 		Do(instanceset2.NewDeletionReconciler()).
 		Do(instanceset2.NewValidationReconciler()).
-		// Revision must precede status so ObservedGeneration, revisions, and InstanceStatus commit as one snapshot.
-		Do(instanceset2.NewRevisionUpdateReconciler()).
+		// Status intentionally precedes revision. A spec change skips status in
+		// this reconcile; revision observes the generation, and status publishes
+		// the observed child snapshot in a subsequent reconcile.
 		Do(instanceset2.NewStatusReconciler()).
+		Do(instanceset2.NewRevisionUpdateReconciler()).
 		Do(instanceset2.NewAssistantObjectReconciler()).
 		Do(instanceset2.NewAlignmentReconciler()).
 		Do(instanceset2.NewUpdateReconciler()).

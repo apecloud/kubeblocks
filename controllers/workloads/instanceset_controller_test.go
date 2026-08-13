@@ -118,6 +118,7 @@ var _ = Describe("InstanceSet Controller", func() {
 
 		Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, set *workloads.InstanceSet) {
 			g.Expect(set.Status.ObservedGeneration).Should(BeEquivalentTo(1))
+			g.Expect(set.Status.InstanceStatusObservedGeneration).Should(BeEquivalentTo(1))
 		}),
 		).Should(Succeed())
 	}
@@ -191,6 +192,7 @@ var _ = Describe("InstanceSet Controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(its),
 				func(g Gomega, set *workloads.InstanceSet) {
 					g.Expect(set.Status.ObservedGeneration).Should(BeEquivalentTo(1))
+					g.Expect(set.Status.InstanceStatusObservedGeneration).Should(BeEquivalentTo(1))
 				}),
 			).Should(Succeed())
 			Expect(k8sClient.Delete(ctx, its)).Should(Succeed())

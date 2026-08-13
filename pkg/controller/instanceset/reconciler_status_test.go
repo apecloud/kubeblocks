@@ -105,25 +105,30 @@ var _ = Describe("status reconciler test", func() {
 			}
 		}
 
-		It("publishes revisions and per-instance status as one observed snapshot", func() {
+		It("publishes revisions before the fenced per-instance status snapshot", func() {
 			its.Generation = 2
 			its.Status.ObservedGeneration = 1
+			its.Status.InstanceStatusObservedGeneration = 1
 			staleRevisions, err := buildRevisions(map[string]string{"stale": "previous-generation"})
 			Expect(err).ShouldNot(HaveOccurred())
 			its.Status.UpdateRevisions = staleRevisions
 			tree := kubebuilderx.NewObjectTree()
 			tree.SetRoot(its)
 
+			statusReconciler := NewStatusReconciler()
+			Expect(statusReconciler.PreCondition(tree)).Should(Equal(kubebuilderx.ConditionUnsatisfied))
+
 			revisionReconciler := NewRevisionUpdateReconciler()
 			Expect(revisionReconciler.PreCondition(tree)).Should(Equal(kubebuilderx.ConditionSatisfied))
 			_, err = revisionReconciler.Reconcile(tree)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(its.Status.ObservedGeneration).Should(Equal(its.Generation))
+			Expect(its.Status.InstanceStatusObservedGeneration).Should(Equal(int64(1)))
 
-			statusReconciler := NewStatusReconciler()
 			Expect(statusReconciler.PreCondition(tree)).Should(Equal(kubebuilderx.ConditionSatisfied))
 			_, err = statusReconciler.Reconcile(tree)
 			Expect(err).ShouldNot(HaveOccurred())
+			Expect(its.Status.InstanceStatusObservedGeneration).Should(Equal(its.Generation))
 
 			updateRevisions, err := GetRevisions(its.Status.UpdateRevisions)
 			Expect(err).ShouldNot(HaveOccurred())

@@ -193,12 +193,14 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		return kubebuilderx.Continue, err
 	}
 
-	// 4. publish the per-instance contract from the same revision snapshot used
-	// above. RevisionUpdateReconciler runs before this reconciler, so advancing
-	// ObservedGeneration and publishing InstanceStatus are atomic at commit time.
+	// 4. publish the per-instance contract only after the revision reconciler has
+	// observed this InstanceSet generation. Status runs before revision in the
+	// controller, so it is skipped during that first reconcile and reaches here
+	// on a later snapshot of the observed Pods.
 	if err = setInstanceStatus(tree, its, podList, currentRevisions, updateRevisions, upToDateNames); err != nil {
 		return kubebuilderx.Continue, err
 	}
+	its.Status.InstanceStatusObservedGeneration = its.Generation
 
 	if its.Spec.MinReadySeconds > 0 && availableReplicas != readyReplicas {
 		return kubebuilderx.RetryAfter(time.Second), nil

@@ -999,11 +999,6 @@ func (r *VolumePopulatorReconciler) completeBoundPVCIfNeeded(reqCtx intctrlutil.
 	pvc *corev1.PersistentVolumeClaim,
 	restoreCtx *pvcRestoreContext) error {
 	if !pvcBindingCompleted(pvc) {
-		if err := r.UpdatePVCConditions(reqCtx, pvc, ReasonPopulatingProcessing,
-			fmt.Sprintf("Waiting for Kubernetes to complete binding target PVC %s/%s to PV %s",
-				pvc.Namespace, pvc.Name, pvc.Spec.VolumeName)); err != nil {
-			return err
-		}
 		return intctrlutil.NewRequeueError(reconcileInterval, "waiting for Kubernetes to complete target PVC binding")
 	}
 	populateReleased := pvcPopulateReleased(pvc)
@@ -1034,6 +1029,9 @@ func (r *VolumePopulatorReconciler) completeBoundPVCIfNeeded(reqCtx intctrlutil.
 		if err := r.updatePVCPopulatingCondition(reqCtx, pvc, reason, message); err != nil {
 			return err
 		}
+	}
+	if err := r.syncTargetPVCBoundStatusIfReady(reqCtx, pvc); err != nil {
+		return err
 	}
 	postReadyCompleted, err := r.ensurePostReadyRestoreCompleted(reqCtx, pvc, restoreCtx)
 	if err != nil {
@@ -1822,6 +1820,48 @@ func (r *VolumePopulatorReconciler) bindTargetPVCToPV(reqCtx intctrlutil.Request
 	patch := client.MergeFrom(pvc.DeepCopy())
 	pvc.Spec.VolumeName = pvName
 	return r.Client.Patch(reqCtx.Ctx, pvc, patch)
+}
+
+func pvClaimRefMatchesPVC(claimRef *corev1.ObjectReference, pvc *corev1.PersistentVolumeClaim) bool {
+	return claimRef != nil &&
+		claimRef.Name == pvc.Name &&
+		claimRef.Namespace == pvc.Namespace &&
+		claimRef.UID == pvc.UID
+}
+
+func (r *VolumePopulatorReconciler) syncTargetPVCBoundStatusIfReady(reqCtx intctrlutil.RequestCtx,
+	pvc *corev1.PersistentVolumeClaim) error {
+	if pvc.Spec.VolumeName == "" {
+		return nil
+	}
+	pv := &corev1.PersistentVolume{}
+	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Name: pvc.Spec.VolumeName}, pv); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+	if !pvClaimRefMatchesPVC(pv.Spec.ClaimRef, pvc) {
+		return nil
+	}
+	return r.syncTargetPVCBoundStatus(reqCtx, pvc, pv)
+}
+
+func (r *VolumePopulatorReconciler) syncTargetPVCBoundStatus(reqCtx intctrlutil.RequestCtx,
+	pvc *corev1.PersistentVolumeClaim,
+	pv *corev1.PersistentVolume) error {
+	capacity := pv.Spec.Capacity.DeepCopy()
+	accessModes := slices.Clone(pv.Spec.AccessModes)
+	if pvc.Status.Phase == corev1.ClaimBound &&
+		reflect.DeepEqual(pvc.Status.Capacity, capacity) &&
+		slices.Equal(pvc.Status.AccessModes, accessModes) {
+		return nil
+	}
+	patch := client.MergeFrom(pvc.DeepCopy())
+	pvc.Status.Phase = corev1.ClaimBound
+	pvc.Status.Capacity = capacity
+	pvc.Status.AccessModes = accessModes
+	return r.Client.Status().Patch(reqCtx.Ctx, pvc, patch)
 }
 
 func pvcBindingCompleted(pvc *corev1.PersistentVolumeClaim) bool {

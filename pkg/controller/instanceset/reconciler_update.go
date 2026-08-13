@@ -174,7 +174,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			updatePolicy = recreatePolicy
 		}
 		if updatePolicy == inPlaceUpdatePolicy {
-			newInstance, err := buildInstanceByTemplate(pod.Name, nameToTemplateMap[pod.Name], its, getPodRevision(pod))
+			newInstance, err := buildInstanceByTemplateForUpdate(pod, nameToTemplateMap[pod.Name], its)
 			if err != nil {
 				return kubebuilderx.Continue, err
 			}

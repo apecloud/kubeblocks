@@ -526,6 +526,19 @@ func buildInstanceByTemplate(name string, template *instanceTemplateExt, parent 
 	return inst, nil
 }
 
+// buildInstanceByTemplateForUpdate builds the desired instance view used to
+// evaluate and apply updates to an existing Pod. Compatibility adjustments are
+// intentionally kept out of buildInstanceByTemplate so newly created and
+// replacement Pods always use the latest template.
+func buildInstanceByTemplateForUpdate(oldPod *corev1.Pod, template *instanceTemplateExt, parent *workloads.InstanceSet) (*instance, error) {
+	desired, err := buildInstanceByTemplate(oldPod.Name, template, parent, getPodRevision(oldPod))
+	if err != nil {
+		return nil, err
+	}
+	desired.pod, _ = podForDeferredKBAgentInitMigration(oldPod, desired.pod)
+	return desired, nil
+}
+
 func buildInstancePVCByTemplate(name string, template *instanceTemplateExt, parent *workloads.InstanceSet) []*corev1.PersistentVolumeClaim {
 	// 2. build pvcs from template
 	var pvcs []*corev1.PersistentVolumeClaim

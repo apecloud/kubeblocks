@@ -95,9 +95,9 @@ var _ = Describe("instance util test", func() {
 				"revision normalization must not modify the desired template")
 
 			parent := builder.NewInstanceSetBuilder(namespace, name).SetUID(uid).GetObject()
-			oldRevision, err := buildInstanceTemplateRevision(oldTemplate, parent, nil)
+			oldRevision, err := BuildInstanceTemplateRevision(oldTemplate, parent)
 			Expect(err).ShouldNot(HaveOccurred())
-			newRevision, err := buildInstanceTemplateRevision(newTemplate, parent, nil)
+			newRevision, err := BuildInstanceTemplateRevision(newTemplate, parent)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(newRevision).Should(Equal(oldRevision))
 		})

@@ -43,6 +43,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/kbagent"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -573,7 +574,7 @@ var _ = Describe("update reconciler test", func() {
 			its.Spec.Template.Spec.Containers = append(its.Spec.Template.Spec.Containers, corev1.Container{
 				Name:    "kbagent",
 				Image:   "docker.io/apecloud/kubeblocks-tools:1.0.0",
-				Command: []string{"/bin/kbagent"},
+				Command: []string{kbagent.BinaryPath},
 			})
 			its.Spec.LifecycleActions = &workloads.LifecycleActions{
 				Switchover: &kbappsv1.Action{
@@ -682,11 +683,11 @@ var _ = Describe("update reconciler test", func() {
 			its.Spec.Template.Spec.InitContainers = []corev1.Container{{
 				Name:    "init-kbagent",
 				Image:   "docker.io/apecloud/kubeblocks-tools:1.0.0",
-				Command: append([]string(nil), legacyKBAgentInitCopyCommand...),
+				Command: kbagent.LegacyInitCopyCommand(),
 			}}
 			its.Spec.Template.Spec.Containers = []corev1.Container{
 				{Name: "app", Image: "mysql:8.0"},
-				{Name: "kbagent", Image: "custom-action:1.0", Command: []string{"/kubeblocks/kbagent"}},
+				{Name: "kbagent", Image: "custom-action:1.0", Command: []string{kbagent.SharedBinaryPath}},
 			}
 
 			tree := kubebuilderx.NewObjectTree()
@@ -704,9 +705,9 @@ var _ = Describe("update reconciler test", func() {
 			})
 
 			its.Spec.Template.Spec.InitContainers[0].Image = "mirror.local/apecloud/kubeblocks-tools:1.1.0"
-			its.Spec.Template.Spec.InitContainers[0].Command = append([]string(nil), kbAgentInitCopyCommand...)
+			its.Spec.Template.Spec.InitContainers[0].Command = kbagent.CurrentInitCopyCommand()
 			its.Spec.Template.Spec.Containers[0].Image = "mysql:8.4"
-			Expect(its.Spec.Template.Spec.InitContainers[0].Command).Should(Equal(kbAgentInitCopyCommand),
+			Expect(its.Spec.Template.Spec.InitContainers[0].Command).Should(Equal(kbagent.CurrentInitCopyCommand()),
 				"the desired template must retain the new command")
 
 			reconciler := NewUpdateReconciler()
@@ -719,7 +720,7 @@ var _ = Describe("update reconciler test", func() {
 			livePod := postPods[0].(*corev1.Pod)
 			Expect(livePod.UID).Should(Equal(pod.UID), "the existing Pod must not be recreated")
 			Expect(livePod.Spec.InitContainers[0].Image).Should(Equal("docker.io/apecloud/kubeblocks-tools:1.0.0"))
-			Expect(livePod.Spec.InitContainers[0].Command).Should(Equal(legacyKBAgentInitCopyCommand),
+			Expect(livePod.Spec.InitContainers[0].Command).Should(Equal(kbagent.LegacyInitCopyCommand()),
 				"the existing Pod must keep the old image and command as one pair")
 			Expect(livePod.Spec.Containers[0].Image).Should(Equal("mysql:8.4"),
 				"the application image must still be updated in place")
@@ -731,7 +732,7 @@ var _ = Describe("update reconciler test", func() {
 			replacement, err := buildInstancePodByTemplate(pod.Name, templates[0], its, "")
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(replacement.Spec.InitContainers[0].Image).Should(Equal("mirror.local/apecloud/kubeblocks-tools:1.1.0"))
-			Expect(replacement.Spec.InitContainers[0].Command).Should(Equal(kbAgentInitCopyCommand),
+			Expect(replacement.Spec.InitContainers[0].Command).Should(Equal(kbagent.CurrentInitCopyCommand()),
 				"a recreated Pod must copy both kbagent and tini-static")
 
 			if its.Spec.Template.Annotations == nil {
@@ -758,7 +759,7 @@ var _ = Describe("update reconciler test", func() {
 				its.Spec.Template.Spec.Containers = append(its.Spec.Template.Spec.Containers, corev1.Container{
 					Name:    "kbagent",
 					Image:   "docker.io/apecloud/kubeblocks-tools:1.0.0",
-					Command: []string{"/bin/kbagent"},
+					Command: []string{kbagent.BinaryPath},
 				})
 
 				tree := kubebuilderx.NewObjectTree()

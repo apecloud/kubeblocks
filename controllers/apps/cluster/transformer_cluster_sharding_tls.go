@@ -216,13 +216,9 @@ func (t *clusterShardingTLSTransformer) buildTLSSecret(transCtx *clusterTransfor
 		Name:        sharding.Name,
 	}
 	secret := t.newTLSSecret(transCtx, sharding)
-	// The sharding Secret is an internal certificate source. Fixed keys decouple
-	// it from the optional file names declared by each ComponentDefinition.
 	caFile, certFile, keyFile := shardingTLSCAKey, shardingTLSCertKey, shardingTLSKeyKey
-	compDef := &appsv1.ComponentDefinition{Spec: appsv1.ComponentDefinitionSpec{TLS: &appsv1.TLS{
-		CAFile: &caFile, CertFile: &certFile, KeyFile: &keyFile,
-	}}}
-	return plan.ComposeTLSCertsWithSecret(compDef, synthesizedComp, secret)
+	keys := plan.TLSSecretKeys{CA: &caFile, Cert: &certFile, Key: &keyFile}
+	return plan.ComposeTLSCertsWithSecret(keys, synthesizedComp, secret)
 }
 
 func (t *clusterShardingTLSTransformer) newTLSSecret(transCtx *clusterTransformContext,

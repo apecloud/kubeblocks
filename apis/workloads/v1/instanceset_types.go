@@ -336,14 +336,8 @@ type InstanceSetStatus struct {
 	// +optional
 	ReadyInitReplicas int32 `json:"readyInitReplicas,omitempty"`
 
-	// InstanceStatusObservedGeneration is the most recent generation observed when publishing InstanceStatus.
-	// Consumers must use InstanceStatus only when this value matches metadata.generation.
-	//
-	// +optional
-	InstanceStatusObservedGeneration int64 `json:"instanceStatusObservedGeneration,omitempty"`
-
 	// Provides the status of every desired or observed instance in the ITS. Revision, desired-state convergence,
-	// readiness, availability, and failure fields form one snapshot fenced by InstanceStatusObservedGeneration.
+	// readiness, availability, and failure fields are published in the same status update as the InstanceReady condition.
 	//
 	// +optional
 	InstanceStatus []InstanceStatus `json:"instanceStatus,omitempty"`

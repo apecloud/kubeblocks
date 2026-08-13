@@ -28,6 +28,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 
@@ -108,7 +109,11 @@ var _ = Describe("status reconciler test", func() {
 		It("publishes revisions before the fenced per-instance status snapshot", func() {
 			its.Generation = 2
 			its.Status.ObservedGeneration = 1
-			its.Status.InstanceStatusObservedGeneration = 1
+			its.Status.Conditions = []metav1.Condition{{
+				Type:               string(workloads.InstanceReady),
+				ObservedGeneration: 1,
+				Status:             metav1.ConditionFalse,
+			}}
 			staleRevisions, err := buildRevisions(map[string]string{"stale": "previous-generation"})
 			Expect(err).ShouldNot(HaveOccurred())
 			its.Status.UpdateRevisions = staleRevisions
@@ -123,12 +128,16 @@ var _ = Describe("status reconciler test", func() {
 			_, err = revisionReconciler.Reconcile(tree)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(its.Status.ObservedGeneration).Should(Equal(its.Generation))
-			Expect(its.Status.InstanceStatusObservedGeneration).Should(Equal(int64(1)))
+			readyCondition := meta.FindStatusCondition(its.Status.Conditions, string(workloads.InstanceReady))
+			Expect(readyCondition).ShouldNot(BeNil())
+			Expect(readyCondition.ObservedGeneration).Should(Equal(int64(1)))
 
 			Expect(statusReconciler.PreCondition(tree)).Should(Equal(kubebuilderx.ConditionSatisfied))
 			_, err = statusReconciler.Reconcile(tree)
 			Expect(err).ShouldNot(HaveOccurred())
-			Expect(its.Status.InstanceStatusObservedGeneration).Should(Equal(its.Generation))
+			readyCondition = meta.FindStatusCondition(its.Status.Conditions, string(workloads.InstanceReady))
+			Expect(readyCondition).ShouldNot(BeNil())
+			Expect(readyCondition.ObservedGeneration).Should(Equal(its.Generation))
 
 			updateRevisions, err := GetRevisions(its.Status.UpdateRevisions)
 			Expect(err).ShouldNot(HaveOccurred())

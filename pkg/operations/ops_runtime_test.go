@@ -66,9 +66,13 @@ func TestOpsRuntimeBuildsInstanceAPIView(t *testing.T) {
 			Replicas:        &replicas,
 		},
 		Status: workloads.InstanceSetStatus{
-			ObservedGeneration:               2,
-			InstanceStatusObservedGeneration: 2,
-			Replicas:                         1,
+			ObservedGeneration: 2,
+			Replicas:           1,
+			Conditions: []metav1.Condition{{
+				Type:               string(workloads.InstanceReady),
+				ObservedGeneration: 2,
+				Status:             metav1.ConditionTrue,
+			}},
 			CurrentRevisions: map[string]string{
 				instanceName: "rev-a",
 			},
@@ -305,10 +309,14 @@ func TestOpsRuntimeWorkloadMissingAndUsesPublicInstanceStatus(t *testing.T) {
 			Generation: 2,
 		},
 		Status: workloads.InstanceSetStatus{
-			ObservedGeneration:               2,
-			InstanceStatusObservedGeneration: 1,
-			CurrentRevisions:                 map[string]string{"zstd": "not-base64"},
-			UpdateRevisions:                  map[string]string{"zstd": "not-base64"},
+			ObservedGeneration: 2,
+			Conditions: []metav1.Condition{{
+				Type:               string(workloads.InstanceReady),
+				ObservedGeneration: 1,
+				Status:             metav1.ConditionFalse,
+			}},
+			CurrentRevisions: map[string]string{"zstd": "not-base64"},
+			UpdateRevisions:  map[string]string{"zstd": "not-base64"},
 			InstanceStatus: []workloads.InstanceStatus{{
 				PodName:         "cluster-mysql-0",
 				CurrentRevision: "rev-a",

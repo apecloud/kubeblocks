@@ -200,7 +200,6 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	if err = setInstanceStatus(tree, its, podList, currentRevisions, updateRevisions, upToDateNames); err != nil {
 		return kubebuilderx.Continue, err
 	}
-	its.Status.InstanceStatusObservedGeneration = its.Generation
 
 	if its.Spec.MinReadySeconds > 0 && availableReplicas != readyReplicas {
 		return kubebuilderx.RetryAfter(time.Second), nil

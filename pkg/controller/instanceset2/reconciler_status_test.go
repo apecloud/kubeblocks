@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 
@@ -456,8 +457,7 @@ func TestStatusReconcilerReadsCurrentRevisionFromInstanceAnnotation(t *testing.T
 			},
 		},
 		Status: workloads.InstanceSetStatus{
-			ObservedGeneration:               3,
-			InstanceStatusObservedGeneration: 3,
+			ObservedGeneration: 3,
 		},
 	}
 
@@ -615,8 +615,12 @@ func TestStatusReconcilerPublishesFencedPerInstanceContract(t *testing.T) {
 			}},
 		},
 		Status: workloads.InstanceSetStatus{
-			ObservedGeneration:               3,
-			InstanceStatusObservedGeneration: 3,
+			ObservedGeneration: 3,
+			Conditions: []metav1.Condition{{
+				Type:               string(workloads.InstanceReady),
+				ObservedGeneration: 3,
+				Status:             metav1.ConditionFalse,
+			}},
 			UpdateRevisions: map[string]string{
 				"stale": "previous-generation",
 			},
@@ -671,9 +675,9 @@ func TestStatusReconcilerPublishesFencedPerInstanceContract(t *testing.T) {
 	if its.Status.ObservedGeneration != its.Generation {
 		t.Fatalf("observedGeneration=%d, want %d", its.Status.ObservedGeneration, its.Generation)
 	}
-	if its.Status.InstanceStatusObservedGeneration != 3 {
-		t.Fatalf("instanceStatusObservedGeneration=%d, want stale generation 3",
-			its.Status.InstanceStatusObservedGeneration)
+	readyCondition := meta.FindStatusCondition(its.Status.Conditions, string(workloads.InstanceReady))
+	if readyCondition == nil || readyCondition.ObservedGeneration != 3 {
+		t.Fatalf("ready condition=%#v, want stale observed generation 3", readyCondition)
 	}
 	if statusReconciler.PreCondition(tree) != kubebuilderx.ConditionSatisfied {
 		t.Fatal("status must run after revisions observe the generation")
@@ -681,9 +685,9 @@ func TestStatusReconcilerPublishesFencedPerInstanceContract(t *testing.T) {
 	if _, err := statusReconciler.Reconcile(tree); err != nil {
 		t.Fatalf("reconcile status: %v", err)
 	}
-	if its.Status.InstanceStatusObservedGeneration != its.Generation {
-		t.Fatalf("instanceStatusObservedGeneration=%d, want %d",
-			its.Status.InstanceStatusObservedGeneration, its.Generation)
+	readyCondition = meta.FindStatusCondition(its.Status.Conditions, string(workloads.InstanceReady))
+	if readyCondition == nil || readyCondition.ObservedGeneration != its.Generation {
+		t.Fatalf("ready condition=%#v, want observed generation %d", readyCondition, its.Generation)
 	}
 
 	byName := make(map[string]workloads.InstanceStatus, len(its.Status.InstanceStatus))

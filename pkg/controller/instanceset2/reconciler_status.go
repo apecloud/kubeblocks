@@ -168,7 +168,6 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	// controller, so it is skipped during that first reconcile and reaches here
 	// on a later snapshot of the observed Instances.
 	setInstanceStatus(its, instanceList, currentRevisions, updateRevisions)
-	its.Status.InstanceStatusObservedGeneration = its.Generation
 
 	if its.Spec.MinReadySeconds > 0 && availableReplicas != readyReplicas {
 		return kubebuilderx.RetryAfter(time.Second), nil

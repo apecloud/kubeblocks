@@ -20134,19 +20134,6 @@ This value remains constant once it equals InitReplicas.</p>
 </tr>
 <tr>
 <td>
-<code>instanceStatusObservedGeneration</code><br/>
-<em>
-int64
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>InstanceStatusObservedGeneration is the most recent generation observed when publishing InstanceStatus.
-Consumers must use InstanceStatus only when this value matches metadata.generation.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>instanceStatus</code><br/>
 <em>
 <a href="#workloads.kubeblocks.io/v1.InstanceStatus">
@@ -20157,7 +20144,7 @@ Consumers must use InstanceStatus only when this value matches metadata.generati
 <td>
 <em>(Optional)</em>
 <p>Provides the status of every desired or observed instance in the ITS. Revision, desired-state convergence,
-readiness, availability, and failure fields form one snapshot fenced by InstanceStatusObservedGeneration.</p>
+readiness, availability, and failure fields are published in the same status update as the InstanceReady condition.</p>
 </td>
 </tr>
 <tr>

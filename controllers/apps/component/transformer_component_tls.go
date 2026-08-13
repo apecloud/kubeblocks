@@ -205,7 +205,7 @@ func (i *tlsIssuerKubeBlocks) create(ctx context.Context, cli client.Reader) (*c
 	}
 	tls := i.compDef.Spec.TLS
 	keys := plan.TLSSecretKeys{CA: tls.CAFile, Cert: tls.CertFile, Key: tls.KeyFile}
-	return plan.ComposeTLSCertsWithSecret(keys, *i.synthesizedComp, proto)
+	return plan.ComposeTLSCertsWithSecret(*i.synthesizedComp, keys, proto)
 }
 
 func (i *tlsIssuerKubeBlocks) delete(ctx context.Context, cli client.Reader, secret *corev1.Secret) (*corev1.Secret, error) {

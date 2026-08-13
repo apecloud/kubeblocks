@@ -40,8 +40,8 @@ type TLSSecretKeys struct {
 	Key  *string
 }
 
-func ComposeTLSCertsWithSecret(keys TLSSecretKeys,
-	synthesizedComp component.SynthesizedComponent, secret *corev1.Secret) (*corev1.Secret, error) {
+func ComposeTLSCertsWithSecret(synthesizedComp component.SynthesizedComponent,
+	keys TLSSecretKeys, secret *corev1.Secret) (*corev1.Secret, error) {
 	var (
 		namespace   = synthesizedComp.Namespace
 		clusterName = synthesizedComp.ClusterName

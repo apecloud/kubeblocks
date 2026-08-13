@@ -27,20 +27,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 
-	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 )
 
 var _ = Describe("TLS test", func() {
 	It("ComposeTLSCertsWithSecret", func() {
-		compDef := &appsv1.ComponentDefinition{
-			Spec: appsv1.ComponentDefinitionSpec{
-				TLS: &appsv1.TLS{
-					CAFile:   ptr.To("ca.pem"),
-					CertFile: ptr.To("cert.pem"),
-					KeyFile:  ptr.To("key.pem"),
-				},
-			},
+		keys := TLSSecretKeys{
+			CA:   ptr.To("ca.pem"),
+			Cert: ptr.To("cert.pem"),
+			Key:  ptr.To("key.pem"),
 		}
 		synthesizedComp := component.SynthesizedComponent{
 			Namespace:   testCtx.DefaultNamespace,
@@ -54,11 +49,11 @@ var _ = Describe("TLS test", func() {
 			},
 			Data: map[string][]byte{},
 		}
-		_, err := ComposeTLSCertsWithSecret(compDef, synthesizedComp, secret)
+		_, err := ComposeTLSCertsWithSecret(keys, synthesizedComp, secret)
 		Expect(err).Should(BeNil())
 		Expect(secret.Data).ShouldNot(BeNil())
-		Expect(secret.Data[*compDef.Spec.TLS.CAFile]).ShouldNot(BeZero())
-		Expect(secret.Data[*compDef.Spec.TLS.CertFile]).ShouldNot(BeZero())
-		Expect(secret.Data[*compDef.Spec.TLS.KeyFile]).ShouldNot(BeZero())
+		Expect(secret.Data[*keys.CA]).ShouldNot(BeZero())
+		Expect(secret.Data[*keys.Cert]).ShouldNot(BeZero())
+		Expect(secret.Data[*keys.Key]).ShouldNot(BeZero())
 	})
 })

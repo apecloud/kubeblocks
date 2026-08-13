@@ -80,8 +80,7 @@ func (t *clusterShardingTLSTransformer) reconcileShardingTLSs(
 	return nil
 }
 
-func (t *clusterShardingTLSTransformer) sharedShardTemplates(transCtx *clusterTransformContext,
-	sharding *appsv1.ClusterSharding) sets.Set[string] {
+func (t *clusterShardingTLSTransformer) sharedShardTemplates(transCtx *clusterTransformContext, sharding *appsv1.ClusterSharding) sets.Set[string] {
 	shared := func(shardingDefName string) bool {
 		shardingDef, ok := transCtx.shardingDefs[shardingDefName]
 		if !ok || shardingDef.Spec.TLS == nil {
@@ -209,8 +208,7 @@ func (t *clusterShardingTLSTransformer) checkTLSSecret(
 	return secret, nil
 }
 
-func (t *clusterShardingTLSTransformer) buildTLSSecret(transCtx *clusterTransformContext,
-	sharding *appsv1.ClusterSharding) (*corev1.Secret, error) {
+func (t *clusterShardingTLSTransformer) buildTLSSecret(transCtx *clusterTransformContext, sharding *appsv1.ClusterSharding) (*corev1.Secret, error) {
 	synthesizedComp := component.SynthesizedComponent{
 		Namespace:   transCtx.Cluster.Namespace,
 		ClusterName: transCtx.Cluster.Name,
@@ -222,8 +220,7 @@ func (t *clusterShardingTLSTransformer) buildTLSSecret(transCtx *clusterTransfor
 	return plan.ComposeTLSCertsWithSecret(synthesizedComp, keys, secret)
 }
 
-func (t *clusterShardingTLSTransformer) newTLSSecret(transCtx *clusterTransformContext,
-	sharding *appsv1.ClusterSharding) *corev1.Secret {
+func (t *clusterShardingTLSTransformer) newTLSSecret(transCtx *clusterTransformContext, sharding *appsv1.ClusterSharding) *corev1.Secret {
 	var (
 		cluster      = transCtx.Cluster
 		namespace    = cluster.Namespace

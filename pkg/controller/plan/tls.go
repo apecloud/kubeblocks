@@ -29,12 +29,19 @@ import (
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 
-	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 )
 
-func ComposeTLSCertsWithSecret(compDef *appsv1.ComponentDefinition,
-	synthesizedComp component.SynthesizedComponent, secret *corev1.Secret) (*corev1.Secret, error) {
+// TLSSecretKeys identifies where generated certificate data is stored in a Secret.
+// A nil key omits the corresponding certificate data.
+type TLSSecretKeys struct {
+	CA   *string
+	Cert *string
+	Key  *string
+}
+
+func ComposeTLSCertsWithSecret(synthesizedComp component.SynthesizedComponent,
+	keys TLSSecretKeys, secret *corev1.Secret) (*corev1.Secret, error) {
 	var (
 		namespace   = synthesizedComp.Namespace
 		clusterName = synthesizedComp.ClusterName
@@ -65,14 +72,14 @@ func ComposeTLSCertsWithSecret(compDef *appsv1.ComponentDefinition,
 		return nil, errors.Errorf("generate TLS certificates failed with cluster name %s, component name %s in namespace %s",
 			clusterName, compName, namespace)
 	}
-	if compDef.Spec.TLS.CAFile != nil {
-		secret.Data[*compDef.Spec.TLS.CAFile] = []byte(parts[0])
+	if keys.CA != nil {
+		secret.Data[*keys.CA] = []byte(parts[0])
 	}
-	if compDef.Spec.TLS.CertFile != nil {
-		secret.Data[*compDef.Spec.TLS.CertFile] = []byte(parts[1])
+	if keys.Cert != nil {
+		secret.Data[*keys.Cert] = []byte(parts[1])
 	}
-	if compDef.Spec.TLS.KeyFile != nil {
-		secret.Data[*compDef.Spec.TLS.KeyFile] = []byte(parts[2])
+	if keys.Key != nil {
+		secret.Data[*keys.Key] = []byte(parts[2])
 	}
 	return secret, nil
 }

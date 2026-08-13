@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -111,6 +112,7 @@ var _ = Describe("Cluster Controller", func() {
 		// non-namespaced
 		testapps.ClearResources(&testCtx, generics.ActionSetSignature, ml)
 		testapps.ClearResources(&testCtx, generics.StorageClassSignature, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ShardingDefinitionSignature, true, ml)
 		resetTestContext()
 	}
 
@@ -130,9 +132,18 @@ var _ = Describe("Cluster Controller", func() {
 
 	createAllDefinitionObjects := func() {
 		By("Create a componentDefinition obj")
-		compDefObj = testapps.NewComponentDefinitionFactory(compDefName).
+		compDefFactory := testapps.NewComponentDefinitionFactory(compDefName).
 			WithRandomName().
-			SetDefaultSpec().
+			SetDefaultSpec()
+		caFile, certFile, keyFile := "ca.crt", "tls.crt", "tls.key"
+		compDefFactory.Get().Spec.TLS = &appsv1.TLS{
+			VolumeName: "tls",
+			MountPath:  "/etc/tls",
+			CAFile:     &caFile,
+			CertFile:   &certFile,
+			KeyFile:    &keyFile,
+		}
+		compDefObj = compDefFactory.
 			Create(&testCtx).
 			GetObject()
 
@@ -811,6 +822,135 @@ var _ = Describe("Cluster Controller", func() {
 
 		It("create sharding cluster", func() {
 			testShardingClusterComponent(defaultCompName, compDefObj.Name, createClusterObjWithSharding, defaultShardCount)
+		})
+
+		It("creates one KubeBlocks TLS source shared by every shard", func() {
+			shardingDef := testapps.NewShardingDefinitionFactory("shared-tls-sharding", compDefObj.Name).
+				WithRandomName()
+			shardingDef.AddAnnotations(constant.CRDAPIVersionAnnotationKey, appsv1.GroupVersion.String())
+			shardingDef.Get().Spec.TLS = &appsv1.ShardingTLS{Shared: ptr.To(true)}
+			shardingDefObj := shardingDef.Create(&testCtx).GetObject()
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(shardingDefObj),
+				func(g Gomega, definition *appsv1.ShardingDefinition) {
+					g.Expect(definition.Status.ObservedGeneration).Should(Equal(definition.Generation))
+					g.Expect(definition.Status.Phase).Should(Equal(appsv1.AvailablePhase))
+				})).Should(Succeed())
+
+			createClusterObjNoWait("", func(factory *testapps.MockClusterFactory) {
+				factory.AddSharding(defaultCompName, shardingDefObj.Name, "").
+					SetShards(defaultShardCount)
+				sharding := &factory.Get().Spec.Shardings[len(factory.Get().Spec.Shardings)-1]
+				sharding.Template.TLS = true
+				sharding.Template.Issuer = &appsv1.Issuer{Name: appsv1.IssuerKubeBlocks}
+			})
+
+			sharedSecretKey := types.NamespacedName{
+				Namespace: clusterKey.Namespace,
+				Name:      shardingTLSSecretName(clusterKey.Name, defaultCompName),
+			}
+			Eventually(testapps.CheckObj(&testCtx, sharedSecretKey, func(g Gomega, secret *corev1.Secret) {
+				g.Expect(secret.Data).Should(HaveKey("ca.crt"))
+				g.Expect(secret.Data).Should(HaveKey("tls.crt"))
+				g.Expect(secret.Data).Should(HaveKey("tls.key"))
+			})).Should(Succeed())
+			sharedSecret := &corev1.Secret{}
+			Eventually(testapps.CheckObjExists(&testCtx, sharedSecretKey, sharedSecret, true)).Should(Succeed())
+			originalCA := slices.Clone(sharedSecret.Data["ca.crt"])
+
+			checkComponents := func(expectedCount int) {
+				componentList := &appsv1.ComponentList{}
+				Eventually(func(g Gomega) {
+					g.Expect(testCtx.Cli.List(testCtx.Ctx, componentList,
+						client.InNamespace(clusterKey.Namespace),
+						client.MatchingLabels{
+							constant.AppInstanceLabelKey:       clusterKey.Name,
+							constant.KBAppShardingNameLabelKey: defaultCompName,
+						})).Should(Succeed())
+					g.Expect(componentList.Items).Should(HaveLen(expectedCount))
+					for i := range componentList.Items {
+						tls := componentList.Items[i].Spec.TLSConfig
+						g.Expect(tls).ShouldNot(BeNil())
+						g.Expect(tls.Enable).Should(BeTrue())
+						g.Expect(tls.Issuer).ShouldNot(BeNil())
+						g.Expect(tls.Issuer.Name).Should(Equal(appsv1.IssuerUserProvided))
+						g.Expect(tls.Issuer.SecretRef).ShouldNot(BeNil())
+						g.Expect(tls.Issuer.SecretRef.Name).Should(Equal(sharedSecretKey.Name))
+						g.Expect(tls.Issuer.SecretRef.Namespace).Should(Equal(sharedSecretKey.Namespace))
+					}
+				}).Should(Succeed())
+			}
+			checkComponents(defaultShardCount)
+			Eventually(testapps.ClusterReconciled(&testCtx, clusterKey)).Should(BeTrue())
+
+			By("scaling out without rotating the shared CA")
+			Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1.Cluster) {
+				cluster.Spec.Shardings[0].Shards++
+			})()).Should(Succeed())
+			Eventually(testapps.ClusterReconciled(&testCtx, clusterKey)).Should(BeTrue())
+			checkComponents(defaultShardCount + 1)
+			Eventually(testapps.CheckObj(&testCtx, sharedSecretKey, func(g Gomega, secret *corev1.Secret) {
+				g.Expect(secret.Data["ca.crt"]).Should(Equal(originalCA))
+			})).Should(Succeed())
+		})
+
+		It("applies shared TLS per shard template ShardingDefinition", func() {
+			createShardingDef := func(prefix string, shared bool) *appsv1.ShardingDefinition {
+				factory := testapps.NewShardingDefinitionFactory(prefix, compDefObj.Name).WithRandomName()
+				factory.AddAnnotations(constant.CRDAPIVersionAnnotationKey, appsv1.GroupVersion.String())
+				factory.Get().Spec.TLS = &appsv1.ShardingTLS{Shared: ptr.To(shared)}
+				obj := factory.Create(&testCtx).GetObject()
+				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(obj),
+					func(g Gomega, definition *appsv1.ShardingDefinition) {
+						g.Expect(definition.Status.Phase).Should(Equal(appsv1.AvailablePhase))
+					})).Should(Succeed())
+				return obj
+			}
+			plainDef := createShardingDef("plain-tls-sharding", false)
+			sharedDef := createShardingDef("shared-tls-sharding", true)
+
+			createClusterObjNoWait("", func(factory *testapps.MockClusterFactory) {
+				factory.AddSharding(defaultCompName, plainDef.Name, "").SetShards(2)
+				sharding := &factory.Get().Spec.Shardings[len(factory.Get().Spec.Shardings)-1]
+				sharding.Template.TLS = true
+				sharding.Template.Issuer = &appsv1.Issuer{Name: appsv1.IssuerKubeBlocks}
+				sharding.ShardTemplates = []appsv1.ShardTemplate{
+					{Name: "private", ShardingDef: ptr.To(plainDef.Name), Shards: ptr.To[int32](1)},
+					{Name: "shared", ShardingDef: ptr.To(sharedDef.Name), Shards: ptr.To[int32](1)},
+				}
+			})
+
+			Eventually(func(g Gomega) {
+				components := &appsv1.ComponentList{}
+				g.Expect(testCtx.Cli.List(testCtx.Ctx, components,
+					client.InNamespace(clusterKey.Namespace),
+					client.MatchingLabels{
+						constant.AppInstanceLabelKey:       clusterKey.Name,
+						constant.KBAppShardingNameLabelKey: defaultCompName,
+					})).Should(Succeed())
+				g.Expect(components.Items).Should(HaveLen(2))
+				seen := map[string]bool{}
+				for i := range components.Items {
+					component := &components.Items[i]
+					templateName := component.Labels[constant.KBAppShardTemplateLabelKey]
+					seen[templateName] = true
+					g.Expect(component.Spec.TLSConfig).ShouldNot(BeNil())
+					g.Expect(component.Spec.TLSConfig.Issuer).ShouldNot(BeNil())
+					switch templateName {
+					case "private":
+						g.Expect(component.Spec.TLSConfig.Issuer.Name).Should(Equal(appsv1.IssuerKubeBlocks))
+					case "shared":
+						g.Expect(component.Spec.TLSConfig.Issuer.Name).Should(Equal(appsv1.IssuerUserProvided))
+						g.Expect(component.Spec.TLSConfig.Issuer.SecretRef.Name).Should(
+							Equal(shardingTLSSecretName(clusterKey.Name, defaultCompName)))
+					}
+				}
+				g.Expect(seen).Should(HaveKeyWithValue("private", true))
+				g.Expect(seen).Should(HaveKeyWithValue("shared", true))
+			}).Should(Succeed())
+
+			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
+				g.Expect(cluster.Spec.Shardings[0].Template.Issuer.Name).Should(Equal(appsv1.IssuerKubeBlocks))
+			})).Should(Succeed())
 		})
 
 		It("create cluster with default topology", func() {

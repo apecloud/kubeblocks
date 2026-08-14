@@ -1948,7 +1948,7 @@ func (r *VolumePopulatorReconciler) rebindPVCAndPV(reqCtx intctrlutil.RequestCtx
 			}
 			pv.Annotations[AnnPopulationAttempt] = attempt
 			if err := r.Client.Patch(reqCtx.Ctx, pv, patchPV); err != nil {
-				return false, err
+				return false, requeuePVRebindConflict(err, pv, pvc)
 			}
 		}
 		return true, r.bindTargetPVCToPV(reqCtx, pvc, pv.Name)
@@ -1972,9 +1972,18 @@ func (r *VolumePopulatorReconciler) rebindPVCAndPV(reqCtx intctrlutil.RequestCtx
 	pv.Annotations[AnnPopulateFrom] = pvc.Spec.DataSourceRef.Name
 	pv.Annotations[AnnPopulationAttempt] = attempt
 	if err := r.Client.Patch(reqCtx.Ctx, pv, patchPV); err != nil {
-		return false, err
+		return false, requeuePVRebindConflict(err, pv, pvc)
 	}
 	return true, r.bindTargetPVCToPV(reqCtx, pvc, pv.Name)
+}
+
+func requeuePVRebindConflict(err error, pv *corev1.PersistentVolume, pvc *corev1.PersistentVolumeClaim) error {
+	if !apierrors.IsConflict(err) {
+		return err
+	}
+	return intctrlutil.NewRequeueError(reconcileInterval, fmt.Sprintf(
+		"PV %s changed while rebinding target PVC %s/%s; retrying with fresh ownership",
+		pv.Name, pvc.Namespace, pvc.Name))
 }
 
 func (r *VolumePopulatorReconciler) bindTargetPVCToPV(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim, pvName string) error {

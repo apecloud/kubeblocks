@@ -3027,11 +3027,17 @@ func TestRebindPVCAndPVDoesNotOverwriteConcurrentClaimRefChange(t *testing.T) {
 	rebound, err := reconciler.rebindPVCAndPV(intctrlutil.RequestCtx{Ctx: context.Background()}, populatePVC, pvc)
 	require.False(t, rebound)
 	require.Error(t, err)
-	require.True(t, apierrors.IsConflict(err), err)
+	require.True(t, intctrlutil.IsRequeueError(err), err)
 	currentPV := &corev1.PersistentVolume{}
 	require.NoError(t, liveClient.Get(context.Background(), client.ObjectKeyFromObject(livePV), currentPV))
 	require.Equal(t, "other", currentPV.Spec.ClaimRef.Name)
 	require.Empty(t, currentPV.Annotations[AnnPopulationAttempt])
+	pvc.Status.Conditions = []corev1.PersistentVolumeClaimCondition{{
+		Type: PersistentVolumeClaimPopulating,
+	}}
+	result, handleErr := reconciler.handleSyncPVCError(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, err)
+	require.NoError(t, handleErr)
+	require.True(t, result.RequeueAfter > 0, "PV conflicts must retry even after Populating is set")
 }
 
 func TestRestoreSystemAccountSecretsUsesShardingSecretName(t *testing.T) {

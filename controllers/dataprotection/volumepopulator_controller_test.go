@@ -1548,6 +1548,31 @@ func TestDeletingTargetPVCCleansPopulationWithoutValidatingSource(t *testing.T) 
 	require.True(t, apierrors.IsNotFound(err), "populate PVC should be deleted, got: %v", err)
 }
 
+func TestSuccessfulPopulateReleaseRemovesOnlyHelperAndTargetFinalizer(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	pvc := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{
+		Namespace:  "default",
+		Name:       "data-0",
+		UID:        "data-0-uid",
+		Finalizers: []string{dptypes.DataProtectionFinalizerName, "example.io/keep"},
+	}}
+	helper := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{
+		Namespace: pvc.Namespace,
+		Name:      getPopulatePVCName(pvc.UID),
+	}}
+	reconciler := &VolumePopulatorReconciler{Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(pvc, helper).Build()}
+
+	err := reconciler.releasePopulateResources(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc)
+
+	require.NoError(t, err)
+	require.True(t, apierrors.IsNotFound(reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(helper), &corev1.PersistentVolumeClaim{})))
+	current := &corev1.PersistentVolumeClaim{}
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(pvc), current))
+	require.NotContains(t, current.Finalizers, dptypes.DataProtectionFinalizerName)
+	require.Contains(t, current.Finalizers, "example.io/keep")
+}
+
 func TestPopulateCreatesExecutionRestoreAndPolls(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, corev1.AddToScheme(scheme))

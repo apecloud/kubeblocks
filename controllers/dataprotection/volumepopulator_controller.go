@@ -173,7 +173,7 @@ func (r *VolumePopulatorReconciler) syncPVC(reqCtx intctrlutil.RequestCtx, pvc *
 		return nil
 	}
 	if !pvc.DeletionTimestamp.IsZero() {
-		return r.Cleanup(reqCtx, pvc)
+		return r.cleanupDeletingPVC(reqCtx, pvc)
 	}
 	var restoreCtx *pvcRestoreContext
 	if pvc.Spec.DataSourceRef.Kind == dptypes.RestoreKind {
@@ -191,7 +191,7 @@ func (r *VolumePopulatorReconciler) syncPVC(reqCtx intctrlutil.RequestCtx, pvc *
 	if err = r.completeBoundPVCIfNeeded(reqCtx, pvc, restoreCtx); err != nil {
 		return err
 	}
-	return r.Cleanup(reqCtx, pvc)
+	return nil
 }
 
 // dispatchUnboundPVC routes an unbound PVC to either Populate or ProvisionOnly.
@@ -1017,7 +1017,7 @@ func (r *VolumePopulatorReconciler) completeBoundPVCIfNeeded(reqCtx intctrlutil.
 		// actions may need the workload pod to start, which cannot happen while
 		// the populate PVC still owns the restored PV or while the target PVC is
 		// still marked as being populated.
-		if err := r.Cleanup(reqCtx, pvc); err != nil {
+		if err := r.releasePopulateResources(reqCtx, pvc); err != nil {
 			return err
 		}
 		reason := ReasonPopulatingSucceed
@@ -1620,7 +1620,26 @@ func postReadyRestoreName(componentUID types.UID) string {
 	return constant.ShortenKubeName(fmt.Sprintf("restore-%s-post-ready", componentUID), constant.KubeNameMaxLength)
 }
 
-func (r *VolumePopulatorReconciler) Cleanup(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim) error {
+// cleanupDeletingPVC releases population resources when the target PVC is
+// being deleted. Keep this entry point separate from successful completion so
+// deletion-specific teardown can evolve without broadening the success path.
+func (r *VolumePopulatorReconciler) cleanupDeletingPVC(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim) error {
+	if err := r.deletePopulatePVC(reqCtx, pvc); err != nil {
+		return err
+	}
+	return r.releaseTargetPVC(reqCtx, pvc)
+}
+
+// releasePopulateResources releases only the temporary PVC and the target PVC
+// finalizer after population has succeeded.
+func (r *VolumePopulatorReconciler) releasePopulateResources(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim) error {
+	if err := r.deletePopulatePVC(reqCtx, pvc); err != nil {
+		return err
+	}
+	return r.releaseTargetPVC(reqCtx, pvc)
+}
+
+func (r *VolumePopulatorReconciler) deletePopulatePVC(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim) error {
 	populatePVC := &corev1.PersistentVolumeClaim{}
 	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Name: getPopulatePVCName(pvc.UID),
 		Namespace: pvc.Namespace}, populatePVC); err != nil {
@@ -1630,7 +1649,10 @@ func (r *VolumePopulatorReconciler) Cleanup(reqCtx intctrlutil.RequestCtx, pvc *
 	} else if err = r.Client.Delete(reqCtx.Ctx, populatePVC); err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
+	return nil
+}
 
+func (r *VolumePopulatorReconciler) releaseTargetPVC(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim) error {
 	if slices.Contains(pvc.Finalizers, dptypes.DataProtectionFinalizerName) {
 		pvcPatch := client.MergeFrom(pvc.DeepCopy())
 		controllerutil.RemoveFinalizer(pvc, dptypes.DataProtectionFinalizerName)

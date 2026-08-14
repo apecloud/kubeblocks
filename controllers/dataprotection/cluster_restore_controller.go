@@ -203,6 +203,15 @@ func (r *ClusterRestoreReconciler) deleteClusterRestores(reqCtx intctrlutil.Requ
 		if restore.Labels[dprestore.DataProtectionRestoreLabelKey] == "" {
 			continue
 		}
+		owned, err := r.restoreOwnedByCluster(reqCtx.Ctx, restore, cluster)
+		if err != nil {
+			return false, err
+		}
+		if !owned {
+			return false, fmt.Errorf(
+				"refusing to delete Restore %s/%s: labels identify Cluster %s/%s UID %s but no producer ownerReference verifies that ownership",
+				restore.Namespace, restore.Name, cluster.Namespace, cluster.Name, cluster.UID)
+		}
 		pending = true
 		if restore.DeletionTimestamp.IsZero() {
 			if err := r.Client.Delete(reqCtx.Ctx, restore); err != nil && !apierrors.IsNotFound(err) {
@@ -211,6 +220,54 @@ func (r *ClusterRestoreReconciler) deleteClusterRestores(reqCtx intctrlutil.Requ
 		}
 	}
 	return pending, nil
+}
+
+// restoreOwnedByCluster verifies the producer-written ownership chain before a
+// label-selected Restore is deleted. Labels route reconciliation, but are not
+// sufficient authority for destructive cleanup.
+func (r *ClusterRestoreReconciler) restoreOwnedByCluster(ctx context.Context,
+	restore *dpv1alpha1.Restore,
+	cluster *appsv1.Cluster) (bool, error) {
+	for _, owner := range restore.OwnerReferences {
+		if owner.APIVersion == appsv1.GroupVersion.String() && owner.Kind == appsv1.ClusterKind &&
+			owner.Name == cluster.Name && owner.UID == cluster.UID {
+			return true, nil
+		}
+		switch owner.Kind {
+		case "PersistentVolumeClaim":
+			if owner.APIVersion != corev1.SchemeGroupVersion.String() {
+				continue
+			}
+			pvc := &corev1.PersistentVolumeClaim{}
+			key := client.ObjectKey{Namespace: restore.Namespace, Name: owner.Name}
+			if err := r.directReader().Get(ctx, key, pvc); err != nil {
+				if apierrors.IsNotFound(err) {
+					continue
+				}
+				return false, err
+			}
+			if pvc.UID == owner.UID && pvc.Labels[dptypes.ClusterUIDLabelKey] == string(cluster.UID) &&
+				isClusterRestoreTargetPVC(pvc) {
+				return true, nil
+			}
+		case "Component":
+			if owner.APIVersion != appsv1.GroupVersion.String() {
+				continue
+			}
+			component := &appsv1.Component{}
+			key := client.ObjectKey{Namespace: restore.Namespace, Name: owner.Name}
+			if err := r.directReader().Get(ctx, key, component); err != nil {
+				if apierrors.IsNotFound(err) {
+					continue
+				}
+				return false, err
+			}
+			if component.UID == owner.UID && component.Annotations[constant.KBAppClusterUIDKey] == string(cluster.UID) {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
 }
 
 func (r *ClusterRestoreReconciler) deleteClusterRestoreHelpers(reqCtx intctrlutil.RequestCtx, cluster *appsv1.Cluster) (bool, error) {

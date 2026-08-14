@@ -132,6 +132,12 @@ func TestDeletingClusterWaitsForRestoreThenReleasesPVCs(t *testing.T) {
 			dprestore.DataProtectionRestoreLabelKey: "execution-restore",
 			dptypes.ClusterUIDLabelKey:              string(cluster.UID),
 		},
+		OwnerReferences: []metav1.OwnerReference{{
+			APIVersion: "v1",
+			Kind:       "PersistentVolumeClaim",
+			Name:       target.Name,
+			UID:        target.UID,
+		}},
 		Finalizers: []string{"test.kubeblocks.io/hold"},
 	}}
 	reconciler := &ClusterRestoreReconciler{
@@ -243,6 +249,26 @@ func TestAPIReaderResidualPreventsClusterFinalizerRelease(t *testing.T) {
 	require.True(t, controllerutil.ContainsFinalizer(current, dptypes.RestoreProtectionFinalizerName))
 }
 
+func TestDeletingClusterDoesNotDeleteLabelOnlyRestore(t *testing.T) {
+	scheme := newClusterRestoreTestScheme(t)
+	now := metav1.Now()
+	cluster := newClusterWithActiveRestore()
+	cluster.DeletionTimestamp = &now
+	cluster.Finalizers = []string{dptypes.RestoreProtectionFinalizerName}
+	forged := newClusterExecutionRestore(cluster, dpv1alpha1.RestorePhaseRunning)
+	forged.OwnerReferences = nil
+	reconciler := &ClusterRestoreReconciler{
+		Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, forged).Build(),
+	}
+
+	_, err := reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cluster)})
+	require.Error(t, err)
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(forged), &dpv1alpha1.Restore{}))
+	current := &appsv1.Cluster{}
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(cluster), current))
+	require.True(t, controllerutil.ContainsFinalizer(current, dptypes.RestoreProtectionFinalizerName))
+}
+
 func newClusterRestoreTestScheme(t *testing.T) *runtime.Scheme {
 	t.Helper()
 	scheme := runtime.NewScheme()
@@ -262,6 +288,12 @@ func newClusterExecutionRestore(cluster *appsv1.Cluster, phase dpv1alpha1.Restor
 				dprestore.DataProtectionRestoreLabelKey: "execution-restore",
 				dptypes.ClusterUIDLabelKey:              string(cluster.UID),
 			},
+			OwnerReferences: []metav1.OwnerReference{{
+				APIVersion: appsv1.GroupVersion.String(),
+				Kind:       appsv1.ClusterKind,
+				Name:       cluster.Name,
+				UID:        cluster.UID,
+			}},
 		},
 		Status: dpv1alpha1.RestoreStatus{Phase: phase},
 	}

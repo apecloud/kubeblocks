@@ -2160,6 +2160,7 @@ func TestCompleteBoundPVCReleasesPopulatePVCBeforeWaitingForPostReady(t *testing
 	pvc.UID = types.UID("target-pvc")
 	pvc.Finalizers = []string{dptypes.DataProtectionFinalizerName}
 	pvc.Spec.VolumeName = "data-pv"
+	pvc.Status.Phase = corev1.ClaimPending
 	pvc.Annotations[volume.AnnBindCompleted] = "yes"
 	pvc.Spec.DataSourceRef = &corev1.TypedObjectReference{
 		APIGroup: &apiGroup,
@@ -2238,9 +2239,9 @@ func TestCompleteBoundPVCReleasesPopulatePVCBeforeWaitingForPostReady(t *testing
 	currentPVC := &corev1.PersistentVolumeClaim{}
 	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(pvc), currentPVC))
 	require.NotContains(t, currentPVC.Finalizers, dptypes.DataProtectionFinalizerName)
-	require.Equal(t, corev1.ClaimBound, currentPVC.Status.Phase)
-	require.Equal(t, resource.MustParse("1Gi"), currentPVC.Status.Capacity[corev1.ResourceStorage])
-	require.Equal(t, []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce}, currentPVC.Status.AccessModes)
+	require.Equal(t, corev1.ClaimPending, currentPVC.Status.Phase)
+	require.Empty(t, currentPVC.Status.Capacity)
+	require.Empty(t, currentPVC.Status.AccessModes)
 	populatingCondition := findPVCConditionByType(currentPVC, string(PersistentVolumeClaimPopulating))
 	require.NotNil(t, populatingCondition)
 	require.Equal(t, ReasonPopulatingSucceed, populatingCondition.Reason)

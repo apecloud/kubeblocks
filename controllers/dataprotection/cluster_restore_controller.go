@@ -29,6 +29,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dprestore "github.com/apecloud/kubeblocks/pkg/dataprotection/restore"
@@ -59,6 +60,20 @@ func (r *ClusterRestoreReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	cluster := &appsv1.Cluster{}
 	if err := r.Client.Get(ctx, req.NamespacedName, cluster); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
+
+	if cluster.DeletionTimestamp.IsZero() || controllerutil.ContainsFinalizer(cluster, dptypes.RestoreProtectionFinalizerName) {
+		legacyFound, adopted, err := r.adoptLegacyClusterRestoreResources(reqCtx, cluster)
+		if err != nil {
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to adopt legacy cluster restore resources")
+		}
+		if legacyFound && cluster.DeletionTimestamp.IsZero() &&
+			!controllerutil.ContainsFinalizer(cluster, dptypes.RestoreProtectionFinalizerName) {
+			return r.ensureFinalizer(reqCtx, cluster)
+		}
+		if adopted {
+			return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, "waiting for legacy restore ownership labels to become visible")
+		}
 	}
 
 	if cluster.DeletionTimestamp.IsZero() {
@@ -246,9 +261,14 @@ func (r *ClusterRestoreReconciler) restoreOwnedByCluster(ctx context.Context,
 				}
 				return false, err
 			}
-			if pvc.UID == owner.UID && pvc.Labels[dptypes.ClusterUIDLabelKey] == string(cluster.UID) &&
-				isClusterRestoreTargetPVC(pvc) {
-				return true, nil
+			if pvc.UID == owner.UID && isClusterRestoreTargetPVC(pvc) {
+				if pvc.Labels[dptypes.ClusterUIDLabelKey] == string(cluster.UID) {
+					return true, nil
+				}
+				if pvc.Labels[dptypes.ClusterUIDLabelKey] == "" &&
+					validateLegacyRestoreTargetPVC(ctx, r.directReader(), pvc, cluster) == nil {
+					return true, nil
+				}
 			}
 		case "Component":
 			if owner.APIVersion != appsv1.GroupVersion.String() {
@@ -268,6 +288,161 @@ func (r *ClusterRestoreReconciler) restoreOwnedByCluster(ctx context.Context,
 		}
 	}
 	return false, nil
+}
+
+func (r *ClusterRestoreReconciler) adoptLegacyClusterRestoreResources(reqCtx intctrlutil.RequestCtx,
+	cluster *appsv1.Cluster) (bool, bool, error) {
+	targetList := &corev1.PersistentVolumeClaimList{}
+	if err := r.directReader().List(reqCtx.Ctx, targetList, client.InNamespace(cluster.Namespace), client.MatchingLabels{
+		constant.AppInstanceLabelKey: cluster.Name,
+	}); err != nil {
+		return false, false, err
+	}
+	legacyTargets := make([]*corev1.PersistentVolumeClaim, 0)
+	for i := range targetList.Items {
+		pvc := &targetList.Items[i]
+		if !isClusterRestoreTargetPVC(pvc) || pvc.Labels[dptypes.ClusterUIDLabelKey] != "" {
+			continue
+		}
+		if err := validateLegacyRestoreTargetPVC(reqCtx.Ctx, r.directReader(), pvc, cluster); err != nil {
+			continue
+		}
+		legacyTargets = append(legacyTargets, pvc)
+	}
+
+	restoreList := &dpv1alpha1.RestoreList{}
+	if err := r.directReader().List(reqCtx.Ctx, restoreList, client.InNamespace(cluster.Namespace), client.MatchingLabels{
+		constant.AppInstanceLabelKey: cluster.Name,
+	}); err != nil {
+		return false, false, err
+	}
+	legacyRestores := make([]*dpv1alpha1.Restore, 0)
+	for i := range restoreList.Items {
+		restore := &restoreList.Items[i]
+		if restore.Labels[dptypes.ClusterUIDLabelKey] != "" ||
+			restore.Labels[dprestore.DataProtectionRestoreLabelKey] == "" {
+			continue
+		}
+		owned, err := r.restoreOwnedByCluster(reqCtx.Ctx, restore, cluster)
+		if err != nil {
+			return false, false, err
+		}
+		if owned {
+			legacyRestores = append(legacyRestores, restore)
+		}
+	}
+
+	legacyFound := len(legacyTargets) > 0 || len(legacyRestores) > 0
+	if !legacyFound || !controllerutil.ContainsFinalizer(cluster, dptypes.RestoreProtectionFinalizerName) {
+		return legacyFound, false, nil
+	}
+	changed := false
+	for _, pvc := range legacyTargets {
+		if err := r.patchLegacyClusterUID(reqCtx.Ctx, pvc, cluster); err != nil {
+			return true, changed, err
+		}
+		changed = true
+		helper := &corev1.PersistentVolumeClaim{}
+		key := client.ObjectKey{Namespace: pvc.Namespace, Name: getPopulatePVCName(pvc.UID)}
+		if err := r.directReader().Get(reqCtx.Ctx, key, helper); err == nil {
+			if isClusterRestoreHelperPVC(helper) && helper.Labels[dptypes.ClusterUIDLabelKey] == "" {
+				if err := r.patchLegacyClusterUID(reqCtx.Ctx, helper, cluster); err != nil {
+					return true, changed, err
+				}
+				changed = true
+			}
+		} else if !apierrors.IsNotFound(err) {
+			return true, changed, err
+		}
+	}
+	for _, restore := range legacyRestores {
+		if err := r.patchLegacyClusterUID(reqCtx.Ctx, restore, cluster); err != nil {
+			return true, changed, err
+		}
+		changed = true
+	}
+	return true, changed, nil
+}
+
+func (r *ClusterRestoreReconciler) patchLegacyClusterUID(ctx context.Context,
+	obj client.Object,
+	cluster *appsv1.Cluster) error {
+	patch := client.MergeFromWithOptions(obj.DeepCopyObject().(client.Object), client.MergeFromWithOptimisticLock{})
+	labels := obj.GetLabels()
+	if labels == nil {
+		labels = map[string]string{}
+	}
+	labels[dptypes.ClusterUIDLabelKey] = string(cluster.UID)
+	labels[constant.AppInstanceLabelKey] = cluster.Name
+	obj.SetLabels(labels)
+	if target, ok := obj.(*corev1.PersistentVolumeClaim); ok && isClusterRestoreTargetPVC(target) {
+		annotations := target.GetAnnotations()
+		if annotations == nil {
+			annotations = map[string]string{}
+		}
+		annotations[constant.KBAppClusterUIDKey] = string(cluster.UID)
+		target.SetAnnotations(annotations)
+	}
+	return r.Client.Patch(ctx, obj, patch)
+}
+
+func validateLegacyRestoreTargetPVC(ctx context.Context,
+	reader client.Reader,
+	pvc *corev1.PersistentVolumeClaim,
+	cluster *appsv1.Cluster) error {
+	if pvc.Labels[constant.AppInstanceLabelKey] != cluster.Name {
+		return fmt.Errorf("target PVC %s/%s does not identify Cluster %s", pvc.Namespace, pvc.Name, cluster.Name)
+	}
+	owner := metav1.GetControllerOf(pvc)
+	if owner == nil || owner.APIVersion != workloads.GroupVersion.String() {
+		return fmt.Errorf("target PVC %s/%s has no supported workload controller owner", pvc.Namespace, pvc.Name)
+	}
+	var its *workloads.InstanceSet
+	switch owner.Kind {
+	case workloads.InstanceSetKind:
+		its = &workloads.InstanceSet{}
+		if err := reader.Get(ctx, client.ObjectKey{Namespace: pvc.Namespace, Name: owner.Name}, its); err != nil {
+			return err
+		}
+		if owner.UID != its.UID {
+			return fmt.Errorf("target PVC %s/%s owner UID does not match InstanceSet %s/%s", pvc.Namespace, pvc.Name, its.Namespace, its.Name)
+		}
+	case "Instance":
+		instance := &workloads.Instance{}
+		if err := reader.Get(ctx, client.ObjectKey{Namespace: pvc.Namespace, Name: owner.Name}, instance); err != nil {
+			return err
+		}
+		if owner.UID != instance.UID {
+			return fmt.Errorf("target PVC %s/%s owner UID does not match Instance %s/%s", pvc.Namespace, pvc.Name, instance.Namespace, instance.Name)
+		}
+		itsOwner := metav1.GetControllerOf(instance)
+		if itsOwner == nil || itsOwner.APIVersion != workloads.GroupVersion.String() || itsOwner.Kind != workloads.InstanceSetKind {
+			return fmt.Errorf("Instance %s/%s has no InstanceSet controller owner", instance.Namespace, instance.Name)
+		}
+		its = &workloads.InstanceSet{}
+		if err := reader.Get(ctx, client.ObjectKey{Namespace: instance.Namespace, Name: itsOwner.Name}, its); err != nil {
+			return err
+		}
+		if itsOwner.UID != its.UID {
+			return fmt.Errorf("Instance %s/%s owner UID does not match InstanceSet %s/%s", instance.Namespace, instance.Name, its.Namespace, its.Name)
+		}
+	default:
+		return fmt.Errorf("target PVC %s/%s has unsupported workload owner kind %s", pvc.Namespace, pvc.Name, owner.Kind)
+	}
+	componentOwner := metav1.GetControllerOf(its)
+	if componentOwner == nil || componentOwner.APIVersion != appsv1.GroupVersion.String() || componentOwner.Kind != appsv1.ComponentKind {
+		return fmt.Errorf("InstanceSet %s/%s has no Component controller owner", its.Namespace, its.Name)
+	}
+	component := &appsv1.Component{}
+	if err := reader.Get(ctx, client.ObjectKey{Namespace: its.Namespace, Name: componentOwner.Name}, component); err != nil {
+		return err
+	}
+	if componentOwner.UID != component.UID || component.Annotations[constant.KBAppClusterUIDKey] != string(cluster.UID) ||
+		component.Labels[constant.AppInstanceLabelKey] != cluster.Name {
+		return fmt.Errorf("InstanceSet %s/%s is not owned by current Cluster %s/%s UID %s",
+			its.Namespace, its.Name, cluster.Namespace, cluster.Name, cluster.UID)
+	}
+	return nil
 }
 
 func (r *ClusterRestoreReconciler) deleteClusterRestoreHelpers(reqCtx intctrlutil.RequestCtx, cluster *appsv1.Cluster) (bool, error) {

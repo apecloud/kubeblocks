@@ -21,6 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -28,6 +29,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	dprestore "github.com/apecloud/kubeblocks/pkg/dataprotection/restore"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
@@ -269,13 +271,110 @@ func TestDeletingClusterDoesNotDeleteLabelOnlyRestore(t *testing.T) {
 	require.True(t, controllerutil.ContainsFinalizer(current, dptypes.RestoreProtectionFinalizerName))
 }
 
+func TestLegacyRestoreResourcesAreAdoptedAfterClusterIsProtected(t *testing.T) {
+	scheme := newClusterRestoreTestScheme(t)
+	cluster := newClusterWithActiveRestore()
+	component, its, target := newLegacyRestoreTarget(cluster)
+	helper := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{
+		Namespace: target.Namespace,
+		Name:      getPopulatePVCName(target.UID),
+		Labels: map[string]string{
+			constant.AppInstanceLabelKey:                cluster.Name,
+			dprestore.DataProtectionPopulatePVCLabelKey: getPopulatePVCName(target.UID),
+		},
+	}}
+	restore := &dpv1alpha1.Restore{ObjectMeta: metav1.ObjectMeta{
+		Namespace: target.Namespace,
+		Name:      getPopulatePVCName(target.UID),
+		Labels: map[string]string{
+			constant.AppInstanceLabelKey:            cluster.Name,
+			dprestore.DataProtectionRestoreLabelKey: getPopulatePVCName(target.UID),
+		},
+		OwnerReferences: []metav1.OwnerReference{{
+			APIVersion: corev1.SchemeGroupVersion.String(), Kind: "PersistentVolumeClaim",
+			Name: target.Name, UID: target.UID,
+		}},
+	}}
+	reconciler := &ClusterRestoreReconciler{Client: fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(cluster, component, its, target, helper, restore).Build()}
+	req := ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cluster)}
+
+	_, err := reconciler.Reconcile(context.Background(), req)
+	require.NoError(t, err)
+	currentCluster := &appsv1.Cluster{}
+	require.NoError(t, reconciler.Client.Get(context.Background(), req.NamespacedName, currentCluster))
+	require.Contains(t, currentCluster.Finalizers, dptypes.RestoreProtectionFinalizerName)
+	currentTarget := &corev1.PersistentVolumeClaim{}
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(target), currentTarget))
+	require.Empty(t, currentTarget.Labels[dptypes.ClusterUIDLabelKey],
+		"legacy resources must not be mutated before Cluster protection is established")
+
+	result, err := reconciler.Reconcile(context.Background(), req)
+	require.NoError(t, err)
+	require.True(t, result.RequeueAfter > 0)
+	for _, object := range []client.Object{currentTarget, &corev1.PersistentVolumeClaim{}, &dpv1alpha1.Restore{}} {
+		switch object := object.(type) {
+		case *corev1.PersistentVolumeClaim:
+			key := client.ObjectKeyFromObject(target)
+			if object != currentTarget {
+				key = client.ObjectKeyFromObject(helper)
+			}
+			require.NoError(t, reconciler.Client.Get(context.Background(), key, object))
+		case *dpv1alpha1.Restore:
+			require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(restore), object))
+		}
+		require.Equal(t, string(cluster.UID), object.GetLabels()[dptypes.ClusterUIDLabelKey])
+	}
+	require.Equal(t, string(cluster.UID), currentTarget.Annotations[constant.KBAppClusterUIDKey])
+}
+
 func newClusterRestoreTestScheme(t *testing.T) *runtime.Scheme {
 	t.Helper()
 	scheme := runtime.NewScheme()
 	require.NoError(t, appsv1.AddToScheme(scheme))
 	require.NoError(t, corev1.AddToScheme(scheme))
 	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
+	require.NoError(t, workloads.AddToScheme(scheme))
 	return scheme
+}
+
+func newLegacyRestoreTarget(cluster *appsv1.Cluster) (*appsv1.Component, *workloads.InstanceSet, *corev1.PersistentVolumeClaim) {
+	component := &appsv1.Component{ObjectMeta: metav1.ObjectMeta{
+		Namespace: cluster.Namespace,
+		Name:      constant.GenerateClusterComponentName(cluster.Name, "mysql"),
+		UID:       "component-uid",
+		Labels:    map[string]string{constant.AppInstanceLabelKey: cluster.Name},
+		Annotations: map[string]string{
+			constant.KBAppClusterUIDKey: string(cluster.UID),
+		},
+	}}
+	its := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{
+		Namespace: cluster.Namespace,
+		Name:      component.Name,
+		UID:       "instanceset-uid",
+		Labels:    map[string]string{constant.AppInstanceLabelKey: cluster.Name},
+		OwnerReferences: []metav1.OwnerReference{{
+			APIVersion: appsv1.GroupVersion.String(), Kind: appsv1.ComponentKind,
+			Name: component.Name, UID: component.UID, Controller: ptr.To(true),
+		}},
+	}}
+	apiGroup := dptypes.DataprotectionAPIGroup
+	target := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: cluster.Namespace,
+			Name:      "data-0",
+			UID:       "target-uid",
+			Labels:    map[string]string{constant.AppInstanceLabelKey: cluster.Name},
+			OwnerReferences: []metav1.OwnerReference{{
+				APIVersion: workloads.GroupVersion.String(), Kind: workloads.InstanceSetKind,
+				Name: its.Name, UID: its.UID, Controller: ptr.To(true),
+			}},
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{DataSourceRef: &corev1.TypedObjectReference{
+			APIGroup: &apiGroup, Kind: dptypes.BackupKind, Name: "backup",
+		}},
+	}
+	return component, its, target
 }
 
 func newClusterExecutionRestore(cluster *appsv1.Cluster, phase dpv1alpha1.RestorePhase) *dpv1alpha1.Restore {

@@ -1637,6 +1637,31 @@ func TestClusterRestoreProtectionPrecedesPopulationSideEffects(t *testing.T) {
 	require.NoError(t, reconciler.ensureClusterRestoreProtection(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc))
 }
 
+func TestEnsureRestoreClusterUIDLabelAdoptsOnlyVerifiedLegacyTarget(t *testing.T) {
+	scheme := newClusterRestoreTestScheme(t)
+	cluster := newClusterWithActiveRestore()
+	component, its, target := newLegacyRestoreTarget(cluster)
+	k8sClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, component, its, target).Build()
+	reconciler := &VolumePopulatorReconciler{Client: k8sClient}
+
+	err := reconciler.ensureRestoreClusterUIDLabel(intctrlutil.RequestCtx{Ctx: context.Background()}, target)
+	require.NoError(t, err)
+	current := &corev1.PersistentVolumeClaim{}
+	require.NoError(t, k8sClient.Get(context.Background(), client.ObjectKeyFromObject(target), current))
+	require.Equal(t, string(cluster.UID), current.Labels[dptypes.ClusterUIDLabelKey])
+	require.Equal(t, string(cluster.UID), current.Annotations[constant.KBAppClusterUIDKey])
+
+	current.Labels = map[string]string{constant.AppInstanceLabelKey: cluster.Name}
+	current.Annotations = nil
+	require.NoError(t, k8sClient.Update(context.Background(), current))
+	component.Annotations[constant.KBAppClusterUIDKey] = "previous-cluster-uid"
+	require.NoError(t, k8sClient.Update(context.Background(), component))
+	err = reconciler.ensureRestoreClusterUIDLabel(intctrlutil.RequestCtx{Ctx: context.Background()}, current)
+	require.NoError(t, err)
+	require.NoError(t, k8sClient.Get(context.Background(), client.ObjectKeyFromObject(target), current))
+	require.Empty(t, current.Labels[dptypes.ClusterUIDLabelKey])
+}
+
 func TestSuccessfulPopulateReleaseRemovesOnlyHelperAndTargetFinalizer(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, corev1.AddToScheme(scheme))

@@ -735,35 +735,59 @@ func internalRestoreLabels(pvc *corev1.PersistentVolumeClaim) map[string]string 
 func (r *VolumePopulatorReconciler) ensureRestoreClusterUIDLabel(reqCtx intctrlutil.RequestCtx,
 	pvc *corev1.PersistentVolumeClaim) error {
 	clusterName := pvc.Labels[constant.AppInstanceLabelKey]
-	clusterUID := pvc.Annotations[constant.KBAppClusterUIDKey]
-	if clusterName == "" || clusterUID == "" {
+	if clusterName == "" {
 		return nil
+	}
+	clusterUID := pvc.Annotations[constant.KBAppClusterUIDKey]
+	if clusterUID == "" {
+		clusterUID = pvc.Labels[dptypes.ClusterUIDLabelKey]
+	}
+	cluster := &appsv1.Cluster{}
+	key := client.ObjectKey{Namespace: pvc.Namespace, Name: clusterName}
+	if err := r.volumePopulatorDirectReader().Get(reqCtx.Ctx, key, cluster); err != nil {
+		if apierrors.IsNotFound(err) {
+			// app.kubernetes.io/instance is also used by standalone population
+			// workloads. Without a Cluster UID there is no Cluster restore
+			// identity to protect or migrate.
+			if clusterUID == "" {
+				return nil
+			}
+			return intctrlutil.NewRequeueError(reconcileInterval,
+				fmt.Sprintf("waiting for Cluster %s/%s restore ownership", pvc.Namespace, clusterName))
+		}
+		return err
+	}
+	if clusterUID == "" {
+		if err := validateLegacyRestoreTargetPVC(reqCtx.Ctx, r.volumePopulatorDirectReader(), pvc, cluster); err != nil {
+			// A name label alone does not make a PVC part of Cluster restore.
+			// Leave unrelated or standalone population to its original path.
+			return nil
+		}
+		clusterUID = string(cluster.UID)
 	}
 	if existing := pvc.Labels[dptypes.ClusterUIDLabelKey]; existing != "" && existing != clusterUID {
 		return intctrlutil.NewFatalError(fmt.Sprintf(
 			"target PVC %s/%s belongs to Cluster UID %s, not restore intent Cluster UID %s",
 			pvc.Namespace, pvc.Name, existing, clusterUID))
 	}
-	cluster := &appsv1.Cluster{}
-	if err := r.Client.Get(reqCtx.Ctx, client.ObjectKey{Namespace: pvc.Namespace, Name: clusterName}, cluster); err != nil {
-		if apierrors.IsNotFound(err) {
-			return nil
-		}
-		return err
-	}
 	if string(cluster.UID) != clusterUID {
 		return intctrlutil.NewFatalError(fmt.Sprintf(
 			"target PVC %s/%s restore intent belongs to Cluster UID %s, not current Cluster %s/%s UID %s",
 			pvc.Namespace, pvc.Name, clusterUID, cluster.Namespace, cluster.Name, cluster.UID))
 	}
-	if pvc.Labels[dptypes.ClusterUIDLabelKey] == clusterUID {
+	if pvc.Labels[dptypes.ClusterUIDLabelKey] == clusterUID &&
+		pvc.Annotations[constant.KBAppClusterUIDKey] == clusterUID {
 		return nil
 	}
-	patch := client.MergeFrom(pvc.DeepCopy())
+	patch := client.MergeFromWithOptions(pvc.DeepCopy(), client.MergeFromWithOptimisticLock{})
 	if pvc.Labels == nil {
 		pvc.Labels = map[string]string{}
 	}
 	pvc.Labels[dptypes.ClusterUIDLabelKey] = clusterUID
+	if pvc.Annotations == nil {
+		pvc.Annotations = map[string]string{}
+	}
+	pvc.Annotations[constant.KBAppClusterUIDKey] = clusterUID
 	return r.Client.Patch(reqCtx.Ctx, pvc, patch)
 }
 

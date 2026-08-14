@@ -497,6 +497,20 @@ spec:
 
                                             This field cannot be updated.
                                           type: string
+                                        nonBlocking:
+                                          default: false
+                                          description: |-
+                                            Specifies how KubeBlocks runs the Action.
+
+                                            When false, KubeBlocks runs the Action in blocking mode. This mode is suitable
+                                            for Actions that are expected to complete quickly.
+
+                                            When true, KubeBlocks runs the Action in non-blocking mode. This mode is
+                                            suitable for long-running Actions, such as data migration, rebalancing, or
+                                            draining, whose duration depends on data volume or runtime conditions.
+
+                                            This field cannot be updated.
+                                          type: boolean
                                         preCondition:
                                           description: |-
                                             Specifies the state that the cluster must reach before the Action is executed.
@@ -535,7 +549,16 @@ spec:
                                               description: |-
                                                 Indicates the duration of time to wait between each retry attempt.
                                                 This value is set to 0 by default, indicating that there will be no delay between retry attempts.
+                                                Values use the time.Duration integer and JSON representation in nanoseconds.
                                               format: int64
+                                              type: integer
+                                            retryIntervalSeconds:
+                                              description: |-
+                                                Specifies the number of seconds to wait between each retry attempt.
+                                                This is a convenient way to configure retryInterval in whole seconds.
+                                                When set, this field takes precedence over retryInterval, including when set to 0.
+                                              format: int64
+                                              minimum: 0
                                               type: integer
                                           type: object
                                         targetPodSelector:
@@ -561,7 +584,11 @@ spec:
                                             Specifies the maximum duration in seconds that the Action is allowed to run.
 
                                             Behavior based on the value:
-                                            - Positive (> 0): The action will be terminated after this many seconds. The maximum allowed value is 60.
+                                            - Positive (> 0): The action will be terminated after this many seconds.
+                                              Blocking Actions are capped at 60 seconds. Non-blocking Actions use the
+                                              configured value as their total run timeout, including all runtime
+                                              argument invocations, retry attempts, and retry intervals, without the
+                                              60-second cap.
                                             - Zero (= 0): The timeout is managed by the system, defaulting to 30 seconds typically.
                                             - Negative (< 0): No timeout is applied; the action runs until the command completes.
 
@@ -927,6 +954,20 @@ spec:
 
                                             This field cannot be updated.
                                           type: string
+                                        nonBlocking:
+                                          default: false
+                                          description: |-
+                                            Specifies how KubeBlocks runs the Action.
+
+                                            When false, KubeBlocks runs the Action in blocking mode. This mode is suitable
+                                            for Actions that are expected to complete quickly.
+
+                                            When true, KubeBlocks runs the Action in non-blocking mode. This mode is
+                                            suitable for long-running Actions, such as data migration, rebalancing, or
+                                            draining, whose duration depends on data volume or runtime conditions.
+
+                                            This field cannot be updated.
+                                          type: boolean
                                         preCondition:
                                           description: |-
                                             Specifies the state that the cluster must reach before the Action is executed.
@@ -965,7 +1006,16 @@ spec:
                                               description: |-
                                                 Indicates the duration of time to wait between each retry attempt.
                                                 This value is set to 0 by default, indicating that there will be no delay between retry attempts.
+                                                Values use the time.Duration integer and JSON representation in nanoseconds.
                                               format: int64
+                                              type: integer
+                                            retryIntervalSeconds:
+                                              description: |-
+                                                Specifies the number of seconds to wait between each retry attempt.
+                                                This is a convenient way to configure retryInterval in whole seconds.
+                                                When set, this field takes precedence over retryInterval, including when set to 0.
+                                              format: int64
+                                              minimum: 0
                                               type: integer
                                           type: object
                                         targetPodSelector:
@@ -991,7 +1041,11 @@ spec:
                                             Specifies the maximum duration in seconds that the Action is allowed to run.
 
                                             Behavior based on the value:
-                                            - Positive (> 0): The action will be terminated after this many seconds. The maximum allowed value is 60.
+                                            - Positive (> 0): The action will be terminated after this many seconds.
+                                              Blocking Actions are capped at 60 seconds. Non-blocking Actions use the
+                                              configured value as their total run timeout, including all runtime
+                                              argument invocations, retry attempts, and retry intervals, without the
+                                              60-second cap.
                                             - Zero (= 0): The timeout is managed by the system, defaulting to 30 seconds typically.
                                             - Negative (< 0): No timeout is applied; the action runs until the command completes.
 
@@ -3834,6 +3888,20 @@ spec:
 
                                             This field cannot be updated.
                                           type: string
+                                        nonBlocking:
+                                          default: false
+                                          description: |-
+                                            Specifies how KubeBlocks runs the Action.
+
+                                            When false, KubeBlocks runs the Action in blocking mode. This mode is suitable
+                                            for Actions that are expected to complete quickly.
+
+                                            When true, KubeBlocks runs the Action in non-blocking mode. This mode is
+                                            suitable for long-running Actions, such as data migration, rebalancing, or
+                                            draining, whose duration depends on data volume or runtime conditions.
+
+                                            This field cannot be updated.
+                                          type: boolean
                                         preCondition:
                                           description: |-
                                             Specifies the state that the cluster must reach before the Action is executed.
@@ -3872,7 +3940,16 @@ spec:
                                               description: |-
                                                 Indicates the duration of time to wait between each retry attempt.
                                                 This value is set to 0 by default, indicating that there will be no delay between retry attempts.
+                                                Values use the time.Duration integer and JSON representation in nanoseconds.
                                               format: int64
+                                              type: integer
+                                            retryIntervalSeconds:
+                                              description: |-
+                                                Specifies the number of seconds to wait between each retry attempt.
+                                                This is a convenient way to configure retryInterval in whole seconds.
+                                                When set, this field takes precedence over retryInterval, including when set to 0.
+                                              format: int64
+                                              minimum: 0
                                               type: integer
                                           type: object
                                         targetPodSelector:
@@ -3898,7 +3975,11 @@ spec:
                                             Specifies the maximum duration in seconds that the Action is allowed to run.
 
                                             Behavior based on the value:
-                                            - Positive (> 0): The action will be terminated after this many seconds. The maximum allowed value is 60.
+                                            - Positive (> 0): The action will be terminated after this many seconds.
+                                              Blocking Actions are capped at 60 seconds. Non-blocking Actions use the
+                                              configured value as their total run timeout, including all runtime
+                                              argument invocations, retry attempts, and retry intervals, without the
+                                              60-second cap.
                                             - Zero (= 0): The timeout is managed by the system, defaulting to 30 seconds typically.
                                             - Negative (< 0): No timeout is applied; the action runs until the command completes.
 
@@ -4264,6 +4345,20 @@ spec:
 
                                             This field cannot be updated.
                                           type: string
+                                        nonBlocking:
+                                          default: false
+                                          description: |-
+                                            Specifies how KubeBlocks runs the Action.
+
+                                            When false, KubeBlocks runs the Action in blocking mode. This mode is suitable
+                                            for Actions that are expected to complete quickly.
+
+                                            When true, KubeBlocks runs the Action in non-blocking mode. This mode is
+                                            suitable for long-running Actions, such as data migration, rebalancing, or
+                                            draining, whose duration depends on data volume or runtime conditions.
+
+                                            This field cannot be updated.
+                                          type: boolean
                                         preCondition:
                                           description: |-
                                             Specifies the state that the cluster must reach before the Action is executed.
@@ -4302,7 +4397,16 @@ spec:
                                               description: |-
                                                 Indicates the duration of time to wait between each retry attempt.
                                                 This value is set to 0 by default, indicating that there will be no delay between retry attempts.
+                                                Values use the time.Duration integer and JSON representation in nanoseconds.
                                               format: int64
+                                              type: integer
+                                            retryIntervalSeconds:
+                                              description: |-
+                                                Specifies the number of seconds to wait between each retry attempt.
+                                                This is a convenient way to configure retryInterval in whole seconds.
+                                                When set, this field takes precedence over retryInterval, including when set to 0.
+                                              format: int64
+                                              minimum: 0
                                               type: integer
                                           type: object
                                         targetPodSelector:
@@ -4328,7 +4432,11 @@ spec:
                                             Specifies the maximum duration in seconds that the Action is allowed to run.
 
                                             Behavior based on the value:
-                                            - Positive (> 0): The action will be terminated after this many seconds. The maximum allowed value is 60.
+                                            - Positive (> 0): The action will be terminated after this many seconds.
+                                              Blocking Actions are capped at 60 seconds. Non-blocking Actions use the
+                                              configured value as their total run timeout, including all runtime
+                                              argument invocations, retry attempts, and retry intervals, without the
+                                              60-second cap.
                                             - Zero (= 0): The timeout is managed by the system, defaulting to 30 seconds typically.
                                             - Negative (< 0): No timeout is applied; the action runs until the command completes.
 

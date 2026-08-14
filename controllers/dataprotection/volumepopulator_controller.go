@@ -28,7 +28,6 @@ import (
 	"strconv"
 	"strings"
 
-	vsv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -174,7 +173,7 @@ func (r *VolumePopulatorReconciler) syncPVC(reqCtx intctrlutil.RequestCtx, pvc *
 		return nil
 	}
 	if !pvc.DeletionTimestamp.IsZero() {
-		return r.Cleanup(reqCtx, pvc)
+		return r.cleanupDeletingPVC(reqCtx, pvc)
 	}
 	var restoreCtx *pvcRestoreContext
 	if pvc.Spec.DataSourceRef.Kind == dptypes.RestoreKind {
@@ -192,7 +191,7 @@ func (r *VolumePopulatorReconciler) syncPVC(reqCtx intctrlutil.RequestCtx, pvc *
 	if err = r.completeBoundPVCIfNeeded(reqCtx, pvc, restoreCtx); err != nil {
 		return err
 	}
-	return r.Cleanup(reqCtx, pvc)
+	return nil
 }
 
 // dispatchUnboundPVC routes an unbound PVC to either Populate or ProvisionOnly.
@@ -1011,11 +1010,14 @@ func (r *VolumePopulatorReconciler) completeBoundPVCIfNeeded(reqCtx intctrlutil.
 		break
 	}
 	if !populateReleased {
+		if !pvcBindingCompleted(pvc) {
+			return intctrlutil.NewRequeueError(reconcileInterval, "waiting for Kubernetes to complete target PVC binding")
+		}
 		// Release the target PVC after prepareData and PV rebind. PostReady
 		// actions may need the workload pod to start, which cannot happen while
 		// the populate PVC still owns the restored PV or while the target PVC is
 		// still marked as being populated.
-		if err := r.Cleanup(reqCtx, pvc); err != nil {
+		if err := r.releasePopulateResources(reqCtx, pvc); err != nil {
 			return err
 		}
 		reason := ReasonPopulatingSucceed
@@ -1083,7 +1085,7 @@ func (r *VolumePopulatorReconciler) waitForSerialPredecessors(reqCtx intctrlutil
 		if cond != nil && cond.Status == corev1.ConditionFalse {
 			return intctrlutil.NewFatalError(fmt.Sprintf("previous restore PVC %s/%s failed: %s", item.Namespace, item.Name, cond.Message))
 		}
-		if item.Spec.VolumeName != "" {
+		if pvcReadyForRestoreProgression(item) {
 			continue
 		}
 		if err = r.UpdatePVCConditions(reqCtx, pvc, ReasonPopulatingProcessing,
@@ -1388,7 +1390,7 @@ func (r *VolumePopulatorReconciler) allRestorePVCsForComponentBound(reqCtx intct
 		if cond != nil && cond.Status == corev1.ConditionFalse {
 			return false, intctrlutil.NewFatalError(fmt.Sprintf("restore PVC %s/%s failed: %s", item.Namespace, item.Name, cond.Message))
 		}
-		if item.Spec.VolumeName == "" {
+		if !pvcReadyForRestoreProgression(item) {
 			return false, nil
 		}
 	}
@@ -1406,7 +1408,7 @@ func (r *VolumePopulatorReconciler) allRestorePVCsForClusterBound(reqCtx intctrl
 		if cond != nil && cond.Status == corev1.ConditionFalse {
 			return false, intctrlutil.NewFatalError(fmt.Sprintf("restore PVC %s/%s failed: %s", item.Namespace, item.Name, cond.Message))
 		}
-		if item.Spec.VolumeName == "" {
+		if !pvcReadyForRestoreProgression(item) {
 			return false, nil
 		}
 	}
@@ -1461,6 +1463,10 @@ func pvcPopulateReleased(pvc *corev1.PersistentVolumeClaim) bool {
 	cond := findPVCConditionByType(pvc, string(PersistentVolumeClaimPopulating))
 	return cond != nil && cond.Status == corev1.ConditionTrue &&
 		(cond.Reason == ReasonPopulatingSucceed || cond.Reason == ReasonPopulatingProvisioned)
+}
+
+func pvcReadyForRestoreProgression(pvc *corev1.PersistentVolumeClaim) bool {
+	return pvcPopulateReleased(pvc) || pvcBindingCompleted(pvc)
 }
 
 func (r *VolumePopulatorReconciler) listRestorePVCsForComponent(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim) ([]corev1.PersistentVolumeClaim, error) {
@@ -1614,7 +1620,26 @@ func postReadyRestoreName(componentUID types.UID) string {
 	return constant.ShortenKubeName(fmt.Sprintf("restore-%s-post-ready", componentUID), constant.KubeNameMaxLength)
 }
 
-func (r *VolumePopulatorReconciler) Cleanup(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim) error {
+// cleanupDeletingPVC releases population resources when the target PVC is
+// being deleted. Keep this entry point separate from successful completion so
+// deletion-specific teardown can evolve without broadening the success path.
+func (r *VolumePopulatorReconciler) cleanupDeletingPVC(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim) error {
+	if err := r.deletePopulatePVC(reqCtx, pvc); err != nil {
+		return err
+	}
+	return r.releaseTargetPVC(reqCtx, pvc)
+}
+
+// releasePopulateResources releases only the temporary PVC and the target PVC
+// finalizer after population has succeeded.
+func (r *VolumePopulatorReconciler) releasePopulateResources(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim) error {
+	if err := r.deletePopulatePVC(reqCtx, pvc); err != nil {
+		return err
+	}
+	return r.releaseTargetPVC(reqCtx, pvc)
+}
+
+func (r *VolumePopulatorReconciler) deletePopulatePVC(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim) error {
 	populatePVC := &corev1.PersistentVolumeClaim{}
 	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Name: getPopulatePVCName(pvc.UID),
 		Namespace: pvc.Namespace}, populatePVC); err != nil {
@@ -1624,7 +1649,10 @@ func (r *VolumePopulatorReconciler) Cleanup(reqCtx intctrlutil.RequestCtx, pvc *
 	} else if err = r.Client.Delete(reqCtx.Ctx, populatePVC); err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
+	return nil
+}
 
+func (r *VolumePopulatorReconciler) releaseTargetPVC(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim) error {
 	if slices.Contains(pvc.Finalizers, dptypes.DataProtectionFinalizerName) {
 		pvcPatch := client.MergeFrom(pvc.DeepCopy())
 		controllerutil.RemoveFinalizer(pvc, dptypes.DataProtectionFinalizerName)
@@ -1707,29 +1735,19 @@ func (r *VolumePopulatorReconciler) getPopulatePVC(reqCtx intctrlutil.RequestCtx
 		}
 
 		if backupSet.UseVolumeSnapshot {
-			// TODO: will be removed in 0.10.0, compatibility handling for version 0.8.
 			prepareDataConfig := restore.Spec.PrepareDataConfig
-			vsName := utils.GetOldBackupVolumeSnapshotName(backupSet.Backup.Name, prepareDataConfig.DataSourceRef.VolumeSource)
-			vsCli := utils.NewCompatClient(r.Client)
-			exist, err := intctrlutil.CheckResourceExists(reqCtx.Ctx, vsCli,
-				types.NamespacedName{Namespace: backupSet.Backup.Namespace, Name: vsName},
-				&vsv1.VolumeSnapshot{})
+			sourceTargetPodName, err := dprestore.GetSourcePodNameFromTarget(target, prepareDataConfig.RequiredPolicyForAllPodSelection, 0)
 			if err != nil {
 				return nil, err
 			}
-			if !exist {
-				sourceTargetPodName, err := dprestore.GetSourcePodNameFromTarget(target, prepareDataConfig.RequiredPolicyForAllPodSelection, 0)
-				if err != nil {
-					return nil, err
+			var vsName string
+			if target.PodSelector.Strategy == dpv1alpha1.PodSelectionStrategyAny || sourceTargetPodName != "" {
+				snapshotGroup := dprestore.GetVolumeSnapshotsBySourcePod(backupSet.Backup, target, sourceTargetPodName)
+				if snapshotGroup == nil {
+					message := fmt.Sprintf(`can not found the volumeSnapshot in status.actions, sourceTargetPod is "%s"`, sourceTargetPodName)
+					return nil, intctrlutil.NewFatalError(message)
 				}
-				if target.PodSelector.Strategy == dpv1alpha1.PodSelectionStrategyAny || sourceTargetPodName != "" {
-					snapshotGroup := dprestore.GetVolumeSnapshotsBySourcePod(backupSet.Backup, target, sourceTargetPodName)
-					if snapshotGroup == nil {
-						message := fmt.Sprintf(`can not found the volumeSnapshot in status.actions, sourceTargetPod is "%s"`, sourceTargetPodName)
-						return nil, intctrlutil.NewFatalError(message)
-					}
-					vsName = snapshotGroup[prepareDataConfig.DataSourceRef.VolumeSource]
-				}
+				vsName = snapshotGroup[prepareDataConfig.DataSourceRef.VolumeSource]
 			}
 			// restore from volume snapshot.
 			populatePVC.Spec.DataSourceRef = &corev1.TypedObjectReference{
@@ -1870,6 +1888,14 @@ func (r *VolumePopulatorReconciler) syncTargetPVCBoundStatus(reqCtx intctrlutil.
 	pvc.Status.Capacity = capacity
 	pvc.Status.AccessModes = accessModes
 	return r.Client.Status().Patch(reqCtx.Ctx, pvc, patch)
+}
+
+func pvcBindingCompleted(pvc *corev1.PersistentVolumeClaim) bool {
+	if pvc.Spec.VolumeName == "" {
+		return false
+	}
+	_, completed := pvc.Annotations[volume.AnnBindCompleted]
+	return completed
 }
 
 func (r *VolumePopulatorReconciler) UpdatePVCConditions(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim, reason, message string) error {
@@ -2217,9 +2243,9 @@ func (r *VolumePopulatorReconciler) restoreSystemAccountSecrets(reqCtx intctrlut
 	encryptor := intctrlutil.NewEncryptor(viper.GetString(constant.CfgKeyDPEncryptionKey))
 	if componentName != "" {
 		labels := map[string]string{
-			constant.AppInstanceLabelKey:        clusterName,
-			constant.KBAppComponentLabelKey:     componentName,
-			"apps.kubeblocks.io/system-account": "",
+			constant.AppInstanceLabelKey:    clusterName,
+			constant.KBAppComponentLabelKey: componentName,
+			constant.SystemAccountLabelKey:  "",
 		}
 		if err := r.restoreSystemAccountSecretSet(reqCtx, pvc, encryptor, accountsByComponent[componentName],
 			systemAccountSecretScopeComponent, clusterName, componentName, labels); err != nil {
@@ -2228,9 +2254,9 @@ func (r *VolumePopulatorReconciler) restoreSystemAccountSecrets(reqCtx intctrlut
 	}
 	if shardingName := pvc.Labels[constant.KBAppShardingNameLabelKey]; shardingName != "" {
 		labels := map[string]string{
-			constant.AppInstanceLabelKey:        clusterName,
-			constant.KBAppShardingNameLabelKey:  shardingName,
-			"apps.kubeblocks.io/system-account": "",
+			constant.AppInstanceLabelKey:       clusterName,
+			constant.KBAppShardingNameLabelKey: shardingName,
+			constant.SystemAccountLabelKey:     "",
 		}
 		if err := r.restoreSystemAccountSecretSet(reqCtx, pvc, encryptor, accountsByComponent[shardingName],
 			systemAccountSecretScopeSharding, clusterName, shardingName, labels); err != nil {
@@ -2262,7 +2288,7 @@ func (r *VolumePopulatorReconciler) restoreSystemAccountSecretSet(reqCtx intctrl
 			return intctrlutil.NewFatalError(err.Error())
 		}
 		accountLabels := mapsClone(labels)
-		accountLabels["apps.kubeblocks.io/system-account"] = accountName
+		accountLabels[constant.SystemAccountLabelKey] = accountName
 		if err = r.upsertSystemAccountSecret(reqCtx, pvc, scope, clusterName, ownerName, accountName, []byte(password), accountLabels); err != nil {
 			return err
 		}

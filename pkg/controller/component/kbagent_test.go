@@ -79,6 +79,7 @@ var _ = Describe("kb-agent", func() {
 
 	Context("build kb-agent", func() {
 		BeforeEach(func() {
+			retryIntervalSeconds := int64(10)
 			synthesizedComp = &SynthesizedComponent{
 				PodSpec: &corev1.PodSpec{
 					Containers: []corev1.Container{
@@ -96,8 +97,9 @@ var _ = Describe("kb-agent", func() {
 							},
 							TimeoutSeconds: 5,
 							RetryPolicy: &appsv1.RetryPolicy{
-								MaxRetries:    5,
-								RetryInterval: 10,
+								MaxRetries:           5,
+								RetryInterval:        10,
+								RetryIntervalSeconds: &retryIntervalSeconds,
 							},
 							PreCondition: &[]appsv1.PreConditionType{appsv1.ComponentReadyPreConditionType}[0],
 						},
@@ -171,6 +173,54 @@ var _ = Describe("kb-agent", func() {
 			c := kbAgentContainer()
 			Expect(c).ShouldNot(BeNil())
 			Expect(c.Env).Should(HaveLen(6)) // 4 + 2
+		})
+
+		It("normalizes explicit retry seconds before serializing kbagent actions", func() {
+			err := buildKBAgentContainer(synthesizedComp)
+			Expect(err).Should(BeNil())
+
+			c := kbAgentContainer()
+			Expect(c).ShouldNot(BeNil())
+			var actions []proto.Action
+			var actionsJSON string
+			for _, e := range c.Env {
+				if e.Name == "KB_AGENT_ACTION" {
+					actionsJSON = e.Value
+					Expect(json.Unmarshal([]byte(e.Value), &actions)).Should(Succeed())
+				}
+			}
+			Expect(actionsJSON).ShouldNot(ContainSubstring("retryIntervalSeconds"))
+
+			var postProvision *proto.Action
+			for i := range actions {
+				if actions[i].Name == "postProvision" {
+					postProvision = &actions[i]
+					break
+				}
+			}
+			Expect(postProvision).ShouldNot(BeNil())
+			Expect(postProvision.RetryPolicy).ShouldNot(BeNil())
+			Expect(postProvision.RetryPolicy.RetryInterval).Should(Equal(10 * time.Second))
+		})
+
+		It("configures non-blocking actions", func() {
+			synthesizedComp.LifecycleActions.CustomActions[0].Action.NonBlocking = true
+
+			Expect(buildKBAgentContainer(synthesizedComp)).Should(Succeed())
+
+			c := kbAgentContainer()
+			Expect(c).ShouldNot(BeNil())
+
+			var actions []proto.Action
+			for _, e := range c.Env {
+				if e.Name == "KB_AGENT_ACTION" {
+					Expect(json.Unmarshal([]byte(e.Value), &actions)).Should(Succeed())
+				}
+			}
+			Expect(actions).Should(ContainElement(And(
+				HaveField("Name", "udf-shardAdd"),
+				HaveField("NonBlocking", true),
+			)))
 		})
 
 		It("role label downward api volume", func() {
@@ -272,13 +322,14 @@ var _ = Describe("kb-agent", func() {
 
 			ic := kbAgentInitContainer()
 			Expect(ic).ShouldNot(BeNil())
+			Expect(ic.Command).Should(Equal(kbagent.InitCommand()))
 
 			c := kbAgentContainer()
 			Expect(c).ShouldNot(BeNil())
 			Expect(c.Image).Should(Equal(image))
-			Expect(c.Command[0]).Should(Equal(kbAgentCommandOnSharedMount))
+			Expect(c.Command[0]).Should(Equal(kbagent.SharedBinaryPath))
 			Expect(c.VolumeMounts).Should(HaveLen(2))
-			Expect(c.VolumeMounts[0]).Should(Equal(sharedVolumeMount))
+			Expect(c.VolumeMounts[0]).Should(Equal(kbagent.SharedVolumeMount()))
 			Expect(c.VolumeMounts[1]).Should(Equal(roleLabelVolumeMount))
 		})
 
@@ -315,7 +366,7 @@ var _ = Describe("kb-agent", func() {
 			c := kbAgentContainer()
 			Expect(c).ShouldNot(BeNil())
 			Expect(c.Image).Should(Equal(viperx.GetString(constant.KBToolsImage)))
-			Expect(c.Command[0]).Should(Equal(kbAgentCommand))
+			Expect(c.Command[0]).Should(Equal(kbagent.BinaryPath))
 			Expect(c.VolumeMounts).Should(HaveLen(1))
 			Expect(c.VolumeMounts[0]).Should(Equal(roleLabelVolumeMount))
 		})
@@ -393,9 +444,9 @@ var _ = Describe("kb-agent", func() {
 			Expect(c).ShouldNot(BeNil())
 			Expect(c).ShouldNot(BeNil())
 			Expect(c.Image).Should(Equal(container.Image))
-			Expect(c.Command[0]).Should(Equal(kbAgentCommandOnSharedMount))
+			Expect(c.Command[0]).Should(Equal(kbagent.SharedBinaryPath))
 			Expect(c.VolumeMounts).Should(HaveLen(3))
-			Expect(c.VolumeMounts[0]).Should(Equal(sharedVolumeMount))
+			Expect(c.VolumeMounts[0]).Should(Equal(kbagent.SharedVolumeMount()))
 			Expect(c.VolumeMounts[1]).Should(Equal(container.VolumeMounts[0]))
 			Expect(c.VolumeMounts[2]).Should(Equal(roleLabelVolumeMount))
 		})
@@ -421,9 +472,9 @@ var _ = Describe("kb-agent", func() {
 
 			c := kbAgentContainer()
 			Expect(c.Image).Should(Equal(image))
-			Expect(c.Command[0]).Should(Equal(kbAgentCommandOnSharedMount))
+			Expect(c.Command[0]).Should(Equal(kbagent.SharedBinaryPath))
 			Expect(c.VolumeMounts).Should(HaveLen(3))
-			Expect(c.VolumeMounts[0]).Should(Equal(sharedVolumeMount))
+			Expect(c.VolumeMounts[0]).Should(Equal(kbagent.SharedVolumeMount()))
 			Expect(c.VolumeMounts[1]).Should(Equal(container.VolumeMounts[0]))
 			Expect(c.VolumeMounts[2]).Should(Equal(roleLabelVolumeMount))
 		})

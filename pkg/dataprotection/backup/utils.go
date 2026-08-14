@@ -142,6 +142,7 @@ func BuildBackupWorkloadLabels(backup *dpv1alpha1.Backup) map[string]string {
 		labels[k] = v
 	}
 	labels[types.BackupNameLabelKey] = backup.Name
+	labels[constant.AppManagedByLabelKey] = types.AppName
 	return labels
 }
 
@@ -198,12 +199,6 @@ func GenerateCRNameByScheduleNameAndMethod(backupSchedule *dpv1alpha1.BackupSche
 		suffix = method
 	}
 	return GenerateCRNameByBackupSchedule(backupSchedule, suffix)
-}
-
-// GenerateLegacyCRNameByBackupSchedule generate a legacy CR name which is created by BackupSchedule, such as CronJob.
-func GenerateLegacyCRNameByBackupSchedule(backupSchedule *dpv1alpha1.BackupSchedule, method string) string {
-	uniqueNameWithBackupSchedule := fmt.Sprintf("%s-%s", backupSchedule.UID[:8], backupSchedule.Name)
-	return generateBaseCRNameByBackupSchedule(uniqueNameWithBackupSchedule, backupSchedule.Namespace, method)
 }
 
 // BuildBaseBackupPath builds the path to storage backup data in backup repository.

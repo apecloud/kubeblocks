@@ -1039,6 +1039,12 @@ spec:
                   The server's time is used for this timestamp.
                 format: date-time
                 type: string
+              deletionFailureReason:
+                description: |-
+                  Any error or blocker encountered while deleting the Backup and its data.
+                  This field does not replace FailureReason, which records a failure of the
+                  backup operation itself.
+                type: string
               duration:
                 description: |-
                   Records the duration of the backup operation.

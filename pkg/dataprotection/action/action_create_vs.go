@@ -34,6 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
@@ -85,6 +86,30 @@ func (c *CreateVolumeSnapshotAction) Type() dpv1alpha1.ActionType {
 	return dpv1alpha1.ActionTypeNone
 }
 
+func (c *CreateVolumeSnapshotAction) BuildObjectRef() *corev1.ObjectReference {
+	if len(c.PersistentVolumeClaimWrappers) != 1 {
+		return nil
+	}
+	key := c.buildVolumeSnapshotObjectKey(&c.PersistentVolumeClaimWrappers[0])
+	return &corev1.ObjectReference{
+		APIVersion: vsv1.SchemeGroupVersion.String(),
+		Kind:       constant.VolumeSnapshotKind,
+		Namespace:  key.Namespace,
+		Name:       key.Name,
+	}
+}
+
+func (c *CreateVolumeSnapshotAction) buildVolumeSnapshotObjectKey(w *PersistentVolumeClaimWrapper) client.ObjectKey {
+	prefix := c.ObjectMeta.Name
+	if c.TargetName != "" {
+		prefix += "-" + c.TargetName
+	}
+	return client.ObjectKey{
+		Namespace: w.PersistentVolumeClaim.Namespace,
+		Name:      utils.GetBackupVolumeSnapshotName(prefix, w.VolumeName, c.Index),
+	}
+}
+
 func (c *CreateVolumeSnapshotAction) Execute(actCtx ActionContext) (*dpv1alpha1.ActionStatus, error) {
 	sb := newStatusBuilder(c)
 	handleErr := func(err error) (*dpv1alpha1.ActionStatus, error) {
@@ -102,16 +127,9 @@ func (c *CreateVolumeSnapshotAction) Execute(actCtx ActionContext) (*dpv1alpha1.
 		snap            *vsv1.VolumeSnapshot
 		totalSize       = &resource.Quantity{}
 		volumeSnapshots []dpv1alpha1.VolumeSnapshotStatus
-		prefix          = c.ObjectMeta.Name
 	)
-	if c.TargetName != "" {
-		prefix += "-" + c.TargetName
-	}
 	for _, w := range c.PersistentVolumeClaimWrappers {
-		key := client.ObjectKey{
-			Namespace: w.PersistentVolumeClaim.Namespace,
-			Name:      utils.GetBackupVolumeSnapshotName(prefix, w.VolumeName, c.Index),
-		}
+		key := c.buildVolumeSnapshotObjectKey(&w)
 		// create volume snapshot
 		if err = c.createVolumeSnapshotIfNotExist(actCtx, &w.PersistentVolumeClaim, key); err != nil {
 			return handleErr(err)

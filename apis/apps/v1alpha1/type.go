@@ -95,14 +95,6 @@ type ConfigTemplateExtension struct {
 	Policy MergedPolicy `json:"policy,omitempty"`
 }
 
-// LegacyRenderedTemplateSpec describes the configuration extension for the lazy rendered template.
-//
-// Deprecated: LegacyRenderedTemplateSpec has been deprecated since 0.9.0 and will be removed in 0.10.0
-type LegacyRenderedTemplateSpec struct {
-	// Extends the configuration template.
-	ConfigTemplateExtension `json:",inline"`
-}
-
 type ComponentConfigSpec struct {
 	ComponentTemplateSpec `json:",inline"`
 
@@ -121,44 +113,12 @@ type ComponentConfigSpec struct {
 	// +optional
 	Keys []string `json:"keys,omitempty"`
 
-	// Specifies the secondary rendered config spec for pod-specific customization.
-	//
-	// The template is rendered inside the pod (by the "config-manager" sidecar container) and merged with the main
-	// template's render result to generate the final configuration file.
-	//
-	// This field is intended to handle scenarios where different pods within the same Component have
-	// varying configurations. It allows for pod-specific customization of the configuration.
-	//
-	// Note: This field will be deprecated in future versions, and the functionality will be moved to
-	// `cluster.spec.componentSpecs[*].instances[*]`.
-	//
-	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0 and will be removed in 0.10.0"
-	// +optional
-	LegacyRenderedConfigSpec *LegacyRenderedTemplateSpec `json:"legacyRenderedConfigSpec,omitempty"`
-
 	// Specifies the name of the referenced configuration constraints object.
 	//
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +optional
 	ConfigConstraintRef string `json:"constraintRef,omitempty"`
-
-	// Specifies the containers to inject the ConfigMap parameters as environment variables.
-	//
-	// This is useful when application images accept parameters through environment variables and
-	// generate the final configuration file in the startup script based on these variables.
-	//
-	// This field allows users to specify a list of container names, and KubeBlocks will inject the environment
-	// variables converted from the ConfigMap into these designated containers. This provides a flexible way to
-	// pass the configuration items from the ConfigMap to the container without modifying the image.
-	//
-	// Deprecated: `asEnvFrom` has been deprecated since 0.9.0 and will be removed in 0.10.0.
-	// Use `injectEnvTo` instead.
-	//
-	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0 and will be removed in 0.10.0"
-	// +listType=set
-	// +optional
-	AsEnvFrom []string `json:"asEnvFrom,omitempty"`
 
 	// Specifies the containers to inject the ConfigMap parameters as environment variables.
 	//

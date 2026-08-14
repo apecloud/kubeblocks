@@ -36,6 +36,7 @@ func newStatusBuilder(a Action) *statusBuilder {
 			Name:       a.GetName(),
 			ActionType: a.Type(),
 			Phase:      dpv1alpha1.ActionPhaseRunning,
+			ObjectRef:  a.BuildObjectRef(),
 		},
 	}
 	return sb.startTimestamp(nil)

@@ -82,8 +82,7 @@ func parseParentNameAndOrdinal(s string) (string, int) {
 // reverse it if reverse==true
 func sortObjects[T client.Object](objects []T, rolePriorityMap map[string]int, reverse bool) {
 	getRolePriorityFunc := func(i int) int {
-		role := strings.ToLower(objects[i].GetLabels()[constant.RoleLabelKey])
-		return rolePriorityMap[role]
+		return getRolePriority(rolePriorityMap, objects[i].GetLabels()[constant.RoleLabelKey])
 	}
 
 	// cache the parent names and ordinals to accelerate the parsing process when there is a massive number of Pods.
@@ -424,6 +423,19 @@ func buildInstancePodByTemplate(name string, template *instancetemplate.Instance
 		return nil, err
 	}
 	return pod, nil
+}
+
+// buildInstancePodByTemplateForUpdate builds the desired Pod view used to
+// evaluate and apply updates to an existing Pod. Compatibility adjustments are
+// intentionally kept out of buildInstancePodByTemplate so newly created and
+// replacement Pods always use the latest template.
+func buildInstancePodByTemplateForUpdate(oldPod *corev1.Pod, template *instancetemplate.InstanceTemplateExt, parent *workloads.InstanceSet) (*corev1.Pod, error) {
+	desiredPod, err := buildInstancePodByTemplate(oldPod.Name, template, parent, getPodRevision(oldPod))
+	if err != nil {
+		return nil, err
+	}
+	desiredPod, _ = podForDeferredKBAgentInitMigration(oldPod, desiredPod)
+	return desiredPod, nil
 }
 
 func buildInstancePVCByTemplate(name string, template *instancetemplate.InstanceTemplateExt, parent *workloads.InstanceSet) ([]*corev1.PersistentVolumeClaim, error) {

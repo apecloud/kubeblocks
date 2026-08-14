@@ -26,6 +26,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 	"sync"
 
@@ -329,6 +330,48 @@ func onlyKBManagedContainerImageChanged(oldContainers, newContainers []corev1.Co
 		if !isKBManagedContainerName(oldContainer.Name) ||
 			!sameImageRepositoryName(oldImage, toolsImage) ||
 			!sameImageRepositoryName(newImage, toolsImage) {
+			return false, false
+		}
+		changed = true
+	}
+	return changed, true
+}
+
+// OnlyKBManagedPodImagesChanged returns true when all desired container image
+// differences in a Pod are KB-managed tools image changes and at least one such
+// image changed. Unlike template-to-template classification, it ignores
+// non-image container fields present only on the live Pod because admission may
+// add them and in-place updates start from a clone of that Pod. Desired
+// non-image container changes remain owned by workload revision classification.
+func OnlyKBManagedPodImagesChanged(old, new *corev1.Pod) bool {
+	toolsImage := viper.GetString(constant.KBToolsImage)
+	if toolsImage == "" {
+		return false
+	}
+	initChanged, ok := onlyKBManagedLiveContainerImagesChanged(old.Spec.InitContainers, new.Spec.InitContainers, toolsImage)
+	if !ok {
+		return false
+	}
+	containerChanged, ok := onlyKBManagedLiveContainerImagesChanged(old.Spec.Containers, new.Spec.Containers, toolsImage)
+	return ok && (initChanged || containerChanged)
+}
+
+func onlyKBManagedLiveContainerImagesChanged(oldContainers, newContainers []corev1.Container, toolsImage string) (bool, bool) {
+	changed := false
+	for _, newContainer := range newContainers {
+		index := slices.IndexFunc(oldContainers, func(oldContainer corev1.Container) bool {
+			return oldContainer.Name == newContainer.Name
+		})
+		if index < 0 {
+			return false, false
+		}
+		oldContainer := oldContainers[index]
+		if EqualContainerImageInSpec(oldContainer.Image, newContainer.Image) {
+			continue
+		}
+		if !isKBManagedContainerName(oldContainer.Name) ||
+			!sameImageRepositoryName(oldContainer.Image, toolsImage) ||
+			!sameImageRepositoryName(newContainer.Image, toolsImage) {
 			return false, false
 		}
 		changed = true

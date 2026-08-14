@@ -96,6 +96,11 @@ var _ = Describe("JobAction Test", func() {
 				},
 				Owner: testdp.NewFakeBackup(&testCtx, nil),
 			}
+			objectRef := act.BuildObjectRef()
+			Expect(objectRef.APIVersion).Should(Equal(batchv1.SchemeGroupVersion.String()))
+			Expect(objectRef.Kind).Should(Equal(constant.JobKind))
+			Expect(objectRef.Namespace).Should(Equal(testCtx.DefaultNamespace))
+			Expect(objectRef.Name).Should(Equal(actionName))
 
 			By("should success to execute")
 			status, err := act.Execute(buildActionCtx())

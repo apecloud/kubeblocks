@@ -91,6 +91,11 @@ var _ = Describe("CreateVolumeSnapshotAction Test", func() {
 					},
 				},
 			}
+			objectRef := act.BuildObjectRef()
+			Expect(objectRef.APIVersion).Should(Equal(vsv1.SchemeGroupVersion.String()))
+			Expect(objectRef.Kind).Should(Equal(constant.VolumeSnapshotKind))
+			Expect(objectRef.Namespace).Should(Equal(testCtx.DefaultNamespace))
+			Expect(objectRef.Name).Should(Equal(dputils.GetBackupVolumeSnapshotName(actionName, volumeName, 0)))
 
 			// mock pv
 			testapps.NewPersistentVolumeFactory(testCtx.DefaultNamespace, volumeName, pvcName).

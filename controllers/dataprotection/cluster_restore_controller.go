@@ -62,18 +62,16 @@ func (r *ClusterRestoreReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
-	if cluster.DeletionTimestamp.IsZero() || controllerutil.ContainsFinalizer(cluster, dptypes.RestoreProtectionFinalizerName) {
-		legacyFound, adopted, err := r.adoptLegacyClusterRestoreResources(reqCtx, cluster)
-		if err != nil {
-			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to adopt legacy cluster restore resources")
-		}
-		if legacyFound && cluster.DeletionTimestamp.IsZero() &&
-			!controllerutil.ContainsFinalizer(cluster, dptypes.RestoreProtectionFinalizerName) {
-			return r.ensureFinalizer(reqCtx, cluster)
-		}
-		if adopted {
-			return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, "waiting for legacy restore ownership labels to become visible")
-		}
+	legacyFound, adopted, err := r.adoptLegacyClusterRestoreResources(reqCtx, cluster)
+	if err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to adopt legacy cluster restore resources")
+	}
+	if legacyFound && cluster.DeletionTimestamp.IsZero() &&
+		!controllerutil.ContainsFinalizer(cluster, dptypes.RestoreProtectionFinalizerName) {
+		return r.ensureFinalizer(reqCtx, cluster)
+	}
+	if adopted {
+		return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, "waiting for legacy restore ownership labels to become visible")
 	}
 
 	if cluster.DeletionTimestamp.IsZero() {
@@ -188,7 +186,7 @@ func (r *ClusterRestoreReconciler) ensureFinalizer(reqCtx intctrlutil.RequestCtx
 	if controllerutil.ContainsFinalizer(cluster, dptypes.RestoreProtectionFinalizerName) {
 		return intctrlutil.Reconciled()
 	}
-	patch := client.MergeFrom(cluster.DeepCopy())
+	patch := client.MergeFromWithOptions(cluster.DeepCopy(), client.MergeFromWithOptimisticLock{})
 	controllerutil.AddFinalizer(cluster, dptypes.RestoreProtectionFinalizerName)
 	if err := r.Client.Patch(reqCtx.Ctx, cluster, patch); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to add cluster restore finalizer")
@@ -200,7 +198,7 @@ func (r *ClusterRestoreReconciler) removeFinalizer(reqCtx intctrlutil.RequestCtx
 	if !controllerutil.ContainsFinalizer(cluster, dptypes.RestoreProtectionFinalizerName) {
 		return intctrlutil.Reconciled()
 	}
-	patch := client.MergeFrom(cluster.DeepCopy())
+	patch := client.MergeFromWithOptions(cluster.DeepCopy(), client.MergeFromWithOptimisticLock{})
 	controllerutil.RemoveFinalizer(cluster, dptypes.RestoreProtectionFinalizerName)
 	if err := r.Client.Patch(reqCtx.Ctx, cluster, patch); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to remove cluster restore finalizer")
@@ -317,7 +315,6 @@ func (r *ClusterRestoreReconciler) adoptLegacyClusterRestoreResources(reqCtx int
 		legacyTargets = append(legacyTargets, pvc)
 	}
 	legacyHelpers := make([]*corev1.PersistentVolumeClaim, 0)
-	unverifiedLegacyFound := false
 	for i := range targetList.Items {
 		helper := &targetList.Items[i]
 		if !isClusterRestoreHelperPVC(helper) || helper.Labels[dptypes.ClusterUIDLabelKey] != "" {
@@ -325,7 +322,6 @@ func (r *ClusterRestoreReconciler) adoptLegacyClusterRestoreResources(reqCtx int
 		}
 		if helper.Labels[dprestore.DataProtectionPopulatePVCLabelKey] != helper.Name ||
 			verifiedTargetsByHelper[helper.Name] == nil {
-			unverifiedLegacyFound = true
 			continue
 		}
 		legacyHelpers = append(legacyHelpers, helper)
@@ -350,14 +346,14 @@ func (r *ClusterRestoreReconciler) adoptLegacyClusterRestoreResources(reqCtx int
 		}
 		if owned {
 			legacyRestores = append(legacyRestores, restore)
-		} else {
-			unverifiedLegacyFound = true
 		}
 	}
 
 	legacyFound := len(legacyTargets) > 0 || len(legacyHelpers) > 0 ||
-		len(legacyRestores) > 0 || unverifiedLegacyFound
-	if !legacyFound || !controllerutil.ContainsFinalizer(cluster, dptypes.RestoreProtectionFinalizerName) {
+		len(legacyRestores) > 0
+	canAdopt := controllerutil.ContainsFinalizer(cluster, dptypes.RestoreProtectionFinalizerName) ||
+		!cluster.DeletionTimestamp.IsZero()
+	if !legacyFound || !canAdopt {
 		return legacyFound, false, nil
 	}
 	changed := false
@@ -378,11 +374,6 @@ func (r *ClusterRestoreReconciler) adoptLegacyClusterRestoreResources(reqCtx int
 			return true, changed, err
 		}
 		changed = true
-	}
-	if unverifiedLegacyFound {
-		return true, changed, intctrlutil.NewRequeueError(reconcileInterval,
-			fmt.Sprintf("legacy restore resources for Cluster %s/%s can not be safely attributed to Cluster UID %s",
-				cluster.Namespace, cluster.Name, cluster.UID))
 	}
 	return true, changed, nil
 }
@@ -440,21 +431,21 @@ func validateLegacyRestoreTargetPVC(ctx context.Context,
 		}
 		itsOwner := metav1.GetControllerOf(instance)
 		if itsOwner == nil || itsOwner.APIVersion != workloads.GroupVersion.String() || itsOwner.Kind != workloads.InstanceSetKind {
-			return fmt.Errorf("Instance %s/%s has no InstanceSet controller owner", instance.Namespace, instance.Name)
+			return fmt.Errorf("instance %s/%s has no InstanceSet controller owner", instance.Namespace, instance.Name)
 		}
 		its = &workloads.InstanceSet{}
 		if err := reader.Get(ctx, client.ObjectKey{Namespace: instance.Namespace, Name: itsOwner.Name}, its); err != nil {
 			return err
 		}
 		if itsOwner.UID != its.UID {
-			return fmt.Errorf("Instance %s/%s owner UID does not match InstanceSet %s/%s", instance.Namespace, instance.Name, its.Namespace, its.Name)
+			return fmt.Errorf("instance %s/%s owner UID does not match InstanceSet %s/%s", instance.Namespace, instance.Name, its.Namespace, its.Name)
 		}
 	default:
 		return fmt.Errorf("target PVC %s/%s has unsupported workload owner kind %s", pvc.Namespace, pvc.Name, owner.Kind)
 	}
 	componentOwner := metav1.GetControllerOf(its)
 	if componentOwner == nil || componentOwner.APIVersion != appsv1.GroupVersion.String() || componentOwner.Kind != appsv1.ComponentKind {
-		return fmt.Errorf("InstanceSet %s/%s has no Component controller owner", its.Namespace, its.Name)
+		return fmt.Errorf("instanceSet %s/%s has no Component controller owner", its.Namespace, its.Name)
 	}
 	component := &appsv1.Component{}
 	if err := reader.Get(ctx, client.ObjectKey{Namespace: its.Namespace, Name: componentOwner.Name}, component); err != nil {
@@ -462,7 +453,7 @@ func validateLegacyRestoreTargetPVC(ctx context.Context,
 	}
 	if componentOwner.UID != component.UID || component.Annotations[constant.KBAppClusterUIDKey] != string(cluster.UID) ||
 		component.Labels[constant.AppInstanceLabelKey] != cluster.Name {
-		return fmt.Errorf("InstanceSet %s/%s is not owned by current Cluster %s/%s UID %s",
+		return fmt.Errorf("instanceSet %s/%s is not owned by current Cluster %s/%s UID %s",
 			its.Namespace, its.Name, cluster.Namespace, cluster.Name, cluster.UID)
 	}
 	return nil

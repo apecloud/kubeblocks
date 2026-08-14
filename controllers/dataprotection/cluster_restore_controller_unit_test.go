@@ -17,6 +17,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -88,6 +89,58 @@ func TestClusterRestoreFinalizerLifecycle(t *testing.T) {
 	require.NoError(t, reconciler.Client.Get(context.Background(), req.NamespacedName, current))
 	require.False(t, controllerutil.ContainsFinalizer(current, dptypes.RestoreProtectionFinalizerName))
 	require.True(t, controllerutil.ContainsFinalizer(current, dptypes.DataProtectionFinalizerName))
+}
+
+func TestClusterRestoreFinalizerPatchUsesOptimisticLock(t *testing.T) {
+	scheme := newClusterRestoreTestScheme(t)
+	for _, test := range []struct {
+		name       string
+		stale      *appsv1.Cluster
+		live       *appsv1.Cluster
+		reconcile  func(*ClusterRestoreReconciler, intctrlutil.RequestCtx, *appsv1.Cluster) (ctrl.Result, error)
+		finalizers []string
+	}{
+		{
+			name: "add",
+			stale: &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{
+				Namespace: "default", Name: "cluster", UID: "cluster-uid", ResourceVersion: "1",
+			}},
+			live: &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{
+				Namespace: "default", Name: "cluster", UID: "cluster-uid", ResourceVersion: "2",
+				Finalizers: []string{"other.example/finalizer"},
+			}},
+			reconcile: func(r *ClusterRestoreReconciler, reqCtx intctrlutil.RequestCtx, cluster *appsv1.Cluster) (ctrl.Result, error) {
+				return r.ensureFinalizer(reqCtx, cluster)
+			},
+			finalizers: []string{"other.example/finalizer"},
+		},
+		{
+			name: "remove",
+			stale: &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{
+				Namespace: "default", Name: "cluster", UID: "cluster-uid", ResourceVersion: "1",
+				Finalizers: []string{dptypes.RestoreProtectionFinalizerName},
+			}},
+			live: &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{
+				Namespace: "default", Name: "cluster", UID: "cluster-uid", ResourceVersion: "2",
+				Finalizers: []string{dptypes.RestoreProtectionFinalizerName, "other.example/finalizer"},
+			}},
+			reconcile: func(r *ClusterRestoreReconciler, reqCtx intctrlutil.RequestCtx, cluster *appsv1.Cluster) (ctrl.Result, error) {
+				return r.removeFinalizer(reqCtx, cluster)
+			},
+			finalizers: []string{dptypes.RestoreProtectionFinalizerName, "other.example/finalizer"},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			k8sClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(test.live).Build()
+			reconciler := &ClusterRestoreReconciler{Client: k8sClient}
+			_, err := test.reconcile(reconciler, intctrlutil.RequestCtx{Ctx: context.Background()}, test.stale)
+			require.Error(t, err)
+			require.True(t, apierrors.IsConflict(err), err)
+			current := &appsv1.Cluster{}
+			require.NoError(t, k8sClient.Get(context.Background(), client.ObjectKeyFromObject(test.live), current))
+			require.ElementsMatch(t, test.finalizers, current.Finalizers)
+		})
+	}
 }
 
 func TestDeletingClusterWaitsForRestoreThenReleasesPVCs(t *testing.T) {
@@ -329,12 +382,59 @@ func TestLegacyRestoreResourcesAreAdoptedAfterClusterIsProtected(t *testing.T) {
 	require.Equal(t, string(cluster.UID), currentTarget.Annotations[constant.KBAppClusterUIDKey])
 }
 
-func TestUnverifiedLegacyHelperBlocksClusterFinalizerRelease(t *testing.T) {
+func TestDeletingClusterAdoptsVerifiedLegacyResourcesWithoutRestoreFinalizer(t *testing.T) {
 	scheme := newClusterRestoreTestScheme(t)
 	cluster := newClusterWithActiveRestore()
 	now := metav1.Now()
 	cluster.DeletionTimestamp = &now
-	cluster.Finalizers = []string{dptypes.RestoreProtectionFinalizerName}
+	cluster.Finalizers = []string{dptypes.DataProtectionFinalizerName}
+	component, its, target := newLegacyRestoreTarget(cluster)
+	helper := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{
+		Namespace: target.Namespace,
+		Name:      getPopulatePVCName(target.UID),
+		Labels: map[string]string{
+			constant.AppInstanceLabelKey:                cluster.Name,
+			dprestore.DataProtectionPopulatePVCLabelKey: getPopulatePVCName(target.UID),
+		},
+	}}
+	restore := &dpv1alpha1.Restore{ObjectMeta: metav1.ObjectMeta{
+		Namespace: target.Namespace,
+		Name:      getPopulatePVCName(target.UID),
+		Labels: map[string]string{
+			constant.AppInstanceLabelKey:            cluster.Name,
+			dprestore.DataProtectionRestoreLabelKey: getPopulatePVCName(target.UID),
+		},
+		OwnerReferences: []metav1.OwnerReference{{
+			APIVersion: corev1.SchemeGroupVersion.String(), Kind: "PersistentVolumeClaim",
+			Name: target.Name, UID: target.UID,
+		}},
+	}}
+	reconciler := &ClusterRestoreReconciler{Client: fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(cluster, component, its, target, helper, restore).Build()}
+
+	result, err := reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cluster)})
+	require.NoError(t, err)
+	require.True(t, result.RequeueAfter > 0)
+	currentCluster := &appsv1.Cluster{}
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(cluster), currentCluster))
+	require.NotContains(t, currentCluster.Finalizers, dptypes.RestoreProtectionFinalizerName)
+	currentTarget := &corev1.PersistentVolumeClaim{}
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(target), currentTarget))
+	currentHelper := &corev1.PersistentVolumeClaim{}
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(helper), currentHelper))
+	currentRestore := &dpv1alpha1.Restore{}
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(restore), currentRestore))
+	for _, object := range []client.Object{currentTarget, currentHelper, currentRestore} {
+		require.Equal(t, string(cluster.UID), object.GetLabels()[dptypes.ClusterUIDLabelKey])
+	}
+}
+
+func TestUnverifiedLegacyHelperDoesNotBlockClusterFinalizerRelease(t *testing.T) {
+	scheme := newClusterRestoreTestScheme(t)
+	cluster := newClusterWithActiveRestore()
+	now := metav1.Now()
+	cluster.DeletionTimestamp = &now
+	cluster.Finalizers = []string{dptypes.DataProtectionFinalizerName, dptypes.RestoreProtectionFinalizerName}
 	helper := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{
 		Namespace: cluster.Namespace,
 		Name:      "kb-populate-orphaned-target-uid",
@@ -346,13 +446,11 @@ func TestUnverifiedLegacyHelperBlocksClusterFinalizerRelease(t *testing.T) {
 	reconciler := &ClusterRestoreReconciler{Client: fake.NewClientBuilder().WithScheme(scheme).
 		WithObjects(cluster, helper).Build()}
 
-	result, err := reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cluster)})
-	require.Error(t, err)
-	require.True(t, intctrlutil.IsRequeueError(err), err)
-	require.Zero(t, result)
+	_, err := reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cluster)})
+	require.NoError(t, err)
 	currentCluster := &appsv1.Cluster{}
 	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(cluster), currentCluster))
-	require.Contains(t, currentCluster.Finalizers, dptypes.RestoreProtectionFinalizerName)
+	require.NotContains(t, currentCluster.Finalizers, dptypes.RestoreProtectionFinalizerName)
 	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(helper), &corev1.PersistentVolumeClaim{}))
 }
 
@@ -393,6 +491,9 @@ func newLegacyRestoreTarget(cluster *appsv1.Cluster) (*appsv1.Component, *worklo
 			Name:      "data-0",
 			UID:       "target-uid",
 			Labels:    map[string]string{constant.AppInstanceLabelKey: cluster.Name},
+			Finalizers: []string{
+				dptypes.DataProtectionFinalizerName,
+			},
 			OwnerReferences: []metav1.OwnerReference{{
 				APIVersion: workloads.GroupVersion.String(), Kind: workloads.InstanceSetKind,
 				Name: its.Name, UID: its.UID, Controller: ptr.To(true),

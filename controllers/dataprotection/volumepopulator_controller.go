@@ -827,7 +827,7 @@ func (r *VolumePopulatorReconciler) ensureClusterRestoreProtection(reqCtx intctr
 	if controllerutil.ContainsFinalizer(cluster, dptypes.RestoreProtectionFinalizerName) {
 		return nil
 	}
-	patch := client.MergeFrom(cluster.DeepCopy())
+	patch := client.MergeFromWithOptions(cluster.DeepCopy(), client.MergeFromWithOptimisticLock{})
 	controllerutil.AddFinalizer(cluster, dptypes.RestoreProtectionFinalizerName)
 	if err := r.Client.Patch(reqCtx.Ctx, cluster, patch); err != nil {
 		return err

@@ -1637,6 +1637,36 @@ func TestClusterRestoreProtectionPrecedesPopulationSideEffects(t *testing.T) {
 	require.NoError(t, reconciler.ensureClusterRestoreProtection(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc))
 }
 
+func TestVolumePopulatorClusterFinalizerPatchUsesOptimisticLock(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, kbappsv1.AddToScheme(scheme))
+	staleCluster := &kbappsv1.Cluster{ObjectMeta: metav1.ObjectMeta{
+		Namespace: "default", Name: "cluster", UID: "cluster-uid", ResourceVersion: "1",
+	}}
+	liveCluster := staleCluster.DeepCopy()
+	liveCluster.ResourceVersion = "2"
+	liveCluster.Finalizers = []string{"other.example/finalizer"}
+	pvc := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{
+		Namespace: "default", Name: "data-0",
+		Labels: map[string]string{
+			constant.AppInstanceLabelKey: liveCluster.Name,
+			dptypes.ClusterUIDLabelKey:   string(liveCluster.UID),
+		},
+		Annotations: map[string]string{constant.KBAppClusterUIDKey: string(liveCluster.UID)},
+	}}
+	liveClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(liveCluster).Build()
+	staleReader := fake.NewClientBuilder().WithScheme(scheme).WithObjects(staleCluster).Build()
+	reconciler := &VolumePopulatorReconciler{Client: liveClient, APIReader: staleReader}
+
+	err := reconciler.ensureClusterRestoreProtection(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc)
+	require.Error(t, err)
+	require.True(t, apierrors.IsConflict(err), err)
+	current := &kbappsv1.Cluster{}
+	require.NoError(t, liveClient.Get(context.Background(), client.ObjectKeyFromObject(liveCluster), current))
+	require.Equal(t, []string{"other.example/finalizer"}, current.Finalizers)
+}
+
 func TestEnsureRestoreClusterUIDLabelAdoptsOnlyVerifiedLegacyTarget(t *testing.T) {
 	scheme := newClusterRestoreTestScheme(t)
 	cluster := newClusterWithActiveRestore()

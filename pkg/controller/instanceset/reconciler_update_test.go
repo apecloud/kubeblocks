@@ -50,6 +50,26 @@ import (
 var _ = Describe("update reconciler test", func() {
 	var replicas int32
 
+	DescribeTable("parse rolling update quotas",
+		func(totalReplicas int, replicasValue, maxUnavailableValue intstr.IntOrString, expectedReplicas, expectedMaxUnavailable int) {
+			strategy := &workloads.InstanceUpdateStrategy{
+				RollingUpdate: &workloads.RollingUpdate{
+					Replicas:       &replicasValue,
+					MaxUnavailable: &maxUnavailableValue,
+				},
+			}
+
+			replicas, maxUnavailable, err := parseReplicasNMaxUnavailable(strategy, totalReplicas)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(replicas).Should(Equal(expectedReplicas))
+			Expect(maxUnavailable).Should(Equal(expectedMaxUnavailable))
+		},
+		Entry("rounds replicas up and maxUnavailable down", 3, intstr.FromString("34%"), intstr.FromString("34%"), 2, 1),
+		Entry("keeps maxUnavailable at least one", 3, intstr.FromString("10%"), intstr.FromString("10%"), 1, 1),
+		Entry("keeps exact percentage results", 4, intstr.FromString("50%"), intstr.FromString("50%"), 2, 2),
+		Entry("keeps absolute values", 3, intstr.FromInt32(2), intstr.FromInt32(1), 2, 1),
+	)
+
 	BeforeEach(func() {
 		replicas = 3
 		its = builder.NewInstanceSetBuilder(namespace, name).

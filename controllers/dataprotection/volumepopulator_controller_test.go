@@ -2443,6 +2443,60 @@ func TestWaitForSerialPredecessorsAllowsAfterEarlierBoundPVC(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestWaitForSerialPredecessorsAllowsAfterEarlierReleasedPVC(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
+	previous := newRestorePVCForSerialTest("data-target-0", "pv-0")
+	previous.Status.Conditions = []corev1.PersistentVolumeClaimCondition{{
+		Type:   PersistentVolumeClaimPopulating,
+		Status: corev1.ConditionTrue,
+		Reason: ReasonPopulatingSucceed,
+	}}
+	current := newRestorePVCForSerialTest("data-target-1", "")
+	backup := newBackupForRestoreDecision([]string{"data"}, nil)
+	reconciler := &VolumePopulatorReconciler{Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(previous, current, backup).Build()}
+	restoreMgr := dprestore.NewRestoreManager(&dpv1alpha1.Restore{
+		Spec: dpv1alpha1.RestoreSpec{
+			PrepareDataConfig: &dpv1alpha1.PrepareDataConfig{
+				VolumeClaimRestorePolicy: dpv1alpha1.VolumeClaimRestorePolicySerial,
+			},
+		},
+	}, nil, scheme, reconciler.Client)
+
+	err := reconciler.waitForSerialPredecessors(intctrlutil.RequestCtx{Ctx: context.Background()}, current, restoreMgr)
+
+	require.NoError(t, err)
+}
+
+func TestRestorePVCAggregationAllowsReleasedPVCWithoutBindingAnnotation(t *testing.T) {
+	for _, reason := range []string{ReasonPopulatingSucceed, ReasonPopulatingProvisioned} {
+		t.Run(reason, func(t *testing.T) {
+			scheme := runtime.NewScheme()
+			require.NoError(t, corev1.AddToScheme(scheme))
+			pvc := &corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "target"},
+				Spec:       corev1.PersistentVolumeClaimSpec{VolumeName: "pv-0"},
+				Status: corev1.PersistentVolumeClaimStatus{Conditions: []corev1.PersistentVolumeClaimCondition{{
+					Type:   PersistentVolumeClaimPopulating,
+					Status: corev1.ConditionTrue,
+					Reason: reason,
+				}}},
+			}
+			reconciler := &VolumePopulatorReconciler{Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(pvc).Build()}
+			reqCtx := intctrlutil.RequestCtx{Ctx: context.Background()}
+
+			componentReady, err := reconciler.allRestorePVCsForComponentBound(reqCtx, pvc)
+			require.NoError(t, err)
+			require.True(t, componentReady)
+
+			clusterReady, err := reconciler.allRestorePVCsForClusterBound(reqCtx, pvc)
+			require.NoError(t, err)
+			require.True(t, clusterReady)
+		})
+	}
+}
+
 func TestWaitForSerialPredecessorsSkipsProvisionOnlyPVC(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, corev1.AddToScheme(scheme))

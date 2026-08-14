@@ -1085,7 +1085,7 @@ func (r *VolumePopulatorReconciler) waitForSerialPredecessors(reqCtx intctrlutil
 		if cond != nil && cond.Status == corev1.ConditionFalse {
 			return intctrlutil.NewFatalError(fmt.Sprintf("previous restore PVC %s/%s failed: %s", item.Namespace, item.Name, cond.Message))
 		}
-		if pvcBindingCompleted(item) {
+		if pvcReadyForRestoreProgression(item) {
 			continue
 		}
 		if err = r.UpdatePVCConditions(reqCtx, pvc, ReasonPopulatingProcessing,
@@ -1390,7 +1390,7 @@ func (r *VolumePopulatorReconciler) allRestorePVCsForComponentBound(reqCtx intct
 		if cond != nil && cond.Status == corev1.ConditionFalse {
 			return false, intctrlutil.NewFatalError(fmt.Sprintf("restore PVC %s/%s failed: %s", item.Namespace, item.Name, cond.Message))
 		}
-		if !pvcBindingCompleted(item) {
+		if !pvcReadyForRestoreProgression(item) {
 			return false, nil
 		}
 	}
@@ -1408,7 +1408,7 @@ func (r *VolumePopulatorReconciler) allRestorePVCsForClusterBound(reqCtx intctrl
 		if cond != nil && cond.Status == corev1.ConditionFalse {
 			return false, intctrlutil.NewFatalError(fmt.Sprintf("restore PVC %s/%s failed: %s", item.Namespace, item.Name, cond.Message))
 		}
-		if !pvcBindingCompleted(item) {
+		if !pvcReadyForRestoreProgression(item) {
 			return false, nil
 		}
 	}
@@ -1463,6 +1463,10 @@ func pvcPopulateReleased(pvc *corev1.PersistentVolumeClaim) bool {
 	cond := findPVCConditionByType(pvc, string(PersistentVolumeClaimPopulating))
 	return cond != nil && cond.Status == corev1.ConditionTrue &&
 		(cond.Reason == ReasonPopulatingSucceed || cond.Reason == ReasonPopulatingProvisioned)
+}
+
+func pvcReadyForRestoreProgression(pvc *corev1.PersistentVolumeClaim) bool {
+	return pvcPopulateReleased(pvc) || pvcBindingCompleted(pvc)
 }
 
 func (r *VolumePopulatorReconciler) listRestorePVCsForComponent(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim) ([]corev1.PersistentVolumeClaim, error) {

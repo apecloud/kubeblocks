@@ -9994,7 +9994,7 @@ Kubernetes api utils intstr.IntOrString
 <em>(Optional)</em>
 <p>The maximum number of instances that can be unavailable during the update.
 Value can be an absolute number (ex: 5) or a percentage of desired instances (ex: 10%).
-Absolute number is calculated from percentage by rounding up. This can not be 0.
+Absolute number is calculated from percentage by rounding down, with a minimum value of 1.
 Defaults to 1. The field applies to all instances. That means if there is any unavailable pod,
 it will be counted towards MaxUnavailable.</p>
 </td>

@@ -731,8 +731,14 @@ func internalRestoreLabels(pvc *corev1.PersistentVolumeClaim) map[string]string 
 func (r *VolumePopulatorReconciler) ensureRestoreClusterUIDLabel(reqCtx intctrlutil.RequestCtx,
 	pvc *corev1.PersistentVolumeClaim) error {
 	clusterName := pvc.Labels[constant.AppInstanceLabelKey]
-	if clusterName == "" {
+	clusterUID := pvc.Annotations[constant.KBAppClusterUIDKey]
+	if clusterName == "" || clusterUID == "" {
 		return nil
+	}
+	if existing := pvc.Labels[dptypes.ClusterUIDLabelKey]; existing != "" && existing != clusterUID {
+		return intctrlutil.NewFatalError(fmt.Sprintf(
+			"target PVC %s/%s belongs to Cluster UID %s, not restore intent Cluster UID %s",
+			pvc.Namespace, pvc.Name, existing, clusterUID))
 	}
 	cluster := &appsv1.Cluster{}
 	if err := r.Client.Get(reqCtx.Ctx, client.ObjectKey{Namespace: pvc.Namespace, Name: clusterName}, cluster); err != nil {
@@ -741,14 +747,10 @@ func (r *VolumePopulatorReconciler) ensureRestoreClusterUIDLabel(reqCtx intctrlu
 		}
 		return err
 	}
-	clusterUID := string(cluster.UID)
-	if clusterUID == "" {
-		return nil
-	}
-	if existing := pvc.Labels[dptypes.ClusterUIDLabelKey]; existing != "" && existing != clusterUID {
+	if string(cluster.UID) != clusterUID {
 		return intctrlutil.NewFatalError(fmt.Sprintf(
-			"target PVC %s/%s belongs to Cluster UID %s, not current Cluster %s/%s UID %s",
-			pvc.Namespace, pvc.Name, existing, cluster.Namespace, cluster.Name, clusterUID))
+			"target PVC %s/%s restore intent belongs to Cluster UID %s, not current Cluster %s/%s UID %s",
+			pvc.Namespace, pvc.Name, clusterUID, cluster.Namespace, cluster.Name, cluster.UID))
 	}
 	if pvc.Labels[dptypes.ClusterUIDLabelKey] == clusterUID {
 		return nil

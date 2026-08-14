@@ -47,6 +47,7 @@ func TestInjectRestoreIntentRemovesStaleOptionalAnnotations(t *testing.T) {
 	cluster := &appsv1.Cluster{}
 	cluster.Name = "test-cluster"
 	cluster.Namespace = "test-ns"
+	cluster.UID = "cluster-uid"
 	cluster.Spec.Restore = &appsv1.ClusterRestore{
 		Source: appsv1.ClusterRestoreSource{
 			APIGroup:  testRestoreSourceAPIGroup,
@@ -72,6 +73,7 @@ func TestInjectRestoreIntentRemovesStaleOptionalAnnotations(t *testing.T) {
 	require.Equal(t, "backup", vct.Spec.DataSourceRef.Name)
 	require.NotNil(t, vct.Spec.DataSourceRef.Namespace)
 	require.Equal(t, "backup-ns", *vct.Spec.DataSourceRef.Namespace)
+	require.Equal(t, string(cluster.UID), vct.Annotations[constant.KBAppClusterUIDKey])
 }
 
 func TestInjectRestoreIntentOmitsDataSourceRefNamespaceForSameNamespaceSource(t *testing.T) {

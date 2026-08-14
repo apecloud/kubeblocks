@@ -1944,6 +1944,18 @@ func TestCompleteBoundPVCWaitsForKubernetesBinding(t *testing.T) {
 			Finalizers: []string{dptypes.DataProtectionFinalizerName},
 		},
 		Spec: corev1.PersistentVolumeClaimSpec{VolumeName: "restored-pv"},
+		Status: corev1.PersistentVolumeClaimStatus{Conditions: []corev1.PersistentVolumeClaimCondition{
+			{
+				Type:   PersistentVolumeClaimPopulating,
+				Status: corev1.ConditionTrue,
+				Reason: ReasonPopulatingProcessing,
+			},
+			{
+				Type:   corev1.PersistentVolumeClaimConditionType(kbappsv1.ConditionTypeRestore),
+				Status: corev1.ConditionUnknown,
+				Reason: ReasonPopulatingProcessing,
+			},
+		}},
 	}
 	helper := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{
 		Namespace: pvc.Namespace,
@@ -1962,6 +1974,64 @@ func TestCompleteBoundPVCWaitsForKubernetesBinding(t *testing.T) {
 	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(pvc), currentPVC))
 	require.Contains(t, currentPVC.Finalizers, dptypes.DataProtectionFinalizerName)
 	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(helper), &corev1.PersistentVolumeClaim{}))
+	restoreCondition := findPVCConditionByType(currentPVC, kbappsv1.ConditionTypeRestore)
+	require.NotNil(t, restoreCondition)
+	require.Equal(t, corev1.ConditionUnknown, restoreCondition.Status)
+}
+
+func TestCompleteBoundPVCKeepsFailedRestoreTerminalWhileBindingIsIncomplete(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "target"},
+		Spec:       corev1.PersistentVolumeClaimSpec{VolumeName: "restored-pv"},
+		Status: corev1.PersistentVolumeClaimStatus{Conditions: []corev1.PersistentVolumeClaimCondition{{
+			Type:   corev1.PersistentVolumeClaimConditionType(kbappsv1.ConditionTypeRestore),
+			Status: corev1.ConditionFalse,
+			Reason: ReasonPopulatingFailed,
+		}}},
+	}
+	reconciler := &VolumePopulatorReconciler{
+		Client:   fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(pvc).WithObjects(pvc).Build(),
+		Recorder: record.NewFakeRecorder(10),
+	}
+
+	err := reconciler.completeBoundPVCIfNeeded(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, &pvcRestoreContext{})
+
+	require.NoError(t, err)
+}
+
+func TestCompleteBoundPVCDoesNotReapplyBindingGateAfterPopulateReleased(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "target"},
+		Spec:       corev1.PersistentVolumeClaimSpec{VolumeName: "restored-pv"},
+		Status: corev1.PersistentVolumeClaimStatus{Conditions: []corev1.PersistentVolumeClaimCondition{{
+			Type:   PersistentVolumeClaimPopulating,
+			Status: corev1.ConditionTrue,
+			Reason: ReasonPopulatingSucceed,
+		}}},
+	}
+	reconciler := &VolumePopulatorReconciler{
+		Client:   fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(pvc).WithObjects(pvc).Build(),
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(10),
+	}
+	restoreMgr := dprestore.NewRestoreManager(&dpv1alpha1.Restore{}, nil, scheme, reconciler.Client)
+
+	err := reconciler.completeBoundPVCIfNeeded(
+		intctrlutil.RequestCtx{Ctx: context.Background()},
+		pvc,
+		&pvcRestoreContext{restoreMgr: restoreMgr, mode: pvcRestoreModeRestoreData},
+	)
+
+	require.NoError(t, err)
+	currentPVC := &corev1.PersistentVolumeClaim{}
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(pvc), currentPVC))
+	restoreCondition := findPVCConditionByType(currentPVC, kbappsv1.ConditionTypeRestore)
+	require.NotNil(t, restoreCondition)
+	require.Equal(t, corev1.ConditionTrue, restoreCondition.Status)
 }
 
 func TestCompleteBoundPVCReleasesPopulatePVCBeforeWaitingForPostReady(t *testing.T) {

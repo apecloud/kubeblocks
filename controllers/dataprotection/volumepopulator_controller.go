@@ -998,9 +998,6 @@ func (r *VolumePopulatorReconciler) ProvisionOnly(reqCtx intctrlutil.RequestCtx,
 func (r *VolumePopulatorReconciler) completeBoundPVCIfNeeded(reqCtx intctrlutil.RequestCtx,
 	pvc *corev1.PersistentVolumeClaim,
 	restoreCtx *pvcRestoreContext) error {
-	if !pvcBindingCompleted(pvc) {
-		return intctrlutil.NewRequeueError(reconcileInterval, "waiting for Kubernetes to complete target PVC binding")
-	}
 	populateReleased := pvcPopulateReleased(pvc)
 	for i := range pvc.Status.Conditions {
 		condition := pvc.Status.Conditions[i]
@@ -1013,6 +1010,9 @@ func (r *VolumePopulatorReconciler) completeBoundPVCIfNeeded(reqCtx intctrlutil.
 		break
 	}
 	if !populateReleased {
+		if !pvcBindingCompleted(pvc) {
+			return intctrlutil.NewRequeueError(reconcileInterval, "waiting for Kubernetes to complete target PVC binding")
+		}
 		// Release the target PVC after prepareData and PV rebind. PostReady
 		// actions may need the workload pod to start, which cannot happen while
 		// the populate PVC still owns the restored PV or while the target PVC is

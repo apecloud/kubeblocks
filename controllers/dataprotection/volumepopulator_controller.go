@@ -713,6 +713,7 @@ func internalRestoreLabels(pvc *corev1.PersistentVolumeClaim) map[string]string 
 		constant.KBAppComponentLabelKey,
 		constant.KBAppShardingNameLabelKey,
 		constant.VolumeClaimTemplateNameLabelKey,
+		dptypes.ClusterUIDLabelKey,
 	} {
 		if value := pvc.Labels[key]; value != "" {
 			labels[key] = value
@@ -722,6 +723,62 @@ func internalRestoreLabels(pvc *corev1.PersistentVolumeClaim) map[string]string 
 		labels[dptypes.BackupNameLabelKey] = pvc.Spec.DataSourceRef.Name
 	}
 	return labels
+}
+
+// ensureRestoreClusterUIDLabel binds every resource in a Cluster restore to a
+// specific Cluster incarnation. Cluster names can be reused, so name labels
+// alone are not safe input for destructive cleanup.
+func (r *VolumePopulatorReconciler) ensureRestoreClusterUIDLabel(reqCtx intctrlutil.RequestCtx,
+	pvc *corev1.PersistentVolumeClaim) error {
+	clusterName := pvc.Labels[constant.AppInstanceLabelKey]
+	if clusterName == "" {
+		return nil
+	}
+	cluster := &appsv1.Cluster{}
+	if err := r.Client.Get(reqCtx.Ctx, client.ObjectKey{Namespace: pvc.Namespace, Name: clusterName}, cluster); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+	clusterUID := string(cluster.UID)
+	if clusterUID == "" {
+		return nil
+	}
+	if existing := pvc.Labels[dptypes.ClusterUIDLabelKey]; existing != "" && existing != clusterUID {
+		return intctrlutil.NewFatalError(fmt.Sprintf(
+			"target PVC %s/%s belongs to Cluster UID %s, not current Cluster %s/%s UID %s",
+			pvc.Namespace, pvc.Name, existing, cluster.Namespace, cluster.Name, clusterUID))
+	}
+	if pvc.Labels[dptypes.ClusterUIDLabelKey] == clusterUID {
+		return nil
+	}
+	patch := client.MergeFrom(pvc.DeepCopy())
+	if pvc.Labels == nil {
+		pvc.Labels = map[string]string{}
+	}
+	pvc.Labels[dptypes.ClusterUIDLabelKey] = clusterUID
+	return r.Client.Patch(reqCtx.Ctx, pvc, patch)
+}
+
+func (r *VolumePopulatorReconciler) ensurePopulatePVCLabels(reqCtx intctrlutil.RequestCtx,
+	populatePVC, targetPVC *corev1.PersistentVolumeClaim) error {
+	desired := internalRestoreLabels(targetPVC)
+	patch := client.MergeFrom(populatePVC.DeepCopy())
+	if populatePVC.Labels == nil {
+		populatePVC.Labels = map[string]string{}
+	}
+	changed := false
+	for key, value := range desired {
+		if populatePVC.Labels[key] != value {
+			populatePVC.Labels[key] = value
+			changed = true
+		}
+	}
+	if !changed {
+		return nil
+	}
+	return r.Client.Patch(reqCtx.Ctx, populatePVC, patch)
 }
 
 func (r *VolumePopulatorReconciler) ensureExecutionRestore(reqCtx intctrlutil.RequestCtx,
@@ -906,6 +963,9 @@ func (r *VolumePopulatorReconciler) Populate(reqCtx intctrlutil.RequestCtx, pvc 
 	if err != nil || wait {
 		return err
 	}
+	if err = r.ensureRestoreClusterUIDLabel(reqCtx, pvc); err != nil {
+		return err
+	}
 	// Make sure the PVC finalizer is present
 	if !slices.Contains(pvc.Finalizers, dptypes.DataProtectionFinalizerName) {
 		pvcPatch := client.MergeFrom(pvc.DeepCopy())
@@ -966,6 +1026,9 @@ func (r *VolumePopulatorReconciler) Populate(reqCtx intctrlutil.RequestCtx, pvc 
 func (r *VolumePopulatorReconciler) ProvisionOnly(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim, restoreCtx *pvcRestoreContext) error {
 	wait, nodeName, err := r.waitForPVCSelectedNode(reqCtx, pvc)
 	if err != nil || wait {
+		return err
+	}
+	if err = r.ensureRestoreClusterUIDLabel(reqCtx, pvc); err != nil {
 		return err
 	}
 	if !slices.Contains(pvc.Finalizers, dptypes.DataProtectionFinalizerName) {
@@ -1604,6 +1667,7 @@ func postReadyRestoreLabels(pvc *corev1.PersistentVolumeClaim, comp *appsv1.Comp
 		constant.AppInstanceLabelKey,
 		constant.KBAppComponentLabelKey,
 		constant.KBAppShardingNameLabelKey,
+		dptypes.ClusterUIDLabelKey,
 	} {
 		if value := pvc.Labels[key]; value != "" {
 			labels[key] = value
@@ -1720,6 +1784,7 @@ func (r *VolumePopulatorReconciler) getPopulatePVC(reqCtx intctrlutil.RequestCtx
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      populatePVCName,
 				Namespace: pvc.Namespace,
+				Labels:    internalRestoreLabels(pvc),
 			},
 			Spec: corev1.PersistentVolumeClaimSpec{
 				AccessModes:      pvc.Spec.AccessModes,
@@ -1760,6 +1825,9 @@ func (r *VolumePopulatorReconciler) getPopulatePVC(reqCtx intctrlutil.RequestCtx
 			return nil, err
 		}
 	}
+	if err := r.ensurePopulatePVCLabels(reqCtx, populatePVC, pvc); err != nil {
+		return nil, err
+	}
 	return populatePVC, nil
 }
 
@@ -1777,6 +1845,7 @@ func (r *VolumePopulatorReconciler) getProvisionOnlyPVC(reqCtx intctrlutil.Reque
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      populatePVCName,
 				Namespace: pvc.Namespace,
+				Labels:    internalRestoreLabels(pvc),
 			},
 			Spec: corev1.PersistentVolumeClaimSpec{
 				AccessModes:      pvc.Spec.AccessModes,
@@ -1793,6 +1862,9 @@ func (r *VolumePopulatorReconciler) getProvisionOnlyPVC(reqCtx intctrlutil.Reque
 		if err = r.Client.Create(reqCtx.Ctx, populatePVC); err != nil && !apierrors.IsAlreadyExists(err) {
 			return nil, err
 		}
+	}
+	if err := r.ensurePopulatePVCLabels(reqCtx, populatePVC, pvc); err != nil {
+		return nil, err
 	}
 	return populatePVC, nil
 }

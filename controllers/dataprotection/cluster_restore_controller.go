@@ -39,7 +39,8 @@ import (
 // running resources and synchronizes those resources when deletion starts.
 type ClusterRestoreReconciler struct {
 	client.Client
-	Recorder record.EventRecorder
+	APIReader client.Reader
+	Recorder  record.EventRecorder
 }
 
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusters,verbs=get;list;watch;patch;update
@@ -62,7 +63,7 @@ func (r *ClusterRestoreReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	if cluster.DeletionTimestamp.IsZero() {
 		active := clusterRestoreConditionActive(cluster)
-		if !active && cluster.Spec.Restore != nil {
+		if !active {
 			var err error
 			active, err = r.hasActiveClusterRestores(reqCtx, cluster)
 			if err != nil {
@@ -85,6 +86,13 @@ func (r *ClusterRestoreReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	if pending {
 		return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, "waiting for cluster restore executions to stop")
 	}
+	pending, err = r.deleteClusterRestoreHelpers(reqCtx, cluster)
+	if err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to delete cluster restore helper PVCs")
+	}
+	if pending {
+		return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, "waiting for cluster restore helper PVCs to disappear")
+	}
 	pending, err = r.releaseClusterRestorePVCs(reqCtx, cluster)
 	if err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to release cluster restore PVCs")
@@ -92,10 +100,23 @@ func (r *ClusterRestoreReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	if pending {
 		return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, "waiting for cluster restore PVC cleanup")
 	}
+	// All destructive cleanup checks above use the uncached API reader. Perform
+	// one final pass before the irreversible Cluster finalizer removal so a
+	// transient informer gap can never be interpreted as cleanup completion.
+	pending, err = r.hasClusterRestoreCleanupResources(reqCtx.Ctx, cluster)
+	if err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to confirm cluster restore cleanup")
+	}
+	if pending {
+		return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, "waiting for API server to confirm cluster restore cleanup")
+	}
 	return r.removeFinalizer(reqCtx, cluster)
 }
 
 func (r *ClusterRestoreReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	if r.APIReader == nil {
+		r.APIReader = mgr.GetAPIReader()
+	}
 	return intctrlutil.NewControllerManagedBy(mgr).
 		Named("cluster_restore").
 		For(&appsv1.Cluster{}).
@@ -121,17 +142,27 @@ func clusterRestoreConditionActive(cluster *appsv1.Cluster) bool {
 }
 
 func (r *ClusterRestoreReconciler) hasActiveClusterRestores(reqCtx intctrlutil.RequestCtx, cluster *appsv1.Cluster) (bool, error) {
-	list := &dpv1alpha1.RestoreList{}
-	if err := r.Client.List(reqCtx.Ctx, list, client.InNamespace(cluster.Namespace),
-		client.MatchingLabels{constant.AppInstanceLabelKey: cluster.Name}); err != nil {
+	restores, err := r.listClusterRestores(reqCtx.Ctx, cluster)
+	if err != nil {
 		return false, err
 	}
-	for i := range list.Items {
-		restore := &list.Items[i]
-		if restore.Labels[dprestore.DataProtectionRestoreLabelKey] == "" || !restore.DeletionTimestamp.IsZero() {
+	for _, restore := range restores {
+		if restore.Labels[dprestore.DataProtectionRestoreLabelKey] == "" {
 			continue
 		}
-		if restore.Status.Phase != dpv1alpha1.RestorePhaseCompleted && restore.Status.Phase != dpv1alpha1.RestorePhaseFailed {
+		// Failed and deleting Restores still own retained restore resources. Only a
+		// completed, non-deleting execution is inactive.
+		if !restore.DeletionTimestamp.IsZero() || restore.Status.Phase != dpv1alpha1.RestorePhaseCompleted {
+			return true, nil
+		}
+	}
+	pvcs, err := r.listClusterPVCs(reqCtx.Ctx, cluster)
+	if err != nil {
+		return false, err
+	}
+	for _, pvc := range pvcs {
+		if isClusterRestoreHelperPVC(pvc) ||
+			(isClusterRestoreTargetPVC(pvc) && controllerutil.ContainsFinalizer(pvc, dptypes.DataProtectionFinalizerName)) {
 			return true, nil
 		}
 	}
@@ -163,14 +194,12 @@ func (r *ClusterRestoreReconciler) removeFinalizer(reqCtx intctrlutil.RequestCtx
 }
 
 func (r *ClusterRestoreReconciler) deleteClusterRestores(reqCtx intctrlutil.RequestCtx, cluster *appsv1.Cluster) (bool, error) {
-	list := &dpv1alpha1.RestoreList{}
-	if err := r.Client.List(reqCtx.Ctx, list, client.InNamespace(cluster.Namespace),
-		client.MatchingLabels{constant.AppInstanceLabelKey: cluster.Name}); err != nil {
+	restores, err := r.listClusterRestores(reqCtx.Ctx, cluster)
+	if err != nil {
 		return false, err
 	}
 	pending := false
-	for i := range list.Items {
-		restore := &list.Items[i]
+	for _, restore := range restores {
 		if restore.Labels[dprestore.DataProtectionRestoreLabelKey] == "" {
 			continue
 		}
@@ -184,30 +213,35 @@ func (r *ClusterRestoreReconciler) deleteClusterRestores(reqCtx intctrlutil.Requ
 	return pending, nil
 }
 
-func (r *ClusterRestoreReconciler) releaseClusterRestorePVCs(reqCtx intctrlutil.RequestCtx, cluster *appsv1.Cluster) (bool, error) {
-	list := &corev1.PersistentVolumeClaimList{}
-	if err := r.Client.List(reqCtx.Ctx, list, client.InNamespace(cluster.Namespace),
-		client.MatchingLabels{constant.AppInstanceLabelKey: cluster.Name}); err != nil {
+func (r *ClusterRestoreReconciler) deleteClusterRestoreHelpers(reqCtx intctrlutil.RequestCtx, cluster *appsv1.Cluster) (bool, error) {
+	pvcs, err := r.listClusterPVCs(reqCtx.Ctx, cluster)
+	if err != nil {
 		return false, err
 	}
 	pending := false
-	for i := range list.Items {
-		pvc := &list.Items[i]
-		if pvc.Spec.DataSourceRef == nil || pvc.Spec.DataSourceRef.APIGroup == nil ||
-			*pvc.Spec.DataSourceRef.APIGroup != dptypes.DataprotectionAPIGroup {
+	for _, pvc := range pvcs {
+		if !isClusterRestoreHelperPVC(pvc) {
 			continue
 		}
-		helper := &corev1.PersistentVolumeClaim{}
-		helperKey := client.ObjectKey{Namespace: pvc.Namespace, Name: getPopulatePVCName(pvc.UID)}
-		if err := r.Client.Get(reqCtx.Ctx, helperKey, helper); err == nil {
-			pending = true
-			if helper.DeletionTimestamp.IsZero() {
-				if err := r.Client.Delete(reqCtx.Ctx, helper); err != nil && !apierrors.IsNotFound(err) {
-					return false, fmt.Errorf("delete helper PVC %s/%s: %w", helperKey.Namespace, helperKey.Name, err)
-				}
+		pending = true
+		if pvc.DeletionTimestamp.IsZero() {
+			if err := r.Client.Delete(reqCtx.Ctx, pvc); err != nil && !apierrors.IsNotFound(err) {
+				return false, fmt.Errorf("delete helper PVC %s/%s: %w", pvc.Namespace, pvc.Name, err)
 			}
-		} else if !apierrors.IsNotFound(err) {
-			return false, err
+		}
+	}
+	return pending, nil
+}
+
+func (r *ClusterRestoreReconciler) releaseClusterRestorePVCs(reqCtx intctrlutil.RequestCtx, cluster *appsv1.Cluster) (bool, error) {
+	pvcs, err := r.listClusterPVCs(reqCtx.Ctx, cluster)
+	if err != nil {
+		return false, err
+	}
+	pending := false
+	for _, pvc := range pvcs {
+		if !isClusterRestoreTargetPVC(pvc) {
+			continue
 		}
 		if controllerutil.ContainsFinalizer(pvc, dptypes.DataProtectionFinalizerName) {
 			pending = true
@@ -219,4 +253,71 @@ func (r *ClusterRestoreReconciler) releaseClusterRestorePVCs(reqCtx intctrlutil.
 		}
 	}
 	return pending, nil
+}
+
+func (r *ClusterRestoreReconciler) directReader() client.Reader {
+	if r.APIReader != nil {
+		return r.APIReader
+	}
+	return r.Client
+}
+
+func (r *ClusterRestoreReconciler) listClusterRestores(ctx context.Context, cluster *appsv1.Cluster) ([]*dpv1alpha1.Restore, error) {
+	list := &dpv1alpha1.RestoreList{}
+	if err := r.directReader().List(ctx, list, client.InNamespace(cluster.Namespace), client.MatchingLabels{
+		dptypes.ClusterUIDLabelKey: string(cluster.UID),
+	}); err != nil {
+		return nil, err
+	}
+	result := make([]*dpv1alpha1.Restore, 0, len(list.Items))
+	for i := range list.Items {
+		result = append(result, &list.Items[i])
+	}
+	return result, nil
+}
+
+func (r *ClusterRestoreReconciler) listClusterPVCs(ctx context.Context, cluster *appsv1.Cluster) ([]*corev1.PersistentVolumeClaim, error) {
+	list := &corev1.PersistentVolumeClaimList{}
+	if err := r.directReader().List(ctx, list, client.InNamespace(cluster.Namespace), client.MatchingLabels{
+		dptypes.ClusterUIDLabelKey: string(cluster.UID),
+	}); err != nil {
+		return nil, err
+	}
+	result := make([]*corev1.PersistentVolumeClaim, 0, len(list.Items))
+	for i := range list.Items {
+		result = append(result, &list.Items[i])
+	}
+	return result, nil
+}
+
+func (r *ClusterRestoreReconciler) hasClusterRestoreCleanupResources(ctx context.Context, cluster *appsv1.Cluster) (bool, error) {
+	restores, err := r.listClusterRestores(ctx, cluster)
+	if err != nil {
+		return false, err
+	}
+	for _, restore := range restores {
+		if restore.Labels[dprestore.DataProtectionRestoreLabelKey] != "" {
+			return true, nil
+		}
+	}
+	pvcs, err := r.listClusterPVCs(ctx, cluster)
+	if err != nil {
+		return false, err
+	}
+	for _, pvc := range pvcs {
+		if isClusterRestoreHelperPVC(pvc) ||
+			(isClusterRestoreTargetPVC(pvc) && controllerutil.ContainsFinalizer(pvc, dptypes.DataProtectionFinalizerName)) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func isClusterRestoreHelperPVC(pvc *corev1.PersistentVolumeClaim) bool {
+	return pvc.Labels[dprestore.DataProtectionPopulatePVCLabelKey] != ""
+}
+
+func isClusterRestoreTargetPVC(pvc *corev1.PersistentVolumeClaim) bool {
+	return pvc.Spec.DataSourceRef != nil && pvc.Spec.DataSourceRef.APIGroup != nil &&
+		*pvc.Spec.DataSourceRef.APIGroup == dptypes.DataprotectionAPIGroup
 }

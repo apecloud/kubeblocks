@@ -66,6 +66,7 @@ func TestClusterRestoreFinalizerLifecycle(t *testing.T) {
 			Labels: map[string]string{
 				constant.AppInstanceLabelKey:            cluster.Name,
 				dprestore.DataProtectionRestoreLabelKey: "running-restore",
+				dptypes.ClusterUIDLabelKey:              string(cluster.UID),
 			},
 		},
 		Status: dpv1alpha1.RestoreStatus{Phase: dpv1alpha1.RestorePhaseRunning},
@@ -98,10 +99,13 @@ func TestDeletingClusterWaitsForRestoreThenReleasesPVCs(t *testing.T) {
 	apiGroup := dptypes.DataprotectionAPIGroup
 	target := &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace:  cluster.Namespace,
-			Name:       "data-0",
-			UID:        "target-uid",
-			Labels:     map[string]string{constant.AppInstanceLabelKey: cluster.Name},
+			Namespace: cluster.Namespace,
+			Name:      "data-0",
+			UID:       "target-uid",
+			Labels: map[string]string{
+				constant.AppInstanceLabelKey: cluster.Name,
+				dptypes.ClusterUIDLabelKey:   string(cluster.UID),
+			},
 			Finalizers: []string{dptypes.DataProtectionFinalizerName},
 		},
 		Spec: corev1.PersistentVolumeClaimSpec{DataSourceRef: &corev1.TypedObjectReference{
@@ -113,6 +117,12 @@ func TestDeletingClusterWaitsForRestoreThenReleasesPVCs(t *testing.T) {
 	helper := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{
 		Namespace: cluster.Namespace,
 		Name:      getPopulatePVCName(target.UID),
+		Labels: map[string]string{
+			dptypes.ClusterUIDLabelKey:                       string(cluster.UID),
+			dprestore.DataProtectionPopulatePVCLabelKey:      getPopulatePVCName(target.UID),
+			dprestore.DataProtectionRestoreNamespaceLabelKey: target.Namespace,
+		},
+		Finalizers: []string{"test.kubeblocks.io/hold"},
 	}}
 	restore := &dpv1alpha1.Restore{ObjectMeta: metav1.ObjectMeta{
 		Namespace: cluster.Namespace,
@@ -120,6 +130,7 @@ func TestDeletingClusterWaitsForRestoreThenReleasesPVCs(t *testing.T) {
 		Labels: map[string]string{
 			constant.AppInstanceLabelKey:            cluster.Name,
 			dprestore.DataProtectionRestoreLabelKey: "execution-restore",
+			dptypes.ClusterUIDLabelKey:              string(cluster.UID),
 		},
 		Finalizers: []string{"test.kubeblocks.io/hold"},
 	}}
@@ -144,14 +155,116 @@ func TestDeletingClusterWaitsForRestoreThenReleasesPVCs(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, result.RequeueAfter > 0)
 	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(target), target))
+	require.True(t, controllerutil.ContainsFinalizer(target, dptypes.DataProtectionFinalizerName),
+		"target must remain protected until the helper is actually gone")
+	currentHelper := &corev1.PersistentVolumeClaim{}
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(helper), currentHelper))
+	require.False(t, currentHelper.DeletionTimestamp.IsZero())
+
+	currentHelper.Finalizers = nil
+	require.NoError(t, reconciler.Client.Update(context.Background(), currentHelper))
+	result, err = reconciler.Reconcile(context.Background(), req)
+	require.NoError(t, err)
+	require.True(t, result.RequeueAfter > 0)
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(target), target))
 	require.False(t, controllerutil.ContainsFinalizer(target, dptypes.DataProtectionFinalizerName))
-	require.Error(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(helper), &corev1.PersistentVolumeClaim{}))
 
 	_, err = reconciler.Reconcile(context.Background(), req)
 	require.NoError(t, err)
 	require.NoError(t, reconciler.Client.Get(context.Background(), req.NamespacedName, currentCluster))
 	require.False(t, controllerutil.ContainsFinalizer(currentCluster, dptypes.RestoreProtectionFinalizerName))
 	require.True(t, controllerutil.ContainsFinalizer(currentCluster, dptypes.DataProtectionFinalizerName))
+}
+
+func TestFailedAndDeletingRestoreKeepClusterProtected(t *testing.T) {
+	scheme := newClusterRestoreTestScheme(t)
+	for _, phase := range []dpv1alpha1.RestorePhase{
+		dpv1alpha1.RestorePhaseFailed,
+		dpv1alpha1.RestorePhaseRunning,
+	} {
+		t.Run(string(phase), func(t *testing.T) {
+			cluster := newClusterWithActiveRestore()
+			cluster.Status.Conditions = []metav1.Condition{{Type: appsv1.ConditionTypeRestore, Status: metav1.ConditionFalse}}
+			cluster.Finalizers = []string{dptypes.RestoreProtectionFinalizerName}
+			restore := newClusterExecutionRestore(cluster, phase)
+			if phase == dpv1alpha1.RestorePhaseRunning {
+				now := metav1.Now()
+				restore.DeletionTimestamp = &now
+				restore.Finalizers = []string{"test.kubeblocks.io/hold"}
+			}
+			reconciler := &ClusterRestoreReconciler{Client: fake.NewClientBuilder().WithScheme(scheme).
+				WithStatusSubresource(cluster).WithObjects(cluster, restore).Build()}
+
+			_, err := reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cluster)})
+			require.NoError(t, err)
+			current := &appsv1.Cluster{}
+			require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(cluster), current))
+			require.True(t, controllerutil.ContainsFinalizer(current, dptypes.RestoreProtectionFinalizerName))
+		})
+	}
+}
+
+func TestDeletingClusterIgnoresResourcesFromPreviousClusterUID(t *testing.T) {
+	scheme := newClusterRestoreTestScheme(t)
+	now := metav1.Now()
+	cluster := newClusterWithActiveRestore()
+	cluster.DeletionTimestamp = &now
+	cluster.Finalizers = []string{dptypes.DataProtectionFinalizerName, dptypes.RestoreProtectionFinalizerName}
+	stale := newClusterExecutionRestore(cluster, dpv1alpha1.RestorePhaseRunning)
+	stale.Labels[dptypes.ClusterUIDLabelKey] = "previous-cluster-uid"
+	reconciler := &ClusterRestoreReconciler{Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, stale).Build()}
+
+	_, err := reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cluster)})
+	require.NoError(t, err)
+	current := &appsv1.Cluster{}
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(cluster), current))
+	require.False(t, controllerutil.ContainsFinalizer(current, dptypes.RestoreProtectionFinalizerName))
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(stale), &dpv1alpha1.Restore{}))
+}
+
+func TestAPIReaderResidualPreventsClusterFinalizerRelease(t *testing.T) {
+	scheme := newClusterRestoreTestScheme(t)
+	now := metav1.Now()
+	cluster := newClusterWithActiveRestore()
+	cluster.DeletionTimestamp = &now
+	cluster.Finalizers = []string{dptypes.RestoreProtectionFinalizerName}
+	clientWithoutResidual := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster).Build()
+	residual := newClusterExecutionRestore(cluster, dpv1alpha1.RestorePhaseFailed)
+	residual.DeletionTimestamp = &now
+	residual.Finalizers = []string{"test.kubeblocks.io/hold"}
+	apiReader := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster.DeepCopy(), residual).Build()
+	reconciler := &ClusterRestoreReconciler{Client: clientWithoutResidual, APIReader: apiReader}
+
+	result, err := reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cluster)})
+	require.NoError(t, err)
+	require.True(t, result.RequeueAfter > 0)
+	current := &appsv1.Cluster{}
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(cluster), current))
+	require.True(t, controllerutil.ContainsFinalizer(current, dptypes.RestoreProtectionFinalizerName))
+}
+
+func newClusterRestoreTestScheme(t *testing.T) *runtime.Scheme {
+	t.Helper()
+	scheme := runtime.NewScheme()
+	require.NoError(t, appsv1.AddToScheme(scheme))
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
+	return scheme
+}
+
+func newClusterExecutionRestore(cluster *appsv1.Cluster, phase dpv1alpha1.RestorePhase) *dpv1alpha1.Restore {
+	return &dpv1alpha1.Restore{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: cluster.Namespace,
+			Name:      "execution-restore",
+			Labels: map[string]string{
+				constant.AppInstanceLabelKey:            cluster.Name,
+				dprestore.DataProtectionRestoreLabelKey: "execution-restore",
+				dptypes.ClusterUIDLabelKey:              string(cluster.UID),
+			},
+		},
+		Status: dpv1alpha1.RestoreStatus{Phase: phase},
+	}
 }
 
 func newClusterWithActiveRestore() *appsv1.Cluster {

@@ -341,8 +341,9 @@ func main() {
 	}
 
 	if err = (&dpcontrollers.ClusterRestoreReconciler{
-		Client:   mgr.GetClient(),
-		Recorder: mgr.GetEventRecorderFor("cluster-restore-controller"),
+		Client:    mgr.GetClient(),
+		APIReader: mgr.GetAPIReader(),
+		Recorder:  mgr.GetEventRecorderFor("cluster-restore-controller"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ClusterRestore")
 		os.Exit(1)

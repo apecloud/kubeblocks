@@ -371,7 +371,7 @@ var _ = Describe("InstanceSet Controller 2", func() {
 			}).Should(Succeed())
 		})
 
-		It("uses status role order for a roleful rolling-update window", func() {
+		It("keeps a roleful rolling-update window stable when roles change", func() {
 			createITSObj(itsName, func(f *testapps.MockInstanceSetFactory) {
 				f.SetRoles([]workloads.ReplicaRole{
 					{
@@ -405,6 +405,8 @@ var _ = Describe("InstanceSet Controller 2", func() {
 			})).Should(Succeed())
 
 			By("update its spec")
+			beforeUpdate := time.Now()
+			time.Sleep(time.Second)
 			Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
 				its.Spec.Template.Spec.DNSPolicy = corev1.DNSClusterFirstWithHostNet
 			})()).ShouldNot(HaveOccurred())
@@ -415,7 +417,24 @@ var _ = Describe("InstanceSet Controller 2", func() {
 				g.Expect(inst.Spec.Template.Spec.DNSPolicy).Should(Equal(corev1.DNSClusterFirstWithHostNet))
 			})).Should(Succeed())
 
-			By("keep leaders outside the rolling-update window")
+			By("make the updated member ready and switch the follower role")
+			Eventually(testapps.CheckObj(&testCtx, followerKey, func(g Gomega, pod *corev1.Pod) {
+				g.Expect(pod.CreationTimestamp.After(beforeUpdate)).Should(BeTrue())
+			})).Should(Succeed())
+			mockPodReadyNAvailableWithRole(itsObj.Namespace, podName(0), "leader", 0)
+			mockPodReadyNAvailableWithRole(itsObj.Namespace, podName(1), "follower", 0)
+			Eventually(func(g Gomega) {
+				leader := &workloads.Instance{}
+				g.Expect(testCtx.Cli.Get(testCtx.Ctx, followerKey, leader)).Should(Succeed())
+				g.Expect(leader.Status.Role).Should(Equal("leader"))
+
+				newFollower := &workloads.Instance{}
+				newFollowerKey := types.NamespacedName{Namespace: itsObj.Namespace, Name: podName(1)}
+				g.Expect(testCtx.Cli.Get(testCtx.Ctx, newFollowerKey, newFollower)).Should(Succeed())
+				g.Expect(newFollower.Status.Role).Should(Equal("follower"))
+			}).Should(Succeed())
+
+			By("keep the original participant and leave the new follower outside the window")
 			Consistently(func(g Gomega) {
 				for i := int32(1); i < replicas; i++ {
 					inst := &workloads.Instance{}

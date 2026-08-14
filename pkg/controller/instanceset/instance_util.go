@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -43,6 +44,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/rollingupdate"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -568,9 +570,15 @@ func buildInstanceTemplateRevision(template *corev1.PodTemplateSpec, parent *wor
 		mutateTemplateFn(templateCopy)
 	}
 	podTemplate := filterInPlaceFields(templateCopy)
+	annotations := make(map[string]string, len(parent.Annotations))
+	for key, value := range parent.Annotations {
+		if !rollingupdate.IsInternalAnnotation(key) {
+			annotations[key] = value
+		}
+	}
 	its := builder.NewInstanceSetBuilder(parent.Namespace, parent.Name).
 		SetUID(parent.UID).
-		AddAnnotationsInMap(parent.Annotations).
+		AddAnnotationsInMap(annotations).
 		SetSelectorMatchLabel(parent.Labels).
 		SetTemplate(*podTemplate).
 		GetObject()
@@ -580,6 +588,29 @@ func buildInstanceTemplateRevision(template *corev1.PodTemplateSpec, parent *wor
 		return "", err
 	}
 	return cr.Labels[controllerRevisionHashLabel], nil
+}
+
+func buildInstanceRolloutRevision(name string, template *instancetemplate.InstanceTemplateExt,
+	parent *workloads.InstanceSet) (string, error) {
+	pod, err := buildInstancePodByTemplate(name, template, parent, "rollout-intent")
+	if err != nil {
+		return "", err
+	}
+	delete(pod.Labels, appsv1.ControllerRevisionHashLabelKey)
+	intent := struct {
+		Labels      map[string]string `json:"labels,omitempty"`
+		Annotations map[string]string `json:"annotations,omitempty"`
+		Spec        corev1.PodSpec    `json:"spec"`
+	}{
+		Labels:      pod.Labels,
+		Annotations: pod.Annotations,
+		Spec:        pod.Spec,
+	}
+	data, err := json.Marshal(intent)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%x", sha256.Sum256(data)), nil
 }
 
 func getInstanceTemplateMap(annotations map[string]string) (map[string]string, error) {

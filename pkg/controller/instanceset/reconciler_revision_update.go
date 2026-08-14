@@ -31,6 +31,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/rollingupdate"
 )
 
 func NewRevisionUpdateReconciler() kubebuilderx.Reconciler {
@@ -69,6 +70,7 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kub
 		return kubebuilderx.Continue, err
 	}
 
+	previousAssignedOrdinals := its.Status.AssignedOrdinals
 	if its.Spec.FlatInstanceOrdinal {
 		r.updateAssignedOrdinals(its, nameMap, tree.List(&corev1.Pod{}))
 	}
@@ -102,6 +104,17 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kub
 	}
 
 	// 3. persistent these revisions to status
+	previousRevisions, err := GetRevisions(its.Status.UpdateRevisions)
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
+	rolloutRevisions, rolloutBasis, err := buildLegacyRolloutState(its, itsExt, nameMap)
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
+	reassigned := its.Spec.FlatInstanceOrdinal && hasReassignedOrdinal(previousAssignedOrdinals, nameMap)
+	rollingupdate.UpdateLegacyRolloutID(
+		its, previousRevisions, rolloutRevisions, rolloutBasis, reassigned)
 	revisions, err := buildRevisions(updatedRevisions)
 	if err != nil {
 		return kubebuilderx.Continue, err
@@ -128,6 +141,65 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kub
 	its.Status.ObservedGeneration = its.Generation
 
 	return kubebuilderx.Continue, nil
+}
+
+func buildLegacyRolloutState(its *workloads.InstanceSet, itsExt *instancetemplate.InstanceSetExt,
+	nameMap map[string]*instancetemplate.InstanceTemplateExt) (map[string]string, string, error) {
+	defaultTemplate := &instancetemplate.InstanceTemplateExt{
+		Name:            instancetemplate.DefaultTemplateName,
+		PodTemplateSpec: *its.Spec.Template.DeepCopy(),
+	}
+	for i := range its.Spec.VolumeClaimTemplates {
+		defaultTemplate.VolumeClaimTemplates = append(
+			defaultTemplate.VolumeClaimTemplates, *its.Spec.VolumeClaimTemplates[i].DeepCopy())
+	}
+	rolloutTemplates := instancetemplate.BuildInstanceTemplateExt(itsExt)
+	if _, ok := itsExt.InstanceTemplates[instancetemplate.DefaultTemplateName]; !ok {
+		rolloutTemplates = append(rolloutTemplates, defaultTemplate)
+	}
+	rolloutTemplateRevisions := make(map[string]string, len(rolloutTemplates)+len(its.Annotations))
+	for _, templateExt := range rolloutTemplates {
+		name := its.Name + "-rollout"
+		if templateExt.Name != instancetemplate.DefaultTemplateName {
+			name = its.Name + "-" + templateExt.Name + "-rollout"
+		}
+		revision, err := buildInstanceRolloutRevision(name, templateExt, its)
+		if err != nil {
+			return nil, "", err
+		}
+		rolloutTemplateRevisions[templateExt.Name] = revision
+	}
+	for key, value := range its.Annotations {
+		if !rollingupdate.IsInternalAnnotation(key) {
+			rolloutTemplateRevisions["annotation\x00"+key] = value
+		}
+	}
+	rolloutRevisions := make(map[string]string, len(nameMap))
+	for name, templateExt := range nameMap {
+		revision, err := buildInstanceRolloutRevision(name, templateExt, its)
+		if err != nil {
+			return nil, "", err
+		}
+		rolloutRevisions[name] = revision
+	}
+	return rolloutRevisions, rollingupdate.RolloutID(rolloutTemplateRevisions), nil
+}
+
+func hasReassignedOrdinal(previous map[string]workloads.Ordinals,
+	next map[string]*instancetemplate.InstanceTemplateExt) bool {
+	previousTemplates := make(map[int32]string)
+	for template, ordinals := range previous {
+		for _, ordinal := range ordinals.Discrete {
+			previousTemplates[ordinal] = template
+		}
+	}
+	for name, template := range next {
+		_, ordinal := parseParentNameAndOrdinal(name)
+		if previousTemplate, ok := previousTemplates[int32(ordinal)]; ok && previousTemplate != template.Name {
+			return true
+		}
+	}
+	return false
 }
 
 func (r *revisionUpdateReconciler) updateAssignedOrdinals(its *workloads.InstanceSet,

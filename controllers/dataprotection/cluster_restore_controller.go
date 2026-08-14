@@ -299,15 +299,36 @@ func (r *ClusterRestoreReconciler) adoptLegacyClusterRestoreResources(reqCtx int
 		return false, false, err
 	}
 	legacyTargets := make([]*corev1.PersistentVolumeClaim, 0)
+	verifiedTargetsByHelper := map[string]*corev1.PersistentVolumeClaim{}
 	for i := range targetList.Items {
 		pvc := &targetList.Items[i]
-		if !isClusterRestoreTargetPVC(pvc) || pvc.Labels[dptypes.ClusterUIDLabelKey] != "" {
+		if !isClusterRestoreTargetPVC(pvc) {
 			continue
 		}
-		if err := validateLegacyRestoreTargetPVC(reqCtx.Ctx, r.directReader(), pvc, cluster); err != nil {
+		clusterUID := pvc.Labels[dptypes.ClusterUIDLabelKey]
+		if clusterUID == string(cluster.UID) {
+			verifiedTargetsByHelper[getPopulatePVCName(pvc.UID)] = pvc
 			continue
 		}
+		if clusterUID != "" || validateLegacyRestoreTargetPVC(reqCtx.Ctx, r.directReader(), pvc, cluster) != nil {
+			continue
+		}
+		verifiedTargetsByHelper[getPopulatePVCName(pvc.UID)] = pvc
 		legacyTargets = append(legacyTargets, pvc)
+	}
+	legacyHelpers := make([]*corev1.PersistentVolumeClaim, 0)
+	unverifiedLegacyFound := false
+	for i := range targetList.Items {
+		helper := &targetList.Items[i]
+		if !isClusterRestoreHelperPVC(helper) || helper.Labels[dptypes.ClusterUIDLabelKey] != "" {
+			continue
+		}
+		if helper.Labels[dprestore.DataProtectionPopulatePVCLabelKey] != helper.Name ||
+			verifiedTargetsByHelper[helper.Name] == nil {
+			unverifiedLegacyFound = true
+			continue
+		}
+		legacyHelpers = append(legacyHelpers, helper)
 	}
 
 	restoreList := &dpv1alpha1.RestoreList{}
@@ -329,10 +350,13 @@ func (r *ClusterRestoreReconciler) adoptLegacyClusterRestoreResources(reqCtx int
 		}
 		if owned {
 			legacyRestores = append(legacyRestores, restore)
+		} else {
+			unverifiedLegacyFound = true
 		}
 	}
 
-	legacyFound := len(legacyTargets) > 0 || len(legacyRestores) > 0
+	legacyFound := len(legacyTargets) > 0 || len(legacyHelpers) > 0 ||
+		len(legacyRestores) > 0 || unverifiedLegacyFound
 	if !legacyFound || !controllerutil.ContainsFinalizer(cluster, dptypes.RestoreProtectionFinalizerName) {
 		return legacyFound, false, nil
 	}
@@ -342,24 +366,23 @@ func (r *ClusterRestoreReconciler) adoptLegacyClusterRestoreResources(reqCtx int
 			return true, changed, err
 		}
 		changed = true
-		helper := &corev1.PersistentVolumeClaim{}
-		key := client.ObjectKey{Namespace: pvc.Namespace, Name: getPopulatePVCName(pvc.UID)}
-		if err := r.directReader().Get(reqCtx.Ctx, key, helper); err == nil {
-			if isClusterRestoreHelperPVC(helper) && helper.Labels[dptypes.ClusterUIDLabelKey] == "" {
-				if err := r.patchLegacyClusterUID(reqCtx.Ctx, helper, cluster); err != nil {
-					return true, changed, err
-				}
-				changed = true
-			}
-		} else if !apierrors.IsNotFound(err) {
+	}
+	for _, helper := range legacyHelpers {
+		if err := r.patchLegacyClusterUID(reqCtx.Ctx, helper, cluster); err != nil {
 			return true, changed, err
 		}
+		changed = true
 	}
 	for _, restore := range legacyRestores {
 		if err := r.patchLegacyClusterUID(reqCtx.Ctx, restore, cluster); err != nil {
 			return true, changed, err
 		}
 		changed = true
+	}
+	if unverifiedLegacyFound {
+		return true, changed, intctrlutil.NewRequeueError(reconcileInterval,
+			fmt.Sprintf("legacy restore resources for Cluster %s/%s can not be safely attributed to Cluster UID %s",
+				cluster.Namespace, cluster.Name, cluster.UID))
 	}
 	return true, changed, nil
 }

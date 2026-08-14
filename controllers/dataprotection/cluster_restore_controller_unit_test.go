@@ -31,6 +31,7 @@ import (
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dprestore "github.com/apecloud/kubeblocks/pkg/dataprotection/restore"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 )
@@ -326,6 +327,33 @@ func TestLegacyRestoreResourcesAreAdoptedAfterClusterIsProtected(t *testing.T) {
 		require.Equal(t, string(cluster.UID), object.GetLabels()[dptypes.ClusterUIDLabelKey])
 	}
 	require.Equal(t, string(cluster.UID), currentTarget.Annotations[constant.KBAppClusterUIDKey])
+}
+
+func TestUnverifiedLegacyHelperBlocksClusterFinalizerRelease(t *testing.T) {
+	scheme := newClusterRestoreTestScheme(t)
+	cluster := newClusterWithActiveRestore()
+	now := metav1.Now()
+	cluster.DeletionTimestamp = &now
+	cluster.Finalizers = []string{dptypes.RestoreProtectionFinalizerName}
+	helper := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{
+		Namespace: cluster.Namespace,
+		Name:      "kb-populate-orphaned-target-uid",
+		Labels: map[string]string{
+			constant.AppInstanceLabelKey:                cluster.Name,
+			dprestore.DataProtectionPopulatePVCLabelKey: "kb-populate-orphaned-target-uid",
+		},
+	}}
+	reconciler := &ClusterRestoreReconciler{Client: fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(cluster, helper).Build()}
+
+	result, err := reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cluster)})
+	require.Error(t, err)
+	require.True(t, intctrlutil.IsRequeueError(err), err)
+	require.Zero(t, result)
+	currentCluster := &appsv1.Cluster{}
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(cluster), currentCluster))
+	require.Contains(t, currentCluster.Finalizers, dptypes.RestoreProtectionFinalizerName)
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(helper), &corev1.PersistentVolumeClaim{}))
 }
 
 func newClusterRestoreTestScheme(t *testing.T) *runtime.Scheme {

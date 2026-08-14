@@ -1895,6 +1895,13 @@ func (r *VolumePopulatorReconciler) getProvisionOnlyPVC(reqCtx intctrlutil.Reque
 	return populatePVC, nil
 }
 
+func pvClaimRefMatchesPVC(claimRef *corev1.ObjectReference, pvc *corev1.PersistentVolumeClaim) bool {
+	return claimRef != nil &&
+		claimRef.Namespace == pvc.Namespace &&
+		claimRef.Name == pvc.Name &&
+		claimRef.UID == pvc.UID
+}
+
 func (r *VolumePopulatorReconciler) rebindPVCAndPV(reqCtx intctrlutil.RequestCtx, populatePVC, pvc *corev1.PersistentVolumeClaim) (bool, error) {
 	if populatePVC == nil {
 		return false, intctrlutil.NewFatalError(fmt.Sprintf("populate PVC is nil for target PVC %s/%s; restoreData path entered without prepareData backup set", pvc.Namespace, pvc.Name))
@@ -1921,10 +1928,28 @@ func (r *VolumePopulatorReconciler) rebindPVCAndPV(reqCtx intctrlutil.RequestCtx
 	// Examine the claimref for the PV and see if it's bound to the correct PVC
 	claimRef := pv.Spec.ClaimRef
 	if pvClaimRefMatchesPVC(claimRef, pvc) {
-		if pv.Annotations[AnnPopulationAttempt] != attempt {
-			return false, intctrlutil.NewFatalError(fmt.Sprintf(
-				"PV %s already identifies target PVC %s/%s but does not carry population attempt %q",
-				pv.Name, pvc.Namespace, pvc.Name, attempt))
+		actualAttempt := pv.Annotations[AnnPopulationAttempt]
+		if actualAttempt != attempt {
+			legacyRebind := actualAttempt == "" &&
+				pv.Annotations[AnnPopulateFrom] == pvc.Spec.DataSourceRef.Name &&
+				populatePVC.Namespace == pvc.Namespace &&
+				populatePVC.Name == getPopulatePVCName(pvc.UID) &&
+				populatePVC.Spec.VolumeName == pv.Name
+			if !legacyRebind {
+				return false, intctrlutil.NewFatalError(fmt.Sprintf(
+					"PV %s already identifies target PVC %s/%s but does not carry population attempt %q",
+					pv.Name, pvc.Namespace, pvc.Name, attempt))
+			}
+			// Resume an old controller that patched the PV ClaimRef and legacy
+			// marker, then crashed before writing targetPVC.spec.volumeName.
+			patchPV := client.MergeFromWithOptions(pv.DeepCopy(), client.MergeFromWithOptimisticLock{})
+			if pv.Annotations == nil {
+				pv.Annotations = map[string]string{}
+			}
+			pv.Annotations[AnnPopulationAttempt] = attempt
+			if err := r.Client.Patch(reqCtx.Ctx, pv, patchPV); err != nil {
+				return false, err
+			}
 		}
 		return true, r.bindTargetPVCToPV(reqCtx, pvc, pv.Name)
 	}
@@ -1934,7 +1959,7 @@ func (r *VolumePopulatorReconciler) rebindPVCAndPV(reqCtx intctrlutil.RequestCtx
 			pv.Name, pvc.Namespace, pvc.Name, populatePVC.Namespace, populatePVC.Name, populatePVC.UID))
 	}
 	// Make new PV with strategic patch values to perform the PV rebind
-	patchPV := client.MergeFrom(pv.DeepCopy())
+	patchPV := client.MergeFromWithOptions(pv.DeepCopy(), client.MergeFromWithOptimisticLock{})
 	pv.Spec.ClaimRef = &corev1.ObjectReference{
 		Namespace:       pvc.Namespace,
 		Name:            pvc.Name,

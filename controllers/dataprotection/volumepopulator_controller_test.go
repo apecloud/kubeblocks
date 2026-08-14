@@ -2959,6 +2959,81 @@ func TestRebindPVCAndPVRejectsPVNotOwnedByPopulatePVC(t *testing.T) {
 	require.Empty(t, currentPV.Annotations[AnnPopulationAttempt])
 }
 
+func TestRebindPVCAndPVAdoptsLegacyHalfCompletedRebind(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	apiGroup := dptypes.DataprotectionAPIGroup
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "target", UID: "target-uid"},
+		Spec: corev1.PersistentVolumeClaimSpec{DataSourceRef: &corev1.TypedObjectReference{
+			APIGroup: &apiGroup, Kind: dptypes.BackupKind, Name: "backup",
+		}},
+	}
+	populatePVC := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: pvc.Namespace,
+			Name:      getPopulatePVCName(pvc.UID),
+			UID:       "populate-uid",
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{VolumeName: "pv"},
+	}
+	pv := &corev1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{Name: "pv", Annotations: map[string]string{AnnPopulateFrom: "backup"}},
+		Spec: corev1.PersistentVolumeSpec{ClaimRef: &corev1.ObjectReference{
+			Namespace: pvc.Namespace, Name: pvc.Name, UID: pvc.UID,
+		}},
+	}
+	k8sClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(pvc, pv).Build()
+	reconciler := &VolumePopulatorReconciler{Client: k8sClient}
+
+	rebound, err := reconciler.rebindPVCAndPV(intctrlutil.RequestCtx{Ctx: context.Background()}, populatePVC, pvc)
+	require.NoError(t, err)
+	require.True(t, rebound)
+	currentPV := &corev1.PersistentVolume{}
+	require.NoError(t, k8sClient.Get(context.Background(), client.ObjectKeyFromObject(pv), currentPV))
+	require.NotEmpty(t, currentPV.Annotations[AnnPopulationAttempt])
+	currentPVC := &corev1.PersistentVolumeClaim{}
+	require.NoError(t, k8sClient.Get(context.Background(), client.ObjectKeyFromObject(pvc), currentPVC))
+	require.Equal(t, pv.Name, currentPVC.Spec.VolumeName)
+}
+
+func TestRebindPVCAndPVDoesNotOverwriteConcurrentClaimRefChange(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	apiGroup := dptypes.DataprotectionAPIGroup
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "target", UID: "target-uid"},
+		Spec: corev1.PersistentVolumeClaimSpec{DataSourceRef: &corev1.TypedObjectReference{
+			APIGroup: &apiGroup, Kind: dptypes.BackupKind, Name: "backup",
+		}},
+	}
+	populatePVC := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "populate", UID: "populate-uid"},
+		Spec:       corev1.PersistentVolumeClaimSpec{VolumeName: "pv"},
+	}
+	stalePV := &corev1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{Name: "pv", ResourceVersion: "1"},
+		Spec: corev1.PersistentVolumeSpec{ClaimRef: &corev1.ObjectReference{
+			Namespace: populatePVC.Namespace, Name: populatePVC.Name, UID: populatePVC.UID,
+		}},
+	}
+	livePV := stalePV.DeepCopy()
+	livePV.ResourceVersion = "2"
+	livePV.Spec.ClaimRef = &corev1.ObjectReference{Namespace: "default", Name: "other", UID: "other-uid"}
+	liveClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(pvc, livePV).Build()
+	staleReader := fake.NewClientBuilder().WithScheme(scheme).WithObjects(stalePV).Build()
+	reconciler := &VolumePopulatorReconciler{Client: liveClient, APIReader: staleReader}
+
+	rebound, err := reconciler.rebindPVCAndPV(intctrlutil.RequestCtx{Ctx: context.Background()}, populatePVC, pvc)
+	require.False(t, rebound)
+	require.Error(t, err)
+	require.True(t, apierrors.IsConflict(err), err)
+	currentPV := &corev1.PersistentVolume{}
+	require.NoError(t, liveClient.Get(context.Background(), client.ObjectKeyFromObject(livePV), currentPV))
+	require.Equal(t, "other", currentPV.Spec.ClaimRef.Name)
+	require.Empty(t, currentPV.Annotations[AnnPopulationAttempt])
+}
+
 func TestRestoreSystemAccountSecretsUsesShardingSecretName(t *testing.T) {
 	require.Equal(t, "cluster-shard-admin", systemAccountSecretName(systemAccountSecretScopeSharding, "cluster", "shard", "admin"))
 	require.Equal(t, constant.GenerateAccountSecretName("cluster", "mysql", "admin"),

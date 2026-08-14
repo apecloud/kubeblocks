@@ -1010,6 +1010,9 @@ func (r *VolumePopulatorReconciler) completeBoundPVCIfNeeded(reqCtx intctrlutil.
 		break
 	}
 	if !populateReleased {
+		if !pvcBindingCompleted(pvc) {
+			return intctrlutil.NewRequeueError(reconcileInterval, "waiting for Kubernetes to complete target PVC binding")
+		}
 		// Release the target PVC after prepareData and PV rebind. PostReady
 		// actions may need the workload pod to start, which cannot happen while
 		// the populate PVC still owns the restored PV or while the target PVC is
@@ -1082,7 +1085,7 @@ func (r *VolumePopulatorReconciler) waitForSerialPredecessors(reqCtx intctrlutil
 		if cond != nil && cond.Status == corev1.ConditionFalse {
 			return intctrlutil.NewFatalError(fmt.Sprintf("previous restore PVC %s/%s failed: %s", item.Namespace, item.Name, cond.Message))
 		}
-		if item.Spec.VolumeName != "" {
+		if pvcReadyForRestoreProgression(item) {
 			continue
 		}
 		if err = r.UpdatePVCConditions(reqCtx, pvc, ReasonPopulatingProcessing,
@@ -1387,7 +1390,7 @@ func (r *VolumePopulatorReconciler) allRestorePVCsForComponentBound(reqCtx intct
 		if cond != nil && cond.Status == corev1.ConditionFalse {
 			return false, intctrlutil.NewFatalError(fmt.Sprintf("restore PVC %s/%s failed: %s", item.Namespace, item.Name, cond.Message))
 		}
-		if item.Spec.VolumeName == "" {
+		if !pvcReadyForRestoreProgression(item) {
 			return false, nil
 		}
 	}
@@ -1405,7 +1408,7 @@ func (r *VolumePopulatorReconciler) allRestorePVCsForClusterBound(reqCtx intctrl
 		if cond != nil && cond.Status == corev1.ConditionFalse {
 			return false, intctrlutil.NewFatalError(fmt.Sprintf("restore PVC %s/%s failed: %s", item.Namespace, item.Name, cond.Message))
 		}
-		if item.Spec.VolumeName == "" {
+		if !pvcReadyForRestoreProgression(item) {
 			return false, nil
 		}
 	}
@@ -1460,6 +1463,10 @@ func pvcPopulateReleased(pvc *corev1.PersistentVolumeClaim) bool {
 	cond := findPVCConditionByType(pvc, string(PersistentVolumeClaimPopulating))
 	return cond != nil && cond.Status == corev1.ConditionTrue &&
 		(cond.Reason == ReasonPopulatingSucceed || cond.Reason == ReasonPopulatingProvisioned)
+}
+
+func pvcReadyForRestoreProgression(pvc *corev1.PersistentVolumeClaim) bool {
+	return pvcPopulateReleased(pvc) || pvcBindingCompleted(pvc)
 }
 
 func (r *VolumePopulatorReconciler) listRestorePVCsForComponent(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim) ([]corev1.PersistentVolumeClaim, error) {
@@ -1859,6 +1866,14 @@ func (r *VolumePopulatorReconciler) syncTargetPVCBoundStatus(reqCtx intctrlutil.
 	pvc.Status.Capacity = capacity
 	pvc.Status.AccessModes = accessModes
 	return r.Client.Status().Patch(reqCtx.Ctx, pvc, patch)
+}
+
+func pvcBindingCompleted(pvc *corev1.PersistentVolumeClaim) bool {
+	if pvc.Spec.VolumeName == "" {
+		return false
+	}
+	_, completed := pvc.Annotations[volume.AnnBindCompleted]
+	return completed
 }
 
 func (r *VolumePopulatorReconciler) UpdatePVCConditions(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim, reason, message string) error {

@@ -21,10 +21,12 @@ package constant
 
 // labels
 const (
-	OpsRequestTypeLabelKey      = "operations.kubeblocks.io/ops-type"
-	OpsRequestNameLabelKey      = "operations.kubeblocks.io/ops-name"
-	OpsRequestNamespaceLabelKey = "operations.kubeblocks.io/ops-namespace"
-	OpsRequestUIDAnnotationKey  = "operations.kubeblocks.io/ops-uid"
+	OpsRequestTypeLabelKey                  = "operations.kubeblocks.io/ops-type"
+	OpsRequestNameLabelKey                  = "operations.kubeblocks.io/ops-name"
+	OpsRequestNamespaceLabelKey             = "operations.kubeblocks.io/ops-namespace"
+	OpsRequestUIDAnnotationKey              = "operations.kubeblocks.io/ops-uid"
+	OpsRequestBackupIntentHashAnnotationKey = "operations.kubeblocks.io/backup-intent-hash"
+	OpsRequestBackupSpecHashAnnotationKey   = "operations.kubeblocks.io/backup-spec-hash"
 )
 
 // annotations

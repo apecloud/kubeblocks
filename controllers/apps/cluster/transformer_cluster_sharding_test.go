@@ -529,8 +529,12 @@ var _ = Describe("cluster sharding shared transformers", func() {
 		transCtx := newTransformContext(referenced)
 		transCtx.componentDefs = map[string]*appsv1.ComponentDefinition{compDefName: newComponentDefinition()}
 		transCtx.shardings = []*appsv1.ClusterSharding{sharding}
+		comps := []*appsv1.ClusterComponentSpec{{Name: "shard-0"}, {Name: "shard-1"}}
 		transCtx.shardingComps = map[string][]*appsv1.ClusterComponentSpec{
-			shardingName: {{Name: "shard-0"}, {Name: "shard-1"}},
+			shardingName: comps,
+		}
+		transCtx.shardingCompsWithTpl = map[string]map[string][]*appsv1.ClusterComponentSpec{
+			shardingName: {"": comps},
 		}
 
 		managed, err := transformer.newSystemAccountSecret(transCtx, sharding, accountName)
@@ -538,12 +542,13 @@ var _ = Describe("cluster sharding shared transformers", func() {
 		Expect(managed.Data).Should(HaveKeyWithValue(constant.AccountPasswdForSecret, []byte("shared-secret")))
 		Expect(managed.Data).ShouldNot(HaveKey("minio-password"))
 
-		transformer.rewriteSystemAccount(transCtx, shardingName, accountName, "revision")
-		rewritten := transCtx.shardings[0].Template.SystemAccounts[0]
-		Expect(rewritten.SecretRef.Name).Should(Equal(managed.Name))
-		Expect(rewritten.SecretRef.Password).Should(BeEmpty())
+		transformer.rewriteSystemAccount(transCtx, sharding, accountName, "revision")
+		declared := transCtx.shardings[0].Template.SystemAccounts[0]
+		Expect(declared.SecretRef.Name).Should(Equal("custom-password-key"))
+		Expect(declared.SecretRef.Password).Should(Equal("minio-password"))
 		for _, comp := range transCtx.shardingComps[shardingName] {
 			Expect(comp.SystemAccounts).Should(HaveLen(1))
+			Expect(comp.SystemAccounts[0].SecretRef.Name).Should(Equal(managed.Name))
 			Expect(comp.SystemAccounts[0].SecretRef.Password).Should(BeEmpty())
 		}
 	})
@@ -743,7 +748,8 @@ var _ = Describe("cluster sharding shared transformers", func() {
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(managedRevision).Should(Equal(sourceSecretRevision(source, passwordKey)))
 		Expect(managedRevision).ShouldNot(Equal("opaque-revision"))
-		Expect(sharding.Template.SystemAccounts[0].SecretRefRevision).Should(Equal(managedRevision))
+		Expect(sharding.Template.SystemAccounts[0].SecretRef.Name).Should(Equal("source-account"))
+		Expect(sharding.Template.SystemAccounts[0].SecretRefRevision).Should(Equal("opaque-revision"))
 		for _, comp := range transCtx.shardingComps[shardingName] {
 			Expect(comp.SystemAccounts[0].SecretRefRevision).Should(Equal(managedRevision))
 		}
@@ -784,9 +790,7 @@ var _ = Describe("cluster sharding shared transformers", func() {
 			transCtx := newTransformContext(managed)
 			transCtx.componentDefs = map[string]*appsv1.ComponentDefinition{compDefName: newComponentDefinition()}
 			transCtx.shardings = []*appsv1.ClusterSharding{sharding}
-			transCtx.shardingComps = map[string][]*appsv1.ClusterComponentSpec{
-				shardingName: {{Name: "shard-0"}},
-			}
+			setShardingComps(transCtx, sharding)
 			graphCli := model.NewGraphClient(transCtx.Client)
 			transCtx.Client = graphCli
 			dag := graph.NewDAG()
@@ -862,7 +866,7 @@ var _ = Describe("cluster sharding shared transformers", func() {
 		Expect(graphCli.IsAction(dag, managed, model.ActionDeletePtr())).Should(BeTrue())
 	})
 
-	It("rewrites shared system accounts on sharding and generated shard components", func() {
+	It("rewrites shared system accounts only on generated shard components", func() {
 		transformer := &clusterShardingAccountTransformer{}
 		disabled := true
 		sharding := newSharding()
@@ -871,35 +875,45 @@ var _ = Describe("cluster sharding shared transformers", func() {
 				Name:     accountName,
 				Disabled: &disabled,
 				SecretRef: &appsv1.ProvisionSecretRef{
+					Name:     "source-account",
 					Password: "password-key",
 				},
 			},
 		}
 		transCtx := newTransformContext()
 		transCtx.shardings = []*appsv1.ClusterSharding{sharding}
-		transCtx.shardingComps = map[string][]*appsv1.ClusterComponentSpec{
-			shardingName: {
-				{Name: "shard-0"},
-				{Name: "shard-1"},
-			},
-		}
+		setShardingComps(transCtx, sharding)
+		(&clusterNormalizationTransformer{}).writeBackCompNShardingSpecs(transCtx)
+		Expect(transCtx.Cluster.Spec.Shardings).Should(HaveLen(1))
+		Expect(transCtx.Cluster.Spec.Shardings[0].ShardingDef).Should(Equal("sharddef"))
 
-		transformer.rewriteSystemAccount(transCtx, shardingName, accountName, "revision")
-		rewritten := transCtx.shardings[0].Template.SystemAccounts[0]
-		Expect(ptr.Deref(rewritten.Disabled, false)).Should(BeTrue())
-		Expect(rewritten.SecretRef.Name).Should(Equal(shardingAccountSecretName(clusterName, shardingName, accountName)))
-		Expect(rewritten.SecretRef.Namespace).Should(Equal(namespace))
-		Expect(rewritten.SecretRef.Password).Should(BeEmpty())
-		Expect(rewritten.SecretRefRevision).Should(Equal("revision"))
+		transformer.rewriteSystemAccount(transCtx, sharding, accountName, "revision")
+		declared := transCtx.shardings[0].Template.SystemAccounts[0]
+		Expect(ptr.Deref(declared.Disabled, false)).Should(BeTrue())
+		Expect(declared.SecretRef.Name).Should(Equal("source-account"))
+		Expect(declared.SecretRef.Password).Should(Equal("password-key"))
+		Expect(declared.SecretRefRevision).Should(BeEmpty())
+		persisted := transCtx.Cluster.Spec.Shardings[0].Template.SystemAccounts[0]
+		Expect(persisted.SecretRef.Name).Should(Equal("source-account"))
+		Expect(persisted.SecretRef.Password).Should(Equal("password-key"))
+		Expect(persisted.SecretRefRevision).Should(BeEmpty())
 		for _, comp := range transCtx.shardingComps[shardingName] {
 			Expect(comp.SystemAccounts).Should(HaveLen(1))
-			Expect(comp.SystemAccounts[0].SecretRef.Name).Should(Equal(rewritten.SecretRef.Name))
+			Expect(ptr.Deref(comp.SystemAccounts[0].Disabled, false)).Should(BeTrue())
+			Expect(comp.SystemAccounts[0].SecretRef.Name).
+				Should(Equal(shardingAccountSecretName(clusterName, shardingName, accountName)))
+			Expect(comp.SystemAccounts[0].SecretRef.Namespace).Should(Equal(namespace))
+			Expect(comp.SystemAccounts[0].SecretRef.Password).Should(BeEmpty())
+			Expect(comp.SystemAccounts[0].SecretRefRevision).Should(Equal("revision"))
 		}
 
-		transformer.rewriteSystemAccount(transCtx, shardingName, "monitor", "monitor-revision")
-		Expect(transCtx.shardings[0].Template.SystemAccounts).Should(HaveLen(2))
-		Expect(transCtx.shardings[0].Template.SystemAccounts[1].Name).Should(Equal("monitor"))
-		Expect(ptr.Deref(transCtx.shardings[0].Template.SystemAccounts[1].Disabled, true)).Should(BeFalse())
+		transformer.rewriteSystemAccount(transCtx, sharding, "monitor", "monitor-revision")
+		Expect(transCtx.shardings[0].Template.SystemAccounts).Should(HaveLen(1))
+		for _, comp := range transCtx.shardingComps[shardingName] {
+			Expect(comp.SystemAccounts).Should(HaveLen(2))
+			Expect(comp.SystemAccounts[1].Name).Should(Equal("monitor"))
+			Expect(ptr.Deref(comp.SystemAccounts[1].Disabled, true)).Should(BeFalse())
+		}
 	})
 
 	It("reconciles only sharding definitions marked with shared system accounts", func() {
@@ -919,16 +933,10 @@ var _ = Describe("cluster sharding shared transformers", func() {
 		transCtx.shardingDefs = map[string]*appsv1.ShardingDefinition{
 			"sharddef": newShardingDefinition(),
 		}
-		transCtx.shardingComps = map[string][]*appsv1.ClusterComponentSpec{
-			shardingName: {
-				{Name: "shard-0"},
-			},
-		}
+		setShardingComps(transCtx, sharding)
 
 		Expect(transformer.reconcileShardingAccounts(transCtx, nil, nil)).Should(Succeed())
-		Expect(transCtx.shardings[0].Template.SystemAccounts).Should(HaveLen(1))
-		Expect(transCtx.shardings[0].Template.SystemAccounts[0].SecretRef.Name).
-			Should(Equal(shardingAccountSecretName(clusterName, shardingName, accountName)))
+		Expect(transCtx.shardings[0].Template.SystemAccounts).Should(BeEmpty())
 		Expect(transCtx.shardingComps[shardingName][0].SystemAccounts).Should(HaveLen(1))
 	})
 

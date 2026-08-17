@@ -109,7 +109,7 @@ func (t *clusterShardingAccountTransformer) reconcileShardingAccount(transCtx *c
 		}
 	}
 
-	t.rewriteSystemAccount(transCtx, sharding.Name, accountName, revision)
+	t.rewriteSystemAccount(transCtx, sharding, accountName, revision)
 
 	return nil
 }
@@ -318,7 +318,8 @@ func setSecretRevision(secret *corev1.Secret, revision string) {
 	secret.Annotations[constant.SecretRevisionAnnotationKey] = revision
 }
 
-func (t *clusterShardingAccountTransformer) rewriteSystemAccount(transCtx *clusterTransformContext, shardingName, accountName, revision string) {
+func (t *clusterShardingAccountTransformer) rewriteSystemAccount(transCtx *clusterTransformContext,
+	sharding *appsv1.ClusterSharding, accountName, revision string) {
 	var (
 		cluster = transCtx.Cluster
 	)
@@ -326,33 +327,28 @@ func (t *clusterShardingAccountTransformer) rewriteSystemAccount(transCtx *clust
 		Name:     accountName,
 		Disabled: ptr.To(false), // default to false
 		SecretRef: &appsv1.ProvisionSecretRef{
-			Name:      shardingAccountSecretName(cluster.Name, shardingName, accountName),
+			Name:      shardingAccountSecretName(cluster.Name, sharding.Name, accountName),
 			Namespace: cluster.Namespace,
 		},
 		SecretRefRevision: revision,
 	}
 
-	// update sharding
-	for i, sharding := range transCtx.shardings {
-		if sharding.Name == shardingName {
-			for _, account := range sharding.Template.SystemAccounts {
-				if account.Name == accountName {
-					newAccount.Disabled = account.Disabled
-					break
-				}
-			}
-			transCtx.shardings[i].Template.SystemAccounts =
-				upsertSystemAccount(transCtx.shardings[i].Template.SystemAccounts, newAccount)
+	for _, account := range sharding.Template.SystemAccounts {
+		if account.Name == accountName {
+			newAccount.Disabled = account.Disabled
 			break
 		}
 	}
 
-	// update sharding components
-	shardingComps := transCtx.shardingComps[shardingName]
-	for i := range shardingComps {
-		shardingComps[i].SystemAccounts = upsertSystemAccount(shardingComps[i].SystemAccounts, newAccount)
+	// Normalization expands a sharding into component specs before this transformer
+	// runs. Rewrite only those effective specs and keep the sharding declaration
+	// unchanged, so a user-provided source Secret remains the source on the next
+	// reconcile. shardingCompsWithTpl and shardingComps share component pointers.
+	for _, comps := range transCtx.shardingCompsWithTpl[sharding.Name] {
+		for _, comp := range comps {
+			comp.SystemAccounts = upsertSystemAccount(comp.SystemAccounts, newAccount)
+		}
 	}
-	transCtx.shardingComps[shardingName] = shardingComps
 }
 
 func upsertSystemAccount(accounts []appsv1.ComponentSystemAccount,

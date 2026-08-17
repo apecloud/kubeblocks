@@ -109,7 +109,7 @@ func (t *clusterShardingAccountTransformer) reconcileShardingAccount(transCtx *c
 		}
 	}
 
-	t.rewriteSystemAccount(transCtx, sharding, accountName, revision)
+	t.rewriteSystemAccount(transCtx, sharding.Name, accountName, revision)
 
 	return nil
 }
@@ -318,8 +318,7 @@ func setSecretRevision(secret *corev1.Secret, revision string) {
 	secret.Annotations[constant.SecretRevisionAnnotationKey] = revision
 }
 
-func (t *clusterShardingAccountTransformer) rewriteSystemAccount(transCtx *clusterTransformContext,
-	sharding *appsv1.ClusterSharding, accountName, revision string) {
+func (t *clusterShardingAccountTransformer) rewriteSystemAccount(transCtx *clusterTransformContext, shardingName, accountName, revision string) {
 	var (
 		cluster = transCtx.Cluster
 	)
@@ -327,15 +326,20 @@ func (t *clusterShardingAccountTransformer) rewriteSystemAccount(transCtx *clust
 		Name:     accountName,
 		Disabled: ptr.To(false), // default to false
 		SecretRef: &appsv1.ProvisionSecretRef{
-			Name:      shardingAccountSecretName(cluster.Name, sharding.Name, accountName),
+			Name:      shardingAccountSecretName(cluster.Name, shardingName, accountName),
 			Namespace: cluster.Namespace,
 		},
 		SecretRefRevision: revision,
 	}
 
-	for _, account := range sharding.Template.SystemAccounts {
-		if account.Name == accountName {
-			newAccount.Disabled = account.Disabled
+	for _, sharding := range transCtx.shardings {
+		if sharding.Name == shardingName {
+			for _, account := range sharding.Template.SystemAccounts {
+				if account.Name == accountName {
+					newAccount.Disabled = account.Disabled
+					break
+				}
+			}
 			break
 		}
 	}
@@ -343,11 +347,11 @@ func (t *clusterShardingAccountTransformer) rewriteSystemAccount(transCtx *clust
 	// Rewrite only the expanded component specs and keep the sharding declaration
 	// unchanged, so a user-provided source Secret remains the source on the next
 	// reconcile. shardingComps and shardingCompsWithTpl share component pointers.
-	shardingComps := transCtx.shardingComps[sharding.Name]
+	shardingComps := transCtx.shardingComps[shardingName]
 	for i := range shardingComps {
 		shardingComps[i].SystemAccounts = upsertSystemAccount(shardingComps[i].SystemAccounts, newAccount)
 	}
-	transCtx.shardingComps[sharding.Name] = shardingComps
+	transCtx.shardingComps[shardingName] = shardingComps
 }
 
 func upsertSystemAccount(accounts []appsv1.ComponentSystemAccount,

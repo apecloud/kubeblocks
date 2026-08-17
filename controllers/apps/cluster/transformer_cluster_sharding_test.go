@@ -542,7 +542,7 @@ var _ = Describe("cluster sharding shared transformers", func() {
 		Expect(managed.Data).Should(HaveKeyWithValue(constant.AccountPasswdForSecret, []byte("shared-secret")))
 		Expect(managed.Data).ShouldNot(HaveKey("minio-password"))
 
-		transformer.rewriteSystemAccount(transCtx, sharding, accountName, "revision")
+		transformer.rewriteSystemAccount(transCtx, shardingName, accountName, "revision")
 		declared := transCtx.shardings[0].Template.SystemAccounts[0]
 		Expect(declared.SecretRef.Name).Should(Equal("custom-password-key"))
 		Expect(declared.SecretRef.Password).Should(Equal("minio-password"))
@@ -887,7 +887,7 @@ var _ = Describe("cluster sharding shared transformers", func() {
 		Expect(transCtx.Cluster.Spec.Shardings).Should(HaveLen(1))
 		Expect(transCtx.Cluster.Spec.Shardings[0].ShardingDef).Should(Equal("sharddef"))
 
-		transformer.rewriteSystemAccount(transCtx, sharding, accountName, "revision")
+		transformer.rewriteSystemAccount(transCtx, shardingName, accountName, "revision")
 		declared := transCtx.shardings[0].Template.SystemAccounts[0]
 		Expect(ptr.Deref(declared.Disabled, false)).Should(BeTrue())
 		Expect(declared.SecretRef.Name).Should(Equal("source-account"))
@@ -907,7 +907,7 @@ var _ = Describe("cluster sharding shared transformers", func() {
 			Expect(comp.SystemAccounts[0].SecretRefRevision).Should(Equal("revision"))
 		}
 
-		transformer.rewriteSystemAccount(transCtx, sharding, "monitor", "monitor-revision")
+		transformer.rewriteSystemAccount(transCtx, shardingName, "monitor", "monitor-revision")
 		Expect(transCtx.shardings[0].Template.SystemAccounts).Should(HaveLen(1))
 		for _, comp := range transCtx.shardingComps[shardingName] {
 			Expect(comp.SystemAccounts).Should(HaveLen(2))

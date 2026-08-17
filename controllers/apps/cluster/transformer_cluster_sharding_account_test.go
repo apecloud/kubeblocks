@@ -409,6 +409,7 @@ var _ = Describe("cluster sharding shared system account password contract", fun
 		transformer, transCtx, graphCli, dag, shardingSpec, managed :=
 			newSourceSecretReconcile([]byte("new-password"), []byte("old-password"), false)
 		shardingSpec.Template.SystemAccounts[0].SecretRefRevision = "opaque-revision"
+		(&clusterNormalizationTransformer{}).writeBackCompNShardingSpecs(transCtx)
 
 		Expect(transformer.reconcileShardingAccount(transCtx, graphCli, dag, shardingSpec, accountName)).To(Succeed())
 		updated := graphCli.FindMatchedVertex(dag, managed).(*model.ObjectVertex).Obj.(*corev1.Secret)
@@ -418,7 +419,11 @@ var _ = Describe("cluster sharding shared system account password contract", fun
 		Expect(err).NotTo(HaveOccurred())
 		Expect(managedRevision).To(Equal(sourceSecretRevision(source, passwordKey)))
 		Expect(managedRevision).NotTo(Equal("opaque-revision"))
-		Expect(shardingSpec.Template.SystemAccounts[0].SecretRefRevision).To(Equal(managedRevision))
+		Expect(shardingSpec.Template.SystemAccounts[0].SecretRef.Name).To(Equal("source-account"))
+		Expect(shardingSpec.Template.SystemAccounts[0].SecretRefRevision).To(Equal("opaque-revision"))
+		persisted := transCtx.Cluster.Spec.Shardings[0].Template.SystemAccounts[0]
+		Expect(persisted.SecretRef.Name).To(Equal("source-account"))
+		Expect(persisted.SecretRefRevision).To(Equal("opaque-revision"))
 		for _, comp := range transCtx.shardingComps[sharding] {
 			Expect(comp.SystemAccounts[0].SecretRefRevision).To(Equal(managedRevision))
 		}

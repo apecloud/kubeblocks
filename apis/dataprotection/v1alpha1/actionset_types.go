@@ -120,6 +120,8 @@ type BackupActionSpec struct {
 
 	// Represents a custom deletion action that can be executed before the built-in deletion action.
 	//
+	// For backups with multiple targets, the controller creates one preDelete action job for each target.
+	//
 	// If the original cluster and an available target pod still exist, the controller injects the
 	// current connection information through DP_DB_* environment variables. It will also target pod's env/envFrom.
 	// Otherwise, these environment variables are omitted.

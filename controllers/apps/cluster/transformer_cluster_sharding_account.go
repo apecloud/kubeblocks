@@ -332,8 +332,7 @@ func (t *clusterShardingAccountTransformer) rewriteSystemAccount(transCtx *clust
 		SecretRefRevision: revision,
 	}
 
-	// update sharding
-	for i, sharding := range transCtx.shardings {
+	for _, sharding := range transCtx.shardings {
 		if sharding.Name == shardingName {
 			for _, account := range sharding.Template.SystemAccounts {
 				if account.Name == accountName {
@@ -341,13 +340,13 @@ func (t *clusterShardingAccountTransformer) rewriteSystemAccount(transCtx *clust
 					break
 				}
 			}
-			transCtx.shardings[i].Template.SystemAccounts =
-				upsertSystemAccount(transCtx.shardings[i].Template.SystemAccounts, newAccount)
 			break
 		}
 	}
 
-	// update sharding components
+	// Rewrite only the expanded component specs and keep the sharding declaration
+	// unchanged, so a user-provided source Secret remains the source on the next
+	// reconcile. shardingComps and shardingCompsWithTpl share component pointers.
 	shardingComps := transCtx.shardingComps[shardingName]
 	for i := range shardingComps {
 		shardingComps[i].SystemAccounts = upsertSystemAccount(shardingComps[i].SystemAccounts, newAccount)

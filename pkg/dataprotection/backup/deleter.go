@@ -334,7 +334,7 @@ func (d *Deleter) doPreDeleteActions(
 		jobKey := buildTargetPreDeleteJobKey(backup, target.Name, i)
 		targetBackupPath := filepath.Join(backupFilePath, target.Name)
 		job, err := d.doPreDeleteAction(backup, target, jobKey, backupRepo,
-			preDeleteAction, targetBackupPath)
+			preDeleteAction, legacyPVCName, targetBackupPath)
 		if err != nil {
 			return nil, err
 		}
@@ -349,6 +349,7 @@ func (d *Deleter) doPreDeleteAction(
 	preJobKey client.ObjectKey,
 	backupRepo *dpv1alpha1.BackupRepo,
 	preDeleteAction *dpv1alpha1.BaseJobActionSpec,
+	legacyPVCName string,
 	backupFilePath string) (*batchv1.Job, error) {
 	preJob := &batchv1.Job{}
 	if exists, err := ctrlutil.CheckResourceExists(d.Ctx, d.Client, preJobKey, preJob); err != nil {

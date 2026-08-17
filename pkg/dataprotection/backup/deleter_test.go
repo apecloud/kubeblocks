@@ -29,6 +29,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -39,6 +40,7 @@ import (
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	ctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
@@ -112,7 +114,7 @@ func TestDeleterDoPreDeleteActionCreatesAndReusesJob(t *testing.T) {
 	deleter.Req.Namespace = backup.Namespace
 
 	job, err := deleter.doPreDeleteAction(backup, backup.Status.Target, BuildDeleteBackupFilesJobKey(backup, true),
-		repo, &dpv1alpha1.BaseJobActionSpec{Image: "deleter:$(IMAGE_TAG)", Command: []string{"delete"}}, "/backup/path")
+		repo, &dpv1alpha1.BaseJobActionSpec{Image: "deleter:$(IMAGE_TAG)", Command: []string{"delete"}}, "", "/backup/path")
 	assert.NoError(t, err)
 	assert.Empty(t, job.Name)
 
@@ -145,7 +147,7 @@ func TestDeleterDoPreDeleteActionCreatesAndReusesJob(t *testing.T) {
 	}
 
 	job, err = deleter.doPreDeleteAction(backup, backup.Status.Target, BuildDeleteBackupFilesJobKey(backup, true),
-		repo, &dpv1alpha1.BaseJobActionSpec{Image: "deleter:$(IMAGE_TAG)", Command: []string{"delete"}}, "/backup/path")
+		repo, &dpv1alpha1.BaseJobActionSpec{Image: "deleter:$(IMAGE_TAG)", Command: []string{"delete"}}, "", "/backup/path")
 	assert.NoError(t, err)
 	assert.Equal(t, got.Name, job.Name)
 }
@@ -215,7 +217,7 @@ func TestDeleterDoPreDeleteActionsCreatesJobForEachTarget(t *testing.T) {
 	}
 
 	jobs, err := deleter.doPreDeleteActions(backup, &dpv1alpha1.BackupRepo{},
-		&dpv1alpha1.BaseJobActionSpec{Image: "deleter", Command: []string{"delete"}}, "/backup/path")
+		&dpv1alpha1.BaseJobActionSpec{Image: "deleter", Command: []string{"delete"}}, "", "/backup/path")
 	assert.NoError(t, err)
 	assert.Len(t, jobs, 2)
 
@@ -234,7 +236,7 @@ func TestDeleterDoPreDeleteActionsCreatesJobForEachTarget(t *testing.T) {
 	}
 
 	jobs, err = deleter.doPreDeleteActions(backup, &dpv1alpha1.BackupRepo{},
-		&dpv1alpha1.BaseJobActionSpec{Image: "deleter", Command: []string{"delete"}}, "/backup/path")
+		&dpv1alpha1.BaseJobActionSpec{Image: "deleter", Command: []string{"delete"}}, "", "/backup/path")
 	assert.NoError(t, err)
 	assert.Equal(t, buildTargetPreDeleteJobKey(backup, "first", 0).Name, jobs[0].Name)
 	assert.Equal(t, buildTargetPreDeleteJobKey(backup, "second", 1).Name, jobs[1].Name)

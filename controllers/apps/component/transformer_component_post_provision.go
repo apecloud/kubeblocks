@@ -58,7 +58,8 @@ func (t *componentPostProvisionTransformer) Transform(ctx graph.TransformContext
 	if err != nil {
 		err = lifecycle.IgnoreNotDefined(err)
 		if invoked {
-			emitLifecycleActionFailureEvent(transCtx, postProvisionFailedEventReason, "postProvision", err)
+			reportComponentLifecycleActionFailureEvent(transCtx, dag,
+				postProvisionFailureFingerprintAnnotationKey, postProvisionFailedEventReason, "postProvision", err)
 		}
 		if errors.Is(err, lifecycle.ErrPreconditionFailed) {
 			err = fmt.Errorf("%w: %w", intctrlutil.NewDelayedRequeueError(time.Second*10, "wait for lifecycle action precondition"), err)
@@ -81,6 +82,7 @@ func (t *componentPostProvisionTransformer) markPostProvisionDone(transCtx *comp
 	}
 	compObj := comp.DeepCopy()
 	timeStr := time.Now().Format(time.RFC3339Nano)
+	delete(comp.Annotations, postProvisionFailureFingerprintAnnotationKey)
 	comp.Annotations[kbCompPostProvisionDoneKey] = timeStr
 
 	graphCli, _ := transCtx.Client.(model.GraphClient)

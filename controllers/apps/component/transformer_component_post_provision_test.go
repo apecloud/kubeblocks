@@ -151,11 +151,13 @@ var _ = Describe("post-provision transformer test", func() {
 			})
 
 			It("ok", func() {
+				transCtx.Component.Annotations[postProvisionFailureFingerprintAnnotationKey] = "previous-failure"
 				transformer := &componentPostProvisionTransformer{}
 				err := transformer.Transform(transCtx, dag)
 				Expect(err).ShouldNot(BeNil())
 				Expect(err.Error()).Should(ContainSubstring("requeue to waiting for post-provision annotation to be set"))
 				Expect(postProvisionCompleted).Should(BeTrue())
+				Expect(transCtx.Component.Annotations).ShouldNot(HaveKey(postProvisionFailureFingerprintAnnotationKey))
 			})
 
 			It("fails when precondition not met", func() {

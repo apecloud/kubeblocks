@@ -44,7 +44,7 @@ func (r *capturingEventRecorder) AnnotatedEventf(object runtime.Object, annotati
 
 func TestSendEventTruncatesMessage(t *testing.T) {
 	recorder := &capturingEventRecorder{}
-	SendEvent(recorder, &corev1.Pod{}, corev1.EventTypeWarning, "Failed", strings.Repeat("界", 1024))
+	SendEvent(recorder, &corev1.Pod{}, corev1.EventTypeWarning, "Failed", strings.Repeat("\u754c", 1024))
 
 	if len(recorder.message) > maxEventMessageBytes {
 		t.Fatalf("event message has %d bytes, want at most %d", len(recorder.message), maxEventMessageBytes)

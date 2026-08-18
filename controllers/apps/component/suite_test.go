@@ -63,7 +63,7 @@ var testEnv *envtest.Environment
 var ctx context.Context
 var cancel context.CancelFunc
 var testCtx testutil.TestContext
-var clusterRecorder record.EventRecorder
+var clusterRecorder record.EventRecorder = record.NewFakeRecorder(1024)
 var logger logr.Logger
 
 func init() {

@@ -62,6 +62,7 @@ type ReplicaStatus struct {
 	Provisioned       bool       `json:"provisioned,omitempty"`
 	DataLoaded        *bool      `json:"dataLoaded,omitempty"`
 	MemberJoined      *bool      `json:"memberJoined,omitempty"`
+	MemberJoinFailed  bool       `json:"memberJoinFailed,omitempty"`
 	Reconfigured      *string    `json:"reconfigured,omitempty"` // TODO: component status
 }
 
@@ -193,6 +194,21 @@ func UpdateReplicasStatusFunc(its *workloads.InstanceSet, f func(status *Replica
 }
 
 func GetReplicasStatusFunc(its *workloads.InstanceSet, f func(ReplicaStatus) bool) ([]string, error) {
+	statuses, err := GetReplicasStatusListFunc(its, f)
+	if err != nil {
+		return nil, err
+	}
+	if f == nil {
+		return nil, nil
+	}
+	replicas := make([]string, 0)
+	for _, s := range statuses {
+		replicas = append(replicas, s.Name)
+	}
+	return replicas, nil
+}
+
+func GetReplicasStatusListFunc(its *workloads.InstanceSet, f func(ReplicaStatus) bool) ([]ReplicaStatus, error) {
 	if f == nil {
 		return nil, nil
 	}
@@ -200,10 +216,10 @@ func GetReplicasStatusFunc(its *workloads.InstanceSet, f func(ReplicaStatus) boo
 	if err != nil {
 		return nil, err
 	}
-	replicas := make([]string, 0)
+	replicas := make([]ReplicaStatus, 0)
 	for _, s := range status.Status {
 		if f(s) {
-			replicas = append(replicas, s.Name)
+			replicas = append(replicas, s)
 		}
 	}
 	return replicas, nil

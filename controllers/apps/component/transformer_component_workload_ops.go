@@ -120,10 +120,18 @@ func (r *componentWorkloadOps) scaleIn() error {
 	}
 
 	deleteReplicas := r.runningItsPodNameSet.Difference(r.desiredCompPodNameSet).UnsortedList()
+
+	if err := r.gatePendingMemberLifecycle(deleteReplicas); err != nil {
+		return err
+	}
+
 	joinedReplicas := make([]string, 0)
 	err := component.DeleteReplicasStatus(r.protoITS, deleteReplicas, func(s component.ReplicaStatus) {
-		// has no member join defined or has joined successfully
-		if s.Provisioned && (s.MemberJoined == nil || *s.MemberJoined) {
+		// has joined successfully, or has no member join defined and has been provisioned.
+		// a joined replica must leave regardless of the provisioned flag: a join driven
+		// by the scale-in gate in this reconcile sets MemberJoined in the in-memory
+		// records while the provisioned flag may not have been persisted yet.
+		if (s.MemberJoined != nil && *s.MemberJoined) || (s.MemberJoined == nil && s.Provisioned) {
 			joinedReplicas = append(joinedReplicas, s.Name)
 		}
 	})
@@ -137,6 +145,90 @@ func (r *componentWorkloadOps) scaleIn() error {
 		return err
 	}
 	return nil
+}
+
+// gatePendingMemberLifecycle holds the scale-in while any replica to be deleted
+// still has a pending (non-terminal) member-join record and an active pod, and
+// keeps driving the pending joins in the same reconcile.
+//
+// The scale-in path runs before postScaleOut(), and postScaleOut() only runs
+// when there is no replica to scale in or out. So once the gate holds, nothing
+// else would drive the pending joins to completion; the gate has to drive them
+// itself, otherwise a scale-in that cancels a not-yet-joined scale-out would
+// wait forever on a join that nobody re-invokes.
+func (r *componentWorkloadOps) gatePendingMemberLifecycle(deleteReplicas []string) error {
+	deleteSet := sets.New(deleteReplicas...)
+	activePending, err := r.activePendingMemberJoins(r.runningITS, deleteSet)
+	if err != nil {
+		return err
+	}
+	if len(activePending) == 0 {
+		return nil
+	}
+
+	// Keep driving the pending joins while the gate holds. This reuses the
+	// scale-out join path: it is guarded by the replicas-status records, and
+	// re-invoking the memberJoin action is safe the same way the scale-out
+	// path re-drives it on every reconcile until the records are persisted.
+	// A requeue from the drive is superseded by the gate's own requeue below;
+	// the gate re-evaluates the records the drive has just updated instead.
+	if err := r.joinMember4ScaleOut(); err != nil && !intctrlutil.IsRequeueError(err) {
+		return err
+	}
+
+	// re-evaluate against protoITS, whose records joinMember4ScaleOut has updated
+	stillPending, err := r.activePendingMemberJoins(r.protoITS, deleteSet)
+	if err != nil {
+		return err
+	}
+	if len(stillPending) == 0 {
+		// all pending joins have completed (or turned terminal), release the
+		// gate and let the scale-in (member-leave included) proceed within
+		// this reconcile, so that the updated records are persisted through
+		// the workload update path.
+		return nil
+	}
+
+	r.transCtx.EventRecorder.Eventf(r.component, corev1.EventTypeWarning, "PendingMemberJoin",
+		"scale-in of component %s is waiting for replicas %v to finish the member join, the join is re-driven on every reconcile until it completes",
+		r.synthesizeComp.Name, stillPending)
+	return intctrlutil.NewRequeueError(time.Second,
+		fmt.Sprintf("scale-in gated: replicas %v have pending member lifecycle (MemberJoined=false) with active pods, driving the member join until it completes", stillPending))
+}
+
+// activePendingMemberJoins returns the replicas within deleteSet whose
+// member-join records in its are still pending (not joined and not terminally
+// failed) and whose pods are active.
+func (r *componentWorkloadOps) activePendingMemberJoins(its *workloads.InstanceSet, deleteSet sets.Set[string]) ([]string, error) {
+	pendingReplicas, err := component.GetReplicasStatusListFunc(its, func(s component.ReplicaStatus) bool {
+		return deleteSet.Has(s.Name) && s.MemberJoined != nil && !*s.MemberJoined && !s.MemberJoinFailed
+	})
+	if err != nil || len(pendingReplicas) == 0 {
+		return nil, err
+	}
+
+	pods, err := component.ListOwnedInstances(r.transCtx.Context, r.cli,
+		r.component, r.runningITS, r.protoITS)
+	if err != nil {
+		return nil, err
+	}
+	podSet := sets.New[string]()
+	for _, pod := range pods {
+		if isMemberLifecycleActivePod(pod) {
+			podSet.Insert(pod.Name)
+		}
+	}
+	activePending := make([]string, 0, len(pendingReplicas))
+	for _, replica := range pendingReplicas {
+		if podSet.Has(replica.Name) {
+			activePending = append(activePending, replica.Name)
+		}
+	}
+	return activePending, nil
+}
+
+func isMemberLifecycleActivePod(pod *corev1.Pod) bool {
+	return pod != nil && pod.DeletionTimestamp == nil && pod.Status.Phase == corev1.PodRunning
 }
 
 func (r *componentWorkloadOps) leaveMember4ScaleIn(deleteReplicas, joinedReplicas []string) error {
@@ -334,6 +426,7 @@ func (r *componentWorkloadOps) joinMember4ScaleOut() error {
 	}
 
 	joinErrors := make([]error, 0)
+	pendingReplicas := make([]string, 0)
 	if err = component.UpdateReplicasStatusFunc(r.protoITS, func(replicas *component.ReplicasStatus) error {
 		for _, pod := range pods {
 			i := slices.IndexFunc(replicas.Status, func(r component.ReplicaStatus) bool {
@@ -347,24 +440,30 @@ func (r *componentWorkloadOps) joinMember4ScaleOut() error {
 			if status.MemberJoined == nil || *status.MemberJoined {
 				continue // no need to join or already joined
 			}
+			if status.MemberJoinFailed {
+				continue // terminal failure is persisted and cancelable by scale-in
+			}
 
 			// TODO: should wait for the data to be loaded before joining the member?
 
 			if err := r.joinMemberForPod(pod, pods); err != nil {
+				if isTerminalMemberJoinError(err) {
+					replicas.Status[i].MemberJoinFailed = true
+					replicas.Status[i].Message = err.Error()
+					continue
+				}
 				joinErrors = append(joinErrors, fmt.Errorf("pod %s: %w", pod.Name, err))
 			} else {
 				replicas.Status[i].MemberJoined = ptr.To(true)
+				replicas.Status[i].MemberJoinFailed = false
+				replicas.Status[i].Message = ""
 			}
 		}
 
-		notJoinedReplicas := make([]string, 0)
 		for _, r := range replicas.Status {
-			if r.MemberJoined != nil && !*r.MemberJoined {
-				notJoinedReplicas = append(notJoinedReplicas, r.Name)
+			if r.MemberJoined != nil && !*r.MemberJoined && !r.MemberJoinFailed {
+				pendingReplicas = append(pendingReplicas, r.Name)
 			}
-		}
-		if len(notJoinedReplicas) > 0 {
-			joinErrors = append(joinErrors, fmt.Errorf("some replicas have not joined: %v", notJoinedReplicas))
 		}
 		return nil
 	}); err != nil {
@@ -374,7 +473,23 @@ func (r *componentWorkloadOps) joinMember4ScaleOut() error {
 	if len(joinErrors) > 0 {
 		return intctrlutil.NewRequeueError(time.Second, fmt.Sprintf("%v", joinErrors))
 	}
+	if len(pendingReplicas) > 0 {
+		return intctrlutil.NewRequeueError(time.Second, fmt.Sprintf("some replicas have not joined: %v", pendingReplicas))
+	}
+	// Only terminally failed replicas (if any) remain unjoined. Let the
+	// reconciliation continue so the failure state is persisted through the
+	// normal workload update path and surfaced as a failure by the status
+	// transformer, instead of blocking the transformer chain with a requeue.
 	return nil
+}
+
+// isTerminalMemberJoinError reports whether a memberJoin action error can never
+// be resolved by retrying. A plain action failure (non-zero exit) is the
+// documented retry-safe deferral signal of the addon lifecycle contract and
+// kbagent maps every non-zero exit to it, so it must stay retryable; only a
+// statically unimplemented action is terminal.
+func isTerminalMemberJoinError(err error) bool {
+	return errors.Is(err, lifecycle.ErrActionNotImplemented)
 }
 
 func (r *componentWorkloadOps) joinMemberForPod(pod *corev1.Pod, pods []*corev1.Pod) error {

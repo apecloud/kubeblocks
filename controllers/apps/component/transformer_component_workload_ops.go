@@ -37,12 +37,16 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+)
+
+const (
+	memberJoinFailureFingerprintAnnotationKey  = "apps.kubeblocks.io/member-join-failure-fingerprint"
+	memberLeaveFailureFingerprintAnnotationKey = "apps.kubeblocks.io/member-leave-failure-fingerprint"
 )
 
 type componentWorkloadOps struct {
@@ -207,14 +211,14 @@ func (r *componentWorkloadOps) leaveMemberForPod(pod *corev1.Pod, pods []*corev1
 		err := lfa.MemberLeave(r.transCtx.Context, r.cli, nil)
 		if err != nil {
 			if errors.Is(err, lifecycle.ErrActionNotDefined) {
-				r.clearMemberActionFailureFingerprint(pod, constant.MemberLeaveFailureFingerprintAnnotationKey)
+				r.clearMemberActionFailureFingerprint(pod, memberLeaveFailureFingerprintAnnotationKey)
 				return nil
 			}
-			r.reportMemberActionFailure(pod, constant.MemberLeaveFailureFingerprintAnnotationKey,
+			r.reportMemberActionFailure(pod, memberLeaveFailureFingerprintAnnotationKey,
 				memberLeaveFailedEventReason, "memberLeave", fmt.Errorf("pod %s: %w", pod.Name, err))
 			return err
 		}
-		r.clearMemberActionFailureFingerprint(pod, constant.MemberLeaveFailureFingerprintAnnotationKey)
+		r.clearMemberActionFailureFingerprint(pod, memberLeaveFailureFingerprintAnnotationKey)
 		r.transCtx.Logger.Info("succeed to call leave member action", "pod", pod.Name)
 		return nil
 	}
@@ -396,12 +400,12 @@ func (r *componentWorkloadOps) joinMemberForPod(pod *corev1.Pod, pods []*corev1.
 	}
 	if err = lfa.MemberJoin(r.transCtx.Context, r.cli, nil); err != nil {
 		if !errors.Is(err, lifecycle.ErrActionNotDefined) {
-			r.reportMemberActionFailure(pod, constant.MemberJoinFailureFingerprintAnnotationKey,
+			r.reportMemberActionFailure(pod, memberJoinFailureFingerprintAnnotationKey,
 				memberJoinFailedEventReason, "memberJoin", fmt.Errorf("pod %s: %w", pod.Name, err))
 			return err
 		}
 	}
-	r.clearMemberActionFailureFingerprint(pod, constant.MemberJoinFailureFingerprintAnnotationKey)
+	r.clearMemberActionFailureFingerprint(pod, memberJoinFailureFingerprintAnnotationKey)
 	r.transCtx.Logger.Info("succeed to join member for pod", "pod", pod.Name)
 	return nil
 }

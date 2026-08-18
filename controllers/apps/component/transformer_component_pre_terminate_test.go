@@ -174,10 +174,13 @@ var _ = Describe("pre-terminate transformer test", func() {
 		})
 
 		It("no pods error", func() {
+			recorder := &capturingEventRecorder{}
+			transCtx.EventRecorder = recorder
 			transformer := &componentPreTerminateTransformer{}
 			err := transformer.Transform(transCtx, dag)
 			Expect(err).ShouldNot(BeNil())
 			Expect(err.Error()).Should(ContainSubstring("has no pods to running the pre-terminate action"))
+			Expect(recorder.events).Should(BeEmpty())
 		})
 
 		It("not-defined", func() {

@@ -20,8 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
-	"errors"
-
 	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 )
@@ -44,9 +42,5 @@ func emitLifecycleActionFailureEvent(transCtx *componentTransformContext, reason
 }
 
 func isLifecycleActionFailure(err error) bool {
-	return err != nil &&
-		!errors.Is(err, lifecycle.ErrActionNotDefined) &&
-		!errors.Is(err, lifecycle.ErrPreconditionFailed) &&
-		!errors.Is(err, lifecycle.ErrActionInProgress) &&
-		!errors.Is(err, lifecycle.ErrActionBusy)
+	return lifecycle.IsActionFailure(err)
 }

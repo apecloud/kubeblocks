@@ -175,10 +175,13 @@ var _ = Describe("post-provision transformer test", func() {
 		})
 
 		It("no pods error", func() {
+			recorder := &capturingEventRecorder{}
+			transCtx.EventRecorder = recorder
 			transformer := &componentPostProvisionTransformer{}
 			err := transformer.Transform(transCtx, dag)
 			Expect(err).ShouldNot(BeNil())
 			Expect(err.Error()).Should(ContainSubstring("has no pods to running the post-provision action"))
+			Expect(recorder.events).Should(BeEmpty())
 		})
 	})
 })

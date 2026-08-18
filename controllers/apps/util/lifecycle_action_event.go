@@ -21,11 +21,17 @@ package util
 
 import (
 	"fmt"
+	"unicode/utf8"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+)
+
+const (
+	maxEventMessageBytes        = 1024
+	eventMessageTruncatedMarker = "...(truncated)"
 )
 
 // SendLifecycleActionFailureEvent reports a lifecycle action failure on a Component.
@@ -35,6 +41,18 @@ func SendLifecycleActionFailureEvent(recorder record.EventRecorder, comp *appsv1
 		return
 	}
 
-	message := fmt.Sprintf("Failed to execute %s lifecycle action for Component %s: %v", action, comp.Name, actionErr)
+	message := truncateEventMessage(fmt.Sprintf("Failed to execute %s lifecycle action for Component %s: %v", action, comp.Name, actionErr))
 	recorder.Event(comp, corev1.EventTypeWarning, reason, message)
+}
+
+func truncateEventMessage(message string) string {
+	if len(message) <= maxEventMessageBytes {
+		return message
+	}
+	limit := maxEventMessageBytes - len(eventMessageTruncatedMarker)
+	message = message[:limit]
+	for !utf8.ValidString(message) && len(message) > 0 {
+		message = message[:len(message)-1]
+	}
+	return message + eventMessageTruncatedMarker
 }

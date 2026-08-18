@@ -41,6 +41,29 @@ func IgnoreNotDefined(err error) error {
 	return err
 }
 
+// IsActionFailure reports whether err contains at least one real action
+// failure. Waiting states are not failures. Aggregate errors are inspected
+// child by child so a waiting result from one Pod cannot hide a failure from
+// another Pod.
+func IsActionFailure(err error) bool {
+	if err == nil {
+		return false
+	}
+	var aggregate *actionAggregateError
+	if errors.As(err, &aggregate) {
+		for _, child := range aggregate.errs {
+			if IsActionFailure(child) {
+				return true
+			}
+		}
+		return false
+	}
+	return !errors.Is(err, ErrActionNotDefined) &&
+		!errors.Is(err, ErrPreconditionFailed) &&
+		!errors.Is(err, ErrActionInProgress) &&
+		!errors.Is(err, ErrActionBusy)
+}
+
 type actionAggregateError struct {
 	errs []error
 }

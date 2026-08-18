@@ -51,6 +51,41 @@ var _ = Describe("status reconciler test", func() {
 		priorityMap = ComposeRolePriorityMap(its.Spec.Roles)
 	})
 
+	It("does not publish any status field from a partial flat allocation", func() {
+		replicas, one := int32(2), int32(1)
+		its = &workloads.InstanceSet{
+			ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default", Generation: 3},
+			Spec: workloads.InstanceSetSpec{
+				Replicas: &replicas, FlatInstanceOrdinal: true, Template: corev1.PodTemplateSpec{},
+				Instances: []workloads.InstanceTemplate{
+					{Name: "a", Replicas: &one, Ordinals: workloads.Ordinals{Discrete: []int32{1}}},
+					{Name: "b", Replicas: &one, Ordinals: workloads.Ordinals{Discrete: []int32{0}}},
+				},
+			},
+			Status: workloads.InstanceSetStatus{
+				ObservedGeneration: 3,
+				ReadyReplicas:      2,
+				Conditions: []metav1.Condition{{
+					Type:               string(workloads.InstanceReady),
+					Status:             metav1.ConditionTrue,
+					ObservedGeneration: 2,
+				}},
+				AssignedOrdinals: map[string]workloads.Ordinals{
+					"a": {Discrete: []int32{0}}, "b": {Discrete: []int32{1}},
+				},
+				InstanceStatus: []workloads.InstanceStatus{{PodName: "demo-a-0"}},
+			},
+		}
+		before := its.DeepCopy().Status
+		tree := kubebuilderx.NewObjectTree()
+		tree.SetRoot(its)
+
+		result, err := NewStatusReconciler().Reconcile(tree)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(result).Should(Equal(kubebuilderx.Continue))
+		Expect(its.Status).Should(Equal(before))
+	})
+
 	Context("PreCondition & Reconcile", func() {
 		reconcilePods := func(tree *kubebuilderx.ObjectTree) {
 			By("fix meta")

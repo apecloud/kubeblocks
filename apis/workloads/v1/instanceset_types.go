@@ -592,7 +592,7 @@ type InstanceStatus struct {
 	DesiredState InstanceDesiredState `json:"desiredState,omitempty"`
 
 	// CurrentState describes the observed current state of this instance.
-	// An empty value from an older object is treated as Unknown.
+	// An empty value means that an older controller did not report this field.
 	//
 	// +optional
 	// +kubebuilder:validation:Enum=Present;Terminating;Absent
@@ -659,7 +659,6 @@ const (
 type InstanceCurrentState string
 
 const (
-	InstanceCurrentStateUnknown     InstanceCurrentState = "Unknown"
 	InstanceCurrentStatePresent     InstanceCurrentState = "Present"
 	InstanceCurrentStateTerminating InstanceCurrentState = "Terminating"
 	InstanceCurrentStateAbsent      InstanceCurrentState = "Absent"
@@ -671,14 +670,6 @@ func (s *InstanceStatus) EffectiveDesiredState() InstanceDesiredState {
 		return InstanceDesiredStateActive
 	}
 	return s.DesiredState
-}
-
-// EffectiveCurrentState returns the backward-compatible current instance state.
-func (s *InstanceStatus) EffectiveCurrentState() InstanceCurrentState {
-	if s == nil || s.CurrentState == "" {
-		return InstanceCurrentStateUnknown
-	}
-	return s.CurrentState
 }
 
 type InstanceConfigStatus struct {
@@ -770,9 +761,6 @@ const (
 
 	// ReasonInstanceUpdateRestricted is a reason for condition InstanceUpdateRestricted.
 	ReasonInstanceUpdateRestricted = "InstanceUpdateRestricted"
-
-	// ReasonTemplateNameUnknown indicates that a retained historical instance has no reliable template assignment.
-	ReasonTemplateNameUnknown = "TemplateNameUnknown"
 )
 
 // IsInstancesReady gives Instance level 'ready' state when all instances are available
@@ -894,7 +882,7 @@ func (r *InstanceSet) PresentInstanceStatuses() []*InstanceStatus {
 	result := make([]*InstanceStatus, 0, len(r.Status.InstanceStatus))
 	for i := range r.Status.InstanceStatus {
 		status := &r.Status.InstanceStatus[i]
-		if status.EffectiveCurrentState() == InstanceCurrentStatePresent {
+		if status.CurrentState == InstanceCurrentStatePresent {
 			result = append(result, status)
 		}
 	}
@@ -904,7 +892,7 @@ func (r *InstanceSet) PresentInstanceStatuses() []*InstanceStatus {
 // HasPresentInstance reports whether instanceName currently identifies a Present instance.
 func (r *InstanceSet) HasPresentInstance(instanceName string) bool {
 	status := r.FindInstanceStatus(instanceName)
-	return status != nil && status.EffectiveCurrentState() == InstanceCurrentStatePresent
+	return status != nil && status.CurrentState == InstanceCurrentStatePresent
 }
 
 func (r *InstanceSet) instanceStatusesByDesiredState(desiredState InstanceDesiredState) []*InstanceStatus {

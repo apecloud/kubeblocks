@@ -63,6 +63,14 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		inst, _ := object.(*workloads.Instance)
 		instanceList = append(instanceList, inst)
 	}
+	if its.Spec.FlatInstanceOrdinal {
+		if _, _, err := instancetemplate.BuildActiveAllocations(tree, its); err != nil {
+			if instancetemplate.IsActiveAllocationIncomplete(err) {
+				return kubebuilderx.Continue, nil
+			}
+			return kubebuilderx.Continue, err
+		}
+	}
 	replicas := int32(0)
 	currentReplicas, updatedReplicas := int32(0), int32(0)
 	readyReplicas, availableReplicas := int32(0), int32(0)
@@ -166,9 +174,6 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 
 	// 4. set instance status
 	if err := setInstanceStatus(tree, its, instanceList); err != nil {
-		if instancetemplate.IsActiveAllocationIncomplete(err) {
-			return kubebuilderx.Continue, nil
-		}
 		return kubebuilderx.Continue, err
 	}
 
@@ -307,12 +312,14 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 		}
 		switch inst.Status.CurrentState {
 		case workloads.InstanceCurrentStatePresent, workloads.InstanceCurrentStateTerminating:
-			currentRevision := getInstanceRevision(inst)
+			// InstanceSet revisions identify desired Instance specs, while Instance CurrentRevision identifies the
+			// actual Pod revision. Keep the two revision domains separate.
+			instanceSpecRevision := getInstanceRevision(inst)
 			observation := instancestatus.CurrentObservation{
 				InstanceName:    inst.Name,
 				State:           inst.Status.CurrentState,
-				CurrentRevision: currentRevision,
-				UpToDate:        isInstanceUpdatedWithRevisions(inst, currentRevision, updateRevisions),
+				CurrentRevision: inst.Status.CurrentRevision,
+				UpToDate:        isInstanceUpdatedWithRevisions(inst, instanceSpecRevision, updateRevisions),
 				Ready:           intctrlutil.IsInstanceReady(inst),
 				Available:       intctrlutil.IsInstanceAvailable(inst),
 				Failed: !intctrlutil.IsInstanceTerminating(inst) && inst.Status.ObservedGeneration == inst.Generation &&

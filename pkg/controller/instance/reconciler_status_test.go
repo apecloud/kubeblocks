@@ -22,6 +22,7 @@ package instance
 import (
 	"testing"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -31,13 +32,22 @@ import (
 
 func TestStatusReconcilerPublishesInstanceCurrentState(t *testing.T) {
 	tests := []struct {
-		name string
-		pod  *corev1.Pod
-		want workloads.InstanceCurrentState
+		name                string
+		pod                 *corev1.Pod
+		want                workloads.InstanceCurrentState
+		wantCurrentRevision string
 	}{
 		{name: "absent", want: workloads.InstanceCurrentStateAbsent},
 		{name: "present", pod: &corev1.Pod{}, want: workloads.InstanceCurrentStatePresent},
-		{name: "terminating", pod: &corev1.Pod{ObjectMeta: metav1.ObjectMeta{DeletionTimestamp: &metav1.Time{Time: metav1.Now().Time}}}, want: workloads.InstanceCurrentStateTerminating},
+		{
+			name: "terminating",
+			pod: &corev1.Pod{ObjectMeta: metav1.ObjectMeta{
+				DeletionTimestamp: &metav1.Time{Time: metav1.Now().Time},
+				Labels:            map[string]string{appsv1.ControllerRevisionHashLabelKey: "current"},
+			}},
+			want:                workloads.InstanceCurrentStateTerminating,
+			wantCurrentRevision: "current",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -68,7 +78,10 @@ func TestStatusReconcilerPublishesInstanceCurrentState(t *testing.T) {
 			if inst.Status.CurrentState != tt.want {
 				t.Fatalf("expected current state %q, got %#v", tt.want, inst.Status)
 			}
-			if tt.want != workloads.InstanceCurrentStatePresent && (inst.Status.CurrentRevision != "" || inst.Status.UpToDate || inst.Status.Ready || inst.Status.Available || inst.Status.Role != "" || inst.Status.VolumeExpansion || inst.Status.Configs != nil) {
+			if inst.Status.CurrentRevision != tt.wantCurrentRevision {
+				t.Fatalf("expected current revision %q, got %#v", tt.wantCurrentRevision, inst.Status)
+			}
+			if tt.want != workloads.InstanceCurrentStatePresent && (inst.Status.UpToDate || inst.Status.Ready || inst.Status.Available || inst.Status.Role != "" || inst.Status.VolumeExpansion || inst.Status.Configs != nil) {
 				t.Fatalf("non-Present instance retained current runtime fields: %#v", inst.Status)
 			}
 		})

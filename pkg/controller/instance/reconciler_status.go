@@ -58,12 +58,12 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		return kubebuilderx.Continue, err
 	}
 	if obj == nil {
-		r.setPodUnavailableStatus(inst, workloads.InstanceCurrentStateAbsent, inst.Name)
+		r.setPodUnavailableStatus(inst, workloads.InstanceCurrentStateAbsent, inst.Name, "")
 		return kubebuilderx.Continue, nil
 	}
 	pod := obj.(*corev1.Pod)
 	if isTerminating(pod) {
-		r.setPodUnavailableStatus(inst, workloads.InstanceCurrentStateTerminating, pod.Name)
+		r.setPodUnavailableStatus(inst, workloads.InstanceCurrentStateTerminating, pod.Name, getPodRevision(pod))
 		return kubebuilderx.Continue, nil
 	}
 	inst.Status.CurrentState = workloads.InstanceCurrentStatePresent
@@ -124,9 +124,9 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	return kubebuilderx.Continue, nil
 }
 
-func (r *statusReconciler) setPodUnavailableStatus(inst *workloads.Instance, state workloads.InstanceCurrentState, name string) {
+func (r *statusReconciler) setPodUnavailableStatus(inst *workloads.Instance, state workloads.InstanceCurrentState, name, currentRevision string) {
 	inst.Status.CurrentState = state
-	inst.Status.CurrentRevision = ""
+	inst.Status.CurrentRevision = currentRevision
 	inst.Status.UpToDate = false
 	inst.Status.Ready = false
 	inst.Status.Available = false

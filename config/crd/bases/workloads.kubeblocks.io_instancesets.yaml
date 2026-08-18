@@ -11687,7 +11687,7 @@ spec:
                     currentState:
                       description: |-
                         CurrentState describes the observed current state of this instance.
-                        An empty value from an older object is treated as Unknown.
+                        An empty value means that an older controller did not report this field.
                       enum:
                       - Present
                       - Terminating

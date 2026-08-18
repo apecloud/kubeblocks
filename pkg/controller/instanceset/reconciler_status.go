@@ -65,6 +65,14 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		pod, _ := object.(*corev1.Pod)
 		podList = append(podList, pod)
 	}
+	if its.Spec.FlatInstanceOrdinal {
+		if _, _, err := instancetemplate.BuildActiveAllocations(tree, its); err != nil {
+			if instancetemplate.IsActiveAllocationIncomplete(err) {
+				return kubebuilderx.Continue, nil
+			}
+			return kubebuilderx.Continue, err
+		}
+	}
 	// 2. calculate status summary
 	updateRevisions, err := GetRevisions(its.Status.UpdateRevisions)
 	if err != nil {
@@ -192,9 +200,6 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 
 	// 4. set instance status
 	if err = setInstanceStatus(tree, its, podList); err != nil {
-		if instancetemplate.IsActiveAllocationIncomplete(err) {
-			return kubebuilderx.Continue, nil
-		}
 		return kubebuilderx.Continue, err
 	}
 

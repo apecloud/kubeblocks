@@ -19585,8 +19585,6 @@ string
 <td></td>
 </tr><tr><td><p>&#34;Terminating&#34;</p></td>
 <td></td>
-</tr><tr><td><p>&#34;Unknown&#34;</p></td>
-<td></td>
 </tr></tbody>
 </table>
 <h3 id="workloads.kubeblocks.io/v1.InstanceDesiredState">InstanceDesiredState
@@ -20560,7 +20558,7 @@ InstanceCurrentState
 <td>
 <em>(Optional)</em>
 <p>CurrentState describes the observed current state of this instance.
-An empty value from an older object is treated as Unknown.</p>
+An empty value means that an older controller did not report this field.</p>
 </td>
 </tr>
 <tr>

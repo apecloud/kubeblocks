@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset2
 
 import (
+	"reflect"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -72,6 +73,7 @@ func TestSetInstanceStatusReadsCurrentStateFromInstance(t *testing.T) {
 	}
 
 	inst.Status.CurrentState = workloads.InstanceCurrentStatePresent
+	inst.Status.CurrentRevision = revision
 	inst.Status.Conditions = []metav1.Condition{
 		{Type: string(workloads.InstanceReady), Status: metav1.ConditionTrue},
 		{Type: string(workloads.InstanceAvailable), Status: metav1.ConditionTrue},
@@ -458,7 +460,7 @@ func TestBuildInstanceByTemplateStampsRevisionAnnotation(t *testing.T) {
 	}
 }
 
-func TestStatusReconcilerReadsCurrentRevisionFromInstanceAnnotation(t *testing.T) {
+func TestStatusReconcilerReadsCurrentRevisionFromInstanceStatus(t *testing.T) {
 	its := &workloads.InstanceSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:       "test-its",
@@ -515,6 +517,7 @@ func TestStatusReconcilerReadsCurrentRevisionFromInstanceAnnotation(t *testing.T
 	inst.Status = workloads.InstanceStatus2{
 		ObservedGeneration: 2,
 		CurrentState:       workloads.InstanceCurrentStatePresent,
+		CurrentRevision:    "applied-revision",
 		UpToDate:           true,
 		Conditions: []metav1.Condition{
 			{Type: string(workloads.InstanceReady), Status: metav1.ConditionTrue},
@@ -535,7 +538,11 @@ func TestStatusReconcilerReadsCurrentRevisionFromInstanceAnnotation(t *testing.T
 		t.Fatalf("get current revisions: %v", err)
 	}
 	if currentRevisions[inst.Name] != desiredRevision {
-		t.Fatalf("expected current revision to match desired update revision, got %s want %s", currentRevisions[inst.Name], desiredRevision)
+		t.Fatalf("expected aggregate Instance spec revision, got %s want %s", currentRevisions[inst.Name], desiredRevision)
+	}
+	status := got.FindInstanceStatus(inst.Name)
+	if status == nil || status.CurrentRevision != inst.Status.CurrentRevision {
+		t.Fatalf("expected per-instance current revision from Instance status, got %#v", status)
 	}
 	if got.Status.UpdatedReplicas != 1 {
 		t.Fatalf("expected updated replicas to stay at 1, got %d", got.Status.UpdatedReplicas)
@@ -548,11 +555,11 @@ func TestStatusReconcilerReadsCurrentRevisionFromInstanceAnnotation(t *testing.T
 		t.Fatalf("unexpected template status: %#v", got.Status.TemplatesStatus)
 	}
 	if got.Status.CurrentRevision != got.Status.UpdateRevision {
-		t.Fatalf("expected current revision to advance to update revision")
+		t.Fatalf("expected aggregate current revision to advance to update revision")
 	}
 }
 
-func TestStatusReconcilerDoesNotFallbackToLiveHashWhenRevisionAnnotationMissing(t *testing.T) {
+func TestStatusReconcilerDoesNotDependOnRevisionAnnotationForCurrentRevision(t *testing.T) {
 	its := &workloads.InstanceSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:       "test-its",
@@ -594,6 +601,7 @@ func TestStatusReconcilerDoesNotFallbackToLiveHashWhenRevisionAnnotationMissing(
 	inst.Status = workloads.InstanceStatus2{
 		ObservedGeneration: 2,
 		CurrentState:       workloads.InstanceCurrentStatePresent,
+		CurrentRevision:    desiredRevision,
 		UpToDate:           true,
 		Conditions: []metav1.Condition{
 			{Type: string(workloads.InstanceReady), Status: metav1.ConditionTrue},
@@ -614,14 +622,54 @@ func TestStatusReconcilerDoesNotFallbackToLiveHashWhenRevisionAnnotationMissing(
 		t.Fatalf("get current revisions: %v", err)
 	}
 	if currentRevisions[inst.Name] != "" {
-		t.Fatalf("expected empty current revision for missing annotation, got %#v", currentRevisions)
+		t.Fatalf("expected empty aggregate spec revision for missing annotation, got %#v", currentRevisions)
+	}
+	status := got.FindInstanceStatus(inst.Name)
+	if status == nil || status.CurrentRevision != inst.Status.CurrentRevision {
+		t.Fatalf("expected per-instance current revision from Instance status despite missing annotation, got %#v", status)
 	}
 	if got.Status.UpdatedReplicas != 0 {
-		t.Fatalf("expected missing revision annotation to keep updated replicas at 0, got %d", got.Status.UpdatedReplicas)
+		t.Fatalf("expected missing spec revision annotation to keep updated replicas at 0, got %d", got.Status.UpdatedReplicas)
 	}
 	if len(got.Status.TemplatesStatus) != 1 ||
 		got.Status.TemplatesStatus[0].UpdatedReplicas != 0 ||
 		got.Status.TemplatesStatus[0].CurrentReplicas != 1 {
 		t.Fatalf("unexpected template status: %#v", got.Status.TemplatesStatus)
+	}
+}
+
+func TestStatusReconcilerDoesNotPublishPartialFlatAllocation(t *testing.T) {
+	its := &workloads.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default", Generation: 3},
+		Spec: workloads.InstanceSetSpec{
+			Replicas: ptr.To[int32](2), FlatInstanceOrdinal: true, Template: corev1.PodTemplateSpec{},
+			Instances: []workloads.InstanceTemplate{
+				{Name: "a", Replicas: ptr.To[int32](1), Ordinals: workloads.Ordinals{Discrete: []int32{1}}},
+				{Name: "b", Replicas: ptr.To[int32](1), Ordinals: workloads.Ordinals{Discrete: []int32{0}}},
+			},
+		},
+		Status: workloads.InstanceSetStatus{
+			ObservedGeneration: 3,
+			ReadyReplicas:      2,
+			Conditions: []metav1.Condition{{
+				Type:               string(workloads.InstanceReady),
+				Status:             metav1.ConditionTrue,
+				ObservedGeneration: 2,
+			}},
+			AssignedOrdinals: map[string]workloads.Ordinals{
+				"a": {Discrete: []int32{0}}, "b": {Discrete: []int32{1}},
+			},
+			InstanceStatus: []workloads.InstanceStatus{{PodName: "demo-a-0"}},
+		},
+	}
+	before := its.DeepCopy().Status
+	tree := kubebuilderx.NewObjectTree()
+	tree.SetRoot(its)
+
+	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(before, its.Status) {
+		t.Fatalf("partial allocation changed status:\nbefore: %#v\nafter:  %#v", before, its.Status)
 	}
 }

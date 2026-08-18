@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
-	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
+	componentutil "github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 )
 
@@ -38,5 +38,5 @@ func emitLifecycleActionFailureEvent(transCtx *componentTransformContext, reason
 	if transCtx.EventRecorder == nil || !lifecycle.IsActionFailure(actionErr) {
 		return
 	}
-	appsutil.SendLifecycleActionFailureEvent(transCtx.EventRecorder, transCtx.Component, reason, action, actionErr)
+	componentutil.SendLifecycleActionFailureEvent(transCtx.EventRecorder, transCtx.Component, reason, action, actionErr)
 }

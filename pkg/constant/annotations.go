@@ -43,6 +43,10 @@ const (
 	// versioned results read/write only the roleVersion key.
 	LastRoleAuthoritativeVersionAnnotationKey = "apps.kubeblocks.io/last-role-authoritative-version"
 	ComponentScaleInAnnotationKey             = "apps.kubeblocks.io/component-scale-in" // ComponentScaleInAnnotationKey specifies whether the component is scaled in
+	// MemberJoinFailureFingerprintAnnotationKey and MemberLeaveFailureFingerprintAnnotationKey
+	// suppress duplicate lifecycle action failure Events for an unchanged Pod failure.
+	MemberJoinFailureFingerprintAnnotationKey  = "apps.kubeblocks.io/member-join-failure-fingerprint"
+	MemberLeaveFailureFingerprintAnnotationKey = "apps.kubeblocks.io/member-leave-failure-fingerprint"
 
 	// SystemAccountProvisionedAnnotationKey marks a system account secret whose account has already been prepared externally.
 	SystemAccountProvisionedAnnotationKey = "apps.kubeblocks.io/system-account-provisioned"

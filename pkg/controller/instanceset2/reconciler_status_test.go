@@ -44,14 +44,18 @@ func TestSetInstanceStatusReadsCurrentStateFromInstance(t *testing.T) {
 	tree := kubebuilderx.NewObjectTree()
 	tree.SetRoot(its)
 	inst := &workloads.Instance{
-		ObjectMeta: metav1.ObjectMeta{Name: "demo-0"},
+		ObjectMeta: metav1.ObjectMeta{Name: "demo-0", Generation: 1},
 		Spec:       workloads.InstanceSpec{InstanceTemplateName: ""},
 		Status: workloads.InstanceStatus2{
-			CurrentState:    workloads.InstanceCurrentStateAbsent,
-			Configs:         []workloads.InstanceConfigStatus{{Name: "config"}},
-			VolumeExpansion: true,
+			ObservedGeneration: 1,
+			CurrentState:       workloads.InstanceCurrentStateAbsent,
+			UpToDate:           true,
+			Configs:            []workloads.InstanceConfigStatus{{Name: "config"}},
+			VolumeExpansion:    true,
 		},
 	}
+	revision := stampInstanceRevision(inst)
+	its.Status.UpdateRevisions = map[string]string{inst.Name: revision}
 
 	if err := setInstanceStatus(tree, its, []*workloads.Instance{inst}); err != nil {
 		t.Fatal(err)
@@ -59,23 +63,25 @@ func TestSetInstanceStatusReadsCurrentStateFromInstance(t *testing.T) {
 	if len(its.Status.InstanceStatus) != 1 {
 		t.Fatalf("unexpected status: %#v", its.Status.InstanceStatus)
 	}
-	if its.Status.InstanceStatusObservedGeneration != its.Generation {
-		t.Fatalf("instance status generation was not published: %#v", its.Status)
-	}
 	status := its.Status.InstanceStatus[0]
 	if status.TemplateName == nil || *status.TemplateName != "" || status.DesiredState != workloads.InstanceDesiredStateActive || status.CurrentState != workloads.InstanceCurrentStateAbsent {
 		t.Fatalf("Instance was not Active+Absent: %#v", status)
 	}
-	if status.Configs != nil || status.VolumeExpansion {
+	if status.UpdateRevision != revision || status.CurrentRevision != "" || status.UpToDate || status.Configs != nil || status.VolumeExpansion {
 		t.Fatalf("Absent Instance retained runtime fields: %#v", status)
 	}
 
 	inst.Status.CurrentState = workloads.InstanceCurrentStatePresent
+	inst.Status.Conditions = []metav1.Condition{
+		{Type: string(workloads.InstanceReady), Status: metav1.ConditionTrue},
+		{Type: string(workloads.InstanceAvailable), Status: metav1.ConditionTrue},
+		{Type: string(workloads.InstanceFailure), Status: metav1.ConditionTrue},
+	}
 	if err := setInstanceStatus(tree, its, []*workloads.Instance{inst}); err != nil {
 		t.Fatal(err)
 	}
 	status = its.Status.InstanceStatus[0]
-	if status.CurrentState != workloads.InstanceCurrentStatePresent || len(status.Configs) != 1 || !status.VolumeExpansion {
+	if status.CurrentState != workloads.InstanceCurrentStatePresent || status.CurrentRevision != revision || status.UpdateRevision != revision || !status.UpToDate || !status.Ready || !status.Available || !status.Failed || len(status.Configs) != 1 || !status.VolumeExpansion {
 		t.Fatalf("Present Instance did not refresh runtime fields: %#v", status)
 	}
 
@@ -84,7 +90,7 @@ func TestSetInstanceStatusReadsCurrentStateFromInstance(t *testing.T) {
 		t.Fatal(err)
 	}
 	status = its.Status.InstanceStatus[0]
-	if status.CurrentState != workloads.InstanceCurrentStateTerminating || status.Configs != nil || status.VolumeExpansion {
+	if status.CurrentState != workloads.InstanceCurrentStateTerminating || status.CurrentRevision != revision || status.UpToDate || status.Ready || status.Available || status.Failed || status.Configs != nil || status.VolumeExpansion {
 		t.Fatalf("Terminating Instance retained current runtime fields: %#v", status)
 	}
 }

@@ -33,10 +33,10 @@ import (
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/instancesetstatus"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/workloads/instancestatus"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -50,7 +50,7 @@ func NewStatusReconciler() kubebuilderx.Reconciler {
 }
 
 func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
-	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) {
+	if tree.GetRoot() == nil || !model.IsObjectStatusUpdating(tree.GetRoot()) {
 		return kubebuilderx.ConditionUnsatisfied
 	}
 	return kubebuilderx.ConditionSatisfied
@@ -192,7 +192,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 
 	// 4. set instance status
 	if err = setInstanceStatus(tree, its, podList); err != nil {
-		if instancesetstatus.IsActiveAllocationIncomplete(err) {
+		if instancetemplate.IsActiveAllocationIncomplete(err) {
 			return kubebuilderx.Continue, nil
 		}
 		return kubebuilderx.Continue, err
@@ -407,17 +407,7 @@ func buildAvailableCondition(its *workloads.InstanceSet, available bool, notAvai
 func buildFailureCondition(its *workloads.InstanceSet, pods []*corev1.Pod) (*metav1.Condition, error) {
 	var failureNames []string
 	for _, pod := range pods {
-		if isTerminating(pod) {
-			continue
-		}
-		// Kubernetes says the Pod is 'Failed'
-		if pod.Status.Phase == corev1.PodFailed {
-			failureNames = append(failureNames, pod.Name)
-			continue
-		}
-		// KubeBlocks says the Pod is 'Failed'
-		isFailed, isTimedOut, _ := intctrlutil.IsPodFailedAndTimedOut(pod)
-		if isFailed && isTimedOut {
+		if instancePodFailed(pod) {
 			failureNames = append(failureNames, pod.Name)
 		}
 	}
@@ -437,13 +427,32 @@ func buildFailureCondition(its *workloads.InstanceSet, pods []*corev1.Pod) (*met
 	}, nil
 }
 
+func instancePodFailed(pod *corev1.Pod) bool {
+	if isTerminating(pod) {
+		return false
+	}
+	if pod.Status.Phase == corev1.PodFailed {
+		return true
+	}
+	isFailed, isTimedOut, _ := intctrlutil.IsPodFailedAndTimedOut(pod)
+	return isFailed && isTimedOut
+}
+
 func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pods []*corev1.Pod) error {
-	active, templateNames, err := instancesetstatus.BuildActiveAllocations(tree, its)
+	activeAllocations, templateNames, err := instancetemplate.BuildActiveAllocations(tree, its)
+	if err != nil {
+		return err
+	}
+	active := make([]instancestatus.Allocation, 0, len(activeAllocations))
+	for _, allocation := range activeAllocations {
+		active = append(active, instancestatus.Allocation{PodName: allocation.PodName, TemplateName: allocation.TemplateName})
+	}
+	updateRevisions, err := GetRevisions(its.Status.UpdateRevisions)
 	if err != nil {
 		return err
 	}
 	offline := append([]string(nil), its.Spec.OfflineInstances...)
-	hints := make([]instancesetstatus.Allocation, 0, len(active)+len(pods)+len(offline))
+	hints := make([]instancestatus.Allocation, 0, len(active)+len(pods)+len(offline))
 	if isStopRequested(its) {
 		for _, allocation := range active {
 			offline = append(offline, allocation.PodName)
@@ -452,27 +461,35 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 		active = nil
 	}
 
-	observations := make([]instancesetstatus.CurrentObservation, 0, len(pods))
-	runtime := make(map[string]instancesetstatus.RuntimeStatus, len(pods))
+	observations := make([]instancestatus.CurrentObservation, 0, len(pods))
 	roleMap := composeRoleMap(*its)
 	for _, pod := range pods {
 		state := workloads.InstanceCurrentStatePresent
 		if !pod.DeletionTimestamp.IsZero() {
 			state = workloads.InstanceCurrentStateTerminating
 		}
-		observations = append(observations, instancesetstatus.CurrentObservation{InstanceName: pod.Name, State: state})
-		if templateName, ok, err := instancesetstatus.TemplateNameFromLabels(pod.Labels); err != nil {
-			return fmt.Errorf("pod %q: %w", pod.Name, err)
-		} else if ok {
-			hints = append(hints, instancesetstatus.Allocation{PodName: pod.Name, TemplateName: templateName})
+		if templateName, ok := instancetemplate.TemplateNameFromLabels(pod.Labels); ok {
+			hints = append(hints, instancestatus.Allocation{PodName: pod.Name, TemplateName: templateName})
 		}
-		if state != workloads.InstanceCurrentStatePresent {
-			continue
+		ready := state == workloads.InstanceCurrentStatePresent && isImageMatched(pod) && intctrlutil.IsPodReady(pod)
+		observation := instancestatus.CurrentObservation{
+			InstanceName:    pod.Name,
+			State:           state,
+			CurrentRevision: getPodRevision(pod),
+			Ready:           ready,
+			Available:       ready && intctrlutil.IsPodAvailable(pod, its.Spec.MinReadySeconds),
+			Failed:          instancePodFailed(pod),
 		}
-		status := instancesetstatus.RuntimeStatus{}
-		if intctrlutil.PodIsReadyWithLabel(*pod) {
+		if state == workloads.InstanceCurrentStatePresent && isCreated(pod) {
+			updated, err := isPodUpdated(its, pod)
+			if err != nil {
+				return err
+			}
+			observation.UpToDate = updated
+		}
+		if state == workloads.InstanceCurrentStatePresent && intctrlutil.PodIsReadyWithLabel(*pod) {
 			if role, ok := roleMap[getRoleName(pod)]; ok {
-				status.Role = role.Name
+				observation.Role = role.Name
 			}
 		}
 		configs, err := configsFromPod(pod)
@@ -480,38 +497,37 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 			return err
 		}
 		for _, config := range configs {
-			status.Configs = append(status.Configs, workloads.InstanceConfigStatus{Name: config.Name, ConfigHash: config.ConfigHash})
+			observation.Configs = append(observation.Configs, workloads.InstanceConfigStatus{Name: config.Name, ConfigHash: config.ConfigHash})
 		}
-		runtime[pod.Name] = status
+		observations = append(observations, observation)
 	}
 
 	for _, name := range append(append([]string(nil), offline...), podObservationNames(observations)...) {
-		if templateName, ok, err := instancesetstatus.HistoricalTemplateHint(its, name, templateNames); err != nil {
+		if templateName, ok, err := instancetemplate.HistoricalTemplateHint(its, name, templateNames); err != nil {
 			return err
 		} else if ok {
-			hints = append(hints, instancesetstatus.Allocation{PodName: name, TemplateName: templateName})
+			hints = append(hints, instancestatus.Allocation{PodName: name, TemplateName: templateName})
 		}
 	}
-	syncRuntimePVCStatus(tree, its, runtime)
+	syncObservationPVCStatus(tree, its, observations)
 
-	result, err := instancesetstatus.Build(instancesetstatus.BuildInput{
-		Previous:      its.Status.InstanceStatus,
-		Active:        active,
-		Offline:       offline,
-		Current:       observations,
-		TemplateHints: hints,
-		Runtime:       runtime,
+	result, err := instancestatus.Build(instancestatus.BuildInput{
+		Previous:        its.Status.InstanceStatus,
+		Active:          active,
+		Offline:         offline,
+		Current:         observations,
+		TemplateHints:   hints,
+		UpdateRevisions: updateRevisions,
 	})
 	if err != nil {
 		return err
 	}
 	its.Status.InstanceStatus = result.Statuses
-	its.Status.InstanceStatusObservedGeneration = its.Generation
 	setInstanceStatusIncompleteCondition(its, result.UnknownTemplateNames)
 	return nil
 }
 
-func podObservationNames(observations []instancesetstatus.CurrentObservation) []string {
+func podObservationNames(observations []instancestatus.CurrentObservation) []string {
 	names := make([]string, 0, len(observations))
 	for _, observation := range observations {
 		names = append(names, observation.InstanceName)
@@ -519,7 +535,7 @@ func podObservationNames(observations []instancesetstatus.CurrentObservation) []
 	return names
 }
 
-func syncRuntimePVCStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, runtime map[string]instancesetstatus.RuntimeStatus) {
+func syncObservationPVCStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, observations []instancestatus.CurrentObservation) {
 	if tree == nil {
 		return
 	}
@@ -543,10 +559,12 @@ func syncRuntimePVCStatus(tree *kubebuilderx.ObjectTree, its *workloads.Instance
 				instName = pvc.Labels[constant.KBAppPodNameLabelKey]
 			}
 			if len(instName) > 0 {
-				if status, ok := runtime[instName]; ok {
-					// TODO: how to check the expansion failed?
-					status.VolumeExpansion = true
-					runtime[instName] = status
+				for i := range observations {
+					if observations[i].InstanceName == instName && observations[i].State == workloads.InstanceCurrentStatePresent {
+						// TODO: how to check the expansion failed?
+						observations[i].VolumeExpansion = true
+						break
+					}
 				}
 			}
 		}

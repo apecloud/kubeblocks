@@ -20058,19 +20058,6 @@ InstanceSet&rsquo;s generation, which is updated on mutation by the API Server.<
 </tr>
 <tr>
 <td>
-<code>instanceStatusObservedGeneration</code><br/>
-<em>
-int64
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>instanceStatusObservedGeneration is the most recent generation for which the complete instance status view
-has been published.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>replicas</code><br/>
 <em>
 int32
@@ -20577,6 +20564,82 @@ InstanceCurrentState
 <em>(Optional)</em>
 <p>CurrentState describes the observed current state of this instance.
 An empty value from an older object is treated as Unknown.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>currentRevision</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>CurrentRevision identifies the revision currently used by the instance.
+It is empty when CurrentState is Absent.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>updateRevision</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>UpdateRevision identifies the revision desired for an Active instance.
+It is empty for Offline and Released instances.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>upToDate</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>UpToDate indicates that the workload owner has observed the Active instance fully applied the current
+InstanceSet desired state, including changes intentionally excluded from revision hashes.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>ready</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Ready indicates whether the current instance is ready to serve requests.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>available</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Available indicates whether the current instance has remained ready for the required minimum duration.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>failed</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Failed indicates whether the current instance reports a terminal failure state. It is independent of
+desired-state convergence.</p>
 </td>
 </tr>
 <tr>

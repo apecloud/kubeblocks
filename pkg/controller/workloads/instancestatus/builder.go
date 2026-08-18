@@ -8,7 +8,7 @@ it under the terms of the GNU Affero General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
 
-This program is distributed in the hope that it will be useful
+This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU Affero General Public License for more details.
@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package instancesetstatus
+package instancestatus
 
 import (
 	"fmt"
@@ -34,14 +34,15 @@ type Allocation struct {
 	TemplateName string
 }
 
-// CurrentObservation is the observed current state of an instance.
+// CurrentObservation contains fields derived from a current Pod or Instance.
 type CurrentObservation struct {
-	InstanceName string
-	State        workloads.InstanceCurrentState
-}
-
-// RuntimeStatus contains fields that are meaningful only for a current, non-terminating Pod.
-type RuntimeStatus struct {
+	InstanceName    string
+	State           workloads.InstanceCurrentState
+	CurrentRevision string
+	UpToDate        bool
+	Ready           bool
+	Available       bool
+	Failed          bool
 	Role            string
 	Configs         []workloads.InstanceConfigStatus
 	VolumeExpansion bool
@@ -49,12 +50,12 @@ type RuntimeStatus struct {
 
 // BuildInput contains the independently produced desired and observed dimensions of InstanceStatus.
 type BuildInput struct {
-	Previous      []workloads.InstanceStatus
-	Active        []Allocation
-	Offline       []string
-	Current       []CurrentObservation
-	TemplateHints []Allocation
-	Runtime       map[string]RuntimeStatus
+	Previous        []workloads.InstanceStatus
+	Active          []Allocation
+	Offline         []string
+	Current         []CurrentObservation
+	TemplateHints   []Allocation
+	UpdateRevisions map[string]string
 }
 
 // BuildResult contains a complete, bounded InstanceStatus view.
@@ -63,7 +64,8 @@ type BuildResult struct {
 	UnknownTemplateNames []string
 }
 
-// Build merges InstanceStatus by PodName. It never carries current runtime fields forward from Previous.
+// Build merges InstanceStatus by PodName. It carries only retained template identity from Previous;
+// all current, revision, health, and runtime fields are rebuilt from Current.
 func Build(input BuildInput) (BuildResult, error) {
 	previous, err := indexPrevious(input.Previous)
 	if err != nil {
@@ -87,8 +89,9 @@ func Build(input BuildInput) (BuildResult, error) {
 		}
 	}
 
-	current := make(map[string]workloads.InstanceCurrentState, len(input.Current))
-	for _, observation := range input.Current {
+	current := make(map[string]*CurrentObservation, len(input.Current))
+	for i := range input.Current {
+		observation := &input.Current[i]
 		if observation.InstanceName == "" {
 			return BuildResult{}, fmt.Errorf("current observation has an empty instance name")
 		}
@@ -98,7 +101,7 @@ func Build(input BuildInput) (BuildResult, error) {
 		if observation.State != workloads.InstanceCurrentStatePresent && observation.State != workloads.InstanceCurrentStateTerminating {
 			return BuildResult{}, fmt.Errorf("current observation for %q has invalid state %q", observation.InstanceName, observation.State)
 		}
-		current[observation.InstanceName] = observation.State
+		current[observation.InstanceName] = observation
 	}
 
 	names := make(map[string]struct{}, len(active)+len(offline)+len(current))
@@ -115,14 +118,17 @@ func Build(input BuildInput) (BuildResult, error) {
 	result := BuildResult{Statuses: make([]workloads.InstanceStatus, 0, len(names))}
 	for name := range names {
 		status := workloads.InstanceStatus{PodName: name, CurrentState: workloads.InstanceCurrentStateAbsent}
-		if state, ok := current[name]; ok {
-			status.CurrentState = state
+		observation := current[name]
+		if observation != nil {
+			status.CurrentState = observation.State
+			status.CurrentRevision = observation.CurrentRevision
 		}
 
 		switch {
 		case active[name] != nil:
 			status.DesiredState = workloads.InstanceDesiredStateActive
 			status.TemplateName = stringPtr(*active[name])
+			status.UpdateRevision = input.UpdateRevisions[name]
 		case offline[name]:
 			status.DesiredState = workloads.InstanceDesiredStateOffline
 			status.TemplateName = retainedTemplate(name, previous, hints)
@@ -143,11 +149,15 @@ func Build(input BuildInput) (BuildResult, error) {
 		if status.TemplateName == nil {
 			result.UnknownTemplateNames = append(result.UnknownTemplateNames, name)
 		}
-		if status.CurrentState == workloads.InstanceCurrentStatePresent {
-			if runtime, ok := input.Runtime[name]; ok {
-				status.Role = runtime.Role
-				status.Configs = copyConfigs(runtime.Configs)
-				status.VolumeExpansion = runtime.VolumeExpansion
+		if observation != nil && observation.State == workloads.InstanceCurrentStatePresent {
+			status.Ready = observation.Ready
+			status.Available = observation.Ready && observation.Available
+			status.Failed = observation.Failed
+			status.Role = observation.Role
+			status.Configs = copyConfigs(observation.Configs)
+			status.VolumeExpansion = observation.VolumeExpansion
+			if status.DesiredState == workloads.InstanceDesiredStateActive {
+				status.UpToDate = observation.UpToDate
 			}
 		}
 		result.Statuses = append(result.Statuses, status)

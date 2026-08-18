@@ -32,7 +32,24 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 )
 
-func TestRevisionUpdatePublishesCompleteInstanceViewBeforeObservedGeneration(t *testing.T) {
+func TestStatusPreconditionWaitsForRevisionUpdate(t *testing.T) {
+	its := revisionTestInstanceSet()
+	its.Status.ObservedGeneration = its.Generation - 1
+	tree := kubebuilderx.NewObjectTree()
+	tree.SetRoot(its)
+	if result := NewStatusReconciler().PreCondition(tree); result != kubebuilderx.ConditionUnsatisfied {
+		t.Fatalf("status reconciler ran before revisions were published: %#v", result)
+	}
+	if result := NewRevisionUpdateReconciler().PreCondition(tree); result != kubebuilderx.ConditionSatisfied {
+		t.Fatalf("revision reconciler did not accept the pending generation: %#v", result)
+	}
+	its.Status.ObservedGeneration = its.Generation
+	if result := NewStatusReconciler().PreCondition(tree); result != kubebuilderx.ConditionSatisfied {
+		t.Fatalf("status reconciler did not accept the observed generation: %#v", result)
+	}
+}
+
+func TestRevisionUpdatePublishesRevisionsBeforeInstanceStatus(t *testing.T) {
 	its := revisionTestInstanceSet()
 	tree := kubebuilderx.NewObjectTree()
 	tree.SetRoot(its)
@@ -42,35 +59,8 @@ func TestRevisionUpdatePublishesCompleteInstanceViewBeforeObservedGeneration(t *
 	if its.Status.ObservedGeneration != its.Generation {
 		t.Fatalf("ObservedGeneration was not advanced: %#v", its.Status)
 	}
-	if its.Status.InstanceStatusObservedGeneration != its.Generation {
-		t.Fatalf("InstanceStatusObservedGeneration was not advanced: %#v", its.Status)
-	}
-	if len(its.Status.InstanceStatus) != 1 {
-		t.Fatalf("complete InstanceStatus was not published: %#v", its.Status.InstanceStatus)
-	}
-	status := its.Status.InstanceStatus[0]
-	if status.TemplateName == nil || *status.TemplateName != "" || status.DesiredState != workloads.InstanceDesiredStateActive || status.CurrentState != workloads.InstanceCurrentStateAbsent {
-		t.Fatalf("unexpected InstanceStatus: %#v", status)
-	}
-}
-
-func TestRevisionUpdateDoesNotAdvanceObservedGenerationOnInvalidInstanceView(t *testing.T) {
-	its := revisionTestInstanceSet()
-	its.Status.InstanceStatusObservedGeneration = 1
-	its.Status.InstanceStatus = []workloads.InstanceStatus{{PodName: "demo-0"}, {PodName: "demo-0"}}
-	tree := kubebuilderx.NewObjectTree()
-	tree.SetRoot(its)
-	if _, err := NewRevisionUpdateReconciler().Reconcile(tree); err == nil {
-		t.Fatal("expected invalid duplicate status to fail")
-	}
-	if its.Status.ObservedGeneration == its.Generation {
-		t.Fatal("ObservedGeneration advanced despite an incomplete instance view")
-	}
-	if its.Status.InstanceStatusObservedGeneration != 1 {
-		t.Fatal("InstanceStatusObservedGeneration advanced despite an incomplete instance view")
-	}
-	if len(its.Status.InstanceStatus) != 2 {
-		t.Fatal("invalid build partially replaced InstanceStatus")
+	if len(its.Status.InstanceStatus) != 0 {
+		t.Fatalf("revision reconcile unexpectedly published InstanceStatus: %#v", its.Status.InstanceStatus)
 	}
 }
 
@@ -102,7 +92,7 @@ func TestTransientFlatOrdinalReassignmentPreservesViewAndAllowsAlignment(t *test
 	if err != nil || res != kubebuilderx.Continue {
 		t.Fatalf("status reconcile blocked transient allocation: result=%v err=%v", res, err)
 	}
-	if !equality.Semantic.DeepEqual(its.Status.InstanceStatus, previous) || its.Status.InstanceStatusObservedGeneration != 1 {
+	if !equality.Semantic.DeepEqual(its.Status.InstanceStatus, previous) {
 		t.Fatalf("status reconcile published a partial view: %#v", its.Status)
 	}
 
@@ -110,7 +100,7 @@ func TestTransientFlatOrdinalReassignmentPreservesViewAndAllowsAlignment(t *test
 	if err != nil || res != kubebuilderx.Continue {
 		t.Fatalf("revision reconcile blocked transient allocation: result=%v err=%v", res, err)
 	}
-	if its.Status.ObservedGeneration != 1 || its.Status.InstanceStatusObservedGeneration != 1 || !equality.Semantic.DeepEqual(its.Status.InstanceStatus, previous) {
+	if its.Status.ObservedGeneration != its.Generation || !equality.Semantic.DeepEqual(its.Status.InstanceStatus, previous) {
 		t.Fatalf("revision reconcile advanced an incomplete view: %#v", its.Status)
 	}
 
@@ -154,8 +144,7 @@ func transientFlatReassignmentInstanceSet() *workloads.InstanceSet {
 			},
 		},
 		Status: workloads.InstanceSetStatus{
-			ObservedGeneration:               1,
-			InstanceStatusObservedGeneration: 1,
+			ObservedGeneration: 1,
 			AssignedOrdinals: map[string]workloads.Ordinals{
 				templateA: {Discrete: []int32{0}},
 				templateB: {Discrete: []int32{1}},

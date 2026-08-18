@@ -284,12 +284,6 @@ type InstanceSetStatus struct {
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
-	// instanceStatusObservedGeneration is the most recent generation for which the complete instance status view
-	// has been published.
-	//
-	// +optional
-	InstanceStatusObservedGeneration int64 `json:"instanceStatusObservedGeneration,omitempty"`
-
 	// replicas is the number of instances created by the InstanceSet controller.
 	Replicas int32 `json:"replicas"`
 
@@ -604,6 +598,40 @@ type InstanceStatus struct {
 	// +kubebuilder:validation:Enum=Present;Terminating;Absent
 	CurrentState InstanceCurrentState `json:"currentState,omitempty"`
 
+	// CurrentRevision identifies the revision currently used by the instance.
+	// It is empty when CurrentState is Absent.
+	//
+	// +optional
+	CurrentRevision string `json:"currentRevision,omitempty"`
+
+	// UpdateRevision identifies the revision desired for an Active instance.
+	// It is empty for Offline and Released instances.
+	//
+	// +optional
+	UpdateRevision string `json:"updateRevision,omitempty"`
+
+	// UpToDate indicates that the workload owner has observed the Active instance fully applied the current
+	// InstanceSet desired state, including changes intentionally excluded from revision hashes.
+	//
+	// +optional
+	UpToDate bool `json:"upToDate,omitempty"`
+
+	// Ready indicates whether the current instance is ready to serve requests.
+	//
+	// +optional
+	Ready bool `json:"ready,omitempty"`
+
+	// Available indicates whether the current instance has remained ready for the required minimum duration.
+	//
+	// +optional
+	Available bool `json:"available,omitempty"`
+
+	// Failed indicates whether the current instance reports a terminal failure state. It is independent of
+	// desired-state convergence.
+	//
+	// +optional
+	Failed bool `json:"failed,omitempty"`
+
 	// Represents the role of the instance observed.
 	//
 	// +optional
@@ -845,7 +873,7 @@ func (r *InstanceSet) RetainedInstanceStatuses() []*InstanceStatus {
 }
 
 // ActiveRunningInstanceStatuses returns Active instances with current runtime information. An empty CurrentState is
-// included for backward compatibility because legacy InstanceStatus entries were produced only from observed objects.
+// included for backward compatibility because older InstanceStatus entries were produced only from observed objects.
 func (r *InstanceSet) ActiveRunningInstanceStatuses() []*InstanceStatus {
 	if r == nil {
 		return nil

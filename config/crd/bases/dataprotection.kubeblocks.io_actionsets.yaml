@@ -255,7 +255,12 @@ spec:
                   preDelete:
                     description: |-
                       Represents a custom deletion action that can be executed before the built-in deletion action.
-                      Note: The preDelete action job will ignore the env/envFrom.
+
+                      For backups with multiple targets, the controller creates one preDelete action job for each target.
+
+                      If the original cluster and an available target pod still exist, the controller injects the
+                      current connection information through DP_DB_* environment variables. It will also target pod's env/envFrom.
+                      Otherwise, these environment variables are omitted.
                     properties:
                       command:
                         description: Defines the commands to back up the volume data.

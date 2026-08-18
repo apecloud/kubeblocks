@@ -17,6 +17,7 @@ package component
 
 import (
 	"context"
+	"errors"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -45,6 +46,7 @@ var _ = Describe("Component Workload Operations Test", func() {
 
 	var (
 		reader         *appsutil.MockReader
+		graphCli       model.GraphClient
 		dag            *graph.DAG
 		comp           *appsv1.Component
 		synthesizeComp *component.SynthesizedComponent
@@ -102,7 +104,7 @@ var _ = Describe("Component Workload Operations Test", func() {
 			},
 		}
 
-		graphCli := model.NewGraphClient(reader)
+		graphCli = model.NewGraphClient(reader)
 		dag = newDAG(graphCli, comp)
 	})
 
@@ -161,6 +163,7 @@ var _ = Describe("Component Workload Operations Test", func() {
 			ops = &componentWorkloadOps{
 				transCtx: &componentTransformContext{
 					Context:       ctx,
+					Client:        graphCli,
 					Logger:        logger,
 					EventRecorder: clusterRecorder,
 				},
@@ -239,6 +242,39 @@ var _ = Describe("Component Workload Operations Test", func() {
 				Expect(event.reason).Should(Equal(memberJoinFailedEventReason))
 				Expect(event.message).Should(ContainSubstring("pod " + pod1.Name))
 			}
+		})
+
+		It("should emit a member action failure only when its fingerprint changes", func() {
+			eventRecorder := &capturingEventRecorder{}
+			ops.transCtx.Component = comp
+			ops.transCtx.EventRecorder = eventRecorder
+			actionErr := errors.New("member join failed")
+
+			ops.reportMemberActionFailure(pod1, constant.MemberJoinFailureFingerprintAnnotationKey,
+				memberJoinFailedEventReason, "memberJoin", actionErr)
+			Expect(eventRecorder.events).Should(HaveLen(1))
+
+			vertex := graphCli.FindMatchedVertex(dag, pod1)
+			Expect(vertex).ShouldNot(BeNil())
+			patchedPod := vertex.(*model.ObjectVertex).Obj.(*corev1.Pod)
+			Expect(patchedPod.Annotations[constant.MemberJoinFailureFingerprintAnnotationKey]).ShouldNot(BeEmpty())
+
+			ops.dag = newDAG(graphCli, comp)
+			ops.reportMemberActionFailure(patchedPod, constant.MemberJoinFailureFingerprintAnnotationKey,
+				memberJoinFailedEventReason, "memberJoin", actionErr)
+			Expect(eventRecorder.events).Should(HaveLen(1))
+
+			ops.reportMemberActionFailure(patchedPod, constant.MemberJoinFailureFingerprintAnnotationKey,
+				memberJoinFailedEventReason, "memberJoin", errors.New("member join timed out"))
+			Expect(eventRecorder.events).Should(HaveLen(2))
+			changedVertex := graphCli.FindMatchedVertex(ops.dag, patchedPod)
+			changedPod := changedVertex.(*model.ObjectVertex).Obj.(*corev1.Pod)
+
+			ops.dag = newDAG(graphCli, comp)
+			ops.clearMemberActionFailureFingerprint(changedPod, constant.MemberJoinFailureFingerprintAnnotationKey)
+			clearedVertex := graphCli.FindMatchedVertex(ops.dag, changedPod)
+			clearedPod := clearedVertex.(*model.ObjectVertex).Obj.(*corev1.Pod)
+			Expect(clearedPod.Annotations).ShouldNot(HaveKey(constant.MemberJoinFailureFingerprintAnnotationKey))
 		})
 	})
 })

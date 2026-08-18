@@ -8,25 +8,22 @@ it under the terms of the GNU Affero General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
 
-This program is distributed in the hope that it will be useful,
+This program is distributed in the hope that it will be useful
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
+along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-package component
+package controllerutil
 
 import (
-	"fmt"
 	"unicode/utf8"
 
-	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
-
-	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
 const (
@@ -34,15 +31,12 @@ const (
 	eventMessageTruncatedMarker = "...(truncated)"
 )
 
-// SendLifecycleActionFailureEvent reports a lifecycle action failure on a Component.
-func SendLifecycleActionFailureEvent(recorder record.EventRecorder, comp *appsv1.Component,
-	reason, action string, actionErr error) {
-	if recorder == nil || comp == nil || actionErr == nil {
+// SendEvent sends an Event after truncating its message to Kubernetes' limit.
+func SendEvent(recorder record.EventRecorder, object runtime.Object, eventType, reason, message string) {
+	if recorder == nil || object == nil {
 		return
 	}
-
-	message := truncateEventMessage(fmt.Sprintf("Failed to execute %s lifecycle action for Component %s: %v", action, comp.Name, actionErr))
-	recorder.Event(comp, corev1.EventTypeWarning, reason, message)
+	recorder.Event(object, eventType, reason, truncateEventMessage(message))
 }
 
 func truncateEventMessage(message string) string {

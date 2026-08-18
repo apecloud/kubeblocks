@@ -20,8 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
-	componentutil "github.com/apecloud/kubeblocks/pkg/controller/component"
+	"fmt"
+
+	corev1 "k8s.io/api/core/v1"
+
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 const (
@@ -38,5 +42,6 @@ func emitLifecycleActionFailureEvent(transCtx *componentTransformContext, reason
 	if transCtx.EventRecorder == nil || !lifecycle.IsActionFailure(actionErr) {
 		return
 	}
-	componentutil.SendLifecycleActionFailureEvent(transCtx.EventRecorder, transCtx.Component, reason, action, actionErr)
+	message := fmt.Sprintf("Failed to execute %s lifecycle action for Component %s: %v", action, transCtx.Component.Name, actionErr)
+	intctrlutil.SendEvent(transCtx.EventRecorder, transCtx.Component, corev1.EventTypeWarning, reason, message)
 }

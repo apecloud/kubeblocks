@@ -37,7 +37,9 @@ import (
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -77,12 +79,15 @@ type roleEventResult struct {
 	RoleDefined    bool
 	Handled        bool
 	ExclusiveClean bool
+	ProbeFailed    bool
+	ProbeFailCode  int32
+	ProbeFailMsg   string
 	parsed         roleProbeOutput
 }
 
 type RoleEventHandler struct{}
 
-func (h *RoleEventHandler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, _ record.EventRecorder, event *corev1.Event) (bool, error) {
+func (h *RoleEventHandler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) (bool, error) {
 	if !isRoleProbeEvent(event) {
 		return false, nil
 	}
@@ -102,6 +107,9 @@ func (h *RoleEventHandler) Handle(cli client.Client, reqCtx intctrlutil.RequestC
 	}
 	handled, err := h.handleRoleProbeEvent(reqCtx.Ctx, cli, event, result)
 	result.Handled = handled
+	if result.ProbeFailed {
+		h.emitRoleProbeFailureEvents(reqCtx.Ctx, cli, recorder, reqCtx.Log, event, result)
+	}
 	logRoleProbeEvent(reqCtx.Log, result, err)
 	return handled, err
 }
@@ -117,6 +125,9 @@ func (h *RoleEventHandler) handleRoleProbeEvent(ctx context.Context, cli client.
 	if probeEvent.Code != 0 {
 		result.Result = "skipped"
 		result.Reason = fmt.Sprintf("roleProbeFailed:%s", probeEvent.Message)
+		result.ProbeFailed = true
+		result.ProbeFailCode = probeEvent.Code
+		result.ProbeFailMsg = probeEvent.Message
 		return true, nil
 	}
 
@@ -180,6 +191,43 @@ func (h *RoleEventHandler) handleRoleProbeEvent(ctx context.Context, cli client.
 		result.Reason = "unknownPodOwner"
 		return false, nil
 	}
+}
+
+func (h *RoleEventHandler) emitRoleProbeFailureEvents(ctx context.Context, cli client.Client, recorder record.EventRecorder,
+	logger logr.Logger, event *corev1.Event, result *roleEventResult) {
+	if recorder == nil {
+		return
+	}
+	pod := &corev1.Pod{}
+	if err := cli.Get(ctx, result.Pod, pod); err != nil {
+		logger.V(1).Info("failed to get Pod for role probe failure event", "pod", result.Pod, "error", err)
+		return
+	}
+	if pod.UID != event.InvolvedObject.UID {
+		return
+	}
+
+	clusterName := pod.Labels[constant.AppInstanceLabelKey]
+	compName := pod.Labels[constant.KBAppComponentLabelKey]
+	if clusterName == "" || compName == "" {
+		logger.V(1).Info("failed to find Component for role probe failure event", "pod", result.Pod)
+		return
+	}
+	comp := &appsv1.Component{}
+	compKey := types.NamespacedName{
+		Namespace: pod.Namespace,
+		Name:      constant.GenerateClusterComponentName(clusterName, compName),
+	}
+	if err := cli.Get(ctx, compKey, comp); err != nil {
+		logger.V(1).Info("failed to get Component for role probe failure event", "component", compKey, "error", err)
+		return
+	}
+
+	actionErr := fmt.Errorf("pod %s reported failure code %d", pod.Name, result.ProbeFailCode)
+	if result.ProbeFailMsg != "" {
+		actionErr = fmt.Errorf("%w: %s", actionErr, result.ProbeFailMsg)
+	}
+	appsutil.SendLifecycleActionFailureEvent(recorder, comp, "RoleProbeFailed", "roleProbe", actionErr)
 }
 
 func (h *RoleEventHandler) handleInstanceSetRoleProbe(ctx context.Context, cli client.Client, pod *corev1.Pod, itsName string, result *roleEventResult) (bool, error) {

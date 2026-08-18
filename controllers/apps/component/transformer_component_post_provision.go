@@ -57,6 +57,7 @@ func (t *componentPostProvisionTransformer) Transform(ctx graph.TransformContext
 	err := t.postProvision(transCtx)
 	if err != nil {
 		err = lifecycle.IgnoreNotDefined(err)
+		emitLifecycleActionFailureEvent(transCtx, postProvisionFailedEventReason, "postProvision", err)
 		if errors.Is(err, lifecycle.ErrPreconditionFailed) {
 			err = fmt.Errorf("%w: %w", intctrlutil.NewDelayedRequeueError(time.Second*10, "wait for lifecycle action precondition"), err)
 		} else {

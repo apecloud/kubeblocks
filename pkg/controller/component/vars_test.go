@@ -1896,22 +1896,16 @@ var _ = Describe("vars", func() {
 							Status: workloads.InstanceSetStatus{
 								InstanceStatus: []workloads.InstanceStatus{
 									{
-										PodName:      podName("leader"),
-										DesiredState: workloads.InstanceDesiredStateActive,
-										CurrentState: workloads.InstanceCurrentStatePresent,
-										Role:         "leader",
+										PodName: podName("leader"),
+										Role:    "leader",
 									},
 									{
-										PodName:      podName("follower"),
-										DesiredState: workloads.InstanceDesiredStateActive,
-										CurrentState: workloads.InstanceCurrentStatePresent,
-										Role:         "follower",
+										PodName: podName("follower"),
+										Role:    "follower",
 									},
 									{
-										PodName:      podName("empty"),
-										DesiredState: workloads.InstanceDesiredStateActive,
-										CurrentState: workloads.InstanceCurrentStatePresent,
-										Role:         "",
+										PodName: podName("empty"),
+										Role:    "",
 									},
 								},
 							},

@@ -88,9 +88,7 @@ var _ = ginkgo.Describe("restartPolicy test", func() {
 			// only one pod ready
 			mockParam.ITS.Status.InstanceStatus = []workloads.InstanceStatus{
 				{
-					PodName:      "pod1",
-					DesiredState: workloads.InstanceDesiredStateActive,
-					CurrentState: workloads.InstanceCurrentStatePresent,
+					PodName: "pod1",
 					Configs: []workloads.InstanceConfigStatus{
 						{
 							Name:       mockParam.ConfigTemplate.Name,
@@ -108,9 +106,7 @@ var _ = ginkgo.Describe("restartPolicy test", func() {
 			// succeed update pod
 			mockParam.ITS.Status.InstanceStatus = []workloads.InstanceStatus{
 				{
-					PodName:      "pod1",
-					DesiredState: workloads.InstanceDesiredStateActive,
-					CurrentState: workloads.InstanceCurrentStatePresent,
+					PodName: "pod1",
 					Configs: []workloads.InstanceConfigStatus{
 						{
 							Name:       mockParam.ConfigTemplate.Name,
@@ -119,9 +115,7 @@ var _ = ginkgo.Describe("restartPolicy test", func() {
 					},
 				},
 				{
-					PodName:      "pod2",
-					DesiredState: workloads.InstanceDesiredStateActive,
-					CurrentState: workloads.InstanceCurrentStatePresent,
+					PodName: "pod2",
 					Configs: []workloads.InstanceConfigStatus{
 						{
 							Name:       mockParam.ConfigTemplate.Name,

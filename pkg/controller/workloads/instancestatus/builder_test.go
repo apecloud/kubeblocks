@@ -228,18 +228,19 @@ func TestBuildDoesNotInventUnknownHistoricalTemplate(t *testing.T) {
 
 func TestInstanceStatusViewHelpers(t *testing.T) {
 	its := &workloads.InstanceSet{Status: workloads.InstanceSetStatus{InstanceStatus: []workloads.InstanceStatus{
+		{PodName: "old-active"},
 		{PodName: "active-absent", DesiredState: workloads.InstanceDesiredStateActive, CurrentState: workloads.InstanceCurrentStateAbsent},
 		{PodName: "active-present", DesiredState: workloads.InstanceDesiredStateActive, CurrentState: workloads.InstanceCurrentStatePresent},
 		{PodName: "offline", DesiredState: workloads.InstanceDesiredStateOffline, CurrentState: workloads.InstanceCurrentStatePresent},
 		{PodName: "released", DesiredState: workloads.InstanceDesiredStateReleased, CurrentState: workloads.InstanceCurrentStatePresent},
 	}}}
-	if len(its.ActiveInstanceStatuses()) != 2 || len(its.OfflineInstanceStatuses()) != 1 || len(its.RetainedInstanceStatuses()) != 3 {
+	if len(its.ActiveInstanceStatuses()) != 3 || len(its.OfflineInstanceStatuses()) != 1 || len(its.RetainedInstanceStatuses()) != 4 {
 		t.Fatal("desired-state helpers returned an unexpected view")
 	}
-	if len(its.ActiveRunningInstanceStatuses()) != 1 || len(its.PresentInstanceStatuses()) != 3 {
+	if len(its.ActiveRunningInstanceStatuses()) != 2 || len(its.PresentInstanceStatuses()) != 4 {
 		t.Fatal("current-state helpers returned an unexpected view")
 	}
-	if !its.HasPresentInstance("active-present") || !its.HasPresentInstance("offline") || its.HasPresentInstance("active-absent") {
+	if !its.HasPresentInstance("old-active") || !its.HasPresentInstance("active-present") || !its.HasPresentInstance("offline") || its.HasPresentInstance("active-absent") {
 		t.Fatal("HasPresentInstance does not reflect current state")
 	}
 }

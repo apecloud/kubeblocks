@@ -592,6 +592,7 @@ type InstanceStatus struct {
 	DesiredState InstanceDesiredState `json:"desiredState,omitempty"`
 
 	// CurrentState describes the observed current state of this instance.
+	// An empty value from an older object is treated as Present because those entries were produced from observed Pods.
 	//
 	// +optional
 	// +kubebuilder:validation:Enum=Present;Terminating;Absent
@@ -662,6 +663,22 @@ const (
 	InstanceCurrentStateTerminating InstanceCurrentState = "Terminating"
 	InstanceCurrentStateAbsent      InstanceCurrentState = "Absent"
 )
+
+// EffectiveDesiredState returns DesiredState with the compatibility default for older persisted status entries.
+func (s *InstanceStatus) EffectiveDesiredState() InstanceDesiredState {
+	if s == nil || s.DesiredState == "" {
+		return InstanceDesiredStateActive
+	}
+	return s.DesiredState
+}
+
+// EffectiveCurrentState returns CurrentState with the compatibility default for older persisted status entries.
+func (s *InstanceStatus) EffectiveCurrentState() InstanceCurrentState {
+	if s == nil || s.CurrentState == "" {
+		return InstanceCurrentStatePresent
+	}
+	return s.CurrentState
+}
 
 type InstanceConfigStatus struct {
 	// The name of the config.
@@ -841,7 +858,7 @@ func (r *InstanceSet) RetainedInstanceStatuses() []*InstanceStatus {
 	result := make([]*InstanceStatus, 0, len(r.Status.InstanceStatus))
 	for i := range r.Status.InstanceStatus {
 		status := &r.Status.InstanceStatus[i]
-		if status.DesiredState == InstanceDesiredStateActive || status.DesiredState == InstanceDesiredStateOffline {
+		if desiredState := status.EffectiveDesiredState(); desiredState == InstanceDesiredStateActive || desiredState == InstanceDesiredStateOffline {
 			result = append(result, status)
 		}
 	}
@@ -856,7 +873,7 @@ func (r *InstanceSet) ActiveRunningInstanceStatuses() []*InstanceStatus {
 	result := make([]*InstanceStatus, 0, len(r.Status.InstanceStatus))
 	for i := range r.Status.InstanceStatus {
 		status := &r.Status.InstanceStatus[i]
-		if status.DesiredState == InstanceDesiredStateActive && status.CurrentState == InstanceCurrentStatePresent {
+		if status.EffectiveDesiredState() == InstanceDesiredStateActive && status.EffectiveCurrentState() == InstanceCurrentStatePresent {
 			result = append(result, status)
 		}
 	}
@@ -871,7 +888,7 @@ func (r *InstanceSet) PresentInstanceStatuses() []*InstanceStatus {
 	result := make([]*InstanceStatus, 0, len(r.Status.InstanceStatus))
 	for i := range r.Status.InstanceStatus {
 		status := &r.Status.InstanceStatus[i]
-		if status.CurrentState == InstanceCurrentStatePresent {
+		if status.EffectiveCurrentState() == InstanceCurrentStatePresent {
 			result = append(result, status)
 		}
 	}
@@ -881,7 +898,7 @@ func (r *InstanceSet) PresentInstanceStatuses() []*InstanceStatus {
 // HasPresentInstance reports whether instanceName currently identifies a Present instance.
 func (r *InstanceSet) HasPresentInstance(instanceName string) bool {
 	status := r.FindInstanceStatus(instanceName)
-	return status != nil && status.CurrentState == InstanceCurrentStatePresent
+	return status != nil && status.EffectiveCurrentState() == InstanceCurrentStatePresent
 }
 
 func (r *InstanceSet) instanceStatusesByDesiredState(desiredState InstanceDesiredState) []*InstanceStatus {
@@ -891,7 +908,7 @@ func (r *InstanceSet) instanceStatusesByDesiredState(desiredState InstanceDesire
 	result := make([]*InstanceStatus, 0, len(r.Status.InstanceStatus))
 	for i := range r.Status.InstanceStatus {
 		status := &r.Status.InstanceStatus[i]
-		if status.DesiredState == desiredState {
+		if status.EffectiveDesiredState() == desiredState {
 			result = append(result, status)
 		}
 	}

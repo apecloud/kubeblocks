@@ -11685,8 +11685,9 @@ spec:
                         It is empty when CurrentState is Absent.
                       type: string
                     currentState:
-                      description: CurrentState describes the observed current state
-                        of this instance.
+                      description: |-
+                        CurrentState describes the observed current state of this instance.
+                        An empty value from an older object is treated as Present because those entries were produced from observed Pods.
                       enum:
                       - Present
                       - Terminating

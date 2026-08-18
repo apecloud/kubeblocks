@@ -20557,7 +20557,8 @@ InstanceCurrentState
 </td>
 <td>
 <em>(Optional)</em>
-<p>CurrentState describes the observed current state of this instance.</p>
+<p>CurrentState describes the observed current state of this instance.
+An empty value from an older object is treated as Present because those entries were produced from observed Pods.</p>
 </td>
 </tr>
 <tr>

@@ -85,10 +85,8 @@ var _ = Describe("component status transformer conditions", func() {
 		if len(roles) > 0 {
 			for i := int32(0); i < replicas; i++ {
 				its.Status.InstanceStatus = append(its.Status.InstanceStatus, workloads.InstanceStatus{
-					PodName:      "pod-" + strconv.Itoa(int(i)),
-					DesiredState: workloads.InstanceDesiredStateActive,
-					CurrentState: workloads.InstanceCurrentStatePresent,
-					Role:         roles[i%int32(len(roles))].Name,
+					PodName: "pod-" + strconv.Itoa(int(i)),
+					Role:    roles[i%int32(len(roles))].Name,
 				})
 			}
 		}
@@ -370,12 +368,7 @@ var _ = Describe("component status transformer conditions", func() {
 
 		It("should be progressing when volume expansion is running", func() {
 			runningITS.Status.InstanceStatus = []workloads.InstanceStatus{
-				{
-					PodName:         "pod-0",
-					DesiredState:    workloads.InstanceDesiredStateActive,
-					CurrentState:    workloads.InstanceCurrentStatePresent,
-					VolumeExpansion: true,
-				},
+				{PodName: "pod-0", VolumeExpansion: true},
 			}
 			err := transformer.reconcileProgressingCondition(transCtx)
 			Expect(err).Should(BeNil())
@@ -494,8 +487,8 @@ var _ = Describe("component status transformer conditions", func() {
 
 			It("should be available when role is present", func() {
 				runningITS.Status.InstanceStatus = []workloads.InstanceStatus{
-					{PodName: "pod-0", DesiredState: workloads.InstanceDesiredStateActive, CurrentState: workloads.InstanceCurrentStatePresent, Role: "leader"},
-					{PodName: "pod-1", DesiredState: workloads.InstanceDesiredStateActive, CurrentState: workloads.InstanceCurrentStatePresent, Role: "follower"},
+					{PodName: "pod-0", Role: "leader"},
+					{PodName: "pod-1", Role: "follower"},
 				}
 				transCtx.RunningWorkload = runningITS
 				err := transformer.reconcileAvailableCondition(transCtx)
@@ -509,7 +502,7 @@ var _ = Describe("component status transformer conditions", func() {
 
 			It("should not be available when role is not present", func() {
 				runningITS.Status.InstanceStatus = []workloads.InstanceStatus{
-					{PodName: "pod-0", DesiredState: workloads.InstanceDesiredStateActive, CurrentState: workloads.InstanceCurrentStatePresent, Role: "follower"},
+					{PodName: "pod-0", Role: "follower"},
 				}
 				transCtx.RunningWorkload = runningITS
 				err := transformer.reconcileAvailableCondition(transCtx)
@@ -544,7 +537,7 @@ var _ = Describe("component status transformer conditions", func() {
 			It("should be available when both checks pass", func() {
 				comp.Status.Phase = appsv1.RunningComponentPhase
 				runningITS.Status.InstanceStatus = []workloads.InstanceStatus{
-					{PodName: "pod-0", DesiredState: workloads.InstanceDesiredStateActive, CurrentState: workloads.InstanceCurrentStatePresent, Role: "leader"},
+					{PodName: "pod-0", Role: "leader"},
 				}
 				transCtx.RunningWorkload = runningITS
 				err := transformer.reconcileAvailableCondition(transCtx)
@@ -558,7 +551,7 @@ var _ = Describe("component status transformer conditions", func() {
 			It("should not be available when phase check fails", func() {
 				comp.Status.Phase = appsv1.FailedComponentPhase
 				runningITS.Status.InstanceStatus = []workloads.InstanceStatus{
-					{PodName: "pod-0", DesiredState: workloads.InstanceDesiredStateActive, CurrentState: workloads.InstanceCurrentStatePresent, Role: "leader"},
+					{PodName: "pod-0", Role: "leader"},
 				}
 				transCtx.RunningWorkload = runningITS
 				err := transformer.reconcileAvailableCondition(transCtx)
@@ -573,7 +566,7 @@ var _ = Describe("component status transformer conditions", func() {
 			It("should not be available when role check fails", func() {
 				comp.Status.Phase = appsv1.RunningComponentPhase
 				runningITS.Status.InstanceStatus = []workloads.InstanceStatus{
-					{PodName: "pod-0", DesiredState: workloads.InstanceDesiredStateActive, CurrentState: workloads.InstanceCurrentStatePresent, Role: "follower"},
+					{PodName: "pod-0", Role: "follower"},
 				}
 				transCtx.RunningWorkload = runningITS
 				err := transformer.reconcileAvailableCondition(transCtx)

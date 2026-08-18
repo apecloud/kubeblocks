@@ -136,9 +136,7 @@ var _ = ginkgo.Describe("syncPolicy test", func() {
 			ginkgo.By("mock the instance status")
 			rctx.ITS.Status.InstanceStatus = []workloads.InstanceStatus{
 				{
-					PodName:      "pod-0",
-					DesiredState: workloads.InstanceDesiredStateActive,
-					CurrentState: workloads.InstanceCurrentStatePresent,
+					PodName: "pod-0",
 					Configs: []workloads.InstanceConfigStatus{
 						{
 							Name:       rctx.ConfigTemplate.Name,
@@ -167,9 +165,7 @@ var _ = ginkgo.Describe("syncPolicy test", func() {
 			ginkgo.By("mock the instance status")
 			rctx.ITS.Status.InstanceStatus = []workloads.InstanceStatus{
 				{
-					PodName:      "pod-0",
-					DesiredState: workloads.InstanceDesiredStateActive,
-					CurrentState: workloads.InstanceCurrentStatePresent,
+					PodName: "pod-0",
 					Configs: []workloads.InstanceConfigStatus{
 						{
 							Name:       rctx.ConfigTemplate.Name,
@@ -178,9 +174,7 @@ var _ = ginkgo.Describe("syncPolicy test", func() {
 					},
 				},
 				{
-					PodName:      "pod-1",
-					DesiredState: workloads.InstanceDesiredStateActive,
-					CurrentState: workloads.InstanceCurrentStatePresent,
+					PodName: "pod-1",
 					Configs: []workloads.InstanceConfigStatus{
 						{
 							Name:       rctx.ConfigTemplate.Name,
@@ -189,9 +183,7 @@ var _ = ginkgo.Describe("syncPolicy test", func() {
 					},
 				},
 				{
-					PodName:      "pod-2",
-					DesiredState: workloads.InstanceDesiredStateActive,
-					CurrentState: workloads.InstanceCurrentStatePresent,
+					PodName: "pod-2",
 					Configs: []workloads.InstanceConfigStatus{
 						{
 							Name:       rctx.ConfigTemplate.Name,

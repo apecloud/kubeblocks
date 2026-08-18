@@ -195,5 +195,50 @@ var _ = Describe("Component Workload Operations Test", func() {
 			By("executing leave member for leader")
 			Expect(ops.leaveMemberForPod(pod1, pods)).Should(Succeed())
 		})
+
+		It("should emit events when member leave fails", func() {
+			testapps.MockKBAgentClient(func(mockRecorder *kbacli.MockClientMockRecorder) {
+				mockRecorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+					if req.Action == "memberLeave" {
+						return kbagentproto.ActionResponse{
+							Error:   kbagentproto.Error2Type(kbagentproto.ErrTimedOut),
+							Message: "member leave timed out",
+						}, nil
+					}
+					return kbagentproto.ActionResponse{}, nil
+				}).Times(2)
+			})
+
+			eventRecorder := &capturingEventRecorder{}
+			ops.transCtx.Component = comp
+			ops.transCtx.EventRecorder = eventRecorder
+
+			Expect(ops.leaveMemberForPod(pod1, pods)).ShouldNot(Succeed())
+			Expect(eventRecorder.events).Should(HaveLen(1))
+			for _, event := range eventRecorder.events {
+				Expect(event.reason).Should(Equal(memberLeaveFailedEventReason))
+				Expect(event.message).Should(ContainSubstring("pod " + pod1.Name))
+			}
+		})
+
+		It("should emit events when member join fails", func() {
+			testapps.MockKBAgentClient(func(mockRecorder *kbacli.MockClientMockRecorder) {
+				mockRecorder.Action(gomock.Any(), gomock.Any()).Return(kbagentproto.ActionResponse{
+					Error:   kbagentproto.Error2Type(kbagentproto.ErrFailed),
+					Message: "member join failed",
+				}, nil).Times(1)
+			})
+
+			eventRecorder := &capturingEventRecorder{}
+			ops.transCtx.Component = comp
+			ops.transCtx.EventRecorder = eventRecorder
+
+			Expect(ops.joinMemberForPod(pod1, pods)).ShouldNot(Succeed())
+			Expect(eventRecorder.events).Should(HaveLen(1))
+			for _, event := range eventRecorder.events {
+				Expect(event.reason).Should(Equal(memberJoinFailedEventReason))
+				Expect(event.message).Should(ContainSubstring("pod " + pod1.Name))
+			}
+		})
 	})
 })

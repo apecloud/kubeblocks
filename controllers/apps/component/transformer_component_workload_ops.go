@@ -209,6 +209,8 @@ func (r *componentWorkloadOps) leaveMemberForPod(pod *corev1.Pod, pods []*corev1
 			if errors.Is(err, lifecycle.ErrActionNotDefined) {
 				return nil
 			}
+			emitLifecycleActionFailureEvent(r.transCtx, memberLeaveFailedEventReason, "memberLeave",
+				fmt.Errorf("pod %s: %w", pod.Name, err))
 			return err
 		}
 		r.transCtx.Logger.Info("succeed to call leave member action", "pod", pod.Name)
@@ -392,6 +394,8 @@ func (r *componentWorkloadOps) joinMemberForPod(pod *corev1.Pod, pods []*corev1.
 	}
 	if err = lfa.MemberJoin(r.transCtx.Context, r.cli, nil); err != nil {
 		if !errors.Is(err, lifecycle.ErrActionNotDefined) {
+			emitLifecycleActionFailureEvent(r.transCtx, memberJoinFailedEventReason, "memberJoin",
+				fmt.Errorf("pod %s: %w", pod.Name, err))
 			return err
 		}
 	}

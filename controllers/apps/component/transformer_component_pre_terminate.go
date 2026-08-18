@@ -143,8 +143,8 @@ func (t *componentPreTerminateTransformer) markPreTerminateDone(transCtx *compon
 	}
 	compObj := comp.DeepCopy()
 	timeStr := time.Now().Format(time.RFC3339Nano)
-	delete(comp.Annotations, preTerminateFailureFingerprintAnnotationKey)
 	comp.Annotations[kbCompPreTerminateDoneKey] = timeStr
+	delete(comp.Annotations, preTerminateFailureFingerprintAnnotationKey)
 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	graphCli.Update(dag, compObj, comp, &model.ReplaceIfExistingOption{})

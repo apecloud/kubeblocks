@@ -254,31 +254,31 @@ var _ = Describe("Component Workload Operations Test", func() {
 			ops.transCtx.EventRecorder = eventRecorder
 			actionErr := errors.New("member join failed")
 
-			ops.reportMemberActionFailure(pod1, constant.MemberJoinFailureFingerprintAnnotationKey,
+			ops.reportMemberActionFailure(pod1, memberJoinFailureFingerprintAnnotationKey,
 				memberJoinFailedEventReason, "memberJoin", actionErr)
 			Expect(eventRecorder.events).Should(HaveLen(1))
 
 			vertex := graphCli.FindMatchedVertex(dag, pod1)
 			Expect(vertex).ShouldNot(BeNil())
 			patchedPod := vertex.(*model.ObjectVertex).Obj.(*corev1.Pod)
-			Expect(patchedPod.Annotations[constant.MemberJoinFailureFingerprintAnnotationKey]).ShouldNot(BeEmpty())
+			Expect(patchedPod.Annotations[memberJoinFailureFingerprintAnnotationKey]).ShouldNot(BeEmpty())
 
 			ops.dag = newDAG(graphCli, comp)
-			ops.reportMemberActionFailure(patchedPod, constant.MemberJoinFailureFingerprintAnnotationKey,
+			ops.reportMemberActionFailure(patchedPod, memberJoinFailureFingerprintAnnotationKey,
 				memberJoinFailedEventReason, "memberJoin", actionErr)
 			Expect(eventRecorder.events).Should(HaveLen(1))
 
-			ops.reportMemberActionFailure(patchedPod, constant.MemberJoinFailureFingerprintAnnotationKey,
+			ops.reportMemberActionFailure(patchedPod, memberJoinFailureFingerprintAnnotationKey,
 				memberJoinFailedEventReason, "memberJoin", errors.New("member join timed out"))
 			Expect(eventRecorder.events).Should(HaveLen(2))
 			changedVertex := graphCli.FindMatchedVertex(ops.dag, patchedPod)
 			changedPod := changedVertex.(*model.ObjectVertex).Obj.(*corev1.Pod)
 
 			ops.dag = newDAG(graphCli, comp)
-			ops.clearMemberActionFailureFingerprint(changedPod, constant.MemberJoinFailureFingerprintAnnotationKey)
+			ops.clearMemberActionFailureFingerprint(changedPod, memberJoinFailureFingerprintAnnotationKey)
 			clearedVertex := graphCli.FindMatchedVertex(ops.dag, changedPod)
 			clearedPod := clearedVertex.(*model.ObjectVertex).Obj.(*corev1.Pod)
-			Expect(clearedPod.Annotations).ShouldNot(HaveKey(constant.MemberJoinFailureFingerprintAnnotationKey))
+			Expect(clearedPod.Annotations).ShouldNot(HaveKey(memberJoinFailureFingerprintAnnotationKey))
 		})
 
 		It("should eliminate upgrade-only diff by preserving legacy config-manager", func() {

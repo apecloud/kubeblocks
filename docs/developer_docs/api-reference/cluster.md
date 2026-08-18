@@ -20542,7 +20542,8 @@ InstanceDesiredState
 </td>
 <td>
 <em>(Optional)</em>
-<p>DesiredState describes the state the InstanceSet controller expects for this instance.
+<p>DesiredState describes whether this identity should have a running Pod (Active), is retained without a
+desired running Pod (Offline), or is no longer allocated and is kept only until its current Pod disappears (Released).
 An empty value from an older object is treated as Active.</p>
 </td>
 </tr>
@@ -20557,7 +20558,7 @@ InstanceCurrentState
 </td>
 <td>
 <em>(Optional)</em>
-<p>CurrentState describes the observed current state of this instance.
+<p>CurrentState describes whether the Pod for this instance is currently present, terminating, or absent.
 An empty value from an older object is treated as Present because those entries were produced from observed Pods.</p>
 </td>
 </tr>
@@ -20570,7 +20571,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>CurrentRevision identifies the revision currently used by the instance.
+<p>CurrentRevision identifies the revision currently used by the Pod for this instance.
 It is empty when CurrentState is Absent.</p>
 </td>
 </tr>
@@ -20583,7 +20584,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>UpdateRevision identifies the revision desired for an Active instance.
+<p>UpdateRevision identifies the Pod revision desired for an Active instance.
 It is empty for Offline and Released instances.</p>
 </td>
 </tr>
@@ -20597,7 +20598,8 @@ bool
 <td>
 <em>(Optional)</em>
 <p>UpToDate indicates that the workload owner has observed the Active instance fully applied the current
-InstanceSet desired state, including changes intentionally excluded from revision hashes.</p>
+InstanceSet desired state, including changes intentionally excluded from revision hashes.
+It can be true only when DesiredState is Active and CurrentState is Present.</p>
 </td>
 </tr>
 <tr>
@@ -20609,7 +20611,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Ready indicates whether the current instance is ready to serve requests.</p>
+<p>Ready indicates whether the current Present Pod is ready to serve requests.</p>
 </td>
 </tr>
 <tr>
@@ -20621,7 +20623,8 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Available indicates whether the current instance has remained ready for the required minimum duration.</p>
+<p>Available indicates whether the current Present Pod has remained ready for the required minimum duration.
+Available can be true only when Ready is true.</p>
 </td>
 </tr>
 <tr>
@@ -20633,7 +20636,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Failed indicates whether the current instance reports a terminal failure state. It is independent of
+<p>Failed indicates whether the current Present Pod reports a terminal failure state. It is independent of
 desired-state convergence.</p>
 </td>
 </tr>
@@ -20646,7 +20649,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Represents the role of the instance observed.</p>
+<p>Represents the role observed from the current Present Pod.</p>
 </td>
 </tr>
 <tr>
@@ -20660,7 +20663,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>The status of configs.</p>
+<p>The config status observed from the current Present Pod.</p>
 </td>
 </tr>
 <tr>
@@ -20672,7 +20675,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Represents whether the instance is in volume expansion.</p>
+<p>Represents whether storage for the current Present Pod is being expanded.</p>
 </td>
 </tr>
 </tbody>
@@ -20702,8 +20705,8 @@ int64
 </td>
 <td>
 <em>(Optional)</em>
-<p>observedGeneration is the most recent generation observed for this InstanceSet. It corresponds to the
-InstanceSet&rsquo;s generation, which is updated on mutation by the API Server.</p>
+<p>observedGeneration is the most recent generation observed for this Instance. It corresponds to the
+Instance&rsquo;s generation, which is updated on mutation by the API Server.</p>
 </td>
 </tr>
 <tr>
@@ -20732,7 +20735,7 @@ InstanceCurrentState
 </td>
 <td>
 <em>(Optional)</em>
-<p>Represents the observed current state of this instance.</p>
+<p>Represents whether the Pod managed by this Instance is currently present, terminating, or absent.</p>
 </td>
 </tr>
 <tr>
@@ -20744,7 +20747,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>currentRevision, if not empty, indicates the version of the Instance used to generate pod.</p>
+<p>currentRevision, if not empty, identifies the revision currently used by the Pod.</p>
 </td>
 </tr>
 <tr>
@@ -20756,7 +20759,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>updateRevision, if not empty, indicates the version of the Instance used to generate pod.</p>
+<p>updateRevision, if not empty, identifies the revision desired for the Pod.</p>
 </td>
 </tr>
 <tr>

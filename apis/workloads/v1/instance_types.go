@@ -146,8 +146,8 @@ type InstanceSpec struct {
 
 // InstanceStatus2 defines the observed state of Instance
 type InstanceStatus2 struct {
-	// observedGeneration is the most recent generation observed for this InstanceSet. It corresponds to the
-	// InstanceSet's generation, which is updated on mutation by the API Server.
+	// observedGeneration is the most recent generation observed for this Instance. It corresponds to the
+	// Instance's generation, which is updated on mutation by the API Server.
 	//
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
@@ -158,18 +158,18 @@ type InstanceStatus2 struct {
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 
-	// Represents the observed current state of this instance.
+	// Represents whether the Pod managed by this Instance is currently present, terminating, or absent.
 	//
 	// +optional
 	// +kubebuilder:validation:Enum=Present;Terminating;Absent
 	CurrentState InstanceCurrentState `json:"currentState,omitempty"`
 
-	// currentRevision, if not empty, indicates the version of the Instance used to generate pod.
+	// currentRevision, if not empty, identifies the revision currently used by the Pod.
 	//
 	// +optional
 	CurrentRevision string `json:"currentRevision,omitempty"`
 
-	// updateRevision, if not empty, indicates the version of the Instance used to generate pod.
+	// updateRevision, if not empty, identifies the revision desired for the Pod.
 	//
 	// +optional
 	UpdateRevision string `json:"updateRevision,omitempty"`

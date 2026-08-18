@@ -338,11 +338,7 @@ type InstanceSetStatus struct {
 	// Provides the status of each instance in the ITS.
 	//
 	// +optional
-	// +patchMergeKey=podName
-	// +patchStrategy=merge
-	// +listType=map
-	// +listMapKey=podName
-	InstanceStatus []InstanceStatus `json:"instanceStatus,omitempty" patchStrategy:"merge" patchMergeKey:"podName"`
+	InstanceStatus []InstanceStatus `json:"instanceStatus,omitempty"`
 
 	// currentRevisions, if not empty, indicates the old version of the InstanceSet used to generate the underlying workload.
 	// key is the pod name, value is the revision.
@@ -584,27 +580,28 @@ type InstanceStatus struct {
 	// +optional
 	TemplateName *string `json:"templateName,omitempty"`
 
-	// DesiredState describes the state the InstanceSet controller expects for this instance.
+	// DesiredState describes whether this identity should have a running Pod (Active), is retained without a
+	// desired running Pod (Offline), or is no longer allocated and is kept only until its current Pod disappears (Released).
 	// An empty value from an older object is treated as Active.
 	//
 	// +optional
 	// +kubebuilder:validation:Enum=Active;Offline;Released
 	DesiredState InstanceDesiredState `json:"desiredState,omitempty"`
 
-	// CurrentState describes the observed current state of this instance.
+	// CurrentState describes whether the Pod for this instance is currently present, terminating, or absent.
 	// An empty value from an older object is treated as Present because those entries were produced from observed Pods.
 	//
 	// +optional
 	// +kubebuilder:validation:Enum=Present;Terminating;Absent
 	CurrentState InstanceCurrentState `json:"currentState,omitempty"`
 
-	// CurrentRevision identifies the revision currently used by the instance.
+	// CurrentRevision identifies the revision currently used by the Pod for this instance.
 	// It is empty when CurrentState is Absent.
 	//
 	// +optional
 	CurrentRevision string `json:"currentRevision,omitempty"`
 
-	// UpdateRevision identifies the revision desired for an Active instance.
+	// UpdateRevision identifies the Pod revision desired for an Active instance.
 	// It is empty for Offline and Released instances.
 	//
 	// +optional
@@ -612,37 +609,39 @@ type InstanceStatus struct {
 
 	// UpToDate indicates that the workload owner has observed the Active instance fully applied the current
 	// InstanceSet desired state, including changes intentionally excluded from revision hashes.
+	// It can be true only when DesiredState is Active and CurrentState is Present.
 	//
 	// +optional
 	UpToDate bool `json:"upToDate,omitempty"`
 
-	// Ready indicates whether the current instance is ready to serve requests.
+	// Ready indicates whether the current Present Pod is ready to serve requests.
 	//
 	// +optional
 	Ready bool `json:"ready,omitempty"`
 
-	// Available indicates whether the current instance has remained ready for the required minimum duration.
+	// Available indicates whether the current Present Pod has remained ready for the required minimum duration.
+	// Available can be true only when Ready is true.
 	//
 	// +optional
 	Available bool `json:"available,omitempty"`
 
-	// Failed indicates whether the current instance reports a terminal failure state. It is independent of
+	// Failed indicates whether the current Present Pod reports a terminal failure state. It is independent of
 	// desired-state convergence.
 	//
 	// +optional
 	Failed bool `json:"failed,omitempty"`
 
-	// Represents the role of the instance observed.
+	// Represents the role observed from the current Present Pod.
 	//
 	// +optional
 	Role string `json:"role,omitempty"`
 
-	// The status of configs.
+	// The config status observed from the current Present Pod.
 	//
 	// +optional
 	Configs []InstanceConfigStatus `json:"configs,omitempty"`
 
-	// Represents whether the instance is in volume expansion.
+	// Represents whether storage for the current Present Pod is being expanded.
 	//
 	// +optional
 	VolumeExpansion bool `json:"volumeExpansion,omitempty"`
@@ -819,7 +818,7 @@ func (r *InstanceSet) IsRoleProbeDone() bool {
 		replicas = 0
 	}
 	cnt := 0
-	for _, inst := range r.ActiveRunningInstanceStatuses() {
+	for _, inst := range r.ActivePresentInstanceStatuses() {
 		if len(inst.Role) > 0 {
 			cnt++
 		}
@@ -865,8 +864,8 @@ func (r *InstanceSet) RetainedInstanceStatuses() []*InstanceStatus {
 	return result
 }
 
-// ActiveRunningInstanceStatuses returns Active instances with current runtime information.
-func (r *InstanceSet) ActiveRunningInstanceStatuses() []*InstanceStatus {
+// ActivePresentInstanceStatuses returns Active instances whose Pod is currently present.
+func (r *InstanceSet) ActivePresentInstanceStatuses() []*InstanceStatus {
 	if r == nil {
 		return nil
 	}

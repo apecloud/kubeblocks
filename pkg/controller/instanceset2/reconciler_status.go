@@ -281,8 +281,10 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 		return err
 	}
 	active := make([]instancestatus.Allocation, 0, len(activeAllocations))
+	activeNames := make(map[string]struct{}, len(activeAllocations))
 	for _, allocation := range activeAllocations {
 		active = append(active, instancestatus.Allocation{PodName: allocation.PodName, TemplateName: allocation.TemplateName})
+		activeNames[allocation.PodName] = struct{}{}
 	}
 	instanceSpecUpdateRevisions, err := revisionmap.Decode(its.Status.UpdateRevisions)
 	if err != nil {
@@ -307,7 +309,9 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 			return fmt.Errorf("duplicate Instance object for %q", inst.Name)
 		}
 		seenInstances[inst.Name] = struct{}{}
-		podUpdateRevisions[inst.Name] = inst.Status.UpdateRevision
+		if inst.Status.ObservedGeneration == inst.Generation {
+			podUpdateRevisions[inst.Name] = inst.Status.UpdateRevision
+		}
 		hints = append(hints, instancestatus.Allocation{PodName: inst.Name, TemplateName: inst.Spec.InstanceTemplateName})
 		if templateName, ok := instancetemplate.TemplateNameFromLabels(inst.Labels); ok {
 			hints = append(hints, instancestatus.Allocation{PodName: inst.Name, TemplateName: templateName})
@@ -324,26 +328,26 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 				UpToDate:        isInstanceUpdatedWithRevisions(inst, instanceSpecRevision, instanceSpecUpdateRevisions),
 				Ready:           inst.Status.Ready,
 				Available:       inst.Status.Available,
-				Failed: !intctrlutil.IsInstanceTerminating(inst) && inst.Status.ObservedGeneration == inst.Generation &&
-					meta.IsStatusConditionTrue(inst.Status.Conditions, string(workloads.InstanceFailure)),
+				Failed:          meta.IsStatusConditionTrue(inst.Status.Conditions, string(workloads.InstanceFailure)),
 				Configs:         inst.Status.Configs,
 				VolumeExpansion: inst.Status.VolumeExpansion,
 			}
-			if intctrlutil.IsInstanceReadyWithRole(inst) {
+			if inst.Status.Ready {
 				if role, ok := roleMap[getInstanceRoleName(inst)]; ok {
 					observation.Role = role.Name
 				}
 			}
 			observations = append(observations, observation)
-		case workloads.InstanceCurrentStateAbsent:
-		case "":
-			return fmt.Errorf("instance %q has not reported current state", inst.Name)
+		case workloads.InstanceCurrentStateAbsent, "":
 		default:
 			return fmt.Errorf("instance %q has invalid current state %q", inst.Name, inst.Status.CurrentState)
 		}
 	}
 
 	for _, name := range append(append([]string(nil), offline...), observationNames(observations)...) {
+		if _, ok := activeNames[name]; ok {
+			continue
+		}
 		if templateName, ok, err := instancetemplate.HistoricalTemplateHint(its, name, templateNames); err != nil {
 			return err
 		} else if ok {

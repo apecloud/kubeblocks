@@ -137,6 +137,94 @@ func TestSetInstanceStatusRetainsOfflineWithoutInstance(t *testing.T) {
 	}
 }
 
+func TestSetInstanceStatusTreatsUnreportedInstanceAsAbsent(t *testing.T) {
+	its := &workloads.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default"},
+		Spec: workloads.InstanceSetSpec{
+			Replicas: ptr.To[int32](1),
+			Selector: &metav1.LabelSelector{},
+		},
+	}
+	tree := kubebuilderx.NewObjectTree()
+	tree.SetRoot(its)
+	inst := &workloads.Instance{ObjectMeta: metav1.ObjectMeta{Name: "demo-0"}}
+
+	if err := setInstanceStatus(tree, its, []*workloads.Instance{inst}); err != nil {
+		t.Fatal(err)
+	}
+	status := its.FindInstanceStatus(inst.Name)
+	if status == nil || status.DesiredState != workloads.InstanceDesiredStateActive || status.CurrentState != workloads.InstanceCurrentStateAbsent {
+		t.Fatalf("unreported Instance was not published as Active+Absent: %#v", status)
+	}
+}
+
+func TestSetInstanceStatusKeepsRuntimeStateIndependentFromConvergence(t *testing.T) {
+	its := &workloads.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default"},
+		Spec: workloads.InstanceSetSpec{
+			Replicas: ptr.To[int32](1),
+			Selector: &metav1.LabelSelector{},
+			Roles:    []workloads.ReplicaRole{{Name: "leader"}},
+		},
+	}
+	tree := kubebuilderx.NewObjectTree()
+	tree.SetRoot(its)
+	inst := &workloads.Instance{
+		ObjectMeta: metav1.ObjectMeta{Name: "demo-0", Generation: 2},
+		Status: workloads.InstanceStatus2{
+			ObservedGeneration: 1,
+			CurrentState:       workloads.InstanceCurrentStatePresent,
+			CurrentRevision:    "current",
+			UpdateRevision:     "stale-target",
+			UpToDate:           true,
+			Ready:              true,
+			Available:          true,
+			Role:               "leader",
+			Conditions: []metav1.Condition{{
+				Type: string(workloads.InstanceFailure), Status: metav1.ConditionTrue,
+			}},
+		},
+	}
+
+	if err := setInstanceStatus(tree, its, []*workloads.Instance{inst}); err != nil {
+		t.Fatal(err)
+	}
+	status := its.FindInstanceStatus(inst.Name)
+	if status == nil || status.CurrentRevision != "current" || status.UpdateRevision != "" || status.UpToDate ||
+		!status.Ready || !status.Available || !status.Failed || status.Role != "leader" {
+		t.Fatalf("runtime state was coupled to stale desired-state convergence: %#v", status)
+	}
+}
+
+func TestSetInstanceStatusUsesActiveFlatTemplateOverStaleInstanceTemplate(t *testing.T) {
+	its := &workloads.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default"},
+		Spec: workloads.InstanceSetSpec{
+			Replicas: ptr.To[int32](1), FlatInstanceOrdinal: true,
+			Instances: []workloads.InstanceTemplate{{
+				Name: "fast", Replicas: ptr.To[int32](1), Ordinals: workloads.Ordinals{Discrete: []int32{0}},
+			}},
+		},
+		Status: workloads.InstanceSetStatus{
+			AssignedOrdinals: map[string]workloads.Ordinals{"": {Discrete: []int32{0}}},
+		},
+	}
+	tree := kubebuilderx.NewObjectTree()
+	tree.SetRoot(its)
+	inst := &workloads.Instance{
+		ObjectMeta: metav1.ObjectMeta{Name: "demo-0", Labels: map[string]string{constant.KBAppInstanceTemplateLabelKey: ""}},
+		Spec:       workloads.InstanceSpec{InstanceTemplateName: ""},
+	}
+
+	if err := setInstanceStatus(tree, its, []*workloads.Instance{inst}); err != nil {
+		t.Fatal(err)
+	}
+	status := its.FindInstanceStatus(inst.Name)
+	if status == nil || status.TemplateName == nil || *status.TemplateName != "fast" || status.DesiredState != workloads.InstanceDesiredStateActive {
+		t.Fatalf("active allocation did not override stale template observations: %#v", status)
+	}
+}
+
 func TestIsInstanceUpdated(t *testing.T) {
 	newInstance := func(generationAnnotation string, upToDate bool) *workloads.Instance {
 		return &workloads.Instance{

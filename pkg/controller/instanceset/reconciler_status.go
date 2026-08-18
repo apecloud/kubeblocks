@@ -449,8 +449,10 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 		return err
 	}
 	active := make([]instancestatus.Allocation, 0, len(activeAllocations))
+	activeNames := make(map[string]struct{}, len(activeAllocations))
 	for _, allocation := range activeAllocations {
 		active = append(active, instancestatus.Allocation{PodName: allocation.PodName, TemplateName: allocation.TemplateName})
+		activeNames[allocation.PodName] = struct{}{}
 	}
 	updateRevisions, err := GetRevisions(its.Status.UpdateRevisions)
 	if err != nil {
@@ -508,6 +510,9 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 	}
 
 	for _, name := range append(append([]string(nil), offline...), podObservationNames(observations)...) {
+		if _, ok := activeNames[name]; ok {
+			continue
+		}
 		if templateName, ok, err := instancetemplate.HistoricalTemplateHint(its, name, templateNames); err != nil {
 			return err
 		} else if ok {

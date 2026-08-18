@@ -86,6 +86,35 @@ var _ = Describe("status reconciler test", func() {
 		Expect(its.Status).Should(Equal(before))
 	})
 
+	It("uses the active flat allocation while the current Pod still carries the old template", func() {
+		replicas := int32(1)
+		its = &workloads.InstanceSet{
+			ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default"},
+			Spec: workloads.InstanceSetSpec{
+				Replicas: &replicas, FlatInstanceOrdinal: true, Template: corev1.PodTemplateSpec{},
+				Instances: []workloads.InstanceTemplate{{
+					Name: "fast", Replicas: &replicas, Ordinals: workloads.Ordinals{Discrete: []int32{0}},
+				}},
+			},
+			Status: workloads.InstanceSetStatus{
+				AssignedOrdinals: map[string]workloads.Ordinals{"": {Discrete: []int32{0}}},
+				UpdateRevisions:  map[string]string{"demo-0": "target"},
+			},
+		}
+		tree := kubebuilderx.NewObjectTree()
+		tree.SetRoot(its)
+		pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{
+			Name: "demo-0", Labels: map[string]string{constant.KBAppInstanceTemplateLabelKey: ""},
+		}}
+
+		Expect(setInstanceStatus(tree, its, []*corev1.Pod{pod})).Should(Succeed())
+		status := its.FindInstanceStatus("demo-0")
+		Expect(status).ShouldNot(BeNil())
+		Expect(status.TemplateName).ShouldNot(BeNil())
+		Expect(*status.TemplateName).Should(Equal("fast"))
+		Expect(status.DesiredState).Should(Equal(workloads.InstanceDesiredStateActive))
+	})
+
 	Context("PreCondition & Reconcile", func() {
 		reconcilePods := func(tree *kubebuilderx.ObjectTree) {
 			By("fix meta")

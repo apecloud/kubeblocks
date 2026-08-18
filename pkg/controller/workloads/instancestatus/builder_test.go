@@ -180,6 +180,81 @@ func TestBuildNormalizesAvailability(t *testing.T) {
 	}
 }
 
+func TestBuildStateCombinations(t *testing.T) {
+	tests := []struct {
+		name         string
+		active       bool
+		offline      bool
+		current      workloads.InstanceCurrentState
+		wantCount    int
+		wantDesired  workloads.InstanceDesiredState
+		wantTarget   bool
+		wantCurrent  bool
+		wantRuntime  bool
+		wantUpToDate bool
+	}{
+		{name: "active present", active: true, current: workloads.InstanceCurrentStatePresent, wantCount: 1, wantDesired: workloads.InstanceDesiredStateActive, wantTarget: true, wantCurrent: true, wantRuntime: true, wantUpToDate: true},
+		{name: "active terminating", active: true, current: workloads.InstanceCurrentStateTerminating, wantCount: 1, wantDesired: workloads.InstanceDesiredStateActive, wantTarget: true, wantCurrent: true},
+		{name: "active absent", active: true, current: workloads.InstanceCurrentStateAbsent, wantCount: 1, wantDesired: workloads.InstanceDesiredStateActive, wantTarget: true},
+		{name: "offline present", offline: true, current: workloads.InstanceCurrentStatePresent, wantCount: 1, wantDesired: workloads.InstanceDesiredStateOffline, wantCurrent: true, wantRuntime: true},
+		{name: "offline terminating", offline: true, current: workloads.InstanceCurrentStateTerminating, wantCount: 1, wantDesired: workloads.InstanceDesiredStateOffline, wantCurrent: true},
+		{name: "offline absent", offline: true, current: workloads.InstanceCurrentStateAbsent, wantCount: 1, wantDesired: workloads.InstanceDesiredStateOffline},
+		{name: "released present", current: workloads.InstanceCurrentStatePresent, wantCount: 1, wantDesired: workloads.InstanceDesiredStateReleased, wantCurrent: true, wantRuntime: true},
+		{name: "released terminating", current: workloads.InstanceCurrentStateTerminating, wantCount: 1, wantDesired: workloads.InstanceDesiredStateReleased, wantCurrent: true},
+		{name: "released absent", current: workloads.InstanceCurrentStateAbsent, wantCount: 0},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			input := BuildInput{
+				Previous:        []workloads.InstanceStatus{{PodName: "demo-0", TemplateName: ptr.To("template")}},
+				UpdateRevisions: map[string]string{"demo-0": "target"},
+			}
+			if test.active {
+				input.Active = []Allocation{{PodName: "demo-0", TemplateName: "template"}}
+			}
+			if test.offline {
+				input.Offline = []string{"demo-0"}
+			}
+			if test.current != workloads.InstanceCurrentStateAbsent {
+				input.Current = []CurrentObservation{{
+					InstanceName: "demo-0", State: test.current, CurrentRevision: "current", UpToDate: true,
+					Ready: true, Available: true, Failed: true, Role: "leader",
+					Configs: []workloads.InstanceConfigStatus{{Name: "config"}}, VolumeExpansion: true,
+				}}
+			}
+
+			result, err := Build(input)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(result.Statuses) != test.wantCount {
+				t.Fatalf("got %d statuses, want %d: %#v", len(result.Statuses), test.wantCount, result.Statuses)
+			}
+			if test.wantCount == 0 {
+				return
+			}
+			status := result.Statuses[0]
+			if status.DesiredState != test.wantDesired || status.CurrentState != test.current {
+				t.Fatalf("unexpected state pair: %#v", status)
+			}
+			if (status.UpdateRevision != "") != test.wantTarget {
+				t.Fatalf("unexpected target revision: %#v", status)
+			}
+			if (status.CurrentRevision != "") != test.wantCurrent {
+				t.Fatalf("unexpected current revision: %#v", status)
+			}
+			hasRuntime := status.Ready && status.Available && status.Failed && status.Role == "leader" && len(status.Configs) == 1 && status.VolumeExpansion
+			if hasRuntime != test.wantRuntime {
+				t.Fatalf("unexpected runtime fields: %#v", status)
+			}
+			if status.UpToDate != test.wantUpToDate {
+				t.Fatalf("unexpected UpToDate: %#v", status)
+			}
+		})
+	}
+}
+
 func TestBuildRejectsInconsistentInputs(t *testing.T) {
 	tests := []BuildInput{
 		{Active: []Allocation{{PodName: "demo-0"}}, Offline: []string{"demo-0"}},
@@ -237,7 +312,7 @@ func TestInstanceStatusViewHelpers(t *testing.T) {
 	if len(its.ActiveInstanceStatuses()) != 3 || len(its.OfflineInstanceStatuses()) != 1 || len(its.RetainedInstanceStatuses()) != 4 {
 		t.Fatal("desired-state helpers returned an unexpected view")
 	}
-	if len(its.ActiveRunningInstanceStatuses()) != 2 || len(its.PresentInstanceStatuses()) != 4 {
+	if len(its.ActivePresentInstanceStatuses()) != 2 || len(its.PresentInstanceStatuses()) != 4 {
 		t.Fatal("current-state helpers returned an unexpected view")
 	}
 	if !its.HasPresentInstance("old-active") || !its.HasPresentInstance("active-present") || !its.HasPresentInstance("offline") || its.HasPresentInstance("active-absent") {

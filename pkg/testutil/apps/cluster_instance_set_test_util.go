@@ -396,12 +396,8 @@ func MockInstanceSetStatus(testCtx testutil.TestContext, cluster *appsv1.Cluster
 			}
 		}
 		status := workloads.InstanceStatus{
-			PodName:      pod.Name,
-			DesiredState: workloads.InstanceDesiredStateActive,
-			CurrentState: workloads.InstanceCurrentStatePresent,
+			PodName: pod.Name,
 		}
-		templateName := pod.Labels[constant.KBAppInstanceTemplateLabelKey]
-		status.TemplateName = &templateName
 		if role != nil {
 			status.Role = role.Name
 		}

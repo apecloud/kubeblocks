@@ -389,6 +389,10 @@ func (d *Deleter) buildEnvFromTarget(
 		return nil, nil
 	}
 
+	if target == nil || target.PodSelector == nil || target.PodSelector.LabelSelector == nil {
+		return nil, nil
+	}
+
 	cluster := &appsv1.Cluster{}
 	err := d.Client.Get(d.Ctx, client.ObjectKey{Namespace: backup.Namespace, Name: clusterName}, cluster)
 	if apierrors.IsNotFound(err) {
@@ -398,10 +402,6 @@ func (d *Deleter) buildEnvFromTarget(
 		return nil, err
 	}
 	if string(cluster.UID) != clusterUID {
-		return nil, nil
-	}
-
-	if target == nil || target.PodSelector == nil || target.PodSelector.LabelSelector == nil {
 		return nil, nil
 	}
 
@@ -429,7 +429,7 @@ func (d *Deleter) selectAvailableTargetPod(namespace string, selector *dpv1alpha
 	}
 
 	targetPod, err := selectPod(selector.LabelSelector)
-	if err != nil || targetPod != nil || selector.Strategy != dpv1alpha1.PodSelectionStrategyAny || selector.FallbackLabelSelector == nil {
+	if err != nil || targetPod != nil || selector.FallbackLabelSelector == nil {
 		return targetPod, err
 	}
 	return selectPod(selector.FallbackLabelSelector)

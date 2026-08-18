@@ -198,6 +198,24 @@ func TestBuildRejectsInconsistentInputs(t *testing.T) {
 	}
 }
 
+func TestBuildActiveAllocationOverridesStaleTemplateHints(t *testing.T) {
+	result, err := Build(BuildInput{
+		Previous:      []workloads.InstanceStatus{{PodName: "demo-0", TemplateName: ptr.To("old")}},
+		Active:        []Allocation{{PodName: "demo-0", TemplateName: "new"}},
+		TemplateHints: []Allocation{{PodName: "demo-0", TemplateName: "old"}},
+		Current: []CurrentObservation{{
+			InstanceName: "demo-0",
+			State:        workloads.InstanceCurrentStatePresent,
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Statuses) != 1 || result.Statuses[0].TemplateName == nil || *result.Statuses[0].TemplateName != "new" {
+		t.Fatalf("active allocation was overridden by a stale hint: %#v", result.Statuses)
+	}
+}
+
 func TestBuildDoesNotInventUnknownHistoricalTemplate(t *testing.T) {
 	result, err := Build(BuildInput{Offline: []string{"historical-offline"}})
 	if err != nil {
@@ -210,16 +228,15 @@ func TestBuildDoesNotInventUnknownHistoricalTemplate(t *testing.T) {
 
 func TestInstanceStatusViewHelpers(t *testing.T) {
 	its := &workloads.InstanceSet{Status: workloads.InstanceSetStatus{InstanceStatus: []workloads.InstanceStatus{
-		{PodName: "old-active"},
 		{PodName: "active-absent", DesiredState: workloads.InstanceDesiredStateActive, CurrentState: workloads.InstanceCurrentStateAbsent},
 		{PodName: "active-present", DesiredState: workloads.InstanceDesiredStateActive, CurrentState: workloads.InstanceCurrentStatePresent},
 		{PodName: "offline", DesiredState: workloads.InstanceDesiredStateOffline, CurrentState: workloads.InstanceCurrentStatePresent},
 		{PodName: "released", DesiredState: workloads.InstanceDesiredStateReleased, CurrentState: workloads.InstanceCurrentStatePresent},
 	}}}
-	if len(its.ActiveInstanceStatuses()) != 3 || len(its.OfflineInstanceStatuses()) != 1 || len(its.RetainedInstanceStatuses()) != 4 {
+	if len(its.ActiveInstanceStatuses()) != 2 || len(its.OfflineInstanceStatuses()) != 1 || len(its.RetainedInstanceStatuses()) != 3 {
 		t.Fatal("desired-state helpers returned an unexpected view")
 	}
-	if len(its.ActiveRunningInstanceStatuses()) != 2 || len(its.PresentInstanceStatuses()) != 3 {
+	if len(its.ActiveRunningInstanceStatuses()) != 1 || len(its.PresentInstanceStatuses()) != 3 {
 		t.Fatal("current-state helpers returned an unexpected view")
 	}
 	if !its.HasPresentInstance("active-present") || !its.HasPresentInstance("offline") || its.HasPresentInstance("active-absent") {

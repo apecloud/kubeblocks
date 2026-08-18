@@ -11685,9 +11685,8 @@ spec:
                         It is empty when CurrentState is Absent.
                       type: string
                     currentState:
-                      description: |-
-                        CurrentState describes the observed current state of this instance.
-                        An empty value means that an older controller did not report this field.
+                      description: CurrentState describes the observed current state
+                        of this instance.
                       enum:
                       - Present
                       - Terminating

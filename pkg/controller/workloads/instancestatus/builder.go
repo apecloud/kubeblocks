@@ -74,7 +74,15 @@ func Build(input BuildInput) (BuildResult, error) {
 	if err != nil {
 		return BuildResult{}, err
 	}
-	hints, err := indexAllocations("template hint", input.TemplateHints, false)
+	// Active allocation is authoritative. A current object may still carry the previous template while an identity
+	// is moving between templates, so hints for Active names must not veto the desired allocation.
+	nonActiveHints := make([]Allocation, 0, len(input.TemplateHints))
+	for _, hint := range input.TemplateHints {
+		if _, ok := active[hint.PodName]; !ok {
+			nonActiveHints = append(nonActiveHints, hint)
+		}
+	}
+	hints, err := indexAllocations("template hint", nonActiveHints, false)
 	if err != nil {
 		return BuildResult{}, err
 	}

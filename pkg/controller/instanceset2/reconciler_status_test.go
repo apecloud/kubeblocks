@@ -50,13 +50,14 @@ func TestSetInstanceStatusReadsCurrentStateFromInstance(t *testing.T) {
 		Status: workloads.InstanceStatus2{
 			ObservedGeneration: 1,
 			CurrentState:       workloads.InstanceCurrentStateAbsent,
+			UpdateRevision:     "pod-revision",
 			UpToDate:           true,
 			Configs:            []workloads.InstanceConfigStatus{{Name: "config"}},
 			VolumeExpansion:    true,
 		},
 	}
-	revision := stampInstanceRevision(inst)
-	its.Status.UpdateRevisions = map[string]string{inst.Name: revision}
+	instanceSpecRevision := stampInstanceRevision(inst)
+	its.Status.UpdateRevisions = map[string]string{inst.Name: instanceSpecRevision}
 
 	if err := setInstanceStatus(tree, its, []*workloads.Instance{inst}); err != nil {
 		t.Fatal(err)
@@ -68,12 +69,14 @@ func TestSetInstanceStatusReadsCurrentStateFromInstance(t *testing.T) {
 	if status.TemplateName == nil || *status.TemplateName != "" || status.DesiredState != workloads.InstanceDesiredStateActive || status.CurrentState != workloads.InstanceCurrentStateAbsent {
 		t.Fatalf("Instance was not Active+Absent: %#v", status)
 	}
-	if status.UpdateRevision != revision || status.CurrentRevision != "" || status.UpToDate || status.Configs != nil || status.VolumeExpansion {
+	if status.UpdateRevision != inst.Status.UpdateRevision || status.CurrentRevision != "" || status.UpToDate || status.Configs != nil || status.VolumeExpansion {
 		t.Fatalf("Absent Instance retained runtime fields: %#v", status)
 	}
 
 	inst.Status.CurrentState = workloads.InstanceCurrentStatePresent
-	inst.Status.CurrentRevision = revision
+	inst.Status.CurrentRevision = inst.Status.UpdateRevision
+	inst.Status.Ready = true
+	inst.Status.Available = true
 	inst.Status.Conditions = []metav1.Condition{
 		{Type: string(workloads.InstanceReady), Status: metav1.ConditionTrue},
 		{Type: string(workloads.InstanceAvailable), Status: metav1.ConditionTrue},
@@ -83,8 +86,17 @@ func TestSetInstanceStatusReadsCurrentStateFromInstance(t *testing.T) {
 		t.Fatal(err)
 	}
 	status = its.Status.InstanceStatus[0]
-	if status.CurrentState != workloads.InstanceCurrentStatePresent || status.CurrentRevision != revision || status.UpdateRevision != revision || !status.UpToDate || !status.Ready || !status.Available || !status.Failed || len(status.Configs) != 1 || !status.VolumeExpansion {
+	if status.CurrentState != workloads.InstanceCurrentStatePresent || status.CurrentRevision != inst.Status.CurrentRevision || status.UpdateRevision != inst.Status.UpdateRevision || !status.UpToDate || !status.Ready || !status.Available || !status.Failed || len(status.Configs) != 1 || !status.VolumeExpansion {
 		t.Fatalf("Present Instance did not refresh runtime fields: %#v", status)
+	}
+
+	inst.Status.UpToDate = false
+	if err := setInstanceStatus(tree, its, []*workloads.Instance{inst}); err != nil {
+		t.Fatal(err)
+	}
+	status = its.Status.InstanceStatus[0]
+	if status.UpToDate || !status.Ready || !status.Available {
+		t.Fatalf("Ready and Available must be independent from UpToDate: %#v", status)
 	}
 
 	inst.Status.CurrentState = workloads.InstanceCurrentStateTerminating
@@ -92,7 +104,7 @@ func TestSetInstanceStatusReadsCurrentStateFromInstance(t *testing.T) {
 		t.Fatal(err)
 	}
 	status = its.Status.InstanceStatus[0]
-	if status.CurrentState != workloads.InstanceCurrentStateTerminating || status.CurrentRevision != revision || status.UpToDate || status.Ready || status.Available || status.Failed || status.Configs != nil || status.VolumeExpansion {
+	if status.CurrentState != workloads.InstanceCurrentStateTerminating || status.CurrentRevision != inst.Status.CurrentRevision || status.UpdateRevision != inst.Status.UpdateRevision || status.UpToDate || status.Ready || status.Available || status.Failed || status.Configs != nil || status.VolumeExpansion {
 		t.Fatalf("Terminating Instance retained current runtime fields: %#v", status)
 	}
 }
@@ -517,8 +529,11 @@ func TestStatusReconcilerReadsCurrentRevisionFromInstanceStatus(t *testing.T) {
 	inst.Status = workloads.InstanceStatus2{
 		ObservedGeneration: 2,
 		CurrentState:       workloads.InstanceCurrentStatePresent,
-		CurrentRevision:    "applied-revision",
+		CurrentRevision:    "pod-revision",
+		UpdateRevision:     "pod-revision",
 		UpToDate:           true,
+		Ready:              true,
+		Available:          true,
 		Conditions: []metav1.Condition{
 			{Type: string(workloads.InstanceReady), Status: metav1.ConditionTrue},
 			{Type: string(workloads.InstanceAvailable), Status: metav1.ConditionTrue},
@@ -541,8 +556,8 @@ func TestStatusReconcilerReadsCurrentRevisionFromInstanceStatus(t *testing.T) {
 		t.Fatalf("expected aggregate Instance spec revision, got %s want %s", currentRevisions[inst.Name], desiredRevision)
 	}
 	status := got.FindInstanceStatus(inst.Name)
-	if status == nil || status.CurrentRevision != inst.Status.CurrentRevision {
-		t.Fatalf("expected per-instance current revision from Instance status, got %#v", status)
+	if status == nil || status.CurrentRevision != inst.Status.CurrentRevision || status.UpdateRevision != inst.Status.UpdateRevision {
+		t.Fatalf("expected per-instance Pod revisions from Instance status, got %#v", status)
 	}
 	if got.Status.UpdatedReplicas != 1 {
 		t.Fatalf("expected updated replicas to stay at 1, got %d", got.Status.UpdatedReplicas)
@@ -601,8 +616,11 @@ func TestStatusReconcilerDoesNotDependOnRevisionAnnotationForCurrentRevision(t *
 	inst.Status = workloads.InstanceStatus2{
 		ObservedGeneration: 2,
 		CurrentState:       workloads.InstanceCurrentStatePresent,
-		CurrentRevision:    desiredRevision,
+		CurrentRevision:    "pod-current",
+		UpdateRevision:     "pod-target",
 		UpToDate:           true,
+		Ready:              true,
+		Available:          true,
 		Conditions: []metav1.Condition{
 			{Type: string(workloads.InstanceReady), Status: metav1.ConditionTrue},
 			{Type: string(workloads.InstanceAvailable), Status: metav1.ConditionTrue},
@@ -625,8 +643,8 @@ func TestStatusReconcilerDoesNotDependOnRevisionAnnotationForCurrentRevision(t *
 		t.Fatalf("expected empty aggregate spec revision for missing annotation, got %#v", currentRevisions)
 	}
 	status := got.FindInstanceStatus(inst.Name)
-	if status == nil || status.CurrentRevision != inst.Status.CurrentRevision {
-		t.Fatalf("expected per-instance current revision from Instance status despite missing annotation, got %#v", status)
+	if status == nil || status.CurrentRevision != inst.Status.CurrentRevision || status.UpdateRevision != inst.Status.UpdateRevision {
+		t.Fatalf("expected per-instance Pod revisions from Instance status despite missing annotation, got %#v", status)
 	}
 	if got.Status.UpdatedReplicas != 0 {
 		t.Fatalf("expected missing spec revision annotation to keep updated replicas at 0, got %d", got.Status.UpdatedReplicas)

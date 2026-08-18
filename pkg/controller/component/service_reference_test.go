@@ -613,12 +613,16 @@ var _ = Describe("service references", func() {
 						Status: workloads.InstanceSetStatus{
 							InstanceStatus: []workloads.InstanceStatus{
 								{
-									PodName: followerPodName,
-									Role:    "follower",
+									PodName:      followerPodName,
+									DesiredState: workloads.InstanceDesiredStateActive,
+									CurrentState: workloads.InstanceCurrentStatePresent,
+									Role:         "follower",
 								},
 								{
-									PodName: leadPodName,
-									Role:    "leader",
+									PodName:      leadPodName,
+									DesiredState: workloads.InstanceDesiredStateActive,
+									CurrentState: workloads.InstanceCurrentStatePresent,
+									Role:         "leader",
 								},
 							},
 						},

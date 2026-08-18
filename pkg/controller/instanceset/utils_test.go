@@ -210,16 +210,19 @@ var _ = Describe("utils test", func() {
 				{
 					PodName:      name + "-0",
 					Role:         roles[0].Name,
+					DesiredState: workloads.InstanceDesiredStateActive,
 					CurrentState: workloads.InstanceCurrentStatePresent,
 				},
 				{
 					PodName:      name + "-1",
 					Role:         roles[1].Name,
+					DesiredState: workloads.InstanceDesiredStateActive,
 					CurrentState: workloads.InstanceCurrentStatePresent,
 				},
 				{
 					PodName:      name + "-2",
 					Role:         roles[2].Name,
+					DesiredState: workloads.InstanceDesiredStateActive,
 					CurrentState: workloads.InstanceCurrentStatePresent,
 				},
 			}

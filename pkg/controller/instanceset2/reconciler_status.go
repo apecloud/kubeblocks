@@ -284,10 +284,11 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 	for _, allocation := range activeAllocations {
 		active = append(active, instancestatus.Allocation{PodName: allocation.PodName, TemplateName: allocation.TemplateName})
 	}
-	updateRevisions, err := revisionmap.Decode(its.Status.UpdateRevisions)
+	instanceSpecUpdateRevisions, err := revisionmap.Decode(its.Status.UpdateRevisions)
 	if err != nil {
 		return err
 	}
+	podUpdateRevisions := make(map[string]string, len(instances))
 	offline := append([]string(nil), its.Spec.OfflineInstances...)
 	hints := make([]instancestatus.Allocation, 0, len(active)+len(instances)+len(offline))
 	if its.Spec.Stop != nil && *its.Spec.Stop {
@@ -306,6 +307,7 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 			return fmt.Errorf("duplicate Instance object for %q", inst.Name)
 		}
 		seenInstances[inst.Name] = struct{}{}
+		podUpdateRevisions[inst.Name] = inst.Status.UpdateRevision
 		hints = append(hints, instancestatus.Allocation{PodName: inst.Name, TemplateName: inst.Spec.InstanceTemplateName})
 		if templateName, ok := instancetemplate.TemplateNameFromLabels(inst.Labels); ok {
 			hints = append(hints, instancestatus.Allocation{PodName: inst.Name, TemplateName: templateName})
@@ -319,9 +321,9 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 				InstanceName:    inst.Name,
 				State:           inst.Status.CurrentState,
 				CurrentRevision: inst.Status.CurrentRevision,
-				UpToDate:        isInstanceUpdatedWithRevisions(inst, instanceSpecRevision, updateRevisions),
-				Ready:           intctrlutil.IsInstanceReady(inst),
-				Available:       intctrlutil.IsInstanceAvailable(inst),
+				UpToDate:        isInstanceUpdatedWithRevisions(inst, instanceSpecRevision, instanceSpecUpdateRevisions),
+				Ready:           inst.Status.Ready,
+				Available:       inst.Status.Available,
 				Failed: !intctrlutil.IsInstanceTerminating(inst) && inst.Status.ObservedGeneration == inst.Generation &&
 					meta.IsStatusConditionTrue(inst.Status.Conditions, string(workloads.InstanceFailure)),
 				Configs:         inst.Status.Configs,
@@ -355,7 +357,7 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 		Offline:         offline,
 		Current:         observations,
 		TemplateHints:   hints,
-		UpdateRevisions: updateRevisions,
+		UpdateRevisions: podUpdateRevisions,
 	})
 	if err != nil {
 		return err

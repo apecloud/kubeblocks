@@ -20557,8 +20557,7 @@ InstanceCurrentState
 </td>
 <td>
 <em>(Optional)</em>
-<p>CurrentState describes the observed current state of this instance.
-An empty value means that an older controller did not report this field.</p>
+<p>CurrentState describes the observed current state of this instance.</p>
 </td>
 </tr>
 <tr>

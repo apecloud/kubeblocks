@@ -82,8 +82,8 @@ func (t *componentPostProvisionTransformer) markPostProvisionDone(transCtx *comp
 	}
 	compObj := comp.DeepCopy()
 	timeStr := time.Now().Format(time.RFC3339Nano)
-	delete(comp.Annotations, postProvisionFailureFingerprintAnnotationKey)
 	comp.Annotations[kbCompPostProvisionDoneKey] = timeStr
+	delete(comp.Annotations, postProvisionFailureFingerprintAnnotationKey)
 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	graphCli.Update(dag, compObj, comp, &model.ReplaceIfExistingOption{})

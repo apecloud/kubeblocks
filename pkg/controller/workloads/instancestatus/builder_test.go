@@ -206,9 +206,6 @@ func TestBuildDoesNotInventUnknownHistoricalTemplate(t *testing.T) {
 	if len(result.Statuses) != 1 || result.Statuses[0].TemplateName != nil {
 		t.Fatalf("unknown template was invented as default: %#v", result.Statuses)
 	}
-	if len(result.UnknownTemplateNames) != 1 || result.UnknownTemplateNames[0] != "historical-offline" {
-		t.Fatalf("unknown template was not reported: %#v", result.UnknownTemplateNames)
-	}
 }
 
 func TestInstanceStatusViewHelpers(t *testing.T) {

@@ -19327,9 +19327,6 @@ Or, a NotReady reason with not ready instances encoded in the Message filed will
 </tr><tr><td><p>&#34;Restore&#34;</p></td>
 <td><p>InstanceRestore indicates whether the initial data restore for this InstanceSet has completed.</p>
 </td>
-</tr><tr><td><p>&#34;InstanceStatusIncomplete&#34;</p></td>
-<td><p>InstanceStatusIncomplete indicates that retained historical instances have unknown template assignments.</p>
-</td>
 </tr><tr><td><p>&#34;InstanceUpdateRestricted&#34;</p></td>
 <td><p>InstanceUpdateRestricted represents a ConditionType that indicates updates to an InstanceSet are blocked(when the
 PodUpdatePolicy is set to StrictInPlace but the pods cannot be updated in-place).</p>
@@ -20713,20 +20710,6 @@ InstanceSet&rsquo;s generation, which is updated on mutation by the API Server.<
 </tr>
 <tr>
 <td>
-<code>currentState</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1.InstanceCurrentState">
-InstanceCurrentState
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Represents the observed current state of this instance.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>conditions</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#condition-v1-meta">
@@ -20738,6 +20721,20 @@ InstanceCurrentState
 <em>(Optional)</em>
 <p>Represents the latest available observations of an instance&rsquo;s current state.
 Known .status.conditions.type are: &ldquo;InstanceFailure&rdquo;, &ldquo;InstanceReady&rdquo;, &ldquo;InstanceAvailable&rdquo;</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>currentState</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.InstanceCurrentState">
+InstanceCurrentState
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents the observed current state of this instance.</p>
 </td>
 </tr>
 <tr>

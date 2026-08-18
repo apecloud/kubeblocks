@@ -60,8 +60,7 @@ type BuildInput struct {
 
 // BuildResult contains a complete, bounded InstanceStatus view.
 type BuildResult struct {
-	Statuses             []workloads.InstanceStatus
-	UnknownTemplateNames []string
+	Statuses []workloads.InstanceStatus
 }
 
 // Build merges InstanceStatus by PodName. It carries only retained template identity from Previous;
@@ -146,9 +145,6 @@ func Build(input BuildInput) (BuildResult, error) {
 			}
 		}
 
-		if status.TemplateName == nil {
-			result.UnknownTemplateNames = append(result.UnknownTemplateNames, name)
-		}
 		if observation != nil && observation.State == workloads.InstanceCurrentStatePresent {
 			status.Ready = observation.Ready
 			status.Available = observation.Ready && observation.Available
@@ -164,7 +160,6 @@ func Build(input BuildInput) (BuildResult, error) {
 	}
 
 	sortStatuses(result.Statuses)
-	sort.Strings(result.UnknownTemplateNames)
 	return result, nil
 }
 

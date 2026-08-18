@@ -59,6 +59,7 @@ func (r *treeLoader) Load(ctx context.Context, reader client.Reader, req ctrl.Re
 	if err = loadInstanceAssistantObjects(ctx, reader, tree); err != nil {
 		return nil, err
 	}
+
 	tree.Context = ctx
 	tree.EventRecorder = recorder
 	tree.Logger = logger

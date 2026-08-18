@@ -741,9 +741,6 @@ const (
 	// InstanceUpdateRestricted represents a ConditionType that indicates updates to an InstanceSet are blocked(when the
 	// PodUpdatePolicy is set to StrictInPlace but the pods cannot be updated in-place).
 	InstanceUpdateRestricted ConditionType = "InstanceUpdateRestricted"
-
-	// InstanceStatusIncomplete indicates that retained historical instances have unknown template assignments.
-	InstanceStatusIncomplete ConditionType = "InstanceStatusIncomplete"
 )
 
 const (

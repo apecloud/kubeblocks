@@ -523,7 +523,6 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 		return err
 	}
 	its.Status.InstanceStatus = result.Statuses
-	setInstanceStatusIncompleteCondition(its, result.UnknownTemplateNames)
 	return nil
 }
 
@@ -569,19 +568,4 @@ func syncObservationPVCStatus(tree *kubebuilderx.ObjectTree, its *workloads.Inst
 			}
 		}
 	}
-}
-
-func setInstanceStatusIncompleteCondition(its *workloads.InstanceSet, names []string) {
-	if len(names) == 0 {
-		meta.RemoveStatusCondition(&its.Status.Conditions, string(workloads.InstanceStatusIncomplete))
-		return
-	}
-	message, _ := json.Marshal(names)
-	meta.SetStatusCondition(&its.Status.Conditions, metav1.Condition{
-		Type:               string(workloads.InstanceStatusIncomplete),
-		Status:             metav1.ConditionTrue,
-		ObservedGeneration: its.Generation,
-		Reason:             workloads.ReasonTemplateNameUnknown,
-		Message:            string(message),
-	})
 }

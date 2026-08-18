@@ -60,7 +60,8 @@ ENV APK_MIRROR=${APK_MIRROR}
 RUN if [ -n "${APK_MIRROR}" ]; then sed -i "s/dl-cdn.alpinelinux.org/${APK_MIRROR}/g" /etc/apk/repositories; fi
 RUN apk upgrade --no-cache
 # curl is used to send certain requests, such as reload in config-manager.
-RUN apk add --no-cache curl kubectl helm jq --allow-untrusted \
+RUN apk add --no-cache curl kubectl helm jq tini-static --allow-untrusted \
+	&& cp /sbin/tini-static /bin/tini-static \
     && rm -rf /var/cache/apk/*
 
 # copy kubeblocks tools

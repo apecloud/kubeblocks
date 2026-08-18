@@ -86,7 +86,8 @@ func (t *componentPreTerminateTransformer) Transform(ctx graph.TransformContext,
 	if invoked, err = t.preTerminate(transCtx, compDef); err != nil {
 		err = lifecycle.IgnoreNotDefined(err)
 		if invoked {
-			emitLifecycleActionFailureEvent(transCtx, preTerminateFailedEventReason, "preTerminate", err)
+			reportComponentLifecycleActionFailureEvent(transCtx, dag,
+				preTerminateFailureFingerprintAnnotationKey, preTerminateFailedEventReason, "preTerminate", err)
 		}
 		return err
 	}
@@ -142,6 +143,7 @@ func (t *componentPreTerminateTransformer) markPreTerminateDone(transCtx *compon
 	}
 	compObj := comp.DeepCopy()
 	timeStr := time.Now().Format(time.RFC3339Nano)
+	delete(comp.Annotations, preTerminateFailureFingerprintAnnotationKey)
 	comp.Annotations[kbCompPreTerminateDoneKey] = timeStr
 
 	graphCli, _ := transCtx.Client.(model.GraphClient)

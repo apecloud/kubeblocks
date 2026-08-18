@@ -30,7 +30,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
+	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
 type capturedEvent struct {
@@ -110,5 +113,66 @@ func TestEmitLifecycleActionFailureEventSuppressesWaitingStates(t *testing.T) {
 
 	if !lifecycle.IsActionFailure(errors.New("pod is unavailable")) {
 		t.Fatal("expected an execution error to be classified as a lifecycle action failure")
+	}
+}
+
+func TestReportComponentLifecycleActionFailureEventDeduplicatesByFingerprint(t *testing.T) {
+	comp := &appsv1.Component{ObjectMeta: metav1.ObjectMeta{
+		Namespace:   "default",
+		Name:        "test-cluster-mysql",
+		Annotations: map[string]string{},
+	}}
+	recorder := &capturingEventRecorder{}
+	graphCli := model.NewGraphClient(&appsutil.MockReader{})
+	newDAG := func(current *appsv1.Component) *graph.DAG {
+		dag := graph.NewDAG()
+		graphCli.Root(dag, current, current, model.ActionStatusPtr())
+		return dag
+	}
+	transCtx := &componentTransformContext{
+		Client:        graphCli,
+		EventRecorder: recorder,
+		Component:     comp,
+	}
+	dag := newDAG(comp)
+	actionErr := errors.New("post-provision failed")
+
+	reportComponentLifecycleActionFailureEvent(transCtx, dag,
+		postProvisionFailureFingerprintAnnotationKey, postProvisionFailedEventReason, "postProvision", actionErr)
+	if len(recorder.events) != 1 {
+		t.Fatalf("expected one event, got %d", len(recorder.events))
+	}
+	vertex := graphCli.FindMatchedVertex(dag, comp)
+	patchedComp := vertex.(*model.ObjectVertex).Obj.(*appsv1.Component)
+	if patchedComp.Annotations[postProvisionFailureFingerprintAnnotationKey] == "" {
+		t.Fatal("expected the failure fingerprint to be persisted")
+	}
+
+	transCtx.Component = patchedComp
+	dag = newDAG(patchedComp)
+	reportComponentLifecycleActionFailureEvent(transCtx, dag,
+		postProvisionFailureFingerprintAnnotationKey, postProvisionFailedEventReason, "postProvision", actionErr)
+	if len(recorder.events) != 1 {
+		t.Fatalf("expected the unchanged failure to be suppressed, got %d events", len(recorder.events))
+	}
+
+	reportComponentLifecycleActionFailureEvent(transCtx, dag,
+		postProvisionFailureFingerprintAnnotationKey, postProvisionFailedEventReason, "postProvision",
+		errors.New("post-provision timed out"))
+	if len(recorder.events) != 2 {
+		t.Fatalf("expected a changed failure to emit again, got %d events", len(recorder.events))
+	}
+	vertex = graphCli.FindMatchedVertex(dag, patchedComp)
+	changedComp := vertex.(*model.ObjectVertex).Obj.(*appsv1.Component)
+
+	transCtx.Component = changedComp
+	dag = newDAG(changedComp)
+	reportComponentLifecycleActionFailureEvent(transCtx, dag,
+		postProvisionFailureFingerprintAnnotationKey, postProvisionFailedEventReason, "postProvision",
+		lifecycle.ErrActionInProgress)
+	vertex = graphCli.FindMatchedVertex(dag, changedComp)
+	clearedComp := vertex.(*model.ObjectVertex).Obj.(*appsv1.Component)
+	if _, ok := clearedComp.Annotations[postProvisionFailureFingerprintAnnotationKey]; ok {
+		t.Fatal("expected the failure fingerprint to be cleared after recovery")
 	}
 }

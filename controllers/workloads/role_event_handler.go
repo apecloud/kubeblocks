@@ -40,7 +40,6 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	componentutil "github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
@@ -227,7 +226,8 @@ func (h *RoleEventHandler) emitRoleProbeFailureEvents(ctx context.Context, cli c
 	if result.ProbeFailMsg != "" {
 		actionErr = fmt.Errorf("%w: %s", actionErr, result.ProbeFailMsg)
 	}
-	componentutil.SendLifecycleActionFailureEvent(recorder, comp, "RoleProbeFailed", "roleProbe", actionErr)
+	message := fmt.Sprintf("Failed to execute roleProbe lifecycle action for Component %s: %v", comp.Name, actionErr)
+	intctrlutil.SendEvent(recorder, comp, corev1.EventTypeWarning, "RoleProbeFailed", message)
 }
 
 func (h *RoleEventHandler) handleInstanceSetRoleProbe(ctx context.Context, cli client.Client, pod *corev1.Pod, itsName string, result *roleEventResult) (bool, error) {

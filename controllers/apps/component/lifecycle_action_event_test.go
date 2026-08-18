@@ -108,7 +108,7 @@ func TestEmitLifecycleActionFailureEventSuppressesWaitingStates(t *testing.T) {
 		})
 	}
 
-	if !isLifecycleActionFailure(errors.New("pod is unavailable")) {
+	if !lifecycle.IsActionFailure(errors.New("pod is unavailable")) {
 		t.Fatal("expected an execution error to be classified as a lifecycle action failure")
 	}
 }

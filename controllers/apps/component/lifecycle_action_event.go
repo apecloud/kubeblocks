@@ -35,12 +35,8 @@ const (
 // Component. Waiting and retryable action states are not failures and should
 // not produce warning events.
 func emitLifecycleActionFailureEvent(transCtx *componentTransformContext, reason, action string, actionErr error) {
-	if transCtx.EventRecorder == nil || !isLifecycleActionFailure(actionErr) {
+	if transCtx.EventRecorder == nil || !lifecycle.IsActionFailure(actionErr) {
 		return
 	}
 	appsutil.SendLifecycleActionFailureEvent(transCtx.EventRecorder, transCtx.Component, reason, action, actionErr)
-}
-
-func isLifecycleActionFailure(err error) bool {
-	return lifecycle.IsActionFailure(err)
 }

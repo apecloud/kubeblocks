@@ -33,7 +33,7 @@ func TestTruncateEventMessage(t *testing.T) {
 		{name: "short", message: "action failed"},
 		{name: "exact limit", message: strings.Repeat("a", maxEventMessageBytes)},
 		{name: "long ASCII", message: strings.Repeat("a", maxEventMessageBytes+1)},
-		{name: "long UTF-8", message: strings.Repeat("失", maxEventMessageBytes)},
+		{name: "long UTF-8", message: strings.Repeat("é", maxEventMessageBytes)},
 	}
 
 	for _, tt := range tests {

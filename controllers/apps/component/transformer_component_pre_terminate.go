@@ -86,7 +86,7 @@ func (t *componentPreTerminateTransformer) Transform(ctx graph.TransformContext,
 	if invoked, err = t.preTerminate(transCtx, compDef); err != nil {
 		err = lifecycle.IgnoreNotDefined(err)
 		if invoked {
-			reportComponentLifecycleActionFailureEvent(transCtx, dag,
+			reportLifecycleActionFailureEvent(transCtx, dag,
 				preTerminateFailureFingerprintAnnotationKey, preTerminateFailedEventReason, "preTerminate", err)
 		}
 		return err

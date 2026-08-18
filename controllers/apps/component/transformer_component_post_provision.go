@@ -58,7 +58,7 @@ func (t *componentPostProvisionTransformer) Transform(ctx graph.TransformContext
 	if err != nil {
 		err = lifecycle.IgnoreNotDefined(err)
 		if invoked {
-			reportComponentLifecycleActionFailureEvent(transCtx, dag,
+			reportLifecycleActionFailureEvent(transCtx, dag,
 				postProvisionFailureFingerprintAnnotationKey, postProvisionFailedEventReason, "postProvision", err)
 		}
 		if errors.Is(err, lifecycle.ErrPreconditionFailed) {

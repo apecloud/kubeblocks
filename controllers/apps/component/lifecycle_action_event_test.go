@@ -116,7 +116,7 @@ func TestEmitLifecycleActionFailureEventSuppressesWaitingStates(t *testing.T) {
 	}
 }
 
-func TestReportComponentLifecycleActionFailureEventDeduplicatesByFingerprint(t *testing.T) {
+func TestReportLifecycleActionFailureEventDeduplicatesByFingerprint(t *testing.T) {
 	comp := &appsv1.Component{ObjectMeta: metav1.ObjectMeta{
 		Namespace:   "default",
 		Name:        "test-cluster-mysql",
@@ -137,7 +137,7 @@ func TestReportComponentLifecycleActionFailureEventDeduplicatesByFingerprint(t *
 	dag := newDAG(comp)
 	actionErr := errors.New("post-provision failed")
 
-	reportComponentLifecycleActionFailureEvent(transCtx, dag,
+	reportLifecycleActionFailureEvent(transCtx, dag,
 		postProvisionFailureFingerprintAnnotationKey, postProvisionFailedEventReason, "postProvision", actionErr)
 	if len(recorder.events) != 1 {
 		t.Fatalf("expected one event, got %d", len(recorder.events))
@@ -150,13 +150,13 @@ func TestReportComponentLifecycleActionFailureEventDeduplicatesByFingerprint(t *
 
 	transCtx.Component = patchedComp
 	dag = newDAG(patchedComp)
-	reportComponentLifecycleActionFailureEvent(transCtx, dag,
+	reportLifecycleActionFailureEvent(transCtx, dag,
 		postProvisionFailureFingerprintAnnotationKey, postProvisionFailedEventReason, "postProvision", actionErr)
 	if len(recorder.events) != 1 {
 		t.Fatalf("expected the unchanged failure to be suppressed, got %d events", len(recorder.events))
 	}
 
-	reportComponentLifecycleActionFailureEvent(transCtx, dag,
+	reportLifecycleActionFailureEvent(transCtx, dag,
 		postProvisionFailureFingerprintAnnotationKey, postProvisionFailedEventReason, "postProvision",
 		errors.New("post-provision timed out"))
 	if len(recorder.events) != 2 {
@@ -167,7 +167,7 @@ func TestReportComponentLifecycleActionFailureEventDeduplicatesByFingerprint(t *
 
 	transCtx.Component = changedComp
 	dag = newDAG(changedComp)
-	reportComponentLifecycleActionFailureEvent(transCtx, dag,
+	reportLifecycleActionFailureEvent(transCtx, dag,
 		postProvisionFailureFingerprintAnnotationKey, postProvisionFailedEventReason, "postProvision",
 		lifecycle.ErrActionInProgress)
 	vertex = graphCli.FindMatchedVertex(dag, changedComp)

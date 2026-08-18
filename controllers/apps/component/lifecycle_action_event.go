@@ -41,10 +41,10 @@ const (
 	preTerminateFailureFingerprintAnnotationKey  = "apps.kubeblocks.io/pre-terminate-failure-fingerprint"
 )
 
-func reportComponentLifecycleActionFailureEvent(transCtx *componentTransformContext, dag *graph.DAG,
+func reportLifecycleActionFailureEvent(transCtx *componentTransformContext, dag *graph.DAG,
 	annotationKey, reason, action string, actionErr error) {
 	if !lifecycle.IsActionFailure(actionErr) {
-		setComponentLifecycleActionFailureFingerprint(transCtx, dag, annotationKey, "")
+		setLifecycleActionFailureFingerprint(transCtx, dag, annotationKey, "")
 		return
 	}
 	if transCtx.EventRecorder == nil {
@@ -57,10 +57,10 @@ func reportComponentLifecycleActionFailureEvent(transCtx *componentTransformCont
 	}
 
 	emitLifecycleActionFailureEvent(transCtx, reason, action, actionErr)
-	setComponentLifecycleActionFailureFingerprint(transCtx, dag, annotationKey, fingerprint)
+	setLifecycleActionFailureFingerprint(transCtx, dag, annotationKey, fingerprint)
 }
 
-func setComponentLifecycleActionFailureFingerprint(transCtx *componentTransformContext, dag *graph.DAG,
+func setLifecycleActionFailureFingerprint(transCtx *componentTransformContext, dag *graph.DAG,
 	annotationKey, fingerprint string) {
 	comp := transCtx.Component
 	if comp == nil || (fingerprint == "" && (comp.Annotations == nil || comp.Annotations[annotationKey] == "")) {

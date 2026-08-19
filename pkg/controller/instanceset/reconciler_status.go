@@ -344,6 +344,10 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 		}
 		active = nil
 	}
+	currentActiveNames := make(map[string]struct{}, len(active))
+	for _, allocation := range active {
+		currentActiveNames[allocation.PodName] = struct{}{}
+	}
 
 	observations := make([]instancestatus.CurrentObservation, 0, len(pods))
 	roleMap := composeRoleMap(*its)
@@ -376,7 +380,8 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 				observation.Role = role.Name
 			}
 		}
-		observation.Configs = instanceConfigStatus(its, pod.Name)
+		_, isActive := currentActiveNames[pod.Name]
+		observation.Configs = instanceConfigStatus(its, pod.Name, isActive)
 		observations = append(observations, observation)
 	}
 
@@ -407,7 +412,7 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 	return nil
 }
 
-func instanceConfigStatus(its *workloads.InstanceSet, podName string) []workloads.InstanceConfigStatus {
+func instanceConfigStatus(its *workloads.InstanceSet, podName string, isActive bool) []workloads.InstanceConfigStatus {
 	if its.Status.InstanceStatus == nil {
 		return instanceConfigStatusFromSpec(its)
 	}
@@ -420,8 +425,7 @@ func instanceConfigStatus(its *workloads.InstanceSet, podName string) []workload
 		if status.PodName != podName {
 			continue
 		}
-		if status.EffectiveDesiredState() == workloads.InstanceDesiredStateActive &&
-			status.EffectiveCurrentState() == workloads.InstanceCurrentStateAbsent {
+		if isActive && status.EffectiveCurrentState() == workloads.InstanceCurrentStateAbsent {
 			return instanceConfigStatusFromSpec(its)
 		}
 		configs := make([]workloads.InstanceConfigStatus, 0, len(status.Configs))

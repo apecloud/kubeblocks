@@ -119,7 +119,7 @@ var _ = Describe("update reconciler test", func() {
 		}
 	}
 
-	It("does not reconfigure a newly observed Pod after Active+Absent status", func() {
+	DescribeTable("does not reconfigure a newly observed active Pod after an absent status", func(previousDesiredState workloads.InstanceDesiredState) {
 		replicas = 1
 		its.Spec.Replicas = &replicas
 		its.Spec.Configs = []workloads.ConfigTemplate{{
@@ -132,7 +132,7 @@ var _ = Describe("update reconciler test", func() {
 		podName := name + "-0"
 		its.Status.InstanceStatus = []workloads.InstanceStatus{{
 			PodName:      podName,
-			DesiredState: workloads.InstanceDesiredStateActive,
+			DesiredState: previousDesiredState,
 			CurrentState: workloads.InstanceCurrentStateAbsent,
 		}}
 		pod := builder.NewPodBuilder(namespace, podName).GetObject()
@@ -155,7 +155,10 @@ var _ = Describe("update reconciler test", func() {
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(allUpdated).Should(BeTrue())
 		Expect(spy.reconfigureCalls).Should(BeZero())
-	})
+	},
+		Entry("Active+Absent", workloads.InstanceDesiredStateActive),
+		Entry("Offline+Absent", workloads.InstanceDesiredStateOffline),
+	)
 
 	Context("PreCondition & Reconcile", func() {
 		getPodReadyCondition := func() corev1.PodCondition {

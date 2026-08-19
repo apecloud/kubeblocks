@@ -43,6 +43,20 @@ type statusReconciler struct{}
 
 var _ kubebuilderx.Reconciler = &statusReconciler{}
 
+type instanceStatusObservation struct {
+	currentState     workloads.InstanceCurrentState
+	currentRevision  string
+	upToDate         bool
+	ready            bool
+	available        bool
+	role             string
+	volumeExpansion  bool
+	configs          []workloads.InstanceConfigStatus
+	notReadyName     string
+	notAvailableName string
+	failureCondition *metav1.Condition
+}
+
 func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
 	if tree.GetRoot() == nil || !model.IsObjectStatusUpdating(tree.GetRoot()) {
 		return kubebuilderx.ConditionUnsatisfied
@@ -57,85 +71,101 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}
-	if obj == nil {
-		r.setPodUnavailableStatus(inst, workloads.InstanceCurrentStateAbsent, inst.Name, "")
-		return kubebuilderx.Continue, nil
+	var pod *corev1.Pod
+	if obj != nil {
+		pod = obj.(*corev1.Pod)
 	}
-	pod := obj.(*corev1.Pod)
-	if isTerminating(pod) {
-		r.setPodUnavailableStatus(inst, workloads.InstanceCurrentStateTerminating, pod.Name, getPodRevision(pod))
-		return kubebuilderx.Continue, nil
-	}
-	inst.Status.CurrentState = workloads.InstanceCurrentStatePresent
-
-	ready, available, updated := false, false, false
-	notReadyName, notAvailableName := "", ""
-
-	if isCreated(pod) {
-		notReadyName = pod.Name
-	}
-	if isImageMatched(pod) && intctrlutil.IsPodReady(pod) {
-		ready = true
-		notReadyName = ""
-		if intctrlutil.IsPodAvailable(pod, inst.Spec.MinReadySeconds) {
-			available = true
-		} else {
-			notAvailableName = pod.Name
-		}
-	}
-	if isCreated(pod) && !isTerminating(pod) {
-		updated, err = isPodUpdated(inst, pod)
-		if err != nil {
-			return kubebuilderx.Continue, err
-		}
-	}
-	inst.Status.CurrentRevision = getPodRevision(pod)
-	if updated {
-		inst.Status.CurrentRevision = inst.Status.UpdateRevision
-	}
-
-	readyCondition := r.buildReadyCondition(inst, ready, notReadyName)
-	meta.SetStatusCondition(&inst.Status.Conditions, *readyCondition)
-
-	availableCondition := r.buildAvailableCondition(inst, available, notAvailableName)
-	meta.SetStatusCondition(&inst.Status.Conditions, *availableCondition)
-
-	failureCondition := r.buildFailureCondition(inst, pod)
-	if failureCondition != nil {
-		meta.SetStatusCondition(&inst.Status.Conditions, *failureCondition)
-	} else {
-		meta.RemoveStatusCondition(&inst.Status.Conditions, string(workloads.InstanceFailure))
-	}
-
-	inst.Status.UpToDate = updated
-	inst.Status.Ready = ready
-	inst.Status.Available = available
-	inst.Status.Role = r.observedRoleOfPod(inst, pod)
-	inst.Status.VolumeExpansion = r.hasRunningVolumeExpansion(tree, inst)
-	configs, err := r.observedConfigsOfPod(pod)
+	observation, err := r.observeInstanceStatus(tree, inst, pod)
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}
-	inst.Status.Configs = configs
+	r.setInstanceStatus(inst, observation)
+	r.setInstanceConditions(inst, observation)
 
-	if inst.Spec.MinReadySeconds > 0 && !available {
+	if observation.currentState == workloads.InstanceCurrentStatePresent && inst.Spec.MinReadySeconds > 0 && !observation.available {
 		return kubebuilderx.RetryAfter(time.Second), nil
 	}
 	return kubebuilderx.Continue, nil
 }
 
-func (r *statusReconciler) setPodUnavailableStatus(inst *workloads.Instance, state workloads.InstanceCurrentState, name, currentRevision string) {
-	inst.Status.CurrentState = state
-	inst.Status.CurrentRevision = currentRevision
-	inst.Status.UpToDate = false
-	inst.Status.Ready = false
-	inst.Status.Available = false
-	inst.Status.Role = ""
-	inst.Status.VolumeExpansion = false
-	inst.Status.Configs = nil
-	meta.SetStatusCondition(&inst.Status.Conditions, *r.buildReadyCondition(inst, false, name))
-	meta.SetStatusCondition(&inst.Status.Conditions, *r.buildAvailableCondition(inst, false, name))
-	meta.RemoveStatusCondition(&inst.Status.Conditions, string(workloads.InstanceFailure))
+func (r *statusReconciler) observeInstanceStatus(tree *kubebuilderx.ObjectTree, inst *workloads.Instance, pod *corev1.Pod) (instanceStatusObservation, error) {
+	observation := instanceStatusObservation{
+		currentState:     workloads.InstanceCurrentStateAbsent,
+		notReadyName:     inst.Name,
+		notAvailableName: inst.Name,
+	}
+	if pod == nil {
+		return observation, nil
+	}
+	if isTerminating(pod) {
+		observation.currentState = workloads.InstanceCurrentStateTerminating
+		observation.currentRevision = getPodRevision(pod)
+		observation.notReadyName = pod.Name
+		observation.notAvailableName = pod.Name
+		return observation, nil
+	}
+
+	observation.currentState = workloads.InstanceCurrentStatePresent
+	observation.notReadyName = ""
+	observation.notAvailableName = ""
+
+	if isCreated(pod) {
+		observation.notReadyName = pod.Name
+	}
+	if isImageMatched(pod) && intctrlutil.IsPodReady(pod) {
+		observation.ready = true
+		observation.notReadyName = ""
+		if intctrlutil.IsPodAvailable(pod, inst.Spec.MinReadySeconds) {
+			observation.available = true
+		} else {
+			observation.notAvailableName = pod.Name
+		}
+	}
+	if isCreated(pod) && !isTerminating(pod) {
+		updated, err := isPodUpdated(inst, pod)
+		if err != nil {
+			return instanceStatusObservation{}, err
+		}
+		observation.upToDate = updated
+	}
+	observation.currentRevision = getPodRevision(pod)
+	if observation.upToDate {
+		observation.currentRevision = inst.Status.UpdateRevision
+	}
+	observation.failureCondition = r.buildFailureCondition(inst, pod)
+	observation.role = r.observedRoleOfPod(inst, pod)
+	observation.volumeExpansion = r.hasRunningVolumeExpansion(tree, inst)
+	configs, err := r.observedConfigsOfPod(pod)
+	if err != nil {
+		return instanceStatusObservation{}, err
+	}
+	observation.configs = configs
+	return observation, nil
+}
+
+// setInstanceStatus is the only writer for status derived from the current Pod observation.
+// Desired revision and observed generation remain owned by the revision reconciler.
+func (r *statusReconciler) setInstanceStatus(inst *workloads.Instance, observation instanceStatusObservation) {
+	inst.Status.CurrentState = observation.currentState
+	inst.Status.CurrentRevision = observation.currentRevision
+	inst.Status.UpToDate = observation.upToDate
+	inst.Status.Ready = observation.ready
+	inst.Status.Available = observation.available
+	inst.Status.Role = observation.role
+	inst.Status.VolumeExpansion = observation.volumeExpansion
+	inst.Status.Configs = observation.configs
+}
+
+// setInstanceConditions is the only writer for observation-derived Ready, Available, and Failure conditions.
+// UpdateRestricted remains owned by the update reconciler.
+func (r *statusReconciler) setInstanceConditions(inst *workloads.Instance, observation instanceStatusObservation) {
+	meta.SetStatusCondition(&inst.Status.Conditions, *r.buildReadyCondition(inst, observation.ready, observation.notReadyName))
+	meta.SetStatusCondition(&inst.Status.Conditions, *r.buildAvailableCondition(inst, observation.available, observation.notAvailableName))
+	if observation.failureCondition != nil {
+		meta.SetStatusCondition(&inst.Status.Conditions, *observation.failureCondition)
+	} else {
+		meta.RemoveStatusCondition(&inst.Status.Conditions, string(workloads.InstanceFailure))
+	}
 }
 
 func (r *statusReconciler) buildReadyCondition(inst *workloads.Instance, ready bool, notReadyName string) *metav1.Condition {

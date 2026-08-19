@@ -59,6 +59,10 @@ var _ = Describe("revision update reconciler test", func() {
 		It("should work well", func() {
 			By("PreCondition")
 			its.Generation = 1
+			its.Status.InstanceStatus = []workloads.InstanceStatus{{
+				PodName: its.Name + "-0", CurrentRevision: "old", UpdateRevision: "old",
+				UpToDate: true, Ready: true, Failed: true,
+			}}
 			tree := kubebuilderx.NewObjectTree()
 			tree.SetRoot(its)
 			reconciler := NewRevisionUpdateReconciler()
@@ -78,7 +82,13 @@ var _ = Describe("revision update reconciler test", func() {
 			Expect(updateRevisions).Should(HaveKey(its.Name + "-1"))
 			Expect(updateRevisions).Should(HaveKey(its.Name + "-2"))
 			Expect(newITS.Status.UpdateRevision).Should(Equal(updateRevisions[its.Name+"-2"]))
-			Expect(newITS.Status.InstanceStatus).Should(BeEmpty())
+			Expect(newITS.Status.InstanceStatus).Should(HaveLen(1))
+			status := newITS.Status.InstanceStatus[0]
+			Expect(status.UpdateRevision).Should(Equal(updateRevisions[status.PodName]))
+			Expect(status.UpToDate).Should(BeFalse())
+			Expect(status.CurrentRevision).Should(Equal("old"))
+			Expect(status.Ready).Should(BeTrue())
+			Expect(status.Failed).Should(BeTrue())
 		})
 
 		It("preserves the published view and allows alignment during a transient flat ordinal reassignment", func() {
@@ -95,7 +105,12 @@ var _ = Describe("revision update reconciler test", func() {
 			res, err := NewStatusReconciler().Reconcile(tree)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(res).Should(Equal(kubebuilderx.Continue))
-			Expect(its.Status.InstanceStatus).Should(Equal(previous))
+			Expect(its.Status.InstanceStatus).Should(HaveLen(len(previous)))
+			for i := range its.Status.InstanceStatus {
+				Expect(its.Status.InstanceStatus[i].PodName).Should(Equal(previous[i].PodName))
+				Expect(its.Status.InstanceStatus[i].TemplateName).Should(Equal(previous[i].TemplateName))
+				Expect(its.Status.InstanceStatus[i].UpToDate).Should(BeFalse())
+			}
 
 			res, err = NewRevisionUpdateReconciler().Reconcile(tree)
 			Expect(err).ShouldNot(HaveOccurred())

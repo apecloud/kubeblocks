@@ -301,6 +301,22 @@ func TestBuildDoesNotInventUnknownHistoricalTemplate(t *testing.T) {
 	}
 }
 
+func TestBuildNormalizesOfflineNamesAsASet(t *testing.T) {
+	result, err := Build(BuildInput{
+		Offline: []string{"", "demo-0", "demo-0"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Statuses) != 1 {
+		t.Fatalf("expected one normalized Offline status, got %#v", result.Statuses)
+	}
+	status := result.Statuses[0]
+	if status.PodName != "demo-0" || status.DesiredState != workloads.InstanceDesiredStateOffline || status.CurrentState != workloads.InstanceCurrentStateAbsent {
+		t.Fatalf("unexpected normalized Offline status: %#v", status)
+	}
+}
+
 func TestInstanceStatusViewHelpers(t *testing.T) {
 	its := &workloads.InstanceSet{Status: workloads.InstanceSetStatus{InstanceStatus: []workloads.InstanceStatus{
 		{PodName: "old-active"},

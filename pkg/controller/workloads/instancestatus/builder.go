@@ -86,10 +86,7 @@ func Build(input BuildInput) (BuildResult, error) {
 	if err != nil {
 		return BuildResult{}, err
 	}
-	offline, err := indexNames("offline instance", input.Offline)
-	if err != nil {
-		return BuildResult{}, err
-	}
+	offline := indexOfflineNames(input.Offline)
 	for name := range active {
 		if offline[name] {
 			return BuildResult{}, fmt.Errorf("instance %q is both Active and Offline", name)
@@ -206,18 +203,15 @@ func indexAllocations(kind string, allocations []Allocation, rejectDuplicate boo
 	return result, nil
 }
 
-func indexNames(kind string, names []string) (map[string]bool, error) {
+func indexOfflineNames(names []string) map[string]bool {
 	result := make(map[string]bool, len(names))
 	for _, name := range names {
 		if name == "" {
-			return nil, fmt.Errorf("%s has an empty PodName", kind)
-		}
-		if result[name] {
-			return nil, fmt.Errorf("duplicate %s %q", kind, name)
+			continue
 		}
 		result[name] = true
 	}
-	return result, nil
+	return result
 }
 
 func retainedTemplate(name string, previous map[string]*workloads.InstanceStatus, hints map[string]*string) *string {

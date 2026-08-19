@@ -517,10 +517,6 @@ func (c componentOpsHelper) rollingTargetsState(
 		}
 
 		targetSpec, targetFound := findRollingTargetSpec(opsRes.Cluster, targetName)
-		if opsCompStatus.TargetSpecHash == "" {
-			completed = false
-			continue
-		}
 		if !targetFound {
 			opsCompStatus.Reason = "ClusterSpecSuperseded"
 			opsCompStatus.Message = "Cluster target submitted by this operation no longer exists"
@@ -530,7 +526,22 @@ func (c componentOpsHelper) rollingTargetsState(
 			continue
 		}
 		currentSpecHash, err := rollingTargetSpecHash(targetSpec, c.componentOpsSet[targetName])
-		if err != nil || currentSpecHash != opsCompStatus.TargetSpecHash {
+		if err != nil {
+			opsCompStatus.Reason = "ClusterSpecSuperseded"
+			opsCompStatus.Message = "Cluster target spec can no longer be matched to the intent submitted by this operation"
+			opsRes.OpsRequest.Status.Components[targetName] = opsCompStatus
+			failed = true
+			completed = false
+			continue
+		}
+		if opsCompStatus.TargetSpecHash == "" {
+			// Running rolling operations created by an older controller do not
+			// carry TargetSpecHash. Controller upgrades are expected to happen
+			// without running operations, but adopting the current operation-owned
+			// target is a safe best-effort fallback that avoids waiting forever.
+			opsCompStatus.TargetSpecHash = currentSpecHash
+			opsRes.OpsRequest.Status.Components[targetName] = opsCompStatus
+		} else if currentSpecHash != opsCompStatus.TargetSpecHash {
 			opsCompStatus.Reason = "ClusterSpecSuperseded"
 			opsCompStatus.Message = "Cluster target spec no longer matches the intent submitted by this operation"
 			opsRes.OpsRequest.Status.Components[targetName] = opsCompStatus
@@ -548,6 +559,13 @@ func (c componentOpsHelper) rollingTargetsState(
 
 		progressState, hasProgress := progress[targetName]
 		switch {
+		case hasProgress && progressState.partial && !slices.Contains(componentTerminalPhases(), phase):
+			// InstanceStatus is an eventually consistent observation. In the first
+			// reconciliation after a new InstanceSet generation is observed, it may
+			// still contain the previous per-instance values. A terminal aggregate
+			// phase is therefore required as the stability barrier, while the
+			// participating instances remain authoritative for the result.
+			completed = false
 		case hasProgress && progressState.partial && progressState.failed:
 			failed = true
 			completed = false

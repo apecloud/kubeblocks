@@ -539,4 +539,89 @@ func TestRollingComponentAndShardingTerminalStatus(t *testing.T) {
 			t.Fatalf("completed=%v failed=%v, want participant-scoped success", completed, failed)
 		}
 	})
+
+	t.Run("partial target waits for a stable component phase", func(t *testing.T) {
+		cluster := &appsv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{Generation: 5},
+			Spec:       appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{{Name: "mysql"}}},
+			Status: appsv1.ClusterStatus{Components: map[string]appsv1.ClusterComponentStatus{
+				"mysql": {Phase: appsv1.UpdatingComponentPhase, ObservedGeneration: 5, UpToDate: true},
+			}},
+		}
+		ops := &opsv1alpha1.OpsRequest{Status: opsv1alpha1.OpsRequestStatus{ClusterGeneration: 5}}
+		helper := newComponentOpsHelper([]opsv1alpha1.ComponentOps{{ComponentName: "mysql"}})
+		opsRes := &OpsResource{Cluster: cluster, OpsRequest: ops}
+		if err := helper.recordRollingTargetSpecs(opsRes); err != nil {
+			t.Fatal(err)
+		}
+		completed, failed := helper.rollingTargetsState(opsRes, map[string]rollingTargetProgressState{
+			"mysql": {resources: 1, completed: true, partial: true},
+		})
+		if completed || failed {
+			t.Fatalf("completed=%v failed=%v, want processing while component is Updating", completed, failed)
+		}
+	})
+}
+
+func TestRollingTargetLegacyHashTakeover(t *testing.T) {
+	tests := []struct {
+		name   string
+		target appsv1.ClusterComponentSpec
+		op     ComponentOpsInterface
+	}{
+		{
+			name: "upgrade",
+			target: appsv1.ClusterComponentSpec{
+				Name: "mysql", ComponentDef: "mysql-8", ServiceVersion: "8.4.0",
+			},
+			op: opsv1alpha1.UpgradeComponent{
+				ComponentOps: opsv1alpha1.ComponentOps{ComponentName: "mysql"},
+			},
+		},
+		{
+			name: "restart",
+			target: appsv1.ClusterComponentSpec{
+				Name: "mysql", Annotations: map[string]string{constant.RestartAnnotationKey: "2026-08-19T08:00:00Z"},
+			},
+			op: opsv1alpha1.ComponentOps{ComponentName: "mysql"},
+		},
+		{
+			name: "vertical scaling",
+			target: appsv1.ClusterComponentSpec{
+				Name: "mysql",
+				Resources: corev1.ResourceRequirements{Requests: corev1.ResourceList{
+					corev1.ResourceCPU: resource.MustParse("2"),
+				}},
+			},
+			op: opsv1alpha1.VerticalScaling{
+				ComponentOps: opsv1alpha1.ComponentOps{ComponentName: "mysql"},
+				ResourceRequirements: corev1.ResourceRequirements{Requests: corev1.ResourceList{
+					corev1.ResourceCPU: resource.MustParse("2"),
+				}},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cluster := &appsv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{Generation: 5},
+				Spec:       appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{tt.target}},
+				Status: appsv1.ClusterStatus{Components: map[string]appsv1.ClusterComponentStatus{
+					"mysql": {Phase: appsv1.RunningComponentPhase, ObservedGeneration: 5, UpToDate: true},
+				}},
+			}
+			ops := &opsv1alpha1.OpsRequest{Status: opsv1alpha1.OpsRequestStatus{
+				ClusterGeneration: 5,
+				Components:        map[string]opsv1alpha1.OpsRequestComponentStatus{},
+			}}
+			helper := newComponentOpsHelper([]ComponentOpsInterface{tt.op})
+			completed, failed := helper.rollingTargetsState(&OpsResource{Cluster: cluster, OpsRequest: ops}, nil)
+			if !completed || failed {
+				t.Fatalf("completed=%v failed=%v, want legacy operation to continue on the new path", completed, failed)
+			}
+			if ops.Status.Components["mysql"].TargetSpecHash == "" {
+				t.Fatal("legacy target hash was not adopted")
+			}
+		})
+	}
 }

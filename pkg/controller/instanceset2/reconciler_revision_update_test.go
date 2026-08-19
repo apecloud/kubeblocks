@@ -51,6 +51,10 @@ func TestStatusPreconditionWaitsForRevisionUpdate(t *testing.T) {
 
 func TestRevisionUpdatePublishesRevisionsBeforeInstanceStatus(t *testing.T) {
 	its := revisionTestInstanceSet()
+	its.Status.InstanceStatus = []workloads.InstanceStatus{{
+		PodName: "demo-0", CurrentRevision: "old", UpdateRevision: "old",
+		UpToDate: true, Ready: true, Failed: true,
+	}}
 	tree := kubebuilderx.NewObjectTree()
 	tree.SetRoot(its)
 	if _, err := NewRevisionUpdateReconciler().Reconcile(tree); err != nil {
@@ -59,8 +63,13 @@ func TestRevisionUpdatePublishesRevisionsBeforeInstanceStatus(t *testing.T) {
 	if its.Status.ObservedGeneration != its.Generation {
 		t.Fatalf("ObservedGeneration was not advanced: %#v", its.Status)
 	}
-	if len(its.Status.InstanceStatus) != 0 {
-		t.Fatalf("revision reconcile unexpectedly published InstanceStatus: %#v", its.Status.InstanceStatus)
+	if len(its.Status.InstanceStatus) != 1 {
+		t.Fatalf("revision reconcile lost InstanceStatus: %#v", its.Status.InstanceStatus)
+	}
+	status := its.Status.InstanceStatus[0]
+	if status.UpdateRevision == "" || status.UpdateRevision == "old" || status.UpToDate ||
+		status.CurrentRevision != "old" || !status.Ready || !status.Failed {
+		t.Fatalf("revision reconcile did not invalidate only desired-state convergence: %#v", status)
 	}
 }
 
@@ -100,8 +109,15 @@ func TestTransientFlatOrdinalReassignmentPreservesViewAndAllowsAlignment(t *test
 	if err != nil || res != kubebuilderx.Continue {
 		t.Fatalf("revision reconcile blocked transient allocation: result=%v err=%v", res, err)
 	}
-	if its.Status.ObservedGeneration != its.Generation || !equality.Semantic.DeepEqual(its.Status.InstanceStatus, previous) {
-		t.Fatalf("revision reconcile advanced an incomplete view: %#v", its.Status)
+	if its.Status.ObservedGeneration != its.Generation || len(its.Status.InstanceStatus) != len(previous) {
+		t.Fatalf("revision reconcile did not preserve the instance view: %#v", its.Status)
+	}
+	for i := range its.Status.InstanceStatus {
+		status := its.Status.InstanceStatus[i]
+		if status.PodName != previous[i].PodName || !equality.Semantic.DeepEqual(status.TemplateName, previous[i].TemplateName) ||
+			status.UpToDate {
+			t.Fatalf("revision reconcile published unsafe retained status: %#v", its.Status.InstanceStatus)
+		}
 	}
 
 	res, err = NewAlignmentReconciler().Reconcile(tree)

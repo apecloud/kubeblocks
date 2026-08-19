@@ -69,7 +69,12 @@ type BuildResult struct {
 func PrepareForNewDesiredRevisions(statuses []workloads.InstanceStatus, updateRevisions map[string]string) {
 	for i := range statuses {
 		status := &statuses[i]
-		status.UpdateRevision = updateRevisions[status.PodName]
+		if revision, ok := updateRevisions[status.PodName]; ok {
+			status.DesiredState = workloads.InstanceDesiredStateActive
+			status.UpdateRevision = revision
+		} else {
+			status.UpdateRevision = ""
+		}
 		status.UpToDate = false
 	}
 }

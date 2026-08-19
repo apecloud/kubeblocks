@@ -106,6 +106,7 @@ func TestRollingTargetSpecHashScopesOperationIntent(t *testing.T) {
 	}
 
 	t.Run("upgrade ignores unrelated target fields but detects version overwrite", func(t *testing.T) {
+		serviceVersion := "8.0.36"
 		target := &appsv1.ClusterComponentSpec{
 			ComponentDef:   "mysql",
 			ServiceVersion: "8.0.36",
@@ -113,10 +114,14 @@ func TestRollingTargetSpecHashScopesOperationIntent(t *testing.T) {
 				constant.UpgradeIntentAnnotationKey: "upgrade-a",
 			},
 		}
-		op := opsv1alpha1.UpgradeComponent{ComponentOps: opsv1alpha1.ComponentOps{ComponentName: "mysql"}}
+		op := opsv1alpha1.UpgradeComponent{
+			ComponentOps:   opsv1alpha1.ComponentOps{ComponentName: "mysql"},
+			ServiceVersion: &serviceVersion,
+		}
 		original := hash(target, op)
 		target.Labels = map[string]string{"expose": "enabled"}
 		target.Resources = *resources("1")
+		target.ComponentDef = "mysql-new"
 		if got := hash(target, op); got != original {
 			t.Fatalf("unrelated fields changed upgrade intent hash: %s != %s", got, original)
 		}
@@ -540,7 +545,7 @@ func TestRollingComponentAndShardingTerminalStatus(t *testing.T) {
 		}
 	})
 
-	t.Run("partial target waits for a stable component phase", func(t *testing.T) {
+	t.Run("partial target ignores an unrelated component update", func(t *testing.T) {
 		cluster := &appsv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{Generation: 5},
 			Spec:       appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{{Name: "mysql"}}},
@@ -557,17 +562,22 @@ func TestRollingComponentAndShardingTerminalStatus(t *testing.T) {
 		completed, failed := helper.rollingTargetsState(opsRes, map[string]rollingTargetProgressState{
 			"mysql": {resources: 1, completed: true, partial: true},
 		})
-		if completed || failed {
-			t.Fatalf("completed=%v failed=%v, want processing while component is Updating", completed, failed)
+		if !completed || failed {
+			t.Fatalf("completed=%v failed=%v, want participant-scoped success", completed, failed)
 		}
 	})
 }
 
 func TestRollingTargetLegacyHashTakeover(t *testing.T) {
+	componentDef := "mysql-8"
+	serviceVersion := "8.4.0"
+	restartTime := time.Date(2026, time.August, 19, 8, 0, 0, 123, time.UTC)
 	tests := []struct {
-		name   string
-		target appsv1.ClusterComponentSpec
-		op     ComponentOpsInterface
+		name           string
+		target         appsv1.ClusterComponentSpec
+		op             ComponentOpsInterface
+		startTimestamp metav1.Time
+		overwrite      func(*appsv1.ClusterComponentSpec)
 	}{
 		{
 			name: "upgrade",
@@ -575,15 +585,22 @@ func TestRollingTargetLegacyHashTakeover(t *testing.T) {
 				Name: "mysql", ComponentDef: "mysql-8", ServiceVersion: "8.4.0",
 			},
 			op: opsv1alpha1.UpgradeComponent{
-				ComponentOps: opsv1alpha1.ComponentOps{ComponentName: "mysql"},
+				ComponentOps:            opsv1alpha1.ComponentOps{ComponentName: "mysql"},
+				ComponentDefinitionName: &componentDef,
+				ServiceVersion:          &serviceVersion,
 			},
+			overwrite: func(target *appsv1.ClusterComponentSpec) { target.ServiceVersion = "9.0.0" },
 		},
 		{
 			name: "restart",
 			target: appsv1.ClusterComponentSpec{
-				Name: "mysql", Annotations: map[string]string{constant.RestartAnnotationKey: "2026-08-19T08:00:00Z"},
+				Name: "mysql", Annotations: map[string]string{constant.RestartAnnotationKey: restartTime.Format(time.RFC3339)},
 			},
-			op: opsv1alpha1.ComponentOps{ComponentName: "mysql"},
+			op:             opsv1alpha1.ComponentOps{ComponentName: "mysql"},
+			startTimestamp: metav1.NewTime(restartTime),
+			overwrite: func(target *appsv1.ClusterComponentSpec) {
+				target.Annotations[constant.RestartAnnotationKey] = restartTime.Add(time.Second).Format(time.RFC3339Nano)
+			},
 		},
 		{
 			name: "vertical scaling",
@@ -599,6 +616,9 @@ func TestRollingTargetLegacyHashTakeover(t *testing.T) {
 					corev1.ResourceCPU: resource.MustParse("2"),
 				}},
 			},
+			overwrite: func(target *appsv1.ClusterComponentSpec) {
+				target.Resources.Requests[corev1.ResourceCPU] = resource.MustParse("4")
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -613,6 +633,7 @@ func TestRollingTargetLegacyHashTakeover(t *testing.T) {
 			ops := &opsv1alpha1.OpsRequest{Status: opsv1alpha1.OpsRequestStatus{
 				ClusterGeneration: 5,
 				Components:        map[string]opsv1alpha1.OpsRequestComponentStatus{},
+				StartTimestamp:    tt.startTimestamp,
 			}}
 			helper := newComponentOpsHelper([]ComponentOpsInterface{tt.op})
 			completed, failed := helper.rollingTargetsState(&OpsResource{Cluster: cluster, OpsRequest: ops}, nil)
@@ -621,6 +642,19 @@ func TestRollingTargetLegacyHashTakeover(t *testing.T) {
 			}
 			if ops.Status.Components["mysql"].TargetSpecHash == "" {
 				t.Fatal("legacy target hash was not adopted")
+			}
+
+			conflictingCluster := cluster.DeepCopy()
+			tt.overwrite(&conflictingCluster.Spec.ComponentSpecs[0])
+			conflictingOps := ops.DeepCopy()
+			conflictingOps.Status.Components["mysql"] = opsv1alpha1.OpsRequestComponentStatus{}
+			completed, failed = helper.rollingTargetsState(
+				&OpsResource{Cluster: conflictingCluster, OpsRequest: conflictingOps}, nil)
+			if completed || !failed {
+				t.Fatalf("completed=%v failed=%v, want conflicting legacy target to be superseded", completed, failed)
+			}
+			if reason := conflictingOps.Status.Components["mysql"].Reason; reason != "ClusterSpecSuperseded" {
+				t.Fatalf("reason=%q, want ClusterSpecSuperseded", reason)
 			}
 		})
 	}

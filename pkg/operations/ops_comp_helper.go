@@ -30,6 +30,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -114,11 +115,14 @@ func rollingTargetSpecHash(target *appsv1.ClusterComponentSpec, compOps Componen
 	var intent any
 	switch op := compOps.(type) {
 	case opsv1alpha1.UpgradeComponent:
-		intent = rollingUpgradeIntent{
-			ComponentDef:   target.ComponentDef,
-			ServiceVersion: target.ServiceVersion,
-			Receipt:        target.Annotations[constant.UpgradeIntentAnnotationKey],
+		upgradeIntent := rollingUpgradeIntent{Receipt: target.Annotations[constant.UpgradeIntentAnnotationKey]}
+		if op.ComponentDefinitionName != nil {
+			upgradeIntent.ComponentDef = target.ComponentDef
 		}
+		if op.ServiceVersion != nil {
+			upgradeIntent.ServiceVersion = target.ServiceVersion
+		}
+		intent = upgradeIntent
 	case opsv1alpha1.VerticalScaling:
 		vsIntent := rollingVerticalScalingIntent{}
 		if len(op.Requests) > 0 || len(op.Limits) > 0 {
@@ -155,6 +159,46 @@ func rollingTargetSpecHash(target *appsv1.ClusterComponentSpec, compOps Componen
 		return "", err
 	}
 	return fmt.Sprintf("%x", sha256.Sum256(data)), nil
+}
+
+func legacyRollingTargetMatchesIntent(
+	target *appsv1.ClusterComponentSpec,
+	compOps ComponentOpsInterface,
+	opsRequest *opsv1alpha1.OpsRequest,
+) bool {
+	switch op := compOps.(type) {
+	case opsv1alpha1.UpgradeComponent:
+		if op.ComponentDefinitionName == nil && op.ServiceVersion == nil {
+			return false
+		}
+		return (op.ComponentDefinitionName == nil || target.ComponentDef == *op.ComponentDefinitionName) &&
+			(op.ServiceVersion == nil || target.ServiceVersion == *op.ServiceVersion)
+	case opsv1alpha1.VerticalScaling:
+		if (len(op.Requests) > 0 || len(op.Limits) > 0) &&
+			!apiequality.Semantic.DeepEqual(target.Resources, op.ResourceRequirements) {
+			return false
+		}
+		instances := make(map[string]*corev1.ResourceRequirements, len(target.Instances))
+		for i := range target.Instances {
+			instances[target.Instances[i].Name] = target.Instances[i].Resources
+		}
+		for i := range op.Instances {
+			resources, ok := instances[op.Instances[i].Name]
+			if !ok || resources == nil || !apiequality.Semantic.DeepEqual(*resources, op.Instances[i].ResourceRequirements) {
+				return false
+			}
+		}
+		return len(op.Requests) > 0 || len(op.Limits) > 0 || len(op.Instances) > 0
+	case opsv1alpha1.ComponentOps:
+		if opsRequest.Status.StartTimestamp.IsZero() {
+			return false
+		}
+		restartAt := target.Annotations[constant.RestartAnnotationKey]
+		startTime := opsRequest.Status.StartTimestamp.Time
+		return restartAt == startTime.Format(time.RFC3339) || restartAt == startTime.Format(time.RFC3339Nano)
+	default:
+		return false
+	}
 }
 
 func findRollingTargetSpec(cluster *appsv1.Cluster, targetName string) (*appsv1.ClusterComponentSpec, bool) {
@@ -537,8 +581,16 @@ func (c componentOpsHelper) rollingTargetsState(
 		if opsCompStatus.TargetSpecHash == "" {
 			// Running rolling operations created by an older controller do not
 			// carry TargetSpecHash. Controller upgrades are expected to happen
-			// without running operations, but adopting the current operation-owned
-			// target is a safe best-effort fallback that avoids waiting forever.
+			// without running operations, but a matching original intent can be
+			// adopted as a best-effort fallback that avoids waiting forever.
+			if !legacyRollingTargetMatchesIntent(targetSpec, c.componentOpsSet[targetName], opsRes.OpsRequest) {
+				opsCompStatus.Reason = "ClusterSpecSuperseded"
+				opsCompStatus.Message = "Cluster target no longer matches the original intent of this legacy operation"
+				opsRes.OpsRequest.Status.Components[targetName] = opsCompStatus
+				failed = true
+				completed = false
+				continue
+			}
 			opsCompStatus.TargetSpecHash = currentSpecHash
 			opsRes.OpsRequest.Status.Components[targetName] = opsCompStatus
 		} else if currentSpecHash != opsCompStatus.TargetSpecHash {
@@ -559,13 +611,6 @@ func (c componentOpsHelper) rollingTargetsState(
 
 		progressState, hasProgress := progress[targetName]
 		switch {
-		case hasProgress && progressState.partial && !slices.Contains(componentTerminalPhases(), phase):
-			// InstanceStatus is an eventually consistent observation. In the first
-			// reconciliation after a new InstanceSet generation is observed, it may
-			// still contain the previous per-instance values. A terminal aggregate
-			// phase is therefore required as the stability barrier, while the
-			// participating instances remain authoritative for the result.
-			completed = false
 		case hasProgress && progressState.partial && progressState.failed:
 			failed = true
 			completed = false

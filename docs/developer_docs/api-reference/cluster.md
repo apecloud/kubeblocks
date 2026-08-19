@@ -11051,7 +11051,7 @@ Kubernetes api utils intstr.IntOrString
 <em>(Optional)</em>
 <p>The maximum number of instances that can be unavailable during the update.
 Value can be an absolute number (ex: 5) or a percentage of desired instances (ex: 10%).
-Absolute number is calculated from percentage by rounding up. This can not be 0.
+Absolute number is calculated from percentage by rounding down, with a minimum value of 1.
 Defaults to 1. The field applies to all instances. That means if there is any unavailable pod,
 it will be counted towards MaxUnavailable.</p>
 </td>
@@ -19565,6 +19565,50 @@ string
 </tr>
 </tbody>
 </table>
+<h3 id="workloads.kubeblocks.io/v1.InstanceCurrentState">InstanceCurrentState
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceStatus">InstanceStatus</a>, <a href="#workloads.kubeblocks.io/v1.InstanceStatus2">InstanceStatus2</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Absent&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Present&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Terminating&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1.InstanceDesiredState">InstanceDesiredState
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceStatus">InstanceStatus</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Active&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Offline&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Released&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
 <h3 id="workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec
 </h3>
 <p>
@@ -20471,7 +20515,129 @@ string
 </em>
 </td>
 <td>
-<p>Represents the name of the pod.</p>
+<p>PodName is the stable instance identity allocated by the InstanceSet and the name used by its Pod when present.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>templateName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>TemplateName is the instance template assigned to this instance.
+nil means that the template is unknown, while an empty string identifies the default template.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>desiredState</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.InstanceDesiredState">
+InstanceDesiredState
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>DesiredState describes whether this identity should have a running Pod (Active), is retained without a
+desired running Pod (Offline), or is no longer allocated and is kept only until its current Pod disappears (Released).
+An empty value from an older object is treated as Active.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>currentState</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.InstanceCurrentState">
+InstanceCurrentState
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>CurrentState describes whether the Pod for this instance is currently present, terminating, or absent.
+An empty value from an older object is treated as Present because those entries were produced from observed Pods.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>currentRevision</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>CurrentRevision identifies the revision currently used by the Pod for this instance.
+It is empty when CurrentState is Absent.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>updateRevision</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>UpdateRevision identifies the Pod revision desired for an Active instance.
+It is empty for Offline and Released instances.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>upToDate</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>UpToDate indicates that the workload owner has observed the Active instance fully applied the current
+InstanceSet desired state, including changes intentionally excluded from revision hashes.
+It can be true only when DesiredState is Active and CurrentState is Present.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>ready</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Ready indicates whether the current Present Pod is ready to serve requests.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>available</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Available indicates whether the current Present Pod has remained ready for the required minimum duration.
+Available can be true only when Ready is true.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>failed</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Failed indicates whether the current Present Pod reports a terminal failure state. It is independent of
+desired-state convergence.</p>
 </td>
 </tr>
 <tr>
@@ -20483,7 +20649,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Represents the role of the instance observed.</p>
+<p>Represents the role observed from the current Present Pod.</p>
 </td>
 </tr>
 <tr>
@@ -20497,7 +20663,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>The status of configs.</p>
+<p>The config status observed from the current Present Pod.</p>
 </td>
 </tr>
 <tr>
@@ -20509,7 +20675,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Represents whether the instance is in volume expansion.</p>
+<p>Represents whether storage for the current Present Pod is being expanded.</p>
 </td>
 </tr>
 </tbody>
@@ -20539,8 +20705,8 @@ int64
 </td>
 <td>
 <em>(Optional)</em>
-<p>observedGeneration is the most recent generation observed for this InstanceSet. It corresponds to the
-InstanceSet&rsquo;s generation, which is updated on mutation by the API Server.</p>
+<p>observedGeneration is the most recent generation observed for this Instance. It corresponds to the
+Instance&rsquo;s generation, which is updated on mutation by the API Server.</p>
 </td>
 </tr>
 <tr>
@@ -20560,6 +20726,20 @@ Known .status.conditions.type are: &ldquo;InstanceFailure&rdquo;, &ldquo;Instanc
 </tr>
 <tr>
 <td>
+<code>currentState</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.InstanceCurrentState">
+InstanceCurrentState
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents whether the Pod managed by this Instance is currently present, terminating, or absent.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>currentRevision</code><br/>
 <em>
 string
@@ -20567,7 +20747,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>currentRevision, if not empty, indicates the version of the Instance used to generate pod.</p>
+<p>currentRevision, if not empty, identifies the revision currently used by the Pod.</p>
 </td>
 </tr>
 <tr>
@@ -20579,7 +20759,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>updateRevision, if not empty, indicates the version of the Instance used to generate pod.</p>
+<p>updateRevision, if not empty, identifies the revision desired for the Pod.</p>
 </td>
 </tr>
 <tr>

@@ -186,7 +186,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 
 		switch updatePolicy {
 		case inPlaceUpdatePolicy:
-			newPod, err := buildInstancePodByTemplate(pod.Name, nameToTemplateMap[pod.Name], its, getPodRevision(pod))
+			newPod, err := buildInstancePodByTemplateForUpdate(pod, nameToTemplateMap[pod.Name], its)
 			if err != nil {
 				return kubebuilderx.Continue, err
 			}
@@ -392,7 +392,7 @@ func parseReplicasNMaxUnavailable(updateStrategy *workloads.InstanceUpdateStrate
 	}
 	var err error
 	if rollingUpdate.Replicas != nil {
-		replicas, err = intstr.GetScaledValueFromIntOrPercent(rollingUpdate.Replicas, totalReplicas, false)
+		replicas, err = intstr.GetScaledValueFromIntOrPercent(rollingUpdate.Replicas, totalReplicas, true)
 		if err != nil {
 			return replicas, maxUnavailable, err
 		}

@@ -10338,13 +10338,21 @@ spec:
                   type: object
                 type: array
               currentRevision:
-                description: currentRevision, if not empty, indicates the version
-                  of the Instance used to generate pod.
+                description: currentRevision, if not empty, identifies the revision
+                  currently used by the Pod.
+                type: string
+              currentState:
+                description: Represents whether the Pod managed by this Instance is
+                  currently present, terminating, or absent.
+                enum:
+                - Present
+                - Terminating
+                - Absent
                 type: string
               observedGeneration:
                 description: |-
-                  observedGeneration is the most recent generation observed for this InstanceSet. It corresponds to the
-                  InstanceSet's generation, which is updated on mutation by the API Server.
+                  observedGeneration is the most recent generation observed for this Instance. It corresponds to the
+                  Instance's generation, which is updated on mutation by the API Server.
                 format: int64
                 type: integer
               ready:
@@ -10357,8 +10365,8 @@ spec:
                 description: Represents whether the instance is up-to-date.
                 type: boolean
               updateRevision:
-                description: updateRevision, if not empty, indicates the version of
-                  the Instance used to generate pod.
+                description: updateRevision, if not empty, identifies the revision
+                  desired for the Pod.
                 type: string
               volumeExpansion:
                 description: Represents whether the instance is in volume expansion.

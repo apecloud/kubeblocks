@@ -119,6 +119,44 @@ var _ = Describe("update reconciler test", func() {
 		}
 	}
 
+	It("does not reconfigure a newly observed Pod after Active+Absent status", func() {
+		replicas = 1
+		its.Spec.Replicas = &replicas
+		its.Spec.Configs = []workloads.ConfigTemplate{{
+			Name:       "server",
+			Generation: 7,
+			Reconfigure: &kbappsv1.Action{
+				Exec: &kbappsv1.ExecAction{Command: []string{"true"}},
+			},
+		}}
+		podName := name + "-0"
+		its.Status.InstanceStatus = []workloads.InstanceStatus{{
+			PodName:      podName,
+			DesiredState: workloads.InstanceDesiredStateActive,
+			CurrentState: workloads.InstanceCurrentStateAbsent,
+		}}
+		pod := builder.NewPodBuilder(namespace, podName).GetObject()
+		tree := kubebuilderx.NewObjectTree()
+		tree.SetRoot(its)
+
+		Expect(setInstanceStatus(tree, its, []*corev1.Pod{pod})).Should(Succeed())
+		status := its.FindInstanceStatus(podName)
+		Expect(status).ShouldNot(BeNil())
+		Expect(status.Configs).Should(Equal([]workloads.InstanceConfigStatus{{Name: "server", Generation: 7}}))
+
+		spy := &lifecycleCallSpy{}
+		origNewLifecycleAction := newLifecycleAction
+		newLifecycleAction = func(_ *workloads.InstanceSet, _ *kubebuilderx.ObjectTree, _ *corev1.Pod) (lifecycle.Lifecycle, error) {
+			return spy, nil
+		}
+		defer func() { newLifecycleAction = origNewLifecycleAction }()
+
+		allUpdated, err := (&updateReconciler{}).reconfigure(tree, its, pod)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(allUpdated).Should(BeTrue())
+		Expect(spy.reconfigureCalls).Should(BeZero())
+	})
+
 	Context("PreCondition & Reconcile", func() {
 		getPodReadyCondition := func() corev1.PodCondition {
 			return corev1.PodCondition{

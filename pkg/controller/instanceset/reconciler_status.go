@@ -409,11 +409,7 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 
 func instanceConfigStatus(its *workloads.InstanceSet, podName string) []workloads.InstanceConfigStatus {
 	if its.Status.InstanceStatus == nil {
-		configs := make([]workloads.InstanceConfigStatus, 0, len(its.Spec.Configs))
-		for _, config := range its.Spec.Configs {
-			configs = append(configs, workloads.InstanceConfigStatus{Name: config.Name, Generation: config.Generation})
-		}
-		return configs
+		return instanceConfigStatusFromSpec(its)
 	}
 
 	configNames := sets.New[string]()
@@ -424,6 +420,10 @@ func instanceConfigStatus(its *workloads.InstanceSet, podName string) []workload
 		if status.PodName != podName {
 			continue
 		}
+		if status.EffectiveDesiredState() == workloads.InstanceDesiredStateActive &&
+			status.EffectiveCurrentState() == workloads.InstanceCurrentStateAbsent {
+			return instanceConfigStatusFromSpec(its)
+		}
 		configs := make([]workloads.InstanceConfigStatus, 0, len(status.Configs))
 		for _, config := range status.Configs {
 			if configNames.Has(config.Name) {
@@ -433,6 +433,14 @@ func instanceConfigStatus(its *workloads.InstanceSet, podName string) []workload
 		return configs
 	}
 	return nil
+}
+
+func instanceConfigStatusFromSpec(its *workloads.InstanceSet) []workloads.InstanceConfigStatus {
+	configs := make([]workloads.InstanceConfigStatus, 0, len(its.Spec.Configs))
+	for _, config := range its.Spec.Configs {
+		configs = append(configs, workloads.InstanceConfigStatus{Name: config.Name, Generation: config.Generation})
+	}
+	return configs
 }
 
 func podObservationNames(observations []instancestatus.CurrentObservation) []string {

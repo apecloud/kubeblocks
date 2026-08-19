@@ -23,6 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -31,9 +32,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
@@ -612,6 +615,49 @@ func TestRoleEventHandlerConsumesProbeFailureWithoutPodUpdate(t *testing.T) {
 	assertPodLastRoleAuthoritativeVersion(t, ctx, cli, pod, "")
 }
 
+func TestRoleEventHandlerEmitsProbeFailureOnComponent(t *testing.T) {
+	const (
+		namespace   = "default"
+		clusterName = "mysql"
+		compName    = "replicaset"
+	)
+	ctx := context.Background()
+	pod := roleEventPod(namespace, "mysql-replicaset-0", "uid-0", map[string]string{
+		constant.AppInstanceLabelKey:    clusterName,
+		constant.KBAppComponentLabelKey: compName,
+	})
+	comp := &appsv1.Component{ObjectMeta: metav1.ObjectMeta{
+		Namespace: namespace,
+		Name:      constant.GenerateClusterComponentName(clusterName, compName),
+		Labels:    map[string]string{constant.AppInstanceLabelKey: clusterName},
+	}}
+	event := roleProbeEventWithCode(namespace, "event-1", pod, "", time.Now(), 1, "probe timed out")
+	cli := roleEventFakeClient(t, comp, pod, event)
+	recorder := record.NewFakeRecorder(4)
+
+	handled, err := (&RoleEventHandler{}).Handle(cli, intctrlutil.RequestCtx{
+		Ctx: ctx,
+		Log: logr.Discard(),
+	}, recorder, event)
+	if err != nil {
+		t.Fatalf("handle event failed: %v", err)
+	}
+	if !handled {
+		t.Fatal("expected event to be handled")
+	}
+
+	select {
+	case got := <-recorder.Events:
+		if !strings.Contains(got, "Warning RoleProbeFailed") ||
+			!strings.Contains(got, "pod "+pod.Name) ||
+			!strings.Contains(got, "probe timed out") {
+			t.Fatalf("unexpected warning event: %q", got)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for Component warning event")
+	}
+}
+
 func TestRoleEventHandlerRejectsMalformedRoleProbeOutput(t *testing.T) {
 	ctx := context.Background()
 	pod := roleEventPod("default", "mysql-0", "uid-0", map[string]string{
@@ -735,6 +781,9 @@ func roleEventFakeClient(t *testing.T, objects ...client.Object) client.Client {
 	scheme := runtime.NewScheme()
 	if err := corev1.AddToScheme(scheme); err != nil {
 		t.Fatalf("add core scheme: %v", err)
+	}
+	if err := appsv1.AddToScheme(scheme); err != nil {
+		t.Fatalf("add apps scheme: %v", err)
 	}
 	if err := workloads.AddToScheme(scheme); err != nil {
 		t.Fatalf("add workloads scheme: %v", err)

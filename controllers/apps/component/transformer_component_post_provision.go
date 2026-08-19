@@ -54,9 +54,13 @@ func (t *componentPostProvisionTransformer) Transform(ctx graph.TransformContext
 	if checkPostProvisionDone(transCtx) {
 		return nil
 	}
-	err := t.postProvision(transCtx)
+	invoked, err := t.postProvision(transCtx)
 	if err != nil {
 		err = lifecycle.IgnoreNotDefined(err)
+		if invoked {
+			reportLifecycleActionFailureEvent(transCtx, dag,
+				postProvisionFailureFingerprintAnnotationKey, postProvisionFailedEventReason, "postProvision", err)
+		}
 		if errors.Is(err, lifecycle.ErrPreconditionFailed) {
 			err = fmt.Errorf("%w: %w", intctrlutil.NewDelayedRequeueError(time.Second*10, "wait for lifecycle action precondition"), err)
 		} else {
@@ -79,18 +83,19 @@ func (t *componentPostProvisionTransformer) markPostProvisionDone(transCtx *comp
 	compObj := comp.DeepCopy()
 	timeStr := time.Now().Format(time.RFC3339Nano)
 	comp.Annotations[kbCompPostProvisionDoneKey] = timeStr
+	delete(comp.Annotations, postProvisionFailureFingerprintAnnotationKey)
 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	graphCli.Update(dag, compObj, comp, &model.ReplaceIfExistingOption{})
 	return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue, "requeue to waiting for post-provision annotation to be set")
 }
 
-func (t *componentPostProvisionTransformer) postProvision(transCtx *componentTransformContext) error {
+func (t *componentPostProvisionTransformer) postProvision(transCtx *componentTransformContext) (bool, error) {
 	lfa, err := t.lifecycleAction4Component(transCtx)
 	if err != nil {
-		return err
+		return false, err
 	}
-	return lfa.PostProvision(transCtx.Context, transCtx.Client, nil)
+	return true, lfa.PostProvision(transCtx.Context, transCtx.Client, nil)
 }
 
 func (t *componentPostProvisionTransformer) lifecycleAction4Component(transCtx *componentTransformContext) (lifecycle.Lifecycle, error) {

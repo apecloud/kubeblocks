@@ -40,3 +40,13 @@ func IgnoreNotDefined(err error) error {
 	}
 	return err
 }
+
+// IsActionFailure reports whether err is a real action failure. Waiting states
+// are not failures.
+func IsActionFailure(err error) bool {
+	return err != nil &&
+		!errors.Is(err, ErrActionNotDefined) &&
+		!errors.Is(err, ErrPreconditionFailed) &&
+		!errors.Is(err, ErrActionInProgress) &&
+		!errors.Is(err, ErrActionBusy)
+}

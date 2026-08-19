@@ -17,6 +17,7 @@ package component
 
 import (
 	"context"
+	"errors"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -45,6 +46,7 @@ var _ = Describe("Component Workload Operations Test", func() {
 
 	var (
 		reader         *appsutil.MockReader
+		graphCli       model.GraphClient
 		dag            *graph.DAG
 		comp           *appsv1.Component
 		synthesizeComp *component.SynthesizedComponent
@@ -102,7 +104,7 @@ var _ = Describe("Component Workload Operations Test", func() {
 			},
 		}
 
-		graphCli := model.NewGraphClient(reader)
+		graphCli = model.NewGraphClient(reader)
 		dag = newDAG(graphCli, comp)
 	})
 
@@ -161,6 +163,7 @@ var _ = Describe("Component Workload Operations Test", func() {
 			ops = &componentWorkloadOps{
 				transCtx: &componentTransformContext{
 					Context:       ctx,
+					Client:        graphCli,
 					Logger:        logger,
 					EventRecorder: clusterRecorder,
 				},
@@ -194,6 +197,84 @@ var _ = Describe("Component Workload Operations Test", func() {
 
 			By("executing leave member for leader")
 			Expect(ops.leaveMemberForPod(pod1, pods)).Should(Succeed())
+		})
+
+		It("should emit events when member leave fails", func() {
+			testapps.MockKBAgentClient(func(mockRecorder *kbacli.MockClientMockRecorder) {
+				mockRecorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+					if req.Action == "memberLeave" {
+						return kbagentproto.ActionResponse{
+							Error:   kbagentproto.Error2Type(kbagentproto.ErrTimedOut),
+							Message: "member leave timed out",
+						}, nil
+					}
+					return kbagentproto.ActionResponse{}, nil
+				}).Times(2)
+			})
+
+			eventRecorder := &capturingEventRecorder{}
+			ops.transCtx.Component = comp
+			ops.transCtx.EventRecorder = eventRecorder
+
+			Expect(ops.leaveMemberForPod(pod1, pods)).ShouldNot(Succeed())
+			Expect(eventRecorder.events).Should(HaveLen(1))
+			for _, event := range eventRecorder.events {
+				Expect(event.reason).Should(Equal(memberLeaveFailedEventReason))
+				Expect(event.message).Should(ContainSubstring("pod " + pod1.Name))
+			}
+		})
+
+		It("should emit events when member join fails", func() {
+			testapps.MockKBAgentClient(func(mockRecorder *kbacli.MockClientMockRecorder) {
+				mockRecorder.Action(gomock.Any(), gomock.Any()).Return(kbagentproto.ActionResponse{
+					Error:   kbagentproto.Error2Type(kbagentproto.ErrFailed),
+					Message: "member join failed",
+				}, nil).Times(1)
+			})
+
+			eventRecorder := &capturingEventRecorder{}
+			ops.transCtx.Component = comp
+			ops.transCtx.EventRecorder = eventRecorder
+
+			Expect(ops.joinMemberForPod(pod1, pods)).ShouldNot(Succeed())
+			Expect(eventRecorder.events).Should(HaveLen(1))
+			for _, event := range eventRecorder.events {
+				Expect(event.reason).Should(Equal(memberJoinFailedEventReason))
+				Expect(event.message).Should(ContainSubstring("pod " + pod1.Name))
+			}
+		})
+
+		It("should emit a member action failure only when its fingerprint changes", func() {
+			eventRecorder := &capturingEventRecorder{}
+			ops.transCtx.Component = comp
+			ops.transCtx.EventRecorder = eventRecorder
+			actionErr := errors.New("member join failed")
+
+			ops.reportMemberActionFailure(pod1, memberJoinFailureFingerprintAnnotationKey,
+				memberJoinFailedEventReason, "memberJoin", actionErr)
+			Expect(eventRecorder.events).Should(HaveLen(1))
+
+			vertex := graphCli.FindMatchedVertex(dag, pod1)
+			Expect(vertex).ShouldNot(BeNil())
+			patchedPod := vertex.(*model.ObjectVertex).Obj.(*corev1.Pod)
+			Expect(patchedPod.Annotations[memberJoinFailureFingerprintAnnotationKey]).ShouldNot(BeEmpty())
+
+			ops.dag = newDAG(graphCli, comp)
+			ops.reportMemberActionFailure(patchedPod, memberJoinFailureFingerprintAnnotationKey,
+				memberJoinFailedEventReason, "memberJoin", actionErr)
+			Expect(eventRecorder.events).Should(HaveLen(1))
+
+			ops.reportMemberActionFailure(patchedPod, memberJoinFailureFingerprintAnnotationKey,
+				memberJoinFailedEventReason, "memberJoin", errors.New("member join timed out"))
+			Expect(eventRecorder.events).Should(HaveLen(2))
+			changedVertex := graphCli.FindMatchedVertex(ops.dag, patchedPod)
+			changedPod := changedVertex.(*model.ObjectVertex).Obj.(*corev1.Pod)
+
+			ops.dag = newDAG(graphCli, comp)
+			ops.clearMemberActionFailureFingerprint(changedPod, memberJoinFailureFingerprintAnnotationKey)
+			clearedVertex := graphCli.FindMatchedVertex(ops.dag, changedPod)
+			clearedPod := clearedVertex.(*model.ObjectVertex).Obj.(*corev1.Pod)
+			Expect(clearedPod.Annotations).ShouldNot(HaveKey(memberJoinFailureFingerprintAnnotationKey))
 		})
 	})
 })

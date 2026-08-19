@@ -1001,6 +1001,8 @@ func mockConsensusCompToRunning(opsRes *OpsResource) {
 	// mock consensus component is Running
 	compStatus := opsRes.Cluster.Status.Components[defaultCompName]
 	compStatus.Phase = appsv1.RunningComponentPhase
+	compStatus.ObservedGeneration = opsRes.Cluster.Generation
+	compStatus.UpToDate = true
 	opsRes.Cluster.Status.Components[defaultCompName] = compStatus
 }
 

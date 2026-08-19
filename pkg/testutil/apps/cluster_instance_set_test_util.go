@@ -379,36 +379,46 @@ func MockInstanceSetStatus(testCtx testutil.TestContext, cluster *appsv1.Cluster
 	currRevisions := map[string]string{}
 	instanceStatus := make([]workloads.InstanceStatus, 0)
 	notReadyPodNames := make([]string, 0)
+	failedPodNames := make([]string, 0)
 	for _, pod := range podList.Items {
 		currRevisions[pod.Name] = "revision"
-		if !podIsReady(&pod) {
+		failed := pod.Status.Phase == corev1.PodFailed
+		if failed {
+			failedPodNames = append(failedPodNames, pod.Name)
+		}
+		ready := podIsReady(&pod)
+		if !ready {
 			notReadyPodNames = append(notReadyPodNames, pod.Name)
-			continue
-		}
-		if _, ok := pod.Labels[constant.RoleLabelKey]; !ok {
-			continue
-		}
-		var role *workloads.ReplicaRole
-		for _, r := range its.Spec.Roles {
-			if r.Name == pod.Labels[constant.RoleLabelKey] {
-				role = r.DeepCopy()
-				break
-			}
 		}
 		status := workloads.InstanceStatus{
-			PodName: pod.Name,
+			PodName:         pod.Name,
+			CurrentRevision: "revision",
+			UpdateRevision:  "revision",
+			UpToDate:        true,
+			Ready:           ready,
+			Available:       ready,
+			Failed:          failed,
 		}
-		if role != nil {
-			status.Role = role.Name
+		if roleName, ok := pod.Labels[constant.RoleLabelKey]; ok {
+			for _, role := range its.Spec.Roles {
+				if role.Name == roleName {
+					status.Role = role.Name
+					break
+				}
+			}
 		}
 		instanceStatus = append(instanceStatus, status)
 	}
 	compSpec := cluster.Spec.GetComponentByName(compName)
 	gomega.Eventually(GetAndChangeObjStatus(&testCtx, client.ObjectKey{Name: itsName, Namespace: cluster.Namespace}, func(its *workloads.InstanceSet) {
+		its.Status.ObservedGeneration = its.Generation
 		its.Status.CurrentRevisions = currRevisions
 		its.Status.UpdateRevisions = updateRevisions
 		its.Status.Replicas = compSpec.Replicas
 		its.Status.CurrentReplicas = int32(len(podList.Items))
+		its.Status.UpdatedReplicas = int32(len(podList.Items))
+		its.Status.ReadyReplicas = int32(len(podList.Items) - len(notReadyPodNames))
+		its.Status.AvailableReplicas = its.Status.ReadyReplicas
 		its.Status.InstanceStatus = instanceStatus
 		if len(notReadyPodNames) > 0 {
 			msg, _ := json.Marshal(notReadyPodNames)
@@ -426,6 +436,21 @@ func MockInstanceSetStatus(testCtx testutil.TestContext, cluster *appsv1.Cluster
 				ObservedGeneration: its.Generation,
 				Reason:             workloads.ReasonReady,
 			})
+		}
+		availableCondition := meta.FindStatusCondition(its.Status.Conditions, string(workloads.InstanceReady)).DeepCopy()
+		availableCondition.Type = string(workloads.InstanceAvailable)
+		meta.SetStatusCondition(&its.Status.Conditions, *availableCondition)
+		if len(failedPodNames) > 0 {
+			msg, _ := json.Marshal(failedPodNames)
+			meta.SetStatusCondition(&its.Status.Conditions, metav1.Condition{
+				Type:               string(workloads.InstanceFailure),
+				Status:             metav1.ConditionTrue,
+				ObservedGeneration: its.Generation,
+				Reason:             workloads.ReasonInstanceFailure,
+				Message:            string(msg),
+			})
+		} else {
+			meta.RemoveStatusCondition(&its.Status.Conditions, string(workloads.InstanceFailure))
 		}
 	})).Should(gomega.Succeed())
 }

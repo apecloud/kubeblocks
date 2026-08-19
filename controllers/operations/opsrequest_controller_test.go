@@ -812,6 +812,13 @@ var _ = Describe("OpsRequest Controller", func() {
 				g.Expect(cancelCondition).ShouldNot(BeNil())
 				g.Expect(cancelCondition.Reason).Should(Equal(opsv1alpha1.ReasonOpsCanceling))
 			})).Should(Succeed())
+			Eventually(func(g Gomega) {
+				cluster := &appsv1.Cluster{}
+				g.Expect(k8sClient.Get(ctx, clusterKey, cluster)).Should(Succeed())
+				currentOps := &opsv1alpha1.OpsRequest{}
+				g.Expect(k8sClient.Get(ctx, opsKey, currentOps)).Should(Succeed())
+				g.Expect(currentOps.Status.ClusterGeneration).Should(Equal(cluster.Generation))
+			}).Should(Succeed())
 
 			By("mock ITS as ready with original replicas")
 			itsKey := types.NamespacedName{

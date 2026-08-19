@@ -36,6 +36,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/workloads/instancestatus"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -63,6 +64,14 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	for _, object := range pods {
 		pod, _ := object.(*corev1.Pod)
 		podList = append(podList, pod)
+	}
+	if its.Spec.FlatInstanceOrdinal {
+		if _, _, err := instancetemplate.BuildActiveAllocations(tree, its); err != nil {
+			if instancetemplate.IsActiveAllocationIncomplete(err) {
+				return kubebuilderx.Continue, nil
+			}
+			return kubebuilderx.Continue, err
+		}
 	}
 	// 2. calculate status summary
 	updateRevisions, err := GetRevisions(its.Status.UpdateRevisions)
@@ -186,7 +195,9 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 
 	// 4. set instance status
-	setInstanceStatus(tree, its, podList)
+	if err = setInstanceStatus(tree, its, podList); err != nil {
+		return kubebuilderx.Continue, err
+	}
 
 	if its.Spec.MinReadySeconds > 0 && availableReplicas != readyReplicas {
 		return kubebuilderx.RetryAfter(time.Second), nil
@@ -278,17 +289,7 @@ func buildAvailableCondition(its *workloads.InstanceSet, available bool, notAvai
 func buildFailureCondition(its *workloads.InstanceSet, pods []*corev1.Pod) (*metav1.Condition, error) {
 	var failureNames []string
 	for _, pod := range pods {
-		if isTerminating(pod) {
-			continue
-		}
-		// Kubernetes says the Pod is 'Failed'
-		if pod.Status.Phase == corev1.PodFailed {
-			failureNames = append(failureNames, pod.Name)
-			continue
-		}
-		// KubeBlocks says the Pod is 'Failed'
-		isFailed, isTimedOut, _ := intctrlutil.IsPodFailedAndTimedOut(pod)
-		if isFailed && isTimedOut {
+		if instancePodFailed(pod) {
 			failureNames = append(failureNames, pod.Name)
 		}
 	}
@@ -308,94 +309,144 @@ func buildFailureCondition(its *workloads.InstanceSet, pods []*corev1.Pod) (*met
 	}, nil
 }
 
-func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pods []*corev1.Pod) {
-	instanceStatus := make([]workloads.InstanceStatus, 0)
+func instancePodFailed(pod *corev1.Pod) bool {
+	if isTerminating(pod) {
+		return false
+	}
+	if pod.Status.Phase == corev1.PodFailed {
+		return true
+	}
+	isFailed, isTimedOut, _ := intctrlutil.IsPodFailedAndTimedOut(pod)
+	return isFailed && isTimedOut
+}
+
+func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pods []*corev1.Pod) error {
+	activeAllocations, templateNames, err := instancetemplate.BuildActiveAllocations(tree, its)
+	if err != nil {
+		return err
+	}
+	active := make([]instancestatus.Allocation, 0, len(activeAllocations))
+	activeNames := make(map[string]struct{}, len(activeAllocations))
+	for _, allocation := range activeAllocations {
+		active = append(active, instancestatus.Allocation{PodName: allocation.PodName, TemplateName: allocation.TemplateName})
+		activeNames[allocation.PodName] = struct{}{}
+	}
+	updateRevisions, err := GetRevisions(its.Status.UpdateRevisions)
+	if err != nil {
+		return err
+	}
+	offline := append([]string(nil), its.Spec.OfflineInstances...)
+	hints := make([]instancestatus.Allocation, 0, len(active)+len(pods)+len(offline))
+	if isStopRequested(its) {
+		for _, allocation := range active {
+			offline = append(offline, allocation.PodName)
+			hints = append(hints, allocation)
+		}
+		active = nil
+	}
+
+	observations := make([]instancestatus.CurrentObservation, 0, len(pods))
+	roleMap := composeRoleMap(*its)
 	for _, pod := range pods {
-		status := workloads.InstanceStatus{
-			PodName: pod.Name,
+		state := workloads.InstanceCurrentStatePresent
+		if !pod.DeletionTimestamp.IsZero() {
+			state = workloads.InstanceCurrentStateTerminating
 		}
-		instanceStatus = append(instanceStatus, status)
-	}
-
-	syncMemberStatus(its, instanceStatus, pods)
-
-	syncInstanceConfigStatus(its, instanceStatus)
-
-	if tree != nil {
-		syncInstancePVCStatus(tree, its, instanceStatus)
-	}
-
-	sortInstanceStatus(instanceStatus)
-	its.Status.InstanceStatus = instanceStatus
-}
-
-func sortInstanceStatus(instanceStatus []workloads.InstanceStatus) {
-	getNameNOrdinalFunc := func(i int) (string, int) {
-		return parseParentNameAndOrdinal(instanceStatus[i].PodName)
-	}
-	baseSort(instanceStatus, getNameNOrdinalFunc, nil, true)
-}
-
-func syncMemberStatus(its *workloads.InstanceSet, instanceStatus []workloads.InstanceStatus, pods []*corev1.Pod) {
-	if its.Spec.Roles != nil {
-		roleMap := composeRoleMap(*its)
-		for _, pod := range pods {
-			if !intctrlutil.PodIsReadyWithLabel(*pod) {
-				continue
+		if templateName, ok := instancetemplate.TemplateNameFromLabels(pod.Labels); ok {
+			hints = append(hints, instancestatus.Allocation{PodName: pod.Name, TemplateName: templateName})
+		}
+		ready := state == workloads.InstanceCurrentStatePresent && isImageMatched(pod) && intctrlutil.IsPodReady(pod)
+		observation := instancestatus.CurrentObservation{
+			InstanceName:    pod.Name,
+			State:           state,
+			CurrentRevision: getPodRevision(pod),
+			Ready:           ready,
+			Available:       ready && intctrlutil.IsPodAvailable(pod, its.Spec.MinReadySeconds),
+			Failed:          instancePodFailed(pod),
+		}
+		if state == workloads.InstanceCurrentStatePresent && isCreated(pod) {
+			updated, err := isPodUpdated(its, pod)
+			if err != nil {
+				return err
 			}
-			roleName := getRoleName(pod)
-			role, ok := roleMap[roleName]
-			if !ok {
-				continue
-			}
-			for i, inst := range instanceStatus {
-				if inst.PodName == pod.Name {
-					instanceStatus[i].Role = role.Name
-					break
-				}
+			observation.UpToDate = updated
+		}
+		if state == workloads.InstanceCurrentStatePresent && intctrlutil.PodIsReadyWithLabel(*pod) {
+			if role, ok := roleMap[getRoleName(pod)]; ok {
+				observation.Role = role.Name
 			}
 		}
+		observation.Configs = instanceConfigStatus(its, pod.Name)
+		observations = append(observations, observation)
 	}
+
+	for _, name := range append(append([]string(nil), offline...), podObservationNames(observations)...) {
+		if _, ok := activeNames[name]; ok {
+			continue
+		}
+		if templateName, ok, err := instancetemplate.HistoricalTemplateHint(its, name, templateNames); err != nil {
+			return err
+		} else if ok {
+			hints = append(hints, instancestatus.Allocation{PodName: name, TemplateName: templateName})
+		}
+	}
+	syncObservationPVCStatus(tree, its, observations)
+
+	result, err := instancestatus.Build(instancestatus.BuildInput{
+		Previous:        its.Status.InstanceStatus,
+		Active:          active,
+		Offline:         offline,
+		Current:         observations,
+		TemplateHints:   hints,
+		UpdateRevisions: updateRevisions,
+	})
+	if err != nil {
+		return err
+	}
+	its.Status.InstanceStatus = result.Statuses
+	return nil
 }
 
-func syncInstanceConfigStatus(its *workloads.InstanceSet, instanceStatus []workloads.InstanceStatus) {
+func instanceConfigStatus(its *workloads.InstanceSet, podName string) []workloads.InstanceConfigStatus {
 	if its.Status.InstanceStatus == nil {
-		// initialize
-		configs := make([]workloads.InstanceConfigStatus, 0)
+		configs := make([]workloads.InstanceConfigStatus, 0, len(its.Spec.Configs))
 		for _, config := range its.Spec.Configs {
-			configs = append(configs, workloads.InstanceConfigStatus{
-				Name:       config.Name,
-				Generation: config.Generation,
-			})
+			configs = append(configs, workloads.InstanceConfigStatus{Name: config.Name, Generation: config.Generation})
 		}
-		for i := range instanceStatus {
-			instanceStatus[i].Configs = configs
+		return configs
+	}
+
+	configNames := sets.New[string]()
+	for _, config := range its.Spec.Configs {
+		configNames.Insert(config.Name)
+	}
+	for _, status := range its.Status.InstanceStatus {
+		if status.PodName != podName {
+			continue
 		}
-	} else {
-		// HACK: copy the existing config status from the current its.status.instanceStatus
-		configs := sets.New[string]()
-		for _, config := range its.Spec.Configs {
-			configs.Insert(config.Name)
-		}
-		for i, newStatus := range instanceStatus {
-			for _, status := range its.Status.InstanceStatus {
-				if status.PodName == newStatus.PodName {
-					if instanceStatus[i].Configs == nil {
-						instanceStatus[i].Configs = make([]workloads.InstanceConfigStatus, 0)
-					}
-					for j, config := range status.Configs {
-						if configs.Has(config.Name) {
-							instanceStatus[i].Configs = append(instanceStatus[i].Configs, status.Configs[j])
-						}
-					}
-					break
-				}
+		configs := make([]workloads.InstanceConfigStatus, 0, len(status.Configs))
+		for _, config := range status.Configs {
+			if configNames.Has(config.Name) {
+				configs = append(configs, config)
 			}
 		}
+		return configs
 	}
+	return nil
 }
 
-func syncInstancePVCStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, instanceStatus []workloads.InstanceStatus) {
+func podObservationNames(observations []instancestatus.CurrentObservation) []string {
+	names := make([]string, 0, len(observations))
+	for _, observation := range observations {
+		names = append(names, observation.InstanceName)
+	}
+	return names
+}
+
+func syncObservationPVCStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, observations []instancestatus.CurrentObservation) {
+	if tree == nil {
+		return
+	}
 	pvcs := tree.List(&corev1.PersistentVolumeClaim{})
 	var pvcList []*corev1.PersistentVolumeClaim
 	for _, obj := range pvcs {
@@ -416,10 +467,10 @@ func syncInstancePVCStatus(tree *kubebuilderx.ObjectTree, its *workloads.Instanc
 				instName = pvc.Labels[constant.KBAppPodNameLabelKey]
 			}
 			if len(instName) > 0 {
-				for i, inst := range instanceStatus {
-					if inst.PodName == instName {
+				for i := range observations {
+					if observations[i].InstanceName == instName && observations[i].State == workloads.InstanceCurrentStatePresent {
 						// TODO: how to check the expansion failed?
-						instanceStatus[i].VolumeExpansion = true
+						observations[i].VolumeExpansion = true
 						break
 					}
 				}

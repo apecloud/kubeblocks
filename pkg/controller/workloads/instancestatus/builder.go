@@ -63,17 +63,6 @@ type BuildResult struct {
 	Statuses []workloads.InstanceStatus
 }
 
-// PrepareForNewDesiredRevisions keeps the last current observation while publishing
-// the newly computed desired revision. UpToDate must be invalidated until the status
-// reconciler observes the current objects against the new InstanceSet desired state.
-func PrepareForNewDesiredRevisions(statuses []workloads.InstanceStatus, updateRevisions map[string]string) {
-	for i := range statuses {
-		status := &statuses[i]
-		status.UpdateRevision = updateRevisions[status.PodName]
-		status.UpToDate = false
-	}
-}
-
 // Build merges InstanceStatus by PodName. It carries only retained template identity from Previous;
 // all current, revision, health, and runtime fields are rebuilt from Current.
 func Build(input BuildInput) (BuildResult, error) {

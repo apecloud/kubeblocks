@@ -273,6 +273,31 @@ func TestBuildRejectsInconsistentInputs(t *testing.T) {
 	}
 }
 
+func TestPrepareForNewDesiredRevisionsInvalidatesOnlyConvergence(t *testing.T) {
+	statuses := []workloads.InstanceStatus{
+		{
+			PodName: "demo-0", DesiredState: workloads.InstanceDesiredStateOffline,
+			CurrentState: workloads.InstanceCurrentStatePresent, CurrentRevision: "old-current",
+			UpdateRevision: "old-target", UpToDate: true, Ready: true, Available: true, Failed: true,
+		},
+		{
+			PodName: "demo-1", DesiredState: workloads.InstanceDesiredStateActive,
+			CurrentState: workloads.InstanceCurrentStatePresent, UpdateRevision: "old-target", UpToDate: true,
+		},
+	}
+	PrepareForNewDesiredRevisions(statuses, map[string]string{"demo-0": "new-target"})
+
+	active := statuses[0]
+	if active.DesiredState != workloads.InstanceDesiredStateActive || active.UpdateRevision != "new-target" || active.UpToDate ||
+		active.CurrentRevision != "old-current" || !active.Ready || !active.Available || !active.Failed {
+		t.Fatalf("new desired revision did not preserve current observations: %#v", active)
+	}
+	retained := statuses[1]
+	if retained.UpdateRevision != "" || retained.UpToDate {
+		t.Fatalf("status without a new desired revision retained applied state: %#v", retained)
+	}
+}
+
 func TestBuildActiveAllocationOverridesStaleTemplateHints(t *testing.T) {
 	result, err := Build(BuildInput{
 		Previous:      []workloads.InstanceStatus{{PodName: "demo-0", TemplateName: ptr.To("old")}},

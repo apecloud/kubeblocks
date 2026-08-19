@@ -397,7 +397,7 @@ func (r rebuildInstanceOpsHandler) getRebuildInstanceWrapper(opsRes *OpsResource
 	if err != nil {
 		return nil, err
 	}
-	templateByName := map[string]string{}
+	var templateByName map[string]string
 	if workload.HasInstanceStatus() {
 		compStatus := opsRes.OpsRequest.Status.Components[rebuildInstance.ComponentName]
 		snapshot := findParticipantSnapshot(&compStatus, workload.GetName())

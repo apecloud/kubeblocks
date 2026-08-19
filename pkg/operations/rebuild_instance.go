@@ -31,6 +31,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -180,7 +181,7 @@ func (r rebuildInstanceOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.Requ
 		return lastCompConfiguration
 	}
 	compOpsHelper.saveLastConfigurations(opsRes, getLastComponentInfo)
-	return nil
+	return captureSourceParticipants(reqCtx, cli, opsRes, compOpsHelper)
 }
 
 func (r rebuildInstanceOpsHandler) getInstanceProgressDetail(compStatus opsv1alpha1.OpsRequestComponentStatus, instance string) opsv1alpha1.ProgressStatusDetail {
@@ -369,8 +370,8 @@ func (r rebuildInstanceOpsHandler) scaleOutRequiredInstances(reqCtx intctrlutil.
 		if compSpec.Name != compName {
 			continue
 		}
-		if *lastCompConfiguration.Replicas != compSpec.Replicas {
-			// means the componentSpec has been updated, ignore it.
+		expectedReplicas := *lastCompConfiguration.Replicas + int32(len(rebuildInstance.Instances))
+		if compSpec.Replicas != *lastCompConfiguration.Replicas && compSpec.Replicas != expectedReplicas {
 			opsRes.Recorder.Eventf(opsRes.OpsRequest, corev1.EventTypeWarning, reasonCompReplicasChanged, "then replicas of the component %s has been changed", compName)
 			continue
 		}
@@ -392,13 +393,28 @@ func (r rebuildInstanceOpsHandler) getRebuildInstanceWrapper(opsRes *OpsResource
 	if err != nil {
 		return nil, err
 	}
-	plan, err := runtime.GenerateInstanceNamePlan(opsRes.Cluster.Namespace, opsRes.Cluster.Name,
-		rebuildInstance.ComponentName, compSpec)
+	workload, err := runtime.GetWorkload(opsRes.Cluster.Namespace, opsRes.Cluster.Name, rebuildInstance.ComponentName)
 	if err != nil {
 		return nil, err
 	}
+	templateByName := map[string]string{}
+	if workload.HasInstanceStatus() {
+		compStatus := opsRes.OpsRequest.Status.Components[rebuildInstance.ComponentName]
+		snapshot := findParticipantSnapshot(&compStatus, workload.GetName())
+		if snapshot == nil {
+			return nil, fmt.Errorf("source participant snapshot for InstanceSet %q is missing", workload.GetName())
+		}
+		templateByName = participantsToSet(snapshot.Source)
+	} else {
+		plan, planErr := runtime.GenerateInstanceNamePlan(opsRes.Cluster.Namespace, opsRes.Cluster.Name,
+			rebuildInstance.ComponentName, compSpec)
+		if planErr != nil {
+			return nil, planErr
+		}
+		templateByName = plan.TemplateByName
+	}
 	for _, ins := range rebuildInstance.Instances {
-		insTplName, ok := plan.TemplateByName[ins.Name]
+		insTplName, ok := templateByName[ins.Name]
 		if !ok {
 			return nil, intctrlutil.NewFatalError(fmt.Sprintf("cannot determine the instance template of instance %q", ins.Name))
 		}
@@ -419,17 +435,73 @@ func (r rebuildInstanceOpsHandler) scaleOutCompReplicasAndSyncProgress(reqCtx in
 	rebuildInstance opsv1alpha1.RebuildInstance,
 	compStatus *opsv1alpha1.OpsRequestComponentStatus,
 	rebuildInsWrapper map[string]*rebuildInstanceWrapper) error {
-	scaleOutInsMap := map[string]string{}
 	runtime, err := opsRes.GetRuntime(compSpec.Name)
 	if err != nil {
 		return err
 	}
+	workload, err := runtime.GetWorkload(opsRes.Cluster.Namespace, opsRes.Cluster.Name, compSpec.Name)
+	if err != nil {
+		return err
+	}
+	if !workload.HasInstanceStatus() {
+		return r.scaleOutCompReplicasAndSyncProgressWithNamePlan(reqCtx, cli, opsRes, compSpec,
+			rebuildInstance, compStatus, rebuildInsWrapper, runtime)
+	}
+	lastCompConfiguration := opsRes.OpsRequest.Status.LastConfiguration.Components[compSpec.Name]
+	expectedReplicas := *lastCompConfiguration.Replicas + int32(len(rebuildInstance.Instances))
+	// First publish the target replica count. The InstanceSet then becomes the authority that allocates names.
+	if compSpec.Replicas == *lastCompConfiguration.Replicas {
+		for j := range compSpec.Instances {
+			insTpl := &compSpec.Instances[j]
+			if wrapper, ok := rebuildInsWrapper[insTpl.Name]; ok {
+				insTpl.Replicas = pointer.Int32(insTpl.GetReplicas() + wrapper.replicas)
+			}
+		}
+		compSpec.Replicas = expectedReplicas
+		return nil
+	}
+	if compSpec.Replicas != expectedReplicas {
+		return fmt.Errorf("component %q replicas changed while rebuilding instances", compSpec.Name)
+	}
+	snapshot, frozen, err := freezeTargetParticipants(compStatus, workload, compSpec, nil, false)
+	if err != nil || !frozen {
+		return err
+	}
+	createdByTemplate := map[string][]string{}
+	for _, participant := range snapshot.Created {
+		if participant.TemplateName == nil {
+			return fmt.Errorf("instance template for newly allocated instance %q is unknown", participant.PodName)
+		}
+		createdByTemplate[*participant.TemplateName] = append(createdByTemplate[*participant.TemplateName], participant.PodName)
+	}
+	scaleOutInsMap := map[string]string{}
+	for templateName, wrapper := range rebuildInsWrapper {
+		newNames := createdByTemplate[templateName]
+		slices.Sort(newNames)
+		if len(newNames) != int(wrapper.replicas) {
+			return fmt.Errorf("expected %d new instances for template %q, got %d", wrapper.replicas, templateName, len(newNames))
+		}
+		for i, instanceName := range wrapper.insNames {
+			scaleOutInsMap[instanceName] = newNames[i]
+		}
+	}
+
+	return r.syncScalingOutProgressAndNodeSelectors(reqCtx, cli, opsRes, compSpec.Name,
+		rebuildInstance, compStatus, scaleOutInsMap)
+}
+
+func (r rebuildInstanceOpsHandler) scaleOutCompReplicasAndSyncProgressWithNamePlan(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	opsRes *OpsResource,
+	compSpec *appsv1.ClusterComponentSpec,
+	rebuildInstance opsv1alpha1.RebuildInstance,
+	compStatus *opsv1alpha1.OpsRequestComponentStatus,
+	rebuildInsWrapper map[string]*rebuildInstanceWrapper,
+	runtime OpsRuntime) error {
 	beforePlan, err := runtime.GenerateInstanceNamePlan(opsRes.Cluster.Namespace, opsRes.Cluster.Name, compSpec.Name, *compSpec)
 	if err != nil {
 		return err
 	}
-	// update component spec to scale out required instances.
-	workloadName := constant.GenerateWorkloadNamePattern(opsRes.Cluster.Name, compSpec.Name)
 	for j := range compSpec.Instances {
 		insTpl := &compSpec.Instances[j]
 		if wrapper, ok := rebuildInsWrapper[insTpl.Name]; ok {
@@ -441,6 +513,7 @@ func (r rebuildInstanceOpsHandler) scaleOutCompReplicasAndSyncProgress(reqCtx in
 	if err != nil {
 		return err
 	}
+	scaleOutInsMap := map[string]string{}
 	for templateName, wrapper := range rebuildInsWrapper {
 		newNames := make([]string, 0, wrapper.replicas)
 		for _, name := range afterPlan.NamesForTemplate(templateName) {
@@ -455,14 +528,24 @@ func (r rebuildInstanceOpsHandler) scaleOutCompReplicasAndSyncProgress(reqCtx in
 			scaleOutInsMap[instanceName] = newNames[i]
 		}
 	}
+	return r.syncScalingOutProgressAndNodeSelectors(reqCtx, cli, opsRes, compSpec.Name,
+		rebuildInstance, compStatus, scaleOutInsMap)
+}
 
+func (r rebuildInstanceOpsHandler) syncScalingOutProgressAndNodeSelectors(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	opsRes *OpsResource,
+	componentName string,
+	rebuildInstance opsv1alpha1.RebuildInstance,
+	compStatus *opsv1alpha1.OpsRequestComponentStatus,
+	scaleOutInsMap map[string]string) error {
+	workloadName := constant.GenerateWorkloadNamePattern(opsRes.Cluster.Name, componentName)
 	its := &workloads.InstanceSet{}
 	if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Name: workloadName, Namespace: opsRes.OpsRequest.Namespace}, its); err != nil {
 		return err
 	}
 	itsUpdated := false
 	for _, ins := range rebuildInstance.Instances {
-		// set progress details
 		scaleOutInsName := scaleOutInsMap[ins.Name]
 		setComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest, &compStatus.ProgressDetails,
 			opsv1alpha1.ProgressStatusDetail{
@@ -470,8 +553,6 @@ func (r rebuildInstanceOpsHandler) scaleOutCompReplicasAndSyncProgress(reqCtx in
 				Status:    opsv1alpha1.ProcessingProgressStatus,
 				Message:   r.buildScalingOutPodMessage(scaleOutInsName, "Processing"),
 			})
-
-		// specify node to scale out
 		if ins.TargetNodeName != "" {
 			if err := instanceset.MergeNodeSelectorOnceAnnotation(its, map[string]string{scaleOutInsName: ins.TargetNodeName}); err != nil {
 				return err
@@ -479,11 +560,8 @@ func (r rebuildInstanceOpsHandler) scaleOutCompReplicasAndSyncProgress(reqCtx in
 			itsUpdated = true
 		}
 	}
-
 	if itsUpdated {
-		if err := cli.Update(reqCtx.Ctx, its); err != nil {
-			return err
-		}
+		return cli.Update(reqCtx.Ctx, its)
 	}
 	return nil
 }
@@ -504,9 +582,25 @@ func (r rebuildInstanceOpsHandler) checkProgressForScalingOutPods(reqCtx intctrl
 	if err != nil {
 		return 0, 0, nil, err
 	}
-	plan, err := runtime.GenerateInstanceNamePlan(opsRes.Cluster.Namespace, opsRes.Cluster.Name, compSpec.Name, *compSpec)
+	workload, err := runtime.GetWorkload(opsRes.Cluster.Namespace, opsRes.Cluster.Name, compSpec.Name)
 	if err != nil {
 		return 0, 0, nil, err
+	}
+	activeNames := sets.New[string]()
+	if workload.HasInstanceStatus() {
+		for _, status := range workload.GetInstanceStatuses() {
+			if status.EffectiveDesiredState() == workloads.InstanceDesiredStateActive {
+				activeNames.Insert(status.PodName)
+			}
+		}
+	} else {
+		plan, planErr := runtime.GenerateInstanceNamePlan(opsRes.Cluster.Namespace, opsRes.Cluster.Name, compSpec.Name, *compSpec)
+		if planErr != nil {
+			return 0, 0, nil, planErr
+		}
+		for name := range plan.TemplateByName {
+			activeNames.Insert(name)
+		}
 	}
 	synthesizedComp, err := r.buildSynthesizedComponent(reqCtx.Ctx, cli, opsRes.Cluster, compSpec.Name)
 	if err != nil {
@@ -516,7 +610,7 @@ func (r rebuildInstanceOpsHandler) checkProgressForScalingOutPods(reqCtx intctrl
 	for _, instance := range rebuildInstance.Instances {
 		progressDetail := r.getInstanceProgressDetail(*compStatus, instance.Name)
 		scalingOutPodName := r.getScalingOutPodNameFromMessage(progressDetail.Message)
-		if _, ok := plan.TemplateByName[scalingOutPodName]; !ok {
+		if !activeNames.Has(scalingOutPodName) {
 			return 0, 0, nil, intctrlutil.NewFatalError(fmt.Sprintf(`the replicas of the component "%s" has been modified by another operation`, compSpec.Name))
 		}
 		scaledOutInstance, err := runtime.GetInstance(opsRes.Cluster.Namespace, opsRes.Cluster.Name, compSpec.Name, scalingOutPodName)
@@ -575,13 +669,28 @@ func (r rebuildInstanceOpsHandler) offlineSpecifiedInstances(opsRes *OpsResource
 	if err != nil {
 		return err
 	}
-	plan, err := runtime.GenerateInstanceNamePlan(opsRes.Cluster.Namespace, opsRes.Cluster.Name, compSpec.Name, *compSpec)
+	workload, err := runtime.GetWorkload(opsRes.Cluster.Namespace, opsRes.Cluster.Name, compSpec.Name)
 	if err != nil {
 		return err
 	}
+	templateByName := map[string]string{}
+	if workload.HasInstanceStatus() {
+		for _, status := range workload.GetInstanceStatuses() {
+			if status.EffectiveDesiredState() != workloads.InstanceDesiredStateActive || status.TemplateName == nil {
+				continue
+			}
+			templateByName[status.PodName] = *status.TemplateName
+		}
+	} else {
+		plan, planErr := runtime.GenerateInstanceNamePlan(opsRes.Cluster.Namespace, opsRes.Cluster.Name, compSpec.Name, *compSpec)
+		if planErr != nil {
+			return planErr
+		}
+		templateByName = plan.TemplateByName
+	}
 	for _, insName := range instancesNeedToOffline {
 		compSpec.OfflineInstances = append(compSpec.OfflineInstances, insName)
-		templateName, ok := plan.TemplateByName[insName]
+		templateName, ok := templateByName[insName]
 		if !ok {
 			return intctrlutil.NewFatalError(fmt.Sprintf("cannot determine the instance template of instance %q", insName))
 		}

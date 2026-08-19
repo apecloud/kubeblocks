@@ -24,6 +24,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -105,39 +106,54 @@ func (vs verticalScalingHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, 
 		pgRes *progressResource,
 		compStatus *opsv1alpha1.OpsRequestComponentStatus) (expectProgressCount int32, completedCount int32, err error) {
 		verticalScaling := pgRes.compOps.(opsv1alpha1.VerticalScaling)
+		var updatedTemplates sets.Set[string]
 		if len(pgRes.clusterComponent.Instances) != 0 {
-			// obtain the pods which should be updated.
-			updatedPodSet := map[string]string{}
+			updatedTemplates = sets.New[string]()
 			vsInsMap := vs.covertInsResourcesToMap(verticalScaling)
 			templateReplicasCnt := int32(0)
-			runtime, err := opsRes.GetRuntime(pgRes.compOps.GetComponentName())
-			if err != nil {
-				return 0, 0, err
-			}
-			plan, err := runtime.GenerateInstanceNamePlan(opsRes.Cluster.Namespace, opsRes.Cluster.Name,
-				pgRes.fullComponentName, *pgRes.clusterComponent)
-			if err != nil {
-				return 0, 0, err
-			}
 			for _, template := range pgRes.clusterComponent.Instances {
 				replicas := template.GetReplicas()
 				insVS := vsInsMap[template.Name]
 				if vs.verticalScalingInsTemplate(verticalScaling, template, insVS) {
-					for _, podName := range plan.NamesForTemplate(template.Name) {
-						updatedPodSet[podName] = template.Name
-					}
+					updatedTemplates.Insert(template.Name)
 				}
 				templateReplicasCnt += replicas
 			}
 			if vs.verticalScalingComp(verticalScaling) && templateReplicasCnt < pgRes.clusterComponent.Replicas {
-				for _, podName := range plan.NamesForTemplate("") {
-					updatedPodSet[podName] = ""
-				}
+				updatedTemplates.Insert("")
 			} else {
 				pgRes.noWaitComponentCompleted = true
 			}
-			pgRes.updatedPodSet = updatedPodSet
 		}
+		workload, err := workloadForProgress(opsRes, pgRes.compOps.GetComponentName(), pgRes.fullComponentName)
+		if err != nil {
+			return 0, 0, err
+		}
+		if !workload.HasInstanceStatus() {
+			if updatedTemplates != nil {
+				runtime, runtimeErr := opsRes.GetRuntime(pgRes.compOps.GetComponentName())
+				if runtimeErr != nil {
+					return 0, 0, runtimeErr
+				}
+				plan, planErr := runtime.GenerateInstanceNamePlan(opsRes.Cluster.Namespace, opsRes.Cluster.Name,
+					pgRes.fullComponentName, *pgRes.clusterComponent)
+				if planErr != nil {
+					return 0, 0, planErr
+				}
+				pgRes.updatedPodSet = map[string]string{}
+				for templateName := range updatedTemplates {
+					for _, podName := range plan.NamesForTemplate(templateName) {
+						pgRes.updatedPodSet[podName] = templateName
+					}
+				}
+			}
+			return handleComponentStatusProgress(reqCtx, cli, opsRes, pgRes, compStatus, vs.podApplyCompOps)
+		}
+		snapshot, frozen, err := freezeTargetParticipants(compStatus, workload, pgRes.clusterComponent, updatedTemplates, true)
+		if err != nil || !frozen {
+			return 0, 0, err
+		}
+		pgRes.updatedPodSet = participantsToSet(snapshot.Updated)
 		return handleComponentStatusProgress(reqCtx, cli, opsRes, pgRes, compStatus, vs.podApplyCompOps)
 	}
 	return compOpsHelper.reconcileActionWithComponentOps(reqCtx, cli, opsRes, "vertical scale", handleComponentStatusProgressForVS)
@@ -252,7 +268,7 @@ func (vs verticalScalingHandler) SaveLastConfiguration(reqCtx intctrlutil.Reques
 			Instances:            instanceTemplates,
 		}
 	})
-	return nil
+	return captureSourceParticipants(reqCtx, cli, opsRes, compOpsHelper)
 }
 
 // Cancel this function defines the cancel verticalScaling action.

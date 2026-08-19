@@ -20,6 +20,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -1127,6 +1128,15 @@ type OpsRequestComponentStatus struct {
 	// +optional
 	ProgressDetails []ProgressStatusDetail `json:"progressDetails,omitempty"`
 
+	// InstanceParticipants freezes the instances involved in this operation for each workload.
+	// The source view is captured before the operation changes the Cluster spec. Created, deleted,
+	// and updated instances are immutable once Frozen is true.
+	//
+	// +optional
+	// +listType=map
+	// +listMapKey=workloadName
+	InstanceParticipants []InstanceParticipantSnapshot `json:"instanceParticipants,omitempty"`
+
 	// Provides an explanation for the Component being in its current state.
 	// +kubebuilder:validation:MaxLength=1024
 	// +optional
@@ -1136,6 +1146,62 @@ type OpsRequestComponentStatus struct {
 	// +kubebuilder:validation:MaxLength=32768
 	// +optional
 	Message string `json:"message,omitempty" protobuf:"bytes,6,opt,name=message"`
+}
+
+// InstanceParticipantSnapshot records the stable instance identities involved in one workload operation.
+type InstanceParticipantSnapshot struct {
+	// WorkloadName is the InstanceSet name.
+	// +kubebuilder:validation:Required
+	WorkloadName string `json:"workloadName"`
+
+	// WorkloadUID prevents a recreated InstanceSet with the same name from reusing this snapshot.
+	// +kubebuilder:validation:Required
+	WorkloadUID types.UID `json:"workloadUID"`
+
+	// SourceGeneration is the InstanceSet generation observed before the operation changed its desired state.
+	// +optional
+	SourceGeneration int64 `json:"sourceGeneration,omitempty"`
+
+	// TargetGeneration is the InstanceSet generation whose instance identities were frozen for the operation.
+	// +optional
+	TargetGeneration int64 `json:"targetGeneration,omitempty"`
+
+	// Source contains the Active and retained Offline instance identities observed before the operation.
+	// +optional
+	Source []InstanceParticipant `json:"source,omitempty"`
+
+	// Created contains identities made Active by the operation.
+	// +optional
+	Created []InstanceParticipant `json:"created,omitempty"`
+
+	// Deleted contains identities that stopped being Active because of the operation.
+	// +optional
+	Deleted []InstanceParticipant `json:"deleted,omitempty"`
+
+	// Updated contains existing Active identities whose objects are changed by the operation.
+	// +optional
+	Updated []InstanceParticipant `json:"updated,omitempty"`
+
+	// Frozen indicates that Created, Deleted, and Updated are complete and must no longer be recomputed.
+	// +optional
+	Frozen bool `json:"frozen,omitempty"`
+}
+
+// InstanceParticipant identifies one InstanceSet-managed instance and its assigned template.
+type InstanceParticipant struct {
+	// PodName is the stable instance identity allocated by the InstanceSet.
+	// +kubebuilder:validation:Required
+	PodName string `json:"podName"`
+
+	// TemplateName is the assigned instance template. nil means that the template is unknown;
+	// an empty string identifies the default template.
+	// +optional
+	TemplateName *string `json:"templateName,omitempty"`
+
+	// Active records whether this identity was Active in the captured view. It is false for a retained
+	// Offline identity.
+	// +optional
+	Active bool `json:"active,omitempty"`
 }
 
 type PreCheckResult struct {

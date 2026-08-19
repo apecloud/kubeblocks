@@ -249,7 +249,7 @@ func (ve volumeExpansionOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.Req
 			VolumeClaimTemplates: convertedLastVCTs,
 		}
 	})
-	return nil
+	return captureSourceParticipants(reqCtx, cli, opsRes, compOpsHelper)
 }
 
 func (ve volumeExpansionOpsHandler) getRequestStorageMap(opsRequest *opsv1alpha1.OpsRequest) map[string]resource.Quantity {
@@ -281,10 +281,6 @@ func (ve volumeExpansionOpsHandler) handleVCTExpansionProgress(reqCtx intctrluti
 	compStatus *opsv1alpha1.OpsRequestComponentStatus,
 	requestStorage resource.Quantity,
 	veHelper volumeExpansionHelper) (int, int, error) {
-	var (
-		succeedCount   int
-		completedCount int
-	)
 	if veHelper.expectCount <= 0 {
 		return 0, 0, nil
 	}
@@ -292,14 +288,47 @@ func (ve volumeExpansionOpsHandler) handleVCTExpansionProgress(reqCtx intctrluti
 	if err != nil {
 		return 0, 0, err
 	}
-	plan, err := runtime.GenerateInstanceNamePlan(opsRes.Cluster.Namespace, opsRes.Cluster.Name,
-		veHelper.fullComponentName, veHelper.componentSpec)
+	workload, err := runtime.GetWorkload(opsRes.Cluster.Namespace, opsRes.Cluster.Name, veHelper.fullComponentName)
 	if err != nil {
 		return 0, 0, err
 	}
-	instanceNames := plan.NamesForTemplate(veHelper.templateName)
-	instanceNameSet := sets.New(instanceNames...)
-	for instanceName := range instanceNameSet {
+	if !workload.HasInstanceStatus() {
+		plan, planErr := runtime.GenerateInstanceNamePlan(opsRes.Cluster.Namespace, opsRes.Cluster.Name,
+			veHelper.fullComponentName, veHelper.componentSpec)
+		if planErr != nil {
+			return 0, 0, planErr
+		}
+		return ve.handleInstancesVCTExpansionProgress(reqCtx, opsRes, compStatus, requestStorage, veHelper,
+			runtime, sets.New(plan.NamesForTemplate(veHelper.templateName)...))
+	}
+	snapshot, frozen, err := freezeTargetParticipants(compStatus, workload, &veHelper.componentSpec, nil, true)
+	if err != nil || !frozen {
+		return 0, 0, err
+	}
+	instanceNames := sets.New[string]()
+	for _, participant := range snapshot.Updated {
+		templateName := ""
+		if participant.TemplateName != nil {
+			templateName = *participant.TemplateName
+		}
+		if templateName != veHelper.templateName {
+			continue
+		}
+		instanceNames.Insert(participant.PodName)
+	}
+	return ve.handleInstancesVCTExpansionProgress(reqCtx, opsRes, compStatus, requestStorage, veHelper,
+		runtime, instanceNames)
+}
+
+func (ve volumeExpansionOpsHandler) handleInstancesVCTExpansionProgress(reqCtx intctrlutil.RequestCtx,
+	opsRes *OpsResource,
+	compStatus *opsv1alpha1.OpsRequestComponentStatus,
+	requestStorage resource.Quantity,
+	veHelper volumeExpansionHelper,
+	runtime OpsRuntime,
+	instanceNames sets.Set[string]) (int, int, error) {
+	var succeedCount, completedCount int
+	for instanceName := range instanceNames {
 		instance, getErr := runtime.GetInstance(opsRes.Cluster.Namespace, opsRes.Cluster.Name, veHelper.fullComponentName, instanceName)
 		if getErr != nil {
 			if apierrors.IsNotFound(getErr) {

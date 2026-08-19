@@ -174,9 +174,26 @@ func (hs horizontalScalingOpsHandler) ReconcileAction(reqCtx intctrlutil.Request
 				return 0, 0, err
 			}
 		}
-		pgRes.createdPodSet, pgRes.deletedPodSet, err = hs.getCreateAndDeletePodSet(opsRes, lastCompConfiguration, *clusterComponentSpec, horizontalScaling, pgRes.fullComponentName)
+		workload, err := workloadForProgress(opsRes, pgRes.compOps.GetComponentName(), pgRes.fullComponentName)
 		if err != nil {
 			return 0, 0, err
+		}
+		if !workload.HasInstanceStatus() {
+			pgRes.createdPodSet, pgRes.deletedPodSet, err = hs.getCreateAndDeletePodSet(opsRes,
+				lastCompConfiguration, *clusterComponentSpec, horizontalScaling, pgRes.fullComponentName)
+			if err != nil {
+				return 0, 0, err
+			}
+			return handleComponentProgressForScalingReplicas(reqCtx, cli, opsRes, pgRes, compStatus)
+		}
+		snapshot, frozen, err := freezeTargetParticipants(compStatus, workload, clusterComponentSpec, nil, false)
+		if err != nil || !frozen {
+			return 0, 0, err
+		}
+		pgRes.createdPodSet = participantsToSet(snapshot.Created)
+		pgRes.deletedPodSet = participantsToSet(snapshot.Deleted)
+		if opsRes.OpsRequest.Status.Phase == opsv1alpha1.OpsCancellingPhase {
+			pgRes.createdPodSet, pgRes.deletedPodSet = pgRes.deletedPodSet, pgRes.createdPodSet
 		}
 		return handleComponentProgressForScalingReplicas(reqCtx, cli, opsRes, pgRes, compStatus)
 	}
@@ -368,7 +385,7 @@ func (hs horizontalScalingOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.R
 	}
 	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.HorizontalScalingList)
 	compOpsHelper.saveLastConfigurations(opsRes, getLastComponentInfo)
-	return nil
+	return captureSourceParticipants(reqCtx, cli, opsRes, compOpsHelper)
 }
 
 // getCreateAndDeletePodSet gets the pod set that are created and deleted in this opsRequest.
@@ -502,22 +519,34 @@ func filterHorizontalScalingSpec(
 	compOfflineInstances []string,
 	horizontalScaling *opsv1alpha1.HorizontalScaling) (*opsv1alpha1.HorizontalScaling, error) {
 	offlineInstances := sets.New(compOfflineInstances...)
-	runtime, err := opsRes.GetRuntime(horizontalScaling.ComponentName)
-	if err != nil {
-		return nil, err
-	}
-	compSpec.Replicas = compReplicas
-	compSpec.Instances = compInstanceTpls
-	compSpec.OfflineInstances = compOfflineInstances
-	plan, err := runtime.GenerateInstanceNamePlan(opsRes.Cluster.Namespace, opsRes.Cluster.Name,
-		horizontalScaling.ComponentName, compSpec)
-	if err != nil {
-		return nil, err
+	activeNames := sets.New[string]()
+	if hasParticipantSnapshotsForComponent(opsRes, horizontalScaling.ComponentName) {
+		for _, participant := range sourceParticipantsForComponent(opsRes, horizontalScaling.ComponentName) {
+			if participant.Active {
+				activeNames.Insert(participant.PodName)
+			}
+		}
+	} else {
+		runtime, err := opsRes.GetRuntime(horizontalScaling.ComponentName)
+		if err != nil {
+			return nil, err
+		}
+		compSpec.Replicas = compReplicas
+		compSpec.Instances = compInstanceTpls
+		compSpec.OfflineInstances = compOfflineInstances
+		plan, err := runtime.GenerateInstanceNamePlan(opsRes.Cluster.Namespace, opsRes.Cluster.Name,
+			horizontalScaling.ComponentName, compSpec)
+		if err != nil {
+			return nil, err
+		}
+		for name := range plan.TemplateByName {
+			activeNames.Insert(name)
+		}
 	}
 	if horizontalScaling.ScaleIn != nil && len(horizontalScaling.ScaleIn.OnlineInstancesToOffline) > 0 {
 		onlinedInstanceFromOps := sets.Set[string]{}
 		for _, insName := range horizontalScaling.ScaleIn.OnlineInstancesToOffline {
-			if _, ok := plan.TemplateByName[insName]; ok {
+			if activeNames.Has(insName) {
 				onlinedInstanceFromOps.Insert(insName)
 			}
 		}
@@ -580,18 +609,33 @@ func (hs horizontalScalingOpsHandler) autoSyncReplicaChanges(
 		compSpec.Replicas = compReplicas
 		compSpec.Instances = compInstanceTpls
 		compSpec.OfflineInstances = compOfflineInstances
-		runtime, err := opsRes.GetRuntime(horizontalScaling.ComponentName)
-		if err != nil {
-			return err
-		}
-		plan, err := runtime.GenerateInstanceNamePlan(opsRes.Cluster.Namespace, opsRes.Cluster.Name,
-			horizontalScaling.ComponentName, compSpec)
-		if err != nil {
-			return err
+		templateByName := map[string]string{}
+		if hasParticipantSnapshotsForComponent(opsRes, horizontalScaling.ComponentName) {
+			for _, participant := range sourceParticipantsForComponent(opsRes, horizontalScaling.ComponentName) {
+				if !participant.Active || participant.TemplateName == nil {
+					continue
+				}
+				templateByName[participant.PodName] = *participant.TemplateName
+			}
+		} else {
+			runtime, err := opsRes.GetRuntime(horizontalScaling.ComponentName)
+			if err != nil {
+				return err
+			}
+			plan, err := runtime.GenerateInstanceNamePlan(opsRes.Cluster.Namespace, opsRes.Cluster.Name,
+				horizontalScaling.ComponentName, compSpec)
+			if err != nil {
+				return err
+			}
+			templateByName = plan.TemplateByName
 		}
 		offlineInsCountMap := map[string]int32{}
 		for _, name := range scaleIn.OnlineInstancesToOffline {
-			offlineInsCountMap[plan.TemplateByName[name]]++
+			templateName, ok := templateByName[name]
+			if !ok {
+				return intctrlutil.NewFatalError(fmt.Sprintf("cannot determine the instance template of active instance %q", name))
+			}
+			offlineInsCountMap[templateName]++
 		}
 		scaleIn.Instances, scaleIn.ReplicaChanges = getSyncedInstancesAndReplicaChanges(offlineInsCountMap, scaleIn.ReplicaChanger, nil)
 	}
@@ -629,17 +673,28 @@ func (hs horizontalScalingOpsHandler) getToOnlineInsCountMap(
 	compSpec.Replicas = compReplicas
 	compSpec.Instances = compInstanceTpls
 	compSpec.OfflineInstances = compOfflineInstances
-	runtime, err := opsRes.GetRuntime(horizontalScaling.ComponentName)
-	if err != nil {
-		return nil, err
-	}
-	currentPlan, err := runtime.GenerateInstanceNamePlan(opsRes.Cluster.Namespace, opsRes.Cluster.Name,
-		horizontalScaling.ComponentName, compSpec)
-	if err != nil {
-		return nil, err
+	offlineTemplateByName := map[string]string{}
+	if hasParticipantSnapshotsForComponent(opsRes, horizontalScaling.ComponentName) {
+		for _, participant := range sourceParticipantsForComponent(opsRes, horizontalScaling.ComponentName) {
+			if participant.Active || participant.TemplateName == nil {
+				continue
+			}
+			offlineTemplateByName[participant.PodName] = *participant.TemplateName
+		}
+	} else {
+		runtime, err := opsRes.GetRuntime(horizontalScaling.ComponentName)
+		if err != nil {
+			return nil, err
+		}
+		plan, err := runtime.GenerateInstanceNamePlan(opsRes.Cluster.Namespace, opsRes.Cluster.Name,
+			horizontalScaling.ComponentName, compSpec)
+		if err != nil {
+			return nil, err
+		}
+		offlineTemplateByName = plan.OfflineTemplateByName
 	}
 	for _, insName := range horizontalScaling.ScaleOut.OfflineInstancesToOnline {
-		insTplName, ok := currentPlan.OfflineTemplateByName[insName]
+		insTplName, ok := offlineTemplateByName[insName]
 		if !ok {
 			return nil, intctrlutil.NewFatalError(fmt.Sprintf(`cannot determine the instance template of offline instance %q`, insName))
 		}
@@ -656,26 +711,10 @@ func (hs horizontalScalingOpsHandler) getToOnlineInsCountMap(
 			compInstanceTplsClone[i].Replicas = pointer.Int32(compInstanceTplsClone[i].GetReplicas() + int32(len(insNames)))
 		}
 	}
-	// 2. obtain the updated Pod set after synchronization replicas.
-	compSpec.Replicas = compReplicas
-	compSpec.Instances = compInstanceTplsClone
-	compSpec.OfflineInstances = compExpectOfflineInstances
-	expectedPlan, err := runtime.GenerateInstanceNamePlan(opsRes.Cluster.Namespace, opsRes.Cluster.Name,
-		horizontalScaling.ComponentName, compSpec)
-	if err != nil {
-		return nil, err
-	}
-	// 3. count the number of online instances for each instance template.
+	// 2. count the explicitly selected offline identities for each instance template.
 	onlineInsCountMap := map[string]int32{}
 	for insTplName, insNames := range offlineInsMap {
-		for _, insName := range insNames {
-			// Once replica synchronization is complete, sequentially process each instance in the toOnline list to confirm its successful creation.
-			// If any instance fails to come online, break it.
-			if _, ok := expectedPlan.TemplateByName[insName]; !ok {
-				break
-			}
-			onlineInsCountMap[insTplName]++
-		}
+		onlineInsCountMap[insTplName] = int32(len(insNames))
 	}
 	return onlineInsCountMap, nil
 }
@@ -784,20 +823,32 @@ func (hs horizontalScalingOpsHandler) validateOnlineInstancesToOffline(
 	if len(toOfflineSet) < len(onlineInstancesToOffline) {
 		return intctrlutil.NewFatalError("instances specified in onlineInstancesToOffline has duplicates")
 	}
-	runtime, err := opsRes.GetRuntime(componentName)
-	if err != nil {
-		return err
-	}
-	compSpec := getComponentSpecOrShardingTemplate(opsRes.Cluster, componentName).DeepCopy()
-	compSpec.Replicas = *lastCompConfiguration.Replicas
-	compSpec.Instances = lastCompConfiguration.Instances
-	compSpec.OfflineInstances = lastCompConfiguration.OfflineInstances
-	plan, err := runtime.GenerateInstanceNamePlan(opsRes.Cluster.Namespace, opsRes.Cluster.Name, componentName, *compSpec)
-	if err != nil {
-		return err
+	activeNames := sets.New[string]()
+	if hasParticipantSnapshotsForComponent(opsRes, componentName) {
+		for _, participant := range sourceParticipantsForComponent(opsRes, componentName) {
+			if participant.Active {
+				activeNames.Insert(participant.PodName)
+			}
+		}
+	} else {
+		runtime, err := opsRes.GetRuntime(componentName)
+		if err != nil {
+			return err
+		}
+		compSpec := getComponentSpecOrShardingTemplate(opsRes.Cluster, componentName).DeepCopy()
+		compSpec.Replicas = *lastCompConfiguration.Replicas
+		compSpec.Instances = lastCompConfiguration.Instances
+		compSpec.OfflineInstances = lastCompConfiguration.OfflineInstances
+		plan, err := runtime.GenerateInstanceNamePlan(opsRes.Cluster.Namespace, opsRes.Cluster.Name, componentName, *compSpec)
+		if err != nil {
+			return err
+		}
+		for name := range plan.TemplateByName {
+			activeNames.Insert(name)
+		}
 	}
 	for _, onlineIns := range onlineInstancesToOffline {
-		if _, ok := plan.TemplateByName[onlineIns]; !ok {
+		if !activeNames.Has(onlineIns) {
 			return intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" specified in onlineInstancesToOffline is not online`, onlineIns))
 		}
 	}

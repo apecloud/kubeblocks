@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"fmt"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -95,16 +96,31 @@ func (start StartOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli 
 		opsRes *OpsResource,
 		pgRes *progressResource,
 		compStatus *opsv1alpha1.OpsRequestComponentStatus) (int32, int32, error) {
-		runtime, err := opsRes.GetRuntime(pgRes.compOps.GetComponentName())
+		workload, err := workloadForProgress(opsRes, pgRes.compOps.GetComponentName(), pgRes.fullComponentName)
 		if err != nil {
 			return 0, 0, err
 		}
-		plan, err := runtime.GenerateInstanceNamePlan(opsRes.Cluster.Namespace, opsRes.Cluster.Name,
-			pgRes.fullComponentName, *pgRes.clusterComponent)
-		if err != nil {
-			return 0, 0, err
+		if !workload.HasInstanceStatus() {
+			runtime, runtimeErr := opsRes.GetRuntime(pgRes.compOps.GetComponentName())
+			if runtimeErr != nil {
+				return 0, 0, runtimeErr
+			}
+			plan, planErr := runtime.GenerateInstanceNamePlan(opsRes.Cluster.Namespace, opsRes.Cluster.Name,
+				pgRes.fullComponentName, *pgRes.clusterComponent)
+			if planErr != nil {
+				return 0, 0, planErr
+			}
+			pgRes.createdPodSet = plan.TemplateByName
+			return handleComponentProgressForScalingReplicas(reqCtx, cli, opsRes, pgRes, compStatus)
 		}
-		pgRes.createdPodSet = plan.TemplateByName
+		snapshot := findParticipantSnapshot(compStatus, workload.GetName())
+		if snapshot == nil || !snapshot.Frozen {
+			return 0, 0, nil
+		}
+		if snapshot.WorkloadUID != workload.GetUID() {
+			return 0, 0, fmt.Errorf("InstanceSet %q was recreated during the operation", workload.GetName())
+		}
+		pgRes.createdPodSet = participantsToSet(snapshot.Created)
 		return handleComponentProgressForScalingReplicas(reqCtx, cli, opsRes, pgRes, compStatus)
 	}
 	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.StartList)
@@ -113,5 +129,10 @@ func (start StartOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli 
 
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration
 func (start StartOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
+	compOps := newComponentOpsHelper(opsRes.OpsRequest.Spec.StartList)
+	if err := captureSourceParticipants(reqCtx, cli, opsRes, compOps); err != nil {
+		return err
+	}
+	freezeCreatedSourceParticipants(opsRes, compOps)
 	return nil
 }

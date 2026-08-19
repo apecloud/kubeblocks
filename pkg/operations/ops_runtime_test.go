@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -356,6 +357,46 @@ func TestOpsRuntimeGeneratesFlatInstanceNamePlan(t *testing.T) {
 	}
 	if got := scaledPlan.TemplateByName["test-cluster-mysql-2"]; got != "big" {
 		t.Fatalf("unexpected template for newly assigned flat instance: %q", got)
+	}
+}
+
+func TestOpsRuntimeUsesInstanceStatusCurrentState(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := workloads.AddToScheme(scheme); err != nil {
+		t.Fatalf("add workloads scheme: %v", err)
+	}
+	defaultTemplate := ""
+	its := &workloads.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "cluster-comp", UID: types.UID("uid-1")},
+		Status: workloads.InstanceSetStatus{InstanceStatus: []workloads.InstanceStatus{
+			{PodName: "present", TemplateName: &defaultTemplate, DesiredState: workloads.InstanceDesiredStateActive,
+				CurrentState: workloads.InstanceCurrentStatePresent, CurrentRevision: "rev-1", Ready: true, Available: true},
+			{PodName: "terminating", TemplateName: &defaultTemplate, DesiredState: workloads.InstanceDesiredStateReleased,
+				CurrentState: workloads.InstanceCurrentStateTerminating, CurrentRevision: "rev-1"},
+			{PodName: "absent", TemplateName: &defaultTemplate, DesiredState: workloads.InstanceDesiredStateActive,
+				CurrentState: workloads.InstanceCurrentStateAbsent, UpdateRevision: "rev-1"},
+		}},
+	}
+	rt := newOpsRuntime(context.Background(), fake.NewClientBuilder().WithScheme(scheme).WithObjects(its).Build(), "")
+	workload, err := rt.GetWorkload("default", "cluster", "comp")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if workload.GetUID() != types.UID("uid-1") || len(workload.GetInstanceStatuses()) != 3 {
+		t.Fatalf("workload identity/status was not published: uid=%q status=%#v", workload.GetUID(), workload.GetInstanceStatuses())
+	}
+	current := workload.GetCurrentRevisionMap()
+	if current["present"] != "rev-1" || current["terminating"] != "rev-1" {
+		t.Fatalf("present and terminating objects must remain observable: %#v", current)
+	}
+	if _, ok := current["absent"]; ok {
+		t.Fatalf("an absent object must not appear in the current revision map: %#v", current)
+	}
+	if !workload.GetNotReadyInstanceNameSet().Has("terminating") || workload.GetNotReadyInstanceNameSet().Has("present") {
+		t.Fatalf("unexpected readiness projection: %#v", workload.GetNotReadyInstanceNameSet())
+	}
+	if workload.GetNotAvailableInstanceNameSet().Has("present") {
+		t.Fatalf("availability must not depend on upToDate: %#v", workload.GetNotAvailableInstanceNameSet())
 	}
 }
 

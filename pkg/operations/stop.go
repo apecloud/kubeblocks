@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"fmt"
 	"slices"
 	"time"
 
@@ -115,16 +116,31 @@ func (stop StopOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 		opsRes *OpsResource,
 		pgRes *progressResource,
 		compStatus *opsv1alpha1.OpsRequestComponentStatus) (int32, int32, error) {
-		runtime, err := opsRes.GetRuntime(pgRes.compOps.GetComponentName())
+		workload, err := workloadForProgress(opsRes, pgRes.compOps.GetComponentName(), pgRes.fullComponentName)
 		if err != nil {
 			return 0, 0, err
 		}
-		plan, err := runtime.GenerateInstanceNamePlan(opsRes.Cluster.Namespace, opsRes.Cluster.Name,
-			pgRes.fullComponentName, *pgRes.clusterComponent)
-		if err != nil {
-			return 0, 0, err
+		if !workload.HasInstanceStatus() {
+			runtime, runtimeErr := opsRes.GetRuntime(pgRes.compOps.GetComponentName())
+			if runtimeErr != nil {
+				return 0, 0, runtimeErr
+			}
+			plan, planErr := runtime.GenerateInstanceNamePlan(opsRes.Cluster.Namespace, opsRes.Cluster.Name,
+				pgRes.fullComponentName, *pgRes.clusterComponent)
+			if planErr != nil {
+				return 0, 0, planErr
+			}
+			pgRes.deletedPodSet = plan.TemplateByName
+			return handleComponentProgressForScalingReplicas(reqCtx, cli, opsRes, pgRes, compStatus)
 		}
-		pgRes.deletedPodSet = plan.TemplateByName
+		snapshot := findParticipantSnapshot(compStatus, workload.GetName())
+		if snapshot == nil || !snapshot.Frozen {
+			return 0, 0, nil
+		}
+		if snapshot.WorkloadUID != workload.GetUID() {
+			return 0, 0, fmt.Errorf("InstanceSet %q was recreated during the operation", workload.GetName())
+		}
+		pgRes.deletedPodSet = participantsToSet(snapshot.Deleted)
 		expectProgressCount, completedCount, err := handleComponentProgressForScalingReplicas(reqCtx, cli, opsRes, pgRes, compStatus)
 		if err != nil {
 			return expectProgressCount, completedCount, err
@@ -137,5 +153,10 @@ func (stop StopOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration
 func (stop StopOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
+	compOps := newComponentOpsHelper(opsRes.OpsRequest.Spec.StopList)
+	if err := captureSourceParticipants(reqCtx, cli, opsRes, compOps); err != nil {
+		return err
+	}
+	freezeDeletedSourceParticipants(opsRes, compOps)
 	return nil
 }

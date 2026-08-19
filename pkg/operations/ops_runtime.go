@@ -28,6 +28,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubectl/pkg/util/podutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -112,13 +113,71 @@ func (r *opsRuntime) GetWorkload(namespace, clusterName, compName string) (Workl
 		instanceNames:      sets.New[string](),
 	}
 	if its.Name != "" {
-		currRevisionMap, _ := instanceset.GetRevisions(its.Status.CurrentRevisions)
+		workload.name = its.Name
+		workload.uid = its.UID
+		workload.generation = its.Generation
 		workload.minReadySeconds = its.Spec.MinReadySeconds
-		workload.currentRevisionMap = currRevisionMap
-		workload.instanceNames = sets.KeySet(currRevisionMap)
-		workload.notReadySet = instanceset.GetPodNameSetFromInstanceSetCondition(its, workloads.InstanceReady)
-		workload.notAvailableSet = instanceset.GetPodNameSetFromInstanceSetCondition(its, workloads.InstanceAvailable)
-		workload.failedSet = instanceset.GetPodNameSetFromInstanceSetCondition(its, workloads.InstanceFailure)
+		for i := range its.Status.InstanceStatus {
+			status := &its.Status.InstanceStatus[i]
+			if status.DesiredState != "" || status.CurrentState != "" {
+				workload.hasInstanceStatus = true
+				break
+			}
+		}
+		if !workload.hasInstanceStatus {
+			currentRevisions, _ := instanceset.GetRevisions(its.Status.CurrentRevisions)
+			workload.currentRevisionMap = currentRevisions
+			workload.instanceNames = sets.KeySet(currentRevisions)
+			workload.notReadySet = instanceset.GetPodNameSetFromInstanceSetCondition(its, workloads.InstanceReady)
+			workload.notAvailableSet = instanceset.GetPodNameSetFromInstanceSetCondition(its, workloads.InstanceAvailable)
+			workload.failedSet = instanceset.GetPodNameSetFromInstanceSetCondition(its, workloads.InstanceFailure)
+			pods, err := component.ListOwnedPods(r.dataContext(), r.cli, namespace, clusterName, compName, r.dataListOpts...)
+			if err != nil {
+				return nil, err
+			}
+			for _, pod := range pods {
+				templateName := pod.Labels[constant.KBAppInstanceTemplateLabelKey]
+				if templateName == "" {
+					templateName = appsv1.GetInstanceTemplateName(clusterName, compName, pod.Name)
+				}
+				workload.instanceStatuses = append(workload.instanceStatuses, workloads.InstanceStatus{
+					PodName:         pod.Name,
+					TemplateName:    &templateName,
+					DesiredState:    workloads.InstanceDesiredStateActive,
+					CurrentState:    workloads.InstanceCurrentStatePresent,
+					CurrentRevision: currentRevisions[pod.Name],
+					Ready:           !workload.notReadySet.Has(pod.Name),
+					Available:       !workload.notAvailableSet.Has(pod.Name),
+					Failed:          workload.failedSet.Has(pod.Name),
+				})
+			}
+			return workload, nil
+		}
+		workload.instanceStatuses = make([]workloads.InstanceStatus, len(its.Status.InstanceStatus))
+		for i := range its.Status.InstanceStatus {
+			status := its.Status.InstanceStatus[i]
+			status.DeepCopyInto(&workload.instanceStatuses[i])
+			currentState := status.EffectiveCurrentState()
+			if currentState == workloads.InstanceCurrentStateAbsent {
+				continue
+			}
+			workload.currentRevisionMap[status.PodName] = status.CurrentRevision
+			if currentState == workloads.InstanceCurrentStateTerminating {
+				workload.notReadySet.Insert(status.PodName)
+				workload.notAvailableSet.Insert(status.PodName)
+				continue
+			}
+			workload.instanceNames.Insert(status.PodName)
+			if !status.Ready {
+				workload.notReadySet.Insert(status.PodName)
+			}
+			if !status.Available {
+				workload.notAvailableSet.Insert(status.PodName)
+			}
+			if status.Failed {
+				workload.failedSet.Insert(status.PodName)
+			}
+		}
 		return workload, nil
 	}
 	pods, err := component.ListOwnedPods(r.dataContext(), r.cli, namespace, clusterName, compName, r.dataListOpts...)
@@ -411,7 +470,12 @@ func (r *opsRuntime) dataContext() context.Context {
 }
 
 type defaultWorkload struct {
+	name               string
+	uid                types.UID
+	generation         int64
+	hasInstanceStatus  bool
 	minReadySeconds    int32
+	instanceStatuses   []workloads.InstanceStatus
 	currentRevisionMap map[string]string
 	notReadySet        sets.Set[string]
 	notAvailableSet    sets.Set[string]
@@ -419,7 +483,23 @@ type defaultWorkload struct {
 	instanceNames      sets.Set[string]
 }
 
+func (w *defaultWorkload) GetName() string { return w.name }
+
+func (w *defaultWorkload) GetUID() types.UID { return w.uid }
+
+func (w *defaultWorkload) GetGeneration() int64 { return w.generation }
+
+func (w *defaultWorkload) HasInstanceStatus() bool { return w.hasInstanceStatus }
+
 func (w *defaultWorkload) GetMinReadySeconds() int32 { return w.minReadySeconds }
+
+func (w *defaultWorkload) GetInstanceStatuses() []workloads.InstanceStatus {
+	result := make([]workloads.InstanceStatus, len(w.instanceStatuses))
+	for i := range w.instanceStatuses {
+		w.instanceStatuses[i].DeepCopyInto(&result[i])
+	}
+	return result
+}
 
 func (w *defaultWorkload) GetCurrentRevisionMap() map[string]string { return w.currentRevisionMap }
 

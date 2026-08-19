@@ -1290,6 +1290,195 @@ If not set, it will rebuild on a random node.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="operations.kubeblocks.io/v1alpha1.InstanceParticipant">InstanceParticipant
+</h3>
+<p>
+(<em>Appears on:</em><a href="#operations.kubeblocks.io/v1alpha1.InstanceParticipantSnapshot">InstanceParticipantSnapshot</a>)
+</p>
+<div>
+<p>InstanceParticipant identifies one InstanceSet-managed instance and its assigned template.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>podName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>PodName is the stable instance identity allocated by the InstanceSet.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>templateName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>TemplateName is the assigned instance template. nil means that the template is unknown;
+an empty string identifies the default template.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>active</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Active records whether this identity was Active in the captured view. It is false for a retained
+Offline identity.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="operations.kubeblocks.io/v1alpha1.InstanceParticipantSnapshot">InstanceParticipantSnapshot
+</h3>
+<p>
+(<em>Appears on:</em><a href="#operations.kubeblocks.io/v1alpha1.OpsRequestComponentStatus">OpsRequestComponentStatus</a>)
+</p>
+<div>
+<p>InstanceParticipantSnapshot records the stable instance identities involved in one workload operation.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>workloadName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>WorkloadName is the InstanceSet name.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>workloadUID</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/types#UID">
+k8s.io/apimachinery/pkg/types.UID
+</a>
+</em>
+</td>
+<td>
+<p>WorkloadUID prevents a recreated InstanceSet with the same name from reusing this snapshot.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>sourceGeneration</code><br/>
+<em>
+int64
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>SourceGeneration is the InstanceSet generation observed before the operation changed its desired state.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>targetGeneration</code><br/>
+<em>
+int64
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>TargetGeneration is the InstanceSet generation whose instance identities were frozen for the operation.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>source</code><br/>
+<em>
+<a href="#operations.kubeblocks.io/v1alpha1.InstanceParticipant">
+[]InstanceParticipant
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Source contains the Active and retained Offline instance identities observed before the operation.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>created</code><br/>
+<em>
+<a href="#operations.kubeblocks.io/v1alpha1.InstanceParticipant">
+[]InstanceParticipant
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Created contains identities made Active by the operation.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>deleted</code><br/>
+<em>
+<a href="#operations.kubeblocks.io/v1alpha1.InstanceParticipant">
+[]InstanceParticipant
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Deleted contains identities that stopped being Active because of the operation.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>updated</code><br/>
+<em>
+<a href="#operations.kubeblocks.io/v1alpha1.InstanceParticipant">
+[]InstanceParticipant
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Updated contains existing Active identities whose objects are changed by the operation.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>frozen</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Frozen indicates that Created, Deleted, and Updated are complete and must no longer be recomputed.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="operations.kubeblocks.io/v1alpha1.InstanceReplicasTemplate">InstanceReplicasTemplate
 </h3>
 <p>
@@ -2259,6 +2448,22 @@ PreCheckResult
 <td>
 <em>(Optional)</em>
 <p>Describes the progress details of objects or actions associated with the Component.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>instanceParticipants</code><br/>
+<em>
+<a href="#operations.kubeblocks.io/v1alpha1.InstanceParticipantSnapshot">
+[]InstanceParticipantSnapshot
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>InstanceParticipants freezes the instances involved in this operation for each workload.
+The source view is captured before the operation changes the Cluster spec. Created, deleted,
+and updated instances are immutable once Frozen is true.</p>
 </td>
 </tr>
 <tr>

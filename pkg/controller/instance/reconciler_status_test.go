@@ -24,6 +24,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -32,21 +33,45 @@ import (
 
 func TestStatusReconcilerPublishesInstanceCurrentState(t *testing.T) {
 	tests := []struct {
-		name                string
-		pod                 *corev1.Pod
-		want                workloads.InstanceCurrentState
-		wantCurrentRevision string
+		name                 string
+		pod                  *corev1.Pod
+		want                 workloads.InstanceCurrentState
+		wantCurrentRevision  string
+		wantReady            bool
+		wantAvailable        bool
+		wantFailure          bool
+		wantReadyMessage     string
+		wantAvailableMessage string
 	}{
-		{name: "absent", want: workloads.InstanceCurrentStateAbsent},
-		{name: "present", pod: &corev1.Pod{}, want: workloads.InstanceCurrentStatePresent},
 		{
-			name: "terminating",
-			pod: &corev1.Pod{ObjectMeta: metav1.ObjectMeta{
-				DeletionTimestamp: &metav1.Time{Time: metav1.Now().Time},
-				Labels:            map[string]string{appsv1.ControllerRevisionHashLabelKey: "current"},
-			}},
-			want:                workloads.InstanceCurrentStateTerminating,
-			wantCurrentRevision: "current",
+			name: "absent", want: workloads.InstanceCurrentStateAbsent,
+			wantReadyMessage: "demo-0", wantAvailableMessage: "demo-0",
+		},
+		{
+			name:                 "terminating",
+			pod:                  terminatingPod("current"),
+			want:                 workloads.InstanceCurrentStateTerminating,
+			wantCurrentRevision:  "current",
+			wantReadyMessage:     "demo-0",
+			wantAvailableMessage: "demo-0",
+		},
+		{
+			name: "present but not ready",
+			pod:  currentPod("current", corev1.PodRunning),
+			want: workloads.InstanceCurrentStatePresent, wantCurrentRevision: "current",
+			wantReadyMessage: "demo-0",
+		},
+		{
+			name: "present ready and available",
+			pod:  readyPod("current"),
+			want: workloads.InstanceCurrentStatePresent, wantCurrentRevision: "current",
+			wantReady: true, wantAvailable: true,
+		},
+		{
+			name: "present failed",
+			pod:  currentPod("current", corev1.PodFailed),
+			want: workloads.InstanceCurrentStatePresent, wantCurrentRevision: "current",
+			wantFailure: true, wantReadyMessage: "demo-0",
 		},
 	}
 	for _, tt := range tests {
@@ -55,12 +80,19 @@ func TestStatusReconcilerPublishesInstanceCurrentState(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "demo-0", Namespace: "default", Generation: 1},
 				Status: workloads.InstanceStatus2{
 					CurrentRevision: "stale",
+					UpdateRevision:  "target",
 					UpToDate:        true,
 					Ready:           true,
 					Available:       true,
 					Role:            "leader",
 					VolumeExpansion: true,
 					Configs:         []workloads.InstanceConfigStatus{{Name: "stale"}},
+					Conditions: []metav1.Condition{
+						{Type: string(workloads.InstanceReady), Status: metav1.ConditionTrue, Reason: workloads.ReasonReady},
+						{Type: string(workloads.InstanceAvailable), Status: metav1.ConditionTrue, Reason: workloads.ReasonAvailable},
+						{Type: string(workloads.InstanceFailure), Status: metav1.ConditionTrue, Reason: workloads.ReasonInstanceFailure},
+						{Type: string(workloads.InstanceUpdateRestricted), Status: metav1.ConditionTrue, Reason: workloads.ReasonInstanceUpdateRestricted},
+					},
 				},
 			}
 			tree := kubebuilderx.NewObjectTree()
@@ -81,9 +113,54 @@ func TestStatusReconcilerPublishesInstanceCurrentState(t *testing.T) {
 			if inst.Status.CurrentRevision != tt.wantCurrentRevision {
 				t.Fatalf("expected current revision %q, got %#v", tt.wantCurrentRevision, inst.Status)
 			}
-			if tt.want != workloads.InstanceCurrentStatePresent && (inst.Status.UpToDate || inst.Status.Ready || inst.Status.Available || inst.Status.Role != "" || inst.Status.VolumeExpansion || inst.Status.Configs != nil) {
-				t.Fatalf("non-Present instance retained current runtime fields: %#v", inst.Status)
+			if inst.Status.Ready != tt.wantReady || inst.Status.Available != tt.wantAvailable {
+				t.Fatalf("unexpected ready/available status: %#v", inst.Status)
+			}
+			if inst.Status.UpToDate || inst.Status.Role != "" || inst.Status.VolumeExpansion || inst.Status.Configs != nil {
+				t.Fatalf("instance retained stale runtime fields: %#v", inst.Status)
+			}
+			assertCondition(t, inst, workloads.InstanceReady, tt.wantReady, tt.wantReadyMessage)
+			assertCondition(t, inst, workloads.InstanceAvailable, tt.wantAvailable, tt.wantAvailableMessage)
+			if meta.IsStatusConditionTrue(inst.Status.Conditions, string(workloads.InstanceFailure)) != tt.wantFailure {
+				t.Fatalf("unexpected failure condition: %#v", inst.Status.Conditions)
+			}
+			if !meta.IsStatusConditionTrue(inst.Status.Conditions, string(workloads.InstanceUpdateRestricted)) {
+				t.Fatalf("status reconciliation removed an independently owned condition: %#v", inst.Status.Conditions)
 			}
 		})
+	}
+}
+
+func currentPod(revision string, phase corev1.PodPhase) *corev1.Pod {
+	return &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{appsv1.ControllerRevisionHashLabelKey: revision}},
+		Status:     corev1.PodStatus{Phase: phase},
+	}
+}
+
+func terminatingPod(revision string) *corev1.Pod {
+	pod := currentPod(revision, corev1.PodRunning)
+	pod.DeletionTimestamp = &metav1.Time{Time: metav1.Now().Time}
+	return pod
+}
+
+func readyPod(revision string) *corev1.Pod {
+	pod := currentPod(revision, corev1.PodRunning)
+	pod.Status.Conditions = []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}}
+	return pod
+}
+
+func assertCondition(t *testing.T, inst *workloads.Instance, conditionType workloads.ConditionType, expected bool, message string) {
+	t.Helper()
+	condition := meta.FindStatusCondition(inst.Status.Conditions, string(conditionType))
+	if condition == nil {
+		t.Fatalf("condition %q not found: %#v", conditionType, inst.Status.Conditions)
+	}
+	wantStatus := metav1.ConditionFalse
+	if expected {
+		wantStatus = metav1.ConditionTrue
+	}
+	if condition.Status != wantStatus || condition.Message != message || condition.ObservedGeneration != inst.Generation {
+		t.Fatalf("unexpected condition %q: %#v", conditionType, condition)
 	}
 }

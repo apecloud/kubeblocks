@@ -27,15 +27,15 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 )
 
-func TestBuildDesiredAndCurrentDimensions(t *testing.T) {
-	result, err := Build(BuildInput{
-		Active: []Allocation{
-			{PodName: "demo-0", TemplateName: ""},
-			{PodName: "demo-fast-0", TemplateName: "fast"},
-			{PodName: "demo-2", TemplateName: "flat"},
+func TestBuildDesiredAndObservedDimensions(t *testing.T) {
+	result, err := Build(Input{
+		Active: []TemplateAssignment{
+			{InstanceName: "demo-0", TemplateName: ""},
+			{InstanceName: "demo-fast-0", TemplateName: "fast"},
+			{InstanceName: "demo-2", TemplateName: "flat"},
 		},
 		UpdateRevisions: map[string]string{"demo-0": "r2", "demo-fast-0": "r2", "demo-2": "r2"},
-		Current: []CurrentObservation{
+		Observations: []Observation{
 			{
 				InstanceName: "demo-0", State: workloads.InstanceCurrentStatePresent, CurrentRevision: "r1",
 				Ready: true, Available: true, UpToDate: false, Role: "leader",
@@ -49,20 +49,20 @@ func TestBuildDesiredAndCurrentDimensions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(result.Statuses) != 3 {
-		t.Fatalf("expected 3 statuses, got %#v", result.Statuses)
+	if len(result) != 3 {
+		t.Fatalf("expected 3 statuses, got %#v", result)
 	}
-	assertStatus(t, result.Statuses[0], "demo-0", "", workloads.InstanceDesiredStateActive, workloads.InstanceCurrentStatePresent)
-	if result.Statuses[0].CurrentRevision != "r1" || result.Statuses[0].UpdateRevision != "r2" || result.Statuses[0].UpToDate || !result.Statuses[0].Ready || !result.Statuses[0].Available {
-		t.Fatalf("unexpected present status: %#v", result.Statuses[0])
+	assertStatus(t, result[0], "demo-0", "", workloads.InstanceDesiredStateActive, workloads.InstanceCurrentStatePresent)
+	if result[0].CurrentRevision != "r1" || result[0].UpdateRevision != "r2" || result[0].UpToDate || !result[0].Ready || !result[0].Available {
+		t.Fatalf("unexpected present status: %#v", result[0])
 	}
-	assertStatus(t, result.Statuses[1], "demo-2", "flat", workloads.InstanceDesiredStateActive, workloads.InstanceCurrentStateAbsent)
-	if result.Statuses[1].UpdateRevision != "r2" || result.Statuses[1].CurrentRevision != "" || result.Statuses[1].Ready {
-		t.Fatalf("unexpected absent status: %#v", result.Statuses[1])
+	assertStatus(t, result[1], "demo-2", "flat", workloads.InstanceDesiredStateActive, workloads.InstanceCurrentStateAbsent)
+	if result[1].UpdateRevision != "r2" || result[1].CurrentRevision != "" || result[1].Ready {
+		t.Fatalf("unexpected absent status: %#v", result[1])
 	}
-	assertStatus(t, result.Statuses[2], "demo-fast-0", "fast", workloads.InstanceDesiredStateActive, workloads.InstanceCurrentStatePresent)
-	if !result.Statuses[2].UpToDate {
-		t.Fatalf("expected the observed instance to be up to date: %#v", result.Statuses[2])
+	assertStatus(t, result[2], "demo-fast-0", "fast", workloads.InstanceDesiredStateActive, workloads.InstanceCurrentStatePresent)
+	if !result[2].UpToDate {
+		t.Fatalf("expected the observed instance to be up to date: %#v", result[2])
 	}
 }
 
@@ -80,10 +80,10 @@ func TestBuildOfflineLifecycleRetainsOnlyIdentityWhenAbsent(t *testing.T) {
 		Failed:          true,
 		Role:            "leader",
 	}}
-	result, err := Build(BuildInput{
+	result, err := Build(Input{
 		Previous: previous,
 		Offline:  []string{"demo-fast-0"},
-		Current: []CurrentObservation{{
+		Observations: []Observation{{
 			InstanceName: "demo-fast-0", State: workloads.InstanceCurrentStatePresent,
 			CurrentRevision: "current", UpToDate: true, Ready: true, Available: true, Failed: true, Role: "follower",
 		}},
@@ -91,17 +91,17 @@ func TestBuildOfflineLifecycleRetainsOnlyIdentityWhenAbsent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	status := result.Statuses[0]
+	status := result[0]
 	assertStatus(t, status, "demo-fast-0", "fast", workloads.InstanceDesiredStateOffline, workloads.InstanceCurrentStatePresent)
 	if status.UpdateRevision != "" || status.UpToDate || status.CurrentRevision != "current" || !status.Ready || !status.Available || !status.Failed || status.Role != "follower" {
 		t.Fatalf("unexpected Offline+Present status: %#v", status)
 	}
 
-	result, err = Build(BuildInput{Previous: result.Statuses, Offline: []string{"demo-fast-0"}})
+	result, err = Build(Input{Previous: result, Offline: []string{"demo-fast-0"}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	status = result.Statuses[0]
+	status = result[0]
 	assertStatus(t, status, "demo-fast-0", "fast", workloads.InstanceDesiredStateOffline, workloads.InstanceCurrentStateAbsent)
 	if status.CurrentRevision != "" || status.UpdateRevision != "" || status.UpToDate || status.Ready || status.Available || status.Failed || status.Role != "" {
 		t.Fatalf("Offline+Absent retained current fields: %#v", status)
@@ -110,9 +110,9 @@ func TestBuildOfflineLifecycleRetainsOnlyIdentityWhenAbsent(t *testing.T) {
 
 func TestBuildReleasedCleanupIsBounded(t *testing.T) {
 	previous := []workloads.InstanceStatus{{PodName: "demo-0", TemplateName: ptr.To("")}}
-	result, err := Build(BuildInput{
+	result, err := Build(Input{
 		Previous: previous,
-		Current: []CurrentObservation{{
+		Observations: []Observation{{
 			InstanceName: "demo-0", State: workloads.InstanceCurrentStateTerminating, CurrentRevision: "r1",
 			UpToDate: true, Ready: true, Available: true, Failed: true, Role: "old",
 		}},
@@ -120,7 +120,7 @@ func TestBuildReleasedCleanupIsBounded(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	status := result.Statuses[0]
+	status := result[0]
 	if status.DesiredState != workloads.InstanceDesiredStateReleased || status.CurrentState != workloads.InstanceCurrentStateTerminating || status.CurrentRevision != "r1" {
 		t.Fatalf("unexpected Released+Terminating status: %#v", status)
 	}
@@ -128,12 +128,12 @@ func TestBuildReleasedCleanupIsBounded(t *testing.T) {
 		t.Fatalf("terminating instance retained health or runtime fields: %#v", status)
 	}
 
-	result, err = Build(BuildInput{Previous: result.Statuses})
+	result, err = Build(Input{Previous: result})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(result.Statuses) != 0 {
-		t.Fatalf("Released+Absent history was not removed: %#v", result.Statuses)
+	if len(result) != 0 {
+		t.Fatalf("Released+Absent history was not removed: %#v", result)
 	}
 }
 
@@ -144,11 +144,11 @@ func TestBuildRecomputesCurrentFieldsForSameName(t *testing.T) {
 		UpToDate: true, Ready: true, Available: true, Failed: true, Role: "old-role",
 		Configs: []workloads.InstanceConfigStatus{{Name: "old"}}, VolumeExpansion: true,
 	}}
-	result, err := Build(BuildInput{
+	result, err := Build(Input{
 		Previous:        previous,
-		Active:          []Allocation{{PodName: "demo-0", TemplateName: ""}},
+		Active:          []TemplateAssignment{{InstanceName: "demo-0", TemplateName: ""}},
 		UpdateRevisions: map[string]string{"demo-0": "new-target"},
-		Current: []CurrentObservation{{
+		Observations: []Observation{{
 			InstanceName: "demo-0", State: workloads.InstanceCurrentStatePresent, CurrentRevision: "new",
 			Role: "new-role", Configs: []workloads.InstanceConfigStatus{{Name: "new"}},
 		}},
@@ -156,7 +156,7 @@ func TestBuildRecomputesCurrentFieldsForSameName(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	status := result.Statuses[0]
+	status := result[0]
 	if status.CurrentRevision != "new" || status.UpdateRevision != "new-target" || status.Role != "new-role" || len(status.Configs) != 1 || status.Configs[0].Name != "new" {
 		t.Fatalf("current fields were not recomputed: %#v", status)
 	}
@@ -166,17 +166,17 @@ func TestBuildRecomputesCurrentFieldsForSameName(t *testing.T) {
 }
 
 func TestBuildNormalizesAvailability(t *testing.T) {
-	result, err := Build(BuildInput{
-		Active: []Allocation{{PodName: "demo-0"}},
-		Current: []CurrentObservation{{
+	result, err := Build(Input{
+		Active: []TemplateAssignment{{InstanceName: "demo-0"}},
+		Observations: []Observation{{
 			InstanceName: "demo-0", State: workloads.InstanceCurrentStatePresent, Ready: false, Available: true,
 		}},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Statuses[0].Available {
-		t.Fatalf("Available must be false when Ready is false: %#v", result.Statuses[0])
+	if result[0].Available {
+		t.Fatalf("Available must be false when Ready is false: %#v", result[0])
 	}
 }
 
@@ -206,18 +206,18 @@ func TestBuildStateCombinations(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			input := BuildInput{
+			input := Input{
 				Previous:        []workloads.InstanceStatus{{PodName: "demo-0", TemplateName: ptr.To("template")}},
 				UpdateRevisions: map[string]string{"demo-0": "target"},
 			}
 			if test.active {
-				input.Active = []Allocation{{PodName: "demo-0", TemplateName: "template"}}
+				input.Active = []TemplateAssignment{{InstanceName: "demo-0", TemplateName: "template"}}
 			}
 			if test.offline {
 				input.Offline = []string{"demo-0"}
 			}
 			if test.current != workloads.InstanceCurrentStateAbsent {
-				input.Current = []CurrentObservation{{
+				input.Observations = []Observation{{
 					InstanceName: "demo-0", State: test.current, CurrentRevision: "current", UpToDate: true,
 					Ready: true, Available: true, Failed: true, Role: "leader",
 					Configs: []workloads.InstanceConfigStatus{{Name: "config"}}, VolumeExpansion: true,
@@ -228,13 +228,13 @@ func TestBuildStateCombinations(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if len(result.Statuses) != test.wantCount {
-				t.Fatalf("got %d statuses, want %d: %#v", len(result.Statuses), test.wantCount, result.Statuses)
+			if len(result) != test.wantCount {
+				t.Fatalf("got %d statuses, want %d: %#v", len(result), test.wantCount, result)
 			}
 			if test.wantCount == 0 {
 				return
 			}
-			status := result.Statuses[0]
+			status := result[0]
 			if status.DesiredState != test.wantDesired || status.CurrentState != test.current {
 				t.Fatalf("unexpected state pair: %#v", status)
 			}
@@ -256,14 +256,14 @@ func TestBuildStateCombinations(t *testing.T) {
 }
 
 func TestBuildRejectsInconsistentInputs(t *testing.T) {
-	tests := []BuildInput{
-		{Active: []Allocation{{PodName: "demo-0"}}, Offline: []string{"demo-0"}},
+	tests := []Input{
+		{Active: []TemplateAssignment{{InstanceName: "demo-0"}}, Offline: []string{"demo-0"}},
 		{Previous: []workloads.InstanceStatus{{PodName: "demo-0"}, {PodName: "demo-0"}}},
-		{Active: []Allocation{{PodName: "demo-0"}, {PodName: "demo-0"}}},
-		{Current: []CurrentObservation{{InstanceName: "demo-0", State: workloads.InstanceCurrentStateAbsent}}},
+		{Active: []TemplateAssignment{{InstanceName: "demo-0"}, {InstanceName: "demo-0"}}},
+		{Observations: []Observation{{InstanceName: "demo-0", State: workloads.InstanceCurrentStateAbsent}}},
 		{
 			Previous: []workloads.InstanceStatus{{PodName: "demo-0", TemplateName: ptr.To("a")}},
-			Offline:  []string{"demo-0"}, TemplateHints: []Allocation{{PodName: "demo-0", TemplateName: "b"}},
+			Offline:  []string{"demo-0"}, TemplateHints: []TemplateAssignment{{InstanceName: "demo-0", TemplateName: "b"}},
 		},
 	}
 	for i, input := range tests {
@@ -274,11 +274,11 @@ func TestBuildRejectsInconsistentInputs(t *testing.T) {
 }
 
 func TestBuildActiveAllocationOverridesStaleTemplateHints(t *testing.T) {
-	result, err := Build(BuildInput{
+	result, err := Build(Input{
 		Previous:      []workloads.InstanceStatus{{PodName: "demo-0", TemplateName: ptr.To("old")}},
-		Active:        []Allocation{{PodName: "demo-0", TemplateName: "new"}},
-		TemplateHints: []Allocation{{PodName: "demo-0", TemplateName: "old"}},
-		Current: []CurrentObservation{{
+		Active:        []TemplateAssignment{{InstanceName: "demo-0", TemplateName: "new"}},
+		TemplateHints: []TemplateAssignment{{InstanceName: "demo-0", TemplateName: "old"}},
+		Observations: []Observation{{
 			InstanceName: "demo-0",
 			State:        workloads.InstanceCurrentStatePresent,
 		}},
@@ -286,32 +286,32 @@ func TestBuildActiveAllocationOverridesStaleTemplateHints(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(result.Statuses) != 1 || result.Statuses[0].TemplateName == nil || *result.Statuses[0].TemplateName != "new" {
-		t.Fatalf("active allocation was overridden by a stale hint: %#v", result.Statuses)
+	if len(result) != 1 || result[0].TemplateName == nil || *result[0].TemplateName != "new" {
+		t.Fatalf("active allocation was overridden by a stale hint: %#v", result)
 	}
 }
 
 func TestBuildDoesNotInventUnknownHistoricalTemplate(t *testing.T) {
-	result, err := Build(BuildInput{Offline: []string{"historical-offline"}})
+	result, err := Build(Input{Offline: []string{"historical-offline"}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(result.Statuses) != 1 || result.Statuses[0].TemplateName != nil {
-		t.Fatalf("unknown template was invented as default: %#v", result.Statuses)
+	if len(result) != 1 || result[0].TemplateName != nil {
+		t.Fatalf("unknown template was invented as default: %#v", result)
 	}
 }
 
 func TestBuildNormalizesOfflineNamesAsASet(t *testing.T) {
-	result, err := Build(BuildInput{
+	result, err := Build(Input{
 		Offline: []string{"", "demo-0", "demo-0"},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(result.Statuses) != 1 {
-		t.Fatalf("expected one normalized Offline status, got %#v", result.Statuses)
+	if len(result) != 1 {
+		t.Fatalf("expected one normalized Offline status, got %#v", result)
 	}
-	status := result.Statuses[0]
+	status := result[0]
 	if status.PodName != "demo-0" || status.DesiredState != workloads.InstanceDesiredStateOffline || status.CurrentState != workloads.InstanceCurrentStateAbsent {
 		t.Fatalf("unexpected normalized Offline status: %#v", status)
 	}

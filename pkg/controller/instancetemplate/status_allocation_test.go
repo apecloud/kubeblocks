@@ -75,7 +75,7 @@ func TestBuildActiveAllocationsUsesFlatOrdinalAssignment(t *testing.T) {
 	}
 	got := map[string]string{}
 	for _, allocation := range allocations {
-		got[allocation.PodName] = allocation.TemplateName
+		got[allocation.InstanceName] = allocation.TemplateName
 	}
 	if len(got) != 2 || got["demo-0"] != "" || got["demo-2"] != "fast" {
 		t.Fatalf("flat ordinal mapping was guessed incorrectly: %#v", got)
@@ -92,7 +92,7 @@ func TestTemplateNameFromLabelsPrefersSystemLabel(t *testing.T) {
 	}
 }
 
-func TestHistoricalTemplateHintUsesExplicitFlatOrdinalRelation(t *testing.T) {
+func TestResolveHistoricalTemplateUsesExplicitFlatOrdinalRelation(t *testing.T) {
 	its := &workloads.InstanceSet{
 		ObjectMeta: metav1.ObjectMeta{Name: "demo"},
 		Spec: workloads.InstanceSetSpec{
@@ -100,7 +100,7 @@ func TestHistoricalTemplateHintUsesExplicitFlatOrdinalRelation(t *testing.T) {
 			Instances:           []workloads.InstanceTemplate{{Name: "fast", Ordinals: workloads.Ordinals{Discrete: []int32{7}}}},
 		},
 	}
-	templateName, ok, err := HistoricalTemplateHint(its, "demo-7", []string{"", "fast"})
+	templateName, ok, err := ResolveHistoricalTemplate(its, "demo-7", []string{"", "fast"})
 	if err != nil {
 		t.Fatal(err)
 	}

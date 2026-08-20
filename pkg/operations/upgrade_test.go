@@ -29,7 +29,6 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -329,11 +328,8 @@ var _ = Describe("Upgrade OpsRequest", func() {
 		It("Test upgrade OpsRequest when specified serviceVersion is empty", func() {
 			By("init operations resources")
 			compDef1, _, opsRes := initOpsResWithComponentDef(true)
-			By("make latest selection a semantic no-op before this operation")
-			Expect(testapps.ChangeObj(&testCtx, opsRes.Cluster, func(cluster *appsv1.Cluster) {
-				cluster.Spec.ComponentSpecs[0].ServiceVersion = ""
-			})).Should(Succeed())
 			generationBeforeUpgrade := opsRes.Cluster.Generation
+			Expect(opsRes.Cluster.Spec.ComponentSpecs[0].ServiceVersion).ShouldNot(BeEmpty())
 
 			By("create Upgrade Ops")
 			opsRes.OpsRequest = createUpgradeOpsRequest(opsRes.Cluster, opsv1alpha1.Upgrade{
@@ -353,8 +349,6 @@ var _ = Describe("Upgrade OpsRequest", func() {
 				g.Expect(cluster.Spec.ComponentSpecs[0].ComponentDef).Should(Equal(compDef1.Name))
 				g.Expect(cluster.Spec.ComponentSpecs[0].ServiceVersion).Should(BeEmpty())
 				g.Expect(cluster.Generation).Should(BeNumerically(">", generationBeforeUpgrade))
-				g.Expect(cluster.Spec.ComponentSpecs[0].Annotations[constant.UpgradeTriggerAnnotationKey]).
-					Should(Equal(string(opsRes.OpsRequest.UID)))
 			})).Should(Succeed())
 
 			By("looking forward to using the latest serviceVersion and releaseVersion")

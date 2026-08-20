@@ -25,6 +25,8 @@ import (
 	"strconv"
 	"strings"
 
+	"k8s.io/utils/ptr"
+
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 )
 
@@ -38,7 +40,7 @@ type TemplateAssignment struct {
 type Observation struct {
 	InstanceName    string
 	State           workloads.InstanceCurrentState
-	CurrentRevision string
+	Revision        string
 	UpToDate        bool
 	Ready           bool
 	Available       bool
@@ -50,12 +52,12 @@ type Observation struct {
 
 // Input contains the independently produced desired and observed dimensions used to build InstanceStatus.
 type Input struct {
-	Previous        []workloads.InstanceStatus
-	Active          []TemplateAssignment
-	Offline         []string
-	Observations    []Observation
-	TemplateHints   []TemplateAssignment
-	UpdateRevisions map[string]string
+	Previous           []workloads.InstanceStatus
+	DesiredAssignments []TemplateAssignment
+	Offline            []string
+	Observations       []Observation
+	TemplateHints      []TemplateAssignment
+	UpdateRevisions    map[string]string
 }
 
 // Build merges InstanceStatus by PodName. It carries only retained template identity from Previous;
@@ -65,26 +67,26 @@ func Build(input Input) ([]workloads.InstanceStatus, error) {
 	if err != nil {
 		return nil, err
 	}
-	activeByName, err := indexAssignments("active assignment", input.Active, true)
+	desiredByName, err := indexAssignments("desired assignment", input.DesiredAssignments, true)
 	if err != nil {
 		return nil, err
 	}
-	// Active allocation is authoritative. A current object may still carry the previous template while an identity
-	// is moving between templates, so hints for Active names must not veto the desired allocation.
-	nonActiveHints := make([]TemplateAssignment, 0, len(input.TemplateHints))
+	// The desired assignment is authoritative. An observed object may still carry the previous template while an
+	// identity is moving between templates, so its hint must not veto the desired assignment.
+	nonDesiredHints := make([]TemplateAssignment, 0, len(input.TemplateHints))
 	for _, hint := range input.TemplateHints {
-		if _, ok := activeByName[hint.InstanceName]; !ok {
-			nonActiveHints = append(nonActiveHints, hint)
+		if _, ok := desiredByName[hint.InstanceName]; !ok {
+			nonDesiredHints = append(nonDesiredHints, hint)
 		}
 	}
-	templateHintsByName, err := indexAssignments("template hint", nonActiveHints, false)
+	templateHintsByName, err := indexAssignments("template hint", nonDesiredHints, false)
 	if err != nil {
 		return nil, err
 	}
 	offlineNames := indexOfflineNames(input.Offline)
-	for name := range activeByName {
+	for name := range desiredByName {
 		if offlineNames[name] {
-			return nil, fmt.Errorf("instance %q is both Active and Offline", name)
+			return nil, fmt.Errorf("instance %q is both desired to run and Offline", name)
 		}
 	}
 
@@ -103,8 +105,8 @@ func Build(input Input) ([]workloads.InstanceStatus, error) {
 		observationsByName[observation.InstanceName] = observation
 	}
 
-	names := make(map[string]struct{}, len(activeByName)+len(offlineNames)+len(observationsByName))
-	for name := range activeByName {
+	names := make(map[string]struct{}, len(desiredByName)+len(offlineNames)+len(observationsByName))
+	for name := range desiredByName {
 		names[name] = struct{}{}
 	}
 	for name := range offlineNames {
@@ -122,13 +124,13 @@ func Build(input Input) ([]workloads.InstanceStatus, error) {
 		observation := observationsByName[name]
 		if observation != nil {
 			status.CurrentState = observation.State
-			status.CurrentRevision = observation.CurrentRevision
+			status.CurrentRevision = observation.Revision
 		}
 
 		switch {
-		case activeByName[name] != nil:
+		case desiredByName[name] != nil:
 			status.DesiredState = workloads.InstanceDesiredStateActive
-			status.TemplateName = stringPtr(*activeByName[name])
+			status.TemplateName = ptr.To(*desiredByName[name])
 			status.UpdateRevision = input.UpdateRevisions[name]
 		case offlineNames[name]:
 			status.DesiredState = workloads.InstanceDesiredStateOffline
@@ -197,7 +199,7 @@ func indexAssignments(kind string, assignments []TemplateAssignment, rejectDupli
 			}
 			continue
 		}
-		result[assignment.InstanceName] = stringPtr(assignment.TemplateName)
+		result[assignment.InstanceName] = ptr.To(assignment.TemplateName)
 	}
 	return result, nil
 }
@@ -215,10 +217,10 @@ func indexOfflineNames(names []string) map[string]bool {
 
 func retainedTemplateName(name string, previous map[string]*workloads.InstanceStatus, hints map[string]*string) *string {
 	if old := previous[name]; old != nil && old.TemplateName != nil {
-		return stringPtr(*old.TemplateName)
+		return ptr.To(*old.TemplateName)
 	}
 	if hint := hints[name]; hint != nil {
-		return stringPtr(*hint)
+		return ptr.To(*hint)
 	}
 	return nil
 }
@@ -230,10 +232,6 @@ func copyConfigs(configs []workloads.InstanceConfigStatus) []workloads.InstanceC
 	result := make([]workloads.InstanceConfigStatus, len(configs))
 	copy(result, configs)
 	return result
-}
-
-func stringPtr(value string) *string {
-	return &value
 }
 
 func sortStatuses(statuses []workloads.InstanceStatus) {

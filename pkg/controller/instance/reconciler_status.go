@@ -94,9 +94,14 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		inst.Status.CurrentRevision = inst.Status.UpdateRevision
 	}
 
-	meta.SetStatusCondition(&inst.Status.Conditions, *r.buildReadyCondition(inst, ready, notReadyName))
-	meta.SetStatusCondition(&inst.Status.Conditions, *r.buildAvailableCondition(inst, available, notAvailableName))
-	if failureCondition := r.buildFailureCondition(inst, pod); failureCondition != nil {
+	readyCondition := r.buildReadyCondition(inst, ready, notReadyName)
+	meta.SetStatusCondition(&inst.Status.Conditions, *readyCondition)
+
+	availableCondition := r.buildAvailableCondition(inst, available, notAvailableName)
+	meta.SetStatusCondition(&inst.Status.Conditions, *availableCondition)
+
+	failureCondition := r.buildFailureCondition(inst, pod)
+	if failureCondition != nil {
 		meta.SetStatusCondition(&inst.Status.Conditions, *failureCondition)
 	} else {
 		meta.RemoveStatusCondition(&inst.Status.Conditions, string(workloads.InstanceFailure))
@@ -105,9 +110,9 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	inst.Status.UpToDate = updated
 	inst.Status.Ready = ready
 	inst.Status.Available = available
-	inst.Status.Role = r.roleFromPod(inst, pod)
+	inst.Status.Role = r.observedRoleOfPod(inst, pod)
 	inst.Status.VolumeExpansion = r.hasRunningVolumeExpansion(tree, inst)
-	inst.Status.Configs = configStatusesForInstance(inst)
+	inst.Status.Configs = observedConfigsOfInstance(inst)
 
 	if inst.Spec.MinReadySeconds > 0 && !available {
 		return kubebuilderx.RetryAfter(time.Second), nil
@@ -117,9 +122,9 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 
 // An absent or terminating Pod cannot provide a valid runtime observation. Clear every Pod-derived field and
 // condition together so values from the previous Pod do not survive the lifecycle transition.
-func (r *statusReconciler) setPodUnavailableStatus(inst *workloads.Instance, state workloads.InstanceCurrentState, name, currentRevision string) {
+func (r *statusReconciler) setPodUnavailableStatus(inst *workloads.Instance, state workloads.InstanceCurrentState, name, revision string) {
 	inst.Status.CurrentState = state
-	inst.Status.CurrentRevision = currentRevision
+	inst.Status.CurrentRevision = revision
 	inst.Status.UpToDate = false
 	inst.Status.Ready = false
 	inst.Status.Available = false
@@ -187,7 +192,7 @@ func (r *statusReconciler) buildFailureCondition(inst *workloads.Instance, pod *
 	}
 }
 
-func (r *statusReconciler) roleFromPod(inst *workloads.Instance, pod *corev1.Pod) string {
+func (r *statusReconciler) observedRoleOfPod(inst *workloads.Instance, pod *corev1.Pod) string {
 	if inst.Spec.Roles != nil && intctrlutil.PodIsReadyWithLabel(*pod) {
 		roleMap := composeRoleMap(inst)
 		roleName := getRoleName(pod)
@@ -227,7 +232,7 @@ func (r *statusReconciler) hasRunningVolumeExpansion(tree *kubebuilderx.ObjectTr
 	return false
 }
 
-func configStatusesForInstance(inst *workloads.Instance) []workloads.InstanceConfigStatus {
+func observedConfigsOfInstance(inst *workloads.Instance) []workloads.InstanceConfigStatus {
 	if len(inst.Spec.Configs) == 0 {
 		return nil
 	}

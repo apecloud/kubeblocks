@@ -1095,8 +1095,8 @@ type LastComponentConfiguration struct {
 	// +optional
 	OfflineInstances []string `json:"offlineInstances,omitempty"`
 
-	// SourceInstanceAssignments records the InstanceSet-owned identity assignments that cannot be reconstructed
-	// from a flat-ordinal Component spec. It is populated only by operations that change the instance allocation.
+	// SourceInstanceAssignments records the InstanceSet-owned identity assignments before an operation changes
+	// the instance allocation.
 	//
 	// +optional
 	SourceInstanceAssignments []InstanceTemplateAssignment `json:"sourceInstanceAssignments,omitempty"`

@@ -71,7 +71,9 @@ func expectedTemplateReplicas(component *appsv1.ClusterComponentSpec) (map[strin
 	defaultReplicas := component.Replicas
 	for _, template := range component.Instances {
 		replicas := template.GetReplicas()
-		expected[template.Name] += replicas
+		if replicas > 0 {
+			expected[template.Name] += replicas
+		}
 		defaultReplicas -= replicas
 	}
 	if defaultReplicas < 0 {
@@ -141,7 +143,7 @@ func diffAssignments(source, target map[string]string) (created, deleted map[str
 	return created, deleted
 }
 
-func flatHorizontalDiffMatchesOperation(horizontalScaling opsv1alpha1.HorizontalScaling,
+func horizontalDiffMatchesOperation(horizontalScaling opsv1alpha1.HorizontalScaling,
 	created, deleted map[string]string) bool {
 	if horizontalScaling.ScaleOut == nil && len(created) > 0 {
 		return false
@@ -166,10 +168,16 @@ func flatHorizontalDiffMatchesOperation(horizontalScaling opsv1alpha1.Horizontal
 	return true
 }
 
-func captureFlatSourceAssignments(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource,
-	compOps componentOpsHelper, requiredOffline map[string]sets.Set[string]) error {
-	capture := func(logicalComponentName, fullComponentName string, component *appsv1.ClusterComponentSpec) error {
-		if component == nil || !component.FlatInstanceOrdinal {
+func captureSourceAssignments(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource,
+	compOps componentOpsHelper, requiredOffline map[string]sets.Set[string],
+	shouldCapture func(ComponentOpsInterface, *appsv1.ClusterComponentSpec) bool) error {
+	remainingOffline := map[string]sets.Set[string]{}
+	for componentName, names := range requiredOffline {
+		remainingOffline[componentName] = names.Clone()
+	}
+	capture := func(logicalComponentName, fullComponentName string, op ComponentOpsInterface,
+		component *appsv1.ClusterComponentSpec) error {
+		if component == nil || !shouldCapture(op, component) {
 			return nil
 		}
 		runtime, err := opsRes.GetRuntime(logicalComponentName)
@@ -203,14 +211,17 @@ func captureFlatSourceAssignments(reqCtx intctrlutil.RequestCtx, cli client.Clie
 				DesiredState: workloadsv1.InstanceDesiredStateActive,
 			})
 		}
-		if names := requiredOffline[logicalComponentName]; names.Len() > 0 {
+		if names := remainingOffline[logicalComponentName]; names.Len() > 0 {
 			byName, err := instanceStatusByName(workload.GetInstanceStatuses())
 			if err != nil {
 				return err
 			}
 			for name := range names {
 				status, ok := byName[name]
-				if !ok || status.EffectiveDesiredState() != workloadsv1.InstanceDesiredStateOffline || status.TemplateName == nil {
+				if !ok {
+					continue
+				}
+				if status.EffectiveDesiredState() != workloadsv1.InstanceDesiredStateOffline || status.TemplateName == nil {
 					return intctrlutil.NewErrorf(intctrlutil.ErrorTypeNeedWaiting,
 						"waiting for InstanceSet %q to publish offline instance %q and its template", workloadName, name)
 				}
@@ -218,6 +229,7 @@ func captureFlatSourceAssignments(reqCtx intctrlutil.RequestCtx, cli client.Clie
 					WorkloadName: workloadName, PodName: name, TemplateName: *status.TemplateName,
 					DesiredState: workloadsv1.InstanceDesiredStateOffline,
 				})
+				names.Delete(name)
 			}
 		}
 		sort.Slice(last.SourceInstanceAssignments, func(i, j int) bool {
@@ -233,10 +245,7 @@ func captureFlatSourceAssignments(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	for i := range opsRes.Cluster.Spec.ComponentSpecs {
 		component := &opsRes.Cluster.Spec.ComponentSpecs[i]
 		if op, ok := compOps.getComponentOps(component.Name); ok {
-			if horizontalScaling, ok := op.(opsv1alpha1.HorizontalScaling); ok && horizontalScaling.Shards != nil {
-				continue
-			}
-			if err := capture(component.Name, component.Name, component); err != nil {
+			if err := capture(component.Name, component.Name, op, component); err != nil {
 				return err
 			}
 		}
@@ -247,18 +256,22 @@ func captureFlatSourceAssignments(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		if !ok {
 			continue
 		}
-		if horizontalScaling, ok := op.(opsv1alpha1.HorizontalScaling); ok && horizontalScaling.Shards != nil {
-			continue
-		}
 		components, err := sharding.ListShardingComponents(reqCtx.Ctx, cli, opsRes.Cluster, shardingSpec.Name)
 		if err != nil {
 			return err
 		}
 		for _, component := range components {
 			fullName := component.Labels[constant.KBAppComponentLabelKey]
-			if err := capture(shardingSpec.Name, fullName, &shardingSpec.Template); err != nil {
+			if err := capture(shardingSpec.Name, fullName, op, &shardingSpec.Template); err != nil {
 				return err
 			}
+		}
+	}
+	for componentName, names := range remainingOffline {
+		if names.Len() > 0 {
+			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeNeedWaiting,
+				"waiting for InstanceSet to publish offline instances %v of component %q and their templates",
+				sets.List(names), componentName)
 		}
 	}
 	return nil

@@ -66,9 +66,16 @@ func TestActiveAssignmentsMatchComponent(t *testing.T) {
 	if assignmentsMatchComponent(map[string]string{"demo-0": "", "demo-1": "big", "demo-2": "big"}, component) {
 		t.Fatal("template distribution mismatch must not be accepted")
 	}
+	component = &appsv1.ClusterComponentSpec{
+		Replicas:  2,
+		Instances: []appsv1.InstanceTemplate{{Name: "big", Replicas: pointer.Int32(0)}},
+	}
+	if !assignmentsMatchComponent(map[string]string{"demo-0": "", "demo-1": ""}, component) {
+		t.Fatal("zero-replica templates must not require an allocation")
+	}
 }
 
-func TestFlatHorizontalDiff(t *testing.T) {
+func TestHorizontalDiff(t *testing.T) {
 	source := map[string]string{"demo-0": "", "demo-1": "big"}
 	target := map[string]string{"demo-0": "", "demo-2": "big"}
 	created, deleted := diffAssignments(source, target)
@@ -79,14 +86,14 @@ func TestFlatHorizontalDiff(t *testing.T) {
 		ScaleOut: &opsv1alpha1.ScaleOut{OfflineInstancesToOnline: []string{"demo-2"}},
 		ScaleIn:  &opsv1alpha1.ScaleIn{OnlineInstancesToOffline: []string{"demo-1"}},
 	}
-	if !flatHorizontalDiffMatchesOperation(horizontalScaling, created, deleted) {
+	if !horizontalDiffMatchesOperation(horizontalScaling, created, deleted) {
 		t.Fatal("expected explicit online/offline transition to match diff")
 	}
 	horizontalScaling.ScaleOut.OfflineInstancesToOnline = []string{"demo-3"}
-	if flatHorizontalDiffMatchesOperation(horizontalScaling, created, deleted) {
+	if horizontalDiffMatchesOperation(horizontalScaling, created, deleted) {
 		t.Fatal("stale allocation must not satisfy an explicit identity transition")
 	}
-	if flatHorizontalDiffMatchesOperation(opsv1alpha1.HorizontalScaling{ScaleOut: &opsv1alpha1.ScaleOut{}}, created, deleted) {
+	if horizontalDiffMatchesOperation(opsv1alpha1.HorizontalScaling{ScaleOut: &opsv1alpha1.ScaleOut{}}, created, deleted) {
 		t.Fatal("scale-out-only operation must not accept an unexpected deletion")
 	}
 }

@@ -5351,8 +5351,8 @@ spec:
                           type: integer
                         sourceInstanceAssignments:
                           description: |-
-                            SourceInstanceAssignments records the InstanceSet-owned identity assignments that cannot be reconstructed
-                            from a flat-ordinal Component spec. It is populated only by operations that change the instance allocation.
+                            SourceInstanceAssignments records the InstanceSet-owned identity assignments before an operation changes
+                            the instance allocation.
                           items:
                             description: InstanceTemplateAssignment identifies an
                               InstanceSet-assigned instance and its template at the

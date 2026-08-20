@@ -1643,8 +1643,8 @@ Kubernetes core/v1.ResourceRequirements
 </td>
 <td>
 <em>(Optional)</em>
-<p>SourceInstanceAssignments records the InstanceSet-owned identity assignments that cannot be reconstructed
-from a flat-ordinal Component spec. It is populated only by operations that change the instance allocation.</p>
+<p>SourceInstanceAssignments records the InstanceSet-owned identity assignments before an operation changes
+the instance allocation.</p>
 </td>
 </tr>
 <tr>

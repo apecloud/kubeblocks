@@ -199,7 +199,10 @@ func (r rebuildInstanceOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.Requ
 	if len(allocating) == 0 {
 		return nil
 	}
-	return captureFlatSourceAssignments(reqCtx, cli, opsRes, newComponentOpsHelper(allocating), nil)
+	return captureSourceAssignments(reqCtx, cli, opsRes, newComponentOpsHelper(allocating), nil,
+		func(_ ComponentOpsInterface, component *appsv1.ClusterComponentSpec) bool {
+			return component.FlatInstanceOrdinal
+		})
 }
 
 func (r rebuildInstanceOpsHandler) getInstanceProgressDetail(compStatus opsv1alpha1.OpsRequestComponentStatus, instance string) opsv1alpha1.ProgressStatusDetail {

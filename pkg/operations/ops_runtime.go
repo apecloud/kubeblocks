@@ -118,7 +118,6 @@ func (r *opsRuntime) GetWorkload(namespace, clusterName, compName string) (Workl
 		workload.notReadySet = instanceset.GetPodNameSetFromInstanceSetCondition(its, workloads.InstanceReady)
 		workload.notAvailableSet = instanceset.GetPodNameSetFromInstanceSetCondition(its, workloads.InstanceAvailable)
 		workload.failedSet = instanceset.GetPodNameSetFromInstanceSetCondition(its, workloads.InstanceFailure)
-		workload.useInstanceStatus = its.Spec.FlatInstanceOrdinal || hasRicherInstanceStatus(its.Status.InstanceStatus)
 		workload.instanceStatuses = make([]workloads.InstanceStatus, len(its.Status.InstanceStatus))
 		for i := range its.Status.InstanceStatus {
 			its.Status.InstanceStatus[i].DeepCopyInto(&workload.instanceStatuses[i])
@@ -152,18 +151,6 @@ func (r *opsRuntime) GetWorkload(namespace, clusterName, compName string) (Workl
 		}
 	}
 	return workload, nil
-}
-
-func hasRicherInstanceStatus(statuses []workloads.InstanceStatus) bool {
-	if len(statuses) == 0 {
-		return false
-	}
-	for _, status := range statuses {
-		if status.DesiredState == "" || status.CurrentState == "" {
-			return false
-		}
-	}
-	return true
 }
 
 func (r *opsRuntime) GetInstance(namespace, clusterName, compName, instanceName string) (Instance, error) {
@@ -366,7 +353,6 @@ func (r *opsRuntime) dataContext() context.Context {
 
 type defaultWorkload struct {
 	minReadySeconds    int32
-	useInstanceStatus  bool
 	instanceStatuses   []workloads.InstanceStatus
 	currentRevisionMap map[string]string
 	notReadySet        sets.Set[string]
@@ -376,8 +362,6 @@ type defaultWorkload struct {
 }
 
 func (w *defaultWorkload) GetMinReadySeconds() int32 { return w.minReadySeconds }
-
-func (w *defaultWorkload) UseInstanceStatus() bool { return w.useInstanceStatus }
 
 func (w *defaultWorkload) GetInstanceStatuses() []workloads.InstanceStatus {
 	result := make([]workloads.InstanceStatus, len(w.instanceStatuses))

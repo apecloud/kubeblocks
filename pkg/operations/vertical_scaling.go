@@ -124,47 +124,24 @@ func (vs verticalScalingHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, 
 				insVS := vsInsMap[template.Name]
 				if vs.verticalScalingInsTemplate(verticalScaling, template, insVS) {
 					updatedTemplates[template.Name] = struct{}{}
-					if !workload.UseInstanceStatus() {
-						templatePodNames, err := runtime.GenerateTemplateInstanceNames(
-							opsRes.Cluster.Name, pgRes.fullComponentName, template.Name, replicas, pgRes.clusterComponent.OfflineInstances, template.Ordinals)
-						if err != nil {
-							return 0, 0, err
-						}
-						for _, podName := range templatePodNames {
-							updatedPodSet[podName] = template.Name
-						}
-					}
 				}
 				templateReplicasCnt += replicas
 			}
 			if vs.verticalScalingComp(verticalScaling) && templateReplicasCnt < pgRes.clusterComponent.Replicas {
 				updatedTemplates[""] = struct{}{}
-				if !workload.UseInstanceStatus() {
-					podNames, err := runtime.GenerateTemplateInstanceNames(
-						opsRes.Cluster.Name, pgRes.fullComponentName, "", pgRes.clusterComponent.Replicas-templateReplicasCnt,
-						pgRes.clusterComponent.OfflineInstances, appsv1.Ordinals{})
-					if err != nil {
-						return 0, 0, err
-					}
-					for _, podName := range podNames {
-						updatedPodSet[podName] = ""
-					}
-				}
 			} else {
 				pgRes.noWaitComponentCompleted = true
 			}
-			if workload.UseInstanceStatus() {
-				allActive, complete, err := activeAssignmentsForTarget(workload, pgRes.clusterComponent)
-				if err != nil {
-					return 0, 0, err
-				}
-				if !complete {
-					return 1, 0, nil
-				}
-				for podName, templateName := range allActive {
-					if _, ok := updatedTemplates[templateName]; ok {
-						updatedPodSet[podName] = templateName
-					}
+			allActive, complete, err := activeAssignmentsForTarget(workload, pgRes.clusterComponent)
+			if err != nil {
+				return 0, 0, err
+			}
+			if !complete {
+				return 1, 0, nil
+			}
+			for podName, templateName := range allActive {
+				if _, ok := updatedTemplates[templateName]; ok {
+					updatedPodSet[podName] = templateName
 				}
 			}
 			pgRes.updatedPodSet = updatedPodSet

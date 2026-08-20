@@ -125,22 +125,14 @@ func (stop StopOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 		if err != nil {
 			return 0, 0, err
 		}
-		if workload.UseInstanceStatus() {
-			explicitOffline := sets.New(pgRes.clusterComponent.OfflineInstances...)
-			pgRes.deletedPodSet, err = statusesToPodSet(workload.GetInstanceStatuses(), workloads.InstanceDesiredStateOffline,
-				func(status workloads.InstanceStatus) bool { return !explicitOffline.Has(status.PodName) }, false)
-			if err != nil {
-				return 0, 0, err
-			}
-			if int32(len(pgRes.deletedPodSet)) != pgRes.clusterComponent.Replicas {
-				return 1, 0, nil
-			}
-		} else {
-			pgRes.deletedPodSet, err = runtime.GenerateInstanceNameSet(opsRes.Cluster.Name, pgRes.fullComponentName,
-				pgRes.clusterComponent.Replicas, pgRes.clusterComponent.Instances, pgRes.clusterComponent.OfflineInstances)
-			if err != nil {
-				return 0, 0, err
-			}
+		explicitOffline := sets.New(pgRes.clusterComponent.OfflineInstances...)
+		pgRes.deletedPodSet, err = statusesToPodSet(workload.GetInstanceStatuses(), workloads.InstanceDesiredStateOffline,
+			func(status workloads.InstanceStatus) bool { return !explicitOffline.Has(status.PodName) }, false)
+		if err != nil {
+			return 0, 0, err
+		}
+		if int32(len(pgRes.deletedPodSet)) != pgRes.clusterComponent.Replicas {
+			return 1, 0, nil
 		}
 		return handleComponentProgressForScalingReplicas(reqCtx, cli, opsRes, pgRes, compStatus)
 	}

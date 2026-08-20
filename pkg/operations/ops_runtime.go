@@ -118,6 +118,10 @@ func (r *opsRuntime) GetWorkload(namespace, clusterName, compName string) (Workl
 		workload.notReadySet = instanceset.GetPodNameSetFromInstanceSetCondition(its, workloads.InstanceReady)
 		workload.notAvailableSet = instanceset.GetPodNameSetFromInstanceSetCondition(its, workloads.InstanceAvailable)
 		workload.failedSet = instanceset.GetPodNameSetFromInstanceSetCondition(its, workloads.InstanceFailure)
+		workload.instanceStatuses = make([]workloads.InstanceStatus, len(its.Status.InstanceStatus))
+		for i := range its.Status.InstanceStatus {
+			its.Status.InstanceStatus[i].DeepCopyInto(&workload.instanceStatuses[i])
+		}
 		return workload, nil
 	}
 	pods, err := component.ListOwnedPods(r.dataContext(), r.cli, namespace, clusterName, compName, r.dataListOpts...)
@@ -349,6 +353,7 @@ func (r *opsRuntime) dataContext() context.Context {
 
 type defaultWorkload struct {
 	minReadySeconds    int32
+	instanceStatuses   []workloads.InstanceStatus
 	currentRevisionMap map[string]string
 	notReadySet        sets.Set[string]
 	notAvailableSet    sets.Set[string]
@@ -357,6 +362,14 @@ type defaultWorkload struct {
 }
 
 func (w *defaultWorkload) GetMinReadySeconds() int32 { return w.minReadySeconds }
+
+func (w *defaultWorkload) GetInstanceStatuses() []workloads.InstanceStatus {
+	result := make([]workloads.InstanceStatus, len(w.instanceStatuses))
+	for i := range w.instanceStatuses {
+		w.instanceStatuses[i].DeepCopyInto(&result[i])
+	}
+	return result
+}
 
 func (w *defaultWorkload) GetCurrentRevisionMap() map[string]string { return w.currentRevisionMap }
 

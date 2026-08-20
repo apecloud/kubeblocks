@@ -68,6 +68,7 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 		// namespaced
 		testapps.ClearResources(&testCtx, generics.OpsRequestSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.InstanceSetSignature, true, inNS, ml)
 	}
 
 	BeforeEach(cleanEnv)
@@ -109,6 +110,8 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 					cluster.Spec.ComponentSpecs[0].Instances = instances
 				})).Should(Succeed())
 			}
+			testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
+			testapps.MockInstanceSetStatus(testCtx, opsRes.Cluster, defaultCompName)
 			By("create VerticalScaling ops")
 			ops := testops.NewOpsRequestObj("vertical-scaling-ops-"+testCtx.GetRandomStr(), testCtx.DefaultNamespace,
 				clusterName, opsv1alpha1.VerticalScalingType)

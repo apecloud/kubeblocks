@@ -99,10 +99,17 @@ func (start StartOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli 
 		if err != nil {
 			return 0, 0, err
 		}
-		pgRes.createdPodSet, err = runtime.GenerateInstanceNameSet(opsRes.Cluster.Name, pgRes.fullComponentName,
-			pgRes.clusterComponent.Replicas, pgRes.clusterComponent.Instances, pgRes.clusterComponent.OfflineInstances)
+		workload, err := runtime.GetWorkload(opsRes.Cluster.Namespace, opsRes.Cluster.Name, pgRes.fullComponentName)
 		if err != nil {
 			return 0, 0, err
+		}
+		var complete bool
+		pgRes.createdPodSet, complete, err = activeAssignmentsForTarget(workload, pgRes.clusterComponent)
+		if err != nil {
+			return 0, 0, err
+		}
+		if !complete {
+			return 1, 0, nil
 		}
 		return handleComponentProgressForScalingReplicas(reqCtx, cli, opsRes, pgRes, compStatus)
 	}

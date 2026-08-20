@@ -24,6 +24,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
 )
 
 // OpsRequestSpec defines the desired state of OpsRequest
@@ -1094,6 +1095,12 @@ type LastComponentConfiguration struct {
 	// +optional
 	OfflineInstances []string `json:"offlineInstances,omitempty"`
 
+	// SourceInstanceAssignments records the InstanceSet-owned identity assignments before an operation changes
+	// the instance allocation.
+	//
+	// +optional
+	SourceInstanceAssignments []InstanceTemplateAssignment `json:"sourceInstanceAssignments,omitempty"`
+
 	// Records the version of the Service expected to be provisioned by this Component prior to any changes.
 	// +optional
 	ServiceVersion string `json:"serviceVersion,omitempty"`
@@ -1101,6 +1108,27 @@ type LastComponentConfiguration struct {
 	// Records the name of the ComponentDefinition prior to any changes.
 	// +optional
 	ComponentDefinitionName string `json:"componentDefinitionName,omitempty"`
+}
+
+// InstanceTemplateAssignment identifies an InstanceSet-assigned instance and its template at the start of an operation.
+type InstanceTemplateAssignment struct {
+	// WorkloadName is the name of the InstanceSet that owns the instance.
+	// +kubebuilder:validation:Required
+	WorkloadName string `json:"workloadName"`
+
+	// PodName is the stable instance identity allocated by the InstanceSet.
+	// +kubebuilder:validation:Required
+	PodName string `json:"podName"`
+
+	// TemplateName is the assigned instance template. An empty string identifies the default template.
+	// +kubebuilder:validation:Required
+	TemplateName string `json:"templateName"`
+
+	// DesiredState is the allocation state observed when the operation captured the assignment.
+	// Only Active and explicitly referenced Offline identities are recorded.
+	// +kubebuilder:validation:Enum=Active;Offline
+	// +kubebuilder:validation:Required
+	DesiredState workloadsv1.InstanceDesiredState `json:"desiredState"`
 }
 
 type LastConfiguration struct {

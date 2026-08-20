@@ -24,11 +24,13 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -119,16 +121,20 @@ func (stop StopOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 		if err != nil {
 			return 0, 0, err
 		}
-		pgRes.deletedPodSet, err = runtime.GenerateInstanceNameSet(opsRes.Cluster.Name, pgRes.fullComponentName,
-			pgRes.clusterComponent.Replicas, pgRes.clusterComponent.Instances, pgRes.clusterComponent.OfflineInstances)
+		workload, err := runtime.GetWorkload(opsRes.Cluster.Namespace, opsRes.Cluster.Name, pgRes.fullComponentName)
 		if err != nil {
 			return 0, 0, err
 		}
-		expectProgressCount, completedCount, err := handleComponentProgressForScalingReplicas(reqCtx, cli, opsRes, pgRes, compStatus)
+		explicitOffline := sets.New(pgRes.clusterComponent.OfflineInstances...)
+		pgRes.deletedPodSet, err = statusesToPodSet(workload.GetInstanceStatuses(), workloads.InstanceDesiredStateOffline,
+			func(status workloads.InstanceStatus) bool { return !explicitOffline.Has(status.PodName) }, false)
 		if err != nil {
-			return expectProgressCount, completedCount, err
+			return 0, 0, err
 		}
-		return expectProgressCount, completedCount, nil
+		if int32(len(pgRes.deletedPodSet)) != pgRes.clusterComponent.Replicas {
+			return 1, 0, nil
+		}
+		return handleComponentProgressForScalingReplicas(reqCtx, cli, opsRes, pgRes, compStatus)
 	}
 	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.StopList)
 	return compOpsHelper.reconcileActionWithComponentOps(reqCtx, cli, opsRes, "stop", handleComponentProgress)

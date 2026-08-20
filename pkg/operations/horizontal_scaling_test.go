@@ -123,6 +123,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 				})).Should(Succeed())
 			}
 			pods := testapps.MockInstanceSetPods(&testCtx, its, opsRes.Cluster, defaultCompName)
+			testapps.MockInstanceSetStatus(testCtx, opsRes.Cluster, defaultCompName)
 			By("create opsRequest for horizontal scaling of consensus component")
 			initClusterAnnotationAndPhaseForOps(opsRes)
 			horizontalScaling.ComponentName = defaultCompName
@@ -170,6 +171,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 
 			By("Test OpsManager.Reconcile function when horizontal scaling OpsRequest is Running")
 			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsRunningPhase
+			testapps.MockInstanceSetStatus(testCtx, opsRes.Cluster, defaultCompName)
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 			return opsRes, pods
@@ -179,6 +181,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			By("expect for opsRequest phase is Succeed after pods has been scaled and component phase is Running")
 			// mock consensus component is Running
 			mockConsensusCompToRunning(opsRes)
+			testapps.MockInstanceSetStatus(testCtx, opsRes.Cluster, defaultCompName)
 			_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(opsv1alpha1.OpsSucceedPhase))
@@ -221,7 +224,9 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
 			opsRes, podList := commonHScaleConsensusCompTest(reqCtx, changeClusterSpec, horizontalScaling, false, false)
 			mockHScale(podList)
-			testapps.MockInstanceSetStatus(testCtx, opsRes.Cluster, defaultCompName)
+			if horizontalScaling.Shards == nil {
+				testapps.MockInstanceSetStatus(testCtx, opsRes.Cluster, defaultCompName)
+			}
 			checkOpsRequestPhaseIsSucceed(reqCtx, opsRes)
 		}
 
@@ -585,6 +590,9 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			// set ops phase to Pending
 			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsPendingPhase
 			mockComponentIsOperating(opsRes.Cluster, appsv1.UpdatingComponentPhase, defaultCompName)
+			if horizontalScaling.Shards == nil {
+				testapps.MockInstanceSetStatus(testCtx, opsRes.Cluster, defaultCompName)
+			}
 
 			By("expect for opsRequest phase is Creating after doing action")
 			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
@@ -685,7 +693,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("2/2"))
 		})
 
-		It("test run multi horizontalScaling opsRequest with force flag", func() {
+		It("a new horizontalScaling request supersedes an earlier request for the same component", func() {
 			By("init operations resources with CLusterDefinition/Hybrid components Cluster/consensus Pods")
 			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
 			testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
@@ -702,7 +710,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			}, false)
 			Expect(opsRes.Cluster.Spec.GetComponentByName(defaultCompName).Replicas).Should(BeEquivalentTo(5))
 
-			By("create third opsRequest to offline a pod which is created by another running opsRequest and expect it to fail")
+			By("create third opsRequest to offline an instance allocated by the current InstanceSet")
 			offlineInsName := fmt.Sprintf("%s-%s-3", clusterName, defaultCompName)
 			_ = createOpsAndToCreatingPhase(reqCtx, opsRes, opsv1alpha1.HorizontalScaling{
 				ScaleIn: &opsv1alpha1.ScaleIn{
@@ -710,17 +718,13 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 					OnlineInstancesToOffline: []string{offlineInsName},
 				},
 			}, false)
-			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsFailedPhase))
-			conditions := opsRes.OpsRequest.Status.Conditions
-			Expect(conditions[len(conditions)-1].Message).Should(ContainSubstring(fmt.Sprintf(`instance "%s" cannot be taken offline as it has been created by another running opsRequest`, offlineInsName)))
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
 
-			By("create a opsRequest to delete 1 replicas which is created by another running opsRequest and expect it to fail")
+			By("create a fourth request and let it supersede the third request")
 			_ = createOpsAndToCreatingPhase(reqCtx, opsRes, opsv1alpha1.HorizontalScaling{
 				ScaleIn: &opsv1alpha1.ScaleIn{ReplicaChanger: opsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(1)}},
 			}, false)
-			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsFailedPhase))
-			conditions = opsRes.OpsRequest.Status.Conditions
-			Expect(conditions[len(conditions)-1].Message).Should(ContainSubstring(`cannot be taken offline as it has been created by another running opsRequest`))
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
 		})
 
 		It("horizontal scaling for shards component", func() {

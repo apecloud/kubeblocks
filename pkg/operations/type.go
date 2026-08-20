@@ -33,6 +33,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
+	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -134,6 +135,7 @@ type OpsRuntime interface {
 
 type Workload interface {
 	GetMinReadySeconds() int32
+	GetInstanceStatuses() []workloadsv1.InstanceStatus
 	GetInstanceNameSet() sets.Set[string]
 	GetCurrentRevisionMap() map[string]string
 	GetNotReadyInstanceNameSet() sets.Set[string]

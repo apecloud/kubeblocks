@@ -1374,6 +1374,69 @@ Kubernetes core/v1.ResourceRequirements
 </tr>
 </tbody>
 </table>
+<h3 id="operations.kubeblocks.io/v1alpha1.InstanceTemplateAssignment">InstanceTemplateAssignment
+</h3>
+<p>
+(<em>Appears on:</em><a href="#operations.kubeblocks.io/v1alpha1.LastComponentConfiguration">LastComponentConfiguration</a>)
+</p>
+<div>
+<p>InstanceTemplateAssignment identifies an InstanceSet-assigned instance and its template at the start of an operation.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>workloadName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>WorkloadName is the name of the InstanceSet that owns the instance.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>podName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>PodName is the stable instance identity allocated by the InstanceSet.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>templateName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>TemplateName is the assigned instance template. An empty string identifies the default template.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>desiredState</code><br/>
+<em>
+github.com/apecloud/kubeblocks/apis/workloads/v1.InstanceDesiredState
+</em>
+</td>
+<td>
+<p>DesiredState is the allocation state observed when the operation captured the assignment.
+Only Active and explicitly referenced Offline identities are recorded.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="operations.kubeblocks.io/v1alpha1.InstanceVolumeClaimTemplate">InstanceVolumeClaimTemplate
 </h3>
 <div>
@@ -1567,6 +1630,21 @@ Kubernetes core/v1.ResourceRequirements
 <td>
 <em>(Optional)</em>
 <p>Records the offline instances of the Component prior to any changes.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>sourceInstanceAssignments</code><br/>
+<em>
+<a href="#operations.kubeblocks.io/v1alpha1.InstanceTemplateAssignment">
+[]InstanceTemplateAssignment
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>SourceInstanceAssignments records the InstanceSet-owned identity assignments before an operation changes
+the instance allocation.</p>
 </td>
 </tr>
 <tr>

@@ -32,7 +32,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 )
 
-func TestBuildActiveAllocationsReportsTransientFlatOrdinalReassignment(t *testing.T) {
+func TestBuildAssignmentsReportsTransientFlatOrdinalReassignment(t *testing.T) {
 	its := &workloads.InstanceSet{
 		ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default"},
 		Spec: workloads.InstanceSetSpec{
@@ -48,13 +48,13 @@ func TestBuildActiveAllocationsReportsTransientFlatOrdinalReassignment(t *testin
 	}
 	tree := kubebuilderx.NewObjectTree()
 	tree.SetRoot(its)
-	_, _, err := BuildActiveAllocations(tree, its)
-	if !errors.Is(err, ErrActiveAllocationIncomplete) {
+	_, _, err := BuildAssignments(tree, its)
+	if !errors.Is(err, ErrAssignmentIncomplete) {
 		t.Fatalf("expected a temporary incomplete allocation, got %v", err)
 	}
 }
 
-func TestBuildActiveAllocationsUsesFlatOrdinalAssignment(t *testing.T) {
+func TestBuildAssignmentsUsesFlatOrdinalAssignment(t *testing.T) {
 	its := &workloads.InstanceSet{
 		ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default"},
 		Spec: workloads.InstanceSetSpec{
@@ -69,13 +69,13 @@ func TestBuildActiveAllocationsUsesFlatOrdinalAssignment(t *testing.T) {
 	}
 	tree := kubebuilderx.NewObjectTree()
 	tree.SetRoot(its)
-	allocations, _, err := BuildActiveAllocations(tree, its)
+	assignments, _, err := BuildAssignments(tree, its)
 	if err != nil {
 		t.Fatal(err)
 	}
 	got := map[string]string{}
-	for _, allocation := range allocations {
-		got[allocation.PodName] = allocation.TemplateName
+	for _, assignment := range assignments {
+		got[assignment.InstanceName] = assignment.TemplateName
 	}
 	if len(got) != 2 || got["demo-0"] != "" || got["demo-2"] != "fast" {
 		t.Fatalf("flat ordinal mapping was guessed incorrectly: %#v", got)
@@ -92,7 +92,7 @@ func TestTemplateNameFromLabelsPrefersSystemLabel(t *testing.T) {
 	}
 }
 
-func TestHistoricalTemplateHintUsesExplicitFlatOrdinalRelation(t *testing.T) {
+func TestResolveHistoricalTemplateUsesExplicitFlatOrdinalRelation(t *testing.T) {
 	its := &workloads.InstanceSet{
 		ObjectMeta: metav1.ObjectMeta{Name: "demo"},
 		Spec: workloads.InstanceSetSpec{
@@ -100,7 +100,7 @@ func TestHistoricalTemplateHintUsesExplicitFlatOrdinalRelation(t *testing.T) {
 			Instances:           []workloads.InstanceTemplate{{Name: "fast", Ordinals: workloads.Ordinals{Discrete: []int32{7}}}},
 		},
 	}
-	templateName, ok, err := HistoricalTemplateHint(its, "demo-7", []string{"", "fast"})
+	templateName, ok, err := ResolveHistoricalTemplate(its, "demo-7", []string{"", "fast"})
 	if err != nil {
 		t.Fatal(err)
 	}

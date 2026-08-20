@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"slices"
@@ -37,6 +38,11 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+)
+
+const (
+	memberJoinFailureFingerprintAnnotationKey  = "apps.kubeblocks.io/member-join-failure-fingerprint"
+	memberLeaveFailureFingerprintAnnotationKey = "apps.kubeblocks.io/member-leave-failure-fingerprint"
 )
 
 type componentWorkloadOps struct {
@@ -201,10 +207,14 @@ func (r *componentWorkloadOps) leaveMemberForPod(pod *corev1.Pod, pods []*corev1
 		err := lfa.MemberLeave(r.transCtx.Context, r.cli, nil)
 		if err != nil {
 			if errors.Is(err, lifecycle.ErrActionNotDefined) {
+				r.clearMemberActionFailureFingerprint(pod, memberLeaveFailureFingerprintAnnotationKey)
 				return nil
 			}
+			r.reportMemberActionFailure(pod, memberLeaveFailureFingerprintAnnotationKey,
+				memberLeaveFailedEventReason, "memberLeave", fmt.Errorf("pod %s: %w", pod.Name, err))
 			return err
 		}
+		r.clearMemberActionFailureFingerprint(pod, memberLeaveFailureFingerprintAnnotationKey)
 		r.transCtx.Logger.Info("succeed to call leave member action", "pod", pod.Name)
 		return nil
 	}
@@ -386,9 +396,56 @@ func (r *componentWorkloadOps) joinMemberForPod(pod *corev1.Pod, pods []*corev1.
 	}
 	if err = lfa.MemberJoin(r.transCtx.Context, r.cli, nil); err != nil {
 		if !errors.Is(err, lifecycle.ErrActionNotDefined) {
+			r.reportMemberActionFailure(pod, memberJoinFailureFingerprintAnnotationKey,
+				memberJoinFailedEventReason, "memberJoin", fmt.Errorf("pod %s: %w", pod.Name, err))
 			return err
 		}
 	}
+	r.clearMemberActionFailureFingerprint(pod, memberJoinFailureFingerprintAnnotationKey)
 	r.transCtx.Logger.Info("succeed to join member for pod", "pod", pod.Name)
 	return nil
+}
+
+func (r *componentWorkloadOps) reportMemberActionFailure(pod *corev1.Pod, annotationKey, reason, action string, actionErr error) {
+	if !lifecycle.IsActionFailure(actionErr) {
+		r.clearMemberActionFailureFingerprint(pod, annotationKey)
+		return
+	}
+	if r.transCtx.EventRecorder == nil {
+		return
+	}
+
+	fingerprint := fmt.Sprintf("%x", sha256.Sum256([]byte(actionErr.Error())))
+	if pod.Annotations[annotationKey] == fingerprint {
+		return
+	}
+
+	emitLifecycleActionFailureEvent(r.transCtx, reason, action, actionErr)
+	r.setMemberActionFailureFingerprint(pod, annotationKey, fingerprint)
+}
+
+func (r *componentWorkloadOps) clearMemberActionFailureFingerprint(pod *corev1.Pod, annotationKey string) {
+	if pod.Annotations == nil || pod.Annotations[annotationKey] == "" {
+		return
+	}
+	r.setMemberActionFailureFingerprint(pod, annotationKey, "")
+}
+
+func (r *componentWorkloadOps) setMemberActionFailureFingerprint(pod *corev1.Pod, annotationKey, fingerprint string) {
+	graphCli, ok := r.transCtx.Client.(model.GraphClient)
+	if !ok {
+		r.transCtx.Logger.V(1).Info("failed to persist lifecycle action event fingerprint", "pod", pod.Name)
+		return
+	}
+
+	podCopy := pod.DeepCopy()
+	if podCopy.Annotations == nil {
+		podCopy.Annotations = map[string]string{}
+	}
+	if fingerprint == "" {
+		delete(podCopy.Annotations, annotationKey)
+	} else {
+		podCopy.Annotations[annotationKey] = fingerprint
+	}
+	graphCli.Patch(r.dag, pod, podCopy, &model.ReplaceIfExistingOption{})
 }

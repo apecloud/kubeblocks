@@ -66,7 +66,6 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		r.setPodUnavailableStatus(inst, workloads.InstanceCurrentStateTerminating, pod.Name, getPodRevision(pod))
 		return kubebuilderx.Continue, nil
 	}
-	inst.Status.CurrentState = workloads.InstanceCurrentStatePresent
 
 	ready, available, updated := false, false, false
 	notReadyName, notAvailableName := "", ""
@@ -83,12 +82,13 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			notAvailableName = pod.Name
 		}
 	}
-	if isCreated(pod) && !isTerminating(pod) {
+	if isCreated(pod) {
 		updated, err = isPodUpdated(inst, pod)
 		if err != nil {
 			return kubebuilderx.Continue, err
 		}
 	}
+	inst.Status.CurrentState = workloads.InstanceCurrentStatePresent
 	inst.Status.CurrentRevision = getPodRevision(pod)
 	if updated {
 		inst.Status.CurrentRevision = inst.Status.UpdateRevision
@@ -124,9 +124,11 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	return kubebuilderx.Continue, nil
 }
 
-func (r *statusReconciler) setPodUnavailableStatus(inst *workloads.Instance, state workloads.InstanceCurrentState, name, currentRevision string) {
+// An absent or terminating Pod cannot provide a valid runtime observation. Clear every Pod-derived field and
+// condition together so values from the previous Pod do not survive the lifecycle transition.
+func (r *statusReconciler) setPodUnavailableStatus(inst *workloads.Instance, state workloads.InstanceCurrentState, name, revision string) {
 	inst.Status.CurrentState = state
-	inst.Status.CurrentRevision = currentRevision
+	inst.Status.CurrentRevision = revision
 	inst.Status.UpToDate = false
 	inst.Status.Ready = false
 	inst.Status.Available = false

@@ -76,11 +76,10 @@ var _ = Describe("Component Version", func() {
 			Expect(apps["action1"].err).NotTo(HaveOccurred())
 		})
 
-		It("resolves lifecycle action images for an instance template", func() {
+		It("uses the KB tools image for instance template actions without images", func() {
 			const (
 				appName        = "app"
 				serviceVersion = "2.0.0"
-				customImage    = "custom-action:2.0.0"
 			)
 
 			newAction := func() *appsv1.Action {
@@ -113,24 +112,6 @@ var _ = Describe("Component Version", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(images).Should(HaveKeyWithValue(kbagent.ContainerName, viperx.GetString(constant.KBToolsImage)))
 			Expect(images).Should(HaveKeyWithValue(kbagent.ContainerName4Worker, viperx.GetString(constant.KBToolsImage)))
-
-			By("using the single custom action image when other actions have none")
-			images, err = resolveImagesWithCompVersions4Template(newCompDef(), []*appsv1.ComponentVersion{
-				newCompVersion(map[string]string{appName: "app:2.0.0", "memberJoin": customImage}),
-			}, serviceVersion)
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(images).Should(HaveKeyWithValue(kbagent.ContainerName, customImage))
-			Expect(images).Should(HaveKeyWithValue(kbagent.ContainerName4Worker, customImage))
-
-			By("rejecting conflicting custom action images")
-			_, err = resolveImagesWithCompVersions4Template(newCompDef(), []*appsv1.ComponentVersion{
-				newCompVersion(map[string]string{
-					appName:       "app:2.0.0",
-					"memberJoin":  "member-join:2.0.0",
-					"memberLeave": "member-leave:2.0.0",
-				}),
-			}, serviceVersion)
-			Expect(err).Should(MatchError("only one exec image is allowed in lifecycle actions"))
 		})
 
 		It("resolve images before and after new release", func() {

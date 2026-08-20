@@ -68,9 +68,14 @@ func (a *switchover) name() string {
 	return "switchover"
 }
 
+func (a *switchover) authoritativeActionParameters() {}
+
 func (a *switchover) parameters(ctx context.Context, cli client.Reader) (map[string]string, error) {
 	// refer to ComponentLifecycleActions.Switchover's documentation for explanation of each variable.
-	m := make(map[string]string)
+	m := map[string]string{
+		switchoverCandidateName: "",
+		switchoverCandidateFQDN: "",
+	}
 	compName := constant.GenerateClusterComponentName(a.clusterName, a.compName)
 	if len(a.candidatePod) > 0 {
 		m[switchoverCandidateName] = a.candidatePod

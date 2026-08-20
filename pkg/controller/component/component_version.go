@@ -214,20 +214,30 @@ func resolveImagesWithCompVersions4Template(compDef *appsv1.ComponentDefinition,
 	}
 
 	if err = func() error {
+		var actionImage string
+		hasExecAction := false
 		for name, action := range actionsToResolveImage(compDef) {
 			if action != nil && action.Exec != nil {
+				hasExecAction = true
 				if app, ok := apps[name]; ok {
 					if app.err != nil {
 						return app.err
 					}
-					if image, ok := images[kbagent.ContainerName]; !ok || len(image) == 0 {
-						images[kbagent.ContainerName] = app.image
-					}
-					if image, ok := images[kbagent.ContainerName4Worker]; !ok || len(image) == 0 {
-						images[kbagent.ContainerName4Worker] = app.image
+					if len(app.image) > 0 {
+						if len(actionImage) > 0 && actionImage != app.image {
+							return fmt.Errorf("only one exec image is allowed in lifecycle actions")
+						}
+						actionImage = app.image
 					}
 				}
 			}
+		}
+		if hasExecAction {
+			if len(actionImage) == 0 {
+				actionImage = kbToolsImage()
+			}
+			images[kbagent.ContainerName] = actionImage
+			images[kbagent.ContainerName4Worker] = actionImage
 		}
 		return nil
 	}(); err != nil {

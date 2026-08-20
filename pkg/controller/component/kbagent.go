@@ -55,6 +55,10 @@ var (
 	roleLabelVolumeMount = corev1.VolumeMount{Name: roleLabelVolumeName, MountPath: podMetadataMountPath, ReadOnly: true}
 )
 
+func kbToolsImage() string {
+	return viper.GetString(constant.KBToolsImage)
+}
+
 func UpdateKBAgentContainer4HostNetwork(synthesizedComp *SynthesizedComponent) {
 	idx, c := intctrlutil.GetContainerByName(synthesizedComp.PodSpec.Containers, kbagent.ContainerName)
 	if c == nil {
@@ -128,7 +132,7 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 
 	newContainer := func(name string, f func(*builder.ContainerBuilder) error) (*corev1.Container, error) {
 		b := builder.NewContainerBuilder(name).
-			SetImage(viper.GetString(constant.KBToolsImage)).
+			SetImage(kbToolsImage()).
 			SetImagePullPolicy(corev1.PullIfNotPresent).
 			AddCommands(kbagent.BinaryPath).
 			AddEnv(mergedActionEnv4KBAgent(synthesizedComp)...).
@@ -450,7 +454,7 @@ func handleCustomImageNContainerDefined(synthesizedComp *SynthesizedComponent, c
 	if len(image) > 0 {
 		// init-container to copy binaries to the shared mount point /kubeblocks
 		initContainer := builder.NewContainerBuilder(kbagent.InitContainerName).
-			SetImage(viper.GetString(constant.KBToolsImage)).
+			SetImage(kbToolsImage()).
 			SetImagePullPolicy(corev1.PullIfNotPresent).
 			AddCommands(kbagent.InitCommand()...).
 			AddVolumeMounts(kbagent.SharedVolumeMount()).

@@ -27,8 +27,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/generics"
+	"github.com/apecloud/kubeblocks/pkg/kbagent"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	viperx "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 var _ = Describe("Component Version", func() {
@@ -71,6 +74,63 @@ var _ = Describe("Component Version", func() {
 			Expect(apps["image2"].err).To(HaveOccurred())
 
 			Expect(apps["action1"].err).NotTo(HaveOccurred())
+		})
+
+		It("resolves lifecycle action images for an instance template", func() {
+			const (
+				appName        = "app"
+				serviceVersion = "2.0.0"
+				customImage    = "custom-action:2.0.0"
+			)
+
+			newAction := func() *appsv1.Action {
+				return &appsv1.Action{Exec: &appsv1.ExecAction{Command: []string{"true"}}}
+			}
+			newCompDef := func() *appsv1.ComponentDefinition {
+				return testapps.NewComponentDefinitionFactory("test-action-images").
+					SetServiceVersion("1.0.0").
+					SetRuntime(&corev1.Container{Name: appName, Image: "app:1.0.0"}).
+					SetLifecycleAction("memberJoin", newAction()).
+					SetLifecycleAction("memberLeave", newAction()).
+					GetObject()
+			}
+			newCompVersion := func(images map[string]string) *appsv1.ComponentVersion {
+				return testapps.NewComponentVersionFactory("test-action-images").
+					SetSpec(appsv1.ComponentVersionSpec{
+						Releases: []appsv1.ComponentVersionRelease{{
+							Name:           "r0",
+							ServiceVersion: serviceVersion,
+							Images:         images,
+						}},
+					}).
+					GetObject()
+			}
+
+			By("using the KB tools image when no action image is configured")
+			images, err := resolveImagesWithCompVersions4Template(newCompDef(), []*appsv1.ComponentVersion{
+				newCompVersion(map[string]string{appName: "app:2.0.0"}),
+			}, serviceVersion)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(images).Should(HaveKeyWithValue(kbagent.ContainerName, viperx.GetString(constant.KBToolsImage)))
+			Expect(images).Should(HaveKeyWithValue(kbagent.ContainerName4Worker, viperx.GetString(constant.KBToolsImage)))
+
+			By("using the single custom action image when other actions have none")
+			images, err = resolveImagesWithCompVersions4Template(newCompDef(), []*appsv1.ComponentVersion{
+				newCompVersion(map[string]string{appName: "app:2.0.0", "memberJoin": customImage}),
+			}, serviceVersion)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(images).Should(HaveKeyWithValue(kbagent.ContainerName, customImage))
+			Expect(images).Should(HaveKeyWithValue(kbagent.ContainerName4Worker, customImage))
+
+			By("rejecting conflicting custom action images")
+			_, err = resolveImagesWithCompVersions4Template(newCompDef(), []*appsv1.ComponentVersion{
+				newCompVersion(map[string]string{
+					appName:       "app:2.0.0",
+					"memberJoin":  "member-join:2.0.0",
+					"memberLeave": "member-leave:2.0.0",
+				}),
+			}, serviceVersion)
+			Expect(err).Should(MatchError("only one exec image is allowed in lifecycle actions"))
 		})
 
 		It("resolve images before and after new release", func() {

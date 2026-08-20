@@ -54,6 +54,20 @@ func TestInstanceStatusSelection(t *testing.T) {
 	}
 }
 
+func TestRicherInstanceStatusDetection(t *testing.T) {
+	if hasRicherInstanceStatus(nil) {
+		t.Fatal("an absent status view must not replace the existing workload path")
+	}
+	if hasRicherInstanceStatus([]workloads.InstanceStatus{{PodName: "demo-0"}}) {
+		t.Fatal("an old-format status entry must not be treated as the richer authoritative view")
+	}
+	if !hasRicherInstanceStatus([]workloads.InstanceStatus{{
+		PodName: "demo-0", DesiredState: workloads.InstanceDesiredStateActive, CurrentState: workloads.InstanceCurrentStateAbsent,
+	}}) {
+		t.Fatal("expected the richer desired/current state dimensions to identify the authoritative view")
+	}
+}
+
 func TestActiveAssignmentsMatchComponent(t *testing.T) {
 	component := &appsv1.ClusterComponentSpec{
 		Replicas:  3,

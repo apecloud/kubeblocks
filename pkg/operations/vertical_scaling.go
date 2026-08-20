@@ -115,31 +115,34 @@ func (vs verticalScalingHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, 
 			if err != nil {
 				return 0, 0, err
 			}
+			workload, err := runtime.GetWorkload(opsRes.Cluster.Namespace, opsRes.Cluster.Name, pgRes.fullComponentName)
+			if err != nil {
+				return 0, 0, err
+			}
 			for _, template := range pgRes.clusterComponent.Instances {
 				replicas := template.GetReplicas()
 				insVS := vsInsMap[template.Name]
 				if vs.verticalScalingInsTemplate(verticalScaling, template, insVS) {
 					updatedTemplates[template.Name] = struct{}{}
-					if pgRes.clusterComponent.FlatInstanceOrdinal {
-						templateReplicasCnt += replicas
-						continue
-					}
-					templatePodNames, err := runtime.GenerateTemplateInstanceNames(
-						opsRes.Cluster.Name, pgRes.fullComponentName, template.Name, replicas, pgRes.clusterComponent.OfflineInstances, template.Ordinals)
-					if err != nil {
-						return 0, 0, err
-					}
-					for _, podName := range templatePodNames {
-						updatedPodSet[podName] = template.Name
+					if !workload.UseInstanceStatus() {
+						templatePodNames, err := runtime.GenerateTemplateInstanceNames(
+							opsRes.Cluster.Name, pgRes.fullComponentName, template.Name, replicas, pgRes.clusterComponent.OfflineInstances, template.Ordinals)
+						if err != nil {
+							return 0, 0, err
+						}
+						for _, podName := range templatePodNames {
+							updatedPodSet[podName] = template.Name
+						}
 					}
 				}
 				templateReplicasCnt += replicas
 			}
 			if vs.verticalScalingComp(verticalScaling) && templateReplicasCnt < pgRes.clusterComponent.Replicas {
 				updatedTemplates[""] = struct{}{}
-				if !pgRes.clusterComponent.FlatInstanceOrdinal {
+				if !workload.UseInstanceStatus() {
 					podNames, err := runtime.GenerateTemplateInstanceNames(
-						opsRes.Cluster.Name, pgRes.fullComponentName, "", pgRes.clusterComponent.Replicas-templateReplicasCnt, pgRes.clusterComponent.OfflineInstances, appsv1.Ordinals{})
+						opsRes.Cluster.Name, pgRes.fullComponentName, "", pgRes.clusterComponent.Replicas-templateReplicasCnt,
+						pgRes.clusterComponent.OfflineInstances, appsv1.Ordinals{})
 					if err != nil {
 						return 0, 0, err
 					}
@@ -150,11 +153,7 @@ func (vs verticalScalingHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, 
 			} else {
 				pgRes.noWaitComponentCompleted = true
 			}
-			if pgRes.clusterComponent.FlatInstanceOrdinal {
-				workload, err := runtime.GetWorkload(opsRes.Cluster.Namespace, opsRes.Cluster.Name, pgRes.fullComponentName)
-				if err != nil {
-					return 0, 0, err
-				}
+			if workload.UseInstanceStatus() {
 				allActive, complete, err := activeAssignmentsForTarget(workload, pgRes.clusterComponent)
 				if err != nil {
 					return 0, 0, err

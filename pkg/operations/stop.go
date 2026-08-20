@@ -121,11 +121,11 @@ func (stop StopOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 		if err != nil {
 			return 0, 0, err
 		}
-		if pgRes.clusterComponent.FlatInstanceOrdinal {
-			workload, err := runtime.GetWorkload(opsRes.Cluster.Namespace, opsRes.Cluster.Name, pgRes.fullComponentName)
-			if err != nil {
-				return 0, 0, err
-			}
+		workload, err := runtime.GetWorkload(opsRes.Cluster.Namespace, opsRes.Cluster.Name, pgRes.fullComponentName)
+		if err != nil {
+			return 0, 0, err
+		}
+		if workload.UseInstanceStatus() {
 			explicitOffline := sets.New(pgRes.clusterComponent.OfflineInstances...)
 			pgRes.deletedPodSet, err = statusesToPodSet(workload.GetInstanceStatuses(), workloads.InstanceDesiredStateOffline,
 				func(status workloads.InstanceStatus) bool { return !explicitOffline.Has(status.PodName) }, false)
@@ -135,18 +135,14 @@ func (stop StopOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 			if int32(len(pgRes.deletedPodSet)) != pgRes.clusterComponent.Replicas {
 				return 1, 0, nil
 			}
-			return handleComponentProgressForScalingReplicas(reqCtx, cli, opsRes, pgRes, compStatus)
+		} else {
+			pgRes.deletedPodSet, err = runtime.GenerateInstanceNameSet(opsRes.Cluster.Name, pgRes.fullComponentName,
+				pgRes.clusterComponent.Replicas, pgRes.clusterComponent.Instances, pgRes.clusterComponent.OfflineInstances)
+			if err != nil {
+				return 0, 0, err
+			}
 		}
-		pgRes.deletedPodSet, err = runtime.GenerateInstanceNameSet(opsRes.Cluster.Name, pgRes.fullComponentName,
-			pgRes.clusterComponent.Replicas, pgRes.clusterComponent.Instances, pgRes.clusterComponent.OfflineInstances)
-		if err != nil {
-			return 0, 0, err
-		}
-		expectProgressCount, completedCount, err := handleComponentProgressForScalingReplicas(reqCtx, cli, opsRes, pgRes, compStatus)
-		if err != nil {
-			return expectProgressCount, completedCount, err
-		}
-		return expectProgressCount, completedCount, nil
+		return handleComponentProgressForScalingReplicas(reqCtx, cli, opsRes, pgRes, compStatus)
 	}
 	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.StopList)
 	return compOpsHelper.reconcileActionWithComponentOps(reqCtx, cli, opsRes, "stop", handleComponentProgress)

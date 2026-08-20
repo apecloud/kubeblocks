@@ -197,6 +197,9 @@ func TestOpsRuntimeBuildsInstanceAPIView(t *testing.T) {
 	if workload.GetMinReadySeconds() != 15 {
 		t.Fatalf("unexpected minReadySeconds: %d", workload.GetMinReadySeconds())
 	}
+	if !workload.UseInstanceStatus() {
+		t.Fatal("expected richer InstanceStatus to be the authoritative identity view")
+	}
 	if got := workload.GetCurrentRevisionMap()[instanceName]; got != "rev-a" {
 		t.Fatalf("unexpected current revision: %s", got)
 	}

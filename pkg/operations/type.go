@@ -135,6 +135,10 @@ type OpsRuntime interface {
 
 type Workload interface {
 	GetMinReadySeconds() int32
+	// UseInstanceStatus reports whether InstanceStatus is the authoritative identity view for this workload.
+	// Flat-ordinal InstanceSets return true even before the first complete view is published, so callers wait
+	// instead of falling back to name planning.
+	UseInstanceStatus() bool
 	GetInstanceStatuses() []workloadsv1.InstanceStatus
 	GetInstanceNameSet() sets.Set[string]
 	GetCurrentRevisionMap() map[string]string

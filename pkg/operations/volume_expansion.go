@@ -295,13 +295,12 @@ func (ve volumeExpansionOpsHandler) handleVCTExpansionProgress(reqCtx intctrluti
 	if err != nil {
 		return 0, 0, err
 	}
+	workload, err := runtime.GetWorkload(opsRes.Cluster.Namespace, opsRes.Cluster.Name, veHelper.fullComponentName)
+	if err != nil {
+		return 0, 0, err
+	}
 	instanceNameSet := sets.New[string]()
-	component := getComponentSpecOrShardingTemplate(opsRes.Cluster, veHelper.compOps.GetComponentName())
-	if component != nil && component.FlatInstanceOrdinal {
-		workload, err := runtime.GetWorkload(opsRes.Cluster.Namespace, opsRes.Cluster.Name, veHelper.fullComponentName)
-		if err != nil {
-			return 0, 0, err
-		}
+	if workload.UseInstanceStatus() {
 		instances, err := statusesToPodSet(workload.GetInstanceStatuses(), workloads.InstanceDesiredStateActive,
 			func(status workloads.InstanceStatus) bool {
 				return status.TemplateName == nil || *status.TemplateName == veHelper.templateName
@@ -315,7 +314,8 @@ func (ve volumeExpansionOpsHandler) handleVCTExpansionProgress(reqCtx intctrluti
 		instanceNameSet.Insert(sets.List(sets.KeySet(instances))...)
 	} else {
 		instanceNames, err := runtime.GenerateTemplateInstanceNames(
-			opsRes.Cluster.Name, veHelper.fullComponentName, veHelper.templateName, int32(veHelper.expectCount), veHelper.offlineInstanceNames, veHelper.ordinals)
+			opsRes.Cluster.Name, veHelper.fullComponentName, veHelper.templateName, int32(veHelper.expectCount),
+			veHelper.offlineInstanceNames, veHelper.ordinals)
 		if err != nil {
 			return 0, 0, err
 		}

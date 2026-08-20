@@ -89,10 +89,7 @@ func (u upgradeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		}); err != nil {
 		return err
 	}
-	if err := cli.Update(reqCtx.Ctx, opsRes.Cluster); err != nil {
-		return err
-	}
-	return nil
+	return cli.Update(reqCtx.Ctx, opsRes.Cluster)
 }
 
 func upgradeTrigger(opsRequest *opsv1alpha1.OpsRequest) string {

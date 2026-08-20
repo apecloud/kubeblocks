@@ -132,10 +132,7 @@ func (c componentOpsHelper) cancelComponentOps(ctx context.Context,
 		sharding := &opsRes.Cluster.Spec.Shardings[index]
 		rollBackCompSpec(&sharding.Template, lastCompInfos, sharding.Name)
 	}
-	if err := cli.Update(ctx, opsRes.Cluster); err != nil {
-		return err
-	}
-	return nil
+	return cli.Update(ctx, opsRes.Cluster)
 }
 
 func componentStatusFailureCount(compStatus opsv1alpha1.OpsRequestComponentStatus) int32 {

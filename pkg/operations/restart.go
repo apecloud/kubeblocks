@@ -77,10 +77,7 @@ func (r restartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		shardingSpec := &opsRes.Cluster.Spec.Shardings[i]
 		r.doRestart(opsRes, &shardingSpec.Template, shardingSpec.Name)
 	}
-	if err := cli.Update(reqCtx.Ctx, opsRes.Cluster); err != nil {
-		return err
-	}
-	return nil
+	return cli.Update(reqCtx.Ctx, opsRes.Cluster)
 }
 
 // ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.

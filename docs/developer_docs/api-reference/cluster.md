@@ -33174,6 +33174,7 @@ int64
 (<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceStatus">InstanceStatus</a>, <a href="#workloads.kubeblocks.io/v1.InstanceStatus2">InstanceStatus2</a>)
 </p>
 <div>
+<p>InstanceCurrentState describes the observed lifecycle state of an instance runtime.</p>
 </div>
 <table>
 <thead>
@@ -33196,6 +33197,7 @@ int64
 (<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceStatus">InstanceStatus</a>)
 </p>
 <div>
+<p>InstanceDesiredState describes the allocation state desired by the InstanceSet for an instance identity.</p>
 </div>
 <table>
 <thead>
@@ -34101,6 +34103,7 @@ bool
 (<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceSetStatus">InstanceSetStatus</a>)
 </p>
 <div>
+<p>InstanceStatus describes the desired allocation and observed runtime state of an instance identity.</p>
 </div>
 <table>
 <thead>
@@ -34118,7 +34121,7 @@ string
 </em>
 </td>
 <td>
-<p>PodName is the stable instance identity allocated by the InstanceSet and the name used by its Pod when present.</p>
+<p>PodName is the stable name of the instance allocated by the InstanceSet.</p>
 </td>
 </tr>
 <tr>
@@ -34145,8 +34148,8 @@ InstanceDesiredState
 </td>
 <td>
 <em>(Optional)</em>
-<p>DesiredState describes whether this identity should have a running Pod (Active), is retained without a
-desired running Pod (Offline), or is no longer allocated and is kept only until its current Pod disappears (Released).
+<p>DesiredState describes whether the instance should be running (Active), is retained without running (Offline),
+or is no longer allocated and is kept only while its runtime is still observed (Released).
 An empty value from an older object is treated as Active.</p>
 </td>
 </tr>
@@ -34161,8 +34164,8 @@ InstanceCurrentState
 </td>
 <td>
 <em>(Optional)</em>
-<p>CurrentState describes whether the Pod for this instance is currently present, terminating, or absent.
-An empty value from an older object is treated as Present because those entries were produced from observed Pods.</p>
+<p>CurrentState describes whether the instance runtime is currently present, terminating, or absent.
+An empty value from an older object is treated as Present because those entries represented observed instances.</p>
 </td>
 </tr>
 <tr>
@@ -34174,7 +34177,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>CurrentRevision identifies the revision currently used by the Pod for this instance.
+<p>CurrentRevision identifies the revision currently applied to this instance.
 It is empty when CurrentState is Absent.</p>
 </td>
 </tr>
@@ -34187,7 +34190,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>UpdateRevision identifies the Pod revision desired for an Active instance.
+<p>UpdateRevision identifies the revision desired for an Active instance.
 It is empty for Offline and Released instances.</p>
 </td>
 </tr>
@@ -34214,7 +34217,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Ready indicates whether the current Present Pod is ready to serve requests.</p>
+<p>Ready indicates whether the instance is ready to serve requests when CurrentState is Present.</p>
 </td>
 </tr>
 <tr>
@@ -34226,7 +34229,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Available indicates whether the current Present Pod has remained ready for the required minimum duration.
+<p>Available indicates whether the instance has remained ready for the required minimum duration when CurrentState is Present.
 Available can be true only when Ready is true.</p>
 </td>
 </tr>
@@ -34239,7 +34242,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Failed indicates whether the current Present Pod reports a terminal failure state. It is independent of
+<p>Failed indicates whether the instance reports a terminal failure when CurrentState is Present. It is independent of
 desired-state convergence.</p>
 </td>
 </tr>
@@ -34252,7 +34255,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Represents the role observed from the current Present Pod.</p>
+<p>Represents the role observed for the instance when CurrentState is Present.</p>
 </td>
 </tr>
 <tr>
@@ -34266,7 +34269,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>The config status observed from the current Present Pod.</p>
+<p>The config status observed for the instance when CurrentState is Present.</p>
 </td>
 </tr>
 <tr>
@@ -34278,7 +34281,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Represents whether storage for the current Present Pod is being expanded.</p>
+<p>Represents whether storage for the instance is being expanded when CurrentState is Present.</p>
 </td>
 </tr>
 </tbody>

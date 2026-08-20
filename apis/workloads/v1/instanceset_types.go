@@ -555,8 +555,9 @@ type ConfigTemplate struct {
 	Parameters map[string]string `json:"parameters,omitempty"`
 }
 
+// InstanceStatus describes the desired allocation and observed runtime state of an instance identity.
 type InstanceStatus struct {
-	// PodName is the stable instance identity allocated by the InstanceSet and the name used by its Pod when present.
+	// PodName is the stable name of the instance allocated by the InstanceSet.
 	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=Unknown
@@ -568,28 +569,28 @@ type InstanceStatus struct {
 	// +optional
 	TemplateName *string `json:"templateName,omitempty"`
 
-	// DesiredState describes whether this identity should have a running Pod (Active), is retained without a
-	// desired running Pod (Offline), or is no longer allocated and is kept only until its current Pod disappears (Released).
+	// DesiredState describes whether the instance should be running (Active), is retained without running (Offline),
+	// or is no longer allocated and is kept only while its runtime is still observed (Released).
 	// An empty value from an older object is treated as Active.
 	//
 	// +optional
 	// +kubebuilder:validation:Enum=Active;Offline;Released
 	DesiredState InstanceDesiredState `json:"desiredState,omitempty"`
 
-	// CurrentState describes whether the Pod for this instance is currently present, terminating, or absent.
-	// An empty value from an older object is treated as Present because those entries were produced from observed Pods.
+	// CurrentState describes whether the instance runtime is currently present, terminating, or absent.
+	// An empty value from an older object is treated as Present because those entries represented observed instances.
 	//
 	// +optional
 	// +kubebuilder:validation:Enum=Present;Terminating;Absent
 	CurrentState InstanceCurrentState `json:"currentState,omitempty"`
 
-	// CurrentRevision identifies the revision currently used by the Pod for this instance.
+	// CurrentRevision identifies the revision currently applied to this instance.
 	// It is empty when CurrentState is Absent.
 	//
 	// +optional
 	CurrentRevision string `json:"currentRevision,omitempty"`
 
-	// UpdateRevision identifies the Pod revision desired for an Active instance.
+	// UpdateRevision identifies the revision desired for an Active instance.
 	// It is empty for Offline and Released instances.
 	//
 	// +optional
@@ -602,39 +603,40 @@ type InstanceStatus struct {
 	// +optional
 	UpToDate bool `json:"upToDate,omitempty"`
 
-	// Ready indicates whether the current Present Pod is ready to serve requests.
+	// Ready indicates whether the instance is ready to serve requests when CurrentState is Present.
 	//
 	// +optional
 	Ready bool `json:"ready,omitempty"`
 
-	// Available indicates whether the current Present Pod has remained ready for the required minimum duration.
+	// Available indicates whether the instance has remained ready for the required minimum duration when CurrentState is Present.
 	// Available can be true only when Ready is true.
 	//
 	// +optional
 	Available bool `json:"available,omitempty"`
 
-	// Failed indicates whether the current Present Pod reports a terminal failure state. It is independent of
+	// Failed indicates whether the instance reports a terminal failure when CurrentState is Present. It is independent of
 	// desired-state convergence.
 	//
 	// +optional
 	Failed bool `json:"failed,omitempty"`
 
-	// Represents the role observed from the current Present Pod.
+	// Represents the role observed for the instance when CurrentState is Present.
 	//
 	// +optional
 	Role string `json:"role,omitempty"`
 
-	// The config status observed from the current Present Pod.
+	// The config status observed for the instance when CurrentState is Present.
 	//
 	// +optional
 	Configs []InstanceConfigStatus `json:"configs,omitempty"`
 
-	// Represents whether storage for the current Present Pod is being expanded.
+	// Represents whether storage for the instance is being expanded when CurrentState is Present.
 	//
 	// +optional
 	VolumeExpansion bool `json:"volumeExpansion,omitempty"`
 }
 
+// InstanceDesiredState describes the allocation state desired by the InstanceSet for an instance identity.
 type InstanceDesiredState string
 
 const (
@@ -643,6 +645,7 @@ const (
 	InstanceDesiredStateReleased InstanceDesiredState = "Released"
 )
 
+// InstanceCurrentState describes the observed lifecycle state of an instance runtime.
 type InstanceCurrentState string
 
 const (
@@ -802,13 +805,13 @@ func (r *InstanceSet) IsRoleProbeDone() bool {
 	return cnt == replicas
 }
 
-// FindInstanceStatus returns the status entry for podName.
-func (r *InstanceSet) FindInstanceStatus(podName string) *InstanceStatus {
+// FindInstanceStatus returns the status entry for instanceName.
+func (r *InstanceSet) FindInstanceStatus(instanceName string) *InstanceStatus {
 	if r == nil {
 		return nil
 	}
 	for i := range r.Status.InstanceStatus {
-		if r.Status.InstanceStatus[i].PodName == podName {
+		if r.Status.InstanceStatus[i].PodName == instanceName {
 			return &r.Status.InstanceStatus[i]
 		}
 	}
@@ -840,7 +843,7 @@ func (r *InstanceSet) RetainedInstanceStatuses() []*InstanceStatus {
 	return result
 }
 
-// ActivePresentInstanceStatuses returns Active instances whose Pod is currently present.
+// ActivePresentInstanceStatuses returns Active instances whose runtime is currently Present.
 func (r *InstanceSet) ActivePresentInstanceStatuses() []*InstanceStatus {
 	if r == nil {
 		return nil

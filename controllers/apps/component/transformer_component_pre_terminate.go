@@ -82,8 +82,14 @@ func (t *componentPreTerminateTransformer) Transform(ctx graph.TransformContext,
 	if t.checkPreTerminateDone(transCtx, dag) {
 		return nil
 	}
-	if err = t.preTerminate(transCtx, compDef); err != nil {
-		return lifecycle.IgnoreNotDefined(err)
+	var invoked bool
+	if invoked, err = t.preTerminate(transCtx, compDef); err != nil {
+		err = lifecycle.IgnoreNotDefined(err)
+		if invoked {
+			reportLifecycleActionFailureEvent(transCtx, dag,
+				preTerminateFailureFingerprintAnnotationKey, preTerminateFailedEventReason, "preTerminate", err)
+		}
+		return err
 	}
 	return t.markPreTerminateDone(transCtx, dag)
 }
@@ -138,18 +144,19 @@ func (t *componentPreTerminateTransformer) markPreTerminateDone(transCtx *compon
 	compObj := comp.DeepCopy()
 	timeStr := time.Now().Format(time.RFC3339Nano)
 	comp.Annotations[kbCompPreTerminateDoneKey] = timeStr
+	delete(comp.Annotations, preTerminateFailureFingerprintAnnotationKey)
 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	graphCli.Update(dag, compObj, comp, &model.ReplaceIfExistingOption{})
 	return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue, "requeue to waiting for pre-terminate annotation to be set")
 }
 
-func (t *componentPreTerminateTransformer) preTerminate(transCtx *componentTransformContext, compDef *appsv1.ComponentDefinition) error {
+func (t *componentPreTerminateTransformer) preTerminate(transCtx *componentTransformContext, compDef *appsv1.ComponentDefinition) (bool, error) {
 	lfa, err := t.lifecycleAction4Component(transCtx, compDef)
 	if err != nil {
-		return err
+		return false, err
 	}
-	return lfa.PreTerminate(transCtx.Context, transCtx.Client, nil)
+	return true, lfa.PreTerminate(transCtx.Context, transCtx.Client, nil)
 }
 
 func (t *componentPreTerminateTransformer) lifecycleAction4Component(transCtx *componentTransformContext, compDef *appsv1.ComponentDefinition) (lifecycle.Lifecycle, error) {

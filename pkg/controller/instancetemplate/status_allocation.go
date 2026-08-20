@@ -31,23 +31,23 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 )
 
-// ErrActiveAllocationIncomplete indicates a temporary partial view while workload reconciliation is releasing or
+// ErrAssignmentIncomplete indicates a temporary partial view while workload reconciliation is releasing or
 // moving instance names. Callers must not publish the partial view.
-var ErrActiveAllocationIncomplete = errors.New("active instance allocation is incomplete")
+var ErrAssignmentIncomplete = errors.New("instance assignment is incomplete")
 
-// IsActiveAllocationIncomplete reports whether err represents a temporary partial allocation.
-func IsActiveAllocationIncomplete(err error) bool {
-	return errors.Is(err, ErrActiveAllocationIncomplete)
+// IsAssignmentIncomplete reports whether err represents a temporary partial assignment.
+func IsAssignmentIncomplete(err error) bool {
+	return errors.Is(err, ErrAssignmentIncomplete)
 }
 
-// InstanceAllocation is an authoritative PodName-to-template assignment.
-type InstanceAllocation struct {
-	PodName      string
+// Assignment associates an instance identity with its authoritative template.
+type Assignment struct {
+	InstanceName string
 	TemplateName string
 }
 
-// BuildActiveAllocations obtains the authoritative active name-to-template view used by InstanceSet reconciliation.
-func BuildActiveAllocations(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet) ([]InstanceAllocation, []string, error) {
+// BuildAssignments obtains the authoritative name-to-template assignments for identities that should have Pods.
+func BuildAssignments(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet) ([]Assignment, []string, error) {
 	itsExt, err := BuildInstanceSetExt(its, tree)
 	if err != nil {
 		return nil, nil, err
@@ -70,19 +70,19 @@ func BuildActiveAllocations(tree *kubebuilderx.ObjectTree, its *workloads.Instan
 	}
 	if len(nameMap) != int(expected) {
 		if its.Spec.FlatInstanceOrdinal {
-			return nil, nil, fmt.Errorf("%w: expected %d names, got %d", ErrActiveAllocationIncomplete, expected, len(nameMap))
+			return nil, nil, fmt.Errorf("%w: expected %d names, got %d", ErrAssignmentIncomplete, expected, len(nameMap))
 		}
-		return nil, nil, fmt.Errorf("incomplete active instance allocation: expected %d names, got %d", expected, len(nameMap))
+		return nil, nil, fmt.Errorf("incomplete instance assignment: expected %d names, got %d", expected, len(nameMap))
 	}
 
-	allocations := make([]InstanceAllocation, 0, len(nameMap))
+	assignments := make([]Assignment, 0, len(nameMap))
 	for name, template := range nameMap {
 		if template == nil {
-			return nil, nil, fmt.Errorf("active instance %q has no authoritative template", name)
+			return nil, nil, fmt.Errorf("instance %q has no authoritative template assignment", name)
 		}
-		allocations = append(allocations, InstanceAllocation{PodName: name, TemplateName: template.Name})
+		assignments = append(assignments, Assignment{InstanceName: name, TemplateName: template.Name})
 	}
-	sort.Slice(allocations, func(i, j int) bool { return allocations[i].PodName < allocations[j].PodName })
+	sort.Slice(assignments, func(i, j int) bool { return assignments[i].InstanceName < assignments[j].InstanceName })
 
 	templateNames := make([]string, 0, len(itsExt.InstanceTemplates)+1)
 	templateNames = append(templateNames, DefaultTemplateName)
@@ -92,7 +92,7 @@ func BuildActiveAllocations(tree *kubebuilderx.ObjectTree, its *workloads.Instan
 		}
 	}
 	sort.Strings(templateNames)
-	return allocations, templateNames, nil
+	return assignments, templateNames, nil
 }
 
 // TemplateNameFromLabels returns an explicitly published template label, preserving the empty default template value.
@@ -109,18 +109,20 @@ func TemplateNameFromLabels(labels map[string]string) (string, bool) {
 	return "", false
 }
 
-// HistoricalTemplateHint resolves an old retained instance only from explicit allocation state or unambiguous
+// ResolveHistoricalTemplate resolves an old retained instance only from explicit allocation state or unambiguous
 // non-flat naming.
-func HistoricalTemplateHint(its *workloads.InstanceSet, podName string, knownTemplateNames []string) (string, bool, error) {
-	parent, ordinal, ok := parseInstanceName(podName)
+func ResolveHistoricalTemplate(its *workloads.InstanceSet, instanceName string, knownTemplateNames []string) (string, bool, error) {
+	parent, ordinal, ok := parseInstanceName(instanceName)
 	if !ok {
 		return "", false, nil
 	}
 	if its.Spec.FlatInstanceOrdinal {
+		// A flat name does not encode its template. Resolve only from explicit ordinal ownership and reject
+		// conflicting owners instead of guessing from the instance name.
 		var found *string
 		setFound := func(templateName string) error {
 			if found != nil && *found != templateName {
-				return fmt.Errorf("instance %q has conflicting ordinal templates %q and %q", podName, *found, templateName)
+				return fmt.Errorf("instance %q has conflicting ordinal templates %q and %q", instanceName, *found, templateName)
 			}
 			value := templateName
 			found = &value

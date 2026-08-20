@@ -26,7 +26,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/revisionmap"
-	"github.com/apecloud/kubeblocks/pkg/controller/workloads/instancestatus"
 )
 
 func NewRevisionUpdateReconciler() kubebuilderx.Reconciler {
@@ -68,7 +67,6 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kub
 	updatedReplicas := r.calculateUpdatedReplicas(its, tree.List(&workloads.Instance{}))
 	its.Status.UpdatedReplicas = updatedReplicas
 
-	instancestatus.PrepareForNewDesiredRevisions(its.Status.InstanceStatus, updateRevisions)
 	its.Status.ObservedGeneration = its.Generation
 
 	return kubebuilderx.Continue, nil

@@ -65,9 +65,11 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		pod, _ := object.(*corev1.Pod)
 		podList = append(podList, pod)
 	}
+	// Flat-ordinal reassignment can temporarily expose fewer authoritative names than spec.replicas.
+	// Validate before mutating any status fields so a partial view cannot replace the last complete status.
 	if its.Spec.FlatInstanceOrdinal {
-		if _, _, err := instancetemplate.BuildActiveAllocations(tree, its); err != nil {
-			if instancetemplate.IsActiveAllocationIncomplete(err) {
+		if _, _, err := instancetemplate.BuildAssignments(tree, its); err != nil {
+			if instancetemplate.IsAssignmentIncomplete(err) {
 				return kubebuilderx.Continue, nil
 			}
 			return kubebuilderx.Continue, err
@@ -444,31 +446,33 @@ func instancePodFailed(pod *corev1.Pod) bool {
 }
 
 func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pods []*corev1.Pod) error {
-	activeAllocations, templateNames, err := instancetemplate.BuildActiveAllocations(tree, its)
+	desiredAssignments, templateNames, err := instancetemplate.BuildAssignments(tree, its)
 	if err != nil {
 		return err
 	}
-	active := make([]instancestatus.Allocation, 0, len(activeAllocations))
-	activeNames := make(map[string]struct{}, len(activeAllocations))
-	for _, allocation := range activeAllocations {
-		active = append(active, instancestatus.Allocation{PodName: allocation.PodName, TemplateName: allocation.TemplateName})
-		activeNames[allocation.PodName] = struct{}{}
+	desiredTemplateAssignments := make([]instancestatus.TemplateAssignment, 0, len(desiredAssignments))
+	desiredNames := make(map[string]struct{}, len(desiredAssignments))
+	for _, assignment := range desiredAssignments {
+		desiredTemplateAssignments = append(desiredTemplateAssignments, instancestatus.TemplateAssignment{InstanceName: assignment.InstanceName, TemplateName: assignment.TemplateName})
+		desiredNames[assignment.InstanceName] = struct{}{}
 	}
 	updateRevisions, err := GetRevisions(its.Status.UpdateRevisions)
 	if err != nil {
 		return err
 	}
-	offline := append([]string(nil), its.Spec.OfflineInstances...)
-	hints := make([]instancestatus.Allocation, 0, len(active)+len(pods)+len(offline))
+	offlineNames := append([]string(nil), its.Spec.OfflineInstances...)
+	templateHints := make([]instancestatus.TemplateAssignment, 0, len(desiredTemplateAssignments)+len(pods)+len(offlineNames))
 	if isStopRequested(its) {
-		for _, allocation := range active {
-			offline = append(offline, allocation.PodName)
-			hints = append(hints, allocation)
+		// Stop removes the desired Pod assignments, but they remain useful for retaining template identity
+		// while the corresponding Pods are draining or have already disappeared.
+		for _, assignment := range desiredTemplateAssignments {
+			offlineNames = append(offlineNames, assignment.InstanceName)
+			templateHints = append(templateHints, assignment)
 		}
-		active = nil
+		desiredTemplateAssignments = nil
 	}
 
-	observations := make([]instancestatus.CurrentObservation, 0, len(pods))
+	observations := make([]instancestatus.Observation, 0, len(pods))
 	roleMap := composeRoleMap(*its)
 	for _, pod := range pods {
 		state := workloads.InstanceCurrentStatePresent
@@ -476,16 +480,16 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 			state = workloads.InstanceCurrentStateTerminating
 		}
 		if templateName, ok := instancetemplate.TemplateNameFromLabels(pod.Labels); ok {
-			hints = append(hints, instancestatus.Allocation{PodName: pod.Name, TemplateName: templateName})
+			templateHints = append(templateHints, instancestatus.TemplateAssignment{InstanceName: pod.Name, TemplateName: templateName})
 		}
 		ready := state == workloads.InstanceCurrentStatePresent && isImageMatched(pod) && intctrlutil.IsPodReady(pod)
-		observation := instancestatus.CurrentObservation{
-			InstanceName:    pod.Name,
-			State:           state,
-			CurrentRevision: getPodRevision(pod),
-			Ready:           ready,
-			Available:       ready && intctrlutil.IsPodAvailable(pod, its.Spec.MinReadySeconds),
-			Failed:          instancePodFailed(pod),
+		observation := instancestatus.Observation{
+			InstanceName: pod.Name,
+			State:        state,
+			Revision:     getPodRevision(pod),
+			Ready:        ready,
+			Available:    ready && intctrlutil.IsPodAvailable(pod, its.Spec.MinReadySeconds),
+			Failed:       instancePodFailed(pod),
 		}
 		if state == workloads.InstanceCurrentStatePresent && isCreated(pod) {
 			updated, err := isPodUpdated(its, pod)
@@ -509,34 +513,34 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 		observations = append(observations, observation)
 	}
 
-	for _, name := range append(append([]string(nil), offline...), podObservationNames(observations)...) {
-		if _, ok := activeNames[name]; ok {
+	for _, name := range append(append([]string(nil), offlineNames...), podObservationNames(observations)...) {
+		if _, ok := desiredNames[name]; ok {
 			continue
 		}
-		if templateName, ok, err := instancetemplate.HistoricalTemplateHint(its, name, templateNames); err != nil {
+		if templateName, ok, err := instancetemplate.ResolveHistoricalTemplate(its, name, templateNames); err != nil {
 			return err
 		} else if ok {
-			hints = append(hints, instancestatus.Allocation{PodName: name, TemplateName: templateName})
+			templateHints = append(templateHints, instancestatus.TemplateAssignment{InstanceName: name, TemplateName: templateName})
 		}
 	}
 	syncObservationPVCStatus(tree, its, observations)
 
-	result, err := instancestatus.Build(instancestatus.BuildInput{
-		Previous:        its.Status.InstanceStatus,
-		Active:          active,
-		Offline:         offline,
-		Current:         observations,
-		TemplateHints:   hints,
-		UpdateRevisions: updateRevisions,
+	statuses, err := instancestatus.Build(instancestatus.Input{
+		Previous:           its.Status.InstanceStatus,
+		DesiredAssignments: desiredTemplateAssignments,
+		Offline:            offlineNames,
+		Observations:       observations,
+		TemplateHints:      templateHints,
+		UpdateRevisions:    updateRevisions,
 	})
 	if err != nil {
 		return err
 	}
-	its.Status.InstanceStatus = result.Statuses
+	its.Status.InstanceStatus = statuses
 	return nil
 }
 
-func podObservationNames(observations []instancestatus.CurrentObservation) []string {
+func podObservationNames(observations []instancestatus.Observation) []string {
 	names := make([]string, 0, len(observations))
 	for _, observation := range observations {
 		names = append(names, observation.InstanceName)
@@ -544,7 +548,7 @@ func podObservationNames(observations []instancestatus.CurrentObservation) []str
 	return names
 }
 
-func syncObservationPVCStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, observations []instancestatus.CurrentObservation) {
+func syncObservationPVCStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, observations []instancestatus.Observation) {
 	if tree == nil {
 		return
 	}

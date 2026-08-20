@@ -166,18 +166,23 @@ var _ = Describe("pre-terminate transformer test", func() {
 				},
 			})
 
+			transCtx.Component.Annotations[preTerminateFailureFingerprintAnnotationKey] = "previous-failure"
 			transformer := &componentPreTerminateTransformer{}
 			err := transformer.Transform(transCtx, dag)
 			Expect(err).ShouldNot(BeNil())
 			Expect(err.Error()).Should(ContainSubstring("requeue to waiting for pre-terminate annotation to be set"))
 			Expect(preTerminated).Should(BeTrue())
+			Expect(transCtx.Component.Annotations).ShouldNot(HaveKey(preTerminateFailureFingerprintAnnotationKey))
 		})
 
 		It("no pods error", func() {
+			recorder := &capturingEventRecorder{}
+			transCtx.EventRecorder = recorder
 			transformer := &componentPreTerminateTransformer{}
 			err := transformer.Transform(transCtx, dag)
 			Expect(err).ShouldNot(BeNil())
 			Expect(err.Error()).Should(ContainSubstring("has no pods to running the pre-terminate action"))
+			Expect(recorder.events).Should(BeEmpty())
 		})
 
 		It("not-defined", func() {

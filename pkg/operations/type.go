@@ -111,11 +111,6 @@ type progressResource struct {
 	// checks if it needs to wait the component to complete.
 	// if only updates a part of pods, set it to false.
 	noWaitComponentCompleted bool
-	// rollingProgressCompleted and rollingProgressFailed summarize only the
-	// instances participating in this rolling operation.
-	rollingProgressCompleted bool
-	rollingProgressFailed    bool
-	partialRollingTarget     bool
 }
 
 // OpsRuntime abstracts the standard ops paths that only need workload/member views
@@ -135,15 +130,12 @@ type OpsRuntime interface {
 
 type Workload interface {
 	Exists() bool
-	IsStatusObserved() bool
 	GetMinReadySeconds() int32
 	GetDesiredReplicas() int32
-	GetCurrentReplicas() int32
 	GetInstanceNameSet() sets.Set[string]
 	GetActiveInstanceNameSet() sets.Set[string]
 	GetPresentInstanceNameSet() sets.Set[string]
 	GetCurrentRevisionMap() map[string]string
-	GetUpdateRevisionMap() map[string]string
 	GetUpToDateInstanceNameSet() sets.Set[string]
 	GetNotReadyInstanceNameSet() sets.Set[string]
 	GetNotAvailableInstanceNameSet() sets.Set[string]

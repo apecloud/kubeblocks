@@ -153,9 +153,9 @@ func updateProgressDetailTime(progressDetail *opsv1alpha1.ProgressStatusDetail) 
 	}
 }
 
-// handleRollingProgressByRevision reports rolling progress from the InstanceSet status contract.
-// Its participant summary also supplies the terminal result for partial operations.
-func handleRollingProgressByRevision(
+// handleRollingProgress reports rolling progress from the InstanceSet status contract.
+// It does not determine the operation's terminal phase.
+func handleRollingProgress(
 	reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	opsRes *OpsResource,
@@ -172,20 +172,15 @@ func handleRollingProgressByRevision(
 	if err != nil {
 		return 0, 0, err
 	}
-	expectedCount, completedCount := handleRollingProgressByRevisionWithWorkload(opsRes, workload, pgRes, compStatus)
+	expectedCount, completedCount := handleRollingProgressWithWorkload(opsRes, workload, pgRes, compStatus)
 	return expectedCount, completedCount, nil
 }
 
-func handleRollingProgressByRevisionWithWorkload(
+func handleRollingProgressWithWorkload(
 	opsRes *OpsResource,
 	workload Workload,
 	pgRes *progressResource,
 	compStatus *opsv1alpha1.OpsRequestComponentStatus) (int32, int32) {
-	pgRes.rollingProgressCompleted = false
-	pgRes.rollingProgressFailed = false
-	pgRes.partialRollingTarget = pgRes.updatedPodSet != nil
-	currentRevisions := workload.GetCurrentRevisionMap()
-	updateRevisions := workload.GetUpdateRevisionMap()
 	targetNames := make([]string, 0)
 	if pgRes.updatedPodSet != nil {
 		for name := range pgRes.updatedPodSet {
@@ -201,7 +196,7 @@ func handleRollingProgressByRevisionWithWorkload(
 	if pgRes.updatedPodSet == nil {
 		expectedCount = max(expectedCount, workload.GetDesiredReplicas(), pgRes.clusterComponent.Replicas)
 	}
-	if !workload.Exists() || !workload.IsStatusObserved() {
+	if !workload.Exists() {
 		return expectedCount, 0
 	}
 
@@ -224,12 +219,9 @@ func handleRollingProgressByRevisionWithWorkload(
 	for _, name := range targetNames {
 		objectKey := getProgressObjectKey(constant.PodKind, name)
 		detail := opsv1alpha1.ProgressStatusDetail{ObjectKey: objectKey}
-		targetRevision, hasTargetRevision := updateRevisions[name]
-		targetRevisionApplied := hasTargetRevision && targetRevision != "" && currentRevisions[name] == targetRevision
-		targetApplied := active.Has(name) && present.Has(name) && targetRevisionApplied && upToDate.Has(name)
+		targetApplied := active.Has(name) && present.Has(name) && upToDate.Has(name)
 		switch {
 		case targetApplied && failed.Has(name):
-			pgRes.rollingProgressFailed = true
 			detail.SetStatusAndMessage(opsv1alpha1.FailedProgressStatus,
 				getProgressFailedMessage(messageKey, objectKey, componentName,
 					getFailedPodMessage(opsRes.Cluster, componentName, name)))
@@ -246,7 +238,6 @@ func handleRollingProgressByRevisionWithWorkload(
 		setComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest,
 			&compStatus.ProgressDetails, detail)
 	}
-	pgRes.rollingProgressCompleted = !pgRes.rollingProgressFailed && completedCount == expectedCount
 	return expectedCount, completedCount
 }
 

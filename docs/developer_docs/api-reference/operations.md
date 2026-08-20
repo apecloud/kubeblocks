@@ -2221,20 +2221,6 @@ github.com/apecloud/kubeblocks/apis/apps/v1.ComponentPhase
 </tr>
 <tr>
 <td>
-<code>targetSpecHash</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>TargetSpecHash identifies the operation-owned portion of the Cluster component or sharding spec.
-It binds no-op actions to an explicit desired-state intent and detects when a later change overwrites
-that intent, while allowing unrelated Cluster changes to converge concurrently.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>lastFailedTime</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#time-v1-meta">
@@ -2486,9 +2472,8 @@ int64
 </td>
 <td>
 <em>(Optional)</em>
-<p>Records the Cluster generation produced by the OpsRequest action. A later generation may satisfy
-this operation only when the operation-owned target intent is still present and that later generation
-has been observed by the target status.</p>
+<p>Records the Cluster generation after the OpsRequest action. It is the lower bound for
+the Cluster status that may complete the operation.</p>
 </td>
 </tr>
 <tr>

@@ -379,13 +379,9 @@ func MockInstanceSetStatus(testCtx testutil.TestContext, cluster *appsv1.Cluster
 	currRevisions := map[string]string{}
 	instanceStatus := make([]workloads.InstanceStatus, 0)
 	notReadyPodNames := make([]string, 0)
-	failedPodNames := make([]string, 0)
 	for _, pod := range podList.Items {
 		currRevisions[pod.Name] = "revision"
 		failed := pod.Status.Phase == corev1.PodFailed
-		if failed {
-			failedPodNames = append(failedPodNames, pod.Name)
-		}
 		ready := podIsReady(&pod)
 		if !ready {
 			notReadyPodNames = append(notReadyPodNames, pod.Name)
@@ -411,14 +407,10 @@ func MockInstanceSetStatus(testCtx testutil.TestContext, cluster *appsv1.Cluster
 	}
 	compSpec := cluster.Spec.GetComponentByName(compName)
 	gomega.Eventually(GetAndChangeObjStatus(&testCtx, client.ObjectKey{Name: itsName, Namespace: cluster.Namespace}, func(its *workloads.InstanceSet) {
-		its.Status.ObservedGeneration = its.Generation
 		its.Status.CurrentRevisions = currRevisions
 		its.Status.UpdateRevisions = updateRevisions
 		its.Status.Replicas = compSpec.Replicas
 		its.Status.CurrentReplicas = int32(len(podList.Items))
-		its.Status.UpdatedReplicas = int32(len(podList.Items))
-		its.Status.ReadyReplicas = int32(len(podList.Items) - len(notReadyPodNames))
-		its.Status.AvailableReplicas = its.Status.ReadyReplicas
 		its.Status.InstanceStatus = instanceStatus
 		if len(notReadyPodNames) > 0 {
 			msg, _ := json.Marshal(notReadyPodNames)
@@ -436,21 +428,6 @@ func MockInstanceSetStatus(testCtx testutil.TestContext, cluster *appsv1.Cluster
 				ObservedGeneration: its.Generation,
 				Reason:             workloads.ReasonReady,
 			})
-		}
-		availableCondition := meta.FindStatusCondition(its.Status.Conditions, string(workloads.InstanceReady)).DeepCopy()
-		availableCondition.Type = string(workloads.InstanceAvailable)
-		meta.SetStatusCondition(&its.Status.Conditions, *availableCondition)
-		if len(failedPodNames) > 0 {
-			msg, _ := json.Marshal(failedPodNames)
-			meta.SetStatusCondition(&its.Status.Conditions, metav1.Condition{
-				Type:               string(workloads.InstanceFailure),
-				Status:             metav1.ConditionTrue,
-				ObservedGeneration: its.Generation,
-				Reason:             workloads.ReasonInstanceFailure,
-				Message:            string(msg),
-			})
-		} else {
-			meta.RemoveStatusCondition(&its.Status.Conditions, string(workloads.InstanceFailure))
 		}
 	})).Should(gomega.Succeed())
 }

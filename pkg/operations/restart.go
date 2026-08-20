@@ -80,7 +80,7 @@ func (r restartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	if err := cli.Update(reqCtx.Ctx, opsRes.Cluster); err != nil {
 		return err
 	}
-	return r.compOpsHelper.recordRollingTargetSpecs(opsRes)
+	return nil
 }
 
 // ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
@@ -88,7 +88,7 @@ func (r restartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 func (r restartOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (opsv1alpha1.OpsPhase, time.Duration, error) {
 	r.compOpsHelper = newComponentOpsHelper(opsRes.OpsRequest.Spec.RestartList)
 	return r.compOpsHelper.reconcileRollingActionWithComponentOps(reqCtx, cli, opsRes,
-		"restart", handleRollingProgressByRevision)
+		"restart", handleRollingProgress)
 }
 
 // SaveLastConfiguration this operation only restart the pods of the component, no changes for Cluster.spec.

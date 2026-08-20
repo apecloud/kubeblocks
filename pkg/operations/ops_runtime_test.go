@@ -66,8 +66,7 @@ func TestOpsRuntimeBuildsInstanceAPIView(t *testing.T) {
 			Replicas:        &replicas,
 		},
 		Status: workloads.InstanceSetStatus{
-			ObservedGeneration: 2,
-			Replicas:           1,
+			Replicas: 1,
 			CurrentRevisions: map[string]string{
 				instanceName: "rev-a",
 			},
@@ -206,19 +205,15 @@ func TestOpsRuntimeBuildsInstanceAPIView(t *testing.T) {
 	if workload.GetMinReadySeconds() != 15 {
 		t.Fatalf("unexpected minReadySeconds: %d", workload.GetMinReadySeconds())
 	}
-	if !workload.Exists() || !workload.IsStatusObserved() {
-		t.Fatal("expected an observed InstanceSet workload")
+	if !workload.Exists() {
+		t.Fatal("expected an InstanceSet workload")
 	}
-	if workload.GetDesiredReplicas() != 1 || workload.GetCurrentReplicas() != 1 {
-		t.Fatalf("unexpected desired/current replicas: %d/%d", workload.GetDesiredReplicas(), workload.GetCurrentReplicas())
+	if workload.GetDesiredReplicas() != 1 {
+		t.Fatalf("unexpected desired replicas: %d", workload.GetDesiredReplicas())
 	}
 	if got := workload.GetCurrentRevisionMap()[instanceName]; got != "rev-a" {
 		t.Fatalf("unexpected current revision: %s", got)
 	}
-	if got := workload.GetUpdateRevisionMap()[instanceName]; got != "rev-b" {
-		t.Fatalf("unexpected update revision: %s", got)
-	}
-
 	instance, err := rt.GetInstance(namespace, clusterName, component, instanceName)
 	if err != nil {
 		t.Fatalf("get instance: %v", err)
@@ -293,8 +288,8 @@ func TestOpsRuntimeWorkloadMissingAndUsesPublicInstanceStatus(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get missing workload: %v", err)
 	}
-	if workload.Exists() || workload.IsStatusObserved() {
-		t.Fatal("missing InstanceSet must remain an unobserved workload")
+	if workload.Exists() {
+		t.Fatal("missing InstanceSet must remain missing")
 	}
 
 	its := &workloads.InstanceSet{
@@ -304,9 +299,8 @@ func TestOpsRuntimeWorkloadMissingAndUsesPublicInstanceStatus(t *testing.T) {
 			Generation: 2,
 		},
 		Status: workloads.InstanceSetStatus{
-			ObservedGeneration: 1,
-			CurrentRevisions:   map[string]string{"zstd": "not-base64"},
-			UpdateRevisions:    map[string]string{"zstd": "not-base64"},
+			CurrentRevisions: map[string]string{"zstd": "not-base64"},
+			UpdateRevisions:  map[string]string{"zstd": "not-base64"},
 			InstanceStatus: []workloads.InstanceStatus{{
 				PodName:         "cluster-mysql-0",
 				CurrentRevision: "rev-a",
@@ -330,11 +324,7 @@ func TestOpsRuntimeWorkloadMissingAndUsesPublicInstanceStatus(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get workload from public instance status: %v", err)
 	}
-	if workload.IsStatusObserved() {
-		t.Fatal("workload status must remain unobserved when InstanceSet observedGeneration is stale")
-	}
 	if workload.GetCurrentRevisionMap()["cluster-mysql-0"] != "rev-a" ||
-		workload.GetUpdateRevisionMap()["cluster-mysql-0"] != "rev-b" ||
 		!workload.GetUpToDateInstanceNameSet().Has("cluster-mysql-0") ||
 		!workload.GetFailedInstanceNameSet().Has("cluster-mysql-0") {
 		t.Fatal("workload did not use explicit InstanceStatus fields")
@@ -342,7 +332,7 @@ func TestOpsRuntimeWorkloadMissingAndUsesPublicInstanceStatus(t *testing.T) {
 	if !workload.GetActiveInstanceNameSet().Has("cluster-mysql-0") ||
 		workload.GetActiveInstanceNameSet().Has("cluster-mysql-offline") ||
 		workload.GetActiveInstanceNameSet().Has("cluster-mysql-released") {
-		t.Fatal("workload did not filter rolling participants by effective desired state")
+		t.Fatal("workload did not filter active rolling instances by effective desired state")
 	}
 	if !workload.GetPresentInstanceNameSet().Has("cluster-mysql-0") ||
 		!workload.GetPresentInstanceNameSet().Has("cluster-mysql-released") ||

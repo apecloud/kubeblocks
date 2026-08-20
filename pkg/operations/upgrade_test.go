@@ -80,7 +80,6 @@ var _ = Describe("Upgrade OpsRequest", func() {
 		_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(opsv1alpha1.OpsCreatingPhase))
-		Expect(opsRes.OpsRequest.Status.Components[defaultCompName].TargetSpecHash).ShouldNot(BeEmpty())
 		targetComponents := opsRes.OpsRequest.Status.Components
 		mockComponentIsOperating(opsRes.Cluster, appsv1.UpdatingComponentPhase, defaultCompName)
 		opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsRunningPhase
@@ -266,13 +265,6 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			By("the ops succeeds from the current Cluster status without inspecting Pod images")
 			mockComponentIsOperating(opsRes.Cluster, appsv1.RunningComponentPhase, defaultCompName)
 			Expect(opsRes.OpsRequest.Status.ClusterGeneration).Should(Equal(opsRes.Cluster.Generation))
-			targetStatus := opsRes.OpsRequest.Status.Components[defaultCompName]
-			Expect(targetStatus.TargetSpecHash).ShouldNot(BeEmpty())
-			targetSpec, found := findRollingTargetSpec(opsRes.Cluster, defaultCompName)
-			Expect(found).Should(BeTrue())
-			currentHash, hashErr := rollingTargetSpecHash(targetSpec, opsRes.OpsRequest.Spec.Upgrade.Components[0])
-			Expect(hashErr).ShouldNot(HaveOccurred())
-			Expect(currentHash).Should(Equal(targetStatus.TargetSpecHash))
 			_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsSucceedPhase))
@@ -361,7 +353,7 @@ var _ = Describe("Upgrade OpsRequest", func() {
 				g.Expect(cluster.Spec.ComponentSpecs[0].ComponentDef).Should(Equal(compDef1.Name))
 				g.Expect(cluster.Spec.ComponentSpecs[0].ServiceVersion).Should(BeEmpty())
 				g.Expect(cluster.Generation).Should(BeNumerically(">", generationBeforeUpgrade))
-				g.Expect(cluster.Spec.ComponentSpecs[0].Annotations[constant.UpgradeIntentAnnotationKey]).
+				g.Expect(cluster.Spec.ComponentSpecs[0].Annotations[constant.UpgradeTriggerAnnotationKey]).
 					Should(Equal(string(opsRes.OpsRequest.UID)))
 			})).Should(Succeed())
 

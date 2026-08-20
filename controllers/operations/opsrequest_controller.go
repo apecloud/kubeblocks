@@ -230,8 +230,8 @@ func (r *OpsRequestReconciler) handleCancelSignal(reqCtx intctrlutil.RequestCtx,
 		r.Recorder.Eventf(opsRequest, corev1.EventTypeWarning, reasonOpsCancelActionFailed, err.Error())
 		return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
 	}
-	// Cancellation establishes a new desired Cluster spec. Fence rollback
-	// convergence against that exact generation rather than the original action.
+	// Cancellation establishes a new desired Cluster spec. Reset the lower bound
+	// so rollback cannot complete from status older than the cancellation.
 	opsRequest.Status.ClusterGeneration = opsRes.Cluster.Generation
 	opsRequest.Status.CancelTimestamp = metav1.Time{Time: time.Now()}
 	if err := operations.PatchOpsStatusWithOpsDeepCopy(reqCtx.Ctx, r.Client, opsRes, deepCopyOps,

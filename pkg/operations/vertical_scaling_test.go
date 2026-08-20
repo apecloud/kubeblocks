@@ -128,7 +128,7 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 			By("test vertical scale action function")
 			vsHandler := verticalScalingHandler{}
 			Expect(vsHandler.Action(reqCtx, k8sClient, opsRes)).Should(Succeed())
-			mockRollingOpsTargetStatus(opsRes, newComponentOpsHelper(verticalScaling))
+			recordRollingActionGeneration(opsRes)
 			_, _, err = vsHandler.ReconcileAction(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 			return opsRes
@@ -196,7 +196,7 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 
 			By("restarting 1 pod")
 			reCreatePod(pods[0])
-			mockRollingRevisionStatus(opsRes.Cluster, defaultCompName, "scaled-revision", pods[0].Name)
+			mockRollingInstanceStatus(opsRes.Cluster, defaultCompName, pods[0].Name)
 
 			By("reconcile opsRequest status")
 			_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
@@ -206,7 +206,7 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 			By("restarting remain 2 pods")
 			reCreatePod(pods[1])
 			reCreatePod(pods[2])
-			mockRollingRevisionStatus(opsRes.Cluster, defaultCompName, "scaled-revision",
+			mockRollingInstanceStatus(opsRes.Cluster, defaultCompName,
 				pods[0].Name, pods[1].Name, pods[2].Name)
 
 			By("mock cluster running")
@@ -288,7 +288,7 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 
 			By("mock podList[0] rolling update successfully by re-creating it")
 			reCreatePod(podList[0])
-			mockRollingRevisionStatus(opsRes.Cluster, defaultCompName, "scaled-revision", podList[0].Name)
+			mockRollingInstanceStatus(opsRes.Cluster, defaultCompName, podList[0].Name)
 
 			By("reconcile opsRequest status")
 			_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
@@ -304,7 +304,7 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 
 			By("mock podList[0] rolled back successfully by re-creating it")
 			reCreatePod(podList[0])
-			mockRollingRevisionStatus(opsRes.Cluster, defaultCompName, "rollback-revision",
+			mockRollingInstanceStatus(opsRes.Cluster, defaultCompName,
 				podList[0].Name, podList[1].Name, podList[2].Name)
 
 			By("reconcile opsRequest status after canceling opsRequest and component is Running after rolling update")

@@ -92,7 +92,7 @@ func (vs verticalScalingHandler) Action(reqCtx intctrlutil.RequestCtx, cli clien
 	if err := cli.Update(reqCtx.Ctx, opsRes.Cluster); err != nil {
 		return err
 	}
-	return compOpsSet.recordRollingTargetSpecs(opsRes)
+	return nil
 }
 
 // ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
@@ -142,7 +142,7 @@ func (vs verticalScalingHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, 
 			}
 			pgRes.updatedPodSet = updatedPodSet
 		}
-		return handleRollingProgressByRevision(reqCtx, cli, opsRes, pgRes, compStatus)
+		return handleRollingProgress(reqCtx, cli, opsRes, pgRes, compStatus)
 	}
 	return compOpsHelper.reconcileRollingActionWithComponentOps(reqCtx, cli, opsRes, "vertical scale", handleComponentStatusProgressForVS)
 }

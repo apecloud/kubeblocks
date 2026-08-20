@@ -275,7 +275,7 @@ func mockComponentIsOperating(cluster *appsv1.Cluster, expectPhase appsv1.Compon
 	})).Should(Succeed())
 }
 
-func mockRollingRevisionStatus(cluster *appsv1.Cluster, compName, targetRevision string, appliedNames ...string) {
+func mockRollingInstanceStatus(cluster *appsv1.Cluster, compName string, appliedNames ...string) {
 	testapps.MockInstanceSetStatus(testCtx, cluster, compName)
 	its := &workloads.InstanceSet{}
 	key := client.ObjectKey{
@@ -288,33 +288,21 @@ func mockRollingRevisionStatus(cluster *appsv1.Cluster, compName, targetRevision
 		applied[name] = struct{}{}
 	}
 	Expect(testapps.ChangeObjStatus(&testCtx, its, func() {
-		for name := range its.Status.UpdateRevisions {
-			its.Status.UpdateRevisions[name] = targetRevision
-			its.Status.CurrentRevisions[name] = "previous-revision"
-			if _, ok := applied[name]; ok {
-				its.Status.CurrentRevisions[name] = targetRevision
-			}
-		}
 		for i := range its.Status.InstanceStatus {
 			status := &its.Status.InstanceStatus[i]
-			status.UpdateRevision = targetRevision
-			status.CurrentRevision = "previous-revision"
 			status.UpToDate = false
 			if _, ok := applied[status.PodName]; ok {
-				status.CurrentRevision = targetRevision
 				status.UpToDate = true
 			}
 		}
-		its.Status.ObservedGeneration = its.Generation
 	})).Should(Succeed())
 }
 
-func mockRollingOpsTargetStatus(opsRes *OpsResource, helper componentOpsHelper) {
-	Expect(helper.recordRollingTargetSpecs(opsRes)).Should(Succeed())
-	opsRes.OpsRequest.Status.ClusterGeneration = opsRes.Cluster.Generation
-	targetStatus := opsRes.OpsRequest.DeepCopy().Status
+func recordRollingActionGeneration(opsRes *OpsResource) {
+	generation := opsRes.Cluster.Generation
+	opsRes.OpsRequest.Status.ClusterGeneration = generation
 	Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest), func(ops *opsv1alpha1.OpsRequest) {
-		ops.Status = targetStatus
+		ops.Status.ClusterGeneration = generation
 	})).Should(Succeed())
 }
 

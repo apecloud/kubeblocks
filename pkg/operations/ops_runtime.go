@@ -107,7 +107,6 @@ func (r *opsRuntime) GetWorkload(namespace, clusterName, compName string) (Workl
 	}
 	workload := &defaultWorkload{
 		currentRevisionMap:   map[string]string{},
-		updateRevisionMap:    map[string]string{},
 		upToDateSet:          sets.New[string](),
 		notReadySet:          sets.New[string](),
 		notAvailableSet:      sets.New[string](),
@@ -118,12 +117,10 @@ func (r *opsRuntime) GetWorkload(namespace, clusterName, compName string) (Workl
 	}
 	if its.Name != "" {
 		workload.exists = true
-		workload.statusObserved = its.Status.ObservedGeneration == its.Generation
 		workload.minReadySeconds = its.Spec.MinReadySeconds
 		if its.Spec.Replicas != nil {
 			workload.desiredReplicas = *its.Spec.Replicas
 		}
-		workload.currentReplicas = its.Status.Replicas
 		for _, status := range its.Status.InstanceStatus {
 			workload.instanceNames.Insert(status.PodName)
 			if status.EffectiveDesiredState() == workloads.InstanceDesiredStateActive {
@@ -133,7 +130,6 @@ func (r *opsRuntime) GetWorkload(namespace, clusterName, compName string) (Workl
 				workload.presentInstanceNames.Insert(status.PodName)
 			}
 			workload.currentRevisionMap[status.PodName] = status.CurrentRevision
-			workload.updateRevisionMap[status.PodName] = status.UpdateRevision
 			if status.UpToDate {
 				workload.upToDateSet.Insert(status.PodName)
 			}
@@ -150,7 +146,7 @@ func (r *opsRuntime) GetWorkload(namespace, clusterName, compName string) (Workl
 		return workload, nil
 	}
 
-	// Keep the legacy Pod snapshot for non-rolling operations. Rolling operations
+	// Keep the legacy Pod-based view for non-rolling operations. Rolling operations
 	// check Exists first and therefore wait for the InstanceSet status contract.
 	pods, err := component.ListOwnedPods(r.dataContext(), r.cli, namespace, clusterName, compName, r.dataListOpts...)
 	if err != nil {
@@ -381,12 +377,9 @@ func (r *opsRuntime) dataContext() context.Context {
 
 type defaultWorkload struct {
 	exists               bool
-	statusObserved       bool
 	minReadySeconds      int32
 	desiredReplicas      int32
-	currentReplicas      int32
 	currentRevisionMap   map[string]string
-	updateRevisionMap    map[string]string
 	upToDateSet          sets.Set[string]
 	notReadySet          sets.Set[string]
 	notAvailableSet      sets.Set[string]
@@ -398,17 +391,11 @@ type defaultWorkload struct {
 
 func (w *defaultWorkload) Exists() bool { return w.exists }
 
-func (w *defaultWorkload) IsStatusObserved() bool { return w.statusObserved }
-
 func (w *defaultWorkload) GetMinReadySeconds() int32 { return w.minReadySeconds }
 
 func (w *defaultWorkload) GetDesiredReplicas() int32 { return w.desiredReplicas }
 
-func (w *defaultWorkload) GetCurrentReplicas() int32 { return w.currentReplicas }
-
 func (w *defaultWorkload) GetCurrentRevisionMap() map[string]string { return w.currentRevisionMap }
-
-func (w *defaultWorkload) GetUpdateRevisionMap() map[string]string { return w.updateRevisionMap }
 
 func (w *defaultWorkload) GetUpToDateInstanceNameSet() sets.Set[string] {
 	return w.upToDateSet.Clone()

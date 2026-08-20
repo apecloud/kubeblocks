@@ -63,11 +63,9 @@ func (u upgradeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		if compSpec.Annotations == nil {
 			compSpec.Annotations = map[string]string{}
 		}
-		// Bind even a semantic no-op (for example, "" meaning latest) to this
-		// specific Upgrade. The unique intent changes Cluster generation and is
-		// propagated by the Apps owner before it can report that generation as
-		// observed and up-to-date.
-		compSpec.Annotations[constant.UpgradeIntentAnnotationKey] = upgradeIntent(opsRes.OpsRequest)
+		// Ensure a semantic no-op (for example, "" meaning latest) still changes
+		// Cluster generation and is reconciled by the Apps owner.
+		compSpec.Annotations[constant.UpgradeTriggerAnnotationKey] = upgradeTrigger(opsRes.OpsRequest)
 		if u.needUpdateCompDef(upgradeComp, opsRes.Cluster) {
 			compSpec.ComponentDef = *upgradeComp.ComponentDefinitionName
 		}
@@ -94,10 +92,10 @@ func (u upgradeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	if err := cli.Update(reqCtx.Ctx, opsRes.Cluster); err != nil {
 		return err
 	}
-	return compOpsHelper.recordRollingTargetSpecs(opsRes)
+	return nil
 }
 
-func upgradeIntent(opsRequest *opsv1alpha1.OpsRequest) string {
+func upgradeTrigger(opsRequest *opsv1alpha1.OpsRequest) string {
 	if opsRequest.UID != "" {
 		return string(opsRequest.UID)
 	}
@@ -113,7 +111,7 @@ func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 	upgradeSpec := opsRes.OpsRequest.Spec.Upgrade
 	compOpsHelper := newComponentOpsHelper(upgradeSpec.Components)
 	return compOpsHelper.reconcileRollingActionWithComponentOps(
-		reqCtx, cli, opsRes, "upgrade", handleRollingProgressByRevision)
+		reqCtx, cli, opsRes, "upgrade", handleRollingProgress)
 }
 
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration

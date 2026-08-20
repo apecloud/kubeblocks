@@ -83,7 +83,7 @@ var _ = Describe("Ops ProgressDetails", func() {
 		By("mock pod of InstanceSet updating by deleting the pod")
 		pod := pods[0]
 		testk8s.MockPodIsTerminating(ctx, testCtx, pod)
-		mockRollingRevisionStatus(opsRes.Cluster, defaultCompName, "restart-revision")
+		mockRollingInstanceStatus(opsRes.Cluster, defaultCompName)
 		_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 		Expect(getProgressDetailStatus(opsRes, defaultCompName, pod)).Should(Equal(opsv1alpha1.ProcessingProgressStatus))
 
@@ -91,7 +91,7 @@ var _ = Describe("Ops ProgressDetails", func() {
 		testk8s.RemovePodFinalizer(ctx, testCtx, pod)
 		testapps.MockInstanceSetPod(&testCtx, nil, clusterName, defaultCompName,
 			pod.Name, "leader")
-		mockRollingRevisionStatus(opsRes.Cluster, defaultCompName, "restart-revision", pod.Name)
+		mockRollingInstanceStatus(opsRes.Cluster, defaultCompName, pod.Name)
 
 		_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 		Expect(getProgressDetailStatus(opsRes, defaultCompName, pod)).Should(Equal(opsv1alpha1.SucceedProgressStatus))

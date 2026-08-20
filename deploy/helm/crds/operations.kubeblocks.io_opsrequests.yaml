@@ -3319,9 +3319,8 @@ spec:
                 type: string
               clusterGeneration:
                 description: |-
-                  Records the Cluster generation produced by the OpsRequest action. A later generation may satisfy
-                  this operation only when the operation-owned target intent is still present and that later generation
-                  has been observed by the target status.
+                  Records the Cluster generation after the OpsRequest action. It is the lower bound for
+                  the Cluster status that may complete the operation.
                 format: int64
                 type: integer
               completionTimestamp:
@@ -3456,12 +3455,6 @@ spec:
                       description: Provides an explanation for the Component being
                         in its current state.
                       maxLength: 1024
-                      type: string
-                    targetSpecHash:
-                      description: |-
-                        TargetSpecHash identifies the operation-owned portion of the Cluster component or sharding spec.
-                        It binds no-op actions to an explicit desired-state intent and detects when a later change overwrites
-                        that intent, while allowing unrelated Cluster changes to converge concurrently.
                       type: string
                   type: object
                 description: Records the status information of Components changed

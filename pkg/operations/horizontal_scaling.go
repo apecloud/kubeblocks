@@ -89,8 +89,7 @@ func (hs horizontalScalingOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli 
 				currHorizontalScaling := compOps.(opsv1alpha1.HorizontalScaling)
 				component := getComponentSpecOrShardingTemplate(opsRes.Cluster, v.ComponentName)
 				if component != nil && component.FlatInstanceOrdinal {
-					return false, intctrlutil.NewFatalError(fmt.Sprintf(
-						"concurrent horizontal scaling of flat-ordinal component %q is not supported", v.ComponentName))
+					return true, nil
 				}
 				// if the earlier opsRequest is pending return false.
 				if earlierOps.Status.Phase == opsv1alpha1.OpsPendingPhase {

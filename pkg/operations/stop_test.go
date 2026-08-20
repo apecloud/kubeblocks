@@ -122,7 +122,7 @@ var _ = Describe("Stop OpsRequest", func() {
 				testk8s.MockPodIsTerminating(ctx, testCtx, pods[i])
 				testk8s.RemovePodFinalizer(ctx, testCtx, pods[i])
 			}
-			publishInstanceSetStatus(opsRes.Cluster, defaultCompName)
+			testapps.MockInstanceSetStatus(testCtx, opsRes.Cluster, defaultCompName)
 
 			By("test reconcile")
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)

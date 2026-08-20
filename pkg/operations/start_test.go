@@ -147,7 +147,7 @@ var _ = Describe("Start OpsRequest", func() {
 
 			By("mock components start successfully")
 			testapps.MockInstanceSetPods(&testCtx, nil, opsRes.Cluster, defaultCompName)
-			publishInstanceSetStatus(opsRes.Cluster, defaultCompName)
+			testapps.MockInstanceSetStatus(testCtx, opsRes.Cluster, defaultCompName)
 
 			By("test reconcile")
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)

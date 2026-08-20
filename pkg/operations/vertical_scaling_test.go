@@ -111,7 +111,7 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 				})).Should(Succeed())
 			}
 			testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
-			publishInstanceSetStatus(opsRes.Cluster, defaultCompName)
+			testapps.MockInstanceSetStatus(testCtx, opsRes.Cluster, defaultCompName)
 			By("create VerticalScaling ops")
 			ops := testops.NewOpsRequestObj("vertical-scaling-ops-"+testCtx.GetRandomStr(), testCtx.DefaultNamespace,
 				clusterName, opsv1alpha1.VerticalScalingType)

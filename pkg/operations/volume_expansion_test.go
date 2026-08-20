@@ -401,7 +401,7 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
 			_, clusterObject := testapps.InitConsensusMysql(&testCtx, clusterName, compDefName, consensusCompName)
 			testapps.MockInstanceSetComponent(&testCtx, clusterName, consensusCompName)
-			publishInstanceSetStatus(clusterObject, consensusCompName)
+			testapps.MockInstanceSetStatus(testCtx, clusterObject, consensusCompName)
 			// init storageClass
 			sc := testapps.CreateStorageClass(&testCtx, storageClassName, true)
 			Expect(testapps.ChangeObj(&testCtx, sc, func(lsc *storagev1.StorageClass) {
@@ -450,7 +450,7 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 				}
 			})).ShouldNot(HaveOccurred())
 			testapps.MockInstanceSetComponent(&testCtx, clusterName, consensusCompName)
-			publishInstanceSetStatus(clusterObject, consensusCompName)
+			testapps.MockInstanceSetStatus(testCtx, clusterObject, consensusCompName)
 			// init storageClass
 			sc := testapps.CreateStorageClass(&testCtx, storageClassName, true)
 			Expect(testapps.ChangeObj(&testCtx, sc, func(lsc *storagev1.StorageClass) {

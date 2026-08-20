@@ -80,7 +80,11 @@ var _ = Describe("Component Version", func() {
 			const (
 				appName        = "app"
 				serviceVersion = "2.0.0"
+				toolsImage     = "docker.io/apecloud/kubeblocks-tools:test"
 			)
+			oldToolsImage := viperx.GetString(constant.KBToolsImage)
+			defer viperx.Set(constant.KBToolsImage, oldToolsImage)
+			viperx.Set(constant.KBToolsImage, toolsImage)
 
 			newAction := func() *appsv1.Action {
 				return &appsv1.Action{Exec: &appsv1.ExecAction{Command: []string{"true"}}}
@@ -110,8 +114,9 @@ var _ = Describe("Component Version", func() {
 				newCompVersion(map[string]string{appName: "app:2.0.0"}),
 			}, serviceVersion)
 			Expect(err).ShouldNot(HaveOccurred())
-			Expect(images).Should(HaveKeyWithValue(kbagent.ContainerName, viperx.GetString(constant.KBToolsImage)))
-			Expect(images).Should(HaveKeyWithValue(kbagent.ContainerName4Worker, viperx.GetString(constant.KBToolsImage)))
+			Expect(viperx.GetString(constant.KBToolsImage)).Should(Equal(toolsImage))
+			Expect(images).Should(HaveKeyWithValue(kbagent.ContainerName, toolsImage))
+			Expect(images).Should(HaveKeyWithValue(kbagent.ContainerName4Worker, toolsImage))
 		})
 
 		It("resolve images before and after new release", func() {

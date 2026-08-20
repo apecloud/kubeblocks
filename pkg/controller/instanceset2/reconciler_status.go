@@ -21,6 +21,7 @@ package instanceset2
 
 import (
 	"encoding/json"
+	"fmt"
 	"sort"
 	"time"
 
@@ -34,6 +35,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/revisionmap"
+	"github.com/apecloud/kubeblocks/pkg/controller/workloads/instancestatus"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -61,7 +63,16 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		inst, _ := object.(*workloads.Instance)
 		instanceList = append(instanceList, inst)
 	}
-
+	// Flat-ordinal reassignment can temporarily expose fewer authoritative names than spec.replicas.
+	// Validate before mutating any status fields so a partial view cannot replace the last complete status.
+	if its.Spec.FlatInstanceOrdinal {
+		if _, _, err := instancetemplate.BuildAssignments(tree, its); err != nil {
+			if instancetemplate.IsAssignmentIncomplete(err) {
+				return kubebuilderx.Continue, nil
+			}
+			return kubebuilderx.Continue, err
+		}
+	}
 	replicas := int32(0)
 	currentReplicas, updatedReplicas := int32(0), int32(0)
 	readyReplicas, availableReplicas := int32(0), int32(0)
@@ -164,7 +175,9 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 
 	// 4. set instance status
-	setInstanceStatus(its, instanceList)
+	if err := setInstanceStatus(tree, its, instanceList); err != nil {
+		return kubebuilderx.Continue, err
+	}
 
 	if its.Spec.MinReadySeconds > 0 && availableReplicas != readyReplicas {
 		return kubebuilderx.RetryAfter(time.Second), nil
@@ -264,73 +277,107 @@ func buildFailureCondition(its *workloads.InstanceSet, instances []*workloads.In
 	}, nil
 }
 
-func setInstanceStatus(its *workloads.InstanceSet, instances []*workloads.Instance) {
-	// compose new instance status
-	instanceStatus := make([]workloads.InstanceStatus, 0)
-	for _, inst := range instances {
-		status := workloads.InstanceStatus{
-			PodName: inst.Name,
+func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, instances []*workloads.Instance) error {
+	desiredAssignments, templateNames, err := instancetemplate.BuildAssignments(tree, its)
+	if err != nil {
+		return err
+	}
+	desiredTemplateAssignments := make([]instancestatus.TemplateAssignment, 0, len(desiredAssignments))
+	desiredNames := make(map[string]struct{}, len(desiredAssignments))
+	for _, assignment := range desiredAssignments {
+		desiredTemplateAssignments = append(desiredTemplateAssignments, instancestatus.TemplateAssignment{InstanceName: assignment.InstanceName, TemplateName: assignment.TemplateName})
+		desiredNames[assignment.InstanceName] = struct{}{}
+	}
+	instanceSpecUpdateRevisions, err := revisionmap.Decode(its.Status.UpdateRevisions)
+	if err != nil {
+		return err
+	}
+	podUpdateRevisions := make(map[string]string, len(instances))
+	offlineNames := append([]string(nil), its.Spec.OfflineInstances...)
+	templateHints := make([]instancestatus.TemplateAssignment, 0, len(desiredTemplateAssignments)+len(instances)+len(offlineNames))
+	if its.Spec.Stop != nil && *its.Spec.Stop {
+		// Stop removes the desired Pod assignments, but they remain useful for retaining template identity
+		// while the corresponding Instances are draining or have already disappeared.
+		for _, assignment := range desiredTemplateAssignments {
+			offlineNames = append(offlineNames, assignment.InstanceName)
+			templateHints = append(templateHints, assignment)
 		}
-		instanceStatus = append(instanceStatus, status)
+		desiredTemplateAssignments = nil
 	}
 
-	syncMemberStatus(its, instanceStatus, instances)
-
-	syncInstanceConfigStatus(instanceStatus, instances)
-
-	syncInstancePVCStatus(its, instanceStatus, instances)
-
-	sortInstanceStatus(instanceStatus)
-	its.Status.InstanceStatus = instanceStatus
-}
-
-func sortInstanceStatus(instanceStatus []workloads.InstanceStatus) {
-	getNameNOrdinalFunc := func(i int) (string, int) {
-		return parseParentNameAndOrdinal(instanceStatus[i].PodName)
-	}
-	baseSort(instanceStatus, getNameNOrdinalFunc, nil, true)
-}
-
-func syncMemberStatus(its *workloads.InstanceSet, instanceStatus []workloads.InstanceStatus, instances []*workloads.Instance) {
-	if its.Spec.Roles != nil {
-		roleMap := composeRoleMap(*its)
-		for _, inst := range instances {
-			if !intctrlutil.IsInstanceReadyWithRole(inst) {
-				continue
+	observations := make([]instancestatus.Observation, 0, len(instances))
+	seenInstances := make(map[string]struct{}, len(instances))
+	roleMap := composeRoleMap(*its)
+	for _, inst := range instances {
+		if _, ok := seenInstances[inst.Name]; ok {
+			return fmt.Errorf("duplicate Instance object for %q", inst.Name)
+		}
+		seenInstances[inst.Name] = struct{}{}
+		if inst.Status.ObservedGeneration == inst.Generation {
+			podUpdateRevisions[inst.Name] = inst.Status.UpdateRevision
+		}
+		templateHints = append(templateHints, instancestatus.TemplateAssignment{InstanceName: inst.Name, TemplateName: inst.Spec.InstanceTemplateName})
+		if templateName, ok := instancetemplate.TemplateNameFromLabels(inst.Labels); ok {
+			templateHints = append(templateHints, instancestatus.TemplateAssignment{InstanceName: inst.Name, TemplateName: templateName})
+		}
+		switch inst.Status.CurrentState {
+		case workloads.InstanceCurrentStatePresent, workloads.InstanceCurrentStateTerminating:
+			// InstanceSet revisions identify desired Instance specs, while Instance CurrentRevision identifies the
+			// actual Pod revision. Keep the two revision domains separate.
+			instanceSpecRevision := getInstanceRevision(inst)
+			observation := instancestatus.Observation{
+				InstanceName:    inst.Name,
+				State:           inst.Status.CurrentState,
+				Revision:        inst.Status.CurrentRevision,
+				UpToDate:        isInstanceUpdatedWithRevisions(inst, instanceSpecRevision, instanceSpecUpdateRevisions),
+				Ready:           inst.Status.Ready,
+				Available:       inst.Status.Available,
+				Failed:          meta.IsStatusConditionTrue(inst.Status.Conditions, string(workloads.InstanceFailure)),
+				Configs:         inst.Status.Configs,
+				VolumeExpansion: inst.Status.VolumeExpansion,
 			}
-			roleName := getInstanceRoleName(inst)
-			role, ok := roleMap[roleName]
-			if !ok {
-				continue
-			}
-			for i, status := range instanceStatus {
-				if status.PodName == inst.Name {
-					instanceStatus[i].Role = role.Name
-					break
+			if inst.Status.Ready {
+				if role, ok := roleMap[getInstanceRoleName(inst)]; ok {
+					observation.Role = role.Name
 				}
 			}
+			observations = append(observations, observation)
+		case workloads.InstanceCurrentStateAbsent, "":
+		default:
+			return fmt.Errorf("instance %q has invalid current state %q", inst.Name, inst.Status.CurrentState)
 		}
 	}
+
+	for _, name := range append(append([]string(nil), offlineNames...), observationNames(observations)...) {
+		if _, ok := desiredNames[name]; ok {
+			continue
+		}
+		if templateName, ok, err := instancetemplate.ResolveHistoricalTemplate(its, name, templateNames); err != nil {
+			return err
+		} else if ok {
+			templateHints = append(templateHints, instancestatus.TemplateAssignment{InstanceName: name, TemplateName: templateName})
+		}
+	}
+
+	statuses, err := instancestatus.Build(instancestatus.Input{
+		Previous:           its.Status.InstanceStatus,
+		DesiredAssignments: desiredTemplateAssignments,
+		Offline:            offlineNames,
+		Observations:       observations,
+		TemplateHints:      templateHints,
+		UpdateRevisions:    podUpdateRevisions,
+	})
+	if err != nil {
+		return err
+	}
+	its.Status.InstanceStatus = statuses
+	return nil
 }
 
-func syncInstanceConfigStatus(instanceStatus []workloads.InstanceStatus, instances []*workloads.Instance) {
-	for _, inst := range instances {
-		for i, status := range instanceStatus {
-			if status.PodName == inst.Name {
-				instanceStatus[i].Configs = inst.Status.Configs
-				break
-			}
-		}
+func observationNames(observations []instancestatus.Observation) []string {
+	names := make([]string, 0, len(observations))
+	for _, observation := range observations {
+		names = append(names, observation.InstanceName)
 	}
-}
-
-func syncInstancePVCStatus(_ *workloads.InstanceSet, instanceStatus []workloads.InstanceStatus, instances []*workloads.Instance) {
-	for _, inst := range instances {
-		for i, status := range instanceStatus {
-			if status.PodName == inst.Name {
-				instanceStatus[i].VolumeExpansion = inst.Status.VolumeExpansion
-				break
-			}
-		}
-	}
+	return names
 }

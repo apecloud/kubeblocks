@@ -59,6 +59,9 @@ func (c *flatNameBuilder) BuildInstanceName2TemplateMap() (map[string]*InstanceT
 		tplExt := buildInstanceTemplateExt(tpl, c.itsExt.InstanceSet)
 		for ordinal := range ordinalSet {
 			instanceName := fmt.Sprintf("%v-%v", c.itsExt.InstanceSet.Name, ordinal)
+			if existing, ok := allNameTemplateMap[instanceName]; ok {
+				return nil, fmt.Errorf("instance name %q is allocated by both templates %q and %q", instanceName, existing.Name, tplExt.Name)
+			}
 			allNameTemplateMap[instanceName] = tplExt
 		}
 	}

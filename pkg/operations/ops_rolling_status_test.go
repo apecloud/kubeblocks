@@ -317,29 +317,12 @@ func TestRollingComponentAndShardingTerminalStatus(t *testing.T) {
 		}
 	})
 
-	t.Run("partial progress cannot override component failure", func(t *testing.T) {
+	t.Run("failed status is ignored until the target is up-to-date", func(t *testing.T) {
 		cluster := &appsv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{Generation: 5},
 			Spec:       appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{{Name: "mysql"}}},
 			Status: appsv1.ClusterStatus{Components: map[string]appsv1.ClusterComponentStatus{
-				"mysql": {Phase: appsv1.FailedComponentPhase, ObservedGeneration: 5, UpToDate: true},
-			}},
-		}
-		ops := &opsv1alpha1.OpsRequest{Status: opsv1alpha1.OpsRequestStatus{ClusterGeneration: 5}}
-		helper := newComponentOpsHelper([]opsv1alpha1.ComponentOps{{ComponentName: "mysql"}})
-		opsRes := &OpsResource{Cluster: cluster, OpsRequest: ops}
-		completed, failed := helper.rollingTargetsState(opsRes)
-		if completed || !failed {
-			t.Fatalf("completed=%v failed=%v, want Cluster failure", completed, failed)
-		}
-	})
-
-	t.Run("partial progress waits for the component to converge", func(t *testing.T) {
-		cluster := &appsv1.Cluster{
-			ObjectMeta: metav1.ObjectMeta{Generation: 5},
-			Spec:       appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{{Name: "mysql"}}},
-			Status: appsv1.ClusterStatus{Components: map[string]appsv1.ClusterComponentStatus{
-				"mysql": {Phase: appsv1.UpdatingComponentPhase, ObservedGeneration: 5, UpToDate: true},
+				"mysql": {Phase: appsv1.FailedComponentPhase, ObservedGeneration: 5, UpToDate: false},
 			}},
 		}
 		ops := &opsv1alpha1.OpsRequest{Status: opsv1alpha1.OpsRequestStatus{ClusterGeneration: 5}}
@@ -347,7 +330,56 @@ func TestRollingComponentAndShardingTerminalStatus(t *testing.T) {
 		opsRes := &OpsResource{Cluster: cluster, OpsRequest: ops}
 		completed, failed := helper.rollingTargetsState(opsRes)
 		if completed || failed {
-			t.Fatalf("completed=%v failed=%v, want processing", completed, failed)
+			t.Fatalf("completed=%v failed=%v, want processing for stale failure", completed, failed)
+		}
+		status := cluster.Status.Components["mysql"]
+		status.UpToDate = true
+		cluster.Status.Components["mysql"] = status
+		completed, failed = helper.rollingTargetsState(opsRes)
+		if completed || !failed {
+			t.Fatalf("completed=%v failed=%v, want current Cluster failure", completed, failed)
+		}
+	})
+
+	t.Run("instance-scoped progress is independent of aggregate component status", func(t *testing.T) {
+		cluster := &appsv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: clusterName, Generation: 5},
+			Spec: appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{{
+				Name: "mysql", Replicas: 1,
+			}}},
+			Status: appsv1.ClusterStatus{Components: map[string]appsv1.ClusterComponentStatus{
+				"mysql": {Phase: appsv1.FailedComponentPhase, ObservedGeneration: 5, UpToDate: true},
+			}},
+		}
+		ops := &opsv1alpha1.OpsRequest{
+			ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "vertical-scaling"},
+			Status:     opsv1alpha1.OpsRequestStatus{ClusterGeneration: 5},
+		}
+		helper := newComponentOpsHelper([]opsv1alpha1.ComponentOps{{ComponentName: "mysql"}})
+		opsRes := &OpsResource{Cluster: cluster, OpsRequest: ops}
+		cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&opsv1alpha1.OpsRequest{}).WithObjects(cluster, ops).Build()
+		participantStatus := opsv1alpha1.SucceedProgressStatus
+		handler := func(_ intctrlutil.RequestCtx, _ client.Client, _ *OpsResource, pg *progressResource,
+			compStatus *opsv1alpha1.OpsRequestComponentStatus) (int32, int32, error) {
+			const podName = "cluster-mysql-0"
+			pg.updatedPodSet = map[string]string{podName: "template-a"}
+			compStatus.ProgressDetails = []opsv1alpha1.ProgressStatusDetail{{
+				ObjectKey: getProgressObjectKey(constant.PodKind, podName),
+				Status:    participantStatus,
+			}}
+			return 1, 1, nil
+		}
+		phase, _, err := helper.reconcileRollingActionWithComponentOps(
+			intctrlutil.RequestCtx{Ctx: context.Background()}, cli, opsRes, "vertical scale", handler)
+		if err != nil || phase != opsv1alpha1.OpsSucceedPhase {
+			t.Fatalf("phase=%s err=%v, want participant success despite aggregate failure", phase, err)
+		}
+
+		participantStatus = opsv1alpha1.FailedProgressStatus
+		phase, _, err = helper.reconcileRollingActionWithComponentOps(
+			intctrlutil.RequestCtx{Ctx: context.Background()}, cli, opsRes, "vertical scale", handler)
+		if err != nil || phase != opsv1alpha1.OpsFailedPhase {
+			t.Fatalf("phase=%s err=%v, want participant failure", phase, err)
 		}
 	})
 }

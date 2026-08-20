@@ -153,8 +153,8 @@ func updateProgressDetailTime(progressDetail *opsv1alpha1.ProgressStatusDetail) 
 	}
 }
 
-// handleRollingProgress reports rolling progress from the InstanceSet status contract.
-// It does not determine the operation's terminal phase.
+// handleRollingProgress reports the state of participating instances from the
+// InstanceSet status contract.
 func handleRollingProgress(
 	reqCtx intctrlutil.RequestCtx,
 	cli client.Client,

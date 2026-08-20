@@ -145,6 +145,17 @@ func componentStatusFailureCount(compStatus opsv1alpha1.OpsRequestComponentStatu
 	return count
 }
 
+func targetInstanceFailureCount(compStatus opsv1alpha1.OpsRequestComponentStatus, targetInstances map[string]string) int32 {
+	var count int32
+	for instanceName := range targetInstances {
+		detail := findStatusProgressDetail(compStatus.ProgressDetails, getProgressObjectKey(constant.PodKind, instanceName))
+		if detail != nil && detail.Status == opsv1alpha1.FailedProgressStatus {
+			count++
+		}
+	}
+	return count
+}
+
 func (c componentOpsHelper) getComponentOps(componentName string) (ComponentOpsInterface, bool) {
 	if len(c.componentOpsSet) == 0 {
 		return opsv1alpha1.ComponentOps{ComponentName: componentName}, true
@@ -239,7 +250,8 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 }
 
 // reconcileRollingActionWithComponentOps uses Cluster target status as the
-// terminal result. InstanceSet status is used only to report progress.
+// terminal result for component-wide operations. Instance-scoped operations
+// use the status of their participating InstanceSet instances.
 func (c componentOpsHelper) reconcileRollingActionWithComponentOps(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	opsRes *OpsResource,
@@ -284,6 +296,7 @@ func (c componentOpsHelper) reconcileActionWithComponentOpsPolicy(reqCtx intctrl
 	}
 	opsIsCompleted := true
 	existFailure := false
+	instanceStatusTargets := map[string]struct{}{}
 	for i := range progressResources {
 		pgResource := progressResources[i]
 		var componentPhase appsv1.ComponentPhase
@@ -301,7 +314,18 @@ func (c componentOpsHelper) reconcileActionWithComponentOpsPolicy(reqCtx intctrl
 		}
 		expectProgressCount += expectCount
 		completedProgressCount += completedCount
-		if !clusterStatusAuthoritative {
+		if clusterStatusAuthoritative && pgResource.updatedPodSet != nil {
+			// An instance-scoped operation is complete when its participating
+			// instances converge. Unrelated instances must not make it wait for,
+			// or inherit failure from, the aggregate Component status.
+			instanceStatusTargets[pgResource.compOps.GetComponentName()] = struct{}{}
+			if expectCount != completedCount {
+				opsIsCompleted = false
+			}
+			if targetInstanceFailureCount(opsCompStatus, pgResource.updatedPodSet) > 0 {
+				existFailure = true
+			}
+		} else if !clusterStatusAuthoritative {
 			componentFailureCount := componentStatusFailureCount(opsCompStatus)
 			if componentFailureCount > 0 {
 				existFailure = true
@@ -322,7 +346,9 @@ func (c componentOpsHelper) reconcileActionWithComponentOpsPolicy(reqCtx intctrl
 		opsRequest.Status.Components[pgResource.compOps.GetComponentName()] = opsCompStatus
 	}
 	if clusterStatusAuthoritative {
-		opsIsCompleted, existFailure = c.rollingTargetsState(opsRes)
+		clusterCompleted, clusterFailed := c.rollingTargetsStateExcept(opsRes, instanceStatusTargets)
+		opsIsCompleted = opsIsCompleted && clusterCompleted
+		existFailure = existFailure || clusterFailed
 	}
 	if clusterStatusAuthoritative && opsIsCompleted {
 		completedProgressCount = expectProgressCount
@@ -343,11 +369,18 @@ func (c componentOpsHelper) reconcileActionWithComponentOpsPolicy(reqCtx intctrl
 }
 
 func (c componentOpsHelper) rollingTargetsState(opsRes *OpsResource) (completed, failed bool) {
+	return c.rollingTargetsStateExcept(opsRes, nil)
+}
+
+func (c componentOpsHelper) rollingTargetsStateExcept(opsRes *OpsResource, excludedTargets map[string]struct{}) (completed, failed bool) {
 	if opsRes.OpsRequest.Status.Components == nil {
 		opsRes.OpsRequest.Status.Components = map[string]opsv1alpha1.OpsRequestComponentStatus{}
 	}
 	completed = true
 	for targetName := range c.componentOpsSet {
+		if _, excluded := excludedTargets[targetName]; excluded {
+			continue
+		}
 		var (
 			phase              appsv1.ComponentPhase
 			observedGeneration int64
@@ -389,10 +422,12 @@ func (c componentOpsHelper) rollingTargetsState(opsRes *OpsResource) (completed,
 		}
 
 		switch {
+		case !upToDate:
+			completed = false
 		case phase == appsv1.FailedComponentPhase:
 			failed = true
 			completed = false
-		case upToDate && (phase == appsv1.RunningComponentPhase || phase == appsv1.StoppedComponentPhase):
+		case phase == appsv1.RunningComponentPhase || phase == appsv1.StoppedComponentPhase:
 		default:
 			completed = false
 		}

@@ -28,14 +28,14 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 )
 
-// Allocation is an authoritative PodName-to-template assignment.
-type Allocation struct {
-	PodName      string
+// TemplateAssignment associates an instance identity with a template.
+type TemplateAssignment struct {
+	InstanceName string
 	TemplateName string
 }
 
-// CurrentObservation contains fields derived from a current Pod or Instance.
-type CurrentObservation struct {
+// Observation contains runtime fields observed from a Pod or Instance.
+type Observation struct {
 	InstanceName    string
 	State           workloads.InstanceCurrentState
 	CurrentRevision string
@@ -48,108 +48,107 @@ type CurrentObservation struct {
 	VolumeExpansion bool
 }
 
-// BuildInput contains the independently produced desired and observed dimensions of InstanceStatus.
-type BuildInput struct {
+// Input contains the independently produced desired and observed dimensions used to build InstanceStatus.
+type Input struct {
 	Previous        []workloads.InstanceStatus
-	Active          []Allocation
+	Active          []TemplateAssignment
 	Offline         []string
-	Current         []CurrentObservation
-	TemplateHints   []Allocation
+	Observations    []Observation
+	TemplateHints   []TemplateAssignment
 	UpdateRevisions map[string]string
 }
 
-// BuildResult contains a complete, bounded InstanceStatus view.
-type BuildResult struct {
-	Statuses []workloads.InstanceStatus
-}
-
 // Build merges InstanceStatus by PodName. It carries only retained template identity from Previous;
-// all current, revision, health, and runtime fields are rebuilt from Current.
-func Build(input BuildInput) (BuildResult, error) {
-	previous, err := indexPrevious(input.Previous)
+// all observed revision, health, and runtime fields are rebuilt from Observations.
+func Build(input Input) ([]workloads.InstanceStatus, error) {
+	previousByName, err := indexPrevious(input.Previous)
 	if err != nil {
-		return BuildResult{}, err
+		return nil, err
 	}
-	active, err := indexAllocations("active allocation", input.Active, true)
+	activeByName, err := indexAssignments("active assignment", input.Active, true)
 	if err != nil {
-		return BuildResult{}, err
+		return nil, err
 	}
 	// Active allocation is authoritative. A current object may still carry the previous template while an identity
 	// is moving between templates, so hints for Active names must not veto the desired allocation.
-	nonActiveHints := make([]Allocation, 0, len(input.TemplateHints))
+	nonActiveHints := make([]TemplateAssignment, 0, len(input.TemplateHints))
 	for _, hint := range input.TemplateHints {
-		if _, ok := active[hint.PodName]; !ok {
+		if _, ok := activeByName[hint.InstanceName]; !ok {
 			nonActiveHints = append(nonActiveHints, hint)
 		}
 	}
-	hints, err := indexAllocations("template hint", nonActiveHints, false)
+	templateHintsByName, err := indexAssignments("template hint", nonActiveHints, false)
 	if err != nil {
-		return BuildResult{}, err
+		return nil, err
 	}
-	offline := indexOfflineNames(input.Offline)
-	for name := range active {
-		if offline[name] {
-			return BuildResult{}, fmt.Errorf("instance %q is both Active and Offline", name)
+	offlineNames := indexOfflineNames(input.Offline)
+	for name := range activeByName {
+		if offlineNames[name] {
+			return nil, fmt.Errorf("instance %q is both Active and Offline", name)
 		}
 	}
 
-	current := make(map[string]*CurrentObservation, len(input.Current))
-	for i := range input.Current {
-		observation := &input.Current[i]
+	observationsByName := make(map[string]*Observation, len(input.Observations))
+	for i := range input.Observations {
+		observation := &input.Observations[i]
 		if observation.InstanceName == "" {
-			return BuildResult{}, fmt.Errorf("current observation has an empty instance name")
+			return nil, fmt.Errorf("observation has an empty instance name")
 		}
-		if _, ok := current[observation.InstanceName]; ok {
-			return BuildResult{}, fmt.Errorf("duplicate current observation for %q", observation.InstanceName)
+		if _, ok := observationsByName[observation.InstanceName]; ok {
+			return nil, fmt.Errorf("duplicate observation for %q", observation.InstanceName)
 		}
 		if observation.State != workloads.InstanceCurrentStatePresent && observation.State != workloads.InstanceCurrentStateTerminating {
-			return BuildResult{}, fmt.Errorf("current observation for %q has invalid state %q", observation.InstanceName, observation.State)
+			return nil, fmt.Errorf("observation for %q has invalid state %q", observation.InstanceName, observation.State)
 		}
-		current[observation.InstanceName] = observation
+		observationsByName[observation.InstanceName] = observation
 	}
 
-	names := make(map[string]struct{}, len(active)+len(offline)+len(current))
-	for name := range active {
+	names := make(map[string]struct{}, len(activeByName)+len(offlineNames)+len(observationsByName))
+	for name := range activeByName {
 		names[name] = struct{}{}
 	}
-	for name := range offline {
+	for name := range offlineNames {
 		names[name] = struct{}{}
 	}
-	for name := range current {
+	for name := range observationsByName {
 		names[name] = struct{}{}
 	}
 
-	result := BuildResult{Statuses: make([]workloads.InstanceStatus, 0, len(names))}
+	// Previous is intentionally excluded from the output identity set. It may retain template identity for a
+	// desired or observed instance, but must not keep a fully released and disappeared instance alive forever.
+	statuses := make([]workloads.InstanceStatus, 0, len(names))
 	for name := range names {
 		status := workloads.InstanceStatus{PodName: name, CurrentState: workloads.InstanceCurrentStateAbsent}
-		observation := current[name]
+		observation := observationsByName[name]
 		if observation != nil {
 			status.CurrentState = observation.State
 			status.CurrentRevision = observation.CurrentRevision
 		}
 
 		switch {
-		case active[name] != nil:
+		case activeByName[name] != nil:
 			status.DesiredState = workloads.InstanceDesiredStateActive
-			status.TemplateName = stringPtr(*active[name])
+			status.TemplateName = stringPtr(*activeByName[name])
 			status.UpdateRevision = input.UpdateRevisions[name]
-		case offline[name]:
+		case offlineNames[name]:
 			status.DesiredState = workloads.InstanceDesiredStateOffline
-			status.TemplateName = retainedTemplate(name, previous, hints)
+			status.TemplateName = retainedTemplateName(name, previousByName, templateHintsByName)
 		default:
 			status.DesiredState = workloads.InstanceDesiredStateReleased
-			status.TemplateName = retainedTemplate(name, previous, hints)
+			status.TemplateName = retainedTemplateName(name, previousByName, templateHintsByName)
 		}
 
 		if status.DesiredState != workloads.InstanceDesiredStateActive {
-			if old := previous[name]; old != nil && old.TemplateName != nil && status.TemplateName != nil && *old.TemplateName != *status.TemplateName {
-				return BuildResult{}, fmt.Errorf("instance %q has conflicting template assignments %q and %q", name, *old.TemplateName, *status.TemplateName)
+			if old := previousByName[name]; old != nil && old.TemplateName != nil && status.TemplateName != nil && *old.TemplateName != *status.TemplateName {
+				return nil, fmt.Errorf("instance %q has conflicting template assignments %q and %q", name, *old.TemplateName, *status.TemplateName)
 			}
-			if hint := hints[name]; hint != nil && status.TemplateName != nil && *hint != *status.TemplateName {
-				return BuildResult{}, fmt.Errorf("instance %q has conflicting template assignments %q and %q", name, *hint, *status.TemplateName)
+			if hint := templateHintsByName[name]; hint != nil && status.TemplateName != nil && *hint != *status.TemplateName {
+				return nil, fmt.Errorf("instance %q has conflicting template assignments %q and %q", name, *hint, *status.TemplateName)
 			}
 		}
 
+		// Terminating observations retain only lifecycle state and revision. Runtime health belongs to a usable,
+		// present instance and must be cleared rather than inherited from its previous status.
 		if observation != nil && observation.State == workloads.InstanceCurrentStatePresent {
 			status.Ready = observation.Ready
 			status.Available = observation.Ready && observation.Available
@@ -161,11 +160,11 @@ func Build(input BuildInput) (BuildResult, error) {
 				status.UpToDate = observation.UpToDate
 			}
 		}
-		result.Statuses = append(result.Statuses, status)
+		statuses = append(statuses, status)
 	}
 
-	sortStatuses(result.Statuses)
-	return result, nil
+	sortStatuses(statuses)
+	return statuses, nil
 }
 
 func indexPrevious(statuses []workloads.InstanceStatus) (map[string]*workloads.InstanceStatus, error) {
@@ -183,22 +182,22 @@ func indexPrevious(statuses []workloads.InstanceStatus) (map[string]*workloads.I
 	return result, nil
 }
 
-func indexAllocations(kind string, allocations []Allocation, rejectDuplicate bool) (map[string]*string, error) {
-	result := make(map[string]*string, len(allocations))
-	for _, allocation := range allocations {
-		if allocation.PodName == "" {
-			return nil, fmt.Errorf("%s has an empty PodName", kind)
+func indexAssignments(kind string, assignments []TemplateAssignment, rejectDuplicate bool) (map[string]*string, error) {
+	result := make(map[string]*string, len(assignments))
+	for _, assignment := range assignments {
+		if assignment.InstanceName == "" {
+			return nil, fmt.Errorf("%s has an empty instance name", kind)
 		}
-		if template, ok := result[allocation.PodName]; ok {
-			if *template != allocation.TemplateName {
-				return nil, fmt.Errorf("instance %q has conflicting %s templates %q and %q", allocation.PodName, kind, *template, allocation.TemplateName)
+		if template, ok := result[assignment.InstanceName]; ok {
+			if *template != assignment.TemplateName {
+				return nil, fmt.Errorf("instance %q has conflicting %s templates %q and %q", assignment.InstanceName, kind, *template, assignment.TemplateName)
 			}
 			if rejectDuplicate {
-				return nil, fmt.Errorf("duplicate %s for %q", kind, allocation.PodName)
+				return nil, fmt.Errorf("duplicate %s for %q", kind, assignment.InstanceName)
 			}
 			continue
 		}
-		result[allocation.PodName] = stringPtr(allocation.TemplateName)
+		result[assignment.InstanceName] = stringPtr(assignment.TemplateName)
 	}
 	return result, nil
 }
@@ -214,7 +213,7 @@ func indexOfflineNames(names []string) map[string]bool {
 	return result
 }
 
-func retainedTemplate(name string, previous map[string]*workloads.InstanceStatus, hints map[string]*string) *string {
+func retainedTemplateName(name string, previous map[string]*workloads.InstanceStatus, hints map[string]*string) *string {
 	if old := previous[name]; old != nil && old.TemplateName != nil {
 		return stringPtr(*old.TemplateName)
 	}

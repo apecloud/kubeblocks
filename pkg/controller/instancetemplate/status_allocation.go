@@ -40,14 +40,14 @@ func IsActiveAllocationIncomplete(err error) bool {
 	return errors.Is(err, ErrActiveAllocationIncomplete)
 }
 
-// InstanceAllocation is an authoritative PodName-to-template assignment.
-type InstanceAllocation struct {
-	PodName      string
+// Allocation is an authoritative instance-to-template assignment.
+type Allocation struct {
+	InstanceName string
 	TemplateName string
 }
 
 // BuildActiveAllocations obtains the authoritative active name-to-template view used by InstanceSet reconciliation.
-func BuildActiveAllocations(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet) ([]InstanceAllocation, []string, error) {
+func BuildActiveAllocations(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet) ([]Allocation, []string, error) {
 	itsExt, err := BuildInstanceSetExt(its, tree)
 	if err != nil {
 		return nil, nil, err
@@ -75,14 +75,14 @@ func BuildActiveAllocations(tree *kubebuilderx.ObjectTree, its *workloads.Instan
 		return nil, nil, fmt.Errorf("incomplete active instance allocation: expected %d names, got %d", expected, len(nameMap))
 	}
 
-	allocations := make([]InstanceAllocation, 0, len(nameMap))
+	allocations := make([]Allocation, 0, len(nameMap))
 	for name, template := range nameMap {
 		if template == nil {
 			return nil, nil, fmt.Errorf("active instance %q has no authoritative template", name)
 		}
-		allocations = append(allocations, InstanceAllocation{PodName: name, TemplateName: template.Name})
+		allocations = append(allocations, Allocation{InstanceName: name, TemplateName: template.Name})
 	}
-	sort.Slice(allocations, func(i, j int) bool { return allocations[i].PodName < allocations[j].PodName })
+	sort.Slice(allocations, func(i, j int) bool { return allocations[i].InstanceName < allocations[j].InstanceName })
 
 	templateNames := make([]string, 0, len(itsExt.InstanceTemplates)+1)
 	templateNames = append(templateNames, DefaultTemplateName)
@@ -109,18 +109,20 @@ func TemplateNameFromLabels(labels map[string]string) (string, bool) {
 	return "", false
 }
 
-// HistoricalTemplateHint resolves an old retained instance only from explicit allocation state or unambiguous
+// ResolveHistoricalTemplate resolves an old retained instance only from explicit allocation state or unambiguous
 // non-flat naming.
-func HistoricalTemplateHint(its *workloads.InstanceSet, podName string, knownTemplateNames []string) (string, bool, error) {
-	parent, ordinal, ok := parseInstanceName(podName)
+func ResolveHistoricalTemplate(its *workloads.InstanceSet, instanceName string, knownTemplateNames []string) (string, bool, error) {
+	parent, ordinal, ok := parseInstanceName(instanceName)
 	if !ok {
 		return "", false, nil
 	}
 	if its.Spec.FlatInstanceOrdinal {
+		// A flat name does not encode its template. Resolve only from explicit ordinal ownership and reject
+		// conflicting owners instead of guessing from the instance name.
 		var found *string
 		setFound := func(templateName string) error {
 			if found != nil && *found != templateName {
-				return fmt.Errorf("instance %q has conflicting ordinal templates %q and %q", podName, *found, templateName)
+				return fmt.Errorf("instance %q has conflicting ordinal templates %q and %q", instanceName, *found, templateName)
 			}
 			value := templateName
 			found = &value

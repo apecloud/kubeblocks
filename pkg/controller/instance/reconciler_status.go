@@ -112,6 +112,8 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 	inst.Status.Configs = configs
 
+	r.reconcileRestorePVCAnnotation(tree, inst)
+
 	if inst.Spec.MinReadySeconds > 0 && !available {
 		return kubebuilderx.RetryAfter(time.Second), nil
 	}
@@ -210,6 +212,69 @@ func (r *statusReconciler) hasRunningVolumeExpansion(tree *kubebuilderx.ObjectTr
 				return true
 			}
 		}
+	}
+	return false
+}
+
+func (r *statusReconciler) reconcileRestorePVCAnnotation(tree *kubebuilderx.ObjectTree, inst *workloads.Instance) {
+	var expected int
+	for _, vct := range inst.Spec.VolumeClaimTemplates {
+		if vct.Annotations[constant.RestoreSourceKindAnnotationKey] != "" {
+			expected++
+		}
+	}
+	if expected == 0 {
+		delete(inst.Annotations, constant.RestorePVCInitialStepCompletedAnnotationKey)
+		return
+	}
+
+	pvcMap := map[string]*corev1.PersistentVolumeClaim{}
+	for _, obj := range tree.List(&corev1.PersistentVolumeClaim{}) {
+		pvc, _ := obj.(*corev1.PersistentVolumeClaim)
+		pvcMap[pvc.Name] = pvc
+	}
+
+	completed := 0
+	for _, vct := range inst.Spec.VolumeClaimTemplates {
+		if vct.Annotations[constant.RestoreSourceKindAnnotationKey] == "" {
+			continue
+		}
+		pvcName := intctrlutil.ComposePVCName(corev1.PersistentVolumeClaim{ObjectMeta: vct.ObjectMeta}, inst.Spec.InstanceSetName, inst.Name)
+		pvc, ok := pvcMap[pvcName]
+		if !ok || !pvc.DeletionTimestamp.IsZero() || !restorePVCInitialStepCompleted(pvc) {
+			continue
+		}
+		completed++
+	}
+
+	if completed == expected {
+		if inst.Annotations == nil {
+			inst.Annotations = make(map[string]string)
+		}
+		inst.Annotations[constant.RestorePVCInitialStepCompletedAnnotationKey] = "true"
+	} else {
+		delete(inst.Annotations, constant.RestorePVCInitialStepCompletedAnnotationKey)
+	}
+}
+
+func restorePVCInitialStepCompleted(pvc *corev1.PersistentVolumeClaim) bool {
+	for i := range pvc.Status.Conditions {
+		condition := pvc.Status.Conditions[i]
+		if string(condition.Type) != string(workloads.InstanceRestore) {
+			continue
+		}
+		if condition.Status != corev1.ConditionUnknown {
+			return false
+		}
+	}
+	for i := range pvc.Status.Conditions {
+		condition := pvc.Status.Conditions[i]
+		if string(condition.Type) != constant.DataProtectionPVCConditionPopulating {
+			continue
+		}
+		return condition.Status == corev1.ConditionTrue &&
+			(condition.Reason == constant.DataProtectionPVCConditionReasonPopulatingSucceed ||
+				condition.Reason == constant.DataProtectionPVCConditionReasonPopulatingProvision)
 	}
 	return false
 }

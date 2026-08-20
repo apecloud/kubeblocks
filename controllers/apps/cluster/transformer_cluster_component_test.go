@@ -37,6 +37,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -560,6 +561,149 @@ var _ = Describe("cluster component transformer test", func() {
 			graphCli := transCtx.Client.(model.GraphClient)
 			objs := graphCli.FindAll(dag, &appsv1.Component{})
 			Expect(len(objs)).Should(Equal(0))
+		})
+
+		It("w/ orders provision - predecessor restore PVC initial step completed", func() {
+			transformer, transCtx, dag := newTransformerNCtx(clusterTopologyProvisionNUpdateOOD)
+			restoreVCT := appsv1.PersistentVolumeClaimTemplate{
+				Name: "data",
+				Annotations: map[string]string{
+					constant.RestoreSourceKindAnnotationKey: "Backup",
+				},
+				Spec: corev1.PersistentVolumeClaimSpec{
+					Resources: corev1.VolumeResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceStorage: resource.MustParse("1Gi"),
+						},
+					},
+				},
+			}
+			for i := range transCtx.components {
+				if transCtx.components[i].Name == comp1aName {
+					transCtx.components[i].Replicas = 1
+					transCtx.components[i].VolumeClaimTemplates = []appsv1.PersistentVolumeClaimTemplate{restoreVCT}
+					break
+				}
+			}
+			predecessor := mockCompObj(transCtx, comp1aName, func(comp *appsv1.Component) {
+				comp.Status.ObservedGeneration = comp.Generation
+				comp.Status.Phase = appsv1.CreatingComponentPhase
+				comp.Status.Conditions = []metav1.Condition{{
+					Type:   appsv1.ConditionTypeRestore,
+					Status: metav1.ConditionUnknown,
+					Reason: ReasonRestoreRunning,
+				}}
+			})
+			peerPredecessor := mockCompObj(transCtx, comp1bName, func(comp *appsv1.Component) {
+				comp.Status.Phase = appsv1.RunningComponentPhase
+			})
+			pvc := &corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: transCtx.Cluster.Namespace,
+					Name:      "data-" + predecessor.Name + "-0",
+					Labels:    constant.GetCompLabels(transCtx.Cluster.Name, comp1aName),
+					Annotations: map[string]string{
+						constant.RestoreSourceKindAnnotationKey: "Backup",
+					},
+				},
+				Status: corev1.PersistentVolumeClaimStatus{
+					Conditions: []corev1.PersistentVolumeClaimCondition{{
+						Type:   corev1.PersistentVolumeClaimConditionType(constant.DataProtectionPVCConditionPopulating),
+						Status: corev1.ConditionTrue,
+						Reason: constant.DataProtectionPVCConditionReasonPopulatingProvision,
+					}},
+				},
+			}
+			its := &workloads.InstanceSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: predecessor.Namespace,
+					Name:      predecessor.Name,
+				},
+				Spec: workloads.InstanceSetSpec{
+					Replicas: ptr.To[int32](1),
+					VolumeClaimTemplates: []corev1.PersistentVolumeClaim{{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "data",
+							Annotations: map[string]string{
+								constant.RestoreSourceKindAnnotationKey: "Backup",
+							},
+						},
+					}},
+				},
+			}
+			restoreOnlyPVC := pvc.DeepCopy()
+			restoreOnlyPVC.Status.Conditions = []corev1.PersistentVolumeClaimCondition{{
+				Type:   corev1.PersistentVolumeClaimConditionType(appsv1.ConditionTypeRestore),
+				Status: corev1.ConditionTrue,
+				Reason: constant.DataProtectionPVCConditionReasonPopulatingProvision,
+			}}
+			transCtx.Client = model.NewGraphClient(&appsutil.MockReader{
+				Objects: []client.Object{predecessor, peerPredecessor, its, restoreOnlyPVC},
+			})
+			completed, err := restorePVCInitialStepCompletedForComponent(transCtx, predecessor)
+			Expect(err).Should(BeNil())
+			Expect(completed).Should(BeFalse())
+
+			// the full restore has already completed for this PVC: the initial-step
+			// bypass must not apply anymore
+			terminalPVC := pvc.DeepCopy()
+			terminalPVC.Status.Conditions = append(terminalPVC.Status.Conditions, corev1.PersistentVolumeClaimCondition{
+				Type:   corev1.PersistentVolumeClaimConditionType(appsv1.ConditionTypeRestore),
+				Status: corev1.ConditionTrue,
+				Reason: constant.DataProtectionPVCConditionReasonPopulatingProvision,
+			})
+			transCtx.Client = model.NewGraphClient(&appsutil.MockReader{
+				Objects: []client.Object{predecessor, peerPredecessor, its, terminalPVC},
+			})
+			completed, err = restorePVCInitialStepCompletedForComponent(transCtx, predecessor)
+			Expect(err).Should(BeNil())
+			Expect(completed).Should(BeFalse())
+
+			// a leftover PVC with a name outside the expected set cannot substitute
+			// for the expected one
+			stalePVC := pvc.DeepCopy()
+			stalePVC.Name = "data-" + predecessor.Name + "-1"
+			transCtx.Client = model.NewGraphClient(&appsutil.MockReader{
+				Objects: []client.Object{predecessor, peerPredecessor, its, stalePVC},
+			})
+			completed, err = restorePVCInitialStepCompletedForComponent(transCtx, predecessor)
+			Expect(err).Should(BeNil())
+			Expect(completed).Should(BeFalse())
+
+			// without the ITS the expected PVC names cannot be resolved: stay strict
+			transCtx.Client = model.NewGraphClient(&appsutil.MockReader{
+				Objects: []client.Object{predecessor, peerPredecessor, pvc},
+			})
+			completed, err = restorePVCInitialStepCompletedForComponent(transCtx, predecessor)
+			Expect(err).Should(BeNil())
+			Expect(completed).Should(BeFalse())
+
+			reader := &appsutil.MockReader{
+				Objects: []client.Object{predecessor, peerPredecessor, its, pvc},
+			}
+			transCtx.Client = model.NewGraphClient(reader)
+			completed, err = restorePVCInitialStepCompletedForComponent(transCtx, predecessor)
+			Expect(err).Should(BeNil())
+			Expect(completed).Should(BeTrue())
+
+			err = transformer.Transform(transCtx, dag)
+
+			Expect(err).Should(BeNil())
+			graphCli := transCtx.Client.(model.GraphClient)
+			objs := graphCli.FindAll(dag, &appsv1.Component{})
+			Expect(objs).Should(HaveLen(2))
+			created := map[string]struct{}{}
+			for _, obj := range objs {
+				comp := obj.(*appsv1.Component)
+				shortName, err := component.ShortName(transCtx.Cluster.Name, comp.Name)
+				Expect(err).Should(BeNil())
+				created[shortName] = struct{}{}
+				Expect(graphCli.IsAction(dag, comp, model.ActionCreatePtr())).Should(BeTrue())
+			}
+			Expect(created).Should(Equal(map[string]struct{}{
+				comp2aName: {},
+				comp2bName: {},
+			}))
 		})
 
 		It("w/ orders provision - has a predecessor in DAG", func() {

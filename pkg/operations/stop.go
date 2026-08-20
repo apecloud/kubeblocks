@@ -20,16 +20,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
-	"fmt"
 	"slices"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -116,31 +117,31 @@ func (stop StopOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 		opsRes *OpsResource,
 		pgRes *progressResource,
 		compStatus *opsv1alpha1.OpsRequestComponentStatus) (int32, int32, error) {
-		workload, err := workloadForProgress(opsRes, pgRes.compOps.GetComponentName(), pgRes.fullComponentName)
+		runtime, err := opsRes.GetRuntime(pgRes.compOps.GetComponentName())
 		if err != nil {
 			return 0, 0, err
 		}
-		if !workload.HasInstanceStatus() {
-			runtime, runtimeErr := opsRes.GetRuntime(pgRes.compOps.GetComponentName())
-			if runtimeErr != nil {
-				return 0, 0, runtimeErr
+		if pgRes.clusterComponent.FlatInstanceOrdinal {
+			workload, err := runtime.GetWorkload(opsRes.Cluster.Namespace, opsRes.Cluster.Name, pgRes.fullComponentName)
+			if err != nil {
+				return 0, 0, err
 			}
-			plan, planErr := runtime.GenerateInstanceNamePlan(opsRes.Cluster.Namespace, opsRes.Cluster.Name,
-				pgRes.fullComponentName, *pgRes.clusterComponent)
-			if planErr != nil {
-				return 0, 0, planErr
+			explicitOffline := sets.New(pgRes.clusterComponent.OfflineInstances...)
+			pgRes.deletedPodSet, err = statusesToPodSet(workload.GetInstanceStatuses(), workloads.InstanceDesiredStateOffline,
+				func(status workloads.InstanceStatus) bool { return !explicitOffline.Has(status.PodName) }, false)
+			if err != nil {
+				return 0, 0, err
 			}
-			pgRes.deletedPodSet = plan.TemplateByName
+			if int32(len(pgRes.deletedPodSet)) != pgRes.clusterComponent.Replicas {
+				return 1, 0, nil
+			}
 			return handleComponentProgressForScalingReplicas(reqCtx, cli, opsRes, pgRes, compStatus)
 		}
-		snapshot := findParticipantSnapshot(compStatus, workload.GetName())
-		if snapshot == nil || !snapshot.Frozen {
-			return 0, 0, nil
+		pgRes.deletedPodSet, err = runtime.GenerateInstanceNameSet(opsRes.Cluster.Name, pgRes.fullComponentName,
+			pgRes.clusterComponent.Replicas, pgRes.clusterComponent.Instances, pgRes.clusterComponent.OfflineInstances)
+		if err != nil {
+			return 0, 0, err
 		}
-		if snapshot.WorkloadUID != workload.GetUID() {
-			return 0, 0, fmt.Errorf("InstanceSet %q was recreated during the operation", workload.GetName())
-		}
-		pgRes.deletedPodSet = participantsToSet(snapshot.Deleted)
 		expectProgressCount, completedCount, err := handleComponentProgressForScalingReplicas(reqCtx, cli, opsRes, pgRes, compStatus)
 		if err != nil {
 			return expectProgressCount, completedCount, err
@@ -153,10 +154,5 @@ func (stop StopOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration
 func (stop StopOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
-	compOps := newComponentOpsHelper(opsRes.OpsRequest.Spec.StopList)
-	if err := captureSourceParticipants(reqCtx, cli, opsRes, compOps); err != nil {
-		return err
-	}
-	freezeDeletedSourceParticipants(opsRes, compOps)
 	return nil
 }

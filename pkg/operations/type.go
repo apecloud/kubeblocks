@@ -27,14 +27,13 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -119,28 +118,6 @@ type progressResource struct {
 	componentPhase                      appsv1.ComponentPhase
 }
 
-// InstanceNamePlan is the desired instance naming result for a component spec.
-// Names keeps the ordering defined by instancetemplate.PodNameBuilder, while
-// TemplateByName records the instance template assigned to every name.
-type InstanceNamePlan struct {
-	Names                 []string
-	TemplateByName        map[string]string
-	OfflineTemplateByName map[string]string
-}
-
-func (p *InstanceNamePlan) NamesForTemplate(templateName string) []string {
-	if p == nil {
-		return nil
-	}
-	names := make([]string, 0)
-	for _, name := range p.Names {
-		if p.TemplateByName[name] == templateName {
-			names = append(names, name)
-		}
-	}
-	return names
-}
-
 // OpsRuntime abstracts the standard ops paths that only need workload/member views
 // plus a small set of runtime-owned actions.
 //
@@ -151,17 +128,14 @@ type OpsRuntime interface {
 	GetWorkload(namespace, clusterName, compName string) (Workload, error)
 	GetInstance(namespace, clusterName, compName, instanceName string) (Instance, error)
 	ListInstances(namespace, clusterName, compName string) ([]Instance, error)
-	GenerateInstanceNamePlan(namespace, clusterName, compName string, compSpec appsv1.ClusterComponentSpec) (*InstanceNamePlan, error)
+	GenerateInstanceNameSet(clusterName, compName string, compReplicas int32, instances []appsv1.InstanceTemplate, offlineInstances []string) (map[string]string, error)
+	GenerateTemplateInstanceNames(clusterName, compName, templateName string, replicas int32, offlineInstances []string, ordinals appsv1.Ordinals) ([]string, error)
 	Switchover(ctx context.Context, namespace, clusterName, compName, instanceName, candidateName string) error
 }
 
 type Workload interface {
-	GetName() string
-	GetUID() types.UID
-	GetGeneration() int64
-	HasInstanceStatus() bool
 	GetMinReadySeconds() int32
-	GetInstanceStatuses() []workloads.InstanceStatus
+	GetInstanceStatuses() []workloadsv1.InstanceStatus
 	GetInstanceNameSet() sets.Set[string]
 	GetCurrentRevisionMap() map[string]string
 	GetNotReadyInstanceNameSet() sets.Set[string]

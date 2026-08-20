@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -67,6 +66,12 @@ func TestOpsRuntimeBuildsInstanceAPIView(t *testing.T) {
 			CurrentRevisions: map[string]string{
 				instanceName: "rev-a",
 			},
+			InstanceStatus: []workloads.InstanceStatus{{
+				PodName:      instanceName,
+				TemplateName: templateName("big"),
+				DesiredState: workloads.InstanceDesiredStateActive,
+				CurrentState: workloads.InstanceCurrentStatePresent,
+			}},
 		},
 	}
 	pod := &corev1.Pod{
@@ -195,6 +200,15 @@ func TestOpsRuntimeBuildsInstanceAPIView(t *testing.T) {
 	if got := workload.GetCurrentRevisionMap()[instanceName]; got != "rev-a" {
 		t.Fatalf("unexpected current revision: %s", got)
 	}
+	instanceStatuses := workload.GetInstanceStatuses()
+	if len(instanceStatuses) != 1 || instanceStatuses[0].PodName != instanceName ||
+		instanceStatuses[0].TemplateName == nil || *instanceStatuses[0].TemplateName != "big" {
+		t.Fatalf("unexpected instance statuses: %#v", instanceStatuses)
+	}
+	instanceStatuses[0].PodName = "mutated"
+	if workload.GetInstanceStatuses()[0].PodName != instanceName {
+		t.Fatal("GetInstanceStatuses must return a deep copy")
+	}
 
 	instance, err := rt.GetInstance(namespace, clusterName, component, instanceName)
 	if err != nil {
@@ -276,127 +290,6 @@ func TestOpsRuntimeBuildsInstanceAPIView(t *testing.T) {
 	}
 	if volume.IsExpanding() {
 		t.Fatalf("did not expect volume to be expanding")
-	}
-}
-
-func TestOpsRuntimeGeneratesFlatInstanceNamePlan(t *testing.T) {
-	scheme := runtime.NewScheme()
-	if err := corev1.AddToScheme(scheme); err != nil {
-		t.Fatalf("add core scheme: %v", err)
-	}
-	if err := workloads.AddToScheme(scheme); err != nil {
-		t.Fatalf("add workloads scheme: %v", err)
-	}
-
-	const (
-		namespace   = "default"
-		clusterName = "test-cluster"
-		component   = "mysql"
-		workload    = "test-cluster-mysql"
-	)
-	runningITS := &workloads.InstanceSet{
-		ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: workload},
-		Status: workloads.InstanceSetStatus{AssignedOrdinals: map[string]workloads.Ordinals{
-			"":    {Discrete: []int32{0, 1}},
-			"big": {Discrete: []int32{5}},
-		}},
-	}
-	offlinePVC := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{
-		Namespace: namespace,
-		Name:      "data-test-cluster-mysql-7",
-		Labels: map[string]string{
-			constant.AppInstanceLabelKey:           clusterName,
-			constant.KBAppComponentLabelKey:        component,
-			constant.KBAppPodNameLabelKey:          "test-cluster-mysql-7",
-			constant.KBAppInstanceTemplateLabelKey: "big",
-		},
-	}}
-	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(runningITS, offlinePVC).Build()
-	rt := newOpsRuntime(context.Background(), cli, "")
-	bigReplicas := int32(1)
-	compSpec := appsv1.ClusterComponentSpec{
-		Name:                component,
-		Replicas:            3,
-		FlatInstanceOrdinal: true,
-		Instances: []appsv1.InstanceTemplate{{
-			Name:     "big",
-			Replicas: &bigReplicas,
-		}},
-		OfflineInstances: []string{"test-cluster-mysql-7"},
-	}
-	plan, err := rt.GenerateInstanceNamePlan(namespace, clusterName, component, compSpec)
-	if err != nil {
-		t.Fatalf("generate instance name plan: %v", err)
-	}
-
-	expectedNames := []string{"test-cluster-mysql-0", "test-cluster-mysql-1", "test-cluster-mysql-5"}
-	if len(plan.Names) != len(expectedNames) {
-		t.Fatalf("unexpected names: %v", plan.Names)
-	}
-	for i := range expectedNames {
-		if plan.Names[i] != expectedNames[i] {
-			t.Fatalf("unexpected names: %v", plan.Names)
-		}
-	}
-	if got := plan.TemplateByName["test-cluster-mysql-5"]; got != "big" {
-		t.Fatalf("unexpected template for flat instance: %q", got)
-	}
-	if got := plan.NamesForTemplate("big"); len(got) != 1 || got[0] != "test-cluster-mysql-5" {
-		t.Fatalf("unexpected names for big template: %v", got)
-	}
-	if got := plan.OfflineTemplateByName["test-cluster-mysql-7"]; got != "big" {
-		t.Fatalf("unexpected template for offline flat instance: %q", got)
-	}
-
-	scaledBigReplicas := int32(2)
-	compSpec.Replicas = 4
-	compSpec.Instances[0].Replicas = &scaledBigReplicas
-	scaledPlan, err := rt.GenerateInstanceNamePlan(namespace, clusterName, component, compSpec)
-	if err != nil {
-		t.Fatalf("generate scaled instance name plan: %v", err)
-	}
-	if got := scaledPlan.TemplateByName["test-cluster-mysql-2"]; got != "big" {
-		t.Fatalf("unexpected template for newly assigned flat instance: %q", got)
-	}
-}
-
-func TestOpsRuntimeUsesInstanceStatusCurrentState(t *testing.T) {
-	scheme := runtime.NewScheme()
-	if err := workloads.AddToScheme(scheme); err != nil {
-		t.Fatalf("add workloads scheme: %v", err)
-	}
-	defaultTemplate := ""
-	its := &workloads.InstanceSet{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "cluster-comp", UID: types.UID("uid-1")},
-		Status: workloads.InstanceSetStatus{InstanceStatus: []workloads.InstanceStatus{
-			{PodName: "present", TemplateName: &defaultTemplate, DesiredState: workloads.InstanceDesiredStateActive,
-				CurrentState: workloads.InstanceCurrentStatePresent, CurrentRevision: "rev-1", Ready: true, Available: true},
-			{PodName: "terminating", TemplateName: &defaultTemplate, DesiredState: workloads.InstanceDesiredStateReleased,
-				CurrentState: workloads.InstanceCurrentStateTerminating, CurrentRevision: "rev-1"},
-			{PodName: "absent", TemplateName: &defaultTemplate, DesiredState: workloads.InstanceDesiredStateActive,
-				CurrentState: workloads.InstanceCurrentStateAbsent, UpdateRevision: "rev-1"},
-		}},
-	}
-	rt := newOpsRuntime(context.Background(), fake.NewClientBuilder().WithScheme(scheme).WithObjects(its).Build(), "")
-	workload, err := rt.GetWorkload("default", "cluster", "comp")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if workload.GetUID() != types.UID("uid-1") || len(workload.GetInstanceStatuses()) != 3 {
-		t.Fatalf("workload identity/status was not published: uid=%q status=%#v", workload.GetUID(), workload.GetInstanceStatuses())
-	}
-	current := workload.GetCurrentRevisionMap()
-	if current["present"] != "rev-1" || current["terminating"] != "rev-1" {
-		t.Fatalf("present and terminating objects must remain observable: %#v", current)
-	}
-	if _, ok := current["absent"]; ok {
-		t.Fatalf("an absent object must not appear in the current revision map: %#v", current)
-	}
-	if !workload.GetNotReadyInstanceNameSet().Has("terminating") || workload.GetNotReadyInstanceNameSet().Has("present") {
-		t.Fatalf("unexpected readiness projection: %#v", workload.GetNotReadyInstanceNameSet())
-	}
-	if workload.GetNotAvailableInstanceNameSet().Has("present") {
-		t.Fatalf("availability must not depend on upToDate: %#v", workload.GetNotAvailableInstanceNameSet())
 	}
 }
 

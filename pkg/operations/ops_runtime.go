@@ -28,7 +28,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubectl/pkg/util/podutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -39,7 +38,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
-	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -113,70 +111,16 @@ func (r *opsRuntime) GetWorkload(namespace, clusterName, compName string) (Workl
 		instanceNames:      sets.New[string](),
 	}
 	if its.Name != "" {
-		workload.name = its.Name
-		workload.uid = its.UID
-		workload.generation = its.Generation
+		currRevisionMap, _ := instanceset.GetRevisions(its.Status.CurrentRevisions)
 		workload.minReadySeconds = its.Spec.MinReadySeconds
-		for i := range its.Status.InstanceStatus {
-			status := &its.Status.InstanceStatus[i]
-			if status.DesiredState != "" || status.CurrentState != "" {
-				workload.hasInstanceStatus = true
-				break
-			}
-		}
-		if !workload.hasInstanceStatus {
-			currentRevisions, _ := instanceset.GetRevisions(its.Status.CurrentRevisions)
-			workload.currentRevisionMap = currentRevisions
-			workload.instanceNames = sets.KeySet(currentRevisions)
-			workload.notReadySet = instanceset.GetPodNameSetFromInstanceSetCondition(its, workloads.InstanceReady)
-			workload.notAvailableSet = instanceset.GetPodNameSetFromInstanceSetCondition(its, workloads.InstanceAvailable)
-			workload.failedSet = instanceset.GetPodNameSetFromInstanceSetCondition(its, workloads.InstanceFailure)
-			pods, err := component.ListOwnedPods(r.dataContext(), r.cli, namespace, clusterName, compName, r.dataListOpts...)
-			if err != nil {
-				return nil, err
-			}
-			for _, pod := range pods {
-				templateName := pod.Labels[constant.KBAppInstanceTemplateLabelKey]
-				if templateName == "" {
-					templateName = appsv1.GetInstanceTemplateName(clusterName, compName, pod.Name)
-				}
-				workload.instanceStatuses = append(workload.instanceStatuses, workloads.InstanceStatus{
-					PodName:         pod.Name,
-					TemplateName:    &templateName,
-					DesiredState:    workloads.InstanceDesiredStateActive,
-					CurrentState:    workloads.InstanceCurrentStatePresent,
-					CurrentRevision: currentRevisions[pod.Name],
-					Ready:           !workload.notReadySet.Has(pod.Name),
-					Available:       !workload.notAvailableSet.Has(pod.Name),
-					Failed:          workload.failedSet.Has(pod.Name),
-				})
-			}
-			return workload, nil
-		}
+		workload.currentRevisionMap = currRevisionMap
+		workload.instanceNames = sets.KeySet(currRevisionMap)
+		workload.notReadySet = instanceset.GetPodNameSetFromInstanceSetCondition(its, workloads.InstanceReady)
+		workload.notAvailableSet = instanceset.GetPodNameSetFromInstanceSetCondition(its, workloads.InstanceAvailable)
+		workload.failedSet = instanceset.GetPodNameSetFromInstanceSetCondition(its, workloads.InstanceFailure)
 		workload.instanceStatuses = make([]workloads.InstanceStatus, len(its.Status.InstanceStatus))
 		for i := range its.Status.InstanceStatus {
-			status := its.Status.InstanceStatus[i]
-			status.DeepCopyInto(&workload.instanceStatuses[i])
-			currentState := status.EffectiveCurrentState()
-			if currentState == workloads.InstanceCurrentStateAbsent {
-				continue
-			}
-			workload.currentRevisionMap[status.PodName] = status.CurrentRevision
-			if currentState == workloads.InstanceCurrentStateTerminating {
-				workload.notReadySet.Insert(status.PodName)
-				workload.notAvailableSet.Insert(status.PodName)
-				continue
-			}
-			workload.instanceNames.Insert(status.PodName)
-			if !status.Ready {
-				workload.notReadySet.Insert(status.PodName)
-			}
-			if !status.Available {
-				workload.notAvailableSet.Insert(status.PodName)
-			}
-			if status.Failed {
-				workload.failedSet.Insert(status.PodName)
-			}
+			its.Status.InstanceStatus[i].DeepCopyInto(&workload.instanceStatuses[i])
 		}
 		return workload, nil
 	}
@@ -238,79 +182,17 @@ func (r *opsRuntime) ListInstances(namespace, clusterName, compName string) ([]I
 	return r.buildInstances(namespace, clusterName, compName, pods)
 }
 
-func (r *opsRuntime) GenerateInstanceNamePlan(namespace, clusterName, compName string, compSpec appsv1.ClusterComponentSpec) (*InstanceNamePlan, error) {
-	workloadName := constant.GenerateClusterComponentName(clusterName, compName)
-	runningITS := &workloads.InstanceSet{}
-	if err := r.cli.Get(r.ctx, client.ObjectKey{Namespace: namespace, Name: workloadName}, runningITS); err != nil && !apierrors.IsNotFound(err) {
-		return nil, err
-	}
+func (r *opsRuntime) GenerateInstanceNameSet(clusterName, compName string, compReplicas int32, instances []appsv1.InstanceTemplate, offlineInstances []string) (map[string]string, error) {
+	return generateAllPodNamesToSet(compReplicas, instances, offlineInstances, clusterName, compName)
+}
 
-	replicas := compSpec.Replicas
-	templates := make([]workloads.InstanceTemplate, len(compSpec.Instances))
-	for i := range compSpec.Instances {
-		templates[i] = workloads.InstanceTemplate{
-			Name:     compSpec.Instances[i].Name,
-			Replicas: compSpec.Instances[i].Replicas,
-			Ordinals: compSpec.Instances[i].Ordinals,
-		}
-	}
-	protoITS := &workloads.InstanceSet{
-		ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: workloadName},
-		Spec: workloads.InstanceSetSpec{
-			Replicas:            &replicas,
-			Instances:           templates,
-			Ordinals:            compSpec.Ordinals,
-			FlatInstanceOrdinal: compSpec.FlatInstanceOrdinal,
-			OfflineInstances:    compSpec.OfflineInstances,
-		},
-	}
-	if runningITS.Name != "" {
-		protoITS.Status.AssignedOrdinals = runningITS.DeepCopy().Status.AssignedOrdinals
-	}
-
-	itsExt, err := instancetemplate.BuildInstanceSetExt(protoITS, nil)
+func (r *opsRuntime) GenerateTemplateInstanceNames(clusterName, compName, templateName string, replicas int32, offlineInstances []string, ordinals appsv1.Ordinals) ([]string, error) {
+	workloadName := constant.GenerateWorkloadNamePattern(clusterName, compName)
+	ordinalList, err := instanceset.ConvertOrdinalsToSortedList(ordinals)
 	if err != nil {
 		return nil, err
 	}
-	nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt, nil)
-	if err != nil {
-		return nil, err
-	}
-	names, err := nameBuilder.GenerateAllInstanceNames()
-	if err != nil {
-		return nil, err
-	}
-	nameToTemplate, err := nameBuilder.BuildInstanceName2TemplateMap()
-	if err != nil {
-		return nil, err
-	}
-	templateByName := make(map[string]string, len(nameToTemplate))
-	for name, template := range nameToTemplate {
-		templateByName[name] = template.Name
-	}
-	offlineTemplateByName := make(map[string]string, len(compSpec.OfflineInstances))
-	if compSpec.FlatInstanceOrdinal && len(compSpec.OfflineInstances) > 0 {
-		offlineNames := sets.New(compSpec.OfflineInstances...)
-		volumes, err := r.loadVolumes(namespace, clusterName, compName)
-		if err != nil {
-			return nil, err
-		}
-		for _, pvc := range volumes {
-			instanceName := pvc.Labels[constant.KBAppPodNameLabelKey]
-			if offlineNames.Has(instanceName) {
-				offlineTemplateByName[instanceName] = pvc.Labels[constant.KBAppInstanceTemplateLabelKey]
-			}
-		}
-	} else {
-		for _, instanceName := range compSpec.OfflineInstances {
-			offlineTemplateByName[instanceName] = appsv1.GetInstanceTemplateName(clusterName, compName, instanceName)
-		}
-	}
-	return &InstanceNamePlan{
-		Names:                 names,
-		TemplateByName:        templateByName,
-		OfflineTemplateByName: offlineTemplateByName,
-	}, nil
+	return instanceset.GenerateInstanceNamesFromTemplate(workloadName, templateName, replicas, offlineInstances, ordinalList)
 }
 
 func (r *opsRuntime) Switchover(ctx context.Context, namespace, clusterName, compName, instanceName, candidateName string) error {
@@ -470,10 +352,6 @@ func (r *opsRuntime) dataContext() context.Context {
 }
 
 type defaultWorkload struct {
-	name               string
-	uid                types.UID
-	generation         int64
-	hasInstanceStatus  bool
 	minReadySeconds    int32
 	instanceStatuses   []workloads.InstanceStatus
 	currentRevisionMap map[string]string
@@ -482,14 +360,6 @@ type defaultWorkload struct {
 	failedSet          sets.Set[string]
 	instanceNames      sets.Set[string]
 }
-
-func (w *defaultWorkload) GetName() string { return w.name }
-
-func (w *defaultWorkload) GetUID() types.UID { return w.uid }
-
-func (w *defaultWorkload) GetGeneration() int64 { return w.generation }
-
-func (w *defaultWorkload) HasInstanceStatus() bool { return w.hasInstanceStatus }
 
 func (w *defaultWorkload) GetMinReadySeconds() int32 { return w.minReadySeconds }
 
@@ -703,4 +573,39 @@ func (v *instanceVolume) IsExpanding() bool {
 		}
 	}
 	return false
+}
+
+// Deprecated: should use instancetemplate.PodNameBuilder
+func generateAllPodNamesToSet(
+	compReplicas int32,
+	instances []appsv1.InstanceTemplate,
+	offlineInstances []string,
+	clusterName,
+	fullCompName string) (map[string]string, error) {
+	compName := constant.GenerateClusterComponentName(clusterName, fullCompName)
+	instanceNames, err := generateAllPodNames(compReplicas, instances, offlineInstances, compName)
+	if err != nil {
+		return nil, err
+	}
+	instanceSet := map[string]string{}
+	for _, insName := range instanceNames {
+		instanceSet[insName] = appsv1.GetInstanceTemplateName(clusterName, fullCompName, insName)
+	}
+	return instanceSet, nil
+}
+
+func generateAllPodNames(
+	compReplicas int32,
+	instances []appsv1.InstanceTemplate,
+	offlineInstances []string,
+	fullCompName string) ([]string, error) {
+	var templates []instanceset.InstanceTemplate
+	for i := range instances {
+		templates = append(templates, &workloads.InstanceTemplate{
+			Name:     instances[i].Name,
+			Replicas: instances[i].Replicas,
+			Ordinals: instances[i].Ordinals,
+		})
+	}
+	return instanceset.GenerateAllInstanceNames(fullCompName, compReplicas, templates, offlineInstances, appsv1.Ordinals{})
 }

@@ -724,6 +724,7 @@ func (inPlaceHelper *inplaceRebuildHelper) removePVCFinalizer(reqCtx intctrlutil
 func getPVCMapAndVolumes(opsRes *OpsResource,
 	synthesizedComp *component.SynthesizedComponent,
 	targetPod *corev1.Pod,
+	templateName string,
 	rebuildPrefix string,
 	index int,
 	noBackup bool) (map[string]*corev1.PersistentVolumeClaim, []corev1.Volume, []corev1.VolumeMount, error) {
@@ -741,10 +742,6 @@ func getPVCMapAndVolumes(opsRes *OpsResource,
 	}
 	// backup's ready, then start to check restore
 	workloadName := constant.GenerateWorkloadNamePattern(opsRes.Cluster.Name, synthesizedComp.Name)
-	templateName, _, err := getTemplateNameAndOrdinal(workloadName, targetPod.Name)
-	if err != nil {
-		return nil, nil, nil, err
-	}
 	// TODO: create pvc by the volumeClaimTemplates of instance template if it is necessary.
 	for i, vct := range synthesizedComp.VolumeClaimTemplates {
 		sourcePVCName := volumePVCMap[vct.Name]

@@ -33,80 +33,196 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/revisionmap"
 )
 
-func TestSyncInstanceConfigStatus(t *testing.T) {
+func TestSetInstanceStatusReadsCurrentStateFromInstance(t *testing.T) {
 	its := &workloads.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default", Generation: 3},
 		Spec: workloads.InstanceSetSpec{
-			Configs: []workloads.ConfigTemplate{
-				{Name: "log"},
-				{Name: "server"},
-			},
+			Replicas: ptr.To[int32](1),
+			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "demo"}},
+			Configs:  []workloads.ConfigTemplate{{Name: "config"}},
+		},
+		Status: workloads.InstanceSetStatus{ObservedGeneration: 3},
+	}
+	tree := kubebuilderx.NewObjectTree()
+	tree.SetRoot(its)
+	inst := &workloads.Instance{
+		ObjectMeta: metav1.ObjectMeta{Name: "demo-0", Generation: 1},
+		Spec:       workloads.InstanceSpec{InstanceTemplateName: ""},
+		Status: workloads.InstanceStatus2{
+			ObservedGeneration: 1,
+			CurrentState:       workloads.InstanceCurrentStateAbsent,
+			UpdateRevision:     "pod-revision",
+			UpToDate:           true,
+			Configs:            []workloads.InstanceConfigStatus{{Name: "config"}},
+			VolumeExpansion:    true,
 		},
 	}
-	instanceStatus := []workloads.InstanceStatus{
-		{PodName: "test-its-0"},
-		{PodName: "test-its-1"},
+	instanceSpecRevision := stampInstanceRevision(inst)
+	its.Status.UpdateRevisions = map[string]string{inst.Name: instanceSpecRevision}
+
+	if err := setInstanceStatus(tree, its, []*workloads.Instance{inst}); err != nil {
+		t.Fatal(err)
 	}
-	instances := []*workloads.Instance{
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "test-its-0"},
-			Status: workloads.InstanceStatus2{
-				Configs: []workloads.InstanceConfigStatus{
-					{Name: "log", Generation: 1},
-				},
-			},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "test-its-1"},
-			Status: workloads.InstanceStatus2{
-				Configs: []workloads.InstanceConfigStatus{
-					{Name: "log", Generation: 2},
-					{Name: "server", Generation: 3},
-				},
-			},
-		},
+	if len(its.Status.InstanceStatus) != 1 {
+		t.Fatalf("unexpected status: %#v", its.Status.InstanceStatus)
+	}
+	status := its.Status.InstanceStatus[0]
+	if status.TemplateName == nil || *status.TemplateName != "" || status.DesiredState != workloads.InstanceDesiredStateActive || status.CurrentState != workloads.InstanceCurrentStateAbsent {
+		t.Fatalf("Instance was not Active+Absent: %#v", status)
+	}
+	if status.UpdateRevision != inst.Status.UpdateRevision || status.CurrentRevision != "" || status.UpToDate || status.Configs != nil || status.VolumeExpansion {
+		t.Fatalf("Absent Instance retained runtime fields: %#v", status)
 	}
 
-	syncInstanceConfigStatus(its, instanceStatus, instances)
-
-	expected := []workloads.InstanceStatus{
-		{
-			PodName: "test-its-0",
-			Configs: []workloads.InstanceConfigStatus{
-				{Name: "log", Generation: 1},
-			},
-		},
-		{
-			PodName: "test-its-1",
-			Configs: []workloads.InstanceConfigStatus{
-				{Name: "log", Generation: 2},
-				{Name: "server", Generation: 3},
-			},
-		},
+	inst.Status.CurrentState = workloads.InstanceCurrentStatePresent
+	inst.Status.CurrentRevision = inst.Status.UpdateRevision
+	inst.Status.Ready = true
+	inst.Status.Available = true
+	inst.Status.Conditions = []metav1.Condition{
+		{Type: string(workloads.InstanceReady), Status: metav1.ConditionTrue},
+		{Type: string(workloads.InstanceAvailable), Status: metav1.ConditionTrue},
+		{Type: string(workloads.InstanceFailure), Status: metav1.ConditionTrue},
 	}
-	if !reflect.DeepEqual(expected, instanceStatus) {
-		t.Fatalf("unexpected instance status: %#v", instanceStatus)
+	if err := setInstanceStatus(tree, its, []*workloads.Instance{inst}); err != nil {
+		t.Fatal(err)
+	}
+	status = its.Status.InstanceStatus[0]
+	if status.CurrentState != workloads.InstanceCurrentStatePresent || status.CurrentRevision != inst.Status.CurrentRevision || status.UpdateRevision != inst.Status.UpdateRevision || !status.UpToDate || !status.Ready || !status.Available || !status.Failed || len(status.Configs) != 1 || !status.VolumeExpansion {
+		t.Fatalf("Present Instance did not refresh runtime fields: %#v", status)
+	}
+
+	inst.Status.UpToDate = false
+	if err := setInstanceStatus(tree, its, []*workloads.Instance{inst}); err != nil {
+		t.Fatal(err)
+	}
+	status = its.Status.InstanceStatus[0]
+	if status.UpToDate || !status.Ready || !status.Available {
+		t.Fatalf("Ready and Available must be independent from UpToDate: %#v", status)
+	}
+
+	inst.Status.CurrentState = workloads.InstanceCurrentStateTerminating
+	if err := setInstanceStatus(tree, its, []*workloads.Instance{inst}); err != nil {
+		t.Fatal(err)
+	}
+	status = its.Status.InstanceStatus[0]
+	if status.CurrentState != workloads.InstanceCurrentStateTerminating || status.CurrentRevision != inst.Status.CurrentRevision || status.UpdateRevision != inst.Status.UpdateRevision || status.UpToDate || status.Ready || status.Available || status.Failed || status.Configs != nil || status.VolumeExpansion {
+		t.Fatalf("Terminating Instance retained current runtime fields: %#v", status)
 	}
 }
 
-func TestSyncInstanceConfigStatusKeepsEmptyWhenInstanceHasNotReported(t *testing.T) {
+func TestSetInstanceStatusRetainsOfflineWithoutInstance(t *testing.T) {
 	its := &workloads.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default"},
 		Spec: workloads.InstanceSetSpec{
-			Configs: []workloads.ConfigTemplate{{Name: "log"}},
+			Replicas:         ptr.To[int32](1),
+			Selector:         &metav1.LabelSelector{},
+			OfflineInstances: []string{"demo-fast-0"},
+			Instances: []workloads.InstanceTemplate{{
+				Name:     "fast",
+				Replicas: ptr.To[int32](1),
+			}},
+		},
+		Status: workloads.InstanceSetStatus{InstanceStatus: []workloads.InstanceStatus{{
+			PodName:      "demo-fast-0",
+			TemplateName: ptr.To("fast"),
+		}}},
+	}
+	tree := kubebuilderx.NewObjectTree()
+	tree.SetRoot(its)
+	if err := setInstanceStatus(tree, its, nil); err != nil {
+		t.Fatal(err)
+	}
+	status := its.Status.InstanceStatus[0]
+	if status.PodName != "demo-fast-0" || status.TemplateName == nil || *status.TemplateName != "fast" || status.DesiredState != workloads.InstanceDesiredStateOffline || status.CurrentState != workloads.InstanceCurrentStateAbsent {
+		t.Fatalf("offline identity was not retained: %#v", status)
+	}
+}
+
+func TestSetInstanceStatusTreatsUnreportedInstanceAsAbsent(t *testing.T) {
+	its := &workloads.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default"},
+		Spec: workloads.InstanceSetSpec{
+			Replicas: ptr.To[int32](1),
+			Selector: &metav1.LabelSelector{},
 		},
 	}
-	instanceStatus := []workloads.InstanceStatus{
-		{PodName: "test-its-0"},
+	tree := kubebuilderx.NewObjectTree()
+	tree.SetRoot(its)
+	inst := &workloads.Instance{ObjectMeta: metav1.ObjectMeta{Name: "demo-0"}}
+
+	if err := setInstanceStatus(tree, its, []*workloads.Instance{inst}); err != nil {
+		t.Fatal(err)
 	}
-	instances := []*workloads.Instance{
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "test-its-0"},
+	status := its.FindInstanceStatus(inst.Name)
+	if status == nil || status.DesiredState != workloads.InstanceDesiredStateActive || status.CurrentState != workloads.InstanceCurrentStateAbsent {
+		t.Fatalf("unreported Instance was not published as Active+Absent: %#v", status)
+	}
+}
+
+func TestSetInstanceStatusKeepsRuntimeStateIndependentFromConvergence(t *testing.T) {
+	its := &workloads.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default"},
+		Spec: workloads.InstanceSetSpec{
+			Replicas: ptr.To[int32](1),
+			Selector: &metav1.LabelSelector{},
+			Roles:    []workloads.ReplicaRole{{Name: "leader"}},
+		},
+	}
+	tree := kubebuilderx.NewObjectTree()
+	tree.SetRoot(its)
+	inst := &workloads.Instance{
+		ObjectMeta: metav1.ObjectMeta{Name: "demo-0", Generation: 2},
+		Status: workloads.InstanceStatus2{
+			ObservedGeneration: 1,
+			CurrentState:       workloads.InstanceCurrentStatePresent,
+			CurrentRevision:    "current",
+			UpdateRevision:     "stale-target",
+			UpToDate:           true,
+			Ready:              true,
+			Available:          true,
+			Role:               "leader",
+			Conditions: []metav1.Condition{{
+				Type: string(workloads.InstanceFailure), Status: metav1.ConditionTrue,
+			}},
 		},
 	}
 
-	syncInstanceConfigStatus(its, instanceStatus, instances)
+	if err := setInstanceStatus(tree, its, []*workloads.Instance{inst}); err != nil {
+		t.Fatal(err)
+	}
+	status := its.FindInstanceStatus(inst.Name)
+	if status == nil || status.CurrentRevision != "current" || status.UpdateRevision != "" || status.UpToDate ||
+		!status.Ready || !status.Available || !status.Failed || status.Role != "leader" {
+		t.Fatalf("runtime state was coupled to stale desired-state convergence: %#v", status)
+	}
+}
 
-	if instanceStatus[0].Configs != nil {
-		t.Fatalf("expected empty configs, got %#v", instanceStatus[0].Configs)
+func TestSetInstanceStatusUsesActiveFlatTemplateOverStaleInstanceTemplate(t *testing.T) {
+	its := &workloads.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default"},
+		Spec: workloads.InstanceSetSpec{
+			Replicas: ptr.To[int32](1), FlatInstanceOrdinal: true,
+			Instances: []workloads.InstanceTemplate{{
+				Name: "fast", Replicas: ptr.To[int32](1), Ordinals: workloads.Ordinals{Discrete: []int32{0}},
+			}},
+		},
+		Status: workloads.InstanceSetStatus{
+			AssignedOrdinals: map[string]workloads.Ordinals{"": {Discrete: []int32{0}}},
+		},
+	}
+	tree := kubebuilderx.NewObjectTree()
+	tree.SetRoot(its)
+	inst := &workloads.Instance{
+		ObjectMeta: metav1.ObjectMeta{Name: "demo-0", Labels: map[string]string{constant.KBAppInstanceTemplateLabelKey: ""}},
+		Spec:       workloads.InstanceSpec{InstanceTemplateName: ""},
+	}
+
+	if err := setInstanceStatus(tree, its, []*workloads.Instance{inst}); err != nil {
+		t.Fatal(err)
+	}
+	status := its.FindInstanceStatus(inst.Name)
+	if status == nil || status.TemplateName == nil || *status.TemplateName != "fast" || status.DesiredState != workloads.InstanceDesiredStateActive {
+		t.Fatalf("active allocation did not override stale template observations: %#v", status)
 	}
 }
 
@@ -445,7 +561,7 @@ func TestBuildInstanceByTemplateStampsRevisionAnnotation(t *testing.T) {
 	}
 }
 
-func TestStatusReconcilerReadsCurrentRevisionFromInstanceAnnotation(t *testing.T) {
+func TestStatusReconcilerReadsCurrentRevisionFromInstanceStatus(t *testing.T) {
 	its := &workloads.InstanceSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:       "test-its",
@@ -501,7 +617,12 @@ func TestStatusReconcilerReadsCurrentRevisionFromInstanceAnnotation(t *testing.T
 	inst.Generation = 2
 	inst.Status = workloads.InstanceStatus2{
 		ObservedGeneration: 2,
+		CurrentState:       workloads.InstanceCurrentStatePresent,
+		CurrentRevision:    "pod-revision",
+		UpdateRevision:     "pod-revision",
 		UpToDate:           true,
+		Ready:              true,
+		Available:          true,
 		Conditions: []metav1.Condition{
 			{Type: string(workloads.InstanceReady), Status: metav1.ConditionTrue},
 			{Type: string(workloads.InstanceAvailable), Status: metav1.ConditionTrue},
@@ -521,7 +642,11 @@ func TestStatusReconcilerReadsCurrentRevisionFromInstanceAnnotation(t *testing.T
 		t.Fatalf("get current revisions: %v", err)
 	}
 	if currentRevisions[inst.Name] != desiredRevision {
-		t.Fatalf("expected current revision to match desired update revision, got %s want %s", currentRevisions[inst.Name], desiredRevision)
+		t.Fatalf("expected aggregate Instance spec revision, got %s want %s", currentRevisions[inst.Name], desiredRevision)
+	}
+	status := got.FindInstanceStatus(inst.Name)
+	if status == nil || status.CurrentRevision != inst.Status.CurrentRevision || status.UpdateRevision != inst.Status.UpdateRevision {
+		t.Fatalf("expected per-instance Pod revisions from Instance status, got %#v", status)
 	}
 	if got.Status.UpdatedReplicas != 1 {
 		t.Fatalf("expected updated replicas to stay at 1, got %d", got.Status.UpdatedReplicas)
@@ -534,11 +659,11 @@ func TestStatusReconcilerReadsCurrentRevisionFromInstanceAnnotation(t *testing.T
 		t.Fatalf("unexpected template status: %#v", got.Status.TemplatesStatus)
 	}
 	if got.Status.CurrentRevision != got.Status.UpdateRevision {
-		t.Fatalf("expected current revision to advance to update revision")
+		t.Fatalf("expected aggregate current revision to advance to update revision")
 	}
 }
 
-func TestStatusReconcilerDoesNotFallbackToLiveHashWhenRevisionAnnotationMissing(t *testing.T) {
+func TestStatusReconcilerDoesNotDependOnRevisionAnnotationForCurrentRevision(t *testing.T) {
 	its := &workloads.InstanceSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:       "test-its",
@@ -579,7 +704,12 @@ func TestStatusReconcilerDoesNotFallbackToLiveHashWhenRevisionAnnotationMissing(
 	inst.Generation = 2
 	inst.Status = workloads.InstanceStatus2{
 		ObservedGeneration: 2,
+		CurrentState:       workloads.InstanceCurrentStatePresent,
+		CurrentRevision:    "pod-current",
+		UpdateRevision:     "pod-target",
 		UpToDate:           true,
+		Ready:              true,
+		Available:          true,
 		Conditions: []metav1.Condition{
 			{Type: string(workloads.InstanceReady), Status: metav1.ConditionTrue},
 			{Type: string(workloads.InstanceAvailable), Status: metav1.ConditionTrue},
@@ -599,14 +729,74 @@ func TestStatusReconcilerDoesNotFallbackToLiveHashWhenRevisionAnnotationMissing(
 		t.Fatalf("get current revisions: %v", err)
 	}
 	if currentRevisions[inst.Name] != "" {
-		t.Fatalf("expected empty current revision for missing annotation, got %#v", currentRevisions)
+		t.Fatalf("expected empty aggregate spec revision for missing annotation, got %#v", currentRevisions)
+	}
+	status := got.FindInstanceStatus(inst.Name)
+	if status == nil || status.CurrentRevision != inst.Status.CurrentRevision || status.UpdateRevision != inst.Status.UpdateRevision {
+		t.Fatalf("expected per-instance Pod revisions from Instance status despite missing annotation, got %#v", status)
 	}
 	if got.Status.UpdatedReplicas != 0 {
-		t.Fatalf("expected missing revision annotation to keep updated replicas at 0, got %d", got.Status.UpdatedReplicas)
+		t.Fatalf("expected missing spec revision annotation to keep updated replicas at 0, got %d", got.Status.UpdatedReplicas)
 	}
 	if len(got.Status.TemplatesStatus) != 1 ||
 		got.Status.TemplatesStatus[0].UpdatedReplicas != 0 ||
 		got.Status.TemplatesStatus[0].CurrentReplicas != 1 {
 		t.Fatalf("unexpected template status: %#v", got.Status.TemplatesStatus)
+	}
+}
+
+func TestStatusReconcilerDoesNotPublishPartialFlatAllocation(t *testing.T) {
+	its := &workloads.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default", Generation: 3},
+		Spec: workloads.InstanceSetSpec{
+			Replicas: ptr.To[int32](2), FlatInstanceOrdinal: true, Template: corev1.PodTemplateSpec{},
+			Instances: []workloads.InstanceTemplate{
+				{Name: "a", Replicas: ptr.To[int32](1), Ordinals: workloads.Ordinals{Discrete: []int32{1}}},
+				{Name: "b", Replicas: ptr.To[int32](1), Ordinals: workloads.Ordinals{Discrete: []int32{0}}},
+			},
+		},
+		Status: workloads.InstanceSetStatus{
+			ObservedGeneration: 3,
+			ReadyReplicas:      2,
+			Conditions: []metav1.Condition{{
+				Type:               string(workloads.InstanceReady),
+				Status:             metav1.ConditionTrue,
+				ObservedGeneration: 2,
+			}},
+			AssignedOrdinals: map[string]workloads.Ordinals{
+				"a": {Discrete: []int32{0}}, "b": {Discrete: []int32{1}},
+			},
+			InstanceStatus: []workloads.InstanceStatus{{PodName: "demo-a-0"}},
+		},
+	}
+	before := its.DeepCopy().Status
+	tree := kubebuilderx.NewObjectTree()
+	tree.SetRoot(its)
+
+	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(before, its.Status) {
+		t.Fatalf("partial allocation changed status:\nbefore: %#v\nafter:  %#v", before, its.Status)
+	}
+}
+
+func TestFilterInstanceConfigs(t *testing.T) {
+	its := &workloads.InstanceSet{Spec: workloads.InstanceSetSpec{Configs: []workloads.ConfigTemplate{
+		{Name: "log"},
+		{Name: "server"},
+	}}}
+	configs := []workloads.InstanceConfigStatus{
+		{Name: "log", Generation: 1},
+		{Name: "removed", Generation: 2},
+	}
+
+	got := filterInstanceConfigs(its, configs)
+	want := []workloads.InstanceConfigStatus{{Name: "log", Generation: 1}}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("filterInstanceConfigs() = %#v, want %#v", got, want)
+	}
+	if filterInstanceConfigs(its, nil) != nil {
+		t.Fatal("nil config status should remain nil")
 	}
 }

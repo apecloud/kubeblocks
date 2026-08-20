@@ -51,6 +51,70 @@ var _ = Describe("status reconciler test", func() {
 		priorityMap = ComposeRolePriorityMap(its.Spec.Roles)
 	})
 
+	It("does not publish any status field from a partial flat allocation", func() {
+		replicas, one := int32(2), int32(1)
+		its = &workloads.InstanceSet{
+			ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default", Generation: 3},
+			Spec: workloads.InstanceSetSpec{
+				Replicas: &replicas, FlatInstanceOrdinal: true, Template: corev1.PodTemplateSpec{},
+				Instances: []workloads.InstanceTemplate{
+					{Name: "a", Replicas: &one, Ordinals: workloads.Ordinals{Discrete: []int32{1}}},
+					{Name: "b", Replicas: &one, Ordinals: workloads.Ordinals{Discrete: []int32{0}}},
+				},
+			},
+			Status: workloads.InstanceSetStatus{
+				ObservedGeneration: 3,
+				ReadyReplicas:      2,
+				Conditions: []metav1.Condition{{
+					Type:               string(workloads.InstanceReady),
+					Status:             metav1.ConditionTrue,
+					ObservedGeneration: 2,
+				}},
+				AssignedOrdinals: map[string]workloads.Ordinals{
+					"a": {Discrete: []int32{0}}, "b": {Discrete: []int32{1}},
+				},
+				InstanceStatus: []workloads.InstanceStatus{{PodName: "demo-a-0"}},
+			},
+		}
+		before := its.DeepCopy().Status
+		tree := kubebuilderx.NewObjectTree()
+		tree.SetRoot(its)
+
+		result, err := NewStatusReconciler().Reconcile(tree)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(result).Should(Equal(kubebuilderx.Continue))
+		Expect(its.Status).Should(Equal(before))
+	})
+
+	It("uses the active flat allocation while the current Pod still carries the old template", func() {
+		replicas := int32(1)
+		its = &workloads.InstanceSet{
+			ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default"},
+			Spec: workloads.InstanceSetSpec{
+				Replicas: &replicas, FlatInstanceOrdinal: true, Template: corev1.PodTemplateSpec{},
+				Instances: []workloads.InstanceTemplate{{
+					Name: "fast", Replicas: &replicas, Ordinals: workloads.Ordinals{Discrete: []int32{0}},
+				}},
+			},
+			Status: workloads.InstanceSetStatus{
+				AssignedOrdinals: map[string]workloads.Ordinals{"": {Discrete: []int32{0}}},
+				UpdateRevisions:  map[string]string{"demo-0": "target"},
+			},
+		}
+		tree := kubebuilderx.NewObjectTree()
+		tree.SetRoot(its)
+		pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{
+			Name: "demo-0", Labels: map[string]string{constant.KBAppInstanceTemplateLabelKey: ""},
+		}}
+
+		Expect(setInstanceStatus(tree, its, []*corev1.Pod{pod})).Should(Succeed())
+		status := its.FindInstanceStatus("demo-0")
+		Expect(status).ShouldNot(BeNil())
+		Expect(status.TemplateName).ShouldNot(BeNil())
+		Expect(*status.TemplateName).Should(Equal("fast"))
+		Expect(status.DesiredState).Should(Equal(workloads.InstanceDesiredStateActive))
+	})
+
 	Context("PreCondition & Reconcile", func() {
 		reconcilePods := func(tree *kubebuilderx.ObjectTree) {
 			By("fix meta")
@@ -371,43 +435,108 @@ var _ = Describe("status reconciler test", func() {
 
 	Context("setInstanceStatus function", func() {
 		It("should work well", func() {
+			its.Generation = 3
+			its.Status.ObservedGeneration = 3
 			pods := []*corev1.Pod{
-				builder.NewPodBuilder(namespace, "pod-0").AddLabels(RoleLabelKey, "follower").GetObject(),
-				builder.NewPodBuilder(namespace, "pod-1").AddLabels(RoleLabelKey, "leader").GetObject(),
-				builder.NewPodBuilder(namespace, "pod-2").AddLabels(RoleLabelKey, "follower").GetObject(),
+				builder.NewPodBuilder(namespace, "bar-0").AddLabels(RoleLabelKey, "follower").GetObject(),
+				builder.NewPodBuilder(namespace, "bar-1").AddLabels(RoleLabelKey, "leader").GetObject(),
+				builder.NewPodBuilder(namespace, "bar-2").AddLabels(RoleLabelKey, "follower").GetObject(),
 			}
 			readyCondition := corev1.PodCondition{
-				Type:   corev1.PodReady,
-				Status: corev1.ConditionTrue,
+				Type:               corev1.PodReady,
+				Status:             corev1.ConditionTrue,
+				LastTransitionTime: metav1.NewTime(time.Now().Add(-time.Hour)),
 			}
 			pods[0].Status.Conditions = append(pods[0].Status.Conditions, readyCondition)
 			pods[1].Status.Conditions = append(pods[1].Status.Conditions, readyCondition)
+			pods[0].Status.Phase = corev1.PodRunning
+			pods[1].Status.Phase = corev1.PodRunning
+			pods[2].Status.Phase = corev1.PodFailed
+			for _, pod := range pods {
+				pod.Labels[appsv1.ControllerRevisionHashLabelKey] = "current"
+			}
 			oldInstanceStatus := []workloads.InstanceStatus{
 				{
-					PodName: "pod-0",
+					PodName: "bar-0",
 					Role:    "leader",
 				},
 				{
-					PodName: "pod-1",
+					PodName: "bar-1",
 					Role:    "follower",
 				},
 				{
-					PodName: "pod-2",
+					PodName: "bar-2",
 					Role:    "follower",
 				},
 			}
 			replicas := int32(3)
 			its.Spec.Replicas = &replicas
 			its.Status.InstanceStatus = oldInstanceStatus
-			setInstanceStatus(nil, its, pods)
+			its.Status.UpdateRevisions = map[string]string{
+				"bar-0": "target", "bar-1": "target", "bar-2": "target",
+			}
+			Expect(setInstanceStatus(nil, its, pods)).Should(Succeed())
 
 			Expect(its.Status.InstanceStatus).Should(HaveLen(3))
-			Expect(its.Status.InstanceStatus[0].PodName).Should(Equal("pod-0"))
+			Expect(its.Status.InstanceStatus[0].PodName).Should(Equal("bar-0"))
 			Expect(its.Status.InstanceStatus[0].Role).Should(Equal("follower"))
-			Expect(its.Status.InstanceStatus[1].PodName).Should(Equal("pod-1"))
+			Expect(its.Status.InstanceStatus[0].DesiredState).Should(Equal(workloads.InstanceDesiredStateActive))
+			Expect(its.Status.InstanceStatus[0].CurrentState).Should(Equal(workloads.InstanceCurrentStatePresent))
+			Expect(its.Status.InstanceStatus[0].CurrentRevision).Should(Equal("current"))
+			Expect(its.Status.InstanceStatus[0].UpdateRevision).Should(Equal("target"))
+			Expect(its.Status.InstanceStatus[0].Ready).Should(BeTrue())
+			Expect(its.Status.InstanceStatus[0].Available).Should(BeTrue())
+			Expect(its.Status.InstanceStatus[0].TemplateName).ShouldNot(BeNil())
+			Expect(*its.Status.InstanceStatus[0].TemplateName).Should(BeEmpty())
+			Expect(its.Status.InstanceStatus[1].PodName).Should(Equal("bar-1"))
 			Expect(its.Status.InstanceStatus[1].Role).Should(Equal("leader"))
-			Expect(its.Status.InstanceStatus[2].PodName).Should(Equal("pod-2"))
+			Expect(its.Status.InstanceStatus[2].PodName).Should(Equal("bar-2"))
 			Expect(its.Status.InstanceStatus[2].Role).Should(Equal(""))
+			Expect(its.Status.InstanceStatus[2].Failed).Should(BeTrue())
+		})
+
+		It("retains an offline identity and template while its Pod disappears", func() {
+			replicas := int32(1)
+			its.Spec.Replicas = &replicas
+			its.Spec.OfflineInstances = []string{"bar-0"}
+			defaultTemplate := ""
+			its.Status.InstanceStatus = []workloads.InstanceStatus{{
+				PodName:        "bar-0",
+				TemplateName:   &defaultTemplate,
+				DesiredState:   workloads.InstanceDesiredStateActive,
+				CurrentState:   workloads.InstanceCurrentStatePresent,
+				UpdateRevision: "stale-target",
+				UpToDate:       true,
+				Ready:          true,
+				Available:      true,
+				Failed:         true,
+			}}
+			pod := builder.NewPodBuilder(namespace, "bar-0").GetObject()
+
+			Expect(setInstanceStatus(nil, its, []*corev1.Pod{pod})).Should(Succeed())
+			status := its.FindInstanceStatus("bar-0")
+			Expect(status).ShouldNot(BeNil())
+			Expect(status.DesiredState).Should(Equal(workloads.InstanceDesiredStateOffline))
+			Expect(status.CurrentState).Should(Equal(workloads.InstanceCurrentStatePresent))
+			Expect(status.UpdateRevision).Should(BeEmpty())
+			Expect(status.UpToDate).Should(BeFalse())
+			Expect(status.TemplateName).ShouldNot(BeNil())
+			Expect(*status.TemplateName).Should(BeEmpty())
+
+			pod.DeletionTimestamp = &metav1.Time{Time: metav1.Now().Time}
+			Expect(setInstanceStatus(nil, its, []*corev1.Pod{pod})).Should(Succeed())
+			Expect(its.FindInstanceStatus("bar-0").CurrentState).Should(Equal(workloads.InstanceCurrentStateTerminating))
+
+			Expect(setInstanceStatus(nil, its, nil)).Should(Succeed())
+			status = its.FindInstanceStatus("bar-0")
+			Expect(status).ShouldNot(BeNil())
+			Expect(status.CurrentState).Should(Equal(workloads.InstanceCurrentStateAbsent))
+			Expect(status.CurrentRevision).Should(BeEmpty())
+			Expect(status.Ready).Should(BeFalse())
+			Expect(status.Available).Should(BeFalse())
+			Expect(status.Failed).Should(BeFalse())
+			Expect(status.TemplateName).ShouldNot(BeNil())
+			Expect(*status.TemplateName).Should(BeEmpty())
 		})
 	})
 })

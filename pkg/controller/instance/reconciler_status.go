@@ -58,9 +58,14 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		return kubebuilderx.Continue, err
 	}
 	if obj == nil {
+		r.setPodUnavailableStatus(inst, workloads.InstanceCurrentStateAbsent, inst.Name, "")
 		return kubebuilderx.Continue, nil
 	}
 	pod := obj.(*corev1.Pod)
+	if isTerminating(pod) {
+		r.setPodUnavailableStatus(inst, workloads.InstanceCurrentStateTerminating, pod.Name, getPodRevision(pod))
+		return kubebuilderx.Continue, nil
+	}
 
 	ready, available, updated := false, false, false
 	notReadyName, notAvailableName := "", ""
@@ -77,13 +82,13 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			notAvailableName = pod.Name
 		}
 	}
-	if isCreated(pod) && !isTerminating(pod) {
+	if isCreated(pod) {
 		updated, err = isPodUpdated(inst, pod)
 		if err != nil {
 			return kubebuilderx.Continue, err
 		}
 	}
-	syncInstanceConfigStatus(inst)
+	inst.Status.CurrentState = workloads.InstanceCurrentStatePresent
 	inst.Status.CurrentRevision = getPodRevision(pod)
 	if updated {
 		inst.Status.CurrentRevision = inst.Status.UpdateRevision
@@ -107,6 +112,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	inst.Status.Available = available
 	inst.Status.Role = r.observedRoleOfPod(inst, pod)
 	inst.Status.VolumeExpansion = r.hasRunningVolumeExpansion(tree, inst)
+	inst.Status.Configs = observedConfigsOfInstance(inst)
 
 	if inst.Spec.MinReadySeconds > 0 && !available {
 		return kubebuilderx.RetryAfter(time.Second), nil
@@ -114,32 +120,20 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	return kubebuilderx.Continue, nil
 }
 
-func syncInstanceConfigStatus(inst *workloads.Instance) {
-	if len(inst.Spec.Configs) == 0 {
-		inst.Status.Configs = nil
-		return
-	}
-	if len(inst.Status.Configs) == 0 {
-		inst.Status.Configs = make([]workloads.InstanceConfigStatus, 0, len(inst.Spec.Configs))
-		for _, config := range inst.Spec.Configs {
-			inst.Status.Configs = append(inst.Status.Configs, workloads.InstanceConfigStatus{
-				Name:       config.Name,
-				Generation: config.Generation,
-			})
-		}
-		return
-	}
-	currentStatus := make(map[string]workloads.InstanceConfigStatus, len(inst.Status.Configs))
-	for _, config := range inst.Status.Configs {
-		currentStatus[config.Name] = config
-	}
-	configStatus := make([]workloads.InstanceConfigStatus, 0, len(inst.Spec.Configs))
-	for _, config := range inst.Spec.Configs {
-		if status, ok := currentStatus[config.Name]; ok {
-			configStatus = append(configStatus, status)
-		}
-	}
-	inst.Status.Configs = configStatus
+// An absent or terminating Pod cannot provide a valid runtime observation. Clear every Pod-derived field and
+// condition together so values from the previous Pod do not survive the lifecycle transition.
+func (r *statusReconciler) setPodUnavailableStatus(inst *workloads.Instance, state workloads.InstanceCurrentState, name, revision string) {
+	inst.Status.CurrentState = state
+	inst.Status.CurrentRevision = revision
+	inst.Status.UpToDate = false
+	inst.Status.Ready = false
+	inst.Status.Available = false
+	inst.Status.Role = ""
+	inst.Status.VolumeExpansion = false
+	inst.Status.Configs = nil
+	meta.SetStatusCondition(&inst.Status.Conditions, *r.buildReadyCondition(inst, false, name))
+	meta.SetStatusCondition(&inst.Status.Conditions, *r.buildAvailableCondition(inst, false, name))
+	meta.RemoveStatusCondition(&inst.Status.Conditions, string(workloads.InstanceFailure))
 }
 
 func (r *statusReconciler) buildReadyCondition(inst *workloads.Instance, ready bool, notReadyName string) *metav1.Condition {
@@ -236,4 +230,31 @@ func (r *statusReconciler) hasRunningVolumeExpansion(tree *kubebuilderx.ObjectTr
 		}
 	}
 	return false
+}
+
+func observedConfigsOfInstance(inst *workloads.Instance) []workloads.InstanceConfigStatus {
+	if len(inst.Spec.Configs) == 0 {
+		return nil
+	}
+	if len(inst.Status.Configs) == 0 {
+		configs := make([]workloads.InstanceConfigStatus, 0, len(inst.Spec.Configs))
+		for _, config := range inst.Spec.Configs {
+			configs = append(configs, workloads.InstanceConfigStatus{
+				Name:       config.Name,
+				Generation: config.Generation,
+			})
+		}
+		return configs
+	}
+	currentStatus := make(map[string]workloads.InstanceConfigStatus, len(inst.Status.Configs))
+	for _, config := range inst.Status.Configs {
+		currentStatus[config.Name] = config
+	}
+	configs := make([]workloads.InstanceConfigStatus, 0, len(inst.Spec.Configs))
+	for _, config := range inst.Spec.Configs {
+		if status, ok := currentStatus[config.Name]; ok {
+			configs = append(configs, status)
+		}
+	}
+	return configs
 }

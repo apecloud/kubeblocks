@@ -24,7 +24,6 @@ rules:
   - ""
   resources:
   - configmaps/finalizers
-  - persistentvolumeclaims/finalizers
   - pods/finalizers
   - pods/resize
   - secrets/finalizers
@@ -70,6 +69,13 @@ rules:
   - patch
   - update
   - watch
+- apiGroups:
+  - ""
+  resources:
+  - persistentvolumeclaims/finalizers
+  verbs:
+  - patch
+  - update
 - apiGroups:
   - ""
   resources:

@@ -83,6 +83,7 @@ type pvcRestoreDecision struct {
 
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims/finalizers,verbs=update
+// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusters,verbs=get;list;watch
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=components,verbs=get;list;watch
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=componentdefinitions,verbs=get;list;watch
 
@@ -1171,8 +1172,37 @@ func (r *VolumePopulatorReconciler) ensurePostReadyRestoreCompleted(reqCtx intct
 		}
 		return false, err
 	}
-	if comp.Status.Phase != appsv1.RunningComponentPhase || componentPostProvisionRunning(comp) {
-		if err = r.updatePVCConditionsIfPopulateNotReleased(reqCtx, pvc, "Waiting for component to finish post-provision"); err != nil {
+	existing := &dpv1alpha1.Restore{}
+	existingKey := types.NamespacedName{
+		Namespace: pvc.Namespace,
+		Name:      postReadyRestoreName(comp.UID),
+	}
+	if err = r.Client.Get(reqCtx.Ctx, existingKey, existing); err == nil {
+		desired, buildErr := r.buildPostReadyRestore(reqCtx, pvc, restoreMgr, comp, componentName, backupTarget)
+		if buildErr != nil {
+			return false, buildErr
+		}
+		if validateErr := validatePostReadyRestore(existing, desired, comp); validateErr != nil {
+			return false, validateErr
+		}
+		switch existing.Status.Phase {
+		case dpv1alpha1.RestorePhaseCompleted:
+			return true, nil
+		case dpv1alpha1.RestorePhaseFailed:
+			return false, intctrlutil.NewFatalError(fmt.Sprintf("postReady restore %s/%s failed", existing.Namespace, existing.Name))
+		default:
+			if err = r.updatePVCConditionsIfPopulateNotReleased(reqCtx, pvc, "Waiting for postReady restore to complete"); err != nil {
+				return false, err
+			}
+			return false, nil
+		}
+	} else if !apierrors.IsNotFound(err) {
+		return false, err
+	}
+	if comp.Generation != comp.Status.ObservedGeneration ||
+		comp.Status.Phase != appsv1.RunningComponentPhase || componentPostProvisionRunning(comp) {
+		if err = r.updatePVCConditionsIfPopulateNotReleased(reqCtx, pvc,
+			"Waiting for component to observe the current generation and finish post-provision"); err != nil {
 			return false, err
 		}
 		return false, nil
@@ -1184,7 +1214,11 @@ func (r *VolumePopulatorReconciler) ensurePostReadyRestoreCompleted(reqCtx intct
 	if parameters[dptypes.DeferPostReadyUntilClusterRunningParameterKey] == "true" {
 		cluster := &appsv1.Cluster{}
 		if err = r.Client.Get(reqCtx.Ctx, types.NamespacedName{Namespace: pvc.Namespace, Name: clusterName}, cluster); err != nil {
-			return false, err
+			if apierrors.IsForbidden(err) || apierrors.IsUnauthorized(err) {
+				return false, intctrlutil.NewFatalError(err.Error())
+			}
+			return false, intctrlutil.NewRequeueError(reconcileInterval,
+				fmt.Sprintf("waiting for target cluster %s/%s: %v", pvc.Namespace, clusterName, err))
 		}
 		if cluster.Status.Phase != appsv1.RunningClusterPhase {
 			if err = r.updatePVCConditionsIfPopulateNotReleased(reqCtx, pvc, "Waiting for cluster to run before postReady restore"); err != nil {
@@ -1197,33 +1231,13 @@ func (r *VolumePopulatorReconciler) ensurePostReadyRestoreCompleted(reqCtx intct
 	if err != nil {
 		return false, err
 	}
-	existing := &dpv1alpha1.Restore{}
-	if err = r.Client.Get(reqCtx.Ctx, client.ObjectKeyFromObject(postReadyRestore), existing); err != nil {
-		if !apierrors.IsNotFound(err) {
-			return false, err
-		}
-		if err = r.Client.Create(reqCtx.Ctx, postReadyRestore); err != nil && !apierrors.IsAlreadyExists(err) {
-			return false, err
-		}
-		if err = r.updatePVCConditionsIfPopulateNotReleased(reqCtx, pvc, "Waiting for postReady restore to complete"); err != nil {
-			return false, err
-		}
-		return false, nil
-	}
-	if err = validatePostReadyRestore(existing, postReadyRestore, comp); err != nil {
+	if err = r.Client.Create(reqCtx.Ctx, postReadyRestore); err != nil && !apierrors.IsAlreadyExists(err) {
 		return false, err
 	}
-	switch existing.Status.Phase {
-	case dpv1alpha1.RestorePhaseCompleted:
-		return true, nil
-	case dpv1alpha1.RestorePhaseFailed:
-		return false, intctrlutil.NewFatalError(fmt.Sprintf("postReady restore %s/%s failed", existing.Namespace, existing.Name))
-	default:
-		if err = r.updatePVCConditionsIfPopulateNotReleased(reqCtx, pvc, "Waiting for postReady restore to complete"); err != nil {
-			return false, err
-		}
-		return false, nil
+	if err = r.updatePVCConditionsIfPopulateNotReleased(reqCtx, pvc, "Waiting for postReady restore to complete"); err != nil {
+		return false, err
 	}
+	return false, nil
 }
 
 func (r *VolumePopulatorReconciler) updatePVCConditionsIfPopulateNotReleased(reqCtx intctrlutil.RequestCtx,
@@ -1321,7 +1335,7 @@ func (r *VolumePopulatorReconciler) buildPostReadyRestore(reqCtx intctrlutil.Req
 				Namespace: backupNamespace,
 			},
 			RestoreTime: pvc.Annotations[constant.RestorePITRAnnotationKey],
-			Env:         restoreMgr.Restore.Spec.Env,
+			Env:         stripPostReadyTargetEnv(restoreMgr.Restore.Spec.Env),
 			Parameters:  restoreParametersToPairs(restoreActionParameters(parameters)),
 			ReadyConfig: readyConfig,
 		},
@@ -1329,31 +1343,42 @@ func (r *VolumePopulatorReconciler) buildPostReadyRestore(reqCtx intctrlutil.Req
 	if effectiveTarget != nil {
 		restore.Spec.Backup.SourceTargetName = effectiveTarget.Name
 	}
-	if err = controllerutil.SetOwnerReference(comp, restore, r.Scheme); err != nil {
+	if err = controllerutil.SetControllerReference(comp, restore, r.Scheme); err != nil {
+		return nil, err
+	}
+	if err = dprestore.ValidateInternalPostReadyRestoreComponent(restore, comp); err != nil {
 		return nil, err
 	}
 	return restore, nil
 }
 
-func validatePostReadyRestore(existing, desired *dpv1alpha1.Restore, comp *appsv1.Component) error {
-	if !hasOwnerReference(existing.OwnerReferences, comp.UID) {
-		return intctrlutil.NewFatalError(fmt.Sprintf("postReady restore %s/%s is not owned by component %s/%s",
-			existing.Namespace, existing.Name, comp.Namespace, comp.Name))
+func stripPostReadyTargetEnv(source []corev1.EnvVar) []corev1.EnvVar {
+	var env []corev1.EnvVar
+	for i := range source {
+		if dptypes.IsPostReadyTargetEnv(source[i].Name) {
+			continue
+		}
+		env = append(env, source[i])
 	}
-	if !reflect.DeepEqual(existing.Spec, desired.Spec) {
+	return env
+}
+
+func validatePostReadyRestore(existing, desired *dpv1alpha1.Restore, comp *appsv1.Component) error {
+	if err := dprestore.ValidateInternalPostReadyRestoreComponent(existing, comp); err != nil {
+		return err
+	}
+	if err := dprestore.ValidateInternalPostReadyRestoreComponent(desired, comp); err != nil {
+		return err
+	}
+	existingSpec := existing.Spec.DeepCopy()
+	existingSpec.Env = stripPostReadyTargetEnv(existingSpec.Env)
+	desiredSpec := desired.Spec.DeepCopy()
+	desiredSpec.Env = stripPostReadyTargetEnv(desiredSpec.Env)
+	if !reflect.DeepEqual(existingSpec, desiredSpec) {
 		return intctrlutil.NewFatalError(fmt.Sprintf("postReady restore %s/%s spec does not match current restore intent",
 			existing.Namespace, existing.Name))
 	}
 	return nil
-}
-
-func hasOwnerReference(ownerRefs []metav1.OwnerReference, uid types.UID) bool {
-	for _, ownerRef := range ownerRefs {
-		if ownerRef.UID == uid {
-			return true
-		}
-	}
-	return false
 }
 
 func (r *VolumePopulatorReconciler) highestPriorityRoleName(reqCtx intctrlutil.RequestCtx, comp *appsv1.Component) (string, error) {
@@ -1594,8 +1619,9 @@ func postReadyRequiredPolicy(sourceTarget *dpv1alpha1.BackupStatusTarget) *dpv1a
 func postReadyRestoreLabels(pvc *corev1.PersistentVolumeClaim, comp *appsv1.Component) map[string]string {
 	restoreName := postReadyRestoreName(comp.UID)
 	labels := map[string]string{
-		dprestore.DataProtectionRestoreLabelKey:          restoreName,
-		dprestore.DataProtectionRestoreNamespaceLabelKey: pvc.Namespace,
+		dprestore.DataProtectionRestoreLabelKey:           restoreName,
+		dprestore.DataProtectionRestoreNamespaceLabelKey:  pvc.Namespace,
+		dprestore.DataProtectionInternalPostReadyLabelKey: dprestore.DataProtectionInternalPostReadyLabelValue,
 	}
 	for _, key := range []string{
 		constant.AppInstanceLabelKey,
@@ -1613,8 +1639,7 @@ func postReadyRestoreLabels(pvc *corev1.PersistentVolumeClaim, comp *appsv1.Comp
 }
 
 func postReadyRestoreName(componentUID types.UID) string {
-	// Backup dataSource restore is an initial, single-attempt restore for a Component UID.
-	return constant.ShortenKubeName(fmt.Sprintf("restore-%s-post-ready", componentUID), constant.KubeNameMaxLength)
+	return dprestore.PostReadyRestoreName(componentUID)
 }
 
 // cleanupDeletingPVC releases population resources when the target PVC is

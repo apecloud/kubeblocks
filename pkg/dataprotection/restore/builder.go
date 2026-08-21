@@ -310,6 +310,19 @@ func (r *restoreJobBuilder) addTargetPodAndCredentialEnv(pod *corev1.Pod,
 	return r
 }
 
+func (r *restoreJobBuilder) overridePostReadyTargetEnv(targetEnv []corev1.EnvVar) *restoreJobBuilder {
+	env := make([]corev1.EnvVar, 0, len(r.env))
+	for i := range r.env {
+		if dptypes.IsPostReadyTargetEnv(r.env[i].Name) {
+			continue
+		}
+		env = append(env, r.env[i])
+	}
+	env = append(env, targetEnv...)
+	r.env = env
+	return r
+}
+
 // builderRestoreJobName builds restore job name.
 func (r *restoreJobBuilder) builderRestoreJobName(jobIndex int) string {
 	jobName := fmt.Sprintf("restore-%s-%s-%s-%d", strings.ToLower(string(r.stage)), r.restore.UID[:8], r.backupSet.Backup.Name, jobIndex)

@@ -80,6 +80,9 @@ const (
 	// annotation keys
 	AnnSelectedNode = "volume.kubernetes.io/selected-node"
 	AnnPopulateFrom = "dataprotection.kubeblocks.io/populate-from"
+	// AnnPopulationAttempt records the immutable identity of the target PVC
+	// population attempt that performed a PV rebind.
+	AnnPopulationAttempt = "dataprotection.kubeblocks.io/population-attempt"
 
 	// event reason
 	ReasonStartToVolumePopulate = "StartToVolumePopulate"

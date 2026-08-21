@@ -84,30 +84,14 @@ func (r restartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 // the Reconcile function for restart opsRequest.
 func (r restartOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (opsv1alpha1.OpsPhase, time.Duration, error) {
 	r.compOpsHelper = newComponentOpsHelper(opsRes.OpsRequest.Spec.RestartList)
-	handleRestartProgress := func(reqCtx intctrlutil.RequestCtx,
-		cli client.Client,
-		opsRes *OpsResource,
-		pgRes *progressResource,
-		compStatus *opsv1alpha1.OpsRequestComponentStatus) (expectProgressCount int32, completedCount int32, err error) {
-		pgRes.deferInstanceFailureToWorkloadPhase = true
-		return handleComponentStatusProgress(reqCtx, cli, opsRes, pgRes, compStatus, r.podApplyCompOps)
-	}
-	return r.compOpsHelper.reconcileActionWithComponentOps(reqCtx, cli, opsRes,
-		"restart", handleRestartProgress)
+	return r.compOpsHelper.reconcileRollingActionWithComponentOps(reqCtx, cli, opsRes,
+		"restart", handleRollingProgress)
 }
 
 // SaveLastConfiguration this operation only restart the pods of the component, no changes for Cluster.spec.
 // empty implementation here.
 func (r restartOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	return nil
-}
-
-func (r restartOpsHandler) podApplyCompOps(
-	ops *opsv1alpha1.OpsRequest,
-	instance Instance,
-	pgRes *progressResource) bool {
-	creationTimestamp := instance.GetCreationTimestamp()
-	return !creationTimestamp.Before(&ops.Status.StartTimestamp)
 }
 
 func (r restartOpsHandler) doRestart(opsRes *OpsResource, compSpec *appsv1.ClusterComponentSpec, componentName string) {

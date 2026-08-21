@@ -102,7 +102,7 @@ type progressResource struct {
 	clusterComponent *appsv1.ClusterComponentSpec
 	clusterDef       *appsv1.ClusterDefinition
 	componentDef     *appsv1.ComponentDefinition
-	// record which pods need to updated during this operation.
+	// record the participating pods derived from the operation and Cluster spec.
 	// key is podName, value is instance template name.
 	updatedPodSet map[string]string
 	createdPodSet map[string]string
@@ -111,10 +111,6 @@ type progressResource struct {
 	// checks if it needs to wait the component to complete.
 	// if only updates a part of pods, set it to false.
 	noWaitComponentCompleted bool
-	// lets ops types such as restart defer pod-level failure signals until the
-	// workload/component reaches a terminal failure state.
-	deferInstanceFailureToWorkloadPhase bool
-	componentPhase                      appsv1.ComponentPhase
 }
 
 // OpsRuntime abstracts the standard ops paths that only need workload/member views
@@ -133,9 +129,13 @@ type OpsRuntime interface {
 }
 
 type Workload interface {
-	GetMinReadySeconds() int32
+	Exists() bool
+	GetDesiredReplicas() int32
 	GetInstanceNameSet() sets.Set[string]
+	GetActiveInstanceNameSet() sets.Set[string]
+	GetPresentInstanceNameSet() sets.Set[string]
 	GetCurrentRevisionMap() map[string]string
+	GetUpToDateInstanceNameSet() sets.Set[string]
 	GetNotReadyInstanceNameSet() sets.Set[string]
 	GetNotAvailableInstanceNameSet() sets.Set[string]
 	GetFailedInstanceNameSet() sets.Set[string]
@@ -144,15 +144,11 @@ type Workload interface {
 type Instance interface {
 	GetName() string
 	GetComponentName() string
-	GetCreationTimestamp() metav1.Time
 	HasPod() bool
 	IsDeleting() bool
 	GetRole() string
 	IsAvailable(minReadySeconds int32, roleAware bool) bool
 	IsFailedAndTimedOut() bool
-	GetImage(containerName string) string
-	GetStatusImage(containerName string) string
-	GetResources(containerName string) corev1.ResourceRequirements
 	GetNodeName() string
 	GetTolerations() []corev1.Toleration
 	GetAffinity() *corev1.Affinity

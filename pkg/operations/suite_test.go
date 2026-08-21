@@ -268,8 +268,41 @@ func mockComponentIsOperating(cluster *appsv1.Cluster, expectPhase appsv1.Compon
 		for _, v := range compNames {
 			compStatus := cluster.Status.Components[v]
 			compStatus.Phase = expectPhase
+			compStatus.ObservedGeneration = cluster.Generation
+			compStatus.UpToDate = true
 			cluster.Status.Components[v] = compStatus
 		}
+	})).Should(Succeed())
+}
+
+func mockRollingInstanceStatus(cluster *appsv1.Cluster, compName string, appliedNames ...string) {
+	testapps.MockInstanceSetStatus(testCtx, cluster, compName)
+	its := &workloads.InstanceSet{}
+	key := client.ObjectKey{
+		Namespace: cluster.Namespace,
+		Name:      constant.GenerateClusterComponentName(cluster.Name, compName),
+	}
+	Expect(k8sClient.Get(ctx, key, its)).Should(Succeed())
+	applied := map[string]struct{}{}
+	for _, name := range appliedNames {
+		applied[name] = struct{}{}
+	}
+	Expect(testapps.ChangeObjStatus(&testCtx, its, func() {
+		for i := range its.Status.InstanceStatus {
+			status := &its.Status.InstanceStatus[i]
+			status.UpToDate = false
+			if _, ok := applied[status.PodName]; ok {
+				status.UpToDate = true
+			}
+		}
+	})).Should(Succeed())
+}
+
+func recordRollingActionGeneration(opsRes *OpsResource) {
+	generation := opsRes.Cluster.Generation
+	opsRes.OpsRequest.Status.ClusterGeneration = generation
+	Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest), func(ops *opsv1alpha1.OpsRequest) {
+		ops.Status.ClusterGeneration = generation
 	})).Should(Succeed())
 }
 

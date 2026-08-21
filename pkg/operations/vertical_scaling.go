@@ -22,13 +22,11 @@ package operations
 import (
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -138,14 +136,12 @@ func (vs verticalScalingHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, 
 				for _, podName := range podNames {
 					updatedPodSet[podName] = ""
 				}
-			} else {
-				pgRes.noWaitComponentCompleted = true
 			}
 			pgRes.updatedPodSet = updatedPodSet
 		}
-		return handleComponentStatusProgress(reqCtx, cli, opsRes, pgRes, compStatus, vs.podApplyCompOps)
+		return handleRollingProgress(reqCtx, cli, opsRes, pgRes, compStatus)
 	}
-	return compOpsHelper.reconcileActionWithComponentOps(reqCtx, cli, opsRes, "vertical scale", handleComponentStatusProgressForVS)
+	return compOpsHelper.reconcileRollingActionWithComponentOps(reqCtx, cli, opsRes, "vertical scale", handleComponentStatusProgressForVS)
 }
 
 func (vs verticalScalingHandler) covertInsResourcesToMap(verticalScaling opsv1alpha1.VerticalScaling) map[string]*opsv1alpha1.InstanceResourceTemplate {
@@ -167,71 +163,6 @@ func (vs verticalScalingHandler) verticalScalingInsTemplate(verticalScaling opsv
 		return true
 	}
 	return insTemplate.Resources == nil && vs.verticalScalingComp(verticalScaling)
-}
-
-func (vs verticalScalingHandler) setRevertVScalingForCancel(ops *opsv1alpha1.OpsRequest, verticalScaling *opsv1alpha1.VerticalScaling) {
-	lastCompConfiguration := ops.Status.LastConfiguration.Components[verticalScaling.ComponentName]
-	verticalScaling.Requests = lastCompConfiguration.Requests
-	verticalScaling.Limits = lastCompConfiguration.Limits
-	var instanceResources []opsv1alpha1.InstanceResourceTemplate
-	for _, v := range lastCompConfiguration.Instances {
-		resTemplate := opsv1alpha1.InstanceResourceTemplate{Name: v.Name}
-		if v.Resources == nil {
-			resTemplate.ResourceRequirements = corev1.ResourceRequirements{}
-		} else {
-			resTemplate.ResourceRequirements = *v.Resources
-		}
-		instanceResources = append(instanceResources, resTemplate)
-	}
-	verticalScaling.Instances = instanceResources
-}
-
-func (vs verticalScalingHandler) podApplyCompOps(
-	ops *opsv1alpha1.OpsRequest,
-	instance Instance,
-	pgRes *progressResource) bool {
-	insTemplateName := pgRes.updatedPodSet[instance.GetName()]
-	verticalScaling := pgRes.compOps.(opsv1alpha1.VerticalScaling)
-	if ops.Spec.Cancel {
-		vs.setRevertVScalingForCancel(ops, &verticalScaling)
-	}
-	matchResources := func(podResources, vsResources corev1.ResourceRequirements) bool {
-		if vsResources.Requests == nil {
-			vsResources.Requests = corev1.ResourceList{}
-		}
-		for resName, resValue := range vsResources.Limits {
-			// Only default a request value to the matching limit when the caller
-			// omitted the request key entirely. An explicit zero value is a valid
-			// Pod spec and must be compared as a literal zero, not silently
-			// promoted to the limit value.
-			if _, ok := vsResources.Requests[resName]; !ok {
-				vsResources.Requests[resName] = resValue
-			}
-			if !resValue.Equal(podResources.Limits[resName]) {
-				return false
-			}
-		}
-		for resName, resValue := range vsResources.Requests {
-			if !resValue.Equal(podResources.Requests[resName]) {
-				return false
-			}
-		}
-		return true
-	}
-	if insTemplateName == constant.EmptyInsTemplateName {
-		return matchResources(instance.GetResources(""), verticalScaling.ResourceRequirements)
-	}
-	for _, insTpl := range pgRes.clusterComponent.Instances {
-		if insTpl.Name != insTemplateName {
-			continue
-		}
-		if insTpl.Resources != nil {
-			return matchResources(instance.GetResources(""), *insTpl.Resources)
-		} else {
-			return matchResources(instance.GetResources(""), pgRes.clusterComponent.Resources)
-		}
-	}
-	return false
 }
 
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration

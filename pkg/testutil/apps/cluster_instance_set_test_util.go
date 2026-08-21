@@ -381,25 +381,27 @@ func MockInstanceSetStatus(testCtx testutil.TestContext, cluster *appsv1.Cluster
 	notReadyPodNames := make([]string, 0)
 	for _, pod := range podList.Items {
 		currRevisions[pod.Name] = "revision"
-		if !podIsReady(&pod) {
+		failed := pod.Status.Phase == corev1.PodFailed
+		ready := podIsReady(&pod)
+		if !ready {
 			notReadyPodNames = append(notReadyPodNames, pod.Name)
-			continue
-		}
-		if _, ok := pod.Labels[constant.RoleLabelKey]; !ok {
-			continue
-		}
-		var role *workloads.ReplicaRole
-		for _, r := range its.Spec.Roles {
-			if r.Name == pod.Labels[constant.RoleLabelKey] {
-				role = r.DeepCopy()
-				break
-			}
 		}
 		status := workloads.InstanceStatus{
-			PodName: pod.Name,
+			PodName:         pod.Name,
+			CurrentRevision: "revision",
+			UpdateRevision:  "revision",
+			UpToDate:        true,
+			Ready:           ready,
+			Available:       ready,
+			Failed:          failed,
 		}
-		if role != nil {
-			status.Role = role.Name
+		if roleName, ok := pod.Labels[constant.RoleLabelKey]; ok {
+			for _, role := range its.Spec.Roles {
+				if role.Name == roleName {
+					status.Role = role.Name
+					break
+				}
+			}
 		}
 		instanceStatus = append(instanceStatus, status)
 	}

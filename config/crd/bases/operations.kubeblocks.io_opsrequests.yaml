@@ -3318,8 +3318,9 @@ spec:
                 format: date-time
                 type: string
               clusterGeneration:
-                description: Records the cluster generation after the OpsRequest action
-                  has been handled.
+                description: |-
+                  Records the Cluster generation after the OpsRequest action. It is the lower bound for
+                  the Cluster status that may complete the operation.
                 format: int64
                 type: integer
               completionTimestamp:

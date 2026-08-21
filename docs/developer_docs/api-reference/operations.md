@@ -2472,7 +2472,8 @@ int64
 </td>
 <td>
 <em>(Optional)</em>
-<p>Records the cluster generation after the OpsRequest action has been handled.</p>
+<p>Records the Cluster generation after the OpsRequest action. It is the lower bound for
+the Cluster status that may complete the operation.</p>
 </td>
 </tr>
 <tr>

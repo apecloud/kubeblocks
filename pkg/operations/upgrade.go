@@ -20,17 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
-	"fmt"
-	"strings"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -92,34 +88,9 @@ func (u upgradeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 // the Reconcile function for upgrade opsRequest.
 func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (opsv1alpha1.OpsPhase, time.Duration, error) {
 	upgradeSpec := opsRes.OpsRequest.Spec.Upgrade
-	var (
-		compOpsHelper   componentOpsHelper
-		componentDefMap map[string]*appsv1.ComponentDefinition
-		err             error
-	)
-	compOpsHelper = newComponentOpsHelper(upgradeSpec.Components)
-	if componentDefMap, err = u.getComponentDefMapWithUpdatedImages(reqCtx, cli, opsRes); err != nil {
-		return opsRes.OpsRequest.Status.Phase, 0, err
-	}
-	podApplyCompOps := func(
-		ops *opsv1alpha1.OpsRequest,
-		instance Instance,
-		pgRes *progressResource) bool {
-		upgradeComponent := pgRes.compOps.(opsv1alpha1.UpgradeComponent)
-		compDef, ok := componentDefMap[upgradeComponent.GetComponentName()]
-		if !ok {
-			return true
-		}
-		return u.instanceImageApplied(instance, compDef.Spec.Runtime.Containers)
-	}
-	handleUpgradeProgress := func(reqCtx intctrlutil.RequestCtx,
-		cli client.Client,
-		opsRes *OpsResource,
-		pgRes *progressResource,
-		compStatus *opsv1alpha1.OpsRequestComponentStatus) (expectProgressCount int32, completedCount int32, err error) {
-		return handleComponentStatusProgress(reqCtx, cli, opsRes, pgRes, compStatus, podApplyCompOps)
-	}
-	return compOpsHelper.reconcileActionWithComponentOps(reqCtx, cli, opsRes, "upgrade", handleUpgradeProgress)
+	compOpsHelper := newComponentOpsHelper(upgradeSpec.Components)
+	return compOpsHelper.reconcileRollingActionWithComponentOps(
+		reqCtx, cli, opsRes, "upgrade", handleRollingProgress)
 }
 
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration
@@ -132,50 +103,6 @@ func (u upgradeOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, 
 		}
 	})
 	return nil
-}
-
-// getComponentDefMapWithUpdatedImages gets the desired componentDefinition map
-// that is updated with the corresponding images of the ComponentDefinition and service version.
-func (u upgradeOpsHandler) getComponentDefMapWithUpdatedImages(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	opsRes *OpsResource) (map[string]*appsv1.ComponentDefinition, error) {
-	compDefMap := map[string]*appsv1.ComponentDefinition{}
-	for _, v := range opsRes.OpsRequest.Spec.Upgrade.Components {
-		compSpec := getComponentSpecOrShardingTemplate(opsRes.Cluster, v.ComponentName)
-		if compSpec == nil {
-			return nil, intctrlutil.NewFatalError(fmt.Sprintf(`"can not found the component "%s" in the cluster "%s"`,
-				v.ComponentName, opsRes.Cluster.Name))
-		}
-		compDef, err := component.GetCompDefByName(reqCtx.Ctx, cli, compSpec.ComponentDef)
-		if err != nil {
-			return nil, err
-		}
-		if err = component.UpdateCompDefinitionImages4ServiceVersion(reqCtx.Ctx, cli, compDef, compSpec.ServiceVersion); err != nil {
-			return nil, err
-		}
-		compDefMap[v.ComponentName] = compDef
-	}
-	return compDefMap, nil
-}
-
-// podImageApplied checks if the pod has applied the new image.
-func (u upgradeOpsHandler) instanceImageApplied(instance Instance, expectContainers []corev1.Container) bool {
-	if len(expectContainers) == 0 {
-		return true
-	}
-	imageName := func(image string) string {
-		images := strings.Split(image, "/")
-		return images[len(images)-1]
-	}
-	for _, v := range expectContainers {
-		if statusImage := instance.GetStatusImage(v.Name); statusImage != "" && imageName(statusImage) != imageName(v.Image) {
-			return false
-		}
-		if image := instance.GetImage(v.Name); image != "" && imageName(image) != imageName(v.Image) {
-			return false
-		}
-	}
-	return true
 }
 
 func (u upgradeOpsHandler) needUpdateCompDef(upgradeComp opsv1alpha1.UpgradeComponent, cluster *appsv1.Cluster) bool {

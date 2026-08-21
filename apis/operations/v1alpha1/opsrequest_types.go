@@ -955,7 +955,8 @@ type Restore struct {
 
 // OpsRequestStatus represents the observed state of an OpsRequest.
 type OpsRequestStatus struct {
-	// Records the cluster generation after the OpsRequest action has been handled.
+	// Records the Cluster generation after the OpsRequest action. It is the lower bound for
+	// the Cluster status that may complete the operation.
 	// +optional
 	ClusterGeneration int64 `json:"clusterGeneration,omitempty"`
 

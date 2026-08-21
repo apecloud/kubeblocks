@@ -100,26 +100,53 @@ func enabledMultiCluster(obj client.Object) bool {
 func (r *opsRuntime) GetWorkload(namespace, clusterName, compName string) (Workload, error) {
 	itsName := constant.GenerateClusterComponentName(clusterName, compName)
 	its := &workloads.InstanceSet{}
-	if err := r.cli.Get(r.ctx, client.ObjectKey{Name: itsName, Namespace: namespace}, its); err != nil && !apierrors.IsNotFound(err) {
-		return nil, err
+	if err := r.cli.Get(r.dataContext(), client.ObjectKey{Name: itsName, Namespace: namespace}, its, r.dataGetOpts...); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return nil, err
+		}
 	}
 	workload := &defaultWorkload{
-		currentRevisionMap: map[string]string{},
-		notReadySet:        sets.New[string](),
-		notAvailableSet:    sets.New[string](),
-		failedSet:          sets.New[string](),
-		instanceNames:      sets.New[string](),
+		currentRevisionMap:   map[string]string{},
+		upToDateSet:          sets.New[string](),
+		notReadySet:          sets.New[string](),
+		notAvailableSet:      sets.New[string](),
+		failedSet:            sets.New[string](),
+		instanceNames:        sets.New[string](),
+		activeInstanceNames:  sets.New[string](),
+		presentInstanceNames: sets.New[string](),
 	}
 	if its.Name != "" {
-		currRevisionMap, _ := instanceset.GetRevisions(its.Status.CurrentRevisions)
-		workload.minReadySeconds = its.Spec.MinReadySeconds
-		workload.currentRevisionMap = currRevisionMap
-		workload.instanceNames = sets.KeySet(currRevisionMap)
-		workload.notReadySet = instanceset.GetPodNameSetFromInstanceSetCondition(its, workloads.InstanceReady)
-		workload.notAvailableSet = instanceset.GetPodNameSetFromInstanceSetCondition(its, workloads.InstanceAvailable)
-		workload.failedSet = instanceset.GetPodNameSetFromInstanceSetCondition(its, workloads.InstanceFailure)
+		workload.exists = true
+		if its.Spec.Replicas != nil {
+			workload.desiredReplicas = *its.Spec.Replicas
+		}
+		for _, status := range its.Status.InstanceStatus {
+			workload.instanceNames.Insert(status.PodName)
+			if status.EffectiveDesiredState() == workloads.InstanceDesiredStateActive {
+				workload.activeInstanceNames.Insert(status.PodName)
+			}
+			if status.EffectiveCurrentState() == workloads.InstanceCurrentStatePresent {
+				workload.presentInstanceNames.Insert(status.PodName)
+			}
+			workload.currentRevisionMap[status.PodName] = status.CurrentRevision
+			if status.UpToDate {
+				workload.upToDateSet.Insert(status.PodName)
+			}
+			if !status.Ready {
+				workload.notReadySet.Insert(status.PodName)
+			}
+			if !status.Available {
+				workload.notAvailableSet.Insert(status.PodName)
+			}
+			if status.Failed {
+				workload.failedSet.Insert(status.PodName)
+			}
+		}
 		return workload, nil
 	}
+
+	// Keep the legacy Pod-based view for non-rolling operations. Rolling operations
+	// check Exists first and therefore wait for the InstanceSet status contract.
 	pods, err := component.ListOwnedPods(r.dataContext(), r.cli, namespace, clusterName, compName, r.dataListOpts...)
 	if err != nil {
 		return nil, err
@@ -348,17 +375,27 @@ func (r *opsRuntime) dataContext() context.Context {
 }
 
 type defaultWorkload struct {
-	minReadySeconds    int32
-	currentRevisionMap map[string]string
-	notReadySet        sets.Set[string]
-	notAvailableSet    sets.Set[string]
-	failedSet          sets.Set[string]
-	instanceNames      sets.Set[string]
+	exists               bool
+	desiredReplicas      int32
+	currentRevisionMap   map[string]string
+	upToDateSet          sets.Set[string]
+	notReadySet          sets.Set[string]
+	notAvailableSet      sets.Set[string]
+	failedSet            sets.Set[string]
+	instanceNames        sets.Set[string]
+	activeInstanceNames  sets.Set[string]
+	presentInstanceNames sets.Set[string]
 }
 
-func (w *defaultWorkload) GetMinReadySeconds() int32 { return w.minReadySeconds }
+func (w *defaultWorkload) Exists() bool { return w.exists }
+
+func (w *defaultWorkload) GetDesiredReplicas() int32 { return w.desiredReplicas }
 
 func (w *defaultWorkload) GetCurrentRevisionMap() map[string]string { return w.currentRevisionMap }
+
+func (w *defaultWorkload) GetUpToDateInstanceNameSet() sets.Set[string] {
+	return w.upToDateSet.Clone()
+}
 
 func (w *defaultWorkload) GetNotReadyInstanceNameSet() sets.Set[string] {
 	return w.notReadySet.Clone()
@@ -374,6 +411,14 @@ func (w *defaultWorkload) GetInstanceNameSet() sets.Set[string] {
 	return w.instanceNames.Clone()
 }
 
+func (w *defaultWorkload) GetActiveInstanceNameSet() sets.Set[string] {
+	return w.activeInstanceNames.Clone()
+}
+
+func (w *defaultWorkload) GetPresentInstanceNameSet() sets.Set[string] {
+	return w.presentInstanceNames.Clone()
+}
+
 type defaultInstance struct {
 	name          string
 	componentName string
@@ -384,13 +429,6 @@ type defaultInstance struct {
 func (i *defaultInstance) GetComponentName() string { return i.componentName }
 
 func (i *defaultInstance) GetName() string { return i.name }
-
-func (i *defaultInstance) GetCreationTimestamp() metav1.Time {
-	if i.pod == nil {
-		return metav1.Time{}
-	}
-	return i.pod.CreationTimestamp
-}
 
 func (i *defaultInstance) HasPod() bool {
 	return i.pod != nil
@@ -423,37 +461,6 @@ func (i *defaultInstance) IsFailedAndTimedOut() bool {
 	}
 	isFailed, isTimeout, _ := intctrlutil.IsPodFailedAndTimedOut(i.pod)
 	return isFailed && isTimeout
-}
-
-func (i *defaultInstance) GetImage(containerName string) string {
-	container := i.getContainer(containerName)
-	if container == nil {
-		return ""
-	}
-	return container.Image
-}
-
-func (i *defaultInstance) GetStatusImage(containerName string) string {
-	if i.pod == nil {
-		return ""
-	}
-	for _, status := range i.pod.Status.ContainerStatuses {
-		if status.Name == containerName {
-			return status.Image
-		}
-	}
-	if containerName == "" && len(i.pod.Status.ContainerStatuses) > 0 {
-		return i.pod.Status.ContainerStatuses[0].Image
-	}
-	return ""
-}
-
-func (i *defaultInstance) GetResources(containerName string) corev1.ResourceRequirements {
-	container := i.getContainer(containerName)
-	if container == nil {
-		return corev1.ResourceRequirements{}
-	}
-	return container.Resources
 }
 
 func (i *defaultInstance) GetNodeName() string {
@@ -514,6 +521,7 @@ func (i *defaultInstance) getContainer(containerName string) *corev1.Container {
 				return &i.pod.Spec.Containers[idx]
 			}
 		}
+		return nil
 	}
 	if len(i.pod.Spec.Containers) == 0 {
 		return nil

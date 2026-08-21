@@ -155,8 +155,7 @@ func updateProgressDetailTime(progressDetail *opsv1alpha1.ProgressStatusDetail) 
 
 // handleRollingProgress reports the state of participating instances from the
 // InstanceSet status contract.
-func handleRollingProgress(
-	reqCtx intctrlutil.RequestCtx,
+func handleRollingProgress(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	opsRes *OpsResource,
 	pgRes *progressResource,
@@ -176,8 +175,7 @@ func handleRollingProgress(
 	return expectedCount, completedCount, nil
 }
 
-func handleRollingProgressWithWorkload(
-	opsRes *OpsResource,
+func handleRollingProgressWithWorkload(opsRes *OpsResource,
 	workload Workload,
 	pgRes *progressResource,
 	compStatus *opsv1alpha1.OpsRequestComponentStatus) (int32, int32) {

@@ -4825,6 +4825,27 @@ And only takes effect when the &lsquo;strategy&rsquo; is set to &lsquo;Any&rsquo
 </tr>
 </tbody>
 </table>
+<h3 id="dataprotection.kubeblocks.io/v1alpha1.PostReadyExecutionPolicy">PostReadyExecutionPolicy
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.RestoreActionSpec">RestoreActionSpec</a>)
+</p>
+<div>
+<p>PostReadyExecutionPolicy specifies how postReady actions execute across target pods.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Parallel&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Serial&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.PrepareDataConfig">PrepareDataConfig
 </h3>
 <p>
@@ -5205,6 +5226,22 @@ JobActionSpec
 <td>
 <em>(Optional)</em>
 <p>Specifies the actions that should be executed after the data has been prepared and is ready for restoration.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>postReadyExecutionPolicy</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.PostReadyExecutionPolicy">
+PostReadyExecutionPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies how postReady actions run when they target multiple pods.
+Parallel preserves the existing behavior. Serial waits for each target
+action to complete before starting the next one.</p>
 </td>
 </tr>
 <tr>

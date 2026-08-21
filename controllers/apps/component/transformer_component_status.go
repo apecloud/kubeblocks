@@ -265,7 +265,7 @@ func (t *componentStatusTransformer) hasVolumeExpansionRunning() bool {
 	if t.runningITS == nil {
 		return false
 	}
-	for _, inst := range t.runningITS.Status.InstanceStatus {
+	for _, inst := range t.runningITS.ActivePresentInstanceStatuses() {
 		if inst.VolumeExpansion {
 			return true
 		}
@@ -604,7 +604,7 @@ func (t *componentStatusTransformer) availableWithRole(transCtx *componentTransf
 	if its == nil {
 		return metav1.ConditionFalse, "the workload is not present"
 	}
-	for _, inst := range its.Status.InstanceStatus {
+	for _, inst := range its.ActivePresentInstanceStatuses() {
 		if len(inst.Role) > 0 {
 			if strings.EqualFold(inst.Role, *policy.WithRole) {
 				return metav1.ConditionTrue, fmt.Sprintf("the role %s is present", *policy.WithRole)

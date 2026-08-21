@@ -244,8 +244,7 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 	cli client.Client,
 	opsRes *OpsResource,
 	opsMessageKey string,
-	handleStatusProgress handleStatusProgressWithComponent,
-) (opsv1alpha1.OpsPhase, time.Duration, error) {
+	handleStatusProgress handleStatusProgressWithComponent) (opsv1alpha1.OpsPhase, time.Duration, error) {
 	return c.reconcileActionWithComponentOpsPolicy(reqCtx, cli, opsRes, opsMessageKey, handleStatusProgress, false)
 }
 
@@ -256,8 +255,7 @@ func (c componentOpsHelper) reconcileRollingActionWithComponentOps(reqCtx intctr
 	cli client.Client,
 	opsRes *OpsResource,
 	opsMessageKey string,
-	handleStatusProgress handleStatusProgressWithComponent,
-) (opsv1alpha1.OpsPhase, time.Duration, error) {
+	handleStatusProgress handleStatusProgressWithComponent) (opsv1alpha1.OpsPhase, time.Duration, error) {
 	return c.reconcileActionWithComponentOpsPolicy(reqCtx, cli, opsRes, opsMessageKey, handleStatusProgress, true)
 }
 
@@ -266,8 +264,7 @@ func (c componentOpsHelper) reconcileActionWithComponentOpsPolicy(reqCtx intctrl
 	opsRes *OpsResource,
 	opsMessageKey string,
 	handleStatusProgress handleStatusProgressWithComponent,
-	clusterStatusAuthoritative bool,
-) (opsv1alpha1.OpsPhase, time.Duration, error) {
+	clusterStatusAuthoritative bool) (opsv1alpha1.OpsPhase, time.Duration, error) {
 	if opsRes == nil {
 		return "", 0, nil
 	}

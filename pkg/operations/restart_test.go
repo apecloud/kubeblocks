@@ -20,50 +20,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
-	"testing"
-	"time"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testops "github.com/apecloud/kubeblocks/pkg/testutil/operations"
 )
-
-func TestRestartMarkerUsesNanosecondPrecision(t *testing.T) {
-	const component = "mysql"
-	base := time.Date(2026, time.August, 11, 8, 0, 0, 123, time.UTC)
-	compSpec := &appsv1.ClusterComponentSpec{Name: component}
-	helper := newComponentOpsHelper([]opsv1alpha1.ComponentOps{{ComponentName: component}})
-	handler := restartOpsHandler{compOpsHelper: helper}
-
-	first := &OpsResource{OpsRequest: &opsv1alpha1.OpsRequest{Status: opsv1alpha1.OpsRequestStatus{
-		StartTimestamp: metav1.NewTime(base),
-	}}}
-	handler.doRestart(first, compSpec, component)
-	firstMarker := compSpec.Annotations[constant.RestartAnnotationKey]
-	if firstMarker != base.Format(time.RFC3339Nano) {
-		t.Fatalf("restart marker=%q, want %q", firstMarker, base.Format(time.RFC3339Nano))
-	}
-
-	secondTime := base.Add(time.Nanosecond)
-	second := &OpsResource{OpsRequest: &opsv1alpha1.OpsRequest{Status: opsv1alpha1.OpsRequestStatus{
-		StartTimestamp: metav1.NewTime(secondTime),
-	}}}
-	handler.doRestart(second, compSpec, component)
-	if got := compSpec.Annotations[constant.RestartAnnotationKey]; got == firstMarker {
-		t.Fatalf("two restart operations in one second reused marker %q", got)
-	}
-}
 
 var _ = Describe("Restart OpsRequest", func() {
 

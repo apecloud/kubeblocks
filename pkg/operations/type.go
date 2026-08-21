@@ -102,7 +102,7 @@ type progressResource struct {
 	clusterComponent *appsv1.ClusterComponentSpec
 	clusterDef       *appsv1.ClusterDefinition
 	componentDef     *appsv1.ComponentDefinition
-	// record which pods need to updated during this operation.
+	// record the participating pods derived from the operation and Cluster spec.
 	// key is podName, value is instance template name.
 	updatedPodSet map[string]string
 	createdPodSet map[string]string
@@ -130,7 +130,6 @@ type OpsRuntime interface {
 
 type Workload interface {
 	Exists() bool
-	GetMinReadySeconds() int32
 	GetDesiredReplicas() int32
 	GetInstanceNameSet() sets.Set[string]
 	GetActiveInstanceNameSet() sets.Set[string]

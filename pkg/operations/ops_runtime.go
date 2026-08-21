@@ -117,7 +117,6 @@ func (r *opsRuntime) GetWorkload(namespace, clusterName, compName string) (Workl
 	}
 	if its.Name != "" {
 		workload.exists = true
-		workload.minReadySeconds = its.Spec.MinReadySeconds
 		if its.Spec.Replicas != nil {
 			workload.desiredReplicas = *its.Spec.Replicas
 		}
@@ -377,7 +376,6 @@ func (r *opsRuntime) dataContext() context.Context {
 
 type defaultWorkload struct {
 	exists               bool
-	minReadySeconds      int32
 	desiredReplicas      int32
 	currentRevisionMap   map[string]string
 	upToDateSet          sets.Set[string]
@@ -390,8 +388,6 @@ type defaultWorkload struct {
 }
 
 func (w *defaultWorkload) Exists() bool { return w.exists }
-
-func (w *defaultWorkload) GetMinReadySeconds() int32 { return w.minReadySeconds }
 
 func (w *defaultWorkload) GetDesiredReplicas() int32 { return w.desiredReplicas }
 

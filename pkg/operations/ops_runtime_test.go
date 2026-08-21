@@ -202,9 +202,6 @@ func TestOpsRuntimeBuildsInstanceAPIView(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get workload: %v", err)
 	}
-	if workload.GetMinReadySeconds() != 15 {
-		t.Fatalf("unexpected minReadySeconds: %d", workload.GetMinReadySeconds())
-	}
 	if !workload.Exists() {
 		t.Fatal("expected an InstanceSet workload")
 	}

@@ -54,7 +54,6 @@ func TestRollingInstanceProgress(t *testing.T) {
 	baseWorkload := func() *defaultWorkload {
 		return &defaultWorkload{
 			exists:               true,
-			minReadySeconds:      10,
 			desiredReplicas:      2,
 			currentRevisionMap:   map[string]string{pod0: "new", pod1: "new"},
 			upToDateSet:          sets.New(pod0, pod1),
@@ -107,10 +106,6 @@ func TestRollingInstanceProgress(t *testing.T) {
 		{name: "not available", mutate: func(w *defaultWorkload, _ *progressResource) {
 			w.notAvailableSet.Insert(pod0)
 		}, wantExpected: 2, wantCompleted: 1, wantPod0: opsv1alpha1.ProcessingProgressStatus},
-		{name: "availability is ignored without minReadySeconds", mutate: func(w *defaultWorkload, _ *progressResource) {
-			w.minReadySeconds = 0
-			w.notAvailableSet.Insert(pod0)
-		}, wantExpected: 2, wantCompleted: 2, wantPod0: opsv1alpha1.SucceedProgressStatus},
 		{name: "current desired state failure", mutate: func(w *defaultWorkload, _ *progressResource) {
 			w.failedSet.Insert(pod0)
 		}, wantExpected: 2, wantCompleted: 2, wantPod0: opsv1alpha1.FailedProgressStatus},

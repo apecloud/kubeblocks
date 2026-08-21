@@ -224,8 +224,7 @@ func handleRollingProgressWithWorkload(opsRes *OpsResource,
 				getProgressFailedMessage(messageKey, objectKey, componentName,
 					getFailedPodMessage(opsRes.Cluster, componentName, name)))
 			completedCount++
-		case targetApplied && !notReady.Has(name) &&
-			(workload.GetMinReadySeconds() == 0 || !notAvailable.Has(name)):
+		case targetApplied && !notReady.Has(name) && !notAvailable.Has(name):
 			detail.SetStatusAndMessage(opsv1alpha1.SucceedProgressStatus,
 				getProgressSucceedMessage(messageKey, objectKey, componentName))
 			completedCount++

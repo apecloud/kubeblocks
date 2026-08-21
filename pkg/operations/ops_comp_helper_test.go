@@ -25,6 +25,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -205,45 +206,42 @@ func TestRollingComponentAndShardingTerminalStatus(t *testing.T) {
 		}
 	})
 
-	t.Run("instance-scoped progress is independent of aggregate component status", func(t *testing.T) {
-		cluster := &appsv1.Cluster{
-			ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: clusterName, Generation: 5},
-			Spec: appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{{
-				Name: "mysql", Replicas: 1,
-			}}},
-			Status: appsv1.ClusterStatus{Components: map[string]appsv1.ClusterComponentStatus{
-				"mysql": {Phase: appsv1.FailedComponentPhase, ObservedGeneration: 5, UpToDate: true},
-			}},
+	t.Run("instance-scoped result uses workload state instead of progress", func(t *testing.T) {
+		const podName = "cluster-mysql-0"
+		workload := &defaultWorkload{
+			exists:               true,
+			upToDateSet:          sets.New(podName),
+			activeInstanceNames:  sets.New(podName),
+			presentInstanceNames: sets.New(podName),
+			notReadySet:          sets.New[string](),
+			notAvailableSet:      sets.New[string](),
+			failedSet:            sets.New[string](),
 		}
-		ops := &opsv1alpha1.OpsRequest{
-			ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "vertical-scaling"},
-			Status:     opsv1alpha1.OpsRequestStatus{ClusterGeneration: 5},
-		}
-		helper := newComponentOpsHelper([]opsv1alpha1.ComponentOps{{ComponentName: "mysql"}})
-		opsRes := &OpsResource{Cluster: cluster, OpsRequest: ops}
-		cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&opsv1alpha1.OpsRequest{}).WithObjects(cluster, ops).Build()
-		participantStatus := opsv1alpha1.SucceedProgressStatus
-		handler := func(_ intctrlutil.RequestCtx, _ client.Client, _ *OpsResource, pg *progressResource,
-			compStatus *opsv1alpha1.OpsRequestComponentStatus) (int32, int32, error) {
-			const podName = "cluster-mysql-0"
-			pg.updatedPodSet = map[string]string{podName: "template-a"}
-			compStatus.ProgressDetails = []opsv1alpha1.ProgressStatusDetail{{
-				ObjectKey: getProgressObjectKey(constant.PodKind, podName),
-				Status:    participantStatus,
-			}}
-			return 1, 1, nil
-		}
-		phase, _, err := helper.reconcileRollingActionWithComponentOps(
-			intctrlutil.RequestCtx{Ctx: context.Background()}, cli, opsRes, "vertical scale", handler)
-		if err != nil || phase != opsv1alpha1.OpsSucceedPhase {
-			t.Fatalf("phase=%s err=%v, want participant success despite aggregate failure", phase, err)
+		targets := map[string]string{podName: "template-a"}
+
+		completed, failed := rollingInstanceTargetStateWithWorkload(workload, targets)
+		if !completed || failed {
+			t.Fatalf("completed=%v failed=%v, want participant success", completed, failed)
 		}
 
-		participantStatus = opsv1alpha1.FailedProgressStatus
-		phase, _, err = helper.reconcileRollingActionWithComponentOps(
-			intctrlutil.RequestCtx{Ctx: context.Background()}, cli, opsRes, "vertical scale", handler)
-		if err != nil || phase != opsv1alpha1.OpsFailedPhase {
-			t.Fatalf("phase=%s err=%v, want participant failure", phase, err)
+		workload.notReadySet.Insert(podName)
+		completed, failed = rollingInstanceTargetStateWithWorkload(workload, targets)
+		if completed || failed {
+			t.Fatalf("completed=%v failed=%v, want unready participant processing", completed, failed)
+		}
+
+		workload.notReadySet.Delete(podName)
+		workload.notAvailableSet.Insert(podName)
+		completed, failed = rollingInstanceTargetStateWithWorkload(workload, targets)
+		if completed || failed {
+			t.Fatalf("completed=%v failed=%v, want unavailable participant processing", completed, failed)
+		}
+
+		workload.notAvailableSet.Delete(podName)
+		workload.failedSet.Insert(podName)
+		completed, failed = rollingInstanceTargetStateWithWorkload(workload, targets)
+		if completed || !failed {
+			t.Fatalf("completed=%v failed=%v, want participant failure", completed, failed)
 		}
 	})
 }

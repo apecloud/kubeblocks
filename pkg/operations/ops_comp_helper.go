@@ -145,17 +145,6 @@ func componentStatusFailureCount(compStatus opsv1alpha1.OpsRequestComponentStatu
 	return count
 }
 
-func targetInstanceFailureCount(compStatus opsv1alpha1.OpsRequestComponentStatus, targetInstances map[string]string) int32 {
-	var count int32
-	for instanceName := range targetInstances {
-		detail := findStatusProgressDetail(compStatus.ProgressDetails, getProgressObjectKey(constant.PodKind, instanceName))
-		if detail != nil && detail.Status == opsv1alpha1.FailedProgressStatus {
-			count++
-		}
-	}
-	return count
-}
-
 func (c componentOpsHelper) getComponentOps(componentName string) (ComponentOpsInterface, bool) {
 	if len(c.componentOpsSet) == 0 {
 		return opsv1alpha1.ComponentOps{ComponentName: componentName}, true
@@ -312,16 +301,13 @@ func (c componentOpsHelper) reconcileActionWithComponentOpsPolicy(reqCtx intctrl
 		expectProgressCount += expectCount
 		completedProgressCount += completedCount
 		if clusterStatusAuthoritative && pgResource.updatedPodSet != nil {
-			// An instance-scoped operation is complete when its participating
-			// instances converge. Unrelated instances must not make it wait for,
-			// or inherit failure from, the aggregate Component status.
 			instanceStatusTargets[pgResource.compOps.GetComponentName()] = struct{}{}
-			if expectCount != completedCount {
-				opsIsCompleted = false
+			targetCompleted, targetFailed, err := rollingInstanceTargetState(opsRes, &pgResource)
+			if err != nil {
+				return opsRequestPhase, 0, err
 			}
-			if targetInstanceFailureCount(opsCompStatus, pgResource.updatedPodSet) > 0 {
-				existFailure = true
-			}
+			opsIsCompleted = opsIsCompleted && targetCompleted
+			existFailure = existFailure || targetFailed
 		} else if !clusterStatusAuthoritative {
 			componentFailureCount := componentStatusFailureCount(opsCompStatus)
 			if componentFailureCount > 0 {
@@ -363,6 +349,46 @@ func (c componentOpsHelper) reconcileActionWithComponentOpsPolicy(reqCtx intctrl
 		return opsRequestPhase, 0, nil
 	}
 	return opsv1alpha1.OpsSucceedPhase, 0, nil
+}
+
+func rollingInstanceTargetState(opsRes *OpsResource, pgRes *progressResource) (completed, failed bool, err error) {
+	runtime, err := opsRes.GetRuntime(pgRes.compOps.GetComponentName())
+	if err != nil {
+		return false, false, err
+	}
+	workload, err := runtime.GetWorkload(opsRes.Cluster.Namespace, opsRes.Cluster.Name, pgRes.fullComponentName)
+	if err != nil {
+		return false, false, err
+	}
+	completed, failed = rollingInstanceTargetStateWithWorkload(workload, pgRes.updatedPodSet)
+	return completed, failed, nil
+}
+
+func rollingInstanceTargetStateWithWorkload(workload Workload, targetInstances map[string]string) (completed, failed bool) {
+	if !workload.Exists() {
+		return false, false
+	}
+	upToDate := workload.GetUpToDateInstanceNameSet()
+	active := workload.GetActiveInstanceNameSet()
+	present := workload.GetPresentInstanceNameSet()
+	notReady := workload.GetNotReadyInstanceNameSet()
+	notAvailable := workload.GetNotAvailableInstanceNameSet()
+	failedInstances := workload.GetFailedInstanceNameSet()
+
+	completed = true
+	for name := range targetInstances {
+		targetApplied := active.Has(name) && present.Has(name) && upToDate.Has(name)
+		switch {
+		case !targetApplied:
+			completed = false
+		case failedInstances.Has(name):
+			completed = false
+			failed = true
+		case notReady.Has(name) || notAvailable.Has(name):
+			completed = false
+		}
+	}
+	return completed, failed
 }
 
 func (c componentOpsHelper) rollingTargetsState(opsRes *OpsResource) (completed, failed bool) {

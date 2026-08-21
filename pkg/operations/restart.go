@@ -103,7 +103,7 @@ func (r restartOpsHandler) doRestart(opsRes *OpsResource, compSpec *appsv1.Clust
 	}
 	startTimestamp := opsRes.OpsRequest.Status.StartTimestamp
 	workloadRestartTimeStamp := compSpec.Annotations[constant.RestartAnnotationKey]
-	if res, _ := time.Parse(time.RFC3339Nano, workloadRestartTimeStamp); startTimestamp.After(res) {
-		compSpec.Annotations[constant.RestartAnnotationKey] = startTimestamp.Format(time.RFC3339Nano)
+	if res, _ := time.Parse(time.RFC3339, workloadRestartTimeStamp); startTimestamp.After(res) {
+		compSpec.Annotations[constant.RestartAnnotationKey] = startTimestamp.Format(time.RFC3339)
 	}
 }

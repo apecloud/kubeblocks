@@ -25,11 +25,13 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
+	"github.com/apecloud/kubeblocks/pkg/controller/revisionmap"
 )
 
 func TestStatusPreconditionWaitsForRevisionUpdate(t *testing.T) {
@@ -154,5 +156,63 @@ func transientFlatReassignmentInstanceSet() *workloads.InstanceSet {
 				{PodName: "demo-1", TemplateName: &templateB, DesiredState: workloads.InstanceDesiredStateActive, CurrentState: workloads.InstanceCurrentStatePresent},
 			},
 		},
+	}
+}
+
+func TestRevisionUpdateInvalidatesOnlyAffectedITS2Instances(t *testing.T) {
+	tests := []struct {
+		name   string
+		mutate func(*workloads.InstanceSet)
+	}{
+		{
+			name: "pod revision changes for one template",
+			mutate: func(its *workloads.InstanceSet) {
+				its.Spec.Instances[0].Env = []corev1.EnvVar{{Name: "REVISION_CHANGE", Value: "true"}}
+			},
+		},
+		{
+			name: "in-place resources change for one template",
+			mutate: func(its *workloads.InstanceSet) {
+				its.Spec.Instances[0].Resources = &corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("2")},
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			its, tree, _ := newITS2InstanceStatusFixture(t, nil)
+			oldRevisions, err := revisionmap.Decode(its.Status.UpdateRevisions)
+			if err != nil {
+				t.Fatal(err)
+			}
+			its.Generation++
+			tt.mutate(its)
+
+			if NewStatusReconciler().PreCondition(tree) != kubebuilderx.ConditionUnsatisfied {
+				t.Fatal("status reconciler must remain before revision update and wait for the new generation target")
+			}
+			if _, err := NewRevisionUpdateReconciler().Reconcile(tree); err != nil {
+				t.Fatal(err)
+			}
+			newRevisions, err := revisionmap.Decode(its.Status.UpdateRevisions)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if newRevisions["demo-0"] == oldRevisions["demo-0"] || newRevisions["demo-1"] != oldRevisions["demo-1"] {
+				t.Fatalf("Instance spec revision change was not scoped to demo-0: old=%v new=%v", oldRevisions, newRevisions)
+			}
+			assertITS2UpToDate(t, its, "demo-0", false)
+			assertITS2UpToDate(t, its, "demo-1", true)
+
+			// The second pass uses the new Instance-spec revisions and keeps only the affected
+			// current Instance stale until its own controller applies the desired spec.
+			if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+				t.Fatal(err)
+			}
+			assertITS2UpToDate(t, its, "demo-0", false)
+			assertITS2UpToDate(t, its, "demo-1", true)
+		})
 	}
 }

@@ -604,12 +604,14 @@ type InstanceStatus struct {
 	UpToDate bool `json:"upToDate,omitempty"`
 
 	// Ready indicates whether the instance is ready to serve requests when CurrentState is Present.
+	// It is independent of desired-state convergence reported by UpToDate.
 	//
 	// +optional
 	Ready bool `json:"ready,omitempty"`
 
 	// Available indicates whether the instance has remained ready for the required minimum duration when CurrentState is Present.
 	// Available can be true only when Ready is true.
+	// It is independent of desired-state convergence reported by UpToDate.
 	//
 	// +optional
 	Available bool `json:"available,omitempty"`

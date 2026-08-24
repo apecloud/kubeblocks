@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 
@@ -661,6 +662,22 @@ func TestStatusReconcilerReadsCurrentRevisionFromInstanceStatus(t *testing.T) {
 	if got.Status.CurrentRevision != got.Status.UpdateRevision {
 		t.Fatalf("expected aggregate current revision to advance to update revision")
 	}
+
+	// Dynamic config and PVC convergence are represented by UpToDate, but do not make a
+	// healthy runtime unready or unavailable.
+	inst.Status.UpToDate = false
+	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+		t.Fatalf("reconcile non-converged runtime status: %v", err)
+	}
+	got = tree.GetRoot().(*workloads.InstanceSet)
+	status = got.FindInstanceStatus(inst.Name)
+	if status == nil || status.UpToDate || !status.Ready || !status.Available {
+		t.Fatalf("runtime status was coupled to desired-state convergence: %#v", status)
+	}
+	if got.Status.ReadyReplicas != 1 || got.Status.AvailableReplicas != 1 || got.Status.UpdatedReplicas != 0 {
+		t.Fatalf("unexpected aggregate counts while convergence is pending: ready=%d available=%d updated=%d",
+			got.Status.ReadyReplicas, got.Status.AvailableReplicas, got.Status.UpdatedReplicas)
+	}
 }
 
 func TestStatusReconcilerDoesNotDependOnRevisionAnnotationForCurrentRevision(t *testing.T) {
@@ -798,5 +815,159 @@ func TestFilterInstanceConfigs(t *testing.T) {
 	}
 	if filterInstanceConfigs(its, nil) != nil {
 		t.Fatal("nil config status should remain nil")
+	}
+}
+
+func TestITS2RevisionUpdateTracksConfigAndPVCChanges(t *testing.T) {
+	t.Run("dynamic config", func(t *testing.T) {
+		configs := []workloads.ConfigTemplate{{Name: "mysql", ConfigHash: ptr.To("old")}}
+		its, tree, _ := newITS2InstanceStatusFixture(t, configs)
+		its.Generation++
+		its.Spec.Configs[0].ConfigHash = ptr.To("new")
+		if _, err := NewRevisionUpdateReconciler().Reconcile(tree); err != nil {
+			t.Fatal(err)
+		}
+		assertITS2UpToDate(t, its, "demo-0", false)
+		assertITS2UpToDate(t, its, "demo-1", false)
+	})
+
+	t.Run("PVC expansion is scoped to one template", func(t *testing.T) {
+		claim := corev1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{Name: "data"},
+			Spec: corev1.PersistentVolumeClaimSpec{Resources: corev1.VolumeResourceRequirements{
+				Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("1Gi")},
+			}},
+		}
+		its := its2InstanceStatusSet(2)
+		its.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{claim}
+		its, tree, _ := newITS2InstanceStatusFixtureFromSet(t, its)
+
+		its.Generation++
+		expanded := claim.DeepCopy()
+		expanded.Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("2Gi")
+		its.Spec.Instances[0].VolumeClaimTemplates = []corev1.PersistentVolumeClaim{*expanded}
+		if _, err := NewRevisionUpdateReconciler().Reconcile(tree); err != nil {
+			t.Fatal(err)
+		}
+		assertITS2UpToDate(t, its, "demo-0", false)
+		assertITS2UpToDate(t, its, "demo-1", true)
+	})
+}
+
+func TestITS2AllocationChangesStayInDesiredAndCurrentState(t *testing.T) {
+	its := its2InstanceStatusSet(2)
+	its.Spec.FlatInstanceOrdinal = false
+	its.Spec.Instances = nil
+	its, tree, _ := newITS2InstanceStatusFixtureFromSet(t, its)
+
+	its.Generation++
+	its.Spec.Replicas = ptr.To[int32](3)
+	if _, err := NewRevisionUpdateReconciler().Reconcile(tree); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+		t.Fatal(err)
+	}
+	added := its.FindInstanceStatus("demo-2")
+	if added == nil || added.DesiredState != workloads.InstanceDesiredStateActive || added.CurrentState != workloads.InstanceCurrentStateAbsent || added.UpToDate {
+		t.Fatalf("added identity was not expressed by desired/current state: %#v", added)
+	}
+
+	its.Generation++
+	its.Spec.Replicas = ptr.To[int32](1)
+	if _, err := NewRevisionUpdateReconciler().Reconcile(tree); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+		t.Fatal(err)
+	}
+	released := its.FindInstanceStatus("demo-1")
+	if released == nil || released.DesiredState != workloads.InstanceDesiredStateReleased || released.CurrentState != workloads.InstanceCurrentStatePresent || released.UpToDate {
+		t.Fatalf("removed identity was not expressed as Released/Present: %#v", released)
+	}
+
+	its.Generation++
+	its.Spec.OfflineInstances = []string{"demo-0"}
+	if _, err := NewRevisionUpdateReconciler().Reconcile(tree); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+		t.Fatal(err)
+	}
+	offline := its.FindInstanceStatus("demo-0")
+	if offline == nil || offline.DesiredState != workloads.InstanceDesiredStateOffline || offline.CurrentState != workloads.InstanceCurrentStatePresent || offline.UpToDate {
+		t.Fatalf("offline identity was not expressed as Offline/Present: %#v", offline)
+	}
+}
+
+func newITS2InstanceStatusFixture(t *testing.T, configs []workloads.ConfigTemplate) (*workloads.InstanceSet, *kubebuilderx.ObjectTree, map[string]*workloads.Instance) {
+	t.Helper()
+	its := its2InstanceStatusSet(2)
+	its.Spec.Configs = configs
+	return newITS2InstanceStatusFixtureFromSet(t, its)
+}
+
+func newITS2InstanceStatusFixtureFromSet(t *testing.T, its *workloads.InstanceSet) (*workloads.InstanceSet, *kubebuilderx.ObjectTree, map[string]*workloads.Instance) {
+	t.Helper()
+	tree := kubebuilderx.NewObjectTree()
+	tree.SetRoot(its)
+	if _, err := NewRevisionUpdateReconciler().Reconcile(tree); err != nil {
+		t.Fatal(err)
+	}
+	desired, _, err := buildDesiredInstancesByName(tree, its)
+	if err != nil {
+		t.Fatal(err)
+	}
+	instances := make(map[string]*workloads.Instance, len(desired))
+	for name, target := range desired {
+		inst := target.DeepCopy()
+		inst.Generation = 1
+		inst.Status = workloads.InstanceStatus2{
+			ObservedGeneration: 1,
+			CurrentState:       workloads.InstanceCurrentStatePresent,
+			CurrentRevision:    "pod-revision",
+			UpdateRevision:     "pod-revision",
+			UpToDate:           true,
+		}
+		for _, config := range inst.Spec.Configs {
+			inst.Status.Configs = append(inst.Status.Configs, workloads.InstanceConfigStatus{Name: config.Name, ConfigHash: config.ConfigHash})
+		}
+		if err := tree.Add(inst); err != nil {
+			t.Fatal(err)
+		}
+		instances[name] = inst
+	}
+	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+		t.Fatal(err)
+	}
+	assertITS2UpToDate(t, its, "demo-0", true)
+	assertITS2UpToDate(t, its, "demo-1", true)
+	return its, tree, instances
+}
+
+func its2InstanceStatusSet(replicas int32) *workloads.InstanceSet {
+	one := int32(1)
+	return &workloads.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default", Generation: 1},
+		Spec: workloads.InstanceSetSpec{
+			Replicas:            ptr.To(replicas),
+			FlatInstanceOrdinal: true,
+			Selector:            &metav1.LabelSelector{MatchLabels: map[string]string{"app": "demo"}},
+			Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{Containers: []corev1.Container{{
+				Name: "db", Image: "mysql:old",
+			}}}},
+			Instances: []workloads.InstanceTemplate{
+				{Name: "a", Replicas: &one, Ordinals: workloads.Ordinals{Discrete: []int32{0}}},
+				{Name: "b", Replicas: &one, Ordinals: workloads.Ordinals{Discrete: []int32{1}}},
+			},
+		},
+	}
+}
+
+func assertITS2UpToDate(t *testing.T, its *workloads.InstanceSet, name string, want bool) {
+	t.Helper()
+	status := its.FindInstanceStatus(name)
+	if status == nil || status.UpToDate != want {
+		t.Fatalf("instance %s UpToDate = %#v, want %v", name, status, want)
 	}
 }

@@ -29,9 +29,11 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/tools/record"
 
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -96,6 +98,35 @@ var _ = Describe("utils test", func() {
 
 func TestGetUncachedObjects(t *testing.T) {
 	GetUncachedObjects()
+}
+
+func TestInstanceRuntimeStatusHelpersIgnoreConvergence(t *testing.T) {
+	inst := &workloads.Instance{
+		ObjectMeta: metav1.ObjectMeta{Generation: 3},
+		Spec:       workloads.InstanceSpec{Roles: []workloads.ReplicaRole{{Name: "leader"}}},
+		Status: workloads.InstanceStatus2{
+			ObservedGeneration: 3,
+			UpToDate:           false,
+			Role:               "leader",
+			Conditions: []metav1.Condition{
+				{Type: string(workloads.InstanceReady), Status: metav1.ConditionTrue},
+				{Type: string(workloads.InstanceAvailable), Status: metav1.ConditionTrue},
+				{Type: string(workloads.InstanceFailure), Status: metav1.ConditionFalse},
+			},
+		},
+	}
+
+	if !IsInstanceReady(inst) || !IsInstanceReadyWithRole(inst) || !IsInstanceAvailable(inst) {
+		t.Fatal("runtime health must remain observable while desired state is not converged")
+	}
+	inst.Status.Conditions[2].Status = metav1.ConditionTrue
+	if !IsInstanceFailure(inst) {
+		t.Fatal("current failure observation must not depend on desired-state convergence")
+	}
+	inst.Status.ObservedGeneration = 2
+	if IsInstanceReady(inst) || IsInstanceAvailable(inst) || IsInstanceFailure(inst) {
+		t.Fatal("runtime observations from a stale generation must not be reported as current")
+	}
 }
 
 func TestRequestCtxMisc(t *testing.T) {

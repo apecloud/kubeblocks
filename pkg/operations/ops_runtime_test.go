@@ -343,6 +343,9 @@ func TestOpsRuntimeWorkloadMissingAndUsesPublicInstanceStatus(t *testing.T) {
 	if !workload.GetInstanceNameSetByTemplate(sets.New(template)).Has("cluster-mysql-0") {
 		t.Fatal("workload did not expose the public InstanceStatus template assignment")
 	}
+	if !workload.GetUnknownTemplateInstanceNameSet().Has("cluster-mysql-offline") {
+		t.Fatal("workload did not preserve an unknown public InstanceStatus template assignment")
+	}
 }
 
 func TestDefaultInstanceAndVolumeNilBranches(t *testing.T) {

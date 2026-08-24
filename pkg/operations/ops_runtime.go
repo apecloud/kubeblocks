@@ -115,6 +115,7 @@ func (r *opsRuntime) GetWorkload(namespace, clusterName, compName string) (Workl
 		instanceNames:        sets.New[string](),
 		activeInstanceNames:  sets.New[string](),
 		presentInstanceNames: sets.New[string](),
+		unknownTemplateNames: sets.New[string](),
 	}
 	if its.Name != "" {
 		workload.exists = true
@@ -123,7 +124,9 @@ func (r *opsRuntime) GetWorkload(namespace, clusterName, compName string) (Workl
 		}
 		for _, status := range its.Status.InstanceStatus {
 			workload.instanceNames.Insert(status.PodName)
-			if status.TemplateName != nil {
+			if status.TemplateName == nil {
+				workload.unknownTemplateNames.Insert(status.PodName)
+			} else {
 				workload.instanceTemplateMap[status.PodName] = *status.TemplateName
 			}
 			if status.EffectiveDesiredState() == workloads.InstanceDesiredStateActive {
@@ -390,6 +393,7 @@ type defaultWorkload struct {
 	instanceNames        sets.Set[string]
 	activeInstanceNames  sets.Set[string]
 	presentInstanceNames sets.Set[string]
+	unknownTemplateNames sets.Set[string]
 }
 
 func (w *defaultWorkload) Exists() bool { return w.exists }
@@ -432,6 +436,10 @@ func (w *defaultWorkload) GetInstanceNameSetByTemplate(templateNames sets.Set[st
 		}
 	}
 	return result
+}
+
+func (w *defaultWorkload) GetUnknownTemplateInstanceNameSet() sets.Set[string] {
+	return w.unknownTemplateNames.Clone()
 }
 
 type defaultInstance struct {

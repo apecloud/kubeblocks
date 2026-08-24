@@ -387,12 +387,12 @@ func rollingInstanceTargetStateWithWorkload(workload Workload, target *rollingIn
 	if !workload.Exists() {
 		return false, false
 	}
-	targetInstances := workload.GetActiveInstanceNameSet().Intersection(workload.GetInstanceNameSetByTemplate(target.templates))
-	if targetInstances.Len() != int(target.expectedCount) {
+	active := workload.GetActiveInstanceNameSet()
+	if active.Intersection(workload.GetUnknownTemplateInstanceNameSet()).Len() > 0 {
 		return false, false
 	}
+	targetInstances := active.Intersection(workload.GetInstanceNameSetByTemplate(target.templates))
 	upToDate := workload.GetUpToDateInstanceNameSet()
-	active := workload.GetActiveInstanceNameSet()
 	present := workload.GetPresentInstanceNameSet()
 	notReady := workload.GetNotReadyInstanceNameSet()
 	notAvailable := workload.GetNotAvailableInstanceNameSet()

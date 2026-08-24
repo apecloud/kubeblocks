@@ -140,6 +140,7 @@ type Workload interface {
 	GetActiveInstanceNameSet() sets.Set[string]
 	GetPresentInstanceNameSet() sets.Set[string]
 	GetInstanceNameSetByTemplate(templateNames sets.Set[string]) sets.Set[string]
+	GetUnknownTemplateInstanceNameSet() sets.Set[string]
 	GetCurrentRevisionMap() map[string]string
 	GetUpToDateInstanceNameSet() sets.Set[string]
 	GetNotReadyInstanceNameSet() sets.Set[string]

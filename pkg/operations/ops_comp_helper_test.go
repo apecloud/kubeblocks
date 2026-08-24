@@ -240,6 +240,7 @@ func TestRollingComponentAndShardingTerminalStatus(t *testing.T) {
 			upToDateSet:          sets.New(podName),
 			activeInstanceNames:  sets.New(podName),
 			presentInstanceNames: sets.New(podName),
+			unknownTemplateNames: sets.New[string](),
 			notReadySet:          sets.New[string](),
 			notAvailableSet:      sets.New[string](),
 			failedSet:            sets.New[string](),
@@ -273,16 +274,18 @@ func TestRollingComponentAndShardingTerminalStatus(t *testing.T) {
 
 		workload.failedSet.Delete(podName)
 		delete(workload.instanceTemplateMap, podName)
+		workload.unknownTemplateNames.Insert(podName)
 		completed, failed = rollingInstanceTargetStateWithWorkload(workload, target)
 		if completed || failed {
 			t.Fatalf("completed=%v failed=%v, want unknown template assignment to remain processing", completed, failed)
 		}
 
+		workload.unknownTemplateNames.Delete(podName)
 		workload.instanceTemplateMap[podName] = "template-a"
 		target.expectedCount = 2
 		completed, failed = rollingInstanceTargetStateWithWorkload(workload, target)
-		if completed || failed {
-			t.Fatalf("completed=%v failed=%v, want missing participant to remain processing", completed, failed)
+		if !completed || failed {
+			t.Fatalf("completed=%v failed=%v, progress count changed the participant result", completed, failed)
 		}
 	})
 }

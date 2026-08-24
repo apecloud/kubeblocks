@@ -216,3 +216,37 @@ func TestRevisionUpdateInvalidatesOnlyAffectedITS2Instances(t *testing.T) {
 		})
 	}
 }
+
+func TestRevisionUpdateInvalidatesUnobservedITS2InstanceHandoff(t *testing.T) {
+	its, tree, instances := newITS2InstanceStatusFixture(t, nil)
+	its.Generation++
+	its.Spec.Instances[0].Env = []corev1.EnvVar{{Name: "REVISION_CHANGE", Value: "true"}}
+	desired, _, err := buildDesiredInstancesByName(tree, its)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	current := instances["demo-0"]
+	handedOff := copyAndMergeInstance(current, desired[current.Name])
+	if handedOff == nil {
+		t.Fatal("fixture did not produce a child Instance spec handoff")
+	}
+	handedOff.Generation = current.Generation + 1
+	if handedOff.Status.ObservedGeneration >= handedOff.Generation {
+		t.Fatalf("fixture must retain stale child status: %#v", handedOff.Status)
+	}
+	if err := tree.Update(handedOff); err != nil {
+		t.Fatal(err)
+	}
+	if NewStatusReconciler().PreCondition(tree) != kubebuilderx.ConditionUnsatisfied {
+		t.Fatal("status reconciler must wait for the parent generation handoff")
+	}
+
+	// The next parent pass sees the desired child spec already handed off, while the
+	// child status and the previous parent InstanceStatus still describe the old spec.
+	if _, err := NewRevisionUpdateReconciler().Reconcile(tree); err != nil {
+		t.Fatal(err)
+	}
+	assertITS2UpToDate(t, its, "demo-0", false)
+	assertITS2UpToDate(t, its, "demo-1", true)
+}

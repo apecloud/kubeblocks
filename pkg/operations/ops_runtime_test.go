@@ -27,6 +27,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -277,6 +279,7 @@ func TestOpsRuntimeWorkloadMissingAndUsesPublicInstanceStatus(t *testing.T) {
 		namespace   = "default"
 		clusterName = "cluster"
 		component   = "mysql"
+		template    = "fast"
 	)
 
 	cli := fake.NewClientBuilder().WithScheme(scheme).Build()
@@ -300,6 +303,7 @@ func TestOpsRuntimeWorkloadMissingAndUsesPublicInstanceStatus(t *testing.T) {
 			UpdateRevisions:  map[string]string{"zstd": "not-base64"},
 			InstanceStatus: []workloads.InstanceStatus{{
 				PodName:         "cluster-mysql-0",
+				TemplateName:    pointer.String(template),
 				CurrentRevision: "rev-a",
 				UpdateRevision:  "rev-b",
 				UpToDate:        true,
@@ -335,6 +339,9 @@ func TestOpsRuntimeWorkloadMissingAndUsesPublicInstanceStatus(t *testing.T) {
 		!workload.GetPresentInstanceNameSet().Has("cluster-mysql-released") ||
 		workload.GetPresentInstanceNameSet().Has("cluster-mysql-offline") {
 		t.Fatal("workload did not expose current presence from effective current state")
+	}
+	if !workload.GetInstanceNameSetByTemplate(sets.New(template)).Has("cluster-mysql-0") {
+		t.Fatal("workload did not expose the public InstanceStatus template assignment")
 	}
 }
 

@@ -206,10 +206,36 @@ func TestRollingComponentAndShardingTerminalStatus(t *testing.T) {
 		}
 	})
 
+	t.Run("instance-scoped target waits only for the Cluster generation receipt", func(t *testing.T) {
+		cluster := &appsv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{Generation: 7},
+			Status: appsv1.ClusterStatus{Components: map[string]appsv1.ClusterComponentStatus{
+				"mysql": {Phase: appsv1.FailedComponentPhase, ObservedGeneration: 6, UpToDate: false},
+			}},
+		}
+		opsRes := &OpsResource{
+			Cluster: cluster,
+			OpsRequest: &opsv1alpha1.OpsRequest{Status: opsv1alpha1.OpsRequestStatus{
+				ClusterGeneration: 7,
+			}},
+		}
+		pgRes := &progressResource{compOps: opsv1alpha1.ComponentOps{ComponentName: "mysql"}}
+		if rollingTargetGenerationObserved(opsRes, pgRes) {
+			t.Fatal("stale Cluster generation was accepted")
+		}
+		status := cluster.Status.Components["mysql"]
+		status.ObservedGeneration = cluster.Generation
+		cluster.Status.Components["mysql"] = status
+		if !rollingTargetGenerationObserved(opsRes, pgRes) {
+			t.Fatal("current Cluster generation receipt was rejected because of aggregate health")
+		}
+	})
+
 	t.Run("instance-scoped result uses workload state instead of progress", func(t *testing.T) {
 		const podName = "cluster-mysql-0"
 		workload := &defaultWorkload{
 			exists:               true,
+			instanceTemplateMap:  map[string]string{podName: "template-a"},
 			upToDateSet:          sets.New(podName),
 			activeInstanceNames:  sets.New(podName),
 			presentInstanceNames: sets.New(podName),
@@ -217,31 +243,45 @@ func TestRollingComponentAndShardingTerminalStatus(t *testing.T) {
 			notAvailableSet:      sets.New[string](),
 			failedSet:            sets.New[string](),
 		}
-		targets := map[string]string{podName: "template-a"}
+		target := &rollingInstanceTarget{templates: sets.New("template-a"), expectedCount: 1}
 
-		completed, failed := rollingInstanceTargetStateWithWorkload(workload, targets)
+		completed, failed := rollingInstanceTargetStateWithWorkload(workload, target)
 		if !completed || failed {
 			t.Fatalf("completed=%v failed=%v, want participant success", completed, failed)
 		}
 
 		workload.notReadySet.Insert(podName)
-		completed, failed = rollingInstanceTargetStateWithWorkload(workload, targets)
+		completed, failed = rollingInstanceTargetStateWithWorkload(workload, target)
 		if completed || failed {
 			t.Fatalf("completed=%v failed=%v, want unready participant processing", completed, failed)
 		}
 
 		workload.notReadySet.Delete(podName)
 		workload.notAvailableSet.Insert(podName)
-		completed, failed = rollingInstanceTargetStateWithWorkload(workload, targets)
+		completed, failed = rollingInstanceTargetStateWithWorkload(workload, target)
 		if completed || failed {
 			t.Fatalf("completed=%v failed=%v, want unavailable participant processing", completed, failed)
 		}
 
 		workload.notAvailableSet.Delete(podName)
 		workload.failedSet.Insert(podName)
-		completed, failed = rollingInstanceTargetStateWithWorkload(workload, targets)
+		completed, failed = rollingInstanceTargetStateWithWorkload(workload, target)
 		if completed || !failed {
 			t.Fatalf("completed=%v failed=%v, want participant failure", completed, failed)
+		}
+
+		workload.failedSet.Delete(podName)
+		delete(workload.instanceTemplateMap, podName)
+		completed, failed = rollingInstanceTargetStateWithWorkload(workload, target)
+		if completed || failed {
+			t.Fatalf("completed=%v failed=%v, want unknown template assignment to remain processing", completed, failed)
+		}
+
+		workload.instanceTemplateMap[podName] = "template-a"
+		target.expectedCount = 2
+		completed, failed = rollingInstanceTargetStateWithWorkload(workload, target)
+		if completed || failed {
+			t.Fatalf("completed=%v failed=%v, want missing participant to remain processing", completed, failed)
 		}
 	})
 }

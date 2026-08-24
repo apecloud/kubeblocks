@@ -179,21 +179,17 @@ func handleRollingProgressWithWorkload(opsRes *OpsResource,
 	workload Workload,
 	pgRes *progressResource,
 	compStatus *opsv1alpha1.OpsRequestComponentStatus) (int32, int32) {
-	targetNames := make([]string, 0)
-	if pgRes.updatedPodSet != nil {
-		for name := range pgRes.updatedPodSet {
-			targetNames = append(targetNames, name)
-		}
-	} else {
-		for name := range workload.GetActiveInstanceNameSet() {
-			targetNames = append(targetNames, name)
-		}
+	targetNameSet := workload.GetActiveInstanceNameSet()
+	expectedCount := max(workload.GetDesiredReplicas(), pgRes.clusterComponent.Replicas)
+	if pgRes.rollingTarget != nil {
+		targetNameSet = targetNameSet.Intersection(workload.GetInstanceNameSetByTemplate(pgRes.rollingTarget.templates))
+		expectedCount = pgRes.rollingTarget.expectedCount
+	}
+	targetNames := make([]string, 0, targetNameSet.Len())
+	for name := range targetNameSet {
+		targetNames = append(targetNames, name)
 	}
 	slices.Sort(targetNames)
-	expectedCount := int32(len(targetNames))
-	if pgRes.updatedPodSet == nil {
-		expectedCount = max(expectedCount, workload.GetDesiredReplicas(), pgRes.clusterComponent.Replicas)
-	}
 	if !workload.Exists() {
 		return expectedCount, 0
 	}

@@ -21,6 +21,7 @@ package operations
 
 import (
 	"fmt"
+	"testing"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -30,6 +31,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -42,6 +44,31 @@ import (
 	testk8s "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 	testops "github.com/apecloud/kubeblocks/pkg/testutil/operations"
 )
+
+func TestVerticalScalingRollingTargetScope(t *testing.T) {
+	component := &appsv1.ClusterComponentSpec{
+		Replicas: 3,
+		Instances: []appsv1.InstanceTemplate{
+			{Name: "inherited", Replicas: pointer.Int32(1)},
+			{Name: "overridden", Replicas: pointer.Int32(1), Resources: &corev1.ResourceRequirements{}},
+		},
+	}
+	vs := verticalScalingHandler{}
+
+	componentWide := opsv1alpha1.VerticalScaling{ResourceRequirements: corev1.ResourceRequirements{
+		Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")},
+	}}
+	target := vs.resolveRollingTarget(&progressResource{clusterComponent: component, compOps: componentWide})
+	if target.expectedCount != 2 || !target.templates.Equal(sets.New("", "inherited")) {
+		t.Fatalf("unexpected component target: %#v", target)
+	}
+
+	instanceScoped := opsv1alpha1.VerticalScaling{Instances: []opsv1alpha1.InstanceResourceTemplate{{Name: "overridden"}}}
+	target = vs.resolveRollingTarget(&progressResource{clusterComponent: component, compOps: instanceScoped})
+	if target.expectedCount != 1 || !target.templates.Equal(sets.New("overridden")) {
+		t.Fatalf("unexpected instance target: %#v", target)
+	}
+}
 
 var _ = Describe("VerticalScaling OpsRequest", func() {
 

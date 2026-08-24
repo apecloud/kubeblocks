@@ -40,7 +40,8 @@ type ComponentOpsInterface interface {
 }
 
 type componentOpsHelper struct {
-	componentOpsSet map[string]ComponentOpsInterface
+	componentOpsSet       map[string]ComponentOpsInterface
+	rollingTargetResolver func(*progressResource) *rollingInstanceTarget
 }
 
 func newComponentOpsHelper[T ComponentOpsInterface](compOpsList []T) componentOpsHelper {
@@ -285,6 +286,9 @@ func (c componentOpsHelper) reconcileActionWithComponentOpsPolicy(reqCtx intctrl
 	instanceStatusTargets := map[string]struct{}{}
 	for i := range progressResources {
 		pgResource := progressResources[i]
+		if c.rollingTargetResolver != nil {
+			pgResource.rollingTarget = c.rollingTargetResolver(&pgResource)
+		}
 		var componentPhase appsv1.ComponentPhase
 		if pgResource.shards == nil {
 			status := opsRes.Cluster.Status.Components[pgResource.compOps.GetComponentName()]
@@ -300,14 +304,18 @@ func (c componentOpsHelper) reconcileActionWithComponentOpsPolicy(reqCtx intctrl
 		}
 		expectProgressCount += expectCount
 		completedProgressCount += completedCount
-		if clusterStatusAuthoritative && pgResource.updatedPodSet != nil {
+		if clusterStatusAuthoritative && pgResource.rollingTarget != nil {
 			instanceStatusTargets[pgResource.compOps.GetComponentName()] = struct{}{}
-			targetCompleted, targetFailed, err := rollingInstanceTargetState(opsRes, &pgResource)
-			if err != nil {
-				return opsRequestPhase, 0, err
+			if !rollingTargetGenerationObserved(opsRes, &pgResource) {
+				opsIsCompleted = false
+			} else {
+				targetCompleted, targetFailed, err := rollingInstanceTargetState(opsRes, &pgResource)
+				if err != nil {
+					return opsRequestPhase, 0, err
+				}
+				opsIsCompleted = opsIsCompleted && targetCompleted
+				existFailure = existFailure || targetFailed
 			}
-			opsIsCompleted = opsIsCompleted && targetCompleted
-			existFailure = existFailure || targetFailed
 		} else if !clusterStatusAuthoritative {
 			componentFailureCount := componentStatusFailureCount(opsCompStatus)
 			if componentFailureCount > 0 {
@@ -351,6 +359,17 @@ func (c componentOpsHelper) reconcileActionWithComponentOpsPolicy(reqCtx intctrl
 	return opsv1alpha1.OpsSucceedPhase, 0, nil
 }
 
+func rollingTargetGenerationObserved(opsRes *OpsResource, pgRes *progressResource) bool {
+	if opsRes.Cluster.Generation < opsRes.OpsRequest.Status.ClusterGeneration {
+		return false
+	}
+	targetName := pgRes.compOps.GetComponentName()
+	if pgRes.shards == nil {
+		return opsRes.Cluster.Status.Components[targetName].ObservedGeneration == opsRes.Cluster.Generation
+	}
+	return opsRes.Cluster.Status.Shardings[targetName].ObservedGeneration == opsRes.Cluster.Generation
+}
+
 func rollingInstanceTargetState(opsRes *OpsResource, pgRes *progressResource) (completed, failed bool, err error) {
 	runtime, err := opsRes.GetRuntime(pgRes.compOps.GetComponentName())
 	if err != nil {
@@ -360,12 +379,16 @@ func rollingInstanceTargetState(opsRes *OpsResource, pgRes *progressResource) (c
 	if err != nil {
 		return false, false, err
 	}
-	completed, failed = rollingInstanceTargetStateWithWorkload(workload, pgRes.updatedPodSet)
+	completed, failed = rollingInstanceTargetStateWithWorkload(workload, pgRes.rollingTarget)
 	return completed, failed, nil
 }
 
-func rollingInstanceTargetStateWithWorkload(workload Workload, targetInstances map[string]string) (completed, failed bool) {
+func rollingInstanceTargetStateWithWorkload(workload Workload, target *rollingInstanceTarget) (completed, failed bool) {
 	if !workload.Exists() {
+		return false, false
+	}
+	targetInstances := workload.GetActiveInstanceNameSet().Intersection(workload.GetInstanceNameSetByTemplate(target.templates))
+	if targetInstances.Len() != int(target.expectedCount) {
 		return false, false
 	}
 	upToDate := workload.GetUpToDateInstanceNameSet()

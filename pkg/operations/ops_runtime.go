@@ -107,6 +107,7 @@ func (r *opsRuntime) GetWorkload(namespace, clusterName, compName string) (Workl
 	}
 	workload := &defaultWorkload{
 		currentRevisionMap:   map[string]string{},
+		instanceTemplateMap:  map[string]string{},
 		upToDateSet:          sets.New[string](),
 		notReadySet:          sets.New[string](),
 		notAvailableSet:      sets.New[string](),
@@ -122,6 +123,9 @@ func (r *opsRuntime) GetWorkload(namespace, clusterName, compName string) (Workl
 		}
 		for _, status := range its.Status.InstanceStatus {
 			workload.instanceNames.Insert(status.PodName)
+			if status.TemplateName != nil {
+				workload.instanceTemplateMap[status.PodName] = *status.TemplateName
+			}
 			if status.EffectiveDesiredState() == workloads.InstanceDesiredStateActive {
 				workload.activeInstanceNames.Insert(status.PodName)
 			}
@@ -378,6 +382,7 @@ type defaultWorkload struct {
 	exists               bool
 	desiredReplicas      int32
 	currentRevisionMap   map[string]string
+	instanceTemplateMap  map[string]string
 	upToDateSet          sets.Set[string]
 	notReadySet          sets.Set[string]
 	notAvailableSet      sets.Set[string]
@@ -417,6 +422,16 @@ func (w *defaultWorkload) GetActiveInstanceNameSet() sets.Set[string] {
 
 func (w *defaultWorkload) GetPresentInstanceNameSet() sets.Set[string] {
 	return w.presentInstanceNames.Clone()
+}
+
+func (w *defaultWorkload) GetInstanceNameSetByTemplate(templateNames sets.Set[string]) sets.Set[string] {
+	result := sets.New[string]()
+	for instanceName, templateName := range w.instanceTemplateMap {
+		if templateNames.Has(templateName) {
+			result.Insert(instanceName)
+		}
+	}
+	return result
 }
 
 type defaultInstance struct {

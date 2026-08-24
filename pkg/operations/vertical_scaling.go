@@ -23,6 +23,7 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -96,55 +97,34 @@ func (vs verticalScalingHandler) Action(reqCtx intctrlutil.RequestCtx, cli clien
 // the Reconcile function for vertical scaling opsRequest.
 func (vs verticalScalingHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (opsv1alpha1.OpsPhase, time.Duration, error) {
 	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.VerticalScalingList)
-	handleComponentStatusProgressForVS := func(
-		reqCtx intctrlutil.RequestCtx,
-		cli client.Client,
-		opsRes *OpsResource,
-		pgRes *progressResource,
-		compStatus *opsv1alpha1.OpsRequestComponentStatus) (expectProgressCount int32, completedCount int32, err error) {
-		verticalScaling := pgRes.compOps.(opsv1alpha1.VerticalScaling)
-		if len(pgRes.clusterComponent.Instances) != 0 {
-			// obtain the pods which should be updated.
-			updatedPodSet := map[string]string{}
-			vsInsMap := vs.covertInsResourcesToMap(verticalScaling)
-			templateReplicasCnt := int32(0)
-			runtime, err := opsRes.GetRuntime(pgRes.compOps.GetComponentName())
-			if err != nil {
-				return 0, 0, err
-			}
-			for _, template := range pgRes.clusterComponent.Instances {
-				replicas := template.GetReplicas()
-				insVS := vsInsMap[template.Name]
-				if vs.verticalScalingInsTemplate(verticalScaling, template, insVS) {
-					templatePodNames, err := runtime.GenerateTemplateInstanceNames(
-						opsRes.Cluster.Name, pgRes.fullComponentName, template.Name, replicas, pgRes.clusterComponent.OfflineInstances, template.Ordinals)
-					if err != nil {
-						return 0, 0, err
-					}
-					for _, podName := range templatePodNames {
-						updatedPodSet[podName] = template.Name
-					}
-				}
-				templateReplicasCnt += replicas
-			}
-			if vs.verticalScalingComp(verticalScaling) && templateReplicasCnt < pgRes.clusterComponent.Replicas {
-				podNames, err := runtime.GenerateTemplateInstanceNames(
-					opsRes.Cluster.Name, pgRes.fullComponentName, "", pgRes.clusterComponent.Replicas-templateReplicasCnt, pgRes.clusterComponent.OfflineInstances, appsv1.Ordinals{})
-				if err != nil {
-					return 0, 0, err
-				}
-				for _, podName := range podNames {
-					updatedPodSet[podName] = ""
-				}
-			}
-			pgRes.updatedPodSet = updatedPodSet
-		}
-		return handleRollingProgress(reqCtx, cli, opsRes, pgRes, compStatus)
-	}
-	return compOpsHelper.reconcileRollingActionWithComponentOps(reqCtx, cli, opsRes, "vertical scale", handleComponentStatusProgressForVS)
+	compOpsHelper.rollingTargetResolver = vs.resolveRollingTarget
+	return compOpsHelper.reconcileRollingActionWithComponentOps(reqCtx, cli, opsRes, "vertical scale", handleRollingProgress)
 }
 
-func (vs verticalScalingHandler) covertInsResourcesToMap(verticalScaling opsv1alpha1.VerticalScaling) map[string]*opsv1alpha1.InstanceResourceTemplate {
+func (vs verticalScalingHandler) resolveRollingTarget(pgRes *progressResource) *rollingInstanceTarget {
+	if len(pgRes.clusterComponent.Instances) == 0 {
+		return nil
+	}
+	verticalScaling := pgRes.compOps.(opsv1alpha1.VerticalScaling)
+	instanceResources := vs.convertInsResourcesToMap(verticalScaling)
+	target := &rollingInstanceTarget{templates: sets.New[string]()}
+	var templateReplicas int32
+	for _, template := range pgRes.clusterComponent.Instances {
+		replicas := template.GetReplicas()
+		if vs.verticalScalingInsTemplate(verticalScaling, template, instanceResources[template.Name]) {
+			target.templates.Insert(template.Name)
+			target.expectedCount += replicas
+		}
+		templateReplicas += replicas
+	}
+	if vs.verticalScalingComp(verticalScaling) && templateReplicas < pgRes.clusterComponent.Replicas {
+		target.templates.Insert("")
+		target.expectedCount += pgRes.clusterComponent.Replicas - templateReplicas
+	}
+	return target
+}
+
+func (vs verticalScalingHandler) convertInsResourcesToMap(verticalScaling opsv1alpha1.VerticalScaling) map[string]*opsv1alpha1.InstanceResourceTemplate {
 	vsInsMap := map[string]*opsv1alpha1.InstanceResourceTemplate{}
 	for i := range verticalScaling.Instances {
 		vsInsMap[verticalScaling.Instances[i].Name] = &verticalScaling.Instances[i]

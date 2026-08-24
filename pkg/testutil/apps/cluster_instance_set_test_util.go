@@ -386,8 +386,12 @@ func MockInstanceSetStatus(testCtx testutil.TestContext, cluster *appsv1.Cluster
 		if !ready {
 			notReadyPodNames = append(notReadyPodNames, pod.Name)
 		}
+		templateName := appsv1.GetInstanceTemplateName(cluster.Name, compName, pod.Name)
 		status := workloads.InstanceStatus{
 			PodName:         pod.Name,
+			TemplateName:    &templateName,
+			DesiredState:    workloads.InstanceDesiredStateActive,
+			CurrentState:    workloads.InstanceCurrentStatePresent,
 			CurrentRevision: "revision",
 			UpdateRevision:  "revision",
 			UpToDate:        true,

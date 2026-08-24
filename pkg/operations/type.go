@@ -90,6 +90,11 @@ type OpsManager struct {
 	OpsMap map[opsv1alpha1.OpsType]OpsBehaviour
 }
 
+type rollingInstanceTarget struct {
+	templates     sets.Set[string]
+	expectedCount int32
+}
+
 type progressResource struct {
 	// opsMessageKey progress message key of specified OpsType, it is a verb and will form the message of progressDetail
 	// such as "vertical scale" of verticalScaling OpsRequest.
@@ -102,9 +107,9 @@ type progressResource struct {
 	clusterComponent *appsv1.ClusterComponentSpec
 	clusterDef       *appsv1.ClusterDefinition
 	componentDef     *appsv1.ComponentDefinition
-	// record the participating pods derived from the operation and Cluster spec.
-	// key is podName, value is instance template name.
-	updatedPodSet map[string]string
+	// rollingTarget describes the instance-template scope owned by the operation.
+	// Both progress reporting and result evaluation consume it independently.
+	rollingTarget *rollingInstanceTarget
 	createdPodSet map[string]string
 	deletedPodSet map[string]string
 	compOps       ComponentOpsInterface
@@ -134,6 +139,7 @@ type Workload interface {
 	GetInstanceNameSet() sets.Set[string]
 	GetActiveInstanceNameSet() sets.Set[string]
 	GetPresentInstanceNameSet() sets.Set[string]
+	GetInstanceNameSetByTemplate(templateNames sets.Set[string]) sets.Set[string]
 	GetCurrentRevisionMap() map[string]string
 	GetUpToDateInstanceNameSet() sets.Set[string]
 	GetNotReadyInstanceNameSet() sets.Set[string]

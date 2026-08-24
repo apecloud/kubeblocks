@@ -56,6 +56,7 @@ func TestRollingInstanceProgress(t *testing.T) {
 			exists:               true,
 			desiredReplicas:      2,
 			currentRevisionMap:   map[string]string{pod0: "new", pod1: "new"},
+			instanceTemplateMap:  map[string]string{pod0: "template", pod1: "other"},
 			upToDateSet:          sets.New(pod0, pod1),
 			notReadySet:          sets.New[string](),
 			notAvailableSet:      sets.New[string](),
@@ -98,7 +99,7 @@ func TestRollingInstanceProgress(t *testing.T) {
 		}, wantExpected: 2, wantCompleted: 1, wantPod0: opsv1alpha1.ProcessingProgressStatus},
 		{name: "partial vertical scaling waits when resources are not applied", mutate: func(w *defaultWorkload, pg *progressResource) {
 			w.upToDateSet.Delete(pod0)
-			pg.updatedPodSet = map[string]string{pod0: "template"}
+			pg.rollingTarget = &rollingInstanceTarget{templates: sets.New("template"), expectedCount: 1}
 		}, wantExpected: 1, wantCompleted: 0, wantPod0: opsv1alpha1.ProcessingProgressStatus},
 		{name: "not ready", mutate: func(w *defaultWorkload, _ *progressResource) {
 			w.notReadySet.Insert(pod0)
@@ -119,8 +120,12 @@ func TestRollingInstanceProgress(t *testing.T) {
 		}, wantExpected: 1, wantCompleted: 1},
 		{name: "partial target cannot complete after becoming inactive", mutate: func(w *defaultWorkload, pg *progressResource) {
 			w.activeInstanceNames.Delete(pod0)
-			pg.updatedPodSet = map[string]string{pod0: "template"}
-		}, wantExpected: 1, wantCompleted: 0, wantPod0: opsv1alpha1.ProcessingProgressStatus},
+			pg.rollingTarget = &rollingInstanceTarget{templates: sets.New("template"), expectedCount: 1}
+		}, wantExpected: 1, wantCompleted: 0},
+		{name: "partial target waits for template assignment", mutate: func(w *defaultWorkload, pg *progressResource) {
+			delete(w.instanceTemplateMap, pod0)
+			pg.rollingTarget = &rollingInstanceTarget{templates: sets.New("template"), expectedCount: 1}
+		}, wantExpected: 1, wantCompleted: 0},
 		{name: "missing InstanceSet", mutate: func(w *defaultWorkload, _ *progressResource) {
 			w.exists = false
 		}, wantExpected: 2, wantCompleted: 0},

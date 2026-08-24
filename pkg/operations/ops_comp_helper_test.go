@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -284,4 +285,53 @@ func TestRollingComponentAndShardingTerminalStatus(t *testing.T) {
 			t.Fatalf("completed=%v failed=%v, want missing participant to remain processing", completed, failed)
 		}
 	})
+}
+
+func TestReplacedRollingTargetIsPersistedAsAborted(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := appsv1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	if err := opsv1alpha1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	cluster := &appsv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "cluster", Generation: 2},
+		Spec: appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{{
+			Name: "mysql", ComponentDef: "mysql-v3", ServiceVersion: "3.0.0",
+		}}},
+	}
+	componentDef := "mysql-v2"
+	serviceVersion := "2.0.0"
+	ops := &opsv1alpha1.OpsRequest{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "upgrade"},
+		Spec: opsv1alpha1.OpsRequestSpec{
+			ClusterName: "cluster",
+			Type:        opsv1alpha1.UpgradeType,
+			SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{Upgrade: &opsv1alpha1.Upgrade{
+				Components: []opsv1alpha1.UpgradeComponent{{
+					ComponentOps:            opsv1alpha1.ComponentOps{ComponentName: "mysql"},
+					ComponentDefinitionName: &componentDef,
+					ServiceVersion:          &serviceVersion,
+				}},
+			}},
+		},
+		Status: opsv1alpha1.OpsRequestStatus{Phase: opsv1alpha1.OpsRunningPhase, ClusterGeneration: 1},
+	}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&opsv1alpha1.OpsRequest{}).
+		WithObjects(cluster, ops).Build()
+	opsRes := &OpsResource{
+		Cluster:    cluster,
+		OpsRequest: ops,
+		Recorder:   record.NewFakeRecorder(10),
+	}
+	if _, err := GetOpsManager().Reconcile(intctrlutil.RequestCtx{Ctx: context.Background()}, cli, opsRes); err != nil {
+		t.Fatal(err)
+	}
+	if ops.Status.Phase != opsv1alpha1.OpsAbortedPhase {
+		t.Fatalf("phase=%s, want Aborted", ops.Status.Phase)
+	}
+	if len(ops.Status.Conditions) == 0 || ops.Status.Conditions[len(ops.Status.Conditions)-1].Type != opsv1alpha1.ConditionTypeAborted {
+		t.Fatalf("conditions=%v, want an Aborted condition", ops.Status.Conditions)
+	}
 }

@@ -22,6 +22,8 @@ package operations
 import (
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -96,9 +98,69 @@ func (vs verticalScalingHandler) Action(reqCtx intctrlutil.RequestCtx, cli clien
 // ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
 // the Reconcile function for vertical scaling opsRequest.
 func (vs verticalScalingHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (opsv1alpha1.OpsPhase, time.Duration, error) {
+	if !vs.resourceFieldsUnchanged(opsRes) {
+		return opsv1alpha1.OpsAbortedPhase, 0, nil
+	}
 	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.VerticalScalingList)
 	compOpsHelper.rollingTargetResolver = vs.resolveRollingTarget
 	return compOpsHelper.reconcileRollingActionWithComponentOps(reqCtx, cli, opsRes, "vertical scale", handleRollingProgress)
+}
+
+func (vs verticalScalingHandler) resourceFieldsUnchanged(opsRes *OpsResource) bool {
+	if opsRes == nil || opsRes.Cluster == nil || opsRes.OpsRequest == nil {
+		return false
+	}
+	for _, verticalScaling := range opsRes.OpsRequest.Spec.VerticalScalingList {
+		compSpec := getComponentSpecOrShardingTemplate(opsRes.Cluster, verticalScaling.ComponentName)
+		if compSpec == nil {
+			return false
+		}
+		if opsRes.OpsRequest.Status.Phase == opsv1alpha1.OpsCancellingPhase {
+			lastConfig, ok := opsRes.OpsRequest.Status.LastConfiguration.Components[verticalScaling.ComponentName]
+			if !ok || !vs.rollbackResourceFieldsUnchanged(compSpec, verticalScaling, lastConfig) {
+				return false
+			}
+			continue
+		}
+		if vs.verticalScalingComp(verticalScaling) &&
+			!apiequality.Semantic.DeepEqual(compSpec.Resources, verticalScaling.ResourceRequirements) {
+			return false
+		}
+		for _, instance := range verticalScaling.Instances {
+			if !instanceResourceFieldMatches(compSpec, instance.Name, &instance.ResourceRequirements) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func (vs verticalScalingHandler) rollbackResourceFieldsUnchanged(compSpec *appsv1.ClusterComponentSpec, verticalScaling opsv1alpha1.VerticalScaling,
+	lastConfig opsv1alpha1.LastComponentConfiguration) bool {
+	if vs.verticalScalingComp(verticalScaling) &&
+		!apiequality.Semantic.DeepEqual(compSpec.Resources, lastConfig.ResourceRequirements) {
+		return false
+	}
+	lastInstances := make(map[string]*corev1.ResourceRequirements, len(lastConfig.Instances))
+	for i := range lastConfig.Instances {
+		lastInstances[lastConfig.Instances[i].Name] = lastConfig.Instances[i].Resources
+	}
+	for _, instance := range verticalScaling.Instances {
+		resources, ok := lastInstances[instance.Name]
+		if !ok || !instanceResourceFieldMatches(compSpec, instance.Name, resources) {
+			return false
+		}
+	}
+	return true
+}
+
+func instanceResourceFieldMatches(compSpec *appsv1.ClusterComponentSpec, name string, resources *corev1.ResourceRequirements) bool {
+	for i := range compSpec.Instances {
+		if compSpec.Instances[i].Name == name {
+			return apiequality.Semantic.DeepEqual(compSpec.Instances[i].Resources, resources)
+		}
+	}
+	return false
 }
 
 func (vs verticalScalingHandler) resolveRollingTarget(pgRes *progressResource) *rollingInstanceTarget {

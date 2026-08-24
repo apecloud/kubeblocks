@@ -70,6 +70,98 @@ func TestVerticalScalingRollingTargetScope(t *testing.T) {
 	}
 }
 
+func TestVerticalScalingResourceFieldsUnchanged(t *testing.T) {
+	resources := func(cpu string) corev1.ResourceRequirements {
+		return corev1.ResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse(cpu)}}
+	}
+	componentTarget := resources("2")
+	templateTarget := resources("3")
+	unrelatedTemplateResources := resources("4")
+	cluster := &appsv1.Cluster{Spec: appsv1.ClusterSpec{
+		ComponentSpecs: []appsv1.ClusterComponentSpec{{
+			Name: "mysql", Resources: componentTarget, Instances: []appsv1.InstanceTemplate{
+				{Name: "target", Resources: &templateTarget},
+				{Name: "unrelated", Resources: &unrelatedTemplateResources},
+			},
+		}},
+		Shardings: []appsv1.ClusterSharding{{
+			Name: "shard", Template: appsv1.ClusterComponentSpec{
+				Resources: componentTarget,
+				Instances: []appsv1.InstanceTemplate{{Name: "target", Resources: &templateTarget}},
+			},
+		}},
+	}}
+	verticalScaling := opsv1alpha1.VerticalScaling{
+		ComponentOps:         opsv1alpha1.ComponentOps{ComponentName: "mysql"},
+		ResourceRequirements: componentTarget,
+		Instances: []opsv1alpha1.InstanceResourceTemplate{{
+			Name: "target", ResourceRequirements: templateTarget,
+		}},
+	}
+	ops := &opsv1alpha1.OpsRequest{Spec: opsv1alpha1.OpsRequestSpec{SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{
+		VerticalScalingList: []opsv1alpha1.VerticalScaling{verticalScaling},
+	}}}
+	opsRes := &OpsResource{Cluster: cluster, OpsRequest: ops}
+	handler := verticalScalingHandler{}
+	if !handler.resourceFieldsUnchanged(opsRes) {
+		t.Fatal("component and instance-template targets did not match")
+	}
+	shardingOps := ops.DeepCopy()
+	shardingOps.Spec.VerticalScalingList[0].ComponentName = "shard"
+	if !handler.resourceFieldsUnchanged(&OpsResource{Cluster: cluster, OpsRequest: shardingOps}) {
+		t.Fatal("sharding resource fields did not match")
+	}
+	changedUnrelatedResources := resources("5")
+	cluster.Spec.ComponentSpecs[0].Instances[1].Resources = &changedUnrelatedResources
+	if !handler.resourceFieldsUnchanged(opsRes) {
+		t.Fatal("unrelated instance-template change replaced the target")
+	}
+	cluster.Spec.ComponentSpecs[0].Resources = resources("6")
+	if handler.resourceFieldsUnchanged(opsRes) {
+		t.Fatal("replaced component resources were accepted")
+	}
+	cluster.Spec.ComponentSpecs[0].Resources = componentTarget
+	changedTargetResources := resources("7")
+	cluster.Spec.ComponentSpecs[0].Instances[0].Resources = &changedTargetResources
+	if handler.resourceFieldsUnchanged(opsRes) {
+		t.Fatal("replaced instance-template resources were accepted")
+	}
+	phase, _, err := handler.ReconcileAction(intctrlutil.RequestCtx{}, nil, opsRes)
+	if err != nil || phase != opsv1alpha1.OpsAbortedPhase {
+		t.Fatalf("phase=%s err=%v, want Aborted for a replaced target", phase, err)
+	}
+
+	oldComponentResources := resources("500m")
+	oldTemplateResources := resources("750m")
+	cluster.Spec.ComponentSpecs[0].Resources = oldComponentResources
+	cluster.Spec.ComponentSpecs[0].Instances[0].Resources = &oldTemplateResources
+	ops.Status.Phase = opsv1alpha1.OpsCancellingPhase
+	ops.Status.LastConfiguration.Components = map[string]opsv1alpha1.LastComponentConfiguration{
+		"mysql": {
+			ResourceRequirements: oldComponentResources,
+			Instances:            []appsv1.InstanceTemplate{{Name: "target", Resources: &oldTemplateResources}},
+		},
+	}
+	if !handler.resourceFieldsUnchanged(opsRes) {
+		t.Fatal("rollback target did not match lastConfiguration")
+	}
+	cluster.Spec.ComponentSpecs[0].Instances[0].Resources = &changedTargetResources
+	if handler.resourceFieldsUnchanged(opsRes) {
+		t.Fatal("replaced rollback target was accepted")
+	}
+
+	partialOps := ops.DeepCopy()
+	partialOps.Spec.VerticalScalingList[0].ResourceRequirements = corev1.ResourceRequirements{}
+	partialOps.Status.LastConfiguration.Components["mysql"] = opsv1alpha1.LastComponentConfiguration{
+		Instances: []appsv1.InstanceTemplate{{Name: "target", Resources: &oldTemplateResources}},
+	}
+	cluster.Spec.ComponentSpecs[0].Resources = resources("8")
+	cluster.Spec.ComponentSpecs[0].Instances[0].Resources = &oldTemplateResources
+	if !handler.resourceFieldsUnchanged(&OpsResource{Cluster: cluster, OpsRequest: partialOps}) {
+		t.Fatal("unrelated component resources blocked instance-template rollback")
+	}
+}
+
 var _ = Describe("VerticalScaling OpsRequest", func() {
 
 	var (
@@ -296,6 +388,12 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 				},
 			}
 			opsRes.OpsRequest = testops.CreateOpsRequest(ctx, testCtx, ops)
+			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsPendingPhase
+			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			recordRollingActionGeneration(opsRes)
 
 			By("mock opsRequest is Running")
 			mockComponentIsOperating(opsRes.Cluster, appsv1.UpdatingComponentPhase, defaultCompName)
@@ -318,7 +416,7 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 			mockRollingInstanceStatus(opsRes.Cluster, defaultCompName, podList[0].Name)
 
 			By("reconcile opsRequest status")
-			_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 
 			By("the progress status of pod[0] should be Succeed ")

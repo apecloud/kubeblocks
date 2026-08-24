@@ -87,10 +87,34 @@ func (u upgradeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 // ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
 // the Reconcile function for upgrade opsRequest.
 func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (opsv1alpha1.OpsPhase, time.Duration, error) {
+	if !u.componentVersionFieldsUnchanged(opsRes) {
+		return opsv1alpha1.OpsAbortedPhase, 0, nil
+	}
 	upgradeSpec := opsRes.OpsRequest.Spec.Upgrade
 	compOpsHelper := newComponentOpsHelper(upgradeSpec.Components)
 	return compOpsHelper.reconcileRollingActionWithComponentOps(
 		reqCtx, cli, opsRes, "upgrade", handleRollingProgress)
+}
+
+func (u upgradeOpsHandler) componentVersionFieldsUnchanged(opsRes *OpsResource) bool {
+	if opsRes == nil || opsRes.Cluster == nil || opsRes.OpsRequest == nil || opsRes.OpsRequest.Spec.Upgrade == nil {
+		return false
+	}
+	for _, upgrade := range opsRes.OpsRequest.Spec.Upgrade.Components {
+		compSpec := getComponentSpecOrShardingTemplate(opsRes.Cluster, upgrade.ComponentName)
+		if compSpec == nil {
+			return false
+		}
+		if upgrade.ComponentDefinitionName != nil && *upgrade.ComponentDefinitionName != "" &&
+			compSpec.ComponentDef != *upgrade.ComponentDefinitionName {
+			return false
+		}
+		if upgrade.ServiceVersion != nil && *upgrade.ServiceVersion != "" &&
+			compSpec.ServiceVersion != *upgrade.ServiceVersion {
+			return false
+		}
+	}
+	return true
 }
 
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration

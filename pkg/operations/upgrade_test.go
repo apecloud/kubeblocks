@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"testing"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -34,6 +36,62 @@ import (
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testops "github.com/apecloud/kubeblocks/pkg/testutil/operations"
 )
+
+func TestUpgradeComponentVersionFieldsUnchanged(t *testing.T) {
+	explicitCompDef := "mysql-8.0"
+	explicitServiceVersion := "8.0.36"
+	latest := ""
+	cluster := &appsv1.Cluster{Spec: appsv1.ClusterSpec{
+		ComponentSpecs: []appsv1.ClusterComponentSpec{{
+			Name: "mysql", ComponentDef: explicitCompDef, ServiceVersion: explicitServiceVersion,
+		}},
+		Shardings: []appsv1.ClusterSharding{{
+			Name: "shard", Template: appsv1.ClusterComponentSpec{ComponentDef: explicitCompDef, ServiceVersion: explicitServiceVersion},
+		}},
+	}}
+	handler := upgradeOpsHandler{}
+	newOpsResource := func(componentName string, componentDef, serviceVersion *string) *OpsResource {
+		return &OpsResource{Cluster: cluster, OpsRequest: &opsv1alpha1.OpsRequest{Spec: opsv1alpha1.OpsRequestSpec{
+			SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{
+				Upgrade: &opsv1alpha1.Upgrade{Components: []opsv1alpha1.UpgradeComponent{{
+					ComponentOps:            opsv1alpha1.ComponentOps{ComponentName: componentName},
+					ComponentDefinitionName: componentDef,
+					ServiceVersion:          serviceVersion,
+				}}},
+			},
+		}}}
+	}
+
+	if !handler.componentVersionFieldsUnchanged(newOpsResource("mysql", &explicitCompDef, &explicitServiceVersion)) {
+		t.Fatal("explicit component target did not match")
+	}
+	if !handler.componentVersionFieldsUnchanged(newOpsResource("shard", &explicitCompDef, &explicitServiceVersion)) {
+		t.Fatal("explicit sharding target did not match")
+	}
+	cluster.Spec.Services = []appsv1.ClusterService{{Service: appsv1.Service{Name: "unrelated"}}}
+	if !handler.componentVersionFieldsUnchanged(newOpsResource("mysql", &explicitCompDef, &explicitServiceVersion)) {
+		t.Fatal("unrelated Cluster change replaced the upgrade target")
+	}
+	cluster.Spec.ComponentSpecs[0].ServiceVersion = "8.4.0"
+	if handler.componentVersionFieldsUnchanged(newOpsResource("mysql", &explicitCompDef, &explicitServiceVersion)) {
+		t.Fatal("replaced serviceVersion was accepted")
+	}
+	cluster.Spec.ComponentSpecs[0].ServiceVersion = explicitServiceVersion
+	cluster.Spec.ComponentSpecs[0].ComponentDef = "mysql-8.4"
+	if handler.componentVersionFieldsUnchanged(newOpsResource("mysql", &explicitCompDef, &explicitServiceVersion)) {
+		t.Fatal("replaced componentDef was accepted")
+	}
+	cluster.Spec.ComponentSpecs[0].ServiceVersion = "resolved-latest"
+	if !handler.componentVersionFieldsUnchanged(newOpsResource("mysql", &latest, &latest)) {
+		t.Fatal("non-exact latest target rejected the owner-resolved values")
+	}
+
+	phase, _, err := handler.ReconcileAction(intctrlutil.RequestCtx{}, nil,
+		newOpsResource("mysql", &explicitCompDef, &explicitServiceVersion))
+	if err != nil || phase != opsv1alpha1.OpsAbortedPhase {
+		t.Fatalf("phase=%s err=%v, want Aborted for a replaced explicit target", phase, err)
+	}
+}
 
 var _ = Describe("Upgrade OpsRequest", func() {
 

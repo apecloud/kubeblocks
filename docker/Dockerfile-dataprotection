@@ -1,7 +1,7 @@
 # Build the dataprotection binary
 ARG DIST_IMG=gcr.io/distroless/static:nonroot
 
-ARG GO_VERSION=1.25.10-alpine
+ARG GO_VERSION=1.25.13-alpine
 
 FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION} AS builder
 

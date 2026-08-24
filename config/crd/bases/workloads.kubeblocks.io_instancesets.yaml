@@ -11666,6 +11666,7 @@ spec:
                       description: |-
                         Available indicates whether the instance has remained ready for the required minimum duration when CurrentState is Present.
                         Available can be true only when Ready is true.
+                        It is independent of desired-state convergence reported by UpToDate.
                       type: boolean
                     configs:
                       description: The config status observed for the instance when
@@ -11718,8 +11719,9 @@ spec:
                         by the InstanceSet.
                       type: string
                     ready:
-                      description: Ready indicates whether the instance is ready to
-                        serve requests when CurrentState is Present.
+                      description: |-
+                        Ready indicates whether the instance is ready to serve requests when CurrentState is Present.
+                        It is independent of desired-state convergence reported by UpToDate.
                       type: boolean
                     role:
                       description: Represents the role observed for the instance when

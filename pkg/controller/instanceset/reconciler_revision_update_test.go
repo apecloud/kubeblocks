@@ -21,11 +21,13 @@ package instanceset
 
 import (
 	"fmt"
+	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -136,5 +138,76 @@ func transientFlatReassignmentInstanceSet() *workloads.InstanceSet {
 				{PodName: "demo-1", TemplateName: &templateB, DesiredState: workloads.InstanceDesiredStateActive, CurrentState: workloads.InstanceCurrentStatePresent},
 			},
 		},
+	}
+}
+
+func TestRevisionUpdateInvalidatesOnlyAffectedLegacyInstances(t *testing.T) {
+	tests := []struct {
+		name   string
+		mutate func(*workloads.InstanceSet)
+		check  func(*testing.T, *workloads.InstanceSet, map[string]string)
+	}{
+		{
+			name: "pod revision changes for one template",
+			mutate: func(its *workloads.InstanceSet) {
+				its.Spec.Instances[0].Env = []corev1.EnvVar{{Name: "REVISION_CHANGE", Value: "true"}}
+			},
+			check: func(t *testing.T, its *workloads.InstanceSet, old map[string]string) {
+				updated, err := GetRevisions(its.Status.UpdateRevisions)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if updated["demo-0"] == old["demo-0"] || updated["demo-1"] != old["demo-1"] {
+					t.Fatalf("revision change was not scoped to demo-0: old=%v new=%v", old, updated)
+				}
+			},
+		},
+		{
+			name: "revision-excluded resources change for one template",
+			mutate: func(its *workloads.InstanceSet) {
+				its.Spec.Instances[0].Resources = &corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("2")},
+				}
+			},
+			check: func(t *testing.T, its *workloads.InstanceSet, old map[string]string) {
+				updated, err := GetRevisions(its.Status.UpdateRevisions)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if updated["demo-0"] != old["demo-0"] || updated["demo-1"] != old["demo-1"] {
+					t.Fatalf("in-place resources unexpectedly changed revisions: old=%v new=%v", old, updated)
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			its, tree, _ := newLegacyInstanceStatusFixture(t, nil)
+			oldRevisions, err := GetRevisions(its.Status.UpdateRevisions)
+			if err != nil {
+				t.Fatal(err)
+			}
+			its.Generation++
+			tt.mutate(its)
+
+			if NewStatusReconciler().PreCondition(tree) != kubebuilderx.ConditionUnsatisfied {
+				t.Fatal("status reconciler must remain before revision update and wait for the new generation target")
+			}
+			if _, err := NewRevisionUpdateReconciler().Reconcile(tree); err != nil {
+				t.Fatal(err)
+			}
+			tt.check(t, its, oldRevisions)
+			assertLegacyUpToDate(t, its, "demo-0", false)
+			assertLegacyUpToDate(t, its, "demo-1", true)
+
+			// The next status pass consumes the new revisions. The affected instance remains stale and
+			// the unaffected observation remains true across the two-reconcile handoff.
+			if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+				t.Fatal(err)
+			}
+			assertLegacyUpToDate(t, its, "demo-0", false)
+			assertLegacyUpToDate(t, its, "demo-1", true)
+		})
 	}
 }

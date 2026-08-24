@@ -20,7 +20,7 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - description: update-to-date.
+    - description: desired state applied.
       jsonPath: .status.upToDate
       name: UP-TO-DATE
       type: string
@@ -10261,7 +10261,8 @@ spec:
             description: InstanceStatus2 defines the observed state of Instance
             properties:
               available:
-                description: Represents whether the instance is in available condition.
+                description: Represents whether the instance is in available condition,
+                  independent of desired-state convergence.
                 type: boolean
               conditions:
                 description: |-
@@ -10356,13 +10357,16 @@ spec:
                 format: int64
                 type: integer
               ready:
-                description: Represents whether the instance is in ready condition.
+                description: Represents whether the instance is in ready condition,
+                  independent of desired-state convergence.
                 type: boolean
               role:
                 description: Represents the role of the instance observed.
                 type: string
               upToDate:
-                description: Represents whether the instance is up-to-date.
+                description: |-
+                  UpToDate indicates that the Instance controller has observed the Pod, dynamic configs, and PVC expansion
+                  targets represented by this status applied. It is independent of runtime Ready and Available observations.
                 type: boolean
               updateRevision:
                 description: updateRevision, if not empty, identifies the revision

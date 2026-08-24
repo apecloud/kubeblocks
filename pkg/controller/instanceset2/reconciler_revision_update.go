@@ -96,6 +96,10 @@ func (r *revisionUpdateReconciler) invalidateAffectedInstanceStatus(its *workloa
 		if desired == nil || current == nil {
 			continue
 		}
+		if current.Generation != current.Status.ObservedGeneration {
+			status.UpToDate = false
+			continue
+		}
 		podApplied := equality.Semantic.DeepEqual(current.Spec.Template, desired.Spec.Template)
 		configsApplied := instancestatus.ConfigsApplied(desired.Spec.Configs, current.Status.Configs)
 		pvcApplied := volumeExpansionTargetsApplied(current, desired) && !current.Status.VolumeExpansion

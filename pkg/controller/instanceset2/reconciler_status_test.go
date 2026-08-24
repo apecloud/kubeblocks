@@ -30,6 +30,7 @@ import (
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	instctrl "github.com/apecloud/kubeblocks/pkg/controller/instance"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/revisionmap"
 )
@@ -57,6 +58,15 @@ func TestSetInstanceStatusReadsCurrentStateFromInstance(t *testing.T) {
 			VolumeExpansion:    true,
 		},
 	}
+	desiredInstances, _, err := buildDesiredInstancesByName(tree, its)
+	if err != nil {
+		t.Fatal(err)
+	}
+	desiredPodRevision, err := instctrl.BuildPodRevision(desiredInstances[inst.Name])
+	if err != nil {
+		t.Fatal(err)
+	}
+	inst.Status.UpdateRevision = desiredPodRevision
 	instanceSpecRevision := stampInstanceRevision(inst)
 	its.Status.UpdateRevisions = map[string]string{inst.Name: instanceSpecRevision}
 
@@ -148,13 +158,21 @@ func TestSetInstanceStatusTreatsUnreportedInstanceAsAbsent(t *testing.T) {
 	}
 	tree := kubebuilderx.NewObjectTree()
 	tree.SetRoot(its)
-	inst := &workloads.Instance{ObjectMeta: metav1.ObjectMeta{Name: "demo-0"}}
-
-	if err := setInstanceStatus(tree, its, []*workloads.Instance{inst}); err != nil {
+	instanceName := "demo-0"
+	desired, _, err := buildDesiredInstancesByName(tree, its)
+	if err != nil {
 		t.Fatal(err)
 	}
-	status := its.FindInstanceStatus(inst.Name)
-	if status == nil || status.DesiredState != workloads.InstanceDesiredStateActive || status.CurrentState != workloads.InstanceCurrentStateAbsent {
+	desiredPodRevision, err := instctrl.BuildPodRevision(desired[instanceName])
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := setInstanceStatus(tree, its, nil); err != nil {
+		t.Fatal(err)
+	}
+	status := its.FindInstanceStatus(instanceName)
+	if status == nil || status.DesiredState != workloads.InstanceDesiredStateActive || status.CurrentState != workloads.InstanceCurrentStateAbsent || status.UpdateRevision != desiredPodRevision {
 		t.Fatalf("unreported Instance was not published as Active+Absent: %#v", status)
 	}
 }
@@ -186,12 +204,20 @@ func TestSetInstanceStatusKeepsRuntimeStateIndependentFromConvergence(t *testing
 			}},
 		},
 	}
+	desiredInstances, _, err := buildDesiredInstancesByName(tree, its)
+	if err != nil {
+		t.Fatal(err)
+	}
+	desiredPodRevision, err := instctrl.BuildPodRevision(desiredInstances[inst.Name])
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if err := setInstanceStatus(tree, its, []*workloads.Instance{inst}); err != nil {
 		t.Fatal(err)
 	}
 	status := its.FindInstanceStatus(inst.Name)
-	if status == nil || status.CurrentRevision != "current" || status.UpdateRevision != "" || status.UpToDate ||
+	if status == nil || status.CurrentRevision != "current" || status.UpdateRevision != desiredPodRevision || status.UpToDate ||
 		!status.Ready || !status.Available || !status.Failed || status.Role != "leader" {
 		t.Fatalf("runtime state was coupled to stale desired-state convergence: %#v", status)
 	}
@@ -600,6 +626,10 @@ func TestStatusReconcilerReadsCurrentRevisionFromInstanceStatus(t *testing.T) {
 		t.Fatalf("expected desired instance test-its-0, got %#v", desiredInstances)
 	}
 	desiredRevision := getInstanceRevision(desired)
+	desiredPodRevision, err := instctrl.BuildPodRevision(desired)
+	if err != nil {
+		t.Fatalf("build desired Pod revision: %v", err)
+	}
 	updateRevisions, err := revisionmap.Encode(map[string]string{
 		desired.Name: desiredRevision,
 	})
@@ -645,8 +675,8 @@ func TestStatusReconcilerReadsCurrentRevisionFromInstanceStatus(t *testing.T) {
 		t.Fatalf("expected aggregate Instance spec revision, got %s want %s", currentRevisions[inst.Name], desiredRevision)
 	}
 	status := got.FindInstanceStatus(inst.Name)
-	if status == nil || status.CurrentRevision != inst.Status.CurrentRevision || status.UpdateRevision != inst.Status.UpdateRevision {
-		t.Fatalf("expected per-instance Pod revisions from Instance status, got %#v", status)
+	if status == nil || status.CurrentRevision != inst.Status.CurrentRevision || status.UpdateRevision != desiredPodRevision {
+		t.Fatalf("expected observed current and desired target Pod revisions, got %#v", status)
 	}
 	if got.Status.UpdatedReplicas != 1 {
 		t.Fatalf("expected updated replicas to stay at 1, got %d", got.Status.UpdatedReplicas)
@@ -706,6 +736,10 @@ func TestStatusReconcilerDoesNotDependOnRevisionAnnotationForCurrentRevision(t *
 	}
 	desired := desiredInstances["test-its-0"]
 	desiredRevision := getInstanceRevision(desired)
+	desiredPodRevision, err := instctrl.BuildPodRevision(desired)
+	if err != nil {
+		t.Fatalf("build desired Pod revision: %v", err)
+	}
 	updateRevisions, err := revisionmap.Encode(map[string]string{
 		desired.Name: desiredRevision,
 	})
@@ -748,8 +782,8 @@ func TestStatusReconcilerDoesNotDependOnRevisionAnnotationForCurrentRevision(t *
 		t.Fatalf("expected empty aggregate spec revision for missing annotation, got %#v", currentRevisions)
 	}
 	status := got.FindInstanceStatus(inst.Name)
-	if status == nil || status.CurrentRevision != inst.Status.CurrentRevision || status.UpdateRevision != inst.Status.UpdateRevision {
-		t.Fatalf("expected per-instance Pod revisions from Instance status despite missing annotation, got %#v", status)
+	if status == nil || status.CurrentRevision != inst.Status.CurrentRevision || status.UpdateRevision != desiredPodRevision {
+		t.Fatalf("expected desired Pod revision despite missing Instance-spec revision annotation, got %#v", status)
 	}
 	if got.Status.UpdatedReplicas != 0 {
 		t.Fatalf("expected missing spec revision annotation to keep updated replicas at 0, got %d", got.Status.UpdatedReplicas)

@@ -164,6 +164,11 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 				return kubebuilderx.Continue, err
 			}
 			updatingInstances++
+		} else if !isInstanceUpdated(its, inst) {
+			// The desired Instance spec has already been handed off, but its controller has
+			// not finished converging the Pod, dynamic configs, or PVCs. It must continue
+			// to occupy the rolling-update window even though no further spec write is needed.
+			updatingInstances++
 		}
 		updatedInstances++
 	}

@@ -75,7 +75,7 @@ func TestRevisionUpdateInvalidatesOnlyAffectedLegacyInstances(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			its, tree, _ := newLegacyStatusContractFixture(t, nil)
+			its, tree, _ := newLegacyInstanceStatusFixture(t, nil)
 			oldRevisions, err := GetRevisions(its.Status.UpdateRevisions)
 			if err != nil {
 				t.Fatal(err)
@@ -107,7 +107,7 @@ func TestRevisionUpdateInvalidatesOnlyAffectedLegacyInstances(t *testing.T) {
 func TestLegacyInstanceStatusTracksConfigAndPVCConvergence(t *testing.T) {
 	t.Run("dynamic config", func(t *testing.T) {
 		configs := []workloads.ConfigTemplate{{Name: "mysql", ConfigHash: ptr.To("old")}}
-		its, tree, pods := newLegacyStatusContractFixture(t, configs)
+		its, tree, pods := newLegacyInstanceStatusFixture(t, configs)
 		its.Generation++
 		its.Spec.Configs[0].ConfigHash = ptr.To("new")
 		if _, err := NewRevisionUpdateReconciler().Reconcile(tree); err != nil {
@@ -135,7 +135,7 @@ func TestLegacyInstanceStatusTracksConfigAndPVCConvergence(t *testing.T) {
 				Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("1Gi")},
 			}},
 		}
-		its, tree, _ := newLegacyStatusContractFixture(t, nil)
+		its, tree, _ := newLegacyInstanceStatusFixture(t, nil)
 		its.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{claim}
 		addLegacyPVCs(t, tree, its, resource.MustParse("1Gi"))
 		if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
@@ -179,7 +179,7 @@ func TestLegacyInstanceStatusTracksConfigAndPVCConvergence(t *testing.T) {
 }
 
 func TestLegacyAllocationChangesStayInDesiredAndCurrentState(t *testing.T) {
-	its, tree, _ := newLegacyDefaultStatusContractFixture(t, 2)
+	its, tree, _ := newLegacyDefaultInstanceStatusFixture(t, 2)
 
 	its.Generation++
 	its.Spec.Replicas = ptr.To[int32](3)
@@ -221,9 +221,9 @@ func TestLegacyAllocationChangesStayInDesiredAndCurrentState(t *testing.T) {
 	}
 }
 
-func newLegacyStatusContractFixture(t *testing.T, configs []workloads.ConfigTemplate) (*workloads.InstanceSet, *kubebuilderx.ObjectTree, map[string]*corev1.Pod) {
+func newLegacyInstanceStatusFixture(t *testing.T, configs []workloads.ConfigTemplate) (*workloads.InstanceSet, *kubebuilderx.ObjectTree, map[string]*corev1.Pod) {
 	t.Helper()
-	its := legacyContractInstanceSet(2)
+	its := legacyInstanceStatusSet(2)
 	its.Spec.Configs = configs
 	tree := kubebuilderx.NewObjectTree()
 	tree.SetRoot(its)
@@ -254,15 +254,15 @@ func newLegacyStatusContractFixture(t *testing.T, configs []workloads.ConfigTemp
 	return its, tree, pods
 }
 
-func newLegacyDefaultStatusContractFixture(t *testing.T, replicas int32) (*workloads.InstanceSet, *kubebuilderx.ObjectTree, map[string]*corev1.Pod) {
+func newLegacyDefaultInstanceStatusFixture(t *testing.T, replicas int32) (*workloads.InstanceSet, *kubebuilderx.ObjectTree, map[string]*corev1.Pod) {
 	t.Helper()
-	its := legacyContractInstanceSet(replicas)
+	its := legacyInstanceStatusSet(replicas)
 	its.Spec.FlatInstanceOrdinal = false
 	its.Spec.Instances = nil
-	return newLegacyStatusContractFixtureFromInstanceSet(t, its)
+	return newLegacyInstanceStatusFixtureFromSet(t, its)
 }
 
-func newLegacyStatusContractFixtureFromInstanceSet(t *testing.T, its *workloads.InstanceSet) (*workloads.InstanceSet, *kubebuilderx.ObjectTree, map[string]*corev1.Pod) {
+func newLegacyInstanceStatusFixtureFromSet(t *testing.T, its *workloads.InstanceSet) (*workloads.InstanceSet, *kubebuilderx.ObjectTree, map[string]*corev1.Pod) {
 	t.Helper()
 	tree := kubebuilderx.NewObjectTree()
 	tree.SetRoot(its)
@@ -291,7 +291,7 @@ func newLegacyStatusContractFixtureFromInstanceSet(t *testing.T, its *workloads.
 	return its, tree, pods
 }
 
-func legacyContractInstanceSet(replicas int32) *workloads.InstanceSet {
+func legacyInstanceStatusSet(replicas int32) *workloads.InstanceSet {
 	one := int32(1)
 	return &workloads.InstanceSet{
 		ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default", Generation: 1},

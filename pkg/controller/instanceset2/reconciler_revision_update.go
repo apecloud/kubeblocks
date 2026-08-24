@@ -66,11 +66,6 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kub
 
 	updatedReplicas := r.calculateUpdatedReplicas(its, tree.List(&workloads.Instance{}))
 	its.Status.UpdatedReplicas = updatedReplicas
-	// A new spec may include changes excluded from revision hashes. The status
-	// reconciler re-establishes UpToDate after observing the runtime again.
-	for i := range its.Status.InstanceStatus {
-		its.Status.InstanceStatus[i].UpToDate = false
-	}
 
 	its.Status.ObservedGeneration = its.Generation
 

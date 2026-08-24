@@ -81,7 +81,7 @@ var _ = Describe("revision update reconciler test", func() {
 			Expect(newITS.Status.InstanceStatus).Should(BeEmpty())
 		})
 
-		It("invalidates convergence and allows alignment during a transient flat ordinal reassignment", func() {
+		It("preserves the published view and allows alignment during a transient flat ordinal reassignment", func() {
 			its = transientFlatReassignmentInstanceSet()
 			previous := its.DeepCopy().Status.InstanceStatus
 			tree := kubebuilderx.NewObjectTree()
@@ -101,9 +101,6 @@ var _ = Describe("revision update reconciler test", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(res).Should(Equal(kubebuilderx.Continue))
 			Expect(its.Status.ObservedGeneration).Should(Equal(its.Generation))
-			for i := range previous {
-				previous[i].UpToDate = false
-			}
 			Expect(its.Status.InstanceStatus).Should(Equal(previous))
 
 			res, err = NewReplicasAlignmentReconciler().Reconcile(tree)
@@ -135,8 +132,8 @@ func transientFlatReassignmentInstanceSet() *workloads.InstanceSet {
 				templateB: {Discrete: []int32{1}},
 			},
 			InstanceStatus: []workloads.InstanceStatus{
-				{PodName: "demo-0", TemplateName: &templateA, DesiredState: workloads.InstanceDesiredStateActive, CurrentState: workloads.InstanceCurrentStatePresent, UpToDate: true},
-				{PodName: "demo-1", TemplateName: &templateB, DesiredState: workloads.InstanceDesiredStateActive, CurrentState: workloads.InstanceCurrentStatePresent, UpToDate: true},
+				{PodName: "demo-0", TemplateName: &templateA, DesiredState: workloads.InstanceDesiredStateActive, CurrentState: workloads.InstanceCurrentStatePresent},
+				{PodName: "demo-1", TemplateName: &templateB, DesiredState: workloads.InstanceDesiredStateActive, CurrentState: workloads.InstanceCurrentStatePresent},
 			},
 		},
 	}

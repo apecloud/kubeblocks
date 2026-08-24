@@ -64,7 +64,7 @@ func TestRevisionUpdatePublishesRevisionsBeforeInstanceStatus(t *testing.T) {
 	}
 }
 
-func TestTransientFlatOrdinalReassignmentInvalidatesConvergenceAndAllowsAlignment(t *testing.T) {
+func TestTransientFlatOrdinalReassignmentPreservesViewAndAllowsAlignment(t *testing.T) {
 	its := transientFlatReassignmentInstanceSet()
 	previous := its.DeepCopy().Status.InstanceStatus
 	tree := kubebuilderx.NewObjectTree()
@@ -100,11 +100,8 @@ func TestTransientFlatOrdinalReassignmentInvalidatesConvergenceAndAllowsAlignmen
 	if err != nil || res != kubebuilderx.Continue {
 		t.Fatalf("revision reconcile blocked transient allocation: result=%v err=%v", res, err)
 	}
-	for i := range previous {
-		previous[i].UpToDate = false
-	}
 	if its.Status.ObservedGeneration != its.Generation || !equality.Semantic.DeepEqual(its.Status.InstanceStatus, previous) {
-		t.Fatalf("revision reconcile did not preserve identity while invalidating convergence: %#v", its.Status)
+		t.Fatalf("revision reconcile advanced an incomplete view: %#v", its.Status)
 	}
 
 	res, err = NewAlignmentReconciler().Reconcile(tree)
@@ -153,8 +150,8 @@ func transientFlatReassignmentInstanceSet() *workloads.InstanceSet {
 				templateB: {Discrete: []int32{1}},
 			},
 			InstanceStatus: []workloads.InstanceStatus{
-				{PodName: "demo-0", TemplateName: &templateA, DesiredState: workloads.InstanceDesiredStateActive, CurrentState: workloads.InstanceCurrentStatePresent, UpToDate: true},
-				{PodName: "demo-1", TemplateName: &templateB, DesiredState: workloads.InstanceDesiredStateActive, CurrentState: workloads.InstanceCurrentStatePresent, UpToDate: true},
+				{PodName: "demo-0", TemplateName: &templateA, DesiredState: workloads.InstanceDesiredStateActive, CurrentState: workloads.InstanceCurrentStatePresent},
+				{PodName: "demo-1", TemplateName: &templateB, DesiredState: workloads.InstanceDesiredStateActive, CurrentState: workloads.InstanceCurrentStatePresent},
 			},
 		},
 	}

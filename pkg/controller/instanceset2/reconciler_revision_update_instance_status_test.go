@@ -55,7 +55,7 @@ func TestRevisionUpdateInvalidatesOnlyAffectedITS2Instances(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			its, tree, _ := newITS2StatusContractFixture(t, nil)
+			its, tree, _ := newITS2InstanceStatusFixture(t, nil)
 			oldRevisions, err := revisionmap.Decode(its.Status.UpdateRevisions)
 			if err != nil {
 				t.Fatal(err)
@@ -93,7 +93,7 @@ func TestRevisionUpdateInvalidatesOnlyAffectedITS2Instances(t *testing.T) {
 func TestITS2RevisionUpdateTracksConfigAndPVCChanges(t *testing.T) {
 	t.Run("dynamic config", func(t *testing.T) {
 		configs := []workloads.ConfigTemplate{{Name: "mysql", ConfigHash: ptr.To("old")}}
-		its, tree, _ := newITS2StatusContractFixture(t, configs)
+		its, tree, _ := newITS2InstanceStatusFixture(t, configs)
 		its.Generation++
 		its.Spec.Configs[0].ConfigHash = ptr.To("new")
 		if _, err := NewRevisionUpdateReconciler().Reconcile(tree); err != nil {
@@ -110,9 +110,9 @@ func TestITS2RevisionUpdateTracksConfigAndPVCChanges(t *testing.T) {
 				Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("1Gi")},
 			}},
 		}
-		its := its2ContractInstanceSet(2)
+		its := its2InstanceStatusSet(2)
 		its.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{claim}
-		its, tree, _ := newITS2StatusContractFixtureFromInstanceSet(t, its)
+		its, tree, _ := newITS2InstanceStatusFixtureFromSet(t, its)
 
 		its.Generation++
 		expanded := claim.DeepCopy()
@@ -127,10 +127,10 @@ func TestITS2RevisionUpdateTracksConfigAndPVCChanges(t *testing.T) {
 }
 
 func TestITS2AllocationChangesStayInDesiredAndCurrentState(t *testing.T) {
-	its := its2ContractInstanceSet(2)
+	its := its2InstanceStatusSet(2)
 	its.Spec.FlatInstanceOrdinal = false
 	its.Spec.Instances = nil
-	its, tree, _ := newITS2StatusContractFixtureFromInstanceSet(t, its)
+	its, tree, _ := newITS2InstanceStatusFixtureFromSet(t, its)
 
 	its.Generation++
 	its.Spec.Replicas = ptr.To[int32](3)
@@ -172,14 +172,14 @@ func TestITS2AllocationChangesStayInDesiredAndCurrentState(t *testing.T) {
 	}
 }
 
-func newITS2StatusContractFixture(t *testing.T, configs []workloads.ConfigTemplate) (*workloads.InstanceSet, *kubebuilderx.ObjectTree, map[string]*workloads.Instance) {
+func newITS2InstanceStatusFixture(t *testing.T, configs []workloads.ConfigTemplate) (*workloads.InstanceSet, *kubebuilderx.ObjectTree, map[string]*workloads.Instance) {
 	t.Helper()
-	its := its2ContractInstanceSet(2)
+	its := its2InstanceStatusSet(2)
 	its.Spec.Configs = configs
-	return newITS2StatusContractFixtureFromInstanceSet(t, its)
+	return newITS2InstanceStatusFixtureFromSet(t, its)
 }
 
-func newITS2StatusContractFixtureFromInstanceSet(t *testing.T, its *workloads.InstanceSet) (*workloads.InstanceSet, *kubebuilderx.ObjectTree, map[string]*workloads.Instance) {
+func newITS2InstanceStatusFixtureFromSet(t *testing.T, its *workloads.InstanceSet) (*workloads.InstanceSet, *kubebuilderx.ObjectTree, map[string]*workloads.Instance) {
 	t.Helper()
 	tree := kubebuilderx.NewObjectTree()
 	tree.SetRoot(its)
@@ -217,7 +217,7 @@ func newITS2StatusContractFixtureFromInstanceSet(t *testing.T, its *workloads.In
 	return its, tree, instances
 }
 
-func its2ContractInstanceSet(replicas int32) *workloads.InstanceSet {
+func its2InstanceStatusSet(replicas int32) *workloads.InstanceSet {
 	one := int32(1)
 	return &workloads.InstanceSet{
 		ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default", Generation: 1},

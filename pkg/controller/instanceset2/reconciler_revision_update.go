@@ -20,12 +20,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset2
 
 import (
+	"k8s.io/apimachinery/pkg/api/equality"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/revisionmap"
+	"github.com/apecloud/kubeblocks/pkg/controller/workloads/instancestatus"
 )
 
 func NewRevisionUpdateReconciler() kubebuilderx.Reconciler {
@@ -64,12 +66,67 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kub
 		its.Status.UpdateRevision = updateRevisions[names[len(names)-1]]
 	}
 
-	updatedReplicas := r.calculateUpdatedReplicas(its, tree.List(&workloads.Instance{}))
+	instances := tree.List(&workloads.Instance{})
+	updatedReplicas := r.calculateUpdatedReplicas(its, instances)
 	its.Status.UpdatedReplicas = updatedReplicas
+	r.invalidateAffectedInstanceStatus(its, desiredInstances, instances)
 
 	its.Status.ObservedGeneration = its.Generation
 
 	return kubebuilderx.Continue, nil
+}
+
+// invalidateAffectedInstanceStatus preserves observations for unaffected instances while preventing
+// a stale UpToDate=true from crossing an InstanceSet generation that changed that instance's Pod,
+// dynamic config, or PVC expansion target. Instance readiness and allocation lifecycle are independent.
+func (r *revisionUpdateReconciler) invalidateAffectedInstanceStatus(its *workloads.InstanceSet,
+	desiredInstances map[string]*workloads.Instance, instances []client.Object) {
+	currentByName := make(map[string]*workloads.Instance, len(instances))
+	for _, obj := range instances {
+		inst, _ := obj.(*workloads.Instance)
+		currentByName[inst.Name] = inst
+	}
+	for i := range its.Status.InstanceStatus {
+		status := &its.Status.InstanceStatus[i]
+		if !status.UpToDate || status.EffectiveDesiredState() != workloads.InstanceDesiredStateActive ||
+			status.EffectiveCurrentState() != workloads.InstanceCurrentStatePresent {
+			continue
+		}
+		desired, current := desiredInstances[status.PodName], currentByName[status.PodName]
+		if desired == nil || current == nil {
+			continue
+		}
+		podApplied := equality.Semantic.DeepEqual(current.Spec.Template, desired.Spec.Template)
+		configsApplied := instancestatus.ConfigsApplied(desired.Spec.Configs, current.Status.Configs)
+		pvcApplied := volumeExpansionTargetsApplied(current, desired) && !current.Status.VolumeExpansion
+		if !podApplied || !configsApplied || !pvcApplied {
+			status.UpToDate = false
+		}
+	}
+}
+
+func volumeExpansionTargetsApplied(current, desired *workloads.Instance) bool {
+	for _, desiredTemplate := range desired.Spec.VolumeClaimTemplates {
+		desiredStorage := desiredTemplate.Spec.Resources.Requests.Storage()
+		if desiredStorage == nil || desiredStorage.IsZero() {
+			continue
+		}
+		found := false
+		for _, currentTemplate := range current.Spec.VolumeClaimTemplates {
+			if currentTemplate.Name != desiredTemplate.Name {
+				continue
+			}
+			currentStorage := currentTemplate.Spec.Resources.Requests.Storage()
+			if currentStorage != nil && currentStorage.Cmp(*desiredStorage) >= 0 {
+				found = true
+			}
+			break
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
 }
 
 func (r *revisionUpdateReconciler) calculateUpdatedReplicas(its *workloads.InstanceSet, instances []client.Object) int32 {

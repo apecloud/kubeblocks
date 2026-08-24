@@ -20,8 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instance
 
 import (
-	"fmt"
-	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -107,7 +105,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		meta.RemoveStatusCondition(&inst.Status.Conditions, string(workloads.InstanceFailure))
 	}
 
-	inst.Status.UpToDate = updated
+	inst.Status.UpToDate = updated && !r.hasPendingVolumeExpansion(tree, inst)
 	inst.Status.Ready = ready
 	inst.Status.Available = available
 	inst.Status.Role = r.observedRoleOfPod(inst, pod)
@@ -205,56 +203,65 @@ func (r *statusReconciler) observedRoleOfPod(inst *workloads.Instance, pod *core
 }
 
 func (r *statusReconciler) hasRunningVolumeExpansion(tree *kubebuilderx.ObjectTree, inst *workloads.Instance) bool {
-	pvcs := tree.List(&corev1.PersistentVolumeClaim{})
-	var pvcList []*corev1.PersistentVolumeClaim
-	for _, obj := range pvcs {
-		pvc, _ := obj.(*corev1.PersistentVolumeClaim)
-		pvcList = append(pvcList, pvc)
-	}
+	pvcsByName := r.persistentVolumeClaimsByName(tree)
 	for _, vct := range inst.Spec.VolumeClaimTemplates {
-		prefix := fmt.Sprintf("%s-%s", vct.Name, inst.Name)
-		for _, pvc := range pvcList {
-			if !strings.HasPrefix(pvc.Name, prefix) {
-				continue
-			}
-			if pvc.Status.Capacity == nil || pvc.Status.Capacity.Storage().Cmp(pvc.Spec.Resources.Requests[corev1.ResourceStorage]) >= 0 {
-				continue
-			}
-			instName := ""
-			if pvc.Labels != nil {
-				instName = pvc.Labels[constant.KBAppPodNameLabelKey]
-			}
-			if len(instName) > 0 {
-				return true
-			}
+		pvcName := intctrlutil.ComposePVCName(corev1.PersistentVolumeClaim{ObjectMeta: vct.ObjectMeta}, inst.Spec.InstanceSetName, inst.Name)
+		pvc := pvcsByName[pvcName]
+		if pvc == nil || pvc.Labels[constant.KBAppPodNameLabelKey] == "" {
+			continue
+		}
+		requested, requestedOK := pvc.Spec.Resources.Requests[corev1.ResourceStorage]
+		capacity, capacityOK := pvc.Status.Capacity[corev1.ResourceStorage]
+		if requestedOK && capacityOK && capacity.Cmp(requested) < 0 {
+			return true
 		}
 	}
 	return false
 }
 
-func observedConfigsOfInstance(inst *workloads.Instance) []workloads.InstanceConfigStatus {
-	if len(inst.Spec.Configs) == 0 {
-		return nil
-	}
-	if len(inst.Status.Configs) == 0 {
-		configs := make([]workloads.InstanceConfigStatus, 0, len(inst.Spec.Configs))
-		for _, config := range inst.Spec.Configs {
-			configs = append(configs, workloads.InstanceConfigStatus{
-				Name:       config.Name,
-				Generation: config.Generation,
-			})
+func (r *statusReconciler) hasPendingVolumeExpansion(tree *kubebuilderx.ObjectTree, inst *workloads.Instance) bool {
+	pvcsByName := r.persistentVolumeClaimsByName(tree)
+	for _, vct := range inst.Spec.VolumeClaimTemplates {
+		desired, desiredOK := vct.Spec.Resources.Requests[corev1.ResourceStorage]
+		if !desiredOK || desired.IsZero() {
+			continue
 		}
-		return configs
-	}
-	currentStatus := make(map[string]workloads.InstanceConfigStatus, len(inst.Status.Configs))
-	for _, config := range inst.Status.Configs {
-		currentStatus[config.Name] = config
-	}
-	configs := make([]workloads.InstanceConfigStatus, 0, len(inst.Spec.Configs))
-	for _, config := range inst.Spec.Configs {
-		if status, ok := currentStatus[config.Name]; ok {
-			configs = append(configs, status)
+		pvcName := intctrlutil.ComposePVCName(corev1.PersistentVolumeClaim{ObjectMeta: vct.ObjectMeta}, inst.Spec.InstanceSetName, inst.Name)
+		pvc := pvcsByName[pvcName]
+		if pvc == nil {
+			continue
+		}
+		capacity, capacityOK := pvc.Status.Capacity[corev1.ResourceStorage]
+		if capacityOK && capacity.Cmp(desired) < 0 {
+			return true
 		}
 	}
-	return configs
+	return false
+}
+
+func (r *statusReconciler) persistentVolumeClaimsByName(tree *kubebuilderx.ObjectTree) map[string]*corev1.PersistentVolumeClaim {
+	result := make(map[string]*corev1.PersistentVolumeClaim)
+	for _, obj := range tree.List(&corev1.PersistentVolumeClaim{}) {
+		pvc, _ := obj.(*corev1.PersistentVolumeClaim)
+		result[pvc.Name] = pvc
+	}
+	return result
+}
+
+func (r *statusReconciler) observedConfigsOfPod(pod *corev1.Pod) ([]workloads.InstanceConfigStatus, error) {
+	configs, err := configsFromPod(pod)
+	if err != nil {
+		return nil, err
+	}
+	if len(configs) == 0 {
+		return nil, nil
+	}
+	status := make([]workloads.InstanceConfigStatus, 0, len(configs))
+	for _, config := range configs {
+		status = append(status, workloads.InstanceConfigStatus{
+			Name:       config.Name,
+			ConfigHash: config.ConfigHash,
+		})
+	}
+	return status, nil
 }

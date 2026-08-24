@@ -21,9 +21,7 @@ package instanceset
 
 import (
 	"encoding/json"
-	"fmt"
 	"sort"
-	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -327,6 +325,11 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 	if err != nil {
 		return err
 	}
+	desiredTemplates, err := desiredInstanceTemplates(its, tree)
+	if err != nil {
+		return err
+	}
+	pvcsByName := persistentVolumeClaimsByName(tree)
 	desiredTemplateAssignments := make([]instancestatus.TemplateAssignment, 0, len(desiredAssignments))
 	desiredNames := make(map[string]struct{}, len(desiredAssignments))
 	for _, assignment := range desiredAssignments {
@@ -348,11 +351,6 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 		}
 		desiredTemplateAssignments = nil
 	}
-	desiredNameSet := make(map[string]struct{}, len(desiredTemplateAssignments))
-	for _, assignment := range desiredTemplateAssignments {
-		desiredNameSet[assignment.InstanceName] = struct{}{}
-	}
-
 	observations := make([]instancestatus.Observation, 0, len(pods))
 	roleMap := composeRoleMap(*its)
 	for _, pod := range pods {
@@ -372,20 +370,30 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 			Available:    ready && intctrlutil.IsPodAvailable(pod, its.Spec.MinReadySeconds),
 			Failed:       instancePodFailed(pod),
 		}
-		if state == workloads.InstanceCurrentStatePresent && isCreated(pod) {
-			updated, err := isPodUpdated(its, pod)
-			if err != nil {
-				return err
-			}
-			observation.UpToDate = updated
-		}
 		if state == workloads.InstanceCurrentStatePresent && intctrlutil.PodIsReadyWithLabel(*pod) {
 			if role, ok := roleMap[getRoleName(pod)]; ok {
 				observation.Role = role.Name
 			}
 		}
-		_, isDesired := desiredNameSet[pod.Name]
-		observation.Configs = instanceConfigStatus(its, pod.Name, isDesired)
+		configs, err := configsFromPod(pod)
+		if err != nil {
+			return err
+		}
+		for _, config := range configs {
+			observation.Configs = append(observation.Configs, workloads.InstanceConfigStatus{Name: config.Name, ConfigHash: config.ConfigHash})
+		}
+		if state == workloads.InstanceCurrentStatePresent && isCreated(pod) {
+			template := desiredTemplates[pod.Name]
+			if _, active := desiredNames[pod.Name]; active && template != nil {
+				podApplied, err := isDesiredPodApplied(its, pod, template)
+				if err != nil {
+					return err
+				}
+				observation.UpToDate = podApplied &&
+					instancestatus.ConfigsApplied(its.Spec.Configs, observation.Configs) &&
+					!hasPendingPVCExpansion(its.Name, pod.Name, template.VolumeClaimTemplates, pvcsByName)
+			}
+		}
 		observations = append(observations, observation)
 	}
 
@@ -399,7 +407,7 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 			templateHints = append(templateHints, instancestatus.TemplateAssignment{InstanceName: name, TemplateName: templateName})
 		}
 	}
-	syncObservationPVCStatus(tree, its, observations)
+	syncObservationPVCStatus(tree, observations)
 
 	statuses, err := instancestatus.Build(instancestatus.Input{
 		Previous:           its.Status.InstanceStatus,
@@ -416,41 +424,6 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 	return nil
 }
 
-func instanceConfigStatus(its *workloads.InstanceSet, podName string, isDesired bool) []workloads.InstanceConfigStatus {
-	if its.Status.InstanceStatus == nil {
-		return instanceConfigStatusFromSpec(its)
-	}
-
-	configNames := sets.New[string]()
-	for _, config := range its.Spec.Configs {
-		configNames.Insert(config.Name)
-	}
-	for _, status := range its.Status.InstanceStatus {
-		if status.PodName != podName {
-			continue
-		}
-		if isDesired && status.EffectiveCurrentState() == workloads.InstanceCurrentStateAbsent {
-			return instanceConfigStatusFromSpec(its)
-		}
-		configs := make([]workloads.InstanceConfigStatus, 0, len(status.Configs))
-		for _, config := range status.Configs {
-			if configNames.Has(config.Name) {
-				configs = append(configs, config)
-			}
-		}
-		return configs
-	}
-	return nil
-}
-
-func instanceConfigStatusFromSpec(its *workloads.InstanceSet) []workloads.InstanceConfigStatus {
-	configs := make([]workloads.InstanceConfigStatus, 0, len(its.Spec.Configs))
-	for _, config := range its.Spec.Configs {
-		configs = append(configs, workloads.InstanceConfigStatus{Name: config.Name, Generation: config.Generation})
-	}
-	return configs
-}
-
 func podObservationNames(observations []instancestatus.Observation) []string {
 	names := make([]string, 0, len(observations))
 	for _, observation := range observations {
@@ -459,38 +432,88 @@ func podObservationNames(observations []instancestatus.Observation) []string {
 	return names
 }
 
-func syncObservationPVCStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, observations []instancestatus.Observation) {
+func syncObservationPVCStatus(tree *kubebuilderx.ObjectTree, observations []instancestatus.Observation) {
 	if tree == nil {
 		return
 	}
-	pvcs := tree.List(&corev1.PersistentVolumeClaim{})
-	var pvcList []*corev1.PersistentVolumeClaim
-	for _, obj := range pvcs {
+	for _, obj := range tree.List(&corev1.PersistentVolumeClaim{}) {
 		pvc, _ := obj.(*corev1.PersistentVolumeClaim)
-		pvcList = append(pvcList, pvc)
-	}
-	for _, vct := range its.Spec.VolumeClaimTemplates {
-		prefix := fmt.Sprintf("%s-%s", vct.Name, its.Name)
-		for _, pvc := range pvcList {
-			if !strings.HasPrefix(pvc.Name, prefix) {
-				continue
-			}
-			if pvc.Status.Capacity == nil || pvc.Status.Capacity.Storage().Cmp(pvc.Spec.Resources.Requests[corev1.ResourceStorage]) >= 0 {
-				continue
-			}
-			instName := ""
-			if pvc.Labels != nil {
-				instName = pvc.Labels[constant.KBAppPodNameLabelKey]
-			}
-			if len(instName) > 0 {
-				for i := range observations {
-					if observations[i].InstanceName == instName && observations[i].State == workloads.InstanceCurrentStatePresent {
-						// TODO: how to check the expansion failed?
-						observations[i].VolumeExpansion = true
-						break
-					}
-				}
+		if !isPVCExpansionRunning(pvc) {
+			continue
+		}
+		instName := pvc.Labels[constant.KBAppPodNameLabelKey]
+		for i := range observations {
+			if observations[i].InstanceName == instName && observations[i].State == workloads.InstanceCurrentStatePresent {
+				// TODO: how to check the expansion failed?
+				observations[i].VolumeExpansion = true
+				break
 			}
 		}
 	}
+}
+
+func desiredInstanceTemplates(its *workloads.InstanceSet, tree *kubebuilderx.ObjectTree) (map[string]*instancetemplate.InstanceTemplateExt, error) {
+	itsExt, err := instancetemplate.BuildInstanceSetExt(its, tree)
+	if err != nil {
+		return nil, err
+	}
+	nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt, nil)
+	if err != nil {
+		return nil, err
+	}
+	return nameBuilder.BuildInstanceName2TemplateMap()
+}
+
+func persistentVolumeClaimsByName(tree *kubebuilderx.ObjectTree) map[string]*corev1.PersistentVolumeClaim {
+	result := map[string]*corev1.PersistentVolumeClaim{}
+	if tree == nil {
+		return result
+	}
+	for _, obj := range tree.List(&corev1.PersistentVolumeClaim{}) {
+		pvc, _ := obj.(*corev1.PersistentVolumeClaim)
+		result[pvc.Name] = pvc
+	}
+	return result
+}
+
+func isDesiredPodApplied(its *workloads.InstanceSet, pod *corev1.Pod, template *instancetemplate.InstanceTemplateExt) (bool, error) {
+	updated, err := isPodUpdated(its, pod)
+	if err != nil || !updated {
+		return updated, err
+	}
+	desiredPod, err := buildInstancePodByTemplateForUpdate(pod, template, its)
+	if err != nil {
+		return false, err
+	}
+	// Resource requests are intentionally excluded from the legacy revision hash and may also be
+	// ignored by the update-policy feature gate. They remain part of InstanceStatus.UpToDate.
+	return equalResourcesInPlaceFields(pod, desiredPod), nil
+}
+
+func hasPendingPVCExpansion(itsName, instanceName string, templates []corev1.PersistentVolumeClaim,
+	pvcsByName map[string]*corev1.PersistentVolumeClaim) bool {
+	for _, template := range templates {
+		desired, desiredOK := template.Spec.Resources.Requests[corev1.ResourceStorage]
+		if !desiredOK || desired.IsZero() {
+			continue
+		}
+		pvc := pvcsByName[intctrlutil.ComposePVCName(template, itsName, instanceName)]
+		if pvc == nil {
+			continue
+		}
+		capacity, capacityOK := pvc.Status.Capacity[corev1.ResourceStorage]
+		if capacityOK && capacity.Cmp(desired) < 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func isPVCExpansionRunning(pvc *corev1.PersistentVolumeClaim) bool {
+	if pvc == nil {
+		return false
+	}
+	requested, requestedOK := pvc.Spec.Resources.Requests[corev1.ResourceStorage]
+	capacity, capacityOK := pvc.Status.Capacity[corev1.ResourceStorage]
+	return requestedOK && capacityOK && capacity.Cmp(requested) < 0
 }

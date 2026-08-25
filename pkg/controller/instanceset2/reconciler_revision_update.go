@@ -93,7 +93,11 @@ func (r *revisionUpdateReconciler) invalidateAffectedInstanceStatus(its *workloa
 			continue
 		}
 		desired, current := desiredInstances[status.PodName], currentByName[status.PodName]
-		if desired == nil || current == nil {
+		if desired == nil {
+			continue
+		}
+		if current == nil {
+			status.UpToDate = false
 			continue
 		}
 		if current.Generation != current.Status.ObservedGeneration {

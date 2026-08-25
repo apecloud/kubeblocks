@@ -211,3 +211,33 @@ func TestRevisionUpdateInvalidatesOnlyAffectedLegacyInstances(t *testing.T) {
 		})
 	}
 }
+
+func TestRevisionUpdateInvalidatesMissingLegacyPod(t *testing.T) {
+	its, tree, pods := newLegacyInstanceStatusFixture(t, nil)
+	missing := its.FindInstanceStatus("demo-0")
+	missing.Ready = true
+	missing.Available = true
+	if err := tree.Delete(pods[missing.PodName]); err != nil {
+		t.Fatal(err)
+	}
+
+	its.Generation++
+	its.Spec.Instances[0].Resources = &corev1.ResourceRequirements{
+		Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("2")},
+	}
+	if NewStatusReconciler().PreCondition(tree) != kubebuilderx.ConditionUnsatisfied {
+		t.Fatal("status reconciler must wait for revision publication")
+	}
+	if _, err := NewRevisionUpdateReconciler().Reconcile(tree); err != nil {
+		t.Fatal(err)
+	}
+
+	if its.Status.ObservedGeneration != its.Generation {
+		t.Fatalf("ObservedGeneration = %d, want %d", its.Status.ObservedGeneration, its.Generation)
+	}
+	assertLegacyUpToDate(t, its, "demo-0", false)
+	assertLegacyUpToDate(t, its, "demo-1", true)
+	if !missing.Ready || !missing.Available {
+		t.Fatalf("revision updater changed runtime observations: %#v", missing)
+	}
+}

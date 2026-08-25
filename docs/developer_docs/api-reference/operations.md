@@ -599,7 +599,9 @@ string
 <td>
 <code>parameters</code><br/>
 <em>
+<a href="dataprotection.md#dataprotection.kubeblocks.io/v1alpha1.ParameterPair">
 []github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1.ParameterPair
+</a>
 </em>
 </td>
 <td>
@@ -1537,7 +1539,9 @@ Kubernetes core/v1.ResourceRequirements
 <td>
 <code>services</code><br/>
 <em>
+<a href="cluster.md#apps.kubeblocks.io/v1.ClusterComponentService">
 []github.com/apecloud/kubeblocks/apis/apps/v1.ClusterComponentService
+</a>
 </em>
 </td>
 <td>
@@ -1549,7 +1553,9 @@ Kubernetes core/v1.ResourceRequirements
 <td>
 <code>instances</code><br/>
 <em>
+<a href="cluster.md#apps.kubeblocks.io/v1.InstanceTemplate">
 []github.com/apecloud/kubeblocks/apis/apps/v1.InstanceTemplate
+</a>
 </em>
 </td>
 <td>
@@ -2174,7 +2180,9 @@ bool
 <td>
 <code>FromClusterPhases</code><br/>
 <em>
+<a href="cluster.md#apps.kubeblocks.io/v1.ClusterPhase">
 []github.com/apecloud/kubeblocks/apis/apps/v1.ClusterPhase
+</a>
 </em>
 </td>
 <td>
@@ -2184,7 +2192,9 @@ bool
 <td>
 <code>ToClusterPhase</code><br/>
 <em>
+<a href="cluster.md#apps.kubeblocks.io/v1.ClusterPhase">
 github.com/apecloud/kubeblocks/apis/apps/v1.ClusterPhase
+</a>
 </em>
 </td>
 <td>
@@ -2211,7 +2221,9 @@ github.com/apecloud/kubeblocks/apis/apps/v1.ClusterPhase
 <td>
 <code>phase</code><br/>
 <em>
+<a href="cluster.md#apps.kubeblocks.io/v1.ComponentPhase">
 github.com/apecloud/kubeblocks/apis/apps/v1.ComponentPhase
+</a>
 </em>
 </td>
 <td>
@@ -3972,7 +3984,9 @@ ensuring the cluster&rsquo;s overall stability before proceeding.</p>
 <td>
 <code>parameters</code><br/>
 <em>
+<a href="dataprotection.md#dataprotection.kubeblocks.io/v1alpha1.ParameterPair">
 []github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1.ParameterPair
+</a>
 </em>
 </td>
 <td>
@@ -4127,7 +4141,9 @@ ReplicaChanger
 <td>
 <code>newInstances</code><br/>
 <em>
+<a href="cluster.md#apps.kubeblocks.io/v1.InstanceTemplate">
 []github.com/apecloud/kubeblocks/apis/apps/v1.InstanceTemplate
+</a>
 </em>
 </td>
 <td>

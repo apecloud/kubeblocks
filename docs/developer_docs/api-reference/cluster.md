@@ -2624,7 +2624,9 @@ bool
 <td>
 <code>retentionPeriod</code><br/>
 <em>
+<a href="dataprotection.md#dataprotection.kubeblocks.io/v1alpha1.RetentionPeriod">
 github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1.RetentionPeriod
+</a>
 </em>
 </td>
 <td>
@@ -9879,7 +9881,9 @@ This value is set to 0 by default, indicating that no retries will be made.</p>
 <td>
 <code>retryInterval</code><br/>
 <em>
+<a href="https://pkg.go.dev/time#Duration">
 time.Duration
+</a>
 </em>
 </td>
 <td>
@@ -15925,7 +15929,9 @@ bool
 <td>
 <code>retentionPeriod</code><br/>
 <em>
+<a href="dataprotection.md#dataprotection.kubeblocks.io/v1alpha1.RetentionPeriod">
 github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1.RetentionPeriod
+</a>
 </em>
 </td>
 <td>
@@ -25631,7 +25637,9 @@ This value is set to 0 by default, indicating that no retries will be made.</p>
 <td>
 <code>retryInterval</code><br/>
 <em>
+<a href="https://pkg.go.dev/time#Duration">
 time.Duration
+</a>
 </em>
 </td>
 <td>

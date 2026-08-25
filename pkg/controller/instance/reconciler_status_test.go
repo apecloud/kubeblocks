@@ -25,10 +25,13 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 func TestStatusReconcilerPublishesInstanceCurrentState(t *testing.T) {
@@ -128,6 +131,77 @@ func TestStatusReconcilerPublishesInstanceCurrentState(t *testing.T) {
 				t.Fatalf("status reconciliation removed an independently owned condition: %#v", inst.Status.Conditions)
 			}
 		})
+	}
+}
+
+func TestStatusReconcilerKeepsUpToDateFalseUntilPVCExpansionCompletes(t *testing.T) {
+	claim := corev1.PersistentVolumeClaimTemplate{
+		ObjectMeta: metav1.ObjectMeta{Name: "data"},
+		Spec: corev1.PersistentVolumeClaimSpec{Resources: corev1.VolumeResourceRequirements{
+			Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("2Gi")},
+		}},
+	}
+	inst := &workloads.Instance{
+		ObjectMeta: metav1.ObjectMeta{Name: "demo-0", Namespace: "default", Generation: 1},
+		Spec: workloads.InstanceSpec{
+			InstanceSetName:      "demo",
+			VolumeClaimTemplates: []corev1.PersistentVolumeClaimTemplate{claim},
+			Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{Containers: []corev1.Container{{
+				Name: "db", Image: "mysql:old",
+			}}}},
+		},
+	}
+	tree := kubebuilderx.NewObjectTree()
+	tree.SetRoot(inst)
+	if _, err := NewRevisionUpdateReconciler().Reconcile(tree); err != nil {
+		t.Fatal(err)
+	}
+	pod, err := buildInstancePod(inst, inst.Status.UpdateRevision)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pod.Status.Phase = corev1.PodRunning
+	if err := tree.Add(pod); err != nil {
+		t.Fatal(err)
+	}
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      intctrlutil.ComposePVCName(corev1.PersistentVolumeClaim{ObjectMeta: claim.ObjectMeta}, inst.Spec.InstanceSetName, inst.Name),
+			Namespace: inst.Namespace,
+			Labels:    map[string]string{constant.KBAppPodNameLabelKey: inst.Name},
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{Resources: corev1.VolumeResourceRequirements{
+			Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("1Gi")},
+		}},
+		Status: corev1.PersistentVolumeClaimStatus{
+			Capacity: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("1Gi")},
+		},
+	}
+	if err := tree.Add(pvc); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+		t.Fatal(err)
+	}
+	if inst.Status.UpToDate || inst.Status.VolumeExpansion {
+		t.Fatalf("desired expansion must invalidate convergence before the PVC spec is patched: %#v", inst.Status)
+	}
+
+	pvc.Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("2Gi")
+	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+		t.Fatal(err)
+	}
+	if inst.Status.UpToDate || !inst.Status.VolumeExpansion {
+		t.Fatalf("running expansion must remain stale and publish VolumeExpansion: %#v", inst.Status)
+	}
+
+	pvc.Status.Capacity[corev1.ResourceStorage] = resource.MustParse("2Gi")
+	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+		t.Fatal(err)
+	}
+	if !inst.Status.UpToDate || inst.Status.VolumeExpansion {
+		t.Fatalf("completed expansion must restore convergence: %#v", inst.Status)
 	}
 }
 

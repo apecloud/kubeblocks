@@ -60,6 +60,25 @@ type Input struct {
 	UpdateRevisions    map[string]string
 }
 
+// ConfigsApplied reports whether every desired config hash has been observed for an instance.
+// Extra observed entries do not make the desired config stale; they may belong to configuration
+// that is no longer managed by the current InstanceSet spec.
+func ConfigsApplied(desired []workloads.ConfigTemplate, observed []workloads.InstanceConfigStatus) bool {
+	for _, config := range desired {
+		found := false
+		for _, status := range observed {
+			if status.Name == config.Name && ptr.Deref(status.ConfigHash, "") == ptr.Deref(config.ConfigHash, "") {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
+}
+
 // Build merges InstanceStatus by PodName. It carries only retained template identity from Previous;
 // all observed revision, health, and runtime fields are rebuilt from Observations.
 func Build(input Input) ([]workloads.InstanceStatus, error) {

@@ -68,63 +68,75 @@ func TestParseReplicasNMaxUnavailable(t *testing.T) {
 }
 
 func TestUpdateReconcilerKeepsConvergingInstanceInRollingWindow(t *testing.T) {
-	its := its2InstanceStatusSet(2)
-	its.Generation = 2
-	its.Spec.Template.Spec.Containers[0].Image = "mysql:new"
-	tree := kubebuilderx.NewObjectTree()
-	tree.SetRoot(its)
+	tests := []struct {
+		name           string
+		convergingName string
+		pendingName    string
+	}{
+		{name: "converging Instance sorts first", convergingName: "demo-1", pendingName: "demo-0"},
+		{name: "pending Instance sorts first", convergingName: "demo-0", pendingName: "demo-1"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			its := its2InstanceStatusSet(2)
+			its.Generation = 2
+			its.Spec.Template.Spec.Containers[0].Image = "mysql:new"
+			tree := kubebuilderx.NewObjectTree()
+			tree.SetRoot(its)
 
-	desired, names, err := buildDesiredInstancesByName(tree, its)
-	if err != nil {
-		t.Fatal(err)
-	}
-	targetRevisions := make(map[string]string, len(names))
-	for _, name := range names {
-		targetRevisions[name] = getInstanceRevision(desired[name])
-	}
-	its.Status.UpdateRevisions, err = revisionmap.Encode(targetRevisions)
-	if err != nil {
-		t.Fatal(err)
-	}
+			desired, names, err := buildDesiredInstancesByName(tree, its)
+			if err != nil {
+				t.Fatal(err)
+			}
+			targetRevisions := make(map[string]string, len(names))
+			for _, name := range names {
+				targetRevisions[name] = getInstanceRevision(desired[name])
+			}
+			its.Status.UpdateRevisions, err = revisionmap.Encode(targetRevisions)
+			if err != nil {
+				t.Fatal(err)
+			}
 
-	readyAndAvailable := []metav1.Condition{
-		{Type: string(workloads.InstanceReady), Status: metav1.ConditionTrue},
-		{Type: string(workloads.InstanceAvailable), Status: metav1.ConditionTrue},
-	}
-	converging := desired["demo-1"].DeepCopy()
-	converging.Generation = 2
-	converging.Status = workloads.InstanceStatus2{
-		ObservedGeneration: 2,
-		CurrentState:       workloads.InstanceCurrentStatePresent,
-		UpToDate:           false,
-		Conditions:         readyAndAvailable,
-	}
-	pending := desired["demo-0"].DeepCopy()
-	pending.Spec.Template.Spec.Containers[0].Image = "mysql:old"
-	stampInstanceRevision(pending)
-	pending.Generation = 1
-	pending.Status = workloads.InstanceStatus2{
-		ObservedGeneration: 1,
-		CurrentState:       workloads.InstanceCurrentStatePresent,
-		UpToDate:           true,
-		Conditions:         readyAndAvailable,
-	}
-	if err := tree.Add(converging, pending); err != nil {
-		t.Fatal(err)
-	}
+			readyAndAvailable := []metav1.Condition{
+				{Type: string(workloads.InstanceReady), Status: metav1.ConditionTrue},
+				{Type: string(workloads.InstanceAvailable), Status: metav1.ConditionTrue},
+			}
+			converging := desired[tt.convergingName].DeepCopy()
+			converging.Generation = 2
+			converging.Status = workloads.InstanceStatus2{
+				ObservedGeneration: 2,
+				CurrentState:       workloads.InstanceCurrentStatePresent,
+				UpToDate:           false,
+				Conditions:         readyAndAvailable,
+			}
+			pending := desired[tt.pendingName].DeepCopy()
+			pending.Spec.Template.Spec.Containers[0].Image = "mysql:old"
+			stampInstanceRevision(pending)
+			pending.Generation = 1
+			pending.Status = workloads.InstanceStatus2{
+				ObservedGeneration: 1,
+				CurrentState:       workloads.InstanceCurrentStatePresent,
+				UpToDate:           true,
+				Conditions:         readyAndAvailable,
+			}
+			if err := tree.Add(converging, pending); err != nil {
+				t.Fatal(err)
+			}
 
-	if _, err := NewUpdateReconciler().Reconcile(tree); err != nil {
-		t.Fatal(err)
-	}
-	object, err := tree.Get(&workloads.Instance{ObjectMeta: metav1.ObjectMeta{Namespace: its.Namespace, Name: pending.Name}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	got := object.(*workloads.Instance)
-	if image := got.Spec.Template.Spec.Containers[0].Image; image != "mysql:old" {
-		t.Fatalf("maxUnavailable=1 admitted a second unconverged Instance: image=%q", image)
-	}
-	if !intctrlutil.IsInstanceReady(converging) || !intctrlutil.IsInstanceAvailable(converging) {
-		t.Fatal("fixture must remain runtime healthy while desired-state convergence is pending")
+			if _, err := NewUpdateReconciler().Reconcile(tree); err != nil {
+				t.Fatal(err)
+			}
+			object, err := tree.Get(&workloads.Instance{ObjectMeta: metav1.ObjectMeta{Namespace: its.Namespace, Name: pending.Name}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			got := object.(*workloads.Instance)
+			if image := got.Spec.Template.Spec.Containers[0].Image; image != "mysql:old" {
+				t.Fatalf("maxUnavailable=1 admitted a second unconverged Instance: image=%q", image)
+			}
+			if !intctrlutil.IsInstanceReady(converging) || !intctrlutil.IsInstanceAvailable(converging) {
+				t.Fatal("fixture must remain runtime healthy while desired-state convergence is pending")
+			}
+		})
 	}
 }

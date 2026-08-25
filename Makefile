@@ -394,7 +394,7 @@ golangci-lint-bin: $(LOCALBIN) ## Download golangci-lint locally if necessary.
 	}
 
 STATICCHECK_VERSION = v0.6.1
-STATICCHECK_GOTOOLCHAIN ?= go1.25.10
+STATICCHECK_GOTOOLCHAIN ?= go1.25.13
 STATICCHECK = $(LOCALBIN)/staticcheck-$(STATICCHECK_VERSION)
 .PHONY: staticcheck-bin
 staticcheck-bin: $(LOCALBIN) ## Download staticcheck locally if necessary.

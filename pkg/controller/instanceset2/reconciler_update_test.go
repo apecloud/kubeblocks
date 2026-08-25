@@ -97,18 +97,43 @@ func TestParseReplicasNMaxUnavailable(t *testing.T) {
 
 func TestUpdateReconcilerKeepsConvergingInstanceInRollingWindow(t *testing.T) {
 	tests := []struct {
-		name           string
-		convergingName string
-		pendingName    string
+		name                 string
+		convergingName       string
+		pendingName          string
+		maxUnavailable       int32
+		roles                []workloads.ReplicaRole
+		memberUpdateStrategy workloads.MemberUpdateStrategy
+		convergingRole       string
+		pendingRole          string
 	}{
-		{name: "converging Instance sorts first", convergingName: "demo-1", pendingName: "demo-0"},
-		{name: "pending Instance sorts first", convergingName: "demo-0", pendingName: "demo-1"},
+		{name: "converging Instance sorts first", convergingName: "demo-1", pendingName: "demo-0", maxUnavailable: 1},
+		{name: "pending Instance sorts first", convergingName: "demo-0", pendingName: "demo-1", maxUnavailable: 1},
+		{
+			name:           "existing participant occupies Serial member plan",
+			convergingName: "demo-0", pendingName: "demo-1", maxUnavailable: 2,
+			roles: []workloads.ReplicaRole{
+				{Name: "follower", UpdatePriority: 1},
+				{Name: "leader", UpdatePriority: 2},
+			},
+			memberUpdateStrategy: workloads.SerialUpdateStrategy,
+			convergingRole:       "follower",
+			pendingRole:          "leader",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			its := its2InstanceStatusSet(2)
 			its.Generation = 2
 			its.Spec.Template.Spec.Containers[0].Image = "mysql:new"
+			its.Spec.Roles = tt.roles
+			maxUnavailable := intstr.FromInt32(tt.maxUnavailable)
+			its.Spec.InstanceUpdateStrategy = &workloads.InstanceUpdateStrategy{
+				RollingUpdate: &workloads.RollingUpdate{MaxUnavailable: &maxUnavailable},
+			}
+			if tt.memberUpdateStrategy != "" {
+				memberUpdateStrategy := tt.memberUpdateStrategy
+				its.Spec.MemberUpdateStrategy = &memberUpdateStrategy
+			}
 			tree := kubebuilderx.NewObjectTree()
 			tree.SetRoot(its)
 
@@ -135,6 +160,7 @@ func TestUpdateReconcilerKeepsConvergingInstanceInRollingWindow(t *testing.T) {
 				ObservedGeneration: 2,
 				CurrentState:       workloads.InstanceCurrentStatePresent,
 				UpToDate:           false,
+				Role:               tt.convergingRole,
 				Conditions:         readyAndAvailable,
 			}
 			pending := desired[tt.pendingName].DeepCopy()
@@ -145,6 +171,7 @@ func TestUpdateReconcilerKeepsConvergingInstanceInRollingWindow(t *testing.T) {
 				ObservedGeneration: 1,
 				CurrentState:       workloads.InstanceCurrentStatePresent,
 				UpToDate:           true,
+				Role:               tt.pendingRole,
 				Conditions:         readyAndAvailable,
 			}
 			if err := tree.Add(converging, pending); err != nil {
@@ -160,7 +187,7 @@ func TestUpdateReconcilerKeepsConvergingInstanceInRollingWindow(t *testing.T) {
 			}
 			got := object.(*workloads.Instance)
 			if image := got.Spec.Template.Spec.Containers[0].Image; image != "mysql:old" {
-				t.Fatalf("maxUnavailable=1 admitted a second unconverged Instance: image=%q", image)
+				t.Fatalf("maxUnavailable=%d admitted a second unconverged Instance: image=%q", tt.maxUnavailable, image)
 			}
 			if !intctrlutil.IsInstanceReady(converging) || !intctrlutil.IsInstanceAvailable(converging) {
 				t.Fatal("fixture must remain runtime healthy while desired-state convergence is pending")

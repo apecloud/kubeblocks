@@ -10936,7 +10936,9 @@ This value is set to 0 by default, indicating that no retries will be made.</p>
 <td>
 <code>retryInterval</code><br/>
 <em>
+<a href="https://pkg.go.dev/time#Duration">
 time.Duration
+</a>
 </em>
 </td>
 <td>
@@ -20250,7 +20252,7 @@ key is the pod name, value is the revision.</p>
 <code>assignedOrdinals</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.Ordinals">
-map[string]github.com/apecloud/kubeblocks/apis/apps/v1.Ordinals
+map[string]github.com/apecloud/kubeblocks/apis/workloads/v1.Ordinals
 </a>
 </em>
 </td>

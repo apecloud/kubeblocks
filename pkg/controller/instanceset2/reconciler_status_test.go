@@ -854,10 +854,10 @@ func TestFilterInstanceConfigs(t *testing.T) {
 
 func TestITS2RevisionUpdateTracksConfigAndPVCChanges(t *testing.T) {
 	t.Run("dynamic config", func(t *testing.T) {
-		configs := []workloads.ConfigTemplate{{Name: "mysql", ConfigHash: ptr.To("old")}}
+		configs := []workloads.ConfigTemplate{{Name: "mysql", Generation: 1}}
 		its, tree, _ := newITS2InstanceStatusFixture(t, configs)
 		its.Generation++
-		its.Spec.Configs[0].ConfigHash = ptr.To("new")
+		its.Spec.Configs[0].Generation = 2
 		if _, err := NewRevisionUpdateReconciler().Reconcile(tree); err != nil {
 			t.Fatal(err)
 		}
@@ -964,7 +964,7 @@ func newITS2InstanceStatusFixtureFromSet(t *testing.T, its *workloads.InstanceSe
 			UpToDate:           true,
 		}
 		for _, config := range inst.Spec.Configs {
-			inst.Status.Configs = append(inst.Status.Configs, workloads.InstanceConfigStatus{Name: config.Name, ConfigHash: config.ConfigHash})
+			inst.Status.Configs = append(inst.Status.Configs, workloads.InstanceConfigStatus{Name: config.Name, Generation: config.Generation})
 		}
 		if err := tree.Add(inst); err != nil {
 			t.Fatal(err)

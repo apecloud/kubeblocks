@@ -60,14 +60,14 @@ type Input struct {
 	UpdateRevisions    map[string]string
 }
 
-// ConfigsApplied reports whether every desired config hash has been observed for an instance.
+// ConfigsApplied reports whether every desired config generation has been observed for an instance.
 // Extra observed entries do not make the desired config stale; they may belong to configuration
 // that is no longer managed by the current InstanceSet spec.
 func ConfigsApplied(desired []workloads.ConfigTemplate, observed []workloads.InstanceConfigStatus) bool {
 	for _, config := range desired {
 		found := false
 		for _, status := range observed {
-			if status.Name == config.Name && ptr.Deref(status.ConfigHash, "") == ptr.Deref(config.ConfigHash, "") {
+			if status.Name == config.Name && status.Generation >= config.Generation {
 				found = true
 				break
 			}

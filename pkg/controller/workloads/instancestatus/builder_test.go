@@ -29,25 +29,25 @@ import (
 
 func TestConfigsApplied(t *testing.T) {
 	desired := []workloads.ConfigTemplate{
-		{Name: "dynamic", ConfigHash: ptr.To("new")},
-		{Name: "restart", ConfigHash: nil},
+		{Name: "dynamic", Generation: 2},
+		{Name: "restart", Generation: 1},
 	}
 	tests := []struct {
 		name     string
 		observed []workloads.InstanceConfigStatus
 		want     bool
 	}{
-		{name: "all desired hashes observed", observed: []workloads.InstanceConfigStatus{
-			{Name: "dynamic", ConfigHash: ptr.To("new")},
-			{Name: "restart", ConfigHash: ptr.To("")},
-			{Name: "unmanaged", ConfigHash: ptr.To("kept")},
+		{name: "all desired generations observed", observed: []workloads.InstanceConfigStatus{
+			{Name: "dynamic", Generation: 2},
+			{Name: "restart", Generation: 3},
+			{Name: "unmanaged", Generation: 4},
 		}, want: true},
-		{name: "desired hash is stale", observed: []workloads.InstanceConfigStatus{
-			{Name: "dynamic", ConfigHash: ptr.To("old")},
-			{Name: "restart"},
+		{name: "desired generation is stale", observed: []workloads.InstanceConfigStatus{
+			{Name: "dynamic", Generation: 1},
+			{Name: "restart", Generation: 1},
 		}},
 		{name: "desired config is missing", observed: []workloads.InstanceConfigStatus{
-			{Name: "dynamic", ConfigHash: ptr.To("new")},
+			{Name: "dynamic", Generation: 2},
 		}},
 	}
 	for _, tt := range tests {

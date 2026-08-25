@@ -546,19 +546,21 @@ var _ = Describe("status reconciler test", func() {
 
 func TestLegacyInstanceStatusTracksConfigAndPVCConvergence(t *testing.T) {
 	t.Run("dynamic config", func(t *testing.T) {
-		configs := []workloads.ConfigTemplate{{Name: "mysql", ConfigHash: ptr.To("old")}}
-		its, tree, pods := newLegacyInstanceStatusFixture(t, configs)
+		configs := []workloads.ConfigTemplate{{Name: "mysql", Generation: 1}}
+		its, tree, _ := newLegacyInstanceStatusFixture(t, configs)
 		its.Generation++
-		its.Spec.Configs[0].ConfigHash = ptr.To("new")
+		its.Spec.Configs[0].Generation = 2
 		if _, err := NewRevisionUpdateReconciler().Reconcile(tree); err != nil {
 			t.Fatal(err)
 		}
 		assertLegacyUpToDate(t, its, "demo-0", false)
 		assertLegacyUpToDate(t, its, "demo-1", false)
 
-		for _, pod := range pods {
-			if err := configsToPod(its.Spec.Configs, pod); err != nil {
-				t.Fatal(err)
+		for i := range its.Status.InstanceStatus {
+			for j := range its.Status.InstanceStatus[i].Configs {
+				if its.Status.InstanceStatus[i].Configs[j].Name == "mysql" {
+					its.Status.InstanceStatus[i].Configs[j].Generation = 2
+				}
 			}
 		}
 		if _, err := NewStatusReconciler().Reconcile(tree); err != nil {

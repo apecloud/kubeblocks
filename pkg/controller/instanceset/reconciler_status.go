@@ -351,6 +351,10 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 		}
 		desiredTemplateAssignments = nil
 	}
+	desiredNameSet := make(map[string]struct{}, len(desiredTemplateAssignments))
+	for _, assignment := range desiredTemplateAssignments {
+		desiredNameSet[assignment.InstanceName] = struct{}{}
+	}
 	observations := make([]instancestatus.Observation, 0, len(pods))
 	roleMap := composeRoleMap(*its)
 	for _, pod := range pods {
@@ -375,16 +379,11 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 				observation.Role = role.Name
 			}
 		}
-		configs, err := configsFromPod(pod)
-		if err != nil {
-			return err
-		}
-		for _, config := range configs {
-			observation.Configs = append(observation.Configs, workloads.InstanceConfigStatus{Name: config.Name, ConfigHash: config.ConfigHash})
-		}
+		_, isDesired := desiredNameSet[pod.Name]
+		observation.Configs = instanceConfigStatus(its, pod.Name, isDesired)
 		if state == workloads.InstanceCurrentStatePresent && isCreated(pod) {
 			template := desiredTemplates[pod.Name]
-			if _, active := desiredNames[pod.Name]; active && template != nil {
+			if _, active := desiredNameSet[pod.Name]; active && template != nil {
 				podApplied, err := isDesiredPodApplied(its, pod, template)
 				if err != nil {
 					return err
@@ -422,6 +421,41 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 	}
 	its.Status.InstanceStatus = statuses
 	return nil
+}
+
+func instanceConfigStatus(its *workloads.InstanceSet, podName string, isDesired bool) []workloads.InstanceConfigStatus {
+	if its.Status.InstanceStatus == nil {
+		return instanceConfigStatusFromSpec(its)
+	}
+
+	configNames := sets.New[string]()
+	for _, config := range its.Spec.Configs {
+		configNames.Insert(config.Name)
+	}
+	for _, status := range its.Status.InstanceStatus {
+		if status.PodName != podName {
+			continue
+		}
+		if isDesired && status.EffectiveCurrentState() == workloads.InstanceCurrentStateAbsent {
+			return instanceConfigStatusFromSpec(its)
+		}
+		configs := make([]workloads.InstanceConfigStatus, 0, len(status.Configs))
+		for _, config := range status.Configs {
+			if configNames.Has(config.Name) {
+				configs = append(configs, config)
+			}
+		}
+		return configs
+	}
+	return nil
+}
+
+func instanceConfigStatusFromSpec(its *workloads.InstanceSet) []workloads.InstanceConfigStatus {
+	configs := make([]workloads.InstanceConfigStatus, 0, len(its.Spec.Configs))
+	for _, config := range its.Spec.Configs {
+		configs = append(configs, workloads.InstanceConfigStatus{Name: config.Name, Generation: config.Generation})
+	}
+	return configs
 }
 
 func podObservationNames(observations []instancestatus.Observation) []string {

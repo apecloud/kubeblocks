@@ -30,6 +30,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/workloads/instancestatus"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -105,12 +106,13 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		meta.RemoveStatusCondition(&inst.Status.Conditions, string(workloads.InstanceFailure))
 	}
 
-	inst.Status.UpToDate = updated && !r.hasPendingVolumeExpansion(tree, inst)
+	configs := observedConfigsOfInstance(inst)
+	inst.Status.UpToDate = updated && instancestatus.ConfigsApplied(inst.Spec.Configs, configs) && !r.hasPendingVolumeExpansion(tree, inst)
 	inst.Status.Ready = ready
 	inst.Status.Available = available
 	inst.Status.Role = r.observedRoleOfPod(inst, pod)
 	inst.Status.VolumeExpansion = r.hasRunningVolumeExpansion(tree, inst)
-	inst.Status.Configs = observedConfigsOfInstance(inst)
+	inst.Status.Configs = configs
 
 	if inst.Spec.MinReadySeconds > 0 && !available {
 		return kubebuilderx.RetryAfter(time.Second), nil
@@ -248,20 +250,29 @@ func (r *statusReconciler) persistentVolumeClaimsByName(tree *kubebuilderx.Objec
 	return result
 }
 
-func (r *statusReconciler) observedConfigsOfPod(pod *corev1.Pod) ([]workloads.InstanceConfigStatus, error) {
-	configs, err := configsFromPod(pod)
-	if err != nil {
-		return nil, err
+func observedConfigsOfInstance(inst *workloads.Instance) []workloads.InstanceConfigStatus {
+	if len(inst.Spec.Configs) == 0 {
+		return nil
 	}
-	if len(configs) == 0 {
-		return nil, nil
+	if len(inst.Status.Configs) == 0 {
+		configs := make([]workloads.InstanceConfigStatus, 0, len(inst.Spec.Configs))
+		for _, config := range inst.Spec.Configs {
+			configs = append(configs, workloads.InstanceConfigStatus{
+				Name:       config.Name,
+				Generation: config.Generation,
+			})
+		}
+		return configs
 	}
-	status := make([]workloads.InstanceConfigStatus, 0, len(configs))
-	for _, config := range configs {
-		status = append(status, workloads.InstanceConfigStatus{
-			Name:       config.Name,
-			ConfigHash: config.ConfigHash,
-		})
+	currentStatus := make(map[string]workloads.InstanceConfigStatus, len(inst.Status.Configs))
+	for _, config := range inst.Status.Configs {
+		currentStatus[config.Name] = config
 	}
-	return status, nil
+	configs := make([]workloads.InstanceConfigStatus, 0, len(inst.Spec.Configs))
+	for _, config := range inst.Spec.Configs {
+		if status, ok := currentStatus[config.Name]; ok {
+			configs = append(configs, status)
+		}
+	}
+	return configs
 }

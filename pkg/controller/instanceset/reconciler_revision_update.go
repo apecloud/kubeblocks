@@ -158,6 +158,7 @@ func (r *revisionUpdateReconciler) publishInstanceUpdateTargets(its *workloads.I
 
 		template, pod := desiredTemplates[status.PodName], podsByName[status.PodName]
 		if template == nil || pod == nil {
+			status.UpToDate = false
 			continue
 		}
 		podApplied, err := isDesiredPodApplied(its, pod, template)

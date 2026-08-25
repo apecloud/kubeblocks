@@ -108,12 +108,16 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		desiredInstanceMap[inst.Name] = desired
 	}
 
-	// Account for existing rolling participants before sorting candidates. Otherwise a pending
-	// candidate ordered ahead of a converging Instance could be admitted into an already full window.
+	// Account for existing rolling participants against both admission budgets before sorting candidates.
+	// Otherwise traversal order could admit another Instance into a full availability or member-plan window.
 	occupiedRollingSlots := 0
+	occupiedMemberPlanSlots := 0
 	for _, inst := range oldInstanceList {
 		specHandedOffButNotConverged := copyAndMergeInstance(inst, desiredInstanceMap[inst.Name]) == nil &&
 			!isInstanceUpdated(its, inst)
+		if specHandedOffButNotConverged {
+			occupiedMemberPlanSlots++
+		}
 		if !intctrlutil.IsInstanceAvailable(inst) || specHandedOffButNotConverged {
 			occupiedRollingSlots++
 		}
@@ -128,7 +132,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		if err != nil {
 			return kubebuilderx.Continue, err
 		}
-		updateCount = len(instancesToBeUpdated)
+		updateCount = max(0, len(instancesToBeUpdated)-occupiedMemberPlanSlots)
 	}
 
 	// updatedInstances tracks the positions already covered by the rolling-update

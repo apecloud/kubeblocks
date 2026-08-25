@@ -27,6 +27,38 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 )
 
+func TestConfigsApplied(t *testing.T) {
+	desired := []workloads.ConfigTemplate{
+		{Name: "dynamic", Generation: 2},
+		{Name: "restart", Generation: 1},
+	}
+	tests := []struct {
+		name     string
+		observed []workloads.InstanceConfigStatus
+		want     bool
+	}{
+		{name: "all desired generations observed", observed: []workloads.InstanceConfigStatus{
+			{Name: "dynamic", Generation: 2},
+			{Name: "restart", Generation: 3},
+			{Name: "unmanaged", Generation: 4},
+		}, want: true},
+		{name: "desired generation is stale", observed: []workloads.InstanceConfigStatus{
+			{Name: "dynamic", Generation: 1},
+			{Name: "restart", Generation: 1},
+		}},
+		{name: "desired config is missing", observed: []workloads.InstanceConfigStatus{
+			{Name: "dynamic", Generation: 2},
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := ConfigsApplied(desired, tt.observed); got != tt.want {
+				t.Fatalf("ConfigsApplied() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestBuildDesiredAndObservedDimensions(t *testing.T) {
 	result, err := Build(Input{
 		DesiredAssignments: []TemplateAssignment{

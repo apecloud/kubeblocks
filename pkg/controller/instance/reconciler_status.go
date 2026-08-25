@@ -20,8 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instance
 
 import (
-	"fmt"
-	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -32,6 +30,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/workloads/instancestatus"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -107,12 +106,13 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		meta.RemoveStatusCondition(&inst.Status.Conditions, string(workloads.InstanceFailure))
 	}
 
-	inst.Status.UpToDate = updated
+	configs := observedConfigsOfInstance(inst)
+	inst.Status.UpToDate = updated && instancestatus.ConfigsApplied(inst.Spec.Configs, configs) && !r.hasPendingVolumeExpansion(tree, inst)
 	inst.Status.Ready = ready
 	inst.Status.Available = available
 	inst.Status.Role = r.observedRoleOfPod(inst, pod)
 	inst.Status.VolumeExpansion = r.hasRunningVolumeExpansion(tree, inst)
-	inst.Status.Configs = observedConfigsOfInstance(inst)
+	inst.Status.Configs = configs
 
 	if inst.Spec.MinReadySeconds > 0 && !available {
 		return kubebuilderx.RetryAfter(time.Second), nil
@@ -205,31 +205,49 @@ func (r *statusReconciler) observedRoleOfPod(inst *workloads.Instance, pod *core
 }
 
 func (r *statusReconciler) hasRunningVolumeExpansion(tree *kubebuilderx.ObjectTree, inst *workloads.Instance) bool {
-	pvcs := tree.List(&corev1.PersistentVolumeClaim{})
-	var pvcList []*corev1.PersistentVolumeClaim
-	for _, obj := range pvcs {
-		pvc, _ := obj.(*corev1.PersistentVolumeClaim)
-		pvcList = append(pvcList, pvc)
-	}
+	pvcsByName := r.persistentVolumeClaimsByName(tree)
 	for _, vct := range inst.Spec.VolumeClaimTemplates {
-		prefix := fmt.Sprintf("%s-%s", vct.Name, inst.Name)
-		for _, pvc := range pvcList {
-			if !strings.HasPrefix(pvc.Name, prefix) {
-				continue
-			}
-			if pvc.Status.Capacity == nil || pvc.Status.Capacity.Storage().Cmp(pvc.Spec.Resources.Requests[corev1.ResourceStorage]) >= 0 {
-				continue
-			}
-			instName := ""
-			if pvc.Labels != nil {
-				instName = pvc.Labels[constant.KBAppPodNameLabelKey]
-			}
-			if len(instName) > 0 {
-				return true
-			}
+		pvcName := intctrlutil.ComposePVCName(corev1.PersistentVolumeClaim{ObjectMeta: vct.ObjectMeta}, inst.Spec.InstanceSetName, inst.Name)
+		pvc := pvcsByName[pvcName]
+		if pvc == nil || pvc.Labels[constant.KBAppPodNameLabelKey] == "" {
+			continue
+		}
+		requested, requestedOK := pvc.Spec.Resources.Requests[corev1.ResourceStorage]
+		capacity, capacityOK := pvc.Status.Capacity[corev1.ResourceStorage]
+		if requestedOK && capacityOK && capacity.Cmp(requested) < 0 {
+			return true
 		}
 	}
 	return false
+}
+
+func (r *statusReconciler) hasPendingVolumeExpansion(tree *kubebuilderx.ObjectTree, inst *workloads.Instance) bool {
+	pvcsByName := r.persistentVolumeClaimsByName(tree)
+	for _, vct := range inst.Spec.VolumeClaimTemplates {
+		desired, desiredOK := vct.Spec.Resources.Requests[corev1.ResourceStorage]
+		if !desiredOK || desired.IsZero() {
+			continue
+		}
+		pvcName := intctrlutil.ComposePVCName(corev1.PersistentVolumeClaim{ObjectMeta: vct.ObjectMeta}, inst.Spec.InstanceSetName, inst.Name)
+		pvc := pvcsByName[pvcName]
+		if pvc == nil {
+			continue
+		}
+		capacity, capacityOK := pvc.Status.Capacity[corev1.ResourceStorage]
+		if capacityOK && capacity.Cmp(desired) < 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func (r *statusReconciler) persistentVolumeClaimsByName(tree *kubebuilderx.ObjectTree) map[string]*corev1.PersistentVolumeClaim {
+	result := make(map[string]*corev1.PersistentVolumeClaim)
+	for _, obj := range tree.List(&corev1.PersistentVolumeClaim{}) {
+		pvc, _ := obj.(*corev1.PersistentVolumeClaim)
+		result[pvc.Name] = pvc
+	}
+	return result
 }
 
 func observedConfigsOfInstance(inst *workloads.Instance) []workloads.InstanceConfigStatus {

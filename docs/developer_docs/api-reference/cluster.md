@@ -34217,7 +34217,8 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Ready indicates whether the instance is ready to serve requests when CurrentState is Present.</p>
+<p>Ready indicates whether the instance is ready to serve requests when CurrentState is Present.
+It is independent of desired-state convergence reported by UpToDate.</p>
 </td>
 </tr>
 <tr>
@@ -34230,7 +34231,8 @@ bool
 <td>
 <em>(Optional)</em>
 <p>Available indicates whether the instance has remained ready for the required minimum duration when CurrentState is Present.
-Available can be true only when Ready is true.</p>
+Available can be true only when Ready is true.
+It is independent of desired-state convergence reported by UpToDate.</p>
 </td>
 </tr>
 <tr>
@@ -34377,7 +34379,8 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Represents whether the instance is up-to-date.</p>
+<p>UpToDate indicates that the Instance controller has observed the Pod, dynamic configs, and PVC expansion
+targets represented by this status applied. It is independent of runtime Ready and Available observations.</p>
 </td>
 </tr>
 <tr>
@@ -34389,7 +34392,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Represents whether the instance is in ready condition.</p>
+<p>Represents whether the instance is in ready condition, independent of desired-state convergence.</p>
 </td>
 </tr>
 <tr>
@@ -34401,7 +34404,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Represents whether the instance is in available condition.</p>
+<p>Represents whether the instance is in available condition, independent of desired-state convergence.</p>
 </td>
 </tr>
 <tr>

@@ -31,7 +31,7 @@ import (
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks},shortName=inst
-// +kubebuilder:printcolumn:name="UP-TO-DATE",type="string",JSONPath=".status.upToDate",description="update-to-date."
+// +kubebuilder:printcolumn:name="UP-TO-DATE",type="string",JSONPath=".status.upToDate",description="desired state applied."
 // +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.ready",description="ready."
 // +kubebuilder:printcolumn:name="AVAILABLE",type="string",JSONPath=".status.available",description="available."
 // +kubebuilder:printcolumn:name="ROLE",type="string",JSONPath=".status.role",description="role."
@@ -174,17 +174,18 @@ type InstanceStatus2 struct {
 	// +optional
 	UpdateRevision string `json:"updateRevision,omitempty"`
 
-	// Represents whether the instance is up-to-date.
+	// UpToDate indicates that the Instance controller has observed the Pod, dynamic configs, and PVC expansion
+	// targets represented by this status applied. It is independent of runtime Ready and Available observations.
 	//
 	// +optional
 	UpToDate bool `json:"upToDate,omitempty"`
 
-	// Represents whether the instance is in ready condition.
+	// Represents whether the instance is in ready condition, independent of desired-state convergence.
 	//
 	// +optional
 	Ready bool `json:"ready,omitempty"`
 
-	// Represents whether the instance is in available condition.
+	// Represents whether the instance is in available condition, independent of desired-state convergence.
 	//
 	// +optional
 	Available bool `json:"available,omitempty"`

@@ -2491,6 +2491,24 @@ The selector is considered ambiguous and the action fails if multiple Pods share
 </tr>
 <tr>
 <td>
+<code>nonBlocking</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies how KubeBlocks runs the Action.</p>
+<p>When false, KubeBlocks runs the Action in blocking mode. This mode is suitable
+for Actions that are expected to complete quickly.</p>
+<p>When true, KubeBlocks runs the Action in non-blocking mode. This mode is
+suitable for long-running Actions, such as data migration, rebalancing, or
+draining, whose duration depends on data volume or runtime conditions.</p>
+<p>This field cannot be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>timeoutSeconds</code><br/>
 <em>
 int32
@@ -2500,7 +2518,11 @@ int32
 <em>(Optional)</em>
 <p>Specifies the maximum duration in seconds that the Action is allowed to run.</p>
 <p>Behavior based on the value:
-- Positive (&gt; 0): The action will be terminated after this many seconds. The maximum allowed value is 60.
+- Positive (&gt; 0): The action will be terminated after this many seconds.
+  Blocking Actions are capped at 60 seconds. Non-blocking Actions use the
+  configured value as their total run timeout, including all runtime
+  argument invocations, retry attempts, and retry intervals, without the
+  60-second cap.
 - Zero (= 0): The timeout is managed by the system, defaulting to 30 seconds typically.
 - Negative (&lt; 0): No timeout is applied; the action runs until the command completes.</p>
 <p>This field cannot be updated.</p>
@@ -7472,7 +7494,24 @@ ProvisionSecretRef
 <em>(Optional)</em>
 <p>Refers to the secret from which data will be copied to create the new account.</p>
 <p>For user-specified passwords, the maximum length is limited to 64 bytes.</p>
+<p>Updates to the referenced Secret do not automatically trigger reconciliation.
+To apply updated credentials, update the referenced Secret first and then change
+SecretRefRevision to a new value.</p>
 <p>This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>secretRefRevision</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies an opaque revision of the referenced Secret.</p>
+<p>After updating the referenced Secret, change this field to a new value to apply
+the updated credentials. The value is treated as an opaque token.</p>
 </td>
 </tr>
 </tbody>
@@ -10897,13 +10936,30 @@ This value is set to 0 by default, indicating that no retries will be made.</p>
 <td>
 <code>retryInterval</code><br/>
 <em>
+<a href="https://pkg.go.dev/time#Duration">
 time.Duration
+</a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
 <p>Indicates the duration of time to wait between each retry attempt.
-This value is set to 0 by default, indicating that there will be no delay between retry attempts.</p>
+This value is set to 0 by default, indicating that there will be no delay between retry attempts.
+Values use the time.Duration integer and JSON representation in nanoseconds.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>retryIntervalSeconds</code><br/>
+<em>
+int64
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the number of seconds to wait between each retry attempt.
+This is a convenient way to configure retryInterval in whole seconds.
+When set, this field takes precedence over retryInterval, including when set to 0.</p>
 </td>
 </tr>
 </tbody>
@@ -10997,7 +11053,7 @@ Kubernetes api utils intstr.IntOrString
 <em>(Optional)</em>
 <p>The maximum number of instances that can be unavailable during the update.
 Value can be an absolute number (ex: 5) or a percentage of desired instances (ex: 10%).
-Absolute number is calculated from percentage by rounding up. This can not be 0.
+Absolute number is calculated from percentage by rounding down, with a minimum value of 1.
 Defaults to 1. The field applies to all instances. That means if there is any unavailable pod,
 it will be counted towards MaxUnavailable.</p>
 </td>
@@ -13455,7 +13511,7 @@ SystemAccountStatement
 </tr>
 <tr>
 <td>
-<code>passwordGenerationPolicy</code><br/>
+<code>passwordConfig</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.PasswordConfig">
 PasswordConfig
@@ -13464,7 +13520,8 @@ PasswordConfig
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the policy for generating the account&rsquo;s password.</p>
+<p>Specifies the configuration for generating the account&rsquo;s password.
+If this field is nil, the account is passwordless.</p>
 <p>This field is immutable once set.</p>
 </td>
 </tr>
@@ -14721,26 +14778,6 @@ and ConfigConstraint applies to all keys.</p>
 </tr>
 <tr>
 <td>
-<code>legacyRenderedConfigSpec</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.LegacyRenderedTemplateSpec">
-LegacyRenderedTemplateSpec
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the secondary rendered config spec for pod-specific customization.</p>
-<p>The template is rendered inside the pod (by the &ldquo;config-manager&rdquo; sidecar container) and merged with the main
-template&rsquo;s render result to generate the final configuration file.</p>
-<p>This field is intended to handle scenarios where different pods within the same Component have
-varying configurations. It allows for pod-specific customization of the configuration.</p>
-<p>Note: This field will be deprecated in future versions, and the functionality will be moved to
-<code>cluster.spec.componentSpecs[*].instances[*]</code>.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>constraintRef</code><br/>
 <em>
 string
@@ -14749,25 +14786,6 @@ string
 <td>
 <em>(Optional)</em>
 <p>Specifies the name of the referenced configuration constraints object.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>asEnvFrom</code><br/>
-<em>
-[]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the containers to inject the ConfigMap parameters as environment variables.</p>
-<p>This is useful when application images accept parameters through environment variables and
-generate the final configuration file in the startup script based on these variables.</p>
-<p>This field allows users to specify a list of container names, and KubeBlocks will inject the environment
-variables converted from the ConfigMap into these designated containers. This provides a flexible way to
-pass the configuration items from the ConfigMap to the container without modifying the image.</p>
-<p>Deprecated: <code>asEnvFrom</code> has been deprecated since 0.9.0 and will be removed in 0.10.0.
-Use <code>injectEnvTo</code> instead.</p>
 </td>
 </tr>
 <tr>
@@ -15269,7 +15287,7 @@ map[string]*string
 <h3 id="apps.kubeblocks.io/v1alpha1.ConfigTemplateExtension">ConfigTemplateExtension
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ConfigurationItemDetail">ConfigurationItemDetail</a>, <a href="#apps.kubeblocks.io/v1alpha1.LegacyRenderedTemplateSpec">LegacyRenderedTemplateSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ConfigurationItemDetail">ConfigurationItemDetail</a>)
 </p>
 <div>
 </div>
@@ -15349,18 +15367,6 @@ string
 <p>It must be a string of maximum 63 characters, and can only include lowercase alphanumeric characters,
 hyphens, and periods.
 The name must start and end with an alphanumeric character.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>version</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Deprecated: No longer used. Please use &lsquo;Payload&rsquo; instead. Previously represented the version of the configuration template.</p>
 </td>
 </tr>
 <tr>
@@ -15786,41 +15792,6 @@ map[string]string
 </td>
 <td>
 <em>(Optional)</em>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.LegacyRenderedTemplateSpec">LegacyRenderedTemplateSpec
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ComponentConfigSpec">ComponentConfigSpec</a>)
-</p>
-<div>
-<p>LegacyRenderedTemplateSpec describes the configuration extension for the lazy rendered template.</p>
-<p>Deprecated: LegacyRenderedTemplateSpec has been deprecated since 0.9.0 and will be removed in 0.10.0</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>ConfigTemplateExtension</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ConfigTemplateExtension">
-ConfigTemplateExtension
-</a>
-</em>
-</td>
-<td>
-<p>
-(Members of <code>ConfigTemplateExtension</code> are embedded into this type.)
-</p>
-<p>Extends the configuration template.</p>
 </td>
 </tr>
 </tbody>
@@ -19596,6 +19567,52 @@ string
 </tr>
 </tbody>
 </table>
+<h3 id="workloads.kubeblocks.io/v1.InstanceCurrentState">InstanceCurrentState
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceStatus">InstanceStatus</a>, <a href="#workloads.kubeblocks.io/v1.InstanceStatus2">InstanceStatus2</a>)
+</p>
+<div>
+<p>InstanceCurrentState describes the observed lifecycle state of an instance runtime.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Absent&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Present&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Terminating&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1.InstanceDesiredState">InstanceDesiredState
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceStatus">InstanceStatus</a>)
+</p>
+<div>
+<p>InstanceDesiredState describes the allocation state desired by the InstanceSet for an instance identity.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Active&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Offline&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Released&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
 <h3 id="workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec
 </h3>
 <p>
@@ -20235,7 +20252,7 @@ key is the pod name, value is the revision.</p>
 <code>assignedOrdinals</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.Ordinals">
-map[string]github.com/apecloud/kubeblocks/apis/apps/v1.Ordinals
+map[string]github.com/apecloud/kubeblocks/apis/workloads/v1.Ordinals
 </a>
 </em>
 </td>
@@ -20485,6 +20502,7 @@ bool
 (<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceSetStatus">InstanceSetStatus</a>)
 </p>
 <div>
+<p>InstanceStatus describes the desired allocation and observed runtime state of an instance identity.</p>
 </div>
 <table>
 <thead>
@@ -20502,7 +20520,131 @@ string
 </em>
 </td>
 <td>
-<p>Represents the name of the pod.</p>
+<p>PodName is the stable name of the instance allocated by the InstanceSet.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>templateName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>TemplateName is the instance template assigned to this instance.
+nil means that the template is unknown, while an empty string identifies the default template.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>desiredState</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.InstanceDesiredState">
+InstanceDesiredState
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>DesiredState describes whether the instance should be running (Active), is retained without running (Offline),
+or is no longer allocated and is kept only while its runtime is still observed (Released).
+An empty value from an older object is treated as Active.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>currentState</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.InstanceCurrentState">
+InstanceCurrentState
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>CurrentState describes whether the instance runtime is currently present, terminating, or absent.
+An empty value from an older object is treated as Present because those entries represented observed instances.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>currentRevision</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>CurrentRevision identifies the revision currently applied to this instance.
+It is empty when CurrentState is Absent.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>updateRevision</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>UpdateRevision identifies the revision desired for an Active instance.
+It is empty for Offline and Released instances.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>upToDate</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>UpToDate indicates that the workload owner has observed the Active instance fully applied the current
+InstanceSet desired state, including changes intentionally excluded from revision hashes.
+It can be true only when DesiredState is Active and CurrentState is Present.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>ready</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Ready indicates whether the instance is ready to serve requests when CurrentState is Present.
+It is independent of desired-state convergence reported by UpToDate.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>available</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Available indicates whether the instance has remained ready for the required minimum duration when CurrentState is Present.
+Available can be true only when Ready is true.
+It is independent of desired-state convergence reported by UpToDate.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>failed</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Failed indicates whether the instance reports a terminal failure when CurrentState is Present. It is independent of
+desired-state convergence.</p>
 </td>
 </tr>
 <tr>
@@ -20514,7 +20656,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Represents the role of the instance observed.</p>
+<p>Represents the role observed for the instance when CurrentState is Present.</p>
 </td>
 </tr>
 <tr>
@@ -20528,7 +20670,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>The status of configs.</p>
+<p>The config status observed for the instance when CurrentState is Present.</p>
 </td>
 </tr>
 <tr>
@@ -20540,7 +20682,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Represents whether the instance is in volume expansion.</p>
+<p>Represents whether storage for the instance is being expanded when CurrentState is Present.</p>
 </td>
 </tr>
 </tbody>
@@ -20570,8 +20712,8 @@ int64
 </td>
 <td>
 <em>(Optional)</em>
-<p>observedGeneration is the most recent generation observed for this InstanceSet. It corresponds to the
-InstanceSet&rsquo;s generation, which is updated on mutation by the API Server.</p>
+<p>observedGeneration is the most recent generation observed for this Instance. It corresponds to the
+Instance&rsquo;s generation, which is updated on mutation by the API Server.</p>
 </td>
 </tr>
 <tr>
@@ -20591,6 +20733,20 @@ Known .status.conditions.type are: &ldquo;InstanceFailure&rdquo;, &ldquo;Instanc
 </tr>
 <tr>
 <td>
+<code>currentState</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.InstanceCurrentState">
+InstanceCurrentState
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents whether the Pod managed by this Instance is currently present, terminating, or absent.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>currentRevision</code><br/>
 <em>
 string
@@ -20598,7 +20754,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>currentRevision, if not empty, indicates the version of the Instance used to generate pod.</p>
+<p>currentRevision, if not empty, identifies the revision currently used by the Pod.</p>
 </td>
 </tr>
 <tr>
@@ -20610,7 +20766,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>updateRevision, if not empty, indicates the version of the Instance used to generate pod.</p>
+<p>updateRevision, if not empty, identifies the revision desired for the Pod.</p>
 </td>
 </tr>
 <tr>
@@ -20622,7 +20778,8 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Represents whether the instance is up-to-date.</p>
+<p>UpToDate indicates that the Instance controller has observed the Pod, dynamic configs, and PVC expansion
+targets represented by this status applied. It is independent of runtime Ready and Available observations.</p>
 </td>
 </tr>
 <tr>
@@ -20634,7 +20791,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Represents whether the instance is in ready condition.</p>
+<p>Represents whether the instance is in ready condition, independent of desired-state convergence.</p>
 </td>
 </tr>
 <tr>
@@ -20646,7 +20803,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Represents whether the instance is in available condition.</p>
+<p>Represents whether the instance is in available condition, independent of desired-state convergence.</p>
 </td>
 </tr>
 <tr>

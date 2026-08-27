@@ -1293,7 +1293,7 @@ func componentVarPodsWithRoleGetter(ctx context.Context, cli client.Reader,
 	targetRoles := strings.Split(roles, ",")
 
 	names := make([]string, 0)
-	for _, inst := range its.Status.InstanceStatus {
+	for _, inst := range its.ActivePresentInstanceStatuses() {
 		role := inst.Role
 		if slices.Index(targetRoles, role) >= 0 {
 			names = append(names, inst.PodName)
@@ -1413,7 +1413,13 @@ func resolveReferentComponents(synthesizedComp *SynthesizedComponent, objRef app
 			total += cnt
 		}
 	}
-	if len(compNames) != int(total) {
+	if total == 0 && len(compNames) > 0 {
+		return nil, fmt.Errorf("unexpected component objects found when resolving vars, actual: %d", len(compNames))
+	}
+	// During scale-in the desired count is reduced before the extra component
+	// is deleted. Keep all existing referents available to the shard-remove
+	// action, while still blocking when any desired component is missing.
+	if len(compNames) < int(total) {
 		return nil, fmt.Errorf("insufficient component objects to resolve vars, expected: %d, actual: %d", total, len(compNames))
 	}
 	if len(compNames) == 0 {

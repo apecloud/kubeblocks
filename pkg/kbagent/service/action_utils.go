@@ -32,6 +32,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"text/template"
 	"time"
 
@@ -103,7 +104,12 @@ type asyncResult struct {
 }
 
 func blockingCallAction(ctx context.Context, action *kbaproto.Action, parameters map[string]string, arguments []string, timeout *int32) ([]byte, error) {
-	resultChan, err := nonBlockingCallAction(ctx, action, parameters, arguments, timeout)
+	return blockingCallActionWithTimeoutCap(ctx, action, parameters, arguments, timeout, true)
+}
+
+func blockingCallActionWithTimeoutCap(ctx context.Context, action *kbaproto.Action, parameters map[string]string,
+	arguments []string, timeout *int32, capTimeout bool) ([]byte, error) {
+	resultChan, err := nonBlockingCallActionWithTimeoutCap(ctx, action, parameters, arguments, timeout, capTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -127,9 +133,15 @@ func blockingCallAction(ctx context.Context, action *kbaproto.Action, parameters
 }
 
 func nonBlockingCallAction(ctx context.Context, action *kbaproto.Action, parameters map[string]string, arguments []string, timeout *int32) (chan *asyncResult, error) {
+	return nonBlockingCallActionWithTimeoutCap(ctx, action, parameters, arguments, timeout, true)
+}
+
+func nonBlockingCallActionWithTimeoutCap(ctx context.Context, action *kbaproto.Action, parameters map[string]string,
+	arguments []string, timeout *int32, capTimeout bool) (chan *asyncResult, error) {
 	stdoutBuf := bytes.NewBuffer(make([]byte, 0, defaultBufferSize))
 	stderrBuf := bytes.NewBuffer(make([]byte, 0, defaultBufferSize))
-	execErrorChan, err := nonBlockingCallActionX(ctx, action, parameters, arguments, timeout, nil, stdoutBuf, stderrBuf)
+	execErrorChan, err := nonBlockingCallActionXWithTimeoutCap(
+		ctx, action, parameters, arguments, timeout, nil, stdoutBuf, stderrBuf, capTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -151,8 +163,15 @@ func nonBlockingCallAction(ctx context.Context, action *kbaproto.Action, paramet
 
 func nonBlockingCallActionX(ctx context.Context, action *kbaproto.Action, parameters map[string]string, arguments []string, timeout *int32,
 	stdinReader io.Reader, stdoutWriter, stderrWriter io.Writer) (chan error, error) {
+	return nonBlockingCallActionXWithTimeoutCap(
+		ctx, action, parameters, arguments, timeout, stdinReader, stdoutWriter, stderrWriter, true)
+}
+
+func nonBlockingCallActionXWithTimeoutCap(ctx context.Context, action *kbaproto.Action, parameters map[string]string,
+	arguments []string, timeout *int32, stdinReader io.Reader, stdoutWriter, stderrWriter io.Writer,
+	capTimeout bool) (chan error, error) {
 	var cancel context.CancelFunc
-	ctx, cancel = actionCallTimeoutContext(ctx, timeout)
+	ctx, cancel = actionCallTimeoutContextWithCap(ctx, timeout, capTimeout)
 
 	var err error
 	errChan := make(chan error, 1)
@@ -182,11 +201,19 @@ func nonBlockingCallActionX(ctx context.Context, action *kbaproto.Action, parame
 }
 
 func actionCallTimeoutContext(ctx context.Context, timeout *int32) (context.Context, context.CancelFunc) {
+	return actionCallTimeoutContextWithCap(ctx, timeout, true)
+}
+
+func actionCallTimeoutContextWithCap(ctx context.Context, timeout *int32, capTimeout bool) (context.Context, context.CancelFunc) {
 	switch {
 	case ptr.Deref(timeout, 0) == 0:
 		return context.WithTimeout(ctx, defaultActionCallTimeout)
 	case *timeout > 0:
-		return context.WithTimeout(ctx, min(time.Duration(*timeout)*time.Second, maxActionCallTimeout))
+		duration := time.Duration(*timeout) * time.Second
+		if capTimeout {
+			duration = min(duration, maxActionCallTimeout)
+		}
+		return context.WithTimeout(ctx, duration)
 	default:
 		return ctx, func() {}
 	}
@@ -224,6 +251,17 @@ func execActionCallX(ctx context.Context, cancel context.CancelFunc,
 	}()
 
 	cmd := exec.CommandContext(ctx, action.Commands[0], mergedArgs...)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.Cancel = func() error {
+		if cmd.Process == nil {
+			return os.ErrProcessDone
+		}
+		err := syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+		if err == syscall.ESRCH {
+			return os.ErrProcessDone
+		}
+		return err
+	}
 	if len(mergedEnv) > 0 {
 		cmd.Env = mergedEnv
 	}

@@ -11,7 +11,7 @@
 #TARGETARCH - Architecture from --platform, e.g. arm64
 #TARGETVARIANT - used to set target ARM variant, e.g. v7
 
-ARG GO_VERSION=1.25.10-alpine
+ARG GO_VERSION=1.25.13-alpine
 
 FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION} AS builder
 ARG TARGETOS
@@ -60,7 +60,8 @@ ENV APK_MIRROR=${APK_MIRROR}
 RUN if [ -n "${APK_MIRROR}" ]; then sed -i "s/dl-cdn.alpinelinux.org/${APK_MIRROR}/g" /etc/apk/repositories; fi
 RUN apk upgrade --no-cache
 # curl is used to send certain requests, such as reload in config-manager.
-RUN apk add --no-cache curl kubectl helm jq --allow-untrusted \
+RUN apk add --no-cache curl kubectl helm jq tini-static --allow-untrusted \
+	&& cp /sbin/tini-static /bin/tini-static \
     && rm -rf /var/cache/apk/*
 
 # copy kubeblocks tools

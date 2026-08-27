@@ -70,7 +70,12 @@ func newRequestTestFixture(t *testing.T) (*Request, *corev1.Pod) {
 		Backup: &dpv1alpha1.Backup{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "backup", Namespace: "ns", UID: types.UID("1234567890abcdef"),
-				Labels: map[string]string{dptypes.ClusterUIDLabelKey: "uid", constant.AppInstanceLabelKey: "cluster", constant.KBAppComponentLabelKey: "mysql"},
+				Labels: map[string]string{
+					dptypes.ClusterUIDLabelKey:      "uid",
+					constant.AppInstanceLabelKey:    "cluster",
+					constant.KBAppComponentLabelKey: "mysql",
+					constant.AppManagedByLabelKey:   constant.AppName,
+				},
 			},
 			Spec: dpv1alpha1.BackupSpec{RetentionPeriod: "7d"},
 		},
@@ -123,6 +128,7 @@ func TestRequestBuildActionBranches(t *testing.T) {
 	assert.NoError(t, err)
 	assert.IsType(t, &action.JobAction{}, jobAction)
 	assert.Equal(t, dpv1alpha1.ActionTypeJob, jobAction.Type())
+	assert.Equal(t, dptypes.AppName, jobAction.(*action.JobAction).ObjectMeta.Labels[constant.AppManagedByLabelKey])
 }
 
 func TestRequestBuildBackupDataActions(t *testing.T) {
@@ -131,11 +137,13 @@ func TestRequestBuildBackupDataActions(t *testing.T) {
 	backupDataAction, err := req.buildBackupDataAction(pod, "backup-data")
 	assert.NoError(t, err)
 	assert.IsType(t, &action.JobAction{}, backupDataAction)
+	assert.Equal(t, dptypes.AppName, backupDataAction.(*action.JobAction).ObjectMeta.Labels[constant.AppManagedByLabelKey])
 
 	req.ActionSet.Spec.BackupType = dpv1alpha1.BackupTypeContinuous
 	backupDataAction, err = req.buildBackupDataAction(pod, "continuous")
 	assert.NoError(t, err)
 	assert.IsType(t, &action.StatefulSetAction{}, backupDataAction)
+	assert.Equal(t, dptypes.AppName, backupDataAction.(*action.StatefulSetAction).ObjectMeta.Labels[constant.AppManagedByLabelKey])
 	assert.Contains(t, req.buildContinuousSyncProgressCommand(), "retryTimes")
 
 	req.ActionSet.Spec.BackupType = dpv1alpha1.BackupType("Unknown")

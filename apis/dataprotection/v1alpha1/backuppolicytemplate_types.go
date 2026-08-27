@@ -239,6 +239,11 @@ type BackupPolicyTemplateStatus struct {
 	//
 	// +optional
 	Message string `json:"message,omitempty"`
+
+	// Specifies the names of component definitions that match the `spec.compDefs` of the BackupPolicyTemplate.
+	//
+	// +optional
+	MatchedCompDefs []string `json:"matchedCompDefs,omitempty"`
 }
 
 // BackupPolicyTemplate should be provided by addon developers.

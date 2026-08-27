@@ -36,8 +36,7 @@ import (
 )
 
 const (
-	kbEnvClusterUIDPostfix8Deprecated = "KB_CLUSTER_UID_POSTFIX_8"
-	kbComponentEnvCMPlaceHolder       = "$(COMP_ENV_CM_NAME)"
+	kbComponentEnvCMPlaceHolder = "$(COMP_ENV_CM_NAME)"
 )
 
 type envBuildInFunc func(container interface{}, envName string) (string, error)
@@ -50,7 +49,6 @@ type envWrapper struct {
 	// configmap or secret not yet submitted.
 	localObjects  []client.Object
 	clusterName   string
-	clusterUID    string
 	componentName string
 	// cache remoted configmap and secret.
 	cache map[schema.GroupVersionKind]map[client.ObjectKey]client.Object
@@ -67,7 +65,6 @@ func wrapGetEnvByName(templateBuilder *templateRenderWrapper, component *compone
 	// hack for test cases of cli update cmd...
 	if component != nil {
 		wrapper.clusterName = component.ClusterName
-		wrapper.clusterUID = component.ClusterUID
 		wrapper.componentName = component.Name
 	}
 	return func(args interface{}, envName string) (string, error) {
@@ -232,9 +229,8 @@ func (w *envWrapper) checkAndReplaceEnv(value string, container *corev1.Containe
 func (w *envWrapper) doEnvReplace(replacedVars *set.LinkedHashSetString, oldValue string, container *corev1.Container) (string, error) {
 	var (
 		clusterName   = w.clusterName
-		clusterUID    = w.clusterUID
 		componentName = w.componentName
-		builtInEnvMap = getReplacementMapForBuiltInEnv(clusterName, clusterUID, componentName)
+		builtInEnvMap = getReplacementMapForBuiltInEnv(clusterName, componentName)
 	)
 
 	kbInnerEnvReplaceFn := func(envName string, strToReplace string) string {
@@ -314,7 +310,7 @@ func fieldRefValue(podReference *corev1.ObjectFieldSelector, podSpec *corev1.Pod
 	return "", fmt.Errorf("not support pod field ref")
 }
 
-func getReplacementMapForBuiltInEnv(clusterName, clusterUID, componentName string) map[string]string {
+func getReplacementMapForBuiltInEnv(clusterName, componentName string) map[string]string {
 	cc := constant.GenerateClusterComponentName(clusterName, componentName)
 	replacementMap := map[string]string{
 		envPlaceHolder(constant.KBEnvClusterName):     clusterName,
@@ -322,11 +318,6 @@ func getReplacementMapForBuiltInEnv(clusterName, clusterUID, componentName strin
 		envPlaceHolder(constant.KBEnvClusterCompName): cc,
 		kbComponentEnvCMPlaceHolder:                   constant.GenerateClusterComponentEnvPattern(clusterName, componentName),
 	}
-	clusterUIDPostfix := clusterUID
-	if len(clusterUID) > 8 {
-		clusterUIDPostfix = clusterUID[len(clusterUID)-8:]
-	}
-	replacementMap[envPlaceHolder(kbEnvClusterUIDPostfix8Deprecated)] = clusterUIDPostfix
 	return replacementMap
 }
 

@@ -262,6 +262,27 @@ var _ = Describe("TLS transformer test", func() {
 			checkTLSSecret(true, appsv1.IssuerUserProvided)
 			checkVolumeNMounts(true)
 		})
+
+		It("w/ define, enabled - user with optional TLS file names omitted", func() {
+			// A shared sharding TLS source always contains CA, cert, and key. The
+			// ComponentDefinition still controls which files are copied locally.
+			transCtx.CompDef.Spec.TLS = &appsv1.TLS{
+				VolumeName: tls.VolumeName,
+				MountPath:  tls.MountPath,
+				CertFile:   ptr.To("server.crt"),
+			}
+			transCtx.SynthesizeComponent.TLSConfig = tlsConfig4User
+
+			transformer := &componentTLSTransformer{}
+			Expect(transformer.Transform(transCtx, dag)).Should(Succeed())
+
+			graphCli := transCtx.Client.(model.GraphClient)
+			objs := graphCli.FindAll(dag, &corev1.Secret{})
+			Expect(objs).Should(HaveLen(1))
+			secret := objs[0].(*corev1.Secret)
+			Expect(secret.Data).Should(HaveLen(1))
+			Expect(secret.Data).Should(HaveKeyWithValue("server.crt", tlsSecret4User.Data["cert"]))
+		})
 	})
 
 	Context("update & disable", func() {

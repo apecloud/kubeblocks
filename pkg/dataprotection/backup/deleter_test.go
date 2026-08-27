@@ -21,6 +21,7 @@ package backup
 
 import (
 	"context"
+	"path/filepath"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -36,6 +37,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	ctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -50,23 +52,70 @@ func TestDeleterDoPreDeleteActionCreatesAndReusesJob(t *testing.T) {
 	scheme := runtime.NewScheme()
 	assert.NoError(t, corev1.AddToScheme(scheme))
 	assert.NoError(t, batchv1.AddToScheme(scheme))
+	assert.NoError(t, appsv1.AddToScheme(scheme))
 	assert.NoError(t, dpv1alpha1.AddToScheme(scheme))
 
-	cli := fake.NewClientBuilder().WithScheme(scheme).Build()
+	cluster := &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "cluster", Namespace: "ns", UID: types.UID("cluster-uid")}}
+	targetPod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "current-pod", Namespace: "ns", Labels: map[string]string{"role": "leader"}},
+		Spec: corev1.PodSpec{Containers: []corev1.Container{{
+			Name:  "database",
+			Ports: []corev1.ContainerPort{{ContainerPort: 3306}},
+		}}},
+		Status: corev1.PodStatus{
+			Phase: corev1.PodRunning,
+			PodIP: "10.0.0.1",
+			Conditions: []corev1.PodCondition{{
+				Type: corev1.PodReady, Status: corev1.ConditionTrue,
+			}},
+		},
+	}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, targetPod).Build()
 	backup := &dpv1alpha1.Backup{
-		ObjectMeta: metav1.ObjectMeta{Name: "backup", Namespace: "ns", UID: types.UID("backup-uid")},
-		Status:     dpv1alpha1.BackupStatus{BackupMethod: &dpv1alpha1.BackupMethod{Env: []corev1.EnvVar{{Name: "IMAGE_TAG", Value: "1.0"}}}},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "backup", Namespace: "ns", UID: types.UID("backup-uid"),
+			Labels: map[string]string{
+				constant.AppInstanceLabelKey: "cluster",
+				dptypes.ClusterUIDLabelKey:   "cluster-uid",
+			},
+		},
+		Status: dpv1alpha1.BackupStatus{
+			BackupMethod: &dpv1alpha1.BackupMethod{Env: []corev1.EnvVar{
+				{Name: "IMAGE_TAG", Value: "1.0"},
+				{Name: dptypes.DPDBHost, Value: "method-host"},
+			}},
+			Target: &dpv1alpha1.BackupStatusTarget{
+				BackupTarget: dpv1alpha1.BackupTarget{
+					PodSelector: &dpv1alpha1.PodSelector{
+						LabelSelector:         &metav1.LabelSelector{MatchLabels: map[string]string{"role": "old-leader"}},
+						FallbackLabelSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"role": "leader"}},
+						Strategy:              dpv1alpha1.PodSelectionStrategyAny,
+					},
+					ConnectionCredential: &dpv1alpha1.ConnectionCredential{
+						SecretName: "connection", UsernameKey: "username", PasswordKey: "password",
+					},
+				},
+				SelectedTargetPods: []string{"old-pod"},
+			},
+		},
 	}
 	repo := &dpv1alpha1.BackupRepo{Spec: dpv1alpha1.BackupRepoSpec{}, Status: dpv1alpha1.BackupRepoStatus{BackupPVCName: "repo-pvc"}}
 	deleter := &Deleter{
-		RequestCtx:           ctrlutil.RequestCtx{Ctx: context.Background()},
+		RequestCtx: ctrlutil.RequestCtx{
+			Ctx: context.Background(),
+		},
 		Client:               cli,
 		Scheme:               scheme,
 		WorkerServiceAccount: "worker",
-		actionSet:            &dpv1alpha1.ActionSet{Spec: dpv1alpha1.ActionSetSpec{Env: []corev1.EnvVar{{Name: "ACTION_ENV", Value: "set"}}}},
+		actionSet: &dpv1alpha1.ActionSet{Spec: dpv1alpha1.ActionSetSpec{Env: []corev1.EnvVar{
+			{Name: "ACTION_ENV", Value: "set"},
+			{Name: dptypes.DPDBHost, Value: "action-set-host"},
+		}}},
 	}
+	deleter.Req.Namespace = backup.Namespace
 
-	job, err := deleter.doPreDeleteAction(backup, repo, &dpv1alpha1.BaseJobActionSpec{Image: "deleter:$(IMAGE_TAG)", Command: []string{"delete"}}, "", "/backup/path")
+	job, err := deleter.doPreDeleteAction(backup, backup.Status.Target, BuildDeleteBackupFilesJobKey(backup, true),
+		repo, &dpv1alpha1.BaseJobActionSpec{Image: "deleter:$(IMAGE_TAG)", Command: []string{"delete"}}, "/backup/path")
 	assert.NoError(t, err)
 	assert.Empty(t, job.Name)
 
@@ -80,10 +129,225 @@ func TestDeleterDoPreDeleteActionCreatesAndReusesJob(t *testing.T) {
 	}
 	assert.Equal(t, "/backup/path", envMap[dptypes.DPBackupBasePath])
 	assert.Equal(t, "set", envMap["ACTION_ENV"])
+	assert.Equal(t, "method-host", envMap[dptypes.DPDBHost])
+	assert.Equal(t, "3306", envMap[dptypes.DPDBPort])
+	var hostValues []string
+	for _, env := range got.Spec.Template.Spec.Containers[0].Env {
+		if env.Name == dptypes.DPDBHost {
+			hostValues = append(hostValues, env.Value)
+		}
+	}
+	assert.Equal(t, []string{"10.0.0.1", "action-set-host", "method-host"}, hostValues)
+	for _, envName := range []string{dptypes.DPDBUser, dptypes.DPDBPassword} {
+		index := generics.FindFirstFunc(got.Spec.Template.Spec.Containers[0].Env, func(env corev1.EnvVar) bool {
+			return env.Name == envName
+		})
+		assert.NotEqual(t, -1, index)
+		env := got.Spec.Template.Spec.Containers[0].Env[index]
+		assert.Equal(t, "connection", env.ValueFrom.SecretKeyRef.Name)
+	}
 
-	job, err = deleter.doPreDeleteAction(backup, repo, &dpv1alpha1.BaseJobActionSpec{Image: "deleter:$(IMAGE_TAG)", Command: []string{"delete"}}, "", "/backup/path")
+	job, err = deleter.doPreDeleteAction(backup, backup.Status.Target, BuildDeleteBackupFilesJobKey(backup, true),
+		repo, &dpv1alpha1.BaseJobActionSpec{Image: "deleter:$(IMAGE_TAG)", Command: []string{"delete"}}, "/backup/path")
 	assert.NoError(t, err)
 	assert.Equal(t, got.Name, job.Name)
+}
+
+func TestDeleterDoPreDeleteActionsCreatesJobForEachTarget(t *testing.T) {
+	scheme := runtime.NewScheme()
+	assert.NoError(t, corev1.AddToScheme(scheme))
+	assert.NoError(t, batchv1.AddToScheme(scheme))
+	assert.NoError(t, appsv1.AddToScheme(scheme))
+	assert.NoError(t, dpv1alpha1.AddToScheme(scheme))
+
+	cluster := &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{
+		Name: "cluster", Namespace: "ns", UID: types.UID("cluster-uid"),
+	}}
+	newTargetPod := func(name, target, ip string, port int32) *corev1.Pod {
+		return &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "ns", Labels: map[string]string{"target": target}},
+			Spec: corev1.PodSpec{Containers: []corev1.Container{{
+				Name: "database", Ports: []corev1.ContainerPort{{ContainerPort: port}},
+			}}},
+			Status: corev1.PodStatus{
+				Phase: corev1.PodRunning,
+				PodIP: ip,
+				Conditions: []corev1.PodCondition{{
+					Type: corev1.PodReady, Status: corev1.ConditionTrue,
+				}},
+			},
+		}
+	}
+	firstPod := newTargetPod("first-pod", "first", "10.0.0.1", 3306)
+	secondPod := newTargetPod("second-pod", "second", "10.0.0.2", 5432)
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, firstPod, secondPod).Build()
+	backup := &dpv1alpha1.Backup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "backup", Namespace: "ns", UID: types.UID("backup-uid"),
+			Labels: map[string]string{
+				constant.AppInstanceLabelKey: "cluster",
+				dptypes.ClusterUIDLabelKey:   "cluster-uid",
+			},
+		},
+		Status: dpv1alpha1.BackupStatus{Targets: []dpv1alpha1.BackupStatusTarget{
+			{BackupTarget: dpv1alpha1.BackupTarget{
+				Name: "first",
+				PodSelector: &dpv1alpha1.PodSelector{
+					LabelSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"target": "first"}},
+				},
+				ConnectionCredential: &dpv1alpha1.ConnectionCredential{
+					SecretName: "first-connection", UsernameKey: "username", PasswordKey: "password",
+				},
+			}},
+			{BackupTarget: dpv1alpha1.BackupTarget{
+				Name: "second",
+				PodSelector: &dpv1alpha1.PodSelector{
+					LabelSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"target": "second"}},
+				},
+				ConnectionCredential: &dpv1alpha1.ConnectionCredential{
+					SecretName: "second-connection", UsernameKey: "username", PasswordKey: "password",
+				},
+			}},
+		}},
+	}
+	deleter := &Deleter{
+		RequestCtx:           ctrlutil.RequestCtx{Ctx: context.Background()},
+		Client:               cli,
+		Scheme:               scheme,
+		WorkerServiceAccount: "worker",
+	}
+
+	jobs, err := deleter.doPreDeleteActions(backup, &dpv1alpha1.BackupRepo{},
+		&dpv1alpha1.BaseJobActionSpec{Image: "deleter", Command: []string{"delete"}}, "/backup/path")
+	assert.NoError(t, err)
+	assert.Len(t, jobs, 2)
+
+	for i, target := range backup.Status.Targets {
+		job := &batchv1.Job{}
+		key := buildTargetPreDeleteJobKey(backup, target.Name, i)
+		assert.NoError(t, cli.Get(context.Background(), key, job))
+		container := job.Spec.Template.Spec.Containers[0]
+		envMap := map[string]corev1.EnvVar{}
+		for _, env := range container.Env {
+			envMap[env.Name] = env
+		}
+		assert.Equal(t, filepath.Join("/backup/path", target.Name), envMap[dptypes.DPBackupBasePath].Value)
+		assert.Equal(t, target.ConnectionCredential.SecretName, envMap[dptypes.DPDBUser].ValueFrom.SecretKeyRef.Name)
+		assert.Equal(t, target.ConnectionCredential.SecretName, envMap[dptypes.DPDBPassword].ValueFrom.SecretKeyRef.Name)
+	}
+
+	jobs, err = deleter.doPreDeleteActions(backup, &dpv1alpha1.BackupRepo{},
+		&dpv1alpha1.BaseJobActionSpec{Image: "deleter", Command: []string{"delete"}}, "/backup/path")
+	assert.NoError(t, err)
+	assert.Equal(t, buildTargetPreDeleteJobKey(backup, "first", 0).Name, jobs[0].Name)
+	assert.Equal(t, buildTargetPreDeleteJobKey(backup, "second", 1).Name, jobs[1].Name)
+}
+
+func TestDeleterBuildConnectionEnv(t *testing.T) {
+	scheme := runtime.NewScheme()
+	assert.NoError(t, corev1.AddToScheme(scheme))
+	assert.NoError(t, appsv1.AddToScheme(scheme))
+	assert.NoError(t, dpv1alpha1.AddToScheme(scheme))
+
+	cluster := &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{
+		Name: "cluster", Namespace: "ns", UID: types.UID("cluster-uid"),
+	}}
+	availablePod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "pod-0", Namespace: "ns", Labels: map[string]string{"target": "first"}},
+		Spec: corev1.PodSpec{Containers: []corev1.Container{
+			{Name: "sidecar", Ports: []corev1.ContainerPort{{Name: "metrics", ContainerPort: 9090}}},
+			{Name: "database", Ports: []corev1.ContainerPort{{Name: "mysql", ContainerPort: 3306}}},
+		}},
+		Status: corev1.PodStatus{
+			Phase: corev1.PodRunning,
+			PodIP: "10.0.0.2",
+			Conditions: []corev1.PodCondition{{
+				Type: corev1.PodReady, Status: corev1.ConditionTrue,
+			}},
+		},
+	}
+	newBackup := func() *dpv1alpha1.Backup {
+		return &dpv1alpha1.Backup{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "backup", Namespace: "ns",
+				Labels: map[string]string{
+					constant.AppInstanceLabelKey: "cluster",
+					dptypes.ClusterUIDLabelKey:   "cluster-uid",
+				},
+			},
+			Status: dpv1alpha1.BackupStatus{Targets: []dpv1alpha1.BackupStatusTarget{
+				{
+					BackupTarget: dpv1alpha1.BackupTarget{
+						PodSelector: &dpv1alpha1.PodSelector{
+							LabelSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"target": "first"}},
+						},
+						ConnectionCredential: &dpv1alpha1.ConnectionCredential{
+							SecretName: "first-connection", UsernameKey: "username", PasswordKey: "password",
+						},
+						ContainerPort: &dpv1alpha1.ContainerPort{ContainerName: "database", PortName: "mysql"},
+					},
+					SelectedTargetPods: []string{"removed-pod"},
+				},
+				{
+					BackupTarget: dpv1alpha1.BackupTarget{
+						PodSelector: &dpv1alpha1.PodSelector{
+							LabelSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"target": "second"}},
+						},
+						ConnectionCredential: &dpv1alpha1.ConnectionCredential{SecretName: "second-connection"},
+					},
+				},
+			}},
+		}
+	}
+	buildDeleter := func(objects ...client.Object) *Deleter {
+		return &Deleter{
+			RequestCtx: ctrlutil.RequestCtx{Ctx: context.Background()},
+			Client:     fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).Build(),
+		}
+	}
+
+	t.Run("uses the first status target and reselects a current pod", func(t *testing.T) {
+		backup := newBackup()
+		deleter := buildDeleter(cluster.DeepCopy(), availablePod.DeepCopy())
+		env, err := deleter.buildEnvFromTarget(backup, &backup.Status.Targets[0])
+		assert.NoError(t, err)
+		envMap := map[string]corev1.EnvVar{}
+		for _, item := range env {
+			envMap[item.Name] = item
+		}
+		assert.Equal(t, "10.0.0.2", envMap[dptypes.DPDBHost].Value)
+		assert.Equal(t, "3306", envMap[dptypes.DPDBPort].Value)
+		assert.Equal(t, "first-connection", envMap[dptypes.DPDBUser].ValueFrom.SecretKeyRef.Name)
+		assert.Equal(t, "first-connection", envMap[dptypes.DPDBPassword].ValueFrom.SecretKeyRef.Name)
+	})
+
+	t.Run("skips connection env when the original cluster is absent", func(t *testing.T) {
+		backup := newBackup()
+		deleter := buildDeleter(availablePod.DeepCopy())
+		env, err := deleter.buildEnvFromTarget(backup, &backup.Status.Targets[0])
+		assert.NoError(t, err)
+		assert.Empty(t, env)
+	})
+
+	t.Run("skips connection env for a recreated cluster", func(t *testing.T) {
+		backup := newBackup()
+		recreated := cluster.DeepCopy()
+		recreated.UID = types.UID("new-cluster-uid")
+		deleter := buildDeleter(recreated, availablePod.DeepCopy())
+		env, err := deleter.buildEnvFromTarget(backup, &backup.Status.Targets[0])
+		assert.NoError(t, err)
+		assert.Empty(t, env)
+	})
+
+	t.Run("skips connection env when no current pod is available", func(t *testing.T) {
+		backup := newBackup()
+		unavailablePod := availablePod.DeepCopy()
+		unavailablePod.Status.Conditions = nil
+		deleter := buildDeleter(cluster.DeepCopy(), unavailablePod)
+		env, err := deleter.buildEnvFromTarget(backup, &backup.Status.Targets[0])
+		assert.NoError(t, err)
+		assert.Empty(t, env)
+	})
 }
 
 var _ = Describe("Backup Deleter Test", func() {
@@ -109,10 +373,12 @@ var _ = Describe("Backup Deleter Test", func() {
 	cleanEnv := func() {
 		By("clean resources")
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
+		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupSignature, true, inNS)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.JobSignature, true, inNS)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS)
 		testapps.ClearResources(&testCtx, generics.VolumeSnapshotSignature, inNS)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupRepoSignature, true, ml)
 	}
 
 	BeforeEach(func() {
@@ -136,23 +402,33 @@ var _ = Describe("Backup Deleter Test", func() {
 			deleter = buildDeleter()
 		})
 
-		It("should success when backup status PVC is empty", func() {
-			Expect(backup.Status.PersistentVolumeClaimName).Should(Equal(""))
+		createBackupRepo := func() {
+			repo := testdp.NewBackupRepoFactory("", testdp.BackupRepoName).
+				SetStorageProviderRef(testdp.StorageProviderName).
+				Create(&testCtx).GetObject()
+			Expect(testapps.ChangeObjStatus(&testCtx, repo, func() {
+				repo.Status.BackupPVCName = backupRepoPVCName
+			})).Should(Succeed())
+			backup.Status.BackupRepoName = repo.Name
+		}
+
+		It("should success when backup repository name is empty", func() {
+			Expect(backup.Status.BackupRepoName).Should(Equal(""))
 			status, err := deleter.DeleteBackupFiles(backup)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(status).Should(Equal(DeletionStatusSucceeded))
 		})
 
 		It("should success when backup status path is empty", func() {
-			backup.Status.PersistentVolumeClaimName = backupRepoPVCName
+			createBackupRepo()
 			Expect(backup.Status.Path).Should(Equal(""))
 			status, err := deleter.DeleteBackupFiles(backup)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(status).Should(Equal(DeletionStatusSucceeded))
 		})
 
-		It("should success when PVC does not exist", func() {
-			backup.Status.PersistentVolumeClaimName = backupRepoPVCName
+		It("should success when backup repository does not exist", func() {
+			backup.Status.BackupRepoName = "missing-repo"
 			backup.Status.Path = backupPath
 			status, err := deleter.DeleteBackupFiles(backup)
 			Expect(err).ShouldNot(HaveOccurred())
@@ -177,8 +453,7 @@ var _ = Describe("Backup Deleter Test", func() {
 
 			By("creating worker service account when a deletion job is needed")
 			backup.Status.BackupMethod = nil
-			backupRepoPVC := testdp.NewFakePVC(&testCtx, backupRepoPVCName)
-			backup.Status.PersistentVolumeClaimName = backupRepoPVC.Name
+			createBackupRepo()
 			backup.Status.Path = backupPath
 			status, err = deleter.DeleteBackupFiles(backup)
 			Expect(err).ShouldNot(HaveOccurred())
@@ -192,11 +467,10 @@ var _ = Describe("Backup Deleter Test", func() {
 		})
 
 		It("should create job to delete backup file", func() {
-			By("mock backup repo PVC")
-			backupRepoPVC := testdp.NewFakePVC(&testCtx, backupRepoPVCName)
+			By("mock backup repository")
+			createBackupRepo()
 
 			By("delete backup file")
-			backup.Status.PersistentVolumeClaimName = backupRepoPVC.Name
 			backup.Status.Path = backupPath
 			status, err := deleter.DeleteBackupFiles(backup)
 			Expect(err).ShouldNot(HaveOccurred())

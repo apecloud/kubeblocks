@@ -96,7 +96,7 @@ func (p *realUpdatePlan) planWalkFunc(vertex graph.Vertex) error {
 			memberUpdateStrategy := getMemberUpdateStrategy(&p.its)
 			serialUpdate := memberUpdateStrategy == workloads.SerialUpdateStrategy
 			hasRoleProbed := func() bool {
-				for _, status := range p.its.Status.InstanceStatus {
+				for _, status := range p.its.ActivePresentInstanceStatuses() {
 					if len(status.Role) > 0 {
 						return true
 					}
@@ -144,11 +144,12 @@ func (p *realUpdatePlan) buildBestEffortParallelUpdatePlan(rolePriorityMap map[s
 	quorumPriority := math.MaxInt32
 	leaderPriority := 0
 	for _, role := range p.its.Spec.Roles {
-		if rolePriorityMap[role.Name] > leaderPriority {
-			leaderPriority = rolePriorityMap[role.Name]
+		rolePriority := getRolePriority(rolePriorityMap, role.Name)
+		if rolePriority > leaderPriority {
+			leaderPriority = rolePriority
 		}
-		if role.ParticipatesInQuorum && quorumPriority > rolePriorityMap[role.Name] {
-			quorumPriority = rolePriorityMap[role.Name]
+		if role.ParticipatesInQuorum && quorumPriority > rolePriority {
+			quorumPriority = rolePriority
 		}
 	}
 
@@ -157,7 +158,7 @@ func (p *realUpdatePlan) buildBestEffortParallelUpdatePlan(rolePriorityMap map[s
 	instanceList := p.instances
 	for i, inst := range instanceList {
 		roleName := getInstanceRoleName(&inst)
-		if rolePriorityMap[roleName] < quorumPriority {
+		if getRolePriority(rolePriorityMap, roleName) < quorumPriority {
 			vertex := &model.ObjectVertex{Obj: &instanceList[i]}
 			p.dag.AddConnect(preVertex, vertex)
 			currentVertex = vertex
@@ -171,7 +172,7 @@ func (p *realUpdatePlan) buildBestEffortParallelUpdatePlan(rolePriorityMap map[s
 	followerCount := 0
 	for _, inst := range instanceList {
 		roleName := getInstanceRoleName(&inst)
-		if rolePriorityMap[roleName] < leaderPriority {
+		if getRolePriority(rolePriorityMap, roleName) < leaderPriority {
 			followerCount++
 		}
 	}

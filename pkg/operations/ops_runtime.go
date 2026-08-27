@@ -190,15 +190,15 @@ func (r *opsRuntime) GenerateTemplateInstanceNames(clusterName, compName, templa
 	return instanceset.GenerateInstanceNamesFromTemplate(workloadName, templateName, replicas, offlineInstances, ordinalList)
 }
 
-func (r *opsRuntime) Switchover(ctx context.Context, actionCtx SwitchoverActionContext, instanceName, candidateName string) error {
-	return r.doSwitchover(ctx, r.cli, actionCtx, instanceName, candidateName)
+func (r *opsRuntime) Switchover(ctx context.Context, synthesizedComp *component.SynthesizedComponent, instanceName, candidateName string) error {
+	return r.doSwitchover(ctx, r.cli, synthesizedComp, instanceName, candidateName)
 }
 
 // We consider a switchover action succeeds if the action returns without error.
 // We don't need to know if a switchover is actually executed.
-func (r *opsRuntime) doSwitchover(ctx context.Context, cli client.Reader, actionCtx SwitchoverActionContext,
+func (r *opsRuntime) doSwitchover(ctx context.Context, cli client.Reader, synthesizedComp *component.SynthesizedComponent,
 	instanceName, candidateName string) error {
-	pods, err := component.ListOwnedPods(r.dataContext(), cli, actionCtx.Namespace, actionCtx.ClusterName, actionCtx.ComponentName, r.dataListOpts...)
+	pods, err := component.ListOwnedPods(r.dataContext(), cli, synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name, r.dataListOpts...)
 	if err != nil {
 		return err
 	}
@@ -214,7 +214,7 @@ func (r *opsRuntime) doSwitchover(ctx context.Context, cli client.Reader, action
 		return intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" not found`, instanceName))
 	}
 	if candidateName != "" {
-		candidate, err := r.GetInstance(actionCtx.Namespace, actionCtx.ClusterName, actionCtx.ComponentName, candidateName)
+		candidate, err := r.GetInstance(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name, candidateName)
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				return intctrlutil.NewFatalError(fmt.Sprintf(`candidate instance "%s" not found`, candidateName))
@@ -226,8 +226,8 @@ func (r *opsRuntime) doSwitchover(ctx context.Context, cli client.Reader, action
 		}
 	}
 
-	lfa, err := lifecycle.New(actionCtx.Namespace, actionCtx.ClusterName, actionCtx.ComponentName,
-		actionCtx.LifecycleActions, actionCtx.TemplateVars, pod, pods)
+	lfa, err := lifecycle.New(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name,
+		synthesizedComp.LifecycleActions.ComponentLifecycleActions, synthesizedComp.TemplateVars, pod, pods)
 	if err != nil {
 		return err
 	}

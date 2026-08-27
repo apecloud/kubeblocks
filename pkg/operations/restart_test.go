@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"testing"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -33,6 +35,30 @@ import (
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testops "github.com/apecloud/kubeblocks/pkg/testutil/operations"
 )
+
+func TestRestartTargetsExist(t *testing.T) {
+	cluster := &appsv1.Cluster{Spec: appsv1.ClusterSpec{
+		ComponentSpecs: []appsv1.ClusterComponentSpec{{Name: "mysql"}},
+		Shardings:      []appsv1.ClusterSharding{{Name: "shard"}},
+	}}
+	newOpsResource := func(targets ...string) *OpsResource {
+		restartList := make([]opsv1alpha1.ComponentOps, len(targets))
+		for i := range targets {
+			restartList[i].ComponentName = targets[i]
+		}
+		return &OpsResource{Cluster: cluster, OpsRequest: &opsv1alpha1.OpsRequest{
+			Spec: opsv1alpha1.OpsRequestSpec{SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{RestartList: restartList}},
+		}}
+	}
+
+	handler := restartOpsHandler{}
+	if !handler.targetsExist(newOpsResource("mysql", "shard")) {
+		t.Fatal("existing targets were rejected")
+	}
+	if handler.targetsExist(newOpsResource("missing")) {
+		t.Fatal("missing target was accepted")
+	}
+}
 
 var _ = Describe("Restart OpsRequest", func() {
 

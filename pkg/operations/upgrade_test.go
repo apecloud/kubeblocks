@@ -37,7 +37,7 @@ import (
 	testops "github.com/apecloud/kubeblocks/pkg/testutil/operations"
 )
 
-func TestUpgradeComponentVersionFieldsUnchanged(t *testing.T) {
+func TestUpgradeTargetsUnchanged(t *testing.T) {
 	explicitCompDef := "mysql-8.0"
 	explicitServiceVersion := "8.0.36"
 	latest := ""
@@ -62,27 +62,27 @@ func TestUpgradeComponentVersionFieldsUnchanged(t *testing.T) {
 		}}}
 	}
 
-	if !handler.componentVersionFieldsUnchanged(newOpsResource("mysql", &explicitCompDef, &explicitServiceVersion)) {
+	if !handler.targetsUnchanged(newOpsResource("mysql", &explicitCompDef, &explicitServiceVersion)) {
 		t.Fatal("explicit component target did not match")
 	}
-	if !handler.componentVersionFieldsUnchanged(newOpsResource("shard", &explicitCompDef, &explicitServiceVersion)) {
+	if !handler.targetsUnchanged(newOpsResource("shard", &explicitCompDef, &explicitServiceVersion)) {
 		t.Fatal("explicit sharding target did not match")
 	}
 	cluster.Spec.Services = []appsv1.ClusterService{{Service: appsv1.Service{Name: "unrelated"}}}
-	if !handler.componentVersionFieldsUnchanged(newOpsResource("mysql", &explicitCompDef, &explicitServiceVersion)) {
+	if !handler.targetsUnchanged(newOpsResource("mysql", &explicitCompDef, &explicitServiceVersion)) {
 		t.Fatal("unrelated Cluster change replaced the upgrade target")
 	}
 	cluster.Spec.ComponentSpecs[0].ServiceVersion = "8.4.0"
-	if handler.componentVersionFieldsUnchanged(newOpsResource("mysql", &explicitCompDef, &explicitServiceVersion)) {
+	if handler.targetsUnchanged(newOpsResource("mysql", &explicitCompDef, &explicitServiceVersion)) {
 		t.Fatal("replaced serviceVersion was accepted")
 	}
 	cluster.Spec.ComponentSpecs[0].ServiceVersion = explicitServiceVersion
 	cluster.Spec.ComponentSpecs[0].ComponentDef = "mysql-8.4"
-	if handler.componentVersionFieldsUnchanged(newOpsResource("mysql", &explicitCompDef, &explicitServiceVersion)) {
+	if handler.targetsUnchanged(newOpsResource("mysql", &explicitCompDef, &explicitServiceVersion)) {
 		t.Fatal("replaced componentDef was accepted")
 	}
 	cluster.Spec.ComponentSpecs[0].ServiceVersion = "resolved-latest"
-	if !handler.componentVersionFieldsUnchanged(newOpsResource("mysql", &latest, &latest)) {
+	if !handler.targetsUnchanged(newOpsResource("mysql", &latest, &latest)) {
 		t.Fatal("non-exact latest target rejected the owner-resolved values")
 	}
 

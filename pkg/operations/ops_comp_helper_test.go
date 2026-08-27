@@ -31,7 +31,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 )
 
-func TestRollingTargetsState(t *testing.T) {
+func TestRollingActionState(t *testing.T) {
 	cluster := &appsv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{Generation: 8},
 		Spec: appsv1.ClusterSpec{
@@ -54,7 +54,13 @@ func TestRollingTargetsState(t *testing.T) {
 	opsRes := &OpsResource{Cluster: cluster, OpsRequest: ops}
 	helper := newComponentOpsHelper([]opsv1alpha1.ComponentOps{{ComponentName: "mysql"}, {ComponentName: "shard"}})
 
-	completed, failed := helper.rollingTargetsState(opsRes, appsv1.RunningComponentPhase)
+	ops.Status.ClusterGeneration = 9
+	completed, failed := helper.rollingActionState(opsRes, appsv1.RunningComponentPhase)
+	if completed || failed {
+		t.Fatalf("generation before action completed=%v failed=%v, want processing", completed, failed)
+	}
+	ops.Status.ClusterGeneration = 8
+	completed, failed = helper.rollingActionState(opsRes, appsv1.RunningComponentPhase)
 	if completed || failed {
 		t.Fatalf("stale status completed=%v failed=%v, want processing", completed, failed)
 	}
@@ -64,57 +70,31 @@ func TestRollingTargetsState(t *testing.T) {
 	status.UpToDate = false
 	status.Phase = appsv1.FailedComponentPhase
 	cluster.Status.Components["mysql"] = status
-	completed, failed = helper.rollingTargetsState(opsRes, appsv1.RunningComponentPhase)
+	completed, failed = helper.rollingActionState(opsRes, appsv1.RunningComponentPhase)
 	if completed || failed {
 		t.Fatalf("non-current failure completed=%v failed=%v, want processing", completed, failed)
 	}
 
 	status.UpToDate = true
 	cluster.Status.Components["mysql"] = status
-	completed, failed = helper.rollingTargetsState(opsRes, appsv1.RunningComponentPhase)
+	completed, failed = helper.rollingActionState(opsRes, appsv1.RunningComponentPhase)
 	if completed || !failed {
 		t.Fatalf("current failure completed=%v failed=%v, want failed", completed, failed)
 	}
 
 	status.Phase = appsv1.RunningComponentPhase
 	cluster.Status.Components["mysql"] = status
-	completed, failed = helper.rollingTargetsState(opsRes, appsv1.RunningComponentPhase)
+	completed, failed = helper.rollingActionState(opsRes, appsv1.RunningComponentPhase)
 	if !completed || failed {
 		t.Fatalf("current running status completed=%v failed=%v, want success", completed, failed)
 	}
-	completed, failed = helper.rollingTargetsState(opsRes, appsv1.StoppedComponentPhase)
+	completed, failed = helper.rollingActionState(opsRes, appsv1.StoppedComponentPhase)
 	if completed || failed {
 		t.Fatalf("running status completed=%v failed=%v, want stop processing", completed, failed)
 	}
 }
 
-func TestComponentStopFieldsUnchanged(t *testing.T) {
-	cluster := &appsv1.Cluster{Spec: appsv1.ClusterSpec{
-		ComponentSpecs: []appsv1.ClusterComponentSpec{
-			{Name: "mysql", Stop: pointer.Bool(true)},
-			{Name: "proxy"},
-		},
-		Shardings: []appsv1.ClusterSharding{{Name: "shard", Template: appsv1.ClusterComponentSpec{Stop: pointer.Bool(true)}}},
-	}}
-	if !newComponentOpsHelper([]opsv1alpha1.ComponentOps{{ComponentName: "mysql"}}).
-		componentStopFieldsUnchanged(cluster, true) {
-		t.Fatal("matching stop target was rejected")
-	}
-	if newComponentOpsHelper([]opsv1alpha1.ComponentOps{{ComponentName: "proxy"}}).
-		componentStopFieldsUnchanged(cluster, true) {
-		t.Fatal("overwritten stop target was accepted")
-	}
-	if !newComponentOpsHelper([]opsv1alpha1.ComponentOps{{ComponentName: "proxy"}}).
-		componentStopFieldsUnchanged(cluster, false) {
-		t.Fatal("matching start target was rejected")
-	}
-	if newComponentOpsHelper([]opsv1alpha1.ComponentOps{{ComponentName: "missing"}}).
-		componentStopFieldsUnchanged(cluster, false) {
-		t.Fatal("missing target was accepted")
-	}
-}
-
-func TestInstanceStatusProgress(t *testing.T) {
+func TestRunningInstanceProgress(t *testing.T) {
 	const instanceName = "cluster-mysql-0"
 	opsRes := &OpsResource{
 		Cluster:    &appsv1.Cluster{},
@@ -127,39 +107,30 @@ func TestInstanceStatusProgress(t *testing.T) {
 		clusterComponent:  &appsv1.ClusterComponentSpec{Name: "mysql", Replicas: 1},
 	}
 	compStatus := &opsv1alpha1.OpsRequestComponentStatus{}
-	workload := rollingWorkload{
-		exists:          true,
-		desiredReplicas: 1,
-		instances: []workloads.InstanceStatus{{
-			PodName:         instanceName,
-			DesiredState:    workloads.InstanceDesiredStateActive,
-			CurrentState:    workloads.InstanceCurrentStatePresent,
-			UpToDate:        true,
-			Ready:           true,
-			Available:       false,
-			CurrentRevision: "revision-1",
-			UpdateRevision:  "revision-1",
-		}},
+	its := &workloads.InstanceSet{
+		Spec: workloads.InstanceSetSpec{Replicas: pointer.Int32(1)},
+		Status: workloads.InstanceSetStatus{InstanceStatus: []workloads.InstanceStatus{{
+			PodName:      instanceName,
+			DesiredState: workloads.InstanceDesiredStateActive,
+			CurrentState: workloads.InstanceCurrentStatePresent,
+			UpToDate:     false,
+			Ready:        true,
+			Available:    true,
+		}}},
 	}
 
-	expected, completed := handleActiveInstanceStatusProgress(opsRes, pgRes, compStatus, workload)
+	expected, completed := handleRunningInstanceProgress(opsRes, pgRes, compStatus, its)
 	if expected != 1 || completed != 0 {
-		t.Fatalf("progress=%d/%d, want 0/1 until Available", completed, expected)
+		t.Fatalf("progress=%d/%d, want 0/1 until UpToDate", completed, expected)
 	}
-	workload.instances[0].Available = true
-	expected, completed = handleActiveInstanceStatusProgress(opsRes, pgRes, compStatus, workload)
+	its.Status.InstanceStatus[0].UpToDate = true
+	expected, completed = handleRunningInstanceProgress(opsRes, pgRes, compStatus, its)
 	if expected != 1 || completed != 1 {
 		t.Fatalf("progress=%d/%d, want 1/1", completed, expected)
 	}
-	workload.instances[0].Failed = true
-	expected, completed = handleActiveInstanceStatusProgress(opsRes, pgRes, compStatus, workload)
+	its.Status.InstanceStatus[0].Failed = true
+	expected, completed = handleRunningInstanceProgress(opsRes, pgRes, compStatus, its)
 	if expected != 1 || completed != 1 || compStatus.ProgressDetails[0].Status != opsv1alpha1.FailedProgressStatus {
 		t.Fatalf("failed progress=%d/%d details=%v", completed, expected, compStatus.ProgressDetails)
-	}
-
-	workload.instances[0].CurrentState = workloads.InstanceCurrentStateAbsent
-	expected, completed = handleStoppedInstanceStatusProgress(opsRes, pgRes, compStatus, workload)
-	if expected != 1 || completed != 1 {
-		t.Fatalf("stop progress=%d/%d, want 1/1", completed, expected)
 	}
 }

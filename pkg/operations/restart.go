@@ -84,17 +84,30 @@ func (r restartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 // the Reconcile function for restart opsRequest.
 func (r restartOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (opsv1alpha1.OpsPhase, time.Duration, error) {
 	r.compOpsHelper = newComponentOpsHelper(opsRes.OpsRequest.Spec.RestartList)
-	if !r.compOpsHelper.componentTargetsExist(opsRes.Cluster) {
+	if !r.targetsExist(opsRes) {
 		return opsv1alpha1.OpsAbortedPhase, 0, nil
 	}
-	return r.compOpsHelper.reconcileRollingActionWithComponentOps(reqCtx, cli, opsRes,
-		"restart", handleRollingProgress, appsv1.RunningComponentPhase)
+	return r.compOpsHelper.reconcileRollingAction(reqCtx, cli, opsRes,
+		"restart", handleRunningProgress, appsv1.RunningComponentPhase)
 }
 
 // SaveLastConfiguration this operation only restart the pods of the component, no changes for Cluster.spec.
 // empty implementation here.
 func (r restartOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	return nil
+}
+
+func (r restartOpsHandler) targetsExist(opsRes *OpsResource) bool {
+	if opsRes == nil || opsRes.Cluster == nil || opsRes.OpsRequest == nil {
+		return false
+	}
+	for i := range opsRes.OpsRequest.Spec.RestartList {
+		componentName := opsRes.OpsRequest.Spec.RestartList[i].ComponentName
+		if getComponentSpecOrShardingTemplate(opsRes.Cluster, componentName) == nil {
+			return false
+		}
+	}
+	return true
 }
 
 func (r restartOpsHandler) doRestart(opsRes *OpsResource, compSpec *appsv1.ClusterComponentSpec, componentName string) {

@@ -20,19 +20,87 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"testing"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 	testops "github.com/apecloud/kubeblocks/pkg/testutil/operations"
 )
+
+func TestStopTargetsStopped(t *testing.T) {
+	stopped := true
+	cluster := &appsv1.Cluster{Spec: appsv1.ClusterSpec{
+		ComponentSpecs: []appsv1.ClusterComponentSpec{{Name: "mysql", Stop: &stopped}, {Name: "proxy"}},
+		Shardings:      []appsv1.ClusterSharding{{Name: "shard", Template: appsv1.ClusterComponentSpec{Stop: &stopped}}},
+	}}
+	newOpsResource := func(targets ...string) *OpsResource {
+		stopList := make([]opsv1alpha1.ComponentOps, len(targets))
+		for i := range targets {
+			stopList[i].ComponentName = targets[i]
+		}
+		return &OpsResource{Cluster: cluster, OpsRequest: &opsv1alpha1.OpsRequest{
+			Spec: opsv1alpha1.OpsRequestSpec{SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{StopList: stopList}},
+		}}
+	}
+
+	handler := StopOpsHandler{}
+	if !handler.targetsStopped(newOpsResource("mysql", "shard")) {
+		t.Fatal("stopped targets were rejected")
+	}
+	if handler.targetsStopped(newOpsResource("proxy")) {
+		t.Fatal("running target was accepted")
+	}
+	if handler.targetsStopped(newOpsResource("missing")) {
+		t.Fatal("missing target was accepted")
+	}
+	if handler.targetsStopped(newOpsResource()) {
+		t.Fatal("stop-all accepted while a component remained running")
+	}
+}
+
+func TestStoppedInstanceProgress(t *testing.T) {
+	const instanceName = "cluster-mysql-0"
+	replicas := int32(1)
+	opsRes := &OpsResource{
+		Cluster:    &appsv1.Cluster{},
+		OpsRequest: &opsv1alpha1.OpsRequest{},
+		Recorder:   record.NewFakeRecorder(10),
+	}
+	pgRes := &progressResource{
+		opsMessageKey:     "stop",
+		fullComponentName: "mysql",
+		clusterComponent:  &appsv1.ClusterComponentSpec{Name: "mysql", Replicas: replicas},
+	}
+	compStatus := &opsv1alpha1.OpsRequestComponentStatus{}
+	its := &workloads.InstanceSet{
+		Spec: workloads.InstanceSetSpec{Replicas: &replicas},
+		Status: workloads.InstanceSetStatus{InstanceStatus: []workloads.InstanceStatus{{
+			PodName:      instanceName,
+			CurrentState: workloads.InstanceCurrentStatePresent,
+		}}},
+	}
+
+	expected, completed := handleStoppedInstanceProgress(opsRes, pgRes, compStatus, its)
+	if expected != 1 || completed != 0 {
+		t.Fatalf("progress=%d/%d, want 0/1 while the instance is present", completed, expected)
+	}
+	its.Status.InstanceStatus[0].CurrentState = workloads.InstanceCurrentStateAbsent
+	expected, completed = handleStoppedInstanceProgress(opsRes, pgRes, compStatus, its)
+	if expected != 1 || completed != 1 {
+		t.Fatalf("progress=%d/%d, want 1/1", completed, expected)
+	}
+}
 
 var _ = Describe("Stop OpsRequest", func() {
 	var (

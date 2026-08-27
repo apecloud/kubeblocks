@@ -90,15 +90,44 @@ func (start StartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Cl
 // ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
 // the Reconcile function for start opsRequest.
 func (start StartOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (opsv1alpha1.OpsPhase, time.Duration, error) {
-	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.StartList)
-	if !compOpsHelper.componentStopFieldsUnchanged(opsRes.Cluster, false) {
+	if !start.targetsStarted(opsRes) {
 		return opsv1alpha1.OpsAbortedPhase, 0, nil
 	}
-	return compOpsHelper.reconcileRollingActionWithComponentOps(reqCtx, cli, opsRes,
-		"start", handleRollingProgress, appsv1.RunningComponentPhase)
+	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.StartList)
+	return compOpsHelper.reconcileRollingAction(reqCtx, cli, opsRes,
+		"start", handleRunningProgress, appsv1.RunningComponentPhase)
 }
 
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration
 func (start StartOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	return nil
+}
+
+func (start StartOpsHandler) targetsStarted(opsRes *OpsResource) bool {
+	if opsRes == nil || opsRes.Cluster == nil || opsRes.OpsRequest == nil {
+		return false
+	}
+	startList := opsRes.OpsRequest.Spec.StartList
+	if len(startList) > 0 {
+		for i := range startList {
+			compSpec := getComponentSpecOrShardingTemplate(opsRes.Cluster, startList[i].ComponentName)
+			if compSpec == nil || compSpec.Stop != nil && *compSpec.Stop {
+				return false
+			}
+		}
+		return true
+	}
+	for i := range opsRes.Cluster.Spec.ComponentSpecs {
+		stop := opsRes.Cluster.Spec.ComponentSpecs[i].Stop
+		if stop != nil && *stop {
+			return false
+		}
+	}
+	for i := range opsRes.Cluster.Spec.Shardings {
+		stop := opsRes.Cluster.Spec.Shardings[i].Template.Stop
+		if stop != nil && *stop {
+			return false
+		}
+	}
+	return true
 }

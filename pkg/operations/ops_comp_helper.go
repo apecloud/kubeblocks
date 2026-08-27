@@ -313,10 +313,8 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 	return opsv1alpha1.OpsSucceedPhase, 0, nil
 }
 
-func (c componentOpsHelper) buildRollingProgressResources(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	opsRes *OpsResource,
-	opsMessageKey string) ([]progressResource, error) {
+func (c componentOpsHelper) buildRollingResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
+	opsRes *OpsResource, opsMessageKey string) ([]progressResource, error) {
 	var progressResources []progressResource
 	setProgressResource := func(compSpec *appsv1.ClusterComponentSpec, compOps ComponentOpsInterface, fullComponentName string, shards *int32) {
 		progressResources = append(progressResources, progressResource{
@@ -352,11 +350,8 @@ func (c componentOpsHelper) buildRollingProgressResources(reqCtx intctrlutil.Req
 	return progressResources, nil
 }
 
-func (c componentOpsHelper) reconcileRollingActionWithComponentOps(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	opsRes *OpsResource,
-	opsMessageKey string,
-	handleStatusProgress handleStatusProgressWithComponent,
+func (c componentOpsHelper) reconcileRollingAction(reqCtx intctrlutil.RequestCtx, cli client.Client,
+	opsRes *OpsResource, opsMessageKey string, handleStatusProgress handleStatusProgressWithComponent,
 	terminalPhase appsv1.ComponentPhase) (opsv1alpha1.OpsPhase, time.Duration, error) {
 	if opsRes == nil {
 		return "", 0, nil
@@ -367,7 +362,7 @@ func (c componentOpsHelper) reconcileRollingActionWithComponentOps(reqCtx intctr
 	if opsRequest.Status.Components == nil {
 		opsRequest.Status.Components = map[string]opsv1alpha1.OpsRequestComponentStatus{}
 	}
-	progressResources, err := c.buildRollingProgressResources(reqCtx, cli, opsRes, opsMessageKey)
+	progressResources, err := c.buildRollingResources(reqCtx, cli, opsRes, opsMessageKey)
 	if err != nil {
 		return opsv1alpha1.OpsRunningPhase, 0, err
 	}
@@ -384,7 +379,7 @@ func (c componentOpsHelper) reconcileRollingActionWithComponentOps(reqCtx intctr
 		completedCount += completed
 		opsRequest.Status.Components[componentName] = compStatus
 	}
-	completed, failed := c.rollingTargetsState(opsRes, terminalPhase)
+	completed, failed := c.rollingActionState(opsRes, terminalPhase)
 	if completed {
 		completedCount = expectedCount
 	}
@@ -403,7 +398,7 @@ func (c componentOpsHelper) reconcileRollingActionWithComponentOps(reqCtx intctr
 	return opsv1alpha1.OpsSucceedPhase, 0, nil
 }
 
-func (c componentOpsHelper) rollingTargetsState(opsRes *OpsResource, terminalPhase appsv1.ComponentPhase) (bool, bool) {
+func (c componentOpsHelper) rollingActionState(opsRes *OpsResource, terminalPhase appsv1.ComponentPhase) (bool, bool) {
 	if opsRes.Cluster.Generation < opsRes.OpsRequest.Status.ClusterGeneration {
 		return false, false
 	}
@@ -446,47 +441,6 @@ func (c componentOpsHelper) rollingTargetsState(opsRes *OpsResource, terminalPha
 		completed = false
 	}
 	return completed, failed
-}
-
-func (c componentOpsHelper) componentStopFieldsUnchanged(cluster *appsv1.Cluster, stopped bool) bool {
-	matched := 0
-	checkComponent := func(componentName string, compSpec *appsv1.ClusterComponentSpec) bool {
-		if _, ok := c.getComponentOps(componentName); !ok {
-			return true
-		}
-		matched++
-		actualStopped := compSpec.Stop != nil && *compSpec.Stop
-		return actualStopped == stopped
-	}
-	for i := range cluster.Spec.ComponentSpecs {
-		if !checkComponent(cluster.Spec.ComponentSpecs[i].Name, &cluster.Spec.ComponentSpecs[i]) {
-			return false
-		}
-	}
-	for i := range cluster.Spec.Shardings {
-		if !checkComponent(cluster.Spec.Shardings[i].Name, &cluster.Spec.Shardings[i].Template) {
-			return false
-		}
-	}
-	return len(c.componentOpsSet) == 0 || matched == len(c.componentOpsSet)
-}
-
-func (c componentOpsHelper) componentTargetsExist(cluster *appsv1.Cluster) bool {
-	if len(c.componentOpsSet) == 0 {
-		return true
-	}
-	matched := 0
-	for i := range cluster.Spec.ComponentSpecs {
-		if _, ok := c.componentOpsSet[cluster.Spec.ComponentSpecs[i].Name]; ok {
-			matched++
-		}
-	}
-	for i := range cluster.Spec.Shardings {
-		if _, ok := c.componentOpsSet[cluster.Spec.Shardings[i].Name]; ok {
-			matched++
-		}
-	}
-	return matched == len(c.componentOpsSet)
 }
 
 func noAnyProgressCompleted(replicas, completedCount int32) bool {

@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"testing"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"k8s.io/utils/pointer"
@@ -34,6 +36,37 @@ import (
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testops "github.com/apecloud/kubeblocks/pkg/testutil/operations"
 )
+
+func TestStartTargetsStarted(t *testing.T) {
+	stopped := true
+	cluster := &appsv1.Cluster{Spec: appsv1.ClusterSpec{
+		ComponentSpecs: []appsv1.ClusterComponentSpec{{Name: "mysql"}, {Name: "proxy", Stop: &stopped}},
+		Shardings:      []appsv1.ClusterSharding{{Name: "shard"}},
+	}}
+	newOpsResource := func(targets ...string) *OpsResource {
+		startList := make([]opsv1alpha1.ComponentOps, len(targets))
+		for i := range targets {
+			startList[i].ComponentName = targets[i]
+		}
+		return &OpsResource{Cluster: cluster, OpsRequest: &opsv1alpha1.OpsRequest{
+			Spec: opsv1alpha1.OpsRequestSpec{SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{StartList: startList}},
+		}}
+	}
+
+	handler := StartOpsHandler{}
+	if !handler.targetsStarted(newOpsResource("mysql")) {
+		t.Fatal("started target was rejected")
+	}
+	if handler.targetsStarted(newOpsResource("proxy")) {
+		t.Fatal("stopped target was accepted")
+	}
+	if handler.targetsStarted(newOpsResource("missing")) {
+		t.Fatal("missing target was accepted")
+	}
+	if handler.targetsStarted(newOpsResource()) {
+		t.Fatal("start-all accepted while a component remained stopped")
+	}
+}
 
 var _ = Describe("Start OpsRequest", func() {
 	var (

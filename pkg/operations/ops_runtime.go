@@ -149,17 +149,11 @@ func (r *opsRuntime) GetWorkload(namespace, clusterName, compName string) (Workl
 	return workload, nil
 }
 
-type rollingWorkloadReader interface {
-	GetRollingWorkload(namespace, clusterName, compName string) (rollingWorkload, error)
+type instanceSetReader interface {
+	GetInstanceSet(namespace, clusterName, compName string) (*workloads.InstanceSet, error)
 }
 
-type rollingWorkload struct {
-	exists          bool
-	desiredReplicas int32
-	instances       []workloads.InstanceStatus
-}
-
-func (r *opsRuntime) GetRollingWorkload(namespace, clusterName, compName string) (rollingWorkload, error) {
+func (r *opsRuntime) GetInstanceSet(namespace, clusterName, compName string) (*workloads.InstanceSet, error) {
 	its := &workloads.InstanceSet{}
 	key := client.ObjectKey{
 		Namespace: namespace,
@@ -167,18 +161,11 @@ func (r *opsRuntime) GetRollingWorkload(namespace, clusterName, compName string)
 	}
 	if err := r.cli.Get(r.dataContext(), key, its, r.dataGetOpts...); err != nil {
 		if apierrors.IsNotFound(err) {
-			return rollingWorkload{}, nil
+			return nil, nil
 		}
-		return rollingWorkload{}, err
+		return nil, err
 	}
-	workload := rollingWorkload{
-		exists:    true,
-		instances: append([]workloads.InstanceStatus(nil), its.Status.InstanceStatus...),
-	}
-	if its.Spec.Replicas != nil {
-		workload.desiredReplicas = *its.Spec.Replicas
-	}
-	return workload, nil
+	return its, nil
 }
 
 func (r *opsRuntime) GetInstance(namespace, clusterName, compName, instanceName string) (Instance, error) {

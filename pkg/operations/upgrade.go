@@ -87,16 +87,16 @@ func (u upgradeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 // ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
 // the Reconcile function for upgrade opsRequest.
 func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (opsv1alpha1.OpsPhase, time.Duration, error) {
-	if !u.componentVersionFieldsUnchanged(opsRes) {
+	if !u.targetsUnchanged(opsRes) {
 		return opsv1alpha1.OpsAbortedPhase, 0, nil
 	}
 	upgradeSpec := opsRes.OpsRequest.Spec.Upgrade
 	compOpsHelper := newComponentOpsHelper(upgradeSpec.Components)
-	return compOpsHelper.reconcileRollingActionWithComponentOps(
-		reqCtx, cli, opsRes, "upgrade", handleRollingProgress, appsv1.RunningComponentPhase)
+	return compOpsHelper.reconcileRollingAction(
+		reqCtx, cli, opsRes, "upgrade", handleRunningProgress, appsv1.RunningComponentPhase)
 }
 
-func (u upgradeOpsHandler) componentVersionFieldsUnchanged(opsRes *OpsResource) bool {
+func (u upgradeOpsHandler) targetsUnchanged(opsRes *OpsResource) bool {
 	if opsRes == nil || opsRes.Cluster == nil || opsRes.OpsRequest == nil || opsRes.OpsRequest.Spec.Upgrade == nil {
 		return false
 	}

@@ -90,24 +90,12 @@ func (start StartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Cl
 // ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
 // the Reconcile function for start opsRequest.
 func (start StartOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (opsv1alpha1.OpsPhase, time.Duration, error) {
-	handleComponentProgress := func(reqCtx intctrlutil.RequestCtx,
-		cli client.Client,
-		opsRes *OpsResource,
-		pgRes *progressResource,
-		compStatus *opsv1alpha1.OpsRequestComponentStatus) (int32, int32, error) {
-		runtime, err := opsRes.GetRuntime(pgRes.compOps.GetComponentName())
-		if err != nil {
-			return 0, 0, err
-		}
-		pgRes.createdPodSet, err = runtime.GenerateInstanceNameSet(opsRes.Cluster.Name, pgRes.fullComponentName,
-			pgRes.clusterComponent.Replicas, pgRes.clusterComponent.Instances, pgRes.clusterComponent.OfflineInstances)
-		if err != nil {
-			return 0, 0, err
-		}
-		return handleComponentProgressForScalingReplicas(reqCtx, cli, opsRes, pgRes, compStatus)
-	}
 	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.StartList)
-	return compOpsHelper.reconcileActionWithComponentOps(reqCtx, cli, opsRes, "start", handleComponentProgress)
+	if !compOpsHelper.componentStopFieldsUnchanged(opsRes.Cluster, false) {
+		return opsv1alpha1.OpsAbortedPhase, 0, nil
+	}
+	return compOpsHelper.reconcileRollingActionWithComponentOps(reqCtx, cli, opsRes,
+		"start", handleRollingProgress, appsv1.RunningComponentPhase)
 }
 
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration

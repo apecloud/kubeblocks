@@ -169,12 +169,23 @@ var _ = Describe("OpsUtil functions", func() {
 			opsRes.Cluster.Status.SetComponentStatus(defaultCompName, clusterComp)
 
 			By("expect for opsRequest is running")
+			handleRestartProgress := func(reqCtx intctrlutil.RequestCtx,
+				cli client.Client,
+				opsRes *OpsResource,
+				pgRes *progressResource,
+				compStatus *opsv1alpha1.OpsRequestComponentStatus) (expectProgressCount int32, completedCount int32, err error) {
+				return handleComponentStatusProgress(reqCtx, cli, opsRes, pgRes, compStatus,
+					func(ops *opsv1alpha1.OpsRequest, instance Instance, pgRes *progressResource) bool {
+						creationTimestamp := instance.GetCreationTimestamp()
+						return !creationTimestamp.Before(&ops.Status.StartTimestamp)
+					})
+			}
+
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
 			compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.RestartList)
-			recordRollingActionGeneration(opsRes)
 
-			opsPhase, _, err := compOpsHelper.reconcileRollingActionWithComponentOps(reqCtx, k8sClient, opsRes,
-				"test", handleRollingProgress)
+			opsPhase, _, err := compOpsHelper.reconcileActionWithComponentOps(reqCtx, k8sClient, opsRes,
+				"test", handleRestartProgress)
 			Expect(err).Should(BeNil())
 			Expect(opsPhase).Should(Equal(opsv1alpha1.OpsRunningPhase))
 
@@ -185,15 +196,12 @@ var _ = Describe("OpsUtil functions", func() {
 			pod := testapps.MockInstanceSetPod(&testCtx, nil, clusterName, defaultCompName, pods[2].Name, "follower")
 			// mock pod is failed
 			testk8s.MockPodIsFailed(ctx, testCtx, pod)
-			clusterComp.ObservedGeneration = opsRes.Cluster.Generation
-			clusterComp.UpToDate = true
-			opsRes.Cluster.Status.SetComponentStatus(defaultCompName, clusterComp)
-			opsPhase, _, err = compOpsHelper.reconcileRollingActionWithComponentOps(reqCtx, k8sClient, opsRes, "test", handleRollingProgress)
+			opsPhase, _, err = compOpsHelper.reconcileActionWithComponentOps(reqCtx, k8sClient, opsRes, "test", handleRestartProgress)
 			Expect(err).Should(BeNil())
 			Expect(opsPhase).Should(Equal(opsv1alpha1.OpsFailedPhase))
 		})
 
-		It("keeps restart ops running until an InstanceSet failure is reflected by the component", func() {
+		It("keeps restart ops running when a failed progress is not backed by a failed component", func() {
 			By("init operations resources ")
 			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
 			testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
@@ -210,6 +218,19 @@ var _ = Describe("OpsUtil functions", func() {
 			Expect(err).Should(BeNil())
 			opsRes.Runtimes = runtimes
 
+			handleRestartProgress := func(reqCtx intctrlutil.RequestCtx,
+				cli client.Client,
+				opsRes *OpsResource,
+				pgRes *progressResource,
+				compStatus *opsv1alpha1.OpsRequestComponentStatus) (expectProgressCount int32, completedCount int32, err error) {
+				pgRes.deferInstanceFailureToWorkloadPhase = true
+				return handleComponentStatusProgress(reqCtx, cli, opsRes, pgRes, compStatus,
+					func(ops *opsv1alpha1.OpsRequest, instance Instance, pgRes *progressResource) bool {
+						creationTimestamp := instance.GetCreationTimestamp()
+						return !creationTimestamp.Before(&ops.Status.StartTimestamp)
+					})
+			}
+
 			recreatePod := func(pod *corev1.Pod) *corev1.Pod {
 				testk8s.MockPodIsTerminating(ctx, testCtx, pod)
 				testk8s.RemovePodFinalizer(ctx, testCtx, pod)
@@ -219,13 +240,11 @@ var _ = Describe("OpsUtil functions", func() {
 				pods[i] = recreatePod(pods[i])
 			}
 			testk8s.MockPodIsFailed(ctx, testCtx, pods[2])
-			testapps.MockInstanceSetStatus(testCtx, opsRes.Cluster, defaultCompName)
 
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
 			compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.RestartList)
-			recordRollingActionGeneration(opsRes)
-			opsPhase, requeueAfter, err := compOpsHelper.reconcileRollingActionWithComponentOps(reqCtx, k8sClient, opsRes,
-				"test", handleRollingProgress)
+			opsPhase, requeueAfter, err := compOpsHelper.reconcileActionWithComponentOps(reqCtx, k8sClient, opsRes,
+				"test", handleRestartProgress)
 			Expect(err).Should(BeNil())
 			Expect(opsPhase).Should(Equal(opsv1alpha1.OpsRunningPhase))
 			Expect(requeueAfter).Should(BeZero())
@@ -257,11 +276,9 @@ var _ = Describe("OpsUtil functions", func() {
 				},
 			}
 			Expect(k8sClient.Status().Patch(ctx, recoveredPod, patch)).Should(Succeed())
-			testapps.MockInstanceSetStatus(testCtx, opsRes.Cluster, defaultCompName)
-			mockComponentIsOperating(opsRes.Cluster, appsv1.RunningComponentPhase, defaultCompName)
 
-			opsPhase, _, err = compOpsHelper.reconcileRollingActionWithComponentOps(reqCtx, k8sClient, opsRes,
-				"test", handleRollingProgress)
+			opsPhase, _, err = compOpsHelper.reconcileActionWithComponentOps(reqCtx, k8sClient, opsRes,
+				"test", handleRestartProgress)
 			Expect(err).Should(BeNil())
 			Expect(opsPhase).Should(Equal(opsv1alpha1.OpsSucceedPhase))
 			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("3/3"))
@@ -284,6 +301,19 @@ var _ = Describe("OpsUtil functions", func() {
 			Expect(err).Should(BeNil())
 			opsRes.Runtimes = runtimes
 
+			handleRestartProgress := func(reqCtx intctrlutil.RequestCtx,
+				cli client.Client,
+				opsRes *OpsResource,
+				pgRes *progressResource,
+				compStatus *opsv1alpha1.OpsRequestComponentStatus) (expectProgressCount int32, completedCount int32, err error) {
+				pgRes.deferInstanceFailureToWorkloadPhase = true
+				return handleComponentStatusProgress(reqCtx, cli, opsRes, pgRes, compStatus,
+					func(ops *opsv1alpha1.OpsRequest, instance Instance, pgRes *progressResource) bool {
+						creationTimestamp := instance.GetCreationTimestamp()
+						return !creationTimestamp.Before(&ops.Status.StartTimestamp)
+					})
+			}
+
 			recreatePod := func(pod *corev1.Pod) *corev1.Pod {
 				testk8s.MockPodIsTerminating(ctx, testCtx, pod)
 				testk8s.RemovePodFinalizer(ctx, testCtx, pod)
@@ -293,30 +323,30 @@ var _ = Describe("OpsUtil functions", func() {
 				pods[i] = recreatePod(pods[i])
 			}
 			testk8s.MockPodIsFailed(ctx, testCtx, pods[2])
-			testapps.MockInstanceSetStatus(testCtx, opsRes.Cluster, defaultCompName)
 
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
 			compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.RestartList)
-			recordRollingActionGeneration(opsRes)
-			opsPhase, requeueAfter, err := compOpsHelper.reconcileRollingActionWithComponentOps(reqCtx, k8sClient, opsRes,
-				"test", handleRollingProgress)
+			opsPhase, requeueAfter, err := compOpsHelper.reconcileActionWithComponentOps(reqCtx, k8sClient, opsRes,
+				"test", handleRestartProgress)
 			Expect(err).Should(BeNil())
 			Expect(opsPhase).Should(Equal(opsv1alpha1.OpsRunningPhase))
 			Expect(requeueAfter).Should(BeZero())
 
 			By("mock component reaches terminal Failed phase")
-			mockComponentIsOperating(opsRes.Cluster, appsv1.FailedComponentPhase, defaultCompName)
+			clusterComp := opsRes.Cluster.Status.Components[defaultCompName]
+			clusterComp.Phase = appsv1.FailedComponentPhase
+			opsRes.Cluster.Status.SetComponentStatus(defaultCompName, clusterComp)
 
-			opsPhase, requeueAfter, err = compOpsHelper.reconcileRollingActionWithComponentOps(reqCtx, k8sClient, opsRes,
-				"test", handleRollingProgress)
+			opsPhase, requeueAfter, err = compOpsHelper.reconcileActionWithComponentOps(reqCtx, k8sClient, opsRes,
+				"test", handleRestartProgress)
 			Expect(err).Should(BeNil())
 			Expect(requeueAfter).Should(BeZero())
 			Expect(opsPhase).Should(Equal(opsv1alpha1.OpsFailedPhase))
-			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("2/3"))
+			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("3/3"))
 			progressDetail := findStatusProgressDetail(opsRes.OpsRequest.Status.Components[defaultCompName].ProgressDetails,
 				getProgressObjectKey(constant.PodKind, pods[2].Name))
 			Expect(progressDetail).ShouldNot(BeNil())
-			Expect(progressDetail.Status).Should(Equal(opsv1alpha1.ProcessingProgressStatus))
+			Expect(progressDetail.Status).Should(Equal(opsv1alpha1.FailedProgressStatus))
 		})
 
 		It("Test opsRequest with disable ha", func() {
@@ -355,7 +385,6 @@ var _ = Describe("OpsUtil functions", func() {
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
 			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
-			recordRollingActionGeneration(opsRes)
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(haConfig), func(g Gomega, cm *corev1.ConfigMap) {
 				cm.Annotations["enable"] = "false"
 			})).Should(Succeed())
@@ -363,8 +392,7 @@ var _ = Describe("OpsUtil functions", func() {
 			By("mock restart ops to succeed and expect to enable ha")
 			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsRunningPhase
 			_ = testapps.MockInstanceSetPods(&testCtx, its, opsRes.Cluster, defaultCompName)
-			testapps.MockInstanceSetStatus(testCtx, opsRes.Cluster, defaultCompName)
-			mockComponentIsOperating(opsRes.Cluster, appsv1.RunningComponentPhase, defaultCompName)
+			mockRollingTargetStatus(opsRes.Cluster, appsv1.RunningComponentPhase, defaultCompName)
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsSucceedPhase))

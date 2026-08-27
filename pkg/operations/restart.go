@@ -84,8 +84,11 @@ func (r restartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 // the Reconcile function for restart opsRequest.
 func (r restartOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (opsv1alpha1.OpsPhase, time.Duration, error) {
 	r.compOpsHelper = newComponentOpsHelper(opsRes.OpsRequest.Spec.RestartList)
+	if !r.compOpsHelper.componentTargetsExist(opsRes.Cluster) {
+		return opsv1alpha1.OpsAbortedPhase, 0, nil
+	}
 	return r.compOpsHelper.reconcileRollingActionWithComponentOps(reqCtx, cli, opsRes,
-		"restart", handleRollingProgress)
+		"restart", handleRollingProgress, appsv1.RunningComponentPhase)
 }
 
 // SaveLastConfiguration this operation only restart the pods of the component, no changes for Cluster.spec.

@@ -22,20 +22,18 @@ package operations
 import (
 	"fmt"
 	"strings"
-	"testing"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
@@ -44,113 +42,6 @@ import (
 	testk8s "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 	testops "github.com/apecloud/kubeblocks/pkg/testutil/operations"
 )
-
-func TestRollingInstanceProgress(t *testing.T) {
-	const (
-		component = "mysql"
-		pod0      = "cluster-mysql-0"
-		pod1      = "cluster-mysql-1"
-	)
-	baseWorkload := func() *defaultWorkload {
-		return &defaultWorkload{
-			exists:               true,
-			desiredReplicas:      2,
-			currentRevisionMap:   map[string]string{pod0: "new", pod1: "new"},
-			instanceTemplateMap:  map[string]string{pod0: "template", pod1: "other"},
-			upToDateSet:          sets.New(pod0, pod1),
-			notReadySet:          sets.New[string](),
-			notAvailableSet:      sets.New[string](),
-			failedSet:            sets.New[string](),
-			instanceNames:        sets.New(pod0, pod1),
-			activeInstanceNames:  sets.New(pod0, pod1),
-			presentInstanceNames: sets.New(pod0, pod1),
-		}
-	}
-	newResources := func() (*OpsResource, *progressResource, *opsv1alpha1.OpsRequestComponentStatus) {
-		ops := &opsv1alpha1.OpsRequest{}
-		ops.Status.Phase = opsv1alpha1.OpsRunningPhase
-		return &OpsResource{
-				OpsRequest: ops,
-				Cluster: &appsv1.Cluster{Status: appsv1.ClusterStatus{Components: map[string]appsv1.ClusterComponentStatus{
-					component: {},
-				}}},
-				Recorder: record.NewFakeRecorder(20),
-			}, &progressResource{
-				opsMessageKey:     "upgrade",
-				clusterComponent:  &appsv1.ClusterComponentSpec{Name: component, Replicas: 2},
-				fullComponentName: component,
-			}, &opsv1alpha1.OpsRequestComponentStatus{}
-	}
-
-	tests := []struct {
-		name          string
-		mutate        func(*defaultWorkload, *progressResource)
-		wantExpected  int32
-		wantCompleted int32
-		wantPod0      opsv1alpha1.ProgressStatus
-	}{
-		{name: "all instances up-to-date ready and available", wantExpected: 2, wantCompleted: 2, wantPod0: opsv1alpha1.SucceedProgressStatus},
-		{name: "desired state not applied", mutate: func(w *defaultWorkload, _ *progressResource) {
-			w.upToDateSet.Delete(pod0)
-		}, wantExpected: 2, wantCompleted: 1, wantPod0: opsv1alpha1.ProcessingProgressStatus},
-		{name: "failure before desired state is applied is ignored", mutate: func(w *defaultWorkload, _ *progressResource) {
-			w.upToDateSet.Delete(pod0)
-			w.failedSet.Insert(pod0)
-		}, wantExpected: 2, wantCompleted: 1, wantPod0: opsv1alpha1.ProcessingProgressStatus},
-		{name: "partial vertical scaling waits when resources are not applied", mutate: func(w *defaultWorkload, pg *progressResource) {
-			w.upToDateSet.Delete(pod0)
-			pg.rollingTarget = &rollingInstanceTarget{templates: sets.New("template"), expectedCount: 1}
-		}, wantExpected: 1, wantCompleted: 0, wantPod0: opsv1alpha1.ProcessingProgressStatus},
-		{name: "not ready", mutate: func(w *defaultWorkload, _ *progressResource) {
-			w.notReadySet.Insert(pod0)
-		}, wantExpected: 2, wantCompleted: 1, wantPod0: opsv1alpha1.ProcessingProgressStatus},
-		{name: "not available", mutate: func(w *defaultWorkload, _ *progressResource) {
-			w.notAvailableSet.Insert(pod0)
-		}, wantExpected: 2, wantCompleted: 1, wantPod0: opsv1alpha1.ProcessingProgressStatus},
-		{name: "current desired state failure", mutate: func(w *defaultWorkload, _ *progressResource) {
-			w.failedSet.Insert(pod0)
-		}, wantExpected: 2, wantCompleted: 2, wantPod0: opsv1alpha1.FailedProgressStatus},
-		{name: "active instance is absent", mutate: func(w *defaultWorkload, _ *progressResource) {
-			w.presentInstanceNames.Delete(pod0)
-		}, wantExpected: 2, wantCompleted: 1, wantPod0: opsv1alpha1.ProcessingProgressStatus},
-		{name: "offline instance is excluded from full rollout progress", mutate: func(w *defaultWorkload, pg *progressResource) {
-			w.activeInstanceNames.Delete(pod0)
-			w.desiredReplicas = 1
-			pg.clusterComponent.Replicas = 1
-		}, wantExpected: 1, wantCompleted: 1},
-		{name: "partial target cannot complete after becoming inactive", mutate: func(w *defaultWorkload, pg *progressResource) {
-			w.activeInstanceNames.Delete(pod0)
-			pg.rollingTarget = &rollingInstanceTarget{templates: sets.New("template"), expectedCount: 1}
-		}, wantExpected: 1, wantCompleted: 0},
-		{name: "partial target waits for template assignment", mutate: func(w *defaultWorkload, pg *progressResource) {
-			delete(w.instanceTemplateMap, pod0)
-			pg.rollingTarget = &rollingInstanceTarget{templates: sets.New("template"), expectedCount: 1}
-		}, wantExpected: 1, wantCompleted: 0},
-		{name: "missing InstanceSet", mutate: func(w *defaultWorkload, _ *progressResource) {
-			w.exists = false
-		}, wantExpected: 2, wantCompleted: 0},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			workload := baseWorkload()
-			opsRes, pgRes, compStatus := newResources()
-			if tt.mutate != nil {
-				tt.mutate(workload, pgRes)
-			}
-			expected, completed := handleRollingProgressWithWorkload(opsRes, workload, pgRes, compStatus)
-			if expected != tt.wantExpected || completed != tt.wantCompleted {
-				t.Fatalf("progress %d/%d, want %d/%d", completed, expected, tt.wantCompleted, tt.wantExpected)
-			}
-			if tt.wantPod0 != "" {
-				detail := findStatusProgressDetail(compStatus.ProgressDetails, getProgressObjectKey(constant.PodKind, pod0))
-				if detail == nil || detail.Status != tt.wantPod0 {
-					t.Fatalf("pod0 detail = %#v, want status %s", detail, tt.wantPod0)
-				}
-			}
-		})
-	}
-}
 
 var _ = Describe("Ops ProgressDetails", func() {
 
@@ -190,19 +81,35 @@ var _ = Describe("Ops ProgressDetails", func() {
 	}
 
 	testProgressDetailsWithStatefulPodUpdating := func(reqCtx intctrlutil.RequestCtx, opsRes *OpsResource, pods []*corev1.Pod) {
-		By("mock pod of InstanceSet updating by deleting the pod")
+		setInstanceStatus := func(updated int) {
+			statuses := make([]workloads.InstanceStatus, len(pods))
+			for i := range pods {
+				statuses[i] = workloads.InstanceStatus{
+					PodName:      pods[i].Name,
+					DesiredState: workloads.InstanceDesiredStateActive,
+					CurrentState: workloads.InstanceCurrentStatePresent,
+					UpToDate:     i < updated,
+					Ready:        i < updated,
+					Available:    i < updated,
+				}
+			}
+			key := client.ObjectKey{
+				Namespace: opsRes.Cluster.Namespace,
+				Name:      constant.GenerateClusterComponentName(opsRes.Cluster.Name, defaultCompName),
+			}
+			Eventually(testapps.GetAndChangeObjStatus(&testCtx, key, func(its *workloads.InstanceSet) {
+				its.Status.InstanceStatus = statuses
+			})).Should(Succeed())
+		}
+
+		By("mock InstanceSet reporting an instance as updating")
 		pod := pods[0]
-		testk8s.MockPodIsTerminating(ctx, testCtx, pod)
-		mockRollingInstanceStatus(opsRes.Cluster, defaultCompName)
+		setInstanceStatus(0)
 		_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 		Expect(getProgressDetailStatus(opsRes, defaultCompName, pod)).Should(Equal(opsv1alpha1.ProcessingProgressStatus))
 
-		By("mock one pod of InstanceSet to update successfully")
-		testk8s.RemovePodFinalizer(ctx, testCtx, pod)
-		testapps.MockInstanceSetPod(&testCtx, nil, clusterName, defaultCompName,
-			pod.Name, "leader")
-		mockRollingInstanceStatus(opsRes.Cluster, defaultCompName, pod.Name)
-
+		By("mock InstanceSet reporting one instance as applied and available")
+		setInstanceStatus(1)
 		_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 		Expect(getProgressDetailStatus(opsRes, defaultCompName, pod)).Should(Equal(opsv1alpha1.SucceedProgressStatus))
 		Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("1/3"))
@@ -213,12 +120,13 @@ var _ = Describe("Ops ProgressDetails", func() {
 			By("init operations resources ")
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
 			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
-			testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
 
 			By("create restart ops and pods of component")
 			opsRes.OpsRequest = createRestartOpsObj(clusterName, "restart-"+randomStr)
 			mockComponentIsOperating(opsRes.Cluster, appsv1.UpdatingComponentPhase, defaultCompName)
+			testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
 			podList := initInstanceSetPods(ctx, k8sClient, opsRes)
+			testapps.MockInstanceSetStatus(testCtx, opsRes.Cluster, defaultCompName)
 
 			By("mock restart OpsRequest is Running")
 			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)

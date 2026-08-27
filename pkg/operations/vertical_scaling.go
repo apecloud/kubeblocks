@@ -23,13 +23,12 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -98,95 +97,58 @@ func (vs verticalScalingHandler) Action(reqCtx intctrlutil.RequestCtx, cli clien
 // ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
 // the Reconcile function for vertical scaling opsRequest.
 func (vs verticalScalingHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (opsv1alpha1.OpsPhase, time.Duration, error) {
-	if !vs.resourceFieldsUnchanged(opsRes) {
-		return opsv1alpha1.OpsAbortedPhase, 0, nil
-	}
 	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.VerticalScalingList)
-	compOpsHelper.rollingTargetResolver = vs.resolveRollingTarget
-	return compOpsHelper.reconcileRollingActionWithComponentOps(reqCtx, cli, opsRes, "vertical scale", handleRollingProgress)
-}
-
-func (vs verticalScalingHandler) resourceFieldsUnchanged(opsRes *OpsResource) bool {
-	if opsRes == nil || opsRes.Cluster == nil || opsRes.OpsRequest == nil {
-		return false
-	}
-	for _, verticalScaling := range opsRes.OpsRequest.Spec.VerticalScalingList {
-		compSpec := getComponentSpecOrShardingTemplate(opsRes.Cluster, verticalScaling.ComponentName)
-		if compSpec == nil {
-			return false
-		}
-		if opsRes.OpsRequest.Status.Phase == opsv1alpha1.OpsCancellingPhase {
-			lastConfig, ok := opsRes.OpsRequest.Status.LastConfiguration.Components[verticalScaling.ComponentName]
-			if !ok || !vs.rollbackResourceFieldsUnchanged(compSpec, verticalScaling, lastConfig) {
-				return false
+	handleComponentStatusProgressForVS := func(
+		reqCtx intctrlutil.RequestCtx,
+		cli client.Client,
+		opsRes *OpsResource,
+		pgRes *progressResource,
+		compStatus *opsv1alpha1.OpsRequestComponentStatus) (expectProgressCount int32, completedCount int32, err error) {
+		verticalScaling := pgRes.compOps.(opsv1alpha1.VerticalScaling)
+		if len(pgRes.clusterComponent.Instances) != 0 {
+			// obtain the pods which should be updated.
+			updatedPodSet := map[string]string{}
+			vsInsMap := vs.covertInsResourcesToMap(verticalScaling)
+			templateReplicasCnt := int32(0)
+			runtime, err := opsRes.GetRuntime(pgRes.compOps.GetComponentName())
+			if err != nil {
+				return 0, 0, err
 			}
-			continue
-		}
-		if vs.verticalScalingComp(verticalScaling) &&
-			!apiequality.Semantic.DeepEqual(compSpec.Resources, verticalScaling.ResourceRequirements) {
-			return false
-		}
-		for _, instance := range verticalScaling.Instances {
-			if !instanceResourceFieldMatches(compSpec, instance.Name, &instance.ResourceRequirements) {
-				return false
+			for _, template := range pgRes.clusterComponent.Instances {
+				replicas := template.GetReplicas()
+				insVS := vsInsMap[template.Name]
+				if vs.verticalScalingInsTemplate(verticalScaling, template, insVS) {
+					templatePodNames, err := runtime.GenerateTemplateInstanceNames(
+						opsRes.Cluster.Name, pgRes.fullComponentName, template.Name, replicas, pgRes.clusterComponent.OfflineInstances, template.Ordinals)
+					if err != nil {
+						return 0, 0, err
+					}
+					for _, podName := range templatePodNames {
+						updatedPodSet[podName] = template.Name
+					}
+				}
+				templateReplicasCnt += replicas
 			}
+			if vs.verticalScalingComp(verticalScaling) && templateReplicasCnt < pgRes.clusterComponent.Replicas {
+				podNames, err := runtime.GenerateTemplateInstanceNames(
+					opsRes.Cluster.Name, pgRes.fullComponentName, "", pgRes.clusterComponent.Replicas-templateReplicasCnt, pgRes.clusterComponent.OfflineInstances, appsv1.Ordinals{})
+				if err != nil {
+					return 0, 0, err
+				}
+				for _, podName := range podNames {
+					updatedPodSet[podName] = ""
+				}
+			} else {
+				pgRes.noWaitComponentCompleted = true
+			}
+			pgRes.updatedPodSet = updatedPodSet
 		}
+		return handleComponentStatusProgress(reqCtx, cli, opsRes, pgRes, compStatus, vs.podApplyCompOps)
 	}
-	return true
+	return compOpsHelper.reconcileActionWithComponentOps(reqCtx, cli, opsRes, "vertical scale", handleComponentStatusProgressForVS)
 }
 
-func (vs verticalScalingHandler) rollbackResourceFieldsUnchanged(compSpec *appsv1.ClusterComponentSpec, verticalScaling opsv1alpha1.VerticalScaling,
-	lastConfig opsv1alpha1.LastComponentConfiguration) bool {
-	if vs.verticalScalingComp(verticalScaling) &&
-		!apiequality.Semantic.DeepEqual(compSpec.Resources, lastConfig.ResourceRequirements) {
-		return false
-	}
-	lastInstances := make(map[string]*corev1.ResourceRequirements, len(lastConfig.Instances))
-	for i := range lastConfig.Instances {
-		lastInstances[lastConfig.Instances[i].Name] = lastConfig.Instances[i].Resources
-	}
-	for _, instance := range verticalScaling.Instances {
-		resources, ok := lastInstances[instance.Name]
-		if !ok || !instanceResourceFieldMatches(compSpec, instance.Name, resources) {
-			return false
-		}
-	}
-	return true
-}
-
-func instanceResourceFieldMatches(compSpec *appsv1.ClusterComponentSpec, name string, resources *corev1.ResourceRequirements) bool {
-	for i := range compSpec.Instances {
-		if compSpec.Instances[i].Name == name {
-			return apiequality.Semantic.DeepEqual(compSpec.Instances[i].Resources, resources)
-		}
-	}
-	return false
-}
-
-func (vs verticalScalingHandler) resolveRollingTarget(pgRes *progressResource) *rollingInstanceTarget {
-	if len(pgRes.clusterComponent.Instances) == 0 {
-		return nil
-	}
-	verticalScaling := pgRes.compOps.(opsv1alpha1.VerticalScaling)
-	instanceResources := vs.convertInsResourcesToMap(verticalScaling)
-	target := &rollingInstanceTarget{templates: sets.New[string]()}
-	var templateReplicas int32
-	for _, template := range pgRes.clusterComponent.Instances {
-		replicas := template.GetReplicas()
-		if vs.verticalScalingInsTemplate(verticalScaling, template, instanceResources[template.Name]) {
-			target.templates.Insert(template.Name)
-			target.expectedCount += replicas
-		}
-		templateReplicas += replicas
-	}
-	if vs.verticalScalingComp(verticalScaling) && templateReplicas < pgRes.clusterComponent.Replicas {
-		target.templates.Insert("")
-		target.expectedCount += pgRes.clusterComponent.Replicas - templateReplicas
-	}
-	return target
-}
-
-func (vs verticalScalingHandler) convertInsResourcesToMap(verticalScaling opsv1alpha1.VerticalScaling) map[string]*opsv1alpha1.InstanceResourceTemplate {
+func (vs verticalScalingHandler) covertInsResourcesToMap(verticalScaling opsv1alpha1.VerticalScaling) map[string]*opsv1alpha1.InstanceResourceTemplate {
 	vsInsMap := map[string]*opsv1alpha1.InstanceResourceTemplate{}
 	for i := range verticalScaling.Instances {
 		vsInsMap[verticalScaling.Instances[i].Name] = &verticalScaling.Instances[i]
@@ -205,6 +167,71 @@ func (vs verticalScalingHandler) verticalScalingInsTemplate(verticalScaling opsv
 		return true
 	}
 	return insTemplate.Resources == nil && vs.verticalScalingComp(verticalScaling)
+}
+
+func (vs verticalScalingHandler) setRevertVScalingForCancel(ops *opsv1alpha1.OpsRequest, verticalScaling *opsv1alpha1.VerticalScaling) {
+	lastCompConfiguration := ops.Status.LastConfiguration.Components[verticalScaling.ComponentName]
+	verticalScaling.Requests = lastCompConfiguration.Requests
+	verticalScaling.Limits = lastCompConfiguration.Limits
+	var instanceResources []opsv1alpha1.InstanceResourceTemplate
+	for _, v := range lastCompConfiguration.Instances {
+		resTemplate := opsv1alpha1.InstanceResourceTemplate{Name: v.Name}
+		if v.Resources == nil {
+			resTemplate.ResourceRequirements = corev1.ResourceRequirements{}
+		} else {
+			resTemplate.ResourceRequirements = *v.Resources
+		}
+		instanceResources = append(instanceResources, resTemplate)
+	}
+	verticalScaling.Instances = instanceResources
+}
+
+func (vs verticalScalingHandler) podApplyCompOps(
+	ops *opsv1alpha1.OpsRequest,
+	instance Instance,
+	pgRes *progressResource) bool {
+	insTemplateName := pgRes.updatedPodSet[instance.GetName()]
+	verticalScaling := pgRes.compOps.(opsv1alpha1.VerticalScaling)
+	if ops.Spec.Cancel {
+		vs.setRevertVScalingForCancel(ops, &verticalScaling)
+	}
+	matchResources := func(podResources, vsResources corev1.ResourceRequirements) bool {
+		if vsResources.Requests == nil {
+			vsResources.Requests = corev1.ResourceList{}
+		}
+		for resName, resValue := range vsResources.Limits {
+			// Only default a request value to the matching limit when the caller
+			// omitted the request key entirely. An explicit zero value is a valid
+			// Pod spec and must be compared as a literal zero, not silently
+			// promoted to the limit value.
+			if _, ok := vsResources.Requests[resName]; !ok {
+				vsResources.Requests[resName] = resValue
+			}
+			if !resValue.Equal(podResources.Limits[resName]) {
+				return false
+			}
+		}
+		for resName, resValue := range vsResources.Requests {
+			if !resValue.Equal(podResources.Requests[resName]) {
+				return false
+			}
+		}
+		return true
+	}
+	if insTemplateName == constant.EmptyInsTemplateName {
+		return matchResources(instance.GetResources(""), verticalScaling.ResourceRequirements)
+	}
+	for _, insTpl := range pgRes.clusterComponent.Instances {
+		if insTpl.Name != insTemplateName {
+			continue
+		}
+		if insTpl.Resources != nil {
+			return matchResources(instance.GetResources(""), *insTpl.Resources)
+		} else {
+			return matchResources(instance.GetResources(""), pgRes.clusterComponent.Resources)
+		}
+	}
+	return false
 }
 
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration

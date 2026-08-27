@@ -90,11 +90,6 @@ type OpsManager struct {
 	OpsMap map[opsv1alpha1.OpsType]OpsBehaviour
 }
 
-type rollingInstanceTarget struct {
-	templates     sets.Set[string]
-	expectedCount int32
-}
-
 type progressResource struct {
 	// opsMessageKey progress message key of specified OpsType, it is a verb and will form the message of progressDetail
 	// such as "vertical scale" of verticalScaling OpsRequest.
@@ -107,15 +102,19 @@ type progressResource struct {
 	clusterComponent *appsv1.ClusterComponentSpec
 	clusterDef       *appsv1.ClusterDefinition
 	componentDef     *appsv1.ComponentDefinition
-	// rollingTarget describes the instance-template scope owned by the operation.
-	// Both progress reporting and result evaluation consume it independently.
-	rollingTarget *rollingInstanceTarget
+	// record which pods need to updated during this operation.
+	// key is podName, value is instance template name.
+	updatedPodSet map[string]string
 	createdPodSet map[string]string
 	deletedPodSet map[string]string
 	compOps       ComponentOpsInterface
 	// checks if it needs to wait the component to complete.
 	// if only updates a part of pods, set it to false.
 	noWaitComponentCompleted bool
+	// lets ops types such as restart defer pod-level failure signals until the
+	// workload/component reaches a terminal failure state.
+	deferInstanceFailureToWorkloadPhase bool
+	componentPhase                      appsv1.ComponentPhase
 }
 
 // OpsRuntime abstracts the standard ops paths that only need workload/member views
@@ -134,15 +133,9 @@ type OpsRuntime interface {
 }
 
 type Workload interface {
-	Exists() bool
-	GetDesiredReplicas() int32
+	GetMinReadySeconds() int32
 	GetInstanceNameSet() sets.Set[string]
-	GetActiveInstanceNameSet() sets.Set[string]
-	GetPresentInstanceNameSet() sets.Set[string]
-	GetInstanceNameSetByTemplate(templateNames sets.Set[string]) sets.Set[string]
-	GetUnknownTemplateInstanceNameSet() sets.Set[string]
 	GetCurrentRevisionMap() map[string]string
-	GetUpToDateInstanceNameSet() sets.Set[string]
 	GetNotReadyInstanceNameSet() sets.Set[string]
 	GetNotAvailableInstanceNameSet() sets.Set[string]
 	GetFailedInstanceNameSet() sets.Set[string]
@@ -151,11 +144,15 @@ type Workload interface {
 type Instance interface {
 	GetName() string
 	GetComponentName() string
+	GetCreationTimestamp() metav1.Time
 	HasPod() bool
 	IsDeleting() bool
 	GetRole() string
 	IsAvailable(minReadySeconds int32, roleAware bool) bool
 	IsFailedAndTimedOut() bool
+	GetImage(containerName string) string
+	GetStatusImage(containerName string) string
+	GetResources(containerName string) corev1.ResourceRequirements
 	GetNodeName() string
 	GetTolerations() []corev1.Toleration
 	GetAffinity() *corev1.Affinity

@@ -271,7 +271,7 @@ var _ = Describe("Upgrade OpsRequest", func() {
 
 	expectOpsSucceed := func(reqCtx intctrlutil.RequestCtx, opsRes *OpsResource, compNames ...string) {
 		// mock component to running
-		mockComponentIsOperating(opsRes.Cluster, appsv1.RunningComponentPhase, compNames...)
+		mockRollingTargetStatus(opsRes.Cluster, appsv1.RunningComponentPhase, compNames...)
 		_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 		Expect(err).ShouldNot(HaveOccurred())
 		Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsSucceedPhase))
@@ -320,7 +320,7 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			})).Should(Succeed())
 
 			By("the ops succeeds from the current Cluster status without inspecting Pod images")
-			mockComponentIsOperating(opsRes.Cluster, appsv1.RunningComponentPhase, defaultCompName)
+			mockRollingTargetStatus(opsRes.Cluster, appsv1.RunningComponentPhase, defaultCompName)
 			Expect(opsRes.OpsRequest.Status.ClusterGeneration).Should(Equal(opsRes.Cluster.Generation))
 			_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())

@@ -21,7 +21,6 @@ package operations
 
 import (
 	"fmt"
-	"testing"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -31,7 +30,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -44,123 +42,6 @@ import (
 	testk8s "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 	testops "github.com/apecloud/kubeblocks/pkg/testutil/operations"
 )
-
-func TestVerticalScalingRollingTargetScope(t *testing.T) {
-	component := &appsv1.ClusterComponentSpec{
-		Replicas: 3,
-		Instances: []appsv1.InstanceTemplate{
-			{Name: "inherited", Replicas: pointer.Int32(1)},
-			{Name: "overridden", Replicas: pointer.Int32(1), Resources: &corev1.ResourceRequirements{}},
-		},
-	}
-	vs := verticalScalingHandler{}
-
-	componentWide := opsv1alpha1.VerticalScaling{ResourceRequirements: corev1.ResourceRequirements{
-		Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")},
-	}}
-	target := vs.resolveRollingTarget(&progressResource{clusterComponent: component, compOps: componentWide})
-	if target.expectedCount != 2 || !target.templates.Equal(sets.New("", "inherited")) {
-		t.Fatalf("unexpected component target: %#v", target)
-	}
-
-	instanceScoped := opsv1alpha1.VerticalScaling{Instances: []opsv1alpha1.InstanceResourceTemplate{{Name: "overridden"}}}
-	target = vs.resolveRollingTarget(&progressResource{clusterComponent: component, compOps: instanceScoped})
-	if target.expectedCount != 1 || !target.templates.Equal(sets.New("overridden")) {
-		t.Fatalf("unexpected instance target: %#v", target)
-	}
-}
-
-func TestVerticalScalingResourceFieldsUnchanged(t *testing.T) {
-	resources := func(cpu string) corev1.ResourceRequirements {
-		return corev1.ResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse(cpu)}}
-	}
-	componentTarget := resources("2")
-	templateTarget := resources("3")
-	unrelatedTemplateResources := resources("4")
-	cluster := &appsv1.Cluster{Spec: appsv1.ClusterSpec{
-		ComponentSpecs: []appsv1.ClusterComponentSpec{{
-			Name: "mysql", Resources: componentTarget, Instances: []appsv1.InstanceTemplate{
-				{Name: "target", Resources: &templateTarget},
-				{Name: "unrelated", Resources: &unrelatedTemplateResources},
-			},
-		}},
-		Shardings: []appsv1.ClusterSharding{{
-			Name: "shard", Template: appsv1.ClusterComponentSpec{
-				Resources: componentTarget,
-				Instances: []appsv1.InstanceTemplate{{Name: "target", Resources: &templateTarget}},
-			},
-		}},
-	}}
-	verticalScaling := opsv1alpha1.VerticalScaling{
-		ComponentOps:         opsv1alpha1.ComponentOps{ComponentName: "mysql"},
-		ResourceRequirements: componentTarget,
-		Instances: []opsv1alpha1.InstanceResourceTemplate{{
-			Name: "target", ResourceRequirements: templateTarget,
-		}},
-	}
-	ops := &opsv1alpha1.OpsRequest{Spec: opsv1alpha1.OpsRequestSpec{SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{
-		VerticalScalingList: []opsv1alpha1.VerticalScaling{verticalScaling},
-	}}}
-	opsRes := &OpsResource{Cluster: cluster, OpsRequest: ops}
-	handler := verticalScalingHandler{}
-	if !handler.resourceFieldsUnchanged(opsRes) {
-		t.Fatal("component and instance-template targets did not match")
-	}
-	shardingOps := ops.DeepCopy()
-	shardingOps.Spec.VerticalScalingList[0].ComponentName = "shard"
-	if !handler.resourceFieldsUnchanged(&OpsResource{Cluster: cluster, OpsRequest: shardingOps}) {
-		t.Fatal("sharding resource fields did not match")
-	}
-	changedUnrelatedResources := resources("5")
-	cluster.Spec.ComponentSpecs[0].Instances[1].Resources = &changedUnrelatedResources
-	if !handler.resourceFieldsUnchanged(opsRes) {
-		t.Fatal("unrelated instance-template change replaced the target")
-	}
-	cluster.Spec.ComponentSpecs[0].Resources = resources("6")
-	if handler.resourceFieldsUnchanged(opsRes) {
-		t.Fatal("replaced component resources were accepted")
-	}
-	cluster.Spec.ComponentSpecs[0].Resources = componentTarget
-	changedTargetResources := resources("7")
-	cluster.Spec.ComponentSpecs[0].Instances[0].Resources = &changedTargetResources
-	if handler.resourceFieldsUnchanged(opsRes) {
-		t.Fatal("replaced instance-template resources were accepted")
-	}
-	phase, _, err := handler.ReconcileAction(intctrlutil.RequestCtx{}, nil, opsRes)
-	if err != nil || phase != opsv1alpha1.OpsAbortedPhase {
-		t.Fatalf("phase=%s err=%v, want Aborted for a replaced target", phase, err)
-	}
-
-	oldComponentResources := resources("500m")
-	oldTemplateResources := resources("750m")
-	cluster.Spec.ComponentSpecs[0].Resources = oldComponentResources
-	cluster.Spec.ComponentSpecs[0].Instances[0].Resources = &oldTemplateResources
-	ops.Status.Phase = opsv1alpha1.OpsCancellingPhase
-	ops.Status.LastConfiguration.Components = map[string]opsv1alpha1.LastComponentConfiguration{
-		"mysql": {
-			ResourceRequirements: oldComponentResources,
-			Instances:            []appsv1.InstanceTemplate{{Name: "target", Resources: &oldTemplateResources}},
-		},
-	}
-	if !handler.resourceFieldsUnchanged(opsRes) {
-		t.Fatal("rollback target did not match lastConfiguration")
-	}
-	cluster.Spec.ComponentSpecs[0].Instances[0].Resources = &changedTargetResources
-	if handler.resourceFieldsUnchanged(opsRes) {
-		t.Fatal("replaced rollback target was accepted")
-	}
-
-	partialOps := ops.DeepCopy()
-	partialOps.Spec.VerticalScalingList[0].ResourceRequirements = corev1.ResourceRequirements{}
-	partialOps.Status.LastConfiguration.Components["mysql"] = opsv1alpha1.LastComponentConfiguration{
-		Instances: []appsv1.InstanceTemplate{{Name: "target", Resources: &oldTemplateResources}},
-	}
-	cluster.Spec.ComponentSpecs[0].Resources = resources("8")
-	cluster.Spec.ComponentSpecs[0].Instances[0].Resources = &oldTemplateResources
-	if !handler.resourceFieldsUnchanged(&OpsResource{Cluster: cluster, OpsRequest: partialOps}) {
-		t.Fatal("unrelated component resources blocked instance-template rollback")
-	}
-}
 
 var _ = Describe("VerticalScaling OpsRequest", func() {
 
@@ -187,7 +68,6 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 		// namespaced
 		testapps.ClearResources(&testCtx, generics.OpsRequestSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.InstanceSetSignature, true, inNS, ml)
 	}
 
 	BeforeEach(cleanEnv)
@@ -229,7 +109,6 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 					cluster.Spec.ComponentSpecs[0].Instances = instances
 				})).Should(Succeed())
 			}
-			testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
 			By("create VerticalScaling ops")
 			ops := testops.NewOpsRequestObj("vertical-scaling-ops-"+testCtx.GetRandomStr(), testCtx.DefaultNamespace,
 				clusterName, opsv1alpha1.VerticalScalingType)
@@ -247,7 +126,6 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 			By("test vertical scale action function")
 			vsHandler := verticalScalingHandler{}
 			Expect(vsHandler.Action(reqCtx, k8sClient, opsRes)).Should(Succeed())
-			recordRollingActionGeneration(opsRes)
 			_, _, err = vsHandler.ReconcileAction(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 			return opsRes
@@ -315,7 +193,6 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 
 			By("restarting 1 pod")
 			reCreatePod(pods[0])
-			mockRollingInstanceStatus(opsRes.Cluster, defaultCompName, pods[0].Name)
 
 			By("reconcile opsRequest status")
 			_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
@@ -325,8 +202,6 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 			By("restarting remain 2 pods")
 			reCreatePod(pods[1])
 			reCreatePod(pods[2])
-			mockRollingInstanceStatus(opsRes.Cluster, defaultCompName,
-				pods[0].Name, pods[1].Name, pods[2].Name)
 
 			By("mock cluster running")
 			mockComponentIsOperating(opsRes.Cluster, appsv1.RunningComponentPhase, defaultCompName)
@@ -373,7 +248,6 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 			By("init operations resources with CLusterDefinition/Hybrid components Cluster/consensus Pods")
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
 			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
-			testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
 			podList := initInstanceSetPods(ctx, k8sClient, opsRes)
 
 			By("create VerticalScaling ops")
@@ -388,12 +262,6 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 				},
 			}
 			opsRes.OpsRequest = testops.CreateOpsRequest(ctx, testCtx, ops)
-			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsPendingPhase
-			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
-			Expect(err).ShouldNot(HaveOccurred())
-			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
-			Expect(err).ShouldNot(HaveOccurred())
-			recordRollingActionGeneration(opsRes)
 
 			By("mock opsRequest is Running")
 			mockComponentIsOperating(opsRes.Cluster, appsv1.UpdatingComponentPhase, defaultCompName)
@@ -413,10 +281,9 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 
 			By("mock podList[0] rolling update successfully by re-creating it")
 			reCreatePod(podList[0])
-			mockRollingInstanceStatus(opsRes.Cluster, defaultCompName, podList[0].Name)
 
 			By("reconcile opsRequest status")
-			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 
 			By("the progress status of pod[0] should be Succeed ")
@@ -429,8 +296,6 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 
 			By("mock podList[0] rolled back successfully by re-creating it")
 			reCreatePod(podList[0])
-			mockRollingInstanceStatus(opsRes.Cluster, defaultCompName,
-				podList[0].Name, podList[1].Name, podList[2].Name)
 
 			By("reconcile opsRequest status after canceling opsRequest and component is Running after rolling update")
 			mockConsensusCompToRunning(opsRes)
@@ -440,9 +305,9 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 			By("expect for cancelling opsRequest successfully")
 			opsRequest := opsRes.OpsRequest
 			Expect(opsRequest.Status.Phase).Should(Equal(opsv1alpha1.OpsCancelledPhase))
-			Expect(opsRequest.Status.Progress).Should(Equal("3/3"))
+			Expect(opsRequest.Status.Progress).Should(Equal("1/1"))
 			progressDetails = opsRequest.Status.Components[defaultCompName].ProgressDetails
-			Expect(len(progressDetails)).Should(Equal(3))
+			Expect(len(progressDetails)).Should(Equal(1))
 			progressDetail = findStatusProgressDetail(progressDetails, getProgressObjectKey(constant.PodKind, podList[0].Name))
 			Expect(progressDetail.Status).Should(Equal(opsv1alpha1.SucceedProgressStatus))
 			Expect(progressDetail.Message).Should(ContainSubstring("with rollback"))
@@ -499,5 +364,111 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 			opsRequestSlice, _ := opsutil.GetOpsRequestSliceFromCluster(opsRes.Cluster)
 			Expect(len(opsRequestSlice)).Should(Equal(1))
 		})
+	})
+})
+
+var _ = Describe("verticalScalingHandler resource match contract", func() {
+	// These tests pin the contract that podApplyCompOps must use when comparing
+	// a Pod's actual container resources against the target requirements declared
+	// in a VerticalScaling spec. They distinguish two distinct intents that the
+	// previous implementation collapsed into a single state:
+	//   1) the caller omitted a request key entirely (defaulting it to the limit
+	//      value matches the apiserver behaviour for an absent request);
+	//   2) the caller explicitly set the request value to zero (which is a valid
+	//      Pod spec and must be compared as a literal zero, not silently
+	//      promoted to the limit value).
+	const (
+		clusterCompName = "c1"
+		podName         = "pod-0"
+		containerName   = "main"
+	)
+
+	vs := verticalScalingHandler{}
+
+	makePod := func(limits, requests corev1.ResourceList) *corev1.Pod {
+		return &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: podName},
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{
+					{
+						Name: containerName,
+						Resources: corev1.ResourceRequirements{
+							Limits:   limits,
+							Requests: requests,
+						},
+					},
+				},
+			},
+		}
+	}
+
+	makeInstance := func(pod *corev1.Pod) Instance {
+		return &defaultInstance{name: podName, componentName: clusterCompName, pod: pod}
+	}
+
+	makePgRes := func(target corev1.ResourceRequirements) *progressResource {
+		return &progressResource{
+			updatedPodSet:    map[string]string{podName: constant.EmptyInsTemplateName},
+			clusterComponent: &appsv1.ClusterComponentSpec{Name: clusterCompName},
+			compOps: opsv1alpha1.VerticalScaling{
+				ComponentOps:         opsv1alpha1.ComponentOps{ComponentName: clusterCompName},
+				ResourceRequirements: target,
+			},
+		}
+	}
+
+	ops := &opsv1alpha1.OpsRequest{}
+
+	It("treats an explicit requests=0 with limits>0 as a match when the Pod actual has the same explicit zero request", func() {
+		target := corev1.ResourceRequirements{
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("1"),
+				corev1.ResourceMemory: resource.MustParse("2Gi"),
+			},
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("0"),
+				corev1.ResourceMemory: resource.MustParse("2Gi"),
+			},
+		}
+		pod := makePod(target.Limits.DeepCopy(), target.Requests.DeepCopy())
+		Expect(vs.podApplyCompOps(ops, makeInstance(pod), makePgRes(target))).Should(BeTrue())
+	})
+
+	It("defaults an absent request key to its limit value when comparing", func() {
+		target := corev1.ResourceRequirements{
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("1"),
+				corev1.ResourceMemory: resource.MustParse("2Gi"),
+			},
+			Requests: corev1.ResourceList{
+				// cpu key is intentionally absent here.
+				corev1.ResourceMemory: resource.MustParse("2Gi"),
+			},
+		}
+		podRequests := corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("1"),
+			corev1.ResourceMemory: resource.MustParse("2Gi"),
+		}
+		pod := makePod(target.Limits.DeepCopy(), podRequests)
+		Expect(vs.podApplyCompOps(ops, makeInstance(pod), makePgRes(target))).Should(BeTrue())
+	})
+
+	It("returns false when the Pod's actual requests differ from the target", func() {
+		target := corev1.ResourceRequirements{
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("1"),
+				corev1.ResourceMemory: resource.MustParse("2Gi"),
+			},
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("500m"),
+				corev1.ResourceMemory: resource.MustParse("2Gi"),
+			},
+		}
+		podRequests := corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("300m"),
+			corev1.ResourceMemory: resource.MustParse("2Gi"),
+		}
+		pod := makePod(target.Limits.DeepCopy(), podRequests)
+		Expect(vs.podApplyCompOps(ops, makeInstance(pod), makePgRes(target))).Should(BeFalse())
 	})
 })

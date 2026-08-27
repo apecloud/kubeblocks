@@ -8,7 +8,7 @@ it under the terms of the GNU Affero General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
 
-This program is distributed in the hope that it will be useful,
+This program is distributed in the hope that it will be useful
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU Affero General Public License for more details.
@@ -20,321 +20,146 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
-	"context"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"k8s.io/utils/pointer"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 )
 
-func TestRollingComponentAndShardingTerminalStatus(t *testing.T) {
-	const (
-		namespace   = "default"
-		clusterName = "cluster"
-	)
-	scheme := runtime.NewScheme()
-	if err := appsv1.AddToScheme(scheme); err != nil {
-		t.Fatal(err)
+func TestRollingTargetsState(t *testing.T) {
+	cluster := &appsv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Generation: 8},
+		Spec: appsv1.ClusterSpec{
+			ComponentSpecs: []appsv1.ClusterComponentSpec{{Name: "mysql"}},
+			Shardings:      []appsv1.ClusterSharding{{Name: "shard"}},
+		},
+		Status: appsv1.ClusterStatus{
+			Components: map[string]appsv1.ClusterComponentStatus{
+				"mysql": {Phase: appsv1.RunningComponentPhase, ObservedGeneration: 7, UpToDate: true},
+			},
+			Shardings: map[string]appsv1.ClusterShardingStatus{
+				"shard": {Phase: appsv1.RunningComponentPhase, ObservedGeneration: 8, UpToDate: true},
+			},
+		},
 	}
-	if err := opsv1alpha1.AddToScheme(scheme); err != nil {
-		t.Fatal(err)
+	ops := &opsv1alpha1.OpsRequest{Status: opsv1alpha1.OpsRequestStatus{
+		ClusterGeneration: 8,
+		Components:        map[string]opsv1alpha1.OpsRequestComponentStatus{},
+	}}
+	opsRes := &OpsResource{Cluster: cluster, OpsRequest: ops}
+	helper := newComponentOpsHelper([]opsv1alpha1.ComponentOps{{ComponentName: "mysql"}, {ComponentName: "shard"}})
+
+	completed, failed := helper.rollingTargetsState(opsRes, appsv1.RunningComponentPhase)
+	if completed || failed {
+		t.Fatalf("stale status completed=%v failed=%v, want processing", completed, failed)
 	}
 
-	t.Run("all component targets must be current", func(t *testing.T) {
-		cluster := &appsv1.Cluster{
-			ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: clusterName, Generation: 7},
-			Spec: appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{
-				{Name: "a", Replicas: 1}, {Name: "b", Replicas: 1},
-			}},
-			Status: appsv1.ClusterStatus{Components: map[string]appsv1.ClusterComponentStatus{
-				"a": {Phase: appsv1.RunningComponentPhase, ObservedGeneration: 7, UpToDate: true},
-				"b": {Phase: appsv1.FailedComponentPhase, ObservedGeneration: 6, UpToDate: true},
-			}},
-		}
-		ops := &opsv1alpha1.OpsRequest{
-			ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "upgrade"},
-			Status:     opsv1alpha1.OpsRequestStatus{ClusterGeneration: 7},
-		}
-		opsRes := &OpsResource{Cluster: cluster, OpsRequest: ops}
-		helper := newComponentOpsHelper([]opsv1alpha1.ComponentOps{{ComponentName: "a"}, {ComponentName: "b"}})
-		cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&opsv1alpha1.OpsRequest{}).WithObjects(cluster, ops).Build()
-		handler := func(_ intctrlutil.RequestCtx, _ client.Client, _ *OpsResource, pg *progressResource,
-			_ *opsv1alpha1.OpsRequestComponentStatus) (int32, int32, error) {
-			return 1, 1, nil
-		}
-		phase, _, err := helper.reconcileRollingActionWithComponentOps(intctrlutil.RequestCtx{Ctx: context.Background()}, cli, opsRes, "upgrade", handler)
-		if err != nil || phase != opsv1alpha1.OpsRunningPhase {
-			t.Fatalf("phase=%s err=%v, want Running", phase, err)
-		}
-		status := cluster.Status.Components["b"]
-		status.ObservedGeneration = 7
-		status.Phase = appsv1.StoppedComponentPhase
-		cluster.Status.Components["b"] = status
-		phase, _, err = helper.reconcileRollingActionWithComponentOps(intctrlutil.RequestCtx{Ctx: context.Background()}, cli, opsRes, "upgrade", handler)
-		if err != nil || phase != opsv1alpha1.OpsSucceedPhase {
-			t.Fatalf("phase=%s err=%v, want Succeed", phase, err)
-		}
-		if ops.Status.Progress != "2/2" {
-			t.Fatalf("progress=%s, want 2/2", ops.Status.Progress)
-		}
-	})
+	status := cluster.Status.Components["mysql"]
+	status.ObservedGeneration = cluster.Generation
+	status.UpToDate = false
+	status.Phase = appsv1.FailedComponentPhase
+	cluster.Status.Components["mysql"] = status
+	completed, failed = helper.rollingTargetsState(opsRes, appsv1.RunningComponentPhase)
+	if completed || failed {
+		t.Fatalf("non-current failure completed=%v failed=%v, want processing", completed, failed)
+	}
 
-	t.Run("current sharding failure is terminal", func(t *testing.T) {
-		cluster := &appsv1.Cluster{
-			ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: clusterName, Generation: 9},
-			Spec: appsv1.ClusterSpec{Shardings: []appsv1.ClusterSharding{{
-				Name: "shard", Shards: 1, Template: appsv1.ClusterComponentSpec{Replicas: 1},
-			}}},
-			Status: appsv1.ClusterStatus{Shardings: map[string]appsv1.ClusterShardingStatus{
-				"shard": {Phase: appsv1.FailedComponentPhase, ObservedGeneration: 9, UpToDate: true},
-			}},
-		}
-		ops := &opsv1alpha1.OpsRequest{
-			ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "upgrade-shard"},
-			Status:     opsv1alpha1.OpsRequestStatus{ClusterGeneration: 9},
-		}
-		helper := newComponentOpsHelper([]opsv1alpha1.UpgradeComponent{{
-			ComponentOps: opsv1alpha1.ComponentOps{ComponentName: "shard"},
-		}})
-		opsRes := &OpsResource{Cluster: cluster, OpsRequest: ops}
-		cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&opsv1alpha1.OpsRequest{}).WithObjects(cluster, ops).Build()
-		handler := func(_ intctrlutil.RequestCtx, _ client.Client, _ *OpsResource, _ *progressResource,
-			_ *opsv1alpha1.OpsRequestComponentStatus) (int32, int32, error) {
-			return 1, 0, nil
-		}
-		phase, _, err := helper.reconcileRollingActionWithComponentOps(intctrlutil.RequestCtx{Ctx: context.Background()}, cli,
-			opsRes, "upgrade", handler)
-		if err != nil || phase != opsv1alpha1.OpsFailedPhase {
-			t.Fatalf("phase=%s err=%v, want Failed", phase, err)
-		}
-	})
+	status.UpToDate = true
+	cluster.Status.Components["mysql"] = status
+	completed, failed = helper.rollingTargetsState(opsRes, appsv1.RunningComponentPhase)
+	if completed || !failed {
+		t.Fatalf("current failure completed=%v failed=%v, want failed", completed, failed)
+	}
 
-	t.Run("later generation is accepted after the Cluster converges", func(t *testing.T) {
-		cluster := &appsv1.Cluster{
-			ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: clusterName, Generation: 8},
-			Spec: appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{{
-				Name: "mysql", Annotations: map[string]string{constant.RestartAnnotationKey: "restart-a"},
-			}}},
-			Status: appsv1.ClusterStatus{Components: map[string]appsv1.ClusterComponentStatus{
-				"mysql": {Phase: appsv1.RunningComponentPhase, ObservedGeneration: 8, UpToDate: true},
-			}},
-		}
-		ops := &opsv1alpha1.OpsRequest{Status: opsv1alpha1.OpsRequestStatus{ClusterGeneration: 8}}
-		helper := newComponentOpsHelper([]opsv1alpha1.ComponentOps{{ComponentName: "mysql"}})
-		opsRes := &OpsResource{Cluster: cluster, OpsRequest: ops}
-		cluster.Generation = 9
-		cluster.Spec.ComponentSpecs[0].Annotations[constant.RestartAnnotationKey] = "restart-b"
-		cluster.Status.Components["mysql"] = appsv1.ClusterComponentStatus{
-			Phase: appsv1.UpdatingComponentPhase, ObservedGeneration: 9,
-		}
-		completed, failed := helper.rollingTargetsState(opsRes)
-		if completed || failed {
-			t.Fatalf("updating Cluster completed=%v failed=%v, want processing", completed, failed)
-		}
-		cluster.Status.Components["mysql"] = appsv1.ClusterComponentStatus{
-			Phase: appsv1.RunningComponentPhase, ObservedGeneration: 9, UpToDate: true,
-		}
-		completed, failed = helper.rollingTargetsState(opsRes)
-		if !completed || failed {
-			t.Fatalf("converged Cluster completed=%v failed=%v, want success", completed, failed)
-		}
-	})
-
-	t.Run("later generation waits for its current Cluster status", func(t *testing.T) {
-		cluster := &appsv1.Cluster{
-			ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: clusterName, Generation: 8},
-			Spec: appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{{
-				Name: "mysql", Annotations: map[string]string{constant.RestartAnnotationKey: "restart-a"},
-			}}},
-			Status: appsv1.ClusterStatus{Components: map[string]appsv1.ClusterComponentStatus{
-				"mysql": {Phase: appsv1.RunningComponentPhase, ObservedGeneration: 8, UpToDate: true},
-			}},
-		}
-		ops := &opsv1alpha1.OpsRequest{Status: opsv1alpha1.OpsRequestStatus{ClusterGeneration: 8}}
-		helper := newComponentOpsHelper([]opsv1alpha1.ComponentOps{{ComponentName: "mysql"}})
-		opsRes := &OpsResource{Cluster: cluster, OpsRequest: ops}
-
-		// A later Cluster change invalidates the previously observed target status.
-		cluster.Generation = 9
-		cluster.Spec.Services = []appsv1.ClusterService{{Service: appsv1.Service{Name: "external"}}}
-		cluster.Status.Components["mysql"] = appsv1.ClusterComponentStatus{
-			Phase: appsv1.RunningComponentPhase, ObservedGeneration: 8, UpToDate: true,
-		}
-		completed, failed := helper.rollingTargetsState(opsRes)
-		if completed || failed {
-			t.Fatalf("stale status completed=%v failed=%v, want processing", completed, failed)
-		}
-
-		cluster.Status.Components["mysql"] = appsv1.ClusterComponentStatus{
-			Phase: appsv1.RunningComponentPhase, ObservedGeneration: 9, UpToDate: true,
-		}
-		completed, failed = helper.rollingTargetsState(opsRes)
-		if !completed || failed {
-			t.Fatalf("compatible generation completed=%v failed=%v, want success", completed, failed)
-		}
-	})
-
-	t.Run("failed status is ignored until the target is up-to-date", func(t *testing.T) {
-		cluster := &appsv1.Cluster{
-			ObjectMeta: metav1.ObjectMeta{Generation: 5},
-			Spec:       appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{{Name: "mysql"}}},
-			Status: appsv1.ClusterStatus{Components: map[string]appsv1.ClusterComponentStatus{
-				"mysql": {Phase: appsv1.FailedComponentPhase, ObservedGeneration: 5, UpToDate: false},
-			}},
-		}
-		ops := &opsv1alpha1.OpsRequest{Status: opsv1alpha1.OpsRequestStatus{ClusterGeneration: 5}}
-		helper := newComponentOpsHelper([]opsv1alpha1.ComponentOps{{ComponentName: "mysql"}})
-		opsRes := &OpsResource{Cluster: cluster, OpsRequest: ops}
-		completed, failed := helper.rollingTargetsState(opsRes)
-		if completed || failed {
-			t.Fatalf("completed=%v failed=%v, want processing for stale failure", completed, failed)
-		}
-		status := cluster.Status.Components["mysql"]
-		status.UpToDate = true
-		cluster.Status.Components["mysql"] = status
-		completed, failed = helper.rollingTargetsState(opsRes)
-		if completed || !failed {
-			t.Fatalf("completed=%v failed=%v, want current Cluster failure", completed, failed)
-		}
-	})
-
-	t.Run("instance-scoped target waits only for the Cluster generation receipt", func(t *testing.T) {
-		cluster := &appsv1.Cluster{
-			ObjectMeta: metav1.ObjectMeta{Generation: 7},
-			Status: appsv1.ClusterStatus{Components: map[string]appsv1.ClusterComponentStatus{
-				"mysql": {Phase: appsv1.FailedComponentPhase, ObservedGeneration: 6, UpToDate: false},
-			}},
-		}
-		opsRes := &OpsResource{
-			Cluster: cluster,
-			OpsRequest: &opsv1alpha1.OpsRequest{Status: opsv1alpha1.OpsRequestStatus{
-				ClusterGeneration: 7,
-			}},
-		}
-		pgRes := &progressResource{compOps: opsv1alpha1.ComponentOps{ComponentName: "mysql"}}
-		if rollingTargetGenerationObserved(opsRes, pgRes) {
-			t.Fatal("stale Cluster generation was accepted")
-		}
-		status := cluster.Status.Components["mysql"]
-		status.ObservedGeneration = cluster.Generation
-		cluster.Status.Components["mysql"] = status
-		if !rollingTargetGenerationObserved(opsRes, pgRes) {
-			t.Fatal("current Cluster generation receipt was rejected because of aggregate health")
-		}
-	})
-
-	t.Run("instance-scoped result uses workload state instead of progress", func(t *testing.T) {
-		const podName = "cluster-mysql-0"
-		workload := &defaultWorkload{
-			exists:               true,
-			instanceTemplateMap:  map[string]string{podName: "template-a"},
-			upToDateSet:          sets.New(podName),
-			activeInstanceNames:  sets.New(podName),
-			presentInstanceNames: sets.New(podName),
-			unknownTemplateNames: sets.New[string](),
-			notReadySet:          sets.New[string](),
-			notAvailableSet:      sets.New[string](),
-			failedSet:            sets.New[string](),
-		}
-		target := &rollingInstanceTarget{templates: sets.New("template-a"), expectedCount: 1}
-
-		completed, failed := rollingInstanceTargetStateWithWorkload(workload, target)
-		if !completed || failed {
-			t.Fatalf("completed=%v failed=%v, want participant success", completed, failed)
-		}
-
-		workload.notReadySet.Insert(podName)
-		completed, failed = rollingInstanceTargetStateWithWorkload(workload, target)
-		if completed || failed {
-			t.Fatalf("completed=%v failed=%v, want unready participant processing", completed, failed)
-		}
-
-		workload.notReadySet.Delete(podName)
-		workload.notAvailableSet.Insert(podName)
-		completed, failed = rollingInstanceTargetStateWithWorkload(workload, target)
-		if completed || failed {
-			t.Fatalf("completed=%v failed=%v, want unavailable participant processing", completed, failed)
-		}
-
-		workload.notAvailableSet.Delete(podName)
-		workload.failedSet.Insert(podName)
-		completed, failed = rollingInstanceTargetStateWithWorkload(workload, target)
-		if completed || !failed {
-			t.Fatalf("completed=%v failed=%v, want participant failure", completed, failed)
-		}
-
-		workload.failedSet.Delete(podName)
-		delete(workload.instanceTemplateMap, podName)
-		workload.unknownTemplateNames.Insert(podName)
-		completed, failed = rollingInstanceTargetStateWithWorkload(workload, target)
-		if completed || failed {
-			t.Fatalf("completed=%v failed=%v, want unknown template assignment to remain processing", completed, failed)
-		}
-
-		workload.unknownTemplateNames.Delete(podName)
-		workload.instanceTemplateMap[podName] = "template-a"
-		target.expectedCount = 2
-		completed, failed = rollingInstanceTargetStateWithWorkload(workload, target)
-		if !completed || failed {
-			t.Fatalf("completed=%v failed=%v, progress count changed the participant result", completed, failed)
-		}
-	})
+	status.Phase = appsv1.RunningComponentPhase
+	cluster.Status.Components["mysql"] = status
+	completed, failed = helper.rollingTargetsState(opsRes, appsv1.RunningComponentPhase)
+	if !completed || failed {
+		t.Fatalf("current running status completed=%v failed=%v, want success", completed, failed)
+	}
+	completed, failed = helper.rollingTargetsState(opsRes, appsv1.StoppedComponentPhase)
+	if completed || failed {
+		t.Fatalf("running status completed=%v failed=%v, want stop processing", completed, failed)
+	}
 }
 
-func TestReplacedRollingTargetIsPersistedAsAborted(t *testing.T) {
-	scheme := runtime.NewScheme()
-	if err := appsv1.AddToScheme(scheme); err != nil {
-		t.Fatal(err)
-	}
-	if err := opsv1alpha1.AddToScheme(scheme); err != nil {
-		t.Fatal(err)
-	}
-	cluster := &appsv1.Cluster{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "cluster", Generation: 2},
-		Spec: appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{{
-			Name: "mysql", ComponentDef: "mysql-v3", ServiceVersion: "3.0.0",
-		}}},
-	}
-	componentDef := "mysql-v2"
-	serviceVersion := "2.0.0"
-	ops := &opsv1alpha1.OpsRequest{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "upgrade"},
-		Spec: opsv1alpha1.OpsRequestSpec{
-			ClusterName: "cluster",
-			Type:        opsv1alpha1.UpgradeType,
-			SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{Upgrade: &opsv1alpha1.Upgrade{
-				Components: []opsv1alpha1.UpgradeComponent{{
-					ComponentOps:            opsv1alpha1.ComponentOps{ComponentName: "mysql"},
-					ComponentDefinitionName: &componentDef,
-					ServiceVersion:          &serviceVersion,
-				}},
-			}},
+func TestComponentStopFieldsUnchanged(t *testing.T) {
+	cluster := &appsv1.Cluster{Spec: appsv1.ClusterSpec{
+		ComponentSpecs: []appsv1.ClusterComponentSpec{
+			{Name: "mysql", Stop: pointer.Bool(true)},
+			{Name: "proxy"},
 		},
-		Status: opsv1alpha1.OpsRequestStatus{Phase: opsv1alpha1.OpsRunningPhase, ClusterGeneration: 1},
+		Shardings: []appsv1.ClusterSharding{{Name: "shard", Template: appsv1.ClusterComponentSpec{Stop: pointer.Bool(true)}}},
+	}}
+	if !newComponentOpsHelper([]opsv1alpha1.ComponentOps{{ComponentName: "mysql"}}).
+		componentStopFieldsUnchanged(cluster, true) {
+		t.Fatal("matching stop target was rejected")
 	}
-	cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&opsv1alpha1.OpsRequest{}).
-		WithObjects(cluster, ops).Build()
+	if newComponentOpsHelper([]opsv1alpha1.ComponentOps{{ComponentName: "proxy"}}).
+		componentStopFieldsUnchanged(cluster, true) {
+		t.Fatal("overwritten stop target was accepted")
+	}
+	if !newComponentOpsHelper([]opsv1alpha1.ComponentOps{{ComponentName: "proxy"}}).
+		componentStopFieldsUnchanged(cluster, false) {
+		t.Fatal("matching start target was rejected")
+	}
+	if newComponentOpsHelper([]opsv1alpha1.ComponentOps{{ComponentName: "missing"}}).
+		componentStopFieldsUnchanged(cluster, false) {
+		t.Fatal("missing target was accepted")
+	}
+}
+
+func TestInstanceStatusProgress(t *testing.T) {
+	const instanceName = "cluster-mysql-0"
 	opsRes := &OpsResource{
-		Cluster:    cluster,
-		OpsRequest: ops,
+		Cluster:    &appsv1.Cluster{},
+		OpsRequest: &opsv1alpha1.OpsRequest{},
 		Recorder:   record.NewFakeRecorder(10),
 	}
-	if _, err := GetOpsManager().Reconcile(intctrlutil.RequestCtx{Ctx: context.Background()}, cli, opsRes); err != nil {
-		t.Fatal(err)
+	pgRes := &progressResource{
+		opsMessageKey:     "upgrade",
+		fullComponentName: "mysql",
+		clusterComponent:  &appsv1.ClusterComponentSpec{Name: "mysql", Replicas: 1},
 	}
-	if ops.Status.Phase != opsv1alpha1.OpsAbortedPhase {
-		t.Fatalf("phase=%s, want Aborted", ops.Status.Phase)
+	compStatus := &opsv1alpha1.OpsRequestComponentStatus{}
+	workload := rollingWorkload{
+		exists:          true,
+		desiredReplicas: 1,
+		instances: []workloads.InstanceStatus{{
+			PodName:         instanceName,
+			DesiredState:    workloads.InstanceDesiredStateActive,
+			CurrentState:    workloads.InstanceCurrentStatePresent,
+			UpToDate:        true,
+			Ready:           true,
+			Available:       false,
+			CurrentRevision: "revision-1",
+			UpdateRevision:  "revision-1",
+		}},
 	}
-	if len(ops.Status.Conditions) == 0 || ops.Status.Conditions[len(ops.Status.Conditions)-1].Type != opsv1alpha1.ConditionTypeAborted {
-		t.Fatalf("conditions=%v, want an Aborted condition", ops.Status.Conditions)
+
+	expected, completed := handleActiveInstanceStatusProgress(opsRes, pgRes, compStatus, workload)
+	if expected != 1 || completed != 0 {
+		t.Fatalf("progress=%d/%d, want 0/1 until Available", completed, expected)
+	}
+	workload.instances[0].Available = true
+	expected, completed = handleActiveInstanceStatusProgress(opsRes, pgRes, compStatus, workload)
+	if expected != 1 || completed != 1 {
+		t.Fatalf("progress=%d/%d, want 1/1", completed, expected)
+	}
+	workload.instances[0].Failed = true
+	expected, completed = handleActiveInstanceStatusProgress(opsRes, pgRes, compStatus, workload)
+	if expected != 1 || completed != 1 || compStatus.ProgressDetails[0].Status != opsv1alpha1.FailedProgressStatus {
+		t.Fatalf("failed progress=%d/%d details=%v", completed, expected, compStatus.ProgressDetails)
+	}
+
+	workload.instances[0].CurrentState = workloads.InstanceCurrentStateAbsent
+	expected, completed = handleStoppedInstanceStatusProgress(opsRes, pgRes, compStatus, workload)
+	if expected != 1 || completed != 1 {
+		t.Fatalf("stop progress=%d/%d, want 1/1", completed, expected)
 	}
 }

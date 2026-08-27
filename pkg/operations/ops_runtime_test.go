@@ -27,8 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -55,33 +53,19 @@ func TestOpsRuntimeBuildsInstanceAPIView(t *testing.T) {
 		instanceName = "test-cluster-mysql-0"
 	)
 	enableInstanceAPI := true
-	replicas := int32(1)
 	its := &workloads.InstanceSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace:  namespace,
-			Name:       constant.GenerateClusterComponentName(clusterName, component),
-			Labels:     constant.GetCompLabels(clusterName, component),
-			Generation: 2,
+			Namespace: namespace,
+			Name:      constant.GenerateClusterComponentName(clusterName, component),
+			Labels:    constant.GetCompLabels(clusterName, component),
 		},
 		Spec: workloads.InstanceSetSpec{
 			MinReadySeconds: 15,
-			Replicas:        &replicas,
 		},
 		Status: workloads.InstanceSetStatus{
-			Replicas: 1,
 			CurrentRevisions: map[string]string{
 				instanceName: "rev-a",
 			},
-			UpdateRevisions: map[string]string{
-				instanceName: "rev-b",
-			},
-			InstanceStatus: []workloads.InstanceStatus{{
-				PodName:         instanceName,
-				CurrentRevision: "rev-a",
-				UpdateRevision:  "rev-b",
-				Ready:           true,
-				Available:       true,
-			}},
 		},
 	}
 	pod := &corev1.Pod{
@@ -204,21 +188,37 @@ func TestOpsRuntimeBuildsInstanceAPIView(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get workload: %v", err)
 	}
-	if !workload.Exists() {
-		t.Fatal("expected an InstanceSet workload")
-	}
-	if workload.GetDesiredReplicas() != 1 {
-		t.Fatalf("unexpected desired replicas: %d", workload.GetDesiredReplicas())
+	if workload.GetMinReadySeconds() != 15 {
+		t.Fatalf("unexpected minReadySeconds: %d", workload.GetMinReadySeconds())
 	}
 	if got := workload.GetCurrentRevisionMap()[instanceName]; got != "rev-a" {
 		t.Fatalf("unexpected current revision: %s", got)
 	}
+
 	instance, err := rt.GetInstance(namespace, clusterName, component, instanceName)
 	if err != nil {
 		t.Fatalf("get instance: %v", err)
 	}
 	if instance.GetRole() != "leader" {
 		t.Fatalf("unexpected role: %s", instance.GetRole())
+	}
+	if instance.GetImage("mysql") != "mysql:8.0.36" {
+		t.Fatalf("unexpected image: %s", instance.GetImage("mysql"))
+	}
+	if instance.GetStatusImage("mysql") != "mysql@sha256:abc" {
+		t.Fatalf("unexpected status image: %s", instance.GetStatusImage("mysql"))
+	}
+	if instance.GetStatusImage("") != "mysql@sha256:abc" {
+		t.Fatalf("unexpected default status image: %s", instance.GetStatusImage(""))
+	}
+	if instance.GetStatusImage("missing") != "" {
+		t.Fatalf("expected empty missing status image")
+	}
+	if instance.GetImage("") != "mysql:8.0.36" {
+		t.Fatalf("unexpected default image: %s", instance.GetImage(""))
+	}
+	if instance.GetImage("missing") != "mysql:8.0.36" {
+		t.Fatalf("expected missing image lookup to fall back to first container")
 	}
 	if instance.GetNodeName() != "node-a" {
 		t.Fatalf("unexpected node name: %s", instance.GetNodeName())
@@ -238,8 +238,19 @@ func TestOpsRuntimeBuildsInstanceAPIView(t *testing.T) {
 	if len(instance.GetVolumeMounts("mysql")) != 1 {
 		t.Fatalf("expected mysql volume mounts")
 	}
-	if instance.GetVolumeMounts("missing") != nil {
-		t.Fatalf("expected nil missing container volume mounts")
+	if len(instance.GetVolumeMounts("missing")) != 1 {
+		t.Fatalf("expected missing container volume mounts to fall back to first container")
+	}
+	resources := instance.GetResources("mysql")
+	if resources.Requests.Cpu().String() != "100m" {
+		t.Fatalf("unexpected resources")
+	}
+	if len(instance.GetResources("missing").Requests) == 0 {
+		t.Fatalf("expected missing container resources to fall back to first container")
+	}
+	creationTimestamp := instance.GetCreationTimestamp()
+	if creationTimestamp.IsZero() {
+		t.Fatalf("expected creation timestamp")
 	}
 	if !instance.IsAvailable(15, true) {
 		t.Fatalf("expected instance to be available")
@@ -267,87 +278,6 @@ func TestOpsRuntimeBuildsInstanceAPIView(t *testing.T) {
 	}
 }
 
-func TestOpsRuntimeWorkloadMissingAndUsesPublicInstanceStatus(t *testing.T) {
-	scheme := runtime.NewScheme()
-	if err := corev1.AddToScheme(scheme); err != nil {
-		t.Fatal(err)
-	}
-	if err := workloads.AddToScheme(scheme); err != nil {
-		t.Fatal(err)
-	}
-	const (
-		namespace   = "default"
-		clusterName = "cluster"
-		component   = "mysql"
-		template    = "fast"
-	)
-
-	cli := fake.NewClientBuilder().WithScheme(scheme).Build()
-	rt := newOpsRuntime(context.Background(), cli, "")
-	workload, err := rt.GetWorkload(namespace, clusterName, component)
-	if err != nil {
-		t.Fatalf("get missing workload: %v", err)
-	}
-	if workload.Exists() {
-		t.Fatal("missing InstanceSet must remain missing")
-	}
-
-	its := &workloads.InstanceSet{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace:  namespace,
-			Name:       constant.GenerateClusterComponentName(clusterName, component),
-			Generation: 2,
-		},
-		Status: workloads.InstanceSetStatus{
-			CurrentRevisions: map[string]string{"zstd": "not-base64"},
-			UpdateRevisions:  map[string]string{"zstd": "not-base64"},
-			InstanceStatus: []workloads.InstanceStatus{{
-				PodName:         "cluster-mysql-0",
-				TemplateName:    pointer.String(template),
-				CurrentRevision: "rev-a",
-				UpdateRevision:  "rev-b",
-				UpToDate:        true,
-				Failed:          true,
-			}, {
-				PodName:      "cluster-mysql-offline",
-				DesiredState: workloads.InstanceDesiredStateOffline,
-				CurrentState: workloads.InstanceCurrentStateAbsent,
-			}, {
-				PodName:      "cluster-mysql-released",
-				DesiredState: workloads.InstanceDesiredStateReleased,
-				CurrentState: workloads.InstanceCurrentStatePresent,
-			}},
-		},
-	}
-	cli = fake.NewClientBuilder().WithScheme(scheme).WithObjects(its).Build()
-	rt = newOpsRuntime(context.Background(), cli, "")
-	workload, err = rt.GetWorkload(namespace, clusterName, component)
-	if err != nil {
-		t.Fatalf("get workload from public instance status: %v", err)
-	}
-	if workload.GetCurrentRevisionMap()["cluster-mysql-0"] != "rev-a" ||
-		!workload.GetUpToDateInstanceNameSet().Has("cluster-mysql-0") ||
-		!workload.GetFailedInstanceNameSet().Has("cluster-mysql-0") {
-		t.Fatal("workload did not use explicit InstanceStatus fields")
-	}
-	if !workload.GetActiveInstanceNameSet().Has("cluster-mysql-0") ||
-		workload.GetActiveInstanceNameSet().Has("cluster-mysql-offline") ||
-		workload.GetActiveInstanceNameSet().Has("cluster-mysql-released") {
-		t.Fatal("workload did not filter active rolling instances by effective desired state")
-	}
-	if !workload.GetPresentInstanceNameSet().Has("cluster-mysql-0") ||
-		!workload.GetPresentInstanceNameSet().Has("cluster-mysql-released") ||
-		workload.GetPresentInstanceNameSet().Has("cluster-mysql-offline") {
-		t.Fatal("workload did not expose current presence from effective current state")
-	}
-	if !workload.GetInstanceNameSetByTemplate(sets.New(template)).Has("cluster-mysql-0") {
-		t.Fatal("workload did not expose the public InstanceStatus template assignment")
-	}
-	if !workload.GetUnknownTemplateInstanceNameSet().Has("cluster-mysql-offline") {
-		t.Fatal("workload did not preserve an unknown public InstanceStatus template assignment")
-	}
-}
-
 func TestDefaultInstanceAndVolumeNilBranches(t *testing.T) {
 	instance := &defaultInstance{name: "missing", componentName: "mysql"}
 	if instance.GetComponentName() != "mysql" {
@@ -355,6 +285,10 @@ func TestDefaultInstanceAndVolumeNilBranches(t *testing.T) {
 	}
 	if instance.GetName() != "missing" {
 		t.Fatalf("unexpected instance name: %s", instance.GetName())
+	}
+	creationTimestamp := instance.GetCreationTimestamp()
+	if !creationTimestamp.IsZero() {
+		t.Fatalf("expected zero creation timestamp")
 	}
 	if instance.IsDeleting() {
 		t.Fatalf("nil pod should not be deleting")

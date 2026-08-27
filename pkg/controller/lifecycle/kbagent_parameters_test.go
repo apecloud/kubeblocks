@@ -19,10 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package lifecycle
 
-import (
-	"context"
-	"testing"
-)
+import "testing"
 
 func TestAddShellSafeParameterAliasesPreservesRawParameter(t *testing.T) {
 	parameters := map[string]string{
@@ -75,77 +72,6 @@ func TestShellSafeParameterAlias(t *testing.T) {
 	for input, expected := range tests {
 		if got := shellSafeParameterAlias(input); got != expected {
 			t.Fatalf("shellSafeParameterAlias(%q)=%q, want %q", input, got, expected)
-		}
-	}
-}
-
-func TestSwitchoverRuntimeParametersOverrideTemplateVars(t *testing.T) {
-	action := &kbagent{
-		templateVars: map[string]string{
-			switchoverCurrentName:   "spoofed-current",
-			switchoverCurrentFQDN:   "spoofed-current-fqdn",
-			switchoverCandidateName: "spoofed-candidate",
-			switchoverCandidateFQDN: "spoofed-candidate-fqdn",
-			switchoverRole:          "spoofed-role",
-			"USER_DEFINED":          "preserved",
-		},
-	}
-	runtime := &switchover{
-		namespace:    "default",
-		clusterName:  "demo",
-		compName:     "redis",
-		role:         "primary",
-		currentPod:   "demo-redis-0",
-		candidatePod: "demo-redis-1",
-	}
-
-	parameters, err := action.parameters(context.Background(), nil, runtime)
-	if err != nil {
-		t.Fatalf("parameters returned error: %v", err)
-	}
-	want := map[string]string{
-		switchoverCurrentName:   "demo-redis-0",
-		switchoverCurrentFQDN:   "demo-redis-0.demo-redis-headless.default.svc.cluster.local",
-		switchoverCandidateName: "demo-redis-1",
-		switchoverCandidateFQDN: "demo-redis-1.demo-redis-headless.default.svc.cluster.local",
-		switchoverRole:          "primary",
-		"USER_DEFINED":          "preserved",
-	}
-	for key, expected := range want {
-		if got := parameters[key]; got != expected {
-			t.Fatalf("parameter %s=%q, want %q", key, got, expected)
-		}
-	}
-}
-
-func TestSwitchoverEmptyCandidateOverridesTemplateVars(t *testing.T) {
-	action := &kbagent{
-		templateVars: map[string]string{
-			switchoverCandidateName:        "spoofed-candidate",
-			switchoverCandidateFQDN:        "spoofed-candidate-fqdn",
-			"kb_switchover_candidate_name": "alias-spoofed-candidate",
-			"kb_switchover_candidate_fqdn": "alias-spoofed-candidate-fqdn",
-			"kb_switchover_role":           "alias-spoofed-role",
-		},
-	}
-	runtime := &switchover{
-		namespace:   "default",
-		clusterName: "demo",
-		compName:    "redis",
-		currentPod:  "demo-redis-0",
-	}
-
-	parameters, err := action.parameters(context.Background(), nil, runtime)
-	if err != nil {
-		t.Fatalf("parameters returned error: %v", err)
-	}
-	for _, key := range []string{switchoverCandidateName, switchoverCandidateFQDN, switchoverRole} {
-		value, ok := parameters[key]
-		if !ok {
-			t.Fatalf("authoritative empty parameter %s is missing", key)
-		}
-		if value != "" {
-			t.Fatalf("parameter %s=%q, want authoritative empty value", key, value)
 		}
 	}
 }

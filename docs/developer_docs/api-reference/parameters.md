@@ -1392,7 +1392,9 @@ Payload
 <td>
 <code>configSpec</code><br/>
 <em>
+<a href="cluster.md#apps.kubeblocks.io/v1.ComponentFileTemplate">
 github.com/apecloud/kubeblocks/apis/apps/v1.ComponentFileTemplate
+</a>
 </em>
 </td>
 <td>

@@ -200,7 +200,8 @@ func (t *componentAccountTransformer) getPasswordFromSecret(transCtx *componentT
 	if err := transCtx.GetClient().Get(transCtx.GetContext(), secretKey, secret); err != nil {
 		return nil, err
 	}
-	if revision, ok := secret.Annotations[constant.SecretRevisionAnnotationKey]; ok && revision != account.SecretRefRevision {
+	if revision, ok := secret.Annotations[constant.SecretRevisionAnnotationKey]; ok &&
+		account.SecretRefRevision != "" && revision != account.SecretRefRevision {
 		return nil, ctrlutil.NewRequeueError(time.Second,
 			fmt.Sprintf("wait for referenced account secret %s/%s revision %s",
 				secret.Namespace, secret.Name, account.SecretRefRevision))

@@ -26,6 +26,7 @@ import (
 	"slices"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -486,6 +487,10 @@ func syncRollingProgressDetails(opsRes *OpsResource, progressSnapshots map[strin
 		for i := range details {
 			detail := details[i]
 			currentDetails[detail.ObjectKey] = struct{}{}
+			if existing := findStatusProgressDetail(compStatus.ProgressDetails, detail.ObjectKey); existing != nil &&
+				existing.Status != detail.Status && isCompletedProgressStatus(detail.Status) {
+				existing.EndTime = metav1.Time{}
+			}
 			setComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest, &compStatus.ProgressDetails, detail)
 		}
 		compStatus.ProgressDetails = slices.DeleteFunc(compStatus.ProgressDetails, func(detail opsv1alpha1.ProgressStatusDetail) bool {

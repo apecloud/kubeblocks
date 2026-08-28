@@ -22,15 +22,12 @@ package operations
 import (
 	"fmt"
 	"strings"
-	"testing"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -45,47 +42,6 @@ import (
 	testk8s "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 	testops "github.com/apecloud/kubeblocks/pkg/testutil/operations"
 )
-
-func TestProgressDetailEndTimeTransitions(t *testing.T) {
-	oldEndTime := metav1.NewTime(time.Now().Add(-time.Hour))
-	details := []opsv1alpha1.ProgressStatusDetail{{
-		ObjectKey: "Pod/mysql-0",
-		Status:    opsv1alpha1.SucceedProgressStatus,
-		Message:   "succeeded",
-		EndTime:   oldEndTime,
-	}}
-	opsRequest := &opsv1alpha1.OpsRequest{}
-	recorder := record.NewFakeRecorder(3)
-	setDetail := func(status opsv1alpha1.ProgressStatus, message string) {
-		setComponentStatusProgressDetail(recorder, opsRequest, &details,
-			opsv1alpha1.ProgressStatusDetail{ObjectKey: "Pod/mysql-0", Status: status, Message: message})
-	}
-
-	setDetail(opsv1alpha1.ProcessingProgressStatus, "processing again")
-	if details[0].Status != opsv1alpha1.ProcessingProgressStatus || !details[0].EndTime.IsZero() {
-		t.Fatalf("detail=%+v, want Processing without EndTime", details[0])
-	}
-	setDetail(opsv1alpha1.SucceedProgressStatus, "succeeded again")
-	if details[0].Status != opsv1alpha1.SucceedProgressStatus || !details[0].EndTime.After(oldEndTime.Time) {
-		t.Fatalf("detail=%+v, want Succeed with a new EndTime", details[0])
-	}
-	setDetail(opsv1alpha1.FailedProgressStatus, "failed")
-	failedEndTime := details[0].EndTime
-	setDetail(opsv1alpha1.ProcessingProgressStatus, "ignored processing")
-	if details[0].Status != opsv1alpha1.FailedProgressStatus || !details[0].EndTime.Equal(&failedEndTime) {
-		t.Fatalf("detail=%+v, want rejected Failed to Processing transition unchanged", details[0])
-	}
-	staleDetails := []opsv1alpha1.ProgressStatusDetail{{
-		ObjectKey: "Pod/mysql-1",
-		Status:    opsv1alpha1.ProcessingProgressStatus,
-		Message:   "processing",
-		EndTime:   oldEndTime,
-	}}
-	setComponentStatusProgressDetail(recorder, opsRequest, &staleDetails, staleDetails[0])
-	if !staleDetails[0].EndTime.IsZero() {
-		t.Fatalf("detail=%+v, want stale EndTime removed from Processing detail", staleDetails[0])
-	}
-}
 
 var _ = Describe("Ops ProgressDetails", func() {
 

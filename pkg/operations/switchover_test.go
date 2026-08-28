@@ -91,6 +91,14 @@ var _ = Describe("", func() {
 			compDefObj = testapps.NewComponentDefinitionFactory(compDefName).
 				WithRandomName().
 				SetDefaultSpec().
+				AddVar(appsv1.EnvVar{
+					Name: "SWITCHOVER_CLUSTER_NAME",
+					ValueFrom: &appsv1.VarSource{
+						ClusterVarRef: &appsv1.ClusterVarSelector{
+							ClusterVars: appsv1.ClusterVars{ClusterName: &appsv1.VarRequired},
+						},
+					},
+				}).
 				SetLifecycleAction("Switchover", testapps.NewLifecycleAction("switchover")).
 				Create(&testCtx).
 				GetObject()
@@ -231,6 +239,11 @@ var _ = Describe("", func() {
 					GinkgoWriter.Printf("ActionRequest: %#v\n", req)
 					Expect(req.Parameters["KB_SWITCHOVER_CURRENT_NAME"]).Should(Equal(instanceName))
 					Expect(req.Parameters["KB_SWITCHOVER_CANDIDATE_NAME"]).Should(Equal(candidateName))
+					Expect(req.Parameters["KB_SWITCHOVER_CURRENT_FQDN"]).Should(Equal(
+						intctrlutil.PodFQDN(testCtx.DefaultNamespace, compObj.Name, instanceName)))
+					Expect(req.Parameters["KB_SWITCHOVER_CANDIDATE_FQDN"]).Should(Equal(
+						intctrlutil.PodFQDN(testCtx.DefaultNamespace, compObj.Name, candidateName)))
+					Expect(req.Parameters["SWITCHOVER_CLUSTER_NAME"]).Should(Equal(clusterObj.Name))
 					rsp := kbagentproto.ActionResponse{Message: "mock success"}
 					return rsp, nil
 				})
@@ -660,10 +673,12 @@ var _ = Describe("", func() {
 			ops := testops.NewOpsRequestObj("ops-switchover-"+testCtx.GetRandomStr(), testCtx.DefaultNamespace,
 				shardingCluster.Name, opsv1alpha1.SwitchoverType)
 			instanceName := fmt.Sprintf("%s-%d", its.Name, 1)
+			candidateName := fmt.Sprintf("%s-%d", its.Name, 0)
 			ops.Spec.SwitchoverList = []opsv1alpha1.Switchover{
 				{
 					ComponentName: shardingName,
 					InstanceName:  instanceName,
+					CandidateName: candidateName,
 				},
 			}
 			opsRes.OpsRequest = testops.CreateOpsRequest(ctx, testCtx, ops)
@@ -685,6 +700,13 @@ var _ = Describe("", func() {
 				recorder.Action(gomock.Any(), gomock.Any()).Times(1).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
 					GinkgoWriter.Printf("ActionRequest: %#v\n", req)
 					Expect(req.Parameters["KB_SWITCHOVER_CURRENT_NAME"]).Should(Equal(instanceName))
+					Expect(req.Parameters["KB_SWITCHOVER_CANDIDATE_NAME"]).Should(Equal(candidateName))
+					concreteComponentName := shardingCluster.Name + "-" + shardComponentName
+					Expect(req.Parameters["KB_SWITCHOVER_CURRENT_FQDN"]).Should(Equal(
+						intctrlutil.PodFQDN(testCtx.DefaultNamespace, concreteComponentName, instanceName)))
+					Expect(req.Parameters["KB_SWITCHOVER_CANDIDATE_FQDN"]).Should(Equal(
+						intctrlutil.PodFQDN(testCtx.DefaultNamespace, concreteComponentName, candidateName)))
+					Expect(req.Parameters["SWITCHOVER_CLUSTER_NAME"]).Should(Equal(shardingCluster.Name))
 					rsp := kbagentproto.ActionResponse{Message: "mock success"}
 					return rsp, nil
 				})

@@ -173,12 +173,11 @@ func (r *VolumePopulatorReconciler) syncPVC(reqCtx intctrlutil.RequestCtx, pvc *
 		return nil
 	}
 	if !pvc.DeletionTimestamp.IsZero() {
-		// Deleting the target PVC does not authorize the volume populator to tear
-		// down restore resources or release its protection finalizer. Destructive
-		// cleanup must be coordinated by the owning resource lifecycle.
-		message := fmt.Sprintf("target PVC %s/%s deletion is blocked while volume population resources may still be active",
+		// Target PVC deletion is not part of the restore lifecycle. Keep the
+		// restore waiting without mutating its resources or protection finalizer.
+		message := fmt.Sprintf("restore is waiting because target PVC %s/%s is deleting; target PVC deletion is not handled by the data protection controller",
 			pvc.Namespace, pvc.Name)
-		r.Recorder.Event(pvc, corev1.EventTypeWarning, ReasonTargetPVCDeleteBlocked, message)
+		r.Recorder.Event(pvc, corev1.EventTypeWarning, ReasonRestoreTargetPVCDeleting, message)
 		return intctrlutil.NewRequeueError(reconcileInterval, message)
 	}
 	var restoreCtx *pvcRestoreContext

@@ -1556,7 +1556,10 @@ func TestDeletingTargetPVCWaitsWithoutCleaningPopulation(t *testing.T) {
 	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(pvc), current))
 	require.Contains(t, current.Finalizers, dptypes.DataProtectionFinalizerName,
 		"target PVC must remain protected")
-	require.Contains(t, <-recorder.Events, ReasonTargetPVCDeleteBlocked)
+	event := <-recorder.Events
+	require.Contains(t, event, ReasonRestoreTargetPVCDeleting)
+	require.Contains(t, event, "restore is waiting")
+	require.Contains(t, event, "target PVC deletion is not handled")
 }
 
 func TestSuccessfulPopulateReleaseRemovesOnlyHelperAndTargetFinalizer(t *testing.T) {

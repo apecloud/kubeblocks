@@ -82,10 +82,10 @@ const (
 	AnnPopulateFrom = "dataprotection.kubeblocks.io/populate-from"
 
 	// event reason
-	ReasonStartToVolumePopulate  = "StartToVolumePopulate"
-	ReasonVolumePopulateSucceed  = "VolumePopulateSucceed"
-	ReasonVolumePopulateFailed   = "VolumePopulateFailed"
-	ReasonTargetPVCDeleteBlocked = "TargetPVCDeleteBlocked"
+	ReasonStartToVolumePopulate    = "StartToVolumePopulate"
+	ReasonVolumePopulateSucceed    = "VolumePopulateSucceed"
+	ReasonVolumePopulateFailed     = "VolumePopulateFailed"
+	ReasonRestoreTargetPVCDeleting = "RestoreTargetPVCDeleting"
 
 	// pvc condition type and reason
 	ReasonPopulatingFailed      = "Failed"

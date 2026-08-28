@@ -424,6 +424,7 @@ func handleRunningInstanceProgress(opsRes *OpsResource, pgRes *progressResource,
 			detail.SetStatusAndMessage(opsv1alpha1.ProcessingProgressStatus,
 				getProgressProcessingMessage(pgRes.opsMessageKey, objectKey, pgRes.fullComponentName))
 		}
+		pgRes.progressDetails = append(pgRes.progressDetails, detail)
 		setComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest, &compStatus.ProgressDetails, detail)
 	}
 	return expectedCount, completedCount
@@ -460,6 +461,7 @@ func handleStoppedInstanceProgress(opsRes *OpsResource, pgRes *progressResource,
 			detail.SetStatusAndMessage(opsv1alpha1.ProcessingProgressStatus,
 				getProgressProcessingMessage(pgRes.opsMessageKey, objectKey, pgRes.fullComponentName))
 		}
+		pgRes.progressDetails = append(pgRes.progressDetails, detail)
 		setComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest, &compStatus.ProgressDetails, detail)
 	}
 	compStatus.ProgressDetails = slices.DeleteFunc(compStatus.ProgressDetails, func(detail opsv1alpha1.ProgressStatusDetail) bool {

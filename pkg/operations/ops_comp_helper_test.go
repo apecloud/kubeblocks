@@ -95,25 +95,64 @@ func TestUpdateRollingActionPhase(t *testing.T) {
 }
 
 func TestCompleteRollingProgressDetails(t *testing.T) {
-	helper := newComponentOpsHelper([]opsv1alpha1.ComponentOps{{ComponentName: "mysql"}})
-	ops := &opsv1alpha1.OpsRequest{Status: opsv1alpha1.OpsRequestStatus{Components: map[string]opsv1alpha1.OpsRequestComponentStatus{
-		"mysql": {ProgressDetails: []opsv1alpha1.ProgressStatusDetail{{
-			ObjectKey: "Pod/mysql-0",
+	newDetail := func(objectKey string) opsv1alpha1.ProgressStatusDetail {
+		return opsv1alpha1.ProgressStatusDetail{
+			ObjectKey: objectKey,
 			Status:    opsv1alpha1.ProcessingProgressStatus,
 			Message:   "Start to upgrade",
+		}
+	}
+	opsRequest := &opsv1alpha1.OpsRequest{Status: opsv1alpha1.OpsRequestStatus{Components: map[string]opsv1alpha1.OpsRequestComponentStatus{
+		"mysql": {ProgressDetails: []opsv1alpha1.ProgressStatusDetail{{
+			ObjectKey: "Pod/cluster-mysql-0",
+			Status:    opsv1alpha1.FailedProgressStatus,
 		}}},
+		"shard": {ProgressDetails: []opsv1alpha1.ProgressStatusDetail{
+			newDetail("Pod/cluster-shard-0-0"),
+			newDetail("Pod/cluster-shard-1-0"),
+		}},
 		"unrelated": {ProgressDetails: []opsv1alpha1.ProgressStatusDetail{{
 			ObjectKey: "Pod/proxy-0",
 			Status:    opsv1alpha1.ProcessingProgressStatus,
 		}}},
 	}}}
+	progressResources := []progressResource{
+		{
+			opsMessageKey:     "upgrade",
+			fullComponentName: "mysql",
+			compOps:           opsv1alpha1.ComponentOps{ComponentName: "mysql"},
+			progressDetails:   []opsv1alpha1.ProgressStatusDetail{newDetail("Pod/cluster-mysql-0")},
+		},
+		{
+			opsMessageKey:     "upgrade",
+			fullComponentName: "cluster-shard-0",
+			compOps:           opsv1alpha1.ComponentOps{ComponentName: "shard"},
+			progressDetails:   []opsv1alpha1.ProgressStatusDetail{newDetail("Pod/cluster-shard-0-0")},
+		},
+		{
+			opsMessageKey:     "upgrade",
+			fullComponentName: "cluster-shard-1",
+			compOps:           opsv1alpha1.ComponentOps{ComponentName: "shard"},
+			progressDetails:   []opsv1alpha1.ProgressStatusDetail{newDetail("Pod/cluster-shard-1-0")},
+		},
+	}
+	opsRes := &OpsResource{OpsRequest: opsRequest, Recorder: record.NewFakeRecorder(3)}
 
-	helper.completeRollingProgressDetails(ops, "upgrade")
-	detail := ops.Status.Components["mysql"].ProgressDetails[0]
-	if detail.Status != opsv1alpha1.SucceedProgressStatus || detail.Message != "Successfully upgrade: Pod/mysql-0 in Component: mysql" {
+	completeRollingProgressDetails(opsRes, progressResources)
+	detail := opsRequest.Status.Components["mysql"].ProgressDetails[0]
+	if detail.Status != opsv1alpha1.SucceedProgressStatus || detail.EndTime.IsZero() ||
+		detail.Message != "Successfully upgrade: Pod/cluster-mysql-0 in Component: mysql" {
 		t.Fatalf("detail=%+v, want normalized success", detail)
 	}
-	if ops.Status.Components["unrelated"].ProgressDetails[0].Status != opsv1alpha1.ProcessingProgressStatus {
+	shardDetails := opsRequest.Status.Components["shard"].ProgressDetails
+	if shardDetails[0].Message != "Successfully upgrade: Pod/cluster-shard-0-0 in Component: cluster-shard-0" ||
+		shardDetails[1].Message != "Successfully upgrade: Pod/cluster-shard-1-0 in Component: cluster-shard-1" {
+		t.Fatalf("sharding details=%+v, want physical component names", shardDetails)
+	}
+	if len(opsRes.Recorder.(*record.FakeRecorder).Events) != 3 {
+		t.Fatalf("events=%d, want one success event per normalized detail", len(opsRes.Recorder.(*record.FakeRecorder).Events))
+	}
+	if opsRequest.Status.Components["unrelated"].ProgressDetails[0].Status != opsv1alpha1.ProcessingProgressStatus {
 		t.Fatal("unrelated component detail was changed")
 	}
 }

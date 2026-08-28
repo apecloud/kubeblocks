@@ -381,7 +381,7 @@ func (c componentOpsHelper) reconcileRollingAction(reqCtx intctrlutil.RequestCtx
 	phase := c.updateRollingActionPhase(opsRes, terminalPhase)
 	if phase == opsv1alpha1.OpsSucceedPhase {
 		completedCount = expectedCount
-		c.completeRollingProgressDetails(opsRequest, opsMessageKey)
+		completeRollingProgressDetails(opsRes, progressResources)
 	}
 	opsRequest.Status.Progress = fmt.Sprintf("%d/%d", completedCount, expectedCount)
 	if !reflect.DeepEqual(opsRequest.Status, oldOpsRequest.Status) {
@@ -440,15 +440,18 @@ func (c componentOpsHelper) updateRollingActionPhase(opsRes *OpsResource, termin
 	return actionPhase
 }
 
-func (c componentOpsHelper) completeRollingProgressDetails(opsRequest *opsv1alpha1.OpsRequest, opsMessageKey string) {
-	for componentName := range c.componentOpsSet {
-		compStatus := opsRequest.Status.Components[componentName]
-		for i := range compStatus.ProgressDetails {
-			detail := &compStatus.ProgressDetails[i]
+func completeRollingProgressDetails(opsRes *OpsResource, progressResources []progressResource) {
+	for i := range progressResources {
+		pgResource := &progressResources[i]
+		componentName := pgResource.compOps.GetComponentName()
+		compStatus := opsRes.OpsRequest.Status.Components[componentName]
+		for j := range pgResource.progressDetails {
+			detail := pgResource.progressDetails[j]
 			detail.SetStatusAndMessage(opsv1alpha1.SucceedProgressStatus,
-				getProgressSucceedMessage(opsMessageKey, detail.ObjectKey, componentName))
+				getProgressSucceedMessage(pgResource.opsMessageKey, detail.ObjectKey, pgResource.fullComponentName))
+			setComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest, &compStatus.ProgressDetails, detail)
 		}
-		opsRequest.Status.Components[componentName] = compStatus
+		opsRes.OpsRequest.Status.Components[componentName] = compStatus
 	}
 }
 

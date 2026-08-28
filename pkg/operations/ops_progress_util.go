@@ -371,6 +371,16 @@ func handleRunningProgress(reqCtx intctrlutil.RequestCtx, cli client.Client, ops
 	return expected, completed, nil
 }
 
+func handleStopProgress(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource,
+	pgRes *progressResource, compStatus *opsv1alpha1.OpsRequestComponentStatus) (int32, int32, error) {
+	its, err := getInstanceSet(opsRes, pgRes)
+	if err != nil {
+		return 0, 0, err
+	}
+	expected, completed := handleStoppedInstanceProgress(opsRes, pgRes, compStatus, its)
+	return expected, completed, nil
+}
+
 func getInstanceSet(opsRes *OpsResource, pgRes *progressResource) (*workloads.InstanceSet, error) {
 	runtime, err := opsRes.GetRuntime(pgRes.compOps.GetComponentName())
 	if err != nil {
@@ -415,6 +425,36 @@ func handleRunningInstanceProgress(opsRes *OpsResource, pgRes *progressResource,
 				getProgressProcessingMessage(pgRes.opsMessageKey, objectKey, pgRes.fullComponentName))
 		}
 		setComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest, &compStatus.ProgressDetails, detail)
+	}
+	return expectedCount, completedCount
+}
+
+func handleStoppedInstanceProgress(opsRes *OpsResource, pgRes *progressResource,
+	compStatus *opsv1alpha1.OpsRequestComponentStatus, its *workloads.InstanceSet) (int32, int32) {
+	expectedCount := pgRes.clusterComponent.Replicas
+	if its == nil {
+		return expectedCount, expectedCount
+	}
+	var completedCount int32
+	for i := range its.Status.InstanceStatus {
+		instance := &its.Status.InstanceStatus[i]
+		objectKey := getProgressObjectKey(constant.PodKind, instance.PodName)
+		detail := opsv1alpha1.ProgressStatusDetail{ObjectKey: objectKey}
+		if instance.EffectiveCurrentState() == workloads.InstanceCurrentStateAbsent {
+			detail.SetStatusAndMessage(opsv1alpha1.SucceedProgressStatus,
+				getProgressSucceedMessage(pgRes.opsMessageKey, objectKey, pgRes.fullComponentName))
+			completedCount++
+		} else {
+			detail.SetStatusAndMessage(opsv1alpha1.ProcessingProgressStatus,
+				getProgressProcessingMessage(pgRes.opsMessageKey, objectKey, pgRes.fullComponentName))
+		}
+		setComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest, &compStatus.ProgressDetails, detail)
+	}
+	if missing := expectedCount - int32(len(its.Status.InstanceStatus)); missing > 0 {
+		completedCount += missing
+	}
+	if completedCount > expectedCount {
+		completedCount = expectedCount
 	}
 	return expectedCount, completedCount
 }

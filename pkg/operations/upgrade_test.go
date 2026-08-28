@@ -277,26 +277,6 @@ var _ = Describe("Upgrade OpsRequest", func() {
 		Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsSucceedPhase))
 	}
 
-	mockPodsAppliedImage := func(cluster *appsv1.Cluster, releaseVersion string) {
-		pods := testapps.MockInstanceSetPods(&testCtx, nil, cluster, defaultCompName)
-		image := testapps.AppImage(testapps.AppName, releaseVersion)
-		for i := range pods {
-			pod := pods[i]
-			Expect(testapps.ChangeObj(&testCtx, pod, func(pod *corev1.Pod) {
-				pod.Spec.Containers[0].Image = image
-			})).Should(Succeed())
-			Expect(testapps.ChangeObjStatus(&testCtx, pod, func() {
-				pod.Status.ContainerStatuses = []corev1.ContainerStatus{
-					{
-						Name: testapps.DefaultMySQLContainerName,
-						// the latest release version will be selected.
-						Image: image,
-					},
-				}
-			})).Should(Succeed())
-		}
-	}
-
 	Context("Test OpsRequest", func() {
 		It("Test upgrade OpsRequest with ComponentDef and no ComponentVersion", func() {
 			By("init operations resources ")
@@ -319,7 +299,7 @@ var _ = Describe("Upgrade OpsRequest", func() {
 				g.Expect(ops.Status.LastConfiguration.Components[defaultCompName].ComponentDefinitionName).Should(Equal(compDef1.Name))
 			})).Should(Succeed())
 
-			By("the ops succeeds from the current Cluster status without inspecting Pod images")
+			By("the ops succeeds when the current target status is Running and UpToDate")
 			mockRollingTargetStatus(opsRes.Cluster, appsv1.RunningComponentPhase, defaultCompName)
 			Expect(opsRes.OpsRequest.Status.ClusterGeneration).Should(Equal(opsRes.Cluster.Generation))
 			_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
@@ -351,7 +331,6 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			})).Should(Succeed())
 
 			By("expect upgrade successfully")
-			mockPodsAppliedImage(opsRes.Cluster, release3)
 			expectOpsSucceed(reqCtx, opsRes, defaultCompName)
 		})
 
@@ -379,7 +358,6 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			})).Should(Succeed())
 
 			By("expect upgrade successfully with the latest release of the specified serviceVersion")
-			mockPodsAppliedImage(opsRes.Cluster, release4)
 			expectOpsSucceed(reqCtx, opsRes, defaultCompName)
 		})
 
@@ -410,7 +388,6 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			})).Should(Succeed())
 
 			By("looking forward to using the latest serviceVersion and releaseVersion")
-			mockPodsAppliedImage(opsRes.Cluster, release4)
 			expectOpsSucceed(reqCtx, opsRes, defaultCompName)
 		})
 

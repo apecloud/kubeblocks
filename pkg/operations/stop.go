@@ -24,7 +24,7 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -55,7 +55,7 @@ func (stop StopOpsHandler) ActionStartedCondition(reqCtx intctrlutil.RequestCtx,
 	return opsv1alpha1.NewStopCondition(opsRes.OpsRequest), nil
 }
 
-// Action modifies Cluster.spec.components[*].replicas from the opsRequest
+// Action sets Cluster.spec.components[*].stop for the requested components.
 func (stop StopOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	var (
 		cluster  = opsRes.Cluster
@@ -97,7 +97,7 @@ func (stop StopOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 				return
 			}
 		}
-		compSpec.Stop = pointer.Bool(true)
+		compSpec.Stop = ptr.To(true)
 	}
 
 	for i, v := range cluster.Spec.ComponentSpecs {
@@ -133,21 +133,19 @@ func (stop StopOpsHandler) targetsStopped(opsRes *OpsResource) bool {
 	if len(stopList) > 0 {
 		for i := range stopList {
 			compSpec := getComponentSpecOrShardingTemplate(opsRes.Cluster, stopList[i].ComponentName)
-			if compSpec == nil || compSpec.Stop == nil || !*compSpec.Stop {
+			if compSpec == nil || !ptr.Deref(compSpec.Stop, false) {
 				return false
 			}
 		}
 		return true
 	}
 	for i := range opsRes.Cluster.Spec.ComponentSpecs {
-		stop := opsRes.Cluster.Spec.ComponentSpecs[i].Stop
-		if stop == nil || !*stop {
+		if !ptr.Deref(opsRes.Cluster.Spec.ComponentSpecs[i].Stop, false) {
 			return false
 		}
 	}
 	for i := range opsRes.Cluster.Spec.Shardings {
-		stop := opsRes.Cluster.Spec.Shardings[i].Template.Stop
-		if stop == nil || !*stop {
+		if !ptr.Deref(opsRes.Cluster.Spec.Shardings[i].Template.Stop, false) {
 			return false
 		}
 	}

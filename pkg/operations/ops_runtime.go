@@ -148,10 +148,6 @@ func (r *opsRuntime) GetWorkload(namespace, clusterName, compName string) (Workl
 	return workload, nil
 }
 
-type instanceSetReader interface {
-	GetInstanceSet(namespace, clusterName, compName string) (*workloads.InstanceSet, error)
-}
-
 func (r *opsRuntime) GetInstanceSet(namespace, clusterName, compName string) (*workloads.InstanceSet, error) {
 	its := &workloads.InstanceSet{}
 	key := client.ObjectKey{
@@ -159,10 +155,7 @@ func (r *opsRuntime) GetInstanceSet(namespace, clusterName, compName string) (*w
 		Name:      constant.GenerateClusterComponentName(clusterName, compName),
 	}
 	if err := r.cli.Get(r.dataContext(), key, its, r.dataGetOpts...); err != nil {
-		if apierrors.IsNotFound(err) {
-			return nil, nil
-		}
-		return nil, err
+		return nil, client.IgnoreNotFound(err)
 	}
 	return its, nil
 }
@@ -424,29 +417,6 @@ func (i *defaultInstance) IsFailedAndTimedOut() bool {
 	}
 	isFailed, isTimeout, _ := intctrlutil.IsPodFailedAndTimedOut(i.pod)
 	return isFailed && isTimeout
-}
-
-func (i *defaultInstance) GetImage(containerName string) string {
-	container := i.getContainer(containerName)
-	if container == nil {
-		return ""
-	}
-	return container.Image
-}
-
-func (i *defaultInstance) GetStatusImage(containerName string) string {
-	if i.pod == nil {
-		return ""
-	}
-	for _, status := range i.pod.Status.ContainerStatuses {
-		if status.Name == containerName {
-			return status.Image
-		}
-	}
-	if containerName == "" && len(i.pod.Status.ContainerStatuses) > 0 {
-		return i.pod.Status.ContainerStatuses[0].Image
-	}
-	return ""
 }
 
 func (i *defaultInstance) GetResources(containerName string) corev1.ResourceRequirements {

@@ -28,6 +28,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -321,8 +322,7 @@ func handleFailedOrProcessingProgressDetail(opsRes *OpsResource,
 	progressDetail opsv1alpha1.ProgressStatusDetail,
 	instance Instance) (completedCount int32) {
 	componentName := pgRes.clusterComponent.Name
-	if pgRes.componentPhase == appsv1.FailedComponentPhase ||
-		(instance.IsFailedAndTimedOut() && !pgRes.deferInstanceFailureToWorkloadPhase) {
+	if pgRes.componentPhase == appsv1.FailedComponentPhase || instance.IsFailedAndTimedOut() {
 		podMessage := getFailedPodMessage(opsRes.Cluster, componentName, instance.GetName())
 		message := getProgressFailedMessage(pgRes.opsMessageKey, progressDetail.ObjectKey, componentName, podMessage)
 		progressDetail.SetStatusAndMessage(opsv1alpha1.FailedProgressStatus, message)
@@ -376,18 +376,14 @@ func getInstanceSet(opsRes *OpsResource, pgRes *progressResource) (*workloads.In
 	if err != nil {
 		return nil, err
 	}
-	reader, ok := runtime.(instanceSetReader)
-	if !ok {
-		return nil, fmt.Errorf("ops runtime for %q does not expose InstanceSet status", pgRes.compOps.GetComponentName())
-	}
-	return reader.GetInstanceSet(opsRes.Cluster.Namespace, opsRes.Cluster.Name, pgRes.fullComponentName)
+	return runtime.GetInstanceSet(opsRes.Cluster.Namespace, opsRes.Cluster.Name, pgRes.fullComponentName)
 }
 
 func handleRunningInstanceProgress(opsRes *OpsResource, pgRes *progressResource,
 	compStatus *opsv1alpha1.OpsRequestComponentStatus, its *workloads.InstanceSet) (int32, int32) {
 	expectedCount := pgRes.clusterComponent.Replicas
-	if its != nil && its.Spec.Replicas != nil {
-		expectedCount = *its.Spec.Replicas
+	if its != nil {
+		expectedCount = ptr.Deref(its.Spec.Replicas, expectedCount)
 	}
 	if expectedCount < pgRes.clusterComponent.Replicas {
 		expectedCount = pgRes.clusterComponent.Replicas

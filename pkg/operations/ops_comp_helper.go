@@ -316,20 +316,19 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 func (c componentOpsHelper) buildRollingResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 	opsRes *OpsResource, opsMessageKey string) ([]progressResource, error) {
 	var progressResources []progressResource
-	setProgressResource := func(compSpec *appsv1.ClusterComponentSpec, compOps ComponentOpsInterface, fullComponentName string, shards *int32) {
+	setProgressResource := func(compSpec *appsv1.ClusterComponentSpec, compOps ComponentOpsInterface, fullComponentName string) {
 		progressResources = append(progressResources, progressResource{
 			opsMessageKey:     opsMessageKey,
 			clusterComponent:  compSpec,
 			compOps:           compOps,
 			fullComponentName: fullComponentName,
-			shards:            shards,
 		})
 	}
 	for i := range opsRes.Cluster.Spec.ComponentSpecs {
 		compSpec := &opsRes.Cluster.Spec.ComponentSpecs[i]
 		compOps, ok := c.getComponentOps(compSpec.Name)
 		if ok {
-			setProgressResource(compSpec, compOps, compSpec.Name, nil)
+			setProgressResource(compSpec, compOps, compSpec.Name)
 		}
 	}
 	for i := range opsRes.Cluster.Spec.Shardings {
@@ -344,7 +343,7 @@ func (c componentOpsHelper) buildRollingResources(reqCtx intctrlutil.RequestCtx,
 		}
 		for j := range components {
 			setProgressResource(&shardingSpec.Template, compOps,
-				components[j].Labels[constant.KBAppComponentLabelKey], &shardingSpec.Shards)
+				components[j].Labels[constant.KBAppComponentLabelKey])
 		}
 	}
 	return progressResources, nil

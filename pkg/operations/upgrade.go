@@ -23,6 +23,7 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -105,12 +106,12 @@ func (u upgradeOpsHandler) targetsUnchanged(opsRes *OpsResource) bool {
 		if compSpec == nil {
 			return false
 		}
-		if upgrade.ComponentDefinitionName != nil && *upgrade.ComponentDefinitionName != "" &&
-			compSpec.ComponentDef != *upgrade.ComponentDefinitionName {
+		componentDef := ptr.Deref(upgrade.ComponentDefinitionName, "")
+		if componentDef != "" && compSpec.ComponentDef != componentDef {
 			return false
 		}
-		if upgrade.ServiceVersion != nil && *upgrade.ServiceVersion != "" &&
-			compSpec.ServiceVersion != *upgrade.ServiceVersion {
+		serviceVersion := ptr.Deref(upgrade.ServiceVersion, "")
+		if serviceVersion != "" && compSpec.ServiceVersion != serviceVersion {
 			return false
 		}
 	}

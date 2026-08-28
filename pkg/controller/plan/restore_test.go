@@ -209,6 +209,8 @@ func TestBuildPersistentVolumeClaimLabels(t *testing.T) {
 
 func TestRestoreManagerBuildPrepareDataRestore(t *testing.T) {
 	manager := newRestoreManagerForTest()
+	restoreEnv := []corev1.EnvVar{{Name: "RESTORE_ENV", Value: "from-plan-intent"}}
+	manager.SetRestoreEnv(restoreEnv)
 	comp := &component.SynthesizedComponent{
 		Name:     "mysql",
 		Replicas: 2,
@@ -265,6 +267,9 @@ func TestRestoreManagerBuildPrepareDataRestore(t *testing.T) {
 		restore.Spec.Backup.Namespace != "default" ||
 		restore.Spec.Backup.SourceTargetName != "target-a" {
 		t.Fatalf("unexpected backup ref: %#v", restore.Spec.Backup)
+	}
+	if !reflect.DeepEqual(restore.Spec.Env, restoreEnv) {
+		t.Fatalf("restore env = %#v, want %#v", restore.Spec.Env, restoreEnv)
 	}
 	cfg := restore.Spec.PrepareDataConfig
 	if cfg == nil {

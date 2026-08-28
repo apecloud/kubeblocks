@@ -82,6 +82,11 @@ func NewRestoreManager(ctx context.Context,
 	}
 }
 
+// SetRestoreEnv sets the user-provided environment for generated Restore objects.
+func (r *RestoreManager) SetRestoreEnv(env []corev1.EnvVar) {
+	r.env = env
+}
+
 func (r *RestoreManager) DoPrepareData(comp *component.SynthesizedComponent,
 	compObj *appsv1.Component,
 	backupObj *dpv1alpha1.Backup) error {

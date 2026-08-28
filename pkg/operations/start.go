@@ -53,7 +53,7 @@ func (start StartOpsHandler) ActionStartedCondition(reqCtx intctrlutil.RequestCt
 	return opsv1alpha1.NewStartCondition(opsRes.OpsRequest), nil
 }
 
-// Action clears Cluster.spec.components[*].stop for the requested components.
+// Action clears stop on the requested component specs and sharding templates.
 func (start StartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	var (
 		cluster   = opsRes.Cluster
@@ -91,6 +91,9 @@ func (start StartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Cl
 // ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
 // the Reconcile function for start opsRequest.
 func (start StartOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (opsv1alpha1.OpsPhase, time.Duration, error) {
+	if rollingActionGenerationPending(opsRes) {
+		return opsv1alpha1.OpsRunningPhase, 0, nil
+	}
 	if !start.targetsStarted(opsRes) {
 		return opsv1alpha1.OpsAbortedPhase, 0, nil
 	}

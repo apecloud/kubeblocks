@@ -378,8 +378,8 @@ func (c componentOpsHelper) reconcileRollingAction(reqCtx intctrlutil.RequestCtx
 		completedCount += completed
 		opsRequest.Status.Components[componentName] = compStatus
 	}
-	completed, failed := c.rollingActionState(opsRes, terminalPhase)
-	if completed {
+	phase := c.updateRollingActionPhase(opsRes, terminalPhase)
+	if phase == opsv1alpha1.OpsSucceedPhase {
 		completedCount = expectedCount
 	}
 	opsRequest.Status.Progress = fmt.Sprintf("%d/%d", completedCount, expectedCount)
@@ -388,38 +388,35 @@ func (c componentOpsHelper) reconcileRollingAction(reqCtx intctrlutil.RequestCtx
 			return opsv1alpha1.OpsRunningPhase, 0, err
 		}
 	}
-	if failed {
-		return opsv1alpha1.OpsFailedPhase, 0, nil
-	}
-	if !completed {
-		return opsv1alpha1.OpsRunningPhase, 0, nil
-	}
-	return opsv1alpha1.OpsSucceedPhase, 0, nil
+	return phase, 0, nil
 }
 
-func (c componentOpsHelper) rollingActionState(opsRes *OpsResource, terminalPhase appsv1.ComponentPhase) (bool, bool) {
+func (c componentOpsHelper) updateRollingActionPhase(opsRes *OpsResource, terminalPhase appsv1.ComponentPhase) opsv1alpha1.OpsPhase {
 	if opsRes.Cluster.Generation < opsRes.OpsRequest.Status.ClusterGeneration {
-		return false, false
+		return opsv1alpha1.OpsRunningPhase
 	}
-	completed := true
-	failed := false
+	actionPhase := opsv1alpha1.OpsSucceedPhase
 	matched := 0
-	checkTarget := func(name string, phase appsv1.ComponentPhase, observedGeneration int64, upToDate bool) {
+	setProcessing := func() {
+		if actionPhase != opsv1alpha1.OpsFailedPhase {
+			actionPhase = opsv1alpha1.OpsRunningPhase
+		}
+	}
+	checkTarget := func(name string, componentPhase appsv1.ComponentPhase, observedGeneration int64, upToDate bool) {
 		matched++
 		compStatus := opsRes.OpsRequest.Status.Components[name]
-		compStatus.Phase = phase
+		compStatus.Phase = componentPhase
 		opsRes.OpsRequest.Status.Components[name] = compStatus
 		if observedGeneration != opsRes.Cluster.Generation || !upToDate {
-			completed = false
+			setProcessing()
 			return
 		}
-		if phase == appsv1.FailedComponentPhase {
-			completed = false
-			failed = true
+		if componentPhase == appsv1.FailedComponentPhase {
+			actionPhase = opsv1alpha1.OpsFailedPhase
 			return
 		}
-		if phase != terminalPhase {
-			completed = false
+		if componentPhase != terminalPhase {
+			setProcessing()
 		}
 	}
 	for i := range opsRes.Cluster.Spec.ComponentSpecs {
@@ -437,9 +434,14 @@ func (c componentOpsHelper) rollingActionState(opsRes *OpsResource, terminalPhas
 		}
 	}
 	if len(c.componentOpsSet) > 0 && matched != len(c.componentOpsSet) {
-		completed = false
+		setProcessing()
 	}
-	return completed, failed
+	return actionPhase
+}
+
+func rollingActionGenerationPending(opsRes *OpsResource) bool {
+	return opsRes != nil && opsRes.Cluster != nil && opsRes.OpsRequest != nil &&
+		opsRes.Cluster.Generation < opsRes.OpsRequest.Status.ClusterGeneration
 }
 
 func noAnyProgressCompleted(replicas, completedCount int32) bool {

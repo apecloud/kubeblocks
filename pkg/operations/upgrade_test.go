@@ -86,8 +86,15 @@ func TestUpgradeTargetsUnchanged(t *testing.T) {
 		t.Fatal("non-exact latest target rejected the owner-resolved values")
 	}
 
-	phase, _, err := handler.ReconcileAction(intctrlutil.RequestCtx{}, nil,
-		newOpsResource("mysql", &explicitCompDef, &explicitServiceVersion))
+	opsRes := newOpsResource("mysql", &explicitCompDef, &explicitServiceVersion)
+	opsRes.Cluster.Generation = 7
+	opsRes.OpsRequest.Status.ClusterGeneration = 8
+	phase, _, err := handler.ReconcileAction(intctrlutil.RequestCtx{}, nil, opsRes)
+	if err != nil || phase != opsv1alpha1.OpsRunningPhase {
+		t.Fatalf("phase=%s err=%v, want Running before the action generation is observed", phase, err)
+	}
+	opsRes.Cluster.Generation = 8
+	phase, _, err = handler.ReconcileAction(intctrlutil.RequestCtx{}, nil, opsRes)
 	if err != nil || phase != opsv1alpha1.OpsAbortedPhase {
 		t.Fatalf("phase=%s err=%v, want Aborted for a replaced explicit target", phase, err)
 	}

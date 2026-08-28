@@ -58,6 +58,18 @@ func TestRestartTargetsExist(t *testing.T) {
 	if handler.targetsExist(newOpsResource("missing")) {
 		t.Fatal("missing target was accepted")
 	}
+	opsRes := newOpsResource("missing")
+	opsRes.Cluster.Generation = 7
+	opsRes.OpsRequest.Status.ClusterGeneration = 8
+	phase, _, err := handler.ReconcileAction(intctrlutil.RequestCtx{}, nil, opsRes)
+	if err != nil || phase != opsv1alpha1.OpsRunningPhase {
+		t.Fatalf("phase=%s err=%v, want Running before the action generation is observed", phase, err)
+	}
+	opsRes.Cluster.Generation = 8
+	phase, _, err = handler.ReconcileAction(intctrlutil.RequestCtx{}, nil, opsRes)
+	if err != nil || phase != opsv1alpha1.OpsAbortedPhase {
+		t.Fatalf("phase=%s err=%v, want Aborted after the target is removed", phase, err)
+	}
 }
 
 var _ = Describe("Restart OpsRequest", func() {

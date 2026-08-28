@@ -55,7 +55,7 @@ func (stop StopOpsHandler) ActionStartedCondition(reqCtx intctrlutil.RequestCtx,
 	return opsv1alpha1.NewStopCondition(opsRes.OpsRequest), nil
 }
 
-// Action sets Cluster.spec.components[*].stop for the requested components.
+// Action sets stop on the requested component specs and sharding templates.
 func (stop StopOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	var (
 		cluster  = opsRes.Cluster
@@ -112,6 +112,9 @@ func (stop StopOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 // ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
 // the Reconcile function for stop opsRequest.
 func (stop StopOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (opsv1alpha1.OpsPhase, time.Duration, error) {
+	if rollingActionGenerationPending(opsRes) {
+		return opsv1alpha1.OpsRunningPhase, 0, nil
+	}
 	if !stop.targetsStopped(opsRes) {
 		return opsv1alpha1.OpsAbortedPhase, 0, nil
 	}

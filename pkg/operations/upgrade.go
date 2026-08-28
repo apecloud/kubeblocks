@@ -88,6 +88,9 @@ func (u upgradeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 // ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
 // the Reconcile function for upgrade opsRequest.
 func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (opsv1alpha1.OpsPhase, time.Duration, error) {
+	if rollingActionGenerationPending(opsRes) {
+		return opsv1alpha1.OpsRunningPhase, 0, nil
+	}
 	if !u.targetsUnchanged(opsRes) {
 		return opsv1alpha1.OpsAbortedPhase, 0, nil
 	}

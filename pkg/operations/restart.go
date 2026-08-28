@@ -56,7 +56,7 @@ func (r restartOpsHandler) ActionStartedCondition(reqCtx intctrlutil.RequestCtx,
 	return opsv1alpha1.NewRestartingCondition(opsRes.OpsRequest), nil
 }
 
-// Action restarts components by updating StatefulSet.
+// Action restarts the requested components by updating their restart annotation.
 func (r restartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	if opsRes.OpsRequest.Status.StartTimestamp.IsZero() {
 		return fmt.Errorf("status.startTimestamp can not be null")
@@ -84,6 +84,9 @@ func (r restartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 // the Reconcile function for restart opsRequest.
 func (r restartOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (opsv1alpha1.OpsPhase, time.Duration, error) {
 	r.compOpsHelper = newComponentOpsHelper(opsRes.OpsRequest.Spec.RestartList)
+	if rollingActionGenerationPending(opsRes) {
+		return opsv1alpha1.OpsRunningPhase, 0, nil
+	}
 	if !r.targetsExist(opsRes) {
 		return opsv1alpha1.OpsAbortedPhase, 0, nil
 	}
@@ -91,8 +94,7 @@ func (r restartOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 		"restart", handleRunningProgress, appsv1.RunningComponentPhase)
 }
 
-// SaveLastConfiguration this operation only restart the pods of the component, no changes for Cluster.spec.
-// empty implementation here.
+// SaveLastConfiguration has nothing to record for a restart operation.
 func (r restartOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	return nil
 }

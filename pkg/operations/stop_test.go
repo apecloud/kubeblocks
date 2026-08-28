@@ -67,6 +67,18 @@ func TestStopTargetsStopped(t *testing.T) {
 	if handler.targetsStopped(newOpsResource()) {
 		t.Fatal("stop-all accepted while a component remained running")
 	}
+	opsRes := newOpsResource("proxy")
+	opsRes.Cluster.Generation = 7
+	opsRes.OpsRequest.Status.ClusterGeneration = 8
+	phase, _, err := handler.ReconcileAction(intctrlutil.RequestCtx{}, nil, opsRes)
+	if err != nil || phase != opsv1alpha1.OpsRunningPhase {
+		t.Fatalf("phase=%s err=%v, want Running before the action generation is observed", phase, err)
+	}
+	opsRes.Cluster.Generation = 8
+	phase, _, err = handler.ReconcileAction(intctrlutil.RequestCtx{}, nil, opsRes)
+	if err != nil || phase != opsv1alpha1.OpsAbortedPhase {
+		t.Fatalf("phase=%s err=%v, want Aborted after the stop target is overwritten", phase, err)
+	}
 }
 
 func TestStoppedInstanceProgress(t *testing.T) {

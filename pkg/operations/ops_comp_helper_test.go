@@ -31,7 +31,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 )
 
-func TestRollingActionState(t *testing.T) {
+func TestUpdateRollingActionPhase(t *testing.T) {
 	cluster := &appsv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{Generation: 8},
 		Spec: appsv1.ClusterSpec{
@@ -55,14 +55,14 @@ func TestRollingActionState(t *testing.T) {
 	helper := newComponentOpsHelper([]opsv1alpha1.ComponentOps{{ComponentName: "mysql"}, {ComponentName: "shard"}})
 
 	ops.Status.ClusterGeneration = 9
-	completed, failed := helper.rollingActionState(opsRes, appsv1.RunningComponentPhase)
-	if completed || failed {
-		t.Fatalf("generation before action completed=%v failed=%v, want processing", completed, failed)
+	phase := helper.updateRollingActionPhase(opsRes, appsv1.RunningComponentPhase)
+	if phase != opsv1alpha1.OpsRunningPhase {
+		t.Fatalf("generation before action phase=%s, want Running", phase)
 	}
 	ops.Status.ClusterGeneration = 8
-	completed, failed = helper.rollingActionState(opsRes, appsv1.RunningComponentPhase)
-	if completed || failed {
-		t.Fatalf("stale status completed=%v failed=%v, want processing", completed, failed)
+	phase = helper.updateRollingActionPhase(opsRes, appsv1.RunningComponentPhase)
+	if phase != opsv1alpha1.OpsRunningPhase {
+		t.Fatalf("stale status phase=%s, want Running", phase)
 	}
 
 	status := cluster.Status.Components["mysql"]
@@ -70,27 +70,27 @@ func TestRollingActionState(t *testing.T) {
 	status.UpToDate = false
 	status.Phase = appsv1.FailedComponentPhase
 	cluster.Status.Components["mysql"] = status
-	completed, failed = helper.rollingActionState(opsRes, appsv1.RunningComponentPhase)
-	if completed || failed {
-		t.Fatalf("non-current failure completed=%v failed=%v, want processing", completed, failed)
+	phase = helper.updateRollingActionPhase(opsRes, appsv1.RunningComponentPhase)
+	if phase != opsv1alpha1.OpsRunningPhase {
+		t.Fatalf("non-current failure phase=%s, want Running", phase)
 	}
 
 	status.UpToDate = true
 	cluster.Status.Components["mysql"] = status
-	completed, failed = helper.rollingActionState(opsRes, appsv1.RunningComponentPhase)
-	if completed || !failed {
-		t.Fatalf("current failure completed=%v failed=%v, want failed", completed, failed)
+	phase = helper.updateRollingActionPhase(opsRes, appsv1.RunningComponentPhase)
+	if phase != opsv1alpha1.OpsFailedPhase {
+		t.Fatalf("current failure phase=%s, want Failed", phase)
 	}
 
 	status.Phase = appsv1.RunningComponentPhase
 	cluster.Status.Components["mysql"] = status
-	completed, failed = helper.rollingActionState(opsRes, appsv1.RunningComponentPhase)
-	if !completed || failed {
-		t.Fatalf("current running status completed=%v failed=%v, want success", completed, failed)
+	phase = helper.updateRollingActionPhase(opsRes, appsv1.RunningComponentPhase)
+	if phase != opsv1alpha1.OpsSucceedPhase {
+		t.Fatalf("current running status phase=%s, want Succeed", phase)
 	}
-	completed, failed = helper.rollingActionState(opsRes, appsv1.StoppedComponentPhase)
-	if completed || failed {
-		t.Fatalf("running status completed=%v failed=%v, want stop processing", completed, failed)
+	phase = helper.updateRollingActionPhase(opsRes, appsv1.StoppedComponentPhase)
+	if phase != opsv1alpha1.OpsRunningPhase {
+		t.Fatalf("running status phase=%s, want Running while stopping", phase)
 	}
 }
 

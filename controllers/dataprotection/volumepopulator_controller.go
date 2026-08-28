@@ -173,7 +173,13 @@ func (r *VolumePopulatorReconciler) syncPVC(reqCtx intctrlutil.RequestCtx, pvc *
 		return nil
 	}
 	if !pvc.DeletionTimestamp.IsZero() {
-		return r.cleanupDeletingPVC(reqCtx, pvc)
+		// Deleting the target PVC does not authorize the volume populator to tear
+		// down restore resources or release its protection finalizer. Destructive
+		// cleanup must be coordinated by the owning resource lifecycle.
+		message := fmt.Sprintf("target PVC %s/%s deletion is blocked while volume population resources may still be active",
+			pvc.Namespace, pvc.Name)
+		r.Recorder.Event(pvc, corev1.EventTypeWarning, ReasonTargetPVCDeleteBlocked, message)
+		return intctrlutil.NewRequeueError(reconcileInterval, message)
 	}
 	var restoreCtx *pvcRestoreContext
 	if pvc.Spec.DataSourceRef.Kind == dptypes.RestoreKind {
@@ -1615,16 +1621,6 @@ func postReadyRestoreLabels(pvc *corev1.PersistentVolumeClaim, comp *appsv1.Comp
 func postReadyRestoreName(componentUID types.UID) string {
 	// Backup dataSource restore is an initial, single-attempt restore for a Component UID.
 	return constant.ShortenKubeName(fmt.Sprintf("restore-%s-post-ready", componentUID), constant.KubeNameMaxLength)
-}
-
-// cleanupDeletingPVC releases population resources when the target PVC is
-// being deleted. Keep this entry point separate from successful completion so
-// deletion-specific teardown can evolve without broadening the success path.
-func (r *VolumePopulatorReconciler) cleanupDeletingPVC(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim) error {
-	if err := r.deletePopulatePVC(reqCtx, pvc); err != nil {
-		return err
-	}
-	return r.releaseTargetPVC(reqCtx, pvc)
 }
 
 // releasePopulateResources releases only the temporary PVC and the target PVC

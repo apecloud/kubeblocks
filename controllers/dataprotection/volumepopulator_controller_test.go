@@ -39,6 +39,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/component-helpers/storage/volume"
 	"k8s.io/utils/ptr"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -1509,7 +1510,7 @@ func TestDispatchUnboundPVCFailsWhenNoRestoreActionsExist(t *testing.T) {
 		"expected fatal error when neither prepareData nor postReady exists, got: %v", err)
 }
 
-func TestDeletingTargetPVCCleansPopulationWithoutValidatingSource(t *testing.T) {
+func TestDeletingTargetPVCWaitsWithoutCleaningPopulation(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, corev1.AddToScheme(scheme))
 	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
@@ -1537,15 +1538,25 @@ func TestDeletingTargetPVCCleansPopulationWithoutValidatingSource(t *testing.T) 
 			Name:      getPopulatePVCName(pvc.UID),
 		},
 	}
+	recorder := record.NewFakeRecorder(1)
 	reconciler := &VolumePopulatorReconciler{
-		Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(pvc, populatePVC).Build(),
-		Scheme: scheme,
+		Client:   fake.NewClientBuilder().WithScheme(scheme).WithObjects(pvc, populatePVC).Build(),
+		Scheme:   scheme,
+		Recorder: recorder,
 	}
 
-	err := reconciler.syncPVC(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc)
+	result, err := reconciler.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: client.ObjectKeyFromObject(pvc),
+	})
 	require.NoError(t, err)
-	err = reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(populatePVC), &corev1.PersistentVolumeClaim{})
-	require.True(t, apierrors.IsNotFound(err), "populate PVC should be deleted, got: %v", err)
+	require.Positive(t, result.RequeueAfter)
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(populatePVC), &corev1.PersistentVolumeClaim{}),
+		"populate PVC must remain untouched")
+	current := &corev1.PersistentVolumeClaim{}
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(pvc), current))
+	require.Contains(t, current.Finalizers, dptypes.DataProtectionFinalizerName,
+		"target PVC must remain protected")
+	require.Contains(t, <-recorder.Events, ReasonTargetPVCDeleteBlocked)
 }
 
 func TestSuccessfulPopulateReleaseRemovesOnlyHelperAndTargetFinalizer(t *testing.T) {

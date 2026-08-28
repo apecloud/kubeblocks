@@ -1559,7 +1559,6 @@ func TestDeletingTargetPVCWaitsWithoutCleaningPopulation(t *testing.T) {
 	event := <-recorder.Events
 	require.Contains(t, event, ReasonRestoreTargetPVCDeleting)
 	require.Contains(t, event, "restore is waiting")
-	require.Contains(t, event, "target PVC deletion is not handled")
 }
 
 func TestSuccessfulPopulateReleaseRemovesOnlyHelperAndTargetFinalizer(t *testing.T) {

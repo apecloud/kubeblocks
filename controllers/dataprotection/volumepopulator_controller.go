@@ -175,7 +175,7 @@ func (r *VolumePopulatorReconciler) syncPVC(reqCtx intctrlutil.RequestCtx, pvc *
 	if !pvc.DeletionTimestamp.IsZero() {
 		// Target PVC deletion is not part of the restore lifecycle. Keep the
 		// restore waiting without mutating its resources or protection finalizer.
-		message := fmt.Sprintf("restore is waiting because target PVC %s/%s is deleting; target PVC deletion is not handled by the data protection controller",
+		message := fmt.Sprintf("restore is waiting because target PVC %s/%s is deleting",
 			pvc.Namespace, pvc.Name)
 		r.Recorder.Event(pvc, corev1.EventTypeWarning, ReasonRestoreTargetPVCDeleting, message)
 		return intctrlutil.NewRequeueError(reconcileInterval, message)

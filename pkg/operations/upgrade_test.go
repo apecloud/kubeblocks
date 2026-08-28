@@ -20,17 +20,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"context"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -97,6 +104,94 @@ func TestUpgradeTargetsUnchanged(t *testing.T) {
 	phase, _, err = handler.ReconcileAction(intctrlutil.RequestCtx{}, nil, opsRes)
 	if err != nil || phase != opsv1alpha1.OpsAbortedPhase {
 		t.Fatalf("phase=%s err=%v, want Aborted for a replaced explicit target", phase, err)
+	}
+}
+
+func TestUpgradeAllowsLaterUnrelatedClusterGeneration(t *testing.T) {
+	const (
+		namespace      = "default"
+		clusterName    = "cluster"
+		component      = "mysql"
+		componentDef   = "mysql-8.0"
+		serviceVersion = "8.0.36"
+		instanceName   = "cluster-mysql-0"
+	)
+	replicas := int32(1)
+	cluster := &appsv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: clusterName, Generation: 9},
+		Spec: appsv1.ClusterSpec{
+			ComponentSpecs: []appsv1.ClusterComponentSpec{{
+				Name: component, ComponentDef: componentDef, ServiceVersion: serviceVersion, Replicas: replicas,
+			}},
+			Services: []appsv1.ClusterService{{Service: appsv1.Service{Name: "unrelated"}}},
+		},
+		Status: appsv1.ClusterStatus{Components: map[string]appsv1.ClusterComponentStatus{
+			component: {Phase: appsv1.RunningComponentPhase, ObservedGeneration: 9, UpToDate: true},
+		}},
+	}
+	opsRequest := &opsv1alpha1.OpsRequest{
+		ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "upgrade"},
+		Spec: opsv1alpha1.OpsRequestSpec{SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{
+			Upgrade: &opsv1alpha1.Upgrade{Components: []opsv1alpha1.UpgradeComponent{{
+				ComponentOps:            opsv1alpha1.ComponentOps{ComponentName: component},
+				ComponentDefinitionName: pointer.String(componentDef),
+				ServiceVersion:          pointer.String(serviceVersion),
+			}}},
+		}},
+		Status: opsv1alpha1.OpsRequestStatus{
+			ClusterGeneration: 8,
+			Components:        map[string]opsv1alpha1.OpsRequestComponentStatus{},
+		},
+	}
+	its := &workloads.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      constant.GenerateClusterComponentName(clusterName, component),
+		},
+		Spec: workloads.InstanceSetSpec{Replicas: &replicas},
+		Status: workloads.InstanceSetStatus{InstanceStatus: []workloads.InstanceStatus{{
+			PodName:      instanceName,
+			DesiredState: workloads.InstanceDesiredStateActive,
+			CurrentState: workloads.InstanceCurrentStatePresent,
+			UpToDate:     true,
+			Ready:        true,
+			Available:    true,
+		}}},
+	}
+	testScheme := runtime.NewScheme()
+	for name, addToScheme := range map[string]func(*runtime.Scheme) error{
+		"apps":       appsv1.AddToScheme,
+		"operations": opsv1alpha1.AddToScheme,
+		"workloads":  workloads.AddToScheme,
+	} {
+		if err := addToScheme(testScheme); err != nil {
+			t.Fatalf("add %s scheme: %v", name, err)
+		}
+	}
+	cli := fake.NewClientBuilder().WithScheme(testScheme).
+		WithStatusSubresource(&opsv1alpha1.OpsRequest{}).
+		WithObjects(opsRequest, its).Build()
+	opsRes := &OpsResource{
+		Cluster:    cluster,
+		OpsRequest: opsRequest,
+		Recorder:   record.NewFakeRecorder(10),
+	}
+	var err error
+	opsRes.Runtimes, err = buildOpsRuntimes(context.Background(), cli, opsRes)
+	if err != nil {
+		t.Fatalf("build runtimes: %v", err)
+	}
+
+	phase, _, err := (upgradeOpsHandler{}).ReconcileAction(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, cli, opsRes)
+	if err != nil {
+		t.Fatalf("reconcile upgrade: %v", err)
+	}
+	if phase != opsv1alpha1.OpsSucceedPhase {
+		t.Fatalf("phase=%s, want Succeed", phase)
+	}
+	if opsRequest.Status.Progress != "1/1" {
+		t.Fatalf("progress=%s, want 1/1", opsRequest.Status.Progress)
 	}
 }
 

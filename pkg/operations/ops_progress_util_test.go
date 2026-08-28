@@ -133,7 +133,7 @@ var _ = Describe("Ops ProgressDetails", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
 
-			By("test the progressDetails when stateful pod updates during restart operation")
+			By("test the progressDetails when InstanceStatus updates during restart operation")
 			testProgressDetailsWithInstanceStatusUpdating(reqCtx, opsRes, podList)
 		})
 

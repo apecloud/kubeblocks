@@ -294,7 +294,6 @@ func (t *componentWorkloadTransformer) startWorkload(
 	}
 
 	delete(protoITS.Annotations, stopReplicasSnapshotKey)
-	delete(runningITS.Annotations, stopReplicasSnapshotKey)
 
 	return nil
 }
@@ -334,6 +333,13 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet) *workloads.InstanceS
 		})
 	}
 	intctrlutil.MergeMetadataMapInplace(itsProto.Annotations, &itsObjCopy.Annotations)
+	// The stop snapshot is owned by the component controller. Its absence from
+	// the desired object means that the workload has been started and the
+	// persisted annotation must be removed. Do this on the update copy rather
+	// than mutating the informer/cache object in startWorkload.
+	if _, ok := itsProto.Annotations[stopReplicasSnapshotKey]; !ok {
+		delete(itsObjCopy.Annotations, stopReplicasSnapshotKey)
+	}
 	intctrlutil.MergeMetadataMapInplace(itsProto.Labels, &itsObjCopy.Labels)
 	// merge pod spec template annotations
 	intctrlutil.MergeMetadataMapInplace(itsProto.Spec.Template.Annotations, &itsObjCopy.Spec.Template.Annotations)

@@ -25,7 +25,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -93,21 +92,11 @@ func TestStoppedInstanceProgress(t *testing.T) {
 		released = "cluster-mysql-released"
 	)
 	replicas := int32(3)
-	opsRes := &OpsResource{
-		Cluster:    &appsv1.Cluster{},
-		OpsRequest: &opsv1alpha1.OpsRequest{},
-		Recorder:   record.NewFakeRecorder(10),
-	}
 	pgRes := &progressResource{
 		opsMessageKey:     "stop",
 		fullComponentName: "mysql",
 		clusterComponent:  &appsv1.ClusterComponentSpec{Name: "mysql", Replicas: replicas},
 	}
-	compStatus := &opsv1alpha1.OpsRequestComponentStatus{ProgressDetails: []opsv1alpha1.ProgressStatusDetail{
-		{ObjectKey: getProgressObjectKey(constant.PodKind, offline0)},
-		{ObjectKey: getProgressObjectKey(constant.PodKind, offline2)},
-		{ObjectKey: getProgressObjectKey(constant.PodKind, released)},
-	}}
 	its := &workloads.InstanceSet{
 		Spec: workloads.InstanceSetSpec{
 			Replicas:         &replicas,
@@ -123,22 +112,22 @@ func TestStoppedInstanceProgress(t *testing.T) {
 		}},
 	}
 
-	expected, completed := handleStoppedInstanceProgress(opsRes, pgRes, compStatus, its)
-	if expected != 3 || completed != 0 {
-		t.Fatalf("progress=%d/%d, want 0/3 while the stop participants are present", completed, expected)
+	result := handleStoppedInstanceProgress(pgRes, its)
+	if result.expectedCount != 3 || result.completedCount != 0 {
+		t.Fatalf("progress=%d/%d, want 0/3 while the stop participants are present", result.completedCount, result.expectedCount)
 	}
-	if len(compStatus.ProgressDetails) != 3 {
-		t.Fatalf("details=%v, want only the three stop participants", compStatus.ProgressDetails)
+	if len(result.details) != 3 {
+		t.Fatalf("details=%v, want only the three stop participants", result.details)
 	}
-	if findStatusProgressDetail(compStatus.ProgressDetails, getProgressObjectKey(constant.PodKind, offline0)) != nil ||
-		findStatusProgressDetail(compStatus.ProgressDetails, getProgressObjectKey(constant.PodKind, offline2)) != nil ||
-		findStatusProgressDetail(compStatus.ProgressDetails, getProgressObjectKey(constant.PodKind, released)) != nil {
-		t.Fatalf("details=%v, want pre-existing offline and released identities excluded", compStatus.ProgressDetails)
+	if findStatusProgressDetail(result.details, getProgressObjectKey(constant.PodKind, offline0)) != nil ||
+		findStatusProgressDetail(result.details, getProgressObjectKey(constant.PodKind, offline2)) != nil ||
+		findStatusProgressDetail(result.details, getProgressObjectKey(constant.PodKind, released)) != nil {
+		t.Fatalf("details=%v, want pre-existing offline and released identities excluded", result.details)
 	}
 	its.Status.InstanceStatus[0].CurrentState = workloads.InstanceCurrentStateAbsent
-	expected, completed = handleStoppedInstanceProgress(opsRes, pgRes, compStatus, its)
-	if expected != 3 || completed != 1 {
-		t.Fatalf("progress=%d/%d, want 1/3", completed, expected)
+	result = handleStoppedInstanceProgress(pgRes, its)
+	if result.expectedCount != 3 || result.completedCount != 1 {
+		t.Fatalf("progress=%d/%d, want 1/3", result.completedCount, result.expectedCount)
 	}
 }
 

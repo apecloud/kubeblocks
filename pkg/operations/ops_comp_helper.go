@@ -26,6 +26,7 @@ import (
 	"slices"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -349,8 +350,16 @@ func (c componentOpsHelper) buildRollingResources(reqCtx intctrlutil.RequestCtx,
 	return progressResources, nil
 }
 
+type rollingProgress struct {
+	expectedCount  int32
+	completedCount int32
+	details        []opsv1alpha1.ProgressStatusDetail
+}
+
+type rollingProgressHandler func(opsRes *OpsResource, pgRes *progressResource) (rollingProgress, error)
+
 func (c componentOpsHelper) reconcileRollingAction(reqCtx intctrlutil.RequestCtx, cli client.Client,
-	opsRes *OpsResource, opsMessageKey string, handleStatusProgress handleStatusProgressWithComponent,
+	opsRes *OpsResource, opsMessageKey string, handleProgress rollingProgressHandler,
 	terminalPhase appsv1.ComponentPhase) (opsv1alpha1.OpsPhase, time.Duration, error) {
 	if opsRes == nil {
 		return "", 0, nil
@@ -365,23 +374,24 @@ func (c componentOpsHelper) reconcileRollingAction(reqCtx intctrlutil.RequestCtx
 	if err != nil {
 		return opsv1alpha1.OpsRunningPhase, 0, err
 	}
+	progressResults := make([]rollingProgress, len(progressResources))
 	var expectedCount, completedCount int32
 	for i := range progressResources {
 		pgResource := &progressResources[i]
-		componentName := pgResource.compOps.GetComponentName()
-		compStatus := opsRequest.Status.Components[componentName]
-		expected, completed, err := handleStatusProgress(reqCtx, cli, opsRes, pgResource, &compStatus)
+		result, err := handleProgress(opsRes, pgResource)
 		if err != nil {
 			return opsv1alpha1.OpsRunningPhase, 0, err
 		}
-		expectedCount += expected
-		completedCount += completed
-		opsRequest.Status.Components[componentName] = compStatus
+		progressResults[i] = result
+		expectedCount += result.expectedCount
+		completedCount += result.completedCount
 	}
 	phase := c.updateRollingActionPhase(opsRes, terminalPhase)
+	progressSnapshots := c.rollingProgressSnapshots(opsRes.Cluster, progressResources, progressResults,
+		phase == opsv1alpha1.OpsSucceedPhase)
+	syncRollingProgressDetails(opsRes, progressSnapshots)
 	if phase == opsv1alpha1.OpsSucceedPhase {
 		completedCount = expectedCount
-		completeRollingProgressDetails(opsRes, progressResources)
 	}
 	opsRequest.Status.Progress = fmt.Sprintf("%d/%d", completedCount, expectedCount)
 	if !reflect.DeepEqual(opsRequest.Status, oldOpsRequest.Status) {
@@ -390,6 +400,36 @@ func (c componentOpsHelper) reconcileRollingAction(reqCtx intctrlutil.RequestCtx
 		}
 	}
 	return phase, 0, nil
+}
+
+func (c componentOpsHelper) rollingProgressSnapshots(cluster *appsv1.Cluster, progressResources []progressResource,
+	progressResults []rollingProgress, terminalSucceeded bool) map[string][]opsv1alpha1.ProgressStatusDetail {
+	progressSnapshots := make(map[string][]opsv1alpha1.ProgressStatusDetail)
+	for i := range cluster.Spec.ComponentSpecs {
+		name := cluster.Spec.ComponentSpecs[i].Name
+		if _, ok := c.getComponentOps(name); ok {
+			progressSnapshots[name] = nil
+		}
+	}
+	for i := range cluster.Spec.Shardings {
+		name := cluster.Spec.Shardings[i].Name
+		if _, ok := c.getComponentOps(name); ok {
+			progressSnapshots[name] = nil
+		}
+	}
+	for i := range progressResources {
+		pgResource := &progressResources[i]
+		componentName := pgResource.compOps.GetComponentName()
+		for j := range progressResults[i].details {
+			detail := progressResults[i].details[j]
+			if terminalSucceeded {
+				detail.SetStatusAndMessage(opsv1alpha1.SucceedProgressStatus,
+					getProgressSucceedMessage(pgResource.opsMessageKey, detail.ObjectKey, pgResource.fullComponentName))
+			}
+			progressSnapshots[componentName] = append(progressSnapshots[componentName], detail)
+		}
+	}
+	return progressSnapshots
 }
 
 func (c componentOpsHelper) updateRollingActionPhase(opsRes *OpsResource, terminalPhase appsv1.ComponentPhase) opsv1alpha1.OpsPhase {
@@ -440,17 +480,23 @@ func (c componentOpsHelper) updateRollingActionPhase(opsRes *OpsResource, termin
 	return actionPhase
 }
 
-func completeRollingProgressDetails(opsRes *OpsResource, progressResources []progressResource) {
-	for i := range progressResources {
-		pgResource := &progressResources[i]
-		componentName := pgResource.compOps.GetComponentName()
+func syncRollingProgressDetails(opsRes *OpsResource, progressSnapshots map[string][]opsv1alpha1.ProgressStatusDetail) {
+	for componentName, details := range progressSnapshots {
 		compStatus := opsRes.OpsRequest.Status.Components[componentName]
-		for j := range pgResource.progressDetails {
-			detail := pgResource.progressDetails[j]
-			detail.SetStatusAndMessage(opsv1alpha1.SucceedProgressStatus,
-				getProgressSucceedMessage(pgResource.opsMessageKey, detail.ObjectKey, pgResource.fullComponentName))
+		currentDetails := make(map[string]struct{}, len(details))
+		for i := range details {
+			detail := details[i]
+			currentDetails[detail.ObjectKey] = struct{}{}
+			if existing := findStatusProgressDetail(compStatus.ProgressDetails, detail.ObjectKey); existing != nil &&
+				existing.Status != detail.Status && isCompletedProgressStatus(detail.Status) {
+				existing.EndTime = metav1.Time{}
+			}
 			setComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest, &compStatus.ProgressDetails, detail)
 		}
+		compStatus.ProgressDetails = slices.DeleteFunc(compStatus.ProgressDetails, func(detail opsv1alpha1.ProgressStatusDetail) bool {
+			_, ok := currentDetails[detail.ObjectKey]
+			return !ok
+		})
 		opsRes.OpsRequest.Status.Components[componentName] = compStatus
 	}
 }

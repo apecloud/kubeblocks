@@ -21,6 +21,7 @@ package operations
 
 import (
 	"testing"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
@@ -94,7 +95,7 @@ func TestUpdateRollingActionPhase(t *testing.T) {
 	}
 }
 
-func TestCompleteRollingProgressDetails(t *testing.T) {
+func TestSyncRollingProgressDetails(t *testing.T) {
 	newDetail := func(objectKey string) opsv1alpha1.ProgressStatusDetail {
 		return opsv1alpha1.ProgressStatusDetail{
 			ObjectKey: objectKey,
@@ -102,52 +103,72 @@ func TestCompleteRollingProgressDetails(t *testing.T) {
 			Message:   "Start to upgrade",
 		}
 	}
+	failedTime := metav1.NewTime(time.Now().Add(-time.Hour))
 	opsRequest := &opsv1alpha1.OpsRequest{Status: opsv1alpha1.OpsRequestStatus{Components: map[string]opsv1alpha1.OpsRequestComponentStatus{
 		"mysql": {ProgressDetails: []opsv1alpha1.ProgressStatusDetail{{
 			ObjectKey: "Pod/cluster-mysql-0",
 			Status:    opsv1alpha1.FailedProgressStatus,
+			EndTime:   failedTime,
 		}}},
 		"shard": {ProgressDetails: []opsv1alpha1.ProgressStatusDetail{
 			newDetail("Pod/cluster-shard-0-0"),
 			newDetail("Pod/cluster-shard-1-0"),
+			newDetail("Pod/cluster-shard-deleted-0"),
+		}},
+		"gone": {ProgressDetails: []opsv1alpha1.ProgressStatusDetail{
+			newDetail("Pod/cluster-gone-0-0"),
 		}},
 		"unrelated": {ProgressDetails: []opsv1alpha1.ProgressStatusDetail{{
 			ObjectKey: "Pod/proxy-0",
 			Status:    opsv1alpha1.ProcessingProgressStatus,
 		}}},
 	}}}
+	cluster := &appsv1.Cluster{Spec: appsv1.ClusterSpec{
+		ComponentSpecs: []appsv1.ClusterComponentSpec{{Name: "mysql"}},
+		Shardings:      []appsv1.ClusterSharding{{Name: "shard"}, {Name: "gone"}},
+	}}
 	progressResources := []progressResource{
 		{
 			opsMessageKey:     "upgrade",
 			fullComponentName: "mysql",
 			compOps:           opsv1alpha1.ComponentOps{ComponentName: "mysql"},
-			progressDetails:   []opsv1alpha1.ProgressStatusDetail{newDetail("Pod/cluster-mysql-0")},
 		},
 		{
 			opsMessageKey:     "upgrade",
 			fullComponentName: "cluster-shard-0",
 			compOps:           opsv1alpha1.ComponentOps{ComponentName: "shard"},
-			progressDetails:   []opsv1alpha1.ProgressStatusDetail{newDetail("Pod/cluster-shard-0-0")},
 		},
 		{
 			opsMessageKey:     "upgrade",
 			fullComponentName: "cluster-shard-1",
 			compOps:           opsv1alpha1.ComponentOps{ComponentName: "shard"},
-			progressDetails:   []opsv1alpha1.ProgressStatusDetail{newDetail("Pod/cluster-shard-1-0")},
 		},
 	}
-	opsRes := &OpsResource{OpsRequest: opsRequest, Recorder: record.NewFakeRecorder(3)}
+	progressResults := []rollingProgress{
+		{details: []opsv1alpha1.ProgressStatusDetail{newDetail("Pod/cluster-mysql-0")}},
+		{details: []opsv1alpha1.ProgressStatusDetail{newDetail("Pod/cluster-shard-0-0")}},
+		{details: []opsv1alpha1.ProgressStatusDetail{newDetail("Pod/cluster-shard-1-0")}},
+	}
+	opsRes := &OpsResource{Cluster: cluster, OpsRequest: opsRequest, Recorder: record.NewFakeRecorder(3)}
+	helper := newComponentOpsHelper([]opsv1alpha1.ComponentOps{})
 
-	completeRollingProgressDetails(opsRes, progressResources)
+	progressSnapshots := helper.rollingProgressSnapshots(cluster, progressResources, progressResults, true)
+	syncRollingProgressDetails(opsRes, progressSnapshots)
 	detail := opsRequest.Status.Components["mysql"].ProgressDetails[0]
-	if detail.Status != opsv1alpha1.SucceedProgressStatus || detail.EndTime.IsZero() ||
+	if detail.Status != opsv1alpha1.SucceedProgressStatus || !detail.EndTime.After(failedTime.Time) ||
 		detail.Message != "Successfully upgrade: Pod/cluster-mysql-0 in Component: mysql" {
 		t.Fatalf("detail=%+v, want normalized success", detail)
 	}
 	shardDetails := opsRequest.Status.Components["shard"].ProgressDetails
+	if len(shardDetails) != 2 {
+		t.Fatalf("sharding details=%+v, want details for current physical components only", shardDetails)
+	}
 	if shardDetails[0].Message != "Successfully upgrade: Pod/cluster-shard-0-0 in Component: cluster-shard-0" ||
 		shardDetails[1].Message != "Successfully upgrade: Pod/cluster-shard-1-0 in Component: cluster-shard-1" {
 		t.Fatalf("sharding details=%+v, want physical component names", shardDetails)
+	}
+	if len(opsRequest.Status.Components["gone"].ProgressDetails) != 0 {
+		t.Fatalf("gone sharding details=%+v, want stale details removed", opsRequest.Status.Components["gone"].ProgressDetails)
 	}
 	if len(opsRes.Recorder.(*record.FakeRecorder).Events) != 3 {
 		t.Fatalf("events=%d, want one success event per normalized detail", len(opsRes.Recorder.(*record.FakeRecorder).Events))
@@ -169,7 +190,6 @@ func TestRunningInstanceProgress(t *testing.T) {
 		fullComponentName: "mysql",
 		clusterComponent:  &appsv1.ClusterComponentSpec{Name: "mysql", Replicas: 1},
 	}
-	compStatus := &opsv1alpha1.OpsRequestComponentStatus{}
 	its := &workloads.InstanceSet{
 		Spec: workloads.InstanceSetSpec{Replicas: pointer.Int32(1)},
 		Status: workloads.InstanceSetStatus{InstanceStatus: []workloads.InstanceStatus{{
@@ -182,18 +202,18 @@ func TestRunningInstanceProgress(t *testing.T) {
 		}}},
 	}
 
-	expected, completed := handleRunningInstanceProgress(opsRes, pgRes, compStatus, its)
-	if expected != 1 || completed != 0 {
-		t.Fatalf("progress=%d/%d, want 0/1 until UpToDate", completed, expected)
+	result := handleRunningInstanceProgress(opsRes, pgRes, its)
+	if result.expectedCount != 1 || result.completedCount != 0 {
+		t.Fatalf("progress=%d/%d, want 0/1 until UpToDate", result.completedCount, result.expectedCount)
 	}
 	its.Status.InstanceStatus[0].UpToDate = true
-	expected, completed = handleRunningInstanceProgress(opsRes, pgRes, compStatus, its)
-	if expected != 1 || completed != 1 {
-		t.Fatalf("progress=%d/%d, want 1/1", completed, expected)
+	result = handleRunningInstanceProgress(opsRes, pgRes, its)
+	if result.expectedCount != 1 || result.completedCount != 1 {
+		t.Fatalf("progress=%d/%d, want 1/1", result.completedCount, result.expectedCount)
 	}
 	its.Status.InstanceStatus[0].Failed = true
-	expected, completed = handleRunningInstanceProgress(opsRes, pgRes, compStatus, its)
-	if expected != 1 || completed != 1 || compStatus.ProgressDetails[0].Status != opsv1alpha1.FailedProgressStatus {
-		t.Fatalf("failed progress=%d/%d details=%v", completed, expected, compStatus.ProgressDetails)
+	result = handleRunningInstanceProgress(opsRes, pgRes, its)
+	if result.expectedCount != 1 || result.completedCount != 1 || result.details[0].Status != opsv1alpha1.FailedProgressStatus {
+		t.Fatalf("failed progress=%d/%d details=%v", result.completedCount, result.expectedCount, result.details)
 	}
 }

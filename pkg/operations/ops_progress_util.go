@@ -361,24 +361,20 @@ func getProgressProcessingMessage(opsMessageKey, objectKey, componentName string
 	return fmt.Sprintf("Start to %s: %s in Component: %s", opsMessageKey, objectKey, componentName)
 }
 
-func handleRunningProgress(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource,
-	pgRes *progressResource, compStatus *opsv1alpha1.OpsRequestComponentStatus) (int32, int32, error) {
+func handleRunningProgress(opsRes *OpsResource, pgRes *progressResource) (rollingProgress, error) {
 	its, err := getInstanceSet(opsRes, pgRes)
 	if err != nil {
-		return 0, 0, err
+		return rollingProgress{}, err
 	}
-	expected, completed := handleRunningInstanceProgress(opsRes, pgRes, compStatus, its)
-	return expected, completed, nil
+	return handleRunningInstanceProgress(opsRes, pgRes, its), nil
 }
 
-func handleStopProgress(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource,
-	pgRes *progressResource, compStatus *opsv1alpha1.OpsRequestComponentStatus) (int32, int32, error) {
+func handleStopProgress(opsRes *OpsResource, pgRes *progressResource) (rollingProgress, error) {
 	its, err := getInstanceSet(opsRes, pgRes)
 	if err != nil {
-		return 0, 0, err
+		return rollingProgress{}, err
 	}
-	expected, completed := handleStoppedInstanceProgress(opsRes, pgRes, compStatus, its)
-	return expected, completed, nil
+	return handleStoppedInstanceProgress(pgRes, its), nil
 }
 
 func getInstanceSet(opsRes *OpsResource, pgRes *progressResource) (*workloads.InstanceSet, error) {
@@ -389,8 +385,7 @@ func getInstanceSet(opsRes *OpsResource, pgRes *progressResource) (*workloads.In
 	return runtime.GetInstanceSet(opsRes.Cluster.Namespace, opsRes.Cluster.Name, pgRes.fullComponentName)
 }
 
-func handleRunningInstanceProgress(opsRes *OpsResource, pgRes *progressResource,
-	compStatus *opsv1alpha1.OpsRequestComponentStatus, its *workloads.InstanceSet) (int32, int32) {
+func handleRunningInstanceProgress(opsRes *OpsResource, pgRes *progressResource, its *workloads.InstanceSet) rollingProgress {
 	expectedCount := pgRes.clusterComponent.Replicas
 	if its != nil {
 		expectedCount = ptr.Deref(its.Spec.Replicas, expectedCount)
@@ -398,10 +393,10 @@ func handleRunningInstanceProgress(opsRes *OpsResource, pgRes *progressResource,
 	if expectedCount < pgRes.clusterComponent.Replicas {
 		expectedCount = pgRes.clusterComponent.Replicas
 	}
+	result := rollingProgress{expectedCount: expectedCount}
 	if its == nil {
-		return expectedCount, 0
+		return result
 	}
-	var completedCount int32
 	for i := range its.Status.InstanceStatus {
 		instance := &its.Status.InstanceStatus[i]
 		if instance.EffectiveDesiredState() != workloads.InstanceDesiredStateActive {
@@ -415,40 +410,37 @@ func handleRunningInstanceProgress(opsRes *OpsResource, pgRes *progressResource,
 			detail.SetStatusAndMessage(opsv1alpha1.FailedProgressStatus,
 				getProgressFailedMessage(pgRes.opsMessageKey, objectKey, pgRes.fullComponentName,
 					getFailedPodMessage(opsRes.Cluster, pgRes.fullComponentName, instance.PodName)))
-			completedCount++
+			result.completedCount++
 		case targetApplied && instance.Ready && instance.Available:
 			detail.SetStatusAndMessage(opsv1alpha1.SucceedProgressStatus,
 				getProgressSucceedMessage(pgRes.opsMessageKey, objectKey, pgRes.fullComponentName))
-			completedCount++
+			result.completedCount++
 		default:
 			detail.SetStatusAndMessage(opsv1alpha1.ProcessingProgressStatus,
 				getProgressProcessingMessage(pgRes.opsMessageKey, objectKey, pgRes.fullComponentName))
 		}
-		pgRes.progressDetails = append(pgRes.progressDetails, detail)
-		setComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest, &compStatus.ProgressDetails, detail)
+		result.details = append(result.details, detail)
 	}
-	return expectedCount, completedCount
+	return result
 }
 
-func handleStoppedInstanceProgress(opsRes *OpsResource, pgRes *progressResource,
-	compStatus *opsv1alpha1.OpsRequestComponentStatus, its *workloads.InstanceSet) (int32, int32) {
+func handleStoppedInstanceProgress(pgRes *progressResource, its *workloads.InstanceSet) rollingProgress {
 	expectedCount := pgRes.clusterComponent.Replicas
+	result := rollingProgress{expectedCount: expectedCount}
 	if its == nil {
-		return expectedCount, expectedCount
+		result.completedCount = expectedCount
+		return result
 	}
 	preexistingOffline := make(map[string]struct{}, len(its.Spec.OfflineInstances))
-	excludedDetails := make(map[string]struct{}, len(its.Spec.OfflineInstances))
 	for _, name := range its.Spec.OfflineInstances {
 		preexistingOffline[name] = struct{}{}
-		excludedDetails[getProgressObjectKey(constant.PodKind, name)] = struct{}{}
 	}
-	var participantCount, completedCount int32
+	var participantCount int32
 	for i := range its.Status.InstanceStatus {
 		instance := &its.Status.InstanceStatus[i]
 		objectKey := getProgressObjectKey(constant.PodKind, instance.PodName)
 		_, wasOffline := preexistingOffline[instance.PodName]
 		if wasOffline || instance.EffectiveDesiredState() == workloads.InstanceDesiredStateReleased {
-			excludedDetails[objectKey] = struct{}{}
 			continue
 		}
 		participantCount++
@@ -456,25 +448,20 @@ func handleStoppedInstanceProgress(opsRes *OpsResource, pgRes *progressResource,
 		if instance.EffectiveCurrentState() == workloads.InstanceCurrentStateAbsent {
 			detail.SetStatusAndMessage(opsv1alpha1.SucceedProgressStatus,
 				getProgressSucceedMessage(pgRes.opsMessageKey, objectKey, pgRes.fullComponentName))
-			completedCount++
+			result.completedCount++
 		} else {
 			detail.SetStatusAndMessage(opsv1alpha1.ProcessingProgressStatus,
 				getProgressProcessingMessage(pgRes.opsMessageKey, objectKey, pgRes.fullComponentName))
 		}
-		pgRes.progressDetails = append(pgRes.progressDetails, detail)
-		setComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest, &compStatus.ProgressDetails, detail)
+		result.details = append(result.details, detail)
 	}
-	compStatus.ProgressDetails = slices.DeleteFunc(compStatus.ProgressDetails, func(detail opsv1alpha1.ProgressStatusDetail) bool {
-		_, excluded := excludedDetails[detail.ObjectKey]
-		return excluded
-	})
 	if missing := expectedCount - participantCount; missing > 0 {
-		completedCount += missing
+		result.completedCount += missing
 	}
-	if completedCount > expectedCount {
-		completedCount = expectedCount
+	if result.completedCount > expectedCount {
+		result.completedCount = expectedCount
 	}
-	return expectedCount, completedCount
+	return result
 }
 
 func getProgressSucceedMessage(opsMessageKey, objectKey, componentName string) string {

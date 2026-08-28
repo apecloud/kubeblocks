@@ -110,8 +110,6 @@ type progressResource struct {
 	createdPodSet map[string]string
 	deletedPodSet map[string]string
 	compOps       ComponentOpsInterface
-	// progressDetails contains the details observed for this physical component in the current reconcile.
-	progressDetails []opsv1alpha1.ProgressStatusDetail
 	// checks if it needs to wait the component to complete.
 	// if only updates a part of pods, set it to false.
 	noWaitComponentCompleted bool

@@ -154,7 +154,7 @@ func (r *opsRuntime) GetInstanceSet(namespace, clusterName, compName string) (*w
 		Namespace: namespace,
 		Name:      constant.GenerateClusterComponentName(clusterName, compName),
 	}
-	if err := r.cli.Get(r.dataContext(), key, its, r.dataGetOpts...); err != nil {
+	if err := r.cli.Get(r.ctx, key, its, multicluster.InControlContext()); err != nil {
 		return nil, client.IgnoreNotFound(err)
 	}
 	return its, nil

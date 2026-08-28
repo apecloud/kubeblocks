@@ -194,4 +194,30 @@ var _ = Describe("Component Workload Operations Test", func() {
 			Expect(ops.leaveMemberForPod(pod1, pods)).Should(Succeed())
 		})
 	})
+
+	Context("start and stop operations", func() {
+		It("removes the stop snapshot when starting a zero-replica workload", func() {
+			const snapshot = `{"":0}`
+			runningITS := testapps.NewInstanceSetFactory(testCtx.DefaultNamespace,
+				"test-its", clusterName, compName).
+				SetReplicas(0).
+				AddAnnotations(stopReplicasSnapshotKey, snapshot).
+				GetObject()
+			protoITS := runningITS.DeepCopy()
+
+			transformer := &componentWorkloadTransformer{}
+			Expect(transformer.startWorkload(synthesizeComp, runningITS, protoITS)).Should(Succeed())
+
+			By("not mutating the informer/cache object")
+			Expect(runningITS.Annotations).Should(HaveKeyWithValue(stopReplicasSnapshotKey, snapshot))
+			Expect(protoITS.Annotations).ShouldNot(HaveKey(stopReplicasSnapshotKey))
+
+			By("producing an update even though the restored replica count remains zero")
+			updatedITS := copyAndMergeITS(runningITS, protoITS)
+			Expect(updatedITS).ShouldNot(BeNil())
+			Expect(updatedITS.Annotations).ShouldNot(HaveKey(stopReplicasSnapshotKey))
+			Expect(updatedITS.Spec.Replicas).ShouldNot(BeNil())
+			Expect(*updatedITS.Spec.Replicas).Should(BeEquivalentTo(0))
+		})
+	})
 })

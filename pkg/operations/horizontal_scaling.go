@@ -231,6 +231,9 @@ func (hs horizontalScalingOpsHandler) createRestore(reqCtx intctrlutil.RequestCt
 	// create restore
 	restore, err := restoreMGR.BuildPrepareDataRestore(synthesizedComponent, backupObj, getTemplate(templateName))
 	if err != nil {
+		if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeRestoreFailed) {
+			return intctrlutil.NewFatalError(err.Error())
+		}
 		return err
 	}
 	if restore == nil {

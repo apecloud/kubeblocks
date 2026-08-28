@@ -76,12 +76,19 @@ func setComponentStatusProgressDetail(
 	}
 	if existingProgressDetail.Status == newProgressDetail.Status &&
 		existingProgressDetail.Message == newProgressDetail.Message {
+		if !isCompletedProgressStatus(newProgressDetail.Status) {
+			existingProgressDetail.EndTime = metav1.Time{}
+		}
 		return
 	}
 	// if existing progress detail is 'Failed' and new progress detail is not 'Succeed', ignores the new one.
 	if existingProgressDetail.Status == opsv1alpha1.FailedProgressStatus &&
 		newProgressDetail.Status != opsv1alpha1.SucceedProgressStatus {
 		return
+	}
+	if existingProgressDetail.Status != newProgressDetail.Status ||
+		!isCompletedProgressStatus(newProgressDetail.Status) {
+		existingProgressDetail.EndTime = metav1.Time{}
 	}
 	existingProgressDetail.Status = newProgressDetail.Status
 	existingProgressDetail.Message = newProgressDetail.Message

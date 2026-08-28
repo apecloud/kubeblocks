@@ -95,12 +95,12 @@ func TestUpdateRollingActionPhase(t *testing.T) {
 	}
 }
 
-func TestSyncRollingProgressDetails(t *testing.T) {
+func TestSyncStartAllRollingProgressDetails(t *testing.T) {
 	newDetail := func(objectKey string) opsv1alpha1.ProgressStatusDetail {
 		return opsv1alpha1.ProgressStatusDetail{
 			ObjectKey: objectKey,
 			Status:    opsv1alpha1.ProcessingProgressStatus,
-			Message:   "Start to upgrade",
+			Message:   "Start to start",
 		}
 	}
 	failedTime := metav1.NewTime(time.Now().Add(-time.Hour))
@@ -129,17 +129,17 @@ func TestSyncRollingProgressDetails(t *testing.T) {
 	}}
 	progressResources := []progressResource{
 		{
-			opsMessageKey:     "upgrade",
+			opsMessageKey:     "start",
 			fullComponentName: "mysql",
 			compOps:           opsv1alpha1.ComponentOps{ComponentName: "mysql"},
 		},
 		{
-			opsMessageKey:     "upgrade",
+			opsMessageKey:     "start",
 			fullComponentName: "cluster-shard-0",
 			compOps:           opsv1alpha1.ComponentOps{ComponentName: "shard"},
 		},
 		{
-			opsMessageKey:     "upgrade",
+			opsMessageKey:     "start",
 			fullComponentName: "cluster-shard-1",
 			compOps:           opsv1alpha1.ComponentOps{ComponentName: "shard"},
 		},
@@ -156,15 +156,15 @@ func TestSyncRollingProgressDetails(t *testing.T) {
 	syncRollingProgressDetails(opsRes, progressSnapshots)
 	detail := opsRequest.Status.Components["mysql"].ProgressDetails[0]
 	if detail.Status != opsv1alpha1.SucceedProgressStatus || !detail.EndTime.After(failedTime.Time) ||
-		detail.Message != "Successfully upgrade: Pod/cluster-mysql-0 in Component: mysql" {
+		detail.Message != "Successfully start: Pod/cluster-mysql-0 in Component: mysql" {
 		t.Fatalf("detail=%+v, want normalized success", detail)
 	}
 	shardDetails := opsRequest.Status.Components["shard"].ProgressDetails
 	if len(shardDetails) != 2 {
 		t.Fatalf("sharding details=%+v, want details for current physical components only", shardDetails)
 	}
-	if shardDetails[0].Message != "Successfully upgrade: Pod/cluster-shard-0-0 in Component: cluster-shard-0" ||
-		shardDetails[1].Message != "Successfully upgrade: Pod/cluster-shard-1-0 in Component: cluster-shard-1" {
+	if shardDetails[0].Message != "Successfully start: Pod/cluster-shard-0-0 in Component: cluster-shard-0" ||
+		shardDetails[1].Message != "Successfully start: Pod/cluster-shard-1-0 in Component: cluster-shard-1" {
 		t.Fatalf("sharding details=%+v, want physical component names", shardDetails)
 	}
 	if len(opsRequest.Status.Components["gone"].ProgressDetails) != 0 {
@@ -180,11 +180,7 @@ func TestSyncRollingProgressDetails(t *testing.T) {
 
 func TestRunningInstanceProgress(t *testing.T) {
 	const instanceName = "cluster-mysql-0"
-	opsRes := &OpsResource{
-		Cluster:    &appsv1.Cluster{},
-		OpsRequest: &opsv1alpha1.OpsRequest{},
-		Recorder:   record.NewFakeRecorder(10),
-	}
+	opsRes := &OpsResource{Cluster: &appsv1.Cluster{}}
 	pgRes := &progressResource{
 		opsMessageKey:     "upgrade",
 		fullComponentName: "mysql",

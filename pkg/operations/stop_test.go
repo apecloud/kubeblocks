@@ -20,12 +20,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"context"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
@@ -128,6 +133,108 @@ func TestStoppedInstanceProgress(t *testing.T) {
 	result = handleStoppedInstanceProgress(pgRes, its)
 	if result.expectedCount != 3 || result.completedCount != 1 {
 		t.Fatalf("progress=%d/%d, want 1/3", result.completedCount, result.expectedCount)
+	}
+}
+
+func TestStopAllTargetsComplete(t *testing.T) {
+	const (
+		namespace         = "default"
+		clusterName       = "cluster"
+		component         = "mysql"
+		shardingName      = "shard"
+		physicalComponent = "shard-0"
+	)
+	replicas := int32(1)
+	stopped := true
+	cluster := &appsv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: clusterName, Generation: 8},
+		Spec: appsv1.ClusterSpec{
+			ComponentSpecs: []appsv1.ClusterComponentSpec{{Name: component, Replicas: replicas, Stop: &stopped}},
+			Shardings: []appsv1.ClusterSharding{{
+				Name: shardingName, Shards: 1,
+				Template: appsv1.ClusterComponentSpec{Replicas: replicas, Stop: &stopped},
+			}},
+		},
+		Status: appsv1.ClusterStatus{
+			Components: map[string]appsv1.ClusterComponentStatus{
+				component: {Phase: appsv1.StoppedComponentPhase, ObservedGeneration: 8, UpToDate: true},
+			},
+			Shardings: map[string]appsv1.ClusterShardingStatus{
+				shardingName: {Phase: appsv1.StoppedComponentPhase, ObservedGeneration: 8, UpToDate: true},
+			},
+		},
+	}
+	opsRequest := &opsv1alpha1.OpsRequest{
+		ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "stop-all"},
+		Spec: opsv1alpha1.OpsRequestSpec{SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{
+			StopList: nil,
+		}},
+		Status: opsv1alpha1.OpsRequestStatus{
+			ClusterGeneration: 8,
+			Components:        map[string]opsv1alpha1.OpsRequestComponentStatus{},
+		},
+	}
+	shardLabels := constant.GetClusterLabels(clusterName, map[string]string{
+		constant.KBAppShardingNameLabelKey: shardingName,
+	})
+	shardLabels[constant.KBAppComponentLabelKey] = physicalComponent
+	shardComponent := &appsv1.Component{ObjectMeta: metav1.ObjectMeta{
+		Namespace: namespace,
+		Name:      constant.GenerateClusterComponentName(clusterName, physicalComponent),
+		Labels:    shardLabels,
+	}}
+	newInstanceSet := func(name string) *workloads.InstanceSet {
+		return &workloads.InstanceSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace,
+				Name:      constant.GenerateClusterComponentName(clusterName, name),
+			},
+			Spec: workloads.InstanceSetSpec{Replicas: &replicas},
+			Status: workloads.InstanceSetStatus{InstanceStatus: []workloads.InstanceStatus{{
+				PodName:      constant.GenerateClusterComponentName(clusterName, name) + "-0",
+				DesiredState: workloads.InstanceDesiredStateOffline,
+				CurrentState: workloads.InstanceCurrentStateAbsent,
+			}}},
+		}
+	}
+	testScheme := runtime.NewScheme()
+	for name, addToScheme := range map[string]func(*runtime.Scheme) error{
+		"apps":       appsv1.AddToScheme,
+		"operations": opsv1alpha1.AddToScheme,
+		"workloads":  workloads.AddToScheme,
+	} {
+		if err := addToScheme(testScheme); err != nil {
+			t.Fatalf("add %s scheme: %v", name, err)
+		}
+	}
+	cli := fake.NewClientBuilder().WithScheme(testScheme).
+		WithStatusSubresource(&opsv1alpha1.OpsRequest{}).
+		WithObjects(opsRequest, shardComponent, newInstanceSet(component), newInstanceSet(physicalComponent)).Build()
+	opsRes := &OpsResource{
+		Cluster:    cluster,
+		OpsRequest: opsRequest,
+		Recorder:   record.NewFakeRecorder(10),
+	}
+	var err error
+	opsRes.Runtimes, err = buildOpsRuntimes(context.Background(), cli, opsRes)
+	if err != nil {
+		t.Fatalf("build runtimes: %v", err)
+	}
+
+	phase, _, err := (StopOpsHandler{}).ReconcileAction(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, cli, opsRes)
+	if err != nil {
+		t.Fatalf("reconcile stop-all: %v", err)
+	}
+	if phase != opsv1alpha1.OpsSucceedPhase {
+		t.Fatalf("phase=%s, want Succeed", phase)
+	}
+	if opsRequest.Status.Progress != "2/2" {
+		t.Fatalf("progress=%s, want 2/2", opsRequest.Status.Progress)
+	}
+	if len(opsRequest.Status.Components[component].ProgressDetails) != 1 ||
+		len(opsRequest.Status.Components[shardingName].ProgressDetails) != 1 {
+		t.Fatalf("components=%v, want one detail for component and sharding", opsRequest.Status.Components)
 	}
 }
 

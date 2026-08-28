@@ -80,7 +80,7 @@ var _ = Describe("Ops ProgressDetails", func() {
 		opsRes.Cluster.Status.Phase = appsv1.RunningClusterPhase
 	}
 
-	testProgressDetailsWithStatefulPodUpdating := func(reqCtx intctrlutil.RequestCtx, opsRes *OpsResource, pods []*corev1.Pod) {
+	testProgressDetailsWithInstanceStatusUpdating := func(reqCtx intctrlutil.RequestCtx, opsRes *OpsResource, pods []*corev1.Pod) {
 		setInstanceStatus := func(updated int) {
 			statuses := make([]workloads.InstanceStatus, len(pods))
 			for i := range pods {
@@ -134,7 +134,7 @@ var _ = Describe("Ops ProgressDetails", func() {
 			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
 
 			By("test the progressDetails when stateful pod updates during restart operation")
-			testProgressDetailsWithStatefulPodUpdating(reqCtx, opsRes, podList)
+			testProgressDetailsWithInstanceStatusUpdating(reqCtx, opsRes, podList)
 		})
 
 		It("Test Ops ProgressDetails with scale-in replicas", func() {

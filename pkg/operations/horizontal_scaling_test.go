@@ -281,9 +281,11 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			})).Should(Succeed())
 
 			By("scale out replicas from a full backup")
+			restoreEnv := []corev1.EnvVar{{Name: "RESTORE_ENV", Value: "true"}}
 			horizontalScaling := opsv1alpha1.HorizontalScaling{ScaleOut: &opsv1alpha1.ScaleOut{
 				FromBackup: &opsv1alpha1.FromBackup{
-					Name: backupName,
+					Name:       backupName,
+					RestoreEnv: restoreEnv,
 				},
 			}}
 
@@ -306,6 +308,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 					Namespace: restoreMeta.Namespace,
 					Name:      restoreMeta.Name,
 				}, func(restore *dpv1alpha1.Restore) {
+					Expect(restore.Spec.Env).Should(Equal(restoreEnv))
 					restore.Status.Phase = dpv1alpha1.RestorePhaseCompleted
 				})
 			}

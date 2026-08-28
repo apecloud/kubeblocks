@@ -435,10 +435,22 @@ func handleStoppedInstanceProgress(opsRes *OpsResource, pgRes *progressResource,
 	if its == nil {
 		return expectedCount, expectedCount
 	}
-	var completedCount int32
+	preexistingOffline := make(map[string]struct{}, len(its.Spec.OfflineInstances))
+	excludedDetails := make(map[string]struct{}, len(its.Spec.OfflineInstances))
+	for _, name := range its.Spec.OfflineInstances {
+		preexistingOffline[name] = struct{}{}
+		excludedDetails[getProgressObjectKey(constant.PodKind, name)] = struct{}{}
+	}
+	var participantCount, completedCount int32
 	for i := range its.Status.InstanceStatus {
 		instance := &its.Status.InstanceStatus[i]
 		objectKey := getProgressObjectKey(constant.PodKind, instance.PodName)
+		_, wasOffline := preexistingOffline[instance.PodName]
+		if wasOffline || instance.EffectiveDesiredState() == workloads.InstanceDesiredStateReleased {
+			excludedDetails[objectKey] = struct{}{}
+			continue
+		}
+		participantCount++
 		detail := opsv1alpha1.ProgressStatusDetail{ObjectKey: objectKey}
 		if instance.EffectiveCurrentState() == workloads.InstanceCurrentStateAbsent {
 			detail.SetStatusAndMessage(opsv1alpha1.SucceedProgressStatus,
@@ -450,7 +462,11 @@ func handleStoppedInstanceProgress(opsRes *OpsResource, pgRes *progressResource,
 		}
 		setComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest, &compStatus.ProgressDetails, detail)
 	}
-	if missing := expectedCount - int32(len(its.Status.InstanceStatus)); missing > 0 {
+	compStatus.ProgressDetails = slices.DeleteFunc(compStatus.ProgressDetails, func(detail opsv1alpha1.ProgressStatusDetail) bool {
+		_, excluded := excludedDetails[detail.ObjectKey]
+		return excluded
+	})
+	if missing := expectedCount - participantCount; missing > 0 {
 		completedCount += missing
 	}
 	if completedCount > expectedCount {

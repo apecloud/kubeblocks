@@ -381,6 +381,7 @@ func (c componentOpsHelper) reconcileRollingAction(reqCtx intctrlutil.RequestCtx
 	phase := c.updateRollingActionPhase(opsRes, terminalPhase)
 	if phase == opsv1alpha1.OpsSucceedPhase {
 		completedCount = expectedCount
+		c.completeRollingProgressDetails(opsRequest, opsMessageKey)
 	}
 	opsRequest.Status.Progress = fmt.Sprintf("%d/%d", completedCount, expectedCount)
 	if !reflect.DeepEqual(opsRequest.Status, oldOpsRequest.Status) {
@@ -437,6 +438,18 @@ func (c componentOpsHelper) updateRollingActionPhase(opsRes *OpsResource, termin
 		setProcessing()
 	}
 	return actionPhase
+}
+
+func (c componentOpsHelper) completeRollingProgressDetails(opsRequest *opsv1alpha1.OpsRequest, opsMessageKey string) {
+	for componentName := range c.componentOpsSet {
+		compStatus := opsRequest.Status.Components[componentName]
+		for i := range compStatus.ProgressDetails {
+			detail := &compStatus.ProgressDetails[i]
+			detail.SetStatusAndMessage(opsv1alpha1.SucceedProgressStatus,
+				getProgressSucceedMessage(opsMessageKey, detail.ObjectKey, componentName))
+		}
+		opsRequest.Status.Components[componentName] = compStatus
+	}
 }
 
 func rollingActionGenerationPending(opsRes *OpsResource) bool {

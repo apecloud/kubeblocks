@@ -31,6 +31,7 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -82,8 +83,16 @@ func TestStopTargetsStopped(t *testing.T) {
 }
 
 func TestStoppedInstanceProgress(t *testing.T) {
-	const instanceName = "cluster-mysql-0"
-	replicas := int32(1)
+	const (
+		active0  = "cluster-mysql-0"
+		active1  = "cluster-mysql-1"
+		active2  = "cluster-mysql-2"
+		offline0 = "cluster-mysql-offline-0"
+		offline1 = "cluster-mysql-offline-1"
+		offline2 = "cluster-mysql-offline-2"
+		released = "cluster-mysql-released"
+	)
+	replicas := int32(3)
 	opsRes := &OpsResource{
 		Cluster:    &appsv1.Cluster{},
 		OpsRequest: &opsv1alpha1.OpsRequest{},
@@ -94,23 +103,42 @@ func TestStoppedInstanceProgress(t *testing.T) {
 		fullComponentName: "mysql",
 		clusterComponent:  &appsv1.ClusterComponentSpec{Name: "mysql", Replicas: replicas},
 	}
-	compStatus := &opsv1alpha1.OpsRequestComponentStatus{}
+	compStatus := &opsv1alpha1.OpsRequestComponentStatus{ProgressDetails: []opsv1alpha1.ProgressStatusDetail{
+		{ObjectKey: getProgressObjectKey(constant.PodKind, offline0)},
+		{ObjectKey: getProgressObjectKey(constant.PodKind, offline2)},
+		{ObjectKey: getProgressObjectKey(constant.PodKind, released)},
+	}}
 	its := &workloads.InstanceSet{
-		Spec: workloads.InstanceSetSpec{Replicas: &replicas},
-		Status: workloads.InstanceSetStatus{InstanceStatus: []workloads.InstanceStatus{{
-			PodName:      instanceName,
-			CurrentState: workloads.InstanceCurrentStatePresent,
-		}}},
+		Spec: workloads.InstanceSetSpec{
+			Replicas:         &replicas,
+			OfflineInstances: []string{offline0, offline1, offline2},
+		},
+		Status: workloads.InstanceSetStatus{InstanceStatus: []workloads.InstanceStatus{
+			{PodName: active0, DesiredState: workloads.InstanceDesiredStateOffline, CurrentState: workloads.InstanceCurrentStatePresent},
+			{PodName: active1, DesiredState: workloads.InstanceDesiredStateOffline, CurrentState: workloads.InstanceCurrentStatePresent},
+			{PodName: active2, DesiredState: workloads.InstanceDesiredStateOffline, CurrentState: workloads.InstanceCurrentStatePresent},
+			{PodName: offline0, DesiredState: workloads.InstanceDesiredStateOffline, CurrentState: workloads.InstanceCurrentStateAbsent},
+			{PodName: offline1, DesiredState: workloads.InstanceDesiredStateOffline, CurrentState: workloads.InstanceCurrentStateAbsent},
+			{PodName: released, DesiredState: workloads.InstanceDesiredStateReleased, CurrentState: workloads.InstanceCurrentStateAbsent},
+		}},
 	}
 
 	expected, completed := handleStoppedInstanceProgress(opsRes, pgRes, compStatus, its)
-	if expected != 1 || completed != 0 {
-		t.Fatalf("progress=%d/%d, want 0/1 while the instance is present", completed, expected)
+	if expected != 3 || completed != 0 {
+		t.Fatalf("progress=%d/%d, want 0/3 while the stop participants are present", completed, expected)
+	}
+	if len(compStatus.ProgressDetails) != 3 {
+		t.Fatalf("details=%v, want only the three stop participants", compStatus.ProgressDetails)
+	}
+	if findStatusProgressDetail(compStatus.ProgressDetails, getProgressObjectKey(constant.PodKind, offline0)) != nil ||
+		findStatusProgressDetail(compStatus.ProgressDetails, getProgressObjectKey(constant.PodKind, offline2)) != nil ||
+		findStatusProgressDetail(compStatus.ProgressDetails, getProgressObjectKey(constant.PodKind, released)) != nil {
+		t.Fatalf("details=%v, want pre-existing offline and released identities excluded", compStatus.ProgressDetails)
 	}
 	its.Status.InstanceStatus[0].CurrentState = workloads.InstanceCurrentStateAbsent
 	expected, completed = handleStoppedInstanceProgress(opsRes, pgRes, compStatus, its)
-	if expected != 1 || completed != 1 {
-		t.Fatalf("progress=%d/%d, want 1/1", completed, expected)
+	if expected != 3 || completed != 1 {
+		t.Fatalf("progress=%d/%d, want 1/3", completed, expected)
 	}
 }
 

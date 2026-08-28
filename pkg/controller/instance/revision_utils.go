@@ -171,6 +171,11 @@ func getPodRevision(pod *corev1.Pod) string {
 	return pod.Labels[appsv1.ControllerRevisionHashLabelKey]
 }
 
+// BuildPodRevision calculates the desired Pod revision published by an Instance.
+func BuildPodRevision(inst *workloads.Instance) (string, error) {
+	return buildInstancePodRevision(&inst.Spec.Template, inst)
+}
+
 func buildInstancePodRevision(template *corev1.PodTemplateSpec, parent *workloads.Instance) (string, error) {
 	podTemplate := filterInPlaceFields(template)
 	inst := builder.NewInstanceBuilder(parent.Namespace, parent.Name).

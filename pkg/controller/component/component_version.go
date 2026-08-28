@@ -33,7 +33,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/kbagent"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 // CompatibleCompVersions4Definition returns all component versions that are compatible with specified component definition.
@@ -214,8 +216,10 @@ func resolveImagesWithCompVersions4Template(compDef *appsv1.ComponentDefinition,
 	}
 
 	if err = func() error {
+		hasExecAction := false
 		for name, action := range actionsToResolveImage(compDef) {
 			if action != nil && action.Exec != nil {
+				hasExecAction = true
 				if app, ok := apps[name]; ok {
 					if app.err != nil {
 						return app.err
@@ -228,6 +232,13 @@ func resolveImagesWithCompVersions4Template(compDef *appsv1.ComponentDefinition,
 					}
 				}
 			}
+		}
+		if hasExecAction && len(images[kbagent.ContainerName]) == 0 {
+			// Instance template image overrides are applied directly to Pod containers without passing
+			// through buildKBAgentContainer, so materialize the default tools image here.
+			image := viper.GetString(constant.KBToolsImage)
+			images[kbagent.ContainerName] = image
+			images[kbagent.ContainerName4Worker] = image
 		}
 		return nil
 	}(); err != nil {

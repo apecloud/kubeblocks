@@ -25,9 +25,9 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 )
 
-// IsInstanceReady returns true if an instance is ready
+// IsInstanceReady returns the current observed runtime readiness, independently of desired-state convergence.
 func IsInstanceReady(inst *workloads.Instance) bool {
-	return isInstanceUTD(inst) && !IsInstanceTerminating(inst) && isInstanceReady(inst)
+	return isInstanceStatusObserved(inst) && !IsInstanceTerminating(inst) && isInstanceReady(inst)
 }
 
 // IsInstanceReadyWithRole checks if an instance is ready with the role observed.
@@ -35,13 +35,14 @@ func IsInstanceReadyWithRole(inst *workloads.Instance) bool {
 	return IsInstanceReady(inst) && isInstanceHasRole(inst)
 }
 
-// IsInstanceAvailable returns true if an instance is ready for at least minReadySeconds
+// IsInstanceAvailable returns the current observed runtime availability, independently of desired-state convergence.
 func IsInstanceAvailable(inst *workloads.Instance) bool {
-	return isInstanceUTD(inst) && !IsInstanceTerminating(inst) && isInstanceAvailable(inst)
+	return isInstanceStatusObserved(inst) && !IsInstanceTerminating(inst) && isInstanceAvailable(inst)
 }
 
+// IsInstanceFailure returns the current observed runtime failure, independently of desired-state convergence.
 func IsInstanceFailure(inst *workloads.Instance) bool {
-	return isInstanceUTD(inst) && !IsInstanceTerminating(inst) && isInstanceFailure(inst)
+	return isInstanceStatusObserved(inst) && !IsInstanceTerminating(inst) && isInstanceFailure(inst)
 }
 
 // IsInstanceTerminating returns true if instance's DeletionTimestamp has been set
@@ -49,8 +50,8 @@ func IsInstanceTerminating(inst *workloads.Instance) bool {
 	return inst.DeletionTimestamp != nil
 }
 
-func isInstanceUTD(inst *workloads.Instance) bool {
-	return inst.Generation == inst.Status.ObservedGeneration && inst.Status.UpToDate
+func isInstanceStatusObserved(inst *workloads.Instance) bool {
+	return inst.Generation == inst.Status.ObservedGeneration
 }
 
 func isInstanceHasRole(inst *workloads.Instance) bool {

@@ -23,6 +23,7 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -52,7 +53,7 @@ func (start StartOpsHandler) ActionStartedCondition(reqCtx intctrlutil.RequestCt
 	return opsv1alpha1.NewStartCondition(opsRes.OpsRequest), nil
 }
 
-// Action modifies Cluster.spec.components[*].replicas from the opsRequest
+// Action clears stop on the requested component specs and sharding templates.
 func (start StartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	var (
 		cluster   = opsRes.Cluster
@@ -90,27 +91,45 @@ func (start StartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Cl
 // ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
 // the Reconcile function for start opsRequest.
 func (start StartOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (opsv1alpha1.OpsPhase, time.Duration, error) {
-	handleComponentProgress := func(reqCtx intctrlutil.RequestCtx,
-		cli client.Client,
-		opsRes *OpsResource,
-		pgRes *progressResource,
-		compStatus *opsv1alpha1.OpsRequestComponentStatus) (int32, int32, error) {
-		runtime, err := opsRes.GetRuntime(pgRes.compOps.GetComponentName())
-		if err != nil {
-			return 0, 0, err
-		}
-		pgRes.createdPodSet, err = runtime.GenerateInstanceNameSet(opsRes.Cluster.Name, pgRes.fullComponentName,
-			pgRes.clusterComponent.Replicas, pgRes.clusterComponent.Instances, pgRes.clusterComponent.OfflineInstances)
-		if err != nil {
-			return 0, 0, err
-		}
-		return handleComponentProgressForScalingReplicas(reqCtx, cli, opsRes, pgRes, compStatus)
+	if rollingActionGenerationPending(opsRes) {
+		return opsv1alpha1.OpsRunningPhase, 0, nil
+	}
+	if !start.targetsStarted(opsRes) {
+		return opsv1alpha1.OpsAbortedPhase, 0, nil
 	}
 	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.StartList)
-	return compOpsHelper.reconcileActionWithComponentOps(reqCtx, cli, opsRes, "start", handleComponentProgress)
+	return compOpsHelper.reconcileRollingAction(reqCtx, cli, opsRes,
+		"start", handleRunningProgress, appsv1.RunningComponentPhase)
 }
 
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration
 func (start StartOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	return nil
+}
+
+func (start StartOpsHandler) targetsStarted(opsRes *OpsResource) bool {
+	if opsRes == nil || opsRes.Cluster == nil || opsRes.OpsRequest == nil {
+		return false
+	}
+	startList := opsRes.OpsRequest.Spec.StartList
+	if len(startList) > 0 {
+		for i := range startList {
+			compSpec := getComponentSpecOrShardingTemplate(opsRes.Cluster, startList[i].ComponentName)
+			if compSpec == nil || ptr.Deref(compSpec.Stop, false) {
+				return false
+			}
+		}
+		return true
+	}
+	for i := range opsRes.Cluster.Spec.ComponentSpecs {
+		if ptr.Deref(opsRes.Cluster.Spec.ComponentSpecs[i].Stop, false) {
+			return false
+		}
+	}
+	for i := range opsRes.Cluster.Spec.Shardings {
+		if ptr.Deref(opsRes.Cluster.Spec.Shardings[i].Template.Stop, false) {
+			return false
+		}
+	}
+	return true
 }

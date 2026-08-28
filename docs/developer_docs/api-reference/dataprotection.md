@@ -304,7 +304,9 @@ The current implementation only prevent accidental deletion of backup data.</p>
 <td>
 <code>retentionPeriod</code><br/>
 <em>
+<a href="cluster.md#apps.kubeblocks.io/v1.RetentionPeriod">
 github.com/apecloud/kubeblocks/apis/apps/v1.RetentionPeriod
+</a>
 </em>
 </td>
 <td>
@@ -1825,8 +1827,11 @@ BaseJobActionSpec
 </td>
 <td>
 <em>(Optional)</em>
-<p>Represents a custom deletion action that can be executed before the built-in deletion action.
-Note: The preDelete action job will ignore the env/envFrom.</p>
+<p>Represents a custom deletion action that can be executed before the built-in deletion action.</p>
+<p>For backups with multiple targets, the controller creates one preDelete action job for each target.</p>
+<p>If the original cluster and an available target pod still exist, the controller injects the
+current connection information through DP<em>DB</em>* environment variables. It will also target pod&rsquo;s env/envFrom.
+Otherwise, these environment variables are omitted.</p>
 </td>
 </tr>
 <tr>
@@ -3340,7 +3345,9 @@ The current implementation only prevent accidental deletion of backup data.</p>
 <td>
 <code>retentionPeriod</code><br/>
 <em>
+<a href="cluster.md#apps.kubeblocks.io/v1.RetentionPeriod">
 github.com/apecloud/kubeblocks/apis/apps/v1.RetentionPeriod
+</a>
 </em>
 </td>
 <td>
@@ -5975,7 +5982,9 @@ see <a href="https://en.wikipedia.org/wiki/Cron">https://en.wikipedia.org/wiki/C
 <td>
 <code>retentionPeriod</code><br/>
 <em>
+<a href="cluster.md#apps.kubeblocks.io/v1.RetentionPeriod">
 github.com/apecloud/kubeblocks/apis/apps/v1.RetentionPeriod
+</a>
 </em>
 </td>
 <td>

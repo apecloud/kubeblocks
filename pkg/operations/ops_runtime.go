@@ -33,7 +33,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -153,6 +152,18 @@ func (r *opsRuntime) GetWorkload(namespace, clusterName, compName string) (Workl
 	return workload, nil
 }
 
+func (r *opsRuntime) GetInstanceSet(namespace, clusterName, compName string) (*workloads.InstanceSet, error) {
+	its := &workloads.InstanceSet{}
+	key := client.ObjectKey{
+		Namespace: namespace,
+		Name:      constant.GenerateClusterComponentName(clusterName, compName),
+	}
+	if err := r.cli.Get(r.ctx, key, its); err != nil {
+		return nil, client.IgnoreNotFound(err)
+	}
+	return its, nil
+}
+
 func (r *opsRuntime) GetInstance(namespace, clusterName, compName, instanceName string) (Instance, error) {
 	pod := &corev1.Pod{}
 	if err := r.cli.Get(r.dataContext(), client.ObjectKey{Name: instanceName, Namespace: namespace}, pod, r.dataGetOpts...); err != nil {
@@ -195,31 +206,14 @@ func (r *opsRuntime) GenerateTemplateInstanceNames(clusterName, compName, templa
 	return instanceset.GenerateInstanceNamesFromTemplate(workloadName, templateName, replicas, offlineInstances, ordinalList)
 }
 
-func (r *opsRuntime) Switchover(ctx context.Context, namespace, clusterName, compName, instanceName, candidateName string) error {
-	synthesizedComp, err := r.buildSynthesizedCompByCompName(ctx, r.cli, namespace, clusterName, compName)
-	if err != nil {
-		return err
-	}
-	switchover := &opsv1alpha1.Switchover{
-		ComponentName: compName,
-		InstanceName:  instanceName,
-		CandidateName: candidateName,
-	}
-	return r.doSwitchover(ctx, r.cli, synthesizedComp, switchover)
-}
-
-func (r *opsRuntime) buildSynthesizedCompByCompName(ctx context.Context, cli client.Client, namespace, clusterName, compName string) (*component.SynthesizedComponent, error) {
-	compObj, compDefObj, err := component.GetCompNCompDefByName(ctx, cli, namespace, constant.GenerateClusterComponentName(clusterName, compName))
-	if err != nil {
-		return nil, err
-	}
-	return component.BuildSynthesizedComponent(ctx, cli, compDefObj, compObj)
+func (r *opsRuntime) Switchover(ctx context.Context, synthesizedComp *component.SynthesizedComponent, instanceName, candidateName string) error {
+	return r.doSwitchover(ctx, r.cli, synthesizedComp, instanceName, candidateName)
 }
 
 // We consider a switchover action succeeds if the action returns without error.
 // We don't need to know if a switchover is actually executed.
 func (r *opsRuntime) doSwitchover(ctx context.Context, cli client.Reader, synthesizedComp *component.SynthesizedComponent,
-	switchover *opsv1alpha1.Switchover) error {
+	instanceName, candidateName string) error {
 	pods, err := component.ListOwnedPods(r.dataContext(), cli, synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name, r.dataListOpts...)
 	if err != nil {
 		return err
@@ -227,24 +221,24 @@ func (r *opsRuntime) doSwitchover(ctx context.Context, cli client.Reader, synthe
 
 	pod := &corev1.Pod{}
 	for _, p := range pods {
-		if p.Name == switchover.InstanceName {
+		if p.Name == instanceName {
 			pod = p
 			break
 		}
 	}
 	if pod.Name == "" {
-		return intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" not found`, switchover.InstanceName))
+		return intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" not found`, instanceName))
 	}
-	if switchover.CandidateName != "" {
-		candidate, err := r.GetInstance(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name, switchover.CandidateName)
+	if candidateName != "" {
+		candidate, err := r.GetInstance(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name, candidateName)
 		if err != nil {
 			if apierrors.IsNotFound(err) {
-				return intctrlutil.NewFatalError(fmt.Sprintf(`candidate instance "%s" not found`, switchover.CandidateName))
+				return intctrlutil.NewFatalError(fmt.Sprintf(`candidate instance "%s" not found`, candidateName))
 			}
 			return err
 		}
 		if !candidate.HasPod() {
-			return intctrlutil.NewFatalError(fmt.Sprintf(`candidate instance "%s" not found`, switchover.CandidateName))
+			return intctrlutil.NewFatalError(fmt.Sprintf(`candidate instance "%s" not found`, candidateName))
 		}
 	}
 
@@ -257,7 +251,7 @@ func (r *opsRuntime) doSwitchover(ctx context.Context, cli client.Reader, synthe
 	// NOTE: switchover is a blocking action currently. May change to non-blocking for better performance.
 	// Lifecycle preconditions still use the lifecycle reader contract as-is. If a multi-cluster
 	// action needs data-plane runtime readiness checks, model that explicitly in the lifecycle API.
-	return lfa.Switchover(ctx, cli, nil, switchover.CandidateName)
+	return lfa.Switchover(ctx, cli, nil, candidateName)
 }
 
 func (r *opsRuntime) buildInstances(namespace, clusterName, compName string, pods []*corev1.Pod) ([]Instance, error) {
@@ -436,29 +430,6 @@ func (i *defaultInstance) IsFailedAndTimedOut() bool {
 	}
 	isFailed, isTimeout, _ := intctrlutil.IsPodFailedAndTimedOut(i.pod)
 	return isFailed && isTimeout
-}
-
-func (i *defaultInstance) GetImage(containerName string) string {
-	container := i.getContainer(containerName)
-	if container == nil {
-		return ""
-	}
-	return container.Image
-}
-
-func (i *defaultInstance) GetStatusImage(containerName string) string {
-	if i.pod == nil {
-		return ""
-	}
-	for _, status := range i.pod.Status.ContainerStatuses {
-		if status.Name == containerName {
-			return status.Image
-		}
-	}
-	if containerName == "" && len(i.pod.Status.ContainerStatuses) > 0 {
-		return i.pod.Status.ContainerStatuses[0].Image
-	}
-	return ""
 }
 
 func (i *defaultInstance) GetResources(containerName string) corev1.ResourceRequirements {

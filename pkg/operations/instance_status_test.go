@@ -15,6 +15,7 @@ import (
 	"context"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/utils/pointer"
@@ -185,5 +186,84 @@ func TestFlatFutureNameFeaturesFailBeforeMutation(t *testing.T) {
 	}
 	if cluster.Spec.ComponentSpecs[0].Replicas != clusterBefore.Spec.ComponentSpecs[0].Replicas {
 		t.Fatal("unsupported flat scale-out mutated the Cluster")
+	}
+}
+
+func TestVolumeExpansionWaitsWithoutReportingSuccessForIncompleteAllocation(t *testing.T) {
+	const (
+		namespace     = "default"
+		clusterName   = "demo"
+		componentName = "database"
+	)
+	scheme := runtime.NewScheme()
+	if err := workloads.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	its := &workloads.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      constant.GenerateClusterComponentName(clusterName, componentName),
+		},
+		Status: workloads.InstanceSetStatus{InstanceStatus: []workloads.InstanceStatus{{
+			PodName: "allocated-identity", TemplateName: templateName(""),
+			DesiredState: workloads.InstanceDesiredStateActive,
+		}}},
+	}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(its).Build()
+	opsRes := &OpsResource{
+		Cluster:    &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: clusterName}},
+		OpsRequest: &opsv1alpha1.OpsRequest{},
+		Runtimes:   map[string]OpsRuntime{componentName: newOpsRuntime(context.Background(), cli, "")},
+	}
+	compStatus := &opsv1alpha1.OpsRequestComponentStatus{}
+	succeeded, completed, err := (volumeExpansionOpsHandler{}).handleVCTExpansionProgress(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, cli, opsRes, compStatus,
+		resource.MustParse("2Gi"), volumeExpansionHelper{
+			compOps:           opsv1alpha1.VolumeExpansion{ComponentOps: opsv1alpha1.ComponentOps{ComponentName: componentName}},
+			fullComponentName: componentName,
+			expectCount:       2,
+			vctName:           "data",
+		})
+	if err != nil {
+		t.Fatalf("wait for allocation: %v", err)
+	}
+	if succeeded != 0 || completed != 0 {
+		t.Fatalf("incomplete allocation must not report progress, got succeeded=%d completed=%d", succeeded, completed)
+	}
+}
+
+func TestFlatRebuildWaitsForCompleteAllocation(t *testing.T) {
+	const (
+		namespace     = "default"
+		clusterName   = "demo"
+		componentName = "database"
+	)
+	scheme := runtime.NewScheme()
+	if err := workloads.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	its := &workloads.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      constant.GenerateClusterComponentName(clusterName, componentName),
+		},
+		Status: workloads.InstanceSetStatus{InstanceStatus: []workloads.InstanceStatus{{
+			PodName: "allocated-identity", TemplateName: templateName(""),
+			DesiredState: workloads.InstanceDesiredStateActive,
+		}}},
+	}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(its).Build()
+	opsRes := &OpsResource{
+		Cluster:    &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: clusterName}},
+		OpsRequest: &opsv1alpha1.OpsRequest{},
+		Runtimes:   map[string]OpsRuntime{componentName: newOpsRuntime(context.Background(), cli, "")},
+	}
+	compSpec := &appsv1.ClusterComponentSpec{Name: componentName, Replicas: 2, FlatInstanceOrdinal: true}
+	_, _, _, err := (rebuildInstanceOpsHandler{}).checkProgressForScalingOutPods(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, cli, opsRes,
+		opsv1alpha1.RebuildInstance{ComponentOps: opsv1alpha1.ComponentOps{ComponentName: componentName}},
+		compSpec, &opsv1alpha1.OpsRequestComponentStatus{})
+	if !intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeNeedWaiting) {
+		t.Fatalf("expected incomplete allocation to wait, got %v", err)
 	}
 }

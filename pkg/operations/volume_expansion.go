@@ -301,7 +301,7 @@ func (ve volumeExpansionOpsHandler) handleVCTExpansionProgress(reqCtx intctrluti
 		return 0, 0, err
 	}
 	if len(instances) != veHelper.expectCount {
-		return 1, 0, nil
+		return 0, 0, nil
 	}
 	for instanceName := range instances {
 		instance, getErr := runtime.GetInstance(opsRes.Cluster.Namespace, opsRes.Cluster.Name, veHelper.fullComponentName, instanceName)

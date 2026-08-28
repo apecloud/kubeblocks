@@ -24,13 +24,11 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -55,7 +53,7 @@ func (stop StopOpsHandler) ActionStartedCondition(reqCtx intctrlutil.RequestCtx,
 	return opsv1alpha1.NewStopCondition(opsRes.OpsRequest), nil
 }
 
-// Action modifies Cluster.spec.components[*].replicas from the opsRequest
+// Action sets stop on the requested component specs and sharding templates.
 func (stop StopOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	var (
 		cluster  = opsRes.Cluster
@@ -97,7 +95,7 @@ func (stop StopOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 				return
 			}
 		}
-		compSpec.Stop = pointer.Bool(true)
+		compSpec.Stop = ptr.To(true)
 	}
 
 	for i, v := range cluster.Spec.ComponentSpecs {
@@ -112,35 +110,45 @@ func (stop StopOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 // ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
 // the Reconcile function for stop opsRequest.
 func (stop StopOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (opsv1alpha1.OpsPhase, time.Duration, error) {
-	handleComponentProgress := func(reqCtx intctrlutil.RequestCtx,
-		cli client.Client,
-		opsRes *OpsResource,
-		pgRes *progressResource,
-		compStatus *opsv1alpha1.OpsRequestComponentStatus) (int32, int32, error) {
-		runtime, err := opsRes.GetRuntime(pgRes.compOps.GetComponentName())
-		if err != nil {
-			return 0, 0, err
-		}
-		workload, err := runtime.GetWorkload(opsRes.Cluster.Namespace, opsRes.Cluster.Name, pgRes.fullComponentName)
-		if err != nil {
-			return 0, 0, err
-		}
-		explicitOffline := sets.New(pgRes.clusterComponent.OfflineInstances...)
-		pgRes.deletedPodSet, err = statusesToPodSet(workload.GetInstanceStatuses(), workloads.InstanceDesiredStateOffline,
-			func(status workloads.InstanceStatus) bool { return !explicitOffline.Has(status.PodName) }, false)
-		if err != nil {
-			return 0, 0, err
-		}
-		if int32(len(pgRes.deletedPodSet)) != pgRes.clusterComponent.Replicas {
-			return 1, 0, nil
-		}
-		return handleComponentProgressForScalingReplicas(reqCtx, cli, opsRes, pgRes, compStatus)
+	if rollingActionGenerationPending(opsRes) {
+		return opsv1alpha1.OpsRunningPhase, 0, nil
+	}
+	if !stop.targetsStopped(opsRes) {
+		return opsv1alpha1.OpsAbortedPhase, 0, nil
 	}
 	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.StopList)
-	return compOpsHelper.reconcileActionWithComponentOps(reqCtx, cli, opsRes, "stop", handleComponentProgress)
+	return compOpsHelper.reconcileRollingAction(reqCtx, cli, opsRes,
+		"stop", handleStopProgress, appsv1.StoppedComponentPhase)
 }
 
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration
 func (stop StopOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	return nil
+}
+
+func (stop StopOpsHandler) targetsStopped(opsRes *OpsResource) bool {
+	if opsRes == nil || opsRes.Cluster == nil || opsRes.OpsRequest == nil {
+		return false
+	}
+	stopList := opsRes.OpsRequest.Spec.StopList
+	if len(stopList) > 0 {
+		for i := range stopList {
+			compSpec := getComponentSpecOrShardingTemplate(opsRes.Cluster, stopList[i].ComponentName)
+			if compSpec == nil || !ptr.Deref(compSpec.Stop, false) {
+				return false
+			}
+		}
+		return true
+	}
+	for i := range opsRes.Cluster.Spec.ComponentSpecs {
+		if !ptr.Deref(opsRes.Cluster.Spec.ComponentSpecs[i].Stop, false) {
+			return false
+		}
+	}
+	for i := range opsRes.Cluster.Spec.Shardings {
+		if !ptr.Deref(opsRes.Cluster.Spec.Shardings[i].Template.Stop, false) {
+			return false
+		}
+	}
+	return true
 }

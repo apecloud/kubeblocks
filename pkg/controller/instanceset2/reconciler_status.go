@@ -31,6 +31,7 @@ import (
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	instctrl "github.com/apecloud/kubeblocks/pkg/controller/instance"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -292,7 +293,18 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 	if err != nil {
 		return err
 	}
-	podUpdateRevisions := make(map[string]string, len(instances))
+	desiredInstances, _, err := buildDesiredInstancesByName(tree, its)
+	if err != nil {
+		return err
+	}
+	podUpdateRevisions := make(map[string]string, len(desiredInstances))
+	for name, desired := range desiredInstances {
+		podRevision, err := instctrl.BuildPodRevision(desired)
+		if err != nil {
+			return err
+		}
+		podUpdateRevisions[name] = podRevision
+	}
 	offlineNames := append([]string(nil), its.Spec.OfflineInstances...)
 	templateHints := make([]instancestatus.TemplateAssignment, 0, len(desiredTemplateAssignments)+len(instances)+len(offlineNames))
 	if its.Spec.Stop != nil && *its.Spec.Stop {
@@ -313,9 +325,6 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 			return fmt.Errorf("duplicate Instance object for %q", inst.Name)
 		}
 		seenInstances[inst.Name] = struct{}{}
-		if inst.Status.ObservedGeneration == inst.Generation {
-			podUpdateRevisions[inst.Name] = inst.Status.UpdateRevision
-		}
 		templateHints = append(templateHints, instancestatus.TemplateAssignment{InstanceName: inst.Name, TemplateName: inst.Spec.InstanceTemplateName})
 		if templateName, ok := instancetemplate.TemplateNameFromLabels(inst.Labels); ok {
 			templateHints = append(templateHints, instancestatus.TemplateAssignment{InstanceName: inst.Name, TemplateName: templateName})

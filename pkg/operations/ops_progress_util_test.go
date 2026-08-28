@@ -33,6 +33,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
@@ -79,18 +80,36 @@ var _ = Describe("Ops ProgressDetails", func() {
 		opsRes.Cluster.Status.Phase = appsv1.RunningClusterPhase
 	}
 
-	testProgressDetailsWithStatefulPodUpdating := func(reqCtx intctrlutil.RequestCtx, opsRes *OpsResource, pods []*corev1.Pod) {
-		By("mock pod of InstanceSet updating by deleting the pod")
+	testProgressDetailsWithInstanceStatusUpdating := func(reqCtx intctrlutil.RequestCtx, opsRes *OpsResource, pods []*corev1.Pod) {
+		setInstanceStatus := func(updated int) {
+			statuses := make([]workloads.InstanceStatus, len(pods))
+			for i := range pods {
+				statuses[i] = workloads.InstanceStatus{
+					PodName:      pods[i].Name,
+					DesiredState: workloads.InstanceDesiredStateActive,
+					CurrentState: workloads.InstanceCurrentStatePresent,
+					UpToDate:     i < updated,
+					Ready:        i < updated,
+					Available:    i < updated,
+				}
+			}
+			key := client.ObjectKey{
+				Namespace: opsRes.Cluster.Namespace,
+				Name:      constant.GenerateClusterComponentName(opsRes.Cluster.Name, defaultCompName),
+			}
+			Eventually(testapps.GetAndChangeObjStatus(&testCtx, key, func(its *workloads.InstanceSet) {
+				its.Status.InstanceStatus = statuses
+			})).Should(Succeed())
+		}
+
+		By("mock InstanceSet reporting an instance as updating")
 		pod := pods[0]
-		testk8s.MockPodIsTerminating(ctx, testCtx, pod)
+		setInstanceStatus(0)
 		_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 		Expect(getProgressDetailStatus(opsRes, defaultCompName, pod)).Should(Equal(opsv1alpha1.ProcessingProgressStatus))
 
-		By("mock one pod of InstanceSet to update successfully")
-		testk8s.RemovePodFinalizer(ctx, testCtx, pod)
-		testapps.MockInstanceSetPod(&testCtx, nil, clusterName, defaultCompName,
-			pod.Name, "leader")
-
+		By("mock InstanceSet reporting one instance as applied and available")
+		setInstanceStatus(1)
 		_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 		Expect(getProgressDetailStatus(opsRes, defaultCompName, pod)).Should(Equal(opsv1alpha1.SucceedProgressStatus))
 		Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("1/3"))
@@ -105,15 +124,17 @@ var _ = Describe("Ops ProgressDetails", func() {
 			By("create restart ops and pods of component")
 			opsRes.OpsRequest = createRestartOpsObj(clusterName, "restart-"+randomStr)
 			mockComponentIsOperating(opsRes.Cluster, appsv1.UpdatingComponentPhase, defaultCompName)
+			testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
 			podList := initInstanceSetPods(ctx, k8sClient, opsRes)
+			testapps.MockInstanceSetStatus(testCtx, opsRes.Cluster, defaultCompName)
 
 			By("mock restart OpsRequest is Running")
 			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
 
-			By("test the progressDetails when stateful pod updates during restart operation")
-			testProgressDetailsWithStatefulPodUpdating(reqCtx, opsRes, podList)
+			By("test the progressDetails when InstanceStatus updates during restart operation")
+			testProgressDetailsWithInstanceStatusUpdating(reqCtx, opsRes, podList)
 		})
 
 		It("Test Ops ProgressDetails with scale-in replicas", func() {

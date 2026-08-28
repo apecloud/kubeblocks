@@ -217,24 +217,6 @@ func TestOpsRuntimeBuildsInstanceAPIView(t *testing.T) {
 	if instance.GetRole() != "leader" {
 		t.Fatalf("unexpected role: %s", instance.GetRole())
 	}
-	if instance.GetImage("mysql") != "mysql:8.0.36" {
-		t.Fatalf("unexpected image: %s", instance.GetImage("mysql"))
-	}
-	if instance.GetStatusImage("mysql") != "mysql@sha256:abc" {
-		t.Fatalf("unexpected status image: %s", instance.GetStatusImage("mysql"))
-	}
-	if instance.GetStatusImage("") != "mysql@sha256:abc" {
-		t.Fatalf("unexpected default status image: %s", instance.GetStatusImage(""))
-	}
-	if instance.GetStatusImage("missing") != "" {
-		t.Fatalf("expected empty missing status image")
-	}
-	if instance.GetImage("") != "mysql:8.0.36" {
-		t.Fatalf("unexpected default image: %s", instance.GetImage(""))
-	}
-	if instance.GetImage("missing") != "mysql:8.0.36" {
-		t.Fatalf("expected missing image lookup to fall back to first container")
-	}
 	if instance.GetNodeName() != "node-a" {
 		t.Fatalf("unexpected node name: %s", instance.GetNodeName())
 	}

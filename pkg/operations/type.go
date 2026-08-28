@@ -33,7 +33,8 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
-	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -112,10 +113,7 @@ type progressResource struct {
 	// checks if it needs to wait the component to complete.
 	// if only updates a part of pods, set it to false.
 	noWaitComponentCompleted bool
-	// lets ops types such as restart defer pod-level failure signals until the
-	// workload/component reaches a terminal failure state.
-	deferInstanceFailureToWorkloadPhase bool
-	componentPhase                      appsv1.ComponentPhase
+	componentPhase           appsv1.ComponentPhase
 }
 
 // OpsRuntime abstracts the standard ops paths that only need workload/member views
@@ -126,16 +124,17 @@ type progressResource struct {
 // - Custom, which still depends on direct Pod/Job/ConfigMap/Secret based execution
 type OpsRuntime interface {
 	GetWorkload(namespace, clusterName, compName string) (Workload, error)
+	GetInstanceSet(namespace, clusterName, compName string) (*workloads.InstanceSet, error)
 	GetInstance(namespace, clusterName, compName, instanceName string) (Instance, error)
 	ListInstances(namespace, clusterName, compName string) ([]Instance, error)
 	GenerateInstanceNameSet(clusterName, compName string, compReplicas int32, instances []appsv1.InstanceTemplate, offlineInstances []string) (map[string]string, error)
 	GenerateTemplateInstanceNames(clusterName, compName, templateName string, replicas int32, offlineInstances []string, ordinals appsv1.Ordinals) ([]string, error)
-	Switchover(ctx context.Context, namespace, clusterName, compName, instanceName, candidateName string) error
+	Switchover(ctx context.Context, synthesizedComp *component.SynthesizedComponent, instanceName, candidateName string) error
 }
 
 type Workload interface {
 	GetMinReadySeconds() int32
-	GetInstanceStatuses() []workloadsv1.InstanceStatus
+	GetInstanceStatuses() []workloads.InstanceStatus
 	GetInstanceNameSet() sets.Set[string]
 	GetCurrentRevisionMap() map[string]string
 	GetNotReadyInstanceNameSet() sets.Set[string]
@@ -152,8 +151,6 @@ type Instance interface {
 	GetRole() string
 	IsAvailable(minReadySeconds int32, roleAware bool) bool
 	IsFailedAndTimedOut() bool
-	GetImage(containerName string) string
-	GetStatusImage(containerName string) string
 	GetResources(containerName string) corev1.ResourceRequirements
 	GetNodeName() string
 	GetTolerations() []corev1.Toleration

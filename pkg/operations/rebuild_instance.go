@@ -615,9 +615,14 @@ func (r rebuildInstanceOpsHandler) checkProgressForScalingOutPods(reqCtx intctrl
 		if err != nil {
 			return 0, 0, nil, err
 		}
-		currPodSet, _, err = activeAssignmentsForTarget(workload, compSpec)
+		var complete bool
+		currPodSet, complete, err = activeAssignmentsForTarget(workload, compSpec)
 		if err != nil {
 			return 0, 0, nil, err
+		}
+		if !complete {
+			return 0, 0, nil, intctrlutil.NewErrorf(intctrlutil.ErrorTypeNeedWaiting,
+				"waiting for InstanceSet to publish the complete rebuild allocation")
 		}
 	} else {
 		currPodSet, _ = runtime.GenerateInstanceNameSet(opsRes.Cluster.Name, compSpec.Name,

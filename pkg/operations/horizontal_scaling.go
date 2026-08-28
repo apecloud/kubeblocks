@@ -127,7 +127,7 @@ func (hs horizontalScalingOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli 
 			if err = hs.validateHorizontalScalingForRestore(opsRes, lastCompConfiguration, horizontalScaling); err != nil {
 				return err
 			}
-			replicas, instances, offlineInstances, err = hs.getExpectedCompValuesForRestore(opsRes, compSpec.DeepCopy(),
+			replicas, instances, offlineInstances, err = hs.getExpectedCompValuesForRestore(opsRes,
 				lastCompConfiguration, horizontalScaling)
 		} else {
 			if err = hs.validateHorizontalScaling(opsRes, lastCompConfiguration, horizontalScaling); err != nil {
@@ -329,7 +329,7 @@ func (hs horizontalScalingOpsHandler) restoreDataFromBackup(reqCtx intctrlutil.R
 	if err != nil {
 		return err
 	}
-	replicas, instances, offlineInstances, err := hs.getExpectedCompValuesForRestore(opsRes, compSpecDeepyCopy,
+	replicas, instances, offlineInstances, err := hs.getExpectedCompValuesForRestore(opsRes,
 		lastCompConfiguration, horizontalScaling)
 	if err != nil {
 		return err
@@ -459,7 +459,8 @@ func (hs horizontalScalingOpsHandler) getCreateAndDeletePodSetForRestore(opsRes 
 	if err != nil {
 		return nil, nil, err
 	}
-	expectReplicas, expectInstanceTpls, expectOfflineInstances, err := hs.getExpectedCompValuesForRestore(opsRes, &currCompSpec, lastCompConfiguration, horizontalScaling)
+	expectReplicas, expectInstanceTpls, expectOfflineInstances, err := hs.getExpectedCompValuesForRestore(opsRes,
+		lastCompConfiguration, horizontalScaling)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -525,7 +526,6 @@ func (hs horizontalScalingOpsHandler) getExpectedCompValues(
 // non-flat-ordinal scale-out from backup.
 func (hs horizontalScalingOpsHandler) getExpectedCompValuesForRestore(
 	opsRes *OpsResource,
-	compSpec *appsv1.ClusterComponentSpec,
 	lastCompConfiguration opsv1alpha1.LastComponentConfiguration,
 	horizontalScaling opsv1alpha1.HorizontalScaling) (int32, []appsv1.InstanceTemplate, []string, error) {
 	compReplicas := *lastCompConfiguration.Replicas

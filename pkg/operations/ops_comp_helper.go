@@ -26,6 +26,7 @@ import (
 	"slices"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -311,6 +312,198 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 		return opsv1alpha1.OpsFailedPhase, 0, nil
 	}
 	return opsv1alpha1.OpsSucceedPhase, 0, nil
+}
+
+func (c componentOpsHelper) buildRollingResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
+	opsRes *OpsResource, opsMessageKey string) ([]progressResource, error) {
+	var progressResources []progressResource
+	setProgressResource := func(compSpec *appsv1.ClusterComponentSpec, compOps ComponentOpsInterface, fullComponentName string) {
+		progressResources = append(progressResources, progressResource{
+			opsMessageKey:     opsMessageKey,
+			clusterComponent:  compSpec,
+			compOps:           compOps,
+			fullComponentName: fullComponentName,
+		})
+	}
+	for i := range opsRes.Cluster.Spec.ComponentSpecs {
+		compSpec := &opsRes.Cluster.Spec.ComponentSpecs[i]
+		compOps, ok := c.getComponentOps(compSpec.Name)
+		if ok {
+			setProgressResource(compSpec, compOps, compSpec.Name)
+		}
+	}
+	for i := range opsRes.Cluster.Spec.Shardings {
+		shardingSpec := &opsRes.Cluster.Spec.Shardings[i]
+		compOps, ok := c.getComponentOps(shardingSpec.Name)
+		if !ok {
+			continue
+		}
+		components, err := sharding.ListShardingComponents(reqCtx.Ctx, cli, opsRes.Cluster, shardingSpec.Name)
+		if err != nil {
+			return nil, err
+		}
+		for j := range components {
+			setProgressResource(&shardingSpec.Template, compOps,
+				components[j].Labels[constant.KBAppComponentLabelKey])
+		}
+	}
+	return progressResources, nil
+}
+
+type rollingProgress struct {
+	expectedCount  int32
+	completedCount int32
+	details        []opsv1alpha1.ProgressStatusDetail
+}
+
+type rollingProgressHandler func(opsRes *OpsResource, pgRes *progressResource) (rollingProgress, error)
+
+func (c componentOpsHelper) reconcileRollingAction(reqCtx intctrlutil.RequestCtx, cli client.Client,
+	opsRes *OpsResource, opsMessageKey string, handleProgress rollingProgressHandler,
+	terminalPhase appsv1.ComponentPhase) (opsv1alpha1.OpsPhase, time.Duration, error) {
+	if opsRes == nil {
+		return "", 0, nil
+	}
+	opsRequest := opsRes.OpsRequest
+	oldOpsRequest := opsRequest.DeepCopy()
+	patch := client.MergeFrom(oldOpsRequest)
+	if opsRequest.Status.Components == nil {
+		opsRequest.Status.Components = map[string]opsv1alpha1.OpsRequestComponentStatus{}
+	}
+	progressResources, err := c.buildRollingResources(reqCtx, cli, opsRes, opsMessageKey)
+	if err != nil {
+		return opsv1alpha1.OpsRunningPhase, 0, err
+	}
+	progressResults := make([]rollingProgress, len(progressResources))
+	var expectedCount, completedCount int32
+	for i := range progressResources {
+		pgResource := &progressResources[i]
+		result, err := handleProgress(opsRes, pgResource)
+		if err != nil {
+			return opsv1alpha1.OpsRunningPhase, 0, err
+		}
+		progressResults[i] = result
+		expectedCount += result.expectedCount
+		completedCount += result.completedCount
+	}
+	phase := c.updateRollingActionPhase(opsRes, terminalPhase)
+	progressSnapshots := c.rollingProgressSnapshots(opsRes.Cluster, progressResources, progressResults,
+		phase == opsv1alpha1.OpsSucceedPhase)
+	syncRollingProgressDetails(opsRes, progressSnapshots)
+	if phase == opsv1alpha1.OpsSucceedPhase {
+		completedCount = expectedCount
+	}
+	opsRequest.Status.Progress = fmt.Sprintf("%d/%d", completedCount, expectedCount)
+	if !reflect.DeepEqual(opsRequest.Status, oldOpsRequest.Status) {
+		if err := cli.Status().Patch(reqCtx.Ctx, opsRequest, patch); err != nil {
+			return opsv1alpha1.OpsRunningPhase, 0, err
+		}
+	}
+	return phase, 0, nil
+}
+
+func (c componentOpsHelper) rollingProgressSnapshots(cluster *appsv1.Cluster, progressResources []progressResource,
+	progressResults []rollingProgress, terminalSucceeded bool) map[string][]opsv1alpha1.ProgressStatusDetail {
+	progressSnapshots := make(map[string][]opsv1alpha1.ProgressStatusDetail)
+	for i := range cluster.Spec.ComponentSpecs {
+		name := cluster.Spec.ComponentSpecs[i].Name
+		if _, ok := c.getComponentOps(name); ok {
+			progressSnapshots[name] = nil
+		}
+	}
+	for i := range cluster.Spec.Shardings {
+		name := cluster.Spec.Shardings[i].Name
+		if _, ok := c.getComponentOps(name); ok {
+			progressSnapshots[name] = nil
+		}
+	}
+	for i := range progressResources {
+		pgResource := &progressResources[i]
+		componentName := pgResource.compOps.GetComponentName()
+		for j := range progressResults[i].details {
+			detail := progressResults[i].details[j]
+			if terminalSucceeded {
+				detail.SetStatusAndMessage(opsv1alpha1.SucceedProgressStatus,
+					getProgressSucceedMessage(pgResource.opsMessageKey, detail.ObjectKey, pgResource.fullComponentName))
+			}
+			progressSnapshots[componentName] = append(progressSnapshots[componentName], detail)
+		}
+	}
+	return progressSnapshots
+}
+
+func (c componentOpsHelper) updateRollingActionPhase(opsRes *OpsResource, terminalPhase appsv1.ComponentPhase) opsv1alpha1.OpsPhase {
+	if opsRes.Cluster.Generation < opsRes.OpsRequest.Status.ClusterGeneration {
+		return opsv1alpha1.OpsRunningPhase
+	}
+	actionPhase := opsv1alpha1.OpsSucceedPhase
+	matched := 0
+	setProcessing := func() {
+		if actionPhase != opsv1alpha1.OpsFailedPhase {
+			actionPhase = opsv1alpha1.OpsRunningPhase
+		}
+	}
+	checkTarget := func(name string, componentPhase appsv1.ComponentPhase, observedGeneration int64, upToDate bool) {
+		matched++
+		compStatus := opsRes.OpsRequest.Status.Components[name]
+		compStatus.Phase = componentPhase
+		opsRes.OpsRequest.Status.Components[name] = compStatus
+		if observedGeneration != opsRes.Cluster.Generation || !upToDate {
+			setProcessing()
+			return
+		}
+		if componentPhase == appsv1.FailedComponentPhase {
+			actionPhase = opsv1alpha1.OpsFailedPhase
+			return
+		}
+		if componentPhase != terminalPhase {
+			setProcessing()
+		}
+	}
+	for i := range opsRes.Cluster.Spec.ComponentSpecs {
+		name := opsRes.Cluster.Spec.ComponentSpecs[i].Name
+		if _, ok := c.getComponentOps(name); ok {
+			status := opsRes.Cluster.Status.Components[name]
+			checkTarget(name, status.Phase, status.ObservedGeneration, status.UpToDate)
+		}
+	}
+	for i := range opsRes.Cluster.Spec.Shardings {
+		name := opsRes.Cluster.Spec.Shardings[i].Name
+		if _, ok := c.getComponentOps(name); ok {
+			status := opsRes.Cluster.Status.Shardings[name]
+			checkTarget(name, status.Phase, status.ObservedGeneration, status.UpToDate)
+		}
+	}
+	if len(c.componentOpsSet) > 0 && matched != len(c.componentOpsSet) {
+		setProcessing()
+	}
+	return actionPhase
+}
+
+func syncRollingProgressDetails(opsRes *OpsResource, progressSnapshots map[string][]opsv1alpha1.ProgressStatusDetail) {
+	for componentName, details := range progressSnapshots {
+		compStatus := opsRes.OpsRequest.Status.Components[componentName]
+		currentDetails := make(map[string]struct{}, len(details))
+		for i := range details {
+			detail := details[i]
+			currentDetails[detail.ObjectKey] = struct{}{}
+			if existing := findStatusProgressDetail(compStatus.ProgressDetails, detail.ObjectKey); existing != nil &&
+				existing.Status != detail.Status && isCompletedProgressStatus(detail.Status) {
+				existing.EndTime = metav1.Time{}
+			}
+			setComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest, &compStatus.ProgressDetails, detail)
+		}
+		compStatus.ProgressDetails = slices.DeleteFunc(compStatus.ProgressDetails, func(detail opsv1alpha1.ProgressStatusDetail) bool {
+			_, ok := currentDetails[detail.ObjectKey]
+			return !ok
+		})
+		opsRes.OpsRequest.Status.Components[componentName] = compStatus
+	}
+}
+
+func rollingActionGenerationPending(opsRes *OpsResource) bool {
+	return opsRes != nil && opsRes.Cluster != nil && opsRes.OpsRequest != nil &&
+		opsRes.Cluster.Generation < opsRes.OpsRequest.Status.ClusterGeneration
 }
 
 func noAnyProgressCompleted(replicas, completedCount int32) bool {

@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"fmt"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -244,6 +246,11 @@ parameter: {
 				g.Expect(cp.Spec.Desired.Assignments).Should(HaveKeyWithValue("maxmemory-samples", pointer.String("0")))
 			})).Should(Succeed())
 
+			By("seed an unrelated pre-existing desired key that must survive the withdrawal")
+			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(componentParameter), func(cp *parametersv1alpha1.ComponentParameter) {
+				cp.Spec.Desired.Assignments["unrelated-key"] = pointer.String("keep")
+			})()).Should(Succeed())
+
 			By("surface the ComponentParameter failure back to the opsRequest")
 			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(componentParameter), func(cp *parametersv1alpha1.ComponentParameter) {
 				cp.Status.ObservedGeneration = cp.Generation
@@ -262,6 +269,233 @@ parameter: {
 				condition := meta.FindStatusCondition(fetched.Status.Conditions, opsv1alpha1.ConditionTypeFailed)
 				g.Expect(condition).ShouldNot(BeNil())
 				g.Expect(condition.Message).Should(ContainSubstring("maxmemory-samples"))
+			})).Should(Succeed())
+
+			By("the failed ops's own assignment is withdrawn; unrelated intent survives")
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentParameter), func(g Gomega, cp *parametersv1alpha1.ComponentParameter) {
+				g.Expect(cp.Spec.Desired).ShouldNot(BeNil())
+				g.Expect(cp.Spec.Desired.Assignments).ShouldNot(HaveKey("maxmemory-samples"))
+				g.Expect(cp.Spec.Desired.Assignments).Should(HaveKeyWithValue("unrelated-key", pointer.String("keep")))
+			})).Should(Succeed())
+		})
+
+		It("does not withdraw a key that a newer ops has re-set to a different value", func() {
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
+
+			componentParameter := builder.NewComponentParameterBuilder(testCtx.DefaultNamespace, parameterscore.GenerateComponentConfigurationName(clusterName, defaultCompName)).
+				AddLabelsInMap(constant.GetCompLabelsWithDef(clusterName, defaultCompName, compDefName)).
+				SetClusterName(clusterName).
+				SetCompName(defaultCompName).
+				GetObject()
+			componentParameter.Spec.Desired = &parametersv1alpha1.ParameterInputs{
+				// a newer ops has re-set the same key to a different value
+				Assignments: map[string]*string{"maxmemory-samples": pointer.String("7")},
+			}
+			Expect(testCtx.CreateObj(ctx, componentParameter)).Should(Succeed())
+
+			ops := testops.NewOpsRequestObj("failed-reconfigure-guard-"+randomStr, testCtx.DefaultNamespace,
+				clusterName, opsv1alpha1.ReconfiguringType)
+			ops.Spec.Reconfigures = []opsv1alpha1.Reconfigure{{
+				ComponentOps: opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
+				Parameters:   []opsv1alpha1.ParameterPair{{Key: "maxmemory-samples", Value: pointer.String("0")}},
+			}}
+			// prior-state snapshot as SaveLastConfiguration would have recorded it:
+			// the key did not exist before this ops.
+			ops.Annotations = map[string]string{
+				constant.ReconfigurePriorParametersAnnotationKey: fmt.Sprintf(`{"%s":{"maxmemory-samples":{"existed":false}}}`, defaultCompName),
+			}
+			opsRes.OpsRequest = testops.CreateOpsRequest(ctx, testCtx, ops)
+
+			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(componentParameter), func(cp *parametersv1alpha1.ComponentParameter) {
+				cp.Status.ObservedGeneration = cp.Generation
+				cp.Status.Phase = parametersv1alpha1.CMergeFailedPhase
+				cp.Status.Message = "merge failed"
+				cp.Status.ConfigurationItemStatus = []parametersv1alpha1.ConfigTemplateItemDetailStatus{{
+					Name:  "mysql-config",
+					Phase: parametersv1alpha1.CMergeFailedPhase,
+				}}
+			})()).Should(Succeed())
+
+			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsRunningPhase
+			_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+
+			Consistently(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentParameter), func(g Gomega, cp *parametersv1alpha1.ComponentParameter) {
+				g.Expect(cp.Spec.Desired.Assignments).Should(HaveKeyWithValue("maxmemory-samples", pointer.String("7")))
+			})).Should(Succeed())
+		})
+
+		It("withdraws only the failed ops's keys from assignments mixed with another ops's writes", func() {
+			// Modeled on a live field sample (MariaDB, 2026-07-07): the desired
+			// assignments of one ComponentParameter carried the writes of two ops at
+			// once — the failed ops's invalid value plus a later legitimate ops's
+			// keys. The withdrawal must remove exactly the failed ops's own keys and
+			// leave the other ops's intent untouched.
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
+
+			componentParameter := builder.NewComponentParameterBuilder(testCtx.DefaultNamespace, parameterscore.GenerateComponentConfigurationName(clusterName, defaultCompName)).
+				AddLabelsInMap(constant.GetCompLabelsWithDef(clusterName, defaultCompName, compDefName)).
+				SetClusterName(clusterName).
+				SetCompName(defaultCompName).
+				GetObject()
+			componentParameter.Spec.Desired = &parametersv1alpha1.ParameterInputs{
+				Assignments: map[string]*string{
+					// written by the failing ops
+					"slow-query-log":  pointer.String("nonsense"),
+					"long-query-time": pointer.String("5"),
+					// written by a later, legitimate ops
+					"wait-timeout":        pointer.String("90"),
+					"interactive-timeout": pointer.String("90"),
+				},
+			}
+			Expect(testCtx.CreateObj(ctx, componentParameter)).Should(Succeed())
+
+			ops := testops.NewOpsRequestObj("failed-reconfigure-mixed-"+randomStr, testCtx.DefaultNamespace,
+				clusterName, opsv1alpha1.ReconfiguringType)
+			ops.Spec.Reconfigures = []opsv1alpha1.Reconfigure{{
+				ComponentOps: opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
+				Parameters: []opsv1alpha1.ParameterPair{
+					{Key: "slow-query-log", Value: pointer.String("nonsense")},
+					{Key: "long-query-time", Value: pointer.String("5")},
+				},
+			}}
+			// prior-state snapshot as SaveLastConfiguration would have recorded it:
+			// neither key existed before this ops.
+			ops.Annotations = map[string]string{
+				constant.ReconfigurePriorParametersAnnotationKey: fmt.Sprintf(`{"%s":{"slow-query-log":{"existed":false},"long-query-time":{"existed":false}}}`, defaultCompName),
+			}
+			opsRes.OpsRequest = testops.CreateOpsRequest(ctx, testCtx, ops)
+
+			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(componentParameter), func(cp *parametersv1alpha1.ComponentParameter) {
+				cp.Status.ObservedGeneration = cp.Generation
+				cp.Status.Phase = parametersv1alpha1.CMergeFailedPhase
+				cp.Status.Message = "parameter slow-query-log value \"nonsense\" is invalid"
+				cp.Status.ConfigurationItemStatus = []parametersv1alpha1.ConfigTemplateItemDetailStatus{{
+					Name:  "mysql-config",
+					Phase: parametersv1alpha1.CMergeFailedPhase,
+				}}
+			})()).Should(Succeed())
+
+			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsRunningPhase
+			_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentParameter), func(g Gomega, cp *parametersv1alpha1.ComponentParameter) {
+				g.Expect(cp.Spec.Desired).ShouldNot(BeNil())
+				g.Expect(cp.Spec.Desired.Assignments).ShouldNot(HaveKey("slow-query-log"))
+				g.Expect(cp.Spec.Desired.Assignments).ShouldNot(HaveKey("long-query-time"))
+				g.Expect(cp.Spec.Desired.Assignments).Should(HaveKeyWithValue("wait-timeout", pointer.String("90")))
+				g.Expect(cp.Spec.Desired.Assignments).Should(HaveKeyWithValue("interactive-timeout", pointer.String("90")))
+			})).Should(Succeed())
+		})
+
+		It("restores previously accepted desired intent instead of deleting it", func() {
+			// Ownership cannot be proven by value equality against the ops spec: a
+			// failed ops may include a key=value pair that was already accepted
+			// desired intent from an earlier successful reconfigure. The withdrawal
+			// must keep such keys (same prior value) or restore the prior value
+			// (different prior value), guided by the prior-state snapshot.
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
+
+			componentParameter := builder.NewComponentParameterBuilder(testCtx.DefaultNamespace, parameterscore.GenerateComponentConfigurationName(clusterName, defaultCompName)).
+				AddLabelsInMap(constant.GetCompLabelsWithDef(clusterName, defaultCompName, compDefName)).
+				SetClusterName(clusterName).
+				SetCompName(defaultCompName).
+				GetObject()
+			componentParameter.Spec.Desired = &parametersv1alpha1.ParameterInputs{
+				// accepted desired intent from an earlier successful reconfigure
+				Assignments: map[string]*string{
+					"max-connections": pointer.String("200"),
+					"innodb-io-cap":   pointer.String("1000"),
+				},
+			}
+			Expect(testCtx.CreateObj(ctx, componentParameter)).Should(Succeed())
+
+			ops := testops.NewOpsRequestObj("failed-reconfigure-restore-"+randomStr, testCtx.DefaultNamespace,
+				clusterName, opsv1alpha1.ReconfiguringType)
+			ops.Spec.Reconfigures = []opsv1alpha1.Reconfigure{{
+				ComponentOps: opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
+				Parameters: []opsv1alpha1.ParameterPair{
+					// same value as the accepted intent — must be kept
+					{Key: "max-connections", Value: pointer.String("200")},
+					// overwrites the accepted intent — must be restored to prior
+					{Key: "innodb-io-cap", Value: pointer.String("2000")},
+					// fresh invalid key introduced by this ops — must be deleted
+					{Key: "bad-key", Value: pointer.String("nonsense")},
+				},
+			}}
+			ops.Annotations = map[string]string{
+				constant.ReconfigurePriorParametersAnnotationKey: fmt.Sprintf(
+					`{"%s":{"max-connections":{"existed":true,"value":"200"},"innodb-io-cap":{"existed":true,"value":"1000"},"bad-key":{"existed":false}}}`, defaultCompName),
+			}
+			opsRes.OpsRequest = testops.CreateOpsRequest(ctx, testCtx, ops)
+
+			// the CP now carries this ops's writes, as after applyReconfigureToParameters
+			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(componentParameter), func(cp *parametersv1alpha1.ComponentParameter) {
+				cp.Spec.Desired.Assignments["innodb-io-cap"] = pointer.String("2000")
+				cp.Spec.Desired.Assignments["bad-key"] = pointer.String("nonsense")
+			})()).Should(Succeed())
+
+			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(componentParameter), func(cp *parametersv1alpha1.ComponentParameter) {
+				cp.Status.ObservedGeneration = cp.Generation
+				cp.Status.Phase = parametersv1alpha1.CMergeFailedPhase
+				cp.Status.Message = "parameter bad-key value \"nonsense\" is invalid"
+				cp.Status.ConfigurationItemStatus = []parametersv1alpha1.ConfigTemplateItemDetailStatus{{
+					Name:  "mysql-config",
+					Phase: parametersv1alpha1.CMergeFailedPhase,
+				}}
+			})()).Should(Succeed())
+
+			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsRunningPhase
+			_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentParameter), func(g Gomega, cp *parametersv1alpha1.ComponentParameter) {
+				g.Expect(cp.Spec.Desired).ShouldNot(BeNil())
+				g.Expect(cp.Spec.Desired.Assignments).Should(HaveKeyWithValue("max-connections", pointer.String("200")))
+				g.Expect(cp.Spec.Desired.Assignments).Should(HaveKeyWithValue("innodb-io-cap", pointer.String("1000")))
+				g.Expect(cp.Spec.Desired.Assignments).ShouldNot(HaveKey("bad-key"))
+			})).Should(Succeed())
+		})
+
+		It("does not mutate desired state on failure without a prior-state snapshot", func() {
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
+
+			componentParameter := builder.NewComponentParameterBuilder(testCtx.DefaultNamespace, parameterscore.GenerateComponentConfigurationName(clusterName, defaultCompName)).
+				AddLabelsInMap(constant.GetCompLabelsWithDef(clusterName, defaultCompName, compDefName)).
+				SetClusterName(clusterName).
+				SetCompName(defaultCompName).
+				GetObject()
+			componentParameter.Spec.Desired = &parametersv1alpha1.ParameterInputs{
+				Assignments: map[string]*string{"maxmemory-samples": pointer.String("0")},
+			}
+			Expect(testCtx.CreateObj(ctx, componentParameter)).Should(Succeed())
+
+			ops := testops.NewOpsRequestObj("failed-reconfigure-nosnap-"+randomStr, testCtx.DefaultNamespace,
+				clusterName, opsv1alpha1.ReconfiguringType)
+			ops.Spec.Reconfigures = []opsv1alpha1.Reconfigure{{
+				ComponentOps: opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
+				Parameters:   []opsv1alpha1.ParameterPair{{Key: "maxmemory-samples", Value: pointer.String("0")}},
+			}}
+			// no snapshot annotation: ops created before this mechanism
+			opsRes.OpsRequest = testops.CreateOpsRequest(ctx, testCtx, ops)
+
+			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(componentParameter), func(cp *parametersv1alpha1.ComponentParameter) {
+				cp.Status.ObservedGeneration = cp.Generation
+				cp.Status.Phase = parametersv1alpha1.CMergeFailedPhase
+				cp.Status.Message = "merge failed"
+				cp.Status.ConfigurationItemStatus = []parametersv1alpha1.ConfigTemplateItemDetailStatus{{
+					Name:  "mysql-config",
+					Phase: parametersv1alpha1.CMergeFailedPhase,
+				}}
+			})()).Should(Succeed())
+
+			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsRunningPhase
+			_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+
+			Consistently(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentParameter), func(g Gomega, cp *parametersv1alpha1.ComponentParameter) {
+				g.Expect(cp.Spec.Desired.Assignments).Should(HaveKeyWithValue("maxmemory-samples", pointer.String("0")))
 			})).Should(Succeed())
 		})
 	})

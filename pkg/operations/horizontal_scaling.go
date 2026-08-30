@@ -293,6 +293,7 @@ func (hs horizontalScalingOpsHandler) restoreDataFromBackup(reqCtx intctrlutil.R
 			constant.KBAppComponentLabelKey: pgRes.compOps.GetComponentName(),
 		}, 1, int32(podIndexInt))
 		restoreMGR.RestoreTime = fromBackup.RestorePointInTime
+		restoreMGR.SetRestoreEnv(fromBackup.RestoreEnv)
 		restoreMGR.RestoreNamePrefix = string(opsRes.OpsRequest.UID[:8])
 		// check restore status
 		restoreMeta := restoreMGR.GetRestoreObjectMeta(synthesizedComponent, dpv1alpha1.PrepareData, templateName)

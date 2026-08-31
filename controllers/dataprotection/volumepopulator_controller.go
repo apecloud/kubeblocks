@@ -38,9 +38,14 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/component-helpers/storage/volume"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -83,6 +88,8 @@ type pvcRestoreDecision struct {
 
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims/finalizers,verbs=update
+// +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=restores,verbs=get;list;watch
+// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusters,verbs=get;list;watch
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=components,verbs=get;list;watch
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=componentdefinitions,verbs=get;list;watch
 
@@ -133,7 +140,193 @@ func (r *VolumePopulatorReconciler) handleSyncPVCError(reqCtx intctrlutil.Reques
 func (r *VolumePopulatorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return intctrlutil.NewControllerManagedBy(mgr).
 		For(&corev1.PersistentVolumeClaim{}).
+		Watches(&dpv1alpha1.Restore{}, handler.EnqueueRequestsFromMapFunc(r.mapRestoreToPVCs),
+			builder.WithPredicates(restoreDependencyPredicate())).
+		Watches(&appsv1.Component{}, handler.EnqueueRequestsFromMapFunc(r.mapComponentToPVCs),
+			builder.WithPredicates(componentDependencyPredicate())).
+		Watches(&appsv1.Cluster{}, handler.EnqueueRequestsFromMapFunc(r.mapClusterToPVCs),
+			builder.WithPredicates(clusterDependencyPredicate())).
 		Complete(r)
+}
+
+func (r *VolumePopulatorReconciler) mapRestoreToPVCs(ctx context.Context, obj client.Object) []reconcile.Request {
+	restore, ok := obj.(*dpv1alpha1.Restore)
+	if !ok || restore.Labels[dprestore.DataProtectionRestoreLabelKey] != restore.Name {
+		return nil
+	}
+
+	if owner := exactOwnerReference(restore.OwnerReferences, corev1.SchemeGroupVersion.String(), "PersistentVolumeClaim"); owner != nil {
+		pvc := &corev1.PersistentVolumeClaim{}
+		key := types.NamespacedName{Namespace: restore.Namespace, Name: owner.Name}
+		if err := r.Client.Get(ctx, key, pvc); err != nil || pvc.UID != owner.UID ||
+			!isClusterRestorePVC(pvc) || restore.Name != getPopulatePVCName(pvc.UID) {
+			return nil
+		}
+		return []reconcile.Request{{NamespacedName: key}}
+	}
+
+	owner := exactOwnerReference(restore.OwnerReferences, appsv1.GroupVersion.String(), "Component")
+	if owner == nil {
+		return nil
+	}
+	comp := &appsv1.Component{}
+	key := types.NamespacedName{Namespace: restore.Namespace, Name: owner.Name}
+	if err := r.Client.Get(ctx, key, comp); err != nil || comp.UID != owner.UID ||
+		restore.Name != postReadyRestoreName(comp.UID) {
+		return nil
+	}
+	clusterName := comp.Labels[constant.AppInstanceLabelKey]
+	componentName := restore.Labels[constant.KBAppComponentLabelKey]
+	ownerComponentName := comp.Labels[constant.KBAppComponentLabelKey]
+	if clusterName == "" || componentName == "" || ownerComponentName == "" ||
+		restore.Labels[constant.AppInstanceLabelKey] != clusterName {
+		return nil
+	}
+	// A postReady Restore is owned by its target Component, while its labels
+	// identify only the first source PVC that created it. Other Components in
+	// the Cluster can wait on the same Restore through postReady redirection.
+	return r.mapRestorePVCs(ctx, restore.Namespace, client.MatchingLabels{
+		constant.AppInstanceLabelKey: clusterName,
+	})
+}
+
+func (r *VolumePopulatorReconciler) mapComponentToPVCs(ctx context.Context, obj client.Object) []reconcile.Request {
+	comp, ok := obj.(*appsv1.Component)
+	if !ok {
+		return nil
+	}
+	clusterName := comp.Labels[constant.AppInstanceLabelKey]
+	componentName := comp.Labels[constant.KBAppComponentLabelKey]
+	if clusterName == "" || componentName == "" {
+		return nil
+	}
+	// A PVC can depend on another Component through a redirected postReady
+	// Restore. That relationship is derived from Backup status and is not
+	// represented on the Component, so a Component event must fan out to all
+	// active restore PVCs in its Cluster.
+	return r.mapRestorePVCs(ctx, comp.Namespace, client.MatchingLabels{
+		constant.AppInstanceLabelKey: clusterName,
+	})
+}
+
+func (r *VolumePopulatorReconciler) mapClusterToPVCs(ctx context.Context, obj client.Object) []reconcile.Request {
+	cluster, ok := obj.(*appsv1.Cluster)
+	if !ok || cluster.Name == "" {
+		return nil
+	}
+	return r.mapRestorePVCs(ctx, cluster.Namespace, client.MatchingLabels{
+		constant.AppInstanceLabelKey: cluster.Name,
+	})
+}
+
+func (r *VolumePopulatorReconciler) mapRestorePVCs(ctx context.Context, namespace string,
+	labels client.MatchingLabels) []reconcile.Request {
+	list := &corev1.PersistentVolumeClaimList{}
+	if err := r.Client.List(ctx, list, client.InNamespace(namespace), labels); err != nil {
+		return nil
+	}
+	requests := make([]reconcile.Request, 0, len(list.Items))
+	for i := range list.Items {
+		pvc := &list.Items[i]
+		if !isClusterRestorePVC(pvc) || pvcRestoreTerminal(pvc) {
+			continue
+		}
+		requests = append(requests, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(pvc)})
+	}
+	return requests
+}
+
+func isClusterRestorePVC(pvc *corev1.PersistentVolumeClaim) bool {
+	ref := pvc.Spec.DataSourceRef
+	if ref == nil || ref.APIGroup == nil || *ref.APIGroup != dptypes.DataprotectionAPIGroup || ref.Name == "" ||
+		(ref.Kind != dptypes.BackupKind && ref.Kind != dptypes.RestoreKind) {
+		return false
+	}
+	if pvc.Labels[constant.AppInstanceLabelKey] == "" || pvc.Labels[constant.KBAppComponentLabelKey] == "" {
+		return false
+	}
+	for _, key := range []string{
+		constant.RestoreSourceAPIGroupAnnotationKey,
+		constant.RestoreSourceKindAnnotationKey,
+		constant.RestoreSourceNameAnnotationKey,
+		constant.RestoreComponentAnnotationKey,
+		constant.RestoreVolumeTemplateAnnotationKey,
+	} {
+		if pvc.Annotations[key] == "" {
+			return false
+		}
+	}
+	restoreComponent := pvc.Annotations[constant.RestoreComponentAnnotationKey]
+	return restoreComponent == pvc.Labels[constant.KBAppComponentLabelKey] ||
+		restoreComponent == pvc.Labels[constant.KBAppShardingNameLabelKey] ||
+		restoreComponent == pvc.Labels[constant.KBAppShardTemplateLabelKey]
+}
+
+func pvcRestoreTerminal(pvc *corev1.PersistentVolumeClaim) bool {
+	condition := findPVCConditionByType(pvc, appsv1.ConditionTypeRestore)
+	return condition != nil && (condition.Status == corev1.ConditionTrue || condition.Status == corev1.ConditionFalse)
+}
+
+func exactOwnerReference(refs []metav1.OwnerReference, apiVersion, kind string) *metav1.OwnerReference {
+	for i := range refs {
+		if refs[i].APIVersion == apiVersion && refs[i].Kind == kind && refs[i].Name != "" && refs[i].UID != "" {
+			return &refs[i]
+		}
+	}
+	return nil
+}
+
+func restoreDependencyPredicate() predicate.Predicate {
+	return predicate.Funcs{
+		CreateFunc:  func(event.CreateEvent) bool { return true },
+		DeleteFunc:  func(event.DeleteEvent) bool { return true },
+		GenericFunc: func(event.GenericEvent) bool { return false },
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			oldRestore, oldOK := e.ObjectOld.(*dpv1alpha1.Restore)
+			newRestore, newOK := e.ObjectNew.(*dpv1alpha1.Restore)
+			return oldOK && newOK && (oldRestore.Status.Phase != newRestore.Status.Phase ||
+				!reflect.DeepEqual(oldRestore.DeletionTimestamp, newRestore.DeletionTimestamp))
+		},
+	}
+}
+
+func componentDependencyPredicate() predicate.Predicate {
+	return predicate.Funcs{
+		CreateFunc:  func(event.CreateEvent) bool { return true },
+		DeleteFunc:  func(event.DeleteEvent) bool { return true },
+		GenericFunc: func(event.GenericEvent) bool { return false },
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			oldComp, oldOK := e.ObjectOld.(*appsv1.Component)
+			newComp, newOK := e.ObjectNew.(*appsv1.Component)
+			return oldOK && newOK && (oldComp.Status.Phase != newComp.Status.Phase ||
+				!reflect.DeepEqual(oldComp.DeletionTimestamp, newComp.DeletionTimestamp) ||
+				!reflect.DeepEqual(postProvisionCondition(oldComp), postProvisionCondition(newComp)))
+		},
+	}
+}
+
+func clusterDependencyPredicate() predicate.Predicate {
+	return predicate.Funcs{
+		CreateFunc:  func(event.CreateEvent) bool { return true },
+		DeleteFunc:  func(event.DeleteEvent) bool { return true },
+		GenericFunc: func(event.GenericEvent) bool { return false },
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			oldCluster, oldOK := e.ObjectOld.(*appsv1.Cluster)
+			newCluster, newOK := e.ObjectNew.(*appsv1.Cluster)
+			return oldOK && newOK && (oldCluster.Status.Phase != newCluster.Status.Phase ||
+				!reflect.DeepEqual(oldCluster.DeletionTimestamp, newCluster.DeletionTimestamp))
+		},
+	}
+}
+
+func postProvisionCondition(comp *appsv1.Component) *metav1.Condition {
+	for i := range comp.Status.Conditions {
+		condition := &comp.Status.Conditions[i]
+		if condition.Type == appsv1.ComponentConditionProgressing && condition.Reason == "PostProvision" {
+			return condition
+		}
+	}
+	return nil
 }
 
 func (r *VolumePopulatorReconciler) MatchToPopulate(pvc *corev1.PersistentVolumeClaim) (bool, error) {
@@ -171,9 +364,6 @@ func (r *VolumePopulatorReconciler) syncPVC(reqCtx intctrlutil.RequestCtx, pvc *
 	}
 	if !matched {
 		return nil
-	}
-	if !pvc.DeletionTimestamp.IsZero() {
-		return r.cleanupDeletingPVC(reqCtx, pvc)
 	}
 	var restoreCtx *pvcRestoreContext
 	if pvc.Spec.DataSourceRef.Kind == dptypes.RestoreKind {
@@ -1615,16 +1805,6 @@ func postReadyRestoreLabels(pvc *corev1.PersistentVolumeClaim, comp *appsv1.Comp
 func postReadyRestoreName(componentUID types.UID) string {
 	// Backup dataSource restore is an initial, single-attempt restore for a Component UID.
 	return constant.ShortenKubeName(fmt.Sprintf("restore-%s-post-ready", componentUID), constant.KubeNameMaxLength)
-}
-
-// cleanupDeletingPVC releases population resources when the target PVC is
-// being deleted. Keep this entry point separate from successful completion so
-// deletion-specific teardown can evolve without broadening the success path.
-func (r *VolumePopulatorReconciler) cleanupDeletingPVC(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim) error {
-	if err := r.deletePopulatePVC(reqCtx, pvc); err != nil {
-		return err
-	}
-	return r.releaseTargetPVC(reqCtx, pvc)
 }
 
 // releasePopulateResources releases only the temporary PVC and the target PVC

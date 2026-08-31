@@ -515,7 +515,7 @@ type FromBackup struct {
 
 	// Specifies the namespace of the Backup.
 	// If not specified, the namespace of the OpsRequest will be used.
-	// Cross-namespace VolumeSnapshot restores are not supported.
+	// Cross-namespace VolumeSnapshot restores are NOT supported.
 	// +optional
 	Namespace string `json:"namespace,omitempty"`
 

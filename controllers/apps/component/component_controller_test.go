@@ -2052,34 +2052,6 @@ var _ = Describe("Component Controller", func() {
 			checkCompRunning()
 		})
 
-		It("starts a stopped zero-replica component and then scales it to one", func() {
-			changeReplicasLimit(compDefObj.Name, 0, 16384)
-			createCompObjWithPhase(defaultCompName, compDefObj.Name, func(f *testapps.MockComponentFactory) {
-				f.SetReplicas(0).SetStop(ptr.To(true))
-			}, kbappsv1.StoppedComponentPhase)
-
-			itsKey := compKey
-			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
-				g.Expect(its.Spec.Stop).ShouldNot(BeNil())
-				g.Expect(*its.Spec.Stop).Should(BeTrue())
-				g.Expect(*its.Spec.Replicas).Should(BeEquivalentTo(0))
-			})).Should(Succeed())
-
-			By("start the component")
-			startComp()
-			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
-				g.Expect(its.Spec.Stop).Should(BeNil())
-				g.Expect(*its.Spec.Replicas).Should(BeEquivalentTo(0))
-			})).Should(Succeed())
-
-			By("scale the component from zero to one")
-			changeCompReplicas(compKey, 1)
-			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
-				g.Expect(its.Spec.Stop).Should(BeNil())
-				g.Expect(*its.Spec.Replicas).Should(BeEquivalentTo(1))
-			})).Should(Succeed())
-		})
-
 		It("h-scale a stopped component", func() {
 			createCompObjWithPhase(defaultCompName, compDefObj.Name, func(f *testapps.MockComponentFactory) {
 				f.SetStop(ptr.To(true))
@@ -2115,6 +2087,77 @@ var _ = Describe("Component Controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(its.Spec.Stop).Should(BeNil())
 				g.Expect(*its.Spec.Replicas).Should(BeEquivalentTo(3))
+			})).Should(Succeed())
+		})
+
+		It("h-scale a stopped component - w/ data actions", func() {
+			By("update the cmpd object to set data actions")
+			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(compDefObj),
+				func(cmpd *kbappsv1.ComponentDefinition) {
+					if cmpd.Spec.LifecycleActions == nil {
+						cmpd.Spec.LifecycleActions = &kbappsv1.ComponentLifecycleActions{}
+					}
+					cmpd.Spec.LifecycleActions.DataLoad = testapps.NewLifecycleAction("data-load")
+					cmpd.Spec.LifecycleActions.DataDump = testapps.NewLifecycleAction("data-dump")
+				})()).Should(Succeed())
+
+			createCompObjWithPhase(defaultCompName, compDefObj.Name, func(f *testapps.MockComponentFactory) {
+				f.SetStop(ptr.To(true))
+			}, kbappsv1.StoppedComponentPhase)
+			checkCompStopped()
+
+			By("scale-out")
+			Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
+				comp.Spec.Replicas = 3
+			})()).ShouldNot(HaveOccurred())
+
+			By("check comp & its")
+			Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *kbappsv1.Component) {
+				g.Expect(comp.Spec.Replicas).Should(Equal(int32(3)))
+				g.Expect(comp.Status.ObservedGeneration < comp.Generation).Should(BeTrue())
+				g.Expect(comp.Status.Phase).Should(Equal(kbappsv1.StoppedComponentPhase))
+			})).Should(Succeed())
+			itsKey := compKey
+			Consistently(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(its.Spec.Stop).ShouldNot(BeNil())
+				g.Expect(*its.Spec.Stop).Should(BeTrue())
+				g.Expect(*its.Spec.Replicas).Should(BeEquivalentTo(1))
+			})).Should(Succeed())
+
+			By("start it")
+			startComp()
+
+			By("check the workload remains at one replica when the data action has no source pod")
+			Consistently(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(*its.Spec.Replicas).Should(BeEquivalentTo(1))
+			})).Should(Succeed())
+		})
+
+		It("starts a stopped zero-replica component and then scales it to one", func() {
+			changeReplicasLimit(compDefObj.Name, 0, 16384)
+			createCompObjWithPhase(defaultCompName, compDefObj.Name, func(f *testapps.MockComponentFactory) {
+				f.SetReplicas(0).SetStop(ptr.To(true))
+			}, kbappsv1.StoppedComponentPhase)
+
+			itsKey := compKey
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(its.Spec.Stop).ShouldNot(BeNil())
+				g.Expect(*its.Spec.Stop).Should(BeTrue())
+				g.Expect(*its.Spec.Replicas).Should(BeEquivalentTo(0))
+			})).Should(Succeed())
+
+			By("start the component")
+			startComp()
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(its.Spec.Stop).Should(BeNil())
+				g.Expect(*its.Spec.Replicas).Should(BeEquivalentTo(0))
+			})).Should(Succeed())
+
+			By("scale the component from zero to one")
+			changeCompReplicas(compKey, 1)
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(its.Spec.Stop).Should(BeNil())
+				g.Expect(*its.Spec.Replicas).Should(BeEquivalentTo(1))
 			})).Should(Succeed())
 		})
 

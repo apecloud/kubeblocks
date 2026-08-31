@@ -236,7 +236,7 @@ func TestRestoreManagerBuildPrepareDataRestore(t *testing.T) {
 		SchedulingPolicy: &appsv1.SchedulingPolicy{NodeName: "node-a"},
 	}
 	backup := &dpv1alpha1.Backup{
-		ObjectMeta: metav1.ObjectMeta{Name: "backup"},
+		ObjectMeta: metav1.ObjectMeta{Name: "backup", Namespace: "backup-source"},
 		Status: dpv1alpha1.BackupStatus{
 			Targets: []dpv1alpha1.BackupStatusTarget{{
 				BackupTarget: dpv1alpha1.BackupTarget{
@@ -264,7 +264,7 @@ func TestRestoreManagerBuildPrepareDataRestore(t *testing.T) {
 		return
 	}
 	if restore.Spec.Backup.Name != "backup" ||
-		restore.Spec.Backup.Namespace != "default" ||
+		restore.Spec.Backup.Namespace != "backup-source" ||
 		restore.Spec.Backup.SourceTargetName != "target-a" {
 		t.Fatalf("unexpected backup ref: %#v", restore.Spec.Backup)
 	}

@@ -172,15 +172,6 @@ func (r *VolumePopulatorReconciler) syncPVC(reqCtx intctrlutil.RequestCtx, pvc *
 	if !matched {
 		return nil
 	}
-	if !pvc.DeletionTimestamp.IsZero() {
-		if pvcRestoreFailed(pvc) {
-			return r.waitForDeletingRestoreTargetPVC(reqCtx, pvc)
-		}
-		if pvcReadyForRestoreProgression(pvc) {
-			return r.releasePopulateResources(reqCtx, pvc)
-		}
-		return r.waitForDeletingRestoreTargetPVC(reqCtx, pvc)
-	}
 	var restoreCtx *pvcRestoreContext
 	if pvc.Spec.DataSourceRef.Kind == dptypes.RestoreKind {
 		restoreCtx, err = r.validateRestoreRefAndBuildMGR(reqCtx, pvc)
@@ -198,30 +189,6 @@ func (r *VolumePopulatorReconciler) syncPVC(reqCtx intctrlutil.RequestCtx, pvc *
 		return err
 	}
 	return nil
-}
-
-func (r *VolumePopulatorReconciler) waitForDeletingRestoreTargetPVC(reqCtx intctrlutil.RequestCtx,
-	pvc *corev1.PersistentVolumeClaim) error {
-	message := fmt.Sprintf("restore is waiting because target PVC %s/%s is deleting", pvc.Namespace, pvc.Name)
-	condition := corev1.PersistentVolumeClaimCondition{
-		Type:               PersistentVolumeClaimRestoreTargetDeleting,
-		Status:             corev1.ConditionTrue,
-		LastTransitionTime: metav1.Now(),
-		Reason:             ReasonRestoreTargetPVCDeleting,
-		Message:            message,
-	}
-	existing := findPVCConditionByType(pvc, string(PersistentVolumeClaimRestoreTargetDeleting))
-	if existing == nil || existing.Status != condition.Status || existing.Reason != condition.Reason ||
-		existing.Message != condition.Message {
-		patch := client.MergeFrom(pvc.DeepCopy())
-		upsertPVCCondition(&pvc.Status.Conditions, condition)
-		if err := r.Client.Status().Patch(reqCtx.Ctx, pvc, patch); err != nil {
-			return intctrlutil.NewRequeueError(reconcileInterval,
-				fmt.Sprintf("failed to record deleting restore target PVC: %v", err))
-		}
-		r.Recorder.Event(pvc, corev1.EventTypeWarning, ReasonRestoreTargetPVCDeleting, message)
-	}
-	return intctrlutil.NewRequeueError(reconcileInterval, message)
 }
 
 // dispatchUnboundPVC routes an unbound PVC to either Populate or ProvisionOnly.
@@ -1029,8 +996,15 @@ func (r *VolumePopulatorReconciler) completeBoundPVCIfNeeded(reqCtx intctrlutil.
 	pvc *corev1.PersistentVolumeClaim,
 	restoreCtx *pvcRestoreContext) error {
 	populateReleased := pvcPopulateReleased(pvc)
-	if pvcRestoreFailed(pvc) {
-		return nil
+	for i := range pvc.Status.Conditions {
+		condition := pvc.Status.Conditions[i]
+		if string(condition.Type) != appsv1.ConditionTypeRestore {
+			continue
+		}
+		if condition.Status == corev1.ConditionFalse {
+			return nil
+		}
+		break
 	}
 	if !populateReleased {
 		if !pvcBindingCompleted(pvc) {
@@ -1483,11 +1457,6 @@ func pvcPopulateReleased(pvc *corev1.PersistentVolumeClaim) bool {
 	cond := findPVCConditionByType(pvc, string(PersistentVolumeClaimPopulating))
 	return cond != nil && cond.Status == corev1.ConditionTrue &&
 		(cond.Reason == ReasonPopulatingSucceed || cond.Reason == ReasonPopulatingProvisioned)
-}
-
-func pvcRestoreFailed(pvc *corev1.PersistentVolumeClaim) bool {
-	cond := findPVCConditionByType(pvc, appsv1.ConditionTypeRestore)
-	return cond != nil && cond.Status == corev1.ConditionFalse
 }
 
 func pvcReadyForRestoreProgression(pvc *corev1.PersistentVolumeClaim) bool {

@@ -82,10 +82,9 @@ const (
 	AnnPopulateFrom = "dataprotection.kubeblocks.io/populate-from"
 
 	// event reason
-	ReasonStartToVolumePopulate    = "StartToVolumePopulate"
-	ReasonVolumePopulateSucceed    = "VolumePopulateSucceed"
-	ReasonVolumePopulateFailed     = "VolumePopulateFailed"
-	ReasonRestoreTargetPVCDeleting = "RestoreTargetPVCDeleting"
+	ReasonStartToVolumePopulate = "StartToVolumePopulate"
+	ReasonVolumePopulateSucceed = "VolumePopulateSucceed"
+	ReasonVolumePopulateFailed  = "VolumePopulateFailed"
 
 	// pvc condition type and reason
 	ReasonPopulatingFailed      = "Failed"
@@ -93,8 +92,7 @@ const (
 	ReasonPopulatingSucceed     = "Succeed"
 	ReasonPopulatingProvisioned = "Provisioned"
 
-	PersistentVolumeClaimPopulating            corev1.PersistentVolumeClaimConditionType = "Populating"
-	PersistentVolumeClaimRestoreTargetDeleting corev1.PersistentVolumeClaimConditionType = "RestoreTargetDeleting"
+	PersistentVolumeClaimPopulating corev1.PersistentVolumeClaimConditionType = "Populating"
 )
 
 var reconcileInterval = time.Second

@@ -39,7 +39,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/component-helpers/storage/volume"
 	"k8s.io/utils/ptr"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -1510,215 +1509,42 @@ func TestDispatchUnboundPVCFailsWhenNoRestoreActionsExist(t *testing.T) {
 		"expected fatal error when neither prepareData nor postReady exists, got: %v", err)
 }
 
-func TestDeletingUnfinishedTargetPVCWaitsWithoutCleaningPopulation(t *testing.T) {
-	scheme := runtime.NewScheme()
-	require.NoError(t, corev1.AddToScheme(scheme))
-	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
-	apiGroup := dptypes.DataprotectionAPIGroup
-	now := metav1.Now()
-	pvc := &corev1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace:         "default",
-			Name:              "data-0",
-			UID:               "data-0-uid",
-			DeletionTimestamp: &now,
-			Finalizers:        []string{dptypes.DataProtectionFinalizerName},
-		},
-		Spec: corev1.PersistentVolumeClaimSpec{
-			DataSourceRef: &corev1.TypedObjectReference{
-				APIGroup: &apiGroup,
-				Kind:     dptypes.BackupKind,
-				Name:     "already-deleted-backup",
-			},
-		},
-	}
-	populatePVC := &corev1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: pvc.Namespace,
-			Name:      getPopulatePVCName(pvc.UID),
-		},
-	}
-	recorder := record.NewFakeRecorder(2)
-	reconciler := &VolumePopulatorReconciler{
-		Client: fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(pvc).
-			WithObjects(pvc, populatePVC).Build(),
-		Scheme:   scheme,
-		Recorder: recorder,
-	}
-	req := ctrl.Request{NamespacedName: client.ObjectKeyFromObject(pvc)}
-
-	result, err := reconciler.Reconcile(context.Background(), req)
-	require.NoError(t, err)
-	require.Equal(t, reconcileInterval, result.RequeueAfter)
-	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(populatePVC), &corev1.PersistentVolumeClaim{}),
-		"populate PVC must remain untouched")
-	current := &corev1.PersistentVolumeClaim{}
-	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(pvc), current))
-	require.Contains(t, current.Finalizers, dptypes.DataProtectionFinalizerName,
-		"target PVC must remain protected")
-	require.Nil(t, findPVCConditionByType(current, kbappsv1.ConditionTypeRestore))
-	deletingCondition := findPVCConditionByType(current, string(PersistentVolumeClaimRestoreTargetDeleting))
-	require.NotNil(t, deletingCondition)
-	require.Equal(t, corev1.ConditionTrue, deletingCondition.Status)
-	require.Equal(t, ReasonRestoreTargetPVCDeleting, deletingCondition.Reason)
-	event := <-recorder.Events
-	require.Contains(t, event, ReasonRestoreTargetPVCDeleting)
-	require.Contains(t, event, "restore is waiting")
-
-	result, err = reconciler.Reconcile(context.Background(), req)
-	require.NoError(t, err)
-	require.Equal(t, reconcileInterval, result.RequeueAfter)
-	select {
-	case duplicate := <-recorder.Events:
-		require.Failf(t, "unexpected duplicate event", "got %q", duplicate)
-	default:
-	}
-}
-
-func TestDeletingFailedTargetPVCKeepsFailureAndPopulationResources(t *testing.T) {
-	scheme := runtime.NewScheme()
-	require.NoError(t, corev1.AddToScheme(scheme))
-	apiGroup := dptypes.DataprotectionAPIGroup
-	now := metav1.Now()
-	pvc := &corev1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace:         "default",
-			Name:              "data-0",
-			UID:               "data-0-uid",
-			DeletionTimestamp: &now,
-			Finalizers:        []string{dptypes.DataProtectionFinalizerName},
-			Annotations:       map[string]string{volume.AnnBindCompleted: "yes"},
-		},
-		Spec: corev1.PersistentVolumeClaimSpec{
-			VolumeName: "restored-pv",
-			DataSourceRef: &corev1.TypedObjectReference{
-				APIGroup: &apiGroup,
-				Kind:     dptypes.BackupKind,
-				Name:     "backup",
-			},
-		},
-		Status: corev1.PersistentVolumeClaimStatus{Conditions: []corev1.PersistentVolumeClaimCondition{
-			{
-				Type:    corev1.PersistentVolumeClaimConditionType(kbappsv1.ConditionTypeRestore),
-				Status:  corev1.ConditionFalse,
-				Reason:  ReasonPopulatingFailed,
-				Message: "execution restore failed",
-			},
-		}},
-	}
-	populatePVC := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{
-		Namespace: pvc.Namespace,
-		Name:      getPopulatePVCName(pvc.UID),
-	}}
-	recorder := record.NewFakeRecorder(1)
-	reconciler := &VolumePopulatorReconciler{
-		Client: fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(pvc).
-			WithObjects(pvc, populatePVC).Build(),
-		Scheme:   scheme,
-		Recorder: recorder,
-	}
-
-	result, err := reconciler.Reconcile(context.Background(), ctrl.Request{
-		NamespacedName: client.ObjectKeyFromObject(pvc),
-	})
-	require.NoError(t, err)
-	require.Equal(t, reconcileInterval, result.RequeueAfter)
-	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(populatePVC),
-		&corev1.PersistentVolumeClaim{}))
-	current := &corev1.PersistentVolumeClaim{}
-	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(pvc), current))
-	require.Contains(t, current.Finalizers, dptypes.DataProtectionFinalizerName)
-	restoreCondition := findPVCConditionByType(current, kbappsv1.ConditionTypeRestore)
-	require.NotNil(t, restoreCondition)
-	require.Equal(t, corev1.ConditionFalse, restoreCondition.Status)
-	require.Equal(t, ReasonPopulatingFailed, restoreCondition.Reason)
-	require.Equal(t, "execution restore failed", restoreCondition.Message)
-	deletingCondition := findPVCConditionByType(current, string(PersistentVolumeClaimRestoreTargetDeleting))
-	require.NotNil(t, deletingCondition)
-	require.Equal(t, corev1.ConditionTrue, deletingCondition.Status)
-	require.Equal(t, ReasonRestoreTargetPVCDeleting, deletingCondition.Reason)
-}
-
-func TestDeletingCompletedTargetPVCFinishesSuccessfulCleanup(t *testing.T) {
-	tests := []struct {
-		name        string
-		annotations map[string]string
-		conditions  []corev1.PersistentVolumeClaimCondition
-	}{
-		{
-			name:        "binding completed",
-			annotations: map[string]string{volume.AnnBindCompleted: "yes"},
-		},
-		{
-			name: "population succeeded",
-			conditions: []corev1.PersistentVolumeClaimCondition{{
-				Type:   PersistentVolumeClaimPopulating,
-				Status: corev1.ConditionTrue,
-				Reason: ReasonPopulatingSucceed,
-			}},
-		},
-		{
-			name: "provisioning completed",
-			conditions: []corev1.PersistentVolumeClaimCondition{{
-				Type:   PersistentVolumeClaimPopulating,
-				Status: corev1.ConditionTrue,
-				Reason: ReasonPopulatingProvisioned,
-			}},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+func TestDeletingTargetPVCWithDPFinalizerUsesNormalRestorePath(t *testing.T) {
+	for _, deleting := range []bool{false, true} {
+		t.Run(fmt.Sprintf("deleting=%t", deleting), func(t *testing.T) {
 			scheme := runtime.NewScheme()
 			require.NoError(t, corev1.AddToScheme(scheme))
+			require.NoError(t, dpv1alpha1.AddToScheme(scheme))
 			apiGroup := dptypes.DataprotectionAPIGroup
-			now := metav1.Now()
 			pvc := &corev1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{
-					Namespace:         "default",
-					Name:              "data-0",
-					UID:               "data-0-uid",
-					DeletionTimestamp: &now,
-					Finalizers:        []string{dptypes.DataProtectionFinalizerName, "example.io/keep"},
-					Annotations:       tt.annotations,
+					Namespace:  "default",
+					Name:       "data-0",
+					UID:        "data-0-uid",
+					Finalizers: []string{dptypes.DataProtectionFinalizerName},
 				},
-				Spec: corev1.PersistentVolumeClaimSpec{
-					VolumeName: "restored-pv",
-					DataSourceRef: &corev1.TypedObjectReference{
-						APIGroup: &apiGroup,
-						Kind:     dptypes.BackupKind,
-						Name:     "backup",
-					},
-				},
-				Status: corev1.PersistentVolumeClaimStatus{Conditions: tt.conditions},
+				Spec: corev1.PersistentVolumeClaimSpec{DataSourceRef: &corev1.TypedObjectReference{
+					APIGroup: &apiGroup,
+					Kind:     dptypes.BackupKind,
+					Name:     "missing-backup",
+				}},
 			}
-			populatePVC := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{
-				Namespace: pvc.Namespace,
-				Name:      getPopulatePVCName(pvc.UID),
-			}}
-			recorder := record.NewFakeRecorder(1)
+			if deleting {
+				now := metav1.Now()
+				pvc.DeletionTimestamp = &now
+			}
 			reconciler := &VolumePopulatorReconciler{
-				Client:   fake.NewClientBuilder().WithScheme(scheme).WithObjects(pvc, populatePVC).Build(),
-				Scheme:   scheme,
-				Recorder: recorder,
+				Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(pvc).Build(),
+				Scheme: scheme,
 			}
 
-			result, err := reconciler.Reconcile(context.Background(), ctrl.Request{
-				NamespacedName: client.ObjectKeyFromObject(pvc),
-			})
-			require.NoError(t, err)
-			require.Zero(t, result.RequeueAfter)
-			require.True(t, apierrors.IsNotFound(reconciler.Client.Get(context.Background(),
-				client.ObjectKeyFromObject(populatePVC), &corev1.PersistentVolumeClaim{})))
+			err := reconciler.syncPVC(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc)
+
+			require.Error(t, err)
+			require.True(t, apierrors.IsNotFound(err), "deletion must not replace the ordinary restore error: %v", err)
 			current := &corev1.PersistentVolumeClaim{}
 			require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(pvc), current))
-			require.NotContains(t, current.Finalizers, dptypes.DataProtectionFinalizerName)
-			require.Contains(t, current.Finalizers, "example.io/keep")
-			select {
-			case event := <-recorder.Events:
-				require.Failf(t, "unexpected wait event", "got %q", event)
-			default:
-			}
+			require.Contains(t, current.Finalizers, dptypes.DataProtectionFinalizerName)
 		})
 	}
 }

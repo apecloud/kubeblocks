@@ -1509,43 +1509,44 @@ func TestDispatchUnboundPVCFailsWhenNoRestoreActionsExist(t *testing.T) {
 		"expected fatal error when neither prepareData nor postReady exists, got: %v", err)
 }
 
-func TestDeletingTargetPVCCleansPopulationWithoutValidatingSource(t *testing.T) {
-	scheme := runtime.NewScheme()
-	require.NoError(t, corev1.AddToScheme(scheme))
-	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
-	apiGroup := dptypes.DataprotectionAPIGroup
-	now := metav1.Now()
-	pvc := &corev1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace:         "default",
-			Name:              "data-0",
-			UID:               "data-0-uid",
-			DeletionTimestamp: &now,
-			Finalizers:        []string{dptypes.DataProtectionFinalizerName},
-		},
-		Spec: corev1.PersistentVolumeClaimSpec{
-			DataSourceRef: &corev1.TypedObjectReference{
-				APIGroup: &apiGroup,
-				Kind:     dptypes.BackupKind,
-				Name:     "already-deleted-backup",
-			},
-		},
-	}
-	populatePVC := &corev1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: pvc.Namespace,
-			Name:      getPopulatePVCName(pvc.UID),
-		},
-	}
-	reconciler := &VolumePopulatorReconciler{
-		Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(pvc, populatePVC).Build(),
-		Scheme: scheme,
-	}
+func TestDeletingTargetPVCWithDPFinalizerUsesNormalRestorePath(t *testing.T) {
+	for _, deleting := range []bool{false, true} {
+		t.Run(fmt.Sprintf("deleting=%t", deleting), func(t *testing.T) {
+			scheme := runtime.NewScheme()
+			require.NoError(t, corev1.AddToScheme(scheme))
+			require.NoError(t, dpv1alpha1.AddToScheme(scheme))
+			apiGroup := dptypes.DataprotectionAPIGroup
+			pvc := &corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace:  "default",
+					Name:       "data-0",
+					UID:        "data-0-uid",
+					Finalizers: []string{dptypes.DataProtectionFinalizerName},
+				},
+				Spec: corev1.PersistentVolumeClaimSpec{DataSourceRef: &corev1.TypedObjectReference{
+					APIGroup: &apiGroup,
+					Kind:     dptypes.BackupKind,
+					Name:     "missing-backup",
+				}},
+			}
+			if deleting {
+				now := metav1.Now()
+				pvc.DeletionTimestamp = &now
+			}
+			reconciler := &VolumePopulatorReconciler{
+				Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(pvc).Build(),
+				Scheme: scheme,
+			}
 
-	err := reconciler.syncPVC(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc)
-	require.NoError(t, err)
-	err = reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(populatePVC), &corev1.PersistentVolumeClaim{})
-	require.True(t, apierrors.IsNotFound(err), "populate PVC should be deleted, got: %v", err)
+			err := reconciler.syncPVC(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc)
+
+			require.Error(t, err)
+			require.True(t, apierrors.IsNotFound(err), "deletion must not replace the ordinary restore error: %v", err)
+			current := &corev1.PersistentVolumeClaim{}
+			require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(pvc), current))
+			require.Contains(t, current.Finalizers, dptypes.DataProtectionFinalizerName)
+		})
+	}
 }
 
 func TestSuccessfulPopulateReleaseRemovesOnlyHelperAndTargetFinalizer(t *testing.T) {

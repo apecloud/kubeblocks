@@ -20,6 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instance
 
 import (
+	"fmt"
+	"sort"
+	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -50,6 +53,7 @@ func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 
 func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	inst := tree.GetRoot().(*workloads.Instance)
+	r.reconcileRestoreCondition(tree, inst)
 
 	obj, err := tree.Get(podObj(inst))
 	if err != nil {
@@ -120,6 +124,87 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		return kubebuilderx.RetryAfter(time.Second), nil
 	}
 	return kubebuilderx.Continue, nil
+}
+
+func (r *statusReconciler) reconcileRestoreCondition(tree *kubebuilderx.ObjectTree, inst *workloads.Instance) {
+	restoreCond := meta.FindStatusCondition(inst.Status.Conditions, string(workloads.InstanceRestore))
+	if restoreCond != nil && (restoreCond.Status == metav1.ConditionTrue || restoreCond.Status == metav1.ConditionFalse) {
+		return
+	}
+	condition := r.buildRestoreCondition(tree, inst)
+	if condition == nil {
+		meta.RemoveStatusCondition(&inst.Status.Conditions, string(workloads.InstanceRestore))
+		return
+	}
+	meta.SetStatusCondition(&inst.Status.Conditions, *condition)
+}
+
+func (r *statusReconciler) buildRestoreCondition(tree *kubebuilderx.ObjectTree, inst *workloads.Instance) *metav1.Condition {
+	expectedPVCNames := make(map[string]struct{})
+	for i := range inst.Spec.VolumeClaimTemplates {
+		vct := &inst.Spec.VolumeClaimTemplates[i]
+		if vct.Annotations[constant.RestoreSourceKindAnnotationKey] == "" {
+			continue
+		}
+		expectedPVCNames[intctrlutil.ComposePVCName(corev1.PersistentVolumeClaim{ObjectMeta: vct.ObjectMeta}, inst.Spec.InstanceSetName, inst.Name)] = struct{}{}
+	}
+	if len(expectedPVCNames) == 0 {
+		return nil
+	}
+
+	pvcsByName := r.persistentVolumeClaimsByName(tree)
+	completed := 0
+	waiting := make([]string, 0, len(expectedPVCNames))
+	for name := range expectedPVCNames {
+		pvc := pvcsByName[name]
+		if pvc == nil {
+			waiting = append(waiting, name)
+			continue
+		}
+		cond := findPVCRestoreCondition(pvc)
+		if cond == nil || cond.Status == corev1.ConditionUnknown {
+			waiting = append(waiting, name)
+			continue
+		}
+		if cond.Status == corev1.ConditionFalse {
+			return &metav1.Condition{
+				Type:               string(workloads.InstanceRestore),
+				Status:             metav1.ConditionFalse,
+				ObservedGeneration: inst.Generation,
+				Reason:             workloads.ReasonRestoreFailed,
+				Message:            fmt.Sprintf("PVC %s restore failed: %s", pvc.Name, cond.Message),
+			}
+		}
+		if cond.Status == corev1.ConditionTrue {
+			completed++
+		}
+	}
+	if completed == len(expectedPVCNames) {
+		return &metav1.Condition{
+			Type:               string(workloads.InstanceRestore),
+			Status:             metav1.ConditionTrue,
+			ObservedGeneration: inst.Generation,
+			Reason:             workloads.ReasonRestoreCompleted,
+			Message:            "All initial restore PVCs have completed",
+		}
+	}
+	sort.Strings(waiting)
+	return &metav1.Condition{
+		Type:               string(workloads.InstanceRestore),
+		Status:             metav1.ConditionUnknown,
+		ObservedGeneration: inst.Generation,
+		Reason:             workloads.ReasonRestoreRunning,
+		Message:            fmt.Sprintf("Waiting for initial restore PVCs to complete: %s", strings.Join(waiting, ",")),
+	}
+}
+
+func findPVCRestoreCondition(pvc *corev1.PersistentVolumeClaim) *corev1.PersistentVolumeClaimCondition {
+	for i := range pvc.Status.Conditions {
+		if string(pvc.Status.Conditions[i].Type) == string(workloads.InstanceRestore) {
+			return &pvc.Status.Conditions[i]
+		}
+	}
+	return nil
 }
 
 // An absent or terminating Pod cannot provide a valid runtime observation. Clear every Pod-derived field and

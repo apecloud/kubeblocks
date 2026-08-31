@@ -3184,8 +3184,11 @@ func TestMapPostReadyRestoreToNonTerminalComponentPVCs(t *testing.T) {
 		}},
 	}}
 	reconciler := dependencyTestReconciler(t, comp, running, terminal, redirectTarget, otherRedirectSource)
-	require.Equal(t, []reconcile.Request{{NamespacedName: client.ObjectKeyFromObject(running)}},
-		reconciler.mapRestoreToPVCs(context.Background(), restore))
+	require.ElementsMatch(t, []reconcile.Request{
+		{NamespacedName: client.ObjectKeyFromObject(running)},
+		{NamespacedName: client.ObjectKeyFromObject(redirectTarget)},
+		{NamespacedName: client.ObjectKeyFromObject(otherRedirectSource)},
+	}, reconciler.mapRestoreToPVCs(context.Background(), restore))
 
 	redirected := restore.DeepCopy()
 	redirected.Labels[constant.KBAppComponentLabelKey] = "postgresql"

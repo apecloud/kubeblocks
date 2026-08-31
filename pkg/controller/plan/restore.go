@@ -65,6 +65,7 @@ type RestoreManager struct {
 	replicas                          int32
 	restoreLabels                     map[string]string
 	RestoreNamePrefix                 string
+	SourceTargetName                  string
 }
 
 func NewRestoreManager(ctx context.Context,
@@ -266,6 +267,9 @@ func (r *RestoreManager) BuildPrepareDataRestore(comp *component.SynthesizedComp
 		return nil, nil
 	}
 	sourceTargetName := comp.Annotations[constant.BackupSourceTargetAnnotationKey]
+	if r.SourceTargetName != "" {
+		sourceTargetName = r.SourceTargetName
+	}
 	sourceTarget := dputils.GetBackupStatusTarget(backupObj, sourceTargetName)
 	restore := &dpv1alpha1.Restore{
 		ObjectMeta: r.GetRestoreObjectMeta(comp, dpv1alpha1.PrepareData, templateName),

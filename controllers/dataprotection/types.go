@@ -93,7 +93,8 @@ const (
 	ReasonPopulatingSucceed     = "Succeed"
 	ReasonPopulatingProvisioned = "Provisioned"
 
-	PersistentVolumeClaimPopulating corev1.PersistentVolumeClaimConditionType = "Populating"
+	PersistentVolumeClaimPopulating            corev1.PersistentVolumeClaimConditionType = "Populating"
+	PersistentVolumeClaimRestoreTargetDeleting corev1.PersistentVolumeClaimConditionType = "RestoreTargetDeleting"
 )
 
 var reconcileInterval = time.Second

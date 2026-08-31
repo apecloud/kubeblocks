@@ -738,7 +738,7 @@ const (
 	// InstanceFailure is added in an instance set when at least one of its instances(pods) is in a `Failed` phase.
 	InstanceFailure ConditionType = "InstanceFailure"
 
-	// InstanceRestore indicates whether the initial data restore for this InstanceSet has completed.
+	// InstanceRestore indicates whether the initial data restore for this Instance or InstanceSet has completed.
 	InstanceRestore ConditionType = "Restore"
 
 	// InstanceUpdateRestricted represents a ConditionType that indicates updates to an InstanceSet are blocked(when the

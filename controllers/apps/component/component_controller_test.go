@@ -2127,10 +2127,21 @@ var _ = Describe("Component Controller", func() {
 			By("start it")
 			startComp()
 
-			By("check the workload remains at one replica when the data action has no source pod")
+			By("check start is applied before scale-out is blocked by the missing source pod")
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(its.Spec.Stop).Should(BeNil())
+				g.Expect(*its.Spec.Replicas).Should(BeEquivalentTo(1))
+			})).Should(Succeed())
 			Consistently(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(*its.Spec.Replicas).Should(BeEquivalentTo(1))
 			})).Should(Succeed())
+
+			By("restore the component to a reconcilable state")
+			Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
+				comp.Spec.Stop = ptr.To(true)
+				comp.Spec.Replicas = 1
+			})()).Should(Succeed())
+			checkCompStopped()
 		})
 
 		It("starts a stopped zero-replica component and then scales it to one", func() {

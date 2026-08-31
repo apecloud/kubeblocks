@@ -43,6 +43,10 @@ func composeRolePriorityMap(roles []workloads.ReplicaRole) map[string]int {
 	return rolePriorityMap
 }
 
+func getRolePriority(rolePriorityMap map[string]int, roleName string) int {
+	return rolePriorityMap[strings.ToLower(roleName)]
+}
+
 // sortInstances sorts instances by their role priority
 // e.g.: unknown -> empty -> learner -> follower1 -> follower2 -> leader, with follower1.Name > follower2.Name
 // reverse it if reverse==true
@@ -61,8 +65,7 @@ func sortInstanceObjects(instances []*workloads.Instance, rolePriorityMap map[st
 func sortInstancesByRole[T any](instances []T, instanceAt func(int) *workloads.Instance,
 	rolePriorityMap map[string]int, reverse bool) {
 	getRolePriorityFunc := func(i int) int {
-		role := getInstanceRoleName(instanceAt(i))
-		return rolePriorityMap[role]
+		return getRolePriority(rolePriorityMap, getInstanceRoleName(instanceAt(i)))
 	}
 	getNameNOrdinalFunc := func(i int) (string, int) {
 		return parseParentNameAndOrdinal(instanceAt(i).GetName())
@@ -71,7 +74,7 @@ func sortInstancesByRole[T any](instances []T, instanceAt func(int) *workloads.I
 }
 
 func getInstanceRoleName(inst *workloads.Instance) string {
-	return inst.Status.Role
+	return strings.ToLower(inst.Status.Role)
 }
 
 func composeRoleMap(its workloads.InstanceSet) map[string]workloads.ReplicaRole {

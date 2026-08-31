@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 
@@ -42,9 +43,29 @@ import (
 
 const (
 	defaultMaxConcurrency = 32
+	tiniBinaryName        = "tini-static"
 )
 
 var serverConfig server.Config
+
+type execProcessFunc func(argv0 string, argv []string, envv []string) error
+type executableFunc func() (string, error)
+
+func reexecUnderInit(pid int, args, env []string, executable executableFunc, execProcess execProcessFunc) error {
+	if pid != 1 {
+		return nil
+	}
+	exe, err := executable()
+	if err != nil {
+		return errors.Wrap(err, "resolve kbagent executable")
+	}
+	tini := filepath.Join(filepath.Dir(exe), tiniBinaryName)
+	argv := []string{tini, "--", exe}
+	if len(args) > 1 {
+		argv = append(argv, args[1:]...)
+	}
+	return errors.Wrap(execProcess(tini, argv, env), "exec tini-static")
+}
 
 func init() {
 	viper.AutomaticEnv()
@@ -60,6 +81,11 @@ func init() {
 }
 
 func main() {
+	if err := reexecUnderInit(os.Getpid(), os.Args, os.Environ(), os.Executable, syscall.Exec); err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "failed to launch kbagent under tini: %v\n", err)
+		os.Exit(1)
+	}
+
 	// Set GOMAXPROCS
 	_, _ = maxprocs.Set()
 

@@ -495,6 +495,12 @@ spec:
             description: Populated by the system, it represents the current information
               about the BackupPolicyTemplate.
             properties:
+              matchedCompDefs:
+                description: Specifies the names of component definitions that match
+                  the `spec.compDefs` of the BackupPolicyTemplate.
+                items:
+                  type: string
+                type: array
               message:
                 description: Provides additional information about the current phase.
                 type: string

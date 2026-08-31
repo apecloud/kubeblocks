@@ -31,10 +31,8 @@ SHELL = /usr/bin/env bash -o pipefail
 
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.26.1
-ENABLE_WEBHOOKS ?= false
 SKIP_GO_GEN ?= true
 CHART_PATH = deploy/helm
-WEBHOOK_CERT_DIR ?= /tmp/k8s-webhook-server/serving-certs
 
 # Go setup
 export GO111MODULE = auto
@@ -98,8 +96,8 @@ all: manager dataprotection kbagent ## Make all cmd binaries.
 ##@ Development
 
 .PHONY: manifests
-manifests: test-go-generate controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
-	$(CONTROLLER_GEN) rbac:roleName=manager-role crd:generateEmbeddedObjectMeta=true webhook paths="./cmd/manager/...;./apis/...;./controllers/..." output:crd:artifacts:config=config/crd/bases
+manifests: test-go-generate controller-gen ## Generate ClusterRole and CustomResourceDefinition objects.
+	$(CONTROLLER_GEN) rbac:roleName=manager-role crd:generateEmbeddedObjectMeta=true paths="./cmd/manager/...;./apis/...;./controllers/..." output:crd:artifacts:config=config/crd/bases
 	@$(MAKE) label-crds --no-print-directory
 	@cp config/crd/bases/* $(CHART_PATH)/crds
 	@cp config/rbac/role.yaml $(CHART_PATH)/config/rbac/role.yaml
@@ -197,10 +195,6 @@ race:
 test-delve: manifests generate envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" dlv --listen=:$(DEBUG_PORT) --headless=true --api-version=2 --accept-multiclient test $(TEST_PACKAGES)
 
-.PHONY: test-webhook-enabled
-test-webhook-enabled: ## Run tests with webhooks enabled.
-	$(MAKE) test ENABLE_WEBHOOKS=true
-
 .PHONY: cover-report
 cover-report: ## Generate cover.html from cover.out
 	$(GO) tool cover -html=cover.out -o cover.html
@@ -240,22 +234,8 @@ kbagent: generate build-checks
 helmhook:
 	$(GO) build -o bin/helmhook ./cmd/helmhook/main.go
 
-CERT_ROOT_CA ?= $(WEBHOOK_CERT_DIR)/rootCA.key
-.PHONY: webhook-cert
-webhook-cert: $(CERT_ROOT_CA) ## Create root CA certificates for admission webhooks testing.
-$(CERT_ROOT_CA):
-	mkdir -p $(WEBHOOK_CERT_DIR)
-	cd $(WEBHOOK_CERT_DIR) && \
-		step certificate create $(APP_NAME) rootCA.crt rootCA.key --profile root-ca --insecure --no-password && \
-		step certificate create $(APP_NAME)-svc tls.crt tls.key --profile leaf \
-			--ca rootCA.crt --ca-key rootCA.key \
-			--san $(APP_NAME)-svc --san $(APP_NAME)-svc.$(APP_NAME) --san $(APP_NAME)-svc.$(APP_NAME).svc --not-after 43200h --insecure --no-password
-
 .PHONY: run
 run: manifests generate fmt vet ## Run a controller from your host.
-ifeq ($(ENABLE_WEBHOOKS), true)
-	$(MAKE) webhook-cert
-endif
 	$(GO) run ./cmd/manager/main.go --zap-devel=false --zap-encoder=console --zap-time-encoding=iso8601
 
 # Run with Delve for development purposes against the configured Kubernetes cluster in ~/.kube/config

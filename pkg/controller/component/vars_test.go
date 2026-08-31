@@ -2932,6 +2932,45 @@ var _ = Describe("vars", func() {
 				checkEnvVarWithValue(envVars, svcVarName1, svcName1)
 				checkEnvVarWithValue(envVars, svcVarName2, svcName2)
 			})
+
+			It("require all component objects - true with extra component during scale-in", func() {
+				synthesizedComp.Comp2CompDefs = map[string]string{
+					compName1: synthesizedComp.CompDefName,
+					compName2: synthesizedComp.CompDefName,
+					compName3: synthesizedComp.CompDefName,
+				}
+				synthesizedComp.CompDef2CompCnt = map[string]int32{
+					synthesizedComp.CompDefName: int32(2),
+				}
+
+				compNames, err := resolveReferentComponents(synthesizedComp, appsv1.ClusterObjectReference{
+					CompDef: synthesizedComp.CompDefName,
+					MultipleClusterObjectOption: &appsv1.MultipleClusterObjectOption{
+						RequireAllComponentObjects: ptr.To(true),
+						Strategy:                   appsv1.MultipleClusterObjectStrategyCombined,
+					},
+				})
+
+				Expect(err).Should(Succeed())
+				Expect(compNames).Should(ConsistOf(compName1, compName2, compName3))
+			})
+
+			It("require all component objects - true with only unexpected components", func() {
+				synthesizedComp.Comp2CompDefs = map[string]string{
+					compName1: synthesizedComp.CompDefName,
+				}
+				synthesizedComp.CompDef2CompCnt = map[string]int32{}
+
+				_, err := resolveReferentComponents(synthesizedComp, appsv1.ClusterObjectReference{
+					CompDef: synthesizedComp.CompDefName,
+					MultipleClusterObjectOption: &appsv1.MultipleClusterObjectOption{
+						RequireAllComponentObjects: ptr.To(true),
+						Strategy:                   appsv1.MultipleClusterObjectStrategyCombined,
+					},
+				})
+
+				Expect(err).Should(MatchError("unexpected component objects found when resolving vars, actual: 1"))
+			})
 		})
 
 		Context("vars reference and escaping", func() {

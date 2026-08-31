@@ -401,6 +401,7 @@ type ComponentService struct {
 	DisableAutoProvision *bool `json:"disableAutoProvision,omitempty"`
 }
 
+// +kubebuilder:validation:XValidation:rule="!has(self.secretRefRevision) || size(self.secretRefRevision) == 0 || has(self.secretRef)",message="secretRef must be specified when secretRefRevision is non-empty"
 type ComponentSystemAccount struct {
 	// The name of the system account.
 	//
@@ -424,10 +425,22 @@ type ComponentSystemAccount struct {
 	//
 	// For user-specified passwords, the maximum length is limited to 64 bytes.
 	//
+	// Updates to the referenced Secret do not automatically trigger reconciliation.
+	// To apply updated credentials, update the referenced Secret first and then change
+	// SecretRefRevision to a new value.
+	//
 	// This field is immutable once set.
 	//
 	// +optional
 	SecretRef *ProvisionSecretRef `json:"secretRef,omitempty"`
+
+	// Specifies an opaque revision of the referenced Secret.
+	//
+	// After updating the referenced Secret, change this field to a new value to apply
+	// the updated credentials. The value is treated as an opaque token.
+	//
+	// +optional
+	SecretRefRevision string `json:"secretRefRevision,omitempty"`
 }
 
 // PasswordConfig helps provide to customize complexity of password generation pattern.
@@ -446,7 +459,7 @@ type PasswordConfig struct {
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:default=4
 	// +optional
-	NumDigits int32 `json:"numDigits,omitempty"`
+	NumDigits *int32 `json:"numDigits,omitempty"`
 
 	// The number of symbols in the password.
 	//
@@ -652,7 +665,7 @@ type RollingUpdate struct {
 
 	// The maximum number of instances that can be unavailable during the update.
 	// Value can be an absolute number (ex: 5) or a percentage of desired instances (ex: 10%).
-	// Absolute number is calculated from percentage by rounding up. This can not be 0.
+	// Absolute number is calculated from percentage by rounding down, with a minimum value of 1.
 	// Defaults to 1. The field applies to all instances. That means if there is any unavailable pod,
 	// it will be counted towards MaxUnavailable.
 	//

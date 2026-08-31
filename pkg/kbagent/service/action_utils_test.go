@@ -30,9 +30,12 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/go-logr/logr"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -153,6 +156,32 @@ var _ = Describe("action utils", func() {
 			err = waitError(execErrorChan)
 			Expect(err).ShouldNot(BeNil())
 			Expect(errors.Is(err, proto.ErrTimedOut)).Should(BeTrue())
+		})
+
+		It("kills the exec process group on timeout", func() {
+			dir, err := os.MkdirTemp("", "kbagent-process-group-*")
+			Expect(err).ShouldNot(HaveOccurred())
+			DeferCleanup(os.RemoveAll, dir)
+			childMarker := filepath.Join(dir, "child-finished")
+			action := &proto.Action{
+				Exec: &proto.ExecAction{
+					Commands: []string{
+						"/bin/bash", "-c", `(sleep 1; touch "$0") & wait`, childMarker,
+					},
+				},
+			}
+			callCtx, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
+			defer cancel()
+			timeout := int32(-1)
+			execErrorChan, err := nonBlockingCallActionX(callCtx, action, nil, nil, &timeout, nil, nil, nil)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			err = waitError(execErrorChan)
+			Expect(errors.Is(err, proto.ErrTimedOut)).Should(BeTrue())
+			Consistently(func() bool {
+				_, statErr := os.Stat(childMarker)
+				return statErr == nil
+			}, 1200*time.Millisecond, 50*time.Millisecond).Should(BeFalse())
 		})
 
 		It("x - timeout and stdout", func() {
@@ -420,6 +449,30 @@ var _ = Describe("action utils", func() {
 			Expect(err).Should(BeNil())
 
 			wait(errChan)
+		})
+
+		It("executes an HTTP Action through the non-blocking service", func() {
+			svc, err := newActionService(logr.Discard(), []proto.Action{{
+				Name:        "http",
+				NonBlocking: true,
+				HTTP: &proto.HTTPAction{
+					Port: port,
+					Path: "/echo",
+					Body: "http-result",
+				},
+			}})
+			Expect(err).ShouldNot(HaveOccurred())
+
+			req := &proto.ActionRequest{Action: "http"}
+			_, err = svc.handleRequest(ctx, req)
+			Expect(errors.Is(err, proto.ErrInProgress)).Should(BeTrue())
+			Eventually(func() string {
+				output, callErr := svc.handleRequest(ctx, req)
+				if callErr != nil {
+					return callErr.Error()
+				}
+				return string(output)
+			}).Should(Equal("http-result"))
 		})
 
 		It("x - stdout", func() {
@@ -794,6 +847,39 @@ message EchoResponse {
 			Expect(err).Should(BeNil())
 
 			wait(errChan)
+		})
+
+		It("executes a gRPC Action through the non-blocking service", func() {
+			svc, err := newActionService(logr.Discard(), []proto.Action{{
+				Name:        "grpc",
+				NonBlocking: true,
+				GRPC: &proto.GRPCAction{
+					Port:    port,
+					Host:    host,
+					Service: "test.EchoService",
+					Method:  "Echo",
+					Request: map[string]string{
+						"success": "true",
+						"message": "grpc-result",
+					},
+					Response: proto.GRPCResponse{
+						Status:  "status",
+						Message: "message",
+					},
+				},
+			}})
+			Expect(err).ShouldNot(HaveOccurred())
+
+			req := &proto.ActionRequest{Action: "grpc"}
+			_, err = svc.handleRequest(ctx, req)
+			Expect(errors.Is(err, proto.ErrInProgress)).Should(BeTrue())
+			Eventually(func() string {
+				output, callErr := svc.handleRequest(ctx, req)
+				if callErr != nil {
+					return callErr.Error()
+				}
+				return string(output)
+			}).Should(Equal("grpc-result"))
 		})
 
 		It("x - stdout", func() {

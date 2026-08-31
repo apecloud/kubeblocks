@@ -46,8 +46,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
-	gatewayv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	// +kubebuilder:scaffold:imports
 
@@ -123,7 +121,6 @@ func init() {
 	utilruntime.Must(dpv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(snapshotv1.AddToScheme(scheme))
 	utilruntime.Must(snapshotv1beta1.AddToScheme(scheme))
-	utilruntime.Must(gatewayv1beta1.AddToScheme(scheme))
 	utilruntime.Must(extensionsv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(workloadsv1.AddToScheme(scheme))
 	utilruntime.Must(experimentalv1alpha1.AddToScheme(scheme))
@@ -140,7 +137,6 @@ func init() {
 	viper.AutomaticEnv()
 
 	viper.SetDefault(constant.CfgKeyCtrlrReconcileRetryDurationMS, 1000)
-	viper.SetDefault("CERT_DIR", "/tmp/k8s-webhook-server/serving-certs")
 	viper.SetDefault(constant.EnableRBACManager, true)
 	viper.SetDefault("VOLUMESNAPSHOT_API_BETA", false)
 	viper.SetDefault(constant.KBToolsImage, "apecloud/kubeblocks-tools:latest")
@@ -385,10 +381,6 @@ func main() {
 		RenewDeadline:                 ptr.To(time.Duration(viper.GetInt(leaderElectRenewDeadlineFlagKey.viperName())) * time.Second),
 		RetryPeriod:                   ptr.To(time.Duration(viper.GetInt(leaderElectRetryPeriodFlagKey.viperName())) * time.Second),
 
-		WebhookServer: webhook.NewServer(webhook.Options{
-			Port:    9443,
-			CertDir: viper.GetString("cert_dir"),
-		}),
 		Client: client.Options{
 			Cache: &client.CacheOptions{
 				DisableFor: append(intctrlutil.GetUncachedObjects(), &parametersv1alpha1.ComponentParameter{}),
@@ -605,37 +597,6 @@ func main() {
 		}
 		if err := mgr.Add(traceReconciler.InformerManager); err != nil {
 			setupLog.Error(err, "unable to add trace informer manager", "controller", "InformerManager")
-			os.Exit(1)
-		}
-	}
-
-	if os.Getenv("ENABLE_WEBHOOKS") == "true" {
-		if err = (&appsv1.ClusterDefinition{}).SetupWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "ClusterDefinition")
-			os.Exit(1)
-		}
-		if err = (&appsv1.ComponentDefinition{}).SetupWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "ComponentDefinition")
-			os.Exit(1)
-		}
-		if err = (&appsv1.ComponentVersion{}).SetupWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "ComponentVersion")
-			os.Exit(1)
-		}
-		if err = (&appsv1.Cluster{}).SetupWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "Cluster")
-			os.Exit(1)
-		}
-		if err = (&appsv1.Component{}).SetupWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "Component")
-			os.Exit(1)
-		}
-		if err = (&workloadsv1.InstanceSet{}).SetupWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "InstanceSet")
-			os.Exit(1)
-		}
-		if err = (&appsv1.ServiceDescriptor{}).SetupWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "ServiceDescriptor")
 			os.Exit(1)
 		}
 	}

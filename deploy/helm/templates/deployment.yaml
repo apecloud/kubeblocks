@@ -156,10 +156,6 @@ spec:
             - name: VOLUMESNAPSHOT_API_BETA
               value: "true"
             {{- end }}
-            {{- if .Values.webhooks.conversionEnabled }}
-            - name: ENABLE_WEBHOOKS
-              value: "true"
-            {{- end }}
             - name: ENABLE_RBAC_MANAGER
               value: {{ .Values.rbac.enabled | quote}}
             {{- if ( include "kubeblocks.addonControllerEnabled" . ) | deepEqual "true" }}
@@ -220,9 +216,6 @@ spec:
           image: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
-            - name: webhook-server
-              containerPort: 9443
-              protocol: TCP
             - name: health
               containerPort: 8081
               protocol: TCP
@@ -251,11 +244,6 @@ spec:
           volumeMounts:
             - mountPath: /etc/kubeblocks
               name: manager-config
-            {{- if .Values.webhooks.conversionEnabled }}
-            - mountPath: /tmp/k8s-webhook-server/serving-certs
-              name: cert
-              readOnly: true
-            {{- end }}
             {{- if .Values.multiCluster.kubeConfig }}
             - mountPath: {{ .Values.multiCluster.mountPath }}
               name: multi-cluster-kubeconfig
@@ -288,12 +276,6 @@ spec:
         - name: manager-config
           configMap:
             name: {{ include "kubeblocks.fullname" . }}-manager-config
-        {{- if .Values.webhooks.conversionEnabled }}
-        - name: cert
-          secret:
-            defaultMode: 420
-            secretName: {{ include "kubeblocks.fullname" . }}.{{ .Release.Namespace }}.svc.tls-pair
-        {{- end }}
         {{- if .Values.multiCluster.kubeConfig }}
         - name: multi-cluster-kubeconfig
           secret:

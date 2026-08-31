@@ -53,13 +53,16 @@ func ComposeRolePriorityMap(roles []workloads.ReplicaRole) map[string]int {
 	return rolePriorityMap
 }
 
+func getRolePriority(rolePriorityMap map[string]int, roleName string) int {
+	return rolePriorityMap[strings.ToLower(roleName)]
+}
+
 // SortPods sorts pods by their role priority
 // e.g.: unknown -> empty -> learner -> follower1 -> follower2 -> leader, with follower1.Name > follower2.Name
 // reverse it if reverse==true
 func SortPods(pods []corev1.Pod, rolePriorityMap map[string]int, reverse bool) {
 	getRolePriorityFunc := func(i int) int {
-		role := getRoleName(&pods[i])
-		return rolePriorityMap[role]
+		return getRolePriority(rolePriorityMap, getRoleName(&pods[i]))
 	}
 	getNameNOrdinalFunc := func(i int) (string, int) {
 		return parseParentNameAndOrdinal(pods[i].GetName())

@@ -78,6 +78,23 @@ func TestSortObjects(t *testing.T) {
 	}
 }
 
+func TestSortInstancesNormalizesObservedRoleName(t *testing.T) {
+	roles := []workloads.ReplicaRole{
+		{Name: "Follower", UpdatePriority: 1},
+		{Name: "Leader", UpdatePriority: 2},
+	}
+	priorityMap := composeRolePriorityMap(roles)
+	instances := []workloads.Instance{
+		{ObjectMeta: metav1.ObjectMeta{Name: "mysql-0"}, Status: workloads.InstanceStatus2{Role: "Follower"}},
+		{ObjectMeta: metav1.ObjectMeta{Name: "mysql-1"}, Status: workloads.InstanceStatus2{Role: "Leader"}},
+	}
+
+	sortInstances(instances, priorityMap, false)
+	if got := instances[0].Name; got != "mysql-0" {
+		t.Fatalf("sorted instances = %s, want mysql-0", got)
+	}
+}
+
 func TestCopyAndMergeService(t *testing.T) {
 	oldSvc := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{

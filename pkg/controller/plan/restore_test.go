@@ -215,6 +215,8 @@ func TestBuildPersistentVolumeClaimLabels(t *testing.T) {
 
 func TestRestoreManagerBuildPrepareDataRestore(t *testing.T) {
 	manager := newRestoreManagerForTest()
+	restoreEnv := []corev1.EnvVar{{Name: "RESTORE_ENV", Value: "from-plan-intent"}}
+	manager.SetRestoreEnv(restoreEnv)
 	comp := &component.SynthesizedComponent{
 		Name:     "mysql",
 		Replicas: 2,
@@ -240,7 +242,7 @@ func TestRestoreManagerBuildPrepareDataRestore(t *testing.T) {
 		SchedulingPolicy: &appsv1.SchedulingPolicy{NodeName: "node-a"},
 	}
 	backup := &dpv1alpha1.Backup{
-		ObjectMeta: metav1.ObjectMeta{Name: "backup", Namespace: "backup-source"},
+		ObjectMeta: metav1.ObjectMeta{Name: "backup", Namespace: "default"},
 		Status: dpv1alpha1.BackupStatus{
 			Targets: []dpv1alpha1.BackupStatusTarget{{
 				BackupTarget: dpv1alpha1.BackupTarget{
@@ -268,9 +270,12 @@ func TestRestoreManagerBuildPrepareDataRestore(t *testing.T) {
 		return
 	}
 	if restore.Spec.Backup.Name != "backup" ||
-		restore.Spec.Backup.Namespace != "backup-source" ||
+		restore.Spec.Backup.Namespace != "default" ||
 		restore.Spec.Backup.SourceTargetName != "target-a" {
 		t.Fatalf("unexpected backup ref: %#v", restore.Spec.Backup)
+	}
+	if !reflect.DeepEqual(restore.Spec.Env, restoreEnv) {
+		t.Fatalf("restore env = %#v, want %#v", restore.Spec.Env, restoreEnv)
 	}
 	cfg := restore.Spec.PrepareDataConfig
 	if cfg == nil {

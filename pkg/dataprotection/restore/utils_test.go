@@ -32,7 +32,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	gatewayv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -319,90 +318,6 @@ func TestValidateAndInitRestoreMGRFullBackup(t *testing.T) {
 	assert.NoError(t, cli.Update(context.Background(), backup))
 	mgr = &RestoreManager{Restore: restoreObj}
 	assert.Error(t, ValidateAndInitRestoreMGR(reqCtx, cli, mgr))
-}
-
-func TestValidateAndInitRestoreMGRCrossNamespaceBackup(t *testing.T) {
-	scheme := runtime.NewScheme()
-	assert.NoError(t, dpv1alpha1.AddToScheme(scheme))
-	assert.NoError(t, gatewayv1beta1.AddToScheme(scheme))
-
-	actionSet := &dpv1alpha1.ActionSet{
-		ObjectMeta: metav1.ObjectMeta{Name: "full-action"},
-		Spec: dpv1alpha1.ActionSetSpec{
-			BackupType: dpv1alpha1.BackupTypeFull,
-			Restore:    &dpv1alpha1.RestoreActionSpec{PrepareData: &dpv1alpha1.JobActionSpec{}},
-		},
-	}
-	backup := &dpv1alpha1.Backup{
-		ObjectMeta: metav1.ObjectMeta{Name: "backup", Namespace: "source"},
-		Status: dpv1alpha1.BackupStatus{
-			Phase:        dpv1alpha1.BackupPhaseCompleted,
-			BackupMethod: &dpv1alpha1.BackupMethod{Name: "full", ActionSetName: actionSet.Name},
-		},
-	}
-	restoreObj := &dpv1alpha1.Restore{
-		ObjectMeta: metav1.ObjectMeta{Name: "restore", Namespace: "target"},
-		Spec: dpv1alpha1.RestoreSpec{
-			Backup: dpv1alpha1.BackupRef{Name: backup.Name, Namespace: backup.Namespace},
-		},
-	}
-	reqCtx := intctrlutil.RequestCtx{
-		Ctx: context.Background(),
-		Req: ctrl.Request{NamespacedName: client.ObjectKeyFromObject(restoreObj)},
-	}
-	grantForBackup := func(name string) *gatewayv1beta1.ReferenceGrant {
-		backupName := gatewayv1beta1.ObjectName(name)
-		return &gatewayv1beta1.ReferenceGrant{
-			ObjectMeta: metav1.ObjectMeta{Name: "restore-backup", Namespace: backup.Namespace},
-			Spec: gatewayv1beta1.ReferenceGrantSpec{
-				From: []gatewayv1beta1.ReferenceGrantFrom{{
-					Group:     gatewayv1beta1.Group(dpv1alpha1.GroupVersion.Group),
-					Kind:      gatewayv1beta1.Kind("Restore"),
-					Namespace: gatewayv1beta1.Namespace(restoreObj.Namespace),
-				}},
-				To: []gatewayv1beta1.ReferenceGrantTo{{
-					Group: gatewayv1beta1.Group(dpv1alpha1.GroupVersion.Group),
-					Kind:  gatewayv1beta1.Kind("Backup"),
-					Name:  &backupName,
-				}},
-			},
-		}
-	}
-
-	t.Run("requires a ReferenceGrant before reading the Backup", func(t *testing.T) {
-		cli := fake.NewClientBuilder().WithScheme(scheme).Build()
-		err := ValidateAndInitRestoreMGR(reqCtx, cli, &RestoreManager{Restore: restoreObj.DeepCopy()})
-		assert.ErrorContains(t, err, "ReferenceGrant")
-		assert.NotContains(t, err.Error(), "backups.dataprotection.kubeblocks.io")
-		assert.True(t, intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal))
-	})
-
-	t.Run("allows an exact Restore to Backup grant", func(t *testing.T) {
-		grant := grantForBackup(backup.Name)
-		cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(actionSet, backup, grant).Build()
-		mgr := &RestoreManager{Restore: restoreObj.DeepCopy()}
-		assert.NoError(t, ValidateAndInitRestoreMGR(reqCtx, cli, mgr))
-		assert.Len(t, mgr.PrepareDataBackupSets, 1)
-	})
-
-	t.Run("rejects a grant for a different Backup", func(t *testing.T) {
-		grant := grantForBackup("other-backup")
-		cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(actionSet, backup, grant).Build()
-		err := ValidateAndInitRestoreMGR(reqCtx, cli, &RestoreManager{Restore: restoreObj.DeepCopy()})
-		assert.ErrorContains(t, err, "ReferenceGrant")
-		assert.True(t, intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal))
-	})
-
-	t.Run("rejects cross namespace VolumeSnapshot restore after authorization", func(t *testing.T) {
-		snapshotBackup := backup.DeepCopy()
-		snapshotBackup.Status.BackupMethod.SnapshotVolumes = new(bool)
-		*snapshotBackup.Status.BackupMethod.SnapshotVolumes = true
-		grant := grantForBackup(backup.Name)
-		cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(actionSet, snapshotBackup, grant).Build()
-		err := ValidateAndInitRestoreMGR(reqCtx, cli, &RestoreManager{Restore: restoreObj.DeepCopy()})
-		assert.ErrorContains(t, err, "VolumeSnapshot")
-		assert.True(t, intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal))
-	})
 }
 
 func TestRestoreManagerStopsManagerContainer(t *testing.T) {

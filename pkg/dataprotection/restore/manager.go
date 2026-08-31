@@ -26,7 +26,6 @@ import (
 	"strings"
 	"time"
 
-	vsv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -386,30 +385,22 @@ func (r *RestoreManager) RestorePVCFromSnapshot(reqCtx intctrlutil.RequestCtx, c
 	if prepareDataConfig == nil {
 		return nil
 	}
-	createPVCWithSnapshot := func(claim dpv1alpha1.RestoreVolumeClaim, sourceIndex int) error {
+	createPVCWithSnapshot := func(claim dpv1alpha1.RestoreVolumeClaim) error {
 		if claim.VolumeSource == "" {
 			return intctrlutil.NewFatalError(fmt.Sprintf(`claim "%s"" volumeSource can not be empty if the backup uses volume snapshot`, claim.Name))
 		}
-		// TODO:  will be removed in 0.10.0, compatibility handling for version 0.8.
-		volumeSnapshotName := utils.GetOldBackupVolumeSnapshotName(backupSet.Backup.Name, claim.VolumeSource)
-		vsCli := utils.NewCompatClient(cli)
-		if exist, err := intctrlutil.CheckResourceExists(reqCtx.Ctx, vsCli,
-			types.NamespacedName{Namespace: backupSet.Backup.Namespace, Name: volumeSnapshotName},
-			&vsv1.VolumeSnapshot{}); err != nil {
+		sourceTargetPodName, err := GetSourcePodNameFromTarget(target, prepareDataConfig.RequiredPolicyForAllPodSelection, 0)
+		if err != nil {
 			return err
-		} else if !exist {
-			sourceTargetPodName, err := GetSourcePodNameFromTarget(target, prepareDataConfig.RequiredPolicyForAllPodSelection, sourceIndex)
-			if err != nil {
-				return err
+		}
+		var volumeSnapshotName string
+		if target.PodSelector.Strategy == dpv1alpha1.PodSelectionStrategyAny || sourceTargetPodName != "" {
+			snapshotGroup := GetVolumeSnapshotsBySourcePod(backupSet.Backup, target, sourceTargetPodName)
+			if snapshotGroup == nil {
+				message := fmt.Sprintf(`can not found the volumeSnapshot in status.actions, sourceTargetPod is "%s"`, sourceTargetPodName)
+				return intctrlutil.NewFatalError(message)
 			}
-			if target.PodSelector.Strategy == dpv1alpha1.PodSelectionStrategyAny || sourceTargetPodName != "" {
-				snapshotGroup := GetVolumeSnapshotsBySourcePod(backupSet.Backup, target, sourceTargetPodName)
-				if snapshotGroup == nil {
-					message := fmt.Sprintf(`can not found the volumeSnapshot in status.actions, sourceTargetPod is "%s"`, sourceTargetPodName)
-					return intctrlutil.NewFatalError(message)
-				}
-				volumeSnapshotName = snapshotGroup[claim.VolumeSource]
-			}
+			volumeSnapshotName = snapshotGroup[claim.VolumeSource]
 		}
 		if volumeSnapshotName != "" {
 			// get volumeSnapshot by backup and volumeSource.
@@ -422,7 +413,7 @@ func (r *RestoreManager) RestorePVCFromSnapshot(reqCtx intctrlutil.RequestCtx, c
 		return r.createPVCIfNotExist(reqCtx, cli, claim.ObjectMeta, claim.VolumeClaimSpec)
 	}
 	for i := range prepareDataConfig.RestoreVolumeClaims {
-		if err := createPVCWithSnapshot(prepareDataConfig.RestoreVolumeClaims[i], 0); err != nil {
+		if err := createPVCWithSnapshot(prepareDataConfig.RestoreVolumeClaims[i]); err != nil {
 			return err
 		}
 	}
@@ -437,7 +428,7 @@ func (r *RestoreManager) RestorePVCFromSnapshot(reqCtx intctrlutil.RequestCtx, c
 				// HACK: add InstanceSet related labels to the PVC,
 				// so that it can be managed by InstanceSet
 				addItsManagingLabels(&claim, index)
-				if err := createPVCWithSnapshot(claim, index); err != nil {
+				if err := createPVCWithSnapshot(claim); err != nil {
 					return err
 				}
 			}
@@ -448,18 +439,18 @@ func (r *RestoreManager) RestorePVCFromSnapshot(reqCtx intctrlutil.RequestCtx, c
 }
 
 func (r *RestoreManager) prepareBackupRepo(reqCtx intctrlutil.RequestCtx, cli client.Client, backupSet BackupActionSet) (*dpv1alpha1.BackupRepo, error) {
-	if backupSet.Backup.Status.BackupRepoName != "" {
-		backupRepo := &dpv1alpha1.BackupRepo{}
-		err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: backupSet.Backup.Status.BackupRepoName}, backupRepo)
-		if err != nil {
-			if apierrors.IsNotFound(err) {
-				err = intctrlutil.NewFatalError(err.Error())
-			}
-			return nil, err
-		}
-		return backupRepo, nil
+	if backupSet.Backup.Status.BackupRepoName == "" {
+		return nil, intctrlutil.NewFatalError(fmt.Sprintf("backup %s has no backup repository", backupSet.Backup.Name))
 	}
-	return nil, nil
+	backupRepo := &dpv1alpha1.BackupRepo{}
+	err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: backupSet.Backup.Status.BackupRepoName}, backupRepo)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			err = intctrlutil.NewFatalError(err.Error())
+		}
+		return nil, err
+	}
+	return backupRepo, nil
 }
 
 // BuildPrepareDataJobs builds the restore jobs for prepare pvc's data, and will create the target pvcs if not exist.
@@ -550,11 +541,7 @@ func (r *RestoreManager) BuildPrepareDataJobs(reqCtx intctrlutil.RequestCtx, cli
 				jobBuilder.addToSpecificVolumesAndMounts(volume, volumeMount)
 			}
 		}
-		sourceIndex := i
-		if claimsTemplate != nil {
-			sourceIndex += int(claimsTemplate.StartingIndex)
-		}
-		sourceTargetPodName, err := GetSourcePodNameFromTarget(target, prepareDataConfig.RequiredPolicyForAllPodSelection, sourceIndex)
+		sourceTargetPodName, err := GetSourcePodNameFromTarget(target, prepareDataConfig.RequiredPolicyForAllPodSelection, i)
 		if err != nil {
 			return nil, err
 		}

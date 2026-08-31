@@ -38,10 +38,10 @@ import (
 
 func newActionService(logger logr.Logger, actions []proto.Action) (*actionService, error) {
 	sa := &actionService{
-		logger:         logger,
-		actions:        make(map[string]*proto.Action),
-		mutex:          sync.Mutex{},
-		runningActions: map[string]*runningAction{},
+		logger:  logger,
+		actions: make(map[string]*proto.Action),
+		mutex:   sync.Mutex{},
+		calls:   map[string]*actionCall{},
 	}
 	for i, action := range actions {
 		sa.actions[action.Name] = &actions[i]
@@ -54,12 +54,10 @@ type actionService struct {
 	logger  logr.Logger
 	actions map[string]*proto.Action
 
-	mutex          sync.Mutex
-	runningActions map[string]*runningAction
-}
-
-type runningAction struct {
-	resultChan chan *asyncResult
+	mutex sync.Mutex
+	// TODO: preserve non-blocking call tracking across service restarts without
+	// changing the Action API semantics.
+	calls map[string]*actionCall
 }
 
 var _ Service = &actionService{}
@@ -128,36 +126,64 @@ func (s *actionService) handleRequest(ctx context.Context, req *proto.ActionRequ
 	}
 	timeout := resolveTimeout(&action.TimeoutSeconds, req.TimeoutSeconds)
 	retryPolicy := resolveRetryPolicy(action.RetryPolicy, req.RetryPolicy)
-	if req.NonBlocking == nil || !*req.NonBlocking {
+	if !action.NonBlocking {
 		return callActionWithRetry(ctx, action, req.Parameters, req.Arguments, timeout, retryPolicy)
 	}
 	return s.handleRequestNonBlocking(ctx, req, action, timeout, retryPolicy)
 }
 
 func (s *actionService) handleRequestNonBlocking(ctx context.Context, req *proto.ActionRequest, action *proto.Action, timeout *int32, retryPolicy *proto.RetryPolicy) ([]byte, error) {
+	if err := validateActionArguments(action, req.Arguments); err != nil {
+		return nil, err
+	}
+	fingerprint, err := fingerprintActionRequest(req, timeout, retryPolicy)
+	if err != nil {
+		return nil, errors.Wrap(proto.ErrInternalError, err.Error())
+	}
+
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	running, ok := s.runningActions[req.Action]
-	if !ok {
-		resultChan, err := nonBlockingCallActionWithRetry(ctx, action, req.Parameters, req.Arguments, timeout, retryPolicy)
-		if err != nil {
-			return nil, err
+	if call, ok := s.calls[req.Action]; ok {
+		if call.running {
+			if call.requestFingerprint != fingerprint || req.Rerun {
+				return nil, proto.ErrBusy
+			}
+			return nil, proto.ErrInProgress
 		}
-		running = &runningAction{
-			resultChan: resultChan,
+		if call.requestFingerprint == fingerprint && !req.Rerun {
+			return call.result.response()
 		}
-		s.runningActions[req.Action] = running
 	}
-	result := gather(running.resultChan)
-	if result == nil {
-		return nil, proto.ErrInProgress
+
+	call := &actionCall{
+		requestFingerprint: fingerprint,
+		running:            true,
 	}
-	delete(s.runningActions, req.Action)
-	if (*result).err != nil {
-		return nil, (*result).err
+	resultChan, err := startNonBlockingActionCall(
+		context.WithoutCancel(ctx), action, req.Parameters, req.Arguments, timeout, retryPolicy)
+	if err != nil {
+		resultChan = make(chan *asyncResult, 1)
+		resultChan <- &asyncResult{err: err}
 	}
-	return (*result).stdout.Bytes(), nil
+	s.calls[req.Action] = call
+	go s.completeNonBlockingCall(req.Action, call, resultChan)
+	return nil, proto.ErrInProgress
+}
+
+func (s *actionService) completeNonBlockingCall(actionName string, call *actionCall, resultChan chan *asyncResult) {
+	result := <-resultChan
+	var output []byte
+	if result.stdout != nil {
+		output = result.stdout.Bytes()
+	}
+
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	if current, ok := s.calls[actionName]; ok && current == call {
+		call.running = false
+		call.result = newActionResult(output, result.err)
+	}
 }
 
 func resolveTimeout(actionTimeout *int32, requestTimeout *int32) *int32 {
@@ -175,11 +201,11 @@ func resolveRetryPolicy(actionRetryPolicy *proto.RetryPolicy, requestRetryPolicy
 }
 
 func callActionWithRetry(ctx context.Context, action *proto.Action, parameters map[string]string, arguments [][]string, timeout *int32, retryPolicy *proto.RetryPolicy) ([]byte, error) {
+	if err := validateActionArguments(action, arguments); err != nil {
+		return nil, err
+	}
 	if len(arguments) == 0 {
 		return callActionWithRetryOnce(ctx, action, parameters, nil, timeout, retryPolicy)
-	}
-	if action.Exec == nil {
-		return nil, errors.Wrapf(proto.ErrBadRequest, "runtime arguments are only supported for exec actions")
 	}
 	output := bytes.NewBuffer(nil)
 	for _, args := range arguments {
@@ -194,13 +220,22 @@ func callActionWithRetry(ctx context.Context, action *proto.Action, parameters m
 	return output.Bytes(), nil
 }
 
-func nonBlockingCallActionWithRetry(ctx context.Context, action *proto.Action, parameters map[string]string, arguments [][]string, timeout *int32, retryPolicy *proto.RetryPolicy) (chan *asyncResult, error) {
-	if len(arguments) > 0 && action.Exec == nil {
-		return nil, errors.Wrapf(proto.ErrBadRequest, "runtime arguments are only supported for exec actions")
+func startNonBlockingActionCall(ctx context.Context, action *proto.Action, parameters map[string]string, arguments [][]string, timeout *int32, retryPolicy *proto.RetryPolicy) (chan *asyncResult, error) {
+	if err := validateActionArguments(action, arguments); err != nil {
+		return nil, err
 	}
+	actionCtx, cancel := actionCallTimeoutContextWithCap(ctx, timeout, false)
 	resultChan := make(chan *asyncResult, 1)
 	go func() {
-		stdout, err := callActionWithRetry(ctx, action, parameters, arguments, timeout, retryPolicy)
+		defer cancel()
+		// actionCtx owns the timeout for the complete non-blocking call. Individual
+		// attempts inherit that deadline instead of starting a new timeout budget.
+		noAttemptTimeout := int32(-1)
+		stdout, err := callActionWithRetryCap(
+			actionCtx, action, parameters, arguments, &noAttemptTimeout, retryPolicy, false)
+		if err != nil && errors.Is(actionCtx.Err(), context.DeadlineExceeded) {
+			err = proto.ErrTimedOut
+		}
 		resultChan <- &asyncResult{
 			err:    err,
 			stdout: bytes.NewBuffer(stdout),
@@ -211,13 +246,39 @@ func nonBlockingCallActionWithRetry(ctx context.Context, action *proto.Action, p
 }
 
 func callActionWithRetryOnce(ctx context.Context, action *proto.Action, parameters map[string]string, arguments []string, timeout *int32, retryPolicy *proto.RetryPolicy) ([]byte, error) {
-	output, err := blockingCallAction(ctx, action, parameters, arguments, timeout)
+	return callActionWithRetryOnceCap(ctx, action, parameters, arguments, timeout, retryPolicy, true)
+}
+
+func callActionWithRetryCap(ctx context.Context, action *proto.Action, parameters map[string]string,
+	arguments [][]string, timeout *int32, retryPolicy *proto.RetryPolicy, capTimeout bool) ([]byte, error) {
+	if len(arguments) == 0 {
+		return callActionWithRetryOnceCap(ctx, action, parameters, nil, timeout, retryPolicy, capTimeout)
+	}
+	output := bytes.NewBuffer(nil)
+	for _, args := range arguments {
+		out, err := callActionWithRetryOnceCap(ctx, action, parameters, args, timeout, retryPolicy, capTimeout)
+		if err != nil {
+			return output.Bytes(), err
+		}
+		if out != nil {
+			output.Write(out)
+		}
+	}
+	return output.Bytes(), nil
+}
+
+func callActionWithRetryOnceCap(ctx context.Context, action *proto.Action, parameters map[string]string,
+	arguments []string, timeout *int32, retryPolicy *proto.RetryPolicy, capTimeout bool) ([]byte, error) {
+	output, err := blockingCallActionWithTimeoutCap(ctx, action, parameters, arguments, timeout, capTimeout)
 	if err == nil || retryPolicy == nil || retryPolicy.MaxRetries <= 0 {
 		return output, err
 	}
 
 	interval := retryPolicy.RetryInterval
 	for i := 0; i < retryPolicy.MaxRetries; i++ {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		if interval > 0 {
 			select {
 			case <-ctx.Done():
@@ -225,10 +286,20 @@ func callActionWithRetryOnce(ctx context.Context, action *proto.Action, paramete
 			case <-time.After(interval):
 			}
 		}
-		output, err = blockingCallAction(ctx, action, parameters, arguments, timeout)
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		output, err = blockingCallActionWithTimeoutCap(ctx, action, parameters, arguments, timeout, capTimeout)
 		if err == nil {
 			return output, nil
 		}
 	}
 	return output, err
+}
+
+func validateActionArguments(action *proto.Action, arguments [][]string) error {
+	if len(arguments) > 0 && action.Exec == nil {
+		return errors.Wrapf(proto.ErrBadRequest, "runtime arguments are only supported for exec actions")
+	}
+	return nil
 }

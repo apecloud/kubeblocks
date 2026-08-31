@@ -21,6 +21,7 @@ package backup
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	vsv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
@@ -33,6 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -112,43 +114,22 @@ func (d *Deleter) DeleteBackupFiles(backup *dpv1alpha1.Backup) (DeletionStatus, 
 		return DeletionStatusDeleting, nil
 	}
 
-	var backupRepo *dpv1alpha1.BackupRepo
-	if backup.Status.BackupRepoName != "" {
-		backupRepo = &dpv1alpha1.BackupRepo{}
-		if err = d.Client.Get(d.Ctx, client.ObjectKey{Name: backup.Status.BackupRepoName}, backupRepo); err != nil {
-			if apierrors.IsNotFound(err) {
-				return DeletionStatusSucceeded, nil
-			}
-			return DeletionStatusUnknown, err
-		}
+	if backup.Status.BackupRepoName == "" {
+		d.Log.Info("skip deleting backup files because BackupRepoName is empty", "backup", backup.Name)
+		return DeletionStatusSucceeded, nil
 	}
-
-	// if backupRepo is nil (likely because it's a legacy backup object), check the backup PVC
-	var legacyPVCName string
-	if backupRepo == nil {
-		legacyPVCName = backup.Status.PersistentVolumeClaimName
-		if legacyPVCName == "" {
-			d.Log.Info("skip deleting backup files because PersistentVolumeClaimName is empty",
-				"backup", backup.Name)
+	backupRepo := &dpv1alpha1.BackupRepo{}
+	if err = d.Client.Get(d.Ctx, client.ObjectKey{Name: backup.Status.BackupRepoName}, backupRepo); err != nil {
+		if apierrors.IsNotFound(err) {
 			return DeletionStatusSucceeded, nil
 		}
-
-		// check if the backup PVC exists, if not, skip to delete backup files
-		pvcKey := client.ObjectKey{Namespace: backup.Namespace, Name: legacyPVCName}
-		if err = d.Client.Get(d.Ctx, pvcKey, &corev1.PersistentVolumeClaim{}); err != nil {
-			if apierrors.IsNotFound(err) {
-				return DeletionStatusSucceeded, nil
-			}
-			return DeletionStatusUnknown, err
-		}
+		return DeletionStatusUnknown, err
 	}
 
 	backupFilePath := backup.Status.Path
 	if backupFilePath == "" || (!strings.Contains(backupFilePath, backup.Name)) {
-		// For compatibility: the FilePath field is changing from time to time,
-		// and it may not contain the backup name as a path component if the Backup object
-		// was created in a previous version. In this case, it's dangerous to execute
-		// the deletion command. For example, files belongs to other Backups can be deleted as well.
+		// Refuse to delete an empty or overly broad path. Otherwise files belonging to
+		// other backups could be deleted as well.
 		d.Log.Info("skip deleting backup files because backup file path is invalid",
 			"backupFilePath", backupFilePath, "backup", backup.Name)
 		return DeletionStatusSucceeded, nil
@@ -164,20 +145,27 @@ func (d *Deleter) DeleteBackupFiles(backup *dpv1alpha1.Backup) (DeletionStatus, 
 		return DeletionStatusUnknown, err
 	}
 	if preDeleteAction != nil {
-		preJob, err := d.doPreDeleteAction(backup, backupRepo, preDeleteAction, legacyPVCName, backupFilePath)
+		preJobs, err := d.doPreDeleteActions(backup, backupRepo, preDeleteAction, backupFilePath)
 		if err != nil {
 			return DeletionStatusUnknown, err
 		}
-		_, finishedType, msg := utils.IsJobFinished(preJob)
-		if finishedType == batchv1.JobFailed {
-			return DeletionStatusFailed,
-				fmt.Errorf("pre-delete backup files job \"%s\" failed, you can delete it to re-delete the backup files, %s", job.Name, msg)
-		} else if finishedType != batchv1.JobComplete {
+		allCompleted := true
+		for _, preJob := range preJobs {
+			_, finishedType, msg := utils.IsJobFinished(preJob)
+			if finishedType == batchv1.JobFailed {
+				return DeletionStatusFailed,
+					fmt.Errorf("pre-delete backup files job \"%s\" failed, you can delete it to re-delete the backup files, %s", preJob.Name, msg)
+			}
+			if finishedType != batchv1.JobComplete {
+				allCompleted = false
+			}
+		}
+		if !allCompleted {
 			return DeletionStatusDeleting, nil
 		}
 	}
 	// do delete action
-	return DeletionStatusDeleting, d.createDeleteBackupFilesJob(jobKey, backup, backupRepo, legacyPVCName)
+	return DeletionStatusDeleting, d.createDeleteBackupFilesJob(jobKey, backup, backupRepo)
 }
 
 func (d *Deleter) buildDeleteBackupFilesScript(backupPath string) string {
@@ -240,8 +228,7 @@ fi
 func (d *Deleter) createDeleteBackupFilesJob(
 	jobKey types.NamespacedName,
 	backup *dpv1alpha1.Backup,
-	backupRepo *dpv1alpha1.BackupRepo,
-	legacyPVCName string) error {
+	backupRepo *dpv1alpha1.BackupRepo) error {
 
 	runAsUser := int64(0)
 	container := corev1.Container{
@@ -255,14 +242,13 @@ func (d *Deleter) createDeleteBackupFilesJob(
 			RunAsUser:                &runAsUser,
 		},
 	}
-	return d.createDeleteJob(container, jobKey, backup, backupRepo, legacyPVCName)
+	return d.createDeleteJob(container, jobKey, backup, backupRepo)
 }
 
 func (d *Deleter) createDeleteJob(container corev1.Container,
 	jobKey types.NamespacedName,
 	backup *dpv1alpha1.Backup,
-	backupRepo *dpv1alpha1.BackupRepo,
-	legacyPVCName string) error {
+	backupRepo *dpv1alpha1.BackupRepo) error {
 	if err := d.ensureWorkerServiceAccount(); err != nil {
 		return err
 	}
@@ -279,11 +265,7 @@ func (d *Deleter) createDeleteJob(container corev1.Container,
 	}
 	kopiaRepoPath := backup.Status.KopiaRepoPath
 	encryptionConfig := backup.Status.EncryptionConfig
-	if backupRepo != nil {
-		utils.InjectDatasafed(&podSpec, backupRepo, RepoVolumeMountPath, encryptionConfig, kopiaRepoPath)
-	} else {
-		utils.InjectDatasafedWithPVC(&podSpec, legacyPVCName, RepoVolumeMountPath, kopiaRepoPath)
-	}
+	utils.InjectDatasafed(&podSpec, backupRepo, RepoVolumeMountPath, encryptionConfig, kopiaRepoPath)
 
 	// build job
 	job := &batchv1.Job{
@@ -324,13 +306,42 @@ func (d *Deleter) getPreDeleteAction(backupMethod *dpv1alpha1.BackupMethod) (*dp
 	return actionSet.Spec.Backup.PreDeleteBackup, nil
 }
 
-func (d *Deleter) doPreDeleteAction(
+func (d *Deleter) doPreDeleteActions(
 	backup *dpv1alpha1.Backup,
 	backupRepo *dpv1alpha1.BackupRepo,
 	preDeleteAction *dpv1alpha1.BaseJobActionSpec,
-	legacyPVCName string,
+	backupFilePath string) ([]*batchv1.Job, error) {
+	if backup.Status.Target != nil || len(backup.Status.Targets) == 0 {
+		job, err := d.doPreDeleteAction(backup, backup.Status.Target, BuildDeleteBackupFilesJobKey(backup, true),
+			backupRepo, preDeleteAction, backupFilePath)
+		if err != nil {
+			return nil, err
+		}
+		return []*batchv1.Job{job}, nil
+	}
+
+	jobs := make([]*batchv1.Job, 0, len(backup.Status.Targets))
+	for i := range backup.Status.Targets {
+		target := &backup.Status.Targets[i]
+		jobKey := buildTargetPreDeleteJobKey(backup, target.Name, i)
+		targetBackupPath := filepath.Join(backupFilePath, target.Name)
+		job, err := d.doPreDeleteAction(backup, target, jobKey, backupRepo,
+			preDeleteAction, targetBackupPath)
+		if err != nil {
+			return nil, err
+		}
+		jobs = append(jobs, job)
+	}
+	return jobs, nil
+}
+
+func (d *Deleter) doPreDeleteAction(
+	backup *dpv1alpha1.Backup,
+	target *dpv1alpha1.BackupStatusTarget,
+	preJobKey client.ObjectKey,
+	backupRepo *dpv1alpha1.BackupRepo,
+	preDeleteAction *dpv1alpha1.BaseJobActionSpec,
 	backupFilePath string) (*batchv1.Job, error) {
-	preJobKey := BuildDeleteBackupFilesJobKey(backup, true)
 	preJob := &batchv1.Job{}
 	if exists, err := ctrlutil.CheckResourceExists(d.Ctx, d.Client, preJobKey, preJob); err != nil {
 		return nil, err
@@ -343,6 +354,11 @@ func (d *Deleter) doPreDeleteAction(
 		{Name: dptypes.DPBackupBasePath, Value: backupFilePath},
 		{Name: dptypes.DPBackupName, Value: backup.Name},
 	}
+	connectionEnv, err := d.buildEnvFromTarget(backup, target)
+	if err != nil {
+		return nil, err
+	}
+	envVars = append(envVars, connectionEnv...)
 	if d.actionSet != nil {
 		envVars = append(envVars, d.actionSet.Spec.Env...)
 	}
@@ -361,7 +377,62 @@ func (d *Deleter) doPreDeleteAction(
 			RunAsUser:                &runAsUser,
 		},
 	}
-	return preJob, d.createDeleteJob(container, preJobKey, backup, backupRepo, legacyPVCName)
+	return preJob, d.createDeleteJob(container, preJobKey, backup, backupRepo)
+}
+
+func (d *Deleter) buildEnvFromTarget(
+	backup *dpv1alpha1.Backup,
+	target *dpv1alpha1.BackupStatusTarget) ([]corev1.EnvVar, error) {
+	clusterName := backup.Labels[constant.AppInstanceLabelKey]
+	clusterUID := backup.Labels[dptypes.ClusterUIDLabelKey]
+	if clusterName == "" || clusterUID == "" {
+		return nil, nil
+	}
+
+	if target == nil || target.PodSelector == nil || target.PodSelector.LabelSelector == nil {
+		return nil, nil
+	}
+
+	cluster := &appsv1.Cluster{}
+	err := d.Client.Get(d.Ctx, client.ObjectKey{Namespace: backup.Namespace, Name: clusterName}, cluster)
+	if apierrors.IsNotFound(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if string(cluster.UID) != clusterUID {
+		return nil, nil
+	}
+
+	targetPod, err := d.selectAvailableTargetPod(backup.Namespace, target.PodSelector)
+	if err != nil || targetPod == nil {
+		return nil, err
+	}
+	envVars := targetPod.Spec.Containers[0].Env
+	envVarsFromTarget, err := utils.BuildEnvByTarget(targetPod, target.ConnectionCredential, target.ContainerPort)
+	if err != nil {
+		return nil, err
+	}
+	return append(envVars, envVarsFromTarget...), nil
+}
+
+func (d *Deleter) selectAvailableTargetPod(namespace string, selector *dpv1alpha1.PodSelector) (*corev1.Pod, error) {
+	selectPod := func(labelSelector *metav1.LabelSelector) (*corev1.Pod, error) {
+		reqCtx := d.RequestCtx
+		reqCtx.Req.Namespace = namespace
+		pods, err := utils.GetPodListByLabelSelector(reqCtx, d.Client, labelSelector)
+		if err != nil {
+			return nil, err
+		}
+		return utils.GetFirstIndexRunningPod(pods), nil
+	}
+
+	targetPod, err := selectPod(selector.LabelSelector)
+	if err != nil || targetPod != nil || selector.FallbackLabelSelector == nil {
+		return targetPod, err
+	}
+	return selectPod(selector.FallbackLabelSelector)
 }
 
 func (d *Deleter) DeleteVolumeSnapshots(backup *dpv1alpha1.Backup) error {
@@ -407,6 +478,15 @@ func BuildDeleteBackupFilesJobKey(backup *dpv1alpha1.Backup, isPreDelete bool) c
 		preDeletePrefix = "pre"
 	}
 	jobName := fmt.Sprintf("%s-%s%s%s", backup.UID[:8], preDeletePrefix, deleteBackupFilesJobNamePrefix, backup.Name)
+	if len(jobName) > 63 {
+		jobName = strings.TrimSuffix(jobName[:63], "-")
+	}
+	return client.ObjectKey{Namespace: backup.Namespace, Name: jobName}
+}
+
+func buildTargetPreDeleteJobKey(backup *dpv1alpha1.Backup, targetName string, targetIndex int) client.ObjectKey {
+	jobName := fmt.Sprintf("%s-pre%s%d-%s-%s", backup.UID[:8], deleteBackupFilesJobNamePrefix,
+		targetIndex, targetName, backup.Name)
 	if len(jobName) > 63 {
 		jobName = strings.TrimSuffix(jobName[:63], "-")
 	}

@@ -27,8 +27,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/generics"
+	"github.com/apecloud/kubeblocks/pkg/kbagent"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	viperx "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 var _ = Describe("Component Version", func() {
@@ -71,6 +74,49 @@ var _ = Describe("Component Version", func() {
 			Expect(apps["image2"].err).To(HaveOccurred())
 
 			Expect(apps["action1"].err).NotTo(HaveOccurred())
+		})
+
+		It("uses the KB tools image for instance template actions without images", func() {
+			const (
+				appName        = "app"
+				serviceVersion = "2.0.0"
+				toolsImage     = "docker.io/apecloud/kubeblocks-tools:test"
+			)
+			oldToolsImage := viperx.GetString(constant.KBToolsImage)
+			defer viperx.Set(constant.KBToolsImage, oldToolsImage)
+			viperx.Set(constant.KBToolsImage, toolsImage)
+
+			newAction := func() *appsv1.Action {
+				return &appsv1.Action{Exec: &appsv1.ExecAction{Command: []string{"true"}}}
+			}
+			newCompDef := func() *appsv1.ComponentDefinition {
+				return testapps.NewComponentDefinitionFactory("test-action-images").
+					SetServiceVersion("1.0.0").
+					SetRuntime(&corev1.Container{Name: appName, Image: "app:1.0.0"}).
+					SetLifecycleAction("memberJoin", newAction()).
+					SetLifecycleAction("memberLeave", newAction()).
+					GetObject()
+			}
+			newCompVersion := func(images map[string]string) *appsv1.ComponentVersion {
+				return testapps.NewComponentVersionFactory("test-action-images").
+					SetSpec(appsv1.ComponentVersionSpec{
+						Releases: []appsv1.ComponentVersionRelease{{
+							Name:           "r0",
+							ServiceVersion: serviceVersion,
+							Images:         images,
+						}},
+					}).
+					GetObject()
+			}
+
+			By("using the KB tools image when no action image is configured")
+			images, err := resolveImagesWithCompVersions4Template(newCompDef(), []*appsv1.ComponentVersion{
+				newCompVersion(map[string]string{appName: "app:2.0.0"}),
+			}, serviceVersion)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(viperx.GetString(constant.KBToolsImage)).Should(Equal(toolsImage))
+			Expect(images).Should(HaveKeyWithValue(kbagent.ContainerName, toolsImage))
+			Expect(images).Should(HaveKeyWithValue(kbagent.ContainerName4Worker, toolsImage))
 		})
 
 		It("resolve images before and after new release", func() {

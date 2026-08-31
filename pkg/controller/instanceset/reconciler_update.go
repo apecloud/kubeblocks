@@ -120,7 +120,10 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 
 	// treat old and Pending pod as a special case, as they can be updated without a consequence
 	// PodUpdatePolicy is ignored here since in-place update for a pending pod doesn't make much sense.
-	for _, pod := range oldPodList {
+	for i, pod := range oldPodList {
+		if i >= rollingUpdateQuota {
+			break
+		}
 		updatePolicy, _, _, err := getPodUpdatePolicy(its, pod)
 		if err != nil {
 			return kubebuilderx.Continue, err
@@ -183,7 +186,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 
 		switch updatePolicy {
 		case inPlaceUpdatePolicy:
-			newPod, err := buildInstancePodByTemplate(pod.Name, nameToTemplateMap[pod.Name], its, getPodRevision(pod))
+			newPod, err := buildInstancePodByTemplateForUpdate(pod, nameToTemplateMap[pod.Name], its)
 			if err != nil {
 				return kubebuilderx.Continue, err
 			}
@@ -389,7 +392,7 @@ func parseReplicasNMaxUnavailable(updateStrategy *workloads.InstanceUpdateStrate
 	}
 	var err error
 	if rollingUpdate.Replicas != nil {
-		replicas, err = intstr.GetScaledValueFromIntOrPercent(rollingUpdate.Replicas, totalReplicas, false)
+		replicas, err = intstr.GetScaledValueFromIntOrPercent(rollingUpdate.Replicas, totalReplicas, true)
 		if err != nil {
 			return replicas, maxUnavailable, err
 		}

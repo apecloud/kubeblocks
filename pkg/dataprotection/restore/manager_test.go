@@ -257,18 +257,53 @@ var _ = Describe("RestoreManager Test", func() {
 
 		It("test with RestorePVCFromSnapshot function", func() {
 			reqCtx := getReqCtx()
-			startingIndex := 0
+			startingIndex := 1
 			useVolumeSnapshot := true
 			restoreMGR, backupSet := initResources(reqCtx, startingIndex, useVolumeSnapshot, func(f *testdp.MockRestoreFactory) {
 				f.SetVolumeClaimsTemplate(testdp.MysqlTemplateName, testdp.DataVolumeName,
-					testdp.DataVolumeMountPath, "", int32(replicas), int32(startingIndex), nil)
+					testdp.DataVolumeMountPath, "", int32(replicas), int32(startingIndex), nil).
+					SetPrepareDataRequiredPolicy(dpv1alpha1.OneToOneRestorePolicy, "")
 			})
+			backupSet.Backup.Status.Target.PodSelector.Strategy = dpv1alpha1.PodSelectionStrategyAll
+			backupSet.Backup.Status.Target.SelectedTargetPods = []string{"pod-0", "pod-1", "pod-2"}
+			backupSet.Backup.Status.Actions = []dpv1alpha1.ActionStatus{
+				{
+					TargetPodName: "pod-0",
+					VolumeSnapshots: []dpv1alpha1.VolumeSnapshotStatus{{
+						Name:       "snapshot-0",
+						VolumeName: testdp.DataVolumeName,
+					}},
+				},
+				{
+					TargetPodName: "pod-1",
+					VolumeSnapshots: []dpv1alpha1.VolumeSnapshotStatus{{
+						Name:       "snapshot-1",
+						VolumeName: testdp.DataVolumeName,
+					}},
+				},
+				{
+					TargetPodName: "pod-2",
+					VolumeSnapshots: []dpv1alpha1.VolumeSnapshotStatus{{
+						Name:       "snapshot-2",
+						VolumeName: testdp.DataVolumeName,
+					}},
+				},
+			}
 
 			By("test RestorePVCFromSnapshot function")
 			target := utils.GetBackupStatusTarget(backupSet.Backup, restoreMGR.Restore.Spec.Backup.SourceTargetName)
 			Expect(restoreMGR.RestorePVCFromSnapshot(reqCtx, k8sClient, *backupSet, target)).Should(Succeed())
 
 			checkPVC(startingIndex, useVolumeSnapshot, "restore")
+			for i := 0; i < replicas; i++ {
+				pvc := &corev1.PersistentVolumeClaim{}
+				Expect(k8sClient.Get(ctx, client.ObjectKey{
+					Namespace: testCtx.DefaultNamespace,
+					Name:      fmt.Sprintf("%s-%d", testdp.MysqlTemplateName, startingIndex+i),
+				}, pvc)).Should(Succeed())
+				Expect(pvc.Spec.DataSource).ShouldNot(BeNil())
+				Expect(pvc.Spec.DataSource.Name).Should(Equal(fmt.Sprintf("snapshot-%d", startingIndex+i)))
+			}
 		})
 
 		It("test with BuildPrepareDataJobs function and Parallel volumeRestorePolicy", func() {
@@ -278,8 +313,11 @@ var _ = Describe("RestoreManager Test", func() {
 				f.SetVolumeClaimsTemplate(testdp.MysqlTemplateName, testdp.DataVolumeName,
 					testdp.DataVolumeMountPath, "", int32(replicas), int32(startingIndex), map[string]string{
 						constant.AppInstanceLabelKey: instanceName,
-					})
+					}).SetPrepareDataRequiredPolicy(dpv1alpha1.OneToOneRestorePolicy, "")
 			})
+			backupSet.Backup.Status.Path = "/repo/test/backup"
+			backupSet.Backup.Status.Target.PodSelector.Strategy = dpv1alpha1.PodSelectionStrategyAll
+			backupSet.Backup.Status.Target.SelectedTargetPods = []string{"pod-0", "pod-1", "pod-2"}
 
 			By(fmt.Sprintf("test BuildPrepareDataJobs function, expect for %d jobs", replicas))
 			actionSetName := "preparedata-0"
@@ -291,6 +329,10 @@ var _ = Describe("RestoreManager Test", func() {
 			Expect(len(jobs)).Should(Equal(replicas))
 			// image should be expanded by env
 			Expect(jobs[0].Spec.Template.Spec.Containers[0].Image).Should(ContainSubstring(testdp.ImageTag))
+			for i := 0; i < replicas; i++ {
+				env := utils.CovertEnvToMap(jobs[i].Spec.Template.Spec.Containers[0].Env)
+				Expect(env[dptypes.DPTargetRelativePath]).Should(Equal(fmt.Sprintf("pod-%d", startingIndex+i)))
+			}
 
 			checkPVC(startingIndex, false, "restore")
 		})

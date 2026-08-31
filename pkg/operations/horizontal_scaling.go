@@ -229,7 +229,7 @@ func (hs horizontalScalingOpsHandler) createRestore(reqCtx intctrlutil.RequestCt
 		return intctrlutil.NewFatalError(fmt.Sprintf("scale-out from backup %s/%s is not supported because it has multiple source targets", backupObj.Namespace, backupObj.Name))
 	}
 	// create restore
-	restore, err := restoreMGR.BuildPrepareDataRestore(synthesizedComponent, backupObj, getTemplate(templateName))
+	restore, err := restoreMGR.BuildPrepareDataRestoreForPod(synthesizedComponent, backupObj, getTemplate(templateName))
 	if err != nil {
 		if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeRestoreFailed) {
 			return intctrlutil.NewFatalError(err.Error())

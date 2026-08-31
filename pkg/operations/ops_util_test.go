@@ -200,6 +200,8 @@ var _ = Describe("OpsUtil functions", func() {
 			By("init operations resources ")
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
 			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
+			testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
+			testapps.MockInstanceSetStatus(testCtx, opsRes.Cluster, defaultCompName)
 
 			runHscaleOps := func(expectPhase opsv1alpha1.OpsPhase) *opsv1alpha1.OpsRequest {
 				ops := createHorizontalScaling(clusterName, opsv1alpha1.HorizontalScaling{
@@ -259,6 +261,8 @@ var _ = Describe("OpsUtil functions", func() {
 			By("init operations resources ")
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
 			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
+			testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
+			testapps.MockInstanceSetStatus(testCtx, opsRes.Cluster, defaultCompName)
 
 			By("create a first horizontal opsRequest")
 			ops1 := createHorizontalScaling(clusterName, opsv1alpha1.HorizontalScaling{
@@ -315,6 +319,7 @@ var _ = Describe("OpsUtil functions", func() {
 			By("init operations resources ")
 			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
 			testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
+			testapps.MockInstanceSetStatus(testCtx, opsRes.Cluster, defaultCompName)
 
 			By("mock cluster phase to Updating")
 			Expect(testapps.ChangeObjStatus(&testCtx, opsRes.Cluster, func() {

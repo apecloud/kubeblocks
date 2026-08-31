@@ -280,14 +280,14 @@ var _ = Describe("OpsUtil functions", func() {
 				OpsRequest: opsRequest,
 			}
 
-			pvcMap, volumes, volumeMounts, err := getPVCMapAndVolumes(opsRes, synthesizedComp, targetPod, "rebuild", 0, false)
+			pvcMap, volumes, volumeMounts, err := getPVCMapAndVolumes(opsRes, synthesizedComp, targetPod, "", "rebuild", 0, false)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(pvcMap).Should(HaveKey("source-pvc"))
 			Expect(volumes).Should(HaveLen(1))
 			Expect(volumeMounts).Should(ContainElement(corev1.VolumeMount{Name: "data", MountPath: "/kb-tmp/0"}))
 			Expect(pvcMap["source-pvc"].Annotations).Should(HaveKeyWithValue(rebuildFromAnnotation, opsRequest.Name))
 
-			pvcMap, volumes, volumeMounts, err = getPVCMapAndVolumes(opsRes, synthesizedComp, targetPod, "rebuild", 0, true)
+			pvcMap, volumes, volumeMounts, err = getPVCMapAndVolumes(opsRes, synthesizedComp, targetPod, "", "rebuild", 0, true)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(pvcMap["source-pvc"].Name).Should(Equal("source-pvc"))
 			Expect(volumes).Should(BeEmpty())

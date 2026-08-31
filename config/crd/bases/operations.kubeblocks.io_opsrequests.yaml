@@ -5349,6 +5349,43 @@ spec:
                             to any changes.
                           format: int32
                           type: integer
+                        sourceInstanceAssignments:
+                          description: |-
+                            SourceInstanceAssignments records the InstanceSet-owned identity assignments before an operation changes
+                            the instance allocation.
+                          items:
+                            description: InstanceTemplateAssignment identifies an
+                              InstanceSet-assigned instance and its template at the
+                              start of an operation.
+                            properties:
+                              desiredState:
+                                description: |-
+                                  DesiredState is the allocation state observed when the operation captured the assignment.
+                                  Only Active and explicitly referenced Offline identities are recorded.
+                                enum:
+                                - Active
+                                - Offline
+                                type: string
+                              podName:
+                                description: PodName is the stable instance identity
+                                  allocated by the InstanceSet.
+                                type: string
+                              templateName:
+                                description: TemplateName is the assigned instance
+                                  template. An empty string identifies the default
+                                  template.
+                                type: string
+                              workloadName:
+                                description: WorkloadName is the name of the InstanceSet
+                                  that owns the instance.
+                                type: string
+                            required:
+                            - desiredState
+                            - podName
+                            - templateName
+                            - workloadName
+                            type: object
+                          type: array
                         volumeClaimTemplates:
                           description: Records volumes' storage size of the Component
                             prior to any changes.

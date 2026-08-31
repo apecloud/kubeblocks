@@ -26,6 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -110,6 +111,38 @@ var _ = Describe("Component Workload Operations Test", func() {
 
 		graphCli = model.NewGraphClient(reader)
 		dag = newDAG(graphCli, comp)
+	})
+
+	Context("Data Replication Operations", func() {
+		It("blocks scale-out when data actions have no source pod", func() {
+			synthesizeComp.Replicas = 1
+			synthesizeComp.LifecycleActions.DataDump = testapps.NewLifecycleAction("data-dump")
+			synthesizeComp.LifecycleActions.DataLoad = testapps.NewLifecycleAction("data-load")
+
+			runningITS := testapps.NewInstanceSetFactory(testCtx.DefaultNamespace,
+				"test-its", clusterName, compName).
+				AddAppInstanceLabel(clusterName).
+				AddAppComponentLabel(compName).
+				AddAppManagedByLabel().
+				SetReplicas(0).
+				GetObject()
+			protoITS := runningITS.DeepCopy()
+			protoITS.Spec.Replicas = ptr.To(int32(1))
+
+			transCtx := &componentTransformContext{
+				Context:             ctx,
+				Client:              graphCli,
+				Logger:              logger,
+				EventRecorder:       clusterRecorder,
+				Component:           comp,
+				SynthesizeComponent: synthesizeComp,
+			}
+			ops, err := newComponentWorkloadOps(transCtx, k8sClient, synthesizeComp,
+				comp, runningITS, protoITS, dag)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			Expect(ops.scaleOut()).Should(MatchError("no available pod to dump data"))
+		})
 	})
 
 	Context("Member Leave Operations", func() {

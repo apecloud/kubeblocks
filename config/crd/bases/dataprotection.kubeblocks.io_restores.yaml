@@ -83,10 +83,7 @@ spec:
                     description: Specifies the backup name.
                     type: string
                   namespace:
-                    description: |-
-                      Specifies the backup namespace. When this differs from the Restore namespace,
-                      a Gateway API ReferenceGrant in the backup namespace must allow Restores from
-                      the Restore namespace to reference the Backup. Cross-namespace VolumeSnapshot
+                    description: Specifies the backup namespace. Cross-namespace VolumeSnapshot
                       restores are not supported.
                     type: string
                   sourceTargetName:

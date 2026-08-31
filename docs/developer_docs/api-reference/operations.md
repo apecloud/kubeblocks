@@ -1091,9 +1091,7 @@ string
 <em>(Optional)</em>
 <p>Specifies the namespace of the Backup.
 If not specified, the namespace of the OpsRequest will be used.
-Cross-namespace references require a Gateway API ReferenceGrant in the Backup
-namespace that allows Restores from the OpsRequest namespace to reference the
-Backup. Cross-namespace VolumeSnapshot restores are not supported.</p>
+Cross-namespace VolumeSnapshot restores are not supported.</p>
 </td>
 </tr>
 <tr>

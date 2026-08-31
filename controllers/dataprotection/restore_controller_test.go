@@ -664,11 +664,6 @@ var _ = Describe("Restore Controller test", func() {
 
 		Context("test cross namespace", func() {
 			It("should wait for preparation of backup repo", func() {
-				grant := newBackupReferenceGrant("allow-cross-namespace-restore", testCtx.DefaultNamespace, namespace2, "")
-				Expect(k8sClient.Create(ctx, grant)).Should(Succeed())
-				DeferCleanup(func() {
-					Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, grant))).Should(Succeed())
-				})
 				By("creating a restore in a different namespace from backup")
 				initResourcesAndWaitRestore(true, false, true, "", dpv1alpha1.RestorePhaseRunning,
 					func(f *testdp.MockRestoreFactory) {

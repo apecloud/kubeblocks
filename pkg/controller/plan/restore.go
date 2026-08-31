@@ -184,7 +184,15 @@ func (r *RestoreManager) BuildPrepareDataRestore(comp *component.SynthesizedComp
 	if len(templates) == 0 {
 		return nil, nil
 	}
-	sourceTargetName, sourceTarget := r.sourceTargetForRestore(backupObj)
+	sourceTargetName, sourceTarget := backupSourceTargetForRestore(backupObj)
+	requiredPolicy := r.buildRequiredPolicy(sourceTarget)
+	if r.SourceTargetName != "" {
+		// DataProtection owns resolving and validating an explicit source target.
+		sourceTargetName = r.SourceTargetName
+		requiredPolicy = &dpv1alpha1.RequiredPolicyForAllPodSelection{
+			DataRestorePolicy: dpv1alpha1.OneToOneRestorePolicy,
+		}
+	}
 	restore := &dpv1alpha1.Restore{
 		ObjectMeta: r.GetRestoreObjectMeta(comp, dpv1alpha1.PrepareData, templateName),
 		Spec: dpv1alpha1.RestoreSpec{
@@ -197,7 +205,7 @@ func (r *RestoreManager) BuildPrepareDataRestore(comp *component.SynthesizedComp
 			Env:         r.env,
 			Parameters:  r.parameters,
 			PrepareDataConfig: &dpv1alpha1.PrepareDataConfig{
-				RequiredPolicyForAllPodSelection: r.buildRequiredPolicy(sourceTarget),
+				RequiredPolicyForAllPodSelection: requiredPolicy,
 				SchedulingSpec:                   r.buildSchedulingSpec(comp, template),
 				VolumeClaimRestorePolicy:         r.volumeRestorePolicy,
 				RestoreVolumeClaimsTemplate: &dpv1alpha1.RestoreVolumeClaimsTemplate{
@@ -246,7 +254,7 @@ func (r *RestoreManager) DoPostReady(comp *component.SynthesizedComponent,
 		}
 		jobActionLabels[instanceset.RoleLabelKey] = highestPriorityRole.Name
 	}
-	sourceTargetName, sourceTarget := r.sourceTargetForRestore(backupObj)
+	sourceTargetName, sourceTarget := backupSourceTargetForRestore(backupObj)
 	restore := &dpv1alpha1.Restore{
 		ObjectMeta: r.GetRestoreObjectMeta(comp, dpv1alpha1.PostReady, ""),
 		Spec: dpv1alpha1.RestoreSpec{
@@ -304,18 +312,9 @@ func backupSourceTargetForRestore(backupObj *dpv1alpha1.Backup) (string, *dpv1al
 	return "", nil
 }
 
-func (r *RestoreManager) sourceTargetForRestore(backupObj *dpv1alpha1.Backup) (string, *dpv1alpha1.BackupStatusTarget) {
-	if r.SourceTargetName != "" {
-		// DataProtection owns resolving and validating an explicit source target.
-		return r.SourceTargetName, nil
-	}
-	return backupSourceTargetForRestore(backupObj)
-}
-
 func (r *RestoreManager) buildRequiredPolicy(sourceTarget *dpv1alpha1.BackupStatusTarget) *dpv1alpha1.RequiredPolicyForAllPodSelection {
 	var requiredPolicy *dpv1alpha1.RequiredPolicyForAllPodSelection
-	if r.SourceTargetName != "" ||
-		(sourceTarget != nil && sourceTarget.PodSelector.Strategy == dpv1alpha1.PodSelectionStrategyAll) {
+	if sourceTarget != nil && sourceTarget.PodSelector.Strategy == dpv1alpha1.PodSelectionStrategyAll {
 		// TODO: input the RequiredPolicyForAllPodSelection by user.
 		requiredPolicy = &dpv1alpha1.RequiredPolicyForAllPodSelection{
 			DataRestorePolicy: dpv1alpha1.OneToOneRestorePolicy,

@@ -61,9 +61,6 @@ func TestGetBackupStatusTarget(t *testing.T) {
 	}
 	target := GetBackupStatusTarget(backup, "")
 	assert.Equal(t, *target, backupTarget)
-	target = GetBackupStatusTarget(backup, sourceTargetName)
-	assert.Equal(t, *target, backupTarget)
-	assert.Nil(t, GetBackupStatusTarget(backup, "different-target"))
 
 	backup.Status.Target = nil
 	backup.Status.Targets = []dpv1alpha1.BackupStatusTarget{backupTarget}

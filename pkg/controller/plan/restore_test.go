@@ -115,12 +115,6 @@ func TestRestoreManagerBuildRequiredPolicy(t *testing.T) {
 	if got := manager.buildRequiredPolicy(nil); got != nil {
 		t.Fatalf("nil source target policy = %#v, want nil", got)
 	}
-	manager.SourceTargetName = "target-a"
-	if got := manager.buildRequiredPolicy(nil); got == nil ||
-		got.DataRestorePolicy != dpv1alpha1.OneToOneRestorePolicy {
-		t.Fatalf("explicit source target policy = %#v, want one-to-one", got)
-	}
-	manager.SourceTargetName = ""
 	if got := manager.buildRequiredPolicy(&dpv1alpha1.BackupStatusTarget{
 		BackupTarget: dpv1alpha1.BackupTarget{
 			PodSelector: &dpv1alpha1.PodSelector{Strategy: dpv1alpha1.PodSelectionStrategyAny},

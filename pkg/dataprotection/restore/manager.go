@@ -430,10 +430,19 @@ func (r *RestoreManager) RestorePVCFromSnapshot(reqCtx intctrlutil.RequestCtx, c
 				// HACK: add InstanceSet related labels to the PVC,
 				// so that it can be managed by InstanceSet
 				addItsManagingLabels(&claim, index)
-				sourceTargetPodName, err := GetSourcePodNameForTargetPod(target,
-					prepareDataConfig.RequiredPolicyForAllPodSelection,
-					claim.Labels[constant.KBAppPodNameLabelKey],
-					claim.Labels[constant.KBAppInstanceTemplateLabelKey])
+				var sourceTargetPodName string
+				var err error
+				if targetPodName := claim.Labels[constant.KBAppPodNameLabelKey]; targetPodName != "" {
+					sourceTargetPodName, err = GetSourcePodNameForTargetPod(target,
+						prepareDataConfig.RequiredPolicyForAllPodSelection,
+						targetPodName,
+						claim.Labels[constant.KBAppInstanceTemplateLabelKey])
+				} else {
+					// Preserve positional selection for generic claims-template Restores
+					// that do not carry a KubeBlocks target Pod identity.
+					sourceTargetPodName, err = GetSourcePodNameFromTarget(target,
+						prepareDataConfig.RequiredPolicyForAllPodSelection, i)
+				}
 				if err != nil {
 					return err
 				}
@@ -552,12 +561,13 @@ func (r *RestoreManager) BuildPrepareDataJobs(reqCtx intctrlutil.RequestCtx, cli
 		}
 		var sourceTargetPodName string
 		var err error
-		if claimsTemplate == nil {
+		targetPodName := jobBuilder.labels[constant.KBAppPodNameLabelKey]
+		if claimsTemplate == nil || targetPodName == "" {
 			sourceTargetPodName, err = GetSourcePodNameFromTarget(target, prepareDataConfig.RequiredPolicyForAllPodSelection, i)
 		} else {
 			sourceTargetPodName, err = GetSourcePodNameForTargetPod(target,
 				prepareDataConfig.RequiredPolicyForAllPodSelection,
-				jobBuilder.labels[constant.KBAppPodNameLabelKey],
+				targetPodName,
 				jobBuilder.labels[constant.KBAppInstanceTemplateLabelKey])
 		}
 		if err != nil {

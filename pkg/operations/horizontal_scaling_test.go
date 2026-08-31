@@ -279,10 +279,21 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			Expect(testapps.ChangeObjStatus(&testCtx, backup, func() {
 				backup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
 				backup.Status.BackupMethod = &dpv1alpha1.BackupMethod{
-					Name: testdp.VSBackupMethodName,
+					Name:            testdp.VSBackupMethodName,
+					SnapshotVolumes: pointer.Bool(true),
 					TargetVolumes: &dpv1alpha1.TargetVolumeInfo{
 						Volumes: []string{"data"},
 					},
+				}
+				backup.Status.Targets = []dpv1alpha1.BackupStatusTarget{
+					{BackupTarget: dpv1alpha1.BackupTarget{
+						Name:        "target-a",
+						PodSelector: &dpv1alpha1.PodSelector{},
+					}},
+					{BackupTarget: dpv1alpha1.BackupTarget{
+						Name:        "target-b",
+						PodSelector: &dpv1alpha1.PodSelector{Strategy: dpv1alpha1.PodSelectionStrategyAll},
+					}},
 				}
 			})).Should(Succeed())
 
@@ -290,14 +301,26 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			restoreEnv := []corev1.EnvVar{{Name: "RESTORE_ENV", Value: "true"}}
 			horizontalScaling := opsv1alpha1.HorizontalScaling{ScaleOut: &opsv1alpha1.ScaleOut{
 				FromBackup: &opsv1alpha1.FromBackup{
-					Name:       backupName,
-					RestoreEnv: restoreEnv,
+					Name:             backupName,
+					SourceTargetName: "target-b",
+					RestoreEnv:       restoreEnv,
 				},
 			}}
 
 			horizontalScaling.ScaleOut.ReplicaChanges = pointer.Int32(2)
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx, Recorder: eventRecorder}
 			opsRes, _ := commonHScaleConsensusCompTest(reqCtx, nil, horizontalScaling, false, true)
+			restoreList := &dpv1alpha1.RestoreList{}
+			Expect(k8sClient.List(ctx, restoreList, client.MatchingLabels{
+				constant.OpsRequestNameLabelKey: opsRes.OpsRequest.Name,
+			}, client.InNamespace(opsRes.OpsRequest.Namespace))).Should(Succeed())
+			Expect(restoreList.Items).Should(HaveLen(2))
+			for i := range restoreList.Items {
+				Expect(restoreList.Items[i].Spec.Backup.SourceTargetName).Should(Equal("target-b"))
+				Expect(restoreList.Items[i].Spec.PrepareDataConfig.RequiredPolicyForAllPodSelection).NotTo(BeNil())
+				Expect(restoreList.Items[i].Spec.PrepareDataConfig.RequiredPolicyForAllPodSelection.DataRestorePolicy).
+					Should(Equal(dpv1alpha1.OneToOneRestorePolicy))
+			}
 
 			By("mock restore phase to completed")
 			comp, compDef, err := component.GetCompNCompDefByName(reqCtx.Ctx, k8sClient, opsRes.Cluster.Namespace, constant.GenerateClusterComponentName(opsRes.Cluster.Name, defaultCompName))

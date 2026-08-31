@@ -3393,6 +3393,63 @@ func TestParentDeletionTerminatesOnlyVolumePopulatorResourcesInOrder(t *testing.
 		"VolumePopulator must never remove the Cluster controller finalizer")
 }
 
+func TestComponentTerminationPreservesPostReadyRestoreOwnedByActiveComponent(t *testing.T) {
+	scheme, cluster, deletingComponent, its, target := parentRestoreObjects(t)
+	now := metav1.Now()
+	deletingComponent.DeletionTimestamp = &now
+	deletingComponent.Finalizers = []string{"example.io/app-owner"}
+	target.Finalizers = []string{dptypes.DataProtectionFinalizerName}
+	activeComponent := deletingComponent.DeepCopy()
+	activeComponent.Name = "cluster-tikv"
+	activeComponent.UID = "active-component-uid"
+	activeComponent.DeletionTimestamp = nil
+	activeComponent.Finalizers = nil
+	activeComponent.Labels[constant.KBAppComponentLabelKey] = "tikv"
+	postReady := postReadyRestoreForComponent(target, cluster, activeComponent)
+	postReady.Finalizers = []string{"example.io/restore-owner"}
+	cli := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(cluster, deletingComponent, activeComponent, its, target, postReady).Build()
+	reconciler := &VolumePopulatorReconciler{Client: cli, APIReader: cli, Scheme: scheme}
+
+	terminated, err := reconciler.handleRestoreParentLifecycle(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, target)
+
+	require.True(t, terminated)
+	require.NoError(t, err)
+	currentRestore := &dpv1alpha1.Restore{}
+	require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(postReady), currentRestore))
+	require.True(t, currentRestore.DeletionTimestamp.IsZero(),
+		"deleting a source Component must not terminate another Component's shared postReady Restore")
+	currentTarget := &corev1.PersistentVolumeClaim{}
+	require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(target), currentTarget))
+	require.NotContains(t, currentTarget.Finalizers, dptypes.DataProtectionFinalizerName)
+}
+
+func TestComponentTerminationDeletesPostReadyRestoreByOwnerNotSourceLabel(t *testing.T) {
+	scheme, cluster, component, its, target := parentRestoreObjects(t)
+	now := metav1.Now()
+	component.DeletionTimestamp = &now
+	component.Finalizers = []string{"example.io/app-owner"}
+	target.Finalizers = []string{dptypes.DataProtectionFinalizerName}
+	postReady := postReadyRestoreForComponent(target, cluster, component)
+	postReady.Labels[constant.KBAppComponentLabelKey] = "another-source"
+	postReady.Finalizers = []string{"example.io/restore-owner"}
+	cli := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(cluster, component, its, target, postReady).Build()
+	reconciler := &VolumePopulatorReconciler{Client: cli, APIReader: cli, Scheme: scheme}
+
+	terminated, err := reconciler.handleRestoreParentLifecycle(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, target)
+
+	require.True(t, terminated)
+	require.Error(t, err)
+	require.True(t, intctrlutil.IsRequeueError(err))
+	currentRestore := &dpv1alpha1.Restore{}
+	require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(postReady), currentRestore))
+	require.False(t, currentRestore.DeletionTimestamp.IsZero(),
+		"the deleting owner Component must terminate postReady Restore regardless of source label")
+}
+
 func TestTargetPVCDeletionIsNotParentTermination(t *testing.T) {
 	scheme, cluster, component, its, target := parentRestoreObjects(t)
 	now := metav1.Now()
@@ -3470,6 +3527,51 @@ func TestVolumePopulatorAdoptsVerifiedLegacyTargetIdentity(t *testing.T) {
 	require.Equal(t, string(cluster.UID), current.Labels[dptypes.ClusterUIDLabelKey])
 	require.Empty(t, current.Annotations[constant.KBAppClusterUIDKey],
 		"VolumePopulator must not write the Cluster Controller-owned restore-intent annotation")
+}
+
+func TestVolumePopulatorRefusesLegacyPostReadyRestoreOutsideClusterOwnership(t *testing.T) {
+	scheme, cluster, component, its, target := parentRestoreObjects(t)
+	foreignComponent := component.DeepCopy()
+	foreignComponent.Name = "cluster-tikv"
+	foreignComponent.UID = "foreign-component-uid"
+	foreignComponent.Labels[constant.KBAppComponentLabelKey] = "tikv"
+	foreignComponent.OwnerReferences[0].UID = "foreign-cluster-uid"
+	postReady := postReadyRestoreForComponent(target, cluster, foreignComponent)
+	delete(postReady.Labels, dptypes.ClusterUIDLabelKey)
+	cli := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(cluster, component, foreignComponent, its, target, postReady).Build()
+	reconciler := &VolumePopulatorReconciler{Client: cli, APIReader: cli, Scheme: scheme}
+
+	err := reconciler.adoptVolumePopulatorIdentity(context.Background(), target, cluster)
+
+	require.ErrorContains(t, err, "owner Component is not owned by Cluster")
+	current := &dpv1alpha1.Restore{}
+	require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(postReady), current))
+	require.Empty(t, current.Labels[dptypes.ClusterUIDLabelKey])
+}
+
+func TestValidateClusterRestorePVCOwnershipThroughInstance(t *testing.T) {
+	scheme, cluster, component, its, target := parentRestoreObjects(t)
+	controller := true
+	instance := &workloadsv1.Instance{ObjectMeta: metav1.ObjectMeta{
+		Namespace: target.Namespace, Name: "cluster-mysql-0", UID: "instance-uid",
+		OwnerReferences: []metav1.OwnerReference{{
+			APIVersion: workloadsv1.GroupVersion.String(), Kind: workloadsv1.InstanceSetKind,
+			Name: its.Name, UID: its.UID, Controller: &controller,
+		}},
+	}}
+	target.OwnerReferences = []metav1.OwnerReference{{
+		APIVersion: workloadsv1.GroupVersion.String(), Kind: "Instance",
+		Name: instance.Name, UID: instance.UID, Controller: &controller,
+	}}
+	cli := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(cluster, component, its, instance, target).Build()
+	reconciler := &VolumePopulatorReconciler{Client: cli, APIReader: cli, Scheme: scheme}
+
+	actual, err := reconciler.validateClusterRestorePVCOwnership(context.Background(), target, cluster)
+
+	require.NoError(t, err)
+	require.Equal(t, component.UID, actual.UID)
 }
 
 func TestVolumePopulatorRejectsMismatchedClusterUID(t *testing.T) {

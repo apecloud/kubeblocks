@@ -445,7 +445,7 @@ func (r *VolumePopulatorReconciler) handleRestoreParentLifecycle(reqCtx intctrlu
 		return false, restoreParentRequeue(err)
 	}
 	if !cluster.DeletionTimestamp.IsZero() || (comp != nil && !comp.DeletionTimestamp.IsZero()) {
-		err = r.terminateVolumePopulation(reqCtx, pvc, cluster)
+		err = r.terminateVolumePopulation(reqCtx, pvc, cluster, comp)
 		if err != nil && !intctrlutil.IsRequeueError(err) {
 			err = restoreParentRequeue(err)
 		}
@@ -573,17 +573,18 @@ func (r *VolumePopulatorReconciler) adoptVolumePopulatorIdentity(ctx context.Con
 
 	postReady := &dpv1alpha1.RestoreList{}
 	if err := r.Client.List(ctx, postReady, client.InNamespace(pvc.Namespace), client.MatchingLabels{
-		constant.AppInstanceLabelKey:    cluster.Name,
-		constant.KBAppComponentLabelKey: pvc.Labels[constant.KBAppComponentLabelKey],
+		constant.AppInstanceLabelKey: cluster.Name,
 	}); err != nil {
 		return err
 	}
 	for i := range postReady.Items {
 		restore := &postReady.Items[i]
-		owner := exactOwnerReference(restore.OwnerReferences, appsv1.GroupVersion.String(), appsv1.ComponentKind)
-		if owner == nil || restore.Name != postReadyRestoreName(owner.UID) ||
-			restore.Labels[dprestore.DataProtectionRestoreLabelKey] != restore.Name {
+		if internalPostReadyRestoreOwner(restore) == nil ||
+			restore.Labels[dptypes.ClusterUIDLabelKey] == string(cluster.UID) {
 			continue
+		}
+		if _, err := r.validatePostReadyRestoreOwner(ctx, restore, cluster); err != nil {
+			return err
 		}
 		labels := map[string]string{
 			dptypes.ClusterUIDLabelKey:   string(cluster.UID),
@@ -616,12 +617,12 @@ func (r *VolumePopulatorReconciler) patchVolumePopulatorLabels(ctx context.Conte
 }
 
 func (r *VolumePopulatorReconciler) terminateVolumePopulation(reqCtx intctrlutil.RequestCtx,
-	pvc *corev1.PersistentVolumeClaim, cluster *appsv1.Cluster) error {
+	pvc *corev1.PersistentVolumeClaim, cluster *appsv1.Cluster, component *appsv1.Component) error {
 	pending, err := r.deleteExecutionRestoreAndWait(reqCtx.Ctx, pvc, cluster)
 	if err != nil {
 		return err
 	}
-	postReadyPending, err := r.deletePostReadyRestoresAndWait(reqCtx.Ctx, pvc, cluster)
+	postReadyPending, err := r.deletePostReadyRestoresAndWait(reqCtx.Ctx, cluster, component)
 	if err != nil {
 		return err
 	}
@@ -661,45 +662,74 @@ func (r *VolumePopulatorReconciler) deleteExecutionRestoreAndWait(ctx context.Co
 }
 
 func (r *VolumePopulatorReconciler) deletePostReadyRestoresAndWait(ctx context.Context,
-	pvc *corev1.PersistentVolumeClaim, cluster *appsv1.Cluster) (bool, error) {
+	cluster *appsv1.Cluster, deletingComponent *appsv1.Component) (bool, error) {
 	list := &dpv1alpha1.RestoreList{}
-	if err := r.volumePopulatorReader().List(ctx, list, client.InNamespace(pvc.Namespace), client.MatchingLabels{
-		constant.AppInstanceLabelKey:    cluster.Name,
-		constant.KBAppComponentLabelKey: pvc.Labels[constant.KBAppComponentLabelKey],
-		dptypes.ClusterUIDLabelKey:      string(cluster.UID),
+	if err := r.volumePopulatorReader().List(ctx, list, client.InNamespace(cluster.Namespace), client.MatchingLabels{
+		constant.AppInstanceLabelKey: cluster.Name,
+		dptypes.ClusterUIDLabelKey:   string(cluster.UID),
 	}); err != nil {
 		return false, err
 	}
+	clusterDeleting := !cluster.DeletionTimestamp.IsZero()
 	pending := false
 	for i := range list.Items {
 		restore := &list.Items[i]
-		owner := exactOwnerReference(restore.OwnerReferences, appsv1.GroupVersion.String(), appsv1.ComponentKind)
+		owner := internalPostReadyRestoreOwner(restore)
 		if owner == nil {
 			continue
 		}
-		component := &appsv1.Component{}
-		if err := r.volumePopulatorReader().Get(ctx,
-			client.ObjectKey{Namespace: restore.Namespace, Name: owner.Name}, component); err != nil {
-			if !apierrors.IsNotFound(err) || cluster.DeletionTimestamp.IsZero() {
-				return false, err
-			}
-			component = nil
-		}
-		if (component != nil && (component.UID != owner.UID ||
-			component.Labels[constant.AppInstanceLabelKey] != cluster.Name)) ||
-			restore.Name != postReadyRestoreName(owner.UID) ||
-			restore.Labels[dprestore.DataProtectionRestoreLabelKey] != restore.Name {
-			return false, fmt.Errorf("refusing to delete postReady Restore %s/%s without exact VP ownership",
-				restore.Namespace, restore.Name)
+		if !clusterDeleting && (deletingComponent == nil || owner.UID != deletingComponent.UID) {
+			continue
 		}
 		pending = true
-		if restore.DeletionTimestamp.IsZero() {
-			if err := r.Client.Delete(ctx, restore); err != nil && !apierrors.IsNotFound(err) {
-				return false, err
-			}
+		if !restore.DeletionTimestamp.IsZero() {
+			continue
+		}
+		ownerComponent, err := r.validatePostReadyRestoreOwner(ctx, restore, cluster)
+		if err != nil {
+			return false, err
+		}
+		if !clusterDeleting && ownerComponent.DeletionTimestamp.IsZero() {
+			return false, fmt.Errorf("refusing to delete postReady Restore %s/%s owned by active Component %s/%s",
+				restore.Namespace, restore.Name, ownerComponent.Namespace, ownerComponent.Name)
+		}
+		if err := r.Client.Delete(ctx, restore); err != nil && !apierrors.IsNotFound(err) {
+			return false, err
 		}
 	}
 	return pending, nil
+}
+
+func internalPostReadyRestoreOwner(restore *dpv1alpha1.Restore) *metav1.OwnerReference {
+	owner := exactOwnerReference(restore.OwnerReferences, appsv1.GroupVersion.String(), appsv1.ComponentKind)
+	if owner == nil || restore.Name != postReadyRestoreName(owner.UID) ||
+		restore.Labels[dprestore.DataProtectionRestoreLabelKey] != restore.Name {
+		return nil
+	}
+	return owner
+}
+
+func (r *VolumePopulatorReconciler) validatePostReadyRestoreOwner(ctx context.Context,
+	restore *dpv1alpha1.Restore, cluster *appsv1.Cluster) (*appsv1.Component, error) {
+	owner := internalPostReadyRestoreOwner(restore)
+	if owner == nil || restore.Labels[constant.AppInstanceLabelKey] != cluster.Name {
+		return nil, fmt.Errorf("postReady Restore %s/%s has no valid internal Component ownership",
+			restore.Namespace, restore.Name)
+	}
+	component := &appsv1.Component{}
+	if err := r.volumePopulatorReader().Get(ctx,
+		client.ObjectKey{Namespace: restore.Namespace, Name: owner.Name}, component); err != nil {
+		return nil, err
+	}
+	clusterOwner := metav1.GetControllerOf(component)
+	if component.UID != owner.UID || clusterOwner == nil ||
+		clusterOwner.APIVersion != appsv1.GroupVersion.String() || clusterOwner.Kind != appsv1.ClusterKind ||
+		clusterOwner.Name != cluster.Name || clusterOwner.UID != cluster.UID ||
+		component.Labels[constant.AppInstanceLabelKey] != cluster.Name {
+		return nil, fmt.Errorf("postReady Restore %s/%s owner Component is not owned by Cluster %s/%s UID %s",
+			restore.Namespace, restore.Name, cluster.Namespace, cluster.Name, cluster.UID)
+	}
+	return component, nil
 }
 
 func (r *VolumePopulatorReconciler) deletePopulatePVCAndWait(ctx context.Context,

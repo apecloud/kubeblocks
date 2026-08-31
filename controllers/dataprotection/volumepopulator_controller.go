@@ -177,8 +177,18 @@ func (r *VolumePopulatorReconciler) mapRestoreToPVCs(ctx context.Context, obj cl
 	}
 	clusterName := comp.Labels[constant.AppInstanceLabelKey]
 	componentName := restore.Labels[constant.KBAppComponentLabelKey]
-	if clusterName == "" || componentName == "" || restore.Labels[constant.AppInstanceLabelKey] != clusterName {
+	ownerComponentName := comp.Labels[constant.KBAppComponentLabelKey]
+	if clusterName == "" || componentName == "" || ownerComponentName == "" ||
+		restore.Labels[constant.AppInstanceLabelKey] != clusterName {
 		return nil
+	}
+	if componentName != ownerComponentName {
+		// A redirected postReady Restore is owned by its target Component, while
+		// its labels identify only the first source PVC that created it. Other
+		// source Components in the Cluster can wait on the same Restore too.
+		return r.mapRestorePVCs(ctx, restore.Namespace, client.MatchingLabels{
+			constant.AppInstanceLabelKey: clusterName,
+		})
 	}
 	return r.mapRestorePVCs(ctx, restore.Namespace, client.MatchingLabels{
 		constant.AppInstanceLabelKey:    clusterName,
@@ -196,9 +206,12 @@ func (r *VolumePopulatorReconciler) mapComponentToPVCs(ctx context.Context, obj 
 	if clusterName == "" || componentName == "" {
 		return nil
 	}
+	// A PVC can depend on another Component through a redirected postReady
+	// Restore. That relationship is derived from Backup status and is not
+	// represented on the Component, so a Component event must fan out to all
+	// active restore PVCs in its Cluster.
 	return r.mapRestorePVCs(ctx, comp.Namespace, client.MatchingLabels{
-		constant.AppInstanceLabelKey:    clusterName,
-		constant.KBAppComponentLabelKey: componentName,
+		constant.AppInstanceLabelKey: clusterName,
 	})
 }
 
@@ -249,7 +262,10 @@ func isClusterRestorePVC(pvc *corev1.PersistentVolumeClaim) bool {
 			return false
 		}
 	}
-	return pvc.Annotations[constant.RestoreComponentAnnotationKey] == pvc.Labels[constant.KBAppComponentLabelKey]
+	restoreComponent := pvc.Annotations[constant.RestoreComponentAnnotationKey]
+	return restoreComponent == pvc.Labels[constant.KBAppComponentLabelKey] ||
+		restoreComponent == pvc.Labels[constant.KBAppShardingNameLabelKey] ||
+		restoreComponent == pvc.Labels[constant.KBAppShardTemplateLabelKey]
 }
 
 func pvcRestoreTerminal(pvc *corev1.PersistentVolumeClaim) bool {

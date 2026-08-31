@@ -3172,6 +3172,7 @@ func TestMapPostReadyRestoreToNonTerminalComponentPVCs(t *testing.T) {
 		Type: corev1.PersistentVolumeClaimConditionType(kbappsv1.ConditionTypeRestore), Status: corev1.ConditionTrue,
 	}}
 	redirectTarget := dependencyRestorePVC("data-postgresql-0", "postgresql", "redirect-pvc")
+	otherRedirectSource := dependencyRestorePVC("data-tikv-0", "tikv", "other-redirect-pvc")
 	restore := &dpv1alpha1.Restore{ObjectMeta: metav1.ObjectMeta{
 		Namespace: comp.Namespace, Name: postReadyRestoreName(comp.UID),
 		Labels: map[string]string{
@@ -3182,14 +3183,17 @@ func TestMapPostReadyRestoreToNonTerminalComponentPVCs(t *testing.T) {
 			APIVersion: kbappsv1.GroupVersion.String(), Kind: "Component", Name: comp.Name, UID: comp.UID,
 		}},
 	}}
-	reconciler := dependencyTestReconciler(t, comp, running, terminal, redirectTarget)
+	reconciler := dependencyTestReconciler(t, comp, running, terminal, redirectTarget, otherRedirectSource)
 	require.Equal(t, []reconcile.Request{{NamespacedName: client.ObjectKeyFromObject(running)}},
 		reconciler.mapRestoreToPVCs(context.Background(), restore))
 
 	redirected := restore.DeepCopy()
 	redirected.Labels[constant.KBAppComponentLabelKey] = "postgresql"
-	require.Equal(t, []reconcile.Request{{NamespacedName: client.ObjectKeyFromObject(redirectTarget)}},
-		reconciler.mapRestoreToPVCs(context.Background(), redirected))
+	require.ElementsMatch(t, []reconcile.Request{
+		{NamespacedName: client.ObjectKeyFromObject(running)},
+		{NamespacedName: client.ObjectKeyFromObject(redirectTarget)},
+		{NamespacedName: client.ObjectKeyFromObject(otherRedirectSource)},
+	}, reconciler.mapRestoreToPVCs(context.Background(), redirected))
 }
 
 func TestMapComponentAndClusterDependencies(t *testing.T) {
@@ -3210,12 +3214,43 @@ func TestMapComponentAndClusterDependencies(t *testing.T) {
 	cluster := &kbappsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "cluster"}}
 	reconciler := dependencyTestReconciler(t, mysql, postgresql, invalid, terminal)
 
-	require.Equal(t, []reconcile.Request{{NamespacedName: client.ObjectKeyFromObject(mysql)}},
-		reconciler.mapComponentToPVCs(context.Background(), comp))
+	require.ElementsMatch(t, []reconcile.Request{
+		{NamespacedName: client.ObjectKeyFromObject(mysql)},
+		{NamespacedName: client.ObjectKeyFromObject(postgresql)},
+	}, reconciler.mapComponentToPVCs(context.Background(), comp))
 	require.ElementsMatch(t, []reconcile.Request{
 		{NamespacedName: client.ObjectKeyFromObject(mysql)},
 		{NamespacedName: client.ObjectKeyFromObject(postgresql)},
 	}, reconciler.mapClusterToPVCs(context.Background(), cluster))
+}
+
+func TestClusterRestorePVCIdentitySupportsSharding(t *testing.T) {
+	tests := []struct {
+		name          string
+		component     string
+		sharding      string
+		shardTemplate string
+		restoreIntent string
+		want          bool
+	}{
+		{name: "component", component: "mysql", restoreIntent: "mysql", want: true},
+		{name: "sharding default template", component: "shard-a", sharding: "shard", restoreIntent: "shard", want: true},
+		{name: "named shard template", component: "shard-b", sharding: "shard", shardTemplate: "analytics", restoreIntent: "analytics", want: true},
+		{name: "unrelated intent", component: "shard-b", sharding: "shard", shardTemplate: "analytics", restoreIntent: "another", want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pvc := dependencyRestorePVC("data-"+tt.component+"-0", tt.component, types.UID(tt.name))
+			pvc.Annotations[constant.RestoreComponentAnnotationKey] = tt.restoreIntent
+			if tt.sharding != "" {
+				pvc.Labels[constant.KBAppShardingNameLabelKey] = tt.sharding
+			}
+			if tt.shardTemplate != "" {
+				pvc.Labels[constant.KBAppShardTemplateLabelKey] = tt.shardTemplate
+			}
+			require.Equal(t, tt.want, isClusterRestorePVC(pvc))
+		})
+	}
 }
 
 func TestDependencyPredicates(t *testing.T) {

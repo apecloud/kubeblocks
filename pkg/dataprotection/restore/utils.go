@@ -249,6 +249,8 @@ func ValidateAndInitRestoreMGR(reqCtx intctrlutil.RequestCtx,
 		}
 	}
 
+	// TODO: check if there is permission for cross namespace recovery.
+
 	// check if the backup is completed exclude continuous backup.
 	backupType := utils.GetBackupType(backupSet.ActionSet, &backupSet.UseVolumeSnapshot)
 	if backupType != dpv1alpha1.BackupTypeContinuous && backupSet.Backup.Status.Phase != dpv1alpha1.BackupPhaseCompleted {

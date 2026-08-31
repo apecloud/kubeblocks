@@ -2859,7 +2859,7 @@ string
 </td>
 <td>
 <p>Specifies the backup namespace.
-Cross-namespace VolumeSnapshot restores are not supported.</p>
+Cross-namespace VolumeSnapshot restores are NOT supported.</p>
 </td>
 </tr>
 <tr>

@@ -104,7 +104,8 @@ type BackupRef struct {
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
-	// Specifies the backup namespace. Cross-namespace VolumeSnapshot restores are not supported.
+	// Specifies the backup namespace.
+	// Cross-namespace VolumeSnapshot restores are not supported.
 	//
 	// +kubebuilder:validation:Required
 	Namespace string `json:"namespace"`

@@ -60,6 +60,7 @@ type RestoreManager struct {
 	replicas            int32
 	restoreLabels       map[string]string
 	RestoreNamePrefix   string
+	SourceTargetName    string
 }
 
 func NewRestoreManager(ctx context.Context,
@@ -184,6 +185,14 @@ func (r *RestoreManager) BuildPrepareDataRestore(comp *component.SynthesizedComp
 		return nil, nil
 	}
 	sourceTargetName, sourceTarget := backupSourceTargetForRestore(backupObj)
+	requiredPolicy := r.buildRequiredPolicy(sourceTarget)
+	if r.SourceTargetName != "" {
+		// DataProtection owns resolving and validating an explicit source target.
+		sourceTargetName = r.SourceTargetName
+		requiredPolicy = &dpv1alpha1.RequiredPolicyForAllPodSelection{
+			DataRestorePolicy: dpv1alpha1.OneToOneRestorePolicy,
+		}
+	}
 	restore := &dpv1alpha1.Restore{
 		ObjectMeta: r.GetRestoreObjectMeta(comp, dpv1alpha1.PrepareData, templateName),
 		Spec: dpv1alpha1.RestoreSpec{
@@ -196,7 +205,7 @@ func (r *RestoreManager) BuildPrepareDataRestore(comp *component.SynthesizedComp
 			Env:         r.env,
 			Parameters:  r.parameters,
 			PrepareDataConfig: &dpv1alpha1.PrepareDataConfig{
-				RequiredPolicyForAllPodSelection: r.buildRequiredPolicy(sourceTarget),
+				RequiredPolicyForAllPodSelection: requiredPolicy,
 				SchedulingSpec:                   r.buildSchedulingSpec(comp, template),
 				VolumeClaimRestorePolicy:         r.volumeRestorePolicy,
 				RestoreVolumeClaimsTemplate: &dpv1alpha1.RestoreVolumeClaimsTemplate{

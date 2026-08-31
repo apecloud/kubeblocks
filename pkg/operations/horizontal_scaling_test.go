@@ -286,9 +286,11 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			})).Should(Succeed())
 
 			By("scale out replicas from a full backup")
+			restoreEnv := []corev1.EnvVar{{Name: "RESTORE_ENV", Value: "true"}}
 			horizontalScaling := opsv1alpha1.HorizontalScaling{ScaleOut: &opsv1alpha1.ScaleOut{
 				FromBackup: &opsv1alpha1.FromBackup{
-					Name: backupName,
+					Name:       backupName,
+					RestoreEnv: restoreEnv,
 				},
 			}}
 
@@ -311,6 +313,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 					Namespace: restoreMeta.Namespace,
 					Name:      restoreMeta.Name,
 				}, func(restore *dpv1alpha1.Restore) {
+					Expect(restore.Spec.Env).Should(Equal(restoreEnv))
 					restore.Status.Phase = dpv1alpha1.RestorePhaseCompleted
 				})
 			}
@@ -1008,20 +1011,28 @@ func TestHorizontalScalingCreateRestoreReturnsFatalWhenNoRestoreBuilt(t *testing
 	testCases := []struct {
 		name         string
 		backupMethod *dpv1alpha1.BackupMethod
-	}{{
-		// logical backups (e.g. TiDB BR) have no targetVolumes at all
-		name:         "backup method without target volumes",
-		backupMethod: &dpv1alpha1.BackupMethod{Name: "br"},
-	}, {
-		// targetVolumes exist but none match the component's volume claim templates
-		name: "backup method target volumes match no component volume",
-		backupMethod: &dpv1alpha1.BackupMethod{
-			Name: "br",
-			TargetVolumes: &dpv1alpha1.TargetVolumeInfo{
-				Volumes: []string{"other-data"},
+		expectError  string
+	}{
+		{
+			name:         "completed backup without backup method",
+			backupMethod: nil,
+			expectError:  "status.backupMethod",
+		}, {
+			// logical backups (e.g. TiDB BR) have no targetVolumes at all
+			name:         "backup method without target volumes",
+			backupMethod: &dpv1alpha1.BackupMethod{Name: "br"},
+			expectError:  "has no target volumes matching component",
+		}, {
+			// targetVolumes exist but none match the component's volume claim templates
+			name: "backup method target volumes match no component volume",
+			backupMethod: &dpv1alpha1.BackupMethod{
+				Name: "br",
+				TargetVolumes: &dpv1alpha1.TargetVolumeInfo{
+					Volumes: []string{"other-data"},
+				},
 			},
-		},
-	}}
+			expectError: "has no target volumes matching component",
+		}}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
@@ -1087,7 +1098,7 @@ func TestHorizontalScalingCreateRestoreReturnsFatalWhenNoRestoreBuilt(t *testing
 			if !intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal) {
 				t.Fatalf("expected fatal error, got %T: %v", err, err)
 			}
-			if !strings.Contains(err.Error(), "has no target volumes matching component") {
+			if !strings.Contains(err.Error(), tc.expectError) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 

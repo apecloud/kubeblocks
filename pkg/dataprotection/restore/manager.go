@@ -385,13 +385,9 @@ func (r *RestoreManager) RestorePVCFromSnapshot(reqCtx intctrlutil.RequestCtx, c
 	if prepareDataConfig == nil {
 		return nil
 	}
-	createPVCWithSnapshot := func(claim dpv1alpha1.RestoreVolumeClaim, sourceIndex int) error {
+	createPVCWithSnapshot := func(claim dpv1alpha1.RestoreVolumeClaim, sourceTargetPodName string) error {
 		if claim.VolumeSource == "" {
 			return intctrlutil.NewFatalError(fmt.Sprintf(`claim "%s"" volumeSource can not be empty if the backup uses volume snapshot`, claim.Name))
-		}
-		sourceTargetPodName, err := GetSourcePodNameFromTarget(target, prepareDataConfig.RequiredPolicyForAllPodSelection, sourceIndex)
-		if err != nil {
-			return err
 		}
 		var volumeSnapshotName string
 		if target.PodSelector.Strategy == dpv1alpha1.PodSelectionStrategyAny || sourceTargetPodName != "" {
@@ -413,7 +409,11 @@ func (r *RestoreManager) RestorePVCFromSnapshot(reqCtx intctrlutil.RequestCtx, c
 		return r.createPVCIfNotExist(reqCtx, cli, claim.ObjectMeta, claim.VolumeClaimSpec)
 	}
 	for i := range prepareDataConfig.RestoreVolumeClaims {
-		if err := createPVCWithSnapshot(prepareDataConfig.RestoreVolumeClaims[i], 0); err != nil {
+		sourceTargetPodName, err := GetSourcePodNameFromTarget(target, prepareDataConfig.RequiredPolicyForAllPodSelection, 0)
+		if err != nil {
+			return err
+		}
+		if err := createPVCWithSnapshot(prepareDataConfig.RestoreVolumeClaims[i], sourceTargetPodName); err != nil {
 			return err
 		}
 	}
@@ -422,13 +422,22 @@ func (r *RestoreManager) RestorePVCFromSnapshot(reqCtx intctrlutil.RequestCtx, c
 		restoreJobReplicas := GetRestoreActionsCountForPrepareData(prepareDataConfig)
 		for i := 0; i < restoreJobReplicas; i++ {
 			//  create pvc from claims template, build volumes and volumeMounts
-			for _, claim := range prepareDataConfig.RestoreVolumeClaimsTemplate.Templates {
+			for _, c := range prepareDataConfig.RestoreVolumeClaimsTemplate.Templates {
+				// Deep-copy metadata maps so each replica gets its own pod identity.
+				claim := *c.DeepCopy()
 				index := i + int(claimTemplate.StartingIndex)
 				claim.Name = fmt.Sprintf("%s-%d", claim.Name, index)
 				// HACK: add InstanceSet related labels to the PVC,
 				// so that it can be managed by InstanceSet
 				addItsManagingLabels(&claim, index)
-				if err := createPVCWithSnapshot(claim, index); err != nil {
+				sourceTargetPodName, err := GetSourcePodNameForTargetPod(target,
+					prepareDataConfig.RequiredPolicyForAllPodSelection,
+					claim.Labels[constant.KBAppPodNameLabelKey],
+					claim.Labels[constant.KBAppInstanceTemplateLabelKey])
+				if err != nil {
+					return err
+				}
+				if err := createPVCWithSnapshot(claim, sourceTargetPodName); err != nil {
 					return err
 				}
 			}
@@ -541,11 +550,16 @@ func (r *RestoreManager) BuildPrepareDataJobs(reqCtx intctrlutil.RequestCtx, cli
 				jobBuilder.addToSpecificVolumesAndMounts(volume, volumeMount)
 			}
 		}
-		sourceIndex := i
-		if claimsTemplate != nil {
-			sourceIndex += int(claimsTemplate.StartingIndex)
+		var sourceTargetPodName string
+		var err error
+		if claimsTemplate == nil {
+			sourceTargetPodName, err = GetSourcePodNameFromTarget(target, prepareDataConfig.RequiredPolicyForAllPodSelection, i)
+		} else {
+			sourceTargetPodName, err = GetSourcePodNameForTargetPod(target,
+				prepareDataConfig.RequiredPolicyForAllPodSelection,
+				jobBuilder.labels[constant.KBAppPodNameLabelKey],
+				jobBuilder.labels[constant.KBAppInstanceTemplateLabelKey])
 		}
-		sourceTargetPodName, err := GetSourcePodNameFromTarget(target, prepareDataConfig.RequiredPolicyForAllPodSelection, sourceIndex)
 		if err != nil {
 			return nil, err
 		}

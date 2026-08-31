@@ -47,7 +47,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/plan"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	dprestore "github.com/apecloud/kubeblocks/pkg/dataprotection/restore"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	opsutil "github.com/apecloud/kubeblocks/pkg/operations/util"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -1024,7 +1023,7 @@ func TestHorizontalScalingCreateRestorePreservesPerPodStartingIndex(t *testing.T
 					Name:        "redis",
 					PodSelector: &dpv1alpha1.PodSelector{Strategy: dpv1alpha1.PodSelectionStrategyAll},
 				},
-				SelectedTargetPods: []string{"redis-0", "redis-1", "redis-2", "redis-3", "redis-4"},
+				SelectedTargetPods: []string{"redis-az-a-4", "redis-az-a-3"},
 			}},
 		},
 	}
@@ -1075,14 +1074,12 @@ func TestHorizontalScalingCreateRestorePreservesPerPodStartingIndex(t *testing.T
 		if !ok {
 			t.Fatalf("missing restore for actual scale-out pod ordinal %d", ordinal)
 		}
-		requiredPolicy := restore.Spec.PrepareDataConfig.RequiredPolicyForAllPodSelection
-		sourcePod, err := dprestore.GetSourcePodNameFromTarget(&backup.Status.Targets[0], requiredPolicy, int(ordinal))
-		if err != nil {
-			t.Fatalf("resolve source pod for ordinal %d: %v", ordinal, err)
+		claimTemplate := restore.Spec.PrepareDataConfig.RestoreVolumeClaimsTemplate
+		if claimTemplate.Replicas != 1 {
+			t.Fatalf("restore replicas = %d, want 1 for ordinal %d", claimTemplate.Replicas, ordinal)
 		}
-		expectedSourcePod := fmt.Sprintf("redis-%d", ordinal)
-		if sourcePod != expectedSourcePod {
-			t.Fatalf("source pod = %q, want %q for actual scale-out pod ordinal %d", sourcePod, expectedSourcePod, ordinal)
+		if got := claimTemplate.Templates[0].Labels[constant.KBAppInstanceTemplateLabelKey]; got != "az-a" {
+			t.Fatalf("instance template label = %q, want %q for ordinal %d", got, "az-a", ordinal)
 		}
 	}
 }

@@ -148,7 +148,7 @@ func (r *RestoreManager) resolvePrepareDataBackup(backupObj *dpv1alpha1.Backup) 
 		Spec: dpv1alpha1.RestoreSpec{
 			Backup: dpv1alpha1.BackupRef{
 				Name:      backupObj.Name,
-				Namespace: r.namespace,
+				Namespace: backupObj.Namespace,
 			},
 			RestoreTime: r.RestoreTime,
 		},
@@ -158,7 +158,7 @@ func (r *RestoreManager) resolvePrepareDataBackup(backupObj *dpv1alpha1.Backup) 
 		Recorder: record.NewFakeRecorder(16),
 	}
 	restoreMGR := dprestore.NewRestoreManager(restore, reqCtx.Recorder, r.Scheme, r.Client)
-	backupSet, err := restoreMGR.GetBackupActionSetByNamespaced(reqCtx, r.Client, backupObj.Name, r.namespace)
+	backupSet, err := restoreMGR.GetBackupActionSetByNamespaced(reqCtx, r.Client, backupObj.Name, backupObj.Namespace)
 	if err != nil {
 		return nil, err
 	}
@@ -276,7 +276,7 @@ func (r *RestoreManager) BuildPrepareDataRestore(comp *component.SynthesizedComp
 		Spec: dpv1alpha1.RestoreSpec{
 			Backup: dpv1alpha1.BackupRef{
 				Name:             backupObj.Name,
-				Namespace:        r.namespace,
+				Namespace:        backupObj.Namespace,
 				SourceTargetName: sourceTargetName,
 			},
 			RestoreTime: r.RestoreTime,
@@ -338,7 +338,7 @@ func (r *RestoreManager) DoPostReady(comp *component.SynthesizedComponent,
 		Spec: dpv1alpha1.RestoreSpec{
 			Backup: dpv1alpha1.BackupRef{
 				Name:             backupObj.Name,
-				Namespace:        r.namespace,
+				Namespace:        backupObj.Namespace,
 				SourceTargetName: sourceTargetName,
 			},
 			RestoreTime: r.RestoreTime,

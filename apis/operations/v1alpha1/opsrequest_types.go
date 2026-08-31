@@ -513,8 +513,9 @@ type FromBackup struct {
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
-	// Specifies the namespace of the Backup namespace.
+	// Specifies the namespace of the Backup.
 	// If not specified, the namespace of the OpsRequest will be used.
+	// Cross-namespace VolumeSnapshot restores are not supported.
 	// +optional
 	Namespace string `json:"namespace,omitempty"`
 

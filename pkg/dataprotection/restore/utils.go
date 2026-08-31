@@ -37,6 +37,7 @@ import (
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
@@ -365,15 +366,20 @@ func GetSourcePodNameForTargetPod(target *dpv1alpha1.BackupStatusTarget,
 	if !ok {
 		return "", intctrlutil.NewFatalError(fmt.Sprintf("source target pod can not be inferred from target pod %q", targetPodName))
 	}
+	sourceWorkloadName := backupTargetWorkloadName(target)
+	if sourceWorkloadName == "" && instanceTemplateName != "" {
+		return "", intctrlutil.NewFatalError(fmt.Sprintf("source workload identity is required to match instance template %q", instanceTemplateName))
+	}
 	var candidates []string
 	for _, sourcePodName := range target.SelectedTargetPods {
-		sourceOrdinal, ok := podOrdinal(sourcePodName)
-		if !ok || sourceOrdinal != targetOrdinal {
-			continue
-		}
-		if instanceTemplateName != "" {
-			sourceParent := sourcePodName[:strings.LastIndex(sourcePodName, "-")]
-			if !strings.HasSuffix(sourceParent, "-"+instanceTemplateName) {
+		if sourceWorkloadName != "" {
+			sourceTemplateName, sourceOrdinal, err := instancetemplate.GetTemplateNameAndOrdinal(sourceWorkloadName, sourcePodName)
+			if err != nil || int(sourceOrdinal) != targetOrdinal || sourceTemplateName != instanceTemplateName {
+				continue
+			}
+		} else {
+			sourceOrdinal, ok := podOrdinal(sourcePodName)
+			if !ok || sourceOrdinal != targetOrdinal {
 				continue
 			}
 		}
@@ -386,6 +392,18 @@ func GetSourcePodNameForTargetPod(target *dpv1alpha1.BackupStatusTarget,
 		return "", intctrlutil.NewFatalError(fmt.Sprintf("multiple selected source target pods match target pod %q and instance template %q: %v", targetPodName, instanceTemplateName, candidates))
 	}
 	return "", intctrlutil.NewFatalError(fmt.Sprintf("no selected source target pod matches target pod %q and instance template %q", targetPodName, instanceTemplateName))
+}
+
+func backupTargetWorkloadName(target *dpv1alpha1.BackupStatusTarget) string {
+	if target == nil || target.PodSelector == nil || target.PodSelector.LabelSelector == nil {
+		return ""
+	}
+	clusterName := target.PodSelector.MatchLabels[constant.AppInstanceLabelKey]
+	componentName := target.PodSelector.MatchLabels[constant.KBAppComponentLabelKey]
+	if clusterName == "" || componentName == "" {
+		return ""
+	}
+	return constant.GenerateWorkloadNamePattern(clusterName, componentName)
 }
 
 func podOrdinal(podName string) (int, bool) {

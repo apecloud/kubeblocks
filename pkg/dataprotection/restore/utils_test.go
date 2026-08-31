@@ -216,7 +216,13 @@ func TestRestoreSourcePodAndSnapshotHelpers(t *testing.T) {
 func TestGetSourcePodNameForTargetPod(t *testing.T) {
 	target := &dpv1alpha1.BackupStatusTarget{
 		BackupTarget: dpv1alpha1.BackupTarget{
-			PodSelector: &dpv1alpha1.PodSelector{Strategy: dpv1alpha1.PodSelectionStrategyAll},
+			PodSelector: &dpv1alpha1.PodSelector{
+				LabelSelector: &metav1.LabelSelector{MatchLabels: map[string]string{
+					constant.AppInstanceLabelKey:    "source",
+					constant.KBAppComponentLabelKey: "redis",
+				}},
+				Strategy: dpv1alpha1.PodSelectionStrategyAll,
+			},
 		},
 	}
 	policy := &dpv1alpha1.RequiredPolicyForAllPodSelection{DataRestorePolicy: dpv1alpha1.OneToOneRestorePolicy}
@@ -235,6 +241,21 @@ func TestGetSourcePodNameForTargetPod(t *testing.T) {
 		assert.Equal(t, "source-redis-az-a-3", podName)
 	})
 
+	t.Run("matches the exact template instead of a template-name suffix", func(t *testing.T) {
+		target.SelectedTargetPods = []string{"source-redis-b-a-3", "source-redis-a-3"}
+		podName, err := GetSourcePodNameForTargetPod(target, policy, "target-redis-a-3", "a")
+		assert.NoError(t, err)
+		assert.Equal(t, "source-redis-a-3", podName)
+	})
+
+	t.Run("does not treat a flat workload suffix as a template", func(t *testing.T) {
+		target.PodSelector.MatchLabels[constant.KBAppComponentLabelKey] = "redis-a"
+		target.SelectedTargetPods = []string{"source-redis-a-3"}
+		_, err := GetSourcePodNameForTargetPod(target, policy, "target-redis-a-3", "a")
+		assert.ErrorContains(t, err, "no selected source target pod matches")
+		target.PodSelector.MatchLabels[constant.KBAppComponentLabelKey] = "redis"
+	})
+
 	t.Run("matches a flat ordinal with holes", func(t *testing.T) {
 		target.SelectedTargetPods = []string{"source-redis-7", "source-redis-2"}
 		podName, err := GetSourcePodNameForTargetPod(target, policy, "target-redis-7", "")
@@ -243,6 +264,9 @@ func TestGetSourcePodNameForTargetPod(t *testing.T) {
 	})
 
 	t.Run("rejects an ambiguous flat ordinal", func(t *testing.T) {
+		labelSelector := target.PodSelector.LabelSelector
+		target.PodSelector.LabelSelector = nil
+		defer func() { target.PodSelector.LabelSelector = labelSelector }()
 		target.SelectedTargetPods = []string{"source-redis-az-a-3", "source-redis-az-b-3"}
 		_, err := GetSourcePodNameForTargetPod(target, policy, "target-redis-3", "")
 		assert.ErrorContains(t, err, "multiple selected source target pods")

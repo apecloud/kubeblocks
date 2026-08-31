@@ -271,6 +271,8 @@ var _ = Describe("RestoreManager Test", func() {
 					SetPrepareDataRequiredPolicy(dpv1alpha1.OneToOneRestorePolicy, "")
 			})
 			backupSet.Backup.Status.Target.PodSelector.Strategy = dpv1alpha1.PodSelectionStrategyAll
+			backupSet.Backup.Status.Target.PodSelector.MatchLabels[constant.AppInstanceLabelKey] = "source"
+			backupSet.Backup.Status.Target.PodSelector.MatchLabels[constant.KBAppComponentLabelKey] = cmpName
 			backupSet.Backup.Status.Target.SelectedTargetPods = []string{"source-mysql-az-a-4", "source-mysql-az-a-3"}
 			backupSet.Backup.Status.Actions = []dpv1alpha1.ActionStatus{
 				{
@@ -318,6 +320,8 @@ var _ = Describe("RestoreManager Test", func() {
 			})
 			backupSet.Backup.Status.Path = "/repo/test/backup"
 			backupSet.Backup.Status.Target.PodSelector.Strategy = dpv1alpha1.PodSelectionStrategyAll
+			backupSet.Backup.Status.Target.PodSelector.MatchLabels[constant.AppInstanceLabelKey] = "source"
+			backupSet.Backup.Status.Target.PodSelector.MatchLabels[constant.KBAppComponentLabelKey] = cmpName
 			backupSet.Backup.Status.Target.SelectedTargetPods = []string{"source-mysql-4", "source-mysql-3"}
 
 			By(fmt.Sprintf("test BuildPrepareDataJobs function, expect for %d jobs", replicas))
@@ -353,6 +357,8 @@ var _ = Describe("RestoreManager Test", func() {
 			})
 			backupSet.Backup.Status.Path = "/repo/test/backup"
 			backupSet.Backup.Status.Target.PodSelector.Strategy = dpv1alpha1.PodSelectionStrategyAll
+			backupSet.Backup.Status.Target.PodSelector.MatchLabels[constant.AppInstanceLabelKey] = "source"
+			backupSet.Backup.Status.Target.PodSelector.MatchLabels[constant.KBAppComponentLabelKey] = cmpName
 			backupSet.Backup.Status.Target.SelectedTargetPods = []string{
 				"source-mysql-other-301",
 				"source-mysql-abc-301",

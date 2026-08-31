@@ -60,7 +60,9 @@ type RestoreManager struct {
 	replicas            int32
 	restoreLabels       map[string]string
 	RestoreNamePrefix   string
-	SourceTargetName    string
+	// SourceTargetName overrides the source target for prepareData Restores.
+	// It is primarily used by scale-out restoration.
+	SourceTargetName string
 }
 
 func NewRestoreManager(ctx context.Context,

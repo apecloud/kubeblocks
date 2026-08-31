@@ -42,6 +42,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
+	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	"github.com/apecloud/kubeblocks/pkg/generics"
@@ -293,17 +294,17 @@ var _ = Describe("OpsUtil functions", func() {
 			Expect(volumes).Should(BeEmpty())
 			Expect(volumeMounts).Should(BeEmpty())
 
-			templateName, ordinal, err := getTemplateNameAndOrdinal(constant.GenerateWorkloadNamePattern(clusterName, defaultCompName), targetPod.Name)
+			templateName, ordinal, err := instancetemplate.GetTemplateNameAndOrdinal(constant.GenerateWorkloadNamePattern(clusterName, defaultCompName), targetPod.Name)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(templateName).Should(BeEmpty())
 			Expect(ordinal).Should(Equal(int32(0)))
-			templateName, ordinal, err = getTemplateNameAndOrdinal("cluster-comp", "cluster-comp-template-3")
+			templateName, ordinal, err = instancetemplate.GetTemplateNameAndOrdinal("cluster-comp", "cluster-comp-template-3")
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(templateName).Should(Equal("template"))
 			Expect(ordinal).Should(Equal(int32(3)))
-			_, _, err = getTemplateNameAndOrdinal("cluster-comp", "cluster-comp-template-")
+			_, _, err = instancetemplate.GetTemplateNameAndOrdinal("cluster-comp", "cluster-comp-template-")
 			Expect(err).Should(HaveOccurred())
-			_, _, err = getTemplateNameAndOrdinal("cluster-comp", "cluster-comp-template-x")
+			_, _, err = instancetemplate.GetTemplateNameAndOrdinal("cluster-comp", "cluster-comp-template-x")
 			Expect(err).Should(HaveOccurred())
 
 			helper := &inplaceRebuildHelper{synthesizedComp: synthesizedComp, targetPod: targetPod}

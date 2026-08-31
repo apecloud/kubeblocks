@@ -471,7 +471,7 @@ func (r *VolumePopulatorReconciler) validateClusterRestorePVCOwnership(ctx conte
 		itsOwner = metav1.GetControllerOf(instance)
 		if itsOwner == nil || itsOwner.APIVersion != workloads.GroupVersion.String() ||
 			itsOwner.Kind != workloads.InstanceSetKind {
-			return nil, fmt.Errorf("Instance %s/%s has no InstanceSet controller owner", instance.Namespace, instance.Name)
+			return nil, fmt.Errorf("instance %s/%s has no InstanceSet controller owner", instance.Namespace, instance.Name)
 		}
 	default:
 		return nil, fmt.Errorf("restore PVC %s/%s has unsupported workload owner kind %s", pvc.Namespace, pvc.Name, owner.Kind)
@@ -510,7 +510,7 @@ func (r *VolumePopulatorReconciler) validateClusterRestorePVCOwnership(ctx conte
 	clusterOwner := metav1.GetControllerOf(comp)
 	if clusterOwner == nil || clusterOwner.APIVersion != appsv1.GroupVersion.String() ||
 		clusterOwner.Kind != appsv1.ClusterKind || clusterOwner.Name != cluster.Name || clusterOwner.UID != cluster.UID {
-		return nil, fmt.Errorf("Component %s/%s is not owned by current Cluster UID %s",
+		return nil, fmt.Errorf("component %s/%s is not owned by current Cluster UID %s",
 			comp.Namespace, comp.Name, cluster.UID)
 	}
 	return comp, nil

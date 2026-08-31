@@ -188,17 +188,11 @@ func (r *VolumePopulatorReconciler) mapRestoreToPVCs(ctx context.Context, obj cl
 	}
 	includeTerminal := !restore.DeletionTimestamp.IsZero() ||
 		restore.Status.Phase == dpv1alpha1.RestorePhaseCompleted || restore.Status.Phase == dpv1alpha1.RestorePhaseFailed
-	if componentName != ownerComponentName {
-		// A redirected postReady Restore is owned by its target Component, while
-		// its labels identify only the first source PVC that created it. Other
-		// source Components in the Cluster can wait on the same Restore too.
-		return r.mapRestorePVCs(ctx, restore.Namespace, client.MatchingLabels{
-			constant.AppInstanceLabelKey: clusterName,
-		}, includeTerminal)
-	}
+	// A postReady Restore is owned by its target Component, while its labels
+	// identify only the first source PVC that created it. Other Components in
+	// the Cluster can wait on the same Restore through postReady redirection.
 	return r.mapRestorePVCs(ctx, restore.Namespace, client.MatchingLabels{
-		constant.AppInstanceLabelKey:    clusterName,
-		constant.KBAppComponentLabelKey: componentName,
+		constant.AppInstanceLabelKey: clusterName,
 	}, includeTerminal)
 }
 

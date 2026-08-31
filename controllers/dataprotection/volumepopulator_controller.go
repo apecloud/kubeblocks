@@ -421,6 +421,14 @@ func (r *VolumePopulatorReconciler) handleRestoreParentLifecycle(reqCtx intctrlu
 		if apierrors.IsNotFound(err) && !hasClusterIdentity {
 			return false, nil
 		}
+		// A retained target PVC can outlive its Cluster after its VP-owned
+		// finalizer and side effects have been released. Do not restart or poll
+		// the completed cancellation path merely because App-owned restore
+		// identity remains on that PVC.
+		if apierrors.IsNotFound(err) &&
+			!controllerutil.ContainsFinalizer(pvc, dptypes.DataProtectionFinalizerName) {
+			return true, nil
+		}
 		return false, restoreParentRequeue(err)
 	}
 	if cluster.Spec.Restore == nil && !hasClusterIdentity {
@@ -437,6 +445,9 @@ func (r *VolumePopulatorReconciler) handleRestoreParentLifecycle(reqCtx intctrlu
 		}
 	}
 	if terminated, err := r.terminateVerifiedVolumePopulation(reqCtx, pvc, cluster); err != nil || terminated {
+		if err != nil && !intctrlutil.IsRequeueError(err) {
+			err = restoreParentRequeue(err)
+		}
 		return terminated, err
 	}
 
@@ -1594,13 +1605,9 @@ func (r *VolumePopulatorReconciler) Populate(reqCtx intctrlutil.RequestCtx, pvc 
 	if err != nil || wait {
 		return err
 	}
-	// Make sure the PVC finalizer is present
-	if !slices.Contains(pvc.Finalizers, dptypes.DataProtectionFinalizerName) {
-		pvcPatch := client.MergeFrom(pvc.DeepCopy())
-		controllerutil.AddFinalizer(pvc, dptypes.DataProtectionFinalizerName)
-		if err = r.Client.Patch(reqCtx.Ctx, pvc, pvcPatch); err != nil {
-			return err
-		}
+	stopped, err := r.ensureTargetFinalizerAndRevalidateParents(reqCtx, pvc)
+	if err != nil || stopped {
+		return err
 	}
 	if err = r.UpdatePVCConditions(reqCtx, pvc, ReasonPopulatingProcessing, "Populator started"); err != nil {
 		return err
@@ -1656,12 +1663,9 @@ func (r *VolumePopulatorReconciler) ProvisionOnly(reqCtx intctrlutil.RequestCtx,
 	if err != nil || wait {
 		return err
 	}
-	if !slices.Contains(pvc.Finalizers, dptypes.DataProtectionFinalizerName) {
-		pvcPatch := client.MergeFrom(pvc.DeepCopy())
-		controllerutil.AddFinalizer(pvc, dptypes.DataProtectionFinalizerName)
-		if err = r.Client.Patch(reqCtx.Ctx, pvc, pvcPatch); err != nil {
-			return err
-		}
+	stopped, err := r.ensureTargetFinalizerAndRevalidateParents(reqCtx, pvc)
+	if err != nil || stopped {
+		return err
 	}
 	if err = r.UpdatePVCConditions(reqCtx, pvc, ReasonPopulatingProcessing, "Provisioning PVC without data restore"); err != nil {
 		return err
@@ -1681,6 +1685,73 @@ func (r *VolumePopulatorReconciler) ProvisionOnly(reqCtx intctrlutil.RequestCtx,
 		return intctrlutil.NewRequeueError(reconcileInterval, "waiting for provisioned PV to bind target PVC")
 	}
 	return r.completeBoundPVCIfNeeded(reqCtx, pvc, restoreCtx)
+}
+
+// ensureTargetFinalizerAndRevalidateParents closes the race between the
+// initial parent check and creation of helper/Restore side effects. Once the
+// target finalizer is visible, an uncached parent read creates this ordering:
+// deletion before the read is observed here; deletion after the read must be
+// observed by ClusterRestoreReconciler together with the target finalizer.
+func (r *VolumePopulatorReconciler) ensureTargetFinalizerAndRevalidateParents(
+	reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim) (bool, error) {
+	added := false
+	if !slices.Contains(pvc.Finalizers, dptypes.DataProtectionFinalizerName) {
+		pvcPatch := client.MergeFrom(pvc.DeepCopy())
+		controllerutil.AddFinalizer(pvc, dptypes.DataProtectionFinalizerName)
+		if err := r.Client.Patch(reqCtx.Ctx, pvc, pvcPatch); err != nil {
+			return false, err
+		}
+		added = true
+	}
+
+	clusterUID := pvc.Labels[dptypes.ClusterUIDLabelKey]
+	if clusterUID == "" {
+		return false, nil
+	}
+	clusterName := pvc.Labels[constant.AppInstanceLabelKey]
+	if clusterName == "" {
+		if added {
+			if err := r.releaseTargetPVC(reqCtx, pvc); err != nil {
+				return true, err
+			}
+		}
+		return true, restoreParentRequeue(fmt.Errorf(
+			"restore PVC %s/%s has no Cluster name for UID %s", pvc.Namespace, pvc.Name, clusterUID))
+	}
+	cluster := &appsv1.Cluster{}
+	key := types.NamespacedName{Namespace: pvc.Namespace, Name: clusterName}
+	if err := r.volumePopulatorReader().Get(reqCtx.Ctx, key, cluster); err != nil {
+		if apierrors.IsNotFound(err) && added {
+			return true, r.releaseTargetPVC(reqCtx, pvc)
+		}
+		return true, restoreParentRequeue(err)
+	}
+	if string(cluster.UID) != clusterUID {
+		if added {
+			if err := r.releaseTargetPVC(reqCtx, pvc); err != nil {
+				return true, err
+			}
+		}
+		return true, restoreParentRequeue(fmt.Errorf(
+			"restore PVC %s/%s identifies Cluster %s/%s UID %s, not current UID %s",
+			pvc.Namespace, pvc.Name, cluster.Namespace, cluster.Name, clusterUID, cluster.UID))
+	}
+	if terminated, err := r.terminateVerifiedVolumePopulation(reqCtx, pvc, cluster); err != nil || terminated {
+		if err != nil && !intctrlutil.IsRequeueError(err) {
+			err = restoreParentRequeue(err)
+		}
+		return terminated, err
+	}
+	if !controllerutil.ContainsFinalizer(cluster, dptypes.RestoreProtectionFinalizerName) {
+		if added {
+			if err := r.releaseTargetPVC(reqCtx, pvc); err != nil {
+				return true, err
+			}
+		}
+		return true, intctrlutil.NewRequeueError(reconcileInterval,
+			"waiting for Cluster restore-protection finalizer")
+	}
+	return false, nil
 }
 
 func (r *VolumePopulatorReconciler) completeBoundPVCIfNeeded(reqCtx intctrlutil.RequestCtx,

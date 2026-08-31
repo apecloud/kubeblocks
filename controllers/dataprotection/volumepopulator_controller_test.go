@@ -42,6 +42,7 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -58,6 +59,29 @@ import (
 	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
+
+type deleteClusterAfterTargetFinalizerClient struct {
+	client.Client
+	clusterKey client.ObjectKey
+	triggered  bool
+}
+
+func (c *deleteClusterAfterTargetFinalizerClient) Patch(ctx context.Context, obj client.Object,
+	patch client.Patch, opts ...client.PatchOption) error {
+	if err := c.Client.Patch(ctx, obj, patch, opts...); err != nil {
+		return err
+	}
+	pvc, ok := obj.(*corev1.PersistentVolumeClaim)
+	if !ok || c.triggered || !controllerutil.ContainsFinalizer(pvc, dptypes.DataProtectionFinalizerName) {
+		return nil
+	}
+	c.triggered = true
+	cluster := &kbappsv1.Cluster{}
+	if err := c.Client.Get(ctx, c.clusterKey, cluster); err != nil {
+		return err
+	}
+	return c.Client.Delete(ctx, cluster)
+}
 
 var _ = Describe("Volume Populator Controller test", func() {
 	cleanEnv := func() {
@@ -3391,6 +3415,47 @@ func TestParentDeletionTerminatesOnlyVolumePopulatorResourcesInOrder(t *testing.
 	require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(cluster), cluster))
 	require.Contains(t, cluster.Finalizers, dptypes.RestoreProtectionFinalizerName,
 		"VolumePopulator must never remove the Cluster controller finalizer")
+}
+
+func TestVolumePopulatorRevalidatesClusterAfterAddingTargetFinalizer(t *testing.T) {
+	scheme, cluster, component, its, target := parentRestoreObjects(t)
+	target.Finalizers = nil
+	target.Labels[dptypes.ComponentUIDLabelKey] = string(component.UID)
+	baseClient := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(cluster, component, its, target).Build()
+	raceClient := &deleteClusterAfterTargetFinalizerClient{
+		Client: baseClient, clusterKey: client.ObjectKeyFromObject(cluster),
+	}
+	reconciler := &VolumePopulatorReconciler{Client: raceClient, APIReader: baseClient, Scheme: scheme}
+
+	err := reconciler.ProvisionOnly(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, target, &pvcRestoreContext{})
+
+	require.NoError(t, err)
+	require.True(t, raceClient.triggered)
+	currentCluster := &kbappsv1.Cluster{}
+	require.NoError(t, baseClient.Get(context.Background(), client.ObjectKeyFromObject(cluster), currentCluster))
+	require.False(t, currentCluster.DeletionTimestamp.IsZero())
+	require.True(t, apierrors.IsNotFound(baseClient.Get(context.Background(), types.NamespacedName{
+		Namespace: target.Namespace, Name: getPopulatePVCName(target.UID),
+	}, &corev1.PersistentVolumeClaim{})), "no helper PVC may be created after parent deletion starts")
+	currentTarget := &corev1.PersistentVolumeClaim{}
+	require.NoError(t, baseClient.Get(context.Background(), client.ObjectKeyFromObject(target), currentTarget))
+	require.NotContains(t, currentTarget.Finalizers, dptypes.DataProtectionFinalizerName)
+}
+
+func TestRetainedTargetStopsAfterDeletedClusterDisappears(t *testing.T) {
+	scheme, cluster, component, its, target := parentRestoreObjects(t)
+	target.Finalizers = nil
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(component, its, target).Build()
+	reconciler := &VolumePopulatorReconciler{Client: cli, APIReader: cli, Scheme: scheme}
+
+	terminated, err := reconciler.handleRestoreParentLifecycle(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, target)
+
+	require.True(t, terminated)
+	require.NoError(t, err)
+	require.Equal(t, string(cluster.UID), target.Labels[dptypes.ClusterUIDLabelKey])
 }
 
 func TestClusterTerminationContinuesAfterRetainedPVCIsDetachedFromWorkload(t *testing.T) {

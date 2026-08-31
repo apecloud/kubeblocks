@@ -518,6 +518,13 @@ type FromBackup struct {
 	// +optional
 	Namespace string `json:"namespace,omitempty"`
 
+	// Specifies the backup source target name to restore from.
+	// This field is required when the referenced Backup has multiple source targets.
+	// It is propagated to Restore.spec.backup.sourceTargetName.
+	//
+	// +optional
+	SourceTargetName string `json:"sourceTargetName,omitempty"`
+
 	// Defines container environment variables for the restore process.
 	// merged with the ones specified in the Backup and ActionSet resources.
 	//

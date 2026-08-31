@@ -364,6 +364,70 @@ func TestValidateAndInitRestoreMGRCrossNamespaceBackup(t *testing.T) {
 		assert.ErrorContains(t, err, "VolumeSnapshot")
 		assert.True(t, intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal))
 	})
+
+	t.Run("rejects a cross-namespace VolumeSnapshot base Backup selected for PITR", func(t *testing.T) {
+		const backupPolicyName = "policy"
+		now := time.Now().UTC().Truncate(time.Second)
+		continuousStart := metav1.NewTime(now.Add(-2 * time.Hour))
+		baseBackupEnd := metav1.NewTime(now.Add(-time.Hour))
+		continuousEnd := metav1.NewTime(now)
+		snapshotVolumes := true
+
+		continuousActionSet := &dpv1alpha1.ActionSet{
+			ObjectMeta: metav1.ObjectMeta{Name: "continuous-action"},
+			Spec: dpv1alpha1.ActionSetSpec{
+				BackupType: dpv1alpha1.BackupTypeContinuous,
+				Restore:    &dpv1alpha1.RestoreActionSpec{},
+			},
+		}
+		baseBackup := &dpv1alpha1.Backup{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "base-snapshot",
+				Namespace: backup.Namespace,
+				Labels: map[string]string{
+					dptypes.BackupTypeLabelKey:   string(dpv1alpha1.BackupTypeFull),
+					dptypes.BackupPolicyLabelKey: backupPolicyName,
+				},
+			},
+			Spec: dpv1alpha1.BackupSpec{BackupPolicyName: backupPolicyName},
+			Status: dpv1alpha1.BackupStatus{
+				Phase: dpv1alpha1.BackupPhaseCompleted,
+				TimeRange: &dpv1alpha1.BackupTimeRange{
+					Start: &continuousStart,
+					End:   &baseBackupEnd,
+				},
+				BackupMethod: &dpv1alpha1.BackupMethod{
+					Name:            "snapshot",
+					ActionSetName:   actionSet.Name,
+					SnapshotVolumes: &snapshotVolumes,
+				},
+			},
+		}
+		continuousBackup := &dpv1alpha1.Backup{
+			ObjectMeta: metav1.ObjectMeta{Name: "continuous", Namespace: backup.Namespace},
+			Spec:       dpv1alpha1.BackupSpec{BackupPolicyName: backupPolicyName},
+			Status: dpv1alpha1.BackupStatus{
+				Phase: dpv1alpha1.BackupPhaseCompleted,
+				TimeRange: &dpv1alpha1.BackupTimeRange{
+					Start: &continuousStart,
+					End:   &continuousEnd,
+				},
+				BackupMethod: &dpv1alpha1.BackupMethod{
+					Name:          "continuous",
+					ActionSetName: continuousActionSet.Name,
+				},
+			},
+		}
+		pitrRestore := restoreObj.DeepCopy()
+		pitrRestore.Spec.Backup = dpv1alpha1.BackupRef{Name: continuousBackup.Name, Namespace: continuousBackup.Namespace}
+		pitrRestore.Spec.RestoreTime = now.Add(-30 * time.Minute).Format(time.RFC3339)
+		cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(actionSet, continuousActionSet, baseBackup, continuousBackup).Build()
+
+		err := ValidateAndInitRestoreMGR(reqCtx, cli, &RestoreManager{Restore: pitrRestore})
+		assert.ErrorContains(t, err, "VolumeSnapshot")
+		assert.ErrorContains(t, err, "source/base-snapshot")
+		assert.True(t, intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal))
+	})
 }
 
 func TestRestoreManagerStopsManagerContainer(t *testing.T) {

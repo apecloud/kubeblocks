@@ -1549,7 +1549,7 @@ func TestDeletingUnfinishedTargetPVCWaitsWithoutCleaningPopulation(t *testing.T)
 
 	result, err := reconciler.Reconcile(context.Background(), req)
 	require.NoError(t, err)
-	require.Equal(t, restoreTargetDeletingRequeueInterval, result.RequeueAfter)
+	require.Equal(t, reconcileInterval, result.RequeueAfter)
 	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(populatePVC), &corev1.PersistentVolumeClaim{}),
 		"populate PVC must remain untouched")
 	current := &corev1.PersistentVolumeClaim{}
@@ -1566,7 +1566,7 @@ func TestDeletingUnfinishedTargetPVCWaitsWithoutCleaningPopulation(t *testing.T)
 
 	result, err = reconciler.Reconcile(context.Background(), req)
 	require.NoError(t, err)
-	require.Equal(t, restoreTargetDeletingRequeueInterval, result.RequeueAfter)
+	require.Equal(t, reconcileInterval, result.RequeueAfter)
 	select {
 	case duplicate := <-recorder.Events:
 		require.Failf(t, "unexpected duplicate event", "got %q", duplicate)

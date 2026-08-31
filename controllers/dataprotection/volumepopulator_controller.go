@@ -218,7 +218,7 @@ func (r *VolumePopulatorReconciler) waitForDeletingRestoreTargetPVC(reqCtx intct
 		}
 		r.Recorder.Event(pvc, corev1.EventTypeWarning, ReasonRestoreTargetPVCDeleting, message)
 	}
-	return intctrlutil.NewRequeueError(restoreTargetDeletingRequeueInterval, message)
+	return intctrlutil.NewRequeueError(reconcileInterval, message)
 }
 
 // dispatchUnboundPVC routes an unbound PVC to either Populate or ProvisionOnly.

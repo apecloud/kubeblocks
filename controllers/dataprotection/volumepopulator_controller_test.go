@@ -1509,187 +1509,44 @@ func TestDispatchUnboundPVCFailsWhenNoRestoreActionsExist(t *testing.T) {
 		"expected fatal error when neither prepareData nor postReady exists, got: %v", err)
 }
 
-func TestDeletingTargetPVCCleansPopulationWithoutValidatingSource(t *testing.T) {
-	scheme := runtime.NewScheme()
-	require.NoError(t, corev1.AddToScheme(scheme))
-	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
-	apiGroup := dptypes.DataprotectionAPIGroup
-	now := metav1.Now()
-	pvc := &corev1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace:         "default",
-			Name:              "data-0",
-			UID:               "data-0-uid",
-			DeletionTimestamp: &now,
-			Finalizers:        []string{dptypes.DataProtectionFinalizerName},
-		},
-		Spec: corev1.PersistentVolumeClaimSpec{
-			DataSourceRef: &corev1.TypedObjectReference{
-				APIGroup: &apiGroup,
-				Kind:     dptypes.BackupKind,
-				Name:     "already-deleted-backup",
-			},
-		},
+func TestDeletingTargetPVCWithDPFinalizerUsesNormalRestorePath(t *testing.T) {
+	for _, deleting := range []bool{false, true} {
+		t.Run(fmt.Sprintf("deleting=%t", deleting), func(t *testing.T) {
+			scheme := runtime.NewScheme()
+			require.NoError(t, corev1.AddToScheme(scheme))
+			require.NoError(t, dpv1alpha1.AddToScheme(scheme))
+			apiGroup := dptypes.DataprotectionAPIGroup
+			pvc := &corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace:  "default",
+					Name:       "data-0",
+					UID:        "data-0-uid",
+					Finalizers: []string{dptypes.DataProtectionFinalizerName},
+				},
+				Spec: corev1.PersistentVolumeClaimSpec{DataSourceRef: &corev1.TypedObjectReference{
+					APIGroup: &apiGroup,
+					Kind:     dptypes.BackupKind,
+					Name:     "missing-backup",
+				}},
+			}
+			if deleting {
+				now := metav1.Now()
+				pvc.DeletionTimestamp = &now
+			}
+			reconciler := &VolumePopulatorReconciler{
+				Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(pvc).Build(),
+				Scheme: scheme,
+			}
+
+			err := reconciler.syncPVC(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc)
+
+			require.Error(t, err)
+			require.True(t, apierrors.IsNotFound(err), "deletion must not replace the ordinary restore error: %v", err)
+			current := &corev1.PersistentVolumeClaim{}
+			require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(pvc), current))
+			require.Contains(t, current.Finalizers, dptypes.DataProtectionFinalizerName)
+		})
 	}
-	populatePVC := &corev1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: pvc.Namespace,
-			Name:      getPopulatePVCName(pvc.UID),
-		},
-	}
-	reconciler := &VolumePopulatorReconciler{
-		Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(pvc, populatePVC).Build(),
-		Scheme: scheme,
-	}
-
-	err := reconciler.syncPVC(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc)
-	require.Error(t, err)
-	require.True(t, intctrlutil.IsRequeueError(err), err)
-	err = reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(populatePVC), &corev1.PersistentVolumeClaim{})
-	require.True(t, apierrors.IsNotFound(err), "populate PVC should be deleted, got: %v", err)
-	current := &corev1.PersistentVolumeClaim{}
-	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(pvc), current))
-	require.Contains(t, current.Finalizers, dptypes.DataProtectionFinalizerName,
-		"target finalizer must remain until a later API-server read confirms helper deletion")
-	require.NoError(t, reconciler.syncPVC(intctrlutil.RequestCtx{Ctx: context.Background()}, current))
-	require.True(t, apierrors.IsNotFound(reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(pvc), current)),
-		"target PVC should be deleted after its finalizer is released")
-}
-
-func TestDeletingTargetPVCStopsExecutionRestoreBeforeDeletingHelper(t *testing.T) {
-	scheme := runtime.NewScheme()
-	require.NoError(t, corev1.AddToScheme(scheme))
-	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
-	apiGroup := dptypes.DataprotectionAPIGroup
-	now := metav1.Now()
-	pvc := &corev1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "default", Name: "data-0", UID: "target-uid",
-			DeletionTimestamp: &now, Finalizers: []string{dptypes.DataProtectionFinalizerName},
-		},
-		Spec: corev1.PersistentVolumeClaimSpec{DataSourceRef: &corev1.TypedObjectReference{
-			APIGroup: &apiGroup, Kind: dptypes.BackupKind, Name: "backup",
-		}},
-	}
-	helper := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{
-		Namespace: pvc.Namespace, Name: getPopulatePVCName(pvc.UID),
-	}}
-	execution := &dpv1alpha1.Restore{ObjectMeta: metav1.ObjectMeta{
-		Namespace: pvc.Namespace, Name: getPopulatePVCName(pvc.UID),
-		OwnerReferences: []metav1.OwnerReference{{
-			APIVersion: "v1", Kind: "PersistentVolumeClaim", Name: pvc.Name, UID: pvc.UID,
-		}},
-		Finalizers: []string{"test.kubeblocks.io/hold"},
-	}}
-	reconciler := &VolumePopulatorReconciler{
-		Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(pvc, helper, execution).Build(),
-		Scheme: scheme,
-	}
-
-	err := reconciler.cleanupDeletingPVC(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc)
-	require.Error(t, err)
-	require.True(t, intctrlutil.IsRequeueError(err), err)
-	currentExecution := &dpv1alpha1.Restore{}
-	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(execution), currentExecution))
-	require.False(t, currentExecution.DeletionTimestamp.IsZero())
-	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(helper), &corev1.PersistentVolumeClaim{}),
-		"helper must remain until execution Restore is actually gone")
-
-	currentExecution.Finalizers = nil
-	require.NoError(t, reconciler.Client.Update(context.Background(), currentExecution))
-	err = reconciler.cleanupDeletingPVC(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc)
-	require.Error(t, err)
-	require.True(t, intctrlutil.IsRequeueError(err), err)
-	require.True(t, apierrors.IsNotFound(reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(helper), &corev1.PersistentVolumeClaim{})))
-	currentPVC := &corev1.PersistentVolumeClaim{}
-	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(pvc), currentPVC))
-	require.Contains(t, currentPVC.Finalizers, dptypes.DataProtectionFinalizerName)
-
-	require.NoError(t, reconciler.cleanupDeletingPVC(intctrlutil.RequestCtx{Ctx: context.Background()}, currentPVC))
-	require.True(t, apierrors.IsNotFound(reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(pvc), currentPVC)),
-		"target PVC should be deleted after its finalizer is released")
-}
-
-func TestClusterRestoreProtectionPrecedesPopulationSideEffects(t *testing.T) {
-	scheme := runtime.NewScheme()
-	require.NoError(t, corev1.AddToScheme(scheme))
-	require.NoError(t, kbappsv1.AddToScheme(scheme))
-	cluster := &kbappsv1.Cluster{ObjectMeta: metav1.ObjectMeta{
-		Namespace: "default", Name: "cluster", UID: "cluster-uid",
-	}}
-	pvc := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{
-		Namespace: "default", Name: "data-0", UID: "target-uid",
-		Labels: map[string]string{
-			constant.AppInstanceLabelKey: cluster.Name,
-			dptypes.ClusterUIDLabelKey:   string(cluster.UID),
-		},
-		Annotations: map[string]string{constant.KBAppClusterUIDKey: string(cluster.UID)},
-	}}
-	k8sClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, pvc).Build()
-	reconciler := &VolumePopulatorReconciler{Client: k8sClient}
-
-	err := reconciler.ensureClusterRestoreProtection(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc)
-	require.Error(t, err)
-	require.True(t, intctrlutil.IsRequeueError(err), err)
-	currentCluster := &kbappsv1.Cluster{}
-	require.NoError(t, k8sClient.Get(context.Background(), client.ObjectKeyFromObject(cluster), currentCluster))
-	require.Contains(t, currentCluster.Finalizers, dptypes.RestoreProtectionFinalizerName)
-	require.NoError(t, reconciler.ensureClusterRestoreProtection(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc))
-}
-
-func TestVolumePopulatorClusterFinalizerPatchUsesOptimisticLock(t *testing.T) {
-	scheme := runtime.NewScheme()
-	require.NoError(t, corev1.AddToScheme(scheme))
-	require.NoError(t, kbappsv1.AddToScheme(scheme))
-	staleCluster := &kbappsv1.Cluster{ObjectMeta: metav1.ObjectMeta{
-		Namespace: "default", Name: "cluster", UID: "cluster-uid", ResourceVersion: "1",
-	}}
-	liveCluster := staleCluster.DeepCopy()
-	liveCluster.ResourceVersion = "2"
-	liveCluster.Finalizers = []string{"other.example/finalizer"}
-	pvc := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{
-		Namespace: "default", Name: "data-0",
-		Labels: map[string]string{
-			constant.AppInstanceLabelKey: liveCluster.Name,
-			dptypes.ClusterUIDLabelKey:   string(liveCluster.UID),
-		},
-		Annotations: map[string]string{constant.KBAppClusterUIDKey: string(liveCluster.UID)},
-	}}
-	liveClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(liveCluster).Build()
-	staleReader := fake.NewClientBuilder().WithScheme(scheme).WithObjects(staleCluster).Build()
-	reconciler := &VolumePopulatorReconciler{Client: liveClient, APIReader: staleReader}
-
-	err := reconciler.ensureClusterRestoreProtection(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc)
-	require.Error(t, err)
-	require.True(t, apierrors.IsConflict(err), err)
-	current := &kbappsv1.Cluster{}
-	require.NoError(t, liveClient.Get(context.Background(), client.ObjectKeyFromObject(liveCluster), current))
-	require.Equal(t, []string{"other.example/finalizer"}, current.Finalizers)
-}
-
-func TestEnsureRestoreClusterUIDLabelAdoptsOnlyVerifiedLegacyTarget(t *testing.T) {
-	scheme := newClusterRestoreTestScheme(t)
-	cluster := newClusterWithActiveRestore()
-	component, its, target := newLegacyRestoreTarget(cluster)
-	k8sClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, component, its, target).Build()
-	reconciler := &VolumePopulatorReconciler{Client: k8sClient}
-
-	err := reconciler.ensureRestoreClusterUIDLabel(intctrlutil.RequestCtx{Ctx: context.Background()}, target)
-	require.NoError(t, err)
-	current := &corev1.PersistentVolumeClaim{}
-	require.NoError(t, k8sClient.Get(context.Background(), client.ObjectKeyFromObject(target), current))
-	require.Equal(t, string(cluster.UID), current.Labels[dptypes.ClusterUIDLabelKey])
-	require.Equal(t, string(cluster.UID), current.Annotations[constant.KBAppClusterUIDKey])
-
-	current.Labels = map[string]string{constant.AppInstanceLabelKey: cluster.Name}
-	current.Annotations = nil
-	require.NoError(t, k8sClient.Update(context.Background(), current))
-	component.Annotations[constant.KBAppClusterUIDKey] = "previous-cluster-uid"
-	require.NoError(t, k8sClient.Update(context.Background(), component))
-	err = reconciler.ensureRestoreClusterUIDLabel(intctrlutil.RequestCtx{Ctx: context.Background()}, current)
-	require.NoError(t, err)
-	require.NoError(t, k8sClient.Get(context.Background(), client.ObjectKeyFromObject(target), current))
-	require.Empty(t, current.Labels[dptypes.ClusterUIDLabelKey])
 }
 
 func TestSuccessfulPopulateReleaseRemovesOnlyHelperAndTargetFinalizer(t *testing.T) {

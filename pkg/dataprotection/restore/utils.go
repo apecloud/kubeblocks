@@ -249,8 +249,6 @@ func ValidateAndInitRestoreMGR(reqCtx intctrlutil.RequestCtx,
 		}
 	}
 
-	// TODO: check if there is permission for cross namespace recovery.
-
 	// check if the backup is completed exclude continuous backup.
 	backupType := utils.GetBackupType(backupSet.ActionSet, &backupSet.UseVolumeSnapshot)
 	if backupType != dpv1alpha1.BackupTypeContinuous && backupSet.Backup.Status.Phase != dpv1alpha1.BackupPhaseCompleted {
@@ -271,7 +269,17 @@ func ValidateAndInitRestoreMGR(reqCtx intctrlutil.RequestCtx,
 	default:
 		err = intctrlutil.NewFatalError(fmt.Sprintf("backup type of %s is empty", backupName))
 	}
-	return err
+	if err != nil {
+		return err
+	}
+	for i := range restoreMgr.PrepareDataBackupSets {
+		prepareDataBackupSet := &restoreMgr.PrepareDataBackupSets[i]
+		if prepareDataBackupSet.UseVolumeSnapshot && prepareDataBackupSet.Backup.Namespace != restoreMgr.Restore.Namespace {
+			return intctrlutil.NewFatalError(fmt.Sprintf("cross-namespace VolumeSnapshot restore from Backup %s/%s is not supported",
+				prepareDataBackupSet.Backup.Namespace, prepareDataBackupSet.Backup.Name))
+		}
+	}
+	return nil
 }
 
 func cutJobName(jobName string) string {

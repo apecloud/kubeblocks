@@ -1091,7 +1091,7 @@ string
 <em>(Optional)</em>
 <p>Specifies the namespace of the Backup.
 If not specified, the namespace of the OpsRequest will be used.
-Cross-namespace VolumeSnapshot restores are not supported.</p>
+Cross-namespace VolumeSnapshot restores are NOT supported.</p>
 </td>
 </tr>
 <tr>

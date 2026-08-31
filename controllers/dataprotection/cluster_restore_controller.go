@@ -121,7 +121,11 @@ func clusterRestoreConditionActive(cluster *appsv1.Cluster) bool {
 		return false
 	}
 	condition := meta.FindStatusCondition(cluster.Status.Conditions, appsv1.ConditionTypeRestore)
-	return condition == nil || condition.Status == metav1.ConditionUnknown
+	// Restore=False is terminal for status aggregation, but the failed Cluster
+	// still carries initial-restore intent. Keep the protection until the user
+	// deletes the Cluster so remaining PVC restores never observe an absent
+	// protection finalizer and stall between App and DP state machines.
+	return condition == nil || condition.Status != metav1.ConditionTrue
 }
 
 func (r *ClusterRestoreReconciler) hasRestoreResources(ctx context.Context, reader client.Reader,

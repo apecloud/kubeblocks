@@ -436,12 +436,15 @@ func (r *VolumePopulatorReconciler) handleRestoreParentLifecycle(reqCtx intctrlu
 				pvc.Namespace, pvc.Name, cluster.Namespace, cluster.Name, clusterUID, cluster.UID))
 		}
 	}
+	if terminated, err := r.terminateVerifiedVolumePopulation(reqCtx, pvc, cluster); err != nil || terminated {
+		return terminated, err
+	}
 
 	comp, err := r.validateClusterRestorePVCOwnership(reqCtx.Ctx, pvc, cluster)
 	if err != nil {
 		return false, restoreParentRequeue(err)
 	}
-	if err = r.adoptVolumePopulatorIdentity(reqCtx.Ctx, pvc, cluster); err != nil {
+	if err = r.adoptVolumePopulatorIdentity(reqCtx.Ctx, pvc, cluster, comp); err != nil {
 		return false, restoreParentRequeue(err)
 	}
 	if !cluster.DeletionTimestamp.IsZero() || (comp != nil && !comp.DeletionTimestamp.IsZero()) {
@@ -460,6 +463,58 @@ func (r *VolumePopulatorReconciler) handleRestoreParentLifecycle(reqCtx intctrlu
 			"waiting for Cluster restore-protection finalizer")
 	}
 	return false, nil
+}
+
+// terminateVerifiedVolumePopulation lets a previously verified restore finish
+// cleanup after the App deletion path has legitimately detached a retained PVC
+// from its workload owner. Normal reconciliation and legacy adoption still
+// require the complete live owner chain below.
+func (r *VolumePopulatorReconciler) terminateVerifiedVolumePopulation(reqCtx intctrlutil.RequestCtx,
+	pvc *corev1.PersistentVolumeClaim, cluster *appsv1.Cluster) (bool, error) {
+	if pvc.Labels[dptypes.ClusterUIDLabelKey] != string(cluster.UID) {
+		return false, nil
+	}
+	if !cluster.DeletionTimestamp.IsZero() {
+		return true, r.terminateVolumePopulation(reqCtx, pvc, cluster, nil)
+	}
+
+	componentUID := pvc.Labels[dptypes.ComponentUIDLabelKey]
+	if componentUID == "" {
+		return false, nil
+	}
+	componentName := pvc.Labels[constant.KBAppComponentLabelKey]
+	if componentName == "" {
+		return false, restoreParentRequeue(fmt.Errorf(
+			"verified restore PVC %s/%s has no Component identity", pvc.Namespace, pvc.Name))
+	}
+	comp := &appsv1.Component{}
+	key := types.NamespacedName{
+		Namespace: pvc.Namespace,
+		Name:      constant.GenerateClusterComponentName(cluster.Name, componentName),
+	}
+	if err := r.volumePopulatorReader().Get(reqCtx.Ctx, key, comp); err != nil {
+		if apierrors.IsNotFound(err) {
+			// A verified Component identity cannot disappear during an active
+			// initial restore under the App lifecycle contract. Its absence is
+			// therefore the durable form of the Component deletion signal.
+			return true, r.terminateVolumePopulation(reqCtx, pvc, cluster, nil)
+		}
+		return false, restoreParentRequeue(err)
+	}
+	owner := metav1.GetControllerOf(comp)
+	if string(comp.UID) != componentUID ||
+		comp.Labels[constant.AppInstanceLabelKey] != cluster.Name ||
+		comp.Labels[constant.KBAppComponentLabelKey] != componentName ||
+		owner == nil || owner.APIVersion != appsv1.GroupVersion.String() ||
+		owner.Kind != appsv1.ClusterKind || owner.Name != cluster.Name || owner.UID != cluster.UID {
+		return false, restoreParentRequeue(fmt.Errorf(
+			"verified restore PVC %s/%s Component identity does not match current Cluster %s/%s",
+			pvc.Namespace, pvc.Name, cluster.Namespace, cluster.Name))
+	}
+	if comp.DeletionTimestamp.IsZero() {
+		return false, nil
+	}
+	return true, r.terminateVolumePopulation(reqCtx, pvc, cluster, comp)
 }
 
 func restoreParentRequeue(err error) error {
@@ -534,21 +589,31 @@ func (r *VolumePopulatorReconciler) validateClusterRestorePVCOwnership(ctx conte
 }
 
 func (r *VolumePopulatorReconciler) adoptVolumePopulatorIdentity(ctx context.Context,
-	pvc *corev1.PersistentVolumeClaim, cluster *appsv1.Cluster) error {
-	if pvc.Labels[dptypes.ClusterUIDLabelKey] != string(cluster.UID) {
-		patch := client.MergeFromWithOptions(pvc.DeepCopy(), client.MergeFromWithOptimisticLock{})
-		if pvc.Labels == nil {
-			pvc.Labels = map[string]string{}
-		}
-		pvc.Labels[dptypes.ClusterUIDLabelKey] = string(cluster.UID)
-		if err := r.Client.Patch(ctx, pvc, patch); err != nil {
-			return err
-		}
+	pvc *corev1.PersistentVolumeClaim, cluster *appsv1.Cluster, comp *appsv1.Component) error {
+	if comp == nil {
+		return fmt.Errorf("can not adopt restore PVC %s/%s without a verified Component", pvc.Namespace, pvc.Name)
 	}
+	if uid := pvc.Labels[dptypes.ClusterUIDLabelKey]; uid != "" && uid != string(cluster.UID) {
+		return fmt.Errorf("restore PVC %s/%s Cluster UID %s does not match %s",
+			pvc.Namespace, pvc.Name, uid, cluster.UID)
+	}
+	if uid := pvc.Labels[dptypes.ComponentUIDLabelKey]; uid != "" && uid != string(comp.UID) {
+		return fmt.Errorf("restore PVC %s/%s Component UID %s does not match %s",
+			pvc.Namespace, pvc.Name, uid, comp.UID)
+	}
+	originalPVC := pvc.DeepCopy()
+	if pvc.Labels == nil {
+		pvc.Labels = map[string]string{}
+	}
+	pvc.Labels[dptypes.ClusterUIDLabelKey] = string(cluster.UID)
+	pvc.Labels[dptypes.ComponentUIDLabelKey] = string(comp.UID)
 
 	helper := &corev1.PersistentVolumeClaim{}
 	helperKey := types.NamespacedName{Namespace: pvc.Namespace, Name: getPopulatePVCName(pvc.UID)}
 	if err := r.Client.Get(ctx, helperKey, helper); err == nil {
+		if err = validatePopulatePVCForAdoption(helper, pvc, cluster, comp); err != nil {
+			return err
+		}
 		if err = r.patchVolumePopulatorLabels(ctx, helper, internalRestoreLabels(pvc)); err != nil {
 			return err
 		}
@@ -563,6 +628,9 @@ func (r *VolumePopulatorReconciler) adoptVolumePopulatorIdentity(ctx context.Con
 			execution.Labels[dprestore.DataProtectionRestoreLabelKey] != execution.Name {
 			return fmt.Errorf("refusing to adopt execution Restore %s/%s without exact PVC ownership",
 				execution.Namespace, execution.Name)
+		}
+		if err = validateVolumePopulatorUIDLabels(execution, cluster, comp); err != nil {
+			return err
 		}
 		if err = r.patchVolumePopulatorLabels(ctx, execution, internalRestoreLabels(pvc)); err != nil {
 			return err
@@ -579,20 +647,63 @@ func (r *VolumePopulatorReconciler) adoptVolumePopulatorIdentity(ctx context.Con
 	}
 	for i := range postReady.Items {
 		restore := &postReady.Items[i]
-		if internalPostReadyRestoreOwner(restore) == nil ||
-			restore.Labels[dptypes.ClusterUIDLabelKey] == string(cluster.UID) {
+		owner := internalPostReadyRestoreOwner(restore)
+		if owner == nil {
 			continue
 		}
-		if _, err := r.validatePostReadyRestoreOwner(ctx, restore, cluster); err != nil {
+		if restore.Labels[dptypes.ClusterUIDLabelKey] == string(cluster.UID) &&
+			restore.Labels[dptypes.ComponentUIDLabelKey] == string(owner.UID) {
+			continue
+		}
+		ownerComponent, err := r.validatePostReadyRestoreOwner(ctx, restore, cluster)
+		if err != nil {
+			return err
+		}
+		if err = validateVolumePopulatorUIDLabels(restore, cluster, ownerComponent); err != nil {
 			return err
 		}
 		labels := map[string]string{
 			dptypes.ClusterUIDLabelKey:   string(cluster.UID),
+			dptypes.ComponentUIDLabelKey: string(ownerComponent.UID),
 			constant.AppInstanceLabelKey: cluster.Name,
 		}
 		if err := r.patchVolumePopulatorLabels(ctx, restore, labels); err != nil {
 			return err
 		}
+	}
+	if reflect.DeepEqual(originalPVC.Labels, pvc.Labels) {
+		return nil
+	}
+	// Commit the target identity last. Its presence means every pre-existing
+	// VP side effect has either been verified and adopted or was absent.
+	return r.Client.Patch(ctx, pvc,
+		client.MergeFromWithOptions(originalPVC, client.MergeFromWithOptimisticLock{}))
+}
+
+func validatePopulatePVCForAdoption(helper, pvc *corev1.PersistentVolumeClaim,
+	cluster *appsv1.Cluster, comp *appsv1.Component) error {
+	expectedName := getPopulatePVCName(pvc.UID)
+	if helper.Name != expectedName ||
+		helper.Labels[dprestore.DataProtectionRestoreLabelKey] != expectedName ||
+		helper.Labels[dprestore.DataProtectionRestoreNamespaceLabelKey] != pvc.Namespace ||
+		helper.Labels[dprestore.DataProtectionPopulatePVCLabelKey] != expectedName ||
+		helper.Labels[constant.AppInstanceLabelKey] != cluster.Name ||
+		helper.Labels[constant.KBAppComponentLabelKey] != pvc.Labels[constant.KBAppComponentLabelKey] {
+		return fmt.Errorf("refusing to adopt helper PVC %s/%s without exact VP identity",
+			helper.Namespace, helper.Name)
+	}
+	return validateVolumePopulatorUIDLabels(helper, cluster, comp)
+}
+
+func validateVolumePopulatorUIDLabels(obj client.Object, cluster *appsv1.Cluster, comp *appsv1.Component) error {
+	if uid := obj.GetLabels()[dptypes.ClusterUIDLabelKey]; uid != "" && uid != string(cluster.UID) {
+		return fmt.Errorf("refusing to adopt %T %s/%s with Cluster UID %s",
+			obj, obj.GetNamespace(), obj.GetName(), uid)
+	}
+	if uid := obj.GetLabels()[dptypes.ComponentUIDLabelKey]; uid != "" &&
+		(comp == nil || uid != string(comp.UID)) {
+		return fmt.Errorf("refusing to adopt %T %s/%s with Component UID %s",
+			obj, obj.GetNamespace(), obj.GetName(), uid)
 	}
 	return nil
 }
@@ -1289,6 +1400,7 @@ func internalRestoreLabels(pvc *corev1.PersistentVolumeClaim) map[string]string 
 		constant.KBAppShardingNameLabelKey,
 		constant.VolumeClaimTemplateNameLabelKey,
 		dptypes.ClusterUIDLabelKey,
+		dptypes.ComponentUIDLabelKey,
 	} {
 		if value := pvc.Labels[key]; value != "" {
 			labels[key] = value
@@ -2172,6 +2284,7 @@ func postReadyRestoreLabels(pvc *corev1.PersistentVolumeClaim, comp *appsv1.Comp
 	labels := map[string]string{
 		dprestore.DataProtectionRestoreLabelKey:          restoreName,
 		dprestore.DataProtectionRestoreNamespaceLabelKey: pvc.Namespace,
+		dptypes.ComponentUIDLabelKey:                     string(comp.UID),
 	}
 	for _, key := range []string{
 		constant.AppInstanceLabelKey,

@@ -89,6 +89,8 @@ const (
 const (
 	// ClusterUIDLabelKey specifies the cluster UID label key.
 	ClusterUIDLabelKey = "dataprotection.kubeblocks.io/cluster-uid"
+	// ComponentUIDLabelKey specifies the component UID label key.
+	ComponentUIDLabelKey = "dataprotection.kubeblocks.io/component-uid"
 	// BackupNameLabelKey specifies the backup name label key.
 	BackupNameLabelKey = "dataprotection.kubeblocks.io/backup-name"
 	// BackupNamespaceLabelKey specifies the backup namespace label key.

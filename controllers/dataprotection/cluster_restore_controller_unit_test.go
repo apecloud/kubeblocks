@@ -135,6 +135,24 @@ func TestClusterRestoreControllerTreatsCompletedRestoreAsInactive(t *testing.T) 
 		"the Cluster controller observes terminal Restore objects but does not delete them")
 }
 
+func TestClusterRestoreControllerKeepsProtectionAfterRestoreFailure(t *testing.T) {
+	scheme := clusterRestoreTestScheme(t)
+	cluster := activeRestoreCluster()
+	cluster.Finalizers = []string{dptypes.RestoreProtectionFinalizerName}
+	cluster.Status.Conditions = []metav1.Condition{{
+		Type: appsv1.ConditionTypeRestore, Status: metav1.ConditionFalse,
+	}}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster).Build()
+	reconciler := &ClusterRestoreReconciler{Client: cli, APIReader: cli}
+
+	_, err := reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cluster)})
+	require.NoError(t, err)
+	current := &appsv1.Cluster{}
+	require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(cluster), current))
+	require.Contains(t, current.Finalizers, dptypes.RestoreProtectionFinalizerName,
+		"failed restore intent must remain protected until Cluster deletion")
+}
+
 func clusterRestoreTestScheme(t *testing.T) *runtime.Scheme {
 	t.Helper()
 	scheme := runtime.NewScheme()

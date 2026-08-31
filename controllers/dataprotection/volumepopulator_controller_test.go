@@ -1510,7 +1510,7 @@ func TestDispatchUnboundPVCFailsWhenNoRestoreActionsExist(t *testing.T) {
 		"expected fatal error when neither prepareData nor postReady exists, got: %v", err)
 }
 
-func TestDeletingTargetPVCWaitsWithoutCleaningPopulation(t *testing.T) {
+func TestDeletingUnfinishedTargetPVCWaitsWithoutCleaningPopulation(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, corev1.AddToScheme(scheme))
 	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
@@ -1538,6 +1538,69 @@ func TestDeletingTargetPVCWaitsWithoutCleaningPopulation(t *testing.T) {
 			Name:      getPopulatePVCName(pvc.UID),
 		},
 	}
+	recorder := record.NewFakeRecorder(2)
+	reconciler := &VolumePopulatorReconciler{
+		Client: fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(pvc).
+			WithObjects(pvc, populatePVC).Build(),
+		Scheme:   scheme,
+		Recorder: recorder,
+	}
+	req := ctrl.Request{NamespacedName: client.ObjectKeyFromObject(pvc)}
+
+	result, err := reconciler.Reconcile(context.Background(), req)
+	require.NoError(t, err)
+	require.Equal(t, restoreTargetDeletingRequeueInterval, result.RequeueAfter)
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(populatePVC), &corev1.PersistentVolumeClaim{}),
+		"populate PVC must remain untouched")
+	current := &corev1.PersistentVolumeClaim{}
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(pvc), current))
+	require.Contains(t, current.Finalizers, dptypes.DataProtectionFinalizerName,
+		"target PVC must remain protected")
+	restoreCondition := findPVCConditionByType(current, kbappsv1.ConditionTypeRestore)
+	require.NotNil(t, restoreCondition)
+	require.Equal(t, corev1.ConditionUnknown, restoreCondition.Status)
+	require.Equal(t, ReasonRestoreTargetPVCDeleting, restoreCondition.Reason)
+	event := <-recorder.Events
+	require.Contains(t, event, ReasonRestoreTargetPVCDeleting)
+	require.Contains(t, event, "restore is waiting")
+
+	result, err = reconciler.Reconcile(context.Background(), req)
+	require.NoError(t, err)
+	require.Equal(t, restoreTargetDeletingRequeueInterval, result.RequeueAfter)
+	select {
+	case duplicate := <-recorder.Events:
+		require.Failf(t, "unexpected duplicate event", "got %q", duplicate)
+	default:
+	}
+}
+
+func TestDeletingCompletedTargetPVCFinishesSuccessfulCleanup(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	apiGroup := dptypes.DataprotectionAPIGroup
+	now := metav1.Now()
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:         "default",
+			Name:              "data-0",
+			UID:               "data-0-uid",
+			DeletionTimestamp: &now,
+			Finalizers:        []string{dptypes.DataProtectionFinalizerName, "example.io/keep"},
+			Annotations:       map[string]string{volume.AnnBindCompleted: "yes"},
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			VolumeName: "restored-pv",
+			DataSourceRef: &corev1.TypedObjectReference{
+				APIGroup: &apiGroup,
+				Kind:     dptypes.BackupKind,
+				Name:     "backup",
+			},
+		},
+	}
+	populatePVC := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{
+		Namespace: pvc.Namespace,
+		Name:      getPopulatePVCName(pvc.UID),
+	}}
 	recorder := record.NewFakeRecorder(1)
 	reconciler := &VolumePopulatorReconciler{
 		Client:   fake.NewClientBuilder().WithScheme(scheme).WithObjects(pvc, populatePVC).Build(),
@@ -1549,16 +1612,18 @@ func TestDeletingTargetPVCWaitsWithoutCleaningPopulation(t *testing.T) {
 		NamespacedName: client.ObjectKeyFromObject(pvc),
 	})
 	require.NoError(t, err)
-	require.Positive(t, result.RequeueAfter)
-	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(populatePVC), &corev1.PersistentVolumeClaim{}),
-		"populate PVC must remain untouched")
+	require.Zero(t, result.RequeueAfter)
+	require.True(t, apierrors.IsNotFound(reconciler.Client.Get(context.Background(),
+		client.ObjectKeyFromObject(populatePVC), &corev1.PersistentVolumeClaim{})))
 	current := &corev1.PersistentVolumeClaim{}
 	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(pvc), current))
-	require.Contains(t, current.Finalizers, dptypes.DataProtectionFinalizerName,
-		"target PVC must remain protected")
-	event := <-recorder.Events
-	require.Contains(t, event, ReasonRestoreTargetPVCDeleting)
-	require.Contains(t, event, "restore is waiting")
+	require.NotContains(t, current.Finalizers, dptypes.DataProtectionFinalizerName)
+	require.Contains(t, current.Finalizers, "example.io/keep")
+	select {
+	case event := <-recorder.Events:
+		require.Failf(t, "unexpected wait event", "got %q", event)
+	default:
+	}
 }
 
 func TestSuccessfulPopulateReleaseRemovesOnlyHelperAndTargetFinalizer(t *testing.T) {

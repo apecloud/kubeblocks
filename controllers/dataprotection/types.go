@@ -97,3 +97,5 @@ const (
 )
 
 var reconcileInterval = time.Second
+
+const restoreTargetDeletingRequeueInterval = 30 * time.Second

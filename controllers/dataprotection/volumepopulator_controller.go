@@ -173,12 +173,10 @@ func (r *VolumePopulatorReconciler) syncPVC(reqCtx intctrlutil.RequestCtx, pvc *
 		return nil
 	}
 	if !pvc.DeletionTimestamp.IsZero() {
-		// Target PVC deletion is not part of the restore lifecycle. Keep the
-		// restore waiting without mutating its resources or protection finalizer.
-		message := fmt.Sprintf("restore is waiting because target PVC %s/%s is deleting",
-			pvc.Namespace, pvc.Name)
-		r.Recorder.Event(pvc, corev1.EventTypeWarning, ReasonRestoreTargetPVCDeleting, message)
-		return intctrlutil.NewRequeueError(reconcileInterval, message)
+		if pvcReadyForRestoreProgression(pvc) {
+			return r.releasePopulateResources(reqCtx, pvc)
+		}
+		return r.waitForDeletingRestoreTargetPVC(reqCtx, pvc)
 	}
 	var restoreCtx *pvcRestoreContext
 	if pvc.Spec.DataSourceRef.Kind == dptypes.RestoreKind {
@@ -197,6 +195,30 @@ func (r *VolumePopulatorReconciler) syncPVC(reqCtx intctrlutil.RequestCtx, pvc *
 		return err
 	}
 	return nil
+}
+
+func (r *VolumePopulatorReconciler) waitForDeletingRestoreTargetPVC(reqCtx intctrlutil.RequestCtx,
+	pvc *corev1.PersistentVolumeClaim) error {
+	message := fmt.Sprintf("restore is waiting because target PVC %s/%s is deleting", pvc.Namespace, pvc.Name)
+	condition := corev1.PersistentVolumeClaimCondition{
+		Type:               corev1.PersistentVolumeClaimConditionType(appsv1.ConditionTypeRestore),
+		Status:             corev1.ConditionUnknown,
+		LastTransitionTime: metav1.Now(),
+		Reason:             ReasonRestoreTargetPVCDeleting,
+		Message:            message,
+	}
+	existing := findPVCConditionByType(pvc, appsv1.ConditionTypeRestore)
+	if existing == nil || existing.Status != condition.Status || existing.Reason != condition.Reason ||
+		existing.Message != condition.Message {
+		patch := client.MergeFrom(pvc.DeepCopy())
+		upsertPVCCondition(&pvc.Status.Conditions, condition)
+		if err := r.Client.Status().Patch(reqCtx.Ctx, pvc, patch); err != nil {
+			return intctrlutil.NewRequeueError(reconcileInterval,
+				fmt.Sprintf("failed to record deleting restore target PVC: %v", err))
+		}
+		r.Recorder.Event(pvc, corev1.EventTypeWarning, ReasonRestoreTargetPVCDeleting, message)
+	}
+	return intctrlutil.NewRequeueError(restoreTargetDeletingRequeueInterval, message)
 }
 
 // dispatchUnboundPVC routes an unbound PVC to either Populate or ProvisionOnly.

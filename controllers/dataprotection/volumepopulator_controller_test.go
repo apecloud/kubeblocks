@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"testing"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -41,6 +42,8 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -3132,6 +3135,196 @@ func TestEnsurePostReadyRestore_MultiComponent_PrepareDataAndPostReady_Redirects
 	require.Equal(t, tidbComp.UID, restore.OwnerReferences[0].UID)
 	require.Equal(t, "tidb", restore.Spec.Backup.SourceTargetName)
 	require.Equal(t, postReadyRestoreName(tidbComp.UID), restore.Name)
+}
+
+func TestMapExecutionRestoreToTargetPVC(t *testing.T) {
+	pvc := dependencyRestorePVC("data-mysql-0", "mysql", "pvc-uid")
+	restore := &dpv1alpha1.Restore{ObjectMeta: metav1.ObjectMeta{
+		Namespace: pvc.Namespace, Name: getPopulatePVCName(pvc.UID),
+		Labels: map[string]string{dprestore.DataProtectionRestoreLabelKey: getPopulatePVCName(pvc.UID)},
+		OwnerReferences: []metav1.OwnerReference{{
+			APIVersion: corev1.SchemeGroupVersion.String(), Kind: "PersistentVolumeClaim",
+			Name: pvc.Name, UID: pvc.UID,
+		}},
+	}}
+	reconciler := dependencyTestReconciler(t, pvc)
+	require.Equal(t, []reconcile.Request{{NamespacedName: client.ObjectKeyFromObject(pvc)}},
+		reconciler.mapRestoreToPVCs(context.Background(), restore))
+
+	badOwner := restore.DeepCopy()
+	badOwner.OwnerReferences[0].UID = "another-pvc"
+	require.Empty(t, reconciler.mapRestoreToPVCs(context.Background(), badOwner))
+	sourceRestore := restore.DeepCopy()
+	sourceRestore.Labels = nil
+	require.Empty(t, reconciler.mapRestoreToPVCs(context.Background(), sourceRestore))
+}
+
+func TestMapPostReadyRestoreToNonTerminalComponentPVCs(t *testing.T) {
+	comp := &kbappsv1.Component{ObjectMeta: metav1.ObjectMeta{
+		Namespace: "default", Name: "cluster-mysql", UID: "component-uid",
+		Labels: map[string]string{
+			constant.AppInstanceLabelKey: "cluster", constant.KBAppComponentLabelKey: "mysql",
+		},
+	}}
+	running := dependencyRestorePVC("data-mysql-0", "mysql", "running-pvc")
+	terminal := dependencyRestorePVC("data-mysql-1", "mysql", "terminal-pvc")
+	terminal.Status.Conditions = []corev1.PersistentVolumeClaimCondition{{
+		Type: corev1.PersistentVolumeClaimConditionType(kbappsv1.ConditionTypeRestore), Status: corev1.ConditionTrue,
+	}}
+	redirectTarget := dependencyRestorePVC("data-postgresql-0", "postgresql", "redirect-pvc")
+	otherRedirectSource := dependencyRestorePVC("data-tikv-0", "tikv", "other-redirect-pvc")
+	restore := &dpv1alpha1.Restore{ObjectMeta: metav1.ObjectMeta{
+		Namespace: comp.Namespace, Name: postReadyRestoreName(comp.UID),
+		Labels: map[string]string{
+			dprestore.DataProtectionRestoreLabelKey: postReadyRestoreName(comp.UID),
+			constant.AppInstanceLabelKey:            "cluster", constant.KBAppComponentLabelKey: "mysql",
+		},
+		OwnerReferences: []metav1.OwnerReference{{
+			APIVersion: kbappsv1.GroupVersion.String(), Kind: "Component", Name: comp.Name, UID: comp.UID,
+		}},
+	}}
+	reconciler := dependencyTestReconciler(t, comp, running, terminal, redirectTarget, otherRedirectSource)
+	require.ElementsMatch(t, []reconcile.Request{
+		{NamespacedName: client.ObjectKeyFromObject(running)},
+		{NamespacedName: client.ObjectKeyFromObject(redirectTarget)},
+		{NamespacedName: client.ObjectKeyFromObject(otherRedirectSource)},
+	}, reconciler.mapRestoreToPVCs(context.Background(), restore))
+
+	redirected := restore.DeepCopy()
+	redirected.Labels[constant.KBAppComponentLabelKey] = "postgresql"
+	require.ElementsMatch(t, []reconcile.Request{
+		{NamespacedName: client.ObjectKeyFromObject(running)},
+		{NamespacedName: client.ObjectKeyFromObject(redirectTarget)},
+		{NamespacedName: client.ObjectKeyFromObject(otherRedirectSource)},
+	}, reconciler.mapRestoreToPVCs(context.Background(), redirected))
+}
+
+func TestMapComponentAndClusterDependencies(t *testing.T) {
+	mysql := dependencyRestorePVC("data-mysql-0", "mysql", "mysql-pvc")
+	postgresql := dependencyRestorePVC("data-postgresql-0", "postgresql", "postgresql-pvc")
+	invalid := dependencyRestorePVC("invalid", "mysql", "invalid-pvc")
+	delete(invalid.Annotations, constant.RestoreSourceNameAnnotationKey)
+	terminal := dependencyRestorePVC("terminal", "mysql", "terminal-pvc")
+	terminal.Status.Conditions = []corev1.PersistentVolumeClaimCondition{{
+		Type: corev1.PersistentVolumeClaimConditionType(kbappsv1.ConditionTypeRestore), Status: corev1.ConditionFalse,
+	}}
+	comp := &kbappsv1.Component{ObjectMeta: metav1.ObjectMeta{
+		Namespace: "default", Name: "cluster-mysql",
+		Labels: map[string]string{
+			constant.AppInstanceLabelKey: "cluster", constant.KBAppComponentLabelKey: "mysql",
+		},
+	}}
+	cluster := &kbappsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "cluster"}}
+	reconciler := dependencyTestReconciler(t, mysql, postgresql, invalid, terminal)
+
+	require.ElementsMatch(t, []reconcile.Request{
+		{NamespacedName: client.ObjectKeyFromObject(mysql)},
+		{NamespacedName: client.ObjectKeyFromObject(postgresql)},
+	}, reconciler.mapComponentToPVCs(context.Background(), comp))
+	require.ElementsMatch(t, []reconcile.Request{
+		{NamespacedName: client.ObjectKeyFromObject(mysql)},
+		{NamespacedName: client.ObjectKeyFromObject(postgresql)},
+	}, reconciler.mapClusterToPVCs(context.Background(), cluster))
+}
+
+func TestClusterRestorePVCIdentitySupportsSharding(t *testing.T) {
+	tests := []struct {
+		name          string
+		component     string
+		sharding      string
+		shardTemplate string
+		restoreIntent string
+		want          bool
+	}{
+		{name: "component", component: "mysql", restoreIntent: "mysql", want: true},
+		{name: "sharding default template", component: "shard-a", sharding: "shard", restoreIntent: "shard", want: true},
+		{name: "named shard template", component: "shard-b", sharding: "shard", shardTemplate: "analytics", restoreIntent: "analytics", want: true},
+		{name: "unrelated intent", component: "shard-b", sharding: "shard", shardTemplate: "analytics", restoreIntent: "another", want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pvc := dependencyRestorePVC("data-"+tt.component+"-0", tt.component, types.UID(tt.name))
+			pvc.Annotations[constant.RestoreComponentAnnotationKey] = tt.restoreIntent
+			if tt.sharding != "" {
+				pvc.Labels[constant.KBAppShardingNameLabelKey] = tt.sharding
+			}
+			if tt.shardTemplate != "" {
+				pvc.Labels[constant.KBAppShardTemplateLabelKey] = tt.shardTemplate
+			}
+			require.Equal(t, tt.want, isClusterRestorePVC(pvc))
+		})
+	}
+}
+
+func TestDependencyPredicates(t *testing.T) {
+	now := metav1.NewTime(time.Now())
+	restoreOld := &dpv1alpha1.Restore{}
+	restoreNew := restoreOld.DeepCopy()
+	restoreNew.Status.Phase = dpv1alpha1.RestorePhaseRunning
+	require.True(t, restoreDependencyPredicate().Update(event.UpdateEvent{ObjectOld: restoreOld, ObjectNew: restoreNew}))
+	restoreUnrelated := restoreNew.DeepCopy()
+	restoreUnrelated.Annotations = map[string]string{"example": "changed"}
+	require.False(t, restoreDependencyPredicate().Update(event.UpdateEvent{ObjectOld: restoreNew, ObjectNew: restoreUnrelated}))
+	restoreDeleting := restoreNew.DeepCopy()
+	restoreDeleting.DeletionTimestamp = &now
+	require.True(t, restoreDependencyPredicate().Update(event.UpdateEvent{ObjectOld: restoreNew, ObjectNew: restoreDeleting}))
+
+	compOld := &kbappsv1.Component{}
+	compNew := compOld.DeepCopy()
+	compNew.Status.Conditions = []metav1.Condition{{
+		Type: kbappsv1.ComponentConditionProgressing, Status: metav1.ConditionTrue, Reason: "PostProvision",
+	}}
+	require.True(t, componentDependencyPredicate().Update(event.UpdateEvent{ObjectOld: compOld, ObjectNew: compNew}))
+	compUnrelated := compNew.DeepCopy()
+	compUnrelated.Labels = map[string]string{"example": "changed"}
+	require.False(t, componentDependencyPredicate().Update(event.UpdateEvent{ObjectOld: compNew, ObjectNew: compUnrelated}))
+	compRunning := compNew.DeepCopy()
+	compRunning.Status.Phase = kbappsv1.RunningComponentPhase
+	require.True(t, componentDependencyPredicate().Update(event.UpdateEvent{ObjectOld: compNew, ObjectNew: compRunning}))
+
+	clusterOld := &kbappsv1.Cluster{}
+	clusterNew := clusterOld.DeepCopy()
+	clusterNew.Status.Phase = kbappsv1.RunningClusterPhase
+	require.True(t, clusterDependencyPredicate().Update(event.UpdateEvent{ObjectOld: clusterOld, ObjectNew: clusterNew}))
+	clusterUnrelated := clusterNew.DeepCopy()
+	clusterUnrelated.Labels = map[string]string{"example": "changed"}
+	require.False(t, clusterDependencyPredicate().Update(event.UpdateEvent{ObjectOld: clusterNew, ObjectNew: clusterUnrelated}))
+	clusterDeleting := clusterNew.DeepCopy()
+	clusterDeleting.DeletionTimestamp = &now
+	require.True(t, clusterDependencyPredicate().Update(event.UpdateEvent{ObjectOld: clusterNew, ObjectNew: clusterDeleting}))
+}
+
+func dependencyTestReconciler(t *testing.T, objects ...client.Object) *VolumePopulatorReconciler {
+	t.Helper()
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, kbappsv1.AddToScheme(scheme))
+	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
+	return &VolumePopulatorReconciler{
+		Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).Build(), Scheme: scheme,
+	}
+}
+
+func dependencyRestorePVC(name, componentName string, uid types.UID) *corev1.PersistentVolumeClaim {
+	apiGroup := dptypes.DataprotectionAPIGroup
+	return &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default", Name: name, UID: uid,
+			Labels: map[string]string{
+				constant.AppInstanceLabelKey: "cluster", constant.KBAppComponentLabelKey: componentName,
+			},
+			Annotations: map[string]string{
+				constant.RestoreSourceAPIGroupAnnotationKey: dptypes.DataprotectionAPIGroup,
+				constant.RestoreSourceKindAnnotationKey:     dptypes.BackupKind,
+				constant.RestoreSourceNameAnnotationKey:     "backup",
+				constant.RestoreComponentAnnotationKey:      componentName,
+				constant.RestoreVolumeTemplateAnnotationKey: "data",
+			},
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{DataSourceRef: &corev1.TypedObjectReference{
+			APIGroup: &apiGroup, Kind: dptypes.BackupKind, Name: "backup",
+		}},
+	}
 }
 
 func TestEnsurePostReadyRestore_ShardingMissingTargetSkip_DoesNotRedirect(t *testing.T) {

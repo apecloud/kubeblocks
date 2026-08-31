@@ -181,11 +181,21 @@ func (r *VolumePopulatorReconciler) mapRestoreToPVCs(ctx context.Context, obj cl
 	}
 	clusterName := comp.Labels[constant.AppInstanceLabelKey]
 	componentName := restore.Labels[constant.KBAppComponentLabelKey]
-	if clusterName == "" || componentName == "" || restore.Labels[constant.AppInstanceLabelKey] != clusterName {
+	ownerComponentName := comp.Labels[constant.KBAppComponentLabelKey]
+	if clusterName == "" || componentName == "" || ownerComponentName == "" ||
+		restore.Labels[constant.AppInstanceLabelKey] != clusterName {
 		return nil
 	}
 	includeTerminal := !restore.DeletionTimestamp.IsZero() ||
 		restore.Status.Phase == dpv1alpha1.RestorePhaseCompleted || restore.Status.Phase == dpv1alpha1.RestorePhaseFailed
+	if componentName != ownerComponentName {
+		// A redirected postReady Restore is owned by its target Component, while
+		// its labels identify only the first source PVC that created it. Other
+		// source Components in the Cluster can wait on the same Restore too.
+		return r.mapRestorePVCs(ctx, restore.Namespace, client.MatchingLabels{
+			constant.AppInstanceLabelKey: clusterName,
+		}, includeTerminal)
+	}
 	return r.mapRestorePVCs(ctx, restore.Namespace, client.MatchingLabels{
 		constant.AppInstanceLabelKey:    clusterName,
 		constant.KBAppComponentLabelKey: componentName,
@@ -202,10 +212,20 @@ func (r *VolumePopulatorReconciler) mapComponentToPVCs(ctx context.Context, obj 
 	if clusterName == "" || componentName == "" {
 		return nil
 	}
-	return r.mapRestorePVCs(ctx, comp.Namespace, client.MatchingLabels{
-		constant.AppInstanceLabelKey:    clusterName,
-		constant.KBAppComponentLabelKey: componentName,
-	}, !comp.DeletionTimestamp.IsZero())
+	// A PVC can depend on another Component through a redirected postReady
+	// Restore. That relationship is derived from Backup status and is not
+	// represented on the Component, so a Component event must fan out to all
+	// active restore PVCs in its Cluster.
+	labels := client.MatchingLabels{
+		constant.AppInstanceLabelKey: clusterName,
+	}
+	includeTerminal := !comp.DeletionTimestamp.IsZero()
+	if includeTerminal {
+		// Component deletion is a termination signal only for restore PVCs
+		// physically owned by that Component.
+		labels[constant.KBAppComponentLabelKey] = componentName
+	}
+	return r.mapRestorePVCs(ctx, comp.Namespace, labels, includeTerminal)
 }
 
 func (r *VolumePopulatorReconciler) mapClusterToPVCs(ctx context.Context, obj client.Object) []reconcile.Request {
@@ -255,7 +275,10 @@ func isClusterRestorePVC(pvc *corev1.PersistentVolumeClaim) bool {
 			return false
 		}
 	}
-	return pvc.Annotations[constant.RestoreComponentAnnotationKey] == pvc.Labels[constant.KBAppComponentLabelKey]
+	restoreComponent := pvc.Annotations[constant.RestoreComponentAnnotationKey]
+	return restoreComponent == pvc.Labels[constant.KBAppComponentLabelKey] ||
+		restoreComponent == pvc.Labels[constant.KBAppShardingNameLabelKey] ||
+		restoreComponent == pvc.Labels[constant.KBAppShardTemplateLabelKey]
 }
 
 func pvcRestoreTerminal(pvc *corev1.PersistentVolumeClaim) bool {

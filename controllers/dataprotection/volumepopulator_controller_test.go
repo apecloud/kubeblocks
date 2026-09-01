@@ -42,7 +42,6 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -59,29 +58,6 @@ import (
 	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
-
-type deleteClusterAfterTargetFinalizerClient struct {
-	client.Client
-	clusterKey client.ObjectKey
-	triggered  bool
-}
-
-func (c *deleteClusterAfterTargetFinalizerClient) Patch(ctx context.Context, obj client.Object,
-	patch client.Patch, opts ...client.PatchOption) error {
-	if err := c.Client.Patch(ctx, obj, patch, opts...); err != nil {
-		return err
-	}
-	pvc, ok := obj.(*corev1.PersistentVolumeClaim)
-	if !ok || c.triggered || !controllerutil.ContainsFinalizer(pvc, dptypes.DataProtectionFinalizerName) {
-		return nil
-	}
-	c.triggered = true
-	cluster := &kbappsv1.Cluster{}
-	if err := c.Client.Get(ctx, c.clusterKey, cluster); err != nil {
-		return err
-	}
-	return c.Client.Delete(ctx, cluster)
-}
 
 var _ = Describe("Volume Populator Controller test", func() {
 	cleanEnv := func() {
@@ -1877,6 +1853,7 @@ func TestEnsurePostReadyRestoreCompletedDoesNotReuseStaleRestore(t *testing.T) {
 	require.NoError(t, kbappsv1.AddToScheme(scheme))
 	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
 	apiGroup := dptypes.DataprotectionAPIGroup
+	cluster := protectedRestoreCluster()
 	backup := newBackupForRestoreDecision([]string{"data"}, nil)
 	pvc := newPVCForRestoreDecision("data", "mysql", "")
 	pvc.UID = types.UID("current-pvc")
@@ -1911,7 +1888,7 @@ func TestEnsurePostReadyRestoreCompletedDoesNotReuseStaleRestore(t *testing.T) {
 	reconciler := &VolumePopulatorReconciler{
 		Client: fake.NewClientBuilder().WithScheme(scheme).
 			WithStatusSubresource(pvc).
-			WithObjects(backup, pvc, comp, staleRestore).
+			WithObjects(cluster, backup, pvc, comp, staleRestore).
 			Build(),
 		Scheme:   scheme,
 		Recorder: record.NewFakeRecorder(10),
@@ -1944,6 +1921,7 @@ func TestEnsurePostReadyRestoreCompletedUsesOneRestorePerComponent(t *testing.T)
 	require.NoError(t, kbappsv1.AddToScheme(scheme))
 	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
 	apiGroup := dptypes.DataprotectionAPIGroup
+	cluster := protectedRestoreCluster()
 	backup := newBackupForRestoreDecision([]string{"data"}, nil)
 	pvc1 := newPVCForRestoreDecision("data", "mysql", "")
 	pvc1.UID = types.UID("data-pvc")
@@ -1974,7 +1952,7 @@ func TestEnsurePostReadyRestoreCompletedUsesOneRestorePerComponent(t *testing.T)
 	reconciler := &VolumePopulatorReconciler{
 		Client: fake.NewClientBuilder().WithScheme(scheme).
 			WithStatusSubresource(pvc1, pvc2).
-			WithObjects(backup, pvc1, pvc2, comp).
+			WithObjects(cluster, backup, pvc1, pvc2, comp).
 			Build(),
 		Scheme:   scheme,
 		Recorder: record.NewFakeRecorder(10),
@@ -1999,6 +1977,40 @@ func TestEnsurePostReadyRestoreCompletedUsesOneRestorePerComponent(t *testing.T)
 	require.Len(t, restoreList.Items, 1)
 	require.Equal(t, postReadyRestoreName(comp.UID), restoreList.Items[0].Name)
 	require.Equal(t, backup.Name, restoreList.Items[0].Spec.Backup.Name)
+}
+
+func TestEnsureClusterAllowsRestoreSideEffects(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, kbappsv1.AddToScheme(scheme))
+	key := types.NamespacedName{Namespace: "default", Name: "cluster"}
+
+	t.Run("protected Cluster", func(t *testing.T) {
+		cluster := protectedRestoreCluster()
+		reconciler := &VolumePopulatorReconciler{Client: fake.NewClientBuilder().
+			WithScheme(scheme).WithObjects(cluster).Build()}
+		require.NoError(t, reconciler.ensureClusterAllowsRestoreSideEffects(context.Background(), key))
+	})
+
+	t.Run("missing protection", func(t *testing.T) {
+		cluster := protectedRestoreCluster()
+		cluster.Finalizers = nil
+		reconciler := &VolumePopulatorReconciler{Client: fake.NewClientBuilder().
+			WithScheme(scheme).WithObjects(cluster).Build()}
+		err := reconciler.ensureClusterAllowsRestoreSideEffects(context.Background(), key)
+		require.Error(t, err)
+		require.True(t, intctrlutil.IsRequeueError(err))
+	})
+
+	t.Run("deleting Cluster", func(t *testing.T) {
+		cluster := protectedRestoreCluster()
+		now := metav1.Now()
+		cluster.DeletionTimestamp = &now
+		reconciler := &VolumePopulatorReconciler{Client: fake.NewClientBuilder().
+			WithScheme(scheme).WithObjects(cluster).Build()}
+		err := reconciler.ensureClusterAllowsRestoreSideEffects(context.Background(), key)
+		require.Error(t, err)
+		require.True(t, intctrlutil.IsRequeueError(err))
+	})
 }
 
 func TestCompleteBoundPVCWaitsForKubernetesBinding(t *testing.T) {
@@ -2212,6 +2224,7 @@ func TestCompleteBoundPVCContinuesPostReadyAfterPopulateReleased(t *testing.T) {
 	require.NoError(t, kbappsv1.AddToScheme(scheme))
 	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
 	apiGroup := dptypes.DataprotectionAPIGroup
+	cluster := protectedRestoreCluster()
 	backup := newBackupForRestoreDecision([]string{"data"}, nil)
 	pvc := newPVCForRestoreDecision("data", "mysql", "")
 	pvc.UID = types.UID("target-pvc")
@@ -2242,7 +2255,7 @@ func TestCompleteBoundPVCContinuesPostReadyAfterPopulateReleased(t *testing.T) {
 	reconciler := &VolumePopulatorReconciler{
 		Client: fake.NewClientBuilder().WithScheme(scheme).
 			WithStatusSubresource(pvc).
-			WithObjects(backup, pvc, comp).
+			WithObjects(cluster, backup, pvc, comp).
 			Build(),
 		Scheme:   scheme,
 		Recorder: record.NewFakeRecorder(10),
@@ -2683,6 +2696,14 @@ func newClusterForShardingDecision(shards int32) *kbappsv1.Cluster {
 	}
 }
 
+func protectedRestoreCluster() *kbappsv1.Cluster {
+	return &kbappsv1.Cluster{ObjectMeta: metav1.ObjectMeta{
+		Namespace:  "default",
+		Name:       "cluster",
+		Finalizers: []string{dptypes.RestoreProtectionFinalizerName},
+	}}
+}
+
 func newComponentForShardingDecision(componentName string) *kbappsv1.Component {
 	return &kbappsv1.Component{
 		ObjectMeta: metav1.ObjectMeta{
@@ -3077,6 +3098,7 @@ func TestEnsurePostReadyRestore_MultiComponent_PostReadyOnly_ShouldNotSilentlySk
 	require.NoError(t, kbappsv1.AddToScheme(scheme))
 	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
 	apiGroup := dptypes.DataprotectionAPIGroup
+	cluster := protectedRestoreCluster()
 
 	backup := newBackupForRestoreDecision(nil, nil)
 	backup.Status.BackupMethod.TargetVolumes = nil
@@ -3149,7 +3171,7 @@ func TestEnsurePostReadyRestore_MultiComponent_PostReadyOnly_ShouldNotSilentlySk
 	reconciler := &VolumePopulatorReconciler{
 		Client: fake.NewClientBuilder().WithScheme(scheme).
 			WithStatusSubresource(pdPVC, tikvPVC).
-			WithObjects(backup, pdPVC, tikvPVC, pdComp, tikvComp, tidbComp).
+			WithObjects(cluster, backup, pdPVC, tikvPVC, pdComp, tikvComp, tidbComp).
 			Build(),
 		Scheme:   scheme,
 		Recorder: record.NewFakeRecorder(10),
@@ -3236,6 +3258,7 @@ func TestEnsurePostReadyRestore_MultiComponent_PrepareDataAndPostReady_Redirects
 	require.NoError(t, kbappsv1.AddToScheme(scheme))
 	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
 	apiGroup := dptypes.DataprotectionAPIGroup
+	cluster := protectedRestoreCluster()
 
 	backup := newBackupForRestoreDecision([]string{"data"}, nil)
 	backup.Status.Target = &dpv1alpha1.BackupStatusTarget{
@@ -3284,7 +3307,7 @@ func TestEnsurePostReadyRestore_MultiComponent_PrepareDataAndPostReady_Redirects
 	reconciler := &VolumePopulatorReconciler{
 		Client: fake.NewClientBuilder().WithScheme(scheme).
 			WithStatusSubresource(pdPVC).
-			WithObjects(backup, pdPVC, pdComp, tidbComp).
+			WithObjects(cluster, backup, pdPVC, pdComp, tidbComp).
 			Build(),
 		Scheme:   scheme,
 		Recorder: record.NewFakeRecorder(10),
@@ -3537,7 +3560,7 @@ func TestParentDeletionTerminatesOnlyVolumePopulatorResourcesInOrder(t *testing.
 	postReady.Finalizers = []string{"example.io/restore-owner"}
 	cli := fake.NewClientBuilder().WithScheme(scheme).
 		WithObjects(cluster, component, its, target, helper, execution, postReady).Build()
-	reconciler := &VolumePopulatorReconciler{Client: cli, APIReader: cli, Scheme: scheme}
+	reconciler := &VolumePopulatorReconciler{Client: cli, Scheme: scheme}
 	reqCtx := intctrlutil.RequestCtx{Ctx: context.Background()}
 
 	terminated, err := reconciler.handleRestoreParentLifecycle(reqCtx, target)
@@ -3577,38 +3600,11 @@ func TestParentDeletionTerminatesOnlyVolumePopulatorResourcesInOrder(t *testing.
 		"VolumePopulator must never remove the Cluster controller finalizer")
 }
 
-func TestVolumePopulatorRevalidatesClusterAfterAddingTargetFinalizer(t *testing.T) {
-	scheme, cluster, component, its, target := parentRestoreObjects(t)
-	target.Finalizers = nil
-	target.Labels[dptypes.ComponentUIDLabelKey] = string(component.UID)
-	baseClient := fake.NewClientBuilder().WithScheme(scheme).
-		WithObjects(cluster, component, its, target).Build()
-	raceClient := &deleteClusterAfterTargetFinalizerClient{
-		Client: baseClient, clusterKey: client.ObjectKeyFromObject(cluster),
-	}
-	reconciler := &VolumePopulatorReconciler{Client: raceClient, APIReader: baseClient, Scheme: scheme}
-
-	err := reconciler.ProvisionOnly(
-		intctrlutil.RequestCtx{Ctx: context.Background()}, target, &pvcRestoreContext{})
-
-	require.NoError(t, err)
-	require.True(t, raceClient.triggered)
-	currentCluster := &kbappsv1.Cluster{}
-	require.NoError(t, baseClient.Get(context.Background(), client.ObjectKeyFromObject(cluster), currentCluster))
-	require.False(t, currentCluster.DeletionTimestamp.IsZero())
-	require.True(t, apierrors.IsNotFound(baseClient.Get(context.Background(), types.NamespacedName{
-		Namespace: target.Namespace, Name: getPopulatePVCName(target.UID),
-	}, &corev1.PersistentVolumeClaim{})), "no helper PVC may be created after parent deletion starts")
-	currentTarget := &corev1.PersistentVolumeClaim{}
-	require.NoError(t, baseClient.Get(context.Background(), client.ObjectKeyFromObject(target), currentTarget))
-	require.NotContains(t, currentTarget.Finalizers, dptypes.DataProtectionFinalizerName)
-}
-
 func TestRetainedTargetStopsAfterDeletedClusterDisappears(t *testing.T) {
 	scheme, cluster, component, its, target := parentRestoreObjects(t)
 	target.Finalizers = nil
 	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(component, its, target).Build()
-	reconciler := &VolumePopulatorReconciler{Client: cli, APIReader: cli, Scheme: scheme}
+	reconciler := &VolumePopulatorReconciler{Client: cli, Scheme: scheme}
 
 	terminated, err := reconciler.handleRestoreParentLifecycle(
 		intctrlutil.RequestCtx{Ctx: context.Background()}, target)
@@ -3631,7 +3627,7 @@ func TestClusterTerminationContinuesAfterRetainedPVCIsDetachedFromWorkload(t *te
 	execution.Finalizers = []string{"example.io/restore-owner"}
 	cli := fake.NewClientBuilder().WithScheme(scheme).
 		WithObjects(cluster, component, target, helper, execution).Build()
-	reconciler := &VolumePopulatorReconciler{Client: cli, APIReader: cli, Scheme: scheme}
+	reconciler := &VolumePopulatorReconciler{Client: cli, Scheme: scheme}
 
 	terminated, err := reconciler.handleRestoreParentLifecycle(
 		intctrlutil.RequestCtx{Ctx: context.Background()}, target)
@@ -3659,7 +3655,7 @@ func TestComponentTerminationContinuesAfterRetainedPVCIsDetachedFromWorkload(t *
 	execution.Finalizers = []string{"example.io/restore-owner"}
 	cli := fake.NewClientBuilder().WithScheme(scheme).
 		WithObjects(cluster, component, target, execution).Build()
-	reconciler := &VolumePopulatorReconciler{Client: cli, APIReader: cli, Scheme: scheme}
+	reconciler := &VolumePopulatorReconciler{Client: cli, Scheme: scheme}
 
 	terminated, err := reconciler.handleRestoreParentLifecycle(
 		intctrlutil.RequestCtx{Ctx: context.Background()}, target)
@@ -3680,7 +3676,7 @@ func TestITS2ScaleInRetainedPVCContinuesRestoreWithVerifiedIdentity(t *testing.T
 	cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(target).
 		WithObjects(cluster, component, target).Build()
 	reconciler := &VolumePopulatorReconciler{
-		Client: cli, APIReader: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(10),
+		Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(10),
 	}
 	reqCtx := intctrlutil.RequestCtx{Ctx: context.Background()}
 
@@ -3702,7 +3698,7 @@ func TestComponentReplacementFailsClosedBeforeRestoreProgression(t *testing.T) {
 	target.OwnerReferences = nil
 	target.Labels[dptypes.ComponentUIDLabelKey] = "previous-component-uid"
 	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, component, target).Build()
-	reconciler := &VolumePopulatorReconciler{Client: cli, APIReader: cli, Scheme: scheme}
+	reconciler := &VolumePopulatorReconciler{Client: cli, Scheme: scheme}
 
 	terminated, err := reconciler.handleRestoreParentLifecycle(
 		intctrlutil.RequestCtx{Ctx: context.Background()}, target)
@@ -3716,7 +3712,7 @@ func TestOwnerlessRestorePVCWithoutCommittedIdentityStillRequiresOwnershipValida
 	target.OwnerReferences = nil
 	delete(target.Labels, dptypes.ComponentUIDLabelKey)
 	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, component, target).Build()
-	reconciler := &VolumePopulatorReconciler{Client: cli, APIReader: cli, Scheme: scheme}
+	reconciler := &VolumePopulatorReconciler{Client: cli, Scheme: scheme}
 
 	terminated, err := reconciler.handleRestoreParentLifecycle(
 		intctrlutil.RequestCtx{Ctx: context.Background()}, target)
@@ -3731,6 +3727,7 @@ func TestComponentTerminationPreservesPostReadyRestoreOwnedByActiveComponent(t *
 	deletingComponent.DeletionTimestamp = &now
 	deletingComponent.Finalizers = []string{"example.io/app-owner"}
 	target.Finalizers = []string{dptypes.DataProtectionFinalizerName}
+	target.Labels[dptypes.ComponentUIDLabelKey] = string(deletingComponent.UID)
 	activeComponent := deletingComponent.DeepCopy()
 	activeComponent.Name = "cluster-tikv"
 	activeComponent.UID = "active-component-uid"
@@ -3741,7 +3738,7 @@ func TestComponentTerminationPreservesPostReadyRestoreOwnedByActiveComponent(t *
 	postReady.Finalizers = []string{"example.io/restore-owner"}
 	cli := fake.NewClientBuilder().WithScheme(scheme).
 		WithObjects(cluster, deletingComponent, activeComponent, its, target, postReady).Build()
-	reconciler := &VolumePopulatorReconciler{Client: cli, APIReader: cli, Scheme: scheme}
+	reconciler := &VolumePopulatorReconciler{Client: cli, Scheme: scheme}
 
 	terminated, err := reconciler.handleRestoreParentLifecycle(
 		intctrlutil.RequestCtx{Ctx: context.Background()}, target)
@@ -3763,12 +3760,13 @@ func TestComponentTerminationDeletesPostReadyRestoreByOwnerNotSourceLabel(t *tes
 	component.DeletionTimestamp = &now
 	component.Finalizers = []string{"example.io/app-owner"}
 	target.Finalizers = []string{dptypes.DataProtectionFinalizerName}
+	target.Labels[dptypes.ComponentUIDLabelKey] = string(component.UID)
 	postReady := postReadyRestoreForComponent(target, cluster, component)
 	postReady.Labels[constant.KBAppComponentLabelKey] = "another-source"
 	postReady.Finalizers = []string{"example.io/restore-owner"}
 	cli := fake.NewClientBuilder().WithScheme(scheme).
 		WithObjects(cluster, component, its, target, postReady).Build()
-	reconciler := &VolumePopulatorReconciler{Client: cli, APIReader: cli, Scheme: scheme}
+	reconciler := &VolumePopulatorReconciler{Client: cli, Scheme: scheme}
 
 	terminated, err := reconciler.handleRestoreParentLifecycle(
 		intctrlutil.RequestCtx{Ctx: context.Background()}, target)
@@ -3787,8 +3785,9 @@ func TestTargetPVCDeletionIsNotParentTermination(t *testing.T) {
 	now := metav1.Now()
 	target.DeletionTimestamp = &now
 	target.Finalizers = []string{dptypes.DataProtectionFinalizerName, "example.io/app-owner"}
+	target.Labels[dptypes.ComponentUIDLabelKey] = string(component.UID)
 	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, component, its, target).Build()
-	reconciler := &VolumePopulatorReconciler{Client: cli, APIReader: cli, Scheme: scheme}
+	reconciler := &VolumePopulatorReconciler{Client: cli, Scheme: scheme}
 
 	terminated, err := reconciler.handleRestoreParentLifecycle(
 		intctrlutil.RequestCtx{Ctx: context.Background()}, target)
@@ -3804,7 +3803,7 @@ func TestVolumePopulatorWaitsForClusterFinalizerWithoutAddingIt(t *testing.T) {
 	scheme, cluster, component, its, target := parentRestoreObjects(t)
 	cluster.Finalizers = nil
 	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, component, its, target).Build()
-	reconciler := &VolumePopulatorReconciler{Client: cli, APIReader: cli, Scheme: scheme}
+	reconciler := &VolumePopulatorReconciler{Client: cli, Scheme: scheme}
 
 	terminated, err := reconciler.handleRestoreParentLifecycle(
 		intctrlutil.RequestCtx{Ctx: context.Background()}, target)
@@ -3826,28 +3825,28 @@ func TestVolumePopulatorRefusesForeignExecutionRestore(t *testing.T) {
 	component.DeletionTimestamp = &now
 	component.Finalizers = []string{"example.io/app-owner"}
 	target.Finalizers = []string{dptypes.DataProtectionFinalizerName}
+	target.Labels[dptypes.ComponentUIDLabelKey] = string(component.UID)
 	helper := restoreHelperForTarget(target, cluster)
 	foreign := executionRestoreForTarget(target, cluster)
 	foreign.OwnerReferences[0].UID = "foreign-pvc"
 	cli := fake.NewClientBuilder().WithScheme(scheme).
 		WithObjects(cluster, component, its, target, helper, foreign).Build()
-	reconciler := &VolumePopulatorReconciler{Client: cli, APIReader: cli, Scheme: scheme}
+	reconciler := &VolumePopulatorReconciler{Client: cli, Scheme: scheme}
 
 	terminated, err := reconciler.handleRestoreParentLifecycle(
 		intctrlutil.RequestCtx{Ctx: context.Background()}, target)
 
-	require.False(t, terminated)
-	require.ErrorContains(t, err, "refusing to adopt execution Restore")
+	require.True(t, terminated)
+	require.ErrorContains(t, err, "refusing to delete execution Restore")
 	require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(foreign), &dpv1alpha1.Restore{}))
 	require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(helper), &corev1.PersistentVolumeClaim{}))
 }
 
-func TestVolumePopulatorAdoptsVerifiedLegacyTargetIdentity(t *testing.T) {
+func TestVolumePopulatorInitializesVerifiedTargetIdentity(t *testing.T) {
 	scheme, cluster, component, its, target := parentRestoreObjects(t)
 	delete(target.Labels, dptypes.ClusterUIDLabelKey)
-	delete(target.Annotations, constant.KBAppClusterUIDKey)
 	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, component, its, target).Build()
-	reconciler := &VolumePopulatorReconciler{Client: cli, APIReader: cli, Scheme: scheme}
+	reconciler := &VolumePopulatorReconciler{Client: cli, Scheme: scheme}
 
 	terminated, err := reconciler.handleRestoreParentLifecycle(
 		intctrlutil.RequestCtx{Ctx: context.Background()}, target)
@@ -3858,8 +3857,8 @@ func TestVolumePopulatorAdoptsVerifiedLegacyTargetIdentity(t *testing.T) {
 	require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(target), current))
 	require.Equal(t, string(cluster.UID), current.Labels[dptypes.ClusterUIDLabelKey])
 	require.Equal(t, string(component.UID), current.Labels[dptypes.ComponentUIDLabelKey])
-	require.Empty(t, current.Annotations[constant.KBAppClusterUIDKey],
-		"VolumePopulator must not write the Cluster Controller-owned restore-intent annotation")
+	require.Equal(t, string(cluster.UID), current.Annotations[constant.KBAppClusterUIDKey],
+		"VolumePopulator must not modify the Cluster Controller-owned restore-intent annotation")
 }
 
 func TestVolumePopulatorIdentityLabelsUseOwningComponentUID(t *testing.T) {
@@ -3875,48 +3874,6 @@ func TestVolumePopulatorIdentityLabelsUseOwningComponentUID(t *testing.T) {
 		"redirected postReady Restore identity must describe its actual owner Component")
 	require.Equal(t, string(cluster.UID),
 		postReadyRestoreLabels(target, targetComponent)[dptypes.ClusterUIDLabelKey])
-}
-
-func TestVolumePopulatorRefusesLegacyPostReadyRestoreOutsideClusterOwnership(t *testing.T) {
-	scheme, cluster, component, its, target := parentRestoreObjects(t)
-	foreignComponent := component.DeepCopy()
-	foreignComponent.Name = "cluster-tikv"
-	foreignComponent.UID = "foreign-component-uid"
-	foreignComponent.Labels[constant.KBAppComponentLabelKey] = "tikv"
-	foreignComponent.OwnerReferences[0].UID = "foreign-cluster-uid"
-	postReady := postReadyRestoreForComponent(target, cluster, foreignComponent)
-	delete(postReady.Labels, dptypes.ClusterUIDLabelKey)
-	cli := fake.NewClientBuilder().WithScheme(scheme).
-		WithObjects(cluster, component, foreignComponent, its, target, postReady).Build()
-	reconciler := &VolumePopulatorReconciler{Client: cli, APIReader: cli, Scheme: scheme}
-
-	err := reconciler.adoptVolumePopulatorIdentity(context.Background(), target, cluster, component)
-
-	require.ErrorContains(t, err, "owner Component is not owned by Cluster")
-	current := &dpv1alpha1.Restore{}
-	require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(postReady), current))
-	require.Empty(t, current.Labels[dptypes.ClusterUIDLabelKey])
-}
-
-func TestVolumePopulatorRefusesLegacyHelperWithoutExactIdentity(t *testing.T) {
-	scheme, cluster, component, its, target := parentRestoreObjects(t)
-	delete(target.Labels, dptypes.ClusterUIDLabelKey)
-	delete(target.Annotations, constant.KBAppClusterUIDKey)
-	helper := restoreHelperForTarget(target, cluster)
-	delete(helper.Labels, dprestore.DataProtectionPopulatePVCLabelKey)
-	cli := fake.NewClientBuilder().WithScheme(scheme).
-		WithObjects(cluster, component, its, target, helper).Build()
-	reconciler := &VolumePopulatorReconciler{Client: cli, APIReader: cli, Scheme: scheme}
-
-	terminated, err := reconciler.handleRestoreParentLifecycle(
-		intctrlutil.RequestCtx{Ctx: context.Background()}, target)
-
-	require.False(t, terminated)
-	require.ErrorContains(t, err, "refusing to adopt helper PVC")
-	currentTarget := &corev1.PersistentVolumeClaim{}
-	require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(target), currentTarget))
-	require.Empty(t, currentTarget.Labels[dptypes.ClusterUIDLabelKey],
-		"target identity is committed only after every side effect is verified")
 }
 
 func TestValidateClusterRestorePVCOwnershipThroughInstance(t *testing.T) {
@@ -3935,7 +3892,7 @@ func TestValidateClusterRestorePVCOwnershipThroughInstance(t *testing.T) {
 	}}
 	cli := fake.NewClientBuilder().WithScheme(scheme).
 		WithObjects(cluster, component, its, instance, target).Build()
-	reconciler := &VolumePopulatorReconciler{Client: cli, APIReader: cli, Scheme: scheme}
+	reconciler := &VolumePopulatorReconciler{Client: cli, Scheme: scheme}
 
 	actual, err := reconciler.validateClusterRestorePVCOwnership(context.Background(), target, cluster)
 
@@ -3949,7 +3906,7 @@ func TestVolumePopulatorRejectsMismatchedClusterUID(t *testing.T) {
 	target.Finalizers = []string{dptypes.DataProtectionFinalizerName}
 	helper := restoreHelperForTarget(target, cluster)
 	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, component, its, target, helper).Build()
-	reconciler := &VolumePopulatorReconciler{Client: cli, APIReader: cli, Scheme: scheme}
+	reconciler := &VolumePopulatorReconciler{Client: cli, Scheme: scheme}
 
 	terminated, err := reconciler.handleRestoreParentLifecycle(
 		intctrlutil.RequestCtx{Ctx: context.Background()}, target)
@@ -4198,6 +4155,7 @@ func TestEnsurePostReadyRestore_MultiComponent_PostReadyRedirectPreservesTargetE
 	require.NoError(t, kbappsv1.AddToScheme(scheme))
 	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
 	apiGroup := dptypes.DataprotectionAPIGroup
+	cluster := protectedRestoreCluster()
 	targetMounts := []corev1.VolumeMount{{Name: "data", MountPath: "/data"}}
 
 	backup := newBackupForRestoreDecision(nil, nil)
@@ -4249,7 +4207,7 @@ func TestEnsurePostReadyRestore_MultiComponent_PostReadyRedirectPreservesTargetE
 	reconciler := &VolumePopulatorReconciler{
 		Client: fake.NewClientBuilder().WithScheme(scheme).
 			WithStatusSubresource(pdPVC).
-			WithObjects(backup, pdPVC, pdComp, tidbComp).
+			WithObjects(cluster, backup, pdPVC, pdComp, tidbComp).
 			Build(),
 		Scheme:   scheme,
 		Recorder: record.NewFakeRecorder(10),
@@ -4534,6 +4492,7 @@ func TestEnsurePostReadyRestore_MultiComponent_PostReadyOnly_TargetsSlice(t *tes
 	require.NoError(t, kbappsv1.AddToScheme(scheme))
 	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
 	apiGroup := dptypes.DataprotectionAPIGroup
+	cluster := protectedRestoreCluster()
 
 	backup := newBackupForRestoreDecision(nil, nil)
 	backup.Status.BackupMethod.TargetVolumes = nil
@@ -4584,7 +4543,7 @@ func TestEnsurePostReadyRestore_MultiComponent_PostReadyOnly_TargetsSlice(t *tes
 	reconciler := &VolumePopulatorReconciler{
 		Client: fake.NewClientBuilder().WithScheme(scheme).
 			WithStatusSubresource(pdPVC).
-			WithObjects(backup, pdPVC, pdComp, tidbComp).
+			WithObjects(cluster, backup, pdPVC, pdComp, tidbComp).
 			Build(),
 		Scheme:   scheme,
 		Recorder: record.NewFakeRecorder(10),

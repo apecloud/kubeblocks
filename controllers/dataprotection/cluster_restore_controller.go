@@ -45,8 +45,7 @@ import (
 // VolumePopulator remains the owner of all PVC-scoped restore resources.
 type ClusterRestoreReconciler struct {
 	client.Client
-	APIReader client.Reader
-	Recorder  record.EventRecorder
+	Recorder record.EventRecorder
 }
 
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusters,verbs=get;list;watch;patch;update
@@ -82,24 +81,10 @@ func (r *ClusterRestoreReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log,
 			"waiting for restore resource owners to finish Cluster termination")
 	}
-
-	// A final uncached read closes informer visibility gaps before releasing the
-	// only protection that keeps the Cluster identity available to resource owners.
-	active, err = r.hasRestoreResources(ctx, r.directReader(), cluster)
-	if err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to confirm Cluster restore cleanup")
-	}
-	if active {
-		return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log,
-			"waiting for API server to confirm Cluster restore cleanup")
-	}
 	return r.removeFinalizer(reqCtx, cluster)
 }
 
 func (r *ClusterRestoreReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	if r.APIReader == nil {
-		r.APIReader = mgr.GetAPIReader()
-	}
 	return intctrlutil.NewControllerManagedBy(mgr).
 		Named("cluster_restore").
 		For(&appsv1.Cluster{}).
@@ -145,7 +130,8 @@ func (r *ClusterRestoreReconciler) hasRestoreResources(ctx context.Context, read
 		ownedByCurrentCluster := clusterUID == "" || clusterUID == string(cluster.UID)
 		terminal := restore.Status.Phase == dpv1alpha1.RestorePhaseCompleted ||
 			restore.Status.Phase == dpv1alpha1.RestorePhaseFailed
-		if ownedByCurrentCluster && (!terminal || !restore.DeletionTimestamp.IsZero()) {
+		if ownedByCurrentCluster && (!cluster.DeletionTimestamp.IsZero() ||
+			!terminal || !restore.DeletionTimestamp.IsZero()) {
 			return true, nil
 		}
 	}
@@ -194,13 +180,6 @@ func (r *ClusterRestoreReconciler) removeFinalizer(reqCtx intctrlutil.RequestCtx
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to remove Cluster restore-protection finalizer")
 	}
 	return intctrlutil.Reconciled()
-}
-
-func (r *ClusterRestoreReconciler) directReader() client.Reader {
-	if r.APIReader != nil {
-		return r.APIReader
-	}
-	return r.Client
 }
 
 func isClusterRestoreHelperPVC(pvc *corev1.PersistentVolumeClaim) bool {

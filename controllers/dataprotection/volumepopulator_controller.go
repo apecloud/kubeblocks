@@ -63,9 +63,8 @@ import (
 // VolumePopulatorReconciler reconciles Backup dataSource PVCs.
 type VolumePopulatorReconciler struct {
 	client.Client
-	APIReader client.Reader
-	Scheme    *runtime.Scheme
-	Recorder  record.EventRecorder
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
 }
 
 type pvcRestoreMode string
@@ -139,9 +138,6 @@ func (r *VolumePopulatorReconciler) handleSyncPVCError(reqCtx intctrlutil.Reques
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *VolumePopulatorReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	if r.APIReader == nil {
-		r.APIReader = mgr.GetAPIReader()
-	}
 	return intctrlutil.NewControllerManagedBy(mgr).
 		For(&corev1.PersistentVolumeClaim{}).
 		Watches(&dpv1alpha1.Restore{}, handler.EnqueueRequestsFromMapFunc(r.mapRestoreToPVCs),
@@ -431,7 +427,7 @@ func (r *VolumePopulatorReconciler) handleRestoreParentLifecycle(reqCtx intctrlu
 		}
 		return false, restoreParentRequeue(err)
 	}
-	if cluster.Spec.Restore == nil && !hasClusterIdentity {
+	if !hasClusterIdentity {
 		return false, nil
 	}
 	for _, clusterUID := range []string{
@@ -457,11 +453,15 @@ func (r *VolumePopulatorReconciler) handleRestoreParentLifecycle(reqCtx intctrlu
 			return false, restoreParentRequeue(err)
 		}
 	} else {
+		if controllerutil.ContainsFinalizer(pvc, dptypes.DataProtectionFinalizerName) {
+			return false, restoreParentRequeue(fmt.Errorf(
+				"restore PVC %s/%s started without committed parent identity", pvc.Namespace, pvc.Name))
+		}
 		comp, err = r.validateClusterRestorePVCOwnership(reqCtx.Ctx, pvc, cluster)
 		if err != nil {
 			return false, restoreParentRequeue(err)
 		}
-		if err = r.adoptVolumePopulatorIdentity(reqCtx.Ctx, pvc, cluster, comp); err != nil {
+		if err = r.initializeVolumePopulationIdentity(reqCtx.Ctx, pvc, cluster, comp); err != nil {
 			return false, restoreParentRequeue(err)
 		}
 	}
@@ -484,9 +484,9 @@ func volumePopulationIdentityCommitted(pvc *corev1.PersistentVolumeClaim, cluste
 		pvc.Labels[dptypes.ComponentUIDLabelKey] != ""
 }
 
-// committedVolumePopulationComponent resolves the Component recorded when VP
-// adopted the target. Retention may detach the workload owner chain, but it
-// does not transfer the restore to a replacement Component.
+// committedVolumePopulationComponent resolves the Component identity recorded
+// on the target before VP creates restore resources. Retention may detach the
+// workload owner chain, but it does not change that identity.
 func (r *VolumePopulatorReconciler) committedVolumePopulationComponent(ctx context.Context,
 	pvc *corev1.PersistentVolumeClaim, cluster *appsv1.Cluster) (*appsv1.Component, error) {
 	componentName := pvc.Labels[constant.KBAppComponentLabelKey]
@@ -499,7 +499,7 @@ func (r *VolumePopulatorReconciler) committedVolumePopulationComponent(ctx conte
 		Namespace: pvc.Namespace,
 		Name:      constant.GenerateClusterComponentName(cluster.Name, componentName),
 	}
-	if err := r.volumePopulatorReader().Get(ctx, key, comp); err != nil {
+	if err := r.Client.Get(ctx, key, comp); err != nil {
 		return nil, err
 	}
 	if string(comp.UID) != pvc.Labels[dptypes.ComponentUIDLabelKey] {
@@ -535,7 +535,7 @@ func (r *VolumePopulatorReconciler) validateClusterRestorePVCOwnership(ctx conte
 		itsOwner = owner
 	case "Instance":
 		instance := &workloads.Instance{}
-		if err := r.volumePopulatorReader().Get(ctx,
+		if err := r.Client.Get(ctx,
 			client.ObjectKey{Namespace: pvc.Namespace, Name: owner.Name}, instance); err != nil {
 			return nil, err
 		}
@@ -552,7 +552,7 @@ func (r *VolumePopulatorReconciler) validateClusterRestorePVCOwnership(ctx conte
 	}
 
 	its := &workloads.InstanceSet{}
-	if err := r.volumePopulatorReader().Get(ctx,
+	if err := r.Client.Get(ctx,
 		client.ObjectKey{Namespace: pvc.Namespace, Name: itsOwner.Name}, its); err != nil {
 		return nil, err
 	}
@@ -569,7 +569,7 @@ func (r *VolumePopulatorReconciler) validateClusterRestorePVCOwnership(ctx conte
 		return nil, fmt.Errorf("InstanceSet %s/%s has no Component controller owner", its.Namespace, its.Name)
 	}
 	comp := &appsv1.Component{}
-	if err := r.volumePopulatorReader().Get(ctx,
+	if err := r.Client.Get(ctx,
 		client.ObjectKey{Namespace: pvc.Namespace, Name: componentOwner.Name}, comp); err != nil {
 		if apierrors.IsNotFound(err) && !cluster.DeletionTimestamp.IsZero() {
 			return nil, nil
@@ -590,10 +590,12 @@ func (r *VolumePopulatorReconciler) validateClusterRestorePVCOwnership(ctx conte
 	return comp, nil
 }
 
-func (r *VolumePopulatorReconciler) adoptVolumePopulatorIdentity(ctx context.Context,
+// initializeVolumePopulationIdentity records the verified App ownership on a
+// target PVC before VP creates any resources.
+func (r *VolumePopulatorReconciler) initializeVolumePopulationIdentity(ctx context.Context,
 	pvc *corev1.PersistentVolumeClaim, cluster *appsv1.Cluster, comp *appsv1.Component) error {
 	if comp == nil {
-		return fmt.Errorf("can not adopt restore PVC %s/%s without a verified Component", pvc.Namespace, pvc.Name)
+		return fmt.Errorf("can not initialize restore PVC %s/%s without a verified Component", pvc.Namespace, pvc.Name)
 	}
 	if uid := pvc.Labels[dptypes.ClusterUIDLabelKey]; uid != "" && uid != string(cluster.UID) {
 		return fmt.Errorf("restore PVC %s/%s Cluster UID %s does not match %s",
@@ -609,124 +611,11 @@ func (r *VolumePopulatorReconciler) adoptVolumePopulatorIdentity(ctx context.Con
 	}
 	pvc.Labels[dptypes.ClusterUIDLabelKey] = string(cluster.UID)
 	pvc.Labels[dptypes.ComponentUIDLabelKey] = string(comp.UID)
-
-	helper := &corev1.PersistentVolumeClaim{}
-	helperKey := types.NamespacedName{Namespace: pvc.Namespace, Name: getPopulatePVCName(pvc.UID)}
-	if err := r.Client.Get(ctx, helperKey, helper); err == nil {
-		if err = validatePopulatePVCForAdoption(helper, pvc, cluster, comp); err != nil {
-			return err
-		}
-		if err = r.patchVolumePopulatorLabels(ctx, helper, internalRestoreLabels(pvc)); err != nil {
-			return err
-		}
-	} else if !apierrors.IsNotFound(err) {
-		return err
-	}
-
-	execution := &dpv1alpha1.Restore{}
-	if err := r.Client.Get(ctx, helperKey, execution); err == nil {
-		if !hasExactOwnerReference(execution.OwnerReferences, corev1.SchemeGroupVersion.String(),
-			"PersistentVolumeClaim", pvc.Name, pvc.UID) ||
-			execution.Labels[dprestore.DataProtectionRestoreLabelKey] != execution.Name {
-			return fmt.Errorf("refusing to adopt execution Restore %s/%s without exact PVC ownership",
-				execution.Namespace, execution.Name)
-		}
-		if err = validateVolumePopulatorUIDLabels(execution, cluster, comp); err != nil {
-			return err
-		}
-		if err = r.patchVolumePopulatorLabels(ctx, execution, internalRestoreLabels(pvc)); err != nil {
-			return err
-		}
-	} else if !apierrors.IsNotFound(err) {
-		return err
-	}
-
-	postReady := &dpv1alpha1.RestoreList{}
-	if err := r.Client.List(ctx, postReady, client.InNamespace(pvc.Namespace), client.MatchingLabels{
-		constant.AppInstanceLabelKey: cluster.Name,
-	}); err != nil {
-		return err
-	}
-	for i := range postReady.Items {
-		restore := &postReady.Items[i]
-		owner := internalPostReadyRestoreOwner(restore)
-		if owner == nil {
-			continue
-		}
-		if restore.Labels[dptypes.ClusterUIDLabelKey] == string(cluster.UID) &&
-			restore.Labels[dptypes.ComponentUIDLabelKey] == string(owner.UID) {
-			continue
-		}
-		ownerComponent, err := r.validatePostReadyRestoreOwner(ctx, restore, cluster)
-		if err != nil {
-			return err
-		}
-		if err = validateVolumePopulatorUIDLabels(restore, cluster, ownerComponent); err != nil {
-			return err
-		}
-		labels := map[string]string{
-			dptypes.ClusterUIDLabelKey:   string(cluster.UID),
-			dptypes.ComponentUIDLabelKey: string(ownerComponent.UID),
-			constant.AppInstanceLabelKey: cluster.Name,
-		}
-		if err := r.patchVolumePopulatorLabels(ctx, restore, labels); err != nil {
-			return err
-		}
-	}
 	if reflect.DeepEqual(originalPVC.Labels, pvc.Labels) {
 		return nil
 	}
-	// Commit the target identity last. Its presence means every pre-existing
-	// VP side effect has either been verified and adopted or was absent.
 	return r.Client.Patch(ctx, pvc,
 		client.MergeFromWithOptions(originalPVC, client.MergeFromWithOptimisticLock{}))
-}
-
-func validatePopulatePVCForAdoption(helper, pvc *corev1.PersistentVolumeClaim,
-	cluster *appsv1.Cluster, comp *appsv1.Component) error {
-	expectedName := getPopulatePVCName(pvc.UID)
-	if helper.Name != expectedName ||
-		helper.Labels[dprestore.DataProtectionRestoreLabelKey] != expectedName ||
-		helper.Labels[dprestore.DataProtectionRestoreNamespaceLabelKey] != pvc.Namespace ||
-		helper.Labels[dprestore.DataProtectionPopulatePVCLabelKey] != expectedName ||
-		helper.Labels[constant.AppInstanceLabelKey] != cluster.Name ||
-		helper.Labels[constant.KBAppComponentLabelKey] != pvc.Labels[constant.KBAppComponentLabelKey] {
-		return fmt.Errorf("refusing to adopt helper PVC %s/%s without exact VP identity",
-			helper.Namespace, helper.Name)
-	}
-	return validateVolumePopulatorUIDLabels(helper, cluster, comp)
-}
-
-func validateVolumePopulatorUIDLabels(obj client.Object, cluster *appsv1.Cluster, comp *appsv1.Component) error {
-	if uid := obj.GetLabels()[dptypes.ClusterUIDLabelKey]; uid != "" && uid != string(cluster.UID) {
-		return fmt.Errorf("refusing to adopt %T %s/%s with Cluster UID %s",
-			obj, obj.GetNamespace(), obj.GetName(), uid)
-	}
-	if uid := obj.GetLabels()[dptypes.ComponentUIDLabelKey]; uid != "" &&
-		(comp == nil || uid != string(comp.UID)) {
-		return fmt.Errorf("refusing to adopt %T %s/%s with Component UID %s",
-			obj, obj.GetNamespace(), obj.GetName(), uid)
-	}
-	return nil
-}
-
-func (r *VolumePopulatorReconciler) patchVolumePopulatorLabels(ctx context.Context,
-	obj client.Object, labels map[string]string) error {
-	original := obj.DeepCopyObject().(client.Object)
-	if obj.GetLabels() == nil {
-		obj.SetLabels(map[string]string{})
-	}
-	changed := false
-	for key, value := range labels {
-		if value != "" && obj.GetLabels()[key] != value {
-			obj.GetLabels()[key] = value
-			changed = true
-		}
-	}
-	if !changed {
-		return nil
-	}
-	return r.Client.Patch(ctx, obj, client.MergeFromWithOptions(original, client.MergeFromWithOptimisticLock{}))
 }
 
 func (r *VolumePopulatorReconciler) terminateVolumePopulation(reqCtx intctrlutil.RequestCtx,
@@ -756,7 +645,7 @@ func (r *VolumePopulatorReconciler) deleteExecutionRestoreAndWait(ctx context.Co
 	pvc *corev1.PersistentVolumeClaim, cluster *appsv1.Cluster) (bool, error) {
 	restore := &dpv1alpha1.Restore{}
 	key := types.NamespacedName{Namespace: pvc.Namespace, Name: getPopulatePVCName(pvc.UID)}
-	if err := r.volumePopulatorReader().Get(ctx, key, restore); err != nil {
+	if err := r.Client.Get(ctx, key, restore); err != nil {
 		return false, client.IgnoreNotFound(err)
 	}
 	if restore.Labels[dptypes.ClusterUIDLabelKey] != string(cluster.UID) ||
@@ -777,7 +666,7 @@ func (r *VolumePopulatorReconciler) deleteExecutionRestoreAndWait(ctx context.Co
 func (r *VolumePopulatorReconciler) deletePostReadyRestoresAndWait(ctx context.Context,
 	cluster *appsv1.Cluster, deletingComponent *appsv1.Component) (bool, error) {
 	list := &dpv1alpha1.RestoreList{}
-	if err := r.volumePopulatorReader().List(ctx, list, client.InNamespace(cluster.Namespace), client.MatchingLabels{
+	if err := r.Client.List(ctx, list, client.InNamespace(cluster.Namespace), client.MatchingLabels{
 		constant.AppInstanceLabelKey: cluster.Name,
 		dptypes.ClusterUIDLabelKey:   string(cluster.UID),
 	}); err != nil {
@@ -830,7 +719,7 @@ func (r *VolumePopulatorReconciler) validatePostReadyRestoreOwner(ctx context.Co
 			restore.Namespace, restore.Name)
 	}
 	component := &appsv1.Component{}
-	if err := r.volumePopulatorReader().Get(ctx,
+	if err := r.Client.Get(ctx,
 		client.ObjectKey{Namespace: restore.Namespace, Name: owner.Name}, component); err != nil {
 		return nil, err
 	}
@@ -849,7 +738,7 @@ func (r *VolumePopulatorReconciler) deletePopulatePVCAndWait(ctx context.Context
 	pvc *corev1.PersistentVolumeClaim, cluster *appsv1.Cluster) (bool, error) {
 	helper := &corev1.PersistentVolumeClaim{}
 	key := types.NamespacedName{Namespace: pvc.Namespace, Name: getPopulatePVCName(pvc.UID)}
-	if err := r.volumePopulatorReader().Get(ctx, key, helper); err != nil {
+	if err := r.Client.Get(ctx, key, helper); err != nil {
 		return false, client.IgnoreNotFound(err)
 	}
 	if helper.Labels[dptypes.ClusterUIDLabelKey] != string(cluster.UID) ||
@@ -863,13 +752,6 @@ func (r *VolumePopulatorReconciler) deletePopulatePVCAndWait(ctx context.Context
 		}
 	}
 	return true, nil
-}
-
-func (r *VolumePopulatorReconciler) volumePopulatorReader() client.Reader {
-	if r.APIReader != nil {
-		return r.APIReader
-	}
-	return r.Client
 }
 
 func hasExactOwnerReference(refs []metav1.OwnerReference, apiVersion, kind, name string, uid types.UID) bool {
@@ -1596,8 +1478,7 @@ func (r *VolumePopulatorReconciler) Populate(reqCtx intctrlutil.RequestCtx, pvc 
 	if err != nil || wait {
 		return err
 	}
-	stopped, err := r.ensureTargetFinalizerAndRevalidateParents(reqCtx, pvc)
-	if err != nil || stopped {
+	if err = r.ensureTargetFinalizer(reqCtx, pvc); err != nil {
 		return err
 	}
 	if err = r.UpdatePVCConditions(reqCtx, pvc, ReasonPopulatingProcessing, "Populator started"); err != nil {
@@ -1654,8 +1535,7 @@ func (r *VolumePopulatorReconciler) ProvisionOnly(reqCtx intctrlutil.RequestCtx,
 	if err != nil || wait {
 		return err
 	}
-	stopped, err := r.ensureTargetFinalizerAndRevalidateParents(reqCtx, pvc)
-	if err != nil || stopped {
+	if err = r.ensureTargetFinalizer(reqCtx, pvc); err != nil {
 		return err
 	}
 	if err = r.UpdatePVCConditions(reqCtx, pvc, ReasonPopulatingProcessing, "Provisioning PVC without data restore"); err != nil {
@@ -1678,79 +1558,14 @@ func (r *VolumePopulatorReconciler) ProvisionOnly(reqCtx intctrlutil.RequestCtx,
 	return r.completeBoundPVCIfNeeded(reqCtx, pvc, restoreCtx)
 }
 
-// ensureTargetFinalizerAndRevalidateParents closes the race between the
-// initial parent check and creation of helper/Restore side effects. Once the
-// target finalizer is visible, an uncached parent read creates this ordering:
-// deletion before the read is observed here; deletion after the read must be
-// observed by ClusterRestoreReconciler together with the target finalizer.
-func (r *VolumePopulatorReconciler) ensureTargetFinalizerAndRevalidateParents(
-	reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim) (bool, error) {
-	added := false
-	if !slices.Contains(pvc.Finalizers, dptypes.DataProtectionFinalizerName) {
-		pvcPatch := client.MergeFrom(pvc.DeepCopy())
-		controllerutil.AddFinalizer(pvc, dptypes.DataProtectionFinalizerName)
-		if err := r.Client.Patch(reqCtx.Ctx, pvc, pvcPatch); err != nil {
-			return false, err
-		}
-		added = true
+func (r *VolumePopulatorReconciler) ensureTargetFinalizer(
+	reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim) error {
+	if slices.Contains(pvc.Finalizers, dptypes.DataProtectionFinalizerName) {
+		return nil
 	}
-
-	clusterUID := pvc.Labels[dptypes.ClusterUIDLabelKey]
-	if clusterUID == "" {
-		return false, nil
-	}
-	clusterName := pvc.Labels[constant.AppInstanceLabelKey]
-	if clusterName == "" {
-		if added {
-			if err := r.releaseTargetPVC(reqCtx, pvc); err != nil {
-				return true, err
-			}
-		}
-		return true, restoreParentRequeue(fmt.Errorf(
-			"restore PVC %s/%s has no Cluster name for UID %s", pvc.Namespace, pvc.Name, clusterUID))
-	}
-	cluster := &appsv1.Cluster{}
-	key := types.NamespacedName{Namespace: pvc.Namespace, Name: clusterName}
-	if err := r.volumePopulatorReader().Get(reqCtx.Ctx, key, cluster); err != nil {
-		if apierrors.IsNotFound(err) && added {
-			return true, r.releaseTargetPVC(reqCtx, pvc)
-		}
-		return true, restoreParentRequeue(err)
-	}
-	if string(cluster.UID) != clusterUID {
-		if added {
-			if err := r.releaseTargetPVC(reqCtx, pvc); err != nil {
-				return true, err
-			}
-		}
-		return true, restoreParentRequeue(fmt.Errorf(
-			"restore PVC %s/%s identifies Cluster %s/%s UID %s, not current UID %s",
-			pvc.Namespace, pvc.Name, cluster.Namespace, cluster.Name, clusterUID, cluster.UID))
-	}
-	if !cluster.DeletionTimestamp.IsZero() {
-		return r.terminateParentVolumePopulation(reqCtx, pvc, cluster, nil)
-	}
-	if !volumePopulationIdentityCommitted(pvc, cluster) {
-		return true, restoreParentRequeue(fmt.Errorf(
-			"restore PVC %s/%s identity is not fully verified", pvc.Namespace, pvc.Name))
-	}
-	comp, err := r.committedVolumePopulationComponent(reqCtx.Ctx, pvc, cluster)
-	if err != nil {
-		return true, restoreParentRequeue(err)
-	}
-	if !comp.DeletionTimestamp.IsZero() {
-		return r.terminateParentVolumePopulation(reqCtx, pvc, cluster, comp)
-	}
-	if !controllerutil.ContainsFinalizer(cluster, dptypes.RestoreProtectionFinalizerName) {
-		if added {
-			if err := r.releaseTargetPVC(reqCtx, pvc); err != nil {
-				return true, err
-			}
-		}
-		return true, intctrlutil.NewRequeueError(reconcileInterval,
-			"waiting for Cluster restore-protection finalizer")
-	}
-	return false, nil
+	pvcPatch := client.MergeFrom(pvc.DeepCopy())
+	controllerutil.AddFinalizer(pvc, dptypes.DataProtectionFinalizerName)
+	return r.Client.Patch(reqCtx.Ctx, pvc, pvcPatch)
 }
 
 func (r *VolumePopulatorReconciler) completeBoundPVCIfNeeded(reqCtx intctrlutil.RequestCtx,
@@ -1929,6 +1744,10 @@ func (r *VolumePopulatorReconciler) ensurePostReadyRestoreCompleted(reqCtx intct
 		}
 		return false, err
 	}
+	if !comp.DeletionTimestamp.IsZero() {
+		return false, intctrlutil.NewRequeueError(reconcileInterval,
+			"waiting for deleting Component to terminate restore")
+	}
 	if comp.Status.Phase != appsv1.RunningComponentPhase || componentPostProvisionRunning(comp) {
 		if err = r.updatePVCConditionsIfPopulateNotReleased(reqCtx, pvc, "Waiting for component to finish post-provision"); err != nil {
 			return false, err
@@ -1960,6 +1779,12 @@ func (r *VolumePopulatorReconciler) ensurePostReadyRestoreCompleted(reqCtx intct
 		if !apierrors.IsNotFound(err) {
 			return false, err
 		}
+		if err = r.ensureClusterAllowsRestoreSideEffects(reqCtx.Ctx, types.NamespacedName{
+			Namespace: pvc.Namespace,
+			Name:      clusterName,
+		}); err != nil {
+			return false, err
+		}
 		if err = r.Client.Create(reqCtx.Ctx, postReadyRestore); err != nil && !apierrors.IsAlreadyExists(err) {
 			return false, err
 		}
@@ -1982,6 +1807,23 @@ func (r *VolumePopulatorReconciler) ensurePostReadyRestoreCompleted(reqCtx intct
 		}
 		return false, nil
 	}
+}
+
+func (r *VolumePopulatorReconciler) ensureClusterAllowsRestoreSideEffects(
+	ctx context.Context, key types.NamespacedName) error {
+	cluster := &appsv1.Cluster{}
+	if err := r.Client.Get(ctx, key, cluster); err != nil {
+		return err
+	}
+	if !cluster.DeletionTimestamp.IsZero() {
+		return intctrlutil.NewRequeueError(reconcileInterval,
+			"waiting for deleting Cluster to terminate restore")
+	}
+	if !controllerutil.ContainsFinalizer(cluster, dptypes.RestoreProtectionFinalizerName) {
+		return intctrlutil.NewRequeueError(reconcileInterval,
+			"waiting for Cluster restore-protection finalizer")
+	}
+	return nil
 }
 
 func (r *VolumePopulatorReconciler) updatePVCConditionsIfPopulateNotReleased(reqCtx intctrlutil.RequestCtx,

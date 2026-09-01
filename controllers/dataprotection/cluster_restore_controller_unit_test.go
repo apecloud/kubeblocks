@@ -43,7 +43,7 @@ func TestClusterRestoreControllerOwnsOnlyClusterFinalizer(t *testing.T) {
 	scheme := clusterRestoreTestScheme(t)
 	cluster := activeRestoreCluster()
 	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster).Build()
-	reconciler := &ClusterRestoreReconciler{Client: cli, APIReader: cli}
+	reconciler := &ClusterRestoreReconciler{Client: cli}
 
 	_, err := reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cluster)})
 	require.NoError(t, err)
@@ -64,7 +64,7 @@ func TestClusterRestoreControllerWaitsWithoutMutatingOwnerResources(t *testing.T
 	restore := clusterExecutionRestore(cluster, target)
 	restore.Finalizers = []string{"dataprotection.kubeblocks.io/restore-finalizer"}
 	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, target, helper, restore).Build()
-	reconciler := &ClusterRestoreReconciler{Client: cli, APIReader: cli}
+	reconciler := &ClusterRestoreReconciler{Client: cli}
 
 	result, err := reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cluster)})
 	require.NoError(t, err)
@@ -76,26 +76,6 @@ func TestClusterRestoreControllerWaitsWithoutMutatingOwnerResources(t *testing.T
 	require.Contains(t, currentTarget.Finalizers, dptypes.DataProtectionFinalizerName)
 }
 
-func TestClusterRestoreControllerUsesUncachedFinalCheck(t *testing.T) {
-	scheme := clusterRestoreTestScheme(t)
-	cluster := activeRestoreCluster()
-	now := metav1.Now()
-	cluster.DeletionTimestamp = &now
-	cluster.Finalizers = []string{dptypes.RestoreProtectionFinalizerName}
-	target := clusterRestoreTarget(cluster, "target-uid")
-	target.Finalizers = []string{dptypes.DataProtectionFinalizerName}
-	cached := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster).Build()
-	direct := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, target).Build()
-	reconciler := &ClusterRestoreReconciler{Client: cached, APIReader: direct}
-
-	result, err := reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cluster)})
-	require.NoError(t, err)
-	require.NotZero(t, result.RequeueAfter)
-	current := &appsv1.Cluster{}
-	require.NoError(t, cached.Get(context.Background(), client.ObjectKeyFromObject(cluster), current))
-	require.Contains(t, current.Finalizers, dptypes.RestoreProtectionFinalizerName)
-}
-
 func TestClusterRestoreControllerReleasesFinalizerAfterOwnersFinish(t *testing.T) {
 	scheme := clusterRestoreTestScheme(t)
 	cluster := activeRestoreCluster()
@@ -103,7 +83,7 @@ func TestClusterRestoreControllerReleasesFinalizerAfterOwnersFinish(t *testing.T
 	cluster.DeletionTimestamp = &now
 	cluster.Finalizers = []string{dptypes.RestoreProtectionFinalizerName, "example.io/keep"}
 	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster).Build()
-	reconciler := &ClusterRestoreReconciler{Client: cli, APIReader: cli}
+	reconciler := &ClusterRestoreReconciler{Client: cli}
 
 	_, err := reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cluster)})
 	require.NoError(t, err)
@@ -124,7 +104,7 @@ func TestClusterRestoreControllerTreatsCompletedRestoreAsInactive(t *testing.T) 
 	restore := clusterExecutionRestore(cluster, target)
 	restore.Status.Phase = dpv1alpha1.RestorePhaseCompleted
 	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, target, restore).Build()
-	reconciler := &ClusterRestoreReconciler{Client: cli, APIReader: cli}
+	reconciler := &ClusterRestoreReconciler{Client: cli}
 
 	_, err := reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cluster)})
 	require.NoError(t, err)
@@ -143,7 +123,7 @@ func TestClusterRestoreControllerKeepsProtectionAfterRestoreFailure(t *testing.T
 		Type: appsv1.ConditionTypeRestore, Status: metav1.ConditionFalse,
 	}}
 	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster).Build()
-	reconciler := &ClusterRestoreReconciler{Client: cli, APIReader: cli}
+	reconciler := &ClusterRestoreReconciler{Client: cli}
 
 	_, err := reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cluster)})
 	require.NoError(t, err)
@@ -151,6 +131,26 @@ func TestClusterRestoreControllerKeepsProtectionAfterRestoreFailure(t *testing.T
 	require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(cluster), current))
 	require.Contains(t, current.Finalizers, dptypes.RestoreProtectionFinalizerName,
 		"failed restore intent must remain protected until Cluster deletion")
+}
+
+func TestClusterRestoreControllerWaitsForTerminalRestoreDuringDeletion(t *testing.T) {
+	scheme := clusterRestoreTestScheme(t)
+	cluster := activeRestoreCluster()
+	now := metav1.Now()
+	cluster.DeletionTimestamp = &now
+	cluster.Finalizers = []string{dptypes.RestoreProtectionFinalizerName}
+	target := clusterRestoreTarget(cluster, "target-uid")
+	restore := clusterExecutionRestore(cluster, target)
+	restore.Status.Phase = dpv1alpha1.RestorePhaseFailed
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, target, restore).Build()
+	reconciler := &ClusterRestoreReconciler{Client: cli}
+
+	result, err := reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cluster)})
+	require.NoError(t, err)
+	require.NotZero(t, result.RequeueAfter)
+	current := &appsv1.Cluster{}
+	require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(cluster), current))
+	require.Contains(t, current.Finalizers, dptypes.RestoreProtectionFinalizerName)
 }
 
 func clusterRestoreTestScheme(t *testing.T) *runtime.Scheme {

@@ -1255,9 +1255,9 @@ func (r *VolumePopulatorReconciler) validateBoundTargetPV(reqCtx intctrlutil.Req
 		return err
 	}
 	if !pvClaimRefMatchesPVC(pv.Spec.ClaimRef, pvc) {
-		return intctrlutil.NewFatalError(fmt.Sprintf(
-			"target PVC %s/%s is bound to PV %s whose claimRef does not identify the restore target",
-			pvc.Namespace, pvc.Name, pv.Name))
+		return intctrlutil.NewRequeueError(reconcileInterval, fmt.Sprintf(
+			"waiting for target PV %s claimRef to identify PVC %s/%s",
+			pv.Name, pvc.Namespace, pvc.Name))
 	}
 	if pvc.Spec.DataSourceRef == nil || pvc.Spec.DataSourceRef.Name == "" {
 		return intctrlutil.NewFatalError(fmt.Sprintf(
@@ -2021,12 +2021,18 @@ func (r *VolumePopulatorReconciler) rebindPVCAndPV(reqCtx intctrlutil.RequestCtx
 	if populatePVC == nil {
 		return false, intctrlutil.NewFatalError(fmt.Sprintf("populate PVC is nil for target PVC %s/%s; restoreData path entered without prepareData backup set", pvc.Namespace, pvc.Name))
 	}
-	if populatePVC.Spec.VolumeName == "" {
-		return false, nil
-	}
 	if pvc.Spec.DataSourceRef == nil || pvc.Spec.DataSourceRef.Name == "" {
 		return false, intctrlutil.NewFatalError(fmt.Sprintf(
 			"target PVC %s/%s has no dataSourceRef", pvc.Namespace, pvc.Name))
+	}
+	if pvc.Spec.VolumeName != "" {
+		if err := r.validateBoundTargetPV(reqCtx, pvc); err != nil {
+			return false, err
+		}
+		return true, nil
+	}
+	if populatePVC.Spec.VolumeName == "" {
+		return false, nil
 	}
 	pv := &corev1.PersistentVolume{}
 	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Name: populatePVC.Spec.VolumeName}, pv); err != nil {

@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
@@ -34,6 +35,86 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/revisionmap"
 )
+
+func TestStatusReconcilerAggregatesInstanceRestoreConditions(t *testing.T) {
+	newFixture := func() (*workloads.InstanceSet, *kubebuilderx.ObjectTree) {
+		its := &workloads.InstanceSet{
+			ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default", Generation: 3},
+			Spec: workloads.InstanceSetSpec{
+				Replicas: ptr.To[int32](1),
+				Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "demo"}},
+				VolumeClaimTemplates: []corev1.PersistentVolumeClaim{{ObjectMeta: metav1.ObjectMeta{
+					Name: "data",
+					Annotations: map[string]string{
+						constant.RestoreSourceKindAnnotationKey: "Backup",
+					},
+				}}},
+			},
+		}
+		tree := kubebuilderx.NewObjectTree()
+		tree.SetRoot(its)
+		return its, tree
+	}
+	newInstance := func(status metav1.ConditionStatus) *workloads.Instance {
+		return &workloads.Instance{
+			ObjectMeta: metav1.ObjectMeta{Name: "demo-0", Namespace: "default"},
+			Status: workloads.InstanceStatus2{Conditions: []metav1.Condition{{
+				Type:    string(workloads.InstanceRestore),
+				Status:  status,
+				Message: "restore result",
+			}}},
+		}
+	}
+
+	t.Run("waits for the desired Instance", func(t *testing.T) {
+		its, tree := newFixture()
+		cond, err := buildRestoreCondition(tree, its, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if cond == nil || cond.Status != metav1.ConditionUnknown || cond.Reason != workloads.ReasonRestoreRunning {
+			t.Fatalf("unexpected Restore condition: %#v", cond)
+		}
+	})
+
+	t.Run("publishes completed", func(t *testing.T) {
+		its, tree := newFixture()
+		cond, err := buildRestoreCondition(tree, its, []*workloads.Instance{newInstance(metav1.ConditionTrue)})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if cond == nil || cond.Status != metav1.ConditionTrue || cond.Reason != workloads.ReasonRestoreCompleted {
+			t.Fatalf("unexpected Restore condition: %#v", cond)
+		}
+	})
+
+	t.Run("publishes failure first", func(t *testing.T) {
+		its, tree := newFixture()
+		cond, err := buildRestoreCondition(tree, its, []*workloads.Instance{newInstance(metav1.ConditionFalse)})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if cond == nil || cond.Status != metav1.ConditionFalse || cond.Reason != workloads.ReasonRestoreFailed {
+			t.Fatalf("unexpected Restore condition: %#v", cond)
+		}
+	})
+
+	t.Run("keeps a terminal failure", func(t *testing.T) {
+		its, tree := newFixture()
+		meta.SetStatusCondition(&its.Status.Conditions, metav1.Condition{
+			Type:   string(workloads.InstanceRestore),
+			Status: metav1.ConditionFalse,
+			Reason: workloads.ReasonRestoreFailed,
+		})
+		if err := (&statusReconciler{}).reconcileRestoreCondition(tree, its, []*workloads.Instance{newInstance(metav1.ConditionTrue)}); err != nil {
+			t.Fatal(err)
+		}
+		cond := meta.FindStatusCondition(its.Status.Conditions, string(workloads.InstanceRestore))
+		if cond == nil || cond.Status != metav1.ConditionFalse {
+			t.Fatalf("terminal Restore condition was overwritten: %#v", cond)
+		}
+	})
+}
 
 func TestSetInstanceStatusReadsCurrentStateFromInstance(t *testing.T) {
 	its := &workloads.InstanceSet{

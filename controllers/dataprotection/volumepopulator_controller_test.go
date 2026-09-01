@@ -3512,6 +3512,45 @@ func TestComponentTerminationContinuesAfterRetainedPVCIsDetachedFromWorkload(t *
 	require.False(t, currentRestore.DeletionTimestamp.IsZero())
 }
 
+func TestITS2ScaleInRetainedPVCContinuesRestoreWithVerifiedIdentity(t *testing.T) {
+	scheme, cluster, component, _, target := parentRestoreObjects(t)
+	target.OwnerReferences = nil
+	target.Finalizers = []string{dptypes.DataProtectionFinalizerName}
+	target.Labels[dptypes.ComponentUIDLabelKey] = string(component.UID)
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(target).
+		WithObjects(cluster, component, target).Build()
+	reconciler := &VolumePopulatorReconciler{
+		Client: cli, APIReader: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(10),
+	}
+	reqCtx := intctrlutil.RequestCtx{Ctx: context.Background()}
+
+	terminated, err := reconciler.handleRestoreParentLifecycle(reqCtx, target)
+	require.False(t, terminated)
+	require.NoError(t, err)
+
+	err = reconciler.ProvisionOnly(reqCtx, target, &pvcRestoreContext{})
+	require.Error(t, err)
+	require.True(t, intctrlutil.IsRequeueError(err))
+	helper := &corev1.PersistentVolumeClaim{}
+	require.NoError(t, cli.Get(context.Background(), types.NamespacedName{
+		Namespace: target.Namespace, Name: getPopulatePVCName(target.UID),
+	}, helper), "verified retained target must continue the normal restore state machine")
+}
+
+func TestOwnerlessRestorePVCWithoutCommittedIdentityStillRequiresOwnershipValidation(t *testing.T) {
+	scheme, cluster, component, _, target := parentRestoreObjects(t)
+	target.OwnerReferences = nil
+	delete(target.Labels, dptypes.ComponentUIDLabelKey)
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, component, target).Build()
+	reconciler := &VolumePopulatorReconciler{Client: cli, APIReader: cli, Scheme: scheme}
+
+	terminated, err := reconciler.handleRestoreParentLifecycle(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, target)
+
+	require.False(t, terminated)
+	require.ErrorContains(t, err, "has no supported workload controller owner")
+}
+
 func TestComponentTerminationPreservesPostReadyRestoreOwnedByActiveComponent(t *testing.T) {
 	scheme, cluster, deletingComponent, its, target := parentRestoreObjects(t)
 	now := metav1.Now()

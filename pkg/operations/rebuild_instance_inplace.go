@@ -21,7 +21,6 @@ package operations
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -42,6 +41,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
+	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dputils "github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
@@ -741,7 +741,7 @@ func getPVCMapAndVolumes(opsRes *OpsResource,
 	}
 	// backup's ready, then start to check restore
 	workloadName := constant.GenerateWorkloadNamePattern(opsRes.Cluster.Name, synthesizedComp.Name)
-	templateName, _, err := getTemplateNameAndOrdinal(workloadName, targetPod.Name)
+	templateName, _, err := instancetemplate.GetTemplateNameAndOrdinal(workloadName, targetPod.Name)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -861,25 +861,4 @@ func generateAllPodNames(
 		})
 	}
 	return instanceset.GenerateAllInstanceNames(fullCompName, compReplicas, templates, offlineInstances, appsv1.Ordinals{})
-}
-
-func getTemplateNameAndOrdinal(workloadName, podName string) (string, int32, error) {
-	podSuffix := strings.Replace(podName, workloadName+"-", "", 1)
-	lastDashIndex := strings.LastIndex(podSuffix, "-")
-	if lastDashIndex == len(podSuffix)-1 {
-		return "", 0, fmt.Errorf("no pod ordinal found after the last dash")
-	}
-	templateName := ""
-	indexStr := ""
-	if lastDashIndex == -1 {
-		indexStr = podSuffix
-	} else {
-		templateName = podSuffix[0:lastDashIndex]
-		indexStr = podSuffix[lastDashIndex+1:]
-	}
-	index, err := strconv.ParseInt(indexStr, 10, 32)
-	if err != nil {
-		return "", 0, fmt.Errorf("failed to obtain pod ordinal")
-	}
-	return templateName, int32(index), nil
 }

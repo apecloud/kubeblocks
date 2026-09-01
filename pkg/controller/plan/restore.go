@@ -65,7 +65,9 @@ type RestoreManager struct {
 	replicas                          int32
 	restoreLabels                     map[string]string
 	RestoreNamePrefix                 string
-	SourceTargetName                  string
+	// SourceTargetName overrides the source target for prepareData Restores.
+	// It is primarily used by scale-out restoration.
+	SourceTargetName string
 }
 
 func NewRestoreManager(ctx context.Context,
@@ -211,15 +213,28 @@ func (r *RestoreManager) DoPrepareData(comp *component.SynthesizedComponent,
 }
 
 func (r *RestoreManager) BuildPrepareDataRestore(comp *component.SynthesizedComponent, backupObj *dpv1alpha1.Backup, template *appsv1.InstanceTemplate) (*dpv1alpha1.Restore, error) {
-	templateName := ""
 	startingIndex := r.startingIndex
 	if template != nil {
-		templateName = template.Name
 		if len(template.Ordinals.Ranges) > 0 {
 			// todo: currently restore api does not support multiple ranges, if implement in current way it
 			// need to use multiple restore objects
 			startingIndex = template.Ordinals.Ranges[0].Start
 		}
+	}
+	return r.buildPrepareDataRestore(comp, backupObj, template, startingIndex)
+}
+
+// BuildPrepareDataRestoreForPod builds the Restore for one known Pod during
+// scale-out. The manager's startingIndex is the Pod's actual ordinal and must
+// not be replaced by the start of its instance template's ordinal range.
+func (r *RestoreManager) BuildPrepareDataRestoreForPod(comp *component.SynthesizedComponent, backupObj *dpv1alpha1.Backup, template *appsv1.InstanceTemplate) (*dpv1alpha1.Restore, error) {
+	return r.buildPrepareDataRestore(comp, backupObj, template, r.startingIndex)
+}
+
+func (r *RestoreManager) buildPrepareDataRestore(comp *component.SynthesizedComponent, backupObj *dpv1alpha1.Backup, template *appsv1.InstanceTemplate, startingIndex int32) (*dpv1alpha1.Restore, error) {
+	templateName := ""
+	if template != nil {
+		templateName = template.Name
 	}
 	backupMethod := backupObj.Status.BackupMethod
 	if backupMethod == nil {

@@ -32,6 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 )
@@ -64,6 +65,7 @@ func TestValidateAndInitRestoreMGRCrossNamespaceBackup(t *testing.T) {
 		Ctx: context.Background(),
 		Req: ctrl.Request{NamespacedName: client.ObjectKeyFromObject(restoreObj)},
 	}
+
 	t.Run("allows the Backup reference by default", func(t *testing.T) {
 		cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(actionSet, backup).Build()
 		mgr := &RestoreManager{Restore: restoreObj.DeepCopy()}
@@ -143,5 +145,71 @@ func TestValidateAndInitRestoreMGRCrossNamespaceBackup(t *testing.T) {
 		assert.ErrorContains(t, err, "VolumeSnapshot")
 		assert.ErrorContains(t, err, "source/base-snapshot")
 		assert.True(t, intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal))
+	})
+}
+
+func TestGetSourcePodNameForTargetPod(t *testing.T) {
+	target := &dpv1alpha1.BackupStatusTarget{
+		BackupTarget: dpv1alpha1.BackupTarget{
+			PodSelector: &dpv1alpha1.PodSelector{
+				LabelSelector: &metav1.LabelSelector{MatchLabels: map[string]string{
+					constant.AppInstanceLabelKey:    "source",
+					constant.KBAppComponentLabelKey: "redis",
+				}},
+				Strategy: dpv1alpha1.PodSelectionStrategyAll,
+			},
+		},
+	}
+	policy := &dpv1alpha1.RequiredPolicyForAllPodSelection{DataRestorePolicy: dpv1alpha1.OneToOneRestorePolicy}
+
+	t.Run("matches instance template identity without list order", func(t *testing.T) {
+		target.SelectedTargetPods = []string{"source-redis-az-a-4", "source-redis-az-a-3"}
+		podName, err := GetSourcePodNameForTargetPod(target, policy, "target-redis-az-a-3", "az-a")
+		assert.NoError(t, err)
+		assert.Equal(t, "source-redis-az-a-3", podName)
+	})
+
+	t.Run("disambiguates templates sharing an ordinal", func(t *testing.T) {
+		target.SelectedTargetPods = []string{"source-redis-az-b-3", "source-redis-az-a-3"}
+		podName, err := GetSourcePodNameForTargetPod(target, policy, "target-redis-az-a-3", "az-a")
+		assert.NoError(t, err)
+		assert.Equal(t, "source-redis-az-a-3", podName)
+	})
+
+	t.Run("matches the exact template rather than a suffix", func(t *testing.T) {
+		target.SelectedTargetPods = []string{"source-redis-b-a-3", "source-redis-a-3"}
+		podName, err := GetSourcePodNameForTargetPod(target, policy, "target-redis-a-3", "a")
+		assert.NoError(t, err)
+		assert.Equal(t, "source-redis-a-3", podName)
+	})
+
+	t.Run("does not treat a flat workload suffix as a template", func(t *testing.T) {
+		target.PodSelector.MatchLabels[constant.KBAppComponentLabelKey] = "redis-a"
+		target.SelectedTargetPods = []string{"source-redis-a-3"}
+		_, err := GetSourcePodNameForTargetPod(target, policy, "target-redis-a-3", "a")
+		assert.ErrorContains(t, err, "no selected source target pod matches")
+		target.PodSelector.MatchLabels[constant.KBAppComponentLabelKey] = "redis"
+	})
+
+	t.Run("matches a flat ordinal with holes", func(t *testing.T) {
+		target.SelectedTargetPods = []string{"source-redis-7", "source-redis-2"}
+		podName, err := GetSourcePodNameForTargetPod(target, policy, "target-redis-7", "")
+		assert.NoError(t, err)
+		assert.Equal(t, "source-redis-7", podName)
+	})
+
+	t.Run("rejects an ambiguous generic ordinal", func(t *testing.T) {
+		labelSelector := target.PodSelector.LabelSelector
+		target.PodSelector.LabelSelector = nil
+		defer func() { target.PodSelector.LabelSelector = labelSelector }()
+		target.SelectedTargetPods = []string{"source-redis-az-a-3", "source-redis-az-b-3"}
+		_, err := GetSourcePodNameForTargetPod(target, policy, "target-redis-3", "")
+		assert.ErrorContains(t, err, "multiple selected source target pods")
+	})
+
+	t.Run("rejects a missing identity", func(t *testing.T) {
+		target.SelectedTargetPods = []string{"source-redis-az-a-4"}
+		_, err := GetSourcePodNameForTargetPod(target, policy, "target-redis-az-a-3", "az-a")
+		assert.ErrorContains(t, err, "no selected source target pod matches")
 	})
 }

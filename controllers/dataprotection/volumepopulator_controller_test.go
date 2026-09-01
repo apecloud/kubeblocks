@@ -2939,6 +2939,40 @@ func TestRebindPVCAndPVRejectsPVNotOwnedByPopulatePVC(t *testing.T) {
 	require.Equal(t, "another-helper", currentPV.Spec.ClaimRef.Name)
 }
 
+func TestRebindPVCAndPVRequeuesForIncompleteHelperClaimRef(t *testing.T) {
+	for _, claimRef := range []*corev1.ObjectReference{
+		nil,
+		{Namespace: "default", Name: "populate"},
+	} {
+		t.Run(fmt.Sprintf("claimRef-%v", claimRef), func(t *testing.T) {
+			scheme := runtime.NewScheme()
+			require.NoError(t, corev1.AddToScheme(scheme))
+			pvc := &corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "target", UID: "target-uid"},
+				Spec:       corev1.PersistentVolumeClaimSpec{DataSourceRef: &corev1.TypedObjectReference{Name: "backup"}},
+			}
+			populatePVC := &corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "populate", UID: "populate-uid"},
+				Spec:       corev1.PersistentVolumeClaimSpec{VolumeName: "pv"},
+			}
+			pv := &corev1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{Name: populatePVC.Spec.VolumeName},
+				Spec:       corev1.PersistentVolumeSpec{ClaimRef: claimRef},
+			}
+			reconciler := &VolumePopulatorReconciler{
+				Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(pvc, pv).Build(),
+			}
+
+			rebound, err := reconciler.rebindPVCAndPV(
+				intctrlutil.RequestCtx{Ctx: context.Background()}, populatePVC, pvc)
+
+			require.False(t, rebound)
+			require.Error(t, err)
+			require.True(t, intctrlutil.IsRequeueError(err), err)
+		})
+	}
+}
+
 func TestRebindPVCAndPVValidatesExistingTargetBindingBeforeChangingHelperPV(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, corev1.AddToScheme(scheme))
@@ -2984,7 +3018,7 @@ func TestRebindPVCAndPVValidatesExistingTargetBindingBeforeChangingHelperPV(t *t
 	require.Empty(t, currentHelperPV.Annotations[AnnPopulateFrom])
 }
 
-func TestRebindPVCAndPVResumesAfterPVClaimRefPatch(t *testing.T) {
+func TestRebindPVCAndPVResumesAfterPVHandoff(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, corev1.AddToScheme(scheme))
 	apiGroup := dptypes.DataprotectionAPIGroup
@@ -3017,9 +3051,65 @@ func TestRebindPVCAndPVResumesAfterPVClaimRefPatch(t *testing.T) {
 	currentPV := &corev1.PersistentVolume{}
 	require.NoError(t, k8sClient.Get(context.Background(), client.ObjectKeyFromObject(pv), currentPV))
 	require.Equal(t, pvc.Spec.DataSourceRef.Name, currentPV.Annotations[AnnPopulateFrom])
+	require.True(t, pvClaimRefMatchesPVC(currentPV.Spec.ClaimRef, pvc))
 	currentPVC := &corev1.PersistentVolumeClaim{}
 	require.NoError(t, k8sClient.Get(context.Background(), client.ObjectKeyFromObject(pvc), currentPVC))
 	require.Equal(t, pv.Name, currentPVC.Spec.VolumeName)
+}
+
+func TestRebindPVCAndPVDoesNotOverwriteConcurrentTargetPVCBinding(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	stalePVC := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default", Name: "target", UID: "target-uid", ResourceVersion: "1",
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{DataSourceRef: &corev1.TypedObjectReference{Name: "backup"}},
+	}
+	livePVC := stalePVC.DeepCopy()
+	livePVC.ResourceVersion = "2"
+	livePVC.Spec.VolumeName = "other-pv"
+	populatePVC := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "populate", UID: "populate-uid"},
+		Spec:       corev1.PersistentVolumeClaimSpec{VolumeName: "restored-pv"},
+	}
+	helperPV := &corev1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{Name: populatePVC.Spec.VolumeName},
+		Spec: corev1.PersistentVolumeSpec{ClaimRef: &corev1.ObjectReference{
+			Namespace: populatePVC.Namespace, Name: populatePVC.Name, UID: populatePVC.UID,
+		}},
+	}
+	otherPV := &corev1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{Name: livePVC.Spec.VolumeName},
+		Spec: corev1.PersistentVolumeSpec{ClaimRef: &corev1.ObjectReference{
+			Namespace: livePVC.Namespace, Name: livePVC.Name, UID: livePVC.UID,
+		}},
+	}
+	liveClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(livePVC, helperPV, otherPV).Build()
+	reconciler := &VolumePopulatorReconciler{Client: liveClient}
+
+	rebound, err := reconciler.rebindPVCAndPV(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, populatePVC, stalePVC)
+
+	require.False(t, rebound)
+	require.Error(t, err)
+	require.True(t, intctrlutil.IsRequeueError(err), err)
+	currentPVC := &corev1.PersistentVolumeClaim{}
+	require.NoError(t, liveClient.Get(context.Background(), client.ObjectKeyFromObject(livePVC), currentPVC))
+	require.Equal(t, "other-pv", currentPVC.Spec.VolumeName)
+	halfCompletedPV := &corev1.PersistentVolume{}
+	require.NoError(t, liveClient.Get(context.Background(), client.ObjectKeyFromObject(helperPV), halfCompletedPV))
+	require.True(t, pvClaimRefMatchesPVC(halfCompletedPV.Spec.ClaimRef, stalePVC))
+
+	rebound, err = reconciler.rebindPVCAndPV(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, populatePVC, currentPVC)
+	require.False(t, rebound)
+	require.Error(t, err)
+	require.True(t, intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal), err)
+	currentHelperPV := &corev1.PersistentVolume{}
+	require.NoError(t, liveClient.Get(context.Background(), client.ObjectKeyFromObject(helperPV), currentHelperPV))
+	require.True(t, pvClaimRefMatchesPVC(currentHelperPV.Spec.ClaimRef, populatePVC))
+	require.Empty(t, currentHelperPV.Annotations[AnnPopulateFrom])
 }
 
 func TestRebindPVCAndPVDoesNotOverwriteConcurrentClaimRefChange(t *testing.T) {

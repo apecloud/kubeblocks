@@ -2017,6 +2017,10 @@ func pvClaimRefMatchesPVC(claimRef *corev1.ObjectReference, pvc *corev1.Persiste
 		claimRef.UID == pvc.UID
 }
 
+func pvClaimRefComplete(claimRef *corev1.ObjectReference) bool {
+	return claimRef != nil && claimRef.Namespace != "" && claimRef.Name != "" && claimRef.UID != ""
+}
+
 func (r *VolumePopulatorReconciler) rebindPVCAndPV(reqCtx intctrlutil.RequestCtx, populatePVC, pvc *corev1.PersistentVolumeClaim) (bool, error) {
 	if populatePVC == nil {
 		return false, intctrlutil.NewFatalError(fmt.Sprintf("populate PVC is nil for target PVC %s/%s; restoreData path entered without prepareData backup set", pvc.Namespace, pvc.Name))
@@ -2025,13 +2029,13 @@ func (r *VolumePopulatorReconciler) rebindPVCAndPV(reqCtx intctrlutil.RequestCtx
 		return false, intctrlutil.NewFatalError(fmt.Sprintf(
 			"target PVC %s/%s has no dataSourceRef", pvc.Namespace, pvc.Name))
 	}
-	if pvc.Spec.VolumeName != "" {
-		if err := r.validateBoundTargetPV(reqCtx, pvc); err != nil {
-			return false, err
-		}
-		return true, nil
-	}
 	if populatePVC.Spec.VolumeName == "" {
+		if pvc.Spec.VolumeName != "" {
+			if err := r.validateBoundTargetPV(reqCtx, pvc); err != nil {
+				return false, err
+			}
+			return true, nil
+		}
 		return false, nil
 	}
 	pv := &corev1.PersistentVolume{}
@@ -2050,12 +2054,35 @@ func (r *VolumePopulatorReconciler) rebindPVCAndPV(reqCtx intctrlutil.RequestCtx
 				"PV %s already identifies target PVC %s/%s without expected population provenance %s=%q",
 				pv.Name, pvc.Namespace, pvc.Name, AnnPopulateFrom, pvc.Spec.DataSourceRef.Name))
 		}
-		return true, r.bindTargetPVCToPV(reqCtx, pvc, pv.Name)
+		if pvc.Spec.VolumeName != "" && pvc.Spec.VolumeName != pv.Name {
+			if err := r.restoreHelperPVBinding(reqCtx, pv, populatePVC); err != nil {
+				return false, err
+			}
+			if err := r.validateBoundTargetPV(reqCtx, pvc); err != nil {
+				return false, err
+			}
+			return true, nil
+		}
+		if err := r.bindTargetPVCToPV(reqCtx, pvc, pv.Name); err != nil {
+			return false, err
+		}
+		return true, nil
 	}
 	if !pvClaimRefMatchesPVC(claimRef, populatePVC) {
+		if !pvClaimRefComplete(claimRef) {
+			return false, intctrlutil.NewRequeueError(reconcileInterval, fmt.Sprintf(
+				"waiting for PV %s claimRef to identify helper PVC %s/%s",
+				pv.Name, populatePVC.Namespace, populatePVC.Name))
+		}
 		return false, intctrlutil.NewFatalError(fmt.Sprintf(
 			"refusing to rebind PV %s for target PVC %s/%s: claimRef does not identify helper PVC %s/%s UID %s",
 			pv.Name, pvc.Namespace, pvc.Name, populatePVC.Namespace, populatePVC.Name, populatePVC.UID))
+	}
+	if pvc.Spec.VolumeName != "" {
+		if err := r.validateBoundTargetPV(reqCtx, pvc); err != nil {
+			return false, err
+		}
+		return true, nil
 	}
 	// Make new PV with strategic patch values to perform the PV rebind
 	patchPV := client.MergeFromWithOptions(pv.DeepCopy(), client.MergeFromWithOptimisticLock{})
@@ -2072,7 +2099,32 @@ func (r *VolumePopulatorReconciler) rebindPVCAndPV(reqCtx intctrlutil.RequestCtx
 	if err := r.Client.Patch(reqCtx.Ctx, pv, patchPV); err != nil {
 		return false, requeuePVRebindConflict(err, pv, pvc)
 	}
-	return true, r.bindTargetPVCToPV(reqCtx, pvc, pv.Name)
+	if err := r.bindTargetPVCToPV(reqCtx, pvc, pv.Name); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func (r *VolumePopulatorReconciler) restoreHelperPVBinding(reqCtx intctrlutil.RequestCtx,
+	pv *corev1.PersistentVolume,
+	populatePVC *corev1.PersistentVolumeClaim) error {
+	patchPV := client.MergeFromWithOptions(pv.DeepCopy(), client.MergeFromWithOptimisticLock{})
+	pv.Spec.ClaimRef = &corev1.ObjectReference{
+		Namespace:       populatePVC.Namespace,
+		Name:            populatePVC.Name,
+		UID:             populatePVC.UID,
+		ResourceVersion: populatePVC.ResourceVersion,
+	}
+	delete(pv.Annotations, AnnPopulateFrom)
+	if err := r.Client.Patch(reqCtx.Ctx, pv, patchPV); err != nil {
+		if apierrors.IsConflict(err) {
+			return intctrlutil.NewRequeueError(reconcileInterval, fmt.Sprintf(
+				"PV %s changed while restoring helper PVC %s/%s binding; retrying",
+				pv.Name, populatePVC.Namespace, populatePVC.Name))
+		}
+		return err
+	}
+	return nil
 }
 
 func requeuePVRebindConflict(err error, pv *corev1.PersistentVolume, pvc *corev1.PersistentVolumeClaim) error {
@@ -2092,9 +2144,17 @@ func (r *VolumePopulatorReconciler) bindTargetPVCToPV(reqCtx intctrlutil.Request
 		return intctrlutil.NewFatalError(fmt.Sprintf("target PVC %s/%s is already bound to PV %s, expected %s",
 			pvc.Namespace, pvc.Name, pvc.Spec.VolumeName, pvName))
 	}
-	patch := client.MergeFrom(pvc.DeepCopy())
+	patch := client.MergeFromWithOptions(pvc.DeepCopy(), client.MergeFromWithOptimisticLock{})
 	pvc.Spec.VolumeName = pvName
-	return r.Client.Patch(reqCtx.Ctx, pvc, patch)
+	if err := r.Client.Patch(reqCtx.Ctx, pvc, patch); err != nil {
+		if apierrors.IsConflict(err) {
+			return intctrlutil.NewRequeueError(reconcileInterval, fmt.Sprintf(
+				"target PVC %s/%s changed while binding PV %s; retrying",
+				pvc.Namespace, pvc.Name, pvName))
+		}
+		return err
+	}
+	return nil
 }
 
 func pvcBindingCompleted(pvc *corev1.PersistentVolumeClaim) bool {

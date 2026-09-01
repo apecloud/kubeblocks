@@ -500,6 +500,26 @@ var _ = Describe("RestoreManager Test", func() {
 				return continuousBackup, restore
 			}
 
+			It("returns a fatal error when the base Backup has no status.backupMethod", func() {
+				baseBackup := mockBackupForRestore(
+					&testCtx, actionSet.Name, testdp.BackupPVCName, true, false, dpv1alpha1.BackupTypeFull,
+					"", "2023-01-01T10:00:00Z", "",
+				)
+				Expect(testapps.ChangeObjStatus(&testCtx, baseBackup, func() {
+					baseBackup.Status.BackupMethod = nil
+				})).Should(Succeed())
+
+				continuousBackup, restore := createContinuousBackupAndRestore("2023-01-01T11:30:00Z")
+				reqCtx := getReqCtx()
+				restoreMGR := NewRestoreManager(restore, recorder, k8sClient.Scheme(), k8sClient)
+				backupSet, err := restoreMGR.GetBackupActionSetByNamespaced(reqCtx, k8sClient, continuousBackup.Name, testCtx.DefaultNamespace)
+				Expect(err).ShouldNot(HaveOccurred())
+
+				err = restoreMGR.BuildContinuousRestoreManager(reqCtx, k8sClient, *backupSet)
+				Expect(err).Should(MatchError(ContainSubstring("status.backupMethod")))
+				Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeTrue())
+			})
+
 			It("respects UnifyFullAndContinuousRestore annotation", func() {
 				By("create a completed backup")
 				_ = mockBackupForRestore(&testCtx, actionSet.Name, testdp.BackupPVCName, true, false, dpv1alpha1.BackupTypeFull, "", "2023-01-01T10:00:00Z", "")

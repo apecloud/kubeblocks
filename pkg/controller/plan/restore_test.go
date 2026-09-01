@@ -20,8 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package plan
 
 import (
+	"context"
 	"fmt"
 	"strings"
+	"testing"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -43,6 +45,32 @@ import (
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
 )
+
+func TestBuildPrepareDataRestorePreservesBackupNamespace(t *testing.T) {
+	manager := NewRestoreManager(context.Background(), nil, &appsv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "target", Namespace: "target", UID: "12345678"},
+	}, nil, nil, 1, 0)
+	comp := &component.SynthesizedComponent{
+		Name: "mysql",
+		VolumeClaimTemplates: []corev1.PersistentVolumeClaimTemplate{{
+			ObjectMeta: metav1.ObjectMeta{Name: "data"},
+		}},
+	}
+	backup := &dpv1alpha1.Backup{
+		ObjectMeta: metav1.ObjectMeta{Name: "backup", Namespace: "source"},
+		Status: dpv1alpha1.BackupStatus{BackupMethod: &dpv1alpha1.BackupMethod{
+			TargetVolumes: &dpv1alpha1.TargetVolumeInfo{Volumes: []string{"data"}},
+		}},
+	}
+
+	restore, err := manager.BuildPrepareDataRestore(comp, backup, nil)
+	if err != nil {
+		t.Fatalf("BuildPrepareDataRestore() error = %v", err)
+	}
+	if restore.Spec.Backup.Namespace != backup.Namespace {
+		t.Fatalf("backup namespace = %q, want %q", restore.Spec.Backup.Namespace, backup.Namespace)
+	}
+}
 
 var _ = Describe("Restore", func() {
 	const backupName = "test-backup-job"

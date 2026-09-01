@@ -99,7 +99,7 @@ func (r *RestoreManager) GetBackupActionSetByNamespaced(reqCtx intctrlutil.Reque
 	if backupMethod == nil {
 		return nil, intctrlutil.NewFatalError(fmt.Sprintf(`status.backupMethod of backup "%s" is empty`, backupName))
 	}
-	useVolumeSnapshot := backupMethod.SnapshotVolumes != nil && *backupMethod.SnapshotVolumes
+	useVolumeSnapshot := boolptr.IsSetToTrue(backupMethod.SnapshotVolumes)
 	actionSet, err := utils.GetActionSetByName(reqCtx, cli, backup.Status.BackupMethod.ActionSetName)
 	if err != nil {
 		return nil, err
@@ -256,15 +256,19 @@ func (r *RestoreManager) getBaseBackupActionSetForContinuous(reqCtx intctrlutil.
 		return notFoundLatestBackup()
 	}
 	// 3. get the action set
-	var actionSetName string
-	if latestBackup.Status.BackupMethod != nil {
-		actionSetName = latestBackup.Status.BackupMethod.ActionSetName
+	backupMethod := latestBackup.Status.BackupMethod
+	if backupMethod == nil {
+		return nil, intctrlutil.NewFatalError(fmt.Sprintf(`status.backupMethod of backup "%s" is empty`, latestBackup.Name))
 	}
-	actionSet, err := utils.GetActionSetByName(reqCtx, cli, actionSetName)
+	actionSet, err := utils.GetActionSetByName(reqCtx, cli, backupMethod.ActionSetName)
 	if err != nil {
 		return nil, err
 	}
-	return &BackupActionSet{Backup: latestBackup, ActionSet: actionSet}, nil
+	return &BackupActionSet{
+		Backup:            latestBackup,
+		ActionSet:         actionSet,
+		UseVolumeSnapshot: boolptr.IsSetToTrue(backupMethod.SnapshotVolumes),
+	}, nil
 }
 
 func (r *RestoreManager) listCompletedBackups(reqCtx intctrlutil.RequestCtx, cli client.Client, continuousBackup *dpv1alpha1.Backup, backupType dpv1alpha1.BackupType) ([]dpv1alpha1.Backup, error) {

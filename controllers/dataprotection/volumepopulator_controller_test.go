@@ -3537,6 +3537,20 @@ func TestITS2ScaleInRetainedPVCContinuesRestoreWithVerifiedIdentity(t *testing.T
 	}, helper), "verified retained target must continue the normal restore state machine")
 }
 
+func TestComponentReplacementDoesNotInventRestoreCancellation(t *testing.T) {
+	scheme, cluster, component, _, target := parentRestoreObjects(t)
+	target.OwnerReferences = nil
+	target.Labels[dptypes.ComponentUIDLabelKey] = "previous-component-uid"
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, component, target).Build()
+	reconciler := &VolumePopulatorReconciler{Client: cli, APIReader: cli, Scheme: scheme}
+
+	terminated, err := reconciler.handleRestoreParentLifecycle(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, target)
+
+	require.False(t, terminated)
+	require.NoError(t, err)
+}
+
 func TestOwnerlessRestorePVCWithoutCommittedIdentityStillRequiresOwnershipValidation(t *testing.T) {
 	scheme, cluster, component, _, target := parentRestoreObjects(t)
 	target.OwnerReferences = nil

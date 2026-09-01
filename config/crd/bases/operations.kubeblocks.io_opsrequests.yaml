@@ -619,8 +619,9 @@ spec:
                               type: string
                             namespace:
                               description: |-
-                                Specifies the namespace of the Backup namespace.
+                                Specifies the namespace of the Backup.
                                 If not specified, the namespace of the OpsRequest will be used.
+                                Cross-namespace VolumeSnapshot restores are NOT supported.
                               type: string
                             restoreEnv:
                               description: |-

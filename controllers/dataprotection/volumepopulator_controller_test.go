@@ -3537,7 +3537,7 @@ func TestITS2ScaleInRetainedPVCContinuesRestoreWithVerifiedIdentity(t *testing.T
 	}, helper), "verified retained target must continue the normal restore state machine")
 }
 
-func TestComponentReplacementDoesNotInventRestoreCancellation(t *testing.T) {
+func TestComponentReplacementFailsClosedBeforeRestoreProgression(t *testing.T) {
 	scheme, cluster, component, _, target := parentRestoreObjects(t)
 	target.OwnerReferences = nil
 	target.Labels[dptypes.ComponentUIDLabelKey] = "previous-component-uid"
@@ -3548,7 +3548,7 @@ func TestComponentReplacementDoesNotInventRestoreCancellation(t *testing.T) {
 		intctrlutil.RequestCtx{Ctx: context.Background()}, target)
 
 	require.False(t, terminated)
-	require.NoError(t, err)
+	require.ErrorContains(t, err, "Component UID changed")
 }
 
 func TestOwnerlessRestorePVCWithoutCommittedIdentityStillRequiresOwnershipValidation(t *testing.T) {

@@ -447,11 +447,16 @@ func (r *VolumePopulatorReconciler) handleRestoreParentLifecycle(reqCtx intctrlu
 	if !cluster.DeletionTimestamp.IsZero() {
 		return r.terminateParentVolumePopulation(reqCtx, pvc, cluster, nil)
 	}
-	comp, committed, err := r.componentForCommittedVolumePopulation(reqCtx.Ctx, pvc, cluster)
-	if err != nil {
-		return false, restoreParentRequeue(err)
-	}
-	if !committed {
+	var (
+		comp *appsv1.Component
+		err  error
+	)
+	if volumePopulationIdentityCommitted(pvc, cluster) {
+		comp, err = r.committedVolumePopulationComponent(reqCtx.Ctx, pvc, cluster)
+		if err != nil {
+			return false, restoreParentRequeue(err)
+		}
+	} else {
 		comp, err = r.validateClusterRestorePVCOwnership(reqCtx.Ctx, pvc, cluster)
 		if err != nil {
 			return false, restoreParentRequeue(err)
@@ -460,7 +465,7 @@ func (r *VolumePopulatorReconciler) handleRestoreParentLifecycle(reqCtx intctrlu
 			return false, restoreParentRequeue(err)
 		}
 	}
-	if comp != nil && !comp.DeletionTimestamp.IsZero() {
+	if !comp.DeletionTimestamp.IsZero() {
 		return r.terminateParentVolumePopulation(reqCtx, pvc, cluster, comp)
 	}
 	if !controllerutil.ContainsFinalizer(cluster, dptypes.RestoreProtectionFinalizerName) {
@@ -474,22 +479,19 @@ func (r *VolumePopulatorReconciler) handleRestoreParentLifecycle(reqCtx intctrlu
 	return false, nil
 }
 
-// componentForCommittedVolumePopulation uses VP's committed identity only to
-// avoid revalidating a workload owner chain that retention policies may later
-// detach. Parent deletion is observed exclusively through DeletionTimestamp;
-// Component replacement and other topology changes during restore are outside
-// the restore lifecycle contract.
-func (r *VolumePopulatorReconciler) componentForCommittedVolumePopulation(ctx context.Context,
-	pvc *corev1.PersistentVolumeClaim, cluster *appsv1.Cluster) (*appsv1.Component, bool, error) {
-	if pvc.Labels[dptypes.ClusterUIDLabelKey] != string(cluster.UID) {
-		return nil, false, nil
-	}
-	if pvc.Labels[dptypes.ComponentUIDLabelKey] == "" {
-		return nil, false, nil
-	}
+func volumePopulationIdentityCommitted(pvc *corev1.PersistentVolumeClaim, cluster *appsv1.Cluster) bool {
+	return pvc.Labels[dptypes.ClusterUIDLabelKey] == string(cluster.UID) &&
+		pvc.Labels[dptypes.ComponentUIDLabelKey] != ""
+}
+
+// committedVolumePopulationComponent resolves the Component recorded when VP
+// adopted the target. Retention may detach the workload owner chain, but it
+// does not transfer the restore to a replacement Component.
+func (r *VolumePopulatorReconciler) committedVolumePopulationComponent(ctx context.Context,
+	pvc *corev1.PersistentVolumeClaim, cluster *appsv1.Cluster) (*appsv1.Component, error) {
 	componentName := pvc.Labels[constant.KBAppComponentLabelKey]
 	if componentName == "" {
-		return nil, true, fmt.Errorf(
+		return nil, fmt.Errorf(
 			"restore PVC %s/%s has no Component name", pvc.Namespace, pvc.Name)
 	}
 	comp := &appsv1.Component{}
@@ -498,14 +500,14 @@ func (r *VolumePopulatorReconciler) componentForCommittedVolumePopulation(ctx co
 		Name:      constant.GenerateClusterComponentName(cluster.Name, componentName),
 	}
 	if err := r.volumePopulatorReader().Get(ctx, key, comp); err != nil {
-		return nil, true, err
+		return nil, err
 	}
-	// A same-name replacement is outside the restore lifecycle contract and
-	// cannot authorize cancellation of resources tied to the original UID.
 	if string(comp.UID) != pvc.Labels[dptypes.ComponentUIDLabelKey] {
-		return nil, true, nil
+		return nil, fmt.Errorf(
+			"restore PVC %s/%s Component UID changed from %s to %s",
+			pvc.Namespace, pvc.Name, pvc.Labels[dptypes.ComponentUIDLabelKey], comp.UID)
 	}
-	return comp, true, nil
+	return comp, nil
 }
 
 func restoreParentRequeue(err error) error {
@@ -1728,15 +1730,15 @@ func (r *VolumePopulatorReconciler) ensureTargetFinalizerAndRevalidateParents(
 	if !cluster.DeletionTimestamp.IsZero() {
 		return r.terminateParentVolumePopulation(reqCtx, pvc, cluster, nil)
 	}
-	comp, committed, err := r.componentForCommittedVolumePopulation(reqCtx.Ctx, pvc, cluster)
-	if err != nil {
-		return true, restoreParentRequeue(err)
-	}
-	if !committed {
+	if !volumePopulationIdentityCommitted(pvc, cluster) {
 		return true, restoreParentRequeue(fmt.Errorf(
 			"restore PVC %s/%s identity is not fully verified", pvc.Namespace, pvc.Name))
 	}
-	if comp != nil && !comp.DeletionTimestamp.IsZero() {
+	comp, err := r.committedVolumePopulationComponent(reqCtx.Ctx, pvc, cluster)
+	if err != nil {
+		return true, restoreParentRequeue(err)
+	}
+	if !comp.DeletionTimestamp.IsZero() {
 		return r.terminateParentVolumePopulation(reqCtx, pvc, cluster, comp)
 	}
 	if !controllerutil.ContainsFinalizer(cluster, dptypes.RestoreProtectionFinalizerName) {

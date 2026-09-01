@@ -256,18 +256,18 @@ func (r *RestoreManager) getBaseBackupActionSetForContinuous(reqCtx intctrlutil.
 		return notFoundLatestBackup()
 	}
 	// 3. get the action set
-	var actionSetName string
-	if latestBackup.Status.BackupMethod != nil {
-		actionSetName = latestBackup.Status.BackupMethod.ActionSetName
+	backupMethod := latestBackup.Status.BackupMethod
+	if backupMethod == nil {
+		return nil, intctrlutil.NewFatalError(fmt.Sprintf(`status.backupMethod of backup "%s" is empty`, latestBackup.Name))
 	}
-	actionSet, err := utils.GetActionSetByName(reqCtx, cli, actionSetName)
+	actionSet, err := utils.GetActionSetByName(reqCtx, cli, backupMethod.ActionSetName)
 	if err != nil {
 		return nil, err
 	}
 	return &BackupActionSet{
 		Backup:            latestBackup,
 		ActionSet:         actionSet,
-		UseVolumeSnapshot: boolptr.IsSetToTrue(latestBackup.Status.BackupMethod.SnapshotVolumes),
+		UseVolumeSnapshot: boolptr.IsSetToTrue(backupMethod.SnapshotVolumes),
 	}, nil
 }
 

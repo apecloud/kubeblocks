@@ -56,30 +56,18 @@ var _ = Describe("syncClusterConditions", func() {
 					constant.AppInstanceLabelKey:  clusterName,
 				},
 			},
-			Status: appsv1.ComponentStatus{
-				Conditions: []metav1.Condition{
-					{
-						Type:   appsv1.ComponentConditionHealthy,
-						Status: metav1.ConditionTrue,
-						Reason: "test",
-					},
-					{
-						Type:   appsv1.ComponentConditionProgressing,
-						Status: metav1.ConditionFalse,
-						Reason: "test",
-					},
-				},
-			},
 		}
 		if shardingName != "" {
 			comp.Labels[constant.KBAppShardingNameLabelKey] = shardingName
 		}
 		if available != nil {
-			meta.SetStatusCondition(&comp.Status.Conditions, metav1.Condition{
-				Type:   appsv1.ConditionTypeAvailable,
-				Status: *available,
-				Reason: "test",
-			})
+			comp.Status.Conditions = []metav1.Condition{
+				{
+					Type:   appsv1.ConditionTypeAvailable,
+					Status: *available,
+					Reason: "test",
+				},
+			}
 		}
 		return comp
 	}
@@ -113,53 +101,7 @@ var _ = Describe("syncClusterConditions", func() {
 		Expect(readyCond.Reason).Should(Equal(ReasonClusterReady))
 	})
 
-	It("should set NotReady condition when components are unhealthy", func() {
-		cluster.Status.Components["comp1"] = appsv1.ClusterComponentStatus{Phase: appsv1.FailedComponentPhase}
-		cluster.Status.Phase = appsv1.FailedClusterPhase
-		available := metav1.ConditionTrue
-		comp := newComponent("comp1", &available, "")
-		meta.SetStatusCondition(&comp.Status.Conditions, metav1.Condition{
-			Type:   appsv1.ComponentConditionHealthy,
-			Status: metav1.ConditionFalse,
-			Reason: "test",
-		})
-		reader.Objects = []client.Object{comp}
-
-		err := transformer.syncClusterConditions(context.Background(), reader, cluster)
-		Expect(err).Should(BeNil())
-
-		readyCond := meta.FindStatusCondition(cluster.Status.Conditions, appsv1.ConditionTypeReady)
-		Expect(readyCond).ShouldNot(BeNil())
-		Expect(readyCond.Status).Should(Equal(metav1.ConditionFalse))
-		Expect(readyCond.Reason).Should(Equal(ReasonComponentsNotReady))
-	})
-
-	It("should set NotReady condition when sharding components are unhealthy", func() {
-		cluster.Status.Shardings = map[string]appsv1.ClusterShardingStatus{
-			"shard1": {Phase: appsv1.FailedComponentPhase},
-		}
-		cluster.Status.Phase = appsv1.FailedClusterPhase
-		available := metav1.ConditionTrue
-		shardingComp := newComponent("shard1-0", &available, "shard1")
-		meta.SetStatusCondition(&shardingComp.Status.Conditions, metav1.Condition{
-			Type:   appsv1.ComponentConditionHealthy,
-			Status: metav1.ConditionFalse,
-			Reason: "test",
-		})
-		reader.Objects = []client.Object{
-			newComponent("comp1", &available, ""),
-			shardingComp,
-		}
-
-		err := transformer.syncClusterConditions(context.Background(), reader, cluster)
-		Expect(err).Should(BeNil())
-
-		readyCond := meta.FindStatusCondition(cluster.Status.Conditions, appsv1.ConditionTypeReady)
-		Expect(readyCond).ShouldNot(BeNil())
-		Expect(readyCond.Status).Should(Equal(metav1.ConditionFalse))
-	})
-
-	It("should remain Ready when restore changes phase but workloads are ready", func() {
+	It("should set NotReady condition when components have failed", func() {
 		cluster.Status.Components["comp1"] = appsv1.ClusterComponentStatus{Phase: appsv1.FailedComponentPhase}
 		cluster.Status.Phase = appsv1.FailedClusterPhase
 		available := metav1.ConditionTrue
@@ -170,10 +112,24 @@ var _ = Describe("syncClusterConditions", func() {
 
 		readyCond := meta.FindStatusCondition(cluster.Status.Conditions, appsv1.ConditionTypeReady)
 		Expect(readyCond).ShouldNot(BeNil())
-		Expect(readyCond.Status).Should(Equal(metav1.ConditionTrue))
-		availableCond := meta.FindStatusCondition(cluster.Status.Conditions, appsv1.ConditionTypeAvailable)
-		Expect(availableCond).ShouldNot(BeNil())
-		Expect(availableCond.Status).Should(Equal(metav1.ConditionTrue))
+		Expect(readyCond.Status).Should(Equal(metav1.ConditionFalse))
+		Expect(readyCond.Reason).Should(Equal(ReasonComponentsNotReady))
+	})
+
+	It("should set NotReady condition when shardings have failed", func() {
+		cluster.Status.Shardings = map[string]appsv1.ClusterShardingStatus{
+			"shard1": {Phase: appsv1.FailedComponentPhase},
+		}
+		cluster.Status.Phase = appsv1.FailedClusterPhase
+		available := metav1.ConditionTrue
+		reader.Objects = []client.Object{newComponent("comp1", &available, "")}
+
+		err := transformer.syncClusterConditions(context.Background(), reader, cluster)
+		Expect(err).Should(BeNil())
+
+		readyCond := meta.FindStatusCondition(cluster.Status.Conditions, appsv1.ConditionTypeReady)
+		Expect(readyCond).ShouldNot(BeNil())
+		Expect(readyCond.Status).Should(Equal(metav1.ConditionFalse))
 	})
 
 	It("should set Available=True when all components are available", func() {

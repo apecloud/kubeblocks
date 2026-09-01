@@ -397,7 +397,10 @@ func (t *componentStatusTransformer) updateComponentStatus(transCtx *componentTr
 }
 
 func (t *componentStatusTransformer) reconcileStatusCondition(transCtx *componentTransformContext) error {
-	return t.reconcileStatusConditionForPhase(transCtx, t.comp.Status.Phase)
+	return errors.Join(
+		t.reconcileStatusConditionForPhase(transCtx, t.comp.Status.Phase),
+		t.reconcileRestoreCondition(transCtx),
+	)
 }
 
 func (t *componentStatusTransformer) reconcileStatusConditionForPhase(
@@ -406,7 +409,6 @@ func (t *componentStatusTransformer) reconcileStatusConditionForPhase(
 		t.reconcileAvailableConditionForPhase(transCtx, workloadPhase),
 		t.reconcileProgressingCondition(transCtx),
 		t.reconcileHealthyCondition(transCtx),
-		t.reconcileRestoreCondition(transCtx),
 	)
 }
 

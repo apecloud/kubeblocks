@@ -166,26 +166,74 @@ func (t *componentStatusTransformer) reconcileStatus(transCtx *componentTransfor
 		}, phase)
 	}()
 
+	var (
+		workloadPhase      appsv1.ComponentPhase
+		statusMessage      map[string]string
+		phaseTransitionMsg string
+	)
 	switch {
 	case isDeleting:
-		t.setComponentStatusPhase(transCtx, appsv1.DeletingComponentPhase, nil, "component is Deleting")
+		workloadPhase = appsv1.DeletingComponentPhase
+		phaseTransitionMsg = "component is Deleting"
 	case stopped && (hasRunningPods || !checkPostProvisionDone(transCtx)):
-		t.setComponentStatusPhase(transCtx, appsv1.StoppingComponentPhase, nil, "component is Stopping")
+		workloadPhase = appsv1.StoppingComponentPhase
+		phaseTransitionMsg = "component is Stopping"
 	case stopped:
-		t.setComponentStatusPhase(transCtx, appsv1.StoppedComponentPhase, nil, "component is Stopped")
+		workloadPhase = appsv1.StoppedComponentPhase
+		phaseTransitionMsg = "component is Stopped"
 	case isITSUpdatedNRunning && !hasRunningScaleOut && !hasRunningVolumeExpansion:
-		t.setComponentStatusPhase(transCtx, appsv1.RunningComponentPhase, nil, "component is Running")
+		workloadPhase = appsv1.RunningComponentPhase
+		phaseTransitionMsg = "component is Running"
 	case !hasFailure && isInCreatingPhase:
-		t.setComponentStatusPhase(transCtx, appsv1.CreatingComponentPhase, nil, "component is Creating")
+		workloadPhase = appsv1.CreatingComponentPhase
+		phaseTransitionMsg = "component is Creating"
 	case !hasFailure && isInStartingPhase:
-		t.setComponentStatusPhase(transCtx, appsv1.StartingComponentPhase, nil, "component is Starting")
+		workloadPhase = appsv1.StartingComponentPhase
+		phaseTransitionMsg = "component is Starting"
 	case !hasFailure:
-		t.setComponentStatusPhase(transCtx, appsv1.UpdatingComponentPhase, nil, "component is Updating")
+		workloadPhase = appsv1.UpdatingComponentPhase
+		phaseTransitionMsg = "component is Updating"
 	default:
-		t.setComponentStatusPhase(transCtx, appsv1.FailedComponentPhase, messages, "component is Failed")
+		workloadPhase = appsv1.FailedComponentPhase
+		statusMessage = messages
+		phaseTransitionMsg = "component is Failed"
 	}
 
-	return t.reconcileStatusCondition(transCtx)
+	if err := t.reconcileRestoreCondition(transCtx); err != nil {
+		return err
+	}
+	phase := t.phaseWithRestore(workloadPhase)
+	if phase != workloadPhase {
+		phaseTransitionMsg = fmt.Sprintf("component is %s", phase)
+	}
+	t.setComponentStatusPhase(transCtx, phase, statusMessage, phaseTransitionMsg)
+
+	return t.reconcileStatusConditionForPhase(transCtx, workloadPhase)
+}
+
+// phaseWithRestore projects the initial restore result onto the component phase.
+// Workload lifecycle states caused by explicit user intent take precedence.
+func (t *componentStatusTransformer) phaseWithRestore(workloadPhase appsv1.ComponentPhase) appsv1.ComponentPhase {
+	if slices.Contains([]appsv1.ComponentPhase{
+		appsv1.DeletingComponentPhase,
+		appsv1.StoppingComponentPhase,
+		appsv1.StoppedComponentPhase,
+		appsv1.FailedComponentPhase,
+	}, workloadPhase) {
+		return workloadPhase
+	}
+	restoreCond := meta.FindStatusCondition(t.comp.Status.Conditions, appsv1.ConditionTypeRestore)
+	if restoreCond == nil {
+		return workloadPhase
+	}
+	switch restoreCond.Status {
+	case metav1.ConditionFalse:
+		return appsv1.FailedComponentPhase
+	case metav1.ConditionUnknown:
+		return appsv1.CreatingComponentPhase
+	default:
+		return workloadPhase
+	}
 }
 
 func (t *componentStatusTransformer) workloadGeneration() (*int64, error) {
@@ -349,8 +397,13 @@ func (t *componentStatusTransformer) updateComponentStatus(transCtx *componentTr
 }
 
 func (t *componentStatusTransformer) reconcileStatusCondition(transCtx *componentTransformContext) error {
+	return t.reconcileStatusConditionForPhase(transCtx, t.comp.Status.Phase)
+}
+
+func (t *componentStatusTransformer) reconcileStatusConditionForPhase(
+	transCtx *componentTransformContext, workloadPhase appsv1.ComponentPhase) error {
 	return errors.Join(
-		t.reconcileAvailableCondition(transCtx),
+		t.reconcileAvailableConditionForPhase(transCtx, workloadPhase),
 		t.reconcileProgressingCondition(transCtx),
 		t.reconcileHealthyCondition(transCtx),
 		t.reconcileRestoreCondition(transCtx),
@@ -557,6 +610,11 @@ func (t *componentStatusTransformer) reconcileHealthyCondition(transCtx *compone
 }
 
 func (t *componentStatusTransformer) reconcileAvailableCondition(transCtx *componentTransformContext) error {
+	return t.reconcileAvailableConditionForPhase(transCtx, t.comp.Status.Phase)
+}
+
+func (t *componentStatusTransformer) reconcileAvailableConditionForPhase(
+	transCtx *componentTransformContext, workloadPhase appsv1.ComponentPhase) error {
 	policy := component.GetComponentAvailablePolicy(transCtx.CompDef)
 	if policy.WithPhases == nil && policy.WithRole == nil {
 		return nil
@@ -567,7 +625,7 @@ func (t *componentStatusTransformer) reconcileAvailableCondition(transCtx *compo
 		appsv1.ComponentConditionAvailable,
 		func() (status metav1.ConditionStatus, reason string, message string, err error) {
 			if policy.WithPhases != nil {
-				status, message1 := t.availableWithPhases(transCtx, transCtx.Component, policy)
+				status, message1 := t.availableWithPhases(workloadPhase, policy)
 				if status != metav1.ConditionTrue {
 					return status, "PhaseCheckFail", message1, nil
 				}
@@ -586,16 +644,16 @@ func (t *componentStatusTransformer) reconcileAvailableCondition(transCtx *compo
 	)
 }
 
-func (t *componentStatusTransformer) availableWithPhases(_ *componentTransformContext,
-	comp *appsv1.Component, policy appsv1.ComponentAvailable) (metav1.ConditionStatus, string) {
-	if comp.Status.Phase == "" {
+func (t *componentStatusTransformer) availableWithPhases(
+	workloadPhase appsv1.ComponentPhase, policy appsv1.ComponentAvailable) (metav1.ConditionStatus, string) {
+	if workloadPhase == "" {
 		return metav1.ConditionUnknown, "the component phase is unknown"
 	}
 	phases := sets.New(strings.Split(strings.ToLower(*policy.WithPhases), ",")...)
-	if phases.Has(strings.ToLower(string(comp.Status.Phase))) {
-		return metav1.ConditionTrue, fmt.Sprintf("the component phase is %s", comp.Status.Phase)
+	if phases.Has(strings.ToLower(string(workloadPhase))) {
+		return metav1.ConditionTrue, fmt.Sprintf("the component workload phase is %s", workloadPhase)
 	}
-	return metav1.ConditionFalse, fmt.Sprintf("the component phase is %s", comp.Status.Phase)
+	return metav1.ConditionFalse, fmt.Sprintf("the component workload phase is %s", workloadPhase)
 }
 
 func (t *componentStatusTransformer) availableWithRole(transCtx *componentTransformContext,

@@ -94,33 +94,39 @@ func (t *clusterStatusTransformer) reconcileClusterPhase(cluster *appsv1.Cluster
 }
 
 func (t *clusterStatusTransformer) syncClusterConditions(ctx context.Context, cli client.Reader, cluster *appsv1.Cluster) error {
-	if cluster.Status.Phase == appsv1.RunningClusterPhase {
-		meta.SetStatusCondition(&cluster.Status.Conditions, newClusterReadyCondition(cluster.Name))
-	} else {
-		kindNames := map[string][]string{}
-		for kind, statusMap := range map[string]map[string]appsv1.ClusterComponentStatus{
-			"component": cluster.Status.Components,
-			"sharding":  t.shardingToCompStatus(cluster.Status.Shardings),
-		} {
-			for name, status := range statusMap {
-				if status.Phase == appsv1.FailedComponentPhase {
-					if _, ok := kindNames[kind]; !ok {
-						kindNames[kind] = []string{}
-					}
-					kindNames[kind] = append(kindNames[kind], name)
-				}
+	comps, shardingComps, err := listClusterComponents(ctx, cli, cluster)
+	if err != nil {
+		return err
+	}
+
+	componentReady := func(comp *appsv1.Component) bool {
+		return meta.IsStatusConditionTrue(comp.Status.Conditions, appsv1.ComponentConditionHealthy) &&
+			meta.IsStatusConditionFalse(comp.Status.Conditions, appsv1.ComponentConditionProgressing)
+	}
+	kindNames := map[string][]string{}
+	for name, comp := range comps {
+		if !componentReady(comp) {
+			kindNames["component"] = append(kindNames["component"], name)
+		}
+	}
+	for shardingName, components := range shardingComps {
+		for _, comp := range components {
+			if !componentReady(comp) {
+				kindNames["sharding"] = append(kindNames["sharding"], shardingName)
+				break
 			}
 		}
-		if len(kindNames) > 0 {
-			meta.SetStatusCondition(&cluster.Status.Conditions, newClusterNotReadyCondition(cluster.Name, kindNames))
-		}
+	}
+	if len(comps) == 0 && len(shardingComps) == 0 {
+		kindNames["component"] = []string{"none"}
+	}
+	if len(kindNames) == 0 {
+		meta.SetStatusCondition(&cluster.Status.Conditions, newClusterReadyCondition(cluster.Name))
+	} else {
+		meta.SetStatusCondition(&cluster.Status.Conditions, newClusterNotReadyCondition(cluster.Name, kindNames))
 	}
 
 	setAvailableCondition := func() error {
-		comps, shardingComps, err := listClusterComponents(ctx, cli, cluster)
-		if err != nil {
-			return err
-		}
 		available := true
 		aggregatedMessage := ""
 		defer func() {

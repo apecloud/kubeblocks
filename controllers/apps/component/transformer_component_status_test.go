@@ -282,6 +282,33 @@ var _ = Describe("component status transformer conditions", func() {
 		})
 	})
 
+	DescribeTable("should project restore status onto phase without changing workload availability",
+		func(restoreStatus metav1.ConditionStatus, expectedPhase appsv1.ComponentPhase) {
+			setExpectedRestoreVCT()
+			setWorkloadRestoreCondition(restoreStatus)
+			compDef.Spec.Available = &appsv1.ComponentAvailable{
+				WithPhases: ptr.To("Running"),
+			}
+
+			err := transformer.reconcileStatus(transCtx)
+			Expect(err).Should(BeNil())
+			Expect(comp.Status.Phase).Should(Equal(expectedPhase))
+
+			restoreCond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ConditionTypeRestore)
+			Expect(restoreCond).ShouldNot(BeNil())
+			Expect(restoreCond.Status).Should(Equal(restoreStatus))
+			availableCond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ComponentConditionAvailable)
+			Expect(availableCond).ShouldNot(BeNil())
+			Expect(availableCond.Status).Should(Equal(metav1.ConditionTrue))
+			healthyCond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ComponentConditionHealthy)
+			Expect(healthyCond).ShouldNot(BeNil())
+			Expect(healthyCond.Status).Should(Equal(metav1.ConditionTrue))
+		},
+		Entry("restore is running", metav1.ConditionUnknown, appsv1.CreatingComponentPhase),
+		Entry("restore has failed", metav1.ConditionFalse, appsv1.FailedComponentPhase),
+		Entry("restore has completed", metav1.ConditionTrue, appsv1.RunningComponentPhase),
+	)
+
 	Context("reconcileHealthyCondition", func() {
 		It("should be unhealthy when runningITS is nil", func() {
 			transformer.runningITS = nil

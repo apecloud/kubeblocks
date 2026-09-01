@@ -63,9 +63,8 @@ import (
 // VolumePopulatorReconciler reconciles Backup dataSource PVCs.
 type VolumePopulatorReconciler struct {
 	client.Client
-	APIReader client.Reader
-	Scheme    *runtime.Scheme
-	Recorder  record.EventRecorder
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
 }
 
 type pvcRestoreMode string
@@ -139,9 +138,6 @@ func (r *VolumePopulatorReconciler) handleSyncPVCError(reqCtx intctrlutil.Reques
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *VolumePopulatorReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	if r.APIReader == nil {
-		r.APIReader = mgr.GetAPIReader()
-	}
 	return intctrlutil.NewControllerManagedBy(mgr).
 		For(&corev1.PersistentVolumeClaim{}).
 		Watches(&dpv1alpha1.Restore{}, handler.EnqueueRequestsFromMapFunc(r.mapRestoreToPVCs),
@@ -1244,97 +1240,36 @@ func (r *VolumePopulatorReconciler) completeBoundPVCIfNeeded(reqCtx intctrlutil.
 }
 
 // validateBoundTargetPV verifies that an already-bound target PVC points to
-// the PV rebound by this populator. Use the direct API reader when available so
-// informer ordering between the PV and PVC updates cannot create a permanent
-// false failure.
+// the PV rebound by this populator.
 func (r *VolumePopulatorReconciler) validateBoundTargetPV(reqCtx intctrlutil.RequestCtx,
 	pvc *corev1.PersistentVolumeClaim) error {
 	if pvc.Spec.VolumeName == "" {
 		return intctrlutil.NewRequeueError(reconcileInterval, "waiting for target PVC to bind")
 	}
-	reader := client.Reader(r.Client)
-	if r.APIReader != nil {
-		reader = r.APIReader
-	}
 	pv := &corev1.PersistentVolume{}
-	if err := reader.Get(reqCtx.Ctx, types.NamespacedName{Name: pvc.Spec.VolumeName}, pv); err != nil {
+	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Name: pvc.Spec.VolumeName}, pv); err != nil {
 		if apierrors.IsNotFound(err) {
 			return intctrlutil.NewRequeueError(reconcileInterval,
 				fmt.Sprintf("waiting for target PV %s for PVC %s/%s", pvc.Spec.VolumeName, pvc.Namespace, pvc.Name))
 		}
 		return err
 	}
-	claimRef := pv.Spec.ClaimRef
-	claimMatches := claimRef != nil && claimRef.Namespace == pvc.Namespace && claimRef.Name == pvc.Name
-	if claimMatches && pvc.UID != "" {
-		claimMatches = claimRef.UID == pvc.UID
-	}
-	if !claimMatches {
+	if !pvClaimRefMatchesPVC(pv.Spec.ClaimRef, pvc) {
 		return intctrlutil.NewFatalError(fmt.Sprintf(
 			"target PVC %s/%s is bound to PV %s whose claimRef does not identify the restore target",
 			pvc.Namespace, pvc.Name, pv.Name))
 	}
-	expectedAttempt, err := populationAttemptIdentity(pvc)
-	if err != nil {
-		return intctrlutil.NewFatalError(err.Error())
-	}
-	if actualAttempt := pv.Annotations[AnnPopulationAttempt]; actualAttempt != "" {
-		if actualAttempt == expectedAttempt {
-			return nil
-		}
-		return intctrlutil.NewFatalError(fmt.Sprintf(
-			"target PVC %s/%s is bound to PV %s from population attempt %q, expected %q",
-			pvc.Namespace, pvc.Name, pv.Name, actualAttempt, expectedAttempt))
-	}
-
-	// Compatibility for an in-flight rebind started by an older controller:
-	// the old marker recorded only the source name. Accept it only while the
-	// exact helper PVC still points at this PV. A provisioner-bound empty PV
-	// cannot satisfy this relationship.
-	expectedSource := pvc.Spec.DataSourceRef.Name
-	if expectedSource != "" && pv.Annotations[AnnPopulateFrom] == expectedSource {
-		helper := &corev1.PersistentVolumeClaim{}
-		helperKey := types.NamespacedName{Namespace: pvc.Namespace, Name: getPopulatePVCName(pvc.UID)}
-		if err := reader.Get(reqCtx.Ctx, helperKey, helper); err == nil && helper.Spec.VolumeName == pv.Name {
-			return nil
-		} else if err != nil && apierrors.IsNotFound(err) && pvcBindingCompleted(pvc) {
-			// An older controller wrote AnnPopulateFrom before deleting the helper
-			// and before recording population success. If Kubernetes has already
-			// completed the target binding, the exact target ClaimRef validated
-			// above plus the legacy marker is sufficient to resume after an upgrade.
-			return nil
-		} else if err != nil && !apierrors.IsNotFound(err) {
-			return err
-		}
-	}
-	return intctrlutil.NewFatalError(fmt.Sprintf(
-		"target PVC %s/%s is bound to PV %s without expected population provenance %s=%q",
-		pvc.Namespace, pvc.Name, pv.Name, AnnPopulationAttempt, expectedAttempt))
-}
-
-func populationAttemptIdentity(pvc *corev1.PersistentVolumeClaim) (string, error) {
-	if pvc.UID == "" {
-		return "", fmt.Errorf("target PVC %s/%s has no UID", pvc.Namespace, pvc.Name)
-	}
 	if pvc.Spec.DataSourceRef == nil || pvc.Spec.DataSourceRef.Name == "" {
-		return "", fmt.Errorf("target PVC %s/%s has no dataSourceRef identity", pvc.Namespace, pvc.Name)
+		return intctrlutil.NewFatalError(fmt.Sprintf(
+			"target PVC %s/%s has no dataSourceRef", pvc.Namespace, pvc.Name))
 	}
-	apiGroup := ""
-	if pvc.Spec.DataSourceRef.APIGroup != nil {
-		apiGroup = *pvc.Spec.DataSourceRef.APIGroup
+	expectedSource := pvc.Spec.DataSourceRef.Name
+	if pv.Annotations[AnnPopulateFrom] != expectedSource {
+		return intctrlutil.NewFatalError(fmt.Sprintf(
+			"target PVC %s/%s is bound to PV %s without expected population provenance %s=%q",
+			pvc.Namespace, pvc.Name, pv.Name, AnnPopulateFrom, expectedSource))
 	}
-	sourceNamespace := pvc.Namespace
-	if pvc.Spec.DataSourceRef.Kind == dptypes.BackupKind {
-		var err error
-		sourceNamespace, err = backupNamespaceFromPVC(pvc)
-		if err != nil {
-			return "", err
-		}
-	} else if pvc.Spec.DataSourceRef.Namespace != nil && *pvc.Spec.DataSourceRef.Namespace != "" {
-		sourceNamespace = *pvc.Spec.DataSourceRef.Namespace
-	}
-	return fmt.Sprintf("v1|%s|%s|%s|%s|%s", pvc.UID, apiGroup, pvc.Spec.DataSourceRef.Kind,
-		sourceNamespace, pvc.Spec.DataSourceRef.Name), nil
+	return nil
 }
 
 func (r *VolumePopulatorReconciler) waitForSerialPredecessors(reqCtx intctrlutil.RequestCtx,
@@ -2089,16 +2024,12 @@ func (r *VolumePopulatorReconciler) rebindPVCAndPV(reqCtx intctrlutil.RequestCtx
 	if populatePVC.Spec.VolumeName == "" {
 		return false, nil
 	}
-	attempt, err := populationAttemptIdentity(pvc)
-	if err != nil {
-		return false, intctrlutil.NewFatalError(err.Error())
-	}
-	reader := client.Reader(r.Client)
-	if r.APIReader != nil {
-		reader = r.APIReader
+	if pvc.Spec.DataSourceRef == nil || pvc.Spec.DataSourceRef.Name == "" {
+		return false, intctrlutil.NewFatalError(fmt.Sprintf(
+			"target PVC %s/%s has no dataSourceRef", pvc.Namespace, pvc.Name))
 	}
 	pv := &corev1.PersistentVolume{}
-	if err := reader.Get(reqCtx.Ctx, types.NamespacedName{Name: populatePVC.Spec.VolumeName}, pv); err != nil {
+	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Name: populatePVC.Spec.VolumeName}, pv); err != nil {
 		if !apierrors.IsNotFound(err) {
 			return false, err
 		}
@@ -2108,28 +2039,10 @@ func (r *VolumePopulatorReconciler) rebindPVCAndPV(reqCtx intctrlutil.RequestCtx
 	// Examine the claimref for the PV and see if it's bound to the correct PVC
 	claimRef := pv.Spec.ClaimRef
 	if pvClaimRefMatchesPVC(claimRef, pvc) {
-		actualAttempt := pv.Annotations[AnnPopulationAttempt]
-		if actualAttempt != attempt {
-			legacyRebind := actualAttempt == "" &&
-				pv.Annotations[AnnPopulateFrom] == pvc.Spec.DataSourceRef.Name &&
-				populatePVC.Namespace == pvc.Namespace &&
-				populatePVC.Name == getPopulatePVCName(pvc.UID) &&
-				populatePVC.Spec.VolumeName == pv.Name
-			if !legacyRebind {
-				return false, intctrlutil.NewFatalError(fmt.Sprintf(
-					"PV %s already identifies target PVC %s/%s but does not carry population attempt %q",
-					pv.Name, pvc.Namespace, pvc.Name, attempt))
-			}
-			// Resume an old controller that patched the PV ClaimRef and legacy
-			// marker, then crashed before writing targetPVC.spec.volumeName.
-			patchPV := client.MergeFromWithOptions(pv.DeepCopy(), client.MergeFromWithOptimisticLock{})
-			if pv.Annotations == nil {
-				pv.Annotations = map[string]string{}
-			}
-			pv.Annotations[AnnPopulationAttempt] = attempt
-			if err := r.Client.Patch(reqCtx.Ctx, pv, patchPV); err != nil {
-				return false, requeuePVRebindConflict(err, pv, pvc)
-			}
+		if pv.Annotations[AnnPopulateFrom] != pvc.Spec.DataSourceRef.Name {
+			return false, intctrlutil.NewFatalError(fmt.Sprintf(
+				"PV %s already identifies target PVC %s/%s without expected population provenance %s=%q",
+				pv.Name, pvc.Namespace, pvc.Name, AnnPopulateFrom, pvc.Spec.DataSourceRef.Name))
 		}
 		return true, r.bindTargetPVCToPV(reqCtx, pvc, pv.Name)
 	}
@@ -2150,7 +2063,6 @@ func (r *VolumePopulatorReconciler) rebindPVCAndPV(reqCtx intctrlutil.RequestCtx
 		pv.Annotations = map[string]string{}
 	}
 	pv.Annotations[AnnPopulateFrom] = pvc.Spec.DataSourceRef.Name
-	pv.Annotations[AnnPopulationAttempt] = attempt
 	if err := r.Client.Patch(reqCtx.Ctx, pv, patchPV); err != nil {
 		return false, requeuePVRebindConflict(err, pv, pvc)
 	}

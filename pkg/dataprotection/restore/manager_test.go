@@ -35,6 +35,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -47,6 +48,17 @@ import (
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
+func postReadyJobEnvValues(job *batchv1.Job, name string) []string {
+	var values []string
+	for i := range job.Spec.Template.Spec.Containers[0].Env {
+		env := job.Spec.Template.Spec.Containers[0].Env[i]
+		if env.Name == name {
+			values = append(values, env.Value)
+		}
+	}
+	return values
+}
+
 var _ = Describe("RestoreManager Test", func() {
 
 	cleanEnv := func() {
@@ -58,6 +70,7 @@ var _ = Describe("RestoreManager Test", func() {
 		// namespaced
 		testapps.ClearResources(&testCtx, generics.PodSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.ClusterSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.ComponentSignature, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupSignature, true, inNS)
 
 		// wait all backup to be deleted, otherwise the controller maybe create
@@ -538,9 +551,27 @@ var _ = Describe("RestoreManager Test", func() {
 			restoreMGR, backupSet := initResources(reqCtx, 0, false, func(f *testdp.MockRestoreFactory) {
 				f.SetConnectCredential(testdp.ClusterName).SetJobActionConfig(matchLabels).SetExecActionConfig(matchLabels)
 			})
+			if restoreMGR.Restore.Labels == nil {
+				restoreMGR.Restore.Labels = map[string]string{}
+			}
+			restoreMGR.Restore.Labels[DataProtectionInternalPostReadyLabelKey] = "true"
+			restoreMGR.Restore.Spec.Env = append(restoreMGR.Restore.Spec.Env,
+				corev1.EnvVar{Name: dptypes.DPTargetClusterTopology, Value: "spoofed-topology"},
+				corev1.EnvVar{Name: dptypes.DPTargetComponentServiceVersion, Value: "spoofed-version"})
 
 			By("create cluster to restore")
-			testdp.NewFakeCluster(&testCtx)
+			clusterInfo := testdp.NewFakeCluster(&testCtx)
+			Expect(testapps.ChangeObj(&testCtx, clusterInfo.Cluster, func(cluster *appsv1.Cluster) {
+				cluster.Spec.Topology = "shared-nothing"
+			})).Should(Succeed())
+			testapps.NewComponentFactory(testCtx.DefaultNamespace,
+				constant.GenerateClusterComponentName(testdp.ClusterName, testdp.ComponentName), "test-cmpd").
+				SetServiceVersion("3.3.2").
+				AddInstances(appsv1.InstanceTemplate{Name: "canary", ServiceVersion: "3.4.0"}).
+				Create(&testCtx)
+			Expect(testapps.ChangeObj(&testCtx, clusterInfo.TargetPod, func(pod *corev1.Pod) {
+				pod.Labels[constant.KBAppInstanceTemplateLabelKey] = "canary"
+			})).Should(Succeed())
 
 			By("test with execAction and expect for creating 2 exec job")
 			target := utils.GetBackupStatusTarget(backupSet.Backup, restoreMGR.Restore.Spec.Backup.SourceTargetName)
@@ -558,6 +589,8 @@ var _ = Describe("RestoreManager Test", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 			// count of job should equal to 1
 			Expect(len(jobs)).Should(Equal(1))
+			Expect(postReadyJobEnvValues(jobs[0], dptypes.DPTargetClusterTopology)).Should(Equal([]string{"shared-nothing"}))
+			Expect(postReadyJobEnvValues(jobs[0], dptypes.DPTargetComponentServiceVersion)).Should(Equal([]string{"3.4.0"}))
 			// test timeZone transform
 			var backupStopTimeEnv string
 			for _, v := range jobs[0].Spec.Template.Spec.Containers[0].Env {

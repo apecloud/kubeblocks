@@ -36,6 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
@@ -661,6 +662,53 @@ func (r *RestoreManager) isJobForRestoreAction(job *batchv1.Job) bool {
 	return restoreNamespace == "" || restoreNamespace == r.Restore.Namespace
 }
 
+func (r *RestoreManager) postReadyTargetEnv(reqCtx intctrlutil.RequestCtx, cli client.Client, pod *corev1.Pod) ([]corev1.EnvVar, error) {
+	if r.Restore.Labels[DataProtectionInternalPostReadyLabelKey] != "true" {
+		return nil, nil
+	}
+	clusterName := pod.Labels[constant.AppInstanceLabelKey]
+	componentName := pod.Labels[constant.KBAppComponentLabelKey]
+	if clusterName == "" || componentName == "" {
+		return nil, intctrlutil.NewFatalError(fmt.Sprintf("target Pod %s/%s is missing cluster/component labels", pod.Namespace, pod.Name))
+	}
+	cluster := &appsv1.Cluster{}
+	if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Namespace: pod.Namespace, Name: clusterName}, cluster); err != nil {
+		return nil, err
+	}
+	component := &appsv1.Component{}
+	componentKey := types.NamespacedName{
+		Namespace: pod.Namespace,
+		Name:      constant.GenerateClusterComponentName(clusterName, componentName),
+	}
+	if err := cli.Get(reqCtx.Ctx, componentKey, component); err != nil {
+		return nil, err
+	}
+
+	serviceVersion := component.Spec.ServiceVersion
+	if templateName := pod.Labels[constant.KBAppInstanceTemplateLabelKey]; templateName != "" {
+		found := false
+		for i := range component.Spec.Instances {
+			instance := component.Spec.Instances[i]
+			if instance.Name != templateName {
+				continue
+			}
+			found = true
+			if instance.ServiceVersion != "" {
+				serviceVersion = instance.ServiceVersion
+			}
+			break
+		}
+		if !found {
+			return nil, intctrlutil.NewFatalError(fmt.Sprintf(
+				"target Pod %s/%s references unknown instance template %q", pod.Namespace, pod.Name, templateName))
+		}
+	}
+	return []corev1.EnvVar{
+		{Name: dptypes.DPTargetClusterTopology, Value: cluster.Spec.Topology},
+		{Name: dptypes.DPTargetComponentServiceVersion, Value: serviceVersion},
+	}, nil
+}
+
 // BuildPostReadyActionJobs builds the post ready jobs.
 func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx, cli client.Client, backupSet BackupActionSet, target *dpv1alpha1.BackupStatusTarget, step int) ([]*batchv1.Job, error) {
 	readyConfig := r.Restore.Spec.ReadyConfig
@@ -705,7 +753,7 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 			return nil, err
 		}
 		sort.Sort(intctrlutil.ByPodName(targetPodList.Items))
-		buildJob := func(targetPod *corev1.Pod, sourceTargetPodName string, index int) *batchv1.Job {
+		buildJob := func(targetPod *corev1.Pod, sourceTargetPodName string, index int, targetEnv []corev1.EnvVar) *batchv1.Job {
 			if boolptr.IsSetToTrue(actionSpec.Job.RunOnTargetPodNode) {
 				jobBuilder.resetSpecificVolumesAndMounts()
 				jobBuilder.setNodeNameToNodeSelector(targetPod.Spec.NodeName)
@@ -726,6 +774,7 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 				setCommand(actionSpec.Job.Command).
 				setToleration(targetPod.Spec.Tolerations).
 				addTargetPodAndCredentialEnv(targetPod, readyConfig.ConnectionCredential, &target.BackupTarget).
+				overridePostReadyTargetEnv(targetEnv).
 				setServiceAccount(r.WorkerServiceAccount).
 				build()
 		}
@@ -747,7 +796,11 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 				// no need to recover the volume when the pod selection policy is 'All' and sourceTargetPodName is not found.
 				continue
 			}
-			jobs = append(jobs, buildJob(&targetPodList.Items[i], sourceTargetPodName, i))
+			targetEnv, err := r.postReadyTargetEnv(reqCtx, cli, &targetPodList.Items[i])
+			if err != nil {
+				return nil, err
+			}
+			jobs = append(jobs, buildJob(&targetPodList.Items[i], sourceTargetPodName, i, targetEnv))
 		}
 		return jobs, nil
 	}

@@ -47,9 +47,10 @@ const (
 
 // labels key
 const (
-	DataProtectionRestoreLabelKey          = "dataprotection.kubeblocks.io/restore"
-	DataProtectionRestoreNamespaceLabelKey = "dataprotection.kubeblocks.io/restore-namespace"
-	DataProtectionPopulatePVCLabelKey      = "dataprotection.kubeblocks.io/populate-pvc"
+	DataProtectionRestoreLabelKey           = "dataprotection.kubeblocks.io/restore"
+	DataProtectionRestoreNamespaceLabelKey  = "dataprotection.kubeblocks.io/restore-namespace"
+	DataProtectionPopulatePVCLabelKey       = "dataprotection.kubeblocks.io/populate-pvc"
+	DataProtectionInternalPostReadyLabelKey = "dataprotection.kubeblocks.io/internal-post-ready"
 )
 
 // Annotations key

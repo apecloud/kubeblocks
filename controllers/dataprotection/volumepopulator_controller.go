@@ -1784,8 +1784,9 @@ func postReadyRequiredPolicy(sourceTarget *dpv1alpha1.BackupStatusTarget) *dpv1a
 func postReadyRestoreLabels(pvc *corev1.PersistentVolumeClaim, comp *appsv1.Component) map[string]string {
 	restoreName := postReadyRestoreName(comp.UID)
 	labels := map[string]string{
-		dprestore.DataProtectionRestoreLabelKey:          restoreName,
-		dprestore.DataProtectionRestoreNamespaceLabelKey: pvc.Namespace,
+		dprestore.DataProtectionRestoreLabelKey:           restoreName,
+		dprestore.DataProtectionRestoreNamespaceLabelKey:  pvc.Namespace,
+		dprestore.DataProtectionInternalPostReadyLabelKey: "true",
 	}
 	for _, key := range []string{
 		constant.AppInstanceLabelKey,

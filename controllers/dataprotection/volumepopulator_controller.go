@@ -1000,11 +1000,11 @@ func (r *VolumePopulatorReconciler) validateRestoreAndBuildMGR(reqCtx intctrluti
 			}
 		}
 	}
-	if err = r.restoreSystemAccountSecrets(reqCtx, pvc, backupNamespace); err != nil {
-		return nil, err
-	}
 	restoreMgr := dprestore.NewRestoreManager(restore, r.Recorder, r.Scheme, r.Client)
 	if err = dprestore.ValidateAndInitRestoreMGR(reqCtx, r.Client, restoreMgr); err != nil {
+		return nil, err
+	}
+	if err = r.restoreSystemAccountSecrets(reqCtx, pvc, backupNamespace); err != nil {
 		return nil, err
 	}
 	if decision.mode == pvcRestoreModeProvisionOnly {

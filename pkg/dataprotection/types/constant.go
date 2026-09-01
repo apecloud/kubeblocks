@@ -110,6 +110,10 @@ const (
 	DPTargetPodName = "DP_TARGET_POD_NAME"
 	// DPTargetPodRole the target pod role
 	DPTargetPodRole = "DP_TARGET_POD_ROLE"
+	// DPTargetClusterTopology is the topology of the restore target Cluster.
+	DPTargetClusterTopology = "DP_TARGET_CLUSTER_TOPOLOGY"
+	// DPTargetServiceVersion is the expected serviceVersion of the restore target instance.
+	DPTargetServiceVersion = "DP_TARGET_SERVICE_VERSION"
 	// DPBackupBasePath the base path for backup data in the storage
 	// In a backup action pod, it equals ${DP_BACKUP_ROOT_PATH}/${DP_BACKUP_NAME}/${DP_TARGET_RELATIVE_PATH}
 	DPBackupBasePath = "DP_BACKUP_BASE_PATH"

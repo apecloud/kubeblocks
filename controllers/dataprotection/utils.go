@@ -302,7 +302,7 @@ func getDefaultBackupRepo(ctx context.Context, cli client.Client) (*dpv1alpha1.B
 }
 
 type objectList interface {
-	*appsv1.StatefulSetList | *batchv1.JobList
+	*appsv1.StatefulSetList | *batchv1.JobList | *corev1.SecretList
 	client.ObjectList
 }
 

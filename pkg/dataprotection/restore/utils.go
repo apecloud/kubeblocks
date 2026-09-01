@@ -241,6 +241,12 @@ func ValidateAndInitRestoreMGR(reqCtx intctrlutil.RequestCtx,
 	if err != nil {
 		return err
 	}
+	if backupSet.UseDurablePostReadyPlan {
+		// Reaching a committed postReady plan proves that prepareData already
+		// converged. If the mutable ActionSet is later deleted, the immutable
+		// plan remains the sole executable source for the unfinished stage.
+		return nil
+	}
 
 	// validate restore parameters
 	if backupSet.ActionSet != nil {

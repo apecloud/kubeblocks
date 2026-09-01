@@ -213,7 +213,7 @@ func (r *RestoreManager) buildPrepareDataRestore(comp *component.SynthesizedComp
 		Spec: dpv1alpha1.RestoreSpec{
 			Backup: dpv1alpha1.BackupRef{
 				Name:             backupObj.Name,
-				Namespace:        r.namespace,
+				Namespace:        backupObj.Namespace,
 				SourceTargetName: sourceTargetName,
 			},
 			RestoreTime: r.RestoreTime,
@@ -275,7 +275,7 @@ func (r *RestoreManager) DoPostReady(comp *component.SynthesizedComponent,
 		Spec: dpv1alpha1.RestoreSpec{
 			Backup: dpv1alpha1.BackupRef{
 				Name:             backupObj.Name,
-				Namespace:        r.namespace,
+				Namespace:        backupObj.Namespace,
 				SourceTargetName: sourceTargetName,
 			},
 			RestoreTime: r.RestoreTime,

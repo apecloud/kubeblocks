@@ -750,6 +750,21 @@ var _ = Describe("Volume Populator Controller test", func() {
 					g.Expect(restoreCondition).ShouldNot(BeNil())
 					g.Expect(restoreCondition.Status).Should(Equal(corev1.ConditionUnknown))
 				})).Should(Succeed())
+
+				populateKey := types.NamespacedName{
+					Namespace: testCtx.DefaultNamespace,
+					Name:      getPopulatePVCName(pvc.UID),
+				}
+				Eventually(testapps.CheckObjExists(&testCtx, populateKey,
+					&corev1.PersistentVolumeClaim{}, true)).Should(Succeed())
+				Eventually(testapps.CheckObjExists(&testCtx, populateKey,
+					&dpv1alpha1.Restore{}, true)).Should(Succeed())
+
+				By("clean resources created by the case")
+				cleanEnv()
+				testapps.DeleteObject(&testCtx, secretKey, &corev1.Secret{})
+				Eventually(testapps.CheckObjExists(&testCtx, secretKey,
+					&corev1.Secret{}, false)).Should(Succeed())
 			})
 
 			It("test VolumePopulator when it fails", func() {
@@ -2709,6 +2724,151 @@ func TestRestoreSystemAccountSecretsUsesShardingSecretName(t *testing.T) {
 	require.Equal(t, "cluster-shard-admin", systemAccountSecretName(systemAccountSecretScopeSharding, "cluster", "shard", "admin"))
 	require.Equal(t, constant.GenerateAccountSecretName("cluster", "mysql", "admin"),
 		systemAccountSecretName(systemAccountSecretScopeComponent, "cluster", "mysql", "admin"))
+}
+
+func TestValidateRestoreBeforeRestoringSystemAccountSecrets(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, kbappsv1.AddToScheme(scheme))
+	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
+	require.NoError(t, workloadsv1.AddToScheme(scheme))
+
+	const (
+		sourceNamespace = "source"
+		targetNamespace = "target"
+		clusterName     = "cluster"
+		componentName   = "mysql"
+		accountName     = "admin"
+	)
+	actionSet := &dpv1alpha1.ActionSet{
+		ObjectMeta: metav1.ObjectMeta{Name: "snapshot-action"},
+		Spec: dpv1alpha1.ActionSetSpec{
+			BackupType: dpv1alpha1.BackupTypeFull,
+			Restore: &dpv1alpha1.RestoreActionSpec{
+				PrepareData: &dpv1alpha1.JobActionSpec{},
+			},
+		},
+	}
+	encryptor := intctrlutil.NewEncryptor(viper.GetString(constant.CfgKeyDPEncryptionKey))
+	encryptedPassword, err := encryptor.Encrypt([]byte("restored-password"))
+	require.NoError(t, err)
+	accounts, err := json.Marshal(map[string]map[string]string{
+		componentName: {accountName: encryptedPassword},
+	})
+	require.NoError(t, err)
+	backup := &dpv1alpha1.Backup{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: sourceNamespace,
+			Name:      "backup",
+			Annotations: map[string]string{
+				constant.EncryptedSystemAccountsAnnotationKey: string(accounts),
+			},
+		},
+		Status: dpv1alpha1.BackupStatus{
+			Phase: dpv1alpha1.BackupPhaseCompleted,
+			BackupMethod: &dpv1alpha1.BackupMethod{
+				Name:            "snapshot",
+				ActionSetName:   actionSet.Name,
+				SnapshotVolumes: ptr.To(true),
+				TargetVolumes:   &dpv1alpha1.TargetVolumeInfo{Volumes: []string{"data"}},
+			},
+		},
+	}
+	cluster := &kbappsv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Namespace: targetNamespace, Name: clusterName, UID: types.UID("cluster-uid")},
+		Spec: kbappsv1.ClusterSpec{
+			Restore: &kbappsv1.ClusterRestore{
+				Source: kbappsv1.ClusterRestoreSource{
+					APIGroup:  dptypes.DataprotectionAPIGroup,
+					Kind:      dptypes.BackupKind,
+					Name:      backup.Name,
+					Namespace: backup.Namespace,
+				},
+			},
+		},
+	}
+	component := &kbappsv1.Component{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: targetNamespace,
+			Name:      constant.GenerateClusterComponentName(clusterName, componentName),
+			UID:       types.UID("component-uid"),
+		},
+	}
+	instanceSet := &workloadsv1.InstanceSet{
+		TypeMeta: metav1.TypeMeta{APIVersion: workloadsv1.GroupVersion.String(), Kind: workloadsv1.InstanceSetKind},
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: targetNamespace,
+			Name:      "cluster-mysql",
+			UID:       types.UID("instanceset-uid"),
+			Labels: map[string]string{
+				constant.AppInstanceLabelKey:    clusterName,
+				constant.KBAppComponentLabelKey: componentName,
+			},
+		},
+		Spec: workloadsv1.InstanceSetSpec{
+			Replicas: ptr.To[int32](1),
+			VolumeClaimTemplates: []corev1.PersistentVolumeClaim{{
+				ObjectMeta: metav1.ObjectMeta{Name: "data"},
+			}},
+		},
+	}
+	apiGroup := dptypes.DataprotectionAPIGroup
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: targetNamespace,
+			Name:      "data-cluster-mysql-0",
+			Labels: map[string]string{
+				constant.AppInstanceLabelKey:             clusterName,
+				constant.KBAppComponentLabelKey:          componentName,
+				constant.KBAppPodNameLabelKey:            "cluster-mysql-0",
+				constant.VolumeClaimTemplateNameLabelKey: "data",
+			},
+			Annotations: map[string]string{
+				constant.RestoreSourceNamespaceAnnotationKey: sourceNamespace,
+				constant.RestoreVolumeTemplateAnnotationKey:  "data",
+			},
+			OwnerReferences: []metav1.OwnerReference{{
+				APIVersion: workloadsv1.GroupVersion.String(),
+				Kind:       workloadsv1.InstanceSetKind,
+				Name:       instanceSet.Name,
+				UID:        instanceSet.UID,
+				Controller: ptr.To(true),
+			}},
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			DataSourceRef: &corev1.TypedObjectReference{
+				APIGroup: &apiGroup,
+				Kind:     dptypes.BackupKind,
+				Name:     backup.Name,
+			},
+		},
+	}
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: targetNamespace,
+			Name:      constant.GenerateAccountSecretName(clusterName, componentName, accountName),
+		},
+		Data: map[string][]byte{
+			constant.AccountNameForSecret:   []byte(accountName),
+			constant.AccountPasswdForSecret: []byte("existing-password"),
+		},
+	}
+	reconciler := &VolumePopulatorReconciler{
+		Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(
+			actionSet, backup, cluster, component, instanceSet, secret,
+		).Build(),
+		Scheme: scheme,
+	}
+
+	_, err = reconciler.validateRestoreAndBuildMGR(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc)
+	require.ErrorContains(t, err, "cross-namespace VolumeSnapshot")
+	require.True(t, intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal))
+
+	got := &corev1.Secret{}
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(secret), got))
+	require.Equal(t, []byte("existing-password"), got.Data[constant.AccountPasswdForSecret])
+	require.NotContains(t, got.Annotations, constant.SystemAccountProvisionedAnnotationKey)
+	require.Empty(t, got.OwnerReferences)
 }
 
 func TestRestoreSystemAccountSecretsRestoresComponentAndShardingSecrets(t *testing.T) {

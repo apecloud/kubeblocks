@@ -64,6 +64,7 @@ var _ = Describe("Restore Controller test", func() {
 
 			// namespaced
 			testapps.ClearResources(&testCtx, generics.ClusterSignature, inNS, ml)
+			testapps.ClearResources(&testCtx, generics.ComponentSignature, inNS, ml)
 			testapps.ClearResources(&testCtx, generics.PodSignature, inNS, ml)
 			testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupSignature, true, inNS)
 
@@ -487,6 +488,10 @@ var _ = Describe("Restore Controller test", func() {
 			BeforeEach(func() {
 				By("fake a new cluster")
 				_ = testdp.NewFakeCluster(&testCtx)
+				testapps.NewComponentFactory(testCtx.DefaultNamespace,
+					constant.GenerateClusterComponentName(testdp.ClusterName, testdp.ComponentName), "test-cmpd").
+					SetServiceVersion("8.0.30").
+					Create(&testCtx)
 			})
 
 			It("test post ready actions", func() {

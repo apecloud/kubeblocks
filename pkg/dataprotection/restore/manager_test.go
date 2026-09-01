@@ -20,20 +20,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package restore
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
+	"testing"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/require"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -46,6 +52,82 @@ import (
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
+func postReadyJobEnvValues(job *batchv1.Job, name string) []string {
+	var values []string
+	for i := range job.Spec.Template.Spec.Containers[0].Env {
+		env := job.Spec.Template.Spec.Containers[0].Env[i]
+		if env.Name == name {
+			values = append(values, env.Value)
+		}
+	}
+	return values
+}
+
+func TestRestoreManagerPostReadyTargetEnv(t *testing.T) {
+	const (
+		namespace     = "default"
+		clusterName   = "target"
+		componentName = "mysql"
+	)
+	scheme := runtime.NewScheme()
+	require.NoError(t, appsv1.AddToScheme(scheme))
+	cluster := &appsv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: clusterName},
+		Spec:       appsv1.ClusterSpec{Topology: "shared-nothing"},
+	}
+	component := &appsv1.Component{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      constant.GenerateClusterComponentName(clusterName, componentName),
+		},
+		Spec: appsv1.ComponentSpec{
+			ServiceVersion: "3.3.2",
+			Instances: []appsv1.InstanceTemplate{
+				{Name: "canary", ServiceVersion: "3.4.0"},
+				{Name: "inherited"},
+			},
+		},
+	}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, component).Build()
+	manager := &RestoreManager{Restore: &dpv1alpha1.Restore{}}
+	reqCtx := intctrlutil.RequestCtx{Ctx: context.Background()}
+
+	tests := []struct {
+		name             string
+		instanceTemplate string
+		wantVersion      string
+	}{
+		{name: "component default", wantVersion: "3.3.2"},
+		{name: "instance override", instanceTemplate: "canary", wantVersion: "3.4.0"},
+		{name: "instance inherits component", instanceTemplate: "inherited", wantVersion: "3.3.2"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace,
+				Name:      "target-mysql-0",
+				Labels: map[string]string{
+					constant.AppInstanceLabelKey:           clusterName,
+					constant.KBAppComponentLabelKey:        componentName,
+					constant.KBAppInstanceTemplateLabelKey: tt.instanceTemplate,
+				},
+			}}
+
+			env, err := manager.postReadyTargetEnv(reqCtx, cli, pod)
+
+			require.NoError(t, err)
+			require.Equal(t, []corev1.EnvVar{
+				{Name: dptypes.DPTargetClusterTopology, Value: "shared-nothing"},
+				{Name: dptypes.DPTargetServiceVersion, Value: tt.wantVersion},
+			}, env)
+		})
+	}
+
+	env, err := manager.postReadyTargetEnv(reqCtx, cli, &corev1.Pod{})
+	require.NoError(t, err)
+	require.Empty(t, env, "non-KubeBlocks target Pods must keep their existing behavior")
+}
+
 var _ = Describe("RestoreManager Test", func() {
 
 	cleanEnv := func() {
@@ -57,6 +139,7 @@ var _ = Describe("RestoreManager Test", func() {
 		// namespaced
 		testapps.ClearResources(&testCtx, generics.PodSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.ClusterSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.ComponentSignature, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupSignature, true, inNS)
 
 		// wait all backup to be deleted, otherwise the controller maybe create
@@ -431,9 +514,23 @@ var _ = Describe("RestoreManager Test", func() {
 			restoreMGR, backupSet := initResources(reqCtx, 0, false, func(f *testdp.MockRestoreFactory) {
 				f.SetConnectCredential(testdp.ClusterName).SetJobActionConfig(matchLabels).SetExecActionConfig(matchLabels)
 			})
+			restoreMGR.Restore.Spec.Env = append(restoreMGR.Restore.Spec.Env,
+				corev1.EnvVar{Name: dptypes.DPTargetClusterTopology, Value: "spoofed-topology"},
+				corev1.EnvVar{Name: dptypes.DPTargetServiceVersion, Value: "spoofed-version"})
 
 			By("create cluster to restore")
-			testdp.NewFakeCluster(&testCtx)
+			clusterInfo := testdp.NewFakeCluster(&testCtx)
+			Expect(testapps.ChangeObj(&testCtx, clusterInfo.Cluster, func(cluster *appsv1.Cluster) {
+				cluster.Spec.Topology = "shared-nothing"
+			})).Should(Succeed())
+			testapps.NewComponentFactory(testCtx.DefaultNamespace,
+				constant.GenerateClusterComponentName(testdp.ClusterName, testdp.ComponentName), "test-cmpd").
+				SetServiceVersion("3.3.2").
+				AddInstances(appsv1.InstanceTemplate{Name: "canary", ServiceVersion: "3.4.0"}).
+				Create(&testCtx)
+			Expect(testapps.ChangeObj(&testCtx, clusterInfo.TargetPod, func(pod *corev1.Pod) {
+				pod.Labels[constant.KBAppInstanceTemplateLabelKey] = "canary"
+			})).Should(Succeed())
 
 			By("test with execAction and expect for creating 2 exec job")
 			target := utils.GetBackupStatusTarget(backupSet.Backup, restoreMGR.Restore.Spec.Backup.SourceTargetName)
@@ -451,6 +548,8 @@ var _ = Describe("RestoreManager Test", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 			// count of job should equal to 1
 			Expect(len(jobs)).Should(Equal(1))
+			Expect(postReadyJobEnvValues(jobs[0], dptypes.DPTargetClusterTopology)).Should(Equal([]string{"shared-nothing"}))
+			Expect(postReadyJobEnvValues(jobs[0], dptypes.DPTargetServiceVersion)).Should(Equal([]string{"3.4.0"}))
 			// test timeZone transform
 			var backupStopTimeEnv string
 			for _, v := range jobs[0].Spec.Template.Spec.Containers[0].Env {

@@ -3625,6 +3625,21 @@ Either <code>objectKey</code> or <code>actionName</code> must be provided.</p>
 </tr>
 <tr>
 <td>
+<code>switchoverDispatch</code><br/>
+<em>
+<a href="#operations.kubeblocks.io/v1alpha1.SwitchoverDispatchStatus">
+SwitchoverDispatchStatus
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Records the durable dispatch state for a Switchover lifecycle action.
+This structured field is the controller protocol; Message remains display-only.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>status</code><br/>
 <em>
 <a href="#operations.kubeblocks.io/v1alpha1.ProgressStatus">
@@ -3645,7 +3660,8 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Provides a human-readable explanation of the object&rsquo;s condition.</p>
+<p>Provides a human-readable explanation of the object&rsquo;s condition.
+Controllers must not parse this field as durable state or a versioned protocol.</p>
 </td>
 </tr>
 <tr>
@@ -4451,6 +4467,134 @@ string
 <p>If CandidateName is specified, the role will be transferred to this instance.
 The name must match one of the pods in the component.
 Refer to ComponentDefinition&rsquo;s Swtichover lifecycle action for more details.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="operations.kubeblocks.io/v1alpha1.SwitchoverDispatchState">SwitchoverDispatchState
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#operations.kubeblocks.io/v1alpha1.SwitchoverDispatchStatus">SwitchoverDispatchStatus</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Claimed&#34;</p></td>
+<td><p>SwitchoverDispatchClaimed means the claim was committed before the external
+call but no call result has been committed yet.</p>
+</td>
+</tr><tr><td><p>&#34;OutcomeUnknown&#34;</p></td>
+<td><p>SwitchoverDispatchOutcomeUnknown means no caller-held result remains and
+the lifecycle action must not be replayed.</p>
+</td>
+</tr><tr><td><p>&#34;Resolved&#34;</p></td>
+<td><p>SwitchoverDispatchResolved means the caller committed its definite result.</p>
+</td>
+</tr></tbody>
+</table>
+<h3 id="operations.kubeblocks.io/v1alpha1.SwitchoverDispatchStatus">SwitchoverDispatchStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#operations.kubeblocks.io/v1alpha1.ProgressStatusDetail">ProgressStatusDetail</a>)
+</p>
+<div>
+<p>SwitchoverDispatchStatus records the durable identity and state of one
+non-idempotent Switchover lifecycle-action dispatch.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>version</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Version selects the protocol contract used by this status value.
+Readers must fail closed when they do not support the recorded version.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>opsRequestUID</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>OpsRequestUID binds the dispatch to one exact OpsRequest incarnation.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>componentName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>ComponentName is the logical component or sharding name used by the writer.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>instanceName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>InstanceName is the source instance requested by the Switchover.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>candidateName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>CandidateName is the optional target instance requested by the Switchover.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>token</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Token uniquely identifies the writer that committed the dispatch claim.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>state</code><br/>
+<em>
+<a href="#operations.kubeblocks.io/v1alpha1.SwitchoverDispatchState">
+SwitchoverDispatchState
+</a>
+</em>
+</td>
+<td>
+<p>State records whether the external call is still unconfirmed, was resolved
+by its caller, or crossed a restart with no retained result.</p>
 </td>
 </tr>
 </tbody>

@@ -31,7 +31,7 @@ import (
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks},shortName=inst
-// +kubebuilder:printcolumn:name="UP-TO-DATE",type="string",JSONPath=".status.upToDate",description="update-to-date."
+// +kubebuilder:printcolumn:name="UP-TO-DATE",type="string",JSONPath=".status.upToDate",description="desired state applied."
 // +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.ready",description="ready."
 // +kubebuilder:printcolumn:name="AVAILABLE",type="string",JSONPath=".status.available",description="available."
 // +kubebuilder:printcolumn:name="ROLE",type="string",JSONPath=".status.role",description="role."
@@ -146,39 +146,46 @@ type InstanceSpec struct {
 
 // InstanceStatus2 defines the observed state of Instance
 type InstanceStatus2 struct {
-	// observedGeneration is the most recent generation observed for this InstanceSet. It corresponds to the
-	// InstanceSet's generation, which is updated on mutation by the API Server.
+	// observedGeneration is the most recent generation observed for this Instance. It corresponds to the
+	// Instance's generation, which is updated on mutation by the API Server.
 	//
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
 	// Represents the latest available observations of an instance's current state.
-	// Known .status.conditions.type are: "InstanceFailure", "InstanceReady", "InstanceAvailable"
+	// Known .status.conditions.type are: "InstanceFailure", "InstanceReady", "InstanceAvailable", "Restore"
 	//
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 
-	// currentRevision, if not empty, indicates the version of the Instance used to generate pod.
+	// Represents whether the Pod managed by this Instance is currently present, terminating, or absent.
+	//
+	// +optional
+	// +kubebuilder:validation:Enum=Present;Terminating;Absent
+	CurrentState InstanceCurrentState `json:"currentState,omitempty"`
+
+	// currentRevision, if not empty, identifies the revision currently used by the Pod.
 	//
 	// +optional
 	CurrentRevision string `json:"currentRevision,omitempty"`
 
-	// updateRevision, if not empty, indicates the version of the Instance used to generate pod.
+	// updateRevision, if not empty, identifies the revision desired for the Pod.
 	//
 	// +optional
 	UpdateRevision string `json:"updateRevision,omitempty"`
 
-	// Represents whether the instance is up-to-date.
+	// UpToDate indicates that the Instance controller has observed the Pod, dynamic configs, and PVC expansion
+	// targets represented by this status applied. It is independent of runtime Ready and Available observations.
 	//
 	// +optional
 	UpToDate bool `json:"upToDate,omitempty"`
 
-	// Represents whether the instance is in ready condition.
+	// Represents whether the instance is in ready condition, independent of desired-state convergence.
 	//
 	// +optional
 	Ready bool `json:"ready,omitempty"`
 
-	// Represents whether the instance is in available condition.
+	// Represents whether the instance is in available condition, independent of desired-state convergence.
 	//
 	// +optional
 	Available bool `json:"available,omitempty"`

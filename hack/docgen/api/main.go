@@ -42,8 +42,9 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/russross/blackfriday/v2"
-	"k8s.io/gengo/parser"
-	"k8s.io/gengo/types"
+	gengo "k8s.io/gengo/v2"
+	"k8s.io/gengo/v2/parser"
+	"k8s.io/gengo/v2/types"
 	"k8s.io/klog/v2"
 )
 
@@ -174,10 +175,11 @@ func main() {
 	if err != nil {
 		klog.Fatal(err)
 	}
+	allTypePkgMap := extractTypeToPackageMap(allAPIPackages)
 
 	mkOutput := func(groupName string, groupAPIPakcages []*apiPackage) (string, error) {
 		var b bytes.Buffer
-		err := render(&b, groupName, groupAPIPakcages, config)
+		err := render(&b, groupName, groupAPIPakcages, allTypePkgMap, config)
 		if err != nil {
 			return "", errors.Wrap(err, "failed to render the result")
 		}
@@ -233,7 +235,7 @@ func main() {
 // groupName extracts the "//+groupName" meta-comment from the specified
 // package's comments, or returns empty string if it cannot be found.
 func groupName(pkg *types.Package) string {
-	m := types.ExtractCommentTags("+", pkg.Comments)
+	m := gengo.ExtractCommentTags("+", pkg.Comments)
 	v := m["groupName"]
 	if len(v) == 1 {
 		return v[0]
@@ -242,14 +244,18 @@ func groupName(pkg *types.Package) string {
 }
 
 func parseAPIPackages() ([]*types.Package, error) {
-	b := parser.New()
-	// the following will silently fail (turn on -v=4 to see logs)
-	if err := b.AddDirRecursive(*flAPIDir); err != nil {
-		return nil, err
-	}
-	scan, err := b.FindTypes()
+	p := parser.New()
+	pkgsFound, err := p.FindPackages(*flAPIDir + "/...")
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse pkgs and types")
+		return nil, errors.Wrap(err, "failed to find pkgs")
+	}
+	klog.Infof("found %d packages", len(pkgsFound))
+	if err := p.LoadPackages(pkgsFound...); err != nil {
+		return nil, errors.Wrap(err, "failed to load pkgs")
+	}
+	scan, err := p.NewUniverse()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create type universe")
 	}
 	var pkgNames []string
 	for p := range scan {
@@ -338,7 +344,7 @@ func combineAPIPackages(pkgs []*types.Package) ([]*apiPackage, error) {
 // isVendorPackage determines if package is coming from vendor/ dir.
 func isVendorPackage(pkg *types.Package) bool {
 	vendorPattern := string(os.PathSeparator) + "vendor" + string(os.PathSeparator)
-	return strings.Contains(pkg.SourcePath, vendorPattern)
+	return strings.Contains(pkg.Dir, vendorPattern)
 }
 
 func findTypeReferences(pkgs []*apiPackage) map[*types.Type][]*types.Type {
@@ -435,11 +441,33 @@ func anchorIDForLocalType(t *types.Type, typePkgMap map[*types.Type]*apiPackage)
 
 // linkForType returns an anchor to the type if it can be generated. returns
 // empty string if it is not a local type or unrecognized external type.
-func linkForType(t *types.Type, c generatorConfig, typePkgMap map[*types.Type]*apiPackage) (string, error) {
+func linkForType(t *types.Type, c generatorConfig, typePkgMap, allTypePkgMap map[*types.Type]*apiPackage, currentGroupName string) (string, error) {
 	t = tryDereference(t) // dereference kind=Pointer
 
 	if isLocalType(t, typePkgMap) {
 		return "#" + anchorIDForLocalType(t, typePkgMap), nil
+	}
+
+	if pkg := allTypePkgMap[t]; pkg != nil {
+		for _, group := range c.PackageGroups {
+			for _, apiGroup := range group.Packages {
+				if apiGroup != pkg.apiGroup {
+					continue
+				}
+
+				link := "#" + anchorIDForLocalType(t, allTypePkgMap)
+				if group.GroupName != currentGroupName {
+					link = group.GroupName + ".md" + link
+				}
+				return link, nil
+			}
+		}
+	}
+
+	// Predeclared Go types, such as any, do not have an external documentation
+	// package to link to.
+	if t.Name.Package == "" {
+		return "", nil
 	}
 
 	var arrIndex = func(a []string, i int) string {
@@ -621,7 +649,7 @@ func filterCommentTags(comments []string) []string {
 }
 
 func isOptionalMember(m types.Member) bool {
-	tags := types.ExtractCommentTags("+", m.CommentLines)
+	tags := gengo.ExtractCommentTags("+", m.CommentLines)
 	_, ok := tags["optional"]
 	return ok
 }
@@ -675,7 +703,7 @@ func getAPIDocOrder(filename string, pg []PackageGroup) int {
 	return 1000
 }
 
-func render(w io.Writer, groupName string, pkgs []*apiPackage, config generatorConfig) error {
+func render(w io.Writer, groupName string, pkgs []*apiPackage, allTypePkgMap map[*types.Type]*apiPackage, config generatorConfig) error {
 	references := findTypeReferences(pkgs)
 	typePkgMap := extractTypeToPackageMap(pkgs)
 
@@ -693,7 +721,7 @@ func render(w io.Writer, groupName string, pkgs []*apiPackage, config generatorC
 			return strings.ReplaceAll(p.identifier(), " ", "")
 		},
 		"linkForType": func(t *types.Type) string {
-			v, err := linkForType(t, config, typePkgMap)
+			v, err := linkForType(t, config, typePkgMap, allTypePkgMap, groupName)
 			if err != nil {
 				klog.Fatal(errors.Wrapf(err, "error getting link for type=%s", t.Name))
 				return ""

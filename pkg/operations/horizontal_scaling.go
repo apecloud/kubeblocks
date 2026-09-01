@@ -224,13 +224,12 @@ func (hs horizontalScalingOpsHandler) createRestore(reqCtx intctrlutil.RequestCt
 		}
 		return nil
 	}
-	if len(backupObj.Status.Targets) > 1 {
-		// TODO: support explicit source target selection for scale-out restore from multi-target backups.
-		return intctrlutil.NewFatalError(fmt.Sprintf("scale-out from backup %s/%s is not supported because it has multiple source targets", backupObj.Namespace, backupObj.Name))
-	}
 	// create restore
-	restore, err := restoreMGR.BuildPrepareDataRestore(synthesizedComponent, backupObj, getTemplate(templateName))
+	restore, err := restoreMGR.BuildPrepareDataRestoreForPod(synthesizedComponent, backupObj, getTemplate(templateName))
 	if err != nil {
+		if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeRestoreFailed) {
+			return intctrlutil.NewFatalError(err.Error())
+		}
 		return err
 	}
 	if restore == nil {
@@ -298,7 +297,9 @@ func (hs horizontalScalingOpsHandler) restoreDataFromBackup(reqCtx intctrlutil.R
 			constant.KBAppComponentLabelKey: pgRes.compOps.GetComponentName(),
 		}, 1, int32(podIndexInt))
 		restoreMGR.RestoreTime = fromBackup.RestorePointInTime
+		restoreMGR.SetRestoreEnv(fromBackup.RestoreEnv)
 		restoreMGR.RestoreNamePrefix = string(opsRes.OpsRequest.UID[:8])
+		restoreMGR.SourceTargetName = fromBackup.SourceTargetName
 		// check restore status
 		restoreMeta := restoreMGR.GetRestoreObjectMeta(synthesizedComponent, dpv1alpha1.PrepareData, templateName)
 		restore := &dpv1alpha1.Restore{}

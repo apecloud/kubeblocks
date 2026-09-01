@@ -619,8 +619,9 @@ spec:
                               type: string
                             namespace:
                               description: |-
-                                Specifies the namespace of the Backup namespace.
+                                Specifies the namespace of the Backup.
                                 If not specified, the namespace of the OpsRequest will be used.
+                                Cross-namespace VolumeSnapshot restores are NOT supported.
                               type: string
                             restoreEnv:
                               description: |-
@@ -756,6 +757,12 @@ spec:
 
                                 - RFC3339 format, e.g. "2023-11-25T18:52:53Z"
                                 - A human-readable date-time format, e.g. "Jul 25,2023 18:52:53 UTC+0800"
+                              type: string
+                            sourceTargetName:
+                              description: |-
+                                Specifies the backup source target name to restore from.
+                                This field is required when the referenced Backup has multiple source targets.
+                                It is propagated to Restore.spec.backup.sourceTargetName.
                               type: string
                           required:
                           - name

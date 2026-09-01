@@ -257,29 +257,72 @@ var _ = Describe("RestoreManager Test", func() {
 
 		It("test with RestorePVCFromSnapshot function", func() {
 			reqCtx := getReqCtx()
-			startingIndex := 0
+			startingIndex := 3
+			templateName := "az-a"
+			cmpName := "mysql"
 			useVolumeSnapshot := true
 			restoreMGR, backupSet := initResources(reqCtx, startingIndex, useVolumeSnapshot, func(f *testdp.MockRestoreFactory) {
 				f.SetVolumeClaimsTemplate(testdp.MysqlTemplateName, testdp.DataVolumeName,
-					testdp.DataVolumeMountPath, "", int32(replicas), int32(startingIndex), nil)
+					testdp.DataVolumeMountPath, "", int32(replicas), int32(startingIndex), map[string]string{
+						constant.AppInstanceLabelKey:           instanceName,
+						constant.KBAppComponentLabelKey:        cmpName,
+						constant.KBAppInstanceTemplateLabelKey: templateName,
+					}).
+					SetPrepareDataRequiredPolicy(dpv1alpha1.OneToOneRestorePolicy, "")
 			})
+			backupSet.Backup.Status.Target.PodSelector.Strategy = dpv1alpha1.PodSelectionStrategyAll
+			backupSet.Backup.Status.Target.PodSelector.MatchLabels[constant.AppInstanceLabelKey] = "source"
+			backupSet.Backup.Status.Target.PodSelector.MatchLabels[constant.KBAppComponentLabelKey] = cmpName
+			backupSet.Backup.Status.Target.SelectedTargetPods = []string{"source-mysql-az-a-4", "source-mysql-az-a-3"}
+			backupSet.Backup.Status.Actions = []dpv1alpha1.ActionStatus{
+				{
+					TargetPodName: "source-mysql-az-a-4",
+					VolumeSnapshots: []dpv1alpha1.VolumeSnapshotStatus{{
+						Name:       "snapshot-4",
+						VolumeName: testdp.DataVolumeName,
+					}},
+				},
+				{
+					TargetPodName: "source-mysql-az-a-3",
+					VolumeSnapshots: []dpv1alpha1.VolumeSnapshotStatus{{
+						Name:       "snapshot-3",
+						VolumeName: testdp.DataVolumeName,
+					}},
+				},
+			}
 
 			By("test RestorePVCFromSnapshot function")
 			target := utils.GetBackupStatusTarget(backupSet.Backup, restoreMGR.Restore.Spec.Backup.SourceTargetName)
 			Expect(restoreMGR.RestorePVCFromSnapshot(reqCtx, k8sClient, *backupSet, target)).Should(Succeed())
 
-			checkPVC(startingIndex, useVolumeSnapshot, "restore")
+			checkPVC(startingIndex, useVolumeSnapshot, constant.AppName)
+			for i := 0; i < replicas; i++ {
+				pvc := &corev1.PersistentVolumeClaim{}
+				Expect(k8sClient.Get(ctx, client.ObjectKey{
+					Namespace: testCtx.DefaultNamespace,
+					Name:      fmt.Sprintf("%s-%d", testdp.MysqlTemplateName, startingIndex+i),
+				}, pvc)).Should(Succeed())
+				Expect(pvc.Spec.DataSource).ShouldNot(BeNil())
+				Expect(pvc.Spec.DataSource.Name).Should(Equal(fmt.Sprintf("snapshot-%d", startingIndex+i)))
+			}
 		})
 
 		It("test with BuildPrepareDataJobs function and Parallel volumeRestorePolicy", func() {
 			reqCtx := getReqCtx()
-			startingIndex := 1
+			startingIndex := 3
+			cmpName := "mysql"
 			restoreMGR, backupSet := initResources(reqCtx, startingIndex, false, func(f *testdp.MockRestoreFactory) {
 				f.SetVolumeClaimsTemplate(testdp.MysqlTemplateName, testdp.DataVolumeName,
 					testdp.DataVolumeMountPath, "", int32(replicas), int32(startingIndex), map[string]string{
-						constant.AppInstanceLabelKey: instanceName,
-					})
+						constant.AppInstanceLabelKey:    instanceName,
+						constant.KBAppComponentLabelKey: cmpName,
+					}).SetPrepareDataRequiredPolicy(dpv1alpha1.OneToOneRestorePolicy, "")
 			})
+			backupSet.Backup.Status.Path = "/repo/test/backup"
+			backupSet.Backup.Status.Target.PodSelector.Strategy = dpv1alpha1.PodSelectionStrategyAll
+			backupSet.Backup.Status.Target.PodSelector.MatchLabels[constant.AppInstanceLabelKey] = "source"
+			backupSet.Backup.Status.Target.PodSelector.MatchLabels[constant.KBAppComponentLabelKey] = cmpName
+			backupSet.Backup.Status.Target.SelectedTargetPods = []string{"source-mysql-4", "source-mysql-3"}
 
 			By(fmt.Sprintf("test BuildPrepareDataJobs function, expect for %d jobs", replicas))
 			actionSetName := "preparedata-0"
@@ -291,8 +334,12 @@ var _ = Describe("RestoreManager Test", func() {
 			Expect(len(jobs)).Should(Equal(replicas))
 			// image should be expanded by env
 			Expect(jobs[0].Spec.Template.Spec.Containers[0].Image).Should(ContainSubstring(testdp.ImageTag))
+			for i := 0; i < replicas; i++ {
+				env := utils.CovertEnvToMap(jobs[i].Spec.Template.Spec.Containers[0].Env)
+				Expect(env[dptypes.DPTargetRelativePath]).Should(Equal(fmt.Sprintf("source-mysql-%d", startingIndex+i)))
+			}
 
-			checkPVC(startingIndex, false, "restore")
+			checkPVC(startingIndex, false, constant.AppName)
 		})
 
 		It("test with BuildPrepareDataJobs function with InstanceTemplates claims", func() {
@@ -306,8 +353,18 @@ var _ = Describe("RestoreManager Test", func() {
 						constant.AppInstanceLabelKey:           instanceName,
 						constant.KBAppComponentLabelKey:        cmpName,
 						constant.KBAppInstanceTemplateLabelKey: templateName,
-					})
+					}).SetPrepareDataRequiredPolicy(dpv1alpha1.OneToOneRestorePolicy, "")
 			})
+			backupSet.Backup.Status.Path = "/repo/test/backup"
+			backupSet.Backup.Status.Target.PodSelector.Strategy = dpv1alpha1.PodSelectionStrategyAll
+			backupSet.Backup.Status.Target.PodSelector.MatchLabels[constant.AppInstanceLabelKey] = "source"
+			backupSet.Backup.Status.Target.PodSelector.MatchLabels[constant.KBAppComponentLabelKey] = cmpName
+			backupSet.Backup.Status.Target.SelectedTargetPods = []string{
+				"source-mysql-other-301",
+				"source-mysql-abc-301",
+				"source-mysql-other-300",
+				"source-mysql-abc-300",
+			}
 			By(fmt.Sprintf("test BuildPrepareDataJobs function, expect job label pod name contains template '%s' and ordinal correct", templateName))
 			actionSetName := "preparedata-0"
 			target := utils.GetBackupStatusTarget(backupSet.Backup, restoreMGR.Restore.Spec.Backup.SourceTargetName)
@@ -317,6 +374,8 @@ var _ = Describe("RestoreManager Test", func() {
 			// job label contains pod name and ordinal match
 			for i := 0; i < replicas; i++ {
 				Expect(jobs[i].Spec.Template.Labels[constant.KBAppPodNameLabelKey]).Should(Equal(fmt.Sprintf("%s-%s-%s-%d", instanceName, cmpName, templateName, startingIndex+i)))
+				env := utils.CovertEnvToMap(jobs[i].Spec.Template.Spec.Containers[0].Env)
+				Expect(env[dptypes.DPTargetRelativePath]).Should(Equal(fmt.Sprintf("source-mysql-%s-%d", templateName, startingIndex+i)))
 			}
 
 			checkPVC(startingIndex, false, constant.AppName)

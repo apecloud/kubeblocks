@@ -37,6 +37,7 @@ import (
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
@@ -334,6 +335,84 @@ func GetSourcePodNameFromTarget(target *dpv1alpha1.BackupStatusTarget,
 	}
 	// get the source target pod according to index for 'OneToOne' policy
 	return target.SelectedTargetPods[index], nil
+}
+
+// GetSourcePodNameForTargetPod gets the source pod for a concrete target pod.
+// SelectedTargetPods is an unordered list, so OneToOne restore must match pod
+// identity instead of treating the target pod ordinal as a slice index.
+func GetSourcePodNameForTargetPod(target *dpv1alpha1.BackupStatusTarget,
+	requiredPolicy *dpv1alpha1.RequiredPolicyForAllPodSelection,
+	targetPodName, instanceTemplateName string) (string, error) {
+	if target.PodSelector.Strategy == dpv1alpha1.PodSelectionStrategyAny {
+		return "", nil
+	}
+	if requiredPolicy == nil {
+		return "", intctrlutil.NewFatalError("requiredPolicyForAllPodSelection can not be empty when the pod selection strategy of the source target is All")
+	}
+	if requiredPolicy.DataRestorePolicy == dpv1alpha1.OneToManyRestorePolicy {
+		if requiredPolicy.SourceOfOneToMany == nil || requiredPolicy.SourceOfOneToMany.TargetPodName == "" {
+			return "", intctrlutil.NewFatalError("the source target pod can not be empty when restore policy is OneToMany")
+		}
+		return requiredPolicy.SourceOfOneToMany.TargetPodName, nil
+	}
+	if targetPodName == "" {
+		return "", intctrlutil.NewFatalError("target pod name can not be empty when restore policy is OneToOne")
+	}
+	if slices.Contains(target.SelectedTargetPods, targetPodName) {
+		return targetPodName, nil
+	}
+
+	targetOrdinal, ok := podOrdinal(targetPodName)
+	if !ok {
+		return "", intctrlutil.NewFatalError(fmt.Sprintf("source target pod can not be inferred from target pod %q", targetPodName))
+	}
+	sourceWorkloadName := backupTargetWorkloadName(target)
+	if sourceWorkloadName == "" && instanceTemplateName != "" {
+		return "", intctrlutil.NewFatalError(fmt.Sprintf("source workload identity is required to match instance template %q", instanceTemplateName))
+	}
+	var candidates []string
+	for _, sourcePodName := range target.SelectedTargetPods {
+		if sourceWorkloadName != "" {
+			sourceTemplateName, sourceOrdinal, err := instancetemplate.GetTemplateNameAndOrdinal(sourceWorkloadName, sourcePodName)
+			if err != nil || int(sourceOrdinal) != targetOrdinal || sourceTemplateName != instanceTemplateName {
+				continue
+			}
+		} else {
+			sourceOrdinal, ok := podOrdinal(sourcePodName)
+			if !ok || sourceOrdinal != targetOrdinal {
+				continue
+			}
+		}
+		candidates = append(candidates, sourcePodName)
+	}
+	if len(candidates) == 1 {
+		return candidates[0], nil
+	}
+	if len(candidates) > 1 {
+		return "", intctrlutil.NewFatalError(fmt.Sprintf("multiple selected source target pods match target pod %q and instance template %q: %v", targetPodName, instanceTemplateName, candidates))
+	}
+	return "", intctrlutil.NewFatalError(fmt.Sprintf("no selected source target pod matches target pod %q and instance template %q", targetPodName, instanceTemplateName))
+}
+
+func backupTargetWorkloadName(target *dpv1alpha1.BackupStatusTarget) string {
+	if target == nil || target.PodSelector == nil || target.PodSelector.LabelSelector == nil {
+		return ""
+	}
+	clusterName := target.PodSelector.MatchLabels[constant.AppInstanceLabelKey]
+	componentName := target.PodSelector.MatchLabels[constant.KBAppComponentLabelKey]
+	if clusterName == "" || componentName == "" {
+		return ""
+	}
+	return constant.GenerateWorkloadNamePattern(clusterName, componentName)
+}
+
+func podOrdinal(podName string) (int, bool) {
+	index := strings.LastIndex(podName, "-")
+	if index < 0 || index == len(podName)-1 {
+		return 0, false
+	}
+	ordinal, err := strconv.Atoi(podName[index+1:])
+	return ordinal, err == nil
 }
 
 // GetVolumeSnapshotsBySourcePod gets the volume snapshots of the backup and group by source target pod.

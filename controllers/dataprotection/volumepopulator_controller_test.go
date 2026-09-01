@@ -750,6 +750,21 @@ var _ = Describe("Volume Populator Controller test", func() {
 					g.Expect(restoreCondition).ShouldNot(BeNil())
 					g.Expect(restoreCondition.Status).Should(Equal(corev1.ConditionUnknown))
 				})).Should(Succeed())
+
+				populateKey := types.NamespacedName{
+					Namespace: testCtx.DefaultNamespace,
+					Name:      getPopulatePVCName(pvc.UID),
+				}
+				Eventually(testapps.CheckObjExists(&testCtx, populateKey,
+					&corev1.PersistentVolumeClaim{}, true)).Should(Succeed())
+				Eventually(testapps.CheckObjExists(&testCtx, populateKey,
+					&dpv1alpha1.Restore{}, true)).Should(Succeed())
+
+				By("clean resources created by the case")
+				cleanEnv()
+				testapps.DeleteObject(&testCtx, secretKey, &corev1.Secret{})
+				Eventually(testapps.CheckObjExists(&testCtx, secretKey,
+					&corev1.Secret{}, false)).Should(Succeed())
 			})
 
 			It("test VolumePopulator when it fails", func() {

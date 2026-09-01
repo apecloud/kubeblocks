@@ -663,13 +663,10 @@ func (r *RestoreManager) isJobForRestoreAction(job *batchv1.Job) bool {
 }
 
 func (r *RestoreManager) postReadyTargetEnv(reqCtx intctrlutil.RequestCtx, cli client.Client, pod *corev1.Pod) ([]corev1.EnvVar, error) {
-	if r.Restore.Labels[DataProtectionInternalPostReadyLabelKey] != "true" {
-		return nil, nil
-	}
 	clusterName := pod.Labels[constant.AppInstanceLabelKey]
 	componentName := pod.Labels[constant.KBAppComponentLabelKey]
 	if clusterName == "" || componentName == "" {
-		return nil, intctrlutil.NewFatalError(fmt.Sprintf("target Pod %s/%s is missing cluster/component labels", pod.Namespace, pod.Name))
+		return nil, nil
 	}
 	cluster := &appsv1.Cluster{}
 	if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Namespace: pod.Namespace, Name: clusterName}, cluster); err != nil {
@@ -753,7 +750,7 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 			return nil, err
 		}
 		sort.Sort(intctrlutil.ByPodName(targetPodList.Items))
-		buildJob := func(targetPod *corev1.Pod, sourceTargetPodName string, index int, targetEnv []corev1.EnvVar) *batchv1.Job {
+		buildJob := func(targetPod *corev1.Pod, sourceTargetPodName string, index int) (*batchv1.Job, error) {
 			if boolptr.IsSetToTrue(actionSpec.Job.RunOnTargetPodNode) {
 				jobBuilder.resetSpecificVolumesAndMounts()
 				jobBuilder.setNodeNameToNodeSelector(targetPod.Spec.NodeName)
@@ -767,6 +764,10 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 					}
 				}
 			}
+			targetEnv, err := r.postReadyTargetEnv(reqCtx, cli, targetPod)
+			if err != nil {
+				return nil, err
+			}
 			return jobBuilder.setImage(actionSpec.Job.Image).
 				setJobName(buildJobName(index)).
 				addCommonEnv(sourceTargetPodName).
@@ -776,7 +777,7 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 				addTargetPodAndCredentialEnv(targetPod, readyConfig.ConnectionCredential, &target.BackupTarget).
 				overridePostReadyTargetEnv(targetEnv).
 				setServiceAccount(r.WorkerServiceAccount).
-				build()
+				build(), nil
 		}
 
 		if podSelector.Strategy == dpv1alpha1.PodSelectionStrategyAny {
@@ -796,11 +797,11 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 				// no need to recover the volume when the pod selection policy is 'All' and sourceTargetPodName is not found.
 				continue
 			}
-			targetEnv, err := r.postReadyTargetEnv(reqCtx, cli, &targetPodList.Items[i])
+			job, err := buildJob(&targetPodList.Items[i], sourceTargetPodName, i)
 			if err != nil {
 				return nil, err
 			}
-			jobs = append(jobs, buildJob(&targetPodList.Items[i], sourceTargetPodName, i, targetEnv))
+			jobs = append(jobs, job)
 		}
 		return jobs, nil
 	}

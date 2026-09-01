@@ -1805,7 +1805,6 @@ func TestBuildPostReadyRestoreSelectsHighestPriorityRole(t *testing.T) {
 	restore, err := reconciler.buildPostReadyRestore(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, restoreMgr, comp, "", nil)
 
 	require.NoError(t, err)
-	require.Equal(t, "true", restore.Labels[dprestore.DataProtectionInternalPostReadyLabelKey])
 	require.Equal(t, "leader", restore.Spec.ReadyConfig.JobAction.Target.PodSelector.LabelSelector.MatchLabels[instanceset.RoleLabelKey])
 	require.NotContains(t, restore.Spec.ReadyConfig.ExecAction.Target.PodSelector.MatchLabels, instanceset.RoleLabelKey)
 }

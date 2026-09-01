@@ -36,7 +36,7 @@ import (
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 )
 
-func TestPostReadyTargetEnv(t *testing.T) {
+func TestRestoreManagerPostReadyTargetEnv(t *testing.T) {
 	const (
 		namespace     = "default"
 		clusterName   = "target"
@@ -62,9 +62,7 @@ func TestPostReadyTargetEnv(t *testing.T) {
 		},
 	}
 	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, component).Build()
-	manager := &RestoreManager{Restore: &dpv1alpha1.Restore{ObjectMeta: metav1.ObjectMeta{
-		Labels: map[string]string{DataProtectionInternalPostReadyLabelKey: "true"},
-	}}}
+	manager := &RestoreManager{Restore: &dpv1alpha1.Restore{}}
 	reqCtx := intctrlutil.RequestCtx{Ctx: context.Background()}
 
 	tests := []struct {
@@ -98,13 +96,12 @@ func TestPostReadyTargetEnv(t *testing.T) {
 		})
 	}
 
-	manager.Restore.Labels = nil
 	env, err := manager.postReadyTargetEnv(reqCtx, cli, &corev1.Pod{})
 	require.NoError(t, err)
-	require.Empty(t, env, "ordinary Restores must keep their existing behavior")
+	require.Empty(t, env, "non-KubeBlocks target Pods must keep their existing behavior")
 }
 
-func TestOverridePostReadyTargetEnv(t *testing.T) {
+func TestRestoreJobBuilderOverridePostReadyTargetEnv(t *testing.T) {
 	builder := &restoreJobBuilder{env: []corev1.EnvVar{
 		{Name: "KEEP", Value: "kept"},
 		{Name: dptypes.DPTargetClusterTopology, Value: "restore-value"},

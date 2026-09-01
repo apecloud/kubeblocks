@@ -551,10 +551,6 @@ var _ = Describe("RestoreManager Test", func() {
 			restoreMGR, backupSet := initResources(reqCtx, 0, false, func(f *testdp.MockRestoreFactory) {
 				f.SetConnectCredential(testdp.ClusterName).SetJobActionConfig(matchLabels).SetExecActionConfig(matchLabels)
 			})
-			if restoreMGR.Restore.Labels == nil {
-				restoreMGR.Restore.Labels = map[string]string{}
-			}
-			restoreMGR.Restore.Labels[DataProtectionInternalPostReadyLabelKey] = "true"
 			restoreMGR.Restore.Spec.Env = append(restoreMGR.Restore.Spec.Env,
 				corev1.EnvVar{Name: dptypes.DPTargetClusterTopology, Value: "spoofed-topology"},
 				corev1.EnvVar{Name: dptypes.DPTargetComponentServiceVersion, Value: "spoofed-version"})

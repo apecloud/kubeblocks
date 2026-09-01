@@ -322,7 +322,8 @@ func (r *restoreJobBuilder) overridePostReadyTargetEnv(targetEnv []corev1.EnvVar
 		}
 		env = append(env, r.env[i])
 	}
-	r.env = append(env, targetEnv...)
+	env = append(env, targetEnv...)
+	r.env = env
 	return r
 }
 

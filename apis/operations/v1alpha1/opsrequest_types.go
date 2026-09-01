@@ -1032,11 +1032,17 @@ type ProgressStatusDetail struct {
 	// +optional
 	ActionTasks []ActionTask `json:"actionTasks,omitempty"`
 
+	// Records the durable dispatch state for a Switchover lifecycle action.
+	// This structured field is the controller protocol; Message remains display-only.
+	// +optional
+	SwitchoverDispatch *SwitchoverDispatchStatus `json:"switchoverDispatch,omitempty"`
+
 	// Represents the current processing state of the object, including "Processing", "Pending", "Failed", "Succeed"
 	// +kubebuilder:validation:Required
 	Status ProgressStatus `json:"status"`
 
 	// Provides a human-readable explanation of the object's condition.
+	// Controllers must not parse this field as durable state or a versioned protocol.
 	// +optional
 	Message string `json:"message,omitempty"`
 
@@ -1048,6 +1054,61 @@ type ProgressStatusDetail struct {
 	// +optional
 	EndTime metav1.Time `json:"endTime,omitempty"`
 }
+
+const SwitchoverDispatchProtocolVersionV1 = "v1"
+
+// SwitchoverDispatchStatus records the durable identity and state of one
+// non-idempotent Switchover lifecycle-action dispatch.
+type SwitchoverDispatchStatus struct {
+	// Version selects the protocol contract used by this status value.
+	// Readers must fail closed when they do not support the recorded version.
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=16
+	Version string `json:"version"`
+
+	// OpsRequestUID binds the dispatch to one exact OpsRequest incarnation.
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=128
+	OpsRequestUID string `json:"opsRequestUID"`
+
+	// ComponentName is the logical component or sharding name used by the writer.
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=256
+	ComponentName string `json:"componentName"`
+
+	// InstanceName is the source instance requested by the Switchover.
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=256
+	InstanceName string `json:"instanceName"`
+
+	// CandidateName is the optional target instance requested by the Switchover.
+	// +kubebuilder:validation:MaxLength=256
+	// +optional
+	CandidateName string `json:"candidateName,omitempty"`
+
+	// Token uniquely identifies the writer that committed the dispatch claim.
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=256
+	Token string `json:"token"`
+
+	// State records whether the external call is still unconfirmed, was resolved
+	// by its caller, or crossed a restart with no retained result.
+	// +kubebuilder:validation:Enum=Claimed;Resolved;OutcomeUnknown
+	State SwitchoverDispatchState `json:"state"`
+}
+
+type SwitchoverDispatchState string
+
+const (
+	// SwitchoverDispatchClaimed means the claim was committed before the external
+	// call but no call result has been committed yet.
+	SwitchoverDispatchClaimed SwitchoverDispatchState = "Claimed"
+	// SwitchoverDispatchResolved means the caller committed its definite result.
+	SwitchoverDispatchResolved SwitchoverDispatchState = "Resolved"
+	// SwitchoverDispatchOutcomeUnknown means no caller-held result remains and
+	// the lifecycle action must not be replayed.
+	SwitchoverDispatchOutcomeUnknown SwitchoverDispatchState = "OutcomeUnknown"
+)
 
 type ActionTask struct {
 	// Represents the name of the task.

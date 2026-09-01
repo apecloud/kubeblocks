@@ -153,6 +153,30 @@ func TestClusterRestoreControllerWaitsForTerminalRestoreDuringDeletion(t *testin
 	require.Contains(t, current.Finalizers, dptypes.RestoreProtectionFinalizerName)
 }
 
+func TestClusterRestoreControllerIgnoresResourcesWithoutExactClusterUID(t *testing.T) {
+	scheme := clusterRestoreTestScheme(t)
+	cluster := activeRestoreCluster()
+	now := metav1.Now()
+	cluster.DeletionTimestamp = &now
+	cluster.Finalizers = []string{dptypes.RestoreProtectionFinalizerName, "example.io/keep"}
+	target := clusterRestoreTarget(cluster, "target-uid")
+	target.Finalizers = []string{dptypes.DataProtectionFinalizerName}
+	delete(target.Labels, dptypes.ClusterUIDLabelKey)
+	helper := clusterRestoreHelper(cluster, target)
+	delete(helper.Labels, dptypes.ClusterUIDLabelKey)
+	restore := clusterExecutionRestore(cluster, target)
+	delete(restore.Labels, dptypes.ClusterUIDLabelKey)
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, target, helper, restore).Build()
+	reconciler := &ClusterRestoreReconciler{Client: cli}
+
+	_, err := reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cluster)})
+	require.NoError(t, err)
+	current := &appsv1.Cluster{}
+	require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(cluster), current))
+	require.NotContains(t, current.Finalizers, dptypes.RestoreProtectionFinalizerName)
+	require.Contains(t, current.Finalizers, "example.io/keep")
+}
+
 func clusterRestoreTestScheme(t *testing.T) *runtime.Scheme {
 	t.Helper()
 	scheme := runtime.NewScheme()

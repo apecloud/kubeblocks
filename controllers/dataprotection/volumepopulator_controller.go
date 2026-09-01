@@ -159,7 +159,8 @@ func (r *VolumePopulatorReconciler) mapRestoreToPVCs(ctx context.Context, obj cl
 		pvc := &corev1.PersistentVolumeClaim{}
 		key := types.NamespacedName{Namespace: restore.Namespace, Name: owner.Name}
 		if err := r.Client.Get(ctx, key, pvc); err != nil || pvc.UID != owner.UID ||
-			!isClusterRestorePVC(pvc) || restore.Name != getPopulatePVCName(pvc.UID) {
+			!isClusterRestorePVC(pvc) || restore.Name != getPopulatePVCName(pvc.UID) ||
+			restore.Labels[dptypes.ClusterUIDLabelKey] != clusterRestorePVCUID(pvc) {
 			return nil
 		}
 		return []reconcile.Request{{NamespacedName: key}}
@@ -189,7 +190,7 @@ func (r *VolumePopulatorReconciler) mapRestoreToPVCs(ctx context.Context, obj cl
 	// the Cluster can wait on the same Restore through postReady redirection.
 	return r.mapRestorePVCs(ctx, restore.Namespace, client.MatchingLabels{
 		constant.AppInstanceLabelKey: clusterName,
-	}, includeTerminal)
+	}, restore.Labels[dptypes.ClusterUIDLabelKey], includeTerminal)
 }
 
 func (r *VolumePopulatorReconciler) mapComponentToPVCs(ctx context.Context, obj client.Object) []reconcile.Request {
@@ -209,13 +210,17 @@ func (r *VolumePopulatorReconciler) mapComponentToPVCs(ctx context.Context, obj 
 	labels := client.MatchingLabels{
 		constant.AppInstanceLabelKey: clusterName,
 	}
+	clusterOwner := exactOwnerReference(comp.OwnerReferences, appsv1.GroupVersion.String(), appsv1.ClusterKind)
+	if clusterOwner == nil || clusterOwner.Name != clusterName {
+		return nil
+	}
 	includeTerminal := !comp.DeletionTimestamp.IsZero()
 	if includeTerminal {
 		// Component deletion is a termination signal only for restore PVCs
 		// physically owned by that Component.
 		labels[constant.KBAppComponentLabelKey] = componentName
 	}
-	return r.mapRestorePVCs(ctx, comp.Namespace, labels, includeTerminal)
+	return r.mapRestorePVCs(ctx, comp.Namespace, labels, string(clusterOwner.UID), includeTerminal)
 }
 
 func (r *VolumePopulatorReconciler) mapClusterToPVCs(ctx context.Context, obj client.Object) []reconcile.Request {
@@ -225,11 +230,14 @@ func (r *VolumePopulatorReconciler) mapClusterToPVCs(ctx context.Context, obj cl
 	}
 	return r.mapRestorePVCs(ctx, cluster.Namespace, client.MatchingLabels{
 		constant.AppInstanceLabelKey: cluster.Name,
-	}, !cluster.DeletionTimestamp.IsZero())
+	}, string(cluster.UID), !cluster.DeletionTimestamp.IsZero())
 }
 
 func (r *VolumePopulatorReconciler) mapRestorePVCs(ctx context.Context, namespace string,
-	labels client.MatchingLabels, includeTerminal bool) []reconcile.Request {
+	labels client.MatchingLabels, clusterUID string, includeTerminal bool) []reconcile.Request {
+	if clusterUID == "" {
+		return nil
+	}
 	list := &corev1.PersistentVolumeClaimList{}
 	if err := r.Client.List(ctx, list, client.InNamespace(namespace), labels); err != nil {
 		return nil
@@ -237,7 +245,8 @@ func (r *VolumePopulatorReconciler) mapRestorePVCs(ctx context.Context, namespac
 	requests := make([]reconcile.Request, 0, len(list.Items))
 	for i := range list.Items {
 		pvc := &list.Items[i]
-		if !isClusterRestorePVC(pvc) || (!includeTerminal && pvcRestoreTerminal(pvc)) {
+		if !isClusterRestorePVC(pvc) || clusterRestorePVCUID(pvc) != clusterUID ||
+			(!includeTerminal && pvcRestoreTerminal(pvc)) {
 			continue
 		}
 		requests = append(requests, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(pvc)})
@@ -252,6 +261,9 @@ func isClusterRestorePVC(pvc *corev1.PersistentVolumeClaim) bool {
 		return false
 	}
 	if pvc.Labels[constant.AppInstanceLabelKey] == "" || pvc.Labels[constant.KBAppComponentLabelKey] == "" {
+		return false
+	}
+	if clusterRestorePVCUID(pvc) == "" {
 		return false
 	}
 	for _, key := range []string{
@@ -269,6 +281,18 @@ func isClusterRestorePVC(pvc *corev1.PersistentVolumeClaim) bool {
 	return restoreComponent == pvc.Labels[constant.KBAppComponentLabelKey] ||
 		restoreComponent == pvc.Labels[constant.KBAppShardingNameLabelKey] ||
 		restoreComponent == pvc.Labels[constant.KBAppShardTemplateLabelKey]
+}
+
+func clusterRestorePVCUID(pvc *corev1.PersistentVolumeClaim) string {
+	annotationUID := pvc.Annotations[constant.KBAppClusterUIDKey]
+	labelUID := pvc.Labels[dptypes.ClusterUIDLabelKey]
+	if annotationUID != "" && labelUID != "" && annotationUID != labelUID {
+		return ""
+	}
+	if labelUID != "" {
+		return labelUID
+	}
+	return annotationUID
 }
 
 func pvcRestoreTerminal(pvc *corev1.PersistentVolumeClaim) bool {
@@ -323,7 +347,9 @@ func clusterDependencyPredicate() predicate.Predicate {
 			oldCluster, oldOK := e.ObjectOld.(*appsv1.Cluster)
 			newCluster, newOK := e.ObjectNew.(*appsv1.Cluster)
 			return oldOK && newOK && (oldCluster.Status.Phase != newCluster.Status.Phase ||
-				!reflect.DeepEqual(oldCluster.DeletionTimestamp, newCluster.DeletionTimestamp))
+				!reflect.DeepEqual(oldCluster.DeletionTimestamp, newCluster.DeletionTimestamp) ||
+				controllerutil.ContainsFinalizer(oldCluster, dptypes.RestoreProtectionFinalizerName) !=
+					controllerutil.ContainsFinalizer(newCluster, dptypes.RestoreProtectionFinalizerName))
 		},
 	}
 }
@@ -687,11 +713,23 @@ func (r *VolumePopulatorReconciler) deletePostReadyRestoresAndWait(ctx context.C
 		if !restore.DeletionTimestamp.IsZero() {
 			continue
 		}
+		if clusterDeleting {
+			// Cluster scope is authorized by the exact Cluster UID and internal
+			// postReady identity above. The owner Component may already be gone.
+			if restore.Labels[constant.AppInstanceLabelKey] != cluster.Name {
+				return false, fmt.Errorf("refusing to delete postReady Restore %s/%s without exact Cluster identity",
+					restore.Namespace, restore.Name)
+			}
+			if err := r.Client.Delete(ctx, restore); err != nil && !apierrors.IsNotFound(err) {
+				return false, err
+			}
+			continue
+		}
 		ownerComponent, err := r.validatePostReadyRestoreOwner(ctx, restore, cluster)
 		if err != nil {
 			return false, err
 		}
-		if !clusterDeleting && ownerComponent.DeletionTimestamp.IsZero() {
+		if ownerComponent.DeletionTimestamp.IsZero() {
 			return false, fmt.Errorf("refusing to delete postReady Restore %s/%s owned by active Component %s/%s",
 				restore.Namespace, restore.Name, ownerComponent.Namespace, ownerComponent.Name)
 		}
@@ -705,7 +743,8 @@ func (r *VolumePopulatorReconciler) deletePostReadyRestoresAndWait(ctx context.C
 func internalPostReadyRestoreOwner(restore *dpv1alpha1.Restore) *metav1.OwnerReference {
 	owner := exactOwnerReference(restore.OwnerReferences, appsv1.GroupVersion.String(), appsv1.ComponentKind)
 	if owner == nil || restore.Name != postReadyRestoreName(owner.UID) ||
-		restore.Labels[dprestore.DataProtectionRestoreLabelKey] != restore.Name {
+		restore.Labels[dprestore.DataProtectionRestoreLabelKey] != restore.Name ||
+		restore.Labels[dptypes.ComponentUIDLabelKey] != string(owner.UID) {
 		return nil
 	}
 	return owner

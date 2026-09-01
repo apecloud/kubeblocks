@@ -3348,7 +3348,10 @@ func TestMapExecutionRestoreToTargetPVC(t *testing.T) {
 	pvc := dependencyRestorePVC("data-mysql-0", "mysql", "pvc-uid")
 	restore := &dpv1alpha1.Restore{ObjectMeta: metav1.ObjectMeta{
 		Namespace: pvc.Namespace, Name: getPopulatePVCName(pvc.UID),
-		Labels: map[string]string{dprestore.DataProtectionRestoreLabelKey: getPopulatePVCName(pvc.UID)},
+		Labels: map[string]string{
+			dprestore.DataProtectionRestoreLabelKey: getPopulatePVCName(pvc.UID),
+			dptypes.ClusterUIDLabelKey:              "cluster-uid",
+		},
 		OwnerReferences: []metav1.OwnerReference{{
 			APIVersion: corev1.SchemeGroupVersion.String(), Kind: "PersistentVolumeClaim",
 			Name: pvc.Name, UID: pvc.UID,
@@ -3361,6 +3364,9 @@ func TestMapExecutionRestoreToTargetPVC(t *testing.T) {
 	badOwner := restore.DeepCopy()
 	badOwner.OwnerReferences[0].UID = "another-pvc"
 	require.Empty(t, reconciler.mapRestoreToPVCs(context.Background(), badOwner))
+	wrongCluster := restore.DeepCopy()
+	wrongCluster.Labels[dptypes.ClusterUIDLabelKey] = "another-cluster-uid"
+	require.Empty(t, reconciler.mapRestoreToPVCs(context.Background(), wrongCluster))
 	sourceRestore := restore.DeepCopy()
 	sourceRestore.Labels = nil
 	require.Empty(t, reconciler.mapRestoreToPVCs(context.Background(), sourceRestore))
@@ -3385,6 +3391,8 @@ func TestMapPostReadyRestoreToNonTerminalComponentPVCs(t *testing.T) {
 		Labels: map[string]string{
 			dprestore.DataProtectionRestoreLabelKey: postReadyRestoreName(comp.UID),
 			constant.AppInstanceLabelKey:            "cluster", constant.KBAppComponentLabelKey: "mysql",
+			dptypes.ClusterUIDLabelKey:   "cluster-uid",
+			dptypes.ComponentUIDLabelKey: string(comp.UID),
 		},
 		OwnerReferences: []metav1.OwnerReference{{
 			APIVersion: kbappsv1.GroupVersion.String(), Kind: "Component", Name: comp.Name, UID: comp.UID,
@@ -3404,6 +3412,9 @@ func TestMapPostReadyRestoreToNonTerminalComponentPVCs(t *testing.T) {
 		{NamespacedName: client.ObjectKeyFromObject(redirectTarget)},
 		{NamespacedName: client.ObjectKeyFromObject(otherRedirectSource)},
 	}, reconciler.mapRestoreToPVCs(context.Background(), redirected))
+	withoutClusterUID := restore.DeepCopy()
+	delete(withoutClusterUID.Labels, dptypes.ClusterUIDLabelKey)
+	require.Empty(t, reconciler.mapRestoreToPVCs(context.Background(), withoutClusterUID))
 }
 
 func TestMapComponentAndClusterDependencies(t *testing.T) {
@@ -3415,14 +3426,22 @@ func TestMapComponentAndClusterDependencies(t *testing.T) {
 	terminal.Status.Conditions = []corev1.PersistentVolumeClaimCondition{{
 		Type: corev1.PersistentVolumeClaimConditionType(kbappsv1.ConditionTypeRestore), Status: corev1.ConditionFalse,
 	}}
+	foreign := dependencyRestorePVC("foreign", "mysql", "foreign-pvc")
+	foreign.Annotations[constant.KBAppClusterUIDKey] = "another-cluster-uid"
 	comp := &kbappsv1.Component{ObjectMeta: metav1.ObjectMeta{
-		Namespace: "default", Name: "cluster-mysql",
+		Namespace: "default", Name: "cluster-mysql", UID: "component-uid",
 		Labels: map[string]string{
 			constant.AppInstanceLabelKey: "cluster", constant.KBAppComponentLabelKey: "mysql",
 		},
+		OwnerReferences: []metav1.OwnerReference{{
+			APIVersion: kbappsv1.GroupVersion.String(), Kind: kbappsv1.ClusterKind,
+			Name: "cluster", UID: "cluster-uid",
+		}},
 	}}
-	cluster := &kbappsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "cluster"}}
-	reconciler := dependencyTestReconciler(t, mysql, postgresql, invalid, terminal)
+	cluster := &kbappsv1.Cluster{ObjectMeta: metav1.ObjectMeta{
+		Namespace: "default", Name: "cluster", UID: "cluster-uid",
+	}}
+	reconciler := dependencyTestReconciler(t, mysql, postgresql, invalid, terminal, foreign)
 
 	require.ElementsMatch(t, []reconcile.Request{
 		{NamespacedName: client.ObjectKeyFromObject(mysql)},
@@ -3512,6 +3531,9 @@ func TestDependencyPredicates(t *testing.T) {
 	clusterDeleting := clusterNew.DeepCopy()
 	clusterDeleting.DeletionTimestamp = &now
 	require.True(t, clusterDependencyPredicate().Update(event.UpdateEvent{ObjectOld: clusterNew, ObjectNew: clusterDeleting}))
+	clusterProtected := clusterNew.DeepCopy()
+	clusterProtected.Finalizers = []string{dptypes.RestoreProtectionFinalizerName}
+	require.True(t, clusterDependencyPredicate().Update(event.UpdateEvent{ObjectOld: clusterNew, ObjectNew: clusterProtected}))
 }
 
 func dependencyTestReconciler(t *testing.T, objects ...client.Object) *VolumePopulatorReconciler {
@@ -3534,6 +3556,7 @@ func dependencyRestorePVC(name, componentName string, uid types.UID) *corev1.Per
 				constant.AppInstanceLabelKey: "cluster", constant.KBAppComponentLabelKey: componentName,
 			},
 			Annotations: map[string]string{
+				constant.KBAppClusterUIDKey:                 "cluster-uid",
 				constant.RestoreSourceAPIGroupAnnotationKey: dptypes.DataprotectionAPIGroup,
 				constant.RestoreSourceKindAnnotationKey:     dptypes.BackupKind,
 				constant.RestoreSourceNameAnnotationKey:     "backup",
@@ -3598,6 +3621,29 @@ func TestParentDeletionTerminatesOnlyVolumePopulatorResourcesInOrder(t *testing.
 	require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(cluster), cluster))
 	require.Contains(t, cluster.Finalizers, dptypes.RestoreProtectionFinalizerName,
 		"VolumePopulator must never remove the Cluster controller finalizer")
+}
+
+func TestClusterDeletionTerminatesPostReadyRestoreAfterComponentIsGone(t *testing.T) {
+	scheme, cluster, component, _, target := parentRestoreObjects(t)
+	now := metav1.Now()
+	cluster.DeletionTimestamp = &now
+	cluster.Finalizers = []string{dptypes.RestoreProtectionFinalizerName, "example.io/keep"}
+	target.Finalizers = []string{dptypes.DataProtectionFinalizerName}
+	target.Labels[dptypes.ComponentUIDLabelKey] = string(component.UID)
+	postReady := postReadyRestoreForComponent(target, cluster, component)
+	postReady.Finalizers = []string{"example.io/restore-owner"}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, target, postReady).Build()
+	reconciler := &VolumePopulatorReconciler{Client: cli, Scheme: scheme}
+
+	terminated, err := reconciler.handleRestoreParentLifecycle(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, target)
+
+	require.True(t, terminated)
+	require.Error(t, err)
+	require.True(t, intctrlutil.IsRequeueError(err))
+	current := &dpv1alpha1.Restore{}
+	require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(postReady), current))
+	require.False(t, current.DeletionTimestamp.IsZero())
 }
 
 func TestRetainedTargetStopsAfterDeletedClusterDisappears(t *testing.T) {
@@ -4010,6 +4056,7 @@ func postReadyRestoreForComponent(target *corev1.PersistentVolumeClaim, cluster 
 			constant.AppInstanceLabelKey:            cluster.Name,
 			constant.KBAppComponentLabelKey:         target.Labels[constant.KBAppComponentLabelKey],
 			dptypes.ClusterUIDLabelKey:              string(cluster.UID),
+			dptypes.ComponentUIDLabelKey:            string(component.UID),
 			dprestore.DataProtectionRestoreLabelKey: name,
 		},
 		OwnerReferences: []metav1.OwnerReference{{

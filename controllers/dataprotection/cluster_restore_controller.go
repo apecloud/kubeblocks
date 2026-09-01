@@ -126,8 +126,7 @@ func (r *ClusterRestoreReconciler) hasRestoreResources(ctx context.Context, read
 		if restore.Labels[dprestore.DataProtectionRestoreLabelKey] != restore.Name {
 			continue
 		}
-		clusterUID := restore.Labels[dptypes.ClusterUIDLabelKey]
-		ownedByCurrentCluster := clusterUID == "" || clusterUID == string(cluster.UID)
+		ownedByCurrentCluster := restore.Labels[dptypes.ClusterUIDLabelKey] == string(cluster.UID)
 		terminal := restore.Status.Phase == dpv1alpha1.RestorePhaseCompleted ||
 			restore.Status.Phase == dpv1alpha1.RestorePhaseFailed
 		if ownedByCurrentCluster && (!cluster.DeletionTimestamp.IsZero() ||
@@ -144,8 +143,7 @@ func (r *ClusterRestoreReconciler) hasRestoreResources(ctx context.Context, read
 	}
 	for i := range pvcs.Items {
 		pvc := &pvcs.Items[i]
-		clusterUID := pvc.Labels[dptypes.ClusterUIDLabelKey]
-		if clusterUID != "" && clusterUID != string(cluster.UID) {
+		if pvc.Labels[dptypes.ClusterUIDLabelKey] != string(cluster.UID) {
 			continue
 		}
 		if isClusterRestoreHelperPVC(pvc) ||

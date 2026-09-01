@@ -119,7 +119,7 @@ func TestRestoreManagerPostReadyTargetEnv(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, []corev1.EnvVar{
 				{Name: dptypes.DPTargetClusterTopology, Value: "shared-nothing"},
-				{Name: dptypes.DPTargetComponentServiceVersion, Value: tt.wantVersion},
+				{Name: dptypes.DPTargetServiceVersion, Value: tt.wantVersion},
 			}, env)
 		})
 	}
@@ -623,7 +623,7 @@ var _ = Describe("RestoreManager Test", func() {
 			})
 			restoreMGR.Restore.Spec.Env = append(restoreMGR.Restore.Spec.Env,
 				corev1.EnvVar{Name: dptypes.DPTargetClusterTopology, Value: "spoofed-topology"},
-				corev1.EnvVar{Name: dptypes.DPTargetComponentServiceVersion, Value: "spoofed-version"})
+				corev1.EnvVar{Name: dptypes.DPTargetServiceVersion, Value: "spoofed-version"})
 
 			By("create cluster to restore")
 			clusterInfo := testdp.NewFakeCluster(&testCtx)
@@ -656,7 +656,7 @@ var _ = Describe("RestoreManager Test", func() {
 			// count of job should equal to 1
 			Expect(len(jobs)).Should(Equal(1))
 			Expect(postReadyJobEnvValues(jobs[0], dptypes.DPTargetClusterTopology)).Should(Equal([]string{"shared-nothing"}))
-			Expect(postReadyJobEnvValues(jobs[0], dptypes.DPTargetComponentServiceVersion)).Should(Equal([]string{"3.4.0"}))
+			Expect(postReadyJobEnvValues(jobs[0], dptypes.DPTargetServiceVersion)).Should(Equal([]string{"3.4.0"}))
 			// test timeZone transform
 			var backupStopTimeEnv string
 			for _, v := range jobs[0].Spec.Template.Spec.Containers[0].Env {

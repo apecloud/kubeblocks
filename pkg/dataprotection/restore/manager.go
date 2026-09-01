@@ -702,7 +702,7 @@ func (r *RestoreManager) postReadyTargetEnv(reqCtx intctrlutil.RequestCtx, cli c
 	}
 	return []corev1.EnvVar{
 		{Name: dptypes.DPTargetClusterTopology, Value: cluster.Spec.Topology},
-		{Name: dptypes.DPTargetComponentServiceVersion, Value: serviceVersion},
+		{Name: dptypes.DPTargetServiceVersion, Value: serviceVersion},
 	}, nil
 }
 

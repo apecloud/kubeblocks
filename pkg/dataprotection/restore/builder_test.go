@@ -33,11 +33,11 @@ func TestRestoreJobBuilderOverridePostReadyTargetEnv(t *testing.T) {
 		{Name: "KEEP", Value: "kept"},
 		{Name: dptypes.DPTargetClusterTopology, Value: "restore-value"},
 		{Name: dptypes.DPTargetClusterTopology, Value: "pod-value"},
-		{Name: dptypes.DPTargetComponentServiceVersion, Value: "spoofed-version"},
+		{Name: dptypes.DPTargetServiceVersion, Value: "spoofed-version"},
 	}}
 	builder.overridePostReadyTargetEnv([]corev1.EnvVar{
 		{Name: dptypes.DPTargetClusterTopology, Value: "shared-nothing"},
-		{Name: dptypes.DPTargetComponentServiceVersion, Value: "3.4.0"},
+		{Name: dptypes.DPTargetServiceVersion, Value: "3.4.0"},
 	})
 
 	values := func(name string) []string {
@@ -51,5 +51,5 @@ func TestRestoreJobBuilderOverridePostReadyTargetEnv(t *testing.T) {
 	}
 	require.Equal(t, []string{"kept"}, values("KEEP"))
 	require.Equal(t, []string{"shared-nothing"}, values(dptypes.DPTargetClusterTopology))
-	require.Equal(t, []string{"3.4.0"}, values(dptypes.DPTargetComponentServiceVersion))
+	require.Equal(t, []string{"3.4.0"}, values(dptypes.DPTargetServiceVersion))
 }

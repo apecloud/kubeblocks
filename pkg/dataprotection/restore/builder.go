@@ -317,7 +317,7 @@ func (r *restoreJobBuilder) overridePostReadyTargetEnv(targetEnv []corev1.EnvVar
 	env := make([]corev1.EnvVar, 0, len(r.env)+len(targetEnv))
 	for i := range r.env {
 		if r.env[i].Name == dptypes.DPTargetClusterTopology ||
-			r.env[i].Name == dptypes.DPTargetComponentServiceVersion {
+			r.env[i].Name == dptypes.DPTargetServiceVersion {
 			continue
 		}
 		env = append(env, r.env[i])

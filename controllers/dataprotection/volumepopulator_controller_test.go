@@ -3057,20 +3057,38 @@ func TestRebindPVCAndPVResumesAfterPVHandoff(t *testing.T) {
 	require.Equal(t, pv.Name, currentPVC.Spec.VolumeName)
 }
 
-func TestRebindPVCAndPVDoesNotOverwriteConcurrentTargetPVCBinding(t *testing.T) {
+func TestReconcileRecoversPVHandoffAfterConcurrentTargetBinding(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
+	apiGroup := dptypes.DataprotectionAPIGroup
 	stalePVC := &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "default", Name: "target", UID: "target-uid", ResourceVersion: "1",
+			Finalizers: []string{dptypes.DataProtectionFinalizerName},
 		},
-		Spec: corev1.PersistentVolumeClaimSpec{DataSourceRef: &corev1.TypedObjectReference{Name: "backup"}},
+		Spec: corev1.PersistentVolumeClaimSpec{DataSourceRef: &corev1.TypedObjectReference{
+			APIGroup: &apiGroup, Kind: dptypes.RestoreKind, Name: "source-restore",
+		}},
+	}
+	backup := newBackupForRestoreDecision([]string{"data"}, nil)
+	backup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
+	backup.Status.BackupMethod.SnapshotVolumes = ptr.To(true)
+	sourceRestore := &dpv1alpha1.Restore{
+		ObjectMeta: metav1.ObjectMeta{Namespace: stalePVC.Namespace, Name: stalePVC.Spec.DataSourceRef.Name},
+		Spec: dpv1alpha1.RestoreSpec{
+			Backup:             dpv1alpha1.BackupRef{Namespace: backup.Namespace, Name: backup.Name},
+			ServiceAccountName: "worker",
+			PrepareDataConfig: &dpv1alpha1.PrepareDataConfig{
+				DataSourceRef: &dpv1alpha1.VolumeConfig{VolumeSource: "data"},
+			},
+		},
 	}
 	livePVC := stalePVC.DeepCopy()
 	livePVC.ResourceVersion = "2"
 	livePVC.Spec.VolumeName = "other-pv"
 	populatePVC := &corev1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "populate", UID: "populate-uid"},
+		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: getPopulatePVCName(stalePVC.UID), UID: "populate-uid"},
 		Spec:       corev1.PersistentVolumeClaimSpec{VolumeName: "restored-pv"},
 	}
 	helperPV := &corev1.PersistentVolume{
@@ -3085,8 +3103,9 @@ func TestRebindPVCAndPVDoesNotOverwriteConcurrentTargetPVCBinding(t *testing.T) 
 			Namespace: livePVC.Namespace, Name: livePVC.Name, UID: livePVC.UID,
 		}},
 	}
-	liveClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(livePVC, helperPV, otherPV).Build()
-	reconciler := &VolumePopulatorReconciler{Client: liveClient}
+	liveClient := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(livePVC).
+		WithObjects(livePVC, populatePVC, helperPV, otherPV, backup, sourceRestore).Build()
+	reconciler := &VolumePopulatorReconciler{Client: liveClient, Scheme: scheme, Recorder: record.NewFakeRecorder(10)}
 
 	rebound, err := reconciler.rebindPVCAndPV(
 		intctrlutil.RequestCtx{Ctx: context.Background()}, populatePVC, stalePVC)
@@ -3101,15 +3120,19 @@ func TestRebindPVCAndPVDoesNotOverwriteConcurrentTargetPVCBinding(t *testing.T) 
 	require.NoError(t, liveClient.Get(context.Background(), client.ObjectKeyFromObject(helperPV), halfCompletedPV))
 	require.True(t, pvClaimRefMatchesPVC(halfCompletedPV.Spec.ClaimRef, stalePVC))
 
-	rebound, err = reconciler.rebindPVCAndPV(
-		intctrlutil.RequestCtx{Ctx: context.Background()}, populatePVC, currentPVC)
-	require.False(t, rebound)
-	require.Error(t, err)
-	require.True(t, intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal), err)
+	_, err = reconciler.Reconcile(context.Background(), reconcile.Request{NamespacedName: client.ObjectKeyFromObject(currentPVC)})
+	require.NoError(t, err)
 	currentHelperPV := &corev1.PersistentVolume{}
 	require.NoError(t, liveClient.Get(context.Background(), client.ObjectKeyFromObject(helperPV), currentHelperPV))
 	require.True(t, pvClaimRefMatchesPVC(currentHelperPV.Spec.ClaimRef, populatePVC))
 	require.Empty(t, currentHelperPV.Annotations[AnnPopulateFrom])
+	require.NoError(t, liveClient.Get(context.Background(), client.ObjectKeyFromObject(livePVC), currentPVC))
+	require.Equal(t, "other-pv", currentPVC.Spec.VolumeName)
+	require.Contains(t, currentPVC.Finalizers, dptypes.DataProtectionFinalizerName)
+	require.NoError(t, liveClient.Get(context.Background(), client.ObjectKeyFromObject(populatePVC), &corev1.PersistentVolumeClaim{}))
+	restoreCondition := findPVCConditionByType(currentPVC, kbappsv1.ConditionTypeRestore)
+	require.NotNil(t, restoreCondition)
+	require.Equal(t, corev1.ConditionFalse, restoreCondition.Status)
 }
 
 func TestRebindPVCAndPVDoesNotOverwriteConcurrentClaimRefChange(t *testing.T) {

@@ -1200,6 +1200,24 @@ func (r *VolumePopulatorReconciler) completeBoundPVCIfNeeded(reqCtx intctrlutil.
 		break
 	}
 	if !populateReleased {
+		// A target PVC can be bound elsewhere while our PV-first handoff is in
+		// progress. Recover that handoff before validation makes the failure terminal.
+		populatePVC := &corev1.PersistentVolumeClaim{}
+		populateKey := types.NamespacedName{Namespace: pvc.Namespace, Name: getPopulatePVCName(pvc.UID)}
+		if err := r.Client.Get(reqCtx.Ctx, populateKey, populatePVC); err != nil {
+			if !apierrors.IsNotFound(err) {
+				return intctrlutil.NewRequeueError(reconcileInterval,
+					fmt.Sprintf("waiting to read helper PVC %s: %v", populateKey, err))
+			}
+		} else if populatePVC.Spec.VolumeName != "" && populatePVC.Spec.VolumeName != pvc.Spec.VolumeName {
+			rebound, err := r.rebindPVCAndPV(reqCtx, populatePVC, pvc)
+			if err != nil {
+				return err
+			}
+			if !rebound {
+				return intctrlutil.NewRequeueError(reconcileInterval, "waiting to recover interrupted PV handoff")
+			}
+		}
 		if err := r.validateBoundTargetPV(reqCtx, pvc); err != nil {
 			return err
 		}

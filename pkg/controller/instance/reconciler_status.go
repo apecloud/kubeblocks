@@ -28,6 +28,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -36,11 +37,17 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-func NewStatusReconciler() kubebuilderx.Reconciler {
-	return &statusReconciler{}
+func NewStatusReconciler(readers ...client.Reader) kubebuilderx.Reconciler {
+	var reader client.Reader
+	if len(readers) > 0 {
+		reader = readers[0]
+	}
+	return &statusReconciler{reader: reader}
 }
 
-type statusReconciler struct{}
+type statusReconciler struct {
+	reader client.Reader
+}
 
 var _ kubebuilderx.Reconciler = &statusReconciler{}
 
@@ -75,7 +82,11 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	if isCreated(pod) {
 		notReadyName = pod.Name
 	}
-	if isImageMatched(pod) && intctrlutil.IsPodReady(pod) {
+	imageMatched, err := isImageMatched(tree.Context, r.reader, pod)
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
+	if imageMatched && intctrlutil.IsPodReady(pod) {
 		ready = true
 		notReadyName = ""
 		if intctrlutil.IsPodAvailable(pod, inst.Spec.MinReadySeconds) {

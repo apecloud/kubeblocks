@@ -41,8 +41,7 @@ import (
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 )
 
-// ClusterRestoreReconciler owns only the Cluster restore-protection finalizer.
-// VolumePopulator remains the owner of all PVC-scoped restore resources.
+// ClusterRestoreReconciler coordinates the Cluster-level restore lifecycle.
 type ClusterRestoreReconciler struct {
 	client.Client
 	Recorder record.EventRecorder
@@ -64,12 +63,12 @@ func (r *ClusterRestoreReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
-	active, err := r.hasRestoreResources(ctx, r.Client, cluster)
+	hasResources, err := r.hasRestoreResources(ctx, cluster)
 	if err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to inspect Cluster restore resources")
 	}
 	if cluster.DeletionTimestamp.IsZero() {
-		if clusterRestoreConditionActive(cluster) || active {
+		if clusterRestoreConditionActive(cluster) || hasResources {
 			return r.ensureFinalizer(reqCtx, cluster)
 		}
 		return r.removeFinalizer(reqCtx, cluster)
@@ -77,7 +76,7 @@ func (r *ClusterRestoreReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	if !controllerutil.ContainsFinalizer(cluster, dptypes.RestoreProtectionFinalizerName) {
 		return intctrlutil.Reconciled()
 	}
-	if active {
+	if hasResources {
 		return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log,
 			"waiting for restore resource owners to finish Cluster termination")
 	}
@@ -113,10 +112,10 @@ func clusterRestoreConditionActive(cluster *appsv1.Cluster) bool {
 	return condition == nil || condition.Status != metav1.ConditionTrue
 }
 
-func (r *ClusterRestoreReconciler) hasRestoreResources(ctx context.Context, reader client.Reader,
+func (r *ClusterRestoreReconciler) hasRestoreResources(ctx context.Context,
 	cluster *appsv1.Cluster) (bool, error) {
 	restores := &dpv1alpha1.RestoreList{}
-	if err := reader.List(ctx, restores, client.InNamespace(cluster.Namespace), client.MatchingLabels{
+	if err := r.Client.List(ctx, restores, client.InNamespace(cluster.Namespace), client.MatchingLabels{
 		constant.AppInstanceLabelKey: cluster.Name,
 	}); err != nil {
 		return false, err
@@ -126,17 +125,17 @@ func (r *ClusterRestoreReconciler) hasRestoreResources(ctx context.Context, read
 		if restore.Labels[dprestore.DataProtectionRestoreLabelKey] != restore.Name {
 			continue
 		}
-		ownedByCurrentCluster := restore.Labels[dptypes.ClusterUIDLabelKey] == string(cluster.UID)
+		owned := restore.Labels[dptypes.ClusterUIDLabelKey] == string(cluster.UID)
 		terminal := restore.Status.Phase == dpv1alpha1.RestorePhaseCompleted ||
 			restore.Status.Phase == dpv1alpha1.RestorePhaseFailed
-		if ownedByCurrentCluster && (!cluster.DeletionTimestamp.IsZero() ||
+		if owned && (!cluster.DeletionTimestamp.IsZero() ||
 			!terminal || !restore.DeletionTimestamp.IsZero()) {
 			return true, nil
 		}
 	}
 
 	pvcs := &corev1.PersistentVolumeClaimList{}
-	if err := reader.List(ctx, pvcs, client.InNamespace(cluster.Namespace), client.MatchingLabels{
+	if err := r.Client.List(ctx, pvcs, client.InNamespace(cluster.Namespace), client.MatchingLabels{
 		constant.AppInstanceLabelKey: cluster.Name,
 	}); err != nil {
 		return false, err

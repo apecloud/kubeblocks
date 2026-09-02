@@ -39,7 +39,7 @@ import (
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 )
 
-func TestClusterRestoreControllerOwnsOnlyClusterFinalizer(t *testing.T) {
+func TestClusterRestoreControllerAddsProtectionForRestoreIntent(t *testing.T) {
 	scheme := clusterRestoreTestScheme(t)
 	cluster := activeRestoreCluster()
 	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster).Build()
@@ -93,7 +93,7 @@ func TestClusterRestoreControllerReleasesFinalizerAfterOwnersFinish(t *testing.T
 	require.Contains(t, current.Finalizers, "example.io/keep")
 }
 
-func TestClusterRestoreControllerTreatsCompletedRestoreAsInactive(t *testing.T) {
+func TestClusterRestoreControllerReleasesProtectionAfterSuccessfulRestore(t *testing.T) {
 	scheme := clusterRestoreTestScheme(t)
 	cluster := activeRestoreCluster()
 	cluster.Finalizers = []string{dptypes.RestoreProtectionFinalizerName, "example.io/keep"}
@@ -112,7 +112,7 @@ func TestClusterRestoreControllerTreatsCompletedRestoreAsInactive(t *testing.T) 
 	require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(cluster), current))
 	require.NotContains(t, current.Finalizers, dptypes.RestoreProtectionFinalizerName)
 	require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(restore), &dpv1alpha1.Restore{}),
-		"the Cluster controller observes terminal Restore objects but does not delete them")
+		"ClusterRestoreReconciler must leave terminal Restore objects for their resource owner to manage")
 }
 
 func TestClusterRestoreControllerKeepsProtectionAfterRestoreFailure(t *testing.T) {

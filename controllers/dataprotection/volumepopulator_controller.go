@@ -60,7 +60,7 @@ import (
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
-// VolumePopulatorReconciler reconciles Backup dataSource PVCs.
+// VolumePopulatorReconciler coordinates data population and restore for PVCs.
 type VolumePopulatorReconciler struct {
 	client.Client
 	Scheme   *runtime.Scheme
@@ -93,11 +93,7 @@ type pvcRestoreDecision struct {
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=components,verbs=get;list;watch
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=componentdefinitions,verbs=get;list;watch
 
-// Reconcile is part of the main kubernetes reconciliation loop which aims to
-// move the current state of the cluster closer to the desired state.
-//
-// For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.11.0/pkg/reconcile
+// Reconcile advances a PVC's population and restore lifecycle.
 func (r *VolumePopulatorReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	reqCtx := intctrlutil.RequestCtx{
 		Ctx:      ctx,
@@ -185,9 +181,9 @@ func (r *VolumePopulatorReconciler) mapRestoreToPVCs(ctx context.Context, obj cl
 	}
 	includeTerminal := !restore.DeletionTimestamp.IsZero() ||
 		restore.Status.Phase == dpv1alpha1.RestorePhaseCompleted || restore.Status.Phase == dpv1alpha1.RestorePhaseFailed
-	// A postReady Restore is owned by its target Component, while its labels
-	// identify only the first source PVC that created it. Other Components in
-	// the Cluster can wait on the same Restore through postReady redirection.
+	// The component-name label identifies the first source PVC's Component,
+	// while the owner reference identifies the target Component. Other
+	// Components can wait on the same Restore through postReady redirection.
 	return r.mapRestorePVCs(ctx, restore.Namespace, client.MatchingLabels{
 		constant.AppInstanceLabelKey: clusterName,
 	}, restore.Labels[dptypes.ClusterUIDLabelKey], includeTerminal)
@@ -203,10 +199,9 @@ func (r *VolumePopulatorReconciler) mapComponentToPVCs(ctx context.Context, obj 
 	if clusterName == "" || componentName == "" {
 		return nil
 	}
-	// A PVC can depend on another Component through a redirected postReady
-	// Restore. That relationship is derived from Backup status and is not
-	// represented on the Component, so a Component event must fan out to all
-	// active restore PVCs in its Cluster.
+	// Normal Component updates can unblock redirected postReady restores in
+	// other Components. Fan out to unfinished restore PVCs in the Cluster,
+	// since those dependencies are not represented on the Component itself.
 	labels := client.MatchingLabels{
 		constant.AppInstanceLabelKey: clusterName,
 	}
@@ -216,8 +211,8 @@ func (r *VolumePopulatorReconciler) mapComponentToPVCs(ctx context.Context, obj 
 	}
 	includeTerminal := !comp.DeletionTimestamp.IsZero()
 	if includeTerminal {
-		// Component deletion is a termination signal only for restore PVCs
-		// physically owned by that Component.
+		// Deletion targets this Component's restore PVCs, including terminal
+		// PVCs that may still have restore resources to clean up.
 		labels[constant.KBAppComponentLabelKey] = componentName
 	}
 	return r.mapRestorePVCs(ctx, comp.Namespace, labels, string(clusterOwner.UID), includeTerminal)
@@ -423,9 +418,10 @@ func (r *VolumePopulatorReconciler) syncPVC(reqCtx intctrlutil.RequestCtx, pvc *
 	return nil
 }
 
-// handleRestoreParentLifecycle makes Cluster and Component dependencies part of
-// the PVC restore state machine. Parent deletion is the only cancellation
-// signal; the target PVC deletion timestamp is intentionally irrelevant.
+// handleRestoreParentLifecycle validates parent identity and protection, and
+// initiates restore termination when the Cluster or Component is deleting.
+// It returns true when normal restore processing should stop. Target PVC
+// deletion alone does not request restore termination.
 func (r *VolumePopulatorReconciler) handleRestoreParentLifecycle(reqCtx intctrlutil.RequestCtx,
 	pvc *corev1.PersistentVolumeClaim) (bool, error) {
 	clusterName := pvc.Labels[constant.AppInstanceLabelKey]
@@ -438,15 +434,13 @@ func (r *VolumePopulatorReconciler) handleRestoreParentLifecycle(reqCtx intctrlu
 	cluster := &appsv1.Cluster{}
 	clusterKey := types.NamespacedName{Namespace: pvc.Namespace, Name: clusterName}
 	if err := r.Client.Get(reqCtx.Ctx, clusterKey, cluster); err != nil {
-		// Unmarked PVCs may be standalone DP restores that happen to use app
-		// labels. Marked PVCs are known Cluster restores and must retry.
+		// App labels alone do not establish Cluster restore identity;
+		// standalone DP restores may use the same labels.
 		if apierrors.IsNotFound(err) && !hasClusterIdentity {
 			return false, nil
 		}
-		// A retained target PVC can outlive its Cluster after its VP-owned
-		// finalizer and side effects have been released. Do not restart or poll
-		// the completed cancellation path merely because App-owned restore
-		// identity remains on that PVC.
+		// Do not restart a retained target after its Cluster is gone and VP
+		// has released the target finalizer.
 		if apierrors.IsNotFound(err) &&
 			!controllerutil.ContainsFinalizer(pvc, dptypes.DataProtectionFinalizerName) {
 			return true, nil

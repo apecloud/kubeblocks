@@ -3372,7 +3372,7 @@ func TestMapExecutionRestoreToTargetPVC(t *testing.T) {
 	require.Empty(t, reconciler.mapRestoreToPVCs(context.Background(), sourceRestore))
 }
 
-func TestMapPostReadyRestoreToNonTerminalComponentPVCs(t *testing.T) {
+func TestMapPostReadyRestoreToNonTerminalClusterPVCs(t *testing.T) {
 	comp := &kbappsv1.Component{ObjectMeta: metav1.ObjectMeta{
 		Namespace: "default", Name: "cluster-mysql", UID: "component-uid",
 		Labels: map[string]string{
@@ -3610,7 +3610,7 @@ func TestParentDeletionTerminatesOnlyVolumePopulatorResourcesInOrder(t *testing.
 	require.True(t, apierrors.IsNotFound(cli.Get(context.Background(), client.ObjectKeyFromObject(helper), helper)))
 	require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(target), currentTarget))
 	require.Contains(t, currentTarget.Finalizers, dptypes.DataProtectionFinalizerName,
-		"target DP finalizer must remain until an API read confirms helper deletion")
+		"target DP finalizer must remain until helper deletion is observed")
 
 	terminated, err = reconciler.handleRestoreParentLifecycle(reqCtx, currentTarget)
 	require.True(t, terminated)
@@ -3620,7 +3620,7 @@ func TestParentDeletionTerminatesOnlyVolumePopulatorResourcesInOrder(t *testing.
 	require.Contains(t, currentTarget.Finalizers, "example.io/app-owner")
 	require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(cluster), cluster))
 	require.Contains(t, cluster.Finalizers, dptypes.RestoreProtectionFinalizerName,
-		"VolumePopulator must never remove the Cluster controller finalizer")
+		"VolumePopulator must not remove the Cluster restore-protection finalizer")
 }
 
 func TestClusterDeletionTerminatesPostReadyRestoreAfterComponentIsGone(t *testing.T) {
@@ -3714,7 +3714,7 @@ func TestComponentTerminationContinuesAfterRetainedPVCIsDetachedFromWorkload(t *
 	require.False(t, currentRestore.DeletionTimestamp.IsZero())
 }
 
-func TestITS2ScaleInRetainedPVCContinuesRestoreWithVerifiedIdentity(t *testing.T) {
+func TestRetainedPVCContinuesRestoreWithVerifiedIdentity(t *testing.T) {
 	scheme, cluster, component, _, target := parentRestoreObjects(t)
 	target.OwnerReferences = nil
 	target.Finalizers = []string{dptypes.DataProtectionFinalizerName}
@@ -3739,7 +3739,7 @@ func TestITS2ScaleInRetainedPVCContinuesRestoreWithVerifiedIdentity(t *testing.T
 	}, helper), "verified retained target must continue the normal restore state machine")
 }
 
-func TestComponentReplacementFailsClosedBeforeRestoreProgression(t *testing.T) {
+func TestVolumePopulatorRejectsMismatchedComponentUID(t *testing.T) {
 	scheme, cluster, component, _, target := parentRestoreObjects(t)
 	target.OwnerReferences = nil
 	target.Labels[dptypes.ComponentUIDLabelKey] = "previous-component-uid"
@@ -3823,7 +3823,7 @@ func TestComponentTerminationDeletesPostReadyRestoreByOwnerNotSourceLabel(t *tes
 	currentRestore := &dpv1alpha1.Restore{}
 	require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(postReady), currentRestore))
 	require.False(t, currentRestore.DeletionTimestamp.IsZero(),
-		"the deleting owner Component must terminate postReady Restore regardless of source label")
+		"VolumePopulator must terminate postReady Restore when its owner Component is deleting, regardless of source label")
 }
 
 func TestTargetPVCDeletionIsNotParentTermination(t *testing.T) {

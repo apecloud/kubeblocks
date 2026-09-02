@@ -46,9 +46,9 @@ const (
 const (
 	// DataProtectionFinalizerName is the name of our custom finalizer
 	DataProtectionFinalizerName = "dataprotection.kubeblocks.io/finalizer"
-	// RestoreProtectionFinalizerName is owned independently by the Cluster
-	// restore lifecycle controller.
-	RestoreProtectionFinalizerName = "dataprotection.kubeblocks.io/restore-protection"
+	// RestoreProtectionFinalizerName prevents Cluster deletion from completing
+	// before its restore resources have been cleaned up.
+	RestoreProtectionFinalizerName = "dataprotection.kubeblocks.io/restore-protection-finalizer"
 )
 
 // annotation keys

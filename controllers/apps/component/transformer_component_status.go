@@ -208,7 +208,7 @@ func (t *componentStatusTransformer) reconcileStatus(transCtx *componentTransfor
 	}
 	t.setComponentStatusPhase(transCtx, phase, statusMessage, phaseTransitionMsg)
 
-	return t.reconcileStatusConditionForPhase(transCtx, workloadPhase)
+	return t.reconcileStatusConditionsWithoutRestore(transCtx)
 }
 
 // phaseWithRestore projects the initial restore result onto the component phase.
@@ -397,16 +397,15 @@ func (t *componentStatusTransformer) updateComponentStatus(transCtx *componentTr
 }
 
 func (t *componentStatusTransformer) reconcileStatusCondition(transCtx *componentTransformContext) error {
-	return errors.Join(
-		t.reconcileStatusConditionForPhase(transCtx, t.comp.Status.Phase),
-		t.reconcileRestoreCondition(transCtx),
-	)
+	if err := t.reconcileRestoreCondition(transCtx); err != nil {
+		return err
+	}
+	return t.reconcileStatusConditionsWithoutRestore(transCtx)
 }
 
-func (t *componentStatusTransformer) reconcileStatusConditionForPhase(
-	transCtx *componentTransformContext, workloadPhase appsv1.ComponentPhase) error {
+func (t *componentStatusTransformer) reconcileStatusConditionsWithoutRestore(transCtx *componentTransformContext) error {
 	return errors.Join(
-		t.reconcileAvailableConditionForPhase(transCtx, workloadPhase),
+		t.reconcileAvailableCondition(transCtx),
 		t.reconcileProgressingCondition(transCtx),
 		t.reconcileHealthyCondition(transCtx),
 	)
@@ -434,7 +433,7 @@ func (t *componentStatusTransformer) reconcileRestoreCondition(transCtx *compone
 		})
 		return nil
 	}
-	workloadCond := meta.FindStatusCondition(t.runningITS.Status.Conditions, string(workloads.InstanceRestore))
+	workloadCond := meta.FindStatusCondition(t.runningITS.Status.Conditions, string(workloads.Restore))
 	if workloadCond == nil {
 		meta.SetStatusCondition(&t.comp.Status.Conditions, metav1.Condition{
 			Type:               appsv1.ConditionTypeRestore,
@@ -557,6 +556,10 @@ func (t *componentStatusTransformer) reconcileProgressingCondition(transCtx *com
 		transCtx.EventRecorder,
 		appsv1.ComponentConditionProgressing,
 		func() (status metav1.ConditionStatus, reason string, message string, err error) {
+			restoreCond := meta.FindStatusCondition(t.comp.Status.Conditions, appsv1.ConditionTypeRestore)
+			if restoreCond != nil && restoreCond.Status == metav1.ConditionUnknown {
+				return metav1.ConditionTrue, workloads.ReasonRestoreRunning, restoreCond.Message, nil
+			}
 			if !t.isWorkloadUpdated() {
 				return metav1.ConditionTrue, "WorkloadNotUpdated", "observed workload's generation not matching component's", nil
 			}
@@ -612,11 +615,6 @@ func (t *componentStatusTransformer) reconcileHealthyCondition(transCtx *compone
 }
 
 func (t *componentStatusTransformer) reconcileAvailableCondition(transCtx *componentTransformContext) error {
-	return t.reconcileAvailableConditionForPhase(transCtx, t.comp.Status.Phase)
-}
-
-func (t *componentStatusTransformer) reconcileAvailableConditionForPhase(
-	transCtx *componentTransformContext, workloadPhase appsv1.ComponentPhase) error {
 	policy := component.GetComponentAvailablePolicy(transCtx.CompDef)
 	if policy.WithPhases == nil && policy.WithRole == nil {
 		return nil
@@ -627,7 +625,7 @@ func (t *componentStatusTransformer) reconcileAvailableConditionForPhase(
 		appsv1.ComponentConditionAvailable,
 		func() (status metav1.ConditionStatus, reason string, message string, err error) {
 			if policy.WithPhases != nil {
-				status, message1 := t.availableWithPhases(workloadPhase, policy)
+				status, message1 := t.availableWithPhases(transCtx.Component, policy)
 				if status != metav1.ConditionTrue {
 					return status, "PhaseCheckFail", message1, nil
 				}
@@ -647,15 +645,15 @@ func (t *componentStatusTransformer) reconcileAvailableConditionForPhase(
 }
 
 func (t *componentStatusTransformer) availableWithPhases(
-	workloadPhase appsv1.ComponentPhase, policy appsv1.ComponentAvailable) (metav1.ConditionStatus, string) {
-	if workloadPhase == "" {
+	comp *appsv1.Component, policy appsv1.ComponentAvailable) (metav1.ConditionStatus, string) {
+	if comp.Status.Phase == "" {
 		return metav1.ConditionUnknown, "the component phase is unknown"
 	}
 	phases := sets.New(strings.Split(strings.ToLower(*policy.WithPhases), ",")...)
-	if phases.Has(strings.ToLower(string(workloadPhase))) {
-		return metav1.ConditionTrue, fmt.Sprintf("the component workload phase is %s", workloadPhase)
+	if phases.Has(strings.ToLower(string(comp.Status.Phase))) {
+		return metav1.ConditionTrue, fmt.Sprintf("the component phase is %s", comp.Status.Phase)
 	}
-	return metav1.ConditionFalse, fmt.Sprintf("the component workload phase is %s", workloadPhase)
+	return metav1.ConditionFalse, fmt.Sprintf("the component phase is %s", comp.Status.Phase)
 }
 
 func (t *componentStatusTransformer) availableWithRole(transCtx *componentTransformContext,

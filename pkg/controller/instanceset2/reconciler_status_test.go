@@ -36,7 +36,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/revisionmap"
 )
 
-func TestStatusReconcilerAggregatesInstanceRestoreConditions(t *testing.T) {
+func TestStatusReconcilerAggregatesRestoreConditions(t *testing.T) {
 	newFixture := func() (*workloads.InstanceSet, *kubebuilderx.ObjectTree) {
 		its := &workloads.InstanceSet{
 			ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default", Generation: 3},
@@ -59,7 +59,7 @@ func TestStatusReconcilerAggregatesInstanceRestoreConditions(t *testing.T) {
 		return &workloads.Instance{
 			ObjectMeta: metav1.ObjectMeta{Name: "demo-0", Namespace: "default"},
 			Status: workloads.InstanceStatus2{Conditions: []metav1.Condition{{
-				Type:    string(workloads.InstanceRestore),
+				Type:    string(workloads.Restore),
 				Status:  status,
 				Message: "restore result",
 			}}},
@@ -102,14 +102,14 @@ func TestStatusReconcilerAggregatesInstanceRestoreConditions(t *testing.T) {
 	t.Run("keeps a terminal failure", func(t *testing.T) {
 		its, tree := newFixture()
 		meta.SetStatusCondition(&its.Status.Conditions, metav1.Condition{
-			Type:   string(workloads.InstanceRestore),
+			Type:   string(workloads.Restore),
 			Status: metav1.ConditionFalse,
 			Reason: workloads.ReasonRestoreFailed,
 		})
 		if err := (&statusReconciler{}).reconcileRestoreCondition(tree, its, []*workloads.Instance{newInstance(metav1.ConditionTrue)}); err != nil {
 			t.Fatal(err)
 		}
-		cond := meta.FindStatusCondition(its.Status.Conditions, string(workloads.InstanceRestore))
+		cond := meta.FindStatusCondition(its.Status.Conditions, string(workloads.Restore))
 		if cond == nil || cond.Status != metav1.ConditionFalse {
 			t.Fatalf("terminal Restore condition was overwritten: %#v", cond)
 		}

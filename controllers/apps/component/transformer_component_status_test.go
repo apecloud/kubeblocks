@@ -172,7 +172,7 @@ var _ = Describe("component status transformer conditions", func() {
 
 	setWorkloadRestoreCondition := func(status metav1.ConditionStatus) {
 		runningITS.Status.Conditions = []metav1.Condition{{
-			Type:    string(workloads.InstanceRestore),
+			Type:    string(workloads.Restore),
 			Status:  status,
 			Reason:  workloads.ReasonRestoreRunning,
 			Message: "workload restore status",
@@ -282,8 +282,9 @@ var _ = Describe("component status transformer conditions", func() {
 		})
 	})
 
-	DescribeTable("should project restore status onto phase without changing workload availability",
-		func(restoreStatus metav1.ConditionStatus, expectedPhase appsv1.ComponentPhase) {
+	DescribeTable("should project restore status onto component summary conditions",
+		func(restoreStatus metav1.ConditionStatus, expectedPhase appsv1.ComponentPhase,
+			expectedAvailable, expectedProgressing metav1.ConditionStatus) {
 			setExpectedRestoreVCT()
 			setWorkloadRestoreCondition(restoreStatus)
 			compDef.Spec.Available = &appsv1.ComponentAvailable{
@@ -299,14 +300,20 @@ var _ = Describe("component status transformer conditions", func() {
 			Expect(restoreCond.Status).Should(Equal(restoreStatus))
 			availableCond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ComponentConditionAvailable)
 			Expect(availableCond).ShouldNot(BeNil())
-			Expect(availableCond.Status).Should(Equal(metav1.ConditionTrue))
+			Expect(availableCond.Status).Should(Equal(expectedAvailable))
 			healthyCond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ComponentConditionHealthy)
 			Expect(healthyCond).ShouldNot(BeNil())
 			Expect(healthyCond.Status).Should(Equal(metav1.ConditionTrue))
+			progressingCond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ComponentConditionProgressing)
+			Expect(progressingCond).ShouldNot(BeNil())
+			Expect(progressingCond.Status).Should(Equal(expectedProgressing))
 		},
-		Entry("restore is running", metav1.ConditionUnknown, appsv1.CreatingComponentPhase),
-		Entry("restore has failed", metav1.ConditionFalse, appsv1.FailedComponentPhase),
-		Entry("restore has completed", metav1.ConditionTrue, appsv1.RunningComponentPhase),
+		Entry("restore is running", metav1.ConditionUnknown, appsv1.CreatingComponentPhase,
+			metav1.ConditionFalse, metav1.ConditionTrue),
+		Entry("restore has failed", metav1.ConditionFalse, appsv1.FailedComponentPhase,
+			metav1.ConditionFalse, metav1.ConditionFalse),
+		Entry("restore has completed", metav1.ConditionTrue, appsv1.RunningComponentPhase,
+			metav1.ConditionTrue, metav1.ConditionFalse),
 	)
 
 	Context("reconcileHealthyCondition", func() {

@@ -558,7 +558,7 @@ func (t *componentStatusTransformer) reconcileProgressingCondition(transCtx *com
 		func() (status metav1.ConditionStatus, reason string, message string, err error) {
 			restoreCond := meta.FindStatusCondition(t.comp.Status.Conditions, appsv1.ConditionTypeRestore)
 			if restoreCond != nil && restoreCond.Status == metav1.ConditionUnknown {
-				return metav1.ConditionTrue, workloads.ReasonRestoreRunning, restoreCond.Message, nil
+				return metav1.ConditionTrue, "RestoreRunning", restoreCond.Message, nil
 			}
 			if !t.isWorkloadUpdated() {
 				return metav1.ConditionTrue, "WorkloadNotUpdated", "observed workload's generation not matching component's", nil

@@ -19328,12 +19328,12 @@ and continue for &ldquo;MinReadySeconds&rdquo; seconds. Otherwise, it will be se
 ConditionStatus will be True if all its instances(pods) are in a Ready condition.
 Or, a NotReady reason with not ready instances encoded in the Message filed will be set.</p>
 </td>
-</tr><tr><td><p>&#34;Restore&#34;</p></td>
-<td><p>Restore indicates whether the initial data restore for this Instance or InstanceSet has completed.</p>
-</td>
 </tr><tr><td><p>&#34;InstanceUpdateRestricted&#34;</p></td>
 <td><p>InstanceUpdateRestricted represents a ConditionType that indicates updates to an InstanceSet are blocked(when the
 PodUpdatePolicy is set to StrictInPlace but the pods cannot be updated in-place).</p>
+</td>
+</tr><tr><td><p>&#34;Restore&#34;</p></td>
+<td><p>Restore indicates whether the initial data restore for this Instance or InstanceSet has completed.</p>
 </td>
 </tr></tbody>
 </table>

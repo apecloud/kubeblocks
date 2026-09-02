@@ -763,13 +763,13 @@ const (
 	ReasonInstanceFailure = "InstanceFailure"
 
 	// ReasonRestoreCompleted is a reason for condition Restore.
-	ReasonRestoreCompleted = "RestoreCompleted"
+	ReasonRestoreCompleted = "Completed"
 
 	// ReasonRestoreRunning is a reason for condition Restore.
-	ReasonRestoreRunning = "RestoreRunning"
+	ReasonRestoreRunning = "Running"
 
 	// ReasonRestoreFailed is a reason for condition Restore.
-	ReasonRestoreFailed = "RestoreFailed"
+	ReasonRestoreFailed = "Failed"
 
 	// ReasonInstanceUpdateRestricted is a reason for condition InstanceUpdateRestricted.
 	ReasonInstanceUpdateRestricted = "InstanceUpdateRestricted"

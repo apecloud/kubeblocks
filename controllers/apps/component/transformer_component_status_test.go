@@ -284,7 +284,7 @@ var _ = Describe("component status transformer conditions", func() {
 
 	DescribeTable("should project restore status onto component summary conditions",
 		func(restoreStatus metav1.ConditionStatus, expectedPhase appsv1.ComponentPhase,
-			expectedAvailable, expectedProgressing metav1.ConditionStatus) {
+			expectedAvailable, expectedProgressing metav1.ConditionStatus, expectedRestoreReason string) {
 			setExpectedRestoreVCT()
 			setWorkloadRestoreCondition(restoreStatus)
 			compDef.Spec.Available = &appsv1.ComponentAvailable{
@@ -298,6 +298,7 @@ var _ = Describe("component status transformer conditions", func() {
 			restoreCond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ConditionTypeRestore)
 			Expect(restoreCond).ShouldNot(BeNil())
 			Expect(restoreCond.Status).Should(Equal(restoreStatus))
+			Expect(restoreCond.Reason).Should(Equal(expectedRestoreReason))
 			availableCond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ComponentConditionAvailable)
 			Expect(availableCond).ShouldNot(BeNil())
 			Expect(availableCond.Status).Should(Equal(expectedAvailable))
@@ -307,13 +308,16 @@ var _ = Describe("component status transformer conditions", func() {
 			progressingCond := meta.FindStatusCondition(comp.Status.Conditions, appsv1.ComponentConditionProgressing)
 			Expect(progressingCond).ShouldNot(BeNil())
 			Expect(progressingCond.Status).Should(Equal(expectedProgressing))
+			if restoreStatus == metav1.ConditionUnknown {
+				Expect(progressingCond.Reason).Should(Equal("RestoreRunning"))
+			}
 		},
 		Entry("restore is running", metav1.ConditionUnknown, appsv1.CreatingComponentPhase,
-			metav1.ConditionFalse, metav1.ConditionTrue),
+			metav1.ConditionFalse, metav1.ConditionTrue, "Running"),
 		Entry("restore has failed", metav1.ConditionFalse, appsv1.FailedComponentPhase,
-			metav1.ConditionFalse, metav1.ConditionFalse),
+			metav1.ConditionFalse, metav1.ConditionFalse, "Failed"),
 		Entry("restore has completed", metav1.ConditionTrue, appsv1.RunningComponentPhase,
-			metav1.ConditionTrue, metav1.ConditionFalse),
+			metav1.ConditionTrue, metav1.ConditionFalse, "Completed"),
 	)
 
 	Context("reconcileHealthyCondition", func() {

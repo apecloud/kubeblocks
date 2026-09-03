@@ -463,19 +463,21 @@ func (r *VolumePopulatorReconciler) handleRestoreParentLifecycle(reqCtx intctrlu
 	if !cluster.DeletionTimestamp.IsZero() {
 		return r.terminateParentVolumePopulation(reqCtx, pvc, cluster, nil)
 	}
-	if !clusterRestoreConditionActive(cluster) && !pvcRestoreTerminal(pvc) {
-		return false, intctrlutil.NewRequeueError(reconcileInterval, "Cluster restore is no longer active")
-	}
-	var (
-		comp *appsv1.Component
-		err  error
-	)
-	if volumePopulationIdentityCommitted(pvc, cluster) {
-		comp, err = r.committedVolumePopulationComponent(reqCtx.Ctx, pvc, cluster)
+	committed := volumePopulationIdentityCommitted(pvc, cluster)
+	if committed {
+		comp, err := r.committedVolumePopulationComponent(reqCtx.Ctx, pvc, cluster)
 		if err != nil {
 			return false, restoreParentRequeue(err)
 		}
-	} else {
+		if !comp.DeletionTimestamp.IsZero() {
+			return r.terminateParentVolumePopulation(reqCtx, pvc, cluster, comp)
+		}
+	}
+	// Aggregate restore status gates normal progression, not owner cleanup.
+	if !clusterRestoreConditionActive(cluster) && !pvcRestoreTerminal(pvc) {
+		return false, intctrlutil.NewRequeueError(reconcileInterval, "Cluster restore is no longer active")
+	}
+	if !committed {
 		if pvcRestoreTerminal(pvc) && !controllerutil.ContainsFinalizer(pvc, dptypes.DataProtectionFinalizerName) {
 			return false, nil
 		}
@@ -483,7 +485,7 @@ func (r *VolumePopulatorReconciler) handleRestoreParentLifecycle(reqCtx intctrlu
 			return false, restoreParentRequeue(fmt.Errorf(
 				"restore PVC %s/%s started without committed parent identity", pvc.Namespace, pvc.Name))
 		}
-		comp, err = r.validateClusterRestorePVCOwnership(reqCtx.Ctx, pvc, cluster)
+		comp, err := r.validateClusterRestorePVCOwnership(reqCtx.Ctx, pvc, cluster)
 		if err != nil {
 			return false, restoreParentRequeue(err)
 		}
@@ -491,9 +493,6 @@ func (r *VolumePopulatorReconciler) handleRestoreParentLifecycle(reqCtx intctrlu
 			return false, restoreParentRequeue(err)
 		}
 		return false, intctrlutil.NewRequeueError(reconcileInterval, "waiting for target PVC restore protection")
-	}
-	if !comp.DeletionTimestamp.IsZero() {
-		return r.terminateParentVolumePopulation(reqCtx, pvc, cluster, comp)
 	}
 	if !controllerutil.ContainsFinalizer(cluster, dptypes.RestoreProtectionFinalizerName) {
 		if pvcRestoreTerminal(pvc) &&
@@ -504,7 +503,7 @@ func (r *VolumePopulatorReconciler) handleRestoreParentLifecycle(reqCtx intctrlu
 			"waiting for Cluster restore-protection finalizer")
 	}
 	if !pvcPopulateReleased(pvc) && !pvcRestoreTerminal(pvc) {
-		if err = r.ensureTargetFinalizer(reqCtx, pvc); err != nil {
+		if err := r.ensureTargetFinalizer(reqCtx, pvc); err != nil {
 			return false, err
 		}
 	}
@@ -520,7 +519,7 @@ func (r *VolumePopulatorReconciler) releaseUnusedTargetFinalizer(reqCtx intctrlu
 		return fmt.Errorf("restore PVC %s/%s has no committed parent identity", pvc.Namespace, pvc.Name)
 	}
 	if r.ContainPopulatingCondition(pvc) && !pvcPopulateReleased(pvc) {
-		return fmt.Errorf("Cluster is missing after population started for PVC %s/%s", pvc.Namespace, pvc.Name)
+		return fmt.Errorf("cluster is missing after population started for PVC %s/%s", pvc.Namespace, pvc.Name)
 	}
 	key := types.NamespacedName{Namespace: pvc.Namespace, Name: getPopulatePVCName(pvc.UID)}
 	for _, obj := range []client.Object{&corev1.PersistentVolumeClaim{}, &dpv1alpha1.Restore{}} {
@@ -528,7 +527,7 @@ func (r *VolumePopulatorReconciler) releaseUnusedTargetFinalizer(reqCtx intctrlu
 			if err != nil {
 				return err
 			}
-			return fmt.Errorf("Cluster is missing while restore resources for PVC %s/%s remain", pvc.Namespace, pvc.Name)
+			return fmt.Errorf("cluster is missing while restore resources for PVC %s/%s remain", pvc.Namespace, pvc.Name)
 		}
 	}
 	// A redirected postReady Restore can be owned by another Component.
@@ -541,7 +540,7 @@ func (r *VolumePopulatorReconciler) releaseUnusedTargetFinalizer(reqCtx intctrlu
 	}
 	for i := range list.Items {
 		if internalPostReadyRestoreOwner(&list.Items[i]) != nil {
-			return fmt.Errorf("Cluster is missing while postReady Restore %s/%s remains", list.Items[i].Namespace, list.Items[i].Name)
+			return fmt.Errorf("cluster is missing while postReady Restore %s/%s remains", list.Items[i].Namespace, list.Items[i].Name)
 		}
 	}
 	return r.releaseTargetPVC(reqCtx, pvc)
@@ -1889,9 +1888,6 @@ func (r *VolumePopulatorReconciler) ensurePostReadyRestoreCompleted(reqCtx intct
 				return false, err
 			}
 		}
-		if err = r.ensureClusterAllowsRestoreSideEffects(reqCtx.Ctx, pvc); err != nil {
-			return false, err
-		}
 		if err = r.Client.Create(reqCtx.Ctx, postReadyRestore); err != nil && !apierrors.IsAlreadyExists(err) {
 			return false, err
 		}
@@ -1921,29 +1917,6 @@ func (r *VolumePopulatorReconciler) ensurePostReadyRestoreCompleted(reqCtx intct
 		}
 		return false, nil
 	}
-}
-
-func (r *VolumePopulatorReconciler) ensureClusterAllowsRestoreSideEffects(
-	ctx context.Context, pvc *corev1.PersistentVolumeClaim) error {
-	cluster := &appsv1.Cluster{}
-	key := types.NamespacedName{Namespace: pvc.Namespace, Name: pvc.Labels[constant.AppInstanceLabelKey]}
-	if err := r.Client.Get(ctx, key, cluster); err != nil {
-		return err
-	}
-	if uid := clusterRestorePVCUID(pvc); uid != "" {
-		if uid != string(cluster.UID) || !clusterRestoreConditionActive(cluster) {
-			return intctrlutil.NewRequeueError(reconcileInterval, "waiting for the matching active Cluster restore")
-		}
-	}
-	if !cluster.DeletionTimestamp.IsZero() {
-		return intctrlutil.NewRequeueError(reconcileInterval,
-			"waiting for deleting Cluster to terminate restore")
-	}
-	if !controllerutil.ContainsFinalizer(cluster, dptypes.RestoreProtectionFinalizerName) {
-		return intctrlutil.NewRequeueError(reconcileInterval,
-			"waiting for Cluster restore-protection finalizer")
-	}
-	return nil
 }
 
 func (r *VolumePopulatorReconciler) updatePVCConditionsIfPopulateNotReleased(reqCtx intctrlutil.RequestCtx,

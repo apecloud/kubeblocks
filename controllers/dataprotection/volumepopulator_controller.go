@@ -129,10 +129,7 @@ func (r *VolumePopulatorReconciler) handleSyncPVCError(reqCtx intctrlutil.Reques
 	if requeueErr, ok := err.(intctrlutil.RequeueError); ok {
 		return intctrlutil.RequeueAfter(requeueErr.RequeueAfter(), reqCtx.Log, requeueErr.Reason())
 	}
-	if r.ContainPopulatingCondition(pvc) {
-		// Ignore the error if an external controller handles this PVC.
-		return intctrlutil.Reconciled()
-	}
+	// Populating records progress, not external ownership; ordinary errors must still retry.
 	return RecorderEventAndRequeue(reqCtx, r.Recorder, pvc, err)
 }
 
@@ -363,6 +360,12 @@ func (r *VolumePopulatorReconciler) syncPVC(reqCtx intctrlutil.RequestCtx, pvc *
 		return err
 	}
 	if !matched {
+		return nil
+	}
+	// Bound terminal PVCs no longer depend on the source Backup/Restore remaining
+	// available. Populating alone is not terminal: postReady may still be pending.
+	// Leave unbound and deleting PVCs on the existing lifecycle path.
+	if pvc.Spec.VolumeName != "" && pvc.DeletionTimestamp.IsZero() && pvcRestoreTerminal(pvc) {
 		return nil
 	}
 	var restoreCtx *pvcRestoreContext
@@ -1206,8 +1209,7 @@ func (r *VolumePopulatorReconciler) completeBoundPVCIfNeeded(reqCtx intctrlutil.
 		populateKey := types.NamespacedName{Namespace: pvc.Namespace, Name: getPopulatePVCName(pvc.UID)}
 		if err := r.Client.Get(reqCtx.Ctx, populateKey, populatePVC); err != nil {
 			if !apierrors.IsNotFound(err) {
-				return intctrlutil.NewRequeueError(reconcileInterval,
-					fmt.Sprintf("waiting to read helper PVC %s: %v", populateKey, err))
+				return err
 			}
 		} else if populatePVC.Spec.VolumeName != "" && populatePVC.Spec.VolumeName != pvc.Spec.VolumeName {
 			rebound, err := r.rebindPVCAndPV(reqCtx, populatePVC, pvc)
@@ -2115,7 +2117,7 @@ func (r *VolumePopulatorReconciler) rebindPVCAndPV(reqCtx intctrlutil.RequestCtx
 	}
 	pv.Annotations[AnnPopulateFrom] = pvc.Spec.DataSourceRef.Name
 	if err := r.Client.Patch(reqCtx.Ctx, pv, patchPV); err != nil {
-		return false, requeuePVRebindConflict(err, pv, pvc)
+		return false, err
 	}
 	if err := r.bindTargetPVCToPV(reqCtx, pvc, pv.Name); err != nil {
 		return false, err
@@ -2134,24 +2136,7 @@ func (r *VolumePopulatorReconciler) restoreHelperPVBinding(reqCtx intctrlutil.Re
 		ResourceVersion: populatePVC.ResourceVersion,
 	}
 	delete(pv.Annotations, AnnPopulateFrom)
-	if err := r.Client.Patch(reqCtx.Ctx, pv, patchPV); err != nil {
-		if apierrors.IsConflict(err) {
-			return intctrlutil.NewRequeueError(reconcileInterval, fmt.Sprintf(
-				"PV %s changed while restoring helper PVC %s/%s binding; retrying",
-				pv.Name, populatePVC.Namespace, populatePVC.Name))
-		}
-		return err
-	}
-	return nil
-}
-
-func requeuePVRebindConflict(err error, pv *corev1.PersistentVolume, pvc *corev1.PersistentVolumeClaim) error {
-	if !apierrors.IsConflict(err) {
-		return err
-	}
-	return intctrlutil.NewRequeueError(reconcileInterval, fmt.Sprintf(
-		"PV %s changed while rebinding target PVC %s/%s; retrying with fresh ownership",
-		pv.Name, pvc.Namespace, pvc.Name))
+	return r.Client.Patch(reqCtx.Ctx, pv, patchPV)
 }
 
 func (r *VolumePopulatorReconciler) bindTargetPVCToPV(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim, pvName string) error {
@@ -2164,15 +2149,7 @@ func (r *VolumePopulatorReconciler) bindTargetPVCToPV(reqCtx intctrlutil.Request
 	}
 	patch := client.MergeFromWithOptions(pvc.DeepCopy(), client.MergeFromWithOptimisticLock{})
 	pvc.Spec.VolumeName = pvName
-	if err := r.Client.Patch(reqCtx.Ctx, pvc, patch); err != nil {
-		if apierrors.IsConflict(err) {
-			return intctrlutil.NewRequeueError(reconcileInterval, fmt.Sprintf(
-				"target PVC %s/%s changed while binding PV %s; retrying",
-				pvc.Namespace, pvc.Name, pvName))
-		}
-		return err
-	}
-	return nil
+	return r.Client.Patch(reqCtx.Ctx, pvc, patch)
 }
 
 func pvcBindingCompleted(pvc *corev1.PersistentVolumeClaim) bool {

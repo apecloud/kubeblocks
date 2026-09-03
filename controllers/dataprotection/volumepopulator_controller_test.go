@@ -42,6 +42,7 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -1354,6 +1355,176 @@ func TestHandleSyncPVCErrorKeepsInternalRequeueWhenPVCIsPopulating(t *testing.T)
 	require.Equal(t, reconcileInterval, result.RequeueAfter)
 }
 
+func TestHandleSyncPVCErrorPropagatesOrdinaryErrors(t *testing.T) {
+	for _, reason := range []string{"", ReasonPopulatingProcessing, ReasonPopulatingSucceed, ReasonPopulatingProvisioned, ReasonPopulatingFailed} {
+		for _, test := range []struct {
+			name string
+			err  error
+		}{
+			{name: "ordinary", err: fmt.Errorf("temporary API error")},
+			{name: "conflict", err: apierrors.NewConflict(corev1.Resource("persistentvolumeclaims"), "target", fmt.Errorf("resource version changed"))},
+			{name: "timeout", err: apierrors.NewTimeoutError("API request timed out", 1)},
+			{name: "not-found", err: apierrors.NewNotFound(corev1.Resource("persistentvolumes"), "restored-pv")},
+		} {
+			t.Run(reason+"/"+test.name, func(t *testing.T) {
+				pvc := &corev1.PersistentVolumeClaim{
+					ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "target"},
+				}
+				if reason != "" {
+					pvc.Status.Conditions = []corev1.PersistentVolumeClaimCondition{{
+						Type: PersistentVolumeClaimPopulating, Status: corev1.ConditionTrue, Reason: reason,
+					}}
+				}
+				originalPVC := pvc.DeepCopy()
+				reconciler := &VolumePopulatorReconciler{Recorder: record.NewFakeRecorder(10)}
+
+				result, err := reconciler.handleSyncPVCError(
+					intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, test.err)
+
+				require.ErrorIs(t, err, test.err)
+				require.Zero(t, result)
+				require.Equal(t, originalPVC, pvc, "retryable errors must not mark the restore failed or successful")
+			})
+		}
+	}
+}
+
+func TestReconcileIgnoresUnrelatedPopulatingPVCs(t *testing.T) {
+	for _, dataSourceRef := range []*corev1.TypedObjectReference{
+		nil,
+		{APIGroup: ptr.To("storage.example.com"), Kind: "ExternalSource", Name: "source"},
+	} {
+		t.Run(fmt.Sprintf("dataSourceRef-%v", dataSourceRef), func(t *testing.T) {
+			scheme := runtime.NewScheme()
+			require.NoError(t, corev1.AddToScheme(scheme))
+			pvc := &corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "target"},
+				Spec:       corev1.PersistentVolumeClaimSpec{DataSourceRef: dataSourceRef},
+				Status: corev1.PersistentVolumeClaimStatus{
+					Conditions: []corev1.PersistentVolumeClaimCondition{{Type: PersistentVolumeClaimPopulating}},
+				},
+			}
+			reconciler := &VolumePopulatorReconciler{
+				Client: fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(pvc).WithObjects(pvc).Build(),
+			}
+			originalPVC := &corev1.PersistentVolumeClaim{}
+			require.NoError(t, reconciler.Get(context.Background(), client.ObjectKeyFromObject(pvc), originalPVC))
+
+			result, err := reconciler.Reconcile(context.Background(), reconcile.Request{NamespacedName: client.ObjectKeyFromObject(pvc)})
+
+			require.NoError(t, err)
+			require.Zero(t, result)
+			require.NoError(t, reconciler.Get(context.Background(), client.ObjectKeyFromObject(pvc), pvc))
+			require.Equal(t, originalPVC, pvc)
+		})
+	}
+}
+
+func TestReconcileSkipsSourceLookupOnlyForNonDeletingTerminalPVCs(t *testing.T) {
+	for _, kind := range []string{dptypes.BackupKind, dptypes.RestoreKind} {
+		for _, test := range []struct {
+			name     string
+			status   corev1.ConditionStatus
+			deleting bool
+			unbound  bool
+		}{
+			{name: "succeeded", status: corev1.ConditionTrue},
+			{name: "failed", status: corev1.ConditionFalse},
+			{name: "postReady", status: corev1.ConditionUnknown},
+			{name: "deleting-succeeded", status: corev1.ConditionTrue, deleting: true},
+			{name: "deleting-failed", status: corev1.ConditionFalse, deleting: true},
+			{name: "deleting-postReady", status: corev1.ConditionUnknown, deleting: true},
+			{name: "unbound-failed", status: corev1.ConditionFalse, unbound: true},
+		} {
+			t.Run(kind+"/"+test.name, func(t *testing.T) {
+				scheme := runtime.NewScheme()
+				require.NoError(t, corev1.AddToScheme(scheme))
+				require.NoError(t, dpv1alpha1.AddToScheme(scheme))
+				pvc := &corev1.PersistentVolumeClaim{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "default", Name: "target", UID: "target-uid",
+						Finalizers: []string{dptypes.DataProtectionFinalizerName},
+					},
+					Spec: corev1.PersistentVolumeClaimSpec{
+						VolumeName: "restored-pv",
+						DataSourceRef: &corev1.TypedObjectReference{
+							APIGroup: ptr.To(dptypes.DataprotectionAPIGroup), Kind: kind, Name: "removed-source",
+						},
+					},
+					Status: corev1.PersistentVolumeClaimStatus{
+						Conditions: []corev1.PersistentVolumeClaimCondition{
+							{Type: PersistentVolumeClaimPopulating, Status: corev1.ConditionTrue, Reason: ReasonPopulatingSucceed},
+							{Type: corev1.PersistentVolumeClaimConditionType(kbappsv1.ConditionTypeRestore), Status: test.status},
+						},
+					},
+				}
+				if test.deleting {
+					now := metav1.Now()
+					pvc.DeletionTimestamp = &now
+				}
+				if test.unbound {
+					pvc.Spec.VolumeName = ""
+				}
+				reconciler := &VolumePopulatorReconciler{
+					Client:   fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(pvc).WithObjects(pvc).Build(),
+					Recorder: record.NewFakeRecorder(10),
+				}
+				originalPVC := &corev1.PersistentVolumeClaim{}
+				require.NoError(t, reconciler.Get(context.Background(), client.ObjectKeyFromObject(pvc), originalPVC))
+
+				result, err := reconciler.Reconcile(context.Background(), reconcile.Request{NamespacedName: client.ObjectKeyFromObject(pvc)})
+
+				if !test.deleting && !test.unbound && test.status != corev1.ConditionUnknown {
+					require.NoError(t, err, "a terminal restore no longer depends on its source")
+				} else {
+					require.True(t, apierrors.IsNotFound(err), "unbound, postReady and deletion paths must not be skipped: %v", err)
+				}
+				require.Zero(t, result)
+				require.NoError(t, reconciler.Get(context.Background(), client.ObjectKeyFromObject(pvc), pvc))
+				require.Equal(t, originalPVC, pvc)
+			})
+		}
+	}
+}
+
+func TestHandleSyncPVCErrorPropagatesStatusPatchFailures(t *testing.T) {
+	for _, fatal := range []bool{false, true} {
+		t.Run(fmt.Sprintf("fatal=%t", fatal), func(t *testing.T) {
+			scheme := runtime.NewScheme()
+			require.NoError(t, corev1.AddToScheme(scheme))
+			pvc := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "target"}}
+			patchErr := apierrors.NewConflict(corev1.Resource("persistentvolumeclaims"), pvc.Name, fmt.Errorf("resource version changed"))
+			reconciler := &VolumePopulatorReconciler{
+				Client: fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(pvc).WithObjects(pvc).
+					WithInterceptorFuncs(interceptor.Funcs{
+						SubResourcePatch: func(_ context.Context, _ client.Client, subResource string, _ client.Object, _ client.Patch, _ ...client.SubResourcePatchOption) error {
+							require.Equal(t, "status", subResource)
+							return patchErr
+						},
+					}).Build(),
+				Recorder: record.NewFakeRecorder(10),
+			}
+			reqCtx := intctrlutil.RequestCtx{Ctx: context.Background()}
+			var err error
+			if fatal {
+				err = intctrlutil.NewFatalError("restore failed")
+			} else {
+				err = reconciler.UpdatePVCConditions(reqCtx, pvc, ReasonPopulatingProcessing, "Populator started")
+				require.ErrorIs(t, err, patchErr)
+				require.True(t, reconciler.ContainPopulatingCondition(pvc), "the failed patch leaves an in-memory condition")
+			}
+
+			result, err := reconciler.handleSyncPVCError(reqCtx, pvc, err)
+
+			require.ErrorIs(t, err, patchErr)
+			require.Zero(t, result)
+			persistedPVC := &corev1.PersistentVolumeClaim{}
+			require.NoError(t, reconciler.Get(context.Background(), client.ObjectKeyFromObject(pvc), persistedPVC))
+			require.Empty(t, persistedPVC.Status.Conditions)
+		})
+	}
+}
+
 func TestDecidePVCRestoreAssignsShardingTargetsByStableComponentOrder(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, corev1.AddToScheme(scheme))
@@ -1744,12 +1915,16 @@ func TestPopulateCreatesExecutionRestoreAndPolls(t *testing.T) {
 	err = reconciler.Populate(intctrlutil.RequestCtx{Ctx: context.Background()}, currentPVC, restoreCtx)
 	require.Error(t, err)
 	require.True(t, intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal), err.Error())
-	_, reconcileErr := reconciler.handleSyncPVCError(intctrlutil.RequestCtx{Ctx: context.Background()}, currentPVC, err)
+	result, reconcileErr := reconciler.handleSyncPVCError(intctrlutil.RequestCtx{Ctx: context.Background()}, currentPVC, err)
 	require.NoError(t, reconcileErr)
+	require.Zero(t, result)
 	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(pvc), currentPVC))
 	failedCondition := findPVCConditionByType(currentPVC, string(PersistentVolumeClaimPopulating))
 	require.NotNil(t, failedCondition)
 	require.Equal(t, ReasonPopulatingFailed, failedCondition.Reason)
+	restoreCondition := findPVCConditionByType(currentPVC, kbappsv1.ConditionTypeRestore)
+	require.NotNil(t, restoreCondition)
+	require.Equal(t, corev1.ConditionFalse, restoreCondition.Status)
 }
 
 func TestBuildExecutionRestoreIsIndependentOfDataSourceEntry(t *testing.T) {
@@ -3112,7 +3287,9 @@ func TestReconcileRecoversPVHandoffAfterConcurrentTargetBinding(t *testing.T) {
 
 	require.False(t, rebound)
 	require.Error(t, err)
-	require.True(t, intctrlutil.IsRequeueError(err), err)
+	require.True(t, apierrors.IsConflict(err), err)
+	_, handleErr := reconciler.handleSyncPVCError(intctrlutil.RequestCtx{Ctx: context.Background()}, stalePVC, err)
+	require.ErrorIs(t, handleErr, err)
 	currentPVC := &corev1.PersistentVolumeClaim{}
 	require.NoError(t, liveClient.Get(context.Background(), client.ObjectKeyFromObject(livePVC), currentPVC))
 	require.Equal(t, "other-pv", currentPVC.Spec.VolumeName)
@@ -3159,12 +3336,15 @@ func TestRebindPVCAndPVDoesNotOverwriteConcurrentClaimRefChange(t *testing.T) {
 	livePV.ResourceVersion = "2"
 	livePV.Spec.ClaimRef = &corev1.ObjectReference{Namespace: "default", Name: "other", UID: "other-uid"}
 	liveClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(pvc, livePV).Build()
-	reconciler := &VolumePopulatorReconciler{Client: &stalePVGetClient{Client: liveClient, pv: stalePV}}
+	reconciler := &VolumePopulatorReconciler{
+		Client:   &stalePVGetClient{Client: liveClient, pv: stalePV},
+		Recorder: record.NewFakeRecorder(10),
+	}
 
 	rebound, err := reconciler.rebindPVCAndPV(intctrlutil.RequestCtx{Ctx: context.Background()}, populatePVC, pvc)
 	require.False(t, rebound)
 	require.Error(t, err)
-	require.True(t, intctrlutil.IsRequeueError(err), err)
+	require.True(t, apierrors.IsConflict(err), err)
 	currentPV := &corev1.PersistentVolume{}
 	require.NoError(t, liveClient.Get(context.Background(), client.ObjectKeyFromObject(livePV), currentPV))
 	require.Equal(t, "other", currentPV.Spec.ClaimRef.Name)
@@ -3172,8 +3352,8 @@ func TestRebindPVCAndPVDoesNotOverwriteConcurrentClaimRefChange(t *testing.T) {
 		Type: PersistentVolumeClaimPopulating,
 	}}
 	result, handleErr := reconciler.handleSyncPVCError(intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, err)
-	require.NoError(t, handleErr)
-	require.True(t, result.RequeueAfter > 0, "PV conflicts must retry even after Populating is set")
+	require.True(t, apierrors.IsConflict(handleErr), handleErr)
+	require.Zero(t, result)
 }
 
 func TestRestoreSystemAccountSecretsUsesShardingSecretName(t *testing.T) {

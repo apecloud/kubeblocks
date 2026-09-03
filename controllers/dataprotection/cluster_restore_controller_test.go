@@ -31,6 +31,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -42,7 +43,13 @@ import (
 func TestClusterRestoreControllerAddsProtectionForRestoreIntent(t *testing.T) {
 	scheme := clusterRestoreTestScheme(t)
 	cluster := activeRestoreCluster()
-	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster).Build()
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster).
+		WithInterceptorFuncs(interceptor.Funcs{
+			List: func(context.Context, client.WithWatch, client.ObjectList, ...client.ListOption) error {
+				t.Fatal("initial restore protection must not depend on resource listing")
+				return nil
+			},
+		}).Build()
 	reconciler := &ClusterRestoreReconciler{Client: cli}
 
 	_, err := reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cluster)})
@@ -50,6 +57,29 @@ func TestClusterRestoreControllerAddsProtectionForRestoreIntent(t *testing.T) {
 	current := &appsv1.Cluster{}
 	require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(cluster), current))
 	require.Contains(t, current.Finalizers, dptypes.RestoreProtectionFinalizerName)
+}
+
+func TestClusterRestoreControllerSkipsDeletionWithoutProtection(t *testing.T) {
+	scheme := clusterRestoreTestScheme(t)
+	cluster := activeRestoreCluster()
+	now := metav1.Now()
+	cluster.DeletionTimestamp = &now
+	cluster.Finalizers = []string{"example.io/app-owner"}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster).
+		WithInterceptorFuncs(interceptor.Funcs{
+			List: func(context.Context, client.WithWatch, client.ObjectList, ...client.ListOption) error {
+				t.Fatal("deletion without DP protection must not inspect restore resources")
+				return nil
+			},
+		}).Build()
+	reconciler := &ClusterRestoreReconciler{Client: cli}
+
+	result, err := reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cluster)})
+	require.NoError(t, err)
+	require.Zero(t, result)
+	current := &appsv1.Cluster{}
+	require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(cluster), current))
+	require.Equal(t, cluster.Finalizers, current.Finalizers)
 }
 
 func TestClusterRestoreControllerWaitsWithoutMutatingOwnerResources(t *testing.T) {

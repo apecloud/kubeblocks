@@ -63,18 +63,23 @@ func (r *ClusterRestoreReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
+	if cluster.DeletionTimestamp.IsZero() {
+		if clusterRestoreConditionActive(cluster) {
+			return r.ensureFinalizer(reqCtx, cluster)
+		}
+	} else if !controllerutil.ContainsFinalizer(cluster, dptypes.RestoreProtectionFinalizerName) {
+		return intctrlutil.Reconciled()
+	}
+
 	hasResources, err := r.hasRestoreResources(ctx, cluster)
 	if err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to inspect Cluster restore resources")
 	}
 	if cluster.DeletionTimestamp.IsZero() {
-		if clusterRestoreConditionActive(cluster) || hasResources {
+		if hasResources {
 			return r.ensureFinalizer(reqCtx, cluster)
 		}
 		return r.removeFinalizer(reqCtx, cluster)
-	}
-	if !controllerutil.ContainsFinalizer(cluster, dptypes.RestoreProtectionFinalizerName) {
-		return intctrlutil.Reconciled()
 	}
 	if hasResources {
 		return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log,
@@ -114,6 +119,25 @@ func clusterRestoreConditionActive(cluster *appsv1.Cluster) bool {
 
 func (r *ClusterRestoreReconciler) hasRestoreResources(ctx context.Context,
 	cluster *appsv1.Cluster) (bool, error) {
+	// VP releases target protection only after observing postReady Restore in
+	// the cache. Inspect PVCs before Restores so that this handoff cannot fall
+	// between the two resource scans.
+	pvcs := &corev1.PersistentVolumeClaimList{}
+	if err := r.Client.List(ctx, pvcs, client.InNamespace(cluster.Namespace), client.MatchingLabels{
+		constant.AppInstanceLabelKey: cluster.Name,
+	}); err != nil {
+		return false, err
+	}
+	for i := range pvcs.Items {
+		pvc := &pvcs.Items[i]
+		if pvc.Labels[dptypes.ClusterUIDLabelKey] != string(cluster.UID) {
+			continue
+		}
+		if isClusterRestoreHelperPVC(pvc) ||
+			(isClusterRestoreTargetPVC(pvc) && controllerutil.ContainsFinalizer(pvc, dptypes.DataProtectionFinalizerName)) {
+			return true, nil
+		}
+	}
 	restores := &dpv1alpha1.RestoreList{}
 	if err := r.Client.List(ctx, restores, client.InNamespace(cluster.Namespace), client.MatchingLabels{
 		constant.AppInstanceLabelKey: cluster.Name,
@@ -134,22 +158,6 @@ func (r *ClusterRestoreReconciler) hasRestoreResources(ctx context.Context,
 		}
 	}
 
-	pvcs := &corev1.PersistentVolumeClaimList{}
-	if err := r.Client.List(ctx, pvcs, client.InNamespace(cluster.Namespace), client.MatchingLabels{
-		constant.AppInstanceLabelKey: cluster.Name,
-	}); err != nil {
-		return false, err
-	}
-	for i := range pvcs.Items {
-		pvc := &pvcs.Items[i]
-		if pvc.Labels[dptypes.ClusterUIDLabelKey] != string(cluster.UID) {
-			continue
-		}
-		if isClusterRestoreHelperPVC(pvc) ||
-			(isClusterRestoreTargetPVC(pvc) && controllerutil.ContainsFinalizer(pvc, dptypes.DataProtectionFinalizerName)) {
-			return true, nil
-		}
-	}
 	return false, nil
 }
 

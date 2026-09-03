@@ -129,7 +129,7 @@ func (r *VolumePopulatorReconciler) handleSyncPVCError(reqCtx intctrlutil.Reques
 	if requeueErr, ok := err.(intctrlutil.RequeueError); ok {
 		return intctrlutil.RequeueAfter(requeueErr.RequeueAfter(), reqCtx.Log, requeueErr.Reason())
 	}
-	// Populating records progress, not external ownership; ordinary errors must still retry.
+	// Return ordinary errors so controller-runtime retries them with rate limiting.
 	return RecorderEventAndRequeue(reqCtx, r.Recorder, pvc, err)
 }
 
@@ -362,9 +362,8 @@ func (r *VolumePopulatorReconciler) syncPVC(reqCtx intctrlutil.RequestCtx, pvc *
 	if !matched {
 		return nil
 	}
-	// Bound terminal PVCs no longer depend on the source Backup/Restore remaining
-	// available. Populating alone is not terminal: postReady may still be pending.
-	// Leave unbound and deleting PVCs on the existing lifecycle path.
+	// A non-deleting bound PVC with a terminal Restore condition does not need
+	// its source Backup/Restore. Populating can finish while postReady is pending.
 	if pvc.Spec.VolumeName != "" && pvc.DeletionTimestamp.IsZero() && pvcRestoreTerminal(pvc) {
 		return nil
 	}

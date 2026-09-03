@@ -46,6 +46,9 @@ const (
 const (
 	// DataProtectionFinalizerName is the name of our custom finalizer
 	DataProtectionFinalizerName = "dataprotection.kubeblocks.io/finalizer"
+	// RestoreProtectionFinalizerName prevents Cluster deletion from completing
+	// before its restore resources have been cleaned up.
+	RestoreProtectionFinalizerName = "dataprotection.kubeblocks.io/restore-protection-finalizer"
 )
 
 // annotation keys
@@ -86,6 +89,8 @@ const (
 const (
 	// ClusterUIDLabelKey specifies the cluster UID label key.
 	ClusterUIDLabelKey = "dataprotection.kubeblocks.io/cluster-uid"
+	// ComponentUIDLabelKey specifies the component UID label key.
+	ComponentUIDLabelKey = "dataprotection.kubeblocks.io/component-uid"
 	// BackupNameLabelKey specifies the backup name label key.
 	BackupNameLabelKey = "dataprotection.kubeblocks.io/backup-name"
 	// BackupNamespaceLabelKey specifies the backup namespace label key.

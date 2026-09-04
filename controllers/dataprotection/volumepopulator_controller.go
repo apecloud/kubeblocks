@@ -198,12 +198,17 @@ func (r *VolumePopulatorReconciler) mapComponentToPVCs(ctx context.Context, obj 
 	if clusterOwner == nil || clusterOwner.Name != clusterName {
 		return nil
 	}
+	labels := client.MatchingLabels{constant.AppInstanceLabelKey: clusterName}
+	includeTerminal := !comp.DeletionTimestamp.IsZero()
+	if includeTerminal {
+		// Component deletion is a Component-scoped termination signal. Include
+		// terminal PVCs because they may still own restore resources.
+		labels[constant.KBAppComponentLabelKey] = componentName
+	}
 	// A PVC can depend on another Component through redirected postReady. The
 	// dependency is not represented on the Component, so normal Component
 	// changes fan out to unfinished restore PVCs in the exact Cluster instance.
-	return r.mapRestorePVCs(ctx, comp.Namespace, client.MatchingLabels{
-		constant.AppInstanceLabelKey: clusterName,
-	}, string(clusterOwner.UID), false)
+	return r.mapRestorePVCs(ctx, comp.Namespace, labels, string(clusterOwner.UID), includeTerminal)
 }
 
 func (r *VolumePopulatorReconciler) mapClusterToPVCs(ctx context.Context, obj client.Object) []reconcile.Request {
@@ -396,7 +401,7 @@ func (r *VolumePopulatorReconciler) syncPVC(reqCtx intctrlutil.RequestCtx, pvc *
 	if !matched {
 		return nil
 	}
-	terminated, err := r.handleRestoreClusterLifecycle(reqCtx, pvc)
+	terminated, err := r.handleRestoreParentLifecycle(reqCtx, pvc)
 	if err != nil || terminated {
 		return err
 	}
@@ -431,10 +436,11 @@ func (r *VolumePopulatorReconciler) syncPVC(reqCtx intctrlutil.RequestCtx, pvc *
 	return nil
 }
 
-// handleRestoreClusterLifecycle validates the Cluster identity and protection
-// before restore work starts, and initiates owner-driven cleanup when the
-// Cluster is deleting. Target PVC deletion alone is not a termination signal.
-func (r *VolumePopulatorReconciler) handleRestoreClusterLifecycle(reqCtx intctrlutil.RequestCtx,
+// handleRestoreParentLifecycle validates the recorded parent identity and
+// Cluster protection before restore work starts, and initiates owner-driven
+// cleanup when a supported parent is deleting. Target PVC deletion alone is
+// not a termination signal.
+func (r *VolumePopulatorReconciler) handleRestoreParentLifecycle(reqCtx intctrlutil.RequestCtx,
 	pvc *corev1.PersistentVolumeClaim) (bool, error) {
 	clusterName := pvc.Labels[constant.AppInstanceLabelKey]
 	componentName := pvc.Labels[constant.KBAppComponentLabelKey]
@@ -478,16 +484,20 @@ func (r *VolumePopulatorReconciler) handleRestoreClusterLifecycle(reqCtx intctrl
 	if !cluster.DeletionTimestamp.IsZero() {
 		return r.terminateClusterVolumePopulation(reqCtx, pvc, cluster)
 	}
-	if !pvc.DeletionTimestamp.IsZero() &&
-		!controllerutil.ContainsFinalizer(pvc, dptypes.DataProtectionFinalizerName) {
-		return true, nil
-	}
 
 	committed := volumePopulationIdentityCommitted(pvc, cluster)
 	if committed {
-		if _, err := r.committedVolumePopulationComponent(reqCtx.Ctx, pvc, cluster); err != nil {
+		comp, err := r.committedVolumePopulationComponent(reqCtx.Ctx, pvc, cluster)
+		if err != nil {
 			return false, restoreParentRequeue(err)
 		}
+		if !comp.DeletionTimestamp.IsZero() {
+			return r.terminateSourceComponentVolumePopulation(reqCtx, pvc, cluster)
+		}
+	}
+	if !pvc.DeletionTimestamp.IsZero() &&
+		!controllerutil.ContainsFinalizer(pvc, dptypes.DataProtectionFinalizerName) {
+		return true, nil
 	}
 	// Aggregate restore status gates normal progression, not owner cleanup.
 	if !clusterAllowsRestoreProgress(cluster) && !pvcRestoreTerminal(pvc) {
@@ -500,6 +510,11 @@ func (r *VolumePopulatorReconciler) handleRestoreClusterLifecycle(reqCtx intctrl
 		comp, err := r.validateClusterRestorePVCOwnership(reqCtx.Ctx, pvc, cluster)
 		if err != nil {
 			return false, restoreParentRequeue(err)
+		}
+		// A deleting source Component terminates this PVC's restore before VP
+		// registers protection or creates any restore resources.
+		if !comp.DeletionTimestamp.IsZero() {
+			return true, nil
 		}
 		if err = r.registerVolumePopulation(reqCtx.Ctx, pvc, cluster, comp); err != nil {
 			return false, restoreParentRequeue(err)
@@ -597,6 +612,15 @@ func (r *VolumePopulatorReconciler) terminateClusterVolumePopulation(reqCtx intc
 	return true, err
 }
 
+func (r *VolumePopulatorReconciler) terminateSourceComponentVolumePopulation(reqCtx intctrlutil.RequestCtx,
+	pvc *corev1.PersistentVolumeClaim, cluster *appsv1.Cluster) (bool, error) {
+	err := r.cleanupSourceComponentVolumePopulation(reqCtx, pvc, cluster)
+	if err != nil && !intctrlutil.IsRequeueError(err) {
+		err = restoreParentRequeue(err)
+	}
+	return true, err
+}
+
 func (r *VolumePopulatorReconciler) cleanupClusterVolumePopulation(reqCtx intctrlutil.RequestCtx,
 	pvc *corev1.PersistentVolumeClaim, cluster *appsv1.Cluster) error {
 	pending, err := r.deleteExecutionRestoreAndWait(reqCtx.Ctx, pvc, cluster)
@@ -607,10 +631,27 @@ func (r *VolumePopulatorReconciler) cleanupClusterVolumePopulation(reqCtx intctr
 	if err != nil {
 		return err
 	}
-	if pending || postReadyPending {
+	return r.finishVolumePopulationTermination(reqCtx, pvc, cluster, pending || postReadyPending)
+}
+
+func (r *VolumePopulatorReconciler) cleanupSourceComponentVolumePopulation(reqCtx intctrlutil.RequestCtx,
+	pvc *corev1.PersistentVolumeClaim, cluster *appsv1.Cluster) error {
+	pending, err := r.deleteExecutionRestoreAndWait(reqCtx.Ctx, pvc, cluster)
+	if err != nil {
+		return err
+	}
+	// postReady Restore is Component-owned and may be shared by PVCs from
+	// multiple source Components. Its ownerReference, rather than a source PVC,
+	// governs deletion.
+	return r.finishVolumePopulationTermination(reqCtx, pvc, cluster, pending)
+}
+
+func (r *VolumePopulatorReconciler) finishVolumePopulationTermination(reqCtx intctrlutil.RequestCtx,
+	pvc *corev1.PersistentVolumeClaim, cluster *appsv1.Cluster, restoresPending bool) error {
+	if restoresPending {
 		return intctrlutil.NewRequeueError(reconcileInterval, "waiting for Restore owners to finish termination")
 	}
-	pending, err = r.deletePopulatePVCAndWait(reqCtx.Ctx, pvc, cluster)
+	pending, err := r.deletePopulatePVCAndWait(reqCtx.Ctx, pvc, cluster)
 	if err != nil {
 		return err
 	}

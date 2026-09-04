@@ -3970,7 +3970,10 @@ func TestMapExecutionRestoreToTargetPVC(t *testing.T) {
 	pvc := dependencyRestorePVC("data-mysql-0", "mysql", "pvc-uid")
 	restore := &dpv1alpha1.Restore{ObjectMeta: metav1.ObjectMeta{
 		Namespace: pvc.Namespace, Name: getPopulatePVCName(pvc.UID),
-		Labels: map[string]string{dprestore.DataProtectionRestoreLabelKey: getPopulatePVCName(pvc.UID)},
+		Labels: map[string]string{
+			dprestore.DataProtectionRestoreLabelKey: getPopulatePVCName(pvc.UID),
+			dptypes.ClusterUIDLabelKey:              "cluster-uid",
+		},
 		OwnerReferences: []metav1.OwnerReference{{
 			APIVersion: corev1.SchemeGroupVersion.String(), Kind: "PersistentVolumeClaim",
 			Name: pvc.Name, UID: pvc.UID,
@@ -3983,12 +3986,15 @@ func TestMapExecutionRestoreToTargetPVC(t *testing.T) {
 	badOwner := restore.DeepCopy()
 	badOwner.OwnerReferences[0].UID = "another-pvc"
 	require.Empty(t, reconciler.mapRestoreToPVCs(context.Background(), badOwner))
+	wrongCluster := restore.DeepCopy()
+	wrongCluster.Labels[dptypes.ClusterUIDLabelKey] = "unmatched-cluster-uid"
+	require.Empty(t, reconciler.mapRestoreToPVCs(context.Background(), wrongCluster))
 	sourceRestore := restore.DeepCopy()
 	sourceRestore.Labels = nil
 	require.Empty(t, reconciler.mapRestoreToPVCs(context.Background(), sourceRestore))
 }
 
-func TestMapPostReadyRestoreToNonTerminalComponentPVCs(t *testing.T) {
+func TestMapPostReadyRestoreWithoutComponent(t *testing.T) {
 	comp := &kbappsv1.Component{ObjectMeta: metav1.ObjectMeta{
 		Namespace: "default", Name: "cluster-mysql", UID: "component-uid",
 		Labels: map[string]string{
@@ -4000,32 +4006,59 @@ func TestMapPostReadyRestoreToNonTerminalComponentPVCs(t *testing.T) {
 	terminal.Status.Conditions = []corev1.PersistentVolumeClaimCondition{{
 		Type: corev1.PersistentVolumeClaimConditionType(kbappsv1.ConditionTypeRestore), Status: corev1.ConditionTrue,
 	}}
+	failed := dependencyRestorePVC("failed", "mysql", "failed-pvc")
+	failed.Status.Conditions = []corev1.PersistentVolumeClaimCondition{{
+		Type: corev1.PersistentVolumeClaimConditionType(kbappsv1.ConditionTypeRestore), Status: corev1.ConditionFalse,
+	}}
 	redirectTarget := dependencyRestorePVC("data-postgresql-0", "postgresql", "redirect-pvc")
 	otherRedirectSource := dependencyRestorePVC("data-tikv-0", "tikv", "other-redirect-pvc")
+	foreign := dependencyRestorePVC("foreign", "mysql", "foreign-pvc")
+	foreign.Annotations[constant.KBAppClusterUIDKey] = "another-cluster-uid"
+	conflicting := dependencyRestorePVC("conflicting", "mysql", "conflicting-pvc")
+	conflicting.Labels[dptypes.ClusterUIDLabelKey] = "another-cluster-uid"
 	restore := &dpv1alpha1.Restore{ObjectMeta: metav1.ObjectMeta{
 		Namespace: comp.Namespace, Name: postReadyRestoreName(comp.UID),
-		Labels: map[string]string{
-			dprestore.DataProtectionRestoreLabelKey: postReadyRestoreName(comp.UID),
-			constant.AppInstanceLabelKey:            "cluster", constant.KBAppComponentLabelKey: "mysql",
-		},
+		Labels: postReadyRestoreLabels(running, comp),
 		OwnerReferences: []metav1.OwnerReference{{
 			APIVersion: kbappsv1.GroupVersion.String(), Kind: "Component", Name: comp.Name, UID: comp.UID,
 		}},
 	}}
-	reconciler := dependencyTestReconciler(t, comp, running, terminal, redirectTarget, otherRedirectSource)
-	require.ElementsMatch(t, []reconcile.Request{
+	// The event must be sufficient after the Component itself has disappeared.
+	reconciler := dependencyTestReconciler(t, running, terminal, failed, redirectTarget,
+		otherRedirectSource, foreign, conflicting)
+	pending := []reconcile.Request{
 		{NamespacedName: client.ObjectKeyFromObject(running)},
 		{NamespacedName: client.ObjectKeyFromObject(redirectTarget)},
 		{NamespacedName: client.ObjectKeyFromObject(otherRedirectSource)},
-	}, reconciler.mapRestoreToPVCs(context.Background(), restore))
+	}
+	require.ElementsMatch(t, pending, reconciler.mapRestoreToPVCs(context.Background(), restore))
 
 	redirected := restore.DeepCopy()
 	redirected.Labels[constant.KBAppComponentLabelKey] = "postgresql"
-	require.ElementsMatch(t, []reconcile.Request{
-		{NamespacedName: client.ObjectKeyFromObject(running)},
-		{NamespacedName: client.ObjectKeyFromObject(redirectTarget)},
-		{NamespacedName: client.ObjectKeyFromObject(otherRedirectSource)},
-	}, reconciler.mapRestoreToPVCs(context.Background(), redirected))
+	require.ElementsMatch(t, pending, reconciler.mapRestoreToPVCs(context.Background(), redirected))
+
+	all := append(append([]reconcile.Request(nil), pending...),
+		reconcile.Request{NamespacedName: client.ObjectKeyFromObject(terminal)},
+		reconcile.Request{NamespacedName: client.ObjectKeyFromObject(failed)})
+	for _, phase := range []dpv1alpha1.RestorePhase{dpv1alpha1.RestorePhaseCompleted, dpv1alpha1.RestorePhaseFailed} {
+		obj := restore.DeepCopy()
+		obj.Status.Phase = phase
+		require.ElementsMatch(t, all, reconciler.mapRestoreToPVCs(context.Background(), obj))
+	}
+	deleting := restore.DeepCopy()
+	now := metav1.Now()
+	deleting.DeletionTimestamp = &now
+	require.ElementsMatch(t, all, reconciler.mapRestoreToPVCs(context.Background(), deleting))
+
+	wrongOwner := restore.DeepCopy()
+	wrongOwner.OwnerReferences[0].UID = "another-component"
+	require.Empty(t, reconciler.mapRestoreToPVCs(context.Background(), wrongOwner))
+	wrongIdentity := restore.DeepCopy()
+	wrongIdentity.Labels[dptypes.ComponentUIDLabelKey] = "another-component"
+	require.Empty(t, reconciler.mapRestoreToPVCs(context.Background(), wrongIdentity))
+	wrongCluster := restore.DeepCopy()
+	wrongCluster.Labels[dptypes.ClusterUIDLabelKey] = "unmatched-cluster-uid"
+	require.Empty(t, reconciler.mapRestoreToPVCs(context.Background(), wrongCluster))
 }
 
 func TestMapComponentAndClusterDependencies(t *testing.T) {
@@ -4037,14 +4070,22 @@ func TestMapComponentAndClusterDependencies(t *testing.T) {
 	terminal.Status.Conditions = []corev1.PersistentVolumeClaimCondition{{
 		Type: corev1.PersistentVolumeClaimConditionType(kbappsv1.ConditionTypeRestore), Status: corev1.ConditionFalse,
 	}}
+	foreign := dependencyRestorePVC("foreign", "mysql", "foreign-pvc")
+	foreign.Annotations[constant.KBAppClusterUIDKey] = "another-cluster-uid"
 	comp := &kbappsv1.Component{ObjectMeta: metav1.ObjectMeta{
-		Namespace: "default", Name: "cluster-mysql",
+		Namespace: "default", Name: "cluster-mysql", UID: "component-uid",
 		Labels: map[string]string{
 			constant.AppInstanceLabelKey: "cluster", constant.KBAppComponentLabelKey: "mysql",
 		},
+		OwnerReferences: []metav1.OwnerReference{{
+			APIVersion: kbappsv1.GroupVersion.String(), Kind: kbappsv1.ClusterKind,
+			Name: "cluster", UID: "cluster-uid",
+		}},
 	}}
-	cluster := &kbappsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "cluster"}}
-	reconciler := dependencyTestReconciler(t, mysql, postgresql, invalid, terminal)
+	cluster := &kbappsv1.Cluster{ObjectMeta: metav1.ObjectMeta{
+		Namespace: "default", Name: "cluster", UID: "cluster-uid",
+	}}
+	reconciler := dependencyTestReconciler(t, mysql, postgresql, invalid, terminal, foreign)
 
 	require.ElementsMatch(t, []reconcile.Request{
 		{NamespacedName: client.ObjectKeyFromObject(mysql)},
@@ -4083,6 +4124,29 @@ func TestClusterRestorePVCIdentitySupportsSharding(t *testing.T) {
 			require.Equal(t, tt.want, isClusterRestorePVC(pvc))
 		})
 	}
+}
+
+func TestInternalRestoreCorrelationIdentity(t *testing.T) {
+	pvc := dependencyRestorePVC("data-mysql-0", "mysql", "pvc-uid")
+	comp := &kbappsv1.Component{ObjectMeta: metav1.ObjectMeta{
+		Namespace: pvc.Namespace, Name: "cluster-mysql", UID: "component-uid",
+	}}
+
+	require.Equal(t, "cluster-uid", internalRestoreLabels(pvc)[dptypes.ClusterUIDLabelKey])
+	postReadyLabels := postReadyRestoreLabels(pvc, comp)
+	require.Equal(t, "cluster-uid", postReadyLabels[dptypes.ClusterUIDLabelKey])
+	require.Equal(t, string(comp.UID), postReadyLabels[dptypes.ComponentUIDLabelKey])
+
+	reconciler := dependencyTestReconciler(t)
+	helper, err := reconciler.getProvisionOnlyPVC(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, "")
+	require.NoError(t, err)
+	require.Equal(t, "cluster-uid", helper.Labels[dptypes.ClusterUIDLabelKey])
+
+	conflicting := pvc.DeepCopy()
+	conflicting.Labels[dptypes.ClusterUIDLabelKey] = "another-cluster-uid"
+	require.Empty(t, clusterRestorePVCUID(conflicting))
+	require.False(t, isClusterRestorePVC(conflicting))
 }
 
 func TestDependencyPredicates(t *testing.T) {
@@ -4143,6 +4207,7 @@ func dependencyRestorePVC(name, componentName string, uid types.UID) *corev1.Per
 				constant.AppInstanceLabelKey: "cluster", constant.KBAppComponentLabelKey: componentName,
 			},
 			Annotations: map[string]string{
+				constant.KBAppClusterUIDKey:                 "cluster-uid",
 				constant.RestoreSourceAPIGroupAnnotationKey: dptypes.DataprotectionAPIGroup,
 				constant.RestoreSourceKindAnnotationKey:     dptypes.BackupKind,
 				constant.RestoreSourceNameAnnotationKey:     "backup",

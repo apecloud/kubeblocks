@@ -156,35 +156,32 @@ func (r *VolumePopulatorReconciler) mapRestoreToPVCs(ctx context.Context, obj cl
 		pvc := &corev1.PersistentVolumeClaim{}
 		key := types.NamespacedName{Namespace: restore.Namespace, Name: owner.Name}
 		if err := r.Client.Get(ctx, key, pvc); err != nil || pvc.UID != owner.UID ||
-			!isClusterRestorePVC(pvc) || restore.Name != getPopulatePVCName(pvc.UID) {
+			!isClusterRestorePVC(pvc) || restore.Name != getPopulatePVCName(pvc.UID) ||
+			restore.Labels[dptypes.ClusterUIDLabelKey] != clusterRestorePVCUID(pvc) {
 			return nil
 		}
 		return []reconcile.Request{{NamespacedName: key}}
 	}
 
-	owner := exactOwnerReference(restore.OwnerReferences, appsv1.GroupVersion.String(), "Component")
-	if owner == nil {
+	// A Component can disappear before a postReady Restore deletion event is
+	// observed. The Restore carries enough correlation identity to notify its
+	// PVC dependents without resolving the live Component.
+	if internalPostReadyRestoreOwner(restore) == nil {
 		return nil
 	}
-	comp := &appsv1.Component{}
-	key := types.NamespacedName{Namespace: restore.Namespace, Name: owner.Name}
-	if err := r.Client.Get(ctx, key, comp); err != nil || comp.UID != owner.UID ||
-		restore.Name != postReadyRestoreName(comp.UID) {
+	clusterName := restore.Labels[constant.AppInstanceLabelKey]
+	if clusterName == "" || restore.Labels[constant.KBAppComponentLabelKey] == "" {
 		return nil
 	}
-	clusterName := comp.Labels[constant.AppInstanceLabelKey]
-	componentName := restore.Labels[constant.KBAppComponentLabelKey]
-	ownerComponentName := comp.Labels[constant.KBAppComponentLabelKey]
-	if clusterName == "" || componentName == "" || ownerComponentName == "" ||
-		restore.Labels[constant.AppInstanceLabelKey] != clusterName {
-		return nil
-	}
-	// A postReady Restore is owned by its target Component, while its labels
-	// identify only the first source PVC that created it. Other Components in
-	// the Cluster can wait on the same Restore through postReady redirection.
+	includeTerminal := !restore.DeletionTimestamp.IsZero() ||
+		restore.Status.Phase == dpv1alpha1.RestorePhaseCompleted ||
+		restore.Status.Phase == dpv1alpha1.RestorePhaseFailed
+	// The component label identifies the first source PVC, while the owner
+	// reference identifies the target Component. Redirected postReady restores
+	// can therefore have dependents in other Components of the same Cluster.
 	return r.mapRestorePVCs(ctx, restore.Namespace, client.MatchingLabels{
 		constant.AppInstanceLabelKey: clusterName,
-	})
+	}, restore.Labels[dptypes.ClusterUIDLabelKey], includeTerminal)
 }
 
 func (r *VolumePopulatorReconciler) mapComponentToPVCs(ctx context.Context, obj client.Object) []reconcile.Request {
@@ -197,13 +194,16 @@ func (r *VolumePopulatorReconciler) mapComponentToPVCs(ctx context.Context, obj 
 	if clusterName == "" || componentName == "" {
 		return nil
 	}
-	// A PVC can depend on another Component through a redirected postReady
-	// Restore. That relationship is derived from Backup status and is not
-	// represented on the Component, so a Component event must fan out to all
-	// active restore PVCs in its Cluster.
+	clusterOwner := exactOwnerReference(comp.OwnerReferences, appsv1.GroupVersion.String(), appsv1.ClusterKind)
+	if clusterOwner == nil || clusterOwner.Name != clusterName {
+		return nil
+	}
+	// A PVC can depend on another Component through redirected postReady. The
+	// dependency is not represented on the Component, so normal Component
+	// changes fan out to unfinished restore PVCs in the exact Cluster instance.
 	return r.mapRestorePVCs(ctx, comp.Namespace, client.MatchingLabels{
 		constant.AppInstanceLabelKey: clusterName,
-	})
+	}, string(clusterOwner.UID), false)
 }
 
 func (r *VolumePopulatorReconciler) mapClusterToPVCs(ctx context.Context, obj client.Object) []reconcile.Request {
@@ -213,11 +213,14 @@ func (r *VolumePopulatorReconciler) mapClusterToPVCs(ctx context.Context, obj cl
 	}
 	return r.mapRestorePVCs(ctx, cluster.Namespace, client.MatchingLabels{
 		constant.AppInstanceLabelKey: cluster.Name,
-	})
+	}, string(cluster.UID), false)
 }
 
 func (r *VolumePopulatorReconciler) mapRestorePVCs(ctx context.Context, namespace string,
-	labels client.MatchingLabels) []reconcile.Request {
+	labels client.MatchingLabels, clusterUID string, includeTerminal bool) []reconcile.Request {
+	if clusterUID == "" {
+		return nil
+	}
 	list := &corev1.PersistentVolumeClaimList{}
 	if err := r.Client.List(ctx, list, client.InNamespace(namespace), labels); err != nil {
 		return nil
@@ -225,7 +228,8 @@ func (r *VolumePopulatorReconciler) mapRestorePVCs(ctx context.Context, namespac
 	requests := make([]reconcile.Request, 0, len(list.Items))
 	for i := range list.Items {
 		pvc := &list.Items[i]
-		if !isClusterRestorePVC(pvc) || pvcRestoreTerminal(pvc) {
+		if !isClusterRestorePVC(pvc) || clusterRestorePVCUID(pvc) != clusterUID ||
+			(!includeTerminal && pvcRestoreTerminal(pvc)) {
 			continue
 		}
 		requests = append(requests, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(pvc)})
@@ -240,6 +244,9 @@ func isClusterRestorePVC(pvc *corev1.PersistentVolumeClaim) bool {
 		return false
 	}
 	if pvc.Labels[constant.AppInstanceLabelKey] == "" || pvc.Labels[constant.KBAppComponentLabelKey] == "" {
+		return false
+	}
+	if clusterRestorePVCUID(pvc) == "" {
 		return false
 	}
 	for _, key := range []string{
@@ -259,6 +266,21 @@ func isClusterRestorePVC(pvc *corev1.PersistentVolumeClaim) bool {
 		restoreComponent == pvc.Labels[constant.KBAppShardTemplateLabelKey]
 }
 
+// clusterRestorePVCUID returns the Cluster correlation identity inherited
+// from restore intent. A later verified label may repeat it, but conflicting
+// identities are never accepted.
+func clusterRestorePVCUID(pvc *corev1.PersistentVolumeClaim) string {
+	annotationUID := pvc.Annotations[constant.KBAppClusterUIDKey]
+	labelUID := pvc.Labels[dptypes.ClusterUIDLabelKey]
+	if annotationUID != "" && labelUID != "" && annotationUID != labelUID {
+		return ""
+	}
+	if labelUID != "" {
+		return labelUID
+	}
+	return annotationUID
+}
+
 func pvcRestoreTerminal(pvc *corev1.PersistentVolumeClaim) bool {
 	condition := findPVCConditionByType(pvc, appsv1.ConditionTypeRestore)
 	return condition != nil && (condition.Status == corev1.ConditionTrue || condition.Status == corev1.ConditionFalse)
@@ -271,6 +293,16 @@ func exactOwnerReference(refs []metav1.OwnerReference, apiVersion, kind string) 
 		}
 	}
 	return nil
+}
+
+func internalPostReadyRestoreOwner(restore *dpv1alpha1.Restore) *metav1.OwnerReference {
+	owner := exactOwnerReference(restore.OwnerReferences, appsv1.GroupVersion.String(), appsv1.ComponentKind)
+	if owner == nil || restore.Name != postReadyRestoreName(owner.UID) ||
+		restore.Labels[dprestore.DataProtectionRestoreLabelKey] != restore.Name ||
+		restore.Labels[dptypes.ComponentUIDLabelKey] != string(owner.UID) {
+		return nil
+	}
+	return owner
 }
 
 func restoreDependencyPredicate() predicate.Predicate {
@@ -898,6 +930,9 @@ func internalRestoreLabels(pvc *corev1.PersistentVolumeClaim) map[string]string 
 		dprestore.DataProtectionRestoreLabelKey:          getPopulatePVCName(pvc.UID),
 		dprestore.DataProtectionRestoreNamespaceLabelKey: pvc.Namespace,
 		dprestore.DataProtectionPopulatePVCLabelKey:      getPopulatePVCName(pvc.UID),
+	}
+	if clusterUID := clusterRestorePVCUID(pvc); clusterUID != "" {
+		labels[dptypes.ClusterUIDLabelKey] = clusterUID
 	}
 	for _, key := range []string{
 		constant.AppInstanceLabelKey,
@@ -1836,6 +1871,10 @@ func postReadyRestoreLabels(pvc *corev1.PersistentVolumeClaim, comp *appsv1.Comp
 	labels := map[string]string{
 		dprestore.DataProtectionRestoreLabelKey:          restoreName,
 		dprestore.DataProtectionRestoreNamespaceLabelKey: pvc.Namespace,
+		dptypes.ComponentUIDLabelKey:                     string(comp.UID),
+	}
+	if clusterUID := clusterRestorePVCUID(pvc); clusterUID != "" {
+		labels[dptypes.ClusterUIDLabelKey] = clusterUID
 	}
 	for _, key := range []string{
 		constant.AppInstanceLabelKey,
@@ -1947,6 +1986,7 @@ func (r *VolumePopulatorReconciler) getPopulatePVC(reqCtx intctrlutil.RequestCtx
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      populatePVCName,
 				Namespace: pvc.Namespace,
+				Labels:    internalRestoreLabels(pvc),
 			},
 			Spec: corev1.PersistentVolumeClaimSpec{
 				AccessModes:      pvc.Spec.AccessModes,
@@ -2004,6 +2044,7 @@ func (r *VolumePopulatorReconciler) getProvisionOnlyPVC(reqCtx intctrlutil.Reque
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      populatePVCName,
 				Namespace: pvc.Namespace,
+				Labels:    internalRestoreLabels(pvc),
 			},
 			Spec: corev1.PersistentVolumeClaimSpec{
 				AccessModes:      pvc.Spec.AccessModes,

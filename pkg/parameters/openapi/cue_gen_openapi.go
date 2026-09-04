@@ -164,6 +164,14 @@ func deReferenceSchema(props *apiextv1.JSONSchemaProps, resolveFn func(path stri
 			return err
 		}
 	}
+	for i := range props.AllOf {
+		schemaProps := util.ToPointer(props.AllOf[i])
+		schemaProps, err = oneProps(schemaProps)
+		if err != nil {
+			return err
+		}
+		props.AllOf[i] = *schemaProps
+	}
 	for key := range props.Properties {
 		schemaProps := util.ToPointer(props.Properties[key])
 		schemaProps, err = oneProps(schemaProps)

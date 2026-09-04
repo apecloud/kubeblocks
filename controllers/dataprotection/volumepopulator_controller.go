@@ -492,7 +492,7 @@ func (r *VolumePopulatorReconciler) handleRestoreParentLifecycle(reqCtx intctrlu
 			return false, restoreParentRequeue(err)
 		}
 		if !comp.DeletionTimestamp.IsZero() {
-			return r.terminateComponentVolumePopulation(reqCtx, pvc, cluster, comp)
+			return r.terminateSourceComponentVolumePopulation(reqCtx, pvc, cluster, comp)
 		}
 	}
 	if !pvc.DeletionTimestamp.IsZero() &&
@@ -510,6 +510,11 @@ func (r *VolumePopulatorReconciler) handleRestoreParentLifecycle(reqCtx intctrlu
 		comp, err := r.validateClusterRestorePVCOwnership(reqCtx.Ctx, pvc, cluster)
 		if err != nil {
 			return false, restoreParentRequeue(err)
+		}
+		// A deleting source Component terminates this PVC's restore before VP
+		// registers protection or creates any restore resources.
+		if !comp.DeletionTimestamp.IsZero() {
+			return true, nil
 		}
 		if err = r.registerVolumePopulation(reqCtx.Ctx, pvc, cluster, comp); err != nil {
 			return false, restoreParentRequeue(err)
@@ -607,9 +612,9 @@ func (r *VolumePopulatorReconciler) terminateClusterVolumePopulation(reqCtx intc
 	return true, err
 }
 
-func (r *VolumePopulatorReconciler) terminateComponentVolumePopulation(reqCtx intctrlutil.RequestCtx,
+func (r *VolumePopulatorReconciler) terminateSourceComponentVolumePopulation(reqCtx intctrlutil.RequestCtx,
 	pvc *corev1.PersistentVolumeClaim, cluster *appsv1.Cluster, component *appsv1.Component) (bool, error) {
-	err := r.cleanupComponentVolumePopulation(reqCtx, pvc, cluster, component)
+	err := r.cleanupSourceComponentVolumePopulation(reqCtx, pvc, cluster, component)
 	if err != nil && !intctrlutil.IsRequeueError(err) {
 		err = restoreParentRequeue(err)
 	}
@@ -629,13 +634,13 @@ func (r *VolumePopulatorReconciler) cleanupClusterVolumePopulation(reqCtx intctr
 	return r.finishVolumePopulationTermination(reqCtx, pvc, cluster, pending || postReadyPending)
 }
 
-func (r *VolumePopulatorReconciler) cleanupComponentVolumePopulation(reqCtx intctrlutil.RequestCtx,
+func (r *VolumePopulatorReconciler) cleanupSourceComponentVolumePopulation(reqCtx intctrlutil.RequestCtx,
 	pvc *corev1.PersistentVolumeClaim, cluster *appsv1.Cluster, component *appsv1.Component) error {
 	pending, err := r.deleteExecutionRestoreAndWait(reqCtx.Ctx, pvc, cluster)
 	if err != nil {
 		return err
 	}
-	postReadyPending, err := r.deleteComponentPostReadyRestoreAndWait(reqCtx.Ctx, cluster, component)
+	postReadyPending, err := r.deleteSourceComponentPostReadyRestoreAndWait(reqCtx.Ctx, cluster, component)
 	if err != nil {
 		return err
 	}
@@ -705,15 +710,19 @@ func (r *VolumePopulatorReconciler) deleteClusterPostReadyRestoresAndWait(ctx co
 	return pending, nil
 }
 
-func (r *VolumePopulatorReconciler) deleteComponentPostReadyRestoreAndWait(ctx context.Context,
+func (r *VolumePopulatorReconciler) deleteSourceComponentPostReadyRestoreAndWait(ctx context.Context,
 	cluster *appsv1.Cluster, component *appsv1.Component) (bool, error) {
 	restore := &dpv1alpha1.Restore{}
 	key := client.ObjectKey{Namespace: component.Namespace, Name: postReadyRestoreName(component.UID)}
 	if err := r.Client.Get(ctx, key, restore); err != nil {
 		return false, client.IgnoreNotFound(err)
 	}
-	if restore.Labels[constant.AppInstanceLabelKey] != cluster.Name ||
-		restore.Labels[dptypes.ClusterUIDLabelKey] != string(cluster.UID) {
+	sourceComponentName := component.Labels[constant.KBAppComponentLabelKey]
+	// A redirected postReady Restore can be owned by this target Component but
+	// originate from another source Component. Source deletion does not own it.
+	if sourceComponentName == "" || restore.Labels[constant.AppInstanceLabelKey] != cluster.Name ||
+		restore.Labels[dptypes.ClusterUIDLabelKey] != string(cluster.UID) ||
+		restore.Labels[constant.KBAppComponentLabelKey] != sourceComponentName {
 		return false, nil
 	}
 	owner := internalPostReadyRestoreOwner(restore)
@@ -1882,10 +1891,6 @@ func (r *VolumePopulatorReconciler) ensurePostReadyRestoreCompleted(reqCtx intct
 			return false, nil
 		}
 		return false, err
-	}
-	if !comp.DeletionTimestamp.IsZero() {
-		return false, intctrlutil.NewRequeueError(reconcileInterval,
-			"waiting for deleting Component to terminate restore")
 	}
 	if comp.Status.Phase != appsv1.RunningComponentPhase || componentPostProvisionRunning(comp) {
 		if err = r.updatePVCConditionsIfPopulateNotReleased(reqCtx, pvc, "Waiting for component to finish post-provision"); err != nil {

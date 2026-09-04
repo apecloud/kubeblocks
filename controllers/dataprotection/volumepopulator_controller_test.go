@@ -4351,53 +4351,34 @@ func TestComponentDeletionCleansPostReadyAfterTargetProtectionHandoff(t *testing
 	require.NotContains(t, target.Finalizers, dptypes.DataProtectionFinalizerName)
 }
 
-func TestComponentTerminationPreservesPostReadyRestoreOwnedByActiveComponent(t *testing.T) {
-	scheme, cluster, deletingComponent, its, target := parentRestoreObjects(t)
-	now := metav1.Now()
-	deletingComponent.DeletionTimestamp = &now
-	deletingComponent.Finalizers = []string{"example.io/app-owner"}
-	target.Finalizers = []string{dptypes.DataProtectionFinalizerName}
-	target.Labels[dptypes.ComponentUIDLabelKey] = string(deletingComponent.UID)
-	activeComponent := deletingComponent.DeepCopy()
-	activeComponent.Name = "cluster-tikv"
-	activeComponent.UID = "active-component-uid"
-	activeComponent.DeletionTimestamp = nil
-	activeComponent.Finalizers = nil
-	activeComponent.Labels[constant.KBAppComponentLabelKey] = "tikv"
-	postReady := postReadyRestoreForComponent(target, cluster, activeComponent)
-	postReady.Finalizers = []string{"example.io/restore-owner"}
-	cli := fake.NewClientBuilder().WithScheme(scheme).
-		WithObjects(cluster, deletingComponent, activeComponent, its, target, postReady).Build()
-	vp := &VolumePopulatorReconciler{Client: cli, Scheme: scheme}
-
-	terminated, err := vp.handleRestoreParentLifecycle(
-		intctrlutil.RequestCtx{Ctx: context.Background()}, target)
-
-	require.True(t, terminated)
-	require.NoError(t, err)
-	current := &dpv1alpha1.Restore{}
-	require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(postReady), current))
-	require.True(t, current.DeletionTimestamp.IsZero())
-}
-
-func TestComponentTerminationDeletesPostReadyRestoreByOwnerNotSourceLabel(t *testing.T) {
-	scheme, cluster, component, _, target := parentRestoreObjects(t)
+func TestSourceComponentDeletionPreservesRedirectedPostReadyRestore(t *testing.T) {
+	scheme, cluster, component, its, target := parentRestoreObjects(t)
 	now := metav1.Now()
 	component.DeletionTimestamp = &now
 	component.Finalizers = []string{"example.io/app-owner"}
+	target.Finalizers = []string{dptypes.DataProtectionFinalizerName}
+	target.Labels[dptypes.ComponentUIDLabelKey] = string(component.UID)
+	target.Status.Conditions = []corev1.PersistentVolumeClaimCondition{{
+		Type: corev1.PersistentVolumeClaimConditionType(kbappsv1.ConditionTypeRestore), Status: corev1.ConditionTrue,
+	}}
+	otherSource := dependencyRestorePVC("data-tikv-0", "tikv", "other-source-pvc-uid")
 	postReady := postReadyRestoreForComponent(target, cluster, component)
-	postReady.Labels[constant.KBAppComponentLabelKey] = "another-source"
+	postReady.Labels[constant.KBAppComponentLabelKey] = "tikv"
 	postReady.Finalizers = []string{"example.io/restore-owner"}
-	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(postReady).Build()
+	cli := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(cluster, component, its, target, otherSource, postReady).Build()
 	vp := &VolumePopulatorReconciler{Client: cli, Scheme: scheme}
 
-	pending, err := vp.deleteComponentPostReadyRestoreAndWait(context.Background(), cluster, component)
+	requests := vp.mapComponentToPVCs(context.Background(), component)
+	require.Equal(t, []reconcile.Request{{NamespacedName: client.ObjectKeyFromObject(target)}}, requests)
+	require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(target), target))
+	require.NoError(t, vp.syncPVC(intctrlutil.RequestCtx{Ctx: context.Background()}, target))
 
-	require.NoError(t, err)
-	require.True(t, pending)
 	current := &dpv1alpha1.Restore{}
 	require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(postReady), current))
-	require.False(t, current.DeletionTimestamp.IsZero())
+	require.True(t, current.DeletionTimestamp.IsZero())
+	require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(target), target))
+	require.NotContains(t, target.Finalizers, dptypes.DataProtectionFinalizerName)
 }
 
 func TestComponentPostReadyTerminationRejectsInvalidOwnership(t *testing.T) {
@@ -4422,7 +4403,7 @@ func TestComponentPostReadyTerminationRejectsInvalidOwnership(t *testing.T) {
 			cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(postReady).Build()
 			vp := &VolumePopulatorReconciler{Client: cli, Scheme: scheme}
 
-			pending, err := vp.deleteComponentPostReadyRestoreAndWait(context.Background(), cluster, component)
+			pending, err := vp.deleteSourceComponentPostReadyRestoreAndWait(context.Background(), cluster, component)
 			require.ErrorContains(t, err, "without exact deleting Component ownership")
 			require.False(t, pending)
 		})
@@ -4449,32 +4430,47 @@ func TestComponentIdentityMismatchDoesNotAuthorizeTermination(t *testing.T) {
 	require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(execution), &dpv1alpha1.Restore{}))
 }
 
-func TestPostReadyDoesNotProgressForDeletingComponent(t *testing.T) {
-	scheme, cluster, component, _, target := parentRestoreObjects(t)
+func TestClusterDeletionPrecedesComponentIdentityValidation(t *testing.T) {
+	scheme, cluster, _, _, target := parentRestoreObjects(t)
+	now := metav1.Now()
+	cluster.DeletionTimestamp = &now
+	cluster.Finalizers = append(cluster.Finalizers, "example.io/app-owner")
+	target.Finalizers = []string{dptypes.DataProtectionFinalizerName}
+	target.Labels[dptypes.ComponentUIDLabelKey] = "component-that-no-longer-exists"
+	execution := executionRestoreForTarget(target, cluster)
+	execution.Finalizers = []string{"example.io/restore-owner"}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, target, execution).Build()
+	vp := &VolumePopulatorReconciler{Client: cli, Scheme: scheme}
+
+	err := vp.syncPVC(intctrlutil.RequestCtx{Ctx: context.Background()}, target)
+
+	require.ErrorContains(t, err, "waiting for Restore owners")
+	require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(execution), execution))
+	require.False(t, execution.DeletionTimestamp.IsZero())
+}
+
+func TestUncommittedSourceComponentDeletionDoesNotStartRestore(t *testing.T) {
+	scheme, cluster, component, its, target := parentRestoreObjects(t)
 	now := metav1.Now()
 	component.DeletionTimestamp = &now
 	component.Finalizers = []string{"example.io/app-owner"}
-	component.Status.Phase = kbappsv1.RunningComponentPhase
-	target.Spec.VolumeName = "target-pv"
-	target.Status.Conditions = []corev1.PersistentVolumeClaimCondition{{
-		Type: PersistentVolumeClaimPopulating, Status: corev1.ConditionTrue, Reason: ReasonPopulatingProvisioned,
-	}}
-	backup, _ := restoreBackupObjects()
-	cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(target).
-		WithObjects(cluster, component, target, backup).Build()
-	restoreMgr := dprestore.NewRestoreManager(&dpv1alpha1.Restore{}, nil, scheme, cli)
-	restoreMgr.PostReadyBackupSets = []dprestore.BackupActionSet{{Backup: backup}}
-	vp := &VolumePopulatorReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(10)}
+	delete(target.Labels, dptypes.ComponentUIDLabelKey)
+	target.Finalizers = nil
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, component, its, target).Build()
+	vp := &VolumePopulatorReconciler{Client: cli, Scheme: scheme}
 
-	completed, err := vp.ensurePostReadyRestoreCompleted(
-		intctrlutil.RequestCtx{Ctx: context.Background()}, target,
-		&pvcRestoreContext{restoreMgr: restoreMgr, mode: pvcRestoreModeProvisionOnly})
+	require.NoError(t, vp.syncPVC(intctrlutil.RequestCtx{Ctx: context.Background()}, target))
 
-	require.False(t, completed)
-	require.ErrorContains(t, err, "waiting for deleting Component to terminate restore")
+	require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(target), target))
+	require.Empty(t, target.Labels[dptypes.ComponentUIDLabelKey])
+	require.NotContains(t, target.Finalizers, dptypes.DataProtectionFinalizerName)
 	restores := &dpv1alpha1.RestoreList{}
 	require.NoError(t, cli.List(context.Background(), restores))
 	require.Empty(t, restores.Items)
+	helper := &corev1.PersistentVolumeClaim{}
+	require.True(t, apierrors.IsNotFound(cli.Get(context.Background(), types.NamespacedName{
+		Namespace: target.Namespace, Name: getPopulatePVCName(target.UID),
+	}, helper)))
 }
 
 func TestClusterLifecycleRegistersBeforeWaitingForProtection(t *testing.T) {

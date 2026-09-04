@@ -4091,6 +4091,13 @@ func TestMapComponentAndClusterDependencies(t *testing.T) {
 		{NamespacedName: client.ObjectKeyFromObject(mysql)},
 		{NamespacedName: client.ObjectKeyFromObject(postgresql)},
 	}, reconciler.mapComponentToPVCs(context.Background(), comp))
+	deleting := comp.DeepCopy()
+	now := metav1.Now()
+	deleting.DeletionTimestamp = &now
+	require.ElementsMatch(t, []reconcile.Request{
+		{NamespacedName: client.ObjectKeyFromObject(mysql)},
+		{NamespacedName: client.ObjectKeyFromObject(terminal)},
+	}, reconciler.mapComponentToPVCs(context.Background(), deleting))
 	require.ElementsMatch(t, []reconcile.Request{
 		{NamespacedName: client.ObjectKeyFromObject(mysql)},
 		{NamespacedName: client.ObjectKeyFromObject(postgresql)},
@@ -4272,6 +4279,182 @@ func TestClusterDeletionTerminatesVolumePopulationInOrder(t *testing.T) {
 	}
 }
 
+func TestComponentDeletionTerminatesVolumePopulationInOrder(t *testing.T) {
+	for _, retained := range []bool{false, true} {
+		t.Run(fmt.Sprintf("retained=%t", retained), func(t *testing.T) {
+			ctx := context.Background()
+			scheme, cluster, component, its, target := parentRestoreObjects(t)
+			now := metav1.Now()
+			component.DeletionTimestamp = &now
+			component.Finalizers = []string{"example.io/app-owner"}
+			cluster.Status.Conditions = []metav1.Condition{{
+				Type: kbappsv1.ConditionTypeRestore, Status: metav1.ConditionTrue,
+			}}
+			target.Finalizers = []string{dptypes.DataProtectionFinalizerName, "example.io/app-owner"}
+			target.Labels[dptypes.ComponentUIDLabelKey] = string(component.UID)
+			objects := []client.Object{cluster, component, target}
+			if retained {
+				target.OwnerReferences = nil
+			} else {
+				objects = append(objects, its)
+			}
+			helper := restoreHelperForTarget(target, cluster)
+			execution := executionRestoreForTarget(target, cluster)
+			execution.Finalizers = []string{"example.io/restore-owner"}
+			postReady := postReadyRestoreForComponent(target, cluster, component)
+			postReady.Finalizers = []string{"example.io/restore-owner"}
+			objects = append(objects, helper, execution, postReady)
+			cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).Build()
+			vp := &VolumePopulatorReconciler{Client: cli, Scheme: scheme}
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+
+			require.ErrorContains(t, vp.syncPVC(reqCtx, target), "waiting for Restore owners")
+			for _, expected := range []*dpv1alpha1.Restore{execution, postReady} {
+				current := &dpv1alpha1.Restore{}
+				require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(expected), current))
+				require.False(t, current.DeletionTimestamp.IsZero())
+				current.Finalizers = nil
+				require.NoError(t, cli.Update(ctx, current))
+			}
+
+			require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(target), target))
+			require.ErrorContains(t, vp.syncPVC(reqCtx, target), "waiting for helper PVC to disappear")
+			require.True(t, apierrors.IsNotFound(cli.Get(ctx, client.ObjectKeyFromObject(helper), helper)))
+
+			require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(target), target))
+			require.NoError(t, vp.syncPVC(reqCtx, target))
+			require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(target), target))
+			require.Equal(t, []string{"example.io/app-owner"}, target.Finalizers)
+		})
+	}
+}
+
+func TestComponentTerminationPreservesPostReadyRestoreOwnedByActiveComponent(t *testing.T) {
+	scheme, cluster, deletingComponent, its, target := parentRestoreObjects(t)
+	now := metav1.Now()
+	deletingComponent.DeletionTimestamp = &now
+	deletingComponent.Finalizers = []string{"example.io/app-owner"}
+	target.Finalizers = []string{dptypes.DataProtectionFinalizerName}
+	target.Labels[dptypes.ComponentUIDLabelKey] = string(deletingComponent.UID)
+	activeComponent := deletingComponent.DeepCopy()
+	activeComponent.Name = "cluster-tikv"
+	activeComponent.UID = "active-component-uid"
+	activeComponent.DeletionTimestamp = nil
+	activeComponent.Finalizers = nil
+	activeComponent.Labels[constant.KBAppComponentLabelKey] = "tikv"
+	postReady := postReadyRestoreForComponent(target, cluster, activeComponent)
+	postReady.Finalizers = []string{"example.io/restore-owner"}
+	cli := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(cluster, deletingComponent, activeComponent, its, target, postReady).Build()
+	vp := &VolumePopulatorReconciler{Client: cli, Scheme: scheme}
+
+	terminated, err := vp.handleRestoreParentLifecycle(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, target)
+
+	require.True(t, terminated)
+	require.NoError(t, err)
+	current := &dpv1alpha1.Restore{}
+	require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(postReady), current))
+	require.True(t, current.DeletionTimestamp.IsZero())
+}
+
+func TestComponentTerminationDeletesPostReadyRestoreByOwnerNotSourceLabel(t *testing.T) {
+	scheme, cluster, component, _, target := parentRestoreObjects(t)
+	now := metav1.Now()
+	component.DeletionTimestamp = &now
+	component.Finalizers = []string{"example.io/app-owner"}
+	postReady := postReadyRestoreForComponent(target, cluster, component)
+	postReady.Labels[constant.KBAppComponentLabelKey] = "another-source"
+	postReady.Finalizers = []string{"example.io/restore-owner"}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(postReady).Build()
+	vp := &VolumePopulatorReconciler{Client: cli, Scheme: scheme}
+
+	pending, err := vp.deleteComponentPostReadyRestoreAndWait(context.Background(), cluster, component)
+
+	require.NoError(t, err)
+	require.True(t, pending)
+	current := &dpv1alpha1.Restore{}
+	require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(postReady), current))
+	require.False(t, current.DeletionTimestamp.IsZero())
+}
+
+func TestComponentPostReadyTerminationRejectsInvalidOwnership(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		mutate func(*kbappsv1.Component, *dpv1alpha1.Restore)
+	}{
+		{"active Component", func(comp *kbappsv1.Component, _ *dpv1alpha1.Restore) { comp.DeletionTimestamp = nil }},
+		{"foreign Cluster owner", func(comp *kbappsv1.Component, _ *dpv1alpha1.Restore) {
+			comp.OwnerReferences[0].UID = "foreign-cluster"
+		}},
+		{"wrong Component owner name", func(_ *kbappsv1.Component, restore *dpv1alpha1.Restore) {
+			restore.OwnerReferences[0].Name = "another-component"
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			scheme, cluster, component, _, target := parentRestoreObjects(t)
+			now := metav1.Now()
+			component.DeletionTimestamp = &now
+			postReady := postReadyRestoreForComponent(target, cluster, component)
+			tc.mutate(component, postReady)
+			cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(postReady).Build()
+			vp := &VolumePopulatorReconciler{Client: cli, Scheme: scheme}
+
+			pending, err := vp.deleteComponentPostReadyRestoreAndWait(context.Background(), cluster, component)
+			require.ErrorContains(t, err, "without exact deleting Component ownership")
+			require.False(t, pending)
+		})
+	}
+}
+
+func TestComponentIdentityMismatchDoesNotAuthorizeTermination(t *testing.T) {
+	scheme, cluster, component, _, target := parentRestoreObjects(t)
+	component.UID = "replacement-component-uid"
+	now := metav1.Now()
+	component.DeletionTimestamp = &now
+	component.Finalizers = []string{"example.io/app-owner"}
+	target.Finalizers = []string{dptypes.DataProtectionFinalizerName}
+	target.Labels[dptypes.ComponentUIDLabelKey] = "original-component-uid"
+	execution := executionRestoreForTarget(target, cluster)
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, component, target, execution).Build()
+	vp := &VolumePopulatorReconciler{Client: cli, Scheme: scheme}
+
+	terminated, err := vp.handleRestoreParentLifecycle(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, target)
+
+	require.False(t, terminated)
+	require.ErrorContains(t, err, "Component UID changed")
+	require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(execution), &dpv1alpha1.Restore{}))
+}
+
+func TestPostReadyDoesNotProgressForDeletingComponent(t *testing.T) {
+	scheme, cluster, component, _, target := parentRestoreObjects(t)
+	now := metav1.Now()
+	component.DeletionTimestamp = &now
+	component.Finalizers = []string{"example.io/app-owner"}
+	component.Status.Phase = kbappsv1.RunningComponentPhase
+	target.Spec.VolumeName = "target-pv"
+	target.Status.Conditions = []corev1.PersistentVolumeClaimCondition{{
+		Type: PersistentVolumeClaimPopulating, Status: corev1.ConditionTrue, Reason: ReasonPopulatingProvisioned,
+	}}
+	backup, _ := restoreBackupObjects()
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(target).
+		WithObjects(cluster, component, target, backup).Build()
+	restoreMgr := dprestore.NewRestoreManager(&dpv1alpha1.Restore{}, nil, scheme, cli)
+	restoreMgr.PostReadyBackupSets = []dprestore.BackupActionSet{{Backup: backup}}
+	vp := &VolumePopulatorReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(10)}
+
+	completed, err := vp.ensurePostReadyRestoreCompleted(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, target,
+		&pvcRestoreContext{restoreMgr: restoreMgr, mode: pvcRestoreModeProvisionOnly})
+
+	require.False(t, completed)
+	require.ErrorContains(t, err, "waiting for deleting Component to terminate restore")
+	restores := &dpv1alpha1.RestoreList{}
+	require.NoError(t, cli.List(context.Background(), restores))
+	require.Empty(t, restores.Items)
+}
+
 func TestClusterLifecycleRegistersBeforeWaitingForProtection(t *testing.T) {
 	for _, existingFinalizer := range []bool{false, true} {
 		t.Run(fmt.Sprintf("existing-finalizer=%t", existingFinalizer), func(t *testing.T) {
@@ -4396,7 +4579,7 @@ func TestClusterLifecycleSafetyBoundaries(t *testing.T) {
 		cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, component, its, target).Build()
 		vp := &VolumePopulatorReconciler{Client: cli, Scheme: scheme}
 
-		terminated, err := vp.handleRestoreClusterLifecycle(intctrlutil.RequestCtx{Ctx: context.Background()}, target)
+		terminated, err := vp.handleRestoreParentLifecycle(intctrlutil.RequestCtx{Ctx: context.Background()}, target)
 		require.NoError(t, err)
 		require.False(t, terminated)
 	})
@@ -4468,7 +4651,7 @@ func TestClusterLifecycleRefusesForeignExecutionRestore(t *testing.T) {
 	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, target, helper, foreign).Build()
 	vp := &VolumePopulatorReconciler{Client: cli, Scheme: scheme}
 
-	terminated, err := vp.handleRestoreClusterLifecycle(intctrlutil.RequestCtx{Ctx: context.Background()}, target)
+	terminated, err := vp.handleRestoreParentLifecycle(intctrlutil.RequestCtx{Ctx: context.Background()}, target)
 	require.True(t, terminated)
 	require.ErrorContains(t, err, "refusing to delete execution Restore")
 	require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(foreign), &dpv1alpha1.Restore{}))

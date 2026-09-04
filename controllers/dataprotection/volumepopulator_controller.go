@@ -389,10 +389,6 @@ func (r *VolumePopulatorReconciler) MatchToPopulate(pvc *corev1.PersistentVolume
 }
 
 func (r *VolumePopulatorReconciler) syncPVC(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim) error {
-	// Kubernetes does not allow registering new finalizers after deletion starts.
-	if !pvc.DeletionTimestamp.IsZero() && !controllerutil.ContainsFinalizer(pvc, dptypes.DataProtectionFinalizerName) {
-		return nil
-	}
 	matched, err := r.MatchToPopulate(pvc)
 	if err != nil {
 		return err
@@ -403,6 +399,13 @@ func (r *VolumePopulatorReconciler) syncPVC(reqCtx intctrlutil.RequestCtx, pvc *
 	terminated, err := r.handleRestoreClusterLifecycle(reqCtx, pvc)
 	if err != nil || terminated {
 		return err
+	}
+	// Parent deletion is checked first because it authorizes cleanup even after
+	// target protection has been handed off. Target deletion alone remains a
+	// no-op, and Kubernetes does not allow acquiring a new finalizer here.
+	if !pvc.DeletionTimestamp.IsZero() &&
+		!controllerutil.ContainsFinalizer(pvc, dptypes.DataProtectionFinalizerName) {
+		return nil
 	}
 	// A non-deleting bound PVC with a terminal Restore condition does not need
 	// its source Backup/Restore. Populating can finish while postReady is pending.
@@ -475,6 +478,10 @@ func (r *VolumePopulatorReconciler) handleRestoreClusterLifecycle(reqCtx intctrl
 	if !cluster.DeletionTimestamp.IsZero() {
 		return r.terminateClusterVolumePopulation(reqCtx, pvc, cluster)
 	}
+	if !pvc.DeletionTimestamp.IsZero() &&
+		!controllerutil.ContainsFinalizer(pvc, dptypes.DataProtectionFinalizerName) {
+		return true, nil
+	}
 
 	committed := volumePopulationIdentityCommitted(pvc, cluster)
 	if committed {
@@ -483,7 +490,7 @@ func (r *VolumePopulatorReconciler) handleRestoreClusterLifecycle(reqCtx intctrl
 		}
 	}
 	// Aggregate restore status gates normal progression, not owner cleanup.
-	if !clusterRestoreConditionActive(cluster) && !pvcRestoreTerminal(pvc) {
+	if !clusterAllowsRestoreProgress(cluster) && !pvcRestoreTerminal(pvc) {
 		return false, intctrlutil.NewRequeueError(reconcileInterval, "Cluster restore is no longer active")
 	}
 	if !committed {

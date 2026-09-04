@@ -4329,6 +4329,28 @@ func TestComponentDeletionTerminatesVolumePopulationInOrder(t *testing.T) {
 	}
 }
 
+func TestComponentDeletionCleansPostReadyAfterTargetProtectionHandoff(t *testing.T) {
+	scheme, cluster, component, _, target := parentRestoreObjects(t)
+	now := metav1.Now()
+	component.DeletionTimestamp = &now
+	component.Finalizers = []string{"example.io/app-owner"}
+	target.DeletionTimestamp = &now
+	target.Finalizers = []string{"example.io/app-owner"}
+	target.Labels[dptypes.ComponentUIDLabelKey] = string(component.UID)
+	postReady := postReadyRestoreForComponent(target, cluster, component)
+	postReady.Finalizers = []string{"example.io/restore-owner"}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, component, target, postReady).Build()
+	vp := &VolumePopulatorReconciler{Client: cli, Scheme: scheme}
+
+	err := vp.syncPVC(intctrlutil.RequestCtx{Ctx: context.Background()}, target)
+
+	require.ErrorContains(t, err, "waiting for Restore owners")
+	require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(postReady), postReady))
+	require.False(t, postReady.DeletionTimestamp.IsZero())
+	require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(target), target))
+	require.NotContains(t, target.Finalizers, dptypes.DataProtectionFinalizerName)
+}
+
 func TestComponentTerminationPreservesPostReadyRestoreOwnedByActiveComponent(t *testing.T) {
 	scheme, cluster, deletingComponent, its, target := parentRestoreObjects(t)
 	now := metav1.Now()

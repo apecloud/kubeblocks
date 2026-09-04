@@ -484,10 +484,6 @@ func (r *VolumePopulatorReconciler) handleRestoreParentLifecycle(reqCtx intctrlu
 	if !cluster.DeletionTimestamp.IsZero() {
 		return r.terminateClusterVolumePopulation(reqCtx, pvc, cluster)
 	}
-	if !pvc.DeletionTimestamp.IsZero() &&
-		!controllerutil.ContainsFinalizer(pvc, dptypes.DataProtectionFinalizerName) {
-		return true, nil
-	}
 
 	committed := volumePopulationIdentityCommitted(pvc, cluster)
 	if committed {
@@ -498,6 +494,10 @@ func (r *VolumePopulatorReconciler) handleRestoreParentLifecycle(reqCtx intctrlu
 		if !comp.DeletionTimestamp.IsZero() {
 			return r.terminateComponentVolumePopulation(reqCtx, pvc, cluster, comp)
 		}
+	}
+	if !pvc.DeletionTimestamp.IsZero() &&
+		!controllerutil.ContainsFinalizer(pvc, dptypes.DataProtectionFinalizerName) {
+		return true, nil
 	}
 	// Aggregate restore status gates normal progression, not owner cleanup.
 	if !clusterAllowsRestoreProgress(cluster) && !pvcRestoreTerminal(pvc) {

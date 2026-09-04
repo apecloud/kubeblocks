@@ -492,7 +492,7 @@ func (r *VolumePopulatorReconciler) handleRestoreParentLifecycle(reqCtx intctrlu
 			return false, restoreParentRequeue(err)
 		}
 		if !comp.DeletionTimestamp.IsZero() {
-			return r.terminateSourceComponentVolumePopulation(reqCtx, pvc, cluster, comp)
+			return r.terminateSourceComponentVolumePopulation(reqCtx, pvc, cluster)
 		}
 	}
 	if !pvc.DeletionTimestamp.IsZero() &&
@@ -613,8 +613,8 @@ func (r *VolumePopulatorReconciler) terminateClusterVolumePopulation(reqCtx intc
 }
 
 func (r *VolumePopulatorReconciler) terminateSourceComponentVolumePopulation(reqCtx intctrlutil.RequestCtx,
-	pvc *corev1.PersistentVolumeClaim, cluster *appsv1.Cluster, component *appsv1.Component) (bool, error) {
-	err := r.cleanupSourceComponentVolumePopulation(reqCtx, pvc, cluster, component)
+	pvc *corev1.PersistentVolumeClaim, cluster *appsv1.Cluster) (bool, error) {
+	err := r.cleanupSourceComponentVolumePopulation(reqCtx, pvc, cluster)
 	if err != nil && !intctrlutil.IsRequeueError(err) {
 		err = restoreParentRequeue(err)
 	}
@@ -635,16 +635,15 @@ func (r *VolumePopulatorReconciler) cleanupClusterVolumePopulation(reqCtx intctr
 }
 
 func (r *VolumePopulatorReconciler) cleanupSourceComponentVolumePopulation(reqCtx intctrlutil.RequestCtx,
-	pvc *corev1.PersistentVolumeClaim, cluster *appsv1.Cluster, component *appsv1.Component) error {
+	pvc *corev1.PersistentVolumeClaim, cluster *appsv1.Cluster) error {
 	pending, err := r.deleteExecutionRestoreAndWait(reqCtx.Ctx, pvc, cluster)
 	if err != nil {
 		return err
 	}
-	postReadyPending, err := r.deleteSourceComponentPostReadyRestoreAndWait(reqCtx.Ctx, cluster, component)
-	if err != nil {
-		return err
-	}
-	return r.finishVolumePopulationTermination(reqCtx, pvc, cluster, pending || postReadyPending)
+	// postReady Restore is Component-owned and may be shared by PVCs from
+	// multiple source Components. Its ownerReference, rather than a source PVC,
+	// governs deletion.
+	return r.finishVolumePopulationTermination(reqCtx, pvc, cluster, pending)
 }
 
 func (r *VolumePopulatorReconciler) finishVolumePopulationTermination(reqCtx intctrlutil.RequestCtx,
@@ -708,39 +707,6 @@ func (r *VolumePopulatorReconciler) deleteClusterPostReadyRestoresAndWait(ctx co
 		}
 	}
 	return pending, nil
-}
-
-func (r *VolumePopulatorReconciler) deleteSourceComponentPostReadyRestoreAndWait(ctx context.Context,
-	cluster *appsv1.Cluster, component *appsv1.Component) (bool, error) {
-	restore := &dpv1alpha1.Restore{}
-	key := client.ObjectKey{Namespace: component.Namespace, Name: postReadyRestoreName(component.UID)}
-	if err := r.Client.Get(ctx, key, restore); err != nil {
-		return false, client.IgnoreNotFound(err)
-	}
-	sourceComponentName := component.Labels[constant.KBAppComponentLabelKey]
-	// A redirected postReady Restore can be owned by this target Component but
-	// originate from another source Component. Source deletion does not own it.
-	if sourceComponentName == "" || restore.Labels[constant.AppInstanceLabelKey] != cluster.Name ||
-		restore.Labels[dptypes.ClusterUIDLabelKey] != string(cluster.UID) ||
-		restore.Labels[constant.KBAppComponentLabelKey] != sourceComponentName {
-		return false, nil
-	}
-	owner := internalPostReadyRestoreOwner(restore)
-	clusterOwner := metav1.GetControllerOf(component)
-	if owner == nil || owner.Name != component.Name || owner.UID != component.UID ||
-		component.Namespace != cluster.Namespace || component.DeletionTimestamp.IsZero() ||
-		clusterOwner == nil || clusterOwner.APIVersion != appsv1.GroupVersion.String() ||
-		clusterOwner.Kind != appsv1.ClusterKind || clusterOwner.Name != cluster.Name ||
-		clusterOwner.UID != cluster.UID || component.Labels[constant.AppInstanceLabelKey] != cluster.Name {
-		return false, fmt.Errorf("refusing to delete postReady Restore %s/%s without exact deleting Component ownership",
-			restore.Namespace, restore.Name)
-	}
-	if restore.DeletionTimestamp.IsZero() {
-		if err := r.Client.Delete(ctx, restore); err != nil && !apierrors.IsNotFound(err) {
-			return false, err
-		}
-	}
-	return true, nil
 }
 
 func (r *VolumePopulatorReconciler) deletePopulatePVCAndWait(ctx context.Context,

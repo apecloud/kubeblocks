@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -98,6 +99,43 @@ var _ = Describe("ShardingDefinition Controller", func() {
 					g.Expect(sdd.Status.ObservedGeneration).Should(Equal(sdd.GetGeneration()))
 					g.Expect(sdd.Status.Phase).Should(Equal(appsv1.AvailablePhase))
 				})).Should(Succeed())
+		})
+	})
+
+	Context("non-blocking actions", func() {
+		It("allows shardAdd and shardRemove", func() {
+			shardingDef := &appsv1.ShardingDefinition{
+				Spec: appsv1.ShardingDefinitionSpec{
+					LifecycleActions: &appsv1.ShardingLifecycleActions{
+						ShardAdd:    &appsv1.ShardingAction{Action: appsv1.Action{NonBlocking: true}},
+						ShardRemove: &appsv1.ShardingAction{Action: appsv1.Action{NonBlocking: true}},
+					},
+				},
+			}
+			err := (&ShardingDefinitionReconciler{}).validateLifecycleActions(context.Background(), nil, shardingDef)
+			Expect(err).Should(BeNil())
+		})
+
+		It("rejects postProvision and preTerminate", func() {
+			reconciler := &ShardingDefinitionReconciler{}
+			for _, testCase := range []struct {
+				path   string
+				action func(*appsv1.ShardingLifecycleActions)
+			}{
+				{"spec.lifecycleActions.postProvision", func(actions *appsv1.ShardingLifecycleActions) {
+					actions.PostProvision = &appsv1.ShardingAction{Action: appsv1.Action{NonBlocking: true}}
+				}},
+				{"spec.lifecycleActions.preTerminate", func(actions *appsv1.ShardingLifecycleActions) {
+					actions.PreTerminate = &appsv1.ShardingAction{Action: appsv1.Action{NonBlocking: true}}
+				}},
+			} {
+				shardingDef := &appsv1.ShardingDefinition{
+					Spec: appsv1.ShardingDefinitionSpec{LifecycleActions: &appsv1.ShardingLifecycleActions{}},
+				}
+				testCase.action(shardingDef.Spec.LifecycleActions)
+				err := reconciler.validateLifecycleActions(context.Background(), nil, shardingDef)
+				Expect(err).Should(MatchError(ContainSubstring(testCase.path)), testCase.path)
+			}
 		})
 	})
 

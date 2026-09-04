@@ -422,6 +422,9 @@ spec:
                           suitable for long-running Actions, such as data migration, rebalancing, or
                           draining, whose duration depends on data volume or runtime conditions.
 
+                          Non-blocking mode can be enabled only for Action fields that explicitly
+                          document support for it.
+
                           This field cannot be updated.
                         type: boolean
                       preCondition:
@@ -885,6 +888,9 @@ spec:
                           suitable for long-running Actions, such as data migration, rebalancing, or
                           draining, whose duration depends on data volume or runtime conditions.
 
+                          Non-blocking mode can be enabled only for Action fields that explicitly
+                          document support for it.
+
                           This field cannot be updated.
                         type: boolean
                       preCondition:
@@ -995,6 +1001,10 @@ spec:
                       The container executing this action has access to following variables:
 
                       - KB_ADD_SHARD_NAME: The name of the shard being added.
+
+                      This Action supports both blocking and non-blocking modes. KubeBlocks does
+                      not finish adding the shard until the Action has succeeded on every
+                      selected target shard and Pod.
 
                       Note: This field is immutable once it has been set.
                     properties:
@@ -1342,6 +1352,9 @@ spec:
                           When true, KubeBlocks runs the Action in non-blocking mode. This mode is
                           suitable for long-running Actions, such as data migration, rebalancing, or
                           draining, whose duration depends on data volume or runtime conditions.
+
+                          Non-blocking mode can be enabled only for Action fields that explicitly
+                          document support for it.
 
                           This field cannot be updated.
                         type: boolean
@@ -1454,6 +1467,10 @@ spec:
 
                       - KB_REMOVE_SHARD_NAME: The name of the shard being removed.
 
+                      This Action supports both blocking and non-blocking modes. KubeBlocks does
+                      not remove the shard until the Action has succeeded on every selected
+                      target shard and Pod.
+
                       Note: This field is immutable once it has been set.
                     properties:
                       exec:
@@ -1800,6 +1817,9 @@ spec:
                           When true, KubeBlocks runs the Action in non-blocking mode. This mode is
                           suitable for long-running Actions, such as data migration, rebalancing, or
                           draining, whose duration depends on data volume or runtime conditions.
+
+                          Non-blocking mode can be enabled only for Action fields that explicitly
+                          document support for it.
 
                           This field cannot be updated.
                         type: boolean

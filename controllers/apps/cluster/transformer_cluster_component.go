@@ -173,6 +173,9 @@ func checkAllCompsUpToDate(transCtx *clusterTransformContext, cluster *appsv1.Cl
 		return false, nil
 	}
 	for _, comp := range compList.Items {
+		if hasPendingNonBlockingAction(&comp) {
+			return false, nil
+		}
 		generation, ok := comp.Annotations[constant.KubeBlocksGenerationKey]
 		if !ok {
 			return false, nil
@@ -908,6 +911,11 @@ func (h *clusterShardingHandler) update(transCtx *clusterTransformContext, dag *
 		return err
 	}
 
+	if handler := newNonBlockingShardingHandler(h, transCtx, dag, name,
+		runningCompsMap, protoCompsMap, toCreate, toDelete, toUpdate); handler != nil {
+		return handler.update()
+	}
+
 	errorSkip, err3 := h.handleShardAddNRemove(transCtx, name, runningCompsMap, protoCompsMap, toCreate, toDelete, toUpdate)
 
 	// TODO: update strategy
@@ -1368,7 +1376,7 @@ func (h *clusterShardingHandler) handleShardAddNRemove(transCtx *clusterTransfor
 			for name := range toUpdate {
 				err1 := h.handleShardAdd(transCtx, shardingName, maps.Values(runningCompsMap), runningCompsMap[name])
 				if err1 != nil {
-					transCtx.Logger.Error(err, "failed to call the shard add action", "shard", name)
+					transCtx.Logger.Error(err1, "failed to call the shard add action", "shard", name)
 					if err == nil {
 						err = err1
 					}
@@ -1383,7 +1391,7 @@ func (h *clusterShardingHandler) handleShardAddNRemove(transCtx *clusterTransfor
 			for name := range toDelete {
 				err1 := h.handleShardRemove(transCtx, shardingName, maps.Values(runningCompsMap), runningCompsMap[name])
 				if err1 != nil {
-					transCtx.Logger.Error(err, "failed to call the shard remove action", "shard", name)
+					transCtx.Logger.Error(err1, "failed to call the shard remove action", "shard", name)
 					if err == nil {
 						err = err1
 					}
@@ -1441,17 +1449,15 @@ func (h *clusterShardingHandler) handleShardRemove(transCtx *clusterTransformCon
 		pending = func() bool {
 			return runningComp.DeletionTimestamp.IsZero()
 		}
-
-		skipIfShardAddNotDone = func() bool {
-			return runningComp.Annotations[shardingAddShardKey] != ""
-		}
 	)
 
-	if shardingDef == nil || shardingDef.Spec.LifecycleActions == nil || shardingDef.Spec.LifecycleActions.ShardRemove == nil {
-		return nil
+	if runningComp.Annotations[shardingAddShardKey] != "" {
+		if err := h.handleShardAdd(transCtx, shardingName, runningComps, runningComp); err != nil {
+			return err
+		}
 	}
 
-	if skipIfShardAddNotDone() {
+	if shardingDef == nil || shardingDef.Spec.LifecycleActions == nil || shardingDef.Spec.LifecycleActions.ShardRemove == nil {
 		return nil
 	}
 

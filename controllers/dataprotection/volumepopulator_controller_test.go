@@ -4221,6 +4221,394 @@ func dependencyRestorePVC(name, componentName string, uid types.UID) *corev1.Per
 	}
 }
 
+func TestClusterDeletionTerminatesVolumePopulationInOrder(t *testing.T) {
+	for _, retained := range []bool{false, true} {
+		t.Run(fmt.Sprintf("retained=%t", retained), func(t *testing.T) {
+			ctx := context.Background()
+			scheme, cluster, component, its, target := parentRestoreObjects(t)
+			now := metav1.Now()
+			cluster.DeletionTimestamp = &now
+			cluster.Finalizers = append(cluster.Finalizers, "example.io/app-owner")
+			target.Finalizers = []string{dptypes.DataProtectionFinalizerName, "example.io/app-owner"}
+			target.Labels[dptypes.ComponentUIDLabelKey] = string(component.UID)
+			objects := []client.Object{cluster, target}
+			if retained {
+				target.OwnerReferences = nil
+			} else {
+				objects = append(objects, its)
+			}
+			helper := restoreHelperForTarget(target, cluster)
+			execution := executionRestoreForTarget(target, cluster)
+			execution.Finalizers = []string{"example.io/restore-owner"}
+			postReady := postReadyRestoreForComponent(target, cluster, component)
+			postReady.Finalizers = []string{"example.io/restore-owner"}
+			objects = append(objects, helper, execution, postReady)
+			cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).Build()
+			vp := &VolumePopulatorReconciler{Client: cli, Scheme: scheme}
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+
+			require.ErrorContains(t, vp.syncPVC(reqCtx, target), "waiting for Restore owners")
+			for _, expected := range []*dpv1alpha1.Restore{execution, postReady} {
+				current := &dpv1alpha1.Restore{}
+				require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(expected), current))
+				require.False(t, current.DeletionTimestamp.IsZero())
+				require.Equal(t, expected.Finalizers, current.Finalizers)
+				current.Finalizers = nil
+				require.NoError(t, cli.Update(ctx, current))
+			}
+			require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(helper), &corev1.PersistentVolumeClaim{}))
+
+			require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(target), target))
+			require.ErrorContains(t, vp.syncPVC(reqCtx, target), "waiting for helper PVC to disappear")
+			require.True(t, apierrors.IsNotFound(cli.Get(ctx, client.ObjectKeyFromObject(helper), helper)))
+
+			require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(target), target))
+			require.NoError(t, vp.syncPVC(reqCtx, target))
+			require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(target), target))
+			require.Equal(t, []string{"example.io/app-owner"}, target.Finalizers)
+			require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(cluster), cluster))
+			require.Contains(t, cluster.Finalizers, dptypes.RestoreProtectionFinalizerName)
+		})
+	}
+}
+
+func TestClusterLifecycleRegistersBeforeWaitingForProtection(t *testing.T) {
+	for _, existingFinalizer := range []bool{false, true} {
+		t.Run(fmt.Sprintf("existing-finalizer=%t", existingFinalizer), func(t *testing.T) {
+			ctx := context.Background()
+			scheme, cluster, component, its, target := parentRestoreObjects(t)
+			cluster.Finalizers = nil
+			delete(target.Labels, dptypes.ClusterUIDLabelKey)
+			if existingFinalizer {
+				target.Finalizers = []string{dptypes.DataProtectionFinalizerName}
+			}
+			cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, component, its, target).Build()
+			vp := &VolumePopulatorReconciler{Client: cli, Scheme: scheme}
+
+			require.ErrorContains(t, vp.syncPVC(intctrlutil.RequestCtx{Ctx: ctx}, target),
+				"waiting for target PVC restore protection")
+			require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(target), target))
+			require.Equal(t, string(cluster.UID), target.Labels[dptypes.ClusterUIDLabelKey])
+			require.Equal(t, string(component.UID), target.Labels[dptypes.ComponentUIDLabelKey])
+			require.Contains(t, target.Finalizers, dptypes.DataProtectionFinalizerName)
+			require.Empty(t, target.Status.Conditions)
+
+			require.ErrorContains(t, vp.syncPVC(intctrlutil.RequestCtx{Ctx: ctx}, target),
+				"waiting for Cluster restore-protection finalizer")
+			require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(cluster), cluster))
+			require.NotContains(t, cluster.Finalizers, dptypes.RestoreProtectionFinalizerName,
+				"VolumePopulator must not add the Cluster finalizer")
+			pvcs := &corev1.PersistentVolumeClaimList{}
+			require.NoError(t, cli.List(ctx, pvcs))
+			require.Len(t, pvcs.Items, 1)
+			restores := &dpv1alpha1.RestoreList{}
+			require.NoError(t, cli.List(ctx, restores))
+			require.Empty(t, restores.Items)
+		})
+	}
+}
+
+func TestClusterLifecycleRegistrationReturnsBeforeRestoreValidation(t *testing.T) {
+	ctx := context.Background()
+	scheme, cluster, component, its, target := parentRestoreObjects(t)
+	delete(target.Labels, dptypes.ClusterUIDLabelKey)
+	target.Spec.DataSourceRef.Kind = dptypes.RestoreKind
+	target.Spec.DataSourceRef.Name = "source"
+	target.Annotations[constant.RestoreSourceKindAnnotationKey] = dptypes.RestoreKind
+	target.Annotations[constant.RestoreSourceNameAnnotationKey] = "source"
+	base := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, component, its, target).Build()
+	validated := false
+	cli := interceptor.NewClient(base, interceptor.Funcs{Get: func(ctx context.Context, inner client.WithWatch,
+		key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+		if _, ok := obj.(*dpv1alpha1.Restore); ok {
+			validated = true
+		}
+		return inner.Get(ctx, key, obj, opts...)
+	}})
+	vp := &VolumePopulatorReconciler{Client: cli, Scheme: scheme}
+
+	require.ErrorContains(t, vp.syncPVC(intctrlutil.RequestCtx{Ctx: ctx}, target),
+		"waiting for target PVC restore protection")
+	require.False(t, validated)
+	require.NoError(t, base.Get(ctx, client.ObjectKeyFromObject(target), target))
+	require.Contains(t, target.Finalizers, dptypes.DataProtectionFinalizerName)
+}
+
+func TestClusterLifecyclePostReadyProtectionHandoff(t *testing.T) {
+	ctx := context.Background()
+	scheme, cluster, component, _, target := parentRestoreObjects(t)
+	target.Labels[dptypes.ComponentUIDLabelKey] = string(component.UID)
+	target.Finalizers = nil
+	target.Spec.VolumeName = "target-pv"
+	target.Status.Conditions = []corev1.PersistentVolumeClaimCondition{{
+		Type: PersistentVolumeClaimPopulating, Status: corev1.ConditionTrue, Reason: ReasonPopulatingProvisioned,
+	}}
+	component.Status.Phase = kbappsv1.RunningComponentPhase
+	backup, actionSet := restoreBackupObjects()
+	actionSet.Spec.Restore.PostReady = []dpv1alpha1.ActionSpec{{Job: &dpv1alpha1.JobActionSpec{}}}
+	worker := &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "worker", Namespace: target.Namespace}}
+	for key, value := range map[string]string{
+		dptypes.CfgKeyWorkerServiceAccountName: "worker",
+		dptypes.CfgKeyWorkerClusterRoleName:    "worker-role",
+	} {
+		previous := viper.Get(key)
+		viper.Set(key, value)
+		t.Cleanup(func() { viper.Set(key, previous) })
+	}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(target).
+		WithObjects(cluster, component, target, backup, actionSet, worker).Build()
+	vp := &VolumePopulatorReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(10)}
+	mgr := dprestore.NewRestoreManager(&dpv1alpha1.Restore{}, nil, scheme, cli)
+	mgr.PostReadyBackupSets = []dprestore.BackupActionSet{{Backup: backup}}
+	restoreCtx := &pvcRestoreContext{restoreMgr: mgr, mode: pvcRestoreModeProvisionOnly}
+	reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+
+	require.ErrorContains(t, vp.completeBoundPVCIfNeeded(reqCtx, target, restoreCtx),
+		"waiting for target PVC restore protection")
+	require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(target), target))
+	require.Contains(t, target.Finalizers, dptypes.DataProtectionFinalizerName)
+	restores := &dpv1alpha1.RestoreList{}
+	require.NoError(t, cli.List(ctx, restores))
+	require.Empty(t, restores.Items)
+
+	require.ErrorContains(t, vp.completeBoundPVCIfNeeded(reqCtx, target, restoreCtx), "waiting for postReady restore")
+	require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(target), target))
+	require.Contains(t, target.Finalizers, dptypes.DataProtectionFinalizerName)
+	require.NoError(t, cli.List(ctx, restores))
+	require.Len(t, restores.Items, 1)
+
+	require.ErrorContains(t, vp.completeBoundPVCIfNeeded(reqCtx, target, restoreCtx), "waiting for postReady restore")
+	require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(target), target))
+	require.NotContains(t, target.Finalizers, dptypes.DataProtectionFinalizerName)
+	coordinator := &ClusterRestoreReconciler{Client: cli}
+	hasResources, err := coordinator.hasRestoreResources(ctx, cluster)
+	require.NoError(t, err)
+	require.True(t, hasResources)
+}
+
+func TestClusterLifecycleSafetyBoundaries(t *testing.T) {
+	t.Run("target deletion is not termination", func(t *testing.T) {
+		scheme, cluster, component, its, target := parentRestoreObjects(t)
+		now := metav1.Now()
+		target.DeletionTimestamp = &now
+		target.Finalizers = []string{dptypes.DataProtectionFinalizerName, "example.io/app-owner"}
+		target.Labels[dptypes.ComponentUIDLabelKey] = string(component.UID)
+		cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, component, its, target).Build()
+		vp := &VolumePopulatorReconciler{Client: cli, Scheme: scheme}
+
+		terminated, err := vp.handleRestoreClusterLifecycle(intctrlutil.RequestCtx{Ctx: context.Background()}, target)
+		require.NoError(t, err)
+		require.False(t, terminated)
+	})
+
+	t.Run("deleting target without VP finalizer is ignored", func(t *testing.T) {
+		scheme, _, _, _, target := parentRestoreObjects(t)
+		now := metav1.Now()
+		target.DeletionTimestamp = &now
+		target.Finalizers = []string{"kubernetes.io/pvc-protection"}
+		cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(target).WithInterceptorFuncs(interceptor.Funcs{
+			Get: func(context.Context, client.WithWatch, client.ObjectKey, client.Object, ...client.GetOption) error {
+				t.Fatal("deleting target without VP protection must not start restore")
+				return nil
+			},
+			Patch: func(context.Context, client.WithWatch, client.Object, client.Patch, ...client.PatchOption) error {
+				t.Fatal("deleting target must not acquire VP protection")
+				return nil
+			},
+		}).Build()
+		vp := &VolumePopulatorReconciler{Client: cli, Scheme: scheme}
+		require.NoError(t, vp.syncPVC(intctrlutil.RequestCtx{Ctx: context.Background()}, target))
+	})
+
+	t.Run("missing Cluster does not authorize active cleanup", func(t *testing.T) {
+		scheme, cluster, component, _, target := parentRestoreObjects(t)
+		target.Labels[dptypes.ComponentUIDLabelKey] = string(component.UID)
+		target.Finalizers = []string{dptypes.DataProtectionFinalizerName}
+		helper := restoreHelperForTarget(target, cluster)
+		cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(target, helper).
+			WithInterceptorFuncs(interceptor.Funcs{
+				Delete: func(context.Context, client.WithWatch, client.Object, ...client.DeleteOption) error {
+					t.Fatal("missing Cluster must not authorize deletion")
+					return nil
+				},
+				Patch: func(context.Context, client.WithWatch, client.Object, client.Patch, ...client.PatchOption) error {
+					t.Fatal("active protection must remain")
+					return nil
+				},
+			}).Build()
+		vp := &VolumePopulatorReconciler{Client: cli, Scheme: scheme}
+		require.True(t, intctrlutil.IsRequeueError(vp.syncPVC(
+			intctrlutil.RequestCtx{Ctx: context.Background()}, target)))
+	})
+
+	t.Run("completed Cluster restore does not register", func(t *testing.T) {
+		scheme, cluster, component, its, target := parentRestoreObjects(t)
+		cluster.Status.Conditions = []metav1.Condition{{
+			Type: kbappsv1.ConditionTypeRestore, Status: metav1.ConditionTrue,
+		}}
+		delete(target.Labels, dptypes.ClusterUIDLabelKey)
+		cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, component, its, target).Build()
+		vp := &VolumePopulatorReconciler{Client: cli, Scheme: scheme}
+		err := vp.syncPVC(intctrlutil.RequestCtx{Ctx: context.Background()}, target)
+		require.ErrorContains(t, err, "Cluster restore is no longer active")
+		require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(target), target))
+		require.NotContains(t, target.Finalizers, dptypes.DataProtectionFinalizerName)
+	})
+}
+
+func TestClusterLifecycleRefusesForeignExecutionRestore(t *testing.T) {
+	scheme, cluster, component, _, target := parentRestoreObjects(t)
+	now := metav1.Now()
+	cluster.DeletionTimestamp = &now
+	target.Finalizers = []string{dptypes.DataProtectionFinalizerName}
+	target.Labels[dptypes.ComponentUIDLabelKey] = string(component.UID)
+	helper := restoreHelperForTarget(target, cluster)
+	foreign := executionRestoreForTarget(target, cluster)
+	foreign.OwnerReferences[0].UID = "foreign-pvc"
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, target, helper, foreign).Build()
+	vp := &VolumePopulatorReconciler{Client: cli, Scheme: scheme}
+
+	terminated, err := vp.handleRestoreClusterLifecycle(intctrlutil.RequestCtx{Ctx: context.Background()}, target)
+	require.True(t, terminated)
+	require.ErrorContains(t, err, "refusing to delete execution Restore")
+	require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(foreign), &dpv1alpha1.Restore{}))
+	require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(helper), &corev1.PersistentVolumeClaim{}))
+}
+
+func TestValidateClusterRestorePVCOwnershipThroughInstance(t *testing.T) {
+	scheme, cluster, component, its, target := parentRestoreObjects(t)
+	controller := true
+	instance := &workloadsv1.Instance{ObjectMeta: metav1.ObjectMeta{
+		Namespace: target.Namespace, Name: "cluster-mysql-0", UID: "instance-uid",
+		OwnerReferences: []metav1.OwnerReference{{
+			APIVersion: workloadsv1.GroupVersion.String(), Kind: workloadsv1.InstanceSetKind,
+			Name: its.Name, UID: its.UID, Controller: &controller,
+		}},
+	}}
+	target.OwnerReferences = []metav1.OwnerReference{{
+		APIVersion: workloadsv1.GroupVersion.String(), Kind: "Instance",
+		Name: instance.Name, UID: instance.UID, Controller: &controller,
+	}}
+	cli := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(cluster, component, its, instance, target).Build()
+	vp := &VolumePopulatorReconciler{Client: cli, Scheme: scheme}
+
+	actual, err := vp.validateClusterRestorePVCOwnership(context.Background(), target, cluster)
+	require.NoError(t, err)
+	require.Equal(t, component.UID, actual.UID)
+}
+
+func restoreBackupObjects() (*dpv1alpha1.Backup, *dpv1alpha1.ActionSet) {
+	backup := newBackupForRestoreDecision([]string{"data"}, nil)
+	backup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
+	backup.Status.BackupMethod.ActionSetName = "full"
+	backup.Status.Target.PodSelector = &dpv1alpha1.PodSelector{Strategy: dpv1alpha1.PodSelectionStrategyAny}
+	actionSet := &dpv1alpha1.ActionSet{ObjectMeta: metav1.ObjectMeta{Name: "full"}, Spec: dpv1alpha1.ActionSetSpec{
+		BackupType: dpv1alpha1.BackupTypeFull,
+		Restore:    &dpv1alpha1.RestoreActionSpec{PrepareData: &dpv1alpha1.JobActionSpec{}},
+	}}
+	return backup, actionSet
+}
+
+func parentRestoreObjects(t *testing.T) (*runtime.Scheme, *kbappsv1.Cluster, *kbappsv1.Component,
+	*workloadsv1.InstanceSet, *corev1.PersistentVolumeClaim) {
+	t.Helper()
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, kbappsv1.AddToScheme(scheme))
+	require.NoError(t, workloadsv1.AddToScheme(scheme))
+	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
+	controller := true
+	cluster := &kbappsv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default", Name: "cluster", UID: "cluster-uid",
+			Finalizers: []string{dptypes.RestoreProtectionFinalizerName},
+		},
+		Spec: kbappsv1.ClusterSpec{Restore: &kbappsv1.ClusterRestore{}},
+	}
+	component := &kbappsv1.Component{ObjectMeta: metav1.ObjectMeta{
+		Namespace: cluster.Namespace, Name: "cluster-mysql", UID: "component-uid",
+		Labels: map[string]string{
+			constant.AppInstanceLabelKey: cluster.Name, constant.KBAppComponentLabelKey: "mysql",
+		},
+		OwnerReferences: []metav1.OwnerReference{{
+			APIVersion: kbappsv1.GroupVersion.String(), Kind: kbappsv1.ClusterKind,
+			Name: cluster.Name, UID: cluster.UID, Controller: &controller,
+		}},
+	}}
+	its := &workloadsv1.InstanceSet{ObjectMeta: metav1.ObjectMeta{
+		Namespace: cluster.Namespace, Name: "cluster-mysql", UID: "its-uid",
+		Labels: map[string]string{
+			constant.AppInstanceLabelKey: cluster.Name, constant.KBAppComponentLabelKey: "mysql",
+		},
+		OwnerReferences: []metav1.OwnerReference{{
+			APIVersion: kbappsv1.GroupVersion.String(), Kind: kbappsv1.ComponentKind,
+			Name: component.Name, UID: component.UID, Controller: &controller,
+		}},
+	}}
+	target := dependencyRestorePVC("data-mysql-0", "mysql", "target-uid")
+	target.Annotations[constant.KBAppClusterUIDKey] = string(cluster.UID)
+	target.Labels[dptypes.ClusterUIDLabelKey] = string(cluster.UID)
+	target.OwnerReferences = []metav1.OwnerReference{{
+		APIVersion: workloadsv1.GroupVersion.String(), Kind: workloadsv1.InstanceSetKind,
+		Name: its.Name, UID: its.UID, Controller: &controller,
+	}}
+	return scheme, cluster, component, its, target
+}
+
+func restoreHelperForTarget(target *corev1.PersistentVolumeClaim,
+	cluster *kbappsv1.Cluster) *corev1.PersistentVolumeClaim {
+	name := getPopulatePVCName(target.UID)
+	return &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{
+		Namespace: target.Namespace, Name: name,
+		Labels: map[string]string{
+			constant.AppInstanceLabelKey:                     cluster.Name,
+			constant.KBAppComponentLabelKey:                  target.Labels[constant.KBAppComponentLabelKey],
+			dptypes.ClusterUIDLabelKey:                       string(cluster.UID),
+			dprestore.DataProtectionRestoreLabelKey:          name,
+			dprestore.DataProtectionRestoreNamespaceLabelKey: target.Namespace,
+			dprestore.DataProtectionPopulatePVCLabelKey:      name,
+		},
+	}}
+}
+
+func executionRestoreForTarget(target *corev1.PersistentVolumeClaim,
+	cluster *kbappsv1.Cluster) *dpv1alpha1.Restore {
+	name := getPopulatePVCName(target.UID)
+	return &dpv1alpha1.Restore{ObjectMeta: metav1.ObjectMeta{
+		Namespace: target.Namespace, Name: name,
+		Labels: map[string]string{
+			constant.AppInstanceLabelKey:            cluster.Name,
+			constant.KBAppComponentLabelKey:         target.Labels[constant.KBAppComponentLabelKey],
+			dptypes.ClusterUIDLabelKey:              string(cluster.UID),
+			dprestore.DataProtectionRestoreLabelKey: name,
+		},
+		OwnerReferences: []metav1.OwnerReference{{
+			APIVersion: corev1.SchemeGroupVersion.String(), Kind: "PersistentVolumeClaim",
+			Name: target.Name, UID: target.UID,
+		}},
+	}}
+}
+
+func postReadyRestoreForComponent(target *corev1.PersistentVolumeClaim, cluster *kbappsv1.Cluster,
+	component *kbappsv1.Component) *dpv1alpha1.Restore {
+	name := postReadyRestoreName(component.UID)
+	return &dpv1alpha1.Restore{ObjectMeta: metav1.ObjectMeta{
+		Namespace: target.Namespace, Name: name,
+		Labels: map[string]string{
+			constant.AppInstanceLabelKey:            cluster.Name,
+			constant.KBAppComponentLabelKey:         target.Labels[constant.KBAppComponentLabelKey],
+			dptypes.ClusterUIDLabelKey:              string(cluster.UID),
+			dptypes.ComponentUIDLabelKey:            string(component.UID),
+			dprestore.DataProtectionRestoreLabelKey: name,
+		},
+		OwnerReferences: []metav1.OwnerReference{{
+			APIVersion: kbappsv1.GroupVersion.String(), Kind: kbappsv1.ComponentKind,
+			Name: component.Name, UID: component.UID,
+		}},
+	}}
+}
+
 func TestEnsurePostReadyRestore_ShardingMissingTargetSkip_DoesNotRedirect(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, corev1.AddToScheme(scheme))

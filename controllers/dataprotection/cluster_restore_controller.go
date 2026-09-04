@@ -63,34 +63,30 @@ func (r *ClusterRestoreReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
-	if cluster.DeletionTimestamp.IsZero() {
-		if clusterRestoreConditionActive(cluster) {
-			return r.ensureFinalizer(reqCtx, cluster)
-		}
-	} else if !controllerutil.ContainsFinalizer(cluster, dptypes.RestoreProtectionFinalizerName) {
-		return intctrlutil.Reconciled()
-	}
-
-	hasResources, err := r.hasRestoreResources(ctx, cluster)
+	restoring, err := r.isClusterRestoring(ctx, cluster)
 	if err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to inspect Cluster restore resources")
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to determine Cluster restore state")
 	}
-	if cluster.DeletionTimestamp.IsZero() {
-		if hasResources {
-			return r.ensureFinalizer(reqCtx, cluster)
+	if !restoring {
+		return r.releaseClusterRestoreProtection(reqCtx, cluster)
+	}
+	if !isClusterRestoreProtected(cluster) {
+		// If deletion began without our finalizer, this controller cannot acquire
+		// protection and must not delay Cluster deletion.
+		if !cluster.DeletionTimestamp.IsZero() {
+			return intctrlutil.Reconciled()
 		}
-		return r.removeFinalizer(reqCtx, cluster)
+		return r.protectClusterRestore(reqCtx, cluster)
 	}
-	if hasResources {
+	if !cluster.DeletionTimestamp.IsZero() {
 		return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log,
-			"waiting for restore resource owners to finish Cluster termination")
+			"waiting for restore owners to finish Cluster termination")
 	}
-	return r.removeFinalizer(reqCtx, cluster)
+	return intctrlutil.Reconciled()
 }
 
 func (r *ClusterRestoreReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return intctrlutil.NewControllerManagedBy(mgr).
-		Named("cluster_restore").
 		For(&appsv1.Cluster{}).
 		Watches(&dpv1alpha1.Restore{}, handler.EnqueueRequestsFromMapFunc(r.mapObjectToCluster)).
 		Watches(&corev1.PersistentVolumeClaim{}, handler.EnqueueRequestsFromMapFunc(r.mapObjectToCluster)).
@@ -105,19 +101,12 @@ func (r *ClusterRestoreReconciler) mapObjectToCluster(_ context.Context, obj cli
 	return []reconcile.Request{{NamespacedName: client.ObjectKey{Namespace: obj.GetNamespace(), Name: clusterName}}}
 }
 
-func clusterRestoreConditionActive(cluster *appsv1.Cluster) bool {
-	if cluster.Spec.Restore == nil {
-		return false
-	}
-	condition := meta.FindStatusCondition(cluster.Status.Conditions, appsv1.ConditionTypeRestore)
-	// Restore=False is terminal for status aggregation, but the failed Cluster
-	// still carries initial-restore intent. Keep protection until Cluster deletion
-	// so remaining PVC restores never lose the lifecycle coordinator.
-	return condition == nil || condition.Status != metav1.ConditionTrue
-}
-
-func (r *ClusterRestoreReconciler) hasRestoreResources(ctx context.Context,
+func (r *ClusterRestoreReconciler) isClusterRestoring(ctx context.Context,
 	cluster *appsv1.Cluster) (bool, error) {
+	if cluster.DeletionTimestamp.IsZero() && clusterAllowsRestoreProgress(cluster) {
+		return true, nil
+	}
+
 	// Inspect PVCs before Restores. VP releases temporary target protection only
 	// after observing postReady Restore, so this order closes the handoff window.
 	pvcs := &corev1.PersistentVolumeClaimList{}
@@ -158,9 +147,24 @@ func (r *ClusterRestoreReconciler) hasRestoreResources(ctx context.Context,
 	return false, nil
 }
 
-func (r *ClusterRestoreReconciler) ensureFinalizer(reqCtx intctrlutil.RequestCtx,
+func clusterAllowsRestoreProgress(cluster *appsv1.Cluster) bool {
+	if cluster.Spec.Restore == nil {
+		return false
+	}
+	condition := meta.FindStatusCondition(cluster.Status.Conditions, appsv1.ConditionTypeRestore)
+	// Restore=False is terminal for status aggregation, but the Cluster still
+	// has initial-restore intent. Keep the lifecycle active until deletion so
+	// PVC restores cannot lose protection while converging on the failure.
+	return condition == nil || condition.Status != metav1.ConditionTrue
+}
+
+func isClusterRestoreProtected(cluster *appsv1.Cluster) bool {
+	return controllerutil.ContainsFinalizer(cluster, dptypes.RestoreProtectionFinalizerName)
+}
+
+func (r *ClusterRestoreReconciler) protectClusterRestore(reqCtx intctrlutil.RequestCtx,
 	cluster *appsv1.Cluster) (ctrl.Result, error) {
-	if controllerutil.ContainsFinalizer(cluster, dptypes.RestoreProtectionFinalizerName) {
+	if isClusterRestoreProtected(cluster) {
 		return intctrlutil.Reconciled()
 	}
 	patch := client.MergeFromWithOptions(cluster.DeepCopy(), client.MergeFromWithOptimisticLock{})
@@ -171,9 +175,9 @@ func (r *ClusterRestoreReconciler) ensureFinalizer(reqCtx intctrlutil.RequestCtx
 	return intctrlutil.Reconciled()
 }
 
-func (r *ClusterRestoreReconciler) removeFinalizer(reqCtx intctrlutil.RequestCtx,
+func (r *ClusterRestoreReconciler) releaseClusterRestoreProtection(reqCtx intctrlutil.RequestCtx,
 	cluster *appsv1.Cluster) (ctrl.Result, error) {
-	if !controllerutil.ContainsFinalizer(cluster, dptypes.RestoreProtectionFinalizerName) {
+	if !isClusterRestoreProtected(cluster) {
 		return intctrlutil.Reconciled()
 	}
 	patch := client.MergeFromWithOptions(cluster.DeepCopy(), client.MergeFromWithOptimisticLock{})

@@ -4527,6 +4527,9 @@ func TestClusterLifecyclePostReadyProtectionHandoff(t *testing.T) {
 		Type: PersistentVolumeClaimPopulating, Status: corev1.ConditionTrue, Reason: ReasonPopulatingProvisioned,
 	}}
 	component.Status.Phase = kbappsv1.RunningComponentPhase
+	cluster.Status.Conditions = []metav1.Condition{{
+		Type: kbappsv1.ConditionTypeRestore, Status: metav1.ConditionTrue,
+	}}
 	backup, actionSet := restoreBackupObjects()
 	actionSet.Spec.Restore.PostReady = []dpv1alpha1.ActionSpec{{Job: &dpv1alpha1.JobActionSpec{}}}
 	worker := &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "worker", Namespace: target.Namespace}}
@@ -4564,9 +4567,10 @@ func TestClusterLifecyclePostReadyProtectionHandoff(t *testing.T) {
 	require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(target), target))
 	require.NotContains(t, target.Finalizers, dptypes.DataProtectionFinalizerName)
 	coordinator := &ClusterRestoreReconciler{Client: cli}
-	hasResources, err := coordinator.hasRestoreResources(ctx, cluster)
+	_, err := coordinator.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(cluster)})
 	require.NoError(t, err)
-	require.True(t, hasResources)
+	require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(cluster), cluster))
+	require.True(t, isClusterRestoreProtected(cluster))
 }
 
 func TestClusterLifecycleSafetyBoundaries(t *testing.T) {
@@ -4585,22 +4589,39 @@ func TestClusterLifecycleSafetyBoundaries(t *testing.T) {
 	})
 
 	t.Run("deleting target without VP finalizer is ignored", func(t *testing.T) {
-		scheme, _, _, _, target := parentRestoreObjects(t)
+		scheme, cluster, _, _, target := parentRestoreObjects(t)
 		now := metav1.Now()
 		target.DeletionTimestamp = &now
 		target.Finalizers = []string{"kubernetes.io/pvc-protection"}
-		cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(target).WithInterceptorFuncs(interceptor.Funcs{
-			Get: func(context.Context, client.WithWatch, client.ObjectKey, client.Object, ...client.GetOption) error {
-				t.Fatal("deleting target without VP protection must not start restore")
-				return nil
-			},
-			Patch: func(context.Context, client.WithWatch, client.Object, client.Patch, ...client.PatchOption) error {
-				t.Fatal("deleting target must not acquire VP protection")
-				return nil
-			},
-		}).Build()
+		cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, target).Build()
 		vp := &VolumePopulatorReconciler{Client: cli, Scheme: scheme}
 		require.NoError(t, vp.syncPVC(intctrlutil.RequestCtx{Ctx: context.Background()}, target))
+		require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(target), target))
+		require.Equal(t, []string{"kubernetes.io/pvc-protection"}, target.Finalizers)
+		restores := &dpv1alpha1.RestoreList{}
+		require.NoError(t, cli.List(context.Background(), restores))
+		require.Empty(t, restores.Items)
+	})
+
+	t.Run("Cluster deletion cleans postReady after target protection handoff", func(t *testing.T) {
+		scheme, cluster, component, _, target := parentRestoreObjects(t)
+		now := metav1.Now()
+		cluster.DeletionTimestamp = &now
+		cluster.Finalizers = append(cluster.Finalizers, "example.io/app-owner")
+		target.DeletionTimestamp = &now
+		target.Finalizers = []string{"example.io/app-owner"}
+		postReady := postReadyRestoreForComponent(target, cluster, component)
+		postReady.Finalizers = []string{"example.io/restore-owner"}
+		cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, target, postReady).Build()
+		vp := &VolumePopulatorReconciler{Client: cli, Scheme: scheme}
+
+		err := vp.syncPVC(intctrlutil.RequestCtx{Ctx: context.Background()}, target)
+
+		require.ErrorContains(t, err, "waiting for Restore owners")
+		require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(postReady), postReady))
+		require.False(t, postReady.DeletionTimestamp.IsZero())
+		require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(target), target))
+		require.NotContains(t, target.Finalizers, dptypes.DataProtectionFinalizerName)
 	})
 
 	t.Run("missing Cluster does not authorize active cleanup", func(t *testing.T) {

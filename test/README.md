@@ -5,3 +5,12 @@ Additional external test apps and test data. Feel free to structure the `/test` 
 Examples:
 
 * https://github.com/openshift/origin/tree/master/test (test data is in the `/testdata` subdirectory)
+
+## Helm Chart Rendering
+
+Install Helm, then run `go test ./test/helm -count=1 -v` from the repository root.
+These tests render the real chart without contacting a Kubernetes cluster. They
+are skipped when Helm is not installed.
+
+The chart tests cover datasafed registry overrides, legacy registry fallbacks,
+and isolation from other rendered resources and image settings.

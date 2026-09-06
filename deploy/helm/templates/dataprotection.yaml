@@ -150,7 +150,7 @@ spec:
                 secretKeyRef:
                   {{- include "dataprotection.encryptionKeySecretKeyRef" . | nindent 18 }}
             - name: DATASAFED_IMAGE
-              value: "{{ .Values.dataProtection.image.registry | default $dataProtectionImageRegistry }}/{{ .Values.dataProtection.image.datasafed.repository }}:{{ .Values.dataProtection.image.datasafed.tag | default "latest" }}"
+              value: "{{ .Values.dataProtection.image.datasafed.registry | default .Values.dataProtection.image.registry | default $dataProtectionImageRegistry }}/{{ .Values.dataProtection.image.datasafed.repository }}:{{ .Values.dataProtection.image.datasafed.tag | default "latest" }}"
             - name: GC_FREQUENCY_SECONDS
               value: "{{ .Values.dataProtection.gcFrequencySeconds }}"
             - name: WORKER_SERVICE_ACCOUNT_NAME

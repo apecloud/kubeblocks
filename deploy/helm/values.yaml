@@ -400,6 +400,8 @@ dataProtection:
     tag: ""
     imagePullSecrets: []
     datasafed:
+      ## @param dataProtection.image.datasafed.registry Datasafed image registry; empty uses dataProtection.image.registry, then the global image registry default.
+      registry: ""
       repository: apecloud/datasafed
       tag: "0.2.3"
   ## @param toleration

@@ -640,9 +640,8 @@ func (r *VolumePopulatorReconciler) cleanupSourceComponentVolumePopulation(reqCt
 	if err != nil {
 		return err
 	}
-	// postReady Restore is Component-owned and may be shared by PVCs from
-	// multiple source Components. Its ownerReference, rather than a source PVC,
-	// governs deletion.
+	// Source Component cleanup leaves shared postReady Restores to their target
+	// Component ownerReferences. Cluster cleanup deletes them at Cluster scope.
 	return r.finishVolumePopulationTermination(reqCtx, pvc, cluster, pending)
 }
 

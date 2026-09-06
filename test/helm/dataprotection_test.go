@@ -1,7 +1,5 @@
 /*
-Copyright (C) 2026 ApeCloud Co., Ltd.
-
-This file is part of KubeBlocks project.
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

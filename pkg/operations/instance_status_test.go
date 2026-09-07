@@ -345,7 +345,7 @@ func TestInstanceStatusSelection(t *testing.T) {
 		{PodName: "demo-1", TemplateName: templateName("big"), DesiredState: workloads.InstanceDesiredStateActive},
 		{PodName: "demo-2", DesiredState: workloads.InstanceDesiredStateOffline},
 	}
-	active, err := activeInstanceTemplates(statuses, nil)
+	active, err := activeInstanceTemplates(statuses)
 	if err != nil {
 		t.Fatalf("select active assignments: %v", err)
 	}
@@ -353,14 +353,14 @@ func TestInstanceStatusSelection(t *testing.T) {
 		t.Fatalf("unexpected active assignments: %#v", active)
 	}
 	statuses[0].TemplateName = nil
-	if _, err := activeInstanceTemplates(statuses, nil); !intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeNeedWaiting) {
+	if _, err := activeInstanceTemplates(statuses); !intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeNeedWaiting) {
 		t.Fatalf("expected an active instance with unknown template to wait, got %v", err)
 	}
 	for _, invalid := range [][]workloads.InstanceStatus{
 		{{PodName: ""}},
 		{{PodName: "duplicate"}, {PodName: "duplicate"}},
 	} {
-		if _, err := activeInstanceTemplates(invalid, nil); err == nil {
+		if _, err := activeInstanceTemplates(invalid); err == nil {
 			t.Fatalf("invalid identities must not be silently accepted: %#v", invalid)
 		}
 	}

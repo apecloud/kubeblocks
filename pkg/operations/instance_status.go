@@ -19,28 +19,27 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-func instanceStatusByName(statuses []workloadsv1.InstanceStatus) (map[string]workloadsv1.InstanceStatus, error) {
-	result := make(map[string]workloadsv1.InstanceStatus, len(statuses))
+func validateInstanceIdentities(statuses []workloadsv1.InstanceStatus) error {
+	names := make(map[string]struct{}, len(statuses))
 	for _, status := range statuses {
 		if status.PodName == "" {
-			return nil, fmt.Errorf("InstanceSet published an empty instance identity")
+			return fmt.Errorf("InstanceSet published an empty instance identity")
 		}
-		if _, ok := result[status.PodName]; ok {
-			return nil, fmt.Errorf("InstanceSet published duplicate instance identity %q", status.PodName)
+		if _, ok := names[status.PodName]; ok {
+			return fmt.Errorf("InstanceSet published duplicate instance identity %q", status.PodName)
 		}
-		result[status.PodName] = status
+		names[status.PodName] = struct{}{}
 	}
-	return result, nil
+	return nil
 }
 
-func activeInstanceTemplates(statuses []workloadsv1.InstanceStatus,
-	include func(workloadsv1.InstanceStatus) bool) (map[string]string, error) {
-	return instanceTemplatesByState(statuses, workloadsv1.InstanceDesiredStateActive, include)
+func activeInstanceTemplates(statuses []workloadsv1.InstanceStatus) (map[string]string, error) {
+	return instanceTemplatesByState(statuses, workloadsv1.InstanceDesiredStateActive, nil)
 }
 
 func instanceTemplatesByState(statuses []workloadsv1.InstanceStatus, desired workloadsv1.InstanceDesiredState,
 	include func(workloadsv1.InstanceStatus) bool) (map[string]string, error) {
-	if _, err := instanceStatusByName(statuses); err != nil {
+	if err := validateInstanceIdentities(statuses); err != nil {
 		return nil, err
 	}
 	result := map[string]string{}
@@ -103,7 +102,7 @@ func assignmentsMatchComponent(assignments map[string]string, component *appsv1.
 }
 
 func activeAssignmentsForTarget(workload Workload, component *appsv1.ClusterComponentSpec) (map[string]string, bool, error) {
-	assignments, err := activeInstanceTemplates(workload.GetInstanceStatuses(), nil)
+	assignments, err := activeInstanceTemplates(workload.GetInstanceStatuses())
 	if err != nil {
 		return nil, false, err
 	}

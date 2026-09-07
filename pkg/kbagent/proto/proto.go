@@ -80,6 +80,9 @@ type ActionRequest struct {
 	// Rerun requests a new run instead of returning the previous terminal result.
 	// It does not interrupt a running Action.
 	Rerun bool `json:"rerun,omitempty"`
+	// QueryOnly observes an equivalent non-blocking request without starting it.
+	// A missing result returns ErrResultNotFound. It cannot be combined with Rerun.
+	QueryOnly bool `json:"queryOnly,omitempty"`
 }
 
 type ActionResponse struct {

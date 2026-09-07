@@ -78,20 +78,14 @@ func (h *clusterShardingHandler) nonBlockingShardingAction(transCtx *clusterTran
 		}
 		for j := range target.Pods {
 			pod := &target.Pods[j]
-			spec := &action.Action
-			if !pod.Rerun && spec.PreCondition != nil {
-				// Once accepted, a request must remain observable even if its
-				// execution changes the readiness required to start it.
-				spec = spec.DeepCopy()
-				spec.PreCondition = nil
-			}
 			opts := &lifecycle.Options{
 				Rerun:         pod.Rerun,
+				QueryOnly:     !pod.Rerun,
 				TargetPodName: pod.Name,
 				PreConditionObjectSelector: constant.GetClusterLabels(transCtx.Cluster.Name,
 					map[string]string{constant.KBAppShardingNameLabelKey: shardingName}),
 			}
-			err := lfa.UserDefined(transCtx.Context, transCtx.Client, opts, actionName, spec, args)
+			err := lfa.UserDefined(transCtx.Context, transCtx.Client, opts, actionName, &action.Action, args)
 			if err = lifecycle.IgnoreNotDefined(err); err == nil {
 				pod.Rerun = false
 				continue
@@ -101,6 +95,11 @@ func (h *clusterShardingHandler) nonBlockingShardingAction(transCtx *clusterTran
 				pod.Rerun = false
 				pending = true
 			case errors.Is(err, lifecycle.ErrActionBusy):
+				pending = true
+			case errors.Is(err, lifecycle.ErrActionResultNotFound):
+				// Persist the restart decision first. The next call must pass
+				// startup preconditions again before it can execute anything.
+				pod.Rerun = true
 				pending = true
 			case isTerminalShardingActionError(err):
 				pod.Rerun = true

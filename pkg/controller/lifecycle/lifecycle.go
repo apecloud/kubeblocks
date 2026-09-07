@@ -31,6 +31,8 @@ import (
 
 type Options struct {
 	Rerun bool
+	// QueryOnly observes an existing non-blocking request without starting it.
+	QueryOnly bool
 
 	// TargetPodName, when set, executes the Action only on the named Pod and
 	// overrides the Action's targetPodSelector. The Pod must be present in the

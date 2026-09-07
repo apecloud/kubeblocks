@@ -253,6 +253,7 @@ var _ = Describe("action", func() {
 			}
 			second := &proto.ActionRequest{
 				Action:     "shardAdd",
+				QueryOnly:  true,
 				Parameters: map[string]string{"first": "1", "second": "2"},
 				Arguments:  [][]string{},
 			}
@@ -342,6 +343,88 @@ var _ = Describe("action", func() {
 				return string(output)
 			}, 2*time.Second, 10*time.Millisecond).Should(Equal("3"))
 		})
+
+		It("observes cached requests atomically without starting commands on a miss", func() {
+			counter := filepath.Join(GinkgoT().TempDir(), "calls")
+			action := proto.Action{Name: "query", NonBlocking: true, Exec: &proto.ExecAction{
+				Commands: []string{"/bin/sh", "-c", `echo run >> "$1"; printf done`, "sh", counter},
+			}}
+			svc, err := newActionService(logr.Discard(), []proto.Action{action})
+			Expect(err).ShouldNot(HaveOccurred())
+			query := &proto.ActionRequest{Action: action.Name, QueryOnly: true}
+			_, err = svc.handleRequest(ctx, query)
+			Expect(errors.Is(err, proto.ErrResultNotFound)).Should(BeTrue())
+			Expect(svc.calls).Should(BeEmpty())
+			_, err = svc.handleRequest(ctx, &proto.ActionRequest{Action: action.Name, QueryOnly: true, Rerun: true})
+			Expect(errors.Is(err, proto.ErrBadRequest)).Should(BeTrue())
+			svc.actions[action.Name].NonBlocking = false
+			_, err = svc.handleRequest(ctx, query)
+			Expect(errors.Is(err, proto.ErrBadRequest)).Should(BeTrue())
+			svc.actions[action.Name].NonBlocking = true
+			_, err = os.Stat(counter)
+			Expect(os.IsNotExist(err)).Should(BeTrue())
+
+			// Queries racing the first start may see a miss, progress, or the
+			// completed result, but must never create another invocation.
+			var wg sync.WaitGroup
+			for i := range 16 {
+				wg.Add(1)
+				go func(start bool) {
+					defer GinkgoRecover()
+					defer wg.Done()
+					_, callErr := svc.handleRequest(ctx, &proto.ActionRequest{Action: action.Name, QueryOnly: !start})
+					Expect(callErr == nil || errors.Is(callErr, proto.ErrInProgress) || errors.Is(callErr, proto.ErrResultNotFound)).Should(BeTrue())
+				}(i == 0)
+			}
+			wg.Wait()
+			Eventually(func() string {
+				out, callErr := svc.handleRequest(ctx, query)
+				if callErr != nil {
+					return callErr.Error()
+				}
+				return string(out)
+			}).Should(Equal("done"))
+			_, err = svc.handleRequest(ctx, &proto.ActionRequest{Action: action.Name, QueryOnly: true, Parameters: map[string]string{"other": "request"}})
+			Expect(errors.Is(err, proto.ErrResultNotFound)).Should(BeTrue())
+			out, err := svc.handleRequest(ctx, query)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(string(out)).Should(Equal("done"))
+			svc, err = newActionService(logr.Discard(), []proto.Action{action})
+			Expect(err).ShouldNot(HaveOccurred())
+			_, err = svc.handleRequest(ctx, query)
+			Expect(errors.Is(err, proto.ErrResultNotFound)).Should(BeTrue())
+			data, err := os.ReadFile(counter)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(string(data)).Should(Equal("run\n"))
+		})
+
+		DescribeTable("queries never enter an action backend", func(action proto.Action) {
+			action.Name, action.NonBlocking = "query", true
+			svc, err := newActionService(logr.Discard(), []proto.Action{action})
+			Expect(err).ShouldNot(HaveOccurred())
+			req := &proto.ActionRequest{Action: action.Name, QueryOnly: true}
+			_, err = svc.handleRequest(ctx, req)
+			Expect(errors.Is(err, proto.ErrResultNotFound)).Should(BeTrue())
+			hash, err := fingerprintActionRequest(req, &action.TimeoutSeconds, nil)
+			Expect(err).ShouldNot(HaveOccurred())
+			call := &actionCall{requestFingerprint: hash, running: true}
+			svc.calls[action.Name] = call
+			_, err = svc.handleRequest(ctx, req)
+			Expect(errors.Is(err, proto.ErrInProgress)).Should(BeTrue())
+			different := *req
+			different.Parameters = map[string]string{"different": "request"}
+			_, err = svc.handleRequest(ctx, &different)
+			Expect(errors.Is(err, proto.ErrResultNotFound)).Should(BeTrue())
+			call.running = false
+			call.result = newActionResult(nil, proto.ErrFailed)
+			_, err = svc.handleRequest(ctx, req)
+			Expect(errors.Is(err, proto.ErrFailed)).Should(BeTrue())
+			Expect(svc.calls[action.Name]).Should(BeIdenticalTo(call))
+		},
+			Entry("Exec", proto.Action{Exec: &proto.ExecAction{Commands: []string{"does-not-exist"}}}),
+			Entry("HTTP", proto.Action{HTTP: &proto.HTTPAction{Port: "invalid"}}),
+			Entry("gRPC", proto.Action{GRPC: &proto.GRPCAction{Port: "invalid"}}),
+		)
 
 		It("starts only one process for concurrent equivalent requests", func() {
 			dir, err := os.MkdirTemp("", "kbagent-action-concurrent-*")

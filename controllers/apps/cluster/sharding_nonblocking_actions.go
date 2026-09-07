@@ -112,18 +112,27 @@ func (h *nonBlockingShardingActions) reconcileActions() (sets.Set[string], error
 		}
 	}
 
+	var source *appsv1.Component
+	remove := false
 	for _, name := range sets.List(h.toUpdate) {
 		if comp := h.runningComps[name]; comp.Annotations[shardingAddShardKey] != "" &&
 			h.actions != nil && h.actions.ShardAdd != nil {
-			return h.advanceAction(comp, false, blocked)
+			source = comp
+			break
 		}
 	}
-	if deleting := sets.List(h.toDelete); len(deleting) > 0 {
-		comp := h.runningComps[deleting[0]]
-		if comp.Annotations[shardingAddShardKey] != "" && h.actions != nil && h.actions.ShardAdd != nil {
-			return h.advanceAction(comp, false, blocked)
+	if deleting := sets.List(h.toDelete); source == nil && len(deleting) > 0 {
+		source = h.runningComps[deleting[0]]
+		remove = source.Annotations[shardingAddShardKey] == "" || h.actions == nil || h.actions.ShardAdd == nil
+	}
+	if source != nil {
+		// Before starting a request, finish creating its potential participants.
+		// Partial creation must not deadlock variables or Pod startup that require
+		// all Component objects. Persisted requests above still freeze the topology.
+		if len(h.toCreate) > 0 {
+			return blocked.Difference(h.toCreate), pendingShardingAction("sharding", "waiting for shard creation")
 		}
-		return h.advanceAction(comp, true, blocked)
+		return h.advanceAction(source, remove, blocked)
 	}
 	return sets.New[string](), nil
 }

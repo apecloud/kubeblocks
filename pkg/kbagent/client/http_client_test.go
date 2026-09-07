@@ -69,7 +69,7 @@ func TestHTTPClientAction(t *testing.T) {
 		if err := json.NewDecoder(r.Body).Decode(request); err != nil {
 			t.Fatalf("decode Action request: %v", err)
 		}
-		if request.Action != "backup" || !request.Rerun {
+		if request.Action != "backup" || request.Rerun == request.QueryOnly {
 			t.Fatalf("unexpected Action request: %#v", request)
 		}
 		w.WriteHeader(http.StatusOK)
@@ -83,6 +83,9 @@ func TestHTTPClientAction(t *testing.T) {
 	}
 	if resp.Message != "done" || string(resp.Output) != "ok" {
 		t.Fatalf("unexpected response: %#v", resp)
+	}
+	if _, err = cli.Action(context.Background(), proto.ActionRequest{Action: "backup", QueryOnly: true}); err != nil {
+		t.Fatalf("query Action() error = %v", err)
 	}
 
 	resp, err = cli.Action(context.WithValue(context.Background(), constant.DryRunContextKey, true), proto.ActionRequest{Action: "backup"})

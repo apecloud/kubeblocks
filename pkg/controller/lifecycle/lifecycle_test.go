@@ -585,6 +585,25 @@ var _ = Describe("lifecycle", func() {
 			Expect(err).Should(BeNil())
 		})
 
+		It("observes a missing result without bypassing preconditions for a new run", func() {
+			lifecycleActions.PostProvision.PreCondition = ptr.To(appsv1.ClusterReadyPreConditionType)
+			lfa, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods)
+			Expect(err).ShouldNot(HaveOccurred())
+			reader := &mockReader{cli: k8sClient, objs: []client.Object{&appsv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{Name: clusterName, Namespace: namespace},
+				Status:     appsv1.ClusterStatus{Phase: appsv1.FailedClusterPhase},
+			}}}
+			mockKBAgentClient(func(r *kbacli.MockClientMockRecorder) {
+				r.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
+					Expect(req.QueryOnly).Should(BeTrue())
+					Expect(req.Rerun).Should(BeFalse())
+					return proto.ActionResponse{Error: proto.Error2Type(proto.ErrResultNotFound)}, nil
+				}).Times(1)
+			})
+			Expect(errors.Is(lfa.PostProvision(ctx, reader, &Options{QueryOnly: true}), ErrActionResultNotFound)).Should(BeTrue())
+			Expect(errors.Is(lfa.PostProvision(ctx, reader, &Options{Rerun: true}), ErrPreconditionFailed)).Should(BeTrue())
+		})
+
 		It("precondition - fail", func() {
 			clusterReady := appsv1.ClusterReadyPreConditionType
 			lifecycleActions.PostProvision.PreCondition = &clusterReady

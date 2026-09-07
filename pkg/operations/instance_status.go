@@ -108,3 +108,19 @@ func activeAssignmentsForTarget(workload Workload, component *appsv1.ClusterComp
 	}
 	return assignments, assignmentsMatchComponent(assignments, component), nil
 }
+
+func diffAssignments(source, target map[string]string) (created, deleted map[string]string) {
+	created = map[string]string{}
+	deleted = map[string]string{}
+	for name, templateName := range target {
+		if _, ok := source[name]; !ok {
+			created[name] = templateName
+		}
+	}
+	for name, templateName := range source {
+		if _, ok := target[name]; !ok {
+			deleted[name] = templateName
+		}
+	}
+	return created, deleted
+}

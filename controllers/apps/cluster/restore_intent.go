@@ -84,6 +84,7 @@ func injectRestoreIntentToVCT(cluster *appsv1.Cluster, componentName string, vct
 	vct.Annotations[constant.RestoreSourceKindAnnotationKey] = restore.Source.Kind
 	vct.Annotations[constant.RestoreSourceNameAnnotationKey] = restore.Source.Name
 	vct.Annotations[constant.RestoreSourceNamespaceAnnotationKey] = sourceNamespace
+	vct.Annotations[constant.KBAppClusterUIDKey] = string(cluster.UID)
 	vct.Annotations[constant.RestoreComponentAnnotationKey] = componentName
 	vct.Annotations[constant.RestoreVolumeTemplateAnnotationKey] = vct.Name
 	delete(vct.Annotations, constant.RestorePITRAnnotationKey)
@@ -118,6 +119,7 @@ func cleanupRestoreIntentFromVCT(vct *appsv1.PersistentVolumeClaimTemplate) {
 		delete(vct.Annotations, constant.RestoreSourceKindAnnotationKey)
 		delete(vct.Annotations, constant.RestoreSourceNameAnnotationKey)
 		delete(vct.Annotations, constant.RestoreSourceNamespaceAnnotationKey)
+		delete(vct.Annotations, constant.KBAppClusterUIDKey)
 		delete(vct.Annotations, constant.RestorePITRAnnotationKey)
 		delete(vct.Annotations, constant.RestoreParametersAnnotationKey)
 		delete(vct.Annotations, constant.RestoreComponentAnnotationKey)
@@ -138,6 +140,7 @@ func hasRestoreIntent(vct *appsv1.PersistentVolumeClaimTemplate) bool {
 		constant.RestoreSourceKindAnnotationKey,
 		constant.RestoreSourceNameAnnotationKey,
 		constant.RestoreSourceNamespaceAnnotationKey,
+		constant.KBAppClusterUIDKey,
 		constant.RestoreComponentAnnotationKey,
 		constant.RestoreVolumeTemplateAnnotationKey,
 	} {

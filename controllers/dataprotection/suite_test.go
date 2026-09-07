@@ -187,6 +187,12 @@ var _ = BeforeSuite(func() {
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
+	err = (&ClusterRestoreReconciler{
+		Client:   k8sClient,
+		Recorder: k8sManager.GetEventRecorderFor("cluster-restore-controller"),
+	}).SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
 	err = (&BackupScheduleReconciler{
 		Client:   k8sClient,
 		Scheme:   k8sManager.GetScheme(),

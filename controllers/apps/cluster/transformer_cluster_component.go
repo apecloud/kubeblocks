@@ -908,6 +908,7 @@ func (h *clusterShardingHandler) update(transCtx *clusterTransformContext, dag *
 	if err := h.handlePostProvision(transCtx, name, maps.Values(runningCompsMap)); err != nil {
 		return err
 	}
+
 	return h.updateShards(transCtx, dag, name, runningCompsMap, protoCompsMap)
 }
 
@@ -917,9 +918,12 @@ func (h *clusterShardingHandler) updateShards(transCtx *clusterTransformContext,
 	runningComps, protoComps map[string]*appsv1.Component) error {
 	toCreate, toDelete, toUpdate := mapDiff(runningComps, protoComps)
 	blocked, err := h.handleShardAddNRemove(transCtx, dag, name, runningComps, protoComps, toCreate, toDelete, toUpdate)
+
+	// TODO: update strategy
 	h.deleteComps(transCtx, dag, runningComps, toDelete.Difference(blocked))
 	h.updateComps(transCtx, dag, runningComps, protoComps, toUpdate.Difference(blocked))
 	h.createComps(transCtx, dag, protoComps, toCreate.Difference(blocked))
+
 	return err
 }
 
@@ -1380,8 +1384,9 @@ func (h *clusterShardingHandler) handleShardAddNRemove(transCtx *clusterTransfor
 		blocked, err = h.handleBlockingShardActions(transCtx, shardingName, runningCompsMap, toDelete, toUpdate)
 	}
 
-	// Keep action progress even when an error prevents the Component's next
-	// topology change. Unblocked Components use the ordinary update/delete path.
+	// Preserve completed adds when a subsequent remove failure keeps the shard alive.
+	// The same path persists non-blocking action progress for blocked Components.
+	// Unblocked Components use the ordinary update/delete path.
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	for name, original := range originals {
 		current := runningCompsMap[name]

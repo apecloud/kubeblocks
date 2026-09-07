@@ -80,7 +80,7 @@ func (h *clusterShardingHandler) nonBlockingShardingAction(transCtx *clusterTran
 	pending := false
 	for i := range targets.Targets {
 		target := &targets.Targets[i]
-		lfa, err := h.newLifecycle(transCtx, comps[target.Component])
+		lfa, err := h.newLifecycle(transCtx, comps[target.Component], target.TemplateVars)
 		if err != nil {
 			callErrors = append(callErrors, err)
 			continue
@@ -121,7 +121,9 @@ func (h *clusterShardingHandler) nonBlockingShardingAction(transCtx *clusterTran
 	if pending {
 		return pendingShardingAction(actionName, "still running")
 	}
-	delete(sourceComp.Annotations, targetsAnnotation)
+	if targetsAnnotation == shardingAddActionTargetsKey {
+		delete(sourceComp.Annotations, targetsAnnotation)
+	}
 	return nil
 }
 
@@ -213,12 +215,22 @@ func (h *clusterShardingHandler) selectShardingActionTargets(transCtx *clusterTr
 	if err != nil {
 		return nil, err
 	}
-	sort.Slice(shards, func(i, j int) bool {
-		return shards[i].Name < shards[j].Name
-	})
-
 	targets := &shardingActionTargets{Version: shardingActionTargetsVersion}
 	for _, shard := range shards {
+		compDef := transCtx.componentDefs[shard.Spec.CompDef]
+		if compDef == nil {
+			return nil, fmt.Errorf("component definition not found for shard %s", shard.Name)
+		}
+		synthesized, err := component.BuildSynthesizedComponent(transCtx.Context, transCtx.Client, compDef, shard)
+		if err != nil {
+			return nil, err
+		}
+		// Resolve once for this request. Secret-backed environment references are
+		// kept as references by the existing template-variable resolver.
+		vars, _, err := component.ResolveTemplateNEnvVars(transCtx.Context, transCtx.Client, synthesized, compDef.Spec.Vars)
+		if err != nil {
+			return nil, err
+		}
 		pods, err := component.ListOwnedInstances(transCtx.Context, transCtx.Client, shard)
 		if err != nil {
 			return nil, err
@@ -228,8 +240,9 @@ func (h *clusterShardingHandler) selectShardingActionTargets(transCtx *clusterTr
 			return nil, err
 		}
 		targets.Targets = append(targets.Targets, shardingActionTarget{
-			Component: shard.Name,
-			Pods:      selectedPods,
+			Component:    shard.Name,
+			Pods:         selectedPods,
+			TemplateVars: vars,
 		})
 	}
 	return targets, nil
@@ -253,15 +266,13 @@ func selectShardingActionPods(action *appsv1.ShardingAction, pods []*corev1.Pod,
 		// so it must not reuse a terminal result cached for an older request.
 		targets = append(targets, shardingActionTargetPod{Name: pod.Name, Rerun: true})
 	}
-	sort.Slice(targets, func(i, j int) bool {
-		return targets[i].Name < targets[j].Name
-	})
 	return targets, nil
 }
 
 type shardingActionTarget struct {
-	Component string                    `json:"component"`
-	Pods      []shardingActionTargetPod `json:"pods"`
+	Component    string                    `json:"component"`
+	Pods         []shardingActionTargetPod `json:"pods"`
+	TemplateVars map[string]string         `json:"templateVars,omitempty"`
 }
 
 type shardingActionTargetPod struct {

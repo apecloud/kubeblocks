@@ -629,7 +629,7 @@ func (c *phasePrecondition) shardingMatch(transCtx *clusterTransformContext, dag
 		return false, nil
 	}
 	for _, comp := range comps {
-		if !c.expected(&comp) {
+		if hasPendingNonBlockingAction(&comp) || !c.expected(&comp) {
 			transCtx.Logger.Info("waiting for predecessor sharding in expected phase",
 				"shard", comp.Name, "predecessor sharding", name)
 			return false, nil
@@ -1538,12 +1538,13 @@ func (h *clusterShardingHandler) selectTargetShard(shardingAction *appsv1.Shardi
 	}
 }
 
-func (h *clusterShardingHandler) newLifecycle(transCtx *clusterTransformContext, comp *appsv1.Component) (lifecycle.Lifecycle, error) {
+func (h *clusterShardingHandler) newLifecycle(transCtx *clusterTransformContext, comp *appsv1.Component,
+	templateVars ...map[string]string) (lifecycle.Lifecycle, error) {
 	compDef := transCtx.componentDefs[comp.Spec.CompDef]
 	if compDef == nil {
 		return nil, fmt.Errorf("component definition not found for shard %s", comp.Name)
 	}
-	return component.NewLifecycle(transCtx.Context, transCtx.Client, compDef, comp)
+	return component.NewLifecycle(transCtx.Context, transCtx.Client, compDef, comp, templateVars...)
 }
 
 func clusterRunningCompNShardingSet(ctx context.Context, cli client.Reader, cluster *appsv1.Cluster) (sets.Set[string], error) {

@@ -184,8 +184,10 @@ func (hs horizontalScalingOpsHandler) ReconcileAction(reqCtx intctrlutil.Request
 		lastCompConfiguration := opsRes.OpsRequest.Status.LastConfiguration.Components[pgRes.compOps.GetComponentName()]
 		clusterComponentSpec := pgRes.clusterComponent.DeepCopy()
 		if scaleOutFromBackup(horizontalScaling) {
-			if err := hs.restoreDataFromBackup(reqCtx, cli, opsRes, pgRes, clusterComponentSpec, horizontalScaling, lastCompConfiguration, compStatus); err != nil {
-				return 0, 0, err
+			if opsRes.OpsRequest.Status.Phase != opsv1alpha1.OpsCancellingPhase {
+				if err := hs.restoreDataFromBackup(reqCtx, cli, opsRes, pgRes, clusterComponentSpec, horizontalScaling, lastCompConfiguration, compStatus); err != nil {
+					return 0, 0, err
+				}
 			}
 			created, deleted, err := hs.getCreateAndDeletePodSetForRestore(
 				opsRes, lastCompConfiguration, *clusterComponentSpec, horizontalScaling, pgRes.fullComponentName)
@@ -208,6 +210,14 @@ func (hs horizontalScalingOpsHandler) ReconcileAction(reqCtx intctrlutil.Request
 		// the live Cluster spec. No workload generation is a snapshot marker.
 		if lastCompConfiguration.Replicas == nil {
 			return 0, 0, fmt.Errorf("missing source replicas for component %q", pgRes.fullComponentName)
+		}
+		if opsRes.OpsRequest.Status.Phase == opsv1alpha1.OpsCancellingPhase && !clusterComponentSpec.FlatInstanceOrdinal {
+			pgRes.createdPodSet, pgRes.deletedPodSet, err = hs.nonFlatRollbackInstanceSets(runtime,
+				opsRes.Cluster.Name, pgRes.fullComponentName, lastCompConfiguration, horizontalScaling)
+			if err != nil {
+				return 0, 0, err
+			}
+			return handleComponentProgressForScalingReplicas(reqCtx, cli, opsRes, pgRes, compStatus)
 		}
 		if opsRes.OpsRequest.Status.Phase == opsv1alpha1.OpsCancellingPhase {
 			clusterComponentSpec.Replicas = *lastCompConfiguration.Replicas
@@ -240,11 +250,13 @@ func (hs horizontalScalingOpsHandler) ReconcileAction(reqCtx intctrlutil.Request
 		}
 		created, deleted := diffAssignments(source, target)
 		if opsRes.OpsRequest.Status.Phase == opsv1alpha1.OpsCancellingPhase {
+			// TODO: define flat-ordinal cancellation. Restoring the original spec
+			// does not guarantee that the allocator restores the original names.
 			if !maps.Equal(source, target) {
 				return 1, 0, nil
 			}
-			pgRes.createdPodSet, pgRes.deletedPodSet = rollbackInstanceSets(source, workload,
-				lastCompConfiguration.OfflineInstances, compStatus.ProgressDetails, pgRes.fullComponentName)
+			pgRes.createdPodSet, pgRes.deletedPodSet = rollbackInstanceSets(source,
+				compStatus.ProgressDetails, pgRes.fullComponentName)
 		} else {
 			effective := filterHorizontalScalingSpec(lastCompConfiguration, lastCompConfiguration.OfflineInstances, horizontalScaling.DeepCopy())
 			if !horizontalDiffMatchesOperation(*effective, created, deleted) {

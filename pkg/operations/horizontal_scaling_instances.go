@@ -12,6 +12,8 @@ the Free Software Foundation, either version 3 of the License, or
 package operations
 
 import (
+	"fmt"
+	"maps"
 	"sort"
 	"strings"
 
@@ -77,40 +79,49 @@ func horizontalDiffMatchesOperation(horizontalScaling opsv1alpha1.HorizontalScal
 	return true
 }
 
-// rollbackInstanceSets retains checks for previously affected identities even
-// after the desired allocation has returned to the source. Desired identity
-// membership alone does not imply that creation/deletion has finished.
-func rollbackInstanceSets(source map[string]string, workload Workload, explicitOffline []string,
+// rollbackInstanceSets checks every source identity, even if its replacement
+// already exists but is not ready. Only recorded participants are checked for
+// deletion: runtime presence, Released and Offline do not establish that an
+// instance was created by this operation.
+func rollbackInstanceSets(source map[string]string,
 	details []opsv1alpha1.ProgressStatusDetail, componentName string) (map[string]string, map[string]string) {
-	created, deleted := map[string]string{}, map[string]string{}
+	created, deleted := maps.Clone(source), map[string]string{}
 	for _, detail := range details {
-		if !strings.HasPrefix(detail.Group, componentName+"/") {
+		if detail.Group != componentName+"/Create" && detail.Group != componentName+"/Delete" {
 			continue
 		}
 		name, ok := strings.CutPrefix(detail.ObjectKey, "Pod/")
 		if !ok {
 			continue
 		}
-		if template, ok := source[name]; ok {
-			created[name] = template
-		} else {
+		if _, ok := source[name]; !ok {
 			deleted[name] = ""
-		}
-	}
-	// Cover cancellation before any forward progress has been recorded.
-	offline := sets.New(explicitOffline...)
-	current := workload.GetCurrentRevisionMap()
-	for name := range current {
-		if _, ok := source[name]; !ok && !offline.Has(name) {
-			deleted[name] = ""
-		}
-	}
-	for name, template := range source {
-		if _, ok := current[name]; !ok {
-			created[name] = template
 		}
 	}
 	return created, deleted
+}
+
+// nonFlatRollbackInstanceSets preserves the existing cancellation contract:
+// reverse the operation's planned creations/deletions, including when no
+// forward progress was observed. Name planning is valid here only because
+// non-flat names are determined by configuration, not allocation history.
+func (hs horizontalScalingOpsHandler) nonFlatRollbackInstanceSets(runtime OpsRuntime,
+	clusterName, componentName string, last opsv1alpha1.LastComponentConfiguration,
+	scaling opsv1alpha1.HorizontalScaling) (map[string]string, map[string]string, error) {
+	replicas, templates, offline, err := hs.getExpectedCompValues(last, scaling)
+	if err != nil {
+		return nil, nil, err
+	}
+	forward, err := runtime.GenerateInstanceNameSet(clusterName, componentName, replicas, templates, offline)
+	if err != nil {
+		return nil, nil, err
+	}
+	source := sourceAssignmentsForWorkload(last, constant.GenerateClusterComponentName(clusterName, componentName))
+	if !assignmentsMatchComponent(source, &appsv1.ClusterComponentSpec{Replicas: *last.Replicas, Instances: last.Instances}) {
+		return nil, nil, fmt.Errorf("source instance assignments for component %q are incomplete", componentName)
+	}
+	created, deleted := diffAssignments(source, forward)
+	return deleted, created, nil
 }
 
 func captureHScaleSourceAssignments(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource,

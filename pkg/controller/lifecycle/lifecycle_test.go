@@ -251,7 +251,7 @@ var _ = Describe("lifecycle", func() {
 				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
 					Expect(req.Action).Should(Equal("postProvision"))
 					Expect(req.Parameters).Should(BeEmpty())
-					Expect(req.Rerun).Should(BeTrue())
+					Expect(req.Query).Should(BeFalse())
 					Expect(req.TimeoutSeconds).ShouldNot(BeNil())
 					Expect(*req.TimeoutSeconds).Should(Equal(action.TimeoutSeconds))
 					Expect(req.RetryPolicy).ShouldNot(BeNil())
@@ -262,7 +262,6 @@ var _ = Describe("lifecycle", func() {
 			})
 
 			opts := &Options{
-				Rerun:          true,
 				TimeoutSeconds: &action.TimeoutSeconds,
 				RetryPolicy:    action.RetryPolicy,
 			}
@@ -595,13 +594,12 @@ var _ = Describe("lifecycle", func() {
 			}}}
 			mockKBAgentClient(func(r *kbacli.MockClientMockRecorder) {
 				r.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
-					Expect(req.QueryOnly).Should(BeTrue())
-					Expect(req.Rerun).Should(BeFalse())
+					Expect(req.Query).Should(BeTrue())
 					return proto.ActionResponse{Error: proto.Error2Type(proto.ErrResultNotFound)}, nil
 				}).Times(1)
 			})
-			Expect(errors.Is(lfa.PostProvision(ctx, reader, &Options{QueryOnly: true}), ErrActionResultNotFound)).Should(BeTrue())
-			Expect(errors.Is(lfa.PostProvision(ctx, reader, &Options{Rerun: true}), ErrPreconditionFailed)).Should(BeTrue())
+			Expect(errors.Is(lfa.PostProvision(ctx, reader, &Options{Query: true}), ErrActionResultNotFound)).Should(BeTrue())
+			Expect(errors.Is(lfa.PostProvision(ctx, reader, nil), ErrPreconditionFailed)).Should(BeTrue())
 		})
 
 		It("precondition - fail", func() {

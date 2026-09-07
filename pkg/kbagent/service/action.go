@@ -120,11 +120,11 @@ func (s *actionService) handleRequest(ctx context.Context, req *proto.ActionRequ
 	if action.Exec == nil && action.HTTP == nil && action.GRPC == nil {
 		return nil, errors.Wrapf(proto.ErrBadRequest, "%s is invalid", req.Action)
 	}
-	if req.QueryOnly && (req.Rerun || !action.NonBlocking) {
-		return nil, errors.Wrap(proto.ErrBadRequest, "queryOnly requires a non-blocking action and cannot be combined with rerun")
+	if req.Query && !action.NonBlocking {
+		return nil, errors.Wrap(proto.ErrBadRequest, "query requires a non-blocking action")
 	}
 	// HACK: pre-check for the reconfigure action
-	if !req.QueryOnly {
+	if !req.Query {
 		if err := checkReconfigure(ctx, req); err != nil {
 			return nil, err
 		}
@@ -149,7 +149,7 @@ func (s *actionService) handleRequestNonBlocking(ctx context.Context, req *proto
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	if req.QueryOnly {
+	if req.Query {
 		call, ok := s.calls[req.Action]
 		if !ok || call.requestFingerprint != fingerprint {
 			return nil, proto.ErrResultNotFound
@@ -160,16 +160,11 @@ func (s *actionService) handleRequestNonBlocking(ctx context.Context, req *proto
 		return call.result.response()
 	}
 
-	if call, ok := s.calls[req.Action]; ok {
-		if call.running {
-			if call.requestFingerprint != fingerprint || req.Rerun {
-				return nil, proto.ErrBusy
-			}
-			return nil, proto.ErrInProgress
+	if call, ok := s.calls[req.Action]; ok && call.running {
+		if call.requestFingerprint != fingerprint {
+			return nil, proto.ErrBusy
 		}
-		if call.requestFingerprint == fingerprint && !req.Rerun {
-			return call.result.response()
-		}
+		return nil, proto.ErrInProgress
 	}
 
 	call := &actionCall{

@@ -466,6 +466,7 @@ var _ = Describe("action utils", func() {
 			req := &proto.ActionRequest{Action: "http"}
 			_, err = svc.handleRequest(ctx, req)
 			Expect(errors.Is(err, proto.ErrInProgress)).Should(BeTrue())
+			req.Query = true
 			Eventually(func() string {
 				output, callErr := svc.handleRequest(ctx, req)
 				if callErr != nil {
@@ -873,6 +874,7 @@ message EchoResponse {
 			req := &proto.ActionRequest{Action: "grpc"}
 			_, err = svc.handleRequest(ctx, req)
 			Expect(errors.Is(err, proto.ErrInProgress)).Should(BeTrue())
+			req.Query = true
 			Eventually(func() string {
 				output, callErr := svc.handleRequest(ctx, req)
 				if callErr != nil {

@@ -149,7 +149,7 @@ func (a *kbagent) checkedCallAction(ctx context.Context, cli client.Reader, spec
 	if !spec.Defined() {
 		return nil, errors.Wrap(ErrActionNotDefined, lfa.name())
 	}
-	if opts != nil && opts.QueryOnly {
+	if opts != nil && opts.Query {
 		// Queries cannot start a request, including after the agent loses its
 		// cached result, so startup preconditions must not gate observation.
 		return a.callAction(ctx, cli, spec, lfa, opts)
@@ -305,8 +305,7 @@ func (a *kbagent) buildActionRequest(ctx context.Context, cli client.Reader, lfa
 		Parameters: parameters,
 	}
 	if opts != nil {
-		req.Rerun = opts.Rerun
-		req.QueryOnly = opts.QueryOnly
+		req.Query = opts.Query
 		if opts.TimeoutSeconds != nil {
 			req.TimeoutSeconds = opts.TimeoutSeconds
 		}

@@ -109,6 +109,7 @@ var _ = Describe("action", func() {
 			Expect(out).Should(BeNil())
 			Expect(errors.Is(err, proto.ErrInProgress)).Should(BeTrue())
 
+			req.Query = true
 			Eventually(func() error {
 				out, err = svc.handleRequest(ctx, req)
 				return err
@@ -136,7 +137,7 @@ var _ = Describe("action", func() {
 			cancel()
 
 			Eventually(func() string {
-				output, callErr := svc.handleRequest(ctx, &proto.ActionRequest{Action: "async"})
+				output, callErr := svc.handleRequest(ctx, &proto.ActionRequest{Action: "async", Query: true})
 				if callErr != nil {
 					return callErr.Error()
 				}
@@ -253,7 +254,7 @@ var _ = Describe("action", func() {
 			}
 			second := &proto.ActionRequest{
 				Action:     "shardAdd",
-				QueryOnly:  true,
+				Query:      true,
 				Parameters: map[string]string{"first": "1", "second": "2"},
 				Arguments:  [][]string{},
 			}
@@ -278,8 +279,8 @@ var _ = Describe("action", func() {
 			Expect(differentFingerprint).ShouldNot(Equal(firstFingerprint))
 		})
 
-		It("serializes a single running request and honors rerun after completion", func() {
-			dir, err := os.MkdirTemp("", "kbagent-action-rerun-*")
+		DescribeTable("serializes a running request and executes again after completion", func(firstResult string) {
+			dir, err := os.MkdirTemp("", "kbagent-action-repeat-*")
 			Expect(err).ShouldNot(HaveOccurred())
 			DeferCleanup(os.RemoveAll, dir)
 			counterPath := filepath.Join(dir, "counter")
@@ -288,8 +289,8 @@ var _ = Describe("action", func() {
 				NonBlocking: true,
 				Exec: &proto.ExecAction{Commands: []string{
 					"/bin/bash", "-c",
-					`n=0; [ -f "$0" ] && n=$(cat "$0"); n=$((n+1)); echo "$n" > "$0"; sleep 0.1; printf "$n"`,
-					counterPath,
+					`n=0; [ -f "$0" ] && n=$(cat "$0"); n=$((n+1)); echo "$n" > "$0"; sleep 0.1; printf "$n"; if [ "$n" -eq 1 ] && [ "$1" = failed ]; then exit 1; fi`,
+					counterPath, firstResult,
 				}},
 			}
 			svc, err := newActionService(logr.Discard(), []proto.Action{action})
@@ -300,29 +301,34 @@ var _ = Describe("action", func() {
 			Expect(errors.Is(err, proto.ErrInProgress)).Should(BeTrue())
 			_, err = svc.handleRequest(ctx, req)
 			Expect(errors.Is(err, proto.ErrInProgress)).Should(BeTrue())
-			_, err = svc.handleRequest(ctx, &proto.ActionRequest{Action: "async", Rerun: true})
-			Expect(errors.Is(err, proto.ErrBusy)).Should(BeTrue())
+			query := &proto.ActionRequest{Action: "async", Query: true}
+			_, err = svc.handleRequest(ctx, query)
+			Expect(errors.Is(err, proto.ErrInProgress)).Should(BeTrue())
 			_, err = svc.handleRequest(ctx, &proto.ActionRequest{
 				Action: "async", Parameters: map[string]string{"different": "request"},
 			})
 			Expect(errors.Is(err, proto.ErrBusy)).Should(BeTrue())
 
 			Eventually(func() string {
-				output, callErr := svc.handleRequest(ctx, req)
+				output, callErr := svc.handleRequest(ctx, query)
 				if callErr != nil {
-					return callErr.Error()
+					return proto.Error2Type(callErr)
 				}
 				return string(output)
-			}, 2*time.Second, 10*time.Millisecond).Should(Equal("1"))
+			}, 2*time.Second, 10*time.Millisecond).Should(Equal(firstResult))
 
-			output, err := svc.handleRequest(ctx, req)
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(string(output)).Should(Equal("1"))
+			output, err := svc.handleRequest(ctx, query)
+			if firstResult == "failed" {
+				Expect(errors.Is(err, proto.ErrFailed)).Should(BeTrue())
+			} else {
+				Expect(err).ShouldNot(HaveOccurred())
+				Expect(string(output)).Should(Equal(firstResult))
+			}
 
-			_, err = svc.handleRequest(ctx, &proto.ActionRequest{Action: "async", Rerun: true})
+			_, err = svc.handleRequest(ctx, req)
 			Expect(errors.Is(err, proto.ErrInProgress)).Should(BeTrue())
 			Eventually(func() string {
-				output, callErr := svc.handleRequest(ctx, req)
+				output, callErr := svc.handleRequest(ctx, query)
 				if callErr != nil {
 					return callErr.Error()
 				}
@@ -335,6 +341,7 @@ var _ = Describe("action", func() {
 			}
 			_, err = svc.handleRequest(ctx, differentReq)
 			Expect(errors.Is(err, proto.ErrInProgress)).Should(BeTrue())
+			differentReq.Query = true
 			Eventually(func() string {
 				output, callErr := svc.handleRequest(ctx, differentReq)
 				if callErr != nil {
@@ -342,7 +349,7 @@ var _ = Describe("action", func() {
 				}
 				return string(output)
 			}, 2*time.Second, 10*time.Millisecond).Should(Equal("3"))
-		})
+		}, Entry("success", "1"), Entry("failure", "failed"))
 
 		It("observes cached requests atomically without starting commands on a miss", func() {
 			counter := filepath.Join(GinkgoT().TempDir(), "calls")
@@ -351,12 +358,10 @@ var _ = Describe("action", func() {
 			}}
 			svc, err := newActionService(logr.Discard(), []proto.Action{action})
 			Expect(err).ShouldNot(HaveOccurred())
-			query := &proto.ActionRequest{Action: action.Name, QueryOnly: true}
+			query := &proto.ActionRequest{Action: action.Name, Query: true}
 			_, err = svc.handleRequest(ctx, query)
 			Expect(errors.Is(err, proto.ErrResultNotFound)).Should(BeTrue())
 			Expect(svc.calls).Should(BeEmpty())
-			_, err = svc.handleRequest(ctx, &proto.ActionRequest{Action: action.Name, QueryOnly: true, Rerun: true})
-			Expect(errors.Is(err, proto.ErrBadRequest)).Should(BeTrue())
 			svc.actions[action.Name].NonBlocking = false
 			_, err = svc.handleRequest(ctx, query)
 			Expect(errors.Is(err, proto.ErrBadRequest)).Should(BeTrue())
@@ -372,7 +377,7 @@ var _ = Describe("action", func() {
 				go func(start bool) {
 					defer GinkgoRecover()
 					defer wg.Done()
-					_, callErr := svc.handleRequest(ctx, &proto.ActionRequest{Action: action.Name, QueryOnly: !start})
+					_, callErr := svc.handleRequest(ctx, &proto.ActionRequest{Action: action.Name, Query: !start})
 					Expect(callErr == nil || errors.Is(callErr, proto.ErrInProgress) || errors.Is(callErr, proto.ErrResultNotFound)).Should(BeTrue())
 				}(i == 0)
 			}
@@ -384,7 +389,7 @@ var _ = Describe("action", func() {
 				}
 				return string(out)
 			}).Should(Equal("done"))
-			_, err = svc.handleRequest(ctx, &proto.ActionRequest{Action: action.Name, QueryOnly: true, Parameters: map[string]string{"other": "request"}})
+			_, err = svc.handleRequest(ctx, &proto.ActionRequest{Action: action.Name, Query: true, Parameters: map[string]string{"other": "request"}})
 			Expect(errors.Is(err, proto.ErrResultNotFound)).Should(BeTrue())
 			out, err := svc.handleRequest(ctx, query)
 			Expect(err).ShouldNot(HaveOccurred())
@@ -402,7 +407,7 @@ var _ = Describe("action", func() {
 			action.Name, action.NonBlocking = "query", true
 			svc, err := newActionService(logr.Discard(), []proto.Action{action})
 			Expect(err).ShouldNot(HaveOccurred())
-			req := &proto.ActionRequest{Action: action.Name, QueryOnly: true}
+			req := &proto.ActionRequest{Action: action.Name, Query: true}
 			_, err = svc.handleRequest(ctx, req)
 			Expect(errors.Is(err, proto.ErrResultNotFound)).Should(BeTrue())
 			hash, err := fingerprintActionRequest(req, &action.TimeoutSeconds, nil)
@@ -458,7 +463,7 @@ var _ = Describe("action", func() {
 			}
 
 			Eventually(func() string {
-				output, callErr := svc.handleRequest(ctx, &proto.ActionRequest{Action: "async"})
+				output, callErr := svc.handleRequest(ctx, &proto.ActionRequest{Action: "async", Query: true})
 				if callErr != nil {
 					return callErr.Error()
 				}
@@ -542,6 +547,9 @@ var _ = Describe("action", func() {
 			svc.actions["retry"].NonBlocking = true
 
 			req := &proto.ActionRequest{Action: "retry"}
+			_, err = svc.handleRequest(ctx, req)
+			Expect(errors.Is(err, proto.ErrInProgress)).Should(BeTrue())
+			req.Query = true
 			Eventually(func() string {
 				output, err := svc.handleRequest(ctx, req)
 				if err != nil {

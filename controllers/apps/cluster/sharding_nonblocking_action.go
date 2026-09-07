@@ -79,30 +79,29 @@ func (h *clusterShardingHandler) nonBlockingShardingAction(transCtx *clusterTran
 		for j := range target.Pods {
 			pod := &target.Pods[j]
 			opts := &lifecycle.Options{
-				Rerun:         pod.Rerun,
-				QueryOnly:     !pod.Rerun,
+				Query:         pod.Query,
 				TargetPodName: pod.Name,
 				PreConditionObjectSelector: constant.GetClusterLabels(transCtx.Cluster.Name,
 					map[string]string{constant.KBAppShardingNameLabelKey: shardingName}),
 			}
 			err := lfa.UserDefined(transCtx.Context, transCtx.Client, opts, actionName, &action.Action, args)
 			if err = lifecycle.IgnoreNotDefined(err); err == nil {
-				pod.Rerun = false
+				pod.Query = true
 				continue
 			}
 			switch {
 			case errors.Is(err, lifecycle.ErrActionInProgress):
-				pod.Rerun = false
+				pod.Query = true
 				pending = true
 			case errors.Is(err, lifecycle.ErrActionBusy):
 				pending = true
 			case errors.Is(err, lifecycle.ErrActionResultNotFound):
 				// Persist the restart decision first. The next call must pass
 				// startup preconditions again before it can execute anything.
-				pod.Rerun = true
+				pod.Query = false
 				pending = true
 			case isTerminalShardingActionError(err):
-				pod.Rerun = true
+				pod.Query = false
 				callErrors = append(callErrors, err)
 			default:
 				callErrors = append(callErrors, err)
@@ -269,9 +268,7 @@ func selectShardingActionPods(action *appsv1.ShardingAction, pods []*corev1.Pod,
 	}
 	targets := make([]shardingActionTargetPod, 0, len(selected))
 	for _, pod := range selected {
-		// A newly selected target belongs to a new request,
-		// so it must not reuse a terminal result cached for an older request.
-		targets = append(targets, shardingActionTargetPod{Name: pod.Name, Rerun: true})
+		targets = append(targets, shardingActionTargetPod{Name: pod.Name})
 	}
 	return targets, nil
 }
@@ -284,7 +281,7 @@ type shardingActionTarget struct {
 
 type shardingActionTargetPod struct {
 	Name  string `json:"name"`
-	Rerun bool   `json:"rerun,omitempty"`
+	Query bool   `json:"query,omitempty"`
 }
 
 func getShardingActionTargets(comp *appsv1.Component, annotation string) (*shardingActionTargets, bool, error) {

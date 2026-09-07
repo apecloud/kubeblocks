@@ -134,6 +134,7 @@ type OpsRuntime interface {
 
 type Workload interface {
 	GetMinReadySeconds() int32
+	GetInstanceStatuses() []workloads.InstanceStatus
 	GetInstanceNameSet() sets.Set[string]
 	GetCurrentRevisionMap() map[string]string
 	GetNotReadyInstanceNameSet() sets.Set[string]

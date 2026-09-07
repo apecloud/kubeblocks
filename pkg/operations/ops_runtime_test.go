@@ -66,6 +66,12 @@ func TestOpsRuntimeBuildsInstanceAPIView(t *testing.T) {
 			CurrentRevisions: map[string]string{
 				instanceName: "rev-a",
 			},
+			InstanceStatus: []workloads.InstanceStatus{{
+				PodName:      instanceName,
+				TemplateName: templateName("big"),
+				DesiredState: workloads.InstanceDesiredStateActive,
+				CurrentState: workloads.InstanceCurrentStatePresent,
+			}},
 		},
 	}
 	pod := &corev1.Pod{
@@ -193,6 +199,15 @@ func TestOpsRuntimeBuildsInstanceAPIView(t *testing.T) {
 	}
 	if got := workload.GetCurrentRevisionMap()[instanceName]; got != "rev-a" {
 		t.Fatalf("unexpected current revision: %s", got)
+	}
+	instanceStatuses := workload.GetInstanceStatuses()
+	if len(instanceStatuses) != 1 || instanceStatuses[0].PodName != instanceName ||
+		instanceStatuses[0].TemplateName == nil || *instanceStatuses[0].TemplateName != "big" {
+		t.Fatalf("unexpected instance statuses: %#v", instanceStatuses)
+	}
+	instanceStatuses[0].PodName = "mutated"
+	if workload.GetInstanceStatuses()[0].PodName != instanceName {
+		t.Fatal("GetInstanceStatuses must return a deep copy")
 	}
 
 	instance, err := rt.GetInstance(namespace, clusterName, component, instanceName)

@@ -1375,14 +1375,7 @@ func (h *clusterShardingHandler) handleShardAddNRemove(transCtx *clusterTransfor
 		}
 	}
 
-	var blocked sets.Set[string]
-	var err error
-	if actions := newNonBlockingShardingActions(h, transCtx, shardingName, runningCompsMap,
-		toCreate, toDelete, toUpdate); actions != nil {
-		blocked, err = actions.reconcile()
-	} else {
-		blocked, err = h.handleBlockingShardActions(transCtx, shardingName, runningCompsMap, toDelete, toUpdate)
-	}
+	blocked, err := h.handleShardActions(transCtx, shardingName, runningCompsMap, toCreate, toDelete, toUpdate)
 
 	// Preserve completed adds when a subsequent remove failure keeps the shard alive.
 	// The same path persists non-blocking action progress for blocked Components.
@@ -1401,31 +1394,6 @@ func shardingActionStateChanged(original, current *appsv1.Component) bool {
 	return original.Annotations[shardingAddActionTargetsKey] != current.Annotations[shardingAddActionTargetsKey] ||
 		original.Annotations[shardingRemoveActionTargetsKey] != current.Annotations[shardingRemoveActionTargetsKey] ||
 		original.Annotations[shardingAddShardKey] != current.Annotations[shardingAddShardKey]
-}
-
-func (h *clusterShardingHandler) handleBlockingShardActions(transCtx *clusterTransformContext, shardingName string,
-	runningCompsMap map[string]*appsv1.Component, toDelete, toUpdate sets.Set[string]) (sets.Set[string], error) {
-	blocked := sets.New[string]()
-	var result error
-	runningComps := maps.Values(runningCompsMap)
-	for name := range toUpdate {
-		if err := h.handleShardAdd(transCtx, shardingName, runningComps, runningCompsMap[name]); err != nil {
-			transCtx.Logger.Error(err, "failed to call the shard add action", "shard", name)
-			if result == nil {
-				result = err
-			}
-		}
-	}
-	for name := range toDelete {
-		if err := h.handleShardRemove(transCtx, shardingName, runningComps, runningCompsMap[name]); err != nil {
-			transCtx.Logger.Error(err, "failed to call the shard remove action", "shard", name)
-			blocked.Insert(name)
-			if result == nil {
-				result = err
-			}
-		}
-	}
-	return blocked, result
 }
 
 func (h *clusterShardingHandler) handleShardAdd(transCtx *clusterTransformContext,

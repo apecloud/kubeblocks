@@ -30,7 +30,7 @@ import (
 	ictrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-type nonBlockingShardingActions struct {
+type shardingActions struct {
 	shardingHandler *clusterShardingHandler
 	transCtx        *clusterTransformContext
 	shardingName    string
@@ -41,36 +41,25 @@ type nonBlockingShardingActions struct {
 	toUpdate        sets.Set[string]
 }
 
-func newNonBlockingShardingActions(shardingHandler *clusterShardingHandler,
-	transCtx *clusterTransformContext, shardingName string, runningComps map[string]*appsv1.Component,
-	toCreate, toDelete, toUpdate sets.Set[string]) *nonBlockingShardingActions {
-	shardingDef := shardingHandler.shardingDef(transCtx, shardingName)
-	var actions *appsv1.ShardingLifecycleActions
-	if shardingDef != nil {
-		actions = shardingDef.Spec.LifecycleActions
-	}
-	enabled := actions != nil &&
-		((actions.ShardAdd != nil && actions.ShardAdd.NonBlocking) ||
-			(actions.ShardRemove != nil && actions.ShardRemove.NonBlocking))
-	if !enabled {
-		enabled = slices.ContainsFunc(maps.Values(runningComps), hasPendingNonBlockingAction)
-	}
-	if !enabled {
-		return nil
-	}
-	return &nonBlockingShardingActions{
-		shardingHandler: shardingHandler,
+func (h *clusterShardingHandler) handleShardActions(transCtx *clusterTransformContext,
+	shardingName string, runningComps map[string]*appsv1.Component,
+	toCreate, toDelete, toUpdate sets.Set[string]) (sets.Set[string], error) {
+	actions := &shardingActions{
+		shardingHandler: h,
 		transCtx:        transCtx,
 		shardingName:    shardingName,
-		actions:         actions,
 		runningComps:    runningComps,
 		toCreate:        toCreate,
 		toDelete:        toDelete,
 		toUpdate:        toUpdate,
 	}
+	if shardingDef := h.shardingDef(transCtx, shardingName); shardingDef != nil {
+		actions.actions = shardingDef.Spec.LifecycleActions
+	}
+	return actions.reconcile()
 }
 
-func (h *nonBlockingShardingActions) reconcile() (sets.Set[string], error) {
+func (h *shardingActions) reconcile() (sets.Set[string], error) {
 	topologyBlocked, err := h.reconcileActions()
 	// Restoring a still-desired participant is not a new topology change: the
 	// outstanding request may need this Component in order to make progress.
@@ -91,63 +80,81 @@ func (h *nonBlockingShardingActions) reconcile() (sets.Set[string], error) {
 	return topologyBlocked, err
 }
 
-func (h *nonBlockingShardingActions) reconcileActions() (sets.Set[string], error) {
-	blocked := h.toCreate.Union(h.toDelete).Union(h.toUpdate)
+func (h *shardingActions) reconcileActions() (sets.Set[string], error) {
+	all := h.toCreate.Union(h.toDelete).Union(h.toUpdate)
 	names := sets.List(sets.KeySet(h.runningComps))
-	// A DELETE in the preceding DAG is not necessarily finished yet. In
-	// particular, AllShards must not select a terminating shard for a new call.
-	for _, name := range names {
-		if !h.runningComps[name].DeletionTimestamp.IsZero() {
-			return blocked, pendingShardingAction("sharding", "waiting for shard deletion")
-		}
-	}
 	// An already-started action takes precedence over the latest topology diff.
 	for _, name := range names {
 		comp := h.runningComps[name]
 		switch {
 		case comp.Annotations[shardingAddActionTargetsKey] != "":
-			return h.advanceAction(comp, false, blocked)
+			return h.advanceAction(comp, false, all)
 		case comp.Annotations[shardingRemoveActionTargetsKey] != "":
-			return h.advanceAction(comp, true, blocked)
+			return h.advanceAction(comp, true, all)
 		}
 	}
 
-	var source *appsv1.Component
-	remove := false
-	for _, name := range sets.List(h.toUpdate) {
-		if comp := h.runningComps[name]; comp.Annotations[shardingAddShardKey] != "" &&
-			h.actions != nil && h.actions.ShardAdd != nil {
-			source = comp
-			break
+	blocked, completedRemoves := sets.New[string](), sets.New[string]()
+	var result error
+	for _, name := range append(sets.List(h.toUpdate), sets.List(h.toDelete)...) {
+		comp := h.runningComps[name]
+		deleting := h.toDelete.Has(name)
+		for _, remove := range []bool{false, true} {
+			if (remove && !deleting) || (!remove && comp.Annotations[shardingAddShardKey] == "") {
+				continue
+			}
+			var action *appsv1.ShardingAction
+			if h.actions != nil {
+				action = h.actions.ShardAdd
+				if remove {
+					action = h.actions.ShardRemove
+				}
+			}
+			if action != nil && action.NonBlocking {
+				blocked = all.Difference(completedRemoves)
+				if result != nil {
+					return blocked, result
+				}
+				// Complete earlier deletes before a new request freezes its targets.
+				if len(completedRemoves) > 0 {
+					return blocked, pendingShardingAction("sharding", "waiting for shard deletion")
+				}
+				// Finish partial creation before selecting potential participants.
+				// Pod startup and template variables can require all Components.
+				if len(h.toCreate) > 0 {
+					return blocked.Difference(h.toCreate), pendingShardingAction("sharding", "waiting for shard creation")
+				}
+				return h.advanceAction(comp, remove, blocked)
+			}
+			if err := h.callAction(comp, remove); err != nil {
+				h.transCtx.Logger.Error(err, "failed to call sharding action", "shard", name)
+				if result == nil {
+					result = err
+				}
+				if deleting {
+					blocked.Insert(name)
+				}
+				break
+			}
+			if remove {
+				completedRemoves.Insert(name)
+			}
 		}
 	}
-	if deleting := sets.List(h.toDelete); source == nil && len(deleting) > 0 {
-		source = h.runningComps[deleting[0]]
-		remove = source.Annotations[shardingAddShardKey] == "" || h.actions == nil || h.actions.ShardAdd == nil
-	}
-	if source != nil {
-		// Before starting a request, finish creating its potential participants.
-		// Partial creation must not deadlock variables or Pod startup that require
-		// all Component objects. Persisted requests above still freeze the topology.
-		if len(h.toCreate) > 0 {
-			return blocked.Difference(h.toCreate), pendingShardingAction("sharding", "waiting for shard creation")
-		}
-		return h.advanceAction(source, remove, blocked)
-	}
-	return sets.New[string](), nil
+	return blocked, result
 }
 
 // Complete and persist one source request before selecting the next. The same
 // topology guard applies to first selection, polling, retries and completion.
-func (h *nonBlockingShardingActions) advanceAction(comp *appsv1.Component, remove bool,
+func (h *shardingActions) advanceAction(comp *appsv1.Component, remove bool,
 	blocked sets.Set[string]) (sets.Set[string], error) {
-	var err error
-	if remove {
-		err = h.shardingHandler.handleShardRemove(h.transCtx, h.shardingName, maps.Values(h.runningComps), comp)
-	} else {
-		err = h.shardingHandler.handleShardAdd(h.transCtx, h.shardingName, maps.Values(h.runningComps), comp)
+	// A DELETE from a preceding reconciliation may still be in progress.
+	for _, target := range h.runningComps {
+		if !target.DeletionTimestamp.IsZero() {
+			return blocked, pendingShardingAction("sharding", "waiting for shard deletion")
+		}
 	}
-	if err != nil {
+	if err := h.callAction(comp, remove); err != nil {
 		if !ictrlutil.IsDelayedRequeueError(err) {
 			h.transCtx.Logger.Error(err, "failed to call sharding action", "shard", comp.Name)
 		}
@@ -166,6 +173,13 @@ func (h *nonBlockingShardingActions) advanceAction(comp *appsv1.Component, remov
 		}
 	}
 	return blocked, pendingShardingAction("sharding", "waiting for completed action state to persist")
+}
+
+func (h *shardingActions) callAction(comp *appsv1.Component, remove bool) error {
+	if remove {
+		return h.shardingHandler.handleShardRemove(h.transCtx, h.shardingName, maps.Values(h.runningComps), comp)
+	}
+	return h.shardingHandler.handleShardAdd(h.transCtx, h.shardingName, maps.Values(h.runningComps), comp)
 }
 
 func hasPendingNonBlockingAction(comp *appsv1.Component) bool {

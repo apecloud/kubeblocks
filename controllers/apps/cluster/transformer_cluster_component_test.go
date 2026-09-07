@@ -2485,10 +2485,12 @@ var _ = Describe("cluster component transformer test", func() {
 				Expect(actionDone).Should(BeTrue())
 			})
 
-			It("shard-add - pending or failed", func() {
+			DescribeTable("finishes marked shard-add before deletion", func(removeDefined, addFails bool) {
 				transCtx.shardingDefs[shardingDefName].Spec.LifecycleActions = &appsv1.ShardingLifecycleActions{
-					ShardAdd:    mockShardingAction("shard-add"),
-					ShardRemove: mockShardingAction("shard-remove"),
+					ShardAdd: mockShardingAction("shard-add"),
+				}
+				if removeDefined {
+					transCtx.shardingDefs[shardingDefName].Spec.LifecycleActions.ShardRemove = mockShardingAction("shard-remove")
 				}
 
 				transCtx.shardingCompsWithTpl[sharding1aName][""] = nil
@@ -2501,25 +2503,53 @@ var _ = Describe("cluster component transformer test", func() {
 				}(transCtx)}
 				transCtx.Client = model.NewGraphClient(reader)
 
-				mockKBAgent(shardingRemoveShardAction)
+				var calls []string
+				testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+					recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(
+						func(_ context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+							calls = append(calls, req.Action)
+							if req.Action == "udf-"+shardingAddShardAction && addFails {
+								return kbagentproto.ActionResponse{Error: kbagentproto.Error2Type(kbagentproto.ErrFailed)}, nil
+							}
+							return kbagentproto.ActionResponse{}, nil
+						}).AnyTimes()
+				})
 
 				err := transformer.Transform(transCtx, dag)
-				Expect(err).Should(BeNil())
-
-				By("check the shard being deleted")
-				walk := func(vertex graph.Vertex) error {
-					node, ok := vertex.(*model.ObjectVertex)
-					Expect(ok).Should(BeTrue())
-					if reflect.TypeOf(node.Obj).AssignableTo(reflect.TypeOf(&appsv1.Component{})) {
-						Expect(*node.Action).Should(BeElementOf(model.DELETE, model.UPDATE))
+				expectedCalls := []string{"udf-" + shardingAddShardAction}
+				if addFails {
+					Expect(err).ShouldNot(BeNil())
+					By("check failed shard-add blocks deletion even without shard-remove")
+					graphCli := transCtx.Client.(model.GraphClient)
+					Expect(graphCli.FindAll(dag, &appsv1.Component{})).Should(BeEmpty())
+				} else {
+					Expect(err).Should(BeNil())
+					if removeDefined {
+						expectedCalls = append(expectedCalls, "udf-"+shardingRemoveShardAction)
 					}
-					return nil
-				}
-				Expect(dag.WalkReverseTopoOrder(walk, nil)).Should(BeNil())
 
-				By("check the shard-remove action is NOT done")
-				Expect(actionDone).Should(BeFalse())
-			})
+					By("check deletion is scheduled after the action prerequisites succeed")
+					deletes := 0
+					walk := func(vertex graph.Vertex) error {
+						node, ok := vertex.(*model.ObjectVertex)
+						Expect(ok).Should(BeTrue())
+						if comp, ok := node.Obj.(*appsv1.Component); ok && *node.Action == model.DELETE {
+							Expect(comp.Name).Should(Equal(shardComp.Name))
+							Expect(comp.Annotations).ShouldNot(HaveKey(shardingAddShardKey))
+							deletes++
+						}
+						return nil
+					}
+					Expect(dag.WalkReverseTopoOrder(walk, nil)).Should(Succeed())
+					Expect(deletes).Should(Equal(1))
+				}
+				Expect(calls).Should(Equal(expectedCalls))
+			},
+				Entry("add failure with remove defined", true, true),
+				Entry("add failure without remove defined", false, true),
+				Entry("add succeeds before remove", true, false),
+				Entry("add succeeds without remove defined", false, false),
+			)
 		})
 	})
 })

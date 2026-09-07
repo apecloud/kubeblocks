@@ -908,7 +908,23 @@ func (h *clusterShardingHandler) update(transCtx *clusterTransformContext, dag *
 		return err
 	}
 
+	pendingAdds := make(map[string]*appsv1.Component)
+	for name := range toDelete {
+		if comp := runningCompsMap[name]; comp.Annotations[shardingAddShardKey] != "" {
+			pendingAdds[name] = comp.DeepCopy()
+		}
+	}
 	errorSkip, err3 := h.handleShardAddNRemove(transCtx, name, runningCompsMap, protoCompsMap, toCreate, toDelete, toUpdate)
+
+	// Preserve completed adds when a subsequent remove failure keeps the shard alive.
+	graphCli, _ := transCtx.Client.(model.GraphClient)
+	for name, original := range pendingAdds {
+		if errorSkip.Has(name) && runningCompsMap[name].Annotations[shardingAddShardKey] == "" {
+			updated := original.DeepCopy()
+			delete(updated.Annotations, shardingAddShardKey)
+			graphCli.Update(dag, original, updated)
+		}
+	}
 
 	// TODO: update strategy
 	h.deleteComps(transCtx, dag, runningCompsMap, toDelete.Difference(errorSkip))

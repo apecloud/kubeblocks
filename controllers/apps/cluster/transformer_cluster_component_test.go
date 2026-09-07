@@ -2485,6 +2485,81 @@ var _ = Describe("cluster component transformer test", func() {
 				Expect(actionDone).Should(BeTrue())
 			})
 
+			DescribeTable("persists completed shard-add when shard-remove fails", func(transportError bool) {
+				transCtx.shardingDefs[shardingDefName].Spec.LifecycleActions = &appsv1.ShardingLifecycleActions{
+					ShardAdd:    mockShardingAction("shard-add"),
+					ShardRemove: mockShardingAction("shard-remove"),
+				}
+				transCtx.shardingCompsWithTpl[sharding1aName][""] = nil
+				shardComp, pod := mockShardCompWithPod(appsv1.RunningComponentPhase, map[string]string{
+					constant.KBAppClusterUIDKey: "test-uid",
+					shardingAddShardKey:         "test",
+				})
+				original := shardComp.DeepCopy()
+				transCtx.Client = model.NewGraphClient(&appsutil.MockReader{Objects: []client.Object{shardComp, pod}})
+				var calls []string
+				removeFails := true
+				testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+					recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(
+						func(_ context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+							calls = append(calls, req.Action)
+							if req.Action == "udf-"+shardingRemoveShardAction && removeFails {
+								if transportError {
+									return kbagentproto.ActionResponse{}, fmt.Errorf("remove transport error")
+								}
+								return kbagentproto.ActionResponse{Error: kbagentproto.Error2Type(kbagentproto.ErrFailed)}, nil
+							}
+							return kbagentproto.ActionResponse{}, nil
+						}).AnyTimes()
+				})
+
+				err := transformer.Transform(transCtx, dag)
+				Expect(err).ShouldNot(BeNil())
+				Expect(ictrlutil.IsDelayedRequeueError(err)).Should(BeFalse())
+				Expect(calls).Should(Equal([]string{"udf-" + shardingAddShardAction, "udf-" + shardingRemoveShardAction}))
+
+				By("persisting only the completed add marker without scheduling deletion")
+				expected := original.DeepCopy()
+				delete(expected.Annotations, shardingAddShardKey)
+				var persisted *appsv1.Component
+				updates := 0
+				Expect(dag.WalkReverseTopoOrder(func(vertex graph.Vertex) error {
+					node := vertex.(*model.ObjectVertex)
+					if comp, ok := node.Obj.(*appsv1.Component); ok {
+						Expect(*node.Action).Should(Equal(model.UPDATE))
+						Expect(node.OriObj).Should(Equal(original))
+						Expect(comp).Should(Equal(expected))
+						persisted = comp.DeepCopy()
+						updates++
+					}
+					return nil
+				}, nil)).Should(Succeed())
+				Expect(updates).Should(Equal(1))
+
+				By("retrying only remove from the persisted Component in a fresh DAG")
+				removeFails = false
+				graphCli := model.NewGraphClient(&appsutil.MockReader{Objects: []client.Object{persisted, pod}})
+				transCtx.Client = graphCli
+				dag = newDAG(graphCli, transCtx.Cluster)
+				Expect(transformer.Transform(transCtx, dag)).Should(Succeed())
+				Expect(calls).Should(Equal([]string{
+					"udf-" + shardingAddShardAction, "udf-" + shardingRemoveShardAction, "udf-" + shardingRemoveShardAction,
+				}))
+				deletes := 0
+				Expect(dag.WalkReverseTopoOrder(func(vertex graph.Vertex) error {
+					node := vertex.(*model.ObjectVertex)
+					if comp, ok := node.Obj.(*appsv1.Component); ok && *node.Action == model.DELETE {
+						Expect(comp.Name).Should(Equal(persisted.Name))
+						deletes++
+					}
+					return nil
+				}, nil)).Should(Succeed())
+				Expect(deletes).Should(Equal(1))
+			},
+				Entry("terminal failure", false),
+				Entry("transport error", true),
+			)
+
 			DescribeTable("finishes marked shard-add before deletion", func(removeDefined, addFails bool) {
 				transCtx.shardingDefs[shardingDefName].Spec.LifecycleActions = &appsv1.ShardingLifecycleActions{
 					ShardAdd: mockShardingAction("shard-add"),

@@ -273,6 +273,18 @@ func mockComponentIsOperating(cluster *appsv1.Cluster, expectPhase appsv1.Compon
 	})).Should(Succeed())
 }
 
+func mockRollingTargetStatus(cluster *appsv1.Cluster, expectPhase appsv1.ComponentPhase, compNames ...string) {
+	Expect(testapps.ChangeObjStatus(&testCtx, cluster, func() {
+		for _, name := range compNames {
+			status := cluster.Status.Components[name]
+			status.Phase = expectPhase
+			status.ObservedGeneration = cluster.Generation
+			status.UpToDate = true
+			cluster.Status.Components[name] = status
+		}
+	})).Should(Succeed())
+}
+
 func runAction(reqCtx intctrlutil.RequestCtx, opsRes *OpsResource, expectPhase opsv1alpha1.OpsPhase) {
 	_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 	Expect(err).ShouldNot(HaveOccurred())

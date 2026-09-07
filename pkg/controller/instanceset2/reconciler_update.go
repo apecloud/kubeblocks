@@ -99,13 +99,30 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}
-	currentUnavailable := 0
+	desiredInstanceMap := make(map[string]*workloads.Instance, len(oldInstanceList))
 	for _, inst := range oldInstanceList {
-		if !intctrlutil.IsInstanceAvailable(inst) {
-			currentUnavailable++
+		desired, err := buildInstanceByTemplate(tree, inst.Name, nameToTemplateMap[inst.Name], its)
+		if err != nil {
+			return kubebuilderx.Continue, err
+		}
+		desiredInstanceMap[inst.Name] = desired
+	}
+
+	// Account for existing rolling participants against both admission budgets before sorting candidates.
+	// Otherwise traversal order could admit another Instance into a full availability or member-plan window.
+	occupiedRollingSlots := 0
+	occupiedMemberPlanSlots := 0
+	for _, inst := range oldInstanceList {
+		specHandedOffButNotConverged := copyAndMergeInstance(inst, desiredInstanceMap[inst.Name]) == nil &&
+			!isInstanceUpdated(its, inst)
+		if specHandedOffButNotConverged {
+			occupiedMemberPlanSlots++
+		}
+		if !intctrlutil.IsInstanceAvailable(inst) || specHandedOffButNotConverged {
+			occupiedRollingSlots++
 		}
 	}
-	unavailable := maxUnavailable - currentUnavailable
+	availableRollingSlots := maxUnavailable - occupiedRollingSlots
 
 	// if it's a roleful InstanceSet, we use updateCount to represent Pods can be updated according to the spec.memberUpdateStrategy.
 	updateCount := len(oldInstanceList)
@@ -115,7 +132,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		if err != nil {
 			return kubebuilderx.Continue, err
 		}
-		updateCount = len(instancesToBeUpdated)
+		updateCount = max(0, len(instancesToBeUpdated)-occupiedMemberPlanSlots)
 	}
 
 	// updatedInstances tracks the positions already covered by the rolling-update
@@ -145,7 +162,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		if updatedInstances >= replicas {
 			break
 		}
-		if updatingInstances >= min(unavailable, updateCount) {
+		if updatingInstances >= min(availableRollingSlots, updateCount) {
 			break
 		}
 
@@ -153,10 +170,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			break
 		}
 
-		newInst, err := buildInstanceByTemplate(tree, inst.Name, nameToTemplateMap[inst.Name], its)
-		if err != nil {
-			return kubebuilderx.Continue, err
-		}
+		newInst := desiredInstanceMap[inst.Name]
 		mergedInst := copyAndMergeInstance(inst, newInst)
 		if mergedInst != nil {
 			err = tree.Update(mergedInst)

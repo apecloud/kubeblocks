@@ -197,6 +197,12 @@ func (opsMgr *OpsManager) Reconcile(reqCtx intctrlutil.RequestCtx, cli client.Cl
 	case opsv1alpha1.OpsFailedPhase:
 		return 0, opsMgr.handleOpsCompleted(reqCtx, cli, opsRes, opsRequestPhase,
 			opsv1alpha1.NewCancelFailedCondition(opsRequest, err), opsv1alpha1.NewFailedCondition(opsRequest, err))
+	case opsv1alpha1.OpsAbortedPhase:
+		if err := updateHAConfigIfNecessary(reqCtx, cli, opsRes.OpsRequest, "true"); err != nil {
+			return 0, err
+		}
+		return 0, PatchOpsStatus(reqCtx.Ctx, cli, opsRes, opsRequestPhase,
+			opsv1alpha1.NewAbortedCondition("Aborted because the Cluster spec fields managed by this OpsRequest were overwritten"))
 	default:
 		return opsMgr.checkAndHandleOpsTimeout(reqCtx, cli, opsRes, requeueAfter)
 	}

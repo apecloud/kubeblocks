@@ -20,20 +20,180 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"context"
+	"testing"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testops "github.com/apecloud/kubeblocks/pkg/testutil/operations"
 )
+
+func TestUpgradeTargetsUnchanged(t *testing.T) {
+	explicitCompDef := "mysql-8.0"
+	explicitServiceVersion := "8.0.36"
+	latest := ""
+	cluster := &appsv1.Cluster{Spec: appsv1.ClusterSpec{
+		ComponentSpecs: []appsv1.ClusterComponentSpec{{
+			Name: "mysql", ComponentDef: explicitCompDef, ServiceVersion: explicitServiceVersion,
+		}},
+		Shardings: []appsv1.ClusterSharding{{
+			Name: "shard", Template: appsv1.ClusterComponentSpec{ComponentDef: explicitCompDef, ServiceVersion: explicitServiceVersion},
+		}},
+	}}
+	handler := upgradeOpsHandler{}
+	newOpsResource := func(componentName string, componentDef, serviceVersion *string) *OpsResource {
+		return &OpsResource{Cluster: cluster, OpsRequest: &opsv1alpha1.OpsRequest{Spec: opsv1alpha1.OpsRequestSpec{
+			SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{
+				Upgrade: &opsv1alpha1.Upgrade{Components: []opsv1alpha1.UpgradeComponent{{
+					ComponentOps:            opsv1alpha1.ComponentOps{ComponentName: componentName},
+					ComponentDefinitionName: componentDef,
+					ServiceVersion:          serviceVersion,
+				}}},
+			},
+		}}}
+	}
+
+	if !handler.targetsUnchanged(newOpsResource("mysql", &explicitCompDef, &explicitServiceVersion)) {
+		t.Fatal("explicit component target did not match")
+	}
+	if !handler.targetsUnchanged(newOpsResource("shard", &explicitCompDef, &explicitServiceVersion)) {
+		t.Fatal("explicit sharding target did not match")
+	}
+	cluster.Spec.Services = []appsv1.ClusterService{{Service: appsv1.Service{Name: "unrelated"}}}
+	if !handler.targetsUnchanged(newOpsResource("mysql", &explicitCompDef, &explicitServiceVersion)) {
+		t.Fatal("unrelated Cluster change replaced the upgrade target")
+	}
+	cluster.Spec.ComponentSpecs[0].ServiceVersion = "8.4.0"
+	if handler.targetsUnchanged(newOpsResource("mysql", &explicitCompDef, &explicitServiceVersion)) {
+		t.Fatal("replaced serviceVersion was accepted")
+	}
+	cluster.Spec.ComponentSpecs[0].ServiceVersion = explicitServiceVersion
+	cluster.Spec.ComponentSpecs[0].ComponentDef = "mysql-8.4"
+	if handler.targetsUnchanged(newOpsResource("mysql", &explicitCompDef, &explicitServiceVersion)) {
+		t.Fatal("replaced componentDef was accepted")
+	}
+	cluster.Spec.ComponentSpecs[0].ServiceVersion = "resolved-latest"
+	if !handler.targetsUnchanged(newOpsResource("mysql", &latest, &latest)) {
+		t.Fatal("non-exact latest target rejected the owner-resolved values")
+	}
+
+	opsRes := newOpsResource("mysql", &explicitCompDef, &explicitServiceVersion)
+	opsRes.Cluster.Generation = 7
+	opsRes.OpsRequest.Status.ClusterGeneration = 8
+	phase, _, err := handler.ReconcileAction(intctrlutil.RequestCtx{}, nil, opsRes)
+	if err != nil || phase != opsv1alpha1.OpsRunningPhase {
+		t.Fatalf("phase=%s err=%v, want Running before the action generation is observed", phase, err)
+	}
+	opsRes.Cluster.Generation = 8
+	phase, _, err = handler.ReconcileAction(intctrlutil.RequestCtx{}, nil, opsRes)
+	if err != nil || phase != opsv1alpha1.OpsAbortedPhase {
+		t.Fatalf("phase=%s err=%v, want Aborted for a replaced explicit target", phase, err)
+	}
+}
+
+func TestUpgradeAllowsLaterUnrelatedClusterGeneration(t *testing.T) {
+	const (
+		namespace      = "default"
+		clusterName    = "cluster"
+		component      = "mysql"
+		componentDef   = "mysql-8.0"
+		serviceVersion = "8.0.36"
+		instanceName   = "cluster-mysql-0"
+	)
+	replicas := int32(1)
+	cluster := &appsv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: clusterName, Generation: 9},
+		Spec: appsv1.ClusterSpec{
+			ComponentSpecs: []appsv1.ClusterComponentSpec{{
+				Name: component, ComponentDef: componentDef, ServiceVersion: serviceVersion, Replicas: replicas,
+			}},
+			Services: []appsv1.ClusterService{{Service: appsv1.Service{Name: "unrelated"}}},
+		},
+		Status: appsv1.ClusterStatus{Components: map[string]appsv1.ClusterComponentStatus{
+			component: {Phase: appsv1.RunningComponentPhase, ObservedGeneration: 9, UpToDate: true},
+		}},
+	}
+	opsRequest := &opsv1alpha1.OpsRequest{
+		ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "upgrade"},
+		Spec: opsv1alpha1.OpsRequestSpec{SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{
+			Upgrade: &opsv1alpha1.Upgrade{Components: []opsv1alpha1.UpgradeComponent{{
+				ComponentOps:            opsv1alpha1.ComponentOps{ComponentName: component},
+				ComponentDefinitionName: pointer.String(componentDef),
+				ServiceVersion:          pointer.String(serviceVersion),
+			}}},
+		}},
+		Status: opsv1alpha1.OpsRequestStatus{
+			ClusterGeneration: 8,
+			Components:        map[string]opsv1alpha1.OpsRequestComponentStatus{},
+		},
+	}
+	its := &workloads.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      constant.GenerateClusterComponentName(clusterName, component),
+		},
+		Spec: workloads.InstanceSetSpec{Replicas: &replicas},
+		Status: workloads.InstanceSetStatus{InstanceStatus: []workloads.InstanceStatus{{
+			PodName:      instanceName,
+			DesiredState: workloads.InstanceDesiredStateActive,
+			CurrentState: workloads.InstanceCurrentStatePresent,
+			UpToDate:     true,
+			Ready:        true,
+			Available:    true,
+		}}},
+	}
+	testScheme := runtime.NewScheme()
+	for name, addToScheme := range map[string]func(*runtime.Scheme) error{
+		"apps":       appsv1.AddToScheme,
+		"operations": opsv1alpha1.AddToScheme,
+		"workloads":  workloads.AddToScheme,
+	} {
+		if err := addToScheme(testScheme); err != nil {
+			t.Fatalf("add %s scheme: %v", name, err)
+		}
+	}
+	cli := fake.NewClientBuilder().WithScheme(testScheme).
+		WithStatusSubresource(&opsv1alpha1.OpsRequest{}).
+		WithObjects(opsRequest, its).Build()
+	opsRes := &OpsResource{
+		Cluster:    cluster,
+		OpsRequest: opsRequest,
+		Recorder:   record.NewFakeRecorder(10),
+	}
+	var err error
+	opsRes.Runtimes, err = buildOpsRuntimes(context.Background(), cli, opsRes)
+	if err != nil {
+		t.Fatalf("build runtimes: %v", err)
+	}
+
+	phase, _, err := (upgradeOpsHandler{}).ReconcileAction(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, cli, opsRes)
+	if err != nil {
+		t.Fatalf("reconcile upgrade: %v", err)
+	}
+	if phase != opsv1alpha1.OpsSucceedPhase {
+		t.Fatalf("phase=%s, want Succeed", phase)
+	}
+	if opsRequest.Status.Progress != "1/1" {
+		t.Fatalf("progress=%s, want 1/1", opsRequest.Status.Progress)
+	}
+}
 
 var _ = Describe("Upgrade OpsRequest", func() {
 
@@ -78,9 +238,15 @@ var _ = Describe("Upgrade OpsRequest", func() {
 		// do upgrade
 		_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 		Expect(err).ShouldNot(HaveOccurred())
+		Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(opsv1alpha1.OpsCreatingPhase))
+		targetComponents := opsRes.OpsRequest.Status.Components
 		mockComponentIsOperating(opsRes.Cluster, appsv1.UpdatingComponentPhase, defaultCompName)
-		Expect(testapps.ChangeObjStatus(&testCtx, opsRes.OpsRequest, func() {
-			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsRunningPhase
+		opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsRunningPhase
+		opsRes.OpsRequest.Status.ClusterGeneration = opsRes.Cluster.Generation
+		Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest), func(ops *opsv1alpha1.OpsRequest) {
+			ops.Status.Phase = opsv1alpha1.OpsRunningPhase
+			ops.Status.ClusterGeneration = opsRes.Cluster.Generation
+			ops.Status.Components = targetComponents
 		})).Should(Succeed())
 	}
 
@@ -207,30 +373,10 @@ var _ = Describe("Upgrade OpsRequest", func() {
 
 	expectOpsSucceed := func(reqCtx intctrlutil.RequestCtx, opsRes *OpsResource, compNames ...string) {
 		// mock component to running
-		mockComponentIsOperating(opsRes.Cluster, appsv1.RunningComponentPhase, compNames...)
+		mockRollingTargetStatus(opsRes.Cluster, appsv1.RunningComponentPhase, compNames...)
 		_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 		Expect(err).ShouldNot(HaveOccurred())
 		Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsSucceedPhase))
-	}
-
-	mockPodsAppliedImage := func(cluster *appsv1.Cluster, releaseVersion string) {
-		pods := testapps.MockInstanceSetPods(&testCtx, nil, cluster, defaultCompName)
-		image := testapps.AppImage(testapps.AppName, releaseVersion)
-		for i := range pods {
-			pod := pods[i]
-			Expect(testapps.ChangeObj(&testCtx, pod, func(pod *corev1.Pod) {
-				pod.Spec.Containers[0].Image = image
-			})).Should(Succeed())
-			Expect(testapps.ChangeObjStatus(&testCtx, pod, func() {
-				pod.Status.ContainerStatuses = []corev1.ContainerStatus{
-					{
-						Name: testapps.DefaultMySQLContainerName,
-						// the latest release version will be selected.
-						Image: image,
-					},
-				}
-			})).Should(Succeed())
-		}
 	}
 
 	Context("Test OpsRequest", func() {
@@ -255,15 +401,12 @@ var _ = Describe("Upgrade OpsRequest", func() {
 				g.Expect(ops.Status.LastConfiguration.Components[defaultCompName].ComponentDefinitionName).Should(Equal(compDef1.Name))
 			})).Should(Succeed())
 
-			By("the ops is expected to be Running when the component phase is in a terminal state but progress is not completed")
-			mockComponentIsOperating(opsRes.Cluster, appsv1.RunningComponentPhase, defaultCompName)
+			By("the ops succeeds when the current target status is Running and UpToDate")
+			mockRollingTargetStatus(opsRes.Cluster, appsv1.RunningComponentPhase, defaultCompName)
+			Expect(opsRes.OpsRequest.Status.ClusterGeneration).Should(Equal(opsRes.Cluster.Generation))
 			_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
-			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsRunningPhase))
-
-			By("expect upgrade successfully with the image that is provided in the specified componentDefinition")
-			mockPodsAppliedImage(opsRes.Cluster, release2)
-			expectOpsSucceed(reqCtx, opsRes, defaultCompName)
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsSucceedPhase))
 		})
 
 		It("Test upgrade OpsRequest with ComponentDef and ComponentVersion", func() {
@@ -290,7 +433,6 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			})).Should(Succeed())
 
 			By("expect upgrade successfully")
-			mockPodsAppliedImage(opsRes.Cluster, release3)
 			expectOpsSucceed(reqCtx, opsRes, defaultCompName)
 		})
 
@@ -318,13 +460,14 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			})).Should(Succeed())
 
 			By("expect upgrade successfully with the latest release of the specified serviceVersion")
-			mockPodsAppliedImage(opsRes.Cluster, release4)
 			expectOpsSucceed(reqCtx, opsRes, defaultCompName)
 		})
 
 		It("Test upgrade OpsRequest when specified serviceVersion is empty", func() {
 			By("init operations resources")
 			compDef1, _, opsRes := initOpsResWithComponentDef(true)
+			generationBeforeUpgrade := opsRes.Cluster.Generation
+			Expect(opsRes.Cluster.Spec.ComponentSpecs[0].ServiceVersion).ShouldNot(BeEmpty())
 
 			By("create Upgrade Ops")
 			opsRes.OpsRequest = createUpgradeOpsRequest(opsRes.Cluster, opsv1alpha1.Upgrade{
@@ -343,10 +486,10 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.Cluster), func(g Gomega, cluster *appsv1.Cluster) {
 				g.Expect(cluster.Spec.ComponentSpecs[0].ComponentDef).Should(Equal(compDef1.Name))
 				g.Expect(cluster.Spec.ComponentSpecs[0].ServiceVersion).Should(BeEmpty())
+				g.Expect(cluster.Generation).Should(BeNumerically(">", generationBeforeUpgrade))
 			})).Should(Succeed())
 
 			By("looking forward to using the latest serviceVersion and releaseVersion")
-			mockPodsAppliedImage(opsRes.Cluster, release4)
 			expectOpsSucceed(reqCtx, opsRes, defaultCompName)
 		})
 

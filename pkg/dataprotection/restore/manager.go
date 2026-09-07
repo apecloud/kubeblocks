@@ -36,6 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
@@ -99,7 +100,7 @@ func (r *RestoreManager) GetBackupActionSetByNamespaced(reqCtx intctrlutil.Reque
 	if backupMethod == nil {
 		return nil, intctrlutil.NewFatalError(fmt.Sprintf(`status.backupMethod of backup "%s" is empty`, backupName))
 	}
-	useVolumeSnapshot := backupMethod.SnapshotVolumes != nil && *backupMethod.SnapshotVolumes
+	useVolumeSnapshot := boolptr.IsSetToTrue(backupMethod.SnapshotVolumes)
 	actionSet, err := utils.GetActionSetByName(reqCtx, cli, backup.Status.BackupMethod.ActionSetName)
 	if err != nil {
 		return nil, err
@@ -256,15 +257,19 @@ func (r *RestoreManager) getBaseBackupActionSetForContinuous(reqCtx intctrlutil.
 		return notFoundLatestBackup()
 	}
 	// 3. get the action set
-	var actionSetName string
-	if latestBackup.Status.BackupMethod != nil {
-		actionSetName = latestBackup.Status.BackupMethod.ActionSetName
+	backupMethod := latestBackup.Status.BackupMethod
+	if backupMethod == nil {
+		return nil, intctrlutil.NewFatalError(fmt.Sprintf(`status.backupMethod of backup "%s" is empty`, latestBackup.Name))
 	}
-	actionSet, err := utils.GetActionSetByName(reqCtx, cli, actionSetName)
+	actionSet, err := utils.GetActionSetByName(reqCtx, cli, backupMethod.ActionSetName)
 	if err != nil {
 		return nil, err
 	}
-	return &BackupActionSet{Backup: latestBackup, ActionSet: actionSet}, nil
+	return &BackupActionSet{
+		Backup:            latestBackup,
+		ActionSet:         actionSet,
+		UseVolumeSnapshot: boolptr.IsSetToTrue(backupMethod.SnapshotVolumes),
+	}, nil
 }
 
 func (r *RestoreManager) listCompletedBackups(reqCtx intctrlutil.RequestCtx, cli client.Client, continuousBackup *dpv1alpha1.Backup, backupType dpv1alpha1.BackupType) ([]dpv1alpha1.Backup, error) {
@@ -385,13 +390,9 @@ func (r *RestoreManager) RestorePVCFromSnapshot(reqCtx intctrlutil.RequestCtx, c
 	if prepareDataConfig == nil {
 		return nil
 	}
-	createPVCWithSnapshot := func(claim dpv1alpha1.RestoreVolumeClaim) error {
+	createPVCWithSnapshot := func(claim dpv1alpha1.RestoreVolumeClaim, sourceTargetPodName string) error {
 		if claim.VolumeSource == "" {
 			return intctrlutil.NewFatalError(fmt.Sprintf(`claim "%s"" volumeSource can not be empty if the backup uses volume snapshot`, claim.Name))
-		}
-		sourceTargetPodName, err := GetSourcePodNameFromTarget(target, prepareDataConfig.RequiredPolicyForAllPodSelection, 0)
-		if err != nil {
-			return err
 		}
 		var volumeSnapshotName string
 		if target.PodSelector.Strategy == dpv1alpha1.PodSelectionStrategyAny || sourceTargetPodName != "" {
@@ -413,7 +414,11 @@ func (r *RestoreManager) RestorePVCFromSnapshot(reqCtx intctrlutil.RequestCtx, c
 		return r.createPVCIfNotExist(reqCtx, cli, claim.ObjectMeta, claim.VolumeClaimSpec)
 	}
 	for i := range prepareDataConfig.RestoreVolumeClaims {
-		if err := createPVCWithSnapshot(prepareDataConfig.RestoreVolumeClaims[i]); err != nil {
+		sourceTargetPodName, err := GetSourcePodNameFromTarget(target, prepareDataConfig.RequiredPolicyForAllPodSelection, 0)
+		if err != nil {
+			return err
+		}
+		if err := createPVCWithSnapshot(prepareDataConfig.RestoreVolumeClaims[i], sourceTargetPodName); err != nil {
 			return err
 		}
 	}
@@ -422,13 +427,31 @@ func (r *RestoreManager) RestorePVCFromSnapshot(reqCtx intctrlutil.RequestCtx, c
 		restoreJobReplicas := GetRestoreActionsCountForPrepareData(prepareDataConfig)
 		for i := 0; i < restoreJobReplicas; i++ {
 			//  create pvc from claims template, build volumes and volumeMounts
-			for _, claim := range prepareDataConfig.RestoreVolumeClaimsTemplate.Templates {
+			for _, c := range prepareDataConfig.RestoreVolumeClaimsTemplate.Templates {
+				// Deep-copy metadata maps so each replica gets its own pod identity.
+				claim := *c.DeepCopy()
 				index := i + int(claimTemplate.StartingIndex)
 				claim.Name = fmt.Sprintf("%s-%d", claim.Name, index)
 				// HACK: add InstanceSet related labels to the PVC,
 				// so that it can be managed by InstanceSet
 				addItsManagingLabels(&claim, index)
-				if err := createPVCWithSnapshot(claim); err != nil {
+				var sourceTargetPodName string
+				var err error
+				if targetPodName := claim.Labels[constant.KBAppPodNameLabelKey]; targetPodName != "" {
+					sourceTargetPodName, err = GetSourcePodNameForTargetPod(target,
+						prepareDataConfig.RequiredPolicyForAllPodSelection,
+						targetPodName,
+						claim.Labels[constant.KBAppInstanceTemplateLabelKey])
+				} else {
+					// Preserve positional selection for generic claims-template Restores
+					// that do not carry a KubeBlocks target Pod identity.
+					sourceTargetPodName, err = GetSourcePodNameFromTarget(target,
+						prepareDataConfig.RequiredPolicyForAllPodSelection, i)
+				}
+				if err != nil {
+					return err
+				}
+				if err := createPVCWithSnapshot(claim, sourceTargetPodName); err != nil {
 					return err
 				}
 			}
@@ -541,7 +564,17 @@ func (r *RestoreManager) BuildPrepareDataJobs(reqCtx intctrlutil.RequestCtx, cli
 				jobBuilder.addToSpecificVolumesAndMounts(volume, volumeMount)
 			}
 		}
-		sourceTargetPodName, err := GetSourcePodNameFromTarget(target, prepareDataConfig.RequiredPolicyForAllPodSelection, i)
+		var sourceTargetPodName string
+		var err error
+		targetPodName := jobBuilder.labels[constant.KBAppPodNameLabelKey]
+		if claimsTemplate == nil || targetPodName == "" {
+			sourceTargetPodName, err = GetSourcePodNameFromTarget(target, prepareDataConfig.RequiredPolicyForAllPodSelection, i)
+		} else {
+			sourceTargetPodName, err = GetSourcePodNameForTargetPod(target,
+				prepareDataConfig.RequiredPolicyForAllPodSelection,
+				targetPodName,
+				jobBuilder.labels[constant.KBAppInstanceTemplateLabelKey])
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -629,6 +662,50 @@ func (r *RestoreManager) isJobForRestoreAction(job *batchv1.Job) bool {
 	return restoreNamespace == "" || restoreNamespace == r.Restore.Namespace
 }
 
+func (r *RestoreManager) postReadyTargetEnv(reqCtx intctrlutil.RequestCtx, cli client.Client, pod *corev1.Pod) ([]corev1.EnvVar, error) {
+	clusterName := pod.Labels[constant.AppInstanceLabelKey]
+	componentName := pod.Labels[constant.KBAppComponentLabelKey]
+	if clusterName == "" || componentName == "" {
+		return nil, nil
+	}
+	cluster := &appsv1.Cluster{}
+	if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Namespace: pod.Namespace, Name: clusterName}, cluster); err != nil {
+		return nil, err
+	}
+	component := &appsv1.Component{}
+	componentKey := types.NamespacedName{
+		Namespace: pod.Namespace,
+		Name:      constant.GenerateClusterComponentName(clusterName, componentName),
+	}
+	if err := cli.Get(reqCtx.Ctx, componentKey, component); err != nil {
+		return nil, err
+	}
+
+	serviceVersion := component.Spec.ServiceVersion
+	if templateName := pod.Labels[constant.KBAppInstanceTemplateLabelKey]; templateName != "" {
+		found := false
+		for i := range component.Spec.Instances {
+			instance := component.Spec.Instances[i]
+			if instance.Name != templateName {
+				continue
+			}
+			found = true
+			if instance.ServiceVersion != "" {
+				serviceVersion = instance.ServiceVersion
+			}
+			break
+		}
+		if !found {
+			return nil, intctrlutil.NewFatalError(fmt.Sprintf(
+				"target Pod %s/%s references unknown instance template %q", pod.Namespace, pod.Name, templateName))
+		}
+	}
+	return []corev1.EnvVar{
+		{Name: dptypes.DPTargetClusterTopology, Value: cluster.Spec.Topology},
+		{Name: dptypes.DPTargetServiceVersion, Value: serviceVersion},
+	}, nil
+}
+
 // BuildPostReadyActionJobs builds the post ready jobs.
 func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx, cli client.Client, backupSet BackupActionSet, target *dpv1alpha1.BackupStatusTarget, step int) ([]*batchv1.Job, error) {
 	readyConfig := r.Restore.Spec.ReadyConfig
@@ -673,7 +750,7 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 			return nil, err
 		}
 		sort.Sort(intctrlutil.ByPodName(targetPodList.Items))
-		buildJob := func(targetPod *corev1.Pod, sourceTargetPodName string, index int) *batchv1.Job {
+		buildJob := func(targetPod *corev1.Pod, sourceTargetPodName string, index int) (*batchv1.Job, error) {
 			if boolptr.IsSetToTrue(actionSpec.Job.RunOnTargetPodNode) {
 				jobBuilder.resetSpecificVolumesAndMounts()
 				jobBuilder.setNodeNameToNodeSelector(targetPod.Spec.NodeName)
@@ -687,6 +764,10 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 					}
 				}
 			}
+			targetEnv, err := r.postReadyTargetEnv(reqCtx, cli, targetPod)
+			if err != nil {
+				return nil, err
+			}
 			return jobBuilder.setImage(actionSpec.Job.Image).
 				setJobName(buildJobName(index)).
 				addCommonEnv(sourceTargetPodName).
@@ -694,8 +775,9 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 				setCommand(actionSpec.Job.Command).
 				setToleration(targetPod.Spec.Tolerations).
 				addTargetPodAndCredentialEnv(targetPod, readyConfig.ConnectionCredential, &target.BackupTarget).
+				overridePostReadyTargetEnv(targetEnv).
 				setServiceAccount(r.WorkerServiceAccount).
-				build()
+				build(), nil
 		}
 
 		if podSelector.Strategy == dpv1alpha1.PodSelectionStrategyAny {
@@ -715,7 +797,11 @@ func (r *RestoreManager) BuildPostReadyActionJobs(reqCtx intctrlutil.RequestCtx,
 				// no need to recover the volume when the pod selection policy is 'All' and sourceTargetPodName is not found.
 				continue
 			}
-			jobs = append(jobs, buildJob(&targetPodList.Items[i], sourceTargetPodName, i))
+			job, err := buildJob(&targetPodList.Items[i], sourceTargetPodName, i)
+			if err != nil {
+				return nil, err
+			}
+			jobs = append(jobs, job)
 		}
 		return jobs, nil
 	}

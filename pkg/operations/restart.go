@@ -56,7 +56,7 @@ func (r restartOpsHandler) ActionStartedCondition(reqCtx intctrlutil.RequestCtx,
 	return opsv1alpha1.NewRestartingCondition(opsRes.OpsRequest), nil
 }
 
-// Action restarts components by updating StatefulSet.
+// Action restarts the requested components by updating their restart annotation.
 func (r restartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	if opsRes.OpsRequest.Status.StartTimestamp.IsZero() {
 		return fmt.Errorf("status.startTimestamp can not be null")
@@ -84,30 +84,32 @@ func (r restartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 // the Reconcile function for restart opsRequest.
 func (r restartOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (opsv1alpha1.OpsPhase, time.Duration, error) {
 	r.compOpsHelper = newComponentOpsHelper(opsRes.OpsRequest.Spec.RestartList)
-	handleRestartProgress := func(reqCtx intctrlutil.RequestCtx,
-		cli client.Client,
-		opsRes *OpsResource,
-		pgRes *progressResource,
-		compStatus *opsv1alpha1.OpsRequestComponentStatus) (expectProgressCount int32, completedCount int32, err error) {
-		pgRes.deferInstanceFailureToWorkloadPhase = true
-		return handleComponentStatusProgress(reqCtx, cli, opsRes, pgRes, compStatus, r.podApplyCompOps)
+	if rollingActionGenerationPending(opsRes) {
+		return opsv1alpha1.OpsRunningPhase, 0, nil
 	}
-	return r.compOpsHelper.reconcileActionWithComponentOps(reqCtx, cli, opsRes,
-		"restart", handleRestartProgress)
+	if !r.targetsExist(opsRes) {
+		return opsv1alpha1.OpsAbortedPhase, 0, nil
+	}
+	return r.compOpsHelper.reconcileRollingAction(reqCtx, cli, opsRes,
+		"restart", handleRunningProgress, appsv1.RunningComponentPhase)
 }
 
-// SaveLastConfiguration this operation only restart the pods of the component, no changes for Cluster.spec.
-// empty implementation here.
+// SaveLastConfiguration has nothing to record for a restart operation.
 func (r restartOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	return nil
 }
 
-func (r restartOpsHandler) podApplyCompOps(
-	ops *opsv1alpha1.OpsRequest,
-	instance Instance,
-	pgRes *progressResource) bool {
-	creationTimestamp := instance.GetCreationTimestamp()
-	return !creationTimestamp.Before(&ops.Status.StartTimestamp)
+func (r restartOpsHandler) targetsExist(opsRes *OpsResource) bool {
+	if opsRes == nil || opsRes.Cluster == nil || opsRes.OpsRequest == nil {
+		return false
+	}
+	for i := range opsRes.OpsRequest.Spec.RestartList {
+		componentName := opsRes.OpsRequest.Spec.RestartList[i].ComponentName
+		if getComponentSpecOrShardingTemplate(opsRes.Cluster, componentName) == nil {
+			return false
+		}
+	}
+	return true
 }
 
 func (r restartOpsHandler) doRestart(opsRes *OpsResource, compSpec *appsv1.ClusterComponentSpec, componentName string) {

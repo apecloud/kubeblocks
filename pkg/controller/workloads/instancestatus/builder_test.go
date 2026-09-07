@@ -27,6 +27,38 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 )
 
+func TestConfigsApplied(t *testing.T) {
+	desired := []workloads.ConfigTemplate{
+		{Name: "dynamic", ConfigHash: ptr.To("new")},
+		{Name: "restart", ConfigHash: nil},
+	}
+	tests := []struct {
+		name     string
+		observed []workloads.InstanceConfigStatus
+		want     bool
+	}{
+		{name: "all desired hashes observed", observed: []workloads.InstanceConfigStatus{
+			{Name: "dynamic", ConfigHash: ptr.To("new")},
+			{Name: "restart", ConfigHash: ptr.To("")},
+			{Name: "unmanaged", ConfigHash: ptr.To("kept")},
+		}, want: true},
+		{name: "desired hash is stale", observed: []workloads.InstanceConfigStatus{
+			{Name: "dynamic", ConfigHash: ptr.To("old")},
+			{Name: "restart"},
+		}},
+		{name: "desired config is missing", observed: []workloads.InstanceConfigStatus{
+			{Name: "dynamic", ConfigHash: ptr.To("new")},
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := ConfigsApplied(desired, tt.observed); got != tt.want {
+				t.Fatalf("ConfigsApplied() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestBuildDesiredAndObservedDimensions(t *testing.T) {
 	result, err := Build(Input{
 		DesiredAssignments: []TemplateAssignment{

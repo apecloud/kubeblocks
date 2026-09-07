@@ -38,8 +38,10 @@ func TestInstanceStatusHelpers(t *testing.T) {
 		},
 		Status: workloads.InstanceStatus2{
 			ObservedGeneration: 3,
-			UpToDate:           true,
-			Role:               "leader",
+			// Runtime health is independent from desired-state convergence. A dynamic config
+			// update or PVC expansion can keep UpToDate false while the Instance stays ready.
+			UpToDate: false,
+			Role:     "leader",
 			Conditions: []metav1.Condition{
 				{Type: string(workloads.InstanceReady), Status: metav1.ConditionTrue},
 				{Type: string(workloads.InstanceAvailable), Status: metav1.ConditionTrue},
@@ -60,6 +62,11 @@ func TestInstanceStatusHelpers(t *testing.T) {
 	if IsInstanceFailure(inst) {
 		t.Fatalf("expected instance not to be failed")
 	}
+	inst.Status.Conditions[2].Status = metav1.ConditionTrue
+	if !IsInstanceFailure(inst) {
+		t.Fatalf("expected current failure observation even when instance is not up-to-date")
+	}
+	inst.Status.Conditions[2].Status = metav1.ConditionFalse
 
 	inst.Status.Role = ""
 	if IsInstanceReadyWithRole(inst) {

@@ -26,6 +26,10 @@
         {
             "typeMatchPrefix": "^k8s\\.io/apimachinery/pkg/types",
             "docsURLTemplate": "https://pkg.go.dev/k8s.io/apimachinery/pkg/types#{{.TypeIdentifier}}"
+        },
+        {
+            "typeMatchPrefix": "^time\\.Duration$",
+            "docsURLTemplate": "https://pkg.go.dev/time#Duration"
         }
     ],
     "typeDisplayNamePrefixOverrides": {

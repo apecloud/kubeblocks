@@ -10938,7 +10938,9 @@ This value is set to 0 by default, indicating that no retries will be made.</p>
 <td>
 <code>retryInterval</code><br/>
 <em>
+<a href="https://pkg.go.dev/time#Duration">
 time.Duration
+</a>
 </em>
 </td>
 <td>
@@ -19333,7 +19335,7 @@ ConditionStatus will be True if all its instances(pods) are in a Ready condition
 Or, a NotReady reason with not ready instances encoded in the Message filed will be set.</p>
 </td>
 </tr><tr><td><p>&#34;Restore&#34;</p></td>
-<td><p>InstanceRestore indicates whether the initial data restore for this InstanceSet has completed.</p>
+<td><p>InstanceRestore indicates whether the initial data restore for this Instance or InstanceSet has completed.</p>
 </td>
 </tr><tr><td><p>&#34;InstanceUpdateRestricted&#34;</p></td>
 <td><p>InstanceUpdateRestricted represents a ConditionType that indicates updates to an InstanceSet are blocked(when the
@@ -20258,7 +20260,7 @@ key is the pod name, value is the revision.</p>
 <code>assignedOrdinals</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.Ordinals">
-map[string]github.com/apecloud/kubeblocks/apis/apps/v1.Ordinals
+map[string]github.com/apecloud/kubeblocks/apis/workloads/v1.Ordinals
 </a>
 </em>
 </td>
@@ -20622,7 +20624,8 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Ready indicates whether the instance is ready to serve requests when CurrentState is Present.</p>
+<p>Ready indicates whether the instance is ready to serve requests when CurrentState is Present.
+It is independent of desired-state convergence reported by UpToDate.</p>
 </td>
 </tr>
 <tr>
@@ -20635,7 +20638,8 @@ bool
 <td>
 <em>(Optional)</em>
 <p>Available indicates whether the instance has remained ready for the required minimum duration when CurrentState is Present.
-Available can be true only when Ready is true.</p>
+Available can be true only when Ready is true.
+It is independent of desired-state convergence reported by UpToDate.</p>
 </td>
 </tr>
 <tr>
@@ -20732,7 +20736,7 @@ Instance&rsquo;s generation, which is updated on mutation by the API Server.</p>
 <td>
 <em>(Optional)</em>
 <p>Represents the latest available observations of an instance&rsquo;s current state.
-Known .status.conditions.type are: &ldquo;InstanceFailure&rdquo;, &ldquo;InstanceReady&rdquo;, &ldquo;InstanceAvailable&rdquo;</p>
+Known .status.conditions.type are: &ldquo;InstanceFailure&rdquo;, &ldquo;InstanceReady&rdquo;, &ldquo;InstanceAvailable&rdquo;, &ldquo;Restore&rdquo;</p>
 </td>
 </tr>
 <tr>
@@ -20782,7 +20786,8 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Represents whether the instance is up-to-date.</p>
+<p>UpToDate indicates that the Instance controller has observed the Pod, dynamic configs, and PVC expansion
+targets represented by this status applied. It is independent of runtime Ready and Available observations.</p>
 </td>
 </tr>
 <tr>
@@ -20794,7 +20799,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Represents whether the instance is in ready condition.</p>
+<p>Represents whether the instance is in ready condition, independent of desired-state convergence.</p>
 </td>
 </tr>
 <tr>
@@ -20806,7 +20811,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Represents whether the instance is in available condition.</p>
+<p>Represents whether the instance is in available condition, independent of desired-state convergence.</p>
 </td>
 </tr>
 <tr>

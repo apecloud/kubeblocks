@@ -31,6 +31,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/workloads/instancestatus"
 )
 
 func NewRevisionUpdateReconciler() kubebuilderx.Reconciler {
@@ -122,9 +123,55 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kub
 		return kubebuilderx.Continue, err
 	}
 	its.Status.UpdatedReplicas = updatedReplicas
+	if err := r.publishInstanceUpdateTargets(its, updatedRevisions, nameMap, tree); err != nil {
+		return kubebuilderx.Continue, err
+	}
 	its.Status.ObservedGeneration = its.Generation
 
 	return kubebuilderx.Continue, nil
+}
+
+// publishInstanceUpdateTargets advances the per-instance desired Pod revision and invalidates only
+// existing Active instances whose Pod, dynamic config, or PVC capacity has not applied the new desired state.
+// Runtime health and allocation lifecycle fields remain the observations published by the status reconciler.
+func (r *revisionUpdateReconciler) publishInstanceUpdateTargets(its *workloads.InstanceSet,
+	updateRevisions map[string]string, desiredTemplates map[string]*instancetemplate.InstanceTemplateExt,
+	tree *kubebuilderx.ObjectTree) error {
+	podsByName := make(map[string]*corev1.Pod)
+	for _, obj := range tree.List(&corev1.Pod{}) {
+		pod, _ := obj.(*corev1.Pod)
+		podsByName[pod.Name] = pod
+	}
+	pvcsByName := persistentVolumeClaimsByName(tree)
+
+	for i := range its.Status.InstanceStatus {
+		status := &its.Status.InstanceStatus[i]
+		newRevision, desired := updateRevisions[status.PodName]
+		if !desired || status.EffectiveDesiredState() != workloads.InstanceDesiredStateActive {
+			continue
+		}
+		previousRevision := status.UpdateRevision
+		status.UpdateRevision = newRevision
+		if !status.UpToDate || status.EffectiveCurrentState() != workloads.InstanceCurrentStatePresent {
+			continue
+		}
+
+		template, pod := desiredTemplates[status.PodName], podsByName[status.PodName]
+		if template == nil || pod == nil {
+			status.UpToDate = false
+			continue
+		}
+		podApplied, err := isDesiredPodApplied(its, pod, template)
+		if err != nil {
+			return err
+		}
+		configsApplied := instancestatus.ConfigsApplied(its.Spec.Configs, status.Configs)
+		pvcApplied := !hasPendingPVCExpansion(its.Name, status.PodName, template.VolumeClaimTemplates, pvcsByName)
+		if previousRevision != newRevision || !podApplied || !configsApplied || !pvcApplied {
+			status.UpToDate = false
+		}
+	}
+	return nil
 }
 
 func (r *revisionUpdateReconciler) updateAssignedOrdinals(its *workloads.InstanceSet,

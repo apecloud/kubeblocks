@@ -83,7 +83,9 @@ spec:
                     description: Specifies the backup name.
                     type: string
                   namespace:
-                    description: Specifies the backup namespace.
+                    description: |-
+                      Specifies the backup namespace.
+                      Cross-namespace VolumeSnapshot restores are NOT supported.
                     type: string
                   sourceTargetName:
                     description: Specifies the source target for restoration, identified

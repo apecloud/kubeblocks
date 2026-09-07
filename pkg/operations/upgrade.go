@@ -20,17 +20,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
-	"fmt"
-	"strings"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -91,35 +88,37 @@ func (u upgradeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 // ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
 // the Reconcile function for upgrade opsRequest.
 func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (opsv1alpha1.OpsPhase, time.Duration, error) {
+	if rollingActionGenerationPending(opsRes) {
+		return opsv1alpha1.OpsRunningPhase, 0, nil
+	}
+	if !u.targetsUnchanged(opsRes) {
+		return opsv1alpha1.OpsAbortedPhase, 0, nil
+	}
 	upgradeSpec := opsRes.OpsRequest.Spec.Upgrade
-	var (
-		compOpsHelper   componentOpsHelper
-		componentDefMap map[string]*appsv1.ComponentDefinition
-		err             error
-	)
-	compOpsHelper = newComponentOpsHelper(upgradeSpec.Components)
-	if componentDefMap, err = u.getComponentDefMapWithUpdatedImages(reqCtx, cli, opsRes); err != nil {
-		return opsRes.OpsRequest.Status.Phase, 0, err
+	compOpsHelper := newComponentOpsHelper(upgradeSpec.Components)
+	return compOpsHelper.reconcileRollingAction(
+		reqCtx, cli, opsRes, "upgrade", handleRunningProgress, appsv1.RunningComponentPhase)
+}
+
+func (u upgradeOpsHandler) targetsUnchanged(opsRes *OpsResource) bool {
+	if opsRes == nil || opsRes.Cluster == nil || opsRes.OpsRequest == nil || opsRes.OpsRequest.Spec.Upgrade == nil {
+		return false
 	}
-	podApplyCompOps := func(
-		ops *opsv1alpha1.OpsRequest,
-		instance Instance,
-		pgRes *progressResource) bool {
-		upgradeComponent := pgRes.compOps.(opsv1alpha1.UpgradeComponent)
-		compDef, ok := componentDefMap[upgradeComponent.GetComponentName()]
-		if !ok {
-			return true
+	for _, upgrade := range opsRes.OpsRequest.Spec.Upgrade.Components {
+		compSpec := getComponentSpecOrShardingTemplate(opsRes.Cluster, upgrade.ComponentName)
+		if compSpec == nil {
+			return false
 		}
-		return u.instanceImageApplied(instance, compDef.Spec.Runtime.Containers)
+		componentDef := ptr.Deref(upgrade.ComponentDefinitionName, "")
+		if componentDef != "" && compSpec.ComponentDef != componentDef {
+			return false
+		}
+		serviceVersion := ptr.Deref(upgrade.ServiceVersion, "")
+		if serviceVersion != "" && compSpec.ServiceVersion != serviceVersion {
+			return false
+		}
 	}
-	handleUpgradeProgress := func(reqCtx intctrlutil.RequestCtx,
-		cli client.Client,
-		opsRes *OpsResource,
-		pgRes *progressResource,
-		compStatus *opsv1alpha1.OpsRequestComponentStatus) (expectProgressCount int32, completedCount int32, err error) {
-		return handleComponentStatusProgress(reqCtx, cli, opsRes, pgRes, compStatus, podApplyCompOps)
-	}
-	return compOpsHelper.reconcileActionWithComponentOps(reqCtx, cli, opsRes, "upgrade", handleUpgradeProgress)
+	return true
 }
 
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration
@@ -132,50 +131,6 @@ func (u upgradeOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, 
 		}
 	})
 	return nil
-}
-
-// getComponentDefMapWithUpdatedImages gets the desired componentDefinition map
-// that is updated with the corresponding images of the ComponentDefinition and service version.
-func (u upgradeOpsHandler) getComponentDefMapWithUpdatedImages(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	opsRes *OpsResource) (map[string]*appsv1.ComponentDefinition, error) {
-	compDefMap := map[string]*appsv1.ComponentDefinition{}
-	for _, v := range opsRes.OpsRequest.Spec.Upgrade.Components {
-		compSpec := getComponentSpecOrShardingTemplate(opsRes.Cluster, v.ComponentName)
-		if compSpec == nil {
-			return nil, intctrlutil.NewFatalError(fmt.Sprintf(`"can not found the component "%s" in the cluster "%s"`,
-				v.ComponentName, opsRes.Cluster.Name))
-		}
-		compDef, err := component.GetCompDefByName(reqCtx.Ctx, cli, compSpec.ComponentDef)
-		if err != nil {
-			return nil, err
-		}
-		if err = component.UpdateCompDefinitionImages4ServiceVersion(reqCtx.Ctx, cli, compDef, compSpec.ServiceVersion); err != nil {
-			return nil, err
-		}
-		compDefMap[v.ComponentName] = compDef
-	}
-	return compDefMap, nil
-}
-
-// podImageApplied checks if the pod has applied the new image.
-func (u upgradeOpsHandler) instanceImageApplied(instance Instance, expectContainers []corev1.Container) bool {
-	if len(expectContainers) == 0 {
-		return true
-	}
-	imageName := func(image string) string {
-		images := strings.Split(image, "/")
-		return images[len(images)-1]
-	}
-	for _, v := range expectContainers {
-		if statusImage := instance.GetStatusImage(v.Name); statusImage != "" && imageName(statusImage) != imageName(v.Image) {
-			return false
-		}
-		if image := instance.GetImage(v.Name); image != "" && imageName(image) != imageName(v.Image) {
-			return false
-		}
-	}
-	return true
 }
 
 func (u upgradeOpsHandler) needUpdateCompDef(upgradeComp opsv1alpha1.UpgradeComponent, cluster *appsv1.Cluster) bool {

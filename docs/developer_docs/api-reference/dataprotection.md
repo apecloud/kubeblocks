@@ -304,7 +304,9 @@ The current implementation only prevent accidental deletion of backup data.</p>
 <td>
 <code>retentionPeriod</code><br/>
 <em>
+<a href="cluster.md#apps.kubeblocks.io/v1.RetentionPeriod">
 github.com/apecloud/kubeblocks/apis/apps/v1.RetentionPeriod
+</a>
 </em>
 </td>
 <td>
@@ -2856,7 +2858,8 @@ string
 </em>
 </td>
 <td>
-<p>Specifies the backup namespace.</p>
+<p>Specifies the backup namespace.
+Cross-namespace VolumeSnapshot restores are NOT supported.</p>
 </td>
 </tr>
 <tr>
@@ -3343,7 +3346,9 @@ The current implementation only prevent accidental deletion of backup data.</p>
 <td>
 <code>retentionPeriod</code><br/>
 <em>
+<a href="cluster.md#apps.kubeblocks.io/v1.RetentionPeriod">
 github.com/apecloud/kubeblocks/apis/apps/v1.RetentionPeriod
+</a>
 </em>
 </td>
 <td>
@@ -5978,7 +5983,9 @@ see <a href="https://en.wikipedia.org/wiki/Cron">https://en.wikipedia.org/wiki/C
 <td>
 <code>retentionPeriod</code><br/>
 <em>
+<a href="cluster.md#apps.kubeblocks.io/v1.RetentionPeriod">
 github.com/apecloud/kubeblocks/apis/apps/v1.RetentionPeriod
+</a>
 </em>
 </td>
 <td>

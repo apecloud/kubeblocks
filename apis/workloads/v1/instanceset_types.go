@@ -616,12 +616,14 @@ type InstanceStatus struct {
 	UpToDate bool `json:"upToDate,omitempty"`
 
 	// Ready indicates whether the instance is ready to serve requests when CurrentState is Present.
+	// It is independent of desired-state convergence reported by UpToDate.
 	//
 	// +optional
 	Ready bool `json:"ready,omitempty"`
 
 	// Available indicates whether the instance has remained ready for the required minimum duration when CurrentState is Present.
 	// Available can be true only when Ready is true.
+	// It is independent of desired-state convergence reported by UpToDate.
 	//
 	// +optional
 	Available bool `json:"available,omitempty"`
@@ -736,7 +738,7 @@ const (
 	// InstanceFailure is added in an instance set when at least one of its instances(pods) is in a `Failed` phase.
 	InstanceFailure ConditionType = "InstanceFailure"
 
-	// InstanceRestore indicates whether the initial data restore for this InstanceSet has completed.
+	// InstanceRestore indicates whether the initial data restore for this Instance or InstanceSet has completed.
 	InstanceRestore ConditionType = "Restore"
 
 	// InstanceUpdateRestricted represents a ConditionType that indicates updates to an InstanceSet are blocked(when the

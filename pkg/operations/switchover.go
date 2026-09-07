@@ -229,7 +229,7 @@ func handleSwitchover(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *
 
 	switch progressDetail.Status {
 	case opsv1alpha1.PendingProgressStatus:
-		if err = runtime.Switchover(reqCtx.Ctx, synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name, switchover.InstanceName, switchover.CandidateName); err != nil {
+		if err = runtime.Switchover(reqCtx.Ctx, synthesizedComp, switchover.InstanceName, switchover.CandidateName); err != nil {
 			progressDetail.Status = opsv1alpha1.FailedProgressStatus
 			progressDetail.Message = fmt.Sprintf("component %s %s", compName, err.Error())
 		} else {

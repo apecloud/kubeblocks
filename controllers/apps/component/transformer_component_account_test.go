@@ -186,6 +186,12 @@ func TestBuildAccountSecretRevisionContract(t *testing.T) {
 	if err = fakeClient.Update(context.Background(), referenced); err != nil {
 		t.Fatalf("update referenced Secret revision: %v", err)
 	}
+	unversionedAccount := account
+	unversionedAccount.SecretRefRevision = ""
+	if _, err = (&componentAccountTransformer{}).buildAccountSecret(transCtx, unversionedAccount); err != nil {
+		t.Fatalf("a managed Secret should be read when no revision is requested: %v", err)
+	}
+
 	if _, err = (&componentAccountTransformer{}).buildAccountSecret(transCtx, account); !intctrlutil.IsRequeueError(err) || intctrlutil.IsDelayedRequeueError(err) {
 		t.Fatalf("a managed Secret with a mismatched revision should stop and requeue, got %v", err)
 	}

@@ -28,10 +28,12 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/sharding"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -320,8 +322,7 @@ func handleFailedOrProcessingProgressDetail(opsRes *OpsResource,
 	progressDetail opsv1alpha1.ProgressStatusDetail,
 	instance Instance) (completedCount int32) {
 	componentName := pgRes.clusterComponent.Name
-	if pgRes.componentPhase == appsv1.FailedComponentPhase ||
-		(instance.IsFailedAndTimedOut() && !pgRes.deferInstanceFailureToWorkloadPhase) {
+	if pgRes.componentPhase == appsv1.FailedComponentPhase || instance.IsFailedAndTimedOut() {
 		podMessage := getFailedPodMessage(opsRes.Cluster, componentName, instance.GetName())
 		message := getProgressFailedMessage(pgRes.opsMessageKey, progressDetail.ObjectKey, componentName, podMessage)
 		progressDetail.SetStatusAndMessage(opsv1alpha1.FailedProgressStatus, message)
@@ -358,6 +359,109 @@ func instanceProcessedSuccessful(pgRes *progressResource,
 
 func getProgressProcessingMessage(opsMessageKey, objectKey, componentName string) string {
 	return fmt.Sprintf("Start to %s: %s in Component: %s", opsMessageKey, objectKey, componentName)
+}
+
+func handleRunningProgress(opsRes *OpsResource, pgRes *progressResource) (rollingProgress, error) {
+	its, err := getInstanceSet(opsRes, pgRes)
+	if err != nil {
+		return rollingProgress{}, err
+	}
+	return handleRunningInstanceProgress(opsRes, pgRes, its), nil
+}
+
+func handleStopProgress(opsRes *OpsResource, pgRes *progressResource) (rollingProgress, error) {
+	its, err := getInstanceSet(opsRes, pgRes)
+	if err != nil {
+		return rollingProgress{}, err
+	}
+	return handleStoppedInstanceProgress(pgRes, its), nil
+}
+
+func getInstanceSet(opsRes *OpsResource, pgRes *progressResource) (*workloads.InstanceSet, error) {
+	runtime, err := opsRes.GetRuntime(pgRes.compOps.GetComponentName())
+	if err != nil {
+		return nil, err
+	}
+	return runtime.GetInstanceSet(opsRes.Cluster.Namespace, opsRes.Cluster.Name, pgRes.fullComponentName)
+}
+
+func handleRunningInstanceProgress(opsRes *OpsResource, pgRes *progressResource, its *workloads.InstanceSet) rollingProgress {
+	expectedCount := pgRes.clusterComponent.Replicas
+	if its != nil {
+		expectedCount = ptr.Deref(its.Spec.Replicas, expectedCount)
+	}
+	if expectedCount < pgRes.clusterComponent.Replicas {
+		expectedCount = pgRes.clusterComponent.Replicas
+	}
+	result := rollingProgress{expectedCount: expectedCount}
+	if its == nil {
+		return result
+	}
+	for i := range its.Status.InstanceStatus {
+		instance := &its.Status.InstanceStatus[i]
+		if instance.EffectiveDesiredState() != workloads.InstanceDesiredStateActive {
+			continue
+		}
+		objectKey := getProgressObjectKey(constant.PodKind, instance.PodName)
+		detail := opsv1alpha1.ProgressStatusDetail{ObjectKey: objectKey}
+		targetApplied := instance.EffectiveCurrentState() == workloads.InstanceCurrentStatePresent && instance.UpToDate
+		switch {
+		case targetApplied && instance.Failed:
+			detail.SetStatusAndMessage(opsv1alpha1.FailedProgressStatus,
+				getProgressFailedMessage(pgRes.opsMessageKey, objectKey, pgRes.fullComponentName,
+					getFailedPodMessage(opsRes.Cluster, pgRes.fullComponentName, instance.PodName)))
+			result.completedCount++
+		case targetApplied && instance.Ready && instance.Available:
+			detail.SetStatusAndMessage(opsv1alpha1.SucceedProgressStatus,
+				getProgressSucceedMessage(pgRes.opsMessageKey, objectKey, pgRes.fullComponentName))
+			result.completedCount++
+		default:
+			detail.SetStatusAndMessage(opsv1alpha1.ProcessingProgressStatus,
+				getProgressProcessingMessage(pgRes.opsMessageKey, objectKey, pgRes.fullComponentName))
+		}
+		result.details = append(result.details, detail)
+	}
+	return result
+}
+
+func handleStoppedInstanceProgress(pgRes *progressResource, its *workloads.InstanceSet) rollingProgress {
+	expectedCount := pgRes.clusterComponent.Replicas
+	result := rollingProgress{expectedCount: expectedCount}
+	if its == nil {
+		result.completedCount = expectedCount
+		return result
+	}
+	preexistingOffline := make(map[string]struct{}, len(its.Spec.OfflineInstances))
+	for _, name := range its.Spec.OfflineInstances {
+		preexistingOffline[name] = struct{}{}
+	}
+	var participantCount int32
+	for i := range its.Status.InstanceStatus {
+		instance := &its.Status.InstanceStatus[i]
+		objectKey := getProgressObjectKey(constant.PodKind, instance.PodName)
+		_, wasOffline := preexistingOffline[instance.PodName]
+		if wasOffline || instance.EffectiveDesiredState() == workloads.InstanceDesiredStateReleased {
+			continue
+		}
+		participantCount++
+		detail := opsv1alpha1.ProgressStatusDetail{ObjectKey: objectKey}
+		if instance.EffectiveCurrentState() == workloads.InstanceCurrentStateAbsent {
+			detail.SetStatusAndMessage(opsv1alpha1.SucceedProgressStatus,
+				getProgressSucceedMessage(pgRes.opsMessageKey, objectKey, pgRes.fullComponentName))
+			result.completedCount++
+		} else {
+			detail.SetStatusAndMessage(opsv1alpha1.ProcessingProgressStatus,
+				getProgressProcessingMessage(pgRes.opsMessageKey, objectKey, pgRes.fullComponentName))
+		}
+		result.details = append(result.details, detail)
+	}
+	if missing := expectedCount - participantCount; missing > 0 {
+		result.completedCount += missing
+	}
+	if result.completedCount > expectedCount {
+		result.completedCount = expectedCount
+	}
+	return result
 }
 
 func getProgressSucceedMessage(opsMessageKey, objectKey, componentName string) string {

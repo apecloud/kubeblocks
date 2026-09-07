@@ -2504,6 +2504,8 @@ for Actions that are expected to complete quickly.</p>
 <p>When true, KubeBlocks runs the Action in non-blocking mode. This mode is
 suitable for long-running Actions, such as data migration, rebalancing, or
 draining, whose duration depends on data volume or runtime conditions.</p>
+<p>Non-blocking mode can be enabled only for Action fields that explicitly
+document support for it.</p>
 <p>This field cannot be updated.</p>
 </td>
 </tr>

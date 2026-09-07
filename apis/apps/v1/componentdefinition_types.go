@@ -1911,6 +1911,9 @@ type Action struct {
 	// suitable for long-running Actions, such as data migration, rebalancing, or
 	// draining, whose duration depends on data volume or runtime conditions.
 	//
+	// Non-blocking mode can be enabled only for Action fields that explicitly
+	// document support for it.
+	//
 	// This field cannot be updated.
 	//
 	// +kubebuilder:default=false

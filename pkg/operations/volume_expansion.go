@@ -34,6 +34,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/sharding"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -43,13 +44,13 @@ type volumeExpansionOpsHandler struct {
 }
 
 type volumeExpansionHelper struct {
-	compOps              ComponentOpsInterface
-	fullComponentName    string
-	vctName              string
-	expectCount          int
-	offlineInstanceNames []string
-	templateName         string
-	ordinals             appsv1.Ordinals
+	compOps           ComponentOpsInterface
+	fullComponentName string
+	vctName           string
+	expectCount       int
+	templateName      string
+	stopped           bool
+	explicitOffline   sets.Set[string]
 }
 
 var _ OpsHandler = volumeExpansionOpsHandler{}
@@ -60,7 +61,7 @@ const (
 )
 
 func init() {
-	// the volume expansion operation only supports online expansion now
+	// Expansion progress is checked on PVCs, including those retained after Stop.
 	volumeExpansionBehaviour := OpsBehaviour{
 		OpsHandler:  volumeExpansionOpsHandler{},
 		QueueBySelf: true,
@@ -128,26 +129,29 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 	var veHelpers []volumeExpansionHelper
 	setVeHelpers := func(compSpec appsv1.ClusterComponentSpec, compOps ComponentOpsInterface, fullComponentName string) {
 		volumeExpansion := compOps.(opsv1alpha1.VolumeExpansion)
+		stopped := compSpec.Stop != nil && *compSpec.Stop
+		explicitOffline := sets.New(compSpec.OfflineInstances...)
 		if len(volumeExpansion.VolumeClaimTemplates) > 0 {
 			expectReplicas := compSpec.Replicas - getTemplateReplicas(compSpec.Instances)
 			for _, vct := range volumeExpansion.VolumeClaimTemplates {
 				veHelpers = append(veHelpers, volumeExpansionHelper{
-					compOps:              compOps,
-					fullComponentName:    fullComponentName,
-					expectCount:          int(expectReplicas),
-					vctName:              vct.Name,
-					offlineInstanceNames: compSpec.OfflineInstances,
+					compOps:           compOps,
+					fullComponentName: fullComponentName,
+					expectCount:       int(expectReplicas),
+					vctName:           vct.Name,
+					stopped:           stopped,
+					explicitOffline:   explicitOffline,
 				})
 				for _, template := range compSpec.Instances {
 					// todo: consider instance template with volumeClaimTemplates
 					veHelpers = append(veHelpers, volumeExpansionHelper{
-						compOps:              compOps,
-						fullComponentName:    fullComponentName,
-						expectCount:          int(*template.Replicas),
-						vctName:              vct.Name,
-						offlineInstanceNames: compSpec.OfflineInstances,
-						templateName:         template.Name,
-						ordinals:             template.Ordinals,
+						compOps:           compOps,
+						fullComponentName: fullComponentName,
+						expectCount:       int(template.GetReplicas()),
+						vctName:           vct.Name,
+						templateName:      template.Name,
+						stopped:           stopped,
+						explicitOffline:   explicitOffline,
 					})
 				}
 			}
@@ -294,13 +298,28 @@ func (ve volumeExpansionOpsHandler) handleVCTExpansionProgress(reqCtx intctrluti
 	if err != nil {
 		return 0, 0, err
 	}
-	instanceNames, err := runtime.GenerateTemplateInstanceNames(
-		opsRes.Cluster.Name, veHelper.fullComponentName, veHelper.templateName, int32(veHelper.expectCount), veHelper.offlineInstanceNames, veHelper.ordinals)
+	workload, err := runtime.GetWorkload(opsRes.Cluster.Namespace, opsRes.Cluster.Name, veHelper.fullComponentName)
 	if err != nil {
 		return 0, 0, err
 	}
-	instanceNameSet := sets.New(instanceNames...)
-	for instanceName := range instanceNameSet {
+	desiredState := workloads.InstanceDesiredStateActive
+	if veHelper.stopped {
+		// Stop retains the normal allocation as Offline, while explicitly
+		// offlined instances remain outside this operation's replica count.
+		desiredState = workloads.InstanceDesiredStateOffline
+	}
+	instances, err := instanceTemplatesByState(workload.GetInstanceStatuses(), desiredState,
+		func(status workloads.InstanceStatus) bool {
+			return !veHelper.explicitOffline.Has(status.PodName) &&
+				(status.TemplateName == nil || *status.TemplateName == veHelper.templateName)
+		})
+	if err != nil {
+		return 0, 0, err
+	}
+	if len(instances) != veHelper.expectCount {
+		return 0, 0, nil
+	}
+	for instanceName := range instances {
 		instance, getErr := runtime.GetInstance(opsRes.Cluster.Namespace, opsRes.Cluster.Name, veHelper.fullComponentName, instanceName)
 		if getErr != nil {
 			if apierrors.IsNotFound(getErr) {

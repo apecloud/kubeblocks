@@ -440,8 +440,19 @@ var _ = Describe("OpsRequest Controller", func() {
 
 		itsList := testk8s.ListAndCheckInstanceSetWithComponent(&testCtx, clusterKey, mysqlCompName)
 		mysqlIts := &itsList.Items[0]
+		mockDefaultTemplateReady := func(its *workloads.InstanceSet) {
+			testk8s.MockInstanceSetReady(its, pod)
+			// This fixture has one default-template instance. Publish its API
+			// assignment separately from the actual Pod resource update below.
+			for i := range its.Status.InstanceStatus {
+				status := &its.Status.InstanceStatus[i]
+				status.TemplateName = pointer.String("")
+				status.DesiredState = workloads.InstanceDesiredStateActive
+				status.CurrentState = workloads.InstanceCurrentStatePresent
+			}
+		}
 		Expect(testapps.ChangeObjStatus(&testCtx, mysqlIts, func() {
-			testk8s.MockInstanceSetReady(mysqlIts, pod)
+			mockDefaultTemplateReady(mysqlIts)
 		})).ShouldNot(HaveOccurred())
 		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1.RunningClusterPhase))
 
@@ -466,7 +477,7 @@ var _ = Describe("OpsRequest Controller", func() {
 
 		By("mock bring Cluster and changed component back to running status")
 		Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(mysqlIts), func(tmpIts *workloads.InstanceSet) {
-			testk8s.MockInstanceSetReady(tmpIts, pod)
+			mockDefaultTemplateReady(tmpIts)
 		})()).ShouldNot(HaveOccurred())
 		Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, mysqlCompName)).Should(Equal(appsv1.RunningComponentPhase))
 		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1.RunningClusterPhase))

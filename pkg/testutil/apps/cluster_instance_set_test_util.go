@@ -460,6 +460,23 @@ func MockInstanceSetStatus(testCtx testutil.TestContext, cluster *appsv1.Cluster
 		}
 		instanceStatus = append(instanceStatus, status)
 	}
+	// Offline identities remain published after their Pods disappear. This
+	// fixture uses non-flat names; flat-ordinal tests provide explicit assignments.
+	for _, podName := range sets.List(sets.New(compSpec.OfflineInstances...)) {
+		templateName := appsv1.GetInstanceTemplateName(cluster.Name, compName, podName)
+		status := workloads.InstanceStatus{PodName: podName, TemplateName: &templateName,
+			DesiredState: workloads.InstanceDesiredStateOffline, CurrentState: workloads.InstanceCurrentStateAbsent}
+		for _, pod := range podList.Items {
+			if pod.Name == podName {
+				status.CurrentState = workloads.InstanceCurrentStatePresent
+				if !pod.DeletionTimestamp.IsZero() {
+					status.CurrentState = workloads.InstanceCurrentStateTerminating
+				}
+				break
+			}
+		}
+		instanceStatus = append(instanceStatus, status)
+	}
 	gomega.Eventually(GetAndChangeObjStatus(&testCtx, client.ObjectKey{Name: itsName, Namespace: cluster.Namespace}, func(its *workloads.InstanceSet) {
 		its.Status.CurrentRevisions = currRevisions
 		its.Status.UpdateRevisions = updateRevisions

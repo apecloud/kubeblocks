@@ -143,6 +143,7 @@ var _ = Describe("Ops ProgressDetails", func() {
 			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
 			its := testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
 			podList := testapps.MockInstanceSetPods(&testCtx, its, opsRes.Cluster, defaultCompName)
+			testapps.MockInstanceSetStatus(testCtx, opsRes.Cluster, defaultCompName)
 
 			By("create horizontalScaling operation to test the progressDetails when scaling in the replicas")
 			opsRes.OpsRequest = createHorizontalScaling(clusterName, opsv1alpha1.HorizontalScaling{
@@ -197,6 +198,7 @@ var _ = Describe("Ops ProgressDetails", func() {
 			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
 			its := testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
 			podList := testapps.MockInstanceSetPods(&testCtx, its, opsRes.Cluster, defaultCompName)
+			testapps.MockInstanceSetStatus(testCtx, opsRes.Cluster, defaultCompName)
 
 			// ops will use the startTimestamp to make decision, start time should not equal the pod createTime during testing.
 			time.Sleep(time.Second)

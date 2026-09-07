@@ -583,6 +583,11 @@ var _ = Describe("OpsRequest Controller", func() {
 			testapps.MockInstanceSetStatus(testCtx, clusterObj, mysqlCompName)
 			Expect(testapps.ChangeObjStatus(&testCtx, its, func() {
 				testk8s.MockInstanceSetReady(its, mockPods...)
+				for i := range its.Status.InstanceStatus {
+					its.Status.InstanceStatus[i].TemplateName = pointer.String("")
+					its.Status.InstanceStatus[i].DesiredState = workloads.InstanceDesiredStateActive
+					its.Status.InstanceStatus[i].CurrentState = workloads.InstanceCurrentStatePresent
+				}
 			})).ShouldNot(HaveOccurred())
 
 			Eventually(testapps.GetComponentPhase(&testCtx, compKey)).Should(Equal(appsv1.RunningComponentPhase))

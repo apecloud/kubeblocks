@@ -19327,7 +19327,7 @@ ConditionStatus will be True if all its instances(pods) are in a Ready condition
 Or, a NotReady reason with not ready instances encoded in the Message filed will be set.</p>
 </td>
 </tr><tr><td><p>&#34;Restore&#34;</p></td>
-<td><p>InstanceRestore indicates whether the initial data restore for this InstanceSet has completed.</p>
+<td><p>InstanceRestore indicates whether the initial data restore for this Instance or InstanceSet has completed.</p>
 </td>
 </tr><tr><td><p>&#34;InstanceUpdateRestricted&#34;</p></td>
 <td><p>InstanceUpdateRestricted represents a ConditionType that indicates updates to an InstanceSet are blocked(when the
@@ -20728,7 +20728,7 @@ Instance&rsquo;s generation, which is updated on mutation by the API Server.</p>
 <td>
 <em>(Optional)</em>
 <p>Represents the latest available observations of an instance&rsquo;s current state.
-Known .status.conditions.type are: &ldquo;InstanceFailure&rdquo;, &ldquo;InstanceReady&rdquo;, &ldquo;InstanceAvailable&rdquo;</p>
+Known .status.conditions.type are: &ldquo;InstanceFailure&rdquo;, &ldquo;InstanceReady&rdquo;, &ldquo;InstanceAvailable&rdquo;, &ldquo;Restore&rdquo;</p>
 </td>
 </tr>
 <tr>

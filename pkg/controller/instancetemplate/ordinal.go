@@ -66,6 +66,23 @@ func getOrdinal(podName string) (int32, error) {
 	return int32(ordinal), nil
 }
 
+// GetTemplateNameAndOrdinal parses the instance template name and ordinal from
+// a Pod name that belongs to the specified workload.
+func GetTemplateNameAndOrdinal(workloadName, podName string) (string, int32, error) {
+	parentName, ordinal := parseParentNameAndOrdinal(podName)
+	if ordinal < 0 {
+		return "", 0, fmt.Errorf("failed to obtain pod ordinal from %q", podName)
+	}
+	if parentName == workloadName {
+		return "", int32(ordinal), nil
+	}
+	prefix := workloadName + "-"
+	if !strings.HasPrefix(parentName, prefix) {
+		return "", 0, fmt.Errorf("pod %q does not belong to workload %q", podName, workloadName)
+	}
+	return strings.TrimPrefix(parentName, prefix), int32(ordinal), nil
+}
+
 // parseParentNameAndOrdinal parses parent (instance template) Name and ordinal from the give instance name.
 // -1 will be returned if no numeric suffix contained.
 func parseParentNameAndOrdinal(s string) (string, int) {

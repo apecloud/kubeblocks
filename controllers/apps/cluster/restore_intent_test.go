@@ -47,6 +47,7 @@ func TestInjectRestoreIntentRemovesStaleOptionalAnnotations(t *testing.T) {
 	cluster := &appsv1.Cluster{}
 	cluster.Name = "test-cluster"
 	cluster.Namespace = "test-ns"
+	cluster.UID = "cluster-uid"
 	cluster.Spec.Restore = &appsv1.ClusterRestore{
 		Source: appsv1.ClusterRestoreSource{
 			APIGroup:  testRestoreSourceAPIGroup,
@@ -72,6 +73,7 @@ func TestInjectRestoreIntentRemovesStaleOptionalAnnotations(t *testing.T) {
 	require.Equal(t, "backup", vct.Spec.DataSourceRef.Name)
 	require.NotNil(t, vct.Spec.DataSourceRef.Namespace)
 	require.Equal(t, "backup-ns", *vct.Spec.DataSourceRef.Namespace)
+	require.Equal(t, string(cluster.UID), vct.Annotations[constant.KBAppClusterUIDKey])
 }
 
 func TestInjectRestoreIntentOmitsDataSourceRefNamespaceForSameNamespaceSource(t *testing.T) {
@@ -154,6 +156,7 @@ func TestApplyClusterRestoreIntentCleansTemplatesAfterRestoreCompleted(t *testin
 			Annotations: map[string]string{
 				constant.RestoreSourceKindAnnotationKey: testRestoreSourceKind,
 				constant.RestorePITRAnnotationKey:       "stale-pitr",
+				constant.KBAppClusterUIDKey:             "cluster-uid",
 			},
 			Spec: corev1.PersistentVolumeClaimSpec{
 				DataSourceRef: &corev1.TypedObjectReference{
@@ -172,6 +175,7 @@ func TestApplyClusterRestoreIntentCleansTemplatesAfterRestoreCompleted(t *testin
 	require.Nil(t, vct.Annotations)
 	require.NotContains(t, vct.Annotations, constant.RestoreSourceKindAnnotationKey)
 	require.NotContains(t, vct.Annotations, constant.RestorePITRAnnotationKey)
+	require.NotContains(t, vct.Annotations, constant.KBAppClusterUIDKey)
 }
 
 func TestApplyClusterRestoreIntentKeepsNonRestoreDataSourceAfterRestoreCompleted(t *testing.T) {

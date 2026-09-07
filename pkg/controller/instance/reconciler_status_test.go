@@ -134,6 +134,76 @@ func TestStatusReconcilerPublishesInstanceCurrentState(t *testing.T) {
 	}
 }
 
+func TestStatusReconcilerAggregatesRestorePVCConditionsWithoutPod(t *testing.T) {
+	newFixture := func() (*workloads.Instance, *kubebuilderx.ObjectTree, string) {
+		claim := corev1.PersistentVolumeClaimTemplate{ObjectMeta: metav1.ObjectMeta{
+			Name: "data",
+			Annotations: map[string]string{
+				constant.RestoreSourceKindAnnotationKey: "Backup",
+			},
+		}}
+		inst := &workloads.Instance{
+			ObjectMeta: metav1.ObjectMeta{Name: "demo-0", Namespace: "default", Generation: 2},
+			Spec: workloads.InstanceSpec{
+				InstanceSetName:      "demo",
+				VolumeClaimTemplates: []corev1.PersistentVolumeClaimTemplate{claim},
+			},
+		}
+		tree := kubebuilderx.NewObjectTree()
+		tree.SetRoot(inst)
+		return inst, tree, intctrlutil.ComposePVCName(corev1.PersistentVolumeClaim{ObjectMeta: claim.ObjectMeta}, "demo", "demo-0")
+	}
+	addPVC := func(t *testing.T, tree *kubebuilderx.ObjectTree, name string, status corev1.ConditionStatus) {
+		t.Helper()
+		pvc := &corev1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "default"},
+			Status: corev1.PersistentVolumeClaimStatus{Conditions: []corev1.PersistentVolumeClaimCondition{{
+				Type:    corev1.PersistentVolumeClaimConditionType(workloads.InstanceRestore),
+				Status:  status,
+				Message: "restore result",
+			}}},
+		}
+		if err := tree.Add(pvc); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	t.Run("waits for the PVC before the Pod exists", func(t *testing.T) {
+		inst, tree, _ := newFixture()
+		if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+			t.Fatal(err)
+		}
+		cond := meta.FindStatusCondition(inst.Status.Conditions, string(workloads.InstanceRestore))
+		if cond == nil || cond.Status != metav1.ConditionUnknown || cond.Reason != workloads.ReasonRestoreRunning {
+			t.Fatalf("unexpected Restore condition: %#v", cond)
+		}
+	})
+
+	t.Run("publishes completed", func(t *testing.T) {
+		inst, tree, pvcName := newFixture()
+		addPVC(t, tree, pvcName, corev1.ConditionTrue)
+		if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+			t.Fatal(err)
+		}
+		cond := meta.FindStatusCondition(inst.Status.Conditions, string(workloads.InstanceRestore))
+		if cond == nil || cond.Status != metav1.ConditionTrue || cond.Reason != workloads.ReasonRestoreCompleted {
+			t.Fatalf("unexpected Restore condition: %#v", cond)
+		}
+	})
+
+	t.Run("publishes failure first", func(t *testing.T) {
+		inst, tree, pvcName := newFixture()
+		addPVC(t, tree, pvcName, corev1.ConditionFalse)
+		if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+			t.Fatal(err)
+		}
+		cond := meta.FindStatusCondition(inst.Status.Conditions, string(workloads.InstanceRestore))
+		if cond == nil || cond.Status != metav1.ConditionFalse || cond.Reason != workloads.ReasonRestoreFailed {
+			t.Fatalf("unexpected Restore condition: %#v", cond)
+		}
+	})
+}
+
 func TestStatusReconcilerKeepsUpToDateFalseUntilPVCExpansionCompletes(t *testing.T) {
 	claim := corev1.PersistentVolumeClaimTemplate{
 		ObjectMeta: metav1.ObjectMeta{Name: "data"},

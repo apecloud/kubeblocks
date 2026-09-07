@@ -21,7 +21,6 @@ package operations
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -820,25 +819,4 @@ func instanceIsAvailable(
 		return true, nil
 	}
 	return false, nil
-}
-
-func getTemplateNameAndOrdinal(workloadName, podName string) (string, int32, error) {
-	podSuffix := strings.Replace(podName, workloadName+"-", "", 1)
-	lastDashIndex := strings.LastIndex(podSuffix, "-")
-	if lastDashIndex == len(podSuffix)-1 {
-		return "", 0, fmt.Errorf("no pod ordinal found after the last dash")
-	}
-	templateName := ""
-	indexStr := ""
-	if lastDashIndex == -1 {
-		indexStr = podSuffix
-	} else {
-		templateName = podSuffix[0:lastDashIndex]
-		indexStr = podSuffix[lastDashIndex+1:]
-	}
-	index, err := strconv.ParseInt(indexStr, 10, 32)
-	if err != nil {
-		return "", 0, fmt.Errorf("failed to obtain pod ordinal")
-	}
-	return templateName, int32(index), nil
 }

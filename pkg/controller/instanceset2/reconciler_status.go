@@ -175,6 +175,10 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		meta.RemoveStatusCondition(&its.Status.Conditions, string(workloads.InstanceFailure))
 	}
 
+	if err = r.reconcileRestoreCondition(tree, its, instanceList); err != nil {
+		return kubebuilderx.Continue, err
+	}
+
 	// 4. set instance status
 	if err := setInstanceStatus(tree, its, instanceList); err != nil {
 		return kubebuilderx.Continue, err
@@ -184,6 +188,93 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		return kubebuilderx.RetryAfter(time.Second), nil
 	}
 	return kubebuilderx.Continue, nil
+}
+
+func (r *statusReconciler) reconcileRestoreCondition(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, instances []*workloads.Instance) error {
+	restoreCond := meta.FindStatusCondition(its.Status.Conditions, string(workloads.InstanceRestore))
+	if restoreCond != nil && (restoreCond.Status == metav1.ConditionTrue || restoreCond.Status == metav1.ConditionFalse) {
+		return nil
+	}
+	condition, err := buildRestoreCondition(tree, its, instances)
+	if err != nil {
+		return err
+	}
+	if condition == nil {
+		meta.RemoveStatusCondition(&its.Status.Conditions, string(workloads.InstanceRestore))
+		return nil
+	}
+	meta.SetStatusCondition(&its.Status.Conditions, *condition)
+	return nil
+}
+
+func buildRestoreCondition(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, instances []*workloads.Instance) (*metav1.Condition, error) {
+	desiredInstances, _, err := buildDesiredInstancesByName(tree, its)
+	if err != nil {
+		return nil, err
+	}
+	expectedNames := sets.New[string]()
+	for name, inst := range desiredInstances {
+		for i := range inst.Spec.VolumeClaimTemplates {
+			if inst.Spec.VolumeClaimTemplates[i].Annotations[constant.RestoreSourceKindAnnotationKey] != "" {
+				expectedNames.Insert(name)
+				break
+			}
+		}
+	}
+	if expectedNames.Len() == 0 {
+		return nil, nil
+	}
+
+	instancesByName := make(map[string]*workloads.Instance, len(instances))
+	for _, inst := range instances {
+		instancesByName[inst.Name] = inst
+	}
+	completed := 0
+	waiting := sets.New[string]()
+	for name := range expectedNames {
+		inst := instancesByName[name]
+		if inst == nil {
+			waiting.Insert(name)
+			continue
+		}
+		cond := meta.FindStatusCondition(inst.Status.Conditions, string(workloads.InstanceRestore))
+		if cond == nil || cond.Status == metav1.ConditionUnknown {
+			waiting.Insert(name)
+			continue
+		}
+		if cond.Status == metav1.ConditionFalse {
+			return &metav1.Condition{
+				Type:               string(workloads.InstanceRestore),
+				Status:             metav1.ConditionFalse,
+				ObservedGeneration: its.Generation,
+				Reason:             workloads.ReasonRestoreFailed,
+				Message:            fmt.Sprintf("Instance %s restore failed: %s", inst.Name, cond.Message),
+			}, nil
+		}
+		if cond.Status == metav1.ConditionTrue {
+			completed++
+		}
+	}
+	if completed == expectedNames.Len() {
+		return &metav1.Condition{
+			Type:               string(workloads.InstanceRestore),
+			Status:             metav1.ConditionTrue,
+			ObservedGeneration: its.Generation,
+			Reason:             workloads.ReasonRestoreCompleted,
+			Message:            "All initial restore Instances have completed",
+		}, nil
+	}
+	message, err := buildConditionMessageWithNames(waiting.UnsortedList())
+	if err != nil {
+		return nil, err
+	}
+	return &metav1.Condition{
+		Type:               string(workloads.InstanceRestore),
+		Status:             metav1.ConditionUnknown,
+		ObservedGeneration: its.Generation,
+		Reason:             workloads.ReasonRestoreRunning,
+		Message:            fmt.Sprintf("Waiting for initial restore Instances to complete: %s", message),
+	}, nil
 }
 
 func getInstanceTemplateName(inst *workloads.Instance) string {

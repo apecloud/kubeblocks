@@ -41,6 +41,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
+	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	dputils "github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
@@ -828,7 +829,7 @@ func (r rebuildInstanceOpsHandler) getInPlaceRebuildTemplateName(opsRes *OpsReso
 	componentSpec := getComponentSpecOrShardingTemplate(opsRes.Cluster, componentName)
 	if componentSpec == nil || !componentSpec.FlatInstanceOrdinal {
 		workloadName := constant.GenerateWorkloadNamePattern(opsRes.Cluster.Name, fullComponentName)
-		templateName, _, err := getTemplateNameAndOrdinal(workloadName, podName)
+		templateName, _, err := instancetemplate.GetTemplateNameAndOrdinal(workloadName, podName)
 		return templateName, err
 	}
 	runtime, err := opsRes.GetRuntime(componentName)

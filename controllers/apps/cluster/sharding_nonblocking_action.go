@@ -50,15 +50,6 @@ type shardingActionTargets struct {
 func (h *clusterShardingHandler) nonBlockingShardingAction(transCtx *clusterTransformContext,
 	shardingName, actionName, targetsAnnotation string, action *appsv1.ShardingAction,
 	args map[string]string, runningComps []*appsv1.Component, sourceComp *appsv1.Component) error {
-	for _, comp := range runningComps {
-		addStarted := comp.Annotations[shardingAddActionTargetsKey] != ""
-		removeStarted := comp.Annotations[shardingRemoveActionTargetsKey] != ""
-		if (addStarted && (comp.Name != sourceComp.Name || targetsAnnotation != shardingAddActionTargetsKey)) ||
-			(removeStarted && (comp.Name != sourceComp.Name || targetsAnnotation != shardingRemoveActionTargetsKey)) {
-			return pendingShardingAction(actionName, "waiting for another sharding action")
-		}
-	}
-
 	targets, changed, err := h.resolveShardingActionTargets(
 		transCtx, action, targetsAnnotation, runningComps, sourceComp)
 	if err != nil {

@@ -2669,10 +2669,10 @@ var _ = Describe("cluster component transformer test", func() {
 			}
 			reconcileActions := func(runningComps, protoComps map[string]*appsv1.Component,
 				toCreate, toDelete, toUpdate sets.Set[string]) (sets.Set[string], error) {
-				handler := newNonBlockingShardingHandler(&clusterShardingHandler{}, transCtx, nil,
+				graphCli := transCtx.Client.(model.GraphClient)
+				dag = newDAG(graphCli, transCtx.Cluster)
+				return (&clusterShardingHandler{}).handleShardAddNRemove(transCtx, dag,
 					sharding1aName, runningComps, protoComps, toCreate, toDelete, toUpdate)
-				Expect(handler).ShouldNot(BeNil())
-				return handler.reconcileActions()
 			}
 
 			DescribeTable("waits for existing pod topology changes before selecting targets",
@@ -2787,6 +2787,97 @@ var _ = Describe("cluster component transformer test", func() {
 				Expect(calls).Should(Equal(4))
 				Expect(shard.Annotations).ShouldNot(HaveKey(shardingAddActionTargetsKey))
 			})
+
+			DescribeTable("persists action progress through the shared update path on target errors", func(terminal bool) {
+				source, pods := buildShard("shard-0", "pod-0", "pod-1")
+				fresh, _ := buildShard("shard-1", "pod-2")
+				source.Annotations[shardingAddShardKey] = "pending"
+				Expect(setShardingActionTargets(source, shardingAddActionTargetsKey, &shardingActionTargets{
+					Version: shardingActionTargetsVersion,
+					Targets: []shardingActionTarget{{Component: source.Name, Pods: []shardingActionTargetPod{
+						{Name: pods[0].Name, Rerun: true}, {Name: pods[1].Name, Rerun: true},
+					}}},
+				})).Should(Succeed())
+				desired := source.DeepCopy()
+				desired.Spec.Replicas = 1
+				delete(desired.Annotations, shardingAddShardKey)
+				delete(desired.Annotations, shardingAddActionTargetsKey)
+				transCtx.shardingDefs[shardingDefName].Spec.LifecycleActions = &appsv1.ShardingLifecycleActions{ShardAdd: action()}
+				round, calls := 0, 0
+				testapps.MockKBAgentClient(func(r *kbacli.MockClientMockRecorder) {
+					r.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+						target := calls % 2
+						calls++
+						Expect(req.Rerun).Should(Equal(round == 0 || (round == 1 && target == 1)))
+						if target == 0 || round == 2 {
+							return kbagentproto.ActionResponse{}, nil
+						}
+						if round == 1 {
+							return kbagentproto.ActionResponse{Error: kbagentproto.Error2Type(kbagentproto.ErrInProgress)}, nil
+						}
+						if terminal {
+							return kbagentproto.ActionResponse{Error: kbagentproto.Error2Type(kbagentproto.ErrFailed)}, nil
+						}
+						return kbagentproto.ActionResponse{}, fmt.Errorf("target transport error")
+					}).Times(6)
+				})
+
+				for ; round < 4; round++ {
+					original := source.DeepCopy()
+					cli := model.NewGraphClient(&appsutil.MockReader{Objects: []client.Object{source, pods[0], pods[1]}})
+					transCtx.Client = cli
+					dag = newDAG(cli, transCtx.Cluster)
+					err := (&clusterShardingHandler{}).updateShards(transCtx, dag, sharding1aName,
+						map[string]*appsv1.Component{source.Name: source},
+						map[string]*appsv1.Component{source.Name: desired, fresh.Name: fresh})
+					switch round {
+					case 0:
+						Expect(err).Should(HaveOccurred())
+						Expect(ictrlutil.IsDelayedRequeueError(err)).Should(BeFalse())
+					case 1, 2:
+						Expect(ictrlutil.IsDelayedRequeueError(err)).Should(BeTrue())
+					default:
+						Expect(err).ShouldNot(HaveOccurred())
+					}
+					var persisted *appsv1.Component
+					var created []string
+					Expect(dag.WalkReverseTopoOrder(func(v graph.Vertex) error {
+						n := v.(*model.ObjectVertex)
+						if comp, ok := n.Obj.(*appsv1.Component); ok {
+							switch *n.Action {
+							case model.UPDATE:
+								Expect(n.OriObj).Should(Equal(original))
+								persisted = comp.DeepCopy()
+							case model.CREATE:
+								created = append(created, comp.Name)
+								Expect(comp.Annotations).Should(HaveKey(shardingAddShardKey))
+							case model.DELETE:
+								Fail("no Component should be deleted")
+							}
+						}
+						return nil
+					}, nil)).Should(Succeed())
+					Expect(persisted).ShouldNot(BeNil())
+					if round < 3 {
+						Expect(created).Should(BeEmpty())
+						Expect(persisted.Spec.Replicas).Should(Equal(int32(2)))
+					} else {
+						Expect(created).Should(ConsistOf(fresh.Name))
+						Expect(persisted.Spec.Replicas).Should(Equal(int32(1)))
+					}
+					if round < 2 {
+						targets, found, err := getShardingActionTargets(persisted, shardingAddActionTargetsKey)
+						Expect(err).ShouldNot(HaveOccurred())
+						Expect(found).Should(BeTrue())
+						Expect(targets.Targets[0].Pods[0].Rerun).Should(BeFalse())
+						Expect(targets.Targets[0].Pods[1].Rerun).Should(Equal(round == 0))
+					} else {
+						Expect(persisted.Annotations).ShouldNot(HaveKey(shardingAddShardKey))
+						Expect(persisted.Annotations).ShouldNot(HaveKey(shardingAddActionTargetsKey))
+					}
+					source = persisted
+				}
+			}, Entry("transport error", false), Entry("terminal failure", true))
 			DescribeTable("persists the first shard-add snapshot during scale-in", func(removeDefined bool) {
 				shard, pods := buildShard("shard-0", "shard-0-0")
 				shard.Annotations[shardingAddShardKey] = "pending"
@@ -2817,12 +2908,9 @@ var _ = Describe("cluster component transformer test", func() {
 					graphCli := model.NewGraphClient(&appsutil.MockReader{Objects: []client.Object{shard, pods[0]}})
 					transCtx.Client = graphCli
 					dag = newDAG(graphCli, transCtx.Cluster)
-					handler := newNonBlockingShardingHandler(&clusterShardingHandler{}, transCtx, dag,
-						sharding1aName, map[string]*appsv1.Component{shard.Name: shard}, map[string]*appsv1.Component{},
-						sets.New[string](), sets.New(shard.Name), sets.New[string]())
-					Expect(handler).ShouldNot(BeNil())
 					addCompleted = round >= 2
-					err := handler.update()
+					err := (&clusterShardingHandler{}).updateShards(transCtx, dag, sharding1aName,
+						map[string]*appsv1.Component{shard.Name: shard}, map[string]*appsv1.Component{})
 					Expect(ictrlutil.IsDelayedRequeueError(err)).Should(BeTrue())
 
 					var persisted *appsv1.Component
@@ -2961,16 +3049,16 @@ var _ = Describe("cluster component transformer test", func() {
 				cli := model.NewGraphClient(&appsutil.MockReader{Objects: []client.Object{source, pods[0]}})
 				transCtx.Client = cli
 				dag = newDAG(cli, transCtx.Cluster)
-				h := newNonBlockingShardingHandler(&clusterShardingHandler{}, transCtx, dag, sharding1aName,
+				err := (&clusterShardingHandler{}).updateShards(transCtx, dag, sharding1aName,
 					map[string]*appsv1.Component{source.Name: source},
-					map[string]*appsv1.Component{source.Name: source.DeepCopy(), missing.Name: missing, unrelated.Name: unrelated},
-					sets.New(missing.Name, unrelated.Name), sets.New[string](), sets.New(source.Name))
-				Expect(ictrlutil.IsDelayedRequeueError(h.update())).Should(BeTrue())
+					map[string]*appsv1.Component{source.Name: source.DeepCopy(), missing.Name: missing, unrelated.Name: unrelated})
+				Expect(ictrlutil.IsDelayedRequeueError(err)).Should(BeTrue())
 				created := []string{}
 				Expect(dag.WalkReverseTopoOrder(func(v graph.Vertex) error {
 					n := v.(*model.ObjectVertex)
 					if comp, ok := n.Obj.(*appsv1.Component); ok && *n.Action == model.CREATE {
 						created = append(created, comp.Name)
+						Expect(comp.Annotations).Should(HaveKey(shardingAddShardKey))
 					}
 					return nil
 				}, nil)).Should(Succeed())
@@ -3006,20 +3094,15 @@ var _ = Describe("cluster component transformer test", func() {
 				running := map[string]*appsv1.Component{first.Name: first, next.Name: next, retained.Name: retained}
 				handle := func() []string {
 					objects := []client.Object{firstPods[0], nextPods[0], retainedPods[0]}
-					toDelete := sets.New[string]()
-					for name, comp := range running {
+					for _, comp := range running {
 						objects = append(objects, comp)
-						if name != retained.Name {
-							toDelete.Insert(name)
-						}
 					}
 					cli := model.NewGraphClient(&appsutil.MockReader{Objects: objects})
 					transCtx.Client = cli
 					dag = newDAG(cli, transCtx.Cluster)
-					h := newNonBlockingShardingHandler(&clusterShardingHandler{}, transCtx, dag, sharding1aName,
-						running, map[string]*appsv1.Component{retained.Name: retained.DeepCopy()},
-						sets.New[string](), toDelete, sets.New(retained.Name))
-					Expect(ictrlutil.IsDelayedRequeueError(h.update())).Should(BeTrue())
+					err := (&clusterShardingHandler{}).updateShards(transCtx, dag, sharding1aName,
+						running, map[string]*appsv1.Component{retained.Name: retained.DeepCopy()})
+					Expect(ictrlutil.IsDelayedRequeueError(err)).Should(BeTrue())
 					var deleted []string
 					Expect(dag.WalkReverseTopoOrder(func(v graph.Vertex) error {
 						n := v.(*model.ObjectVertex)
@@ -3076,11 +3159,10 @@ var _ = Describe("cluster component transformer test", func() {
 				cli := model.NewGraphClient(&appsutil.MockReader{Objects: []client.Object{source, peer, sourcePods[0], peerPods[0], peerPods[1]}})
 				transCtx.Client = cli
 				dag = newDAG(cli, transCtx.Cluster)
-				h := newNonBlockingShardingHandler(&clusterShardingHandler{}, transCtx, dag, sharding1aName,
+				err := (&clusterShardingHandler{}).updateShards(transCtx, dag, sharding1aName,
 					map[string]*appsv1.Component{source.Name: source, peer.Name: peer},
-					map[string]*appsv1.Component{source.Name: source.DeepCopy(), peer.Name: peerDesired},
-					sets.New[string](), sets.New[string](), sets.New(source.Name, peer.Name))
-				Expect(ictrlutil.IsDelayedRequeueError(h.update())).Should(BeTrue())
+					map[string]*appsv1.Component{source.Name: source.DeepCopy(), peer.Name: peerDesired})
+				Expect(ictrlutil.IsDelayedRequeueError(err)).Should(BeTrue())
 				targets, found, err := getShardingActionTargets(source, shardingAddActionTargetsKey)
 				Expect(err).ShouldNot(HaveOccurred())
 				Expect(found).Should(BeTrue())

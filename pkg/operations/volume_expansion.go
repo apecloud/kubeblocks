@@ -29,6 +29,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -48,6 +49,8 @@ type volumeExpansionHelper struct {
 	vctName           string
 	expectCount       int
 	templateName      string
+	stopped           bool
+	explicitOffline   sets.Set[string]
 }
 
 var _ OpsHandler = volumeExpansionOpsHandler{}
@@ -126,6 +129,8 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 	var veHelpers []volumeExpansionHelper
 	setVeHelpers := func(compSpec appsv1.ClusterComponentSpec, compOps ComponentOpsInterface, fullComponentName string) {
 		volumeExpansion := compOps.(opsv1alpha1.VolumeExpansion)
+		stopped := compSpec.Stop != nil && *compSpec.Stop
+		explicitOffline := sets.New(compSpec.OfflineInstances...)
 		if len(volumeExpansion.VolumeClaimTemplates) > 0 {
 			expectReplicas := compSpec.Replicas - getTemplateReplicas(compSpec.Instances)
 			for _, vct := range volumeExpansion.VolumeClaimTemplates {
@@ -134,6 +139,8 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 					fullComponentName: fullComponentName,
 					expectCount:       int(expectReplicas),
 					vctName:           vct.Name,
+					stopped:           stopped,
+					explicitOffline:   explicitOffline,
 				})
 				for _, template := range compSpec.Instances {
 					// todo: consider instance template with volumeClaimTemplates
@@ -143,6 +150,8 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 						expectCount:       int(*template.Replicas),
 						vctName:           vct.Name,
 						templateName:      template.Name,
+						stopped:           stopped,
+						explicitOffline:   explicitOffline,
 					})
 				}
 			}
@@ -293,9 +302,16 @@ func (ve volumeExpansionOpsHandler) handleVCTExpansionProgress(reqCtx intctrluti
 	if err != nil {
 		return 0, 0, err
 	}
-	instances, err := activeInstanceTemplates(workload.GetInstanceStatuses(),
+	desiredState := workloads.InstanceDesiredStateActive
+	if veHelper.stopped {
+		// Stop retains the normal allocation as Offline, while explicitly
+		// offlined instances remain outside this operation's replica count.
+		desiredState = workloads.InstanceDesiredStateOffline
+	}
+	instances, err := instanceTemplatesByState(workload.GetInstanceStatuses(), desiredState,
 		func(status workloads.InstanceStatus) bool {
-			return status.TemplateName == nil || *status.TemplateName == veHelper.templateName
+			return !veHelper.explicitOffline.Has(status.PodName) &&
+				(status.TemplateName == nil || *status.TemplateName == veHelper.templateName)
 		})
 	if err != nil {
 		return 0, 0, err

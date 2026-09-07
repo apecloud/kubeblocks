@@ -35,12 +35,17 @@ func instanceStatusByName(statuses []workloadsv1.InstanceStatus) (map[string]wor
 
 func activeInstanceTemplates(statuses []workloadsv1.InstanceStatus,
 	include func(workloadsv1.InstanceStatus) bool) (map[string]string, error) {
+	return instanceTemplatesByState(statuses, workloadsv1.InstanceDesiredStateActive, include)
+}
+
+func instanceTemplatesByState(statuses []workloadsv1.InstanceStatus, desired workloadsv1.InstanceDesiredState,
+	include func(workloadsv1.InstanceStatus) bool) (map[string]string, error) {
 	if _, err := instanceStatusByName(statuses); err != nil {
 		return nil, err
 	}
 	result := map[string]string{}
 	for _, status := range statuses {
-		if status.EffectiveDesiredState() != workloadsv1.InstanceDesiredStateActive || include != nil && !include(status) {
+		if status.EffectiveDesiredState() != desired || include != nil && !include(status) {
 			continue
 		}
 		if status.TemplateName == nil {

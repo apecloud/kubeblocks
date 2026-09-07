@@ -33,6 +33,83 @@ import (
 
 func templateName(name string) *string { return &name }
 
+func TestStoppedVolumeExpansionUsesRetainedPVCs(t *testing.T) {
+	for _, tc := range []struct {
+		name, podName, template string
+		flat                    bool
+	}{
+		{name: "flat-default", podName: "demo-db-42", flat: true},
+		{name: "flat-template", podName: "demo-db-42", template: "large", flat: true},
+		{name: "nonflat-default", podName: "demo-db-0"},
+		{name: "nonflat-template", podName: "demo-db-large-0", template: "large"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			scheme := runtime.NewScheme()
+			for _, add := range []func(*runtime.Scheme) error{corev1.AddToScheme, appsv1.AddToScheme, workloads.AddToScheme, opsv1alpha1.AddToScheme} {
+				if err := add(scheme); err != nil {
+					t.Fatal(err)
+				}
+			}
+			component := appsv1.ClusterComponentSpec{Name: "db", Replicas: 1, FlatInstanceOrdinal: tc.flat,
+				Stop: pointer.Bool(true), OfflineInstances: []string{"demo-db-8"}}
+			if tc.template != "" {
+				component.Instances = []appsv1.InstanceTemplate{{Name: tc.template, Replicas: pointer.Int32(1)}}
+			}
+			cluster := &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default"},
+				Spec:   appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{component}},
+				Status: appsv1.ClusterStatus{Components: map[string]appsv1.ClusterComponentStatus{"db": {Phase: appsv1.StoppedComponentPhase}}}}
+			its := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Name: "demo-db", Namespace: "default"},
+				Spec: workloads.InstanceSetSpec{Stop: pointer.Bool(true), Replicas: pointer.Int32(1), OfflineInstances: component.OfflineInstances},
+				Status: workloads.InstanceSetStatus{InstanceStatus: []workloads.InstanceStatus{
+					{PodName: tc.podName, TemplateName: templateName(tc.template), DesiredState: workloads.InstanceDesiredStateOffline, CurrentState: workloads.InstanceCurrentStateAbsent},
+					{PodName: "demo-db-8", DesiredState: workloads.InstanceDesiredStateOffline, CurrentState: workloads.InstanceCurrentStateAbsent},
+					{PodName: "demo-db-9", TemplateName: templateName(tc.template), DesiredState: workloads.InstanceDesiredStateReleased, CurrentState: workloads.InstanceCurrentStateTerminating},
+				}}}
+			ops := &opsv1alpha1.OpsRequest{ObjectMeta: metav1.ObjectMeta{Name: "expand", Namespace: "default"},
+				Spec: opsv1alpha1.OpsRequestSpec{SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{VolumeExpansionList: []opsv1alpha1.VolumeExpansion{{
+					ComponentOps: opsv1alpha1.ComponentOps{ComponentName: "db"}, VolumeClaimTemplates: []opsv1alpha1.OpsRequestVolumeClaimTemplate{{Name: "data", Storage: resource.MustParse("2Gi")}},
+				}}}}, Status: opsv1alpha1.OpsRequestStatus{Phase: opsv1alpha1.OpsRunningPhase, StartTimestamp: metav1.Now()}}
+			objects := []client.Object{cluster, its, ops}
+			for _, name := range []string{tc.podName, "demo-db-8", "demo-db-9"} {
+				labels := constant.GetCompLabels("demo", "db")
+				labels[constant.VolumeClaimTemplateNameLabelKey] = "data"
+				objects = append(objects, &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "data-" + name, Namespace: "default", Labels: labels},
+					Spec: corev1.PersistentVolumeClaimSpec{Resources: corev1.VolumeResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("2Gi")}}},
+					Status: corev1.PersistentVolumeClaimStatus{Phase: corev1.ClaimBound, Capacity: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("1Gi")},
+						Conditions: []corev1.PersistentVolumeClaimCondition{{Type: corev1.PersistentVolumeClaimResizing, Status: corev1.ConditionTrue}}}})
+			}
+			cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(ops, &corev1.PersistentVolumeClaim{}).WithObjects(objects...).Build()
+			opsRes := &OpsResource{Cluster: cluster, OpsRequest: ops, Recorder: record.NewFakeRecorder(20), Runtimes: map[string]OpsRuntime{"db": newOpsRuntime(ctx, cli, "")}}
+			check := func(want opsv1alpha1.OpsPhase, progress string) {
+				t.Helper()
+				phase, _, err := (volumeExpansionOpsHandler{}).ReconcileAction(intctrlutil.RequestCtx{Ctx: ctx}, cli, opsRes)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if phase != want || ops.Status.Progress != progress {
+					t.Fatalf("got %s %s, want %s %s", phase, ops.Status.Progress, want, progress)
+				}
+				details := ops.Status.Components["db"].ProgressDetails
+				if len(details) != 1 || details[0].ObjectKey != "PVC/data-"+tc.podName {
+					t.Fatalf("unexpected participants: %#v", details)
+				}
+			}
+			check(opsv1alpha1.OpsRunningPhase, "0/1")
+			pvc := &corev1.PersistentVolumeClaim{}
+			if err := cli.Get(ctx, client.ObjectKey{Namespace: "default", Name: "data-" + tc.podName}, pvc); err != nil {
+				t.Fatal(err)
+			}
+			pvc.Status.Capacity[corev1.ResourceStorage] = resource.MustParse("2Gi")
+			pvc.Status.Conditions = nil
+			if err := cli.Status().Update(ctx, pvc); err != nil {
+				t.Fatal(err)
+			}
+			check(opsv1alpha1.OpsSucceedPhase, "1/1")
+		})
+	}
+}
+
 // Exercise the real Operations runtime and handlers against explicit API objects.
 // The instance names intentionally carry no template name or contiguous ordinal.
 func TestScalingUsesAssignedInstancesAndActualObjects(t *testing.T) {

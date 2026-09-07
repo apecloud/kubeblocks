@@ -2673,6 +2673,92 @@ var _ = Describe("cluster component transformer test", func() {
 				return handler.reconcileActions()
 			}
 
+			DescribeTable("persists the first shard-add snapshot during scale-in", func(removeDefined bool) {
+				shard, pods := buildShard("shard-0", "shard-0-0")
+				shard.Annotations[shardingAddShardKey] = "pending"
+				actions := &appsv1.ShardingLifecycleActions{ShardAdd: action()}
+				if removeDefined {
+					actions.ShardRemove = mockShardingAction("shard-remove")
+				}
+				transCtx.shardingDefs[shardingDefName].Spec.LifecycleActions = actions
+				var calls []string
+				addCompleted := false
+				testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+					recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(
+						func(_ context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+							calls = append(calls, req.Action)
+							if req.Action == "udf-"+shardingAddShardAction {
+								Expect(req.Rerun).Should(Equal(!addCompleted))
+								if !addCompleted {
+									return kbagentproto.ActionResponse{Error: kbagentproto.Error2Type(kbagentproto.ErrInProgress)}, nil
+								}
+							}
+							return kbagentproto.ActionResponse{}, nil
+						}).AnyTimes()
+				})
+
+				for round := 0; round < 3; round++ {
+					By(fmt.Sprintf("reconciling scale-in round %d from the previously persisted Component", round))
+					original := shard.DeepCopy()
+					graphCli := model.NewGraphClient(&appsutil.MockReader{Objects: []client.Object{shard, pods[0]}})
+					transCtx.Client = graphCli
+					dag = newDAG(graphCli, transCtx.Cluster)
+					handler := newNonBlockingShardingHandler(&clusterShardingHandler{}, transCtx, dag,
+						sharding1aName, map[string]*appsv1.Component{shard.Name: shard}, map[string]*appsv1.Component{},
+						sets.New[string](), sets.New(shard.Name), sets.New[string]())
+					Expect(handler).ShouldNot(BeNil())
+					addCompleted = round == 2
+					err := handler.update()
+					if round < 2 {
+						Expect(ictrlutil.IsDelayedRequeueError(err)).Should(BeTrue())
+					} else {
+						Expect(err).ShouldNot(HaveOccurred())
+					}
+
+					var persisted *appsv1.Component
+					deletes := 0
+					Expect(dag.WalkReverseTopoOrder(func(vertex graph.Vertex) error {
+						node := vertex.(*model.ObjectVertex)
+						if comp, ok := node.Obj.(*appsv1.Component); ok {
+							if *node.Action == model.DELETE {
+								deletes++
+								Expect(comp.Annotations).ShouldNot(HaveKey(shardingAddShardKey))
+								Expect(comp.Annotations).ShouldNot(HaveKey(shardingAddActionTargetsKey))
+							} else if *node.Action == model.UPDATE {
+								if round < 2 {
+									Expect(node.OriObj).Should(Equal(original))
+								}
+								persisted = comp.DeepCopy()
+							}
+						}
+						return nil
+					}, nil)).Should(Succeed())
+					if round < 2 {
+						Expect(deletes).Should(BeZero())
+						Expect(persisted).ShouldNot(BeNil())
+						Expect(persisted.Annotations[shardingAddShardKey]).Should(Equal("pending"))
+						targets, found, err := getShardingActionTargets(persisted, shardingAddActionTargetsKey)
+						Expect(err).ShouldNot(HaveOccurred())
+						Expect(found).Should(BeTrue())
+						Expect(targets.Targets).Should(Equal([]shardingActionTarget{{
+							Component: shard.Name, Pods: []shardingActionTargetPod{{Name: pods[0].Name, Rerun: round == 0}},
+						}}))
+						Expect(calls).Should(HaveLen(round))
+						shard = persisted
+					} else {
+						Expect(deletes).Should(Equal(1))
+					}
+				}
+				expectedCalls := []string{"udf-" + shardingAddShardAction, "udf-" + shardingAddShardAction}
+				if removeDefined {
+					expectedCalls = append(expectedCalls, "udf-"+shardingRemoveShardAction)
+				}
+				Expect(calls).Should(Equal(expectedCalls))
+			},
+				Entry("without shard-remove", false),
+				Entry("with blocking shard-remove", true),
+			)
+
 			It("persists the selected targets before invoking the action", func() {
 				shard0, pods0 := buildShard("shard-0", "shard-0-0", "shard-0-1")
 				shard1, pods1 := buildShard("shard-1", "shard-1-0", "shard-1-1")

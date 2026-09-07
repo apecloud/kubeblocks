@@ -98,7 +98,7 @@ func (h *nonBlockingShardingHandler) actionStateSources() map[string]*appsv1.Com
 		active := comp.Annotations[shardingAddActionTargetsKey] != "" ||
 			comp.Annotations[shardingRemoveActionTargetsKey] != ""
 		startsAdd := h.actions != nil && h.actions.ShardAdd != nil && h.actions.ShardAdd.NonBlocking &&
-			h.toUpdate.Has(name) && comp.Annotations[shardingAddShardKey] != ""
+			(h.toUpdate.Has(name) || h.toDelete.Has(name)) && comp.Annotations[shardingAddShardKey] != ""
 		startsRemove := h.actions != nil && h.actions.ShardRemove != nil && h.actions.ShardRemove.NonBlocking &&
 			h.toDelete.Has(name)
 		if active || startsAdd || startsRemove {

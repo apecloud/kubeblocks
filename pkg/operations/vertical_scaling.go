@@ -56,8 +56,7 @@ func (vs verticalScalingHandler) ActionStartedCondition(reqCtx intctrlutil.Reque
 	return opsv1alpha1.NewVerticalScalingCondition(opsRes.OpsRequest), nil
 }
 
-// Action modifies cluster component resources according to
-// the definition of opsRequest with spec.componentNames and spec.componentOps.verticalScaling
+// Action applies spec.verticalScaling to the requested component and instance-template resources.
 func (vs verticalScalingHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	applyVerticalScaling := func(compSpec *appsv1.ClusterComponentSpec, obj ComponentOpsInterface) error {
 		verticalScaling := obj.(opsv1alpha1.VerticalScaling)
@@ -105,46 +104,50 @@ func (vs verticalScalingHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, 
 		pgRes *progressResource,
 		compStatus *opsv1alpha1.OpsRequestComponentStatus) (expectProgressCount int32, completedCount int32, err error) {
 		verticalScaling := pgRes.compOps.(opsv1alpha1.VerticalScaling)
-		if len(pgRes.clusterComponent.Instances) != 0 {
-			// obtain the pods which should be updated.
-			updatedPodSet := map[string]string{}
-			updatedTemplates := map[string]struct{}{}
-			vsInsMap := vs.covertInsResourcesToMap(verticalScaling)
-			templateReplicasCnt := int32(0)
-			runtime, err := opsRes.GetRuntime(pgRes.compOps.GetComponentName())
-			if err != nil {
-				return 0, 0, err
+		// obtain the pods which should be updated.
+		updatedPodSet := map[string]string{}
+		updatedTemplates := map[string]struct{}{}
+		vsInsMap := vs.covertInsResourcesToMap(verticalScaling)
+		templateReplicasCnt := int32(0)
+		runtime, err := opsRes.GetRuntime(pgRes.compOps.GetComponentName())
+		if err != nil {
+			return 0, 0, err
+		}
+		workload, err := runtime.GetWorkload(opsRes.Cluster.Namespace, opsRes.Cluster.Name, pgRes.fullComponentName)
+		if err != nil {
+			return 0, 0, err
+		}
+		for _, template := range pgRes.clusterComponent.Instances {
+			replicas := template.GetReplicas()
+			insVS := vsInsMap[template.Name]
+			if vs.verticalScalingInsTemplate(verticalScaling, template, insVS) {
+				updatedTemplates[template.Name] = struct{}{}
 			}
-			workload, err := runtime.GetWorkload(opsRes.Cluster.Namespace, opsRes.Cluster.Name, pgRes.fullComponentName)
-			if err != nil {
-				return 0, 0, err
+			templateReplicasCnt += replicas
+		}
+		if vs.verticalScalingComp(verticalScaling) && templateReplicasCnt < pgRes.clusterComponent.Replicas {
+			updatedTemplates[""] = struct{}{}
+		} else if len(pgRes.clusterComponent.Instances) > 0 {
+			pgRes.noWaitComponentCompleted = true
+		}
+		allActive, complete, err := activeAssignmentsForTarget(workload, pgRes.clusterComponent)
+		if err != nil {
+			return 0, 0, err
+		}
+		if !complete {
+			return 1, 0, nil
+		}
+		for podName, templateName := range allActive {
+			if _, ok := updatedTemplates[templateName]; ok {
+				updatedPodSet[podName] = templateName
 			}
-			for _, template := range pgRes.clusterComponent.Instances {
-				replicas := template.GetReplicas()
-				insVS := vsInsMap[template.Name]
-				if vs.verticalScalingInsTemplate(verticalScaling, template, insVS) {
-					updatedTemplates[template.Name] = struct{}{}
-				}
-				templateReplicasCnt += replicas
-			}
-			if vs.verticalScalingComp(verticalScaling) && templateReplicasCnt < pgRes.clusterComponent.Replicas {
-				updatedTemplates[""] = struct{}{}
-			} else {
-				pgRes.noWaitComponentCompleted = true
-			}
-			allActive, complete, err := activeAssignmentsForTarget(workload, pgRes.clusterComponent)
-			if err != nil {
-				return 0, 0, err
-			}
-			if !complete {
-				return 1, 0, nil
-			}
-			for podName, templateName := range allActive {
-				if _, ok := updatedTemplates[templateName]; ok {
-					updatedPodSet[podName] = templateName
-				}
-			}
-			pgRes.updatedPodSet = updatedPodSet
+		}
+		pgRes.updatedPodSet = updatedPodSet
+		if len(updatedPodSet) == 0 {
+			// A complete allocation with no affected instances is a no-op, not
+			// a request to use the shared progress helper's all-Pod fallback.
+			pgRes.noWaitComponentCompleted = true
+			return 0, 0, nil
 		}
 		return handleComponentStatusProgress(reqCtx, cli, opsRes, pgRes, compStatus, vs.podApplyCompOps)
 	}

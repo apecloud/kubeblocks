@@ -14,6 +14,7 @@ package operations
 import (
 	"context"
 	"testing"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -33,15 +34,128 @@ import (
 
 func templateName(name string) *string { return &name }
 
+func TestVerticalScalingDefaultAndEmptySelection(t *testing.T) {
+	for _, tc := range []struct {
+		name                                string
+		zeroTemplate, zeroComponent, cancel bool
+	}{
+		{name: "default"},
+		{name: "zero-template", zeroTemplate: true},
+		{name: "zero-component", zeroComponent: true},
+		{name: "cancel-default", cancel: true},
+		{name: "cancel-zero-template", zeroTemplate: true, cancel: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			scheme := runtime.NewScheme()
+			for _, add := range []func(*runtime.Scheme) error{corev1.AddToScheme, appsv1.AddToScheme, workloads.AddToScheme, opsv1alpha1.AddToScheme} {
+				if err := add(scheme); err != nil {
+					t.Fatal(err)
+				}
+			}
+			target := corev1.ResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("2")}}
+			original := corev1.ResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")}}
+			comp := appsv1.ClusterComponentSpec{Name: "db", ComponentDef: "database", Replicas: 1, FlatInstanceOrdinal: true, Resources: target}
+			vs := opsv1alpha1.VerticalScaling{ComponentOps: opsv1alpha1.ComponentOps{ComponentName: "db"}, ResourceRequirements: target}
+			last := opsv1alpha1.LastComponentConfiguration{ResourceRequirements: original}
+			if tc.zeroTemplate {
+				comp.Instances = []appsv1.InstanceTemplate{{Name: "unused", Replicas: pointer.Int32(0), Resources: &target}}
+				vs.ResourceRequirements = corev1.ResourceRequirements{}
+				vs.Instances = []opsv1alpha1.InstanceResourceTemplate{{Name: "unused", ResourceRequirements: target}}
+				last.Instances = []appsv1.InstanceTemplate{{Name: "unused", Resources: &original}}
+			}
+			if tc.zeroComponent {
+				comp.Replicas = 0
+			}
+			cluster := &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default"},
+				Spec:   appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{comp}},
+				Status: appsv1.ClusterStatus{Components: map[string]appsv1.ClusterComponentStatus{"db": {Phase: appsv1.RunningComponentPhase}}}}
+			its := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Name: "demo-db", Namespace: "default"}}
+			ops := &opsv1alpha1.OpsRequest{ObjectMeta: metav1.ObjectMeta{Name: "scale", Namespace: "default"},
+				Spec: opsv1alpha1.OpsRequestSpec{Cancel: tc.cancel, SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{VerticalScalingList: []opsv1alpha1.VerticalScaling{vs}}},
+				Status: opsv1alpha1.OpsRequestStatus{Phase: opsv1alpha1.OpsRunningPhase, StartTimestamp: metav1.NewTime(time.Now().Add(-time.Minute)),
+					LastConfiguration: opsv1alpha1.LastConfiguration{Components: map[string]opsv1alpha1.LastComponentConfiguration{"db": last}}}}
+			if tc.cancel {
+				ops.Status.Phase = opsv1alpha1.OpsCancellingPhase
+				ops.Status.CancelTimestamp = ops.Status.StartTimestamp
+			}
+			objects := []client.Object{cluster, its, ops, &appsv1.ComponentDefinition{ObjectMeta: metav1.ObjectMeta{Name: "database"}}}
+			// These unrelated Pods must never be selected, including when the
+			// authoritative selection is empty. Their resources already match.
+			for _, name := range []string{"demo-db-42", "demo-db-7", "demo-db-8"} {
+				objects = append(objects, &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "default", CreationTimestamp: metav1.Now(), Labels: constant.GetCompLabels("demo", "db")},
+					Spec:   corev1.PodSpec{Containers: []corev1.Container{{Name: "db", Resources: target}}},
+					Status: corev1.PodStatus{Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}}}})
+			}
+			cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(ops, its).WithObjects(objects...).Build()
+			opsRes := &OpsResource{Cluster: cluster, OpsRequest: ops, Recorder: record.NewFakeRecorder(30), Runtimes: map[string]OpsRuntime{"db": newOpsRuntime(ctx, cli, "")}}
+			handler := verticalScalingHandler{}
+			if tc.cancel {
+				if err := handler.Cancel(intctrlutil.RequestCtx{Ctx: ctx}, cli, opsRes); err != nil {
+					t.Fatal(err)
+				}
+			}
+			check := func(want opsv1alpha1.OpsPhase, progress string, participants int) {
+				t.Helper()
+				phase, _, err := handler.ReconcileAction(intctrlutil.RequestCtx{Ctx: ctx}, cli, opsRes)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if phase != want || ops.Status.Progress != progress {
+					t.Fatalf("got %s %s, want %s %s", phase, ops.Status.Progress, want, progress)
+				}
+				details := ops.Status.Components["db"].ProgressDetails
+				if len(details) != participants {
+					t.Fatalf("unexpected participants: %#v", details)
+				}
+				if participants == 1 && details[0].ObjectKey != "Pod/demo-db-42" {
+					t.Fatalf("unexpected participant: %s", details[0].ObjectKey)
+				}
+			}
+			if !tc.zeroComponent {
+				check(opsv1alpha1.OpsRunningPhase, "0/1", 0)
+			}
+			its.Status.InstanceStatus = []workloads.InstanceStatus{
+				{PodName: "demo-db-7", DesiredState: workloads.InstanceDesiredStateReleased},
+				{PodName: "demo-db-8", DesiredState: workloads.InstanceDesiredStateOffline},
+			}
+			if !tc.zeroComponent {
+				its.Status.InstanceStatus = append(its.Status.InstanceStatus, workloads.InstanceStatus{PodName: "demo-db-42", TemplateName: templateName(""), DesiredState: workloads.InstanceDesiredStateActive})
+			}
+			if err := cli.Status().Update(ctx, its); err != nil {
+				t.Fatal(err)
+			}
+			if tc.zeroTemplate || tc.zeroComponent {
+				check(opsv1alpha1.OpsSucceedPhase, "0/0", 0)
+				return
+			}
+			if tc.cancel {
+				check(opsv1alpha1.OpsRunningPhase, "0/1", 1)
+				pod := &corev1.Pod{}
+				if err := cli.Get(ctx, client.ObjectKey{Name: "demo-db-42", Namespace: "default"}, pod); err != nil {
+					t.Fatal(err)
+				}
+				pod.Spec.Containers[0].Resources = original
+				if err := cli.Update(ctx, pod); err != nil {
+					t.Fatal(err)
+				}
+			}
+			check(opsv1alpha1.OpsSucceedPhase, "1/1", 1)
+		})
+	}
+}
+
 func TestStoppedVolumeExpansionUsesRetainedPVCs(t *testing.T) {
 	for _, tc := range []struct {
 		name, podName, template string
 		flat                    bool
+		defaultReplicas         bool
 	}{
 		{name: "flat-default", podName: "demo-db-42", flat: true},
 		{name: "flat-template", podName: "demo-db-42", template: "large", flat: true},
 		{name: "nonflat-default", podName: "demo-db-0"},
 		{name: "nonflat-template", podName: "demo-db-large-0", template: "large"},
+		{name: "template-default-replicas", podName: "demo-db-42", template: "large", flat: true, defaultReplicas: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
@@ -55,6 +169,9 @@ func TestStoppedVolumeExpansionUsesRetainedPVCs(t *testing.T) {
 				Stop: pointer.Bool(true), OfflineInstances: []string{"demo-db-8"}}
 			if tc.template != "" {
 				component.Instances = []appsv1.InstanceTemplate{{Name: tc.template, Replicas: pointer.Int32(1)}}
+				if tc.defaultReplicas {
+					component.Instances[0].Replicas = nil
+				}
 			}
 			cluster := &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default"},
 				Spec:   appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{component}},

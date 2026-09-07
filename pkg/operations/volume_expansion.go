@@ -61,7 +61,7 @@ const (
 )
 
 func init() {
-	// the volume expansion operation only supports online expansion now
+	// Expansion progress is checked on PVCs, including those retained after Stop.
 	volumeExpansionBehaviour := OpsBehaviour{
 		OpsHandler:  volumeExpansionOpsHandler{},
 		QueueBySelf: true,
@@ -147,7 +147,7 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 					veHelpers = append(veHelpers, volumeExpansionHelper{
 						compOps:           compOps,
 						fullComponentName: fullComponentName,
-						expectCount:       int(*template.Replicas),
+						expectCount:       int(template.GetReplicas()),
 						vctName:           vct.Name,
 						templateName:      template.Name,
 						stopped:           stopped,

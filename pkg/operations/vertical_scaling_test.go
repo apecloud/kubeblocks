@@ -252,6 +252,8 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
 			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
 			podList := initInstanceSetPods(ctx, k8sClient, opsRes)
+			testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
+			testapps.MockInstanceSetStatus(testCtx, opsRes.Cluster, defaultCompName)
 
 			By("create VerticalScaling ops")
 			ops := testops.NewOpsRequestObj("vertical-scaling-ops-"+randomStr, testCtx.DefaultNamespace,

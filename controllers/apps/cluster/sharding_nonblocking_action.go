@@ -87,13 +87,20 @@ func (h *clusterShardingHandler) nonBlockingShardingAction(transCtx *clusterTran
 		}
 		for j := range target.Pods {
 			pod := &target.Pods[j]
+			spec := &action.Action
+			if !pod.Rerun && spec.PreCondition != nil {
+				// Once accepted, a request must remain observable even if its
+				// execution changes the readiness required to start it.
+				spec = spec.DeepCopy()
+				spec.PreCondition = nil
+			}
 			opts := &lifecycle.Options{
 				Rerun:         pod.Rerun,
 				TargetPodName: pod.Name,
 				PreConditionObjectSelector: constant.GetClusterLabels(transCtx.Cluster.Name,
 					map[string]string{constant.KBAppShardingNameLabelKey: shardingName}),
 			}
-			err := lfa.UserDefined(transCtx.Context, transCtx.Client, opts, actionName, &action.Action, args)
+			err := lfa.UserDefined(transCtx.Context, transCtx.Client, opts, actionName, spec, args)
 			if err = lifecycle.IgnoreNotDefined(err); err == nil {
 				pod.Rerun = false
 				continue
@@ -217,6 +224,20 @@ func (h *clusterShardingHandler) selectShardingActionTargets(transCtx *clusterTr
 	}
 	targets := &shardingActionTargets{Version: shardingActionTargetsVersion}
 	for _, shard := range shards {
+		pods, err := component.ListOwnedInstances(transCtx.Context, transCtx.Client, shard)
+		if err != nil {
+			return nil, err
+		}
+		// Do not freeze a partial scale-out or surplus scale-in replica into
+		// a request. The topology may still be converging from an earlier update.
+		if shard.Generation != shard.Status.ObservedGeneration || len(pods) != int(shard.Spec.Replicas) {
+			return nil, pendingShardingAction("sharding", fmt.Sprintf("waiting for shard %s pod topology", shard.Name))
+		}
+		for _, pod := range pods {
+			if !pod.DeletionTimestamp.IsZero() {
+				return nil, pendingShardingAction("sharding", fmt.Sprintf("waiting for shard %s pod deletion", shard.Name))
+			}
+		}
 		compDef := transCtx.componentDefs[shard.Spec.CompDef]
 		if compDef == nil {
 			return nil, fmt.Errorf("component definition not found for shard %s", shard.Name)
@@ -228,10 +249,6 @@ func (h *clusterShardingHandler) selectShardingActionTargets(transCtx *clusterTr
 		// Resolve once for this request. Secret-backed environment references are
 		// kept as references by the existing template-variable resolver.
 		vars, _, err := component.ResolveTemplateNEnvVars(transCtx.Context, transCtx.Client, synthesized, compDef.Spec.Vars)
-		if err != nil {
-			return nil, err
-		}
-		pods, err := component.ListOwnedInstances(transCtx.Context, transCtx.Client, shard)
 		if err != nil {
 			return nil, err
 		}

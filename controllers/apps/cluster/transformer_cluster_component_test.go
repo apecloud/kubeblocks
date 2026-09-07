@@ -2636,6 +2636,8 @@ var _ = Describe("cluster component transformer test", func() {
 				spec.Name = name
 				comp := newCompObj(transCtx, spec, func(comp *appsv1.Component) {
 					comp.Status.Phase = appsv1.RunningComponentPhase
+					comp.Status.ObservedGeneration = comp.Generation
+					comp.Spec.Replicas = int32(len(podNames))
 					comp.Labels[constant.KBAppShardingNameLabelKey] = sharding1aName
 					comp.Labels[constant.ShardingDefLabelKey] = shardingDefName
 					if comp.Annotations == nil {
@@ -2673,6 +2675,118 @@ var _ = Describe("cluster component transformer test", func() {
 				return handler.reconcileActions()
 			}
 
+			DescribeTable("waits for existing pod topology changes before selecting targets",
+				func(podCount int, replicas int32, unobserved, deleting bool) {
+					shard, pods := buildShard("shard-0", "pod-0", "pod-1")
+					pods = pods[:podCount]
+					shard.Spec.Replicas = replicas
+					shard.Generation = 2
+					shard.Status.ObservedGeneration = 2
+					// Topology stability must not introduce a business-ready precondition.
+					shard.Status.Phase = appsv1.UpdatingComponentPhase
+					if unobserved {
+						shard.Status.ObservedGeneration = 1
+					}
+					if deleting {
+						now := metav1.Now()
+						pods[len(pods)-1].DeletionTimestamp = &now
+					}
+					setObjects := func() {
+						objects := []client.Object{shard}
+						for _, pod := range pods {
+							objects = append(objects, pod)
+						}
+						transCtx.Client = model.NewGraphClient(&appsutil.MockReader{Objects: objects})
+					}
+					setObjects()
+					shardAction := action()
+					shardAction.TargetPodSelector = appsv1.AllReplicas
+					calls := 0
+					testapps.MockKBAgentClient(func(r *kbacli.MockClientMockRecorder) {
+						r.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, _ kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+							calls++
+							return kbagentproto.ActionResponse{Error: kbagentproto.Error2Type(kbagentproto.ErrInProgress)}, nil
+						}).Times(int(replicas))
+					})
+					poll := func() error {
+						return (&clusterShardingHandler{}).nonBlockingShardingAction(transCtx, sharding1aName,
+							shardingAddShardAction, shardingAddActionTargetsKey, shardAction,
+							nil, []*appsv1.Component{shard}, shard)
+					}
+					for i := 0; i < 2; i++ {
+						Expect(ictrlutil.IsDelayedRequeueError(poll())).Should(BeTrue())
+						Expect(shard.Annotations).ShouldNot(HaveKey(shardingAddActionTargetsKey))
+						Expect(calls).Should(BeZero())
+					}
+
+					By("selecting the complete stable topology before invoking any target")
+					_, pods = buildShard("shard-0", "pod-0", "pod-1")
+					pods = pods[:replicas]
+					shard.Status.ObservedGeneration = shard.Generation
+					setObjects()
+					Expect(ictrlutil.IsDelayedRequeueError(poll())).Should(BeTrue())
+					Expect(calls).Should(BeZero())
+					targets, found, err := getShardingActionTargets(shard, shardingAddActionTargetsKey)
+					Expect(err).ShouldNot(HaveOccurred())
+					Expect(found).Should(BeTrue())
+					Expect(targets.Targets[0].Pods).Should(HaveLen(int(replicas)))
+					Expect(ictrlutil.IsDelayedRequeueError(poll())).Should(BeTrue())
+					Expect(calls).Should(Equal(int(replicas)))
+				},
+				Entry("surplus replica during scale-in", 2, int32(1), false, true),
+				Entry("missing replica during scale-out", 1, int32(2), false, false),
+				Entry("component update not yet observed", 1, int32(1), true, false),
+				Entry("deleting pod despite a matching count", 1, int32(1), false, true),
+			)
+
+			It("checks startup preconditions for starts and retries but not accepted request polls", func() {
+				shard, pods := buildShard("shard-0", "pod-0")
+				shardAction := action()
+				shardAction.PreCondition = ptr.To(appsv1.ComponentReadyPreConditionType)
+				shard.Status.Phase = appsv1.UpdatingComponentPhase
+				transCtx.Client = model.NewGraphClient(&appsutil.MockReader{Objects: []client.Object{shard, pods[0]}})
+				calls := 0
+				testapps.MockKBAgentClient(func(r *kbacli.MockClientMockRecorder) {
+					r.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+						calls++
+						Expect(req.Rerun).Should(Equal(calls == 1 || calls == 3))
+						switch calls {
+						case 1, 3:
+							return kbagentproto.ActionResponse{Error: kbagentproto.Error2Type(kbagentproto.ErrInProgress)}, nil
+						case 2:
+							return kbagentproto.ActionResponse{Error: kbagentproto.Error2Type(kbagentproto.ErrFailed)}, nil
+						default:
+							return kbagentproto.ActionResponse{}, nil
+						}
+					}).Times(4)
+				})
+				poll := func() error {
+					err := (&clusterShardingHandler{}).nonBlockingShardingAction(transCtx, sharding1aName,
+						shardingAddShardAction, shardingAddActionTargetsKey, shardAction,
+						nil, []*appsv1.Component{shard}, shard)
+					Expect(shardAction.PreCondition).ShouldNot(BeNil())
+					Expect(*shardAction.PreCondition).Should(Equal(appsv1.ComponentReadyPreConditionType))
+					return err
+				}
+				Expect(ictrlutil.IsDelayedRequeueError(poll())).Should(BeTrue()) // save targets
+				Expect(errors.Is(poll(), lifecycle.ErrPreconditionFailed)).Should(BeTrue())
+				Expect(calls).Should(BeZero())
+
+				shard.Status.Phase = appsv1.RunningComponentPhase
+				Expect(ictrlutil.IsDelayedRequeueError(poll())).Should(BeTrue()) // accepted
+				shard.Status.Phase = appsv1.UpdatingComponentPhase
+				Expect(errors.Is(poll(), lifecycle.ErrActionFailed)).Should(BeTrue())
+				Expect(calls).Should(Equal(2))
+				Expect(errors.Is(poll(), lifecycle.ErrPreconditionFailed)).Should(BeTrue()) // retry still gated
+				Expect(calls).Should(Equal(2))
+
+				shard.Status.Phase = appsv1.RunningComponentPhase
+				Expect(ictrlutil.IsDelayedRequeueError(poll())).Should(BeTrue()) // retry accepted
+				shard.Status.Phase = appsv1.UpdatingComponentPhase
+				Expect(poll()).Should(Succeed()) // successful result remains observable
+				Expect(calls).Should(Equal(4))
+				Expect(shard.Annotations).ShouldNot(HaveKey(shardingAddActionTargetsKey))
+			})
 			DescribeTable("persists the first shard-add snapshot during scale-in", func(removeDefined bool) {
 				shard, pods := buildShard("shard-0", "shard-0-0")
 				shard.Annotations[shardingAddShardKey] = "pending"

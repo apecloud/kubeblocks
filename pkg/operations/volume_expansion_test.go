@@ -77,6 +77,7 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// delete pvc resources
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.InstanceSetSignature, true, inNS, ml)
 		// namespaced
 		testapps.ClearResources(&testCtx, generics.OpsRequestSignature, inNS, ml)
 		// non-namespaced
@@ -399,6 +400,8 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 		It("VolumeExpansion should work", func() {
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
 			_, clusterObject := testapps.InitConsensusMysql(&testCtx, clusterName, compDefName, consensusCompName)
+			testapps.MockInstanceSetComponent(&testCtx, clusterName, consensusCompName)
+			testapps.MockInstanceSetStatus(testCtx, clusterObject, consensusCompName)
 			// init storageClass
 			sc := testapps.CreateStorageClass(&testCtx, storageClassName, true)
 			Expect(testapps.ChangeObj(&testCtx, sc, func(lsc *storagev1.StorageClass) {
@@ -446,6 +449,8 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 					},
 				}
 			})).ShouldNot(HaveOccurred())
+			testapps.MockInstanceSetComponent(&testCtx, clusterName, consensusCompName)
+			testapps.MockInstanceSetStatus(testCtx, clusterObject, consensusCompName)
 			// init storageClass
 			sc := testapps.CreateStorageClass(&testCtx, storageClassName, true)
 			Expect(testapps.ChangeObj(&testCtx, sc, func(lsc *storagev1.StorageClass) {

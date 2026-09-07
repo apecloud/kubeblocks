@@ -108,9 +108,14 @@ func (vs verticalScalingHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, 
 		if len(pgRes.clusterComponent.Instances) != 0 {
 			// obtain the pods which should be updated.
 			updatedPodSet := map[string]string{}
+			updatedTemplates := map[string]struct{}{}
 			vsInsMap := vs.covertInsResourcesToMap(verticalScaling)
 			templateReplicasCnt := int32(0)
 			runtime, err := opsRes.GetRuntime(pgRes.compOps.GetComponentName())
+			if err != nil {
+				return 0, 0, err
+			}
+			workload, err := runtime.GetWorkload(opsRes.Cluster.Namespace, opsRes.Cluster.Name, pgRes.fullComponentName)
 			if err != nil {
 				return 0, 0, err
 			}
@@ -118,28 +123,26 @@ func (vs verticalScalingHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, 
 				replicas := template.GetReplicas()
 				insVS := vsInsMap[template.Name]
 				if vs.verticalScalingInsTemplate(verticalScaling, template, insVS) {
-					templatePodNames, err := runtime.GenerateTemplateInstanceNames(
-						opsRes.Cluster.Name, pgRes.fullComponentName, template.Name, replicas, pgRes.clusterComponent.OfflineInstances, template.Ordinals)
-					if err != nil {
-						return 0, 0, err
-					}
-					for _, podName := range templatePodNames {
-						updatedPodSet[podName] = template.Name
-					}
+					updatedTemplates[template.Name] = struct{}{}
 				}
 				templateReplicasCnt += replicas
 			}
 			if vs.verticalScalingComp(verticalScaling) && templateReplicasCnt < pgRes.clusterComponent.Replicas {
-				podNames, err := runtime.GenerateTemplateInstanceNames(
-					opsRes.Cluster.Name, pgRes.fullComponentName, "", pgRes.clusterComponent.Replicas-templateReplicasCnt, pgRes.clusterComponent.OfflineInstances, appsv1.Ordinals{})
-				if err != nil {
-					return 0, 0, err
-				}
-				for _, podName := range podNames {
-					updatedPodSet[podName] = ""
-				}
+				updatedTemplates[""] = struct{}{}
 			} else {
 				pgRes.noWaitComponentCompleted = true
+			}
+			allActive, complete, err := activeAssignmentsForTarget(workload, pgRes.clusterComponent)
+			if err != nil {
+				return 0, 0, err
+			}
+			if !complete {
+				return 1, 0, nil
+			}
+			for podName, templateName := range allActive {
+				if _, ok := updatedTemplates[templateName]; ok {
+					updatedPodSet[podName] = templateName
+				}
 			}
 			pgRes.updatedPodSet = updatedPodSet
 		}

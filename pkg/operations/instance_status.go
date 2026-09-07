@@ -1,0 +1,106 @@
+/*
+Copyright (C) 2022-2026 ApeCloud Co., Ltd
+
+This file is part of KubeBlocks project
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+*/
+
+package operations
+
+import (
+	"fmt"
+
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+)
+
+func instanceStatusByName(statuses []workloadsv1.InstanceStatus) (map[string]workloadsv1.InstanceStatus, error) {
+	result := make(map[string]workloadsv1.InstanceStatus, len(statuses))
+	for _, status := range statuses {
+		if status.PodName == "" {
+			return nil, fmt.Errorf("InstanceSet published an empty instance identity")
+		}
+		if _, ok := result[status.PodName]; ok {
+			return nil, fmt.Errorf("InstanceSet published duplicate instance identity %q", status.PodName)
+		}
+		result[status.PodName] = status
+	}
+	return result, nil
+}
+
+func activeInstanceTemplates(statuses []workloadsv1.InstanceStatus,
+	include func(workloadsv1.InstanceStatus) bool) (map[string]string, error) {
+	if _, err := instanceStatusByName(statuses); err != nil {
+		return nil, err
+	}
+	result := map[string]string{}
+	for _, status := range statuses {
+		if status.EffectiveDesiredState() != workloadsv1.InstanceDesiredStateActive || include != nil && !include(status) {
+			continue
+		}
+		if status.TemplateName == nil {
+			return nil, intctrlutil.NewErrorf(intctrlutil.ErrorTypeNeedWaiting,
+				"waiting for InstanceSet to publish the template assignment of instance %q", status.PodName)
+		}
+		result[status.PodName] = *status.TemplateName
+	}
+	return result, nil
+}
+
+func expectedTemplateReplicas(component *appsv1.ClusterComponentSpec) (map[string]int32, bool) {
+	if component == nil {
+		return nil, false
+	}
+	expected := map[string]int32{}
+	defaultReplicas := component.Replicas
+	for _, template := range component.Instances {
+		replicas := template.GetReplicas()
+		if replicas > 0 {
+			expected[template.Name] += replicas
+		}
+		defaultReplicas -= replicas
+	}
+	if defaultReplicas < 0 {
+		return nil, false
+	}
+	if defaultReplicas > 0 {
+		expected[""] = defaultReplicas
+	}
+	return expected, true
+}
+
+func assignmentsMatchComponent(assignments map[string]string, component *appsv1.ClusterComponentSpec) bool {
+	if component == nil || int32(len(assignments)) != component.Replicas {
+		return false
+	}
+	expected, ok := expectedTemplateReplicas(component)
+	if !ok {
+		return false
+	}
+	actual := map[string]int32{}
+	for _, templateName := range assignments {
+		actual[templateName]++
+	}
+	if len(actual) != len(expected) {
+		return false
+	}
+	for templateName, count := range expected {
+		if actual[templateName] != count {
+			return false
+		}
+	}
+	return true
+}
+
+func activeAssignmentsForTarget(workload Workload, component *appsv1.ClusterComponentSpec) (map[string]string, bool, error) {
+	assignments, err := activeInstanceTemplates(workload.GetInstanceStatuses(), nil)
+	if err != nil {
+		return nil, false, err
+	}
+	return assignments, assignmentsMatchComponent(assignments, component), nil
+}

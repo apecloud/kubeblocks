@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"sort"
 
 	"github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -295,9 +296,35 @@ func MockInstanceSetPod(
 }
 
 func generateInstanceNames(parentName, templateName string,
-	replicas int32, offlineInstances []string) []string {
+	replicas int32, offlineInstances []string, ordinals ...appsv1.Ordinals) []string {
+	if replicas <= 0 {
+		return nil
+	}
 	usedNames := sets.New(offlineInstances...)
 	var instanceNameList []string
+	if len(ordinals) > 0 && (len(ordinals[0].Ranges) > 0 || len(ordinals[0].Discrete) > 0) {
+		ordinalSet := sets.New(ordinals[0].Discrete...)
+		for _, ordinalRange := range ordinals[0].Ranges {
+			for ordinal := ordinalRange.Start; ordinal <= ordinalRange.End; ordinal++ {
+				ordinalSet.Insert(ordinal)
+			}
+		}
+		ordinalList := sets.List(ordinalSet)
+		sort.Slice(ordinalList, func(i, j int) bool { return ordinalList[i] < ordinalList[j] })
+		for _, ordinal := range ordinalList {
+			name := fmt.Sprintf("%s-%d", parentName, ordinal)
+			if templateName != "" {
+				name = fmt.Sprintf("%s-%s-%d", parentName, templateName, ordinal)
+			}
+			if !usedNames.Has(name) {
+				instanceNameList = append(instanceNameList, name)
+			}
+			if len(instanceNameList) == int(replicas) {
+				break
+			}
+		}
+		return instanceNameList
+	}
 	ordinal := 0
 	for count := int32(0); count < replicas; count++ {
 		var name string
@@ -325,11 +352,11 @@ func generatePodNames(cluster *appsv1.Cluster, compName string) []string {
 	for _, insTpl := range compSpec.Instances {
 		insReplicas := *insTpl.Replicas
 		insTPLReplicasCnt += insReplicas
-		podNames = append(podNames, generateInstanceNames(workloadName, insTpl.Name, insReplicas, compSpec.OfflineInstances)...)
+		podNames = append(podNames, generateInstanceNames(workloadName, insTpl.Name, insReplicas, compSpec.OfflineInstances, insTpl.Ordinals)...)
 	}
 	if insTPLReplicasCnt < compSpec.Replicas {
 		podNames = append(podNames, generateInstanceNames(workloadName, "",
-			compSpec.Replicas-insTPLReplicasCnt, compSpec.OfflineInstances)...)
+			compSpec.Replicas-insTPLReplicasCnt, compSpec.OfflineInstances, compSpec.Ordinals)...)
 	}
 	return podNames
 }
@@ -341,11 +368,11 @@ func generatePodNames2(clusterName, compName string, comp *appsv1.Component) []s
 	for _, insTpl := range comp.Spec.Instances {
 		insReplicas := *insTpl.Replicas
 		insTPLReplicasCnt += insReplicas
-		podNames = append(podNames, generateInstanceNames(workloadName, insTpl.Name, insReplicas, comp.Spec.OfflineInstances)...)
+		podNames = append(podNames, generateInstanceNames(workloadName, insTpl.Name, insReplicas, comp.Spec.OfflineInstances, insTpl.Ordinals)...)
 	}
 	if insTPLReplicasCnt < comp.Spec.Replicas {
 		podNames = append(podNames, generateInstanceNames(workloadName, "",
-			comp.Spec.Replicas-insTPLReplicasCnt, comp.Spec.OfflineInstances)...)
+			comp.Spec.Replicas-insTPLReplicasCnt, comp.Spec.OfflineInstances, comp.Spec.Ordinals)...)
 	}
 	return podNames
 }
@@ -404,6 +431,35 @@ func MockInstanceSetStatus(testCtx testutil.TestContext, cluster *appsv1.Cluster
 		instanceStatus = append(instanceStatus, status)
 	}
 	compSpec := cluster.Spec.GetComponentByName(compName)
+	// Publish desired identities even before their Pods exist. Keep the existing
+	// observed role information; selecting an identity does not imply readiness.
+	byName := make(map[string]workloads.InstanceStatus, len(instanceStatus))
+	for _, status := range instanceStatus {
+		byName[status.PodName] = status
+	}
+	instanceStatus = nil
+	for _, podName := range currentPodNames {
+		status := byName[podName]
+		templateName := appsv1.GetInstanceTemplateName(cluster.Name, compName, podName)
+		status.PodName = podName
+		status.TemplateName = &templateName
+		status.DesiredState = workloads.InstanceDesiredStateActive
+		if compSpec.Stop != nil && *compSpec.Stop {
+			status.DesiredState = workloads.InstanceDesiredStateOffline
+		}
+		status.CurrentState = workloads.InstanceCurrentStateAbsent
+		for _, pod := range podList.Items {
+			if pod.Name == podName {
+				status.CurrentState = workloads.InstanceCurrentStatePresent
+				if !pod.DeletionTimestamp.IsZero() {
+					status.CurrentState = workloads.InstanceCurrentStateTerminating
+					status.Role = ""
+				}
+				break
+			}
+		}
+		instanceStatus = append(instanceStatus, status)
+	}
 	gomega.Eventually(GetAndChangeObjStatus(&testCtx, client.ObjectKey{Name: itsName, Namespace: cluster.Namespace}, func(its *workloads.InstanceSet) {
 		its.Status.CurrentRevisions = currRevisions
 		its.Status.UpdateRevisions = updateRevisions

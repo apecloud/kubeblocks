@@ -4093,9 +4093,6 @@ spec:
                             suitable for long-running Actions, such as data migration, rebalancing, or
                             draining, whose duration depends on data volume or runtime conditions.
 
-                            Non-blocking mode can be enabled only for Action fields that explicitly
-                            document support for it.
-
                             This field cannot be updated.
                           type: boolean
                         preCondition:
@@ -4708,9 +4705,6 @@ spec:
                           suitable for long-running Actions, such as data migration, rebalancing, or
                           draining, whose duration depends on data volume or runtime conditions.
 
-                          Non-blocking mode can be enabled only for Action fields that explicitly
-                          document support for it.
-
                           This field cannot be updated.
                         type: boolean
                       preCondition:
@@ -5160,9 +5154,6 @@ spec:
                           When true, KubeBlocks runs the Action in non-blocking mode. This mode is
                           suitable for long-running Actions, such as data migration, rebalancing, or
                           draining, whose duration depends on data volume or runtime conditions.
-
-                          Non-blocking mode can be enabled only for Action fields that explicitly
-                          document support for it.
 
                           This field cannot be updated.
                         type: boolean
@@ -5630,9 +5621,6 @@ spec:
                           suitable for long-running Actions, such as data migration, rebalancing, or
                           draining, whose duration depends on data volume or runtime conditions.
 
-                          Non-blocking mode can be enabled only for Action fields that explicitly
-                          document support for it.
-
                           This field cannot be updated.
                         type: boolean
                       preCondition:
@@ -6081,9 +6069,6 @@ spec:
                           When true, KubeBlocks runs the Action in non-blocking mode. This mode is
                           suitable for long-running Actions, such as data migration, rebalancing, or
                           draining, whose duration depends on data volume or runtime conditions.
-
-                          Non-blocking mode can be enabled only for Action fields that explicitly
-                          document support for it.
 
                           This field cannot be updated.
                         type: boolean
@@ -6536,9 +6521,6 @@ spec:
                           When true, KubeBlocks runs the Action in non-blocking mode. This mode is
                           suitable for long-running Actions, such as data migration, rebalancing, or
                           draining, whose duration depends on data volume or runtime conditions.
-
-                          Non-blocking mode can be enabled only for Action fields that explicitly
-                          document support for it.
 
                           This field cannot be updated.
                         type: boolean
@@ -6994,9 +6976,6 @@ spec:
                           suitable for long-running Actions, such as data migration, rebalancing, or
                           draining, whose duration depends on data volume or runtime conditions.
 
-                          Non-blocking mode can be enabled only for Action fields that explicitly
-                          document support for it.
-
                           This field cannot be updated.
                         type: boolean
                       preCondition:
@@ -7440,9 +7419,6 @@ spec:
                           When true, KubeBlocks runs the Action in non-blocking mode. This mode is
                           suitable for long-running Actions, such as data migration, rebalancing, or
                           draining, whose duration depends on data volume or runtime conditions.
-
-                          Non-blocking mode can be enabled only for Action fields that explicitly
-                          document support for it.
 
                           This field cannot be updated.
                         type: boolean
@@ -7888,9 +7864,6 @@ spec:
                           suitable for long-running Actions, such as data migration, rebalancing, or
                           draining, whose duration depends on data volume or runtime conditions.
 
-                          Non-blocking mode can be enabled only for Action fields that explicitly
-                          document support for it.
-
                           This field cannot be updated.
                         type: boolean
                       preCondition:
@@ -8334,9 +8307,6 @@ spec:
                           When true, KubeBlocks runs the Action in non-blocking mode. This mode is
                           suitable for long-running Actions, such as data migration, rebalancing, or
                           draining, whose duration depends on data volume or runtime conditions.
-
-                          Non-blocking mode can be enabled only for Action fields that explicitly
-                          document support for it.
 
                           This field cannot be updated.
                         type: boolean
@@ -8784,9 +8754,6 @@ spec:
                           suitable for long-running Actions, such as data migration, rebalancing, or
                           draining, whose duration depends on data volume or runtime conditions.
 
-                          Non-blocking mode can be enabled only for Action fields that explicitly
-                          document support for it.
-
                           This field cannot be updated.
                         type: boolean
                       preCondition:
@@ -9224,9 +9191,6 @@ spec:
                           When true, KubeBlocks runs the Action in non-blocking mode. This mode is
                           suitable for long-running Actions, such as data migration, rebalancing, or
                           draining, whose duration depends on data volume or runtime conditions.
-
-                          Non-blocking mode can be enabled only for Action fields that explicitly
-                          document support for it.
 
                           This field cannot be updated.
                         type: boolean
@@ -9715,9 +9679,6 @@ spec:
                           suitable for long-running Actions, such as data migration, rebalancing, or
                           draining, whose duration depends on data volume or runtime conditions.
 
-                          Non-blocking mode can be enabled only for Action fields that explicitly
-                          document support for it.
-
                           This field cannot be updated.
                         type: boolean
                       periodSeconds:
@@ -10183,9 +10144,6 @@ spec:
                           When true, KubeBlocks runs the Action in non-blocking mode. This mode is
                           suitable for long-running Actions, such as data migration, rebalancing, or
                           draining, whose duration depends on data volume or runtime conditions.
-
-                          Non-blocking mode can be enabled only for Action fields that explicitly
-                          document support for it.
 
                           This field cannot be updated.
                         type: boolean
@@ -18354,9 +18312,6 @@ spec:
                             When true, KubeBlocks runs the Action in non-blocking mode. This mode is
                             suitable for long-running Actions, such as data migration, rebalancing, or
                             draining, whose duration depends on data volume or runtime conditions.
-
-                            Non-blocking mode can be enabled only for Action fields that explicitly
-                            document support for it.
 
                             This field cannot be updated.
                           type: boolean

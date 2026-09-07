@@ -2488,7 +2488,7 @@ var _ = Describe("cluster component transformer test", func() {
 				Expect(actionDone).Should(BeTrue())
 			})
 
-			It("shard-add - failed", func() {
+			It("shard-add - pending or failed", func() {
 				transCtx.shardingDefs[shardingDefName].Spec.LifecycleActions = &appsv1.ShardingLifecycleActions{
 					ShardAdd:    mockShardingAction("shard-add"),
 					ShardRemove: mockShardingAction("shard-remove"),
@@ -2504,25 +2504,21 @@ var _ = Describe("cluster component transformer test", func() {
 				}(transCtx)}
 				transCtx.Client = model.NewGraphClient(reader)
 
-				testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
-					recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(
-						func(_ context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
-							if req.Action == "udf-"+shardingRemoveShardAction {
-								actionDone = true
-							}
-							if req.Action == "udf-"+shardingAddShardAction {
-								return kbagentproto.ActionResponse{}, fmt.Errorf("action call error")
-							}
-							return kbagentproto.ActionResponse{}, nil
-						}).AnyTimes()
-				})
+				mockKBAgent(shardingRemoveShardAction)
 
 				err := transformer.Transform(transCtx, dag)
-				Expect(err).ShouldNot(BeNil())
+				Expect(err).Should(BeNil())
 
-				By("check the shard is not deleted")
-				graphCli := transCtx.Client.(model.GraphClient)
-				Expect(graphCli.FindAll(dag, &appsv1.Component{})).Should(HaveLen(0))
+				By("check the shard being deleted")
+				walk := func(vertex graph.Vertex) error {
+					node, ok := vertex.(*model.ObjectVertex)
+					Expect(ok).Should(BeTrue())
+					if reflect.TypeOf(node.Obj).AssignableTo(reflect.TypeOf(&appsv1.Component{})) {
+						Expect(*node.Action).Should(BeElementOf(model.DELETE, model.UPDATE))
+					}
+					return nil
+				}
+				Expect(dag.WalkReverseTopoOrder(walk, nil)).Should(BeNil())
 
 				By("check the shard-remove action is NOT done")
 				Expect(actionDone).Should(BeFalse())

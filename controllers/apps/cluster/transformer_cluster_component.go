@@ -1376,7 +1376,7 @@ func (h *clusterShardingHandler) handleShardAddNRemove(transCtx *clusterTransfor
 			for name := range toUpdate {
 				err1 := h.handleShardAdd(transCtx, shardingName, maps.Values(runningCompsMap), runningCompsMap[name])
 				if err1 != nil {
-					transCtx.Logger.Error(err1, "failed to call the shard add action", "shard", name)
+					transCtx.Logger.Error(err, "failed to call the shard add action", "shard", name)
 					if err == nil {
 						err = err1
 					}
@@ -1391,7 +1391,7 @@ func (h *clusterShardingHandler) handleShardAddNRemove(transCtx *clusterTransfor
 			for name := range toDelete {
 				err1 := h.handleShardRemove(transCtx, shardingName, maps.Values(runningCompsMap), runningCompsMap[name])
 				if err1 != nil {
-					transCtx.Logger.Error(err1, "failed to call the shard remove action", "shard", name)
+					transCtx.Logger.Error(err, "failed to call the shard remove action", "shard", name)
 					if err == nil {
 						err = err1
 					}
@@ -1449,15 +1449,17 @@ func (h *clusterShardingHandler) handleShardRemove(transCtx *clusterTransformCon
 		pending = func() bool {
 			return runningComp.DeletionTimestamp.IsZero()
 		}
+
+		skipIfShardAddNotDone = func() bool {
+			return runningComp.Annotations[shardingAddShardKey] != ""
+		}
 	)
 
-	if runningComp.Annotations[shardingAddShardKey] != "" {
-		if err := h.handleShardAdd(transCtx, shardingName, runningComps, runningComp); err != nil {
-			return err
-		}
+	if shardingDef == nil || shardingDef.Spec.LifecycleActions == nil || shardingDef.Spec.LifecycleActions.ShardRemove == nil {
+		return nil
 	}
 
-	if shardingDef == nil || shardingDef.Spec.LifecycleActions == nil || shardingDef.Spec.LifecycleActions.ShardRemove == nil {
+	if skipIfShardAddNotDone() {
 		return nil
 	}
 

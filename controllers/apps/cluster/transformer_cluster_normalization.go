@@ -35,6 +35,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
@@ -70,6 +71,11 @@ func (t *clusterNormalizationTransformer) Transform(ctx graph.TransformContext, 
 		return err
 	}
 
+	// Check each resolved sharding definition once before building shard components.
+	if err = t.checkShardingDefinitions(transCtx); err != nil {
+		return err
+	}
+
 	// resolve component definitions referenced for components
 	if err = t.resolveDefinitions4Components(transCtx); err != nil {
 		return err
@@ -92,6 +98,19 @@ func (t *clusterNormalizationTransformer) Transform(ctx graph.TransformContext, 
 	// write-back the resolved definitions and service versions to cluster spec.
 	t.writeBackCompNShardingSpecs(transCtx)
 
+	return nil
+}
+
+func (t *clusterNormalizationTransformer) checkShardingDefinitions(transCtx *clusterTransformContext) error {
+	for _, def := range transCtx.shardingDefs {
+		if def.Generation != def.Status.ObservedGeneration || def.Status.Phase == "" {
+			return controllerutil.NewRequeueError(appsutil.RequeueDuration,
+				fmt.Sprintf("the referenced ShardingDefinition is awaiting validation: %s", def.Name))
+		}
+		if def.Status.Phase != appsv1.AvailablePhase {
+			return fmt.Errorf("the referenced ShardingDefinition is unavailable: %s: %s", def.Name, def.Status.Message)
+		}
+	}
 	return nil
 }
 

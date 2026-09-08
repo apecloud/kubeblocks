@@ -40,7 +40,7 @@ import (
 
 var _ = Describe("sharding definition availability during normalization", func() {
 	DescribeTable("checks resolved definitions before building shard components",
-		func(phase appsv1.Phase, observed int64, waiting bool, detail string) {
+		func(phase appsv1.Phase, observed int64, detail string) {
 			scheme := runtime.NewScheme()
 			Expect(appsv1.AddToScheme(scheme)).Should(Succeed())
 			compDef := testapps.NewComponentDefinitionFactory("comp-v1").SetServiceVersion("1.0.0").GetObject()
@@ -49,7 +49,7 @@ var _ = Describe("sharding definition availability during normalization", func()
 			def := testapps.NewShardingDefinitionFactory("shard-v2", compDef.Name).GetObject()
 			def.Generation = 2
 			def.Status = appsv1.ShardingDefinitionStatus{
-				Phase: phase, ObservedGeneration: observed, Message: "invalid lifecycle action",
+				Phase: phase, ObservedGeneration: observed,
 			}
 			oldDef := def.DeepCopy()
 			oldDef.Name = "shard-v1"
@@ -72,25 +72,24 @@ var _ = Describe("sharding definition availability during normalization", func()
 					if detail == "" {
 						Expect(err).ShouldNot(HaveOccurred())
 						Expect(transCtx.shardingComps["shard"]).Should(HaveLen(1))
+						Expect(transCtx.shardingDefs).Should(HaveKey(def.Name))
 					} else {
-						Expect(err).Should(MatchError(ContainSubstring(detail)))
-						Expect(err.Error()).Should(ContainSubstring(def.Name))
-						Expect(intctrlutil.IsRequeueError(err)).Should(Equal(waiting))
+						// Selection must not fall back to an older available definition.
+						Expect(err).Should(MatchError(ContainSubstring("the referenced ShardingDefinition is " + detail + ": " + def.Name)))
+						Expect(intctrlutil.IsRequeueError(err)).Should(BeTrue())
 						Expect(transCtx.shardingComps).Should(BeEmpty())
 						Expect(transCtx.Cluster.Status.Conditions).Should(ContainElement(And(
 							HaveField("Status", metav1.ConditionFalse), HaveField("Message", ContainSubstring(detail)))))
 					}
-					// Selection remains unchanged: never fall back to an older available definition.
-					Expect(transCtx.shardingDefs).Should(HaveKey(def.Name))
 				}
 			}
 		},
-		Entry("not yet observed", appsv1.Phase(""), int64(0), true, "awaiting validation"),
-		Entry("empty phase", appsv1.Phase(""), int64(2), true, "awaiting validation"),
-		Entry("stale available", appsv1.AvailablePhase, int64(1), true, "awaiting validation"),
-		Entry("stale unavailable", appsv1.UnavailablePhase, int64(1), true, "awaiting validation"),
-		Entry("current unavailable", appsv1.UnavailablePhase, int64(2), false, "invalid lifecycle action"),
-		Entry("current available", appsv1.AvailablePhase, int64(2), false, ""),
+		Entry("not yet observed", appsv1.Phase(""), int64(0), "not up to date"),
+		Entry("empty phase", appsv1.Phase(""), int64(2), "unavailable"),
+		Entry("stale available", appsv1.AvailablePhase, int64(1), "not up to date"),
+		Entry("stale unavailable", appsv1.UnavailablePhase, int64(1), "not up to date"),
+		Entry("current unavailable", appsv1.UnavailablePhase, int64(2), "unavailable"),
+		Entry("current available", appsv1.AvailablePhase, int64(2), ""),
 	)
 })
 

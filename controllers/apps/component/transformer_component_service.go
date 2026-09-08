@@ -24,11 +24,13 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"time"
 
 	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -77,12 +79,20 @@ func (t *componentServiceTransformer) Transform(ctx graph.TransformContext, dag 
 	}
 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
+	var podNamesNSuffix map[string]string
+	var pendingScaleIn bool
 	for _, service := range synthesizeComp.ComponentServices {
 		// component controller does not handle the default headless service; the default headless service is managed by the InstanceSet.
 		if t.skipDefaultHeadlessSvc(synthesizeComp, &service) {
 			continue
 		}
-		services, err := t.buildCompService(transCtx.Component, synthesizeComp, &service, runningITS, protoITS)
+		if t.isPodService(&service) && (service.DisableAutoProvision == nil || !*service.DisableAutoProvision) && podNamesNSuffix == nil {
+			podNamesNSuffix, pendingScaleIn, err = t.podsNameNSuffix(transCtx, runningITS, protoITS)
+			if err != nil {
+				return err
+			}
+		}
+		services, err := t.buildCompService(transCtx.Component, synthesizeComp, &service, podNamesNSuffix)
 		if err != nil {
 			return err
 		}
@@ -101,6 +111,11 @@ func (t *componentServiceTransformer) Transform(ctx graph.TransformContext, dag 
 		graphCli.Delete(dag, runningServices[svc])
 	}
 
+	if pendingScaleIn {
+		// Continue the transformer chain so memberLeave and the workload update can
+		// make progress, but revisit cleanup even if no further workload event arrives.
+		return intctrlutil.NewDelayedRequeueError(time.Second, "waiting for scaled-in instances to disappear before deleting pod services")
+	}
 	return nil
 }
 
@@ -120,13 +135,13 @@ func (t *componentServiceTransformer) listOwnedServices(ctx context.Context, cli
 }
 
 func (t *componentServiceTransformer) buildCompService(comp *appsv1.Component,
-	synthesizeComp *component.SynthesizedComponent, service *appsv1.ComponentService, runningITS, protoITS *workloadsv1.InstanceSet) ([]*corev1.Service, error) {
+	synthesizeComp *component.SynthesizedComponent, service *appsv1.ComponentService, pods map[string]string) ([]*corev1.Service, error) {
 	if service.DisableAutoProvision != nil && *service.DisableAutoProvision {
 		return nil, nil
 	}
 
 	if t.isPodService(service) {
-		return t.buildPodService(comp, synthesizeComp, service, runningITS, protoITS)
+		return t.buildPodService(comp, synthesizeComp, service, pods)
 	}
 	return t.buildServices(comp, synthesizeComp, []*appsv1.ComponentService{service})
 }
@@ -136,12 +151,7 @@ func (t *componentServiceTransformer) isPodService(service *appsv1.ComponentServ
 }
 
 func (t *componentServiceTransformer) buildPodService(comp *appsv1.Component,
-	synthesizeComp *component.SynthesizedComponent, service *appsv1.ComponentService, runningITS, protoITS *workloadsv1.InstanceSet) ([]*corev1.Service, error) {
-	pods, err := t.podsNameNSuffix(synthesizeComp, runningITS, protoITS)
-	if err != nil {
-		return nil, err
-	}
-
+	synthesizeComp *component.SynthesizedComponent, service *appsv1.ComponentService, pods map[string]string) ([]*corev1.Service, error) {
 	services := make([]*appsv1.ComponentService, 0)
 	for podName, suffix := range pods {
 		svc := service.DeepCopy()
@@ -160,21 +170,40 @@ func (t *componentServiceTransformer) buildPodService(comp *appsv1.Component,
 	return t.buildServices(comp, synthesizeComp, services)
 }
 
-func (t *componentServiceTransformer) podsNameNSuffix(synthesizeComp *component.SynthesizedComponent, runningITS, protoITS *workloadsv1.InstanceSet) (map[string]string, error) {
-	podNames, err := component.GetDesiredPodNamesByITS(runningITS, protoITS)
+func (t *componentServiceTransformer) podsNameNSuffix(transCtx *componentTransformContext, runningITS, protoITS *workloadsv1.InstanceSet) (map[string]string, bool, error) {
+	desiredPodNames, err := component.GetDesiredPodNamesByITS(runningITS, protoITS)
 	if err != nil {
-		return nil, err
+		return nil, false, err
+	}
+	podNames := sets.New(desiredPodNames...)
+	// The running workload still owns replicas whose memberLeave has not completed,
+	// including replicas whose Pods are temporarily absent.
+	if runningITS != nil {
+		currentPodNames, err := component.GetCurrentPodNamesByITS(runningITS)
+		if err != nil {
+			return nil, false, err
+		}
+		podNames.Insert(currentPodNames...)
+	}
+	// Updating the InstanceSet does not synchronously remove its Pods. Keep their
+	// addresses through termination, until the Pod objects have actually disappeared.
+	instances, err := component.ListOwnedInstances(transCtx.Context, transCtx.Client, transCtx.Component, runningITS, protoITS)
+	if err != nil {
+		return nil, false, err
+	}
+	for _, pod := range instances {
+		podNames.Insert(pod.Name)
 	}
 	pods := make(map[string]string)
-	prefix := fmt.Sprintf("%s-", synthesizeComp.FullCompName)
-	for _, podName := range podNames {
+	prefix := fmt.Sprintf("%s-", transCtx.SynthesizeComponent.FullCompName)
+	for podName := range podNames {
 		suffix, found := strings.CutPrefix(podName, prefix)
 		if !found || len(suffix) == 0 {
-			return nil, fmt.Errorf("invalid pod name when building pod services: %s", podName)
+			return nil, false, fmt.Errorf("invalid pod name when building pod services: %s", podName)
 		}
 		pods[podName] = suffix
 	}
-	return pods, nil
+	return pods, podNames.Len() > len(desiredPodNames), nil
 }
 
 func (t *componentServiceTransformer) buildServices(comp *appsv1.Component,

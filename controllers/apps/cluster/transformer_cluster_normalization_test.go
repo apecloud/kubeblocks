@@ -30,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -45,7 +46,8 @@ var _ = Describe("sharding definition availability during normalization", func()
 			compDef := testapps.NewComponentDefinitionFactory("comp-v1").SetServiceVersion("1.0.0").GetObject()
 			// ComponentDefinition availability is outside this check's scope.
 			compDef.Status.Phase = appsv1.UnavailablePhase
-			def := testapps.NewShardingDefinitionFactory("shard-v2", compDef.Name).GetObject()
+			def := testapps.NewShardingDefinitionFactory("shard-v2", compDef.Name).
+				AddAnnotations(constant.CRDAPIVersionAnnotationKey, appsv1.GroupVersion.String()).GetObject()
 			def.Generation = 2
 			def.Status = appsv1.ShardingDefinitionStatus{
 				Phase: phase, ObservedGeneration: observed,

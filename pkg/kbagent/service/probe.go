@@ -27,6 +27,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
@@ -44,16 +45,16 @@ const (
 
 var (
 	defaultRetrySendEventInterval = 1 * time.Minute
-	retrySendEventInterval        = defaultRetrySendEventInterval
 	fileChangeWatchDebounce       = 200 * time.Millisecond
 )
 
 func newProbeService(logger logr.Logger, actionService *actionService, probes []proto.Probe) (*probeService, error) {
 	sp := &probeService{
-		logger:        logger,
-		actionService: actionService,
-		probes:        make(map[string]*proto.Probe),
-		runners:       make(map[string]*probeRunner),
+		logger:                 logger,
+		actionService:          actionService,
+		probes:                 make(map[string]*proto.Probe),
+		runners:                make(map[string]*probeRunner),
+		retrySendEventInterval: defaultRetrySendEventInterval,
 	}
 	for i, p := range probes {
 		if _, ok := actionService.actions[p.Action]; !ok {
@@ -66,11 +67,13 @@ func newProbeService(logger logr.Logger, actionService *actionService, probes []
 }
 
 type probeService struct {
-	logger               logr.Logger
-	actionService        *actionService
-	probes               map[string]*proto.Probe
-	runners              map[string]*probeRunner
-	sendEventWithMessage func(logger *logr.Logger, reason string, message string, sync bool) error
+	logger                 logr.Logger
+	actionService          *actionService
+	probes                 map[string]*proto.Probe
+	runners                map[string]*probeRunner
+	sendEventWithMessage   func(logger *logr.Logger, reason string, message string, sync bool) error
+	retrySendEventInterval time.Duration
+	wg                     sync.WaitGroup
 }
 
 var _ Service = &probeService{}
@@ -84,14 +87,23 @@ func (s *probeService) URI() string {
 }
 
 func (s *probeService) Start() error {
+	return s.start(context.Background())
+}
+
+func (s *probeService) start(ctx context.Context) error {
 	for name := range s.probes {
 		runner := &probeRunner{
-			logger:               s.logger.WithValues("probe", name),
-			actionService:        s.actionService,
-			latestEvent:          make(chan proto.ProbeEvent, 1),
-			sendEventWithMessage: s.sendEventWithMessage,
+			logger:                 s.logger.WithValues("probe", name),
+			actionService:          s.actionService,
+			latestEvent:            make(chan proto.ProbeEvent, 1),
+			sendEventWithMessage:   s.sendEventWithMessage,
+			retrySendEventInterval: s.retrySendEventInterval,
 		}
-		go runner.run(s.probes[name])
+		s.wg.Add(1)
+		go func(probe *proto.Probe) {
+			defer s.wg.Done()
+			runner.run(ctx, probe)
+		}(s.probes[name])
 		s.runners[name] = runner
 	}
 	return nil
@@ -106,14 +118,16 @@ func (s *probeService) HandleRequest(context.Context, []byte) ([]byte, error) {
 }
 
 type probeRunner struct {
-	logger               logr.Logger
-	actionService        *actionService
-	ticker               *time.Ticker
-	succeedCount         int64
-	failedCount          int64
-	latestOutput         []byte
-	latestEvent          chan proto.ProbeEvent
-	sendEventWithMessage func(logger *logr.Logger, reason string, message string, sync bool) error
+	logger                 logr.Logger
+	actionService          *actionService
+	ticker                 *time.Ticker
+	succeedCount           int64
+	failedCount            int64
+	latestOutput           []byte
+	latestEvent            chan proto.ProbeEvent
+	sendEventWithMessage   func(logger *logr.Logger, reason string, message string, sync bool) error
+	retrySendEventInterval time.Duration
+	wg                     sync.WaitGroup
 }
 
 type fileChangeWatch struct {
@@ -121,32 +135,44 @@ type fileChangeWatch struct {
 	dir  bool
 }
 
-func (r *probeRunner) run(probe *proto.Probe) {
-	r.logger.Info("probe started", "config", probe)
-
-	if probe.InitialDelaySeconds > 0 {
-		time.Sleep(time.Duration(probe.InitialDelaySeconds) * time.Second)
-	}
-
-	// launch the report loop first
-	r.launchReportLoop(probe)
-
-	r.launchProbeLoop(probe, r.launchFileChangeWatchLoop(probe))
-}
-
-func (r *probeRunner) launchProbeLoop(probe *proto.Probe, forceProbe <-chan struct{}) {
+func (r *probeRunner) run(ctx context.Context, config *proto.Probe) {
+	defer r.wg.Wait()
+	// Normalize a private copy before the probe and report loops read it.
+	probe := *config
 	if probe.PeriodSeconds <= 0 {
 		probe.PeriodSeconds = defaultProbePeriodSeconds
 	}
+	if probe.ReportPeriodSeconds > 0 && probe.ReportPeriodSeconds < probe.PeriodSeconds {
+		probe.ReportPeriodSeconds = probe.PeriodSeconds
+	}
+	r.logger.Info("probe started", "config", probe)
+
+	if probe.InitialDelaySeconds > 0 {
+		timer := time.NewTimer(time.Duration(probe.InitialDelaySeconds) * time.Second)
+		defer timer.Stop()
+		select {
+		case <-ctx.Done():
+			return
+		case <-timer.C:
+		}
+	}
+
+	// launch the report loop first
+	r.launchReportLoop(ctx, &probe)
+
+	r.launchProbeLoop(ctx, &probe, r.launchFileChangeWatchLoop(ctx, &probe))
+}
+
+func (r *probeRunner) launchProbeLoop(ctx context.Context, probe *proto.Probe, forceProbe <-chan struct{}) {
 	r.ticker = time.NewTicker(time.Duration(probe.PeriodSeconds) * time.Second)
 	defer r.ticker.Stop()
 
-	r.probeLoop(probe, forceProbe)
+	r.probeLoop(ctx, probe, forceProbe)
 }
 
-func (r *probeRunner) probeLoop(probe *proto.Probe, forceProbe <-chan struct{}) {
+func (r *probeRunner) probeLoop(ctx context.Context, probe *proto.Probe, forceProbe <-chan struct{}) {
 	once := func(forceReport bool) {
-		output, err := r.actionService.handleRequest(context.Background(), &proto.ActionRequest{Action: probe.Action})
+		output, err := r.actionService.handleRequest(ctx, &proto.ActionRequest{Action: probe.Action})
 		if err == nil {
 			r.succeedCount++
 			r.failedCount = 0
@@ -167,6 +193,8 @@ func (r *probeRunner) probeLoop(probe *proto.Probe, forceProbe <-chan struct{}) 
 
 	for {
 		select {
+		case <-ctx.Done():
+			return
 		case <-r.ticker.C:
 			once(false)
 		case <-forceProbe:
@@ -224,7 +252,7 @@ func (r *probeRunner) fail(probe *proto.Probe) bool {
 	return false
 }
 
-func (r *probeRunner) launchFileChangeWatchLoop(probe *proto.Probe) <-chan struct{} {
+func (r *probeRunner) launchFileChangeWatchLoop(ctx context.Context, probe *proto.Probe) <-chan struct{} {
 	if len(probe.ReportOnFileChange) == 0 {
 		return nil
 	}
@@ -260,13 +288,20 @@ func (r *probeRunner) launchFileChangeWatchLoop(probe *proto.Probe) <-chan struc
 		return forceProbe
 	}
 
+	r.wg.Add(1)
 	go func() {
+		defer r.wg.Done()
 		defer watcher.Close()
 
 		var (
 			timer  *time.Timer
 			timerC <-chan time.Time
 		)
+		defer func() {
+			if timer != nil {
+				timer.Stop()
+			}
+		}()
 		resetTimer := func() {
 			if timer == nil {
 				timer = time.NewTimer(fileChangeWatchDebounce)
@@ -290,6 +325,8 @@ func (r *probeRunner) launchFileChangeWatchLoop(probe *proto.Probe) <-chan struc
 
 		for {
 			select {
+			case <-ctx.Done():
+				return
 			case event, ok := <-watcher.Events:
 				if !ok {
 					return
@@ -366,19 +403,18 @@ func (r *probeRunner) buildEvent(instance, probe string, code int32, output []by
 	}
 }
 
-func (r *probeRunner) launchReportLoop(probe *proto.Probe) {
+func (r *probeRunner) launchReportLoop(ctx context.Context, probe *proto.Probe) {
+	r.wg.Add(1)
 	go func() {
+		defer r.wg.Done()
 		var reportChan <-chan time.Time
 		if probe.ReportPeriodSeconds > 0 {
-			if probe.ReportPeriodSeconds < probe.PeriodSeconds {
-				probe.ReportPeriodSeconds = probe.PeriodSeconds
-			}
 			ticker := time.NewTicker(time.Duration(probe.ReportPeriodSeconds) * time.Second)
 			defer ticker.Stop()
 			reportChan = ticker.C
 		}
 
-		retryTicker := time.NewTicker(retrySendEventInterval)
+		retryTicker := time.NewTicker(r.retrySendEventInterval)
 		defer retryTicker.Stop()
 
 		var event proto.ProbeEvent
@@ -425,6 +461,8 @@ func (r *probeRunner) launchReportLoop(probe *proto.Probe) {
 		needsRetry := false
 		for {
 			select {
+			case <-ctx.Done():
+				return
 			case latest := <-r.latestEvent:
 				event = latest
 				hasEvent = true

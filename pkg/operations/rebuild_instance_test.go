@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -43,6 +44,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
+	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	"github.com/apecloud/kubeblocks/pkg/generics"
@@ -93,6 +95,42 @@ var _ = Describe("OpsUtil functions", func() {
 	AfterEach(cleanEnv)
 
 	Context("Test Rebuild-Instance opsRequest", func() {
+		// Run the real workload revision/status producers against the current Pods.
+		// Tests explicitly choose when workload reconciliation catches up with Ops;
+		// no hand-written InstanceStatus can make an unallocated name appear ready.
+		publishInstanceStatus := func(opsRes *OpsResource) *workloads.InstanceSet {
+			comp := opsRes.Cluster.Spec.GetComponentByName(defaultCompName)
+			its := &workloads.InstanceSet{}
+			Expect(k8sClient.Get(ctx, client.ObjectKey{Namespace: opsRes.Cluster.Namespace,
+				Name: constant.GenerateClusterComponentName(opsRes.Cluster.Name, defaultCompName)}, its)).To(Succeed())
+			its.Spec.Replicas = ptr.To(comp.Replicas)
+			its.Spec.FlatInstanceOrdinal = comp.FlatInstanceOrdinal
+			its.Spec.OfflineInstances = slices.Clone(comp.OfflineInstances)
+			its.Spec.Instances = nil
+			for _, template := range comp.Instances {
+				its.Spec.Instances = append(its.Spec.Instances, workloads.InstanceTemplate{
+					Name: template.Name, Replicas: template.Replicas,
+					Ordinals: workloads.Ordinals{Discrete: template.Ordinals.Discrete},
+				})
+			}
+			Expect(k8sClient.Update(ctx, its)).To(Succeed())
+			tree := kubebuilderx.NewObjectTree()
+			tree.SetRoot(its)
+			pods := &corev1.PodList{}
+			Expect(k8sClient.List(ctx, pods, client.InNamespace(its.Namespace), client.MatchingLabels{
+				constant.AppInstanceLabelKey: opsRes.Cluster.Name, constant.KBAppComponentLabelKey: defaultCompName,
+			})).To(Succeed())
+			for i := range pods.Items {
+				Expect(tree.Add(&pods.Items[i])).To(Succeed())
+			}
+			_, err := instanceset.NewRevisionUpdateReconciler().Reconcile(tree)
+			Expect(err).NotTo(HaveOccurred())
+			_, err = instanceset.NewStatusReconciler().Reconcile(tree)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(k8sClient.Status().Update(ctx, its)).To(Succeed())
+			return its
+		}
+
 		createRebuildInstanceOps := func(backupName string, inPlace bool, instanceNames ...string) *opsv1alpha1.OpsRequest {
 			opsName := "rebuild-instance-" + testCtx.GetRandomStr()
 			ops := testops.NewOpsRequestObj(opsName, testCtx.DefaultNamespace,
@@ -281,14 +319,14 @@ var _ = Describe("OpsUtil functions", func() {
 				OpsRequest: opsRequest,
 			}
 
-			pvcMap, volumes, volumeMounts, err := getPVCMapAndVolumes(opsRes, synthesizedComp, targetPod, "rebuild", 0, false)
+			pvcMap, volumes, volumeMounts, err := getPVCMapAndVolumes(opsRes, synthesizedComp, targetPod, "", "rebuild", 0, false)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(pvcMap).Should(HaveKey("source-pvc"))
 			Expect(volumes).Should(HaveLen(1))
 			Expect(volumeMounts).Should(ContainElement(corev1.VolumeMount{Name: "data", MountPath: "/kb-tmp/0"}))
 			Expect(pvcMap["source-pvc"].Annotations).Should(HaveKeyWithValue(rebuildFromAnnotation, opsRequest.Name))
 
-			pvcMap, volumes, volumeMounts, err = getPVCMapAndVolumes(opsRes, synthesizedComp, targetPod, "rebuild", 0, true)
+			pvcMap, volumes, volumeMounts, err = getPVCMapAndVolumes(opsRes, synthesizedComp, targetPod, "", "rebuild", 0, true)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(pvcMap["source-pvc"].Name).Should(Equal("source-pvc"))
 			Expect(volumes).Should(BeEmpty())
@@ -667,6 +705,7 @@ var _ = Describe("OpsUtil functions", func() {
 			By("init operations resources ")
 			opsRes := prepareOpsRes("", true)
 			its := testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
+			publishInstanceStatus(opsRes)
 			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsRunningPhase
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
 			matchingLabels := client.MatchingLabels{
@@ -832,6 +871,7 @@ var _ = Describe("OpsUtil functions", func() {
 			})).Should(Succeed())
 			opsRes := prepareOpsRes(backup.Name, true)
 			_ = testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
+			publishInstanceStatus(opsRes)
 			if ignoreRoleCheck {
 				Expect(testapps.ChangeObj(&testCtx, opsRes.OpsRequest, func(request *opsv1alpha1.OpsRequest) {
 					if request.Annotations == nil {
@@ -893,12 +933,183 @@ var _ = Describe("OpsUtil functions", func() {
 			testRebuildInstanceWithBackup(true)
 		})
 
+		DescribeTable("rebuilds from the published allocation without predicting replacement names", func(flat bool) {
+			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
+			comp := &opsRes.Cluster.Spec.ComponentSpecs[0]
+			comp.FlatInstanceOrdinal = flat
+			comp.Instances = []appsv1.InstanceTemplate{{Name: "large", Replicas: ptr.To(int32(1))}}
+			Expect(k8sClient.Update(ctx, opsRes.Cluster)).To(Succeed())
+			createComponentObject(opsRes)
+			its := testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
+			prefix := its.Name
+			original, healthy, named := prefix+"-0", prefix+"-1", prefix+"-large-0"
+			if flat {
+				original, healthy, named = prefix+"-7", prefix+"-9", prefix+"-42"
+				// Existing owner allocation: the names deliberately do not encode templates.
+				its.Status.AssignedOrdinals = map[string]workloads.Ordinals{
+					"": {Discrete: []int32{7, 9}}, "large": {Discrete: []int32{42}},
+				}
+				Expect(k8sClient.Status().Update(ctx, its)).To(Succeed())
+			}
+			testapps.MockInstanceSetPod(&testCtx, its, clusterName, defaultCompName, healthy, "leader")
+			oldPod := testapps.MockInstanceSetPod(&testCtx, its, clusterName, defaultCompName, named, "follower")
+			Expect(testapps.ChangeObjStatus(&testCtx, oldPod, func() { oldPod.Status.Conditions = nil })).To(Succeed())
+			// The first requested instance has no Pod, but its retained volume still exists.
+			pvc := testapps.NewPersistentVolumeClaimFactory(testCtx.DefaultNamespace, "data-"+original,
+				clusterName, defaultCompName, "data").SetStorage("1Gi").Create(&testCtx).GetObject()
+			ops := testops.NewOpsRequestObj("rebuild-allocated-"+testCtx.GetRandomStr(), testCtx.DefaultNamespace,
+				clusterName, opsv1alpha1.RebuildInstanceType)
+			ops.Spec.Force = true
+			ops.Spec.RebuildFrom = []opsv1alpha1.RebuildInstance{{
+				ComponentOps: opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
+				Instances:    []opsv1alpha1.Instance{{Name: named}, {Name: original}},
+			}}
+			opsRes.OpsRequest = testops.CreateOpsRequest(ctx, testCtx, ops)
+			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsRunningPhase
+			opsRes.OpsRequest.Status.Progress = "0/2"
+			opsRes.Runtimes = map[string]OpsRuntime{defaultCompName: newOpsRuntime(ctx, k8sClient, "")}
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+			handler := rebuildInstanceOpsHandler{}
+
+			By("waiting for source publication instead of falling back to names or PVC labels")
+			err := handler.SaveLastConfiguration(reqCtx, k8sClient, opsRes)
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeNeedWaiting)).To(BeTrue())
+			its = publishInstanceStatus(opsRes)
+			Expect(its.FindInstanceStatus(original).CurrentState).To(Equal(workloads.InstanceCurrentStateAbsent))
+			// An unrelated offline identity with unknown template must not block rebuild.
+			its.Status.InstanceStatus = append(its.Status.InstanceStatus, workloads.InstanceStatus{
+				PodName: prefix + "-99", DesiredState: workloads.InstanceDesiredStateOffline,
+				CurrentState: workloads.InstanceCurrentStateAbsent,
+			})
+			Expect(k8sClient.Status().Update(ctx, its)).To(Succeed())
+			Expect(handler.SaveLastConfiguration(reqCtx, k8sClient, opsRes)).To(Succeed())
+			Expect(handler.Action(reqCtx, k8sClient, opsRes)).To(Succeed())
+			Expect(opsRes.OpsRequest.Status.LastConfiguration.Components[defaultCompName].SourceInstanceAssignments).To(HaveLen(3))
+			Expect(k8sClient.Status().Update(ctx, opsRes.OpsRequest)).To(Succeed())
+
+			reconcile := func() opsv1alpha1.OpsPhase {
+				phase, _, err := handler.ReconcileAction(reqCtx, k8sClient, opsRes)
+				Expect(err).NotTo(HaveOccurred())
+				// Each iteration resumes from persisted state, as after a controller restart.
+				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(opsRes.Cluster), opsRes.Cluster)).To(Succeed())
+				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(opsRes.OpsRequest), opsRes.OpsRequest)).To(Succeed())
+				comp = &opsRes.Cluster.Spec.ComponentSpecs[0]
+				return phase
+			}
+			By("writing expansion once and waiting across repeated reconciles with old status")
+			Expect(reconcile()).To(Equal(opsv1alpha1.OpsRunningPhase))
+			Expect(comp.Replicas).To(Equal(int32(5)))
+			for i := 0; i < 2; i++ {
+				Expect(reconcile()).To(Equal(opsv1alpha1.OpsRunningPhase))
+				Expect(comp.Replicas).To(Equal(int32(5)))
+				Expect(opsRes.OpsRequest.Status.Components[defaultCompName].ProgressDetails).To(BeEmpty())
+			}
+			By("letting the actual allocator publish replacements before any new Pod exists")
+			its = publishInstanceStatus(opsRes)
+			Expect(reconcile()).To(Equal(opsv1alpha1.OpsRunningPhase))
+			progress := opsRes.OpsRequest.Status.Components[defaultCompName]
+			Expect(progress.ProgressDetails).To(HaveLen(2))
+			replacements := map[string]string{}
+			for _, name := range []string{original, named} {
+				detail := handler.getInstanceProgressDetail(progress, name)
+				replacement := handler.getScalingOutPodNameFromMessage(detail.Message)
+				Expect(replacement).NotTo(BeEmpty())
+				Expect(replacement).NotTo(BeElementOf(original, named, healthy))
+				Expect(its.FindInstanceStatus(replacement).CurrentState).To(Equal(workloads.InstanceCurrentStateAbsent))
+				expectedTemplate := ""
+				if name == named {
+					expectedTemplate = "large"
+				}
+				Expect(*its.FindInstanceStatus(replacement).TemplateName).To(Equal(expectedTemplate))
+				replacements[name] = replacement
+			}
+			Expect(reconcile()).To(Equal(opsv1alpha1.OpsRunningPhase))
+			Expect(comp.OfflineInstances).To(BeEmpty())
+			Expect(opsRes.OpsRequest.Status.Components[defaultCompName].ProgressDetails).To(Equal(progress.ProgressDetails))
+
+			By("checking actual Pod availability, not the identity or UpToDate fields")
+			var newPods []*corev1.Pod
+			for _, replacement := range replacements {
+				pod := testapps.MockInstanceSetPod(&testCtx, its, clusterName, defaultCompName, replacement, "follower")
+				Expect(testapps.ChangeObjStatus(&testCtx, pod, func() { pod.Status.Conditions = nil })).To(Succeed())
+				newPods = append(newPods, pod)
+			}
+			Expect(reconcile()).To(Equal(opsv1alpha1.OpsRunningPhase))
+			Expect(comp.OfflineInstances).To(BeEmpty())
+			for _, pod := range newPods {
+				Expect(testapps.ChangeObjStatus(&testCtx, pod, func() { testk8s.MockPodAvailable(pod, metav1.Now()) })).To(Succeed())
+			}
+			Expect(reconcile()).To(Equal(opsv1alpha1.OpsRunningPhase))
+			Expect(comp.Replicas).To(Equal(int32(3)))
+			Expect(comp.Instances[0].GetReplicas()).To(Equal(int32(1)))
+			Expect(comp.OfflineInstances).To(ConsistOf(original, named))
+			publishInstanceStatus(opsRes)
+			Expect(reconcile()).To(Equal(opsv1alpha1.OpsRunningPhase)) // old named Pod still exists
+			testk8s.MockPodIsTerminating(ctx, testCtx, oldPod)
+			testk8s.RemovePodFinalizer(ctx, testCtx, oldPod)
+			publishInstanceStatus(opsRes)
+			Expect(reconcile()).To(Equal(opsv1alpha1.OpsSucceedPhase))
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(pvc), &corev1.PersistentVolumeClaim{})).To(Succeed())
+		}, Entry("flat ordinals", true), Entry("non-flat ordinals", false))
+
+		It("uses the published template for an in-place flat instance and its restored PVC labels", func() {
+			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
+			comp := &opsRes.Cluster.Spec.ComponentSpecs[0]
+			comp.FlatInstanceOrdinal = true
+			comp.Instances = []appsv1.InstanceTemplate{{Name: "large", Replicas: ptr.To(int32(1))}}
+			Expect(k8sClient.Update(ctx, opsRes.Cluster)).To(Succeed())
+			createComponentObject(opsRes)
+			its := testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
+			its.Status.AssignedOrdinals = map[string]workloads.Ordinals{
+				"": {Discrete: []int32{8, 9}}, "large": {Discrete: []int32{7}},
+			}
+			Expect(k8sClient.Status().Update(ctx, its)).To(Succeed())
+			pod := testapps.MockInstanceSetPod(&testCtx, its, clusterName, defaultCompName, its.Name+"-7", "follower")
+			opsRes.OpsRequest = createRebuildInstanceOps("", true, pod.Name)
+			opsRes.Runtimes = map[string]OpsRuntime{defaultCompName: newOpsRuntime(ctx, k8sClient, "")}
+			handler := rebuildInstanceOpsHandler{}
+			rebuild := opsRes.OpsRequest.Spec.RebuildFrom[0]
+			_, err := handler.prepareInplaceRebuildHelper(intctrlutil.RequestCtx{Ctx: ctx}, k8sClient, opsRes, rebuild, rebuild.Instances[0], 0)
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeNeedWaiting)).To(BeTrue())
+			its = publishInstanceStatus(opsRes)
+			Expect(*its.FindInstanceStatus(pod.Name).TemplateName).To(Equal("large"))
+			helper, err := handler.prepareInplaceRebuildHelper(intctrlutil.RequestCtx{Ctx: ctx}, k8sClient, opsRes, rebuild, rebuild.Instances[0], 0)
+			Expect(err).NotTo(HaveOccurred())
+			template, err := instanceTemplateByName(its.Status.InstanceStatus, pod.Name)
+			Expect(err).NotTo(HaveOccurred())
+			pvcs, _, _, err := getPVCMapAndVolumes(opsRes, helper.synthesizedComp, pod, template, "rebuild", 0, false)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(pvcs).NotTo(BeEmpty())
+			for _, pvc := range pvcs {
+				Expect(pvc.Labels[constant.KBAppInstanceTemplateLabelKey]).To(Equal("large"))
+			}
+		})
+
+		It("rejects flat replacement placement before waiting for status or mutating resources", func() {
+			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
+			opsRes.Cluster.Spec.ComponentSpecs[0].FlatInstanceOrdinal = true
+			opsRes.OpsRequest = createRebuildInstanceOps("", false, clusterName+"-mysql-7")
+			beforeCluster, beforeOps := opsRes.Cluster.DeepCopy(), opsRes.OpsRequest.DeepCopy()
+			handler := rebuildInstanceOpsHandler{}
+			for _, action := range []func(intctrlutil.RequestCtx, client.Client, *OpsResource) error{handler.SaveLastConfiguration, handler.Action} {
+				err := action(intctrlutil.RequestCtx{Ctx: ctx}, k8sClient, opsRes)
+				Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).To(BeTrue())
+				Expect(err.Error()).To(ContainSubstring("targetNodeName"))
+				Expect(opsRes.Cluster).To(Equal(beforeCluster))
+				Expect(opsRes.OpsRequest).To(Equal(beforeOps))
+			}
+			opsRes.OpsRequest.Spec.RebuildFrom[0].InPlace = true
+			Expect(handler.SaveLastConfiguration(intctrlutil.RequestCtx{Ctx: ctx}, k8sClient, opsRes)).To(Succeed())
+			Expect(opsRes.OpsRequest.Status.LastConfiguration.Components[defaultCompName].SourceInstanceAssignments).To(BeEmpty())
+		})
+
 		It("rebuild instance with horizontal scaling", func() {
 			By("init operations resources ")
 			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
 			createComponentObject(opsRes)
 			its := testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
 			podList := testapps.MockInstanceSetPods(&testCtx, its, opsRes.Cluster, defaultCompName)
+			publishInstanceStatus(opsRes)
 			opsRes.OpsRequest = createRebuildInstanceOps("", false, podList[1].Name, podList[2].Name)
 
 			By("mock cluster/component phase to Failed")
@@ -955,6 +1166,7 @@ var _ = Describe("OpsUtil functions", func() {
 			testapps.MockInstanceSetPod(&testCtx, nil, clusterName, defaultCompName, podPrefix+"-4", "follower")
 
 			By("expect specified instances to take offline")
+			publishInstanceStatus(opsRes)
 			_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			compSpec := opsRes.Cluster.Spec.GetComponentByName(defaultCompName)
 			Expect(compSpec.Replicas).Should(BeEquivalentTo(3))
@@ -966,6 +1178,7 @@ var _ = Describe("OpsUtil functions", func() {
 			testk8s.RemovePodFinalizer(ctx, testCtx, podList[1])
 			testk8s.MockPodIsTerminating(ctx, testCtx, podList[2])
 			testk8s.RemovePodFinalizer(ctx, testCtx, podList[2])
+			publishInstanceStatus(opsRes)
 			_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(opsv1alpha1.OpsSucceedPhase))
 		})

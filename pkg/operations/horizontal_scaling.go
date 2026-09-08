@@ -974,16 +974,6 @@ func (hs horizontalScalingOpsHandler) validateOfflineInstancesToOnline(
 	return nil
 }
 
-func sourceAssignmentsForWorkload(last opsv1alpha1.LastComponentConfiguration, workloadName string) map[string]string {
-	result := map[string]string{}
-	for _, assignment := range last.SourceInstanceAssignments {
-		if assignment.WorkloadName == workloadName && assignment.DesiredState == workloads.InstanceDesiredStateActive {
-			result[assignment.PodName] = assignment.TemplateName
-		}
-	}
-	return result
-}
-
 func horizontalDiffMatchesOperation(horizontalScaling opsv1alpha1.HorizontalScaling,
 	created, deleted map[string]string) bool {
 	if horizontalScaling.ScaleOut == nil && len(created) > 0 {

@@ -34,10 +34,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/sharding"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 // clusterNormalizationTransformer handles the cluster API conversion.
@@ -327,9 +329,9 @@ func (t *clusterNormalizationTransformer) resolveDefinitions4ShardTemplate(trans
 	var shardingDef *appsv1.ShardingDefinition
 	shardingDefName = t.shardingDefinitionName(shardingDefName, comp)
 	if len(shardingDefName) > 0 {
-		shardingDef, err = resolveShardingDefinition(transCtx.Context, transCtx.Client, shardingDefName)
+		shardingDef, err = getNCheckShardingDefinition(transCtx.Context, transCtx.Client, shardingDefName)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, intctrlutil.NewRequeueError(appsutil.RequeueDuration, err.Error())
 		}
 		if len(spec.ComponentDef) == 0 {
 			spec.ComponentDef = shardingDef.Spec.Template.CompDef
@@ -597,6 +599,20 @@ func clusterTopologyCompMatched(comp appsv1.ClusterTopologyComponent, compName s
 		return strings.HasPrefix(compName, comp.Name)
 	}
 	return false
+}
+
+func getNCheckShardingDefinition(ctx context.Context, cli client.Reader, name string) (*appsv1.ShardingDefinition, error) {
+	shardingDef, err := resolveShardingDefinition(ctx, cli, name)
+	if err != nil {
+		return nil, err
+	}
+	if shardingDef.Generation != shardingDef.Status.ObservedGeneration {
+		return nil, fmt.Errorf("the referenced ShardingDefinition is not up to date: %s", shardingDef.Name)
+	}
+	if shardingDef.Status.Phase != appsv1.AvailablePhase {
+		return nil, fmt.Errorf("the referenced ShardingDefinition is unavailable: %s", shardingDef.Name)
+	}
+	return shardingDef, nil
 }
 
 // resolveShardingDefinition resolves and returns the specific sharding definition object supported.

@@ -24,13 +24,74 @@ import (
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
+
+var _ = Describe("sharding definition availability during normalization", func() {
+	DescribeTable("checks resolved definitions before building shard components",
+		func(phase appsv1.Phase, observed int64, detail string) {
+			scheme := runtime.NewScheme()
+			Expect(appsv1.AddToScheme(scheme)).Should(Succeed())
+			compDef := testapps.NewComponentDefinitionFactory("comp-v1").SetServiceVersion("1.0.0").GetObject()
+			// ComponentDefinition availability is outside this check's scope.
+			compDef.Status.Phase = appsv1.UnavailablePhase
+			def := testapps.NewShardingDefinitionFactory("shard-v2", compDef.Name).GetObject()
+			def.Generation = 2
+			def.Status = appsv1.ShardingDefinitionStatus{
+				Phase: phase, ObservedGeneration: observed,
+			}
+			oldDef := def.DeepCopy()
+			oldDef.Name = "shard-v1"
+			oldDef.Status.Phase, oldDef.Status.ObservedGeneration = appsv1.AvailablePhase, 2
+			cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(compDef, def, oldDef).Build()
+			for _, ref := range []string{def.Name, "shard-"} {
+				for _, template := range []bool{false, true} {
+					cluster := testapps.NewClusterFactory(testCtx.DefaultNamespace, "availability-cluster", "").
+						AddSharding("shard", ref, compDef.Name).SetShards(1).GetObject()
+					if template {
+						cluster.Spec.Shardings[0].ShardingDef = oldDef.Name
+						cluster.Spec.Shardings[0].ShardTemplates = []appsv1.ShardTemplate{{
+							Name: "custom", ShardingDef: ptr.To(ref), Shards: ptr.To(int32(1)),
+						}}
+					}
+					transCtx := &clusterTransformContext{
+						Context: ctx, Client: cli, Cluster: cluster.DeepCopy(), OrigCluster: cluster.DeepCopy(),
+					}
+					err := (&clusterNormalizationTransformer{}).Transform(transCtx, graph.NewDAG())
+					if detail == "" {
+						Expect(err).ShouldNot(HaveOccurred())
+						Expect(transCtx.shardingComps["shard"]).Should(HaveLen(1))
+						Expect(transCtx.shardingDefs).Should(HaveKey(def.Name))
+					} else {
+						// Selection must not fall back to an older available definition.
+						Expect(err).Should(MatchError(ContainSubstring("the referenced ShardingDefinition is " + detail + ": " + def.Name)))
+						Expect(intctrlutil.IsRequeueError(err)).Should(BeTrue())
+						Expect(transCtx.shardingComps).Should(BeEmpty())
+						Expect(transCtx.Cluster.Status.Conditions).Should(ContainElement(And(
+							HaveField("Status", metav1.ConditionFalse), HaveField("Message", ContainSubstring(detail)))))
+					}
+				}
+			}
+		},
+		Entry("not yet observed", appsv1.Phase(""), int64(0), "not up to date"),
+		Entry("empty phase", appsv1.Phase(""), int64(2), "unavailable"),
+		Entry("stale available", appsv1.AvailablePhase, int64(1), "not up to date"),
+		Entry("stale unavailable", appsv1.UnavailablePhase, int64(1), "not up to date"),
+		Entry("current unavailable", appsv1.UnavailablePhase, int64(2), "unavailable"),
+		Entry("current available", appsv1.AvailablePhase, int64(2), ""),
+	)
+})
 
 var _ = Describe("resolve CompDefinition and ServiceVersion", func() {
 	var (

@@ -30,8 +30,10 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -154,6 +156,47 @@ var _ = Describe("action utils", func() {
 			Expect(err).ShouldNot(BeNil())
 			Expect(errors.Is(err, proto.ErrTimedOut)).Should(BeTrue())
 		})
+
+		DescribeTable("kills the exec process group", func(explicitCancel bool) {
+			dir, err := os.MkdirTemp("", "kbagent-process-group-*")
+			Expect(err).ShouldNot(HaveOccurred())
+			DeferCleanup(os.RemoveAll, dir)
+			readyMarker := filepath.Join(dir, "ready")
+			childMarker := filepath.Join(dir, "child-finished")
+			action := &proto.Action{Exec: &proto.ExecAction{Commands: []string{
+				"/bin/bash", "-c", `(sleep 1; touch "$1") & touch "$0"; wait`, readyMarker, childMarker,
+			}}}
+			callCtx, cancel := context.WithCancel(ctx)
+			if !explicitCancel {
+				cancel()
+				callCtx, cancel = context.WithTimeout(ctx, 300*time.Millisecond)
+			}
+			defer cancel()
+			timeout := int32(-1)
+			stdout := &bytes.Buffer{}
+			errChan, err := nonBlockingCallActionX(callCtx, action, nil, &timeout, nil, stdout, nil)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(func() bool {
+				_, err := os.Stat(readyMarker)
+				return err == nil
+			}, time.Second, 10*time.Millisecond).Should(BeTrue())
+			if explicitCancel {
+				cancel()
+			}
+			var callErr error
+			Eventually(errChan, 2*time.Second).Should(Receive(&callErr))
+			Expect(callErr).Should(HaveOccurred())
+			if !explicitCancel {
+				Expect(errors.Is(callErr, proto.ErrTimedOut)).Should(BeTrue())
+			}
+			Consistently(func() bool {
+				_, err := os.Stat(childMarker)
+				return err == nil
+			}, 1200*time.Millisecond, 20*time.Millisecond).Should(BeFalse())
+		},
+			Entry("on deadline", false),
+			Entry("on explicit cancellation", true),
+		)
 
 		It("x - timeout and stdout", func() {
 			action := &proto.Action{

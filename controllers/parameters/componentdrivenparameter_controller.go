@@ -33,8 +33,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
+	ctrlbuilder "sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
@@ -92,6 +95,9 @@ func (r *ComponentDrivenParameterReconciler) Reconcile(ctx context.Context, req 
 func (r *ComponentDrivenParameterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1.Component{}).
+		Watches(&appsv1.Component{}, handler.EnqueueRequestsFromMapFunc(r.resourceInputDependents), ctrlbuilder.WithPredicates(predicate.GenerationChangedPredicate{})).
+		Watches(&appsv1.Cluster{}, handler.EnqueueRequestsFromMapFunc(r.resourceInputDependents), ctrlbuilder.WithPredicates(predicate.GenerationChangedPredicate{})).
+		Watches(&appsv1.ComponentDefinition{}, handler.EnqueueRequestsFromMapFunc(r.resourceInputDependents), ctrlbuilder.WithPredicates(predicate.GenerationChangedPredicate{})).
 		Complete(r)
 }
 
@@ -148,7 +154,7 @@ func (r *ComponentDrivenParameterReconciler) update(reqCtx intctrlutil.RequestCt
 	if reflect.DeepEqual(mergedObject, existing) {
 		return intctrlutil.Reconciled()
 	}
-	if err := r.Client.Patch(reqCtx.Ctx, mergedObject, client.MergeFrom(existing)); err != nil {
+	if err := r.Client.Patch(reqCtx.Ctx, mergedObject, client.MergeFromWithOptions(existing, client.MergeFromWithOptimisticLock{})); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	return intctrlutil.Reconciled()
@@ -237,7 +243,13 @@ func buildComponentParameter(reqCtx intctrlutil.RequestCtx, reader client.Reader
 	if configRender != nil {
 		err = parameters.UpdateConfigPayload(&parameterObj.Spec, &comp.Spec, &configRender.Spec, sharding)
 	}
-	return parameterObj, err
+	if err != nil {
+		return nil, err
+	}
+	if err = applyResourceRenderInputs(reqCtx.Ctx, reader, cmpd, comp, &parameterObj.Spec); err != nil {
+		return nil, err
+	}
+	return parameterObj, nil
 }
 
 func handleCustomParameterTemplate(ctx context.Context, reader client.Reader, annotations map[string]string, specs []parametersv1alpha1.ConfigTemplateItemDetail) error {
@@ -357,7 +369,7 @@ func (r *ComponentDrivenParameterReconciler) mergeComponentParameter(expected *p
 		if expected.CustomTemplates != nil {
 			dest.CustomTemplates = expected.CustomTemplates
 		}
-		dest.Payload = expected.Payload
+		mergeResourcePayload(dest, expected)
 		dest.ConfigSpec = expected.ConfigSpec
 	})
 }

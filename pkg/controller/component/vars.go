@@ -59,6 +59,28 @@ func ResolveTemplateNEnvVars(ctx context.Context, cli client.Reader, synthesized
 	return resolveTemplateNEnvVars(ctx, cli, synthesizedComp, definedVars)
 }
 
+// ResolveResourceRenderVars resolves only resourceVarRef inputs using the same
+// selectors as template rendering. It intentionally excludes credentials and
+// other unrelated dependencies. Expressions are evaluated by the normal renderer;
+// tracking their resource operands is sufficient to invalidate the template.
+func ResolveResourceRenderVars(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
+	definedVars []appsv1.EnvVar) (map[string]string, error) {
+	values := make(map[string]string)
+	for _, v := range definedVars {
+		if v.ValueFrom == nil || v.ValueFrom.ResourceVarRef == nil {
+			continue
+		}
+		vars, _, err := resolveResourceVarRef(ctx, cli, synthesizedComp, v.Name, *v.ValueFrom.ResourceVarRef)
+		if err != nil {
+			return nil, err
+		}
+		for _, resolved := range vars {
+			values[resolved.Name] = resolved.Value
+		}
+	}
+	return values, nil
+}
+
 func InjectEnvVars(synthesizedComp *SynthesizedComponent, envVars []corev1.EnvVar, envFromSources []corev1.EnvFromSource) {
 	InjectEnvVars4Containers(synthesizedComp, envVars, envFromSources, nil)
 }

@@ -20,6 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package constant
 
 const (
+	// ResourceRenderInputsPayload is maintained by the component parameter controller.
+	ResourceRenderInputsPayload = "resourceRenderInputs"
+
 	TLSPayload               = "tls"
 	ComponentResourcePayload = "componentResource"
 	ReplicasPayload          = "replicas"

@@ -59,9 +59,14 @@ func mockSchemaData() string {
 	return string(cue)
 }
 
-func mockConfigResource() (*corev1.ConfigMap, *parametersv1alpha1.ParametersDefinition) {
+type mockResourceConfiguration struct {
+	Template func(*corev1.ConfigMap)
+	Vars     []appsv1.EnvVar
+}
+
+func mockConfigResource(options ...mockResourceConfiguration) (*corev1.ConfigMap, *parametersv1alpha1.ParametersDefinition) {
 	By("Create a config template obj")
-	configmap := testparameters.NewComponentTemplateFactory(configSpecName, testCtx.DefaultNamespace).
+	factory := testparameters.NewComponentTemplateFactory(configSpecName, testCtx.DefaultNamespace).
 		AddLabels(
 			constant.AppNameLabelKey, clusterName,
 			constant.AppInstanceLabelKey, clusterName,
@@ -75,9 +80,13 @@ func mockConfigResource() (*corev1.ConfigMap, *parametersv1alpha1.ParametersDefi
 			constant.KBParameterUpdateSourceAnnotationKey, constant.ReconfigureManagerSource,
 			constant.ConfigurationRevision, "1",
 			constant.CMInsEnableRerenderTemplateKey, "true").
-		AddConfigFile(envTestFileKey, "abcde=1234").
-		Create(&testCtx).
-		GetObject()
+		AddConfigFile(envTestFileKey, "abcde=1234")
+	for _, option := range options {
+		if option.Template != nil {
+			option.Template(factory.GetObject())
+		}
+	}
+	configmap := factory.Create(&testCtx).GetObject()
 
 	By("Create a parameters definition obj")
 	paramsdef := testparameters.NewParametersDefinitionFactory(paramsDefName).
@@ -92,16 +101,20 @@ func mockConfigResource() (*corev1.ConfigMap, *parametersv1alpha1.ParametersDefi
 	return configmap, paramsdef
 }
 
-func mockReconcileResource() (*corev1.ConfigMap, *parametersv1alpha1.ParametersDefinition, *appsv1.Cluster, *appsv1.Component, *component.SynthesizedComponent) {
-	configmap, paramsDef := mockConfigResource()
+func mockReconcileResource(options ...mockResourceConfiguration) (*corev1.ConfigMap, *parametersv1alpha1.ParametersDefinition, *appsv1.Cluster, *appsv1.Component, *component.SynthesizedComponent) {
+	configmap, paramsDef := mockConfigResource(options...)
 
 	By("Create a component definition obj and mock to available")
-	compDefObj := testapps.NewComponentDefinitionFactory(compDefName).
+	compDefFactory := testapps.NewComponentDefinitionFactory(compDefName).
 		WithRandomName().
 		SetDefaultSpec().
-		AddConfigTemplate(configSpecName, configmap.Name, testCtx.DefaultNamespace, configVolumeName, true).
-		Create(&testCtx).
-		GetObject()
+		AddConfigTemplate(configSpecName, configmap.Name, testCtx.DefaultNamespace, configVolumeName, true)
+	for _, option := range options {
+		for _, v := range option.Vars {
+			compDefFactory.AddVar(v)
+		}
+	}
+	compDefObj := compDefFactory.Create(&testCtx).GetObject()
 	Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(compDefObj), func(obj *appsv1.ComponentDefinition) {
 		obj.Status.Phase = appsv1.AvailablePhase
 	})()).Should(Succeed())

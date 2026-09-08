@@ -22,6 +22,7 @@ package parameters
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"slices"
 	"strconv"
@@ -60,19 +61,25 @@ type TaskContext struct {
 	ctx                context.Context
 	component          *component.SynthesizedComponent
 	paramsDefs         []*parametersv1alpha1.ParametersDefinition
+	resourceInputs     resourceRenderFingerprint
 }
 
 func NewTaskContext(ctx context.Context, cli client.Client, componentParameter *parametersv1alpha1.ComponentParameter, fetchTask *Task) (*TaskContext, error) {
 	// build synthesized component for the component
 	cmpd := fetchTask.ComponentDefObj
-	synthesizedComp, err := component.BuildSynthesizedComponent(ctx, cli, cmpd, fetchTask.ComponentObj)
+	reader := newResourceSnapshotReader(cli, fetchTask.ComponentObj)
+	synthesizedComp, err := component.BuildSynthesizedComponent(ctx, reader, cmpd, fetchTask.ComponentObj)
 	if err == nil {
-		err = buildTemplateVars(ctx, cli, fetchTask.ComponentDefObj, synthesizedComp)
+		err = buildTemplateVars(ctx, reader, fetchTask.ComponentDefObj, synthesizedComp)
 	}
 	if err != nil {
 		return nil, err
 	}
 
+	fingerprint, err := resourceRenderInputFingerprint(ctx, reader, cmpd, fetchTask.ComponentObj, synthesizedComp)
+	if err != nil {
+		return nil, err
+	}
 	configDefList := &parametersv1alpha1.ParamConfigRendererList{}
 	if err := cli.List(ctx, configDefList); err != nil {
 		return nil, err
@@ -104,6 +111,7 @@ func NewTaskContext(ctx context.Context, cli client.Client, componentParameter *
 	}
 
 	return &TaskContext{ctx: ctx,
+		resourceInputs:     fingerprint,
 		componentParameter: componentParameter,
 		configRender:       configRender,
 		component:          synthesizedComp,
@@ -147,6 +155,22 @@ func syncImpl(taskCtx *TaskContext,
 	status *parametersv1alpha1.ConfigTemplateItemDetailStatus,
 	revision string,
 	configMap *corev1.ConfigMap) (err error) {
+	// Legacy objects without the managed key retain their old behavior until the
+	// generator seeds it. Never publish newer resource inputs under an older revision.
+	if raw, ok := item.Payload[constant.ResourceRenderInputsPayload]; ok {
+		var recorded resourceRenderFingerprint
+		if err := json.Unmarshal(raw, &recorded); err != nil {
+			status.Phase = parametersv1alpha1.CMergeFailedPhase
+			status.Message = pointer.String(err.Error())
+			return err
+		}
+		if recorded != taskCtx.resourceInputs {
+			err := fmt.Errorf("resource render inputs changed; waiting for ComponentParameter to synchronize")
+			status.Phase = parametersv1alpha1.CPendingPhase
+			status.Message = pointer.String(err.Error())
+			return err
+		}
+	}
 	if parameters.IsApplyUpdatedParameters(configMap, item) {
 		return syncStatus(configMap, status)
 	}

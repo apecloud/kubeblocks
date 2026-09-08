@@ -601,6 +601,9 @@ func (r rebuildInstanceOpsHandler) prepareInplaceRebuildHelper(reqCtx intctrluti
 		// prepare backup infos
 		backup = &dpv1alpha1.Backup{}
 		if err = cli.Get(reqCtx.Ctx, client.ObjectKey{Name: rebuildInstance.BackupName, Namespace: opsRes.Cluster.Namespace}, backup); err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil, intctrlutil.NewFatalError(fmt.Sprintf(`the backup "%s" is not found`, rebuildInstance.BackupName))
+			}
 			return nil, err
 		}
 		if !slices.Contains([]string{string(dpv1alpha1.BackupTypeFull), string(dpv1alpha1.BackupTypeIncremental)}, backup.Labels[dptypes.BackupTypeLabelKey]) {
@@ -612,6 +615,8 @@ func (r rebuildInstanceOpsHandler) prepareInplaceRebuildHelper(reqCtx intctrluti
 		if backup.Status.BackupMethod == nil {
 			return nil, intctrlutil.NewFatalError(fmt.Sprintf(`the backupMethod of the backup "%s" can not be empty`, rebuildInstance.BackupName))
 		}
+		// NOTE: an ActionSet is a cluster-scoped resource supplied by the addon and can be
+		// temporarily absent (addon installation/upgrade), so a NotFound here stays retryable.
 		actionSet, err = dputils.GetActionSetByName(reqCtx, cli, backup.Status.BackupMethod.ActionSetName)
 		if err != nil {
 			return nil, err

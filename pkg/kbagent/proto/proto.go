@@ -77,9 +77,10 @@ type ActionRequest struct {
 	Arguments      [][]string        `json:"arguments,omitempty"`
 	TimeoutSeconds *int32            `json:"timeoutSeconds,omitempty"`
 	RetryPolicy    *RetryPolicy      `json:"retryPolicy,omitempty"`
-	// Rerun requests a new run instead of returning the previous terminal result.
-	// It does not interrupt a running Action.
-	Rerun bool `json:"rerun,omitempty"`
+	// Query returns the state or result of an equivalent non-blocking request
+	// without executing it. A missing result returns ErrResultNotFound.
+	// When false, the request executes again unless an equivalent request is running.
+	Query bool `json:"query,omitempty"`
 }
 
 type ActionResponse struct {

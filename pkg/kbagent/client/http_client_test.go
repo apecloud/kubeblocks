@@ -61,6 +61,10 @@ func newHTTPClientForTest(t *testing.T, handler http.HandlerFunc) (*httpClient, 
 }
 
 func TestHTTPClientAction(t *testing.T) {
+	queries := make(chan bool, 2)
+	queries <- false
+	queries <- true
+	close(queries)
 	cli, closeServer := newHTTPClientForTest(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != proto.ServiceAction.URI || r.Method != http.MethodPost {
 			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
@@ -69,7 +73,8 @@ func TestHTTPClientAction(t *testing.T) {
 		if err := json.NewDecoder(r.Body).Decode(request); err != nil {
 			t.Fatalf("decode Action request: %v", err)
 		}
-		if request.Action != "backup" || !request.Rerun {
+		query, ok := <-queries
+		if !ok || request.Action != "backup" || request.Query != query {
 			t.Fatalf("unexpected Action request: %#v", request)
 		}
 		w.WriteHeader(http.StatusOK)
@@ -77,12 +82,15 @@ func TestHTTPClientAction(t *testing.T) {
 	})
 	defer closeServer()
 
-	resp, err := cli.Action(context.Background(), proto.ActionRequest{Action: "backup", Rerun: true})
+	resp, err := cli.Action(context.Background(), proto.ActionRequest{Action: "backup"})
 	if err != nil {
 		t.Fatalf("Action() error = %v", err)
 	}
 	if resp.Message != "done" || string(resp.Output) != "ok" {
 		t.Fatalf("unexpected response: %#v", resp)
+	}
+	if _, err = cli.Action(context.Background(), proto.ActionRequest{Action: "backup", Query: true}); err != nil {
+		t.Fatalf("query Action() error = %v", err)
 	}
 
 	resp, err = cli.Action(context.WithValue(context.Background(), constant.DryRunContextKey, true), proto.ActionRequest{Action: "backup"})

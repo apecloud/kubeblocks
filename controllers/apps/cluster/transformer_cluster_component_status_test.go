@@ -85,6 +85,28 @@ var _ = Describe("cluster component status transformer", func() {
 	})
 
 	Context("component", func() {
+		It("detects pending non-blocking actions", func() {
+			comp := &appsv1.Component{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{shardingAddShardKey: "pending"},
+				},
+				Spec: appsv1.ComponentSpec{
+					CustomActions: []appsv1.CustomAction{{
+						Name:   shardingAddShardAction,
+						Action: &appsv1.Action{},
+					}},
+				},
+			}
+
+			Expect(hasPendingNonBlockingAction(comp)).Should(BeFalse())
+			comp.Spec.CustomActions[0].Action.NonBlocking = true
+			Expect(hasPendingNonBlockingAction(comp)).Should(BeTrue())
+
+			comp.Spec.CustomActions = nil
+			comp.Annotations = map[string]string{shardingRemoveActionTargetsKey: `{"version":1}`}
+			Expect(hasPendingNonBlockingAction(comp)).Should(BeTrue())
+		})
+
 		It("empty", func() {
 			transCtx.components = nil
 

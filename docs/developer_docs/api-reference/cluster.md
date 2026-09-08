@@ -13040,6 +13040,9 @@ ShardingAction
 <ul>
 <li>KB_ADD_SHARD_NAME: The name of the shard being added.</li>
 </ul>
+<p>This Action supports both blocking and non-blocking modes. KubeBlocks does
+not finish adding the shard until the Action has succeeded on every
+selected target shard and Pod.</p>
 <p>Note: This field is immutable once it has been set.</p>
 </td>
 </tr>
@@ -13059,6 +13062,9 @@ ShardingAction
 <ul>
 <li>KB_REMOVE_SHARD_NAME: The name of the shard being removed.</li>
 </ul>
+<p>This Action supports both blocking and non-blocking modes. KubeBlocks does
+not remove the shard until the Action has succeeded on every selected
+target shard and Pod.</p>
 <p>Note: This field is immutable once it has been set.</p>
 </td>
 </tr>

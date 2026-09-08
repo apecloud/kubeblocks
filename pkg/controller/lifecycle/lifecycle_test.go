@@ -251,7 +251,7 @@ var _ = Describe("lifecycle", func() {
 				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
 					Expect(req.Action).Should(Equal("postProvision"))
 					Expect(req.Parameters).Should(BeEmpty())
-					Expect(req.Rerun).Should(BeTrue())
+					Expect(req.Query).Should(BeFalse())
 					Expect(req.TimeoutSeconds).ShouldNot(BeNil())
 					Expect(*req.TimeoutSeconds).Should(Equal(action.TimeoutSeconds))
 					Expect(req.RetryPolicy).ShouldNot(BeNil())
@@ -262,7 +262,6 @@ var _ = Describe("lifecycle", func() {
 			})
 
 			opts := &Options{
-				Rerun:          true,
 				TimeoutSeconds: &action.TimeoutSeconds,
 				RetryPolicy:    action.RetryPolicy,
 			}
@@ -583,6 +582,24 @@ var _ = Describe("lifecycle", func() {
 
 			err = lifecycle.PostProvision(ctx, reader, nil)
 			Expect(err).Should(BeNil())
+		})
+
+		It("observes a missing result without bypassing preconditions for a new run", func() {
+			lifecycleActions.PostProvision.PreCondition = ptr.To(appsv1.ClusterReadyPreConditionType)
+			lfa, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods)
+			Expect(err).ShouldNot(HaveOccurred())
+			reader := &mockReader{cli: k8sClient, objs: []client.Object{&appsv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{Name: clusterName, Namespace: namespace},
+				Status:     appsv1.ClusterStatus{Phase: appsv1.FailedClusterPhase},
+			}}}
+			mockKBAgentClient(func(r *kbacli.MockClientMockRecorder) {
+				r.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
+					Expect(req.Query).Should(BeTrue())
+					return proto.ActionResponse{Error: proto.Error2Type(proto.ErrResultNotFound)}, nil
+				}).Times(1)
+			})
+			Expect(errors.Is(lfa.PostProvision(ctx, reader, &Options{Query: true}), ErrActionResultNotFound)).Should(BeTrue())
+			Expect(errors.Is(lfa.PostProvision(ctx, reader, nil), ErrPreconditionFailed)).Should(BeTrue())
 		})
 
 		It("precondition - fail", func() {

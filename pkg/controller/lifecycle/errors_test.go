@@ -36,6 +36,7 @@ func TestIsActionFailure(t *testing.T) {
 		{name: "precondition", err: ErrPreconditionFailed, want: false},
 		{name: "in progress", err: ErrActionInProgress, want: false},
 		{name: "busy", err: ErrActionBusy, want: false},
+		{name: "result not found", err: ErrActionResultNotFound, want: false},
 		{name: "wrapped waiting", err: fmt.Errorf("wrapped: %w", ErrActionBusy), want: false},
 		{name: "failed", err: ErrActionFailed, want: true},
 		{name: "timed out", err: ErrActionTimedOut, want: true},

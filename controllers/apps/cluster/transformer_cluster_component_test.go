@@ -2102,11 +2102,30 @@ var _ = Describe("cluster component transformer test", func() {
 				transCtx.shardingDefs = nil
 			})
 
+			DescribeTable("blocks invalid definitions on the deletion read path",
+				func(phase appsv1.Phase, observed int64, waiting bool, detail string) {
+					shardingDef := testapps.NewShardingDefinitionFactory(shardingDefName, compDefName).
+						SetLifecycleActions(&appsv1.ShardingLifecycleActions{PreTerminate: mockShardingAction("pre-terminate")}).GetObject()
+					shardingDef.Generation = 2
+					shardingDef.Status = appsv1.ShardingDefinitionStatus{
+						Phase: phase, ObservedGeneration: observed, Message: "invalid lifecycle action",
+					}
+					transCtx.Client = &appsutil.MockReader{Objects: []client.Object{shardingDef}}
+					err := (&clusterShardingHandler{}).handlePreTerminate(transCtx, sharding1aName, nil)
+					Expect(err).Should(MatchError(ContainSubstring(detail)))
+					Expect(ictrlutil.IsRequeueError(err)).Should(Equal(waiting))
+					Expect(transCtx.Cluster.Status.Shardings[sharding1aName].PreTerminate).Should(BeNil())
+				},
+				Entry("stale available", appsv1.AvailablePhase, int64(1), true, "awaiting validation"),
+				Entry("current unavailable", appsv1.UnavailablePhase, int64(2), false, "invalid lifecycle action"),
+			)
+
 			It("not defined", func() {
 				shardComp, pod := mockShardCompWithPod(appsv1.RunningComponentPhase, map[string]string{
 					constant.KBAppClusterUIDKey: "test-uid",
 				})
 				shardingDef := testapps.NewShardingDefinitionFactory(shardingDefName, compDefName).GetObject()
+				shardingDef.Status.Phase = appsv1.AvailablePhase
 				shardingDef.Spec.LifecycleActions = nil
 				reader := &appsutil.MockReader{Objects: func(transCtx *clusterTransformContext) []client.Object {
 					return []client.Object{shardComp, pod, shardingDef}
@@ -2135,6 +2154,7 @@ var _ = Describe("cluster component transformer test", func() {
 					constant.KBAppClusterUIDKey: "test-uid",
 				})
 				shardingDef := testapps.NewShardingDefinitionFactory(shardingDefName, compDefName).GetObject()
+				shardingDef.Status.Phase = appsv1.AvailablePhase
 				shardingDef.Spec.LifecycleActions = &appsv1.ShardingLifecycleActions{
 					PreTerminate: mockShardingAction("pre-terminate"),
 				}
@@ -2165,6 +2185,7 @@ var _ = Describe("cluster component transformer test", func() {
 					constant.KBAppClusterUIDKey: "test-uid",
 				})
 				shardingDef := testapps.NewShardingDefinitionFactory(shardingDefName, compDefName).GetObject()
+				shardingDef.Status.Phase = appsv1.AvailablePhase
 				shardingDef.Spec.LifecycleActions = &appsv1.ShardingLifecycleActions{
 					PreTerminate: mockShardingAction("pre-terminate"),
 				}
@@ -2195,6 +2216,7 @@ var _ = Describe("cluster component transformer test", func() {
 					constant.KBAppClusterUIDKey: "test-uid",
 				})
 				shardingDef := testapps.NewShardingDefinitionFactory(shardingDefName, compDefName).GetObject()
+				shardingDef.Status.Phase = appsv1.AvailablePhase
 				shardingDef.Spec.LifecycleActions = &appsv1.ShardingLifecycleActions{
 					PostProvision: mockShardingAction("post-provision"),
 					PreTerminate:  mockShardingAction("pre-terminate"),
@@ -2236,6 +2258,7 @@ var _ = Describe("cluster component transformer test", func() {
 					constant.KBAppClusterUIDKey: "test-uid",
 				})
 				shardingDef := testapps.NewShardingDefinitionFactory(shardingDefName, compDefName).GetObject()
+				shardingDef.Status.Phase = appsv1.AvailablePhase
 				shardingDef.Spec.LifecycleActions = &appsv1.ShardingLifecycleActions{
 					PostProvision: mockShardingAction("post-provision"),
 					PreTerminate:  mockShardingAction("pre-terminate"),
@@ -2277,6 +2300,7 @@ var _ = Describe("cluster component transformer test", func() {
 					constant.KBAppClusterUIDKey: "test-uid",
 				})
 				shardingDef := testapps.NewShardingDefinitionFactory(shardingDefName, compDefName).GetObject()
+				shardingDef.Status.Phase = appsv1.AvailablePhase
 				shardingDef.Spec.LifecycleActions = &appsv1.ShardingLifecycleActions{
 					PostProvision: mockShardingAction("post-provision"),
 					PreTerminate:  mockShardingAction("pre-terminate"),

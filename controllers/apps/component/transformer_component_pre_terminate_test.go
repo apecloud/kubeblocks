@@ -40,6 +40,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
 	kbagentproto "github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -76,6 +77,7 @@ var _ = Describe("pre-terminate transformer test", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: compDefName,
 			},
+			Status: appsv1.ComponentDefinitionStatus{Phase: appsv1.AvailablePhase},
 			Spec: appsv1.ComponentDefinitionSpec{
 				LifecycleActions: &appsv1.ComponentLifecycleActions{
 					PreTerminate: testapps.NewLifecycleAction("pre-terminate"),
@@ -140,6 +142,27 @@ var _ = Describe("pre-terminate transformer test", func() {
 	})
 
 	Context("pre-terminate", func() {
+		DescribeTable("blocks definitions before loading resources or invoking pre-terminate",
+			func(phase appsv1.Phase, observed int64, waiting bool, detail string) {
+				compDef := reader.Objects[0].(*appsv1.ComponentDefinition)
+				compDef.Generation = 2
+				compDef.Status = appsv1.ComponentDefinitionStatus{
+					Phase: phase, ObservedGeneration: observed, Message: "invalid lifecycle action",
+				}
+				for _, transformer := range []graph.Transformer{&componentLoadResourcesTransformer{}, &componentPreTerminateTransformer{}} {
+					err := transformer.Transform(transCtx, dag)
+					Expect(err).Should(MatchError(ContainSubstring(detail)))
+					Expect(intctrlutil.IsRequeueError(err)).Should(Equal(waiting))
+					Expect(transCtx.SynthesizeComponent).Should(BeNil())
+					Expect(transCtx.Component.Annotations).ShouldNot(HaveKey(kbCompPreTerminateDoneKey))
+				}
+				Expect(transCtx.Component.Status.Conditions).Should(ContainElement(
+					And(HaveField("Status", metav1.ConditionFalse), HaveField("Message", ContainSubstring(detail)))))
+			},
+			Entry("stale available", appsv1.AvailablePhase, int64(1), true, "awaiting validation"),
+			Entry("current unavailable", appsv1.UnavailablePhase, int64(2), false, "invalid lifecycle action"),
+		)
+
 		It("ok", func() {
 			var (
 				preTerminated bool

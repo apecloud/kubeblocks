@@ -1305,6 +1305,9 @@ func (h *clusterShardingHandler) handlePreTerminate(transCtx *clusterTransformCo
 		}
 	}
 
+	if err := ictrlutil.CheckDefinitionAvailable(shardingDef); err != nil {
+		return err
+	}
 	if err := h.shardingAction(transCtx, shardingName, shardingPreTerminateAction,
 		shardingDef.Spec.LifecycleActions.PreTerminate, nil, runningComps, nil); err != nil {
 		return fail(err)

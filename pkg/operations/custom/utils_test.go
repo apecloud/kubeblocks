@@ -340,6 +340,7 @@ var _ = Describe("custom ops helpers", func() {
 				Spec:       appsv1.ComponentSpec{CompDef: "cmpd"},
 			},
 			&appsv1.ComponentDefinition{
+				Status:     appsv1.ComponentDefinitionStatus{Phase: appsv1.AvailablePhase},
 				ObjectMeta: metav1.ObjectMeta{Name: "cmpd"},
 				Spec: appsv1.ComponentDefinitionSpec{
 					ServiceVersion: "8.0.30",

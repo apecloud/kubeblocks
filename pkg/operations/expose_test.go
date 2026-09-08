@@ -152,6 +152,7 @@ var _ = Describe("", func() {
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
 			handler := ExposeOpsHandler{}
 			compDef := &appsv1.ComponentDefinition{
+				Status:     appsv1.ComponentDefinitionStatus{Phase: appsv1.AvailablePhase},
 				ObjectMeta: metav1.ObjectMeta{Name: "expose-cmpd-" + randomStr},
 				Spec: appsv1.ComponentDefinitionSpec{
 					Services: []appsv1.ComponentService{
@@ -242,6 +243,7 @@ var _ = Describe("", func() {
 			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal)).Should(BeTrue())
 
 			compDef := &appsv1.ComponentDefinition{
+				Status:     appsv1.ComponentDefinitionStatus{Phase: appsv1.AvailablePhase},
 				ObjectMeta: metav1.ObjectMeta{Name: "role-cmpd-" + randomStr},
 				Spec: appsv1.ComponentDefinitionSpec{
 					Roles: []appsv1.ReplicaRole{{Name: "leader"}},

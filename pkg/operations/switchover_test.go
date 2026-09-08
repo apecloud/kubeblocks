@@ -102,6 +102,7 @@ var _ = Describe("", func() {
 				SetLifecycleAction("Switchover", testapps.NewLifecycleAction("switchover")).
 				Create(&testCtx).
 				GetObject()
+			mockComponentDefinitionAvailable(compDefObj)
 
 			By("Creating a cluster")
 			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").

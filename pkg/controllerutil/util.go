@@ -26,6 +26,7 @@ import (
 	gruntime "runtime"
 	"slices"
 	"strings"
+	"time"
 
 	"golang.org/x/mod/semver"
 	corev1 "k8s.io/api/core/v1"
@@ -51,6 +52,30 @@ import (
 var (
 	innerScheme = scheme.Scheme
 )
+
+// CheckDefinitionAvailable guards consumption of a definition's spec. Definition
+// reconcilers must validate the spec independently of this consumer-side check.
+func CheckDefinitionAvailable(def client.Object) error {
+	var kind, message string
+	var observedGeneration int64
+	var phase appsv1.Phase
+	switch obj := def.(type) {
+	case *appsv1.ComponentDefinition:
+		kind, observedGeneration, phase, message = "ComponentDefinition", obj.Status.ObservedGeneration, obj.Status.Phase, obj.Status.Message
+	case *appsv1.ShardingDefinition:
+		kind, observedGeneration, phase, message = "ShardingDefinition", obj.Status.ObservedGeneration, obj.Status.Phase, obj.Status.Message
+	default:
+		return fmt.Errorf("unsupported definition type: %T", def)
+	}
+	if observedGeneration != def.GetGeneration() || phase == "" {
+		return NewRequeueError(time.Second, fmt.Sprintf("the referenced %s is awaiting validation: %s (generation %d, observed %d)",
+			kind, def.GetName(), def.GetGeneration(), observedGeneration))
+	}
+	if phase != appsv1.AvailablePhase {
+		return fmt.Errorf("the referenced %s is unavailable: %s: %s", kind, def.GetName(), message)
+	}
+	return nil
+}
 
 func init() {
 	appsv1alpha1.AddToScheme(innerScheme) // nolint: errcheck

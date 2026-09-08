@@ -38,6 +38,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/sharding"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 // clusterNormalizationTransformer handles the cluster API conversion.
@@ -618,7 +619,11 @@ func resolveShardingDefinition(ctx context.Context, cli client.Reader, shardingD
 	slices.Sort(names)
 	latestName := names[len(names)-1]
 
-	return shardingDefs[m[latestName]], nil
+	def := shardingDefs[m[latestName]]
+	if err := intctrlutil.CheckDefinitionAvailable(def); err != nil {
+		return nil, err
+	}
+	return def, nil
 }
 
 // listShardingDefinitionsWithPattern returns all sharding definitions whose names match the given pattern
@@ -694,7 +699,11 @@ func resolveCompDefinitionNServiceVersion(ctx context.Context, cli client.Reader
 	slices.Sort(compatibleCompDefNames)
 	compatibleCompDefName := compatibleCompDefNames[len(compatibleCompDefNames)-1]
 
-	return compatibleCompDefs[compatibleCompDefName], serviceVersion, nil
+	compDef = compatibleCompDefs[compatibleCompDefName]
+	if err := intctrlutil.CheckDefinitionAvailable(compDef); err != nil {
+		return nil, serviceVersion, err
+	}
+	return compDef, serviceVersion, nil
 }
 
 // listCompDefinitionsWithPattern returns all component definitions whose names match the given pattern

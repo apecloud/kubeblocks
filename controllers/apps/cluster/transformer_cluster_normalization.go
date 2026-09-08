@@ -69,11 +69,6 @@ func (t *clusterNormalizationTransformer) Transform(ctx graph.TransformContext, 
 		return err
 	}
 
-	// Check each resolved sharding definition once before building shard components.
-	if err = t.checkShardingDefinitions(transCtx); err != nil {
-		return err
-	}
-
 	// resolve component definitions referenced for components
 	if err = t.resolveDefinitions4Components(transCtx); err != nil {
 		return err
@@ -96,19 +91,6 @@ func (t *clusterNormalizationTransformer) Transform(ctx graph.TransformContext, 
 	// write-back the resolved definitions and service versions to cluster spec.
 	t.writeBackCompNShardingSpecs(transCtx)
 
-	return nil
-}
-
-func (t *clusterNormalizationTransformer) checkShardingDefinitions(transCtx *clusterTransformContext) error {
-	for _, def := range transCtx.shardingDefs {
-		if def.Generation != def.Status.ObservedGeneration || def.Status.Phase == "" {
-			return controllerutil.NewRequeueError(appsutil.RequeueDuration,
-				fmt.Sprintf("the referenced ShardingDefinition is awaiting validation: %s", def.Name))
-		}
-		if def.Status.Phase != appsv1.AvailablePhase {
-			return fmt.Errorf("the referenced ShardingDefinition is unavailable: %s: %s", def.Name, def.Status.Message)
-		}
-	}
 	return nil
 }
 
@@ -271,9 +253,9 @@ func (t *clusterNormalizationTransformer) resolveShardingNCompDefinition(transCt
 	var shardingDef *appsv1.ShardingDefinition
 	shardingDefName := t.shardingDefinitionName(sharding, comp)
 	if len(shardingDefName) > 0 {
-		shardingDef, err = resolveShardingDefinition(transCtx.Context, transCtx.Client, shardingDefName)
+		shardingDef, err = getNCheckShardingDefinition(transCtx.Context, transCtx.Client, shardingDefName)
 		if err != nil {
-			return nil, nil, "", err
+			return nil, nil, "", controllerutil.NewRequeueError(appsutil.RequeueDuration, err.Error())
 		}
 		if len(sharding.Template.ComponentDef) == 0 {
 			sharding.Template.ComponentDef = shardingDef.Spec.Template.CompDef
@@ -534,6 +516,20 @@ func clusterTopologyCompMatched(comp appsv1.ClusterTopologyComponent, compName s
 		return strings.HasPrefix(compName, comp.Name)
 	}
 	return false
+}
+
+func getNCheckShardingDefinition(ctx context.Context, cli client.Reader, name string) (*appsv1.ShardingDefinition, error) {
+	shardingDef, err := resolveShardingDefinition(ctx, cli, name)
+	if err != nil {
+		return nil, err
+	}
+	if shardingDef.Generation != shardingDef.Status.ObservedGeneration {
+		return nil, fmt.Errorf("the referenced ShardingDefinition is not up to date: %s", shardingDef.Name)
+	}
+	if shardingDef.Status.Phase != appsv1.AvailablePhase {
+		return nil, fmt.Errorf("the referenced ShardingDefinition is unavailable: %s", shardingDef.Name)
+	}
+	return shardingDef, nil
 }
 
 // resolveShardingDefinition resolves and returns the specific sharding definition object supported.

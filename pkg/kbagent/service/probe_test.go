@@ -20,11 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
@@ -49,25 +51,36 @@ var _ = Describe("probe", func() {
 					},
 				},
 			}
-			probes = []proto.Probe{
-				{
-					Action:              probeName,
-					InitialDelaySeconds: 0,
-					PeriodSeconds:       1,
-					SuccessThreshold:    1,
-					FailureThreshold:    1,
-					ReportPeriodSeconds: 0,
-				},
-			}
+			probes []proto.Probe
 
 			actionSvc *actionService
 		)
 
 		BeforeEach(func() {
+			probes = []proto.Probe{{
+				Action:           probeName,
+				PeriodSeconds:    1,
+				SuccessThreshold: 1,
+				FailureThreshold: 1,
+			}}
 			var err error
 			actionSvc, err = newActionService(logr.New(nil), actions)
 			Expect(err).Should(BeNil())
 		})
+
+		startService := func(service *probeService) {
+			probeCtx, cancel := context.WithCancel(ctx)
+			DeferCleanup(func() {
+				cancel()
+				done := make(chan struct{})
+				go func() {
+					service.wg.Wait()
+					close(done)
+				}()
+				Eventually(done).Should(BeClosed())
+			})
+			Expect(service.start(probeCtx)).Should(Succeed())
+		}
 
 		It("new", func() {
 			service, err := newProbeService(logr.New(nil), actionSvc, probes)
@@ -83,7 +96,7 @@ var _ = Describe("probe", func() {
 			Expect(err).Should(BeNil())
 			Expect(service).ShouldNot(BeNil())
 
-			Expect(service.Start()).Should(Succeed())
+			startService(service)
 			Expect(len(service.probes)).Should(Equal(len(service.runners)))
 		})
 
@@ -99,18 +112,18 @@ var _ = Describe("probe", func() {
 
 		It("initial delay seconds", func() {
 			probes[0].InitialDelaySeconds = 60
-			defer func() { probes[0].InitialDelaySeconds = 0 }()
 
 			service, err := newProbeService(logr.New(nil), actionSvc, probes)
 			Expect(err).Should(BeNil())
 			Expect(service).ShouldNot(BeNil())
 
-			Expect(service.Start()).Should(Succeed())
-
-			time.Sleep(1 * time.Second)
-			r := service.runners[probeName]
-			Expect(r).ShouldNot(BeNil())
-			Expect(r.ticker).Should(BeNil())
+			events := make(chan struct{}, 1)
+			service.sendEventWithMessage = func(_ *logr.Logger, _, _ string, _ bool) error {
+				events <- struct{}{}
+				return nil
+			}
+			startService(service)
+			Consistently(events, time.Second).ShouldNot(Receive())
 		})
 
 		It("send event", func() {
@@ -130,7 +143,7 @@ var _ = Describe("probe", func() {
 			}
 
 			By("start probe service")
-			Expect(service.Start()).Should(Succeed())
+			startService(service)
 
 			By("check received event")
 			var receivedData struct{ reason, message string }
@@ -143,10 +156,26 @@ var _ = Describe("probe", func() {
 			Eventually(event.Output).Should(Equal([]byte("leader")))
 		})
 
+		It("normalizes probe periods without modifying the shared configuration", func() {
+			probes[0].PeriodSeconds = 0
+			probes[0].ReportPeriodSeconds = 1
+			service, err := newProbeService(logr.New(nil), actionSvc, probes)
+			Expect(err).Should(BeNil())
+			events := make(chan struct{}, 1)
+			service.sendEventWithMessage = func(_ *logr.Logger, _, _ string, _ bool) error {
+				events <- struct{}{}
+				return nil
+			}
+			startService(service)
+			Eventually(events).Should(Receive())
+			Expect(probes[0].PeriodSeconds).Should(BeZero())
+			Expect(probes[0].ReportPeriodSeconds).Should(Equal(int32(1)))
+		})
+
 		It("send event when report-on-file-change trigger fires with unchanged output", func() {
 			tmpDir, err := os.MkdirTemp("", "kbagent-file-change-*")
 			Expect(err).Should(BeNil())
-			defer os.RemoveAll(tmpDir)
+			DeferCleanup(os.RemoveAll, tmpDir)
 
 			triggerPath := filepath.Join(tmpDir, "trigger")
 			Expect(os.WriteFile(triggerPath, []byte("current"), 0644)).Should(Succeed())
@@ -169,7 +198,7 @@ var _ = Describe("probe", func() {
 			}
 
 			By("start probe service")
-			Expect(service.Start()).Should(Succeed())
+			startService(service)
 
 			By("drain initial event")
 			var receivedData struct{ reason, message string }
@@ -226,20 +255,19 @@ var _ = Describe("probe", func() {
 
 			By("mock send event function with error")
 			var (
-				count = 0
+				count atomic.Int64
 			)
 			service.sendEventWithMessage = func(_ *logr.Logger, reason string, message string, _ bool) error {
-				count += 1
+				count.Add(1)
 				return fmt.Errorf("API server error")
 			}
-			retrySendEventInterval = 1 * time.Second
-			defer func() { retrySendEventInterval = defaultRetrySendEventInterval }()
+			service.retrySendEventInterval = time.Second
 
 			By("start probe service")
-			Expect(service.Start()).Should(Succeed())
+			startService(service)
 
 			By("wait for probe to send event error")
-			Eventually(func() int { return count }, 2*retrySendEventInterval).Should(BeNumerically(">", 1))
+			Eventually(count.Load, 2*service.retrySendEventInterval).Should(BeNumerically(">", 1))
 		})
 
 		It("send event - after API server recover", func() {
@@ -250,32 +278,30 @@ var _ = Describe("probe", func() {
 
 			By("mock send event function with temporary error")
 			var (
-				count     = 0
+				count     atomic.Int64
 				eventChan = make(chan struct {
 					reason  string
 					message string
 				}, 128)
 			)
 			service.sendEventWithMessage = func(_ *logr.Logger, reason string, message string, _ bool) error {
-				count += 1
-				if count <= 2 {
+				if count.Add(1) <= 2 {
 					return fmt.Errorf("API server error")
 				}
 				eventChan <- struct{ reason, message string }{reason, message}
 				return nil
 			}
-			retrySendEventInterval = 1 * time.Second
-			defer func() { retrySendEventInterval = defaultRetrySendEventInterval }()
+			service.retrySendEventInterval = time.Second
 
 			By("start probe service")
-			Expect(service.Start()).Should(Succeed())
+			startService(service)
 
 			By("wait for probe to send event error")
-			Eventually(func() int { return count }, 2*retrySendEventInterval).Should(BeNumerically(">", 1))
+			Eventually(count.Load, 2*service.retrySendEventInterval).Should(BeNumerically(">", 1))
 
 			By("check received event after recover")
 			var receivedData struct{ reason, message string }
-			Eventually(eventChan, 2*retrySendEventInterval).Should(Receive(&receivedData))
+			Eventually(eventChan, 2*service.retrySendEventInterval).Should(Receive(&receivedData))
 			Expect(receivedData.reason).Should(Equal(probeName))
 			var event proto.ProbeEvent
 			Expect(json.Unmarshal([]byte(receivedData.message), &event)).Should(Succeed())

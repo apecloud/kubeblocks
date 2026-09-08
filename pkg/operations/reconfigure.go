@@ -24,15 +24,18 @@ import (
 	"fmt"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/sharding"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/parameters"
 	parameterscore "github.com/apecloud/kubeblocks/pkg/parameters/core"
 )
 
@@ -185,7 +188,46 @@ func (r *reconfigureAction) getRunningComponentParameter(ctx context.Context, cl
 		Name:      parameterscore.GenerateComponentConfigurationName(clusterName, compName),
 	}
 	if err := cli.Get(ctx, key, compParam); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, r.classifyComponentParameterNotFound(ctx, cli, namespace, clusterName, compName, err)
+		}
 		return nil, err
 	}
 	return compParam, nil
+}
+
+// classifyComponentParameterNotFound classifies a missing ComponentParameter object.
+// The componentdrivenparameter controller creates the ComponentParameter only when the
+// component's ComponentDefinition declares config templates that resolve to valid
+// ParametersDefinitions. If they don't, the object will never appear and retrying is
+// pointless, so fail the operation fast. In any other case (e.g. the controller has not
+// caught up yet, or the support status cannot be proven), return the original NotFound
+// error to keep the existing retry behavior.
+func (r *reconfigureAction) classifyComponentParameterNotFound(ctx context.Context, cli client.Client, namespace, clusterName, compName string, notFoundErr error) error {
+	comp := &appsv1.Component{}
+	compKey := client.ObjectKey{
+		Namespace: namespace,
+		Name:      constant.GenerateClusterComponentName(clusterName, compName),
+	}
+	if err := cli.Get(ctx, compKey, comp); err != nil {
+		return notFoundErr
+	}
+	cmpd := &appsv1.ComponentDefinition{}
+	if err := cli.Get(ctx, client.ObjectKey{Name: comp.Spec.CompDef}, cmpd); err != nil {
+		return notFoundErr
+	}
+	if len(cmpd.Spec.Configs) != 0 {
+		configDescs, _, err := parameters.ResolveCmpdParametersDefs(ctx, cli, cmpd)
+		if err != nil {
+			// cannot prove that the component does not support parameters, keep retrying.
+			return notFoundErr
+		}
+		if parameters.HasValidParameterTemplate(configDescs) {
+			// the component supports parameters, the ComponentParameter object has not
+			// been created by the componentdrivenparameter controller yet, keep retrying.
+			return notFoundErr
+		}
+	}
+	return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal,
+		"component %s does not support reconfigure: ComponentParameter not found", compName)
 }

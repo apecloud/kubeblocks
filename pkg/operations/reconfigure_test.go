@@ -24,6 +24,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -68,6 +69,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 		testapps.ClearResources(&testCtx, generics.ParametersDefinitionSignature, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.InstanceSetSignature, true, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ComponentParameterSignature, true, inNS)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ComponentSignature, true, inNS, ml)
 	}
 
 	BeforeEach(cleanEnv)
@@ -263,6 +265,137 @@ parameter: {
 				g.Expect(condition).ShouldNot(BeNil())
 				g.Expect(condition.Message).Should(ContainSubstring("maxmemory-samples"))
 			})).Should(Succeed())
+		})
+
+		newReconfigureOps := func(opsName string) *opsv1alpha1.OpsRequest {
+			ops := testops.NewOpsRequestObj(opsName, testCtx.DefaultNamespace,
+				clusterName, opsv1alpha1.ReconfiguringType)
+			ops.Spec.Reconfigures = []opsv1alpha1.Reconfigure{
+				{
+					ComponentOps: opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
+					Parameters: []opsv1alpha1.ParameterPair{
+						{
+							Key:   "max_connections",
+							Value: pointer.String("200"),
+						},
+					},
+				},
+			}
+			return ops
+		}
+
+		createComponentObject := func() {
+			testapps.NewComponentFactory(testCtx.DefaultNamespace,
+				constant.GenerateClusterComponentName(clusterName, defaultCompName), compDefName).
+				Create(&testCtx)
+		}
+
+		prepareParameterSupport := func() {
+			template := testparameters.NewComponentTemplateFactory("mysql-config", testCtx.DefaultNamespace).
+				Create(&testCtx).
+				GetObject()
+			paramsDef := testparameters.NewParametersDefinitionFactory("mysql-params-" + randomStr).
+				SetComponentDefinition(compDefName).
+				SetTemplateName("mysql-config").
+				Schema(`
+parameter: {
+  max_connections?: string
+}`).
+				Create(&testCtx).
+				GetObject()
+			Expect(testapps.ChangeObjStatus(&testCtx, paramsDef, func() {
+				paramsDef.Status.Phase = parametersv1alpha1.PDAvailablePhase
+			})).Should(Succeed())
+			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKey{Name: compDefName}, func(compDef *appsv1.ComponentDefinition) {
+				compDef.Spec.Configs = []appsv1.ComponentFileTemplate{
+					{
+						Name:            "mysql-config",
+						Template:        template.Name,
+						Namespace:       template.Namespace,
+						VolumeName:      "mysql-config",
+						ExternalManaged: pointer.Bool(true),
+					},
+				}
+			})()).Should(Succeed())
+		}
+
+		It("fails fast in Action when the component does not support parameters", func() {
+			By("init operations resources with a componentDefinition without configs")
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
+			createComponentObject()
+
+			By("create a reconfigure opsRequest without the ComponentParameter object")
+			opsRes.OpsRequest = testops.CreateOpsRequest(ctx, testCtx, newReconfigureOps("unsupported-reconfigure-"+randomStr))
+			Expect(opsutil.UpdateClusterOpsAnnotations(ctx, k8sClient, opsRes.Cluster, nil)).Should(Succeed())
+			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsPendingPhase
+			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
+
+			By("expect the opsRequest to fail fast instead of retrying forever")
+			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest), func(g Gomega, fetched *opsv1alpha1.OpsRequest) {
+				g.Expect(fetched.Status.Phase).Should(Equal(opsv1alpha1.OpsFailedPhase))
+				condition := meta.FindStatusCondition(fetched.Status.Conditions, opsv1alpha1.ConditionTypeFailed)
+				g.Expect(condition).ShouldNot(BeNil())
+				g.Expect(condition.Message).Should(ContainSubstring("does not support reconfigure"))
+			})).Should(Succeed())
+		})
+
+		It("fails fast in ReconcileAction when the component does not support parameters", func() {
+			By("init operations resources with a componentDefinition without configs")
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
+			createComponentObject()
+
+			By("create a running reconfigure opsRequest without the ComponentParameter object")
+			opsRes.OpsRequest = testops.CreateOpsRequest(ctx, testCtx, newReconfigureOps("unsupported-reconcile-"+randomStr))
+			Expect(testapps.ChangeObjStatus(&testCtx, opsRes.OpsRequest, func() {
+				opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsRunningPhase
+			})).Should(Succeed())
+
+			By("expect the opsRequest to fail fast instead of retrying forever")
+			_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest), func(g Gomega, fetched *opsv1alpha1.OpsRequest) {
+				g.Expect(fetched.Status.Phase).Should(Equal(opsv1alpha1.OpsFailedPhase))
+				condition := meta.FindStatusCondition(fetched.Status.Conditions, opsv1alpha1.ConditionTypeFailed)
+				g.Expect(condition).ShouldNot(BeNil())
+				g.Expect(condition.Message).Should(ContainSubstring("does not support reconfigure"))
+			})).Should(Succeed())
+		})
+
+		It("keeps waiting when the component supports parameters but the ComponentParameter is not created yet", func() {
+			By("init operations resources with a componentDefinition with valid parameter definitions")
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
+			createComponentObject()
+			prepareParameterSupport()
+
+			By("create a reconfigure opsRequest without the ComponentParameter object")
+			opsRes.OpsRequest = testops.CreateOpsRequest(ctx, testCtx, newReconfigureOps("waiting-reconfigure-"+randomStr))
+			Expect(opsutil.UpdateClusterOpsAnnotations(ctx, k8sClient, opsRes.Cluster, nil)).Should(Succeed())
+			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsPendingPhase
+			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
+
+			By("expect the Action path to keep retrying on the transient NotFound error")
+			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).Should(HaveOccurred())
+			Expect(apierrors.IsNotFound(err)).Should(BeTrue())
+			Consistently(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
+
+			By("expect the Reconcile path to keep retrying on the transient NotFound error")
+			Expect(testapps.ChangeObjStatus(&testCtx, opsRes.OpsRequest, func() {
+				opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsRunningPhase
+			})).Should(Succeed())
+			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			Expect(err).Should(HaveOccurred())
+			Expect(apierrors.IsNotFound(err)).Should(BeTrue())
+			Consistently(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsRunningPhase))
 		})
 	})
 })

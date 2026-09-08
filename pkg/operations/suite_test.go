@@ -152,21 +152,11 @@ var _ = AfterSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 })
 
-// Ops tests run without the definition controller; model its validation result.
-func mockComponentDefinitionAvailable(compDef *appsv1.ComponentDefinition) {
-	Expect(testapps.ChangeObjStatus(&testCtx, compDef, func() {
-		compDef.Status.ObservedGeneration = compDef.Generation
-		compDef.Status.Phase = appsv1.AvailablePhase
-		compDef.Status.Message = ""
-	})).Should(Succeed())
-}
-
 func initOperationsResources(compDefName, clusterName string) (*OpsResource, *appsv1.ComponentDefinition, *appsv1.Cluster) {
 	compDef := testapps.NewComponentDefinitionFactory(compDefName).
 		SetDefaultSpec().
 		Create(&testCtx).
 		GetObject()
-	mockComponentDefinitionAvailable(compDef)
 
 	pvcSpec := testapps.NewPVCSpec("1Gi")
 	clusterObject := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
@@ -220,7 +210,6 @@ func initOperationsResourcesWithTopology(clusterDefName, compDefName, clusterNam
 		SetDefaultSpec().
 		Create(&testCtx).
 		GetObject()
-	mockComponentDefinitionAvailable(compDef)
 
 	pvcSpec := testapps.NewPVCSpec("1Gi")
 	clusterObject := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName).

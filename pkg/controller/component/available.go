@@ -158,7 +158,20 @@ func (h *AvailableEventHandler) handleEvent(event probeEvent, comp *appsv1.Compo
 }
 
 func (h *AvailableEventHandler) getNCheckCompDefinition(ctx context.Context, cli client.Reader, name string) (*appsv1.ComponentDefinition, error) {
-	return GetCompDefByName(ctx, cli, name)
+	compKey := types.NamespacedName{
+		Name: name,
+	}
+	compDef := &appsv1.ComponentDefinition{}
+	if err := cli.Get(ctx, compKey, compDef); err != nil {
+		return nil, err
+	}
+	if compDef.Generation != compDef.Status.ObservedGeneration {
+		return nil, fmt.Errorf("the referenced ComponentDefinition is not up to date: %s", compDef.Name)
+	}
+	if compDef.Status.Phase != appsv1.AvailablePhase {
+		return nil, fmt.Errorf("the referenced ComponentDefinition is unavailable: %s", compDef.Name)
+	}
+	return compDef, nil
 }
 
 type probeEvent struct {

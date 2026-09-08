@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -47,8 +48,7 @@ func (t *componentLoadResourcesTransformer) Transform(ctx graph.TransformContext
 		setProvisioningStartedCondition(&comp.Status.Conditions, comp.Name, comp.Generation, err)
 	}()
 
-	err = t.transformForNativeComponent(transCtx)
-	return err
+	return t.transformForNativeComponent(transCtx)
 }
 
 func (t *componentLoadResourcesTransformer) transformForNativeComponent(transCtx *componentTransformContext) error {
@@ -60,7 +60,7 @@ func (t *componentLoadResourcesTransformer) transformForNativeComponent(transCtx
 
 	compDef, err := getNCheckCompDefinition(ctx, cli, comp.Spec.CompDef)
 	if err != nil {
-		return err
+		return intctrlutil.NewRequeueError(appsutil.RequeueDuration, err.Error())
 	}
 
 	if err = component.UpdateCompDefinitionImages4ServiceVersion(ctx, cli, compDef, comp.Spec.ServiceVersion); err != nil {
@@ -78,7 +78,7 @@ func (t *componentLoadResourcesTransformer) transformForNativeComponent(transCtx
 			// TODO: comp defs?
 			compDef, err = getNCheckCompDefinition(ctx, cli, tpl.CompDef)
 			if err != nil {
-				return err
+				return intctrlutil.NewRequeueError(appsutil.RequeueDuration, err.Error())
 			}
 			images, err := component.ResolveInstanceTemplateImages4ServiceVersion(ctx, cli, compDef, tpl.ServiceVersion)
 			if err != nil {
@@ -112,5 +112,18 @@ func (t *componentLoadResourcesTransformer) runningInstanceSetObject(ctx *compon
 }
 
 func getNCheckCompDefinition(ctx context.Context, cli client.Reader, name string) (*appsv1.ComponentDefinition, error) {
-	return component.GetCompDefByName(ctx, cli, name)
+	compKey := types.NamespacedName{
+		Name: name,
+	}
+	compDef := &appsv1.ComponentDefinition{}
+	if err := cli.Get(ctx, compKey, compDef); err != nil {
+		return nil, err
+	}
+	if compDef.Generation != compDef.Status.ObservedGeneration {
+		return nil, fmt.Errorf("the referenced ComponentDefinition is not up to date: %s", compDef.Name)
+	}
+	if compDef.Status.Phase != appsv1.AvailablePhase {
+		return nil, fmt.Errorf("the referenced ComponentDefinition is unavailable: %s", compDef.Name)
+	}
+	return compDef, nil
 }

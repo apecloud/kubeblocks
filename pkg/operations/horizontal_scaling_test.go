@@ -117,7 +117,6 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 					MaxReplicas: 10,
 				}
 			})).Should(Succeed())
-			mockComponentDefinitionAvailable(compDef)
 			its := testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
 			if changeClusterSpec != nil {
 				Expect(testapps.ChangeObj(&testCtx, opsRes.Cluster, func(cluster *appsv1.Cluster) {

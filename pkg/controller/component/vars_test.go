@@ -395,7 +395,6 @@ var _ = Describe("vars", func() {
 					},
 				}
 				compDef := &appsv1.ComponentDefinition{
-					Status: appsv1.ComponentDefinitionStatus{Phase: appsv1.AvailablePhase},
 					ObjectMeta: metav1.ObjectMeta{
 						Name: synthesizedComp.CompDefName,
 					},
@@ -2158,7 +2157,6 @@ var _ = Describe("vars", func() {
 					},
 				}
 				compDef := &appsv1.ComponentDefinition{
-					Status: appsv1.ComponentDefinitionStatus{Phase: appsv1.AvailablePhase},
 					ObjectMeta: metav1.ObjectMeta{
 						Name: synthesizedComp.CompDefName,
 					},
@@ -2373,7 +2371,6 @@ var _ = Describe("vars", func() {
 						},
 					}
 					compDef := &appsv1.ComponentDefinition{
-						Status: appsv1.ComponentDefinitionStatus{Phase: appsv1.AvailablePhase},
 						ObjectMeta: metav1.ObjectMeta{
 							Name: synthesizedComp.CompDefName,
 						},

@@ -82,9 +82,6 @@ func (t *componentPreTerminateTransformer) Transform(ctx graph.TransformContext,
 	if t.checkPreTerminateDone(transCtx, dag) {
 		return nil
 	}
-	if err := intctrlutil.CheckDefinitionAvailable(compDef); err != nil {
-		return err
-	}
 	var invoked bool
 	if invoked, err = t.preTerminate(transCtx, compDef); err != nil {
 		err = lifecycle.IgnoreNotDefined(err)

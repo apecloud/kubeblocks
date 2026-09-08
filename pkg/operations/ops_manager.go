@@ -70,9 +70,6 @@ func (opsMgr *OpsManager) Do(reqCtx intctrlutil.RequestCtx, cli client.Client, o
 		// validate OpsRequest.spec
 		err = opsRequest.ValidateOps(reqCtx.Ctx, cli, opsRes.Cluster)
 	}
-	if intctrlutil.IsRequeueError(err) {
-		return nil, err
-	}
 	if err != nil {
 		return &ctrl.Result{}, patchValidateErrorCondition(reqCtx.Ctx, cli, opsRes, err.Error())
 	}

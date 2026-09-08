@@ -34,6 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
@@ -69,6 +70,11 @@ func (t *clusterNormalizationTransformer) Transform(ctx graph.TransformContext, 
 		return err
 	}
 
+	// Check each resolved sharding definition once before building shard components.
+	if err = t.checkShardingDefinitions(transCtx); err != nil {
+		return err
+	}
+
 	// resolve component definitions referenced for components
 	if err = t.resolveDefinitions4Components(transCtx); err != nil {
 		return err
@@ -91,6 +97,19 @@ func (t *clusterNormalizationTransformer) Transform(ctx graph.TransformContext, 
 	// write-back the resolved definitions and service versions to cluster spec.
 	t.writeBackCompNShardingSpecs(transCtx)
 
+	return nil
+}
+
+func (t *clusterNormalizationTransformer) checkShardingDefinitions(transCtx *clusterTransformContext) error {
+	for _, def := range transCtx.shardingDefs {
+		if def.Generation != def.Status.ObservedGeneration || def.Status.Phase == "" {
+			return intctrlutil.NewRequeueError(appsutil.RequeueDuration,
+				fmt.Sprintf("the referenced ShardingDefinition is awaiting validation: %s", def.Name))
+		}
+		if def.Status.Phase != appsv1.AvailablePhase {
+			return fmt.Errorf("the referenced ShardingDefinition is unavailable: %s: %s", def.Name, def.Status.Message)
+		}
+	}
 	return nil
 }
 
@@ -619,11 +638,7 @@ func resolveShardingDefinition(ctx context.Context, cli client.Reader, shardingD
 	slices.Sort(names)
 	latestName := names[len(names)-1]
 
-	def := shardingDefs[m[latestName]]
-	if err := intctrlutil.CheckDefinitionAvailable(def); err != nil {
-		return nil, err
-	}
-	return def, nil
+	return shardingDefs[m[latestName]], nil
 }
 
 // listShardingDefinitionsWithPattern returns all sharding definitions whose names match the given pattern
@@ -699,11 +714,7 @@ func resolveCompDefinitionNServiceVersion(ctx context.Context, cli client.Reader
 	slices.Sort(compatibleCompDefNames)
 	compatibleCompDefName := compatibleCompDefNames[len(compatibleCompDefNames)-1]
 
-	compDef = compatibleCompDefs[compatibleCompDefName]
-	if err := intctrlutil.CheckDefinitionAvailable(compDef); err != nil {
-		return nil, serviceVersion, err
-	}
-	return compDef, serviceVersion, nil
+	return compatibleCompDefs[compatibleCompDefName], serviceVersion, nil
 }
 
 // listCompDefinitionsWithPattern returns all component definitions whose names match the given pattern

@@ -32,7 +32,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/scheduling"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 func FullName(clusterName, compName string) string {
@@ -133,13 +132,10 @@ func getCompValueFromMap(comp *appsv1.Component, m map[string]string, tp string,
 	return val, nil
 }
 
-// GetCompDefByName gets a component definition validated for its current generation.
+// GetCompDefByName gets the component definition by component definition name.
 func GetCompDefByName(ctx context.Context, cli client.Reader, compDefName string) (*appsv1.ComponentDefinition, error) {
 	compDef := &appsv1.ComponentDefinition{}
 	if err := cli.Get(ctx, client.ObjectKey{Name: compDefName}, compDef); err != nil {
-		return nil, err
-	}
-	if err := intctrlutil.CheckDefinitionAvailable(compDef); err != nil {
 		return nil, err
 	}
 	return compDef, nil

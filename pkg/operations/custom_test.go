@@ -181,7 +181,6 @@ var _ = Describe("CustomOps", func() {
 				SetDefaultSpec().
 				Create(&testCtx).
 				GetObject()
-			mockComponentDefinitionAvailable(componentDefObj)
 
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
 				SetSchedulingPolicy(&appsv1.SchedulingPolicy{
@@ -225,28 +224,6 @@ var _ = Describe("CustomOps", func() {
 				}}
 			})).Should(Succeed())
 		}
-
-		It("waits for definition validation without failing the custom request", func() {
-			compDef := &appsv1.ComponentDefinition{}
-			Expect(k8sClient.Get(ctx, client.ObjectKey{Name: compDefName}, compDef)).Should(Succeed())
-			Expect(testapps.ChangeObjStatus(&testCtx, compDef, func() {
-				compDef.Status.ObservedGeneration = compDef.Generation - 1
-			})).Should(Succeed())
-			ops := createCustomOps(defaultCompName, []opsv1alpha1.Parameter{{Name: requiredParam, Value: "select 1"}})
-			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsResource)
-			Expect(intctrlutil.IsRequeueError(err)).Should(BeTrue())
-			Expect(ops.Status.Phase).Should(Equal(opsv1alpha1.OpsPendingPhase))
-
-			Expect(testapps.ChangeObjStatus(&testCtx, compDef, func() {
-				compDef.Status.ObservedGeneration = compDef.Generation
-				compDef.Status.Phase = appsv1.UnavailablePhase
-				compDef.Status.Message = "invalid lifecycle action"
-			})).Should(Succeed())
-			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsResource)
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(ops.Status.Phase).Should(Equal(opsv1alpha1.OpsFailedPhase))
-			Expect(ops.Status.Conditions).Should(ContainElement(HaveField("Message", ContainSubstring("invalid lifecycle action"))))
-		})
 
 		It("validate json parameter schemas", func() {
 			params := []opsv1alpha1.Parameter{

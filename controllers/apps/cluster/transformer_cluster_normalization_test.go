@@ -20,14 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package cluster
 
 import (
-	"context"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -39,55 +38,52 @@ import (
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 
-var _ = Describe("definition availability at resolution", func() {
-	DescribeTable("checks the selected generation without falling back to an older definition",
+var _ = Describe("sharding definition availability during normalization", func() {
+	DescribeTable("checks resolved definitions before building shard components",
 		func(phase appsv1.Phase, observed int64, waiting bool, detail string) {
 			scheme := runtime.NewScheme()
 			Expect(appsv1.AddToScheme(scheme)).Should(Succeed())
-			compDef := &appsv1.ComponentDefinition{
-				ObjectMeta: metav1.ObjectMeta{Name: "comp-v2", Generation: 2},
-				Spec:       appsv1.ComponentDefinitionSpec{ServiceVersion: "1.0.0"},
-				Status:     appsv1.ComponentDefinitionStatus{Phase: phase, ObservedGeneration: observed, Message: "invalid lifecycle action"},
+			compDef := testapps.NewComponentDefinitionFactory("comp-v1").SetServiceVersion("1.0.0").GetObject()
+			// ComponentDefinition availability is outside this check's scope.
+			compDef.Status.Phase = appsv1.UnavailablePhase
+			def := testapps.NewShardingDefinitionFactory("shard-v2", compDef.Name).GetObject()
+			def.Generation = 2
+			def.Status = appsv1.ShardingDefinitionStatus{
+				Phase: phase, ObservedGeneration: observed, Message: "invalid lifecycle action",
 			}
-			shardingDef := &appsv1.ShardingDefinition{
-				ObjectMeta: metav1.ObjectMeta{Name: "shard-v2", Generation: 2},
-				Status:     appsv1.ShardingDefinitionStatus{Phase: phase, ObservedGeneration: observed, Message: "invalid lifecycle action"},
-			}
-			oldCompDef := compDef.DeepCopy()
-			oldCompDef.Name = "comp-v1"
-			oldCompDef.Status.Phase, oldCompDef.Status.ObservedGeneration = appsv1.AvailablePhase, 2
-			oldShardingDef := shardingDef.DeepCopy()
-			oldShardingDef.Name = "shard-v1"
-			oldShardingDef.Status.Phase, oldShardingDef.Status.ObservedGeneration = appsv1.AvailablePhase, 2
-			cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(compDef, shardingDef, oldCompDef, oldShardingDef).Build()
-			for _, name := range []string{"comp-v2", "comp-"} {
-				def, _, err := resolveCompDefinitionNServiceVersion(context.Background(), cli, name, "1.0.0")
-				if detail == "" {
-					Expect(err).ShouldNot(HaveOccurred())
-					Expect(def.Name).Should(Equal(compDef.Name))
-				} else {
-					Expect(err).Should(MatchError(ContainSubstring(detail)))
-					Expect(err.Error()).Should(ContainSubstring(compDef.Name))
-					Expect(intctrlutil.IsRequeueError(err)).Should(Equal(waiting))
-					Expect(def).Should(BeNil())
+			oldDef := def.DeepCopy()
+			oldDef.Name = "shard-v1"
+			oldDef.Status.Phase, oldDef.Status.ObservedGeneration = appsv1.AvailablePhase, 2
+			cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(compDef, def, oldDef).Build()
+			for _, ref := range []string{def.Name, "shard-"} {
+				for _, template := range []bool{false, true} {
+					cluster := testapps.NewClusterFactory(testCtx.DefaultNamespace, "availability-cluster", "").
+						AddSharding("shard", ref, compDef.Name).SetShards(1).GetObject()
+					if template {
+						cluster.Spec.Shardings[0].ShardingDef = oldDef.Name
+						cluster.Spec.Shardings[0].ShardTemplates = []appsv1.ShardTemplate{{
+							Name: "custom", ShardingDef: ptr.To(ref), Shards: ptr.To(int32(1)),
+						}}
+					}
+					transCtx := &clusterTransformContext{
+						Context: ctx, Client: cli, Cluster: cluster.DeepCopy(), OrigCluster: cluster.DeepCopy(),
+					}
+					err := (&clusterNormalizationTransformer{}).Transform(transCtx, graph.NewDAG())
+					if detail == "" {
+						Expect(err).ShouldNot(HaveOccurred())
+						Expect(transCtx.shardingComps["shard"]).Should(HaveLen(1))
+					} else {
+						Expect(err).Should(MatchError(ContainSubstring(detail)))
+						Expect(err.Error()).Should(ContainSubstring(def.Name))
+						Expect(intctrlutil.IsRequeueError(err)).Should(Equal(waiting))
+						Expect(transCtx.shardingComps).Should(BeEmpty())
+						Expect(transCtx.Cluster.Status.Conditions).Should(ContainElement(And(
+							HaveField("Status", metav1.ConditionFalse), HaveField("Message", ContainSubstring(detail)))))
+					}
+					// Selection remains unchanged: never fall back to an older available definition.
+					Expect(transCtx.shardingDefs).Should(HaveKey(def.Name))
 				}
 			}
-			for _, name := range []string{"shard-v2", "shard-"} {
-				def, err := resolveShardingDefinition(context.Background(), cli, name)
-				if detail == "" {
-					Expect(err).ShouldNot(HaveOccurred())
-					Expect(def.Name).Should(Equal(shardingDef.Name))
-				} else {
-					Expect(err).Should(MatchError(ContainSubstring(detail)))
-					Expect(err.Error()).Should(ContainSubstring(shardingDef.Name))
-					Expect(intctrlutil.IsRequeueError(err)).Should(Equal(waiting))
-					Expect(def).Should(BeNil())
-				}
-			}
-			_, _, err := resolveCompDefinitionNServiceVersion(context.Background(), cli, oldCompDef.Name, "1.0.0")
-			Expect(err).ShouldNot(HaveOccurred())
-			_, err = resolveShardingDefinition(context.Background(), cli, oldShardingDef.Name)
-			Expect(err).ShouldNot(HaveOccurred())
 		},
 		Entry("not yet observed", appsv1.Phase(""), int64(0), true, "awaiting validation"),
 		Entry("empty phase", appsv1.Phase(""), int64(2), true, "awaiting validation"),
@@ -135,16 +131,12 @@ var _ = Describe("resolve CompDefinition and ServiceVersion", func() {
 		cleanEnv()
 	})
 
-	createCompDefinitionObjs := func(serviceVersions ...string) []*appsv1.ComponentDefinition {
+	createCompDefinitionObjs := func() []*appsv1.ComponentDefinition {
 		By("create default ComponentDefinition objs")
-		serviceVersion := testapps.ServiceVersion("v0")
-		if len(serviceVersions) > 0 {
-			serviceVersion = serviceVersions[0]
-		}
 		objs := make([]*appsv1.ComponentDefinition, 0)
 		for _, name := range compDefNames {
 			f := testapps.NewComponentDefinitionFactory(name).
-				SetServiceVersion(serviceVersion)
+				SetServiceVersion(testapps.ServiceVersion("v0")) // use v0 as init service version
 			for _, app := range []string{testapps.AppName, testapps.AppNameSamePrefix} {
 				// use empty revision as init image tag
 				f = f.SetRuntime(&corev1.Container{Name: app, Image: testapps.AppImage(app, testapps.ReleaseID(""))})
@@ -157,52 +149,10 @@ var _ = Describe("resolve CompDefinition and ServiceVersion", func() {
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(obj),
 				func(g Gomega, compDef *appsv1.ComponentDefinition) {
 					g.Expect(compDef.Status.ObservedGeneration).Should(Equal(compDef.Generation))
-					g.Expect(compDef.Status.Phase).Should(Equal(appsv1.AvailablePhase))
 				})).Should(Succeed())
 		}
 		return objs
 	}
-
-	It("blocks owner-rejected sharding definitions and resumes after validation succeeds", func() {
-		compDefs := createCompDefinitionObjs()
-		shardingDef := testapps.NewShardingDefinitionFactory("owner-validation-shard", compDefs[0].Name).
-			SetLifecycleActions(&appsv1.ShardingLifecycleActions{
-				PostProvision: &appsv1.ShardingAction{Action: appsv1.Action{NonBlocking: true}},
-			}).Create(&testCtx).GetObject()
-		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(shardingDef),
-			func(g Gomega, def *appsv1.ShardingDefinition) {
-				g.Expect(def.Status.ObservedGeneration).Should(Equal(def.Generation))
-				g.Expect(def.Status.Phase).Should(Equal(appsv1.UnavailablePhase))
-			})).Should(Succeed())
-		_, err := resolveShardingDefinition(ctx, k8sClient, shardingDef.Name)
-		Expect(err).Should(MatchError(ContainSubstring("spec.lifecycleActions.postProvision does not support non-blocking mode")))
-		Expect(intctrlutil.IsRequeueError(err)).Should(BeFalse())
-		cluster := testapps.NewClusterFactory(testCtx.DefaultNamespace, "owner-validation-cluster", "").
-			AddSharding("shard", shardingDef.Name, compDefs[0].Name).GetObject()
-		normalize := func() (*clusterTransformContext, error) {
-			transCtx := &clusterTransformContext{
-				Context: ctx, Client: k8sClient, Cluster: cluster.DeepCopy(), OrigCluster: cluster.DeepCopy(),
-			}
-			err := (&clusterNormalizationTransformer{}).Transform(transCtx, graph.NewDAG())
-			return transCtx, err
-		}
-		transCtx, err := normalize()
-		Expect(err).Should(MatchError(ContainSubstring("does not support non-blocking mode")))
-		Expect(transCtx.shardingComps).Should(BeEmpty())
-		Expect(transCtx.Cluster.Status.Conditions).Should(ContainElement(
-			And(HaveField("Status", metav1.ConditionFalse), HaveField("Message", ContainSubstring("does not support non-blocking mode")))))
-
-		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(shardingDef), shardingDef)).Should(Succeed())
-		shardingDef.Spec.LifecycleActions = nil
-		Expect(k8sClient.Update(ctx, shardingDef)).Should(Succeed())
-		Eventually(func() error {
-			_, err := resolveShardingDefinition(ctx, k8sClient, shardingDef.Name)
-			return err
-		}).Should(Succeed())
-		transCtx, err = normalize()
-		Expect(err).ShouldNot(HaveOccurred())
-		Expect(transCtx.shardingComps["shard"]).Should(HaveLen(1))
-	})
 
 	createCompVersionObj := func() *appsv1.ComponentVersion {
 		By("create a default ComponentVersion obj with multiple releases")
@@ -745,7 +695,13 @@ var _ = Describe("resolve CompDefinition and ServiceVersion", func() {
 
 	Context("resolve component definition, service version without serviceVersion in componentDefinition", func() {
 		BeforeEach(func() {
-			createCompDefinitionObjs("")
+			compDefs := createCompDefinitionObjs()
+			for _, compDef := range compDefs {
+				compDefKey := client.ObjectKeyFromObject(compDef)
+				Eventually(testapps.GetAndChangeObj(&testCtx, compDefKey, func(compDef *appsv1.ComponentDefinition) {
+					compDef.Spec.ServiceVersion = ""
+				})).Should(Succeed())
+			}
 			compVersionObj = createCompVersionObj()
 		})
 

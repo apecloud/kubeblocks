@@ -762,8 +762,8 @@ For instance, when using the <code>ini</code> format, you can specify the sectio
 <td>
 <em>(Optional)</em>
 <p>This field currently has no effect on configuration re-rendering.
-Configuration templates automatically re-render when the Component's resources,
-replicas, TLS configuration, volume claim template capacity, or its own sharding's
+Configuration templates automatically re-render when the Component&rsquo;s resources,
+replicas, TLS configuration, volume claim template capacity, or its own sharding&rsquo;s
 shard count or template replicas change.</p>
 </td>
 </tr>

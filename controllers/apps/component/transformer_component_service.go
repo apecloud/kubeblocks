@@ -149,7 +149,7 @@ func (t *componentServiceTransformer) buildPodService(transCtx *componentTransfo
 		return nil, err
 	}
 
-	services := make([]*appsv1.ComponentService, 0)
+	compServices := make([]*appsv1.ComponentService, 0)
 	for podName, suffix := range pods {
 		svc := service.DeepCopy()
 		svc.Name = fmt.Sprintf("%s-%s", service.Name, suffix)
@@ -162,18 +162,18 @@ func (t *componentServiceTransformer) buildPodService(transCtx *componentTransfo
 			svc.Spec.Selector = make(map[string]string)
 		}
 		svc.Spec.Selector[constant.KBAppPodNameLabelKey] = podName
-		services = append(services, svc)
+		compServices = append(compServices, svc)
 	}
-	builtServices, err := t.buildServices(transCtx.Component, transCtx.SynthesizeComponent, services)
+	services, err := t.buildServices(transCtx.Component, transCtx.SynthesizeComponent, compServices)
 	if err != nil {
 		return nil, err
 	}
 	if pendingScaleIn {
 		// Return the Services to retain along with a retry, so memberLeave and the
 		// workload update can proceed while their eventual cleanup is still pending.
-		return builtServices, intctrlutil.NewDelayedRequeueError(time.Second, "waiting for scaled-in instances to disappear before deleting pod services")
+		return services, intctrlutil.NewDelayedRequeueError(time.Second, "waiting for scaled-in instances to disappear before deleting pod services")
 	}
-	return builtServices, nil
+	return services, nil
 }
 
 func (t *componentServiceTransformer) podsNameNSuffix(transCtx *componentTransformContext, runningITS, protoITS *workloadsv1.InstanceSet) (map[string]string, bool, error) {

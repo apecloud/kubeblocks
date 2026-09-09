@@ -20,10 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
+	"context"
 	"fmt"
 	"slices"
 	"strings"
 
+	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -31,6 +33,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -39,7 +43,11 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	"github.com/apecloud/kubeblocks/pkg/controllerutil"
+	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
+	kbagentproto "github.com/apecloud/kubeblocks/pkg/kbagent/proto"
+	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 
 var _ = Describe("component service transformer test", func() {
@@ -139,7 +147,242 @@ var _ = Describe("component service transformer test", func() {
 			transCtx.SynthesizeComponent.ComponentServices[0].PodService = truep()
 		})
 
+		newPod := func(suffix string) *corev1.Pod {
+			return &corev1.Pod{ObjectMeta: metav1.ObjectMeta{
+				Namespace: transCtx.Component.Namespace,
+				Name:      transCtx.Component.Name + "-" + suffix,
+				Labels:    transCtx.Component.Labels,
+			}}
+		}
+
+		It("retains pod services until memberLeave succeeds and the Pod disappears", func() {
+			pod0, pod1 := newPod("0"), newPod("1")
+			svc0, svc1 := podService(0), podService(1)
+			cli := fake.NewClientBuilder().WithScheme(k8sClient.Scheme()).WithObjects(pod0, pod1, svc0, svc1).Build()
+			graphCli := model.NewGraphClient(cli)
+			transCtx.Client = graphCli
+			transCtx.EventRecorder = &capturingEventRecorder{}
+			transCtx.SynthesizeComponent.Replicas = 2
+			transCtx.SynthesizeComponent.LifecycleActions.ComponentLifecycleActions = &appsv1.ComponentLifecycleActions{
+				MemberLeave: &appsv1.Action{Exec: &appsv1.ExecAction{Image: "test-image"}},
+			}
+			var err error
+			transCtx.RunningWorkload, err = component.BuildInstanceSet(transCtx.SynthesizeComponent, nil)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(component.StatusReplicasStatus(transCtx.RunningWorkload, []string{pod0.Name, pod1.Name}, true, false)).To(Succeed())
+			transCtx.SynthesizeComponent.Replicas = 1
+
+			allowLeave := false
+			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).Times(2).DoAndReturn(func(_ context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+					Expect(req.Action).To(Equal("memberLeave"))
+					Expect(req.Parameters["KB_LEAVE_MEMBER_POD_NAME"]).To(Equal(pod1.Name))
+					if !allowLeave {
+						return kbagentproto.ActionResponse{Error: kbagentproto.Error2Type(kbagentproto.ErrFailed), Message: "leave blocked"}, nil
+					}
+					return kbagentproto.ActionResponse{}, nil
+				})
+			})
+			DeferCleanup(func() { kbacli.SetMockClient(nil, nil) })
+			chain := graph.TransformerChain{&componentServiceTransformer{}, &componentWorkloadTransformer{Client: cli}}
+			reconcile := func() error {
+				dag = newDAG(graphCli, transCtx.Component)
+				return chain.ApplyTo(transCtx, dag)
+			}
+
+			By("executing memberLeave despite deferred Service cleanup, and retaining the workload on failure")
+			err = reconcile()
+			Expect(controllerutil.IsRequeueError(err)).To(BeTrue())
+			Expect(err.Error()).To(ContainSubstring("leave blocked"))
+			Expect(graphCli.IsAction(dag, svc1, model.ActionDeletePtr())).To(BeFalse())
+			Expect(graphCli.FindAll(dag, &corev1.Service{})).To(HaveLen(2))
+			Expect(graphCli.FindAll(dag, &workloadsv1.InstanceSet{})).To(BeEmpty())
+
+			By("allowing the workload update after memberLeave succeeds")
+			allowLeave = true
+			Expect(controllerutil.IsDelayedRequeueError(reconcile())).To(BeTrue())
+			Expect(graphCli.IsAction(dag, svc1, model.ActionDeletePtr())).To(BeFalse())
+			workloads := graphCli.FindAll(dag, &workloadsv1.InstanceSet{})
+			Expect(workloads).To(HaveLen(1))
+			updated := workloads[0].(*workloadsv1.InstanceSet)
+			Expect(*updated.Spec.Replicas).To(Equal(int32(1)))
+			Expect(graphCli.IsAction(dag, updated, model.ActionUpdatePtr())).To(BeTrue())
+			transCtx.RunningWorkload = updated
+
+			By("retaining the address after the ITS update while the Pod still exists")
+			Expect(controllerutil.IsDelayedRequeueError(reconcile())).To(BeTrue())
+			Expect(graphCli.IsAction(dag, svc1, model.ActionDeletePtr())).To(BeFalse())
+
+			By("retaining the address while the Pod is terminating")
+			Expect(cli.Get(ctx, client.ObjectKeyFromObject(pod1), pod1)).To(Succeed())
+			pod1.Finalizers = []string{"test.kubeblocks.io/hold"}
+			Expect(cli.Update(ctx, pod1)).To(Succeed())
+			Expect(cli.Delete(ctx, pod1)).To(Succeed())
+			Expect(controllerutil.IsDelayedRequeueError(reconcile())).To(BeTrue())
+			Expect(graphCli.IsAction(dag, svc1, model.ActionDeletePtr())).To(BeFalse())
+
+			By("cleaning up only after the Pod object disappears")
+			Expect(cli.Get(ctx, client.ObjectKeyFromObject(pod1), pod1)).To(Succeed())
+			pod1.Finalizers = nil
+			Expect(cli.Update(ctx, pod1)).To(Succeed())
+			Expect(reconcile()).To(Succeed())
+			Expect(graphCli.IsAction(dag, svc1, model.ActionDeletePtr())).To(BeTrue())
+			Expect(graphCli.IsAction(dag, svc0, model.ActionDeletePtr())).To(BeFalse())
+		})
+
+		It("recreates services for current replicas even when their Pods are temporarily absent", func() {
+			transCtx.SynthesizeComponent.Replicas = 1
+			err := (&componentServiceTransformer{}).Transform(transCtx, dag)
+			Expect(controllerutil.IsDelayedRequeueError(err)).To(BeTrue())
+			graphCli := transCtx.Client.(model.GraphClient)
+			Expect(graphCli.FindAll(dag, &corev1.Service{})).To(HaveLen(3))
+			Expect(graphCli.IsAction(dag, podService(2), model.ActionCreatePtr())).To(BeTrue())
+		})
+
+		DescribeTable("handles delayed requeues while building multiple services", func(invalidRole bool) {
+			transCtx.SynthesizeComponent.Replicas = 1
+			obsolete := podService(9)
+			reader.Objects = append(reader.Objects, podService(0), podService(1), podService(2), obsolete)
+			otherPodService := transCtx.SynthesizeComponent.ComponentServices[0].DeepCopy()
+			otherPodService.Name, otherPodService.ServiceName = "other", "other"
+			ordinaryService := appsv1.ComponentService{Service: appsv1.Service{Name: "client", ServiceName: "client"}}
+			if invalidRole {
+				ordinaryService.RoleSelector = "missing"
+			}
+			transCtx.SynthesizeComponent.ComponentServices = append(transCtx.SynthesizeComponent.ComponentServices,
+				*otherPodService, ordinaryService)
+
+			err := (&componentServiceTransformer{}).Transform(transCtx, dag)
+			graphCli := transCtx.Client.(model.GraphClient)
+			Expect(graphCli.IsAction(dag, podService(1), model.ActionDeletePtr())).To(BeFalse())
+			other := &corev1.Service{ObjectMeta: metav1.ObjectMeta{
+				Namespace: transCtx.Component.Namespace,
+				Name:      constant.GenerateComponentServiceName(clusterName, compName, "other-2"),
+			}}
+			Expect(graphCli.IsAction(dag, other, model.ActionCreatePtr())).To(BeTrue())
+			if invalidRole {
+				Expect(err).To(MatchError("role selector for service is not defined, service: client, role: missing"))
+				Expect(graphCli.IsAction(dag, obsolete, model.ActionDeletePtr())).To(BeFalse())
+			} else {
+				Expect(controllerutil.IsDelayedRequeueError(err)).To(BeTrue())
+				Expect(graphCli.FindAll(dag, &corev1.Service{})).To(HaveLen(8))
+				Expect(graphCli.IsAction(dag, obsolete, model.ActionDeletePtr())).To(BeTrue())
+			}
+		},
+			Entry("continues provisioning and cleanup without losing the retry", false),
+			Entry("returns a subsequent build failure instead of the retry", true),
+		)
+
+		It("precreates services during scale-out before Pods exist", func() {
+			transCtx.RunningWorkload.Spec.Replicas = ptr.To[int32](1)
+			Expect((&componentServiceTransformer{}).Transform(transCtx, dag)).To(Succeed())
+			graphCli := transCtx.Client.(model.GraphClient)
+			Expect(graphCli.FindAll(dag, &corev1.Service{})).To(HaveLen(3))
+			Expect(graphCli.IsAction(dag, podService(2), model.ActionCreatePtr())).To(BeTrue())
+		})
+
+		It("retains named and offline instances by name instead of replica count", func() {
+			transCtx.SynthesizeComponent.Replicas = 1
+			transCtx.SynthesizeComponent.Instances = []appsv1.InstanceTemplate{{Name: "reader", Replicas: ptr.To[int32](1)}}
+			transCtx.RunningWorkload.Spec.Instances = []workloadsv1.InstanceTemplate{{Name: "reader", Replicas: ptr.To[int32](2)}}
+			transCtx.RunningWorkload.Spec.Replicas = ptr.To[int32](2)
+			transCtx.SynthesizeComponent.OfflineInstances = []string{newPod("reader-0").Name}
+			reader.Objects = append(reader.Objects, newPod("reader-7"))
+			err := (&componentServiceTransformer{}).Transform(transCtx, dag)
+			Expect(controllerutil.IsDelayedRequeueError(err)).To(BeTrue())
+			graphCli := transCtx.Client.(model.GraphClient)
+			services := graphCli.FindAll(dag, &corev1.Service{})
+			selectors := make([]string, 0, len(services))
+			for _, obj := range services {
+				svc := obj.(*corev1.Service)
+				selectors = append(selectors, svc.Spec.Selector[constant.KBAppPodNameLabelKey])
+			}
+			Expect(selectors).To(ConsistOf(newPod("reader-0").Name, newPod("reader-1").Name, newPod("reader-7").Name))
+		})
+
+		It("retains services across changes to non-contiguous ordinals", func() {
+			transCtx.SynthesizeComponent.Replicas = 2
+			transCtx.SynthesizeComponent.Ordinals = appsv1.Ordinals{Discrete: []int32{2, 8}}
+			transCtx.RunningWorkload.Spec.Replicas = ptr.To[int32](2)
+			transCtx.RunningWorkload.Spec.Ordinals = appsv1.Ordinals{Discrete: []int32{2, 5}}
+			reader.Objects = append(reader.Objects, newPod("11"))
+			Expect(controllerutil.IsDelayedRequeueError((&componentServiceTransformer{}).Transform(transCtx, dag))).To(BeTrue())
+			graphCli := transCtx.Client.(model.GraphClient)
+			services := graphCli.FindAll(dag, &corev1.Service{})
+			names := make([]string, 0, len(services))
+			for _, svc := range services {
+				names = append(names, svc.GetName())
+			}
+			Expect(names).To(ConsistOf(podServiceName(2), podServiceName(5), podServiceName(8), podServiceName(11)))
+		})
+
+		DescribeTable("retains remote Pod services until their Pods disappear", func(componentPlacement bool) {
+			transCtx.SynthesizeComponent.Replicas = 1
+			transCtx.RunningWorkload.Spec.Replicas = ptr.To[int32](1)
+			annotations := map[string]string{constant.KBAppMultiClusterPlacementKey: "member-a"}
+			if componentPlacement {
+				transCtx.Component.Annotations = annotations
+			} else {
+				transCtx.RunningWorkload.Annotations = annotations
+			}
+			transCtx.SynthesizeComponent.EnableInstanceAPI = ptr.To(true)
+			transCtx.SynthesizeComponent.Annotations = annotations
+			remotePod := newPod("1")
+			svc1, svc2 := podService(1), podService(2)
+			control := fake.NewClientBuilder().WithScheme(k8sClient.Scheme()).WithObjects(svc1, svc2).Build()
+			memberA := fake.NewClientBuilder().WithScheme(k8sClient.Scheme()).WithObjects(remotePod).Build()
+			memberB := fake.NewClientBuilder().WithScheme(k8sClient.Scheme()).WithObjects(newPod("2")).Build()
+			cli := multicluster.NewClient(control, map[string]client.Client{"member-a": memberA, "member-b": memberB})
+			graphCli := model.NewGraphClient(cli)
+			transCtx.Client = graphCli
+			reconcile := func() error {
+				dag = newDAG(graphCli, transCtx.Component)
+				transCtx.SynthesizeComponent.InstanceAssistantObjects = nil
+				return (&componentServiceTransformer{}).Transform(transCtx, dag)
+			}
+
+			Expect(controllerutil.IsDelayedRequeueError(reconcile())).To(BeTrue())
+			Expect(graphCli.IsAction(dag, svc1, model.ActionUpdatePtr())).To(BeTrue())
+			// A Pod with matching labels in an unrelated cluster must not retain its Service.
+			Expect(graphCli.IsAction(dag, svc2, model.ActionDeletePtr())).To(BeTrue())
+			ref := corev1.ObjectReference{Kind: "Service", Namespace: svc1.Namespace, Name: svc1.Name}
+			Expect(transCtx.SynthesizeComponent.InstanceAssistantObjects).To(ContainElement(ref))
+
+			Expect(memberA.Delete(ctx, remotePod)).To(Succeed())
+			Expect(reconcile()).To(Succeed())
+			Expect(graphCli.IsAction(dag, svc1, model.ActionDeletePtr())).To(BeTrue())
+			Expect(transCtx.SynthesizeComponent.InstanceAssistantObjects).NotTo(ContainElement(ref))
+		},
+			Entry("using Component placement", true),
+			Entry("using existing workload placement when the Component has none", false),
+		)
+
+		It("does not delete Services when listing Pods fails", func() {
+			cli := fake.NewClientBuilder().WithScheme(k8sClient.Scheme()).WithObjects(podService(1)).
+				WithInterceptorFuncs(interceptor.Funcs{List: func(ctx context.Context, cli client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
+					if _, ok := list.(*corev1.PodList); ok {
+						return fmt.Errorf("pod list unavailable")
+					}
+					return cli.List(ctx, list, opts...)
+				}}).Build()
+			transCtx.Client = model.NewGraphClient(cli)
+			transCtx.SynthesizeComponent.Replicas = 1
+			transCtx.RunningWorkload.Spec.Replicas = ptr.To[int32](1)
+			Expect((&componentServiceTransformer{}).Transform(transCtx, dag)).To(MatchError("pod list unavailable"))
+			Expect(transCtx.Client.(model.GraphClient).FindAll(dag, &corev1.Service{})).To(BeEmpty())
+		})
+
+		It("cleans up disabled pod services even while Pods exist", func() {
+			svc := podService(1)
+			reader.Objects = append(reader.Objects, newPod("1"), svc)
+			transCtx.SynthesizeComponent.Replicas = 1
+			transCtx.SynthesizeComponent.ComponentServices[0].DisableAutoProvision = truep()
+			Expect((&componentServiceTransformer{}).Transform(transCtx, dag)).To(Succeed())
+			Expect(transCtx.Client.(model.GraphClient).IsAction(dag, svc, model.ActionDeletePtr())).To(BeTrue())
+		})
+
 		It("provision", func() {
+			transCtx.RunningWorkload = nil
 			transformer := &componentServiceTransformer{}
 			err := transformer.Transform(transCtx, dag)
 			Expect(err).Should(BeNil())
@@ -159,6 +402,7 @@ var _ = Describe("component service transformer test", func() {
 		})
 
 		It("deletion", func() {
+			reader.Objects = append(reader.Objects, newPod("1"))
 			services := make([]client.Object, 0)
 			for i := int32(0); i < transCtx.SynthesizeComponent.Replicas; i++ {
 				services = append(services, podService(i))

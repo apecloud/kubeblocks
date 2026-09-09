@@ -21,11 +21,16 @@ package parameters
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -35,6 +40,8 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/generics"
+	"github.com/apecloud/kubeblocks/pkg/parameters"
+	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testparameters "github.com/apecloud/kubeblocks/pkg/testutil/parameters"
 	"github.com/apecloud/kubeblocks/test/testdata"
@@ -193,3 +200,148 @@ func cleanEnv() {
 	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ComponentParameterSignature, true, inNS)
 	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ParameterSignature, true, inNS, ml)
 }
+
+func resourceTestComponent(name, def string) *appsv1.Component {
+	return &appsv1.Component{ObjectMeta: metav1.ObjectMeta{Name: "test-" + name, Namespace: "ns",
+		Labels: map[string]string{constant.AppInstanceLabelKey: "test"}}, Spec: appsv1.ComponentSpec{CompDef: def,
+		Resources: corev1.ResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1"), corev1.ResourceMemory: resource.MustParse("1Gi")}},
+		VolumeClaimTemplates: []appsv1.PersistentVolumeClaimTemplate{{Name: "data", Spec: corev1.PersistentVolumeClaimSpec{
+			Resources: corev1.VolumeResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("1Gi")}},
+		}}},
+	}}
+}
+
+func storageVar(def string) appsv1.EnvVar {
+	return appsv1.EnvVar{Name: "DISK", ValueFrom: &appsv1.VarSource{ResourceVarRef: &appsv1.ResourceVarSelector{
+		ClusterObjectReference: appsv1.ClusterObjectReference{CompDef: def},
+		ResourceVars:           appsv1.ResourceVars{Storage: &appsv1.NamedVar{Name: "data"}},
+	}}}
+}
+
+var _ = Describe("Automatic resource rendering", func() {
+	BeforeEach(cleanEnv)
+	AfterEach(cleanEnv)
+
+	waitFinished := func(comp *appsv1.Component, content string, afterGeneration ...int64) int64 {
+		key := client.ObjectKey{Namespace: comp.Namespace, Name: core.GenerateComponentConfigurationName(clusterName, defaultCompName)}
+		var generation int64
+		Eventually(func(g Gomega) {
+			cp := &parametersv1alpha1.ComponentParameter{}
+			g.Expect(testCtx.Cli.Get(testCtx.Ctx, key, cp)).To(Succeed())
+			if len(afterGeneration) > 0 {
+				g.Expect(cp.Generation).To(BeNumerically(">", afterGeneration[0]))
+			}
+			g.Expect(cp.Status.ObservedGeneration).To(Equal(cp.Generation))
+			item := parameters.GetItemStatus(&cp.Status, configSpecName)
+			g.Expect(item).NotTo(BeNil())
+			g.Expect(item.Phase).To(Equal(parametersv1alpha1.CFinishedPhase))
+			g.Expect(item.UpdateRevision).To(Equal(strconv.FormatInt(cp.Generation, 10)))
+			cm := &corev1.ConfigMap{}
+			cmKey := client.ObjectKey{Namespace: comp.Namespace, Name: core.GetComponentCfgName(clusterName, defaultCompName, configSpecName)}
+			g.Expect(testCtx.Cli.Get(testCtx.Ctx, cmKey, cm)).To(Succeed())
+			g.Expect(cm.Data[testparameters.MysqlConfigFile]).To(ContainSubstring(content))
+			g.Expect(cm.Annotations[constant.ConfigurationRevision]).To(Equal(item.UpdateRevision))
+			generation = cp.Generation
+		}).Should(Succeed())
+		return generation
+	}
+
+	It("rerenders storage vars and built-in functions without trigger declarations", func() {
+		_, _, _, comp, _ := mockReconcileResource(mockResourceConfiguration{
+			Vars: []appsv1.EnvVar{storageVar("")},
+			Template: func(cm *corev1.ConfigMap) {
+				cm.Data[testparameters.MysqlConfigFile] = strings.ReplaceAll(cm.Data[testparameters.MysqlConfigFile], "server-id=1", "server-id={{ div (int64 $.DISK) 1073741824 }}")
+				cm.Data[envTestFileKey] = `capacity={{ getComponentPVCSizeByName $.component "data" }}`
+			},
+		})
+		waitFinished(comp, "server-id=0")
+		expand := func(size string) {
+			// This suite runs parameter controllers; emulate the Component update that
+			// the apps controller normally propagates from a VolumeExpansion operation.
+			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(comp), func(c *appsv1.Component) {
+				c.Spec.VolumeClaimTemplates = resourceTestComponent("db", "db").Spec.VolumeClaimTemplates
+				c.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse(size)
+			})()).To(Succeed())
+		}
+		expand("2Gi")
+		first := waitFinished(comp, "server-id=2")
+		cm := &corev1.ConfigMap{}
+		cmKey := client.ObjectKey{Namespace: comp.Namespace, Name: core.GetComponentCfgName(clusterName, defaultCompName, configSpecName)}
+		Expect(testCtx.Cli.Get(testCtx.Ctx, cmKey, cm)).To(Succeed())
+		Expect(cm.Data[envTestFileKey]).To(Equal("capacity=2147483648"))
+		expand("3Gi")
+		second := waitFinished(comp, "server-id=3")
+		Expect(second).To(BeNumerically(">", first))
+		expand("3072Mi")
+		Consistently(func() int64 {
+			cp := &parametersv1alpha1.ComponentParameter{}
+			Expect(testCtx.Cli.Get(testCtx.Ctx, client.ObjectKey{Namespace: comp.Namespace, Name: comp.Name}, cp)).To(Succeed())
+			return cp.Generation
+		}, time.Second*2, time.Millisecond*100).Should(Equal(second))
+	})
+
+	It("preserves explicit parameters through storage changes", func() {
+		_, _, _, comp, _ := mockReconcileResource(mockResourceConfiguration{
+			Vars: []appsv1.EnvVar{storageVar("")},
+			Template: func(cm *corev1.ConfigMap) {
+				cm.Data[testparameters.MysqlConfigFile] = strings.ReplaceAll(cm.Data[testparameters.MysqlConfigFile], "server-id=1", "server-id={{ div (int64 $.DISK) 1073741824 }}")
+			},
+		})
+		waitFinished(comp, "server-id=0")
+		expand := func(size string) {
+			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(comp), func(c *appsv1.Component) {
+				c.Spec.VolumeClaimTemplates = resourceTestComponent("db", "db").Spec.VolumeClaimTemplates
+				c.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse(size)
+			})()).To(Succeed())
+		}
+		expand("2Gi")
+		waitFinished(comp, "server-id=2")
+		By("preserve a user override through subsequent expansions")
+		override := "9"
+		Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(comp), func(cp *parametersv1alpha1.ComponentParameter) {
+			item := parameters.GetConfigTemplateItem(&cp.Spec, configSpecName)
+			item.ConfigFileParams = map[string]parametersv1alpha1.ParametersInFile{testparameters.MysqlConfigFile: {Parameters: map[string]*string{"server-id": &override}}}
+		})()).To(Succeed())
+		before := waitFinished(comp, "server-id=9")
+		cm := &corev1.ConfigMap{}
+		cmKey := client.ObjectKey{Namespace: comp.Namespace, Name: core.GetComponentCfgName(clusterName, defaultCompName, configSpecName)}
+		Expect(testCtx.Cli.Get(testCtx.Ctx, cmKey, cm)).To(Succeed())
+		data := cm.DeepCopy().Data
+		expand("3Gi")
+		after := waitFinished(comp, "server-id=9", before)
+		Expect(after).To(BeNumerically(">", before))
+		Expect(testCtx.Cli.Get(testCtx.Ctx, cmKey, cm)).To(Succeed())
+		Expect(cm.Data).To(Equal(data))
+		Expect(fmt.Sprint(after)).To(Equal(cm.Annotations[constant.ConfigurationRevision]))
+	})
+	It("refreshes sharding payload when only Cluster shard count changes", func() {
+		_, _, _, comp, _ := mockReconcileResource()
+		waitFinished(comp, "server-id=1")
+		Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(comp), func(c *appsv1.Component) {
+			c.Labels[constant.KBAppShardingNameLabelKey] = shardingCompName
+		})()).To(Succeed())
+		waitShards := func(shards string) int64 {
+			var generation int64
+			Eventually(func(g Gomega) {
+				cp := &parametersv1alpha1.ComponentParameter{}
+				g.Expect(testCtx.Cli.Get(testCtx.Ctx, client.ObjectKeyFromObject(comp), cp)).To(Succeed())
+				item := parameters.GetConfigTemplateItem(&cp.Spec, configSpecName)
+				g.Expect(item).NotTo(BeNil())
+				g.Expect(string(item.Payload[constant.ShardingPayload])).To(ContainSubstring(`"shards":"` + shards + `"`))
+				g.Expect(cp.Status.ObservedGeneration).To(Equal(cp.Generation))
+				generation = cp.Generation
+			}).Should(Succeed())
+			return generation
+		}
+		before := waitShards("5")
+		Expect(testCtx.Cli.Get(testCtx.Ctx, client.ObjectKeyFromObject(comp), comp)).To(Succeed())
+		componentGeneration := comp.Generation
+		Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKey{Namespace: comp.Namespace, Name: clusterName}, func(c *appsv1.Cluster) {
+			c.Spec.Shardings[0].Shards = 6
+		})()).To(Succeed())
+		Expect(waitShards("6")).To(BeNumerically(">", before))
+		Expect(testCtx.Cli.Get(testCtx.Ctx, client.ObjectKeyFromObject(comp), comp)).To(Succeed())
+		Expect(comp.Generation).To(Equal(componentGeneration))
+	})
+
+})

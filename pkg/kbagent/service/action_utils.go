@@ -31,6 +31,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"text/template"
 	"time"
 
@@ -214,6 +215,17 @@ func execActionCallX(ctx context.Context, cancel context.CancelFunc,
 	}()
 
 	cmd := exec.CommandContext(ctx, action.Commands[0], mergedArgs...)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.Cancel = func() error {
+		if cmd.Process == nil {
+			return os.ErrProcessDone
+		}
+		err := syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+		if err == syscall.ESRCH {
+			return os.ErrProcessDone
+		}
+		return err
+	}
 	if len(mergedEnv) > 0 {
 		cmd.Env = mergedEnv
 	}

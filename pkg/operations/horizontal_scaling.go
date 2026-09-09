@@ -21,7 +21,6 @@ package operations
 
 import (
 	"fmt"
-	"maps"
 	"slices"
 	"sort"
 	"strconv"
@@ -171,6 +170,11 @@ func (hs horizontalScalingOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli 
 // ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
 // the Reconcile function for horizontal scaling opsRequest.
 func (hs horizontalScalingOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (opsv1alpha1.OpsPhase, time.Duration, error) {
+	if opsRes.OpsRequest.Status.Phase == opsv1alpha1.OpsCancellingPhase {
+		if err := hs.validateCancellation(opsRes); err != nil {
+			return opsRes.OpsRequest.Status.Phase, 0, err
+		}
+	}
 	handleComponentProgress := func(
 		reqCtx intctrlutil.RequestCtx,
 		cli client.Client,
@@ -213,7 +217,7 @@ func (hs horizontalScalingOpsHandler) ReconcileAction(reqCtx intctrlutil.Request
 		if lastCompConfiguration.Replicas == nil {
 			return 0, 0, fmt.Errorf("missing source replicas for component %q", pgRes.fullComponentName)
 		}
-		if opsRes.OpsRequest.Status.Phase == opsv1alpha1.OpsCancellingPhase && !clusterComponentSpec.FlatInstanceOrdinal {
+		if opsRes.OpsRequest.Status.Phase == opsv1alpha1.OpsCancellingPhase {
 			pgRes.createdPodSet, pgRes.deletedPodSet, err = hs.nonFlatRollbackInstanceSets(runtime,
 				opsRes.Cluster.Name, pgRes.fullComponentName, lastCompConfiguration, horizontalScaling)
 			if err != nil {
@@ -221,16 +225,10 @@ func (hs horizontalScalingOpsHandler) ReconcileAction(reqCtx intctrlutil.Request
 			}
 			return handleComponentProgressForScalingReplicas(reqCtx, cli, opsRes, pgRes, compStatus)
 		}
-		if opsRes.OpsRequest.Status.Phase == opsv1alpha1.OpsCancellingPhase {
-			clusterComponentSpec.Replicas = *lastCompConfiguration.Replicas
-			clusterComponentSpec.Instances = lastCompConfiguration.Instances
-			clusterComponentSpec.OfflineInstances = lastCompConfiguration.OfflineInstances
-		} else {
-			clusterComponentSpec.Replicas, clusterComponentSpec.Instances, clusterComponentSpec.OfflineInstances, err =
-				hs.getExpectedCompValues(lastCompConfiguration, horizontalScaling)
-			if err != nil {
-				return 0, 0, err
-			}
+		clusterComponentSpec.Replicas, clusterComponentSpec.Instances, clusterComponentSpec.OfflineInstances, err =
+			hs.getExpectedCompValues(lastCompConfiguration, horizontalScaling)
+		if err != nil {
+			return 0, 0, err
 		}
 		target, complete, err := activeAssignmentsForTarget(workload, clusterComponentSpec)
 		if err != nil {
@@ -251,21 +249,11 @@ func (hs horizontalScalingOpsHandler) ReconcileAction(reqCtx intctrlutil.Request
 			return 0, 0, fmt.Errorf("source instance assignments for InstanceSet %q are incomplete", workloadName)
 		}
 		created, deleted := diffAssignments(source, target)
-		if opsRes.OpsRequest.Status.Phase == opsv1alpha1.OpsCancellingPhase {
-			// TODO: define flat-ordinal cancellation. Restoring the original spec
-			// does not guarantee that the allocator restores the original names.
-			if !maps.Equal(source, target) {
-				return 1, 0, nil
-			}
-			pgRes.createdPodSet, pgRes.deletedPodSet = rollbackInstanceSets(source,
-				compStatus.ProgressDetails, pgRes.fullComponentName)
-		} else {
-			effective := filterHorizontalScalingSpec(lastCompConfiguration, lastCompConfiguration.OfflineInstances, horizontalScaling.DeepCopy())
-			if !horizontalDiffMatchesOperation(*effective, created, deleted) {
-				return 1, 0, nil
-			}
-			pgRes.createdPodSet, pgRes.deletedPodSet = created, deleted
+		effective := filterHorizontalScalingSpec(lastCompConfiguration, lastCompConfiguration.OfflineInstances, horizontalScaling.DeepCopy())
+		if !horizontalDiffMatchesOperation(*effective, created, deleted) {
+			return 1, 0, nil
 		}
+		pgRes.createdPodSet, pgRes.deletedPodSet = created, deleted
 		return handleComponentProgressForScalingReplicas(reqCtx, cli, opsRes, pgRes, compStatus)
 	}
 	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.HorizontalScalingList)
@@ -514,11 +502,9 @@ func (hs horizontalScalingOpsHandler) getCreateAndDeletePodSetForRestore(opsRes 
 
 // Cancel this function defines the cancel horizontalScaling action.
 func (hs horizontalScalingOpsHandler) Cancel(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
-	for _, v := range opsRes.OpsRequest.Spec.HorizontalScalingList {
-		if v.Shards != nil {
-			// This operation requires intervention by operations personnel.
-			return intctrlutil.NewErrorf(intctrlutil.ErrorIgnoreCancel, "does not support cancellation of shard count changes during horizontal scaling.")
-		}
+	// Validate the whole request before restoring any component configuration.
+	if err := hs.validateCancellation(opsRes); err != nil {
+		return err
 	}
 	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.HorizontalScalingList)
 	return compOpsHelper.cancelComponentOps(reqCtx.Ctx, cli, opsRes, func(lastConfig *opsv1alpha1.LastComponentConfiguration, comp *appsv1.ClusterComponentSpec) {
@@ -526,6 +512,34 @@ func (hs horizontalScalingOpsHandler) Cancel(reqCtx intctrlutil.RequestCtx, cli 
 		comp.Instances = lastConfig.Instances
 		comp.OfflineInstances = lastConfig.OfflineInstances
 	})
+}
+
+func (hs horizontalScalingOpsHandler) validateCancellation(opsRes *OpsResource) error {
+	for _, v := range opsRes.OpsRequest.Spec.HorizontalScalingList {
+		if v.Shards != nil {
+			// This operation requires intervention by operations personnel.
+			return intctrlutil.NewErrorf(intctrlutil.ErrorIgnoreCancel, "does not support cancellation of shard count changes during horizontal scaling.")
+		}
+		comp := opsRes.Cluster.Spec.GetComponentByName(v.ComponentName)
+		flat := comp != nil && comp.FlatInstanceOrdinal
+		if sharding := opsRes.Cluster.Spec.GetShardingByName(v.ComponentName); sharding != nil {
+			// Shard templates may override the common template's ordinal mode.
+			remaining := sharding.Shards
+			for _, template := range sharding.ShardTemplates {
+				count := pointer.Int32Deref(template.Shards, 0)
+				remaining -= count
+				if count > 0 && pointer.BoolDeref(template.FlatInstanceOrdinal, sharding.Template.FlatInstanceOrdinal) {
+					flat = true
+				}
+			}
+			flat = flat || remaining > 0 && sharding.Template.FlatInstanceOrdinal
+		}
+		if flat {
+			return intctrlutil.NewErrorf(intctrlutil.ErrorIgnoreCancel,
+				"cancellation of horizontal scaling is not supported for flat-ordinal component/sharding %q; the operation will continue", v.ComponentName)
+		}
+	}
+	return nil
 }
 
 // getExpectedCompValues gets the expected replicas, instances and offline instances from
@@ -1007,28 +1021,6 @@ func horizontalDiffMatchesOperation(horizontalScaling opsv1alpha1.HorizontalScal
 		}
 	}
 	return true
-}
-
-// rollbackInstanceSets checks every source identity, even if its replacement
-// already exists but is not ready. Only recorded participants are checked for
-// deletion: runtime presence, Released and Offline do not establish that an
-// instance was created by this operation.
-func rollbackInstanceSets(source map[string]string,
-	details []opsv1alpha1.ProgressStatusDetail, componentName string) (map[string]string, map[string]string) {
-	created, deleted := maps.Clone(source), map[string]string{}
-	for _, detail := range details {
-		if detail.Group != componentName+"/Create" && detail.Group != componentName+"/Delete" {
-			continue
-		}
-		name, ok := strings.CutPrefix(detail.ObjectKey, "Pod/")
-		if !ok {
-			continue
-		}
-		if _, ok := source[name]; !ok {
-			deleted[name] = ""
-		}
-	}
-	return created, deleted
 }
 
 // nonFlatRollbackInstanceSets preserves the existing cancellation contract:

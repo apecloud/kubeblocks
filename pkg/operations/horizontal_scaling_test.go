@@ -1257,29 +1257,63 @@ func TestHScaleRejectsFlatFromBackupBeforeMutation(t *testing.T) {
 	}
 }
 
-func TestHScaleRollbackParticipants(t *testing.T) {
-	source := map[string]string{"demo-db-7": "", "demo-db-42": "large"}
-	details := []opsv1alpha1.ProgressStatusDetail{
-		{Group: "db/Create", ObjectKey: "Pod/demo-db-99"},
-		{Group: "db/Delete", ObjectKey: "Pod/demo-db-42"},
-		{Group: "other/Create", ObjectKey: "Pod/other-0"},
-		{Group: "db/OtherAction", ObjectKey: "Pod/demo-db-100"},
-		{Group: "db/Create", ObjectKey: "PVC/data-demo-db-99"},
-	}
-	created, deleted := rollbackInstanceSets(source, details, "db")
-	if !reflect.DeepEqual(created, source) ||
-		!reflect.DeepEqual(deleted, map[string]string{"demo-db-99": ""}) {
-		t.Fatalf("rollback must check source health and only recorded deletions: created=%v deleted=%v", created, deleted)
-	}
-	// With no recorded participants, current runtime objects must not be
-	// guessed to be operation-created instances. Source health is still checked.
-	created, deleted = rollbackInstanceSets(source, nil, "db")
-	if !reflect.DeepEqual(created, source) || len(deleted) != 0 {
-		t.Fatalf("empty progress lost source health or invented deletions: created=%v deleted=%v", created, deleted)
-	}
-	delete(created, "demo-db-7")
-	if len(source) != 2 {
-		t.Fatal("rollback mutated the saved source")
+func TestHScaleCancellationBoundary(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		sharding *appsv1.ClusterSharding
+		allowed  bool
+	}{
+		{name: "mixed components"},
+		{name: "flat common shard template", sharding: &appsv1.ClusterSharding{Name: "flat", Shards: 2,
+			Template: appsv1.ClusterComponentSpec{FlatInstanceOrdinal: true}}},
+		{name: "flat shard override", sharding: &appsv1.ClusterSharding{Name: "flat", Shards: 2,
+			ShardTemplates: []appsv1.ShardTemplate{{Name: "a", Shards: pointer.Int32(1), FlatInstanceOrdinal: pointer.Bool(true)}}}},
+		{name: "all shards override to non-flat", allowed: true, sharding: &appsv1.ClusterSharding{Name: "flat", Shards: 2,
+			Template:       appsv1.ClusterComponentSpec{FlatInstanceOrdinal: true},
+			ShardTemplates: []appsv1.ShardTemplate{{Name: "a", Shards: pointer.Int32(2), FlatInstanceOrdinal: pointer.Bool(false)}}}},
+		{name: "unused flat shard template", allowed: true, sharding: &appsv1.ClusterSharding{Name: "flat", Shards: 2,
+			ShardTemplates: []appsv1.ShardTemplate{{Name: "a", Shards: pointer.Int32(0), FlatInstanceOrdinal: pointer.Bool(true)}}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cluster := &appsv1.Cluster{Spec: appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{
+				{Name: "ordinary", Replicas: 3},
+			}}}
+			if tc.sharding != nil {
+				cluster.Spec.Shardings = []appsv1.ClusterSharding{*tc.sharding}
+			} else {
+				cluster.Spec.ComponentSpecs = append(cluster.Spec.ComponentSpecs, appsv1.ClusterComponentSpec{Name: "flat", Replicas: 3, FlatInstanceOrdinal: true})
+			}
+			ops := &opsv1alpha1.OpsRequest{Spec: opsv1alpha1.OpsRequestSpec{Cancel: true,
+				SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{HorizontalScalingList: []opsv1alpha1.HorizontalScaling{
+					{ComponentOps: opsv1alpha1.ComponentOps{ComponentName: "ordinary"}},
+					{ComponentOps: opsv1alpha1.ComponentOps{ComponentName: "flat"}},
+				}}}, Status: opsv1alpha1.OpsRequestStatus{Phase: opsv1alpha1.OpsRunningPhase,
+				LastConfiguration: opsv1alpha1.LastConfiguration{Components: map[string]opsv1alpha1.LastComponentConfiguration{
+					"ordinary": {Replicas: pointer.Int32(2)}, "flat": {Replicas: pointer.Int32(2)},
+				}}}}
+			res := &OpsResource{Cluster: cluster, OpsRequest: ops}
+			h := horizontalScalingOpsHandler{}
+			if tc.allowed {
+				if err := h.validateCancellation(res); err != nil {
+					t.Fatalf("non-flat shards must remain cancellable: %v", err)
+				}
+				return
+			}
+			beforeCluster, beforeOps := cluster.DeepCopy(), ops.DeepCopy()
+			// A nil client verifies that rejection happens before any write,
+			// including rollback of the earlier ordinary component in this request.
+			err := h.Cancel(intctrlutil.RequestCtx{Ctx: context.Background()}, nil, res)
+			if !intctrlutil.IsTargetError(err, intctrlutil.ErrorIgnoreCancel) {
+				t.Fatalf("want IgnoreCancel, got %v", err)
+			}
+			if !reflect.DeepEqual(beforeCluster, cluster) || !reflect.DeepEqual(beforeOps, ops) {
+				t.Fatal("rejected cancellation changed configuration or operation state")
+			}
+			ops.Status.Phase = opsv1alpha1.OpsCancellingPhase
+			if _, _, err := h.ReconcileAction(intctrlutil.RequestCtx{Ctx: context.Background()}, nil, res); !intctrlutil.IsTargetError(err, intctrlutil.ErrorIgnoreCancel) {
+				t.Fatalf("unexpected flat rollback execution: %v", err)
+			}
+		})
 	}
 }
 
@@ -1603,6 +1637,17 @@ func TestHScaleInstanceStatusLifecycle(t *testing.T) {
 					return
 				}
 				ops.Spec.Cancel = true
+				if flat {
+					beforeCluster, beforeOps := cluster.DeepCopy(), ops.DeepCopy()
+					if err := h.Cancel(req, cli, res); !intctrlutil.IsTargetError(err, intctrlutil.ErrorIgnoreCancel) {
+						t.Fatalf("flat cancellation must be rejected: %v", err)
+					}
+					if !reflect.DeepEqual(cluster, beforeCluster) || !reflect.DeepEqual(ops, beforeOps) {
+						t.Fatal("rejected cancellation changed the forward operation")
+					}
+					check(opsv1alpha1.OpsSucceedPhase) // The original scale-out/in can still finish.
+					return
+				}
 				ops.Status.Phase = opsv1alpha1.OpsCancellingPhase
 				if err := cli.Status().Update(ctx, ops); err != nil {
 					t.Fatal(err)

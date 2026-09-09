@@ -76,6 +76,50 @@ func newOperationsTestScheme() *runtime.Scheme {
 	return scheme
 }
 
+var _ = DescribeTable("flat horizontal scaling cancellation boundary", func(phase opsv1alpha1.OpsPhase) {
+	cluster := &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "cancel-flat", Namespace: "default"},
+		Spec: appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{{Name: "db", Replicas: 3, FlatInstanceOrdinal: true}}}}
+	ops := &opsv1alpha1.OpsRequest{ObjectMeta: metav1.ObjectMeta{Name: "cancel-flat", Namespace: "default"},
+		Spec: opsv1alpha1.OpsRequestSpec{ClusterName: cluster.Name, Type: opsv1alpha1.HorizontalScalingType, Cancel: true,
+			SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{HorizontalScalingList: []opsv1alpha1.HorizontalScaling{{
+				ComponentOps: opsv1alpha1.ComponentOps{ComponentName: "db"},
+				ScaleOut:     &opsv1alpha1.ScaleOut{ReplicaChanger: opsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(1)}},
+			}}}},
+		Status: opsv1alpha1.OpsRequestStatus{Phase: phase, Progress: "0/1",
+			LastConfiguration: opsv1alpha1.LastConfiguration{Components: map[string]opsv1alpha1.LastComponentConfiguration{
+				"db": {Replicas: pointer.Int32(2)},
+			}}}}
+	cli := fake.NewClientBuilder().WithScheme(newOperationsTestScheme()).WithObjects(cluster, ops).WithStatusSubresource(ops).Build()
+	recorder := record.NewFakeRecorder(10)
+	r := OpsRequestReconciler{Client: cli, Recorder: recorder}
+	res := &kboperations.OpsResource{Cluster: cluster, OpsRequest: ops, Recorder: recorder}
+	before := cluster.DeepCopy()
+	result, err := r.handleCancelSignal(ctrlutil.RequestCtx{Ctx: ctx}, res)
+	Expect(err).NotTo(HaveOccurred())
+	stored := &appsv1.Cluster{}
+	Expect(cli.Get(ctx, client.ObjectKeyFromObject(cluster), stored)).To(Succeed())
+	Expect(stored.Spec).To(Equal(before.Spec))
+	Expect(cluster.Spec).To(Equal(before.Spec))
+	Expect(cli.Get(ctx, client.ObjectKeyFromObject(ops), ops)).To(Succeed())
+	Expect(ops.Status.CancelTimestamp.IsZero()).To(BeTrue())
+	if phase == opsv1alpha1.OpsPendingPhase {
+		// Nothing has been executed yet, so the generic pending cancellation remains safe.
+		Expect(result).NotTo(BeNil())
+		Expect(ops.Status.Phase).To(Equal(opsv1alpha1.OpsCancelledPhase))
+		return
+	}
+	Expect(result).To(BeNil()) // The controller continues its normal phase handler.
+	Expect(ops.Status.Phase).To(Equal(phase))
+	Expect(meta.FindStatusCondition(ops.Status.Conditions, opsv1alpha1.ConditionTypeCancelled)).To(BeNil())
+	select {
+	case event := <-recorder.Events:
+		Expect(event).To(ContainSubstring(reasonOpsCancelActionNotSupported))
+		Expect(event).To(ContainSubstring("flat-ordinal"))
+	default:
+		Fail("expected an unsupported-cancellation event")
+	}
+}, Entry("creating", opsv1alpha1.OpsCreatingPhase), Entry("running", opsv1alpha1.OpsRunningPhase), Entry("pending", opsv1alpha1.OpsPendingPhase))
+
 var _ = Describe("OpsRequest Controller", func() {
 	const compDefName = "test-compdef"
 	const clusterNamePrefix = "test-cluster"

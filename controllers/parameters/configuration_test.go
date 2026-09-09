@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package parameters
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -36,12 +37,14 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	"github.com/apecloud/kubeblocks/pkg/parameters"
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
+	"github.com/apecloud/kubeblocks/pkg/parameters/util"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testparameters "github.com/apecloud/kubeblocks/pkg/testutil/parameters"
 	"github.com/apecloud/kubeblocks/test/testdata"
@@ -280,14 +283,82 @@ var _ = Describe("Automatic resource rendering", func() {
 		}, time.Second*2, time.Millisecond*100).Should(Equal(second))
 	})
 
-	It("preserves explicit parameters through storage changes", func() {
-		_, _, _, comp, _ := mockReconcileResource(mockResourceConfiguration{
+	It("applies storage-derived configuration through restart and preserves explicit parameters", func() {
+		_, pd, cluster, comp, _ := mockReconcileResource(mockResourceConfiguration{
 			Vars: []appsv1.EnvVar{storageVar("")},
 			Template: func(cm *corev1.ConfigMap) {
 				cm.Data[testparameters.MysqlConfigFile] = strings.ReplaceAll(cm.Data[testparameters.MysqlConfigFile], "server-id=1", "server-id={{ div (int64 $.DISK) 1073741824 }}")
 			},
 		})
 		waitFinished(comp, "server-id=0")
+		By("mount the rendered configuration and select the real restart policy")
+		cmKey := client.ObjectKey{Namespace: comp.Namespace, Name: core.GetComponentCfgName(clusterName, defaultCompName, configSpecName)}
+		its := &workloads.InstanceSet{}
+		itsKey := client.ObjectKey{Namespace: comp.Namespace, Name: defaultITSName}
+		Expect(testapps.GetAndChangeObj(&testCtx, itsKey, func(obj *workloads.InstanceSet) {
+			obj.Spec.Template.Spec.Volumes[0].ConfigMap.Name = cmKey.Name
+		})()).To(Succeed())
+		Expect(testCtx.Cli.Get(testCtx.Ctx, itsKey, its)).To(Succeed())
+		Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(pd), func(obj *parametersv1alpha1.ParametersDefinition) {
+			obj.Spec.ReloadAction = nil
+		})()).To(Succeed())
+
+		pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{
+			Name: its.Name + "-0", Namespace: its.Namespace, Labels: its.Spec.Selector.MatchLabels,
+		}, Spec: *its.Spec.Template.Spec.DeepCopy()}
+		pod.Spec.Containers[0].Image = "test:latest"
+		Expect(testCtx.Cli.Create(testCtx.Ctx, pod)).To(Succeed())
+		DeferCleanup(func() { Expect(client.IgnoreNotFound(testCtx.Cli.Delete(testCtx.Ctx, pod))).To(Succeed()) })
+		Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(pod), func(obj *corev1.Pod) {
+			obj.Status.Phase = corev1.PodRunning
+			obj.Status.Conditions = []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}}
+		})()).To(Succeed())
+		Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(comp), func(obj *appsv1.Component) {
+			obj.Status.Phase = appsv1.RunningComponentPhase
+		})()).To(Succeed())
+
+		restartKey := core.GenerateUniqKeyWithConfig(constant.UpgradeRestartAnnotationKey, configSpecName)
+		completeRestart := func(content, previousVersion string) string {
+			var version string
+			Eventually(func(g Gomega) {
+				cm := &corev1.ConfigMap{}
+				g.Expect(testCtx.Cli.Get(testCtx.Ctx, cmKey, cm)).To(Succeed())
+				g.Expect(cm.Data[testparameters.MysqlConfigFile]).To(ContainSubstring(content))
+				hash, err := util.ComputeHash(cm.Data)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(hash).NotTo(Equal(previousVersion))
+				g.Expect(testCtx.Cli.Get(testCtx.Ctx, client.ObjectKeyFromObject(cluster), cluster)).To(Succeed())
+				g.Expect(cluster.Spec.ComponentSpecs[0].Annotations[restartKey]).To(Equal(hash))
+				version = hash
+			}).Should(Succeed())
+			cp := &parametersv1alpha1.ComponentParameter{}
+			Eventually(func(g Gomega) {
+				g.Expect(testCtx.Cli.Get(testCtx.Ctx, client.ObjectKeyFromObject(comp), cp)).To(Succeed())
+				item := parameters.GetItemStatus(&cp.Status, configSpecName)
+				g.Expect(item).NotTo(BeNil())
+				g.Expect(item.UpdateRevision).To(Equal(strconv.FormatInt(cp.Generation, 10)))
+				g.Expect(item.Phase).NotTo(Equal(parametersv1alpha1.CFinishedPhase))
+			}).Should(Succeed())
+			// Parameter controllers issue the restart. Emulate the workload
+			// controller completing it by acknowledging the version on the Pod.
+			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(pod), func(obj *corev1.Pod) {
+				obj.Annotations = map[string]string{restartKey: version}
+			})()).To(Succeed())
+			waitFinished(comp, content)
+			Expect(testCtx.Cli.Get(testCtx.Ctx, client.ObjectKeyFromObject(comp), cp)).To(Succeed())
+			detail := parameters.GetItemStatus(&cp.Status, configSpecName).ReconcileDetail
+			Expect(detail).NotTo(BeNil())
+			Expect(detail.Policy).To(Equal(string(parametersv1alpha1.RestartPolicy)))
+			Expect(detail.SucceedCount).To(BeNumerically("==", 1))
+			Expect(detail.ExpectedCount).To(BeNumerically("==", 1))
+			cm := &corev1.ConfigMap{}
+			Expect(testCtx.Cli.Get(testCtx.Ctx, cmKey, cm)).To(Succeed())
+			applied, err := json.Marshal(cm.Data)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(cm.Annotations[constant.LastAppliedConfigAnnotationKey]).To(Equal(string(applied)))
+			return version
+		}
+
 		expand := func(size string) {
 			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(comp), func(c *appsv1.Component) {
 				c.Spec.VolumeClaimTemplates = resourceTestComponent("db", "db").Spec.VolumeClaimTemplates
@@ -295,16 +366,16 @@ var _ = Describe("Automatic resource rendering", func() {
 			})()).To(Succeed())
 		}
 		expand("2Gi")
-		waitFinished(comp, "server-id=2")
+		version := completeRestart("server-id=2", "")
 		By("preserve a user override through subsequent expansions")
 		override := "9"
 		Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(comp), func(cp *parametersv1alpha1.ComponentParameter) {
 			item := parameters.GetConfigTemplateItem(&cp.Spec, configSpecName)
 			item.ConfigFileParams = map[string]parametersv1alpha1.ParametersInFile{testparameters.MysqlConfigFile: {Parameters: map[string]*string{"server-id": &override}}}
 		})()).To(Succeed())
+		version = completeRestart("server-id=9", version)
 		before := waitFinished(comp, "server-id=9")
 		cm := &corev1.ConfigMap{}
-		cmKey := client.ObjectKey{Namespace: comp.Namespace, Name: core.GetComponentCfgName(clusterName, defaultCompName, configSpecName)}
 		Expect(testCtx.Cli.Get(testCtx.Ctx, cmKey, cm)).To(Succeed())
 		data := cm.DeepCopy().Data
 		expand("3Gi")
@@ -313,6 +384,14 @@ var _ = Describe("Automatic resource rendering", func() {
 		Expect(testCtx.Cli.Get(testCtx.Ctx, cmKey, cm)).To(Succeed())
 		Expect(cm.Data).To(Equal(data))
 		Expect(fmt.Sprint(after)).To(Equal(cm.Annotations[constant.ConfigurationRevision]))
+		cp := &parametersv1alpha1.ComponentParameter{}
+		Expect(testCtx.Cli.Get(testCtx.Ctx, client.ObjectKeyFromObject(comp), cp)).To(Succeed())
+		detail := parameters.GetItemStatus(&cp.Status, configSpecName).ReconcileDetail
+		Expect(detail).NotTo(BeNil())
+		Expect(detail.ErrMessage).To(Equal(configurationNoChangedMessage))
+		Expect(detail.Policy).To(BeEmpty())
+		Expect(testCtx.Cli.Get(testCtx.Ctx, client.ObjectKeyFromObject(cluster), cluster)).To(Succeed())
+		Expect(cluster.Spec.ComponentSpecs[0].Annotations[restartKey]).To(Equal(version))
 	})
 	It("refreshes sharding payload when only Cluster shard count changes", func() {
 		_, _, _, comp, _ := mockReconcileResource()

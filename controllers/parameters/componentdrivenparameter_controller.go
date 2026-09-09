@@ -106,7 +106,7 @@ func (r *ComponentDrivenParameterReconciler) SetupWithManager(mgr ctrl.Manager) 
 func (r *ComponentDrivenParameterReconciler) shardingComponents(ctx context.Context, obj client.Object) []reconcile.Request {
 	comps := &appsv1.ComponentList{}
 	if err := r.List(ctx, comps, client.InNamespace(obj.GetNamespace()),
-		client.MatchingLabels{constant.AppInstanceLabelKey: obj.GetName()},
+		client.MatchingLabels(constant.GetClusterLabels(obj.GetName())),
 		client.HasLabels{constant.KBAppShardingNameLabelKey}); err != nil {
 		log.FromContext(ctx).Error(err, "failed to list sharding components")
 		return nil

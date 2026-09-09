@@ -761,7 +761,7 @@ For instance, when using the <code>ini</code> format, you can specify the sectio
 </td>
 <td>
 <em>(Optional)</em>
-<p>Deprecated: retained for API compatibility and ignored by the controller.
+<p>This field currently has no effect on configuration re-rendering.
 Configuration templates automatically re-render when the Component's resources,
 replicas, TLS configuration, volume claim template capacity, or its own sharding's
 shard count or template replicas change.</p>

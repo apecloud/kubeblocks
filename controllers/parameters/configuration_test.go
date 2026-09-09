@@ -153,7 +153,7 @@ func mockReconcileResource(options ...mockResourceConfiguration) (*corev1.Config
 	compObj := testapps.NewComponentFactory(testCtx.DefaultNamespace, fullCompName, compDefObj.Name).
 		AddAnnotations(constant.KBAppClusterUIDKey, string(clusterObj.UID)).
 		AddAnnotations(constant.CRDAPIVersionAnnotationKey, appsv1.GroupVersion.String()).
-		AddLabels(constant.AppInstanceLabelKey, clusterName).
+		AddLabelsInMap(constant.GetClusterLabels(clusterName)).
 		SetUID(types.UID(fmt.Sprintf("%s-%s", clusterObj.Name, "test-uid"))).
 		SetReplicas(1).
 		Create(&testCtx).
@@ -206,7 +206,7 @@ func cleanEnv() {
 
 func resourceTestComponent(name, def string) *appsv1.Component {
 	return &appsv1.Component{ObjectMeta: metav1.ObjectMeta{Name: "test-" + name, Namespace: "ns",
-		Labels: map[string]string{constant.AppInstanceLabelKey: "test"}}, Spec: appsv1.ComponentSpec{CompDef: def,
+		Labels: constant.GetClusterLabels("test")}, Spec: appsv1.ComponentSpec{CompDef: def,
 		Resources: corev1.ResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1"), corev1.ResourceMemory: resource.MustParse("1Gi")}},
 		VolumeClaimTemplates: []appsv1.PersistentVolumeClaimTemplate{{Name: "data", Spec: corev1.PersistentVolumeClaimSpec{
 			Resources: corev1.VolumeResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("1Gi")}},

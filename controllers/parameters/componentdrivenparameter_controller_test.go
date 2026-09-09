@@ -200,7 +200,10 @@ func TestShardingComponents(t *testing.T) {
 	otherCluster.Labels[constant.AppInstanceLabelKey] = "other"
 	otherNamespace := member.DeepCopy()
 	otherNamespace.Namespace = "other"
-	r := &ComponentDrivenParameterReconciler{Client: resourceTestClient(t, member, ordinary, otherCluster, otherNamespace)}
+	unmanaged := member.DeepCopy()
+	unmanaged.Name = "unmanaged-shard"
+	delete(unmanaged.Labels, constant.AppManagedByLabelKey)
+	r := &ComponentDrivenParameterReconciler{Client: resourceTestClient(t, member, ordinary, otherCluster, otherNamespace, unmanaged)}
 	requests := r.shardingComponents(context.Background(), &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "ns"}})
 	require.Len(t, requests, 1)
 	require.Equal(t, client.ObjectKeyFromObject(member), requests[0].NamespacedName)

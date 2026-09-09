@@ -20,10 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package constant
 
 const (
-	TLSPayload                  = "tls"
-	ComponentResourcePayload    = "componentResource"
-	ReplicasPayload             = "replicas"
-	BinaryVersionPayload        = "binaryVersion"
-	ShardingPayload             = "sharding"
+	TLSPayload               = "tls"
+	ComponentResourcePayload = "componentResource"
+	ReplicasPayload          = "replicas"
+	BinaryVersionPayload     = "binaryVersion"
+	ShardingPayload          = "sharding"
+
+	// VolumeClaimTemplatesPayload records desired storage capacities for
+	// configuration change detection.
 	VolumeClaimTemplatesPayload = "volumeClaimTemplates"
 )

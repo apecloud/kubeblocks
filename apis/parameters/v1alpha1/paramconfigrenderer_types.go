@@ -117,7 +117,7 @@ type ComponentConfigDescription struct {
 	// +optional
 	FileFormatConfig *FileFormatConfig `json:"fileFormatConfig,omitempty"`
 
-	// Deprecated: retained for API compatibility and ignored by the controller.
+	// This field currently has no effect on configuration re-rendering.
 	// Configuration templates automatically re-render when the Component's resources,
 	// replicas, TLS configuration, volume claim template capacity, or its own sharding's
 	// shard count or template replicas change.

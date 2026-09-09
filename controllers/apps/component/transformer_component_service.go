@@ -42,7 +42,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -193,20 +192,7 @@ func (t *componentServiceTransformer) podsNameNSuffix(transCtx *componentTransfo
 	}
 	// Updating the InstanceSet does not synchronously remove its Pods. Keep their
 	// addresses through termination, until the Pod objects have actually disappeared.
-	podCtx := transCtx.Context
-	placement := transCtx.Component.Annotations[constant.KBAppMultiClusterPlacementKey]
-	if placement == "" && runningITS != nil {
-		placement = runningITS.Annotations[constant.KBAppMultiClusterPlacementKey]
-	}
-	if placement == "" && protoITS != nil {
-		placement = protoITS.Annotations[constant.KBAppMultiClusterPlacementKey]
-	}
-	if placement != "" {
-		podCtx = multicluster.IntoContext(podCtx, placement)
-	}
-	synthesizeComp := transCtx.SynthesizeComponent
-	instances, err := component.ListOwnedPods(podCtx, transCtx.Client,
-		synthesizeComp.Namespace, synthesizeComp.ClusterName, synthesizeComp.Name)
+	instances, err := component.ListOwnedInstances(transCtx.Context, transCtx.Client, transCtx.Component, runningITS, protoITS)
 	if err != nil {
 		return nil, false, err
 	}

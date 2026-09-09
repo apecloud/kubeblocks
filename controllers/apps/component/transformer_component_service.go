@@ -79,22 +79,18 @@ func (t *componentServiceTransformer) Transform(ctx graph.TransformContext, dag 
 	}
 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
-	var podNamesNSuffix map[string]string
-	var pendingScaleIn bool
+	var delayedErr error
 	for _, service := range synthesizeComp.ComponentServices {
 		// component controller does not handle the default headless service; the default headless service is managed by the InstanceSet.
 		if t.skipDefaultHeadlessSvc(synthesizeComp, &service) {
 			continue
 		}
-		if t.isPodService(&service) && (service.DisableAutoProvision == nil || !*service.DisableAutoProvision) && podNamesNSuffix == nil {
-			podNamesNSuffix, pendingScaleIn, err = t.podsNameNSuffix(transCtx, runningITS, protoITS)
-			if err != nil {
+		services, err := t.buildCompService(transCtx, &service, runningITS, protoITS)
+		if err != nil {
+			if !intctrlutil.IsDelayedRequeueError(err) {
 				return err
 			}
-		}
-		services, err := t.buildCompService(transCtx.Component, synthesizeComp, &service, podNamesNSuffix)
-		if err != nil {
-			return err
+			delayedErr = err
 		}
 		for _, svc := range services {
 			if err = t.createOrUpdateService(ctx, dag, graphCli, &service, svc, transCtx.ComponentOrig); err != nil {
@@ -111,12 +107,7 @@ func (t *componentServiceTransformer) Transform(ctx graph.TransformContext, dag 
 		graphCli.Delete(dag, runningServices[svc])
 	}
 
-	if pendingScaleIn {
-		// Continue the transformer chain so memberLeave and the workload update can
-		// make progress, but revisit cleanup even if no further workload event arrives.
-		return intctrlutil.NewDelayedRequeueError(time.Second, "waiting for scaled-in instances to disappear before deleting pod services")
-	}
-	return nil
+	return delayedErr
 }
 
 func (t *componentServiceTransformer) listOwnedServices(ctx context.Context, cli client.Reader,
@@ -134,24 +125,29 @@ func (t *componentServiceTransformer) listOwnedServices(ctx context.Context, cli
 	return owned, nil
 }
 
-func (t *componentServiceTransformer) buildCompService(comp *appsv1.Component,
-	synthesizeComp *component.SynthesizedComponent, service *appsv1.ComponentService, pods map[string]string) ([]*corev1.Service, error) {
+func (t *componentServiceTransformer) buildCompService(transCtx *componentTransformContext,
+	service *appsv1.ComponentService, runningITS, protoITS *workloadsv1.InstanceSet) ([]*corev1.Service, error) {
 	if service.DisableAutoProvision != nil && *service.DisableAutoProvision {
 		return nil, nil
 	}
 
 	if t.isPodService(service) {
-		return t.buildPodService(comp, synthesizeComp, service, pods)
+		return t.buildPodService(transCtx, service, runningITS, protoITS)
 	}
-	return t.buildServices(comp, synthesizeComp, []*appsv1.ComponentService{service})
+	return t.buildServices(transCtx.Component, transCtx.SynthesizeComponent, []*appsv1.ComponentService{service})
 }
 
 func (t *componentServiceTransformer) isPodService(service *appsv1.ComponentService) bool {
 	return service.PodService != nil && *service.PodService
 }
 
-func (t *componentServiceTransformer) buildPodService(comp *appsv1.Component,
-	synthesizeComp *component.SynthesizedComponent, service *appsv1.ComponentService, pods map[string]string) ([]*corev1.Service, error) {
+func (t *componentServiceTransformer) buildPodService(transCtx *componentTransformContext,
+	service *appsv1.ComponentService, runningITS, protoITS *workloadsv1.InstanceSet) ([]*corev1.Service, error) {
+	pods, pendingScaleIn, err := t.podsNameNSuffix(transCtx, runningITS, protoITS)
+	if err != nil {
+		return nil, err
+	}
+
 	services := make([]*appsv1.ComponentService, 0)
 	for podName, suffix := range pods {
 		svc := service.DeepCopy()
@@ -167,7 +163,16 @@ func (t *componentServiceTransformer) buildPodService(comp *appsv1.Component,
 		svc.Spec.Selector[constant.KBAppPodNameLabelKey] = podName
 		services = append(services, svc)
 	}
-	return t.buildServices(comp, synthesizeComp, services)
+	builtServices, err := t.buildServices(transCtx.Component, transCtx.SynthesizeComponent, services)
+	if err != nil {
+		return nil, err
+	}
+	if pendingScaleIn {
+		// Return the Services to retain along with a retry, so memberLeave and the
+		// workload update can proceed while their eventual cleanup is still pending.
+		return builtServices, intctrlutil.NewDelayedRequeueError(time.Second, "waiting for scaled-in instances to disappear before deleting pod services")
+	}
+	return builtServices, nil
 }
 
 func (t *componentServiceTransformer) podsNameNSuffix(transCtx *componentTransformContext, runningITS, protoITS *workloadsv1.InstanceSet) (map[string]string, bool, error) {

@@ -222,6 +222,7 @@ func (c componentOpsHelper) buildProgressResources(reqCtx intctrlutil.RequestCtx
 				shardingComps[j].Labels[constant.KBAppComponentLabelKey], &spec.Shards); err != nil {
 				return nil, err
 			}
+			progressResources[len(progressResources)-1].shardTemplateName = shardingComps[j].Labels[constant.KBAppShardTemplateLabelKey]
 		}
 	}
 	return progressResources, nil

@@ -204,29 +204,42 @@ func (hs horizontalScalingOpsHandler) ReconcileAction(reqCtx intctrlutil.Request
 			return handleComponentProgressForScalingReplicas(reqCtx, cli, opsRes, pgRes, compStatus)
 		}
 
+		// Compare against this request's target, not an unrelated later edit to
+		// the live Cluster spec.
+		if lastCompConfiguration.Replicas == nil {
+			return 0, 0, fmt.Errorf("missing source replicas for component %q", pgRes.fullComponentName)
+		}
+		var err error
+		clusterComponentSpec.Replicas, clusterComponentSpec.Instances, clusterComponentSpec.OfflineInstances, err =
+			hs.getExpectedCompValues(lastCompConfiguration, horizontalScaling)
+		if err != nil {
+			return 0, 0, err
+		}
+		workloadName := constant.GenerateClusterComponentName(opsRes.Cluster.Name, pgRes.fullComponentName)
+		source := sourceAssignmentsForWorkload(lastCompConfiguration, workloadName)
+		sourceComponent := clusterComponentSpec.DeepCopy()
+		sourceComponent.Replicas = *lastCompConfiguration.Replicas
+		sourceComponent.Instances = lastCompConfiguration.Instances
+		sourceComponent.OfflineInstances = lastCompConfiguration.OfflineInstances
+		shardingSpec := opsRes.Cluster.Spec.GetShardingByName(horizontalScaling.ComponentName)
+		applyHScaleShardOverrides(sourceComponent, shardingSpec, pgRes.shardTemplateName)
+		applyHScaleShardOverrides(clusterComponentSpec, shardingSpec, pgRes.shardTemplateName)
+		if !assignmentsMatchComponent(source, sourceComponent) {
+			return 0, 0, fmt.Errorf("source instance assignments for InstanceSet %q are incomplete", workloadName)
+		}
 		runtime, err := opsRes.GetRuntime(pgRes.compOps.GetComponentName())
 		if err != nil {
 			return 0, 0, err
 		}
-		workload, err := runtime.GetWorkload(opsRes.Cluster.Namespace, opsRes.Cluster.Name, pgRes.fullComponentName)
-		if err != nil {
-			return 0, 0, err
-		}
-		// Compare against this request's target, not an unrelated later edit to
-		// the live Cluster spec. No workload generation is a snapshot marker.
-		if lastCompConfiguration.Replicas == nil {
-			return 0, 0, fmt.Errorf("missing source replicas for component %q", pgRes.fullComponentName)
-		}
 		if opsRes.OpsRequest.Status.Phase == opsv1alpha1.OpsCancellingPhase {
 			pgRes.createdPodSet, pgRes.deletedPodSet, err = hs.nonFlatRollbackInstanceSets(runtime,
-				opsRes.Cluster.Name, pgRes.fullComponentName, lastCompConfiguration, horizontalScaling)
+				opsRes.Cluster.Name, pgRes.fullComponentName, source, clusterComponentSpec)
 			if err != nil {
 				return 0, 0, err
 			}
 			return handleComponentProgressForScalingReplicas(reqCtx, cli, opsRes, pgRes, compStatus)
 		}
-		clusterComponentSpec.Replicas, clusterComponentSpec.Instances, clusterComponentSpec.OfflineInstances, err =
-			hs.getExpectedCompValues(lastCompConfiguration, horizontalScaling)
+		workload, err := runtime.GetWorkload(opsRes.Cluster.Namespace, opsRes.Cluster.Name, pgRes.fullComponentName)
 		if err != nil {
 			return 0, 0, err
 		}
@@ -237,23 +250,13 @@ func (hs horizontalScalingOpsHandler) ReconcileAction(reqCtx intctrlutil.Request
 		if !complete {
 			return 1, 0, nil
 		}
-		workloadName := constant.GenerateClusterComponentName(opsRes.Cluster.Name, pgRes.fullComponentName)
-		source := sourceAssignmentsForWorkload(lastCompConfiguration, workloadName)
-		sourceComponent := clusterComponentSpec.DeepCopy()
-		if lastCompConfiguration.Replicas != nil {
-			sourceComponent.Replicas = *lastCompConfiguration.Replicas
-			sourceComponent.Instances = lastCompConfiguration.Instances
-			sourceComponent.OfflineInstances = lastCompConfiguration.OfflineInstances
-		}
-		if !assignmentsMatchComponent(source, sourceComponent) {
-			return 0, 0, fmt.Errorf("source instance assignments for InstanceSet %q are incomplete", workloadName)
-		}
-		created, deleted := diffAssignments(source, target)
-		effective := filterHorizontalScalingSpec(lastCompConfiguration, lastCompConfiguration.OfflineInstances, horizontalScaling.DeepCopy())
+		created, deleted, updated := diffAssignments(source, target)
+		effective := filterHorizontalScalingSpec(lastCompConfiguration, horizontalScaling.DeepCopy())
 		if !horizontalDiffMatchesOperation(*effective, created, deleted) {
 			return 1, 0, nil
 		}
 		pgRes.createdPodSet, pgRes.deletedPodSet = created, deleted
+		pgRes.updatedPodSet = updated
 		return handleComponentProgressForScalingReplicas(reqCtx, cli, opsRes, pgRes, compStatus)
 	}
 	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.HorizontalScalingList)
@@ -550,7 +553,7 @@ func (hs horizontalScalingOpsHandler) getExpectedCompValues(
 	compReplicas := *lastCompConfiguration.Replicas
 	compInstanceTpls := slices.Clone(lastCompConfiguration.Instances)
 	compOfflineInstances := lastCompConfiguration.OfflineInstances
-	filteredHorizontal := filterHorizontalScalingSpec(lastCompConfiguration, compOfflineInstances, horizontalScaling.DeepCopy())
+	filteredHorizontal := filterHorizontalScalingSpec(lastCompConfiguration, horizontalScaling.DeepCopy())
 	expectOfflineInstances := hs.getCompExpectedOfflineInstances(compOfflineInstances, *filteredHorizontal)
 	if err := hs.autoSyncReplicaChanges(lastCompConfiguration, *filteredHorizontal); err != nil {
 		return 0, nil, nil, err
@@ -560,7 +563,7 @@ func (hs horizontalScalingOpsHandler) getExpectedCompValues(
 		expectOfflineInstances, nil
 }
 
-// getExpectedCompValuesForRestore is the legacy deterministic-name path used only by
+// getExpectedCompValuesForRestore is the deterministic-name path used only by
 // non-flat-ordinal scale-out from backup.
 func (hs horizontalScalingOpsHandler) getExpectedCompValuesForRestore(
 	opsRes *OpsResource,
@@ -588,9 +591,8 @@ func (hs horizontalScalingOpsHandler) getExpectedCompValuesForRestore(
 // required by the requested transition.
 func filterHorizontalScalingSpec(
 	lastCompConfiguration opsv1alpha1.LastComponentConfiguration,
-	compOfflineInstances []string,
 	horizontalScaling *opsv1alpha1.HorizontalScaling) *opsv1alpha1.HorizontalScaling {
-	offlineInstances := sets.New(compOfflineInstances...)
+	offlineInstances := sets.New(lastCompConfiguration.OfflineInstances...)
 	podSet := map[string]string{}
 	for _, assignment := range lastCompConfiguration.SourceInstanceAssignments {
 		if assignment.DesiredState == workloads.InstanceDesiredStateActive {
@@ -618,7 +620,7 @@ func filterHorizontalScalingSpec(
 	return horizontalScaling
 }
 
-// filterHorizontalScalingSpecForRestore preserves the legacy deterministic-name behavior used
+// filterHorizontalScalingSpecForRestore implements the deterministic-name behavior used
 // exclusively by non-flat-ordinal scale-out from backup.
 func filterHorizontalScalingSpecForRestore(
 	opsRes *OpsResource,
@@ -1028,21 +1030,25 @@ func horizontalDiffMatchesOperation(horizontalScaling opsv1alpha1.HorizontalScal
 // forward progress was observed. Name planning is valid here only because
 // non-flat names are determined by configuration, not allocation history.
 func (hs horizontalScalingOpsHandler) nonFlatRollbackInstanceSets(runtime OpsRuntime,
-	clusterName, componentName string, last opsv1alpha1.LastComponentConfiguration,
-	scaling opsv1alpha1.HorizontalScaling) (map[string]string, map[string]string, error) {
-	replicas, templates, offline, err := hs.getExpectedCompValues(last, scaling)
+	clusterName, componentName string, source map[string]string,
+	target *appsv1.ClusterComponentSpec) (map[string]string, map[string]string, error) {
+	templates := slices.Clone(target.Instances)
+	// HScale does not change the component's default ordinals. Include the
+	// default template explicitly so cancellation planning respects them too.
+	defaultReplicas := target.Replicas
+	for _, template := range templates {
+		defaultReplicas -= template.GetReplicas()
+	}
+	if defaultReplicas > 0 {
+		templates = append(templates, appsv1.InstanceTemplate{Replicas: &defaultReplicas, Ordinals: target.Ordinals})
+	}
+	forward, err := runtime.GenerateInstanceNameSet(clusterName, componentName, target.Replicas, templates, target.OfflineInstances)
 	if err != nil {
 		return nil, nil, err
 	}
-	forward, err := runtime.GenerateInstanceNameSet(clusterName, componentName, replicas, templates, offline)
-	if err != nil {
-		return nil, nil, err
-	}
-	source := sourceAssignmentsForWorkload(last, constant.GenerateClusterComponentName(clusterName, componentName))
-	if !assignmentsMatchComponent(source, &appsv1.ClusterComponentSpec{Replicas: *last.Replicas, Instances: last.Instances}) {
-		return nil, nil, fmt.Errorf("source instance assignments for component %q are incomplete", componentName)
-	}
-	created, deleted := diffAssignments(source, forward)
+	// Non-flat template names are part of the instance name, so changing a
+	// template cannot reassign an existing name.
+	created, deleted, _ := diffAssignments(source, forward)
 	return deleted, created, nil
 }
 
@@ -1135,7 +1141,9 @@ func captureHScaleSourceAssignments(reqCtx intctrlutil.RequestCtx, cli client.Cl
 		}
 		for _, component := range components {
 			fullName := component.Labels[constant.KBAppComponentLabelKey]
-			if err := capture(shardingSpec.Name, fullName, op, &shardingSpec.Template); err != nil {
+			spec := shardingSpec.Template.DeepCopy()
+			applyHScaleShardOverrides(spec, shardingSpec, component.Labels[constant.KBAppShardTemplateLabelKey])
+			if err := capture(shardingSpec.Name, fullName, op, spec); err != nil {
 				return err
 			}
 		}
@@ -1148,4 +1156,31 @@ func captureHScaleSourceAssignments(reqCtx intctrlutil.RequestCtx, cli client.Cl
 		}
 	}
 	return nil
+}
+
+// HScale updates the common sharding template. Explicit per-shard settings
+// continue to override it, both before scaling and in the operation's target.
+// Only allocation-related fields are needed here; this is not a full spec merge.
+func applyHScaleShardOverrides(spec *appsv1.ClusterComponentSpec, sharding *appsv1.ClusterSharding, templateName string) {
+	if sharding == nil {
+		return
+	}
+	for _, template := range sharding.ShardTemplates {
+		if template.Name != templateName {
+			continue
+		}
+		if template.Replicas != nil {
+			spec.Replicas = *template.Replicas
+		}
+		if template.Instances != nil {
+			spec.Instances = template.Instances
+		}
+		if template.Ordinals != nil {
+			spec.Ordinals = *template.Ordinals
+		}
+		if template.FlatInstanceOrdinal != nil {
+			spec.FlatInstanceOrdinal = *template.FlatInstanceOrdinal
+		}
+		return
+	}
 }

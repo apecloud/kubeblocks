@@ -27,6 +27,7 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -490,13 +491,13 @@ func handleComponentProgressForScalingReplicas(reqCtx intctrlutil.RequestCtx,
 	var (
 		clusterComponent = pgRes.clusterComponent
 		err              error
-		updatedPodCount  = int32(len(pgRes.createdPodSet) + len(pgRes.deletedPodSet))
+		updatedPodCount  = int32(len(pgRes.createdPodSet) + len(pgRes.deletedPodSet) + len(pgRes.updatedPodSet))
 		completedCount   int32
 	)
 	if clusterComponent == nil {
 		return 0, 0, nil
 	}
-	// if no any pod needs to create or delete, return
+	// No instance needs to be created, deleted or reassigned to a template.
 	if updatedPodCount == 0 {
 		return 0, 0, nil
 	}
@@ -509,11 +510,10 @@ func handleComponentProgressForScalingReplicas(reqCtx intctrlutil.RequestCtx,
 		return 0, 0, err
 	}
 	if len(pgRes.createdPodSet) > 0 {
-		scaleOutCompletedCount, scaleOutErr := handleScaleOutProgressWithWorkload(opsRes, pgRes, workload, compStatus)
-		if scaleOutErr != nil {
-			err = scaleOutErr
-		}
-		completedCount += scaleOutCompletedCount
+		completedCount += handleHScaleRunningProgress(opsRes, pgRes, workload, compStatus, pgRes.createdPodSet, false)
+	}
+	if len(pgRes.updatedPodSet) > 0 {
+		completedCount += handleHScaleRunningProgress(opsRes, pgRes, workload, compStatus, pgRes.updatedPodSet, true)
 	}
 	if len(pgRes.deletedPodSet) > 0 {
 		scaleInCompletedCount, scaleInErr := handleScaleInProgressWithWorkload(opsRes, pgRes, workload, compStatus)
@@ -554,18 +554,31 @@ func updateProgressDetailForHScale(
 		&compStatus.ProgressDetails, progressDetail)
 }
 
-func handleScaleOutProgressWithWorkload(
+func handleHScaleRunningProgress(
 	opsRes *OpsResource,
 	pgRes *progressResource,
 	workload Workload,
-	compStatus *opsv1alpha1.OpsRequestComponentStatus) (completedCount int32, err error) {
+	compStatus *opsv1alpha1.OpsRequestComponentStatus,
+	instances map[string]string, updating bool) (completedCount int32) {
 	currPodRevisionMap := workload.GetCurrentRevisionMap()
 	notReadyPodSet := workload.GetNotReadyInstanceNameSet()
 	notAvailablePodSet := workload.GetNotAvailableInstanceNameSet()
 	failurePodSet := workload.GetFailedInstanceNameSet()
 	pgRes.opsMessageKey = "Create"
+	var applied sets.Set[string]
+	if updating {
+		pgRes.opsMessageKey = "Update"
+		applied = sets.New[string]()
+		for _, status := range workload.GetInstanceStatuses() {
+			if template, ok := instances[status.PodName]; ok && status.TemplateName != nil && *status.TemplateName == template &&
+				status.EffectiveDesiredState() == workloads.InstanceDesiredStateActive &&
+				status.EffectiveCurrentState() == workloads.InstanceCurrentStatePresent && status.UpToDate {
+				applied.Insert(status.PodName)
+			}
+		}
+	}
 	memberStatusMap := workload.GetInstanceNameSet()
-	for podName := range pgRes.createdPodSet {
+	for podName := range instances {
 		objectKey := getProgressObjectKey(constant.PodKind, podName)
 		if _, ok := currPodRevisionMap[podName]; !ok {
 			updateProgressDetailForHScale(opsRes, pgRes, compStatus, objectKey, opsv1alpha1.PendingProgressStatus)
@@ -574,6 +587,12 @@ func handleScaleOutProgressWithWorkload(
 		if _, ok := failurePodSet[podName]; ok {
 			completedCount += 1
 			updateProgressDetailForHScale(opsRes, pgRes, compStatus, objectKey, opsv1alpha1.FailedProgressStatus)
+			continue
+		}
+		// A usable old Pod is not evidence that its new template has been
+		// applied. Configuration convergence and health are independent.
+		if updating && !applied.Has(podName) {
+			updateProgressDetailForHScale(opsRes, pgRes, compStatus, objectKey, opsv1alpha1.ProcessingProgressStatus)
 			continue
 		}
 		if _, ok := notReadyPodSet[podName]; ok {
@@ -589,7 +608,7 @@ func handleScaleOutProgressWithWorkload(
 		completedCount += 1
 		updateProgressDetailForHScale(opsRes, pgRes, compStatus, objectKey, opsv1alpha1.SucceedProgressStatus)
 	}
-	return completedCount, nil
+	return completedCount
 }
 
 func handleScaleInProgressWithWorkload(

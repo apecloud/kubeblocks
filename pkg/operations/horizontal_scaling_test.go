@@ -31,6 +31,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -47,6 +48,8 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
+	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/plan"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -1320,7 +1323,10 @@ func TestHScaleCancellationBoundary(t *testing.T) {
 func TestHorizontalDiff(t *testing.T) {
 	source := map[string]string{"demo-0": "", "demo-1": "big"}
 	target := map[string]string{"demo-0": "", "demo-2": "big"}
-	created, deleted := diffAssignments(source, target)
+	created, deleted, updated := diffAssignments(source, target)
+	if len(updated) != 0 {
+		t.Fatalf("unexpected template changes: %#v", updated)
+	}
 	if len(created) != 1 || created["demo-2"] != "big" || len(deleted) != 1 || deleted["demo-1"] != "big" {
 		t.Fatalf("unexpected assignment diff: created=%#v deleted=%#v", created, deleted)
 	}
@@ -1338,13 +1344,246 @@ func TestHorizontalDiff(t *testing.T) {
 	if horizontalDiffMatchesOperation(opsv1alpha1.HorizontalScaling{ScaleOut: &opsv1alpha1.ScaleOut{}}, created, deleted) {
 		t.Fatal("scale-out-only operation must not accept an unexpected deletion")
 	}
+	target["demo-0"] = "reader"
+	created, deleted, updated = diffAssignments(source, target)
+	if len(created) != 1 || len(deleted) != 1 || len(updated) != 1 || updated["demo-0"] != "reader" {
+		t.Fatalf("template reassignment must be an update, not creation/deletion: %v %v %v", created, deleted, updated)
+	}
+}
+
+func TestHScaleRejectsActiveOfflineAssignments(t *testing.T) {
+	comp := &appsv1.ClusterComponentSpec{Replicas: 2, OfflineInstances: []string{"demo-0"}}
+	if assignmentsMatchComponent(map[string]string{"demo-0": "", "demo-1": ""}, comp) {
+		t.Fatal("matching replica counts must not accept an explicitly offline instance as Active")
+	}
+	if !assignmentsMatchComponent(map[string]string{"demo-1": "", "demo-2": ""}, comp) {
+		t.Fatal("expected the active allocation to match")
+	}
+}
+
+func TestHScaleShardOverrides(t *testing.T) {
+	for _, flat := range []bool{false, true} {
+		t.Run(fmt.Sprintf("flat=%t", flat), func(t *testing.T) {
+			ctx := context.Background()
+			scheme := runtime.NewScheme()
+			for _, add := range []func(*runtime.Scheme) error{appsv1.AddToScheme, workloads.AddToScheme, opsv1alpha1.AddToScheme} {
+				if err := add(scheme); err != nil {
+					t.Fatal(err)
+				}
+			}
+			cluster := &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default"},
+				Spec: appsv1.ClusterSpec{Shardings: []appsv1.ClusterSharding{{Name: "db", Shards: 2,
+					Template: appsv1.ClusterComponentSpec{ComponentDef: "database", Replicas: 1, FlatInstanceOrdinal: flat},
+					ShardTemplates: []appsv1.ShardTemplate{{Name: "large", Shards: pointer.Int32(1), Replicas: pointer.Int32(2),
+						Instances: []appsv1.InstanceTemplate{{Name: "reader", Replicas: pointer.Int32(1)}}}}}}},
+				Status: appsv1.ClusterStatus{Phase: appsv1.RunningClusterPhase,
+					Shardings: map[string]appsv1.ClusterShardingStatus{"db": {Phase: appsv1.RunningComponentPhase}}}}
+			ops := &opsv1alpha1.OpsRequest{ObjectMeta: metav1.ObjectMeta{Name: "sharding", Namespace: "default"},
+				Spec: opsv1alpha1.OpsRequestSpec{Type: opsv1alpha1.HorizontalScalingType,
+					SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{HorizontalScalingList: []opsv1alpha1.HorizontalScaling{{
+						ComponentOps: opsv1alpha1.ComponentOps{ComponentName: "db"},
+						ScaleOut:     &opsv1alpha1.ScaleOut{ReplicaChanger: opsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(1)}}}}}},
+				Status: opsv1alpha1.OpsRequestStatus{Phase: opsv1alpha1.OpsRunningPhase}}
+			objects := []client.Object{cluster, ops, &appsv1.ComponentDefinition{ObjectMeta: metav1.ObjectMeta{Name: "database"}}}
+			var common *workloads.InstanceSet
+			for _, name := range []string{"db-a", "db-b"} {
+				labels := constant.GetCompLabels("demo", name)
+				labels[constant.KBAppShardingNameLabelKey] = "db"
+				its := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Name: "demo-" + name, Namespace: "default"},
+					Status: workloads.InstanceSetStatus{InstanceStatus: []workloads.InstanceStatus{{
+						PodName: "demo-" + name + "-0", TemplateName: templateName(""), DesiredState: workloads.InstanceDesiredStateActive}},
+						CurrentRevisions: map[string]string{"demo-" + name + "-0": "r"}}}
+				if name == "db-a" {
+					labels[constant.KBAppShardTemplateLabelKey] = "large"
+					readerName := "demo-db-a-reader-0"
+					if flat {
+						readerName = "demo-db-a-7"
+					}
+					its.Status.InstanceStatus = append(its.Status.InstanceStatus, workloads.InstanceStatus{
+						PodName: readerName, TemplateName: templateName("reader"), DesiredState: workloads.InstanceDesiredStateActive})
+					its.Status.CurrentRevisions[readerName] = "r"
+				} else {
+					common = its
+				}
+				objects = append(objects, its, &appsv1.Component{ObjectMeta: metav1.ObjectMeta{Name: its.Name, Namespace: "default", Labels: labels}})
+			}
+			cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(ops, &workloads.InstanceSet{}).WithObjects(objects...).Build()
+			res := &OpsResource{Cluster: cluster, OpsRequest: ops, Recorder: record.NewFakeRecorder(100),
+				Runtimes: map[string]OpsRuntime{"db": newOpsRuntime(ctx, cli, "")}}
+			h, req := horizontalScalingOpsHandler{}, intctrlutil.RequestCtx{Ctx: ctx}
+			if err := h.SaveLastConfiguration(req, cli, res); err != nil {
+				t.Fatal(err)
+			}
+			if err := cli.Status().Update(ctx, ops); err != nil {
+				t.Fatal(err)
+			}
+			if err := h.Action(req, cli, res); err != nil {
+				t.Fatal(err)
+			}
+			check := func(want opsv1alpha1.OpsPhase) {
+				t.Helper()
+				phase, _, err := h.ReconcileAction(req, cli, res)
+				if err != nil || phase != want {
+					t.Fatalf("phase=%s progress=%s err=%v, want %s", phase, ops.Status.Progress, err, want)
+				}
+			}
+			check(opsv1alpha1.OpsRunningPhase)
+			// The common shard scales; the overridden shard keeps its own
+			// replica count and reader assignment, and must not block progress.
+			common.Status.InstanceStatus = append(common.Status.InstanceStatus, workloads.InstanceStatus{
+				PodName: "demo-db-b-1", TemplateName: templateName(""), DesiredState: workloads.InstanceDesiredStateActive})
+			common.Status.CurrentRevisions["demo-db-b-1"] = "r"
+			if err := cli.Status().Update(ctx, common); err != nil {
+				t.Fatal(err)
+			}
+			check(opsv1alpha1.OpsSucceedPhase)
+			if flat {
+				return
+			}
+			if err := h.Cancel(req, cli, res); err != nil {
+				t.Fatal(err)
+			}
+			ops.Status.Phase = opsv1alpha1.OpsCancellingPhase
+			if err := cli.Status().Update(ctx, ops); err != nil {
+				t.Fatal(err)
+			}
+			check(opsv1alpha1.OpsRunningPhase)
+			delete(common.Status.CurrentRevisions, "demo-db-b-1")
+			if err := cli.Status().Update(ctx, common); err != nil {
+				t.Fatal(err)
+			}
+			check(opsv1alpha1.OpsSucceedPhase)
+		})
+	}
+}
+
+// Use the workload allocator and status producer, not a hand-written target
+// allocation, to exercise a template taking over an existing flat ordinal.
+func TestHScaleTemplateReassignment(t *testing.T) {
+	ctx := context.Background()
+	scheme := runtime.NewScheme()
+	for _, add := range []func(*runtime.Scheme) error{appsv1.AddToScheme, workloads.AddToScheme, opsv1alpha1.AddToScheme} {
+		if err := add(scheme); err != nil {
+			t.Fatal(err)
+		}
+	}
+	comp := appsv1.ClusterComponentSpec{Name: "db", ComponentDef: "database", Replicas: 2, FlatInstanceOrdinal: true}
+	cluster := &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default"},
+		Spec: appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{comp}},
+		Status: appsv1.ClusterStatus{Phase: appsv1.RunningClusterPhase,
+			Components: map[string]appsv1.ClusterComponentStatus{"db": {Phase: appsv1.RunningComponentPhase}}}}
+	reader := appsv1.InstanceTemplate{Name: "reader", Replicas: pointer.Int32(1),
+		Ordinals: appsv1.Ordinals{Discrete: []int32{1}}, Annotations: map[string]string{"template": "reader"}}
+	ops := &opsv1alpha1.OpsRequest{ObjectMeta: metav1.ObjectMeta{Name: "reassign", Namespace: "default"},
+		Spec: opsv1alpha1.OpsRequestSpec{SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{
+			HorizontalScalingList: []opsv1alpha1.HorizontalScaling{{ComponentOps: opsv1alpha1.ComponentOps{ComponentName: "db"},
+				ScaleIn:  &opsv1alpha1.ScaleIn{ReplicaChanger: opsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(1)}},
+				ScaleOut: &opsv1alpha1.ScaleOut{NewInstances: []appsv1.InstanceTemplate{reader}}}}}},
+		Status: opsv1alpha1.OpsRequestStatus{Phase: opsv1alpha1.OpsRunningPhase}}
+	its := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Name: "demo-db", Namespace: "default", Generation: 1},
+		Spec: workloads.InstanceSetSpec{Replicas: pointer.Int32(2), FlatInstanceOrdinal: true,
+			MinReadySeconds:     60,
+			PodManagementPolicy: apps.ParallelPodManagement,
+			Selector:            &metav1.LabelSelector{MatchLabels: map[string]string{"app": "demo"}},
+			Template:            corev1.PodTemplateSpec{Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "db", Image: "mysql:8"}}}}}}
+	tree := kubebuilderx.NewObjectTree()
+	tree.SetRoot(its)
+	run := func(reconciler kubebuilderx.Reconciler) {
+		t.Helper()
+		if _, err := reconciler.Reconcile(tree); err != nil {
+			t.Fatal(err)
+		}
+	}
+	ready := func(pod *corev1.Pod, condition corev1.ConditionStatus) {
+		pod.Status.Phase = corev1.PodRunning
+		pod.Status.Conditions = []corev1.PodCondition{{Type: corev1.PodReady, Status: condition,
+			LastTransitionTime: metav1.NewTime(time.Now().Add(-time.Hour))}}
+	}
+	run(instanceset.NewRevisionUpdateReconciler())
+	run(instanceset.NewReplicasAlignmentReconciler())
+	for _, obj := range tree.List(&corev1.Pod{}) {
+		ready(obj.(*corev1.Pod), corev1.ConditionTrue)
+	}
+	run(instanceset.NewStatusReconciler())
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(ops, its).WithObjects(cluster, ops, its,
+		&appsv1.ComponentDefinition{ObjectMeta: metav1.ObjectMeta{Name: "database"}}).Build()
+	res := &OpsResource{Cluster: cluster, OpsRequest: ops, Recorder: record.NewFakeRecorder(100),
+		Runtimes: map[string]OpsRuntime{"db": newOpsRuntime(ctx, cli, "")}}
+	h, req := horizontalScalingOpsHandler{}, intctrlutil.RequestCtx{Ctx: ctx}
+	if err := h.SaveLastConfiguration(req, cli, res); err != nil {
+		t.Fatal(err)
+	}
+	if err := cli.Status().Update(ctx, ops); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.Action(req, cli, res); err != nil {
+		t.Fatal(err)
+	}
+	target := cluster.Spec.ComponentSpecs[0]
+	its.Spec.Replicas = &target.Replicas
+	its.Spec.Instances = []workloads.InstanceTemplate{{Name: reader.Name, Replicas: reader.Replicas,
+		Ordinals: reader.Ordinals, Annotations: reader.Annotations}}
+	its.Generation++
+	if err := cli.Update(ctx, its); err != nil {
+		t.Fatal(err)
+	}
+	run(instanceset.NewRevisionUpdateReconciler())
+	check := func(want opsv1alpha1.OpsPhase, progress string, applied, healthy bool) {
+		t.Helper()
+		run(instanceset.NewStatusReconciler())
+		status := its.FindInstanceStatus("demo-db-1")
+		if status == nil || status.TemplateName == nil || *status.TemplateName != "reader" || status.UpToDate != applied || status.Ready != healthy {
+			t.Fatalf("unexpected workload observation: %#v", status)
+		}
+		if err := cli.Status().Update(ctx, its); err != nil {
+			t.Fatal(err)
+		}
+		phase, _, err := h.ReconcileAction(req, cli, res)
+		if err != nil || phase != want || ops.Status.Progress != progress {
+			t.Fatalf("phase=%s progress=%s err=%v, want %s %s", phase, ops.Status.Progress, err, want, progress)
+		}
+	}
+	check(opsv1alpha1.OpsRunningPhase, "0/1", false, true) // Old Pod is healthy but still uses the default template.
+	obj, err := tree.Get(&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "demo-db-1", Namespace: "default"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	pod := obj.(*corev1.Pod)
+	ready(pod, corev1.ConditionFalse)
+	check(opsv1alpha1.OpsRunningPhase, "0/1", false, false)
+	deleting := metav1.Now()
+	pod.DeletionTimestamp = &deleting
+	check(opsv1alpha1.OpsRunningPhase, "0/1", false, false)
+	// Recreate through alignment so revision and configuration are produced by
+	// the workload controller. No InstanceStatus fields are patched by this test.
+	if err := tree.Delete(pod); err != nil {
+		t.Fatal(err)
+	}
+	check(opsv1alpha1.OpsRunningPhase, "0/1", false, false)
+	run(instanceset.NewReplicasAlignmentReconciler())
+	obj, err = tree.Get(pod)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pod = obj.(*corev1.Pod)
+	ready(pod, corev1.ConditionFalse)
+	check(opsv1alpha1.OpsRunningPhase, "0/1", true, false)
+	ready(pod, corev1.ConditionTrue)
+	pod.Status.Conditions[0].LastTransitionTime = metav1.Now()
+	check(opsv1alpha1.OpsRunningPhase, "0/1", true, true) // Ready but not yet Available.
+	ready(pod, corev1.ConditionTrue)
+	check(opsv1alpha1.OpsSucceedPhase, "1/1", true, true)
+	details := ops.Status.Components["db"].ProgressDetails
+	if len(details) != 1 || details[0].Group != "db/Update" || details[0].ObjectKey != "Pod/demo-db-1" {
+		t.Fatalf("expected one template update, got %#v", details)
+	}
 }
 
 // Exercise the real Operations runtime and cancellation handler, without a
 // forward ReconcileAction publishing progress first. Desired allocation alone
 // must neither complete rollback nor make unrelated objects participants.
 func TestNonFlatHScaleCancellation(t *testing.T) {
-	for _, operation := range []string{"scale-out", "scale-in", "named-swap", "online-high-ordinal", "from-backup"} {
+	for _, operation := range []string{"scale-out", "scale-in", "named-swap", "online-high-ordinal", "default-ordinals", "from-backup"} {
 		for _, unrelatedReleased := range []bool{false, true} {
 			t.Run(fmt.Sprintf("%s/unrelated-released=%t", operation, unrelatedReleased), func(t *testing.T) {
 				ctx := context.Background()
@@ -1371,6 +1610,12 @@ func TestNonFlatHScaleCancellation(t *testing.T) {
 				case "scale-in":
 					scaling.ScaleIn = &opsv1alpha1.ScaleIn{ReplicaChanger: opsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(1)}}
 					restored = []string{"demo-db-1"}
+				case "default-ordinals":
+					comp.Replicas = 1
+					comp.Ordinals = appsv1.Ordinals{Discrete: []int32{5, 6}}
+					source = map[string]string{"demo-db-5": ""}
+					scaling.ScaleOut = &opsv1alpha1.ScaleOut{ReplicaChanger: opsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(1)}}
+					removed = []string{"demo-db-6"}
 				case "named-swap":
 					source = map[string]string{"demo-db-0": "", "demo-db-large-0": "large"}
 					comp.Instances = []appsv1.InstanceTemplate{{Name: "large", Replicas: pointer.Int32(1)}}

@@ -14,6 +14,8 @@ package operations
 import (
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/util/sets"
+
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -87,7 +89,11 @@ func assignmentsMatchComponent(assignments map[string]string, component *appsv1.
 		return false
 	}
 	actual := map[string]int32{}
-	for _, templateName := range assignments {
+	offline := sets.New(component.OfflineInstances...)
+	for name, templateName := range assignments {
+		if offline.Has(name) {
+			return false
+		}
 		actual[templateName]++
 	}
 	if len(actual) != len(expected) {
@@ -109,12 +115,15 @@ func activeAssignmentsForTarget(workload Workload, component *appsv1.ClusterComp
 	return assignments, assignmentsMatchComponent(assignments, component), nil
 }
 
-func diffAssignments(source, target map[string]string) (created, deleted map[string]string) {
+func diffAssignments(source, target map[string]string) (created, deleted, updated map[string]string) {
 	created = map[string]string{}
 	deleted = map[string]string{}
+	updated = map[string]string{}
 	for name, templateName := range target {
-		if _, ok := source[name]; !ok {
+		if previous, ok := source[name]; !ok {
 			created[name] = templateName
+		} else if previous != templateName {
+			updated[name] = templateName
 		}
 	}
 	for name, templateName := range source {
@@ -122,5 +131,5 @@ func diffAssignments(source, target map[string]string) (created, deleted map[str
 			deleted[name] = templateName
 		}
 	}
-	return created, deleted
+	return created, deleted, updated
 }

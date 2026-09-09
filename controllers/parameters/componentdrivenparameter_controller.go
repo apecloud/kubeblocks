@@ -38,6 +38,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
@@ -95,10 +96,28 @@ func (r *ComponentDrivenParameterReconciler) Reconcile(ctx context.Context, req 
 func (r *ComponentDrivenParameterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1.Component{}).
-		Watches(&appsv1.Component{}, handler.EnqueueRequestsFromMapFunc(r.resourceInputDependents), ctrlbuilder.WithPredicates(predicate.GenerationChangedPredicate{})).
-		Watches(&appsv1.Cluster{}, handler.EnqueueRequestsFromMapFunc(r.resourceInputDependents), ctrlbuilder.WithPredicates(predicate.GenerationChangedPredicate{})).
-		Watches(&appsv1.ComponentDefinition{}, handler.EnqueueRequestsFromMapFunc(r.resourceInputDependents), ctrlbuilder.WithPredicates(predicate.GenerationChangedPredicate{})).
+		Watches(&appsv1.Cluster{}, handler.EnqueueRequestsFromMapFunc(r.shardingComponents),
+			ctrlbuilder.WithPredicates(predicate.GenerationChangedPredicate{})).
 		Complete(r)
+}
+
+// Shard counts live on Cluster, so existing members must also reconcile when
+// Cluster spec changes. This is limited to the existing shardingHScale scope.
+func (r *ComponentDrivenParameterReconciler) shardingComponents(ctx context.Context, obj client.Object) []reconcile.Request {
+	comps := &appsv1.ComponentList{}
+	if err := r.List(ctx, comps, client.InNamespace(obj.GetNamespace()),
+		client.MatchingLabels{constant.AppInstanceLabelKey: obj.GetName()},
+		client.HasLabels{constant.KBAppShardingNameLabelKey}); err != nil {
+		log.FromContext(ctx).Error(err, "failed to list sharding components")
+		return nil
+	}
+	requests := make([]reconcile.Request, 0, len(comps.Items))
+	for i := range comps.Items {
+		if !model.IsObjectDeleting(&comps.Items[i]) {
+			requests = append(requests, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(&comps.Items[i])})
+		}
+	}
+	return requests
 }
 
 func (r *ComponentDrivenParameterReconciler) reconcile(reqCtx intctrlutil.RequestCtx, component *appsv1.Component) (ctrl.Result, error) {
@@ -154,7 +173,7 @@ func (r *ComponentDrivenParameterReconciler) update(reqCtx intctrlutil.RequestCt
 	if reflect.DeepEqual(mergedObject, existing) {
 		return intctrlutil.Reconciled()
 	}
-	if err := r.Client.Patch(reqCtx.Ctx, mergedObject, client.MergeFromWithOptions(existing, client.MergeFromWithOptimisticLock{})); err != nil {
+	if err := r.Client.Patch(reqCtx.Ctx, mergedObject, client.MergeFrom(existing)); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	return intctrlutil.Reconciled()
@@ -240,16 +259,8 @@ func buildComponentParameter(reqCtx intctrlutil.RequestCtx, reader client.Reader
 	if err != nil {
 		return nil, err
 	}
-	if configRender != nil {
-		err = parameters.UpdateConfigPayload(&parameterObj.Spec, &comp.Spec, &configRender.Spec, sharding)
-	}
-	if err != nil {
-		return nil, err
-	}
-	if err = applyResourceRenderInputs(reqCtx.Ctx, reader, cmpd, comp, &parameterObj.Spec); err != nil {
-		return nil, err
-	}
-	return parameterObj, nil
+	err = parameters.UpdateConfigPayload(&parameterObj.Spec, &comp.Spec, sharding)
+	return parameterObj, err
 }
 
 func handleCustomParameterTemplate(ctx context.Context, reader client.Reader, annotations map[string]string, specs []parametersv1alpha1.ConfigTemplateItemDetail) error {
@@ -369,7 +380,7 @@ func (r *ComponentDrivenParameterReconciler) mergeComponentParameter(expected *p
 		if expected.CustomTemplates != nil {
 			dest.CustomTemplates = expected.CustomTemplates
 		}
-		mergeResourcePayload(dest, expected)
+		dest.Payload = expected.Payload
 		dest.ConfigSpec = expected.ConfigSpec
 	})
 }

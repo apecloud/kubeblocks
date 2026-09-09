@@ -1,13 +1,24 @@
-# Automatic configuration rendering from Component resources (1.1)
+# Automatic resource-triggered configuration rendering (1.1)
 
-Configuration templates automatically re-render when their Component's CPU,
-memory, or volume claim template capacity changes. Addons do not need to add a
-`reRenderResourceTypes` entry for these changes. Existing trigger declarations,
-custom templates, parameter overrides, and reload/restart policies remain supported.
+Resource changes automatically trigger configuration rendering without a
+`reRenderResourceTypes` declaration. The supported inputs are the existing
+trigger scope plus the Component's desired storage capacity:
+
+| Existing trigger | Automatically tracked input | Scope |
+| --- | --- | --- |
+| vscale | Component resources (requests and limits) | Current Component |
+| hscale | Component replicas | Current Component |
+| tls | Component TLS configuration | Current Component |
+| shardingHScale | Shard count and sharding template replicas | Current Component's sharding |
+| Storage (no new enum) | Volume claim template storage requests and limits | Current Component |
+
+Existing declarations remain valid API fields. They are no longer required to
+enable these triggers. All configuration items receive these fixed inputs;
+there is no analysis of which template expressions use them.
 
 ## Addon example
 
-Declare a storage variable in the ComponentDefinition:
+Declare a variable in the ComponentDefinition:
 
 ```yaml
 spec:
@@ -19,71 +30,50 @@ spec:
             name: data
 ```
 
-Use it in a configuration template, for example to allocate half the requested
-volume capacity to a cache:
+Use it in a configuration template:
 
 ```gotemplate
 cache_capacity_bytes={{ div (int64 $.DATA_CAPACITY) 2 }}
 ```
 
-The built-in `getComponentPVCSizeByName $.component "data"` function and direct
-access to Component resources also participate in automatic re-rendering.
-The input is the Component's desired capacity, with the existing variable
-resolver's request/limit fallback semantics. It does not wait for PVC status or
-filesystem expansion, and it does not change the meaning of OpsRequest success.
+The existing built-in `getComponentPVCSizeByName $.component "data"` works too.
+Both keep their existing request/limit semantics. Input comes from Component
+spec, not PVC status; rendering does not wait for CSI or filesystem expansion.
 
-A `resourceVarRef.compDef` can reference another Component in the same Cluster.
-Changes to that source enqueue resource-var consumers. The existing resolver
-continues to handle component matching, optional references, and multiple-object
-selection. Required unresolved references retain the previous configuration and
-retry; optional references follow their existing rendering semantics.
+## Flow
 
-## Controller behavior
+1. Component changes enqueue the existing Component-driven parameter controller.
+   A small Cluster watch also enqueues that Cluster's sharding members when
+   Cluster spec changes, because shard count may change without modifying an
+   existing member's spec.
+2. `UpdateConfigPayload` records the fixed fields in existing payload keys:
+   `componentResource`, `replicas`, `tls` and `sharding`.
+   The new internal `volumeClaimTemplates` key maps volume names to storage
+   request/limit bytes. Equivalent storage units and volume ordering are stable.
+3. The existing merge/update path compares the generated ComponentParameter
+   with the persisted object. Changed payload advances its generation; unchanged
+   inputs do not create a new revision.
+4. The original parameter controller renders templates, merges explicit user
+   parameters, validates configuration, and publishes the ConfigMap.
+5. The original reconfigure controller compares final configuration content.
+   Changed content follows existing reload/restart policy; unchanged content
+   finishes without applying it again.
 
-The Component-driven parameter controller computes a versioned fingerprint of:
+Rendering, variable resolution, parameter precedence, revision processing and
+application policies are unchanged. Existing configurations may acquire missing
+payload fields and render once after controller upgrade.
 
-- The Component's CPU and memory requests/limits.
-- Storage requests/limits indexed by volume claim template name.
-- Declared resource variable selectors and their resolved resource operands.
+Cross-Component references continue to resolve through the original renderer
+when rendering occurs. This change does not introduce subscriptions to their
+sources, a dependency graph, fingerprints, snapshots or new retry states.
+Per-instance resources and Secret/ConfigMap/Service dependencies are outside
+this trigger scope.
 
-It stores the fingerprint under the controller-owned
-`ComponentParameter.spec.configItemDetails[].payload.resourceRenderInputs` key.
-Changing that payload advances ComponentParameter generation and reuses the 1.1
-configuration revision and status machinery. External payload keys are preserved.
-Do not edit the managed key manually.
+## Validation
 
-Resource quantities are normalized, so equivalent units and volume-list ordering
-do not create new revisions. Component status and unrelated metadata are not
-included. A resource change can re-render every configuration template for the
-Component; no template-language dependency analysis is performed.
-
-Rendering and explicit parameter merging run in their original order. The existing
-configuration controller compares final content with the last applied content.
-Unchanged content completes the new revision without running a reload or restart;
-metadata can still change to record the processed input. Explicit user parameters
-can therefore keep the final configuration unchanged even after a resource change.
-
-Fingerprinting and rendering use consistent Component reads within a reconcile.
-If the inputs no longer match the payload being processed, rendering waits for the
-Component-driven controller to synchronize the next revision.
-
-On controller upgrade, existing configurations acquire the fingerprint on their
-first reconciliation and are rendered once. This also refreshes stale resource-derived
-configuration. Subsequent unchanged inputs are no-ops.
-
-## Scope and validation
-
-Automatic watches cover Component resource changes and resource-variable consumers,
-including source creation/deletion and matching changes from Cluster or
-ComponentDefinition updates. Candidate consumer scans are bounded to the source
-Cluster; resolved fingerprints decide whether a configuration actually needs work.
-This does not add automatic watches for Secret, ConfigMap, Service, or other
-non-resource variable sources, nor for per-instance resource overrides.
-
-Controller integration tests exercise storage variables, the built-in PVC-size
-function, consecutive resource revisions, cross-Component changes without changing
-the consumer generation, explicit parameter overrides, and unchanged output.
-The parameter controller tests use envtest and emulate the Component update normally
-propagated by the apps controller. They do not expand a real CSI volume or run a
-live database. Existing data-cluster ConfigMap routing and configuration application
-policies are reused.
+Unit tests cover the old trigger types, storage changes/removal/normalization,
+and sharding watch scope. Envtest covers storage vars and the built-in size
+function, consecutive expansions, explicit parameter overrides, and Cluster-only
+shard count changes. An unchanged-output test checks that reconfigure skips apply.
+The suite emulates Component updates; it does not expand real CSI volumes or run
+a live database.

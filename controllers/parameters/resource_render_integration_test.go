@@ -102,40 +102,27 @@ var _ = Describe("Automatic resource rendering", func() {
 		}, time.Second*2, time.Millisecond*100).Should(Equal(second))
 	})
 
-	It("refreshes cross-component storage vars and preserves explicit parameters", func() {
-		sourceDef := testapps.NewComponentDefinitionFactory("resource-source").WithRandomName().SetDefaultSpec().Create(&testCtx).GetObject()
-		Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(sourceDef), func(def *appsv1.ComponentDefinition) { def.Status.Phase = appsv1.AvailablePhase })()).To(Succeed())
-		source := testapps.NewComponentFactory(testCtx.DefaultNamespace, clusterName+"-source", sourceDef.Name).
-			AddLabels(constant.AppInstanceLabelKey, clusterName, constant.AppManagedByLabelKey, constant.AppName).
-			AddAnnotations(constant.CRDAPIVersionAnnotationKey, appsv1.GroupVersion.String()).Create(&testCtx).GetObject()
-		Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(source), func(c *appsv1.Component) {
-			c.Spec.VolumeClaimTemplates = resourceTestComponent("db", "db").Spec.VolumeClaimTemplates
-		})()).To(Succeed())
+	It("preserves explicit parameters through storage changes", func() {
 		_, _, _, comp, _ := mockReconcileResource(mockResourceConfiguration{
-			Vars: []appsv1.EnvVar{storageVar(sourceDef.Name)},
+			Vars: []appsv1.EnvVar{storageVar("")},
 			Template: func(cm *corev1.ConfigMap) {
 				cm.Data[testparameters.MysqlConfigFile] = strings.ReplaceAll(cm.Data[testparameters.MysqlConfigFile], "server-id=1", "server-id={{ div (int64 $.DISK) 1073741824 }}")
 			},
 		})
-		waitFinished(comp, "server-id=1")
-		var targetGeneration int64
-		Expect(testCtx.Cli.Get(testCtx.Ctx, client.ObjectKeyFromObject(comp), comp)).To(Succeed())
-		targetGeneration = comp.Generation
+		waitFinished(comp, "server-id=0")
 		expand := func(size string) {
-			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(source), func(c *appsv1.Component) {
+			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(comp), func(c *appsv1.Component) {
+				c.Spec.VolumeClaimTemplates = resourceTestComponent("db", "db").Spec.VolumeClaimTemplates
 				c.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse(size)
 			})()).To(Succeed())
 		}
 		expand("2Gi")
 		waitFinished(comp, "server-id=2")
-		Expect(testCtx.Cli.Get(testCtx.Ctx, client.ObjectKeyFromObject(comp), comp)).To(Succeed())
-		Expect(comp.Generation).To(Equal(targetGeneration))
-		By("preserve a user override and external payload through subsequent expansions")
+		By("preserve a user override through subsequent expansions")
 		override := "9"
 		Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(comp), func(cp *parametersv1alpha1.ComponentParameter) {
 			item := parameters.GetConfigTemplateItem(&cp.Spec, configSpecName)
 			item.ConfigFileParams = map[string]parametersv1alpha1.ParametersInFile{testparameters.MysqlConfigFile: {Parameters: map[string]*string{"server-id": &override}}}
-			item.Payload["external"] = []byte(`{"revision":7}`)
 		})()).To(Succeed())
 		before := waitFinished(comp, "server-id=9")
 		cm := &corev1.ConfigMap{}
@@ -147,9 +134,36 @@ var _ = Describe("Automatic resource rendering", func() {
 		Expect(after).To(BeNumerically(">", before))
 		Expect(testCtx.Cli.Get(testCtx.Ctx, cmKey, cm)).To(Succeed())
 		Expect(cm.Data).To(Equal(data))
-		cp := &parametersv1alpha1.ComponentParameter{}
-		Expect(testCtx.Cli.Get(testCtx.Ctx, client.ObjectKeyFromObject(comp), cp)).To(Succeed())
-		Expect(string(parameters.GetConfigTemplateItem(&cp.Spec, configSpecName).Payload["external"])).To(MatchJSON(`{"revision":7}`))
 		Expect(fmt.Sprint(after)).To(Equal(cm.Annotations[constant.ConfigurationRevision]))
 	})
+	It("refreshes sharding payload when only Cluster shard count changes", func() {
+		_, _, _, comp, _ := mockReconcileResource()
+		waitFinished(comp, "server-id=1")
+		Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(comp), func(c *appsv1.Component) {
+			c.Labels[constant.KBAppShardingNameLabelKey] = shardingCompName
+		})()).To(Succeed())
+		waitShards := func(shards string) int64 {
+			var generation int64
+			Eventually(func(g Gomega) {
+				cp := &parametersv1alpha1.ComponentParameter{}
+				g.Expect(testCtx.Cli.Get(testCtx.Ctx, client.ObjectKeyFromObject(comp), cp)).To(Succeed())
+				item := parameters.GetConfigTemplateItem(&cp.Spec, configSpecName)
+				g.Expect(item).NotTo(BeNil())
+				g.Expect(string(item.Payload[constant.ShardingPayload])).To(ContainSubstring(`"shards":"` + shards + `"`))
+				g.Expect(cp.Status.ObservedGeneration).To(Equal(cp.Generation))
+				generation = cp.Generation
+			}).Should(Succeed())
+			return generation
+		}
+		before := waitShards("5")
+		Expect(testCtx.Cli.Get(testCtx.Ctx, client.ObjectKeyFromObject(comp), comp)).To(Succeed())
+		componentGeneration := comp.Generation
+		Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKey{Namespace: comp.Namespace, Name: clusterName}, func(c *appsv1.Cluster) {
+			c.Spec.Shardings[0].Shards = 6
+		})()).To(Succeed())
+		Expect(waitShards("6")).To(BeNumerically(">", before))
+		Expect(testCtx.Cli.Get(testCtx.Ctx, client.ObjectKeyFromObject(comp), comp)).To(Succeed())
+		Expect(comp.Generation).To(Equal(componentGeneration))
+	})
+
 })

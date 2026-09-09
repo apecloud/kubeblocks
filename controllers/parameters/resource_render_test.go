@@ -21,7 +21,6 @@ package parameters
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -36,7 +35,6 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 )
 
@@ -66,198 +64,19 @@ func resourceTestClient(t *testing.T, objects ...client.Object) client.Client {
 	return fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).Build()
 }
 
-func TestResourceRenderFingerprint(t *testing.T) {
-	ctx := context.Background()
-	cmpd := &appsv1.ComponentDefinition{}
-	original := resourceTestComponent("db", "db")
-	cli := resourceTestClient(t)
-	baseline, err := resourceRenderInputFingerprint(ctx, cli, cmpd, original, nil)
-	require.NoError(t, err)
-	for _, tc := range []struct {
-		name    string
-		change  func(*appsv1.Component)
-		changed bool
-	}{
-		{"storage", func(c *appsv1.Component) {
-			c.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("2Gi")
-		}, true},
-		{"cpu", func(c *appsv1.Component) { c.Spec.Resources.Requests[corev1.ResourceCPU] = resource.MustParse("1500m") }, true},
-		{"memory limit", func(c *appsv1.Component) {
-			c.Spec.Resources.Limits = corev1.ResourceList{corev1.ResourceMemory: resource.MustParse("2Gi")}
-		}, true},
-		{"equivalent units", func(c *appsv1.Component) {
-			c.Spec.Resources.Requests[corev1.ResourceCPU] = resource.MustParse("1000m")
-			c.Spec.Resources.Requests[corev1.ResourceMemory] = resource.MustParse("1024Mi")
-			c.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("1073741824")
-		}, false},
-		{"metadata", func(c *appsv1.Component) {
-			c.Generation++
-			c.ResourceVersion = "99"
-			c.Annotations = map[string]string{"unrelated": "changed"}
-		}, false},
-		{"replicas", func(c *appsv1.Component) { c.Spec.Replicas++ }, false},
-		{"deleted volume", func(c *appsv1.Component) { c.Spec.VolumeClaimTemplates = nil }, true},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			comp := original.DeepCopy()
-			tc.change(comp)
-			actual, err := resourceRenderInputFingerprint(ctx, cli, cmpd, comp, nil)
-			require.NoError(t, err)
-			require.Equal(t, tc.changed, baseline != actual)
-		})
-	}
-	original.Spec.VolumeClaimTemplates = append(original.Spec.VolumeClaimTemplates, appsv1.PersistentVolumeClaimTemplate{Name: "log"})
-	before, err := resourceRenderInputFingerprint(ctx, cli, cmpd, original, nil)
-	require.NoError(t, err)
-	original.Spec.VolumeClaimTemplates[0], original.Spec.VolumeClaimTemplates[1] = original.Spec.VolumeClaimTemplates[1], original.Spec.VolumeClaimTemplates[0]
-	after, err := resourceRenderInputFingerprint(ctx, cli, cmpd, original, nil)
-	require.NoError(t, err)
-	require.Equal(t, before, after)
-}
-
-func TestResourceRenderReferences(t *testing.T) {
-	ctx := context.Background()
-	target := resourceTestComponent("app", "app-def")
-	source := resourceTestComponent("db", "db-def")
-	cli := resourceTestClient(t, source, target)
-	cmpd := &appsv1.ComponentDefinition{Spec: appsv1.ComponentDefinitionSpec{Vars: []appsv1.EnvVar{storageVar("db-def")}}}
-	synth := &component.SynthesizedComponent{Namespace: "ns", ClusterName: "test", Name: "app", CompDefName: "app-def", Comp2CompDefs: map[string]string{"app": "app-def", "db": "db-def"}}
-	first, err := resourceRenderInputFingerprint(ctx, cli, cmpd, target, synth)
-	require.NoError(t, err)
-	snap := newResourceSnapshotReader(cli, target)
-	cached, err := resourceRenderInputFingerprint(ctx, snap, cmpd, target, synth)
-	require.NoError(t, err)
-	require.Equal(t, first, cached)
-	source.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("2Gi")
-	require.NoError(t, cli.Update(ctx, source))
-	next, err := resourceRenderInputFingerprint(ctx, cli, cmpd, target, synth)
-	require.NoError(t, err)
-	require.NotEqual(t, first, next)
-	cached, err = resourceRenderInputFingerprint(ctx, snap, cmpd, target, synth)
-	require.NoError(t, err)
-	require.Equal(t, first, cached)
-	values, err := component.ResolveResourceRenderVars(ctx, snap, synth, cmpd.Spec.Vars)
-	require.NoError(t, err)
-	require.Equal(t, "1073741824", values["DISK"])
-	require.NoError(t, cli.Delete(ctx, source))
-	_, err = resourceRenderInputFingerprint(ctx, cli, cmpd, target, synth)
-	require.Error(t, err)
-	optional := true
-	cmpd.Spec.Vars[0].ValueFrom.ResourceVarRef.Optional = &optional
-	absent, err := resourceRenderInputFingerprint(ctx, cli, cmpd, target, synth)
-	require.NoError(t, err)
-	require.NotEqual(t, next, absent)
-	// A new source must invalidate the optional-missing snapshot.
-	source.ResourceVersion = ""
-	require.NoError(t, cli.Create(ctx, source))
-	restored, err := resourceRenderInputFingerprint(ctx, cli, cmpd, target, synth)
-	require.NoError(t, err)
-	require.NotEqual(t, absent, restored)
-	// Unrelated Secret variables are not resolved by the fingerprint builder.
-	cmpd.Spec.Vars = append(cmpd.Spec.Vars, appsv1.EnvVar{Name: "PASSWORD", ValueFrom: &appsv1.VarSource{SecretKeyRef: &corev1.SecretKeySelector{LocalObjectReference: corev1.LocalObjectReference{Name: "missing"}, Key: "password"}}})
-	unchanged, err := resourceRenderInputFingerprint(ctx, cli, cmpd, target, synth)
-	require.NoError(t, err)
-	require.Equal(t, restored, unchanged)
-}
-
-func TestResourcePayloadMerge(t *testing.T) {
-	expected := &parametersv1alpha1.ConfigTemplateItemDetail{Payload: parametersv1alpha1.Payload{constant.ResourceRenderInputsPayload: json.RawMessage(`{"version":"v1","digest":"new"}`)}}
-	dest := &parametersv1alpha1.ConfigTemplateItemDetail{Payload: parametersv1alpha1.Payload{"external": json.RawMessage(`{"revision":7}`), constant.ResourceRenderInputsPayload: json.RawMessage(`{"digest":"old"}`), constant.ReplicasPayload: json.RawMessage(`2`)}}
-	mergeResourcePayload(dest, expected)
-	require.JSONEq(t, `{"revision":7}`, string(dest.Payload["external"]))
-	require.Equal(t, expected.Payload[constant.ResourceRenderInputsPayload], dest.Payload[constant.ResourceRenderInputsPayload])
-	require.NotContains(t, dest.Payload, constant.ReplicasPayload)
-	before := dest.DeepCopy()
-	mergeResourcePayload(dest, expected)
-	require.Equal(t, before, dest)
-}
-
-func TestResourceInputDependents(t *testing.T) {
-	ctx := context.Background()
-	source := resourceTestComponent("db", "db-def")
-	consumer := resourceTestComponent("app", "app-def")
-	unrelated := resourceTestComponent("other", "plain-def")
-	otherCluster := resourceTestComponent("other-app", "app-def")
+func TestShardingComponents(t *testing.T) {
+	member := resourceTestComponent("shard-0", "db")
+	member.Labels[constant.KBAppShardingNameLabelKey] = "shard"
+	ordinary := resourceTestComponent("app", "app")
+	otherCluster := member.DeepCopy()
+	otherCluster.Name = "other-shard-0"
 	otherCluster.Labels[constant.AppInstanceLabelKey] = "other"
-	otherNamespace := resourceTestComponent("other-ns", "app-def")
-	otherNamespace.Namespace = "different"
-	def := &appsv1.ComponentDefinition{ObjectMeta: metav1.ObjectMeta{Name: "app-def"}, Spec: appsv1.ComponentDefinitionSpec{Vars: []appsv1.EnvVar{storageVar("db-def")}}}
-	cli := resourceTestClient(t, source, consumer, unrelated, otherCluster, otherNamespace, def,
-		&appsv1.ComponentDefinition{ObjectMeta: metav1.ObjectMeta{Name: "db-def"}}, &appsv1.ComponentDefinition{ObjectMeta: metav1.ObjectMeta{Name: "plain-def"}})
-	reconciler := &ComponentDrivenParameterReconciler{Client: cli}
-	requests := reconciler.resourceInputDependents(ctx, source)
+	otherNamespace := member.DeepCopy()
+	otherNamespace.Namespace = "other"
+	r := &ComponentDrivenParameterReconciler{Client: resourceTestClient(t, member, ordinary, otherCluster, otherNamespace)}
+	requests := r.shardingComponents(context.Background(), &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "ns"}})
 	require.Len(t, requests, 1)
-	require.Equal(t, client.ObjectKeyFromObject(consumer), requests[0].NamespacedName)
-	// Deleting the source must still enqueue declarations which no longer resolve.
-	require.NoError(t, cli.Delete(ctx, source))
-	require.Equal(t, requests, reconciler.resourceInputDependents(ctx, source))
-	require.Equal(t, requests, reconciler.resourceInputDependents(ctx, &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "ns"}}))
-	require.Len(t, reconciler.resourceInputDependents(ctx, def), 3)
-}
-
-func TestResourceRenderRejectsStaleInput(t *testing.T) {
-	recorded, err := json.Marshal(resourceRenderFingerprint{Version: "v1", Digest: "old"})
-	require.NoError(t, err)
-	item := parametersv1alpha1.ConfigTemplateItemDetail{Payload: parametersv1alpha1.Payload{constant.ResourceRenderInputsPayload: recorded}}
-	status := &parametersv1alpha1.ConfigTemplateItemDetailStatus{Phase: parametersv1alpha1.CFinishedPhase}
-	err = syncImpl(&TaskContext{resourceInputs: resourceRenderFingerprint{Version: "v1", Digest: "new"}}, &Task{}, item, status, "7", nil)
-	require.ErrorContains(t, err, "waiting for ComponentParameter")
-	require.Equal(t, parametersv1alpha1.CPendingPhase, status.Phase)
-}
-
-func TestResourceRenderMultipleReferences(t *testing.T) {
-	ctx := context.Background()
-	target := resourceTestComponent("app", "app-def")
-	first := resourceTestComponent("db-0", "db-def")
-	second := resourceTestComponent("db-1", "db-def")
-	cli := resourceTestClient(t, target, first, second)
-	ref := storageVar("db-def")
-	all := true
-	ref.ValueFrom.ResourceVarRef.MultipleClusterObjectOption = &appsv1.MultipleClusterObjectOption{
-		RequireAllComponentObjects: &all, Strategy: appsv1.MultipleClusterObjectStrategyIndividual,
-	}
-	cmpd := &appsv1.ComponentDefinition{Spec: appsv1.ComponentDefinitionSpec{Vars: []appsv1.EnvVar{ref}}}
-	synth := &component.SynthesizedComponent{Namespace: "ns", ClusterName: "test", Name: "app", CompDefName: "app-def",
-		Comp2CompDefs: map[string]string{"app": "app-def", "db-0": "db-def", "db-1": "db-def"}, CompDef2CompCnt: map[string]int32{"db-def": 2}}
-	before, err := resourceRenderInputFingerprint(ctx, cli, cmpd, target, synth)
-	require.NoError(t, err)
-	values, err := component.ResolveResourceRenderVars(ctx, cli, synth, cmpd.Spec.Vars)
-	require.NoError(t, err)
-	require.Equal(t, "1073741824", values["DISK_DB_0"])
-	require.Equal(t, "1073741824", values["DISK_DB_1"])
-	second.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("2Gi")
-	require.NoError(t, cli.Update(ctx, second))
-	after, err := resourceRenderInputFingerprint(ctx, cli, cmpd, target, synth)
-	require.NoError(t, err)
-	require.NotEqual(t, before, after)
-	delete(synth.Comp2CompDefs, "db-1")
-	_, err = resourceRenderInputFingerprint(ctx, cli, cmpd, target, synth)
-	require.ErrorContains(t, err, "insufficient component objects")
-}
-
-func TestResourceRenderSeedsLegacyPayload(t *testing.T) {
-	ctx := context.Background()
-	comp := resourceTestComponent("db", "db")
-	cli := resourceTestClient(t)
-	def := &appsv1.ComponentDefinition{}
-	spec := &parametersv1alpha1.ComponentParameterSpec{ConfigItemDetails: []parametersv1alpha1.ConfigTemplateItemDetail{{Name: "config"}}}
-	require.NoError(t, applyResourceRenderInputs(ctx, cli, def, comp, spec))
-	require.Contains(t, spec.ConfigItemDetails[0].Payload, constant.ResourceRenderInputsPayload)
-	before := spec.DeepCopy()
-	require.NoError(t, applyResourceRenderInputs(ctx, cli, def, comp, spec))
-	require.Equal(t, before, spec)
-}
-
-func TestResourceSnapshotKeepsMissingReferents(t *testing.T) {
-	ctx := context.Background()
-	target := resourceTestComponent("app", "app-def")
-	cli := resourceTestClient(t, target)
-	snap := newResourceSnapshotReader(cli, target)
-	source := resourceTestComponent("db", "db-def")
-	require.Error(t, snap.Get(ctx, client.ObjectKeyFromObject(source), &appsv1.Component{}))
-	require.NoError(t, cli.Create(ctx, source))
-	require.Error(t, snap.Get(ctx, client.ObjectKeyFromObject(source), &appsv1.Component{}))
-	require.NoError(t, newResourceSnapshotReader(cli, target).Get(ctx, client.ObjectKeyFromObject(source), &appsv1.Component{}))
+	require.Equal(t, client.ObjectKeyFromObject(member), requests[0].NamespacedName)
 }
 
 func TestResourceRenderUnchangedOutputSkipsApply(t *testing.T) {

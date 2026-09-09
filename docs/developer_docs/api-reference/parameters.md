@@ -761,14 +761,10 @@ For instance, when using the <code>ini</code> format, you can specify the sectio
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies whether the configuration needs to be re-rendered after v-scale or h-scale operations to reflect changes.</p>
-<p>In some scenarios, the configuration may need to be updated to reflect the changes in resource allocation
-or cluster topology. Examples:</p>
-<ul>
-<li>Redis: adjust maxmemory after v-scale operation.</li>
-<li>MySQL: increase max connections after v-scale operation.</li>
-<li>Zookeeper: update zoo.cfg with new node addresses after h-scale operation.</li>
-</ul>
+<p>This field currently has no effect on configuration re-rendering.
+Configuration templates automatically re-render when the Component&rsquo;s resources,
+replicas, TLS configuration, volume claim template capacity, or its own sharding&rsquo;s
+shard count or template replicas change.</p>
 </td>
 </tr>
 </tbody>

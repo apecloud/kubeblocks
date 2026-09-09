@@ -20,12 +20,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package parameters
 
 import (
+	"context"
+	"testing"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/parameters/core"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -134,3 +141,27 @@ var _ = Describe("Reconfigure Controller", func() {
 	})
 
 })
+
+func TestReconfigureUnchangedOutputSkipsApply(t *testing.T) {
+	ctx := context.Background()
+	cm := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "config", Namespace: "ns", Annotations: map[string]string{
+		constant.ConfigurationRevision: "2", constant.LastAppliedConfigAnnotationKey: `{"my.cnf":"cache=9"}`,
+	}, Labels: map[string]string{}}, Data: map[string]string{"my.cnf": "cache=9"}}
+	for _, label := range reconfigureRequiredLabels {
+		cm.Labels[label] = "test"
+	}
+	cm.Labels[constant.CMConfigurationTypeLabelKey] = constant.ConfigInstanceType
+	cli := resourceTestClient(t, cm)
+	// No Cluster, workload or database runtime exists. Any attempt to apply the
+	// configuration would fail while fetching those resources.
+	r := &ReconfigureReconciler{Client: cli}
+	result, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cm)})
+	require.NoError(t, err)
+	require.Zero(t, result.RequeueAfter)
+	require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(cm), cm))
+	require.Contains(t, cm.Annotations, core.GenerateRevisionPhaseKey("2"))
+	revisions := RetrieveRevision(cm.Annotations)
+	require.Len(t, revisions, 1)
+	require.Equal(t, parametersv1alpha1.CFinishedPhase, revisions[0].Phase)
+	require.Contains(t, revisions[0].Result.Message, "not been modified")
+}

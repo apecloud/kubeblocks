@@ -25,4 +25,8 @@ const (
 	ReplicasPayload          = "replicas"
 	BinaryVersionPayload     = "binaryVersion"
 	ShardingPayload          = "sharding"
+
+	// VolumeClaimTemplatesPayload records desired storage capacities for
+	// configuration change detection.
+	VolumeClaimTemplatesPayload = "volumeClaimTemplates"
 )

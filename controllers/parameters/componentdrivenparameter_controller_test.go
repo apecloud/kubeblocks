@@ -20,16 +20,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package parameters
 
 import (
+	"context"
 	"encoding/json"
+	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
@@ -175,3 +181,30 @@ var _ = Describe("ComponentParameterGenerator Controller", func() {
 		})
 	})
 })
+
+func resourceTestClient(t *testing.T, objects ...client.Object) client.Client {
+	t.Helper()
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, appsv1.AddToScheme(scheme))
+	require.NoError(t, parametersv1alpha1.AddToScheme(scheme))
+	return fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).Build()
+}
+
+func TestShardingComponents(t *testing.T) {
+	member := resourceTestComponent("shard-0", "db")
+	member.Labels[constant.KBAppShardingNameLabelKey] = "shard"
+	ordinary := resourceTestComponent("app", "app")
+	otherCluster := member.DeepCopy()
+	otherCluster.Name = "other-shard-0"
+	otherCluster.Labels[constant.AppInstanceLabelKey] = "other"
+	otherNamespace := member.DeepCopy()
+	otherNamespace.Namespace = "other"
+	unmanaged := member.DeepCopy()
+	unmanaged.Name = "unmanaged-shard"
+	delete(unmanaged.Labels, constant.AppManagedByLabelKey)
+	r := &ComponentDrivenParameterReconciler{Client: resourceTestClient(t, member, ordinary, otherCluster, otherNamespace, unmanaged)}
+	requests := r.shardingComponents(context.Background(), &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "ns"}})
+	require.Len(t, requests, 1)
+	require.Equal(t, client.ObjectKeyFromObject(member), requests[0].NamespacedName)
+}

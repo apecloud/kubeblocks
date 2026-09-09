@@ -33,8 +33,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
+	ctrlbuilder "sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
@@ -92,7 +96,28 @@ func (r *ComponentDrivenParameterReconciler) Reconcile(ctx context.Context, req 
 func (r *ComponentDrivenParameterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1.Component{}).
+		Watches(&appsv1.Cluster{}, handler.EnqueueRequestsFromMapFunc(r.shardingComponents),
+			ctrlbuilder.WithPredicates(predicate.GenerationChangedPredicate{})).
 		Complete(r)
+}
+
+// Shard counts live on Cluster, so existing members must also reconcile when
+// Cluster spec changes. This is limited to the existing shardingHScale scope.
+func (r *ComponentDrivenParameterReconciler) shardingComponents(ctx context.Context, obj client.Object) []reconcile.Request {
+	comps := &appsv1.ComponentList{}
+	if err := r.List(ctx, comps, client.InNamespace(obj.GetNamespace()),
+		client.MatchingLabels(constant.GetClusterLabels(obj.GetName())),
+		client.HasLabels{constant.KBAppShardingNameLabelKey}); err != nil {
+		log.FromContext(ctx).Error(err, "failed to list sharding components")
+		return nil
+	}
+	requests := make([]reconcile.Request, 0, len(comps.Items))
+	for i := range comps.Items {
+		if !model.IsObjectDeleting(&comps.Items[i]) {
+			requests = append(requests, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(&comps.Items[i])})
+		}
+	}
+	return requests
 }
 
 func (r *ComponentDrivenParameterReconciler) reconcile(reqCtx intctrlutil.RequestCtx, component *appsv1.Component) (ctrl.Result, error) {
@@ -234,9 +259,7 @@ func buildComponentParameter(reqCtx intctrlutil.RequestCtx, reader client.Reader
 	if err != nil {
 		return nil, err
 	}
-	if configRender != nil {
-		err = parameters.UpdateConfigPayload(&parameterObj.Spec, &comp.Spec, &configRender.Spec, sharding)
-	}
+	err = parameters.UpdateConfigPayload(&parameterObj.Spec, &comp.Spec, sharding)
 	return parameterObj, err
 }
 

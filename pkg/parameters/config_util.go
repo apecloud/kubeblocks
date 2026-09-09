@@ -559,40 +559,30 @@ func findPortByPortName(container corev1.Container) (int32, bool) {
 	return constant.InvalidContainerPort, false
 }
 
-// UpdateConfigPayload updates the configuration payload
-func UpdateConfigPayload(config *parametersv1alpha1.ComponentParameterSpec, component *appsv1.ComponentSpec, configRender *parametersv1alpha1.ParamConfigRendererSpec, sharding *appsv1.ClusterSharding) error {
-	if len(configRender.Configs) == 0 {
-		return nil
+// UpdateConfigPayload automatically tracks the inputs formerly selected by
+// reRenderResourceTypes, plus the Component's volume capacities. It deliberately
+// does not resolve vars or subscribe to resources owned by other Components.
+func UpdateConfigPayload(config *parametersv1alpha1.ComponentParameterSpec, component *appsv1.ComponentSpec, sharding *appsv1.ClusterSharding) error {
+	var tlsPayload, shardingPayload any
+	if component.TLSConfig != nil {
+		tlsPayload = component.TLSConfig
 	}
-
-	for i, item := range config.ConfigItemDetails {
-		configDescs := GetComponentConfigDescriptions(configRender, item.Name)
-		configSpec := &config.ConfigItemDetails[i]
-		// check v-scale operation
-		if enableVScaleTrigger(configDescs) {
-			resourcePayload := ResourcesPayloadForComponent(component.Resources)
-			if _, err := CheckAndPatchPayload(configSpec, constant.ComponentResourcePayload, resourcePayload); err != nil {
-				return err
-			}
+	if sharding != nil {
+		shardingPayload = map[string]string{
+			"shards":   strconv.Itoa(int(sharding.Shards)),
+			"replicas": strconv.Itoa(int(sharding.Template.Replicas)),
 		}
-		// check h-scale operation
-		if enableHScaleTrigger(configDescs) {
-			if _, err := CheckAndPatchPayload(configSpec, constant.ReplicasPayload, component.Replicas); err != nil {
-				return err
-			}
-		}
-		// check tls
-		if enableTLSTrigger(configDescs) {
-			if component.TLSConfig == nil {
-				continue
-			}
-			if _, err := CheckAndPatchPayload(configSpec, constant.TLSPayload, component.TLSConfig); err != nil {
-				return err
-			}
-		}
-		// check sharding h-scale operation
-		if sharding != nil && enableShardingHVScaleTrigger(configDescs) {
-			if _, err := CheckAndPatchPayload(configSpec, constant.ShardingPayload, resolveShardingResource(sharding)); err != nil {
+	}
+	payloads := map[string]any{
+		constant.ComponentResourcePayload:    ResourcesPayloadForComponent(component.Resources),
+		constant.ReplicasPayload:             component.Replicas,
+		constant.TLSPayload:                  tlsPayload,
+		constant.ShardingPayload:             shardingPayload,
+		constant.VolumeClaimTemplatesPayload: volumeCapacitiesPayload(component.VolumeClaimTemplates),
+	}
+	for i := range config.ConfigItemDetails {
+		for key, value := range payloads {
+			if _, err := CheckAndPatchPayload(&config.ConfigItemDetails[i], key, value); err != nil {
 				return err
 			}
 		}
@@ -600,36 +590,21 @@ func UpdateConfigPayload(config *parametersv1alpha1.ComponentParameterSpec, comp
 	return nil
 }
 
-func rerenderConfigEnabled(configDescs []parametersv1alpha1.ComponentConfigDescription, rerenderType parametersv1alpha1.RerenderResourceType) bool {
-	for _, desc := range configDescs {
-		if slices.Contains(desc.ReRenderResourceTypes, rerenderType) {
-			return true
+// Only capacity participates: metadata and template ordering do not invalidate
+// configuration. Bytes also normalize equivalent quantities such as 1Gi/1024Mi.
+func volumeCapacitiesPayload(templates []appsv1.PersistentVolumeClaimTemplate) map[string]map[string]int64 {
+	volumes := make(map[string]map[string]int64, len(templates))
+	for _, template := range templates {
+		capacity := make(map[string]int64)
+		if q, ok := template.Spec.Resources.Requests[corev1.ResourceStorage]; ok {
+			capacity["requests"] = q.Value()
 		}
+		if q, ok := template.Spec.Resources.Limits[corev1.ResourceStorage]; ok {
+			capacity["limits"] = q.Value()
+		}
+		volumes[template.Name] = capacity
 	}
-	return false
-}
-
-func resolveShardingResource(sharding *appsv1.ClusterSharding) map[string]string {
-	return map[string]string{
-		"shards":   strconv.Itoa(int(sharding.Shards)),
-		"replicas": strconv.Itoa(int(sharding.Template.Replicas)),
-	}
-}
-
-func enableHScaleTrigger(configDescs []parametersv1alpha1.ComponentConfigDescription) bool {
-	return rerenderConfigEnabled(configDescs, parametersv1alpha1.ComponentHScaleType)
-}
-
-func enableVScaleTrigger(configDescs []parametersv1alpha1.ComponentConfigDescription) bool {
-	return rerenderConfigEnabled(configDescs, parametersv1alpha1.ComponentVScaleType)
-}
-
-func enableTLSTrigger(configDescs []parametersv1alpha1.ComponentConfigDescription) bool {
-	return rerenderConfigEnabled(configDescs, parametersv1alpha1.ComponentTLSType)
-}
-
-func enableShardingHVScaleTrigger(configDescs []parametersv1alpha1.ComponentConfigDescription) bool {
-	return rerenderConfigEnabled(configDescs, parametersv1alpha1.ShardingComponentHScaleType)
+	return volumes
 }
 
 func ResolveComponentTemplate(ctx context.Context, reader client.Reader, cmpd *appsv1.ComponentDefinition) (map[string]*corev1.ConfigMap, error) {

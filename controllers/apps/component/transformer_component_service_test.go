@@ -239,6 +239,40 @@ var _ = Describe("component service transformer test", func() {
 			Expect(graphCli.IsAction(dag, podService(2), model.ActionCreatePtr())).To(BeTrue())
 		})
 
+		DescribeTable("handles delayed requeues while building multiple services", func(invalidRole bool) {
+			transCtx.SynthesizeComponent.Replicas = 1
+			obsolete := podService(9)
+			reader.Objects = append(reader.Objects, podService(0), podService(1), podService(2), obsolete)
+			otherPodService := transCtx.SynthesizeComponent.ComponentServices[0].DeepCopy()
+			otherPodService.Name, otherPodService.ServiceName = "other", "other"
+			ordinaryService := appsv1.ComponentService{Service: appsv1.Service{Name: "client", ServiceName: "client"}}
+			if invalidRole {
+				ordinaryService.RoleSelector = "missing"
+			}
+			transCtx.SynthesizeComponent.ComponentServices = append(transCtx.SynthesizeComponent.ComponentServices,
+				*otherPodService, ordinaryService)
+
+			err := (&componentServiceTransformer{}).Transform(transCtx, dag)
+			graphCli := transCtx.Client.(model.GraphClient)
+			Expect(graphCli.IsAction(dag, podService(1), model.ActionDeletePtr())).To(BeFalse())
+			other := &corev1.Service{ObjectMeta: metav1.ObjectMeta{
+				Namespace: transCtx.Component.Namespace,
+				Name:      constant.GenerateComponentServiceName(clusterName, compName, "other-2"),
+			}}
+			Expect(graphCli.IsAction(dag, other, model.ActionCreatePtr())).To(BeTrue())
+			if invalidRole {
+				Expect(err).To(MatchError("role selector for service is not defined, service: client, role: missing"))
+				Expect(graphCli.IsAction(dag, obsolete, model.ActionDeletePtr())).To(BeFalse())
+			} else {
+				Expect(controllerutil.IsDelayedRequeueError(err)).To(BeTrue())
+				Expect(graphCli.FindAll(dag, &corev1.Service{})).To(HaveLen(8))
+				Expect(graphCli.IsAction(dag, obsolete, model.ActionDeletePtr())).To(BeTrue())
+			}
+		},
+			Entry("continues provisioning and cleanup without losing the retry", false),
+			Entry("returns a subsequent build failure instead of the retry", true),
+		)
+
 		DescribeTable("precreates services before Pods exist",
 			func(currentReplicas *int32) {
 				if currentReplicas == nil {

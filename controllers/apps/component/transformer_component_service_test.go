@@ -273,21 +273,13 @@ var _ = Describe("component service transformer test", func() {
 			Entry("returns a subsequent build failure instead of the retry", true),
 		)
 
-		DescribeTable("precreates services before Pods exist",
-			func(currentReplicas *int32) {
-				if currentReplicas == nil {
-					transCtx.RunningWorkload = nil
-				} else {
-					transCtx.RunningWorkload.Spec.Replicas = currentReplicas
-				}
-				Expect((&componentServiceTransformer{}).Transform(transCtx, dag)).To(Succeed())
-				graphCli := transCtx.Client.(model.GraphClient)
-				Expect(graphCli.FindAll(dag, &corev1.Service{})).To(HaveLen(3))
-				Expect(graphCli.IsAction(dag, podService(2), model.ActionCreatePtr())).To(BeTrue())
-			},
-			Entry("on creation", nil),
-			Entry("on scale-out", ptr.To[int32](1)),
-		)
+		It("precreates services during scale-out before Pods exist", func() {
+			transCtx.RunningWorkload.Spec.Replicas = ptr.To[int32](1)
+			Expect((&componentServiceTransformer{}).Transform(transCtx, dag)).To(Succeed())
+			graphCli := transCtx.Client.(model.GraphClient)
+			Expect(graphCli.FindAll(dag, &corev1.Service{})).To(HaveLen(3))
+			Expect(graphCli.IsAction(dag, podService(2), model.ActionCreatePtr())).To(BeTrue())
+		})
 
 		It("retains named and offline instances by name instead of replica count", func() {
 			transCtx.SynthesizeComponent.Replicas = 1
@@ -324,31 +316,46 @@ var _ = Describe("component service transformer test", func() {
 			Expect(names).To(ConsistOf(podServiceName(2), podServiceName(5), podServiceName(8), podServiceName(11)))
 		})
 
-		It("queries Pods in the data placement and retains their Service assistant objects", func() {
+		DescribeTable("retains remote Pod services until their Pods disappear", func(componentPlacement bool) {
 			transCtx.SynthesizeComponent.Replicas = 1
 			transCtx.RunningWorkload.Spec.Replicas = ptr.To[int32](1)
-			transCtx.RunningWorkload.Annotations = map[string]string{constant.KBAppMultiClusterPlacementKey: "test-context"}
+			annotations := map[string]string{constant.KBAppMultiClusterPlacementKey: "member-a"}
+			if componentPlacement {
+				transCtx.Component.Annotations = annotations
+			} else {
+				transCtx.RunningWorkload.Annotations = annotations
+			}
 			transCtx.SynthesizeComponent.EnableInstanceAPI = ptr.To(true)
-			transCtx.SynthesizeComponent.Annotations = transCtx.RunningWorkload.Annotations
-			listedPods := false
-			cli := fake.NewClientBuilder().WithScheme(k8sClient.Scheme()).WithObjects(newPod("1")).
-				WithInterceptorFuncs(interceptor.Funcs{List: func(ctx context.Context, cli client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
-					if _, ok := list.(*corev1.PodList); ok {
-						placement, err := multicluster.FromContext(ctx)
-						Expect(err).NotTo(HaveOccurred())
-						Expect(placement).To(Equal("test-context"))
-						Expect(opts).To(ContainElement(multicluster.InDataContext()))
-						listedPods = true
-					}
-					return cli.List(ctx, list, opts...)
-				}}).Build()
-			transCtx.Client = model.NewGraphClient(cli)
-			Expect(controllerutil.IsDelayedRequeueError((&componentServiceTransformer{}).Transform(transCtx, dag))).To(BeTrue())
-			Expect(listedPods).To(BeTrue())
-			Expect(transCtx.SynthesizeComponent.InstanceAssistantObjects).To(ContainElement(corev1.ObjectReference{
-				Kind: "Service", Namespace: transCtx.Component.Namespace, Name: podServiceName(1),
-			}))
-		})
+			transCtx.SynthesizeComponent.Annotations = annotations
+			remotePod := newPod("1")
+			svc1, svc2 := podService(1), podService(2)
+			control := fake.NewClientBuilder().WithScheme(k8sClient.Scheme()).WithObjects(svc1, svc2).Build()
+			memberA := fake.NewClientBuilder().WithScheme(k8sClient.Scheme()).WithObjects(remotePod).Build()
+			memberB := fake.NewClientBuilder().WithScheme(k8sClient.Scheme()).WithObjects(newPod("2")).Build()
+			cli := multicluster.NewClient(control, map[string]client.Client{"member-a": memberA, "member-b": memberB})
+			graphCli := model.NewGraphClient(cli)
+			transCtx.Client = graphCli
+			reconcile := func() error {
+				dag = newDAG(graphCli, transCtx.Component)
+				transCtx.SynthesizeComponent.InstanceAssistantObjects = nil
+				return (&componentServiceTransformer{}).Transform(transCtx, dag)
+			}
+
+			Expect(controllerutil.IsDelayedRequeueError(reconcile())).To(BeTrue())
+			Expect(graphCli.IsAction(dag, svc1, model.ActionUpdatePtr())).To(BeTrue())
+			// A Pod with matching labels in an unrelated cluster must not retain its Service.
+			Expect(graphCli.IsAction(dag, svc2, model.ActionDeletePtr())).To(BeTrue())
+			ref := corev1.ObjectReference{Kind: "Service", Namespace: svc1.Namespace, Name: svc1.Name}
+			Expect(transCtx.SynthesizeComponent.InstanceAssistantObjects).To(ContainElement(ref))
+
+			Expect(memberA.Delete(ctx, remotePod)).To(Succeed())
+			Expect(reconcile()).To(Succeed())
+			Expect(graphCli.IsAction(dag, svc1, model.ActionDeletePtr())).To(BeTrue())
+			Expect(transCtx.SynthesizeComponent.InstanceAssistantObjects).NotTo(ContainElement(ref))
+		},
+			Entry("using Component placement", true),
+			Entry("using existing workload placement when the Component has none", false),
+		)
 
 		It("does not delete Services when listing Pods fails", func() {
 			cli := fake.NewClientBuilder().WithScheme(k8sClient.Scheme()).WithObjects(podService(1)).
@@ -365,24 +372,17 @@ var _ = Describe("component service transformer test", func() {
 			Expect(transCtx.Client.(model.GraphClient).FindAll(dag, &corev1.Service{})).To(BeEmpty())
 		})
 
-		DescribeTable("cleans up explicitly removed pod services even while Pods exist",
-			func(disable bool) {
-				svc := podService(1)
-				reader.Objects = append(reader.Objects, newPod("1"), svc)
-				transCtx.SynthesizeComponent.Replicas = 1
-				if disable {
-					transCtx.SynthesizeComponent.ComponentServices[0].DisableAutoProvision = truep()
-				} else {
-					transCtx.SynthesizeComponent.ComponentServices = nil
-				}
-				Expect((&componentServiceTransformer{}).Transform(transCtx, dag)).To(Succeed())
-				Expect(transCtx.Client.(model.GraphClient).IsAction(dag, svc, model.ActionDeletePtr())).To(BeTrue())
-			},
-			Entry("removed from the configuration", false),
-			Entry("auto provision disabled", true),
-		)
+		It("cleans up disabled pod services even while Pods exist", func() {
+			svc := podService(1)
+			reader.Objects = append(reader.Objects, newPod("1"), svc)
+			transCtx.SynthesizeComponent.Replicas = 1
+			transCtx.SynthesizeComponent.ComponentServices[0].DisableAutoProvision = truep()
+			Expect((&componentServiceTransformer{}).Transform(transCtx, dag)).To(Succeed())
+			Expect(transCtx.Client.(model.GraphClient).IsAction(dag, svc, model.ActionDeletePtr())).To(BeTrue())
+		})
 
 		It("provision", func() {
+			transCtx.RunningWorkload = nil
 			transformer := &componentServiceTransformer{}
 			err := transformer.Transform(transCtx, dag)
 			Expect(err).Should(BeNil())
@@ -402,6 +402,7 @@ var _ = Describe("component service transformer test", func() {
 		})
 
 		It("deletion", func() {
+			reader.Objects = append(reader.Objects, newPod("1"))
 			services := make([]client.Object, 0)
 			for i := int32(0); i < transCtx.SynthesizeComponent.Replicas; i++ {
 				services = append(services, podService(i))

@@ -107,30 +107,32 @@ func (hs horizontalScalingOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli 
 			if slices.Contains([]opsv1alpha1.OpsType{opsv1alpha1.StartType, opsv1alpha1.StopType}, earlierOps.Spec.Type) {
 				return true, nil
 			}
+			if earlierOps.Status.Phase == opsv1alpha1.OpsPendingPhase {
+				return false, nil
+			}
+			needAborted := false
 			for _, v := range earlierOps.Spec.HorizontalScalingList {
 				compOps, ok := compOpsSet.componentOpsSet[v.ComponentName]
 				if !ok {
-					return false, nil
+					continue
 				}
 				currHorizontalScaling := compOps.(opsv1alpha1.HorizontalScaling)
-				// if the earlier opsRequest is pending return false.
-				if earlierOps.Status.Phase == opsv1alpha1.OpsPendingPhase {
-					return false, nil
-				}
 				if v.Shards != nil && currHorizontalScaling.Shards != nil {
-					return true, nil
+					needAborted = true
+					continue
 				}
 				// Ordinary scaling can supersede an earlier request without predicting
 				// which instance names that unfinished request would allocate.
 				if !hscaleFromBackup(currHorizontalScaling) {
-					return true, nil
+					needAborted = true
+					continue
 				}
 				// Backup recovery still needs the existing planned-name safety check.
 				if err := hs.checkIntersectionWithEarlierOps(opsRes, earlierOps, currHorizontalScaling, v); err != nil {
 					return false, err
 				}
 			}
-			return false, nil
+			return needAborted, nil
 		}); err != nil {
 		return err
 	}

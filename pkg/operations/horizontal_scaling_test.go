@@ -1221,6 +1221,135 @@ func TestHScaleValidatesBeforeSuperseding(t *testing.T) {
 	}
 }
 
+func TestHScaleSupersedeComponentOrder(t *testing.T) {
+	for _, sharedFirst := range []bool{false, true} {
+		t.Run(fmt.Sprintf("sharedFirst=%t", sharedFirst), func(t *testing.T) {
+			f := newHorizontalScalingFixture(t, scaleOutRequest("other", false), scaleOutRequest("db", false))
+			for _, spec := range f.res.Cluster.Spec.ComponentSpecs {
+				f.publishAllocation(t, spec.Name)
+			}
+			f.saveConfiguration(t)
+			earlier := f.res.OpsRequest.DeepCopy()
+			earlier.Name, earlier.UID, earlier.ResourceVersion = "earlier", "earlier", ""
+			if sharedFirst {
+				slices.Reverse(earlier.Spec.HorizontalScalingList)
+			}
+			if err := f.cli.Create(f.req.Ctx, earlier); err != nil {
+				t.Fatal(err)
+			}
+			for i := range f.res.Cluster.Spec.ComponentSpecs {
+				f.res.Cluster.Spec.ComponentSpecs[i].Replicas = 2
+				f.publishAllocation(t, f.res.Cluster.Spec.ComponentSpecs[i].Name)
+			}
+			f.res.OpsRequest.Spec.HorizontalScalingList = []opsv1alpha1.HorizontalScaling{scaleOutRequest("db", false)}
+			f.res.OpsRequest.Spec.Force = true
+			if err := f.cli.Update(f.req.Ctx, f.res.OpsRequest); err != nil {
+				t.Fatal(err)
+			}
+			f.saveConfiguration(t)
+			opsutil.SetOpsRequestToCluster(f.res.Cluster, []opsv1alpha1.OpsRecorder{
+				{Name: earlier.Name, Type: opsv1alpha1.HorizontalScalingType},
+				{Name: f.res.OpsRequest.Name, Type: opsv1alpha1.HorizontalScalingType},
+			})
+			if err := f.cli.Update(f.req.Ctx, f.res.Cluster); err != nil {
+				t.Fatal(err)
+			}
+			if err := (horizontalScalingOpsHandler{}).Action(f.req, f.cli, f.res); err != nil {
+				t.Fatal(err)
+			}
+			if err := f.cli.Get(f.req.Ctx, client.ObjectKeyFromObject(earlier), earlier); err != nil {
+				t.Fatal(err)
+			}
+			if earlier.Status.Phase != opsv1alpha1.OpsAbortedPhase {
+				t.Fatalf("overlapping request remains %s", earlier.Status.Phase)
+			}
+			if f.res.Cluster.Spec.ComponentSpecs[0].Replicas != 2 || f.res.Cluster.Spec.ComponentSpecs[1].Replicas != 3 {
+				t.Fatalf("unexpected replacement target: %+v", f.res.Cluster.Spec)
+			}
+			queue, err := opsutil.GetOpsRequestSliceFromCluster(f.res.Cluster)
+			if err != nil || len(queue) != 1 || queue[0].Name != f.res.OpsRequest.Name {
+				t.Fatalf("unexpected Ops queue: %v, err=%v", queue, err)
+			}
+		})
+	}
+}
+
+func TestHScaleChecksAllSupersedeConflictsBeforeAborting(t *testing.T) {
+	for _, separateRequests := range []bool{false, true} {
+		t.Run(fmt.Sprintf("separateRequests=%t", separateRequests), func(t *testing.T) {
+			f := newHorizontalScalingFixture(t, scaleOutRequest("ordinary", false), scaleOutRequest("restored", false))
+			for _, spec := range f.res.Cluster.Spec.ComponentSpecs {
+				f.publishAllocation(t, spec.Name)
+			}
+			f.saveConfiguration(t)
+			groups := [][]opsv1alpha1.HorizontalScaling{f.res.OpsRequest.Spec.HorizontalScalingList}
+			if separateRequests {
+				groups = [][]opsv1alpha1.HorizontalScaling{{scaleOutRequest("ordinary", false)}, {scaleOutRequest("restored", false)}}
+			}
+			var earlier []*opsv1alpha1.OpsRequest
+			var queue []opsv1alpha1.OpsRecorder
+			for i, group := range groups {
+				ops := f.res.OpsRequest.DeepCopy()
+				ops.Name, ops.UID, ops.ResourceVersion = fmt.Sprintf("earlier-%d", i), "", ""
+				ops.Spec.HorizontalScalingList = group
+				if err := f.cli.Create(f.req.Ctx, ops); err != nil {
+					t.Fatal(err)
+				}
+				earlier = append(earlier, ops)
+				queue = append(queue, opsv1alpha1.OpsRecorder{Name: ops.Name, Type: opsv1alpha1.HorizontalScalingType})
+			}
+			for i := range f.res.Cluster.Spec.ComponentSpecs {
+				f.res.Cluster.Spec.ComponentSpecs[i].Replicas = 2
+				f.publishAllocation(t, f.res.Cluster.Spec.ComponentSpecs[i].Name)
+			}
+			// The ordinary component can supersede its earlier request, but the
+			// backup component cannot remove an instance created by an earlier Ops.
+			backup := scaleOutRequest("restored", true)
+			backup.ScaleIn = &opsv1alpha1.ScaleIn{
+				ReplicaChanger:           opsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(1)},
+				OnlineInstancesToOffline: []string{"demo-restored-1"},
+			}
+			f.res.OpsRequest.Spec.HorizontalScalingList = []opsv1alpha1.HorizontalScaling{scaleOutRequest("ordinary", false), backup}
+			f.res.OpsRequest.Spec.Force = true
+			if err := f.cli.Update(f.req.Ctx, f.res.OpsRequest); err != nil {
+				t.Fatal(err)
+			}
+			f.saveConfiguration(t)
+			queue = append(queue, opsv1alpha1.OpsRecorder{Name: f.res.OpsRequest.Name, Type: opsv1alpha1.HorizontalScalingType})
+			opsutil.SetOpsRequestToCluster(f.res.Cluster, queue)
+			if err := f.cli.Update(f.req.Ctx, f.res.Cluster); err != nil {
+				t.Fatal(err)
+			}
+			before, writes := f.res.Cluster.DeepCopy(), f.clusterWrites
+			err := (horizontalScalingOpsHandler{}).Action(f.req, f.cli, f.res)
+			if !intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal) || !strings.Contains(err.Error(), "demo-restored-1") {
+				t.Fatalf("expected backup intersection rejection: %v", err)
+			}
+			for _, ops := range earlier {
+				stored := &opsv1alpha1.OpsRequest{}
+				if err := f.cli.Get(f.req.Ctx, client.ObjectKeyFromObject(ops), stored); err != nil {
+					t.Fatal(err)
+				}
+				if !reflect.DeepEqual(ops.Status, stored.Status) || stored.Status.Phase != opsv1alpha1.OpsRunningPhase {
+					t.Fatalf("rejected request changed earlier Ops %s: %+v", ops.Name, stored.Status)
+				}
+			}
+			stored := &appsv1.Cluster{}
+			if err := f.cli.Get(f.req.Ctx, client.ObjectKeyFromObject(before), stored); err != nil {
+				t.Fatal(err)
+			}
+			if f.clusterWrites != writes || !reflect.DeepEqual(before, stored) || !reflect.DeepEqual(before, f.res.Cluster) {
+				t.Fatal("rejected request changed Cluster spec, metadata or queue")
+			}
+			select {
+			case event := <-f.res.Recorder.(*record.FakeRecorder).Events:
+				t.Fatalf("rejected request emitted an event: %s", event)
+			default:
+			}
+		})
+	}
+}
+
 func TestHScaleAllocatedIdentities(t *testing.T) {
 	for _, flat := range []bool{false, true} {
 		t.Run(fmt.Sprintf("flat=%t", flat), func(t *testing.T) {

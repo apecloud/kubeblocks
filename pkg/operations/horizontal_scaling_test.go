@@ -33,6 +33,7 @@ import (
 
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -41,6 +42,7 @@ import (
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -1023,100 +1025,6 @@ func createHorizontalScaling(clusterName string, horizontalScaling opsv1alpha1.H
 	return opsRequest
 }
 
-func TestHorizontalScalingCreateRestorePreservesPerPodStartingIndex(t *testing.T) {
-	ctx := context.Background()
-	scheme := runtime.NewScheme()
-	for _, addToScheme := range []func(*runtime.Scheme) error{
-		corev1.AddToScheme,
-		appsv1.AddToScheme,
-		dpv1alpha1.AddToScheme,
-		opsv1alpha1.AddToScheme,
-	} {
-		if err := addToScheme(scheme); err != nil {
-			t.Fatalf("add scheme: %v", err)
-		}
-	}
-
-	cluster := &appsv1.Cluster{
-		ObjectMeta: metav1.ObjectMeta{Name: "redis", Namespace: "default", UID: types.UID("cluster1")},
-	}
-	opsRequest := &opsv1alpha1.OpsRequest{
-		ObjectMeta: metav1.ObjectMeta{Name: "scale-out-from-backup", Namespace: "default", UID: types.UID("opsreq1")},
-	}
-	backup := &dpv1alpha1.Backup{
-		ObjectMeta: metav1.ObjectMeta{Name: "redis-backup", Namespace: "default"},
-		Status: dpv1alpha1.BackupStatus{
-			Phase: dpv1alpha1.BackupPhaseCompleted,
-			BackupMethod: &dpv1alpha1.BackupMethod{
-				Name:          "snapshot",
-				TargetVolumes: &dpv1alpha1.TargetVolumeInfo{Volumes: []string{"data"}},
-			},
-			Targets: []dpv1alpha1.BackupStatusTarget{{
-				BackupTarget: dpv1alpha1.BackupTarget{
-					Name:        "redis",
-					PodSelector: &dpv1alpha1.PodSelector{Strategy: dpv1alpha1.PodSelectionStrategyAll},
-				},
-				SelectedTargetPods: []string{"redis-az-a-4", "redis-az-a-3"},
-			}},
-		},
-	}
-	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, opsRequest, backup).Build()
-	opsRes := &OpsResource{Cluster: cluster, OpsRequest: opsRequest}
-	synthesizedComponent := &component.SynthesizedComponent{
-		Name: "redis",
-		VolumeClaimTemplates: []corev1.PersistentVolumeClaimTemplate{{
-			ObjectMeta: metav1.ObjectMeta{Name: "data"},
-		}},
-	}
-	componentSpec := &appsv1.ClusterComponentSpec{
-		Name: "redis",
-		Instances: []appsv1.InstanceTemplate{{
-			Name: "az-a",
-			Ordinals: appsv1.Ordinals{
-				Ranges: []appsv1.Range{{Start: 3, End: 4}},
-			},
-		}},
-	}
-	for _, ordinal := range []int32{3, 4} {
-		restoreMGR := plan.NewRestoreManager(ctx, cli, cluster, scheme, map[string]string{
-			constant.OpsRequestNameLabelKey: opsRequest.Name,
-		}, 1, ordinal)
-		err := horizontalScalingOpsHandler{}.createRestore(
-			intctrlutil.RequestCtx{Ctx: ctx, Recorder: record.NewFakeRecorder(1)},
-			cli, opsRes, synthesizedComponent, restoreMGR, componentSpec, backup, "az-a")
-		if err != nil {
-			t.Fatalf("create restore for ordinal %d: %v", ordinal, err)
-		}
-	}
-
-	restoreList := &dpv1alpha1.RestoreList{}
-	if err := cli.List(ctx, restoreList, client.InNamespace("default")); err != nil {
-		t.Fatalf("list restores: %v", err)
-	}
-	if len(restoreList.Items) != 2 {
-		t.Fatalf("expected two restores, got %d", len(restoreList.Items))
-	}
-	restoresByOrdinal := map[int32]dpv1alpha1.Restore{}
-	for i := range restoreList.Items {
-		restore := restoreList.Items[i]
-		startingIndex := restore.Spec.PrepareDataConfig.RestoreVolumeClaimsTemplate.StartingIndex
-		restoresByOrdinal[startingIndex] = restore
-	}
-	for _, ordinal := range []int32{3, 4} {
-		restore, ok := restoresByOrdinal[ordinal]
-		if !ok {
-			t.Fatalf("missing restore for actual scale-out pod ordinal %d", ordinal)
-		}
-		claimTemplate := restore.Spec.PrepareDataConfig.RestoreVolumeClaimsTemplate
-		if claimTemplate.Replicas != 1 {
-			t.Fatalf("restore replicas = %d, want 1 for ordinal %d", claimTemplate.Replicas, ordinal)
-		}
-		if got := claimTemplate.Templates[0].Labels[constant.KBAppInstanceTemplateLabelKey]; got != "az-a" {
-			t.Fatalf("instance template label = %q, want %q for ordinal %d", got, "az-a", ordinal)
-		}
-	}
-}
-
 func cancelOpsRequest(reqCtx intctrlutil.RequestCtx, opsRes *OpsResource, cancelTime time.Time) {
 	opsRequest := opsRes.OpsRequest
 	opsRequest.Spec.Cancel = true
@@ -1133,112 +1041,6 @@ func mockConsensusCompToRunning(opsRes *OpsResource) {
 	compStatus := opsRes.Cluster.Status.Components[defaultCompName]
 	compStatus.Phase = appsv1.RunningComponentPhase
 	opsRes.Cluster.Status.Components[defaultCompName] = compStatus
-}
-
-func TestHorizontalScalingCreateRestoreReturnsFatalWhenNoRestoreBuilt(t *testing.T) {
-	testCases := []struct {
-		name         string
-		backupMethod *dpv1alpha1.BackupMethod
-		expectError  string
-	}{
-		{
-			name:         "completed backup without backup method",
-			backupMethod: nil,
-			expectError:  "status.backupMethod",
-		}, {
-			// logical backups (e.g. TiDB BR) have no targetVolumes at all
-			name:         "backup method without target volumes",
-			backupMethod: &dpv1alpha1.BackupMethod{Name: "br"},
-			expectError:  "has no target volumes matching component",
-		}, {
-			// targetVolumes exist but none match the component's volume claim templates
-			name: "backup method target volumes match no component volume",
-			backupMethod: &dpv1alpha1.BackupMethod{
-				Name: "br",
-				TargetVolumes: &dpv1alpha1.TargetVolumeInfo{
-					Volumes: []string{"other-data"},
-				},
-			},
-			expectError: "has no target volumes matching component",
-		}}
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			ctx := context.Background()
-			scheme := runtime.NewScheme()
-			for _, addToScheme := range []func(*runtime.Scheme) error{
-				corev1.AddToScheme,
-				appsv1.AddToScheme,
-				dpv1alpha1.AddToScheme,
-				opsv1alpha1.AddToScheme,
-			} {
-				if err := addToScheme(scheme); err != nil {
-					t.Fatalf("add scheme: %v", err)
-				}
-			}
-
-			cluster := &appsv1.Cluster{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "tidb",
-					Namespace: "default",
-					UID:       types.UID("cluster1"),
-				},
-			}
-			opsRequest := &opsv1alpha1.OpsRequest{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "scale-out-from-backup",
-					Namespace: "default",
-					UID:       types.UID("opsreq1"),
-				},
-			}
-			backup := &dpv1alpha1.Backup{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "br-full",
-					Namespace: "default",
-				},
-				Status: dpv1alpha1.BackupStatus{
-					Phase:        dpv1alpha1.BackupPhaseCompleted,
-					BackupMethod: tc.backupMethod,
-				},
-			}
-			cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, opsRequest, backup).Build()
-			opsRes := &OpsResource{
-				Cluster:    cluster,
-				OpsRequest: opsRequest,
-			}
-			synthesizedComponent := &component.SynthesizedComponent{
-				Name: "tikv",
-				VolumeClaimTemplates: []corev1.PersistentVolumeClaimTemplate{{
-					ObjectMeta: metav1.ObjectMeta{Name: "data"},
-					Spec: corev1.PersistentVolumeClaimSpec{
-						AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-					},
-				}},
-			}
-			restoreMGR := plan.NewRestoreManager(ctx, cli, cluster, scheme, map[string]string{
-				constant.OpsRequestNameLabelKey: opsRequest.Name,
-			}, 1, 3)
-
-			err := horizontalScalingOpsHandler{}.createRestore(intctrlutil.RequestCtx{Ctx: ctx}, cli, opsRes,
-				synthesizedComponent, restoreMGR, &appsv1.ClusterComponentSpec{Name: "tikv"}, backup, "")
-			if err == nil {
-				t.Fatal("expected fatal error when backup method cannot build prepareData restore")
-			}
-			if !intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal) {
-				t.Fatalf("expected fatal error, got %T: %v", err, err)
-			}
-			if !strings.Contains(err.Error(), tc.expectError) {
-				t.Fatalf("unexpected error: %v", err)
-			}
-
-			restoreList := &dpv1alpha1.RestoreList{}
-			if err := cli.List(ctx, restoreList, client.InNamespace("default")); err != nil {
-				t.Fatalf("list restores: %v", err)
-			}
-			if len(restoreList.Items) != 0 {
-				t.Fatalf("expected no restore to be created, got %d", len(restoreList.Items))
-			}
-		})
-	}
 }
 
 func TestHScaleRejectsFlatFromBackupBeforeMutation(t *testing.T) {
@@ -1583,7 +1385,7 @@ func TestHScaleTemplateReassignment(t *testing.T) {
 // forward ReconcileAction publishing progress first. Desired allocation alone
 // must neither complete rollback nor make unrelated objects participants.
 func TestNonFlatHScaleCancellation(t *testing.T) {
-	for _, operation := range []string{"scale-out", "scale-in", "named-swap", "online-high-ordinal", "default-ordinals", "from-backup"} {
+	for _, operation := range []string{"scale-out", "scale-in", "named-swap", "online-high-ordinal", "default-ordinals"} {
 		for _, unrelatedReleased := range []bool{false, true} {
 			t.Run(fmt.Sprintf("%s/unrelated-released=%t", operation, unrelatedReleased), func(t *testing.T) {
 				ctx := context.Background()
@@ -1599,14 +1401,9 @@ func TestNonFlatHScaleCancellation(t *testing.T) {
 				var restored, removed []string
 				offline := map[string]string{}
 				switch operation {
-				case "scale-out", "from-backup":
+				case "scale-out":
 					scaling.ScaleOut = &opsv1alpha1.ScaleOut{ReplicaChanger: opsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(1)}}
 					removed = []string{"demo-db-2"}
-					if operation == "from-backup" {
-						// No Backup exists in the client: cancellation must not invoke
-						// restore or depend on its state.
-						scaling.ScaleOut.FromBackup = &opsv1alpha1.FromBackup{Name: "not-needed-for-cancel"}
-					}
 				case "scale-in":
 					scaling.ScaleIn = &opsv1alpha1.ScaleIn{ReplicaChanger: opsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(1)}}
 					restored = []string{"demo-db-1"}
@@ -1917,5 +1714,428 @@ func TestHScaleInstanceStatusLifecycle(t *testing.T) {
 				check(opsv1alpha1.OpsSucceedPhase)
 			})
 		}
+	}
+}
+
+// Use the real naming and workload runtime; only API storage is in memory.
+type horizontalScalingFixture struct {
+	cli                                      client.Client
+	res                                      *OpsResource
+	req                                      intctrlutil.RequestCtx
+	clusterWrites, backupReads, restoreReads int
+}
+
+// Observe the real runtime and inject failures only to check short-circuit order.
+type horizontalScalingRuntimeTrace struct {
+	OpsRuntime
+	calls  []string
+	specs  []appsv1.ClusterComponentSpec
+	failAt int
+	err    error
+}
+
+func (r *horizontalScalingRuntimeTrace) GenerateInstanceNameSet(clusterName, compName string, replicas int32,
+	instances []appsv1.InstanceTemplate, offline []string) (map[string]string, error) {
+	r.calls = append(r.calls, fmt.Sprintf("names(%s,%d)", compName, replicas))
+	spec := appsv1.ClusterComponentSpec{Name: compName, Replicas: replicas, Instances: instances, OfflineInstances: offline}
+	r.specs = append(r.specs, *spec.DeepCopy())
+	if r.failAt > 0 && len(r.calls) == r.failAt {
+		return nil, r.err
+	}
+	return r.OpsRuntime.GenerateInstanceNameSet(clusterName, compName, replicas, instances, offline)
+}
+
+func (r *horizontalScalingRuntimeTrace) GetWorkload(namespace, clusterName, compName string) (Workload, error) {
+	r.calls = append(r.calls, "workload("+compName+")")
+	return r.OpsRuntime.GetWorkload(namespace, clusterName, compName)
+}
+
+func newHorizontalScalingFixture(t *testing.T, requests ...opsv1alpha1.HorizontalScaling) *horizontalScalingFixture {
+	t.Helper()
+	f := &horizontalScalingFixture{}
+	f.req = intctrlutil.RequestCtx{Ctx: context.Background(), Recorder: record.NewFakeRecorder(100)}
+	scheme := runtime.NewScheme()
+	for _, add := range []func(*runtime.Scheme) error{corev1.AddToScheme, appsv1.AddToScheme,
+		dpv1alpha1.AddToScheme, opsv1alpha1.AddToScheme, workloads.AddToScheme} {
+		if err := add(scheme); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cluster := &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default", UID: "cluster1"},
+		Status: appsv1.ClusterStatus{Phase: appsv1.RunningClusterPhase}}
+	ops := &opsv1alpha1.OpsRequest{ObjectMeta: metav1.ObjectMeta{Name: "scale", Namespace: "default", UID: "opsreq123"},
+		Spec: opsv1alpha1.OpsRequestSpec{Type: opsv1alpha1.HorizontalScalingType,
+			SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{HorizontalScalingList: requests}},
+		Status: opsv1alpha1.OpsRequestStatus{Phase: opsv1alpha1.OpsRunningPhase}}
+	objects := []client.Object{cluster, ops, &appsv1.ComponentDefinition{ObjectMeta: metav1.ObjectMeta{Name: "database"}}}
+	for _, request := range requests {
+		spec := appsv1.ClusterComponentSpec{Name: request.ComponentName, ComponentDef: "database", Replicas: 1,
+			VolumeClaimTemplates: []appsv1.PersistentVolumeClaimTemplate{{Name: "data"}}}
+		cluster.Spec.ComponentSpecs = append(cluster.Spec.ComponentSpecs, spec)
+		comp, err := component.BuildComponent(cluster, &spec, nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		objects = append(objects, comp)
+	}
+	f.cli = fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).
+		WithStatusSubresource(ops, &dpv1alpha1.Restore{}, &workloads.InstanceSet{}).WithInterceptorFuncs(interceptor.Funcs{
+		Get: func(ctx context.Context, cli client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+			switch obj.(type) {
+			case *dpv1alpha1.Backup:
+				f.backupReads++
+			case *dpv1alpha1.Restore:
+				f.restoreReads++
+			}
+			return cli.Get(ctx, key, obj, opts...)
+		},
+		Update: func(ctx context.Context, cli client.WithWatch, obj client.Object, opts ...client.UpdateOption) error {
+			if _, ok := obj.(*appsv1.Cluster); ok {
+				f.clusterWrites++
+			}
+			return cli.Update(ctx, obj, opts...)
+		},
+	}).Build()
+	f.res = &OpsResource{Cluster: cluster, OpsRequest: ops, Recorder: f.req.Recorder}
+	var err error
+	f.res.Runtimes, err = buildOpsRuntimes(f.req.Ctx, f.cli, f.res)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return f
+}
+
+// saveConfiguration models OpsManager persisting configuration before Action.
+func (f *horizontalScalingFixture) saveConfiguration(t *testing.T) {
+	t.Helper()
+	if err := (horizontalScalingOpsHandler{}).SaveLastConfiguration(f.req, f.cli, f.res); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.cli.Status().Update(f.req.Ctx, f.res.OpsRequest); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// publishAllocation runs the real workload producers only when a test explicitly advances the workload.
+func (f *horizontalScalingFixture) publishAllocation(t *testing.T, spec appsv1.ClusterComponentSpec) {
+	t.Helper()
+	key := client.ObjectKey{Namespace: "default", Name: "demo-" + spec.Name}
+	its := &workloads.InstanceSet{}
+	err := f.cli.Get(f.req.Ctx, key, its)
+	fresh := apierrors.IsNotFound(err)
+	if err != nil && !fresh {
+		t.Fatal(err)
+	}
+	if fresh {
+		its.ObjectMeta = metav1.ObjectMeta{Name: key.Name, Namespace: key.Namespace}
+	}
+	its.Generation++
+	its.Spec.Replicas = pointer.Int32(spec.Replicas)
+	its.Spec.OfflineInstances = spec.OfflineInstances
+	its.Spec.Instances = nil
+	its.Spec.Selector = &metav1.LabelSelector{MatchLabels: constant.GetCompLabels("demo", spec.Name)}
+	its.Spec.Template = corev1.PodTemplateSpec{Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "db", Image: "mysql:8"}}}}
+	for _, template := range spec.Instances {
+		its.Spec.Instances = append(its.Spec.Instances, workloads.InstanceTemplate{
+			Name: template.Name, Replicas: template.Replicas, Ordinals: template.Ordinals})
+	}
+	tree := kubebuilderx.NewObjectTree()
+	tree.SetRoot(its)
+	pods := &corev1.PodList{}
+	if err := f.cli.List(f.req.Ctx, pods, client.InNamespace(key.Namespace),
+		client.MatchingLabels(constant.GetCompLabels("demo", spec.Name))); err != nil {
+		t.Fatal(err)
+	}
+	for i := range pods.Items {
+		if err := tree.Add(&pods.Items[i]); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, reconciler := range []kubebuilderx.Reconciler{instanceset.NewRevisionUpdateReconciler(), instanceset.NewStatusReconciler()} {
+		if _, err := reconciler.Reconcile(tree); err != nil {
+			t.Fatal(err)
+		}
+	}
+	status := its.Status.DeepCopy()
+	if fresh {
+		err = f.cli.Create(f.req.Ctx, its)
+	} else {
+		err = f.cli.Update(f.req.Ctx, its)
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	its.Status = *status
+	if err := f.cli.Status().Update(f.req.Ctx, its); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func scaleOutRequest(name string) opsv1alpha1.HorizontalScaling {
+	return opsv1alpha1.HorizontalScaling{ComponentOps: opsv1alpha1.ComponentOps{ComponentName: name},
+		ScaleOut: &opsv1alpha1.ScaleOut{ReplicaChanger: opsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(1)}}}
+}
+
+func (f *horizontalScalingFixture) replicas(t *testing.T, name string, want int32) {
+	t.Helper()
+	cluster := &appsv1.Cluster{}
+	if err := f.cli.Get(f.req.Ctx, client.ObjectKeyFromObject(f.res.Cluster), cluster); err != nil {
+		t.Fatal(err)
+	}
+	if got := cluster.Spec.GetComponentByName(name).Replicas; got != want {
+		t.Fatalf("%s replicas = %d, want %d", name, got, want)
+	}
+}
+
+func (f *horizontalScalingFixture) reconcile(t *testing.T, want opsv1alpha1.OpsPhase) {
+	t.Helper()
+	phase, _, err := (horizontalScalingOpsHandler{}).ReconcileAction(f.req, f.cli, f.res)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if phase != want {
+		t.Fatalf("reconcile phase = %s, want %s", phase, want)
+	}
+}
+
+func TestHorizontalScalingOrdinaryPathDoesNotRestore(t *testing.T) {
+	f := newHorizontalScalingFixture(t, scaleOutRequest("db"))
+	f.publishAllocation(t, f.res.Cluster.Spec.ComponentSpecs[0])
+	trace := &horizontalScalingRuntimeTrace{OpsRuntime: f.res.Runtimes["db"]}
+	f.res.Runtimes["db"] = trace
+	f.saveConfiguration(t)
+	t.Cleanup(func() {
+		for _, call := range trace.calls {
+			if strings.HasPrefix(call, "names(") {
+				t.Fatalf("ordinary scaling invoked name planning: %s", call)
+			}
+		}
+	})
+	if err := (horizontalScalingOpsHandler{}).Action(f.req, f.cli, f.res); err != nil {
+		t.Fatal(err)
+	}
+	f.replicas(t, "db", 2)
+	// Until the owner publishes the new allocation, no participant is invented.
+	f.reconcile(t, opsv1alpha1.OpsRunningPhase)
+	if len(f.res.OpsRequest.Status.Components["db"].ProgressDetails) != 0 {
+		t.Fatal("unpublished target produced participants")
+	}
+	f.publishAllocation(t, f.res.Cluster.Spec.ComponentSpecs[0])
+	f.reconcile(t, opsv1alpha1.OpsRunningPhase)
+	if f.backupReads != 0 || f.restoreReads != 0 || f.clusterWrites != 1 {
+		t.Fatalf("ordinary path API calls: backup=%d restore=%d cluster writes=%d", f.backupReads, f.restoreReads, f.clusterWrites)
+	}
+	details := f.res.OpsRequest.Status.Components["db"].ProgressDetails
+	if f.res.OpsRequest.Status.Progress != "0/1" || len(details) != 1 || details[0].ObjectKey != "Pod/demo-db-1" || details[0].Status != opsv1alpha1.PendingProgressStatus {
+		t.Fatalf("unexpected create progress: %+v", f.res.OpsRequest.Status)
+	}
+}
+
+func TestHorizontalScalingMixedComponentsRestoreTiming(t *testing.T) {
+	for _, backupFirst := range []bool{false, true} {
+		name := "ordinary-first"
+		if backupFirst {
+			name = "backup-first"
+		}
+		t.Run(name, func(t *testing.T) {
+			requests := []opsv1alpha1.HorizontalScaling{scaleOutRequest("ordinary"), backupScaleOutRequest("restored")}
+			if backupFirst {
+				requests[0], requests[1] = requests[1], requests[0]
+			}
+			f := newHorizontalScalingFixture(t, requests...)
+			f.publishAllocation(t, *f.res.Cluster.Spec.GetComponentByName("ordinary"))
+			f.saveConfiguration(t)
+			f.addBackup(t)
+			if err := (horizontalScalingOpsHandler{}).Action(f.req, f.cli, f.res); err != nil {
+				t.Fatal(err)
+			}
+			f.replicas(t, "ordinary", 2)
+			f.replicas(t, "restored", 1)
+			if f.backupReads != 0 || f.restoreReads != 0 {
+				t.Fatal("Action must defer Restore work")
+			}
+			for i := 0; i < 2; i++ {
+				f.reconcile(t, opsv1alpha1.OpsRunningPhase)
+				f.replicas(t, "restored", 1)
+				if f.clusterWrites != 1 {
+					t.Fatal("pending Restore wrote target configuration")
+				}
+				if got := f.res.OpsRequest.Status.Components["restored"].Message; got != "Restore Data In Progress" {
+					t.Fatalf("message = %q", got)
+				}
+				if got := f.res.OpsRequest.Status.Progress; got != "0/2" {
+					t.Fatalf("progress = %q", got)
+				}
+			}
+			restores := &dpv1alpha1.RestoreList{}
+			if err := f.cli.List(f.req.Ctx, restores); err != nil {
+				t.Fatal(err)
+			}
+			if len(restores.Items) != 1 {
+				t.Fatalf("repeated reconcile created %d restores", len(restores.Items))
+			}
+			restore := &restores.Items[0]
+			if restore.Spec.PrepareDataConfig.RestoreVolumeClaimsTemplate.StartingIndex != 1 {
+				t.Fatal("unexpected restore ordinal")
+			}
+			restore.Status.Phase = dpv1alpha1.RestorePhaseCompleted
+			if err := f.cli.Status().Update(f.req.Ctx, restore); err != nil {
+				t.Fatal(err)
+			}
+			f.reconcile(t, opsv1alpha1.OpsRunningPhase)
+			f.replicas(t, "restored", 2)
+			if f.clusterWrites != 2 || f.res.OpsRequest.Status.Components["restored"].Message != "Restore Data Completed" {
+				t.Fatal("missing restore completion write/message")
+			}
+			reads := f.backupReads + f.restoreReads
+			f.reconcile(t, opsv1alpha1.OpsRunningPhase)
+			if f.clusterWrites != 2 || reads != f.backupReads+f.restoreReads {
+				t.Fatal("completed marker did not skip repeated restore work")
+			}
+			f.publishAllocation(t, *f.res.Cluster.Spec.GetComponentByName("ordinary"))
+			// Restore completion alone does not complete the Ops: the newly
+			// requested instances must become available on both paths.
+			for _, name := range []string{"ordinary", "restored"} {
+				pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "demo-" + name + "-1", Namespace: "default",
+					Labels: constant.GetCompLabels("demo", name)},
+					Status: corev1.PodStatus{Phase: corev1.PodRunning,
+						Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}}}}
+				if err := f.cli.Create(f.req.Ctx, pod); err != nil {
+					t.Fatal(err)
+				}
+				if name == "ordinary" {
+					f.publishAllocation(t, *f.res.Cluster.Spec.GetComponentByName(name))
+				}
+			}
+			f.reconcile(t, opsv1alpha1.OpsSucceedPhase)
+			if got := f.res.OpsRequest.Status.Progress; got != "2/2" {
+				t.Fatalf("completed progress = %q", got)
+			}
+			for _, name := range []string{"ordinary", "restored"} {
+				details := f.res.OpsRequest.Status.Components[name].ProgressDetails
+				if len(details) != 1 || details[0].ObjectKey != "Pod/demo-"+name+"-1" || details[0].Status != opsv1alpha1.SucceedProgressStatus {
+					t.Fatalf("unexpected completed participants for %s: %+v", name, details)
+				}
+			}
+			f.reconcile(t, opsv1alpha1.OpsSucceedPhase)
+			if f.clusterWrites != 2 || reads != f.backupReads+f.restoreReads {
+				t.Fatal("completed Ops repeated restore work")
+			}
+		})
+	}
+}
+
+func TestHorizontalScalingCancelRestoresConfigurationAndDirection(t *testing.T) {
+	f := newHorizontalScalingFixture(t, scaleOutRequest("db"))
+	spec := &f.res.Cluster.Spec.ComponentSpecs[0]
+	spec.Instances = []appsv1.InstanceTemplate{{Name: "foo", Replicas: pointer.Int32(1)}}
+	spec.OfflineInstances = []string{"demo-db-foo-0"}
+	f.publishAllocation(t, *spec)
+	hs := horizontalScalingOpsHandler{}
+	if err := hs.SaveLastConfiguration(f.req, f.cli, f.res); err != nil {
+		t.Fatal(err)
+	}
+	last := f.res.OpsRequest.Status.LastConfiguration.Components["db"]
+	if err := f.cli.Status().Update(f.req.Ctx, f.res.OpsRequest); err != nil {
+		t.Fatal(err)
+	}
+	if err := hs.Action(f.req, f.cli, f.res); err != nil {
+		t.Fatal(err)
+	}
+	f.publishAllocation(t, *spec)
+	f.reconcile(t, opsv1alpha1.OpsRunningPhase)
+	details := f.res.OpsRequest.Status.Components["db"].ProgressDetails
+	if f.res.OpsRequest.Status.Progress != "0/1" || len(details) != 1 || details[0].ObjectKey != "Pod/demo-db-0" ||
+		details[0].Status != opsv1alpha1.PendingProgressStatus || !strings.Contains(details[0].Message, "create") {
+		t.Fatalf("unexpected create participants: %+v", f.res.OpsRequest.Status)
+	}
+	f.res.OpsRequest.Status.Phase = opsv1alpha1.OpsCancellingPhase
+	if err := hs.Cancel(f.req, f.cli, f.res); err != nil {
+		t.Fatal(err)
+	}
+	if spec.Replicas != *last.Replicas || !reflect.DeepEqual(spec.Instances, last.Instances) || !reflect.DeepEqual(spec.OfflineInstances, last.OfflineInstances) {
+		t.Fatal("Cancel did not restore the original configuration")
+	}
+	// ReconcileAction reports successful rollback; OpsManager maps it to Cancelled.
+	f.reconcile(t, opsv1alpha1.OpsSucceedPhase)
+	details = f.res.OpsRequest.Status.Components["db"].ProgressDetails
+	if f.res.OpsRequest.Status.Progress != "1/1" || len(details) != 1 || details[0].ObjectKey != "Pod/demo-db-0" || !strings.Contains(details[0].Message, "delete") {
+		t.Fatalf("unexpected cancel progress: %+v", f.res.OpsRequest.Status)
+	}
+}
+
+func TestHorizontalScalingShardCountAndShardReplicas(t *testing.T) {
+	for _, changeCount := range []bool{false, true} {
+		name := "replicas-per-shard"
+		request := scaleOutRequest("sharded")
+		if changeCount {
+			name = "shard-count"
+			request.ScaleOut = nil
+			request.Shards = pointer.Int32(3)
+		}
+		t.Run(name, func(t *testing.T) {
+			f := newHorizontalScalingFixture(t, request)
+			cluster := f.res.Cluster
+			cluster.Spec.Shardings = []appsv1.ClusterSharding{{Name: "sharded", Shards: 2, Template: cluster.Spec.ComponentSpecs[0]}}
+			cluster.Spec.ComponentSpecs = nil
+			for _, shard := range []string{"sharded-a", "sharded-b"} {
+				comp := &appsv1.Component{ObjectMeta: metav1.ObjectMeta{Name: "demo-" + shard, Namespace: "default",
+					Labels: constant.GetCompLabels("demo", shard, map[string]string{constant.KBAppShardingNameLabelKey: "sharded"})}}
+				if err := f.cli.Create(f.req.Ctx, comp); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if !changeCount {
+				for _, name := range []string{"sharded-a", "sharded-b"} {
+					spec := cluster.Spec.Shardings[0].Template
+					spec.Name = name
+					f.publishAllocation(t, spec)
+				}
+			}
+			hs := horizontalScalingOpsHandler{}
+			if err := hs.SaveLastConfiguration(f.req, f.cli, f.res); err != nil {
+				t.Fatal(err)
+			}
+			if err := f.cli.Status().Update(f.req.Ctx, f.res.OpsRequest); err != nil {
+				t.Fatal(err)
+			}
+			if err := hs.Action(f.req, f.cli, f.res); err != nil {
+				t.Fatal(err)
+			}
+			wantShards, wantReplicas, wantProgress := int32(2), int32(2), "0/2"
+			if changeCount {
+				wantShards, wantReplicas, wantProgress = 3, 1, "0/1"
+			}
+			if got := cluster.Spec.Shardings[0]; got.Shards != wantShards || got.Template.Replicas != wantReplicas {
+				t.Fatalf("unexpected sharding: %+v", got)
+			}
+			if !changeCount {
+				for _, name := range []string{"sharded-a", "sharded-b"} {
+					spec := cluster.Spec.Shardings[0].Template
+					spec.Name = name
+					f.publishAllocation(t, spec)
+				}
+			}
+			f.reconcile(t, opsv1alpha1.OpsRunningPhase)
+			if got := f.res.OpsRequest.Status.Progress; got != wantProgress {
+				t.Fatalf("progress = %s, want %s", got, wantProgress)
+			}
+			details := f.res.OpsRequest.Status.Components["sharded"].ProgressDetails
+			if len(details) != 2 {
+				t.Fatalf("progress details = %+v", details)
+			}
+			for _, detail := range details {
+				prefix := "Pod/demo-sharded-"
+				if changeCount {
+					prefix = "Component/demo-sharded-"
+				}
+				if !strings.HasPrefix(detail.ObjectKey, prefix) {
+					t.Fatalf("wrong progress path: %+v", detail)
+				}
+			}
+			if f.backupReads != 0 || f.restoreReads != 0 {
+				t.Fatal("sharding request entered Restore path")
+			}
+		})
 	}
 }

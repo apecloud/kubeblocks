@@ -516,6 +516,55 @@ func (r *ComponentDefinitionReconciler) validatePolicyRules(cli client.Client, r
 
 func (r *ComponentDefinitionReconciler) validateLifecycleActions(cli client.Client, reqCtx intctrlutil.RequestCtx,
 	cmpd *appsv1.ComponentDefinition) error {
+	validate := func(path string, action *appsv1.Action) error {
+		if action != nil && action.NonBlocking {
+			return fmt.Errorf("%s does not support non-blocking mode", path)
+		}
+		return nil
+	}
+
+	if actions := cmpd.Spec.LifecycleActions; actions != nil {
+		type actionField struct {
+			path   string
+			action *appsv1.Action
+		}
+		actionFields := []actionField{
+			{"spec.lifecycleActions.postProvision", actions.PostProvision},
+			{"spec.lifecycleActions.preTerminate", actions.PreTerminate},
+			{"spec.lifecycleActions.switchover", actions.Switchover},
+			{"spec.lifecycleActions.memberJoin", actions.MemberJoin},
+			{"spec.lifecycleActions.memberLeave", actions.MemberLeave},
+			{"spec.lifecycleActions.readonly", actions.Readonly},
+			{"spec.lifecycleActions.readwrite", actions.Readwrite},
+			{"spec.lifecycleActions.dataDump", actions.DataDump},
+			{"spec.lifecycleActions.dataLoad", actions.DataLoad},
+			{"spec.lifecycleActions.reconfigure", actions.Reconfigure},
+			{"spec.lifecycleActions.accountProvision", actions.AccountProvision},
+		}
+		if actions.RoleProbe != nil {
+			actionFields = append(actionFields,
+				actionField{"spec.lifecycleActions.roleProbe", &actions.RoleProbe.Action})
+		}
+		if actions.AvailableProbe != nil {
+			actionFields = append(actionFields,
+				actionField{"spec.lifecycleActions.availableProbe", &actions.AvailableProbe.Action})
+		}
+		for _, field := range actionFields {
+			if err := validate(field.path, field.action); err != nil {
+				return err
+			}
+		}
+	}
+	for i := range cmpd.Spec.Configs {
+		if err := validate(fmt.Sprintf("spec.configs[%d].reconfigure", i), cmpd.Spec.Configs[i].Reconfigure); err != nil {
+			return err
+		}
+	}
+	for i := range cmpd.Spec.Scripts {
+		if err := validate(fmt.Sprintf("spec.scripts[%d].reconfigure", i), cmpd.Spec.Scripts[i].Reconfigure); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

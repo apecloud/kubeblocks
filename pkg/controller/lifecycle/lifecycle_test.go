@@ -251,7 +251,7 @@ var _ = Describe("lifecycle", func() {
 				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
 					Expect(req.Action).Should(Equal("postProvision"))
 					Expect(req.Parameters).Should(BeEmpty())
-					Expect(req.Rerun).Should(BeTrue())
+					Expect(req.Query).Should(BeFalse())
 					Expect(req.TimeoutSeconds).ShouldNot(BeNil())
 					Expect(*req.TimeoutSeconds).Should(Equal(action.TimeoutSeconds))
 					Expect(req.RetryPolicy).ShouldNot(BeNil())
@@ -262,7 +262,6 @@ var _ = Describe("lifecycle", func() {
 			})
 
 			opts := &Options{
-				Rerun:          true,
 				TimeoutSeconds: &action.TimeoutSeconds,
 				RetryPolicy:    action.RetryPolicy,
 			}
@@ -287,6 +286,82 @@ var _ = Describe("lifecycle", func() {
 
 			err = lifecycle.PostProvision(ctx, k8sClient, &Options{Arguments: arguments})
 			Expect(err).Should(BeNil())
+		})
+
+		DescribeTable("executes on an exact target pod regardless of selector", func(selector appsv1.TargetPodSelector, matchingKey string) {
+			lifecycleActions.PostProvision.Exec.TargetPodSelector = selector
+			lifecycleActions.PostProvision.Exec.MatchingKey = matchingKey
+			pods = []*corev1.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "pod-0"}},
+				{ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "pod-1"}},
+			}
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods)
+			Expect(err).Should(BeNil())
+			selected, err := lifecycle.(*kbagent).selectTargetPods(
+				lifecycleActions.PostProvision, &Options{TargetPodName: "pod-1"})
+			Expect(err).Should(BeNil())
+			Expect(selected).Should(HaveLen(1))
+			Expect(selected[0].Name).Should(Equal("pod-1"))
+
+			mockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).Return(proto.ActionResponse{}, nil).Times(1)
+			})
+
+			err = lifecycle.PostProvision(ctx, k8sClient, &Options{TargetPodName: "pod-1"})
+			Expect(err).Should(BeNil())
+		},
+			Entry("default", appsv1.TargetPodSelector(""), ""),
+			Entry("any replica", appsv1.AnyReplica, ""),
+			Entry("all replicas", appsv1.AllReplicas, ""),
+			Entry("role with no matching pod", appsv1.RoleSelector, "leader"),
+			Entry("ordinal selecting a different pod", appsv1.OrdinalSelector, "0"),
+		)
+
+		DescribeTable("preserves the selector without an exact target", func(opts *Options) {
+			lifecycleActions.PostProvision.Exec.TargetPodSelector = appsv1.AllReplicas
+			pods = []*corev1.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "pod-0"}},
+				{ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "pod-1"}},
+			}
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods)
+			Expect(err).Should(BeNil())
+			mockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).Return(proto.ActionResponse{}, nil).Times(2)
+			})
+			Expect(lifecycle.PostProvision(ctx, k8sClient, opts)).Should(Succeed())
+		},
+			Entry("nil options", (*Options)(nil)),
+			Entry("empty target name", &Options{}),
+		)
+
+		It("returns a single target error when overriding all replicas", func() {
+			lifecycleActions.PostProvision.Exec.TargetPodSelector = appsv1.AllReplicas
+			pods = []*corev1.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "pod-0"}},
+				{ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "pod-1"}},
+			}
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods)
+			Expect(err).Should(BeNil())
+			mockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).Return(
+					proto.ActionResponse{Error: proto.Error2Type(proto.ErrInProgress)}, nil).Times(1)
+			})
+			err = lifecycle.PostProvision(ctx, k8sClient, &Options{TargetPodName: "pod-1"})
+			Expect(errors.Is(err, ErrActionInProgress)).Should(BeTrue())
+			Expect(err.Error()).Should(ContainSubstring("pod-1"))
+			var aggregate *actionAggregateError
+			Expect(errors.As(err, &aggregate)).Should(BeFalse())
+		})
+
+		It("rejects an unavailable exact target pod", func() {
+			mockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).Times(0)
+			})
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods)
+			Expect(err).Should(BeNil())
+
+			err = lifecycle.PostProvision(ctx, k8sClient, &Options{TargetPodName: "missing"})
+			Expect(err).Should(MatchError(ContainSubstring("target pod missing is not available")))
 		})
 
 		It("succeed", func() {
@@ -507,6 +582,24 @@ var _ = Describe("lifecycle", func() {
 
 			err = lifecycle.PostProvision(ctx, reader, nil)
 			Expect(err).Should(BeNil())
+		})
+
+		It("observes a missing result without bypassing preconditions for a new run", func() {
+			lifecycleActions.PostProvision.PreCondition = ptr.To(appsv1.ClusterReadyPreConditionType)
+			lfa, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods)
+			Expect(err).ShouldNot(HaveOccurred())
+			reader := &mockReader{cli: k8sClient, objs: []client.Object{&appsv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{Name: clusterName, Namespace: namespace},
+				Status:     appsv1.ClusterStatus{Phase: appsv1.FailedClusterPhase},
+			}}}
+			mockKBAgentClient(func(r *kbacli.MockClientMockRecorder) {
+				r.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
+					Expect(req.Query).Should(BeTrue())
+					return proto.ActionResponse{Error: proto.Error2Type(proto.ErrResultNotFound)}, nil
+				}).Times(1)
+			})
+			Expect(errors.Is(lfa.PostProvision(ctx, reader, &Options{Query: true}), ErrActionResultNotFound)).Should(BeTrue())
+			Expect(errors.Is(lfa.PostProvision(ctx, reader, nil), ErrPreconditionFailed)).Should(BeTrue())
 		})
 
 		It("precondition - fail", func() {

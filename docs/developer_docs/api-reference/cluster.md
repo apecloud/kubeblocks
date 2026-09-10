@@ -2504,6 +2504,8 @@ for Actions that are expected to complete quickly.</p>
 <p>When true, KubeBlocks runs the Action in non-blocking mode. This mode is
 suitable for long-running Actions, such as data migration, rebalancing, or
 draining, whose duration depends on data volume or runtime conditions.</p>
+<p>Non-blocking mode can be enabled only for Action fields that explicitly
+document support for it.</p>
 <p>This field cannot be updated.</p>
 </td>
 </tr>
@@ -13038,6 +13040,9 @@ ShardingAction
 <ul>
 <li>KB_ADD_SHARD_NAME: The name of the shard being added.</li>
 </ul>
+<p>This Action supports both blocking and non-blocking modes. KubeBlocks does
+not finish adding the shard until the Action has succeeded on every
+selected target shard and Pod.</p>
 <p>Note: This field is immutable once it has been set.</p>
 </td>
 </tr>
@@ -13057,6 +13062,9 @@ ShardingAction
 <ul>
 <li>KB_REMOVE_SHARD_NAME: The name of the shard being removed.</li>
 </ul>
+<p>This Action supports both blocking and non-blocking modes. KubeBlocks does
+not remove the shard until the Action has succeeded on every selected
+target shard and Pod.</p>
 <p>Note: This field is immutable once it has been set.</p>
 </td>
 </tr>

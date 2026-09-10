@@ -149,6 +149,11 @@ func (a *kbagent) checkedCallAction(ctx context.Context, cli client.Reader, spec
 	if !spec.Defined() {
 		return nil, errors.Wrap(ErrActionNotDefined, lfa.name())
 	}
+	if opts != nil && opts.Query {
+		// Queries cannot start a request, including after the agent loses its
+		// cached result, so startup preconditions must not gate observation.
+		return a.callAction(ctx, cli, spec, lfa, opts)
+	}
 	if err := a.precondition(ctx, cli, spec, func() client.MatchingLabels {
 		if opts == nil || opts.PreConditionObjectSelector == nil {
 			return nil
@@ -261,7 +266,7 @@ func (a *kbagent) callAction(ctx context.Context, cli client.Reader, spec *appsv
 	if err1 != nil {
 		return nil, err1
 	}
-	return a.callActionWithSelector(ctx, spec, lfa, req)
+	return a.callActionWithSelector(ctx, spec, lfa, req, opts)
 }
 
 // BuildKBAgentRetryPolicy normalizes the API retry policy into the kbagent wire contract.
@@ -300,7 +305,7 @@ func (a *kbagent) buildActionRequest(ctx context.Context, cli client.Reader, lfa
 		Parameters: parameters,
 	}
 	if opts != nil {
-		req.Rerun = opts.Rerun
+		req.Query = opts.Query
 		if opts.TimeoutSeconds != nil {
 			req.TimeoutSeconds = opts.TimeoutSeconds
 		}
@@ -378,8 +383,9 @@ func (a *kbagent) templateVarsParameters() (map[string]string, error) {
 	return m, nil
 }
 
-func (a *kbagent) callActionWithSelector(ctx context.Context, spec *appsv1.Action, lfa lifecycleAction, req *proto.ActionRequest) ([]byte, error) {
-	pods, err := a.selectTargetPods(spec)
+func (a *kbagent) callActionWithSelector(ctx context.Context, spec *appsv1.Action, lfa lifecycleAction,
+	req *proto.ActionRequest, opts *Options) ([]byte, error) {
+	pods, err := a.selectTargetPods(spec, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -387,7 +393,7 @@ func (a *kbagent) callActionWithSelector(ctx context.Context, spec *appsv1.Actio
 		return nil, fmt.Errorf("no available pod to execute action %s", lfa.name())
 	}
 	selector, _ := resolveTargetPodSelector(spec)
-	aggregateErrors := selector == appsv1.AllReplicas
+	aggregateErrors := (opts == nil || opts.TargetPodName == "") && selector == appsv1.AllReplicas
 
 	// TODO: impl
 	//  - back-off to retry
@@ -452,7 +458,15 @@ func (a *kbagent) callActionWithSelector(ctx context.Context, spec *appsv1.Actio
 	return output, nil
 }
 
-func (a *kbagent) selectTargetPods(spec *appsv1.Action) ([]*corev1.Pod, error) {
+func (a *kbagent) selectTargetPods(spec *appsv1.Action, opts *Options) ([]*corev1.Pod, error) {
+	if opts != nil && opts.TargetPodName != "" {
+		for _, pod := range a.pods {
+			if pod.Name == opts.TargetPodName {
+				return []*corev1.Pod{pod}, nil
+			}
+		}
+		return nil, fmt.Errorf("target pod %s is not available to execute action", opts.TargetPodName)
+	}
 	return SelectTargetPods(a.pods, a.pod, spec)
 }
 
@@ -489,6 +503,8 @@ func (a *kbagent) formatError(lfa lifecycleAction, rsp proto.ActionResponse, pod
 		return wrapError(ErrActionInProgress)
 	case errors.Is(err, proto.ErrBusy):
 		return wrapError(ErrActionBusy)
+	case errors.Is(err, proto.ErrResultNotFound):
+		return wrapError(ErrActionResultNotFound)
 	case errors.Is(err, proto.ErrTimedOut):
 		return wrapError(ErrActionTimedOut)
 	case errors.Is(err, proto.ErrFailed):

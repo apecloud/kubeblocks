@@ -261,6 +261,22 @@ func (r *ShardingDefinitionReconciler) requireParallelProvision() bool {
 
 func (r *ShardingDefinitionReconciler) validateLifecycleActions(ctx context.Context, cli client.Client,
 	shardingDef *appsv1.ShardingDefinition) error {
+	actions := shardingDef.Spec.LifecycleActions
+	if actions == nil {
+		return nil
+	}
+	unsupported := []struct {
+		path   string
+		action *appsv1.ShardingAction
+	}{
+		{"spec.lifecycleActions.postProvision", actions.PostProvision},
+		{"spec.lifecycleActions.preTerminate", actions.PreTerminate},
+	}
+	for _, field := range unsupported {
+		if field.action != nil && field.action.NonBlocking {
+			return fmt.Errorf("%s does not support non-blocking mode", field.path)
+		}
+	}
 	return nil
 }
 

@@ -29,6 +29,7 @@ var (
 	ErrPreconditionFailed   = errors.New("action precondition is not met")
 	ErrActionInProgress     = errors.New("action is in progress")
 	ErrActionBusy           = errors.New("action is busy")
+	ErrActionResultNotFound = errors.New("action result not found")
 	ErrActionTimedOut       = errors.New("action timed-out")
 	ErrActionFailed         = errors.New("action failed")
 	ErrActionInternalError  = errors.New("action internal error")
@@ -61,7 +62,8 @@ func IsActionFailure(err error) bool {
 	return !errors.Is(err, ErrActionNotDefined) &&
 		!errors.Is(err, ErrPreconditionFailed) &&
 		!errors.Is(err, ErrActionInProgress) &&
-		!errors.Is(err, ErrActionBusy)
+		!errors.Is(err, ErrActionBusy) &&
+		!errors.Is(err, ErrActionResultNotFound)
 }
 
 type actionAggregateError struct {

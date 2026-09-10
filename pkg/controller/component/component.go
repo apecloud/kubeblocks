@@ -168,14 +168,21 @@ func GetExporter(componentDef appsv1.ComponentDefinitionSpec) *appsv1.Exporter {
 	return nil
 }
 
-func NewLifecycle(ctx context.Context, cli client.Reader, compDef *appsv1.ComponentDefinition, comp *appsv1.Component) (lifecycle.Lifecycle, error) {
+// NewLifecycle uses the supplied template variables, when present, instead of
+// resolving them again. This keeps a continuing Action's request inputs stable.
+func NewLifecycle(ctx context.Context, cli client.Reader, compDef *appsv1.ComponentDefinition, comp *appsv1.Component,
+	templateVars ...map[string]string) (lifecycle.Lifecycle, error) {
 	synthesizedComp, err := BuildSynthesizedComponent(ctx, cli, compDef, comp)
 	if err != nil {
 		return nil, err
 	}
-	synthesizedComp.TemplateVars, _, err = ResolveTemplateNEnvVars(ctx, cli, synthesizedComp, compDef.Spec.Vars)
-	if err != nil {
-		return nil, err
+	if len(templateVars) > 0 {
+		synthesizedComp.TemplateVars = templateVars[0]
+	} else {
+		synthesizedComp.TemplateVars, _, err = ResolveTemplateNEnvVars(ctx, cli, synthesizedComp, compDef.Spec.Vars)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	pods, err := ListOwnedInstances(ctx, cli, comp)

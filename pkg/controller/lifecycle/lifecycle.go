@@ -30,7 +30,13 @@ import (
 )
 
 type Options struct {
-	Rerun                      bool
+	// Query observes an existing non-blocking request without executing it.
+	Query bool
+
+	// TargetPodName, when set, executes the Action only on the named Pod and
+	// overrides the Action's targetPodSelector. The Pod must be present in the
+	// lifecycle's Pod list; an unavailable target returns an error without fallback.
+	TargetPodName              string
 	TimeoutSeconds             *int32
 	RetryPolicy                *appsv1.RetryPolicy
 	Arguments                  [][]string

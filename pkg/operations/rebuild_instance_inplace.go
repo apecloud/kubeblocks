@@ -39,7 +39,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
-	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/plan"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dputils "github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
@@ -724,6 +723,7 @@ func (inPlaceHelper *inplaceRebuildHelper) removePVCFinalizer(reqCtx intctrlutil
 func getPVCMapAndVolumes(opsRes *OpsResource,
 	synthesizedComp *component.SynthesizedComponent,
 	targetPod *corev1.Pod,
+	templateName string,
 	rebuildPrefix string,
 	index int,
 	noBackup bool) (map[string]*corev1.PersistentVolumeClaim, []corev1.Volume, []corev1.VolumeMount, error) {
@@ -741,10 +741,6 @@ func getPVCMapAndVolumes(opsRes *OpsResource,
 	}
 	// backup's ready, then start to check restore
 	workloadName := constant.GenerateWorkloadNamePattern(opsRes.Cluster.Name, synthesizedComp.Name)
-	templateName, _, err := instancetemplate.GetTemplateNameAndOrdinal(workloadName, targetPod.Name)
-	if err != nil {
-		return nil, nil, nil, err
-	}
 	// TODO: create pvc by the volumeClaimTemplates of instance template if it is necessary.
 	for i, vct := range synthesizedComp.VolumeClaimTemplates {
 		sourcePVCName := volumePVCMap[vct.Name]

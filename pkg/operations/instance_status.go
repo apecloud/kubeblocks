@@ -17,6 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -132,4 +133,27 @@ func diffAssignments(source, target map[string]string) (created, deleted, update
 		}
 	}
 	return created, deleted, updated
+}
+
+func sourceAssignmentsForWorkload(last opsv1alpha1.LastComponentConfiguration, workloadName string) map[string]string {
+	result := map[string]string{}
+	for _, assignment := range last.SourceInstanceAssignments {
+		if assignment.WorkloadName == workloadName && assignment.DesiredState == workloadsv1.InstanceDesiredStateActive {
+			result[assignment.PodName] = assignment.TemplateName
+		}
+	}
+	return result
+}
+
+func instanceTemplateByName(statuses []workloadsv1.InstanceStatus, name string) (string, error) {
+	if err := validateInstanceIdentities(statuses); err != nil {
+		return "", err
+	}
+	for _, status := range statuses {
+		if status.PodName == name && status.TemplateName != nil {
+			return *status.TemplateName, nil
+		}
+	}
+	return "", intctrlutil.NewErrorf(intctrlutil.ErrorTypeNeedWaiting,
+		"waiting for InstanceSet to publish the template assignment of instance %q", name)
 }

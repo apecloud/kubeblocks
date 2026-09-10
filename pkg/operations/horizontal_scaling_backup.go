@@ -48,15 +48,17 @@ func (hs horizontalScalingOpsHandler) reconcileBackupScaling(reqCtx intctrlutil.
 	compStatus *opsv1alpha1.OpsRequestComponentStatus) (int32, int32, error) {
 	horizontalScaling := pgRes.compOps.(opsv1alpha1.HorizontalScaling)
 	lastCompConfiguration := opsRes.OpsRequest.Status.LastConfiguration.Components[horizontalScaling.ComponentName]
-	clusterComponentSpec := pgRes.clusterComponent.DeepCopy()
 	// Preserve the restore step during cancellation as well as normal reconciliation.
-	if err := hs.restoreDataFromBackup(reqCtx, cli, opsRes, pgRes, clusterComponentSpec,
+	if err := hs.restoreDataFromBackup(reqCtx, cli, opsRes, pgRes, pgRes.clusterComponent.DeepCopy(),
 		horizontalScaling, lastCompConfiguration, compStatus); err != nil {
 		return 0, 0, err
 	}
-	// restoreDataFromBackup may have prepared a target spec even while Restore is
-	// pending. Keep using that local spec for the existing progress calculation.
-	return hs.reconcileReplicaScaling(reqCtx, cli, opsRes, pgRes, clusterComponentSpec, compStatus)
+	// Continue checking instance progress even while Restore is pending, as in
+	// the existing lifecycle. Only the target configuration write waits for Restore.
+	if err := hs.setReplicaScalingParticipants(opsRes, pgRes); err != nil {
+		return 0, 0, err
+	}
+	return handleComponentProgressForScalingReplicas(reqCtx, cli, opsRes, pgRes, compStatus)
 }
 
 func (hs horizontalScalingOpsHandler) getBackupObj(reqCtx intctrlutil.RequestCtx,
@@ -85,14 +87,14 @@ func (hs horizontalScalingOpsHandler) createRestore(reqCtx intctrlutil.RequestCt
 	opsRes *OpsResource,
 	synthesizedComponent *intctrlcomp.SynthesizedComponent,
 	restoreMGR *plan.RestoreManager,
-	compSpecDeepyCopy *appsv1.ClusterComponentSpec,
+	targetCompSpec *appsv1.ClusterComponentSpec,
 	backupObj *dpv1alpha1.Backup,
 	templateName string) error {
 	getTemplate := func(templateName string) *appsv1.InstanceTemplate {
 		if templateName == "" {
 			return nil
 		}
-		for _, template := range compSpecDeepyCopy.Instances {
+		for _, template := range targetCompSpec.Instances {
 			if template.Name == templateName {
 				return &template
 			}
@@ -126,7 +128,7 @@ func (hs horizontalScalingOpsHandler) restoreDataFromBackup(reqCtx intctrlutil.R
 	cli client.Client,
 	opsRes *OpsResource,
 	pgRes *progressResource,
-	compSpecDeepyCopy *appsv1.ClusterComponentSpec,
+	targetCompSpec *appsv1.ClusterComponentSpec,
 	horizontalScaling opsv1alpha1.HorizontalScaling,
 	lastCompConfiguration opsv1alpha1.LastComponentConfiguration,
 	compStatus *opsv1alpha1.OpsRequestComponentStatus) error {
@@ -141,17 +143,21 @@ func (hs horizontalScalingOpsHandler) restoreDataFromBackup(reqCtx intctrlutil.R
 	if err != nil {
 		return err
 	}
-	replicas, instances, offlineInstances, err := hs.getExpectedCompValues(opsRes, compSpecDeepyCopy,
+	replicas, instances, offlineInstances, err := hs.getExpectedCompValues(opsRes,
 		lastCompConfiguration, horizontalScaling)
 	if err != nil {
 		return err
 	}
-	compSpecDeepyCopy.Replicas = replicas
-	compSpecDeepyCopy.Instances = instances
-	compSpecDeepyCopy.OfflineInstances = offlineInstances
-	createdPodSet, _, err := hs.getCreateAndDeletePodSet(opsRes, lastCompConfiguration, *compSpecDeepyCopy, horizontalScaling, pgRes.fullComponentName)
+	targetCompSpec.Replicas = replicas
+	targetCompSpec.Instances = instances
+	targetCompSpec.OfflineInstances = offlineInstances
+	createdPodSet, deletedPodSet, err := hs.getReplicaScalingChanges(opsRes, lastCompConfiguration, horizontalScaling, pgRes.fullComponentName)
 	if err != nil {
 		return err
+	}
+	if opsRes.OpsRequest.Status.Phase == opsv1alpha1.OpsCancellingPhase {
+		// Preserve which instances the existing cancellation path restores.
+		createdPodSet = deletedPodSet
 	}
 	comp, compDef, err := intctrlcomp.GetCompNCompDefByName(reqCtx.Ctx, cli, opsRes.Cluster.Namespace, constant.GenerateClusterComponentName(opsRes.Cluster.Name, pgRes.fullComponentName))
 	if err != nil {
@@ -181,7 +187,7 @@ func (hs horizontalScalingOpsHandler) restoreDataFromBackup(reqCtx intctrlutil.R
 		if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Namespace: opsRes.Cluster.Namespace, Name: restoreMeta.Name}, restore); err != nil {
 			if apierrors.IsNotFound(err) {
 				allRestoreCompleted = false
-				if err = hs.createRestore(reqCtx, cli, opsRes, synthesizedComponent, restoreMGR, compSpecDeepyCopy, backupObj, templateName); err != nil {
+				if err = hs.createRestore(reqCtx, cli, opsRes, synthesizedComponent, restoreMGR, targetCompSpec, backupObj, templateName); err != nil {
 					return err
 				}
 				continue
@@ -197,7 +203,7 @@ func (hs horizontalScalingOpsHandler) restoreDataFromBackup(reqCtx intctrlutil.R
 	}
 	compStatus.Message = "Restore Data In Progress"
 	if allRestoreCompleted {
-		if err := hs.scaleOutComponentAfterRestoreData(reqCtx, cli, opsRes, compSpecDeepyCopy); err != nil {
+		if err := hs.scaleOutComponentAfterRestoreData(reqCtx, cli, opsRes, targetCompSpec); err != nil {
 			return err
 		}
 		// set restore completed message
@@ -209,13 +215,13 @@ func (hs horizontalScalingOpsHandler) restoreDataFromBackup(reqCtx intctrlutil.R
 func (hs horizontalScalingOpsHandler) scaleOutComponentAfterRestoreData(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	opsRes *OpsResource,
-	compSpecDeepyCopy *appsv1.ClusterComponentSpec) error {
+	targetCompSpec *appsv1.ClusterComponentSpec) error {
 	for i := range opsRes.Cluster.Spec.ComponentSpecs {
 		compSpec := &opsRes.Cluster.Spec.ComponentSpecs[i]
-		if compSpec.Name == compSpecDeepyCopy.Name {
-			compSpec.Replicas = compSpecDeepyCopy.Replicas
-			compSpec.OfflineInstances = compSpecDeepyCopy.OfflineInstances
-			compSpec.Instances = compSpecDeepyCopy.Instances
+		if compSpec.Name == targetCompSpec.Name {
+			compSpec.Replicas = targetCompSpec.Replicas
+			compSpec.OfflineInstances = targetCompSpec.OfflineInstances
+			compSpec.Instances = targetCompSpec.Instances
 		}
 	}
 	return cli.Update(reqCtx.Ctx, opsRes.Cluster)

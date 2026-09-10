@@ -22,25 +22,16 @@ package operations
 import (
 	"fmt"
 	"slices"
-	"strconv"
-	"strings"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	intctrlcomp "github.com/apecloud/kubeblocks/pkg/controller/component"
-	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/apecloud/kubeblocks/pkg/controller/plan"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -119,31 +110,18 @@ func (hs horizontalScalingOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli 
 		if horizontalScaling.Shards != nil {
 			return nil
 		}
-		lastCompConfiguration := opsRes.OpsRequest.Status.LastConfiguration.Components[obj.GetComponentName()]
-		if err := hs.validateHorizontalScaling(opsRes, lastCompConfiguration, horizontalScaling); err != nil {
-			return err
-		}
-		replicas, instances, offlineInstances, err := hs.getExpectedCompValues(opsRes, compSpec.DeepCopy(),
-			lastCompConfiguration, horizontalScaling)
+		expected, err := hs.prepareReplicaScaling(opsRes, compSpec, horizontalScaling)
 		if err != nil {
 			return err
 		}
-		var insReplicas int32
-		for _, v := range instances {
-			insReplicas += v.GetReplicas()
-		}
-		if insReplicas > replicas {
-			errMsg := fmt.Sprintf(`the total number of replicas for the instance template cannot be greater than the number of replicas for component "%s" after horizontally scaling`,
-				horizontalScaling.ComponentName)
-			return intctrlutil.NewFatalError(errMsg)
-		}
 		if horizontalScaling.ScaleOut != nil && horizontalScaling.ScaleOut.FromBackup != nil {
-			// Wait for the persistent volume to be restored from backup before proceeding.
+			// The backup path submits this configuration from reconcileBackupScaling
+			// only after all persistent volumes have been restored.
 			return nil
 		}
-		compSpec.Replicas = replicas
-		compSpec.Instances = instances
-		compSpec.OfflineInstances = offlineInstances
+		compSpec.Replicas = expected.Replicas
+		compSpec.Instances = expected.Instances
+		compSpec.OfflineInstances = expected.OfflineInstances
 		return nil
 	}); err != nil {
 		return err
@@ -166,184 +144,62 @@ func (hs horizontalScalingOpsHandler) ReconcileAction(reqCtx intctrlutil.Request
 			// horizontal scaling for shard count.
 			return handleComponentProgressForScalingShards(reqCtx, cli, opsRes, pgRes, compStatus)
 		}
-		var err error
-		lastCompConfiguration := opsRes.OpsRequest.Status.LastConfiguration.Components[pgRes.compOps.GetComponentName()]
-		clusterComponentSpec := pgRes.clusterComponent.DeepCopy()
 		if horizontalScaling.ScaleOut != nil && horizontalScaling.ScaleOut.FromBackup != nil {
-			if err := hs.restoreDataFromBackup(reqCtx, cli, opsRes, pgRes, clusterComponentSpec, horizontalScaling, lastCompConfiguration, compStatus); err != nil {
-				return 0, 0, err
-			}
+			return hs.reconcileBackupScaling(reqCtx, cli, opsRes, pgRes, compStatus)
 		}
-		pgRes.createdPodSet, pgRes.deletedPodSet, err = hs.getCreateAndDeletePodSet(opsRes, lastCompConfiguration, *clusterComponentSpec, horizontalScaling, pgRes.fullComponentName)
-		if err != nil {
-			return 0, 0, err
-		}
-		return handleComponentProgressForScalingReplicas(reqCtx, cli, opsRes, pgRes, compStatus)
+		return hs.reconcileReplicaScaling(reqCtx, cli, opsRes, pgRes, pgRes.clusterComponent.DeepCopy(), compStatus)
 	}
 	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.HorizontalScalingList)
 	return compOpsHelper.reconcileActionWithComponentOps(reqCtx, cli, opsRes, "", handleComponentProgress)
 }
 
-func (hs horizontalScalingOpsHandler) getBackupObj(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	opsRes *OpsResource,
-	fromBackup opsv1alpha1.FromBackup) (*dpv1alpha1.Backup, error) {
-	backupNamespace := opsRes.Cluster.Namespace
-	if fromBackup.Namespace != "" {
-		backupNamespace = fromBackup.Namespace
-	}
-	backupObj := &dpv1alpha1.Backup{}
-	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Namespace: backupNamespace, Name: fromBackup.Name}, backupObj); err != nil {
-		if apierrors.IsNotFound(err) {
-			return nil, intctrlutil.NewFatalError(fmt.Sprintf("backup %s not found", fromBackup.Name))
-		}
+// prepareReplicaScaling validates and computes the target configuration for both
+// ordinary and backup requests. Each path decides when to submit it.
+func (hs horizontalScalingOpsHandler) prepareReplicaScaling(opsRes *OpsResource,
+	compSpec *appsv1.ClusterComponentSpec,
+	horizontalScaling opsv1alpha1.HorizontalScaling) (*appsv1.ClusterComponentSpec, error) {
+	lastCompConfiguration := opsRes.OpsRequest.Status.LastConfiguration.Components[horizontalScaling.ComponentName]
+	if err := hs.validateHorizontalScaling(opsRes, lastCompConfiguration, horizontalScaling); err != nil {
 		return nil, err
 	}
-	if backupObj.Status.Phase != dpv1alpha1.BackupPhaseCompleted {
-		return nil, intctrlutil.NewFatalError(fmt.Sprintf("backup %s phase is not completed", fromBackup.Name))
-	}
-	return backupObj, nil
-}
-
-func (hs horizontalScalingOpsHandler) createRestore(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	opsRes *OpsResource,
-	synthesizedComponent *intctrlcomp.SynthesizedComponent,
-	restoreMGR *plan.RestoreManager,
-	compSpecDeepyCopy *appsv1.ClusterComponentSpec,
-	backupObj *dpv1alpha1.Backup,
-	templateName string) error {
-	getTemplate := func(templateName string) *appsv1.InstanceTemplate {
-		if templateName == "" {
-			return nil
-		}
-		for _, template := range compSpecDeepyCopy.Instances {
-			if template.Name == templateName {
-				return &template
-			}
-		}
-		return nil
-	}
-	// create restore
-	restore, err := restoreMGR.BuildPrepareDataRestoreForPod(synthesizedComponent, backupObj, getTemplate(templateName))
+	expected := compSpec.DeepCopy()
+	replicas, instances, offlineInstances, err := hs.getExpectedCompValues(opsRes, expected,
+		lastCompConfiguration, horizontalScaling)
 	if err != nil {
-		if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeRestoreFailed) {
-			return intctrlutil.NewFatalError(err.Error())
-		}
-		return err
+		return nil, err
 	}
-	if restore == nil {
-		return intctrlutil.NewFatalError(fmt.Sprintf("scale-out from backup %s/%s is not supported because backup method %q has no target volumes matching component %q",
-			backupObj.Namespace, backupObj.Name, backupObj.Status.BackupMethod.Name, synthesizedComponent.Name))
+	var insReplicas int32
+	for _, v := range instances {
+		insReplicas += v.GetReplicas()
 	}
-	scheme, _ := opsv1alpha1.SchemeBuilder.Build()
-	if err := intctrlutil.SetOwnership(opsRes.OpsRequest, restore, scheme, ""); err != nil {
-		return err
+	if insReplicas > replicas {
+		errMsg := fmt.Sprintf(`the total number of replicas for the instance template cannot be greater than the number of replicas for component "%s" after horizontally scaling`,
+			horizontalScaling.ComponentName)
+		return nil, intctrlutil.NewFatalError(errMsg)
 	}
-	if err := cli.Create(reqCtx.Ctx, restore); err != nil {
-		return err
-	}
-	reqCtx.Recorder.Eventf(opsRes.OpsRequest, corev1.EventTypeNormal, "RestoreCreated", "Restore %s created", restore.Name)
-	return nil
+	expected.Replicas = replicas
+	expected.Instances = instances
+	expected.OfflineInstances = offlineInstances
+	return expected, nil
 }
 
-func (hs horizontalScalingOpsHandler) restoreDataFromBackup(reqCtx intctrlutil.RequestCtx,
+// reconcileReplicaScaling determines the affected instances and checks their
+// actual progress. Backup scaling shares this step after preparing its local spec.
+func (hs horizontalScalingOpsHandler) reconcileReplicaScaling(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	opsRes *OpsResource,
 	pgRes *progressResource,
-	compSpecDeepyCopy *appsv1.ClusterComponentSpec,
-	horizontalScaling opsv1alpha1.HorizontalScaling,
-	lastCompConfiguration opsv1alpha1.LastComponentConfiguration,
-	compStatus *opsv1alpha1.OpsRequestComponentStatus) error {
-	restoreCompletedMsg := "Restore Data Completed"
-	// check if restore completed
-	if compStatus.Message == restoreCompletedMsg {
-		return nil
-	}
-	// get and check backup
-	fromBackup := horizontalScaling.ScaleOut.FromBackup
-	backupObj, err := hs.getBackupObj(reqCtx, cli, opsRes, *fromBackup)
+	clusterComponentSpec *appsv1.ClusterComponentSpec,
+	compStatus *opsv1alpha1.OpsRequestComponentStatus) (int32, int32, error) {
+	horizontalScaling := pgRes.compOps.(opsv1alpha1.HorizontalScaling)
+	lastCompConfiguration := opsRes.OpsRequest.Status.LastConfiguration.Components[horizontalScaling.ComponentName]
+	var err error
+	pgRes.createdPodSet, pgRes.deletedPodSet, err = hs.getCreateAndDeletePodSet(opsRes, lastCompConfiguration,
+		*clusterComponentSpec, horizontalScaling, pgRes.fullComponentName)
 	if err != nil {
-		return err
+		return 0, 0, err
 	}
-	replicas, instances, offlineInstances, err := hs.getExpectedCompValues(opsRes, compSpecDeepyCopy,
-		lastCompConfiguration, horizontalScaling)
-	if err != nil {
-		return err
-	}
-	compSpecDeepyCopy.Replicas = replicas
-	compSpecDeepyCopy.Instances = instances
-	compSpecDeepyCopy.OfflineInstances = offlineInstances
-	createdPodSet, _, err := hs.getCreateAndDeletePodSet(opsRes, lastCompConfiguration, *compSpecDeepyCopy, horizontalScaling, pgRes.fullComponentName)
-	if err != nil {
-		return err
-	}
-	comp, compDef, err := intctrlcomp.GetCompNCompDefByName(reqCtx.Ctx, cli, opsRes.Cluster.Namespace, constant.GenerateClusterComponentName(opsRes.Cluster.Name, pgRes.fullComponentName))
-	if err != nil {
-		return err
-	}
-	synthesizedComponent, err := intctrlcomp.BuildSynthesizedComponent(reqCtx.Ctx, cli, compDef, comp)
-	if err != nil {
-		return err
-	}
-	allRestoreCompleted := true
-	for podName, templateName := range createdPodSet {
-		idx := strings.LastIndex(podName, "-")
-		podIndex := podName[idx+1:]
-		podIndexInt, _ := strconv.ParseInt(podIndex, 10, 32)
-		restoreMGR := plan.NewRestoreManager(reqCtx.Ctx, cli, opsRes.Cluster, model.GetScheme(), map[string]string{
-			constant.OpsRequestNameLabelKey: opsRes.OpsRequest.Name,
-			constant.AppInstanceLabelKey:    opsRes.Cluster.Name,
-			constant.KBAppComponentLabelKey: pgRes.compOps.GetComponentName(),
-		}, 1, int32(podIndexInt))
-		restoreMGR.RestoreTime = fromBackup.RestorePointInTime
-		restoreMGR.SetRestoreEnv(fromBackup.RestoreEnv)
-		restoreMGR.RestoreNamePrefix = string(opsRes.OpsRequest.UID[:8])
-		restoreMGR.SourceTargetName = fromBackup.SourceTargetName
-		// check restore status
-		restoreMeta := restoreMGR.GetRestoreObjectMeta(synthesizedComponent, dpv1alpha1.PrepareData, templateName)
-		restore := &dpv1alpha1.Restore{}
-		if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Namespace: opsRes.Cluster.Namespace, Name: restoreMeta.Name}, restore); err != nil {
-			if apierrors.IsNotFound(err) {
-				allRestoreCompleted = false
-				if err = hs.createRestore(reqCtx, cli, opsRes, synthesizedComponent, restoreMGR, compSpecDeepyCopy, backupObj, templateName); err != nil {
-					return err
-				}
-				continue
-			}
-			return err
-		}
-		if restore.Status.Phase == dpv1alpha1.RestorePhaseFailed {
-			return intctrlutil.NewFatalError(fmt.Sprintf("restore for horizontalScaling failed: you can describe the restore resource \"%s\"", restore.Name))
-		}
-		if restore.Status.Phase != dpv1alpha1.RestorePhaseCompleted {
-			allRestoreCompleted = false
-		}
-	}
-	compStatus.Message = "Restore Data In Progress"
-	if allRestoreCompleted {
-		if err := hs.scaleOutComponentAfterRestoreData(reqCtx, cli, opsRes, compSpecDeepyCopy); err != nil {
-			return err
-		}
-		// set restore completed message
-		compStatus.Message = restoreCompletedMsg
-	}
-	return nil
-}
-
-func (hs horizontalScalingOpsHandler) scaleOutComponentAfterRestoreData(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	opsRes *OpsResource,
-	compSpecDeepyCopy *appsv1.ClusterComponentSpec) error {
-	for i := range opsRes.Cluster.Spec.ComponentSpecs {
-		compSpec := &opsRes.Cluster.Spec.ComponentSpecs[i]
-		if compSpec.Name == compSpecDeepyCopy.Name {
-			compSpec.Replicas = compSpecDeepyCopy.Replicas
-			compSpec.OfflineInstances = compSpecDeepyCopy.OfflineInstances
-			compSpec.Instances = compSpecDeepyCopy.Instances
-		}
-	}
-	return cli.Update(reqCtx.Ctx, opsRes.Cluster)
+	return handleComponentProgressForScalingReplicas(reqCtx, cli, opsRes, pgRes, compStatus)
 }
 
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration

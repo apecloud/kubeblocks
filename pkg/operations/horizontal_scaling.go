@@ -680,7 +680,7 @@ func (hs horizontalScalingOpsHandler) checkFlatOrdinalSupport(reqCtx intctrlutil
 		if request.Shards != nil || !cancelling && !hscaleFromBackup(request) {
 			continue
 		}
-		specs, err := hscaleComponentSpecs(reqCtx, cli, opsRes, request.ComponentName, nil)
+		specs, err := hscaleComponentSpecs(reqCtx, cli, opsRes, request.ComponentName)
 		if err != nil {
 			return err
 		}
@@ -702,13 +702,10 @@ func (hs horizontalScalingOpsHandler) checkFlatOrdinalSupport(reqCtx intctrlutil
 // A shard's explicit overrides take precedence over the common template, both
 // before and after an operation changes that common template.
 func hscaleComponentSpecs(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource,
-	componentName string, common *appsv1.ClusterComponentSpec) (map[string]*appsv1.ClusterComponentSpec, error) {
+	componentName string) (map[string]*appsv1.ClusterComponentSpec, error) {
 	for i := range opsRes.Cluster.Spec.ComponentSpecs {
 		spec := &opsRes.Cluster.Spec.ComponentSpecs[i]
 		if spec.Name == componentName {
-			if common != nil {
-				spec = common
-			}
 			return map[string]*appsv1.ClusterComponentSpec{componentName: spec.DeepCopy()}, nil
 		}
 	}
@@ -723,26 +720,7 @@ func hscaleComponentSpecs(reqCtx intctrlutil.RequestCtx, cli client.Client, opsR
 		result := map[string]*appsv1.ClusterComponentSpec{}
 		for _, component := range components {
 			spec := group.Template.DeepCopy()
-			if common != nil {
-				spec = common.DeepCopy()
-			}
-			for _, template := range group.ShardTemplates {
-				if template.Name != component.Labels[constant.KBAppShardTemplateLabelKey] {
-					continue
-				}
-				if template.Replicas != nil {
-					spec.Replicas = *template.Replicas
-				}
-				if template.Instances != nil {
-					spec.Instances = template.Instances
-				}
-				if template.Ordinals != nil {
-					spec.Ordinals = *template.Ordinals
-				}
-				if template.FlatInstanceOrdinal != nil {
-					spec.FlatInstanceOrdinal = *template.FlatInstanceOrdinal
-				}
-			}
+			applyHScaleShardOverrides(spec, &group, component.Labels[constant.KBAppShardTemplateLabelKey])
 			result[component.Labels[constant.KBAppComponentLabelKey]] = spec
 		}
 		if len(result) != int(group.Shards) {
@@ -751,6 +729,31 @@ func hscaleComponentSpecs(reqCtx intctrlutil.RequestCtx, cli client.Client, opsR
 		return result, nil
 	}
 	return nil, fmt.Errorf("component or sharding %q not found", componentName)
+}
+
+// Only allocation fields are relevant here; this is not a full Component spec merge.
+func applyHScaleShardOverrides(spec *appsv1.ClusterComponentSpec, group *appsv1.ClusterSharding, templateName string) {
+	if group == nil {
+		return
+	}
+	for _, template := range group.ShardTemplates {
+		if template.Name != templateName {
+			continue
+		}
+		if template.Replicas != nil {
+			spec.Replicas = *template.Replicas
+		}
+		if template.Instances != nil {
+			spec.Instances = template.Instances
+		}
+		if template.Ordinals != nil {
+			spec.Ordinals = *template.Ordinals
+		}
+		if template.FlatInstanceOrdinal != nil {
+			spec.FlatInstanceOrdinal = *template.FlatInstanceOrdinal
+		}
+		return
+	}
 }
 
 func (hs horizontalScalingOpsHandler) saveSourceAssignments(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
@@ -762,7 +765,7 @@ func (hs horizontalScalingOpsHandler) saveSourceAssignments(reqCtx intctrlutil.R
 		if err != nil {
 			return err
 		}
-		specs, err := hscaleComponentSpecs(reqCtx, cli, opsRes, request.ComponentName, nil)
+		specs, err := hscaleComponentSpecs(reqCtx, cli, opsRes, request.ComponentName)
 		if err != nil {
 			return err
 		}
@@ -857,7 +860,7 @@ func (hs horizontalScalingOpsHandler) reconcileAllocatedScaling(reqCtx intctrlut
 	if opsRes.OpsRequest.Status.Phase == opsv1alpha1.OpsCancellingPhase {
 		// Only non-flat cancellation reaches here. The deterministic plan preserves
 		// the original rollback behavior even before forward progress was recorded.
-		if err := hs.setCancellationParticipants(reqCtx, cli, opsRes, pgRes); err != nil {
+		if err := hs.setCancellationParticipants(opsRes, pgRes); err != nil {
 			return 0, 0, err
 		}
 		return handleComponentProgressForScalingReplicas(reqCtx, cli, opsRes, pgRes, compStatus)
@@ -866,14 +869,7 @@ func (hs horizontalScalingOpsHandler) reconcileAllocatedScaling(reqCtx intctrlut
 	replicas, templates, offline := hs.getAllocatedCompValues(last, request)
 	targetSpec := pgRes.clusterComponent.DeepCopy()
 	targetSpec.Replicas, targetSpec.Instances, targetSpec.OfflineInstances = replicas, templates, offline
-	specs, err := hscaleComponentSpecs(reqCtx, cli, opsRes, request.ComponentName, targetSpec)
-	if err != nil {
-		return 0, 0, err
-	}
-	targetSpec = specs[pgRes.fullComponentName]
-	if targetSpec == nil {
-		return 1, 0, nil
-	}
+	applyHScaleShardOverrides(targetSpec, opsRes.Cluster.Spec.GetShardingByName(request.ComponentName), pgRes.shardTemplateName)
 	runtime, err := opsRes.GetRuntime(request.ComponentName)
 	if err != nil {
 		return 0, 0, err
@@ -903,68 +899,38 @@ func (hs horizontalScalingOpsHandler) reconcileAllocatedScaling(reqCtx intctrlut
 	if err != nil || len(pgRes.updatedPodSet) == 0 {
 		return expected, completed, err
 	}
-	// A template reassignment retains the instance name; it is an update, not
-	// a deletion and a creation of that same name. Applied and healthy are separate.
-	statuses := map[string]workloads.InstanceStatus{}
-	for _, status := range workload.GetInstanceStatuses() {
-		statuses[status.PodName] = status
-	}
-	pgRes.opsMessageKey = "Update"
-	updateExpected, updateCompleted, err := handleComponentStatusProgress(reqCtx, cli, opsRes, pgRes, compStatus,
-		func(_ *opsv1alpha1.OpsRequest, instance Instance, _ *progressResource) bool {
-			status := statuses[instance.GetName()]
-			return status.CurrentState == workloads.InstanceCurrentStatePresent && status.UpToDate
-		})
-	return expected + updateExpected, completed + updateCompleted, err
+	updateCompleted, err := handleHScaleInstanceProgress(opsRes, pgRes, workload, compStatus, pgRes.updatedPodSet, true)
+	return expected + int32(len(pgRes.updatedPodSet)), completed + updateCompleted, err
 }
 
-func (hs horizontalScalingOpsHandler) setCancellationParticipants(reqCtx intctrlutil.RequestCtx, cli client.Client,
-	opsRes *OpsResource, pgRes *progressResource) error {
+func (hs horizontalScalingOpsHandler) setCancellationParticipants(opsRes *OpsResource, pgRes *progressResource) error {
 	request := pgRes.compOps.(opsv1alpha1.HorizontalScaling)
 	last := opsRes.OpsRequest.Status.LastConfiguration.Components[request.ComponentName]
-	sourceSpec := pgRes.clusterComponent.DeepCopy()
-	sourceSpec.Replicas, sourceSpec.Instances, sourceSpec.OfflineInstances = *last.Replicas, last.Instances, last.OfflineInstances
-	targetSpec := sourceSpec.DeepCopy()
+	targetSpec := pgRes.clusterComponent.DeepCopy()
 	targetSpec.Replicas, targetSpec.Instances, targetSpec.OfflineInstances = hs.getAllocatedCompValues(last, request)
+	applyHScaleShardOverrides(targetSpec, opsRes.Cluster.Spec.GetShardingByName(request.ComponentName), pgRes.shardTemplateName)
 	runtime, err := opsRes.GetRuntime(request.ComponentName)
 	if err != nil {
 		return err
 	}
-	plan := func(common *appsv1.ClusterComponentSpec) (map[string]string, error) {
-		specs, err := hscaleComponentSpecs(reqCtx, cli, opsRes, request.ComponentName, common)
+	workloadName := constant.GenerateClusterComponentName(opsRes.Cluster.Name, pgRes.fullComponentName)
+	source := sourceAssignments(last.SourceInstanceAssignments, workloadName, workloads.InstanceDesiredStateActive)
+	target := map[string]string{}
+	templates := slices.Clone(targetSpec.Instances)
+	defaultReplicas := targetSpec.Replicas
+	for _, template := range templates {
+		defaultReplicas -= template.GetReplicas()
+	}
+	templates = append(templates, appsv1.InstanceTemplate{Replicas: &defaultReplicas, Ordinals: targetSpec.Ordinals})
+	for _, template := range templates {
+		names, err := runtime.GenerateTemplateInstanceNames(opsRes.Cluster.Name, pgRes.fullComponentName,
+			template.Name, template.GetReplicas(), targetSpec.OfflineInstances, template.Ordinals)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		spec := specs[pgRes.fullComponentName]
-		if spec == nil {
-			return nil, fmt.Errorf("component %q no longer exists", pgRes.fullComponentName)
+		for _, name := range names {
+			target[name] = template.Name
 		}
-		result := map[string]string{}
-		templates := slices.Clone(spec.Instances)
-		defaultReplicas := spec.Replicas
-		for _, template := range templates {
-			defaultReplicas -= template.GetReplicas()
-		}
-		templates = append(templates, appsv1.InstanceTemplate{Replicas: &defaultReplicas, Ordinals: spec.Ordinals})
-		for _, template := range templates {
-			names, err := runtime.GenerateTemplateInstanceNames(opsRes.Cluster.Name, pgRes.fullComponentName,
-				template.Name, template.GetReplicas(), spec.OfflineInstances, template.Ordinals)
-			if err != nil {
-				return nil, err
-			}
-			for _, name := range names {
-				result[name] = template.Name
-			}
-		}
-		return result, nil
-	}
-	source, err := plan(sourceSpec)
-	if err != nil {
-		return err
-	}
-	target, err := plan(targetSpec)
-	if err != nil {
-		return err
 	}
 	pgRes.createdPodSet, pgRes.deletedPodSet, _ = diffInstanceAssignments(target, source)
 	return nil

@@ -34,6 +34,30 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
+func TestOpsRuntimeFailureConditionPolarity(t *testing.T) {
+	for _, state := range []metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionFalse, metav1.ConditionUnknown} {
+		t.Run(string(state), func(t *testing.T) {
+			scheme := runtime.NewScheme()
+			if err := workloads.AddToScheme(scheme); err != nil {
+				t.Fatal(err)
+			}
+			its := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "demo-db",
+				Labels: constant.GetCompLabels("demo", "db")},
+				Status: workloads.InstanceSetStatus{Conditions: []metav1.Condition{
+					{Type: string(workloads.InstanceFailure), Status: state, Message: `["demo-db-0"]`},
+				}}}
+			cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(its).Build()
+			workload, err := newOpsRuntime(context.Background(), cli, "").GetWorkload("default", "demo", "db")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := workload.GetFailedInstanceNameSet(); got.Has("demo-db-0") != (state == metav1.ConditionTrue) {
+				t.Fatalf("failure condition %s produced %v", state, got)
+			}
+		})
+	}
+}
+
 func TestOpsRuntimeBuildsInstanceAPIView(t *testing.T) {
 	scheme := runtime.NewScheme()
 	if err := corev1.AddToScheme(scheme); err != nil {

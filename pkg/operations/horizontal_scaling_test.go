@@ -107,6 +107,73 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 	}
 
 	Context("Test OpsRequest", func() {
+		DescribeTable("validates named template scaling through OpsManager", func(flat, online, invalidCount bool) {
+			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
+			testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
+			Expect(testapps.ChangeObj(&testCtx, opsRes.Cluster, func(cluster *appsv1.Cluster) {
+				spec := &cluster.Spec.ComponentSpecs[0]
+				spec.FlatInstanceOrdinal = flat
+				spec.Instances = []appsv1.InstanceTemplate{{Name: "reader", Replicas: pointer.Int32(2)}}
+			})).Should(Succeed())
+			publish := func() *workloads.InstanceSet {
+				tree, err := publishHScaleAllocation(ctx, k8sClient, opsRes.Cluster, defaultCompName, &opsRes.Cluster.Spec.ComponentSpecs[0])
+				Expect(err).ShouldNot(HaveOccurred())
+				return tree.GetRoot().(*workloads.InstanceSet)
+			}
+			var names []string
+			for _, status := range publish().Status.InstanceStatus {
+				if status.TemplateName != nil && *status.TemplateName == "reader" {
+					names = append(names, status.PodName)
+				}
+			}
+			Expect(names).To(HaveLen(2))
+			if !invalidCount {
+				names = names[:1]
+			}
+			changer := opsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(int32(len(names))),
+				Instances: []opsv1alpha1.InstanceReplicasTemplate{{Name: "reader", ReplicaChanges: 1}}}
+			request := opsv1alpha1.HorizontalScaling{ComponentOps: opsv1alpha1.ComponentOps{ComponentName: defaultCompName}}
+			wantReplicas, wantReaderReplicas := int32(2), int32(1)
+			if online {
+				// Retain the real producer's template assignment while the instance is offline.
+				Expect(testapps.ChangeObj(&testCtx, opsRes.Cluster, func(cluster *appsv1.Cluster) {
+					spec := &cluster.Spec.ComponentSpecs[0]
+					spec.Replicas, spec.Instances[0].Replicas = 3-int32(len(names)), pointer.Int32(2-int32(len(names)))
+					spec.OfflineInstances = names
+				})).Should(Succeed())
+				publish()
+				request.ScaleOut = &opsv1alpha1.ScaleOut{ReplicaChanger: changer, OfflineInstancesToOnline: names}
+				wantReplicas, wantReaderReplicas = 3, 2
+			} else {
+				request.ScaleIn = &opsv1alpha1.ScaleIn{ReplicaChanger: changer, OnlineInstancesToOffline: names}
+			}
+			initClusterAnnotationAndPhaseForOps(opsRes)
+			opsRes.OpsRequest = createHorizontalScaling(clusterName, request, false)
+			before := opsRes.Cluster.Spec.DeepCopy()
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(opsRes.OpsRequest.Status.Phase).To(Equal(opsv1alpha1.OpsCreatingPhase))
+			Expect(opsRes.Cluster.Spec).To(Equal(*before))
+			Expect(opsRes.OpsRequest.Status.LastConfiguration.Components[defaultCompName].SourceInstanceAssignments).NotTo(BeEmpty())
+			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			if invalidCount {
+				// The exact template count becomes known after capture. Reject before
+				// Action: two reader names cannot be covered by one reader replica.
+				Expect(opsRes.OpsRequest.Status.Phase).To(Equal(opsv1alpha1.OpsFailedPhase))
+				Expect(opsRes.Cluster.Spec).To(Equal(*before))
+				return
+			}
+			Expect(opsRes.OpsRequest.Status.Phase).NotTo(Equal(opsv1alpha1.OpsFailedPhase))
+			Expect(opsRes.Cluster.Spec.ComponentSpecs[0].Replicas).To(Equal(wantReplicas))
+			Expect(opsRes.Cluster.Spec.ComponentSpecs[0].Instances[0].GetReplicas()).To(Equal(wantReaderReplicas))
+		},
+			Entry("non-flat scale-in", false, false, false), Entry("flat scale-in", true, false, false),
+			Entry("non-flat scale-out", false, true, false), Entry("flat scale-out", true, true, false),
+			Entry("non-flat invalid scale-in", false, false, true), Entry("flat invalid scale-in", true, false, true),
+			Entry("non-flat invalid scale-out", false, true, true), Entry("flat invalid scale-out", true, true, true))
+
 		commonHScaleConsensusCompTest := func(reqCtx intctrlutil.RequestCtx,
 			changeClusterSpec func(cluster *appsv1.Cluster),
 			horizontalScaling opsv1alpha1.HorizontalScaling,

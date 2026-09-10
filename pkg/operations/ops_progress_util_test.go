@@ -143,6 +143,8 @@ var _ = Describe("Ops ProgressDetails", func() {
 			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
 			its := testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
 			podList := testapps.MockInstanceSetPods(&testCtx, its, opsRes.Cluster, defaultCompName)
+			_, publishErr := publishHScaleAllocation(ctx, k8sClient, opsRes.Cluster, defaultCompName, &opsRes.Cluster.Spec.ComponentSpecs[0])
+			Expect(publishErr).ShouldNot(HaveOccurred())
 
 			By("create horizontalScaling operation to test the progressDetails when scaling in the replicas")
 			opsRes.OpsRequest = createHorizontalScaling(clusterName, opsv1alpha1.HorizontalScaling{
@@ -165,10 +167,13 @@ var _ = Describe("Ops ProgressDetails", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 
 			By("mock the pod is terminating, pod[1] is target pod to delete. and mock pod[2] is failed and deleted by stateful controller")
+			_, publishErr = publishHScaleAllocation(ctx, k8sClient, opsRes.Cluster, defaultCompName, &opsRes.Cluster.Spec.ComponentSpecs[0])
+			Expect(publishErr).ShouldNot(HaveOccurred())
 			for i := 1; i < 3; i++ {
 				pod := podList[i]
 				testk8s.MockPodIsTerminating(ctx, testCtx, pod)
-				testapps.MockInstanceSetStatus(testCtx, opsRes.Cluster, defaultCompName)
+				_, publishErr = publishHScaleAllocation(ctx, k8sClient, opsRes.Cluster, defaultCompName, &opsRes.Cluster.Spec.ComponentSpecs[0])
+				Expect(publishErr).ShouldNot(HaveOccurred())
 				_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 				Expect(getProgressDetailStatus(opsRes, defaultCompName, pod)).Should(Equal(opsv1alpha1.ProcessingProgressStatus))
 
@@ -176,7 +181,8 @@ var _ = Describe("Ops ProgressDetails", func() {
 			By("mock the target pod is deleted and progressDetail status should be succeed")
 			targetPod := podList[1]
 			testk8s.RemovePodFinalizer(ctx, testCtx, targetPod)
-			testapps.MockInstanceSetStatus(testCtx, opsRes.Cluster, defaultCompName)
+			_, publishErr = publishHScaleAllocation(ctx, k8sClient, opsRes.Cluster, defaultCompName, &opsRes.Cluster.Spec.ComponentSpecs[0])
+			Expect(publishErr).ShouldNot(HaveOccurred())
 			_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(getProgressDetailStatus(opsRes, defaultCompName, targetPod)).Should(Equal(opsv1alpha1.SucceedProgressStatus))
 			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("1/2"))
@@ -185,7 +191,8 @@ var _ = Describe("Ops ProgressDetails", func() {
 			pod := podList[2]
 			testk8s.RemovePodFinalizer(ctx, testCtx, pod)
 			// expect the progress is 2/2
-			testapps.MockInstanceSetStatus(testCtx, opsRes.Cluster, defaultCompName)
+			_, publishErr = publishHScaleAllocation(ctx, k8sClient, opsRes.Cluster, defaultCompName, &opsRes.Cluster.Spec.ComponentSpecs[0])
+			Expect(publishErr).ShouldNot(HaveOccurred())
 			_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(getProgressDetailStatus(opsRes, defaultCompName, targetPod)).Should(Equal(opsv1alpha1.SucceedProgressStatus))
 			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("2/2"))
@@ -197,6 +204,8 @@ var _ = Describe("Ops ProgressDetails", func() {
 			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
 			its := testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
 			podList := testapps.MockInstanceSetPods(&testCtx, its, opsRes.Cluster, defaultCompName)
+			_, publishErr := publishHScaleAllocation(ctx, k8sClient, opsRes.Cluster, defaultCompName, &opsRes.Cluster.Spec.ComponentSpecs[0])
+			Expect(publishErr).ShouldNot(HaveOccurred())
 
 			// ops will use the startTimestamp to make decision, start time should not equal the pod createTime during testing.
 			time.Sleep(time.Second)
@@ -222,13 +231,16 @@ var _ = Describe("Ops ProgressDetails", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 
 			By("test the progressDetails when scaling out replicas")
+			_, publishErr = publishHScaleAllocation(ctx, k8sClient, opsRes.Cluster, defaultCompName, &opsRes.Cluster.Spec.ComponentSpecs[0])
+			Expect(publishErr).ShouldNot(HaveOccurred())
 			tokens := strings.Split(podList[2].Name, "-")
 			targetPodName := fmt.Sprintf("%s-3", strings.Join(tokens[0:len(tokens)-1], "-"))
 			testapps.MockInstanceSetPod(&testCtx, nil, clusterName, defaultCompName,
 				targetPodName, "follower")
 			targetPod := &corev1.Pod{}
 			Expect(k8sClient.Get(ctx, client.ObjectKey{Name: targetPodName, Namespace: testCtx.DefaultNamespace}, targetPod)).Should(Succeed())
-			testapps.MockInstanceSetStatus(testCtx, opsRes.Cluster, defaultCompName)
+			_, publishErr = publishHScaleAllocation(ctx, k8sClient, opsRes.Cluster, defaultCompName, &opsRes.Cluster.Spec.ComponentSpecs[0])
+			Expect(publishErr).ShouldNot(HaveOccurred())
 			_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(getProgressDetailStatus(opsRes, defaultCompName, targetPod)).Should(Equal(opsv1alpha1.SucceedProgressStatus))
 			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("1/1"))

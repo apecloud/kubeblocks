@@ -22,6 +22,7 @@ package operations
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -29,7 +30,9 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	k8sappsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -42,8 +45,11 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
+	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/plan"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -124,6 +130,10 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 				})).Should(Succeed())
 			}
 			pods := testapps.MockInstanceSetPods(&testCtx, its, opsRes.Cluster, defaultCompName)
+			if !hscaleFromBackup(horizontalScaling) {
+				_, err = publishHScaleAllocation(ctx, k8sClient, opsRes.Cluster, defaultCompName, &opsRes.Cluster.Spec.ComponentSpecs[0])
+				Expect(err).ShouldNot(HaveOccurred())
+			}
 			By("create opsRequest for horizontal scaling of consensus component")
 			initClusterAnnotationAndPhaseForOps(opsRes)
 			horizontalScaling.ComponentName = defaultCompName
@@ -180,6 +190,10 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			By("expect for opsRequest phase is Succeed after pods has been scaled and component phase is Running")
 			// mock consensus component is Running
 			mockConsensusCompToRunning(opsRes)
+			if !hscaleFromBackup(opsRes.OpsRequest.Spec.HorizontalScalingList[0]) {
+				_, err := publishHScaleAllocation(ctx, k8sClient, opsRes.Cluster, defaultCompName, &opsRes.Cluster.Spec.ComponentSpecs[0])
+				Expect(err).ShouldNot(HaveOccurred())
+			}
 			_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(opsv1alpha1.OpsSucceedPhase))
@@ -607,6 +621,10 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			if horizontalScaling.ComponentName == "" {
 				horizontalScaling.ComponentName = defaultCompName
 			}
+			if horizontalScaling.Shards == nil && !hscaleFromBackup(horizontalScaling) {
+				_, err := publishHScaleAllocation(ctx, k8sClient, opsRes.Cluster, defaultCompName, &opsRes.Cluster.Spec.ComponentSpecs[0])
+				Expect(err).ShouldNot(HaveOccurred())
+			}
 			opsRes.OpsRequest = createHorizontalScaling(clusterName, horizontalScaling, ignoreHscalingStrictValidate)
 			opsRes.OpsRequest.Spec.Force = true
 			// set ops phase to Pending
@@ -729,7 +747,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			}, false)
 			Expect(opsRes.Cluster.Spec.GetComponentByName(defaultCompName).Replicas).Should(BeEquivalentTo(5))
 
-			By("create third opsRequest to offline a pod which is created by another running opsRequest and expect it to fail")
+			By("a newer request supersedes previous ordinary scaling and can offline an assigned instance")
 			offlineInsName := fmt.Sprintf("%s-%s-3", clusterName, defaultCompName)
 			_ = createOpsAndToCreatingPhase(reqCtx, opsRes, opsv1alpha1.HorizontalScaling{
 				ScaleIn: &opsv1alpha1.ScaleIn{
@@ -737,17 +755,14 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 					OnlineInstancesToOffline: []string{offlineInsName},
 				},
 			}, false)
-			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsFailedPhase))
-			conditions := opsRes.OpsRequest.Status.Conditions
-			Expect(conditions[len(conditions)-1].Message).Should(ContainSubstring(fmt.Sprintf(`instance "%s" cannot be taken offline as it has been created by another running opsRequest`, offlineInsName)))
+			Expect(opsRes.Cluster.Spec.GetComponentByName(defaultCompName).Replicas).Should(BeEquivalentTo(4))
+			Expect(opsRes.Cluster.Spec.GetComponentByName(defaultCompName).OfflineInstances).Should(ContainElement(offlineInsName))
 
-			By("create a opsRequest to delete 1 replicas which is created by another running opsRequest and expect it to fail")
+			By("a subsequent scale-in also supersedes the previous request without name prediction")
 			_ = createOpsAndToCreatingPhase(reqCtx, opsRes, opsv1alpha1.HorizontalScaling{
 				ScaleIn: &opsv1alpha1.ScaleIn{ReplicaChanger: opsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(1)}},
 			}, false)
-			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsFailedPhase))
-			conditions = opsRes.OpsRequest.Status.Conditions
-			Expect(conditions[len(conditions)-1].Message).Should(ContainSubstring(`cannot be taken offline as it has been created by another running opsRequest`))
+			Expect(opsRes.Cluster.Spec.GetComponentByName(defaultCompName).Replicas).Should(BeEquivalentTo(3))
 		})
 
 		It("horizontal scaling for shards component", func() {
@@ -992,6 +1007,360 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 
 	})
 })
+
+// Publish allocation through the real InstanceSet allocator and status producer.
+// Deliberately do not create/update Pods: tests control when the workload applies
+// the allocation, independently of when identities are published to Operations.
+func publishHScaleAllocation(ctx context.Context, cli client.Client, cluster *appsv1.Cluster,
+	name string, spec *appsv1.ClusterComponentSpec) (*kubebuilderx.ObjectTree, error) {
+	its := &workloads.InstanceSet{}
+	key := client.ObjectKey{Namespace: cluster.Namespace, Name: constant.GenerateClusterComponentName(cluster.Name, name)}
+	err := cli.Get(ctx, key, its)
+	if err != nil && !apierrors.IsNotFound(err) {
+		return nil, err
+	}
+	create := apierrors.IsNotFound(err)
+	if create {
+		its.ObjectMeta = metav1.ObjectMeta{Name: key.Name, Namespace: key.Namespace, Labels: constant.GetCompLabels(cluster.Name, name)}
+		its.Spec.PodManagementPolicy = k8sappsv1.ParallelPodManagement
+		its.Spec.Selector = &metav1.LabelSelector{MatchLabels: its.Labels}
+		its.Spec.Template = corev1.PodTemplateSpec{ObjectMeta: metav1.ObjectMeta{Labels: its.Labels}, Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "mysql", Image: "mysql:8"}}}}
+	}
+	its.Spec.Replicas, its.Spec.OfflineInstances = pointer.Int32(spec.Replicas), slices.Clone(spec.OfflineInstances)
+	its.Spec.FlatInstanceOrdinal, its.Spec.Ordinals = spec.FlatInstanceOrdinal, spec.Ordinals
+	its.Spec.Instances = nil
+	for _, template := range spec.Instances {
+		its.Spec.Instances = append(its.Spec.Instances, workloads.InstanceTemplate{
+			Name: template.Name, Replicas: template.Replicas, Ordinals: template.Ordinals, Resources: template.Resources,
+			Annotations: template.Annotations, Labels: template.Labels, Env: template.Env,
+		})
+	}
+	if create {
+		err = cli.Create(ctx, its)
+	} else {
+		err = cli.Update(ctx, its)
+	}
+	if err != nil {
+		return nil, err
+	}
+	tree := kubebuilderx.NewObjectTree()
+	tree.SetRoot(its)
+	pods := &corev1.PodList{}
+	if err := cli.List(ctx, pods, client.InNamespace(key.Namespace), client.MatchingLabels(constant.GetCompLabels(cluster.Name, name))); err != nil {
+		return nil, err
+	}
+	for i := range pods.Items {
+		if err := tree.Add(&pods.Items[i]); err != nil {
+			return nil, err
+		}
+	}
+	if _, err := instanceset.NewRevisionUpdateReconciler().Reconcile(tree); err != nil {
+		return nil, err
+	}
+	if _, err := instanceset.NewStatusReconciler().Reconcile(tree); err != nil {
+		return nil, err
+	}
+	return tree, cli.Status().Update(ctx, its)
+}
+
+func TestHScaleAllocatedIdentities(t *testing.T) {
+	for _, flat := range []bool{false, true} {
+		t.Run(fmt.Sprintf("flat=%t", flat), func(t *testing.T) {
+			f := newHorizontalScalingFixture(t, scaleOutRequest("db", false))
+			spec := &f.res.Cluster.Spec.ComponentSpecs[0]
+			spec.FlatInstanceOrdinal = flat
+			spec.Ordinals.Discrete = []int32{3, 7}
+			spec.OfflineInstances = []string{"demo-db-99"} // unrelated retained identity, with no observed template
+			tree := f.publishAllocation(t, "db")
+			if _, err := instanceset.NewReplicasAlignmentReconciler().Reconcile(tree); err != nil {
+				t.Fatal(err)
+			}
+			for _, obj := range tree.List(&corev1.Pod{}) {
+				pod := obj.(*corev1.Pod)
+				if pod.Name != "demo-db-3" {
+					t.Fatalf("initial allocation = %s", pod.Name)
+				}
+				pod.Status.Phase = corev1.PodRunning
+				pod.Status.Conditions = []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}}
+				if err := f.cli.Create(f.req.Ctx, pod); err != nil {
+					t.Fatal(err)
+				}
+			}
+			f.publishAllocation(t, "db")
+			f.saveConfiguration(t)
+			if len(f.res.OpsRequest.Status.LastConfiguration.Components["db"].SourceInstanceAssignments) != 1 {
+				t.Fatal("unrelated Offline identity entered source assignments")
+			}
+			trace := &horizontalScalingRuntimeTrace{OpsRuntime: f.res.Runtimes["db"], failAt: 1, err: fmt.Errorf("unexpected name planning")}
+			f.res.Runtimes["db"] = trace
+			if err := (horizontalScalingOpsHandler{}).Action(f.req, f.cli, f.res); err != nil {
+				t.Fatal(err)
+			}
+			f.reconcile(t, opsv1alpha1.OpsRunningPhase)
+			tree = f.publishAllocation(t, "db")
+			f.reconcile(t, opsv1alpha1.OpsRunningPhase)
+			if got := f.res.OpsRequest.Status.Progress; got != "0/1" {
+				t.Fatalf("progress = %s", got)
+			}
+			details := f.res.OpsRequest.Status.Components["db"].ProgressDetails
+			if len(details) != 1 || details[0].ObjectKey != "Pod/demo-db-7" {
+				t.Fatalf("participants = %+v", details)
+			}
+			if _, err := instanceset.NewReplicasAlignmentReconciler().Reconcile(tree); err != nil {
+				t.Fatal(err)
+			}
+			for _, obj := range tree.List(&corev1.Pod{}) {
+				pod := obj.(*corev1.Pod)
+				if pod.Name != "demo-db-7" {
+					continue
+				}
+				pod.Status.Phase = corev1.PodPending
+				if err := f.cli.Create(f.req.Ctx, pod); err != nil {
+					t.Fatal(err)
+				}
+			}
+			f.publishAllocation(t, "db")
+			f.reconcile(t, opsv1alpha1.OpsRunningPhase)
+			pod := &corev1.Pod{}
+			if err := f.cli.Get(f.req.Ctx, client.ObjectKey{Namespace: "default", Name: "demo-db-7"}, pod); err != nil {
+				t.Fatal(err)
+			}
+			pod.Status.Phase = corev1.PodRunning
+			pod.Status.Conditions = []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}}
+			if err := f.cli.Status().Update(f.req.Ctx, pod); err != nil {
+				t.Fatal(err)
+			}
+			f.publishAllocation(t, "db")
+			f.reconcile(t, opsv1alpha1.OpsSucceedPhase)
+			if len(trace.specs) != 0 {
+				t.Fatal("ordinary forward path called name planner")
+			}
+			// Scale back in. Assignment removal must not bypass actual Pod deletion.
+			f.res.OpsRequest.Spec.HorizontalScalingList[0].ScaleOut = nil
+			f.res.OpsRequest.Spec.HorizontalScalingList[0].ScaleIn = &opsv1alpha1.ScaleIn{ReplicaChanger: opsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(1)}}
+			if err := f.cli.Update(f.req.Ctx, f.res.OpsRequest); err != nil {
+				t.Fatal(err)
+			}
+			f.res.OpsRequest.Status.Components = nil
+			f.saveConfiguration(t)
+			if err := (horizontalScalingOpsHandler{}).Action(f.req, f.cli, f.res); err != nil {
+				t.Fatal(err)
+			}
+			f.reconcile(t, opsv1alpha1.OpsRunningPhase)
+			f.publishAllocation(t, "db")
+			f.reconcile(t, opsv1alpha1.OpsRunningPhase)
+			if err := f.cli.Delete(f.req.Ctx, pod); err != nil {
+				t.Fatal(err)
+			}
+			f.publishAllocation(t, "db")
+			f.reconcile(t, opsv1alpha1.OpsSucceedPhase)
+			if got := f.res.OpsRequest.Status.Progress; got != "1/1" {
+				t.Fatalf("scale-in progress = %s", got)
+			}
+		})
+	}
+}
+
+func TestHScaleNonFlatCancellationOrdinals(t *testing.T) {
+	for _, scaleIn := range []bool{false, true} {
+		f := newHorizontalScalingFixture(t, scaleOutRequest("db", false))
+		spec := &f.res.Cluster.Spec.ComponentSpecs[0]
+		spec.Ordinals.Discrete = []int32{3, 7}
+		if scaleIn {
+			spec.Replicas = 2
+			f.res.OpsRequest.Spec.HorizontalScalingList[0].ScaleOut = nil
+			f.res.OpsRequest.Spec.HorizontalScalingList[0].ScaleIn = &opsv1alpha1.ScaleIn{ReplicaChanger: opsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(1)}}
+			if err := f.cli.Update(f.req.Ctx, f.res.OpsRequest); err != nil {
+				t.Fatal(err)
+			}
+		}
+		f.publishAllocation(t, "db")
+		f.saveConfiguration(t)
+		hs := horizontalScalingOpsHandler{}
+		if err := hs.Action(f.req, f.cli, f.res); err != nil {
+			t.Fatal(err)
+		}
+		if err := hs.Cancel(f.req, f.cli, f.res); err != nil {
+			t.Fatal(err)
+		}
+		f.res.OpsRequest.Status.Phase = opsv1alpha1.OpsCancellingPhase
+		// No forward progress or target status was published before cancellation.
+		if scaleIn {
+			f.reconcile(t, opsv1alpha1.OpsRunningPhase)
+		} else {
+			f.reconcile(t, opsv1alpha1.OpsSucceedPhase)
+		}
+		details := f.res.OpsRequest.Status.Components["db"].ProgressDetails
+		if len(details) != 1 || details[0].ObjectKey != "Pod/demo-db-7" {
+			t.Fatalf("rollback names = %+v", details)
+		}
+		if !slices.Equal(spec.Ordinals.Discrete, []int32{3, 7}) {
+			t.Fatal("rollback changed default ordinals")
+		}
+	}
+}
+
+func TestHScaleShardOverrides(t *testing.T) {
+	f := newHorizontalScalingFixture(t, scaleOutRequest("group", false))
+	common := f.res.Cluster.Spec.ComponentSpecs[0]
+	f.res.Cluster.Spec.ComponentSpecs = nil
+	f.res.Cluster.Spec.Shardings = []appsv1.ClusterSharding{{Name: "group", Shards: 2, Template: common,
+		ShardTemplates: []appsv1.ShardTemplate{{Name: "fixed", Replicas: pointer.Int32(2), FlatInstanceOrdinal: pointer.Bool(true)}}}}
+	for _, name := range []string{"group-a", "group-b"} {
+		labels := constant.GetCompLabels("demo", name, map[string]string{constant.KBAppShardingNameLabelKey: "group"})
+		if name == "group-b" {
+			labels[constant.KBAppShardTemplateLabelKey] = "fixed"
+		}
+		comp := &appsv1.Component{ObjectMeta: metav1.ObjectMeta{Name: "demo-" + name, Namespace: "default", Labels: labels}}
+		if err := f.cli.Create(f.req.Ctx, comp); err != nil {
+			t.Fatal(err)
+		}
+	}
+	specs, err := hscaleComponentSpecs(f.req, f.cli, f.res, "group", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, spec := range specs {
+		if _, err := publishHScaleAllocation(f.req.Ctx, f.cli, f.res.Cluster, name, spec); err != nil {
+			t.Fatal(err)
+		}
+	}
+	f.saveConfiguration(t)
+	if got := len(f.res.OpsRequest.Status.LastConfiguration.Components["group"].SourceInstanceAssignments); got != 3 {
+		t.Fatalf("source count = %d", got)
+	}
+	if err := (horizontalScalingOpsHandler{}).Action(f.req, f.cli, f.res); err != nil {
+		t.Fatal(err)
+	}
+	specs, err = hscaleComponentSpecs(f.req, f.cli, f.res, "group", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if specs["group-a"].Replicas != 2 || specs["group-b"].Replicas != 2 || !specs["group-b"].FlatInstanceOrdinal {
+		t.Fatal("lost shard override")
+	}
+	for name, spec := range specs {
+		if _, err := publishHScaleAllocation(f.req.Ctx, f.cli, f.res.Cluster, name, spec); err != nil {
+			t.Fatal(err)
+		}
+	}
+	f.reconcile(t, opsv1alpha1.OpsRunningPhase)
+	if f.res.OpsRequest.Status.Progress != "0/1" {
+		t.Fatalf("progress = %s", f.res.OpsRequest.Status.Progress)
+	}
+	writes := f.clusterWrites
+	if err := (horizontalScalingOpsHandler{}).Cancel(f.req, f.cli, f.res); !intctrlutil.IsTargetError(err, intctrlutil.ErrorIgnoreCancel) {
+		t.Fatalf("flat shard cancel = %v", err)
+	}
+	if f.clusterWrites != writes {
+		t.Fatal("partially rolled back mixed-ordinal sharding")
+	}
+}
+
+func TestHScaleFlatRestrictions(t *testing.T) {
+	for _, backup := range []bool{false, true} {
+		f := newHorizontalScalingFixture(t, scaleOutRequest("db", backup))
+		f.res.Cluster.Spec.ComponentSpecs[0].FlatInstanceOrdinal = true
+		hs := horizontalScalingOpsHandler{}
+		if backup {
+			if err := hs.Action(f.req, f.cli, f.res); !intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal) {
+				t.Fatalf("backup rejection = %v", err)
+			}
+		} else {
+			f.publishAllocation(t, "db")
+			f.saveConfiguration(t)
+			if err := hs.Action(f.req, f.cli, f.res); err != nil {
+				t.Fatal(err)
+			}
+			f.clusterWrites = 0
+			if err := hs.Cancel(f.req, f.cli, f.res); !intctrlutil.IsTargetError(err, intctrlutil.ErrorIgnoreCancel) {
+				t.Fatalf("cancel rejection = %v", err)
+			}
+		}
+		if f.clusterWrites != 0 || f.backupReads != 0 || f.restoreReads != 0 {
+			t.Fatal("unsupported request mutated the cluster or entered restoration")
+		}
+	}
+}
+
+func TestHScaleTemplateReassignment(t *testing.T) {
+	f := newHorizontalScalingFixture(t, scaleOutRequest("db", false))
+	spec := &f.res.Cluster.Spec.ComponentSpecs[0]
+	spec.FlatInstanceOrdinal, spec.Replicas = true, 2
+	tree := f.publishAllocation(t, "db")
+	if _, err := instanceset.NewReplicasAlignmentReconciler().Reconcile(tree); err != nil {
+		t.Fatal(err)
+	}
+	for _, obj := range tree.List(&corev1.Pod{}) {
+		pod := obj.(*corev1.Pod)
+		pod.Status.Phase = corev1.PodRunning
+		pod.Status.Conditions = []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}}
+		if err := f.cli.Create(f.req.Ctx, pod); err != nil {
+			t.Fatal(err)
+		}
+	}
+	f.publishAllocation(t, "db")
+	request := &f.res.OpsRequest.Spec.HorizontalScalingList[0]
+	request.ScaleIn = &opsv1alpha1.ScaleIn{ReplicaChanger: opsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(1)}}
+	request.ScaleOut = &opsv1alpha1.ScaleOut{NewInstances: []appsv1.InstanceTemplate{{Name: "reader", Replicas: pointer.Int32(1),
+		Ordinals: appsv1.Ordinals{Discrete: []int32{1}}, Env: []corev1.EnvVar{{Name: "READER", Value: "true"}}}}}
+	if err := f.cli.Update(f.req.Ctx, f.res.OpsRequest); err != nil {
+		t.Fatal(err)
+	}
+	f.saveConfiguration(t)
+	if err := (horizontalScalingOpsHandler{}).Action(f.req, f.cli, f.res); err != nil {
+		t.Fatal(err)
+	}
+	tree = f.publishAllocation(t, "db")
+	its := tree.GetRoot().(*workloads.InstanceSet)
+	for _, status := range its.Status.InstanceStatus {
+		if status.PodName == "demo-db-1" && (status.TemplateName == nil || *status.TemplateName != "reader" || status.UpToDate) {
+			t.Fatalf("unexpected transition observation: %+v", status)
+		}
+	}
+	f.reconcile(t, opsv1alpha1.OpsRunningPhase)
+	if got := f.res.OpsRequest.Status.Progress; got != "0/1" {
+		t.Fatalf("healthy but unapplied Pod completed reassignment: %s", got)
+	}
+	// Re-create from the real desired template to apply the reassignment.
+	pod := &corev1.Pod{}
+	key := client.ObjectKey{Namespace: "default", Name: "demo-db-1"}
+	if err := f.cli.Get(f.req.Ctx, key, pod); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.cli.Delete(f.req.Ctx, pod); err != nil {
+		t.Fatal(err)
+	}
+	tree = f.publishAllocation(t, "db")
+	f.reconcile(t, opsv1alpha1.OpsRunningPhase)
+	if _, err := instanceset.NewReplicasAlignmentReconciler().Reconcile(tree); err != nil {
+		t.Fatal(err)
+	}
+	for _, obj := range tree.List(&corev1.Pod{}) {
+		if obj.GetName() == key.Name {
+			pod = obj.(*corev1.Pod)
+			pod.Status.Phase = corev1.PodPending
+			if err := f.cli.Create(f.req.Ctx, pod); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	f.publishAllocation(t, "db")
+	f.reconcile(t, opsv1alpha1.OpsRunningPhase)
+	if err := f.cli.Get(f.req.Ctx, key, pod); err != nil {
+		t.Fatal(err)
+	}
+	pod.Status.Phase = corev1.PodRunning
+	pod.Status.Conditions = []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}}
+	if err := f.cli.Status().Update(f.req.Ctx, pod); err != nil {
+		t.Fatal(err)
+	}
+	f.publishAllocation(t, "db")
+	f.reconcile(t, opsv1alpha1.OpsSucceedPhase)
+	if got := f.res.OpsRequest.Status.Progress; got != "1/1" {
+		t.Fatalf("final progress = %s", got)
+	}
+}
 
 func createHorizontalScaling(clusterName string, horizontalScaling opsv1alpha1.HorizontalScaling, ifIgnore bool) *opsv1alpha1.OpsRequest {
 	horizontalOpsName := "horizontal-scaling-ops-" + testCtx.GetRandomStr()

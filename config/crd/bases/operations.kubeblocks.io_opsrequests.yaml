@@ -150,6 +150,7 @@ spec:
                   "Pending", "Creating", or "Running" state.
 
                   This field applies only to "VerticalScaling" and "HorizontalScaling" opsRequests.
+                  Cancellation of an already-started HorizontalScaling operation on a flat-ordinal component is unsupported.
 
                   Note: Setting `cancel` to true is irreversible; further modifications to this field are ineffective.
                 type: boolean
@@ -613,6 +614,7 @@ spec:
                             FromBackup specifies the configuration for creating new instances from an existing backup.
                             This is only effective for non-sharding components.
                             When specified, new instances will be created using data from the specified backup.
+                            Flat-ordinal components do not support scaling out from backup.
                           properties:
                             name:
                               description: Specifies the name of the Backup name.
@@ -5356,6 +5358,40 @@ spec:
                             to any changes.
                           format: int32
                           type: integer
+                        sourceInstanceAssignments:
+                          description: |-
+                            Records the instance assignments before ordinary HorizontalScaling. Includes Active instances and
+                            explicitly requested Offline instances to bring online; it does not record a target allocation.
+                          items:
+                            description: InstanceTemplateAssignment records an instance's
+                              assigned name and template, not its runtime health.
+                            properties:
+                              desiredState:
+                                description: Desired state when the source assignment
+                                  was saved.
+                                enum:
+                                - Active
+                                - Offline
+                                type: string
+                              podName:
+                                description: Stable instance name published by the
+                                  InstanceSet.
+                                type: string
+                              templateName:
+                                description: Template name; the empty string denotes
+                                  the default template.
+                                type: string
+                              workloadName:
+                                description: Name of the InstanceSet that owns the
+                                  instance.
+                                type: string
+                            required:
+                            - desiredState
+                            - podName
+                            - templateName
+                            - workloadName
+                            type: object
+                          type: array
                         volumeClaimTemplates:
                           description: Records volumes' storage size of the Component
                             prior to any changes.

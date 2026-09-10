@@ -34,6 +34,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -70,66 +71,61 @@ func (r *horizontalScalingRuntimeTrace) GetWorkload(namespace, clusterName, comp
 	return r.OpsRuntime.GetWorkload(namespace, clusterName, compName)
 }
 
-func TestHorizontalScalingParticipantAndProgressOrder(t *testing.T) {
-	for _, fromBackup := range []bool{false, true} {
-		want := []string{"names(db,1)", "names(db,1)", "names(db,2)", "workload(db)"}
-		if fromBackup {
-			want = append([]string{"names(db,1)", "names(db,1)", "names(db,1)", "names(db,2)"}, want...)
-		}
-		// Fail each name-planning step in turn to ensure no later planning,
-		// workload checks, or target writes occur after the first error.
-		for failAt := 0; failAt < len(want); failAt++ {
-			t.Run(fmt.Sprintf("backup=%t/failAt=%d", fromBackup, failAt), func(t *testing.T) {
-				f := newHorizontalScalingFixture(t, scaleOutRequest("db", fromBackup))
-				if fromBackup {
-					f.addBackup(t)
+func TestHorizontalScalingBackupParticipantAndProgressOrder(t *testing.T) {
+	// Forward name planning is now confined to backup recovery. Ordinary scaling
+	// has separate API-publication assertions below.
+	want := []string{"names(db,1)", "names(db,1)", "names(db,1)", "names(db,2)", "names(db,1)", "names(db,1)", "names(db,2)", "workload(db)"}
+	// Fail each name-planning step in turn to ensure no later planning,
+	// workload checks, or target writes occur after the first error.
+	for failAt := 0; failAt < len(want); failAt++ {
+		t.Run(fmt.Sprintf("failAt=%d", failAt), func(t *testing.T) {
+			f := newHorizontalScalingFixture(t, scaleOutRequest("db", true))
+			f.addBackup(t)
+			trace := &horizontalScalingRuntimeTrace{OpsRuntime: f.res.Runtimes["db"], err: errors.New("name planning failed")}
+			f.res.Runtimes["db"] = trace
+			hs := horizontalScalingOpsHandler{}
+			if err := hs.Action(f.req, f.cli, f.res); err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(trace.calls, []string{"names(db,1)"}) {
+				t.Fatalf("Action calls = %v", trace.calls)
+			}
+			trace.calls, trace.specs, trace.failAt = nil, nil, failAt
+			phase, _, err := hs.ReconcileAction(f.req, f.cli, f.res)
+			if phase != opsv1alpha1.OpsRunningPhase {
+				t.Fatalf("phase = %s", phase)
+			}
+			wantCalls := want
+			if failAt > 0 {
+				wantCalls = want[:failAt]
+				if !errors.Is(err, trace.err) {
+					t.Fatalf("error = %v, want injected error", err)
 				}
-				trace := &horizontalScalingRuntimeTrace{OpsRuntime: f.res.Runtimes["db"], err: errors.New("name planning failed")}
-				f.res.Runtimes["db"] = trace
-				hs := horizontalScalingOpsHandler{}
-				if err := hs.Action(f.req, f.cli, f.res); err != nil {
-					t.Fatal(err)
-				}
-				if !reflect.DeepEqual(trace.calls, []string{"names(db,1)"}) {
-					t.Fatalf("Action calls = %v", trace.calls)
-				}
-				trace.calls, trace.specs, trace.failAt = nil, nil, failAt
-				phase, _, err := hs.ReconcileAction(f.req, f.cli, f.res)
-				if phase != opsv1alpha1.OpsRunningPhase {
-					t.Fatalf("phase = %s", phase)
-				}
-				wantCalls := want
-				if failAt > 0 {
-					wantCalls = want[:failAt]
-					if !errors.Is(err, trace.err) {
-						t.Fatalf("error = %v, want injected error", err)
-					}
-				} else if err != nil {
-					t.Fatal(err)
-				}
-				if !reflect.DeepEqual(trace.calls, wantCalls) {
-					t.Fatalf("calls = %v, want %v", trace.calls, wantCalls)
-				}
-				if f.clusterWrites != 1 {
-					t.Fatalf("cluster writes = %d", f.clusterWrites)
-				}
-				restores := &dpv1alpha1.RestoreList{}
-				if err := f.cli.List(f.req.Ctx, restores); err != nil {
-					t.Fatal(err)
-				}
-				wantRestores := 0
-				if fromBackup && (failAt == 0 || failAt > 4) {
-					wantRestores = 1
-				}
-				if len(restores.Items) != wantRestores {
-					t.Fatalf("restores = %d, want %d", len(restores.Items), wantRestores)
-				}
-			})
-		}
+			} else if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(trace.calls, wantCalls) {
+				t.Fatalf("calls = %v, want %v", trace.calls, wantCalls)
+			}
+			if f.clusterWrites != 1 {
+				t.Fatalf("cluster writes = %d", f.clusterWrites)
+			}
+			restores := &dpv1alpha1.RestoreList{}
+			if err := f.cli.List(f.req.Ctx, restores); err != nil {
+				t.Fatal(err)
+			}
+			wantRestores := 0
+			if failAt == 0 || failAt > 4 {
+				wantRestores = 1
+			}
+			if len(restores.Items) != wantRestores {
+				t.Fatalf("restores = %d, want %d", len(restores.Items), wantRestores)
+			}
+		})
 	}
 }
 
-func TestHorizontalScalingOnlineInferenceInputs(t *testing.T) {
+func TestHorizontalScalingBackupOnlineInferenceInputs(t *testing.T) {
 	for _, tc := range []struct {
 		name                                             string
 		template, explicitTotal, explicitTemplate, empty bool
@@ -143,7 +139,7 @@ func TestHorizontalScalingOnlineInferenceInputs(t *testing.T) {
 		{name: "empty-list-skips-inference", empty: true, wantCalls: []string{"names(db,1)"}, wantReplicas: 1},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			request := scaleOutRequest("db", false)
+			request := scaleOutRequest("db", true)
 			request.ScaleOut.ReplicaChanges = nil
 			instance := "demo-db-0"
 			if tc.template {
@@ -171,7 +167,8 @@ func TestHorizontalScalingOnlineInferenceInputs(t *testing.T) {
 			original := spec.DeepCopy()
 			trace := &horizontalScalingRuntimeTrace{OpsRuntime: f.res.Runtimes["db"]}
 			f.res.Runtimes["db"] = trace
-			if err := hs.Action(f.req, f.cli, f.res); err != nil {
+			replicas, templates, offline, err := hs.prepareReplicaScaling(f.res, request)
+			if err != nil {
 				t.Fatal(err)
 			}
 			if !reflect.DeepEqual(trace.calls, tc.wantCalls) {
@@ -195,12 +192,14 @@ func TestHorizontalScalingOnlineInferenceInputs(t *testing.T) {
 					}
 				}
 			}
-			f.replicas(t, "db", tc.wantReplicas)
-			if tc.template && (len(spec.Instances) != 1 || spec.Instances[0].GetReplicas() != 2) {
-				t.Fatalf("target instances = %+v", spec.Instances)
+			if replicas != tc.wantReplicas {
+				t.Fatalf("target replicas = %d, want %d", replicas, tc.wantReplicas)
 			}
-			if !tc.empty && len(spec.OfflineInstances) != 0 {
-				t.Fatalf("target offline = %v", spec.OfflineInstances)
+			if tc.template && (len(templates) != 1 || templates[0].GetReplicas() != 2) {
+				t.Fatalf("target instances = %+v", templates)
+			}
+			if !tc.empty && len(offline) != 0 {
+				t.Fatalf("target offline = %v", offline)
 			}
 		})
 	}
@@ -235,7 +234,7 @@ func newHorizontalScalingFixture(t *testing.T, requests ...opsv1alpha1.Horizonta
 		objects = append(objects, comp)
 	}
 	f.cli = fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).
-		WithStatusSubresource(ops, &dpv1alpha1.Restore{}).WithInterceptorFuncs(interceptor.Funcs{
+		WithStatusSubresource(ops, &dpv1alpha1.Restore{}, &workloads.InstanceSet{}).WithInterceptorFuncs(interceptor.Funcs{
 		Get: func(ctx context.Context, cli client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
 			switch obj.(type) {
 			case *dpv1alpha1.Backup:
@@ -258,14 +257,30 @@ func newHorizontalScalingFixture(t *testing.T, requests ...opsv1alpha1.Horizonta
 	if err != nil {
 		t.Fatal(err)
 	}
+	if len(requests) == 1 && hscaleFromBackup(requests[0]) {
+		f.saveConfiguration(t)
+	}
+	return f
+}
+
+func (f *horizontalScalingFixture) saveConfiguration(t *testing.T) {
+	t.Helper()
 	if err := (horizontalScalingOpsHandler{}).SaveLastConfiguration(f.req, f.cli, f.res); err != nil {
 		t.Fatal(err)
 	}
-	// OpsManager persists this snapshot before invoking Action/ReconcileAction.
-	if err := f.cli.Status().Update(f.req.Ctx, ops); err != nil {
+	if err := f.cli.Status().Update(f.req.Ctx, f.res.OpsRequest); err != nil {
 		t.Fatal(err)
 	}
-	return f
+}
+
+func (f *horizontalScalingFixture) publishAllocation(t *testing.T, name string) *kubebuilderx.ObjectTree {
+	t.Helper()
+	spec := f.res.Cluster.Spec.GetComponentByName(name)
+	tree, err := publishHScaleAllocation(f.req.Ctx, f.cli, f.res.Cluster, name, spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return tree
 }
 
 func scaleOutRequest(name string, backup bool) opsv1alpha1.HorizontalScaling {
@@ -314,11 +329,23 @@ func (f *horizontalScalingFixture) reconcile(t *testing.T, want opsv1alpha1.OpsP
 
 func TestHorizontalScalingOrdinaryPathDoesNotRestore(t *testing.T) {
 	f := newHorizontalScalingFixture(t, scaleOutRequest("db", false))
+	f.publishAllocation(t, "db")
+	f.saveConfiguration(t)
+	trace := &horizontalScalingRuntimeTrace{OpsRuntime: f.res.Runtimes["db"], failAt: 1, err: errors.New("ordinary scaling must not plan names")}
+	f.res.Runtimes["db"] = trace
 	if err := (horizontalScalingOpsHandler{}).Action(f.req, f.cli, f.res); err != nil {
 		t.Fatal(err)
 	}
 	f.replicas(t, "db", 2)
 	f.reconcile(t, opsv1alpha1.OpsRunningPhase)
+	if len(f.res.OpsRequest.Status.Components["db"].ProgressDetails) != 0 {
+		t.Fatal("invented participants before allocation publication")
+	}
+	f.publishAllocation(t, "db")
+	f.reconcile(t, opsv1alpha1.OpsRunningPhase)
+	if len(trace.specs) != 0 {
+		t.Fatal("ordinary scaling used name planning")
+	}
 	if f.backupReads != 0 || f.restoreReads != 0 || f.clusterWrites != 1 {
 		t.Fatalf("ordinary path API calls: backup=%d restore=%d cluster writes=%d", f.backupReads, f.restoreReads, f.clusterWrites)
 	}
@@ -340,12 +367,15 @@ func TestHorizontalScalingMixedComponentsRestoreTiming(t *testing.T) {
 				requests[0], requests[1] = requests[1], requests[0]
 			}
 			f := newHorizontalScalingFixture(t, requests...)
+			f.publishAllocation(t, "ordinary")
+			f.saveConfiguration(t)
 			f.addBackup(t)
 			if err := (horizontalScalingOpsHandler{}).Action(f.req, f.cli, f.res); err != nil {
 				t.Fatal(err)
 			}
 			f.replicas(t, "ordinary", 2)
 			f.replicas(t, "restored", 1)
+			f.publishAllocation(t, "ordinary")
 			if f.backupReads != 0 || f.restoreReads != 0 {
 				t.Fatal("Action must defer Restore work")
 			}
@@ -398,6 +428,7 @@ func TestHorizontalScalingMixedComponentsRestoreTiming(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
+			f.publishAllocation(t, "ordinary")
 			f.reconcile(t, opsv1alpha1.OpsSucceedPhase)
 			if got := f.res.OpsRequest.Status.Progress; got != "2/2" {
 				t.Fatalf("completed progress = %q", got)
@@ -468,6 +499,7 @@ func TestHorizontalScalingCancelRestoresConfigurationAndDirection(t *testing.T) 
 	spec := &f.res.Cluster.Spec.ComponentSpecs[0]
 	spec.Instances = []appsv1.InstanceTemplate{{Name: "foo", Replicas: pointer.Int32(1)}}
 	spec.OfflineInstances = []string{"demo-db-foo-0"}
+	f.publishAllocation(t, "db")
 	hs := horizontalScalingOpsHandler{}
 	if err := hs.SaveLastConfiguration(f.req, f.cli, f.res); err != nil {
 		t.Fatal(err)
@@ -479,6 +511,7 @@ func TestHorizontalScalingCancelRestoresConfigurationAndDirection(t *testing.T) 
 	if err := hs.Action(f.req, f.cli, f.res); err != nil {
 		t.Fatal(err)
 	}
+	f.publishAllocation(t, "db")
 	f.reconcile(t, opsv1alpha1.OpsRunningPhase)
 	details := f.res.OpsRequest.Status.Components["db"].ProgressDetails
 	if f.res.OpsRequest.Status.Progress != "0/1" || len(details) != 1 || details[0].ObjectKey != "Pod/demo-db-0" ||
@@ -520,6 +553,11 @@ func TestHorizontalScalingShardCountAndShardReplicas(t *testing.T) {
 				if err := f.cli.Create(f.req.Ctx, comp); err != nil {
 					t.Fatal(err)
 				}
+				if !changeCount {
+					if _, err := publishHScaleAllocation(f.req.Ctx, f.cli, cluster, shard, &cluster.Spec.Shardings[0].Template); err != nil {
+						t.Fatal(err)
+					}
+				}
 			}
 			hs := horizontalScalingOpsHandler{}
 			if err := hs.SaveLastConfiguration(f.req, f.cli, f.res); err != nil {
@@ -537,6 +575,13 @@ func TestHorizontalScalingShardCountAndShardReplicas(t *testing.T) {
 			}
 			if got := cluster.Spec.Shardings[0]; got.Shards != wantShards || got.Template.Replicas != wantReplicas {
 				t.Fatalf("unexpected sharding: %+v", got)
+			}
+			if !changeCount {
+				for _, shard := range []string{"sharded-a", "sharded-b"} {
+					if _, err := publishHScaleAllocation(f.req.Ctx, f.cli, cluster, shard, &cluster.Spec.Shardings[0].Template); err != nil {
+						t.Fatal(err)
+					}
+				}
 			}
 			f.reconcile(t, opsv1alpha1.OpsRunningPhase)
 			if got := f.res.OpsRequest.Status.Progress; got != wantProgress {

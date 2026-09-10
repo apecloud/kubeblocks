@@ -251,7 +251,8 @@ bool
 <em>(Optional)</em>
 <p>Indicates whether the current operation should be canceled and terminated gracefully if it&rsquo;s in the
 &ldquo;Pending&rdquo;, &ldquo;Creating&rdquo;, or &ldquo;Running&rdquo; state.</p>
-<p>This field applies only to &ldquo;VerticalScaling&rdquo; and &ldquo;HorizontalScaling&rdquo; opsRequests.</p>
+<p>This field applies only to &ldquo;VerticalScaling&rdquo; and &ldquo;HorizontalScaling&rdquo; opsRequests.
+Cancellation of an already-started HorizontalScaling operation on a flat-ordinal component is unsupported.</p>
 <p>Note: Setting <code>cancel</code> to true is irreversible; further modifications to this field are ineffective.</p>
 </td>
 </tr>
@@ -1391,6 +1392,70 @@ Kubernetes core/v1.ResourceRequirements
 </tr>
 </tbody>
 </table>
+<h3 id="operations.kubeblocks.io/v1alpha1.InstanceTemplateAssignment">InstanceTemplateAssignment
+</h3>
+<p>
+(<em>Appears on:</em><a href="#operations.kubeblocks.io/v1alpha1.LastComponentConfiguration">LastComponentConfiguration</a>)
+</p>
+<div>
+<p>InstanceTemplateAssignment records an instance&rsquo;s assigned name and template, not its runtime health.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>workloadName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Name of the InstanceSet that owns the instance.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>podName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Stable instance name published by the InstanceSet.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>templateName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Template name; the empty string denotes the default template.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>desiredState</code><br/>
+<em>
+<a href="cluster.md#workloads.kubeblocks.io/v1.InstanceDesiredState">
+github.com/apecloud/kubeblocks/apis/workloads/v1.InstanceDesiredState
+</a>
+</em>
+</td>
+<td>
+<p>Desired state when the source assignment was saved.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="operations.kubeblocks.io/v1alpha1.InstanceVolumeClaimTemplate">InstanceVolumeClaimTemplate
 </h3>
 <div>
@@ -1495,6 +1560,21 @@ string
 </tr>
 </thead>
 <tbody>
+<tr>
+<td>
+<code>sourceInstanceAssignments</code><br/>
+<em>
+<a href="#operations.kubeblocks.io/v1alpha1.InstanceTemplateAssignment">
+[]InstanceTemplateAssignment
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Records the instance assignments before ordinary HorizontalScaling. Includes Active instances and
+explicitly requested Offline instances to bring online; it does not record a target allocation.</p>
+</td>
+</tr>
 <tr>
 <td>
 <code>replicas</code><br/>
@@ -2352,7 +2432,8 @@ bool
 <em>(Optional)</em>
 <p>Indicates whether the current operation should be canceled and terminated gracefully if it&rsquo;s in the
 &ldquo;Pending&rdquo;, &ldquo;Creating&rdquo;, or &ldquo;Running&rdquo; state.</p>
-<p>This field applies only to &ldquo;VerticalScaling&rdquo; and &ldquo;HorizontalScaling&rdquo; opsRequests.</p>
+<p>This field applies only to &ldquo;VerticalScaling&rdquo; and &ldquo;HorizontalScaling&rdquo; opsRequests.
+Cancellation of an already-started HorizontalScaling operation on a flat-ordinal component is unsupported.</p>
 <p>Note: Setting <code>cancel</code> to true is irreversible; further modifications to this field are ineffective.</p>
 </td>
 </tr>
@@ -4133,7 +4214,8 @@ FromBackup
 <em>(Optional)</em>
 <p>FromBackup specifies the configuration for creating new instances from an existing backup.
 This is only effective for non-sharding components.
-When specified, new instances will be created using data from the specified backup.</p>
+When specified, new instances will be created using data from the specified backup.
+Flat-ordinal components do not support scaling out from backup.</p>
 </td>
 </tr>
 <tr>

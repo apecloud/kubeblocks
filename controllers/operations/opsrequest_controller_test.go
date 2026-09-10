@@ -49,6 +49,8 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
+	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	ctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/generics"
 	kboperations "github.com/apecloud/kubeblocks/pkg/operations"
@@ -552,6 +554,38 @@ var _ = Describe("OpsRequest Controller", func() {
 			return &itsList.Items[0]
 		}
 
+		publishHScaleStatus := func() {
+			Eventually(func() error {
+				its := &workloads.InstanceSet{}
+				if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(componentWorkload()), its); err != nil {
+					return err
+				}
+				// These controller tests separately model Component readiness with
+				// MockInstanceSetReady. Publish the additional allocation API from
+				// real producers without replacing that pre-existing runtime setup.
+				runtimeStatus := its.Status.DeepCopy()
+				tree := kubebuilderx.NewObjectTree()
+				tree.SetRoot(its)
+				pods := &corev1.PodList{}
+				if err := k8sClient.List(ctx, pods, client.InNamespace(its.Namespace), client.MatchingLabels(constant.GetCompLabels(clusterObj.Name, mysqlCompName))); err != nil {
+					return err
+				}
+				for i := range pods.Items {
+					if err := tree.Add(&pods.Items[i]); err != nil {
+						return err
+					}
+				}
+				if _, err := instanceset.NewRevisionUpdateReconciler().Reconcile(tree); err != nil {
+					return err
+				}
+				if _, err := instanceset.NewStatusReconciler().Reconcile(tree); err != nil {
+					return err
+				}
+				runtimeStatus.InstanceStatus = its.Status.InstanceStatus
+				its.Status = *runtimeStatus
+				return k8sClient.Status().Update(ctx, its)
+			}).Should(Succeed())
+		}
 		mockCompRunning := func(replicas int32, reCreatePod bool) {
 			// to wait the component object becomes stable
 			compKey := types.NamespacedName{
@@ -584,6 +618,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			Expect(testapps.ChangeObjStatus(&testCtx, its, func() {
 				testk8s.MockInstanceSetReady(its, mockPods...)
 			})).ShouldNot(HaveOccurred())
+			publishHScaleStatus()
 
 			Eventually(testapps.GetComponentPhase(&testCtx, compKey)).Should(Equal(appsv1.RunningComponentPhase))
 			Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, mysqlCompName)).Should(Equal(appsv1.RunningComponentPhase))
@@ -631,6 +666,7 @@ var _ = Describe("OpsRequest Controller", func() {
 		}
 
 		createClusterHScaleOps := func(replicaChanges int32, isScaleOut bool) *opsv1alpha1.OpsRequest {
+			publishHScaleStatus()
 			By("create a opsRequest to horizontal scale")
 			opsName := "hscale-ops-" + testCtx.GetRandomStr()
 			ops := testops.NewOpsRequestObj(opsName, testCtx.DefaultNamespace,

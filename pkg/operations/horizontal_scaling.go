@@ -71,6 +71,36 @@ func (hs horizontalScalingOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli 
 	if err := hs.checkFlatOrdinalSupport(reqCtx, cli, opsRes, false); err != nil {
 		return err
 	}
+	// Validate and prepare every target before aborting any earlier operation.
+	// A later invalid component must not leave a partially applied request.
+	target := opsRes.Cluster.DeepCopy()
+	for i := range target.Spec.Shardings {
+		sharding := &target.Spec.Shardings[i]
+		if compOps, ok := compOpsSet.componentOpsSet[sharding.Name]; ok {
+			horizontalScaling := compOps.(opsv1alpha1.HorizontalScaling)
+			if horizontalScaling.Shards != nil {
+				sharding.Shards = *horizontalScaling.Shards
+			}
+		}
+	}
+	if err := compOpsSet.updateClusterComponentsAndShardings(target, func(compSpec *appsv1.ClusterComponentSpec, obj ComponentOpsInterface) error {
+		horizontalScaling := obj.(opsv1alpha1.HorizontalScaling)
+		if horizontalScaling.Shards != nil {
+			return nil
+		}
+		replicas, instances, offlineInstances, err := hs.prepareReplicaScaling(opsRes, horizontalScaling)
+		if err != nil {
+			return err
+		}
+		if hscaleFromBackup(horizontalScaling) {
+			// Restore still submits the backup target only after volumes are ready.
+			return nil
+		}
+		compSpec.Replicas, compSpec.Instances, compSpec.OfflineInstances = replicas, instances, offlineInstances
+		return nil
+	}); err != nil {
+		return err
+	}
 	// abort earlier running horizontal scaling opsRequest.
 	if err := abortEarlierOpsRequestWithSameKind(reqCtx, cli, opsRes, []opsv1alpha1.OpsType{opsv1alpha1.HorizontalScalingType, opsv1alpha1.StartType},
 		func(earlierOps *opsv1alpha1.OpsRequest) (bool, error) {
@@ -105,38 +135,9 @@ func (hs horizontalScalingOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli 
 		return err
 	}
 
-	// update shard count
-	for i := range opsRes.Cluster.Spec.Shardings {
-		sharding := &opsRes.Cluster.Spec.Shardings[i]
-		if compOps, ok := compOpsSet.componentOpsSet[sharding.Name]; ok {
-			horizontalScaling := compOps.(opsv1alpha1.HorizontalScaling)
-			if horizontalScaling.Shards != nil {
-				sharding.Shards = *horizontalScaling.Shards
-			}
-		}
-	}
-
-	if err := compOpsSet.updateClusterComponentsAndShardings(opsRes.Cluster, func(compSpec *appsv1.ClusterComponentSpec, obj ComponentOpsInterface) error {
-		horizontalScaling := obj.(opsv1alpha1.HorizontalScaling)
-		if horizontalScaling.Shards != nil {
-			return nil
-		}
-		replicas, instances, offlineInstances, err := hs.prepareReplicaScaling(opsRes, horizontalScaling)
-		if err != nil {
-			return err
-		}
-		if horizontalScaling.ScaleOut != nil && horizontalScaling.ScaleOut.FromBackup != nil {
-			// The backup path submits this configuration from reconcileBackupScaling
-			// only after all persistent volumes have been restored.
-			return nil
-		}
-		compSpec.Replicas = replicas
-		compSpec.Instances = instances
-		compSpec.OfflineInstances = offlineInstances
-		return nil
-	}); err != nil {
-		return err
-	}
+	// Aborting updates Cluster metadata (including its resourceVersion and Ops
+	// queue annotation). Keep that metadata and apply only the prepared spec.
+	opsRes.Cluster.Spec = target.Spec
 	return cli.Update(reqCtx.Ctx, opsRes.Cluster)
 }
 

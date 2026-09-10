@@ -1064,6 +1064,96 @@ func publishHScaleAllocation(ctx context.Context, cli client.Client, cluster *ap
 	return tree, cli.Status().Update(ctx, its)
 }
 
+func TestHScaleValidatesBeforeSuperseding(t *testing.T) {
+	for _, flat := range []bool{false, true} {
+		for _, problem := range []string{"duplicate-offline", "template-replicas", "valid"} {
+			t.Run(fmt.Sprintf("flat=%t/%s", flat, problem), func(t *testing.T) {
+				request := scaleOutRequest("db", false)
+				switch problem {
+				case "duplicate-offline":
+					request.ScaleOut = nil
+					request.ScaleIn = &opsv1alpha1.ScaleIn{OnlineInstancesToOffline: []string{"demo-db-0", "demo-db-0"}}
+				case "template-replicas":
+					request.ScaleOut.NewInstances = []appsv1.InstanceTemplate{{Name: "reader", Replicas: pointer.Int32(3)}}
+				}
+				// Both a valid component and a shard-count change precede the invalid
+				// target. Neither may leak into the live Cluster during preparation.
+				shards := opsv1alpha1.HorizontalScaling{ComponentOps: opsv1alpha1.ComponentOps{ComponentName: "group"}, Shards: pointer.Int32(2)}
+				f := newHorizontalScalingFixture(t, scaleOutRequest("ordinary", false), request, shards)
+				f.res.Cluster.Spec.Shardings = []appsv1.ClusterSharding{{Name: "group", Shards: 1,
+					Template: f.res.Cluster.Spec.ComponentSpecs[2]}}
+				f.res.Cluster.Spec.ComponentSpecs = f.res.Cluster.Spec.ComponentSpecs[:2]
+				for i := range f.res.Cluster.Spec.ComponentSpecs {
+					spec := &f.res.Cluster.Spec.ComponentSpecs[i]
+					spec.FlatInstanceOrdinal = flat
+					f.publishAllocation(t, spec.Name)
+				}
+				f.res.OpsRequest.Spec.Force = true
+				if err := f.cli.Update(f.req.Ctx, f.res.OpsRequest); err != nil {
+					t.Fatal(err)
+				}
+				f.saveConfiguration(t)
+				earlier := f.res.OpsRequest.DeepCopy()
+				earlier.Name, earlier.UID, earlier.ResourceVersion = "earlier", "earlier", ""
+				earlier.Spec.HorizontalScalingList = []opsv1alpha1.HorizontalScaling{scaleOutRequest("ordinary", false), scaleOutRequest("db", false)}
+				if err := f.cli.Create(f.req.Ctx, earlier); err != nil {
+					t.Fatal(err)
+				}
+				recorders := []opsv1alpha1.OpsRecorder{{Name: earlier.Name, Type: opsv1alpha1.HorizontalScalingType},
+					{Name: f.res.OpsRequest.Name, Type: opsv1alpha1.HorizontalScalingType}}
+				opsutil.SetOpsRequestToCluster(f.res.Cluster, recorders)
+				f.res.Cluster.Annotations["test.kubeblocks.io/keep"] = "unchanged"
+				if err := f.cli.Update(f.req.Ctx, f.res.Cluster); err != nil {
+					t.Fatal(err)
+				}
+				before, oldStatus := f.res.Cluster.DeepCopy(), earlier.Status.DeepCopy()
+				var writes []appsv1.Cluster
+				cli := interceptor.NewClient(f.cli.(client.WithWatch), interceptor.Funcs{
+					Update: func(ctx context.Context, cli client.WithWatch, obj client.Object, opts ...client.UpdateOption) error {
+						if cluster, ok := obj.(*appsv1.Cluster); ok {
+							writes = append(writes, *cluster.DeepCopy())
+						}
+						return cli.Update(ctx, obj, opts...)
+					},
+				})
+				err := (horizontalScalingOpsHandler{}).Action(f.req, cli, f.res)
+				if err1 := cli.Get(f.req.Ctx, client.ObjectKeyFromObject(earlier), earlier); err1 != nil {
+					t.Fatal(err1)
+				}
+				stored := &appsv1.Cluster{}
+				if err1 := cli.Get(f.req.Ctx, client.ObjectKeyFromObject(before), stored); err1 != nil {
+					t.Fatal(err1)
+				}
+				if problem != "valid" {
+					if !intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal) {
+						t.Fatalf("invalid target should fail: %v", err)
+					}
+					if !reflect.DeepEqual(earlier.Status, *oldStatus) || earlier.Status.Phase != opsv1alpha1.OpsRunningPhase {
+						t.Fatalf("invalid request changed earlier Ops: %+v", earlier.Status)
+					}
+					if len(writes) != 0 || !reflect.DeepEqual(before, stored) || !reflect.DeepEqual(before, f.res.Cluster) {
+						t.Fatal("invalid request changed Cluster spec, metadata or queue")
+					}
+					return
+				}
+				if err != nil || earlier.Status.Phase != opsv1alpha1.OpsAbortedPhase {
+					t.Fatalf("valid request did not supersede earlier Ops: err=%v phase=%s", err, earlier.Status.Phase)
+				}
+				if len(writes) != 2 || !reflect.DeepEqual(writes[0].Spec, before.Spec) {
+					t.Fatal("prepared target was submitted before the abort annotation update")
+				}
+				if stored.Spec.ComponentSpecs[0].Replicas != 2 || stored.Spec.ComponentSpecs[1].Replicas != 2 || stored.Spec.Shardings[0].Shards != 2 {
+					t.Fatalf("prepared target was not applied: %+v", stored.Spec)
+				}
+				queue, err := opsutil.GetOpsRequestSliceFromCluster(stored)
+				if err != nil || len(queue) != 1 || queue[0].Name != f.res.OpsRequest.Name || stored.Annotations["test.kubeblocks.io/keep"] != "unchanged" {
+					t.Fatalf("target update lost queue or metadata: queue=%v err=%v", queue, err)
+				}
+			})
+		}
+	}
+}
+
 func TestHScaleAllocatedIdentities(t *testing.T) {
 	for _, flat := range []bool{false, true} {
 		t.Run(fmt.Sprintf("flat=%t", flat), func(t *testing.T) {

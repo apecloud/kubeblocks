@@ -84,6 +84,74 @@ var _ = Describe("Restore OpsRequest", func() {
 		Expect(cluster.OwnerReferences).Should(BeEmpty())
 	})
 
+	DescribeTable("clears TLS and offline instance settings in the restored Cluster", func(enabled bool, issuer *appsv1.Issuer, sharded bool) {
+		opsRequest := createRestoreOpsObj(restoreClusterName, restoreOpsName, backupName)
+		backup := newRestoreOpsBackup(backupName, nil)
+		source := &appsv1.Cluster{}
+		Expect(json.Unmarshal([]byte(backup.Annotations[constant.ClusterSnapshotAnnotationKey]), source)).Should(Succeed())
+		source.Spec.ComponentSpecs = []appsv1.ClusterComponentSpec{{
+			Name:             "mongodb",
+			ComponentDef:     "mongodb",
+			Replicas:         1,
+			TLS:              enabled,
+			Issuer:           issuer,
+			OfflineInstances: []string{"source-cluster-mongodb-0"},
+		}}
+		if sharded {
+			source.Spec.ComponentSpecs[0].Name = "mongos"
+			source.Spec.ComponentSpecs = append(source.Spec.ComponentSpecs, appsv1.ClusterComponentSpec{
+				Name: "config-server", ComponentDef: "mongodb-config-server", Replicas: 1, TLS: enabled, Issuer: issuer,
+			})
+			source.Spec.Shardings = []appsv1.ClusterSharding{{
+				Name: "shard", Shards: 2,
+				Template: appsv1.ClusterComponentSpec{
+					ComponentDef: "mongodb-shard", Replicas: 1, TLS: enabled, Issuer: issuer,
+					OfflineInstances: []string{"source-cluster-shard-0-0"},
+				},
+			}}
+		}
+		snapshot, err := json.Marshal(source)
+		Expect(err).ShouldNot(HaveOccurred())
+		backup.Annotations[constant.ClusterSnapshotAnnotationKey] = string(snapshot)
+		cli := newRestoreOpsFakeClient(opsRequest, backup)
+
+		Expect(restoreHandler.Action(reqCtx, cli, &OpsResource{OpsRequest: opsRequest})).Should(Succeed())
+
+		target := &appsv1.Cluster{}
+		Expect(cli.Get(reqCtx.Ctx, client.ObjectKey{Name: restoreClusterName, Namespace: opsRequest.Namespace}, target)).Should(Succeed())
+		Expect(target.Spec.Restore.Source.Name).Should(Equal(backupName))
+		Expect(target.Spec.ComponentSpecs).Should(HaveLen(len(source.Spec.ComponentSpecs)))
+		for _, component := range target.Spec.ComponentSpecs {
+			Expect(component.TLS).Should(BeFalse())
+			Expect(component.Issuer).Should(BeNil())
+			Expect(component.OfflineInstances).Should(BeEmpty())
+		}
+		Expect(target.Spec.Shardings).Should(HaveLen(len(source.Spec.Shardings)))
+		for _, sharding := range target.Spec.Shardings {
+			Expect(sharding.Template.TLS).Should(BeFalse())
+			Expect(sharding.Template.Issuer).Should(BeNil())
+			Expect(sharding.Template.OfflineInstances).Should(BeNil())
+		}
+		Expect(backup.Annotations[constant.ClusterSnapshotAnnotationKey]).Should(Equal(string(snapshot)))
+	},
+		Entry("replicaset with TLS disabled", false, (*appsv1.Issuer)(nil), false),
+		Entry("sharding with TLS disabled", false, (*appsv1.Issuer)(nil), true),
+		Entry("replicaset with KubeBlocks TLS", true, &appsv1.Issuer{Name: appsv1.IssuerKubeBlocks}, false),
+		Entry("sharding with KubeBlocks TLS", true, &appsv1.Issuer{Name: appsv1.IssuerKubeBlocks}, true),
+		Entry("replicaset with UserProvided TLS", true, &appsv1.Issuer{
+			Name: appsv1.IssuerUserProvided,
+			SecretRef: &appsv1.TLSSecretRef{
+				Name: "source-tls", Namespace: "certificates", CA: "ca.crt", Cert: "tls.crt", Key: "tls.key",
+			},
+		}, false),
+		Entry("sharding with UserProvided TLS", true, &appsv1.Issuer{
+			Name: appsv1.IssuerUserProvided,
+			SecretRef: &appsv1.TLSSecretRef{
+				Name: "source-tls", Namespace: "certificates", CA: "ca.crt", Cert: "tls.crt", Key: "tls.key",
+			},
+		}, true),
+	)
+
 	It("normalizes restored scheduling labels and clears sharding account secret refs", func() {
 		cluster := &appsv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{Name: restoreClusterName},

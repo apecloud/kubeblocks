@@ -45,6 +45,9 @@ parameters:
   ## parameters references: https://github.com/kubernetes-sigs/alibaba-cloud-csi-driver/blob/master/docs/disk.md
   fstype: {{ .Values.storageClass.provider.aliyun.fsType | default "xfs" }}
   type: {{ .Values.storageClass.provider.aliyun.volumeType }}
+  {{- with .Values.storageClass.provider.aliyun.performanceLevel }}
+  performanceLevel: {{ . | quote }}
+  {{- end }}
 provisioner: diskplugin.csi.alibabacloud.com
 reclaimPolicy: {{ .Values.storageClass.reclaimPolicy | default "Delete" }}
 volumeBindingMode: WaitForFirstConsumer

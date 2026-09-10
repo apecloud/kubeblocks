@@ -521,6 +521,9 @@ storageClass:
     aliyun:
       volumeType: cloud_essd
       fsType: xfs
+      ## @param storageClass.provider.aliyun.performanceLevel -- Specifies the performance level for Alibaba Cloud ESSD volumes.
+      ## Valid options: PL0, PL1, PL2, PL3. Leave empty to use the CSI driver's default.
+      performanceLevel: ""
     azure:
       volumeType: managed
       fsType: xfs

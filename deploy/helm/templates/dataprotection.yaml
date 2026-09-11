@@ -20,9 +20,6 @@ spec:
     matchLabels:
       app.kubernetes.io/component: "dataprotection"
       {{- include "kubeblocks.selectorLabels" . | nindent 6 }}
-      {{- with .Values.dataProtection.extraLabels }}
-        {{- toYaml . | nindent 6 }}
-      {{- end }}
   {{- if .Values.updateStrategy }}
   strategy:
     {{ toYaml .Values.updateStrategy | nindent 4 | trim }}

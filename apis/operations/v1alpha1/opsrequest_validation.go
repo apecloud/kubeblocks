@@ -34,6 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
@@ -366,6 +367,8 @@ func (r *OpsRequest) CountOfflineOrOnlineInstances(clusterName, componentName st
 func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, compSpec appsv1.ClusterComponentSpec, clusterName string, isSharding bool, maxReplicasOrShards int, minReplicasOrShards int) error {
 	scaleIn := hScale.ScaleIn
 	scaleOut := hScale.ScaleOut
+	fromBackup := scaleOut != nil && scaleOut.FromBackup != nil
+	source := r.Status.LastConfiguration.Components[hScale.ComponentName]
 	// Validate Shards if present
 	if hScale.Shards != nil {
 		return r.validateShards(hScale, isSharding, minReplicasOrShards, maxReplicasOrShards)
@@ -400,8 +403,24 @@ func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, com
 			return fmt.Errorf(`the length of %s can't be greater than the "replicaChanges" for the component`, instanceField)
 		}
 
-		// Track the count of offline/online instances
-		offlineOrOnlineInsCountMap := r.CountOfflineOrOnlineInstances(clusterName, hScale.ComponentName, instanceNames)
+		// Ordinary scaling uses the captured allocation, never template names parsed
+		// from identities. OpsManager validates again after saving the source and
+		// before Action, so that pass checks the exact per-template counts.
+		offlineOrOnlineInsCountMap := map[string]int32{}
+		if fromBackup {
+			offlineOrOnlineInsCountMap = r.CountOfflineOrOnlineInstances(clusterName, hScale.ComponentName, instanceNames)
+		} else {
+			namedInstances := sets.New(instanceNames...)
+			state := workloadsv1.InstanceDesiredStateOffline
+			if isScaleIn {
+				state = workloadsv1.InstanceDesiredStateActive
+			}
+			for _, assignment := range source.SourceInstanceAssignments {
+				if assignment.DesiredState == state && namedInstances.Has(assignment.PodName) {
+					offlineOrOnlineInsCountMap[assignment.TemplateName]++
+				}
+			}
+		}
 		insTplChangeMap := make(map[string]int32)
 		totalReplicaChanges := int32(0)
 
@@ -429,6 +448,11 @@ func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, com
 				return fmt.Errorf(`"replicaChanges" can't be less than %d when %d instances of the instance template "%s" are configured in %s`,
 					replicaCount, replicaCount, insTplName, instanceField)
 			}
+		}
+		if !fromBackup && source.Replicas == nil {
+			// Before source capture, names may overlap the explicit template changes.
+			// Their maximum is a safe lower bound; adding them would double-count.
+			totalReplicaChanges = max(totalReplicaChanges, int32(len(instanceNames)))
 		}
 
 		// Validate new instance templates

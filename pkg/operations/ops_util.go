@@ -252,6 +252,8 @@ func abortEarlierOpsRequestWithSameKind(reqCtx intctrlutil.RequestCtx,
 	if len(earlierRunningOpsSlice) == 0 {
 		return nil
 	}
+	// Complete all reads and safety checks before aborting any earlier request.
+	var opsToAbort []*opsv1alpha1.OpsRequest
 	for _, v := range earlierRunningOpsSlice {
 		earlierOps := &opsv1alpha1.OpsRequest{}
 		err = cli.Get(reqCtx.Ctx, client.ObjectKey{Name: v.Name, Namespace: opsRes.OpsRequest.Namespace}, earlierOps)
@@ -270,20 +272,22 @@ func abortEarlierOpsRequestWithSameKind(reqCtx intctrlutil.RequestCtx,
 			return err
 		}
 		if needAborted {
-			// abort the opsRequest that matches the abort condition.
-			patch := client.MergeFrom(earlierOps.DeepCopy())
-			earlierOps.Status.Phase = opsv1alpha1.OpsAbortedPhase
-			abortedCondition := opsv1alpha1.NewAbortedCondition(fmt.Sprintf(`Aborted as a result of the latest opsRequest "%s" being overridden`, earlierOps.Name))
-			earlierOps.SetStatusCondition(*abortedCondition)
-			earlierOps.Status.CompletionTimestamp = metav1.Time{Time: time.Now()}
-			if err = cli.Status().Patch(reqCtx.Ctx, earlierOps, patch); err != nil {
-				return err
-			}
-			opsRes.Recorder.Event(earlierOps, corev1.EventTypeNormal, abortedCondition.Type, abortedCondition.Message)
-			index, _ := GetOpsRecorderFromSlice(opsRequestSlice, earlierOps.Name)
-			if index != -1 {
-				opsRequestSlice = slices.Delete(opsRequestSlice, index, index+1)
-			}
+			opsToAbort = append(opsToAbort, earlierOps)
+		}
+	}
+	for _, earlierOps := range opsToAbort {
+		patch := client.MergeFrom(earlierOps.DeepCopy())
+		earlierOps.Status.Phase = opsv1alpha1.OpsAbortedPhase
+		abortedCondition := opsv1alpha1.NewAbortedCondition(fmt.Sprintf(`Aborted as a result of the latest opsRequest "%s" being overridden`, earlierOps.Name))
+		earlierOps.SetStatusCondition(*abortedCondition)
+		earlierOps.Status.CompletionTimestamp = metav1.Time{Time: time.Now()}
+		if err = cli.Status().Patch(reqCtx.Ctx, earlierOps, patch); err != nil {
+			return err
+		}
+		opsRes.Recorder.Event(earlierOps, corev1.EventTypeNormal, abortedCondition.Type, abortedCondition.Message)
+		index, _ := GetOpsRecorderFromSlice(opsRequestSlice, earlierOps.Name)
+		if index != -1 {
+			opsRequestSlice = slices.Delete(opsRequestSlice, index, index+1)
 		}
 	}
 	return opsutil.UpdateClusterOpsAnnotations(reqCtx.Ctx, cli, opsRes.Cluster, opsRequestSlice)

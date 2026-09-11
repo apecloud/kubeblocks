@@ -19,7 +19,56 @@ package v1alpha1
 import (
 	"context"
 	"testing"
+
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"k8s.io/utils/ptr"
 )
+
+func TestHorizontalScalingAllocationValidationLimits(t *testing.T) {
+	for _, online := range []bool{false, true} {
+		for _, template := range []string{"", "reader"} {
+			name := "scale-in/" + template
+			if online {
+				name = "scale-out/" + template
+			}
+			t.Run(name, func(t *testing.T) {
+				component := appsv1.ClusterComponentSpec{Name: "db", Replicas: 3,
+					Instances: []appsv1.InstanceTemplate{{Name: "reader", Replicas: ptr.To(int32(2))}}}
+				request := HorizontalScaling{ComponentOps: ComponentOps{ComponentName: "db"}}
+				changer := ReplicaChanger{Instances: []InstanceReplicasTemplate{{Name: "reader", ReplicaChanges: 1}}}
+				state := workloadsv1.InstanceDesiredStateActive
+				if online {
+					state = workloadsv1.InstanceDesiredStateOffline
+					request.ScaleOut = &ScaleOut{ReplicaChanger: changer, OfflineInstancesToOnline: []string{"cluster-db-1"}}
+				} else {
+					request.ScaleIn = &ScaleIn{ReplicaChanger: changer, OnlineInstancesToOffline: []string{"cluster-db-1"}}
+				}
+				ops := &OpsRequest{}
+				validate := func() error {
+					return ops.validateHorizontalScalingSpec(request, component, "cluster", false, 4, 2)
+				}
+				// Before capture, the named instance may be one of the explicit
+				// reader changes. The known lower bound is one replica, not two.
+				if err := validate(); err != nil {
+					t.Fatalf("validation before source capture: %v", err)
+				}
+				ops.Status.LastConfiguration.Components = map[string]LastComponentConfiguration{"db": {
+					Replicas: ptr.To(component.Replicas), Instances: component.Instances,
+					SourceInstanceAssignments: []InstanceTemplateAssignment{{WorkloadName: "cluster-db",
+						PodName: "cluster-db-1", TemplateName: template, DesiredState: state}},
+				}}
+				// After capture, the default template is a separate change: the
+				// resulting 1 or 5 replicas must violate the limits [2, 4]. The same
+				// reader instance instead counts once, regardless of its name.
+				err := validate()
+				if (err != nil) != (template == "") {
+					t.Fatalf("template %q: expected limit violation=%t, got %v", template, template == "", err)
+				}
+			})
+		}
+	}
+}
 
 var componentName = "mysql"
 

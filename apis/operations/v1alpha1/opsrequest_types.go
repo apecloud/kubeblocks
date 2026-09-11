@@ -24,6 +24,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
 )
 
 // OpsRequestSpec defines the desired state of OpsRequest
@@ -37,6 +38,7 @@ type OpsRequestSpec struct {
 	// "Pending", "Creating", or "Running" state.
 	//
 	// This field applies only to "VerticalScaling" and "HorizontalScaling" opsRequests.
+	// Cancellation of an already-started HorizontalScaling operation on a flat-ordinal component is unsupported.
 	//
 	// Note: Setting `cancel` to true is irreversible; further modifications to this field are ineffective.
 	//
@@ -461,6 +463,7 @@ type ScaleOut struct {
 	// FromBackup specifies the configuration for creating new instances from an existing backup.
 	// This is only effective for non-sharding components.
 	// When specified, new instances will be created using data from the specified backup.
+	// Flat-ordinal components do not support scaling out from backup.
 	// +optional
 	FromBackup *FromBackup `json:"fromBackup,omitempty"`
 
@@ -1073,6 +1076,11 @@ type ActionTask struct {
 
 // LastComponentConfiguration can be used to track and compare the desired state of the Component over time.
 type LastComponentConfiguration struct {
+	// Records the instance assignments before ordinary HorizontalScaling. Includes Active instances and
+	// explicitly requested Offline instances to bring online; it does not record a target allocation.
+	// +optional
+	SourceInstanceAssignments []InstanceTemplateAssignment `json:"sourceInstanceAssignments,omitempty"`
+
 	// Records the `replicas` of the Component prior to any changes.
 	// +optional
 	Replicas *int32 `json:"replicas,omitempty"`
@@ -1109,6 +1117,19 @@ type LastComponentConfiguration struct {
 	// Records the name of the ComponentDefinition prior to any changes.
 	// +optional
 	ComponentDefinitionName string `json:"componentDefinitionName,omitempty"`
+}
+
+// InstanceTemplateAssignment records an instance's assigned name and template, not its runtime health.
+type InstanceTemplateAssignment struct {
+	// Name of the InstanceSet that owns the instance.
+	WorkloadName string `json:"workloadName"`
+	// Stable instance name published by the InstanceSet.
+	PodName string `json:"podName"`
+	// Template name; the empty string denotes the default template.
+	TemplateName string `json:"templateName"`
+	// Desired state when the source assignment was saved.
+	// +kubebuilder:validation:Enum=Active;Offline
+	DesiredState workloadsv1.InstanceDesiredState `json:"desiredState"`
 }
 
 type LastConfiguration struct {

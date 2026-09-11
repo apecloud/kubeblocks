@@ -21,11 +21,13 @@ package operations
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -116,7 +118,14 @@ func (r *opsRuntime) GetWorkload(namespace, clusterName, compName string) (Workl
 		workload.instanceNames = sets.KeySet(currRevisionMap)
 		workload.notReadySet = instanceset.GetPodNameSetFromInstanceSetCondition(its, workloads.InstanceReady)
 		workload.notAvailableSet = instanceset.GetPodNameSetFromInstanceSetCondition(its, workloads.InstanceAvailable)
-		workload.failedSet = instanceset.GetPodNameSetFromInstanceSetCondition(its, workloads.InstanceFailure)
+		// Unlike Ready/Available, failure names are published when the condition is True.
+		if condition := meta.FindStatusCondition(its.Status.Conditions, string(workloads.InstanceFailure)); condition != nil && condition.Status == metav1.ConditionTrue {
+			var names []string
+			if err := json.Unmarshal([]byte(condition.Message), &names); err != nil {
+				return nil, fmt.Errorf("parse InstanceFailure of InstanceSet %s: %w", its.Name, err)
+			}
+			workload.failedSet = sets.New(names...)
+		}
 		workload.instanceStatuses = make([]workloads.InstanceStatus, len(its.Status.InstanceStatus))
 		for i := range its.Status.InstanceStatus {
 			its.Status.InstanceStatus[i].DeepCopyInto(&workload.instanceStatuses[i])

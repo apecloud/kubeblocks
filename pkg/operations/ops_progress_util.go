@@ -559,13 +559,30 @@ func handleScaleOutProgressWithWorkload(
 	pgRes *progressResource,
 	workload Workload,
 	compStatus *opsv1alpha1.OpsRequestComponentStatus) (completedCount int32, err error) {
+	return handleHScaleInstanceProgress(opsRes, pgRes, workload, compStatus, pgRes.createdPodSet, false)
+}
+
+// Creation and template reassignment share HScale health and failure semantics.
+// Reassignment additionally requires the new template configuration to be applied.
+func handleHScaleInstanceProgress(opsRes *OpsResource, pgRes *progressResource, workload Workload,
+	compStatus *opsv1alpha1.OpsRequestComponentStatus, instances map[string]string, updating bool) (completedCount int32, err error) {
 	currPodRevisionMap := workload.GetCurrentRevisionMap()
 	notReadyPodSet := workload.GetNotReadyInstanceNameSet()
 	notAvailablePodSet := workload.GetNotAvailableInstanceNameSet()
 	failurePodSet := workload.GetFailedInstanceNameSet()
 	pgRes.opsMessageKey = "Create"
+	applied := map[string]bool{}
+	if updating {
+		pgRes.opsMessageKey = "Update"
+		for _, status := range workload.GetInstanceStatuses() {
+			if template, ok := instances[status.PodName]; ok && status.TemplateName != nil && *status.TemplateName == template {
+				applied[status.PodName] = status.EffectiveDesiredState() == workloads.InstanceDesiredStateActive &&
+					status.EffectiveCurrentState() == workloads.InstanceCurrentStatePresent && status.UpToDate
+			}
+		}
+	}
 	memberStatusMap := workload.GetInstanceNameSet()
-	for podName := range pgRes.createdPodSet {
+	for podName := range instances {
 		objectKey := getProgressObjectKey(constant.PodKind, podName)
 		if _, ok := currPodRevisionMap[podName]; !ok {
 			updateProgressDetailForHScale(opsRes, pgRes, compStatus, objectKey, opsv1alpha1.PendingProgressStatus)
@@ -574,6 +591,10 @@ func handleScaleOutProgressWithWorkload(
 		if _, ok := failurePodSet[podName]; ok {
 			completedCount += 1
 			updateProgressDetailForHScale(opsRes, pgRes, compStatus, objectKey, opsv1alpha1.FailedProgressStatus)
+			continue
+		}
+		if updating && !applied[podName] {
+			updateProgressDetailForHScale(opsRes, pgRes, compStatus, objectKey, opsv1alpha1.ProcessingProgressStatus)
 			continue
 		}
 		if _, ok := notReadyPodSet[podName]; ok {

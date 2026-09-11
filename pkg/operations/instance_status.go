@@ -15,6 +15,7 @@ import (
 	"fmt"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -107,4 +108,41 @@ func activeAssignmentsForTarget(workload Workload, component *appsv1.ClusterComp
 		return nil, false, err
 	}
 	return assignments, assignmentsMatchComponent(assignments, component), nil
+}
+
+func sourceAssignments(assignments []opsv1alpha1.InstanceTemplateAssignment, workloadName string,
+	state workloadsv1.InstanceDesiredState) map[string]string {
+	result := map[string]string{}
+	for _, assignment := range assignments {
+		if assignment.DesiredState == state && (workloadName == "" || assignment.WorkloadName == workloadName) {
+			result[assignment.PodName] = assignment.TemplateName
+		}
+	}
+	return result
+}
+
+func assignmentsIncludeOffline(assignments map[string]string, offline []string) bool {
+	for _, name := range offline {
+		if _, ok := assignments[name]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+func diffInstanceAssignments(source, target map[string]string) (created, deleted, updated map[string]string) {
+	created, deleted, updated = map[string]string{}, map[string]string{}, map[string]string{}
+	for name, template := range target {
+		if old, ok := source[name]; !ok {
+			created[name] = template
+		} else if old != template {
+			updated[name] = template
+		}
+	}
+	for name, template := range source {
+		if _, ok := target[name]; !ok {
+			deleted[name] = template
+		}
+	}
+	return
 }

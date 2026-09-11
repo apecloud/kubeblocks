@@ -99,6 +99,8 @@ type progressResource struct {
 	// cluster component name. By default, it is the componentSpec.name.
 	// but if it is a sharding component, the componentName is generated randomly.
 	fullComponentName string
+	// Shard template assigned to the existing Component.
+	shardTemplateName string
 	// specifies the number of shards. if nil, it is not a sharding component.
 	shards           *int32
 	clusterComponent *appsv1.ClusterComponentSpec

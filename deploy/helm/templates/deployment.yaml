@@ -18,9 +18,6 @@ spec:
     matchLabels:
       app.kubernetes.io/component: "apps"
       {{- include "kubeblocks.selectorLabels" . | nindent 6 }}
-      {{- with .Values.extraLabels }}
-        {{- toYaml . | nindent 6 }}
-      {{- end }}
   {{- if .Values.updateStrategy }}
   strategy:
     {{ toYaml .Values.updateStrategy | nindent 4 | trim }}

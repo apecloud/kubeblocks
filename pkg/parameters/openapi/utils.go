@@ -96,7 +96,7 @@ func DeReference(f *ast.File, rt *Runtime) func(path string) (*apiextv1.JSONSche
 
 func fetchTypeDefine(value string, node ast.Node) ast.Node {
 	n := node
-	for _, field := range strings.Split(value, "/") {
+	for field := range strings.SplitSeq(value, "/") {
 		if field == "" {
 			continue
 		}

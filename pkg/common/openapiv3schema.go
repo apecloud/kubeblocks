@@ -22,6 +22,7 @@ package common
 import (
 	"fmt"
 	"math"
+	"math/big"
 	"strconv"
 	"strings"
 
@@ -113,7 +114,7 @@ func isUnsignedByBounds(prop apiextensionsv1.JSONSchemaProps) bool {
 		prop.Maximum != nil && *prop.Maximum > math.Exp2(63)
 }
 
-// stripIntegerOverflow removes Maximum from integer properties whose Maximum
+// stripIntegerOverflow removes Maximum from integer schemas whose Maximum
 // >= 2^63. kube-openapi internally converts float64 Maximum to int64;
 // float64(MaxInt64) rounds to 2^63 and float64(MaxUint64) rounds to 2^64,
 // both of which overflow int64. User-declared maximums that were stripped
@@ -122,82 +123,248 @@ func stripIntegerOverflow(schema *apiextensionsv1.JSONSchemaProps) *apiextension
 	if schema == nil {
 		return nil
 	}
-	needsCopy := false
-	for _, prop := range schema.Properties {
-		if prop.Type == "integer" && prop.Maximum != nil && *prop.Maximum >= math.Exp2(63) {
-			needsCopy = true
-			break
-		}
-	}
-	if !needsCopy {
+	if !hasIntegerOverflowMaximum(schema, false) {
 		return schema
 	}
 	out := schema.DeepCopy()
-	for k, prop := range out.Properties {
-		if prop.Type == "integer" && prop.Maximum != nil && *prop.Maximum >= math.Exp2(63) {
-			prop.Maximum = nil
-			prop.ExclusiveMaximum = false
-			out.Properties[k] = prop
+	stripIntegerOverflowMaximum(out, false)
+	return out
+}
+
+func hasIntegerOverflowMaximum(schema *apiextensionsv1.JSONSchemaProps, inheritedInteger bool) bool {
+	integerContext := hasEffectiveIntegerType(schema, inheritedInteger)
+	if integerContext && schema.Maximum != nil && *schema.Maximum >= math.Exp2(63) {
+		return true
+	}
+	for i := range schema.AllOf {
+		if hasIntegerOverflowMaximum(&schema.AllOf[i], integerContext) {
+			return true
 		}
 	}
-	return out
+	for k := range schema.Properties {
+		prop := schema.Properties[k]
+		if hasIntegerOverflowMaximum(&prop, false) {
+			return true
+		}
+	}
+	if schema.AdditionalProperties != nil && schema.AdditionalProperties.Schema != nil &&
+		hasIntegerOverflowMaximum(schema.AdditionalProperties.Schema, false) {
+		return true
+	}
+	if schema.Items != nil {
+		if schema.Items.Schema != nil && hasIntegerOverflowMaximum(schema.Items.Schema, false) {
+			return true
+		}
+		for i := range schema.Items.JSONSchemas {
+			if hasIntegerOverflowMaximum(&schema.Items.JSONSchemas[i], false) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func stripIntegerOverflowMaximum(schema *apiextensionsv1.JSONSchemaProps, inheritedInteger bool) {
+	integerContext := hasEffectiveIntegerType(schema, inheritedInteger)
+	if integerContext && schema.Maximum != nil && *schema.Maximum >= math.Exp2(63) {
+		schema.Maximum = nil
+		schema.ExclusiveMaximum = false
+	}
+	for i := range schema.AllOf {
+		stripIntegerOverflowMaximum(&schema.AllOf[i], integerContext)
+	}
+	for k := range schema.Properties {
+		prop := schema.Properties[k]
+		stripIntegerOverflowMaximum(&prop, false)
+		schema.Properties[k] = prop
+	}
+	if schema.AdditionalProperties != nil && schema.AdditionalProperties.Schema != nil {
+		stripIntegerOverflowMaximum(schema.AdditionalProperties.Schema, false)
+	}
+	if schema.Items != nil {
+		if schema.Items.Schema != nil {
+			stripIntegerOverflowMaximum(schema.Items.Schema, false)
+		}
+		for i := range schema.Items.JSONSchemas {
+			stripIntegerOverflowMaximum(&schema.Items.JSONSchemas[i], false)
+		}
+	}
+}
+
+func hasEffectiveIntegerType(schema *apiextensionsv1.JSONSchemaProps, inheritedInteger bool) bool {
+	typeName, conflict := effectiveAllOfType(schema)
+	if conflict {
+		return false
+	}
+	if inheritedInteger {
+		typeName, conflict = intersectJSONSchemaType("integer", typeName)
+	}
+	return !conflict && typeName == "integer"
+}
+
+func effectiveAllOfType(schema *apiextensionsv1.JSONSchemaProps) (string, bool) {
+	if schema == nil {
+		return "", false
+	}
+	typeName := schema.Type
+	for i := range schema.AllOf {
+		branchType, conflict := effectiveAllOfType(&schema.AllOf[i])
+		if conflict {
+			return "", true
+		}
+		typeName, conflict = intersectJSONSchemaType(typeName, branchType)
+		if conflict {
+			return "", true
+		}
+	}
+	return typeName, false
+}
+
+func intersectJSONSchemaType(left, right string) (string, bool) {
+	if left == "" {
+		return right, false
+	}
+	if right == "" || left == right {
+		return left, false
+	}
+	if (left == "integer" && right == "number") || (left == "number" && right == "integer") {
+		return "integer", false
+	}
+	return "", true
 }
 
 // validateLargeIntegerBounds enforces original Maximum for integer properties
 // whose Maximum was >= 2^63 (stripped by stripIntegerOverflow to prevent
-// kube-openapi int64 overflow). CUE type extrema (2^63 for int64, 2^64 for
-// uint64) are skipped because ParseInt/ParseUint already enforce type range.
+// kube-openapi int64 overflow).
 func validateLargeIntegerBounds(schema *apiextensionsv1.JSONSchemaProps, data interface{}) error {
-	dataMap, ok := data.(map[string]interface{})
-	if !ok {
+	return validateLargeIntegerBoundsAt(schema, data, "", false)
+}
+
+func validateLargeIntegerBoundsAt(schema *apiextensionsv1.JSONSchemaProps, data interface{}, path string, inheritedInteger bool) error {
+	if schema == nil {
 		return nil
 	}
-	for k, prop := range schema.Properties {
-		if prop.Type != "integer" || prop.Maximum == nil || *prop.Maximum < math.Exp2(63) {
-			continue
-		}
-		if *prop.Maximum == math.Exp2(63) || *prop.Maximum == math.Exp2(64) {
-			continue
-		}
-		val, exists := dataMap[k]
-		if !exists {
-			continue
-		}
-		f, ok := toFloat64(val)
-		if !ok {
-			continue
-		}
-		if prop.ExclusiveMaximum {
-			if f >= *prop.Maximum {
-				return fmt.Errorf("%s: must be less than %g", k, *prop.Maximum)
+	integerContext := hasEffectiveIntegerType(schema, inheritedInteger)
+	if integerContext && schema.Maximum != nil && *schema.Maximum >= math.Exp2(63) {
+		if cmp, ok := compareNumericValueToFloat64(data, *schema.Maximum); ok {
+			if schema.ExclusiveMaximum && cmp >= 0 {
+				return fmt.Errorf("%s: must be less than %g", schemaPath(path), *schema.Maximum)
 			}
-		} else {
-			if f > *prop.Maximum {
-				return fmt.Errorf("%s: must be less than or equal to %g", k, *prop.Maximum)
+			if !schema.ExclusiveMaximum && cmp > 0 {
+				return fmt.Errorf("%s: must be less than or equal to %g", schemaPath(path), *schema.Maximum)
 			}
+		}
+	}
+	for i := range schema.AllOf {
+		if err := validateLargeIntegerBoundsAt(&schema.AllOf[i], data, path, integerContext); err != nil {
+			return err
+		}
+	}
+	dataMap, ok := data.(map[string]interface{})
+	if ok {
+		for k := range schema.Properties {
+			val, exists := dataMap[k]
+			if !exists {
+				continue
+			}
+			prop := schema.Properties[k]
+			if err := validateLargeIntegerBoundsAt(&prop, val, childSchemaPath(path, k), false); err != nil {
+				return err
+			}
+		}
+		if schema.AdditionalProperties != nil && schema.AdditionalProperties.Schema != nil {
+			for k, val := range dataMap {
+				if _, defined := schema.Properties[k]; defined {
+					continue
+				}
+				if err := validateLargeIntegerBoundsAt(schema.AdditionalProperties.Schema, val, childSchemaPath(path, k), false); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	dataSlice, ok := data.([]interface{})
+	if !ok || schema.Items == nil {
+		return nil
+	}
+	if schema.Items.Schema != nil {
+		for i, val := range dataSlice {
+			if err := validateLargeIntegerBoundsAt(schema.Items.Schema, val, fmt.Sprintf("%s[%d]", schemaPath(path), i), false); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	for i := range schema.Items.JSONSchemas {
+		if i >= len(dataSlice) {
+			break
+		}
+		if err := validateLargeIntegerBoundsAt(&schema.Items.JSONSchemas[i], dataSlice[i], fmt.Sprintf("%s[%d]", schemaPath(path), i), false); err != nil {
+			return err
 		}
 	}
 	return nil
 }
 
-func toFloat64(val interface{}) (float64, bool) {
+func childSchemaPath(path, child string) string {
+	if path == "" {
+		return child
+	}
+	return path + "." + child
+}
+
+func schemaPath(path string) string {
+	if path == "" {
+		return "value"
+	}
+	return path
+}
+
+func compareNumericValueToFloat64(val interface{}, bound float64) (int, bool) {
 	switch v := val.(type) {
 	case float64:
-		return v, true
+		return compareFloat64(v, bound)
 	case float32:
-		return float64(v), true
+		return compareFloat64(float64(v), bound)
 	case int64:
-		return float64(v), true
+		return compareIntegerToFloat64(big.NewInt(v), bound)
 	case uint64:
-		return float64(v), true
+		return compareIntegerToFloat64(new(big.Int).SetUint64(v), bound)
 	case int:
-		return float64(v), true
+		return compareIntegerToFloat64(big.NewInt(int64(v)), bound)
 	case int32:
-		return float64(v), true
+		return compareIntegerToFloat64(big.NewInt(int64(v)), bound)
 	case uint:
-		return float64(v), true
+		return compareIntegerToFloat64(new(big.Int).SetUint64(uint64(v)), bound)
 	case uint32:
-		return float64(v), true
+		return compareIntegerToFloat64(new(big.Int).SetUint64(uint64(v)), bound)
 	}
 	return 0, false
+}
+
+func compareIntegerToFloat64(value *big.Int, bound float64) (int, bool) {
+	boundValue := new(big.Rat).SetFloat64(bound)
+	if boundValue == nil {
+		if math.IsInf(bound, 1) {
+			return -1, true
+		}
+		if math.IsInf(bound, -1) {
+			return 1, true
+		}
+		return 0, false
+	}
+	return new(big.Rat).SetInt(value).Cmp(boundValue), true
+}
+
+func compareFloat64(value, bound float64) (int, bool) {
+	if math.IsNaN(value) || math.IsNaN(bound) {
+		return 0, false
+	}
+	if value < bound {
+		return -1, true
+	}
+	if value > bound {
+		return 1, true
+	}
+	return 0, true
 }

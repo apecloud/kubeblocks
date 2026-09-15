@@ -246,7 +246,14 @@ func (hs horizontalScalingOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.R
 		if !assignmentsMatchComponent(active, previous) {
 			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeNeedWaiting, "waiting for instance assignments of component %q", target.ComponentName)
 		}
-		last.InstanceTemplates = active
+		last.InstanceTemplates = map[string]string{}
+		if target.ScaleIn != nil {
+			for _, name := range target.ScaleIn.OnlineInstancesToOffline {
+				if template, ok := active[name]; ok {
+					last.InstanceTemplates[name] = template
+				}
+			}
+		}
 		if target.ScaleOut != nil {
 			for _, name := range target.ScaleOut.OfflineInstancesToOnline {
 				if !slices.Contains(last.OfflineInstances, name) {
@@ -376,7 +383,8 @@ func (hs horizontalScalingOpsHandler) getExpectedCompValues(
 	filteredHorizontal := horizontalScaling.DeepCopy()
 	assignments := lastCompConfiguration.InstanceTemplates
 	if hasExplicitScalingInstances(horizontalScaling) && assignments == nil &&
-		(compReplicas > 0 || len(compOfflineInstances) > 0) {
+		(compReplicas > 0 || len(compOfflineInstances) > 0) &&
+		opsRes.OpsRequest.Annotations[constant.IgnoreHscaleValidateAnnoKey] != "true" {
 		return 0, nil, nil, fmt.Errorf("missing pre-operation instance assignments for component %q", horizontalScaling.ComponentName)
 	}
 	online := make(map[string]string, len(assignments))

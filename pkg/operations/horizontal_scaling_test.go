@@ -2025,8 +2025,12 @@ func TestHorizontalScalingPersistsOwnerAssignmentsBeforeAction(t *testing.T) {
 				}
 			}
 			res = load()
-			if res.OpsRequest.Status.Phase != opsv1alpha1.OpsCreatingPhase || res.OpsRequest.Status.LastConfiguration.Components["db"].InstanceTemplates["owner-chosen"] != "blue" {
+			assignments := res.OpsRequest.Status.LastConfiguration.Components["db"].InstanceTemplates
+			if res.OpsRequest.Status.Phase != opsv1alpha1.OpsCreatingPhase || assignments["owner-chosen"] != "blue" {
 				t.Fatalf("owner assignments were not persisted: %+v", res.OpsRequest.Status)
+			}
+			if len(assignments) != 1 {
+				t.Fatalf("persisted unrelated owner assignments: %v", assignments)
 			}
 			if err := cli.Delete(req.Ctx, its); err != nil {
 				t.Fatal(err)

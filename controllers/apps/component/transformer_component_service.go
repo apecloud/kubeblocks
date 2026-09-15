@@ -25,11 +25,13 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 
 	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -73,14 +75,18 @@ func (t *componentServiceTransformer) Transform(ctx graph.TransformContext, dag 
 	}
 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
+	var delayedErr error
 	for _, service := range synthesizeComp.ComponentServices {
 		// component controller does not handle the default headless service; the default headless service is managed by the InstanceSet.
 		if t.skipDefaultHeadlessSvc(synthesizeComp, &service) {
 			continue
 		}
-		services, err := t.buildCompService(transCtx.Component, synthesizeComp, &service)
+		services, err := t.buildCompService(transCtx, &service)
 		if err != nil {
-			return err
+			if !intctrlutil.IsDelayedRequeueError(err) {
+				return err
+			}
+			delayedErr = err
 		}
 		for _, svc := range services {
 			if err = t.createOrUpdateService(ctx, dag, graphCli, &service, svc, transCtx.ComponentOrig); err != nil {
@@ -94,7 +100,7 @@ func (t *componentServiceTransformer) Transform(ctx graph.TransformContext, dag 
 		graphCli.Delete(dag, runningServices[svc], appsutil.InDataContext4G())
 	}
 
-	return nil
+	return delayedErr
 }
 
 func (t *componentServiceTransformer) listOwnedServices(ctx context.Context, cli client.Reader,
@@ -112,25 +118,25 @@ func (t *componentServiceTransformer) listOwnedServices(ctx context.Context, cli
 	return owned, nil
 }
 
-func (t *componentServiceTransformer) buildCompService(comp *appsv1.Component,
-	synthesizeComp *component.SynthesizedComponent, service *appsv1.ComponentService) ([]*corev1.Service, error) {
+func (t *componentServiceTransformer) buildCompService(transCtx *componentTransformContext,
+	service *appsv1.ComponentService) ([]*corev1.Service, error) {
 	if service.DisableAutoProvision != nil && *service.DisableAutoProvision {
 		return nil, nil
 	}
 
 	if t.isPodService(service) {
-		return t.buildPodService(comp, synthesizeComp, service)
+		return t.buildPodService(transCtx, service)
 	}
-	return t.buildServices(comp, synthesizeComp, []*appsv1.ComponentService{service})
+	return t.buildServices(transCtx.Component, transCtx.SynthesizeComponent, []*appsv1.ComponentService{service})
 }
 
 func (t *componentServiceTransformer) isPodService(service *appsv1.ComponentService) bool {
 	return service.PodService != nil && *service.PodService
 }
 
-func (t *componentServiceTransformer) buildPodService(comp *appsv1.Component,
-	synthesizeComp *component.SynthesizedComponent, service *appsv1.ComponentService) ([]*corev1.Service, error) {
-	pods, err := t.podsNameNSuffix(synthesizeComp)
+func (t *componentServiceTransformer) buildPodService(transCtx *componentTransformContext,
+	service *appsv1.ComponentService) ([]*corev1.Service, error) {
+	pods, pendingScaleIn, err := t.podsNameNSuffix(transCtx)
 	if err != nil {
 		return nil, err
 	}
@@ -150,24 +156,54 @@ func (t *componentServiceTransformer) buildPodService(comp *appsv1.Component,
 		svc.Spec.Selector[constant.KBAppPodNameLabelKey] = podName
 		services = append(services, svc)
 	}
-	return t.buildServices(comp, synthesizeComp, services)
-}
-
-func (t *componentServiceTransformer) podsNameNSuffix(synthesizeComp *component.SynthesizedComponent) (map[string]string, error) {
-	podNames, err := generatePodNames(synthesizeComp)
+	serviceObjects, err := t.buildServices(transCtx.Component, transCtx.SynthesizeComponent, services)
 	if err != nil {
 		return nil, err
 	}
+	if pendingScaleIn {
+		// Return the Services to retain along with a retry, so memberLeave and the
+		// workload update can proceed while their eventual cleanup is still pending.
+		return serviceObjects, intctrlutil.NewDelayedRequeueError(time.Second, "waiting for scaled-in instances to disappear before deleting pod services")
+	}
+	return serviceObjects, nil
+}
+
+func (t *componentServiceTransformer) podsNameNSuffix(transCtx *componentTransformContext) (map[string]string, bool, error) {
+	synthesizeComp := transCtx.SynthesizeComponent
+	desiredPodNames, err := generatePodNames(synthesizeComp)
+	if err != nil {
+		return nil, false, err
+	}
+	podNames := sets.New(desiredPodNames...)
+	// The running workload still owns replicas whose memberLeave has not completed,
+	// including replicas whose Pods are temporarily absent.
+	if runningITS, _ := transCtx.RunningWorkload.(*workloads.InstanceSet); runningITS != nil {
+		currentPodNames, err := generatePodNamesByITS(runningITS)
+		if err != nil {
+			return nil, false, err
+		}
+		podNames.Insert(currentPodNames...)
+	}
+	// Updating the InstanceSet does not synchronously remove its Pods. Keep their
+	// addresses through termination, until the Pod objects have actually disappeared.
+	instances, err := component.ListOwnedPods(transCtx.Context, transCtx.Client,
+		synthesizeComp.Namespace, synthesizeComp.ClusterName, synthesizeComp.Name)
+	if err != nil {
+		return nil, false, err
+	}
+	for _, pod := range instances {
+		podNames.Insert(pod.Name)
+	}
 	pods := make(map[string]string)
 	prefix := fmt.Sprintf("%s-", synthesizeComp.FullCompName)
-	for _, podName := range podNames {
+	for podName := range podNames {
 		suffix, found := strings.CutPrefix(podName, prefix)
 		if !found || len(suffix) == 0 {
-			return nil, fmt.Errorf("invalid pod name when building pod services: %s", podName)
+			return nil, false, fmt.Errorf("invalid pod name when building pod services: %s", podName)
 		}
 		pods[podName] = suffix
 	}
-	return pods, nil
+	return pods, podNames.Len() > len(desiredPodNames), nil
 }
 
 func (t *componentServiceTransformer) buildServices(comp *appsv1.Component,

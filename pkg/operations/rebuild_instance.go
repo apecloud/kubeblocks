@@ -241,8 +241,11 @@ func (r rebuildInstanceOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx
 			return opsRequestPhase, 0, err
 		}
 	}
-	if err = syncProgressToOpsRequest(reqCtx, cli, opsRes, oldOpsRequest, completedCount, expectCount); err != nil {
-		return opsRequestPhase, 0, err
+	opsRes.OpsRequest.Status.Progress = fmt.Sprintf("%d/%d", completedCount, expectCount)
+	if !reflect.DeepEqual(opsRes.OpsRequest.Status, oldOpsRequest.Status) {
+		if err = cli.Status().Patch(reqCtx.Ctx, opsRes.OpsRequest, client.MergeFrom(oldOpsRequest)); err != nil {
+			return opsRequestPhase, 0, err
+		}
 	}
 	// check if the ops has been finished.
 	if completedCount != expectCount {

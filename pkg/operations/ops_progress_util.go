@@ -21,7 +21,6 @@ package operations
 
 import (
 	"fmt"
-	"reflect"
 	"slices"
 	"strings"
 	"time"
@@ -614,20 +613,6 @@ func handleScaleInProgressWithWorkload(
 		updateProgressDetailForHScale(opsRes, pgRes, compStatus, objectKey, opsv1alpha1.PendingProgressStatus)
 	}
 	return completedCount, nil
-}
-
-func syncProgressToOpsRequest(
-	reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	opsRes *OpsResource,
-	oldOpsRequest *opsv1alpha1.OpsRequest,
-	completedCount, expectCount int) error {
-	// sync progress
-	opsRes.OpsRequest.Status.Progress = fmt.Sprintf("%d/%d", completedCount, expectCount)
-	if !reflect.DeepEqual(opsRes.OpsRequest.Status, oldOpsRequest.Status) {
-		return cli.Status().Patch(reqCtx.Ctx, opsRes.OpsRequest, client.MergeFrom(oldOpsRequest))
-	}
-	return nil
 }
 
 // handleComponentProgressForScalingShards handles the component progressDetails when scaling the shards.

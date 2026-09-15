@@ -23,6 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strings"
 	"text/template"
 	"time"
@@ -109,9 +110,11 @@ func (c CustomOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cli
 		}
 		completedActionCount += workflowStatus.CompletedCount
 	}
-	// sync progress
-	if err := syncProgressToOpsRequest(reqCtx, cli, opsRes, oldOpsRequest, completedActionCount, compCount*len(opsRes.OpsDef.Spec.Actions)); err != nil {
-		return opsRequestPhase, 0, err
+	opsRes.OpsRequest.Status.Progress = fmt.Sprintf("%d/%d", completedActionCount, compCount*len(opsRes.OpsDef.Spec.Actions))
+	if !reflect.DeepEqual(opsRes.OpsRequest.Status, oldOpsRequest.Status) {
+		if err := cli.Status().Patch(reqCtx.Ctx, opsRes.OpsRequest, client.MergeFrom(oldOpsRequest)); err != nil {
+			return opsRequestPhase, 0, err
+		}
 	}
 	// check if the ops has been finished.
 	if compCompleteCount != compCount {

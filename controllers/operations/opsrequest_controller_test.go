@@ -21,9 +21,11 @@ package operations
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -44,6 +46,7 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -56,6 +59,7 @@ import (
 	ctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/generics"
 	kboperations "github.com/apecloud/kubeblocks/pkg/operations"
+	customops "github.com/apecloud/kubeblocks/pkg/operations/custom"
 	opsutil "github.com/apecloud/kubeblocks/pkg/operations/util"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
@@ -230,22 +234,132 @@ var _ = Describe("OpsRequest Controller", func() {
 			Expect(reconciler.parseBackupOpsRequest(ctx, &dpv1alpha1.Backup{})).Should(BeNil())
 		})
 
-		It("deletes external jobs and temporary pods created for an ops request", func() {
-			ops := testops.NewOpsRequestObj("cleanup-ops", helperNamespace, helperClusterName, opsv1alpha1.RestartType)
-			job := &batchv1.Job{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "cleanup-job",
+		It("maps only Custom and Rebuild task pods and Custom-owned jobs", func() {
+			customOps := testops.NewOpsRequestObj("custom-ops", helperNamespace, helperClusterName, opsv1alpha1.CustomType)
+			customOps.UID = "custom-uid"
+			rebuildOps := testops.NewOpsRequestObj("rebuild-ops", helperNamespace, helperClusterName, opsv1alpha1.RebuildInstanceType)
+			rebuildOps.UID = "rebuild-uid"
+			restartOps := testops.NewOpsRequestObj("restart-ops", helperNamespace, helperClusterName, opsv1alpha1.RestartType)
+			restartOps.UID = "restart-uid"
+			reconciler := newOpsRequestReconciler(customOps, rebuildOps, restartOps)
+
+			newTaskPod := func(ops *opsv1alpha1.OpsRequest) *corev1.Pod {
+				return &corev1.Pod{ObjectMeta: metav1.ObjectMeta{
+					Name:      ops.Name + "-pod",
 					Namespace: helperNamespace,
 					Labels: map[string]string{
-						constant.OpsRequestNameLabelKey: ops.Name,
+						constant.OpsRequestNameLabelKey:      ops.Name,
+						constant.OpsRequestNamespaceLabelKey: ops.Namespace,
+					},
+				}}
+			}
+			expectTaskRequest := func(ops *opsv1alpha1.OpsRequest) []reconcile.Request {
+				return []reconcile.Request{{NamespacedName: client.ObjectKeyFromObject(ops)}}
+			}
+			Expect(customops.TaskPodRequests(ctx, reconciler.Client, newTaskPod(customOps))).Should(Equal(expectTaskRequest(customOps)))
+			Expect(kboperations.RebuildInstanceTaskPodRequests(ctx, reconciler.Client, newTaskPod(rebuildOps))).Should(Equal(expectTaskRequest(rebuildOps)))
+			Expect(customops.TaskPodRequests(ctx, reconciler.Client, newTaskPod(rebuildOps))).Should(BeNil())
+			Expect(kboperations.RebuildInstanceTaskPodRequests(ctx, reconciler.Client, newTaskPod(customOps))).Should(BeNil())
+			Expect(customops.TaskPodRequests(ctx, reconciler.Client, newTaskPod(restartOps))).Should(BeNil())
+			Expect(kboperations.RebuildInstanceTaskPodRequests(ctx, reconciler.Client, newTaskPod(restartOps))).Should(BeNil())
+
+			customJob := &batchv1.Job{ObjectMeta: metav1.ObjectMeta{
+				Name:            "custom-job",
+				Namespace:       helperNamespace,
+				OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(customOps, opsv1alpha1.GroupVersion.WithKind("OpsRequest"))},
+			}}
+			Expect(customops.TaskJobRequests(ctx, reconciler.Client, customJob)).Should(Equal(expectTaskRequest(customOps)))
+
+			rebuildJob := customJob.DeepCopy()
+			rebuildJob.Name = "rebuild-job"
+			rebuildJob.OwnerReferences = []metav1.OwnerReference{*metav1.NewControllerRef(rebuildOps, opsv1alpha1.GroupVersion.WithKind("OpsRequest"))}
+			Expect(customops.TaskJobRequests(ctx, reconciler.Client, rebuildJob)).Should(BeNil())
+
+			labelOnlyJob := customJob.DeepCopy()
+			labelOnlyJob.OwnerReferences = nil
+			labelOnlyJob.Labels = map[string]string{constant.OpsRequestNameLabelKey: customOps.Name}
+			Expect(customops.TaskJobRequests(ctx, reconciler.Client, labelOnlyJob)).Should(BeNil())
+
+			staleOwnerJob := customJob.DeepCopy()
+			staleOwnerJob.OwnerReferences[0].UID = "stale-uid"
+			Expect(customops.TaskJobRequests(ctx, reconciler.Client, staleOwnerJob)).Should(BeNil())
+		})
+
+		It("requeues resolved task owners when the OpsRequest read fails transiently", func() {
+			key := types.NamespacedName{Namespace: helperNamespace, Name: "task-ops"}
+			pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{
+				Name:      "task-pod",
+				Namespace: helperNamespace,
+				Labels: map[string]string{
+					constant.OpsRequestNameLabelKey:      key.Name,
+					constant.OpsRequestNamespaceLabelKey: key.Namespace,
+				},
+			}}
+			opsOwner := &opsv1alpha1.OpsRequest{ObjectMeta: metav1.ObjectMeta{Name: key.Name, UID: "task-uid"}}
+			job := &batchv1.Job{ObjectMeta: metav1.ObjectMeta{
+				Name:            "task-job",
+				Namespace:       key.Namespace,
+				OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(opsOwner, opsv1alpha1.GroupVersion.WithKind("OpsRequest"))},
+			}}
+			transientErr := errors.New("transient OpsRequest read failure")
+			baseClient := fake.NewClientBuilder().WithScheme(newOperationsTestScheme()).Build()
+			failingClient := interceptor.NewClient(baseClient, interceptor.Funcs{
+				Get: func(_ context.Context, _ client.WithWatch, _ client.ObjectKey, _ client.Object, _ ...client.GetOption) error {
+					return transientErr
+				},
+			})
+			expected := []reconcile.Request{{NamespacedName: key}}
+			Expect(customops.TaskPodRequests(ctx, failingClient, pod)).Should(Equal(expected))
+			Expect(kboperations.RebuildInstanceTaskPodRequests(ctx, failingClient, pod)).Should(Equal(expected))
+			Expect(customops.TaskJobRequests(ctx, failingClient, job)).Should(Equal(expected))
+
+			Expect(customops.TaskPodRequests(ctx, baseClient, pod)).Should(BeNil())
+			Expect(kboperations.RebuildInstanceTaskPodRequests(ctx, baseClient, pod)).Should(BeNil())
+			Expect(customops.TaskJobRequests(ctx, baseClient, job)).Should(BeNil())
+		})
+
+		It("keeps task cleanup on the existing Custom lifecycle paths", func() {
+			customOps := testops.NewOpsRequestObj("cleanup-custom", helperNamespace, helperClusterName, opsv1alpha1.CustomType)
+			customOps.Status.Phase = opsv1alpha1.OpsSucceedPhase
+			customJob := &batchv1.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "custom-job",
+					Namespace: helperNamespace,
+					Labels: map[string]string{
+						constant.OpsRequestNameLabelKey: customOps.Name,
 					},
 				},
 			}
-			reconciler := newOpsRequestReconciler(job)
-			Expect(reconciler.deleteExternalJobs(ctx, ops)).Should(Succeed())
+			reconciler := newOpsRequestReconciler(customJob)
+			reqCtx := ctrlutil.RequestCtx{Ctx: ctx}
+			_, err := reconciler.handleSucceedOpsRequest(reqCtx, customOps)
+			Expect(err).ShouldNot(HaveOccurred())
 			jobList := &batchv1.JobList{}
 			Expect(reconciler.Client.List(ctx, jobList, client.InNamespace(helperNamespace))).Should(Succeed())
 			Expect(jobList.Items).Should(BeEmpty())
+
+			restartOps := testops.NewOpsRequestObj("cleanup-restart", helperNamespace, helperClusterName, opsv1alpha1.RestartType)
+			restartOps.Status.Phase = opsv1alpha1.OpsSucceedPhase
+			restartJob := customJob.DeepCopy()
+			restartJob.Name = "restart-job"
+			restartJob.Labels[constant.OpsRequestNameLabelKey] = restartOps.Name
+			reconciler = newOpsRequestReconciler(restartJob)
+			_, err = reconciler.handleSucceedOpsRequest(reqCtx, restartOps)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(restartJob), &batchv1.Job{})).Should(Succeed())
+
+			for _, phase := range []opsv1alpha1.OpsPhase{opsv1alpha1.OpsFailedPhase, opsv1alpha1.OpsCancelledPhase} {
+				incompleteOps := testops.NewOpsRequestObj("cleanup-"+strings.ToLower(string(phase)), helperNamespace, helperClusterName, opsv1alpha1.CustomType)
+				incompleteOps.Status.Phase = phase
+				incompleteJob := customJob.DeepCopy()
+				incompleteJob.Name = incompleteOps.Name + "-job"
+				incompleteJob.Labels[constant.OpsRequestNameLabelKey] = incompleteOps.Name
+				reconciler = newOpsRequestReconciler(incompleteJob)
+				reqCtx.Req = reconcile.Request{NamespacedName: client.ObjectKeyFromObject(incompleteOps)}
+				_, err = reconciler.handleUnsuccessfulCompletionOpsRequest(reqCtx, &kboperations.OpsResource{OpsRequest: incompleteOps})
+				Expect(err).ShouldNot(HaveOccurred())
+				Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(incompleteJob), &batchv1.Job{})).Should(Succeed())
+			}
 
 			oldControllerNamespace := viper.GetString(constant.CfgKeyCtrlrMgrNS)
 			viper.Set(constant.CfgKeyCtrlrMgrNS, helperNamespace)
@@ -256,13 +370,18 @@ var _ = Describe("OpsRequest Controller", func() {
 					Name:      "cleanup-pod",
 					Namespace: helperNamespace,
 					Labels: map[string]string{
-						constant.OpsRequestNameLabelKey:      ops.Name,
-						constant.OpsRequestNamespaceLabelKey: ops.Namespace,
+						constant.OpsRequestNameLabelKey:      customOps.Name,
+						constant.OpsRequestNamespaceLabelKey: customOps.Namespace,
 					},
 				},
 			}
-			reconciler = newOpsRequestReconciler(pod)
-			Expect(reconciler.deleteCreatedPodsInKBNamespace(ctrlutil.RequestCtx{Ctx: ctx}, ops)).Should(Succeed())
+			customOps.Finalizers = []string{constant.OpsRequestFinalizerName}
+			reconciler = newOpsRequestReconciler(customOps, pod)
+			Expect(reconciler.Client.Delete(ctx, customOps)).Should(Succeed())
+			deletingOps := &opsv1alpha1.OpsRequest{}
+			Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(customOps), deletingOps)).Should(Succeed())
+			_, err = reconciler.handleDeletion(reqCtx, &kboperations.OpsResource{OpsRequest: deletingOps})
+			Expect(err).ShouldNot(HaveOccurred())
 			podList := &corev1.PodList{}
 			Expect(reconciler.Client.List(ctx, podList, client.InNamespace(helperNamespace))).Should(Succeed())
 			Expect(podList.Items).Should(BeEmpty())

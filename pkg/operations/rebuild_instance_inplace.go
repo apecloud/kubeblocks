@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -30,6 +31,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	"k8s.io/kubectl/pkg/util/podutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
@@ -45,6 +47,27 @@ import (
 	dputils "github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
+
+// RebuildInstancePodRequests maps temporary rebuild Pod events back to their OpsRequest.
+func RebuildInstancePodRequests(ctx context.Context, cli client.Client, pod *corev1.Pod) []reconcile.Request {
+	opsName := pod.Labels[constant.OpsRequestNameLabelKey]
+	opsNamespace := pod.Labels[constant.OpsRequestNamespaceLabelKey]
+	if opsName == "" || opsNamespace == "" {
+		return nil
+	}
+	key := types.NamespacedName{Namespace: opsNamespace, Name: opsName}
+	opsRequest := &opsv1alpha1.OpsRequest{}
+	if err := cli.Get(ctx, key, opsRequest); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return []reconcile.Request{{NamespacedName: key}}
+	}
+	if opsRequest.Spec.Type != opsv1alpha1.RebuildInstanceType {
+		return nil
+	}
+	return []reconcile.Request{{NamespacedName: key}}
+}
 
 const (
 	rebuildFromAnnotation           = "operations.kubeblocks.io/rebuild-from"

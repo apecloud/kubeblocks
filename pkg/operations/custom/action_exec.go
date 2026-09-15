@@ -20,7 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package custom
 
 import (
+	"context"
+
 	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
@@ -29,6 +32,30 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
+
+// DeleteManagerNamespacePods deletes Custom exec Pods that cannot be owned by
+// an OpsRequest because they run in the controller manager namespace.
+func DeleteManagerNamespacePods(ctx context.Context, cli client.Client, opsRequest *opsv1alpha1.OpsRequest) error {
+	namespace := viper.GetString(constant.CfgKeyCtrlrMgrNS)
+	if namespace == "" {
+		return nil
+	}
+	pods := &corev1.PodList{}
+	if err := cli.List(ctx, pods,
+		client.InNamespace(namespace),
+		client.MatchingLabels{
+			constant.OpsRequestNameLabelKey:      opsRequest.Name,
+			constant.OpsRequestNamespaceLabelKey: opsRequest.Namespace,
+		}); err != nil {
+		return err
+	}
+	for i := range pods.Items {
+		if err := intctrlutil.BackgroundDeleteObject(cli, ctx, &pods.Items[i]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 type ExecAction struct {
 	OpsRequest     *opsv1alpha1.OpsRequest

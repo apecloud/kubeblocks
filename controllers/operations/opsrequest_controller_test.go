@@ -234,7 +234,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			Expect(reconciler.parseBackupOpsRequest(ctx, &dpv1alpha1.Backup{})).Should(BeNil())
 		})
 
-		It("maps only Custom and Rebuild task pods and Custom-owned jobs", func() {
+		It("maps only Custom and Rebuild Pods and Custom-owned Jobs", func() {
 			customOps := testops.NewOpsRequestObj("custom-ops", helperNamespace, helperClusterName, opsv1alpha1.CustomType)
 			customOps.UID = "custom-uid"
 			rebuildOps := testops.NewOpsRequestObj("rebuild-ops", helperNamespace, helperClusterName, opsv1alpha1.RebuildInstanceType)
@@ -256,36 +256,36 @@ var _ = Describe("OpsRequest Controller", func() {
 			expectTaskRequest := func(ops *opsv1alpha1.OpsRequest) []reconcile.Request {
 				return []reconcile.Request{{NamespacedName: client.ObjectKeyFromObject(ops)}}
 			}
-			Expect(customops.TaskPodRequests(ctx, reconciler.Client, newTaskPod(customOps))).Should(Equal(expectTaskRequest(customOps)))
-			Expect(kboperations.RebuildInstanceTaskPodRequests(ctx, reconciler.Client, newTaskPod(rebuildOps))).Should(Equal(expectTaskRequest(rebuildOps)))
-			Expect(customops.TaskPodRequests(ctx, reconciler.Client, newTaskPod(rebuildOps))).Should(BeNil())
-			Expect(kboperations.RebuildInstanceTaskPodRequests(ctx, reconciler.Client, newTaskPod(customOps))).Should(BeNil())
-			Expect(customops.TaskPodRequests(ctx, reconciler.Client, newTaskPod(restartOps))).Should(BeNil())
-			Expect(kboperations.RebuildInstanceTaskPodRequests(ctx, reconciler.Client, newTaskPod(restartOps))).Should(BeNil())
+			Expect(customops.PodRequests(ctx, reconciler.Client, newTaskPod(customOps))).Should(Equal(expectTaskRequest(customOps)))
+			Expect(kboperations.RebuildInstancePodRequests(ctx, reconciler.Client, newTaskPod(rebuildOps))).Should(Equal(expectTaskRequest(rebuildOps)))
+			Expect(customops.PodRequests(ctx, reconciler.Client, newTaskPod(rebuildOps))).Should(BeNil())
+			Expect(kboperations.RebuildInstancePodRequests(ctx, reconciler.Client, newTaskPod(customOps))).Should(BeNil())
+			Expect(customops.PodRequests(ctx, reconciler.Client, newTaskPod(restartOps))).Should(BeNil())
+			Expect(kboperations.RebuildInstancePodRequests(ctx, reconciler.Client, newTaskPod(restartOps))).Should(BeNil())
 
 			customJob := &batchv1.Job{ObjectMeta: metav1.ObjectMeta{
 				Name:            "custom-job",
 				Namespace:       helperNamespace,
 				OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(customOps, opsv1alpha1.GroupVersion.WithKind("OpsRequest"))},
 			}}
-			Expect(customops.TaskJobRequests(ctx, reconciler.Client, customJob)).Should(Equal(expectTaskRequest(customOps)))
+			Expect(customops.JobRequests(ctx, reconciler.Client, customJob)).Should(Equal(expectTaskRequest(customOps)))
 
 			rebuildJob := customJob.DeepCopy()
 			rebuildJob.Name = "rebuild-job"
 			rebuildJob.OwnerReferences = []metav1.OwnerReference{*metav1.NewControllerRef(rebuildOps, opsv1alpha1.GroupVersion.WithKind("OpsRequest"))}
-			Expect(customops.TaskJobRequests(ctx, reconciler.Client, rebuildJob)).Should(BeNil())
+			Expect(customops.JobRequests(ctx, reconciler.Client, rebuildJob)).Should(BeNil())
 
 			labelOnlyJob := customJob.DeepCopy()
 			labelOnlyJob.OwnerReferences = nil
 			labelOnlyJob.Labels = map[string]string{constant.OpsRequestNameLabelKey: customOps.Name}
-			Expect(customops.TaskJobRequests(ctx, reconciler.Client, labelOnlyJob)).Should(BeNil())
+			Expect(customops.JobRequests(ctx, reconciler.Client, labelOnlyJob)).Should(BeNil())
 
 			staleOwnerJob := customJob.DeepCopy()
 			staleOwnerJob.OwnerReferences[0].UID = "stale-uid"
-			Expect(customops.TaskJobRequests(ctx, reconciler.Client, staleOwnerJob)).Should(BeNil())
+			Expect(customops.JobRequests(ctx, reconciler.Client, staleOwnerJob)).Should(BeNil())
 		})
 
-		It("requeues resolved task owners when the OpsRequest read fails transiently", func() {
+		It("requeues resolved resource owners when the OpsRequest read fails transiently", func() {
 			key := types.NamespacedName{Namespace: helperNamespace, Name: "task-ops"}
 			pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{
 				Name:      "task-pod",
@@ -309,16 +309,16 @@ var _ = Describe("OpsRequest Controller", func() {
 				},
 			})
 			expected := []reconcile.Request{{NamespacedName: key}}
-			Expect(customops.TaskPodRequests(ctx, failingClient, pod)).Should(Equal(expected))
-			Expect(kboperations.RebuildInstanceTaskPodRequests(ctx, failingClient, pod)).Should(Equal(expected))
-			Expect(customops.TaskJobRequests(ctx, failingClient, job)).Should(Equal(expected))
+			Expect(customops.PodRequests(ctx, failingClient, pod)).Should(Equal(expected))
+			Expect(kboperations.RebuildInstancePodRequests(ctx, failingClient, pod)).Should(Equal(expected))
+			Expect(customops.JobRequests(ctx, failingClient, job)).Should(Equal(expected))
 
-			Expect(customops.TaskPodRequests(ctx, baseClient, pod)).Should(BeNil())
-			Expect(kboperations.RebuildInstanceTaskPodRequests(ctx, baseClient, pod)).Should(BeNil())
-			Expect(customops.TaskJobRequests(ctx, baseClient, job)).Should(BeNil())
+			Expect(customops.PodRequests(ctx, baseClient, pod)).Should(BeNil())
+			Expect(kboperations.RebuildInstancePodRequests(ctx, baseClient, pod)).Should(BeNil())
+			Expect(customops.JobRequests(ctx, baseClient, job)).Should(BeNil())
 		})
 
-		It("keeps task cleanup on the existing Custom lifecycle paths", func() {
+		It("keeps resource cleanup on the existing Custom lifecycle paths", func() {
 			customOps := testops.NewOpsRequestObj("cleanup-custom", helperNamespace, helperClusterName, opsv1alpha1.CustomType)
 			customOps.Status.Phase = opsv1alpha1.OpsSucceedPhase
 			customJob := &batchv1.Job{

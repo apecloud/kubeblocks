@@ -106,14 +106,14 @@ func (r *OpsRequestReconciler) SetupWithManager(mgr ctrl.Manager, multiClusterMg
 		Watches(&dpv1alpha1.Backup{}, handler.EnqueueRequestsFromMapFunc(r.parseBackupOpsRequest)).
 		Owns(&dpv1alpha1.Restore{}).
 		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, object client.Object) []reconcile.Request {
-			return customops.TaskPodRequests(ctx, r.Client, object.(*corev1.Pod))
+			return customops.PodRequests(ctx, r.Client, object.(*corev1.Pod))
 		})).
 		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, object client.Object) []reconcile.Request {
-			return operations.RebuildInstanceTaskPodRequests(ctx, r.Client, object.(*corev1.Pod))
+			return operations.RebuildInstancePodRequests(ctx, r.Client, object.(*corev1.Pod))
 		})).
 		Watches(&corev1.PersistentVolumeClaim{}, handler.EnqueueRequestsFromMapFunc(r.parseVolumeExpansionOpsRequest)).
 		Watches(&batchv1.Job{}, handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, object client.Object) []reconcile.Request {
-			return customops.TaskJobRequests(ctx, r.Client, object.(*batchv1.Job))
+			return customops.JobRequests(ctx, r.Client, object.(*batchv1.Job))
 		}))
 	if multiClusterMgr != nil {
 		multiClusterMgr.Watch(b, &workloads.Instance{}, handler.EnqueueRequestsFromMapFunc(r.parseRunningOpsRequestsForInstance))
@@ -155,7 +155,7 @@ func (r *OpsRequestReconciler) handleDeletion(reqCtx intctrlutil.RequestCtx, ops
 	}
 	return intctrlutil.HandleCRDeletion(reqCtx, r, opsRes.OpsRequest, constant.OpsRequestFinalizerName, func() (*ctrl.Result, error) {
 		if opsRes.OpsRequest.Spec.Type == opsv1alpha1.CustomType {
-			if err := customops.DeleteManagerNamespacePodTasks(reqCtx.Ctx, r.Client, opsRes.OpsRequest); err != nil {
+			if err := customops.DeleteManagerNamespacePods(reqCtx.Ctx, r.Client, opsRes.OpsRequest); err != nil {
 				return nil, err
 			}
 		}
@@ -267,7 +267,7 @@ func (r *OpsRequestReconciler) handleSucceedOpsRequest(reqCtx intctrlutil.Reques
 		return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
 	}
 	if opsRequest.Spec.Type == opsv1alpha1.CustomType {
-		if err := customops.DeleteJobTasks(reqCtx.Ctx, r.Client, opsRequest); err != nil {
+		if err := customops.DeleteJobs(reqCtx.Ctx, r.Client, opsRequest); err != nil {
 			return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
 		}
 	}

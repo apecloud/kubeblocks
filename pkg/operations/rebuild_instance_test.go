@@ -20,8 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"context"
 	"fmt"
 	"slices"
+	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -33,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -43,6 +46,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	"github.com/apecloud/kubeblocks/pkg/generics"
@@ -972,3 +976,124 @@ var _ = Describe("OpsUtil functions", func() {
 
 	})
 })
+
+func TestRebuildRetainedPVCOnlyInstance(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatalf("add core scheme: %v", err)
+	}
+
+	const (
+		namespace     = "default"
+		clusterName   = "test-cluster"
+		componentName = "mysql"
+		instanceName  = "test-cluster-mysql-0"
+	)
+	pvc := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{
+		Namespace: namespace,
+		Name:      "data-" + instanceName,
+		Labels:    constant.GetCompLabels(clusterName, componentName),
+	}}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(pvc).Build()
+	r := rebuildInstanceOpsHandler{}
+	cluster := &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: clusterName, Namespace: namespace}}
+
+	instance, err := r.getInstancePod(context.Background(), cli, cluster, componentName, instanceName)
+	if err != nil {
+		t.Fatalf("get retained-PVC-only instance: %v", err)
+	}
+	if instance != nil || r.isPodAvailable(instance, 0, false) {
+		t.Fatalf("retained-PVC-only instance must have no available Pod: %#v", instance)
+	}
+
+	_, err = r.getInstancePod(context.Background(), cli, cluster, componentName, "missing")
+	if !apierrors.IsNotFound(err) {
+		t.Fatalf("missing instance should remain NotFound, got %v", err)
+	}
+}
+
+func TestRebuildMultiClusterRouting(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatalf("add core scheme: %v", err)
+	}
+	const (
+		namespace     = "default"
+		clusterName   = "test-cluster"
+		componentName = "mysql"
+		instanceName  = "test-cluster-mysql-0"
+		placement     = "data-context"
+	)
+	cluster := &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: clusterName, Namespace: namespace, Annotations: map[string]string{
+		constant.KBAppMultiClusterPlacementKey: placement,
+	}}}
+	pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{
+		Namespace: namespace,
+		Name:      instanceName,
+		Labels:    constant.GetCompLabels(clusterName, componentName),
+	}}
+	const retainedInstanceName = "test-cluster-mysql-1"
+	pvc := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{
+		Namespace: namespace,
+		Name:      "data-" + retainedInstanceName,
+		Labels:    constant.GetCompLabels(clusterName, componentName),
+	}}
+	pod.Status.Conditions = []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}}
+	var getCalls, podLists, pvcLists int
+	assertDataRouting := func(ctx context.Context, opts ...any) {
+		t.Helper()
+		gotPlacement, err := multicluster.FromContext(ctx)
+		if err != nil || gotPlacement != placement {
+			t.Fatalf("unexpected data context placement %q: %v", gotPlacement, err)
+		}
+		for _, opt := range opts {
+			if _, ok := opt.(*multicluster.ClientOption); ok {
+				return
+			}
+		}
+		t.Fatal("missing data-context client option")
+	}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(pod, pvc).WithInterceptorFuncs(interceptor.Funcs{
+		Get: func(ctx context.Context, cli client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+			getCalls++
+			dataOpts := make([]any, len(opts))
+			for i := range opts {
+				dataOpts[i] = opts[i]
+			}
+			assertDataRouting(ctx, dataOpts...)
+			return cli.Get(ctx, key, obj, opts...)
+		},
+		List: func(ctx context.Context, cli client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
+			switch list.(type) {
+			case *corev1.PodList:
+				podLists++
+			case *corev1.PersistentVolumeClaimList:
+				pvcLists++
+			}
+			dataOpts := make([]any, len(opts))
+			for i := range opts {
+				dataOpts[i] = opts[i]
+			}
+			assertDataRouting(ctx, dataOpts...)
+			return cli.List(ctx, list, opts...)
+		},
+	}).Build()
+	r := rebuildInstanceOpsHandler{}
+	if _, err := r.getInstancePod(context.Background(), cli, cluster, componentName, instanceName); err != nil {
+		t.Fatalf("get instance through data context: %v", err)
+	}
+	if err := r.validateRebuildInstanceWithHScale(intctrlutil.RequestCtx{Ctx: context.Background()}, cli,
+		&OpsResource{Cluster: cluster}, componentName, &component.SynthesizedComponent{Name: componentName}, nil); err != nil {
+		t.Fatalf("list instances through data context: %v", err)
+	}
+	if getCalls != 1 || podLists != 1 || pvcLists != 0 {
+		t.Fatalf("Pod-backed lookups must not read PVCs: get=%d podLists=%d pvcLists=%d", getCalls, podLists, pvcLists)
+	}
+	instance, err := r.getInstancePod(context.Background(), cli, cluster, componentName, retainedInstanceName)
+	if err != nil {
+		t.Fatalf("get retained-PVC-only instance through data context: %v", err)
+	}
+	if instance != nil || pvcLists != 1 {
+		t.Fatalf("expected retained-PVC-only lookup, got instance=%#v pvcLists=%d", instance, pvcLists)
+	}
+}

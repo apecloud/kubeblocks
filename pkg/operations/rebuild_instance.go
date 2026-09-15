@@ -31,6 +31,8 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/kubectl/pkg/util/podutils"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -41,6 +43,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	dputils "github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
@@ -94,9 +97,8 @@ func (r rebuildInstanceOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli cli
 			err             error
 			instanceNames   []string
 		)
-		runtime := newRebuildInstanceRuntime(reqCtx.Ctx, cli, opsRes.Cluster)
 		for _, ins := range v.Instances {
-			targetInstance, err := runtime.getInstance(opsRes.Cluster.Namespace, opsRes.Cluster.Name, v.ComponentName, ins.Name)
+			targetPod, err := r.getInstancePod(reqCtx.Ctx, cli, opsRes.Cluster, v.ComponentName, ins.Name)
 			if err != nil {
 				if apierrors.IsNotFound(err) {
 					// neither a Pod nor a retained PVC exists for this name, so
@@ -105,12 +107,12 @@ func (r rebuildInstanceOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli cli
 				}
 				return err
 			}
-			synthesizedComp, err = r.buildSynthesizedComponent(reqCtx.Ctx, cli, opsRes.Cluster, targetInstance.componentName)
+			synthesizedComp, err = r.buildSynthesizedComponent(reqCtx.Ctx, cli, opsRes.Cluster, v.ComponentName)
 			if err != nil {
 				return err
 			}
 			roleAware := len(synthesizedComp.Roles) > 0
-			if !opsRes.OpsRequest.Spec.Force && targetInstance.isAvailable(synthesizedComp.MinReadySeconds, roleAware) {
+			if !opsRes.OpsRequest.Spec.Force && r.isPodAvailable(targetPod, synthesizedComp.MinReadySeconds, roleAware) {
 				return intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" is available, can not rebuild it`, ins.Name))
 			}
 			instanceNames = append(instanceNames, ins.Name)
@@ -145,17 +147,22 @@ func (r rebuildInstanceOpsHandler) validateRebuildInstanceWithHScale(reqCtx intc
 	synthesizedComp *component.SynthesizedComponent,
 	instanceNames []string) error {
 	// rebuild instance by horizontal scaling
-	runtime := newRebuildInstanceRuntime(reqCtx.Ctx, cli, opsRes.Cluster)
-	instances, err := runtime.listInstances(opsRes.Cluster.Namespace, opsRes.Cluster.Name, synthesizedComp.Name)
+	ctx := reqCtx.Ctx
+	var opts []client.ListOption
+	if placement := opsRes.Cluster.Annotations[constant.KBAppMultiClusterPlacementKey]; strings.TrimSpace(placement) != "" {
+		ctx = multicluster.IntoContext(ctx, placement)
+		opts = append(opts, multicluster.InDataContext())
+	}
+	pods, err := component.ListOwnedPods(ctx, cli, opsRes.Cluster.Namespace, opsRes.Cluster.Name, synthesizedComp.Name, opts...)
 	if err != nil {
 		return err
 	}
 	roleAware := len(synthesizedComp.Roles) > 0
-	for _, instance := range instances {
-		if slices.Contains(instanceNames, instance.name) {
+	for _, pod := range pods {
+		if slices.Contains(instanceNames, pod.Name) {
 			continue
 		}
-		if instance.isAvailable(synthesizedComp.MinReadySeconds, roleAware) {
+		if r.isPodAvailable(pod, synthesizedComp.MinReadySeconds, roleAware) {
 			return nil
 		}
 	}
@@ -397,16 +404,15 @@ func (r rebuildInstanceOpsHandler) scaleOutCompReplicasAndSyncProgress(reqCtx in
 	compStatus *opsv1alpha1.OpsRequestComponentStatus,
 	rebuildInsWrapper map[string]*rebuildInstanceWrapper) error {
 	scaleOutInsMap := map[string]string{}
-	runtime := newRebuildInstanceRuntime(reqCtx.Ctx, cli, opsRes.Cluster)
+	workloadName := constant.GenerateWorkloadNamePattern(opsRes.Cluster.Name, compSpec.Name)
 	setScaleOutInsMap := func(templateName string, replicas int32, offlineInstances []string, wrapper *rebuildInstanceWrapper) error {
-		insNames, _ := runtime.generateTemplateInstanceNames(opsRes.Cluster.Name, compSpec.Name, templateName, replicas, offlineInstances, appsv1.Ordinals{})
+		insNames, _ := instanceset.GenerateInstanceNamesFromTemplate(workloadName, templateName, replicas, offlineInstances, nil)
 		for i, insName := range wrapper.insNames {
 			scaleOutInsMap[insName] = insNames[int(replicas-wrapper.replicas)+i]
 		}
 		return nil
 	}
 	// update component spec to scale out required instances.
-	workloadName := constant.GenerateWorkloadNamePattern(opsRes.Cluster.Name, compSpec.Name)
 	var allTemplateReplicas int32
 	for j := range compSpec.Instances {
 		insTpl := &compSpec.Instances[j]
@@ -469,8 +475,7 @@ func (r rebuildInstanceOpsHandler) checkProgressForScalingOutPods(reqCtx intctrl
 		failedCount            int
 		completedCount         int
 	)
-	runtime := newRebuildInstanceRuntime(reqCtx.Ctx, cli, opsRes.Cluster)
-	currPodSet, _ := runtime.generateInstanceNameSet(opsRes.Cluster.Name, compSpec.Name,
+	currPodSet, _ := generateRebuildInstanceNames(opsRes.Cluster.Name, compSpec.Name,
 		compSpec.Replicas, compSpec.Instances, compSpec.OfflineInstances)
 	synthesizedComp, err := r.buildSynthesizedComponent(reqCtx.Ctx, cli, opsRes.Cluster, compSpec.Name)
 	if err != nil {
@@ -483,7 +488,7 @@ func (r rebuildInstanceOpsHandler) checkProgressForScalingOutPods(reqCtx intctrl
 		if _, ok := currPodSet[scalingOutPodName]; !ok {
 			return 0, 0, nil, intctrlutil.NewFatalError(fmt.Sprintf(`the replicas of the component "%s" has been modified by another operation`, compSpec.Name))
 		}
-		scaledOutInstance, err := runtime.getInstance(opsRes.Cluster.Namespace, opsRes.Cluster.Name, compSpec.Name, scalingOutPodName)
+		scaledOutPod, err := r.getInstancePod(reqCtx.Ctx, cli, opsRes.Cluster, compSpec.Name, scalingOutPodName)
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				reqCtx.Log.Info(fmt.Sprintf("waiting to create the pod %s", scalingOutPodName))
@@ -491,7 +496,12 @@ func (r rebuildInstanceOpsHandler) checkProgressForScalingOutPods(reqCtx intctrl
 			}
 			return 0, 0, nil, err
 		}
-		if scaledOutInstance.isFailedAndTimedOut() {
+		if scaledOutPod == nil {
+			reqCtx.Log.Info(fmt.Sprintf("waiting to create the pod %s", scalingOutPodName))
+			continue
+		}
+		isFailed, isTimeout, _ := intctrlutil.IsPodFailedAndTimedOut(scaledOutPod)
+		if isFailed && isTimeout {
 			failedCount += 1
 			completedCount += 1
 			progressDetail.SetStatusAndMessage(opsv1alpha1.FailedProgressStatus,
@@ -499,12 +509,12 @@ func (r rebuildInstanceOpsHandler) checkProgressForScalingOutPods(reqCtx intctrl
 			setComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest, &compStatus.ProgressDetails, progressDetail)
 			continue
 		}
-		if !scaledOutInstance.isAvailable(synthesizedComp.MinReadySeconds, roleAware) {
+		if !r.isPodAvailable(scaledOutPod, synthesizedComp.MinReadySeconds, roleAware) {
 			reqCtx.Log.Info(fmt.Sprintf("waiting to create the pod %s", scalingOutPodName))
 			continue
 		}
 		if slices.Contains(compSpec.OfflineInstances, instance.Name) {
-			oldInstance, err := runtime.getInstance(opsRes.Cluster.Namespace, opsRes.Cluster.Name, compSpec.Name, instance.Name)
+			oldPod, err := r.getInstancePod(reqCtx.Ctx, cli, opsRes.Cluster, compSpec.Name, instance.Name)
 			if err != nil && !apierrors.IsNotFound(err) {
 				return 0, 0, nil, err
 			}
@@ -517,7 +527,7 @@ func (r rebuildInstanceOpsHandler) checkProgressForScalingOutPods(reqCtx intctrl
 			} else {
 				progressDetail.SetStatusAndMessage(opsv1alpha1.ProcessingProgressStatus,
 					r.buildScalingOutPodMessage(scalingOutPodName, string(opsv1alpha1.AvailablePhase)))
-				if oldInstance.isDeleting() && opsRes.OpsRequest.Force() {
+				if oldPod != nil && !oldPod.DeletionTimestamp.IsZero() && opsRes.OpsRequest.Force() {
 					pod := &corev1.Pod{}
 					if getErr := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: instance.Name, Namespace: opsRes.Cluster.Namespace}, pod); getErr == nil {
 						_ = intctrlutil.BackgroundDeleteObject(cli, reqCtx.Ctx, pod, client.GracePeriodSeconds(0))
@@ -645,4 +655,66 @@ func (r rebuildInstanceOpsHandler) cleanupTmpResources(reqCtx intctrlutil.Reques
 	// TODO: need to delete the restore CR?
 	// Pods are limited in k8s, so we need to release them if they are not needed.
 	return intctrlutil.DeleteOwnedResources(reqCtx.Ctx, cli, opsRes.OpsRequest, matchLabels, generics.PodSignature)
+}
+
+// getInstancePod returns a nil Pod without an error when only a retained PVC exists.
+func (r rebuildInstanceOpsHandler) getInstancePod(ctx context.Context, cli client.Client,
+	cluster *appsv1.Cluster, compName, instanceName string) (*corev1.Pod, error) {
+	var getOpts []client.GetOption
+	listOpts := []client.ListOption{client.InNamespace(cluster.Namespace), client.MatchingLabels{
+		constant.AppInstanceLabelKey:    cluster.Name,
+		constant.KBAppComponentLabelKey: compName,
+	}}
+	if placement := cluster.Annotations[constant.KBAppMultiClusterPlacementKey]; strings.TrimSpace(placement) != "" {
+		ctx = multicluster.IntoContext(ctx, placement)
+		getOpts = append(getOpts, multicluster.InDataContext())
+		listOpts = append(listOpts, multicluster.InDataContext())
+	}
+	pod := &corev1.Pod{}
+	if err := cli.Get(ctx, client.ObjectKey{Name: instanceName, Namespace: cluster.Namespace}, pod, getOpts...); err != nil {
+		if apierrors.IsNotFound(err) {
+			pvcs := &corev1.PersistentVolumeClaimList{}
+			if listErr := cli.List(ctx, pvcs, listOpts...); listErr != nil {
+				return nil, listErr
+			}
+			for _, pvc := range pvcs.Items {
+				if strings.HasSuffix(pvc.Name, "-"+instanceName) {
+					return nil, nil
+				}
+			}
+		}
+		return nil, err
+	}
+	if pod.Labels[constant.AppInstanceLabelKey] != cluster.Name || pod.Labels[constant.KBAppComponentLabelKey] != compName {
+		return nil, intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" does not belong to component "%s"`, instanceName, compName))
+	}
+	return pod, nil
+}
+
+func (r rebuildInstanceOpsHandler) isPodAvailable(pod *corev1.Pod, minReadySeconds int32, roleAware bool) bool {
+	if pod == nil || !pod.DeletionTimestamp.IsZero() {
+		return false
+	}
+	if roleAware {
+		return intctrlutil.PodIsReadyWithLabel(*pod)
+	}
+	return podutils.IsPodAvailable(pod, minReadySeconds, metav1.Now())
+}
+
+func generateRebuildInstanceNames(clusterName, compName string, compReplicas int32,
+	instances []appsv1.InstanceTemplate, offlineInstances []string) (sets.Set[string], error) {
+	workloadName := constant.GenerateClusterComponentName(clusterName, compName)
+	templates := make([]instanceset.InstanceTemplate, 0, len(instances))
+	for i := range instances {
+		templates = append(templates, &workloads.InstanceTemplate{
+			Name:     instances[i].Name,
+			Replicas: instances[i].Replicas,
+			Ordinals: instances[i].Ordinals,
+		})
+	}
+	instanceNames, err := instanceset.GenerateAllInstanceNames(workloadName, compReplicas, templates, offlineInstances, appsv1.Ordinals{})
+	if err != nil {
+		return nil, err
+	}
+	return sets.New(instanceNames...), nil
 }

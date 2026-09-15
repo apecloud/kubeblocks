@@ -284,13 +284,6 @@ type InstanceSetStatus struct {
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
-	// InstanceStatusObservedGeneration is the InstanceSet generation for which InstanceStatus contains a complete
-	// allocation snapshot. Individual rows can still have CurrentState Unknown while their child observation catches up.
-	// A missing or older value means consumers must not infer success from stale or missing rows.
-	//
-	// +optional
-	InstanceStatusObservedGeneration int64 `json:"instanceStatusObservedGeneration,omitempty"`
-
 	// replicas is the number of instances created by the InstanceSet controller.
 	Replicas int32 `json:"replicas"`
 
@@ -796,9 +789,6 @@ func (r *InstanceSet) IsInstancesReady() bool {
 	if r.Status.ObservedGeneration != r.Generation {
 		return false
 	}
-	if !r.IsInstanceStatusSnapshotValid() {
-		return false
-	}
 	// check whether the underlying workload is ready
 	if r.Spec.Replicas == nil {
 		return false
@@ -815,12 +805,6 @@ func (r *InstanceSet) IsInstancesReady() bool {
 	}
 
 	return true
-}
-
-// IsInstanceStatusSnapshotValid reports whether InstanceStatus completely describes the allocation selected by the
-// current InstanceSet generation. Unknown child observations remain explicit rows in a valid allocation snapshot.
-func (r *InstanceSet) IsInstanceStatusSnapshotValid() bool {
-	return r != nil && r.Status.InstanceStatusObservedGeneration == r.Generation
 }
 
 // IsInstanceSetReady gives InstanceSet level 'ready' state:

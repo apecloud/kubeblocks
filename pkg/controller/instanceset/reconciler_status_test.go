@@ -66,9 +66,8 @@ var _ = Describe("status reconciler test", func() {
 				},
 			},
 			Status: workloads.InstanceSetStatus{
-				ObservedGeneration:               3,
-				InstanceStatusObservedGeneration: 2,
-				ReadyReplicas:                    2,
+				ObservedGeneration: 3,
+				ReadyReplicas:      2,
 				Conditions: []metav1.Condition{{
 					Type:               string(workloads.InstanceReady),
 					Status:             metav1.ConditionTrue,
@@ -788,9 +787,6 @@ func newLegacyInstanceStatusFixtureFromSet(t *testing.T, its *workloads.Instance
 	}
 	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
 		t.Fatal(err)
-	}
-	if !its.IsInstanceStatusSnapshotValid() {
-		t.Fatalf("status reconciler did not publish a complete snapshot: %#v", its.Status)
 	}
 	return its, tree, pods
 }

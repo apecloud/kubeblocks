@@ -185,7 +185,6 @@ var _ = Describe("utils test", func() {
 
 			By("set its.status.replicas to not as expected")
 			its.Status.ObservedGeneration = its.Generation
-			its.Status.InstanceStatusObservedGeneration = its.Generation
 			its.Status.Replicas = replicas - 1
 			Expect(its.IsInstanceSetReady()).Should(BeFalse())
 

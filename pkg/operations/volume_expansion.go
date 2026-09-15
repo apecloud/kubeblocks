@@ -291,6 +291,9 @@ func (ve volumeExpansionOpsHandler) handleVCTExpansionProgress(reqCtx intctrluti
 		succeedCount   int
 		completedCount int
 	)
+	if veHelper.expectCount <= 0 {
+		return 0, 0, nil
+	}
 	runtime, err := opsRes.GetRuntime(veHelper.compOps.GetComponentName())
 	if err != nil {
 		return 0, 0, err
@@ -304,13 +307,6 @@ func (ve volumeExpansionOpsHandler) handleVCTExpansionProgress(reqCtx intctrluti
 		// Stop retains the normal allocation as Offline, while explicitly
 		// offlined instances remain outside this operation's replica count.
 		desiredState = workloads.InstanceDesiredStateOffline
-	}
-	if !workload.IsInstanceStatusSnapshotValid() {
-		return 0, 0, intctrlutil.NewErrorf(intctrlutil.ErrorTypeNeedWaiting,
-			"waiting for InstanceSet to publish a complete instance status snapshot")
-	}
-	if veHelper.expectCount <= 0 {
-		return 0, 0, nil
 	}
 	instances, err := instanceTemplatesByState(workload.GetInstanceStatuses(), desiredState,
 		func(status workloads.InstanceStatus) bool {

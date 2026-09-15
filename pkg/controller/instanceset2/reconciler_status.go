@@ -420,13 +420,6 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 		if templateName, ok := instancetemplate.TemplateNameFromLabels(inst.Labels); ok {
 			templateHints = append(templateHints, instancestatus.TemplateAssignment{InstanceName: inst.Name, TemplateName: templateName})
 		}
-		if inst.Generation != inst.Status.ObservedGeneration {
-			observations = append(observations, instancestatus.Observation{
-				InstanceName: inst.Name,
-				State:        workloads.InstanceCurrentStateUnknown,
-			})
-			continue
-		}
 		switch inst.Status.CurrentState {
 		case workloads.InstanceCurrentStatePresent, workloads.InstanceCurrentStateTerminating:
 			// InstanceSet revisions identify desired Instance specs, while Instance CurrentRevision identifies the
@@ -483,7 +476,6 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 		return err
 	}
 	its.Status.InstanceStatus = statuses
-	its.Status.InstanceStatusObservedGeneration = its.Generation
 	return nil
 }
 

@@ -547,7 +547,6 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 		return err
 	}
 	its.Status.InstanceStatus = statuses
-	its.Status.InstanceStatusObservedGeneration = its.Generation
 	return nil
 }
 

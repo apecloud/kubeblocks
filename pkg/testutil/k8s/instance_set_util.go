@@ -38,7 +38,6 @@ func MockInstanceSetReady(its *workloads.InstanceSet, pods ...*corev1.Pod) {
 	its.Status.ReadyInitReplicas = *its.Spec.Replicas
 	its.Status.AvailableReplicas = *its.Spec.Replicas
 	its.Status.ObservedGeneration = its.Generation
-	its.Status.InstanceStatusObservedGeneration = its.Generation
 	its.Status.Replicas = *its.Spec.Replicas
 	its.Status.ReadyReplicas = *its.Spec.Replicas
 	its.Status.CurrentRevision = its.Status.UpdateRevision

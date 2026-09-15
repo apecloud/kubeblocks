@@ -102,10 +102,6 @@ func assignmentsMatchComponent(assignments map[string]string, component *appsv1.
 }
 
 func activeAssignmentsForTarget(workload Workload, component *appsv1.ClusterComponentSpec) (map[string]string, bool, error) {
-	if !workload.IsInstanceStatusSnapshotValid() {
-		return nil, false, intctrlutil.NewErrorf(intctrlutil.ErrorTypeNeedWaiting,
-			"waiting for InstanceSet to publish a complete instance status snapshot")
-	}
 	assignments, err := activeInstanceTemplates(workload.GetInstanceStatuses())
 	if err != nil {
 		return nil, false, err

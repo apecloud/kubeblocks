@@ -74,13 +74,12 @@ var _ = Describe("component status transformer conditions", func() {
 				Roles:    roles,
 			},
 			Status: workloads.InstanceSetStatus{
-				ObservedGeneration:               generation,
-				InstanceStatusObservedGeneration: generation,
-				Replicas:                         replicas,
-				ReadyReplicas:                    replicas,
-				UpdatedReplicas:                  replicas,
-				InitReplicas:                     replicas,
-				ReadyInitReplicas:                replicas,
+				ObservedGeneration: generation,
+				Replicas:           replicas,
+				ReadyReplicas:      replicas,
+				UpdatedReplicas:    replicas,
+				InitReplicas:       replicas,
+				ReadyInitReplicas:  replicas,
 			},
 		}
 		if len(roles) > 0 {

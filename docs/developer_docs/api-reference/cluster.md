@@ -20067,20 +20067,6 @@ InstanceSet&rsquo;s generation, which is updated on mutation by the API Server.<
 </tr>
 <tr>
 <td>
-<code>instanceStatusObservedGeneration</code><br/>
-<em>
-int64
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>InstanceStatusObservedGeneration is the InstanceSet generation for which InstanceStatus contains a complete
-allocation snapshot. Individual rows can still have CurrentState Unknown while their child observation catches up.
-A missing or older value means consumers must not infer success from stale or missing rows.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>replicas</code><br/>
 <em>
 int32

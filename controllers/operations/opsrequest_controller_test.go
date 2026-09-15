@@ -1175,20 +1175,30 @@ func TestOpsRequestDoesNotRetargetRecreatedCluster(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			reconcileOwnerTest(t, r, ops)
 			actual := &opsv1alpha1.OpsRequest{}
 			if !tc.deleting {
 				if err := r.Get(ctx, client.ObjectKeyFromObject(ops), actual); err != nil {
 					t.Fatal(err)
 				}
-				if actual.DeletionTimestamp.IsZero() {
-					t.Fatal("request outlived its owner without entering deletion")
+				beforeOps := actual.DeepCopy()
+				for i := 0; i < 2; i++ {
+					if _, err := r.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(ops)}); err == nil {
+						t.Fatal("expected owner mismatch error")
+					}
+					if err := r.Get(ctx, client.ObjectKeyFromObject(ops), actual); err != nil {
+						t.Fatal(err)
+					}
+					if !reflect.DeepEqual(beforeOps, actual) {
+						t.Fatal("owner mismatch changed or started deleting the request")
+					}
 				}
-				if actual.Status.Phase != tc.phase || actual.OwnerReferences[0].UID != cluster.UID {
-					t.Fatal("request was rebound or given a new outcome")
+				// Simulate GC marking the dependent for deletion after the owner has disappeared.
+				if err := r.Delete(ctx, actual); err != nil {
+					t.Fatal(err)
 				}
-				reconcileOwnerTest(t, r, ops)
 			}
+			// The deletion event must reach finalizer cleanup despite the owner mismatch.
+			reconcileOwnerTest(t, r, ops)
 			if err := r.Get(ctx, client.ObjectKeyFromObject(ops), actual); !apierrors.IsNotFound(err) {
 				t.Fatalf("old request was not finalized: %v", err)
 			}

@@ -21,6 +21,7 @@ package operations
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"slices"
 	"strings"
@@ -131,6 +132,15 @@ func (r *OpsRequestReconciler) fetchOpsRequest(reqCtx intctrlutil.RequestCtx, op
 
 // handleDeletion handles the delete event of the OpsRequest.
 func (r *OpsRequestReconciler) handleDeletion(reqCtx intctrlutil.RequestCtx, opsRes *operations.OpsResource) (*ctrl.Result, error) {
+	isClusterCreation := operations.GetOpsManager().OpsMap[opsRes.OpsRequest.Spec.Type].IsClusterCreation
+	if !isClusterCreation && !opsRes.OpsRequest.DeletionTimestamp.IsZero() {
+		if owner := clusterOwnerReference(opsRes.OpsRequest); owner != nil &&
+			(owner.Name != opsRes.Cluster.Name || owner.UID != opsRes.Cluster.UID) {
+			return intctrlutil.HandleCRDeletion(reqCtx, r, opsRes.OpsRequest, constant.OpsRequestFinalizerName, func() (*ctrl.Result, error) {
+				return nil, r.deleteCreatedPodsInKBNamespace(reqCtx, opsRes.OpsRequest)
+			})
+		}
+	}
 	if opsRes.OpsRequest.Status.Phase == opsv1alpha1.OpsRunningPhase && !opsRes.Cluster.IsDeleting() {
 		return nil, nil
 	}
@@ -178,20 +188,14 @@ func (r *OpsRequestReconciler) fetchCluster(reqCtx intctrlutil.RequestCtx, opsRe
 		}
 		return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
 	}
-	if owner := clusterOwnerReference(opsRes.OpsRequest); owner != nil &&
-		(owner.Name != cluster.Name || owner.UID != cluster.UID) {
-		// The original Cluster is gone. Finish its request's deletion without using the replacement.
-		if opsRes.OpsRequest.DeletionTimestamp.IsZero() {
-			if err := r.Client.Delete(reqCtx.Ctx, opsRes.OpsRequest); err != nil {
-				return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
-			}
-			return intctrlutil.ResultToP(intctrlutil.Reconciled())
+	// Deletion events must reach finalizer cleanup even when the original Cluster is gone.
+	if opsRes.OpsRequest.DeletionTimestamp.IsZero() {
+		if owner := clusterOwnerReference(opsRes.OpsRequest); owner != nil &&
+			(owner.Name != cluster.Name || owner.UID != cluster.UID) {
+			return nil, fmt.Errorf("cluster %s/%s UID %s does not match OpsRequest owner %s UID %s",
+				cluster.Namespace, cluster.Name, cluster.UID, owner.Name, owner.UID)
 		}
-		return intctrlutil.HandleCRDeletion(reqCtx, r, opsRes.OpsRequest, constant.OpsRequestFinalizerName, func() (*ctrl.Result, error) {
-			return nil, r.deleteCreatedPodsInKBNamespace(reqCtx, opsRes.OpsRequest)
-		})
 	}
-	// set cluster variable
 	opsRes.Cluster = cluster
 	return nil, nil
 }

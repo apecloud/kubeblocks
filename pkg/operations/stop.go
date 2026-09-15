@@ -24,7 +24,6 @@ import (
 	"reflect"
 	"slices"
 	"sort"
-	"strings"
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -126,80 +125,8 @@ func (stop StopOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 	return stop.reconcile(reqCtx, cli, opsRes)
 }
 
-// SaveLastConfiguration records the allocated online instance identities before Stop changes their desired state.
+// SaveLastConfiguration is empty because Stop reconciles the current component target.
 func (stop StopOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
-	helper := newComponentOpsHelper(opsRes.OpsRequest.Spec.StopList)
-	resources, err := helper.buildRollingResources(reqCtx, cli, opsRes, "stop")
-	if err != nil {
-		return err
-	}
-
-	baselines := map[string][]opsv1alpha1.ProgressStatusDetail{}
-	for i := range opsRes.Cluster.Spec.ComponentSpecs {
-		name := opsRes.Cluster.Spec.ComponentSpecs[i].Name
-		if _, ok := helper.getComponentOps(name); ok {
-			baselines[name] = nil
-		}
-	}
-	for i := range opsRes.Cluster.Spec.Shardings {
-		name := opsRes.Cluster.Spec.Shardings[i].Name
-		if _, ok := helper.getComponentOps(name); ok {
-			baselines[name] = nil
-		}
-	}
-
-	for i := range resources {
-		resource := &resources[i]
-		its := &workloads.InstanceSet{}
-		key := client.ObjectKey{
-			Namespace: opsRes.Cluster.Namespace,
-			Name:      constant.GenerateClusterComponentName(opsRes.Cluster.Name, resource.fullComponentName),
-		}
-		if err := cli.Get(reqCtx.Ctx, key, its); err != nil {
-			if apierrors.IsNotFound(err) && (resource.clusterComponent.Replicas == 0 || ptr.Deref(resource.clusterComponent.Stop, false)) {
-				continue
-			}
-			if apierrors.IsNotFound(err) {
-				return intctrlutil.NewErrorf(intctrlutil.ErrorTypeNeedWaiting,
-					"waiting for InstanceSet %q before stopping", key.Name)
-			}
-			return err
-		}
-		participants := stopParticipantStatuses(its)
-		if err := validateInstanceIdentities(participants); err != nil {
-			return err
-		}
-		if int32(len(participants)) < ptr.Deref(its.Spec.Replicas, resource.clusterComponent.Replicas) {
-			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeNeedWaiting,
-				"waiting for InstanceSet %q to publish all active instance identities", key.Name)
-		}
-		for _, status := range participants {
-			baselines[resource.compOps.GetComponentName()] = append(
-				baselines[resource.compOps.GetComponentName()],
-				opsv1alpha1.ProgressStatusDetail{
-					Group:     resource.fullComponentName,
-					ObjectKey: getProgressObjectKey(constant.PodKind, status.PodName),
-					Status:    opsv1alpha1.PendingProgressStatus,
-				})
-		}
-	}
-
-	if opsRes.OpsRequest.Status.Components == nil {
-		opsRes.OpsRequest.Status.Components = map[string]opsv1alpha1.OpsRequestComponentStatus{}
-	}
-	for name, details := range baselines {
-		sort.Slice(details, func(i, j int) bool {
-			return details[i].ObjectKey < details[j].ObjectKey
-		})
-		for i := 1; i < len(details); i++ {
-			if details[i-1].ObjectKey == details[i].ObjectKey {
-				return fmt.Errorf("duplicate stop participant %q", details[i].ObjectKey)
-			}
-		}
-		status := opsRes.OpsRequest.Status.Components[name]
-		status.ProgressDetails = details
-		opsRes.OpsRequest.Status.Components[name] = status
-	}
 	return nil
 }
 
@@ -233,29 +160,69 @@ func (stop StopOpsHandler) reconcile(reqCtx intctrlutil.RequestCtx, cli client.C
 	if opsRequest.Status.Components == nil {
 		opsRequest.Status.Components = map[string]opsv1alpha1.OpsRequestComponentStatus{}
 	}
-
 	helper := newComponentOpsHelper(opsRequest.Spec.StopList)
-	instanceSets := map[string]*workloads.InstanceSet{}
-	var expectedCount, completedCount int32
-	for name, compStatus := range opsRequest.Status.Components {
-		if _, ok := helper.getComponentOps(name); !ok {
-			continue
+	resources, err := helper.buildRollingResources(reqCtx, cli, opsRes, "stop")
+	if err != nil {
+		return opsv1alpha1.OpsRunningPhase, 0, err
+	}
+	current := map[string][]opsv1alpha1.ProgressStatusDetail{}
+	for name := range opsRequest.Status.Components {
+		if _, ok := helper.getComponentOps(name); ok {
+			current[name] = nil
 		}
-		for i := range compStatus.ProgressDetails {
-			detail := compStatus.ProgressDetails[i]
-			expectedCount++
-			completed, err := stop.reconcileParticipant(reqCtx, cli, opsRes, instanceSets, &detail)
-			if err != nil {
+	}
+	var expectedCount, completedCount int32
+	for _, resource := range resources {
+		name := resource.compOps.GetComponentName()
+		if _, ok := current[name]; !ok {
+			current[name] = nil
+		}
+		its := &workloads.InstanceSet{}
+		key := client.ObjectKey{Namespace: opsRes.Cluster.Namespace,
+			Name: constant.GenerateClusterComponentName(opsRes.Cluster.Name, resource.fullComponentName)}
+		if err := cli.Get(reqCtx.Ctx, key, its); err != nil {
+			if !apierrors.IsNotFound(err) {
 				return opsv1alpha1.OpsRunningPhase, 0, err
 			}
-			if completed {
-				completedCount++
-			}
-			setComponentStatusProgressDetail(opsRes.Recorder, opsRequest, &compStatus.ProgressDetails, detail)
+			expectedCount += resource.clusterComponent.Replicas
+			continue
 		}
-		opsRequest.Status.Components[name] = compStatus
+		participants := stopParticipantStatuses(its)
+		expectedCount += max(resource.clusterComponent.Replicas, int32(len(participants)))
+		for _, instance := range participants {
+			objectKey := getProgressObjectKey(constant.PodKind, instance.PodName)
+			detail := opsv1alpha1.ProgressStatusDetail{ObjectKey: objectKey, Group: resource.fullComponentName}
+			if instance.EffectiveCurrentState() == workloads.InstanceCurrentStateAbsent {
+				detail.SetStatusAndMessage(opsv1alpha1.SucceedProgressStatus,
+					getProgressSucceedMessage("stop", objectKey, resource.fullComponentName))
+				completedCount++
+			} else {
+				detail.SetStatusAndMessage(opsv1alpha1.ProcessingProgressStatus,
+					getProgressProcessingMessage("stop", objectKey, resource.fullComponentName))
+			}
+			current[name] = append(current[name], detail)
+		}
 	}
-
+	for name, details := range current {
+		status := opsRequest.Status.Components[name]
+		sort.Slice(details, func(i, j int) bool { return details[i].ObjectKey < details[j].ObjectKey })
+		for i := range details {
+			detail := &details[i]
+			previous := findStatusProgressDetail(status.ProgressDetails, detail.ObjectKey)
+			if previous != nil {
+				detail.StartTime = previous.StartTime
+				if previous.Status == detail.Status {
+					detail.EndTime = previous.EndTime
+				}
+			}
+			updateProgressDetailTime(detail)
+			if previous == nil || previous.Status != detail.Status || previous.Message != detail.Message {
+				sendProgressDetailEvent(opsRes.Recorder, opsRequest, *detail)
+			}
+		}
+		status.ProgressDetails = details
+		opsRequest.Status.Components[name] = status
+	}
 	phase := helper.updateRollingActionPhase(opsRes, appsv1.StoppedComponentPhase)
 	opsRequest.Status.Progress = fmt.Sprintf("%d/%d", completedCount, expectedCount)
 	if !reflect.DeepEqual(opsRequest.Status, oldOpsRequest.Status) {
@@ -263,47 +230,10 @@ func (stop StopOpsHandler) reconcile(reqCtx intctrlutil.RequestCtx, cli client.C
 			return opsv1alpha1.OpsRunningPhase, 0, err
 		}
 	}
-	if phase == opsv1alpha1.OpsRunningPhase && completedCount < expectedCount {
+	if phase == opsv1alpha1.OpsRunningPhase {
 		return phase, time.Second, nil
 	}
 	return phase, 0, nil
-}
-
-func (stop StopOpsHandler) reconcileParticipant(reqCtx intctrlutil.RequestCtx, cli client.Client,
-	opsRes *OpsResource, instanceSets map[string]*workloads.InstanceSet,
-	detail *opsv1alpha1.ProgressStatusDetail) (bool, error) {
-	prefix := constant.PodKind + "/"
-	if detail.Group == "" || !strings.HasPrefix(detail.ObjectKey, prefix) {
-		return false, fmt.Errorf("invalid persisted stop participant %q for component %q", detail.ObjectKey, detail.Group)
-	}
-	key := client.ObjectKey{
-		Namespace: opsRes.Cluster.Namespace,
-		Name:      constant.GenerateClusterComponentName(opsRes.Cluster.Name, detail.Group),
-	}
-	its, loaded := instanceSets[detail.Group]
-	if !loaded {
-		its = &workloads.InstanceSet{}
-		if err := cli.Get(reqCtx.Ctx, key, its); err != nil {
-			if !apierrors.IsNotFound(err) {
-				return false, err
-			}
-			its = nil
-		}
-		instanceSets[detail.Group] = its
-	}
-	instanceName := strings.TrimPrefix(detail.ObjectKey, prefix)
-	var instance *workloads.InstanceStatus
-	if its != nil {
-		instance = its.FindInstanceStatus(instanceName)
-	}
-	if instance != nil && instance.EffectiveCurrentState() == workloads.InstanceCurrentStateAbsent {
-		detail.SetStatusAndMessage(opsv1alpha1.SucceedProgressStatus,
-			getProgressSucceedMessage("stop", detail.ObjectKey, detail.Group))
-		return true, nil
-	}
-	detail.SetStatusAndMessage(opsv1alpha1.ProcessingProgressStatus,
-		getProgressProcessingMessage("stop", detail.ObjectKey, detail.Group))
-	return false, nil
 }
 
 func (stop StopOpsHandler) targetsStopped(opsRes *OpsResource) bool {

@@ -319,8 +319,6 @@ var _ = Describe("Start OpsRequest", func() {
 			By("init operations resources with topology")
 			opsRes, _, _ := initOperationsResourcesWithTopology(clusterDefName, compDefName, clusterName)
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
-			testapps.MockInstanceSetPods(&testCtx, nil, opsRes.Cluster, defaultCompName)
-			testapps.MockInstanceSetStatus(testCtx, opsRes.Cluster, defaultCompName)
 
 			By("create 'Stop' opsRequest for all components")
 			stopOps := createStopOpsRequest(opsRes, defaultCompName)

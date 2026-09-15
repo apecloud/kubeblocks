@@ -87,22 +87,12 @@ func (r *rebuildInstanceRuntime) getInstance(namespace, clusterName, compName, i
 	if pod.Labels[constant.AppInstanceLabelKey] != clusterName || pod.Labels[constant.KBAppComponentLabelKey] != compName {
 		return nil, intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" does not belong to component "%s"`, instanceName, compName))
 	}
-	// Keep the existing read/error behavior even though Rebuild only needs the
-	// Pod-backed instance state after the instance has been found.
-	if _, err := r.loadVolumes(namespace, clusterName, compName); err != nil {
-		return nil, err
-	}
 	return &rebuildRuntimeInstance{name: pod.Name, componentName: compName, pod: pod}, nil
 }
 
 func (r *rebuildInstanceRuntime) listInstances(namespace, clusterName, compName string) ([]*rebuildRuntimeInstance, error) {
 	pods, err := component.ListOwnedPods(r.ctx, r.cli, namespace, clusterName, compName, r.dataListOpts...)
 	if err != nil {
-		return nil, err
-	}
-	// Keep the existing PVC read/error behavior while the public runtime is
-	// migrated independently.
-	if _, err := r.loadVolumes(namespace, clusterName, compName); err != nil {
 		return nil, err
 	}
 	result := make([]*rebuildRuntimeInstance, 0, len(pods))

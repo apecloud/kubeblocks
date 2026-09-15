@@ -93,7 +93,13 @@ func TestRebuildRuntimeKeepsMultiClusterRouting(t *testing.T) {
 		Name:      instanceName,
 		Labels:    constant.GetCompLabels(clusterName, component),
 	}}
-	var getCalls, listCalls int
+	const retainedInstanceName = "test-cluster-mysql-1"
+	pvc := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{
+		Namespace: namespace,
+		Name:      "data-" + retainedInstanceName,
+		Labels:    constant.GetCompLabels(clusterName, component),
+	}}
+	var getCalls, podLists, pvcLists int
 	assertDataRouting := func(ctx context.Context, opts ...any) {
 		t.Helper()
 		gotPlacement, err := multicluster.FromContext(ctx)
@@ -107,7 +113,7 @@ func TestRebuildRuntimeKeepsMultiClusterRouting(t *testing.T) {
 		}
 		t.Fatal("missing data-context client option")
 	}
-	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(pod).WithInterceptorFuncs(interceptor.Funcs{
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(pod, pvc).WithInterceptorFuncs(interceptor.Funcs{
 		Get: func(ctx context.Context, cli client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
 			getCalls++
 			dataOpts := make([]any, len(opts))
@@ -118,7 +124,12 @@ func TestRebuildRuntimeKeepsMultiClusterRouting(t *testing.T) {
 			return cli.Get(ctx, key, obj, opts...)
 		},
 		List: func(ctx context.Context, cli client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
-			listCalls++
+			switch list.(type) {
+			case *corev1.PodList:
+				podLists++
+			case *corev1.PersistentVolumeClaimList:
+				pvcLists++
+			}
 			dataOpts := make([]any, len(opts))
 			for i := range opts {
 				dataOpts[i] = opts[i]
@@ -134,7 +145,14 @@ func TestRebuildRuntimeKeepsMultiClusterRouting(t *testing.T) {
 	if _, err := r.listInstances(namespace, clusterName, component); err != nil {
 		t.Fatalf("list instances through data context: %v", err)
 	}
-	if getCalls == 0 || listCalls < 3 {
-		t.Fatalf("expected routed Get and Pod/PVC List calls, got get=%d list=%d", getCalls, listCalls)
+	if getCalls != 1 || podLists != 1 || pvcLists != 0 {
+		t.Fatalf("Pod-backed lookups must not read PVCs: get=%d podLists=%d pvcLists=%d", getCalls, podLists, pvcLists)
+	}
+	instance, err := r.getInstance(namespace, clusterName, component, retainedInstanceName)
+	if err != nil {
+		t.Fatalf("get retained-PVC-only instance through data context: %v", err)
+	}
+	if instance.name != retainedInstanceName || instance.pod != nil || pvcLists != 1 {
+		t.Fatalf("expected retained-PVC-only lookup, got instance=%#v pvcLists=%d", instance, pvcLists)
 	}
 }

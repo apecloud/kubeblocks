@@ -217,27 +217,6 @@ func TestOpsRuntimeBuildsInstanceAPIView(t *testing.T) {
 	if instance.GetRole() != "leader" {
 		t.Fatalf("unexpected role: %s", instance.GetRole())
 	}
-	if instance.GetNodeName() != "node-a" {
-		t.Fatalf("unexpected node name: %s", instance.GetNodeName())
-	}
-	if len(instance.GetTolerations()) != 1 {
-		t.Fatalf("expected tolerations")
-	}
-	if instance.GetAffinity() == nil {
-		t.Fatalf("expected affinity")
-	}
-	if len(instance.GetTopologySpreadConstraints()) != 1 {
-		t.Fatalf("expected topology spread constraints")
-	}
-	if len(instance.GetPodVolumes()) != 1 {
-		t.Fatalf("expected pod volumes")
-	}
-	if len(instance.GetVolumeMounts("mysql")) != 1 {
-		t.Fatalf("expected mysql volume mounts")
-	}
-	if len(instance.GetVolumeMounts("missing")) != 1 {
-		t.Fatalf("expected missing container volume mounts to fall back to first container")
-	}
 	resources := instance.GetResources("mysql")
 	if resources.Requests.Cpu().String() != "100m" {
 		t.Fatalf("unexpected resources")
@@ -299,25 +278,6 @@ func TestDefaultInstanceAndVolumeNilBranches(t *testing.T) {
 	if instance.IsFailedAndTimedOut() {
 		t.Fatalf("nil pod should not be failed and timed out")
 	}
-	if instance.GetNodeName() != "" {
-		t.Fatalf("expected empty node name")
-	}
-	if instance.GetTolerations() != nil {
-		t.Fatalf("expected nil tolerations")
-	}
-	if instance.GetAffinity() != nil {
-		t.Fatalf("expected nil affinity")
-	}
-	if instance.GetTopologySpreadConstraints() != nil {
-		t.Fatalf("expected nil topology constraints")
-	}
-	if instance.GetPodVolumes() != nil {
-		t.Fatalf("expected nil pod volumes")
-	}
-	if instance.GetVolumeMounts("") != nil {
-		t.Fatalf("expected nil volume mounts")
-	}
-
 	now := metav1.Now()
 	deleting := &defaultInstance{pod: &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{

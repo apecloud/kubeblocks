@@ -1307,6 +1307,7 @@ func instanceStatusWithoutRevisionAndHealth(status workloads.InstanceStatus) wor
 	status.CurrentRevision = ""
 	status.UpdateRevision = ""
 	status.UpToDate = false
+	status.PrimaryContainerResourcesApplied = false
 	status.Ready = false
 	status.Available = false
 	status.Failed = false

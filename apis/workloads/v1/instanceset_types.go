@@ -615,6 +615,15 @@ type InstanceStatus struct {
 	// +optional
 	UpToDate bool `json:"upToDate,omitempty"`
 
+	// PrimaryContainerResourcesApplied indicates that the InstanceSet controller has observed every resource
+	// request and limit specified for the first container in the template assigned to this Active instance.
+	// Extra observed resource keys do not make this false. This fact is valid for the InstanceSet generation
+	// published in InstanceSetStatus.ObservedGeneration and is independent of configs, storage expansion,
+	// and other containers.
+	//
+	// +optional
+	PrimaryContainerResourcesApplied bool `json:"primaryContainerResourcesApplied,omitempty"`
+
 	// Ready indicates whether the instance is ready to serve requests when CurrentState is Present.
 	// It is independent of desired-state convergence reported by UpToDate.
 	//

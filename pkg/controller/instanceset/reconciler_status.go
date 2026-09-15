@@ -511,6 +511,8 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 		if state == workloads.InstanceCurrentStatePresent && isCreated(pod) {
 			template := desiredTemplates[pod.Name]
 			if _, active := desiredNames[pod.Name]; active && template != nil {
+				observation.PrimaryContainerResourcesApplied =
+					instancestatus.PrimaryContainerResourcesApplied(template.Spec, pod.Spec)
 				podApplied, err := isDesiredPodApplied(its, pod, template)
 				if err != nil {
 					return err

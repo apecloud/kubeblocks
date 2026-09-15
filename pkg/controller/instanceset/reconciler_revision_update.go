@@ -152,6 +152,14 @@ func (r *revisionUpdateReconciler) publishInstanceUpdateTargets(its *workloads.I
 		}
 		previousRevision := status.UpdateRevision
 		status.UpdateRevision = newRevision
+		if status.PrimaryContainerResourcesApplied &&
+			status.EffectiveCurrentState() == workloads.InstanceCurrentStatePresent {
+			template, pod := desiredTemplates[status.PodName], podsByName[status.PodName]
+			if template == nil || pod == nil ||
+				!instancestatus.PrimaryContainerResourcesApplied(template.Spec, pod.Spec) {
+				status.PrimaryContainerResourcesApplied = false
+			}
+		}
 		if !status.UpToDate || status.EffectiveCurrentState() != workloads.InstanceCurrentStatePresent {
 			continue
 		}

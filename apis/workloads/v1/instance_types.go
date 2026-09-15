@@ -180,6 +180,14 @@ type InstanceStatus2 struct {
 	// +optional
 	UpToDate bool `json:"upToDate,omitempty"`
 
+	// PrimaryContainerResourcesApplied indicates that the Instance controller has observed every resource
+	// request and limit specified for the first container in Spec.Template on the running Pod. Extra observed
+	// resource keys do not make this false. This fact is valid for the Instance generation published in
+	// ObservedGeneration and is independent of configs, storage expansion, and other containers.
+	//
+	// +optional
+	PrimaryContainerResourcesApplied bool `json:"primaryContainerResourcesApplied,omitempty"`
+
 	// Represents whether the instance is in ready condition, independent of desired-state convergence.
 	//
 	// +optional

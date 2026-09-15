@@ -143,12 +143,14 @@ func transientFlatReassignmentInstanceSet() *workloads.InstanceSet {
 
 func TestRevisionUpdateInvalidatesOnlyAffectedLegacyInstances(t *testing.T) {
 	tests := []struct {
-		name   string
-		mutate func(*workloads.InstanceSet)
-		check  func(*testing.T, *workloads.InstanceSet, map[string]string)
+		name                  string
+		mutate                func(*workloads.InstanceSet)
+		check                 func(*testing.T, *workloads.InstanceSet, map[string]string)
+		wantPrimaryResources0 bool
 	}{
 		{
-			name: "pod revision changes for one template",
+			name:                  "pod revision changes for one template",
+			wantPrimaryResources0: true,
 			mutate: func(its *workloads.InstanceSet) {
 				its.Spec.Instances[0].Env = []corev1.EnvVar{{Name: "REVISION_CHANGE", Value: "true"}}
 			},
@@ -200,6 +202,8 @@ func TestRevisionUpdateInvalidatesOnlyAffectedLegacyInstances(t *testing.T) {
 			tt.check(t, its, oldRevisions)
 			assertLegacyUpToDate(t, its, "demo-0", false)
 			assertLegacyUpToDate(t, its, "demo-1", true)
+			assertLegacyPrimaryResourcesApplied(t, its, "demo-0", tt.wantPrimaryResources0)
+			assertLegacyPrimaryResourcesApplied(t, its, "demo-1", true)
 
 			// The next status pass consumes the new revisions. The affected instance remains stale and
 			// the unaffected observation remains true across the two-reconcile handoff.
@@ -208,6 +212,8 @@ func TestRevisionUpdateInvalidatesOnlyAffectedLegacyInstances(t *testing.T) {
 			}
 			assertLegacyUpToDate(t, its, "demo-0", false)
 			assertLegacyUpToDate(t, its, "demo-1", true)
+			assertLegacyPrimaryResourcesApplied(t, its, "demo-0", tt.wantPrimaryResources0)
+			assertLegacyPrimaryResourcesApplied(t, its, "demo-1", true)
 		})
 	}
 }

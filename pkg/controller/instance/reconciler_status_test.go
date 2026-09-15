@@ -257,6 +257,9 @@ func TestStatusReconcilerKeepsUpToDateFalseUntilPVCExpansionCompletes(t *testing
 	if inst.Status.UpToDate || inst.Status.VolumeExpansion {
 		t.Fatalf("desired expansion must invalidate convergence before the PVC spec is patched: %#v", inst.Status)
 	}
+	if !inst.Status.PrimaryContainerResourcesApplied {
+		t.Fatalf("pending PVC work must not hide applied primary-container resources: %#v", inst.Status)
+	}
 
 	pvc.Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("2Gi")
 	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
@@ -265,6 +268,9 @@ func TestStatusReconcilerKeepsUpToDateFalseUntilPVCExpansionCompletes(t *testing
 	if inst.Status.UpToDate || !inst.Status.VolumeExpansion {
 		t.Fatalf("running expansion must remain stale and publish VolumeExpansion: %#v", inst.Status)
 	}
+	if !inst.Status.PrimaryContainerResourcesApplied {
+		t.Fatalf("running PVC expansion must not hide applied primary-container resources: %#v", inst.Status)
+	}
 
 	pvc.Status.Capacity[corev1.ResourceStorage] = resource.MustParse("2Gi")
 	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
@@ -272,6 +278,57 @@ func TestStatusReconcilerKeepsUpToDateFalseUntilPVCExpansionCompletes(t *testing
 	}
 	if !inst.Status.UpToDate || inst.Status.VolumeExpansion {
 		t.Fatalf("completed expansion must restore convergence: %#v", inst.Status)
+	}
+}
+
+func TestStatusReconcilerCorrelatesPrimaryContainerResourcesToInstanceTarget(t *testing.T) {
+	resources := corev1.ResourceRequirements{
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("1"),
+			corev1.ResourceMemory: resource.MustParse("2Gi"),
+		},
+		Requests: corev1.ResourceList{corev1.ResourceMemory: resource.MustParse("1Gi")},
+	}
+	inst := &workloads.Instance{
+		ObjectMeta: metav1.ObjectMeta{Name: "demo-0", Namespace: "default", Generation: 1},
+		Spec: workloads.InstanceSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{Containers: []corev1.Container{
+			{Name: "database", Resources: resources},
+			{Name: "sidecar", Resources: corev1.ResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("10m")}}},
+		}}}},
+	}
+	tree := kubebuilderx.NewObjectTree()
+	tree.SetRoot(inst)
+	if _, err := NewRevisionUpdateReconciler().Reconcile(tree); err != nil {
+		t.Fatal(err)
+	}
+	pod, err := buildInstancePod(inst, inst.Status.UpdateRevision)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pod = pod.DeepCopy()
+	pod.Spec.Containers[0].Resources.Requests[corev1.ResourceCPU] = resource.MustParse("1")
+	pod.Spec.Containers[1].Resources.Requests[corev1.ResourceCPU] = resource.MustParse("20m")
+	pod.Status.Phase = corev1.PodRunning
+	if err := tree.Add(pod); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+		t.Fatal(err)
+	}
+	if !inst.Status.PrimaryContainerResourcesApplied {
+		t.Fatalf("applied primary resources were hidden by sidecar drift or per-key request defaulting: %#v", inst.Status)
+	}
+
+	inst.Generation++
+	inst.Spec.Template.Spec.Containers[0].Resources.Limits[corev1.ResourceCPU] = resource.MustParse("2")
+	if _, err := NewRevisionUpdateReconciler().Reconcile(tree); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+		t.Fatal(err)
+	}
+	if inst.Status.PrimaryContainerResourcesApplied {
+		t.Fatalf("the old Pod resource observation satisfied a new Instance target: %#v", inst.Status)
 	}
 }
 

@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset2
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -88,11 +89,19 @@ func (r *revisionUpdateReconciler) invalidateAffectedInstanceStatus(its *workloa
 	}
 	for i := range its.Status.InstanceStatus {
 		status := &its.Status.InstanceStatus[i]
+		desired, current := desiredInstances[status.PodName], currentByName[status.PodName]
+		if status.PrimaryContainerResourcesApplied &&
+			status.EffectiveDesiredState() == workloads.InstanceDesiredStateActive &&
+			status.EffectiveCurrentState() == workloads.InstanceCurrentStatePresent &&
+			(desired == nil || current == nil || current.Generation != current.Status.ObservedGeneration ||
+				!current.Status.PrimaryContainerResourcesApplied ||
+				!primaryContainerResourcesEqual(desired.Spec.Template.Spec, current.Spec.Template.Spec)) {
+			status.PrimaryContainerResourcesApplied = false
+		}
 		if !status.UpToDate || status.EffectiveDesiredState() != workloads.InstanceDesiredStateActive ||
 			status.EffectiveCurrentState() != workloads.InstanceCurrentStatePresent {
 			continue
 		}
-		desired, current := desiredInstances[status.PodName], currentByName[status.PodName]
 		if desired == nil {
 			continue
 		}
@@ -111,6 +120,19 @@ func (r *revisionUpdateReconciler) invalidateAffectedInstanceStatus(its *workloa
 			status.UpToDate = false
 		}
 	}
+}
+
+func primaryContainerResourcesEqual(desired, current corev1.PodSpec) bool {
+	if len(desired.Containers) == 0 {
+		return false
+	}
+	desiredContainer := desired.Containers[0]
+	for _, currentContainer := range current.Containers {
+		if currentContainer.Name == desiredContainer.Name {
+			return equality.Semantic.DeepEqual(desiredContainer.Resources, currentContainer.Resources)
+		}
+	}
+	return false
 }
 
 func volumeExpansionTargetsApplied(current, desired *workloads.Instance) bool {

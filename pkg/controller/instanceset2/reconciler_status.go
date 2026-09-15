@@ -436,6 +436,11 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 				Configs:         inst.Status.Configs,
 				VolumeExpansion: inst.Status.VolumeExpansion,
 			}
+			if desired := desiredInstances[inst.Name]; desired != nil &&
+				inst.Generation == inst.Status.ObservedGeneration &&
+				primaryContainerResourcesEqual(desired.Spec.Template.Spec, inst.Spec.Template.Spec) {
+				observation.PrimaryContainerResourcesApplied = inst.Status.PrimaryContainerResourcesApplied
+			}
 			if inst.Status.Ready {
 				if role, ok := roleMap[getInstanceRoleName(inst)]; ok {
 					observation.Role = role.Name

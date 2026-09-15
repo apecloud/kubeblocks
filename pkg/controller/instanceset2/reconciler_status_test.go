@@ -923,6 +923,8 @@ func TestITS2RevisionUpdateTracksConfigAndPVCChanges(t *testing.T) {
 		}
 		assertITS2UpToDate(t, its, "demo-0", false)
 		assertITS2UpToDate(t, its, "demo-1", false)
+		assertITS2PrimaryResourcesApplied(t, its, "demo-0", true)
+		assertITS2PrimaryResourcesApplied(t, its, "demo-1", true)
 	})
 
 	t.Run("PVC expansion is scoped to one template", func(t *testing.T) {
@@ -945,6 +947,8 @@ func TestITS2RevisionUpdateTracksConfigAndPVCChanges(t *testing.T) {
 		}
 		assertITS2UpToDate(t, its, "demo-0", false)
 		assertITS2UpToDate(t, its, "demo-1", true)
+		assertITS2PrimaryResourcesApplied(t, its, "demo-0", true)
+		assertITS2PrimaryResourcesApplied(t, its, "demo-1", true)
 	})
 }
 
@@ -1017,11 +1021,12 @@ func newITS2InstanceStatusFixtureFromSet(t *testing.T, its *workloads.InstanceSe
 		inst := target.DeepCopy()
 		inst.Generation = 1
 		inst.Status = workloads.InstanceStatus2{
-			ObservedGeneration: 1,
-			CurrentState:       workloads.InstanceCurrentStatePresent,
-			CurrentRevision:    "pod-revision",
-			UpdateRevision:     "pod-revision",
-			UpToDate:           true,
+			ObservedGeneration:               1,
+			CurrentState:                     workloads.InstanceCurrentStatePresent,
+			CurrentRevision:                  "pod-revision",
+			UpdateRevision:                   "pod-revision",
+			UpToDate:                         true,
+			PrimaryContainerResourcesApplied: true,
 		}
 		for _, config := range inst.Spec.Configs {
 			inst.Status.Configs = append(inst.Status.Configs, workloads.InstanceConfigStatus{Name: config.Name, ConfigHash: config.ConfigHash})
@@ -1036,6 +1041,8 @@ func newITS2InstanceStatusFixtureFromSet(t *testing.T, its *workloads.InstanceSe
 	}
 	assertITS2UpToDate(t, its, "demo-0", true)
 	assertITS2UpToDate(t, its, "demo-1", true)
+	assertITS2PrimaryResourcesApplied(t, its, "demo-0", true)
+	assertITS2PrimaryResourcesApplied(t, its, "demo-1", true)
 	return its, tree, instances
 }
 
@@ -1063,5 +1070,13 @@ func assertITS2UpToDate(t *testing.T, its *workloads.InstanceSet, name string, w
 	status := its.FindInstanceStatus(name)
 	if status == nil || status.UpToDate != want {
 		t.Fatalf("instance %s UpToDate = %#v, want %v", name, status, want)
+	}
+}
+
+func assertITS2PrimaryResourcesApplied(t *testing.T, its *workloads.InstanceSet, name string, want bool) {
+	t.Helper()
+	status := its.FindInstanceStatus(name)
+	if status == nil || status.PrimaryContainerResourcesApplied != want {
+		t.Fatalf("instance %s PrimaryContainerResourcesApplied = %#v, want %v", name, status, want)
 	}
 }

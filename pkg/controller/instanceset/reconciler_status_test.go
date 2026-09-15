@@ -615,6 +615,8 @@ func TestLegacyInstanceStatusTracksConfigAndPVCConvergence(t *testing.T) {
 		}
 		assertLegacyUpToDate(t, its, "demo-0", false)
 		assertLegacyUpToDate(t, its, "demo-1", false)
+		assertLegacyPrimaryResourcesApplied(t, its, "demo-0", true)
+		assertLegacyPrimaryResourcesApplied(t, its, "demo-1", true)
 
 		for _, pod := range pods {
 			if err := configsToPod(its.Spec.Configs, pod); err != nil {
@@ -656,6 +658,8 @@ func TestLegacyInstanceStatusTracksConfigAndPVCConvergence(t *testing.T) {
 		}
 		assertLegacyUpToDate(t, its, "demo-0", false)
 		assertLegacyUpToDate(t, its, "demo-1", true)
+		assertLegacyPrimaryResourcesApplied(t, its, "demo-0", true)
+		assertLegacyPrimaryResourcesApplied(t, its, "demo-1", true)
 
 		pvc := legacyPVCForInstance(tree, "demo-0")
 		pvc.Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("2Gi")
@@ -751,6 +755,8 @@ func newLegacyInstanceStatusFixture(t *testing.T, configs []workloads.ConfigTemp
 	}
 	assertLegacyUpToDate(t, its, "demo-0", true)
 	assertLegacyUpToDate(t, its, "demo-1", true)
+	assertLegacyPrimaryResourcesApplied(t, its, "demo-0", true)
+	assertLegacyPrimaryResourcesApplied(t, its, "demo-1", true)
 	return its, tree, pods
 }
 
@@ -845,5 +851,13 @@ func assertLegacyUpToDate(t *testing.T, its *workloads.InstanceSet, name string,
 	status := its.FindInstanceStatus(name)
 	if status == nil || status.UpToDate != want {
 		t.Fatalf("instance %s UpToDate = %#v, want %v", name, status, want)
+	}
+}
+
+func assertLegacyPrimaryResourcesApplied(t *testing.T, its *workloads.InstanceSet, name string, want bool) {
+	t.Helper()
+	status := its.FindInstanceStatus(name)
+	if status == nil || status.PrimaryContainerResourcesApplied != want {
+		t.Fatalf("instance %s PrimaryContainerResourcesApplied = %#v, want %v", name, status, want)
 	}
 }

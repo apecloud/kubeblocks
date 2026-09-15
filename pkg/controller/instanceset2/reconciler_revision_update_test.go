@@ -161,11 +161,13 @@ func transientFlatReassignmentInstanceSet() *workloads.InstanceSet {
 
 func TestRevisionUpdateInvalidatesOnlyAffectedITS2Instances(t *testing.T) {
 	tests := []struct {
-		name   string
-		mutate func(*workloads.InstanceSet)
+		name                  string
+		mutate                func(*workloads.InstanceSet)
+		wantPrimaryResources0 bool
 	}{
 		{
-			name: "pod revision changes for one template",
+			name:                  "pod revision changes for one template",
+			wantPrimaryResources0: true,
 			mutate: func(its *workloads.InstanceSet) {
 				its.Spec.Instances[0].Env = []corev1.EnvVar{{Name: "REVISION_CHANGE", Value: "true"}}
 			},
@@ -205,6 +207,8 @@ func TestRevisionUpdateInvalidatesOnlyAffectedITS2Instances(t *testing.T) {
 			}
 			assertITS2UpToDate(t, its, "demo-0", false)
 			assertITS2UpToDate(t, its, "demo-1", true)
+			assertITS2PrimaryResourcesApplied(t, its, "demo-0", tt.wantPrimaryResources0)
+			assertITS2PrimaryResourcesApplied(t, its, "demo-1", true)
 
 			// The second pass uses the new Instance-spec revisions and keeps only the affected
 			// current Instance stale until its own controller applies the desired spec.
@@ -213,6 +217,8 @@ func TestRevisionUpdateInvalidatesOnlyAffectedITS2Instances(t *testing.T) {
 			}
 			assertITS2UpToDate(t, its, "demo-0", false)
 			assertITS2UpToDate(t, its, "demo-1", true)
+			assertITS2PrimaryResourcesApplied(t, its, "demo-0", tt.wantPrimaryResources0)
+			assertITS2PrimaryResourcesApplied(t, its, "demo-1", true)
 		})
 	}
 }
@@ -279,4 +285,6 @@ func TestRevisionUpdateInvalidatesUnobservedITS2InstanceHandoff(t *testing.T) {
 	}
 	assertITS2UpToDate(t, its, "demo-0", false)
 	assertITS2UpToDate(t, its, "demo-1", true)
+	assertITS2PrimaryResourcesApplied(t, its, "demo-0", false)
+	assertITS2PrimaryResourcesApplied(t, its, "demo-1", true)
 }

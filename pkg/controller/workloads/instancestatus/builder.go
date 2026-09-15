@@ -25,6 +25,7 @@ import (
 	"strconv"
 	"strings"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -38,16 +39,54 @@ type TemplateAssignment struct {
 
 // Observation contains runtime fields observed from a Pod or Instance.
 type Observation struct {
-	InstanceName    string
-	State           workloads.InstanceCurrentState
-	Revision        string
-	UpToDate        bool
-	Ready           bool
-	Available       bool
-	Failed          bool
-	Role            string
-	Configs         []workloads.InstanceConfigStatus
-	VolumeExpansion bool
+	InstanceName                     string
+	State                            workloads.InstanceCurrentState
+	Revision                         string
+	UpToDate                         bool
+	PrimaryContainerResourcesApplied bool
+	Ready                            bool
+	Available                        bool
+	Failed                           bool
+	Role                             string
+	Configs                          []workloads.InstanceConfigStatus
+	VolumeExpansion                  bool
+}
+
+// PrimaryContainerResourcesApplied reports whether the observed Pod has every resource request and
+// limit specified for the first container in the desired Pod spec. Extra observed resource keys and
+// additional containers do not participate because Component resources apply only to this container.
+func PrimaryContainerResourcesApplied(desired, observed corev1.PodSpec) bool {
+	if len(desired.Containers) == 0 {
+		return false
+	}
+	desiredContainer := desired.Containers[0]
+	for _, observedContainer := range observed.Containers {
+		if observedContainer.Name == desiredContainer.Name {
+			return resourceRequirementsApplied(desiredContainer.Resources, observedContainer.Resources)
+		}
+	}
+	return false
+}
+
+func resourceRequirementsApplied(desired, observed corev1.ResourceRequirements) bool {
+	for name, desiredLimit := range desired.Limits {
+		if !desiredLimit.Equal(observed.Limits[name]) {
+			return false
+		}
+		desiredRequest, ok := desired.Requests[name]
+		if !ok {
+			desiredRequest = desiredLimit
+		}
+		if !desiredRequest.Equal(observed.Requests[name]) {
+			return false
+		}
+	}
+	for name, desiredRequest := range desired.Requests {
+		if !desiredRequest.Equal(observed.Requests[name]) {
+			return false
+		}
+	}
+	return true
 }
 
 // Input contains the independently produced desired and observed dimensions used to build InstanceStatus.
@@ -179,6 +218,7 @@ func Build(input Input) ([]workloads.InstanceStatus, error) {
 			status.VolumeExpansion = observation.VolumeExpansion
 			if status.DesiredState == workloads.InstanceDesiredStateActive {
 				status.UpToDate = observation.UpToDate
+				status.PrimaryContainerResourcesApplied = observation.PrimaryContainerResourcesApplied
 			}
 		}
 		statuses = append(statuses, status)

@@ -33,6 +33,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/workloads/instancestatus"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -110,6 +111,9 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 
 	inst.Status.UpToDate = updated && !r.hasPendingVolumeExpansion(tree, inst)
+	inst.Status.PrimaryContainerResourcesApplied = isCreated(pod) &&
+		inst.Status.ObservedGeneration == inst.Generation &&
+		instancestatus.PrimaryContainerResourcesApplied(inst.Spec.Template.Spec, pod.Spec)
 	inst.Status.Ready = ready
 	inst.Status.Available = available
 	inst.Status.Role = r.observedRoleOfPod(inst, pod)
@@ -213,6 +217,7 @@ func (r *statusReconciler) setPodUnavailableStatus(inst *workloads.Instance, sta
 	inst.Status.CurrentState = state
 	inst.Status.CurrentRevision = revision
 	inst.Status.UpToDate = false
+	inst.Status.PrimaryContainerResourcesApplied = false
 	inst.Status.Ready = false
 	inst.Status.Available = false
 	inst.Status.Role = ""

@@ -22,10 +22,51 @@ package instancestatus
 import (
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/utils/ptr"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 )
+
+func TestPrimaryContainerResourcesApplied(t *testing.T) {
+	desired := corev1.PodSpec{Containers: []corev1.Container{
+		{
+			Name: "database",
+			Resources: corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("1"),
+					corev1.ResourceMemory: resource.MustParse("2Gi"),
+				},
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("0"),
+					corev1.ResourceMemory: resource.MustParse("1Gi"),
+				},
+			},
+		},
+		{Name: "sidecar", Resources: corev1.ResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")}}},
+	}}
+	observed := corev1.PodSpec{Containers: []corev1.Container{
+		{Name: "injected", Resources: corev1.ResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("4")}}},
+		*desired.Containers[0].DeepCopy(),
+	}}
+	observed.Containers[1].Resources.Requests[corev1.ResourceEphemeralStorage] = resource.MustParse("1Gi")
+	observed.Containers[1].Resources.Limits[corev1.ResourceEphemeralStorage] = resource.MustParse("2Gi")
+	if !PrimaryContainerResourcesApplied(desired, observed) {
+		t.Fatal("matching desired values were rejected because of extra resource keys or another container")
+	}
+
+	observed.Containers[1].Resources.Requests[corev1.ResourceCPU] = resource.MustParse("100m")
+	if PrimaryContainerResourcesApplied(desired, observed) {
+		t.Fatal("an explicit zero request was treated as omitted")
+	}
+
+	delete(desired.Containers[0].Resources.Requests, corev1.ResourceCPU)
+	observed.Containers[1].Resources.Requests[corev1.ResourceCPU] = resource.MustParse("1")
+	if !PrimaryContainerResourcesApplied(desired, observed) {
+		t.Fatal("a request omitted beside other request keys did not default to its limit")
+	}
+}
 
 func TestConfigsApplied(t *testing.T) {
 	desired := []workloads.ConfigTemplate{
@@ -70,7 +111,7 @@ func TestBuildDesiredAndObservedDimensions(t *testing.T) {
 		Observations: []Observation{
 			{
 				InstanceName: "demo-0", State: workloads.InstanceCurrentStatePresent, Revision: "r1",
-				Ready: true, Available: true, UpToDate: false, Role: "leader",
+				Ready: true, Available: true, UpToDate: false, PrimaryContainerResourcesApplied: true, Role: "leader",
 			},
 			{
 				InstanceName: "demo-fast-0", State: workloads.InstanceCurrentStatePresent, Revision: "r2",
@@ -85,7 +126,8 @@ func TestBuildDesiredAndObservedDimensions(t *testing.T) {
 		t.Fatalf("expected 3 statuses, got %#v", result)
 	}
 	assertStatus(t, result[0], "demo-0", "", workloads.InstanceDesiredStateActive, workloads.InstanceCurrentStatePresent)
-	if result[0].CurrentRevision != "r1" || result[0].UpdateRevision != "r2" || result[0].UpToDate || !result[0].Ready || !result[0].Available {
+	if result[0].CurrentRevision != "r1" || result[0].UpdateRevision != "r2" || result[0].UpToDate ||
+		!result[0].PrimaryContainerResourcesApplied || !result[0].Ready || !result[0].Available {
 		t.Fatalf("unexpected present status: %#v", result[0])
 	}
 	assertStatus(t, result[1], "demo-2", "flat", workloads.InstanceDesiredStateActive, workloads.InstanceCurrentStateAbsent)

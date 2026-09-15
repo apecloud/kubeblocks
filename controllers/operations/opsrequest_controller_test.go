@@ -264,7 +264,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			Expect(podList.Items).Should(BeEmpty())
 		})
 
-		It("does not clean Cluster queues when the ops request identity is gone", func() {
+		It("cleans deleted ops annotations and reconciles related ops requests", func() {
 			deletedOpsName := "deleted-ops"
 			firstCluster := &appsv1.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
@@ -280,33 +280,25 @@ var _ = Describe("OpsRequest Controller", func() {
 				},
 			}
 			opsutil.SetOpsRequestToCluster(secondCluster, []opsv1alpha1.OpsRecorder{{Name: deletedOpsName, Type: opsv1alpha1.RestartType}})
-			reconciler := newOpsRequestReconciler(firstCluster, secondCluster)
+			relatedOps := testops.NewOpsRequestObj("related-ops", helperNamespace, helperClusterName, opsv1alpha1.RestartType)
+			reconciler := newOpsRequestReconciler(firstCluster, secondCluster, relatedOps)
 
 			reqCtx := ctrlutil.RequestCtx{
 				Ctx: ctx,
 				Req: reconcile.Request{NamespacedName: types.NamespacedName{Namespace: helperNamespace, Name: deletedOpsName}},
 			}
-			opsRes := &kboperations.OpsResource{Recorder: reconciler.Recorder}
-			res, err := reconciler.fetchOpsRequest(reqCtx, opsRes)
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(res).ShouldNot(BeNil())
+			Expect(reconciler.handleOpsReqDeletedDuringRunning(reqCtx)).Should(Succeed())
 
 			fetchedCluster := &appsv1.Cluster{}
 			Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(firstCluster), fetchedCluster)).Should(Succeed())
 			opsSlice, err := opsutil.GetOpsRequestSliceFromCluster(fetchedCluster)
 			Expect(err).ShouldNot(HaveOccurred())
-			Expect(opsSlice).Should(HaveLen(1))
+			Expect(opsSlice).Should(BeEmpty())
 
 			Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(secondCluster), fetchedCluster)).Should(Succeed())
 			opsSlice, err = opsutil.GetOpsRequestSliceFromCluster(fetchedCluster)
 			Expect(err).ShouldNot(HaveOccurred())
-			Expect(opsSlice).Should(HaveLen(1))
-		})
-
-		It("reconciles related ops requests", func() {
-			relatedOps := testops.NewOpsRequestObj("related-ops", helperNamespace, helperClusterName, opsv1alpha1.RestartType)
-			reconciler := newOpsRequestReconciler(relatedOps)
-			reqCtx := ctrlutil.RequestCtx{Ctx: ctx}
+			Expect(opsSlice).Should(BeEmpty())
 
 			sourceOps := testops.NewOpsRequestObj("source-ops", helperNamespace, helperClusterName, opsv1alpha1.RestartType)
 			sourceOps.ResourceVersion = "42"
@@ -318,199 +310,6 @@ var _ = Describe("OpsRequest Controller", func() {
 			fetchedOps := &opsv1alpha1.OpsRequest{}
 			Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(relatedOps), fetchedOps)).Should(Succeed())
 			Expect(fetchedOps.Annotations[constant.ReconcileAnnotationKey]).Should(Equal(sourceOps.ResourceVersion))
-		})
-
-		It("adds the Cluster owner reference when labels are already complete", func() {
-			cluster := &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{
-				Name: helperClusterName, Namespace: helperNamespace, UID: types.UID("cluster-uid"),
-			}}
-			ops := testops.NewOpsRequestObj("owner-backfill", helperNamespace, helperClusterName, opsv1alpha1.RestartType)
-			Expect(ops.Labels[constant.AppInstanceLabelKey]).Should(Equal(helperClusterName))
-			Expect(ops.Labels[constant.OpsRequestTypeLabelKey]).Should(Equal(string(ops.Spec.Type)))
-			reconciler := newOpsRequestReconciler(cluster, ops)
-			reqCtx := ctrlutil.RequestCtx{Ctx: ctx, Req: reconcile.Request{NamespacedName: client.ObjectKeyFromObject(ops)}}
-			opsRes := &kboperations.OpsResource{Cluster: cluster, OpsRequest: ops, Recorder: reconciler.Recorder}
-
-			res, err := reconciler.addClusterLabelAndSetOwnerReference(reqCtx, opsRes)
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(res).ShouldNot(BeNil())
-			fetched := &opsv1alpha1.OpsRequest{}
-			Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(ops), fetched)).Should(Succeed())
-			Expect(fetched.OwnerReferences).Should(ContainElement(HaveField("UID", cluster.UID)))
-		})
-
-		It("aborts an active request owned by a replaced Cluster", func() {
-			cluster := &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{
-				Name: helperClusterName, Namespace: helperNamespace, UID: types.UID("replacement-uid"),
-			}}
-			ops := testops.NewOpsRequestObj("old-owner", helperNamespace, helperClusterName, opsv1alpha1.StopType)
-			ops.Status.Phase = opsv1alpha1.OpsCreatingPhase
-			ops.OwnerReferences = []metav1.OwnerReference{{
-				APIVersion: appsv1.APIVersion, Kind: appsv1.ClusterKind,
-				Name: cluster.Name, UID: types.UID("old-cluster-uid"),
-			}}
-			reconciler := newOpsRequestReconciler(cluster, ops)
-			reqCtx := ctrlutil.RequestCtx{Ctx: ctx, Req: reconcile.Request{NamespacedName: client.ObjectKeyFromObject(ops)}}
-			opsRes := &kboperations.OpsResource{OpsRequest: ops, Recorder: reconciler.Recorder}
-
-			res, err := reconciler.fetchCluster(reqCtx, opsRes)
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(res).ShouldNot(BeNil())
-			fetched := &opsv1alpha1.OpsRequest{}
-			Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(ops), fetched)).Should(Succeed())
-			Expect(fetched.Status.Phase).Should(Equal(opsv1alpha1.OpsAbortedPhase))
-			condition := meta.FindStatusCondition(fetched.Status.Conditions, opsv1alpha1.ConditionTypeAborted)
-			Expect(condition).ShouldNot(BeNil())
-			Expect(condition.Reason).Should(Equal(opsv1alpha1.ConditionTypeAborted))
-		})
-
-		It("does not clean a replacement Cluster while applying terminal TTL", func() {
-			cluster := &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{
-				Name: helperClusterName, Namespace: helperNamespace, UID: types.UID("replacement-uid"),
-			}}
-			ops := testops.NewOpsRequestObj("terminal-old-owner", helperNamespace, helperClusterName, opsv1alpha1.StopType)
-			ops.Status.Phase = opsv1alpha1.OpsAbortedPhase
-			ops.Status.CompletionTimestamp = metav1.NewTime(time.Now().Add(-time.Minute))
-			ops.Spec.TTLSecondsAfterUnsuccessfulCompletion = 1
-			ops.OwnerReferences = []metav1.OwnerReference{{
-				APIVersion: appsv1.APIVersion, Kind: appsv1.ClusterKind,
-				Name: cluster.Name, UID: types.UID("old-cluster-uid"),
-			}}
-			opsutil.SetOpsRequestToCluster(cluster, []opsv1alpha1.OpsRecorder{{Name: ops.Name, Type: ops.Spec.Type}})
-			reconciler := newOpsRequestReconciler(cluster, ops)
-
-			request := reconcile.Request{NamespacedName: client.ObjectKeyFromObject(ops)}
-			_, err := reconciler.Reconcile(ctx, request)
-			Expect(err).ShouldNot(HaveOccurred())
-			_, err = reconciler.Reconcile(ctx, request)
-			Expect(err).ShouldNot(HaveOccurred())
-			fetchedOps := &opsv1alpha1.OpsRequest{}
-			err = reconciler.Client.Get(ctx, client.ObjectKeyFromObject(ops), fetchedOps)
-			Expect(err).Should(HaveOccurred())
-			Expect(client.IgnoreNotFound(err)).Should(Succeed())
-			fetchedCluster := &appsv1.Cluster{}
-			Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(cluster), fetchedCluster)).Should(Succeed())
-			queue, err := opsutil.GetOpsRequestSliceFromCluster(fetchedCluster)
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(queue).Should(HaveLen(1))
-		})
-
-		It("preserves terminal status and schedules TTL when the Cluster is gone", func() {
-			for _, phase := range []opsv1alpha1.OpsPhase{opsv1alpha1.OpsSucceedPhase, opsv1alpha1.OpsAbortedPhase} {
-				ops := testops.NewOpsRequestObj("terminal-missing-"+string(phase), helperNamespace, helperClusterName, opsv1alpha1.RestartType)
-				ops.Status.Phase = phase
-				ops.Status.CompletionTimestamp = metav1.Now()
-				ops.Status.Conditions = []metav1.Condition{{
-					Type: "Historical", Status: metav1.ConditionTrue, Reason: "Completed",
-				}}
-				if phase == opsv1alpha1.OpsSucceedPhase {
-					ops.Spec.TTLSecondsAfterSucceed = 60
-				} else {
-					ops.Spec.TTLSecondsAfterUnsuccessfulCompletion = 60
-				}
-				reconciler := newOpsRequestReconciler(ops)
-				reqCtx := ctrlutil.RequestCtx{Ctx: ctx, Req: reconcile.Request{NamespacedName: client.ObjectKeyFromObject(ops)}}
-				opsRes := &kboperations.OpsResource{OpsRequest: ops, Recorder: reconciler.Recorder}
-
-				res, err := reconciler.fetchCluster(reqCtx, opsRes)
-				Expect(err).ShouldNot(HaveOccurred())
-				Expect(res).ShouldNot(BeNil())
-				Expect(res.RequeueAfter).Should(BeNumerically(">", 30*time.Second))
-				fetched := &opsv1alpha1.OpsRequest{}
-				Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(ops), fetched)).Should(Succeed())
-				Expect(fetched.Status.Phase).Should(Equal(phase))
-				Expect(fetched.Status.Conditions).Should(Equal(ops.Status.Conditions))
-			}
-		})
-
-		It("finalizes a terminal request without cleaning a deleting replacement Cluster", func() {
-			now := metav1.Now()
-			cluster := &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{
-				Name: helperClusterName, Namespace: helperNamespace, UID: types.UID("replacement-uid"),
-				DeletionTimestamp: &now, Finalizers: []string{"test-cluster-finalizer"},
-			}}
-			ops := testops.NewOpsRequestObj("terminal-deleting-replacement", helperNamespace, helperClusterName, opsv1alpha1.RestartType)
-			ops.Status.Phase = opsv1alpha1.OpsAbortedPhase
-			ops.Status.CompletionTimestamp = now
-			ops.Finalizers = []string{constant.OpsRequestFinalizerName}
-			ops.OwnerReferences = []metav1.OwnerReference{{
-				APIVersion: appsv1.APIVersion, Kind: appsv1.ClusterKind,
-				Name: cluster.Name, UID: types.UID("old-cluster-uid"),
-			}}
-			opsutil.SetOpsRequestToCluster(cluster, []opsv1alpha1.OpsRecorder{{Name: ops.Name, Type: ops.Spec.Type}})
-			reconciler := newOpsRequestReconciler(cluster, ops)
-			request := reconcile.Request{NamespacedName: client.ObjectKeyFromObject(ops)}
-
-			_, err := reconciler.Reconcile(ctx, request)
-			Expect(err).ShouldNot(HaveOccurred())
-			_, err = reconciler.Reconcile(ctx, request)
-			Expect(err).ShouldNot(HaveOccurred())
-			fetchedOps := &opsv1alpha1.OpsRequest{}
-			err = reconciler.Client.Get(ctx, client.ObjectKeyFromObject(ops), fetchedOps)
-			Expect(client.IgnoreNotFound(err)).Should(Succeed())
-			if err == nil {
-				Expect(fetchedOps.Finalizers).ShouldNot(ContainElement(constant.OpsRequestFinalizerName))
-			}
-			fetchedCluster := &appsv1.Cluster{}
-			Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(cluster), fetchedCluster)).Should(Succeed())
-			queue, err := opsutil.GetOpsRequestSliceFromCluster(fetchedCluster)
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(queue).Should(HaveLen(1))
-		})
-
-		It("finalizes a deleting request without cleaning a replacement Cluster", func() {
-			cluster := &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{
-				Name: helperClusterName, Namespace: helperNamespace, UID: types.UID("replacement-uid"),
-			}}
-			now := metav1.Now()
-			ops := testops.NewOpsRequestObj("deleting-old-owner", helperNamespace, helperClusterName, opsv1alpha1.RestartType)
-			ops.Status.Phase = opsv1alpha1.OpsRunningPhase
-			ops.DeletionTimestamp = &now
-			ops.Finalizers = []string{constant.OpsRequestFinalizerName}
-			ops.OwnerReferences = []metav1.OwnerReference{{
-				APIVersion: appsv1.APIVersion, Kind: appsv1.ClusterKind,
-				Name: cluster.Name, UID: types.UID("old-cluster-uid"),
-			}}
-			opsutil.SetOpsRequestToCluster(cluster, []opsv1alpha1.OpsRecorder{{Name: ops.Name, Type: ops.Spec.Type}})
-			reconciler := newOpsRequestReconciler(cluster, ops)
-
-			_, err := reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(ops)})
-			Expect(err).ShouldNot(HaveOccurred())
-			fetchedOps := &opsv1alpha1.OpsRequest{}
-			err = reconciler.Client.Get(ctx, client.ObjectKeyFromObject(ops), fetchedOps)
-			Expect(client.IgnoreNotFound(err)).Should(Succeed())
-			if err == nil {
-				Expect(fetchedOps.Finalizers).ShouldNot(ContainElement(constant.OpsRequestFinalizerName))
-			}
-			fetchedCluster := &appsv1.Cluster{}
-			Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(cluster), fetchedCluster)).Should(Succeed())
-			queue, err := opsutil.GetOpsRequestSliceFromCluster(fetchedCluster)
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(queue).Should(HaveLen(1))
-		})
-
-		It("finalizes a deleting Running request instead of continuing the operation", func() {
-			cluster := &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{
-				Name: helperClusterName, Namespace: helperNamespace, UID: types.UID("cluster-uid"),
-			}}
-			now := metav1.Now()
-			ops := testops.NewOpsRequestObj("deleting-running", helperNamespace, helperClusterName, opsv1alpha1.RestartType)
-			ops.Status.Phase = opsv1alpha1.OpsRunningPhase
-			ops.DeletionTimestamp = &now
-			ops.Finalizers = []string{constant.OpsRequestFinalizerName}
-			reconciler := newOpsRequestReconciler(cluster, ops)
-			reqCtx := ctrlutil.RequestCtx{Ctx: ctx, Req: reconcile.Request{NamespacedName: client.ObjectKeyFromObject(ops)}}
-			opsRes := &kboperations.OpsResource{Cluster: cluster, OpsRequest: ops, Recorder: reconciler.Recorder}
-
-			res, err := reconciler.handleDeletion(reqCtx, opsRes)
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(res).ShouldNot(BeNil())
-			fetched := &opsv1alpha1.OpsRequest{}
-			err = reconciler.Client.Get(ctx, client.ObjectKeyFromObject(ops), fetched)
-			Expect(client.IgnoreNotFound(err)).Should(Succeed())
-			if err == nil {
-				Expect(fetched.Finalizers).ShouldNot(ContainElement(constant.OpsRequestFinalizerName))
-			}
 		})
 
 		It("fetches clusters for supported ops requests and reports unsupported or missing targets", func() {

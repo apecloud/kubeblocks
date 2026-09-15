@@ -21,7 +21,6 @@ package operations
 
 import (
 	"context"
-	"fmt"
 	"reflect"
 	"slices"
 	"strings"
@@ -120,6 +119,10 @@ func (r *OpsRequestReconciler) fetchOpsRequest(reqCtx intctrlutil.RequestCtx, op
 		if !apierrors.IsNotFound(err) {
 			return intctrlutil.ResultToP(intctrlutil.RequeueWithError(err, reqCtx.Log, ""))
 		}
+		// if the opsRequest is not found, we need to check if this opsRequest is deleted abnormally
+		if err = r.handleOpsReqDeletedDuringRunning(reqCtx); err != nil {
+			return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
+		}
 		return intctrlutil.ResultToP(intctrlutil.Reconciled())
 	}
 	opsRes.OpsRequest = opsRequest
@@ -128,8 +131,7 @@ func (r *OpsRequestReconciler) fetchOpsRequest(reqCtx intctrlutil.RequestCtx, op
 
 // handleDeletion handles the delete event of the OpsRequest.
 func (r *OpsRequestReconciler) handleDeletion(reqCtx intctrlutil.RequestCtx, opsRes *operations.OpsResource) (*ctrl.Result, error) {
-	if opsRes.OpsRequest.Status.Phase == opsv1alpha1.OpsRunningPhase &&
-		opsRes.OpsRequest.DeletionTimestamp.IsZero() && !opsRes.Cluster.IsDeleting() {
+	if opsRes.OpsRequest.Status.Phase == opsv1alpha1.OpsRunningPhase && !opsRes.Cluster.IsDeleting() {
 		return nil, nil
 	}
 	if opsRes.Cluster.IsDeleting() && opsRes.OpsRequest.DeletionTimestamp.IsZero() {
@@ -167,59 +169,31 @@ func (r *OpsRequestReconciler) fetchCluster(reqCtx intctrlutil.RequestCtx, opsRe
 		Name:      opsRes.OpsRequest.Spec.GetClusterName(),
 	}, cluster); err != nil {
 		if apierrors.IsNotFound(err) {
+			_ = operations.PatchClusterNotFound(reqCtx.Ctx, r.Client, opsRes)
 			if !opsRes.OpsRequest.DeletionTimestamp.IsZero() {
 				return intctrlutil.HandleCRDeletion(reqCtx, r, opsRes.OpsRequest, constant.OpsRequestFinalizerName, func() (*ctrl.Result, error) {
 					return nil, r.deleteCreatedPodsInKBNamespace(reqCtx, opsRes.OpsRequest)
 				})
 			}
-			if opsRes.OpsRequest.IsComplete() {
-				if opsRes.OpsRequest.Status.Phase == opsv1alpha1.OpsSucceedPhase {
-					return r.handleSucceedOpsRequest(reqCtx, opsRes.OpsRequest)
-				}
-				return r.handleUnsuccessfulCompletionOpsRequest(reqCtx, opsRes)
-			}
-			if err := operations.PatchClusterNotFound(reqCtx.Ctx, r.Client, opsRes); err != nil {
-				return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
-			}
 		}
 		return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
 	}
-	if hasClusterOwnerReference, ownerReferencesMatch := clusterOwnerReferencesMatch(opsRes.OpsRequest, cluster); hasClusterOwnerReference && !ownerReferencesMatch {
-		if !opsRes.OpsRequest.DeletionTimestamp.IsZero() {
-			return intctrlutil.HandleCRDeletion(reqCtx, r, opsRes.OpsRequest, constant.OpsRequestFinalizerName, func() (*ctrl.Result, error) {
-				return nil, r.deleteCreatedPodsInKBNamespace(reqCtx, opsRes.OpsRequest)
-			})
-		}
-		if !opsRes.OpsRequest.IsComplete() {
-			base := opsRes.OpsRequest.DeepCopy()
-			condition := opsv1alpha1.NewAbortedCondition(fmt.Sprintf(
-				"Aborted because the owning Cluster no longer matches %s/%s", cluster.Namespace, cluster.Name))
-			opsRes.OpsRequest.SetStatusCondition(*condition)
-			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsAbortedPhase
-			opsRes.OpsRequest.Status.CompletionTimestamp = metav1.Now()
-			if err := r.Client.Status().Patch(reqCtx.Ctx, opsRes.OpsRequest, client.MergeFrom(base)); err != nil {
+	if owner := clusterOwnerReference(opsRes.OpsRequest); owner != nil &&
+		(owner.Name != cluster.Name || owner.UID != cluster.UID) {
+		// The original Cluster is gone. Finish its request's deletion without using the replacement.
+		if opsRes.OpsRequest.DeletionTimestamp.IsZero() {
+			if err := r.Client.Delete(reqCtx.Ctx, opsRes.OpsRequest); err != nil {
 				return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
 			}
 			return intctrlutil.ResultToP(intctrlutil.Reconciled())
 		}
+		return intctrlutil.HandleCRDeletion(reqCtx, r, opsRes.OpsRequest, constant.OpsRequestFinalizerName, func() (*ctrl.Result, error) {
+			return nil, r.deleteCreatedPodsInKBNamespace(reqCtx, opsRes.OpsRequest)
+		})
 	}
 	// set cluster variable
 	opsRes.Cluster = cluster
 	return nil, nil
-}
-
-func clusterOwnerReferencesMatch(opsRequest *opsv1alpha1.OpsRequest, cluster *appsv1.Cluster) (bool, bool) {
-	hasClusterOwnerReference := false
-	for _, ownerReference := range opsRequest.OwnerReferences {
-		groupVersion, err := schema.ParseGroupVersion(ownerReference.APIVersion)
-		if err == nil && groupVersion.Group == appsv1.GroupVersion.Group && ownerReference.Kind == appsv1.ClusterKind {
-			hasClusterOwnerReference = true
-			if ownerReference.Name != cluster.Name || ownerReference.UID != cluster.UID {
-				return true, false
-			}
-		}
-	}
-	return hasClusterOwnerReference, true
 }
 
 // handleOpsRequestByPhase handles the OpsRequest by its phase.
@@ -305,13 +279,8 @@ func (r *OpsRequestReconciler) handleUnsuccessfulCompletionOpsRequest(reqCtx int
 	if err := r.annotateRelatedOps(reqCtx, opsRes.OpsRequest); err != nil {
 		return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
 	}
-	if opsRes.Cluster != nil {
-		hasClusterOwnerReference, ownerReferencesMatch := clusterOwnerReferencesMatch(opsRequest, opsRes.Cluster)
-		if !hasClusterOwnerReference || ownerReferencesMatch {
-			if err := r.cleanupOpsAnnotationForCluster(reqCtx, opsRes.Cluster); err != nil {
-				return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
-			}
-		}
+	if err := r.cleanupOpsAnnotationForCluster(reqCtx, opsRes.Cluster); err != nil {
+		return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
 	}
 	if opsRequest.Status.CompletionTimestamp.IsZero() || opsRequest.Spec.TTLSecondsAfterUnsuccessfulCompletion == 0 {
 		return intctrlutil.ResultToP(intctrlutil.Reconciled())
@@ -355,14 +324,9 @@ func (r *OpsRequestReconciler) addClusterLabelAndSetOwnerReference(reqCtx intctr
 
 	// add label of clusterRef
 	opsRequest := opsRes.OpsRequest
-	if opsRequest.IsComplete() {
-		return nil, nil
-	}
 	clusterName := opsRequest.Labels[constant.AppInstanceLabelKey]
 	opsType := opsRequest.Labels[constant.OpsRequestTypeLabelKey]
-	hasClusterOwnerReference, ownerReferencesMatch := clusterOwnerReferencesMatch(opsRequest, opsRes.Cluster)
-	hasTargetOwnerReference := hasClusterOwnerReference && ownerReferencesMatch
-	if clusterName == opsRequest.Spec.GetClusterName() && opsType == string(opsRequest.Spec.Type) && hasTargetOwnerReference {
+	if clusterName == opsRequest.Spec.GetClusterName() && opsType == string(opsRequest.Spec.Type) && clusterOwnerReference(opsRequest) != nil {
 		return nil, nil
 	}
 	patch := client.MergeFrom(opsRequest.DeepCopy())
@@ -379,6 +343,17 @@ func (r *OpsRequestReconciler) addClusterLabelAndSetOwnerReference(reqCtx intctr
 		return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
 	}
 	return intctrlutil.ResultToP(intctrlutil.Reconciled())
+}
+
+func clusterOwnerReference(opsRequest *opsv1alpha1.OpsRequest) *metav1.OwnerReference {
+	for i := range opsRequest.OwnerReferences {
+		owner := &opsRequest.OwnerReferences[i]
+		gv, err := schema.ParseGroupVersion(owner.APIVersion)
+		if err == nil && gv.Group == appsv1.GroupVersion.Group && owner.Kind == appsv1.ClusterKind {
+			return owner
+		}
+	}
+	return nil
 }
 
 // doOpsRequestAction will do the action of the OpsRequest.
@@ -408,6 +383,20 @@ func (r *OpsRequestReconciler) doOpsRequestAction(reqCtx intctrlutil.RequestCtx,
 		return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
 	}
 	return intctrlutil.ResultToP(intctrlutil.Reconciled())
+}
+
+// handleOpsReqDeletedDuringRunning handles the cluster annotation if the OpsRequest is deleted during running.
+func (r *OpsRequestReconciler) handleOpsReqDeletedDuringRunning(reqCtx intctrlutil.RequestCtx) error {
+	clusterList := &appsv1.ClusterList{}
+	if err := r.Client.List(reqCtx.Ctx, clusterList, client.InNamespace(reqCtx.Req.Namespace)); err != nil {
+		return err
+	}
+	for _, cluster := range clusterList.Items {
+		if err := r.cleanupOpsAnnotationForCluster(reqCtx, &cluster); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (r *OpsRequestReconciler) cleanupOpsAnnotationForCluster(reqCtx intctrlutil.RequestCtx, cluster *appsv1.Cluster) error {

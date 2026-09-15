@@ -562,28 +562,74 @@ func TestHorizontalScalingShardCountAndShardReplicas(t *testing.T) {
 	}
 }
 
-// Characterize main's cancellation behavior; fixing it belongs in a separate change.
-func TestHorizontalScalingCancellingBackupStillSubmitsTarget(t *testing.T) {
-	f := newHorizontalScalingFixture(t, scaleOutRequest("db", true))
-	f.addBackup(t)
-	hs := horizontalScalingOpsHandler{}
-	if err := hs.Action(f.req, f.cli, f.res); err != nil {
-		t.Fatal(err)
-	}
-	f.reconcile(t, opsv1alpha1.OpsRunningPhase)
-	f.res.OpsRequest.Status.Phase = opsv1alpha1.OpsCancellingPhase
-	if err := f.cli.Status().Update(f.req.Ctx, f.res.OpsRequest); err != nil {
-		t.Fatal(err)
-	}
-	if err := hs.Cancel(f.req, f.cli, f.res); err != nil {
-		t.Fatal(err)
-	}
-	f.replicas(t, "db", 1)
-	f.reconcile(t, opsv1alpha1.OpsSucceedPhase)
-	// Cancelling swaps the create/delete sets, so this pure scale-out request
-	// has no restores to wait for and submits its original scale-out target.
-	f.replicas(t, "db", 2)
-	if f.res.OpsRequest.Status.Components["db"].Message != "Restore Data Completed" {
-		t.Fatal("unexpected cancellation restore message")
+func TestHorizontalScalingCancellingBackupKeepsOriginalScale(t *testing.T) {
+	for _, tc := range []struct {
+		name               string
+		startRestore       bool
+		replicaChanges     int32
+		wantRestoreCount   int
+		completeOneRestore bool
+	}{
+		{name: "before-first-restore", replicaChanges: 1},
+		{name: "after-partial-restore", startRestore: true, replicaChanges: 2, wantRestoreCount: 2, completeOneRestore: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			request := scaleOutRequest("db", true)
+			request.ScaleOut.ReplicaChanges = pointer.Int32(tc.replicaChanges)
+			f := newHorizontalScalingFixture(t, request)
+			f.addBackup(t)
+			hs := horizontalScalingOpsHandler{}
+			if err := hs.Action(f.req, f.cli, f.res); err != nil {
+				t.Fatal(err)
+			}
+			if tc.startRestore {
+				f.reconcile(t, opsv1alpha1.OpsRunningPhase)
+			}
+
+			restores := &dpv1alpha1.RestoreList{}
+			if err := f.cli.List(f.req.Ctx, restores); err != nil {
+				t.Fatal(err)
+			}
+			if len(restores.Items) != tc.wantRestoreCount {
+				t.Fatalf("restores before cancellation = %d, want %d", len(restores.Items), tc.wantRestoreCount)
+			}
+			if tc.completeOneRestore {
+				restore := &restores.Items[0]
+				restore.Status.Phase = dpv1alpha1.RestorePhaseCompleted
+				if err := f.cli.Status().Update(f.req.Ctx, restore); err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			f.res.OpsRequest.Status.Phase = opsv1alpha1.OpsCancellingPhase
+			if err := f.cli.Status().Update(f.req.Ctx, f.res.OpsRequest); err != nil {
+				t.Fatal(err)
+			}
+			if err := hs.Cancel(f.req, f.cli, f.res); err != nil {
+				t.Fatal(err)
+			}
+			f.replicas(t, "db", 1)
+			f.reconcile(t, opsv1alpha1.OpsSucceedPhase)
+			f.replicas(t, "db", 1)
+
+			afterCancel := &dpv1alpha1.RestoreList{}
+			if err := f.cli.List(f.req.Ctx, afterCancel); err != nil {
+				t.Fatal(err)
+			}
+			if len(afterCancel.Items) != tc.wantRestoreCount {
+				t.Fatalf("restores after cancellation = %d, want %d", len(afterCancel.Items), tc.wantRestoreCount)
+			}
+			if tc.completeOneRestore {
+				completed := 0
+				for i := range afterCancel.Items {
+					if afterCancel.Items[i].Status.Phase == dpv1alpha1.RestorePhaseCompleted {
+						completed++
+					}
+				}
+				if completed != 1 {
+					t.Fatalf("completed restores after cancellation = %d, want 1", completed)
+				}
+			}
+		})
 	}
 }

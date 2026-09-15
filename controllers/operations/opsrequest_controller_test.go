@@ -1213,6 +1213,20 @@ func TestOpsRequestDoesNotRetargetRecreatedCluster(t *testing.T) {
 	}
 }
 
+func TestOpsRequestDeletionWithoutCluster(t *testing.T) {
+	_, ops := ownerTestObjects()
+	ops.Status.Phase = opsv1alpha1.OpsRunningPhase
+	r := ownerTestReconciler(t, ops)
+	ctx := context.Background()
+	if err := r.Delete(ctx, ops); err != nil {
+		t.Fatal(err)
+	}
+	reconcileOwnerTest(t, r, ops)
+	if err := r.Get(ctx, client.ObjectKeyFromObject(ops), &opsv1alpha1.OpsRequest{}); !apierrors.IsNotFound(err) {
+		t.Fatalf("request without its Cluster was not finalized: %v", err)
+	}
+}
+
 func TestOpsRequestSameOwnerStillExecutesStop(t *testing.T) {
 	cluster, ops := ownerTestObjects()
 	ops.Status.Phase = opsv1alpha1.OpsCreatingPhase

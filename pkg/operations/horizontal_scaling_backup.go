@@ -158,6 +158,9 @@ func (hs horizontalScalingOpsHandler) restoreDataFromBackup(reqCtx intctrlutil.R
 	if opsRes.OpsRequest.Status.Phase == opsv1alpha1.OpsCancellingPhase {
 		// Preserve which instances the existing cancellation path restores.
 		createdPodSet = deletedPodSet
+		targetCompSpec.Replicas = *lastCompConfiguration.Replicas
+		targetCompSpec.Instances = lastCompConfiguration.Instances
+		targetCompSpec.OfflineInstances = lastCompConfiguration.OfflineInstances
 	}
 	comp, compDef, err := intctrlcomp.GetCompNCompDefByName(reqCtx.Ctx, cli, opsRes.Cluster.Namespace, constant.GenerateClusterComponentName(opsRes.Cluster.Name, pgRes.fullComponentName))
 	if err != nil {

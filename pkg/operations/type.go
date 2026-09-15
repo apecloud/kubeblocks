@@ -128,7 +128,6 @@ type OpsRuntime interface {
 	GetInstance(namespace, clusterName, compName, instanceName string) (Instance, error)
 	ListInstances(namespace, clusterName, compName string) ([]Instance, error)
 	GenerateInstanceNameSet(clusterName, compName string, compReplicas int32, instances []appsv1.InstanceTemplate, offlineInstances []string) (map[string]string, error)
-	GenerateTemplateInstanceNames(clusterName, compName, templateName string, replicas int32, offlineInstances []string, ordinals appsv1.Ordinals) ([]string, error)
 	Switchover(ctx context.Context, synthesizedComp *component.SynthesizedComponent, instanceName, candidateName string) error
 }
 
@@ -152,12 +151,6 @@ type Instance interface {
 	IsAvailable(minReadySeconds int32, roleAware bool) bool
 	IsFailedAndTimedOut() bool
 	GetResources(containerName string) corev1.ResourceRequirements
-	GetNodeName() string
-	GetTolerations() []corev1.Toleration
-	GetAffinity() *corev1.Affinity
-	GetTopologySpreadConstraints() []corev1.TopologySpreadConstraint
-	GetPodVolumes() []corev1.Volume
-	GetVolumeMounts(containerName string) []corev1.VolumeMount
 	GetVolume(name string) (InstanceVolume, bool)
 }
 

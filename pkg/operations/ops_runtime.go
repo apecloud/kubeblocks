@@ -197,15 +197,6 @@ func (r *opsRuntime) GenerateInstanceNameSet(clusterName, compName string, compR
 	return generateAllPodNamesToSet(compReplicas, instances, offlineInstances, clusterName, compName)
 }
 
-func (r *opsRuntime) GenerateTemplateInstanceNames(clusterName, compName, templateName string, replicas int32, offlineInstances []string, ordinals appsv1.Ordinals) ([]string, error) {
-	workloadName := constant.GenerateWorkloadNamePattern(clusterName, compName)
-	ordinalList, err := instanceset.ConvertOrdinalsToSortedList(ordinals)
-	if err != nil {
-		return nil, err
-	}
-	return instanceset.GenerateInstanceNamesFromTemplate(workloadName, templateName, replicas, offlineInstances, ordinalList)
-}
-
 func (r *opsRuntime) Switchover(ctx context.Context, synthesizedComp *component.SynthesizedComponent, instanceName, candidateName string) error {
 	return r.doSwitchover(ctx, r.cli, synthesizedComp, instanceName, candidateName)
 }
@@ -438,49 +429,6 @@ func (i *defaultInstance) GetResources(containerName string) corev1.ResourceRequ
 		return corev1.ResourceRequirements{}
 	}
 	return container.Resources
-}
-
-func (i *defaultInstance) GetNodeName() string {
-	if i.pod == nil {
-		return ""
-	}
-	return i.pod.Spec.NodeName
-}
-
-func (i *defaultInstance) GetTolerations() []corev1.Toleration {
-	if i.pod == nil {
-		return nil
-	}
-	return append([]corev1.Toleration{}, i.pod.Spec.Tolerations...)
-}
-
-func (i *defaultInstance) GetAffinity() *corev1.Affinity {
-	if i.pod == nil || i.pod.Spec.Affinity == nil {
-		return nil
-	}
-	return i.pod.Spec.Affinity.DeepCopy()
-}
-
-func (i *defaultInstance) GetTopologySpreadConstraints() []corev1.TopologySpreadConstraint {
-	if i.pod == nil {
-		return nil
-	}
-	return append([]corev1.TopologySpreadConstraint{}, i.pod.Spec.TopologySpreadConstraints...)
-}
-
-func (i *defaultInstance) GetPodVolumes() []corev1.Volume {
-	if i.pod == nil {
-		return nil
-	}
-	return append([]corev1.Volume{}, i.pod.Spec.Volumes...)
-}
-
-func (i *defaultInstance) GetVolumeMounts(containerName string) []corev1.VolumeMount {
-	container := i.getContainer(containerName)
-	if container == nil {
-		return nil
-	}
-	return append([]corev1.VolumeMount{}, container.VolumeMounts...)
 }
 
 func (i *defaultInstance) GetVolume(name string) (InstanceVolume, bool) {

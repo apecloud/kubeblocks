@@ -115,7 +115,7 @@ func (hs horizontalScalingOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli 
 			return err
 		}
 		if horizontalScaling.ScaleOut != nil && horizontalScaling.ScaleOut.FromBackup != nil {
-			// The backup path submits this configuration from reconcileBackupScaling
+			// The backup path submits this configuration from restoreDataFromBackup
 			// only after all persistent volumes have been restored.
 			return nil
 		}
@@ -144,8 +144,12 @@ func (hs horizontalScalingOpsHandler) ReconcileAction(reqCtx intctrlutil.Request
 			// horizontal scaling for shard count.
 			return handleComponentProgressForScalingShards(reqCtx, cli, opsRes, pgRes, compStatus)
 		}
-		if horizontalScaling.ScaleOut != nil && horizontalScaling.ScaleOut.FromBackup != nil {
-			return hs.reconcileBackupScaling(reqCtx, cli, opsRes, pgRes, compStatus)
+		if isBackupScaling(horizontalScaling) {
+			lastConfig := opsRes.OpsRequest.Status.LastConfiguration.Components[horizontalScaling.ComponentName]
+			if err := hs.restoreDataFromBackup(reqCtx, cli, opsRes, pgRes.fullComponentName,
+				pgRes.clusterComponent.DeepCopy(), horizontalScaling, lastConfig, compStatus); err != nil {
+				return 0, 0, err
+			}
 		}
 		if err := hs.setReplicaScalingParticipants(opsRes, pgRes); err != nil {
 			return 0, 0, err
@@ -231,6 +235,9 @@ func (hs horizontalScalingOpsHandler) getReplicaScalingChanges(opsRes *OpsResour
 	lastCompConfiguration opsv1alpha1.LastComponentConfiguration,
 	horizontalScaling opsv1alpha1.HorizontalScaling,
 	fullCompName string) (map[string]string, map[string]string, error) {
+	if isBackupScaling(horizontalScaling) {
+		return hs.getBackupReplicaScalingChanges(opsRes, lastCompConfiguration, horizontalScaling, fullCompName)
+	}
 	clusterName := opsRes.Cluster.Name
 	runtime, err := opsRes.GetRuntime(horizontalScaling.ComponentName)
 	if err != nil {
@@ -325,6 +332,9 @@ func (hs horizontalScalingOpsHandler) getExpectedCompValues(
 	opsRes *OpsResource,
 	lastCompConfiguration opsv1alpha1.LastComponentConfiguration,
 	horizontalScaling opsv1alpha1.HorizontalScaling) (int32, []appsv1.InstanceTemplate, []string, error) {
+	if isBackupScaling(horizontalScaling) {
+		return hs.getBackupExpectedCompValues(opsRes, lastCompConfiguration, horizontalScaling)
+	}
 	compReplicas := *lastCompConfiguration.Replicas
 	compInstanceTpls := slices.Clone(lastCompConfiguration.Instances)
 	compOfflineInstances := lastCompConfiguration.OfflineInstances
@@ -581,7 +591,11 @@ func (hs horizontalScalingOpsHandler) validateHorizontalScaling(
 		return nil
 	}
 	if horizontalScaling.ScaleIn != nil {
-		if err := hs.validateOnlineInstancesToOffline(lastCompConfiguration,
+		validateOnline := hs.validateOnlineInstancesToOffline
+		if isBackupScaling(horizontalScaling) {
+			validateOnline = hs.validateBackupOnlineInstancesToOffline
+		}
+		if err := validateOnline(lastCompConfiguration,
 			horizontalScaling.ScaleIn.OnlineInstancesToOffline, opsRes, horizontalScaling.ComponentName); err != nil {
 			return err
 		}

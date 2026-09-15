@@ -20,16 +20,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package custom
 
 import (
+	"context"
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
 )
+
+// PodRequests maps Custom Pod events back to their OpsRequest.
+func PodRequests(ctx context.Context, cli client.Client, pod *corev1.Pod) []reconcile.Request {
+	opsName := pod.Labels[constant.OpsRequestNameLabelKey]
+	opsNamespace := pod.Labels[constant.OpsRequestNamespaceLabelKey]
+	if opsName == "" || opsNamespace == "" {
+		return nil
+	}
+	key := types.NamespacedName{Namespace: opsNamespace, Name: opsName}
+	opsRequest := &opsv1alpha1.OpsRequest{}
+	if err := cli.Get(ctx, key, opsRequest); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return []reconcile.Request{{NamespacedName: key}}
+	}
+	if opsRequest.Spec.Type != opsv1alpha1.CustomType {
+		return nil
+	}
+	return []reconcile.Request{{NamespacedName: key}}
+}
 
 type OpsAction interface {
 	// Execute executes the action.

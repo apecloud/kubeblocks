@@ -54,6 +54,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	customops "github.com/apecloud/kubeblocks/pkg/operations/custom"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -104,9 +105,16 @@ func (r *OpsRequestReconciler) SetupWithManager(mgr ctrl.Manager, multiClusterMg
 		Watches(&parametersv1alpha1.ComponentParameter{}, handler.EnqueueRequestsFromMapFunc(r.parseRunningOpsRequestsForComponentParameter)).
 		Watches(&dpv1alpha1.Backup{}, handler.EnqueueRequestsFromMapFunc(r.parseBackupOpsRequest)).
 		Owns(&dpv1alpha1.Restore{}).
-		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(r.parsePod)).
+		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, object client.Object) []reconcile.Request {
+			return customops.PodRequests(ctx, r.Client, object.(*corev1.Pod))
+		})).
+		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, object client.Object) []reconcile.Request {
+			return operations.RebuildInstancePodRequests(ctx, r.Client, object.(*corev1.Pod))
+		})).
 		Watches(&corev1.PersistentVolumeClaim{}, handler.EnqueueRequestsFromMapFunc(r.parseVolumeExpansionOpsRequest)).
-		Owns(&batchv1.Job{})
+		Watches(&batchv1.Job{}, handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, object client.Object) []reconcile.Request {
+			return customops.JobRequests(ctx, r.Client, object.(*batchv1.Job))
+		}))
 	if multiClusterMgr != nil {
 		multiClusterMgr.Watch(b, &workloads.Instance{}, handler.EnqueueRequestsFromMapFunc(r.parseRunningOpsRequestsForInstance))
 	}
@@ -146,8 +154,10 @@ func (r *OpsRequestReconciler) handleDeletion(reqCtx intctrlutil.RequestCtx, ops
 		}
 	}
 	return intctrlutil.HandleCRDeletion(reqCtx, r, opsRes.OpsRequest, constant.OpsRequestFinalizerName, func() (*ctrl.Result, error) {
-		if err := r.deleteCreatedPodsInKBNamespace(reqCtx, opsRes.OpsRequest); err != nil {
-			return nil, err
+		if opsRes.OpsRequest.Spec.Type == opsv1alpha1.CustomType {
+			if err := customops.DeleteManagerNamespacePods(reqCtx.Ctx, r.Client, opsRes.OpsRequest); err != nil {
+				return nil, err
+			}
 		}
 		if cluster != nil {
 			return nil, operations.DequeueOpsRequestInClusterAnnotation(reqCtx.Ctx, r.Client, opsRes)
@@ -256,8 +266,10 @@ func (r *OpsRequestReconciler) handleSucceedOpsRequest(reqCtx intctrlutil.Reques
 	if err := r.annotateRelatedOps(reqCtx, opsRequest); err != nil {
 		return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
 	}
-	if err := r.deleteExternalJobs(reqCtx.Ctx, opsRequest); err != nil {
-		return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
+	if opsRequest.Spec.Type == opsv1alpha1.CustomType {
+		if err := customops.DeleteJobs(reqCtx.Ctx, r.Client, opsRequest); err != nil {
+			return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
+		}
 	}
 	if opsRequest.Status.CompletionTimestamp.IsZero() || opsRequest.Spec.TTLSecondsAfterSucceed == 0 {
 		return intctrlutil.ResultToP(intctrlutil.Reconciled())
@@ -545,19 +557,6 @@ func (r *OpsRequestReconciler) parseVolumeExpansionOpsRequest(ctx context.Contex
 	return requests
 }
 
-func (r *OpsRequestReconciler) deleteExternalJobs(ctx context.Context, ops *opsv1alpha1.OpsRequest) error {
-	jobList := &batchv1.JobList{}
-	if err := r.Client.List(ctx, jobList, client.InNamespace(ops.Namespace), client.MatchingLabels{constant.OpsRequestNameLabelKey: ops.Name}); err != nil {
-		return err
-	}
-	for i := range jobList.Items {
-		if err := intctrlutil.BackgroundDeleteObject(r.Client, ctx, &jobList.Items[i]); err != nil && !apierrors.IsNotFound(err) {
-			return err
-		}
-	}
-	return nil
-}
-
 func (r *OpsRequestReconciler) parseBackupOpsRequest(ctx context.Context, object client.Object) []reconcile.Request {
 	backup := object.(*dpv1alpha1.Backup)
 	var (
@@ -573,44 +572,6 @@ func (r *OpsRequestReconciler) parseBackupOpsRequest(ctx context.Context, object
 		})
 	}
 	return requests
-}
-
-func (r *OpsRequestReconciler) parsePod(ctx context.Context, object client.Object) []reconcile.Request {
-	pod := object.(*corev1.Pod)
-	var (
-		requests []reconcile.Request
-	)
-	opsName := pod.Labels[constant.OpsRequestNameLabelKey]
-	opsNamespace := pod.Labels[constant.OpsRequestNamespaceLabelKey]
-	if opsName != "" && opsNamespace != "" {
-		requests = append(requests, reconcile.Request{
-			NamespacedName: types.NamespacedName{
-				Namespace: opsNamespace,
-				Name:      opsName,
-			},
-		})
-	}
-	return requests
-}
-
-func (r *OpsRequestReconciler) deleteCreatedPodsInKBNamespace(reqCtx intctrlutil.RequestCtx, opsRequest *opsv1alpha1.OpsRequest) error {
-	namespace := viper.GetString(constant.CfgKeyCtrlrMgrNS)
-	if namespace == "" {
-		return nil
-	}
-	podList := &corev1.PodList{}
-	if err := r.Client.List(reqCtx.Ctx, podList, client.InNamespace(viper.GetString(constant.CfgKeyCtrlrMgrNS)), client.MatchingLabels{
-		constant.OpsRequestNameLabelKey:      opsRequest.Name,
-		constant.OpsRequestNamespaceLabelKey: opsRequest.Namespace,
-	}); err != nil {
-		return err
-	}
-	for i := range podList.Items {
-		if err := intctrlutil.BackgroundDeleteObject(r.Client, reqCtx.Ctx, &podList.Items[i]); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 // annotateRelatedOps annotates the related opsRequests to reconcile.

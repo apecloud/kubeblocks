@@ -20,18 +20,59 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package custom
 
 import (
+	"context"
 	"fmt"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
+
+// JobRequests maps directly owned Custom Job events back to their OpsRequest.
+func JobRequests(ctx context.Context, cli client.Client, job *batchv1.Job) []reconcile.Request {
+	owner := metav1.GetControllerOf(job)
+	if owner == nil || owner.APIVersion != opsv1alpha1.GroupVersion.String() || owner.Kind != "OpsRequest" {
+		return nil
+	}
+	key := types.NamespacedName{Namespace: job.Namespace, Name: owner.Name}
+	opsRequest := &opsv1alpha1.OpsRequest{}
+	if err := cli.Get(ctx, key, opsRequest); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return []reconcile.Request{{NamespacedName: key}}
+	}
+	if opsRequest.UID != owner.UID || opsRequest.Spec.Type != opsv1alpha1.CustomType {
+		return nil
+	}
+	return []reconcile.Request{{NamespacedName: key}}
+}
+
+// DeleteJobs deletes the in-namespace Jobs created by Custom workload actions.
+func DeleteJobs(ctx context.Context, cli client.Client, opsRequest *opsv1alpha1.OpsRequest) error {
+	jobs := &batchv1.JobList{}
+	if err := cli.List(ctx, jobs,
+		client.InNamespace(opsRequest.Namespace),
+		client.MatchingLabels{constant.OpsRequestNameLabelKey: opsRequest.Name}); err != nil {
+		return err
+	}
+	for i := range jobs.Items {
+		if err := intctrlutil.BackgroundDeleteObject(cli, ctx, &jobs.Items[i]); err != nil && !apierrors.IsNotFound(err) {
+			return err
+		}
+	}
+	return nil
+}
 
 // createJob creates the job workload.
 func (w *WorkloadAction) createJob(actionCtx ActionContext,

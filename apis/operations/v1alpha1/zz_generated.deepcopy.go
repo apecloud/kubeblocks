@@ -405,6 +405,13 @@ func (in *LastComponentConfiguration) DeepCopyInto(out *LastComponentConfigurati
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.InstanceTemplates != nil {
+		in, out := &in.InstanceTemplates, &out.InstanceTemplates
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	if in.OfflineInstances != nil {
 		in, out := &in.OfflineInstances, &out.OfflineInstances
 		*out = make([]string, len(*in))

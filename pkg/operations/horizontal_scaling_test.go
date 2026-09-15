@@ -103,6 +103,18 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 		})).ShouldNot(HaveOccurred())
 	}
 
+	mockScalingAssignments := func(opsRes *OpsResource) {
+		testapps.MockInstanceSetStatus(testCtx, opsRes.Cluster, defaultCompName)
+		Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKey{Namespace: opsRes.Cluster.Namespace,
+			Name: constant.GenerateClusterComponentName(opsRes.Cluster.Name, defaultCompName)}, func(its *workloads.InstanceSet) {
+			for _, name := range opsRes.Cluster.Spec.GetComponentByName(defaultCompName).OfflineInstances {
+				template := appsv1.GetInstanceTemplateName(opsRes.Cluster.Name, defaultCompName, name)
+				its.Status.InstanceStatus = append(its.Status.InstanceStatus, workloads.InstanceStatus{PodName: name, TemplateName: &template,
+					DesiredState: workloads.InstanceDesiredStateOffline, CurrentState: workloads.InstanceCurrentStateAbsent})
+			}
+		})()).Should(Succeed())
+	}
+
 	Context("Test OpsRequest", func() {
 		commonHScaleConsensusCompTest := func(reqCtx intctrlutil.RequestCtx,
 			changeClusterSpec func(cluster *appsv1.Cluster),
@@ -128,6 +140,9 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 				})).Should(Succeed())
 			}
 			pods := testapps.MockInstanceSetPods(&testCtx, its, opsRes.Cluster, defaultCompName)
+			if hasExplicitScalingInstances(horizontalScaling) && !isBackupScaling(horizontalScaling) {
+				mockScalingAssignments(opsRes)
+			}
 			By("create opsRequest for horizontal scaling of consensus component")
 			initClusterAnnotationAndPhaseForOps(opsRes)
 			horizontalScaling.ComponentName = defaultCompName
@@ -610,6 +625,9 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 		createOpsAndToCreatingPhase := func(reqCtx intctrlutil.RequestCtx, opsRes *OpsResource, horizontalScaling opsv1alpha1.HorizontalScaling, ignoreHscalingStrictValidate bool) *opsv1alpha1.OpsRequest {
 			if horizontalScaling.ComponentName == "" {
 				horizontalScaling.ComponentName = defaultCompName
+			}
+			if hasExplicitScalingInstances(horizontalScaling) && !isBackupScaling(horizontalScaling) {
+				mockScalingAssignments(opsRes)
 			}
 			opsRes.OpsRequest = createHorizontalScaling(clusterName, horizontalScaling, ignoreHscalingStrictValidate)
 			opsRes.OpsRequest.Spec.Force = true
@@ -1270,7 +1288,7 @@ func (r *horizontalScalingRuntimeTrace) GetWorkload(namespace, clusterName, comp
 
 func TestHorizontalScalingParticipantAndProgressOrder(t *testing.T) {
 	for _, fromBackup := range []bool{false, true} {
-		want := []string{"names(db,1)", "names(db,1)", "names(db,2)", "workload(db)"}
+		want := []string{"names(db,1)", "names(db,2)", "workload(db)"}
 		if fromBackup {
 			want = []string{"workload(db)"}
 		}
@@ -1289,9 +1307,6 @@ func TestHorizontalScalingParticipantAndProgressOrder(t *testing.T) {
 					t.Fatal(err)
 				}
 				var actionCalls []string
-				if !fromBackup {
-					actionCalls = []string{"names(db,1)"}
-				}
 				if !reflect.DeepEqual(trace.calls, actionCalls) {
 					t.Fatalf("Action calls = %v", trace.calls)
 				}
@@ -1338,11 +1353,11 @@ func TestHorizontalScalingOnlineInferenceInputs(t *testing.T) {
 		wantCalls                                        []string
 		wantReplicas                                     int32
 	}{
-		{name: "infer-default", wantCalls: []string{"names(db,1)", "names(db,2)"}, wantReplicas: 2},
-		{name: "infer-template", template: true, wantCalls: []string{"names(db,1)", "names(db,2)"}, wantReplicas: 2},
-		{name: "explicit-total-skips-inference", explicitTotal: true, wantCalls: []string{"names(db,1)"}, wantReplicas: 2},
-		{name: "explicit-template-keeps-lookup", template: true, explicitTemplate: true, wantCalls: []string{"names(db,1)", "names(db,1)"}, wantReplicas: 2},
-		{name: "empty-list-skips-inference", empty: true, wantCalls: []string{"names(db,1)"}, wantReplicas: 1},
+		{name: "infer-default", wantReplicas: 2},
+		{name: "infer-template", template: true, wantReplicas: 2},
+		{name: "explicit-total-skips-inference", explicitTotal: true, wantReplicas: 2},
+		{name: "explicit-template", template: true, explicitTemplate: true, wantReplicas: 2},
+		{name: "empty-list-skips-inference", empty: true, wantReplicas: 1},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			request := scaleOutRequest("db", false)
@@ -1366,6 +1381,7 @@ func TestHorizontalScalingOnlineInferenceInputs(t *testing.T) {
 			if tc.template {
 				spec.Instances = []appsv1.InstanceTemplate{{Name: "foo", Replicas: pointer.Int32(1)}}
 			}
+			publishHorizontalScalingAssignments(t, f)
 			hs := horizontalScalingOpsHandler{}
 			if err := hs.SaveLastConfiguration(f.req, f.cli, f.res); err != nil {
 				t.Fatal(err)
@@ -1379,23 +1395,9 @@ func TestHorizontalScalingOnlineInferenceInputs(t *testing.T) {
 			if !reflect.DeepEqual(trace.calls, tc.wantCalls) {
 				t.Fatalf("calls = %v, want %v", trace.calls, tc.wantCalls)
 			}
-			if !reflect.DeepEqual(trace.specs[0].Instances, original.Instances) || !reflect.DeepEqual(trace.specs[0].OfflineInstances, original.OfflineInstances) {
-				t.Fatalf("initial planning inputs = %+v", trace.specs[0])
-			}
-			if len(trace.specs) == 2 {
-				candidate := trace.specs[1]
-				if len(candidate.OfflineInstances) != 0 {
-					t.Fatalf("candidate offline = %v", candidate.OfflineInstances)
-				}
-				if tc.template {
-					want := int32(2)
-					if tc.explicitTemplate {
-						want = 1
-					}
-					if len(candidate.Instances) != 1 || candidate.Instances[0].GetReplicas() != want {
-						t.Fatalf("candidate instances = %+v", candidate.Instances)
-					}
-				}
+			last := f.res.OpsRequest.Status.LastConfiguration.Components["db"]
+			if !reflect.DeepEqual(last.Instances, original.Instances) || !reflect.DeepEqual(last.OfflineInstances, original.OfflineInstances) {
+				t.Fatalf("Action changed the saved configuration: %+v", last)
 			}
 			backupRequest := request.DeepCopy()
 			backupRequest.ScaleOut.FromBackup = &opsv1alpha1.FromBackup{Name: "snapshot"}
@@ -1470,6 +1472,7 @@ func newHorizontalScalingFixture(t *testing.T, requests ...opsv1alpha1.Horizonta
 	if err != nil {
 		t.Fatal(err)
 	}
+	publishHorizontalScalingAssignments(t, f)
 	if err := (horizontalScalingOpsHandler{}).SaveLastConfiguration(f.req, f.cli, f.res); err != nil {
 		t.Fatal(err)
 	}
@@ -1733,6 +1736,7 @@ func TestHorizontalScalingShardCountAndShardReplicas(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
+			publishHorizontalScalingAssignments(t, f)
 			hs := horizontalScalingOpsHandler{}
 			if err := hs.SaveLastConfiguration(f.req, f.cli, f.res); err != nil {
 				t.Fatal(err)
@@ -1864,7 +1868,10 @@ func TestHorizontalScalingMixedBackupConflicts(t *testing.T) {
 					t.Fatal(err)
 				}
 				f.res.Cluster.Spec.ComponentSpecs[0].Replicas = 2
-				f.res.OpsRequest.Status.LastConfiguration.Components["db"] = opsv1alpha1.LastComponentConfiguration{Replicas: pointer.Int32(2)}
+				publishHorizontalScalingAssignments(t, f)
+				if err := (horizontalScalingOpsHandler{}).SaveLastConfiguration(f.req, f.cli, f.res); err != nil {
+					t.Fatal(err)
+				}
 				f.res.Cluster.Annotations = map[string]string{constant.OpsRequestAnnotationKey: fmt.Sprintf(`[{"name":"earlier","type":%q},{"name":"scale","type":%q}]`, opsv1alpha1.HorizontalScalingType, opsv1alpha1.HorizontalScalingType)}
 				err := (horizontalScalingOpsHandler{}).Action(f.req, f.cli, f.res)
 				if !intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal) || !strings.Contains(err.Error(), `instance "demo-db-1" cannot be taken offline`) {
@@ -1903,5 +1910,151 @@ func TestHorizontalScalingBackupRejectsInvalidPlanBeforeWork(t *testing.T) {
 	}
 	if f.clusterWrites != 0 || f.restoreReads != 0 {
 		t.Fatal("invalid plan performed scaling or restore work")
+	}
+}
+
+func publishHorizontalScalingAssignments(t *testing.T, f *horizontalScalingFixture) {
+	t.Helper()
+	for _, target := range f.res.OpsRequest.Spec.HorizontalScalingList {
+		if isBackupScaling(target) || !hasExplicitScalingInstances(target) {
+			continue
+		}
+		spec := getComponentSpecOrShardingTemplate(f.res.Cluster, target.ComponentName)
+		if spec == nil {
+			continue
+		}
+		names, err := generateAllPodNamesToSet(spec.Replicas, spec.Instances, spec.OfflineInstances, f.res.Cluster.Name, target.ComponentName)
+		if err != nil {
+			t.Fatal(err)
+		}
+		its := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Name: constant.GenerateClusterComponentName(f.res.Cluster.Name, target.ComponentName), Namespace: f.res.Cluster.Namespace}}
+		for name := range names {
+			template := appsv1.GetInstanceTemplateName(f.res.Cluster.Name, target.ComponentName, name)
+			its.Status.InstanceStatus = append(its.Status.InstanceStatus, workloads.InstanceStatus{PodName: name, TemplateName: &template, DesiredState: workloads.InstanceDesiredStateActive})
+		}
+		for _, name := range spec.OfflineInstances {
+			template := appsv1.GetInstanceTemplateName(f.res.Cluster.Name, target.ComponentName, name)
+			its.Status.InstanceStatus = append(its.Status.InstanceStatus, workloads.InstanceStatus{PodName: name, TemplateName: &template, DesiredState: workloads.InstanceDesiredStateOffline, CurrentState: workloads.InstanceCurrentStateAbsent})
+		}
+		current := &workloads.InstanceSet{}
+		if err := f.cli.Get(f.req.Ctx, client.ObjectKeyFromObject(its), current); client.IgnoreNotFound(err) != nil {
+			t.Fatal(err)
+		} else if err != nil {
+			if err := f.cli.Create(f.req.Ctx, its); err != nil {
+				t.Fatal(err)
+			}
+		} else {
+			current.Status = its.Status
+			if err := f.cli.Update(f.req.Ctx, current); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+}
+
+func TestHorizontalScalingPersistsOwnerAssignmentsBeforeAction(t *testing.T) {
+	for _, invalidTemplateCount := range []bool{false, true} {
+		t.Run(fmt.Sprintf("invalid-template-count=%t", invalidTemplateCount), func(t *testing.T) {
+			scheme := runtime.NewScheme()
+			for _, add := range []func(*runtime.Scheme) error{appsv1.AddToScheme, opsv1alpha1.AddToScheme, workloads.AddToScheme} {
+				if err := add(scheme); err != nil {
+					t.Fatal(err)
+				}
+			}
+			cluster := &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default", UID: "cluster"},
+				Spec: appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{{Name: "db", Replicas: 2,
+					Instances: []appsv1.InstanceTemplate{{Name: "blue", Replicas: pointer.Int32(1)}}}}},
+				Status: appsv1.ClusterStatus{Phase: appsv1.RunningClusterPhase}}
+			ops := &opsv1alpha1.OpsRequest{ObjectMeta: metav1.ObjectMeta{Name: "scale", Namespace: "default", UID: "request"},
+				Spec: opsv1alpha1.OpsRequestSpec{Type: opsv1alpha1.HorizontalScalingType,
+					SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{HorizontalScalingList: []opsv1alpha1.HorizontalScaling{{
+						ComponentOps: opsv1alpha1.ComponentOps{ComponentName: "db"},
+						ScaleIn:      &opsv1alpha1.ScaleIn{OnlineInstancesToOffline: []string{"owner-chosen"}},
+					}}}}, Status: opsv1alpha1.OpsRequestStatus{Phase: opsv1alpha1.OpsPendingPhase}}
+			if invalidTemplateCount {
+				ops.Spec.HorizontalScalingList[0].ScaleIn.Instances = []opsv1alpha1.InstanceReplicasTemplate{{Name: "blue", ReplicaChanges: 0}}
+			}
+			its := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Name: "demo-db", Namespace: "default"},
+				Status: workloads.InstanceSetStatus{InstanceStatus: []workloads.InstanceStatus{
+					{PodName: "owner-chosen", TemplateName: pointer.String("blue"), DesiredState: workloads.InstanceDesiredStateActive},
+					{PodName: "another-identity", TemplateName: pointer.String(""), DesiredState: workloads.InstanceDesiredStateActive},
+				}}}
+			failPatch := true
+			cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, ops, its).
+				WithStatusSubresource(ops).WithInterceptorFuncs(interceptor.Funcs{
+				SubResourcePatch: func(ctx context.Context, c client.Client, subresource string, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {
+					if request, ok := obj.(*opsv1alpha1.OpsRequest); ok && request.Status.Phase == opsv1alpha1.OpsCreatingPhase && failPatch {
+						failPatch = false
+						return errors.New("injected allocation persistence failure")
+					}
+					return c.SubResource(subresource).Patch(ctx, obj, patch, opts...)
+				},
+			}).Build()
+			req := intctrlutil.RequestCtx{Ctx: context.Background(), Recorder: record.NewFakeRecorder(32)}
+			load := func() *OpsResource {
+				c, o := &appsv1.Cluster{}, &opsv1alpha1.OpsRequest{}
+				if err := cli.Get(req.Ctx, client.ObjectKeyFromObject(cluster), c); err != nil {
+					t.Fatal(err)
+				}
+				if err := cli.Get(req.Ctx, client.ObjectKeyFromObject(ops), o); err != nil {
+					t.Fatal(err)
+				}
+				return &OpsResource{Cluster: c, OpsRequest: o, Recorder: req.Recorder}
+			}
+			var patchErr error
+			for range 4 {
+				_, patchErr = GetOpsManager().Do(req, cli, load())
+				if patchErr != nil {
+					break
+				}
+			}
+			if patchErr == nil || !strings.Contains(patchErr.Error(), "allocation persistence") {
+				t.Fatalf("expected persistence failure, got %v", patchErr)
+			}
+			res := load()
+			if res.OpsRequest.Status.Phase != opsv1alpha1.OpsPendingPhase || res.Cluster.Spec.ComponentSpecs[0].Replicas != 2 {
+				t.Fatalf("failed baseline patch changed operation or target: %+v", res)
+			}
+			for range 4 {
+				res = load()
+				if res.OpsRequest.Status.Phase == opsv1alpha1.OpsCreatingPhase {
+					break
+				}
+				if _, err := GetOpsManager().Do(req, cli, res); err != nil {
+					t.Fatal(err)
+				}
+			}
+			res = load()
+			if res.OpsRequest.Status.Phase != opsv1alpha1.OpsCreatingPhase || res.OpsRequest.Status.LastConfiguration.Components["db"].InstanceTemplates["owner-chosen"] != "blue" {
+				t.Fatalf("owner assignments were not persisted: %+v", res.OpsRequest.Status)
+			}
+			if err := cli.Delete(req.Ctx, its); err != nil {
+				t.Fatal(err)
+			}
+			if invalidTemplateCount {
+				if _, err := GetOpsManager().Do(req, cli, load()); err != nil {
+					t.Fatal(err)
+				}
+				res = load()
+				if res.OpsRequest.Status.Phase != opsv1alpha1.OpsFailedPhase ||
+					!strings.Contains(fmt.Sprint(res.OpsRequest.Status.Conditions), "replicaChanges") {
+					t.Fatalf("Creating did not reject the template count: %+v", res.OpsRequest.Status)
+				}
+				if !reflect.DeepEqual(res.Cluster.Spec, cluster.Spec) {
+					t.Fatalf("invalid template count changed Cluster spec: %+v", res.Cluster.Spec)
+				}
+				return
+			}
+			for range 2 {
+				if _, err := GetOpsManager().Do(req, cli, load()); err != nil {
+					t.Fatalf("Creating replay must reuse assignments: %v", err)
+				}
+			}
+			res = load()
+			target := res.Cluster.Spec.ComponentSpecs[0]
+			if target.Replicas != 1 || target.Instances[0].GetReplicas() != 0 || !reflect.DeepEqual(target.OfflineInstances, []string{"owner-chosen"}) {
+				t.Fatalf("wrong target after replay: %+v", target)
+			}
+		})
 	}
 }

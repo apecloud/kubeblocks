@@ -3575,6 +3575,13 @@ spec:
                           description: Records the name of the ComponentDefinition
                             prior to any changes.
                           type: string
+                        instanceTemplates:
+                          additionalProperties:
+                            type: string
+                          description: |-
+                            Records owner-published template assignments before an explicit instance online/offline operation.
+                            Keys are instance identities; an empty value identifies the default template.
+                          type: object
                         instances:
                           description: Records the InstanceTemplate list of the Component
                             prior to any changes.

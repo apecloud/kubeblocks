@@ -387,3 +387,18 @@ func generateBackupInstanceNames(clusterName, componentName string, replicas int
 	}
 	return result, nil
 }
+
+func countPlannedOnlineInstances(offlineInsMap map[string][]string, podSet map[string]string) map[string]int32 {
+	onlineInsCountMap := map[string]int32{}
+	for insTplName, insNames := range offlineInsMap {
+		for _, insName := range insNames {
+			// Count the leading requested names present in the plan, stopping at
+			// the first missing name in each template. This does not check readiness.
+			if _, ok := podSet[insName]; !ok {
+				break
+			}
+			onlineInsCountMap[insTplName]++
+		}
+	}
+	return onlineInsCountMap
+}

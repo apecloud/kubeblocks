@@ -1098,6 +1098,11 @@ type LastComponentConfiguration struct {
 	// +optional
 	Instances []appsv1.InstanceTemplate `json:"instances,omitempty"`
 
+	// Records owner-published template assignments before an explicit instance online/offline operation.
+	// Keys are instance identities; an empty value identifies the default template.
+	// +optional
+	InstanceTemplates map[string]string `json:"instanceTemplates,omitempty"`
+
 	// Records the offline instances of the Component prior to any changes.
 	// +optional
 	OfflineInstances []string `json:"offlineInstances,omitempty"`

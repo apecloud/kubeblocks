@@ -401,7 +401,21 @@ func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, com
 		}
 
 		// Track the count of offline/online instances
-		offlineOrOnlineInsCountMap := r.CountOfflineOrOnlineInstances(clusterName, hScale.ComponentName, instanceNames)
+		assignments := r.Status.LastConfiguration.Components[hScale.ComponentName].InstanceTemplates
+		fromBackup := hScale.ScaleOut != nil && hScale.ScaleOut.FromBackup != nil
+		countsPending := !fromBackup && len(instanceNames) > 0 && assignments == nil && len(compSpec.Instances) > 0
+		offlineOrOnlineInsCountMap := map[string]int32{}
+		if fromBackup {
+			offlineOrOnlineInsCountMap = r.CountOfflineOrOnlineInstances(clusterName, hScale.ComponentName, instanceNames)
+		} else if !countsPending {
+			for _, name := range instanceNames {
+				if len(compSpec.Instances) == 0 {
+					offlineOrOnlineInsCountMap[""]++
+				} else if template, ok := assignments[name]; ok {
+					offlineOrOnlineInsCountMap[template]++
+				}
+			}
+		}
 		insTplChangeMap := make(map[string]int32)
 		totalReplicaChanges := int32(0)
 
@@ -437,6 +451,10 @@ func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, com
 				return fmt.Errorf(`new instance template "%s" already exists in component "%s"`, insTpl.Name, hScale.ComponentName)
 			}
 			totalReplicaChanges += insTpl.GetReplicas()
+		}
+
+		if countsPending && replicaChanger.ReplicaChanges == nil {
+			return nil
 		}
 
 		// Validate if replicaChanges exceed the allowed replicaChanges limit

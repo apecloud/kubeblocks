@@ -5409,6 +5409,11 @@ spec:
                 description: Records the time when the OpsRequest started processing.
                 format: date-time
                 type: string
+              targetClusterUID:
+                description: |-
+                  TargetClusterUID records the immutable identity of the existing Cluster accepted by this request.
+                  It is empty for operations that create their target Cluster.
+                type: string
             required:
             - progress
             type: object

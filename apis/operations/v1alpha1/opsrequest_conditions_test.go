@@ -82,6 +82,9 @@ func TestReasonConstantsStringDrift(t *testing.T) {
 		{"ReasonOpsTypeNotSupported", ReasonOpsTypeNotSupported, "OpsTypeNotSupported"},
 		{"ReasonValidateFailed", ReasonValidateFailed, "ValidateFailed"},
 		{"ReasonClusterNotFound", ReasonClusterNotFound, "ClusterNotFound"},
+		{"ReasonTargetClusterReplaced", ReasonTargetClusterReplaced, "TargetClusterReplaced"},
+		{"ReasonTargetClusterGone", ReasonTargetClusterGone, "TargetClusterGone"},
+		{"ReasonTargetIdentityUnknown", ReasonTargetIdentityUnknown, "TargetIdentityUnknown"},
 		{"ReasonOpsRequestFailed", ReasonOpsRequestFailed, "OpsRequestFailed"},
 		{"ReasonOpsCanceling", ReasonOpsCanceling, "Canceling"},
 		{"ReasonOpsCancelFailed", ReasonOpsCancelFailed, "CancelFailed"},
@@ -144,6 +147,7 @@ func TestNewConditionReasonsMatchConstants(t *testing.T) {
 		{"NewReconfigureFailedCondition", NewReconfigureFailedCondition(opsRequest, nil).Reason, ReasonReconfigureFailed},
 		{"NewBackupCondition", NewBackupCondition(opsRequest).Reason, ReasonBackupStarted},
 		{"NewRestoreCondition", NewRestoreCondition(opsRequest).Reason, ReasonRestoreStarted},
+		{"NewAbortedConditionWithReason", NewAbortedConditionWithReason(ReasonTargetClusterGone, "test").Reason, ReasonTargetClusterGone},
 	}
 	for _, tc := range cases {
 		if tc.got != tc.want {

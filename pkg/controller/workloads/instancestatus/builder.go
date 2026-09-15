@@ -118,7 +118,8 @@ func Build(input Input) ([]workloads.InstanceStatus, error) {
 		if _, ok := observationsByName[observation.InstanceName]; ok {
 			return nil, fmt.Errorf("duplicate observation for %q", observation.InstanceName)
 		}
-		if observation.State != workloads.InstanceCurrentStatePresent && observation.State != workloads.InstanceCurrentStateTerminating {
+		if observation.State != workloads.InstanceCurrentStatePresent && observation.State != workloads.InstanceCurrentStateTerminating &&
+			observation.State != workloads.InstanceCurrentStateUnknown {
 			return nil, fmt.Errorf("observation for %q has invalid state %q", observation.InstanceName, observation.State)
 		}
 		observationsByName[observation.InstanceName] = observation

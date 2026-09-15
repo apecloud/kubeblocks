@@ -27,6 +27,9 @@ import (
 
 	"github.com/golang/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -82,6 +85,37 @@ var _ = Describe("utils test", func() {
 				Expect(err).Should(BeNil())
 				Expect(obj).Should(Equal(pod))
 			}
+		})
+
+		It("excludes children owned by a replaced root", func() {
+			controller, k8sMock := testutil.SetupK8sMock()
+			defer controller.Finish()
+
+			root := builder.NewInstanceSetBuilder(namespace, name).SetUID(types.UID("current-owner")).GetObject()
+			stale := builder.NewPodBuilder(namespace, name+"-0").GetObject()
+			stale.OwnerReferences = []metav1.OwnerReference{{
+				APIVersion: "workloads.kubeblocks.io/v1",
+				Kind:       "InstanceSet",
+				Name:       name,
+				UID:        types.UID("old-owner"),
+				Controller: ptr.To(true),
+			}}
+
+			k8sMock.EXPECT().Get(gomock.Any(), gomock.Any(), &workloads.InstanceSet{}, gomock.Any()).
+				DoAndReturn(func(_ context.Context, _ client.ObjectKey, obj *workloads.InstanceSet, _ ...client.GetOption) error {
+					*obj = *root
+					return nil
+				})
+			k8sMock.EXPECT().List(gomock.Any(), &corev1.PodList{}, gomock.Any()).
+				DoAndReturn(func(_ context.Context, list *corev1.PodList, _ ...client.ListOption) error {
+					list.Items = []corev1.Pod{*stale}
+					return nil
+				})
+
+			tree, err := ReadObjectTree[*workloads.InstanceSet](context.Background(), k8sMock,
+				ctrl.Request{NamespacedName: client.ObjectKeyFromObject(root)}, nil, &corev1.PodList{})
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(tree.GetSecondaryObjects()).Should(BeEmpty())
 		})
 	})
 })

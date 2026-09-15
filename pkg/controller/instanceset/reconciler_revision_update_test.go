@@ -98,12 +98,14 @@ var _ = Describe("revision update reconciler test", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(res).Should(Equal(kubebuilderx.Continue))
 			Expect(its.Status.InstanceStatus).Should(Equal(previous))
+			Expect(its.IsInstanceStatusSnapshotValid()).Should(BeFalse())
 
 			res, err = NewRevisionUpdateReconciler().Reconcile(tree)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(res).Should(Equal(kubebuilderx.Continue))
 			Expect(its.Status.ObservedGeneration).Should(Equal(its.Generation))
 			Expect(its.Status.InstanceStatus).Should(Equal(previous))
+			Expect(its.IsInstanceStatusSnapshotValid()).Should(BeFalse())
 
 			res, err = NewReplicasAlignmentReconciler().Reconcile(tree)
 			Expect(err).ShouldNot(HaveOccurred())
@@ -128,7 +130,8 @@ func transientFlatReassignmentInstanceSet() *workloads.InstanceSet {
 			},
 		},
 		Status: workloads.InstanceSetStatus{
-			ObservedGeneration: 1,
+			ObservedGeneration:               1,
+			InstanceStatusObservedGeneration: 1,
 			AssignedOrdinals: map[string]workloads.Ordinals{
 				templateA: {Discrete: []int32{0}},
 				templateB: {Discrete: []int32{1}},

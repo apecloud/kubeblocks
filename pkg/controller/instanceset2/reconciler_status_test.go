@@ -201,6 +201,59 @@ func TestSetInstanceStatusReadsCurrentStateFromInstance(t *testing.T) {
 	}
 }
 
+func TestSetInstanceStatusDoesNotPublishUnobservedChildState(t *testing.T) {
+	tests := []struct {
+		name       string
+		generation int64
+		status     workloads.InstanceStatus2
+	}{
+		{name: "empty status", generation: 1},
+		{name: "stale absent", generation: 2, status: workloads.InstanceStatus2{
+			ObservedGeneration: 1,
+			CurrentState:       workloads.InstanceCurrentStateAbsent,
+		}},
+		{name: "stale present", generation: 2, status: workloads.InstanceStatus2{
+			ObservedGeneration: 1,
+			CurrentState:       workloads.InstanceCurrentStatePresent,
+			CurrentRevision:    "stale-revision",
+			UpToDate:           true,
+			Ready:              true,
+			Available:          true,
+			Configs:            []workloads.InstanceConfigStatus{{Name: "stale-config"}},
+			VolumeExpansion:    true,
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			its := &workloads.InstanceSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default", Generation: 1},
+				Spec: workloads.InstanceSetSpec{
+					Replicas: ptr.To[int32](1),
+					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "demo"}},
+				},
+				Status: workloads.InstanceSetStatus{ObservedGeneration: 1},
+			}
+			tree := kubebuilderx.NewObjectTree()
+			tree.SetRoot(its)
+			inst := &workloads.Instance{
+				ObjectMeta: metav1.ObjectMeta{Name: "demo-0", Namespace: "default", Generation: tt.generation},
+				Spec:       workloads.InstanceSpec{InstanceTemplateName: ""},
+				Status:     tt.status,
+			}
+			if err := setInstanceStatus(tree, its, []*workloads.Instance{inst}); err != nil {
+				t.Fatal(err)
+			}
+			status := its.FindInstanceStatus(inst.Name)
+			if status == nil || status.CurrentState != workloads.InstanceCurrentStateUnknown {
+				t.Fatalf("unobserved child was not reported unknown: %#v", status)
+			}
+			if status.CurrentRevision != "" || status.UpToDate || status.Ready || status.Available || status.Configs != nil || status.VolumeExpansion {
+				t.Fatalf("unobserved child retained stale runtime fields: %#v", status)
+			}
+		})
+	}
+}
+
 func TestSetInstanceStatusRetainsOfflineWithoutInstance(t *testing.T) {
 	its := &workloads.InstanceSet{
 		ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default"},
@@ -272,7 +325,7 @@ func TestSetInstanceStatusKeepsRuntimeStateIndependentFromConvergence(t *testing
 	inst := &workloads.Instance{
 		ObjectMeta: metav1.ObjectMeta{Name: "demo-0", Generation: 2},
 		Status: workloads.InstanceStatus2{
-			ObservedGeneration: 1,
+			ObservedGeneration: 2,
 			CurrentState:       workloads.InstanceCurrentStatePresent,
 			CurrentRevision:    "current",
 			UpdateRevision:     "stale-target",
@@ -887,8 +940,9 @@ func TestStatusReconcilerDoesNotPublishPartialFlatAllocation(t *testing.T) {
 			},
 		},
 		Status: workloads.InstanceSetStatus{
-			ObservedGeneration: 3,
-			ReadyReplicas:      2,
+			ObservedGeneration:               3,
+			InstanceStatusObservedGeneration: 2,
+			ReadyReplicas:                    2,
 			Conditions: []metav1.Condition{{
 				Type:               string(workloads.InstanceReady),
 				Status:             metav1.ConditionTrue,
@@ -1033,6 +1087,9 @@ func newITS2InstanceStatusFixtureFromSet(t *testing.T, its *workloads.InstanceSe
 	}
 	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
 		t.Fatal(err)
+	}
+	if !its.IsInstanceStatusSnapshotValid() {
+		t.Fatalf("status reconciler did not publish a complete snapshot: %#v", its.Status)
 	}
 	assertITS2UpToDate(t, its, "demo-0", true)
 	assertITS2UpToDate(t, its, "demo-1", true)

@@ -112,6 +112,7 @@ func (r *opsRuntime) GetWorkload(namespace, clusterName, compName string) (Workl
 	if its.Name != "" {
 		currRevisionMap, _ := instanceset.GetRevisions(its.Status.CurrentRevisions)
 		workload.minReadySeconds = its.Spec.MinReadySeconds
+		workload.instanceStatusSnapshotValid = its.IsInstanceStatusSnapshotValid()
 		workload.currentRevisionMap = currRevisionMap
 		workload.instanceNames = sets.KeySet(currRevisionMap)
 		workload.notReadySet = instanceset.GetPodNameSetFromInstanceSetCondition(its, workloads.InstanceReady)
@@ -346,16 +347,21 @@ func (r *opsRuntime) dataContext() context.Context {
 }
 
 type defaultWorkload struct {
-	minReadySeconds    int32
-	instanceStatuses   []workloads.InstanceStatus
-	currentRevisionMap map[string]string
-	notReadySet        sets.Set[string]
-	notAvailableSet    sets.Set[string]
-	failedSet          sets.Set[string]
-	instanceNames      sets.Set[string]
+	minReadySeconds             int32
+	instanceStatusSnapshotValid bool
+	instanceStatuses            []workloads.InstanceStatus
+	currentRevisionMap          map[string]string
+	notReadySet                 sets.Set[string]
+	notAvailableSet             sets.Set[string]
+	failedSet                   sets.Set[string]
+	instanceNames               sets.Set[string]
 }
 
 func (w *defaultWorkload) GetMinReadySeconds() int32 { return w.minReadySeconds }
+
+func (w *defaultWorkload) IsInstanceStatusSnapshotValid() bool {
+	return w.instanceStatusSnapshotValid
+}
 
 func (w *defaultWorkload) GetInstanceStatuses() []workloads.InstanceStatus {
 	result := make([]workloads.InstanceStatus, len(w.instanceStatuses))

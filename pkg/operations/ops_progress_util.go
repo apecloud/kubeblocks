@@ -397,6 +397,9 @@ func handleRunningInstanceProgress(opsRes *OpsResource, pgRes *progressResource,
 	if its == nil {
 		return result
 	}
+	if !its.IsInstanceStatusSnapshotValid() {
+		return result
+	}
 	for i := range its.Status.InstanceStatus {
 		instance := &its.Status.InstanceStatus[i]
 		if instance.EffectiveDesiredState() != workloads.InstanceDesiredStateActive {
@@ -429,6 +432,9 @@ func handleStoppedInstanceProgress(pgRes *progressResource, its *workloads.Insta
 	result := rollingProgress{expectedCount: expectedCount}
 	if its == nil {
 		result.completedCount = expectedCount
+		return result
+	}
+	if !its.IsInstanceStatusSnapshotValid() {
 		return result
 	}
 	preexistingOffline := make(map[string]struct{}, len(its.Spec.OfflineInstances))

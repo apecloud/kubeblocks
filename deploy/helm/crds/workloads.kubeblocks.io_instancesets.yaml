@@ -11700,12 +11700,13 @@ spec:
                       type: string
                     currentState:
                       description: |-
-                        CurrentState describes whether the instance runtime is currently present, terminating, or absent.
+                        CurrentState describes whether the instance runtime is currently present, terminating, absent, or not yet observed.
                         An empty value from an older object is treated as Present because those entries represented observed instances.
                       enum:
                       - Present
                       - Terminating
                       - Absent
+                      - Unknown
                       type: string
                     desiredState:
                       description: |-
@@ -11760,6 +11761,13 @@ spec:
                   - podName
                   type: object
                 type: array
+              instanceStatusObservedGeneration:
+                description: |-
+                  InstanceStatusObservedGeneration is the InstanceSet generation for which InstanceStatus contains a complete
+                  allocation snapshot. Individual rows can still have CurrentState Unknown while their child observation catches up.
+                  A missing or older value means consumers must not infer success from stale or missing rows.
+                format: int64
+                type: integer
               observedGeneration:
                 description: |-
                   observedGeneration is the most recent generation observed for this InstanceSet. It corresponds to the

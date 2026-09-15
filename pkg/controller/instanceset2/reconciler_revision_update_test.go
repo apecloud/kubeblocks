@@ -97,6 +97,9 @@ func TestTransientFlatOrdinalReassignmentPreservesViewAndAllowsAlignment(t *test
 	if !equality.Semantic.DeepEqual(its.Status.InstanceStatus, previous) {
 		t.Fatalf("status reconcile published a partial view: %#v", its.Status)
 	}
+	if its.IsInstanceStatusSnapshotValid() {
+		t.Fatalf("partial allocation was marked valid: %#v", its.Status)
+	}
 
 	res, err = NewRevisionUpdateReconciler().Reconcile(tree)
 	if err != nil || res != kubebuilderx.Continue {
@@ -104,6 +107,9 @@ func TestTransientFlatOrdinalReassignmentPreservesViewAndAllowsAlignment(t *test
 	}
 	if its.Status.ObservedGeneration != its.Generation || !equality.Semantic.DeepEqual(its.Status.InstanceStatus, previous) {
 		t.Fatalf("revision reconcile advanced an incomplete view: %#v", its.Status)
+	}
+	if its.IsInstanceStatusSnapshotValid() {
+		t.Fatalf("revision publication marked a partial allocation valid: %#v", its.Status)
 	}
 
 	res, err = NewAlignmentReconciler().Reconcile(tree)
@@ -146,7 +152,8 @@ func transientFlatReassignmentInstanceSet() *workloads.InstanceSet {
 			},
 		},
 		Status: workloads.InstanceSetStatus{
-			ObservedGeneration: 1,
+			ObservedGeneration:               1,
+			InstanceStatusObservedGeneration: 1,
 			AssignedOrdinals: map[string]workloads.Ordinals{
 				templateA: {Discrete: []int32{0}},
 				templateB: {Discrete: []int32{1}},

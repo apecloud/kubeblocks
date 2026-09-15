@@ -187,8 +187,9 @@ func TestRunningInstanceProgress(t *testing.T) {
 		clusterComponent:  &appsv1.ClusterComponentSpec{Name: "mysql", Replicas: 1},
 	}
 	its := &workloads.InstanceSet{
-		Spec: workloads.InstanceSetSpec{Replicas: pointer.Int32(1)},
-		Status: workloads.InstanceSetStatus{InstanceStatus: []workloads.InstanceStatus{{
+		ObjectMeta: metav1.ObjectMeta{Generation: 2},
+		Spec:       workloads.InstanceSetSpec{Replicas: pointer.Int32(1)},
+		Status: workloads.InstanceSetStatus{ObservedGeneration: 2, InstanceStatusObservedGeneration: 1, InstanceStatus: []workloads.InstanceStatus{{
 			PodName:      instanceName,
 			DesiredState: workloads.InstanceDesiredStateActive,
 			CurrentState: workloads.InstanceCurrentStatePresent,
@@ -204,6 +205,11 @@ func TestRunningInstanceProgress(t *testing.T) {
 	}
 	its.Status.InstanceStatus[0].UpToDate = true
 	result = handleRunningInstanceProgress(opsRes, pgRes, its)
+	if result.expectedCount != 1 || result.completedCount != 0 {
+		t.Fatalf("stale progress=%d/%d, want 0/1", result.completedCount, result.expectedCount)
+	}
+	its.Status.InstanceStatusObservedGeneration = its.Generation
+	result = handleRunningInstanceProgress(opsRes, pgRes, its)
 	if result.expectedCount != 1 || result.completedCount != 1 {
 		t.Fatalf("progress=%d/%d, want 1/1", result.completedCount, result.expectedCount)
 	}
@@ -211,5 +217,34 @@ func TestRunningInstanceProgress(t *testing.T) {
 	result = handleRunningInstanceProgress(opsRes, pgRes, its)
 	if result.expectedCount != 1 || result.completedCount != 1 || result.details[0].Status != opsv1alpha1.FailedProgressStatus {
 		t.Fatalf("failed progress=%d/%d details=%v", result.completedCount, result.expectedCount, result.details)
+	}
+}
+
+func TestStoppedInstanceProgressRequiresObservedAbsence(t *testing.T) {
+	pgRes := &progressResource{clusterComponent: &appsv1.ClusterComponentSpec{Replicas: 1}}
+	its := &workloads.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{Generation: 2},
+		Status: workloads.InstanceSetStatus{
+			InstanceStatusObservedGeneration: 1,
+			InstanceStatus: []workloads.InstanceStatus{{
+				PodName: "cluster-mysql-0", DesiredState: workloads.InstanceDesiredStateActive,
+				CurrentState: workloads.InstanceCurrentStateUnknown,
+			}},
+		},
+	}
+
+	result := handleStoppedInstanceProgress(pgRes, its)
+	if result.completedCount != 0 {
+		t.Fatalf("stale snapshot completed %d instances, want 0", result.completedCount)
+	}
+	its.Status.InstanceStatusObservedGeneration = its.Generation
+	result = handleStoppedInstanceProgress(pgRes, its)
+	if result.completedCount != 0 {
+		t.Fatalf("unknown instance completed %d instances, want 0", result.completedCount)
+	}
+	its.Status.InstanceStatus[0].CurrentState = workloads.InstanceCurrentStateAbsent
+	result = handleStoppedInstanceProgress(pgRes, its)
+	if result.completedCount != 1 {
+		t.Fatalf("observed absence completed %d instances, want 1", result.completedCount)
 	}
 }

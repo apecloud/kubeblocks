@@ -2492,21 +2492,6 @@ SpecificOpsRequest
 <tbody>
 <tr>
 <td>
-<code>targetClusterUID</code><br/>
-<em>
-<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/types#UID">
-k8s.io/apimachinery/pkg/types.UID
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>TargetClusterUID records the immutable identity of the existing Cluster accepted by this request.
-It is empty for operations that create their target Cluster.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>clusterGeneration</code><br/>
 <em>
 int64

@@ -51,9 +51,6 @@ const (
 	ReasonOpsTypeNotSupported   = "OpsTypeNotSupported"
 	ReasonValidateFailed        = "ValidateFailed"
 	ReasonClusterNotFound       = "ClusterNotFound"
-	ReasonTargetClusterReplaced = "TargetClusterReplaced"
-	ReasonTargetClusterGone     = "TargetClusterGone"
-	ReasonTargetIdentityUnknown = "TargetIdentityUnknown"
 	ReasonOpsRequestFailed      = "OpsRequestFailed"
 	ReasonOpsCanceling          = "Canceling"
 	ReasonOpsCancelFailed       = "CancelFailed"
@@ -129,15 +126,10 @@ func NewCancelFailedCondition(ops *OpsRequest, err error) *metav1.Condition {
 
 // NewAbortedCondition creates a condition for aborted phase.
 func NewAbortedCondition(message string) *metav1.Condition {
-	return NewAbortedConditionWithReason(ConditionTypeAborted, message)
-}
-
-// NewAbortedConditionWithReason creates an aborted condition with a specific reason.
-func NewAbortedConditionWithReason(reason, message string) *metav1.Condition {
 	return &metav1.Condition{
 		Type:               ConditionTypeAborted,
 		Status:             metav1.ConditionTrue,
-		Reason:             reason,
+		Reason:             ConditionTypeAborted,
 		LastTransitionTime: metav1.Now(),
 		Message:            message,
 	}

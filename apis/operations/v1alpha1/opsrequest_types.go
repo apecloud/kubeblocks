@@ -20,7 +20,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -964,11 +963,6 @@ type Restore struct {
 
 // OpsRequestStatus represents the observed state of an OpsRequest.
 type OpsRequestStatus struct {
-	// TargetClusterUID records the immutable identity of the existing Cluster accepted by this request.
-	// It is empty for operations that create their target Cluster.
-	// +optional
-	TargetClusterUID types.UID `json:"targetClusterUID,omitempty"`
-
 	// Records the cluster generation after the OpsRequest action has been handled.
 	// +optional
 	ClusterGeneration int64 `json:"clusterGeneration,omitempty"`

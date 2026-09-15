@@ -21,6 +21,7 @@ package operations
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -29,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -86,7 +88,7 @@ func TestStopTargetsStopped(t *testing.T) {
 	}
 }
 
-func TestStoppedInstanceProgress(t *testing.T) {
+func TestStopParticipantStatuses(t *testing.T) {
 	const (
 		active0  = "cluster-mysql-0"
 		active1  = "cluster-mysql-1"
@@ -97,42 +99,263 @@ func TestStoppedInstanceProgress(t *testing.T) {
 		released = "cluster-mysql-released"
 	)
 	replicas := int32(3)
-	pgRes := &progressResource{
-		opsMessageKey:     "stop",
-		fullComponentName: "mysql",
-		clusterComponent:  &appsv1.ClusterComponentSpec{Name: "mysql", Replicas: replicas},
-	}
 	its := &workloads.InstanceSet{
 		Spec: workloads.InstanceSetSpec{
 			Replicas:         &replicas,
 			OfflineInstances: []string{offline0, offline1, offline2},
 		},
 		Status: workloads.InstanceSetStatus{InstanceStatus: []workloads.InstanceStatus{
-			{PodName: active0, DesiredState: workloads.InstanceDesiredStateOffline, CurrentState: workloads.InstanceCurrentStatePresent},
-			{PodName: active1, DesiredState: workloads.InstanceDesiredStateOffline, CurrentState: workloads.InstanceCurrentStatePresent},
-			{PodName: active2, DesiredState: workloads.InstanceDesiredStateOffline, CurrentState: workloads.InstanceCurrentStatePresent},
+			{PodName: active0, DesiredState: workloads.InstanceDesiredStateActive, CurrentState: workloads.InstanceCurrentStatePresent},
+			{PodName: active1, DesiredState: workloads.InstanceDesiredStateActive, CurrentState: workloads.InstanceCurrentStateTerminating},
+			{PodName: active2, DesiredState: workloads.InstanceDesiredStateActive, CurrentState: workloads.InstanceCurrentStateAbsent},
 			{PodName: offline0, DesiredState: workloads.InstanceDesiredStateOffline, CurrentState: workloads.InstanceCurrentStateAbsent},
 			{PodName: offline1, DesiredState: workloads.InstanceDesiredStateOffline, CurrentState: workloads.InstanceCurrentStateAbsent},
 			{PodName: released, DesiredState: workloads.InstanceDesiredStateReleased, CurrentState: workloads.InstanceCurrentStateAbsent},
 		}},
 	}
 
-	result := handleStoppedInstanceProgress(pgRes, its)
-	if result.expectedCount != 3 || result.completedCount != 0 {
-		t.Fatalf("progress=%d/%d, want 0/3 while the stop participants are present", result.completedCount, result.expectedCount)
+	participants := stopParticipantStatuses(its)
+	if len(participants) != 3 || participants[0].PodName != active0 || participants[1].PodName != active1 || participants[2].PodName != active2 {
+		t.Fatalf("participants=%v, want all active assignments independent of observed runtime state", participants)
 	}
-	if len(result.details) != 3 {
-		t.Fatalf("details=%v, want only the three stop participants", result.details)
+
+	stopped := true
+	its.Spec.Stop = &stopped
+	for i := range its.Status.InstanceStatus[:3] {
+		its.Status.InstanceStatus[i].DesiredState = workloads.InstanceDesiredStateOffline
 	}
-	if findStatusProgressDetail(result.details, getProgressObjectKey(constant.PodKind, offline0)) != nil ||
-		findStatusProgressDetail(result.details, getProgressObjectKey(constant.PodKind, offline2)) != nil ||
-		findStatusProgressDetail(result.details, getProgressObjectKey(constant.PodKind, released)) != nil {
-		t.Fatalf("details=%v, want pre-existing offline and released identities excluded", result.details)
+	participants = stopParticipantStatuses(its)
+	if len(participants) != 3 || participants[0].PodName != active0 || participants[1].PodName != active1 || participants[2].PodName != active2 {
+		t.Fatalf("stopping participants=%v, want retained Stop identities without preexisting offline assignments", participants)
 	}
-	its.Status.InstanceStatus[0].CurrentState = workloads.InstanceCurrentStateAbsent
-	result = handleStoppedInstanceProgress(pgRes, its)
-	if result.expectedCount != 3 || result.completedCount != 1 {
-		t.Fatalf("progress=%d/%d, want 1/3", result.completedCount, result.expectedCount)
+}
+
+type failNextStatusPatchClient struct {
+	client.Client
+	failNext  bool
+	failPhase opsv1alpha1.OpsPhase
+}
+
+func (c *failNextStatusPatchClient) Status() client.StatusWriter {
+	return &failNextStatusWriter{StatusWriter: c.Client.Status(), failNext: &c.failNext, failPhase: c.failPhase}
+}
+
+type failNextStatusWriter struct {
+	client.StatusWriter
+	failNext  *bool
+	failPhase opsv1alpha1.OpsPhase
+}
+
+func (w *failNextStatusWriter) Patch(ctx context.Context, obj client.Object, patch client.Patch,
+	opts ...client.SubResourcePatchOption) error {
+	opsRequest, isOpsRequest := obj.(*opsv1alpha1.OpsRequest)
+	if *w.failNext && isOpsRequest && opsRequest.Status.Phase == w.failPhase {
+		*w.failNext = false
+		return errors.New("injected status patch failure")
+	}
+	return w.StatusWriter.Patch(ctx, obj, patch, opts...)
+}
+
+func TestStopPersistsParticipantsBeforeActionAndReusesThemAfterPatchFailure(t *testing.T) {
+	const (
+		namespace = "default"
+		cluster   = "cluster"
+		component = "mysql"
+		active0   = "cluster-mysql-0"
+		active1   = "cluster-mysql-1"
+		offline   = "cluster-mysql-offline"
+	)
+	replicas := int32(2)
+	scheme := runtime.NewScheme()
+	for name, addToScheme := range map[string]func(*runtime.Scheme) error{
+		"apps": appsv1.AddToScheme, "operations": opsv1alpha1.AddToScheme, "workloads": workloads.AddToScheme,
+	} {
+		if err := addToScheme(scheme); err != nil {
+			t.Fatalf("add %s scheme: %v", name, err)
+		}
+	}
+	clusterObj := &appsv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace, Name: cluster, Generation: 1,
+			Annotations: map[string]string{constant.KBAppMultiClusterPlacementKey: "data"},
+		},
+		Spec: appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{{
+			Name: component, Replicas: replicas,
+		}}},
+		Status: appsv1.ClusterStatus{
+			Phase:              appsv1.RunningClusterPhase,
+			ObservedGeneration: 1,
+			Components: map[string]appsv1.ClusterComponentStatus{
+				component: {Phase: appsv1.RunningComponentPhase, ObservedGeneration: 1, UpToDate: true},
+			},
+		},
+	}
+	ops := &opsv1alpha1.OpsRequest{
+		ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "stop"},
+		Spec: opsv1alpha1.OpsRequestSpec{
+			ClusterName: cluster,
+			Type:        opsv1alpha1.StopType,
+			SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{StopList: []opsv1alpha1.ComponentOps{{
+				ComponentName: component,
+			}}},
+		},
+		Status: opsv1alpha1.OpsRequestStatus{Phase: opsv1alpha1.OpsPendingPhase, Progress: "-/-"},
+	}
+	its := &workloads.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace, Name: constant.GenerateClusterComponentName(cluster, component), Generation: 1,
+		},
+		Spec: workloads.InstanceSetSpec{Replicas: &replicas, OfflineInstances: []string{offline}},
+		Status: workloads.InstanceSetStatus{
+			Replicas: 99,
+			InstanceStatus: []workloads.InstanceStatus{
+				{PodName: active0, DesiredState: workloads.InstanceDesiredStateActive, CurrentState: workloads.InstanceCurrentStatePresent},
+				{PodName: offline, DesiredState: workloads.InstanceDesiredStateOffline, CurrentState: workloads.InstanceCurrentStateAbsent},
+			},
+		},
+	}
+	cli := fake.NewClientBuilder().WithScheme(scheme).
+		WithStatusSubresource(&appsv1.Cluster{}, &opsv1alpha1.OpsRequest{}).
+		WithObjects(clusterObj, ops, its).Build()
+	reqCtx := intctrlutil.RequestCtx{Ctx: context.Background()}
+	load := func() *OpsResource {
+		gotCluster := &appsv1.Cluster{}
+		gotOps := &opsv1alpha1.OpsRequest{}
+		if err := cli.Get(reqCtx.Ctx, client.ObjectKeyFromObject(clusterObj), gotCluster); err != nil {
+			t.Fatal(err)
+		}
+		if err := cli.Get(reqCtx.Ctx, client.ObjectKeyFromObject(ops), gotOps); err != nil {
+			t.Fatal(err)
+		}
+		return &OpsResource{Cluster: gotCluster, OpsRequest: gotOps, Recorder: record.NewFakeRecorder(20)}
+	}
+
+	var (
+		res     *OpsResource
+		waitErr error
+	)
+	for range 2 {
+		res = load()
+		_, waitErr = GetOpsManager().Do(reqCtx, cli, res)
+		if waitErr != nil {
+			break
+		}
+	}
+	if !intctrlutil.IsTargetError(waitErr, intctrlutil.ErrorTypeNeedWaiting) {
+		t.Fatalf("incomplete participant observation error=%v, want NeedWaiting", waitErr)
+	}
+	res = load()
+	if res.OpsRequest.Status.Phase != opsv1alpha1.OpsPendingPhase ||
+		len(res.OpsRequest.Status.Components[component].ProgressDetails) != 0 {
+		t.Fatalf("incomplete participant baseline was persisted: %#v", res.OpsRequest.Status)
+	}
+	if err := cli.Get(reqCtx.Ctx, client.ObjectKeyFromObject(its), its); err != nil {
+		t.Fatal(err)
+	}
+	its.Status.InstanceStatus = append(its.Status.InstanceStatus, workloads.InstanceStatus{
+		PodName: active1, DesiredState: workloads.InstanceDesiredStateActive, CurrentState: workloads.InstanceCurrentStateAbsent,
+	})
+	if err := cli.Update(reqCtx.Ctx, its); err != nil {
+		t.Fatal(err)
+	}
+
+	creatingFailure := &failNextStatusPatchClient{
+		Client: cli, failNext: true, failPhase: opsv1alpha1.OpsCreatingPhase,
+	}
+	var creatingErr error
+	for range 4 {
+		res = load()
+		if _, creatingErr = GetOpsManager().Do(reqCtx, creatingFailure, res); creatingErr != nil {
+			break
+		}
+	}
+	if creatingErr == nil || creatingFailure.failNext {
+		t.Fatalf("creating status patch error=%v armed=%t, want the injected failure", creatingErr, creatingFailure.failNext)
+	}
+	res = load()
+	if res.OpsRequest.Status.Phase != opsv1alpha1.OpsPendingPhase ||
+		len(res.OpsRequest.Status.Components[component].ProgressDetails) != 0 {
+		t.Fatalf("failed Creating patch persisted the participant baseline: %#v", res.OpsRequest.Status)
+	}
+	if ptr.Deref(res.Cluster.Spec.ComponentSpecs[0].Stop, false) {
+		t.Fatal("Stop mutated the Cluster before the participant baseline was persisted")
+	}
+
+	for range 4 {
+		res = load()
+		if res.OpsRequest.Status.Phase == opsv1alpha1.OpsCreatingPhase {
+			break
+		}
+		if _, err := GetOpsManager().Do(reqCtx, cli, res); err != nil {
+			t.Fatalf("prepare Stop through manager: %v", err)
+		}
+	}
+	res = load()
+	if res.OpsRequest.Status.Phase != opsv1alpha1.OpsCreatingPhase {
+		t.Fatalf("phase=%s, want Creating after participant persistence", res.OpsRequest.Status.Phase)
+	}
+	details := res.OpsRequest.Status.Components[component].ProgressDetails
+	if len(details) != 2 || details[0].ObjectKey != "Pod/"+active0 || details[1].ObjectKey != "Pod/"+active1 ||
+		details[0].Group != component || details[1].Group != component {
+		t.Fatalf("persisted participants=%v, want the two initially active identities", details)
+	}
+
+	if _, err := GetOpsManager().Do(reqCtx, cli, res); err != nil {
+		t.Fatalf("apply Stop through manager: %v", err)
+	}
+	res = load()
+	res.OpsRequest.Status.Phase = opsv1alpha1.OpsRunningPhase
+	res.OpsRequest.Status.ClusterGeneration = res.Cluster.Generation
+	if err := cli.Status().Update(reqCtx.Ctx, res.OpsRequest); err != nil {
+		t.Fatal(err)
+	}
+	stopping := true
+	its.Spec.Stop = &stopping
+	its.Generation = 2
+	its.Status.ObservedGeneration = 2
+	its.Status.InstanceStatus = []workloads.InstanceStatus{{
+		PodName: active0, DesiredState: workloads.InstanceDesiredStateOffline, CurrentState: workloads.InstanceCurrentStateAbsent,
+	}}
+	if err := cli.Update(reqCtx.Ctx, its); err != nil {
+		t.Fatal(err)
+	}
+
+	res = load()
+	failing := &failNextStatusPatchClient{
+		Client: cli, failNext: true, failPhase: opsv1alpha1.OpsRunningPhase,
+	}
+	if _, err := GetOpsManager().Reconcile(reqCtx, failing, res); err == nil {
+		t.Fatal("expected the injected first progress patch to fail")
+	}
+	res = load()
+	if len(res.OpsRequest.Status.Components[component].ProgressDetails) != 2 {
+		t.Fatalf("participant baseline was lost after patch failure: %v", res.OpsRequest.Status.Components)
+	}
+	requeueAfter, err := GetOpsManager().Reconcile(reqCtx, cli, res)
+	if err != nil {
+		t.Fatalf("retry Stop reconciliation: %v", err)
+	}
+	if requeueAfter <= 0 {
+		t.Fatal("missing participant observation did not request another reconciliation")
+	}
+	res = load()
+	if res.OpsRequest.Status.Progress != "1/2" {
+		t.Fatalf("progress=%s, want 1/2 while one persisted participant has no observation", res.OpsRequest.Status.Progress)
+	}
+
+	res.Cluster.Status.Components[component] = appsv1.ClusterComponentStatus{
+		Phase: appsv1.StoppedComponentPhase, ObservedGeneration: res.Cluster.Generation, UpToDate: true,
+	}
+	if err := cli.Status().Update(reqCtx.Ctx, res.Cluster); err != nil {
+		t.Fatal(err)
+	}
+	res = load()
+	if _, err := GetOpsManager().Reconcile(reqCtx, cli, res); err != nil {
+		t.Fatalf("complete Stop from apps status: %v", err)
+	}
+	res = load()
+	if res.OpsRequest.Status.Phase != opsv1alpha1.OpsSucceedPhase || res.OpsRequest.Status.Progress != "1/2" {
+		t.Fatalf("phase=%s progress=%s, want Succeed with independently observed progress 1/2", res.OpsRequest.Status.Phase, res.OpsRequest.Status.Progress)
 	}
 }
 
@@ -215,10 +438,20 @@ func TestStopAllTargetsComplete(t *testing.T) {
 		OpsRequest: opsRequest,
 		Recorder:   record.NewFakeRecorder(10),
 	}
-	var err error
-	opsRes.Runtimes, err = buildOpsRuntimes(context.Background(), cli, opsRes)
-	if err != nil {
-		t.Fatalf("build runtimes: %v", err)
+	for _, name := range []string{component, physicalComponent} {
+		obj := &workloads.InstanceSet{}
+		key := client.ObjectKey{Namespace: namespace, Name: constant.GenerateClusterComponentName(clusterName, name)}
+		if err := cli.Get(context.Background(), key, obj); err != nil {
+			t.Fatal(err)
+		}
+		obj.Spec.Stop = &stopped
+		if err := cli.Update(context.Background(), obj); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := (StopOpsHandler{}).SaveLastConfiguration(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, cli, opsRes); err != nil {
+		t.Fatalf("save Stop participants: %v", err)
 	}
 
 	phase, _, err := (StopOpsHandler{}).ReconcileAction(
@@ -276,6 +509,8 @@ var _ = Describe("Stop OpsRequest", func() {
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
 			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
 			testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
+			testapps.MockInstanceSetPods(&testCtx, nil, opsRes.Cluster, defaultCompName)
+			testapps.MockInstanceSetStatus(testCtx, opsRes.Cluster, defaultCompName)
 			By("create 'Stop' opsRequest")
 			createStopOpsRequest(opsRes)
 
@@ -296,6 +531,7 @@ var _ = Describe("Stop OpsRequest", func() {
 			By("init operations resources with topology")
 			opsRes, _, _ := initOperationsResourcesWithTopology(clusterDefName, compDefName, clusterName)
 			pods := testapps.MockInstanceSetPods(&testCtx, nil, opsRes.Cluster, defaultCompName)
+			testapps.MockInstanceSetStatus(testCtx, opsRes.Cluster, defaultCompName)
 
 			By("create 'Stop' opsRequest for specific components")
 			createStopOpsRequest(opsRes, defaultCompName)

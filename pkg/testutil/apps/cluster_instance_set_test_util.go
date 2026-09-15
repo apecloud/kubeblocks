@@ -461,6 +461,7 @@ func MockInstanceSetStatus(testCtx testutil.TestContext, cluster *appsv1.Cluster
 		instanceStatus = append(instanceStatus, status)
 	}
 	gomega.Eventually(GetAndChangeObjStatus(&testCtx, client.ObjectKey{Name: itsName, Namespace: cluster.Namespace}, func(its *workloads.InstanceSet) {
+		its.Status.ObservedGeneration = its.Generation
 		its.Status.CurrentRevisions = currRevisions
 		its.Status.UpdateRevisions = updateRevisions
 		its.Status.Replicas = compSpec.Replicas

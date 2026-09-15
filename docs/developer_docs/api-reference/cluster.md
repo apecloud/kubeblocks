@@ -19596,6 +19596,8 @@ string
 <td></td>
 </tr><tr><td><p>&#34;Terminating&#34;</p></td>
 <td></td>
+</tr><tr><td><p>&#34;Unknown&#34;</p></td>
+<td></td>
 </tr></tbody>
 </table>
 <h3 id="workloads.kubeblocks.io/v1.InstanceDesiredState">InstanceDesiredState
@@ -20061,6 +20063,20 @@ int64
 <em>(Optional)</em>
 <p>observedGeneration is the most recent generation observed for this InstanceSet. It corresponds to the
 InstanceSet&rsquo;s generation, which is updated on mutation by the API Server.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>instanceStatusObservedGeneration</code><br/>
+<em>
+int64
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>InstanceStatusObservedGeneration is the InstanceSet generation for which InstanceStatus contains a complete
+allocation snapshot. Individual rows can still have CurrentState Unknown while their child observation catches up.
+A missing or older value means consumers must not infer success from stale or missing rows.</p>
 </td>
 </tr>
 <tr>
@@ -20571,7 +20587,7 @@ InstanceCurrentState
 </td>
 <td>
 <em>(Optional)</em>
-<p>CurrentState describes whether the instance runtime is currently present, terminating, or absent.
+<p>CurrentState describes whether the instance runtime is currently present, terminating, absent, or not yet observed.
 An empty value from an older object is treated as Present because those entries represented observed instances.</p>
 </td>
 </tr>

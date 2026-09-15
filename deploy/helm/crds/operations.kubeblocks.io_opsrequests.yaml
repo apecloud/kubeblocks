@@ -3265,8 +3265,9 @@ spec:
                               object belongs to.
                             type: string
                           message:
-                            description: Provides a human-readable explanation of
-                              the object's condition.
+                            description: |-
+                              Provides a human-readable explanation of the object's condition.
+                              Controllers must not parse this field as durable state or a versioned protocol.
                             type: string
                           objectKey:
                             description: |-
@@ -3287,6 +3288,64 @@ spec:
                             - Failed
                             - Succeed
                             type: string
+                          switchoverDispatch:
+                            description: |-
+                              Records the durable dispatch state for a Switchover lifecycle action.
+                              This structured field is the controller protocol; Message remains display-only.
+                            properties:
+                              candidateName:
+                                description: CandidateName is the optional target
+                                  instance requested by the Switchover.
+                                maxLength: 256
+                                type: string
+                              componentName:
+                                description: ComponentName is the logical component
+                                  or sharding name used by the writer.
+                                maxLength: 256
+                                minLength: 1
+                                type: string
+                              instanceName:
+                                description: InstanceName is the source instance requested
+                                  by the Switchover.
+                                maxLength: 256
+                                minLength: 1
+                                type: string
+                              opsRequestUID:
+                                description: OpsRequestUID binds the dispatch to one
+                                  exact OpsRequest incarnation.
+                                maxLength: 128
+                                minLength: 1
+                                type: string
+                              state:
+                                description: |-
+                                  State records whether the external call is still unconfirmed, was resolved
+                                  by its caller, or crossed a restart with no retained result.
+                                enum:
+                                - Claimed
+                                - Resolved
+                                - OutcomeUnknown
+                                type: string
+                              token:
+                                description: Token uniquely identifies the writer
+                                  that committed the dispatch claim.
+                                maxLength: 256
+                                minLength: 1
+                                type: string
+                              version:
+                                description: |-
+                                  Version selects the protocol contract used by this status value.
+                                  Readers must fail closed when they do not support the recorded version.
+                                maxLength: 16
+                                minLength: 1
+                                type: string
+                            required:
+                            - componentName
+                            - instanceName
+                            - opsRequestUID
+                            - state
+                            - token
+                            - version
+                            type: object
                         required:
                         - status
                         type: object

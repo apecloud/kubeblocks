@@ -74,7 +74,7 @@ func TestHorizontalScalingParticipantAndProgressOrder(t *testing.T) {
 	for _, fromBackup := range []bool{false, true} {
 		want := []string{"names(db,1)", "names(db,1)", "names(db,2)", "workload(db)"}
 		if fromBackup {
-			want = append([]string{"names(db,1)", "names(db,1)", "names(db,1)", "names(db,2)"}, want...)
+			want = []string{"workload(db)"}
 		}
 		// Fail each name-planning step in turn to ensure no later planning,
 		// workload checks, or target writes occur after the first error.
@@ -90,7 +90,11 @@ func TestHorizontalScalingParticipantAndProgressOrder(t *testing.T) {
 				if err := hs.Action(f.req, f.cli, f.res); err != nil {
 					t.Fatal(err)
 				}
-				if !reflect.DeepEqual(trace.calls, []string{"names(db,1)"}) {
+				var actionCalls []string
+				if !fromBackup {
+					actionCalls = []string{"names(db,1)"}
+				}
+				if !reflect.DeepEqual(trace.calls, actionCalls) {
 					t.Fatalf("Action calls = %v", trace.calls)
 				}
 				trace.calls, trace.specs, trace.failAt = nil, nil, failAt
@@ -118,7 +122,7 @@ func TestHorizontalScalingParticipantAndProgressOrder(t *testing.T) {
 					t.Fatal(err)
 				}
 				wantRestores := 0
-				if fromBackup && (failAt == 0 || failAt > 4) {
+				if fromBackup {
 					wantRestores = 1
 				}
 				if len(restores.Items) != wantRestores {
@@ -194,6 +198,16 @@ func TestHorizontalScalingOnlineInferenceInputs(t *testing.T) {
 						t.Fatalf("candidate instances = %+v", candidate.Instances)
 					}
 				}
+			}
+			backupRequest := request.DeepCopy()
+			backupRequest.ScaleOut.FromBackup = &opsv1alpha1.FromBackup{Name: "snapshot"}
+			replicas, instances, offline, err := hs.getExpectedCompValues(f.res,
+				f.res.OpsRequest.Status.LastConfiguration.Components["db"], *backupRequest)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if replicas != spec.Replicas || !reflect.DeepEqual(instances, spec.Instances) || !reflect.DeepEqual(offline, spec.OfflineInstances) {
+				t.Fatal("backup and ordinary planning produced different targets")
 			}
 			f.replicas(t, "db", tc.wantReplicas)
 			if tc.template && (len(spec.Instances) != 1 || spec.Instances[0].GetReplicas() != 2) {
@@ -631,5 +645,65 @@ func TestHorizontalScalingCancellingBackupKeepsOriginalScale(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestHorizontalScalingMixedBackupConflicts(t *testing.T) {
+	for _, earlierBackup := range []bool{false, true} {
+		for _, currentBackup := range []bool{false, true} {
+			t.Run(fmt.Sprintf("earlier-backup=%t/current-backup=%t", earlierBackup, currentBackup), func(t *testing.T) {
+				current := scaleOutRequest("db", currentBackup)
+				current.ScaleOut.ReplicaChanges = pointer.Int32(0)
+				current.ScaleIn = &opsv1alpha1.ScaleIn{
+					ReplicaChanger:           opsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(1)},
+					OnlineInstancesToOffline: []string{"demo-db-1"},
+				}
+				f := newHorizontalScalingFixture(t, current)
+				earlier := f.res.OpsRequest.DeepCopy()
+				earlier.Name, earlier.UID, earlier.ResourceVersion = "earlier", "earlier1", ""
+				earlier.Spec.HorizontalScalingList = []opsv1alpha1.HorizontalScaling{scaleOutRequest("db", earlierBackup)}
+				if err := f.cli.Create(f.req.Ctx, earlier); err != nil {
+					t.Fatal(err)
+				}
+				f.res.Cluster.Spec.ComponentSpecs[0].Replicas = 2
+				f.res.OpsRequest.Status.LastConfiguration.Components["db"] = opsv1alpha1.LastComponentConfiguration{Replicas: pointer.Int32(2)}
+				f.res.Cluster.Annotations = map[string]string{constant.OpsRequestAnnotationKey: fmt.Sprintf(`[{"name":"earlier","type":%q},{"name":"scale","type":%q}]`, opsv1alpha1.HorizontalScalingType, opsv1alpha1.HorizontalScalingType)}
+				err := (horizontalScalingOpsHandler{}).Action(f.req, f.cli, f.res)
+				if !intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal) || !strings.Contains(err.Error(), `instance "demo-db-1" cannot be taken offline`) {
+					t.Fatalf("expected conflict with earlier request, got %v", err)
+				}
+				if f.clusterWrites != 0 || f.backupReads != 0 || f.restoreReads != 0 {
+					t.Fatal("conflict performed scaling or restore work")
+				}
+			})
+		}
+	}
+}
+
+func TestHorizontalScalingBackupRejectsInvalidPlanBeforeWork(t *testing.T) {
+	request := scaleOutRequest("db", true)
+	request.ScaleOut.NewInstances = []appsv1.InstanceTemplate{{Name: "invalid", Replicas: pointer.Int32(1),
+		Ordinals: appsv1.Ordinals{Ranges: []appsv1.Range{{Start: 3, End: 2}}}}}
+	actionFixture := newHorizontalScalingFixture(t, scaleOutRequest("db", true))
+	actionFixture.res.OpsRequest.Status.LastConfiguration.Components["db"] = opsv1alpha1.LastComponentConfiguration{
+		Replicas: pointer.Int32(1), Instances: request.ScaleOut.NewInstances,
+	}
+	hs := horizontalScalingOpsHandler{}
+	if err := hs.Action(actionFixture.req, actionFixture.cli, actionFixture.res); err == nil {
+		t.Fatal("Action accepted invalid existing instance ordinals")
+	}
+	if actionFixture.clusterWrites != 0 || actionFixture.backupReads != 0 || actionFixture.restoreReads != 0 {
+		t.Fatal("invalid existing instance ordinals performed work during Action")
+	}
+
+	f := newHorizontalScalingFixture(t, request)
+	f.addBackup(t)
+	for i := 0; i < 2; i++ {
+		if _, _, err := hs.ReconcileAction(f.req, f.cli, f.res); err == nil {
+			t.Fatal("invalid instance plan was accepted")
+		}
+	}
+	if f.clusterWrites != 0 || f.restoreReads != 0 {
+		t.Fatal("invalid plan performed scaling or restore work")
 	}
 }

@@ -21,45 +21,28 @@ package operations
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlcomp "github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/plan"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
-
-// reconcileBackupScaling prepares volumes before submitting the target configuration,
-// then tracks the same instance changes as ordinary replica scaling.
-func (hs horizontalScalingOpsHandler) reconcileBackupScaling(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	opsRes *OpsResource,
-	pgRes *progressResource,
-	compStatus *opsv1alpha1.OpsRequestComponentStatus) (int32, int32, error) {
-	horizontalScaling := pgRes.compOps.(opsv1alpha1.HorizontalScaling)
-	lastCompConfiguration := opsRes.OpsRequest.Status.LastConfiguration.Components[horizontalScaling.ComponentName]
-	// Preserve the restore step during cancellation as well as normal reconciliation.
-	if err := hs.restoreDataFromBackup(reqCtx, cli, opsRes, pgRes, pgRes.clusterComponent.DeepCopy(),
-		horizontalScaling, lastCompConfiguration, compStatus); err != nil {
-		return 0, 0, err
-	}
-	// Continue checking instance progress even while Restore is pending, as in
-	// the existing lifecycle. Only the target configuration write waits for Restore.
-	if err := hs.setReplicaScalingParticipants(opsRes, pgRes); err != nil {
-		return 0, 0, err
-	}
-	return handleComponentProgressForScalingReplicas(reqCtx, cli, opsRes, pgRes, compStatus)
-}
 
 func (hs horizontalScalingOpsHandler) getBackupObj(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
@@ -127,7 +110,7 @@ func (hs horizontalScalingOpsHandler) createRestore(reqCtx intctrlutil.RequestCt
 func (hs horizontalScalingOpsHandler) restoreDataFromBackup(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	opsRes *OpsResource,
-	pgRes *progressResource,
+	fullComponentName string,
 	targetCompSpec *appsv1.ClusterComponentSpec,
 	horizontalScaling opsv1alpha1.HorizontalScaling,
 	lastCompConfiguration opsv1alpha1.LastComponentConfiguration,
@@ -143,7 +126,7 @@ func (hs horizontalScalingOpsHandler) restoreDataFromBackup(reqCtx intctrlutil.R
 	if err != nil {
 		return err
 	}
-	replicas, instances, offlineInstances, err := hs.getExpectedCompValues(opsRes,
+	replicas, instances, offlineInstances, err := hs.getBackupExpectedCompValues(opsRes,
 		lastCompConfiguration, horizontalScaling)
 	if err != nil {
 		return err
@@ -151,7 +134,7 @@ func (hs horizontalScalingOpsHandler) restoreDataFromBackup(reqCtx intctrlutil.R
 	targetCompSpec.Replicas = replicas
 	targetCompSpec.Instances = instances
 	targetCompSpec.OfflineInstances = offlineInstances
-	createdPodSet, deletedPodSet, err := hs.getReplicaScalingChanges(opsRes, lastCompConfiguration, horizontalScaling, pgRes.fullComponentName)
+	createdPodSet, deletedPodSet, err := hs.getBackupReplicaScalingChanges(opsRes, lastCompConfiguration, horizontalScaling, fullComponentName)
 	if err != nil {
 		return err
 	}
@@ -162,7 +145,7 @@ func (hs horizontalScalingOpsHandler) restoreDataFromBackup(reqCtx intctrlutil.R
 		targetCompSpec.Instances = lastCompConfiguration.Instances
 		targetCompSpec.OfflineInstances = lastCompConfiguration.OfflineInstances
 	}
-	comp, compDef, err := intctrlcomp.GetCompNCompDefByName(reqCtx.Ctx, cli, opsRes.Cluster.Namespace, constant.GenerateClusterComponentName(opsRes.Cluster.Name, pgRes.fullComponentName))
+	comp, compDef, err := intctrlcomp.GetCompNCompDefByName(reqCtx.Ctx, cli, opsRes.Cluster.Namespace, constant.GenerateClusterComponentName(opsRes.Cluster.Name, fullComponentName))
 	if err != nil {
 		return err
 	}
@@ -178,7 +161,7 @@ func (hs horizontalScalingOpsHandler) restoreDataFromBackup(reqCtx intctrlutil.R
 		restoreMGR := plan.NewRestoreManager(reqCtx.Ctx, cli, opsRes.Cluster, model.GetScheme(), map[string]string{
 			constant.OpsRequestNameLabelKey: opsRes.OpsRequest.Name,
 			constant.AppInstanceLabelKey:    opsRes.Cluster.Name,
-			constant.KBAppComponentLabelKey: pgRes.compOps.GetComponentName(),
+			constant.KBAppComponentLabelKey: horizontalScaling.ComponentName,
 		}, 1, int32(podIndexInt))
 		restoreMGR.RestoreTime = fromBackup.RestorePointInTime
 		restoreMGR.SetRestoreEnv(fromBackup.RestoreEnv)
@@ -228,4 +211,179 @@ func (hs horizontalScalingOpsHandler) scaleOutComponentAfterRestoreData(reqCtx i
 		}
 	}
 	return cli.Update(reqCtx.Ctx, opsRes.Cluster)
+}
+
+func isBackupScaling(scaling opsv1alpha1.HorizontalScaling) bool {
+	return scaling.ScaleOut != nil && scaling.ScaleOut.FromBackup != nil
+}
+
+func (hs horizontalScalingOpsHandler) getBackupReplicaScalingChanges(opsRes *OpsResource,
+	lastCompConfiguration opsv1alpha1.LastComponentConfiguration,
+	horizontalScaling opsv1alpha1.HorizontalScaling,
+	fullCompName string) (map[string]string, map[string]string, error) {
+	clusterName := opsRes.Cluster.Name
+	lastPodSet, err := generateBackupInstanceNames(clusterName, fullCompName,
+		*lastCompConfiguration.Replicas, lastCompConfiguration.Instances, lastCompConfiguration.OfflineInstances)
+	if err != nil {
+		return nil, nil, err
+	}
+	expectReplicas, expectInstanceTpls, expectOfflineInstances, err := hs.getBackupExpectedCompValues(opsRes, lastCompConfiguration, horizontalScaling)
+	if err != nil {
+		return nil, nil, err
+	}
+	currPodSet, err := generateBackupInstanceNames(clusterName, fullCompName,
+		expectReplicas, expectInstanceTpls, expectOfflineInstances)
+	if err != nil {
+		return nil, nil, err
+	}
+	createPodSet := map[string]string{}
+	deletePodSet := map[string]string{}
+	for k := range currPodSet {
+		if _, ok := lastPodSet[k]; !ok {
+			createPodSet[k] = appsv1.GetInstanceTemplateName(clusterName, fullCompName, k)
+		}
+	}
+	for k := range lastPodSet {
+		if _, ok := currPodSet[k]; !ok {
+			deletePodSet[k] = appsv1.GetInstanceTemplateName(clusterName, fullCompName, k)
+		}
+	}
+	return createPodSet, deletePodSet, nil
+}
+
+func (hs horizontalScalingOpsHandler) getBackupExpectedCompValues(
+	opsRes *OpsResource,
+	lastCompConfiguration opsv1alpha1.LastComponentConfiguration,
+	horizontalScaling opsv1alpha1.HorizontalScaling) (int32, []appsv1.InstanceTemplate, []string, error) {
+	compReplicas := *lastCompConfiguration.Replicas
+	compInstanceTpls := slices.Clone(lastCompConfiguration.Instances)
+	compOfflineInstances := lastCompConfiguration.OfflineInstances
+	filteredHorizontal := horizontalScaling.DeepCopy()
+	podSet, err := generateBackupInstanceNames(opsRes.Cluster.Name, horizontalScaling.ComponentName,
+		compReplicas, compInstanceTpls, compOfflineInstances)
+	if err != nil {
+		return 0, nil, nil, err
+	}
+	filterHorizontalScalingSpec(podSet, compOfflineInstances, filteredHorizontal)
+	expectOfflineInstances := hs.getCompExpectedOfflineInstances(compOfflineInstances, *filteredHorizontal)
+	err = hs.autoSyncBackupReplicaChanges(opsRes, *filteredHorizontal, compReplicas, compInstanceTpls, expectOfflineInstances)
+	if err != nil {
+		return 0, nil, nil, err
+	}
+	return hs.getCompExpectReplicas(*filteredHorizontal, compReplicas),
+		hs.getCompExpectedInstances(compInstanceTpls, *filteredHorizontal),
+		expectOfflineInstances, nil
+}
+
+func (hs horizontalScalingOpsHandler) autoSyncBackupReplicaChanges(
+	opsRes *OpsResource,
+	horizontalScaling opsv1alpha1.HorizontalScaling,
+	compReplicas int32,
+	compInstanceTpls []appsv1.InstanceTemplate,
+	compExpectOfflineInstances []string) error {
+	scaleIn := horizontalScaling.ScaleIn
+	if scaleIn != nil {
+		offlineInsCountMap := opsRes.OpsRequest.CountOfflineOrOnlineInstances(opsRes.Cluster.Name, horizontalScaling.ComponentName, scaleIn.OnlineInstancesToOffline)
+		scaleIn.Instances, scaleIn.ReplicaChanges = syncReplicaChangesFromCounts(offlineInsCountMap, scaleIn.ReplicaChanger, nil)
+	}
+	scaleOut := horizontalScaling.ScaleOut
+	if scaleOut != nil {
+		onlineInsCountMap, err := hs.getBackupPlannedOnlineInstanceCounts(opsRes, horizontalScaling, compReplicas, compInstanceTpls, compExpectOfflineInstances)
+		if err != nil {
+			return err
+		}
+		scaleOut.Instances, scaleOut.ReplicaChanges = syncReplicaChangesFromCounts(onlineInsCountMap, scaleOut.ReplicaChanger, scaleOut.NewInstances)
+	}
+	return nil
+}
+
+func (hs horizontalScalingOpsHandler) getBackupPlannedOnlineInstanceCounts(
+	opsRes *OpsResource,
+	horizontalScaling opsv1alpha1.HorizontalScaling,
+	compReplicas int32,
+	compInstanceTpls []appsv1.InstanceTemplate,
+	compExpectOfflineInstances []string) (map[string]int32, error) {
+	if horizontalScaling.ScaleOut.ReplicaChanges != nil || len(horizontalScaling.ScaleOut.OfflineInstancesToOnline) == 0 {
+		return nil, nil
+	}
+	compInstanceTplsClone := slices.Clone(compInstanceTpls)
+	offlineInsMap := groupBackupInstancesToOnline(opsRes.Cluster.Name, horizontalScaling.ComponentName, horizontalScaling.ScaleOut)
+	for _, insNames := range offlineInsMap {
+		compReplicas += int32(len(insNames))
+	}
+	for i := range compInstanceTplsClone {
+		tplName := compInstanceTplsClone[i].Name
+		if insNames, ok := offlineInsMap[tplName]; ok {
+			compInstanceTplsClone[i].Replicas = pointer.Int32(compInstanceTplsClone[i].GetReplicas() + int32(len(insNames)))
+		}
+	}
+	podSet, err := generateBackupInstanceNames(opsRes.Cluster.Name, horizontalScaling.ComponentName,
+		compReplicas, compInstanceTplsClone, compExpectOfflineInstances)
+	if err != nil {
+		return nil, err
+	}
+	return countPlannedOnlineInstances(offlineInsMap, podSet), nil
+}
+
+func groupBackupInstancesToOnline(clusterName, componentName string, scaleOut *opsv1alpha1.ScaleOut) map[string][]string {
+	slices.Sort(scaleOut.OfflineInstancesToOnline)
+	offlineInsMap := map[string][]string{}
+	instanceTplChangesMap := map[string]int32{}
+	for _, tplChange := range scaleOut.ReplicaChanger.Instances {
+		instanceTplChangesMap[tplChange.Name] = tplChange.ReplicaChanges
+	}
+	for _, insName := range scaleOut.OfflineInstancesToOnline {
+		insTplName := appsv1.GetInstanceTemplateName(clusterName, componentName, insName)
+		if _, ok := instanceTplChangesMap[insTplName]; ok {
+			// Explicit template replica changes take precedence over inferred counts.
+			continue
+		}
+		offlineInsMap[insTplName] = append(offlineInsMap[insTplName], insName)
+	}
+	return offlineInsMap
+}
+
+func (hs horizontalScalingOpsHandler) validateBackupOnlineInstancesToOffline(
+	lastCompConfiguration opsv1alpha1.LastComponentConfiguration,
+	onlineInstancesToOffline []string,
+	opsRes *OpsResource,
+	componentName string) error {
+	if len(onlineInstancesToOffline) == 0 {
+		return nil
+	}
+	toOfflineSet := sets.New(onlineInstancesToOffline...)
+	if len(toOfflineSet) < len(onlineInstancesToOffline) {
+		return intctrlutil.NewFatalError("instances specified in onlineInstancesToOffline has duplicates")
+	}
+	currPodSet, err := generateBackupInstanceNames(opsRes.Cluster.Name, componentName,
+		*lastCompConfiguration.Replicas, lastCompConfiguration.Instances, lastCompConfiguration.OfflineInstances)
+	if err != nil {
+		return err
+	}
+	for _, onlineIns := range onlineInstancesToOffline {
+		if _, ok := currPodSet[onlineIns]; !ok {
+			return intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" specified in onlineInstancesToOffline is not online`, onlineIns))
+		}
+	}
+	return nil
+}
+
+func generateBackupInstanceNames(clusterName, componentName string, replicas int32,
+	instances []appsv1.InstanceTemplate, offlineInstances []string) (map[string]string, error) {
+	var templates []instanceset.InstanceTemplate
+	for _, instance := range instances {
+		templates = append(templates, &workloads.InstanceTemplate{
+			Name: instance.Name, Replicas: instance.Replicas, Ordinals: instance.Ordinals,
+		})
+	}
+	names, err := instanceset.GenerateAllInstanceNames(constant.GenerateClusterComponentName(clusterName, componentName),
+		replicas, templates, offlineInstances, appsv1.Ordinals{})
+	if err != nil {
+		return nil, err
+	}
+	result := make(map[string]string, len(names))
+	for _, name := range names {
+		result[name] = appsv1.GetInstanceTemplateName(clusterName, componentName, name)
+	}
+	return result, nil
 }

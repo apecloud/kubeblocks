@@ -132,6 +132,8 @@ var _ = Describe("Ops ProgressDetails", func() {
 			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
+			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
 
 			By("test the progressDetails when InstanceStatus updates during restart operation")
 			testProgressDetailsWithInstanceStatusUpdating(reqCtx, opsRes, podList)

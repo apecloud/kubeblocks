@@ -285,6 +285,26 @@ func mockRollingTargetStatus(cluster *appsv1.Cluster, expectPhase appsv1.Compone
 	})).Should(Succeed())
 }
 
+func mockRunningInstanceStatus(cluster *appsv1.Cluster, compNames ...string) {
+	for _, name := range compNames {
+		testapps.MockInstanceSetStatus(testCtx, cluster, name)
+		key := client.ObjectKey{Namespace: cluster.Namespace,
+			Name: constant.GenerateClusterComponentName(cluster.Name, name)}
+		Eventually(testapps.GetAndChangeObjStatus(&testCtx, key, func(its *workloads.InstanceSet) {
+			its.Status.ObservedGeneration = its.Generation
+			for i := range its.Status.InstanceStatus {
+				status := &its.Status.InstanceStatus[i]
+				if status.EffectiveDesiredState() == workloads.InstanceDesiredStateActive &&
+					status.EffectiveCurrentState() == workloads.InstanceCurrentStatePresent {
+					status.UpToDate = true
+					status.Ready = true
+					status.Available = true
+				}
+			}
+		})).Should(Succeed())
+	}
+}
+
 func runAction(reqCtx intctrlutil.RequestCtx, opsRes *OpsResource, expectPhase opsv1alpha1.OpsPhase) {
 	_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 	Expect(err).ShouldNot(HaveOccurred())

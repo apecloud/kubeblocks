@@ -360,34 +360,9 @@ func getProgressProcessingMessage(opsMessageKey, objectKey, componentName string
 	return fmt.Sprintf("Start to %s: %s in Component: %s", opsMessageKey, objectKey, componentName)
 }
 
-func handleRunningProgress(opsRes *OpsResource, pgRes *progressResource) (rollingProgress, error) {
-	its, err := getInstanceSet(opsRes, pgRes)
-	if err != nil {
-		return rollingProgress{}, err
-	}
-	return handleRunningInstanceProgress(opsRes, pgRes, its), nil
-}
-
-func getInstanceSet(opsRes *OpsResource, pgRes *progressResource) (*workloads.InstanceSet, error) {
-	runtime, err := opsRes.GetRuntime(pgRes.compOps.GetComponentName())
-	if err != nil {
-		return nil, err
-	}
-	return runtime.GetInstanceSet(opsRes.Cluster.Namespace, opsRes.Cluster.Name, pgRes.fullComponentName)
-}
-
-func handleRunningInstanceProgress(opsRes *OpsResource, pgRes *progressResource, its *workloads.InstanceSet) rollingProgress {
-	expectedCount := pgRes.clusterComponent.Replicas
-	if its != nil {
-		expectedCount = ptr.Deref(its.Spec.Replicas, expectedCount)
-	}
-	if expectedCount < pgRes.clusterComponent.Replicas {
-		expectedCount = pgRes.clusterComponent.Replicas
-	}
-	result := rollingProgress{expectedCount: expectedCount}
-	if its == nil {
-		return result
-	}
+func handleRunningInstanceProgress(opsRes *OpsResource, pgRes *progressResource, its *workloads.InstanceSet) instanceProgress {
+	expectedCount := ptr.Deref(its.Spec.Replicas, int32(1))
+	result := instanceProgress{expectedCount: expectedCount}
 	for i := range its.Status.InstanceStatus {
 		instance := &its.Status.InstanceStatus[i]
 		if instance.EffectiveDesiredState() != workloads.InstanceDesiredStateActive {
@@ -406,12 +381,15 @@ func handleRunningInstanceProgress(opsRes *OpsResource, pgRes *progressResource,
 			detail.SetStatusAndMessage(opsv1alpha1.SucceedProgressStatus,
 				getProgressSucceedMessage(pgRes.opsMessageKey, objectKey, pgRes.fullComponentName))
 			result.completedCount++
+			result.succeededCount++
 		default:
 			detail.SetStatusAndMessage(opsv1alpha1.ProcessingProgressStatus,
 				getProgressProcessingMessage(pgRes.opsMessageKey, objectKey, pgRes.fullComponentName))
 		}
 		result.details = append(result.details, detail)
 	}
+	result.observationsComplete = its.Status.ObservedGeneration == its.Generation &&
+		!ptr.Deref(its.Spec.Stop, false) && int32(len(result.details)) == expectedCount
 	return result
 }
 

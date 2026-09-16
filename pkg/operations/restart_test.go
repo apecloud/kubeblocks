@@ -22,6 +22,7 @@ package operations
 import (
 	"context"
 	"testing"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -95,6 +96,7 @@ func TestRestartUsesClusterStatusForTerminalPhase(t *testing.T) {
 		name             string
 		componentPhase   appsv1.ComponentPhase
 		upToDate         bool
+		instanceFailed   bool
 		wantPhase        opsv1alpha1.OpsPhase
 		wantDetailStatus opsv1alpha1.ProgressStatus
 	}{
@@ -102,6 +104,7 @@ func TestRestartUsesClusterStatusForTerminalPhase(t *testing.T) {
 			name:             "instance failure remains progress while component is updating",
 			componentPhase:   appsv1.UpdatingComponentPhase,
 			upToDate:         true,
+			instanceFailed:   true,
 			wantPhase:        opsv1alpha1.OpsRunningPhase,
 			wantDetailStatus: opsv1alpha1.FailedProgressStatus,
 		},
@@ -116,6 +119,7 @@ func TestRestartUsesClusterStatusForTerminalPhase(t *testing.T) {
 			name:             "failed component is authoritative failure",
 			componentPhase:   appsv1.FailedComponentPhase,
 			upToDate:         true,
+			instanceFailed:   true,
 			wantPhase:        opsv1alpha1.OpsFailedPhase,
 			wantDetailStatus: opsv1alpha1.FailedProgressStatus,
 		},
@@ -134,6 +138,7 @@ func TestRestartUsesClusterStatusForTerminalPhase(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: clusterName, Generation: 8},
 				Spec: appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{{
 					Name: component, Replicas: replicas,
+					Annotations: map[string]string{constant.RestartAnnotationKey: "2026-09-16T01:02:03Z"},
 				}}},
 				Status: appsv1.ClusterStatus{Components: map[string]appsv1.ClusterComponentStatus{
 					component: {
@@ -150,6 +155,7 @@ func TestRestartUsesClusterStatusForTerminalPhase(t *testing.T) {
 				}},
 				Status: opsv1alpha1.OpsRequestStatus{
 					ClusterGeneration: 8,
+					StartTimestamp:    metav1.NewTime(time.Date(2026, 9, 16, 1, 2, 3, 0, time.UTC)),
 					Components:        map[string]opsv1alpha1.OpsRequestComponentStatus{},
 				},
 			}
@@ -166,7 +172,7 @@ func TestRestartUsesClusterStatusForTerminalPhase(t *testing.T) {
 					UpToDate:     true,
 					Ready:        true,
 					Available:    true,
-					Failed:       true,
+					Failed:       test.instanceFailed,
 				}}},
 			}
 			cli := fake.NewClientBuilder().WithScheme(testScheme).

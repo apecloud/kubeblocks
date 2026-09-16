@@ -90,8 +90,7 @@ func (r restartOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 	if !r.targetsExist(opsRes) {
 		return opsv1alpha1.OpsAbortedPhase, 0, nil
 	}
-	return r.compOpsHelper.reconcileRollingAction(reqCtx, cli, opsRes,
-		"restart", handleRunningProgress, appsv1.RunningComponentPhase)
+	return r.compOpsHelper.reconcileRunningAction(reqCtx, cli, opsRes, "restart")
 }
 
 // SaveLastConfiguration has nothing to record for a restart operation.

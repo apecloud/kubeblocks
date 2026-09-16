@@ -98,8 +98,7 @@ func (start StartOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli 
 		return opsv1alpha1.OpsAbortedPhase, 0, nil
 	}
 	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.StartList)
-	return compOpsHelper.reconcileRollingAction(reqCtx, cli, opsRes,
-		"start", handleRunningProgress, appsv1.RunningComponentPhase)
+	return compOpsHelper.reconcileRunningAction(reqCtx, cli, opsRes, "start")
 }
 
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration

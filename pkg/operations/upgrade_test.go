@@ -27,6 +27,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
@@ -372,6 +373,18 @@ var _ = Describe("Upgrade OpsRequest", func() {
 	}
 
 	expectOpsSucceed := func(reqCtx intctrlutil.RequestCtx, opsRes *OpsResource, compNames ...string) {
+		for _, name := range compNames {
+			its := &workloads.InstanceSet{}
+			key := client.ObjectKey{Namespace: opsRes.Cluster.Namespace,
+				Name: constant.GenerateClusterComponentName(opsRes.Cluster.Name, name)}
+			if err := k8sClient.Get(ctx, key, its); apierrors.IsNotFound(err) {
+				its = testapps.MockInstanceSetComponent(&testCtx, opsRes.Cluster.Name, name)
+			} else {
+				Expect(err).ShouldNot(HaveOccurred())
+			}
+			testapps.MockInstanceSetPods(&testCtx, its, opsRes.Cluster, name)
+		}
+		mockRunningInstanceStatus(opsRes.Cluster, compNames...)
 		// mock component to running
 		mockRollingTargetStatus(opsRes.Cluster, appsv1.RunningComponentPhase, compNames...)
 		_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
@@ -402,11 +415,8 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			})).Should(Succeed())
 
 			By("the ops succeeds when the current target status is Running and UpToDate")
-			mockRollingTargetStatus(opsRes.Cluster, appsv1.RunningComponentPhase, defaultCompName)
 			Expect(opsRes.OpsRequest.Status.ClusterGeneration).Should(Equal(opsRes.Cluster.Generation))
-			_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
-			Expect(err).ShouldNot(HaveOccurred())
-			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsSucceedPhase))
+			expectOpsSucceed(reqCtx, opsRes, defaultCompName)
 		})
 
 		It("Test upgrade OpsRequest with ComponentDef and ComponentVersion", func() {

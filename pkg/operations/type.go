@@ -124,7 +124,6 @@ type progressResource struct {
 // - Custom, which still depends on direct Pod/Job/ConfigMap/Secret based execution
 type OpsRuntime interface {
 	GetWorkload(namespace, clusterName, compName string) (Workload, error)
-	GetInstanceSet(namespace, clusterName, compName string) (*workloads.InstanceSet, error)
 	GetInstance(namespace, clusterName, compName, instanceName string) (Instance, error)
 	ListInstances(namespace, clusterName, compName string) ([]Instance, error)
 	GenerateInstanceNameSet(clusterName, compName string, compReplicas int32, instances []appsv1.InstanceTemplate, offlineInstances []string) (map[string]string, error)

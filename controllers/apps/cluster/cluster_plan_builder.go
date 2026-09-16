@@ -292,7 +292,7 @@ func (c *clusterPlanBuilder) reconcileCluster(node *model.ObjectVertex) error {
 	// cluster.meta and cluster.spec might change
 	case model.STATUS:
 		if !reflect.DeepEqual(cluster.ObjectMeta, origCluster.ObjectMeta) || !reflect.DeepEqual(cluster.Spec, origCluster.Spec) {
-			patch := client.MergeFrom(origCluster.DeepCopy())
+			patch := client.MergeFromWithOptions(origCluster.DeepCopy(), client.MergeFromWithOptimisticLock{})
 			if err := c.cli.Patch(c.transCtx.Context, cluster, patch); err != nil {
 				return err
 			}

@@ -38,9 +38,18 @@ func TestValidateVolumeExpansion(t *testing.T) {
 	}{
 		{name: "inherited storage"},
 		{name: "same size retry", change: func(c *appsv1.ClusterComponentSpec, _ *VolumeExpansion) { c.VolumeClaimTemplates = volume("5Gi") }},
-		{name: "replace a larger pending declaration", change: func(c *appsv1.ClusterComponentSpec, _ *VolumeExpansion) { c.VolumeClaimTemplates = volume("6Gi") }},
+		{name: "reject a smaller declared target", change: func(c *appsv1.ClusterComponentSpec, _ *VolumeExpansion) { c.VolumeClaimTemplates = volume("6Gi") }, wantError: "less than declared size"},
 		{name: "missing component", change: func(_ *appsv1.ClusterComponentSpec, r *VolumeExpansion) { r.ComponentName = "missing" }, wantError: "not found"},
 		{name: "missing volume", change: func(_ *appsv1.ClusterComponentSpec, r *VolumeExpansion) { r.VolumeClaimTemplates[0].Name = "missing" }, wantError: "not found"},
+		{name: "zero replicas with valid volume", change: func(c *appsv1.ClusterComponentSpec, _ *VolumeExpansion) { c.Replicas = 0 }},
+		{name: "zero replicas with missing volume", change: func(c *appsv1.ClusterComponentSpec, r *VolumeExpansion) {
+			c.Replicas = 0
+			r.VolumeClaimTemplates[0].Name = "missing"
+		}, wantError: "not found"},
+		{name: "zero replicas with smaller target", change: func(c *appsv1.ClusterComponentSpec, _ *VolumeExpansion) {
+			c.Replicas = 0
+			c.VolumeClaimTemplates = volume("6Gi")
+		}, wantError: "less than declared size"},
 		{name: "empty volumes", change: func(_ *appsv1.ClusterComponentSpec, r *VolumeExpansion) { r.VolumeClaimTemplates = nil }},
 		{name: "matching override", change: func(c *appsv1.ClusterComponentSpec, _ *VolumeExpansion) {
 			c.Instances[0].VolumeClaimTemplates = volume("5Gi")
@@ -92,6 +101,7 @@ func TestValidateVolumeExpansion(t *testing.T) {
 		wantError bool
 	}{
 		{name: "inherited sharding"},
+		{name: "smaller sharding target", change: func(s *appsv1.ClusterSharding) { s.Template.VolumeClaimTemplates = volume("6Gi") }, wantError: true},
 		{name: "conflicting shard override", change: func(s *appsv1.ClusterSharding) { s.ShardTemplates[0].VolumeClaimTemplates = volume("4Gi") }, wantError: true},
 		{name: "matching shard override", change: func(s *appsv1.ClusterSharding) { s.ShardTemplates[0].VolumeClaimTemplates = volume("5Gi") }},
 		{name: "missing shard volume", change: func(s *appsv1.ClusterSharding) {

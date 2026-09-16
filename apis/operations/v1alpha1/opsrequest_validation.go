@@ -677,6 +677,9 @@ func validateExpansionVolumes(expansion VolumeExpansion, scope string, volumes [
 			return fmt.Errorf("volumeClaimTemplate %q not found in %s", requested.Name, scope)
 		}
 		current := volumes[index].Spec.Resources.Requests.Storage()
+		if !fixed && requested.Storage.Cmp(*current) < 0 {
+			return fmt.Errorf("requested storage for %s/%s cannot be less than declared size %s", scope, requested.Name, current.String())
+		}
 		if fixed && requested.Storage.Cmp(*current) != 0 {
 			return fmt.Errorf("storage override for %s/%s differs from requested size %s", scope, requested.Name, requested.Storage.String())
 		}

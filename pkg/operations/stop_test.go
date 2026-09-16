@@ -22,6 +22,7 @@ package operations
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -245,7 +246,115 @@ func TestStopReconcilesCurrentInstanceStatus(t *testing.T) {
 	if err := cli.Status().Update(req.Ctx, res.Cluster); err != nil {
 		t.Fatal(err)
 	}
-	check("1/2", 1, opsv1alpha1.OpsSucceedPhase)
+	check("1/2", 1, opsv1alpha1.OpsRunningPhase)
+	its.Status.InstanceStatus = append(its.Status.InstanceStatus, workloads.InstanceStatus{
+		PodName: "second-name", DesiredState: workloads.InstanceDesiredStateOffline, CurrentState: workloads.InstanceCurrentStateTerminating,
+	})
+	if err := cli.Update(req.Ctx, its); err != nil {
+		t.Fatal(err)
+	}
+	check("1/2", 2, opsv1alpha1.OpsRunningPhase)
+	its.Status.InstanceStatus[1].CurrentState = workloads.InstanceCurrentStateAbsent
+	its.Status.InstanceStatus = append(its.Status.InstanceStatus, workloads.InstanceStatus{
+		PodName: "old-allocation", DesiredState: workloads.InstanceDesiredStateOffline, CurrentState: workloads.InstanceCurrentStateAbsent,
+	})
+	if err := cli.Update(req.Ctx, its); err != nil {
+		t.Fatal(err)
+	}
+	check("3/3", 3, opsv1alpha1.OpsRunningPhase)
+	its.Status.InstanceStatus = its.Status.InstanceStatus[:2]
+	if err := cli.Update(req.Ctx, its); err != nil {
+		t.Fatal(err)
+	}
+	failProgressPatch = true
+	if _, err := GetOpsManager().Reconcile(req, cli, load()); err == nil {
+		t.Fatal("expected failed final progress patch")
+	}
+	if load().OpsRequest.Status.Phase != opsv1alpha1.OpsRunningPhase {
+		t.Fatal("Stop completed before final progress was persisted")
+	}
+	check("2/2", 2, opsv1alpha1.OpsSucceedPhase)
+}
+
+func TestStopWaitsForAppsResult(t *testing.T) {
+	for _, replicas := range []int32{0, 1} {
+		t.Run(fmt.Sprintf("replicas=%d", replicas), func(t *testing.T) {
+			scheme := runtime.NewScheme()
+			for _, add := range []func(*runtime.Scheme) error{appsv1.AddToScheme, opsv1alpha1.AddToScheme, workloads.AddToScheme} {
+				if err := add(scheme); err != nil {
+					t.Fatal(err)
+				}
+			}
+			cluster := &appsv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{Name: "cluster", Namespace: "default", Generation: 1},
+				Spec:       appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{{Name: "mysql", Replicas: replicas, Stop: ptr.To(true)}}},
+				Status: appsv1.ClusterStatus{Components: map[string]appsv1.ClusterComponentStatus{
+					"mysql": {Phase: appsv1.StoppedComponentPhase, ObservedGeneration: 1, UpToDate: true},
+				}},
+			}
+			ops := &opsv1alpha1.OpsRequest{
+				ObjectMeta: metav1.ObjectMeta{Name: "stop", Namespace: "default"},
+				Spec:       opsv1alpha1.OpsRequestSpec{ClusterName: "cluster", Type: opsv1alpha1.StopType},
+				Status:     opsv1alpha1.OpsRequestStatus{Phase: opsv1alpha1.OpsRunningPhase, ClusterGeneration: 1},
+			}
+			cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, ops).
+				WithStatusSubresource(cluster, ops).Build()
+			ctx := context.Background()
+			check := func(wantPhase opsv1alpha1.OpsPhase, wantProgress string) {
+				t.Helper()
+				currentCluster, currentOps := &appsv1.Cluster{}, &opsv1alpha1.OpsRequest{}
+				if err := cli.Get(ctx, client.ObjectKeyFromObject(cluster), currentCluster); err != nil {
+					t.Fatal(err)
+				}
+				if err := cli.Get(ctx, client.ObjectKeyFromObject(ops), currentOps); err != nil {
+					t.Fatal(err)
+				}
+				res := &OpsResource{Cluster: currentCluster, OpsRequest: currentOps, Recorder: record.NewFakeRecorder(16)}
+				delay, err := GetOpsManager().Reconcile(intctrlutil.RequestCtx{Ctx: ctx}, cli, res)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := cli.Get(ctx, client.ObjectKeyFromObject(ops), currentOps); err != nil {
+					t.Fatal(err)
+				}
+				if currentOps.Status.Phase != wantPhase || currentOps.Status.Progress != wantProgress {
+					t.Fatalf("phase=%s progress=%s, want %s %s", currentOps.Status.Phase, currentOps.Status.Progress, wantPhase, wantProgress)
+				}
+				if wantPhase == opsv1alpha1.OpsRunningPhase && delay <= 0 {
+					t.Fatal("Stop has no retry while observations disagree")
+				}
+			}
+			check(opsv1alpha1.OpsRunningPhase, fmt.Sprintf("0/%d", replicas))
+			its := &workloads.InstanceSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "cluster-mysql", Namespace: "default"},
+				Spec:       workloads.InstanceSetSpec{Replicas: &replicas},
+			}
+			if replicas > 0 {
+				its.Status.InstanceStatus = []workloads.InstanceStatus{{PodName: "mysql-0", DesiredState: workloads.InstanceDesiredStateActive, CurrentState: workloads.InstanceCurrentStateAbsent}}
+			}
+			if err := cli.Create(ctx, its); err != nil {
+				t.Fatal(err)
+			}
+			check(opsv1alpha1.OpsRunningPhase, fmt.Sprintf("%d/%d", replicas, replicas))
+			cluster.Status.Components["mysql"] = appsv1.ClusterComponentStatus{Phase: appsv1.StoppingComponentPhase, ObservedGeneration: 1, UpToDate: true}
+			if err := cli.Status().Update(ctx, cluster); err != nil {
+				t.Fatal(err)
+			}
+			its.Spec.Stop = ptr.To(true)
+			for i := range its.Status.InstanceStatus {
+				its.Status.InstanceStatus[i].DesiredState = workloads.InstanceDesiredStateOffline
+			}
+			if err := cli.Update(ctx, its); err != nil {
+				t.Fatal(err)
+			}
+			check(opsv1alpha1.OpsRunningPhase, fmt.Sprintf("%d/%d", replicas, replicas))
+			cluster.Status.Components["mysql"] = appsv1.ClusterComponentStatus{Phase: appsv1.StoppedComponentPhase, ObservedGeneration: 1, UpToDate: true}
+			if err := cli.Status().Update(ctx, cluster); err != nil {
+				t.Fatal(err)
+			}
+			check(opsv1alpha1.OpsSucceedPhase, fmt.Sprintf("%d/%d", replicas, replicas))
+		})
+	}
 }
 
 func TestStopAllTargetsComplete(t *testing.T) {
@@ -264,7 +373,8 @@ func TestStopAllTargetsComplete(t *testing.T) {
 			ComponentSpecs: []appsv1.ClusterComponentSpec{{Name: component, Replicas: replicas, Stop: &stopped}},
 			Shardings: []appsv1.ClusterSharding{{
 				Name: shardingName, Shards: 1,
-				Template: appsv1.ClusterComponentSpec{Replicas: replicas, Stop: &stopped},
+				Template:       appsv1.ClusterComponentSpec{Replicas: 3, Stop: &stopped},
+				ShardTemplates: []appsv1.ShardTemplate{{Name: "small", Shards: ptr.To(int32(1)), Replicas: &replicas}},
 			}},
 		},
 		Status: appsv1.ClusterStatus{
@@ -321,7 +431,7 @@ func TestStopAllTargetsComplete(t *testing.T) {
 	}
 	cli := fake.NewClientBuilder().WithScheme(testScheme).
 		WithStatusSubresource(&opsv1alpha1.OpsRequest{}).
-		WithObjects(opsRequest, shardComponent, newInstanceSet(component), newInstanceSet(physicalComponent)).Build()
+		WithObjects(opsRequest, newInstanceSet(component), newInstanceSet(physicalComponent)).Build()
 	opsRes := &OpsResource{
 		Cluster:    cluster,
 		OpsRequest: opsRequest,
@@ -339,7 +449,15 @@ func TestStopAllTargetsComplete(t *testing.T) {
 		}
 	}
 
-	phase, _, err := (StopOpsHandler{}).ReconcileAction(
+	phase, delay, err := (StopOpsHandler{}).ReconcileAction(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, cli, opsRes)
+	if err != nil || phase != opsv1alpha1.OpsRunningPhase || delay <= 0 {
+		t.Fatalf("phase=%s delay=%s err=%v, want retry while the shard list is incomplete", phase, delay, err)
+	}
+	if err := cli.Create(context.Background(), shardComponent); err != nil {
+		t.Fatal(err)
+	}
+	phase, _, err = (StopOpsHandler{}).ReconcileAction(
 		intctrlutil.RequestCtx{Ctx: context.Background()}, cli, opsRes)
 	if err != nil {
 		t.Fatalf("reconcile stop-all: %v", err)
@@ -443,6 +561,11 @@ var _ = Describe("Stop OpsRequest", func() {
 			})).Should(Succeed())
 
 			By("mock components stopped successfully")
+			itsKey := client.ObjectKey{Namespace: opsRes.Cluster.Namespace,
+				Name: constant.GenerateClusterComponentName(opsRes.Cluster.Name, defaultCompName)}
+			Eventually(testapps.GetAndChangeObj(&testCtx, itsKey, func(its *workloads.InstanceSet) {
+				its.Spec.Stop = ptr.To(true)
+			})).Should(Succeed())
 			for i := range pods {
 				testk8s.MockPodIsTerminating(ctx, testCtx, pods[i])
 				testk8s.RemovePodFinalizer(ctx, testCtx, pods[i])

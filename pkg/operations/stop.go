@@ -172,8 +172,11 @@ func (stop StopOpsHandler) reconcile(reqCtx intctrlutil.RequestCtx, cli client.C
 		}
 	}
 	var expectedCount, completedCount int32
+	observationsComplete := true
+	componentCounts := map[string]int32{}
 	for _, resource := range resources {
 		name := resource.compOps.GetComponentName()
+		componentCounts[name]++
 		if _, ok := current[name]; !ok {
 			current[name] = nil
 		}
@@ -185,10 +188,15 @@ func (stop StopOpsHandler) reconcile(reqCtx intctrlutil.RequestCtx, cli client.C
 				return opsv1alpha1.OpsRunningPhase, 0, err
 			}
 			expectedCount += resource.clusterComponent.Replicas
+			observationsComplete = false
 			continue
 		}
 		participants := stopParticipantStatuses(its)
-		expectedCount += max(resource.clusterComponent.Replicas, int32(len(participants)))
+		replicas := ptr.Deref(its.Spec.Replicas, 1)
+		expectedCount += max(replicas, int32(len(participants)))
+		if !ptr.Deref(its.Spec.Stop, false) || int32(len(participants)) != replicas {
+			observationsComplete = false
+		}
 		for _, instance := range participants {
 			objectKey := getProgressObjectKey(constant.PodKind, instance.PodName)
 			detail := opsv1alpha1.ProgressStatusDetail{ObjectKey: objectKey, Group: resource.fullComponentName}
@@ -201,6 +209,11 @@ func (stop StopOpsHandler) reconcile(reqCtx intctrlutil.RequestCtx, cli client.C
 					getProgressProcessingMessage("stop", objectKey, resource.fullComponentName))
 			}
 			current[name] = append(current[name], detail)
+		}
+	}
+	for _, sharding := range opsRes.Cluster.Spec.Shardings {
+		if _, selected := helper.getComponentOps(sharding.Name); selected && componentCounts[sharding.Name] != sharding.Shards {
+			observationsComplete = false
 		}
 	}
 	for name, details := range current {
@@ -224,6 +237,11 @@ func (stop StopOpsHandler) reconcile(reqCtx intctrlutil.RequestCtx, cli client.C
 		opsRequest.Status.Components[name] = status
 	}
 	phase := helper.updateRollingActionPhase(opsRes, appsv1.StoppedComponentPhase)
+	// Apps and workload observations can arrive separately. Keep reconciling until
+	// the observed progress agrees with success; never fill missing progress from it.
+	if phase == opsv1alpha1.OpsSucceedPhase && (!observationsComplete || completedCount != expectedCount) {
+		phase = opsv1alpha1.OpsRunningPhase
+	}
 	opsRequest.Status.Progress = fmt.Sprintf("%d/%d", completedCount, expectedCount)
 	if !reflect.DeepEqual(opsRequest.Status, oldOpsRequest.Status) {
 		if err := cli.Status().Patch(reqCtx.Ctx, opsRequest, client.MergeFrom(oldOpsRequest)); err != nil {

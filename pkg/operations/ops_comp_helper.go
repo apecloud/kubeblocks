@@ -374,7 +374,7 @@ func (c componentOpsHelper) reconcileRunningAction(reqCtx intctrlutil.RequestCtx
 	if err != nil {
 		return opsv1alpha1.OpsRunningPhase, 0, err
 	}
-	current := c.emptyInstanceProgress(opsRes.Cluster)
+	current := c.emptyInstanceProgress(opsRes)
 	componentCounts := map[string]int32{}
 	observationsComplete := true
 	var expectedCount, completedCount, succeededCount int32
@@ -420,8 +420,14 @@ func (c componentOpsHelper) reconcileRunningAction(reqCtx intctrlutil.RequestCtx
 	return phase, 0, nil
 }
 
-func (c componentOpsHelper) emptyInstanceProgress(cluster *appsv1.Cluster) map[string][]opsv1alpha1.ProgressStatusDetail {
+func (c componentOpsHelper) emptyInstanceProgress(opsRes *OpsResource) map[string][]opsv1alpha1.ProgressStatusDetail {
 	progress := make(map[string][]opsv1alpha1.ProgressStatusDetail)
+	for name := range opsRes.OpsRequest.Status.Components {
+		if _, ok := c.getComponentOps(name); ok {
+			progress[name] = nil
+		}
+	}
+	cluster := opsRes.Cluster
 	for i := range cluster.Spec.ComponentSpecs {
 		name := cluster.Spec.ComponentSpecs[i].Name
 		if _, ok := c.getComponentOps(name); ok {

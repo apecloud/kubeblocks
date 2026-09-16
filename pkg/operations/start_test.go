@@ -309,6 +309,92 @@ func TestStartAllTargetsComplete(t *testing.T) {
 	}
 }
 
+func TestStartAndStopRefreshRemovedScopeProgress(t *testing.T) {
+	for _, operation := range []opsv1alpha1.OpsType{opsv1alpha1.StartType, opsv1alpha1.StopType} {
+		for _, selectedOnly := range []bool{false, true} {
+			name := string(operation) + "-all"
+			if selectedOnly {
+				name = string(operation) + "-selected"
+			}
+			t.Run(name, func(t *testing.T) {
+				scheme := runtime.NewScheme()
+				for _, add := range []func(*runtime.Scheme) error{appsv1.AddToScheme, opsv1alpha1.AddToScheme, workloads.AddToScheme} {
+					if err := add(scheme); err != nil {
+						t.Fatal(err)
+					}
+				}
+				stopping := operation == opsv1alpha1.StopType
+				componentPhase := appsv1.RunningComponentPhase
+				if stopping {
+					componentPhase = appsv1.StoppedComponentPhase
+				}
+				cluster := &appsv1.Cluster{
+					ObjectMeta: metav1.ObjectMeta{Name: "cluster", Namespace: "default", Generation: 2},
+					Spec: appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{{
+						Name: "mysql", Replicas: 1, Stop: pointer.Bool(stopping),
+					}}},
+					Status: appsv1.ClusterStatus{Components: map[string]appsv1.ClusterComponentStatus{
+						"mysql": {Phase: componentPhase, ObservedGeneration: 2, UpToDate: true},
+					}},
+				}
+				stale := []opsv1alpha1.ProgressStatusDetail{{ObjectKey: "Pod/removed-0", Status: opsv1alpha1.ProcessingProgressStatus}}
+				ops := &opsv1alpha1.OpsRequest{
+					ObjectMeta: metav1.ObjectMeta{Name: "operation", Namespace: "default"},
+					Spec:       opsv1alpha1.OpsRequestSpec{ClusterName: cluster.Name, Type: operation},
+					Status: opsv1alpha1.OpsRequestStatus{Phase: opsv1alpha1.OpsRunningPhase, ClusterGeneration: 2,
+						Components: map[string]opsv1alpha1.OpsRequestComponentStatus{
+							"removed-component": {ProgressDetails: stale},
+							"removed-sharding":  {ProgressDetails: stale},
+						}},
+				}
+				if selectedOnly {
+					selection := []opsv1alpha1.ComponentOps{{ComponentName: "mysql"}}
+					if stopping {
+						ops.Spec.StopList = selection
+					} else {
+						ops.Spec.StartList = selection
+					}
+				}
+				instance := workloads.InstanceStatus{PodName: "cluster-mysql-0", DesiredState: workloads.InstanceDesiredStateActive,
+					CurrentState: workloads.InstanceCurrentStatePresent, UpToDate: true, Ready: true, Available: true}
+				if stopping {
+					instance.DesiredState = workloads.InstanceDesiredStateOffline
+					instance.CurrentState = workloads.InstanceCurrentStateAbsent
+				}
+				its := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Name: "cluster-mysql", Namespace: "default"},
+					Spec:   workloads.InstanceSetSpec{Replicas: pointer.Int32(1), Stop: pointer.Bool(stopping)},
+					Status: workloads.InstanceSetStatus{InstanceStatus: []workloads.InstanceStatus{instance}}}
+				cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(ops).WithObjects(cluster, ops, its).Build()
+				reqCtx := intctrlutil.RequestCtx{Ctx: context.Background()}
+				res := &OpsResource{Cluster: cluster, OpsRequest: ops, Recorder: record.NewFakeRecorder(8)}
+				if _, err := GetOpsManager().Reconcile(reqCtx, cli, res); err != nil {
+					t.Fatal(err)
+				}
+				persisted := &opsv1alpha1.OpsRequest{}
+				if err := cli.Get(reqCtx.Ctx, client.ObjectKeyFromObject(ops), persisted); err != nil {
+					t.Fatal(err)
+				}
+				if persisted.Status.Phase != opsv1alpha1.OpsSucceedPhase || persisted.Status.Progress != "1/1" {
+					t.Fatalf("phase=%s progress=%s, want Succeed 1/1", persisted.Status.Phase, persisted.Status.Progress)
+				}
+				for _, scope := range []string{"removed-component", "removed-sharding"} {
+					rows := persisted.Status.Components[scope].ProgressDetails
+					if selectedOnly {
+						if len(rows) != 1 || rows[0].ObjectKey != stale[0].ObjectKey || rows[0].Status != stale[0].Status {
+							t.Fatalf("unselected scope %s changed: %v", scope, rows)
+						}
+					} else if len(rows) != 0 {
+						t.Fatalf("removed scope %s retained stale progress: %v", scope, rows)
+					}
+				}
+				if rows := persisted.Status.Components["mysql"].ProgressDetails; len(rows) != 1 || rows[0].Status != opsv1alpha1.SucceedProgressStatus {
+					t.Fatalf("current scope progress=%v, want one Succeed row", rows)
+				}
+			})
+		}
+	}
+}
+
 var _ = Describe("Start OpsRequest", func() {
 	var (
 		randomStr      = testCtx.GetRandomStr()

@@ -125,11 +125,11 @@ func TestSyncCurrentProgressDetails(t *testing.T) {
 	}}}
 	cluster := &appsv1.Cluster{Spec: appsv1.ClusterSpec{
 		ComponentSpecs: []appsv1.ClusterComponentSpec{{Name: "mysql"}},
-		Shardings:      []appsv1.ClusterSharding{{Name: "shard"}, {Name: "gone"}},
+		Shardings:      []appsv1.ClusterSharding{{Name: "shard"}},
 	}}
 	opsRes := &OpsResource{Cluster: cluster, OpsRequest: opsRequest, Recorder: record.NewFakeRecorder(3)}
-	helper := newComponentOpsHelper([]opsv1alpha1.ComponentOps{})
-	current := helper.emptyInstanceProgress(cluster)
+	helper := newComponentOpsHelper([]opsv1alpha1.ComponentOps{{ComponentName: "mysql"}, {ComponentName: "shard"}, {ComponentName: "gone"}})
+	current := helper.emptyInstanceProgress(opsRes)
 	current["mysql"] = []opsv1alpha1.ProgressStatusDetail{newDetail("Pod/cluster-mysql-0")}
 	current["shard"] = []opsv1alpha1.ProgressStatusDetail{
 		newDetail("Pod/cluster-shard-1-0"),

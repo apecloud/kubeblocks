@@ -162,7 +162,7 @@ func (stop StopOpsHandler) reconcile(reqCtx intctrlutil.RequestCtx, cli client.C
 	if err != nil {
 		return opsv1alpha1.OpsRunningPhase, 0, err
 	}
-	current := helper.emptyInstanceProgress(opsRes.Cluster)
+	current := helper.emptyInstanceProgress(opsRes)
 	var expectedCount, completedCount int32
 	observationsComplete := true
 	componentCounts := map[string]int32{}

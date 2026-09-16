@@ -1580,6 +1580,19 @@ Kubernetes core/v1.ResourceRequirements
 </tr>
 <tr>
 <td>
+<code>instanceTemplates</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Records owner-published template assignments before an explicit instance online/offline operation.
+Keys are instance identities; an empty value identifies the default template.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>offlineInstances</code><br/>
 <em>
 []string

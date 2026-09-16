@@ -539,22 +539,12 @@ func (r *OpsRequest) validateVolumeExpansion(ctx context.Context, cli client.Cli
 		return err
 	}
 	storageClasses := sets.New[string]()
-	collectStorageClasses := func(expansion VolumeExpansion, comp appsv1.ClusterComponentSpec) {
-		for _, volume := range comp.VolumeClaimTemplates {
-			if volume.Spec.StorageClassName == nil || *volume.Spec.StorageClassName == "" ||
-				!slices.ContainsFunc(expansion.VolumeClaimTemplates, func(v OpsRequestVolumeClaimTemplate) bool { return v.Name == volume.Name }) ||
-				!expansionUsesComponentVolume(comp, volume.Name) {
-				continue
-			}
-			storageClasses.Insert(*volume.Spec.StorageClassName)
-		}
-	}
 	for _, expansion := range volumeExpansionList {
 		if comp := cluster.Spec.GetComponentByName(expansion.ComponentName); comp != nil {
 			if err := validateExpansionVolumes(expansion, comp.Name, comp.VolumeClaimTemplates); err != nil {
 				return err
 			}
-			collectStorageClasses(expansion, *comp)
+			collectExpansionStorageClasses(expansion, *comp, storageClasses)
 			continue
 		}
 		for _, sharding := range cluster.Spec.Shardings {
@@ -564,29 +554,13 @@ func (r *OpsRequest) validateVolumeExpansion(ctx context.Context, cli client.Cli
 			if err := validateExpansionVolumes(expansion, sharding.Name, sharding.Template.VolumeClaimTemplates); err != nil {
 				return err
 			}
-			remaining := sharding.Shards
-			for _, template := range sharding.ShardTemplates {
-				if template.Shards == nil || *template.Shards == 0 {
-					continue
-				}
-				remaining -= *template.Shards
-				if template.VolumeClaimTemplates != nil {
-					continue
-				}
-				comp := sharding.Template
-				if template.Replicas != nil {
-					comp.Replicas = *template.Replicas
-				}
-				if template.Instances != nil {
-					comp.Instances = template.Instances
-				}
-				collectStorageClasses(expansion, comp)
-			}
-			if remaining > 0 {
-				collectStorageClasses(expansion, sharding.Template)
-			}
+			collectShardingExpansionStorageClasses(expansion, sharding, storageClasses)
 		}
 	}
+	return validateExpansionStorageClasses(ctx, cli, storageClasses)
+}
+
+func validateExpansionStorageClasses(ctx context.Context, cli client.Client, storageClasses sets.Set[string]) error {
 	for _, name := range sets.List(storageClasses) {
 		sc := &storagev1.StorageClass{}
 		if err := cli.Get(ctx, client.ObjectKey{Name: name}, sc); err != nil {
@@ -597,6 +571,41 @@ func (r *OpsRequest) validateVolumeExpansion(ctx context.Context, cli client.Cli
 		}
 	}
 	return nil
+}
+
+func collectShardingExpansionStorageClasses(expansion VolumeExpansion, sharding appsv1.ClusterSharding, storageClasses sets.Set[string]) {
+	remaining := sharding.Shards
+	for _, template := range sharding.ShardTemplates {
+		if template.Shards == nil || *template.Shards == 0 {
+			continue
+		}
+		remaining -= *template.Shards
+		if template.VolumeClaimTemplates != nil {
+			continue
+		}
+		comp := sharding.Template
+		if template.Replicas != nil {
+			comp.Replicas = *template.Replicas
+		}
+		if template.Instances != nil {
+			comp.Instances = template.Instances
+		}
+		collectExpansionStorageClasses(expansion, comp, storageClasses)
+	}
+	if remaining > 0 {
+		collectExpansionStorageClasses(expansion, sharding.Template, storageClasses)
+	}
+}
+
+func collectExpansionStorageClasses(expansion VolumeExpansion, comp appsv1.ClusterComponentSpec, storageClasses sets.Set[string]) {
+	for _, volume := range comp.VolumeClaimTemplates {
+		if volume.Spec.StorageClassName == nil || *volume.Spec.StorageClassName == "" ||
+			!slices.ContainsFunc(expansion.VolumeClaimTemplates, func(v OpsRequestVolumeClaimTemplate) bool { return v.Name == volume.Name }) ||
+			!expansionUsesComponentVolume(comp, volume.Name) {
+			continue
+		}
+		storageClasses.Insert(*volume.Spec.StorageClassName)
+	}
 }
 
 // validateSwitchover validates switchover api when spec.type is Switchover.

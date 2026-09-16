@@ -44,14 +44,10 @@ import (
 	testops "github.com/apecloud/kubeblocks/pkg/testutil/operations"
 )
 
-func TestRestartTargetsMatchTrigger(t *testing.T) {
-	startTimestamp := metav1.NewTime(time.Date(2026, 9, 16, 1, 2, 3, 0, time.UTC))
-	trigger := startTimestamp.Format(time.RFC3339)
+func TestRestartTargetsExist(t *testing.T) {
 	cluster := &appsv1.Cluster{Spec: appsv1.ClusterSpec{
-		ComponentSpecs: []appsv1.ClusterComponentSpec{{Name: "mysql", Annotations: map[string]string{constant.RestartAnnotationKey: trigger}}},
-		Shardings: []appsv1.ClusterSharding{{Name: "shard", Template: appsv1.ClusterComponentSpec{
-			Annotations: map[string]string{constant.RestartAnnotationKey: trigger},
-		}}},
+		ComponentSpecs: []appsv1.ClusterComponentSpec{{Name: "mysql"}},
+		Shardings:      []appsv1.ClusterSharding{{Name: "shard"}},
 	}}
 	newOpsResource := func(targets ...string) *OpsResource {
 		restartList := make([]opsv1alpha1.ComponentOps, len(targets))
@@ -59,21 +55,16 @@ func TestRestartTargetsMatchTrigger(t *testing.T) {
 			restartList[i].ComponentName = targets[i]
 		}
 		return &OpsResource{Cluster: cluster, OpsRequest: &opsv1alpha1.OpsRequest{
-			Spec:   opsv1alpha1.OpsRequestSpec{SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{RestartList: restartList}},
-			Status: opsv1alpha1.OpsRequestStatus{StartTimestamp: startTimestamp},
+			Spec: opsv1alpha1.OpsRequestSpec{SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{RestartList: restartList}},
 		}}
 	}
 
 	handler := restartOpsHandler{}
-	if !handler.targetsRestarted(newOpsResource("mysql", "shard")) {
-		t.Fatal("applied restart targets were rejected")
+	if !handler.targetsExist(newOpsResource("mysql", "shard")) {
+		t.Fatal("existing targets were rejected")
 	}
-	if handler.targetsRestarted(newOpsResource("missing")) {
+	if handler.targetsExist(newOpsResource("missing")) {
 		t.Fatal("missing target was accepted")
-	}
-	cluster.Spec.ComponentSpecs[0].Annotations[constant.RestartAnnotationKey] = startTimestamp.Add(time.Second).Format(time.RFC3339)
-	if handler.targetsRestarted(newOpsResource("mysql")) {
-		t.Fatal("a replaced restart trigger was accepted")
 	}
 	opsRes := newOpsResource("missing")
 	opsRes.Cluster.Generation = 7

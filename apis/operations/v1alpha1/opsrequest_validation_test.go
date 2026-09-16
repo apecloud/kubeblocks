@@ -23,8 +23,14 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 )
 
 func TestValidateVolumeExpansion(t *testing.T) {
@@ -82,7 +88,7 @@ func TestValidateVolumeExpansion(t *testing.T) {
 			}
 			cluster := &appsv1.Cluster{Spec: appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{comp}}}
 			ops := &OpsRequest{Spec: OpsRequestSpec{Type: VolumeExpansionType, SpecificOpsRequest: SpecificOpsRequest{VolumeExpansionList: []VolumeExpansion{expansion}}}}
-			// A nil client proves this validation needs only the public Cluster declaration.
+			// Unspecified storage classes require no resource reads.
 			err := ops.ValidateOps(context.Background(), nil, cluster)
 			if tc.wantError == "" {
 				if err != nil {
@@ -136,6 +142,90 @@ func TestValidateVolumeExpansion(t *testing.T) {
 			err := ops.ValidateOps(context.Background(), nil, cluster)
 			if (err != nil) != tc.wantError {
 				t.Fatalf("error = %v, wantError = %t", err, tc.wantError)
+			}
+		})
+	}
+}
+
+func TestValidateVolumeExpansionStorageClass(t *testing.T) {
+	for _, tc := range []struct {
+		name              string
+		change            func(*appsv1.ClusterComponentSpec)
+		sharding          bool
+		independentShards bool
+		allow             *bool
+		missing           bool
+		wantReads         int
+		wantError         string
+	}{
+		{name: "explicit supported class", allow: ptr.To(true), wantReads: 1},
+		{name: "explicit unsupported class", allow: ptr.To(false), wantReads: 1, wantError: "does not allow"},
+		{name: "expansion capability unset", wantReads: 1, wantError: "does not allow"},
+		{name: "explicit class missing", missing: true, wantReads: 1, wantError: "not found"},
+		{name: "unspecified class skips even an unsupported default", change: func(c *appsv1.ClusterComponentSpec) { c.VolumeClaimTemplates[0].Spec.StorageClassName = nil }},
+		{name: "empty class skips lookup", change: func(c *appsv1.ClusterComponentSpec) { c.VolumeClaimTemplates[0].Spec.StorageClassName = ptr.To("") }},
+		{name: "zero replicas skip lookup", change: func(c *appsv1.ClusterComponentSpec) { c.Replicas = 0 }},
+		{name: "all instances override the requested volume", change: func(c *appsv1.ClusterComponentSpec) {
+			c.Instances = []appsv1.InstanceTemplate{{Name: "custom", Replicas: ptr.To(int32(2)), VolumeClaimTemplates: c.VolumeClaimTemplates}}
+		}},
+		{name: "unrelated template storage class is ignored", change: func(c *appsv1.ClusterComponentSpec) {
+			c.Instances = []appsv1.InstanceTemplate{{Name: "custom", Replicas: ptr.To(int32(2)), VolumeClaimTemplates: []appsv1.PersistentVolumeClaimTemplate{{Name: "other", Spec: corev1.PersistentVolumeClaimSpec{StorageClassName: ptr.To("missing-other")}}}}}
+		}, allow: ptr.To(true), wantReads: 1},
+		{name: "an inherited template is checked", change: func(c *appsv1.ClusterComponentSpec) {
+			c.Instances = []appsv1.InstanceTemplate{{Name: "custom", Replicas: ptr.To(int32(2))}}
+		}, allow: ptr.To(false), wantReads: 1, wantError: "does not allow"},
+		{name: "stopped instances are checked", change: func(c *appsv1.ClusterComponentSpec) { c.Stop = ptr.To(true) }, allow: ptr.To(false), wantReads: 1, wantError: "does not allow"},
+		{name: "sharding class checked once", sharding: true, allow: ptr.To(true), wantReads: 1},
+		{name: "unsupported sharding class", sharding: true, allow: ptr.To(false), wantReads: 1, wantError: "does not allow"},
+		{name: "independent shard volumes skip lookup", sharding: true, independentShards: true},
+		{name: "shard instances override the requested volume", sharding: true, change: func(c *appsv1.ClusterComponentSpec) {
+			c.Instances = []appsv1.InstanceTemplate{{Name: "custom", Replicas: ptr.To(int32(2)), VolumeClaimTemplates: c.VolumeClaimTemplates}}
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			comp := appsv1.ClusterComponentSpec{Name: "db", Replicas: 2, VolumeClaimTemplates: []appsv1.PersistentVolumeClaimTemplate{{Name: "data", Spec: corev1.PersistentVolumeClaimSpec{StorageClassName: ptr.To("explicit"), Resources: corev1.VolumeResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("3Gi")}}}}}}
+			if tc.change != nil {
+				tc.change(&comp)
+			}
+			cluster := &appsv1.Cluster{Spec: appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{comp}}}
+			if tc.sharding {
+				cluster.Spec.ComponentSpecs = nil
+				shard := appsv1.ClusterSharding{Name: "db", Shards: 2, Template: comp, ShardTemplates: []appsv1.ShardTemplate{{Name: "custom", Shards: ptr.To(int32(1))}}}
+				if tc.independentShards {
+					shard.ShardTemplates[0].Shards = ptr.To(int32(2))
+					shard.ShardTemplates[0].VolumeClaimTemplates = comp.VolumeClaimTemplates
+				}
+				cluster.Spec.Shardings = []appsv1.ClusterSharding{shard}
+			}
+			ops := &OpsRequest{Spec: OpsRequestSpec{Type: VolumeExpansionType, SpecificOpsRequest: SpecificOpsRequest{VolumeExpansionList: []VolumeExpansion{{ComponentOps: ComponentOps{ComponentName: "db"}, VolumeClaimTemplates: []OpsRequestVolumeClaimTemplate{{Name: "data", Storage: resource.MustParse("5Gi")}}}}}}}
+			scheme := runtime.NewScheme()
+			if err := storagev1.AddToScheme(scheme); err != nil {
+				t.Fatal(err)
+			}
+			objects := []client.Object{&storagev1.StorageClass{ObjectMeta: metav1.ObjectMeta{Name: "default", Annotations: map[string]string{"storageclass.kubernetes.io/is-default-class": "true"}}, AllowVolumeExpansion: ptr.To(false)}}
+			if !tc.missing {
+				objects = append(objects, &storagev1.StorageClass{ObjectMeta: metav1.ObjectMeta{Name: "explicit"}, AllowVolumeExpansion: tc.allow})
+			}
+			reads := 0
+			cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).WithInterceptorFuncs(interceptor.Funcs{
+				Get: func(ctx context.Context, cli client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+					if _, ok := obj.(*storagev1.StorageClass); !ok || key.Name != "explicit" {
+						t.Fatalf("unexpected resource lookup: %T %v", obj, key)
+					}
+					reads++
+					return cli.Get(ctx, key, obj, opts...)
+				},
+				List: func(context.Context, client.WithWatch, client.ObjectList, ...client.ListOption) error {
+					t.Fatal("validation must not list resources or discover a default class")
+					return nil
+				},
+			}).Build()
+			err := ops.ValidateOps(context.Background(), cli, cluster)
+			if tc.wantError == "" && err != nil || tc.wantError != "" && (err == nil || !strings.Contains(err.Error(), tc.wantError)) {
+				t.Fatalf("error=%v, want %q", err, tc.wantError)
+			}
+			if reads != tc.wantReads {
+				t.Fatalf("reads=%d, want %d", reads, tc.wantReads)
 			}
 		})
 	}

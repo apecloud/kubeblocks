@@ -25,6 +25,7 @@ import (
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -135,7 +136,7 @@ func (r *OpsRequest) ValidateOps(ctx context.Context,
 	case HorizontalScalingType:
 		return r.validateHorizontalScaling(ctx, k8sClient, cluster)
 	case VolumeExpansionType:
-		return r.validateVolumeExpansion(cluster)
+		return r.validateVolumeExpansion(ctx, k8sClient, cluster)
 	case RestartType:
 		return r.validateRestart(cluster)
 	case SwitchoverType:
@@ -524,7 +525,7 @@ func (r *OpsRequest) checkConflictingScalingOperations(hScale HorizontalScaling)
 }
 
 // validateVolumeExpansion validates volumeExpansion api when spec.type is VolumeExpansion
-func (r *OpsRequest) validateVolumeExpansion(cluster *appsv1.Cluster) error {
+func (r *OpsRequest) validateVolumeExpansion(ctx context.Context, cli client.Client, cluster *appsv1.Cluster) error {
 	volumeExpansionList := r.Spec.VolumeExpansionList
 	if len(volumeExpansionList) == 0 {
 		return notEmptyError("spec.volumeExpansion")
@@ -537,19 +538,62 @@ func (r *OpsRequest) validateVolumeExpansion(cluster *appsv1.Cluster) error {
 	if err := r.checkComponentExistence(cluster, compOpsList); err != nil {
 		return err
 	}
+	storageClasses := sets.New[string]()
+	collectStorageClasses := func(expansion VolumeExpansion, comp appsv1.ClusterComponentSpec) {
+		for _, volume := range comp.VolumeClaimTemplates {
+			if volume.Spec.StorageClassName == nil || *volume.Spec.StorageClassName == "" ||
+				!slices.ContainsFunc(expansion.VolumeClaimTemplates, func(v OpsRequestVolumeClaimTemplate) bool { return v.Name == volume.Name }) ||
+				!expansionUsesComponentVolume(comp, volume.Name) {
+				continue
+			}
+			storageClasses.Insert(*volume.Spec.StorageClassName)
+		}
+	}
 	for _, expansion := range volumeExpansionList {
 		if comp := cluster.Spec.GetComponentByName(expansion.ComponentName); comp != nil {
 			if err := validateExpansionVolumes(expansion, comp.Name, comp.VolumeClaimTemplates); err != nil {
 				return err
 			}
+			collectStorageClasses(expansion, *comp)
 			continue
 		}
 		for _, sharding := range cluster.Spec.Shardings {
-			if sharding.Name == expansion.ComponentName {
-				if err := validateExpansionVolumes(expansion, sharding.Name, sharding.Template.VolumeClaimTemplates); err != nil {
-					return err
-				}
+			if sharding.Name != expansion.ComponentName {
+				continue
 			}
+			if err := validateExpansionVolumes(expansion, sharding.Name, sharding.Template.VolumeClaimTemplates); err != nil {
+				return err
+			}
+			remaining := sharding.Shards
+			for _, template := range sharding.ShardTemplates {
+				if template.Shards == nil || *template.Shards == 0 {
+					continue
+				}
+				remaining -= *template.Shards
+				if template.VolumeClaimTemplates != nil {
+					continue
+				}
+				comp := sharding.Template
+				if template.Replicas != nil {
+					comp.Replicas = *template.Replicas
+				}
+				if template.Instances != nil {
+					comp.Instances = template.Instances
+				}
+				collectStorageClasses(expansion, comp)
+			}
+			if remaining > 0 {
+				collectStorageClasses(expansion, sharding.Template)
+			}
+		}
+	}
+	for _, name := range sets.List(storageClasses) {
+		sc := &storagev1.StorageClass{}
+		if err := cli.Get(ctx, client.ObjectKey{Name: name}, sc); err != nil {
+			return fmt.Errorf("get storageClass %q for volume expansion: %w", name, err)
+		}
+		if sc.AllowVolumeExpansion == nil || !*sc.AllowVolumeExpansion {
+			return fmt.Errorf("storageClass %q does not allow volume expansion", name)
 		}
 	}
 	return nil
@@ -639,6 +683,23 @@ func (r *OpsRequest) checkComponentExistence(cluster *appsv1.Cluster, compOpsLis
 		return fmt.Errorf("components: %v not found, in cluster.spec.componentSpecs or cluster.spec.shardingSpecs", notFoundCompNames)
 	}
 	return nil
+}
+
+func expansionUsesComponentVolume(comp appsv1.ClusterComponentSpec, volumeName string) bool {
+	if comp.Replicas == 0 {
+		return false
+	}
+	defaultReplicas := comp.Replicas
+	for _, template := range comp.Instances {
+		replicas := template.GetReplicas()
+		defaultReplicas -= replicas
+		if replicas > 0 && !slices.ContainsFunc(template.VolumeClaimTemplates, func(v appsv1.PersistentVolumeClaimTemplate) bool {
+			return v.Name == volumeName
+		}) {
+			return true
+		}
+	}
+	return defaultReplicas > 0
 }
 
 func validateExpansionVolumes(expansion VolumeExpansion, scope string, volumes []appsv1.PersistentVolumeClaimTemplate) error {

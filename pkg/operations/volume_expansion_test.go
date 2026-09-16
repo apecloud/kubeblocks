@@ -397,18 +397,45 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 	}
 
 	Context("Test VolumeExpansion", func() {
-		It("keeps the expansion payload immutable while allowing cancellation", func() {
-			ops := testops.NewOpsRequestObj("volumeexpansion-immutable-"+testCtx.GetRandomStr(), testCtx.DefaultNamespace, clusterName, opsv1alpha1.VolumeExpansionType)
+		It("preserves payload updates and control fields in the existing API", func() {
+			ops := testops.NewOpsRequestObj("volumeexpansion-update-"+testCtx.GetRandomStr(), testCtx.DefaultNamespace, clusterName, opsv1alpha1.VolumeExpansionType)
 			ops.Spec.VolumeExpansionList = []opsv1alpha1.VolumeExpansion{{ComponentOps: opsv1alpha1.ComponentOps{ComponentName: consensusCompName}, VolumeClaimTemplates: []opsv1alpha1.OpsRequestVolumeClaimTemplate{{Name: vctName, Storage: resource.MustParse("5Gi")}}}}
 			ops = testops.CreateOpsRequest(ctx, testCtx, ops)
-			changed := ops.DeepCopy()
-			changed.Spec.VolumeExpansionList[0].VolumeClaimTemplates[0].Storage = resource.MustParse("6Gi")
-			Expect(apierrors.IsInvalid(k8sClient.Update(ctx, changed))).To(BeTrue())
-			changed = ops.DeepCopy()
-			changed.Spec.VolumeExpansionList = nil
-			Expect(apierrors.IsInvalid(k8sClient.Update(ctx, changed))).To(BeTrue())
-			ops.Spec.Cancel = true
-			Expect(k8sClient.Update(ctx, ops)).To(Succeed())
+			current := ops.DeepCopy()
+			current.Spec.VolumeExpansionList[0].VolumeClaimTemplates[0].Storage = resource.MustParse("6Gi")
+			Expect(k8sClient.Update(ctx, current)).To(Succeed())
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(ops), current)).To(Succeed())
+			current.Spec.VolumeExpansionList = nil
+			Expect(k8sClient.Update(ctx, current)).To(Succeed())
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(ops), current)).To(Succeed())
+			current.Spec.VolumeExpansionList = ops.Spec.VolumeExpansionList
+			current.Spec.Cancel = true
+			Expect(k8sClient.Update(ctx, current)).To(Succeed())
+		})
+
+		It("preserves an empty volume selection as a no-op", func() {
+			_, clusterObject := testapps.InitConsensusMysql(&testCtx, clusterName, compDefName, consensusCompName)
+			ops := testops.NewOpsRequestObj("volumeexpansion-empty-"+testCtx.GetRandomStr(), testCtx.DefaultNamespace, clusterName, opsv1alpha1.VolumeExpansionType)
+			ops.Spec.VolumeExpansionList = []opsv1alpha1.VolumeExpansion{{ComponentOps: opsv1alpha1.ComponentOps{ComponentName: consensusCompName}, VolumeClaimTemplates: []opsv1alpha1.OpsRequestVolumeClaimTemplate{}}}
+			ops = testops.CreateOpsRequest(ctx, testCtx, ops)
+			Expect(testapps.ChangeObjStatus(&testCtx, ops, func() { ops.Status.Phase = opsv1alpha1.OpsPendingPhase })).To(Succeed())
+			opsRes := &OpsResource{Cluster: clusterObject, OpsRequest: ops, Recorder: k8sManager.GetEventRecorderFor("opsrequest-controller")}
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(opsRes.OpsRequest.Status.Phase).To(Equal(opsv1alpha1.OpsCreatingPhase))
+			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(testapps.ChangeObjStatus(&testCtx, ops, func() {
+				ops.Status.Phase = opsv1alpha1.OpsRunningPhase
+				ops.Status.StartTimestamp = metav1.Now()
+			})).To(Succeed())
+			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			Expect(err).NotTo(HaveOccurred())
+			persisted := &opsv1alpha1.OpsRequest{}
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(ops), persisted)).To(Succeed())
+			Expect(persisted.Status.Phase).To(Equal(opsv1alpha1.OpsSucceedPhase))
+			Expect(persisted.Status.Progress).To(Equal("0/0"))
 		})
 
 		It("rejects conflicting storage overrides before writing the Cluster", func() {

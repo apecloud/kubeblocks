@@ -538,9 +538,6 @@ func (r *OpsRequest) validateVolumeExpansion(cluster *appsv1.Cluster) error {
 		return err
 	}
 	for _, expansion := range volumeExpansionList {
-		if len(expansion.VolumeClaimTemplates) == 0 {
-			return notEmptyError("volumeExpansion.volumeClaimTemplates")
-		}
 		if comp := cluster.Spec.GetComponentByName(expansion.ComponentName); comp != nil {
 			if err := validateExpansionVolumes(expansion, comp.Name, comp.VolumeClaimTemplates, false); err != nil {
 				return err
@@ -680,9 +677,6 @@ func validateExpansionVolumes(expansion VolumeExpansion, scope string, volumes [
 			return fmt.Errorf("volumeClaimTemplate %q not found in %s", requested.Name, scope)
 		}
 		current := volumes[index].Spec.Resources.Requests.Storage()
-		if requested.Storage.Cmp(*current) < 0 {
-			return fmt.Errorf("requested storage for %s/%s cannot be less than declared storage %s", scope, requested.Name, current.String())
-		}
 		if fixed && requested.Storage.Cmp(*current) != 0 {
 			return fmt.Errorf("storage override for %s/%s differs from requested size %s", scope, requested.Name, requested.Storage.String())
 		}

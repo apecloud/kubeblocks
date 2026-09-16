@@ -3269,7 +3269,7 @@ spec:
               volumeExpansion:
                 description: |-
                   Lists VolumeExpansion objects, each specifying a component and its corresponding volumeClaimTemplates
-                  that requires storage expansion. This field is immutable once set.
+                  that requires storage expansion.
                 items:
                   description: VolumeExpansion encapsulates the parameters required
                     for a volume expansion operation.
@@ -3314,15 +3314,9 @@ spec:
                 x-kubernetes-list-map-keys:
                 - componentName
                 x-kubernetes-list-type: map
-                x-kubernetes-validations:
-                - message: forbidden to update spec.volumeExpansion
-                  rule: self == oldSelf
             required:
             - type
             type: object
-            x-kubernetes-validations:
-            - message: forbidden to update spec.volumeExpansion
-              rule: has(self.volumeExpansion) == has(oldSelf.volumeExpansion)
           status:
             description: OpsRequestStatus represents the observed state of an OpsRequest.
             properties:

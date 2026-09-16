@@ -38,10 +38,10 @@ func TestValidateVolumeExpansion(t *testing.T) {
 	}{
 		{name: "inherited storage"},
 		{name: "same size retry", change: func(c *appsv1.ClusterComponentSpec, _ *VolumeExpansion) { c.VolumeClaimTemplates = volume("5Gi") }},
-		{name: "shrinking declaration", change: func(c *appsv1.ClusterComponentSpec, _ *VolumeExpansion) { c.VolumeClaimTemplates = volume("6Gi") }, wantError: "less than declared"},
+		{name: "replace a larger pending declaration", change: func(c *appsv1.ClusterComponentSpec, _ *VolumeExpansion) { c.VolumeClaimTemplates = volume("6Gi") }},
 		{name: "missing component", change: func(_ *appsv1.ClusterComponentSpec, r *VolumeExpansion) { r.ComponentName = "missing" }, wantError: "not found"},
 		{name: "missing volume", change: func(_ *appsv1.ClusterComponentSpec, r *VolumeExpansion) { r.VolumeClaimTemplates[0].Name = "missing" }, wantError: "not found"},
-		{name: "empty volumes", change: func(_ *appsv1.ClusterComponentSpec, r *VolumeExpansion) { r.VolumeClaimTemplates = nil }, wantError: "empty"},
+		{name: "empty volumes", change: func(_ *appsv1.ClusterComponentSpec, r *VolumeExpansion) { r.VolumeClaimTemplates = nil }},
 		{name: "matching override", change: func(c *appsv1.ClusterComponentSpec, _ *VolumeExpansion) {
 			c.Instances[0].VolumeClaimTemplates = volume("5Gi")
 		}},

@@ -397,6 +397,76 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 	}
 
 	Context("Test VolumeExpansion", func() {
+		It("keeps the expansion payload immutable while allowing cancellation", func() {
+			ops := testops.NewOpsRequestObj("volumeexpansion-immutable-"+testCtx.GetRandomStr(), testCtx.DefaultNamespace, clusterName, opsv1alpha1.VolumeExpansionType)
+			ops.Spec.VolumeExpansionList = []opsv1alpha1.VolumeExpansion{{ComponentOps: opsv1alpha1.ComponentOps{ComponentName: consensusCompName}, VolumeClaimTemplates: []opsv1alpha1.OpsRequestVolumeClaimTemplate{{Name: vctName, Storage: resource.MustParse("5Gi")}}}}
+			ops = testops.CreateOpsRequest(ctx, testCtx, ops)
+			changed := ops.DeepCopy()
+			changed.Spec.VolumeExpansionList[0].VolumeClaimTemplates[0].Storage = resource.MustParse("6Gi")
+			Expect(apierrors.IsInvalid(k8sClient.Update(ctx, changed))).To(BeTrue())
+			changed = ops.DeepCopy()
+			changed.Spec.VolumeExpansionList = nil
+			Expect(apierrors.IsInvalid(k8sClient.Update(ctx, changed))).To(BeTrue())
+			ops.Spec.Cancel = true
+			Expect(k8sClient.Update(ctx, ops)).To(Succeed())
+		})
+
+		It("rejects conflicting storage overrides before writing the Cluster", func() {
+			_, clusterObject := testapps.InitConsensusMysql(&testCtx, clusterName, compDefName, consensusCompName)
+			Expect(testapps.ChangeObj(&testCtx, clusterObject, func(c *appsv1.Cluster) {
+				c.Spec.ComponentSpecs[0].Instances = []appsv1.InstanceTemplate{{Name: "custom", VolumeClaimTemplates: c.Spec.ComponentSpecs[0].VolumeClaimTemplates}}
+			})).To(Succeed())
+			for _, phase := range []opsv1alpha1.OpsPhase{opsv1alpha1.OpsPendingPhase, opsv1alpha1.OpsCreatingPhase} {
+				ops := testops.NewOpsRequestObj("volumeexpansion-conflict-"+testCtx.GetRandomStr(), testCtx.DefaultNamespace, clusterName, opsv1alpha1.VolumeExpansionType)
+				ops.Spec.VolumeExpansionList = []opsv1alpha1.VolumeExpansion{{ComponentOps: opsv1alpha1.ComponentOps{ComponentName: consensusCompName}, VolumeClaimTemplates: []opsv1alpha1.OpsRequestVolumeClaimTemplate{{Name: vctName, Storage: resource.MustParse("5Gi")}}}}
+				ops = testops.CreateOpsRequest(ctx, testCtx, ops)
+				Expect(testapps.ChangeObjStatus(&testCtx, ops, func() { ops.Status.Phase = phase })).To(Succeed())
+				opsRes := &OpsResource{Cluster: clusterObject, OpsRequest: ops, Recorder: k8sManager.GetEventRecorderFor("opsrequest-controller")}
+				before := clusterObject.Spec.DeepCopy()
+				_, err := GetOpsManager().Do(intctrlutil.RequestCtx{Ctx: ctx}, k8sClient, opsRes)
+				Expect(err).NotTo(HaveOccurred())
+				persistedOps := &opsv1alpha1.OpsRequest{}
+				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(ops), persistedOps)).To(Succeed())
+				Expect(persistedOps.Status.Phase).To(Equal(opsv1alpha1.OpsFailedPhase))
+				persistedCluster := &appsv1.Cluster{}
+				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(clusterObject), persistedCluster)).To(Succeed())
+				Expect(persistedCluster.Spec).To(Equal(*before))
+			}
+		})
+
+		It("waits for storage convergence and fails at the existing timeout", func() {
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+			_, clusterObject := testapps.InitConsensusMysql(&testCtx, clusterName, compDefName, consensusCompName)
+			testapps.MockInstanceSetComponent(&testCtx, clusterName, consensusCompName)
+			testapps.MockInstanceSetStatus(testCtx, clusterObject, consensusCompName)
+			testapps.CreateStorageClass(&testCtx, storageClassName, false)
+			opsRes := &OpsResource{Cluster: clusterObject, Recorder: k8sManager.GetEventRecorderFor("opsrequest-controller")}
+			ops, _ := initResourcesForVolumeExpansion(clusterObject, opsRes, "5Gi", int(clusterObject.Spec.ComponentSpecs[0].Replicas))
+			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).NotTo(HaveOccurred())
+			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(testapps.ChangeObjStatus(&testCtx, ops, func() {
+				ops.Status.Phase = opsv1alpha1.OpsRunningPhase
+				ops.Status.StartTimestamp = metav1.Now()
+			})).To(Succeed())
+			opsRes.OpsRequest = ops
+			persistedCluster := &appsv1.Cluster{}
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(clusterObject), persistedCluster)).To(Succeed())
+			Expect(persistedCluster.Spec.ComponentSpecs[0].VolumeClaimTemplates[0].Spec.Resources.Requests.Storage().String()).To(Equal("5Gi"))
+			delay, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(delay).To(BeNumerically(">", 0))
+			Expect(testapps.ChangeObjStatus(&testCtx, opsRes.OpsRequest, func() {
+				opsRes.OpsRequest.Status.StartTimestamp = metav1.NewTime(time.Now().Add(-VolumeExpansionTimeOut - time.Minute))
+			})).To(Succeed())
+			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			Expect(err).NotTo(HaveOccurred())
+			persistedOps := &opsv1alpha1.OpsRequest{}
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(ops), persistedOps)).To(Succeed())
+			Expect(persistedOps.Status.Phase).To(Equal(opsv1alpha1.OpsFailedPhase))
+		})
+
 		It("VolumeExpansion should work", func() {
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
 			_, clusterObject := testapps.InitConsensusMysql(&testCtx, clusterName, compDefName, consensusCompName)

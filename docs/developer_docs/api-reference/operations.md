@@ -4239,7 +4239,7 @@ and take offline/online the specified instances.</p>
 <td>
 <em>(Optional)</em>
 <p>Lists VolumeExpansion objects, each specifying a component and its corresponding volumeClaimTemplates
-that requires storage expansion.</p>
+that requires storage expansion. This field is immutable once set.</p>
 </td>
 </tr>
 <tr>

@@ -27,6 +27,7 @@ import (
 )
 
 // OpsRequestSpec defines the desired state of OpsRequest
+// +kubebuilder:validation:XValidation:rule="has(self.volumeExpansion) == has(oldSelf.volumeExpansion)",message="forbidden to update spec.volumeExpansion"
 type OpsRequestSpec struct {
 	// Specifies the name of the Cluster resource that this operation is targeting.
 	//
@@ -125,13 +126,14 @@ type SpecificOpsRequest struct {
 	HorizontalScalingList []HorizontalScaling `json:"horizontalScaling,omitempty"  patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
 
 	// Lists VolumeExpansion objects, each specifying a component and its corresponding volumeClaimTemplates
-	// that requires storage expansion.
+	// that requires storage expansion. This field is immutable once set.
 	//
 	// +optional
 	// +patchMergeKey=componentName
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=componentName
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.volumeExpansion"
 	VolumeExpansionList []VolumeExpansion `json:"volumeExpansion,omitempty"  patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
 
 	// Lists Components to be started. If empty, all components will be started.

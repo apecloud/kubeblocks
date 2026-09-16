@@ -368,14 +368,6 @@ func handleRunningProgress(opsRes *OpsResource, pgRes *progressResource) (rollin
 	return handleRunningInstanceProgress(opsRes, pgRes, its), nil
 }
 
-func handleStopProgress(opsRes *OpsResource, pgRes *progressResource) (rollingProgress, error) {
-	its, err := getInstanceSet(opsRes, pgRes)
-	if err != nil {
-		return rollingProgress{}, err
-	}
-	return handleStoppedInstanceProgress(pgRes, its), nil
-}
-
 func getInstanceSet(opsRes *OpsResource, pgRes *progressResource) (*workloads.InstanceSet, error) {
 	runtime, err := opsRes.GetRuntime(pgRes.compOps.GetComponentName())
 	if err != nil {
@@ -419,46 +411,6 @@ func handleRunningInstanceProgress(opsRes *OpsResource, pgRes *progressResource,
 				getProgressProcessingMessage(pgRes.opsMessageKey, objectKey, pgRes.fullComponentName))
 		}
 		result.details = append(result.details, detail)
-	}
-	return result
-}
-
-func handleStoppedInstanceProgress(pgRes *progressResource, its *workloads.InstanceSet) rollingProgress {
-	expectedCount := pgRes.clusterComponent.Replicas
-	result := rollingProgress{expectedCount: expectedCount}
-	if its == nil {
-		result.completedCount = expectedCount
-		return result
-	}
-	preexistingOffline := make(map[string]struct{}, len(its.Spec.OfflineInstances))
-	for _, name := range its.Spec.OfflineInstances {
-		preexistingOffline[name] = struct{}{}
-	}
-	var participantCount int32
-	for i := range its.Status.InstanceStatus {
-		instance := &its.Status.InstanceStatus[i]
-		objectKey := getProgressObjectKey(constant.PodKind, instance.PodName)
-		_, wasOffline := preexistingOffline[instance.PodName]
-		if wasOffline || instance.EffectiveDesiredState() == workloads.InstanceDesiredStateReleased {
-			continue
-		}
-		participantCount++
-		detail := opsv1alpha1.ProgressStatusDetail{ObjectKey: objectKey}
-		if instance.EffectiveCurrentState() == workloads.InstanceCurrentStateAbsent {
-			detail.SetStatusAndMessage(opsv1alpha1.SucceedProgressStatus,
-				getProgressSucceedMessage(pgRes.opsMessageKey, objectKey, pgRes.fullComponentName))
-			result.completedCount++
-		} else {
-			detail.SetStatusAndMessage(opsv1alpha1.ProcessingProgressStatus,
-				getProgressProcessingMessage(pgRes.opsMessageKey, objectKey, pgRes.fullComponentName))
-		}
-		result.details = append(result.details, detail)
-	}
-	if missing := expectedCount - participantCount; missing > 0 {
-		result.completedCount += missing
-	}
-	if result.completedCount > expectedCount {
-		result.completedCount = expectedCount
 	}
 	return result
 }

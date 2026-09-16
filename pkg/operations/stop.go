@@ -20,15 +20,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"fmt"
+	"reflect"
 	"slices"
+	"sort"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -116,14 +122,136 @@ func (stop StopOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 	if !stop.targetsStopped(opsRes) {
 		return opsv1alpha1.OpsAbortedPhase, 0, nil
 	}
-	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.StopList)
-	return compOpsHelper.reconcileRollingAction(reqCtx, cli, opsRes,
-		"stop", handleStopProgress, appsv1.StoppedComponentPhase)
+	return stop.reconcile(reqCtx, cli, opsRes)
 }
 
-// SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration
+// SaveLastConfiguration is empty because Stop reconciles the current component target.
 func (stop StopOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	return nil
+}
+
+func stopParticipantStatuses(its *workloads.InstanceSet) []workloads.InstanceStatus {
+	preexistingOffline := make(map[string]struct{}, len(its.Spec.OfflineInstances))
+	for _, name := range its.Spec.OfflineInstances {
+		preexistingOffline[name] = struct{}{}
+	}
+	stopping := ptr.Deref(its.Spec.Stop, false)
+	participants := make([]workloads.InstanceStatus, 0, len(its.Status.InstanceStatus))
+	for i := range its.Status.InstanceStatus {
+		status := its.Status.InstanceStatus[i]
+		switch status.EffectiveDesiredState() {
+		case workloads.InstanceDesiredStateActive:
+			participants = append(participants, status)
+		case workloads.InstanceDesiredStateOffline:
+			if stopping {
+				if _, alreadyOffline := preexistingOffline[status.PodName]; !alreadyOffline {
+					participants = append(participants, status)
+				}
+			}
+		}
+	}
+	return participants
+}
+
+func (stop StopOpsHandler) reconcile(reqCtx intctrlutil.RequestCtx, cli client.Client,
+	opsRes *OpsResource) (opsv1alpha1.OpsPhase, time.Duration, error) {
+	opsRequest := opsRes.OpsRequest
+	oldOpsRequest := opsRequest.DeepCopy()
+	if opsRequest.Status.Components == nil {
+		opsRequest.Status.Components = map[string]opsv1alpha1.OpsRequestComponentStatus{}
+	}
+	helper := newComponentOpsHelper(opsRequest.Spec.StopList)
+	resources, err := helper.buildRollingResources(reqCtx, cli, opsRes, "stop")
+	if err != nil {
+		return opsv1alpha1.OpsRunningPhase, 0, err
+	}
+	current := map[string][]opsv1alpha1.ProgressStatusDetail{}
+	for name := range opsRequest.Status.Components {
+		if _, ok := helper.getComponentOps(name); ok {
+			current[name] = nil
+		}
+	}
+	var expectedCount, completedCount int32
+	observationsComplete := true
+	componentCounts := map[string]int32{}
+	for _, resource := range resources {
+		name := resource.compOps.GetComponentName()
+		componentCounts[name]++
+		if _, ok := current[name]; !ok {
+			current[name] = nil
+		}
+		its := &workloads.InstanceSet{}
+		key := client.ObjectKey{Namespace: opsRes.Cluster.Namespace,
+			Name: constant.GenerateClusterComponentName(opsRes.Cluster.Name, resource.fullComponentName)}
+		if err := cli.Get(reqCtx.Ctx, key, its); err != nil {
+			if !apierrors.IsNotFound(err) {
+				return opsv1alpha1.OpsRunningPhase, 0, err
+			}
+			expectedCount += resource.clusterComponent.Replicas
+			observationsComplete = false
+			continue
+		}
+		participants := stopParticipantStatuses(its)
+		replicas := ptr.Deref(its.Spec.Replicas, 1)
+		expectedCount += max(replicas, int32(len(participants)))
+		if !ptr.Deref(its.Spec.Stop, false) || int32(len(participants)) != replicas {
+			observationsComplete = false
+		}
+		for _, instance := range participants {
+			objectKey := getProgressObjectKey(constant.PodKind, instance.PodName)
+			detail := opsv1alpha1.ProgressStatusDetail{ObjectKey: objectKey, Group: resource.fullComponentName}
+			if instance.EffectiveCurrentState() == workloads.InstanceCurrentStateAbsent {
+				detail.SetStatusAndMessage(opsv1alpha1.SucceedProgressStatus,
+					getProgressSucceedMessage("stop", objectKey, resource.fullComponentName))
+				completedCount++
+			} else {
+				detail.SetStatusAndMessage(opsv1alpha1.ProcessingProgressStatus,
+					getProgressProcessingMessage("stop", objectKey, resource.fullComponentName))
+			}
+			current[name] = append(current[name], detail)
+		}
+	}
+	for _, sharding := range opsRes.Cluster.Spec.Shardings {
+		if _, selected := helper.getComponentOps(sharding.Name); selected && componentCounts[sharding.Name] != sharding.Shards {
+			observationsComplete = false
+		}
+	}
+	for name, details := range current {
+		status := opsRequest.Status.Components[name]
+		sort.Slice(details, func(i, j int) bool { return details[i].ObjectKey < details[j].ObjectKey })
+		for i := range details {
+			detail := &details[i]
+			previous := findStatusProgressDetail(status.ProgressDetails, detail.ObjectKey)
+			if previous != nil {
+				detail.StartTime = previous.StartTime
+				if previous.Status == detail.Status {
+					detail.EndTime = previous.EndTime
+				}
+			}
+			updateProgressDetailTime(detail)
+			if previous == nil || previous.Status != detail.Status || previous.Message != detail.Message {
+				sendProgressDetailEvent(opsRes.Recorder, opsRequest, *detail)
+			}
+		}
+		status.ProgressDetails = details
+		opsRequest.Status.Components[name] = status
+	}
+	phase := helper.updateRollingActionPhase(opsRes, appsv1.StoppedComponentPhase)
+	// Apps and workload observations can arrive separately. Keep reconciling until
+	// the observed progress agrees with success; never fill missing progress from it.
+	if phase == opsv1alpha1.OpsSucceedPhase && (!observationsComplete || completedCount != expectedCount) {
+		phase = opsv1alpha1.OpsRunningPhase
+	}
+	opsRequest.Status.Progress = fmt.Sprintf("%d/%d", completedCount, expectedCount)
+	if !reflect.DeepEqual(opsRequest.Status, oldOpsRequest.Status) {
+		if err := cli.Status().Patch(reqCtx.Ctx, opsRequest, client.MergeFrom(oldOpsRequest)); err != nil {
+			return opsv1alpha1.OpsRunningPhase, 0, err
+		}
+	}
+	if phase == opsv1alpha1.OpsRunningPhase {
+		return phase, time.Second, nil
+	}
+	return phase, 0, nil
 }
 
 func (stop StopOpsHandler) targetsStopped(opsRes *OpsResource) bool {

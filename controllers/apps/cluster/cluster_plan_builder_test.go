@@ -59,7 +59,8 @@ func TestClusterReconcilePreservesConcurrentScaling(t *testing.T) {
 			g.Expect(appsv1.AddToScheme(scheme)).To(Succeed())
 			compDef := testapps.NewComponentDefinitionFactory("mysql-v1").SetServiceVersion("1.0").GetObject()
 			compDef.Status.Phase = appsv1.AvailablePhase
-			shardingDef := testapps.NewShardingDefinitionFactory("mysql-sharding", compDef.Name).GetObject()
+			shardingDef := testapps.NewShardingDefinitionFactory("mysql-sharding", compDef.Name).
+				AddAnnotations(constant.CRDAPIVersionAnnotationKey, appsv1.GroupVersion.String()).GetObject()
 			shardingDef.Status.Phase = appsv1.AvailablePhase
 			factory := testapps.NewClusterFactory("default", "concurrent-scaling", "")
 			if sharded {

@@ -1375,7 +1375,8 @@ func TestHorizontalScalingOnlineInferenceInputs(t *testing.T) {
 			if tc.explicitTemplate {
 				request.ScaleOut.Instances = []opsv1alpha1.InstanceReplicasTemplate{{Name: "foo", ReplicaChanges: 1}}
 			}
-			f := newHorizontalScalingFixture(t, request)
+			f := newHorizontalScalingFixture(t, scaleOutRequest("db", false))
+			f.res.OpsRequest.Spec.HorizontalScalingList = []opsv1alpha1.HorizontalScaling{request}
 			spec := &f.res.Cluster.Spec.ComponentSpecs[0]
 			spec.OfflineInstances = []string{instance}
 			if tc.template {
@@ -1860,7 +1861,8 @@ func TestHorizontalScalingMixedBackupConflicts(t *testing.T) {
 					ReplicaChanger:           opsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(1)},
 					OnlineInstancesToOffline: []string{"demo-db-1"},
 				}
-				f := newHorizontalScalingFixture(t, current)
+				f := newHorizontalScalingFixture(t, scaleOutRequest("db", currentBackup))
+				f.res.OpsRequest.Spec.HorizontalScalingList = []opsv1alpha1.HorizontalScaling{current}
 				earlier := f.res.OpsRequest.DeepCopy()
 				earlier.Name, earlier.UID, earlier.ResourceVersion = "earlier", "earlier1", ""
 				earlier.Spec.HorizontalScalingList = []opsv1alpha1.HorizontalScaling{scaleOutRequest("db", earlierBackup)}
@@ -2058,6 +2060,88 @@ func TestHorizontalScalingPersistsOwnerAssignmentsBeforeAction(t *testing.T) {
 			target := res.Cluster.Spec.ComponentSpecs[0]
 			if target.Replicas != 1 || target.Instances[0].GetReplicas() != 0 || !reflect.DeepEqual(target.OfflineInstances, []string{"owner-chosen"}) {
 				t.Fatalf("wrong target after replay: %+v", target)
+			}
+		})
+	}
+}
+
+func TestHorizontalScalingRejectsInvalidInstanceTargets(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		targets      []string
+		ignore       bool
+		wantReplicas int32
+	}{
+		{name: "invalid", targets: []string{"missing"}, wantReplicas: 3},
+		{name: "mixed", targets: []string{"owner-chosen", "missing"}, wantReplicas: 3},
+		{name: "ignore-invalid", targets: []string{"missing"}, ignore: true, wantReplicas: 3},
+		{name: "ignore-mixed", targets: []string{"owner-chosen", "missing"}, ignore: true, wantReplicas: 2},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			scheme := runtime.NewScheme()
+			for _, add := range []func(*runtime.Scheme) error{appsv1.AddToScheme, opsv1alpha1.AddToScheme, workloads.AddToScheme} {
+				if err := add(scheme); err != nil {
+					t.Fatal(err)
+				}
+			}
+			cluster := &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default", UID: "cluster"},
+				Spec:   appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{{Name: "db", Replicas: 3}}},
+				Status: appsv1.ClusterStatus{Phase: appsv1.RunningClusterPhase}}
+			ops := &opsv1alpha1.OpsRequest{ObjectMeta: metav1.ObjectMeta{Name: "scale", Namespace: "default", UID: "request"},
+				Spec: opsv1alpha1.OpsRequestSpec{Type: opsv1alpha1.HorizontalScalingType,
+					SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{HorizontalScalingList: []opsv1alpha1.HorizontalScaling{{
+						ComponentOps: opsv1alpha1.ComponentOps{ComponentName: "db"},
+						ScaleIn:      &opsv1alpha1.ScaleIn{OnlineInstancesToOffline: tc.targets},
+					}}}}, Status: opsv1alpha1.OpsRequestStatus{Phase: opsv1alpha1.OpsPendingPhase}}
+			if tc.ignore {
+				ops.Annotations = map[string]string{constant.IgnoreHscaleValidateAnnoKey: "true"}
+			}
+			its := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Name: "demo-db", Namespace: "default"},
+				Status: workloads.InstanceSetStatus{InstanceStatus: []workloads.InstanceStatus{
+					{PodName: "owner-chosen", TemplateName: pointer.String(""), DesiredState: workloads.InstanceDesiredStateActive},
+					{PodName: "another-identity", TemplateName: pointer.String(""), DesiredState: workloads.InstanceDesiredStateActive},
+					{PodName: "third-identity", TemplateName: pointer.String(""), DesiredState: workloads.InstanceDesiredStateActive},
+				}}}
+			cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, ops, its).WithStatusSubresource(ops).Build()
+			req := intctrlutil.RequestCtx{Ctx: context.Background(), Recorder: record.NewFakeRecorder(32)}
+			for range 4 {
+				if err := cli.Get(req.Ctx, client.ObjectKeyFromObject(cluster), cluster); err != nil {
+					t.Fatal(err)
+				}
+				if err := cli.Get(req.Ctx, client.ObjectKeyFromObject(ops), ops); err != nil {
+					t.Fatal(err)
+				}
+				if ops.Status.Phase == opsv1alpha1.OpsFailedPhase {
+					break
+				}
+				res := &OpsResource{Cluster: cluster, OpsRequest: ops, Recorder: req.Recorder}
+				if _, err := GetOpsManager().Do(req, cli, res); err != nil {
+					t.Fatalf("invalid target must be rejected, not retried: %v", err)
+				}
+			}
+			if err := cli.Get(req.Ctx, client.ObjectKeyFromObject(cluster), cluster); err != nil {
+				t.Fatal(err)
+			}
+			if err := cli.Get(req.Ctx, client.ObjectKeyFromObject(ops), ops); err != nil {
+				t.Fatal(err)
+			}
+			if !tc.ignore && (ops.Status.Phase != opsv1alpha1.OpsFailedPhase ||
+				!strings.Contains(fmt.Sprint(ops.Status.Conditions), `instance "missing" specified in onlineInstancesToOffline is not online`)) {
+				t.Fatalf("expected invalid-instance failure, got %+v", ops.Status)
+			}
+			if tc.ignore && ops.Status.Phase != opsv1alpha1.OpsCreatingPhase {
+				t.Fatalf("ignore mode did not reach Action: %+v", ops.Status)
+			}
+			spec := cluster.Spec.ComponentSpecs[0]
+			if spec.Replicas != tc.wantReplicas {
+				t.Fatalf("replicas = %d, want %d", spec.Replicas, tc.wantReplicas)
+			}
+			wantOffline := []string(nil)
+			if tc.wantReplicas == 2 {
+				wantOffline = []string{"owner-chosen"}
+			}
+			if !reflect.DeepEqual(spec.OfflineInstances, wantOffline) {
+				t.Fatalf("offline instances = %v, want %v", spec.OfflineInstances, wantOffline)
 			}
 		})
 	}

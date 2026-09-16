@@ -266,6 +266,9 @@ func (hs horizontalScalingOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.R
 				last.InstanceTemplates[name] = *status.TemplateName
 			}
 		}
+		if err := hs.validateHorizontalScaling(opsRes, last, target); err != nil {
+			return err
+		}
 		opsRes.OpsRequest.Status.LastConfiguration.Components[target.ComponentName] = last
 	}
 	return nil

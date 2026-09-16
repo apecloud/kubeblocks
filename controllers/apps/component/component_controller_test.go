@@ -1626,7 +1626,7 @@ var _ = Describe("Component Controller", func() {
 		})).Should(Succeed())
 	}
 
-	testReconfigureRestart := func(compName, compDefName, fileTemplate string) {
+	testReconfigureRestart := func(compName, compDefName, fileTemplate, previousRestart string) {
 		// mock the cmpd to set restartOnFileChange
 		compDefKey := types.NamespacedName{Name: compDefName}
 		Expect(testapps.GetAndChangeObj(&testCtx, compDefKey, func(cmpd *kbappsv1.ComponentDefinition) {
@@ -1635,7 +1635,11 @@ var _ = Describe("Component Controller", func() {
 			}
 		})()).ShouldNot(HaveOccurred())
 
-		createCompObj(compName, compDefName, nil)
+		createCompObj(compName, compDefName, func(f *testapps.MockComponentFactory) {
+			if previousRestart != "" {
+				f.SetAnnotations(map[string]string{constant.RestartAnnotationKey: previousRestart})
+			}
+		})
 
 		By("check the file template object")
 		fileTemplateCMKey := types.NamespacedName{
@@ -1665,10 +1669,32 @@ var _ = Describe("Component Controller", func() {
 
 		By("check the workload updated")
 		itsKey := compKey
+		var configRestart string
 		Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 			g.Expect(its.Spec.Configs).Should(BeNil())
 			g.Expect(its.Spec.Template.Annotations).ShouldNot(BeNil())
 			g.Expect(its.Spec.Template.Annotations).Should(HaveKey(constant.RestartAnnotationKey))
+			configRestart = its.Spec.Template.Annotations[constant.RestartAnnotationKey]
+			g.Expect(configRestart).ShouldNot(Equal(previousRestart))
+		})).Should(Succeed())
+
+		By("preserve the config restart across subsequent reconciliations")
+		Consistently(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+			g.Expect(its.Spec.Template.Annotations).Should(HaveKeyWithValue(constant.RestartAnnotationKey, configRestart))
+		}), time.Second).Should(Succeed())
+
+		By("accept a newer explicit restart from the Component spec")
+		configRestartTime, err := time.Parse(time.RFC3339, configRestart)
+		Expect(err).ShouldNot(HaveOccurred())
+		nextRestart := configRestartTime.Add(time.Minute).Format(time.RFC3339)
+		Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
+			if comp.Spec.Annotations == nil {
+				comp.Spec.Annotations = map[string]string{}
+			}
+			comp.Spec.Annotations[constant.RestartAnnotationKey] = nextRestart
+		})()).Should(Succeed())
+		Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+			g.Expect(its.Spec.Template.Annotations).Should(HaveKeyWithValue(constant.RestartAnnotationKey, nextRestart))
 		})).Should(Succeed())
 	}
 
@@ -2281,7 +2307,11 @@ var _ = Describe("Component Controller", func() {
 		})
 
 		It("reconfigure - restart", func() {
-			testReconfigureRestart(defaultCompName, compDefObj.Name, fileTemplate)
+			testReconfigureRestart(defaultCompName, compDefObj.Name, fileTemplate, "")
+		})
+
+		It("reconfigure - restart after an earlier explicit restart", func() {
+			testReconfigureRestart(defaultCompName, compDefObj.Name, fileTemplate, "2020-01-01T00:00:00Z")
 		})
 	})
 })

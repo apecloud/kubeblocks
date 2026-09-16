@@ -539,41 +539,14 @@ func (r *OpsRequest) validateVolumeExpansion(cluster *appsv1.Cluster) error {
 	}
 	for _, expansion := range volumeExpansionList {
 		if comp := cluster.Spec.GetComponentByName(expansion.ComponentName); comp != nil {
-			if err := validateExpansionVolumes(expansion, comp.Name, comp.VolumeClaimTemplates, false); err != nil {
-				return err
-			}
-			if err := validateExpansionInstances(expansion, comp.Name, comp, nil); err != nil {
+			if err := validateExpansionVolumes(expansion, comp.Name, comp.VolumeClaimTemplates); err != nil {
 				return err
 			}
 			continue
 		}
 		for _, sharding := range cluster.Spec.Shardings {
-			if sharding.Name != expansion.ComponentName {
-				continue
-			}
-			if err := validateExpansionVolumes(expansion, sharding.Name, sharding.Template.VolumeClaimTemplates, false); err != nil {
-				return err
-			}
-			remaining := sharding.Shards
-			for _, template := range sharding.ShardTemplates {
-				if template.Shards == nil || *template.Shards == 0 {
-					continue
-				}
-				remaining -= *template.Shards
-				comp := sharding.Template
-				if template.Replicas != nil {
-					comp.Replicas = *template.Replicas
-				}
-				if template.Instances != nil {
-					comp.Instances = template.Instances
-				}
-				scope := sharding.Name + "/" + template.Name
-				if err := validateExpansionInstances(expansion, scope, &comp, template.VolumeClaimTemplates); err != nil {
-					return err
-				}
-			}
-			if remaining > 0 {
-				if err := validateExpansionInstances(expansion, sharding.Name, &sharding.Template, nil); err != nil {
+			if sharding.Name == expansion.ComponentName {
+				if err := validateExpansionVolumes(expansion, sharding.Name, sharding.Template.VolumeClaimTemplates); err != nil {
 					return err
 				}
 			}
@@ -668,54 +641,15 @@ func (r *OpsRequest) checkComponentExistence(cluster *appsv1.Cluster, compOpsLis
 	return nil
 }
 
-// VolumeExpansion changes the component-level declaration. An allocated template
-// override must already match the requested size, since this operation does not change it.
-func validateExpansionVolumes(expansion VolumeExpansion, scope string, volumes []appsv1.PersistentVolumeClaimTemplate, fixed bool) error {
+func validateExpansionVolumes(expansion VolumeExpansion, scope string, volumes []appsv1.PersistentVolumeClaimTemplate) error {
 	for _, requested := range expansion.VolumeClaimTemplates {
 		index := slices.IndexFunc(volumes, func(v appsv1.PersistentVolumeClaimTemplate) bool { return v.Name == requested.Name })
 		if index < 0 {
 			return fmt.Errorf("volumeClaimTemplate %q not found in %s", requested.Name, scope)
 		}
 		current := volumes[index].Spec.Resources.Requests.Storage()
-		if !fixed && requested.Storage.Cmp(*current) < 0 {
+		if requested.Storage.Cmp(*current) < 0 {
 			return fmt.Errorf("requested storage for %s/%s cannot be less than declared size %s", scope, requested.Name, current.String())
-		}
-		if fixed && requested.Storage.Cmp(*current) != 0 {
-			return fmt.Errorf("storage override for %s/%s differs from requested size %s", scope, requested.Name, requested.Storage.String())
-		}
-	}
-	return nil
-}
-
-func validateExpansionInstances(expansion VolumeExpansion, scope string, comp *appsv1.ClusterComponentSpec, shardVolumes []appsv1.PersistentVolumeClaimTemplate) error {
-	if comp.Replicas == 0 {
-		return nil
-	}
-	defaultReplicas := comp.Replicas
-	for _, template := range comp.Instances {
-		defaultReplicas -= template.GetReplicas()
-	}
-	for _, requested := range expansion.VolumeClaimTemplates {
-		inherits := defaultReplicas > 0
-		for _, template := range comp.Instances {
-			if template.GetReplicas() == 0 {
-				continue
-			}
-			index := slices.IndexFunc(template.VolumeClaimTemplates, func(v appsv1.PersistentVolumeClaimTemplate) bool { return v.Name == requested.Name })
-			if index < 0 {
-				inherits = true
-				continue
-			}
-			volume := template.VolumeClaimTemplates[index]
-			if requested.Storage.Cmp(*volume.Spec.Resources.Requests.Storage()) != 0 {
-				return fmt.Errorf("storage override for %s/%s/%s differs from requested size %s", scope, template.Name, requested.Name, requested.Storage.String())
-			}
-		}
-		if inherits && shardVolumes != nil {
-			target := VolumeExpansion{VolumeClaimTemplates: []OpsRequestVolumeClaimTemplate{requested}}
-			if err := validateExpansionVolumes(target, scope, shardVolumes, true); err != nil {
-				return err
-			}
 		}
 	}
 	return nil

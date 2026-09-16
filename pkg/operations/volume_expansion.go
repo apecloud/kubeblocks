@@ -22,6 +22,7 @@ package operations
 import (
 	"fmt"
 	"reflect"
+	"slices"
 	"time"
 
 	"github.com/pkg/errors"
@@ -127,6 +128,10 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.VolumeExpansionList)
 	storageMap := ve.getRequestStorageMap(opsRequest)
 	var veHelpers []volumeExpansionHelper
+	currentDetails := map[string][]opsv1alpha1.ProgressStatusDetail{}
+	for name := range compOpsHelper.componentOpsSet {
+		currentDetails[name] = nil
+	}
 	setVeHelpers := func(compSpec appsv1.ClusterComponentSpec, compOps ComponentOpsInterface, fullComponentName string) {
 		volumeExpansion := compOps.(opsv1alpha1.VolumeExpansion)
 		stopped := compSpec.Stop != nil && *compSpec.Stop
@@ -143,7 +148,12 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 					explicitOffline:   explicitOffline,
 				})
 				for _, template := range compSpec.Instances {
-					// todo: consider instance template with volumeClaimTemplates
+					// An explicit VCT replaces the component declaration for this volume.
+					if slices.ContainsFunc(template.VolumeClaimTemplates, func(v appsv1.PersistentVolumeClaimTemplate) bool {
+						return v.Name == vct.Name
+					}) {
+						continue
+					}
 					veHelpers = append(veHelpers, volumeExpansionHelper{
 						compOps:           compOps,
 						fullComponentName: fullComponentName,
@@ -174,13 +184,22 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 			return opsRequestPhase, 0, err
 		}
 		for _, v := range shardingComps {
-			setVeHelpers(spec.Template, compOps, v.Labels[constant.KBAppComponentLabelKey])
+			if slices.ContainsFunc(spec.ShardTemplates, func(t appsv1.ShardTemplate) bool {
+				return t.Name == v.Labels[constant.KBAppShardTemplateLabelKey] && t.VolumeClaimTemplates != nil
+			}) {
+				continue
+			}
+			physical := appsv1.ClusterComponentSpec{
+				Replicas: v.Spec.Replicas, Instances: v.Spec.Instances,
+				Stop: v.Spec.Stop, OfflineInstances: v.Spec.OfflineInstances,
+			}
+			setVeHelpers(physical, compOps, v.Labels[constant.KBAppComponentLabelKey])
 		}
 	}
 	// reconcile the status.components. when the volume expansion is successful,
 	// sync the volumeClaimTemplate status and component phase On the OpsRequest and Cluster.
 	for _, veHelper := range veHelpers {
-		opsCompStatus := opsRequest.Status.Components[veHelper.compOps.GetComponentName()]
+		opsCompStatus := oldOpsRequestStatus.Components[veHelper.compOps.GetComponentName()]
 		key := getComponentVCTKey(veHelper.compOps.GetComponentName(), veHelper.vctName)
 		requestStorage, ok := storageMap[key]
 		if !ok {
@@ -194,7 +213,13 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 		expectProgressCount += veHelper.expectCount
 		succeedProgressCount += succeedCount
 		completedProgressCount += completedCount
-		opsRequest.Status.Components[veHelper.compOps.GetComponentName()] = opsCompStatus
+		name := veHelper.compOps.GetComponentName()
+		currentDetails[name] = append(currentDetails[name], opsCompStatus.ProgressDetails...)
+	}
+	for name, details := range currentDetails {
+		status := opsRequest.Status.Components[name]
+		status.ProgressDetails = details
+		opsRequest.Status.Components[name] = status
 	}
 	if completedProgressCount != expectProgressCount {
 		requeueAfter = time.Minute
@@ -291,6 +316,8 @@ func (ve volumeExpansionOpsHandler) handleVCTExpansionProgress(reqCtx intctrluti
 		succeedCount   int
 		completedCount int
 	)
+	previous := *compStatus
+	compStatus.ProgressDetails = nil
 	if veHelper.expectCount <= 0 {
 		return 0, 0, nil
 	}
@@ -332,8 +359,9 @@ func (ve volumeExpansionOpsHandler) handleVCTExpansionProgress(reqCtx intctrluti
 			continue
 		}
 		objectKey := getPVCProgressObjectKey(volume.GetClaimName())
-		progressDetail := ve.getProgressDetail(veHelper, compStatus, objectKey)
+		progressDetail := ve.getProgressDetail(veHelper, &previous, objectKey)
 		if progressDetail.Status == opsv1alpha1.FailedProgressStatus {
+			compStatus.ProgressDetails = append(compStatus.ProgressDetails, progressDetail)
 			completedCount += 1
 			continue
 		}

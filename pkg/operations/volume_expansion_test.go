@@ -20,8 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"context"
 	"fmt"
 	"strings"
+	"testing"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -32,12 +34,16 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/kubectl/pkg/util/storage"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
@@ -438,28 +444,71 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 			Expect(persisted.Status.Progress).To(Equal("0/0"))
 		})
 
-		It("rejects conflicting storage overrides before writing the Cluster", func() {
+		DescribeTable("expands only instances inheriting component storage", func(overridden int32, stopped bool) {
+			testapps.CreateStorageClass(&testCtx, storageClassName, true)
 			_, clusterObject := testapps.InitConsensusMysql(&testCtx, clusterName, compDefName, consensusCompName)
 			Expect(testapps.ChangeObj(&testCtx, clusterObject, func(c *appsv1.Cluster) {
-				c.Spec.ComponentSpecs[0].Instances = []appsv1.InstanceTemplate{{Name: "custom", VolumeClaimTemplates: c.Spec.ComponentSpecs[0].VolumeClaimTemplates}}
+				comp := &c.Spec.ComponentSpecs[0]
+				comp.Stop = ptr.To(stopped)
+				comp.Instances = []appsv1.InstanceTemplate{{Name: "custom", Replicas: ptr.To(overridden), VolumeClaimTemplates: comp.VolumeClaimTemplates}}
+				if overridden < comp.Replicas {
+					other := comp.VolumeClaimTemplates[0].DeepCopy()
+					other.Name = "other"
+					comp.Instances = append(comp.Instances, appsv1.InstanceTemplate{Name: "inherited", Replicas: ptr.To(int32(1)), VolumeClaimTemplates: []appsv1.PersistentVolumeClaimTemplate{*other}})
+				}
 			})).To(Succeed())
-			for _, phase := range []opsv1alpha1.OpsPhase{opsv1alpha1.OpsPendingPhase, opsv1alpha1.OpsCreatingPhase} {
-				ops := testops.NewOpsRequestObj("volumeexpansion-conflict-"+testCtx.GetRandomStr(), testCtx.DefaultNamespace, clusterName, opsv1alpha1.VolumeExpansionType)
-				ops.Spec.VolumeExpansionList = []opsv1alpha1.VolumeExpansion{{ComponentOps: opsv1alpha1.ComponentOps{ComponentName: consensusCompName}, VolumeClaimTemplates: []opsv1alpha1.OpsRequestVolumeClaimTemplate{{Name: vctName, Storage: resource.MustParse("5Gi")}}}}
-				ops = testops.CreateOpsRequest(ctx, testCtx, ops)
-				Expect(testapps.ChangeObjStatus(&testCtx, ops, func() { ops.Status.Phase = phase })).To(Succeed())
-				opsRes := &OpsResource{Cluster: clusterObject, OpsRequest: ops, Recorder: k8sManager.GetEventRecorderFor("opsrequest-controller")}
-				before := clusterObject.Spec.DeepCopy()
-				_, err := GetOpsManager().Do(intctrlutil.RequestCtx{Ctx: ctx}, k8sClient, opsRes)
-				Expect(err).NotTo(HaveOccurred())
-				persistedOps := &opsv1alpha1.OpsRequest{}
-				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(ops), persistedOps)).To(Succeed())
-				Expect(persistedOps.Status.Phase).To(Equal(opsv1alpha1.OpsFailedPhase))
-				persistedCluster := &appsv1.Cluster{}
-				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(clusterObject), persistedCluster)).To(Succeed())
-				Expect(persistedCluster.Spec).To(Equal(*before))
+			testapps.MockInstanceSetComponent(&testCtx, clusterName, consensusCompName)
+			testapps.MockInstanceSetStatus(testCtx, clusterObject, consensusCompName)
+			opsRes := &OpsResource{Cluster: clusterObject, Recorder: k8sManager.GetEventRecorderFor("opsrequest-controller")}
+			ops, pvcNames := initResourceForItsVolumeExpansion(clusterObject, opsRes, "5Gi", int(clusterObject.Spec.ComponentSpecs[0].Replicas))
+			Expect(testapps.ChangeObjStatus(&testCtx, ops, func() { ops.Status.Phase = opsv1alpha1.OpsPendingPhase })).To(Succeed())
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(opsRes.OpsRequest.Status.Phase).To(Equal(opsv1alpha1.OpsCreatingPhase))
+			before := clusterObject.Spec.ComponentSpecs[0].DeepCopy()
+			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).NotTo(HaveOccurred())
+			persistedCluster := &appsv1.Cluster{}
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(clusterObject), persistedCluster)).To(Succeed())
+			Expect(persistedCluster.Spec.ComponentSpecs[0].Instances).To(Equal(before.Instances))
+			Expect(persistedCluster.Spec.ComponentSpecs[0].VolumeClaimTemplates[0].Spec.Resources.Requests.Storage().String()).To(Equal("5Gi"))
+			Expect(testapps.ChangeObjStatus(&testCtx, ops, func() {
+				ops.Status.Phase = opsv1alpha1.OpsRunningPhase
+				ops.Status.StartTimestamp = metav1.Now()
+				ops.Status.Components = map[string]opsv1alpha1.OpsRequestComponentStatus{consensusCompName: {ProgressDetails: []opsv1alpha1.ProgressStatusDetail{{ObjectKey: "PVC/previously-included-override", Status: opsv1alpha1.FailedProgressStatus}}}}
+			})).To(Succeed())
+			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			Expect(err).NotTo(HaveOccurred())
+			expected := int(before.Replicas - overridden)
+			Expect(opsRes.OpsRequest.Status.Progress).To(Equal(fmt.Sprintf("0/%d", expected)))
+			if expected > 0 {
+				Expect(opsRes.OpsRequest.Status.Phase).To(Equal(opsv1alpha1.OpsRunningPhase))
 			}
-		})
+			for _, name := range pvcNames {
+				pvc := &corev1.PersistentVolumeClaim{}
+				Expect(k8sClient.Get(ctx, client.ObjectKey{Namespace: testCtx.DefaultNamespace, Name: name}, pvc)).To(Succeed())
+				if pvc.Labels[constant.KBAppInstanceTemplateLabelKey] == "custom" {
+					Expect(pvc.Spec.Resources.Requests.Storage().String()).To(Equal("2Gi"))
+					continue
+				}
+				Expect(testapps.ChangeObj(&testCtx, pvc, func(v *corev1.PersistentVolumeClaim) {
+					v.Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("5Gi")
+				})).To(Succeed())
+				Expect(testapps.ChangeObjStatus(&testCtx, pvc, func() {
+					pvc.Status.Capacity = corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("5Gi")}
+				})).To(Succeed())
+			}
+			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			Expect(err).NotTo(HaveOccurred())
+			persistedOps := &opsv1alpha1.OpsRequest{}
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(ops), persistedOps)).To(Succeed())
+			Expect(persistedOps.Status.Phase).To(Equal(opsv1alpha1.OpsSucceedPhase))
+			Expect(persistedOps.Status.Progress).To(Equal(fmt.Sprintf("%d/%d", expected, expected)))
+			Expect(persistedOps.Status.Components[consensusCompName].ProgressDetails).To(HaveLen(expected))
+		}, Entry("mixed default and template instances", int32(1), false),
+			Entry("all instances have independent storage", int32(3), false),
+			Entry("stopped instances retain the same storage scope", int32(1), true))
 
 		It("waits for storage convergence and fails at the existing timeout", func() {
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
@@ -572,3 +621,93 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 		})
 	})
 })
+
+func TestVolumeExpansionPreservesShardStorageOverrides(t *testing.T) {
+	ctx := context.Background()
+	scheme := runtime.NewScheme()
+	for _, add := range []func(*runtime.Scheme) error{corev1.AddToScheme, appsv1.AddToScheme, opsv1alpha1.AddToScheme, workloads.AddToScheme} {
+		if err := add(scheme); err != nil {
+			t.Fatal(err)
+		}
+	}
+	volumes := []appsv1.PersistentVolumeClaimTemplate{{Name: "data", Spec: corev1.PersistentVolumeClaimSpec{Resources: corev1.VolumeResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("3Gi")}}}}}
+	cluster := &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default"}, Spec: appsv1.ClusterSpec{Shardings: []appsv1.ClusterSharding{{
+		Name: "db", Shards: 2, Template: appsv1.ClusterComponentSpec{Replicas: 1, VolumeClaimTemplates: volumes},
+		ShardTemplates: []appsv1.ShardTemplate{{Name: "wide", Shards: ptr.To(int32(1)), Replicas: ptr.To(int32(2))}, {Name: "independent", Shards: ptr.To(int32(1)), Replicas: ptr.To(int32(3)), VolumeClaimTemplates: volumes}},
+	}}}}
+	cluster = cluster.DeepCopy()
+	ops := &opsv1alpha1.OpsRequest{ObjectMeta: metav1.ObjectMeta{Name: "expand", Namespace: "default"}, Spec: opsv1alpha1.OpsRequestSpec{
+		ClusterName: "demo", Type: opsv1alpha1.VolumeExpansionType,
+		SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{VolumeExpansionList: []opsv1alpha1.VolumeExpansion{{ComponentOps: opsv1alpha1.ComponentOps{ComponentName: "db"}, VolumeClaimTemplates: []opsv1alpha1.OpsRequestVolumeClaimTemplate{{Name: "data", Storage: resource.MustParse("5Gi")}}}}},
+	}, Status: opsv1alpha1.OpsRequestStatus{Phase: opsv1alpha1.OpsCreatingPhase}}
+	objects := []client.Object{cluster, ops}
+	for _, entry := range []struct {
+		name, template string
+		replicas       int32
+	}{{"db-a", "wide", 2}, {"db-b", "independent", 3}} {
+		objects = append(objects, &appsv1.Component{ObjectMeta: metav1.ObjectMeta{Name: "demo-" + entry.name, Namespace: "default", Labels: constant.GetCompLabels("demo", entry.name, map[string]string{
+			constant.KBAppShardingNameLabelKey: "db", constant.KBAppShardTemplateLabelKey: entry.template,
+		})}, Spec: appsv1.ComponentSpec{Replicas: entry.replicas, VolumeClaimTemplates: volumes}})
+	}
+	its := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Name: "demo-db-a", Namespace: "default"}, Spec: workloads.InstanceSetSpec{Replicas: ptr.To(int32(2))}}
+	for i := 0; i < 2; i++ {
+		name := fmt.Sprintf("demo-db-a-%d", i)
+		its.Status.InstanceStatus = append(its.Status.InstanceStatus, workloads.InstanceStatus{PodName: name, TemplateName: ptr.To("")})
+		objects = append(objects, &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "data-" + name, Namespace: "default", Labels: map[string]string{
+			constant.AppInstanceLabelKey: "demo", constant.KBAppComponentLabelKey: "db-a", constant.VolumeClaimTemplateNameLabelKey: "data",
+		}}, Spec: *volumes[0].Spec.DeepCopy(), Status: corev1.PersistentVolumeClaimStatus{Phase: corev1.ClaimBound, Capacity: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("3Gi")}}})
+	}
+	objects = append(objects, its)
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(ops, its, &corev1.PersistentVolumeClaim{}).WithObjects(objects...).Build()
+	opsRes := &OpsResource{Cluster: cluster, OpsRequest: ops, Recorder: record.NewFakeRecorder(50)}
+	reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+	if _, err := GetOpsManager().Do(reqCtx, cli, opsRes); err != nil {
+		t.Fatal(err)
+	}
+	persistedCluster := &appsv1.Cluster{}
+	if err := cli.Get(ctx, client.ObjectKeyFromObject(cluster), persistedCluster); err != nil {
+		t.Fatal(err)
+	}
+	shard := persistedCluster.Spec.Shardings[0]
+	if shard.Template.VolumeClaimTemplates[0].Spec.Resources.Requests.Storage().String() != "5Gi" || shard.ShardTemplates[1].VolumeClaimTemplates[0].Spec.Resources.Requests.Storage().String() != "3Gi" {
+		t.Fatal("component target or independent shard storage was changed incorrectly")
+	}
+	ops.Status.Phase = opsv1alpha1.OpsRunningPhase
+	ops.Status.StartTimestamp = metav1.Now()
+	if err := cli.Status().Update(ctx, ops); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := GetOpsManager().Reconcile(reqCtx, cli, opsRes); err != nil {
+		t.Fatal(err)
+	}
+	if ops.Status.Phase != opsv1alpha1.OpsRunningPhase || ops.Status.Progress != "0/2" {
+		t.Fatalf("phase=%s progress=%s, want Running 0/2", ops.Status.Phase, ops.Status.Progress)
+	}
+	for i := 0; i < 2; i++ {
+		pvc := &corev1.PersistentVolumeClaim{}
+		if err := cli.Get(ctx, client.ObjectKey{Name: fmt.Sprintf("data-demo-db-a-%d", i), Namespace: "default"}, pvc); err != nil {
+			t.Fatal(err)
+		}
+		pvc.Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("5Gi")
+		if err := cli.Update(ctx, pvc); err != nil {
+			t.Fatal(err)
+		}
+		pvc.Status.Capacity[corev1.ResourceStorage] = resource.MustParse("5Gi")
+		if err := cli.Status().Update(ctx, pvc); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := GetOpsManager().Reconcile(reqCtx, cli, opsRes); err != nil {
+		t.Fatal(err)
+	}
+	persistedOps := &opsv1alpha1.OpsRequest{}
+	if err := cli.Get(ctx, client.ObjectKeyFromObject(ops), persistedOps); err != nil {
+		t.Fatal(err)
+	}
+	if persistedOps.Status.Phase != opsv1alpha1.OpsSucceedPhase || persistedOps.Status.Progress != "2/2" {
+		t.Fatalf("phase=%s progress=%s, want Succeed 2/2", persistedOps.Status.Phase, persistedOps.Status.Progress)
+	}
+	if len(persistedOps.Status.Components["db"].ProgressDetails) != 2 {
+		t.Fatal("progress includes unaffected shard instances")
+	}
+}

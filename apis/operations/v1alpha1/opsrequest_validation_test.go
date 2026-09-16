@@ -56,10 +56,10 @@ func TestValidateVolumeExpansion(t *testing.T) {
 		}},
 		{name: "smaller override", change: func(c *appsv1.ClusterComponentSpec, _ *VolumeExpansion) {
 			c.Instances[0].VolumeClaimTemplates = volume("4Gi")
-		}, wantError: "storage override"},
+		}},
 		{name: "larger override", change: func(c *appsv1.ClusterComponentSpec, _ *VolumeExpansion) {
 			c.Instances[0].VolumeClaimTemplates = volume("6Gi")
-		}, wantError: "storage override"},
+		}},
 		{name: "disabled override", change: func(c *appsv1.ClusterComponentSpec, _ *VolumeExpansion) {
 			c.Instances[0].VolumeClaimTemplates = volume("4Gi")
 			c.Instances[0].Replicas = ptr.To(int32(0))
@@ -67,12 +67,12 @@ func TestValidateVolumeExpansion(t *testing.T) {
 		{name: "canary override", change: func(c *appsv1.ClusterComponentSpec, _ *VolumeExpansion) {
 			c.Instances[0].VolumeClaimTemplates = volume("4Gi")
 			c.Instances[0].Canary = ptr.To(true)
-		}, wantError: "storage override"},
+		}},
 		{name: "stopped inherits", change: func(c *appsv1.ClusterComponentSpec, _ *VolumeExpansion) { c.Stop = ptr.To(true) }},
-		{name: "stopped conflicting override", change: func(c *appsv1.ClusterComponentSpec, _ *VolumeExpansion) {
+		{name: "stopped independent override", change: func(c *appsv1.ClusterComponentSpec, _ *VolumeExpansion) {
 			c.Stop = ptr.To(true)
 			c.Instances[0].VolumeClaimTemplates = volume("4Gi")
-		}, wantError: "storage override"},
+		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			comp := appsv1.ClusterComponentSpec{Name: "db", Replicas: 2, VolumeClaimTemplates: volume("3Gi"), Instances: []appsv1.InstanceTemplate{{Name: "custom"}}}
@@ -102,19 +102,19 @@ func TestValidateVolumeExpansion(t *testing.T) {
 	}{
 		{name: "inherited sharding"},
 		{name: "smaller sharding target", change: func(s *appsv1.ClusterSharding) { s.Template.VolumeClaimTemplates = volume("6Gi") }, wantError: true},
-		{name: "conflicting shard override", change: func(s *appsv1.ClusterSharding) { s.ShardTemplates[0].VolumeClaimTemplates = volume("4Gi") }, wantError: true},
+		{name: "independent shard override", change: func(s *appsv1.ClusterSharding) { s.ShardTemplates[0].VolumeClaimTemplates = volume("4Gi") }},
 		{name: "matching shard override", change: func(s *appsv1.ClusterSharding) { s.ShardTemplates[0].VolumeClaimTemplates = volume("5Gi") }},
 		{name: "missing shard volume", change: func(s *appsv1.ClusterSharding) {
 			s.ShardTemplates[0].VolumeClaimTemplates = volume("5Gi")
 			s.ShardTemplates[0].VolumeClaimTemplates[0].Name = "other"
-		}, wantError: true},
+		}},
 		{name: "inactive shard override", change: func(s *appsv1.ClusterSharding) {
 			s.ShardTemplates[0].Shards = ptr.To(int32(0))
 			s.ShardTemplates[0].VolumeClaimTemplates = volume("4Gi")
 		}},
-		{name: "inherited instance conflict", change: func(s *appsv1.ClusterSharding) {
+		{name: "independent instance override", change: func(s *appsv1.ClusterSharding) {
 			s.Template.Instances = []appsv1.InstanceTemplate{{Name: "custom", VolumeClaimTemplates: volume("4Gi")}}
-		}, wantError: true},
+		}},
 		{name: "replaced instances", change: func(s *appsv1.ClusterSharding) {
 			s.Shards = 1
 			s.Template.Instances = []appsv1.InstanceTemplate{{Name: "unused", VolumeClaimTemplates: volume("4Gi")}}

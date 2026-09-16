@@ -27,7 +27,6 @@ import (
 )
 
 // OpsRequestSpec defines the desired state of OpsRequest
-// +kubebuilder:validation:XValidation:rule="has(self.verticalScaling) == has(oldSelf.verticalScaling)",message="forbidden to add or remove spec.verticalScaling"
 type OpsRequestSpec struct {
 	// Specifies the name of the Cluster resource that this operation is targeting.
 	//
@@ -175,7 +174,6 @@ type SpecificOpsRequest struct {
 	SwitchoverList []Switchover `json:"switchover,omitempty"  patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
 
 	// Lists VerticalScaling objects, each specifying a component and its desired compute resources for vertical scaling.
-	// This field is immutable after creation.
 	//
 	// +kubebuilder:validation:MaxItems=1024
 	// +optional
@@ -183,7 +181,6 @@ type SpecificOpsRequest struct {
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=componentName
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.verticalScaling"
 	VerticalScalingList []VerticalScaling `json:"verticalScaling,omitempty"  patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
 
 	// Lists Reconfigure objects, each specifying a Component and its configuration updates.

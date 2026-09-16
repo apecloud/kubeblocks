@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -37,6 +38,46 @@ import (
 )
 
 var _ = Describe("Component Workload Operations Test", func() {
+	Context("copyAndMergeITS restart annotations", func() {
+		const older = "2026-09-01T00:00:00Z"
+		const newer = "2026-09-02T00:00:00Z"
+
+		DescribeTable("merge restart timestamps", func(runningRestart, desiredRestart, expectedRestart string) {
+			running := &workloads.InstanceSet{Spec: workloads.InstanceSetSpec{
+				Template: corev1.PodTemplateSpec{ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{"custom": "old", "retained": "value"},
+				}},
+			}}
+			desired := running.DeepCopy()
+			desired.Spec.Template.Annotations = map[string]string{"custom": "new"}
+			if runningRestart != "" {
+				running.Spec.Template.Annotations[constant.RestartAnnotationKey] = runningRestart
+			}
+			if desiredRestart != "" {
+				desired.Spec.Template.Annotations[constant.RestartAnnotationKey] = desiredRestart
+			}
+			before := running.DeepCopy()
+			merged := copyAndMergeITS(running, desired)
+			Expect(merged).ShouldNot(BeNil())
+			Expect(merged.Spec.Template.Annotations).Should(Equal(map[string]string{
+				"custom": "new", "retained": "value", constant.RestartAnnotationKey: expectedRestart,
+			}))
+			Expect(running).Should(Equal(before))
+			Expect(copyAndMergeITS(merged, desired)).Should(BeNil())
+		},
+			Entry("preserve config restart against older ops", newer, older, newer),
+			Entry("accept newer ops restart", older, newer, newer),
+			Entry("equal timestamp", newer, newer, newer),
+			Entry("compare timezone offsets", "2026-09-02T01:00:00+08:00", "2026-09-01T18:00:00Z", "2026-09-01T18:00:00Z"),
+			Entry("preserve equal instant representation", newer, "2026-09-02T08:00:00+08:00", newer),
+			Entry("compare fractional seconds", "2026-09-02T00:00:00.5Z", newer, "2026-09-02T00:00:00.5Z"),
+			Entry("first restart", "", newer, newer),
+			Entry("no incoming restart", newer, "", newer),
+			Entry("replace invalid running value", "invalid", newer, newer),
+			Entry("preserve opaque incoming value behavior", newer, "force-restart", "force-restart"),
+		)
+	})
+
 	const (
 		clusterName    = "test-cluster"
 		compName       = "test-comp"

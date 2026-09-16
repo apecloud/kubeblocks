@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"reflect"
 	"strings"
+	"time"
 
 	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
@@ -343,6 +344,7 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet) *workloads.InstanceS
 	intctrlutil.MergeMetadataMapInplace(itsProto.Labels, &itsObjCopy.Labels)
 	// merge pod spec template annotations
 	intctrlutil.MergeMetadataMapInplace(itsProto.Spec.Template.Annotations, &itsObjCopy.Spec.Template.Annotations)
+	mergeRestartAnnotation(oldITS.Spec.Template.Annotations, itsObjCopy.Spec.Template.Annotations)
 	podTemplateCopy := *itsProto.Spec.Template.DeepCopy()
 	podTemplateCopy.Annotations = itsObjCopy.Spec.Template.Annotations
 
@@ -388,6 +390,17 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet) *workloads.InstanceS
 		return nil
 	}
 	return itsObjCopy
+}
+
+func mergeRestartAnnotation(running, merged map[string]string) {
+	// Restart Ops and config changes share this key. Do not roll back a config
+	// restart to the older timestamp still present in the Component spec.
+	runningRestart := running[constant.RestartAnnotationKey]
+	runningTime, runningErr := time.Parse(time.RFC3339, runningRestart)
+	desiredTime, desiredErr := time.Parse(time.RFC3339, merged[constant.RestartAnnotationKey])
+	if runningErr == nil && desiredErr == nil && !runningTime.Before(desiredTime) {
+		merged[constant.RestartAnnotationKey] = runningRestart
+	}
 }
 
 func checkNRollbackProtoImages(itsObj, itsProto *workloads.InstanceSet) {

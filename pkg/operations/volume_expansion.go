@@ -359,9 +359,13 @@ func (ve volumeExpansionOpsHandler) handleVCTExpansionProgress(reqCtx intctrluti
 			continue
 		}
 		objectKey := getPVCProgressObjectKey(volume.GetClaimName())
-		progressDetail := ve.getProgressDetail(veHelper, &previous, objectKey)
+		progressDetail := opsv1alpha1.ProgressStatusDetail{ObjectKey: objectKey, Group: veHelper.vctName}
+		if existing := findStatusProgressDetail(previous.ProgressDetails, objectKey); existing != nil {
+			progressDetail = *existing
+			// Keep the old value so the setter can detect status and message changes.
+			compStatus.ProgressDetails = append(compStatus.ProgressDetails, *existing)
+		}
 		if progressDetail.Status == opsv1alpha1.FailedProgressStatus {
-			compStatus.ProgressDetails = append(compStatus.ProgressDetails, progressDetail)
 			completedCount += 1
 			continue
 		}
@@ -390,14 +394,6 @@ func (ve volumeExpansionOpsHandler) handleVCTExpansionProgress(reqCtx intctrluti
 		setComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest, &compStatus.ProgressDetails, progressDetail)
 	}
 	return succeedCount, completedCount, nil
-}
-
-func (ve volumeExpansionOpsHandler) getProgressDetail(veHelper volumeExpansionHelper, compStatus *opsv1alpha1.OpsRequestComponentStatus, objectKey string) opsv1alpha1.ProgressStatusDetail {
-	progressDetail := findStatusProgressDetail(compStatus.ProgressDetails, objectKey)
-	if progressDetail == nil {
-		return opsv1alpha1.ProgressStatusDetail{ObjectKey: objectKey, Group: veHelper.vctName}
-	}
-	return *progressDetail
 }
 
 func getComponentVCTKey(compoName, vctName string) string {

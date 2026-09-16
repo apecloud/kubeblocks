@@ -683,7 +683,8 @@ func TestVolumeExpansionPreservesShardStorageOverrides(t *testing.T) {
 	}
 	objects = append(objects, its)
 	cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(ops, its, &corev1.PersistentVolumeClaim{}).WithObjects(objects...).Build()
-	opsRes := &OpsResource{Cluster: cluster, OpsRequest: ops, Recorder: record.NewFakeRecorder(50)}
+	recorder := record.NewFakeRecorder(50)
+	opsRes := &OpsResource{Cluster: cluster, OpsRequest: ops, Recorder: recorder}
 	reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
 	if _, err := GetOpsManager().Do(reqCtx, cli, opsRes); err != nil {
 		t.Fatal(err)
@@ -707,6 +708,25 @@ func TestVolumeExpansionPreservesShardStorageOverrides(t *testing.T) {
 	if ops.Status.Phase != opsv1alpha1.OpsRunningPhase || ops.Status.Progress != "0/2" {
 		t.Fatalf("phase=%s progress=%s, want Running 0/2", ops.Status.Phase, ops.Status.Progress)
 	}
+	assertNoRepeatedEvents := func() {
+		t.Helper()
+		for len(recorder.Events) > 0 {
+			<-recorder.Events
+		}
+		// Reload persisted state, as a later reconcile would after a restart.
+		current := &opsv1alpha1.OpsRequest{}
+		if err := cli.Get(ctx, client.ObjectKeyFromObject(ops), current); err != nil {
+			t.Fatal(err)
+		}
+		opsRes.OpsRequest = current
+		if _, err := GetOpsManager().Reconcile(reqCtx, cli, opsRes); err != nil {
+			t.Fatal(err)
+		}
+		if len(recorder.Events) > 0 {
+			t.Fatalf("unchanged progress emitted another event: %s", <-recorder.Events)
+		}
+	}
+	assertNoRepeatedEvents()
 	for i := 0; i < 2; i++ {
 		pvc := &corev1.PersistentVolumeClaim{}
 		if err := cli.Get(ctx, client.ObjectKey{Name: fmt.Sprintf("data-demo-db-a-%d", i), Namespace: "default"}, pvc); err != nil {
@@ -719,6 +739,30 @@ func TestVolumeExpansionPreservesShardStorageOverrides(t *testing.T) {
 		pvc.Status.Capacity[corev1.ResourceStorage] = resource.MustParse("5Gi")
 		if err := cli.Status().Update(ctx, pvc); err != nil {
 			t.Fatal(err)
+		}
+		if i == 0 {
+			other := &corev1.PersistentVolumeClaim{}
+			if err := cli.Get(ctx, client.ObjectKey{Name: "data-demo-db-a-1", Namespace: "default"}, other); err != nil {
+				t.Fatal(err)
+			}
+			other.Status.Conditions = []corev1.PersistentVolumeClaimCondition{{Type: corev1.PersistentVolumeClaimResizing, Status: corev1.ConditionTrue}}
+			if err := cli.Status().Update(ctx, other); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := GetOpsManager().Reconcile(reqCtx, cli, opsRes); err != nil {
+				t.Fatal(err)
+			}
+			if opsRes.OpsRequest.Status.Phase != opsv1alpha1.OpsRunningPhase || opsRes.OpsRequest.Status.Progress != "1/2" {
+				t.Fatalf("phase=%s progress=%s, want Running 1/2", opsRes.OpsRequest.Status.Phase, opsRes.OpsRequest.Status.Progress)
+			}
+			if len(recorder.Events) != 2 {
+				t.Fatalf("events=%d, want one Succeed and one Processing event", len(recorder.Events))
+			}
+			events := <-recorder.Events + "\n" + <-recorder.Events
+			if !strings.Contains(events, "Normal Succeed ") || !strings.Contains(events, "Normal Processing ") {
+				t.Fatalf("expected Succeed and Processing events, got %s", events)
+			}
+			assertNoRepeatedEvents()
 		}
 	}
 	if _, err := GetOpsManager().Reconcile(reqCtx, cli, opsRes); err != nil {

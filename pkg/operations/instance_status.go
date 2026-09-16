@@ -100,11 +100,3 @@ func assignmentsMatchComponent(assignments map[string]string, component *appsv1.
 	}
 	return true
 }
-
-func activeAssignmentsForTarget(workload Workload, component *appsv1.ClusterComponentSpec) (map[string]string, bool, error) {
-	assignments, err := activeInstanceTemplates(workload.GetInstanceStatuses())
-	if err != nil {
-		return nil, false, err
-	}
-	return assignments, assignmentsMatchComponent(assignments, component), nil
-}

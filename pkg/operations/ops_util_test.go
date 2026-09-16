@@ -187,6 +187,7 @@ var _ = Describe("OpsUtil functions", func() {
 			By("mock restart ops to succeed and expect to enable ha")
 			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsRunningPhase
 			_ = testapps.MockInstanceSetPods(&testCtx, its, opsRes.Cluster, defaultCompName)
+			mockRunningInstanceStatus(opsRes.Cluster, defaultCompName)
 			mockRollingTargetStatus(opsRes.Cluster, appsv1.RunningComponentPhase, defaultCompName)
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())

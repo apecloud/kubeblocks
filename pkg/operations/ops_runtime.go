@@ -152,18 +152,6 @@ func (r *opsRuntime) GetWorkload(namespace, clusterName, compName string) (Workl
 	return workload, nil
 }
 
-func (r *opsRuntime) GetInstanceSet(namespace, clusterName, compName string) (*workloads.InstanceSet, error) {
-	its := &workloads.InstanceSet{}
-	key := client.ObjectKey{
-		Namespace: namespace,
-		Name:      constant.GenerateClusterComponentName(clusterName, compName),
-	}
-	if err := r.cli.Get(r.ctx, key, its); err != nil {
-		return nil, client.IgnoreNotFound(err)
-	}
-	return its, nil
-}
-
 func (r *opsRuntime) GetInstance(namespace, clusterName, compName, instanceName string) (Instance, error) {
 	pod := &corev1.Pod{}
 	if err := r.cli.Get(r.dataContext(), client.ObjectKey{Name: instanceName, Namespace: namespace}, pod, r.dataGetOpts...); err != nil {

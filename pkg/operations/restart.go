@@ -87,11 +87,10 @@ func (r restartOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 	if rollingActionGenerationPending(opsRes) {
 		return opsv1alpha1.OpsRunningPhase, 0, nil
 	}
-	if !r.targetsExist(opsRes) {
+	if !r.targetsRestarted(opsRes) {
 		return opsv1alpha1.OpsAbortedPhase, 0, nil
 	}
-	return r.compOpsHelper.reconcileRollingAction(reqCtx, cli, opsRes,
-		"restart", handleRunningProgress, appsv1.RunningComponentPhase)
+	return r.compOpsHelper.reconcileRunningAction(reqCtx, cli, opsRes, "restart")
 }
 
 // SaveLastConfiguration has nothing to record for a restart operation.
@@ -99,13 +98,18 @@ func (r restartOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, 
 	return nil
 }
 
-func (r restartOpsHandler) targetsExist(opsRes *OpsResource) bool {
+func (r restartOpsHandler) targetsRestarted(opsRes *OpsResource) bool {
 	if opsRes == nil || opsRes.Cluster == nil || opsRes.OpsRequest == nil {
+		return false
+	}
+	trigger := opsRes.OpsRequest.Status.StartTimestamp.Format(time.RFC3339)
+	if opsRes.OpsRequest.Status.StartTimestamp.IsZero() {
 		return false
 	}
 	for i := range opsRes.OpsRequest.Spec.RestartList {
 		componentName := opsRes.OpsRequest.Spec.RestartList[i].ComponentName
-		if getComponentSpecOrShardingTemplate(opsRes.Cluster, componentName) == nil {
+		compSpec := getComponentSpecOrShardingTemplate(opsRes.Cluster, componentName)
+		if compSpec == nil || compSpec.Annotations[constant.RestartAnnotationKey] != trigger {
 			return false
 		}
 	}

@@ -22,6 +22,7 @@ package operations
 import (
 	"context"
 	"testing"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -43,10 +44,14 @@ import (
 	testops "github.com/apecloud/kubeblocks/pkg/testutil/operations"
 )
 
-func TestRestartTargetsExist(t *testing.T) {
+func TestRestartTargetsMatchTrigger(t *testing.T) {
+	startTimestamp := metav1.NewTime(time.Date(2026, 9, 16, 1, 2, 3, 0, time.UTC))
+	trigger := startTimestamp.Format(time.RFC3339)
 	cluster := &appsv1.Cluster{Spec: appsv1.ClusterSpec{
-		ComponentSpecs: []appsv1.ClusterComponentSpec{{Name: "mysql"}},
-		Shardings:      []appsv1.ClusterSharding{{Name: "shard"}},
+		ComponentSpecs: []appsv1.ClusterComponentSpec{{Name: "mysql", Annotations: map[string]string{constant.RestartAnnotationKey: trigger}}},
+		Shardings: []appsv1.ClusterSharding{{Name: "shard", Template: appsv1.ClusterComponentSpec{
+			Annotations: map[string]string{constant.RestartAnnotationKey: trigger},
+		}}},
 	}}
 	newOpsResource := func(targets ...string) *OpsResource {
 		restartList := make([]opsv1alpha1.ComponentOps, len(targets))
@@ -54,16 +59,21 @@ func TestRestartTargetsExist(t *testing.T) {
 			restartList[i].ComponentName = targets[i]
 		}
 		return &OpsResource{Cluster: cluster, OpsRequest: &opsv1alpha1.OpsRequest{
-			Spec: opsv1alpha1.OpsRequestSpec{SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{RestartList: restartList}},
+			Spec:   opsv1alpha1.OpsRequestSpec{SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{RestartList: restartList}},
+			Status: opsv1alpha1.OpsRequestStatus{StartTimestamp: startTimestamp},
 		}}
 	}
 
 	handler := restartOpsHandler{}
-	if !handler.targetsExist(newOpsResource("mysql", "shard")) {
-		t.Fatal("existing targets were rejected")
+	if !handler.targetsRestarted(newOpsResource("mysql", "shard")) {
+		t.Fatal("applied restart targets were rejected")
 	}
-	if handler.targetsExist(newOpsResource("missing")) {
+	if handler.targetsRestarted(newOpsResource("missing")) {
 		t.Fatal("missing target was accepted")
+	}
+	cluster.Spec.ComponentSpecs[0].Annotations[constant.RestartAnnotationKey] = startTimestamp.Add(time.Second).Format(time.RFC3339)
+	if handler.targetsRestarted(newOpsResource("mysql")) {
+		t.Fatal("a replaced restart trigger was accepted")
 	}
 	opsRes := newOpsResource("missing")
 	opsRes.Cluster.Generation = 7
@@ -95,6 +105,7 @@ func TestRestartUsesClusterStatusForTerminalPhase(t *testing.T) {
 		name             string
 		componentPhase   appsv1.ComponentPhase
 		upToDate         bool
+		instanceFailed   bool
 		wantPhase        opsv1alpha1.OpsPhase
 		wantDetailStatus opsv1alpha1.ProgressStatus
 	}{
@@ -102,6 +113,7 @@ func TestRestartUsesClusterStatusForTerminalPhase(t *testing.T) {
 			name:             "instance failure remains progress while component is updating",
 			componentPhase:   appsv1.UpdatingComponentPhase,
 			upToDate:         true,
+			instanceFailed:   true,
 			wantPhase:        opsv1alpha1.OpsRunningPhase,
 			wantDetailStatus: opsv1alpha1.FailedProgressStatus,
 		},
@@ -116,6 +128,7 @@ func TestRestartUsesClusterStatusForTerminalPhase(t *testing.T) {
 			name:             "failed component is authoritative failure",
 			componentPhase:   appsv1.FailedComponentPhase,
 			upToDate:         true,
+			instanceFailed:   true,
 			wantPhase:        opsv1alpha1.OpsFailedPhase,
 			wantDetailStatus: opsv1alpha1.FailedProgressStatus,
 		},
@@ -134,6 +147,7 @@ func TestRestartUsesClusterStatusForTerminalPhase(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: clusterName, Generation: 8},
 				Spec: appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{{
 					Name: component, Replicas: replicas,
+					Annotations: map[string]string{constant.RestartAnnotationKey: "2026-09-16T01:02:03Z"},
 				}}},
 				Status: appsv1.ClusterStatus{Components: map[string]appsv1.ClusterComponentStatus{
 					component: {
@@ -150,6 +164,7 @@ func TestRestartUsesClusterStatusForTerminalPhase(t *testing.T) {
 				}},
 				Status: opsv1alpha1.OpsRequestStatus{
 					ClusterGeneration: 8,
+					StartTimestamp:    metav1.NewTime(time.Date(2026, 9, 16, 1, 2, 3, 0, time.UTC)),
 					Components:        map[string]opsv1alpha1.OpsRequestComponentStatus{},
 				},
 			}
@@ -166,7 +181,7 @@ func TestRestartUsesClusterStatusForTerminalPhase(t *testing.T) {
 					UpToDate:     true,
 					Ready:        true,
 					Available:    true,
-					Failed:       true,
+					Failed:       test.instanceFailed,
 				}}},
 			}
 			cli := fake.NewClientBuilder().WithScheme(testScheme).

@@ -20,10 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
-	"fmt"
-	"reflect"
 	"slices"
-	"sort"
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -161,16 +158,11 @@ func (stop StopOpsHandler) reconcile(reqCtx intctrlutil.RequestCtx, cli client.C
 		opsRequest.Status.Components = map[string]opsv1alpha1.OpsRequestComponentStatus{}
 	}
 	helper := newComponentOpsHelper(opsRequest.Spec.StopList)
-	resources, err := helper.buildRollingResources(reqCtx, cli, opsRes, "stop")
+	resources, err := helper.buildInstanceProgressResources(reqCtx, cli, opsRes, "stop")
 	if err != nil {
 		return opsv1alpha1.OpsRunningPhase, 0, err
 	}
-	current := map[string][]opsv1alpha1.ProgressStatusDetail{}
-	for name := range opsRequest.Status.Components {
-		if _, ok := helper.getComponentOps(name); ok {
-			current[name] = nil
-		}
-	}
+	current := helper.emptyInstanceProgress(opsRes.Cluster)
 	var expectedCount, completedCount int32
 	observationsComplete := true
 	componentCounts := map[string]int32{}
@@ -216,37 +208,14 @@ func (stop StopOpsHandler) reconcile(reqCtx intctrlutil.RequestCtx, cli client.C
 			observationsComplete = false
 		}
 	}
-	for name, details := range current {
-		status := opsRequest.Status.Components[name]
-		sort.Slice(details, func(i, j int) bool { return details[i].ObjectKey < details[j].ObjectKey })
-		for i := range details {
-			detail := &details[i]
-			previous := findStatusProgressDetail(status.ProgressDetails, detail.ObjectKey)
-			if previous != nil {
-				detail.StartTime = previous.StartTime
-				if previous.Status == detail.Status {
-					detail.EndTime = previous.EndTime
-				}
-			}
-			updateProgressDetailTime(detail)
-			if previous == nil || previous.Status != detail.Status || previous.Message != detail.Message {
-				sendProgressDetailEvent(opsRes.Recorder, opsRequest, *detail)
-			}
-		}
-		status.ProgressDetails = details
-		opsRequest.Status.Components[name] = status
-	}
-	phase := helper.updateRollingActionPhase(opsRes, appsv1.StoppedComponentPhase)
+	phase := helper.componentActionPhase(opsRes, appsv1.StoppedComponentPhase)
 	// Apps and workload observations can arrive separately. Keep reconciling until
 	// the observed progress agrees with success; never fill missing progress from it.
 	if phase == opsv1alpha1.OpsSucceedPhase && (!observationsComplete || completedCount != expectedCount) {
 		phase = opsv1alpha1.OpsRunningPhase
 	}
-	opsRequest.Status.Progress = fmt.Sprintf("%d/%d", completedCount, expectedCount)
-	if !reflect.DeepEqual(opsRequest.Status, oldOpsRequest.Status) {
-		if err := cli.Status().Patch(reqCtx.Ctx, opsRequest, client.MergeFrom(oldOpsRequest)); err != nil {
-			return opsv1alpha1.OpsRunningPhase, 0, err
-		}
+	if err := patchCurrentProgress(reqCtx, cli, opsRes, oldOpsRequest, current, completedCount, expectedCount); err != nil {
+		return opsv1alpha1.OpsRunningPhase, 0, err
 	}
 	if phase == opsv1alpha1.OpsRunningPhase {
 		return phase, time.Second, nil

@@ -96,8 +96,7 @@ func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 	}
 	upgradeSpec := opsRes.OpsRequest.Spec.Upgrade
 	compOpsHelper := newComponentOpsHelper(upgradeSpec.Components)
-	return compOpsHelper.reconcileRollingAction(
-		reqCtx, cli, opsRes, "upgrade", handleRunningProgress, appsv1.RunningComponentPhase)
+	return compOpsHelper.reconcileRunningAction(reqCtx, cli, opsRes, "upgrade")
 }
 
 func (u upgradeOpsHandler) targetsUnchanged(opsRes *OpsResource) bool {

@@ -547,7 +547,7 @@ func TestVerticalScalingCancellationUsesLastConfigurationAndRefreshesProgress(t 
 	}
 }
 
-func TestVerticalScalingAbortsWhenManagedTargetIsOverwritten(t *testing.T) {
+func TestVerticalScalingWaitsWhenTargetDoesNotMatch(t *testing.T) {
 	target := verticalScalingTestResources("2")
 	component := appsv1.ClusterComponentSpec{Name: "db", Replicas: 1, Resources: verticalScalingTestResources("3")}
 	request := opsv1alpha1.VerticalScaling{
@@ -556,13 +556,13 @@ func TestVerticalScalingAbortsWhenManagedTargetIsOverwritten(t *testing.T) {
 	cluster := verticalScalingTestCluster(component, appsv1.RunningComponentPhase, 7, true)
 	ops := verticalScalingTestOps(request)
 	cli := verticalScalingTestClient(t, cluster, ops)
-	phase, _, err := (verticalScalingHandler{}).ReconcileAction(
+	phase, requeue, err := (verticalScalingHandler{}).ReconcileAction(
 		intctrlutil.RequestCtx{Ctx: context.Background()}, cli, verticalScalingTestResourcesBundle(cluster, ops))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if phase != opsv1alpha1.OpsAbortedPhase {
-		t.Fatalf("phase=%s, want %s", phase, opsv1alpha1.OpsAbortedPhase)
+	if phase != opsv1alpha1.OpsRunningPhase || requeue <= 0 {
+		t.Fatalf("phase=%s requeue=%s, want Running with a retry", phase, requeue)
 	}
 }
 

@@ -706,6 +706,12 @@ var _ = Describe("OpsRequest Controller", func() {
 			testapps.MockInstanceSetStatus(testCtx, clusterObj, mysqlCompName)
 			Expect(testapps.ChangeObjStatus(&testCtx, its, func() {
 				testk8s.MockInstanceSetReady(its, mockPods...)
+				for i := range its.Status.InstanceStatus {
+					status := &its.Status.InstanceStatus[i]
+					status.UpToDate = true
+					status.Ready = true
+					status.Available = true
+				}
 			})).ShouldNot(HaveOccurred())
 
 			Eventually(testapps.GetComponentPhase(&testCtx, compKey)).Should(Equal(appsv1.RunningComponentPhase))

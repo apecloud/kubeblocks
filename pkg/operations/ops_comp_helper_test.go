@@ -183,6 +183,13 @@ func TestRunningInstanceProgress(t *testing.T) {
 		t.Fatalf("progress=%d/%d, want 0/1 until UpToDate", result.completedCount, result.expectedCount)
 	}
 	its.Status.InstanceStatus[0].UpToDate = true
+	its.Generation = 2
+	its.Status.ObservedGeneration = 1
+	result = handleRunningInstanceProgress(opsRes, pgRes, its)
+	if result.observationsComplete {
+		t.Fatal("stale InstanceSet status must keep the observation incomplete")
+	}
+	its.Status.ObservedGeneration = its.Generation
 	result = handleRunningInstanceProgress(opsRes, pgRes, its)
 	if result.expectedCount != 1 || result.completedCount != 1 || result.succeededCount != 1 {
 		t.Fatalf("progress=%d/%d, want 1/1", result.completedCount, result.expectedCount)

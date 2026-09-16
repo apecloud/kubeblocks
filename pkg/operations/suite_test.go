@@ -291,6 +291,7 @@ func mockRunningInstanceStatus(cluster *appsv1.Cluster, compNames ...string) {
 		key := client.ObjectKey{Namespace: cluster.Namespace,
 			Name: constant.GenerateClusterComponentName(cluster.Name, name)}
 		Eventually(testapps.GetAndChangeObjStatus(&testCtx, key, func(its *workloads.InstanceSet) {
+			its.Status.ObservedGeneration = its.Generation
 			for i := range its.Status.InstanceStatus {
 				status := &its.Status.InstanceStatus[i]
 				if status.EffectiveDesiredState() == workloads.InstanceDesiredStateActive &&

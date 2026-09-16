@@ -388,7 +388,8 @@ func handleRunningInstanceProgress(opsRes *OpsResource, pgRes *progressResource,
 		}
 		result.details = append(result.details, detail)
 	}
-	result.observationsComplete = !ptr.Deref(its.Spec.Stop, false) && int32(len(result.details)) == expectedCount
+	result.observationsComplete = its.Status.ObservedGeneration == its.Generation &&
+		!ptr.Deref(its.Spec.Stop, false) && int32(len(result.details)) == expectedCount
 	return result
 }
 

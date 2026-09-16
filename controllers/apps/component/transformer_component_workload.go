@@ -241,7 +241,8 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet) *workloads.InstanceS
 	intctrlutil.MergeMetadataMapInplace(itsProto.Annotations, &itsObjCopy.Annotations)
 	intctrlutil.MergeMetadataMapInplace(itsProto.Labels, &itsObjCopy.Labels)
 	// merge pod spec template annotations
-	itsObjCopy.Spec.Template.Annotations = mergePodTemplateAnnotations(oldITS.Spec.Template.Annotations, itsProto.Spec.Template.Annotations)
+	intctrlutil.MergeMetadataMapInplace(itsProto.Spec.Template.Annotations, &itsObjCopy.Spec.Template.Annotations)
+	mergeRestartAnnotation(oldITS.Spec.Template.Annotations, itsObjCopy.Spec.Template.Annotations)
 	podTemplateCopy := *itsProto.Spec.Template.DeepCopy()
 	podTemplateCopy.Annotations = itsObjCopy.Spec.Template.Annotations
 
@@ -294,18 +295,15 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet) *workloads.InstanceS
 	return itsObjCopy
 }
 
-func mergePodTemplateAnnotations(running, desired map[string]string) map[string]string {
-	merged := maps.Clone(running)
-	intctrlutil.MergeMetadataMapInplace(desired, &merged)
+func mergeRestartAnnotation(running, merged map[string]string) {
 	// Restart Ops and config changes share this key. Do not roll back a config
 	// restart to the older timestamp still present in the Component spec.
 	runningRestart := running[constant.RestartAnnotationKey]
 	runningTime, runningErr := time.Parse(time.RFC3339, runningRestart)
-	desiredTime, desiredErr := time.Parse(time.RFC3339, desired[constant.RestartAnnotationKey])
+	desiredTime, desiredErr := time.Parse(time.RFC3339, merged[constant.RestartAnnotationKey])
 	if runningErr == nil && desiredErr == nil && !runningTime.Before(desiredTime) {
 		merged[constant.RestartAnnotationKey] = runningRestart
 	}
-	return merged
 }
 
 func checkNRollbackProtoImages(itsObj, itsProto *workloads.InstanceSet) {

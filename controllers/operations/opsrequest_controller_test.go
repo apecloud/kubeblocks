@@ -572,6 +572,9 @@ var _ = Describe("OpsRequest Controller", func() {
 				status.TemplateName = pointer.String("")
 				status.DesiredState = workloads.InstanceDesiredStateActive
 				status.CurrentState = workloads.InstanceCurrentStatePresent
+				status.UpToDate = true
+				status.Ready = true
+				status.Available = true
 			}
 		}
 		Expect(testapps.ChangeObjStatus(&testCtx, mysqlIts, func() {

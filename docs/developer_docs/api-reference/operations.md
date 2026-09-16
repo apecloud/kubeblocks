@@ -4309,7 +4309,8 @@ that requires storage expansion.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Lists VerticalScaling objects, each specifying a component and its desired compute resources for vertical scaling.</p>
+<p>Lists VerticalScaling objects, each specifying a component and its desired compute resources for vertical scaling.
+This field is immutable after creation.</p>
 </td>
 </tr>
 <tr>

@@ -3131,8 +3131,9 @@ spec:
                 - message: forbidden to update spec.upgrade
                   rule: self == oldSelf
               verticalScaling:
-                description: Lists VerticalScaling objects, each specifying a component
-                  and its desired compute resources for vertical scaling.
+                description: |-
+                  Lists VerticalScaling objects, each specifying a component and its desired compute resources for vertical scaling.
+                  This field is immutable after creation.
                 items:
                   description: |-
                     VerticalScaling refers to the process of adjusting compute resources (e.g., CPU, memory) allocated to a Component.
@@ -3266,6 +3267,9 @@ spec:
                 x-kubernetes-list-map-keys:
                 - componentName
                 x-kubernetes-list-type: map
+                x-kubernetes-validations:
+                - message: forbidden to update spec.verticalScaling
+                  rule: self == oldSelf
               volumeExpansion:
                 description: |-
                   Lists VolumeExpansion objects, each specifying a component and its corresponding volumeClaimTemplates
@@ -3317,6 +3321,9 @@ spec:
             required:
             - type
             type: object
+            x-kubernetes-validations:
+            - message: forbidden to add or remove spec.verticalScaling
+              rule: has(self.verticalScaling) == has(oldSelf.verticalScaling)
           status:
             description: OpsRequestStatus represents the observed state of an OpsRequest.
             properties:

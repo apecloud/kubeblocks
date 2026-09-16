@@ -194,9 +194,6 @@ func TestOpsRuntimeBuildsInstanceAPIView(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get workload: %v", err)
 	}
-	if workload.GetMinReadySeconds() != 15 {
-		t.Fatalf("unexpected minReadySeconds: %d", workload.GetMinReadySeconds())
-	}
 	if got := workload.GetCurrentRevisionMap()[instanceName]; got != "rev-a" {
 		t.Fatalf("unexpected current revision: %s", got)
 	}
@@ -216,20 +213,6 @@ func TestOpsRuntimeBuildsInstanceAPIView(t *testing.T) {
 	}
 	if instance.GetRole() != "leader" {
 		t.Fatalf("unexpected role: %s", instance.GetRole())
-	}
-	resources := instance.GetResources("mysql")
-	if resources.Requests.Cpu().String() != "100m" {
-		t.Fatalf("unexpected resources")
-	}
-	if len(instance.GetResources("missing").Requests) == 0 {
-		t.Fatalf("expected missing container resources to fall back to first container")
-	}
-	creationTimestamp := instance.GetCreationTimestamp()
-	if creationTimestamp.IsZero() {
-		t.Fatalf("expected creation timestamp")
-	}
-	if !instance.IsAvailable(15, true) {
-		t.Fatalf("expected instance to be available")
 	}
 	volume, ok := instance.GetVolume("data")
 	if !ok {
@@ -255,50 +238,16 @@ func TestOpsRuntimeBuildsInstanceAPIView(t *testing.T) {
 }
 
 func TestDefaultInstanceAndVolumeNilBranches(t *testing.T) {
-	instance := &defaultInstance{name: "missing", componentName: "mysql"}
-	if instance.GetComponentName() != "mysql" {
-		t.Fatalf("unexpected component name: %s", instance.GetComponentName())
-	}
+	instance := &defaultInstance{name: "missing"}
 	if instance.GetName() != "missing" {
 		t.Fatalf("unexpected instance name: %s", instance.GetName())
-	}
-	creationTimestamp := instance.GetCreationTimestamp()
-	if !creationTimestamp.IsZero() {
-		t.Fatalf("expected zero creation timestamp")
-	}
-	if instance.IsDeleting() {
-		t.Fatalf("nil pod should not be deleting")
 	}
 	if instance.GetRole() != "" {
 		t.Fatalf("expected empty role")
 	}
-	if instance.IsAvailable(0, false) {
-		t.Fatalf("nil pod should not be available")
-	}
 	if instance.IsFailedAndTimedOut() {
 		t.Fatalf("nil pod should not be failed and timed out")
 	}
-	now := metav1.Now()
-	deleting := &defaultInstance{pod: &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:              "deleting",
-			DeletionTimestamp: &now,
-		},
-		Status: corev1.PodStatus{
-			Phase: corev1.PodRunning,
-			Conditions: []corev1.PodCondition{{
-				Type:   corev1.PodReady,
-				Status: corev1.ConditionTrue,
-			}},
-		},
-	}}
-	if !deleting.IsDeleting() {
-		t.Fatalf("expected deleting pod")
-	}
-	if deleting.IsAvailable(0, false) {
-		t.Fatalf("deleting pod should not be available")
-	}
-
 	volume := &instanceVolume{}
 	if volume.GetClaimName() != "" {
 		t.Fatalf("expected empty claim name")

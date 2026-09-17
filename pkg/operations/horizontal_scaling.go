@@ -146,6 +146,7 @@ func (hs horizontalScalingOpsHandler) ReconcileAction(reqCtx intctrlutil.Request
 	}
 	current := helper.emptyInstanceProgress(opsRes)
 	observedTargets := sets.New[string]()
+	observedShards := map[string]int32{}
 	complete, failed := true, false
 	var expected, completed int32
 	for i := range resources {
@@ -168,6 +169,9 @@ func (hs horizontalScalingOpsHandler) ReconcileAction(reqCtx intctrlutil.Request
 			current[name] = append(current[name], status.ProgressDetails...)
 			opsRequest.Status.Components[name] = status
 			continue
+		}
+		if resource.shards != nil {
+			observedShards[name]++
 		}
 		if isBackupScaling(target) {
 			last := opsRequest.Status.LastConfiguration.Components[name]
@@ -212,10 +216,13 @@ func (hs horizontalScalingOpsHandler) ReconcileAction(reqCtx intctrlutil.Request
 				progress.succeededCount == progress.expectedCount)
 	}
 	for _, target := range opsRequest.Spec.HorizontalScalingList {
+		sharding := opsRes.Cluster.Spec.GetShardingByName(target.ComponentName)
+		if target.Shards == nil && sharding != nil && observedShards[target.ComponentName] != sharding.Shards {
+			complete = false
+		}
 		if observedTargets.Has(target.ComponentName) || isBackupScaling(target) {
 			continue
 		}
-		sharding := opsRes.Cluster.Spec.GetShardingByName(target.ComponentName)
 		if sharding == nil || sharding.Shards != 0 {
 			continue
 		}

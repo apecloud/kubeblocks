@@ -2327,3 +2327,37 @@ func TestHorizontalScalingEmptyShardingRequiresObservedResult(t *testing.T) {
 		t.Fatalf("progress=%s", f.res.OpsRequest.Status.Progress)
 	}
 }
+
+func TestHorizontalScalingWaitsForEveryShardObservation(t *testing.T) {
+	f := newHorizontalScalingFixture(t, scaleOutRequest("sharded", false))
+	cluster := f.res.Cluster
+	cluster.Spec.Shardings = []appsv1.ClusterSharding{{Name: "sharded", Shards: 2, Template: cluster.Spec.ComponentSpecs[0]}}
+	cluster.Spec.ComponentSpecs = nil
+	cluster.Status.Shardings = map[string]appsv1.ClusterShardingStatus{
+		"sharded": {ObservedGeneration: cluster.Generation, UpToDate: true, Phase: appsv1.RunningComponentPhase},
+	}
+	for _, name := range []string{"sharded-a", "sharded-b"} {
+		comp := &appsv1.Component{ObjectMeta: metav1.ObjectMeta{Name: "demo-" + name, Namespace: "default",
+			Labels: constant.GetCompLabels("demo", name, map[string]string{constant.KBAppShardingNameLabelKey: "sharded"})}}
+		its := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Name: comp.Name, Namespace: comp.Namespace},
+			Spec: workloads.InstanceSetSpec{Replicas: pointer.Int32(1)},
+			Status: workloads.InstanceSetStatus{InstanceStatus: []workloads.InstanceStatus{{
+				PodName: comp.Name + "-chosen", TemplateName: pointer.String(""),
+				DesiredState: workloads.InstanceDesiredStateActive, CurrentState: workloads.InstanceCurrentStatePresent,
+				UpToDate: true, Ready: true, Available: true,
+			}}}}
+		for _, obj := range []client.Object{comp, its} {
+			if err := f.cli.Create(f.req.Ctx, obj); err != nil {
+				t.Fatal(err)
+			}
+		}
+		want := opsv1alpha1.OpsRunningPhase
+		if name == "sharded-b" {
+			want = opsv1alpha1.OpsSucceedPhase
+		}
+		f.reconcile(t, want)
+	}
+	if f.res.OpsRequest.Status.Progress != "2/2" {
+		t.Fatalf("progress=%s", f.res.OpsRequest.Status.Progress)
+	}
+}

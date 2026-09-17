@@ -711,6 +711,9 @@ var _ = Describe("OpsRequest Controller", func() {
 				testk8s.MockInstanceSetReady(its, mockPods...)
 				for i := range its.Status.InstanceStatus {
 					status := &its.Status.InstanceStatus[i]
+					status.TemplateName = pointer.String("")
+					status.DesiredState = workloads.InstanceDesiredStateActive
+					status.CurrentState = workloads.InstanceCurrentStatePresent
 					status.UpToDate = true
 					status.Ready = true
 					status.Available = true
@@ -966,6 +969,13 @@ var _ = Describe("OpsRequest Controller", func() {
 			})).Should(Succeed())
 			Expect(testapps.GetAndChangeObjStatus(&testCtx, itsKey, func(its *workloads.InstanceSet) {
 				testk8s.MockInstanceSetReady(its, testapps.MockInstanceSetPods(&testCtx, its, clusterObj, mysqlCompName)...)
+				for i := range its.Status.InstanceStatus {
+					status := &its.Status.InstanceStatus[i]
+					status.TemplateName = pointer.String("")
+					status.DesiredState = workloads.InstanceDesiredStateActive
+					status.CurrentState = workloads.InstanceCurrentStatePresent
+					status.UpToDate, status.Ready, status.Available = true, true, true
+				}
 			})()).ShouldNot(HaveOccurred())
 
 			By("opsRequest phase should be Cancelled")

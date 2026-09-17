@@ -24,14 +24,12 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -103,37 +101,20 @@ type progressResource struct {
 	compOps          ComponentOpsInterface
 }
 
-// OpsRuntime abstracts the standard ops paths that only need workload/member views
-// plus a small set of runtime-owned actions.
+// OpsRuntime retains instance execution and Force conflict planning until their migrations.
 //
 // Explicitly out of scope for this abstraction:
 // - RebuildInstance, which still depends on direct Pod/PVC/PV/InstanceSet actions
 // - Custom, which still depends on direct Pod/Job/ConfigMap/Secret based execution
 type OpsRuntime interface {
-	GetWorkload(namespace, clusterName, compName string) (Workload, error)
 	GetInstance(namespace, clusterName, compName, instanceName string) (Instance, error)
 	GenerateInstanceNameSet(clusterName, compName string, compReplicas int32, instances []appsv1.InstanceTemplate, offlineInstances []string) (map[string]string, error)
 	Switchover(ctx context.Context, synthesizedComp *component.SynthesizedComponent, instanceName, candidateName string) error
 }
 
-type Workload interface {
-	GetInstanceStatuses() []workloads.InstanceStatus
-}
-
 type Instance interface {
-	GetName() string
 	HasPod() bool
 	GetRole() string
-	IsFailedAndTimedOut() bool
-	GetVolume(name string) (InstanceVolume, bool)
-}
-
-type InstanceVolume interface {
-	GetClaimName() string
-	GetRequestedStorage() resource.Quantity
-	GetCapacity() resource.Quantity
-	IsBound() bool
-	IsExpanding() bool
 }
 
 func (r *OpsResource) GetRuntime(name string) (OpsRuntime, error) {

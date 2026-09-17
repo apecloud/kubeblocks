@@ -1260,43 +1260,10 @@ type horizontalScalingFixture struct {
 	clusterWrites, backupReads, restoreReads int
 }
 
-// Record runtime calls to prove replica observations use the domain API.
-type horizontalScalingRuntimeTrace struct {
-	OpsRuntime
-	calls []string
-}
-
-func (r *horizontalScalingRuntimeTrace) GetWorkload(namespace, clusterName, compName string) (Workload, error) {
-	r.calls = append(r.calls, "workload("+compName+")")
-	return r.OpsRuntime.GetWorkload(namespace, clusterName, compName)
-}
-
-func TestHorizontalScalingDoesNotReadRuntimeProgress(t *testing.T) {
-	for _, fromBackup := range []bool{false, true} {
-		t.Run(fmt.Sprintf("backup=%t", fromBackup), func(t *testing.T) {
-			f := newHorizontalScalingFixture(t, scaleOutRequest("db", fromBackup))
-			if fromBackup {
-				f.addBackup(t)
-			}
-			trace := &horizontalScalingRuntimeTrace{OpsRuntime: f.res.Runtimes["db"]}
-			f.res.Runtimes["db"] = trace
-			hs := horizontalScalingOpsHandler{}
-			if err := hs.Action(f.req, f.cli, f.res); err != nil {
-				t.Fatal(err)
-			}
-			f.reconcile(t, opsv1alpha1.OpsRunningPhase)
-			if len(trace.calls) > 0 {
-				t.Fatalf("runtime progress calls: %v", trace.calls)
-			}
-		})
-	}
-}
-
 func TestHorizontalScalingOnlineInferenceInputs(t *testing.T) {
 	for _, tc := range []struct {
 		name                                             string
 		template, explicitTotal, explicitTemplate, empty bool
-		wantCalls                                        []string
 		wantReplicas                                     int32
 	}{
 		{name: "infer-default", wantReplicas: 2},
@@ -1334,13 +1301,8 @@ func TestHorizontalScalingOnlineInferenceInputs(t *testing.T) {
 				t.Fatal(err)
 			}
 			original := spec.DeepCopy()
-			trace := &horizontalScalingRuntimeTrace{OpsRuntime: f.res.Runtimes["db"]}
-			f.res.Runtimes["db"] = trace
 			if err := hs.Action(f.req, f.cli, f.res); err != nil {
 				t.Fatal(err)
-			}
-			if !reflect.DeepEqual(trace.calls, tc.wantCalls) {
-				t.Fatalf("calls = %v, want %v", trace.calls, tc.wantCalls)
 			}
 			last := f.res.OpsRequest.Status.LastConfiguration.Components["db"]
 			if !reflect.DeepEqual(last.InstanceTemplates, original.Instances) || !reflect.DeepEqual(last.OfflineInstances, original.OfflineInstances) {

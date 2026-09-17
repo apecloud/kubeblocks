@@ -111,7 +111,6 @@ func (r *OpsRequestReconciler) SetupWithManager(mgr ctrl.Manager, multiClusterMg
 		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, object client.Object) []reconcile.Request {
 			return operations.RebuildInstancePodRequests(ctx, r.Client, object.(*corev1.Pod))
 		})).
-		Watches(&corev1.PersistentVolumeClaim{}, handler.EnqueueRequestsFromMapFunc(r.parseVolumeExpansionOpsRequest)).
 		Watches(&batchv1.Job{}, handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, object client.Object) []reconcile.Request {
 			return customops.JobRequests(ctx, r.Client, object.(*batchv1.Job))
 		}))
@@ -529,32 +528,6 @@ func (r *OpsRequestReconciler) parseRunningOpsRequestsForComponentParameter(ctx 
 		return nil
 	}
 	return r.getRunningOpsRequestsFromCluster(cluster)
-}
-
-func (r *OpsRequestReconciler) parseVolumeExpansionOpsRequest(ctx context.Context, object client.Object) []reconcile.Request {
-	pvc := object.(*corev1.PersistentVolumeClaim)
-	if pvc.Labels[constant.AppManagedByLabelKey] != constant.AppName {
-		return nil
-	}
-	clusterName := pvc.Labels[constant.AppInstanceLabelKey]
-	if clusterName == "" {
-		return nil
-	}
-	opsRequestList, err := opsv1alpha1.GetRunningOpsByOpsType(ctx, r.Client,
-		pvc.Labels[constant.AppInstanceLabelKey], pvc.Namespace, string(opsv1alpha1.VolumeExpansionType))
-	if err != nil {
-		return nil
-	}
-	var requests []reconcile.Request
-	for _, v := range opsRequestList {
-		requests = append(requests, reconcile.Request{
-			NamespacedName: types.NamespacedName{
-				Namespace: v.Namespace,
-				Name:      v.Name,
-			},
-		})
-	}
-	return requests
 }
 
 func (r *OpsRequestReconciler) parseBackupOpsRequest(ctx context.Context, object client.Object) []reconcile.Request {

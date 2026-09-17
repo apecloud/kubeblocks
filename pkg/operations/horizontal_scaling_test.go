@@ -1397,7 +1397,7 @@ func TestHorizontalScalingOnlineInferenceInputs(t *testing.T) {
 				t.Fatalf("calls = %v, want %v", trace.calls, tc.wantCalls)
 			}
 			last := f.res.OpsRequest.Status.LastConfiguration.Components["db"]
-			if !reflect.DeepEqual(last.Instances, original.Instances) || !reflect.DeepEqual(last.OfflineInstances, original.OfflineInstances) {
+			if !reflect.DeepEqual(last.InstanceTemplates, original.Instances) || !reflect.DeepEqual(last.OfflineInstances, original.OfflineInstances) {
 				t.Fatalf("Action changed the saved configuration: %+v", last)
 			}
 			backupRequest := request.DeepCopy()
@@ -1705,7 +1705,7 @@ func TestHorizontalScalingCancelRestoresConfigurationAndDirection(t *testing.T) 
 	if err := hs.Cancel(f.req, f.cli, f.res); err != nil {
 		t.Fatal(err)
 	}
-	if spec.Replicas != *last.Replicas || !reflect.DeepEqual(spec.Instances, last.Instances) || !reflect.DeepEqual(spec.OfflineInstances, last.OfflineInstances) {
+	if spec.Replicas != *last.Replicas || !reflect.DeepEqual(spec.Instances, last.InstanceTemplates) || !reflect.DeepEqual(spec.OfflineInstances, last.OfflineInstances) {
 		t.Fatal("Cancel did not restore the original configuration")
 	}
 	// ReconcileAction reports successful rollback; OpsManager maps it to Cancelled.
@@ -1893,7 +1893,7 @@ func TestHorizontalScalingBackupRejectsInvalidPlanBeforeWork(t *testing.T) {
 		Ordinals: appsv1.Ordinals{Ranges: []appsv1.Range{{Start: 3, End: 2}}}}}
 	actionFixture := newHorizontalScalingFixture(t, scaleOutRequest("db", true))
 	actionFixture.res.OpsRequest.Status.LastConfiguration.Components["db"] = opsv1alpha1.LastComponentConfiguration{
-		Replicas: pointer.Int32(1), Instances: request.ScaleOut.NewInstances,
+		Replicas: pointer.Int32(1), InstanceTemplates: request.ScaleOut.NewInstances,
 	}
 	hs := horizontalScalingOpsHandler{}
 	if err := hs.Action(actionFixture.req, actionFixture.cli, actionFixture.res); err == nil {
@@ -2027,12 +2027,12 @@ func TestHorizontalScalingPersistsOwnerAssignmentsBeforeAction(t *testing.T) {
 				}
 			}
 			res = load()
-			assignments := res.OpsRequest.Status.LastConfiguration.Components["db"].InstanceTemplates
-			if res.OpsRequest.Status.Phase != opsv1alpha1.OpsCreatingPhase || assignments["owner-chosen"] != "blue" {
+			instances := res.OpsRequest.Status.LastConfiguration.Components["db"].Instances
+			if res.OpsRequest.Status.Phase != opsv1alpha1.OpsCreatingPhase || !reflect.DeepEqual(instances, []opsv1alpha1.LastInstanceConfiguration{{Name: "owner-chosen", TemplateName: "blue"}}) {
 				t.Fatalf("owner assignments were not persisted: %+v", res.OpsRequest.Status)
 			}
-			if len(assignments) != 1 {
-				t.Fatalf("persisted unrelated owner assignments: %v", assignments)
+			if len(instances) != 1 {
+				t.Fatalf("persisted unrelated owner assignments: %v", instances)
 			}
 			if err := cli.Delete(req.Ctx, its); err != nil {
 				t.Fatal(err)

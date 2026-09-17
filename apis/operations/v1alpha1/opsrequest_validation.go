@@ -401,9 +401,9 @@ func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, com
 		}
 
 		// Track the count of offline/online instances
-		assignments := r.Status.LastConfiguration.Components[hScale.ComponentName].InstanceTemplates
+		last := r.Status.LastConfiguration.Components[hScale.ComponentName]
 		fromBackup := hScale.ScaleOut != nil && hScale.ScaleOut.FromBackup != nil
-		countsPending := !fromBackup && len(instanceNames) > 0 && assignments == nil && len(compSpec.Instances) > 0
+		countsPending := !fromBackup && len(instanceNames) > 0 && last.Instances == nil && len(compSpec.Instances) > 0
 		offlineOrOnlineInsCountMap := map[string]int32{}
 		if fromBackup {
 			offlineOrOnlineInsCountMap = r.CountOfflineOrOnlineInstances(clusterName, hScale.ComponentName, instanceNames)
@@ -411,8 +411,8 @@ func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, com
 			for _, name := range instanceNames {
 				if len(compSpec.Instances) == 0 {
 					offlineOrOnlineInsCountMap[""]++
-				} else if template, ok := assignments[name]; ok {
-					offlineOrOnlineInsCountMap[template]++
+				} else if instance := last.FindInstance(name); instance != nil {
+					offlineOrOnlineInsCountMap[instance.TemplateName]++
 				}
 			}
 		}
@@ -518,7 +518,7 @@ func (r *OpsRequest) validateShards(hScale HorizontalScaling, isSharding bool, m
 // applyLastConfiguration applies the last known configuration to the component spec
 func (r *OpsRequest) applyLastConfiguration(componentName string, compSpec *appsv1.ClusterComponentSpec) error {
 	if lastCompConfiguration, ok := r.Status.LastConfiguration.Components[componentName]; ok {
-		compSpec.Instances = lastCompConfiguration.Instances
+		compSpec.Instances = lastCompConfiguration.InstanceTemplates
 		if lastCompConfiguration.Replicas != nil {
 			compSpec.Replicas = *lastCompConfiguration.Replicas
 		}

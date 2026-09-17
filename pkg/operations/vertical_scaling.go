@@ -167,9 +167,9 @@ func (vs verticalScalingHandler) componentTargetMatches(ops *opsv1alpha1.OpsRequ
 		}
 		for _, requested := range verticalScaling.Instances {
 			var previous *corev1.ResourceRequirements
-			for i := range last.Instances {
-				if last.Instances[i].Name == requested.Name {
-					previous = last.Instances[i].Resources
+			for i := range last.InstanceTemplates {
+				if last.InstanceTemplates[i].Name == requested.Name {
+					previous = last.InstanceTemplates[i].Resources
 					break
 				}
 			}
@@ -407,7 +407,7 @@ func (vs verticalScalingHandler) SaveLastConfiguration(reqCtx intctrlutil.Reques
 		}
 		return opsv1alpha1.LastComponentConfiguration{
 			ResourceRequirements: compSpec.Resources,
-			Instances:            instanceTemplates,
+			InstanceTemplates:    instanceTemplates,
 		}
 	})
 	return nil
@@ -418,7 +418,7 @@ func (vs verticalScalingHandler) Cancel(reqCxt intctrlutil.RequestCtx, cli clien
 	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.VerticalScalingList)
 	return compOpsHelper.cancelComponentOps(reqCxt.Ctx, cli, opsRes, func(lastConfig *opsv1alpha1.LastComponentConfiguration, comp *appsv1.ClusterComponentSpec) {
 		comp.Resources = lastConfig.ResourceRequirements
-		for _, lastIns := range lastConfig.Instances {
+		for _, lastIns := range lastConfig.InstanceTemplates {
 			for i := range comp.Instances {
 				if comp.Instances[i].Name != lastIns.Name {
 					continue

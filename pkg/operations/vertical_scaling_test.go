@@ -547,22 +547,60 @@ func TestVerticalScalingCancellationUsesLastConfigurationAndRefreshesProgress(t 
 	}
 }
 
-func TestVerticalScalingWaitsWhenTargetDoesNotMatch(t *testing.T) {
-	target := verticalScalingTestResources("2")
-	component := appsv1.ClusterComponentSpec{Name: "db", Replicas: 1, Resources: verticalScalingTestResources("3")}
-	request := opsv1alpha1.VerticalScaling{
-		ComponentOps: opsv1alpha1.ComponentOps{ComponentName: "db"}, ResourceRequirements: target,
-	}
-	cluster := verticalScalingTestCluster(component, appsv1.RunningComponentPhase, 7, true)
-	ops := verticalScalingTestOps(request)
-	cli := verticalScalingTestClient(t, cluster, ops)
-	phase, requeue, err := (verticalScalingHandler{}).ReconcileAction(
-		intctrlutil.RequestCtx{Ctx: context.Background()}, cli, verticalScalingTestResourcesBundle(cluster, ops))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if phase != opsv1alpha1.OpsRunningPhase || requeue <= 0 {
-		t.Fatalf("phase=%s requeue=%s, want Running with a retry", phase, requeue)
+func TestVerticalScalingReplacedTarget(t *testing.T) {
+	for _, template := range []bool{false, true} {
+		for _, tc := range []struct {
+			name, current string
+			cancel, stale bool
+			want          opsv1alpha1.OpsPhase
+		}{
+			{name: "same target", current: "2", want: opsv1alpha1.OpsSucceedPhase},
+			{name: "replaced target", current: "3", want: opsv1alpha1.OpsAbortedPhase},
+			{name: "wait for action generation", current: "3", stale: true, want: opsv1alpha1.OpsRunningPhase},
+			{name: "cancel reaches original target", current: "1", cancel: true, want: opsv1alpha1.OpsCancelledPhase},
+			{name: "cancel target replaced", current: "3", cancel: true, want: opsv1alpha1.OpsAbortedPhase},
+		} {
+			t.Run(fmt.Sprintf("%s/template=%t", tc.name, template), func(t *testing.T) {
+				target, previous, current := verticalScalingTestResources("2"), verticalScalingTestResources("1"), verticalScalingTestResources(tc.current)
+				component := appsv1.ClusterComponentSpec{Name: "db", Replicas: 1, Resources: current}
+				request := opsv1alpha1.VerticalScaling{ComponentOps: opsv1alpha1.ComponentOps{ComponentName: "db"}, ResourceRequirements: target}
+				last := opsv1alpha1.LastComponentConfiguration{ResourceRequirements: previous}
+				instance := verticalScalingTestInstance("demo-db-0", "", true)
+				if template {
+					component.Instances = []appsv1.InstanceTemplate{{Name: "reader", Replicas: ptr.To[int32](1), Resources: &current}}
+					request.ResourceRequirements = corev1.ResourceRequirements{}
+					request.Instances = []opsv1alpha1.InstanceResourceTemplate{{Name: "reader", ResourceRequirements: target}}
+					last.Instances = []appsv1.InstanceTemplate{{Name: "reader", Resources: &previous}}
+					instance = verticalScalingTestInstance("demo-db-reader-0", "reader", true)
+				}
+				cluster := verticalScalingTestCluster(component, appsv1.RunningComponentPhase, 7, true)
+				ops := verticalScalingTestOps(request)
+				ops.Spec.Type, ops.Spec.ClusterName = opsv1alpha1.VerticalScalingType, cluster.Name
+				ops.Status.ClusterGeneration = 6
+				if tc.stale {
+					ops.Status.ClusterGeneration = 8
+				}
+				if tc.cancel {
+					ops.Spec.Cancel, ops.Status.Phase = true, opsv1alpha1.OpsCancellingPhase
+					ops.Status.LastConfiguration.Components["db"] = last
+				}
+				its := verticalScalingTestInstanceSet(component, instance)
+				cli := verticalScalingTestClient(t, cluster, ops, its)
+				if _, err := GetOpsManager().Reconcile(intctrlutil.RequestCtx{Ctx: context.Background()}, cli, verticalScalingTestResourcesBundle(cluster, ops)); err != nil {
+					t.Fatal(err)
+				}
+				persisted := &opsv1alpha1.OpsRequest{}
+				if err := cli.Get(context.Background(), client.ObjectKeyFromObject(ops), persisted); err != nil {
+					t.Fatal(err)
+				}
+				if persisted.Status.Phase != tc.want {
+					t.Fatalf("phase=%s, want %s", persisted.Status.Phase, tc.want)
+				}
+				if tc.want == opsv1alpha1.OpsAbortedPhase && persisted.Status.CompletionTimestamp.IsZero() {
+					t.Fatal("abort was not persisted as terminal")
+				}
+			})
+		}
 	}
 }
 

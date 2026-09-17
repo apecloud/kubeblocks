@@ -44,10 +44,12 @@ import (
 	testops "github.com/apecloud/kubeblocks/pkg/testutil/operations"
 )
 
-func TestRestartTargetsExist(t *testing.T) {
+func TestRestartTargetsMatch(t *testing.T) {
+	started := metav1.NewTime(time.Date(2026, 9, 16, 1, 2, 3, 0, time.UTC))
+	annotations := map[string]string{constant.RestartAnnotationKey: started.Format(time.RFC3339)}
 	cluster := &appsv1.Cluster{Spec: appsv1.ClusterSpec{
-		ComponentSpecs: []appsv1.ClusterComponentSpec{{Name: "mysql"}},
-		Shardings:      []appsv1.ClusterSharding{{Name: "shard"}},
+		ComponentSpecs: []appsv1.ClusterComponentSpec{{Name: "mysql", Annotations: annotations}},
+		Shardings:      []appsv1.ClusterSharding{{Name: "shard", Template: appsv1.ClusterComponentSpec{Annotations: annotations}}},
 	}}
 	newOpsResource := func(targets ...string) *OpsResource {
 		restartList := make([]opsv1alpha1.ComponentOps, len(targets))
@@ -55,15 +57,16 @@ func TestRestartTargetsExist(t *testing.T) {
 			restartList[i].ComponentName = targets[i]
 		}
 		return &OpsResource{Cluster: cluster, OpsRequest: &opsv1alpha1.OpsRequest{
-			Spec: opsv1alpha1.OpsRequestSpec{SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{RestartList: restartList}},
+			Spec:   opsv1alpha1.OpsRequestSpec{SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{RestartList: restartList}},
+			Status: opsv1alpha1.OpsRequestStatus{StartTimestamp: started},
 		}}
 	}
 
 	handler := restartOpsHandler{}
-	if !handler.targetsExist(newOpsResource("mysql", "shard")) {
+	if !handler.targetsMatch(newOpsResource("mysql", "shard")) {
 		t.Fatal("existing targets were rejected")
 	}
-	if handler.targetsExist(newOpsResource("missing")) {
+	if handler.targetsMatch(newOpsResource("missing")) {
 		t.Fatal("missing target was accepted")
 	}
 	opsRes := newOpsResource("missing")
@@ -77,6 +80,68 @@ func TestRestartTargetsExist(t *testing.T) {
 	phase, _, err = handler.ReconcileAction(intctrlutil.RequestCtx{}, nil, opsRes)
 	if err != nil || phase != opsv1alpha1.OpsAbortedPhase {
 		t.Fatalf("phase=%s err=%v, want Aborted after the target is removed", phase, err)
+	}
+}
+
+func TestRestartReplacedTrigger(t *testing.T) {
+	for _, tc := range []struct {
+		name, trigger   string
+		sharding, stale bool
+		want            opsv1alpha1.OpsPhase
+	}{
+		{name: "same trigger at a later generation", trigger: "2026-09-16T01:02:03Z", want: opsv1alpha1.OpsSucceedPhase},
+		{name: "replaced trigger", trigger: "2026-09-16T01:03:03Z", want: opsv1alpha1.OpsAbortedPhase},
+		{name: "removed trigger", want: opsv1alpha1.OpsAbortedPhase},
+		{name: "replaced shard trigger", trigger: "2026-09-16T01:03:03Z", sharding: true, want: opsv1alpha1.OpsAbortedPhase},
+		{name: "wait for action generation", stale: true, want: opsv1alpha1.OpsRunningPhase},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			scheme := runtime.NewScheme()
+			for _, add := range []func(*runtime.Scheme) error{appsv1.AddToScheme, opsv1alpha1.AddToScheme, workloads.AddToScheme} {
+				if err := add(scheme); err != nil {
+					t.Fatal(err)
+				}
+			}
+			component := appsv1.ClusterComponentSpec{Name: "db", Replicas: 1,
+				Annotations: map[string]string{constant.RestartAnnotationKey: tc.trigger}}
+			cluster := &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default", Generation: 8},
+				Spec: appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{component}},
+				Status: appsv1.ClusterStatus{Components: map[string]appsv1.ClusterComponentStatus{"db": {
+					Phase: appsv1.RunningComponentPhase, ObservedGeneration: 8, UpToDate: true,
+				}}}}
+			if tc.sharding {
+				cluster.Spec.ComponentSpecs = nil
+				cluster.Spec.Shardings = []appsv1.ClusterSharding{{Name: "db", Shards: 1, Template: component}}
+			}
+			if tc.stale {
+				cluster.Generation = 6
+			}
+			ops := &opsv1alpha1.OpsRequest{ObjectMeta: metav1.ObjectMeta{Name: "restart", Namespace: "default"},
+				Spec: opsv1alpha1.OpsRequestSpec{ClusterName: "demo", Type: opsv1alpha1.RestartType,
+					SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{RestartList: []opsv1alpha1.ComponentOps{{ComponentName: "db"}}}},
+				Status: opsv1alpha1.OpsRequestStatus{Phase: opsv1alpha1.OpsRunningPhase, ClusterGeneration: 7,
+					StartTimestamp: metav1.NewTime(time.Date(2026, 9, 16, 1, 2, 3, 0, time.UTC))}}
+			its := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Name: "demo-db", Namespace: "default"},
+				Spec: workloads.InstanceSetSpec{Replicas: &component.Replicas},
+				Status: workloads.InstanceSetStatus{InstanceStatus: []workloads.InstanceStatus{{PodName: "demo-db-0",
+					DesiredState: workloads.InstanceDesiredStateActive, CurrentState: workloads.InstanceCurrentStatePresent,
+					UpToDate: true, Ready: true, Available: true}}}}
+			cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(ops).WithObjects(cluster, ops, its).Build()
+			res := &OpsResource{Cluster: cluster, OpsRequest: ops, Recorder: record.NewFakeRecorder(20)}
+			if _, err := GetOpsManager().Reconcile(intctrlutil.RequestCtx{Ctx: context.Background()}, cli, res); err != nil {
+				t.Fatal(err)
+			}
+			persisted := &opsv1alpha1.OpsRequest{}
+			if err := cli.Get(context.Background(), client.ObjectKeyFromObject(ops), persisted); err != nil {
+				t.Fatal(err)
+			}
+			if persisted.Status.Phase != tc.want {
+				t.Fatalf("phase=%s, want %s", persisted.Status.Phase, tc.want)
+			}
+			if tc.want == opsv1alpha1.OpsAbortedPhase && persisted.Status.CompletionTimestamp.IsZero() {
+				t.Fatal("abort was not persisted as terminal")
+			}
+		})
 	}
 }
 

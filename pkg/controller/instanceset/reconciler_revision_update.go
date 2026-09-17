@@ -166,7 +166,8 @@ func (r *revisionUpdateReconciler) publishInstanceUpdateTargets(its *workloads.I
 			return err
 		}
 		configsApplied := instancestatus.ConfigsApplied(its.Spec.Configs, status.Configs)
-		pvcApplied := !hasPendingPVCExpansion(its.Name, status.PodName, template.VolumeClaimTemplates, pvcsByName)
+		pending, observed := hasPendingPVCExpansion(its.Name, status.PodName, template.VolumeClaimTemplates, pvcsByName)
+		pvcApplied := observed && !pending
 		if previousRevision != newRevision || !podApplied || !configsApplied || !pvcApplied {
 			status.UpToDate = false
 		}

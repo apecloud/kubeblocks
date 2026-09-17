@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instance
 
 import (
+	"fmt"
 	"testing"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -234,14 +235,6 @@ func TestStatusReconcilerKeepsUpToDateFalseUntilPVCExpansionCompletes(t *testing
 	if err := tree.Add(pod); err != nil {
 		t.Fatal(err)
 	}
-	t.Run("missing PVC", func(t *testing.T) {
-		if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
-			t.Fatal(err)
-		}
-		if inst.Status.UpToDate {
-			t.Fatal("missing PVC must keep the instance out of date")
-		}
-	})
 	pvc := &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      intctrlutil.ComposePVCName(corev1.PersistentVolumeClaim{ObjectMeta: claim.ObjectMeta}, inst.Spec.InstanceSetName, inst.Name),
@@ -258,19 +251,6 @@ func TestStatusReconcilerKeepsUpToDateFalseUntilPVCExpansionCompletes(t *testing
 	if err := tree.Add(pvc); err != nil {
 		t.Fatal(err)
 	}
-
-	t.Run("missing capacity", func(t *testing.T) {
-		pvc.Status.Capacity = nil
-		defer func() {
-			pvc.Status.Capacity = corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("1Gi")}
-		}()
-		if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
-			t.Fatal(err)
-		}
-		if inst.Status.UpToDate {
-			t.Fatal("missing PVC capacity must keep the instance out of date")
-		}
-	})
 
 	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
 		t.Fatal(err)
@@ -294,6 +274,64 @@ func TestStatusReconcilerKeepsUpToDateFalseUntilPVCExpansionCompletes(t *testing
 	if !inst.Status.UpToDate || inst.Status.VolumeExpansion {
 		t.Fatalf("completed expansion must restore convergence: %#v", inst.Status)
 	}
+	for _, missing := range []string{"PVC", "capacity"} {
+		for _, previous := range []bool{false, true} {
+			t.Run(fmt.Sprintf("missing %s preserves %t", missing, previous), func(t *testing.T) {
+				desired := inst.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage]
+				capacity := desired.DeepCopy()
+				if !previous {
+					capacity.Sub(resource.MustParse("1Gi"))
+				}
+				pvc.Status.Capacity = corev1.ResourceList{corev1.ResourceStorage: capacity}
+				if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+					t.Fatal(err)
+				}
+				if inst.Status.UpToDate != previous {
+					t.Fatalf("initial UpToDate = %t, want %t", inst.Status.UpToDate, previous)
+				}
+
+				if missing == "PVC" {
+					if err := tree.Delete(pvc); err != nil {
+						t.Fatal(err)
+					}
+				} else {
+					pvc.Status.Capacity = nil
+				}
+				if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+					t.Fatal(err)
+				}
+				if inst.Status.UpToDate != previous {
+					t.Errorf("missing %s changed UpToDate from %t to %t", missing, previous, inst.Status.UpToDate)
+				}
+
+				inst.Generation++
+				desired.Add(resource.MustParse("1Gi"))
+				inst.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = desired
+				if _, err := NewRevisionUpdateReconciler().Reconcile(tree); err != nil {
+					t.Fatal(err)
+				}
+				if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+					t.Fatal(err)
+				}
+				if inst.Status.UpToDate {
+					t.Error("the previous result must not confirm a new capacity target")
+				}
+
+				pvc.Spec.Resources.Requests[corev1.ResourceStorage] = desired
+				pvc.Status.Capacity = corev1.ResourceList{corev1.ResourceStorage: desired}
+				if err := tree.Add(pvc); err != nil {
+					t.Fatal(err)
+				}
+				if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+					t.Fatal(err)
+				}
+				if !inst.Status.UpToDate {
+					t.Error("observing the new capacity must restore convergence")
+				}
+			})
+		}
+	}
+
 }
 
 func currentPod(revision string, phase corev1.PodPhase) *corev1.Pod {

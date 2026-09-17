@@ -50,6 +50,8 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kub
 	// The 'ObservedGeneration' field is used to indicate whether the revisions have been updated.
 	// Computing these revisions in each reconciliation loop can be time-consuming, so we optimize it by
 	// performing the computation only when the 'spec' is updated.
+	// A result for an older generation cannot confirm the new desired state.
+	inst.Status.UpToDate = false
 	inst.Status.ObservedGeneration = inst.Generation
 
 	return kubebuilderx.Continue, nil

@@ -515,9 +515,15 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 				if err != nil {
 					return err
 				}
-				observation.UpToDate = podApplied &&
-					instancestatus.ConfigsApplied(its.Spec.Configs, observation.Configs) &&
-					!hasPendingPVCExpansion(its.Name, pod.Name, template.VolumeClaimTemplates, pvcsByName)
+				if previous := its.FindInstanceStatus(pod.Name); previous != nil {
+					observation.UpToDate = previous.UpToDate
+				}
+				pending, observed := hasPendingPVCExpansion(its.Name, pod.Name, template.VolumeClaimTemplates, pvcsByName)
+				if observed {
+					observation.UpToDate = !pending
+				}
+				observation.UpToDate = observation.UpToDate && podApplied &&
+					instancestatus.ConfigsApplied(its.Spec.Configs, observation.Configs)
 			}
 		}
 		observations = append(observations, observation)
@@ -617,7 +623,8 @@ func isDesiredPodApplied(its *workloads.InstanceSet, pod *corev1.Pod, template *
 }
 
 func hasPendingPVCExpansion(itsName, instanceName string, templates []corev1.PersistentVolumeClaim,
-	pvcsByName map[string]*corev1.PersistentVolumeClaim) bool {
+	pvcsByName map[string]*corev1.PersistentVolumeClaim) (pending, observed bool) {
+	observed = true
 	for _, template := range templates {
 		desired, desiredOK := template.Spec.Resources.Requests[corev1.ResourceStorage]
 		if !desiredOK || desired.IsZero() {
@@ -625,14 +632,19 @@ func hasPendingPVCExpansion(itsName, instanceName string, templates []corev1.Per
 		}
 		pvc := pvcsByName[intctrlutil.ComposePVCName(template, itsName, instanceName)]
 		if pvc == nil {
-			return true
+			observed = false
+			continue
 		}
 		capacity, capacityOK := pvc.Status.Capacity[corev1.ResourceStorage]
-		if !capacityOK || capacity.Cmp(desired) < 0 {
-			return true
+		if !capacityOK {
+			observed = false
+			continue
+		}
+		if capacity.Cmp(desired) < 0 {
+			return true, true
 		}
 	}
-	return false
+	return false, observed
 }
 
 func isPVCExpansionRunning(pvc *corev1.PersistentVolumeClaim) bool {

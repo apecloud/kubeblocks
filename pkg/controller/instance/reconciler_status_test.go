@@ -234,6 +234,14 @@ func TestStatusReconcilerKeepsUpToDateFalseUntilPVCExpansionCompletes(t *testing
 	if err := tree.Add(pod); err != nil {
 		t.Fatal(err)
 	}
+	t.Run("missing PVC", func(t *testing.T) {
+		if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+			t.Fatal(err)
+		}
+		if inst.Status.UpToDate {
+			t.Fatal("missing PVC must keep the instance out of date")
+		}
+	})
 	pvc := &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      intctrlutil.ComposePVCName(corev1.PersistentVolumeClaim{ObjectMeta: claim.ObjectMeta}, inst.Spec.InstanceSetName, inst.Name),
@@ -250,6 +258,19 @@ func TestStatusReconcilerKeepsUpToDateFalseUntilPVCExpansionCompletes(t *testing
 	if err := tree.Add(pvc); err != nil {
 		t.Fatal(err)
 	}
+
+	t.Run("missing capacity", func(t *testing.T) {
+		pvc.Status.Capacity = nil
+		defer func() {
+			pvc.Status.Capacity = corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("1Gi")}
+		}()
+		if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+			t.Fatal(err)
+		}
+		if inst.Status.UpToDate {
+			t.Fatal("missing PVC capacity must keep the instance out of date")
+		}
+	})
 
 	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
 		t.Fatal(err)

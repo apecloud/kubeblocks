@@ -318,10 +318,10 @@ func (r *statusReconciler) hasPendingVolumeExpansion(tree *kubebuilderx.ObjectTr
 		pvcName := intctrlutil.ComposePVCName(corev1.PersistentVolumeClaim{ObjectMeta: vct.ObjectMeta}, inst.Spec.InstanceSetName, inst.Name)
 		pvc := pvcsByName[pvcName]
 		if pvc == nil {
-			continue
+			return true
 		}
 		capacity, capacityOK := pvc.Status.Capacity[corev1.ResourceStorage]
-		if capacityOK && capacity.Cmp(desired) < 0 {
+		if !capacityOK || capacity.Cmp(desired) < 0 {
 			return true
 		}
 	}

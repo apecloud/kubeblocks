@@ -658,6 +658,32 @@ func TestLegacyInstanceStatusTracksConfigAndPVCConvergence(t *testing.T) {
 		assertLegacyUpToDate(t, its, "demo-1", true)
 
 		pvc := legacyPVCForInstance(tree, "demo-0")
+		t.Run("missing PVC", func(t *testing.T) {
+			if err := tree.Delete(pvc); err != nil {
+				t.Fatal(err)
+			}
+			defer func() {
+				if err := tree.Add(pvc); err != nil {
+					t.Fatal(err)
+				}
+			}()
+			if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+				t.Fatal(err)
+			}
+			assertLegacyUpToDate(t, its, "demo-0", false)
+			assertLegacyUpToDate(t, its, "demo-1", true)
+		})
+		t.Run("missing capacity", func(t *testing.T) {
+			pvc.Status.Capacity = nil
+			defer func() {
+				pvc.Status.Capacity = corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("1Gi")}
+			}()
+			if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+				t.Fatal(err)
+			}
+			assertLegacyUpToDate(t, its, "demo-0", false)
+			assertLegacyUpToDate(t, its, "demo-1", true)
+		})
 		pvc.Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("2Gi")
 		if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
 			t.Fatal(err)

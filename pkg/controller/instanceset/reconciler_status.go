@@ -625,10 +625,10 @@ func hasPendingPVCExpansion(itsName, instanceName string, templates []corev1.Per
 		}
 		pvc := pvcsByName[intctrlutil.ComposePVCName(template, itsName, instanceName)]
 		if pvc == nil {
-			continue
+			return true
 		}
 		capacity, capacityOK := pvc.Status.Capacity[corev1.ResourceStorage]
-		if capacityOK && capacity.Cmp(desired) < 0 {
+		if !capacityOK || capacity.Cmp(desired) < 0 {
 			return true
 		}
 	}

@@ -104,7 +104,7 @@ func (vs verticalScalingHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, 
 		return opsv1alpha1.OpsRunningPhase, 0, nil
 	}
 	if !vs.targetsMatch(opsRes) {
-		return opsv1alpha1.OpsRunningPhase, time.Second, nil
+		return opsv1alpha1.OpsAbortedPhase, 0, nil
 	}
 
 	opsRequest := opsRes.OpsRequest

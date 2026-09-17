@@ -27,9 +27,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubectl/pkg/util/podutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -102,50 +99,11 @@ func (r *opsRuntime) GetWorkload(namespace, clusterName, compName string) (Workl
 	if err := r.cli.Get(r.ctx, client.ObjectKey{Name: itsName, Namespace: namespace}, its); err != nil && !apierrors.IsNotFound(err) {
 		return nil, err
 	}
-	workload := &defaultWorkload{
-		currentRevisionMap: map[string]string{},
-		notReadySet:        sets.New[string](),
-		notAvailableSet:    sets.New[string](),
-		failedSet:          sets.New[string](),
-		instanceNames:      sets.New[string](),
-	}
+	workload := &defaultWorkload{}
 	if its.Name != "" {
-		currRevisionMap, _ := instanceset.GetRevisions(its.Status.CurrentRevisions)
-		workload.currentRevisionMap = currRevisionMap
-		workload.instanceNames = sets.KeySet(currRevisionMap)
-		workload.notReadySet = instanceset.GetPodNameSetFromInstanceSetCondition(its, workloads.InstanceReady)
-		workload.notAvailableSet = instanceset.GetPodNameSetFromInstanceSetCondition(its, workloads.InstanceAvailable)
-		workload.failedSet = instanceset.GetPodNameSetFromInstanceSetCondition(its, workloads.InstanceFailure)
 		workload.instanceStatuses = make([]workloads.InstanceStatus, len(its.Status.InstanceStatus))
 		for i := range its.Status.InstanceStatus {
 			its.Status.InstanceStatus[i].DeepCopyInto(&workload.instanceStatuses[i])
-		}
-		return workload, nil
-	}
-	pods, err := component.ListOwnedPods(r.dataContext(), r.cli, namespace, clusterName, compName, r.dataListOpts...)
-	if err != nil {
-		return nil, err
-	}
-	instances, err := r.buildInstances(namespace, clusterName, compName, pods)
-	if err != nil {
-		return nil, err
-	}
-	for _, instance := range instances {
-		podInstance, ok := instance.(*defaultInstance)
-		if !ok || podInstance.pod == nil {
-			continue
-		}
-		name := podInstance.GetName()
-		workload.instanceNames.Insert(name)
-		workload.currentRevisionMap[name] = ""
-		if !podutils.IsPodReady(podInstance.pod) {
-			workload.notReadySet.Insert(name)
-		}
-		if !podutils.IsPodAvailable(podInstance.pod, 0, metav1.Now()) {
-			workload.notAvailableSet.Insert(name)
-		}
-		if podInstance.IsFailedAndTimedOut() {
-			workload.failedSet.Insert(name)
 		}
 	}
 	return workload, nil
@@ -224,22 +182,6 @@ func (r *opsRuntime) doSwitchover(ctx context.Context, cli client.Reader, synthe
 	return lfa.Switchover(ctx, cli, nil, candidateName)
 }
 
-func (r *opsRuntime) buildInstances(namespace, clusterName, compName string, pods []*corev1.Pod) ([]Instance, error) {
-	pvcMap, err := r.loadVolumes(namespace, clusterName, compName)
-	if err != nil {
-		return nil, err
-	}
-	instances := make([]Instance, 0, len(pods))
-	for i := range pods {
-		inst, err := r.newPodInstanceWithVolumes(compName, pods[i], pvcMap)
-		if err != nil {
-			return nil, err
-		}
-		instances = append(instances, inst)
-	}
-	return instances, nil
-}
-
 func (r *opsRuntime) loadVolumes(namespace, clusterName, compName string) (map[string]*corev1.PersistentVolumeClaim, error) {
 	pvcList := &corev1.PersistentVolumeClaimList{}
 	opts := []client.ListOption{
@@ -314,12 +256,7 @@ func (r *opsRuntime) dataContext() context.Context {
 }
 
 type defaultWorkload struct {
-	instanceStatuses   []workloads.InstanceStatus
-	currentRevisionMap map[string]string
-	notReadySet        sets.Set[string]
-	notAvailableSet    sets.Set[string]
-	failedSet          sets.Set[string]
-	instanceNames      sets.Set[string]
+	instanceStatuses []workloads.InstanceStatus
 }
 
 func (w *defaultWorkload) GetInstanceStatuses() []workloads.InstanceStatus {
@@ -328,22 +265,6 @@ func (w *defaultWorkload) GetInstanceStatuses() []workloads.InstanceStatus {
 		w.instanceStatuses[i].DeepCopyInto(&result[i])
 	}
 	return result
-}
-
-func (w *defaultWorkload) GetCurrentRevisionMap() map[string]string { return w.currentRevisionMap }
-
-func (w *defaultWorkload) GetNotReadyInstanceNameSet() sets.Set[string] {
-	return w.notReadySet.Clone()
-}
-
-func (w *defaultWorkload) GetNotAvailableInstanceNameSet() sets.Set[string] {
-	return w.notAvailableSet.Clone()
-}
-
-func (w *defaultWorkload) GetFailedInstanceNameSet() sets.Set[string] { return w.failedSet.Clone() }
-
-func (w *defaultWorkload) GetInstanceNameSet() sets.Set[string] {
-	return w.instanceNames.Clone()
 }
 
 type defaultInstance struct {

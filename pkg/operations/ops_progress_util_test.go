@@ -170,7 +170,7 @@ var _ = Describe("Ops ProgressDetails", func() {
 			for i := 1; i < 3; i++ {
 				pod := podList[i]
 				testk8s.MockPodIsTerminating(ctx, testCtx, pod)
-				testapps.MockInstanceSetStatus(testCtx, opsRes.Cluster, defaultCompName)
+				mockHorizontalScalingProgress(opsRes.Cluster, defaultCompName)
 				_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 				Expect(getProgressDetailStatus(opsRes, defaultCompName, pod)).Should(Equal(opsv1alpha1.ProcessingProgressStatus))
 
@@ -178,7 +178,7 @@ var _ = Describe("Ops ProgressDetails", func() {
 			By("mock the target pod is deleted and progressDetail status should be succeed")
 			targetPod := podList[1]
 			testk8s.RemovePodFinalizer(ctx, testCtx, targetPod)
-			testapps.MockInstanceSetStatus(testCtx, opsRes.Cluster, defaultCompName)
+			mockHorizontalScalingProgress(opsRes.Cluster, defaultCompName)
 			_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(getProgressDetailStatus(opsRes, defaultCompName, targetPod)).Should(Equal(opsv1alpha1.SucceedProgressStatus))
 			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("1/2"))
@@ -187,10 +187,10 @@ var _ = Describe("Ops ProgressDetails", func() {
 			pod := podList[2]
 			testk8s.RemovePodFinalizer(ctx, testCtx, pod)
 			// expect the progress is 2/2
-			testapps.MockInstanceSetStatus(testCtx, opsRes.Cluster, defaultCompName)
+			mockHorizontalScalingProgress(opsRes.Cluster, defaultCompName)
 			_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(getProgressDetailStatus(opsRes, defaultCompName, targetPod)).Should(Equal(opsv1alpha1.SucceedProgressStatus))
-			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("2/2"))
+			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("1/1"))
 		})
 
 		It("Test Ops ProgressDetails with scale-out replicas", func() {
@@ -230,10 +230,10 @@ var _ = Describe("Ops ProgressDetails", func() {
 				targetPodName, "follower")
 			targetPod := &corev1.Pod{}
 			Expect(k8sClient.Get(ctx, client.ObjectKey{Name: targetPodName, Namespace: testCtx.DefaultNamespace}, targetPod)).Should(Succeed())
-			testapps.MockInstanceSetStatus(testCtx, opsRes.Cluster, defaultCompName)
+			mockHorizontalScalingProgress(opsRes.Cluster, defaultCompName)
 			_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(getProgressDetailStatus(opsRes, defaultCompName, targetPod)).Should(Equal(opsv1alpha1.SucceedProgressStatus))
-			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("1/1"))
+			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("4/4"))
 		})
 	})
 })

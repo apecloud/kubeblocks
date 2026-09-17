@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"reflect"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -30,7 +31,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -44,16 +45,6 @@ import (
 type volumeExpansionOpsHandler struct {
 }
 
-type volumeExpansionHelper struct {
-	compOps           ComponentOpsInterface
-	fullComponentName string
-	vctName           string
-	expectCount       int
-	templateName      string
-	stopped           bool
-	explicitOffline   sets.Set[string]
-}
-
 var _ OpsHandler = volumeExpansionOpsHandler{}
 
 const (
@@ -62,7 +53,7 @@ const (
 )
 
 func init() {
-	// Expansion progress is checked on PVCs, including those retained after Stop.
+	// Expansion follows the current target and owner instance observations.
 	volumeExpansionBehaviour := OpsBehaviour{
 		OpsHandler:  volumeExpansionOpsHandler{},
 		QueueBySelf: true,
@@ -104,147 +95,204 @@ func (ve volumeExpansionOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli cl
 // ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
 // the Reconcile function for volume expansion opsRequest.
 func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (opsv1alpha1.OpsPhase, time.Duration, error) {
-	var (
-		opsRequest             = opsRes.OpsRequest
-		requeueAfter           time.Duration
-		err                    error
-		opsRequestPhase        = opsv1alpha1.OpsRunningPhase
-		oldOpsRequestStatus    = opsRequest.Status.DeepCopy()
-		expectProgressCount    int
-		succeedProgressCount   int
-		completedProgressCount int
-	)
-	patch := client.MergeFrom(opsRequest.DeepCopy())
-	if opsRequest.Status.Components == nil {
-		ve.initComponentStatus(opsRequest)
+	ops := opsRes.OpsRequest
+	oldOps := ops.DeepCopy()
+	if ops.Status.Components == nil {
+		ve.initComponentStatus(ops)
 	}
-	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.VolumeExpansionList)
-	storageMap := ve.getRequestStorageMap(opsRequest)
-	var veHelpers []volumeExpansionHelper
-	currentDetails := map[string][]opsv1alpha1.ProgressStatusDetail{}
-	for name := range compOpsHelper.componentOpsSet {
-		currentDetails[name] = nil
-	}
-	for _, compSpec := range opsRes.Cluster.Spec.ComponentSpecs {
-		compOps, ok := compOpsHelper.componentOpsSet[compSpec.Name]
-		if !ok {
-			continue
+	helper := newComponentOpsHelper(ops.Spec.VolumeExpansionList)
+	current := helper.emptyInstanceProgress(opsRes)
+	complete := opsRes.Cluster.Generation >= ops.Status.ClusterGeneration
+	var expected, succeeded int32
+	observe := func(name, physicalName string, spec *appsv1.ClusterComponentSpec, targets map[string]resource.Quantity) error {
+		its := &workloads.InstanceSet{}
+		err := cli.Get(reqCtx.Ctx, client.ObjectKey{Namespace: opsRes.Cluster.Namespace,
+			Name: constant.GenerateClusterComponentName(opsRes.Cluster.Name, physicalName)}, its)
+		if apierrors.IsNotFound(err) {
+			complete = false
+			return nil
 		}
-		veHelpers = append(veHelpers, buildVolumeExpansionHelpers(compSpec, compOps, compSpec.Name)...)
-	}
-	for _, spec := range opsRes.Cluster.Spec.Shardings {
-		compOps, ok := compOpsHelper.componentOpsSet[spec.Name]
-		if !ok {
-			continue
-		}
-		shardingComps, err := sharding.ListShardingComponents(reqCtx.Ctx, cli, opsRes.Cluster, spec.Name)
 		if err != nil {
-			return opsRequestPhase, 0, err
+			return err
 		}
-		for _, v := range shardingComps {
-			if slices.ContainsFunc(spec.ShardTemplates, func(t appsv1.ShardTemplate) bool {
-				return t.Name == v.Labels[constant.KBAppShardTemplateLabelKey] && t.VolumeClaimTemplates != nil
+		progress := volumeExpansionProgress(its, spec, targets)
+		current[name] = append(current[name], progress.details...)
+		expected += progress.expectedCount
+		succeeded += progress.succeededCount
+		complete = complete && progress.observationsComplete && progress.succeededCount == progress.expectedCount
+		return nil
+	}
+	for _, request := range ops.Spec.VolumeExpansionList {
+		name := request.ComponentName
+		current[name] = nil
+		spec := opsRes.Cluster.Spec.GetComponentByName(name)
+		shardSpec := opsRes.Cluster.Spec.GetShardingByName(name)
+		var status appsv1.ClusterComponentStatus
+		if shardSpec != nil {
+			spec = &shardSpec.Template
+			shardStatus := opsRes.Cluster.Status.Shardings[name]
+			status = appsv1.ClusterComponentStatus{Phase: shardStatus.Phase, ObservedGeneration: shardStatus.ObservedGeneration, UpToDate: shardStatus.UpToDate}
+		} else {
+			status = opsRes.Cluster.Status.Components[name]
+		}
+		componentStatus := ops.Status.Components[name]
+		componentStatus.Phase = status.Phase
+		ops.Status.Components[name] = componentStatus
+		if spec == nil {
+			complete = false
+			continue
+		}
+		targets, targetObserved := volumeExpansionTargets(spec, request.VolumeClaimTemplates)
+		complete = complete && targetObserved && status.ObservedGeneration == opsRes.Cluster.Generation && status.UpToDate
+		if shardSpec == nil {
+			if err := observe(name, name, spec, targets); err != nil {
+				return opsv1alpha1.OpsRunningPhase, time.Minute, err
+			}
+			continue
+		}
+		components, err := sharding.ListShardingComponents(reqCtx.Ctx, cli, opsRes.Cluster, name)
+		if err != nil {
+			return opsv1alpha1.OpsRunningPhase, time.Minute, err
+		}
+		complete = complete && int32(len(components)) == shardSpec.Shards
+		for _, comp := range components {
+			if slices.ContainsFunc(shardSpec.ShardTemplates, func(t appsv1.ShardTemplate) bool {
+				return t.Name == comp.Labels[constant.KBAppShardTemplateLabelKey] && t.VolumeClaimTemplates != nil
 			}) {
 				continue
 			}
-			physical := appsv1.ClusterComponentSpec{
-				Replicas: v.Spec.Replicas, Instances: v.Spec.Instances,
-				Stop: v.Spec.Stop, OfflineInstances: v.Spec.OfflineInstances,
+			physical := &appsv1.ClusterComponentSpec{Replicas: comp.Spec.Replicas, Instances: comp.Spec.Instances,
+				Stop: comp.Spec.Stop, OfflineInstances: comp.Spec.OfflineInstances}
+			if err := observe(name, comp.Labels[constant.KBAppComponentLabelKey], physical, targets); err != nil {
+				return opsv1alpha1.OpsRunningPhase, time.Minute, err
 			}
-			veHelpers = append(veHelpers, buildVolumeExpansionHelpers(physical, compOps, v.Labels[constant.KBAppComponentLabelKey])...)
 		}
 	}
-	// reconcile the status.components. when the volume expansion is successful,
-	// sync the volumeClaimTemplate status and component phase On the OpsRequest and Cluster.
-	for _, veHelper := range veHelpers {
-		opsCompStatus := oldOpsRequestStatus.Components[veHelper.compOps.GetComponentName()]
-		key := getComponentVCTKey(veHelper.compOps.GetComponentName(), veHelper.vctName)
-		requestStorage, ok := storageMap[key]
-		if !ok {
-			continue
-		}
-		succeedCount, completedCount, err := ve.handleVCTExpansionProgress(reqCtx, cli, opsRes,
-			&opsCompStatus, requestStorage, veHelper)
-		if err != nil {
-			return "", requeueAfter, err
-		}
-		expectProgressCount += veHelper.expectCount
-		succeedProgressCount += succeedCount
-		completedProgressCount += completedCount
-		name := veHelper.compOps.GetComponentName()
-		currentDetails[name] = append(currentDetails[name], opsCompStatus.ProgressDetails...)
+	if err := patchCurrentProgress(reqCtx, cli, opsRes, oldOps, current, succeeded, expected); err != nil {
+		return opsv1alpha1.OpsRunningPhase, time.Minute, err
 	}
-	for name, details := range currentDetails {
-		status := opsRequest.Status.Components[name]
-		status.ProgressDetails = details
-		opsRequest.Status.Components[name] = status
+	if complete {
+		return opsv1alpha1.OpsSucceedPhase, 0, nil
 	}
-	if completedProgressCount != expectProgressCount {
-		requeueAfter = time.Minute
+	if time.Now().After(ops.Status.StartTimestamp.Add(VolumeExpansionTimeOut)) {
+		return opsv1alpha1.OpsFailedPhase, time.Minute, errors.New(fmt.Sprintf(
+			"Timed out waiting for volume expansion to complete, the timeout value is %g minutes", VolumeExpansionTimeOut.Minutes()))
 	}
-	opsRequest.Status.Progress = fmt.Sprintf("%d/%d", completedProgressCount, expectProgressCount)
-	// patch OpsRequest.status.components
-	if !reflect.DeepEqual(*oldOpsRequestStatus, opsRequest.Status) {
-		if err = cli.Status().Patch(reqCtx.Ctx, opsRequest, patch); err != nil {
-			return opsRequestPhase, requeueAfter, err
-		}
-	}
-
-	// check all PVCs of volumeClaimTemplate are successful
-	if expectProgressCount == completedProgressCount {
-		if expectProgressCount == succeedProgressCount {
-			opsRequestPhase = opsv1alpha1.OpsSucceedPhase
-		} else {
-			opsRequestPhase = opsv1alpha1.OpsFailedPhase
-		}
-		return opsRequestPhase, requeueAfter, err
-	}
-	// check whether the volume expansion operation has timed out
-	if time.Now().After(opsRequest.Status.StartTimestamp.Add(VolumeExpansionTimeOut)) {
-		// if volume expansion timed out
-		opsRequestPhase = opsv1alpha1.OpsFailedPhase
-		err = errors.New(fmt.Sprintf("Timed out waiting for volume expansion to complete, the timeout value is %g minutes", VolumeExpansionTimeOut.Minutes()))
-	}
-	return opsRequestPhase, requeueAfter, err
+	return opsv1alpha1.OpsRunningPhase, time.Minute, nil
 }
 
-func buildVolumeExpansionHelpers(compSpec appsv1.ClusterComponentSpec, compOps ComponentOpsInterface, fullComponentName string) []volumeExpansionHelper {
-	volumeExpansion := compOps.(opsv1alpha1.VolumeExpansion)
-	stopped := compSpec.Stop != nil && *compSpec.Stop
-	explicitOffline := sets.New(compSpec.OfflineInstances...)
-	var veHelpers []volumeExpansionHelper
-	expectReplicas := compSpec.Replicas
-	for _, template := range compSpec.Instances {
-		expectReplicas -= template.GetReplicas()
-	}
-	for _, vct := range volumeExpansion.VolumeClaimTemplates {
-		veHelpers = append(veHelpers, volumeExpansionHelper{
-			compOps:           compOps,
-			fullComponentName: fullComponentName,
-			expectCount:       int(expectReplicas),
-			vctName:           vct.Name,
-			stopped:           stopped,
-			explicitOffline:   explicitOffline,
-		})
-		for _, template := range compSpec.Instances {
-			// An explicit VCT replaces the component declaration for this volume.
-			if slices.ContainsFunc(template.VolumeClaimTemplates, func(v appsv1.PersistentVolumeClaimTemplate) bool {
-				return v.Name == vct.Name
-			}) {
-				continue
+// volumeExpansionTargets keeps the current logical target, including a later compatible expansion.
+func volumeExpansionTargets(spec *appsv1.ClusterComponentSpec, requested []opsv1alpha1.OpsRequestVolumeClaimTemplate) (map[string]resource.Quantity, bool) {
+	targets := map[string]resource.Quantity{}
+	for _, request := range requested {
+		for _, vct := range spec.VolumeClaimTemplates {
+			if vct.Name == request.Name {
+				storage := vct.Spec.Resources.Requests[corev1.ResourceStorage]
+				if storage.Cmp(request.Storage) >= 0 {
+					targets[vct.Name] = storage
+				}
 			}
-			veHelpers = append(veHelpers, volumeExpansionHelper{
-				compOps:           compOps,
-				fullComponentName: fullComponentName,
-				expectCount:       int(template.GetReplicas()),
-				vctName:           vct.Name,
-				templateName:      template.Name,
-				stopped:           stopped,
-				explicitOffline:   explicitOffline,
-			})
 		}
 	}
-	return veHelpers
+	return targets, len(targets) == len(requested)
+}
+
+// volumeExpansionProgress combines volume observations per instance, retaining volume count units.
+// UpToDate is the owner's application/capacity judgment; service health is outside expansion.
+func volumeExpansionProgress(its *workloads.InstanceSet, spec *appsv1.ClusterComponentSpec, targets map[string]resource.Quantity) instanceProgress {
+	result := instanceProgress{observationsComplete: its.Status.ObservedGeneration == its.Generation &&
+		ptr.Deref(its.Spec.Replicas, int32(1)) == spec.Replicas &&
+		ptr.Deref(its.Spec.Stop, false) == ptr.Deref(spec.Stop, false)}
+	templateReplicas, valid := expectedTemplateReplicas(spec)
+	result.observationsComplete = result.observationsComplete && valid
+	forwardedTargets := make(map[string]bool, len(targets))
+	for name, storage := range targets {
+		forwardedTargets[name] = slices.ContainsFunc(its.Spec.VolumeClaimTemplates, func(v corev1.PersistentVolumeClaim) bool {
+			capacity := v.Spec.Resources.Requests[corev1.ResourceStorage]
+			return v.Name == name && capacity.Cmp(storage) >= 0
+		})
+		result.observationsComplete = result.observationsComplete && forwardedTargets[name]
+	}
+	affected := map[string][]string{}
+	for templateName, replicas := range templateReplicas {
+		for name := range targets {
+			overridden := slices.ContainsFunc(spec.Instances, func(t appsv1.InstanceTemplate) bool {
+				return t.Name == templateName && slices.ContainsFunc(t.VolumeClaimTemplates, func(v appsv1.PersistentVolumeClaimTemplate) bool { return v.Name == name })
+			})
+			forwardedOverride := false
+			for _, t := range its.Spec.Instances {
+				if t.Name == templateName {
+					forwardedOverride = slices.ContainsFunc(t.VolumeClaimTemplates, func(v corev1.PersistentVolumeClaim) bool { return v.Name == name })
+				}
+			}
+			result.observationsComplete = result.observationsComplete && overridden == forwardedOverride
+			if overridden {
+				continue
+			}
+			affected[templateName] = append(affected[templateName], name)
+			result.expectedCount += replicas
+		}
+		slices.Sort(affected[templateName])
+	}
+	// Zero work follows observed allocation declarations, never an empty online status list.
+	itsSpec := &appsv1.ClusterComponentSpec{Replicas: ptr.Deref(its.Spec.Replicas, int32(1))}
+	for _, t := range its.Spec.Instances {
+		itsSpec.Instances = append(itsSpec.Instances, appsv1.InstanceTemplate{Name: t.Name, Replicas: t.Replicas})
+	}
+	itsReplicas, itsValid := expectedTemplateReplicas(itsSpec)
+	result.observationsComplete = result.observationsComplete && itsValid && reflect.DeepEqual(templateReplicas, itsReplicas)
+	if result.expectedCount == 0 {
+		state := workloads.InstanceDesiredStateActive
+		if ptr.Deref(its.Spec.Stop, false) {
+			state = workloads.InstanceDesiredStateOffline
+		}
+		allocated, err := instanceTemplatesByState(its.Status.InstanceStatus, state, func(s workloads.InstanceStatus) bool {
+			return !slices.Contains(spec.OfflineInstances, s.PodName)
+		})
+		result.observationsComplete = result.observationsComplete && err == nil && assignmentsMatchComponent(allocated, spec)
+		return result
+	}
+	active, err := instanceTemplatesByState(its.Status.InstanceStatus, workloads.InstanceDesiredStateActive, func(s workloads.InstanceStatus) bool {
+		return s.TemplateName == nil || len(affected[*s.TemplateName]) > 0
+	})
+	actualReplicas := map[string]int32{}
+	for _, template := range active {
+		actualReplicas[template]++
+	}
+	for template, volumes := range affected {
+		if len(volumes) > 0 {
+			result.observationsComplete = result.observationsComplete && actualReplicas[template] == templateReplicas[template]
+		}
+	}
+	result.observationsComplete = result.observationsComplete && err == nil &&
+		!ptr.Deref(its.Spec.Stop, false) && !ptr.Deref(spec.Stop, false)
+	for _, instance := range its.Status.InstanceStatus {
+		if instance.EffectiveDesiredState() != workloads.InstanceDesiredStateActive || instance.TemplateName == nil {
+			continue
+		}
+		volumes := affected[*instance.TemplateName]
+		if len(volumes) == 0 {
+			continue
+		}
+		detail := opsv1alpha1.ProgressStatusDetail{ObjectKey: getProgressObjectKey(constant.PodKind, instance.PodName)}
+		if instance.EffectiveCurrentState() == workloads.InstanceCurrentStatePresent && instance.UpToDate {
+			forwarded := 0
+			for _, name := range volumes {
+				if forwardedTargets[name] {
+					forwarded++
+				}
+			}
+			result.succeededCount += int32(forwarded)
+			if forwarded == len(volumes) {
+				detail.SetStatusAndMessage(opsv1alpha1.SucceedProgressStatus, fmt.Sprintf("Volumes %s applied to instance %s", strings.Join(volumes, ", "), instance.PodName))
+			}
+		}
+		if detail.Status == "" {
+			detail.SetStatusAndMessage(opsv1alpha1.ProcessingProgressStatus, fmt.Sprintf("Waiting for volumes %s on instance %s", strings.Join(volumes, ", "), instance.PodName))
+		}
+		result.details = append(result.details, detail)
+	}
+	return result
 }
 
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration
@@ -302,101 +350,6 @@ func (ve volumeExpansionOpsHandler) initComponentStatus(opsRequest *opsv1alpha1.
 	}
 }
 
-// handleVCTExpansionProgress checks whether the pvc of the volume claim template is in (resizing, expansion succeeded, expansion completed).
-func (ve volumeExpansionOpsHandler) handleVCTExpansionProgress(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	opsRes *OpsResource,
-	compStatus *opsv1alpha1.OpsRequestComponentStatus,
-	requestStorage resource.Quantity,
-	veHelper volumeExpansionHelper) (int, int, error) {
-	var (
-		succeedCount   int
-		completedCount int
-	)
-	previous := *compStatus
-	compStatus.ProgressDetails = nil
-	if veHelper.expectCount <= 0 {
-		return 0, 0, nil
-	}
-	runtime, err := opsRes.GetRuntime(veHelper.compOps.GetComponentName())
-	if err != nil {
-		return 0, 0, err
-	}
-	workload, err := runtime.GetWorkload(opsRes.Cluster.Namespace, opsRes.Cluster.Name, veHelper.fullComponentName)
-	if err != nil {
-		return 0, 0, err
-	}
-	desiredState := workloads.InstanceDesiredStateActive
-	if veHelper.stopped {
-		// Stop retains the normal allocation as Offline, while explicitly
-		// offlined instances remain outside this operation's replica count.
-		desiredState = workloads.InstanceDesiredStateOffline
-	}
-	instances, err := instanceTemplatesByState(workload.GetInstanceStatuses(), desiredState,
-		func(status workloads.InstanceStatus) bool {
-			return !veHelper.explicitOffline.Has(status.PodName) &&
-				(status.TemplateName == nil || *status.TemplateName == veHelper.templateName)
-		})
-	if err != nil {
-		return 0, 0, err
-	}
-	if len(instances) != veHelper.expectCount {
-		return 0, 0, nil
-	}
-	for instanceName := range instances {
-		instance, getErr := runtime.GetInstance(opsRes.Cluster.Namespace, opsRes.Cluster.Name, veHelper.fullComponentName, instanceName)
-		if getErr != nil {
-			if apierrors.IsNotFound(getErr) {
-				continue
-			}
-			return 0, 0, getErr
-		}
-		volume, ok := instance.GetVolume(veHelper.vctName)
-		if !ok {
-			continue
-		}
-		objectKey := getPVCProgressObjectKey(volume.GetClaimName())
-		progressDetail := opsv1alpha1.ProgressStatusDetail{ObjectKey: objectKey, Group: veHelper.vctName}
-		if existing := findStatusProgressDetail(previous.ProgressDetails, objectKey); existing != nil {
-			progressDetail = *existing
-			// Keep the old value so the setter can detect status and message changes.
-			compStatus.ProgressDetails = append(compStatus.ProgressDetails, *existing)
-		}
-		if progressDetail.Status == opsv1alpha1.FailedProgressStatus {
-			completedCount += 1
-			continue
-		}
-		// should check if the spec.resources.requests.storage equals to the requested storage
-		// and current storage size is greater than or equal to request storage size.
-		// and pvc is bound if the pvc is re-created for recovery.
-		capacity := volume.GetCapacity()
-		requestedStorage := volume.GetRequestedStorage()
-		if capacity.Cmp(requestStorage) >= 0 &&
-			requestedStorage.Cmp(requestStorage) == 0 &&
-			volume.IsBound() {
-			succeedCount += 1
-			completedCount += 1
-			message := fmt.Sprintf("Successfully expand volume: %s in component: %s", objectKey, veHelper.compOps.GetComponentName())
-			progressDetail.SetStatusAndMessage(opsv1alpha1.SucceedProgressStatus, message)
-			setComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest, &compStatus.ProgressDetails, progressDetail)
-			continue
-		}
-		if volume.IsExpanding() {
-			message := fmt.Sprintf("Start expanding volume: %s in component: %s", objectKey, veHelper.compOps.GetComponentName())
-			progressDetail.SetStatusAndMessage(opsv1alpha1.ProcessingProgressStatus, message)
-		} else {
-			message := fmt.Sprintf("Waiting for an external controller to process the pvc: %s in component: %s", objectKey, veHelper.compOps.GetComponentName())
-			progressDetail.SetStatusAndMessage(opsv1alpha1.PendingProgressStatus, message)
-		}
-		setComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest, &compStatus.ProgressDetails, progressDetail)
-	}
-	return succeedCount, completedCount, nil
-}
-
 func getComponentVCTKey(compoName, vctName string) string {
 	return fmt.Sprintf("%s.%s", compoName, vctName)
-}
-
-func getPVCProgressObjectKey(pvcName string) string {
-	return fmt.Sprintf("PVC/%s", pvcName)
 }

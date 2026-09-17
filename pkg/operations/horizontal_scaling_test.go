@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
@@ -1259,43 +1260,10 @@ type horizontalScalingFixture struct {
 	clusterWrites, backupReads, restoreReads int
 }
 
-// Record runtime calls to prove replica observations use the domain API.
-type horizontalScalingRuntimeTrace struct {
-	OpsRuntime
-	calls []string
-}
-
-func (r *horizontalScalingRuntimeTrace) GetWorkload(namespace, clusterName, compName string) (Workload, error) {
-	r.calls = append(r.calls, "workload("+compName+")")
-	return r.OpsRuntime.GetWorkload(namespace, clusterName, compName)
-}
-
-func TestHorizontalScalingDoesNotReadRuntimeProgress(t *testing.T) {
-	for _, fromBackup := range []bool{false, true} {
-		t.Run(fmt.Sprintf("backup=%t", fromBackup), func(t *testing.T) {
-			f := newHorizontalScalingFixture(t, scaleOutRequest("db", fromBackup))
-			if fromBackup {
-				f.addBackup(t)
-			}
-			trace := &horizontalScalingRuntimeTrace{OpsRuntime: f.res.Runtimes["db"]}
-			f.res.Runtimes["db"] = trace
-			hs := horizontalScalingOpsHandler{}
-			if err := hs.Action(f.req, f.cli, f.res); err != nil {
-				t.Fatal(err)
-			}
-			f.reconcile(t, opsv1alpha1.OpsRunningPhase)
-			if len(trace.calls) > 0 {
-				t.Fatalf("runtime progress calls: %v", trace.calls)
-			}
-		})
-	}
-}
-
 func TestHorizontalScalingOnlineInferenceInputs(t *testing.T) {
 	for _, tc := range []struct {
 		name                                             string
 		template, explicitTotal, explicitTemplate, empty bool
-		wantCalls                                        []string
 		wantReplicas                                     int32
 	}{
 		{name: "infer-default", wantReplicas: 2},
@@ -1333,13 +1301,8 @@ func TestHorizontalScalingOnlineInferenceInputs(t *testing.T) {
 				t.Fatal(err)
 			}
 			original := spec.DeepCopy()
-			trace := &horizontalScalingRuntimeTrace{OpsRuntime: f.res.Runtimes["db"]}
-			f.res.Runtimes["db"] = trace
 			if err := hs.Action(f.req, f.cli, f.res); err != nil {
 				t.Fatal(err)
-			}
-			if !reflect.DeepEqual(trace.calls, tc.wantCalls) {
-				t.Fatalf("calls = %v, want %v", trace.calls, tc.wantCalls)
 			}
 			last := f.res.OpsRequest.Status.LastConfiguration.Components["db"]
 			if !reflect.DeepEqual(last.InstanceTemplates, original.Instances) || !reflect.DeepEqual(last.OfflineInstances, original.OfflineInstances) {
@@ -1862,7 +1825,7 @@ func publishHorizontalScalingAssignments(t *testing.T, f *horizontalScalingFixtu
 		if err != nil {
 			t.Fatal(err)
 		}
-		its := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Name: constant.GenerateClusterComponentName(f.res.Cluster.Name, target.ComponentName), Namespace: f.res.Cluster.Namespace}, Spec: workloads.InstanceSetSpec{Replicas: pointer.Int32(spec.Replicas)}}
+		its := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Name: constant.GenerateClusterComponentName(f.res.Cluster.Name, target.ComponentName), Namespace: f.res.Cluster.Namespace}, Spec: workloads.InstanceSetSpec{Replicas: ptr.To[int32](spec.Replicas)}}
 		for name := range names {
 			template := appsv1.GetInstanceTemplateName(f.res.Cluster.Name, target.ComponentName, name)
 			its.Status.InstanceStatus = append(its.Status.InstanceStatus, workloads.InstanceStatus{PodName: name, TemplateName: &template, DesiredState: workloads.InstanceDesiredStateActive})
@@ -2083,7 +2046,7 @@ func TestHorizontalScalingRejectsInvalidInstanceTargets(t *testing.T) {
 			cluster.Status.Components = map[string]appsv1.ClusterComponentStatus{
 				"db": {ObservedGeneration: cluster.Generation, UpToDate: true, Phase: appsv1.RunningComponentPhase},
 			}
-			its.Spec.Replicas = pointer.Int32(spec.Replicas)
+			its.Spec.Replicas = ptr.To[int32](spec.Replicas)
 			its.Status.ObservedGeneration = its.Generation
 			for i := range its.Status.InstanceStatus {
 				status := &its.Status.InstanceStatus[i]
@@ -2146,7 +2109,7 @@ func mockHorizontalScalingProgress(cluster *appsv1.Cluster, name string) {
 	its := &workloads.InstanceSet{}
 	Expect(k8sClient.Get(testCtx.Ctx, key, its)).Should(Succeed())
 	spec := cluster.Spec.GetComponentByName(name)
-	its.Spec.Replicas = pointer.Int32(spec.Replicas)
+	its.Spec.Replicas = ptr.To[int32](spec.Replicas)
 	Expect(k8sClient.Update(testCtx.Ctx, its)).Should(Succeed())
 	pods := &corev1.PodList{}
 	Expect(k8sClient.List(testCtx.Ctx, pods, client.InNamespace(cluster.Namespace), client.MatchingLabels{constant.AppInstanceLabelKey: cluster.Name, constant.KBAppComponentLabelKey: name})).Should(Succeed())
@@ -2203,7 +2166,7 @@ func TestHorizontalScalingResultAndCurrentProgressConverge(t *testing.T) {
 		t.Fatalf("missing observation was filled: %+v", f.res.OpsRequest.Status)
 	}
 	// A cached workload for the previous allocation is also insufficient.
-	its.Spec.Replicas = pointer.Int32(1)
+	its.Spec.Replicas = ptr.To[int32](1)
 	if err := f.cli.Update(f.req.Ctx, its); err != nil {
 		t.Fatal(err)
 	}
@@ -2340,9 +2303,9 @@ func TestHorizontalScalingWaitsForEveryShardObservation(t *testing.T) {
 		comp := &appsv1.Component{ObjectMeta: metav1.ObjectMeta{Name: "demo-" + name, Namespace: "default",
 			Labels: constant.GetCompLabels("demo", name, map[string]string{constant.KBAppShardingNameLabelKey: "sharded"})}}
 		its := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Name: comp.Name, Namespace: comp.Namespace},
-			Spec: workloads.InstanceSetSpec{Replicas: pointer.Int32(1)},
+			Spec: workloads.InstanceSetSpec{Replicas: ptr.To[int32](1)},
 			Status: workloads.InstanceSetStatus{InstanceStatus: []workloads.InstanceStatus{{
-				PodName: comp.Name + "-chosen", TemplateName: pointer.String(""),
+				PodName: comp.Name + "-chosen", TemplateName: ptr.To(""),
 				DesiredState: workloads.InstanceDesiredStateActive, CurrentState: workloads.InstanceCurrentStatePresent,
 				UpToDate: true, Ready: true, Available: true,
 			}}}}

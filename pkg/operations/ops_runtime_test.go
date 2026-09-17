@@ -30,20 +30,16 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
-func TestOpsRuntimeBuildsInstanceAPIView(t *testing.T) {
+func TestOpsRuntimeReadsSwitchoverPod(t *testing.T) {
 	scheme := runtime.NewScheme()
 	if err := corev1.AddToScheme(scheme); err != nil {
 		t.Fatalf("add core scheme: %v", err)
 	}
 	if err := appsv1.AddToScheme(scheme); err != nil {
 		t.Fatalf("add apps scheme: %v", err)
-	}
-	if err := workloads.AddToScheme(scheme); err != nil {
-		t.Fatalf("add workloads scheme: %v", err)
 	}
 
 	const (
@@ -53,27 +49,6 @@ func TestOpsRuntimeBuildsInstanceAPIView(t *testing.T) {
 		instanceName = "test-cluster-mysql-0"
 	)
 	enableInstanceAPI := true
-	its := &workloads.InstanceSet{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: namespace,
-			Name:      constant.GenerateClusterComponentName(clusterName, component),
-			Labels:    constant.GetCompLabels(clusterName, component),
-		},
-		Spec: workloads.InstanceSetSpec{
-			MinReadySeconds: 15,
-		},
-		Status: workloads.InstanceSetStatus{
-			CurrentRevisions: map[string]string{
-				instanceName: "rev-a",
-			},
-			InstanceStatus: []workloads.InstanceStatus{{
-				PodName:      instanceName,
-				TemplateName: templateName("big"),
-				DesiredState: workloads.InstanceDesiredStateActive,
-				CurrentState: workloads.InstanceCurrentStatePresent,
-			}},
-		},
-	}
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:         namespace,
@@ -127,31 +102,6 @@ func TestOpsRuntimeBuildsInstanceAPIView(t *testing.T) {
 			}},
 		},
 	}
-	pvc := &corev1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: namespace,
-			Name:      "data-" + instanceName,
-			Labels: map[string]string{
-				constant.AppInstanceLabelKey:             clusterName,
-				constant.KBAppComponentLabelKey:          component,
-				constant.KBAppPodNameLabelKey:            instanceName,
-				constant.VolumeClaimTemplateNameLabelKey: "data",
-			},
-		},
-		Spec: corev1.PersistentVolumeClaimSpec{
-			Resources: corev1.VolumeResourceRequirements{
-				Requests: corev1.ResourceList{
-					corev1.ResourceStorage: resource.MustParse("2Gi"),
-				},
-			},
-		},
-		Status: corev1.PersistentVolumeClaimStatus{
-			Phase: corev1.ClaimBound,
-			Capacity: corev1.ResourceList{
-				corev1.ResourceStorage: resource.MustParse("2Gi"),
-			},
-		},
-	}
 	cluster := &appsv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
@@ -170,7 +120,7 @@ func TestOpsRuntimeBuildsInstanceAPIView(t *testing.T) {
 
 	cli := fake.NewClientBuilder().
 		WithScheme(scheme).
-		WithObjects(its, pod, pvc).
+		WithObjects(pod).
 		Build()
 	opsRes := &OpsResource{Cluster: cluster}
 	runtimes, err := buildOpsRuntimes(context.Background(), cli, opsRes)
@@ -190,20 +140,6 @@ func TestOpsRuntimeBuildsInstanceAPIView(t *testing.T) {
 		t.Fatal("expected multi-cluster runtime")
 	}
 
-	workload, err := rt.GetWorkload(namespace, clusterName, component)
-	if err != nil {
-		t.Fatalf("get workload: %v", err)
-	}
-	instanceStatuses := workload.GetInstanceStatuses()
-	if len(instanceStatuses) != 1 || instanceStatuses[0].PodName != instanceName ||
-		instanceStatuses[0].TemplateName == nil || *instanceStatuses[0].TemplateName != "big" {
-		t.Fatalf("unexpected instance statuses: %#v", instanceStatuses)
-	}
-	instanceStatuses[0].PodName = "mutated"
-	if workload.GetInstanceStatuses()[0].PodName != instanceName {
-		t.Fatal("GetInstanceStatuses must return a deep copy")
-	}
-
 	instance, err := rt.GetInstance(namespace, clusterName, component, instanceName)
 	if err != nil {
 		t.Fatalf("get instance: %v", err)
@@ -211,68 +147,14 @@ func TestOpsRuntimeBuildsInstanceAPIView(t *testing.T) {
 	if instance.GetRole() != "leader" {
 		t.Fatalf("unexpected role: %s", instance.GetRole())
 	}
-	volume, ok := instance.GetVolume("data")
-	if !ok {
-		t.Fatalf("expected instance volume, got type=%T", instance)
-	}
-	if volume.GetClaimName() != "data-"+instanceName {
-		t.Fatalf("unexpected pvc name: %s", volume.GetClaimName())
-	}
-	requestedStorage := volume.GetRequestedStorage()
-	if requestedStorage.String() != "2Gi" {
-		t.Fatalf("unexpected requested storage: %s", requestedStorage.String())
-	}
-	capacity := volume.GetCapacity()
-	if capacity.String() != "2Gi" {
-		t.Fatalf("unexpected capacity: %s", capacity.String())
-	}
-	if !volume.IsBound() {
-		t.Fatalf("expected volume to be bound")
-	}
-	if volume.IsExpanding() {
-		t.Fatalf("did not expect volume to be expanding")
+	if !instance.HasPod() {
+		t.Fatal("expected Switchover pod")
 	}
 }
 
-func TestDefaultInstanceAndVolumeNilBranches(t *testing.T) {
-	instance := &defaultInstance{name: "missing"}
-	if instance.GetName() != "missing" {
-		t.Fatalf("unexpected instance name: %s", instance.GetName())
-	}
-	if instance.GetRole() != "" {
-		t.Fatalf("expected empty role")
-	}
-	if instance.IsFailedAndTimedOut() {
-		t.Fatalf("nil pod should not be failed and timed out")
-	}
-	volume := &instanceVolume{}
-	if volume.GetClaimName() != "" {
-		t.Fatalf("expected empty claim name")
-	}
-	requestedStorage := volume.GetRequestedStorage()
-	if !requestedStorage.IsZero() {
-		t.Fatalf("expected zero requested storage")
-	}
-	capacity := volume.GetCapacity()
-	if !capacity.IsZero() {
-		t.Fatalf("expected zero capacity")
-	}
-	if volume.IsBound() {
-		t.Fatalf("nil pvc should not be bound")
-	}
-	if volume.IsExpanding() {
-		t.Fatalf("nil pvc should not be expanding")
-	}
-
-	expanding := &instanceVolume{pvc: &corev1.PersistentVolumeClaim{
-		Status: corev1.PersistentVolumeClaimStatus{
-			Conditions: []corev1.PersistentVolumeClaimCondition{{
-				Type:   corev1.PersistentVolumeClaimResizing,
-				Status: corev1.ConditionTrue,
-			}},
-		},
-	}}
-	if !expanding.IsExpanding() {
-		t.Fatalf("expected resizing pvc to be expanding")
+func TestDefaultInstanceNilPod(t *testing.T) {
+	instance := &defaultInstance{}
+	if instance.HasPod() || instance.GetRole() != "" {
+		t.Fatal("nil pod must have no role or membership")
 	}
 }

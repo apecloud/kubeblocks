@@ -26,7 +26,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -93,41 +92,15 @@ func enabledMultiCluster(obj client.Object) bool {
 	return multicluster.Enabled4Object(obj)
 }
 
-func (r *opsRuntime) GetWorkload(namespace, clusterName, compName string) (Workload, error) {
-	itsName := constant.GenerateClusterComponentName(clusterName, compName)
-	its := &workloads.InstanceSet{}
-	if err := r.cli.Get(r.ctx, client.ObjectKey{Name: itsName, Namespace: namespace}, its); err != nil && !apierrors.IsNotFound(err) {
-		return nil, err
-	}
-	workload := &defaultWorkload{}
-	if its.Name != "" {
-		workload.instanceStatuses = make([]workloads.InstanceStatus, len(its.Status.InstanceStatus))
-		for i := range its.Status.InstanceStatus {
-			its.Status.InstanceStatus[i].DeepCopyInto(&workload.instanceStatuses[i])
-		}
-	}
-	return workload, nil
-}
-
 func (r *opsRuntime) GetInstance(namespace, clusterName, compName, instanceName string) (Instance, error) {
 	pod := &corev1.Pod{}
 	if err := r.cli.Get(r.dataContext(), client.ObjectKey{Name: instanceName, Namespace: namespace}, pod, r.dataGetOpts...); err != nil {
-		if apierrors.IsNotFound(err) {
-			pvcMap, loadErr := r.loadVolumes(namespace, clusterName, compName)
-			if loadErr != nil {
-				return nil, loadErr
-			}
-			instance := r.newPVCOnlyInstance(compName, instanceName, pvcMap)
-			if len(instance.volumes) > 0 {
-				return instance, nil
-			}
-		}
 		return nil, err
 	}
 	if pod.Labels[constant.AppInstanceLabelKey] != clusterName || pod.Labels[constant.KBAppComponentLabelKey] != compName {
 		return nil, intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" does not belong to component "%s"`, instanceName, compName))
 	}
-	return r.newPodInstance(compName, pod)
+	return &defaultInstance{pod: pod}, nil
 }
 
 func (r *opsRuntime) GenerateInstanceNameSet(clusterName, compName string, compReplicas int32, instances []appsv1.InstanceTemplate, offlineInstances []string) (map[string]string, error) {
@@ -182,72 +155,6 @@ func (r *opsRuntime) doSwitchover(ctx context.Context, cli client.Reader, synthe
 	return lfa.Switchover(ctx, cli, nil, candidateName)
 }
 
-func (r *opsRuntime) loadVolumes(namespace, clusterName, compName string) (map[string]*corev1.PersistentVolumeClaim, error) {
-	pvcList := &corev1.PersistentVolumeClaimList{}
-	opts := []client.ListOption{
-		client.InNamespace(namespace),
-		client.MatchingLabels{
-			constant.AppInstanceLabelKey:    clusterName,
-			constant.KBAppComponentLabelKey: compName,
-		},
-	}
-	opts = append(opts, r.dataListOpts...)
-	if err := r.cli.List(r.dataContext(), pvcList, opts...); err != nil {
-		return nil, err
-	}
-	pvcMap := make(map[string]*corev1.PersistentVolumeClaim, len(pvcList.Items))
-	for i := range pvcList.Items {
-		pvc := pvcList.Items[i]
-		pvcMap[pvc.Name] = pvc.DeepCopy()
-	}
-	return pvcMap, nil
-}
-
-func (r *opsRuntime) newPodInstance(compName string, pod *corev1.Pod) (Instance, error) {
-	pvcMap, err := r.loadVolumes(pod.Namespace, pod.Labels[constant.AppInstanceLabelKey], compName)
-	if err != nil {
-		return nil, err
-	}
-	return r.newPodInstanceWithVolumes(compName, pod, pvcMap)
-}
-
-func (r *opsRuntime) newPodInstanceWithVolumes(compName string, pod *corev1.Pod, pvcMap map[string]*corev1.PersistentVolumeClaim) (Instance, error) {
-	inst := &defaultInstance{
-		name:    pod.Name,
-		pod:     pod,
-		volumes: map[string]InstanceVolume{},
-	}
-	for _, volume := range pod.Spec.Volumes {
-		if volume.PersistentVolumeClaim == nil {
-			continue
-		}
-		pvc := pvcMap[volume.PersistentVolumeClaim.ClaimName]
-		if pvc == nil {
-			continue
-		}
-		inst.volumes[volume.Name] = &instanceVolume{pvc: pvc}
-	}
-	return inst, nil
-}
-
-func (r *opsRuntime) newPVCOnlyInstance(compName, instanceName string, pvcMap map[string]*corev1.PersistentVolumeClaim) *defaultInstance {
-	inst := &defaultInstance{
-		name:    instanceName,
-		volumes: map[string]InstanceVolume{},
-	}
-	for _, pvc := range pvcMap {
-		if !strings.HasSuffix(pvc.Name, "-"+instanceName) {
-			continue
-		}
-		volumeName := pvc.Labels[constant.VolumeClaimTemplateNameLabelKey]
-		if volumeName == "" {
-			volumeName = strings.TrimSuffix(pvc.Name, "-"+instanceName)
-		}
-		inst.volumes[volumeName] = &instanceVolume{pvc: pvc}
-	}
-	return inst
-}
-
 func (r *opsRuntime) dataContext() context.Context {
 	if !r.multiCluster {
 		return r.ctx
@@ -255,25 +162,9 @@ func (r *opsRuntime) dataContext() context.Context {
 	return r.dataCtx
 }
 
-type defaultWorkload struct {
-	instanceStatuses []workloads.InstanceStatus
-}
-
-func (w *defaultWorkload) GetInstanceStatuses() []workloads.InstanceStatus {
-	result := make([]workloads.InstanceStatus, len(w.instanceStatuses))
-	for i := range w.instanceStatuses {
-		w.instanceStatuses[i].DeepCopyInto(&result[i])
-	}
-	return result
-}
-
 type defaultInstance struct {
-	name    string
-	pod     *corev1.Pod
-	volumes map[string]InstanceVolume
+	pod *corev1.Pod
 }
-
-func (i *defaultInstance) GetName() string { return i.name }
 
 func (i *defaultInstance) HasPod() bool {
 	return i.pod != nil
@@ -284,60 +175,6 @@ func (i *defaultInstance) GetRole() string {
 		return ""
 	}
 	return i.pod.Labels[constant.RoleLabelKey]
-}
-
-func (i *defaultInstance) IsFailedAndTimedOut() bool {
-	if i.pod == nil {
-		return false
-	}
-	isFailed, isTimeout, _ := intctrlutil.IsPodFailedAndTimedOut(i.pod)
-	return isFailed && isTimeout
-}
-
-func (i *defaultInstance) GetVolume(name string) (InstanceVolume, bool) {
-	volume, ok := i.volumes[name]
-	return volume, ok
-}
-
-type instanceVolume struct {
-	pvc *corev1.PersistentVolumeClaim
-}
-
-func (v *instanceVolume) GetClaimName() string {
-	if v.pvc == nil {
-		return ""
-	}
-	return v.pvc.Name
-}
-
-func (v *instanceVolume) GetRequestedStorage() resource.Quantity {
-	if v.pvc == nil || v.pvc.Spec.Resources.Requests.Storage() == nil {
-		return resource.Quantity{}
-	}
-	return *v.pvc.Spec.Resources.Requests.Storage()
-}
-
-func (v *instanceVolume) GetCapacity() resource.Quantity {
-	if v.pvc == nil || v.pvc.Status.Capacity.Storage() == nil {
-		return resource.Quantity{}
-	}
-	return *v.pvc.Status.Capacity.Storage()
-}
-
-func (v *instanceVolume) IsBound() bool {
-	return v.pvc != nil && v.pvc.Status.Phase == corev1.ClaimBound
-}
-
-func (v *instanceVolume) IsExpanding() bool {
-	if v.pvc == nil {
-		return false
-	}
-	for _, condition := range v.pvc.Status.Conditions {
-		if condition.Type == corev1.PersistentVolumeClaimResizing || condition.Type == corev1.PersistentVolumeClaimFileSystemResizePending {
-			return true
-		}
-	}
-	return false
 }
 
 // Deprecated: should use instancetemplate.PodNameBuilder

@@ -68,9 +68,12 @@ func TestVerticalScalingDefaultAndEmptySelection(t *testing.T) {
 				comp.Replicas = 0
 			}
 			cluster := &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default"},
-				Spec:   appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{comp}},
-				Status: appsv1.ClusterStatus{Components: map[string]appsv1.ClusterComponentStatus{"db": {Phase: appsv1.RunningComponentPhase}}}}
-			its := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Name: "demo-db", Namespace: "default"}}
+				Spec: appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{comp}},
+				Status: appsv1.ClusterStatus{Components: map[string]appsv1.ClusterComponentStatus{"db": {
+					Phase: appsv1.RunningComponentPhase, UpToDate: true,
+				}}}}
+			its := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Name: "demo-db", Namespace: "default"},
+				Spec: workloads.InstanceSetSpec{Replicas: pointer.Int32(comp.Replicas)}}
 			ops := &opsv1alpha1.OpsRequest{ObjectMeta: metav1.ObjectMeta{Name: "scale", Namespace: "default"},
 				Spec: opsv1alpha1.OpsRequestSpec{Cancel: tc.cancel, SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{VerticalScalingList: []opsv1alpha1.VerticalScaling{vs}}},
 				Status: opsv1alpha1.OpsRequestStatus{Phase: opsv1alpha1.OpsRunningPhase, StartTimestamp: metav1.NewTime(time.Now().Add(-time.Minute)),
@@ -112,7 +115,7 @@ func TestVerticalScalingDefaultAndEmptySelection(t *testing.T) {
 					t.Fatalf("unexpected participant: %s", details[0].ObjectKey)
 				}
 			}
-			if !tc.zeroComponent {
+			if !tc.zeroComponent && !tc.zeroTemplate {
 				check(opsv1alpha1.OpsRunningPhase, "0/1", 0)
 			}
 			its.Status.InstanceStatus = []workloads.InstanceStatus{
@@ -120,7 +123,10 @@ func TestVerticalScalingDefaultAndEmptySelection(t *testing.T) {
 				{PodName: "demo-db-8", DesiredState: workloads.InstanceDesiredStateOffline},
 			}
 			if !tc.zeroComponent {
-				its.Status.InstanceStatus = append(its.Status.InstanceStatus, workloads.InstanceStatus{PodName: "demo-db-42", TemplateName: templateName(""), DesiredState: workloads.InstanceDesiredStateActive})
+				its.Status.InstanceStatus = append(its.Status.InstanceStatus, workloads.InstanceStatus{
+					PodName: "demo-db-42", TemplateName: templateName(""), DesiredState: workloads.InstanceDesiredStateActive,
+					CurrentState: workloads.InstanceCurrentStatePresent, UpToDate: true, Ready: true, Available: true,
+				})
 			}
 			if err := cli.Status().Update(ctx, its); err != nil {
 				t.Fatal(err)
@@ -130,15 +136,8 @@ func TestVerticalScalingDefaultAndEmptySelection(t *testing.T) {
 				return
 			}
 			if tc.cancel {
-				check(opsv1alpha1.OpsRunningPhase, "0/1", 1)
-				pod := &corev1.Pod{}
-				if err := cli.Get(ctx, client.ObjectKey{Name: "demo-db-42", Namespace: "default"}, pod); err != nil {
-					t.Fatal(err)
-				}
-				pod.Spec.Containers[0].Resources = original
-				if err := cli.Update(ctx, pod); err != nil {
-					t.Fatal(err)
-				}
+				check(opsv1alpha1.OpsSucceedPhase, "1/1", 1)
+				return
 			}
 			check(opsv1alpha1.OpsSucceedPhase, "1/1", 1)
 		})
@@ -243,8 +242,13 @@ func TestScalingUsesAssignedInstancesAndActualObjects(t *testing.T) {
 			cluster := &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default"},
 				Spec: appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{{Name: "db", ComponentDef: "database", Replicas: 3, FlatInstanceOrdinal: true,
 					Instances: []appsv1.InstanceTemplate{{Name: "large", Replicas: pointer.Int32(2), Resources: &resources}}}}},
-				Status: appsv1.ClusterStatus{Components: map[string]appsv1.ClusterComponentStatus{"db": {Phase: appsv1.RunningComponentPhase}}}}
+				Status: appsv1.ClusterStatus{Components: map[string]appsv1.ClusterComponentStatus{"db": {
+					Phase: appsv1.RunningComponentPhase, UpToDate: true,
+				}}}}
 			its := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Name: "demo-db", Namespace: "default"},
+				Spec: workloads.InstanceSetSpec{Replicas: pointer.Int32(3), Instances: []workloads.InstanceTemplate{{
+					Name: "large", Replicas: pointer.Int32(2),
+				}}},
 				Status: workloads.InstanceSetStatus{InstanceStatus: []workloads.InstanceStatus{
 					{PodName: "demo-db-7", TemplateName: templateName("large"), DesiredState: workloads.InstanceDesiredStateActive, CurrentState: workloads.InstanceCurrentStatePresent, UpToDate: true},
 					{PodName: "demo-db-42", TemplateName: templateName("large"), DesiredState: workloads.InstanceDesiredStateActive, CurrentState: workloads.InstanceCurrentStatePresent, UpToDate: true},
@@ -314,12 +318,14 @@ func TestScalingUsesAssignedInstancesAndActualObjects(t *testing.T) {
 			for i, name := range []string{"demo-db-7", "demo-db-42"} {
 				key := client.ObjectKey{Namespace: "default", Name: name}
 				if operation == "vertical" {
-					pod := &corev1.Pod{}
-					if err := cli.Get(ctx, key, pod); err != nil {
-						t.Fatal(err)
+					for j := range its.Status.InstanceStatus {
+						status := &its.Status.InstanceStatus[j]
+						if status.PodName == name {
+							status.Ready = true
+							status.Available = true
+						}
 					}
-					pod.Spec.Containers[0].Resources = resources
-					if err := cli.Update(ctx, pod); err != nil {
+					if err := cli.Status().Update(ctx, its); err != nil {
 						t.Fatal(err)
 					}
 				} else {

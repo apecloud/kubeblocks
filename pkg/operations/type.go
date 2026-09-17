@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -104,12 +103,9 @@ type progressResource struct {
 	clusterComponent *appsv1.ClusterComponentSpec
 	clusterDef       *appsv1.ClusterDefinition
 	componentDef     *appsv1.ComponentDefinition
-	// record which pods need to updated during this operation.
-	// key is podName, value is instance template name.
-	updatedPodSet map[string]string
-	createdPodSet map[string]string
-	deletedPodSet map[string]string
-	compOps       ComponentOpsInterface
+	createdPodSet    map[string]string
+	deletedPodSet    map[string]string
+	compOps          ComponentOpsInterface
 	// checks if it needs to wait the component to complete.
 	// if only updates a part of pods, set it to false.
 	noWaitComponentCompleted bool
@@ -124,15 +120,12 @@ type progressResource struct {
 // - Custom, which still depends on direct Pod/Job/ConfigMap/Secret based execution
 type OpsRuntime interface {
 	GetWorkload(namespace, clusterName, compName string) (Workload, error)
-	GetInstanceSet(namespace, clusterName, compName string) (*workloads.InstanceSet, error)
 	GetInstance(namespace, clusterName, compName, instanceName string) (Instance, error)
-	ListInstances(namespace, clusterName, compName string) ([]Instance, error)
 	GenerateInstanceNameSet(clusterName, compName string, compReplicas int32, instances []appsv1.InstanceTemplate, offlineInstances []string) (map[string]string, error)
 	Switchover(ctx context.Context, synthesizedComp *component.SynthesizedComponent, instanceName, candidateName string) error
 }
 
 type Workload interface {
-	GetMinReadySeconds() int32
 	GetInstanceStatuses() []workloads.InstanceStatus
 	GetInstanceNameSet() sets.Set[string]
 	GetCurrentRevisionMap() map[string]string
@@ -143,14 +136,9 @@ type Workload interface {
 
 type Instance interface {
 	GetName() string
-	GetComponentName() string
-	GetCreationTimestamp() metav1.Time
 	HasPod() bool
-	IsDeleting() bool
 	GetRole() string
-	IsAvailable(minReadySeconds int32, roleAware bool) bool
 	IsFailedAndTimedOut() bool
-	GetResources(containerName string) corev1.ResourceRequirements
 	GetVolume(name string) (InstanceVolume, bool)
 }
 

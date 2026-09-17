@@ -111,7 +111,6 @@ func (r *opsRuntime) GetWorkload(namespace, clusterName, compName string) (Workl
 	}
 	if its.Name != "" {
 		currRevisionMap, _ := instanceset.GetRevisions(its.Status.CurrentRevisions)
-		workload.minReadySeconds = its.Spec.MinReadySeconds
 		workload.currentRevisionMap = currRevisionMap
 		workload.instanceNames = sets.KeySet(currRevisionMap)
 		workload.notReadySet = instanceset.GetPodNameSetFromInstanceSetCondition(its, workloads.InstanceReady)
@@ -152,18 +151,6 @@ func (r *opsRuntime) GetWorkload(namespace, clusterName, compName string) (Workl
 	return workload, nil
 }
 
-func (r *opsRuntime) GetInstanceSet(namespace, clusterName, compName string) (*workloads.InstanceSet, error) {
-	its := &workloads.InstanceSet{}
-	key := client.ObjectKey{
-		Namespace: namespace,
-		Name:      constant.GenerateClusterComponentName(clusterName, compName),
-	}
-	if err := r.cli.Get(r.ctx, key, its); err != nil {
-		return nil, client.IgnoreNotFound(err)
-	}
-	return its, nil
-}
-
 func (r *opsRuntime) GetInstance(namespace, clusterName, compName, instanceName string) (Instance, error) {
 	pod := &corev1.Pod{}
 	if err := r.cli.Get(r.dataContext(), client.ObjectKey{Name: instanceName, Namespace: namespace}, pod, r.dataGetOpts...); err != nil {
@@ -183,14 +170,6 @@ func (r *opsRuntime) GetInstance(namespace, clusterName, compName, instanceName 
 		return nil, intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" does not belong to component "%s"`, instanceName, compName))
 	}
 	return r.newPodInstance(compName, pod)
-}
-
-func (r *opsRuntime) ListInstances(namespace, clusterName, compName string) ([]Instance, error) {
-	pods, err := component.ListOwnedPods(r.dataContext(), r.cli, namespace, clusterName, compName, r.dataListOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return r.buildInstances(namespace, clusterName, compName, pods)
 }
 
 func (r *opsRuntime) GenerateInstanceNameSet(clusterName, compName string, compReplicas int32, instances []appsv1.InstanceTemplate, offlineInstances []string) (map[string]string, error) {
@@ -292,10 +271,9 @@ func (r *opsRuntime) newPodInstance(compName string, pod *corev1.Pod) (Instance,
 
 func (r *opsRuntime) newPodInstanceWithVolumes(compName string, pod *corev1.Pod, pvcMap map[string]*corev1.PersistentVolumeClaim) (Instance, error) {
 	inst := &defaultInstance{
-		name:          pod.Name,
-		componentName: compName,
-		pod:           pod,
-		volumes:       map[string]InstanceVolume{},
+		name:    pod.Name,
+		pod:     pod,
+		volumes: map[string]InstanceVolume{},
 	}
 	for _, volume := range pod.Spec.Volumes {
 		if volume.PersistentVolumeClaim == nil {
@@ -312,9 +290,8 @@ func (r *opsRuntime) newPodInstanceWithVolumes(compName string, pod *corev1.Pod,
 
 func (r *opsRuntime) newPVCOnlyInstance(compName, instanceName string, pvcMap map[string]*corev1.PersistentVolumeClaim) *defaultInstance {
 	inst := &defaultInstance{
-		name:          instanceName,
-		componentName: compName,
-		volumes:       map[string]InstanceVolume{},
+		name:    instanceName,
+		volumes: map[string]InstanceVolume{},
 	}
 	for _, pvc := range pvcMap {
 		if !strings.HasSuffix(pvc.Name, "-"+instanceName) {
@@ -337,7 +314,6 @@ func (r *opsRuntime) dataContext() context.Context {
 }
 
 type defaultWorkload struct {
-	minReadySeconds    int32
 	instanceStatuses   []workloads.InstanceStatus
 	currentRevisionMap map[string]string
 	notReadySet        sets.Set[string]
@@ -345,8 +321,6 @@ type defaultWorkload struct {
 	failedSet          sets.Set[string]
 	instanceNames      sets.Set[string]
 }
-
-func (w *defaultWorkload) GetMinReadySeconds() int32 { return w.minReadySeconds }
 
 func (w *defaultWorkload) GetInstanceStatuses() []workloads.InstanceStatus {
 	result := make([]workloads.InstanceStatus, len(w.instanceStatuses))
@@ -373,29 +347,15 @@ func (w *defaultWorkload) GetInstanceNameSet() sets.Set[string] {
 }
 
 type defaultInstance struct {
-	name          string
-	componentName string
-	pod           *corev1.Pod
-	volumes       map[string]InstanceVolume
+	name    string
+	pod     *corev1.Pod
+	volumes map[string]InstanceVolume
 }
-
-func (i *defaultInstance) GetComponentName() string { return i.componentName }
 
 func (i *defaultInstance) GetName() string { return i.name }
 
-func (i *defaultInstance) GetCreationTimestamp() metav1.Time {
-	if i.pod == nil {
-		return metav1.Time{}
-	}
-	return i.pod.CreationTimestamp
-}
-
 func (i *defaultInstance) HasPod() bool {
 	return i.pod != nil
-}
-
-func (i *defaultInstance) IsDeleting() bool {
-	return i.pod != nil && !i.pod.DeletionTimestamp.IsZero()
 }
 
 func (i *defaultInstance) GetRole() string {
@@ -403,16 +363,6 @@ func (i *defaultInstance) GetRole() string {
 		return ""
 	}
 	return i.pod.Labels[constant.RoleLabelKey]
-}
-
-func (i *defaultInstance) IsAvailable(minReadySeconds int32, roleAware bool) bool {
-	if i.pod == nil || i.IsDeleting() {
-		return false
-	}
-	if roleAware {
-		return intctrlutil.PodIsReadyWithLabel(*i.pod)
-	}
-	return podutils.IsPodAvailable(i.pod, minReadySeconds, metav1.Now())
 }
 
 func (i *defaultInstance) IsFailedAndTimedOut() bool {
@@ -423,34 +373,9 @@ func (i *defaultInstance) IsFailedAndTimedOut() bool {
 	return isFailed && isTimeout
 }
 
-func (i *defaultInstance) GetResources(containerName string) corev1.ResourceRequirements {
-	container := i.getContainer(containerName)
-	if container == nil {
-		return corev1.ResourceRequirements{}
-	}
-	return container.Resources
-}
-
 func (i *defaultInstance) GetVolume(name string) (InstanceVolume, bool) {
 	volume, ok := i.volumes[name]
 	return volume, ok
-}
-
-func (i *defaultInstance) getContainer(containerName string) *corev1.Container {
-	if i.pod == nil {
-		return nil
-	}
-	if containerName != "" {
-		for idx := range i.pod.Spec.Containers {
-			if i.pod.Spec.Containers[idx].Name == containerName {
-				return &i.pod.Spec.Containers[idx]
-			}
-		}
-	}
-	if len(i.pod.Spec.Containers) == 0 {
-		return nil
-	}
-	return &i.pod.Spec.Containers[0]
 }
 
 type instanceVolume struct {

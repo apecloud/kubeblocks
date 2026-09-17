@@ -1566,7 +1566,7 @@ Kubernetes core/v1.ResourceRequirements
 </tr>
 <tr>
 <td>
-<code>instances</code><br/>
+<code>instanceTemplates</code><br/>
 <em>
 <a href="cluster.md#apps.kubeblocks.io/v1.InstanceTemplate">
 []github.com/apecloud/kubeblocks/apis/apps/v1.InstanceTemplate
@@ -1575,7 +1575,21 @@ Kubernetes core/v1.ResourceRequirements
 </td>
 <td>
 <em>(Optional)</em>
-<p>Records the InstanceTemplate list of the Component prior to any changes.</p>
+<p>Records the component&rsquo;s instance template definitions before the operation.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>instances</code><br/>
+<em>
+<a href="#operations.kubeblocks.io/v1alpha1.LastInstanceConfiguration">
+[]LastInstanceConfiguration
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Records instances explicitly requested online or offline before the operation.</p>
 </td>
 </tr>
 <tr>
@@ -1643,6 +1657,47 @@ map[string]github.com/apecloud/kubeblocks/apis/operations/v1alpha1.LastComponent
 <td>
 <em>(Optional)</em>
 <p>Records the configuration of each Component prior to any changes.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="operations.kubeblocks.io/v1alpha1.LastInstanceConfiguration">LastInstanceConfiguration
+</h3>
+<p>
+(<em>Appears on:</em><a href="#operations.kubeblocks.io/v1alpha1.LastComponentConfiguration">LastComponentConfiguration</a>)
+</p>
+<div>
+<p>LastInstanceConfiguration records an instance before an operation.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Name identifies the instance.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>templateName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>TemplateName identifies its instance template. An empty name denotes the default template.</p>
 </td>
 </tr>
 </tbody>

@@ -142,7 +142,7 @@ func (hs horizontalScalingOpsHandler) restoreDataFromBackup(reqCtx intctrlutil.R
 		// Preserve which instances the existing cancellation path restores.
 		createdPodSet = deletedPodSet
 		targetCompSpec.Replicas = *lastCompConfiguration.Replicas
-		targetCompSpec.Instances = lastCompConfiguration.Instances
+		targetCompSpec.Instances = lastCompConfiguration.InstanceTemplates
 		targetCompSpec.OfflineInstances = lastCompConfiguration.OfflineInstances
 	}
 	comp, compDef, err := intctrlcomp.GetCompNCompDefByName(reqCtx.Ctx, cli, opsRes.Cluster.Namespace, constant.GenerateClusterComponentName(opsRes.Cluster.Name, fullComponentName))
@@ -223,7 +223,7 @@ func (hs horizontalScalingOpsHandler) getBackupReplicaScalingChanges(opsRes *Ops
 	fullCompName string) (map[string]string, map[string]string, error) {
 	clusterName := opsRes.Cluster.Name
 	lastPodSet, err := generateBackupInstanceNames(clusterName, fullCompName,
-		*lastCompConfiguration.Replicas, lastCompConfiguration.Instances, lastCompConfiguration.OfflineInstances)
+		*lastCompConfiguration.Replicas, lastCompConfiguration.InstanceTemplates, lastCompConfiguration.OfflineInstances)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -256,7 +256,7 @@ func (hs horizontalScalingOpsHandler) getBackupExpectedCompValues(
 	lastCompConfiguration opsv1alpha1.LastComponentConfiguration,
 	horizontalScaling opsv1alpha1.HorizontalScaling) (int32, []appsv1.InstanceTemplate, []string, error) {
 	compReplicas := *lastCompConfiguration.Replicas
-	compInstanceTpls := slices.Clone(lastCompConfiguration.Instances)
+	compInstanceTpls := slices.Clone(lastCompConfiguration.InstanceTemplates)
 	compOfflineInstances := lastCompConfiguration.OfflineInstances
 	filteredHorizontal := horizontalScaling.DeepCopy()
 	podSet, err := generateBackupInstanceNames(opsRes.Cluster.Name, horizontalScaling.ComponentName,
@@ -356,7 +356,7 @@ func (hs horizontalScalingOpsHandler) validateBackupOnlineInstancesToOffline(
 		return intctrlutil.NewFatalError("instances specified in onlineInstancesToOffline has duplicates")
 	}
 	currPodSet, err := generateBackupInstanceNames(opsRes.Cluster.Name, componentName,
-		*lastCompConfiguration.Replicas, lastCompConfiguration.Instances, lastCompConfiguration.OfflineInstances)
+		*lastCompConfiguration.Replicas, lastCompConfiguration.InstanceTemplates, lastCompConfiguration.OfflineInstances)
 	if err != nil {
 		return err
 	}
@@ -386,4 +386,19 @@ func generateBackupInstanceNames(clusterName, componentName string, replicas int
 		result[name] = appsv1.GetInstanceTemplateName(clusterName, componentName, name)
 	}
 	return result, nil
+}
+
+func countPlannedOnlineInstances(offlineInsMap map[string][]string, podSet map[string]string) map[string]int32 {
+	onlineInsCountMap := map[string]int32{}
+	for insTplName, insNames := range offlineInsMap {
+		for _, insName := range insNames {
+			// Count the leading requested names present in the plan, stopping at
+			// the first missing name in each template. This does not check readiness.
+			if _, ok := podSet[insName]; !ok {
+				break
+			}
+			onlineInsCountMap[insTplName]++
+		}
+	}
+	return onlineInsCountMap
 }

@@ -62,7 +62,7 @@ func TestVerticalScalingDefaultAndEmptySelection(t *testing.T) {
 				comp.Instances = []appsv1.InstanceTemplate{{Name: "unused", Replicas: pointer.Int32(0), Resources: &target}}
 				vs.ResourceRequirements = corev1.ResourceRequirements{}
 				vs.Instances = []opsv1alpha1.InstanceResourceTemplate{{Name: "unused", ResourceRequirements: target}}
-				last.Instances = []appsv1.InstanceTemplate{{Name: "unused", Resources: &original}}
+				last.InstanceTemplates = []appsv1.InstanceTemplate{{Name: "unused", Resources: &original}}
 			}
 			if tc.zeroComponent {
 				comp.Replicas = 0

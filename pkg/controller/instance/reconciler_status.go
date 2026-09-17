@@ -109,7 +109,11 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		meta.RemoveStatusCondition(&inst.Status.Conditions, string(workloads.InstanceFailure))
 	}
 
-	inst.Status.UpToDate = updated && !r.hasPendingVolumeExpansion(tree, inst)
+	pending, observed := r.hasPendingVolumeExpansion(tree, inst)
+	if observed {
+		inst.Status.UpToDate = !pending
+	}
+	inst.Status.UpToDate = updated && inst.Status.UpToDate
 	inst.Status.Ready = ready
 	inst.Status.Available = available
 	inst.Status.Role = r.observedRoleOfPod(inst, pod)
@@ -308,8 +312,9 @@ func (r *statusReconciler) hasRunningVolumeExpansion(tree *kubebuilderx.ObjectTr
 	return false
 }
 
-func (r *statusReconciler) hasPendingVolumeExpansion(tree *kubebuilderx.ObjectTree, inst *workloads.Instance) bool {
+func (r *statusReconciler) hasPendingVolumeExpansion(tree *kubebuilderx.ObjectTree, inst *workloads.Instance) (pending, observed bool) {
 	pvcsByName := r.persistentVolumeClaimsByName(tree)
+	observed = true
 	for _, vct := range inst.Spec.VolumeClaimTemplates {
 		desired, desiredOK := vct.Spec.Resources.Requests[corev1.ResourceStorage]
 		if !desiredOK || desired.IsZero() {
@@ -318,14 +323,19 @@ func (r *statusReconciler) hasPendingVolumeExpansion(tree *kubebuilderx.ObjectTr
 		pvcName := intctrlutil.ComposePVCName(corev1.PersistentVolumeClaim{ObjectMeta: vct.ObjectMeta}, inst.Spec.InstanceSetName, inst.Name)
 		pvc := pvcsByName[pvcName]
 		if pvc == nil {
+			observed = false
 			continue
 		}
 		capacity, capacityOK := pvc.Status.Capacity[corev1.ResourceStorage]
-		if capacityOK && capacity.Cmp(desired) < 0 {
-			return true
+		if !capacityOK {
+			observed = false
+			continue
+		}
+		if capacity.Cmp(desired) < 0 {
+			return true, true
 		}
 	}
-	return false
+	return false, observed
 }
 
 func (r *statusReconciler) persistentVolumeClaimsByName(tree *kubebuilderx.ObjectTree) map[string]*corev1.PersistentVolumeClaim {

@@ -21,6 +21,7 @@ package instanceset
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
@@ -675,6 +676,64 @@ func TestLegacyInstanceStatusTracksConfigAndPVCConvergence(t *testing.T) {
 		if !status.UpToDate || status.VolumeExpansion {
 			t.Fatalf("completed expansion did not converge: %#v", status)
 		}
+		for _, missing := range []string{"PVC", "capacity"} {
+			for _, previous := range []bool{false, true} {
+				t.Run(fmt.Sprintf("missing %s preserves %t", missing, previous), func(t *testing.T) {
+					desired := its.Spec.Instances[0].VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage]
+					capacity := desired.DeepCopy()
+					if !previous {
+						capacity.Sub(resource.MustParse("1Gi"))
+					}
+					pvc.Status.Capacity = corev1.ResourceList{corev1.ResourceStorage: capacity}
+					if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+						t.Fatal(err)
+					}
+					if its.FindInstanceStatus("demo-0").UpToDate != previous {
+						t.Fatalf("initial UpToDate = %t, want %t", its.FindInstanceStatus("demo-0").UpToDate, previous)
+					}
+
+					if missing == "PVC" {
+						if err := tree.Delete(pvc); err != nil {
+							t.Fatal(err)
+						}
+					} else {
+						pvc.Status.Capacity = nil
+					}
+					if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+						t.Fatal(err)
+					}
+					if its.FindInstanceStatus("demo-0").UpToDate != previous {
+						t.Errorf("missing %s changed UpToDate from %t to %t", missing, previous, its.FindInstanceStatus("demo-0").UpToDate)
+					}
+
+					its.Generation++
+					desired.Add(resource.MustParse("1Gi"))
+					its.Spec.Instances[0].VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = desired
+					if _, err := NewRevisionUpdateReconciler().Reconcile(tree); err != nil {
+						t.Fatal(err)
+					}
+					if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+						t.Fatal(err)
+					}
+					if its.FindInstanceStatus("demo-0").UpToDate {
+						t.Error("the previous result must not confirm a new capacity target")
+					}
+
+					pvc.Spec.Resources.Requests[corev1.ResourceStorage] = desired
+					pvc.Status.Capacity = corev1.ResourceList{corev1.ResourceStorage: desired}
+					if err := tree.Add(pvc); err != nil {
+						t.Fatal(err)
+					}
+					if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+						t.Fatal(err)
+					}
+					if !its.FindInstanceStatus("demo-0").UpToDate {
+						t.Error("observing the new capacity must restore convergence")
+					}
+				})
+			}
+		}
+
 	})
 }
 

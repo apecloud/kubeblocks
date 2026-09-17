@@ -138,16 +138,6 @@ func (c componentOpsHelper) cancelComponentOps(ctx context.Context,
 	return cli.Update(ctx, opsRes.Cluster)
 }
 
-func componentStatusFailureCount(compStatus opsv1alpha1.OpsRequestComponentStatus) int32 {
-	var count int32
-	for _, v := range compStatus.ProgressDetails {
-		if v.Status == opsv1alpha1.FailedProgressStatus {
-			count++
-		}
-	}
-	return count
-}
-
 func (c componentOpsHelper) getComponentOps(componentName string) (ComponentOpsInterface, bool) {
 	if len(c.componentOpsSet) == 0 {
 		return opsv1alpha1.ComponentOps{ComponentName: componentName}, true
@@ -156,84 +146,18 @@ func (c componentOpsHelper) getComponentOps(componentName string) (ComponentOpsI
 	return compOps, ok
 }
 
-func (c componentOpsHelper) isHScaleShards(opsRequest *opsv1alpha1.OpsRequest, compOps ComponentOpsInterface) bool {
-	if opsRequest.Spec.Type != opsv1alpha1.HorizontalScalingType {
-		return false
-	}
-	return compOps.(opsv1alpha1.HorizontalScaling).Shards != nil
-}
-
-func (c componentOpsHelper) buildProgressResources(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	opsRes *OpsResource,
-	clusterDef *appsv1.ClusterDefinition,
-	opsMessageKey string) ([]progressResource, error) {
-	var progressResources []progressResource
-	setProgressResource := func(compSpec *appsv1.ClusterComponentSpec, compOps ComponentOpsInterface,
-		fullComponentName string, shards *int32) error {
-		var componentDefinition *appsv1.ComponentDefinition
-		if compSpec.ComponentDef != "" {
-			componentDefinition = &appsv1.ComponentDefinition{}
-			if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: compSpec.ComponentDef}, componentDefinition); err != nil {
-				return err
-			}
-		}
-		progressResources = append(progressResources, progressResource{
-			opsMessageKey:     opsMessageKey,
-			clusterComponent:  compSpec,
-			clusterDef:        clusterDef,
-			componentDef:      componentDefinition,
-			compOps:           compOps,
-			fullComponentName: fullComponentName,
-			shards:            shards,
-		})
-		return nil
-	}
-	// 1. handle the component status
-	for i := range opsRes.Cluster.Spec.ComponentSpecs {
-		compSpec := &opsRes.Cluster.Spec.ComponentSpecs[i]
-		compOps, ok := c.getComponentOps(compSpec.Name)
-		if !ok {
-			continue
-		}
-		if err := setProgressResource(compSpec, compOps, compSpec.Name, nil); err != nil {
-			return nil, err
-		}
-	}
-
-	// 2. handle the sharding status.
-	for i := range opsRes.Cluster.Spec.Shardings {
-		spec := opsRes.Cluster.Spec.Shardings[i]
-		compOps, ok := c.getComponentOps(spec.Name)
-		if !ok {
-			continue
-		}
-		if c.isHScaleShards(opsRes.OpsRequest, compOps) {
-			if err := setProgressResource(&spec.Template, compOps, "", &spec.Shards); err != nil {
-				return nil, err
-			}
-			continue
-		}
-		// handle the progress of the components of the sharding.
-		shardingComps, err := sharding.ListShardingComponents(reqCtx.Ctx, cli, opsRes.Cluster, spec.Name)
-		if err != nil {
-			return nil, err
-		}
-		for j := range shardingComps {
-			if err = setProgressResource(&spec.Template, compOps,
-				shardingComps[j].Labels[constant.KBAppComponentLabelKey], &spec.Shards); err != nil {
-				return nil, err
-			}
-		}
-	}
-	return progressResources, nil
+type instanceProgressResource struct {
+	opsMessageKey     string
+	fullComponentName string
+	clusterComponent  *appsv1.ClusterComponentSpec
+	compOps           ComponentOpsInterface
 }
 
 func (c componentOpsHelper) buildInstanceProgressResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
-	opsRes *OpsResource, opsMessageKey string) ([]progressResource, error) {
-	var progressResources []progressResource
+	opsRes *OpsResource, opsMessageKey string) ([]instanceProgressResource, error) {
+	var instanceProgressResources []instanceProgressResource
 	setProgressResource := func(compSpec *appsv1.ClusterComponentSpec, compOps ComponentOpsInterface, fullComponentName string) {
-		progressResources = append(progressResources, progressResource{
+		instanceProgressResources = append(instanceProgressResources, instanceProgressResource{
 			opsMessageKey:     opsMessageKey,
 			clusterComponent:  compSpec,
 			compOps:           compOps,
@@ -262,7 +186,7 @@ func (c componentOpsHelper) buildInstanceProgressResources(reqCtx intctrlutil.Re
 				components[j].Labels[constant.KBAppComponentLabelKey])
 		}
 	}
-	return progressResources, nil
+	return instanceProgressResources, nil
 }
 
 type instanceProgress struct {
@@ -283,7 +207,7 @@ func (c componentOpsHelper) reconcileRunningAction(reqCtx intctrlutil.RequestCtx
 	if opsRequest.Status.Components == nil {
 		opsRequest.Status.Components = map[string]opsv1alpha1.OpsRequestComponentStatus{}
 	}
-	progressResources, err := c.buildInstanceProgressResources(reqCtx, cli, opsRes, opsMessageKey)
+	instanceProgressResources, err := c.buildInstanceProgressResources(reqCtx, cli, opsRes, opsMessageKey)
 	if err != nil {
 		return opsv1alpha1.OpsRunningPhase, 0, err
 	}
@@ -291,8 +215,8 @@ func (c componentOpsHelper) reconcileRunningAction(reqCtx intctrlutil.RequestCtx
 	componentCounts := map[string]int32{}
 	observationsComplete := true
 	var expectedCount, completedCount, succeededCount int32
-	for i := range progressResources {
-		pgResource := &progressResources[i]
+	for i := range instanceProgressResources {
+		pgResource := &instanceProgressResources[i]
 		componentName := pgResource.compOps.GetComponentName()
 		componentCounts[componentName]++
 		its := &workloads.InstanceSet{}

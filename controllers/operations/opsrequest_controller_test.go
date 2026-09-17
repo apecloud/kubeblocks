@@ -711,7 +711,7 @@ var _ = Describe("OpsRequest Controller", func() {
 				testk8s.MockInstanceSetReady(its, mockPods...)
 				for i := range its.Status.InstanceStatus {
 					status := &its.Status.InstanceStatus[i]
-					status.TemplateName = pointer.String("")
+					status.TemplateName = ptr.To("")
 					status.DesiredState = workloads.InstanceDesiredStateActive
 					status.CurrentState = workloads.InstanceCurrentStatePresent
 					status.UpToDate = true
@@ -971,7 +971,7 @@ var _ = Describe("OpsRequest Controller", func() {
 				testk8s.MockInstanceSetReady(its, testapps.MockInstanceSetPods(&testCtx, its, clusterObj, mysqlCompName)...)
 				for i := range its.Status.InstanceStatus {
 					status := &its.Status.InstanceStatus[i]
-					status.TemplateName = pointer.String("")
+					status.TemplateName = ptr.To("")
 					status.DesiredState = workloads.InstanceDesiredStateActive
 					status.CurrentState = workloads.InstanceCurrentStatePresent
 					status.UpToDate, status.Ready, status.Available = true, true, true

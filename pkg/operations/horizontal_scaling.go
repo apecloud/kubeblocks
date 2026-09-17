@@ -34,8 +34,11 @@ import (
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/sharding"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
+
+const horizontalScalingFailedReason = "HorizontalScalingFailed"
 
 type horizontalScalingOpsHandler struct{}
 
@@ -140,100 +143,37 @@ func (hs horizontalScalingOpsHandler) ReconcileAction(reqCtx intctrlutil.Request
 		opsRequest.Status.Components = map[string]opsv1alpha1.OpsRequestComponentStatus{}
 	}
 	helper := newComponentOpsHelper(opsRequest.Spec.HorizontalScalingList)
-	resources, err := helper.buildProgressResources(reqCtx, cli, opsRes, nil, "horizontal scale")
-	if err != nil {
-		return opsv1alpha1.OpsRunningPhase, 0, err
-	}
 	current := helper.emptyInstanceProgress(opsRes)
-	observedTargets := sets.New[string]()
-	observedShards := map[string]int32{}
 	complete, failed := true, false
 	var expected, completed int32
-	for i := range resources {
-		resource := &resources[i]
-		target := resource.compOps.(opsv1alpha1.HorizontalScaling)
-		name := target.ComponentName
-		observedTargets.Insert(name)
-		status := opsRequest.Status.Components[name]
-		if target.Shards != nil {
-			// Shard-count progress follows the current component lifecycle.
-			count, done, err := handleComponentProgressForScalingShards(reqCtx, cli, opsRes, resource, &status)
-			if err != nil {
+	var failureErr error
+	for _, target := range opsRequest.Spec.HorizontalScalingList {
+		phase, progress, err := hs.reconcileScalingTarget(reqCtx, cli, opsRes, target)
+		if err != nil {
+			if !intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal) {
 				return opsv1alpha1.OpsRunningPhase, 0, err
 			}
-			expected += count
-			completed += done
-			complete = complete && count == done
-			failed = failed || componentStatusFailureCount(status) > 0
-			status.Phase = opsRes.Cluster.Status.Shardings[name].Phase
-			current[name] = append(current[name], status.ProgressDetails...)
-			opsRequest.Status.Components[name] = status
-			continue
-		}
-		if resource.shards != nil {
-			observedShards[name]++
-		}
-		if isBackupScaling(target) {
-			last := opsRequest.Status.LastConfiguration.Components[name]
-			if err := hs.restoreDataFromBackup(reqCtx, cli, opsRes, resource.fullComponentName,
-				resource.clusterComponent.DeepCopy(), target, last, &status); err != nil {
-				return opsv1alpha1.OpsRunningPhase, 0, err
-			}
-			opsRequest.Status.Components[name] = status
-			if status.Message != "Restore Data Completed" {
-				// The current topology still describes the pre-restore workload.
-				progress, err := hs.observeBackupPreparation(reqCtx, cli, opsRes, name)
-				if err != nil {
-					return opsv1alpha1.OpsRunningPhase, 0, err
-				}
-				expected += progress.expectedCount
-				completed += progress.completedCount
-				current[name] = append(current[name], progress.details...)
-				complete = false
-				continue
+			phase = opsv1alpha1.OpsFailedPhase
+			status := opsRequest.Status.Components[target.ComponentName]
+			status.Message = err.Error()
+			opsRequest.Status.Components[target.ComponentName] = status
+			if failureErr == nil {
+				failureErr = err
 			}
 		}
-		resultHelper := newComponentOpsHelper([]opsv1alpha1.HorizontalScaling{target})
-		phase := resultHelper.componentActionPhase(opsRes, appsv1.RunningComponentPhase)
-		failed = failed || phase == opsv1alpha1.OpsFailedPhase
-		its := &workloads.InstanceSet{}
-		key := client.ObjectKey{Namespace: opsRes.Cluster.Namespace,
-			Name: constant.GenerateClusterComponentName(opsRes.Cluster.Name, resource.fullComponentName)}
-		if err := cli.Get(reqCtx.Ctx, key, its); err != nil {
-			if !apierrors.IsNotFound(err) {
-				return opsv1alpha1.OpsRunningPhase, 0, err
+		if phase == opsv1alpha1.OpsFailedPhase {
+			status := opsRequest.Status.Components[target.ComponentName]
+			status.Reason = horizontalScalingFailedReason
+			if err == nil {
+				status.Message = fmt.Sprintf("Component %s failed while reconciling horizontal scaling", target.ComponentName)
 			}
-			expected += resource.clusterComponent.Replicas
-			complete = complete && phase == opsv1alpha1.OpsFailedPhase
-			continue
+			opsRequest.Status.Components[target.ComponentName] = status
 		}
-		progress := handleReplicaScalingProgress(opsRes, resource, its)
 		expected += progress.expectedCount
 		completed += progress.completedCount
-		current[name] = append(current[name], progress.details...)
-		complete = complete && phase != opsv1alpha1.OpsRunningPhase &&
-			(phase == opsv1alpha1.OpsFailedPhase || progress.observationsComplete &&
-				progress.succeededCount == progress.expectedCount)
-	}
-	for _, target := range opsRequest.Spec.HorizontalScalingList {
-		sharding := opsRes.Cluster.Spec.GetShardingByName(target.ComponentName)
-		if target.Shards == nil && sharding != nil && observedShards[target.ComponentName] != sharding.Shards {
-			complete = false
-		}
-		if observedTargets.Has(target.ComponentName) || isBackupScaling(target) {
-			continue
-		}
-		if sharding == nil || sharding.Shards != 0 {
-			continue
-		}
-		observedTargets.Insert(target.ComponentName)
-		resultHelper := newComponentOpsHelper([]opsv1alpha1.HorizontalScaling{target})
-		phase := resultHelper.componentActionPhase(opsRes, appsv1.RunningComponentPhase)
+		current[target.ComponentName] = progress.details
 		complete = complete && phase != opsv1alpha1.OpsRunningPhase
 		failed = failed || phase == opsv1alpha1.OpsFailedPhase
-	}
-	if len(observedTargets) != len(helper.componentOpsSet) {
-		complete = false
 	}
 	if err := patchCurrentProgress(reqCtx, cli, opsRes, oldOpsRequest, current, completed, expected); err != nil {
 		return opsv1alpha1.OpsRunningPhase, 0, err
@@ -242,9 +182,127 @@ func (hs horizontalScalingOpsHandler) ReconcileAction(reqCtx intctrlutil.Request
 		return opsv1alpha1.OpsRunningPhase, time.Second, nil
 	}
 	if failed {
-		return opsv1alpha1.OpsFailedPhase, 0, nil
+		return opsv1alpha1.OpsFailedPhase, 0, failureErr
 	}
 	return opsv1alpha1.OpsSucceedPhase, 0, nil
+}
+
+func (hs horizontalScalingOpsHandler) reconcileScalingTarget(reqCtx intctrlutil.RequestCtx, cli client.Client,
+	opsRes *OpsResource, target opsv1alpha1.HorizontalScaling) (opsv1alpha1.OpsPhase, instanceProgress, error) {
+	status := opsRes.OpsRequest.Status.Components[target.ComponentName]
+	if status.Reason == horizontalScalingFailedReason {
+		return opsv1alpha1.OpsFailedPhase, instanceProgress{}, intctrlutil.NewFatalError(status.Message)
+	}
+	helper := newComponentOpsHelper([]opsv1alpha1.HorizontalScaling{target})
+	var progress instanceProgress
+	var err error
+	if target.Shards != nil {
+		progress, err = hs.observeShardScaling(reqCtx, cli, opsRes, target)
+	} else {
+		progress, err = hs.observeReplicaScaling(reqCtx, cli, opsRes, helper, target)
+	}
+	if err != nil {
+		return opsv1alpha1.OpsRunningPhase, progress, err
+	}
+	if isBackupScaling(target) && opsRes.OpsRequest.Status.Components[target.ComponentName].Message != "Restore Data Completed" {
+		return opsv1alpha1.OpsRunningPhase, progress, nil
+	}
+	phase := helper.componentActionPhase(opsRes, appsv1.RunningComponentPhase)
+	if target.Shards != nil {
+		spec := opsRes.Cluster.Spec.GetShardingByName(target.ComponentName)
+		if spec == nil || spec.Shards != *target.Shards {
+			phase = opsv1alpha1.OpsRunningPhase
+		}
+	}
+	if phase == opsv1alpha1.OpsSucceedPhase && (!progress.observationsComplete || progress.succeededCount != progress.expectedCount) {
+		phase = opsv1alpha1.OpsRunningPhase
+	}
+	return phase, progress, nil
+}
+
+func (hs horizontalScalingOpsHandler) observeReplicaScaling(reqCtx intctrlutil.RequestCtx, cli client.Client,
+	opsRes *OpsResource, helper componentOpsHelper, target opsv1alpha1.HorizontalScaling) (instanceProgress, error) {
+	progress := instanceProgress{observationsComplete: true}
+	resources, err := helper.buildInstanceProgressResources(reqCtx, cli, opsRes, "horizontal scale")
+	if err != nil {
+		return progress, err
+	}
+	for i := range resources {
+		resource := &resources[i]
+		if isBackupScaling(target) {
+			status := opsRes.OpsRequest.Status.Components[target.ComponentName]
+			timeout := opsRes.OpsRequest.Spec.TimeoutSeconds
+			if status.Message != "Restore Data Completed" && timeout != nil && *timeout > 0 &&
+				!time.Now().Before(opsRes.OpsRequest.Status.StartTimestamp.Add(time.Duration(*timeout)*time.Second)) {
+				progress.observationsComplete = false
+				return progress, nil
+			}
+			last := opsRes.OpsRequest.Status.LastConfiguration.Components[target.ComponentName]
+			if err := hs.restoreDataFromBackup(reqCtx, cli, opsRes, resource.fullComponentName,
+				resource.clusterComponent.DeepCopy(), target, last, &status); err != nil {
+				return progress, err
+			}
+			opsRes.OpsRequest.Status.Components[target.ComponentName] = status
+			if status.Message != "Restore Data Completed" {
+				return hs.observeBackupPreparation(reqCtx, cli, opsRes, target.ComponentName)
+			}
+		}
+		its := &workloads.InstanceSet{}
+		key := client.ObjectKey{Namespace: opsRes.Cluster.Namespace,
+			Name: constant.GenerateClusterComponentName(opsRes.Cluster.Name, resource.fullComponentName)}
+		if err := cli.Get(reqCtx.Ctx, key, its); err != nil {
+			if !apierrors.IsNotFound(err) {
+				return progress, err
+			}
+			progress.expectedCount += resource.clusterComponent.Replicas
+			progress.observationsComplete = false
+			continue
+		}
+		observed := handleReplicaScalingProgress(opsRes, resource, its)
+		progress.expectedCount += observed.expectedCount
+		progress.completedCount += observed.completedCount
+		progress.succeededCount += observed.succeededCount
+		progress.observationsComplete = progress.observationsComplete && observed.observationsComplete
+		progress.details = append(progress.details, observed.details...)
+	}
+	expectedComponents := int32(1)
+	if spec := opsRes.Cluster.Spec.GetShardingByName(target.ComponentName); spec != nil {
+		expectedComponents = spec.Shards
+	}
+	progress.observationsComplete = progress.observationsComplete && int32(len(resources)) == expectedComponents
+	return progress, nil
+}
+
+func (hs horizontalScalingOpsHandler) observeShardScaling(reqCtx intctrlutil.RequestCtx, cli client.Client,
+	opsRes *OpsResource, target opsv1alpha1.HorizontalScaling) (instanceProgress, error) {
+	progress := instanceProgress{expectedCount: *target.Shards}
+	children, err := sharding.ListShardingComponents(reqCtx.Ctx, cli, opsRes.Cluster, target.ComponentName)
+	if err != nil {
+		return progress, err
+	}
+	progress.expectedCount = max(progress.expectedCount, int32(len(children)))
+	progress.observationsComplete = int32(len(children)) == *target.Shards
+	for _, child := range children {
+		detail := opsv1alpha1.ProgressStatusDetail{ObjectKey: getProgressObjectKey(appsv1.ComponentKind, child.Name),
+			Status: opsv1alpha1.ProcessingProgressStatus}
+		observed := child.Status.ObservedGeneration == child.Generation
+		if !child.DeletionTimestamp.IsZero() {
+			progress.observationsComplete = false
+		} else if observed {
+			switch child.Status.Phase {
+			case appsv1.RunningComponentPhase:
+				detail.Status = opsv1alpha1.SucceedProgressStatus
+				progress.completedCount++
+				progress.succeededCount++
+			case appsv1.FailedComponentPhase:
+				detail.Status = opsv1alpha1.FailedProgressStatus
+				progress.completedCount++
+			}
+		}
+		detail.Message = fmt.Sprintf("%s shard %s", detail.Status, child.Name)
+		progress.details = append(progress.details, detail)
+	}
+	return progress, nil
 }
 
 // prepareReplicaScaling validates and computes the target configuration for both
@@ -398,11 +456,20 @@ func (hs horizontalScalingOpsHandler) Cancel(reqCtx intctrlutil.RequestCtx, cli 
 		}
 	}
 	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.HorizontalScalingList)
-	return compOpsHelper.cancelComponentOps(reqCtx.Ctx, cli, opsRes, func(lastConfig *opsv1alpha1.LastComponentConfiguration, comp *appsv1.ClusterComponentSpec) {
+	if err := compOpsHelper.cancelComponentOps(reqCtx.Ctx, cli, opsRes, func(lastConfig *opsv1alpha1.LastComponentConfiguration, comp *appsv1.ClusterComponentSpec) {
 		comp.Replicas = *lastConfig.Replicas
 		comp.Instances = lastConfig.InstanceTemplates
 		comp.OfflineInstances = lastConfig.OfflineInstances
-	})
+	}); err != nil {
+		return err
+	}
+	for name, status := range opsRes.OpsRequest.Status.Components {
+		if status.Reason == horizontalScalingFailedReason {
+			status.Reason, status.Message = "", ""
+			opsRes.OpsRequest.Status.Components[name] = status
+		}
+	}
+	return nil
 }
 
 // checkIntersectionWithEarlierOps checks if the pod deleted by the current ops is a pod created by another ops

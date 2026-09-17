@@ -174,9 +174,9 @@ func (r rebuildInstanceOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.Requ
 	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.RebuildFrom)
 	getLastComponentInfo := func(compSpec appsv1.ClusterComponentSpec, comOps ComponentOpsInterface) opsv1alpha1.LastComponentConfiguration {
 		lastCompConfiguration := opsv1alpha1.LastComponentConfiguration{
-			Replicas:         pointer.Int32(compSpec.Replicas),
-			Instances:        compSpec.Instances,
-			OfflineInstances: compSpec.OfflineInstances,
+			Replicas:          pointer.Int32(compSpec.Replicas),
+			InstanceTemplates: compSpec.Instances,
+			OfflineInstances:  compSpec.OfflineInstances,
 		}
 		return lastCompConfiguration
 	}

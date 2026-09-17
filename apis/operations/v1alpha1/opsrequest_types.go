@@ -1094,9 +1094,13 @@ type LastComponentConfiguration struct {
 	// +optional
 	Services []appsv1.ClusterComponentService `json:"services,omitempty"`
 
-	// Records the InstanceTemplate list of the Component prior to any changes.
+	// Records the component's instance template definitions before the operation.
 	// +optional
-	Instances []appsv1.InstanceTemplate `json:"instances,omitempty"`
+	InstanceTemplates []appsv1.InstanceTemplate `json:"instanceTemplates,omitempty"`
+
+	// Records instances explicitly requested online or offline before the operation.
+	// +optional
+	Instances []LastInstanceConfiguration `json:"instances,omitempty"`
 
 	// Records the offline instances of the Component prior to any changes.
 	// +optional
@@ -1109,6 +1113,26 @@ type LastComponentConfiguration struct {
 	// Records the name of the ComponentDefinition prior to any changes.
 	// +optional
 	ComponentDefinitionName string `json:"componentDefinitionName,omitempty"`
+}
+
+// LastInstanceConfiguration records an instance before an operation.
+type LastInstanceConfiguration struct {
+	// Name identifies the instance.
+	Name string `json:"name"`
+
+	// TemplateName identifies its instance template. An empty name denotes the default template.
+	// +optional
+	TemplateName string `json:"templateName,omitempty"`
+}
+
+// FindInstance returns the saved record for the named instance, if present.
+func (c *LastComponentConfiguration) FindInstance(name string) *LastInstanceConfiguration {
+	for i := range c.Instances {
+		if c.Instances[i].Name == name {
+			return &c.Instances[i]
+		}
+	}
+	return nil
 }
 
 type LastConfiguration struct {

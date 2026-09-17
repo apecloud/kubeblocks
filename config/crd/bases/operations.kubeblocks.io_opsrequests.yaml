@@ -3575,9 +3575,9 @@ spec:
                           description: Records the name of the ComponentDefinition
                             prior to any changes.
                           type: string
-                        instances:
-                          description: Records the InstanceTemplate list of the Component
-                            prior to any changes.
+                        instanceTemplates:
+                          description: Records the component's instance template definitions
+                            before the operation.
                           items:
                             description: InstanceTemplate allows customization of
                               individual replica configurations in a Component.
@@ -5259,6 +5259,24 @@ spec:
                                   - name
                                   type: object
                                 type: array
+                            required:
+                            - name
+                            type: object
+                          type: array
+                        instances:
+                          description: Records instances explicitly requested online
+                            or offline before the operation.
+                          items:
+                            description: LastInstanceConfiguration records an instance
+                              before an operation.
+                            properties:
+                              name:
+                                description: Name identifies the instance.
+                                type: string
+                              templateName:
+                                description: TemplateName identifies its instance
+                                  template. An empty name denotes the default template.
+                                type: string
                             required:
                             - name
                             type: object

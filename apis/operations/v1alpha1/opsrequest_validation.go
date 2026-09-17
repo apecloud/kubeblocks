@@ -400,7 +400,21 @@ func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, com
 		}
 
 		// Track the count of offline/online instances
-		offlineOrOnlineInsCountMap := r.CountOfflineOrOnlineInstances(clusterName, hScale.ComponentName, instanceNames)
+		last := r.Status.LastConfiguration.Components[hScale.ComponentName]
+		fromBackup := hScale.ScaleOut != nil && hScale.ScaleOut.FromBackup != nil
+		countsPending := !fromBackup && len(instanceNames) > 0 && last.Instances == nil && len(compSpec.Instances) > 0
+		offlineOrOnlineInsCountMap := map[string]int32{}
+		if fromBackup {
+			offlineOrOnlineInsCountMap = r.CountOfflineOrOnlineInstances(clusterName, hScale.ComponentName, instanceNames)
+		} else if !countsPending {
+			for _, name := range instanceNames {
+				if len(compSpec.Instances) == 0 {
+					offlineOrOnlineInsCountMap[""]++
+				} else if instance := last.FindInstance(name); instance != nil {
+					offlineOrOnlineInsCountMap[instance.TemplateName]++
+				}
+			}
+		}
 		insTplChangeMap := make(map[string]int32)
 		totalReplicaChanges := int32(0)
 
@@ -436,6 +450,10 @@ func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, com
 				return fmt.Errorf(`new instance template "%s" already exists in component "%s"`, insTpl.Name, hScale.ComponentName)
 			}
 			totalReplicaChanges += insTpl.GetReplicas()
+		}
+
+		if countsPending && replicaChanger.ReplicaChanges == nil {
+			return nil
 		}
 
 		// Validate if replicaChanges exceed the allowed replicaChanges limit
@@ -499,7 +517,7 @@ func (r *OpsRequest) validateShards(hScale HorizontalScaling, isSharding bool, m
 // applyLastConfiguration applies the last known configuration to the component spec
 func (r *OpsRequest) applyLastConfiguration(componentName string, compSpec *appsv1.ClusterComponentSpec) error {
 	if lastCompConfiguration, ok := r.Status.LastConfiguration.Components[componentName]; ok {
-		compSpec.Instances = lastCompConfiguration.Instances
+		compSpec.Instances = lastCompConfiguration.InstanceTemplates
 		if lastCompConfiguration.Replicas != nil {
 			compSpec.Replicas = *lastCompConfiguration.Replicas
 		}

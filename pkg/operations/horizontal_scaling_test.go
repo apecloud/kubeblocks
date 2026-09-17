@@ -23,6 +23,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"k8s.io/utils/ptr"
 	"reflect"
 	"slices"
 	"strings"
@@ -1862,7 +1863,7 @@ func publishHorizontalScalingAssignments(t *testing.T, f *horizontalScalingFixtu
 		if err != nil {
 			t.Fatal(err)
 		}
-		its := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Name: constant.GenerateClusterComponentName(f.res.Cluster.Name, target.ComponentName), Namespace: f.res.Cluster.Namespace}, Spec: workloads.InstanceSetSpec{Replicas: pointer.Int32(spec.Replicas)}}
+		its := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Name: constant.GenerateClusterComponentName(f.res.Cluster.Name, target.ComponentName), Namespace: f.res.Cluster.Namespace}, Spec: workloads.InstanceSetSpec{Replicas: ptr.To[int32](spec.Replicas)}}
 		for name := range names {
 			template := appsv1.GetInstanceTemplateName(f.res.Cluster.Name, target.ComponentName, name)
 			its.Status.InstanceStatus = append(its.Status.InstanceStatus, workloads.InstanceStatus{PodName: name, TemplateName: &template, DesiredState: workloads.InstanceDesiredStateActive})
@@ -2083,7 +2084,7 @@ func TestHorizontalScalingRejectsInvalidInstanceTargets(t *testing.T) {
 			cluster.Status.Components = map[string]appsv1.ClusterComponentStatus{
 				"db": {ObservedGeneration: cluster.Generation, UpToDate: true, Phase: appsv1.RunningComponentPhase},
 			}
-			its.Spec.Replicas = pointer.Int32(spec.Replicas)
+			its.Spec.Replicas = ptr.To[int32](spec.Replicas)
 			its.Status.ObservedGeneration = its.Generation
 			for i := range its.Status.InstanceStatus {
 				status := &its.Status.InstanceStatus[i]
@@ -2146,7 +2147,7 @@ func mockHorizontalScalingProgress(cluster *appsv1.Cluster, name string) {
 	its := &workloads.InstanceSet{}
 	Expect(k8sClient.Get(testCtx.Ctx, key, its)).Should(Succeed())
 	spec := cluster.Spec.GetComponentByName(name)
-	its.Spec.Replicas = pointer.Int32(spec.Replicas)
+	its.Spec.Replicas = ptr.To[int32](spec.Replicas)
 	Expect(k8sClient.Update(testCtx.Ctx, its)).Should(Succeed())
 	pods := &corev1.PodList{}
 	Expect(k8sClient.List(testCtx.Ctx, pods, client.InNamespace(cluster.Namespace), client.MatchingLabels{constant.AppInstanceLabelKey: cluster.Name, constant.KBAppComponentLabelKey: name})).Should(Succeed())
@@ -2203,7 +2204,7 @@ func TestHorizontalScalingResultAndCurrentProgressConverge(t *testing.T) {
 		t.Fatalf("missing observation was filled: %+v", f.res.OpsRequest.Status)
 	}
 	// A cached workload for the previous allocation is also insufficient.
-	its.Spec.Replicas = pointer.Int32(1)
+	its.Spec.Replicas = ptr.To[int32](1)
 	if err := f.cli.Update(f.req.Ctx, its); err != nil {
 		t.Fatal(err)
 	}
@@ -2340,9 +2341,9 @@ func TestHorizontalScalingWaitsForEveryShardObservation(t *testing.T) {
 		comp := &appsv1.Component{ObjectMeta: metav1.ObjectMeta{Name: "demo-" + name, Namespace: "default",
 			Labels: constant.GetCompLabels("demo", name, map[string]string{constant.KBAppShardingNameLabelKey: "sharded"})}}
 		its := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Name: comp.Name, Namespace: comp.Namespace},
-			Spec: workloads.InstanceSetSpec{Replicas: pointer.Int32(1)},
+			Spec: workloads.InstanceSetSpec{Replicas: ptr.To[int32](1)},
 			Status: workloads.InstanceSetStatus{InstanceStatus: []workloads.InstanceStatus{{
-				PodName: comp.Name + "-chosen", TemplateName: pointer.String(""),
+				PodName: comp.Name + "-chosen", TemplateName: ptr.To(""),
 				DesiredState: workloads.InstanceDesiredStateActive, CurrentState: workloads.InstanceCurrentStatePresent,
 				UpToDate: true, Ready: true, Available: true,
 			}}}}

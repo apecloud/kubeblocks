@@ -2215,12 +2215,13 @@ func TestHorizontalScalingResultAndCurrentProgressConverge(t *testing.T) {
 	its.Spec = original.Spec
 	its.Status = original.Status
 	its.Status.InstanceStatus[0].Failed = true
+	objectKey := getProgressObjectKey(constant.PodKind, its.Status.InstanceStatus[0].PodName)
 	if err := f.cli.Update(f.req.Ctx, its); err != nil {
 		t.Fatal(err)
 	}
 	f.reconcile(t, opsv1alpha1.OpsRunningPhase)
-	failed := f.res.OpsRequest.Status.Components["db"].ProgressDetails[0]
-	if failed.Status != opsv1alpha1.FailedProgressStatus || failed.EndTime.IsZero() {
+	failed := findStatusProgressDetail(f.res.OpsRequest.Status.Components["db"].ProgressDetails, objectKey)
+	if failed == nil || failed.Status != opsv1alpha1.FailedProgressStatus || failed.EndTime.IsZero() {
 		t.Fatalf("failed observation=%+v", failed)
 	}
 	its.Status.InstanceStatus[0].Failed = false
@@ -2229,8 +2230,8 @@ func TestHorizontalScalingResultAndCurrentProgressConverge(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.reconcile(t, opsv1alpha1.OpsRunningPhase)
-	recovering := f.res.OpsRequest.Status.Components["db"].ProgressDetails[0]
-	if recovering.Status != opsv1alpha1.ProcessingProgressStatus || !recovering.EndTime.IsZero() {
+	recovering := findStatusProgressDetail(f.res.OpsRequest.Status.Components["db"].ProgressDetails, objectKey)
+	if recovering == nil || recovering.Status != opsv1alpha1.ProcessingProgressStatus || !recovering.EndTime.IsZero() {
 		t.Fatalf("failed detail did not recover=%+v", recovering)
 	}
 	its.Status.InstanceStatus[0].Ready = true

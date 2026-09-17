@@ -104,6 +104,21 @@ var _ = Describe("InstanceSet Controller 2", func() {
 		return fmt.Sprintf("%s-%d", itsKey.Name, ordinal)
 	}
 
+	mockPVCCapacities := func() {
+		By("report PVC capacities")
+		for i := int32(0); i < replicas; i++ {
+			for _, claim := range itsObj.Spec.VolumeClaimTemplates {
+				key := client.ObjectKey{
+					Namespace: itsObj.Namespace,
+					Name:      intctrlutil.ComposePVCName(claim, itsObj.Name, podName(i)),
+				}
+				Eventually(testapps.GetAndChangeObjStatus(&testCtx, key, func(pvc *corev1.PersistentVolumeClaim) {
+					pvc.Status.Capacity = pvc.Spec.Resources.Requests.DeepCopy()
+				})).Should(Succeed())
+			}
+		}
+	}
+
 	mockPodsReady := func() {
 		for i := int32(0); i < replicas; i++ {
 			mockPodReady(itsObj.Namespace, podName(i))
@@ -457,6 +472,7 @@ var _ = Describe("InstanceSet Controller 2", func() {
 					})
 			})
 
+			mockPVCCapacities()
 			mockPodsReady()
 
 			By("check its ready")
@@ -496,6 +512,7 @@ var _ = Describe("InstanceSet Controller 2", func() {
 					})
 			})
 
+			mockPVCCapacities()
 			mockPodsReady()
 
 			By("check its ready")

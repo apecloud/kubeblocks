@@ -26,7 +26,6 @@ import (
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -539,7 +538,74 @@ func (r *OpsRequest) validateVolumeExpansion(ctx context.Context, cli client.Cli
 	if err := r.checkComponentExistence(cluster, compOpsList); err != nil {
 		return err
 	}
-	return r.checkVolumesAllowExpansion(ctx, cli, cluster)
+	storageClasses := sets.New[string]()
+	for _, expansion := range volumeExpansionList {
+		if comp := cluster.Spec.GetComponentByName(expansion.ComponentName); comp != nil {
+			if err := validateExpansionVolumes(expansion, comp.Name, comp.VolumeClaimTemplates); err != nil {
+				return err
+			}
+			collectExpansionStorageClasses(expansion, *comp, storageClasses)
+			continue
+		}
+		for _, sharding := range cluster.Spec.Shardings {
+			if sharding.Name != expansion.ComponentName {
+				continue
+			}
+			if err := validateExpansionVolumes(expansion, sharding.Name, sharding.Template.VolumeClaimTemplates); err != nil {
+				return err
+			}
+			collectShardingExpansionStorageClasses(expansion, sharding, storageClasses)
+		}
+	}
+	return validateExpansionStorageClasses(ctx, cli, storageClasses)
+}
+
+func validateExpansionStorageClasses(ctx context.Context, cli client.Client, storageClasses sets.Set[string]) error {
+	for _, name := range sets.List(storageClasses) {
+		sc := &storagev1.StorageClass{}
+		if err := cli.Get(ctx, client.ObjectKey{Name: name}, sc); err != nil {
+			return fmt.Errorf("get storageClass %q for volume expansion: %w", name, err)
+		}
+		if sc.AllowVolumeExpansion == nil || !*sc.AllowVolumeExpansion {
+			return fmt.Errorf("storageClass %q does not allow volume expansion", name)
+		}
+	}
+	return nil
+}
+
+func collectShardingExpansionStorageClasses(expansion VolumeExpansion, sharding appsv1.ClusterSharding, storageClasses sets.Set[string]) {
+	remaining := sharding.Shards
+	for _, template := range sharding.ShardTemplates {
+		if template.Shards == nil || *template.Shards == 0 {
+			continue
+		}
+		remaining -= *template.Shards
+		if template.VolumeClaimTemplates != nil {
+			continue
+		}
+		comp := sharding.Template
+		if template.Replicas != nil {
+			comp.Replicas = *template.Replicas
+		}
+		if template.Instances != nil {
+			comp.Instances = template.Instances
+		}
+		collectExpansionStorageClasses(expansion, comp, storageClasses)
+	}
+	if remaining > 0 {
+		collectExpansionStorageClasses(expansion, sharding.Template, storageClasses)
+	}
+}
+
+func collectExpansionStorageClasses(expansion VolumeExpansion, comp appsv1.ClusterComponentSpec, storageClasses sets.Set[string]) {
+	for _, volume := range comp.VolumeClaimTemplates {
+		if volume.Spec.StorageClassName == nil || *volume.Spec.StorageClassName == "" ||
+			!slices.ContainsFunc(expansion.VolumeClaimTemplates, func(v OpsRequestVolumeClaimTemplate) bool { return v.Name == volume.Name }) ||
+			!expansionUsesComponentVolume(comp, volume.Name) {
+			continue
+		}
+		storageClasses.Insert(*volume.Spec.StorageClassName)
+	}
 }
 
 // validateSwitchover validates switchover api when spec.type is Switchover.
@@ -628,218 +694,35 @@ func (r *OpsRequest) checkComponentExistence(cluster *appsv1.Cluster, compOpsLis
 	return nil
 }
 
-func (r *OpsRequest) checkVolumesAllowExpansion(ctx context.Context, cli client.Client, cluster *appsv1.Cluster) error {
-	type Entity struct {
-		existInSpec         bool
-		storageClassName    *string
-		allowExpansion      bool
-		requestStorage      resource.Quantity
-		isShardingComponent bool
-		hasPvc              bool
+func expansionUsesComponentVolume(comp appsv1.ClusterComponentSpec, volumeName string) bool {
+	if comp.Replicas == 0 {
+		return false
 	}
+	defaultReplicas := comp.Replicas
+	for _, template := range comp.Instances {
+		replicas := template.GetReplicas()
+		defaultReplicas -= replicas
+		if replicas > 0 && !slices.ContainsFunc(template.VolumeClaimTemplates, func(v appsv1.PersistentVolumeClaimTemplate) bool {
+			return v.Name == volumeName
+		}) {
+			return true
+		}
+	}
+	return defaultReplicas > 0
+}
 
-	// [component name]/ [sharding name]/ [component name.its name] -> vct name -> entity
-	vols := make(map[string]map[string]Entity)
-	setVols := func(vcts []OpsRequestVolumeClaimTemplate, componentName string) {
-		for _, vct := range vcts {
-			if _, ok := vols[componentName]; !ok {
-				vols[componentName] = make(map[string]Entity)
-			}
-			vols[componentName][vct.Name] = Entity{false, nil, false, vct.Storage, false, false}
+func validateExpansionVolumes(expansion VolumeExpansion, scope string, volumes []appsv1.PersistentVolumeClaimTemplate) error {
+	for _, requested := range expansion.VolumeClaimTemplates {
+		index := slices.IndexFunc(volumes, func(v appsv1.PersistentVolumeClaimTemplate) bool { return v.Name == requested.Name })
+		if index < 0 {
+			return fmt.Errorf("volumeClaimTemplate %q not found in %s", requested.Name, scope)
 		}
-	}
-
-	for _, comp := range r.Spec.VolumeExpansionList {
-		setVols(comp.VolumeClaimTemplates, comp.ComponentOps.ComponentName)
-		for _, compSpec := range cluster.Spec.ComponentSpecs {
-			if compSpec.Name == comp.ComponentOps.ComponentName {
-				for _, its := range compSpec.Instances {
-					setVols(comp.VolumeClaimTemplates, fmt.Sprintf("%s.%s", compSpec.Name, its.Name))
-				}
-			}
-		}
-	}
-	fillVol := func(vct appsv1.PersistentVolumeClaimTemplate, key string, isShardingComp bool) {
-		e, ok := vols[key][vct.Name]
-		if !ok {
-			return
-		}
-		e.existInSpec = true
-		e.storageClassName = vct.Spec.StorageClassName
-		e.isShardingComponent = isShardingComp
-		vols[key][vct.Name] = e
-	}
-	fillCompVols := func(compSpec appsv1.ClusterComponentSpec, componentName string, isShardingComp bool) {
-		if _, ok := vols[componentName]; !ok {
-			return // ignore not-exist component
-		}
-		for _, vct := range compSpec.VolumeClaimTemplates {
-			fillVol(vct, componentName, isShardingComp)
-		}
-	}
-	fillItsVols := func(itsSpec appsv1.InstanceTemplate, cmpVcts []appsv1.PersistentVolumeClaimTemplate, key string) {
-		if _, ok := vols[key]; !ok {
-			return // ignore not-exist its
-		}
-		mergedVcts := mergeItsCmpTemplates(itsSpec.VolumeClaimTemplates, cmpVcts)
-		for _, vct := range mergedVcts {
-			fillVol(vct, key, false)
-		}
-	}
-	// traverse the spec to update volumes
-	for _, comp := range cluster.Spec.ComponentSpecs {
-		fillCompVols(comp, comp.Name, false)
-		for _, its := range comp.Instances {
-			// update its vct volumes
-			fillItsVols(its, comp.VolumeClaimTemplates, fmt.Sprintf("%s.%s", comp.Name, its.Name))
-		}
-	}
-	for _, sharding := range cluster.Spec.Shardings {
-		fillCompVols(sharding.Template, sharding.Name, true)
-	}
-
-	// check all used storage classes
-	for key, compVols := range vols {
-		for vname := range compVols {
-			e := vols[key][vname]
-			if !e.existInSpec {
-				continue
-			}
-			found, scName, err := r.getSCNameByPvcAndCheckStorageSize(ctx, cli, key, vname, e.isShardingComponent, e.requestStorage)
-			if err != nil {
-				return err
-			}
-			if !found {
-				continue
-			}
-			e.hasPvc = found
-			e.storageClassName = scName
-			allowExpansion, err := r.checkStorageClassAllowExpansion(ctx, cli, e.storageClassName)
-			if err != nil {
-				continue // ignore the error and take it as not-supported
-			}
-			e.allowExpansion = allowExpansion
-			vols[key][vname] = e
-		}
-	}
-
-	for key, compVols := range vols {
-		var (
-			notFound     []string
-			notSupport   []string
-			notSupportSc []string
-		)
-		for vct, e := range compVols {
-			if !e.hasPvc {
-				continue
-			}
-			if !e.existInSpec {
-				notFound = append(notFound, vct)
-			}
-			if !e.allowExpansion {
-				notSupport = append(notSupport, vct)
-				if e.storageClassName != nil {
-					notSupportSc = append(notSupportSc, *e.storageClassName)
-				}
-			}
-		}
-		if len(notFound) > 0 {
-			return fmt.Errorf("volumeClaimTemplates: %v not found in component: %s, you can view infos by command: "+
-				"kubectl get cluster %s -n %s", notFound, key, cluster.Name, r.Namespace)
-		}
-		if len(notSupport) > 0 {
-			var notSupportScString string
-			if len(notSupportSc) > 0 {
-				notSupportScString = fmt.Sprintf("storageClass: %v of ", notSupportSc)
-			}
-			return fmt.Errorf(notSupportScString+"volumeClaimTemplate: %v not support volume expansion in component: %s, you can view infos by command: "+
-				"kubectl get sc", notSupport, key)
+		current := volumes[index].Spec.Resources.Requests.Storage()
+		if requested.Storage.Cmp(*current) < 0 {
+			return fmt.Errorf("requested storage for %s/%s cannot be less than declared size %s", scope, requested.Name, current.String())
 		}
 	}
 	return nil
-}
-
-// checkStorageClassAllowExpansion checks whether the specified storage class supports volume expansion.
-func (r *OpsRequest) checkStorageClassAllowExpansion(ctx context.Context,
-	cli client.Client,
-	storageClassName *string) (bool, error) {
-	if storageClassName == nil {
-		return false, nil
-	}
-	storageClass := &storagev1.StorageClass{}
-	// take not found error as unsupported
-	if err := cli.Get(ctx, types.NamespacedName{Name: *storageClassName}, storageClass); err != nil && !apierrors.IsNotFound(err) {
-		return false, err
-	}
-	if storageClass.AllowVolumeExpansion == nil {
-		return false, nil
-	}
-	return *storageClass.AllowVolumeExpansion, nil
-}
-
-// getSCNameByPvcAndCheckStorageSize gets the storageClassName by pvc and checks if the storage size is valid.
-func (r *OpsRequest) getSCNameByPvcAndCheckStorageSize(ctx context.Context,
-	cli client.Client,
-	key,
-	vctName string,
-	isShardingComponent bool,
-	requestStorage resource.Quantity) (found bool, scName *string, err error) {
-	componentName := key
-	targetInsTPLName := ""
-	if strings.Contains(key, ".") {
-		keyStrs := strings.Split(key, ".")
-		componentName = keyStrs[0]
-		targetInsTPLName = keyStrs[1]
-	}
-	matchingLabels := client.MatchingLabels{
-		constant.AppInstanceLabelKey:             r.Spec.GetClusterName(),
-		constant.VolumeClaimTemplateNameLabelKey: vctName,
-	}
-	if isShardingComponent {
-		matchingLabels[constant.KBAppShardingNameLabelKey] = componentName
-	} else {
-		matchingLabels[constant.KBAppComponentLabelKey] = componentName
-	}
-	pvcList := &corev1.PersistentVolumeClaimList{}
-	if err := cli.List(ctx, pvcList, client.InNamespace(r.Namespace), matchingLabels); err != nil {
-		return false, nil, err
-	}
-	var pvc *corev1.PersistentVolumeClaim
-	for _, pvcItem := range pvcList.Items {
-		if targetInsTPLName == pvcItem.Labels[constant.KBAppInstanceTemplateLabelKey] {
-			pvc = &pvcItem
-			break
-		}
-	}
-	if pvc == nil {
-		return false, nil, nil
-	}
-	previousValue := *pvc.Status.Capacity.Storage()
-	if requestStorage.Cmp(previousValue) < 0 {
-		return true, nil, fmt.Errorf(`requested storage size of volumeClaimTemplate "%s" can not less than status.capacity.storage "%s" `,
-			vctName, previousValue.String())
-	}
-	return true, pvc.Spec.StorageClassName, nil
-}
-
-func mergeItsCmpTemplates(itsVcts []appsv1.PersistentVolumeClaimTemplate, cmpVcts []appsv1.PersistentVolumeClaimTemplate) []appsv1.PersistentVolumeClaimTemplate {
-	mergedVcts := make([]appsv1.PersistentVolumeClaimTemplate, 0)
-	mergedVcts = append(mergedVcts, cmpVcts...)
-	for _, itsVct := range itsVcts {
-		found := false
-		for i, cmpVct := range mergedVcts {
-			if itsVct.Name == cmpVct.Name {
-				// cmpVct will be override by itsVct
-				mergedVcts[i] = itsVct
-				found = true
-				break
-			}
-		}
-		if !found {
-			mergedVcts = append(mergedVcts, itsVct)
-		}
-	}
-	return mergedVcts
 }
 
 // validateVerticalResourceList checks if k8s resourceList is legal

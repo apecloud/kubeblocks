@@ -166,28 +166,17 @@ func (c componentOpsHelper) isHScaleShards(opsRequest *opsv1alpha1.OpsRequest, c
 func (c componentOpsHelper) buildProgressResources(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	opsRes *OpsResource,
-	clusterDef *appsv1.ClusterDefinition,
 	opsMessageKey string) ([]progressResource, error) {
 	var progressResources []progressResource
 	setProgressResource := func(compSpec *appsv1.ClusterComponentSpec, compOps ComponentOpsInterface,
-		fullComponentName string, shards *int32) error {
-		var componentDefinition *appsv1.ComponentDefinition
-		if compSpec.ComponentDef != "" {
-			componentDefinition = &appsv1.ComponentDefinition{}
-			if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: compSpec.ComponentDef}, componentDefinition); err != nil {
-				return err
-			}
-		}
+		fullComponentName string, shards *int32) {
 		progressResources = append(progressResources, progressResource{
 			opsMessageKey:     opsMessageKey,
 			clusterComponent:  compSpec,
-			clusterDef:        clusterDef,
-			componentDef:      componentDefinition,
 			compOps:           compOps,
 			fullComponentName: fullComponentName,
 			shards:            shards,
 		})
-		return nil
 	}
 	// 1. handle the component status
 	for i := range opsRes.Cluster.Spec.ComponentSpecs {
@@ -196,9 +185,7 @@ func (c componentOpsHelper) buildProgressResources(reqCtx intctrlutil.RequestCtx
 		if !ok {
 			continue
 		}
-		if err := setProgressResource(compSpec, compOps, compSpec.Name, nil); err != nil {
-			return nil, err
-		}
+		setProgressResource(compSpec, compOps, compSpec.Name, nil)
 	}
 
 	// 2. handle the sharding status.
@@ -209,9 +196,7 @@ func (c componentOpsHelper) buildProgressResources(reqCtx intctrlutil.RequestCtx
 			continue
 		}
 		if c.isHScaleShards(opsRes.OpsRequest, compOps) {
-			if err := setProgressResource(&spec.Template, compOps, "", &spec.Shards); err != nil {
-				return nil, err
-			}
+			setProgressResource(&spec.Template, compOps, "", &spec.Shards)
 			continue
 		}
 		// handle the progress of the components of the sharding.
@@ -220,10 +205,8 @@ func (c componentOpsHelper) buildProgressResources(reqCtx intctrlutil.RequestCtx
 			return nil, err
 		}
 		for j := range shardingComps {
-			if err = setProgressResource(&spec.Template, compOps,
-				shardingComps[j].Labels[constant.KBAppComponentLabelKey], &spec.Shards); err != nil {
-				return nil, err
-			}
+			setProgressResource(&spec.Template, compOps,
+				shardingComps[j].Labels[constant.KBAppComponentLabelKey], &spec.Shards)
 		}
 	}
 	return progressResources, nil

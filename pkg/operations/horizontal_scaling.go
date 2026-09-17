@@ -140,7 +140,7 @@ func (hs horizontalScalingOpsHandler) ReconcileAction(reqCtx intctrlutil.Request
 		opsRequest.Status.Components = map[string]opsv1alpha1.OpsRequestComponentStatus{}
 	}
 	helper := newComponentOpsHelper(opsRequest.Spec.HorizontalScalingList)
-	resources, err := helper.buildProgressResources(reqCtx, cli, opsRes, nil, "horizontal scale")
+	resources, err := helper.buildProgressResources(reqCtx, cli, opsRes, "horizontal scale")
 	if err != nil {
 		return opsv1alpha1.OpsRunningPhase, 0, err
 	}

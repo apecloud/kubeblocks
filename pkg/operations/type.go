@@ -98,8 +98,6 @@ type progressResource struct {
 	// specifies the number of shards. if nil, it is not a sharding component.
 	shards           *int32
 	clusterComponent *appsv1.ClusterComponentSpec
-	clusterDef       *appsv1.ClusterDefinition
-	componentDef     *appsv1.ComponentDefinition
 	compOps          ComponentOpsInterface
 }
 

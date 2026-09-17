@@ -570,7 +570,7 @@ func TestVerticalScalingReplacedTarget(t *testing.T) {
 					component.Instances = []appsv1.InstanceTemplate{{Name: "reader", Replicas: ptr.To[int32](1), Resources: &current}}
 					request.ResourceRequirements = corev1.ResourceRequirements{}
 					request.Instances = []opsv1alpha1.InstanceResourceTemplate{{Name: "reader", ResourceRequirements: target}}
-					last.Instances = []appsv1.InstanceTemplate{{Name: "reader", Resources: &previous}}
+					last.InstanceTemplates = []appsv1.InstanceTemplate{{Name: "reader", Resources: &previous}}
 					instance = verticalScalingTestInstance("demo-db-reader-0", "reader", true)
 				}
 				cluster := verticalScalingTestCluster(component, appsv1.RunningComponentPhase, 7, true)

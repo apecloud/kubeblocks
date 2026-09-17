@@ -552,7 +552,7 @@ var _ = Describe("status reconciler test", func() {
 			newRestorePVC := func(name string, status corev1.ConditionStatus) *corev1.PersistentVolumeClaim {
 				pvc := builder.NewPVCBuilder(namespace, name).GetObject()
 				pvc.Status.Conditions = []corev1.PersistentVolumeClaimCondition{{
-					Type:    corev1.PersistentVolumeClaimConditionType(workloads.InstanceRestore),
+					Type:    corev1.PersistentVolumeClaimConditionType(workloads.Restore),
 					Status:  status,
 					Reason:  "Restore",
 					Message: "restore status",

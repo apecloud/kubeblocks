@@ -62,6 +62,22 @@ func (u upgradeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	compOpsHelper = newComponentOpsHelper(upgradeSpec.Components)
 	if err := compOpsHelper.updateClusterComponentsAndShardings(opsRes.Cluster, func(compSpec *appsv1.ClusterComponentSpec, obj ComponentOpsInterface) error {
 		upgradeComp := obj.(opsv1alpha1.UpgradeComponent)
+		if len(upgradeComp.Instances) > 0 {
+			for i := range compSpec.Instances {
+				for _, instance := range upgradeComp.Instances {
+					if compSpec.Instances[i].Name != instance.Name {
+						continue
+					}
+					if u.needUpdateCompDefName(instance.ComponentDefinitionName, opsRes.Cluster) {
+						compSpec.Instances[i].CompDef = *instance.ComponentDefinitionName
+					}
+					if instance.ServiceVersion != nil {
+						compSpec.Instances[i].ServiceVersion = *instance.ServiceVersion
+					}
+				}
+			}
+			return nil
+		}
 		if u.needUpdateCompDef(upgradeComp, opsRes.Cluster) {
 			compSpec.ComponentDef = *upgradeComp.ComponentDefinitionName
 		}
@@ -183,10 +199,14 @@ func (u upgradeOpsHandler) podImageApplied(pod *corev1.Pod, expectContainers []c
 }
 
 func (u upgradeOpsHandler) needUpdateCompDef(upgradeComp opsv1alpha1.UpgradeComponent, cluster *appsv1.Cluster) bool {
-	if upgradeComp.ComponentDefinitionName == nil {
+	return u.needUpdateCompDefName(upgradeComp.ComponentDefinitionName, cluster)
+}
+
+func (u upgradeOpsHandler) needUpdateCompDefName(componentDefinitionName *string, cluster *appsv1.Cluster) bool {
+	if componentDefinitionName == nil {
 		return false
 	}
 	// we will ignore the empty ComponentDefinitionName if cluster.Spec.clusterDef is empty.
-	return *upgradeComp.ComponentDefinitionName != "" ||
-		(*upgradeComp.ComponentDefinitionName == "" && cluster.Spec.ClusterDef != "")
+	return *componentDefinitionName != "" ||
+		(*componentDefinitionName == "" && cluster.Spec.ClusterDef != "")
 }

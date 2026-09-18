@@ -22,6 +22,7 @@ package operations
 import (
 	"fmt"
 	"strings"
+	"testing"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -470,3 +471,24 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 		})
 	})
 })
+
+func TestVolumeExpansionStorageMapScopedToInstanceTemplate(t *testing.T) {
+	op := &opsv1alpha1.OpsRequest{}
+	op.Spec.VolumeExpansionList = []opsv1alpha1.VolumeExpansion{{
+		ComponentOps: opsv1alpha1.ComponentOps{ComponentName: "db"},
+		Instances: []opsv1alpha1.InstanceVolumeClaimTemplate{{
+			Name: "large",
+			VolumeClaimTemplates: []opsv1alpha1.OpsRequestVolumeClaimTemplate{{
+				Name: "data", Storage: resource.MustParse("20Gi"),
+			}},
+		}},
+	}}
+
+	storage := (volumeExpansionOpsHandler{}).getRequestStorageMap(op)
+	if got := storage[getComponentVCTKey("db", "large", "data")]; got.Cmp(resource.MustParse("20Gi")) != 0 {
+		t.Fatalf("scoped storage = %s, want 20Gi", got.String())
+	}
+	if _, ok := storage[getComponentVCTKey("db", "", "data")]; ok {
+		t.Fatal("scoped expansion unexpectedly populated component-level storage")
+	}
+}

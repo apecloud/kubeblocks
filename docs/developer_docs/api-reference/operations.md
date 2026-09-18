@@ -4785,6 +4785,20 @@ ComponentOps
 that are used to expand the storage and the desired storage size for each one.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>instances</code><br/>
+<em>
+<a href="#operations.kubeblocks.io/v1alpha1.InstanceVolumeClaimTemplate">
+[]InstanceVolumeClaimTemplate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies volume expansions for individual instance templates.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <hr/>

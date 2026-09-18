@@ -216,6 +216,23 @@ func (r *OpsRequest) validateUpgrade(ctx context.Context, k8sClient client.Clien
 		return notEmptyError("spec.upgrade.components")
 	}
 	for _, v := range r.Spec.Upgrade.Components {
+		instanceNames := make([]string, 0, len(v.Instances))
+		for _, instance := range v.Instances {
+			instanceNames = append(instanceNames, instance.Name)
+			if instance.ComponentDefinitionName == nil && instance.ServiceVersion == nil {
+				return invalidValueError(instance.Name, "at least one componentDefinitionName or serviceVersion is required")
+			}
+			if instance.ServiceVersion != nil && *instance.ServiceVersion != "" {
+				if _, err := version.ParseSemantic(*instance.ServiceVersion); err != nil {
+					return invalidValueError(instance.Name, fmt.Sprintf("serviceVersion \"%s\" is not a valid semantic version: %s", *instance.ServiceVersion, err.Error()))
+				}
+			}
+		}
+		if len(instanceNames) > 0 {
+			if err := r.checkInstanceTemplate(cluster, v.ComponentOps, instanceNames); err != nil {
+				return err
+			}
+		}
 		if v.ServiceVersion != nil && *v.ServiceVersion != "" {
 			if _, err := version.ParseSemantic(*v.ServiceVersion); err != nil {
 				return invalidValueError(v.ComponentName, fmt.Sprintf("serviceVersion \"%s\" is not a valid semantic version: %s", *v.ServiceVersion, err.Error()))
@@ -539,6 +556,15 @@ func (r *OpsRequest) validateVolumeExpansion(ctx context.Context, cli client.Cli
 	if err := r.checkComponentExistence(cluster, compOpsList); err != nil {
 		return err
 	}
+	for _, volumeExpansion := range volumeExpansionList {
+		instanceNames := make([]string, 0, len(volumeExpansion.Instances))
+		for _, instance := range volumeExpansion.Instances {
+			instanceNames = append(instanceNames, instance.Name)
+		}
+		if err := r.checkInstanceTemplate(cluster, volumeExpansion.ComponentOps, instanceNames); err != nil {
+			return err
+		}
+	}
 	return r.checkVolumesAllowExpansion(ctx, cli, cluster)
 }
 
@@ -651,11 +677,22 @@ func (r *OpsRequest) checkVolumesAllowExpansion(ctx context.Context, cli client.
 
 	for _, comp := range r.Spec.VolumeExpansionList {
 		setVols(comp.VolumeClaimTemplates, comp.ComponentOps.ComponentName)
+		for _, instance := range comp.Instances {
+			setVols(instance.VolumeClaimTemplates, fmt.Sprintf("%s.%s", comp.ComponentName, instance.Name))
+		}
 		for _, compSpec := range cluster.Spec.ComponentSpecs {
 			if compSpec.Name == comp.ComponentOps.ComponentName {
 				for _, its := range compSpec.Instances {
 					setVols(comp.VolumeClaimTemplates, fmt.Sprintf("%s.%s", compSpec.Name, its.Name))
 				}
+			}
+		}
+		for _, sharding := range cluster.Spec.Shardings {
+			if sharding.Name != comp.ComponentName {
+				continue
+			}
+			for _, instance := range comp.Instances {
+				setVols(instance.VolumeClaimTemplates, fmt.Sprintf("%s.%s", sharding.Name, instance.Name))
 			}
 		}
 	}
@@ -677,13 +714,13 @@ func (r *OpsRequest) checkVolumesAllowExpansion(ctx context.Context, cli client.
 			fillVol(vct, componentName, isShardingComp)
 		}
 	}
-	fillItsVols := func(itsSpec appsv1.InstanceTemplate, cmpVcts []appsv1.PersistentVolumeClaimTemplate, key string) {
+	fillItsVols := func(itsSpec appsv1.InstanceTemplate, cmpVcts []appsv1.PersistentVolumeClaimTemplate, key string, isShardingComp bool) {
 		if _, ok := vols[key]; !ok {
 			return // ignore not-exist its
 		}
 		mergedVcts := mergeItsCmpTemplates(itsSpec.VolumeClaimTemplates, cmpVcts)
 		for _, vct := range mergedVcts {
-			fillVol(vct, key, false)
+			fillVol(vct, key, isShardingComp)
 		}
 	}
 	// traverse the spec to update volumes
@@ -691,11 +728,14 @@ func (r *OpsRequest) checkVolumesAllowExpansion(ctx context.Context, cli client.
 		fillCompVols(comp, comp.Name, false)
 		for _, its := range comp.Instances {
 			// update its vct volumes
-			fillItsVols(its, comp.VolumeClaimTemplates, fmt.Sprintf("%s.%s", comp.Name, its.Name))
+			fillItsVols(its, comp.VolumeClaimTemplates, fmt.Sprintf("%s.%s", comp.Name, its.Name), false)
 		}
 	}
 	for _, sharding := range cluster.Spec.Shardings {
 		fillCompVols(sharding.Template, sharding.Name, true)
+		for _, its := range sharding.Template.Instances {
+			fillItsVols(its, sharding.Template.VolumeClaimTemplates, fmt.Sprintf("%s.%s", sharding.Name, its.Name), true)
+		}
 	}
 
 	// check all used storage classes
@@ -787,7 +827,7 @@ func (r *OpsRequest) getSCNameByPvcAndCheckStorageSize(ctx context.Context,
 	componentName := key
 	targetInsTPLName := ""
 	if strings.Contains(key, ".") {
-		keyStrs := strings.Split(key, ".")
+		keyStrs := strings.SplitN(key, ".", 2)
 		componentName = keyStrs[0]
 		targetInsTPLName = keyStrs[1]
 	}

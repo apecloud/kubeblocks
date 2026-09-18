@@ -3115,12 +3115,34 @@ spec:
                             use the latest available version in ComponentVersion.
                           maxLength: 32
                           type: string
+                        instances:
+                          description: Specifies the instance templates to upgrade.
+                          items:
+                            properties:
+                              componentDefinitionName:
+                                description: Specifies the ComponentDefinition for this instance template.
+                                maxLength: 64
+                                type: string
+                              name:
+                                description: Refer to the instance template name of the component or sharding.
+                                type: string
+                              serviceVersion:
+                                description: Specifies the ServiceVersion for this instance template.
+                                maxLength: 32
+                                type: string
+                            required:
+                            - name
+                            type: object
+                          type: array
+                          x-kubernetes-list-map-keys:
+                          - name
+                          x-kubernetes-list-type: map
                       required:
                       - componentName
                       type: object
                       x-kubernetes-validations:
-                      - message: at least one componentDefinitionName or serviceVersion
-                        rule: has(self.componentDefinitionName) || has(self.serviceVersion)
+                      - message: at least one componentDefinitionName, serviceVersion, or instances entry is required
+                        rule: has(self.componentDefinitionName) || has(self.serviceVersion) || size(self.instances) > 0
                     maxItems: 1024
                     type: array
                     x-kubernetes-list-map-keys:
@@ -3306,10 +3328,52 @@ spec:
                       x-kubernetes-list-map-keys:
                       - name
                       x-kubernetes-list-type: map
+                    instances:
+                      description: Specifies volume expansions for individual instance templates.
+                      items:
+                        properties:
+                          name:
+                            description: Refer to the instance template name of the component or sharding.
+                            type: string
+                          volumeClaimTemplates:
+                            description: volumeClaimTemplates specifies the storage size and volumeClaimTemplate name.
+                            items:
+                              properties:
+                                name:
+                                  description: |-
+                                    Specify the name of the volumeClaimTemplate in the Component.
+                                    The specified name must match one of the volumeClaimTemplates defined
+                                    in the `clusterComponentSpec.volumeClaimTemplates` field.
+                                  type: string
+                                storage:
+                                  anyOf:
+                                  - type: integer
+                                  - type: string
+                                  description: Specifies the desired storage size for the volume.
+                                  pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                  x-kubernetes-int-or-string: true
+                              required:
+                              - name
+                              - storage
+                              type: object
+                            type: array
+                            x-kubernetes-list-map-keys:
+                            - name
+                            x-kubernetes-list-type: map
+                        required:
+                        - name
+                        - volumeClaimTemplates
+                        type: object
+                      type: array
+                      x-kubernetes-list-map-keys:
+                      - name
+                      x-kubernetes-list-type: map
                   required:
                   - componentName
-                  - volumeClaimTemplates
                   type: object
+                  x-kubernetes-validations:
+                  - message: at least one volumeClaimTemplates or instances entry is required
+                    rule: size(self.volumeClaimTemplates) > 0 || size(self.instances) > 0
                 type: array
                 x-kubernetes-list-map-keys:
                 - componentName

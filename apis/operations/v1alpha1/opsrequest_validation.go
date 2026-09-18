@@ -556,6 +556,15 @@ func (r *OpsRequest) validateVolumeExpansion(ctx context.Context, cli client.Cli
 	if err := r.checkComponentExistence(cluster, compOpsList); err != nil {
 		return err
 	}
+	for _, expansion := range volumeExpansionList {
+		instanceNames := make([]string, 0, len(expansion.Instances))
+		for _, instance := range expansion.Instances {
+			instanceNames = append(instanceNames, instance.Name)
+		}
+		if err := r.checkInstanceTemplate(cluster, expansion.ComponentOps, instanceNames); err != nil {
+			return err
+		}
+	}
 	storageClasses := sets.New[string]()
 	for _, expansion := range volumeExpansionList {
 		if comp := cluster.Spec.GetComponentByName(expansion.ComponentName); comp != nil {

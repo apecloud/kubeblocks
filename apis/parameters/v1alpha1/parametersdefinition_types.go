@@ -467,6 +467,7 @@ type IniConfig struct {
 type ParametersSchema struct {
 	// Specifies the top-level key in the 'configSchema.cue' that organizes the validation rules for parameters.
 	// This key must exist within the CUE script defined in 'configSchema.cue'.
+	// If not specified, the first schema found will be used.
 	//
 	// +optional
 	TopLevelKey string `json:"topLevelKey,omitempty"`

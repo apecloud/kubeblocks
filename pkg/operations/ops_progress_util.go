@@ -26,6 +26,7 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -154,13 +155,6 @@ func updateProgressDetailTime(progressDetail *opsv1alpha1.ProgressStatusDetail) 
 	}
 }
 
-func needToCheckRole(pgRes *progressResource) bool {
-	if pgRes.componentDef == nil {
-		panic("componentDef is nil")
-	}
-	return len(pgRes.componentDef.Spec.Roles) > 0
-}
-
 func getProgressProcessingMessage(opsMessageKey, objectKey, componentName string) string {
 	return fmt.Sprintf("Start to %s: %s in Component: %s", opsMessageKey, objectKey, componentName)
 }
@@ -212,51 +206,71 @@ func getFailedPodMessage(cluster *appsv1.Cluster, componentName, instanceName st
 	return clusterCompStatus.GetObjectMessage(constant.PodKind, instanceName)
 }
 
-// handleComponentProgressDetails handles the component progressDetails when scale the replicas.
-// @return expectProgressCount,
-// @return completedCount
-// @return error
-func handleComponentProgressForScalingReplicas(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	opsRes *OpsResource,
-	pgRes *progressResource,
-	compStatus *opsv1alpha1.OpsRequestComponentStatus) (int32, int32, error) {
-	var (
-		clusterComponent = pgRes.clusterComponent
-		err              error
-		updatedPodCount  = int32(len(pgRes.createdPodSet) + len(pgRes.deletedPodSet))
-		completedCount   int32
-	)
-	if clusterComponent == nil {
-		return 0, 0, nil
+// handleReplicaScalingProgress projects the current allocation without predicting identities.
+func handleReplicaScalingProgress(opsRes *OpsResource, resource *progressResource,
+	its *workloads.InstanceSet) instanceProgress {
+	result := handleRunningInstanceProgress(opsRes, resource, its)
+	if resource.shards == nil {
+		active, err := activeInstanceTemplates(its.Status.InstanceStatus)
+		result.observationsComplete = result.observationsComplete && err == nil &&
+			assignmentsMatchComponent(active, resource.clusterComponent)
 	}
-	// if no any pod needs to create or delete, return
-	if updatedPodCount == 0 {
-		return 0, 0, nil
-	}
-	runtime, err := opsRes.GetRuntime(pgRes.compOps.GetComponentName())
-	if err != nil {
-		return 0, completedCount, err
-	}
-	workload, err := runtime.GetWorkload(opsRes.Cluster.Namespace, opsRes.Cluster.Name, pgRes.fullComponentName)
-	if err != nil {
-		return 0, 0, err
-	}
-	if len(pgRes.createdPodSet) > 0 {
-		scaleOutCompletedCount, scaleOutErr := handleScaleOutProgressWithWorkload(opsRes, pgRes, workload, compStatus)
-		if scaleOutErr != nil {
-			err = scaleOutErr
+	target := resource.compOps.(opsv1alpha1.HorizontalScaling)
+	last := opsRes.OpsRequest.Status.LastConfiguration.Components[target.ComponentName]
+	explicit := sets.New[string]()
+	if target.ScaleIn != nil {
+		for _, name := range target.ScaleIn.OnlineInstancesToOffline {
+			if slices.Contains(resource.clusterComponent.OfflineInstances, name) {
+				explicit.Insert(name)
+			}
 		}
-		completedCount += scaleOutCompletedCount
 	}
-	if len(pgRes.deletedPodSet) > 0 {
-		scaleInCompletedCount, scaleInErr := handleScaleInProgressWithWorkload(opsRes, pgRes, workload, compStatus)
-		if scaleInErr != nil {
-			err = fmt.Errorf(scaleInErr.Error(), err)
+	if target.ScaleOut != nil {
+		for _, name := range target.ScaleOut.OfflineInstancesToOnline {
+			if slices.Contains(last.OfflineInstances, name) {
+				explicit.Insert(name)
+			}
 		}
-		completedCount += scaleInCompletedCount
 	}
-	return updatedPodCount, completedCount, err
+	for name := range explicit {
+		instance := its.FindInstanceStatus(name)
+		desired := workloads.InstanceDesiredStateActive
+		if slices.Contains(resource.clusterComponent.OfflineInstances, name) {
+			desired = workloads.InstanceDesiredStateOffline
+		}
+		if instance == nil || instance.EffectiveDesiredState() != desired {
+			result.observationsComplete = false
+		}
+	}
+	for i := range its.Status.InstanceStatus {
+		instance := &its.Status.InstanceStatus[i]
+		if instance.EffectiveDesiredState() == workloads.InstanceDesiredStateActive {
+			explicit.Delete(instance.PodName)
+			continue
+		}
+		if instance.EffectiveCurrentState() == workloads.InstanceCurrentStateAbsent && !explicit.Has(instance.PodName) {
+			continue
+		}
+		explicit.Delete(instance.PodName)
+		result.expectedCount++
+		detail := opsv1alpha1.ProgressStatusDetail{ObjectKey: getProgressObjectKey(constant.PodKind, instance.PodName),
+			Status: opsv1alpha1.ProcessingProgressStatus}
+		if instance.EffectiveCurrentState() == workloads.InstanceCurrentStateAbsent {
+			detail.Status = opsv1alpha1.SucceedProgressStatus
+			result.completedCount++
+			result.succeededCount++
+		}
+		detail.Message = fmt.Sprintf("%s instance %s in Component: %s", detail.Status, instance.PodName, resource.fullComponentName)
+		result.details = append(result.details, detail)
+	}
+	for name := range explicit {
+		result.expectedCount++
+		result.observationsComplete = false
+		result.details = append(result.details, opsv1alpha1.ProgressStatusDetail{
+			ObjectKey: getProgressObjectKey(constant.PodKind, name), Status: opsv1alpha1.PendingProgressStatus,
+			Message: fmt.Sprintf("Waiting for instance %s in Component: %s", name, resource.fullComponentName)})
+	}
+	return result
 }
 
 func updateProgressDetailForHScale(
@@ -286,68 +300,6 @@ func updateProgressDetailForHScale(
 		messagePrefix, strings.ToLower(pgRes.opsMessageKey), objectKey, pgRes.clusterComponent.Name)
 	setComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest,
 		&compStatus.ProgressDetails, progressDetail)
-}
-
-func handleScaleOutProgressWithWorkload(
-	opsRes *OpsResource,
-	pgRes *progressResource,
-	workload Workload,
-	compStatus *opsv1alpha1.OpsRequestComponentStatus) (completedCount int32, err error) {
-	currPodRevisionMap := workload.GetCurrentRevisionMap()
-	notReadyPodSet := workload.GetNotReadyInstanceNameSet()
-	notAvailablePodSet := workload.GetNotAvailableInstanceNameSet()
-	failurePodSet := workload.GetFailedInstanceNameSet()
-	pgRes.opsMessageKey = "Create"
-	memberStatusMap := workload.GetInstanceNameSet()
-	for podName := range pgRes.createdPodSet {
-		objectKey := getProgressObjectKey(constant.PodKind, podName)
-		if _, ok := currPodRevisionMap[podName]; !ok {
-			updateProgressDetailForHScale(opsRes, pgRes, compStatus, objectKey, opsv1alpha1.PendingProgressStatus)
-			continue
-		}
-		if _, ok := failurePodSet[podName]; ok {
-			completedCount += 1
-			updateProgressDetailForHScale(opsRes, pgRes, compStatus, objectKey, opsv1alpha1.FailedProgressStatus)
-			continue
-		}
-		if _, ok := notReadyPodSet[podName]; ok {
-			updateProgressDetailForHScale(opsRes, pgRes, compStatus, objectKey, opsv1alpha1.ProcessingProgressStatus)
-			continue
-		}
-		if _, ok := notAvailablePodSet[podName]; ok {
-			continue
-		}
-		if !memberStatusMap.Has(podName) && needToCheckRole(pgRes) {
-			continue
-		}
-		completedCount += 1
-		updateProgressDetailForHScale(opsRes, pgRes, compStatus, objectKey, opsv1alpha1.SucceedProgressStatus)
-	}
-	return completedCount, nil
-}
-
-func handleScaleInProgressWithWorkload(
-	opsRes *OpsResource,
-	pgRes *progressResource,
-	workload Workload,
-	compStatus *opsv1alpha1.OpsRequestComponentStatus) (completedCount int32, err error) {
-	currPodRevisionMap := workload.GetCurrentRevisionMap()
-	notReadyPodSet := workload.GetNotReadyInstanceNameSet()
-	pgRes.opsMessageKey = "Delete"
-	for podName := range pgRes.deletedPodSet {
-		objectKey := getProgressObjectKey(constant.PodKind, podName)
-		if _, ok := currPodRevisionMap[podName]; !ok {
-			completedCount += 1
-			updateProgressDetailForHScale(opsRes, pgRes, compStatus, objectKey, opsv1alpha1.SucceedProgressStatus)
-			continue
-		}
-		if _, ok := notReadyPodSet[podName]; ok {
-			updateProgressDetailForHScale(opsRes, pgRes, compStatus, objectKey, opsv1alpha1.ProcessingProgressStatus)
-			continue
-		}
-		updateProgressDetailForHScale(opsRes, pgRes, compStatus, objectKey, opsv1alpha1.PendingProgressStatus)
-	}
-	return completedCount, nil
 }
 
 // handleComponentProgressForScalingShards handles the component progressDetails when scaling the shards.

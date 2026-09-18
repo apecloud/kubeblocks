@@ -49,21 +49,6 @@ func (e *WaitForClusterPhaseErr) Error() string {
 	return fmt.Sprintf("wait for cluster %s to reach phase %v, current status is :%s", e.clusterName, e.expectedPhase, e.currentPhase)
 }
 
-type handleStatusProgressWithComponent func(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	opsRes *OpsResource,
-	pgRes *progressResource,
-	compStatus *opsv1alpha1.OpsRequestComponentStatus) (expectProgressCount int32, succeedCount int32, err error)
-
-// getClusterDefByName gets the ClusterDefinition object by the name.
-func getClusterDefByName(ctx context.Context, cli client.Client, clusterDefName string) (*appsv1.ClusterDefinition, error) {
-	clusterDef := &appsv1.ClusterDefinition{}
-	if err := cli.Get(ctx, client.ObjectKey{Name: clusterDefName}, clusterDef); err != nil {
-		return nil, err
-	}
-	return clusterDef, nil
-}
-
 // PatchOpsStatusWithOpsDeepCopy patches OpsRequest.status with the deepCopy opsRequest.
 func PatchOpsStatusWithOpsDeepCopy(ctx context.Context,
 	cli client.Client,

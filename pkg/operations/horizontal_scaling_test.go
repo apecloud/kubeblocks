@@ -24,6 +24,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -38,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
@@ -48,7 +50,6 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/plan"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
@@ -104,15 +105,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 	}
 
 	mockScalingAssignments := func(opsRes *OpsResource) {
-		testapps.MockInstanceSetStatus(testCtx, opsRes.Cluster, defaultCompName)
-		Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKey{Namespace: opsRes.Cluster.Namespace,
-			Name: constant.GenerateClusterComponentName(opsRes.Cluster.Name, defaultCompName)}, func(its *workloads.InstanceSet) {
-			for _, name := range opsRes.Cluster.Spec.GetComponentByName(defaultCompName).OfflineInstances {
-				template := appsv1.GetInstanceTemplateName(opsRes.Cluster.Name, defaultCompName, name)
-				its.Status.InstanceStatus = append(its.Status.InstanceStatus, workloads.InstanceStatus{PodName: name, TemplateName: &template,
-					DesiredState: workloads.InstanceDesiredStateOffline, CurrentState: workloads.InstanceCurrentStateAbsent})
-			}
-		})()).Should(Succeed())
+		mockHorizontalScalingProgress(opsRes.Cluster, defaultCompName)
 	}
 
 	Context("Test OpsRequest", func() {
@@ -199,6 +192,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			By("expect for opsRequest phase is Succeed after pods has been scaled and component phase is Running")
 			// mock consensus component is Running
 			mockConsensusCompToRunning(opsRes)
+			mockHorizontalScalingProgress(opsRes.Cluster, defaultCompName)
 			_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(opsv1alpha1.OpsSucceedPhase))
@@ -209,8 +203,8 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(opsv1alpha1.OpsCancelledPhase))
 			opsProgressDetails := opsRes.OpsRequest.Status.Components[defaultCompName].ProgressDetails
-			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("2/2"))
-			Expect(len(opsProgressDetails)).Should(Equal(2))
+			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("3/3"))
+			Expect(len(opsProgressDetails)).Should(Equal(3))
 		}
 
 		deletePods := func(pods ...*corev1.Pod) {
@@ -241,7 +235,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
 			opsRes, podList := commonHScaleConsensusCompTest(reqCtx, changeClusterSpec, horizontalScaling, false, false)
 			mockHScale(podList)
-			testapps.MockInstanceSetStatus(testCtx, opsRes.Cluster, defaultCompName)
+			mockHorizontalScalingProgress(opsRes.Cluster, defaultCompName)
 			checkOpsRequestPhaseIsSucceed(reqCtx, opsRes)
 		}
 
@@ -259,7 +253,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 				By("create the pod")
 				pod = createPods("", 3)[0]
 			}
-			testapps.MockInstanceSetStatus(testCtx, opsRes.Cluster, defaultCompName)
+			mockHorizontalScalingProgress(opsRes.Cluster, defaultCompName)
 			By("cancel HScale opsRequest after one pod has been deleted")
 			cancelOpsRequest(reqCtx, opsRes, time.Now().Add(-1*time.Second))
 			if isScaleDown {
@@ -269,12 +263,11 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 				By("delete the pod for rollback")
 				deletePods(pod)
 			}
-			testapps.MockInstanceSetStatus(testCtx, opsRes.Cluster, defaultCompName)
+			mockHorizontalScalingProgress(opsRes.Cluster, defaultCompName)
 			By("expect for opsRequest phase is Succeed after pods has been scaled and component phase is Running")
 			mockConsensusCompToRunning(opsRes)
 			checkCancelledSucceed(reqCtx, opsRes)
-			Expect(findStatusProgressDetail(opsRes.OpsRequest.Status.Components[defaultCompName].ProgressDetails,
-				getProgressObjectKey(constant.PodKind, pod.Name)).Status).Should(Equal(opsv1alpha1.SucceedProgressStatus))
+
 		}
 
 		It("test to scale out replicas with `scaleOut`", func() {
@@ -341,36 +334,21 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 					Should(Equal(dpv1alpha1.OneToOneRestorePolicy))
 			}
 
-			By("mock restore phase to completed")
-			comp, compDef, err := component.GetCompNCompDefByName(reqCtx.Ctx, k8sClient, opsRes.Cluster.Namespace, constant.GenerateClusterComponentName(opsRes.Cluster.Name, defaultCompName))
-			Expect(err).Should(BeNil())
-			synthesizedComponent, err := component.BuildSynthesizedComponent(reqCtx.Ctx, k8sClient, compDef, comp)
-			Expect(err).Should(BeNil())
-			changeRestorePhaseToComplete := func(index int32) {
-				restoreMGR := plan.NewRestoreManager(reqCtx.Ctx, k8sClient, opsRes.Cluster, model.GetScheme(), map[string]string{
-					constant.OpsRequestNameLabelKey: opsRes.OpsRequest.Name,
-				}, 1, index)
-				// check restore status
-				restoreMeta := restoreMGR.GetRestoreObjectMeta(synthesizedComponent, dpv1alpha1.PrepareData, "")
-				testapps.GetAndChangeObjStatus(&testCtx, types.NamespacedName{
-					Namespace: restoreMeta.Namespace,
-					Name:      restoreMeta.Name,
-				}, func(restore *dpv1alpha1.Restore) {
+			By("complete the created restores and submit the replica target")
+			for i := range restoreList.Items {
+				key := client.ObjectKeyFromObject(&restoreList.Items[i])
+				Eventually(testapps.GetAndChangeObjStatus(&testCtx, key, func(restore *dpv1alpha1.Restore) {
 					Expect(restore.Spec.Env).Should(Equal(restoreEnv))
 					restore.Status.Phase = dpv1alpha1.RestorePhaseCompleted
-				})
+				})).Should(Succeed())
 			}
-			changeRestorePhaseToComplete(3)
-			changeRestorePhaseToComplete(4)
-
-			By("expect component replicas to 5")
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.Cluster), func(g Gomega, cluster *appsv1.Cluster) {
-				g.Expect(cluster.Spec.GetComponentByName(defaultCompName).Replicas).Should(Equal(pointer.Int32(5)))
-			}))
+			_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(opsRes.Cluster.Spec.GetComponentByName(defaultCompName).Replicas).Should(Equal(int32(5)))
 
 			By("mock pods to created and expect opsRequest phase to Succeed")
 			createPods("", 3, 4)
-			testapps.MockInstanceSetStatus(testCtx, opsRes.Cluster, defaultCompName)
+			mockHorizontalScalingProgress(opsRes.Cluster, defaultCompName)
 			checkOpsRequestPhaseIsSucceed(reqCtx, opsRes)
 		})
 
@@ -440,7 +418,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 
 			By("mock specified pods deleted or created")
 			mockHScale(podList)
-			testapps.MockInstanceSetStatus(testCtx, opsRes.Cluster, defaultCompName)
+			mockHorizontalScalingProgress(opsRes.Cluster, defaultCompName)
 			checkOpsRequestPhaseIsSucceed(reqCtx, opsRes)
 			return opsRes
 		}
@@ -461,7 +439,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 				By(fmt.Sprintf(`delete the specified pod "%s"`, toDeletePodName))
 				deletePods(podList[2])
 			}, false)
-			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("1/1"))
+			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("3/3"))
 		})
 
 		It("test offline the specified pod and scale out another replicas", func() {
@@ -485,7 +463,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 				By("create a new pod(ordinal:2) by replicas")
 				createPods("", 2)
 			}, false)
-			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("2/2"))
+			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("4/4"))
 		})
 
 		It("test offline the specified pod and auto-sync replicaChanges", func() {
@@ -503,7 +481,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 				By("delete the specified pod " + offlineInstanceName)
 				deletePods(podList[0])
 			}, false)
-			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("1/1"))
+			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("3/3"))
 			By("expect replicas to 2 and template " + insTplName + " replicas to 0")
 			compSpec := opsRes.Cluster.Spec.GetComponentByName(defaultCompName)
 			Expect(compSpec.Replicas).Should(BeEquivalentTo(2))
@@ -525,7 +503,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 				By("create the specified pod " + offlineInstanceName)
 				testapps.MockInstanceSetPod(&testCtx, nil, clusterName, defaultCompName, offlineInstanceName, "follower")
 			}, false)
-			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("1/1"))
+			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("4/4"))
 			By("expect replicas to 4")
 			compSpec := opsRes.Cluster.Spec.GetComponentByName(defaultCompName)
 			Expect(compSpec.Replicas).Should(BeEquivalentTo(4))
@@ -549,7 +527,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 				testapps.MockInstanceSetPod(&testCtx, nil, clusterName, defaultCompName, offlineInstanceName, "follower")
 				testapps.MockInstanceSetPod(&testCtx, nil, clusterName, defaultCompName, offlineInstanceName2, "follower")
 			}, false)
-			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("2/2"))
+			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("5/5"))
 			By("expect replicas to 4")
 			compSpec := opsRes.Cluster.Spec.GetComponentByName(defaultCompName)
 			Expect(compSpec.Replicas).Should(BeEquivalentTo(5))
@@ -577,7 +555,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 				By(fmt.Sprintf(`create the pod "%s" which is removed from offlineInstances`, onlinePodName))
 				createPods("", 1)
 			}, false)
-			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("2/2"))
+			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("4/4"))
 			By("expect replicas to 3")
 			Expect(opsRes.Cluster.Spec.GetComponentByName(defaultCompName).Replicas).Should(BeEquivalentTo(3))
 		})
@@ -619,7 +597,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			createPods("bar", 0, 1, 2)
 			By("delete three pods")
 			deletePods(pods...)
-			testapps.MockInstanceSetStatus(testCtx, opsRes.Cluster, defaultCompName)
+			mockHorizontalScalingProgress(opsRes.Cluster, defaultCompName)
 			checkOpsRequestPhaseIsSucceed(reqCtx, opsRes)
 		})
 		createOpsAndToCreatingPhase := func(reqCtx intctrlutil.RequestCtx, opsRes *OpsResource, horizontalScaling opsv1alpha1.HorizontalScaling, ignoreHscalingStrictValidate bool) *opsv1alpha1.OpsRequest {
@@ -683,10 +661,14 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			onlineToOfflineInstances := opsRes.OpsRequest.Spec.HorizontalScalingList[0].ScaleIn.OnlineInstancesToOffline
 			Expect(onlineToOfflineInstances).Should(Equal([]string{testPodName, testPodName}), fmt.Sprintf("info: %v", opsRes.OpsRequest))
 			// expect for opsRequest phase is Succeed after pods has been scaled and component phase is Running
+			By("mock the remaining active instances")
+			its := &workloads.InstanceSet{}
+			Expect(k8sClient.Get(ctx, client.ObjectKey{Namespace: opsRes.Cluster.Namespace, Name: constant.GenerateClusterComponentName(clusterName, defaultCompName)}, its)).Should(Succeed())
+			testapps.MockInstanceSetPods(&testCtx, its, opsRes.Cluster, defaultCompName)
 			checkOpsRequestPhaseIsSucceed(reqCtx, opsRes)
 		})
 
-		It("test online two specified pods with same pod name with ignore validate", func() {
+		It("test offline duplicate instance names with ignore validation", func() {
 			By("init operations resources with CLusterDefinition/ClusterVersion/Hybrid components Cluster/consensus Pods")
 			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
 			testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
@@ -705,8 +687,12 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			onlineToOfflineInstances := opsRes.OpsRequest.Spec.HorizontalScalingList[0].ScaleIn.OnlineInstancesToOffline
 			Expect(onlineToOfflineInstances).Should(Equal([]string{testPodName, testPodName}), fmt.Sprintf("info: %v", opsRes.OpsRequest))
 			By("expect for opsRequest phase is Succeed after pods has been scaled and component phase is Running")
+			By("mock the remaining active instances")
+			its := &workloads.InstanceSet{}
+			Expect(k8sClient.Get(ctx, client.ObjectKey{Namespace: opsRes.Cluster.Namespace, Name: constant.GenerateClusterComponentName(clusterName, defaultCompName)}, its)).Should(Succeed())
+			testapps.MockInstanceSetPods(&testCtx, its, opsRes.Cluster, defaultCompName)
 			checkOpsRequestPhaseIsSucceed(reqCtx, opsRes)
-			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("1/1"), fmt.Sprintf("info: %v", opsRes.OpsRequest))
+			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("3/3"), fmt.Sprintf("info: %v", opsRes.OpsRequest))
 
 		})
 
@@ -731,25 +717,28 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 				By(fmt.Sprintf(`create the pod "%s" which is removed from offlineInstances`, onlinePodName))
 				createPods("", 1)
 			}, true)
-			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("2/2"))
+			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("4/4"))
 		})
 
 		It("test run multi horizontalScaling opsRequest with force flag", func() {
 			By("init operations resources with CLusterDefinition/Hybrid components Cluster/consensus Pods")
 			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
 			testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
+			createPods("", 0, 1, 2)
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
 			By("create first opsRequest to add 1 replicas with `scaleOut` field and expect replicas to 4")
-			createOpsAndToCreatingPhase(reqCtx, opsRes, opsv1alpha1.HorizontalScaling{
+			first := createOpsAndToCreatingPhase(reqCtx, opsRes, opsv1alpha1.HorizontalScaling{
 				ScaleOut: &opsv1alpha1.ScaleOut{ReplicaChanger: opsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(1)}},
 			}, false)
 			Expect(opsRes.Cluster.Spec.GetComponentByName(defaultCompName).Replicas).Should(BeEquivalentTo(4))
 
 			By("create secondary opsRequest to add 1 replicas with `replicasToAdd` field and expect replicas to 5")
-			createOpsAndToCreatingPhase(reqCtx, opsRes, opsv1alpha1.HorizontalScaling{
+			second := createOpsAndToCreatingPhase(reqCtx, opsRes, opsv1alpha1.HorizontalScaling{
 				ScaleOut: &opsv1alpha1.ScaleOut{ReplicaChanger: opsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(1)}},
 			}, false)
 			Expect(opsRes.Cluster.Spec.GetComponentByName(defaultCompName).Replicas).Should(BeEquivalentTo(5))
+
+			createPods("", 3, 4)
 
 			By("create third opsRequest to offline a pod which is created by another running opsRequest and expect it to fail")
 			offlineInsName := fmt.Sprintf("%s-%s-3", clusterName, defaultCompName)
@@ -770,6 +759,14 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsFailedPhase))
 			conditions = opsRes.OpsRequest.Status.Conditions
 			Expect(conditions[len(conditions)-1].Message).Should(ContainSubstring(`cannot be taken offline as it has been created by another running opsRequest`))
+			By("complete both accepted scale-outs against the current five-replica target")
+			for _, accepted := range []*opsv1alpha1.OpsRequest{first, second} {
+				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(accepted), accepted)).Should(Succeed())
+				opsRes.OpsRequest = accepted
+				checkOpsRequestPhaseIsSucceed(reqCtx, opsRes)
+				Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("5/5"))
+			}
+
 		})
 
 		It("horizontal scaling for shards component", func() {
@@ -1144,6 +1141,8 @@ func mockConsensusCompToRunning(opsRes *OpsResource) {
 	// mock consensus component is Running
 	compStatus := opsRes.Cluster.Status.Components[defaultCompName]
 	compStatus.Phase = appsv1.RunningComponentPhase
+	compStatus.UpToDate = true
+	compStatus.ObservedGeneration = opsRes.Cluster.Generation
 	opsRes.Cluster.Status.Components[defaultCompName] = compStatus
 }
 
@@ -1261,24 +1260,10 @@ type horizontalScalingFixture struct {
 	clusterWrites, backupReads, restoreReads int
 }
 
-// Observe the real runtime and inject failures only to check short-circuit order.
+// Record runtime calls to prove replica observations use the domain API.
 type horizontalScalingRuntimeTrace struct {
 	OpsRuntime
-	calls  []string
-	specs  []appsv1.ClusterComponentSpec
-	failAt int
-	err    error
-}
-
-func (r *horizontalScalingRuntimeTrace) GenerateInstanceNameSet(clusterName, compName string, replicas int32,
-	instances []appsv1.InstanceTemplate, offline []string) (map[string]string, error) {
-	r.calls = append(r.calls, fmt.Sprintf("names(%s,%d)", compName, replicas))
-	spec := appsv1.ClusterComponentSpec{Name: compName, Replicas: replicas, Instances: instances, OfflineInstances: offline}
-	r.specs = append(r.specs, *spec.DeepCopy())
-	if r.failAt > 0 && len(r.calls) == r.failAt {
-		return nil, r.err
-	}
-	return r.OpsRuntime.GenerateInstanceNameSet(clusterName, compName, replicas, instances, offline)
+	calls []string
 }
 
 func (r *horizontalScalingRuntimeTrace) GetWorkload(namespace, clusterName, compName string) (Workload, error) {
@@ -1286,63 +1271,24 @@ func (r *horizontalScalingRuntimeTrace) GetWorkload(namespace, clusterName, comp
 	return r.OpsRuntime.GetWorkload(namespace, clusterName, compName)
 }
 
-func TestHorizontalScalingParticipantAndProgressOrder(t *testing.T) {
+func TestHorizontalScalingDoesNotReadRuntimeProgress(t *testing.T) {
 	for _, fromBackup := range []bool{false, true} {
-		want := []string{"names(db,1)", "names(db,2)", "workload(db)"}
-		if fromBackup {
-			want = []string{"workload(db)"}
-		}
-		// Fail each name-planning step in turn to ensure no later planning,
-		// workload checks, or target writes occur after the first error.
-		for failAt := 0; failAt < len(want); failAt++ {
-			t.Run(fmt.Sprintf("backup=%t/failAt=%d", fromBackup, failAt), func(t *testing.T) {
-				f := newHorizontalScalingFixture(t, scaleOutRequest("db", fromBackup))
-				if fromBackup {
-					f.addBackup(t)
-				}
-				trace := &horizontalScalingRuntimeTrace{OpsRuntime: f.res.Runtimes["db"], err: errors.New("name planning failed")}
-				f.res.Runtimes["db"] = trace
-				hs := horizontalScalingOpsHandler{}
-				if err := hs.Action(f.req, f.cli, f.res); err != nil {
-					t.Fatal(err)
-				}
-				var actionCalls []string
-				if !reflect.DeepEqual(trace.calls, actionCalls) {
-					t.Fatalf("Action calls = %v", trace.calls)
-				}
-				trace.calls, trace.specs, trace.failAt = nil, nil, failAt
-				phase, _, err := hs.ReconcileAction(f.req, f.cli, f.res)
-				if phase != opsv1alpha1.OpsRunningPhase {
-					t.Fatalf("phase = %s", phase)
-				}
-				wantCalls := want
-				if failAt > 0 {
-					wantCalls = want[:failAt]
-					if !errors.Is(err, trace.err) {
-						t.Fatalf("error = %v, want injected error", err)
-					}
-				} else if err != nil {
-					t.Fatal(err)
-				}
-				if !reflect.DeepEqual(trace.calls, wantCalls) {
-					t.Fatalf("calls = %v, want %v", trace.calls, wantCalls)
-				}
-				if f.clusterWrites != 1 {
-					t.Fatalf("cluster writes = %d", f.clusterWrites)
-				}
-				restores := &dpv1alpha1.RestoreList{}
-				if err := f.cli.List(f.req.Ctx, restores); err != nil {
-					t.Fatal(err)
-				}
-				wantRestores := 0
-				if fromBackup {
-					wantRestores = 1
-				}
-				if len(restores.Items) != wantRestores {
-					t.Fatalf("restores = %d, want %d", len(restores.Items), wantRestores)
-				}
-			})
-		}
+		t.Run(fmt.Sprintf("backup=%t", fromBackup), func(t *testing.T) {
+			f := newHorizontalScalingFixture(t, scaleOutRequest("db", fromBackup))
+			if fromBackup {
+				f.addBackup(t)
+			}
+			trace := &horizontalScalingRuntimeTrace{OpsRuntime: f.res.Runtimes["db"]}
+			f.res.Runtimes["db"] = trace
+			hs := horizontalScalingOpsHandler{}
+			if err := hs.Action(f.req, f.cli, f.res); err != nil {
+				t.Fatal(err)
+			}
+			f.reconcile(t, opsv1alpha1.OpsRunningPhase)
+			if len(trace.calls) > 0 {
+				t.Fatalf("runtime progress calls: %v", trace.calls)
+			}
+		})
 	}
 }
 
@@ -1539,7 +1485,7 @@ func TestHorizontalScalingOrdinaryPathDoesNotRestore(t *testing.T) {
 		t.Fatalf("ordinary path API calls: backup=%d restore=%d cluster writes=%d", f.backupReads, f.restoreReads, f.clusterWrites)
 	}
 	details := f.res.OpsRequest.Status.Components["db"].ProgressDetails
-	if f.res.OpsRequest.Status.Progress != "0/1" || len(details) != 1 || details[0].ObjectKey != "Pod/demo-db-1" || details[0].Status != opsv1alpha1.PendingProgressStatus {
+	if f.res.OpsRequest.Status.Progress != "0/1" || len(details) != 1 || details[0].ObjectKey != "Pod/demo-db-0" || details[0].Status != opsv1alpha1.ProcessingProgressStatus {
 		t.Fatalf("unexpected create progress: %+v", f.res.OpsRequest.Status)
 	}
 }
@@ -1605,22 +1551,14 @@ func TestHorizontalScalingMixedComponentsRestoreTiming(t *testing.T) {
 			}
 			// Restore completion alone does not complete the Ops: the newly
 			// requested instances must become available on both paths.
-			for _, name := range []string{"ordinary", "restored"} {
-				pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "demo-" + name + "-1", Namespace: "default",
-					Labels: constant.GetCompLabels("demo", name)},
-					Status: corev1.PodStatus{Phase: corev1.PodRunning,
-						Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}}}}
-				if err := f.cli.Create(f.req.Ctx, pod); err != nil {
-					t.Fatal(err)
-				}
-			}
+			publishHorizontalScalingResult(t, f)
 			f.reconcile(t, opsv1alpha1.OpsSucceedPhase)
-			if got := f.res.OpsRequest.Status.Progress; got != "2/2" {
+			if got := f.res.OpsRequest.Status.Progress; got != "4/4" {
 				t.Fatalf("completed progress = %q", got)
 			}
 			for _, name := range []string{"ordinary", "restored"} {
 				details := f.res.OpsRequest.Status.Components[name].ProgressDetails
-				if len(details) != 1 || details[0].ObjectKey != "Pod/demo-"+name+"-1" || details[0].Status != opsv1alpha1.SucceedProgressStatus {
+				if len(details) != 2 || details[0].ObjectKey != "Pod/demo-"+name+"-0" || details[0].Status != opsv1alpha1.SucceedProgressStatus {
 					t.Fatalf("unexpected completed participants for %s: %+v", name, details)
 				}
 			}
@@ -1696,11 +1634,6 @@ func TestHorizontalScalingCancelRestoresConfigurationAndDirection(t *testing.T) 
 		t.Fatal(err)
 	}
 	f.reconcile(t, opsv1alpha1.OpsRunningPhase)
-	details := f.res.OpsRequest.Status.Components["db"].ProgressDetails
-	if f.res.OpsRequest.Status.Progress != "0/1" || len(details) != 1 || details[0].ObjectKey != "Pod/demo-db-0" ||
-		details[0].Status != opsv1alpha1.PendingProgressStatus || !strings.Contains(details[0].Message, "create") {
-		t.Fatalf("unexpected create participants: %+v", f.res.OpsRequest.Status)
-	}
 	f.res.OpsRequest.Status.Phase = opsv1alpha1.OpsCancellingPhase
 	if err := hs.Cancel(f.req, f.cli, f.res); err != nil {
 		t.Fatal(err)
@@ -1709,10 +1642,10 @@ func TestHorizontalScalingCancelRestoresConfigurationAndDirection(t *testing.T) 
 		t.Fatal("Cancel did not restore the original configuration")
 	}
 	// ReconcileAction reports successful rollback; OpsManager maps it to Cancelled.
+	publishHorizontalScalingResult(t, f)
 	f.reconcile(t, opsv1alpha1.OpsSucceedPhase)
-	details = f.res.OpsRequest.Status.Components["db"].ProgressDetails
-	if f.res.OpsRequest.Status.Progress != "1/1" || len(details) != 1 || details[0].ObjectKey != "Pod/demo-db-0" || !strings.Contains(details[0].Message, "delete") {
-		t.Fatalf("unexpected cancel progress: %+v", f.res.OpsRequest.Status)
+	if f.res.OpsRequest.Status.Progress != "1/1" {
+		t.Fatalf("unexpected rollback observation: %+v", f.res.OpsRequest.Status)
 	}
 }
 
@@ -1748,7 +1681,7 @@ func TestHorizontalScalingShardCountAndShardReplicas(t *testing.T) {
 			if err := hs.Action(f.req, f.cli, f.res); err != nil {
 				t.Fatal(err)
 			}
-			wantShards, wantReplicas, wantProgress := int32(2), int32(2), "0/2"
+			wantShards, wantReplicas, wantProgress := int32(2), int32(2), "0/4"
 			if changeCount {
 				wantShards, wantReplicas, wantProgress = 3, 1, "0/1"
 			}
@@ -1760,7 +1693,7 @@ func TestHorizontalScalingShardCountAndShardReplicas(t *testing.T) {
 				t.Fatalf("progress = %s, want %s", got, wantProgress)
 			}
 			details := f.res.OpsRequest.Status.Components["sharded"].ProgressDetails
-			if len(details) != 2 {
+			if changeCount && len(details) != 2 || !changeCount && len(details) != 0 {
 				t.Fatalf("progress details = %+v", details)
 			}
 			for _, detail := range details {
@@ -1826,6 +1759,7 @@ func TestHorizontalScalingCancellingBackupKeepsOriginalScale(t *testing.T) {
 				t.Fatal(err)
 			}
 			f.replicas(t, "db", 1)
+			publishHorizontalScalingResult(t, f)
 			f.reconcile(t, opsv1alpha1.OpsSucceedPhase)
 			f.replicas(t, "db", 1)
 
@@ -1918,7 +1852,7 @@ func TestHorizontalScalingBackupRejectsInvalidPlanBeforeWork(t *testing.T) {
 func publishHorizontalScalingAssignments(t *testing.T, f *horizontalScalingFixture) {
 	t.Helper()
 	for _, target := range f.res.OpsRequest.Spec.HorizontalScalingList {
-		if isBackupScaling(target) || !hasExplicitScalingInstances(target) {
+		if target.Shards != nil {
 			continue
 		}
 		spec := getComponentSpecOrShardingTemplate(f.res.Cluster, target.ComponentName)
@@ -1929,7 +1863,7 @@ func publishHorizontalScalingAssignments(t *testing.T, f *horizontalScalingFixtu
 		if err != nil {
 			t.Fatal(err)
 		}
-		its := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Name: constant.GenerateClusterComponentName(f.res.Cluster.Name, target.ComponentName), Namespace: f.res.Cluster.Namespace}}
+		its := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Name: constant.GenerateClusterComponentName(f.res.Cluster.Name, target.ComponentName), Namespace: f.res.Cluster.Namespace}, Spec: workloads.InstanceSetSpec{Replicas: ptr.To[int32](spec.Replicas)}}
 		for name := range names {
 			template := appsv1.GetInstanceTemplateName(f.res.Cluster.Name, target.ComponentName, name)
 			its.Status.InstanceStatus = append(its.Status.InstanceStatus, workloads.InstanceStatus{PodName: name, TemplateName: &template, DesiredState: workloads.InstanceDesiredStateActive})
@@ -1947,6 +1881,7 @@ func publishHorizontalScalingAssignments(t *testing.T, f *horizontalScalingFixtu
 			}
 		} else {
 			current.Status = its.Status
+			current.Spec = its.Spec
 			if err := f.cli.Update(f.req.Ctx, current); err != nil {
 				t.Fatal(err)
 			}
@@ -2143,6 +2078,288 @@ func TestHorizontalScalingRejectsInvalidInstanceTargets(t *testing.T) {
 			if !reflect.DeepEqual(spec.OfflineInstances, wantOffline) {
 				t.Fatalf("offline instances = %v, want %v", spec.OfflineInstances, wantOffline)
 			}
+			if !tc.ignore {
+				return
+			}
+			cluster.Status.Components = map[string]appsv1.ClusterComponentStatus{
+				"db": {ObservedGeneration: cluster.Generation, UpToDate: true, Phase: appsv1.RunningComponentPhase},
+			}
+			its.Spec.Replicas = ptr.To[int32](spec.Replicas)
+			its.Status.ObservedGeneration = its.Generation
+			for i := range its.Status.InstanceStatus {
+				status := &its.Status.InstanceStatus[i]
+				status.CurrentState = workloads.InstanceCurrentStatePresent
+				status.UpToDate, status.Ready, status.Available = true, true, true
+				if slices.Contains(wantOffline, status.PodName) {
+					status.DesiredState = workloads.InstanceDesiredStateOffline
+					status.CurrentState = workloads.InstanceCurrentStateAbsent
+				}
+			}
+			if err := cli.Update(req.Ctx, its); err != nil {
+				t.Fatal(err)
+			}
+			res := &OpsResource{Cluster: cluster, OpsRequest: ops, Recorder: req.Recorder}
+			if _, err := GetOpsManager().Reconcile(req, cli, res); err != nil {
+				t.Fatal(err)
+			}
+			if err := cli.Get(req.Ctx, client.ObjectKeyFromObject(ops), ops); err != nil {
+				t.Fatal(err)
+			}
+			if ops.Status.Phase != opsv1alpha1.OpsSucceedPhase || ops.Status.Progress != "3/3" {
+				t.Fatalf("ignored names prevented completion: %+v", ops.Status)
+			}
 		})
+	}
+}
+
+// Publish the apps result and workload observations separately from the request.
+func publishHorizontalScalingResult(t *testing.T, f *horizontalScalingFixture) {
+	t.Helper()
+	publishHorizontalScalingAssignments(t, f)
+	if f.res.Cluster.Status.Components == nil {
+		f.res.Cluster.Status.Components = map[string]appsv1.ClusterComponentStatus{}
+	}
+	for _, spec := range f.res.Cluster.Spec.ComponentSpecs {
+		f.res.Cluster.Status.Components[spec.Name] = appsv1.ClusterComponentStatus{Phase: appsv1.RunningComponentPhase,
+			ObservedGeneration: f.res.Cluster.Generation, UpToDate: true}
+		its := &workloads.InstanceSet{}
+		if err := f.cli.Get(f.req.Ctx, client.ObjectKey{Namespace: f.res.Cluster.Namespace, Name: constant.GenerateClusterComponentName(f.res.Cluster.Name, spec.Name)}, its); err != nil {
+			t.Fatal(err)
+		}
+		its.Status.ObservedGeneration = its.Generation
+		for i := range its.Status.InstanceStatus {
+			status := &its.Status.InstanceStatus[i]
+			if status.EffectiveDesiredState() == workloads.InstanceDesiredStateActive {
+				status.CurrentState = workloads.InstanceCurrentStatePresent
+				status.UpToDate, status.Ready, status.Available = true, true, true
+			}
+		}
+		if err := f.cli.Update(f.req.Ctx, its); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+// Model owner observations, including terminating identities outside the target allocation.
+func mockHorizontalScalingProgress(cluster *appsv1.Cluster, name string) {
+	mockRunningInstanceStatus(cluster, name)
+	key := client.ObjectKey{Namespace: cluster.Namespace, Name: constant.GenerateClusterComponentName(cluster.Name, name)}
+	its := &workloads.InstanceSet{}
+	Expect(k8sClient.Get(testCtx.Ctx, key, its)).Should(Succeed())
+	spec := cluster.Spec.GetComponentByName(name)
+	its.Spec.Replicas = ptr.To[int32](spec.Replicas)
+	Expect(k8sClient.Update(testCtx.Ctx, its)).Should(Succeed())
+	pods := &corev1.PodList{}
+	Expect(k8sClient.List(testCtx.Ctx, pods, client.InNamespace(cluster.Namespace), client.MatchingLabels{constant.AppInstanceLabelKey: cluster.Name, constant.KBAppComponentLabelKey: name})).Should(Succeed())
+	Eventually(testapps.GetAndChangeObjStatus(&testCtx, key, func(its *workloads.InstanceSet) {
+		its.Status.ObservedGeneration = its.Generation
+		for _, offline := range spec.OfflineInstances {
+			template := appsv1.GetInstanceTemplateName(cluster.Name, name, offline)
+			its.Status.InstanceStatus = append(its.Status.InstanceStatus, workloads.InstanceStatus{PodName: offline, TemplateName: &template, DesiredState: workloads.InstanceDesiredStateOffline, CurrentState: workloads.InstanceCurrentStateAbsent})
+		}
+		for _, pod := range pods.Items {
+			if its.FindInstanceStatus(pod.Name) != nil {
+				continue
+			}
+			template := appsv1.GetInstanceTemplateName(cluster.Name, name, pod.Name)
+			currentState := workloads.InstanceCurrentStatePresent
+			if !pod.DeletionTimestamp.IsZero() {
+				currentState = workloads.InstanceCurrentStateTerminating
+			}
+			its.Status.InstanceStatus = append(its.Status.InstanceStatus, workloads.InstanceStatus{PodName: pod.Name, TemplateName: &template, DesiredState: workloads.InstanceDesiredStateReleased, CurrentState: currentState})
+		}
+	})).Should(Succeed())
+}
+
+func TestHorizontalScalingResultAndCurrentProgressConverge(t *testing.T) {
+	f := newHorizontalScalingFixture(t, scaleOutRequest("db", false))
+	hs := horizontalScalingOpsHandler{}
+	if err := hs.Action(f.req, f.cli, f.res); err != nil {
+		t.Fatal(err)
+	}
+	publishHorizontalScalingResult(t, f)
+	key := client.ObjectKey{Namespace: "default", Name: "demo-db"}
+	its := &workloads.InstanceSet{}
+	if err := f.cli.Get(f.req.Ctx, key, its); err != nil {
+		t.Fatal(err)
+	}
+	// A complete instance projection does not decide the apps result.
+	status := f.res.Cluster.Status.Components["db"]
+	status.UpToDate = false
+	f.res.Cluster.Status.Components["db"] = status
+	f.reconcile(t, opsv1alpha1.OpsRunningPhase)
+	if f.res.OpsRequest.Status.Progress != "2/2" {
+		t.Fatalf("progress=%s", f.res.OpsRequest.Status.Progress)
+	}
+	status.UpToDate = true
+	f.res.Cluster.Status.Components["db"] = status
+	// Apps can converge before all instance observations arrive.
+	original := its.DeepCopy()
+	its.Status.InstanceStatus = its.Status.InstanceStatus[:1]
+	if err := f.cli.Update(f.req.Ctx, its); err != nil {
+		t.Fatal(err)
+	}
+	f.reconcile(t, opsv1alpha1.OpsRunningPhase)
+	if f.res.OpsRequest.Status.Progress != "1/2" || len(f.res.OpsRequest.Status.Components["db"].ProgressDetails) != 1 {
+		t.Fatalf("missing observation was filled: %+v", f.res.OpsRequest.Status)
+	}
+	// A cached workload for the previous allocation is also insufficient.
+	its.Spec.Replicas = ptr.To[int32](1)
+	if err := f.cli.Update(f.req.Ctx, its); err != nil {
+		t.Fatal(err)
+	}
+	f.reconcile(t, opsv1alpha1.OpsRunningPhase)
+	if f.res.OpsRequest.Status.Progress != "1/1" {
+		t.Fatalf("progress=%s", f.res.OpsRequest.Status.Progress)
+	}
+	its.Spec = original.Spec
+	its.Status = original.Status
+	its.Status.InstanceStatus[0].Failed = true
+	objectKey := getProgressObjectKey(constant.PodKind, its.Status.InstanceStatus[0].PodName)
+	if err := f.cli.Update(f.req.Ctx, its); err != nil {
+		t.Fatal(err)
+	}
+	f.reconcile(t, opsv1alpha1.OpsRunningPhase)
+	failed := findStatusProgressDetail(f.res.OpsRequest.Status.Components["db"].ProgressDetails, objectKey)
+	if failed == nil || failed.Status != opsv1alpha1.FailedProgressStatus || failed.EndTime.IsZero() {
+		t.Fatalf("failed observation=%+v", failed)
+	}
+	its.Status.InstanceStatus[0].Failed = false
+	its.Status.InstanceStatus[0].Ready = false
+	if err := f.cli.Update(f.req.Ctx, its); err != nil {
+		t.Fatal(err)
+	}
+	f.reconcile(t, opsv1alpha1.OpsRunningPhase)
+	recovering := findStatusProgressDetail(f.res.OpsRequest.Status.Components["db"].ProgressDetails, objectKey)
+	if recovering == nil || recovering.Status != opsv1alpha1.ProcessingProgressStatus || !recovering.EndTime.IsZero() {
+		t.Fatalf("failed detail did not recover=%+v", recovering)
+	}
+	its.Status.InstanceStatus[0].Ready = true
+	if err := f.cli.Update(f.req.Ctx, its); err != nil {
+		t.Fatal(err)
+	}
+	// Simulate restarting the ops process from its persisted status.
+	resumed := &opsv1alpha1.OpsRequest{}
+	if err := f.cli.Get(f.req.Ctx, client.ObjectKeyFromObject(f.res.OpsRequest), resumed); err != nil {
+		t.Fatal(err)
+	}
+	f.res.OpsRequest = resumed
+	f.reconcile(t, opsv1alpha1.OpsSucceedPhase)
+	if f.res.OpsRequest.Status.Progress != "2/2" {
+		t.Fatalf("progress=%s", f.res.OpsRequest.Status.Progress)
+	}
+}
+
+func TestHorizontalScalingBackupPreparationIgnoresOldRunningTopology(t *testing.T) {
+	f := newHorizontalScalingFixture(t, scaleOutRequest("db", true))
+	f.addBackup(t)
+	publishHorizontalScalingResult(t, f)
+	if err := (horizontalScalingOpsHandler{}).Action(f.req, f.cli, f.res); err != nil {
+		t.Fatal(err)
+	}
+	f.reconcile(t, opsv1alpha1.OpsRunningPhase)
+	details := f.res.OpsRequest.Status.Components["db"].ProgressDetails
+	if f.res.OpsRequest.Status.Progress != "0/1" || len(details) != 1 || !strings.HasPrefix(details[0].ObjectKey, "Restore/") {
+		t.Fatalf("preparation projected old topology: %+v", f.res.OpsRequest.Status)
+	}
+	f.replicas(t, "db", 1)
+}
+
+func TestHorizontalScalingProgressPatchFailureRetries(t *testing.T) {
+	f := newHorizontalScalingFixture(t, scaleOutRequest("db", false))
+	if err := (horizontalScalingOpsHandler{}).Action(f.req, f.cli, f.res); err != nil {
+		t.Fatal(err)
+	}
+	publishHorizontalScalingResult(t, f)
+	failedPatch := errors.New("status patch failed")
+	interrupted := interceptor.NewClient(f.cli.(client.WithWatch), interceptor.Funcs{SubResourcePatch: func(ctx context.Context, cli client.Client, subResource string, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {
+		return failedPatch
+	}})
+	phase, _, err := (horizontalScalingOpsHandler{}).ReconcileAction(f.req, interrupted, f.res)
+	if phase != opsv1alpha1.OpsRunningPhase || !errors.Is(err, failedPatch) {
+		t.Fatalf("phase=%s err=%v", phase, err)
+	}
+	resumed := &opsv1alpha1.OpsRequest{}
+	if err := f.cli.Get(f.req.Ctx, client.ObjectKeyFromObject(f.res.OpsRequest), resumed); err != nil {
+		t.Fatal(err)
+	}
+	f.res.OpsRequest = resumed
+	f.reconcile(t, opsv1alpha1.OpsSucceedPhase)
+}
+
+func TestHorizontalScalingFailureWaitsForOtherAcceptedTargets(t *testing.T) {
+	f := newHorizontalScalingFixture(t, scaleOutRequest("db", false), scaleOutRequest("other", false))
+	if err := (horizontalScalingOpsHandler{}).Action(f.req, f.cli, f.res); err != nil {
+		t.Fatal(err)
+	}
+	publishHorizontalScalingResult(t, f)
+	status := f.res.Cluster.Status.Components["db"]
+	status.Phase = appsv1.FailedComponentPhase
+	f.res.Cluster.Status.Components["db"] = status
+	if err := f.cli.Delete(f.req.Ctx, &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Name: "demo-db", Namespace: "default"}}); err != nil {
+		t.Fatal(err)
+	}
+	other := f.res.Cluster.Status.Components["other"]
+	other.UpToDate = false
+	f.res.Cluster.Status.Components["other"] = other
+	f.reconcile(t, opsv1alpha1.OpsRunningPhase)
+	other.UpToDate = true
+	f.res.Cluster.Status.Components["other"] = other
+	f.reconcile(t, opsv1alpha1.OpsFailedPhase)
+}
+
+func TestHorizontalScalingEmptyShardingRequiresObservedResult(t *testing.T) {
+	f := newHorizontalScalingFixture(t, scaleOutRequest("sharded", false))
+	cluster := f.res.Cluster
+	cluster.Spec.Shardings = []appsv1.ClusterSharding{{Name: "sharded", Shards: 0, Template: cluster.Spec.ComponentSpecs[0]}}
+	cluster.Spec.ComponentSpecs = nil
+	hs := horizontalScalingOpsHandler{}
+	if err := hs.SaveLastConfiguration(f.req, f.cli, f.res); err != nil {
+		t.Fatal(err)
+	}
+	if err := hs.Action(f.req, f.cli, f.res); err != nil {
+		t.Fatal(err)
+	}
+	f.reconcile(t, opsv1alpha1.OpsRunningPhase)
+	cluster.Status.Shardings = map[string]appsv1.ClusterShardingStatus{
+		"sharded": {ObservedGeneration: cluster.Generation, UpToDate: true, Phase: appsv1.RunningComponentPhase},
+	}
+	f.reconcile(t, opsv1alpha1.OpsSucceedPhase)
+	if f.res.OpsRequest.Status.Progress != "0/0" {
+		t.Fatalf("progress=%s", f.res.OpsRequest.Status.Progress)
+	}
+}
+
+func TestHorizontalScalingWaitsForEveryShardObservation(t *testing.T) {
+	f := newHorizontalScalingFixture(t, scaleOutRequest("sharded", false))
+	cluster := f.res.Cluster
+	cluster.Spec.Shardings = []appsv1.ClusterSharding{{Name: "sharded", Shards: 2, Template: cluster.Spec.ComponentSpecs[0]}}
+	cluster.Spec.ComponentSpecs = nil
+	cluster.Status.Shardings = map[string]appsv1.ClusterShardingStatus{
+		"sharded": {ObservedGeneration: cluster.Generation, UpToDate: true, Phase: appsv1.RunningComponentPhase},
+	}
+	for _, name := range []string{"sharded-a", "sharded-b"} {
+		comp := &appsv1.Component{ObjectMeta: metav1.ObjectMeta{Name: "demo-" + name, Namespace: "default",
+			Labels: constant.GetCompLabels("demo", name, map[string]string{constant.KBAppShardingNameLabelKey: "sharded"})}}
+		its := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Name: comp.Name, Namespace: comp.Namespace},
+			Spec: workloads.InstanceSetSpec{Replicas: ptr.To[int32](1)},
+			Status: workloads.InstanceSetStatus{InstanceStatus: []workloads.InstanceStatus{{
+				PodName: comp.Name + "-chosen", TemplateName: ptr.To(""),
+				DesiredState: workloads.InstanceDesiredStateActive, CurrentState: workloads.InstanceCurrentStatePresent,
+				UpToDate: true, Ready: true, Available: true,
+			}}}}
+		for _, obj := range []client.Object{comp, its} {
+			if err := f.cli.Create(f.req.Ctx, obj); err != nil {
+				t.Fatal(err)
+			}
+		}
+		want := opsv1alpha1.OpsRunningPhase
+		if name == "sharded-b" {
+			want = opsv1alpha1.OpsSucceedPhase
+		}
+		f.reconcile(t, want)
+	}
+	if f.res.OpsRequest.Status.Progress != "2/2" {
+		t.Fatalf("progress=%s", f.res.OpsRequest.Status.Progress)
 	}
 }

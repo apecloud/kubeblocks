@@ -26,7 +26,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -101,15 +100,7 @@ type progressResource struct {
 	// specifies the number of shards. if nil, it is not a sharding component.
 	shards           *int32
 	clusterComponent *appsv1.ClusterComponentSpec
-	clusterDef       *appsv1.ClusterDefinition
-	componentDef     *appsv1.ComponentDefinition
-	createdPodSet    map[string]string
-	deletedPodSet    map[string]string
 	compOps          ComponentOpsInterface
-	// checks if it needs to wait the component to complete.
-	// if only updates a part of pods, set it to false.
-	noWaitComponentCompleted bool
-	componentPhase           appsv1.ComponentPhase
 }
 
 // OpsRuntime abstracts the standard ops paths that only need workload/member views
@@ -127,11 +118,6 @@ type OpsRuntime interface {
 
 type Workload interface {
 	GetInstanceStatuses() []workloads.InstanceStatus
-	GetInstanceNameSet() sets.Set[string]
-	GetCurrentRevisionMap() map[string]string
-	GetNotReadyInstanceNameSet() sets.Set[string]
-	GetNotAvailableInstanceNameSet() sets.Set[string]
-	GetFailedInstanceNameSet() sets.Set[string]
 }
 
 type Instance interface {

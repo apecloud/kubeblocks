@@ -59,11 +59,27 @@ func (u upgradeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	compOpsHelper = newComponentOpsHelper(upgradeSpec.Components)
 	if err := compOpsHelper.updateClusterComponentsAndShardings(opsRes.Cluster, func(compSpec *appsv1.ClusterComponentSpec, obj ComponentOpsInterface) error {
 		upgradeComp := obj.(opsv1alpha1.UpgradeComponent)
-		if u.needUpdateCompDef(upgradeComp, opsRes.Cluster) {
-			compSpec.ComponentDef = *upgradeComp.ComponentDefinitionName
+		if len(upgradeComp.Instances) == 0 {
+			if u.needUpdateCompDef(upgradeComp.ComponentDefinitionName, opsRes.Cluster) {
+				compSpec.ComponentDef = *upgradeComp.ComponentDefinitionName
+			}
+			if upgradeComp.ServiceVersion != nil {
+				compSpec.ServiceVersion = *upgradeComp.ServiceVersion
+			}
+			return nil
 		}
-		if upgradeComp.ServiceVersion != nil {
-			compSpec.ServiceVersion = *upgradeComp.ServiceVersion
+		for i := range compSpec.Instances {
+			for _, instance := range upgradeComp.Instances {
+				if compSpec.Instances[i].Name != instance.Name {
+					continue
+				}
+				if instance.ComponentDefinitionName != nil && u.needUpdateCompDef(instance.ComponentDefinitionName, opsRes.Cluster) {
+					compSpec.Instances[i].CompDef = *instance.ComponentDefinitionName
+				}
+				if instance.ServiceVersion != nil {
+					compSpec.Instances[i].ServiceVersion = *instance.ServiceVersion
+				}
+			}
 		}
 		return nil
 	}); err != nil {
@@ -109,13 +125,34 @@ func (u upgradeOpsHandler) targetsUnchanged(opsRes *OpsResource) bool {
 		if compSpec == nil {
 			return false
 		}
-		componentDef := ptr.Deref(upgrade.ComponentDefinitionName, "")
-		if componentDef != "" && compSpec.ComponentDef != componentDef {
-			return false
+		if len(upgrade.Instances) == 0 {
+			componentDef := ptr.Deref(upgrade.ComponentDefinitionName, "")
+			if componentDef != "" && compSpec.ComponentDef != componentDef {
+				return false
+			}
+			serviceVersion := ptr.Deref(upgrade.ServiceVersion, "")
+			if serviceVersion != "" && compSpec.ServiceVersion != serviceVersion {
+				return false
+			}
+			continue
 		}
-		serviceVersion := ptr.Deref(upgrade.ServiceVersion, "")
-		if serviceVersion != "" && compSpec.ServiceVersion != serviceVersion {
-			return false
+		for _, target := range upgrade.Instances {
+			var instance *appsv1.InstanceTemplate
+			for i := range compSpec.Instances {
+				if compSpec.Instances[i].Name == target.Name {
+					instance = &compSpec.Instances[i]
+					break
+				}
+			}
+			if instance == nil {
+				return false
+			}
+			if componentDef := ptr.Deref(target.ComponentDefinitionName, ""); componentDef != "" && instance.CompDef != componentDef {
+				return false
+			}
+			if serviceVersion := ptr.Deref(target.ServiceVersion, ""); serviceVersion != "" && instance.ServiceVersion != serviceVersion {
+				return false
+			}
 		}
 	}
 	return true
@@ -133,11 +170,11 @@ func (u upgradeOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, 
 	return nil
 }
 
-func (u upgradeOpsHandler) needUpdateCompDef(upgradeComp opsv1alpha1.UpgradeComponent, cluster *appsv1.Cluster) bool {
-	if upgradeComp.ComponentDefinitionName == nil {
+func (u upgradeOpsHandler) needUpdateCompDef(componentDefinitionName *string, cluster *appsv1.Cluster) bool {
+	if componentDefinitionName == nil {
 		return false
 	}
 	// we will ignore the empty ComponentDefinitionName if cluster.Spec.clusterDef is empty.
-	return *upgradeComp.ComponentDefinitionName != "" ||
-		(*upgradeComp.ComponentDefinitionName == "" && cluster.Spec.ClusterDef != "")
+	return *componentDefinitionName != "" ||
+		(*componentDefinitionName == "" && cluster.Spec.ClusterDef != "")
 }

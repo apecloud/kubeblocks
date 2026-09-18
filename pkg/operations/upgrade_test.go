@@ -108,6 +108,47 @@ func TestUpgradeTargetsUnchanged(t *testing.T) {
 	}
 }
 
+func TestUpgradeInstanceTemplate(t *testing.T) {
+	componentDef := "mysql-8.0"
+	serviceVersion := "8.0.36"
+	cluster := &appsv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "cluster", Namespace: "default"},
+		Spec: appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{{
+			Name: "mysql",
+			Instances: []appsv1.InstanceTemplate{
+				{Name: "az-a", CompDef: componentDef, ServiceVersion: serviceVersion},
+				{Name: "az-b", CompDef: componentDef, ServiceVersion: serviceVersion},
+			},
+		}}},
+	}
+	newDef, newVersion := "mysql-8.1", "8.1.0"
+	ops := &opsv1alpha1.OpsRequest{Spec: opsv1alpha1.OpsRequestSpec{SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{
+		Upgrade: &opsv1alpha1.Upgrade{Components: []opsv1alpha1.UpgradeComponent{{
+			ComponentOps: opsv1alpha1.ComponentOps{ComponentName: "mysql"},
+			Instances: []opsv1alpha1.InstanceUpgradeTemplate{{
+				Name: "az-a", ComponentDefinitionName: &newDef, ServiceVersion: &newVersion,
+			}},
+		}}},
+	}}}
+	scheme := runtime.NewScheme()
+	if err := appsv1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	if err := opsv1alpha1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster).Build()
+	if err := (upgradeOpsHandler{}).Action(intctrlutil.RequestCtx{Ctx: context.Background()}, cli, &OpsResource{Cluster: cluster, OpsRequest: ops}); err != nil {
+		t.Fatal(err)
+	}
+	if got := cluster.Spec.ComponentSpecs[0].Instances[0]; got.CompDef != newDef || got.ServiceVersion != newVersion {
+		t.Fatalf("az-a was not upgraded: %+v", got)
+	}
+	if got := cluster.Spec.ComponentSpecs[0].Instances[1]; got.CompDef != componentDef || got.ServiceVersion != serviceVersion {
+		t.Fatalf("az-b was unexpectedly upgraded: %+v", got)
+	}
+}
+
 func TestUpgradeAllowsLaterUnrelatedClusterGeneration(t *testing.T) {
 	const (
 		namespace      = "default"

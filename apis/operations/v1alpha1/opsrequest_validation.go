@@ -216,6 +216,23 @@ func (r *OpsRequest) validateUpgrade(ctx context.Context, k8sClient client.Clien
 		return notEmptyError("spec.upgrade.components")
 	}
 	for _, v := range r.Spec.Upgrade.Components {
+		instanceNames := make([]string, 0, len(v.Instances))
+		for _, instance := range v.Instances {
+			instanceNames = append(instanceNames, instance.Name)
+			if instance.ComponentDefinitionName == nil && instance.ServiceVersion == nil {
+				return invalidValueError(instance.Name, "at least one componentDefinitionName or serviceVersion is required")
+			}
+			if instance.ServiceVersion != nil && *instance.ServiceVersion != "" {
+				if _, err := version.ParseSemantic(*instance.ServiceVersion); err != nil {
+					return invalidValueError(instance.Name, fmt.Sprintf("serviceVersion \"%s\" is not a valid semantic version: %s", *instance.ServiceVersion, err.Error()))
+				}
+			}
+		}
+		if len(instanceNames) > 0 {
+			if err := r.checkInstanceTemplate(cluster, v.ComponentOps, instanceNames); err != nil {
+				return err
+			}
+		}
 		if v.ServiceVersion != nil && *v.ServiceVersion != "" {
 			if _, err := version.ParseSemantic(*v.ServiceVersion); err != nil {
 				return invalidValueError(v.ComponentName, fmt.Sprintf("serviceVersion \"%s\" is not a valid semantic version: %s", *v.ServiceVersion, err.Error()))

@@ -173,8 +173,6 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 						expectCount:       int(template.GetReplicas()),
 						vctName:           vct.Name,
 						templateName:      template.Name,
-						stopped:           stopped,
-						explicitOffline:   explicitOffline,
 					})
 				}
 				break

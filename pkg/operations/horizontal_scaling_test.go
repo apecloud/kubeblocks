@@ -2498,6 +2498,91 @@ func TestHorizontalScalingFailedRestoreDoesNotRestartWhilePeersFinish(t *testing
 	}
 }
 
+func TestHorizontalScalingPersistsFailureBeforeLaterRestoreReadError(t *testing.T) {
+	f := newHorizontalScalingFixture(t, scaleOutRequest("broken", true), scaleOutRequest("healthy", true))
+	f.addBackup(t)
+	if err := (horizontalScalingOpsHandler{}).Action(f.req, f.cli, f.res); err != nil {
+		t.Fatal(err)
+	}
+	f.reconcile(t, opsv1alpha1.OpsRunningPhase)
+	restores := &dpv1alpha1.RestoreList{}
+	if err := f.cli.List(f.req.Ctx, restores); err != nil {
+		t.Fatal(err)
+	}
+	var broken *dpv1alpha1.Restore
+	for i := range restores.Items {
+		if restores.Items[i].Labels[constant.KBAppComponentLabelKey] == "broken" {
+			broken = &restores.Items[i]
+		}
+	}
+	if broken == nil {
+		t.Fatal("missing broken restore")
+	}
+	broken.Status.Phase = dpv1alpha1.RestorePhaseFailed
+	if err := f.cli.Status().Update(f.req.Ctx, broken); err != nil {
+		t.Fatal(err)
+	}
+	failing := interceptor.NewClient(f.cli.(client.WithWatch), interceptor.Funcs{Get: func(ctx context.Context, cli client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+		if _, ok := obj.(*dpv1alpha1.Restore); ok && key.Name != broken.Name {
+			return errors.New("injected later Restore read failure")
+		}
+		return cli.Get(ctx, key, obj, opts...)
+	}})
+	_, err := GetOpsManager().Reconcile(f.req, failing, f.res)
+	if err == nil || !strings.Contains(err.Error(), "injected later") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	reloaded := &opsv1alpha1.OpsRequest{}
+	if err := f.cli.Get(f.req.Ctx, client.ObjectKeyFromObject(f.res.OpsRequest), reloaded); err != nil {
+		t.Fatal(err)
+	}
+	if reloaded.Status.Components["broken"].Reason != horizontalScalingFailedReason {
+		t.Fatalf("failed branch was not persisted: %+v", reloaded.Status)
+	}
+	f.res.OpsRequest = reloaded
+	if err := f.cli.Delete(f.req.Ctx, broken); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := GetOpsManager().Reconcile(f.req, f.cli, f.res); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.cli.Get(f.req.Ctx, client.ObjectKeyFromObject(broken), &dpv1alpha1.Restore{}); err == nil {
+		t.Fatal("failed Restore was recreated")
+	}
+}
+
+func TestHorizontalScalingCancellationCompletesAfterForwardTimeout(t *testing.T) {
+	f := newHorizontalScalingFixture(t, scaleOutRequest("db", true))
+	f.addBackup(t)
+	if err := (horizontalScalingOpsHandler{}).Action(f.req, f.cli, f.res); err != nil {
+		t.Fatal(err)
+	}
+	f.reconcile(t, opsv1alpha1.OpsRunningPhase)
+	f.res.OpsRequest.Spec.TimeoutSeconds = ptr.To(int32(1))
+	if err := f.cli.Update(f.req.Ctx, f.res.OpsRequest); err != nil {
+		t.Fatal(err)
+	}
+	previous := f.res.OpsRequest.DeepCopy()
+	if err := (horizontalScalingOpsHandler{}).Cancel(f.req, f.cli, f.res); err != nil {
+		t.Fatal(err)
+	}
+	f.res.OpsRequest.Status.StartTimestamp = metav1.NewTime(time.Now().Add(-time.Minute))
+	if err := PatchOpsStatusWithOpsDeepCopy(f.req.Ctx, f.cli, f.res, previous, opsv1alpha1.OpsCancellingPhase, opsv1alpha1.NewCancelingCondition(f.res.OpsRequest)); err != nil {
+		t.Fatal(err)
+	}
+	publishHorizontalScalingResult(t, f)
+	if _, err := GetOpsManager().Reconcile(f.req, f.cli, f.res); err != nil {
+		t.Fatal(err)
+	}
+	reloaded := &opsv1alpha1.OpsRequest{}
+	if err := f.cli.Get(f.req.Ctx, client.ObjectKeyFromObject(f.res.OpsRequest), reloaded); err != nil {
+		t.Fatal(err)
+	}
+	if reloaded.Status.Phase != opsv1alpha1.OpsCancelledPhase {
+		t.Fatalf("completed rollback was aborted: %s", reloaded.Status.Phase)
+	}
+}
+
 func TestHorizontalScalingTimeoutDoesNotDispatchBackupWork(t *testing.T) {
 	for _, started := range []bool{false, true} {
 		t.Run(fmt.Sprintf("restore-started-%t", started), func(t *testing.T) {

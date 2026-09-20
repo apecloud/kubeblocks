@@ -151,6 +151,9 @@ func (hs horizontalScalingOpsHandler) ReconcileAction(reqCtx intctrlutil.Request
 		phase, progress, err := hs.reconcileScalingTarget(reqCtx, cli, opsRes, target)
 		if err != nil {
 			if !intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal) {
+				if patchErr := patchCurrentProgress(reqCtx, cli, opsRes, oldOpsRequest, current, completed, expected); patchErr != nil {
+					return opsv1alpha1.OpsRunningPhase, 0, patchErr
+				}
 				return opsv1alpha1.OpsRunningPhase, 0, err
 			}
 			phase = opsv1alpha1.OpsFailedPhase
@@ -232,7 +235,8 @@ func (hs horizontalScalingOpsHandler) observeReplicaScaling(reqCtx intctrlutil.R
 		if isBackupScaling(target) {
 			status := opsRes.OpsRequest.Status.Components[target.ComponentName]
 			timeout := opsRes.OpsRequest.Spec.TimeoutSeconds
-			if status.Message != "Restore Data Completed" && timeout != nil && *timeout > 0 &&
+			if opsRes.OpsRequest.Status.Phase != opsv1alpha1.OpsCancellingPhase &&
+				status.Message != "Restore Data Completed" && timeout != nil && *timeout > 0 &&
 				!time.Now().Before(opsRes.OpsRequest.Status.StartTimestamp.Add(time.Duration(*timeout)*time.Second)) {
 				progress.observationsComplete = false
 				return progress, nil

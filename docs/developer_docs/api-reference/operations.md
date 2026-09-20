@@ -1755,6 +1755,20 @@ string
 <p>TemplateName identifies its instance template. An empty name denotes the default template.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>volumeClaimTemplates</code><br/>
+<em>
+<a href="#operations.kubeblocks.io/v1alpha1.OpsRequestVolumeClaimTemplate">
+[]OpsRequestVolumeClaimTemplate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Records instance-specific volume claim template storage before an operation.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="operations.kubeblocks.io/v1alpha1.MatchExpressions">MatchExpressions
@@ -2740,7 +2754,7 @@ Possible condition types include &ldquo;Cancelled&rdquo;, &ldquo;WaitForProgress
 <h3 id="operations.kubeblocks.io/v1alpha1.OpsRequestVolumeClaimTemplate">OpsRequestVolumeClaimTemplate
 </h3>
 <p>
-(<em>Appears on:</em><a href="#operations.kubeblocks.io/v1alpha1.InstanceVolumeClaimTemplate">InstanceVolumeClaimTemplate</a>, <a href="#operations.kubeblocks.io/v1alpha1.LastComponentConfiguration">LastComponentConfiguration</a>, <a href="#operations.kubeblocks.io/v1alpha1.VolumeExpansion">VolumeExpansion</a>)
+(<em>Appears on:</em><a href="#operations.kubeblocks.io/v1alpha1.InstanceVolumeClaimTemplate">InstanceVolumeClaimTemplate</a>, <a href="#operations.kubeblocks.io/v1alpha1.LastComponentConfiguration">LastComponentConfiguration</a>, <a href="#operations.kubeblocks.io/v1alpha1.LastInstanceConfiguration">LastInstanceConfiguration</a>, <a href="#operations.kubeblocks.io/v1alpha1.VolumeExpansion">VolumeExpansion</a>)
 </p>
 <div>
 </div>

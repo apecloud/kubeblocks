@@ -524,6 +524,9 @@ func setInitContainer(addon *extensionsv1alpha1.Addon, helmJobPodSpec *corev1.Po
 			},
 		},
 	}
+	if addon.Spec.RefreshRevision > 0 {
+		copyChartsContainer.ImagePullPolicy = corev1.PullAlways
+	}
 	if err := setAddonJobResourcesOrZero(&copyChartsContainer); err != nil {
 		return err
 	}

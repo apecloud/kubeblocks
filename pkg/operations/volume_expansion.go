@@ -94,10 +94,30 @@ func (ve volumeExpansionOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli cl
 		setVolumeStorage(volumeExpansion.VolumeClaimTemplates, compSpec.VolumeClaimTemplates)
 		for _, instanceExpansion := range volumeExpansion.Instances {
 			for i := range compSpec.Instances {
-				if compSpec.Instances[i].Name == instanceExpansion.Name {
-					setVolumeStorage(instanceExpansion.VolumeClaimTemplates, compSpec.Instances[i].VolumeClaimTemplates)
-					break
+				if compSpec.Instances[i].Name != instanceExpansion.Name {
+					continue
 				}
+				// An instance template may inherit the component VCT. Materialize
+				// that inherited VCT before applying the per-instance override.
+				for _, requested := range instanceExpansion.VolumeClaimTemplates {
+					found := false
+					for _, existing := range compSpec.Instances[i].VolumeClaimTemplates {
+						if existing.Name == requested.Name {
+							found = true
+							break
+						}
+					}
+					if !found {
+						for _, inherited := range compSpec.VolumeClaimTemplates {
+							if inherited.Name == requested.Name {
+								compSpec.Instances[i].VolumeClaimTemplates = append(compSpec.Instances[i].VolumeClaimTemplates, *inherited.DeepCopy())
+								break
+							}
+						}
+					}
+				}
+				setVolumeStorage(instanceExpansion.VolumeClaimTemplates, compSpec.Instances[i].VolumeClaimTemplates)
+				break
 			}
 		}
 		return nil

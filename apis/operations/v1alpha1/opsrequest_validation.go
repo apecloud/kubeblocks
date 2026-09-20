@@ -215,6 +215,9 @@ func (r *OpsRequest) validateUpgrade(ctx context.Context, k8sClient client.Clien
 		return notEmptyError("spec.upgrade.components")
 	}
 	for _, v := range r.Spec.Upgrade.Components {
+		if len(v.Instances) > 0 && (v.ComponentDefinitionName != nil || v.ServiceVersion != nil) {
+			return fmt.Errorf("upgrade component %q cannot combine component-level fields with instances", v.ComponentName)
+		}
 		instanceNames := make([]string, 0, len(v.Instances))
 		for _, instance := range v.Instances {
 			instanceNames = append(instanceNames, instance.Name)
@@ -584,6 +587,11 @@ func (r *OpsRequest) validateVolumeExpansion(ctx context.Context, cli client.Cli
 	}
 	storageClasses := sets.New[string]()
 	for _, expansion := range volumeExpansionList {
+		if len(expansion.Instances) > 0 {
+			if err := validateInstanceVolumeExpansions(expansion, cluster, storageClasses); err != nil {
+				return err
+			}
+		}
 		if comp := cluster.Spec.GetComponentByName(expansion.ComponentName); comp != nil {
 			if err := validateExpansionVolumes(expansion, comp.Name, comp.VolumeClaimTemplates); err != nil {
 				return err
@@ -602,6 +610,68 @@ func (r *OpsRequest) validateVolumeExpansion(ctx context.Context, cli client.Cli
 		}
 	}
 	return validateExpansionStorageClasses(ctx, cli, storageClasses)
+}
+
+func validateInstanceVolumeExpansions(expansion VolumeExpansion, cluster *appsv1.Cluster, storageClasses sets.Set[string]) error {
+	validated := sets.New[string]()
+	validate := func(scope string, base []appsv1.PersistentVolumeClaimTemplate, instances []appsv1.InstanceTemplate) error {
+		for _, target := range expansion.Instances {
+			for _, instance := range instances {
+				key := scope + "/" + instance.Name
+				if instance.Name != target.Name || validated.Has(key) {
+					continue
+				}
+				volumes := mergeInstanceVolumeTemplates(base, instance.VolumeClaimTemplates)
+				if err := validateExpansionVolumes(VolumeExpansion{VolumeClaimTemplates: target.VolumeClaimTemplates}, key, volumes); err != nil {
+					return err
+				}
+				collectExpansionStorageClasses(VolumeExpansion{VolumeClaimTemplates: target.VolumeClaimTemplates}, appsv1.ClusterComponentSpec{Replicas: instance.GetReplicas(), VolumeClaimTemplates: volumes}, storageClasses)
+				validated.Insert(key)
+			}
+		}
+		return nil
+	}
+	if comp := cluster.Spec.GetComponentByName(expansion.ComponentName); comp != nil {
+		if err := validate(comp.Name, comp.VolumeClaimTemplates, comp.Instances); err != nil {
+			return err
+		}
+	} else {
+		for _, sharding := range cluster.Spec.Shardings {
+			if sharding.Name != expansion.ComponentName {
+				continue
+			}
+			if err := validate(sharding.Name, sharding.Template.VolumeClaimTemplates, sharding.Template.Instances); err != nil {
+				return err
+			}
+			for _, shardTemplate := range sharding.ShardTemplates {
+				if err := validate(sharding.Name+"/"+shardTemplate.Name, shardTemplate.VolumeClaimTemplates, shardTemplate.Instances); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	if len(validated) == 0 {
+		return fmt.Errorf("instance templates in component %q were not found", expansion.ComponentName)
+	}
+	return nil
+}
+
+func mergeInstanceVolumeTemplates(base, overrides []appsv1.PersistentVolumeClaimTemplate) []appsv1.PersistentVolumeClaimTemplate {
+	merged := append([]appsv1.PersistentVolumeClaimTemplate(nil), base...)
+	for _, override := range overrides {
+		found := false
+		for i := range merged {
+			if merged[i].Name == override.Name {
+				merged[i] = override
+				found = true
+				break
+			}
+		}
+		if !found {
+			merged = append(merged, override)
+		}
+	}
+	return merged
 }
 
 func validateExpansionStorageClasses(ctx context.Context, cli client.Client, storageClasses sets.Set[string]) error {
@@ -694,6 +764,9 @@ func (r *OpsRequest) checkInstanceTemplate(cluster *appsv1.Cluster, componentOps
 			continue
 		}
 		setInstanceMap(spec.Template.Instances)
+		for _, shardTemplate := range spec.ShardTemplates {
+			setInstanceMap(shardTemplate.Instances)
+		}
 	}
 	for _, compSpec := range cluster.Spec.ComponentSpecs {
 		if compSpec.Name != componentOps.ComponentName {

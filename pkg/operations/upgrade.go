@@ -135,11 +135,21 @@ func (u upgradeOpsHandler) targetsUnchanged(opsRes *OpsResource) bool {
 			}
 			continue
 		}
+		instances := append([]appsv1.InstanceTemplate(nil), compSpec.Instances...)
+		for i := range opsRes.Cluster.Spec.Shardings {
+			sharding := &opsRes.Cluster.Spec.Shardings[i]
+			if sharding.Name != upgrade.ComponentName {
+				continue
+			}
+			for _, template := range sharding.ShardTemplates {
+				instances = append(instances, template.Instances...)
+			}
+		}
 		for _, target := range upgrade.Instances {
 			var instance *appsv1.InstanceTemplate
-			for i := range compSpec.Instances {
-				if compSpec.Instances[i].Name == target.Name {
-					instance = &compSpec.Instances[i]
+			for i := range instances {
+				if instances[i].Name == target.Name {
+					instance = &instances[i]
 					break
 				}
 			}

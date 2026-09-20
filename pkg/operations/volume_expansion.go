@@ -96,6 +96,20 @@ func (ve volumeExpansionOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli cl
 				if compSpec.Instances[i].Name != instanceExpansion.Name {
 					continue
 				}
+				for _, requested := range instanceExpansion.VolumeClaimTemplates {
+					found := false
+					for _, existing := range compSpec.Instances[i].VolumeClaimTemplates {
+						if existing.Name == requested.Name { found = true; break }
+					}
+					if !found {
+						for _, inherited := range compSpec.VolumeClaimTemplates {
+							if inherited.Name == requested.Name {
+								compSpec.Instances[i].VolumeClaimTemplates = append(compSpec.Instances[i].VolumeClaimTemplates, *inherited.DeepCopy())
+								break
+							}
+						}
+					}
+				}
 				setVolumeStorage(instanceExpansion.VolumeClaimTemplates, compSpec.Instances[i].VolumeClaimTemplates)
 				break
 			}

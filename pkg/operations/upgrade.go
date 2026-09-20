@@ -30,6 +30,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -122,7 +123,15 @@ func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 		pod *corev1.Pod,
 		pgRes *progressResource) bool {
 		upgradeComponent := pgRes.compOps.(opsv1alpha1.UpgradeComponent)
-		compDef, ok := componentDefMap[upgradeComponent.GetComponentName()]
+		templateName := pod.Labels[constant.KBAppInstanceTemplateLabelKey]
+		key := upgradeComponent.GetComponentName()
+		if templateName != "" {
+			key += "." + templateName
+		}
+		compDef, ok := componentDefMap[key]
+		if !ok {
+			compDef, ok = componentDefMap[upgradeComponent.GetComponentName()]
+		}
 		if !ok {
 			return true
 		}
@@ -153,23 +162,39 @@ func (u upgradeOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, 
 // getComponentDefMapWithUpdatedImages gets the desired componentDefinition map
 // that is updated with the corresponding images of the ComponentDefinition and service version.
 func (u upgradeOpsHandler) getComponentDefMapWithUpdatedImages(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	opsRes *OpsResource) (map[string]*appsv1.ComponentDefinition, error) {
+	cli client.Client, opsRes *OpsResource) (map[string]*appsv1.ComponentDefinition, error) {
 	compDefMap := map[string]*appsv1.ComponentDefinition{}
-	for _, v := range opsRes.OpsRequest.Spec.Upgrade.Components {
-		compSpec := getComponentSpecOrShardingTemplate(opsRes.Cluster, v.ComponentName)
+	for _, upgrade := range opsRes.OpsRequest.Spec.Upgrade.Components {
+		compSpec := getComponentSpecOrShardingTemplate(opsRes.Cluster, upgrade.ComponentName)
 		if compSpec == nil {
-			return nil, intctrlutil.NewFatalError(fmt.Sprintf(`"can not found the component "%s" in the cluster "%s"`,
-				v.ComponentName, opsRes.Cluster.Name))
+			return nil, intctrlutil.NewFatalError(fmt.Sprintf(`"can not found the component "%s" in the cluster "%s"`, upgrade.ComponentName, opsRes.Cluster.Name))
 		}
-		compDef, err := component.GetCompDefByName(reqCtx.Ctx, cli, compSpec.ComponentDef)
-		if err != nil {
-			return nil, err
+		load := func(key, compDefName, serviceVersion string) error {
+			compDef, err := component.GetCompDefByName(reqCtx.Ctx, cli, compDefName)
+			if err != nil {
+				return err
+			}
+			if err = component.UpdateCompDefinitionImages4ServiceVersion(reqCtx.Ctx, cli, compDef, serviceVersion); err != nil {
+				return err
+			}
+			compDefMap[key] = compDef
+			return nil
 		}
-		if err = component.UpdateCompDefinitionImages4ServiceVersion(reqCtx.Ctx, cli, compDef, compSpec.ServiceVersion); err != nil {
-			return nil, err
+		if len(upgrade.Instances) == 0 {
+			if err := load(upgrade.ComponentName, compSpec.ComponentDef, compSpec.ServiceVersion); err != nil {
+				return nil, err
+			}
+			continue
 		}
-		compDefMap[v.ComponentName] = compDef
+		for _, target := range upgrade.Instances {
+			for _, instance := range compSpec.Instances {
+				if instance.Name == target.Name {
+					if err := load(upgrade.ComponentName+"."+target.Name, instance.CompDef, instance.ServiceVersion); err != nil {
+						return nil, err
+					}
+				}
+			}
+		}
 	}
 	return compDefMap, nil
 }

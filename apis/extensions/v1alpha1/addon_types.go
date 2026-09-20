@@ -48,6 +48,15 @@ type AddonSpec struct {
 	// +optional
 	Version string `json:"version,omitempty"`
 
+	// Increment to reapply the current chart and installation values without changing the add-on version.
+	// Only increment after the current operation has finished and its installation Job has been deleted.
+	// Defaults to zero when omitted.
+	// To fetch updated chart images under the same tag, configure addonChartsImage.pullPolicy as Always.
+	//
+	// +kubebuilder:validation:Minimum=0
+	// +optional
+	RefreshRevision int64 `json:"refreshRevision,omitempty"`
+
 	// Specifies the provider of the add-on.
 	//
 	// +optional

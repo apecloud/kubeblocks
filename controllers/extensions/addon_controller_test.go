@@ -525,6 +525,46 @@ var _ = Describe("Addon controller", func() {
 			enablingPhaseCheck(2)
 		}
 
+		It("reconciles when refreshRevision changes after installation cleanup", func() {
+			createAddonSpecWithRequiredAttributes(func(obj *extensionsv1alpha1.Addon) {
+				obj.Spec.Version = "1.0.7"
+				obj.Spec.InstallSpec = obj.Spec.DefaultInstallValues[0].AddonInstallSpec.DeepCopy()
+				obj.Spec.InstallSpec.Enabled = true
+			})
+			addon.Status.Phase = extensionsv1alpha1.AddonEnabled
+			addon.Status.ObservedGeneration = addon.Generation
+			Expect(testCtx.Cli.Status().Update(ctx, addon)).Should(Succeed())
+			originalSpec := addon.Spec.DeepCopy()
+			generation := addon.Generation
+
+			addon.Spec.RefreshRevision = 1
+			Expect(testCtx.Cli.Update(ctx, addon)).Should(Succeed())
+			Expect(addon.Generation).Should(Equal(generation + 1))
+			Expect(addon.Spec.RefreshRevision).Should(Equal(int64(1)))
+			jobKey := client.ObjectKey{Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS), Name: getInstallJobName(addon)}
+			job := getJob(NewGomegaWithT(GinkgoT()), jobKey)
+			Expect(job.Spec.Template.Spec.Containers[0].Args[:2]).Should(Equal([]string{"upgrade", "--install"}))
+			Expect(testCtx.Cli.Get(ctx, key, addon)).Should(Succeed())
+			Expect(addon.Status.Phase).Should(Equal(extensionsv1alpha1.AddonEnabling))
+			originalSpec.RefreshRevision = 1
+			Expect(addon.Spec).Should(Equal(*originalSpec))
+
+			job.Status.Succeeded = 1
+			Expect(testCtx.Cli.Status().Update(ctx, job)).Should(Succeed())
+			addonStatusPhaseCheck(int(addon.Generation), extensionsv1alpha1.AddonEnabled, nil)
+
+			generation = addon.Generation
+			addon.Annotations = map[string]string{"test-refresh-note": "same revision"}
+			Expect(testCtx.Cli.Update(ctx, addon)).Should(Succeed())
+			Expect(addon.Generation).Should(Equal(generation))
+			_, err := doReconcile()
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(testCtx.Cli.Get(ctx, key, addon)).Should(Succeed())
+			Expect(addon.Status.Phase).Should(Equal(extensionsv1alpha1.AddonEnabled))
+			addon.Spec.RefreshRevision = -1
+			Expect(apierrors.IsInvalid(testCtx.Cli.Update(ctx, addon))).Should(BeTrue())
+		})
+
 		It("should successfully reconcile a custom resource for Addon with autoInstall=true", func() {
 			createAutoInstallAddon()
 

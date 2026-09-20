@@ -92,6 +92,14 @@ func (ve volumeExpansionOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli cl
 		}
 		volumeExpansion := obj.(opsv1alpha1.VolumeExpansion)
 		setVolumeStorage(volumeExpansion.VolumeClaimTemplates, compSpec.VolumeClaimTemplates)
+		for _, instanceExpansion := range volumeExpansion.Instances {
+			for i := range compSpec.Instances {
+				if compSpec.Instances[i].Name == instanceExpansion.Name {
+					setVolumeStorage(instanceExpansion.VolumeClaimTemplates, compSpec.Instances[i].VolumeClaimTemplates)
+					break
+				}
+			}
+		}
 		return nil
 	}
 	compOpsSet := newComponentOpsHelper(opsRes.OpsRequest.Spec.VolumeExpansionList)
@@ -158,8 +166,11 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 	// sync the volumeClaimTemplate status and component phase On the OpsRequest and Cluster.
 	for _, veHelper := range veHelpers {
 		opsCompStatus := oldOpsRequestStatus.Components[veHelper.compOps.GetComponentName()]
-		key := getComponentVCTKey(veHelper.compOps.GetComponentName(), veHelper.vctName)
+		key := getComponentVCTKey(veHelper.compOps.GetComponentName(), veHelper.templateName, veHelper.vctName)
 		requestStorage, ok := storageMap[key]
+		if !ok && veHelper.templateName != "" {
+			requestStorage, ok = storageMap[getComponentVCTKey(veHelper.compOps.GetComponentName(), "", veHelper.vctName)]
+		}
 		if !ok {
 			continue
 		}
@@ -244,6 +255,20 @@ func buildVolumeExpansionHelpers(compSpec appsv1.ClusterComponentSpec, compOps C
 			})
 		}
 	}
+	for _, instanceExpansion := range volumeExpansion.Instances {
+		for _, template := range compSpec.Instances {
+			if template.Name != instanceExpansion.Name {
+				continue
+			}
+			for _, vct := range instanceExpansion.VolumeClaimTemplates {
+				veHelpers = append(veHelpers, volumeExpansionHelper{
+					compOps: compOps, fullComponentName: fullComponentName, expectCount: int(template.GetReplicas()),
+					vctName: vct.Name, templateName: template.Name, stopped: stopped, explicitOffline: explicitOffline,
+				})
+			}
+			break
+		}
+	}
 	return veHelpers
 }
 
@@ -289,6 +314,11 @@ func (ve volumeExpansionOpsHandler) getRequestStorageMap(opsRequest *opsv1alpha1
 	for _, v := range opsRequest.Spec.VolumeExpansionList {
 		for _, vct := range v.VolumeClaimTemplates {
 			setStorageMap(vct, v.ComponentOps)
+		}
+		for _, instance := range v.Instances {
+			for _, vct := range instance.VolumeClaimTemplates {
+				storageMap[getComponentVCTKey(v.ComponentName, instance.Name, vct.Name)] = vct.Storage
+			}
 		}
 	}
 	return storageMap
@@ -393,8 +423,14 @@ func (ve volumeExpansionOpsHandler) handleVCTExpansionProgress(reqCtx intctrluti
 	return succeedCount, completedCount, nil
 }
 
-func getComponentVCTKey(compoName, vctName string) string {
-	return fmt.Sprintf("%s.%s", compoName, vctName)
+func getComponentVCTKey(compoName string, names ...string) string {
+	if len(names) == 2 && names[0] != "" {
+		return fmt.Sprintf("%s.%s.%s", compoName, names[0], names[1])
+	}
+	if len(names) == 2 {
+		return fmt.Sprintf("%s.%s", compoName, names[1])
+	}
+	return fmt.Sprintf("%s.%s", compoName, names[0])
 }
 
 func getPVCProgressObjectKey(pvcName string) string {

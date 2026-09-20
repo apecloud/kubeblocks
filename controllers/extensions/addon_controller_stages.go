@@ -63,7 +63,6 @@ const (
 
 func init() {
 	viper.SetDefault(constant.KBServiceAccountName, "kubeblocks")
-	viper.SetDefault(constant.CfgKeyAddonChartsImgPullPolicy, string(corev1.PullAlways))
 	viper.SetDefault(addonHelmInstallOptKey, []string{
 		"--atomic",
 		"--cleanup-on-fail",

@@ -658,10 +658,8 @@ spec:
                 type: string
               refreshRevision:
                 description: |-
-                  Increment to reapply the current chart and installation values without changing the add-on version.
-                  Only increment after the current operation has finished and its installation Job has been deleted.
-                  Defaults to zero when omitted.
-                  Chart images follow the addonChartsImage.pullPolicy setting.
+                  Increment to reapply the current chart and values without changing the add-on version.
+                  Wait for the previous operation to finish and its installation Job to be deleted.
                 format: int64
                 minimum: 0
                 type: integer

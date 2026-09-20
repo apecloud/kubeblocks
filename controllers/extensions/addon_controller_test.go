@@ -123,7 +123,6 @@ var _ = Describe("Addon controller", func() {
 
 			Expect(setInitContainer(addon, &job.Spec.Template.Spec)).Should(Succeed())
 			Expect(job.Spec.Template.Spec.InitContainers).Should(HaveLen(1))
-			Expect(job.Spec.Template.Spec.InitContainers[0].ImagePullPolicy).Should(Equal(corev1.PullAlways))
 			Expect(job.Spec.Template.Spec.InitContainers[0].Resources.Requests).Should(HaveKeyWithValue(corev1.ResourceCPU, resource.MustParse("10m")))
 			Expect(job.Spec.Template.Spec.InitContainers[0].Resources.Requests).Should(HaveKeyWithValue(corev1.ResourceMemory, resource.MustParse("16Mi")))
 		})

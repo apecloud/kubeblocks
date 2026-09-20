@@ -3380,11 +3380,6 @@ spec:
                   required:
                   - componentName
                   type: object
-                  x-kubernetes-validations:
-                  - message: at least one volumeClaimTemplates or instances entry
-                      is required
-                    rule: size(self.volumeClaimTemplates) > 0 || size(self.instances)
-                      > 0
                 type: array
                 x-kubernetes-list-map-keys:
                 - componentName

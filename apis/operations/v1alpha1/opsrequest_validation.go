@@ -219,6 +219,9 @@ func (r *OpsRequest) validateUpgrade(ctx context.Context, k8sClient client.Clien
 		if len(v.Instances) > 0 && (v.ComponentDefinitionName != nil || v.ServiceVersion != nil) {
 			return fmt.Errorf("upgrade component %q cannot combine component-level fields with instances", v.ComponentName)
 		}
+		if len(v.Instances) > 0 && (v.ComponentDefinitionName != nil || v.ServiceVersion != nil) {
+			return fmt.Errorf("upgrade component %q cannot combine component-level fields with instances", v.ComponentName)
+		}
 		instanceNames := make([]string, 0, len(v.Instances))
 		for _, instance := range v.Instances {
 			instanceNames = append(instanceNames, instance.Name)
@@ -613,6 +616,9 @@ func (r *OpsRequest) checkInstanceTemplate(cluster *appsv1.Cluster, componentOps
 			continue
 		}
 		setInstanceMap(spec.Template.Instances)
+		for _, shardTemplate := range spec.ShardTemplates {
+			setInstanceMap(shardTemplate.Instances)
+		}
 		for _, shardTemplate := range spec.ShardTemplates {
 			setInstanceMap(shardTemplate.Instances)
 		}

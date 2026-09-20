@@ -613,12 +613,6 @@ func (r *OpsRequest) checkInstanceTemplate(cluster *appsv1.Cluster, componentOps
 			continue
 		}
 		setInstanceMap(spec.Template.Instances)
-		for _, shardTemplate := range spec.ShardTemplates {
-			setInstanceMap(shardTemplate.Instances)
-		}
-		for _, shardTemplate := range spec.ShardTemplates {
-			setInstanceMap(shardTemplate.Instances)
-		}
 	}
 	for _, compSpec := range cluster.Spec.ComponentSpecs {
 		if compSpec.Name != componentOps.ComponentName {
@@ -744,12 +738,6 @@ func (r *OpsRequest) checkVolumesAllowExpansion(ctx context.Context, cli client.
 		fillCompVols(sharding.Template, sharding.Name, true)
 		for _, its := range sharding.Template.Instances {
 			fillItsVols(its, sharding.Template.VolumeClaimTemplates, fmt.Sprintf("%s.%s", sharding.Name, its.Name), true)
-		}
-		for _, shardTemplate := range sharding.ShardTemplates {
-			shardComp := appsv1.ClusterComponentSpec{VolumeClaimTemplates: shardTemplate.VolumeClaimTemplates}
-			for _, its := range shardTemplate.Instances {
-				fillItsVols(its, shardComp.VolumeClaimTemplates, fmt.Sprintf("%s.%s", sharding.Name, its.Name), true)
-			}
 		}
 	}
 

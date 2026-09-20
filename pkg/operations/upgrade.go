@@ -169,13 +169,6 @@ func (u upgradeOpsHandler) targetsUnchanged(opsRes *OpsResource) bool {
 			continue
 		}
 		instances := append([]appsv1.InstanceTemplate(nil), compSpec.Instances...)
-		for _, sharding := range opsRes.Cluster.Spec.Shardings {
-			if sharding.Name == upgrade.ComponentName {
-				for _, template := range sharding.ShardTemplates {
-					instances = append(instances, template.Instances...)
-				}
-			}
-		}
 		for _, target := range upgrade.Instances {
 			var found *appsv1.InstanceTemplate
 			for i := range instances {
@@ -237,14 +230,6 @@ func (u upgradeOpsHandler) getComponentDefMapWithUpdatedImages(reqCtx intctrluti
 			}
 		}
 		instances := append([]appsv1.InstanceTemplate(nil), compSpec.Instances...)
-		for _, sharding := range opsRes.Cluster.Spec.Shardings {
-			if sharding.Name != upgrade.ComponentName {
-				continue
-			}
-			for _, shardTemplate := range sharding.ShardTemplates {
-				instances = append(instances, shardTemplate.Instances...)
-			}
-		}
 		for _, target := range upgrade.Instances {
 			for _, instance := range instances {
 				if instance.Name == target.Name {

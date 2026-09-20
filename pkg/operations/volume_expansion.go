@@ -214,20 +214,14 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 			return opsRequestPhase, 0, err
 		}
 		for _, v := range shardingComps {
-			physical := appsv1.ClusterComponentSpec{
-				Replicas: v.Spec.Replicas, Instances: v.Spec.Instances,
-				VolumeClaimTemplates: v.Spec.VolumeClaimTemplates,
-				Stop:                 v.Spec.Stop, OfflineInstances: v.Spec.OfflineInstances,
-			}
-			physicalOps := compOps
 			if slices.ContainsFunc(spec.ShardTemplates, func(t appsv1.ShardTemplate) bool {
 				return t.Name == v.Labels[constant.KBAppShardTemplateLabelKey] && t.VolumeClaimTemplates != nil
 			}) {
-				volumeExpansion := compOps.(opsv1alpha1.VolumeExpansion)
-				volumeExpansion.VolumeClaimTemplates = nil
-				physicalOps = volumeExpansion
+				continue
 			}
-			setVeHelpers(physical, physicalOps, v.Labels[constant.KBAppComponentLabelKey])
+			physical := spec.Template
+			physical.Replicas = v.Spec.Replicas
+			setVeHelpers(physical, compOps, v.Labels[constant.KBAppComponentLabelKey])
 		}
 	}
 	// reconcile the status.components. when the volume expansion is successful,

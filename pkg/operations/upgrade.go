@@ -184,8 +184,17 @@ func (u upgradeOpsHandler) getComponentDefMapWithUpdatedImages(reqCtx intctrluti
 				return nil, err
 			}
 		}
+		instances := append([]appsv1.InstanceTemplate(nil), compSpec.Instances...)
+		for _, sharding := range opsRes.Cluster.Spec.Shardings {
+			if sharding.Name != upgrade.ComponentName {
+				continue
+			}
+			for _, shardTemplate := range sharding.ShardTemplates {
+				instances = append(instances, shardTemplate.Instances...)
+			}
+		}
 		for _, target := range upgrade.Instances {
-			for _, instance := range compSpec.Instances {
+			for _, instance := range instances {
 				if instance.Name == target.Name {
 					if err := load(upgrade.ComponentName+"."+target.Name, instance.CompDef, instance.ServiceVersion); err != nil {
 						return nil, err

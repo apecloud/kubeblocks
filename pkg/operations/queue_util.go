@@ -108,9 +108,6 @@ func enqueueOpsRequestToClusterAnnotation(ctx context.Context, cli client.Client
 	}
 
 	inQueue := func() bool {
-		if mustWaitForOps(opsRes.OpsRequest, opsRequestSlice, opsBehaviour) {
-			return true
-		}
 		if opsRes.OpsRequest.Force() && !opsRes.OpsRequest.Spec.EnqueueOnForce {
 			return false
 		}
@@ -145,7 +142,7 @@ func enqueueOpsRequestToClusterAnnotation(ctx context.Context, cli client.Client
 				// the opsRequest is already running.
 				return &opsRecorder, nil
 			}
-			if mustWaitForOps(opsRes.OpsRequest, opsRequestSlice, opsBehaviour) {
+			if !opsRes.OpsRequest.Spec.Force && existOtherRunningOps(opsRequestSlice, opsRecorder.Type, opsBehaviour) {
 				// if exists other running opsRequest, return.
 				return &opsRecorder, nil
 			}
@@ -154,26 +151,6 @@ func enqueueOpsRequestToClusterAnnotation(ctx context.Context, cli client.Client
 		}
 	}
 	return &opsRecorder, opsutil.UpdateClusterOpsAnnotations(ctx, cli, opsRes.Cluster, opsRequestSlice)
-}
-
-func mustWaitForOps(opsRequest *opsv1alpha1.OpsRequest, opsRecorderSlice []opsv1alpha1.OpsRecorder, opsBehaviour OpsBehaviour) bool {
-	if opsRequest.Spec.Type == opsv1alpha1.StopType {
-		return existOtherRunningOps(opsRecorderSlice, opsRequest.Spec.Type, opsBehaviour)
-	}
-	if hasStop(opsRecorderSlice) {
-		return true
-	}
-	return !opsRequest.Force() && existOtherRunningOps(opsRecorderSlice, opsRequest.Spec.Type, opsBehaviour)
-}
-
-// hasStop reserves the cluster-wide queue for a Stop request, including one still waiting in the queue.
-func hasStop(opsRecorderSlice []opsv1alpha1.OpsRecorder) bool {
-	for _, recorder := range opsRecorderSlice {
-		if recorder.Type == opsv1alpha1.StopType {
-			return true
-		}
-	}
-	return false
 }
 
 func swapOpsWithDependentBefore(opsRequestSlice []opsv1alpha1.OpsRecorder, currentIndex int, opsRes *OpsResource) ([]opsv1alpha1.OpsRecorder, bool) {
@@ -199,16 +176,15 @@ func swapOpsWithDependentBefore(opsRequestSlice []opsv1alpha1.OpsRecorder, curre
 // existOtherRunningOps checks if exists other running opsRequest.
 func existOtherRunningOps(opsRecorderSlice []opsv1alpha1.OpsRecorder, opsType opsv1alpha1.OpsType, opsBehaviour OpsBehaviour) bool {
 	for i := range opsRecorderSlice {
-		if opsRecorderSlice[i].InQueue {
+		if opsBehaviour.QueueByCluster && opsRecorderSlice[i].QueueBySelf {
 			continue
 		}
-		if opsType != opsv1alpha1.StopType && opsRecorderSlice[i].Type != opsv1alpha1.StopType && opsBehaviour.QueueByCluster && opsRecorderSlice[i].QueueBySelf {
+		if opsBehaviour.QueueBySelf && opsRecorderSlice[i].Type != opsType {
 			continue
 		}
-		if opsType != opsv1alpha1.StopType && opsRecorderSlice[i].Type != opsv1alpha1.StopType && opsBehaviour.QueueBySelf && opsRecorderSlice[i].Type != opsType {
-			continue
+		if !opsRecorderSlice[i].InQueue {
+			return true
 		}
-		return true
 	}
 	return false
 }

@@ -150,12 +150,12 @@ func TestUpgradeInstanceTemplate(t *testing.T) {
 	// ComponentDefinitionName is optional when upgrading an instance template by service version.
 	cluster.Spec.ComponentSpecs[0].Instances[0].CompDef = componentDef
 	cluster.Spec.ComponentSpecs[0].Instances[0].ServiceVersion = serviceVersion
-	serviceOnly := &opsv1alpha1.OpsRequest{Spec: opsv1alpha1.OpsRequestSpec{SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{
-		Upgrade: &opsv1alpha1.Upgrade{Components: []opsv1alpha1.UpgradeComponent{{
-			ComponentOps: opsv1alpha1.ComponentOps{ComponentName: "mysql"},
-			Instances: []opsv1alpha1.InstanceUpgradeTemplate{{Name: "az-a", ServiceVersion: &newVersion}},
-		}}}},
-	}}}
+	serviceOnly := &opsv1alpha1.OpsRequest{}
+	serviceOnly.Spec.Upgrade = &opsv1alpha1.Upgrade{}
+	serviceOnly.Spec.Upgrade.Components = []opsv1alpha1.UpgradeComponent{{
+		ComponentOps: opsv1alpha1.ComponentOps{ComponentName: "mysql"},
+		Instances:    []opsv1alpha1.InstanceUpgradeTemplate{{Name: "az-a", ServiceVersion: &newVersion}},
+	}}
 	if err := (upgradeOpsHandler{}).Action(intctrlutil.RequestCtx{Ctx: context.Background()}, cli, &OpsResource{Cluster: cluster, OpsRequest: serviceOnly}); err != nil {
 		t.Fatal(err)
 	}

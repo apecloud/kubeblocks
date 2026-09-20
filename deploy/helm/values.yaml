@@ -472,7 +472,7 @@ addonController:
 
 ## @param addonChartsImage.pullPolicy - addon charts image pull policy.
 addonChartsImage:
-  pullPolicy: IfNotPresent
+  pullPolicy: Always
 
 ## @param addonHelmInstallOptions - addon helm install options.
 addonHelmInstallOptions:

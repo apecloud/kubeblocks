@@ -63,6 +63,7 @@ const (
 
 func init() {
 	viper.SetDefault(constant.KBServiceAccountName, "kubeblocks")
+	viper.SetDefault(constant.CfgKeyAddonChartsImgPullPolicy, string(corev1.PullAlways))
 	viper.SetDefault(addonHelmInstallOptKey, []string{
 		"--atomic",
 		"--cleanup-on-fail",
@@ -523,9 +524,6 @@ func setInitContainer(addon *extensionsv1alpha1.Addon, helmJobPodSpec *corev1.Po
 				MountPath: "/mnt/charts",
 			},
 		},
-	}
-	if addon.Spec.RefreshRevision > 0 {
-		copyChartsContainer.ImagePullPolicy = corev1.PullAlways
 	}
 	if err := setAddonJobResourcesOrZero(&copyChartsContainer); err != nil {
 		return err

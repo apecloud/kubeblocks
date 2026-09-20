@@ -103,8 +103,6 @@ var _ = Describe("Addon controller", func() {
 		})
 
 		It("should apply configured resources to addon job containers", func() {
-			DeferCleanup(viper.Set, constant.CfgKeyAddonChartsImgPullPolicy, viper.GetString(constant.CfgKeyAddonChartsImgPullPolicy))
-			viper.Set(constant.CfgKeyAddonChartsImgPullPolicy, string(corev1.PullIfNotPresent))
 			viper.Set(constant.CfgKeyAddonJobResources, `{"requests":{"cpu":"10m","memory":"16Mi"},"limits":{"cpu":"100m","memory":"64Mi"}}`)
 			addon := &extensionsv1alpha1.Addon{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-addon"},
@@ -125,7 +123,7 @@ var _ = Describe("Addon controller", func() {
 
 			Expect(setInitContainer(addon, &job.Spec.Template.Spec)).Should(Succeed())
 			Expect(job.Spec.Template.Spec.InitContainers).Should(HaveLen(1))
-			Expect(job.Spec.Template.Spec.InitContainers[0].ImagePullPolicy).Should(Equal(corev1.PullIfNotPresent))
+			Expect(job.Spec.Template.Spec.InitContainers[0].ImagePullPolicy).Should(Equal(corev1.PullAlways))
 			Expect(job.Spec.Template.Spec.InitContainers[0].Resources.Requests).Should(HaveKeyWithValue(corev1.ResourceCPU, resource.MustParse("10m")))
 			Expect(job.Spec.Template.Spec.InitContainers[0].Resources.Requests).Should(HaveKeyWithValue(corev1.ResourceMemory, resource.MustParse("16Mi")))
 		})
@@ -552,7 +550,7 @@ var _ = Describe("Addon controller", func() {
 			job := getJob(NewGomegaWithT(GinkgoT()), jobKey)
 			Expect(job.Spec.Template.Spec.Containers[0].Args[:2]).Should(Equal([]string{"upgrade", "--install"}))
 			Expect(job.Spec.Template.Spec.InitContainers).Should(HaveLen(1))
-			Expect(job.Spec.Template.Spec.InitContainers[0].ImagePullPolicy).Should(Equal(corev1.PullAlways))
+			Expect(job.Spec.Template.Spec.InitContainers[0].ImagePullPolicy).Should(Equal(corev1.PullIfNotPresent))
 			Expect(testCtx.Cli.Get(ctx, key, addon)).Should(Succeed())
 			Expect(addon.Status.Phase).Should(Equal(extensionsv1alpha1.AddonEnabling))
 			originalSpec.RefreshRevision = 1

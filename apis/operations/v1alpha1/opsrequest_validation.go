@@ -649,11 +649,6 @@ func validateInstanceVolumeExpansions(expansion VolumeExpansion, cluster *appsv1
 			if err := validate(sharding.Name, sharding.Template.VolumeClaimTemplates, sharding.Template.Instances); err != nil {
 				return err
 			}
-			for _, shardTemplate := range sharding.ShardTemplates {
-				if err := validate(sharding.Name+"/"+shardTemplate.Name, shardTemplate.VolumeClaimTemplates, shardTemplate.Instances); err != nil {
-					return err
-				}
-			}
 		}
 	}
 	if len(validated) == 0 {
@@ -706,9 +701,6 @@ func collectShardingExpansionStorageClasses(expansion VolumeExpansion, sharding 
 		comp := sharding.Template
 		if template.Replicas != nil {
 			comp.Replicas = *template.Replicas
-		}
-		if template.Instances != nil {
-			comp.Instances = template.Instances
 		}
 		collectExpansionStorageClasses(expansion, comp, storageClasses)
 	}
@@ -770,9 +762,6 @@ func (r *OpsRequest) checkInstanceTemplate(cluster *appsv1.Cluster, componentOps
 			continue
 		}
 		setInstanceMap(spec.Template.Instances)
-		for _, shardTemplate := range spec.ShardTemplates {
-			setInstanceMap(shardTemplate.Instances)
-		}
 	}
 	for _, compSpec := range cluster.Spec.ComponentSpecs {
 		if compSpec.Name != componentOps.ComponentName {

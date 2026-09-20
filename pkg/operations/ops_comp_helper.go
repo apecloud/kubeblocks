@@ -84,37 +84,8 @@ func (c componentOpsHelper) updateClusterComponentsAndShardings(cluster *appsv1.
 		if err := updateFunc(&sharding.Template, obj); err != nil {
 			return err
 		}
-		if !hasInstanceTemplateTargets(obj) {
-			continue
-		}
-		for i := range sharding.ShardTemplates {
-			shardTemplate := &sharding.ShardTemplates[i]
-			effective := sharding.Template
-			if shardTemplate.Instances != nil {
-				effective.Instances = shardTemplate.Instances
-			}
-			if shardTemplate.VolumeClaimTemplates != nil {
-				effective.VolumeClaimTemplates = shardTemplate.VolumeClaimTemplates
-			}
-			if err := updateFunc(&effective, obj); err != nil {
-				return err
-			}
-			shardTemplate.Instances = effective.Instances
-			shardTemplate.VolumeClaimTemplates = effective.VolumeClaimTemplates
-		}
 	}
 	return nil
-}
-
-func hasInstanceTemplateTargets(obj ComponentOpsInterface) bool {
-	switch v := obj.(type) {
-	case opsv1alpha1.UpgradeComponent:
-		return len(v.Instances) > 0
-	case opsv1alpha1.VolumeExpansion:
-		return len(v.Instances) > 0
-	default:
-		return false
-	}
 }
 
 func (c componentOpsHelper) saveLastConfigurations(opsRes *OpsResource,

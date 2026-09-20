@@ -625,7 +625,16 @@ func validateInstanceVolumeExpansions(expansion VolumeExpansion, cluster *appsv1
 				if err := validateExpansionVolumes(VolumeExpansion{VolumeClaimTemplates: target.VolumeClaimTemplates}, key, volumes); err != nil {
 					return err
 				}
-				collectExpansionStorageClasses(VolumeExpansion{VolumeClaimTemplates: target.VolumeClaimTemplates}, appsv1.ClusterComponentSpec{Replicas: instance.GetReplicas(), VolumeClaimTemplates: volumes}, storageClasses)
+				for _, volume := range volumes {
+					if volume.Spec.StorageClassName == nil || *volume.Spec.StorageClassName == "" {
+						continue
+					}
+					for _, requested := range target.VolumeClaimTemplates {
+						if requested.Name == volume.Name {
+							storageClasses.Insert(*volume.Spec.StorageClassName)
+						}
+					}
+				}
 				validated.Insert(key)
 			}
 		}

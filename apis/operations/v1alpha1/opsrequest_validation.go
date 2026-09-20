@@ -745,6 +745,12 @@ func (r *OpsRequest) checkVolumesAllowExpansion(ctx context.Context, cli client.
 		for _, its := range sharding.Template.Instances {
 			fillItsVols(its, sharding.Template.VolumeClaimTemplates, fmt.Sprintf("%s.%s", sharding.Name, its.Name), true)
 		}
+		for _, shardTemplate := range sharding.ShardTemplates {
+			shardComp := appsv1.ClusterComponentSpec{VolumeClaimTemplates: shardTemplate.VolumeClaimTemplates}
+			for _, its := range shardTemplate.Instances {
+				fillItsVols(its, shardComp.VolumeClaimTemplates, fmt.Sprintf("%s.%s", sharding.Name, its.Name), true)
+			}
+		}
 	}
 
 	// check all used storage classes

@@ -26,6 +26,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -107,6 +108,9 @@ func (u upgradeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 // ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
 // the Reconcile function for upgrade opsRequest.
 func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (opsv1alpha1.OpsPhase, time.Duration, error) {
+	if !u.targetsUnchanged(opsRes) {
+		return opsv1alpha1.OpsAbortedPhase, 0, nil
+	}
 	upgradeSpec := opsRes.OpsRequest.Spec.Upgrade
 	var (
 		compOpsHelper   componentOpsHelper
@@ -144,6 +148,54 @@ func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 		return handleComponentStatusProgress(reqCtx, cli, opsRes, pgRes, compStatus, podApplyCompOps)
 	}
 	return compOpsHelper.reconcileActionWithComponentOps(reqCtx, cli, opsRes, "upgrade", handleUpgradeProgress)
+}
+
+func (u upgradeOpsHandler) targetsUnchanged(opsRes *OpsResource) bool {
+	if opsRes == nil || opsRes.Cluster == nil || opsRes.OpsRequest == nil || opsRes.OpsRequest.Spec.Upgrade == nil {
+		return false
+	}
+	for _, upgrade := range opsRes.OpsRequest.Spec.Upgrade.Components {
+		compSpec := getComponentSpecOrShardingTemplate(opsRes.Cluster, upgrade.ComponentName)
+		if compSpec == nil {
+			return false
+		}
+		if v := ptr.Deref(upgrade.ComponentDefinitionName, ""); v != "" && compSpec.ComponentDef != v {
+			return false
+		}
+		if v := ptr.Deref(upgrade.ServiceVersion, ""); v != "" && compSpec.ServiceVersion != v {
+			return false
+		}
+		if len(upgrade.Instances) == 0 {
+			continue
+		}
+		instances := append([]appsv1.InstanceTemplate(nil), compSpec.Instances...)
+		for _, sharding := range opsRes.Cluster.Spec.Shardings {
+			if sharding.Name == upgrade.ComponentName {
+				for _, template := range sharding.ShardTemplates {
+					instances = append(instances, template.Instances...)
+				}
+			}
+		}
+		for _, target := range upgrade.Instances {
+			var found *appsv1.InstanceTemplate
+			for i := range instances {
+				if instances[i].Name == target.Name {
+					found = &instances[i]
+					break
+				}
+			}
+			if found == nil {
+				return false
+			}
+			if v := ptr.Deref(target.ComponentDefinitionName, ""); v != "" && found.CompDef != v {
+				return false
+			}
+			if v := ptr.Deref(target.ServiceVersion, ""); v != "" && found.ServiceVersion != v {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration
@@ -196,7 +248,15 @@ func (u upgradeOpsHandler) getComponentDefMapWithUpdatedImages(reqCtx intctrluti
 		for _, target := range upgrade.Instances {
 			for _, instance := range instances {
 				if instance.Name == target.Name {
-					if err := load(upgrade.ComponentName+"."+target.Name, instance.CompDef, instance.ServiceVersion); err != nil {
+					compDef := instance.CompDef
+					if compDef == "" {
+						compDef = compSpec.ComponentDef
+					}
+					serviceVersion := instance.ServiceVersion
+					if serviceVersion == "" {
+						serviceVersion = compSpec.ServiceVersion
+					}
+					if err := load(upgrade.ComponentName+"."+target.Name, compDef, serviceVersion); err != nil {
 						return nil, err
 					}
 				}

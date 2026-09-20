@@ -22,6 +22,7 @@ package operations
 import (
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 	"time"
 
@@ -99,7 +100,10 @@ func (ve volumeExpansionOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli cl
 				for _, requested := range instanceExpansion.VolumeClaimTemplates {
 					found := false
 					for _, existing := range compSpec.Instances[i].VolumeClaimTemplates {
-						if existing.Name == requested.Name { found = true; break }
+						if existing.Name == requested.Name {
+							found = true
+							break
+						}
 					}
 					if !found {
 						for _, inherited := range compSpec.VolumeClaimTemplates {
@@ -210,7 +214,20 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 			return opsRequestPhase, 0, err
 		}
 		for _, v := range shardingComps {
-			setVeHelpers(spec.Template, compOps, v.Labels[constant.KBAppComponentLabelKey])
+			physical := appsv1.ClusterComponentSpec{
+				Replicas: v.Spec.Replicas, Instances: v.Spec.Instances,
+				VolumeClaimTemplates: v.Spec.VolumeClaimTemplates,
+				Stop:                 v.Spec.Stop, OfflineInstances: v.Spec.OfflineInstances,
+			}
+			physicalOps := compOps
+			if slices.ContainsFunc(spec.ShardTemplates, func(t appsv1.ShardTemplate) bool {
+				return t.Name == v.Labels[constant.KBAppShardTemplateLabelKey] && t.VolumeClaimTemplates != nil
+			}) {
+				volumeExpansion := compOps.(opsv1alpha1.VolumeExpansion)
+				volumeExpansion.VolumeClaimTemplates = nil
+				physicalOps = volumeExpansion
+			}
+			setVeHelpers(physical, physicalOps, v.Labels[constant.KBAppComponentLabelKey])
 		}
 	}
 	// reconcile the status.components. when the volume expansion is successful,

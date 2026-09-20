@@ -656,6 +656,15 @@ spec:
               provider:
                 description: Specifies the provider of the add-on.
                 type: string
+              refreshRevision:
+                description: |-
+                  Increment to reapply the current chart and installation values without changing the add-on version.
+                  Only increment after the current operation has finished and its installation Job has been deleted.
+                  Defaults to zero when omitted.
+                  To fetch updated chart images under the same tag, configure addonChartsImage.pullPolicy as Always.
+                format: int64
+                minimum: 0
+                type: integer
               type:
                 description: Defines the type of the add-on. The only valid value
                   is 'helm'.

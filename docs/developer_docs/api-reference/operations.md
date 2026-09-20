@@ -1391,8 +1391,63 @@ Kubernetes core/v1.ResourceRequirements
 </tr>
 </tbody>
 </table>
+<h3 id="operations.kubeblocks.io/v1alpha1.InstanceUpgradeTemplate">InstanceUpgradeTemplate
+</h3>
+<p>
+(<em>Appears on:</em><a href="#operations.kubeblocks.io/v1alpha1.UpgradeComponent">UpgradeComponent</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Refer to the instance template name of the component or sharding.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>componentDefinitionName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the ComponentDefinition for this instance template.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceVersion</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the ServiceVersion for this instance template.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="operations.kubeblocks.io/v1alpha1.InstanceVolumeClaimTemplate">InstanceVolumeClaimTemplate
 </h3>
+<p>
+(<em>Appears on:</em><a href="#operations.kubeblocks.io/v1alpha1.VolumeExpansion">VolumeExpansion</a>)
+</p>
 <div>
 </div>
 <table>
@@ -4727,6 +4782,21 @@ And ServiceVersion in ClusterComponentSpec is optional, when no version is speci
 use the latest available version in ComponentVersion.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>instances</code><br/>
+<em>
+<a href="#operations.kubeblocks.io/v1alpha1.InstanceUpgradeTemplate">
+[]InstanceUpgradeTemplate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the instance templates to upgrade. When set, only these
+templates are changed; when omitted, the component template is changed.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="operations.kubeblocks.io/v1alpha1.VerticalScaling">VerticalScaling
@@ -4836,6 +4906,7 @@ ComponentOps
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Specifies a list of OpsRequestVolumeClaimTemplate objects, defining the volumeClaimTemplates
 that are used to expand the storage and the desired storage size for each one.</p>
 </td>

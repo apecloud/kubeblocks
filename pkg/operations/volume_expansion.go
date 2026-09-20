@@ -170,16 +170,23 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 			return opsRequestPhase, 0, err
 		}
 		for _, v := range shardingComps {
+			// Component is the rendered physical shard.  Its VCTs and instance
+			// templates include shard-template overrides and must be used when
+			// accounting for PVCs.
+			physical := appsv1.ClusterComponentSpec{
+				Replicas: v.Spec.Replicas, Instances: v.Spec.Instances,
+				VolumeClaimTemplates: v.Spec.VolumeClaimTemplates,
+				Stop:                 v.Spec.Stop, OfflineInstances: v.Spec.OfflineInstances,
+			}
+			physicalOps := compOps
 			if slices.ContainsFunc(spec.ShardTemplates, func(t appsv1.ShardTemplate) bool {
 				return t.Name == v.Labels[constant.KBAppShardTemplateLabelKey] && t.VolumeClaimTemplates != nil
 			}) {
-				continue
+				volumeExpansion := compOps.(opsv1alpha1.VolumeExpansion)
+				volumeExpansion.VolumeClaimTemplates = nil
+				physicalOps = volumeExpansion
 			}
-			physical := appsv1.ClusterComponentSpec{
-				Replicas: v.Spec.Replicas, Instances: v.Spec.Instances,
-				Stop: v.Spec.Stop, OfflineInstances: v.Spec.OfflineInstances,
-			}
-			veHelpers = append(veHelpers, buildVolumeExpansionHelpers(physical, compOps, v.Labels[constant.KBAppComponentLabelKey])...)
+			veHelpers = append(veHelpers, buildVolumeExpansionHelpers(physical, physicalOps, v.Labels[constant.KBAppComponentLabelKey])...)
 		}
 	}
 	// reconcile the status.components. when the volume expansion is successful,
@@ -241,6 +248,13 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 
 func buildVolumeExpansionHelpers(compSpec appsv1.ClusterComponentSpec, compOps ComponentOpsInterface, fullComponentName string) []volumeExpansionHelper {
 	volumeExpansion := compOps.(opsv1alpha1.VolumeExpansion)
+	instanceVCTs := map[string]sets.Set[string]{}
+	for _, instance := range volumeExpansion.Instances {
+		instanceVCTs[instance.Name] = sets.New[string]()
+		for _, vct := range instance.VolumeClaimTemplates {
+			instanceVCTs[instance.Name].Insert(vct.Name)
+		}
+	}
 	stopped := compSpec.Stop != nil && *compSpec.Stop
 	explicitOffline := sets.New(compSpec.OfflineInstances...)
 	var veHelpers []volumeExpansionHelper
@@ -261,7 +275,10 @@ func buildVolumeExpansionHelpers(compSpec appsv1.ClusterComponentSpec, compOps C
 			// An explicit VCT replaces the component declaration for this volume.
 			if slices.ContainsFunc(template.VolumeClaimTemplates, func(v appsv1.PersistentVolumeClaimTemplate) bool {
 				return v.Name == vct.Name
-			}) {
+			}) && !instanceVCTs[template.Name].Has(vct.Name) {
+				continue
+			}
+			if instanceVCTs[template.Name].Has(vct.Name) {
 				continue
 			}
 			veHelpers = append(veHelpers, volumeExpansionHelper{
@@ -318,9 +335,26 @@ func (ve volumeExpansionOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.Req
 				Storage: v.Spec.Resources.Requests[corev1.ResourceStorage],
 			})
 		}
-		return opsv1alpha1.LastComponentConfiguration{
-			VolumeClaimTemplates: convertedLastVCTs,
+		lastInstances := make([]opsv1alpha1.LastInstanceConfiguration, 0)
+		volumeExpansion := comOps.(opsv1alpha1.VolumeExpansion)
+		for _, requested := range volumeExpansion.Instances {
+			for _, instance := range compSpec.Instances {
+				if instance.Name != requested.Name {
+					continue
+				}
+				last := opsv1alpha1.LastInstanceConfiguration{Name: instance.Name, VolumeClaimTemplates: nil}
+				for _, vct := range instance.VolumeClaimTemplates {
+					for _, target := range requested.VolumeClaimTemplates {
+						if vct.Name == target.Name {
+							last.VolumeClaimTemplates = append(last.VolumeClaimTemplates, opsv1alpha1.OpsRequestVolumeClaimTemplate{Name: vct.Name, Storage: vct.Spec.Resources.Requests[corev1.ResourceStorage]})
+						}
+					}
+				}
+				lastInstances = append(lastInstances, last)
+				break
+			}
 		}
+		return opsv1alpha1.LastComponentConfiguration{VolumeClaimTemplates: convertedLastVCTs, Instances: lastInstances}
 	})
 	return nil
 }

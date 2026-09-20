@@ -5347,6 +5347,30 @@ spec:
                                 description: TemplateName identifies its instance
                                   template. An empty name denotes the default template.
                                 type: string
+                              volumeClaimTemplates:
+                                description: Records instance-specific volume claim
+                                  template storage before an operation.
+                                items:
+                                  properties:
+                                    name:
+                                      description: |-
+                                        Specify the name of the volumeClaimTemplate in the Component.
+                                        The specified name must match one of the volumeClaimTemplates defined
+                                        in the `clusterComponentSpec.volumeClaimTemplates` field.
+                                      type: string
+                                    storage:
+                                      anyOf:
+                                      - type: integer
+                                      - type: string
+                                      description: Specifies the desired storage size
+                                        for the volume.
+                                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                      x-kubernetes-int-or-string: true
+                                  required:
+                                  - name
+                                  - storage
+                                  type: object
+                                type: array
                             required:
                             - name
                             type: object

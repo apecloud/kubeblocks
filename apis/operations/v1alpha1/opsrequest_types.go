@@ -1154,6 +1154,10 @@ type LastInstanceConfiguration struct {
 	// TemplateName identifies its instance template. An empty name denotes the default template.
 	// +optional
 	TemplateName string `json:"templateName,omitempty"`
+
+	// Records instance-specific volume claim template storage before an operation.
+	// +optional
+	VolumeClaimTemplates []OpsRequestVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
 }
 
 // FindInstance returns the saved record for the named instance, if present.

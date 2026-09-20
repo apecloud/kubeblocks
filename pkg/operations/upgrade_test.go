@@ -162,6 +162,21 @@ func TestUpgradeInstanceTemplate(t *testing.T) {
 	if got := cluster.Spec.ComponentSpecs[0].Instances[0]; got.CompDef != componentDef || got.ServiceVersion != newVersion {
 		t.Fatalf("service-version-only upgrade changed the component definition: %+v", got)
 	}
+	cluster.Spec.ComponentSpecs[0].ComponentDef = componentDef
+	cluster.Spec.ComponentSpecs[0].ServiceVersion = serviceVersion
+	overrideVersion := "8.1.1"
+	mixed := &opsv1alpha1.OpsRequest{}
+	mixed.Spec.Upgrade = &opsv1alpha1.Upgrade{Components: []opsv1alpha1.UpgradeComponent{{
+		ComponentOps:   opsv1alpha1.ComponentOps{ComponentName: "mysql"},
+		ServiceVersion: &newVersion,
+		Instances:      []opsv1alpha1.InstanceUpgradeTemplate{{Name: "az-a", ServiceVersion: &overrideVersion}},
+	}}}
+	if err := (upgradeOpsHandler{}).Action(intctrlutil.RequestCtx{Ctx: context.Background()}, cli, &OpsResource{Cluster: cluster, OpsRequest: mixed}); err != nil {
+		t.Fatal(err)
+	}
+	if cluster.Spec.ComponentSpecs[0].ServiceVersion != newVersion || cluster.Spec.ComponentSpecs[0].Instances[0].ServiceVersion != overrideVersion {
+		t.Fatalf("component and instance upgrade targets did not both apply: %+v", cluster.Spec.ComponentSpecs[0])
+	}
 }
 
 func TestUpgradeAllowsLaterUnrelatedClusterGeneration(t *testing.T) {

@@ -59,14 +59,11 @@ func (u upgradeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	compOpsHelper = newComponentOpsHelper(upgradeSpec.Components)
 	if err := compOpsHelper.updateClusterComponentsAndShardings(opsRes.Cluster, func(compSpec *appsv1.ClusterComponentSpec, obj ComponentOpsInterface) error {
 		upgradeComp := obj.(opsv1alpha1.UpgradeComponent)
-		if len(upgradeComp.Instances) == 0 {
-			if u.needUpdateCompDef(upgradeComp.ComponentDefinitionName, opsRes.Cluster) {
-				compSpec.ComponentDef = *upgradeComp.ComponentDefinitionName
-			}
-			if upgradeComp.ServiceVersion != nil {
-				compSpec.ServiceVersion = *upgradeComp.ServiceVersion
-			}
-			return nil
+		if u.needUpdateCompDef(upgradeComp.ComponentDefinitionName, opsRes.Cluster) {
+			compSpec.ComponentDef = *upgradeComp.ComponentDefinitionName
+		}
+		if upgradeComp.ServiceVersion != nil {
+			compSpec.ServiceVersion = *upgradeComp.ServiceVersion
 		}
 		for i := range compSpec.Instances {
 			for _, instance := range upgradeComp.Instances {
@@ -124,15 +121,15 @@ func (u upgradeOpsHandler) targetsUnchanged(opsRes *OpsResource) bool {
 		if compSpec == nil {
 			return false
 		}
+		componentDef := ptr.Deref(upgrade.ComponentDefinitionName, "")
+		if componentDef != "" && compSpec.ComponentDef != componentDef {
+			return false
+		}
+		serviceVersion := ptr.Deref(upgrade.ServiceVersion, "")
+		if serviceVersion != "" && compSpec.ServiceVersion != serviceVersion {
+			return false
+		}
 		if len(upgrade.Instances) == 0 {
-			componentDef := ptr.Deref(upgrade.ComponentDefinitionName, "")
-			if componentDef != "" && compSpec.ComponentDef != componentDef {
-				return false
-			}
-			serviceVersion := ptr.Deref(upgrade.ServiceVersion, "")
-			if serviceVersion != "" && compSpec.ServiceVersion != serviceVersion {
-				return false
-			}
 			continue
 		}
 		instances := append([]appsv1.InstanceTemplate(nil), compSpec.Instances...)

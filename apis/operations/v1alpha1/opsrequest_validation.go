@@ -215,9 +215,6 @@ func (r *OpsRequest) validateUpgrade(ctx context.Context, k8sClient client.Clien
 		return notEmptyError("spec.upgrade.components")
 	}
 	for _, v := range r.Spec.Upgrade.Components {
-		if len(v.Instances) > 0 && (v.ComponentDefinitionName != nil || v.ServiceVersion != nil) {
-			return fmt.Errorf("upgrade component %q cannot combine component-level fields with instances", v.ComponentName)
-		}
 		instanceNames := make([]string, 0, len(v.Instances))
 		for _, instance := range v.Instances {
 			instanceNames = append(instanceNames, instance.Name)

@@ -63,6 +63,12 @@ func (u upgradeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	compOpsHelper = newComponentOpsHelper(upgradeSpec.Components)
 	if err := compOpsHelper.updateClusterComponentsAndShardings(opsRes.Cluster, func(compSpec *appsv1.ClusterComponentSpec, obj ComponentOpsInterface) error {
 		upgradeComp := obj.(opsv1alpha1.UpgradeComponent)
+		if u.needUpdateCompDef(upgradeComp, opsRes.Cluster) {
+			compSpec.ComponentDef = *upgradeComp.ComponentDefinitionName
+		}
+		if upgradeComp.ServiceVersion != nil {
+			compSpec.ServiceVersion = *upgradeComp.ServiceVersion
+		}
 		if len(upgradeComp.Instances) > 0 {
 			for i := range compSpec.Instances {
 				for _, instance := range upgradeComp.Instances {
@@ -77,13 +83,6 @@ func (u upgradeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 					}
 				}
 			}
-			return nil
-		}
-		if u.needUpdateCompDef(upgradeComp, opsRes.Cluster) {
-			compSpec.ComponentDef = *upgradeComp.ComponentDefinitionName
-		}
-		if upgradeComp.ServiceVersion != nil {
-			compSpec.ServiceVersion = *upgradeComp.ServiceVersion
 		}
 		return nil
 	}); err != nil {
@@ -180,11 +179,10 @@ func (u upgradeOpsHandler) getComponentDefMapWithUpdatedImages(reqCtx intctrluti
 			compDefMap[key] = compDef
 			return nil
 		}
-		if len(upgrade.Instances) == 0 {
+		if upgrade.ComponentDefinitionName != nil || upgrade.ServiceVersion != nil {
 			if err := load(upgrade.ComponentName, compSpec.ComponentDef, compSpec.ServiceVersion); err != nil {
 				return nil, err
 			}
-			continue
 		}
 		for _, target := range upgrade.Instances {
 			for _, instance := range compSpec.Instances {

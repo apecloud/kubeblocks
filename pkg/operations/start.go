@@ -60,17 +60,6 @@ func (start StartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Cl
 		startList = opsRes.OpsRequest.Spec.StartList
 	)
 	compOpsHelper := newComponentOpsHelper(startList)
-	// abort earlier running opsRequests.
-	if err := abortEarlierOpsRequestWithSameKind(reqCtx, cli, opsRes, []opsv1alpha1.OpsType{opsv1alpha1.StopType},
-		func(earlierOps *opsv1alpha1.OpsRequest) (bool, error) {
-			if len(startList) == 0 {
-				// start all components
-				return true, nil
-			}
-			return len(earlierOps.Spec.StopList) == 0 || hasIntersectionCompOpsList(compOpsHelper.componentOpsSet, earlierOps.Spec.StopList), nil
-		}); err != nil {
-		return err
-	}
 	startComp := func(compSpec *appsv1.ClusterComponentSpec, clusterCompName string) {
 		if len(startList) > 0 {
 			if _, ok := compOpsHelper.componentOpsSet[clusterCompName]; !ok {

@@ -519,7 +519,7 @@ var _ = Describe("Start OpsRequest", func() {
 				client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsSucceedPhase))
 		})
 
-		It("Test abort running 'Stop' opsRequest", func() {
+		It("Test does not abort running 'Stop' opsRequest", func() {
 			By("init operations resources with topology")
 			opsRes, _, _ := initOperationsResourcesWithTopology(clusterDefName, compDefName, clusterName)
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
@@ -534,8 +534,8 @@ var _ = Describe("Start OpsRequest", func() {
 			err := startHandler.Action(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 
-			By("expect the 'Stop' OpsRequest to be Aborted")
-			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(stopOps))).Should(Equal(opsv1alpha1.OpsAbortedPhase))
+			By("expect the 'Stop' OpsRequest to remain active")
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(stopOps))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
 		})
 	})
 })

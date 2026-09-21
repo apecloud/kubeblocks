@@ -69,29 +69,6 @@ func (stop StopOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		return nil
 	}
 	compOpsHelper := newComponentOpsHelper(stopList)
-	// abort earlier running opsRequests.
-	if err := abortEarlierOpsRequestWithSameKind(reqCtx, cli, opsRes, []opsv1alpha1.OpsType{opsv1alpha1.HorizontalScalingType,
-		opsv1alpha1.StartType, opsv1alpha1.RestartType, opsv1alpha1.VerticalScalingType},
-		func(earlierOps *opsv1alpha1.OpsRequest) (bool, error) {
-			if len(stopList) == 0 {
-				// stop all components
-				return true, nil
-			}
-			switch earlierOps.Spec.Type {
-			case opsv1alpha1.RestartType:
-				return hasIntersectionCompOpsList(compOpsHelper.componentOpsSet, earlierOps.Spec.RestartList), nil
-			case opsv1alpha1.VerticalScalingType:
-				return hasIntersectionCompOpsList(compOpsHelper.componentOpsSet, earlierOps.Spec.VerticalScalingList), nil
-			case opsv1alpha1.HorizontalScalingType:
-				return hasIntersectionCompOpsList(compOpsHelper.componentOpsSet, earlierOps.Spec.HorizontalScalingList), nil
-			case opsv1alpha1.StartType:
-				return len(earlierOps.Spec.StartList) == 0 || hasIntersectionCompOpsList(compOpsHelper.componentOpsSet, earlierOps.Spec.StartList), nil
-			}
-			return false, nil
-		}); err != nil {
-		return err
-	}
-
 	stopComp := func(compSpec *appsv1.ClusterComponentSpec, clusterCompName string) {
 		if len(stopList) > 0 {
 			if _, ok := compOpsHelper.componentOpsSet[clusterCompName]; !ok {

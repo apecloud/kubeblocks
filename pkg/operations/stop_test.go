@@ -582,7 +582,7 @@ var _ = Describe("Stop OpsRequest", func() {
 				client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsSucceedPhase))
 		})
 
-		It("Test abort other running opsRequests", func() {
+		It("Test does not abort other running opsRequests", func() {
 			By("init operations resources with topology")
 			opsRes, _, _ := initOperationsResourcesWithTopology(clusterDefName, compDefName, clusterName)
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
@@ -613,14 +613,14 @@ var _ = Describe("Stop OpsRequest", func() {
 			err := stopHandler.Action(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 
-			By("expect the 'Restart' opsRequest with intersection component to be Aborted")
-			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops1))).Should(Equal(opsv1alpha1.OpsAbortedPhase))
+			By("expect the running 'Restart' opsRequest to remain active")
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops1))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
 
 			By("expect the 'Restart' opsRequest with non-intersection component  to be Creating")
 			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops2))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
 
-			By("expect the 'Start' opsRequest to be Aborted")
-			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops1))).Should(Equal(opsv1alpha1.OpsAbortedPhase))
+			By("expect the pending 'Start' opsRequest to remain pending")
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops3))).Should(Equal(opsv1alpha1.OpsPendingPhase))
 		})
 	})
 })

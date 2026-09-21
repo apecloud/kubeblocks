@@ -38,8 +38,9 @@ import (
 
 const opsRequestQueueLimitSize = 20
 
-// DequeueOpsRequestInClusterAnnotation when OpsRequest.status.phase is Succeeded or Failed
-// we should remove the OpsRequest Annotation of cluster, then unlock cluster
+// DequeueOpsRequestInClusterAnnotation removes a terminal OpsRequest from the
+// cluster queue. A failed non-Stop head preserves the existing cancellation of
+// queued work; a Stop barrier releases later entries for normal promotion.
 func DequeueOpsRequestInClusterAnnotation(ctx context.Context, cli client.Client, opsRes *OpsResource) error {
 	var (
 		opsRequestSlice []opsv1alpha1.OpsRecorder
@@ -48,11 +49,11 @@ func DequeueOpsRequestInClusterAnnotation(ctx context.Context, cli client.Client
 	if opsRequestSlice, err = opsutil.GetOpsRequestSliceFromCluster(opsRes.Cluster); err != nil {
 		return err
 	}
-	index, _ := GetOpsRecorderFromSlice(opsRequestSlice, opsRes.OpsRequest.Name)
+	index, opsRecorder := GetOpsRecorderFromSlice(opsRequestSlice, opsRes.OpsRequest.Name)
 	if index == -1 {
 		return nil
 	}
-	if opsRes.OpsRequest.Status.Phase == opsv1alpha1.OpsFailedPhase && index == 0 {
+	if opsRes.OpsRequest.Status.Phase == opsv1alpha1.OpsFailedPhase && index == 0 && opsRecorder.Type != opsv1alpha1.StopType {
 		var newOpsRequestSlice []opsv1alpha1.OpsRecorder
 		// 1. update all pending opsRequest phase to Cancelled if the head opsRequest is Failed.
 		for i := 1; i < len(opsRequestSlice); i++ {
@@ -108,6 +109,15 @@ func enqueueOpsRequestToClusterAnnotation(ctx context.Context, cli client.Client
 	}
 
 	inQueue := func() bool {
+		// Stop is a cluster-wide barrier. It waits for every running operation,
+		// including QueueBySelf operations, and prevents later operations from
+		// bypassing it with Force.
+		if opsRes.OpsRequest.Spec.Type == opsv1alpha1.StopType {
+			return hasStopBarrier(opsRequestSlice) || hasRunningOps(opsRequestSlice)
+		}
+		if hasStopBarrier(opsRequestSlice) {
+			return true
+		}
 		if opsRes.OpsRequest.Force() && !opsRes.OpsRequest.Spec.EnqueueOnForce {
 			return false
 		}
@@ -142,6 +152,15 @@ func enqueueOpsRequestToClusterAnnotation(ctx context.Context, cli client.Client
 				// the opsRequest is already running.
 				return &opsRecorder, nil
 			}
+			if opsRecorder.Type == opsv1alpha1.StopType {
+				if !hasRunningOpsBefore(opsRequestSlice, index) {
+					opsRequestSlice[index].InQueue = false
+				}
+				return &opsRecorder, opsutil.UpdateClusterOpsAnnotations(ctx, cli, opsRes.Cluster, opsRequestSlice)
+			}
+			if hasStopBarrierBefore(opsRequestSlice, index) {
+				return &opsRecorder, nil
+			}
 			if !opsRes.OpsRequest.Spec.Force && existOtherRunningOps(opsRequestSlice, opsRecorder.Type, opsBehaviour) {
 				// if exists other running opsRequest, return.
 				return &opsRecorder, nil
@@ -151,6 +170,42 @@ func enqueueOpsRequestToClusterAnnotation(ctx context.Context, cli client.Client
 		}
 	}
 	return &opsRecorder, opsutil.UpdateClusterOpsAnnotations(ctx, cli, opsRes.Cluster, opsRequestSlice)
+}
+
+func hasRunningOps(opsRequestSlice []opsv1alpha1.OpsRecorder) bool {
+	for i := range opsRequestSlice {
+		if !opsRequestSlice[i].InQueue {
+			return true
+		}
+	}
+	return false
+}
+
+func hasRunningOpsBefore(opsRequestSlice []opsv1alpha1.OpsRecorder, index int) bool {
+	for i := 0; i < index; i++ {
+		if !opsRequestSlice[i].InQueue {
+			return true
+		}
+	}
+	return false
+}
+
+func hasStopBarrier(opsRequestSlice []opsv1alpha1.OpsRecorder) bool {
+	for i := range opsRequestSlice {
+		if opsRequestSlice[i].Type == opsv1alpha1.StopType {
+			return true
+		}
+	}
+	return false
+}
+
+func hasStopBarrierBefore(opsRequestSlice []opsv1alpha1.OpsRecorder, index int) bool {
+	for i := 0; i < index; i++ {
+		if opsRequestSlice[i].Type == opsv1alpha1.StopType {
+			return true
+		}
+	}
+	return false
 }
 
 func swapOpsWithDependentBefore(opsRequestSlice []opsv1alpha1.OpsRecorder, currentIndex int, opsRes *OpsResource) ([]opsv1alpha1.OpsRecorder, bool) {

@@ -36,6 +36,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -255,12 +256,44 @@ func handleSwitchover(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *
 					compName, switchover.CandidateName, candidateInstance.GetRole(), targetRole)
 			}
 		} else {
-			progressDetail.Message = "do switchover succeed"
-			progressDetail.Status = opsv1alpha1.SucceedProgressStatus
+			observed, err := switchoverTargetRoleObserved(reqCtx.Ctx, cli, opsRes.Cluster, synthesizedComp.Name, switchover.InstanceName, targetRole)
+			if err != nil {
+				return err
+			}
+			if observed {
+				progressDetail.Message = "do switchover succeed"
+				progressDetail.Status = opsv1alpha1.SucceedProgressStatus
+			} else {
+				progressDetail.Message = fmt.Sprintf("waiting for an instance to assume role %q", targetRole)
+			}
 		}
 	}
 	handleProgressDetail(reqCtx, opsRequest, progressDetail, compName, completedCount, failedCount)
 	return nil
+}
+
+func switchoverTargetRoleObserved(ctx context.Context, cli client.Client, cluster *appsv1.Cluster,
+	componentName, sourceName, targetRole string) (bool, error) {
+	its := &workloads.InstanceSet{}
+	if err := cli.Get(ctx, client.ObjectKey{
+		Namespace: cluster.Namespace,
+		Name:      constant.GenerateClusterComponentName(cluster.Name, componentName),
+	}, its); err != nil {
+		if apierrors.IsNotFound(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	for _, status := range its.Status.InstanceStatus {
+		if status.PodName == sourceName || status.EffectiveDesiredState() != workloads.InstanceDesiredStateActive ||
+			status.EffectiveCurrentState() != workloads.InstanceCurrentStatePresent {
+			continue
+		}
+		if status.Role == targetRole {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func getSwitchoverPodBackedInstance(runtime OpsRuntime, namespace, clusterName, compName, instanceName string) (Instance, error) {

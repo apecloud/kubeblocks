@@ -201,6 +201,7 @@ var _ = Describe("", func() {
 			By("do reconcile switchover action")
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
+			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(opsv1alpha1.OpsCreatingPhase))
 		})
 
 		testSwitchoverWithCandidate := func(useComponentObjectName bool) {

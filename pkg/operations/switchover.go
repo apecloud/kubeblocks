@@ -284,6 +284,19 @@ func switchoverTargetRoleObserved(ctx context.Context, cli client.Client, cluste
 		}
 		return false, err
 	}
+	source := its.FindInstanceStatus(sourceName)
+	if source == nil {
+		return false, nil
+	}
+	switch source.EffectiveCurrentState() {
+	case workloads.InstanceCurrentStatePresent:
+		if source.Role == "" || source.Role == targetRole {
+			return false, nil
+		}
+	case workloads.InstanceCurrentStateAbsent:
+	default:
+		return false, nil
+	}
 	for _, status := range its.Status.InstanceStatus {
 		if status.PodName == sourceName || status.EffectiveDesiredState() != workloads.InstanceDesiredStateActive ||
 			status.EffectiveCurrentState() != workloads.InstanceCurrentStatePresent {

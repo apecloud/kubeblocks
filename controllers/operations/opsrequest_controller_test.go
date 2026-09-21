@@ -200,19 +200,6 @@ var _ = Describe("OpsRequest Controller", func() {
 			expectMappedRequests(reconciler.parseRunningOpsRequestsForComponentParameter(ctx, componentParameter))
 			Expect(reconciler.parseRunningOpsRequestsForComponentParameter(ctx, &parametersv1alpha1.ComponentParameter{})).Should(BeNil())
 
-			pvc := &corev1.PersistentVolumeClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "data-volume",
-					Namespace: helperNamespace,
-					Labels: map[string]string{
-						constant.AppManagedByLabelKey: constant.AppName,
-						constant.AppInstanceLabelKey:  helperClusterName,
-					},
-				},
-			}
-			Expect(reconciler.parseVolumeExpansionOpsRequest(ctx, pvc)).Should(Equal([]reconcile.Request{
-				{NamespacedName: types.NamespacedName{Namespace: helperNamespace, Name: volumeOps.Name}},
-			}))
 		})
 
 		It("maps backup records to the owning ops request", func() {
@@ -1402,5 +1389,89 @@ func TestOpsRequestRunningDeletionStillWaitsForCompletion(t *testing.T) {
 	}
 	if after.Annotations[constant.OpsRequestAnnotationKey] != cluster.Annotations[constant.OpsRequestAnnotationKey] {
 		t.Fatal("Running deletion removed its queue entry")
+	}
+}
+
+func TestVolumeExpansionControllerWakesAndRetriesCurrentProgress(t *testing.T) {
+	ctx := context.Background()
+	cluster, ops := ownerTestObjects()
+	cluster.Spec.ComponentSpecs[0].VolumeClaimTemplates = []appsv1.PersistentVolumeClaimTemplate{{Name: "data", Spec: corev1.PersistentVolumeClaimSpec{Resources: corev1.VolumeResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("5Gi")}}}}}
+	cluster.Status.Components["db"] = appsv1.ClusterComponentStatus{ObservedGeneration: cluster.Generation, UpToDate: true, Phase: appsv1.FailedComponentPhase}
+	ops.Spec.Type = opsv1alpha1.VolumeExpansionType
+	ops.Labels[constant.OpsRequestTypeLabelKey] = string(ops.Spec.Type)
+	ops.Spec.VolumeExpansionList = []opsv1alpha1.VolumeExpansion{{ComponentOps: opsv1alpha1.ComponentOps{ComponentName: "db"}, VolumeClaimTemplates: []opsv1alpha1.OpsRequestVolumeClaimTemplate{{Name: "data", Storage: resource.MustParse("5Gi")}}}}
+	ops.Status.Phase = opsv1alpha1.OpsRunningPhase
+	ops.Status.StartTimestamp = metav1.Now()
+	opsutil.SetOpsRequestToCluster(cluster, []opsv1alpha1.OpsRecorder{{Name: ops.Name, Type: ops.Spec.Type}})
+	its := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Name: "demo-db", Namespace: "default", Generation: 4, Labels: constant.GetCompLabels("demo", "db")}, Spec: workloads.InstanceSetSpec{Replicas: ptr.To(int32(1)), VolumeClaimTemplates: []corev1.PersistentVolumeClaim{{ObjectMeta: metav1.ObjectMeta{Name: "data"}, Spec: *cluster.Spec.ComponentSpecs[0].VolumeClaimTemplates[0].Spec.DeepCopy()}}}, Status: workloads.InstanceSetStatus{ObservedGeneration: 4, InstanceStatus: []workloads.InstanceStatus{{PodName: "owner-selected", TemplateName: ptr.To(""), DesiredState: workloads.InstanceDesiredStateActive, CurrentState: workloads.InstanceCurrentStatePresent}}}}
+	its.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("2Gi")
+	r := ownerTestReconciler(t)
+	base := fake.NewClientBuilder().WithScheme(r.Scheme).WithStatusSubresource(cluster, ops, its).WithObjects(cluster, ops, its).Build()
+	failProgressPatch := false
+	r.Client = interceptor.NewClient(base, interceptor.Funcs{
+		Get: func(ctx context.Context, cli client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+			switch obj.(type) {
+			case *corev1.Pod, *corev1.PersistentVolumeClaim, *corev1.PersistentVolume, *corev1.Service, *corev1.ConfigMap, *batchv1.Job:
+				return fmt.Errorf("forbidden observation %T", obj)
+			}
+			return cli.Get(ctx, key, obj, opts...)
+		},
+		List: func(ctx context.Context, cli client.WithWatch, obj client.ObjectList, opts ...client.ListOption) error {
+			switch obj.(type) {
+			case *corev1.PodList, *corev1.PersistentVolumeClaimList, *corev1.PersistentVolumeList, *corev1.ServiceList, *corev1.ConfigMapList, *batchv1.JobList:
+				return fmt.Errorf("forbidden observation %T", obj)
+			}
+			return cli.List(ctx, obj, opts...)
+		},
+		SubResourcePatch: func(ctx context.Context, cli client.Client, name string, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {
+			if failProgressPatch && name == "status" {
+				failProgressPatch = false
+				return fmt.Errorf("injected progress patch failure")
+			}
+			return cli.SubResource(name).Patch(ctx, obj, patch, opts...)
+		},
+	})
+	wantRequest := []reconcile.Request{{NamespacedName: client.ObjectKeyFromObject(ops)}}
+	if !reflect.DeepEqual(r.parseRunningOpsRequests(ctx, cluster), wantRequest) || !reflect.DeepEqual(r.parseRunningOpsRequestsForInstanceSet(ctx, its), wantRequest) {
+		t.Fatal("Cluster/ITS event failed to wake running VolumeExpansion")
+	}
+	result, err := r.Reconcile(ctx, wantRequest[0])
+	if err != nil || result.RequeueAfter != time.Minute {
+		t.Fatalf("waiting result=%#v error=%v", result, err)
+	}
+	if err := r.Get(ctx, client.ObjectKeyFromObject(ops), ops); err != nil {
+		t.Fatal(err)
+	}
+	if ops.Status.Phase != opsv1alpha1.OpsRunningPhase || ops.Status.Progress != "0/1" {
+		t.Fatalf("premature result: %#v", ops.Status)
+	}
+	its.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("5Gi")
+	if err := r.Update(ctx, its); err != nil {
+		t.Fatal(err)
+	}
+	its.Status.ObservedGeneration = its.Generation
+	its.Status.InstanceStatus = []workloads.InstanceStatus{{PodName: "owner-selected", TemplateName: ptr.To(""), DesiredState: workloads.InstanceDesiredStateActive, CurrentState: workloads.InstanceCurrentStatePresent, UpToDate: true}}
+	if err := r.Status().Update(ctx, its); err != nil {
+		t.Fatal(err)
+	}
+	failProgressPatch = true
+	// A failed progress write must not persist terminal success; the controller retry reloads status.
+	_, _ = r.Reconcile(ctx, wantRequest[0])
+	if err := r.Get(ctx, client.ObjectKeyFromObject(ops), ops); err != nil {
+		t.Fatal(err)
+	}
+	if ops.Status.Phase != opsv1alpha1.OpsRunningPhase || ops.Status.Progress != "0/1" {
+		t.Fatalf("failed patch persisted premature result: %#v", ops.Status)
+	}
+	reconcileOwnerTest(t, r, ops)
+	if err := r.Get(ctx, client.ObjectKeyFromObject(ops), ops); err != nil {
+		t.Fatal(err)
+	}
+	if ops.Status.Phase != opsv1alpha1.OpsSucceedPhase || ops.Status.Progress != "1/1" {
+		t.Fatalf("retry failed to persist complete result: %#v", ops.Status)
+	}
+	details := ops.Status.Components["db"].ProgressDetails
+	if len(details) != 1 || details[0].ObjectKey != "Pod/owner-selected" || details[0].Status != opsv1alpha1.SucceedProgressStatus || details[0].EndTime.IsZero() {
+		t.Fatalf("incomplete persisted progress: %#v", details)
 	}
 }

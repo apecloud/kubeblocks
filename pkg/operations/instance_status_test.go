@@ -13,6 +13,7 @@ package operations
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -22,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -144,204 +146,77 @@ func TestVerticalScalingDefaultAndEmptySelection(t *testing.T) {
 	}
 }
 
-func TestStoppedVolumeExpansionUsesRetainedPVCs(t *testing.T) {
-	for _, tc := range []struct {
-		name, podName, template string
-		flat                    bool
-		defaultReplicas         bool
-	}{
-		{name: "flat-default", podName: "demo-db-42", flat: true},
-		{name: "flat-template", podName: "demo-db-42", template: "large", flat: true},
-		{name: "nonflat-default", podName: "demo-db-0"},
-		{name: "nonflat-template", podName: "demo-db-large-0", template: "large"},
-		{name: "template-default-replicas", podName: "demo-db-42", template: "large", flat: true, defaultReplicas: true},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			ctx := context.Background()
-			scheme := runtime.NewScheme()
-			for _, add := range []func(*runtime.Scheme) error{corev1.AddToScheme, appsv1.AddToScheme, workloads.AddToScheme, opsv1alpha1.AddToScheme} {
-				if err := add(scheme); err != nil {
-					t.Fatal(err)
-				}
-			}
-			component := appsv1.ClusterComponentSpec{Name: "db", Replicas: 1, FlatInstanceOrdinal: tc.flat,
-				Stop: pointer.Bool(true), OfflineInstances: []string{"demo-db-8"}}
-			if tc.template != "" {
-				component.Instances = []appsv1.InstanceTemplate{{Name: tc.template, Replicas: pointer.Int32(1)}}
-				if tc.defaultReplicas {
-					component.Instances[0].Replicas = nil
-				}
-			}
-			cluster := &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default"},
-				Spec:   appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{component}},
-				Status: appsv1.ClusterStatus{Components: map[string]appsv1.ClusterComponentStatus{"db": {Phase: appsv1.StoppedComponentPhase}}}}
-			its := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Name: "demo-db", Namespace: "default"},
-				Spec: workloads.InstanceSetSpec{Stop: pointer.Bool(true), Replicas: pointer.Int32(1), OfflineInstances: component.OfflineInstances},
-				Status: workloads.InstanceSetStatus{InstanceStatus: []workloads.InstanceStatus{
-					{PodName: tc.podName, TemplateName: templateName(tc.template), DesiredState: workloads.InstanceDesiredStateOffline, CurrentState: workloads.InstanceCurrentStateAbsent},
-					{PodName: "demo-db-8", DesiredState: workloads.InstanceDesiredStateOffline, CurrentState: workloads.InstanceCurrentStateAbsent},
-					{PodName: "demo-db-9", TemplateName: templateName(tc.template), DesiredState: workloads.InstanceDesiredStateReleased, CurrentState: workloads.InstanceCurrentStateTerminating},
-				}}}
-			ops := &opsv1alpha1.OpsRequest{ObjectMeta: metav1.ObjectMeta{Name: "expand", Namespace: "default"},
-				Spec: opsv1alpha1.OpsRequestSpec{SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{VolumeExpansionList: []opsv1alpha1.VolumeExpansion{{
-					ComponentOps: opsv1alpha1.ComponentOps{ComponentName: "db"}, VolumeClaimTemplates: []opsv1alpha1.OpsRequestVolumeClaimTemplate{{Name: "data", Storage: resource.MustParse("2Gi")}},
-				}}}}, Status: opsv1alpha1.OpsRequestStatus{Phase: opsv1alpha1.OpsRunningPhase, StartTimestamp: metav1.Now()}}
-			objects := []client.Object{cluster, its, ops}
-			for _, name := range []string{tc.podName, "demo-db-8", "demo-db-9"} {
-				labels := constant.GetCompLabels("demo", "db")
-				labels[constant.VolumeClaimTemplateNameLabelKey] = "data"
-				objects = append(objects, &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "data-" + name, Namespace: "default", Labels: labels},
-					Spec: corev1.PersistentVolumeClaimSpec{Resources: corev1.VolumeResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("2Gi")}}},
-					Status: corev1.PersistentVolumeClaimStatus{Phase: corev1.ClaimBound, Capacity: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("1Gi")},
-						Conditions: []corev1.PersistentVolumeClaimCondition{{Type: corev1.PersistentVolumeClaimResizing, Status: corev1.ConditionTrue}}}})
-			}
-			cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(ops, &corev1.PersistentVolumeClaim{}).WithObjects(objects...).Build()
-			opsRes := &OpsResource{Cluster: cluster, OpsRequest: ops, Recorder: record.NewFakeRecorder(20), Runtimes: map[string]OpsRuntime{"db": newOpsRuntime(ctx, cli, "")}}
-			check := func(want opsv1alpha1.OpsPhase, progress string) {
-				t.Helper()
-				phase, _, err := (volumeExpansionOpsHandler{}).ReconcileAction(intctrlutil.RequestCtx{Ctx: ctx}, cli, opsRes)
-				if err != nil {
-					t.Fatal(err)
-				}
-				if phase != want || ops.Status.Progress != progress {
-					t.Fatalf("got %s %s, want %s %s", phase, ops.Status.Progress, want, progress)
-				}
-				details := ops.Status.Components["db"].ProgressDetails
-				if len(details) != 1 || details[0].ObjectKey != "PVC/data-"+tc.podName {
-					t.Fatalf("unexpected participants: %#v", details)
-				}
-			}
-			check(opsv1alpha1.OpsRunningPhase, "0/1")
-			pvc := &corev1.PersistentVolumeClaim{}
-			if err := cli.Get(ctx, client.ObjectKey{Namespace: "default", Name: "data-" + tc.podName}, pvc); err != nil {
-				t.Fatal(err)
-			}
-			pvc.Status.Capacity[corev1.ResourceStorage] = resource.MustParse("2Gi")
-			pvc.Status.Conditions = nil
-			if err := cli.Status().Update(ctx, pvc); err != nil {
-				t.Fatal(err)
-			}
-			check(opsv1alpha1.OpsSucceedPhase, "1/1")
-		})
-	}
-}
-
-// Exercise the real Operations runtime and handlers against explicit API objects.
-// The instance names intentionally carry no template name or contiguous ordinal.
-func TestScalingUsesAssignedInstancesAndActualObjects(t *testing.T) {
+// Instance identity and template assignment come from owner status, independent of names.
+func TestVerticalScalingUsesAssignedInstances(t *testing.T) {
 	ctx := context.Background()
-	for _, operation := range []string{"vertical", "volume"} {
-		t.Run(operation, func(t *testing.T) {
-			scheme := runtime.NewScheme()
-			for _, add := range []func(*runtime.Scheme) error{corev1.AddToScheme, appsv1.AddToScheme, workloads.AddToScheme, opsv1alpha1.AddToScheme} {
-				if err := add(scheme); err != nil {
-					t.Fatal(err)
-				}
+	scheme := runtime.NewScheme()
+	for _, add := range []func(*runtime.Scheme) error{corev1.AddToScheme, appsv1.AddToScheme, workloads.AddToScheme, opsv1alpha1.AddToScheme} {
+		if err := add(scheme); err != nil {
+			t.Fatal(err)
+		}
+	}
+	resources := corev1.ResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("2")}}
+	cluster := &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default"},
+		Spec: appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{{Name: "db", ComponentDef: "database", Replicas: 3, FlatInstanceOrdinal: true,
+			Instances: []appsv1.InstanceTemplate{{Name: "large", Replicas: ptr.To(int32(2)), Resources: &resources}}}}},
+		Status: appsv1.ClusterStatus{Components: map[string]appsv1.ClusterComponentStatus{"db": {
+			Phase: appsv1.RunningComponentPhase, UpToDate: true,
+		}}}}
+	its := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Name: "demo-db", Namespace: "default"},
+		Spec: workloads.InstanceSetSpec{Replicas: ptr.To(int32(3)), Instances: []workloads.InstanceTemplate{{
+			Name: "large", Replicas: ptr.To(int32(2)),
+		}}},
+		Status: workloads.InstanceSetStatus{InstanceStatus: []workloads.InstanceStatus{
+			{PodName: "demo-db-7", TemplateName: ptr.To("large"), DesiredState: workloads.InstanceDesiredStateActive, CurrentState: workloads.InstanceCurrentStatePresent, UpToDate: true},
+			{PodName: "demo-db-42", TemplateName: ptr.To("large"), DesiredState: workloads.InstanceDesiredStateActive, CurrentState: workloads.InstanceCurrentStatePresent, UpToDate: true},
+			{PodName: "demo-db-3", TemplateName: ptr.To(""), DesiredState: workloads.InstanceDesiredStateActive},
+			{PodName: "demo-db-8", DesiredState: workloads.InstanceDesiredStateOffline},
+			{PodName: "demo-db-9", TemplateName: ptr.To("large"), DesiredState: workloads.InstanceDesiredStateReleased},
+		}}}
+	ops := &opsv1alpha1.OpsRequest{ObjectMeta: metav1.ObjectMeta{Name: "scaling", Namespace: "default"},
+		Spec: opsv1alpha1.OpsRequestSpec{SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{VerticalScalingList: []opsv1alpha1.VerticalScaling{{
+			ComponentOps: opsv1alpha1.ComponentOps{ComponentName: "db"}, Instances: []opsv1alpha1.InstanceResourceTemplate{{Name: "large", ResourceRequirements: resources}},
+		}}}}, Status: opsv1alpha1.OpsRequestStatus{Phase: opsv1alpha1.OpsRunningPhase}}
+
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(ops, its).WithObjects(cluster, its, ops, &appsv1.ComponentDefinition{ObjectMeta: metav1.ObjectMeta{Name: "database"}}).Build()
+	res := &OpsResource{Cluster: cluster, OpsRequest: ops, Recorder: record.NewFakeRecorder(50)}
+	check := func(completed int) {
+		t.Helper()
+		phase, _, err := (verticalScalingHandler{}).ReconcileAction(intctrlutil.RequestCtx{Ctx: ctx}, cli, res)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := opsv1alpha1.OpsRunningPhase
+		if completed == 2 {
+			want = opsv1alpha1.OpsSucceedPhase
+		}
+		if phase != want || ops.Status.Progress != fmt.Sprintf("%d/2", completed) {
+			t.Fatalf("phase=%s progress=%s, want %s %d/2", phase, ops.Status.Progress, want, completed)
+		}
+		for _, d := range ops.Status.Components["db"].ProgressDetails {
+			if d.ObjectKey != "Pod/demo-db-7" && d.ObjectKey != "Pod/demo-db-42" {
+				t.Fatalf("unexpected participant %s", d.ObjectKey)
 			}
-			resources := corev1.ResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("2")}}
-			cluster := &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default"},
-				Spec: appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{{Name: "db", ComponentDef: "database", Replicas: 3, FlatInstanceOrdinal: true,
-					Instances: []appsv1.InstanceTemplate{{Name: "large", Replicas: pointer.Int32(2), Resources: &resources}}}}},
-				Status: appsv1.ClusterStatus{Components: map[string]appsv1.ClusterComponentStatus{"db": {
-					Phase: appsv1.RunningComponentPhase, UpToDate: true,
-				}}}}
-			its := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Name: "demo-db", Namespace: "default"},
-				Spec: workloads.InstanceSetSpec{Replicas: pointer.Int32(3), Instances: []workloads.InstanceTemplate{{
-					Name: "large", Replicas: pointer.Int32(2),
-				}}},
-				Status: workloads.InstanceSetStatus{InstanceStatus: []workloads.InstanceStatus{
-					{PodName: "demo-db-7", TemplateName: templateName("large"), DesiredState: workloads.InstanceDesiredStateActive, CurrentState: workloads.InstanceCurrentStatePresent, UpToDate: true},
-					{PodName: "demo-db-42", TemplateName: templateName("large"), DesiredState: workloads.InstanceDesiredStateActive, CurrentState: workloads.InstanceCurrentStatePresent, UpToDate: true},
-					{PodName: "demo-db-3", TemplateName: templateName(""), DesiredState: workloads.InstanceDesiredStateActive},
-					{PodName: "demo-db-8", DesiredState: workloads.InstanceDesiredStateOffline},
-					{PodName: "demo-db-9", TemplateName: templateName("large"), DesiredState: workloads.InstanceDesiredStateReleased},
-				}}}
-			ops := &opsv1alpha1.OpsRequest{ObjectMeta: metav1.ObjectMeta{Name: "scaling", Namespace: "default"},
-				Spec: opsv1alpha1.OpsRequestSpec{SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{VerticalScalingList: []opsv1alpha1.VerticalScaling{{
-					ComponentOps: opsv1alpha1.ComponentOps{ComponentName: "db"}, Instances: []opsv1alpha1.InstanceResourceTemplate{{Name: "large", ResourceRequirements: resources}},
-				}}}}, Status: opsv1alpha1.OpsRequestStatus{Phase: opsv1alpha1.OpsRunningPhase}}
-			objects := []client.Object{cluster, its, ops, &appsv1.ComponentDefinition{ObjectMeta: metav1.ObjectMeta{Name: "database"}}}
-			for _, name := range []string{"demo-db-7", "demo-db-42", "demo-db-3", "demo-db-9"} {
-				objects = append(objects, &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "default", Labels: constant.GetCompLabels("demo", "db")},
-					Spec:   corev1.PodSpec{Containers: []corev1.Container{{Name: "db"}}, Volumes: []corev1.Volume{{Name: "data", VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: "data-" + name}}}}},
-					Status: corev1.PodStatus{Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}}}},
-					&corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "data-" + name, Namespace: "default", Labels: constant.GetCompLabels("demo", "db")},
-						Spec:   corev1.PersistentVolumeClaimSpec{Resources: corev1.VolumeResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("2Gi")}}},
-						Status: corev1.PersistentVolumeClaimStatus{Phase: corev1.ClaimBound, Capacity: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("1Gi")}}})
-			}
-			cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(ops, its, &corev1.PersistentVolumeClaim{}).WithObjects(objects...).Build()
-			opsRes := &OpsResource{Cluster: cluster, OpsRequest: ops, Recorder: record.NewFakeRecorder(50), Runtimes: map[string]OpsRuntime{"db": newOpsRuntime(ctx, cli, "")}}
-			compStatus := &opsv1alpha1.OpsRequestComponentStatus{}
-			check := func(wantCompleted int) {
-				t.Helper()
-				if operation == "vertical" {
-					phase, _, err := (verticalScalingHandler{}).ReconcileAction(intctrlutil.RequestCtx{Ctx: ctx}, cli, opsRes)
-					if err != nil {
-						t.Fatal(err)
-					}
-					wantPhase := opsv1alpha1.OpsRunningPhase
-					if wantCompleted == 2 {
-						wantPhase = opsv1alpha1.OpsSucceedPhase
-					}
-					if phase != wantPhase {
-						t.Fatalf("phase=%s, want %s", phase, wantPhase)
-					}
-					status := ops.Status.Components["db"]
-					compStatus = &status
-				} else {
-					succeeded, completed, err := (volumeExpansionOpsHandler{}).handleVCTExpansionProgress(intctrlutil.RequestCtx{Ctx: ctx}, cli, opsRes, compStatus, resource.MustParse("2Gi"), volumeExpansionHelper{
-						compOps: opsv1alpha1.VolumeExpansion{ComponentOps: opsv1alpha1.ComponentOps{ComponentName: "db"}}, fullComponentName: "db", expectCount: 2, templateName: "large", vctName: "data"})
-					if err != nil {
-						t.Fatal(err)
-					}
-					if succeeded != wantCompleted || completed != wantCompleted {
-						t.Fatalf("progress=%d/%d, want %d", succeeded, completed, wantCompleted)
-					}
-				}
-				for _, detail := range compStatus.ProgressDetails {
-					if detail.ObjectKey != "Pod/demo-db-7" && detail.ObjectKey != "Pod/demo-db-42" && detail.ObjectKey != "PVC/data-demo-db-7" && detail.ObjectKey != "PVC/data-demo-db-42" {
-						t.Fatalf("unexpected participant: %s", detail.ObjectKey)
-					}
-				}
-			}
-			published := its.Status.InstanceStatus
-			its.Status.InstanceStatus = nil
-			if err := cli.Status().Update(ctx, its); err != nil {
-				t.Fatal(err)
-			}
-			check(0) // Existing Pods do not replace an unpublished allocation.
-			its.Status.InstanceStatus = published
-			if err := cli.Status().Update(ctx, its); err != nil {
-				t.Fatal(err)
-			}
-			check(0) // UpToDate alone must not bypass actual Pod/PVC checks.
-			for i, name := range []string{"demo-db-7", "demo-db-42"} {
-				key := client.ObjectKey{Namespace: "default", Name: name}
-				if operation == "vertical" {
-					for j := range its.Status.InstanceStatus {
-						status := &its.Status.InstanceStatus[j]
-						if status.PodName == name {
-							status.Ready = true
-							status.Available = true
-						}
-					}
-					if err := cli.Status().Update(ctx, its); err != nil {
-						t.Fatal(err)
-					}
-				} else {
-					key.Name = "data-" + name
-					pvc := &corev1.PersistentVolumeClaim{}
-					if err := cli.Get(ctx, key, pvc); err != nil {
-						t.Fatal(err)
-					}
-					pvc.Status.Capacity[corev1.ResourceStorage] = resource.MustParse("2Gi")
-					if err := cli.Status().Update(ctx, pvc); err != nil {
-						t.Fatal(err)
-					}
-				}
-				check(i + 1)
-			}
-		})
+		}
+	}
+	published := its.Status.InstanceStatus
+	its.Status.InstanceStatus = nil
+	if err := cli.Status().Update(ctx, its); err != nil {
+		t.Fatal(err)
+	}
+	check(0)
+	its.Status.InstanceStatus = published
+	if err := cli.Status().Update(ctx, its); err != nil {
+		t.Fatal(err)
+	}
+	check(0) // UpToDate alone does not establish vertical scaling's service health.
+	for i := 0; i < 2; i++ {
+		its.Status.InstanceStatus[i].Ready = true
+		its.Status.InstanceStatus[i].Available = true
+		if err := cli.Status().Update(ctx, its); err != nil {
+			t.Fatal(err)
+		}
+		check(i + 1)
 	}
 }
 
@@ -390,48 +265,5 @@ func TestActiveAssignmentsMatchComponent(t *testing.T) {
 	}
 	if !assignmentsMatchComponent(map[string]string{"demo-0": "", "demo-1": ""}, component) {
 		t.Fatal("zero-replica templates must not require an allocation")
-	}
-}
-
-func TestVolumeExpansionWaitsWithoutReportingSuccessForIncompleteAllocation(t *testing.T) {
-	const (
-		namespace     = "default"
-		clusterName   = "demo"
-		componentName = "database"
-	)
-	scheme := runtime.NewScheme()
-	if err := workloads.AddToScheme(scheme); err != nil {
-		t.Fatal(err)
-	}
-	its := &workloads.InstanceSet{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: namespace,
-			Name:      constant.GenerateClusterComponentName(clusterName, componentName),
-		},
-		Status: workloads.InstanceSetStatus{InstanceStatus: []workloads.InstanceStatus{{
-			PodName: "allocated-identity", TemplateName: templateName(""),
-			DesiredState: workloads.InstanceDesiredStateActive,
-		}}},
-	}
-	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(its).Build()
-	opsRes := &OpsResource{
-		Cluster:    &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: clusterName}},
-		OpsRequest: &opsv1alpha1.OpsRequest{},
-		Runtimes:   map[string]OpsRuntime{componentName: newOpsRuntime(context.Background(), cli, "")},
-	}
-	compStatus := &opsv1alpha1.OpsRequestComponentStatus{}
-	succeeded, completed, err := (volumeExpansionOpsHandler{}).handleVCTExpansionProgress(
-		intctrlutil.RequestCtx{Ctx: context.Background()}, cli, opsRes, compStatus,
-		resource.MustParse("2Gi"), volumeExpansionHelper{
-			compOps:           opsv1alpha1.VolumeExpansion{ComponentOps: opsv1alpha1.ComponentOps{ComponentName: componentName}},
-			fullComponentName: componentName,
-			expectCount:       2,
-			vctName:           "data",
-		})
-	if err != nil {
-		t.Fatalf("wait for allocation: %v", err)
-	}
-	if succeeded != 0 || completed != 0 {
-		t.Fatalf("incomplete allocation must not report progress, got succeeded=%d completed=%d", succeeded, completed)
 	}
 }

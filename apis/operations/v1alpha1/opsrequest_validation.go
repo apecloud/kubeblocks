@@ -531,6 +531,21 @@ func (r *OpsRequest) validateVolumeExpansion(ctx context.Context, cli client.Cli
 	if err := r.checkComponentExistence(cluster, compOpsList); err != nil {
 		return err
 	}
+	for _, expansion := range volumeExpansionList {
+		if len(expansion.VolumeClaimTemplates) == 0 && len(expansion.Instances) == 0 {
+			return notEmptyError("spec.volumeExpansion.volumeClaimTemplates or instances")
+		}
+		var names []string
+		for _, instance := range expansion.Instances {
+			names = append(names, instance.Name)
+			if len(instance.VolumeClaimTemplates) == 0 {
+				return notEmptyError("spec.volumeExpansion.instances.volumeClaimTemplates")
+			}
+		}
+		if err := r.checkInstanceTemplate(cluster, expansion.ComponentOps, names); err != nil {
+			return err
+		}
+	}
 	return r.checkVolumesAllowExpansion(ctx, cli, cluster)
 }
 
@@ -642,13 +657,36 @@ func (r *OpsRequest) checkVolumesAllowExpansion(ctx context.Context, cli client.
 	}
 
 	for _, comp := range r.Spec.VolumeExpansionList {
-		setVols(comp.VolumeClaimTemplates, comp.ComponentOps.ComponentName)
-		for _, compSpec := range cluster.Spec.ComponentSpecs {
-			if compSpec.Name == comp.ComponentOps.ComponentName {
-				for _, its := range compSpec.Instances {
-					setVols(comp.VolumeClaimTemplates, fmt.Sprintf("%s.%s", compSpec.Name, its.Name))
+		setVols(comp.VolumeClaimTemplates, comp.ComponentName)
+		setInstanceVols := func(spec appsv1.ClusterComponentSpec) {
+			for _, instance := range spec.Instances {
+				key := fmt.Sprintf("%s.%s", comp.ComponentName, instance.Name)
+				for _, vct := range comp.VolumeClaimTemplates {
+					overridden := false
+					for _, override := range instance.VolumeClaimTemplates {
+						if override.Name == vct.Name {
+							overridden = true
+							break
+						}
+					}
+					if !overridden {
+						setVols([]OpsRequestVolumeClaimTemplate{vct}, key)
+					}
 				}
 			}
+		}
+		for _, spec := range cluster.Spec.ComponentSpecs {
+			if spec.Name == comp.ComponentName {
+				setInstanceVols(spec)
+			}
+		}
+		for _, sharding := range cluster.Spec.Shardings {
+			if sharding.Name == comp.ComponentName {
+				setInstanceVols(sharding.Template)
+			}
+		}
+		for _, instance := range comp.Instances {
+			setVols(instance.VolumeClaimTemplates, fmt.Sprintf("%s.%s", comp.ComponentName, instance.Name))
 		}
 	}
 	fillVol := func(vct appsv1.ClusterComponentVolumeClaimTemplate, key string, isShardingComp bool) {
@@ -669,13 +707,13 @@ func (r *OpsRequest) checkVolumesAllowExpansion(ctx context.Context, cli client.
 			fillVol(vct, componentName, isShardingComp)
 		}
 	}
-	fillItsVols := func(itsSpec appsv1.InstanceTemplate, cmpVcts []appsv1.ClusterComponentVolumeClaimTemplate, key string) {
+	fillItsVols := func(itsSpec appsv1.InstanceTemplate, cmpVcts []appsv1.ClusterComponentVolumeClaimTemplate, key string, isSharding bool) {
 		if _, ok := vols[key]; !ok {
 			return // ignore not-exist its
 		}
 		mergedVcts := mergeItsCmpTemplates(itsSpec.VolumeClaimTemplates, cmpVcts)
 		for _, vct := range mergedVcts {
-			fillVol(vct, key, false)
+			fillVol(vct, key, isSharding)
 		}
 	}
 	// traverse the spec to update volumes
@@ -683,11 +721,14 @@ func (r *OpsRequest) checkVolumesAllowExpansion(ctx context.Context, cli client.
 		fillCompVols(comp, comp.Name, false)
 		for _, its := range comp.Instances {
 			// update its vct volumes
-			fillItsVols(its, comp.VolumeClaimTemplates, fmt.Sprintf("%s.%s", comp.Name, its.Name))
+			fillItsVols(its, comp.VolumeClaimTemplates, fmt.Sprintf("%s.%s", comp.Name, its.Name), false)
 		}
 	}
 	for _, sharding := range cluster.Spec.Shardings {
 		fillCompVols(sharding.Template, sharding.Name, true)
+		for _, its := range sharding.Template.Instances {
+			fillItsVols(its, sharding.Template.VolumeClaimTemplates, fmt.Sprintf("%s.%s", sharding.Name, its.Name), true)
+		}
 	}
 
 	// check all used storage classes
@@ -722,11 +763,12 @@ func (r *OpsRequest) checkVolumesAllowExpansion(ctx context.Context, cli client.
 			notSupportSc []string
 		)
 		for vct, e := range compVols {
-			if !e.hasPvc {
-				continue
-			}
 			if !e.existInSpec {
 				notFound = append(notFound, vct)
+				continue
+			}
+			if !e.hasPvc {
+				continue
 			}
 			if !e.allowExpansion {
 				notSupport = append(notSupport, vct)

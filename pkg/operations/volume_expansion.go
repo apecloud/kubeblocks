@@ -50,6 +50,7 @@ type volumeExpansionHelper struct {
 	offlineInstanceNames []string
 	templateName         string
 	ordinals             appsv1.Ordinals
+	requestStorage       resource.Quantity
 }
 
 var _ OpsHandler = volumeExpansionOpsHandler{}
@@ -84,11 +85,41 @@ func (ve volumeExpansionOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli cl
 					if vct.Name != v.Name {
 						continue
 					}
+					if targetVCTs[i].Spec.Resources.Requests == nil {
+						targetVCTs[i].Spec.Resources.Requests = corev1.ResourceList{}
+					}
 					targetVCTs[i].Spec.Resources.Requests[corev1.ResourceStorage] = v.Storage
 				}
 			}
 		}
 		volumeExpansion := obj.(opsv1alpha1.VolumeExpansion)
+		// Materialize inherited volumes before updating component defaults.
+		for _, instance := range volumeExpansion.Instances {
+			for i := range compSpec.Instances {
+				template := &compSpec.Instances[i]
+				if template.Name != instance.Name {
+					continue
+				}
+				for _, requested := range instance.VolumeClaimTemplates {
+					found := false
+					for _, vct := range template.VolumeClaimTemplates {
+						if vct.Name == requested.Name {
+							found = true
+							break
+						}
+					}
+					if !found {
+						for _, vct := range compSpec.VolumeClaimTemplates {
+							if vct.Name == requested.Name {
+								template.VolumeClaimTemplates = append(template.VolumeClaimTemplates, *vct.DeepCopy())
+								break
+							}
+						}
+					}
+				}
+				setVolumeStorage(instance.VolumeClaimTemplates, template.VolumeClaimTemplates)
+			}
+		}
 		setVolumeStorage(volumeExpansion.VolumeClaimTemplates, compSpec.VolumeClaimTemplates)
 		return nil
 	}
@@ -124,33 +155,53 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 		ve.initComponentStatus(opsRequest)
 	}
 	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.VolumeExpansionList)
-	storageMap := ve.getRequestStorageMap(opsRequest)
 	var veHelpers []volumeExpansionHelper
 	setVeHelpers := func(compSpec appsv1.ClusterComponentSpec, compOps ComponentOpsInterface, fullComponentName string) {
 		volumeExpansion := compOps.(opsv1alpha1.VolumeExpansion)
-		if len(volumeExpansion.VolumeClaimTemplates) > 0 {
-			expectReplicas := compSpec.Replicas - getTemplateReplicas(compSpec.Instances)
-			for _, vct := range volumeExpansion.VolumeClaimTemplates {
+		appendHelpers := func(vcts []opsv1alpha1.OpsRequestVolumeClaimTemplate, name string, replicas int32, ordinals appsv1.Ordinals) {
+			for _, vct := range vcts {
 				veHelpers = append(veHelpers, volumeExpansionHelper{
 					compOps:              compOps,
 					fullComponentName:    fullComponentName,
-					expectCount:          int(expectReplicas),
+					expectCount:          int(replicas),
 					vctName:              vct.Name,
 					offlineInstanceNames: compSpec.OfflineInstances,
+					templateName:         name,
+					ordinals:             ordinals,
+					requestStorage:       vct.Storage,
 				})
-				for _, template := range compSpec.Instances {
-					// todo: consider instance template with volumeClaimTemplates
-					veHelpers = append(veHelpers, volumeExpansionHelper{
-						compOps:              compOps,
-						fullComponentName:    fullComponentName,
-						expectCount:          int(*template.Replicas),
-						vctName:              vct.Name,
-						offlineInstanceNames: compSpec.OfflineInstances,
-						templateName:         template.Name,
-						ordinals:             template.Ordinals,
-					})
+			}
+		}
+		appendHelpers(volumeExpansion.VolumeClaimTemplates, "", compSpec.Replicas-getTemplateReplicas(compSpec.Instances), appsv1.Ordinals{})
+		for _, template := range compSpec.Instances {
+			var requests []opsv1alpha1.OpsRequestVolumeClaimTemplate
+			for _, vct := range volumeExpansion.VolumeClaimTemplates {
+				overridden := false
+				for _, override := range template.VolumeClaimTemplates {
+					if override.Name == vct.Name {
+						overridden = true
+						break
+					}
+				}
+				if !overridden {
+					requests = append(requests, vct)
 				}
 			}
+			for _, instance := range volumeExpansion.Instances {
+				if instance.Name == template.Name {
+					// Explicit requests win even before Action has materialized overrides.
+					for _, vct := range instance.VolumeClaimTemplates {
+						for i := 0; i < len(requests); i++ {
+							if requests[i].Name == vct.Name {
+								requests = append(requests[:i], requests[i+1:]...)
+								break
+							}
+						}
+						requests = append(requests, vct)
+					}
+				}
+			}
+			appendHelpers(requests, template.Name, template.GetReplicas(), template.Ordinals)
 		}
 	}
 	for _, compSpec := range opsRes.Cluster.Spec.ComponentSpecs {
@@ -177,13 +228,8 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 	// sync the volumeClaimTemplate status and component phase On the OpsRequest and Cluster.
 	for _, veHelper := range veHelpers {
 		opsCompStatus := opsRequest.Status.Components[veHelper.compOps.GetComponentName()]
-		key := getComponentVCTKey(veHelper.compOps.GetComponentName(), veHelper.vctName)
-		requestStorage, ok := storageMap[key]
-		if !ok {
-			continue
-		}
 		succeedCount, completedCount, err := ve.handleVCTExpansionProgress(reqCtx, cli, opsRes,
-			&opsCompStatus, requestStorage, veHelper)
+			&opsCompStatus, veHelper.requestStorage, veHelper)
 		if err != nil {
 			return "", requeueAfter, err
 		}
@@ -238,7 +284,18 @@ func (ve volumeExpansionOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.Req
 			}
 			return lastVCTs
 		}
-		// save the last vcts of the componnet
+		var instances []appsv1.InstanceTemplate
+		for _, requested := range comOps.(opsv1alpha1.VolumeExpansion).Instances {
+			for _, template := range compSpec.Instances {
+				if requested.Name == template.Name {
+					instances = append(instances, appsv1.InstanceTemplate{
+						Name:                 template.Name,
+						VolumeClaimTemplates: template.DeepCopy().VolumeClaimTemplates,
+					})
+				}
+			}
+		}
+		// Save the last component volumes.
 		lastVCTS := getLastVCTs(compSpec.VolumeClaimTemplates)
 		var convertedLastVCTs []opsv1alpha1.OpsRequestVolumeClaimTemplate
 		for _, v := range lastVCTS {
@@ -249,6 +306,7 @@ func (ve volumeExpansionOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.Req
 		}
 		return opsv1alpha1.LastComponentConfiguration{
 			VolumeClaimTemplates: convertedLastVCTs,
+			Instances:            instances,
 		}
 	})
 	return nil

@@ -1379,6 +1379,9 @@ Kubernetes core/v1.ResourceRequirements
 </table>
 <h3 id="operations.kubeblocks.io/v1alpha1.InstanceVolumeClaimTemplate">InstanceVolumeClaimTemplate
 </h3>
+<p>
+(<em>Appears on:</em><a href="#operations.kubeblocks.io/v1alpha1.VolumeExpansion">VolumeExpansion</a>)
+</p>
 <div>
 </div>
 <table>
@@ -4767,8 +4770,24 @@ ComponentOps
 </em>
 </td>
 <td>
+<p><em>(Optional)</em></p>
 <p>Specifies a list of OpsRequestVolumeClaimTemplate objects, defining the volumeClaimTemplates
 that are used to expand the storage and the desired storage size for each one.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>instances</code><br/>
+<em>
+<a href="#operations.kubeblocks.io/v1alpha1.InstanceVolumeClaimTemplate">
+[]InstanceVolumeClaimTemplate
+</a>
+</em>
+</td>
+<td>
+<p><em>(Optional)</em></p>
+<p>Specifies volume expansion for named instance templates of the component or sharding.
+Volumes not overridden by an instance template inherit component-level expansion.</p>
 </td>
 </tr>
 </tbody>

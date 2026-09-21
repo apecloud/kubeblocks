@@ -396,6 +396,22 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 	}
 
 	Context("Test VolumeExpansion", func() {
+		It("persists instance-only volume expansion requests", func() {
+			ops := testops.NewOpsRequestObj("instance-volumeexpansion-"+testCtx.GetRandomStr(),
+				testCtx.DefaultNamespace, clusterName, opsv1alpha1.VolumeExpansionType)
+			ops.Spec.VolumeExpansionList = []opsv1alpha1.VolumeExpansion{{
+				ComponentOps: opsv1alpha1.ComponentOps{ComponentName: consensusCompName},
+				Instances: []opsv1alpha1.InstanceVolumeClaimTemplate{{
+					Name:                 "large",
+					VolumeClaimTemplates: []opsv1alpha1.OpsRequestVolumeClaimTemplate{{Name: vctName, Storage: resource.MustParse("10Gi")}},
+				}},
+			}}
+			created := testops.CreateOpsRequest(ctx, testCtx, ops)
+			stored := &opsv1alpha1.OpsRequest{}
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(created), stored)).To(Succeed())
+			Expect(stored.Spec.VolumeExpansionList).To(Equal(ops.Spec.VolumeExpansionList))
+		})
+
 		It("VolumeExpansion should work", func() {
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
 			_, clusterObject := testapps.InitConsensusMysql(&testCtx, clusterName, compDefName, consensusCompName)

@@ -33,6 +33,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
@@ -169,7 +170,7 @@ var _ = Describe("", func() {
 			By("create switchover opsRequest")
 			ops := testops.NewOpsRequestObj("ops-switchover-"+testCtx.GetRandomStr(), testCtx.DefaultNamespace,
 				clusterObj.Name, opsv1alpha1.SwitchoverType)
-			instanceName := fmt.Sprintf("%s-%s-%d", clusterObj.Name, defaultCompName, 1)
+			instanceName := fmt.Sprintf("%s-%s-%d", clusterObj.Name, defaultCompName, 0)
 			ops.Spec.SwitchoverList = []opsv1alpha1.Switchover{
 				{
 					ComponentName: defaultCompName,
@@ -201,6 +202,46 @@ var _ = Describe("", func() {
 			By("do reconcile switchover action")
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
+			checkProgress := func(phase opsv1alpha1.OpsPhase, progress string, detailStatus opsv1alpha1.ProgressStatus) {
+				persisted := &opsv1alpha1.OpsRequest{}
+				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(opsRes.OpsRequest), persisted)).Should(Succeed())
+				Expect(persisted.Status.Phase).Should(Equal(phase))
+				Expect(persisted.Status.Progress).Should(Equal(progress))
+				detail := findStatusProgressDetail(persisted.Status.Components[defaultCompName].ProgressDetails,
+					getProgressObjectKey(KBSwitchoverKey, defaultCompName))
+				Expect(detail).ShouldNot(BeNil())
+				Expect(detail.Status).Should(Equal(detailStatus))
+				opsRes.OpsRequest = persisted
+			}
+			checkProgress(opsv1alpha1.OpsCreatingPhase, "0/1", opsv1alpha1.ProcessingProgressStatus)
+
+			its := &workloads.InstanceSet{}
+			Expect(k8sClient.Get(ctx, client.ObjectKey{Name: compObj.Name, Namespace: clusterObj.Namespace}, its)).Should(Succeed())
+			Expect(testapps.ChangeObjStatus(&testCtx, its, func() {
+				its.Status.ObservedGeneration = its.Generation
+				its.Status.Replicas = 2
+				its.Status.InstanceStatus = []workloads.InstanceStatus{
+					{PodName: instanceName, DesiredState: workloads.InstanceDesiredStateActive, CurrentState: workloads.InstanceCurrentStatePresent, Role: testapps.Leader, Ready: true},
+					{PodName: compObj.Name + "-1", DesiredState: workloads.InstanceDesiredStateActive, CurrentState: workloads.InstanceCurrentStatePresent, Role: testapps.Follower, Ready: true},
+				}
+			})).Should(Succeed())
+			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			checkProgress(opsv1alpha1.OpsCreatingPhase, "0/1", opsv1alpha1.ProcessingProgressStatus)
+
+			Expect(testapps.ChangeObjStatus(&testCtx, its, func() {
+				its.Status.InstanceStatus[1].Role = testapps.Leader
+			})).Should(Succeed())
+			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			checkProgress(opsv1alpha1.OpsCreatingPhase, "0/1", opsv1alpha1.ProcessingProgressStatus)
+
+			Expect(testapps.ChangeObjStatus(&testCtx, its, func() {
+				its.Status.InstanceStatus[0].Role = testapps.Follower
+			})).Should(Succeed())
+			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			checkProgress(opsv1alpha1.OpsSucceedPhase, "1/1", opsv1alpha1.SucceedProgressStatus)
 		})
 
 		testSwitchoverWithCandidate := func(useComponentObjectName bool) {

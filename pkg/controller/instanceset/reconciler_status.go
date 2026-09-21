@@ -478,6 +478,13 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 	}
 
 	observations := make([]instancestatus.Observation, 0, len(pods))
+	roleClaims, err := RoleLabelClaims(its.Spec.Roles, pods)
+	if err != nil {
+		return err
+	}
+	if err := RepairRoleLabels(tree, pods, roleClaims); err != nil {
+		return err
+	}
 	roleMap := composeRoleMap(*its)
 	for _, pod := range pods {
 		state := workloads.InstanceCurrentStatePresent
@@ -496,9 +503,13 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 			Available:    ready && intctrlutil.IsPodAvailable(pod, its.Spec.MinReadySeconds),
 			Failed:       instancePodFailed(pod),
 		}
-		if state == workloads.InstanceCurrentStatePresent && intctrlutil.PodIsReadyWithLabel(*pod) {
-			if role, ok := roleMap[getRoleName(pod)]; ok {
-				observation.Role = role.Name
+		if state == workloads.InstanceCurrentStatePresent {
+			if claimedRole, observed := roleClaims[pod.Name]; observed {
+				observation.Role = claimedRole
+			} else if intctrlutil.PodIsReadyWithLabel(*pod) {
+				if role, ok := roleMap[getRoleName(pod)]; ok {
+					observation.Role = role.Name
+				}
 			}
 		}
 		configs, err := configsFromPod(pod)
@@ -553,6 +564,38 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 		return err
 	}
 	its.Status.InstanceStatus = statuses
+	return nil
+}
+
+func RepairRoleLabels(tree *kubebuilderx.ObjectTree, pods []*corev1.Pod, claims map[string]string) error {
+	for _, pod := range pods {
+		desiredRole, observed := claims[pod.Name]
+		if !observed || !pod.DeletionTimestamp.IsZero() {
+			continue
+		}
+		currentRole := ""
+		if pod.Labels != nil {
+			currentRole = pod.Labels[constant.RoleLabelKey]
+		}
+		if currentRole == desiredRole {
+			continue
+		}
+		repaired := pod.DeepCopy()
+		if repaired.Labels == nil {
+			repaired.Labels = make(map[string]string)
+		}
+		if desiredRole == "" {
+			delete(repaired.Labels, constant.RoleLabelKey)
+		} else {
+			repaired.Labels[constant.RoleLabelKey] = desiredRole
+		}
+		if tree != nil {
+			if err := tree.Update(repaired, kubebuilderx.WithPatch(true)); err != nil {
+				return err
+			}
+		}
+		*pod = *repaired
+	}
 	return nil
 }
 

@@ -42,6 +42,7 @@ const (
 	// semantics: single-token results read/write only the EventTime key and
 	// versioned results read/write only the roleVersion key.
 	LastRoleAuthoritativeVersionAnnotationKey = "apps.kubeblocks.io/last-role-authoritative-version"
+	RoleObservationAnnotationKey               = "apps.kubeblocks.io/role-observation"
 	ComponentScaleInAnnotationKey             = "apps.kubeblocks.io/component-scale-in" // ComponentScaleInAnnotationKey specifies whether the component is scaled in
 
 	// SystemAccountProvisionedAnnotationKey marks a system account secret whose account has already been prepared externally.

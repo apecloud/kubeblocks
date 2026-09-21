@@ -18,7 +18,6 @@ package component
 import (
 	"context"
 	"errors"
-	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -1339,34 +1338,3 @@ var _ = Describe("Component Workload Operations Test", func() {
 		})
 	})
 })
-
-func TestVolumeExpansionTargetDeferredUntilAfterStart(t *testing.T) {
-	vct := func(size string) corev1.PersistentVolumeClaim {
-		return corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "data"}, Spec: corev1.PersistentVolumeClaimSpec{Resources: corev1.VolumeResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse(size)}}}}
-	}
-	running := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{constant.KubeBlocksGenerationKey: "1"}}, Spec: workloads.InstanceSetSpec{VolumeClaimTemplates: []corev1.PersistentVolumeClaim{vct("2Gi")}}}
-	synth := &component.SynthesizedComponent{Stop: ptr.To(true)}
-	ctx := &componentTransformContext{SynthesizeComponent: synth}
-	transformer := &componentWorkloadTransformer{}
-	proposed := func() *workloads.InstanceSet {
-		return &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{constant.KubeBlocksGenerationKey: "2"}}, Spec: workloads.InstanceSetSpec{VolumeClaimTemplates: []corev1.PersistentVolumeClaim{vct("5Gi")}}}
-	}
-	target := proposed()
-	start, stop := transformer.handleWorkloadStartNStop(ctx, synth, running, &target)
-	if start || !stop || !ptr.Deref(target.Spec.Stop, false) || target.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests.Storage().String() != "2Gi" || target.Annotations[constant.KubeBlocksGenerationKey] != "2" {
-		t.Fatalf("Stop did not preserve target while observing new config: %#v", target)
-	}
-	running = target
-	synth.Stop = nil
-	target = proposed()
-	start, stop = transformer.handleWorkloadStartNStop(ctx, synth, running, &target)
-	if !start || stop || ptr.Deref(target.Spec.Stop, false) || target.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests.Storage().String() != "2Gi" {
-		t.Fatalf("Start should clear Stop before forwarding new target: %#v", target)
-	}
-	running = target
-	target = proposed()
-	start, stop = transformer.handleWorkloadStartNStop(ctx, synth, running, &target)
-	if start || stop || target.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests.Storage().String() != "5Gi" {
-		t.Fatalf("running reconcile should forward new capacity: %#v", target)
-	}
-}

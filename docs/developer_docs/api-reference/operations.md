@@ -4770,7 +4770,7 @@ ComponentOps
 </em>
 </td>
 <td>
-<p><em>(Optional)</em></p>
+<em>(Optional)</em>
 <p>Specifies a list of OpsRequestVolumeClaimTemplate objects, defining the volumeClaimTemplates
 that are used to expand the storage and the desired storage size for each one.</p>
 </td>
@@ -4785,7 +4785,7 @@ that are used to expand the storage and the desired storage size for each one.</
 </em>
 </td>
 <td>
-<p><em>(Optional)</em></p>
+<em>(Optional)</em>
 <p>Specifies volume expansion for named instance templates of the component or sharding.
 Volumes not overridden by an instance template inherit component-level expansion.</p>
 </td>

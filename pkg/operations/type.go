@@ -90,19 +90,6 @@ type OpsManager struct {
 	OpsMap map[opsv1alpha1.OpsType]OpsBehaviour
 }
 
-type progressResource struct {
-	// opsMessageKey progress message key of specified OpsType, it is a verb and will form the message of progressDetail
-	// such as "vertical scale" of verticalScaling OpsRequest.
-	opsMessageKey string
-	// cluster component name. By default, it is the componentSpec.name.
-	// but if it is a sharding component, the componentName is generated randomly.
-	fullComponentName string
-	// specifies the number of shards. if nil, it is not a sharding component.
-	shards           *int32
-	clusterComponent *appsv1.ClusterComponentSpec
-	compOps          ComponentOpsInterface
-}
-
 // OpsRuntime abstracts the standard ops paths that only need workload/member views
 // plus a small set of runtime-owned actions.
 //

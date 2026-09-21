@@ -22,21 +22,17 @@ package operations
 import (
 	"fmt"
 	"slices"
-	"strings"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/sharding"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 // getProgressObjectKey gets progress object key from the client.Object.
@@ -159,7 +155,7 @@ func getProgressProcessingMessage(opsMessageKey, objectKey, componentName string
 	return fmt.Sprintf("Start to %s: %s in Component: %s", opsMessageKey, objectKey, componentName)
 }
 
-func handleRunningInstanceProgress(opsRes *OpsResource, pgRes *progressResource, its *workloads.InstanceSet) instanceProgress {
+func handleRunningInstanceProgress(opsRes *OpsResource, pgRes *instanceProgressResource, its *workloads.InstanceSet) instanceProgress {
 	expectedCount := ptr.Deref(its.Spec.Replicas, int32(1))
 	result := instanceProgress{expectedCount: expectedCount}
 	for i := range its.Status.InstanceStatus {
@@ -207,10 +203,10 @@ func getFailedPodMessage(cluster *appsv1.Cluster, componentName, instanceName st
 }
 
 // handleReplicaScalingProgress projects the current allocation without predicting identities.
-func handleReplicaScalingProgress(opsRes *OpsResource, resource *progressResource,
+func handleReplicaScalingProgress(opsRes *OpsResource, resource *instanceProgressResource,
 	its *workloads.InstanceSet) instanceProgress {
 	result := handleRunningInstanceProgress(opsRes, resource, its)
-	if resource.shards == nil {
+	if opsRes.Cluster.Spec.GetShardingByName(resource.compOps.GetComponentName()) == nil {
 		active, err := activeInstanceTemplates(its.Status.InstanceStatus)
 		result.observationsComplete = result.observationsComplete && err == nil &&
 			assignmentsMatchComponent(active, resource.clusterComponent)
@@ -271,126 +267,4 @@ func handleReplicaScalingProgress(opsRes *OpsResource, resource *progressResourc
 			Message: fmt.Sprintf("Waiting for instance %s in Component: %s", name, resource.fullComponentName)})
 	}
 	return result
-}
-
-func updateProgressDetailForHScale(
-	opsRes *OpsResource,
-	pgRes *progressResource,
-	compStatus *opsv1alpha1.OpsRequestComponentStatus,
-	objectKey string, status opsv1alpha1.ProgressStatus) {
-	var group string
-	if pgRes.fullComponentName != "" {
-		group = fmt.Sprintf("%s/%s", pgRes.fullComponentName, pgRes.opsMessageKey)
-	}
-	progressDetail := opsv1alpha1.ProgressStatusDetail{
-		Group:     group,
-		ObjectKey: objectKey,
-		Status:    status,
-	}
-	var messagePrefix string
-	switch status {
-	case opsv1alpha1.SucceedProgressStatus:
-		messagePrefix = "Successfully"
-	case opsv1alpha1.ProcessingProgressStatus:
-		messagePrefix = "Start to"
-	case opsv1alpha1.PendingProgressStatus:
-		messagePrefix = "wait to"
-	}
-	progressDetail.Message = fmt.Sprintf(`%s %s "%s" in Component: %s`,
-		messagePrefix, strings.ToLower(pgRes.opsMessageKey), objectKey, pgRes.clusterComponent.Name)
-	setComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest,
-		&compStatus.ProgressDetails, progressDetail)
-}
-
-// handleComponentProgressForScalingShards handles the component progressDetails when scaling the shards.
-// @return expectProgressCount,
-// @return completedCount
-// @return error
-func handleComponentProgressForScalingShards(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	opsRes *OpsResource,
-	pgRes *progressResource,
-	compStatus *opsv1alpha1.OpsRequestComponentStatus) (int32, int32, error) {
-	var (
-		lastCompConfiguration = opsRes.OpsRequest.Status.LastConfiguration.Components[pgRes.compOps.GetComponentName()]
-		err                   error
-		completedCount        int32
-		updateShards          int32
-	)
-	updateShards = *pgRes.shards - *lastCompConfiguration.Shards
-	if updateShards > 0 {
-		completedCount, err = handleScaleOutForShards(reqCtx, cli, opsRes, pgRes, compStatus)
-	} else if updateShards < 0 {
-		updateShards *= -1
-		completedCount, err = handleScaleInForShards(reqCtx, cli, opsRes, pgRes, compStatus, updateShards)
-	}
-	if completedCount > updateShards {
-		// completedCount may exceed updated shards if components have been rebuilt by other operations.
-		completedCount = updateShards
-	}
-	return updateShards, completedCount, err
-}
-
-func handleScaleOutForShards(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	opsRes *OpsResource,
-	pgRes *progressResource,
-	compStatus *opsv1alpha1.OpsRequestComponentStatus) (int32, error) {
-	compList, err := sharding.ListShardingComponents(reqCtx.Ctx, cli, opsRes.Cluster, pgRes.compOps.GetComponentName())
-	if err != nil {
-		return 0, err
-	}
-	var completedCount int32
-	for _, comp := range compList {
-		if comp.CreationTimestamp.Before(&opsRes.OpsRequest.Status.StartTimestamp) {
-			continue
-		}
-		objectKey := getProgressObjectKey(appsv1.ComponentKind, comp.Name)
-		pgRes.opsMessageKey = "create"
-		switch comp.Status.Phase {
-		case appsv1.RunningComponentPhase:
-			completedCount += 1
-			updateProgressDetailForHScale(opsRes, pgRes, compStatus, objectKey, opsv1alpha1.SucceedProgressStatus)
-		case appsv1.FailedComponentPhase:
-			completedCount += 1
-			updateProgressDetailForHScale(opsRes, pgRes, compStatus, objectKey, opsv1alpha1.FailedProgressStatus)
-		default:
-			updateProgressDetailForHScale(opsRes, pgRes, compStatus, objectKey, opsv1alpha1.ProcessingProgressStatus)
-		}
-	}
-	return completedCount, nil
-}
-
-func handleScaleInForShards(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	opsRes *OpsResource,
-	pgRes *progressResource,
-	compStatus *opsv1alpha1.OpsRequestComponentStatus,
-	updateShards int32) (int32, error) {
-	compList, err := sharding.ListShardingComponents(reqCtx.Ctx, cli, opsRes.Cluster, pgRes.compOps.GetComponentName())
-	if err != nil {
-		return 0, err
-	}
-	var completedCount int32
-	compMap := make(map[string]struct{}, len(compList))
-	for _, comp := range compList {
-		objKey := getProgressObjectKey(appsv1.ComponentKind, comp.Name)
-		compMap[objKey] = struct{}{}
-		if comp.DeletionTimestamp.IsZero() || comp.DeletionTimestamp.Before(&opsRes.OpsRequest.Status.StartTimestamp) {
-			continue
-		}
-		pgRes.opsMessageKey = "delete"
-		updateProgressDetailForHScale(opsRes, pgRes, compStatus, objKey, opsv1alpha1.ProcessingProgressStatus)
-	}
-	for i := range compStatus.ProgressDetails {
-		progressDetail := &compStatus.ProgressDetails[i]
-		if _, ok := compMap[progressDetail.ObjectKey]; !ok {
-			completedCount += 1
-			updateProgressDetailForHScale(opsRes, pgRes, compStatus, progressDetail.ObjectKey, opsv1alpha1.SucceedProgressStatus)
-		}
-	}
-	if int32(len(compList)) == *pgRes.compOps.(opsv1alpha1.HorizontalScaling).Shards {
-		completedCount = updateShards
-	}
-	return completedCount, nil
 }

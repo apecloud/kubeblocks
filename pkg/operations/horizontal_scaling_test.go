@@ -794,6 +794,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			})).Should(Succeed())
 
 			By("expect component shards to 5")
+			Expect(PatchOpsStatus(ctx, k8sClient, opsRes, opsv1alpha1.OpsRunningPhase)).Should(Succeed())
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.Cluster), func(g Gomega, cluster *appsv1.Cluster) {
 				g.Expect(cluster.Spec.Shardings[0].Shards).Should(BeEquivalentTo(5))
 			})).Should(Succeed())
@@ -814,30 +815,38 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 				})).Should(Succeed())
 				return comp
 			}
+			comp1 := createComponent(secondaryCompName + "-comp1")
+			comp2 := createComponent(secondaryCompName + "-comp2")
+			comp3 := createComponent(secondaryCompName + "-comp3")
 			comp4 := createComponent(secondaryCompName + "-comp4")
 			comp5 := createComponent(secondaryCompName + "-comp5")
 			_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest), func(g Gomega, pobj *opsv1alpha1.OpsRequest) {
 				g.Expect(pobj.Status.Progress).Should(Equal("0/2"))
-				g.Expect(pobj.Status.Components[secondaryCompName].ProgressDetails).Should(HaveLen(2))
+				g.Expect(pobj.Status.Components[secondaryCompName].ProgressDetails).Should(HaveLen(5))
 			})).Should(Succeed())
 
 			By("expect ops phase to succeed when new components are running")
-			// mock components and cluster is running
-			Expect(testapps.ChangeObjStatus(&testCtx, comp4, func() {
-				comp4.Status.Phase = appsv1.RunningComponentPhase
-			})).Should(Succeed())
-			Expect(testapps.ChangeObjStatus(&testCtx, comp5, func() {
-				comp5.Status.Phase = appsv1.RunningComponentPhase
-			})).Should(Succeed())
-			Expect(testapps.ChangeObjStatus(&testCtx, opsRes.Cluster, func() {
-				opsRes.Cluster.Status.Shardings = map[string]appsv1.ClusterShardingStatus{
-					secondaryCompName: {
-						Phase: appsv1.RunningComponentPhase,
-					},
-				}
-			})).Should(Succeed())
+			for _, comp := range []*appsv1.Component{comp1, comp2, comp3, comp4, comp5} {
+				Expect(testapps.ChangeObjStatus(&testCtx, comp, func() {
+					comp.Status.Phase = appsv1.RunningComponentPhase
+					comp.Status.ObservedGeneration = comp.Generation
+				})).Should(Succeed())
+			}
+			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("2/2"))
+			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(opsv1alpha1.OpsRunningPhase))
+			mockShardingRunning := func() {
+				Expect(testapps.ChangeObjStatus(&testCtx, opsRes.Cluster, func() {
+					opsRes.Cluster.Status.Shardings = map[string]appsv1.ClusterShardingStatus{
+						secondaryCompName: {Phase: appsv1.RunningComponentPhase,
+							ObservedGeneration: opsRes.Cluster.Generation, UpToDate: true},
+					}
+				})).Should(Succeed())
+			}
+			mockShardingRunning()
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest), func(g Gomega, pobj *opsv1alpha1.OpsRequest) {
@@ -861,11 +870,8 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			})).Should(Succeed())
 
 			By("expect ops phase to succeed when the component is deleted")
-			// Create 3 components to mock already existing components.
-			createComponent(secondaryCompName + "-comp1")
-			createComponent(secondaryCompName + "-comp2")
-			createComponent(secondaryCompName + "-comp3")
 			testapps.DeleteObject(&testCtx, client.ObjectKeyFromObject(comp5), &appsv1.Component{})
+			mockShardingRunning()
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest), func(g Gomega, pobj *opsv1alpha1.OpsRequest) {
@@ -2303,9 +2309,74 @@ func TestHorizontalScalingFailureWaitsForOtherAcceptedTargets(t *testing.T) {
 	other.UpToDate = false
 	f.res.Cluster.Status.Components["other"] = other
 	f.reconcile(t, opsv1alpha1.OpsRunningPhase)
+	status.Phase = appsv1.RunningComponentPhase
+	f.res.Cluster.Status.Components["db"] = status
 	other.UpToDate = true
 	f.res.Cluster.Status.Components["other"] = other
-	f.reconcile(t, opsv1alpha1.OpsFailedPhase)
+	if _, err := GetOpsManager().Reconcile(f.req, f.cli, f.res); err != nil {
+		t.Fatal(err)
+	}
+	if f.res.OpsRequest.Status.Phase != opsv1alpha1.OpsFailedPhase {
+		t.Fatalf("terminal branch failure was lost: %s", f.res.OpsRequest.Status.Phase)
+	}
+}
+
+func TestHorizontalScalingCancellationReobservesFailedBranch(t *testing.T) {
+	f := newHorizontalScalingFixture(t, scaleOutRequest("db", false), scaleOutRequest("other", false))
+	hs := horizontalScalingOpsHandler{}
+	if err := hs.Action(f.req, f.cli, f.res); err != nil {
+		t.Fatal(err)
+	}
+	publishHorizontalScalingResult(t, f)
+	status := f.res.Cluster.Status.Components["db"]
+	status.Phase = appsv1.FailedComponentPhase
+	f.res.Cluster.Status.Components["db"] = status
+	other := f.res.Cluster.Status.Components["other"]
+	other.UpToDate = false
+	f.res.Cluster.Status.Components["other"] = other
+	if _, err := GetOpsManager().Reconcile(f.req, f.cli, f.res); err != nil {
+		t.Fatal(err)
+	}
+	if f.res.OpsRequest.Status.Phase != opsv1alpha1.OpsRunningPhase || f.res.OpsRequest.Status.Components["db"].Reason != horizontalScalingFailedReason {
+		t.Fatalf("expected a recorded branch failure: %+v", f.res.OpsRequest.Status)
+	}
+	previous := f.res.OpsRequest.DeepCopy()
+	if err := hs.Cancel(f.req, f.cli, f.res); err != nil {
+		t.Fatal(err)
+	}
+	if err := PatchOpsStatusWithOpsDeepCopy(f.req.Ctx, f.cli, f.res, previous,
+		opsv1alpha1.OpsCancellingPhase, opsv1alpha1.NewCancelingCondition(f.res.OpsRequest)); err != nil {
+		t.Fatal(err)
+	}
+	resumed := &opsv1alpha1.OpsRequest{}
+	if err := f.cli.Get(f.req.Ctx, client.ObjectKeyFromObject(f.res.OpsRequest), resumed); err != nil {
+		t.Fatal(err)
+	}
+	f.res.OpsRequest = resumed
+	publishHorizontalScalingResult(t, f)
+	its := &workloads.InstanceSet{}
+	if err := f.cli.Get(f.req.Ctx, client.ObjectKey{Namespace: "default", Name: "demo-db"}, its); err != nil {
+		t.Fatal(err)
+	}
+	its.Status.InstanceStatus[0].Ready = false
+	if err := f.cli.Update(f.req.Ctx, its); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := GetOpsManager().Reconcile(f.req, f.cli, f.res); err != nil {
+		t.Fatal(err)
+	}
+	if f.res.OpsRequest.Status.Phase != opsv1alpha1.OpsCancellingPhase {
+		t.Fatalf("cancel ended before rollback converged: %s", f.res.OpsRequest.Status.Phase)
+	}
+	publishHorizontalScalingResult(t, f)
+	if _, err := GetOpsManager().Reconcile(f.req, f.cli, f.res); err != nil {
+		t.Fatal(err)
+	}
+	if f.res.OpsRequest.Status.Phase != opsv1alpha1.OpsCancelledPhase || !slices.ContainsFunc(f.res.OpsRequest.Status.Conditions, func(c metav1.Condition) bool {
+		return c.Type == opsv1alpha1.ConditionTypeCancelled && c.Reason == opsv1alpha1.ReasonOpsCancelSucceed
+	}) {
+		t.Fatalf("rollback did not complete successfully: %+v", f.res.OpsRequest.Status)
+	}
 }
 
 func TestHorizontalScalingEmptyShardingRequiresObservedResult(t *testing.T) {
@@ -2361,5 +2432,200 @@ func TestHorizontalScalingWaitsForEveryShardObservation(t *testing.T) {
 	}
 	if f.res.OpsRequest.Status.Progress != "2/2" {
 		t.Fatalf("progress=%s", f.res.OpsRequest.Status.Progress)
+	}
+}
+
+func TestHorizontalScalingFailedRestoreDoesNotRestartWhilePeersFinish(t *testing.T) {
+	f := newHorizontalScalingFixture(t, scaleOutRequest("broken", true), scaleOutRequest("healthy", true))
+	f.addBackup(t)
+	if err := (horizontalScalingOpsHandler{}).Action(f.req, f.cli, f.res); err != nil {
+		t.Fatal(err)
+	}
+	f.reconcile(t, opsv1alpha1.OpsRunningPhase)
+	restores := &dpv1alpha1.RestoreList{}
+	if err := f.cli.List(f.req.Ctx, restores); err != nil {
+		t.Fatal(err)
+	}
+	if len(restores.Items) != 2 {
+		t.Fatalf("restores=%d", len(restores.Items))
+	}
+	var broken, healthy *dpv1alpha1.Restore
+	for i := range restores.Items {
+		restore := &restores.Items[i]
+		if restore.Labels[constant.KBAppComponentLabelKey] == "broken" {
+			broken = restore
+		} else {
+			healthy = restore
+		}
+	}
+	broken.Status.Phase = dpv1alpha1.RestorePhaseFailed
+	if err := f.cli.Status().Update(f.req.Ctx, broken); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := GetOpsManager().Reconcile(f.req, f.cli, f.res); err != nil {
+		t.Fatal(err)
+	}
+	resumed := &opsv1alpha1.OpsRequest{}
+	if err := f.cli.Get(f.req.Ctx, client.ObjectKeyFromObject(f.res.OpsRequest), resumed); err != nil {
+		t.Fatal(err)
+	}
+	if resumed.Status.Phase != opsv1alpha1.OpsRunningPhase || resumed.Status.Components["broken"].Reason != horizontalScalingFailedReason {
+		t.Fatalf("failed branch not persisted while peer waits: %+v", resumed.Status)
+	}
+	f.res.OpsRequest = resumed
+	if err := f.cli.Delete(f.req.Ctx, broken); err != nil {
+		t.Fatal(err)
+	}
+	healthy.Status.Phase = dpv1alpha1.RestorePhaseCompleted
+	if err := f.cli.Status().Update(f.req.Ctx, healthy); err != nil {
+		t.Fatal(err)
+	}
+	f.reconcile(t, opsv1alpha1.OpsRunningPhase)
+	f.replicas(t, "broken", 1)
+	f.replicas(t, "healthy", 2)
+	if err := f.cli.List(f.req.Ctx, restores); err != nil {
+		t.Fatal(err)
+	}
+	if len(restores.Items) != 1 {
+		t.Fatal("failed restore was recreated")
+	}
+	publishHorizontalScalingResult(t, f)
+	if _, err := GetOpsManager().Reconcile(f.req, f.cli, f.res); err != nil {
+		t.Fatal(err)
+	}
+	if f.res.OpsRequest.Status.Phase != opsv1alpha1.OpsFailedPhase {
+		t.Fatalf("phase=%s", f.res.OpsRequest.Status.Phase)
+	}
+}
+
+func TestHorizontalScalingPersistsFailureBeforeLaterRestoreReadError(t *testing.T) {
+	f := newHorizontalScalingFixture(t, scaleOutRequest("broken", true), scaleOutRequest("healthy", true))
+	f.addBackup(t)
+	if err := (horizontalScalingOpsHandler{}).Action(f.req, f.cli, f.res); err != nil {
+		t.Fatal(err)
+	}
+	f.reconcile(t, opsv1alpha1.OpsRunningPhase)
+	restores := &dpv1alpha1.RestoreList{}
+	if err := f.cli.List(f.req.Ctx, restores); err != nil {
+		t.Fatal(err)
+	}
+	var broken *dpv1alpha1.Restore
+	for i := range restores.Items {
+		if restores.Items[i].Labels[constant.KBAppComponentLabelKey] == "broken" {
+			broken = &restores.Items[i]
+		}
+	}
+	if broken == nil {
+		t.Fatal("missing broken restore")
+	}
+	broken.Status.Phase = dpv1alpha1.RestorePhaseFailed
+	if err := f.cli.Status().Update(f.req.Ctx, broken); err != nil {
+		t.Fatal(err)
+	}
+	failing := interceptor.NewClient(f.cli.(client.WithWatch), interceptor.Funcs{Get: func(ctx context.Context, cli client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+		if _, ok := obj.(*dpv1alpha1.Restore); ok && key.Name != broken.Name {
+			return errors.New("injected later Restore read failure")
+		}
+		return cli.Get(ctx, key, obj, opts...)
+	}})
+	_, err := GetOpsManager().Reconcile(f.req, failing, f.res)
+	if err == nil || !strings.Contains(err.Error(), "injected later") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	reloaded := &opsv1alpha1.OpsRequest{}
+	if err := f.cli.Get(f.req.Ctx, client.ObjectKeyFromObject(f.res.OpsRequest), reloaded); err != nil {
+		t.Fatal(err)
+	}
+	if reloaded.Status.Components["broken"].Reason != horizontalScalingFailedReason {
+		t.Fatalf("failed branch was not persisted: %+v", reloaded.Status)
+	}
+	f.res.OpsRequest = reloaded
+	if err := f.cli.Delete(f.req.Ctx, broken); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := GetOpsManager().Reconcile(f.req, f.cli, f.res); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.cli.Get(f.req.Ctx, client.ObjectKeyFromObject(broken), &dpv1alpha1.Restore{}); err == nil {
+		t.Fatal("failed Restore was recreated")
+	}
+}
+
+func TestHorizontalScalingCancellationCompletesAfterForwardTimeout(t *testing.T) {
+	f := newHorizontalScalingFixture(t, scaleOutRequest("db", true))
+	f.addBackup(t)
+	if err := (horizontalScalingOpsHandler{}).Action(f.req, f.cli, f.res); err != nil {
+		t.Fatal(err)
+	}
+	f.reconcile(t, opsv1alpha1.OpsRunningPhase)
+	f.res.OpsRequest.Spec.TimeoutSeconds = ptr.To(int32(1))
+	if err := f.cli.Update(f.req.Ctx, f.res.OpsRequest); err != nil {
+		t.Fatal(err)
+	}
+	previous := f.res.OpsRequest.DeepCopy()
+	if err := (horizontalScalingOpsHandler{}).Cancel(f.req, f.cli, f.res); err != nil {
+		t.Fatal(err)
+	}
+	f.res.OpsRequest.Status.StartTimestamp = metav1.NewTime(time.Now().Add(-time.Minute))
+	if err := PatchOpsStatusWithOpsDeepCopy(f.req.Ctx, f.cli, f.res, previous, opsv1alpha1.OpsCancellingPhase, opsv1alpha1.NewCancelingCondition(f.res.OpsRequest)); err != nil {
+		t.Fatal(err)
+	}
+	publishHorizontalScalingResult(t, f)
+	if _, err := GetOpsManager().Reconcile(f.req, f.cli, f.res); err != nil {
+		t.Fatal(err)
+	}
+	reloaded := &opsv1alpha1.OpsRequest{}
+	if err := f.cli.Get(f.req.Ctx, client.ObjectKeyFromObject(f.res.OpsRequest), reloaded); err != nil {
+		t.Fatal(err)
+	}
+	if reloaded.Status.Phase != opsv1alpha1.OpsCancelledPhase {
+		t.Fatalf("completed rollback was aborted: %s", reloaded.Status.Phase)
+	}
+}
+
+func TestHorizontalScalingTimeoutDoesNotDispatchBackupWork(t *testing.T) {
+	for _, started := range []bool{false, true} {
+		t.Run(fmt.Sprintf("restore-started-%t", started), func(t *testing.T) {
+			f := newHorizontalScalingFixture(t, scaleOutRequest("db", true))
+			f.addBackup(t)
+			if err := (horizontalScalingOpsHandler{}).Action(f.req, f.cli, f.res); err != nil {
+				t.Fatal(err)
+			}
+			if started {
+				f.reconcile(t, opsv1alpha1.OpsRunningPhase)
+				restores := &dpv1alpha1.RestoreList{}
+				if err := f.cli.List(f.req.Ctx, restores); err != nil {
+					t.Fatal(err)
+				}
+				for i := range restores.Items {
+					restores.Items[i].Status.Phase = dpv1alpha1.RestorePhaseCompleted
+					if err := f.cli.Status().Update(f.req.Ctx, &restores.Items[i]); err != nil {
+						t.Fatal(err)
+					}
+				}
+			}
+			f.res.OpsRequest.Spec.TimeoutSeconds = ptr.To[int32](1)
+			if err := f.cli.Update(f.req.Ctx, f.res.OpsRequest); err != nil {
+				t.Fatal(err)
+			}
+			f.res.OpsRequest.Status.StartTimestamp = metav1.NewTime(time.Now().Add(-time.Minute))
+			if err := f.cli.Status().Update(f.req.Ctx, f.res.OpsRequest); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := GetOpsManager().Reconcile(f.req, f.cli, f.res); err != nil {
+				t.Fatal(err)
+			}
+			if f.res.OpsRequest.Status.Phase != opsv1alpha1.OpsAbortedPhase {
+				t.Fatalf("phase=%s", f.res.OpsRequest.Status.Phase)
+			}
+			f.replicas(t, "db", 1)
+			restores := &dpv1alpha1.RestoreList{}
+			if err := f.cli.List(f.req.Ctx, restores); err != nil {
+				t.Fatal(err)
+			}
+			if !started && len(restores.Items) != 0 || f.clusterWrites != 1 {
+				t.Fatal("expired request dispatched new backup work or topology")
+			}
+		})
 	}
 }

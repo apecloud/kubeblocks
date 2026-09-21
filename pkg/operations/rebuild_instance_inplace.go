@@ -492,9 +492,9 @@ func (inPlaceHelper *inplaceRebuildHelper) deleteTargetPodForRebuild(reqCtx intc
 	cli client.Client,
 	opsRequest *opsv1alpha1.OpsRequest) error {
 	var options []client.DeleteOption
-	if opsRequest.Spec.Force {
-		options = append(options, client.GracePeriodSeconds(0))
-	}
+	// if opsRequest.Spec.Force {
+	// 	options = append(options, client.GracePeriodSeconds(0))
+	// }
 	return client.IgnoreNotFound(intctrlutil.BackgroundDeleteObject(cli, reqCtx.Ctx, inPlaceHelper.targetPod, options...))
 }
 

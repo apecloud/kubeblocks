@@ -23,14 +23,11 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"os"
-	"path/filepath"
 	"reflect"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/fsnotify/fsnotify"
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	"golang.org/x/exp/maps"
@@ -45,7 +42,6 @@ const (
 
 var (
 	defaultRetrySendEventInterval = 1 * time.Minute
-	fileChangeWatchDebounce       = 200 * time.Millisecond
 )
 
 func newProbeService(logger logr.Logger, actionService *actionService, probes []proto.Probe) (*probeService, error) {
@@ -130,11 +126,6 @@ type probeRunner struct {
 	wg                     sync.WaitGroup
 }
 
-type fileChangeWatch struct {
-	path string
-	dir  bool
-}
-
 func (r *probeRunner) run(ctx context.Context, config *proto.Probe) {
 	defer r.wg.Wait()
 	// Normalize a private copy before the probe and report loops read it.
@@ -160,18 +151,18 @@ func (r *probeRunner) run(ctx context.Context, config *proto.Probe) {
 	// launch the report loop first
 	r.launchReportLoop(ctx, &probe)
 
-	r.launchProbeLoop(ctx, &probe, r.launchFileChangeWatchLoop(ctx, &probe))
+	r.launchProbeLoop(ctx, &probe)
 }
 
-func (r *probeRunner) launchProbeLoop(ctx context.Context, probe *proto.Probe, forceProbe <-chan struct{}) {
+func (r *probeRunner) launchProbeLoop(ctx context.Context, probe *proto.Probe) {
 	r.ticker = time.NewTicker(time.Duration(probe.PeriodSeconds) * time.Second)
 	defer r.ticker.Stop()
 
-	r.probeLoop(ctx, probe, forceProbe)
+	r.probeLoop(ctx, probe)
 }
 
-func (r *probeRunner) probeLoop(ctx context.Context, probe *proto.Probe, forceProbe <-chan struct{}) {
-	once := func(forceReport bool) {
+func (r *probeRunner) probeLoop(ctx context.Context, probe *proto.Probe) {
+	once := func() {
 		output, err := r.actionService.handleRequest(ctx, &proto.ActionRequest{Action: probe.Action})
 		if err == nil {
 			r.succeedCount++
@@ -181,7 +172,7 @@ func (r *probeRunner) probeLoop(ctx context.Context, probe *proto.Probe, forcePr
 			r.failedCount++
 		}
 
-		r.report(probe, output, err, forceReport)
+		r.report(probe, output, err)
 
 		if succeed, _ := r.succeed(probe); succeed && !reflect.DeepEqual(output, r.latestOutput) {
 			r.latestOutput = output
@@ -189,31 +180,24 @@ func (r *probeRunner) probeLoop(ctx context.Context, probe *proto.Probe, forcePr
 	}
 
 	// initial run
-	once(false)
+	once()
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-r.ticker.C:
-			once(false)
-		case <-forceProbe:
-			once(true)
+			once()
 		}
 	}
 }
 
-func (r *probeRunner) report(probe *proto.Probe, output []byte, err error, forceReport bool) {
+func (r *probeRunner) report(probe *proto.Probe, output []byte, err error) {
 	var latestEvent *proto.ProbeEvent
 
 	succeed, thresholdPoint := r.succeed(probe)
-	switch {
-	case forceReport && err == nil:
-		latestEvent = r.buildEvent(probe.Instance, probe.Action, 0, output, "")
-	case forceReport && err != nil:
-		latestEvent = r.buildEvent(probe.Instance, probe.Action, -1, r.latestOutput, err.Error())
-	case succeed && thresholdPoint ||
-		succeed && !thresholdPoint && !reflect.DeepEqual(output, r.latestOutput):
+	if (succeed && thresholdPoint) ||
+		(succeed && !thresholdPoint && !reflect.DeepEqual(output, r.latestOutput)) {
 		latestEvent = r.buildEvent(probe.Instance, probe.Action, 0, output, "")
 	}
 	if r.fail(probe) {
@@ -248,147 +232,6 @@ func (r *probeRunner) fail(probe *proto.Probe) bool {
 			failureThreshold = 1
 		}
 		return r.failedCount >= int64(failureThreshold)
-	}
-	return false
-}
-
-func (r *probeRunner) launchFileChangeWatchLoop(ctx context.Context, probe *proto.Probe) <-chan struct{} {
-	if len(probe.ReportOnFileChange) == 0 {
-		return nil
-	}
-
-	forceProbe := make(chan struct{}, 1)
-	watcher, err := fsnotify.NewWatcher()
-	if err != nil {
-		r.logger.Error(err, "failed to create file-change probe watcher")
-		return forceProbe
-	}
-
-	watches := make([]fileChangeWatch, 0, len(probe.ReportOnFileChange))
-	watched := map[string]struct{}{}
-	for _, path := range probe.ReportOnFileChange {
-		watch, watchDir, err := buildFileChangeWatch(path)
-		if err != nil {
-			r.logger.Info("file-change probe watch path skipped", "path", path, "error", err.Error())
-			continue
-		}
-		if _, ok := watched[watchDir]; ok {
-			watches = append(watches, watch)
-			continue
-		}
-		if err = watcher.Add(watchDir); err != nil {
-			r.logger.Error(err, "failed to watch file-change probe directory", "path", watchDir)
-			continue
-		}
-		watched[watchDir] = struct{}{}
-		watches = append(watches, watch)
-	}
-	if len(watches) == 0 {
-		_ = watcher.Close()
-		return forceProbe
-	}
-
-	r.wg.Add(1)
-	go func() {
-		defer r.wg.Done()
-		defer watcher.Close()
-
-		var (
-			timer  *time.Timer
-			timerC <-chan time.Time
-		)
-		defer func() {
-			if timer != nil {
-				timer.Stop()
-			}
-		}()
-		resetTimer := func() {
-			if timer == nil {
-				timer = time.NewTimer(fileChangeWatchDebounce)
-				timerC = timer.C
-				return
-			}
-			if !timer.Stop() {
-				select {
-				case <-timer.C:
-				default:
-				}
-			}
-			timer.Reset(fileChangeWatchDebounce)
-		}
-		trigger := func() {
-			select {
-			case forceProbe <- struct{}{}:
-			default:
-			}
-		}
-
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case event, ok := <-watcher.Events:
-				if !ok {
-					return
-				}
-				if watchedFileChanged(event, watches) {
-					resetTimer()
-				}
-			case err, ok := <-watcher.Errors:
-				if !ok {
-					return
-				}
-				r.logger.Error(err, "file-change probe watcher error")
-				trigger()
-			case <-timerC:
-				timer = nil
-				timerC = nil
-				trigger()
-			}
-		}
-	}()
-	return forceProbe
-}
-
-func buildFileChangeWatch(path string) (fileChangeWatch, string, error) {
-	watch := fileChangeWatch{path: filepath.Clean(path)}
-	info, err := os.Stat(watch.path)
-	if err != nil && !os.IsNotExist(err) {
-		return watch, "", err
-	}
-	if err == nil && info.IsDir() {
-		watch.dir = true
-		return watch, watch.path, nil
-	}
-	watchDir := filepath.Dir(watch.path)
-	info, err = os.Stat(watchDir)
-	if err != nil {
-		return watch, "", err
-	}
-	if !info.IsDir() {
-		return watch, "", fmt.Errorf("watch parent path %q is not a directory", watchDir)
-	}
-	return watch, watchDir, nil
-}
-
-func watchedFileChanged(event fsnotify.Event, watches []fileChangeWatch) bool {
-	name := filepath.Clean(event.Name)
-	for _, watch := range watches {
-		if watch.dir {
-			if event.Op&(fsnotify.Create|fsnotify.Remove|fsnotify.Rename) == 0 {
-				continue
-			}
-			if filepath.Dir(name) == watch.path {
-				return true
-			}
-			continue
-		}
-		if event.Op&(fsnotify.Create|fsnotify.Write|fsnotify.Remove|fsnotify.Rename) == 0 {
-			continue
-		}
-		if name == watch.path {
-			return true
-		}
 	}
 	return false
 }

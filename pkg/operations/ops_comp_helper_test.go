@@ -161,7 +161,7 @@ func TestSyncCurrentProgressDetails(t *testing.T) {
 func TestRunningInstanceProgress(t *testing.T) {
 	const instanceName = "cluster-mysql-0"
 	opsRes := &OpsResource{Cluster: &appsv1.Cluster{}}
-	pgRes := &progressResource{
+	pgRes := &instanceProgressResource{
 		opsMessageKey:     "upgrade",
 		fullComponentName: "mysql",
 		clusterComponent:  &appsv1.ClusterComponentSpec{Name: "mysql", Replicas: 3},

@@ -54,18 +54,23 @@ func init() {
 }
 
 func (e ExposeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
-	var (
-		exposeMap = opsRes.OpsRequest.Spec.ToExposeListToMap()
-	)
 	reqCtx.Log.Info("cluster service before action", "clusterService", opsRes.Cluster.Spec.Services)
+	exposes := opsRes.OpsRequest.Spec.ExposeList
+	if len(exposes) == 0 {
+		return nil
+	}
+	if err := validateExposeTargets(exposes); err != nil {
+		return err
+	}
+	cluster := opsRes.Cluster.DeepCopy()
 	compMap := make(map[string]appsv1.ClusterComponentSpec)
-	for _, comp := range opsRes.Cluster.Spec.ComponentSpecs {
+	for _, comp := range cluster.Spec.ComponentSpecs {
 		compMap[comp.Name] = comp
 	}
-	for _, shard := range opsRes.Cluster.Spec.Shardings {
+	for _, shard := range cluster.Spec.Shardings {
 		compMap[shard.Name] = shard.Template
 	}
-	for _, expose := range exposeMap {
+	for _, expose := range exposes {
 		clusterCompSpecName := ""
 		compDef := ""
 		if len(expose.ComponentName) > 0 {
@@ -80,19 +85,43 @@ func (e ExposeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clien
 
 		switch expose.Switch {
 		case opsv1alpha1.EnableExposeSwitch:
-			if err := e.buildClusterServices(reqCtx, cli, opsRes.Cluster, clusterCompSpecName, compDef, expose.Services); err != nil {
+			if err := e.buildClusterServices(reqCtx, cli, cluster, clusterCompSpecName, compDef, expose.Services); err != nil {
 				return err
 			}
 		case opsv1alpha1.DisableExposeSwitch:
-			if err := e.removeClusterServices(opsRes.Cluster, clusterCompSpecName, expose.Services); err != nil {
+			if err := e.removeClusterServices(cluster, clusterCompSpecName, expose.Services); err != nil {
 				return err
 			}
 		default:
 			return intctrlutil.NewFatalError(fmt.Sprintf("invalid expose switch: %s", expose.Switch))
 		}
 	}
-	reqCtx.Log.Info("cluster service to be updated", "clusterService", opsRes.Cluster.Spec.Services)
-	return cli.Update(reqCtx.Ctx, opsRes.Cluster)
+	reqCtx.Log.Info("cluster service to be updated", "clusterService", cluster.Spec.Services)
+	if err := cli.Update(reqCtx.Ctx, cluster); err != nil {
+		return err
+	}
+	*opsRes.Cluster = *cluster
+	return nil
+}
+
+func validateExposeTargets(exposes []opsv1alpha1.Expose) error {
+	logicalKeys := map[string]struct{}{}
+	serviceNames := map[string]struct{}{}
+	for _, expose := range exposes {
+		for _, service := range expose.Services {
+			logicalKey := expose.ComponentName + "/" + service.Name
+			if _, ok := logicalKeys[logicalKey]; ok {
+				return intctrlutil.NewFatalError(fmt.Sprintf("duplicate expose target: component %q service %q", expose.ComponentName, service.Name))
+			}
+			logicalKeys[logicalKey] = struct{}{}
+			generatedName := generateServiceName(expose.ComponentName, service.Name)
+			if _, ok := serviceNames[generatedName]; ok {
+				return intctrlutil.NewFatalError(fmt.Sprintf("duplicate generated service name: %q", generatedName))
+			}
+			serviceNames[generatedName] = struct{}{}
+		}
+	}
+	return nil
 }
 
 func (e ExposeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsResource *OpsResource) (opsv1alpha1.OpsPhase, time.Duration, error) {
@@ -101,12 +130,17 @@ func (e ExposeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cli
 		oldOpsRequestStatus = opsRequest.Status.DeepCopy()
 		opsRequestPhase     = opsv1alpha1.OpsRunningPhase
 	)
+	if err := validateExposeTargets(opsRequest.Spec.ExposeList); err != nil {
+		return opsRequestPhase, 0, err
+	}
 	patch := client.MergeFrom(opsRequest.DeepCopy())
 
 	// update component status
 	if opsRequest.Status.Components == nil {
 		opsRequest.Status.Components = make(map[string]opsv1alpha1.OpsRequestComponentStatus)
-		for _, v := range opsRequest.Spec.ExposeList {
+	}
+	for _, v := range opsRequest.Spec.ExposeList {
+		if _, ok := opsRequest.Status.Components[v.ComponentName]; !ok {
 			opsRequest.Status.Components[v.ComponentName] = opsv1alpha1.OpsRequestComponentStatus{
 				Phase: appsv1.UpdatingComponentPhase, // appsv1.ExposingPhase,
 			}
@@ -116,6 +150,7 @@ func (e ExposeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cli
 	var (
 		actualProgressCount int
 		expectProgressCount int
+		componentPending    = map[string]bool{}
 	)
 	for _, v := range opsRequest.Spec.ExposeList {
 		actualCount, expectCount, err := e.handleComponentServices(reqCtx, cli, opsResource, v)
@@ -124,12 +159,15 @@ func (e ExposeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cli
 		}
 		actualProgressCount += actualCount
 		expectProgressCount += expectCount
-
-		// update component status if completed
-		if actualCount == expectCount {
-			p := opsRequest.Status.Components[v.ComponentName]
-			p.Phase = appsv1.RunningComponentPhase
+		componentPending[v.ComponentName] = componentPending[v.ComponentName] || actualCount != expectCount
+	}
+	for componentName, pending := range componentPending {
+		status := opsRequest.Status.Components[componentName]
+		status.Phase = appsv1.UpdatingComponentPhase
+		if !pending {
+			status.Phase = appsv1.RunningComponentPhase
 		}
+		opsRequest.Status.Components[componentName] = status
 	}
 	opsRequest.Status.Progress = fmt.Sprintf("%d/%d", actualProgressCount, expectProgressCount)
 

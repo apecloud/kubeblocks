@@ -823,7 +823,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest), func(g Gomega, pobj *opsv1alpha1.OpsRequest) {
-				g.Expect(pobj.Status.Progress).Should(Equal("0/5"))
+				g.Expect(pobj.Status.Progress).Should(Equal("0/2"))
 				g.Expect(pobj.Status.Components[secondaryCompName].ProgressDetails).Should(HaveLen(5))
 			})).Should(Succeed())
 
@@ -836,7 +836,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			}
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
-			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("5/5"))
+			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("2/2"))
 			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(opsv1alpha1.OpsRunningPhase))
 			mockShardingRunning := func() {
 				Expect(testapps.ChangeObjStatus(&testCtx, opsRes.Cluster, func() {
@@ -850,7 +850,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest), func(g Gomega, pobj *opsv1alpha1.OpsRequest) {
-				g.Expect(pobj.Status.Progress).Should(Equal("5/5"))
+				g.Expect(pobj.Status.Progress).Should(Equal("2/2"))
 				g.Expect(pobj.Status.Phase).Should(Equal(opsv1alpha1.OpsSucceedPhase))
 			})).Should(Succeed())
 
@@ -875,7 +875,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest), func(g Gomega, pobj *opsv1alpha1.OpsRequest) {
-				g.Expect(pobj.Status.Progress).Should(Equal("4/4"))
+				g.Expect(pobj.Status.Progress).Should(Equal("1/1"))
 				g.Expect(pobj.Status.Phase).Should(Equal(opsv1alpha1.OpsSucceedPhase))
 			})).Should(Succeed())
 		})
@@ -1689,7 +1689,7 @@ func TestHorizontalScalingShardCountAndShardReplicas(t *testing.T) {
 			}
 			wantShards, wantReplicas, wantProgress := int32(2), int32(2), "0/4"
 			if changeCount {
-				wantShards, wantReplicas, wantProgress = 3, 1, "0/3"
+				wantShards, wantReplicas, wantProgress = 3, 1, "0/1"
 			}
 			if got := cluster.Spec.Shardings[0]; got.Shards != wantShards || got.Template.Replicas != wantReplicas {
 				t.Fatalf("unexpected sharding: %+v", got)

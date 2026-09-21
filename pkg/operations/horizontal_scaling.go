@@ -279,32 +279,50 @@ func (hs horizontalScalingOpsHandler) observeReplicaScaling(reqCtx intctrlutil.R
 
 func (hs horizontalScalingOpsHandler) observeShardScaling(reqCtx intctrlutil.RequestCtx, cli client.Client,
 	opsRes *OpsResource, target opsv1alpha1.HorizontalScaling) (instanceProgress, error) {
-	progress := instanceProgress{expectedCount: *target.Shards}
+	previousShards := int32(0)
+	if previous := opsRes.OpsRequest.Status.LastConfiguration.Components[target.ComponentName].Shards; previous != nil {
+		previousShards = *previous
+	}
+	targetShards := *target.Shards
+	delta := targetShards - previousShards
+	if delta < 0 {
+		delta = -delta
+	}
+	progress := instanceProgress{expectedCount: delta}
 	children, err := sharding.ListShardingComponents(reqCtx.Ctx, cli, opsRes.Cluster, target.ComponentName)
 	if err != nil {
 		return progress, err
 	}
-	progress.expectedCount = max(progress.expectedCount, int32(len(children)))
-	progress.observationsComplete = int32(len(children)) == *target.Shards
+	progress.observationsComplete = int32(len(children)) == targetShards
+	runningChildren, terminalChildren := int32(0), int32(0)
 	for _, child := range children {
 		detail := opsv1alpha1.ProgressStatusDetail{ObjectKey: getProgressObjectKey(appsv1.ComponentKind, child.Name),
 			Status: opsv1alpha1.ProcessingProgressStatus}
 		observed := child.Status.ObservedGeneration == child.Generation
 		if !child.DeletionTimestamp.IsZero() {
 			progress.observationsComplete = false
-		} else if observed {
-			switch child.Status.Phase {
-			case appsv1.RunningComponentPhase:
+		} else {
+			switch {
+			case !observed:
+				progress.observationsComplete = false
+			case child.Status.Phase == appsv1.RunningComponentPhase:
 				detail.Status = opsv1alpha1.SucceedProgressStatus
-				progress.completedCount++
-				progress.succeededCount++
-			case appsv1.FailedComponentPhase:
+				runningChildren++
+				terminalChildren++
+			case child.Status.Phase == appsv1.FailedComponentPhase:
 				detail.Status = opsv1alpha1.FailedProgressStatus
-				progress.completedCount++
+				terminalChildren++
 			}
 		}
 		detail.Message = fmt.Sprintf("%s shard %s", detail.Status, child.Name)
 		progress.details = append(progress.details, detail)
+	}
+	if targetShards >= previousShards {
+		progress.completedCount = min(delta, max(0, terminalChildren-previousShards))
+		progress.succeededCount = min(delta, max(0, runningChildren-previousShards))
+	} else {
+		progress.completedCount = min(delta, max(0, previousShards-int32(len(children))))
+		progress.succeededCount = progress.completedCount
 	}
 	return progress, nil
 }

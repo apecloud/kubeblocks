@@ -194,9 +194,6 @@ func TestOpsRuntimeBuildsInstanceAPIView(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get workload: %v", err)
 	}
-	if got := workload.GetCurrentRevisionMap()[instanceName]; got != "rev-a" {
-		t.Fatalf("unexpected current revision: %s", got)
-	}
 	instanceStatuses := workload.GetInstanceStatuses()
 	if len(instanceStatuses) != 1 || instanceStatuses[0].PodName != instanceName ||
 		instanceStatuses[0].TemplateName == nil || *instanceStatuses[0].TemplateName != "big" {

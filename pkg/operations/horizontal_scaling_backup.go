@@ -217,6 +217,30 @@ func isBackupScaling(scaling opsv1alpha1.HorizontalScaling) bool {
 	return scaling.ScaleOut != nil && scaling.ScaleOut.FromBackup != nil
 }
 
+func (hs horizontalScalingOpsHandler) observeBackupPreparation(reqCtx intctrlutil.RequestCtx,
+	cli client.Client, opsRes *OpsResource, componentName string) (instanceProgress, error) {
+	restores := &dpv1alpha1.RestoreList{}
+	if err := cli.List(reqCtx.Ctx, restores, client.InNamespace(opsRes.Cluster.Namespace),
+		client.MatchingLabels{constant.OpsRequestNameLabelKey: opsRes.OpsRequest.Name,
+			constant.KBAppComponentLabelKey: componentName}); err != nil {
+		return instanceProgress{}, err
+	}
+	progress := instanceProgress{expectedCount: int32(len(restores.Items))}
+	for i := range restores.Items {
+		restore := &restores.Items[i]
+		detail := opsv1alpha1.ProgressStatusDetail{ObjectKey: getProgressObjectKey("Restore", restore.Name),
+			Status: opsv1alpha1.ProcessingProgressStatus, Message: "Restore Data In Progress"}
+		if restore.Status.Phase == dpv1alpha1.RestorePhaseCompleted {
+			detail.Status = opsv1alpha1.SucceedProgressStatus
+			detail.Message = "Restore Data Completed"
+			progress.completedCount++
+			progress.succeededCount++
+		}
+		progress.details = append(progress.details, detail)
+	}
+	return progress, nil
+}
+
 func (hs horizontalScalingOpsHandler) getBackupReplicaScalingChanges(opsRes *OpsResource,
 	lastCompConfiguration opsv1alpha1.LastComponentConfiguration,
 	horizontalScaling opsv1alpha1.HorizontalScaling,

@@ -21,30 +21,6 @@ import (
 	"testing"
 )
 
-var componentName = "mysql"
-
-func mockExposeOps() *OpsRequest {
-	ops := &OpsRequest{}
-	ops.Spec.Type = ExposeType
-	ops.Spec.ExposeList = []Expose{
-		{
-			ComponentName: componentName,
-		},
-	}
-	return ops
-}
-
-func TestToExposeListToMap(t *testing.T) {
-	ops := mockExposeOps()
-	exposeMap := ops.Spec.ToExposeListToMap()
-	if len(exposeMap) != len(ops.Spec.ExposeList) {
-		t.Error(`Expected expose map length equals list length`)
-	}
-	if _, ok := exposeMap[componentName]; !ok {
-		t.Error(`Expected component name map exists the key of "mysql"`)
-	}
-}
-
 func TestSetStatusAndMessage(t *testing.T) {
 	p := ProgressStatusDetail{}
 	message := "handle successfully"

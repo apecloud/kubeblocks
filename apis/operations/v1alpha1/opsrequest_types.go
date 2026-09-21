@@ -1241,15 +1241,6 @@ func (c ComponentOps) GetComponentName() string {
 	return c.ComponentName
 }
 
-// ToExposeListToMap build expose map
-func (r OpsRequestSpec) ToExposeListToMap() map[string]Expose {
-	exposeMap := make(map[string]Expose)
-	for _, v := range r.ExposeList {
-		exposeMap[v.ComponentName] = v
-	}
-	return exposeMap
-}
-
 func (r OpsRequestSpec) GetClusterName() string {
 	return r.ClusterName
 }

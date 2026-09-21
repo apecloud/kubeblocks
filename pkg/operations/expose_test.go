@@ -20,6 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"context"
+	"testing"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -27,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -37,6 +41,100 @@ import (
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testops "github.com/apecloud/kubeblocks/pkg/testutil/operations"
 )
+
+func TestExposeActionRejectsDuplicateGeneratedNamesBeforeUpdate(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := appsv1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	if err := opsv1alpha1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	cluster := &appsv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default"},
+		Spec:       appsv1.ClusterSpec{Services: []appsv1.ClusterService{{Service: appsv1.Service{Name: "existing"}}}},
+	}
+	ops := &opsv1alpha1.OpsRequest{Spec: opsv1alpha1.OpsRequestSpec{
+		Type: opsv1alpha1.ExposeType,
+		SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{ExposeList: []opsv1alpha1.Expose{
+			{ComponentName: "db", Services: []opsv1alpha1.OpsService{{Name: "read"}}},
+			{Services: []opsv1alpha1.OpsService{{Name: "db-read"}}},
+		}},
+	}}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, ops).Build()
+	res := &OpsResource{Cluster: cluster, OpsRequest: ops, Recorder: record.NewFakeRecorder(10)}
+
+	if err := (ExposeOpsHandler{}).Action(intctrlutil.RequestCtx{Ctx: context.Background()}, cli, res); err == nil {
+		t.Fatal("duplicate generated service name was accepted")
+	}
+	if len(cluster.Spec.Services) != 1 || cluster.Spec.Services[0].Name != "existing" {
+		t.Fatalf("cluster services changed after rejected input: %#v", cluster.Spec.Services)
+	}
+}
+
+func TestExposeActionDoesNotPartiallyApplyLaterInvalidTarget(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := appsv1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	if err := opsv1alpha1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	cluster := &appsv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default"},
+		Spec:       appsv1.ClusterSpec{},
+	}
+	ops := &opsv1alpha1.OpsRequest{Spec: opsv1alpha1.OpsRequestSpec{
+		Type: opsv1alpha1.ExposeType,
+		SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{ExposeList: []opsv1alpha1.Expose{
+			{Switch: opsv1alpha1.EnableExposeSwitch, Services: []opsv1alpha1.OpsService{{Name: "read", Ports: []corev1.ServicePort{{Port: 80}}}}},
+			{ComponentName: "missing", Switch: opsv1alpha1.DisableExposeSwitch, Services: []opsv1alpha1.OpsService{{Name: "write"}}},
+		}},
+	}}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, ops).Build()
+	res := &OpsResource{Cluster: cluster, OpsRequest: ops, Recorder: record.NewFakeRecorder(10)}
+
+	if err := (ExposeOpsHandler{}).Action(intctrlutil.RequestCtx{Ctx: context.Background()}, cli, res); err == nil {
+		t.Fatal("missing component was accepted")
+	}
+	if len(cluster.Spec.Services) != 0 {
+		t.Fatalf("cluster services changed after rejected input: %#v", cluster.Spec.Services)
+	}
+}
+
+func TestValidateExposeTargetsRejectsDuplicateLogicalTargets(t *testing.T) {
+	err := validateExposeTargets([]opsv1alpha1.Expose{
+		{ComponentName: "db", Services: []opsv1alpha1.OpsService{{Name: "read"}}},
+		{ComponentName: "db", Services: []opsv1alpha1.OpsService{{Name: "read"}}},
+	})
+	if err == nil {
+		t.Fatal("duplicate logical target was accepted")
+	}
+}
+
+func TestExposeActionKeepsMultipleServicesForOneComponent(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := appsv1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	if err := opsv1alpha1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	cluster := &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default"}, Spec: appsv1.ClusterSpec{ComponentSpecs: []appsv1.ClusterComponentSpec{{Name: "db", ComponentDef: "mysql"}}}}
+	ops := &opsv1alpha1.OpsRequest{Spec: opsv1alpha1.OpsRequestSpec{Type: opsv1alpha1.ExposeType, SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{ExposeList: []opsv1alpha1.Expose{
+		{ComponentName: "db", Switch: opsv1alpha1.EnableExposeSwitch, Services: []opsv1alpha1.OpsService{{Name: "read", ServiceType: corev1.ServiceTypeClusterIP, Ports: []corev1.ServicePort{{Name: "http", Port: 80, TargetPort: intstr.FromInt(8080)}}}}},
+		{ComponentName: "db", Switch: opsv1alpha1.EnableExposeSwitch, Services: []opsv1alpha1.OpsService{{Name: "write", ServiceType: corev1.ServiceTypeClusterIP, Ports: []corev1.ServicePort{{Name: "http", Port: 81, TargetPort: intstr.FromInt(8081)}}}}},
+	}}}}
+	compDef := &appsv1.ComponentDefinition{ObjectMeta: metav1.ObjectMeta{Name: "mysql"}}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, ops, compDef).Build()
+	res := &OpsResource{Cluster: cluster, OpsRequest: ops, Recorder: record.NewFakeRecorder(10)}
+	if err := (ExposeOpsHandler{}).Action(intctrlutil.RequestCtx{Ctx: context.Background()}, cli, res); err != nil {
+		t.Fatal(err)
+	}
+	if len(cluster.Spec.Services) != 2 || cluster.Spec.Services[0].Name != "db-read" || cluster.Spec.Services[1].Name != "db-write" {
+		t.Fatalf("services = %#v", cluster.Spec.Services)
+	}
+}
 
 var _ = Describe("", func() {
 	var (
@@ -103,6 +201,11 @@ var _ = Describe("", func() {
 			By("Test OpsManager.MainEnter function")
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
+
+			persisted := &appsv1.Cluster{}
+			Expect(k8sClient.Get(testCtx.Ctx, client.ObjectKeyFromObject(clusterObject), persisted)).Should(Succeed())
+			Expect(persisted.Spec.Services).Should(HaveLen(1))
+			Expect(persisted.Spec.Services[0].Name).Should(Equal(defaultCompName + "-" + testapps.ServiceVPCName))
 		})
 
 		It("Test expose OpsRequest with empty ComponentName", func() {

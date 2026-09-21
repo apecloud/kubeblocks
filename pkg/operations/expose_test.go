@@ -21,6 +21,7 @@ package operations
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -36,6 +37,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -133,6 +135,83 @@ func TestExposeActionKeepsMultipleServicesForOneComponent(t *testing.T) {
 	}
 	if len(cluster.Spec.Services) != 2 || cluster.Spec.Services[0].Name != "db-read" || cluster.Spec.Services[1].Name != "db-write" {
 		t.Fatalf("services = %#v", cluster.Spec.Services)
+	}
+}
+
+func TestExposeReconcileAggregatesComponentServiceProgress(t *testing.T) {
+	for _, reverse := range []bool{false, true} {
+		for _, disable := range []bool{false, true} {
+			t.Run(fmt.Sprintf("reverse-%t-disable-%t", reverse, disable), func(t *testing.T) {
+				scheme := runtime.NewScheme()
+				for _, add := range []func(*runtime.Scheme) error{appsv1.AddToScheme, opsv1alpha1.AddToScheme, corev1.AddToScheme} {
+					if err := add(scheme); err != nil {
+						t.Fatal(err)
+					}
+				}
+				cluster := &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default"}}
+				targets := []opsv1alpha1.Expose{
+					{ComponentName: "db", Switch: opsv1alpha1.EnableExposeSwitch, Services: []opsv1alpha1.OpsService{{Name: "read"}}},
+					{ComponentName: "db", Switch: opsv1alpha1.EnableExposeSwitch, Services: []opsv1alpha1.OpsService{{Name: "write"}}},
+					{ComponentName: "cache", Switch: opsv1alpha1.EnableExposeSwitch, Services: []opsv1alpha1.OpsService{{Name: "read"}}},
+				}
+				if disable {
+					targets[1].Switch = opsv1alpha1.DisableExposeSwitch
+				}
+				if reverse {
+					targets[0], targets[1] = targets[1], targets[0]
+				}
+				ops := &opsv1alpha1.OpsRequest{ObjectMeta: metav1.ObjectMeta{Name: "expose", Namespace: "default"},
+					Spec:   opsv1alpha1.OpsRequestSpec{Type: opsv1alpha1.ExposeType, SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{ExposeList: targets}},
+					Status: opsv1alpha1.OpsRequestStatus{Phase: opsv1alpha1.OpsRunningPhase}}
+				service := func(name string) *corev1.Service {
+					return &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "demo-" + name, Namespace: "default", Labels: map[string]string{constant.AppInstanceLabelKey: "demo"}}}
+				}
+				objects := []client.Object{cluster, ops, service("db-read")}
+				if disable {
+					objects = append(objects, service("db-write"))
+				}
+				cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).WithStatusSubresource(ops).Build()
+				ctx := context.Background()
+				req := intctrlutil.RequestCtx{Ctx: ctx, Recorder: record.NewFakeRecorder(10)}
+				check := func(phase opsv1alpha1.OpsPhase, progress string, dbPhase appsv1.ComponentPhase) {
+					t.Helper()
+					current := &opsv1alpha1.OpsRequest{}
+					if err := cli.Get(ctx, client.ObjectKeyFromObject(ops), current); err != nil {
+						t.Fatal(err)
+					}
+					res := &OpsResource{Cluster: cluster, OpsRequest: current, Recorder: req.Recorder}
+					if _, err := GetOpsManager().Reconcile(req, cli, res); err != nil {
+						t.Fatal(err)
+					}
+					if err := cli.Get(ctx, client.ObjectKeyFromObject(ops), current); err != nil {
+						t.Fatal(err)
+					}
+					if current.Status.Phase != phase || current.Status.Progress != progress || current.Status.Components["db"].Phase != dbPhase {
+						t.Fatalf("phase=%s progress=%s db=%s, want %s %s %s", current.Status.Phase, current.Status.Progress, current.Status.Components["db"].Phase, phase, progress, dbPhase)
+					}
+				}
+				check(opsv1alpha1.OpsRunningPhase, "1/3", appsv1.UpdatingComponentPhase)
+				check(opsv1alpha1.OpsRunningPhase, "1/3", appsv1.UpdatingComponentPhase)
+				if disable {
+					if err := cli.Delete(ctx, service("db-write")); err != nil {
+						t.Fatal(err)
+					}
+				} else if err := cli.Create(ctx, service("db-write")); err != nil {
+					t.Fatal(err)
+				}
+				check(opsv1alpha1.OpsRunningPhase, "2/3", appsv1.RunningComponentPhase)
+				if err := cli.Delete(ctx, service("db-read")); err != nil {
+					t.Fatal(err)
+				}
+				check(opsv1alpha1.OpsRunningPhase, "1/3", appsv1.UpdatingComponentPhase)
+				for _, name := range []string{"db-read", "cache-read"} {
+					if err := cli.Create(ctx, service(name)); err != nil {
+						t.Fatal(err)
+					}
+				}
+				check(opsv1alpha1.OpsSucceedPhase, "3/3", appsv1.RunningComponentPhase)
+			})
+		}
 	}
 }
 

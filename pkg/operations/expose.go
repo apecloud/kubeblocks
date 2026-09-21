@@ -150,6 +150,7 @@ func (e ExposeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cli
 	var (
 		actualProgressCount int
 		expectProgressCount int
+		componentPending    = map[string]bool{}
 	)
 	for _, v := range opsRequest.Spec.ExposeList {
 		actualCount, expectCount, err := e.handleComponentServices(reqCtx, cli, opsResource, v)
@@ -158,13 +159,15 @@ func (e ExposeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cli
 		}
 		actualProgressCount += actualCount
 		expectProgressCount += expectCount
-
-		// update component status if completed
-		if actualCount == expectCount {
-			p := opsRequest.Status.Components[v.ComponentName]
-			p.Phase = appsv1.RunningComponentPhase
-			opsRequest.Status.Components[v.ComponentName] = p
+		componentPending[v.ComponentName] = componentPending[v.ComponentName] || actualCount != expectCount
+	}
+	for componentName, pending := range componentPending {
+		status := opsRequest.Status.Components[componentName]
+		status.Phase = appsv1.UpdatingComponentPhase
+		if !pending {
+			status.Phase = appsv1.RunningComponentPhase
 		}
+		opsRequest.Status.Components[componentName] = status
 	}
 	opsRequest.Status.Progress = fmt.Sprintf("%d/%d", actualProgressCount, expectProgressCount)
 

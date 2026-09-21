@@ -906,3 +906,105 @@ func assertLegacyUpToDate(t *testing.T, its *workloads.InstanceSet, name string,
 		t.Fatalf("instance %s UpToDate = %#v, want %v", name, status, want)
 	}
 }
+
+func TestRepairRoleLabelsUsesAcceptedObservations(t *testing.T) {
+	roles := []workloads.ReplicaRole{{Name: "primary", IsExclusive: true}}
+	primary := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "db-0", Annotations: map[string]string{
+		constant.RoleObservationAnnotationKey: `{"role":"primary","roleDefined":true,"eventVersion":"obs:200"}`,
+	}, Labels: map[string]string{constant.RoleLabelKey: "primary"}}}
+	peer := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "db-1", Annotations: map[string]string{
+		constant.RoleObservationAnnotationKey: `{"role":"primary","roleDefined":true,"eventVersion":"obs:100"}`,
+	}, Labels: map[string]string{constant.RoleLabelKey: "primary"}}}
+
+	claims, err := RoleLabelClaims(roles, []*corev1.Pod{primary, peer})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := RepairRoleLabels(nil, []*corev1.Pod{primary, peer}, claims); err != nil {
+		t.Fatal(err)
+	}
+	if primary.Labels[constant.RoleLabelKey] != "primary" {
+		t.Fatalf("primary claim was removed: %#v", primary.Labels)
+	}
+	if peer.Labels[constant.RoleLabelKey] != "" {
+		t.Fatalf("stale exclusive claim was retained: %#v", peer.Labels)
+	}
+}
+
+func TestRepairRoleLabelsRestoresMissingNonExclusiveLabel(t *testing.T) {
+	roles := []workloads.ReplicaRole{{Name: "secondary"}}
+	pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "db-0", Annotations: map[string]string{
+		constant.RoleObservationAnnotationKey: `{"role":"secondary","roleDefined":true,"eventVersion":"obs:100"}`,
+	}}}
+
+	claims, err := RoleLabelClaims(roles, []*corev1.Pod{pod})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := RepairRoleLabels(nil, []*corev1.Pod{pod}, claims); err != nil {
+		t.Fatal(err)
+	}
+	if pod.Labels[constant.RoleLabelKey] != "secondary" {
+		t.Fatalf("missing label was not repaired: %#v", pod.Labels)
+	}
+}
+
+func TestSetInstanceStatusProjectsAndRepairsRoleObservation(t *testing.T) {
+	replicas := int32(1)
+	its := &workloads.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{Name: "db", Namespace: "default"},
+		Spec:       workloads.InstanceSetSpec{Replicas: &replicas, Roles: []workloads.ReplicaRole{{Name: "secondary"}}},
+		Status:     workloads.InstanceSetStatus{UpdateRevisions: map[string]string{"db-0": ""}},
+	}
+	pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "db-0", Namespace: "default", Annotations: map[string]string{
+		constant.RoleObservationAnnotationKey: `{"role":"secondary","roleDefined":true,"eventVersion":"obs:100"}`,
+	}}, Status: corev1.PodStatus{Phase: corev1.PodRunning, Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue, LastTransitionTime: metav1.NewTime(time.Now().Add(-time.Hour))}}}}
+	if err := setInstanceStatus(nil, its, []*corev1.Pod{pod}); err != nil {
+		t.Fatal(err)
+	}
+	if pod.Labels[constant.RoleLabelKey] != "secondary" {
+		t.Fatalf("role label was not repaired: %#v", pod.Labels)
+	}
+	if status := its.FindInstanceStatus("db-0"); status == nil || status.Role != "secondary" {
+		t.Fatalf("role status was not projected: %#v", status)
+	}
+}
+
+func TestRoleLabelClaimsRepairsMissingLabelsAndExclusiveClaims(t *testing.T) {
+	roles := []workloads.ReplicaRole{{Name: "primary", IsExclusive: true}, {Name: "secondary"}}
+	primaryOld := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "db-0", Annotations: map[string]string{
+		constant.RoleObservationAnnotationKey: `{"role":"primary","roleDefined":true,"eventVersion":"100"}`,
+	}, Labels: map[string]string{constant.RoleLabelKey: "primary"}}}
+	primaryNew := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "db-1", Annotations: map[string]string{
+		constant.RoleObservationAnnotationKey: `{"role":"primary","roleDefined":true,"eventVersion":"200"}`,
+	}}}
+	secondary := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "db-2", Annotations: map[string]string{
+		constant.RoleObservationAnnotationKey: `{"role":"secondary","roleDefined":true,"eventVersion":"300"}`,
+	}}}
+
+	claims, err := RoleLabelClaims(roles, []*corev1.Pod{primaryOld, primaryNew, secondary})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if claims[primaryNew.Name] != "primary" || claims[primaryOld.Name] != "" || claims[secondary.Name] != "secondary" {
+		t.Fatalf("unexpected claims: %#v", claims)
+	}
+}
+
+func TestRoleLabelClaimsPreferAuthoritativeObservation(t *testing.T) {
+	roles := []workloads.ReplicaRole{{Name: "primary", IsExclusive: true}}
+	old := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "db-0", Annotations: map[string]string{
+		constant.RoleObservationAnnotationKey: `{"role":"primary","roleDefined":true,"eventVersion":"200","authoritativeVersion":1}`,
+	}}}
+	new := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "db-1", Annotations: map[string]string{
+		constant.RoleObservationAnnotationKey: `{"role":"primary","roleDefined":true,"eventVersion":"100","authoritativeVersion":2}`,
+	}}}
+
+	claims, err := RoleLabelClaims(roles, []*corev1.Pod{old, new})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if claims[new.Name] != "primary" || claims[old.Name] != "" {
+		t.Fatalf("unexpected claims: %#v", claims)
+	}
+}

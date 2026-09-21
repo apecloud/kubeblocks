@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"strings"
 	"sync/atomic"
+	"testing"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -285,3 +286,26 @@ var _ = Describe("probe", func() {
 		})
 	})
 })
+
+func TestProbeEventObservationVersionUsesSampleTime(t *testing.T) {
+	now := int64(100)
+	runner := &probeRunner{nowMicros: func() int64 { return now }}
+	first := runner.buildEvent("db-0", "roleProbe", 0, []byte("primary"), "")
+	if first.ObservationVersion != 100 {
+		t.Fatalf("first sample version = %d, want 100", first.ObservationVersion)
+	}
+	now = 200
+	retry := runner.buildEvent("db-0", "roleProbe", 0, []byte("primary"), "")
+	if retry.ObservationVersion != first.ObservationVersion {
+		t.Fatalf("same sample changed version from %d to %d", first.ObservationVersion, retry.ObservationVersion)
+	}
+	now = 300
+	changed := runner.buildEvent("db-0", "roleProbe", 0, []byte("secondary"), "")
+	if changed.ObservationVersion != 300 {
+		t.Fatalf("changed sample version = %d, want 300", changed.ObservationVersion)
+	}
+	failure := runner.buildEvent("db-0", "roleProbe", 1, nil, "failed")
+	if failure.ObservationVersion != changed.ObservationVersion {
+		t.Fatalf("failure changed version from %d to %d", changed.ObservationVersion, failure.ObservationVersion)
+	}
+}

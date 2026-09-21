@@ -123,6 +123,9 @@ type probeRunner struct {
 	latestEvent            chan proto.ProbeEvent
 	sendEventWithMessage   func(logger *logr.Logger, reason string, message string, sync bool) error
 	retrySendEventInterval time.Duration
+	lastSuccessVersion     uint64
+	lastSuccessOutput      []byte
+	nowMicros              func() int64
 	wg                     sync.WaitGroup
 }
 
@@ -237,12 +240,21 @@ func (r *probeRunner) fail(probe *proto.Probe) bool {
 }
 
 func (r *probeRunner) buildEvent(instance, probe string, code int32, output []byte, message string) *proto.ProbeEvent {
+	if code == 0 && !reflect.DeepEqual(output, r.lastSuccessOutput) {
+		now := time.Now().UnixMicro()
+		if r.nowMicros != nil {
+			now = r.nowMicros()
+		}
+		r.lastSuccessVersion = uint64(now)
+		r.lastSuccessOutput = append(r.lastSuccessOutput[:0], output...)
+	}
 	return &proto.ProbeEvent{
-		Instance: instance,
-		Probe:    probe,
-		Code:     code,
-		Output:   output,
-		Message:  message,
+		Instance:           instance,
+		Probe:              probe,
+		Code:               code,
+		Output:             output,
+		Message:            message,
+		ObservationVersion: r.lastSuccessVersion,
 	}
 }
 

@@ -120,6 +120,9 @@ func (h *RoleEventHandler) handleRoleProbeEvent(ctx context.Context, cli client.
 		result.Reason = "invalidProbeEventMessage"
 		return true, nil
 	}
+	if probeEvent.ObservationVersion > 0 {
+		result.Version = fmt.Sprintf("obs:%d", probeEvent.ObservationVersion)
+	}
 
 	if probeEvent.Code != 0 {
 		result.Result = "skipped"
@@ -231,12 +234,6 @@ func (h *RoleEventHandler) emitRoleProbeFailureEvents(ctx context.Context, cli c
 }
 
 func (h *RoleEventHandler) handleInstanceSetRoleProbe(ctx context.Context, cli client.Client, pod *corev1.Pod, itsName string, result *roleEventResult) (bool, error) {
-	if !acceptRoleProbeEvent(pod, result.Version, result.parsed) {
-		result.Result = "skipped"
-		result.Reason = "staleRoleEventVersion"
-		return true, nil
-	}
-
 	its := &workloads.InstanceSet{}
 	if err := cli.Get(ctx, types.NamespacedName{Namespace: pod.Namespace, Name: itsName}, its); err != nil {
 		if apierrors.IsNotFound(err) {
@@ -252,6 +249,12 @@ func (h *RoleEventHandler) handleInstanceSetRoleProbe(ctx context.Context, cli c
 	roleMap := composeRoleMap(its.Spec.Roles)
 	role, defined := roleMap[result.Role]
 	result.RoleDefined = defined
+	accepted := acceptRoleProbeEvent(pod, result.Version, result.parsed)
+	if !accepted && !(defined && role.IsExclusive && sameAcceptedRoleObservation(pod, roleObservationForResult(result, defined))) {
+		result.Result = "skipped"
+		result.Reason = "staleRoleEventVersion"
+		return true, nil
+	}
 
 	if defined && role.IsExclusive {
 		if !result.parsed.hasAuthoritativeVersion {
@@ -383,8 +386,9 @@ func parseRoleProbeOutput(stdout []byte) (roleProbeOutput, error) {
 //
 //   - Versioned result (`<role> <uint64>`) is accepted iff its version is
 //     strictly greater than the Pod's recorded authoritative role version.
-//   - Single-token result (`<role>`) is accepted iff its EventTime micros are
-//     strictly greater than the recorded single-token EventTime anchor.
+//   - Single-token result (`<role>`) from a current kbagent is accepted iff its
+//     sample-time observation version is newer than the recorded sample. A
+//     legacy event without that version uses EventTime micros.
 //     A single-token result is also rejected once the same Pod has accepted
 //     any versioned result, avoiding downgrade from authoritative ordering.
 //
@@ -411,15 +415,27 @@ func acceptRoleProbeEvent(pod *corev1.Pod, eventVersion string, parsed roleProbe
 	if last == "" {
 		return true
 	}
-	lastV, err := strconv.ParseUint(last, 10, 64)
+	lastV, lastObs, err := parseRoleEventVersion(last)
 	if err != nil {
 		return true
 	}
-	eventV, parseErr := strconv.ParseUint(eventVersion, 10, 64)
+	eventV, eventObs, parseErr := parseRoleEventVersion(eventVersion)
 	if parseErr != nil {
 		return true
 	}
+	if eventObs != lastObs {
+		return eventObs
+	}
 	return eventV > lastV
+}
+
+func parseRoleEventVersion(version string) (uint64, bool, error) {
+	if strings.HasPrefix(version, "obs:") {
+		value, err := strconv.ParseUint(strings.TrimPrefix(version, "obs:"), 10, 64)
+		return value, true, err
+	}
+	value, err := strconv.ParseUint(version, 10, 64)
+	return value, false, err
 }
 
 func composeRoleMap(roles []workloads.ReplicaRole) map[string]workloads.ReplicaRole {
@@ -473,10 +489,44 @@ func updatePodRoleLabel(ctx context.Context, cli client.Client, pod *corev1.Pod,
 	} else {
 		newPod.Annotations[constant.LastRoleEventVersionAnnotationKey] = eventVersion
 	}
+	observation, err := instanceset.EncodeRoleObservation(roleObservationForValues(roleName, roleDefined, eventVersion, parsed))
+	if err != nil {
+		return err
+	}
+	newPod.Annotations[constant.RoleObservationAnnotationKey] = observation
 	if reflect.DeepEqual(newPod.Labels, pod.Labels) && reflect.DeepEqual(newPod.Annotations, pod.Annotations) {
 		return nil
 	}
 	return cli.Update(ctx, newPod)
+}
+
+func roleObservationForResult(result *roleEventResult, roleDefined bool) instanceset.RoleObservation {
+	return roleObservationForValues(result.Role, roleDefined, result.Version, result.parsed)
+}
+
+func roleObservationForValues(roleName string, roleDefined bool, eventVersion string, parsed roleProbeOutput) instanceset.RoleObservation {
+	observation := instanceset.RoleObservation{
+		Role:         roleName,
+		RoleDefined:  roleDefined,
+		EventVersion: eventVersion,
+	}
+	if parsed.hasAuthoritativeVersion {
+		version := parsed.authoritativeVersion
+		observation.AuthoritativeVersion = &version
+	}
+	return observation
+}
+
+func sameAcceptedRoleObservation(pod *corev1.Pod, expected instanceset.RoleObservation) bool {
+	actual, ok, err := instanceset.DecodeRoleObservation(pod)
+	if err != nil || !ok || actual.Role != expected.Role || actual.RoleDefined != expected.RoleDefined {
+		return false
+	}
+	if actual.AuthoritativeVersion != nil || expected.AuthoritativeVersion != nil {
+		return actual.AuthoritativeVersion != nil && expected.AuthoritativeVersion != nil &&
+			*actual.AuthoritativeVersion == *expected.AuthoritativeVersion
+	}
+	return actual.EventVersion == expected.EventVersion
 }
 
 // removeExclusiveRoleLabels strips the exclusive role label from peers when

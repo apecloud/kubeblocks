@@ -30,11 +30,10 @@ const (
 
 	KBAppClusterUIDKey                = "apps.kubeblocks.io/cluster-uid"
 	BackupPolicyTemplateAnnotationKey = "apps.kubeblocks.io/backup-policy-template"
-	// LastRoleEventVersionAnnotationKey records the EventTime micros of the
-	// most recent single-token roleProbe result the controller accepted on a
-	// Pod. It is the staleness anchor for the `<role>` stdout form;
-	// versioned stdout (`<role> <roleVersion>`) is tracked separately via
-	// LastRoleAuthoritativeVersionAnnotationKey.
+	// LastRoleEventVersionAnnotationKey records the version of the most recent
+	// single-token roleProbe result accepted on a Pod. Legacy emitters store
+	// EventTime micros; current emitters store an `obs:<sample-time-micros>`
+	// value. Versioned stdout (`<role> <roleVersion>`) is tracked separately.
 	LastRoleEventVersionAnnotationKey = "apps.kubeblocks.io/last-role-snapshot-version"
 	// LastRoleAuthoritativeVersionAnnotationKey records the authoritative uint64
 	// roleVersion from the most recent versioned roleProbe result the
@@ -42,6 +41,7 @@ const (
 	// semantics: single-token results read/write only the EventTime key and
 	// versioned results read/write only the roleVersion key.
 	LastRoleAuthoritativeVersionAnnotationKey = "apps.kubeblocks.io/last-role-authoritative-version"
+	RoleObservationAnnotationKey              = "apps.kubeblocks.io/role-observation"
 	ComponentScaleInAnnotationKey             = "apps.kubeblocks.io/component-scale-in" // ComponentScaleInAnnotationKey specifies whether the component is scaled in
 
 	// SystemAccountProvisionedAnnotationKey marks a system account secret whose account has already been prepared externally.

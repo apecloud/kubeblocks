@@ -113,6 +113,9 @@ type ProbeEvent struct {
 	Code     int32  `json:"code"`
 	Output   []byte `json:"output,omitempty"`  // output of the probe on success, or latest succeed output on failure
 	Message  string `json:"message,omitempty"` // message of the probe on failure
+	// ObservationVersion identifies the successful probe sample that produced
+	// this event. Retries of the same event keep the same value.
+	ObservationVersion uint64 `json:"observationVersion,omitempty"`
 }
 
 type Task struct {

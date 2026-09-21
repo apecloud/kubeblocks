@@ -31,6 +31,7 @@ import (
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -67,6 +68,13 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	if isTerminating(pod) {
 		r.setPodUnavailableStatus(inst, workloads.InstanceCurrentStateTerminating, pod.Name, getPodRevision(pod))
 		return kubebuilderx.Continue, nil
+	}
+	roleClaims, err := instanceset.RoleLabelClaims(inst.Spec.Roles, []*corev1.Pod{pod})
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
+	if err := instanceset.RepairRoleLabels(tree, []*corev1.Pod{pod}, roleClaims); err != nil {
+		return kubebuilderx.Continue, err
 	}
 
 	ready, available, updated := false, false, false

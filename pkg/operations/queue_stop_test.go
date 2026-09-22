@@ -101,6 +101,25 @@ func TestVolumeExpansionWaitsForStopButOtherQueueBySelfOpsRemainUnchanged(t *tes
 	}
 }
 
+func TestStopQueueConflictIsScopedToVolumeExpansion(t *testing.T) {
+	ve := opsv1alpha1.OpsRecorder{Name: "volume-expansion", Type: opsv1alpha1.VolumeExpansionType}
+	other := opsv1alpha1.OpsRecorder{Name: "expose", Type: opsv1alpha1.ExposeType, QueueBySelf: true}
+	stop := opsv1alpha1.OpsRecorder{Name: "stop", Type: opsv1alpha1.StopType}
+
+	if !hasStopQueueConflict([]opsv1alpha1.OpsRecorder{ve}, 1, opsv1alpha1.StopType, false) {
+		t.Fatal("Stop did not conflict with a preceding VolumeExpansion")
+	}
+	if hasStopQueueConflict([]opsv1alpha1.OpsRecorder{other}, 1, opsv1alpha1.StopType, false) {
+		t.Fatal("Stop unexpectedly conflicted with another QueueBySelf operation")
+	}
+	if !hasStopQueueConflict([]opsv1alpha1.OpsRecorder{stop}, 1, opsv1alpha1.VolumeExpansionType, true) {
+		t.Fatal("VolumeExpansion did not conflict with a preceding Stop")
+	}
+	if hasStopQueueConflict([]opsv1alpha1.OpsRecorder{stop}, 1, opsv1alpha1.ExposeType, false) {
+		t.Fatal("another operation unexpectedly conflicted with Stop")
+	}
+}
+
 func queueStopTestScheme(t *testing.T) *runtime.Scheme {
 	t.Helper()
 	scheme := runtime.NewScheme()

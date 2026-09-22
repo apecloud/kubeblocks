@@ -39,4 +39,8 @@ const (
 	// FeatureGateInPlacePodVerticalScaling specifies to enable in-place pod vertical scaling
 	// NOTE: This feature depends on the InPlacePodVerticalScaling feature of the K8s cluster in which the KubeBlocks runs.
 	FeatureGateInPlacePodVerticalScaling = "IN_PLACE_POD_VERTICAL_SCALING"
+
+	// FeatureGateKBAgentRoleLabelReprobe controls the #10201 role-label
+	// recovery fields added to generated kb-agent PodTemplates.
+	FeatureGateKBAgentRoleLabelReprobe = "ENABLE_KBAGENT_ROLE_LABEL_REPROBE"
 )

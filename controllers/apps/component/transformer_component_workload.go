@@ -240,6 +240,11 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet, legacyConfigManagerP
 	// Preserve the legacy config-manager only for existing workloads that still have it in their live template.
 	// This avoids an upgrade-only template diff from forcing all old Pods to restart after config-manager moved to kbagent.
 	preserveLegacyConfigManagerPodSpec(oldITS, itsProto, itsObjCopy, legacyConfigManagerPolicy)
+	// Preserve role-label reprobe fields on workloads that already adopted #10201.
+	// Turning the gate off prevents new adoption but must not create a reverse rollout.
+	if !viper.GetBool(constant.FeatureGateKBAgentRoleLabelReprobe) {
+		component.PreserveKBAgentRoleLabelReprobePodSpec(&oldITS.Spec.Template.Spec, &itsObjCopy.Spec.Template.Spec)
+	}
 	itsObjCopy.Spec.Replicas = itsProto.Spec.Replicas
 	itsObjCopy.Spec.Roles = itsProto.Spec.Roles
 	itsObjCopy.Spec.LifecycleActions = itsProto.Spec.LifecycleActions

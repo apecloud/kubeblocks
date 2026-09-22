@@ -199,6 +199,10 @@ spec:
               value: {{ .Values.featureGates.componentReplicasAnnotation.enabled | quote }}
             - name: IN_PLACE_POD_VERTICAL_SCALING
               value: {{ .Values.featureGates.inPlacePodVerticalScaling.enabled | quote }}
+            {{- if .Values.featureGates.kbagentRoleLabelReprobe.enabled }}
+            - name: ENABLE_KBAGENT_ROLE_LABEL_REPROBE
+              value: "true"
+            {{- end }}
             {{- if .Values.controllers.trace.enabled }}
             - name: I18N_RESOURCES_NAME
               value: {{ include "kubeblocks.i18nResourcesName" . }}

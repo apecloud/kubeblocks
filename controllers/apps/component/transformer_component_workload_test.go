@@ -402,6 +402,37 @@ var _ = Describe("Component Workload Operations Test", func() {
 			Expect(merged.Spec.Template.Spec.Volumes).Should(BeEmpty())
 		})
 
+		It("preserves adopted role-label reprobe fields when the gate is disabled", func() {
+			oldGate := viper.GetBool(constant.FeatureGateKBAgentRoleLabelReprobe)
+			defer viper.Set(constant.FeatureGateKBAgentRoleLabelReprobe, oldGate)
+			viper.Set(constant.FeatureGateKBAgentRoleLabelReprobe, false)
+
+			oldITS := testapps.NewInstanceSetFactory(testCtx.DefaultNamespace,
+				"old-its-role-reprobe", clusterName, compName).
+				AddContainer(corev1.Container{
+					Name: "kbagent",
+					VolumeMounts: []corev1.VolumeMount{{
+						Name: "kubeblocks-role-label", MountPath: "/etc/kubeblocks/pod-metadata", ReadOnly: true,
+					}},
+					Env: []corev1.EnvVar{{Name: "KB_AGENT_PROBE", Value: `[{"action":"roleProbe","reportPeriodSeconds":15,"reportOnFileChange":["/etc/kubeblocks/pod-metadata"]}]`}},
+				}).
+				GetObject()
+			oldITS.Spec.Template.Spec.Volumes = []corev1.Volume{{
+				Name:         "kubeblocks-role-label",
+				VolumeSource: corev1.VolumeSource{DownwardAPI: &corev1.DownwardAPIVolumeSource{}},
+			}}
+			newITS := oldITS.DeepCopy()
+			newITS.Spec.Template.Spec.Volumes = nil
+			newITS.Spec.Template.Spec.Containers[0].VolumeMounts = nil
+			newITS.Spec.Template.Spec.Containers[0].Env[0].Value = `[{"action":"roleProbe"}]`
+
+			merged := copyAndMergeITS(oldITS, newITS, legacyConfigManagerPolicyKeep)
+			Expect(merged).ShouldNot(BeNil())
+			Expect(merged.Spec.Template.Spec.Volumes).Should(ContainElement(oldITS.Spec.Template.Spec.Volumes[0]))
+			Expect(merged.Spec.Template.Spec.Containers[0].VolumeMounts).Should(ContainElement(oldITS.Spec.Template.Spec.Containers[0].VolumeMounts[0]))
+			Expect(merged.Spec.Template.Spec.Containers[0].Env[0].Value).Should(ContainSubstring("reportOnFileChange"))
+		})
+
 		It("should preserve only the legacy config-manager resources that still exist on the live template", func() {
 			// Some clusters may carry partially migrated legacy resources. The compatibility logic should
 			// keep only what still exists on the live template instead of synthesizing a full legacy bundle.

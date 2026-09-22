@@ -40,6 +40,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/kbagent"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 // componentWorkloadTransformer handles component workload generation
@@ -247,6 +248,9 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet) *workloads.InstanceS
 	podTemplateCopy.Annotations = itsObjCopy.Spec.Template.Annotations
 
 	itsObjCopy.Spec.Template = podTemplateCopy
+	if !viper.GetBool(constant.FeatureGateKBAgentRoleLabelReprobe) {
+		component.PreserveKBAgentRoleLabelReprobePodSpec(&oldITS.Spec.Template.Spec, &itsObjCopy.Spec.Template.Spec)
+	}
 	itsObjCopy.Spec.Replicas = itsProto.Spec.Replicas
 	itsObjCopy.Spec.Roles = itsProto.Spec.Roles
 	itsObjCopy.Spec.LifecycleActions = itsProto.Spec.LifecycleActions

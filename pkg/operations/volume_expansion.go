@@ -22,6 +22,7 @@ package operations
 import (
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 	"time"
 
@@ -96,6 +97,23 @@ func (ve volumeExpansionOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli cl
 				if compSpec.Instances[i].Name != instanceExpansion.Name {
 					continue
 				}
+				for _, requested := range instanceExpansion.VolumeClaimTemplates {
+					found := false
+					for _, existing := range compSpec.Instances[i].VolumeClaimTemplates {
+						if existing.Name == requested.Name {
+							found = true
+							break
+						}
+					}
+					if !found {
+						for _, inherited := range compSpec.VolumeClaimTemplates {
+							if inherited.Name == requested.Name {
+								compSpec.Instances[i].VolumeClaimTemplates = append(compSpec.Instances[i].VolumeClaimTemplates, *inherited.DeepCopy())
+								break
+							}
+						}
+					}
+				}
 				setVolumeStorage(instanceExpansion.VolumeClaimTemplates, compSpec.Instances[i].VolumeClaimTemplates)
 				break
 			}
@@ -138,47 +156,43 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 	var veHelpers []volumeExpansionHelper
 	setVeHelpers := func(compSpec appsv1.ClusterComponentSpec, compOps ComponentOpsInterface, fullComponentName string) {
 		volumeExpansion := compOps.(opsv1alpha1.VolumeExpansion)
-		if len(volumeExpansion.VolumeClaimTemplates) > 0 {
-			expectReplicas := compSpec.Replicas - getTemplateReplicas(compSpec.Instances)
-			for _, vct := range volumeExpansion.VolumeClaimTemplates {
+		appendHelpers := func(requests []opsv1alpha1.OpsRequestVolumeClaimTemplate, templateName string, replicas int32, ordinals appsv1.Ordinals) {
+			for _, request := range requests {
 				veHelpers = append(veHelpers, volumeExpansionHelper{
 					compOps:              compOps,
 					fullComponentName:    fullComponentName,
-					expectCount:          int(expectReplicas),
-					vctName:              vct.Name,
+					expectCount:          int(replicas),
+					vctName:              request.Name,
 					offlineInstanceNames: compSpec.OfflineInstances,
+					templateName:         templateName,
+					ordinals:             ordinals,
 				})
-				for _, template := range compSpec.Instances {
-					veHelpers = append(veHelpers, volumeExpansionHelper{
-						compOps:              compOps,
-						fullComponentName:    fullComponentName,
-						expectCount:          int(*template.Replicas),
-						vctName:              vct.Name,
-						offlineInstanceNames: compSpec.OfflineInstances,
-						templateName:         template.Name,
-						ordinals:             template.Ordinals,
-					})
-				}
 			}
 		}
-		for _, instanceExpansion := range volumeExpansion.Instances {
-			for _, template := range compSpec.Instances {
-				if template.Name != instanceExpansion.Name {
+		appendHelpers(volumeExpansion.VolumeClaimTemplates, "", compSpec.Replicas-getTemplateReplicas(compSpec.Instances), compSpec.Ordinals)
+		for _, template := range compSpec.Instances {
+			requests := make([]opsv1alpha1.OpsRequestVolumeClaimTemplate, 0, len(volumeExpansion.VolumeClaimTemplates))
+			for _, request := range volumeExpansion.VolumeClaimTemplates {
+				if slices.ContainsFunc(template.VolumeClaimTemplates, func(v appsv1.PersistentVolumeClaimTemplate) bool { return v.Name == request.Name }) {
 					continue
 				}
-				for _, vct := range instanceExpansion.VolumeClaimTemplates {
-					veHelpers = append(veHelpers, volumeExpansionHelper{
-						compOps:           compOps,
-						fullComponentName: fullComponentName,
-						expectCount:       int(template.GetReplicas()),
-						vctName:           vct.Name,
-						templateName:      template.Name,
-						stopped:           stopped,
-						explicitOffline:   explicitOffline,
-					})
-				}
-				break
+				requests = append(requests, request)
 			}
+			for _, instanceExpansion := range volumeExpansion.Instances {
+				if instanceExpansion.Name != template.Name {
+					continue
+				}
+				for _, request := range instanceExpansion.VolumeClaimTemplates {
+					for i := range requests {
+						if requests[i].Name == request.Name {
+							requests = append(requests[:i], requests[i+1:]...)
+							break
+						}
+					}
+					requests = append(requests, request)
+				}
+			}
+			appendHelpers(requests, template.Name, template.GetReplicas(), template.Ordinals)
 		}
 	}
 	for _, compSpec := range opsRes.Cluster.Spec.ComponentSpecs {
@@ -198,7 +212,14 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 			return opsRequestPhase, 0, err
 		}
 		for _, v := range shardingComps {
-			setVeHelpers(spec.Template, compOps, v.Labels[constant.KBAppComponentLabelKey])
+			if slices.ContainsFunc(spec.ShardTemplates, func(t appsv1.ShardTemplate) bool {
+				return t.Name == v.Labels[constant.KBAppShardTemplateLabelKey] && t.VolumeClaimTemplates != nil
+			}) {
+				continue
+			}
+			physical := spec.Template
+			physical.Replicas = v.Spec.Replicas
+			setVeHelpers(physical, compOps, v.Labels[constant.KBAppComponentLabelKey])
 		}
 	}
 	// reconcile the status.components. when the volume expansion is successful,

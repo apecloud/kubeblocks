@@ -1393,6 +1393,9 @@ Kubernetes core/v1.ResourceRequirements
 </table>
 <h3 id="operations.kubeblocks.io/v1alpha1.InstanceVolumeClaimTemplate">InstanceVolumeClaimTemplate
 </h3>
+<p>
+(<em>Appears on:</em><a href="#operations.kubeblocks.io/v1alpha1.VolumeExpansion">VolumeExpansion</a>)
+</p>
 <div>
 </div>
 <table>
@@ -4781,6 +4784,7 @@ ComponentOps
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Specifies a list of OpsRequestVolumeClaimTemplate objects, defining the volumeClaimTemplates
 that are used to expand the storage and the desired storage size for each one.</p>
 </td>

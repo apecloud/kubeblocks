@@ -400,7 +400,6 @@ type InstanceVolumeClaimTemplate struct {
 	VolumeClaimTemplates []OpsRequestVolumeClaimTemplate `json:"volumeClaimTemplates" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 }
 
-// +kubebuilder:validation:XValidation:rule="size(self.volumeClaimTemplates) > 0 || size(self.instances) > 0",message="at least one volumeClaimTemplates or instances entry is required"
 // VolumeExpansion encapsulates the parameters required for a volume expansion operation.
 type VolumeExpansion struct {
 	// Specifies the name of the Component.

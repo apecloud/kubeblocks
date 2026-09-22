@@ -44,17 +44,13 @@ func PreserveKBAgentRoleLabelReprobePodSpec(oldSpec, newSpec *corev1.PodSpec) {
 		return
 	}
 	oldVolume := findVolume(oldSpec.Volumes, KBAgentRoleLabelVolumeName)
-	if oldVolume == nil {
+	oldContainer := findContainer(oldSpec.Containers, kbagent.ContainerName)
+	newContainer := findContainer(newSpec.Containers, kbagent.ContainerName)
+	if oldVolume == nil || oldContainer == nil || newContainer == nil {
 		return
 	}
 	if findVolume(newSpec.Volumes, KBAgentRoleLabelVolumeName) == nil {
 		newSpec.Volumes = append(newSpec.Volumes, *oldVolume.DeepCopy())
-	}
-
-	oldContainer := findContainer(oldSpec.Containers, kbagent.ContainerName)
-	newContainer := findContainer(newSpec.Containers, kbagent.ContainerName)
-	if oldContainer == nil || newContainer == nil {
-		return
 	}
 	for _, mount := range oldContainer.VolumeMounts {
 		if mount.Name != KBAgentRoleLabelVolumeName || mount.MountPath != KBAgentRoleLabelMountPath {

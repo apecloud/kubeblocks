@@ -182,6 +182,19 @@ var _ = Describe("kb-agent", func() {
 			Expect(probes[0].ReportOnFileChange).Should(Equal([]string{podMetadataMountPath}))
 		})
 
+		It("does not preserve a role-label volume when kbagent is removed", func() {
+			oldSpec := &corev1.PodSpec{
+				Volumes: []corev1.Volume{{Name: roleLabelVolumeName}},
+				Containers: []corev1.Container{{Name: kbagent.ContainerName,
+					VolumeMounts: []corev1.VolumeMount{roleLabelVolumeMount},
+				}},
+			}
+			newSpec := &corev1.PodSpec{}
+
+			PreserveKBAgentRoleLabelReprobePodSpec(oldSpec, newSpec)
+			Expect(newSpec.Volumes).Should(BeEmpty())
+		})
+
 		It("nil", func() {
 			synthesizedComp.LifecycleActions.ComponentLifecycleActions = nil
 			synthesizedComp.LifecycleActions.CustomActions = nil

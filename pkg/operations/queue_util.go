@@ -107,14 +107,21 @@ func enqueueOpsRequestToClusterAnnotation(ctx context.Context, cli client.Client
 		return nil, err
 	}
 
+	index, opsRecorder := GetOpsRecorderFromSlice(opsRequestSlice, opsRes.OpsRequest.Name)
+	currentIndex := index
+	if currentIndex == -1 {
+		currentIndex = len(opsRequestSlice)
+	}
 	inQueue := func() bool {
+		if hasStopQueueConflict(opsRequestSlice, currentIndex, opsRes.OpsRequest.Spec.Type, opsBehaviour.QueueWithStop) {
+			return true
+		}
 		if opsRes.OpsRequest.Force() && !opsRes.OpsRequest.Spec.EnqueueOnForce {
 			return false
 		}
 		return existOtherRunningOps(opsRequestSlice, opsRes.OpsRequest.Spec.Type, opsBehaviour)
 	}
 
-	index, opsRecorder := GetOpsRecorderFromSlice(opsRequestSlice, opsRes.OpsRequest.Name)
 	switch index {
 	case -1:
 		// if not exists but reach the queue limit size, throw an error
@@ -142,6 +149,9 @@ func enqueueOpsRequestToClusterAnnotation(ctx context.Context, cli client.Client
 				// the opsRequest is already running.
 				return &opsRecorder, nil
 			}
+			if hasStopQueueConflict(opsRequestSlice, index, opsRes.OpsRequest.Spec.Type, opsBehaviour.QueueWithStop) {
+				return &opsRecorder, nil
+			}
 			if !opsRes.OpsRequest.Spec.Force && existOtherRunningOps(opsRequestSlice, opsRecorder.Type, opsBehaviour) {
 				// if exists other running opsRequest, return.
 				return &opsRecorder, nil
@@ -151,6 +161,24 @@ func enqueueOpsRequestToClusterAnnotation(ctx context.Context, cli client.Client
 		}
 	}
 	return &opsRecorder, opsutil.UpdateClusterOpsAnnotations(ctx, cli, opsRes.Cluster, opsRequestSlice)
+}
+
+func hasStopQueueConflict(queue []opsv1alpha1.OpsRecorder, index int, opsType opsv1alpha1.OpsType, queueWithStop bool) bool {
+	if opsType != opsv1alpha1.StopType && !queueWithStop {
+		return false
+	}
+	for i := 0; i < index; i++ {
+		if opsType == opsv1alpha1.StopType {
+			if behaviour, ok := GetOpsManager().OpsMap[queue[i].Type]; ok && behaviour.QueueWithStop {
+				return true
+			}
+			continue
+		}
+		if queue[i].Type == opsv1alpha1.StopType {
+			return true
+		}
+	}
+	return false
 }
 
 func swapOpsWithDependentBefore(opsRequestSlice []opsv1alpha1.OpsRecorder, currentIndex int, opsRes *OpsResource) ([]opsv1alpha1.OpsRecorder, bool) {

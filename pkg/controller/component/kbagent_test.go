@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"testing"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -162,7 +163,7 @@ var _ = Describe("kb-agent", func() {
 		It("preserves adopted role-label reprobe fields when the gate is disabled", func() {
 			oldSpec := &corev1.PodSpec{
 				Volumes: []corev1.Volume{{Name: roleLabelVolumeName, VolumeSource: corev1.VolumeSource{
-					DownwardAPI: &corev1.DownwardAPIVolumeSource{},
+					DownwardAPI: &corev1.DownwardAPIVolumeSource{Items: []corev1.DownwardAPIVolumeFile{{Path: "role", FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.labels['kubeblocks.io/role']"}}}},
 				}}},
 				Containers: []corev1.Container{{Name: kbagent.ContainerName,
 					VolumeMounts: []corev1.VolumeMount{roleLabelVolumeMount},
@@ -173,7 +174,7 @@ var _ = Describe("kb-agent", func() {
 				Env: []corev1.EnvVar{{Name: "KB_AGENT_PROBE", Value: `[{"action":"roleProbe"}]`}},
 			}}}
 
-			PreserveKBAgentRoleLabelReprobePodSpec(oldSpec, newSpec)
+			Expect(PreserveKBAgentRoleLabelReprobePodSpec(oldSpec, newSpec)).Should(Succeed())
 			Expect(newSpec.Volumes).Should(ContainElement(oldSpec.Volumes[0]))
 			Expect(newSpec.Containers[0].VolumeMounts).Should(ContainElement(roleLabelVolumeMount))
 			var probes []proto.Probe
@@ -191,7 +192,7 @@ var _ = Describe("kb-agent", func() {
 			}
 			newSpec := &corev1.PodSpec{}
 
-			PreserveKBAgentRoleLabelReprobePodSpec(oldSpec, newSpec)
+			Expect(PreserveKBAgentRoleLabelReprobePodSpec(oldSpec, newSpec)).Should(Succeed())
 			Expect(newSpec.Volumes).Should(BeEmpty())
 		})
 
@@ -658,3 +659,68 @@ var _ = Describe("kb-agent", func() {
 		})
 	})
 })
+
+func TestKBAgentRoleReprobeTransitions(t *testing.T) {
+	oldGate := viperx.GetBool(constant.FeatureGateKBAgentRoleLabelReprobe)
+	defer viperx.Set(constant.FeatureGateKBAgentRoleLabelReprobe, oldGate)
+	for _, role := range []bool{false, true} {
+		for _, custom := range []bool{false, true} {
+			for _, tail := range []bool{false, true} {
+				for _, from := range []bool{false, true} {
+					for _, to := range []bool{false, true} {
+						t.Run(fmt.Sprintf("role=%v/custom=%v/tail=%v/%v-to-%v", role, custom, tail, from, to), func(t *testing.T) {
+							build := func(enabled bool) *corev1.PodSpec {
+								viperx.Set(constant.FeatureGateKBAgentRoleLabelReprobe, enabled)
+								action := appsv1.Action{Exec: &appsv1.ExecAction{Command: []string{"true"}}}
+								if custom {
+									action.Exec.Image = "example.com/tools:1"
+								}
+								actions := &appsv1.ComponentLifecycleActions{PostProvision: action.DeepCopy(), AvailableProbe: &appsv1.Probe{Action: action, PeriodSeconds: 5}}
+								if role {
+									actions.RoleProbe = &appsv1.Probe{Action: action, PeriodSeconds: 1}
+								}
+								c := &SynthesizedComponent{FullCompName: "db", PodSpec: &corev1.PodSpec{Containers: []corev1.Container{{Name: "database", Image: "db:1"}}}, LifecycleActions: SynthesizedLifecycleActions{ComponentLifecycleActions: actions}}
+								if err := buildKBAgentContainer(c); err != nil {
+									t.Fatal(err)
+								}
+								if tail {
+									c.PodSpec.Volumes = append(c.PodSpec.Volumes, corev1.Volume{Name: "scripts", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}})
+									for i := range c.PodSpec.Containers {
+										c.PodSpec.Containers[i].VolumeMounts = append(c.PodSpec.Containers[i].VolumeMounts, corev1.VolumeMount{Name: "scripts", MountPath: "/scripts"})
+									}
+								}
+								return c.PodSpec
+							}
+							old := build(from)
+							original := old.DeepCopy()
+							desired := build(to)
+							if !to {
+								if err := PreserveKBAgentRoleLabelReprobePodSpec(old, desired); err != nil {
+									t.Fatal(err)
+								}
+							}
+							wantChange := !from && to
+							if equal := reflect.DeepEqual(old, desired); equal == wantChange {
+								a, _ := json.Marshal(old)
+								b, _ := json.Marshal(desired)
+								t.Fatalf("unexpected PodSpec change=%v (want %v)\nold=%s\nnew=%s", !equal, wantChange, a, b)
+							}
+							if !reflect.DeepEqual(old, original) {
+								t.Fatal("mutated existing template")
+							}
+							if !to {
+								again := build(false)
+								if err := PreserveKBAgentRoleLabelReprobePodSpec(desired, again); err != nil {
+									t.Fatal(err)
+								}
+								if !reflect.DeepEqual(desired, again) {
+									t.Fatal("not stable on next reconciliation")
+								}
+							}
+						})
+					}
+				}
+			}
+		}
+	}
+}

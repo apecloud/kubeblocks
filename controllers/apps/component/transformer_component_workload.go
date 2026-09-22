@@ -163,7 +163,10 @@ func (t *componentWorkloadTransformer) handleUpdate(transCtx *componentTransform
 		}
 	}
 
-	objCopy := copyAndMergeITS(runningITS, protoITS, legacyConfigManagerRequired(comp))
+	objCopy, err := copyAndMergeITS(runningITS, protoITS, legacyConfigManagerRequired(comp))
+	if err != nil {
+		return err
+	}
 	if objCopy != nil {
 		cli.Update(dag, nil, objCopy, &model.ReplaceIfExistingOption{})
 		// make sure the workload is updated after the env CM
@@ -216,7 +219,7 @@ func (t *componentWorkloadTransformer) handleWorkloadUpdate(transCtx *componentT
 // copyAndMergeITS merges two ITS objects for updating:
 //  1. new an object targetObj by copying from oldObj
 //  2. merge all fields can be updated from newObj into targetObj
-func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet, legacyConfigManagerPolicy legacyConfigManagerPolicy) *workloads.InstanceSet {
+func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet, legacyConfigManagerPolicy legacyConfigManagerPolicy) (*workloads.InstanceSet, error) {
 	itsObjCopy := oldITS.DeepCopy()
 	itsProto := newITS
 
@@ -243,7 +246,9 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet, legacyConfigManagerP
 	// Preserve role-label reprobe fields on workloads that already adopted #10201.
 	// Turning the gate off prevents new adoption but must not create a reverse rollout.
 	if !viper.GetBool(constant.FeatureGateKBAgentRoleLabelReprobe) {
-		component.PreserveKBAgentRoleLabelReprobePodSpec(&oldITS.Spec.Template.Spec, &itsObjCopy.Spec.Template.Spec)
+		if err := component.PreserveKBAgentRoleLabelReprobePodSpec(&oldITS.Spec.Template.Spec, &itsObjCopy.Spec.Template.Spec); err != nil {
+			return nil, err
+		}
 	}
 	itsObjCopy.Spec.Replicas = itsProto.Spec.Replicas
 	itsObjCopy.Spec.Roles = itsProto.Spec.Roles
@@ -288,9 +293,9 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet, legacyConfigManagerP
 	isLabelsUpdated := !reflect.DeepEqual(oldITS.Labels, itsObjCopy.Labels)
 	isAnnotationsUpdated := !reflect.DeepEqual(oldITS.Annotations, itsObjCopy.Annotations)
 	if !isSpecUpdated && !isLabelsUpdated && !isAnnotationsUpdated {
-		return nil
+		return nil, nil
 	}
-	return itsObjCopy
+	return itsObjCopy, nil
 }
 
 const (

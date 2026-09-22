@@ -756,20 +756,6 @@ func expansionUsesComponentVolume(comp appsv1.ClusterComponentSpec, volumeName s
 	return defaultReplicas > 0
 }
 
-func validateExpansionVolumes(expansion VolumeExpansion, scope string, volumes []appsv1.PersistentVolumeClaimTemplate) error {
-	for _, requested := range expansion.VolumeClaimTemplates {
-		index := slices.IndexFunc(volumes, func(v appsv1.PersistentVolumeClaimTemplate) bool { return v.Name == requested.Name })
-		if index < 0 {
-			return fmt.Errorf("volumeClaimTemplate %q not found in %s", requested.Name, scope)
-		}
-		current := volumes[index].Spec.Resources.Requests.Storage()
-		if requested.Storage.Cmp(*current) < 0 {
-			return fmt.Errorf("requested storage for %s/%s cannot be less than declared size %s", scope, requested.Name, current.String())
-		}
-	}
-	return nil
-}
-
 // validateVerticalResourceList checks if k8s resourceList is legal
 func validateVerticalResourceList(resourceList map[corev1.ResourceName]resource.Quantity) (string, error) {
 	for k := range resourceList {

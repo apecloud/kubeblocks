@@ -209,6 +209,9 @@ func swapOpsWithDependentBefore(opsRequestSlice []opsv1alpha1.OpsRecorder, curre
 	}
 	var doSwap bool
 	for i := currentIndex + 1; i < len(opsRequestSlice); i++ {
+		if opsRequestSlice[i].Type == opsv1alpha1.StopType {
+			break
+		}
 		if _, ok := dependentSet[opsRequestSlice[i].Name]; ok {
 			opsRequestSlice[currentIndex], opsRequestSlice[i] = opsRequestSlice[i], opsRequestSlice[currentIndex]
 			currentIndex = i

@@ -11,3 +11,9 @@ spec:
     volumeClaimTemplates:
     - name: data
       storage: "2Gi"
+    # Optional: if the component has an instance template named "az-a", add:
+    # instances:
+    # - name: az-a
+    #   volumeClaimTemplates:
+    #   - name: data
+    #     storage: "3Gi"

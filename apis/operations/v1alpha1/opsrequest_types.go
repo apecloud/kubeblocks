@@ -408,12 +408,22 @@ type VolumeExpansion struct {
 	// Specifies a list of OpsRequestVolumeClaimTemplate objects, defining the volumeClaimTemplates
 	// that are used to expand the storage and the desired storage size for each one.
 	//
-	// +kubebuilder:validation:Required
+	// +optional
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=name
-	VolumeClaimTemplates []OpsRequestVolumeClaimTemplate `json:"volumeClaimTemplates" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
+	VolumeClaimTemplates []OpsRequestVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
+
+	// Specifies volume expansion targets for named instance templates. An instance
+	// target overrides a component-level target with the same volumeClaimTemplate name.
+	//
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
+	// +optional
+	Instances []InstanceVolumeClaimTemplate `json:"instances,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 }
 
 type OpsRequestVolumeClaimTemplate struct {

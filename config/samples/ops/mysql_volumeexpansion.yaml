@@ -11,3 +11,10 @@ spec:
     volumeClaimTemplates:
     - name: data
       storage: "2Gi"
+    # Optional: target a named instance template. This takes precedence over
+    # the component-level target for the same volumeClaimTemplate.
+    instances:
+    - name: canary
+      volumeClaimTemplates:
+      - name: data
+        storage: "3Gi"

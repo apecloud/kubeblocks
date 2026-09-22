@@ -1393,6 +1393,9 @@ Kubernetes core/v1.ResourceRequirements
 </table>
 <h3 id="operations.kubeblocks.io/v1alpha1.InstanceVolumeClaimTemplate">InstanceVolumeClaimTemplate
 </h3>
+<p>
+(<em>Appears on:</em><a href="#operations.kubeblocks.io/v1alpha1.VolumeExpansion">VolumeExpansion</a>)
+</p>
 <div>
 </div>
 <table>
@@ -4836,8 +4839,134 @@ ComponentOps
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Specifies a list of OpsRequestVolumeClaimTemplate objects, defining the volumeClaimTemplates
 that are used to expand the storage and the desired storage size for each one.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>instances</code><br/>
+<em>
+<a href="#operations.kubeblocks.io/v1alpha1.InstanceVolumeClaimTemplate">
+[]InstanceVolumeClaimTemplate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies volume expansion targets for named instance templates. An instance
+target overrides a component-level target with the same volumeClaimTemplate name.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="operations.kubeblocks.io/v1alpha1.VolumeExpansionPlan">VolumeExpansionPlan
+</h3>
+<div>
+<p>VolumeExpansionPlan is the normalized intent of a VolumeExpansion request.
+Instance-template targets take precedence over component targets with the
+same volume template name.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>Targets</code><br/>
+<em>
+<a href="#operations.kubeblocks.io/v1alpha1.VolumeExpansionTarget">
+map[github.com/apecloud/kubeblocks/apis/operations/v1alpha1.VolumeExpansionTargetKey]github.com/apecloud/kubeblocks/apis/operations/v1alpha1.VolumeExpansionTarget
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="operations.kubeblocks.io/v1alpha1.VolumeExpansionTarget">VolumeExpansionTarget
+</h3>
+<p>
+(<em>Appears on:</em><a href="#operations.kubeblocks.io/v1alpha1.VolumeExpansionPlan">VolumeExpansionPlan</a>)
+</p>
+<div>
+<p>VolumeExpansionTarget is a normalized volume expansion target.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>Key</code><br/>
+<em>
+<a href="#operations.kubeblocks.io/v1alpha1.VolumeExpansionTargetKey">
+VolumeExpansionTargetKey
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>RequestedStorage</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#quantity-resource-core">
+Kubernetes resource.Quantity
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="operations.kubeblocks.io/v1alpha1.VolumeExpansionTargetKey">VolumeExpansionTargetKey
+</h3>
+<p>
+(<em>Appears on:</em><a href="#operations.kubeblocks.io/v1alpha1.VolumeExpansionTarget">VolumeExpansionTarget</a>)
+</p>
+<div>
+<p>VolumeExpansionTargetKey identifies a volume expansion target. An empty
+InstanceTemplateName identifies the component&rsquo;s default volume template.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>InstanceTemplateName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>VCTName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
 </td>
 </tr>
 </tbody>

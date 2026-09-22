@@ -559,7 +559,7 @@ func (r *OpsRequest) validateVolumeExpansion(ctx context.Context, cli client.Cli
 	storageClasses := sets.New[string]()
 	for _, expansion := range volumeExpansionList {
 		if comp := cluster.Spec.GetComponentByName(expansion.ComponentName); comp != nil {
-			if err := validateExpansionVolumes(expansion, comp.Name, comp.VolumeClaimTemplates); err != nil {
+			if _, err := NormalizeVolumeExpansion(expansion, comp); err != nil {
 				return err
 			}
 			collectExpansionStorageClasses(expansion, *comp, storageClasses)
@@ -569,8 +569,15 @@ func (r *OpsRequest) validateVolumeExpansion(ctx context.Context, cli client.Cli
 			if sharding.Name != expansion.ComponentName {
 				continue
 			}
-			if err := validateExpansionVolumes(expansion, sharding.Name, sharding.Template.VolumeClaimTemplates); err != nil {
+			if _, err := NormalizeVolumeExpansion(expansion, &sharding.Template); err != nil {
 				return err
+			}
+			if len(expansion.Instances) > 0 {
+				for _, template := range sharding.ShardTemplates {
+					if template.Shards != nil && *template.Shards > 0 && template.Instances != nil {
+						return fmt.Errorf("instance-scoped volume expansion is not supported for sharding %q with heterogeneous shard instance templates", sharding.Name)
+					}
+				}
 			}
 			collectShardingExpansionStorageClasses(expansion, sharding, storageClasses)
 		}
@@ -623,6 +630,15 @@ func collectExpansionStorageClasses(expansion VolumeExpansion, comp appsv1.Clust
 			continue
 		}
 		storageClasses.Insert(*volume.Spec.StorageClassName)
+	}
+	for _, instanceRequest := range expansion.Instances {
+		for _, requested := range instanceRequest.VolumeClaimTemplates {
+			volume, ok := EffectiveVolumeClaimTemplate(&comp, instanceRequest.Name, requested.Name)
+			if !ok || volume.Spec.StorageClassName == nil || *volume.Spec.StorageClassName == "" {
+				continue
+			}
+			storageClasses.Insert(*volume.Spec.StorageClassName)
+		}
 	}
 }
 

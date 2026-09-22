@@ -46,8 +46,8 @@ const (
 	defaultProbeReportPeriodSeconds = 60
 	minProbeReportPeriodSeconds     = 15
 
-	roleLabelVolumeName  = "kubeblocks-role-label"
-	podMetadataMountPath = "/etc/kubeblocks/pod-metadata"
+	roleLabelVolumeName  = KBAgentRoleLabelVolumeName
+	podMetadataMountPath = KBAgentRoleLabelMountPath
 	podRoleLabelFileName = "role"
 )
 
@@ -186,8 +186,10 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 		return err
 	}
 
-	if err = mountPodRoleLabelFile(synthesizedComp, container); err != nil {
-		return err
+	if viper.GetBool(constant.FeatureGateKBAgentRoleLabelReprobe) {
+		if err = mountPodRoleLabelFile(synthesizedComp, container); err != nil {
+			return err
+		}
 	}
 
 	// set kb-agent container ports to host network
@@ -345,8 +347,10 @@ func buildKBAgentStartupEnvs(synthesizedComp *SynthesizedComponent) ([]corev1.En
 		}
 
 		if a, p := buildProbe4KBAgent(synthesizedComp.LifecycleActions.RoleProbe, "roleProbe", synthesizedComp.FullCompName); a != nil && p != nil {
-			p.ReportOnFileChange = []string{podMetadataMountPath}
-			p.ReportPeriodSeconds = probeReportPeriodSeconds(p.PeriodSeconds)
+			if viper.GetBool(constant.FeatureGateKBAgentRoleLabelReprobe) {
+				p.ReportOnFileChange = []string{podMetadataMountPath}
+				p.ReportPeriodSeconds = probeReportPeriodSeconds(p.PeriodSeconds)
+			}
 			actions = append(actions, *a)
 			probes = append(probes, *p)
 		}

@@ -113,7 +113,7 @@ func enqueueOpsRequestToClusterAnnotation(ctx context.Context, cli client.Client
 		// including QueueBySelf operations, and prevents later operations from
 		// bypassing it with Force.
 		if opsRes.OpsRequest.Spec.Type == opsv1alpha1.StopType {
-			return hasStopBarrier(opsRequestSlice) || hasRunningOps(opsRequestSlice)
+			return hasStopBarrier(opsRequestSlice) || hasQueuedOps(opsRequestSlice)
 		}
 		if hasStopBarrier(opsRequestSlice) {
 			return true
@@ -153,7 +153,7 @@ func enqueueOpsRequestToClusterAnnotation(ctx context.Context, cli client.Client
 				return &opsRecorder, nil
 			}
 			if opsRecorder.Type == opsv1alpha1.StopType {
-				if !hasRunningOpsBefore(opsRequestSlice, index) {
+				if !hasQueuedOpsBefore(opsRequestSlice, index) {
 					opsRequestSlice[index].InQueue = false
 				}
 				return &opsRecorder, opsutil.UpdateClusterOpsAnnotations(ctx, cli, opsRes.Cluster, opsRequestSlice)
@@ -172,22 +172,12 @@ func enqueueOpsRequestToClusterAnnotation(ctx context.Context, cli client.Client
 	return &opsRecorder, opsutil.UpdateClusterOpsAnnotations(ctx, cli, opsRes.Cluster, opsRequestSlice)
 }
 
-func hasRunningOps(opsRequestSlice []opsv1alpha1.OpsRecorder) bool {
-	for i := range opsRequestSlice {
-		if !opsRequestSlice[i].InQueue {
-			return true
-		}
-	}
-	return false
+func hasQueuedOps(opsRequestSlice []opsv1alpha1.OpsRecorder) bool {
+	return len(opsRequestSlice) > 0
 }
 
-func hasRunningOpsBefore(opsRequestSlice []opsv1alpha1.OpsRecorder, index int) bool {
-	for i := 0; i < index; i++ {
-		if !opsRequestSlice[i].InQueue {
-			return true
-		}
-	}
-	return false
+func hasQueuedOpsBefore(opsRequestSlice []opsv1alpha1.OpsRecorder, index int) bool {
+	return index > 0
 }
 
 func hasStopBarrier(opsRequestSlice []opsv1alpha1.OpsRecorder) bool {

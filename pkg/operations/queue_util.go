@@ -125,6 +125,13 @@ func enqueueOpsRequestToClusterAnnotation(ctx context.Context, cli client.Client
 	}
 
 	index, opsRecorder := GetOpsRecorderFromSlice(opsRequestSlice, opsRes.OpsRequest.Name)
+	currentIndex := index
+	if currentIndex == -1 {
+		currentIndex = len(opsRequestSlice)
+	}
+	if err := validateDependenciesAgainstStopBarrier(opsRequestSlice, currentIndex, opsRes.OpsRequest); err != nil {
+		return nil, err
+	}
 	switch index {
 	case -1:
 		// if not exists but reach the queue limit size, throw an error
@@ -170,6 +177,52 @@ func enqueueOpsRequestToClusterAnnotation(ctx context.Context, cli client.Client
 		}
 	}
 	return &opsRecorder, opsutil.UpdateClusterOpsAnnotations(ctx, cli, opsRes.Cluster, opsRequestSlice)
+}
+
+func validateDependenciesAgainstStopBarrier(queue []opsv1alpha1.OpsRecorder, currentIndex int, request *opsv1alpha1.OpsRequest) error {
+	dependencyText := request.Annotations[constant.OpsDependentOnSuccessfulOpsAnnoKey]
+	if dependencyText == "" {
+		return nil
+	}
+	for _, dependency := range strings.Split(dependencyText, ",") {
+		dependencyIndex := -1
+		for i, recorder := range queue {
+			if recorder.Name == dependency {
+				dependencyIndex = i
+				break
+			}
+		}
+		if dependencyIndex == -1 {
+			continue
+		}
+		for stopIndex, recorder := range queue {
+			if recorder.Type != opsv1alpha1.StopType {
+				continue
+			}
+			// A request can depend on a Stop only after that Stop. A request
+			// before the barrier cannot wait for work on the other side.
+			if dependencyIndex == stopIndex {
+				if currentIndex < stopIndex {
+					return intctrlutil.NewFatalError(fmt.Sprintf("OpsRequest %q has a dependency that crosses the Stop queue barrier", request.Name))
+				}
+				continue
+			}
+			// The Stop request itself may depend on work before it, but never on
+			// work after it. This also covers a newly enqueued Stop whose index is
+			// len(queue), after all existing entries.
+			if request.Spec.Type == opsv1alpha1.StopType && currentIndex == stopIndex {
+				if dependencyIndex > stopIndex {
+					return intctrlutil.NewFatalError(fmt.Sprintf("OpsRequest %q has a dependency that crosses the Stop queue barrier", request.Name))
+				}
+				continue
+			}
+			if (currentIndex < stopIndex && dependencyIndex > stopIndex) ||
+				(currentIndex > stopIndex && dependencyIndex < stopIndex) {
+				return intctrlutil.NewFatalError(fmt.Sprintf("OpsRequest %q has a dependency that crosses the Stop queue barrier", request.Name))
+			}
+		}
+	}
+	return nil
 }
 
 func hasQueuedOps(opsRequestSlice []opsv1alpha1.OpsRecorder) bool {

@@ -643,8 +643,8 @@ func TestStopQueueBarrierBlocksDependentSwapAcrossStop(t *testing.T) {
 	}
 	opsutil.SetOpsRequestToCluster(cluster, queue)
 	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, dependent).Build()
-	if _, err := enqueueOpsRequestToClusterAnnotation(context.Background(), cli, &OpsResource{Cluster: cluster, OpsRequest: dependent}, OpsBehaviour{QueueByCluster: true}); err != nil {
-		t.Fatal(err)
+	if _, err := enqueueOpsRequestToClusterAnnotation(context.Background(), cli, &OpsResource{Cluster: cluster, OpsRequest: dependent}, OpsBehaviour{QueueByCluster: true}); err == nil {
+		t.Fatal("dependency crossed Stop without error")
 	}
 	got, err := opsutil.GetOpsRequestSliceFromCluster(cluster)
 	if err != nil {
@@ -652,6 +652,70 @@ func TestStopQueueBarrierBlocksDependentSwapAcrossStop(t *testing.T) {
 	}
 	if len(got) != len(queue) || got[1].Name != dependent.Name || got[2].Type != opsv1alpha1.StopType {
 		t.Fatalf("dependent swap crossed Stop barrier: %#v", got)
+	}
+}
+
+func TestStopQueueBarrierRejectsCrossingDependencies(t *testing.T) {
+	scheme := queueBarrierScheme(t)
+	ctx := context.Background()
+	for _, current := range []string{"dependent-before-stop", "stop"} {
+		cluster := queueBarrierCluster()
+		queue := []opsv1alpha1.OpsRecorder{
+			{Name: "dependent-before-stop", Type: opsv1alpha1.RestartType, InQueue: true},
+			{Name: "stop", Type: opsv1alpha1.StopType, InQueue: true},
+			{Name: "dependent-after-stop", Type: opsv1alpha1.RestartType, InQueue: true},
+		}
+		if current == "stop" {
+			queue[0], queue[1] = queue[1], queue[0]
+		}
+		opsutil.SetOpsRequestToCluster(cluster, queue)
+		request := &opsv1alpha1.OpsRequest{
+			ObjectMeta: metav1.ObjectMeta{Name: current, Namespace: cluster.Namespace, Annotations: map[string]string{constant.OpsDependentOnSuccessfulOpsAnnoKey: "dependent-after-stop"}},
+			Spec:       opsv1alpha1.OpsRequestSpec{ClusterName: cluster.Name, Type: opsv1alpha1.RestartType},
+		}
+		if current == "stop" {
+			request.Spec.Type = opsv1alpha1.StopType
+		}
+		cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, request).Build()
+		if err := validateDependenciesAgainstStopBarrier(queue, func() int {
+			for i, item := range queue {
+				if item.Name == current {
+					return i
+				}
+			}
+			return -1
+		}(), request); err == nil {
+			t.Fatalf("%s dependency was not rejected by barrier validation", current)
+		}
+		if _, err := enqueueOpsRequestToClusterAnnotation(ctx, cli, &OpsResource{Cluster: cluster, OpsRequest: request}, OpsBehaviour{QueueByCluster: true}); err == nil {
+			t.Fatalf("%s dependency crossed Stop without error", current)
+		}
+	}
+}
+
+func TestStopQueueBarrierAllowsDependenciesOnTheSameSide(t *testing.T) {
+	cluster := queueBarrierCluster()
+	queue := []opsv1alpha1.OpsRecorder{
+		{Name: "before", Type: opsv1alpha1.RestartType, InQueue: true},
+		{Name: "stop", Type: opsv1alpha1.StopType, InQueue: true},
+		{Name: "after", Type: opsv1alpha1.RestartType, InQueue: true},
+	}
+	opsutil.SetOpsRequestToCluster(cluster, queue)
+
+	stop := &opsv1alpha1.OpsRequest{
+		ObjectMeta: metav1.ObjectMeta{Name: "stop", Namespace: cluster.Namespace, Annotations: map[string]string{constant.OpsDependentOnSuccessfulOpsAnnoKey: "before"}},
+		Spec:       opsv1alpha1.OpsRequestSpec{ClusterName: cluster.Name, Type: opsv1alpha1.StopType},
+	}
+	if err := validateDependenciesAgainstStopBarrier(queue, 1, stop); err != nil {
+		t.Fatalf("Stop dependency on earlier operation was rejected: %v", err)
+	}
+
+	after := &opsv1alpha1.OpsRequest{
+		ObjectMeta: metav1.ObjectMeta{Name: "after", Namespace: cluster.Namespace, Annotations: map[string]string{constant.OpsDependentOnSuccessfulOpsAnnoKey: "stop"}},
+		Spec:       opsv1alpha1.OpsRequestSpec{ClusterName: cluster.Name, Type: opsv1alpha1.RestartType},
+	}
+	if err := validateDependenciesAgainstStopBarrier(queue, 2, after); err != nil {
+		t.Fatalf("operation after Stop dependency on Stop was rejected: %v", err)
 	}
 }
 

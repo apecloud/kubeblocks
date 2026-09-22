@@ -72,6 +72,10 @@ type OpsBehaviour struct {
 	// QueueWithSelf indicates that the operation is queued for execution within opsType scope.
 	QueueBySelf bool
 
+	// QueueWithStop indicates that the operation must preserve queue order with Stop.
+	// It does not change the queue relationship with other operation types.
+	QueueWithStop bool
+
 	OpsHandler OpsHandler
 }
 

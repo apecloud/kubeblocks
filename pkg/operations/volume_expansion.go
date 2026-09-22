@@ -55,8 +55,9 @@ const (
 func init() {
 	// Expansion follows the current target and owner instance observations.
 	volumeExpansionBehaviour := OpsBehaviour{
-		OpsHandler:  volumeExpansionOpsHandler{},
-		QueueBySelf: true,
+		OpsHandler:    volumeExpansionOpsHandler{},
+		QueueBySelf:   true,
+		QueueWithStop: true,
 	}
 	opsMgr := GetOpsManager()
 	opsMgr.RegisterOps(opsv1alpha1.VolumeExpansionType, volumeExpansionBehaviour)

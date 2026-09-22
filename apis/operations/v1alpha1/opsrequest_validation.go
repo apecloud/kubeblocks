@@ -643,6 +643,11 @@ func collectExpansionStorageClasses(expansion VolumeExpansion, comp appsv1.Clust
 		storageClasses.Insert(*volume.Spec.StorageClassName)
 	}
 	for _, instanceRequest := range expansion.Instances {
+		if !slices.ContainsFunc(comp.Instances, func(instance appsv1.InstanceTemplate) bool {
+			return instance.Name == instanceRequest.Name && instance.GetReplicas() > 0
+		}) {
+			continue
+		}
 		for _, requested := range instanceRequest.VolumeClaimTemplates {
 			volume, ok := EffectiveVolumeClaimTemplate(&comp, instanceRequest.Name, requested.Name)
 			if !ok || volume.Spec.StorageClassName == nil || *volume.Spec.StorageClassName == "" {

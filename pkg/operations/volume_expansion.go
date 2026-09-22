@@ -203,7 +203,7 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 				return opsv1alpha1.OpsRunningPhase, time.Minute, err
 			}
 		}
-		if !eligible {
+		if !eligible && len(request.Instances) > 0 {
 			complete = false
 		}
 	}

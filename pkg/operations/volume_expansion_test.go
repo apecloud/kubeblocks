@@ -298,6 +298,67 @@ func TestVolumeExpansionUsesOwnerObservations(t *testing.T) {
 	}
 }
 
+func TestVolumeExpansionActionMaterializesInstanceOverride(t *testing.T) {
+	f := newVolumeExpansionFixture(t)
+	spec := &f.res.Cluster.Spec.ComponentSpecs[0]
+	spec.VolumeClaimTemplates[0].Spec.StorageClassName = ptr.To("fast")
+	spec.VolumeClaimTemplates[0].Spec.AccessModes = []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce}
+	spec.VolumeClaimTemplates[0].Annotations = map[string]string{"example.io/keep": "true"}
+	spec.Instances = []appsv1.InstanceTemplate{{Name: "az-a", Replicas: ptr.To(int32(1))}}
+	f.res.OpsRequest.Spec.VolumeExpansionList[0] = opsv1alpha1.VolumeExpansion{
+		ComponentOps: opsv1alpha1.ComponentOps{ComponentName: "db"},
+		Instances: []opsv1alpha1.InstanceVolumeClaimTemplate{{
+			Name: "az-a",
+			VolumeClaimTemplates: []opsv1alpha1.OpsRequestVolumeClaimTemplate{{
+				Name: "data", Storage: resource.MustParse("5Gi"),
+			}},
+		}},
+	}
+	if err := (volumeExpansionOpsHandler{}).Action(f.req, f.cli, f.res); err != nil {
+		t.Fatal(err)
+	}
+	if len(spec.Instances[0].VolumeClaimTemplates) != 1 {
+		t.Fatalf("materialized VCTs=%d, want 1", len(spec.Instances[0].VolumeClaimTemplates))
+	}
+	got := spec.Instances[0].VolumeClaimTemplates[0]
+	if got.Spec.Resources.Requests.Storage().Cmp(resource.MustParse("5Gi")) != 0 {
+		t.Fatalf("storage=%s, want 5Gi", got.Spec.Resources.Requests.Storage())
+	}
+	if got.Spec.StorageClassName == nil || *got.Spec.StorageClassName != "fast" || len(got.Spec.AccessModes) != 1 || got.Annotations["example.io/keep"] != "true" {
+		t.Fatalf("inherited VCT fields were not preserved: %#v", got)
+	}
+}
+
+func TestVolumeExpansionProgressCountsComponentAndInstanceTargetsOnce(t *testing.T) {
+	data := appsv1.PersistentVolumeClaimTemplate{Name: "data", Spec: corev1.PersistentVolumeClaimSpec{Resources: corev1.VolumeResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("2Gi")}}}}
+	instanceVCT := *data.DeepCopy()
+	instanceVCT.Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("6Gi")
+	forwardedDefault := *data.DeepCopy()
+	forwardedDefault.Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("5Gi")
+	spec := &appsv1.ClusterComponentSpec{
+		Replicas:             2,
+		VolumeClaimTemplates: []appsv1.PersistentVolumeClaimTemplate{data},
+		Instances:            []appsv1.InstanceTemplate{{Name: "az-a", Replicas: ptr.To(int32(1)), VolumeClaimTemplates: []appsv1.PersistentVolumeClaimTemplate{instanceVCT}}},
+	}
+	its := &workloads.InstanceSet{Spec: workloads.InstanceSetSpec{
+		Replicas:             ptr.To(int32(2)),
+		VolumeClaimTemplates: []corev1.PersistentVolumeClaim{{ObjectMeta: metav1.ObjectMeta{Name: "data"}, Spec: *forwardedDefault.Spec.DeepCopy()}},
+		Instances:            []workloads.InstanceTemplate{{Name: "az-a", Replicas: ptr.To(int32(1)), VolumeClaimTemplates: []corev1.PersistentVolumeClaim{{ObjectMeta: metav1.ObjectMeta{Name: "data"}, Spec: *instanceVCT.Spec.DeepCopy()}}}},
+	}, Status: workloads.InstanceSetStatus{ObservedGeneration: 1}}
+	its.Generation = 1
+	its.Status.InstanceStatus = []workloads.InstanceStatus{
+		{PodName: "default-0", TemplateName: ptr.To(""), DesiredState: workloads.InstanceDesiredStateActive, CurrentState: workloads.InstanceCurrentStatePresent, UpToDate: true},
+		{PodName: "az-a-0", TemplateName: ptr.To("az-a"), DesiredState: workloads.InstanceDesiredStateActive, CurrentState: workloads.InstanceCurrentStatePresent, UpToDate: true},
+	}
+	progress := volumeExpansionProgress(its, spec,
+		map[string]resource.Quantity{"data": resource.MustParse("5Gi")},
+		map[string]map[string]resource.Quantity{"az-a": {"data": resource.MustParse("6Gi")}},
+	)
+	if progress.expectedCount != 2 || progress.succeededCount != 2 || !progress.observationsComplete {
+		t.Fatalf("progress=%+v, want 2/2 complete", progress)
+	}
+}
+
 func TestVolumeExpansionWaitsForCurrentTargetAndAllocation(t *testing.T) {
 	for _, state := range []string{"old-target", "stale-apps", "stale-its", "missing-its", "missing-row", "unknown-template", "absent", "offline", "released", "stale-allocation"} {
 		t.Run(state, func(t *testing.T) {

@@ -573,10 +573,21 @@ func (r *OpsRequest) validateVolumeExpansion(ctx context.Context, cli client.Cli
 				return err
 			}
 			if len(expansion.Instances) > 0 {
+				eligible := sharding.Shards
 				for _, template := range sharding.ShardTemplates {
-					if template.Shards != nil && *template.Shards > 0 && template.Instances != nil {
+					if template.Shards == nil || *template.Shards == 0 {
+						continue
+					}
+					eligible -= *template.Shards
+					if template.VolumeClaimTemplates != nil {
+						continue
+					}
+					if template.Instances != nil {
 						return fmt.Errorf("instance-scoped volume expansion is not supported for sharding %q with heterogeneous shard instance templates", sharding.Name)
 					}
+				}
+				if eligible <= 0 {
+					return fmt.Errorf("instance-scoped volume expansion has no homogeneous shard target in sharding %q", sharding.Name)
 				}
 			}
 			collectShardingExpansionStorageClasses(expansion, sharding, storageClasses)

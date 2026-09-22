@@ -541,11 +541,62 @@ func (r *OpsRequest) validateVolumeExpansion(ctx context.Context, cli client.Cli
 	}
 	for _, volumeExpansion := range volumeExpansionList {
 		instanceNames := make([]string, 0, len(volumeExpansion.Instances))
+		seenInstances := sets.New[string]()
 		for _, instance := range volumeExpansion.Instances {
+			if instance.Name == "" || seenInstances.Has(instance.Name) {
+				return fmt.Errorf("invalid or duplicate instance template %q", instance.Name)
+			}
+			seenInstances.Insert(instance.Name)
 			instanceNames = append(instanceNames, instance.Name)
+			if len(instance.VolumeClaimTemplates) == 0 {
+				return notEmptyError("spec.volumeExpansion.instances.volumeClaimTemplates")
+			}
 		}
 		if err := r.checkInstanceTemplate(cluster, volumeExpansion.ComponentOps, instanceNames); err != nil {
 			return err
+		}
+		var spec *appsv1.ClusterComponentSpec
+		if component := cluster.Spec.GetComponentByName(volumeExpansion.ComponentName); component != nil {
+			spec = component
+		} else {
+			for i := range cluster.Spec.Shardings {
+				if cluster.Spec.Shardings[i].Name == volumeExpansion.ComponentName {
+					spec = &cluster.Spec.Shardings[i].Template
+					break
+				}
+			}
+		}
+		if spec == nil {
+			continue
+		}
+		validateTarget := func(scope string, target OpsRequestVolumeClaimTemplate, volumes []appsv1.PersistentVolumeClaimTemplate) error {
+			index := slices.IndexFunc(volumes, func(volume appsv1.PersistentVolumeClaimTemplate) bool { return volume.Name == target.Name })
+			if index < 0 {
+				return fmt.Errorf("volumeClaimTemplate %q not found in %s", target.Name, scope)
+			}
+			current := volumes[index].Spec.Resources.Requests.Storage()
+			if target.Storage.Cmp(*current) < 0 {
+				return fmt.Errorf("requested storage for %s/%s cannot be less than declared size %s", scope, target.Name, current.String())
+			}
+			return nil
+		}
+		for _, target := range volumeExpansion.VolumeClaimTemplates {
+			if err := validateTarget(volumeExpansion.ComponentName, target, spec.VolumeClaimTemplates); err != nil {
+				return err
+			}
+		}
+		for _, requested := range volumeExpansion.Instances {
+			for _, template := range spec.Instances {
+				if template.Name != requested.Name {
+					continue
+				}
+				volumes := mergeItsCmpTemplates(template.VolumeClaimTemplates, spec.VolumeClaimTemplates)
+				for _, target := range requested.VolumeClaimTemplates {
+					if err := validateTarget(requested.Name, target, volumes); err != nil {
+						return err
+					}
+				}
+			}
 		}
 	}
 	return r.checkVolumesAllowExpansion(ctx, cli, cluster)

@@ -57,13 +57,16 @@ var _ = Describe("Component Workload Operations Test", func() {
 				desired.Spec.Template.Annotations[constant.RestartAnnotationKey] = desiredRestart
 			}
 			before := running.DeepCopy()
-			merged := copyAndMergeITS(running, desired)
+			merged, err := copyAndMergeITS(running, desired)
+			Expect(err).Should(Succeed())
 			Expect(merged).ShouldNot(BeNil())
 			Expect(merged.Spec.Template.Annotations).Should(Equal(map[string]string{
 				"custom": "new", "retained": "value", constant.RestartAnnotationKey: expectedRestart,
 			}))
 			Expect(running).Should(Equal(before))
-			Expect(copyAndMergeITS(merged, desired)).Should(BeNil())
+			mergedAgain, err := copyAndMergeITS(merged, desired)
+			Expect(err).Should(Succeed())
+			Expect(mergedAgain).Should(BeNil())
 		},
 			Entry("preserve config restart against older ops", newer, older, newer),
 			Entry("accept newer ops restart", older, newer, newer),
@@ -254,7 +257,8 @@ var _ = Describe("Component Workload Operations Test", func() {
 			Expect(protoITS.Annotations).ShouldNot(HaveKey(stopReplicasSnapshotKey))
 
 			By("producing an update even though the restored replica count remains zero")
-			updatedITS := copyAndMergeITS(runningITS, protoITS)
+			updatedITS, err := copyAndMergeITS(runningITS, protoITS)
+			Expect(err).Should(Succeed())
 			Expect(updatedITS).ShouldNot(BeNil())
 			Expect(updatedITS.Annotations).ShouldNot(HaveKey(stopReplicasSnapshotKey))
 			Expect(updatedITS.Spec.Replicas).ShouldNot(BeNil())

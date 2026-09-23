@@ -43,6 +43,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/kbagent"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 const (
@@ -183,7 +184,10 @@ func (t *componentWorkloadTransformer) handleUpdate(transCtx *componentTransform
 		}
 	}
 
-	objCopy := copyAndMergeITS(runningITS, protoITS)
+	objCopy, err := copyAndMergeITS(runningITS, protoITS)
+	if err != nil {
+		return err
+	}
 	if objCopy != nil {
 		cli.Update(dag, nil, objCopy, &model.ReplaceIfExistingOption{})
 		// make sure the workload is updated after the env CM
@@ -320,7 +324,7 @@ func (t *componentWorkloadTransformer) handleWorkloadUpdate(transCtx *componentT
 // copyAndMergeITS merges two ITS objects for updating:
 //  1. new an object targetObj by copying from oldObj
 //  2. merge all fields can be updated from newObj into targetObj
-func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet) *workloads.InstanceSet {
+func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet) (*workloads.InstanceSet, error) {
 	itsObjCopy := oldITS.DeepCopy()
 	itsProto := newITS
 
@@ -349,6 +353,11 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet) *workloads.InstanceS
 	podTemplateCopy.Annotations = itsObjCopy.Spec.Template.Annotations
 
 	itsObjCopy.Spec.Template = podTemplateCopy
+	if !viper.GetBool(constant.FeatureGateRoleLabelRecovery) {
+		if err := component.PreserveKBAgentRoleLabelRecoveryPodSpec(&oldITS.Spec.Template.Spec, &itsObjCopy.Spec.Template.Spec); err != nil {
+			return nil, err
+		}
+	}
 	itsObjCopy.Spec.Replicas = itsProto.Spec.Replicas
 	itsObjCopy.Spec.Roles = itsProto.Spec.Roles
 	itsObjCopy.Spec.MembershipReconfiguration = itsProto.Spec.MembershipReconfiguration
@@ -387,9 +396,9 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet) *workloads.InstanceS
 	isLabelsUpdated := !reflect.DeepEqual(oldITS.Labels, itsObjCopy.Labels)
 	isAnnotationsUpdated := !reflect.DeepEqual(oldITS.Annotations, itsObjCopy.Annotations)
 	if !isSpecUpdated && !isLabelsUpdated && !isAnnotationsUpdated {
-		return nil
+		return nil, nil
 	}
-	return itsObjCopy
+	return itsObjCopy, nil
 }
 
 func mergeRestartAnnotation(running, merged map[string]string) {

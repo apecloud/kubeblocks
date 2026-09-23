@@ -159,6 +159,7 @@ func init() {
 	viper.SetDefault(intctrlutil.FeatureGateEnableRuntimeMetrics, false)
 	viper.SetDefault(constant.FeatureGateIgnoreConfigTemplateDefaultMode, false)
 	viper.SetDefault(constant.FeatureGateInPlacePodVerticalScaling, false)
+	viper.SetDefault(constant.FeatureGateRoleLabelRecovery, false)
 	viper.SetDefault(constant.I18nResourcesName, "kubeblocks-i18n-resources")
 	viper.SetDefault(constant.APIVersionSupported, "")
 	viper.SetDefault(constant.CfgKBReconcileWorkers, 32)

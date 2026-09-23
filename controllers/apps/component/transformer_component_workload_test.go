@@ -257,7 +257,8 @@ var _ = Describe("Component Workload Operations Test", func() {
 			Expect(protoITS.Annotations).ShouldNot(HaveKey(stopReplicasSnapshotKey))
 
 			By("producing an update even though the restored replica count remains zero")
-			updatedITS := copyAndMergeITS(runningITS, protoITS)
+			updatedITS, err := copyAndMergeITS(runningITS, protoITS)
+			Expect(err).Should(Succeed())
 			Expect(updatedITS).ShouldNot(BeNil())
 			Expect(updatedITS.Annotations).ShouldNot(HaveKey(stopReplicasSnapshotKey))
 			Expect(updatedITS.Spec.Replicas).ShouldNot(BeNil())

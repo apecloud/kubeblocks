@@ -682,3 +682,38 @@ func TestVolumeExpansionCannotCompensateAcrossScopes(t *testing.T) {
 	}
 	f.reconcile(t, opsv1alpha1.OpsRunningPhase, "4/4")
 }
+
+func TestNormalizeVolumeExpansionInstanceTargets(t *testing.T) {
+	component := &appsv1.ClusterComponentSpec{Name: "db", VolumeClaimTemplates: []appsv1.PersistentVolumeClaimTemplate{{
+		Name: "data", Spec: corev1.PersistentVolumeClaimSpec{Resources: corev1.VolumeResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("2Gi")}}},
+	}}, Instances: []appsv1.InstanceTemplate{{Name: "az-a"}}}
+	request := opsv1alpha1.VolumeExpansion{
+		VolumeClaimTemplates: []opsv1alpha1.OpsRequestVolumeClaimTemplate{{Name: "data", Storage: resource.MustParse("5Gi")}},
+		Instances:            []opsv1alpha1.InstanceVolumeClaimTemplate{{Name: "az-a", VolumeClaimTemplates: []opsv1alpha1.OpsRequestVolumeClaimTemplate{{Name: "data", Storage: resource.MustParse("3Gi")}}}},
+	}
+	plan, err := normalizeVolumeExpansion(request, component)
+	if err != nil {
+		t.Fatal(err)
+	}
+	target := plan.Targets[volumeExpansionTargetKey{InstanceTemplateName: "az-a", VCTName: "data"}]
+	if len(plan.Targets) != 2 || target.RequestedStorage.Cmp(resource.MustParse("3Gi")) != 0 {
+		t.Fatalf("normalized targets = %#v", plan.Targets)
+	}
+}
+
+func TestNormalizeVolumeExpansionRejectsUnknownAndShrink(t *testing.T) {
+	component := &appsv1.ClusterComponentSpec{Name: "db", VolumeClaimTemplates: []appsv1.PersistentVolumeClaimTemplate{{
+		Name: "data", Spec: corev1.PersistentVolumeClaimSpec{Resources: corev1.VolumeResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("2Gi")}}},
+	}}, Instances: []appsv1.InstanceTemplate{{Name: "az-a"}}}
+	cases := map[string]opsv1alpha1.VolumeExpansion{
+		"unknown instance": {Instances: []opsv1alpha1.InstanceVolumeClaimTemplate{{Name: "missing", VolumeClaimTemplates: []opsv1alpha1.OpsRequestVolumeClaimTemplate{{Name: "data", Storage: resource.MustParse("3Gi")}}}}},
+		"shrink":           {Instances: []opsv1alpha1.InstanceVolumeClaimTemplate{{Name: "az-a", VolumeClaimTemplates: []opsv1alpha1.OpsRequestVolumeClaimTemplate{{Name: "data", Storage: resource.MustParse("1Gi")}}}}},
+	}
+	for name, request := range cases {
+		t.Run(name, func(t *testing.T) {
+			if _, err := normalizeVolumeExpansion(request, component); err == nil || name == "unknown instance" && !strings.Contains(err.Error(), "not found") {
+				t.Fatalf("error = %v", err)
+			}
+		})
+	}
+}

@@ -569,6 +569,29 @@ func (r *OpsRequest) validateVolumeExpansion(ctx context.Context, cli client.Cli
 		if spec == nil {
 			continue
 		}
+		if len(volumeExpansion.Instances) > 0 && cluster.Spec.GetComponentByName(volumeExpansion.ComponentName) == nil {
+			for _, sharding := range cluster.Spec.Shardings {
+				if sharding.Name != volumeExpansion.ComponentName {
+					continue
+				}
+				eligible := sharding.Shards
+				for _, template := range sharding.ShardTemplates {
+					if template.Shards == nil || *template.Shards == 0 {
+						continue
+					}
+					eligible -= *template.Shards
+					if template.VolumeClaimTemplates != nil {
+						continue
+					}
+					if template.Instances != nil {
+						return fmt.Errorf("instance-scoped volume expansion is not supported for sharding %q with heterogeneous shard instance templates", sharding.Name)
+					}
+				}
+				if eligible <= 0 {
+					return fmt.Errorf("instance-scoped volume expansion has no homogeneous shard target in sharding %q", sharding.Name)
+				}
+			}
+		}
 		validateTarget := func(scope string, target OpsRequestVolumeClaimTemplate, volumes []appsv1.PersistentVolumeClaimTemplate) error {
 			index := slices.IndexFunc(volumes, func(volume appsv1.PersistentVolumeClaimTemplate) bool { return volume.Name == target.Name })
 			if index < 0 {
@@ -711,15 +734,17 @@ func (r *OpsRequest) checkVolumesAllowExpansion(ctx context.Context, cli client.
 
 	for _, comp := range r.Spec.VolumeExpansionList {
 		setVols(comp.VolumeClaimTemplates, comp.ComponentOps.ComponentName)
-		for _, instance := range comp.Instances {
-			setVols(instance.VolumeClaimTemplates, fmt.Sprintf("%s.%s", comp.ComponentName, instance.Name))
-		}
 		for _, compSpec := range cluster.Spec.ComponentSpecs {
 			if compSpec.Name == comp.ComponentOps.ComponentName {
 				for _, its := range compSpec.Instances {
 					setVols(comp.VolumeClaimTemplates, fmt.Sprintf("%s.%s", compSpec.Name, its.Name))
 				}
 			}
+		}
+		// Apply explicit instance targets after inherited component targets so
+		// an instance-scoped request remains the effective target.
+		for _, instance := range comp.Instances {
+			setVols(instance.VolumeClaimTemplates, fmt.Sprintf("%s.%s", comp.ComponentName, instance.Name))
 		}
 		for _, sharding := range cluster.Spec.Shardings {
 			if sharding.Name != comp.ComponentName {

@@ -19,6 +19,11 @@ package v1alpha1
 import (
 	"context"
 	"testing"
+
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/utils/ptr"
 )
 
 var componentName = "mysql"
@@ -42,6 +47,24 @@ func TestToExposeListToMap(t *testing.T) {
 	}
 	if _, ok := exposeMap[componentName]; !ok {
 		t.Error(`Expected component name map exists the key of "mysql"`)
+	}
+}
+
+func TestValidateVolumeExpansionRejectsHeterogeneousShardingInstances(t *testing.T) {
+	volume := func(size string) []appsv1.PersistentVolumeClaimTemplate {
+		return []appsv1.PersistentVolumeClaimTemplate{{Name: "data", Spec: corev1.PersistentVolumeClaimSpec{Resources: corev1.VolumeResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse(size)}}}}}
+	}
+	cluster := &appsv1.Cluster{Spec: appsv1.ClusterSpec{Shardings: []appsv1.ClusterSharding{{
+		Name: "shard", Shards: 2,
+		Template:       appsv1.ClusterComponentSpec{Replicas: 1, VolumeClaimTemplates: volume("3Gi"), Instances: []appsv1.InstanceTemplate{{Name: "az-a"}}},
+		ShardTemplates: []appsv1.ShardTemplate{{Name: "custom", Shards: ptr.To(int32(2)), VolumeClaimTemplates: volume("3Gi")}},
+	}}}}
+	ops := &OpsRequest{Spec: OpsRequestSpec{Type: VolumeExpansionType, SpecificOpsRequest: SpecificOpsRequest{VolumeExpansionList: []VolumeExpansion{{
+		ComponentOps: ComponentOps{ComponentName: "shard"},
+		Instances:    []InstanceVolumeClaimTemplate{{Name: "az-a", VolumeClaimTemplates: []OpsRequestVolumeClaimTemplate{{Name: "data", Storage: resource.MustParse("5Gi")}}}},
+	}}}}}
+	if err := ops.ValidateOps(context.Background(), nil, cluster); err == nil {
+		t.Fatal("heterogeneous sharding instance expansion was accepted")
 	}
 }
 

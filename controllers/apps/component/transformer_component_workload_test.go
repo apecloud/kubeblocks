@@ -369,7 +369,9 @@ var _ = Describe("Component Workload Operations Test", func() {
 			newITS.Spec.Template.Spec.InitContainers = nil
 			newITS.Spec.Template.Spec.Volumes = nil
 
-			merged := copyAndMergeITS(oldITS, newITS, legacyConfigManagerPolicyKeep)
+			merged, err := copyAndMergeITS(oldITS, newITS, legacyConfigManagerPolicyKeep)
+
+			Expect(err).Should(Succeed())
 			Expect(merged).Should(BeNil())
 		})
 
@@ -390,7 +392,9 @@ var _ = Describe("Component Workload Operations Test", func() {
 				},
 			}
 
-			merged := copyAndMergeITS(oldITS, newITS, legacyConfigManagerPolicyKeep)
+			merged, err := copyAndMergeITS(oldITS, newITS, legacyConfigManagerPolicyKeep)
+
+			Expect(err).Should(Succeed())
 			Expect(merged).ShouldNot(BeNil())
 			Expect(merged.Spec.Template.Spec.Containers).Should(HaveLen(1))
 			Expect(merged.Spec.Template.Spec.Containers[0].Name).Should(Equal("main"))
@@ -400,6 +404,36 @@ var _ = Describe("Component Workload Operations Test", func() {
 			_, init := intctrlutil.GetContainerByName(merged.Spec.Template.Spec.InitContainers, "install-config-manager-tool")
 			Expect(init).Should(BeNil())
 			Expect(merged.Spec.Template.Spec.Volumes).Should(BeEmpty())
+		})
+
+		It("preserves adopted role-label recovery fields when the gate is disabled", func() {
+			oldGate := viper.GetBool(constant.FeatureGateRoleLabelRecovery)
+			defer viper.Set(constant.FeatureGateRoleLabelRecovery, oldGate)
+			viper.Set(constant.FeatureGateRoleLabelRecovery, false)
+
+			oldITS := testapps.NewInstanceSetFactory(testCtx.DefaultNamespace,
+				"old-its-role-recovery", clusterName, compName).
+				AddContainer(corev1.Container{
+					Name: "kbagent",
+					VolumeMounts: []corev1.VolumeMount{{
+						Name: "kubeblocks-role-label", MountPath: "/etc/kubeblocks/pod-metadata", ReadOnly: true,
+					}},
+					Env: []corev1.EnvVar{{Name: "KB_AGENT_PROBE", Value: `[{"instance":"","action":"roleProbe","reportPeriodSeconds":15,"reportOnFileChange":["/etc/kubeblocks/pod-metadata"]}]`}},
+				}).
+				GetObject()
+			oldITS.Spec.Template.Spec.Volumes = []corev1.Volume{{
+				Name:         "kubeblocks-role-label",
+				VolumeSource: corev1.VolumeSource{DownwardAPI: &corev1.DownwardAPIVolumeSource{Items: []corev1.DownwardAPIVolumeFile{{Path: "role", FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.labels['kubeblocks.io/role']"}}}}},
+			}}
+			newITS := oldITS.DeepCopy()
+			newITS.Spec.Template.Spec.Volumes = nil
+			newITS.Spec.Template.Spec.Containers[0].VolumeMounts = nil
+			newITS.Spec.Template.Spec.Containers[0].Env[0].Value = `[{"instance":"","action":"roleProbe"}]`
+
+			merged, err := copyAndMergeITS(oldITS, newITS, legacyConfigManagerPolicyKeep)
+
+			Expect(err).Should(Succeed())
+			Expect(merged).Should(BeNil())
 		})
 
 		It("should preserve only the legacy config-manager resources that still exist on the live template", func() {
@@ -514,7 +548,9 @@ var _ = Describe("Component Workload Operations Test", func() {
 				newITS.Spec.Template.Spec.InitContainers = nil
 				newITS.Spec.Template.Spec.Volumes = nil
 
-				merged := copyAndMergeITS(tt.oldITS, newITS, legacyConfigManagerPolicyKeep)
+				merged, err := copyAndMergeITS(tt.oldITS, newITS, legacyConfigManagerPolicyKeep)
+
+				Expect(err).Should(Succeed())
 				Expect(merged).ShouldNot(BeNil())
 
 				_, cfg := intctrlutil.GetContainerByName(merged.Spec.Template.Spec.Containers, "config-manager")
@@ -616,7 +652,9 @@ var _ = Describe("Component Workload Operations Test", func() {
 			}
 			newITS.Spec.Template.Spec.Volumes = nil
 
-			merged := copyAndMergeITS(oldITS, newITS, legacyConfigManagerPolicyKeep)
+			merged, err := copyAndMergeITS(oldITS, newITS, legacyConfigManagerPolicyKeep)
+
+			Expect(err).Should(Succeed())
 			Expect(merged).ShouldNot(BeNil())
 			_, cfg := intctrlutil.GetContainerByName(merged.Spec.Template.Spec.Containers, "config-manager")
 			Expect(cfg).ShouldNot(BeNil())
@@ -693,7 +731,9 @@ var _ = Describe("Component Workload Operations Test", func() {
 			}}
 			newITS.Spec.Template.Spec.Volumes = nil
 
-			merged := copyAndMergeITS(oldITS, newITS, legacyConfigManagerPolicyCleanup)
+			merged, err := copyAndMergeITS(oldITS, newITS, legacyConfigManagerPolicyCleanup)
+
+			Expect(err).Should(Succeed())
 			Expect(merged).ShouldNot(BeNil())
 			_, cfg := intctrlutil.GetContainerByName(merged.Spec.Template.Spec.Containers, "config-manager")
 			Expect(cfg).Should(BeNil())
@@ -766,7 +806,9 @@ var _ = Describe("Component Workload Operations Test", func() {
 			}}
 			newITS.Spec.Template.Spec.Volumes = nil
 
-			merged := copyAndMergeITS(oldITS, newITS, legacyConfigManagerRequired(comp))
+			merged, err := copyAndMergeITS(oldITS, newITS, legacyConfigManagerRequired(comp))
+
+			Expect(err).Should(Succeed())
 			Expect(legacyConfigManagerRequired(comp)).Should(Equal(legacyConfigManagerPolicyCleanup))
 			Expect(merged).ShouldNot(BeNil())
 
@@ -844,7 +886,9 @@ var _ = Describe("Component Workload Operations Test", func() {
 			}}
 			newITS.Spec.Template.Spec.Volumes = nil
 
-			merged := copyAndMergeITS(oldITS, newITS, legacyConfigManagerPolicyKeep)
+			merged, err := copyAndMergeITS(oldITS, newITS, legacyConfigManagerPolicyKeep)
+
+			Expect(err).Should(Succeed())
 			Expect(merged).ShouldNot(BeNil())
 			_, cfg := intctrlutil.GetContainerByName(merged.Spec.Template.Spec.Containers, "config-manager")
 			Expect(cfg).ShouldNot(BeNil())
@@ -910,7 +954,9 @@ var _ = Describe("Component Workload Operations Test", func() {
 			}}
 			newITS.Spec.Template.Spec.Volumes = nil
 
-			merged := copyAndMergeITS(oldITS, newITS, legacyConfigManagerPolicyKeep)
+			merged, err := copyAndMergeITS(oldITS, newITS, legacyConfigManagerPolicyKeep)
+
+			Expect(err).Should(Succeed())
 			Expect(merged).ShouldNot(BeNil())
 			_, cfg := intctrlutil.GetContainerByName(merged.Spec.Template.Spec.Containers, "config-manager")
 			Expect(cfg).ShouldNot(BeNil())
@@ -977,7 +1023,9 @@ var _ = Describe("Component Workload Operations Test", func() {
 			}}
 			newITS.Spec.Template.Spec.Volumes = nil
 
-			merged := copyAndMergeITS(oldITS, newITS, legacyConfigManagerPolicyKeep)
+			merged, err := copyAndMergeITS(oldITS, newITS, legacyConfigManagerPolicyKeep)
+
+			Expect(err).Should(Succeed())
 			Expect(merged).ShouldNot(BeNil())
 			_, cfg := intctrlutil.GetContainerByName(merged.Spec.Template.Spec.Containers, "config-manager")
 			Expect(cfg).ShouldNot(BeNil())
@@ -1043,7 +1091,9 @@ var _ = Describe("Component Workload Operations Test", func() {
 			}}
 			newITS.Spec.Template.Spec.Volumes = nil
 
-			merged := copyAndMergeITS(oldITS, newITS, legacyConfigManagerPolicyKeep)
+			merged, err := copyAndMergeITS(oldITS, newITS, legacyConfigManagerPolicyKeep)
+
+			Expect(err).Should(Succeed())
 			Expect(merged).ShouldNot(BeNil())
 			_, cfg := intctrlutil.GetContainerByName(merged.Spec.Template.Spec.Containers, "config-manager")
 			Expect(cfg).ShouldNot(BeNil())
@@ -1108,7 +1158,9 @@ var _ = Describe("Component Workload Operations Test", func() {
 			}}
 			newITS.Spec.Template.Spec.Volumes = nil
 
-			merged := copyAndMergeITS(oldITS, newITS, legacyConfigManagerPolicyCleanup)
+			merged, err := copyAndMergeITS(oldITS, newITS, legacyConfigManagerPolicyCleanup)
+
+			Expect(err).Should(Succeed())
 			Expect(merged).ShouldNot(BeNil())
 			_, cfg := intctrlutil.GetContainerByName(merged.Spec.Template.Spec.Containers, "config-manager")
 			Expect(cfg).ShouldNot(BeNil())

@@ -75,7 +75,7 @@ func (t *clusterNormalizationTransformer) Transform(ctx graph.TransformContext, 
 		return err
 	}
 
-	if err = applyClusterRestoreIntent(cluster, transCtx.components, transCtx.shardings); err != nil {
+	if err = applyClusterRestoreIntentWithReader(transCtx.Context, transCtx.Client, cluster, transCtx.components, transCtx.shardings); err != nil {
 		return err
 	}
 

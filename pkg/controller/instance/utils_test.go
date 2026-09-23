@@ -621,6 +621,31 @@ func TestBuildInstancePodAndPVCs(t *testing.T) {
 	}
 }
 
+func TestBuildInstancePVCsAppliesReplicaRestoreOnlyToTarget(t *testing.T) {
+	group := "dataprotection.kubeblocks.io"
+	inst := builder.NewInstanceBuilder("default", "mysql-3").
+		SetInstanceSetName("mysql").
+		AddVolumeClaimTemplate(corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "data"}}).
+		GetObject()
+	inst.Spec.ReplicaRestore = &kbappsv1.ReplicaRestoreProjection{
+		StartOrdinal: 3,
+		EndOrdinal:   5,
+		SourceRef:    corev1.TypedObjectReference{APIGroup: &group, Kind: "Backup", Name: "backup"},
+		Annotations:  map[string]string{constant.RestoreSourceNameAnnotationKey: "backup"},
+		Fingerprint:  "fp",
+	}
+	pvcs, err := buildInstancePVCs(inst)
+	if err != nil {
+		t.Fatalf("buildInstancePVCs() error = %v", err)
+	}
+	if len(pvcs) != 1 || pvcs[0].Spec.DataSourceRef == nil || pvcs[0].Spec.DataSourceRef.Name != "backup" {
+		t.Fatalf("expected target PVC source, got %#v", pvcs)
+	}
+	if pvcs[0].Annotations[constant.ReplicaRestoreFingerprintAnnotationKey] != "fp" {
+		t.Fatalf("expected restore fingerprint, got %#v", pvcs[0].Annotations)
+	}
+}
+
 func TestConfigsFromPod(t *testing.T) {
 	pod := builder.NewPodBuilder("default", "mysql-0").GetObject()
 	if got, err := configsFromPod(pod); err != nil || got != nil {

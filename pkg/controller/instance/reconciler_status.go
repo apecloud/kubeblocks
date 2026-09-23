@@ -33,6 +33,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/replicarestore"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -54,6 +55,7 @@ func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	inst := tree.GetRoot().(*workloads.Instance)
 	r.reconcileRestoreCondition(tree, inst)
+	r.reconcileReplicaRestoreCondition(tree, inst)
 
 	obj, err := tree.Get(podObj(inst))
 	if err != nil {
@@ -128,6 +130,50 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		return kubebuilderx.RetryAfter(time.Second), nil
 	}
 	return kubebuilderx.Continue, nil
+}
+
+func (r *statusReconciler) reconcileReplicaRestoreCondition(tree *kubebuilderx.ObjectTree, inst *workloads.Instance) {
+	condition := r.buildReplicaRestoreCondition(tree, inst)
+	if condition == nil {
+		meta.RemoveStatusCondition(&inst.Status.Conditions, string(workloads.InstanceReplicaRestore))
+		return
+	}
+	meta.SetStatusCondition(&inst.Status.Conditions, *condition)
+}
+
+func (r *statusReconciler) buildReplicaRestoreCondition(tree *kubebuilderx.ObjectTree, inst *workloads.Instance) *metav1.Condition {
+	intent := inst.Spec.ReplicaRestore
+	if intent == nil || !replicarestore.Applies(intent, inst.Name) {
+		return nil
+	}
+	expected := make(map[string]struct{}, len(inst.Spec.VolumeClaimTemplates))
+	for i := range inst.Spec.VolumeClaimTemplates {
+		vct := &inst.Spec.VolumeClaimTemplates[i]
+		expected[intctrlutil.ComposePVCName(corev1.PersistentVolumeClaim{ObjectMeta: vct.ObjectMeta}, inst.Spec.InstanceSetName, inst.Name)] = struct{}{}
+	}
+	if len(expected) == 0 {
+		return nil
+	}
+	pvcs := r.persistentVolumeClaimsByName(tree)
+	completed := 0
+	for name := range expected {
+		pvc := pvcs[name]
+		if pvc == nil || !replicarestore.IsReplicaPVC(pvc) || (intent.Fingerprint != "" && pvc.Annotations[constant.ReplicaRestoreFingerprintAnnotationKey] != intent.Fingerprint) {
+			return &metav1.Condition{Type: string(workloads.InstanceReplicaRestore), Status: metav1.ConditionUnknown, ObservedGeneration: inst.Generation, Reason: workloads.ReasonRestoreRunning, Message: fmt.Sprintf("Waiting for replica restore PVC %s", name)}
+		}
+		cond := findPVCRestoreCondition(pvc)
+		if cond == nil || cond.Status == corev1.ConditionUnknown {
+			continue
+		}
+		if cond.Status == corev1.ConditionFalse {
+			return &metav1.Condition{Type: string(workloads.InstanceReplicaRestore), Status: metav1.ConditionFalse, ObservedGeneration: inst.Generation, Reason: workloads.ReasonRestoreFailed, Message: fmt.Sprintf("PVC %s restore failed: %s", name, cond.Message)}
+		}
+		completed++
+	}
+	if completed == len(expected) {
+		return &metav1.Condition{Type: string(workloads.InstanceReplicaRestore), Status: metav1.ConditionTrue, ObservedGeneration: inst.Generation, Reason: workloads.ReasonRestoreCompleted, Message: "All replica restore PVCs have completed"}
+	}
+	return &metav1.Condition{Type: string(workloads.InstanceReplicaRestore), Status: metav1.ConditionUnknown, ObservedGeneration: inst.Generation, Reason: workloads.ReasonRestoreRunning, Message: "Waiting for replica restore PVCs to complete"}
 }
 
 func (r *statusReconciler) reconcileRestoreCondition(tree *kubebuilderx.ObjectTree, inst *workloads.Instance) {

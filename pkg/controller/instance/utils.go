@@ -37,6 +37,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/replicarestore"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -209,6 +210,7 @@ func buildInstancePVCs(inst *workloads.Instance) ([]*corev1.PersistentVolumeClai
 			AddAnnotationsInMap(claimTemplate.Annotations).
 			SetSpec(*claimTemplate.Spec.DeepCopy()).
 			GetObject()
+		replicarestore.ApplyToPVC(pvc, inst.Spec.ReplicaRestore, inst.Name)
 		if inst.Spec.InstanceTemplateName != "" {
 			pvc.Labels[constant.KBAppInstanceTemplateLabelKey] = inst.Spec.InstanceTemplateName
 		}

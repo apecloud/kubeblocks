@@ -271,9 +271,10 @@ func isClusterRestorePVC(pvc *corev1.PersistentVolumeClaim) bool {
 		restoreComponent == pvc.Labels[constant.KBAppShardTemplateLabelKey]
 }
 
-// clusterRestorePVCUID returns the Cluster correlation identity inherited
-// from restore intent. A later verified label may repeat it, but conflicting
-// identities are never accepted.
+// clusterRestorePVCUID returns the Cluster correlation identity inherited from
+// restore intent. Before VolumePopulator registers a PVC, the intent may only
+// have written the annotation; registration later adds the verified label.
+// Conflicting identities are never accepted.
 func clusterRestorePVCUID(pvc *corev1.PersistentVolumeClaim) string {
 	annotationUID := pvc.Annotations[constant.KBAppClusterUIDKey]
 	labelUID := pvc.Labels[dptypes.ClusterUIDLabelKey]
@@ -414,7 +415,8 @@ func (r *VolumePopulatorReconciler) syncPVC(reqCtx intctrlutil.RequestCtx, pvc *
 	}
 	// A non-deleting bound PVC with a terminal Restore condition does not need
 	// its source Backup/Restore. Populating can finish while postReady is pending.
-	if pvc.Spec.VolumeName != "" && pvc.DeletionTimestamp.IsZero() && pvcRestoreTerminal(pvc) {
+	if pvc.Spec.VolumeName != "" && pvc.DeletionTimestamp.IsZero() &&
+		pvcRestoreTerminal(pvc) && (!isReplicaRestorePVC(pvc) || replicaRestoreSucceeded(pvc)) {
 		return nil
 	}
 	var restoreCtx *pvcRestoreContext
@@ -500,7 +502,7 @@ func (r *VolumePopulatorReconciler) handleRestoreParentLifecycle(reqCtx intctrlu
 		return true, nil
 	}
 	// Aggregate restore status gates normal progression, not owner cleanup.
-	if !clusterAllowsRestoreProgress(cluster) && !pvcRestoreTerminal(pvc) {
+	if !clusterAllowsRestoreProgress(cluster) && !pvcRestoreTerminal(pvc) && !isReplicaRestorePVC(pvc) {
 		return false, intctrlutil.NewRequeueError(reconcileInterval, "Cluster restore is no longer active")
 	}
 	if !committed {
@@ -823,6 +825,10 @@ func (r *VolumePopulatorReconciler) registerVolumePopulation(ctx context.Context
 func (r *VolumePopulatorReconciler) dispatchUnboundPVC(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim, restoreCtx *pvcRestoreContext) error {
 	if restoreCtx.mode == pvcRestoreModeRestoreData {
 		if len(restoreCtx.restoreMgr.PrepareDataBackupSets) == 0 {
+			if isReplicaRestorePVC(pvc) {
+				return intctrlutil.NewFatalError(fmt.Sprintf(
+					"replica restore PVC %s/%s requires a prepareData restore action", pvc.Namespace, pvc.Name))
+			}
 			if len(restoreCtx.restoreMgr.PostReadyBackupSets) > 0 {
 				return r.ProvisionOnly(reqCtx, pvc, restoreCtx)
 			}
@@ -894,6 +900,10 @@ func (r *VolumePopulatorReconciler) validateRestoreAndBuildMGR(reqCtx intctrluti
 	if err != nil {
 		return nil, err
 	}
+	if isReplicaRestorePVC(pvc) && decision.mode != pvcRestoreModeRestoreData {
+		return nil, intctrlutil.NewFatalError(fmt.Sprintf(
+			"replica restore PVC %s/%s has no matching prepareData target volume", pvc.Namespace, pvc.Name))
+	}
 	restore := &dpv1alpha1.Restore{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      getPopulatePVCName(pvc.UID),
@@ -937,8 +947,10 @@ func (r *VolumePopulatorReconciler) validateRestoreAndBuildMGR(reqCtx intctrluti
 	if err = dprestore.ValidateAndInitRestoreMGR(reqCtx, r.Client, restoreMgr); err != nil {
 		return nil, err
 	}
-	if err = r.restoreSystemAccountSecrets(reqCtx, pvc, backupNamespace); err != nil {
-		return nil, err
+	if !isReplicaRestorePVC(pvc) {
+		if err = r.restoreSystemAccountSecrets(reqCtx, pvc, backupNamespace); err != nil {
+			return nil, err
+		}
 	}
 	if decision.mode == pvcRestoreModeProvisionOnly {
 		restoreMgr.PrepareDataBackupSets = nil
@@ -955,7 +967,7 @@ func (r *VolumePopulatorReconciler) validateRestoreAndBuildMGR(reqCtx intctrluti
 	return &pvcRestoreContext{
 		restoreMgr:    restoreMgr,
 		mode:          decision.mode,
-		skipPostReady: decision.skipPostReady,
+		skipPostReady: decision.skipPostReady || isReplicaRestorePVC(pvc),
 	}, nil
 }
 
@@ -1809,6 +1821,12 @@ func (r *VolumePopulatorReconciler) pvcNeedsDataRestore(reqCtx intctrlutil.Reque
 func (r *VolumePopulatorReconciler) ensurePostReadyRestoreCompleted(reqCtx intctrlutil.RequestCtx,
 	pvc *corev1.PersistentVolumeClaim,
 	restoreCtx *pvcRestoreContext) (bool, error) {
+	// Replica scale-out restores are deliberately prepareData-only. The marker
+	// is carried by the PVC projection, so skipping postReady remains effective
+	// after a controller restart without requiring an in-memory operation state.
+	if isReplicaRestorePVC(pvc) {
+		return true, nil
+	}
 	restoreMgr := restoreCtx.restoreMgr
 	if len(restoreMgr.PostReadyBackupSets) == 0 {
 		return true, nil
@@ -1922,6 +1940,19 @@ func (r *VolumePopulatorReconciler) ensurePostReadyRestoreCompleted(reqCtx intct
 		}
 		return false, nil
 	}
+}
+
+func isReplicaRestorePVC(pvc *corev1.PersistentVolumeClaim) bool {
+	return pvc != nil && pvc.Annotations != nil &&
+		pvc.Annotations[constant.RestorePurposeAnnotationKey] == constant.RestorePurposeReplica
+}
+
+func replicaRestoreSucceeded(pvc *corev1.PersistentVolumeClaim) bool {
+	if pvc == nil {
+		return false
+	}
+	condition := findPVCConditionByType(pvc, appsv1.ConditionTypeRestore)
+	return condition != nil && condition.Status == corev1.ConditionTrue && condition.Reason == ReasonPopulatingSucceed
 }
 
 func (r *VolumePopulatorReconciler) updatePVCConditionsIfPopulateNotReleased(reqCtx intctrlutil.RequestCtx,
@@ -2765,19 +2796,7 @@ func (r *VolumePopulatorReconciler) validateBackupNamespaceAuthorized(reqCtx int
 	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Namespace: pvc.Namespace, Name: clusterName}, cluster); err != nil {
 		return err
 	}
-	if cluster.Spec.Restore == nil {
-		return fmt.Errorf("PVC %s/%s can not restore Backup from namespace %q without cluster restore intent",
-			pvc.Namespace, pvc.Name, backupNamespace)
-	}
-	source := cluster.Spec.Restore.Source
-	sourceNamespace := source.Namespace
-	if sourceNamespace == "" {
-		sourceNamespace = cluster.Namespace
-	}
-	if source.APIGroup != dptypes.DataprotectionAPIGroup ||
-		source.Kind != dptypes.BackupKind ||
-		source.Name != pvc.Spec.DataSourceRef.Name ||
-		sourceNamespace != backupNamespace {
+	if !r.clusterSourceAuthorizesPVC(reqCtx, cluster, pvc, backupNamespace) {
 		return fmt.Errorf("PVC %s/%s can not restore Backup %s/%s without matching cluster restore intent",
 			pvc.Namespace, pvc.Name, backupNamespace, pvc.Spec.DataSourceRef.Name)
 	}
@@ -2785,6 +2804,78 @@ func (r *VolumePopulatorReconciler) validateBackupNamespaceAuthorized(reqCtx int
 		return err
 	}
 	return nil
+}
+
+// clusterSourceAuthorizesPVC accepts either the initial Cluster restore source
+// or the matching component ReplicaRestore source. The latter is deliberately
+// read from the persisted Component projection as well: an in-flight PVC must
+// remain authorized even if a user removes the source from Cluster.spec.
+func (r *VolumePopulatorReconciler) clusterSourceAuthorizesPVC(reqCtx intctrlutil.RequestCtx,
+	cluster *appsv1.Cluster, pvc *corev1.PersistentVolumeClaim, backupNamespace string) bool {
+	ref := pvc.Spec.DataSourceRef
+	if ref == nil {
+		return false
+	}
+	matches := func(apiGroup, kind, name, namespace string) bool {
+		if namespace == "" {
+			namespace = cluster.Namespace
+		}
+		return apiGroup == dptypes.DataprotectionAPIGroup && kind == dptypes.BackupKind &&
+			name == ref.Name && namespace == backupNamespace
+	}
+	if restore := cluster.Spec.Restore; restore != nil && matches(restore.Source.APIGroup,
+		restore.Source.Kind, restore.Source.Name, restore.Source.Namespace) {
+		if !isReplicaRestorePVC(pvc) {
+			return true
+		}
+	}
+	componentName := restoreComponentName(pvc)
+	if isReplicaRestorePVC(pvc) {
+		component := &appsv1.Component{}
+		componentErr := r.Client.Get(reqCtx.Ctx, client.ObjectKey{
+			Namespace: cluster.Namespace,
+			Name:      constant.GenerateClusterComponentName(cluster.Name, componentName),
+		}, component)
+		if componentErr == nil && component.Spec.ReplicaRestore != nil {
+			return r.replicaRestoreSourceAuthorizesPVC(reqCtx, cluster, pvc, componentName, matches)
+		}
+		for i := range cluster.Spec.ComponentSpecs {
+			spec := &cluster.Spec.ComponentSpecs[i]
+			if spec.Name == componentName && spec.ReplicaRestore != nil {
+				source := spec.ReplicaRestore.Source
+				return matches(source.APIGroup, source.Kind, source.Name, source.Namespace)
+			}
+		}
+		return false
+	}
+	return false
+}
+
+func (r *VolumePopulatorReconciler) replicaRestoreSourceAuthorizesPVC(reqCtx intctrlutil.RequestCtx,
+	cluster *appsv1.Cluster, pvc *corev1.PersistentVolumeClaim, componentName string,
+	matches func(string, string, string, string) bool) bool {
+	if componentName == "" {
+		return false
+	}
+	component := &appsv1.Component{}
+	if err := r.Client.Get(reqCtx.Ctx, client.ObjectKey{
+		Namespace: cluster.Namespace,
+		Name:      constant.GenerateClusterComponentName(cluster.Name, componentName),
+	}, component); err != nil || component.Spec.ReplicaRestore == nil {
+		return false
+	}
+	source := component.Spec.ReplicaRestore.SourceRef
+	sourceNamespace := ""
+	if source.Namespace != nil {
+		sourceNamespace = *source.Namespace
+	}
+	apiGroup := ""
+	if source.APIGroup != nil {
+		apiGroup = *source.APIGroup
+	}
+	return matches(apiGroup, source.Kind, source.Name, sourceNamespace) &&
+		(component.Spec.ReplicaRestore.Fingerprint == "" ||
+			pvc.Annotations[constant.ReplicaRestoreFingerprintAnnotationKey] == component.Spec.ReplicaRestore.Fingerprint)
 }
 
 func (r *VolumePopulatorReconciler) validateBackupRestorePVCWorkload(reqCtx intctrlutil.RequestCtx,

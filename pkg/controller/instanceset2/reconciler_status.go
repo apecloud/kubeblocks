@@ -35,6 +35,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/replicarestore"
 	"github.com/apecloud/kubeblocks/pkg/controller/revisionmap"
 	"github.com/apecloud/kubeblocks/pkg/controller/workloads/instancestatus"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -178,6 +179,9 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	if err = r.reconcileRestoreCondition(tree, its, instanceList); err != nil {
 		return kubebuilderx.Continue, err
 	}
+	if err = r.reconcileReplicaRestoreCondition(tree, its, instanceList); err != nil {
+		return kubebuilderx.Continue, err
+	}
 
 	// 4. set instance status
 	if err := setInstanceStatus(tree, its, instanceList); err != nil {
@@ -205,6 +209,68 @@ func (r *statusReconciler) reconcileRestoreCondition(tree *kubebuilderx.ObjectTr
 	}
 	meta.SetStatusCondition(&its.Status.Conditions, *condition)
 	return nil
+}
+
+func (r *statusReconciler) reconcileReplicaRestoreCondition(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, instances []*workloads.Instance) error {
+	condition, err := buildReplicaRestoreCondition(tree, its, instances)
+	if err != nil {
+		return err
+	}
+	if condition == nil {
+		meta.RemoveStatusCondition(&its.Status.Conditions, string(workloads.InstanceReplicaRestore))
+		return nil
+	}
+	meta.SetStatusCondition(&its.Status.Conditions, *condition)
+	return nil
+}
+
+func buildReplicaRestoreCondition(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, instances []*workloads.Instance) (*metav1.Condition, error) {
+	intent := its.Spec.ReplicaRestore
+	if intent == nil || intent.EndOrdinal <= intent.StartOrdinal {
+		return nil, nil
+	}
+	desired, _, err := buildDesiredInstancesByName(tree, its)
+	if err != nil {
+		return nil, err
+	}
+	expected := sets.New[string]()
+	for name := range desired {
+		if replicarestore.Applies(intent, name) {
+			expected.Insert(name)
+		}
+	}
+	if expected.Len() == 0 {
+		return nil, nil
+	}
+	instancesByName := make(map[string]*workloads.Instance, len(instances))
+	for _, inst := range instances {
+		instancesByName[inst.Name] = inst
+	}
+	completed := 0
+	waiting := sets.New[string]()
+	for name := range expected {
+		inst := instancesByName[name]
+		if inst == nil {
+			waiting.Insert(name)
+			continue
+		}
+		cond := meta.FindStatusCondition(inst.Status.Conditions, string(workloads.InstanceReplicaRestore))
+		if cond == nil || cond.Status == metav1.ConditionUnknown {
+			waiting.Insert(name)
+			continue
+		}
+		if cond.Status == metav1.ConditionFalse {
+			return &metav1.Condition{Type: string(workloads.InstanceReplicaRestore), Status: metav1.ConditionFalse, ObservedGeneration: its.Generation, Reason: workloads.ReasonRestoreFailed, Message: fmt.Sprintf("Instance %s restore failed: %s", name, cond.Message)}, nil
+		}
+		completed++
+	}
+	if waiting.Len() > 0 {
+		return &metav1.Condition{Type: string(workloads.InstanceReplicaRestore), Status: metav1.ConditionUnknown, ObservedGeneration: its.Generation, Reason: workloads.ReasonRestoreRunning, Message: fmt.Sprintf("Waiting for replica restore Instances: %s", waiting.UnsortedList())}, nil
+	}
+	if completed == expected.Len() {
+		return &metav1.Condition{Type: string(workloads.InstanceReplicaRestore), Status: metav1.ConditionTrue, ObservedGeneration: its.Generation, Reason: workloads.ReasonRestoreCompleted, Message: "All replica restore Instances have completed"}, nil
+	}
+	return &metav1.Condition{Type: string(workloads.InstanceReplicaRestore), Status: metav1.ConditionUnknown, ObservedGeneration: its.Generation, Reason: workloads.ReasonRestoreRunning, Message: "Waiting for replica restore Instances to complete"}, nil
 }
 
 func buildRestoreCondition(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, instances []*workloads.Instance) (*metav1.Condition, error) {

@@ -30,6 +30,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/replicarestore"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -169,6 +170,9 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 					return kubebuilderx.Continue, err
 				}
 			default:
+				if err := replicarestore.ValidateExistingPVC(oldPvc.(*corev1.PersistentVolumeClaim), pvc, its.Spec.ReplicaRestore); err != nil {
+					return kubebuilderx.Continue, err
+				}
 				pvcObj := copyAndMerge(oldPvc, pvc)
 				if pvcObj != nil {
 					if err := tryTakeOverExternalPVC(its, pvcObj.(*corev1.PersistentVolumeClaim)); err != nil {

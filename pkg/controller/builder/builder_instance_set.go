@@ -50,6 +50,11 @@ func (builder *InstanceSetBuilder) SetReplicas(replicas int32) *InstanceSetBuild
 	return builder
 }
 
+func (builder *InstanceSetBuilder) SetReplicaRestore(restore *kbappsv1.ReplicaRestoreProjection) *InstanceSetBuilder {
+	builder.get().Spec.ReplicaRestore = restore
+	return builder
+}
+
 func (builder *InstanceSetBuilder) SetMinReadySeconds(minReadySeconds int32) *InstanceSetBuilder {
 	builder.get().Spec.MinReadySeconds = minReadySeconds
 	return builder

@@ -70,6 +70,11 @@ func init() {
 
 // ComponentSpec defines the desired state of Component
 type ComponentSpec struct {
+	// ReplicaRestore is the internal workload projection of a Cluster replica restore.
+	// It is populated by the Cluster controller and is not user-facing.
+	//
+	// +optional
+	ReplicaRestore *ReplicaRestoreProjection `json:"replicaRestore,omitempty"`
 	// Specifies the behavior when a Component is deleted.
 	//
 	// +kubebuilder:default=Delete
@@ -355,6 +360,16 @@ type ComponentSpec struct {
 	//
 	// +optional
 	CustomActions []CustomAction `json:"customActions,omitempty"`
+}
+
+// ReplicaRestoreProjection carries a scale-out restore intent to the workload
+// controller without importing DataProtection API types.
+type ReplicaRestoreProjection struct {
+	StartOrdinal int32                       `json:"startOrdinal"`
+	EndOrdinal   int32                       `json:"endOrdinal"`
+	SourceRef    corev1.TypedObjectReference `json:"sourceRef"`
+	Annotations  map[string]string           `json:"annotations,omitempty"`
+	Fingerprint  string                      `json:"fingerprint"`
 }
 
 // ComponentStatus represents the observed state of a Component within the Cluster.

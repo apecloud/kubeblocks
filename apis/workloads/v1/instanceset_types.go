@@ -76,6 +76,11 @@ func init() {
 
 // InstanceSetSpec defines the desired state of InstanceSet
 type InstanceSetSpec struct {
+	// ReplicaRestore is an internal per-ordinal restore projection populated by
+	// the Component controller. It contains no DataProtection API types.
+	//
+	// +optional
+	ReplicaRestore *kbappsv1.ReplicaRestoreProjection `json:"replicaRestore,omitempty"`
 	// Specifies the desired number of replicas of the given Template.
 	// These replicas are instantiations of the same Template, with each having a consistent identity.
 	// Defaults to 1 if unspecified.
@@ -309,7 +314,7 @@ type InstanceSetStatus struct {
 	UpdateRevision string `json:"updateRevision,omitempty"`
 
 	// Represents the latest available observations of an instanceset's current state.
-	// Known .status.conditions.type are: "InstanceFailure", "InstanceReady", "Restore"
+	// Known .status.conditions.type are: "InstanceFailure", "InstanceReady", "Restore", "ReplicaRestore"
 	//
 	// +optional
 	// +patchMergeKey=type
@@ -740,6 +745,11 @@ const (
 
 	// InstanceRestore indicates whether the initial data restore for this Instance or InstanceSet has completed.
 	InstanceRestore ConditionType = "Restore"
+
+	// InstanceReplicaRestore reports only the PVCs selected by a scale-out
+	// replica restore projection. It is independent of the initial restore
+	// condition above.
+	InstanceReplicaRestore ConditionType = "ReplicaRestore"
 
 	// InstanceUpdateRestricted represents a ConditionType that indicates updates to an InstanceSet are blocked(when the
 	// PodUpdatePolicy is set to StrictInPlace but the pods cannot be updated in-place).

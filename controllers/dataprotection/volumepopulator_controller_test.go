@@ -4194,6 +4194,64 @@ func TestDependencyPredicates(t *testing.T) {
 	require.True(t, clusterDependencyPredicate().Update(event.UpdateEvent{ObjectOld: clusterNew, ObjectNew: clusterDeleting}))
 }
 
+func TestReplicaRestorePVCRequiresPrepareData(t *testing.T) {
+	pvc := dependencyRestorePVC("data-mysql-3", "mysql", "pvc-uid")
+	pvc.Annotations[constant.RestorePurposeAnnotationKey] = constant.RestorePurposeReplica
+	reconciler := &VolumePopulatorReconciler{}
+	restoreCtx := &pvcRestoreContext{
+		restoreMgr: &dprestore.RestoreManager{
+			PostReadyBackupSets: []dprestore.BackupActionSet{{}},
+		},
+		mode: pvcRestoreModeRestoreData,
+	}
+	err := reconciler.dispatchUnboundPVC(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, restoreCtx)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "requires a prepareData restore action")
+}
+
+func TestReplicaRestoreSkipsPostReady(t *testing.T) {
+	pvc := dependencyRestorePVC("data-mysql-3", "mysql", "pvc-uid")
+	pvc.Annotations[constant.RestorePurposeAnnotationKey] = constant.RestorePurposeReplica
+	restoreCtx := &pvcRestoreContext{
+		restoreMgr: &dprestore.RestoreManager{
+			PostReadyBackupSets: []dprestore.BackupActionSet{{}},
+		},
+		mode: pvcRestoreModeRestoreData,
+	}
+	reconciler := &VolumePopulatorReconciler{}
+	completed, err := reconciler.ensurePostReadyRestoreCompleted(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, restoreCtx)
+	require.NoError(t, err)
+	require.True(t, completed)
+}
+
+func TestReplicaRestoreAuthorizesCrossNamespaceBackup(t *testing.T) {
+	apiGroup := dptypes.DataprotectionAPIGroup
+	sourceNamespace := "backup"
+	cluster := &kbappsv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "cluster"},
+		Spec: kbappsv1.ClusterSpec{ComponentSpecs: []kbappsv1.ClusterComponentSpec{{
+			Name: "mysql",
+			ReplicaRestore: &kbappsv1.ClusterReplicaRestore{Source: kbappsv1.ClusterRestoreSource{
+				APIGroup: apiGroup, Kind: dptypes.BackupKind, Name: "backup", Namespace: sourceNamespace,
+			}},
+		}}},
+	}
+	pvc := dependencyRestorePVC("data-mysql-3", "mysql", "pvc-uid")
+	pvc.Namespace = cluster.Namespace
+	pvc.Labels[constant.AppInstanceLabelKey] = cluster.Name
+	pvc.Annotations[constant.RestorePurposeAnnotationKey] = constant.RestorePurposeReplica
+	pvc.Annotations[constant.ReplicaRestoreFingerprintAnnotationKey] = "fingerprint"
+	pvc.Spec.DataSourceRef.Namespace = &sourceNamespace
+	reconciler := dependencyTestReconciler(t, cluster)
+	require.True(t, reconciler.clusterSourceAuthorizesPVC(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, cluster, pvc, sourceNamespace))
+	pvc.Spec.DataSourceRef.Name = "other-backup"
+	require.False(t, reconciler.clusterSourceAuthorizesPVC(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, cluster, pvc, sourceNamespace))
+}
+
 func dependencyTestReconciler(t *testing.T, objects ...client.Object) *VolumePopulatorReconciler {
 	t.Helper()
 	scheme := runtime.NewScheme()

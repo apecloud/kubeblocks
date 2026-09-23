@@ -2461,6 +2461,53 @@ spec:
               podUpgradePolicy:
                 description: PodUpdatePolicy indicates how pods should be upgraded.
                 type: string
+              replicaRestore:
+                description: |-
+                  ReplicaRestore is copied from the owning InstanceSet and is applied only
+                  while building PVCs for this instance.
+                properties:
+                  annotations:
+                    additionalProperties:
+                      type: string
+                    type: object
+                  endOrdinal:
+                    format: int32
+                    type: integer
+                  fingerprint:
+                    type: string
+                  sourceRef:
+                    properties:
+                      apiGroup:
+                        description: |-
+                          APIGroup is the group for the resource being referenced.
+                          If APIGroup is not specified, the specified Kind must be in the core API group.
+                          For any other third-party types, APIGroup is required.
+                        type: string
+                      kind:
+                        description: Kind is the type of resource being referenced
+                        type: string
+                      name:
+                        description: Name is the name of resource being referenced
+                        type: string
+                      namespace:
+                        description: |-
+                          Namespace is the namespace of resource being referenced
+                          Note that when a namespace is specified, a gateway.networking.k8s.io/ReferenceGrant object is required in the referent namespace to allow that namespace's owner to accept the reference. See the ReferenceGrant documentation for details.
+                          (Alpha) This field requires the CrossNamespaceVolumeDataSource feature gate to be enabled.
+                        type: string
+                    required:
+                    - kind
+                    - name
+                    type: object
+                  startOrdinal:
+                    format: int32
+                    type: integer
+                required:
+                - endOrdinal
+                - fingerprint
+                - sourceRef
+                - startOrdinal
+                type: object
               roles:
                 description: A list of roles defined in the system. Instanceset obtains
                   role through pods' role label `kubeblocks.io/role`.

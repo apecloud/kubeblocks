@@ -36,6 +36,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 )
 
 const (
@@ -258,6 +259,78 @@ func TestApplyClusterRestoreIntentHandlesInstanceTemplateVCTs(t *testing.T) {
 	require.Nil(t, component.VolumeClaimTemplates[0].Spec.DataSourceRef)
 	require.Nil(t, component.Instances[0].VolumeClaimTemplates[0].Spec.DataSourceRef)
 	require.Nil(t, component.Instances[0].VolumeClaimTemplates[1].Spec.DataSourceRef)
+}
+
+func TestApplyReplicaRestoreProjectionUsesLiveReplicaBoundary(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, appsv1.AddToScheme(scheme))
+	cluster := &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default", UID: "cluster-uid"}}
+	component := &appsv1.Component{ObjectMeta: metav1.ObjectMeta{Name: constant.GenerateClusterComponentName(cluster.Name, "mysql"), Namespace: cluster.Namespace}, Spec: appsv1.ComponentSpec{Replicas: 3, VolumeClaimTemplates: []appsv1.PersistentVolumeClaimTemplate{{Name: "data"}}}, Status: appsv1.ComponentStatus{Phase: appsv1.RunningComponentPhase}}
+	compSpec := &appsv1.ClusterComponentSpec{
+		Name:     "mysql",
+		Replicas: 5,
+		ReplicaRestore: &appsv1.ClusterReplicaRestore{Source: appsv1.ClusterRestoreSource{
+			APIGroup:  dptypes.DataprotectionAPIGroup,
+			Kind:      dptypes.BackupKind,
+			Name:      "backup",
+			Namespace: "backup",
+		}},
+	}
+	reader := fake.NewClientBuilder().WithScheme(scheme).WithObjects(component).Build()
+	require.NoError(t, applyClusterRestoreIntentWithReader(context.Background(), reader, cluster, []*appsv1.ClusterComponentSpec{compSpec}, nil))
+	projection := compSpec.ReplicaRestoreProjection
+	require.NotNil(t, projection)
+	require.Equal(t, int32(3), projection.StartOrdinal)
+	require.Equal(t, int32(5), projection.EndOrdinal)
+	require.Equal(t, dptypes.BackupKind, projection.SourceRef.Kind)
+	require.Equal(t, "backup", projection.SourceRef.Name)
+	require.NotNil(t, projection.SourceRef.Namespace)
+	require.Equal(t, "backup", *projection.SourceRef.Namespace)
+	require.Equal(t, constant.RestorePurposeReplica, projection.Annotations[constant.RestorePurposeAnnotationKey])
+	require.NotEmpty(t, projection.Fingerprint)
+}
+
+func TestApplyReplicaRestoreProjectionRejectsMutation(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, appsv1.AddToScheme(scheme))
+	cluster := &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default", UID: "cluster-uid"}}
+	restore := &appsv1.ClusterReplicaRestore{Source: appsv1.ClusterRestoreSource{APIGroup: dptypes.DataprotectionAPIGroup, Kind: dptypes.BackupKind, Name: "backup"}}
+	initial := &appsv1.ClusterComponentSpec{Name: "mysql", Replicas: 5, ReplicaRestore: restore.DeepCopy()}
+	component := &appsv1.Component{ObjectMeta: metav1.ObjectMeta{Name: constant.GenerateClusterComponentName(cluster.Name, "mysql"), Namespace: cluster.Namespace}, Spec: appsv1.ComponentSpec{Replicas: 5, VolumeClaimTemplates: []appsv1.PersistentVolumeClaimTemplate{{Name: "data"}}}, Status: appsv1.ComponentStatus{Phase: appsv1.RunningComponentPhase}}
+	component.Spec.ReplicaRestore = &appsv1.ReplicaRestoreProjection{StartOrdinal: 3, EndOrdinal: 5, Fingerprint: replicaRestoreFingerprint(cluster, "mysql", initial.ReplicaRestore, 3, 5)}
+	reader := fake.NewClientBuilder().WithScheme(scheme).WithObjects(component).Build()
+	require.NoError(t, applyClusterRestoreIntentWithReader(context.Background(), reader, cluster, []*appsv1.ClusterComponentSpec{initial}, nil))
+	mutated := initial.DeepCopy()
+	mutated.ReplicaRestore.Source.Name = "other-backup"
+	err := applyClusterRestoreIntentWithReader(context.Background(), reader, cluster, []*appsv1.ClusterComponentSpec{mutated}, nil)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "immutable")
+
+}
+
+func TestApplyReplicaRestoreProjectionAllowsNextRestoreAfterIntentRemoval(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, appsv1.AddToScheme(scheme))
+	cluster := &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default", UID: "cluster-uid"}, Status: appsv1.ClusterStatus{ReplicaRestores: map[string]appsv1.ReplicaRestoreStatus{
+		"mysql": {Component: "mysql", Phase: appsv1.ReplicaRestoreCompleted, TargetReplicas: 5},
+	}}}
+	component := &appsv1.Component{ObjectMeta: metav1.ObjectMeta{Name: constant.GenerateClusterComponentName(cluster.Name, "mysql"), Namespace: cluster.Namespace}, Spec: appsv1.ComponentSpec{Replicas: 5, VolumeClaimTemplates: []appsv1.PersistentVolumeClaimTemplate{{Name: "data"}}}, Status: appsv1.ComponentStatus{Phase: appsv1.RunningComponentPhase}}
+	compSpec := &appsv1.ClusterComponentSpec{Name: "mysql", Replicas: 7, ReplicaRestore: &appsv1.ClusterReplicaRestore{Source: appsv1.ClusterRestoreSource{APIGroup: dptypes.DataprotectionAPIGroup, Kind: dptypes.BackupKind, Name: "next-backup"}}}
+	reader := fake.NewClientBuilder().WithScheme(scheme).WithObjects(component).Build()
+	require.NoError(t, applyClusterRestoreIntentWithReader(context.Background(), reader, cluster, []*appsv1.ClusterComponentSpec{compSpec}, nil))
+	require.Equal(t, int32(5), compSpec.ReplicaRestoreProjection.StartOrdinal)
+	require.Equal(t, int32(7), compSpec.ReplicaRestoreProjection.EndOrdinal)
+}
+
+func TestApplyReplicaRestoreProjectionAllowsRollbackToStart(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, appsv1.AddToScheme(scheme))
+	cluster := &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default", UID: "cluster-uid"}}
+	component := &appsv1.Component{ObjectMeta: metav1.ObjectMeta{Name: constant.GenerateClusterComponentName(cluster.Name, "mysql"), Namespace: cluster.Namespace}, Spec: appsv1.ComponentSpec{Replicas: 5, VolumeClaimTemplates: []appsv1.PersistentVolumeClaimTemplate{{Name: "data"}}, ReplicaRestore: &appsv1.ReplicaRestoreProjection{StartOrdinal: 3, EndOrdinal: 5, Fingerprint: "old"}}, Status: appsv1.ComponentStatus{Phase: appsv1.RunningComponentPhase}}
+	compSpec := &appsv1.ClusterComponentSpec{Name: "mysql", Replicas: 3}
+	reader := fake.NewClientBuilder().WithScheme(scheme).WithObjects(component).Build()
+	require.NoError(t, applyClusterRestoreIntentWithReader(context.Background(), reader, cluster, []*appsv1.ClusterComponentSpec{compSpec}, nil))
+	require.Nil(t, compSpec.ReplicaRestoreProjection)
 }
 
 func TestSetRestoreConditionSucceedsWhenNoRestorePVCsExist(t *testing.T) {

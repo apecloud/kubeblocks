@@ -241,6 +241,11 @@ type ClusterStatus struct {
 	//
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
+
+	// Records scale-out replica restore status by Component.
+	//
+	// +optional
+	ReplicaRestores map[string]ReplicaRestoreStatus `json:"replicaRestores,omitempty"`
 }
 
 // TerminationPolicyType defines termination policy types.
@@ -262,6 +267,9 @@ const (
 
 // ClusterComponentSpec defines the specification of a Component within a Cluster.
 type ClusterComponentSpec struct {
+	// ReplicaRestoreProjection is populated internally by normalization and is
+	// not part of the user API.
+	ReplicaRestoreProjection *ReplicaRestoreProjection `json:"-"`
 	// Specifies the Component's name.
 	// It's part of the Service DNS name and must comply with the IANA service naming rule.
 	// The name is optional when ClusterComponentSpec is used as a template (e.g., in `clusterSharding`),
@@ -344,6 +352,12 @@ type ClusterComponentSpec struct {
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:default=1
 	Replicas int32 `json:"replicas"`
+
+	// Specifies the restore source for replicas added during scale-out.
+	// This field is only supported for existing, non-sharding Components.
+	//
+	// +optional
+	ReplicaRestore *ClusterReplicaRestore `json:"replicaRestore,omitempty"`
 
 	// Specifies the scheduling policy for the Component.
 	// If defined, it will overwrite the scheduling policy defined in ClusterSpec.
@@ -891,6 +905,57 @@ type ClusterRestore struct {
 	//
 	// +optional
 	Parameters map[string]string `json:"parameters,omitempty"`
+}
+
+// ClusterReplicaRestore specifies how to initialize replicas added during
+// horizontal scale-out. It uses the same source and restore parameters as a
+// Cluster restore, while the target replicas are taken from the Component's
+// replicas field.
+type ClusterReplicaRestore struct {
+	// Specifies the restore source.
+	//
+	// +kubebuilder:validation:Required
+	Source ClusterRestoreSource `json:"source"`
+
+	// Specifies the source target in a Backup with multiple targets.
+	//
+	// +optional
+	SourceTargetName string `json:"sourceTargetName,omitempty"`
+
+	// Specifies the point-in-time recovery target.
+	//
+	// +optional
+	PITR string `json:"pitr,omitempty"`
+
+	// Specifies runtime-specific restore parameters.
+	//
+	// +optional
+	Parameters map[string]string `json:"parameters,omitempty"`
+
+	// Specifies environment variables for the restore worker.
+	//
+	// +optional
+	Env []corev1.EnvVar `json:"env,omitempty"`
+}
+
+// ReplicaRestorePhase defines the observed state of a scale-out restore.
+type ReplicaRestorePhase string
+
+const (
+	ReplicaRestorePending   ReplicaRestorePhase = "Pending"
+	ReplicaRestoreRunning   ReplicaRestorePhase = "Running"
+	ReplicaRestoreCompleted ReplicaRestorePhase = "Completed"
+	ReplicaRestoreFailed    ReplicaRestorePhase = "Failed"
+)
+
+// ReplicaRestoreStatus records the observed status of a scale-out restore.
+type ReplicaRestoreStatus struct {
+	Component          string              `json:"component"`
+	Phase              ReplicaRestorePhase `json:"phase"`
+	RestoredReplicas   int32               `json:"restoredReplicas,omitempty"`
+	TargetReplicas     int32               `json:"targetReplicas,omitempty"`
+	Message            string              `json:"message,omitempty"`
+	ObservedGeneration int64               `json:"observedGeneration,omitempty"`
 }
 
 // ClusterRestoreSource describes the source object used by a Cluster restore.

@@ -32,6 +32,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 )
 
@@ -120,6 +121,35 @@ func TestClusterRestoreProtectionLifecycle(t *testing.T) {
 	}
 }
 
+func TestClusterRestoreProtectionKeepsReplicaRestoreActive(t *testing.T) {
+	cluster := &appsv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "cluster"},
+		Status: appsv1.ClusterStatus{ReplicaRestores: map[string]appsv1.ReplicaRestoreStatus{
+			"mysql": {Component: "mysql", Phase: appsv1.ReplicaRestoreRunning, TargetReplicas: 5},
+		}},
+	}
+	require.True(t, clusterAllowsRestoreProgress(cluster))
+	cluster.Status.ReplicaRestores["mysql"] = appsv1.ReplicaRestoreStatus{
+		Component: "mysql", Phase: appsv1.ReplicaRestoreCompleted, TargetReplicas: 5,
+	}
+	require.False(t, clusterAllowsRestoreProgress(cluster))
+}
+
+func TestClusterRestoreProtectionKeepsUnregisteredReplicaPVC(t *testing.T) {
+	ctx := context.Background()
+	scheme, cluster, _, _, target := parentRestoreObjects(t)
+	cluster.Spec.Restore = nil
+	target.Finalizers = nil
+	target.Labels[dptypes.ClusterUIDLabelKey] = string(cluster.UID)
+	target.Annotations[constant.RestorePurposeAnnotationKey] = constant.RestorePurposeReplica
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, target).Build()
+	reconciler := &ClusterRestoreReconciler{Client: cli}
+	_, err := reconciler.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cluster)})
+	require.NoError(t, err)
+	require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(cluster), cluster))
+	require.Contains(t, cluster.Finalizers, dptypes.RestoreProtectionFinalizerName)
+}
+
 func TestClusterRestoreControllerIgnoresResourcesWithoutExactClusterUID(t *testing.T) {
 	for _, uid := range []string{"", "another-cluster-uid"} {
 		t.Run("uid="+uid, func(t *testing.T) {
@@ -134,6 +164,7 @@ func TestClusterRestoreControllerIgnoresResourcesWithoutExactClusterUID(t *testi
 			for _, obj := range []client.Object{target, helper, restore} {
 				obj.GetLabels()[dptypes.ClusterUIDLabelKey] = uid
 			}
+			target.Annotations[constant.KBAppClusterUIDKey] = uid
 			cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster, target, helper, restore).Build()
 			reconciler := &ClusterRestoreReconciler{Client: cli}
 

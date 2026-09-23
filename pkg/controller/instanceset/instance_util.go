@@ -43,6 +43,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/replicarestore"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -455,6 +456,7 @@ func buildInstancePVCByTemplate(name string, template *instancetemplate.Instance
 		if template.Name != "" {
 			pvc.Labels[constant.KBAppInstanceTemplateLabelKey] = template.Name
 		}
+		replicarestore.ApplyToPVC(pvc, parent.Spec.ReplicaRestore, name)
 		pvcs = append(pvcs, pvc)
 	}
 	for _, pvc := range pvcs {

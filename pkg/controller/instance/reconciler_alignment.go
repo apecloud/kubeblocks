@@ -26,6 +26,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/replicarestore"
 )
 
 func NewAlignmentReconciler() kubebuilderx.Reconciler {
@@ -97,6 +98,9 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 		}
 	}
 	for pvcName := range updateSet {
+		if err := replicarestore.ValidateExistingPVC(oldPVCs[pvcName], newPVCs[pvcName], inst.Spec.ReplicaRestore); err != nil {
+			return kubebuilderx.Continue, err
+		}
 		// TODO: do not update PVC here
 		pvcObj := copyAndMerge(oldPVCs[pvcName], newPVCs[pvcName])
 		if pvcObj != nil {

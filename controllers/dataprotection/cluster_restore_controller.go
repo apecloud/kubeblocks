@@ -117,11 +117,12 @@ func (r *ClusterRestoreReconciler) isClusterRestoring(ctx context.Context,
 	}
 	for i := range pvcs.Items {
 		pvc := &pvcs.Items[i]
-		if pvc.Labels[dptypes.ClusterUIDLabelKey] != string(cluster.UID) {
+		if clusterRestorePVCUID(pvc) != string(cluster.UID) {
 			continue
 		}
 		if isClusterRestoreHelperPVC(pvc) ||
-			(isClusterRestoreTargetPVC(pvc) && controllerutil.ContainsFinalizer(pvc, dptypes.DataProtectionFinalizerName)) {
+			(isClusterRestoreTargetPVC(pvc) && (controllerutil.ContainsFinalizer(pvc, dptypes.DataProtectionFinalizerName) ||
+				(isReplicaRestorePVC(pvc) && !pvcRestoreTerminal(pvc)))) {
 			return true, nil
 		}
 	}
@@ -148,6 +149,9 @@ func (r *ClusterRestoreReconciler) isClusterRestoring(ctx context.Context,
 }
 
 func clusterAllowsRestoreProgress(cluster *appsv1.Cluster) bool {
+	if hasActiveReplicaRestore(cluster) {
+		return true
+	}
 	if cluster.Spec.Restore == nil {
 		return false
 	}
@@ -156,6 +160,29 @@ func clusterAllowsRestoreProgress(cluster *appsv1.Cluster) bool {
 	// has initial-restore intent. Keep the lifecycle active until deletion so
 	// PVC restores cannot lose protection while converging on the failure.
 	return condition == nil || condition.Status != metav1.ConditionTrue
+}
+
+func hasActiveReplicaRestore(cluster *appsv1.Cluster) bool {
+	for _, status := range cluster.Status.ReplicaRestores {
+		switch status.Phase {
+		case appsv1.ReplicaRestorePending, appsv1.ReplicaRestoreRunning:
+			return true
+		}
+	}
+	// The status patch can race the first Component/PVC projection. Keep the
+	// parent protected while a source is declared and the desired count still
+	// exceeds the live Component count; the next reconcile records the status.
+	for _, spec := range cluster.Spec.ComponentSpecs {
+		if spec.ReplicaRestore == nil || spec.Replicas <= 0 {
+			continue
+		}
+		if status, ok := cluster.Status.ReplicaRestores[spec.Name]; ok &&
+			(status.Phase == appsv1.ReplicaRestoreCompleted || status.Phase == appsv1.ReplicaRestoreFailed) {
+			continue
+		}
+		return true
+	}
+	return false
 }
 
 func isClusterRestoreProtected(cluster *appsv1.Cluster) bool {

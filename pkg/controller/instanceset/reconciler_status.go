@@ -36,6 +36,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/replicarestore"
 	"github.com/apecloud/kubeblocks/pkg/controller/workloads/instancestatus"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -199,6 +200,9 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	if err = r.reconcileRestoreCondition(tree, its); err != nil {
 		return kubebuilderx.Continue, err
 	}
+	if err = r.reconcileReplicaRestoreCondition(tree, its); err != nil {
+		return kubebuilderx.Continue, err
+	}
 
 	// 4. set instance status
 	if err = setInstanceStatus(tree, its, podList); err != nil {
@@ -231,6 +235,83 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 
 	return kubebuilderx.Continue, nil
+}
+
+func (r *statusReconciler) reconcileReplicaRestoreCondition(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet) error {
+	condition, err := buildReplicaRestoreCondition(tree, its)
+	if err != nil {
+		return err
+	}
+	if condition == nil {
+		meta.RemoveStatusCondition(&its.Status.Conditions, string(workloads.InstanceReplicaRestore))
+		return nil
+	}
+	meta.SetStatusCondition(&its.Status.Conditions, *condition)
+	return nil
+}
+
+func buildReplicaRestoreCondition(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet) (*metav1.Condition, error) {
+	intent := its.Spec.ReplicaRestore
+	if intent == nil || intent.EndOrdinal <= intent.StartOrdinal {
+		return nil, nil
+	}
+	itsExt, err := instancetemplate.BuildInstanceSetExt(its, tree)
+	if err != nil {
+		return nil, err
+	}
+	builder, err := instancetemplate.NewPodNameBuilder(itsExt, nil)
+	if err != nil {
+		return nil, err
+	}
+	nameToTemplate, err := builder.BuildInstanceName2TemplateMap()
+	if err != nil {
+		return nil, err
+	}
+	expected := sets.New[string]()
+	for name, template := range nameToTemplate {
+		if !replicarestore.Applies(intent, name) {
+			continue
+		}
+		for i := range template.VolumeClaimTemplates {
+			vct := &template.VolumeClaimTemplates[i]
+			pvcName := intctrlutil.ComposePVCName(*vct, its.Name, name)
+			expected.Insert(pvcName)
+		}
+	}
+	return replicaRestoreConditionForPVCs(tree, its.Generation, expected, intent.Fingerprint), nil
+}
+
+func replicaRestoreConditionForPVCs(tree *kubebuilderx.ObjectTree, generation int64, expected sets.Set[string], fingerprint string) *metav1.Condition {
+	if expected.Len() == 0 {
+		return nil
+	}
+	completed := 0
+	waiting := sets.New[string]()
+	for _, obj := range tree.List(&corev1.PersistentVolumeClaim{}) {
+		pvc := obj.(*corev1.PersistentVolumeClaim)
+		if !expected.Has(pvc.Name) {
+			continue
+		}
+		if !replicarestore.IsReplicaPVC(pvc) || (fingerprint != "" && pvc.Annotations[constant.ReplicaRestoreFingerprintAnnotationKey] != fingerprint) {
+			return &metav1.Condition{Type: string(workloads.InstanceReplicaRestore), Status: metav1.ConditionFalse, ObservedGeneration: generation, Reason: workloads.ReasonRestoreFailed, Message: fmt.Sprintf("PVC %s does not match replica restore intent", pvc.Name)}
+		}
+		cond := findPVCRestoreCondition(pvc)
+		if cond == nil || cond.Status == corev1.ConditionUnknown {
+			waiting.Insert(pvc.Name)
+			continue
+		}
+		if cond.Status == corev1.ConditionFalse {
+			return &metav1.Condition{Type: string(workloads.InstanceReplicaRestore), Status: metav1.ConditionFalse, ObservedGeneration: generation, Reason: workloads.ReasonRestoreFailed, Message: fmt.Sprintf("PVC %s restore failed: %s", pvc.Name, cond.Message)}
+		}
+		completed++
+	}
+	if waiting.Len() > 0 {
+		return &metav1.Condition{Type: string(workloads.InstanceReplicaRestore), Status: metav1.ConditionUnknown, ObservedGeneration: generation, Reason: workloads.ReasonRestoreRunning, Message: fmt.Sprintf("Waiting for replica restore PVCs: %s", restoreConditionNamesMessage(waiting))}
+	}
+	if completed == expected.Len() {
+		return &metav1.Condition{Type: string(workloads.InstanceReplicaRestore), Status: metav1.ConditionTrue, ObservedGeneration: generation, Reason: workloads.ReasonRestoreCompleted, Message: "All replica restore PVCs have completed"}
+	}
+	return &metav1.Condition{Type: string(workloads.InstanceReplicaRestore), Status: metav1.ConditionUnknown, ObservedGeneration: generation, Reason: workloads.ReasonRestoreRunning, Message: "Waiting for replica restore PVCs to complete"}
 }
 
 func (r *statusReconciler) reconcileRestoreCondition(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet) error {

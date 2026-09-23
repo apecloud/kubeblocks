@@ -146,6 +146,9 @@ func buildInstanceByTemplate(tree *kubebuilderx.ObjectTree,
 	}
 
 	inst := b.GetObject()
+	// Carry the projection into the per-instance desired object. The Instance
+	// controller applies it only while constructing target PVCs.
+	inst.Spec.ReplicaRestore = its.Spec.ReplicaRestore
 	stampInstanceRevision(inst)
 	if !shouldCloneInstanceAssistantObjects(its) {
 		if err := controllerutil.SetControllerReference(its, inst, model.GetScheme()); err != nil {

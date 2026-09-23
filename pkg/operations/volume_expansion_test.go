@@ -717,3 +717,21 @@ func TestNormalizeVolumeExpansionRejectsUnknownAndShrink(t *testing.T) {
 		})
 	}
 }
+
+func TestVolumeExpansionTargetsUseRequestedStorageDuringObservation(t *testing.T) {
+	component := &appsv1.ClusterComponentSpec{Name: "db", VolumeClaimTemplates: []appsv1.PersistentVolumeClaimTemplate{{
+		Name: "data", Spec: corev1.PersistentVolumeClaimSpec{Resources: corev1.VolumeResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("3Gi")}}},
+	}}}
+	request := opsv1alpha1.VolumeExpansion{VolumeClaimTemplates: []opsv1alpha1.OpsRequestVolumeClaimTemplate{{Name: "data", Storage: resource.MustParse("5Gi")}}}
+	targets, _, observed := volumeExpansionTargets(component, request)
+	target := targets["data"]
+	if !observed || target.Cmp(resource.MustParse("5Gi")) != 0 {
+		t.Fatalf("targets=%v observed=%t, want data=5Gi and observed=true", targets, observed)
+	}
+	component.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("6Gi")
+	targets, _, observed = volumeExpansionTargets(component, request)
+	target = targets["data"]
+	if !observed || target.Cmp(resource.MustParse("5Gi")) != 0 {
+		t.Fatalf("larger current target=%v observed=%t, want requested data=5Gi and observed=true", targets, observed)
+	}
+}

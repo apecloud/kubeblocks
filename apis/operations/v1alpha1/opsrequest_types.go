@@ -387,7 +387,11 @@ type InstanceResourceTemplate struct {
 }
 
 type InstanceVolumeClaimTemplate struct {
-	// Refer to the instance template name of the component or sharding.
+	// Specifies an instance template name, not a Pod name.
+	// For a component selected by componentName, this must match a name in
+	// Cluster.spec.componentSpecs[].instances[].name.
+	// For a sharding selected by componentName, this must match a name in
+	// Cluster.spec.shardings[].template.instances[].name.
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
@@ -415,8 +419,12 @@ type VolumeExpansion struct {
 	// +listMapKey=name
 	VolumeClaimTemplates []OpsRequestVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
-	// Specifies volume expansion targets for named instance templates. An instance
-	// target overrides a component-level target with the same volumeClaimTemplate name.
+	// Specifies volume expansion targets for named instance templates.
+	// Each target applies to all instances generated from the named template,
+	// which may have multiple replicas. For a sharding, it applies across shards
+	// that use the shared template in spec.shardings[].template.
+	// A template target overrides a component-level target with the same
+	// volumeClaimTemplate name.
 	//
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys

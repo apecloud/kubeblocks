@@ -223,27 +223,27 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 
 // volumeExpansionTargets keeps the current logical target, including a later compatible expansion.
 func volumeExpansionTargets(spec *appsv1.ClusterComponentSpec, request opsv1alpha1.VolumeExpansion) (map[string]resource.Quantity, map[string]map[string]resource.Quantity, bool) {
-	plan, err := normalizeVolumeExpansion(request, spec)
+	// Reconciliation observes the target requested by the operation. The
+	// component desired state may still lag behind it, or may already be
+	// larger because another update won the race. The API/action validation
+	// owns the no-shrink check; applying it here would reject a valid retry or
+	// make a stale desired size look complete.
+	plan, err := normalizeVolumeExpansionForObservation(request, spec)
 	if err != nil {
 		return map[string]resource.Quantity{}, map[string]map[string]resource.Quantity{}, false
 	}
 	targets := map[string]resource.Quantity{}
 	instanceTargets := map[string]map[string]resource.Quantity{}
 	for key := range plan.Targets {
+		target := plan.Targets[key]
 		if key.InstanceTemplateName == "" {
-			for _, vct := range spec.VolumeClaimTemplates {
-				if vct.Name == key.VCTName {
-					targets[key.VCTName] = vct.Spec.Resources.Requests[corev1.ResourceStorage]
-				}
-			}
+			targets[key.VCTName] = target.RequestedStorage
 			continue
 		}
 		if instanceTargets[key.InstanceTemplateName] == nil {
 			instanceTargets[key.InstanceTemplateName] = map[string]resource.Quantity{}
 		}
-		if vct, ok := effectiveVolumeClaimTemplate(spec, key.InstanceTemplateName, key.VCTName); ok {
-			instanceTargets[key.InstanceTemplateName][key.VCTName] = vct.Spec.Resources.Requests[corev1.ResourceStorage]
-		}
+		instanceTargets[key.InstanceTemplateName][key.VCTName] = target.RequestedStorage
 	}
 	return targets, instanceTargets, len(plan.Targets) == len(request.VolumeClaimTemplates)+countInstanceVolumeTargets(request)
 }
@@ -473,6 +473,14 @@ type volumeExpansionPlan struct {
 // against the current component desired state. It does not perform client
 // backed checks such as StorageClass validation.
 func normalizeVolumeExpansion(request opsv1alpha1.VolumeExpansion, spec *appsv1.ClusterComponentSpec) (volumeExpansionPlan, error) {
+	return normalizeVolumeExpansionWithGrowthCheck(request, spec, true)
+}
+
+func normalizeVolumeExpansionForObservation(request opsv1alpha1.VolumeExpansion, spec *appsv1.ClusterComponentSpec) (volumeExpansionPlan, error) {
+	return normalizeVolumeExpansionWithGrowthCheck(request, spec, false)
+}
+
+func normalizeVolumeExpansionWithGrowthCheck(request opsv1alpha1.VolumeExpansion, spec *appsv1.ClusterComponentSpec, checkGrowth bool) (volumeExpansionPlan, error) {
 	plan := volumeExpansionPlan{Targets: map[volumeExpansionTargetKey]volumeExpansionTarget{}}
 	if spec == nil {
 		return plan, fmt.Errorf("component spec is nil")
@@ -492,7 +500,7 @@ func normalizeVolumeExpansion(request opsv1alpha1.VolumeExpansion, spec *appsv1.
 		if declared.IsZero() {
 			return fmt.Errorf("volumeClaimTemplate %q in %s has no declared storage", v.Name, scope)
 		}
-		if v.Storage.Cmp(declared) < 0 {
+		if checkGrowth && v.Storage.Cmp(declared) < 0 {
 			return fmt.Errorf("requested storage for %s/%s cannot be less than declared size %s", scope, v.Name, declared.String())
 		}
 		plan.Targets[key] = volumeExpansionTarget{Key: key, RequestedStorage: v.Storage}
@@ -543,25 +551,4 @@ func normalizeVolumeExpansion(request opsv1alpha1.VolumeExpansion, spec *appsv1.
 		}
 	}
 	return plan, nil
-}
-
-// effectiveVolumeClaimTemplate returns the instance override when present and
-// otherwise the component default.
-func effectiveVolumeClaimTemplate(spec *appsv1.ClusterComponentSpec, instanceName, vctName string) (*appsv1.PersistentVolumeClaimTemplate, bool) {
-	for _, instance := range spec.Instances {
-		if instance.Name != instanceName {
-			continue
-		}
-		for _, vct := range instance.VolumeClaimTemplates {
-			if vct.Name == vctName {
-				return vct.DeepCopy(), true
-			}
-		}
-	}
-	for _, vct := range spec.VolumeClaimTemplates {
-		if vct.Name == vctName {
-			return vct.DeepCopy(), true
-		}
-	}
-	return nil, false
 }

@@ -94,6 +94,12 @@ jobs:
       && needs.trigger-mode.result == 'success'
     runs-on: ubuntu-latest
     steps:
+      - name: Comment cherry-pick pre-check failure
+        if: needs.cherry-pick-pre-check.result == 'failure' || needs.cherry-pick-pre-check.result == 'cancelled'
+        run: |
+          gh pr comment "${{ github.event.issue.number }}" \
+            --body "🤖 says: ‼️ cherry-pick pre-check failed. See: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
       - name: cherry-pick pre check
         run: |
           if [[ "${{ needs.cherry-pick-pre-check.result }}" == "failure" || "${{ needs.cherry-pick-pre-check.result }}" == "cancelled" ]]; then

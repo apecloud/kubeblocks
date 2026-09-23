@@ -21,12 +21,14 @@ package component
 
 import (
 	"encoding/json"
+	"fmt"
 	"reflect"
+	"slices"
 
 	corev1 "k8s.io/api/core/v1"
 
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/kbagent"
-	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
 
 const (
@@ -35,74 +37,120 @@ const (
 	kbAgentProbeEnvName  = "KB_AGENT_PROBE"
 )
 
-// PreserveKBAgentRoleLabelRecoveryPodSpec keeps #10201 fields on an existing
-// workload when the feature gate is turned off. New workloads still omit the
-// fields, but disabling the gate cannot create a second rollout by removing
-// fields from a workload that already adopted the feature.
-func PreserveKBAgentRoleLabelRecoveryPodSpec(oldSpec, newSpec *corev1.PodSpec) {
+// PreserveKBAgentRoleLabelRecoveryPodSpec retains the adopted recovery configuration
+// when the gate is disabled, without retaining unrelated workload settings.
+func PreserveKBAgentRoleLabelRecoveryPodSpec(oldSpec, newSpec *corev1.PodSpec) error {
 	if oldSpec == nil || newSpec == nil {
-		return
+		return nil
 	}
-	oldVolume := findVolume(oldSpec.Volumes, roleLabelVolumeName)
 	oldContainer := findContainer(oldSpec.Containers, kbagent.ContainerName)
 	newContainer := findContainer(newSpec.Containers, kbagent.ContainerName)
+	oldVolume := findVolume(oldSpec.Volumes, roleLabelVolumeName)
 	if oldVolume == nil || oldContainer == nil || newContainer == nil {
-		return
+		return nil
 	}
-	if findVolume(newSpec.Volumes, roleLabelVolumeName) == nil {
-		newSpec.Volumes = append(newSpec.Volumes, *oldVolume.DeepCopy())
+	// A user volume with the same name alone does not establish adoption.
+	if oldVolume.DownwardAPI == nil || len(oldVolume.DownwardAPI.Items) != 1 {
+		return nil
 	}
-	for _, mount := range oldContainer.VolumeMounts {
-		if mount.Name != roleLabelVolumeName || mount.MountPath != podMetadataMountPath {
-			continue
+	item := oldVolume.DownwardAPI.Items[0]
+	if item.Path != podRoleLabelFileName || item.FieldRef == nil || item.FieldRef.FieldPath != fmt.Sprintf("metadata.labels['%s']", constant.RoleLabelKey) {
+		return nil
+	}
+	mountIndex := slices.IndexFunc(oldContainer.VolumeMounts, func(m corev1.VolumeMount) bool { return reflect.DeepEqual(m, roleLabelVolumeMount) })
+	if mountIndex < 0 {
+		return nil
+	}
+	volumeIndex := slices.IndexFunc(oldSpec.Volumes, func(v corev1.Volume) bool { return v.Name == roleLabelVolumeName })
+	if current := findVolume(newSpec.Volumes, roleLabelVolumeName); current == nil {
+		newSpec.Volumes = slices.Insert(newSpec.Volumes, min(volumeIndex, len(newSpec.Volumes)), *oldVolume.DeepCopy())
+	} else if !reflect.DeepEqual(current, oldVolume) {
+		return fmt.Errorf("volume %s conflicts with adopted kbagent role label volume", roleLabelVolumeName)
+	}
+	mounted := false
+	for _, mount := range newContainer.VolumeMounts {
+		if reflect.DeepEqual(mount, roleLabelVolumeMount) {
+			mounted = true
+			break
 		}
-		found := false
-		for _, current := range newContainer.VolumeMounts {
-			if reflect.DeepEqual(current, mount) {
-				found = true
-				break
+		if mount.MountPath == podMetadataMountPath {
+			return fmt.Errorf("volumeMount path %s conflicts with adopted kbagent role label mount", podMetadataMountPath)
+		}
+	}
+	if !mounted {
+		newContainer.VolumeMounts = slices.Insert(newContainer.VolumeMounts, min(mountIndex, len(newContainer.VolumeMounts)), roleLabelVolumeMount)
+	}
+	// Both the server and the init worker receive the startup probe environment.
+	for _, pair := range []struct {
+		old, desired []corev1.Container
+		name         string
+	}{
+		{oldSpec.Containers, newSpec.Containers, kbagent.ContainerName},
+		{oldSpec.InitContainers, newSpec.InitContainers, kbagent.ContainerName4Worker},
+	} {
+		old, desired := findContainer(pair.old, pair.name), findContainer(pair.desired, pair.name)
+		if old != nil && desired != nil {
+			if err := preserveRoleProbeFields(old, desired); err != nil {
+				return fmt.Errorf("preserve %s probes: %w", pair.name, err)
 			}
 		}
-		if !found {
-			newContainer.VolumeMounts = append(newContainer.VolumeMounts, mount)
-		}
 	}
-	preserveRoleProbeFields(oldContainer, newContainer)
+	return nil
 }
 
-func preserveRoleProbeFields(oldContainer, newContainer *corev1.Container) {
+func preserveRoleProbeFields(oldContainer, newContainer *corev1.Container) error {
 	oldEnv := findEnv(oldContainer.Env, kbAgentProbeEnvName)
 	newEnv := findEnv(newContainer.Env, kbAgentProbeEnvName)
 	if oldEnv == nil || newEnv == nil || oldEnv.Value == "" || newEnv.Value == "" {
-		return
+		return nil
 	}
-	var oldProbes, newProbes []proto.Probe
+	// Keep unrelated and unknown fields in the desired configuration. Reusing the
+	// original bytes when otherwise equal avoids JSON formatting-only revisions.
+	var oldProbes, newProbes []map[string]json.RawMessage
 	if err := json.Unmarshal([]byte(oldEnv.Value), &oldProbes); err != nil {
-		newEnv.Value = oldEnv.Value
-		return
+		return fmt.Errorf("decode existing probes: %w", err)
 	}
 	if err := json.Unmarshal([]byte(newEnv.Value), &newProbes); err != nil {
-		newEnv.Value = oldEnv.Value
-		return
+		return fmt.Errorf("decode desired probes: %w", err)
 	}
-	for i := range newProbes {
-		if newProbes[i].Action != "roleProbe" {
+	changed := false
+	for _, desired := range newProbes {
+		if string(desired["action"]) != `"roleProbe"` {
 			continue
 		}
-		for _, oldProbe := range oldProbes {
-			if oldProbe.Action == "roleProbe" && len(oldProbe.ReportOnFileChange) > 0 {
-				newProbes[i].ReportOnFileChange = append([]string(nil), oldProbe.ReportOnFileChange...)
-				newProbes[i].ReportPeriodSeconds = oldProbe.ReportPeriodSeconds
-				break
+		for _, old := range oldProbes {
+			if string(old["action"]) != `"roleProbe"` {
+				continue
 			}
+			for _, key := range []string{"reportOnFileChange", "reportPeriodSeconds"} {
+				if value, ok := old[key]; ok {
+					desired[key] = value
+					changed = true
+				}
+			}
+			break
 		}
+	}
+	if !changed {
+		return nil
 	}
 	data, err := json.Marshal(newProbes)
 	if err != nil {
-		newEnv.Value = oldEnv.Value
-		return
+		return fmt.Errorf("encode desired probes: %w", err)
 	}
-	newEnv.Value = string(data)
+	var oldValue, newValue any
+	if err := json.Unmarshal([]byte(oldEnv.Value), &oldValue); err != nil {
+		return err
+	}
+	if err := json.Unmarshal(data, &newValue); err != nil {
+		return err
+	}
+	if reflect.DeepEqual(oldValue, newValue) {
+		newEnv.Value = oldEnv.Value
+	} else {
+		newEnv.Value = string(data)
+	}
+	return nil
 }
 
 func findVolume(volumes []corev1.Volume, name string) *corev1.Volume {
@@ -113,7 +161,6 @@ func findVolume(volumes []corev1.Volume, name string) *corev1.Volume {
 	}
 	return nil
 }
-
 func findContainer(containers []corev1.Container, name string) *corev1.Container {
 	for i := range containers {
 		if containers[i].Name == name {
@@ -122,7 +169,6 @@ func findContainer(containers []corev1.Container, name string) *corev1.Container
 	}
 	return nil
 }
-
 func findEnv(env []corev1.EnvVar, name string) *corev1.EnvVar {
 	for i := range env {
 		if env[i].Name == name {

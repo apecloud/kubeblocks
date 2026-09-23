@@ -248,8 +248,8 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet) *workloads.InstanceS
 	podTemplateCopy.Annotations = itsObjCopy.Spec.Template.Annotations
 
 	itsObjCopy.Spec.Template = podTemplateCopy
-	if !viper.GetBool(constant.FeatureGateKBAgentRoleLabelReprobe) {
-		component.PreserveKBAgentRoleLabelReprobePodSpec(&oldITS.Spec.Template.Spec, &itsObjCopy.Spec.Template.Spec)
+	if !viper.GetBool(constant.FeatureGateRoleLabelRecovery) {
+		component.PreserveKBAgentRoleLabelRecoveryPodSpec(&oldITS.Spec.Template.Spec, &itsObjCopy.Spec.Template.Spec)
 	}
 	itsObjCopy.Spec.Replicas = itsProto.Spec.Replicas
 	itsObjCopy.Spec.Roles = itsProto.Spec.Roles

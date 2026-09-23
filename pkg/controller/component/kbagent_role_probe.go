@@ -30,30 +30,30 @@ import (
 )
 
 const (
-	KBAgentRoleLabelVolumeName = "kubeblocks-role-label"
-	KBAgentRoleLabelMountPath  = "/etc/kubeblocks/pod-metadata"
-	kbAgentProbeEnvName        = "KB_AGENT_PROBE"
+	roleLabelVolumeName  = "kubeblocks-role-label"
+	podMetadataMountPath = "/etc/kubeblocks/pod-metadata"
+	kbAgentProbeEnvName  = "KB_AGENT_PROBE"
 )
 
-// PreserveKBAgentRoleLabelReprobePodSpec keeps #10201 fields on an existing
+// PreserveKBAgentRoleLabelRecoveryPodSpec keeps #10201 fields on an existing
 // workload when the feature gate is turned off. New workloads still omit the
 // fields, but disabling the gate cannot create a second rollout by removing
 // fields from a workload that already adopted the feature.
-func PreserveKBAgentRoleLabelReprobePodSpec(oldSpec, newSpec *corev1.PodSpec) {
+func PreserveKBAgentRoleLabelRecoveryPodSpec(oldSpec, newSpec *corev1.PodSpec) {
 	if oldSpec == nil || newSpec == nil {
 		return
 	}
-	oldVolume := findVolume(oldSpec.Volumes, KBAgentRoleLabelVolumeName)
+	oldVolume := findVolume(oldSpec.Volumes, roleLabelVolumeName)
 	oldContainer := findContainer(oldSpec.Containers, kbagent.ContainerName)
 	newContainer := findContainer(newSpec.Containers, kbagent.ContainerName)
 	if oldVolume == nil || oldContainer == nil || newContainer == nil {
 		return
 	}
-	if findVolume(newSpec.Volumes, KBAgentRoleLabelVolumeName) == nil {
+	if findVolume(newSpec.Volumes, roleLabelVolumeName) == nil {
 		newSpec.Volumes = append(newSpec.Volumes, *oldVolume.DeepCopy())
 	}
 	for _, mount := range oldContainer.VolumeMounts {
-		if mount.Name != KBAgentRoleLabelVolumeName || mount.MountPath != KBAgentRoleLabelMountPath {
+		if mount.Name != roleLabelVolumeName || mount.MountPath != podMetadataMountPath {
 			continue
 		}
 		found := false

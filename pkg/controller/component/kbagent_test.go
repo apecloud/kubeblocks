@@ -41,7 +41,7 @@ import (
 var _ = Describe("kb-agent", func() {
 	var (
 		synthesizedComp *SynthesizedComponent
-		oldRoleReprobe  bool
+		oldRoleRecovery bool
 	)
 
 	cleanEnv := func() {
@@ -54,12 +54,12 @@ var _ = Describe("kb-agent", func() {
 
 	BeforeEach(func() {
 		cleanEnv()
-		oldRoleReprobe = viperx.GetBool(constant.FeatureGateKBAgentRoleLabelReprobe)
-		viperx.Set(constant.FeatureGateKBAgentRoleLabelReprobe, true)
+		oldRoleRecovery = viperx.GetBool(constant.FeatureGateRoleLabelRecovery)
+		viperx.Set(constant.FeatureGateRoleLabelRecovery, true)
 	})
 
 	AfterEach(func() {
-		viperx.Set(constant.FeatureGateKBAgentRoleLabelReprobe, oldRoleReprobe)
+		viperx.Set(constant.FeatureGateRoleLabelRecovery, oldRoleRecovery)
 		cleanEnv()
 	})
 
@@ -134,8 +134,8 @@ var _ = Describe("kb-agent", func() {
 			}
 		})
 
-		It("does not add role-label reprobe PodTemplate fields when disabled", func() {
-			viperx.Set(constant.FeatureGateKBAgentRoleLabelReprobe, false)
+		It("does not add role-label recovery PodTemplate fields when disabled", func() {
+			viperx.Set(constant.FeatureGateRoleLabelRecovery, false)
 			Expect(buildKBAgentContainer(synthesizedComp)).Should(Succeed())
 
 			c := kbAgentContainer()
@@ -159,7 +159,7 @@ var _ = Describe("kb-agent", func() {
 			}
 		})
 
-		It("preserves adopted role-label reprobe fields when the gate is disabled", func() {
+		It("preserves adopted role-label recovery fields when the gate is disabled", func() {
 			oldSpec := &corev1.PodSpec{
 				Volumes: []corev1.Volume{{Name: roleLabelVolumeName, VolumeSource: corev1.VolumeSource{
 					DownwardAPI: &corev1.DownwardAPIVolumeSource{},
@@ -173,7 +173,7 @@ var _ = Describe("kb-agent", func() {
 				Env: []corev1.EnvVar{{Name: "KB_AGENT_PROBE", Value: `[{"action":"roleProbe"}]`}},
 			}}}
 
-			PreserveKBAgentRoleLabelReprobePodSpec(oldSpec, newSpec)
+			PreserveKBAgentRoleLabelRecoveryPodSpec(oldSpec, newSpec)
 			Expect(newSpec.Volumes).Should(ContainElement(oldSpec.Volumes[0]))
 			Expect(newSpec.Containers[0].VolumeMounts).Should(ContainElement(roleLabelVolumeMount))
 			var probes []proto.Probe
@@ -191,7 +191,7 @@ var _ = Describe("kb-agent", func() {
 			}
 			newSpec := &corev1.PodSpec{}
 
-			PreserveKBAgentRoleLabelReprobePodSpec(oldSpec, newSpec)
+			PreserveKBAgentRoleLabelRecoveryPodSpec(oldSpec, newSpec)
 			Expect(newSpec.Volumes).Should(BeEmpty())
 		})
 

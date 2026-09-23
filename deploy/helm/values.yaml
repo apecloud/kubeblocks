@@ -630,7 +630,7 @@ featureGates:
     enabled: false
   # Enables #10201 role-label recovery. Enabling it may roll existing Pods once.
   # Workloads that already adopted it keep the fields when this is later disabled.
-  kbagentRoleLabelReprobe:
+  roleLabelRecovery:
     enabled: false
 
 userAgent: kubeblocks

@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"testing"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -41,6 +42,7 @@ import (
 var _ = Describe("kb-agent", func() {
 	var (
 		synthesizedComp *SynthesizedComponent
+		oldRoleRecovery bool
 	)
 
 	cleanEnv := func() {
@@ -53,9 +55,12 @@ var _ = Describe("kb-agent", func() {
 
 	BeforeEach(func() {
 		cleanEnv()
+		oldRoleRecovery = viperx.GetBool(constant.FeatureGateRoleLabelRecovery)
+		viperx.Set(constant.FeatureGateRoleLabelRecovery, true)
 	})
 
 	AfterEach(func() {
+		viperx.Set(constant.FeatureGateRoleLabelRecovery, oldRoleRecovery)
 		cleanEnv()
 	})
 
@@ -128,6 +133,67 @@ var _ = Describe("kb-agent", func() {
 					},
 				},
 			}
+		})
+
+		It("does not add role-label recovery PodTemplate fields when disabled", func() {
+			viperx.Set(constant.FeatureGateRoleLabelRecovery, false)
+			Expect(buildKBAgentContainer(synthesizedComp)).Should(Succeed())
+
+			c := kbAgentContainer()
+			Expect(c).ShouldNot(BeNil())
+			Expect(c.VolumeMounts).ShouldNot(ContainElement(roleLabelVolumeMount))
+			for _, volume := range synthesizedComp.PodSpec.Volumes {
+				Expect(volume.Name).ShouldNot(Equal(roleLabelVolumeName))
+			}
+			for _, env := range c.Env {
+				if env.Name != "KB_AGENT_PROBE" {
+					continue
+				}
+				var probes []proto.Probe
+				Expect(json.Unmarshal([]byte(env.Value), &probes)).Should(Succeed())
+				for _, probe := range probes {
+					if probe.Action == "roleProbe" {
+						Expect(probe.ReportOnFileChange).Should(BeEmpty())
+						Expect(probe.ReportPeriodSeconds).Should(BeZero())
+					}
+				}
+			}
+		})
+
+		It("preserves adopted role-label recovery fields when the gate is disabled", func() {
+			oldSpec := &corev1.PodSpec{
+				Volumes: []corev1.Volume{{Name: roleLabelVolumeName, VolumeSource: corev1.VolumeSource{
+					DownwardAPI: &corev1.DownwardAPIVolumeSource{Items: []corev1.DownwardAPIVolumeFile{{Path: "role", FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.labels['kubeblocks.io/role']"}}}},
+				}}},
+				Containers: []corev1.Container{{Name: kbagent.ContainerName,
+					VolumeMounts: []corev1.VolumeMount{roleLabelVolumeMount},
+					Env:          []corev1.EnvVar{{Name: "KB_AGENT_PROBE", Value: `[{"action":"roleProbe","reportPeriodSeconds":15,"reportOnFileChange":["/etc/kubeblocks/pod-metadata"]}]`}},
+				}},
+			}
+			newSpec := &corev1.PodSpec{Containers: []corev1.Container{{Name: kbagent.ContainerName,
+				Env: []corev1.EnvVar{{Name: "KB_AGENT_PROBE", Value: `[{"action":"roleProbe"}]`}},
+			}}}
+
+			Expect(PreserveKBAgentRoleLabelRecoveryPodSpec(oldSpec, newSpec)).Should(Succeed())
+			Expect(newSpec.Volumes).Should(ContainElement(oldSpec.Volumes[0]))
+			Expect(newSpec.Containers[0].VolumeMounts).Should(ContainElement(roleLabelVolumeMount))
+			var probes []proto.Probe
+			Expect(json.Unmarshal([]byte(newSpec.Containers[0].Env[0].Value), &probes)).Should(Succeed())
+			Expect(probes[0].ReportPeriodSeconds).Should(Equal(int32(15)))
+			Expect(probes[0].ReportOnFileChange).Should(Equal([]string{podMetadataMountPath}))
+		})
+
+		It("does not preserve a role-label volume when kbagent is removed", func() {
+			oldSpec := &corev1.PodSpec{
+				Volumes: []corev1.Volume{{Name: roleLabelVolumeName}},
+				Containers: []corev1.Container{{Name: kbagent.ContainerName,
+					VolumeMounts: []corev1.VolumeMount{roleLabelVolumeMount},
+				}},
+			}
+			newSpec := &corev1.PodSpec{}
+
+			Expect(PreserveKBAgentRoleLabelRecoveryPodSpec(oldSpec, newSpec)).Should(Succeed())
+			Expect(newSpec.Volumes).Should(BeEmpty())
 		})
 
 		It("nil", func() {
@@ -593,3 +659,68 @@ var _ = Describe("kb-agent", func() {
 		})
 	})
 })
+
+func TestKBAgentRoleRecoveryTransitions(t *testing.T) {
+	oldGate := viperx.GetBool(constant.FeatureGateRoleLabelRecovery)
+	defer viperx.Set(constant.FeatureGateRoleLabelRecovery, oldGate)
+	for _, role := range []bool{false, true} {
+		for _, custom := range []bool{false, true} {
+			for _, tail := range []bool{false, true} {
+				for _, from := range []bool{false, true} {
+					for _, to := range []bool{false, true} {
+						t.Run(fmt.Sprintf("role=%v/custom=%v/tail=%v/%v-to-%v", role, custom, tail, from, to), func(t *testing.T) {
+							build := func(enabled bool) *corev1.PodSpec {
+								viperx.Set(constant.FeatureGateRoleLabelRecovery, enabled)
+								action := appsv1.Action{Exec: &appsv1.ExecAction{Command: []string{"true"}}}
+								if custom {
+									action.Exec.Image = "example.com/tools:1"
+								}
+								actions := &appsv1.ComponentLifecycleActions{PostProvision: action.DeepCopy(), AvailableProbe: &appsv1.Probe{Action: action, PeriodSeconds: 5}}
+								if role {
+									actions.RoleProbe = &appsv1.Probe{Action: action, PeriodSeconds: 1}
+								}
+								c := &SynthesizedComponent{FullCompName: "db", PodSpec: &corev1.PodSpec{Containers: []corev1.Container{{Name: "database", Image: "db:1"}}}, LifecycleActions: SynthesizedLifecycleActions{ComponentLifecycleActions: actions}}
+								if err := buildKBAgentContainer(c); err != nil {
+									t.Fatal(err)
+								}
+								if tail {
+									c.PodSpec.Volumes = append(c.PodSpec.Volumes, corev1.Volume{Name: "scripts", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}})
+									for i := range c.PodSpec.Containers {
+										c.PodSpec.Containers[i].VolumeMounts = append(c.PodSpec.Containers[i].VolumeMounts, corev1.VolumeMount{Name: "scripts", MountPath: "/scripts"})
+									}
+								}
+								return c.PodSpec
+							}
+							old := build(from)
+							original := old.DeepCopy()
+							desired := build(to)
+							if !to {
+								if err := PreserveKBAgentRoleLabelRecoveryPodSpec(old, desired); err != nil {
+									t.Fatal(err)
+								}
+							}
+							wantChange := !from && to
+							if equal := reflect.DeepEqual(old, desired); equal == wantChange {
+								a, _ := json.Marshal(old)
+								b, _ := json.Marshal(desired)
+								t.Fatalf("unexpected PodSpec change=%v (want %v)\nold=%s\nnew=%s", !equal, wantChange, a, b)
+							}
+							if !reflect.DeepEqual(old, original) {
+								t.Fatal("mutated existing template")
+							}
+							if !to {
+								again := build(false)
+								if err := PreserveKBAgentRoleLabelRecoveryPodSpec(desired, again); err != nil {
+									t.Fatal(err)
+								}
+								if !reflect.DeepEqual(desired, again) {
+									t.Fatal("not stable on next reconciliation")
+								}
+							}
+						})
+					}
+				}
+			}
+		}
+	}
+}

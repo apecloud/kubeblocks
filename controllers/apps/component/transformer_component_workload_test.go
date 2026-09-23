@@ -57,13 +57,16 @@ var _ = Describe("Component Workload Operations Test", func() {
 				desired.Spec.Template.Annotations[constant.RestartAnnotationKey] = desiredRestart
 			}
 			before := running.DeepCopy()
-			merged := copyAndMergeITS(running, desired)
+			merged, err := copyAndMergeITS(running, desired)
+			Expect(err).Should(Succeed())
 			Expect(merged).ShouldNot(BeNil())
 			Expect(merged.Spec.Template.Annotations).Should(Equal(map[string]string{
 				"custom": "new", "retained": "value", constant.RestartAnnotationKey: expectedRestart,
 			}))
 			Expect(running).Should(Equal(before))
-			Expect(copyAndMergeITS(merged, desired)).Should(BeNil())
+			mergedAgain, err := copyAndMergeITS(merged, desired)
+			Expect(err).Should(Succeed())
+			Expect(mergedAgain).Should(BeNil())
 		},
 			Entry("preserve config restart against older ops", newer, older, newer),
 			Entry("accept newer ops restart", older, newer, newer),

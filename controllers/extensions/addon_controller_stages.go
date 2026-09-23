@@ -439,11 +439,15 @@ func (r *progressingHandler) Handle(ctx context.Context) {
 				if err := r.reconciler.Get(ctx, key, installJob); client.IgnoreNotFound(err) != nil {
 					r.setRequeueWithErr(err, "")
 					return
-				} else if err == nil && installJob.GetDeletionTimestamp().IsZero() {
-					if err = r.reconciler.Delete(ctx, installJob); err != nil {
-						r.setRequeueWithErr(err, "")
-						return
+				} else if err == nil {
+					if installJob.GetDeletionTimestamp().IsZero() {
+						if err = r.reconciler.Delete(ctx, installJob); client.IgnoreNotFound(err) != nil {
+							r.setRequeueWithErr(err, "")
+							return
+						}
 					}
+					r.setRequeueAfter(time.Second, "waiting for previous install Job deletion")
+					return
 				}
 			}
 			patchPhase(extensionsv1alpha1.AddonEnabling, EnablingAddon)
@@ -547,6 +551,9 @@ func (r *helmTypeInstallStage) Handle(ctx context.Context) {
 			return
 		} else if err == nil {
 			if helmInstallJob.Status.Succeeded > 0 {
+				if err := r.reconciler.deleteRegistrySecretCopy(ctx, addon, helmInstallJob.Namespace); err != nil {
+					r.setRequeueWithErr(err, "delete registry credentials")
+				}
 				return
 			}
 
@@ -557,7 +564,13 @@ func (r *helmTypeInstallStage) Handle(ctx context.Context) {
 			// there are situations that job.status.[Active | Failed | Succeeded ] are all
 			// 0, and len(job.status.conditions) > 0, and need to handle failed
 			// info. from conditions.
-			if helmInstallJob.Status.Failed > 0 {
+			if slices.ContainsFunc(helmInstallJob.Status.Conditions, func(condition batchv1.JobCondition) bool {
+				return condition.Type == batchv1.JobFailed && condition.Status == corev1.ConditionTrue
+			}) {
+				if err := r.reconciler.deleteRegistrySecretCopy(ctx, addon, helmInstallJob.Namespace); err != nil {
+					r.setRequeueWithErr(err, "delete registry credentials")
+					return
+				}
 				// job failed set terminal state phase
 				setAddonErrorConditions(ctx, &r.stageCtx, addon, true, true, InstallationFailed,
 					fmt.Sprintf("Installation failed, do inspect error from jobs.batch %s", key.String()))
@@ -693,6 +706,29 @@ func (r *helmTypeInstallStage) Handle(ctx context.Context) {
 		if err := setInitContainer(addon, helmJobPodSpec); err != nil {
 			r.setRequeueWithErr(err, "")
 			return
+		}
+
+		if err := r.reconciler.prepareRegistrySecret(ctx, addon, helmInstallJob); err != nil {
+			invalid := apierrors.IsBadRequest(err)
+			if invalid {
+				r.setReconciled()
+			} else if apierrors.IsNotFound(err) {
+				r.setRequeueAfter(time.Second, err.Error())
+			} else {
+				r.setRequeueWithErr(err, "prepare registry credentials")
+			}
+			setAddonErrorConditions(ctx, &r.stageCtx, addon, invalid, true, AddonRefObjError, err.Error())
+			return
+		}
+
+		// All referenced objects have been validated. Clear a previous reference error before retrying.
+		if condition := meta.FindStatusCondition(addon.Status.Conditions, extensionsv1alpha1.ConditionTypeChecked); condition != nil && condition.Reason == AddonRefObjError {
+			patch := client.MergeFrom(addon.DeepCopy())
+			meta.RemoveStatusCondition(&addon.Status.Conditions, extensionsv1alpha1.ConditionTypeChecked)
+			if err := r.reconciler.Status().Patch(ctx, addon, patch); err != nil {
+				r.setRequeueWithErr(err, "")
+				return
+			}
 		}
 
 		if err := r.reconciler.Create(ctx, helmInstallJob); err != nil {
@@ -850,6 +886,9 @@ func (r *terminalStateStage) Handle(ctx context.Context) {
 			patch := client.MergeFrom(addon.DeepCopy())
 			addon.Status.Phase = phase
 			addon.Status.ObservedGeneration = addon.Generation
+			if phase == extensionsv1alpha1.AddonEnabled {
+				meta.RemoveStatusCondition(&addon.Status.Conditions, extensionsv1alpha1.ConditionTypeChecked)
+			}
 
 			meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
 				Type:               extensionsv1alpha1.ConditionTypeSucceed,
@@ -881,15 +920,24 @@ func (r *terminalStateStage) Handle(ctx context.Context) {
 	r.next.Handle(ctx)
 }
 
-// attachVolumeMount attaches a volumes to pod and added container.VolumeMounts to a ConfigMap
-// or Secret referenced key as file, and add --values={volumeMountPath}/{selector.Key} to
-// helm install/upgrade args
+// attachVolumeMount mounts a referenced key as a file and passes its path to Helm --values.
 func attachVolumeMount(
 	podSpec *corev1.PodSpec,
 	selector extensionsv1alpha1.DataObjectKeySelector,
 	objName, suff string,
 	volumeSrcBuilder func() corev1.VolumeSource,
 ) {
+	path := mountDataObjectKey(podSpec, selector, objName, suff, volumeSrcBuilder)
+	podSpec.Containers[0].Args = append(podSpec.Containers[0].Args, "--values", path)
+}
+
+// mountDataObjectKey mounts a referenced key read-only and returns its path inside the container.
+func mountDataObjectKey(
+	podSpec *corev1.PodSpec,
+	selector extensionsv1alpha1.DataObjectKeySelector,
+	objName, suff string,
+	volumeSrcBuilder func() corev1.VolumeSource,
+) string {
 	container := &podSpec.Containers[0]
 	volName := fmt.Sprintf("%s-%s", objName, suff)
 	mountPath := fmt.Sprintf("/vol/%s/%s", suff, objName)
@@ -902,8 +950,7 @@ func attachVolumeMount(
 		ReadOnly:  true,
 		MountPath: mountPath,
 	})
-	container.Args = append(container.Args, "--values",
-		fmt.Sprintf("%s/%s", mountPath, selector.Key))
+	return fmt.Sprintf("%s/%s", mountPath, selector.Key)
 }
 
 // createHelmJobProto creates a job.batch prototyped object

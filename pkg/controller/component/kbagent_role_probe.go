@@ -32,14 +32,14 @@ import (
 )
 
 const (
-	KBAgentRoleLabelVolumeName = "kubeblocks-role-label"
-	KBAgentRoleLabelMountPath  = "/etc/kubeblocks/pod-metadata"
-	kbAgentProbeEnvName        = "KB_AGENT_PROBE"
+	roleLabelVolumeName  = "kubeblocks-role-label"
+	podMetadataMountPath = "/etc/kubeblocks/pod-metadata"
+	kbAgentProbeEnvName  = "KB_AGENT_PROBE"
 )
 
-// PreserveKBAgentRoleLabelReprobePodSpec retains the adopted reprobe configuration
+// PreserveKBAgentRoleLabelRecoveryPodSpec retains the adopted recovery configuration
 // when the gate is disabled, without retaining unrelated workload settings.
-func PreserveKBAgentRoleLabelReprobePodSpec(oldSpec, newSpec *corev1.PodSpec) error {
+func PreserveKBAgentRoleLabelRecoveryPodSpec(oldSpec, newSpec *corev1.PodSpec) error {
 	if oldSpec == nil || newSpec == nil {
 		return nil
 	}

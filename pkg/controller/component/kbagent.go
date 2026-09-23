@@ -46,8 +46,6 @@ const (
 	defaultProbeReportPeriodSeconds = 60
 	minProbeReportPeriodSeconds     = 15
 
-	roleLabelVolumeName  = KBAgentRoleLabelVolumeName
-	podMetadataMountPath = KBAgentRoleLabelMountPath
 	podRoleLabelFileName = "role"
 )
 
@@ -186,7 +184,7 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 		return err
 	}
 
-	if viper.GetBool(constant.FeatureGateKBAgentRoleLabelReprobe) {
+	if viper.GetBool(constant.FeatureGateRoleLabelRecovery) {
 		if err = mountPodRoleLabelFile(synthesizedComp, container); err != nil {
 			return err
 		}
@@ -347,7 +345,7 @@ func buildKBAgentStartupEnvs(synthesizedComp *SynthesizedComponent) ([]corev1.En
 		}
 
 		if a, p := buildProbe4KBAgent(synthesizedComp.LifecycleActions.RoleProbe, "roleProbe", synthesizedComp.FullCompName); a != nil && p != nil {
-			if viper.GetBool(constant.FeatureGateKBAgentRoleLabelReprobe) {
+			if viper.GetBool(constant.FeatureGateRoleLabelRecovery) {
 				p.ReportOnFileChange = []string{podMetadataMountPath}
 				p.ReportPeriodSeconds = probeReportPeriodSeconds(p.PeriodSeconds)
 			}

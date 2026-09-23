@@ -406,13 +406,13 @@ var _ = Describe("Component Workload Operations Test", func() {
 			Expect(merged.Spec.Template.Spec.Volumes).Should(BeEmpty())
 		})
 
-		It("preserves adopted role-label reprobe fields when the gate is disabled", func() {
-			oldGate := viper.GetBool(constant.FeatureGateKBAgentRoleLabelReprobe)
-			defer viper.Set(constant.FeatureGateKBAgentRoleLabelReprobe, oldGate)
-			viper.Set(constant.FeatureGateKBAgentRoleLabelReprobe, false)
+		It("preserves adopted role-label recovery fields when the gate is disabled", func() {
+			oldGate := viper.GetBool(constant.FeatureGateRoleLabelRecovery)
+			defer viper.Set(constant.FeatureGateRoleLabelRecovery, oldGate)
+			viper.Set(constant.FeatureGateRoleLabelRecovery, false)
 
 			oldITS := testapps.NewInstanceSetFactory(testCtx.DefaultNamespace,
-				"old-its-role-reprobe", clusterName, compName).
+				"old-its-role-recovery", clusterName, compName).
 				AddContainer(corev1.Container{
 					Name: "kbagent",
 					VolumeMounts: []corev1.VolumeMount{{

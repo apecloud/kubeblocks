@@ -42,7 +42,7 @@ import (
 var _ = Describe("kb-agent", func() {
 	var (
 		synthesizedComp *SynthesizedComponent
-		oldRoleReprobe  bool
+		oldRoleRecovery bool
 	)
 
 	cleanEnv := func() {
@@ -55,12 +55,12 @@ var _ = Describe("kb-agent", func() {
 
 	BeforeEach(func() {
 		cleanEnv()
-		oldRoleReprobe = viperx.GetBool(constant.FeatureGateKBAgentRoleLabelReprobe)
-		viperx.Set(constant.FeatureGateKBAgentRoleLabelReprobe, true)
+		oldRoleRecovery = viperx.GetBool(constant.FeatureGateRoleLabelRecovery)
+		viperx.Set(constant.FeatureGateRoleLabelRecovery, true)
 	})
 
 	AfterEach(func() {
-		viperx.Set(constant.FeatureGateKBAgentRoleLabelReprobe, oldRoleReprobe)
+		viperx.Set(constant.FeatureGateRoleLabelRecovery, oldRoleRecovery)
 		cleanEnv()
 	})
 
@@ -135,8 +135,8 @@ var _ = Describe("kb-agent", func() {
 			}
 		})
 
-		It("does not add role-label reprobe PodTemplate fields when disabled", func() {
-			viperx.Set(constant.FeatureGateKBAgentRoleLabelReprobe, false)
+		It("does not add role-label recovery PodTemplate fields when disabled", func() {
+			viperx.Set(constant.FeatureGateRoleLabelRecovery, false)
 			Expect(buildKBAgentContainer(synthesizedComp)).Should(Succeed())
 
 			c := kbAgentContainer()
@@ -160,7 +160,7 @@ var _ = Describe("kb-agent", func() {
 			}
 		})
 
-		It("preserves adopted role-label reprobe fields when the gate is disabled", func() {
+		It("preserves adopted role-label recovery fields when the gate is disabled", func() {
 			oldSpec := &corev1.PodSpec{
 				Volumes: []corev1.Volume{{Name: roleLabelVolumeName, VolumeSource: corev1.VolumeSource{
 					DownwardAPI: &corev1.DownwardAPIVolumeSource{Items: []corev1.DownwardAPIVolumeFile{{Path: "role", FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.labels['kubeblocks.io/role']"}}}},
@@ -174,7 +174,7 @@ var _ = Describe("kb-agent", func() {
 				Env: []corev1.EnvVar{{Name: "KB_AGENT_PROBE", Value: `[{"action":"roleProbe"}]`}},
 			}}}
 
-			Expect(PreserveKBAgentRoleLabelReprobePodSpec(oldSpec, newSpec)).Should(Succeed())
+			Expect(PreserveKBAgentRoleLabelRecoveryPodSpec(oldSpec, newSpec)).Should(Succeed())
 			Expect(newSpec.Volumes).Should(ContainElement(oldSpec.Volumes[0]))
 			Expect(newSpec.Containers[0].VolumeMounts).Should(ContainElement(roleLabelVolumeMount))
 			var probes []proto.Probe
@@ -192,7 +192,7 @@ var _ = Describe("kb-agent", func() {
 			}
 			newSpec := &corev1.PodSpec{}
 
-			Expect(PreserveKBAgentRoleLabelReprobePodSpec(oldSpec, newSpec)).Should(Succeed())
+			Expect(PreserveKBAgentRoleLabelRecoveryPodSpec(oldSpec, newSpec)).Should(Succeed())
 			Expect(newSpec.Volumes).Should(BeEmpty())
 		})
 
@@ -660,9 +660,9 @@ var _ = Describe("kb-agent", func() {
 	})
 })
 
-func TestKBAgentRoleReprobeTransitions(t *testing.T) {
-	oldGate := viperx.GetBool(constant.FeatureGateKBAgentRoleLabelReprobe)
-	defer viperx.Set(constant.FeatureGateKBAgentRoleLabelReprobe, oldGate)
+func TestKBAgentRoleRecoveryTransitions(t *testing.T) {
+	oldGate := viperx.GetBool(constant.FeatureGateRoleLabelRecovery)
+	defer viperx.Set(constant.FeatureGateRoleLabelRecovery, oldGate)
 	for _, role := range []bool{false, true} {
 		for _, custom := range []bool{false, true} {
 			for _, tail := range []bool{false, true} {
@@ -670,7 +670,7 @@ func TestKBAgentRoleReprobeTransitions(t *testing.T) {
 					for _, to := range []bool{false, true} {
 						t.Run(fmt.Sprintf("role=%v/custom=%v/tail=%v/%v-to-%v", role, custom, tail, from, to), func(t *testing.T) {
 							build := func(enabled bool) *corev1.PodSpec {
-								viperx.Set(constant.FeatureGateKBAgentRoleLabelReprobe, enabled)
+								viperx.Set(constant.FeatureGateRoleLabelRecovery, enabled)
 								action := appsv1.Action{Exec: &appsv1.ExecAction{Command: []string{"true"}}}
 								if custom {
 									action.Exec.Image = "example.com/tools:1"
@@ -695,7 +695,7 @@ func TestKBAgentRoleReprobeTransitions(t *testing.T) {
 							original := old.DeepCopy()
 							desired := build(to)
 							if !to {
-								if err := PreserveKBAgentRoleLabelReprobePodSpec(old, desired); err != nil {
+								if err := PreserveKBAgentRoleLabelRecoveryPodSpec(old, desired); err != nil {
 									t.Fatal(err)
 								}
 							}
@@ -710,7 +710,7 @@ func TestKBAgentRoleReprobeTransitions(t *testing.T) {
 							}
 							if !to {
 								again := build(false)
-								if err := PreserveKBAgentRoleLabelReprobePodSpec(desired, again); err != nil {
+								if err := PreserveKBAgentRoleLabelRecoveryPodSpec(desired, again); err != nil {
 									t.Fatal(err)
 								}
 								if !reflect.DeepEqual(desired, again) {

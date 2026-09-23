@@ -710,11 +710,12 @@ func (r *helmTypeInstallStage) Handle(ctx context.Context) {
 
 		if err := r.reconciler.prepareRegistrySecret(ctx, addon, helmInstallJob); err != nil {
 			invalid := apierrors.IsBadRequest(err)
-			if invalid {
+			switch {
+			case invalid:
 				r.setReconciled()
-			} else if apierrors.IsNotFound(err) {
+			case apierrors.IsNotFound(err):
 				r.setRequeueAfter(time.Second, err.Error())
-			} else {
+			default:
 				r.setRequeueWithErr(err, "prepare registry credentials")
 			}
 			setAddonErrorConditions(ctx, &r.stageCtx, addon, invalid, true, AddonRefObjError, err.Error())

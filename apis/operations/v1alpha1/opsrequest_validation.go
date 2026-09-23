@@ -559,7 +559,7 @@ func (r *OpsRequest) validateVolumeExpansion(ctx context.Context, cli client.Cli
 	storageClasses := sets.New[string]()
 	for _, expansion := range volumeExpansionList {
 		if comp := cluster.Spec.GetComponentByName(expansion.ComponentName); comp != nil {
-			if _, err := NormalizeVolumeExpansion(expansion, comp); err != nil {
+			if err := validateVolumeExpansionIntent(expansion, comp); err != nil {
 				return err
 			}
 			collectExpansionStorageClasses(expansion, *comp, storageClasses)
@@ -569,7 +569,7 @@ func (r *OpsRequest) validateVolumeExpansion(ctx context.Context, cli client.Cli
 			if sharding.Name != expansion.ComponentName {
 				continue
 			}
-			if _, err := NormalizeVolumeExpansion(expansion, &sharding.Template); err != nil {
+			if err := validateVolumeExpansionIntent(expansion, &sharding.Template); err != nil {
 				return err
 			}
 			if len(expansion.Instances) > 0 {
@@ -594,6 +594,87 @@ func (r *OpsRequest) validateVolumeExpansion(ctx context.Context, cli client.Cli
 		}
 	}
 	return validateExpansionStorageClasses(ctx, cli, storageClasses)
+}
+
+func validateVolumeExpansionIntent(request VolumeExpansion, spec *appsv1.ClusterComponentSpec) error {
+	if spec == nil {
+		return fmt.Errorf("component spec is nil")
+	}
+	defaults := make(map[string]appsv1.PersistentVolumeClaimTemplate, len(spec.VolumeClaimTemplates))
+	for _, volume := range spec.VolumeClaimTemplates {
+		defaults[volume.Name] = volume
+	}
+	validateTarget := func(scope string, target OpsRequestVolumeClaimTemplate, volume *appsv1.PersistentVolumeClaimTemplate) error {
+		if volume == nil {
+			return fmt.Errorf("volumeClaimTemplate %q not found in %s", target.Name, scope)
+		}
+		current := volume.Spec.Resources.Requests.Storage()
+		if current.IsZero() {
+			return fmt.Errorf("volumeClaimTemplate %q in %s has no declared storage", target.Name, scope)
+		}
+		if target.Storage.Cmp(*current) < 0 {
+			return fmt.Errorf("requested storage for %s/%s cannot be less than declared size %s", scope, target.Name, current.String())
+		}
+		return nil
+	}
+	seen := sets.New[string]()
+	for _, target := range request.VolumeClaimTemplates {
+		if seen.Has(target.Name) {
+			return fmt.Errorf("duplicate volumeClaimTemplate %q", target.Name)
+		}
+		seen.Insert(target.Name)
+		volume, ok := defaults[target.Name]
+		if !ok {
+			return fmt.Errorf("volumeClaimTemplate %q not found in %s", target.Name, spec.Name)
+		}
+		if err := validateTarget(spec.Name, target, volume.DeepCopy()); err != nil {
+			return err
+		}
+	}
+	instances := make(map[string]appsv1.InstanceTemplate, len(spec.Instances))
+	for _, instance := range spec.Instances {
+		instances[instance.Name] = instance
+	}
+	for _, instanceRequest := range request.Instances {
+		instance, ok := instances[instanceRequest.Name]
+		if !ok {
+			return fmt.Errorf("instance %q not found in %s", instanceRequest.Name, spec.Name)
+		}
+		seen := sets.New[string]()
+		for _, target := range instanceRequest.VolumeClaimTemplates {
+			if seen.Has(target.Name) {
+				return fmt.Errorf("duplicate volume expansion target %s/%s", instanceRequest.Name, target.Name)
+			}
+			seen.Insert(target.Name)
+			volume, ok := effectiveVolumeClaimTemplate(spec, instance.Name, target.Name)
+			if !ok {
+				return fmt.Errorf("volumeClaimTemplate %q not found in instance %s", target.Name, instance.Name)
+			}
+			if err := validateTarget(instance.Name, target, volume); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func effectiveVolumeClaimTemplate(spec *appsv1.ClusterComponentSpec, instanceName, volumeName string) (*appsv1.PersistentVolumeClaimTemplate, bool) {
+	for _, instance := range spec.Instances {
+		if instance.Name != instanceName {
+			continue
+		}
+		for _, volume := range instance.VolumeClaimTemplates {
+			if volume.Name == volumeName {
+				return volume.DeepCopy(), true
+			}
+		}
+	}
+	for _, volume := range spec.VolumeClaimTemplates {
+		if volume.Name == volumeName {
+			return volume.DeepCopy(), true
+		}
+	}
+	return nil, false
 }
 
 func validateExpansionStorageClasses(ctx context.Context, cli client.Client, storageClasses sets.Set[string]) error {
@@ -649,7 +730,7 @@ func collectExpansionStorageClasses(expansion VolumeExpansion, comp appsv1.Clust
 			continue
 		}
 		for _, requested := range instanceRequest.VolumeClaimTemplates {
-			volume, ok := EffectiveVolumeClaimTemplate(&comp, instanceRequest.Name, requested.Name)
+			volume, ok := effectiveVolumeClaimTemplate(&comp, instanceRequest.Name, requested.Name)
 			if !ok || volume.Spec.StorageClassName == nil || *volume.Spec.StorageClassName == "" {
 				continue
 			}

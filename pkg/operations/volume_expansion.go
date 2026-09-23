@@ -78,7 +78,7 @@ func (ve volumeExpansionOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli cl
 			(*requests)[corev1.ResourceStorage] = requested
 		}
 		volumeExpansion := obj.(opsv1alpha1.VolumeExpansion)
-		if _, err := opsv1alpha1.NormalizeVolumeExpansion(volumeExpansion, compSpec); err != nil {
+		if _, err := normalizeVolumeExpansion(volumeExpansion, compSpec); err != nil {
 			return err
 		}
 		for _, v := range volumeExpansion.VolumeClaimTemplates {
@@ -223,7 +223,7 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 
 // volumeExpansionTargets keeps the current logical target, including a later compatible expansion.
 func volumeExpansionTargets(spec *appsv1.ClusterComponentSpec, request opsv1alpha1.VolumeExpansion) (map[string]resource.Quantity, map[string]map[string]resource.Quantity, bool) {
-	plan, err := opsv1alpha1.NormalizeVolumeExpansion(request, spec)
+	plan, err := normalizeVolumeExpansion(request, spec)
 	if err != nil {
 		return map[string]resource.Quantity{}, map[string]map[string]resource.Quantity{}, false
 	}
@@ -241,7 +241,7 @@ func volumeExpansionTargets(spec *appsv1.ClusterComponentSpec, request opsv1alph
 		if instanceTargets[key.InstanceTemplateName] == nil {
 			instanceTargets[key.InstanceTemplateName] = map[string]resource.Quantity{}
 		}
-		if vct, ok := opsv1alpha1.EffectiveVolumeClaimTemplate(spec, key.InstanceTemplateName, key.VCTName); ok {
+		if vct, ok := effectiveVolumeClaimTemplate(spec, key.InstanceTemplateName, key.VCTName); ok {
 			instanceTargets[key.InstanceTemplateName][key.VCTName] = vct.Spec.Resources.Requests[corev1.ResourceStorage]
 		}
 	}

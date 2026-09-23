@@ -17,41 +17,42 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package v1alpha1
+package operations
 
 import (
 	"fmt"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
-// VolumeExpansionTargetKey identifies a volume expansion target. An empty
+// volumeExpansionTargetKey identifies a volume expansion target. An empty
 // InstanceTemplateName identifies the component's default volume template.
-type VolumeExpansionTargetKey struct {
+type volumeExpansionTargetKey struct {
 	InstanceTemplateName string
 	VCTName              string
 }
 
-// VolumeExpansionTarget is a normalized volume expansion target.
-type VolumeExpansionTarget struct {
-	Key              VolumeExpansionTargetKey
+// volumeExpansionTarget is a normalized volume expansion target.
+type volumeExpansionTarget struct {
+	Key              volumeExpansionTargetKey
 	RequestedStorage resource.Quantity
 }
 
-// VolumeExpansionPlan is the normalized intent of a VolumeExpansion request.
+// volumeExpansionPlan is the normalized intent of a VolumeExpansion request.
 // Instance-template targets take precedence over component targets with the
 // same volume template name.
-type VolumeExpansionPlan struct {
-	Targets map[VolumeExpansionTargetKey]VolumeExpansionTarget
+type volumeExpansionPlan struct {
+	Targets map[volumeExpansionTargetKey]volumeExpansionTarget
 }
 
-// NormalizeVolumeExpansion validates and normalizes volume expansion intent
+// normalizeVolumeExpansion validates and normalizes volume expansion intent
 // against the current component desired state. It does not perform client
 // backed checks such as StorageClass validation.
-func NormalizeVolumeExpansion(request VolumeExpansion, spec *appsv1.ClusterComponentSpec) (VolumeExpansionPlan, error) {
-	plan := VolumeExpansionPlan{Targets: map[VolumeExpansionTargetKey]VolumeExpansionTarget{}}
+func normalizeVolumeExpansion(request opsv1alpha1.VolumeExpansion, spec *appsv1.ClusterComponentSpec) (volumeExpansionPlan, error) {
+	plan := volumeExpansionPlan{Targets: map[volumeExpansionTargetKey]volumeExpansionTarget{}}
 	if spec == nil {
 		return plan, fmt.Errorf("component spec is nil")
 	}
@@ -59,7 +60,7 @@ func NormalizeVolumeExpansion(request VolumeExpansion, spec *appsv1.ClusterCompo
 	for _, vct := range spec.VolumeClaimTemplates {
 		defaults[vct.Name] = vct
 	}
-	add := func(scope string, key VolumeExpansionTargetKey, v OpsRequestVolumeClaimTemplate, current *appsv1.PersistentVolumeClaimTemplate) error {
+	add := func(scope string, key volumeExpansionTargetKey, v opsv1alpha1.OpsRequestVolumeClaimTemplate, current *appsv1.PersistentVolumeClaimTemplate) error {
 		if _, ok := plan.Targets[key]; ok {
 			return fmt.Errorf("duplicate volume expansion target %s/%s in %s", key.InstanceTemplateName, key.VCTName, scope)
 		}
@@ -73,7 +74,7 @@ func NormalizeVolumeExpansion(request VolumeExpansion, spec *appsv1.ClusterCompo
 		if v.Storage.Cmp(declared) < 0 {
 			return fmt.Errorf("requested storage for %s/%s cannot be less than declared size %s", scope, v.Name, declared.String())
 		}
-		plan.Targets[key] = VolumeExpansionTarget{Key: key, RequestedStorage: v.Storage}
+		plan.Targets[key] = volumeExpansionTarget{Key: key, RequestedStorage: v.Storage}
 		return nil
 	}
 	for _, v := range request.VolumeClaimTemplates {
@@ -81,7 +82,7 @@ func NormalizeVolumeExpansion(request VolumeExpansion, spec *appsv1.ClusterCompo
 		if !ok {
 			return plan, fmt.Errorf("volumeClaimTemplate %q not found in %s", v.Name, spec.Name)
 		}
-		if err := add(spec.Name, VolumeExpansionTargetKey{VCTName: v.Name}, v, &current); err != nil {
+		if err := add(spec.Name, volumeExpansionTargetKey{VCTName: v.Name}, v, &current); err != nil {
 			return plan, err
 		}
 	}
@@ -107,7 +108,7 @@ func NormalizeVolumeExpansion(request VolumeExpansion, spec *appsv1.ClusterCompo
 				return plan, fmt.Errorf("duplicate volume expansion target %s/%s", instanceRequest.Name, v.Name)
 			}
 			seen[v.Name] = struct{}{}
-			key := VolumeExpansionTargetKey{InstanceTemplateName: instanceRequest.Name, VCTName: v.Name}
+			key := volumeExpansionTargetKey{InstanceTemplateName: instanceRequest.Name, VCTName: v.Name}
 			if _, exists := plan.Targets[key]; exists {
 				return plan, fmt.Errorf("duplicate volume expansion target %s/%s", instanceRequest.Name, v.Name)
 			}
@@ -123,9 +124,9 @@ func NormalizeVolumeExpansion(request VolumeExpansion, spec *appsv1.ClusterCompo
 	return plan, nil
 }
 
-// EffectiveVolumeClaimTemplate returns the instance override when present and
+// effectiveVolumeClaimTemplate returns the instance override when present and
 // otherwise the component default.
-func EffectiveVolumeClaimTemplate(spec *appsv1.ClusterComponentSpec, instanceName, vctName string) (*appsv1.PersistentVolumeClaimTemplate, bool) {
+func effectiveVolumeClaimTemplate(spec *appsv1.ClusterComponentSpec, instanceName, vctName string) (*appsv1.PersistentVolumeClaimTemplate, bool) {
 	for _, instance := range spec.Instances {
 		if instance.Name != instanceName {
 			continue

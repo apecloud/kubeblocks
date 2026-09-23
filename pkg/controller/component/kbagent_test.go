@@ -41,6 +41,7 @@ import (
 var _ = Describe("kb-agent", func() {
 	var (
 		synthesizedComp *SynthesizedComponent
+		oldRoleRecovery bool
 	)
 
 	cleanEnv := func() {
@@ -53,9 +54,12 @@ var _ = Describe("kb-agent", func() {
 
 	BeforeEach(func() {
 		cleanEnv()
+		oldRoleRecovery = viperx.GetBool(constant.FeatureGateRoleLabelRecovery)
+		viperx.Set(constant.FeatureGateRoleLabelRecovery, true)
 	})
 
 	AfterEach(func() {
+		viperx.Set(constant.FeatureGateRoleLabelRecovery, oldRoleRecovery)
 		cleanEnv()
 	})
 
@@ -128,6 +132,84 @@ var _ = Describe("kb-agent", func() {
 					},
 				},
 			}
+		})
+
+		It("does not add role-label recovery PodTemplate fields when disabled", func() {
+			viperx.Set(constant.FeatureGateRoleLabelRecovery, false)
+			Expect(buildKBAgentContainer(synthesizedComp)).Should(Succeed())
+
+			c := kbAgentContainer()
+			Expect(c).ShouldNot(BeNil())
+			Expect(c.VolumeMounts).ShouldNot(ContainElement(roleLabelVolumeMount))
+			for _, volume := range synthesizedComp.PodSpec.Volumes {
+				Expect(volume.Name).ShouldNot(Equal(roleLabelVolumeName))
+			}
+			for _, env := range c.Env {
+				if env.Name != "KB_AGENT_PROBE" {
+					continue
+				}
+				var probes []proto.Probe
+				Expect(json.Unmarshal([]byte(env.Value), &probes)).Should(Succeed())
+				for _, probe := range probes {
+					if probe.Action == "roleProbe" {
+						Expect(probe.ReportOnFileChange).Should(BeEmpty())
+						Expect(probe.ReportPeriodSeconds).Should(BeZero())
+					}
+				}
+			}
+		})
+
+		It("preserves adopted role-label recovery fields when the gate is disabled", func() {
+			oldSpec := &corev1.PodSpec{
+				Volumes: []corev1.Volume{
+					{Name: roleLabelVolumeName, VolumeSource: corev1.VolumeSource{
+						DownwardAPI: &corev1.DownwardAPIVolumeSource{Items: []corev1.DownwardAPIVolumeFile{{Path: podRoleLabelFileName, FieldRef: &corev1.ObjectFieldSelector{FieldPath: fmt.Sprintf("metadata.labels['%s']", constant.RoleLabelKey)}}}},
+					}},
+					{Name: "other", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}},
+				},
+				Containers: []corev1.Container{{Name: kbagent.ContainerName,
+					VolumeMounts: []corev1.VolumeMount{roleLabelVolumeMount, {Name: "other", MountPath: "/other"}},
+					Env:          []corev1.EnvVar{{Name: "KB_AGENT_PROBE", Value: `[{"action":"roleProbe","reportPeriodSeconds":15,"reportOnFileChange":["/etc/kubeblocks/pod-metadata"]}]`}},
+				}},
+				InitContainers: []corev1.Container{{Name: kbagent.ContainerName4Worker,
+					Env: []corev1.EnvVar{{Name: "KB_AGENT_PROBE", Value: `[{"action":"roleProbe","reportPeriodSeconds":15,"reportOnFileChange":["/etc/kubeblocks/pod-metadata"]}]`}},
+				}},
+			}
+			newSpec := &corev1.PodSpec{
+				Volumes: []corev1.Volume{{Name: "other", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}}},
+				Containers: []corev1.Container{{Name: kbagent.ContainerName,
+					VolumeMounts: []corev1.VolumeMount{{Name: "other", MountPath: "/other"}},
+					Env:          []corev1.EnvVar{{Name: "KB_AGENT_PROBE", Value: `[{"action":"roleProbe"}]`}},
+				}},
+				InitContainers: []corev1.Container{{Name: kbagent.ContainerName4Worker,
+					Env: []corev1.EnvVar{{Name: "KB_AGENT_PROBE", Value: `[{"action":"roleProbe"}]`}},
+				}},
+			}
+
+			Expect(PreserveKBAgentRoleLabelRecoveryPodSpec(oldSpec, newSpec)).Should(Succeed())
+			Expect(newSpec.Volumes).Should(Equal(oldSpec.Volumes))
+			Expect(newSpec.Containers[0].VolumeMounts).Should(Equal(oldSpec.Containers[0].VolumeMounts))
+			var probes []proto.Probe
+			Expect(json.Unmarshal([]byte(newSpec.Containers[0].Env[0].Value), &probes)).Should(Succeed())
+			Expect(probes[0].ReportPeriodSeconds).Should(Equal(int32(15)))
+			Expect(probes[0].ReportOnFileChange).Should(Equal([]string{podMetadataMountPath}))
+			workerProbes := make([]proto.Probe, 0)
+			Expect(json.Unmarshal([]byte(newSpec.InitContainers[0].Env[0].Value), &workerProbes)).Should(Succeed())
+			Expect(workerProbes[0].ReportPeriodSeconds).Should(Equal(int32(15)))
+			Expect(workerProbes[0].ReportOnFileChange).Should(Equal([]string{podMetadataMountPath}))
+		})
+
+		It("does not preserve a role-label volume when kbagent is removed", func() {
+			oldSpec := &corev1.PodSpec{
+				Volumes: []corev1.Volume{{Name: roleLabelVolumeName}},
+				Containers: []corev1.Container{{Name: kbagent.ContainerName,
+					VolumeMounts: []corev1.VolumeMount{roleLabelVolumeMount},
+				}},
+			}
+			newSpec := &corev1.PodSpec{}
+
+			Expect(PreserveKBAgentRoleLabelRecoveryPodSpec(oldSpec, newSpec)).Should(Succeed())
+			Expect(newSpec.Volumes).Should(BeEmpty())
 		})
 
 		It("nil", func() {

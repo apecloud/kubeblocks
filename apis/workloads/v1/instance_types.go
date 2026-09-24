@@ -61,10 +61,10 @@ func init() {
 
 // InstanceSpec defines the desired state of Instance
 type InstanceSpec struct {
-	// ReplicaRestore is copied from the owning InstanceSet and is applied only
+	// ReplicaRestore is copied from the owning InstanceSet and is used only
 	// while building PVCs for this instance.
 	// +optional
-	ReplicaRestore *kbappsv1.ReplicaRestoreProjection `json:"replicaRestore,omitempty"`
+	ReplicaRestore *kbappsv1.ClusterReplicaRestore `json:"replicaRestore,omitempty"`
 
 	Template corev1.PodTemplateSpec `json:"template"`
 
@@ -158,7 +158,7 @@ type InstanceStatus2 struct {
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
 	// Represents the latest available observations of an instance's current state.
-	// Known .status.conditions.type are: "InstanceFailure", "InstanceReady", "InstanceAvailable", "Restore", "ReplicaRestore"
+	// Known .status.conditions.type are: "InstanceFailure", "InstanceReady", "InstanceAvailable", "Restore"
 	//
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`

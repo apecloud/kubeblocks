@@ -25,7 +25,6 @@ import (
 	"slices"
 
 	"golang.org/x/exp/maps"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -64,89 +63,7 @@ func (t *clusterStatusTransformer) reconcileClusterStatus(ctx context.Context, c
 		return nil
 	}
 	t.reconcileClusterPhase(cluster)
-	if err := t.reconcileReplicaRestores(ctx, cli, cluster); err != nil {
-		return err
-	}
 	return t.syncClusterConditions(ctx, cli, cluster)
-}
-
-func (t *clusterStatusTransformer) reconcileReplicaRestores(ctx context.Context, cli client.Reader, cluster *appsv1.Cluster) error {
-	statuses := map[string]appsv1.ReplicaRestoreStatus{}
-	for _, spec := range cluster.Spec.ComponentSpecs {
-		if spec.ReplicaRestore == nil {
-			continue
-		}
-		status := appsv1.ReplicaRestoreStatus{
-			Component: spec.Name, TargetReplicas: spec.Replicas,
-			Phase: appsv1.ReplicaRestorePending, ObservedGeneration: cluster.Generation,
-			Message: "waiting for Component restore observation",
-		}
-		comp := &appsv1.Component{}
-		if err := cli.Get(ctx, client.ObjectKey{Namespace: cluster.Namespace, Name: constant.GenerateClusterComponentName(cluster.Name, spec.Name)}, comp); err != nil {
-			if !apierrors.IsNotFound(err) {
-				return err
-			}
-			statuses[spec.Name] = status
-			continue
-		}
-		projection := comp.Spec.ReplicaRestore
-		if projection != nil && (projection.EndOrdinal != spec.Replicas ||
-			projection.Fingerprint != replicaRestoreFingerprint(cluster, spec.Name, spec.ReplicaRestore, projection.StartOrdinal, projection.EndOrdinal)) {
-			status.Phase = appsv1.ReplicaRestoreFailed
-			status.Message = "replicaRestore source or target does not match the active Component intent"
-		} else if observed := comp.Status.ReplicaRestore; projection != nil && observed != nil && observed.ObservedGeneration == comp.Generation {
-			status.Phase = observed.Phase
-			status.RestoredReplicas = observed.RestoredReplicas
-			status.Message = observed.Message
-		}
-		statuses[spec.Name] = status
-	}
-	if len(statuses) == 0 {
-		cluster.Status.ReplicaRestores = nil
-	} else {
-		cluster.Status.ReplicaRestores = statuses
-	}
-	return nil
-}
-
-// reconcileAcceptedReplicaRestores keeps status tied to persisted Component
-// projections when a changed Cluster intent is rejected during normalization.
-func (t *clusterStatusTransformer) reconcileAcceptedReplicaRestores(ctx context.Context, cli client.Reader,
-	cluster *appsv1.Cluster, specs []*appsv1.ClusterComponentSpec) error {
-	statuses := map[string]appsv1.ReplicaRestoreStatus{}
-	for _, spec := range specs {
-		comp := &appsv1.Component{}
-		if err := cli.Get(ctx, client.ObjectKey{
-			Namespace: cluster.Namespace,
-			Name:      constant.GenerateClusterComponentName(cluster.Name, spec.Name),
-		}, comp); err != nil {
-			if apierrors.IsNotFound(err) {
-				continue
-			}
-			return err
-		}
-		projection := comp.Spec.ReplicaRestore
-		if projection == nil {
-			continue
-		}
-		status := appsv1.ReplicaRestoreStatus{
-			Component: spec.Name, TargetReplicas: projection.EndOrdinal,
-			Phase: appsv1.ReplicaRestorePending, ObservedGeneration: cluster.Generation,
-			Message: "waiting for Component restore observation",
-		}
-		if observed := comp.Status.ReplicaRestore; observed != nil && observed.ObservedGeneration == comp.Generation {
-			status.Phase = observed.Phase
-			status.RestoredReplicas = observed.RestoredReplicas
-			status.Message = observed.Message
-		}
-		statuses[spec.Name] = status
-	}
-	if len(statuses) == 0 {
-		cluster.Status.ReplicaRestores = nil
-	} else {
-		cluster.Status.ReplicaRestores = statuses
-	}
-	return nil
 }
 
 func (t *clusterStatusTransformer) reconcileClusterPhase(cluster *appsv1.Cluster) appsv1.ClusterPhase {

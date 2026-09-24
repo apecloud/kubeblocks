@@ -589,35 +589,3 @@ var _ = Describe("component status transformer conditions", func() {
 		})
 	})
 })
-
-var _ = Describe("Component replica restore status projection", func() {
-	intent := &appsv1.ReplicaRestoreProjection{StartOrdinal: 3, EndOrdinal: 5, Fingerprint: "restore-1"}
-
-	It("projects only a current matching workload summary", func() {
-		comp := &appsv1.Component{ObjectMeta: metav1.ObjectMeta{
-			Name: "cluster-mysql", Generation: 9,
-			Labels: map[string]string{constant.KBAppComponentLabelKey: "mysql"},
-		}, Spec: appsv1.ComponentSpec{ReplicaRestore: intent.DeepCopy()}}
-		its := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Generation: 4},
-			Spec: workloads.InstanceSetSpec{ReplicaRestore: intent.DeepCopy()},
-			Status: workloads.InstanceSetStatus{ReplicaRestore: &appsv1.ReplicaRestoreStatus{
-				Phase: appsv1.ReplicaRestoreRunning, RestoredReplicas: 1, TargetReplicas: 5, ObservedGeneration: 4,
-			}},
-		}
-		transformer := &componentStatusTransformer{comp: comp, runningITS: its}
-		transformer.reconcileReplicaRestoreStatus()
-		Expect(comp.Status.ReplicaRestore).ShouldNot(BeNil())
-		Expect(comp.Status.ReplicaRestore.Component).Should(Equal("mysql"))
-		Expect(comp.Status.ReplicaRestore.ObservedGeneration).Should(Equal(int64(9)))
-		Expect(comp.Status.ReplicaRestore.RestoredReplicas).Should(Equal(int32(1)))
-
-		its.Status.ReplicaRestore.ObservedGeneration = 3
-		transformer.reconcileReplicaRestoreStatus()
-		Expect(comp.Status.ReplicaRestore).Should(BeNil())
-
-		its.Status.ReplicaRestore.ObservedGeneration = 4
-		its.Spec.ReplicaRestore.Fingerprint = "other"
-		transformer.reconcileReplicaRestoreStatus()
-		Expect(comp.Status.ReplicaRestore).Should(BeNil())
-	})
-})

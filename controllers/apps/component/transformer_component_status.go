@@ -22,7 +22,6 @@ package component
 import (
 	"errors"
 	"fmt"
-	"reflect"
 	"slices"
 	"strconv"
 	"strings"
@@ -120,7 +119,6 @@ func (t *componentStatusTransformer) reconcileStatus(transCtx *componentTransfor
 	if t.runningITS == nil {
 		return t.reconcileStatusCondition(transCtx)
 	}
-	t.reconcileReplicaRestoreStatus()
 
 	// check if the ITS is deleting
 	isDeleting := func() bool {
@@ -188,23 +186,6 @@ func (t *componentStatusTransformer) reconcileStatus(transCtx *componentTransfor
 	}
 
 	return t.reconcileStatusCondition(transCtx)
-}
-
-func (t *componentStatusTransformer) reconcileReplicaRestoreStatus() {
-	intent := t.comp.Spec.ReplicaRestore
-	if intent == nil || t.runningITS == nil || !reflect.DeepEqual(t.runningITS.Spec.ReplicaRestore, intent) {
-		t.comp.Status.ReplicaRestore = nil
-		return
-	}
-	workloadStatus := t.runningITS.Status.ReplicaRestore
-	if workloadStatus == nil || workloadStatus.ObservedGeneration != t.runningITS.Generation {
-		t.comp.Status.ReplicaRestore = nil
-		return
-	}
-	status := *workloadStatus
-	status.Component = t.comp.Labels[constant.KBAppComponentLabelKey]
-	status.ObservedGeneration = t.comp.Generation
-	t.comp.Status.ReplicaRestore = &status
 }
 
 func (t *componentStatusTransformer) workloadGeneration() (*int64, error) {

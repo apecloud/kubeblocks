@@ -475,15 +475,14 @@ ComponentSpec
 <td>
 <code>replicaRestore</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.ReplicaRestoreProjection">
-ReplicaRestoreProjection
+<a href="#apps.kubeblocks.io/v1.ClusterReplicaRestore">
+ClusterReplicaRestore
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>ReplicaRestore is the internal workload projection of a Cluster replica restore.
-It is populated by the Cluster controller and is not user-facing.</p>
+<p>ReplicaRestore carries the owner restore intent to workload PVC creation.</p>
 </td>
 </tr>
 <tr>
@@ -3129,8 +3128,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the Component&rsquo;s name.
-It&rsquo;s part of the Service DNS name and must comply with the IANA service naming rule.
+<p>It&rsquo;s part of the Service DNS name and must comply with the IANA service naming rule.
 The name is optional when ClusterComponentSpec is used as a template (e.g., in <code>clusterSharding</code>),
 but required otherwise.</p>
 </td>
@@ -3954,7 +3952,7 @@ component is in <code>Creating</code> or <code>Updating</code> phase, indicates 
 <h3 id="apps.kubeblocks.io/v1.ClusterReplicaRestore">ClusterReplicaRestore
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSpec">InstanceSpec</a>)
 </p>
 <div>
 <p>ClusterReplicaRestore specifies how to initialize replicas added during
@@ -4728,20 +4726,6 @@ Each condition in the list provides real-time information about certain aspect o
 <p>This field is crucial for administrators and developers to monitor and respond to changes within the Cluster.
 It provides a history of state transitions and a snapshot of the current state that can be used for
 automated logic or direct inspection.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>replicaRestores</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.ReplicaRestoreStatus">
-map[string]github.com/apecloud/kubeblocks/apis/apps/v1.ReplicaRestoreStatus
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Records scale-out replica restore status by Component.</p>
 </td>
 </tr>
 </tbody>
@@ -6944,15 +6928,14 @@ Instead, you can enable the creation of this service by specifying it explicitly
 <td>
 <code>replicaRestore</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.ReplicaRestoreProjection">
-ReplicaRestoreProjection
+<a href="#apps.kubeblocks.io/v1.ClusterReplicaRestore">
+ClusterReplicaRestore
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>ReplicaRestore is the internal workload projection of a Cluster replica restore.
-It is populated by the Cluster controller and is not user-facing.</p>
+<p>ReplicaRestore carries the owner restore intent to workload PVC creation.</p>
 </td>
 </tr>
 <tr>
@@ -7517,20 +7500,6 @@ int64
 <td>
 <em>(Optional)</em>
 <p>Specifies the most recent generation observed for this Component object.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>replicaRestore</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.ReplicaRestoreStatus">
-ReplicaRestoreStatus
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>ReplicaRestore reports progress for the current scale-out restore projection.</p>
 </td>
 </tr>
 <tr>
@@ -10788,188 +10757,6 @@ int32
 </em>
 </td>
 <td>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1.ReplicaRestorePhase">ReplicaRestorePhase
-(<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ReplicaRestoreStatus">ReplicaRestoreStatus</a>)
-</p>
-<div>
-<p>ReplicaRestorePhase defines the observed state of a scale-out restore.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;Completed&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;Failed&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;Pending&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;Running&#34;</p></td>
-<td></td>
-</tr></tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1.ReplicaRestoreProjection">ReplicaRestoreProjection
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSpec">InstanceSpec</a>)
-</p>
-<div>
-<p>ReplicaRestoreProjection carries a scale-out restore intent to the workload
-controller without importing DataProtection API types.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>startOrdinal</code><br/>
-<em>
-int32
-</em>
-</td>
-<td>
-</td>
-</tr>
-<tr>
-<td>
-<code>endOrdinal</code><br/>
-<em>
-int32
-</em>
-</td>
-<td>
-</td>
-</tr>
-<tr>
-<td>
-<code>sourceRef</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#typedobjectreference-v1-core">
-Kubernetes core/v1.TypedObjectReference
-</a>
-</em>
-</td>
-<td>
-</td>
-</tr>
-<tr>
-<td>
-<code>annotations</code><br/>
-<em>
-map[string]string
-</em>
-</td>
-<td>
-</td>
-</tr>
-<tr>
-<td>
-<code>fingerprint</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1.ReplicaRestoreStatus">ReplicaRestoreStatus
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterStatus">ClusterStatus</a>, <a href="#apps.kubeblocks.io/v1.ComponentStatus">ComponentStatus</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSetStatus">InstanceSetStatus</a>)
-</p>
-<div>
-<p>ReplicaRestoreStatus records the observed status of a scale-out restore.
-Completed means the new replicas&rsquo; volumes are prepared, including auxiliary
-volumes provisioned without backup data. It does not imply that the replicas
-are ready to serve traffic; consumers must also observe Component readiness.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>component</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-</td>
-</tr>
-<tr>
-<td>
-<code>phase</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.ReplicaRestorePhase">
-ReplicaRestorePhase
-</a>
-</em>
-</td>
-<td>
-</td>
-</tr>
-<tr>
-<td>
-<code>restoredReplicas</code><br/>
-<em>
-int32
-</em>
-</td>
-<td>
-<p>RestoredReplicas counts newly added replicas whose volumes are ready.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>targetReplicas</code><br/>
-<em>
-int32
-</em>
-</td>
-<td>
-<p>TargetReplicas is the desired total number of replicas, including existing replicas.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>message</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-</td>
-</tr>
-<tr>
-<td>
-<code>observedGeneration</code><br/>
-<em>
-int64
-</em>
-</td>
-<td>
-<p>ObservedGeneration identifies the generation of the resource publishing this status.</p>
 </td>
 </tr>
 </tbody>
@@ -18957,14 +18744,14 @@ InstanceSpec
 <td>
 <code>replicaRestore</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.ReplicaRestoreProjection">
-ReplicaRestoreProjection
+<a href="#apps.kubeblocks.io/v1.ClusterReplicaRestore">
+ClusterReplicaRestore
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>ReplicaRestore is copied from the owning InstanceSet and is applied only
+<p>ReplicaRestore is copied from the owning InstanceSet and is used only
 while building PVCs for this instance.</p>
 </td>
 </tr>
@@ -19259,15 +19046,14 @@ InstanceSetSpec
 <td>
 <code>replicaRestore</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.ReplicaRestoreProjection">
-ReplicaRestoreProjection
+<a href="#apps.kubeblocks.io/v1.ClusterReplicaRestore">
+ClusterReplicaRestore
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>ReplicaRestore is an internal per-ordinal restore projection populated by
-the Component controller. It contains no DataProtection API types.</p>
+<p>ReplicaRestore carries the owner restore intent to PVC creation.</p>
 </td>
 </tr>
 <tr>
@@ -19707,11 +19493,6 @@ and continue for &ldquo;MinReadySeconds&rdquo; seconds. Otherwise, it will be se
 ConditionStatus will be True if all its instances(pods) are in a Ready condition.
 Or, a NotReady reason with not ready instances encoded in the Message filed will be set.</p>
 </td>
-</tr><tr><td><p>&#34;ReplicaRestore&#34;</p></td>
-<td><p>InstanceReplicaRestore reports only the PVCs selected by a scale-out
-replica restore projection. It is independent of the initial restore
-condition above.</p>
-</td>
 </tr><tr><td><p>&#34;Restore&#34;</p></td>
 <td><p>InstanceRestore indicates whether the initial data restore for this Instance or InstanceSet has completed.</p>
 </td>
@@ -20019,15 +19800,14 @@ string
 <td>
 <code>replicaRestore</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.ReplicaRestoreProjection">
-ReplicaRestoreProjection
+<a href="#apps.kubeblocks.io/v1.ClusterReplicaRestore">
+ClusterReplicaRestore
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>ReplicaRestore is an internal per-ordinal restore projection populated by
-the Component controller. It contains no DataProtection API types.</p>
+<p>ReplicaRestore carries the owner restore intent to PVC creation.</p>
 </td>
 </tr>
 <tr>
@@ -20458,20 +20238,6 @@ InstanceSet&rsquo;s generation, which is updated on mutation by the API Server.<
 </tr>
 <tr>
 <td>
-<code>replicaRestore</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.ReplicaRestoreStatus">
-ReplicaRestoreStatus
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>ReplicaRestore reports progress for the current scale-out restore projection.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>replicas</code><br/>
 <em>
 int32
@@ -20553,7 +20319,7 @@ string
 <td>
 <em>(Optional)</em>
 <p>Represents the latest available observations of an instanceset&rsquo;s current state.
-Known .status.conditions.type are: &ldquo;InstanceFailure&rdquo;, &ldquo;InstanceReady&rdquo;, &ldquo;Restore&rdquo;, &ldquo;ReplicaRestore&rdquo;</p>
+Known .status.conditions.type are: &ldquo;InstanceFailure&rdquo;, &ldquo;InstanceReady&rdquo;, &ldquo;Restore&rdquo;</p>
 </td>
 </tr>
 <tr>
@@ -20702,14 +20468,14 @@ to allocate next during scaling up, or which identity is preserved during a rest
 <td>
 <code>replicaRestore</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.ReplicaRestoreProjection">
-ReplicaRestoreProjection
+<a href="#apps.kubeblocks.io/v1.ClusterReplicaRestore">
+ClusterReplicaRestore
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>ReplicaRestore is copied from the owning InstanceSet and is applied only
+<p>ReplicaRestore is copied from the owning InstanceSet and is used only
 while building PVCs for this instance.</p>
 </td>
 </tr>
@@ -21158,7 +20924,7 @@ Instance&rsquo;s generation, which is updated on mutation by the API Server.</p>
 <td>
 <em>(Optional)</em>
 <p>Represents the latest available observations of an instance&rsquo;s current state.
-Known .status.conditions.type are: &ldquo;InstanceFailure&rdquo;, &ldquo;InstanceReady&rdquo;, &ldquo;InstanceAvailable&rdquo;, &ldquo;Restore&rdquo;, &ldquo;ReplicaRestore&rdquo;</p>
+Known .status.conditions.type are: &ldquo;InstanceFailure&rdquo;, &ldquo;InstanceReady&rdquo;, &ldquo;InstanceAvailable&rdquo;, &ldquo;Restore&rdquo;</p>
 </td>
 </tr>
 <tr>

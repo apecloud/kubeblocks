@@ -50,7 +50,7 @@ func (builder *InstanceSetBuilder) SetReplicas(replicas int32) *InstanceSetBuild
 	return builder
 }
 
-func (builder *InstanceSetBuilder) SetReplicaRestore(restore *kbappsv1.ReplicaRestoreProjection) *InstanceSetBuilder {
+func (builder *InstanceSetBuilder) SetReplicaRestore(restore *kbappsv1.ClusterReplicaRestore) *InstanceSetBuilder {
 	builder.get().Spec.ReplicaRestore = restore
 	return builder
 }

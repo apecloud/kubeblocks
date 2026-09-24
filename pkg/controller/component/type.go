@@ -42,7 +42,7 @@ type SynthesizedComponent struct {
 	ServiceKind                      string
 	ServiceVersion                   string                                 `json:"serviceVersion,omitempty"`
 	Replicas                         int32                                  `json:"replicas"`
-	ReplicaRestore                   *kbappsv1.ReplicaRestoreProjection     `json:"replicaRestore,omitempty"`
+	ReplicaRestore                   *kbappsv1.ClusterReplicaRestore        `json:"replicaRestore,omitempty"`
 	Resources                        corev1.ResourceRequirements            `json:"resources,omitempty"`
 	PodSpec                          *corev1.PodSpec                        `json:"podSpec,omitempty"`
 	SidecarVars                      []kbappsv1.EnvVar                      // vars defined by sidecars

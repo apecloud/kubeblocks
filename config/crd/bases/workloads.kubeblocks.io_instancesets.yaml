@@ -3527,51 +3527,158 @@ spec:
                 description: PodUpgradePolicy indicates how pods should be upgraded.
                 type: string
               replicaRestore:
-                description: |-
-                  ReplicaRestore is an internal per-ordinal restore projection populated by
-                  the Component controller. It contains no DataProtection API types.
+                description: ReplicaRestore carries the owner restore intent to PVC
+                  creation.
                 properties:
-                  annotations:
+                  env:
+                    description: Specifies environment variables for the restore worker.
+                    items:
+                      description: EnvVar represents an environment variable present
+                        in a Container.
+                      properties:
+                        name:
+                          description: Name of the environment variable. Must be a
+                            C_IDENTIFIER.
+                          type: string
+                        value:
+                          description: |-
+                            Variable references $(VAR_NAME) are expanded
+                            using the previously defined environment variables in the container and
+                            any service environment variables. If a variable cannot be resolved,
+                            the reference in the input string will be unchanged. Double $$ are reduced
+                            to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e.
+                            "$$(VAR_NAME)" will produce the string literal "$(VAR_NAME)".
+                            Escaped references will never be expanded, regardless of whether the variable
+                            exists or not.
+                            Defaults to "".
+                          type: string
+                        valueFrom:
+                          description: Source for the environment variable's value.
+                            Cannot be used if value is not empty.
+                          properties:
+                            configMapKeyRef:
+                              description: Selects a key of a ConfigMap.
+                              properties:
+                                key:
+                                  description: The key to select.
+                                  type: string
+                                name:
+                                  description: |-
+                                    Name of the referent.
+                                    More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                  type: string
+                                optional:
+                                  description: Specify whether the ConfigMap or its
+                                    key must be defined
+                                  type: boolean
+                              required:
+                              - key
+                              type: object
+                              x-kubernetes-map-type: atomic
+                            fieldRef:
+                              description: |-
+                                Selects a field of the pod: supports metadata.name, metadata.namespace, `metadata.labels['<KEY>']`, `metadata.annotations['<KEY>']`,
+                                spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP, status.podIPs.
+                              properties:
+                                apiVersion:
+                                  description: Version of the schema the FieldPath
+                                    is written in terms of, defaults to "v1".
+                                  type: string
+                                fieldPath:
+                                  description: Path of the field to select in the
+                                    specified API version.
+                                  type: string
+                              required:
+                              - fieldPath
+                              type: object
+                              x-kubernetes-map-type: atomic
+                            resourceFieldRef:
+                              description: |-
+                                Selects a resource of the container: only resources limits and requests
+                                (limits.cpu, limits.memory, limits.ephemeral-storage, requests.cpu, requests.memory and requests.ephemeral-storage) are currently supported.
+                              properties:
+                                containerName:
+                                  description: 'Container name: required for volumes,
+                                    optional for env vars'
+                                  type: string
+                                divisor:
+                                  anyOf:
+                                  - type: integer
+                                  - type: string
+                                  description: Specifies the output format of the
+                                    exposed resources, defaults to "1"
+                                  pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                  x-kubernetes-int-or-string: true
+                                resource:
+                                  description: 'Required: resource to select'
+                                  type: string
+                              required:
+                              - resource
+                              type: object
+                              x-kubernetes-map-type: atomic
+                            secretKeyRef:
+                              description: Selects a key of a secret in the pod's
+                                namespace
+                              properties:
+                                key:
+                                  description: The key of the secret to select from.  Must
+                                    be a valid secret key.
+                                  type: string
+                                name:
+                                  description: |-
+                                    Name of the referent.
+                                    More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                  type: string
+                                optional:
+                                  description: Specify whether the Secret or its key
+                                    must be defined
+                                  type: boolean
+                              required:
+                              - key
+                              type: object
+                              x-kubernetes-map-type: atomic
+                          type: object
+                      required:
+                      - name
+                      type: object
+                    type: array
+                  parameters:
                     additionalProperties:
                       type: string
+                    description: Specifies runtime-specific restore parameters.
                     type: object
-                  endOrdinal:
-                    format: int32
-                    type: integer
-                  fingerprint:
+                  pitr:
+                    description: Specifies the point-in-time recovery target.
                     type: string
-                  sourceRef:
+                  source:
+                    description: Specifies the restore source.
                     properties:
                       apiGroup:
                         description: |-
-                          APIGroup is the group for the resource being referenced.
-                          If APIGroup is not specified, the specified Kind must be in the core API group.
-                          For any other third-party types, APIGroup is required.
+                          Specifies the API group of the restore source. For example, use "dataprotection.kubeblocks.io" for KubeBlocks
+                          data protection Backup sources.
                         type: string
                       kind:
-                        description: Kind is the type of resource being referenced
+                        description: Specifies the kind of the restore source.
                         type: string
                       name:
-                        description: Name is the name of resource being referenced
+                        description: Specifies the name of the restore source.
                         type: string
                       namespace:
-                        description: |-
-                          Namespace is the namespace of resource being referenced
-                          Note that when a namespace is specified, a gateway.networking.k8s.io/ReferenceGrant object is required in the referent namespace to allow that namespace's owner to accept the reference. See the ReferenceGrant documentation for details.
-                          (Alpha) This field requires the CrossNamespaceVolumeDataSource feature gate to be enabled.
+                        description: Specifies the namespace of the restore source.
+                          If empty, the Cluster namespace is used.
                         type: string
                     required:
+                    - apiGroup
                     - kind
                     - name
                     type: object
-                  startOrdinal:
-                    format: int32
-                    type: integer
+                  sourceTargetName:
+                    description: Specifies the source target in a Backup with multiple
+                      targets.
+                    type: string
                 required:
-                - endOrdinal
-                - fingerprint
-                - sourceRef
-                - startOrdinal
+                - source
                 type: object
               replicas:
                 default: 1
@@ -11621,7 +11728,7 @@ spec:
               conditions:
                 description: |-
                   Represents the latest available observations of an instanceset's current state.
-                  Known .status.conditions.type are: "InstanceFailure", "InstanceReady", "Restore", "ReplicaRestore"
+                  Known .status.conditions.type are: "InstanceFailure", "InstanceReady", "Restore"
                 items:
                   description: Condition contains details for one aspect of the current
                     state of this API Resource.
@@ -11824,37 +11931,6 @@ spec:
                   this InstanceSet with a Ready Condition.
                 format: int32
                 type: integer
-              replicaRestore:
-                description: ReplicaRestore reports progress for the current scale-out
-                  restore projection.
-                properties:
-                  component:
-                    type: string
-                  message:
-                    type: string
-                  observedGeneration:
-                    description: ObservedGeneration identifies the generation of the
-                      resource publishing this status.
-                    format: int64
-                    type: integer
-                  phase:
-                    description: ReplicaRestorePhase defines the observed state of
-                      a scale-out restore.
-                    type: string
-                  restoredReplicas:
-                    description: RestoredReplicas counts newly added replicas whose
-                      volumes are ready.
-                    format: int32
-                    type: integer
-                  targetReplicas:
-                    description: TargetReplicas is the desired total number of replicas,
-                      including existing replicas.
-                    format: int32
-                    type: integer
-                required:
-                - component
-                - phase
-                type: object
               replicas:
                 description: replicas is the number of instances created by the InstanceSet
                   controller.

@@ -31,13 +31,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 
-	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/apecloud/kubeblocks/pkg/controller/replicarestore"
 	"github.com/apecloud/kubeblocks/pkg/controller/workloads/instancestatus"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -201,9 +199,6 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	if err = r.reconcileRestoreCondition(tree, its); err != nil {
 		return kubebuilderx.Continue, err
 	}
-	if err = r.reconcileReplicaRestoreCondition(tree, its); err != nil {
-		return kubebuilderx.Continue, err
-	}
 
 	// 4. set instance status
 	if err = setInstanceStatus(tree, its, podList); err != nil {
@@ -236,63 +231,6 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 
 	return kubebuilderx.Continue, nil
-}
-
-func (r *statusReconciler) reconcileReplicaRestoreCondition(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet) error {
-	status, err := buildReplicaRestoreStatus(tree, its)
-	if err != nil {
-		return err
-	}
-	its.Status.ReplicaRestore = status
-	condition := replicarestore.ConditionFromStatus(status, string(workloads.InstanceReplicaRestore))
-	if condition == nil {
-		meta.RemoveStatusCondition(&its.Status.Conditions, string(workloads.InstanceReplicaRestore))
-		return nil
-	}
-	meta.SetStatusCondition(&its.Status.Conditions, *condition)
-	return nil
-}
-
-func buildReplicaRestoreStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet) (*kbappsv1.ReplicaRestoreStatus, error) {
-	intent := its.Spec.ReplicaRestore
-	if intent == nil || intent.EndOrdinal <= intent.StartOrdinal {
-		return nil, nil
-	}
-	itsExt, err := instancetemplate.BuildInstanceSetExt(its, tree)
-	if err != nil {
-		return nil, err
-	}
-	builder, err := instancetemplate.NewPodNameBuilder(itsExt, nil)
-	if err != nil {
-		return nil, err
-	}
-	nameToTemplate, err := builder.BuildInstanceName2TemplateMap()
-	if err != nil {
-		return nil, err
-	}
-	targets := make([]replicarestore.Target, 0)
-	for name, template := range nameToTemplate {
-		if !replicarestore.Applies(intent, name) {
-			continue
-		}
-		target := replicarestore.Target{InstanceName: name}
-		for i := range template.VolumeClaimTemplates {
-			vct := &template.VolumeClaimTemplates[i]
-			pvcName := intctrlutil.ComposePVCName(*vct, its.Name, name)
-			target.PVCs = append(target.PVCs, replicarestore.PVCIdentity{Name: pvcName, VolumeClaimTemplate: vct.Name})
-		}
-		targets = append(targets, target)
-	}
-	pvcs := make([]*corev1.PersistentVolumeClaim, 0)
-	for _, obj := range tree.List(&corev1.PersistentVolumeClaim{}) {
-		pvcs = append(pvcs, obj.(*corev1.PersistentVolumeClaim))
-	}
-	targetReplicas := int32(1)
-	if its.Spec.Replicas != nil {
-		targetReplicas = *its.Spec.Replicas
-	}
-	return replicarestore.ObservePVCs(intent, its.Labels[constant.KBAppComponentLabelKey], its.Generation,
-		targetReplicas, intent.EndOrdinal-intent.StartOrdinal, targets, pvcs), nil
 }
 
 func (r *statusReconciler) reconcileRestoreCondition(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet) error {

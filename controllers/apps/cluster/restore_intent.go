@@ -21,11 +21,9 @@ package cluster
 
 import (
 	"context"
-	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"maps"
-	"strconv"
+	"reflect"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -50,7 +48,7 @@ func applyClusterRestoreIntentWithReader(ctx context.Context, reader client.Read
 			applyRestoreIntentToComponent(cluster, comp.Name, comp.VolumeClaimTemplates, comp.Instances, completed)
 		}
 		if reader != nil {
-			if err := applyReplicaRestoreProjection(ctx, reader, cluster, comp); err != nil {
+			if err := validateReplicaRestoreIntent(ctx, reader, cluster, comp); err != nil {
 				return err
 			}
 		}
@@ -71,26 +69,9 @@ func applyClusterRestoreIntentWithReader(ctx context.Context, reader client.Read
 	return nil
 }
 
-func applyReplicaRestoreProjection(ctx context.Context, reader client.Reader, cluster *appsv1.Cluster, comp *appsv1.ClusterComponentSpec) error {
-	comp.ReplicaRestoreProjection = nil
+func validateReplicaRestoreIntent(ctx context.Context, reader client.Reader, cluster *appsv1.Cluster, comp *appsv1.ClusterComponentSpec) error {
 	restore := comp.ReplicaRestore
 	if restore == nil {
-		if reader != nil {
-			component := &appsv1.Component{}
-			key := types.NamespacedName{Namespace: cluster.Namespace, Name: constant.GenerateClusterComponentName(cluster.Name, comp.Name)}
-			if err := reader.Get(ctx, key, component); err == nil && component.Spec.ReplicaRestore != nil {
-				projection := component.Spec.ReplicaRestore
-				status := component.Status.ReplicaRestore
-				rollback := comp.Replicas == projection.StartOrdinal
-				terminal := status != nil && status.ObservedGeneration == component.Generation &&
-					(status.Phase == appsv1.ReplicaRestoreCompleted || status.Phase == appsv1.ReplicaRestoreFailed)
-				if !rollback && !terminal {
-					return fmt.Errorf("component %q cannot remove replicaRestore while restore is active", comp.Name)
-				}
-			} else if err != nil && !apierrors.IsNotFound(err) {
-				return err
-			}
-		}
 		return nil
 	}
 	if len(comp.Instances) != 0 || len(comp.Ordinals.Ranges) != 0 || len(comp.Ordinals.Discrete) != 0 || comp.FlatInstanceOrdinal || len(comp.OfflineInstances) != 0 {
@@ -102,29 +83,28 @@ func applyReplicaRestoreProjection(ctx context.Context, reader client.Reader, cl
 	if restore.Source.APIGroup != dptypes.DataprotectionAPIGroup || restore.Source.Kind != dptypes.BackupKind {
 		return fmt.Errorf("component %q replicaRestore source must be a DataProtection Backup", comp.Name)
 	}
+	if reader == nil {
+		return nil
+	}
 	component := &appsv1.Component{}
 	key := types.NamespacedName{Namespace: cluster.Namespace, Name: constant.GenerateClusterComponentName(cluster.Name, comp.Name)}
-	// A missing Component is a normal create-time state, where replicaRestore is invalid.
 	if err := reader.Get(ctx, key, component); err != nil {
+		if apierrors.IsNotFound(err) {
+			return fmt.Errorf("component %q replicaRestore requires an existing Component", comp.Name)
+		}
 		return err
 	}
 	if !component.DeletionTimestamp.IsZero() {
-		return fmt.Errorf("component %q replicaRestore requires a non-deleting live Component", comp.Name)
+		return fmt.Errorf("component %q replicaRestore requires a non-deleting Component", comp.Name)
 	}
 	if existing := component.Spec.ReplicaRestore; existing != nil {
-		if comp.Replicas != existing.EndOrdinal || replicaRestoreFingerprint(cluster, comp.Name, restore, existing.StartOrdinal, existing.EndOrdinal) != existing.Fingerprint {
+		if component.Spec.Replicas != comp.Replicas || !reflect.DeepEqual(existing, restore) {
 			return fmt.Errorf("component %q replicaRestore source and target are immutable until the intent is removed", comp.Name)
 		}
-		// The persisted desired input is sufficient to resume during Updating or
-		// Failed. Baseline stability is only required when accepting a new intent.
-		comp.ReplicaRestoreProjection = existing.DeepCopy()
 		return nil
 	}
-	if component.Status.Phase != appsv1.RunningComponentPhase {
+	if component.Status.Phase != appsv1.RunningComponentPhase || component.Status.ObservedGeneration != component.Generation {
 		return fmt.Errorf("component %q replicaRestore requires a stable Running Component", comp.Name)
-	}
-	if component.Status.ObservedGeneration != component.Generation {
-		return fmt.Errorf("component %q replicaRestore is waiting for the current Component generation", comp.Name)
 	}
 	if len(component.Spec.Instances) != 0 || len(component.Spec.Ordinals.Ranges) != 0 || len(component.Spec.Ordinals.Discrete) != 0 || component.Spec.FlatInstanceOrdinal || len(component.Spec.OfflineInstances) != 0 {
 		return fmt.Errorf("component %q replicaRestore requires a default contiguous live workload", comp.Name)
@@ -132,75 +112,10 @@ func applyReplicaRestoreProjection(ctx context.Context, reader client.Reader, cl
 	if len(component.Spec.VolumeClaimTemplates) == 0 || len(comp.VolumeClaimTemplates) == 0 {
 		return fmt.Errorf("component %q replicaRestore requires at least one volume claim template", comp.Name)
 	}
-	from := component.Spec.Replicas
-	if comp.Replicas <= from {
-		return fmt.Errorf("component %q replicaRestore requires replicas greater than current replicas", comp.Name)
-	}
-	fingerprint := replicaRestoreFingerprint(cluster, comp.Name, restore, from, comp.Replicas)
-	annotations := map[string]string{
-		constant.RestoreSourceAPIGroupAnnotationKey:     restore.Source.APIGroup,
-		constant.RestoreSourceKindAnnotationKey:         restore.Source.Kind,
-		constant.RestoreSourceNameAnnotationKey:         restore.Source.Name,
-		constant.RestoreSourceNamespaceAnnotationKey:    restoreSourceNamespace(cluster, restore.Source.Namespace),
-		constant.KBAppClusterUIDKey:                     string(cluster.UID),
-		constant.RestoreComponentAnnotationKey:          comp.Name,
-		constant.RestorePurposeAnnotationKey:            constant.RestorePurposeReplica,
-		constant.ReplicaRestoreFingerprintAnnotationKey: fingerprint,
-		constant.ReplicaRestoreGenerationAnnotationKey:  strconv.FormatInt(cluster.Generation, 10),
-	}
-	if restore.PITR != "" {
-		annotations[constant.RestorePITRAnnotationKey] = restore.PITR
-	}
-	parameters := maps.Clone(restore.Parameters)
-	if restore.SourceTargetName != "" {
-		annotations[dptypes.SourceTargetNameAnnotationKey] = restore.SourceTargetName
-		if parameters == nil {
-			parameters = map[string]string{}
-		}
-		parameters[dptypes.SourceTargetNameAnnotationKey] = restore.SourceTargetName
-	}
-	if len(restore.Env) > 0 {
-		data, err := json.Marshal(restore.Env)
-		if err != nil {
-			return err
-		}
-		if parameters == nil {
-			parameters = map[string]string{}
-		}
-		parameters[dptypes.RestoreEnvParameterKey] = string(data)
-	}
-	if len(parameters) > 0 {
-		data, err := json.Marshal(parameters)
-		if err != nil {
-			return err
-		}
-		annotations[constant.RestoreParametersAnnotationKey] = string(data)
-	}
-	apiGroup := restore.Source.APIGroup
-	var namespace *string
-	if sourceNamespace := restoreSourceNamespace(cluster, restore.Source.Namespace); sourceNamespace != cluster.Namespace {
-		namespace = &sourceNamespace
-	}
-	comp.ReplicaRestoreProjection = &appsv1.ReplicaRestoreProjection{
-		StartOrdinal: from,
-		EndOrdinal:   comp.Replicas,
-		SourceRef:    corev1.TypedObjectReference{APIGroup: &apiGroup, Kind: restore.Source.Kind, Name: restore.Source.Name, Namespace: namespace},
-		Annotations:  annotations,
-		Fingerprint:  fingerprint,
+	if comp.Replicas <= component.Spec.Replicas {
+		return fmt.Errorf("component %q replicaRestore requires scale-out beyond current replicas", comp.Name)
 	}
 	return nil
-}
-
-func restoreSourceNamespace(cluster *appsv1.Cluster, namespace string) string {
-	if namespace == "" {
-		return cluster.Namespace
-	}
-	return namespace
-}
-
-func replicaRestoreFingerprint(cluster *appsv1.Cluster, component string, restore *appsv1.ClusterReplicaRestore, from, to int32) string {
-	data, _ := json.Marshal([]any{cluster.UID, component, from, to, restore})
-	return fmt.Sprintf("%x", sha256.Sum256(data))[:16]
 }
 
 func isClusterRestoreCompleted(cluster *appsv1.Cluster) bool {

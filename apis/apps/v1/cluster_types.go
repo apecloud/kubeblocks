@@ -241,11 +241,6 @@ type ClusterStatus struct {
 	//
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
-
-	// Records scale-out replica restore status by Component.
-	//
-	// +optional
-	ReplicaRestores map[string]ReplicaRestoreStatus `json:"replicaRestores,omitempty"`
 }
 
 // TerminationPolicyType defines termination policy types.
@@ -266,11 +261,7 @@ const (
 )
 
 // ClusterComponentSpec defines the specification of a Component within a Cluster.
-type ClusterComponentSpec struct {
-	// ReplicaRestoreProjection is populated internally by normalization and is
-	// not part of the user API.
-	ReplicaRestoreProjection *ReplicaRestoreProjection `json:"-"`
-	// Specifies the Component's name.
+type ClusterComponentSpec struct { // Specifies the Component's name.
 	// It's part of the Service DNS name and must comply with the IANA service naming rule.
 	// The name is optional when ClusterComponentSpec is used as a template (e.g., in `clusterSharding`),
 	// but required otherwise.
@@ -940,36 +931,6 @@ type ClusterReplicaRestore struct {
 	//
 	// +optional
 	Env []corev1.EnvVar `json:"env,omitempty"`
-}
-
-// ReplicaRestorePhase defines the observed state of a scale-out restore.
-type ReplicaRestorePhase string
-
-const (
-	ReplicaRestorePending   ReplicaRestorePhase = "Pending"
-	ReplicaRestoreRunning   ReplicaRestorePhase = "Running"
-	ReplicaRestoreCompleted ReplicaRestorePhase = "Completed"
-	ReplicaRestoreFailed    ReplicaRestorePhase = "Failed"
-)
-
-// ReplicaRestoreStatus records the observed status of a scale-out restore.
-// Completed means the new replicas' volumes are prepared, including auxiliary
-// volumes provisioned without backup data. It does not imply that the replicas
-// are ready to serve traffic; consumers must also observe Component readiness.
-type ReplicaRestoreStatus struct {
-	Component string              `json:"component"`
-	Phase     ReplicaRestorePhase `json:"phase"`
-
-	// RestoredReplicas counts newly added replicas whose volumes are ready.
-	RestoredReplicas int32 `json:"restoredReplicas,omitempty"`
-
-	// TargetReplicas is the desired total number of replicas, including existing replicas.
-	TargetReplicas int32 `json:"targetReplicas,omitempty"`
-
-	Message string `json:"message,omitempty"`
-
-	// ObservedGeneration identifies the generation of the resource publishing this status.
-	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
 // ClusterRestoreSource describes the source object used by a Cluster restore.

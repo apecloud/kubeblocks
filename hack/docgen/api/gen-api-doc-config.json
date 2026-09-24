@@ -1,7 +1,6 @@
 {
     "hideMemberFields": [
-        "TypeMeta",
-        "ReplicaRestoreProjection"
+        "TypeMeta"
     ],
     "hideTypePatterns": [
         "ParseError$",

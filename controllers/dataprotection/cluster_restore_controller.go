@@ -163,24 +163,10 @@ func clusterAllowsRestoreProgress(cluster *appsv1.Cluster) bool {
 }
 
 func hasActiveReplicaRestore(cluster *appsv1.Cluster) bool {
-	for _, status := range cluster.Status.ReplicaRestores {
-		switch status.Phase {
-		case appsv1.ReplicaRestorePending, appsv1.ReplicaRestoreRunning:
+	for _, spec := range cluster.Spec.ComponentSpecs {
+		if spec.ReplicaRestore != nil {
 			return true
 		}
-	}
-	// The status patch can race the first Component/PVC projection. Keep the
-	// parent protected while a source is declared and the desired count still
-	// exceeds the live Component count; the next reconcile records the status.
-	for _, spec := range cluster.Spec.ComponentSpecs {
-		if spec.ReplicaRestore == nil || spec.Replicas <= 0 {
-			continue
-		}
-		if status, ok := cluster.Status.ReplicaRestores[spec.Name]; ok &&
-			(status.Phase == appsv1.ReplicaRestoreCompleted || status.Phase == appsv1.ReplicaRestoreFailed) {
-			continue
-		}
-		return true
 	}
 	return false
 }

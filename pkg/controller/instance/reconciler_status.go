@@ -33,7 +33,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/apecloud/kubeblocks/pkg/controller/replicarestore"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -55,7 +54,6 @@ func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	inst := tree.GetRoot().(*workloads.Instance)
 	r.reconcileRestoreCondition(tree, inst)
-	r.reconcileReplicaRestoreCondition(tree, inst)
 
 	obj, err := tree.Get(podObj(inst))
 	if err != nil {
@@ -130,39 +128,6 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		return kubebuilderx.RetryAfter(time.Second), nil
 	}
 	return kubebuilderx.Continue, nil
-}
-
-func (r *statusReconciler) reconcileReplicaRestoreCondition(tree *kubebuilderx.ObjectTree, inst *workloads.Instance) {
-	condition := r.buildReplicaRestoreCondition(tree, inst)
-	if condition == nil {
-		meta.RemoveStatusCondition(&inst.Status.Conditions, string(workloads.InstanceReplicaRestore))
-		return
-	}
-	meta.SetStatusCondition(&inst.Status.Conditions, *condition)
-}
-
-func (r *statusReconciler) buildReplicaRestoreCondition(tree *kubebuilderx.ObjectTree, inst *workloads.Instance) *metav1.Condition {
-	intent := inst.Spec.ReplicaRestore
-	if intent == nil || !replicarestore.Applies(intent, inst.Name) {
-		return nil
-	}
-	target := replicarestore.Target{InstanceName: inst.Name}
-	for i := range inst.Spec.VolumeClaimTemplates {
-		vct := &inst.Spec.VolumeClaimTemplates[i]
-		target.PVCs = append(target.PVCs, replicarestore.PVCIdentity{
-			Name:                intctrlutil.ComposePVCName(corev1.PersistentVolumeClaim{ObjectMeta: vct.ObjectMeta}, inst.Spec.InstanceSetName, inst.Name),
-			VolumeClaimTemplate: vct.Name,
-		})
-	}
-	if len(target.PVCs) == 0 {
-		return nil
-	}
-	pvcs := make([]*corev1.PersistentVolumeClaim, 0)
-	for _, obj := range tree.List(&corev1.PersistentVolumeClaim{}) {
-		pvcs = append(pvcs, obj.(*corev1.PersistentVolumeClaim))
-	}
-	status := replicarestore.ObservePVCs(intent, "", inst.Generation, 1, 1, []replicarestore.Target{target}, pvcs)
-	return replicarestore.ConditionFromStatus(status, string(workloads.InstanceReplicaRestore))
 }
 
 func (r *statusReconciler) reconcileRestoreCondition(tree *kubebuilderx.ObjectTree, inst *workloads.Instance) {

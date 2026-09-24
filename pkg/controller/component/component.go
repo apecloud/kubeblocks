@@ -74,7 +74,7 @@ func BuildComponent(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSp
 		SetSchedulingPolicy(scheduling.BuildSchedulingPolicy(cluster, compSpec)).
 		SetDisableExporter(compSpec.DisableExporter).
 		SetReplicas(compSpec.Replicas).
-		SetReplicaRestore(compSpec.ReplicaRestoreProjection).
+		SetReplicaRestore(compSpec.ReplicaRestore).
 		SetResources(compSpec.Resources).
 		SetServiceAccountName(compSpec.ServiceAccountName).
 		SetParallelPodManagementConcurrency(compSpec.ParallelPodManagementConcurrency).

@@ -2692,7 +2692,6 @@ spec:
                       type: object
                     name:
                       description: |-
-                        Specifies the Component's name.
                         It's part of the Service DNS name and must comply with the IANA service naming rule.
                         The name is optional when ClusterComponentSpec is used as a template (e.g., in `clusterSharding`),
                         but required otherwise.
@@ -14145,7 +14144,6 @@ spec:
                           type: object
                         name:
                           description: |-
-                            Specifies the Component's name.
                             It's part of the Service DNS name and must comply with the IANA service naming rule.
                             The name is optional when ClusterComponentSpec is used as a template (e.g., in `clusterSharding`),
                             but required otherwise.
@@ -18211,43 +18209,6 @@ spec:
                 - Failed
                 - Abnormal
                 type: string
-              replicaRestores:
-                additionalProperties:
-                  description: |-
-                    ReplicaRestoreStatus records the observed status of a scale-out restore.
-                    Completed means the new replicas' volumes are prepared, including auxiliary
-                    volumes provisioned without backup data. It does not imply that the replicas
-                    are ready to serve traffic; consumers must also observe Component readiness.
-                  properties:
-                    component:
-                      type: string
-                    message:
-                      type: string
-                    observedGeneration:
-                      description: ObservedGeneration identifies the generation of
-                        the resource publishing this status.
-                      format: int64
-                      type: integer
-                    phase:
-                      description: ReplicaRestorePhase defines the observed state
-                        of a scale-out restore.
-                      type: string
-                    restoredReplicas:
-                      description: RestoredReplicas counts newly added replicas whose
-                        volumes are ready.
-                      format: int32
-                      type: integer
-                    targetReplicas:
-                      description: TargetReplicas is the desired total number of replicas,
-                        including existing replicas.
-                      format: int32
-                      type: integer
-                  required:
-                  - component
-                  - phase
-                  type: object
-                description: Records scale-out replica restore status by Component.
-                type: object
               shardings:
                 additionalProperties:
                   description: ClusterShardingStatus records a sharding status.

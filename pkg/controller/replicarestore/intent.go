@@ -12,11 +12,9 @@ the Free Software Foundation, either version 3 of the License, or
 package replicarestore
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
-	"slices"
-	"strconv"
-	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 
@@ -25,107 +23,105 @@ import (
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 )
 
-// Applies reports whether a default contiguous ordinal belongs to the
-// projected replica restore range.
-func Applies(intent *appsv1.ReplicaRestoreProjection, instanceName string) bool {
-	if intent == nil || intent.EndOrdinal <= intent.StartOrdinal {
-		return false
-	}
-	idx := strings.LastIndexByte(instanceName, '-')
-	if idx < 0 || idx == len(instanceName)-1 {
-		return false
-	}
-	ordinal, err := strconv.ParseInt(instanceName[idx+1:], 10, 32)
-	if err != nil {
-		return false
-	}
-	return int32(ordinal) >= intent.StartOrdinal && int32(ordinal) < intent.EndOrdinal
-}
-
-// ApplyToPVC adds a replica restore source to a newly-built PVC. It does not
-// mutate an existing PVC; callers must validate an existing object separately.
-func ApplyToPVC(pvc *corev1.PersistentVolumeClaim, intent *appsv1.ReplicaRestoreProjection, instanceName string) {
-	if pvc == nil || !Applies(intent, instanceName) {
+// ApplyToPVC adds the current owner restore intent to a newly built PVC.
+// Existing PVCs are handled by the workload merge path, which preserves their
+// source and restore annotations.
+func ApplyToPVC(pvc *corev1.PersistentVolumeClaim, intent *appsv1.ClusterReplicaRestore, component string) {
+	if pvc == nil || intent == nil {
 		return
 	}
-	ref := intent.SourceRef.DeepCopy()
-	pvc.Spec.DataSourceRef = ref
+	apiGroup := intent.Source.APIGroup
+	namespace := intent.Source.Namespace
+	if namespace == "" {
+		namespace = pvc.Namespace
+	}
+	var namespaceRef *string
+	if namespace != pvc.Namespace {
+		namespaceRef = &namespace
+	}
+	pvc.Spec.DataSourceRef = &corev1.TypedObjectReference{
+		APIGroup:  &apiGroup,
+		Kind:      intent.Source.Kind,
+		Name:      intent.Source.Name,
+		Namespace: namespaceRef,
+	}
 	if pvc.Annotations == nil {
 		pvc.Annotations = map[string]string{}
 	}
-	for _, key := range replicaRestoreMetadataKeys(intent) {
-		delete(pvc.Annotations, key)
-	}
-	for key, value := range expectedReplicaRestoreAnnotations(intent, pvc.Labels[constant.VolumeClaimTemplateNameLabelKey]) {
+	for key, value := range annotations(intent, component, pvc.Namespace) {
 		pvc.Annotations[key] = value
 	}
 }
 
-// ValidateExistingPVC prevents a normal PVC or a PVC from another restore
-// source from being silently converted into a replica restore target.
-func ValidateExistingPVC(existing, desired *corev1.PersistentVolumeClaim, intent *appsv1.ReplicaRestoreProjection) error {
-	if existing == nil || desired == nil || intent == nil || !IsReplicaPVC(desired) {
+// ValidateExistingPVC only validates PVCs that already carry the replica
+// marker. Ordinary existing PVCs remain owned by their original source and are
+// never converted by a desired PVC merge.
+func ValidateExistingPVC(existing, desired *corev1.PersistentVolumeClaim, intent *appsv1.ClusterReplicaRestore) error {
+	if existing == nil || desired == nil || intent == nil || !IsReplicaPVC(existing) {
 		return nil
 	}
-	return validateReplicaPVCIdentity(existing, desired.Spec.DataSourceRef, desired.Annotations,
-		desired.Labels[constant.VolumeClaimTemplateNameLabelKey], intent)
-}
-
-func expectedReplicaRestoreAnnotations(intent *appsv1.ReplicaRestoreProjection, volumeClaimTemplate string) map[string]string {
-	annotations := make(map[string]string, len(intent.Annotations)+3)
-	for key, value := range intent.Annotations {
-		annotations[key] = value
-	}
-	annotations[constant.RestorePurposeAnnotationKey] = constant.RestorePurposeReplica
-	if intent.Fingerprint != "" {
-		annotations[constant.ReplicaRestoreFingerprintAnnotationKey] = intent.Fingerprint
-	}
-	annotations[constant.RestoreVolumeTemplateAnnotationKey] = volumeClaimTemplate
-	return annotations
-}
-
-func validateReplicaPVCIdentity(existing *corev1.PersistentVolumeClaim, expectedSourceRef *corev1.TypedObjectReference,
-	expectedAnnotations map[string]string, expectedVolumeClaimTemplate string, intent *appsv1.ReplicaRestoreProjection) error {
-	name := existing.Name
-	if existing.Namespace != "" {
-		name = fmt.Sprintf("%s/%s", existing.Namespace, existing.Name)
-	}
-	if existing.Spec.DataSourceRef == nil || !reflect.DeepEqual(existing.Spec.DataSourceRef, expectedSourceRef) {
-		return fmt.Errorf("PVC %s does not match replica restore source", name)
-	}
-	for _, key := range replicaRestoreMetadataKeys(intent) {
-		if existing.Annotations[key] != expectedAnnotations[key] {
-			return fmt.Errorf("PVC %s does not match replica restore annotation %s", name, key)
+	// A completed PVC is an ordinary retained replica fact. It belongs to a
+	// previous restore and must not block a later scale-out restore with a new
+	// source. In-flight or failed PVCs remain protected by identity checks.
+	for _, condition := range existing.Status.Conditions {
+		if condition.Type == corev1.PersistentVolumeClaimConditionType(appsv1.ConditionTypeRestore) && condition.Status == corev1.ConditionTrue {
+			return nil
 		}
 	}
-	if existing.Labels[constant.VolumeClaimTemplateNameLabelKey] != expectedVolumeClaimTemplate {
-		return fmt.Errorf("PVC %s does not match replica restore volume claim template", name)
+	expected := desired.DeepCopy()
+	ApplyToPVC(expected, intent, desired.Annotations[constant.RestoreComponentAnnotationKey])
+	if !reflect.DeepEqual(existing.Spec.DataSourceRef, expected.Spec.DataSourceRef) {
+		return fmt.Errorf("PVC %s does not match replica restore source", existing.Name)
 	}
-	return nil
-}
-
-func replicaRestoreMetadataKeys(intent *appsv1.ReplicaRestoreProjection) []string {
-	keys := []string{
+	for _, key := range []string{
 		constant.RestorePurposeAnnotationKey,
-		constant.ReplicaRestoreFingerprintAnnotationKey,
-		constant.ReplicaRestoreGenerationAnnotationKey,
 		constant.RestoreSourceAPIGroupAnnotationKey,
 		constant.RestoreSourceKindAnnotationKey,
 		constant.RestoreSourceNameAnnotationKey,
 		constant.RestoreSourceNamespaceAnnotationKey,
 		constant.RestorePITRAnnotationKey,
 		constant.RestoreParametersAnnotationKey,
-		constant.RestoreComponentAnnotationKey,
-		constant.RestoreVolumeTemplateAnnotationKey,
-		dptypes.SourceTargetNameAnnotationKey,
-		dptypes.RestoreEnvParameterKey,
-	}
-	for key := range intent.Annotations {
-		if !slices.Contains(keys, key) {
-			keys = append(keys, key)
+	} {
+		if existing.Annotations[key] != expected.Annotations[key] {
+			return fmt.Errorf("PVC %s does not match replica restore annotation %s", existing.Name, key)
 		}
 	}
-	return keys
+	return nil
+}
+
+func annotations(intent *appsv1.ClusterReplicaRestore, component, pvcNamespace string) map[string]string {
+	sourceNamespace := intent.Source.Namespace
+	if sourceNamespace == "" {
+		sourceNamespace = pvcNamespace
+	}
+	result := map[string]string{
+		constant.RestorePurposeAnnotationKey:         constant.RestorePurposeReplica,
+		constant.RestoreSourceAPIGroupAnnotationKey:  intent.Source.APIGroup,
+		constant.RestoreSourceKindAnnotationKey:      intent.Source.Kind,
+		constant.RestoreSourceNameAnnotationKey:      intent.Source.Name,
+		constant.RestoreSourceNamespaceAnnotationKey: sourceNamespace,
+		constant.RestoreComponentAnnotationKey:       component,
+	}
+	if intent.PITR != "" {
+		result[constant.RestorePITRAnnotationKey] = intent.PITR
+	}
+	parameters := map[string]string{}
+	for key, value := range intent.Parameters {
+		parameters[key] = value
+	}
+	if intent.SourceTargetName != "" {
+		result[dptypes.SourceTargetNameAnnotationKey] = intent.SourceTargetName
+		parameters[dptypes.SourceTargetNameAnnotationKey] = intent.SourceTargetName
+	}
+	if len(intent.Env) > 0 {
+		data, _ := json.Marshal(intent.Env)
+		parameters[dptypes.RestoreEnvParameterKey] = string(data)
+	}
+	if len(parameters) > 0 {
+		data, _ := json.Marshal(parameters)
+		result[constant.RestoreParametersAnnotationKey] = string(data)
+	}
+	return result
 }
 
 func IsReplicaPVC(pvc *corev1.PersistentVolumeClaim) bool {

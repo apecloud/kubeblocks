@@ -123,20 +123,6 @@ func TestClusterRestoreProtectionLifecycle(t *testing.T) {
 	}
 }
 
-func TestClusterRestoreProtectionKeepsReplicaRestoreActive(t *testing.T) {
-	cluster := &appsv1.Cluster{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "cluster"},
-		Status: appsv1.ClusterStatus{ReplicaRestores: map[string]appsv1.ReplicaRestoreStatus{
-			"mysql": {Component: "mysql", Phase: appsv1.ReplicaRestoreRunning, TargetReplicas: 5},
-		}},
-	}
-	require.True(t, clusterAllowsRestoreProgress(cluster))
-	cluster.Status.ReplicaRestores["mysql"] = appsv1.ReplicaRestoreStatus{
-		Component: "mysql", Phase: appsv1.ReplicaRestoreCompleted, TargetReplicas: 5,
-	}
-	require.False(t, clusterAllowsRestoreProgress(cluster))
-}
-
 func TestClusterRestoreProtectionKeepsUnregisteredReplicaPVC(t *testing.T) {
 	ctx := context.Background()
 	scheme, cluster, _, _, target := parentRestoreObjects(t)

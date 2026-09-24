@@ -1988,6 +1988,62 @@ var _ = Describe("Component Controller", func() {
 			testVolumeExpansion(defaultCompName, compDefObj.Name, mockStorageClass)
 		})
 
+		It("expands every replica using its effective instance template volumes", func() {
+			defaultSpec := testapps.NewPVCSpec("1Gi")
+			defaultSpec.StorageClassName = &mockStorageClass.Name
+			overrideSpec := *defaultSpec.DeepCopy()
+			overrideSpec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("5Gi")
+			createCompObj(defaultCompName, compDefObj.Name, func(f *testapps.MockComponentFactory) {
+				f.SetReplicas(4).
+					AddVolumeClaimTemplate(testapps.DataVolumeName, defaultSpec).
+					AddVolumeClaimTemplate(testapps.LogVolumeName, defaultSpec).
+					AddInstances(kbappsv1.InstanceTemplate{Name: "inherit"}).
+					AddInstances(kbappsv1.InstanceTemplate{Name: "custom", Replicas: ptr.To(int32(2)),
+						VolumeClaimTemplates: []kbappsv1.ClusterComponentVolumeClaimTemplate{{Name: testapps.DataVolumeName, Spec: overrideSpec}}})
+			})
+
+			for _, suffix := range []string{"0", "inherit-0", "custom-0", "custom-1"} {
+				for _, volume := range []string{testapps.DataVolumeName, testapps.LogVolumeName} {
+					spec := defaultSpec
+					if volume == testapps.DataVolumeName && strings.HasPrefix(suffix, "custom-") {
+						spec = overrideSpec
+					}
+					pvc := &corev1.PersistentVolumeClaim{
+						ObjectMeta: metav1.ObjectMeta{Name: volume + "-" + compKey.Name + "-" + suffix, Namespace: compKey.Namespace,
+							Labels: constant.GetCompLabelsWithDef(clusterKey.Name, defaultCompName, compDefObj.Name)},
+						Spec: intctrlutil.ToCoreV1PVCs([]kbappsv1.ClusterComponentVolumeClaimTemplate{{Spec: spec}})[0].Spec,
+					}
+					Expect(testCtx.CreateObj(testCtx.Ctx, pvc)).To(Succeed())
+					pvc.Status.Phase = corev1.ClaimBound
+					pvc.Status.Capacity = pvc.Spec.Resources.Requests.DeepCopy()
+					Expect(k8sClient.Status().Update(testCtx.Ctx, pvc)).To(Succeed())
+				}
+			}
+
+			// First expand only the template, then expand the component defaults.
+			for _, defaultSize := range []string{"1Gi", "2Gi"} {
+				Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
+					comp.Spec.Instances[1].VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("6Gi")
+					comp.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse(defaultSize)
+				})()).To(Succeed())
+				for _, suffix := range []string{"0", "inherit-0", "custom-0", "custom-1"} {
+					for _, volume := range []string{testapps.DataVolumeName, testapps.LogVolumeName} {
+						want := "1Gi"
+						if volume == testapps.DataVolumeName {
+							want = defaultSize
+							if strings.HasPrefix(suffix, "custom-") {
+								want = "6Gi"
+							}
+						}
+						key := client.ObjectKey{Namespace: compKey.Namespace, Name: volume + "-" + compKey.Name + "-" + suffix}
+						Eventually(testapps.CheckObj(&testCtx, key, func(g Gomega, pvc *corev1.PersistentVolumeClaim) {
+							g.Expect(pvc.Spec.Resources.Requests.Storage().Cmp(resource.MustParse(want))).To(BeZero())
+						})).Should(Succeed())
+					}
+				}
+			}
+		})
+
 		It("should be able to recover if volume expansion fails", func() {
 			testVolumeExpansionFailedAndRecover(defaultCompName, compDefObj.Name)
 		})

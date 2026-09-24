@@ -2656,9 +2656,10 @@ string
 </em>
 </td>
 <td>
-<p>Specify the name of the volumeClaimTemplate in the Component.
-The specified name must match one of the volumeClaimTemplates defined
-in the <code>clusterComponentSpec.volumeClaimTemplates</code> field.</p>
+<p>Specifies a volumeClaimTemplate name in the selected scope.
+Component targets match the component&rsquo;s volumeClaimTemplates.
+Instance template targets match that template&rsquo;s volumeClaimTemplates,
+falling back to the component&rsquo;s volumeClaimTemplates for inherited volumes.</p>
 </td>
 </tr>
 </tbody>

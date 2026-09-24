@@ -439,9 +439,10 @@ type OpsRequestVolumeClaimTemplate struct {
 	// +kubebuilder:validation:Required
 	Storage resource.Quantity `json:"storage"`
 
-	// Specify the name of the volumeClaimTemplate in the Component.
-	// The specified name must match one of the volumeClaimTemplates defined
-	// in the `clusterComponentSpec.volumeClaimTemplates` field.
+	// Specifies a volumeClaimTemplate name in the selected scope.
+	// Component targets match the component's volumeClaimTemplates.
+	// Instance template targets match that template's volumeClaimTemplates,
+	// falling back to the component's volumeClaimTemplates for inherited volumes.
 	//
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`

@@ -510,10 +510,10 @@ func TestVolumeExpansionInstances(t *testing.T) {
 					override := *vct.DeepCopy()
 					override.Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("5Gi")
 					spec := appsv1.ClusterComponentSpec{
-						Name: "db", Replicas: 4, OfflineInstances: []string{"test-db-inherit-2", "test-db-a-inherit-2", "test-db-b-inherit-2"}, VolumeClaimTemplates: []appsv1.ClusterComponentVolumeClaimTemplate{vct},
+						Name: "db", Replicas: 5, OfflineInstances: []string{"test-db-inherit-2", "test-db-a-inherit-2", "test-db-b-inherit-2"}, VolumeClaimTemplates: []appsv1.ClusterComponentVolumeClaimTemplate{vct},
 						Instances: []appsv1.InstanceTemplate{
 							{Name: "inherit", Ordinals: appsv1.Ordinals{Discrete: []int32{2, 3}}}, // nil replicas defaults to one.
-							{Name: "custom", VolumeClaimTemplates: []appsv1.ClusterComponentVolumeClaimTemplate{override}},
+							{Name: "custom", Replicas: ptr.To(int32(2)), VolumeClaimTemplates: []appsv1.ClusterComponentVolumeClaimTemplate{override}},
 							{Name: "idle", Replicas: ptr.To(int32(0))},
 						},
 					}
@@ -557,17 +557,17 @@ func TestVolumeExpansionInstances(t *testing.T) {
 					}
 					ops := &opsv1alpha1.OpsRequest{ObjectMeta: metav1.ObjectMeta{Name: "expand", Namespace: "default"}, Spec: opsv1alpha1.OpsRequestSpec{ClusterName: "test", Type: opsv1alpha1.VolumeExpansionType, SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{VolumeExpansionList: []opsv1alpha1.VolumeExpansion{expansion}}}}
 					ops.Status.StartTimestamp = metav1.Now()
-					ops.Status.Phase = opsv1alpha1.OpsCreatingPhase
+					ops.Status.Phase = opsv1alpha1.OpsPendingPhase
 					objects := []client.Object{cluster, ops, &storagev1.StorageClass{ObjectMeta: metav1.ObjectMeta{Name: "expandable"}, AllowVolumeExpansion: ptr.To(true)}}
 					for _, comp := range components {
 						if sharding {
 							objects = append(objects, &appsv1.Component{ObjectMeta: metav1.ObjectMeta{Name: "test-" + comp, Namespace: "default", Labels: map[string]string{constant.AppInstanceLabelKey: "test", constant.KBAppShardingNameLabelKey: "db", constant.KBAppComponentLabelKey: comp}}})
 						}
-						for suffix, size := range map[string]string{"0": "2Gi", "1": "2Gi", "inherit-2": "1Gi", "inherit-3": "2Gi", "custom-0": "5Gi"} {
+						for suffix, size := range map[string]string{"0": "2Gi", "1": "2Gi", "inherit-2": "1Gi", "inherit-3": "2Gi", "custom-0": "5Gi", "custom-1": "5Gi"} {
 							if mode != "component" && suffix == "inherit-3" {
 								size = "3Gi"
 							}
-							if mode != "component" && suffix == "custom-0" {
+							if mode != "component" && (suffix == "custom-0" || suffix == "custom-1") {
 								size = "6Gi"
 							}
 							pvc := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "data-test-" + comp + "-" + suffix, Namespace: "default", Labels: map[string]string{constant.AppInstanceLabelKey: "test", constant.KBAppComponentLabelKey: comp, constant.VolumeClaimTemplateNameLabelKey: "data"}}}
@@ -578,7 +578,7 @@ func TestVolumeExpansionInstances(t *testing.T) {
 							switch suffix {
 							case "inherit-2", "inherit-3":
 								pvc.Labels[constant.KBAppComponentInstanceTemplateLabelKey] = "inherit"
-							case "custom-0":
+							case "custom-0", "custom-1":
 								pvc.Labels[constant.KBAppComponentInstanceTemplateLabelKey] = "custom"
 							}
 							pvc.Spec.Resources.Requests = corev1.ResourceList{corev1.ResourceStorage: resource.MustParse(size)}
@@ -587,7 +587,7 @@ func TestVolumeExpansionInstances(t *testing.T) {
 							objects = append(objects, pvc)
 							if multipleVolumes {
 								for _, name := range []string{"logs", "untouched", "extra"} {
-									if name == "extra" && suffix != "custom-0" {
+									if name == "extra" && suffix != "custom-0" && suffix != "custom-1" {
 										continue
 									}
 									size := "1Gi"
@@ -614,15 +614,19 @@ func TestVolumeExpansionInstances(t *testing.T) {
 					res := &OpsResource{Cluster: cluster, OpsRequest: ops, Recorder: record.NewFakeRecorder(100)}
 					req := intctrlutil.RequestCtx{Ctx: context.Background()}
 					handler := volumeExpansionOpsHandler{}
-					if err := handler.SaveLastConfiguration(req, cli, res); err != nil {
-						t.Fatal(err)
-					}
-					for attempt := 0; attempt < 2; attempt++ {
+					// Enter through Pending, then apply and retry from persisted state.
+					for attempt := 0; attempt < 3; attempt++ {
 						if _, err := GetOpsManager().Do(req, cli, res); err != nil {
 							t.Fatal(err)
 						}
 						if err := cli.Get(req.Ctx, client.ObjectKeyFromObject(cluster), cluster); err != nil {
 							t.Fatal(err)
+						}
+						if err := cli.Get(req.Ctx, client.ObjectKeyFromObject(ops), ops); err != nil {
+							t.Fatal(err)
+						}
+						if ops.Status.Phase != opsv1alpha1.OpsCreatingPhase {
+							t.Fatalf("attempt %d: phase=%s", attempt, ops.Status.Phase)
 						}
 					}
 					got := spec
@@ -652,9 +656,9 @@ func TestVolumeExpansionInstances(t *testing.T) {
 					} else if len(got.Instances[0].VolumeClaimTemplates) != 0 || got.Instances[1].VolumeClaimTemplates[0].Spec.Resources.Requests.Storage().Cmp(resource.MustParse("5Gi")) != 0 {
 						t.Fatal("component expansion modified template overrides")
 					}
-					count := map[string]int{"component": 3, "instance": 2, "both": 4}[mode] * len(components)
+					count := map[string]int{"component": 3, "instance": 3, "both": 5}[mode] * len(components)
 					if multipleVolumes {
-						count = map[string]int{"component": 7, "instance": 4, "both": 9}[mode] * len(components)
+						count = map[string]int{"component": 8, "instance": 6, "both": 12}[mode] * len(components)
 						assertVolume := func(volumes []appsv1.ClusterComponentVolumeClaimTemplate, name, want string) {
 							t.Helper()
 							for _, volume := range volumes {
@@ -708,6 +712,9 @@ func TestVolumeExpansionInstances(t *testing.T) {
 					key := client.ObjectKey{Namespace: "default", Name: "data-test-" + components[0] + "-inherit-3"}
 					if multipleVolumes {
 						key.Name = "logs-test-" + components[0] + "-inherit-3"
+					}
+					if mode != "component" {
+						key.Name = "data-test-" + components[0] + "-custom-1"
 					}
 					if err := cli.Get(req.Ctx, key, pending); err != nil {
 						t.Fatal(err)

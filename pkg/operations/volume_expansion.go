@@ -75,7 +75,7 @@ func (ve volumeExpansionOpsHandler) ActionStartedCondition(reqCtx intctrlutil.Re
 	return opsv1alpha1.NewVolumeExpandingCondition(opsRes.OpsRequest), nil
 }
 
-// Action modifies Cluster.spec.components[*].VolumeClaimTemplates[*].spec.resources
+// Action updates the requested component and instance template volume sizes in Cluster.
 func (ve volumeExpansionOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	applyVolumeExpansion := func(compSpec *appsv1.ClusterComponentSpec, obj ComponentOpsInterface) error {
 		setVolumeStorage := func(volumeExpansionVCTs []opsv1alpha1.OpsRequestVolumeClaimTemplate,

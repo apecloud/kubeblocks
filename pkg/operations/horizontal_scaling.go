@@ -434,12 +434,8 @@ func (hs horizontalScalingOpsHandler) getReplicaScalingChanges(opsRes *OpsResour
 	horizontalScaling opsv1alpha1.HorizontalScaling,
 	fullCompName string) (map[string]string, map[string]string, error) {
 	clusterName := opsRes.Cluster.Name
-	runtime, err := opsRes.GetRuntime(horizontalScaling.ComponentName)
-	if err != nil {
-		return nil, nil, err
-	}
-	lastPodSet, err := runtime.GenerateInstanceNameSet(clusterName, fullCompName,
-		*lastCompConfiguration.Replicas, lastCompConfiguration.InstanceTemplates, lastCompConfiguration.OfflineInstances)
+	lastPodSet, err := generateAllPodNamesToSet(*lastCompConfiguration.Replicas,
+		lastCompConfiguration.InstanceTemplates, lastCompConfiguration.OfflineInstances, clusterName, fullCompName)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -447,8 +443,8 @@ func (hs horizontalScalingOpsHandler) getReplicaScalingChanges(opsRes *OpsResour
 	if err != nil {
 		return nil, nil, err
 	}
-	currPodSet, err := runtime.GenerateInstanceNameSet(clusterName, fullCompName,
-		expectReplicas, expectInstanceTpls, expectOfflineInstances)
+	currPodSet, err := generateAllPodNamesToSet(expectReplicas, expectInstanceTpls,
+		expectOfflineInstances, clusterName, fullCompName)
 	if err != nil {
 		return nil, nil, err
 	}

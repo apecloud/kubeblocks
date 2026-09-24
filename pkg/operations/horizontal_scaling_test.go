@@ -1205,11 +1205,6 @@ func newHorizontalScalingFixture(t *testing.T, requests ...opsv1alpha1.Horizonta
 		},
 	}).Build()
 	f.res = &OpsResource{Cluster: cluster, OpsRequest: ops, Recorder: f.req.Recorder}
-	var err error
-	f.res.Runtimes, err = buildOpsRuntimes(f.req.Ctx, f.cli, f.res)
-	if err != nil {
-		t.Fatal(err)
-	}
 	publishHorizontalScalingAssignments(t, f)
 	if err := (horizontalScalingOpsHandler{}).SaveLastConfiguration(f.req, f.cli, f.res); err != nil {
 		t.Fatal(err)

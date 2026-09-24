@@ -29,16 +29,17 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-type opsRuntime struct {
+// switchoverRuntime contains the data-plane access that Switchover still
+// needs. It is deliberately private so other Ops cannot build a shared
+// dependency on Pods or lifecycle actions.
+type switchoverRuntime struct {
 	ctx          context.Context
 	cli          client.Client
 	multiCluster bool
@@ -47,34 +48,15 @@ type opsRuntime struct {
 	dataListOpts []client.ListOption
 }
 
-func buildOpsRuntimes(ctx context.Context, cli client.Client, opsRes *OpsResource) (map[string]OpsRuntime, error) {
-	runtimes := map[string]OpsRuntime{}
-	placement := ""
-	if opsRes.Cluster != nil && opsRes.Cluster.Annotations != nil {
-		placement = opsRes.Cluster.Annotations[constant.KBAppMultiClusterPlacementKey]
-	}
-	for _, comp := range opsRes.Cluster.Spec.ComponentSpecs {
-		if enabledMultiCluster(opsRes.Cluster) {
-			runtimes[comp.Name] = newOpsRuntime(ctx, cli, placement)
-		} else {
-			runtimes[comp.Name] = newOpsRuntime(ctx, cli, "")
-		}
-	}
-	for _, sharding := range opsRes.Cluster.Spec.Shardings {
-		if enabledMultiCluster(opsRes.Cluster) {
-			runtimes[sharding.Name] = newOpsRuntime(ctx, cli, placement)
-		} else {
-			runtimes[sharding.Name] = newOpsRuntime(ctx, cli, "")
-		}
-	}
-	return runtimes, nil
-}
-
-func newOpsRuntime(ctx context.Context, cli client.Client, placement string) *opsRuntime {
+func newSwitchoverRuntime(ctx context.Context, cli client.Client, cluster *appsv1.Cluster) *switchoverRuntime {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	r := &opsRuntime{
+	placement := ""
+	if cluster != nil && cluster.Annotations != nil && enabledMultiCluster(cluster) {
+		placement = cluster.Annotations[constant.KBAppMultiClusterPlacementKey]
+	}
+	r := &switchoverRuntime{
 		ctx:          ctx,
 		cli:          cli,
 		multiCluster: len(strings.TrimSpace(placement)) > 0,
@@ -92,7 +74,7 @@ func enabledMultiCluster(obj client.Object) bool {
 	return multicluster.Enabled4Object(obj)
 }
 
-func (r *opsRuntime) GetInstance(namespace, clusterName, compName, instanceName string) (Instance, error) {
+func (r *switchoverRuntime) getInstance(namespace, clusterName, compName, instanceName string) (*switchoverInstance, error) {
 	pod := &corev1.Pod{}
 	if err := r.cli.Get(r.dataContext(), client.ObjectKey{Name: instanceName, Namespace: namespace}, pod, r.dataGetOpts...); err != nil {
 		return nil, err
@@ -100,20 +82,16 @@ func (r *opsRuntime) GetInstance(namespace, clusterName, compName, instanceName 
 	if pod.Labels[constant.AppInstanceLabelKey] != clusterName || pod.Labels[constant.KBAppComponentLabelKey] != compName {
 		return nil, intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" does not belong to component "%s"`, instanceName, compName))
 	}
-	return &defaultInstance{pod: pod}, nil
+	return &switchoverInstance{pod: pod}, nil
 }
 
-func (r *opsRuntime) GenerateInstanceNameSet(clusterName, compName string, compReplicas int32, instances []appsv1.InstanceTemplate, offlineInstances []string) (map[string]string, error) {
-	return generateAllPodNamesToSet(compReplicas, instances, offlineInstances, clusterName, compName)
-}
-
-func (r *opsRuntime) Switchover(ctx context.Context, synthesizedComp *component.SynthesizedComponent, instanceName, candidateName string) error {
+func (r *switchoverRuntime) switchover(ctx context.Context, synthesizedComp *component.SynthesizedComponent, instanceName, candidateName string) error {
 	return r.doSwitchover(ctx, r.cli, synthesizedComp, instanceName, candidateName)
 }
 
 // We consider a switchover action succeeds if the action returns without error.
 // We don't need to know if a switchover is actually executed.
-func (r *opsRuntime) doSwitchover(ctx context.Context, cli client.Reader, synthesizedComp *component.SynthesizedComponent,
+func (r *switchoverRuntime) doSwitchover(ctx context.Context, cli client.Reader, synthesizedComp *component.SynthesizedComponent,
 	instanceName, candidateName string) error {
 	pods, err := component.ListOwnedPods(r.dataContext(), cli, synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name, r.dataListOpts...)
 	if err != nil {
@@ -131,15 +109,12 @@ func (r *opsRuntime) doSwitchover(ctx context.Context, cli client.Reader, synthe
 		return intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" not found`, instanceName))
 	}
 	if candidateName != "" {
-		candidate, err := r.GetInstance(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name, candidateName)
+		_, err := r.getInstance(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name, candidateName)
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				return intctrlutil.NewFatalError(fmt.Sprintf(`candidate instance "%s" not found`, candidateName))
 			}
 			return err
-		}
-		if !candidate.HasPod() {
-			return intctrlutil.NewFatalError(fmt.Sprintf(`candidate instance "%s" not found`, candidateName))
 		}
 	}
 
@@ -155,59 +130,24 @@ func (r *opsRuntime) doSwitchover(ctx context.Context, cli client.Reader, synthe
 	return lfa.Switchover(ctx, cli, nil, candidateName)
 }
 
-func (r *opsRuntime) dataContext() context.Context {
+func (r *switchoverRuntime) dataContext() context.Context {
 	if !r.multiCluster {
 		return r.ctx
 	}
 	return r.dataCtx
 }
 
-type defaultInstance struct {
+type switchoverInstance struct {
 	pod *corev1.Pod
 }
 
-func (i *defaultInstance) HasPod() bool {
+func (i *switchoverInstance) hasPod() bool {
 	return i.pod != nil
 }
 
-func (i *defaultInstance) GetRole() string {
+func (i *switchoverInstance) getRole() string {
 	if i.pod == nil {
 		return ""
 	}
 	return i.pod.Labels[constant.RoleLabelKey]
-}
-
-// Deprecated: should use instancetemplate.PodNameBuilder
-func generateAllPodNamesToSet(
-	compReplicas int32,
-	instances []appsv1.InstanceTemplate,
-	offlineInstances []string,
-	clusterName,
-	fullCompName string) (map[string]string, error) {
-	compName := constant.GenerateClusterComponentName(clusterName, fullCompName)
-	instanceNames, err := generateAllPodNames(compReplicas, instances, offlineInstances, compName)
-	if err != nil {
-		return nil, err
-	}
-	instanceSet := map[string]string{}
-	for _, insName := range instanceNames {
-		instanceSet[insName] = appsv1.GetInstanceTemplateName(clusterName, fullCompName, insName)
-	}
-	return instanceSet, nil
-}
-
-func generateAllPodNames(
-	compReplicas int32,
-	instances []appsv1.InstanceTemplate,
-	offlineInstances []string,
-	fullCompName string) ([]string, error) {
-	var templates []instanceset.InstanceTemplate
-	for i := range instances {
-		templates = append(templates, &workloads.InstanceTemplate{
-			Name:     instances[i].Name,
-			Replicas: instances[i].Replicas,
-			Ordinals: instances[i].Ordinals,
-		})
-	}
-	return instanceset.GenerateAllInstanceNames(fullCompName, compReplicas, templates, offlineInstances, appsv1.Ordinals{})
 }

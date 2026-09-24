@@ -93,7 +93,7 @@ func TestVerticalScalingDefaultAndEmptySelection(t *testing.T) {
 					Status: corev1.PodStatus{Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}}}})
 			}
 			cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(ops, its).WithObjects(objects...).Build()
-			opsRes := &OpsResource{Cluster: cluster, OpsRequest: ops, Recorder: record.NewFakeRecorder(30), Runtimes: map[string]OpsRuntime{"db": newOpsRuntime(ctx, cli, "")}}
+			opsRes := &OpsResource{Cluster: cluster, OpsRequest: ops, Recorder: record.NewFakeRecorder(30)}
 			handler := verticalScalingHandler{}
 			if tc.cancel {
 				if err := handler.Cancel(intctrlutil.RequestCtx{Ctx: ctx}, cli, opsRes); err != nil {

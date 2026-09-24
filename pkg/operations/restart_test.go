@@ -248,12 +248,6 @@ func TestRestartUsesClusterStatusForTerminalPhase(t *testing.T) {
 				OpsRequest: opsRequest,
 				Recorder:   record.NewFakeRecorder(10),
 			}
-			var err error
-			opsRes.Runtimes, err = buildOpsRuntimes(context.Background(), cli, opsRes)
-			if err != nil {
-				t.Fatalf("build runtimes: %v", err)
-			}
-
 			phase, _, err := (restartOpsHandler{}).ReconcileAction(
 				intctrlutil.RequestCtx{Ctx: context.Background()}, cli, opsRes)
 			if err != nil {

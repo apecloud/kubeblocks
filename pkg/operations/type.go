@@ -20,8 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
-	"context"
-	"fmt"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,7 +28,6 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -85,35 +82,8 @@ type OpsResource struct {
 	Cluster        *appsv1.Cluster
 	Recorder       record.EventRecorder
 	ToClusterPhase appsv1.ClusterPhase
-	Runtimes       map[string]OpsRuntime
 }
 
 type OpsManager struct {
 	OpsMap map[opsv1alpha1.OpsType]OpsBehaviour
-}
-
-// OpsRuntime abstracts the standard ops paths that only need member execution views.
-//
-// Explicitly out of scope for this abstraction:
-// - RebuildInstance, which still depends on direct Pod/PVC/PV/InstanceSet actions
-// - Custom, which still depends on direct Pod/Job/ConfigMap/Secret based execution
-type OpsRuntime interface {
-	GetInstance(namespace, clusterName, compName, instanceName string) (Instance, error)
-	GenerateInstanceNameSet(clusterName, compName string, compReplicas int32, instances []appsv1.InstanceTemplate, offlineInstances []string) (map[string]string, error)
-	Switchover(ctx context.Context, synthesizedComp *component.SynthesizedComponent, instanceName, candidateName string) error
-}
-
-type Instance interface {
-	HasPod() bool
-	GetRole() string
-}
-
-func (r *OpsResource) GetRuntime(name string) (OpsRuntime, error) {
-	if r == nil {
-		return nil, fmt.Errorf("ops resource is nil")
-	}
-	if runtime, ok := r.Runtimes[name]; ok {
-		return runtime, nil
-	}
-	return nil, fmt.Errorf("ops runtime not found for component/sharding %q", name)
 }

@@ -31,7 +31,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 )
@@ -44,6 +46,66 @@ var _ = Describe("replicas alignment reconciler test", func() {
 			SetVolumeClaimTemplates(volumeClaimTemplates...).
 			SetRoles(roles).
 			GetObject()
+	})
+
+	It("restores only newly created PVCs and resumes from existing PVC sources", func() {
+		its.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
+		its.Annotations = map[string]string{constant.KBAppClusterUIDKey: "cluster-uid"}
+		its.Labels = map[string]string{constant.KBAppComponentLabelKey: "mysql"}
+		tree := kubebuilderx.NewObjectTree()
+		tree.SetRoot(its)
+		_, err := NewReplicasAlignmentReconciler().Reconcile(tree)
+		Expect(err).NotTo(HaveOccurred())
+		original := map[string]*corev1.PersistentVolumeClaim{}
+		for _, obj := range tree.List(&corev1.PersistentVolumeClaim{}) {
+			original[obj.GetName()] = obj.(*corev1.PersistentVolumeClaim).DeepCopy()
+		}
+		Expect(tree.List(&corev1.Pod{})).To(HaveLen(3))
+		replicas := int32(4)
+		its.Spec.Replicas = &replicas
+		its.Spec.ReplicaRestore = &kbappsv1.ClusterReplicaRestore{Source: kbappsv1.ClusterRestoreSource{
+			APIGroup: "dataprotection.kubeblocks.io", Kind: "Backup", Name: "backup-a",
+		}}
+		_, err = NewReplicasAlignmentReconciler().Reconcile(tree)
+		Expect(err).NotTo(HaveOccurred())
+		replicas = 5
+		its.Spec.ReplicaRestore.Source.Name = "backup-b"
+		// A fresh reconciler uses the newly desired state even while the first
+		// added replica is still restoring.
+		_, err = NewReplicasAlignmentReconciler().Reconcile(tree)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(tree.List(&corev1.Pod{})).To(HaveLen(5))
+		Expect(tree.List(&corev1.PersistentVolumeClaim{})).To(HaveLen(5 * len(volumeClaimTemplates)))
+		for _, obj := range tree.List(&corev1.PersistentVolumeClaim{}) {
+			pvc := obj.(*corev1.PersistentVolumeClaim)
+			if before, ok := original[pvc.Name]; ok {
+				Expect(pvc.Spec).To(Equal(before.Spec))
+				Expect(pvc.Annotations).To(Equal(before.Annotations))
+				Expect(pvc.Status).To(Equal(before.Status))
+				continue
+			}
+			source := "backup-b"
+			if pvc.Labels[constant.KBAppPodNameLabelKey] == its.Name+"-3" {
+				source = "backup-a"
+			}
+			Expect(pvc.Spec.DataSourceRef.Name).To(Equal(source))
+			Expect(pvc.Annotations[constant.RestoreSourceNameAnnotationKey]).To(Equal(source))
+			Expect(pvc.Annotations[constant.KBAppClusterUIDKey]).To(Equal("cluster-uid"))
+			Expect(pvc.Annotations[constant.RestoreSourceNamespaceAnnotationKey]).To(Equal(namespace))
+			Expect(pvc.Annotations[constant.RestoreVolumeTemplateAnnotationKey]).To(Equal(pvc.Labels[constant.VolumeClaimTemplateNameLabelKey]))
+		}
+		its.Spec.ReplicaRestore = nil
+		replicas = 6
+		_, err = NewReplicasAlignmentReconciler().Reconcile(tree)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(tree.List(&corev1.Pod{})).To(HaveLen(6))
+		for _, obj := range tree.List(&corev1.PersistentVolumeClaim{}) {
+			pvc := obj.(*corev1.PersistentVolumeClaim)
+			if pvc.Labels[constant.KBAppPodNameLabelKey] == its.Name+"-5" {
+				Expect(pvc.Spec.DataSourceRef).To(BeNil())
+				Expect(pvc.Annotations).NotTo(HaveKey(constant.RestorePurposeAnnotationKey))
+			}
+		}
 	})
 
 	Context("PreCondition & Reconcile", func() {

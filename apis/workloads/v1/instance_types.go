@@ -61,6 +61,11 @@ func init() {
 
 // InstanceSpec defines the desired state of Instance
 type InstanceSpec struct {
+	// ReplicaRestore is copied from the owning InstanceSet and is used only
+	// while building PVCs for this instance.
+	// +optional
+	ReplicaRestore *kbappsv1.ClusterReplicaRestore `json:"replicaRestore,omitempty"`
+
 	Template corev1.PodTemplateSpec `json:"template"`
 
 	// Represents a label query over pods that should match the desired replica count indicated by the `replica` field.

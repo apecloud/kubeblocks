@@ -76,6 +76,10 @@ func init() {
 
 // InstanceSetSpec defines the desired state of InstanceSet
 type InstanceSetSpec struct {
+	// ReplicaRestore carries the owner restore intent to PVC creation.
+	//
+	// +optional
+	ReplicaRestore *kbappsv1.ClusterReplicaRestore `json:"replicaRestore,omitempty"`
 	// Specifies the desired number of replicas of the given Template.
 	// These replicas are instantiations of the same Template, with each having a consistent identity.
 	// Defaults to 1 if unspecified.

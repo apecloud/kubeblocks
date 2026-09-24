@@ -769,3 +769,63 @@ func TestCopyAndMergeObjects(t *testing.T) {
 		t.Fatalf("unexpected merged pod: %#v", mergedPod)
 	}
 }
+
+func TestCopyAndMergePreservesExistingReplicaRestoreSource(t *testing.T) {
+	oldGroup := "dataprotection.kubeblocks.io"
+	newGroup := oldGroup
+	oldPVC := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{
+		Name: "data-mysql-0",
+		Annotations: map[string]string{
+			constant.RestorePurposeAnnotationKey:        constant.RestorePurposeReplica,
+			constant.RestoreSourceNameAnnotationKey:     "old-backup",
+			constant.RestoreSourceKindAnnotationKey:     "Backup",
+			constant.RestoreSourceAPIGroupAnnotationKey: oldGroup,
+		},
+	}, Spec: corev1.PersistentVolumeClaimSpec{DataSourceRef: &corev1.TypedObjectReference{
+		APIGroup: &oldGroup, Kind: "Backup", Name: "old-backup",
+	}}}
+	newPVC := oldPVC.DeepCopy()
+	newPVC.Annotations[constant.RestoreSourceNameAnnotationKey] = "new-backup"
+	newPVC.Spec.DataSourceRef = &corev1.TypedObjectReference{APIGroup: &newGroup, Kind: "Backup", Name: "new-backup"}
+	merged := copyAndMerge(oldPVC, newPVC).(*corev1.PersistentVolumeClaim)
+	if merged.Spec.DataSourceRef.Name != "old-backup" || merged.Annotations[constant.RestoreSourceNameAnnotationKey] != "old-backup" {
+		t.Fatalf("existing PVC restore source changed: %#v", merged)
+	}
+}
+
+func TestReplicaRestorePVCUsesOwnerSourceOnlyAtCreation(t *testing.T) {
+	inst := builder.NewInstanceBuilder("default", "mysql-3").
+		AddAnnotations(constant.KBAppClusterUIDKey, "cluster-uid").
+		AddLabels(constant.KBAppComponentLabelKey, "mysql").
+		SetInstanceSetName("mysql").
+		SetPodTemplate(corev1.PodTemplateSpec{Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "mysql", Image: "mysql:8"}}}}).
+		AddVolumeClaimTemplate(corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "data"}}).GetObject()
+	inst.Spec.ReplicaRestore = &kbappsv1.ClusterReplicaRestore{Source: kbappsv1.ClusterRestoreSource{
+		APIGroup: "dataprotection.kubeblocks.io", Kind: "Backup", Name: "backup-a",
+	}}
+	tree := kubebuilderx.NewObjectTree()
+	tree.SetRoot(inst)
+	if _, err := NewAlignmentReconciler().Reconcile(tree); err != nil {
+		t.Fatal(err)
+	}
+	old := tree.List(&corev1.PersistentVolumeClaim{})[0].(*corev1.PersistentVolumeClaim).DeepCopy()
+	if old.Annotations[constant.KBAppClusterUIDKey] != "cluster-uid" ||
+		old.Annotations[constant.RestoreVolumeTemplateAnnotationKey] != "data" ||
+		old.Annotations[constant.RestoreSourceNamespaceAnnotationKey] != "default" {
+		t.Fatalf("missing restore identity: %v", old.Annotations)
+	}
+	for _, source := range []string{"backup-b", ""} {
+		if source == "" {
+			inst.Spec.ReplicaRestore = nil
+		} else {
+			inst.Spec.ReplicaRestore.Source.Name = source
+		}
+		if _, err := NewAlignmentReconciler().Reconcile(tree); err != nil {
+			t.Fatal(err)
+		}
+		current := tree.List(&corev1.PersistentVolumeClaim{})[0].(*corev1.PersistentVolumeClaim)
+		if !reflect.DeepEqual(old, current) {
+			t.Fatalf("existing PVC changed after source update: %#v", current)
+		}
+	}
+}

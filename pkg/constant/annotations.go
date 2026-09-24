@@ -69,6 +69,8 @@ const (
 	RestoreParametersAnnotationKey      = "apps.kubeblocks.io/restore-parameters"
 	RestoreComponentAnnotationKey       = "apps.kubeblocks.io/restore-component"
 	RestoreVolumeTemplateAnnotationKey  = "apps.kubeblocks.io/restore-volume-template"
+	RestorePurposeAnnotationKey         = "apps.kubeblocks.io/restore-purpose"
+	RestorePurposeReplica               = "Replica"
 
 	// These annoations serve in a transition period when existing clusters can adopt
 	// new serviceaccount naming rules.

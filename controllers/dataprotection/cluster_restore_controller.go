@@ -117,11 +117,12 @@ func (r *ClusterRestoreReconciler) isClusterRestoring(ctx context.Context,
 	}
 	for i := range pvcs.Items {
 		pvc := &pvcs.Items[i]
-		if pvc.Labels[dptypes.ClusterUIDLabelKey] != string(cluster.UID) {
+		if clusterRestorePVCUID(pvc) != string(cluster.UID) {
 			continue
 		}
 		if isClusterRestoreHelperPVC(pvc) ||
-			(isClusterRestoreTargetPVC(pvc) && controllerutil.ContainsFinalizer(pvc, dptypes.DataProtectionFinalizerName)) {
+			(isClusterRestoreTargetPVC(pvc) && (controllerutil.ContainsFinalizer(pvc, dptypes.DataProtectionFinalizerName) ||
+				(isReplicaRestorePVC(pvc) && !pvcRestoreTerminal(pvc)))) {
 			return true, nil
 		}
 	}
@@ -148,6 +149,9 @@ func (r *ClusterRestoreReconciler) isClusterRestoring(ctx context.Context,
 }
 
 func clusterAllowsRestoreProgress(cluster *appsv1.Cluster) bool {
+	if hasReplicaRestoreSource(cluster) {
+		return true
+	}
 	if cluster.Spec.Restore == nil {
 		return false
 	}
@@ -156,6 +160,15 @@ func clusterAllowsRestoreProgress(cluster *appsv1.Cluster) bool {
 	// has initial-restore intent. Keep the lifecycle active until deletion so
 	// PVC restores cannot lose protection while converging on the failure.
 	return condition == nil || condition.Status != metav1.ConditionTrue
+}
+
+func hasReplicaRestoreSource(cluster *appsv1.Cluster) bool {
+	for _, spec := range cluster.Spec.ComponentSpecs {
+		if spec.ReplicaRestore != nil {
+			return true
+		}
+	}
+	return false
 }
 
 func isClusterRestoreProtected(cluster *appsv1.Cluster) bool {

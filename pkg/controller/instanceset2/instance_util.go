@@ -112,6 +112,7 @@ func buildInstanceByTemplate(tree *kubebuilderx.ObjectTree,
 	labels := getMatchLabels(its.Name)
 	b := builder.NewInstanceBuilder(its.Namespace, instName).
 		AddAnnotationsInMap(template.Annotations).
+		AddAnnotations(constant.KBAppClusterUIDKey, its.Annotations[constant.KBAppClusterUIDKey]).
 		AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(its.Generation, 10)).
 		AddLabelsInMap(template.Labels).
 		AddLabelsInMap(labels).
@@ -146,6 +147,9 @@ func buildInstanceByTemplate(tree *kubebuilderx.ObjectTree,
 	}
 
 	inst := b.GetObject()
+	// Carry the owner restore intent into the per-instance desired object. The
+	// Instance controller applies it while constructing PVCs.
+	inst.Spec.ReplicaRestore = its.Spec.ReplicaRestore
 	stampInstanceRevision(inst)
 	if !shouldCloneInstanceAssistantObjects(its) {
 		if err := controllerutil.SetControllerReference(its, inst, model.GetScheme()); err != nil {
@@ -294,6 +298,7 @@ func copyAndMergeInstance(oldInst, newInst *workloads.Instance) *workloads.Insta
 	targetInst.Spec.Roles = newInst.Spec.Roles
 	targetInst.Spec.LifecycleActions = newInst.Spec.LifecycleActions
 	targetInst.Spec.Configs = newInst.Spec.Configs
+	targetInst.Spec.ReplicaRestore = newInst.Spec.ReplicaRestore
 
 	// object meta
 	mergeMap(&newInst.Labels, &targetInst.Labels)

@@ -345,6 +345,17 @@ type ClusterComponentSpec struct {
 	// +kubebuilder:default=1
 	Replicas int32 `json:"replicas"`
 
+	// Specifies the source used when creating missing replica PVCs during scale-out.
+	// Only existing, non-sharding Components with default contiguous ordinals
+	// are supported. Instance templates and offline instances are not supported.
+	// Any initial Cluster restore must have completed before using this field.
+	// Existing PVCs keep their source and data. Changes to this field affect only
+	// PVCs created afterward. Removing it restores ordinary PVC creation and does
+	// not cancel restoration of PVCs that already exist.
+	//
+	// +optional
+	ReplicaRestore *ClusterReplicaRestore `json:"replicaRestore,omitempty"`
+
 	// Specifies the scheduling policy for the Component.
 	// If defined, it will overwrite the scheduling policy defined in ClusterSpec.
 	//
@@ -891,6 +902,37 @@ type ClusterRestore struct {
 	//
 	// +optional
 	Parameters map[string]string `json:"parameters,omitempty"`
+}
+
+// ClusterReplicaRestore specifies how to initialize replicas added during
+// horizontal scale-out. It uses the same source and restore parameters as a
+// Cluster restore, while the target replicas are taken from the Component's
+// replicas field.
+type ClusterReplicaRestore struct {
+	// Specifies the restore source.
+	//
+	// +kubebuilder:validation:Required
+	Source ClusterRestoreSource `json:"source"`
+
+	// Specifies the source target in a Backup with multiple targets.
+	//
+	// +optional
+	SourceTargetName string `json:"sourceTargetName,omitempty"`
+
+	// Specifies the point-in-time recovery target.
+	//
+	// +optional
+	PITR string `json:"pitr,omitempty"`
+
+	// Specifies runtime-specific restore parameters.
+	//
+	// +optional
+	Parameters map[string]string `json:"parameters,omitempty"`
+
+	// Specifies environment variables for the restore worker.
+	//
+	// +optional
+	Env []corev1.EnvVar `json:"env,omitempty"`
 }
 
 // ClusterRestoreSource describes the source object used by a Cluster restore.

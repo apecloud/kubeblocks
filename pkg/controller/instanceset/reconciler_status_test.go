@@ -30,10 +30,12 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
@@ -735,6 +737,81 @@ func TestLegacyInstanceStatusTracksConfigAndPVCConvergence(t *testing.T) {
 		}
 
 	})
+}
+
+func TestLegacyStatusProjectsReplicaRestorePVCIntoInstanceHealth(t *testing.T) {
+	its, tree, pods := newLegacyDefaultInstanceStatusFixture(t, 1)
+	its.Spec.ReplicaRestore = &kbappsv1.ClusterReplicaRestore{}
+	pod := pods["demo-0"]
+	pod.Status.Conditions = []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}}
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "data-demo-0",
+			Namespace: its.Namespace,
+			Labels:    map[string]string{constant.KBAppPodNameLabelKey: pod.Name},
+			Annotations: map[string]string{
+				constant.RestorePurposeAnnotationKey: constant.RestorePurposeReplica,
+			},
+		},
+		Status: corev1.PersistentVolumeClaimStatus{Conditions: []corev1.PersistentVolumeClaimCondition{{
+			Type:   corev1.PersistentVolumeClaimConditionType(workloads.InstanceRestore),
+			Status: corev1.ConditionUnknown,
+		}}},
+	}
+	if err := tree.Add(pvc); err != nil {
+		t.Fatal(err)
+	}
+	its.Spec.ReplicaRestore = nil
+
+	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+		t.Fatal(err)
+	}
+	status := its.FindInstanceStatus(pod.Name)
+	if status == nil || status.Ready || status.Available || status.Failed || its.Status.ReadyReplicas != 0 {
+		t.Fatalf("pending replica restore did not block ordinary readiness: status=%#v summary=%#v", status, its.Status)
+	}
+
+	pvc.Status.Conditions[0].Status = corev1.ConditionFalse
+	if err := tree.Delete(pod); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+		t.Fatal(err)
+	}
+	if !meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceFailure)) {
+		t.Fatalf("replica restore failure without a Pod was not projected into InstanceFailure: %#v", its.Status.Conditions)
+	}
+	if meta.FindStatusCondition(its.Status.Conditions, string(workloads.InstanceRestore)) != nil {
+		t.Fatalf("replica restore created an aggregate Restore condition: %#v", its.Status.Conditions)
+	}
+
+	pvc.Status.Conditions[0].Status = corev1.ConditionTrue
+	if err := tree.Add(pod); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+		t.Fatal(err)
+	}
+	status = its.FindInstanceStatus(pod.Name)
+	if status == nil || !status.Ready || !status.Available || status.Failed || its.Status.ReadyReplicas != 1 ||
+		meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceFailure)) {
+		t.Fatalf("completed replica restore did not release ordinary readiness: status=%#v summary=%#v", status, its.Status)
+	}
+
+	stalePVC := pvc.DeepCopy()
+	stalePVC.Name = "data-demo-1"
+	stalePVC.Labels[constant.KBAppPodNameLabelKey] = "demo-1"
+	stalePVC.Status.Conditions[0].Status = corev1.ConditionFalse
+	if err := tree.Add(stalePVC); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+		t.Fatal(err)
+	}
+	if !meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceReady)) ||
+		meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceFailure)) {
+		t.Fatalf("historical replica restore PVC affected active instance health: %#v", its.Status.Conditions)
+	}
 }
 
 func TestLegacyAllocationChangesStayInDesiredAndCurrentState(t *testing.T) {

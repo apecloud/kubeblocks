@@ -70,6 +70,10 @@ func init() {
 
 // ComponentSpec defines the desired state of Component
 type ComponentSpec struct {
+	// ReplicaRestore carries the owner restore intent to workload PVC creation.
+	//
+	// +optional
+	ReplicaRestore *ClusterReplicaRestore `json:"replicaRestore,omitempty"`
 	// Specifies the behavior when a Component is deleted.
 	//
 	// +kubebuilder:default=Delete

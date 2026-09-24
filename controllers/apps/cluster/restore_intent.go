@@ -20,30 +20,93 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package cluster
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 )
 
 func applyClusterRestoreIntent(cluster *appsv1.Cluster, components []*appsv1.ClusterComponentSpec, shardings []*appsv1.ClusterSharding) error {
-	if cluster.Spec.Restore == nil {
-		return nil
-	}
+	return applyClusterRestoreIntentWithReader(context.Background(), nil, cluster, components, shardings)
+}
+
+func applyClusterRestoreIntentWithReader(ctx context.Context, reader client.Reader, cluster *appsv1.Cluster, components []*appsv1.ClusterComponentSpec, shardings []*appsv1.ClusterSharding) error {
 	completed := isClusterRestoreCompleted(cluster)
 	for _, comp := range components {
-		applyRestoreIntentToComponent(cluster, comp.Name, comp.VolumeClaimTemplates, comp.Instances, completed)
+		if cluster.Spec.Restore != nil {
+			applyRestoreIntentToComponent(cluster, comp.Name, comp.VolumeClaimTemplates, comp.Instances, completed)
+		}
+		if reader != nil {
+			if err := validateReplicaRestoreIntent(ctx, reader, cluster, comp); err != nil {
+				return err
+			}
+		}
 	}
 	for _, sharding := range shardings {
+		if sharding.Template.ReplicaRestore != nil {
+			return fmt.Errorf("sharding %q does not support replicaRestore", sharding.Name)
+		}
+		if cluster.Spec.Restore == nil {
+			continue
+		}
 		applyRestoreIntentToComponent(cluster, sharding.Name, sharding.Template.VolumeClaimTemplates, sharding.Template.Instances, completed)
 		for i := range sharding.ShardTemplates {
 			template := &sharding.ShardTemplates[i]
 			applyRestoreIntentToComponent(cluster, template.Name, template.VolumeClaimTemplates, template.Instances, completed)
 		}
+	}
+	return nil
+}
+
+func validateReplicaRestoreIntent(ctx context.Context, reader client.Reader, cluster *appsv1.Cluster, comp *appsv1.ClusterComponentSpec) error {
+	restore := comp.ReplicaRestore
+	if restore == nil {
+		return nil
+	}
+	if cluster.Spec.Restore != nil && !isClusterRestoreCompleted(cluster) {
+		return fmt.Errorf("component %q replicaRestore requires initial Cluster restore to complete", comp.Name)
+	}
+	if len(comp.Instances) != 0 || len(comp.Ordinals.Ranges) != 0 || len(comp.Ordinals.Discrete) != 0 || comp.FlatInstanceOrdinal || len(comp.OfflineInstances) != 0 {
+		return fmt.Errorf("component %q replicaRestore only supports default contiguous instances", comp.Name)
+	}
+	if comp.Replicas <= 0 {
+		return fmt.Errorf("component %q replicaRestore requires replicas greater than zero", comp.Name)
+	}
+	if restore.Source.APIGroup != dptypes.DataprotectionAPIGroup || restore.Source.Kind != dptypes.BackupKind {
+		return fmt.Errorf("component %q replicaRestore source must be a DataProtection Backup", comp.Name)
+	}
+	if reader == nil {
+		return nil
+	}
+	component := &appsv1.Component{}
+	key := types.NamespacedName{Namespace: cluster.Namespace, Name: constant.GenerateClusterComponentName(cluster.Name, comp.Name)}
+	if err := reader.Get(ctx, key, component); err != nil {
+		if apierrors.IsNotFound(err) {
+			return fmt.Errorf("component %q replicaRestore requires an existing Component", comp.Name)
+		}
+		return err
+	}
+	if !component.DeletionTimestamp.IsZero() {
+		return fmt.Errorf("component %q replicaRestore requires a non-deleting Component", comp.Name)
+	}
+	if len(component.Spec.Instances) != 0 || len(component.Spec.Ordinals.Ranges) != 0 || len(component.Spec.Ordinals.Discrete) != 0 || component.Spec.FlatInstanceOrdinal || len(component.Spec.OfflineInstances) != 0 {
+		return fmt.Errorf("component %q replicaRestore requires a default contiguous live workload", comp.Name)
+	}
+	if len(component.Spec.VolumeClaimTemplates) == 0 || len(comp.VolumeClaimTemplates) == 0 {
+		return fmt.Errorf("component %q replicaRestore requires at least one volume claim template", comp.Name)
+	}
+	if comp.Replicas < component.Spec.Replicas {
+		return fmt.Errorf("component %q replicaRestore does not support scale-in; remove replicaRestore before reducing replicas", comp.Name)
 	}
 	return nil
 }

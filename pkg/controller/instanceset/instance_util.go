@@ -43,6 +43,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/replicarestore"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -455,6 +456,7 @@ func buildInstancePVCByTemplate(name string, template *instancetemplate.Instance
 		if template.Name != "" {
 			pvc.Labels[constant.KBAppInstanceTemplateLabelKey] = template.Name
 		}
+		replicarestore.ApplyToPVC(pvc, parent.Spec.ReplicaRestore, parent.Labels[constant.KBAppComponentLabelKey], parent.Annotations[constant.KBAppClusterUIDKey])
 		pvcs = append(pvcs, pvc)
 	}
 	for _, pvc := range pvcs {
@@ -523,7 +525,7 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 	}
 
 	copyAndMergePVC := func(oldPVC, newPVC *corev1.PersistentVolumeClaim) client.Object {
-		mergeMap(&newPVC.Annotations, &oldPVC.Annotations)
+		replicarestore.MergePVCAnnotations(oldPVC, newPVC)
 		mergeMap(&newPVC.Labels, &oldPVC.Labels)
 		// resources.request.storage and accessModes support in-place update.
 		// resources.request.storage only supports volume expansion.

@@ -473,6 +473,20 @@ ComponentSpec
 <tbody>
 <tr>
 <td>
+<code>replicaRestore</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ClusterReplicaRestore">
+ClusterReplicaRestore
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ReplicaRestore carries the owner restore intent to workload PVC creation.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>terminationPolicy</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.TerminationPolicyType">
@@ -3239,6 +3253,26 @@ int32
 </tr>
 <tr>
 <td>
+<code>replicaRestore</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ClusterReplicaRestore">
+ClusterReplicaRestore
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the source used when creating missing replica PVCs during scale-out.
+Only existing, non-sharding Components with default contiguous ordinals
+are supported. Instance templates and offline instances are not supported.
+Any initial Cluster restore must have completed before using this field.
+Existing PVCs keep their source and data. Changes to this field affect only
+PVCs created afterward. Removing it restores ordinary PVC creation and does
+not cancel restoration of PVCs that already exist.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>schedulingPolicy</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.SchedulingPolicy">
@@ -3917,6 +3951,90 @@ component is in <code>Creating</code> or <code>Updating</code> phase, indicates 
 </td>
 </tr></tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1.ClusterReplicaRestore">ClusterReplicaRestore
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSpec">InstanceSpec</a>)
+</p>
+<div>
+<p>ClusterReplicaRestore specifies how to initialize replicas added during
+horizontal scale-out. It uses the same source and restore parameters as a
+Cluster restore, while the target replicas are taken from the Component&rsquo;s
+replicas field.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>source</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ClusterRestoreSource">
+ClusterRestoreSource
+</a>
+</em>
+</td>
+<td>
+<p>Specifies the restore source.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>sourceTargetName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the source target in a Backup with multiple targets.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>pitr</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the point-in-time recovery target.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>parameters</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies runtime-specific restore parameters.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>env</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#envvar-v1-core">
+[]Kubernetes core/v1.EnvVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies environment variables for the restore worker.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1.ClusterRestore">ClusterRestore
 </h3>
 <p>
@@ -3975,7 +4093,7 @@ map[string]string
 <h3 id="apps.kubeblocks.io/v1.ClusterRestoreSource">ClusterRestoreSource
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterRestore">ClusterRestore</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterReplicaRestore">ClusterReplicaRestore</a>, <a href="#apps.kubeblocks.io/v1.ClusterRestore">ClusterRestore</a>)
 </p>
 <div>
 <p>ClusterRestoreSource describes the source object used by a Cluster restore.</p>
@@ -6808,6 +6926,20 @@ Instead, you can enable the creation of this service by specifying it explicitly
 </tr>
 </thead>
 <tbody>
+<tr>
+<td>
+<code>replicaRestore</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ClusterReplicaRestore">
+ClusterReplicaRestore
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ReplicaRestore carries the owner restore intent to workload PVC creation.</p>
+</td>
+</tr>
 <tr>
 <td>
 <code>terminationPolicy</code><br/>
@@ -18612,6 +18744,21 @@ InstanceSpec
 <tbody>
 <tr>
 <td>
+<code>replicaRestore</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ClusterReplicaRestore">
+ClusterReplicaRestore
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ReplicaRestore is copied from the owning InstanceSet and is used only
+while building PVCs for this instance.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>template</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#podtemplatespec-v1-core">
@@ -18897,6 +19044,20 @@ InstanceSetSpec
 <br/>
 <table>
 <tbody>
+<tr>
+<td>
+<code>replicaRestore</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ClusterReplicaRestore">
+ClusterReplicaRestore
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ReplicaRestore carries the owner restore intent to PVC creation.</p>
+</td>
+</tr>
 <tr>
 <td>
 <code>replicas</code><br/>
@@ -19639,6 +19800,20 @@ string
 <tbody>
 <tr>
 <td>
+<code>replicaRestore</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ClusterReplicaRestore">
+ClusterReplicaRestore
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ReplicaRestore carries the owner restore intent to PVC creation.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>replicas</code><br/>
 <em>
 int32
@@ -20291,6 +20466,21 @@ to allocate next during scaling up, or which identity is preserved during a rest
 </tr>
 </thead>
 <tbody>
+<tr>
+<td>
+<code>replicaRestore</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ClusterReplicaRestore">
+ClusterReplicaRestore
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ReplicaRestore is copied from the owning InstanceSet and is used only
+while building PVCs for this instance.</p>
+</td>
+</tr>
 <tr>
 <td>
 <code>template</code><br/>

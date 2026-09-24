@@ -531,6 +531,65 @@ func (r *OpsRequest) validateVolumeExpansion(ctx context.Context, cli client.Cli
 	if err := r.checkComponentExistence(cluster, compOpsList); err != nil {
 		return err
 	}
+	for _, expansion := range volumeExpansionList {
+		if len(expansion.VolumeClaimTemplates) == 0 && len(expansion.Instances) == 0 {
+			return notEmptyError("spec.volumeExpansion.volumeClaimTemplates or instances")
+		}
+		var names []string
+		seen := sets.New[string]()
+		for _, instance := range expansion.Instances {
+			if instance.Name == "" || seen.Has(instance.Name) {
+				return fmt.Errorf("invalid or duplicate instance template %q", instance.Name)
+			}
+			seen.Insert(instance.Name)
+			names = append(names, instance.Name)
+			if len(instance.VolumeClaimTemplates) == 0 {
+				return notEmptyError("spec.volumeExpansion.instances.volumeClaimTemplates")
+			}
+		}
+		if err := r.checkInstanceTemplate(cluster, expansion.ComponentOps, names); err != nil {
+			return err
+		}
+		spec := cluster.Spec.GetComponentByName(expansion.ComponentName)
+		if spec == nil {
+			for i := range cluster.Spec.Shardings {
+				if cluster.Spec.Shardings[i].Name == expansion.ComponentName {
+					spec = &cluster.Spec.Shardings[i].Template
+					break
+				}
+			}
+		}
+		validateTargets := func(targets []OpsRequestVolumeClaimTemplate, volumes []appsv1.ClusterComponentVolumeClaimTemplate) error {
+			seen := sets.New[string]()
+			for _, target := range targets {
+				if seen.Has(target.Name) {
+					return fmt.Errorf("duplicate volumeClaimTemplate %q", target.Name)
+				}
+				seen.Insert(target.Name)
+				index := slices.IndexFunc(volumes, func(v appsv1.ClusterComponentVolumeClaimTemplate) bool { return v.Name == target.Name })
+				if index < 0 {
+					return fmt.Errorf("volumeClaimTemplate %q not found in %s", target.Name, expansion.ComponentName)
+				}
+				current := volumes[index].Spec.Resources.Requests.Storage()
+				if target.Storage.Cmp(*current) < 0 {
+					return fmt.Errorf("requested storage for %s cannot be less than declared size %s", target.Name, current.String())
+				}
+			}
+			return nil
+		}
+		if err := validateTargets(expansion.VolumeClaimTemplates, spec.VolumeClaimTemplates); err != nil {
+			return err
+		}
+		for _, requested := range expansion.Instances {
+			for _, template := range spec.Instances {
+				if template.Name == requested.Name {
+					if err := validateTargets(requested.VolumeClaimTemplates, mergeItsCmpTemplates(template.VolumeClaimTemplates, spec.VolumeClaimTemplates)); err != nil {
+						return err
+					}
+				}
+			}
+		}
+	}
 	return r.checkVolumesAllowExpansion(ctx, cli, cluster)
 }
 
@@ -630,7 +689,7 @@ func (r *OpsRequest) checkVolumesAllowExpansion(ctx context.Context, cli client.
 		hasPvc              bool
 	}
 
-	// [component name]/ [sharding name]/ [component name.its name] -> vct name -> entity
+	// [component name]/ [sharding name]/ [component name/instance template name] -> vct name -> entity
 	vols := make(map[string]map[string]Entity)
 	setVols := func(vcts []OpsRequestVolumeClaimTemplate, componentName string) {
 		for _, vct := range vcts {
@@ -642,13 +701,36 @@ func (r *OpsRequest) checkVolumesAllowExpansion(ctx context.Context, cli client.
 	}
 
 	for _, comp := range r.Spec.VolumeExpansionList {
-		setVols(comp.VolumeClaimTemplates, comp.ComponentOps.ComponentName)
-		for _, compSpec := range cluster.Spec.ComponentSpecs {
-			if compSpec.Name == comp.ComponentOps.ComponentName {
-				for _, its := range compSpec.Instances {
-					setVols(comp.VolumeClaimTemplates, fmt.Sprintf("%s.%s", compSpec.Name, its.Name))
+		setVols(comp.VolumeClaimTemplates, comp.ComponentName)
+		setInstanceVols := func(spec appsv1.ClusterComponentSpec) {
+			for _, instance := range spec.Instances {
+				key := fmt.Sprintf("%s/%s", comp.ComponentName, instance.Name)
+				for _, vct := range comp.VolumeClaimTemplates {
+					overridden := false
+					for _, override := range instance.VolumeClaimTemplates {
+						if override.Name == vct.Name {
+							overridden = true
+							break
+						}
+					}
+					if !overridden {
+						setVols([]OpsRequestVolumeClaimTemplate{vct}, key)
+					}
 				}
 			}
+		}
+		for _, spec := range cluster.Spec.ComponentSpecs {
+			if spec.Name == comp.ComponentName {
+				setInstanceVols(spec)
+			}
+		}
+		for _, sharding := range cluster.Spec.Shardings {
+			if sharding.Name == comp.ComponentName {
+				setInstanceVols(sharding.Template)
+			}
+		}
+		for _, instance := range comp.Instances {
+			setVols(instance.VolumeClaimTemplates, fmt.Sprintf("%s/%s", comp.ComponentName, instance.Name))
 		}
 	}
 	fillVol := func(vct appsv1.ClusterComponentVolumeClaimTemplate, key string, isShardingComp bool) {
@@ -669,13 +751,13 @@ func (r *OpsRequest) checkVolumesAllowExpansion(ctx context.Context, cli client.
 			fillVol(vct, componentName, isShardingComp)
 		}
 	}
-	fillItsVols := func(itsSpec appsv1.InstanceTemplate, cmpVcts []appsv1.ClusterComponentVolumeClaimTemplate, key string) {
+	fillItsVols := func(itsSpec appsv1.InstanceTemplate, cmpVcts []appsv1.ClusterComponentVolumeClaimTemplate, key string, isSharding bool) {
 		if _, ok := vols[key]; !ok {
 			return // ignore not-exist its
 		}
 		mergedVcts := mergeItsCmpTemplates(itsSpec.VolumeClaimTemplates, cmpVcts)
 		for _, vct := range mergedVcts {
-			fillVol(vct, key, false)
+			fillVol(vct, key, isSharding)
 		}
 	}
 	// traverse the spec to update volumes
@@ -683,11 +765,14 @@ func (r *OpsRequest) checkVolumesAllowExpansion(ctx context.Context, cli client.
 		fillCompVols(comp, comp.Name, false)
 		for _, its := range comp.Instances {
 			// update its vct volumes
-			fillItsVols(its, comp.VolumeClaimTemplates, fmt.Sprintf("%s.%s", comp.Name, its.Name))
+			fillItsVols(its, comp.VolumeClaimTemplates, fmt.Sprintf("%s/%s", comp.Name, its.Name), false)
 		}
 	}
 	for _, sharding := range cluster.Spec.Shardings {
 		fillCompVols(sharding.Template, sharding.Name, true)
+		for _, its := range sharding.Template.Instances {
+			fillItsVols(its, sharding.Template.VolumeClaimTemplates, fmt.Sprintf("%s/%s", sharding.Name, its.Name), true)
+		}
 	}
 
 	// check all used storage classes
@@ -722,11 +807,12 @@ func (r *OpsRequest) checkVolumesAllowExpansion(ctx context.Context, cli client.
 			notSupportSc []string
 		)
 		for vct, e := range compVols {
-			if !e.hasPvc {
-				continue
-			}
 			if !e.existInSpec {
 				notFound = append(notFound, vct)
+				continue
+			}
+			if !e.hasPvc {
+				continue
 			}
 			if !e.allowExpansion {
 				notSupport = append(notSupport, vct)
@@ -778,8 +864,8 @@ func (r *OpsRequest) getSCNameByPvcAndCheckStorageSize(ctx context.Context,
 	requestStorage resource.Quantity) (found bool, scName *string, err error) {
 	componentName := key
 	targetInsTPLName := ""
-	if strings.Contains(key, ".") {
-		keyStrs := strings.Split(key, ".")
+	if strings.Contains(key, "/") {
+		keyStrs := strings.SplitN(key, "/", 2)
 		componentName = keyStrs[0]
 		targetInsTPLName = keyStrs[1]
 	}

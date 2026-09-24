@@ -387,7 +387,11 @@ type InstanceResourceTemplate struct {
 }
 
 type InstanceVolumeClaimTemplate struct {
-	// Refer to the instance template name of the component or sharding.
+	// Specifies an instance template name, not a Pod name.
+	// For a component selected by componentName, this must match a name in
+	// Cluster.spec.componentSpecs[].instances[].name.
+	// For a sharding selected by componentName, this must match a name in
+	// Cluster.spec.shardings[].template.instances[].name.
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
@@ -408,12 +412,25 @@ type VolumeExpansion struct {
 	// Specifies a list of OpsRequestVolumeClaimTemplate objects, defining the volumeClaimTemplates
 	// that are used to expand the storage and the desired storage size for each one.
 	//
-	// +kubebuilder:validation:Required
+	// +optional
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=name
-	VolumeClaimTemplates []OpsRequestVolumeClaimTemplate `json:"volumeClaimTemplates" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
+	VolumeClaimTemplates []OpsRequestVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
+
+	// Specifies volume expansion targets for named instance templates.
+	// Each target applies to all instances generated from the named template,
+	// which may have multiple replicas. For a sharding, it applies across shards
+	// using spec.shardings[].template.
+	// Explicit template targets take precedence over component-level targets
+	// for the same volume. Other independent template overrides are unchanged.
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
+	// +optional
+	Instances []InstanceVolumeClaimTemplate `json:"instances,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 }
 
 type OpsRequestVolumeClaimTemplate struct {
@@ -422,9 +439,10 @@ type OpsRequestVolumeClaimTemplate struct {
 	// +kubebuilder:validation:Required
 	Storage resource.Quantity `json:"storage"`
 
-	// Specify the name of the volumeClaimTemplate in the Component.
-	// The specified name must match one of the volumeClaimTemplates defined
-	// in the `clusterComponentSpec.volumeClaimTemplates` field.
+	// Specifies a volumeClaimTemplate name in the selected scope.
+	// Component targets match the component's volumeClaimTemplates.
+	// Instance template targets match that template's volumeClaimTemplates,
+	// falling back to the component's volumeClaimTemplates for inherited volumes.
 	//
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`

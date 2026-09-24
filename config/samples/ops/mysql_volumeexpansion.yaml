@@ -1,13 +1,22 @@
-apiVersion: apps.kubeblocks.io/v1alpha1
+apiVersion: operations.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
   generateName: mysql-volumeexpansion-
   namespace: default
 spec:
-  clusterRef: wesql
+  clusterName: wesql
   type: VolumeExpansion
   volumeExpansion:
   - componentName: wesql
     volumeClaimTemplates:
     - name: data
       storage: "2Gi"
+    # Optional: expand data volumes for all replicas of instance template "az-a".
+    # The name matches spec.componentSpecs[].instances[].name, not a Pod name.
+    # For a sharding, componentName selects the sharding and the name matches
+    # spec.shardings[].template.instances[].name across its shards.
+    # instances:
+    # - name: az-a
+    #   volumeClaimTemplates:
+    #   - name: data
+    #     storage: "3Gi"

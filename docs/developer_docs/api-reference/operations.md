@@ -1379,6 +1379,9 @@ Kubernetes core/v1.ResourceRequirements
 </table>
 <h3 id="operations.kubeblocks.io/v1alpha1.InstanceVolumeClaimTemplate">InstanceVolumeClaimTemplate
 </h3>
+<p>
+(<em>Appears on:</em><a href="#operations.kubeblocks.io/v1alpha1.VolumeExpansion">VolumeExpansion</a>)
+</p>
 <div>
 </div>
 <table>
@@ -1397,7 +1400,11 @@ string
 </em>
 </td>
 <td>
-<p>Refer to the instance template name of the component or sharding.</p>
+<p>Specifies an instance template name, not a Pod name.
+For a component selected by componentName, this must match a name in
+Cluster.spec.componentSpecs[].instances[].name.
+For a sharding selected by componentName, this must match a name in
+Cluster.spec.shardings[].template.instances[].name.</p>
 </td>
 </tr>
 <tr>
@@ -2649,9 +2656,10 @@ string
 </em>
 </td>
 <td>
-<p>Specify the name of the volumeClaimTemplate in the Component.
-The specified name must match one of the volumeClaimTemplates defined
-in the <code>clusterComponentSpec.volumeClaimTemplates</code> field.</p>
+<p>Specifies a volumeClaimTemplate name in the selected scope.
+Component targets match the component&rsquo;s volumeClaimTemplates.
+Instance template targets match that template&rsquo;s volumeClaimTemplates,
+falling back to the component&rsquo;s volumeClaimTemplates for inherited volumes.</p>
 </td>
 </tr>
 </tbody>
@@ -4767,8 +4775,28 @@ ComponentOps
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Specifies a list of OpsRequestVolumeClaimTemplate objects, defining the volumeClaimTemplates
 that are used to expand the storage and the desired storage size for each one.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>instances</code><br/>
+<em>
+<a href="#operations.kubeblocks.io/v1alpha1.InstanceVolumeClaimTemplate">
+[]InstanceVolumeClaimTemplate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies volume expansion targets for named instance templates.
+Each target applies to all instances generated from the named template,
+which may have multiple replicas. For a sharding, it applies across shards
+using spec.shardings[].template.
+Explicit template targets take precedence over component-level targets
+for the same volume. Other independent template overrides are unchanged.</p>
 </td>
 </tr>
 </tbody>

@@ -408,54 +408,76 @@ func (r *componentWorkloadOps) joinMemberForPod(pod *corev1.Pod, pods []*corev1.
 }
 
 func (r *componentWorkloadOps) expandVolume() error {
-	for _, vct := range r.runningITS.Spec.VolumeClaimTemplates {
-		var proto *corev1.PersistentVolumeClaimTemplate
-		for i, v := range r.synthesizeComp.VolumeClaimTemplates {
-			if v.Name == vct.Name {
-				proto = &r.synthesizeComp.VolumeClaimTemplates[i]
-				break
+	// Resolve each running instance's effective volumes. Component defaults must
+	// not overwrite template overrides, including when only the template changes.
+	for _, pod := range r.runningItsPodNames {
+		templateName, _, err := component.GetTemplateNameAndOrdinal(r.runningITS.Name, pod)
+		if err != nil {
+			return err
+		}
+		volumeNames := sets.New[string]()
+		for _, vct := range r.runningITS.Spec.VolumeClaimTemplates {
+			volumeNames.Insert(vct.Name)
+		}
+		for _, template := range r.runningITS.Spec.Instances {
+			if template.Name == templateName {
+				for _, vct := range template.VolumeClaimTemplates {
+					volumeNames.Insert(vct.Name)
+				}
 			}
 		}
-		// REVIEW: seems we can remove a volume claim from templates at runtime, without any changes and warning messages?
-		if proto == nil {
-			continue
+		desired := make(map[string]corev1.PersistentVolumeClaimTemplate)
+		for _, vct := range r.synthesizeComp.VolumeClaimTemplates {
+			desired[vct.Name] = vct
 		}
-		if err := r.expandVolumes(vct.Name, proto); err != nil {
-			return err
+		for _, template := range r.synthesizeComp.Instances {
+			if template.Name == templateName {
+				for _, vct := range intctrlutil.ToCoreV1PVCTs(template.VolumeClaimTemplates) {
+					desired[vct.Name] = vct
+				}
+			}
+		}
+		for _, name := range sets.List(volumeNames) {
+			proto, ok := desired[name]
+			if !ok {
+				// A removed volume template leaves its PVC unchanged.
+				continue
+			}
+			if err := r.expandInstanceVolume(pod, name, &proto); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
 }
 
-func (r *componentWorkloadOps) expandVolumes(vctName string, proto *corev1.PersistentVolumeClaimTemplate) error {
-	for _, pod := range r.runningItsPodNames {
-		pvc := &corev1.PersistentVolumeClaim{}
-		pvcKey := types.NamespacedName{
-			Namespace: r.synthesizeComp.Namespace,
-			Name:      fmt.Sprintf("%s-%s", vctName, pod),
-		}
-		pvcNotFound := false
-		if err := r.cli.Get(r.transCtx.Context, pvcKey, pvc, appsutil.InDataContext4C()); err != nil {
-			if apierrors.IsNotFound(err) {
-				pvcNotFound = true
-			} else {
-				return err
-			}
-		}
-		if !pvcNotFound {
-			quantity := pvc.Spec.Resources.Requests.Storage()
-			newQuantity := proto.Spec.Resources.Requests.Storage()
-			if quantity.Cmp(*pvc.Status.Capacity.Storage()) == 0 && newQuantity.Cmp(*quantity) < 0 {
-				errMsg := fmt.Sprintf("shrinking the volume is not supported, volume: %s, quantity: %s, new quantity: %s",
-					pvc.GetName(), quantity.String(), newQuantity.String())
-				r.transCtx.Event(r.component, corev1.EventTypeWarning, "VolumeExpansionFailed", errMsg)
-				return fmt.Errorf("%s", errMsg)
-			}
-		}
-
-		if err := r.updatePVCSize(pvcKey, pvc, pvcNotFound, proto); err != nil {
+func (r *componentWorkloadOps) expandInstanceVolume(pod, vctName string, proto *corev1.PersistentVolumeClaimTemplate) error {
+	pvc := &corev1.PersistentVolumeClaim{}
+	pvcKey := types.NamespacedName{
+		Namespace: r.synthesizeComp.Namespace,
+		Name:      fmt.Sprintf("%s-%s", vctName, pod),
+	}
+	pvcNotFound := false
+	if err := r.cli.Get(r.transCtx.Context, pvcKey, pvc, appsutil.InDataContext4C()); err != nil {
+		if apierrors.IsNotFound(err) {
+			pvcNotFound = true
+		} else {
 			return err
 		}
+	}
+	if !pvcNotFound {
+		quantity := pvc.Spec.Resources.Requests.Storage()
+		newQuantity := proto.Spec.Resources.Requests.Storage()
+		if quantity.Cmp(*pvc.Status.Capacity.Storage()) == 0 && newQuantity.Cmp(*quantity) < 0 {
+			errMsg := fmt.Sprintf("shrinking the volume is not supported, volume: %s, quantity: %s, new quantity: %s",
+				pvc.GetName(), quantity.String(), newQuantity.String())
+			r.transCtx.Event(r.component, corev1.EventTypeWarning, "VolumeExpansionFailed", errMsg)
+			return fmt.Errorf("%s", errMsg)
+		}
+	}
+
+	if err := r.updatePVCSize(pvcKey, pvc, pvcNotFound, proto); err != nil {
+		return err
 	}
 	return nil
 }

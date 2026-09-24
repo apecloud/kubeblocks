@@ -3115,6 +3115,59 @@ spec:
                       description: Specifies the name of the Component as defined
                         in the cluster.spec
                       type: string
+                    instances:
+                      description: |-
+                        Specifies volume expansion targets for named instance templates.
+                        Each target applies to all instances generated from the named template,
+                        which may have multiple replicas. For a sharding, it applies across shards
+                        using spec.shardings[].template.
+                        Explicit template targets take precedence over component-level targets
+                        for the same volume. Other independent template overrides are unchanged.
+                      items:
+                        properties:
+                          name:
+                            description: |-
+                              Specifies an instance template name, not a Pod name.
+                              For a component selected by componentName, this must match a name in
+                              Cluster.spec.componentSpecs[].instances[].name.
+                              For a sharding selected by componentName, this must match a name in
+                              Cluster.spec.shardings[].template.instances[].name.
+                            type: string
+                          volumeClaimTemplates:
+                            description: volumeClaimTemplates specifies the storage
+                              size and volumeClaimTemplate name.
+                            items:
+                              properties:
+                                name:
+                                  description: |-
+                                    Specify the name of the volumeClaimTemplate in the Component.
+                                    The specified name must match one of the volumeClaimTemplates defined
+                                    in the `clusterComponentSpec.volumeClaimTemplates` field.
+                                  type: string
+                                storage:
+                                  anyOf:
+                                  - type: integer
+                                  - type: string
+                                  description: Specifies the desired storage size
+                                    for the volume.
+                                  pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                  x-kubernetes-int-or-string: true
+                              required:
+                              - name
+                              - storage
+                              type: object
+                            type: array
+                            x-kubernetes-list-map-keys:
+                            - name
+                            x-kubernetes-list-type: map
+                        required:
+                        - name
+                        - volumeClaimTemplates
+                        type: object
+                      type: array
+                      x-kubernetes-list-map-keys:
+                      - name
+                      x-kubernetes-list-type: map
                     volumeClaimTemplates:
                       description: |-
                         Specifies a list of OpsRequestVolumeClaimTemplate objects, defining the volumeClaimTemplates
@@ -3145,7 +3198,6 @@ spec:
                       x-kubernetes-list-type: map
                   required:
                   - componentName
-                  - volumeClaimTemplates
                   type: object
                 type: array
                 x-kubernetes-list-map-keys:

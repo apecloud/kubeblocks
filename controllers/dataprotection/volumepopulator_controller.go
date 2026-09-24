@@ -234,7 +234,7 @@ func (r *VolumePopulatorReconciler) mapRestorePVCs(ctx context.Context, namespac
 	for i := range list.Items {
 		pvc := &list.Items[i]
 		if !isClusterRestorePVC(pvc) || clusterRestorePVCUID(pvc) != clusterUID ||
-			(!includeTerminal && pvcRestoreTerminal(pvc)) {
+			(!includeTerminal && pvcRestoreTerminal(pvc) && !isReplicaRestorePVC(pvc)) {
 			continue
 		}
 		requests = append(requests, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(pvc)})
@@ -334,6 +334,8 @@ func componentDependencyPredicate() predicate.Predicate {
 			oldComp, oldOK := e.ObjectOld.(*appsv1.Component)
 			newComp, newOK := e.ObjectNew.(*appsv1.Component)
 			return oldOK && newOK && (oldComp.Status.Phase != newComp.Status.Phase ||
+				oldComp.Spec.Replicas != newComp.Spec.Replicas ||
+				!reflect.DeepEqual(oldComp.Spec.ReplicaRestore, newComp.Spec.ReplicaRestore) ||
 				!reflect.DeepEqual(oldComp.DeletionTimestamp, newComp.DeletionTimestamp) ||
 				!reflect.DeepEqual(postProvisionCondition(oldComp), postProvisionCondition(newComp)))
 		},
@@ -349,11 +351,26 @@ func clusterDependencyPredicate() predicate.Predicate {
 			oldCluster, oldOK := e.ObjectOld.(*appsv1.Cluster)
 			newCluster, newOK := e.ObjectNew.(*appsv1.Cluster)
 			return oldOK && newOK && (oldCluster.Status.Phase != newCluster.Status.Phase ||
+				replicaRestoreComponentSpecsChanged(oldCluster, newCluster) ||
 				!reflect.DeepEqual(oldCluster.DeletionTimestamp, newCluster.DeletionTimestamp) ||
 				controllerutil.ContainsFinalizer(oldCluster, dptypes.RestoreProtectionFinalizerName) !=
 					controllerutil.ContainsFinalizer(newCluster, dptypes.RestoreProtectionFinalizerName))
 		},
 	}
+}
+
+func replicaRestoreComponentSpecsChanged(oldCluster, newCluster *appsv1.Cluster) bool {
+	if len(oldCluster.Spec.ComponentSpecs) != len(newCluster.Spec.ComponentSpecs) {
+		return true
+	}
+	for i := range oldCluster.Spec.ComponentSpecs {
+		oldSpec, newSpec := oldCluster.Spec.ComponentSpecs[i], newCluster.Spec.ComponentSpecs[i]
+		if oldSpec.Name != newSpec.Name || oldSpec.Replicas != newSpec.Replicas ||
+			!reflect.DeepEqual(oldSpec.ReplicaRestore, newSpec.ReplicaRestore) {
+			return true
+		}
+	}
+	return false
 }
 
 func postProvisionCondition(comp *appsv1.Component) *metav1.Condition {

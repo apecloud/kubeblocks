@@ -4112,6 +4112,10 @@ func TestMapComponentAndClusterDependencies(t *testing.T) {
 	terminal.Status.Conditions = []corev1.PersistentVolumeClaimCondition{{
 		Type: corev1.PersistentVolumeClaimConditionType(kbappsv1.ConditionTypeRestore), Status: corev1.ConditionFalse,
 	}}
+	replicaTerminal := terminal.DeepCopy()
+	replicaTerminal.Name = "replica-terminal"
+	replicaTerminal.UID = "replica-terminal-pvc"
+	replicaTerminal.Annotations[constant.RestorePurposeAnnotationKey] = constant.RestorePurposeReplica
 	foreign := dependencyRestorePVC("foreign", "mysql", "foreign-pvc")
 	foreign.Annotations[constant.KBAppClusterUIDKey] = "another-cluster-uid"
 	comp := &kbappsv1.Component{ObjectMeta: metav1.ObjectMeta{
@@ -4127,11 +4131,12 @@ func TestMapComponentAndClusterDependencies(t *testing.T) {
 	cluster := &kbappsv1.Cluster{ObjectMeta: metav1.ObjectMeta{
 		Namespace: "default", Name: "cluster", UID: "cluster-uid",
 	}}
-	reconciler := dependencyTestReconciler(t, mysql, postgresql, invalid, terminal, foreign)
+	reconciler := dependencyTestReconciler(t, mysql, postgresql, invalid, terminal, replicaTerminal, foreign)
 
 	require.ElementsMatch(t, []reconcile.Request{
 		{NamespacedName: client.ObjectKeyFromObject(mysql)},
 		{NamespacedName: client.ObjectKeyFromObject(postgresql)},
+		{NamespacedName: client.ObjectKeyFromObject(replicaTerminal)},
 	}, reconciler.mapComponentToPVCs(context.Background(), comp))
 	deleting := comp.DeepCopy()
 	now := metav1.Now()
@@ -4139,10 +4144,12 @@ func TestMapComponentAndClusterDependencies(t *testing.T) {
 	require.ElementsMatch(t, []reconcile.Request{
 		{NamespacedName: client.ObjectKeyFromObject(mysql)},
 		{NamespacedName: client.ObjectKeyFromObject(terminal)},
+		{NamespacedName: client.ObjectKeyFromObject(replicaTerminal)},
 	}, reconciler.mapComponentToPVCs(context.Background(), deleting))
 	require.ElementsMatch(t, []reconcile.Request{
 		{NamespacedName: client.ObjectKeyFromObject(mysql)},
 		{NamespacedName: client.ObjectKeyFromObject(postgresql)},
+		{NamespacedName: client.ObjectKeyFromObject(replicaTerminal)},
 	}, reconciler.mapClusterToPVCs(context.Background(), cluster))
 }
 
@@ -4223,6 +4230,13 @@ func TestDependencyPredicates(t *testing.T) {
 	compRunning := compNew.DeepCopy()
 	compRunning.Status.Phase = kbappsv1.RunningComponentPhase
 	require.True(t, componentDependencyPredicate().Update(event.UpdateEvent{ObjectOld: compNew, ObjectNew: compRunning}))
+	compRestoreOld := compNew.DeepCopy()
+	compRestoreOld.Spec.Replicas = 5
+	compRestoreOld.Spec.ReplicaRestore = &kbappsv1.ReplicaRestoreProjection{Fingerprint: "restore"}
+	compRestoreNew := compRestoreOld.DeepCopy()
+	compRestoreNew.Spec.Replicas = 3
+	compRestoreNew.Spec.ReplicaRestore = nil
+	require.True(t, componentDependencyPredicate().Update(event.UpdateEvent{ObjectOld: compRestoreOld, ObjectNew: compRestoreNew}))
 
 	clusterOld := &kbappsv1.Cluster{}
 	clusterNew := clusterOld.DeepCopy()
@@ -4234,6 +4248,12 @@ func TestDependencyPredicates(t *testing.T) {
 	clusterDeleting := clusterNew.DeepCopy()
 	clusterDeleting.DeletionTimestamp = &now
 	require.True(t, clusterDependencyPredicate().Update(event.UpdateEvent{ObjectOld: clusterNew, ObjectNew: clusterDeleting}))
+	clusterRestoreOld := clusterNew.DeepCopy()
+	clusterRestoreOld.Spec.ComponentSpecs = []kbappsv1.ClusterComponentSpec{{Name: "mysql", Replicas: 5, ReplicaRestore: &kbappsv1.ClusterReplicaRestore{}}}
+	clusterRestoreNew := clusterRestoreOld.DeepCopy()
+	clusterRestoreNew.Spec.ComponentSpecs[0].Replicas = 3
+	clusterRestoreNew.Spec.ComponentSpecs[0].ReplicaRestore = nil
+	require.True(t, clusterDependencyPredicate().Update(event.UpdateEvent{ObjectOld: clusterRestoreOld, ObjectNew: clusterRestoreNew}))
 }
 
 func TestReplicaRestorePVCRequiresPrepareData(t *testing.T) {

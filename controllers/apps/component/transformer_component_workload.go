@@ -272,6 +272,7 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet, legacyConfigManagerP
 	itsObjCopy.Spec.DisableDefaultHeadlessService = itsProto.Spec.DisableDefaultHeadlessService
 	itsObjCopy.Spec.EnableInstanceAPI = itsProto.Spec.EnableInstanceAPI
 	itsObjCopy.Spec.InstanceAssistantObjects = itsProto.Spec.InstanceAssistantObjects
+	itsObjCopy.Spec.ReplicaRestore = itsProto.Spec.ReplicaRestore
 
 	if itsObjCopy.Spec.InstanceUpdateStrategy != nil && itsObjCopy.Spec.InstanceUpdateStrategy.RollingUpdate != nil {
 		// use oldITS because itsObjCopy has been overwritten

@@ -109,3 +109,29 @@ func TestValidateExistingPVCAcceptsMatchingTarget(t *testing.T) {
 		t.Fatalf("expected matching PVC to be accepted: %v", err)
 	}
 }
+
+func TestValidateExistingPVCSkipsOldInitialRestorePVC(t *testing.T) {
+	intent := testIntent()
+	desired := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{
+		Name: "data-mysql-0", Labels: map[string]string{constant.VolumeClaimTemplateNameLabelKey: "data"},
+	}}
+	existing := desired.DeepCopy()
+	existing.Spec.DataSourceRef = &corev1.TypedObjectReference{Kind: "Backup", Name: "initial-backup"}
+	existing.Annotations = map[string]string{constant.RestoreSourceNameAnnotationKey: "initial-backup"}
+	if err := ValidateExistingPVC(existing, desired, intent); err != nil {
+		t.Fatalf("non-target initial restore PVC should be ignored: %v", err)
+	}
+}
+
+func TestValidateExistingPVCRejectsStaleOptionalRestoreMetadata(t *testing.T) {
+	intent := testIntent()
+	desired := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{
+		Name: "data-mysql-3", Labels: map[string]string{constant.VolumeClaimTemplateNameLabelKey: "data"},
+	}}
+	ApplyToPVC(desired, intent, "mysql-3")
+	existing := desired.DeepCopy()
+	existing.Annotations[constant.RestorePITRAnnotationKey] = "stale"
+	if err := ValidateExistingPVC(existing, desired, intent); err == nil {
+		t.Fatal("expected stale optional restore metadata to be rejected")
+	}
+}

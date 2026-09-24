@@ -289,6 +289,10 @@ type InstanceSetStatus struct {
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
+	// ReplicaRestore reports progress for the current scale-out restore projection.
+	// +optional
+	ReplicaRestore *kbappsv1.ReplicaRestoreStatus `json:"replicaRestore,omitempty"`
+
 	// replicas is the number of instances created by the InstanceSet controller.
 	Replicas int32 `json:"replicas"`
 

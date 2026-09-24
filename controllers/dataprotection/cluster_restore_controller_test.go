@@ -21,11 +21,13 @@ package dataprotection
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -148,6 +150,59 @@ func TestClusterRestoreProtectionKeepsUnregisteredReplicaPVC(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(cluster), cluster))
 	require.Contains(t, cluster.Finalizers, dptypes.RestoreProtectionFinalizerName)
+}
+
+func TestClusterDeletionReleasesProtectionAfterReplicaPVCTermination(t *testing.T) {
+	for _, active := range []bool{false, true} {
+		t.Run(fmt.Sprintf("active=%t", active), func(t *testing.T) {
+			ctx := context.Background()
+			scheme, cluster, component, _, target := parentRestoreObjects(t)
+			now := metav1.Now()
+			cluster.DeletionTimestamp = &now
+			cluster.Finalizers = append(cluster.Finalizers, "example.io/app-owner")
+			cluster.Spec.Restore = nil
+			target.OwnerReferences = nil
+			target.Annotations[constant.RestorePurposeAnnotationKey] = constant.RestorePurposeReplica
+			target.Finalizers = nil
+			if active {
+				target.Finalizers = []string{dptypes.DataProtectionFinalizerName}
+				target.Labels[dptypes.ComponentUIDLabelKey] = string(component.UID)
+				target.Status.Conditions = []corev1.PersistentVolumeClaimCondition{{
+					Type: PersistentVolumeClaimPopulating, Status: corev1.ConditionTrue, Reason: ReasonPopulatingProcessing,
+				}}
+			}
+			cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(target).
+				WithObjects(cluster, target).Build()
+			coordinator := &ClusterRestoreReconciler{Client: cli}
+			vp := &VolumePopulatorReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(10)}
+			clusterKey := client.ObjectKeyFromObject(cluster)
+			targetKey := client.ObjectKeyFromObject(target)
+
+			result, err := coordinator.Reconcile(ctx, ctrl.Request{NamespacedName: clusterKey})
+			require.NoError(t, err)
+			require.Positive(t, result.RequeueAfter)
+			require.NoError(t, cli.Get(ctx, clusterKey, cluster))
+			require.Contains(t, cluster.Finalizers, dptypes.RestoreProtectionFinalizerName)
+
+			result, err = vp.Reconcile(ctx, ctrl.Request{NamespacedName: targetKey})
+			require.NoError(t, err)
+			require.Positive(t, result.RequeueAfter)
+			require.NoError(t, cli.Get(ctx, targetKey, target))
+			restoreCondition := findPVCConditionByType(target, appsv1.ConditionTypeRestore)
+			require.NotNil(t, restoreCondition)
+			require.Equal(t, corev1.ConditionFalse, restoreCondition.Status)
+
+			_, err = vp.Reconcile(ctx, ctrl.Request{NamespacedName: targetKey})
+			require.NoError(t, err)
+			require.NoError(t, cli.Get(ctx, targetKey, target))
+			require.NotContains(t, target.Finalizers, dptypes.DataProtectionFinalizerName)
+
+			_, err = coordinator.Reconcile(ctx, ctrl.Request{NamespacedName: clusterKey})
+			require.NoError(t, err)
+			require.NoError(t, cli.Get(ctx, clusterKey, cluster))
+			require.NotContains(t, cluster.Finalizers, dptypes.RestoreProtectionFinalizerName)
+		})
+	}
 }
 
 func TestClusterRestoreControllerIgnoresResourcesWithoutExactClusterUID(t *testing.T) {

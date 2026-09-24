@@ -297,6 +297,7 @@ func copyAndMergeInstance(oldInst, newInst *workloads.Instance) *workloads.Insta
 	targetInst.Spec.Roles = newInst.Spec.Roles
 	targetInst.Spec.LifecycleActions = newInst.Spec.LifecycleActions
 	targetInst.Spec.Configs = newInst.Spec.Configs
+	targetInst.Spec.ReplicaRestore = newInst.Spec.ReplicaRestore
 
 	// object meta
 	mergeMap(&newInst.Labels, &targetInst.Labels)

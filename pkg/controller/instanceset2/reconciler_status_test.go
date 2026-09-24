@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	instctrl "github.com/apecloud/kubeblocks/pkg/controller/instance"
@@ -114,6 +115,45 @@ func TestStatusReconcilerAggregatesInstanceRestoreConditions(t *testing.T) {
 			t.Fatalf("terminal Restore condition was overwritten: %#v", cond)
 		}
 	})
+}
+
+func TestBuildReplicaRestoreStatusWaitsForInstanceProjection(t *testing.T) {
+	intent := &appsv1.ReplicaRestoreProjection{StartOrdinal: 3, EndOrdinal: 5, Fingerprint: "restore-1"}
+	its := &workloads.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default", Generation: 2},
+		Spec: workloads.InstanceSetSpec{
+			Replicas: ptr.To[int32](5), ReplicaRestore: intent,
+			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "demo"}},
+		},
+	}
+	tree := kubebuilderx.NewObjectTree()
+	tree.SetRoot(its)
+	completed := metav1.Condition{
+		Type: string(workloads.InstanceReplicaRestore), Status: metav1.ConditionTrue, ObservedGeneration: 1,
+	}
+	instances := []*workloads.Instance{
+		{ObjectMeta: metav1.ObjectMeta{Name: "demo-3", Generation: 1}, Status: workloads.InstanceStatus2{ObservedGeneration: 1, Conditions: []metav1.Condition{completed}}},
+		{ObjectMeta: metav1.ObjectMeta{Name: "demo-4", Generation: 1}, Status: workloads.InstanceStatus2{ObservedGeneration: 1, Conditions: []metav1.Condition{completed}}},
+	}
+
+	status, err := buildReplicaRestoreStatus(tree, its, instances)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status.Phase != appsv1.ReplicaRestorePending || status.RestoredReplicas != 0 {
+		t.Fatalf("Instance projection propagation should remain pending: %#v", status)
+	}
+
+	for _, inst := range instances {
+		inst.Spec.ReplicaRestore = intent.DeepCopy()
+	}
+	status, err = buildReplicaRestoreStatus(tree, its, instances)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status.Phase != appsv1.ReplicaRestoreCompleted || status.RestoredReplicas != 2 {
+		t.Fatalf("matching current Instance projections should complete: %#v", status)
+	}
 }
 
 func TestSetInstanceStatusReadsCurrentStateFromInstance(t *testing.T) {

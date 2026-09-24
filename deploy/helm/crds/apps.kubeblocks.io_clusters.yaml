@@ -2911,7 +2911,11 @@ spec:
                     replicaRestore:
                       description: |-
                         Specifies the restore source for replicas added during scale-out.
-                        This field is only supported for existing, non-sharding Components.
+                        Only existing, non-sharding Components with default contiguous ordinals
+                        are supported. Instance templates and offline instances are not supported.
+                        The source and replicas cannot change until this intent is removed.
+                        Remove a completed intent before starting another restore. To cancel an
+                        active restore, remove the intent and return replicas to its previous count.
                       properties:
                         env:
                           description: Specifies environment variables for the restore
@@ -14360,7 +14364,11 @@ spec:
                         replicaRestore:
                           description: |-
                             Specifies the restore source for replicas added during scale-out.
-                            This field is only supported for existing, non-sharding Components.
+                            Only existing, non-sharding Components with default contiguous ordinals
+                            are supported. Instance templates and offline instances are not supported.
+                            The source and replicas cannot change until this intent is removed.
+                            Remove a completed intent before starting another restore. To cancel an
+                            active restore, remove the intent and return replicas to its previous count.
                           properties:
                             env:
                               description: Specifies environment variables for the
@@ -18205,14 +18213,19 @@ spec:
                 type: string
               replicaRestores:
                 additionalProperties:
-                  description: ReplicaRestoreStatus records the observed status of
-                    a scale-out restore.
+                  description: |-
+                    ReplicaRestoreStatus records the observed status of a scale-out restore.
+                    Completed means the new replicas' volumes are prepared, including auxiliary
+                    volumes provisioned without backup data. It does not imply that the replicas
+                    are ready to serve traffic; consumers must also observe Component readiness.
                   properties:
                     component:
                       type: string
                     message:
                       type: string
                     observedGeneration:
+                      description: ObservedGeneration identifies the generation of
+                        the resource publishing this status.
                       format: int64
                       type: integer
                     phase:
@@ -18220,9 +18233,13 @@ spec:
                         of a scale-out restore.
                       type: string
                     restoredReplicas:
+                      description: RestoredReplicas counts newly added replicas whose
+                        volumes are ready.
                       format: int32
                       type: integer
                     targetReplicas:
+                      description: TargetReplicas is the desired total number of replicas,
+                        including existing replicas.
                       format: int32
                       type: integer
                   required:

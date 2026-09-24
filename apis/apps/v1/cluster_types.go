@@ -354,7 +354,11 @@ type ClusterComponentSpec struct {
 	Replicas int32 `json:"replicas"`
 
 	// Specifies the restore source for replicas added during scale-out.
-	// This field is only supported for existing, non-sharding Components.
+	// Only existing, non-sharding Components with default contiguous ordinals
+	// are supported. Instance templates and offline instances are not supported.
+	// The source and replicas cannot change until this intent is removed.
+	// Remove a completed intent before starting another restore. To cancel an
+	// active restore, remove the intent and return replicas to its previous count.
 	//
 	// +optional
 	ReplicaRestore *ClusterReplicaRestore `json:"replicaRestore,omitempty"`
@@ -949,13 +953,23 @@ const (
 )
 
 // ReplicaRestoreStatus records the observed status of a scale-out restore.
+// Completed means the new replicas' volumes are prepared, including auxiliary
+// volumes provisioned without backup data. It does not imply that the replicas
+// are ready to serve traffic; consumers must also observe Component readiness.
 type ReplicaRestoreStatus struct {
-	Component          string              `json:"component"`
-	Phase              ReplicaRestorePhase `json:"phase"`
-	RestoredReplicas   int32               `json:"restoredReplicas,omitempty"`
-	TargetReplicas     int32               `json:"targetReplicas,omitempty"`
-	Message            string              `json:"message,omitempty"`
-	ObservedGeneration int64               `json:"observedGeneration,omitempty"`
+	Component string              `json:"component"`
+	Phase     ReplicaRestorePhase `json:"phase"`
+
+	// RestoredReplicas counts newly added replicas whose volumes are ready.
+	RestoredReplicas int32 `json:"restoredReplicas,omitempty"`
+
+	// TargetReplicas is the desired total number of replicas, including existing replicas.
+	TargetReplicas int32 `json:"targetReplicas,omitempty"`
+
+	Message string `json:"message,omitempty"`
+
+	// ObservedGeneration identifies the generation of the resource publishing this status.
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
 // ClusterRestoreSource describes the source object used by a Cluster restore.

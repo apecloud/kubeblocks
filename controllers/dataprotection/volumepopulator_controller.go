@@ -659,6 +659,16 @@ func (r *VolumePopulatorReconciler) finishVolumePopulationTermination(reqCtx int
 	if pending {
 		return intctrlutil.NewRequeueError(reconcileInterval, "waiting for helper PVC to disappear")
 	}
+	if isReplicaRestorePVC(pvc) && !pvcRestoreTerminal(pvc) {
+		if err := r.UpdatePVCConditions(reqCtx, pvc, ReasonPopulatingFailed,
+			"Replica restore terminated because its parent is deleting"); err != nil {
+			return err
+		}
+		// Publish the terminal condition before releasing target protection. The
+		// Cluster restore coordinator uses that condition to distinguish cleanup
+		// completion from an unregistered Replica PVC that has not started yet.
+		return intctrlutil.NewRequeueError(reconcileInterval, "waiting for Replica restore termination status")
+	}
 	return r.releaseTargetPVC(reqCtx, pvc)
 }
 
@@ -900,9 +910,9 @@ func (r *VolumePopulatorReconciler) validateRestoreAndBuildMGR(reqCtx intctrluti
 	if err != nil {
 		return nil, err
 	}
-	if isReplicaRestorePVC(pvc) && decision.mode != pvcRestoreModeRestoreData {
+	if isReplicaRestorePVC(pvc) && (decision.skipPostReady || decision.sourceTarget == nil) {
 		return nil, intctrlutil.NewFatalError(fmt.Sprintf(
-			"replica restore PVC %s/%s has no matching prepareData target volume", pvc.Namespace, pvc.Name))
+			"replica restore PVC %s/%s has no matching backup target", pvc.Namespace, pvc.Name))
 	}
 	restore := &dpv1alpha1.Restore{
 		ObjectMeta: metav1.ObjectMeta{
@@ -946,6 +956,10 @@ func (r *VolumePopulatorReconciler) validateRestoreAndBuildMGR(reqCtx intctrluti
 	restoreMgr := dprestore.NewRestoreManager(restore, r.Recorder, r.Scheme, r.Client)
 	if err = dprestore.ValidateAndInitRestoreMGR(reqCtx, r.Client, restoreMgr); err != nil {
 		return nil, err
+	}
+	if isReplicaRestorePVC(pvc) && len(restoreMgr.PrepareDataBackupSets) == 0 {
+		return nil, intctrlutil.NewFatalError(fmt.Sprintf(
+			"replica restore PVC %s/%s requires a prepareData restore action", pvc.Namespace, pvc.Name))
 	}
 	if !isReplicaRestorePVC(pvc) {
 		if err = r.restoreSystemAccountSecrets(reqCtx, pvc, backupNamespace); err != nil {
@@ -1952,7 +1966,8 @@ func replicaRestoreSucceeded(pvc *corev1.PersistentVolumeClaim) bool {
 		return false
 	}
 	condition := findPVCConditionByType(pvc, appsv1.ConditionTypeRestore)
-	return condition != nil && condition.Status == corev1.ConditionTrue && condition.Reason == ReasonPopulatingSucceed
+	return condition != nil && condition.Status == corev1.ConditionTrue &&
+		(condition.Reason == ReasonPopulatingSucceed || condition.Reason == ReasonPopulatingProvisioned)
 }
 
 func (r *VolumePopulatorReconciler) updatePVCConditionsIfPopulateNotReleased(reqCtx intctrlutil.RequestCtx,
@@ -2211,9 +2226,15 @@ func (r *VolumePopulatorReconciler) listRestorePVCsForComponent(reqCtx intctrlut
 	if err != nil {
 		return nil, intctrlutil.NewFatalError(err.Error())
 	}
+	replicaRestore := isReplicaRestorePVC(pvc)
+	replicaRestoreFingerprint := pvc.Annotations[constant.ReplicaRestoreFingerprintAnnotationKey]
 	for i := range pvcList.Items {
 		item := pvcList.Items[i]
 		if item.Spec.DataSourceRef == nil || item.Spec.DataSourceRef.Name != pvc.Spec.DataSourceRef.Name {
+			continue
+		}
+		if replicaRestore && (!isReplicaRestorePVC(&item) ||
+			item.Annotations[constant.ReplicaRestoreFingerprintAnnotationKey] != replicaRestoreFingerprint) {
 			continue
 		}
 		if item.Annotations[constant.RestoreSourceKindAnnotationKey] == "" {

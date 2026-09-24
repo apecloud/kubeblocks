@@ -7240,6 +7240,37 @@ spec:
                 - Stopped
                 - Failed
                 type: string
+              replicaRestore:
+                description: ReplicaRestore reports progress for the current scale-out
+                  restore projection.
+                properties:
+                  component:
+                    type: string
+                  message:
+                    type: string
+                  observedGeneration:
+                    description: ObservedGeneration identifies the generation of the
+                      resource publishing this status.
+                    format: int64
+                    type: integer
+                  phase:
+                    description: ReplicaRestorePhase defines the observed state of
+                      a scale-out restore.
+                    type: string
+                  restoredReplicas:
+                    description: RestoredReplicas counts newly added replicas whose
+                      volumes are ready.
+                    format: int32
+                    type: integer
+                  targetReplicas:
+                    description: TargetReplicas is the desired total number of replicas,
+                      including existing replicas.
+                    format: int32
+                    type: integer
+                required:
+                - component
+                - phase
+                type: object
             type: object
         type: object
     served: true

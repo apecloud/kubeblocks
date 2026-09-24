@@ -11621,7 +11621,7 @@ spec:
               conditions:
                 description: |-
                   Represents the latest available observations of an instanceset's current state.
-                  Known .status.conditions.type are: "InstanceFailure", "InstanceReady", "Restore"
+                  Known .status.conditions.type are: "InstanceFailure", "InstanceReady", "Restore", "ReplicaRestore"
                 items:
                   description: Condition contains details for one aspect of the current
                     state of this API Resource.
@@ -11824,6 +11824,37 @@ spec:
                   this InstanceSet with a Ready Condition.
                 format: int32
                 type: integer
+              replicaRestore:
+                description: ReplicaRestore reports progress for the current scale-out
+                  restore projection.
+                properties:
+                  component:
+                    type: string
+                  message:
+                    type: string
+                  observedGeneration:
+                    description: ObservedGeneration identifies the generation of the
+                      resource publishing this status.
+                    format: int64
+                    type: integer
+                  phase:
+                    description: ReplicaRestorePhase defines the observed state of
+                      a scale-out restore.
+                    type: string
+                  restoredReplicas:
+                    description: RestoredReplicas counts newly added replicas whose
+                      volumes are ready.
+                    format: int32
+                    type: integer
+                  targetReplicas:
+                    description: TargetReplicas is the desired total number of replicas,
+                      including existing replicas.
+                    format: int32
+                    type: integer
+                required:
+                - component
+                - phase
+                type: object
               replicas:
                 description: replicas is the number of instances created by the InstanceSet
                   controller.

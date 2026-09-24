@@ -55,6 +55,12 @@ func applyClusterRestoreIntentWithReader(ctx context.Context, reader client.Read
 		}
 	}
 	for _, sharding := range shardings {
+		if sharding.Template.ReplicaRestore != nil {
+			return fmt.Errorf("sharding %q does not support replicaRestore", sharding.Name)
+		}
+		if cluster.Spec.Restore == nil {
+			continue
+		}
 		applyRestoreIntentToComponent(cluster, sharding.Name, sharding.Template.VolumeClaimTemplates, sharding.Template.Instances, completed)
 		for i := range sharding.ShardTemplates {
 			template := &sharding.ShardTemplates[i]
@@ -73,9 +79,10 @@ func applyReplicaRestoreProjection(ctx context.Context, reader client.Reader, cl
 			key := types.NamespacedName{Namespace: cluster.Namespace, Name: constant.GenerateClusterComponentName(cluster.Name, comp.Name)}
 			if err := reader.Get(ctx, key, component); err == nil && component.Spec.ReplicaRestore != nil {
 				projection := component.Spec.ReplicaRestore
-				status, ok := cluster.Status.ReplicaRestores[comp.Name]
+				status := component.Status.ReplicaRestore
 				rollback := comp.Replicas == projection.StartOrdinal
-				terminal := ok && (status.Phase == appsv1.ReplicaRestoreCompleted || status.Phase == appsv1.ReplicaRestoreFailed)
+				terminal := status != nil && status.ObservedGeneration == component.Generation &&
+					(status.Phase == appsv1.ReplicaRestoreCompleted || status.Phase == appsv1.ReplicaRestoreFailed)
 				if !rollback && !terminal {
 					return fmt.Errorf("component %q cannot remove replicaRestore while restore is active", comp.Name)
 				}
@@ -103,40 +110,28 @@ func applyReplicaRestoreProjection(ctx context.Context, reader client.Reader, cl
 	if !component.DeletionTimestamp.IsZero() {
 		return fmt.Errorf("component %q replicaRestore requires a non-deleting live Component", comp.Name)
 	}
+	if existing := component.Spec.ReplicaRestore; existing != nil {
+		if comp.Replicas != existing.EndOrdinal || replicaRestoreFingerprint(cluster, comp.Name, restore, existing.StartOrdinal, existing.EndOrdinal) != existing.Fingerprint {
+			return fmt.Errorf("component %q replicaRestore source and target are immutable until the intent is removed", comp.Name)
+		}
+		// The persisted desired input is sufficient to resume during Updating or
+		// Failed. Baseline stability is only required when accepting a new intent.
+		comp.ReplicaRestoreProjection = existing.DeepCopy()
+		return nil
+	}
 	if component.Status.Phase != appsv1.RunningComponentPhase {
 		return fmt.Errorf("component %q replicaRestore requires a stable Running Component", comp.Name)
 	}
-	if component.Status.ObservedGeneration != 0 && component.Status.ObservedGeneration != component.Generation {
+	if component.Status.ObservedGeneration != component.Generation {
 		return fmt.Errorf("component %q replicaRestore is waiting for the current Component generation", comp.Name)
 	}
 	if len(component.Spec.Instances) != 0 || len(component.Spec.Ordinals.Ranges) != 0 || len(component.Spec.Ordinals.Discrete) != 0 || component.Spec.FlatInstanceOrdinal || len(component.Spec.OfflineInstances) != 0 {
 		return fmt.Errorf("component %q replicaRestore requires a default contiguous live workload", comp.Name)
 	}
-	if len(component.Spec.VolumeClaimTemplates) == 0 {
+	if len(component.Spec.VolumeClaimTemplates) == 0 || len(comp.VolumeClaimTemplates) == 0 {
 		return fmt.Errorf("component %q replicaRestore requires at least one volume claim template", comp.Name)
 	}
-	status, hasStatus := cluster.Status.ReplicaRestores[comp.Name]
-	existing := component.Spec.ReplicaRestore
-	if existing != nil && hasStatus && status.Phase == appsv1.ReplicaRestoreFailed {
-		return fmt.Errorf("component %q replicaRestore previously failed: %s", comp.Name, status.Message)
-	}
-	completed := existing != nil && hasStatus && status.Phase == appsv1.ReplicaRestoreCompleted
-	if completed && comp.Replicas != status.TargetReplicas {
-		return fmt.Errorf("component %q must remove completed replicaRestore before changing replicas", comp.Name)
-	}
 	from := component.Spec.Replicas
-	if existing != nil {
-		from = existing.StartOrdinal
-		if comp.Replicas != existing.EndOrdinal || replicaRestoreFingerprint(cluster, comp.Name, restore, existing.StartOrdinal, existing.EndOrdinal) != existing.Fingerprint {
-			return fmt.Errorf("component %q replicaRestore source and target are immutable while restore is active", comp.Name)
-		}
-		if completed {
-			comp.ReplicaRestoreProjection = existing.DeepCopy()
-			return nil
-		}
-	} else if completed {
-		return fmt.Errorf("component %q must remove completed replicaRestore before starting another restore", comp.Name)
-	}
 	if comp.Replicas <= from {
 		return fmt.Errorf("component %q replicaRestore requires replicas greater than current replicas", comp.Name)
 	}

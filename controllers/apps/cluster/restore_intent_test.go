@@ -267,8 +267,9 @@ func TestApplyReplicaRestoreProjectionUsesLiveReplicaBoundary(t *testing.T) {
 	cluster := &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default", UID: "cluster-uid"}}
 	component := &appsv1.Component{ObjectMeta: metav1.ObjectMeta{Name: constant.GenerateClusterComponentName(cluster.Name, "mysql"), Namespace: cluster.Namespace}, Spec: appsv1.ComponentSpec{Replicas: 3, VolumeClaimTemplates: []appsv1.PersistentVolumeClaimTemplate{{Name: "data"}}}, Status: appsv1.ComponentStatus{Phase: appsv1.RunningComponentPhase}}
 	compSpec := &appsv1.ClusterComponentSpec{
-		Name:     "mysql",
-		Replicas: 5,
+		Name:                 "mysql",
+		Replicas:             5,
+		VolumeClaimTemplates: component.Spec.VolumeClaimTemplates,
 		ReplicaRestore: &appsv1.ClusterReplicaRestore{Source: appsv1.ClusterRestoreSource{
 			APIGroup:  dptypes.DataprotectionAPIGroup,
 			Kind:      dptypes.BackupKind,
@@ -315,7 +316,7 @@ func TestApplyReplicaRestoreProjectionAllowsNextRestoreAfterIntentRemoval(t *tes
 		"mysql": {Component: "mysql", Phase: appsv1.ReplicaRestoreCompleted, TargetReplicas: 5},
 	}}}
 	component := &appsv1.Component{ObjectMeta: metav1.ObjectMeta{Name: constant.GenerateClusterComponentName(cluster.Name, "mysql"), Namespace: cluster.Namespace}, Spec: appsv1.ComponentSpec{Replicas: 5, VolumeClaimTemplates: []appsv1.PersistentVolumeClaimTemplate{{Name: "data"}}}, Status: appsv1.ComponentStatus{Phase: appsv1.RunningComponentPhase}}
-	compSpec := &appsv1.ClusterComponentSpec{Name: "mysql", Replicas: 7, ReplicaRestore: &appsv1.ClusterReplicaRestore{Source: appsv1.ClusterRestoreSource{APIGroup: dptypes.DataprotectionAPIGroup, Kind: dptypes.BackupKind, Name: "next-backup"}}}
+	compSpec := &appsv1.ClusterComponentSpec{Name: "mysql", Replicas: 7, VolumeClaimTemplates: component.Spec.VolumeClaimTemplates, ReplicaRestore: &appsv1.ClusterReplicaRestore{Source: appsv1.ClusterRestoreSource{APIGroup: dptypes.DataprotectionAPIGroup, Kind: dptypes.BackupKind, Name: "next-backup"}}}
 	reader := fake.NewClientBuilder().WithScheme(scheme).WithObjects(component).Build()
 	require.NoError(t, applyClusterRestoreIntentWithReader(context.Background(), reader, cluster, []*appsv1.ClusterComponentSpec{compSpec}, nil))
 	require.Equal(t, int32(5), compSpec.ReplicaRestoreProjection.StartOrdinal)

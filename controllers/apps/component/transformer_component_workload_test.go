@@ -26,6 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -1388,5 +1389,62 @@ var _ = Describe("Component Workload Operations Test", func() {
 			}, its)
 			Expect(its.Annotations).Should(HaveKeyWithValue(constant.KBAppMultiClusterPlacementKey, "ctx-a,ctx-b"))
 		})
+	})
+})
+
+var _ = Describe("Replica restore workload projection updates", func() {
+	projection := func(start, end int32, fingerprint string) *appsv1.ReplicaRestoreProjection {
+		return &appsv1.ReplicaRestoreProjection{StartOrdinal: start, EndOrdinal: end, Fingerprint: fingerprint}
+	}
+
+	It("applies, clears, and replaces replica restore projections on an existing InstanceSet", func() {
+		current := &workloads.InstanceSet{}
+		desired := current.DeepCopy()
+		desired.Spec.ReplicaRestore = projection(3, 5, "first")
+
+		updated, err := copyAndMergeITS(current, desired, legacyConfigManagerPolicyKeep)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(updated).ShouldNot(BeNil())
+		Expect(updated.Spec.ReplicaRestore).Should(Equal(desired.Spec.ReplicaRestore))
+
+		desired = updated.DeepCopy()
+		desired.Spec.ReplicaRestore = nil
+		cleared, err := copyAndMergeITS(updated, desired, legacyConfigManagerPolicyKeep)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(cleared).ShouldNot(BeNil())
+		Expect(cleared.Spec.ReplicaRestore).Should(BeNil())
+
+		desired = cleared.DeepCopy()
+		desired.Spec.ReplicaRestore = projection(5, 7, "second")
+		second, err := copyAndMergeITS(cleared, desired, legacyConfigManagerPolicyKeep)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(second).ShouldNot(BeNil())
+		Expect(second.Spec.ReplicaRestore).Should(Equal(desired.Spec.ReplicaRestore))
+	})
+
+	It("persists the 3 to 5 scale-out projection through the workload update entry point", func() {
+		current := &workloads.InstanceSet{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "demo"}, Spec: workloads.InstanceSetSpec{
+			Replicas: ptr.To[int32](3), Template: corev1.PodTemplateSpec{},
+		}}
+		desired := current.DeepCopy()
+		desired.Spec.Replicas = ptr.To[int32](5)
+		desired.Spec.ReplicaRestore = projection(3, 5, "scale-3-to-5")
+		comp := &appsv1.Component{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "demo"}}
+		synthesized := &component.SynthesizedComponent{Namespace: "default", ClusterName: "cluster", Name: "mysql", Replicas: 5}
+		graphCli := model.NewGraphClient(nil)
+		dag := graph.NewDAG()
+		graphCli.Root(dag, comp, comp, model.ActionStatusPtr())
+		transCtx := &componentTransformContext{
+			Context: ctx, Client: graphCli, Component: comp, SynthesizeComponent: synthesized,
+			EventRecorder: record.NewFakeRecorder(10),
+		}
+
+		err := (&componentWorkloadTransformer{}).handleUpdate(transCtx, graphCli, dag, synthesized, comp, current, desired)
+		Expect(err).ShouldNot(HaveOccurred())
+		vertex := graphCli.FindMatchedVertex(dag, current)
+		Expect(vertex).ShouldNot(BeNil())
+		updated := vertex.(*model.ObjectVertex).Obj.(*workloads.InstanceSet)
+		Expect(updated.Spec.Replicas).Should(HaveValue(Equal(int32(5))))
+		Expect(updated.Spec.ReplicaRestore).Should(Equal(desired.Spec.ReplicaRestore))
 	})
 })

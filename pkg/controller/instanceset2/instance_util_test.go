@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
@@ -250,6 +251,30 @@ func TestGetInstanceTemplateMap(t *testing.T) {
 	_, err = getInstanceTemplateMap(map[string]string{templateRefAnnotationKey: "not-json"})
 	if err == nil {
 		t.Fatal("expected invalid json error")
+	}
+}
+
+func TestCopyAndMergeInstanceReplicaRestoreUpdates(t *testing.T) {
+	projection := func(start, end int32, fingerprint string) *appsv1.ReplicaRestoreProjection {
+		return &appsv1.ReplicaRestoreProjection{StartOrdinal: start, EndOrdinal: end, Fingerprint: fingerprint}
+	}
+	current := &workloads.Instance{}
+	updates := []*appsv1.ReplicaRestoreProjection{
+		projection(3, 5, "first"),
+		nil,
+		projection(5, 7, "second"),
+	}
+	for i, update := range updates {
+		desired := current.DeepCopy()
+		desired.Spec.ReplicaRestore = update
+		merged := copyAndMergeInstance(current, desired)
+		if merged == nil {
+			t.Fatalf("update %d did not produce an Instance update", i)
+		}
+		if !reflect.DeepEqual(merged.Spec.ReplicaRestore, update) {
+			t.Fatalf("update %d projection = %#v, want %#v", i, merged.Spec.ReplicaRestore, update)
+		}
+		current = merged
 	}
 }
 

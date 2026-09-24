@@ -146,34 +146,23 @@ func (r *statusReconciler) buildReplicaRestoreCondition(tree *kubebuilderx.Objec
 	if intent == nil || !replicarestore.Applies(intent, inst.Name) {
 		return nil
 	}
-	expected := make(map[string]struct{}, len(inst.Spec.VolumeClaimTemplates))
+	target := replicarestore.Target{InstanceName: inst.Name}
 	for i := range inst.Spec.VolumeClaimTemplates {
 		vct := &inst.Spec.VolumeClaimTemplates[i]
-		expected[intctrlutil.ComposePVCName(corev1.PersistentVolumeClaim{ObjectMeta: vct.ObjectMeta}, inst.Spec.InstanceSetName, inst.Name)] = struct{}{}
+		target.PVCs = append(target.PVCs, replicarestore.PVCIdentity{
+			Name:                intctrlutil.ComposePVCName(corev1.PersistentVolumeClaim{ObjectMeta: vct.ObjectMeta}, inst.Spec.InstanceSetName, inst.Name),
+			VolumeClaimTemplate: vct.Name,
+		})
 	}
-	if len(expected) == 0 {
+	if len(target.PVCs) == 0 {
 		return nil
 	}
-	pvcs := r.persistentVolumeClaimsByName(tree)
-	completed := 0
-	for name := range expected {
-		pvc := pvcs[name]
-		if pvc == nil || !replicarestore.IsReplicaPVC(pvc) || (intent.Fingerprint != "" && pvc.Annotations[constant.ReplicaRestoreFingerprintAnnotationKey] != intent.Fingerprint) {
-			return &metav1.Condition{Type: string(workloads.InstanceReplicaRestore), Status: metav1.ConditionUnknown, ObservedGeneration: inst.Generation, Reason: workloads.ReasonRestoreRunning, Message: fmt.Sprintf("Waiting for replica restore PVC %s", name)}
-		}
-		cond := findPVCRestoreCondition(pvc)
-		if cond == nil || cond.Status == corev1.ConditionUnknown {
-			continue
-		}
-		if cond.Status == corev1.ConditionFalse {
-			return &metav1.Condition{Type: string(workloads.InstanceReplicaRestore), Status: metav1.ConditionFalse, ObservedGeneration: inst.Generation, Reason: workloads.ReasonRestoreFailed, Message: fmt.Sprintf("PVC %s restore failed: %s", name, cond.Message)}
-		}
-		completed++
+	pvcs := make([]*corev1.PersistentVolumeClaim, 0)
+	for _, obj := range tree.List(&corev1.PersistentVolumeClaim{}) {
+		pvcs = append(pvcs, obj.(*corev1.PersistentVolumeClaim))
 	}
-	if completed == len(expected) {
-		return &metav1.Condition{Type: string(workloads.InstanceReplicaRestore), Status: metav1.ConditionTrue, ObservedGeneration: inst.Generation, Reason: workloads.ReasonRestoreCompleted, Message: "All replica restore PVCs have completed"}
-	}
-	return &metav1.Condition{Type: string(workloads.InstanceReplicaRestore), Status: metav1.ConditionUnknown, ObservedGeneration: inst.Generation, Reason: workloads.ReasonRestoreRunning, Message: "Waiting for replica restore PVCs to complete"}
+	status := replicarestore.ObservePVCs(intent, "", inst.Generation, 1, 1, []replicarestore.Target{target}, pvcs)
+	return replicarestore.ConditionFromStatus(status, string(workloads.InstanceReplicaRestore))
 }
 
 func (r *statusReconciler) reconcileRestoreCondition(tree *kubebuilderx.ObjectTree, inst *workloads.Instance) {

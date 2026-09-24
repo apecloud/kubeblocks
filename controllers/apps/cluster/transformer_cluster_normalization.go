@@ -21,6 +21,7 @@ package cluster
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -76,7 +77,9 @@ func (t *clusterNormalizationTransformer) Transform(ctx graph.TransformContext, 
 	}
 
 	if err = applyClusterRestoreIntentWithReader(transCtx.Context, transCtx.Client, cluster, transCtx.components, transCtx.shardings); err != nil {
-		return err
+		observeErr := (&clusterStatusTransformer{}).reconcileAcceptedReplicaRestores(
+			transCtx.Context, transCtx.Client, cluster, transCtx.components)
+		return errors.Join(err, observeErr)
 	}
 
 	// build component specs for shardings after resolving definitions

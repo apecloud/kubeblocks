@@ -23,11 +23,9 @@ import (
 	"context"
 	"fmt"
 	"slices"
-	"strconv"
-	"strings"
 
 	"golang.org/x/exp/maps"
-	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -78,29 +76,29 @@ func (t *clusterStatusTransformer) reconcileReplicaRestores(ctx context.Context,
 		if spec.ReplicaRestore == nil {
 			continue
 		}
-		if previous, ok := cluster.Status.ReplicaRestores[spec.Name]; ok &&
-			(previous.Phase == appsv1.ReplicaRestoreCompleted || previous.Phase == appsv1.ReplicaRestoreFailed) &&
-			previous.TargetReplicas == spec.Replicas {
-			statuses[spec.Name] = previous
-			continue
+		status := appsv1.ReplicaRestoreStatus{
+			Component: spec.Name, TargetReplicas: spec.Replicas,
+			Phase: appsv1.ReplicaRestorePending, ObservedGeneration: cluster.Generation,
+			Message: "waiting for Component restore observation",
 		}
-		status := appsv1.ReplicaRestoreStatus{Component: spec.Name, TargetReplicas: spec.Replicas, Phase: appsv1.ReplicaRestoreRunning, ObservedGeneration: cluster.Generation}
-		component := &appsv1.Component{}
-		if err := cli.Get(ctx, client.ObjectKey{Namespace: cluster.Namespace, Name: constant.GenerateClusterComponentName(cluster.Name, spec.Name)}, component); err != nil {
-			status.Phase = appsv1.ReplicaRestorePending
-			status.Message = "waiting for Component"
+		comp := &appsv1.Component{}
+		if err := cli.Get(ctx, client.ObjectKey{Namespace: cluster.Namespace, Name: constant.GenerateClusterComponentName(cluster.Name, spec.Name)}, comp); err != nil {
+			if !apierrors.IsNotFound(err) {
+				return err
+			}
 			statuses[spec.Name] = status
 			continue
 		}
-		projection := component.Spec.ReplicaRestore
-		if projection == nil {
-			status.Phase = appsv1.ReplicaRestorePending
-			status.Message = "waiting for restore projection"
-			statuses[spec.Name] = status
-			continue
+		projection := comp.Spec.ReplicaRestore
+		if projection != nil && (projection.EndOrdinal != spec.Replicas ||
+			projection.Fingerprint != replicaRestoreFingerprint(cluster, spec.Name, spec.ReplicaRestore, projection.StartOrdinal, projection.EndOrdinal)) {
+			status.Phase = appsv1.ReplicaRestoreFailed
+			status.Message = "replicaRestore source or target does not match the active Component intent"
+		} else if observed := comp.Status.ReplicaRestore; projection != nil && observed != nil && observed.ObservedGeneration == comp.Generation {
+			status.Phase = observed.Phase
+			status.RestoredReplicas = observed.RestoredReplicas
+			status.Message = observed.Message
 		}
-		status.TargetReplicas = projection.EndOrdinal
-		status.RestoredReplicas, status.Phase, status.Message = observeReplicaRestorePVCs(ctx, cli, component, projection)
 		statuses[spec.Name] = status
 	}
 	if len(statuses) == 0 {
@@ -111,125 +109,42 @@ func (t *clusterStatusTransformer) reconcileReplicaRestores(ctx context.Context,
 	return nil
 }
 
-func observeReplicaRestorePVCs(ctx context.Context, cli client.Reader, component *appsv1.Component, projection *appsv1.ReplicaRestoreProjection) (int32, appsv1.ReplicaRestorePhase, string) {
-	pvcs := &corev1.PersistentVolumeClaimList{}
-	if err := cli.List(ctx, pvcs, client.InNamespace(component.Namespace), client.MatchingLabels{
-		constant.AppInstanceLabelKey:    component.Labels[constant.AppInstanceLabelKey],
-		constant.KBAppComponentLabelKey: component.Labels[constant.KBAppComponentLabelKey],
-	}); err != nil {
-		return 0, appsv1.ReplicaRestoreRunning, err.Error()
-	}
-	byOrdinal := map[int32][]corev1.PersistentVolumeClaim{}
-	for ordinal := projection.StartOrdinal; ordinal < projection.EndOrdinal; ordinal++ {
-		byOrdinal[ordinal] = nil
-	}
-	for i := range pvcs.Items {
-		pvc := pvcs.Items[i]
-		pod := pvc.Labels[constant.KBAppPodNameLabelKey]
-		ordinal, ok := pvcOrdinal(pod)
-		if !ok || ordinal < projection.StartOrdinal || ordinal >= projection.EndOrdinal {
-			continue
-		}
-		if pvc.Annotations[constant.RestorePurposeAnnotationKey] != constant.RestorePurposeReplica {
-			return 0, appsv1.ReplicaRestoreFailed, fmt.Sprintf("PVC %s is not marked as a replica restore target", pvc.Name)
-		}
-		if pvc.Annotations[constant.ReplicaRestoreFingerprintAnnotationKey] != projection.Fingerprint {
-			return 0, appsv1.ReplicaRestoreFailed, fmt.Sprintf("PVC %s does not match replica restore fingerprint", pvc.Name)
-		}
-		byOrdinal[ordinal] = append(byOrdinal[ordinal], pvc)
-	}
-	var restored int32
-	expectedVCTs := make(map[string]struct{}, len(component.Spec.VolumeClaimTemplates))
-	for _, vct := range component.Spec.VolumeClaimTemplates {
-		expectedVCTs[vct.Name] = struct{}{}
-	}
-	for ordinal := projection.StartOrdinal; ordinal < projection.EndOrdinal; ordinal++ {
-		items := byOrdinal[ordinal]
-		if len(items) == 0 {
-			continue
-		}
-		complete := true
-		seenVCTs := make(map[string]struct{}, len(items))
-		for i := range items {
-			pvc := &items[i]
-			if !replicaRestorePVCIdentityMatches(pvc, component, projection) {
-				return restored, appsv1.ReplicaRestoreFailed, fmt.Sprintf("PVC %s does not match replica restore source", pvc.Name)
-			}
-			vct := pvc.Labels[constant.VolumeClaimTemplateNameLabelKey]
-			seenVCTs[vct] = struct{}{}
-			cond := findReplicaRestoreCondition(&items[i])
-			if cond == nil || cond.Status == corev1.ConditionUnknown {
-				complete = false
+// reconcileAcceptedReplicaRestores keeps status tied to persisted Component
+// projections when a changed Cluster intent is rejected during normalization.
+func (t *clusterStatusTransformer) reconcileAcceptedReplicaRestores(ctx context.Context, cli client.Reader,
+	cluster *appsv1.Cluster, specs []*appsv1.ClusterComponentSpec) error {
+	statuses := map[string]appsv1.ReplicaRestoreStatus{}
+	for _, spec := range specs {
+		comp := &appsv1.Component{}
+		if err := cli.Get(ctx, client.ObjectKey{
+			Namespace: cluster.Namespace,
+			Name:      constant.GenerateClusterComponentName(cluster.Name, spec.Name),
+		}, comp); err != nil {
+			if apierrors.IsNotFound(err) {
 				continue
 			}
-			if cond.Status == corev1.ConditionFalse {
-				return restored, appsv1.ReplicaRestoreFailed, cond.Message
-			}
+			return err
 		}
-		if complete && len(seenVCTs) == len(expectedVCTs) {
-			restored++
+		projection := comp.Spec.ReplicaRestore
+		if projection == nil {
+			continue
 		}
-	}
-	target := projection.EndOrdinal - projection.StartOrdinal
-	if target > 0 && restored >= target {
-		return restored, appsv1.ReplicaRestoreCompleted, "all replica restore PVCs completed"
-	}
-	return restored, appsv1.ReplicaRestoreRunning, "waiting for replica restore PVCs"
-}
-
-func pvcOrdinal(podName string) (int32, bool) {
-	idx := strings.LastIndexByte(podName, '-')
-	if idx < 0 || idx == len(podName)-1 {
-		return 0, false
-	}
-	value, err := strconv.ParseInt(podName[idx+1:], 10, 32)
-	return int32(value), err == nil
-}
-
-func replicaRestorePVCIdentityMatches(pvc *corev1.PersistentVolumeClaim, component *appsv1.Component, projection *appsv1.ReplicaRestoreProjection) bool {
-	if component.Labels[constant.AppInstanceLabelKey] != "" && pvc.Labels[constant.AppInstanceLabelKey] != component.Labels[constant.AppInstanceLabelKey] {
-		return false
-	}
-	if component.Labels[constant.KBAppComponentLabelKey] != "" && pvc.Labels[constant.KBAppComponentLabelKey] != component.Labels[constant.KBAppComponentLabelKey] {
-		return false
-	}
-	if expectedComponent := component.Labels[constant.KBAppComponentLabelKey]; expectedComponent != "" && pvc.Annotations[constant.RestoreComponentAnnotationKey] != expectedComponent {
-		return false
-	}
-	if vctName := pvc.Labels[constant.VolumeClaimTemplateNameLabelKey]; vctName != "" && pvc.Annotations[constant.RestoreVolumeTemplateAnnotationKey] != vctName {
-		return false
-	}
-	ref := pvc.Spec.DataSourceRef
-	if ref == nil || ref.Kind != projection.SourceRef.Kind || ref.Name != projection.SourceRef.Name {
-		return false
-	}
-	if projection.SourceRef.APIGroup != nil && (ref.APIGroup == nil || *ref.APIGroup != *projection.SourceRef.APIGroup) {
-		return false
-	}
-	if projection.SourceRef.Namespace != nil && (ref.Namespace == nil || *ref.Namespace != *projection.SourceRef.Namespace) {
-		return false
-	}
-	if len(component.Spec.VolumeClaimTemplates) > 0 {
-		vctName := pvc.Labels[constant.VolumeClaimTemplateNameLabelKey]
-		found := false
-		for _, vct := range component.Spec.VolumeClaimTemplates {
-			if vct.Name == vctName {
-				found = true
-				break
-			}
+		status := appsv1.ReplicaRestoreStatus{
+			Component: spec.Name, TargetReplicas: projection.EndOrdinal,
+			Phase: appsv1.ReplicaRestorePending, ObservedGeneration: cluster.Generation,
+			Message: "waiting for Component restore observation",
 		}
-		if !found {
-			return false
+		if observed := comp.Status.ReplicaRestore; observed != nil && observed.ObservedGeneration == comp.Generation {
+			status.Phase = observed.Phase
+			status.RestoredReplicas = observed.RestoredReplicas
+			status.Message = observed.Message
 		}
+		statuses[spec.Name] = status
 	}
-	return true
-}
-
-func findReplicaRestoreCondition(pvc *corev1.PersistentVolumeClaim) *corev1.PersistentVolumeClaimCondition {
-	for i := range pvc.Status.Conditions {
-		if pvc.Status.Conditions[i].Type == corev1.PersistentVolumeClaimConditionType(appsv1.ConditionTypeRestore) {
-			return &pvc.Status.Conditions[i]
-		}
+	if len(statuses) == 0 {
+		cluster.Status.ReplicaRestores = nil
+	} else {
+		cluster.Status.ReplicaRestores = statuses
 	}
 	return nil
 }

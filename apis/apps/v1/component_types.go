@@ -379,6 +379,10 @@ type ComponentStatus struct {
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
+	// ReplicaRestore reports progress for the current scale-out restore projection.
+	// +optional
+	ReplicaRestore *ReplicaRestoreStatus `json:"replicaRestore,omitempty"`
+
 	// Represents a list of detailed status of the Component object.
 	// Each condition in the list provides real-time information about certain aspect of the Component object.
 	//

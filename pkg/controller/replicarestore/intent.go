@@ -14,6 +14,7 @@ package replicarestore
 import (
 	"fmt"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -53,6 +54,7 @@ func ApplyToPVC(pvc *corev1.PersistentVolumeClaim, intent *appsv1.ReplicaRestore
 		pvc.Annotations = map[string]string{}
 	}
 	for _, key := range []string{
+		constant.ReplicaRestoreFingerprintAnnotationKey,
 		constant.RestoreSourceAPIGroupAnnotationKey,
 		constant.RestoreSourceKindAnnotationKey,
 		constant.RestoreSourceNameAnnotationKey,
@@ -79,24 +81,44 @@ func ApplyToPVC(pvc *corev1.PersistentVolumeClaim, intent *appsv1.ReplicaRestore
 // ValidateExistingPVC prevents a normal PVC or a PVC from another restore
 // source from being silently converted into a replica restore target.
 func ValidateExistingPVC(existing, desired *corev1.PersistentVolumeClaim, intent *appsv1.ReplicaRestoreProjection) error {
-	if existing == nil || desired == nil || intent == nil || desired.Spec.DataSourceRef == nil {
+	if existing == nil || desired == nil || intent == nil || !IsReplicaPVC(desired) {
 		return nil
 	}
 	if existing.Spec.DataSourceRef == nil || !reflect.DeepEqual(existing.Spec.DataSourceRef, desired.Spec.DataSourceRef) {
 		return fmt.Errorf("PVC %s/%s does not match replica restore source", existing.Namespace, existing.Name)
 	}
-	if intent.Fingerprint != "" && existing.Annotations[constant.ReplicaRestoreFingerprintAnnotationKey] != intent.Fingerprint {
-		return fmt.Errorf("PVC %s/%s does not match replica restore fingerprint", existing.Namespace, existing.Name)
-	}
-	if existing.Annotations[constant.RestorePurposeAnnotationKey] != constant.RestorePurposeReplica {
-		return fmt.Errorf("PVC %s/%s is not marked as a replica restore target", existing.Namespace, existing.Name)
-	}
-	for key, value := range intent.Annotations {
-		if existing.Annotations[key] != value {
+	for _, key := range replicaRestoreMetadataKeys(intent) {
+		if existing.Annotations[key] != desired.Annotations[key] {
 			return fmt.Errorf("PVC %s/%s does not match replica restore annotation %s", existing.Namespace, existing.Name, key)
 		}
 	}
+	if existing.Labels[constant.VolumeClaimTemplateNameLabelKey] != desired.Labels[constant.VolumeClaimTemplateNameLabelKey] {
+		return fmt.Errorf("PVC %s/%s does not match replica restore volume claim template", existing.Namespace, existing.Name)
+	}
 	return nil
+}
+
+func replicaRestoreMetadataKeys(intent *appsv1.ReplicaRestoreProjection) []string {
+	keys := []string{
+		constant.RestorePurposeAnnotationKey,
+		constant.ReplicaRestoreFingerprintAnnotationKey,
+		constant.RestoreSourceAPIGroupAnnotationKey,
+		constant.RestoreSourceKindAnnotationKey,
+		constant.RestoreSourceNameAnnotationKey,
+		constant.RestoreSourceNamespaceAnnotationKey,
+		constant.RestorePITRAnnotationKey,
+		constant.RestoreParametersAnnotationKey,
+		constant.RestoreComponentAnnotationKey,
+		constant.RestoreVolumeTemplateAnnotationKey,
+		dptypes.SourceTargetNameAnnotationKey,
+		dptypes.RestoreEnvParameterKey,
+	}
+	for key := range intent.Annotations {
+		if !slices.Contains(keys, key) {
+			keys = append(keys, key)
+		}
+	}
+	return keys
 }
 
 func IsReplicaPVC(pvc *corev1.PersistentVolumeClaim) bool {

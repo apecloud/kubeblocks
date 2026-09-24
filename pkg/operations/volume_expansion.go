@@ -68,22 +68,56 @@ func (ve volumeExpansionOpsHandler) ActionStartedCondition(reqCtx intctrlutil.Re
 	return opsv1alpha1.NewVolumeExpandingCondition(opsRes.OpsRequest), nil
 }
 
-// Action modifies Cluster.spec.components[*].VolumeClaimTemplates[*].spec.resources
+// Action modifies the selected component and instance-template VCTs in Cluster.spec.
 func (ve volumeExpansionOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	applyVolumeExpansion := func(compSpec *appsv1.ClusterComponentSpec, obj ComponentOpsInterface) error {
-		setVolumeStorage := func(volumeExpansionVCTs []opsv1alpha1.OpsRequestVolumeClaimTemplate,
-			targetVCTs []appsv1.PersistentVolumeClaimTemplate) {
-			for _, v := range volumeExpansionVCTs {
-				for i, vct := range targetVCTs {
-					if vct.Name != v.Name {
-						continue
-					}
-					targetVCTs[i].Spec.Resources.Requests[corev1.ResourceStorage] = v.Storage
+		setStorage := func(requested resource.Quantity, requests *corev1.ResourceList) {
+			if *requests == nil {
+				*requests = corev1.ResourceList{}
+			}
+			(*requests)[corev1.ResourceStorage] = requested
+		}
+		volumeExpansion := obj.(opsv1alpha1.VolumeExpansion)
+		if _, err := normalizeVolumeExpansion(volumeExpansion, compSpec); err != nil {
+			return err
+		}
+		for _, v := range volumeExpansion.VolumeClaimTemplates {
+			for i := range compSpec.VolumeClaimTemplates {
+				if compSpec.VolumeClaimTemplates[i].Name == v.Name {
+					setStorage(v.Storage, &compSpec.VolumeClaimTemplates[i].Spec.Resources.Requests)
 				}
 			}
 		}
-		volumeExpansion := obj.(opsv1alpha1.VolumeExpansion)
-		setVolumeStorage(volumeExpansion.VolumeClaimTemplates, compSpec.VolumeClaimTemplates)
+		for _, instanceRequest := range volumeExpansion.Instances {
+			for instanceIndex := range compSpec.Instances {
+				instance := &compSpec.Instances[instanceIndex]
+				if instance.Name != instanceRequest.Name {
+					continue
+				}
+				for _, requested := range instanceRequest.VolumeClaimTemplates {
+					found := false
+					for vctIndex := range instance.VolumeClaimTemplates {
+						if instance.VolumeClaimTemplates[vctIndex].Name != requested.Name {
+							continue
+						}
+						setStorage(requested.Storage, &instance.VolumeClaimTemplates[vctIndex].Spec.Resources.Requests)
+						found = true
+					}
+					if found {
+						continue
+					}
+					for _, componentVCT := range compSpec.VolumeClaimTemplates {
+						if componentVCT.Name != requested.Name {
+							continue
+						}
+						copy := *componentVCT.DeepCopy()
+						setStorage(requested.Storage, &copy.Spec.Resources.Requests)
+						instance.VolumeClaimTemplates = append(instance.VolumeClaimTemplates, copy)
+						break
+					}
+				}
+			}
+		}
 		return nil
 	}
 	compOpsSet := newComponentOpsHelper(opsRes.OpsRequest.Spec.VolumeExpansionList)
@@ -105,7 +139,7 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 	current := helper.emptyInstanceProgress(opsRes)
 	complete := opsRes.Cluster.Generation >= ops.Status.ClusterGeneration
 	var expected, succeeded int32
-	observe := func(name, physicalName string, spec *appsv1.ClusterComponentSpec, targets map[string]resource.Quantity) error {
+	observe := func(name, physicalName string, spec *appsv1.ClusterComponentSpec, targets map[string]resource.Quantity, instanceTargets map[string]map[string]resource.Quantity) error {
 		its := &workloads.InstanceSet{}
 		err := cli.Get(reqCtx.Ctx, client.ObjectKey{Namespace: opsRes.Cluster.Namespace,
 			Name: constant.GenerateClusterComponentName(opsRes.Cluster.Name, physicalName)}, its)
@@ -116,7 +150,7 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 		if err != nil {
 			return err
 		}
-		progress := volumeExpansionProgress(its, spec, targets)
+		progress := volumeExpansionProgress(its, spec, targets, instanceTargets)
 		current[name] = append(current[name], progress.details...)
 		expected += progress.expectedCount
 		succeeded += progress.succeededCount
@@ -143,10 +177,10 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 			complete = false
 			continue
 		}
-		targets, targetObserved := volumeExpansionTargets(spec, request.VolumeClaimTemplates)
+		targets, instanceTargets, targetObserved := volumeExpansionTargets(spec, request)
 		complete = complete && targetObserved && status.ObservedGeneration == opsRes.Cluster.Generation && status.UpToDate
 		if shardSpec == nil {
-			if err := observe(name, name, spec, targets); err != nil {
+			if err := observe(name, name, spec, targets, instanceTargets); err != nil {
 				return opsv1alpha1.OpsRunningPhase, time.Minute, err
 			}
 			continue
@@ -156,17 +190,22 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 			return opsv1alpha1.OpsRunningPhase, time.Minute, err
 		}
 		complete = complete && int32(len(components)) == shardSpec.Shards
+		eligible := false
 		for _, comp := range components {
 			if slices.ContainsFunc(shardSpec.ShardTemplates, func(t appsv1.ShardTemplate) bool {
 				return t.Name == comp.Labels[constant.KBAppShardTemplateLabelKey] && t.VolumeClaimTemplates != nil
 			}) {
 				continue
 			}
+			eligible = true
 			physical := &appsv1.ClusterComponentSpec{Replicas: comp.Spec.Replicas, Instances: comp.Spec.Instances,
 				Stop: comp.Spec.Stop, OfflineInstances: comp.Spec.OfflineInstances}
-			if err := observe(name, comp.Labels[constant.KBAppComponentLabelKey], physical, targets); err != nil {
+			if err := observe(name, comp.Labels[constant.KBAppComponentLabelKey], physical, targets, instanceTargets); err != nil {
 				return opsv1alpha1.OpsRunningPhase, time.Minute, err
 			}
+		}
+		if !eligible && len(request.Instances) > 0 {
+			complete = false
 		}
 	}
 	if err := patchCurrentProgress(reqCtx, cli, opsRes, oldOps, current, succeeded, expected); err != nil {
@@ -183,40 +222,77 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 }
 
 // volumeExpansionTargets keeps the current logical target, including a later compatible expansion.
-func volumeExpansionTargets(spec *appsv1.ClusterComponentSpec, requested []opsv1alpha1.OpsRequestVolumeClaimTemplate) (map[string]resource.Quantity, bool) {
-	targets := map[string]resource.Quantity{}
-	for _, request := range requested {
-		for _, vct := range spec.VolumeClaimTemplates {
-			if vct.Name == request.Name {
-				storage := vct.Spec.Resources.Requests[corev1.ResourceStorage]
-				if storage.Cmp(request.Storage) >= 0 {
-					targets[vct.Name] = storage
-				}
-			}
-		}
+func volumeExpansionTargets(spec *appsv1.ClusterComponentSpec, request opsv1alpha1.VolumeExpansion) (map[string]resource.Quantity, map[string]map[string]resource.Quantity, bool) {
+	// Reconciliation observes the target requested by the operation. The
+	// component desired state may still lag behind it, or may already be
+	// larger because another update won the race. The API/action validation
+	// owns the no-shrink check; applying it here would reject a valid retry or
+	// make a stale desired size look complete.
+	plan, err := normalizeVolumeExpansionForObservation(request, spec)
+	if err != nil {
+		return map[string]resource.Quantity{}, map[string]map[string]resource.Quantity{}, false
 	}
-	return targets, len(targets) == len(requested)
+	targets := map[string]resource.Quantity{}
+	instanceTargets := map[string]map[string]resource.Quantity{}
+	for key := range plan.Targets {
+		target := plan.Targets[key]
+		if key.InstanceTemplateName == "" {
+			targets[key.VCTName] = target.RequestedStorage
+			continue
+		}
+		if instanceTargets[key.InstanceTemplateName] == nil {
+			instanceTargets[key.InstanceTemplateName] = map[string]resource.Quantity{}
+		}
+		instanceTargets[key.InstanceTemplateName][key.VCTName] = target.RequestedStorage
+	}
+	return targets, instanceTargets, len(plan.Targets) == len(request.VolumeClaimTemplates)+countInstanceVolumeTargets(request)
+}
+
+func countInstanceVolumeTargets(request opsv1alpha1.VolumeExpansion) int {
+	count := 0
+	for _, instance := range request.Instances {
+		count += len(instance.VolumeClaimTemplates)
+	}
+	return count
 }
 
 // volumeExpansionProgress combines volume observations per instance, retaining volume count units.
 // UpToDate is the owner's application/capacity judgment; service health is outside expansion.
-func volumeExpansionProgress(its *workloads.InstanceSet, spec *appsv1.ClusterComponentSpec, targets map[string]resource.Quantity) instanceProgress {
+func volumeExpansionProgress(its *workloads.InstanceSet, spec *appsv1.ClusterComponentSpec, targets map[string]resource.Quantity, instanceTargets map[string]map[string]resource.Quantity) instanceProgress {
 	result := instanceProgress{observationsComplete: its.Status.ObservedGeneration == its.Generation &&
 		ptr.Deref(its.Spec.Replicas, int32(1)) == spec.Replicas &&
 		ptr.Deref(its.Spec.Stop, false) == ptr.Deref(spec.Stop, false)}
 	templateReplicas, valid := expectedTemplateReplicas(spec)
 	result.observationsComplete = result.observationsComplete && valid
-	forwardedTargets := make(map[string]bool, len(targets))
-	for name, storage := range targets {
-		forwardedTargets[name] = slices.ContainsFunc(its.Spec.VolumeClaimTemplates, func(v corev1.PersistentVolumeClaim) bool {
-			capacity := v.Spec.Resources.Requests[corev1.ResourceStorage]
-			return v.Name == name && capacity.Cmp(storage) >= 0
-		})
-		result.observationsComplete = result.observationsComplete && forwardedTargets[name]
-	}
 	affected := map[string][]string{}
+	forwardedTargets := map[string]map[string]bool{}
+	getForwarded := func(templateName, name string, storage resource.Quantity) bool {
+		if templateName == "" {
+			return slices.ContainsFunc(its.Spec.VolumeClaimTemplates, func(v corev1.PersistentVolumeClaim) bool {
+				capacity := v.Spec.Resources.Requests[corev1.ResourceStorage]
+				return v.Name == name && capacity.Cmp(storage) >= 0
+			})
+		}
+		return slices.ContainsFunc(its.Spec.Instances, func(instance workloads.InstanceTemplate) bool {
+			return instance.Name == templateName && slices.ContainsFunc(instance.VolumeClaimTemplates, func(v corev1.PersistentVolumeClaim) bool {
+				capacity := v.Spec.Resources.Requests[corev1.ResourceStorage]
+				return v.Name == name && capacity.Cmp(storage) >= 0
+			})
+		})
+	}
+	for name, storage := range targets {
+		forwarded := getForwarded("", name, storage)
+		result.observationsComplete = result.observationsComplete && forwarded
+	}
+	for templateName, templateTargets := range instanceTargets {
+		for name, storage := range templateTargets {
+			forwarded := getForwarded(templateName, name, storage)
+			result.observationsComplete = result.observationsComplete && forwarded
+		}
+	}
 	for templateName, replicas := range templateReplicas {
-		for name := range targets {
+		volumeTargets := map[string]resource.Quantity{}
+		for name, storage := range targets {
 			overridden := slices.ContainsFunc(spec.Instances, func(t appsv1.InstanceTemplate) bool {
 				return t.Name == templateName && slices.ContainsFunc(t.VolumeClaimTemplates, func(v appsv1.PersistentVolumeClaimTemplate) bool { return v.Name == name })
 			})
@@ -227,9 +303,27 @@ func volumeExpansionProgress(its *workloads.InstanceSet, spec *appsv1.ClusterCom
 				}
 			}
 			result.observationsComplete = result.observationsComplete && overridden == forwardedOverride
-			if overridden {
-				continue
+			if !overridden {
+				volumeTargets[name] = storage
+				if forwardedTargets[templateName] == nil {
+					forwardedTargets[templateName] = map[string]bool{}
+				}
+				forwardedTargets[templateName][name] = slices.ContainsFunc(its.Spec.VolumeClaimTemplates, func(v corev1.PersistentVolumeClaim) bool {
+					capacity := v.Spec.Resources.Requests[corev1.ResourceStorage]
+					return v.Name == name && capacity.Cmp(storage) >= 0
+				})
+				result.observationsComplete = result.observationsComplete && forwardedTargets[templateName][name]
 			}
+		}
+		for name, storage := range instanceTargets[templateName] {
+			volumeTargets[name] = storage
+			if forwardedTargets[templateName] == nil {
+				forwardedTargets[templateName] = map[string]bool{}
+			}
+			forwardedTargets[templateName][name] = getForwarded(templateName, name, storage)
+			result.observationsComplete = result.observationsComplete && forwardedTargets[templateName][name]
+		}
+		for name := range volumeTargets {
 			affected[templateName] = append(affected[templateName], name)
 			result.expectedCount += replicas
 		}
@@ -279,7 +373,7 @@ func volumeExpansionProgress(its *workloads.InstanceSet, spec *appsv1.ClusterCom
 		if instance.EffectiveCurrentState() == workloads.InstanceCurrentStatePresent && instance.UpToDate {
 			forwarded := 0
 			for _, name := range volumes {
-				if forwardedTargets[name] {
+				if forwardedTargets[*instance.TemplateName][name] {
 					forwarded++
 				}
 			}
@@ -353,4 +447,108 @@ func (ve volumeExpansionOpsHandler) initComponentStatus(opsRequest *opsv1alpha1.
 
 func getComponentVCTKey(compoName, vctName string) string {
 	return fmt.Sprintf("%s.%s", compoName, vctName)
+}
+
+// volumeExpansionTargetKey identifies a volume expansion target. An empty
+// InstanceTemplateName identifies the component's default volume template.
+type volumeExpansionTargetKey struct {
+	InstanceTemplateName string
+	VCTName              string
+}
+
+// volumeExpansionTarget is a normalized volume expansion target.
+type volumeExpansionTarget struct {
+	Key              volumeExpansionTargetKey
+	RequestedStorage resource.Quantity
+}
+
+// volumeExpansionPlan is the normalized intent of a VolumeExpansion request.
+// Instance-template targets take precedence over component targets with the
+// same volume template name.
+type volumeExpansionPlan struct {
+	Targets map[volumeExpansionTargetKey]volumeExpansionTarget
+}
+
+// normalizeVolumeExpansion validates and normalizes volume expansion intent
+// against the current component desired state. It does not perform client
+// backed checks such as StorageClass validation.
+func normalizeVolumeExpansion(request opsv1alpha1.VolumeExpansion, spec *appsv1.ClusterComponentSpec) (volumeExpansionPlan, error) {
+	return normalizeVolumeExpansionWithGrowthCheck(request, spec, true)
+}
+
+func normalizeVolumeExpansionForObservation(request opsv1alpha1.VolumeExpansion, spec *appsv1.ClusterComponentSpec) (volumeExpansionPlan, error) {
+	return normalizeVolumeExpansionWithGrowthCheck(request, spec, false)
+}
+
+func normalizeVolumeExpansionWithGrowthCheck(request opsv1alpha1.VolumeExpansion, spec *appsv1.ClusterComponentSpec, checkGrowth bool) (volumeExpansionPlan, error) {
+	plan := volumeExpansionPlan{Targets: map[volumeExpansionTargetKey]volumeExpansionTarget{}}
+	if spec == nil {
+		return plan, fmt.Errorf("component spec is nil")
+	}
+	defaults := make(map[string]appsv1.PersistentVolumeClaimTemplate, len(spec.VolumeClaimTemplates))
+	for _, vct := range spec.VolumeClaimTemplates {
+		defaults[vct.Name] = vct
+	}
+	add := func(scope string, key volumeExpansionTargetKey, v opsv1alpha1.OpsRequestVolumeClaimTemplate, current *appsv1.PersistentVolumeClaimTemplate) error {
+		if _, ok := plan.Targets[key]; ok {
+			return fmt.Errorf("duplicate volume expansion target %s/%s in %s", key.InstanceTemplateName, key.VCTName, scope)
+		}
+		if current == nil {
+			return fmt.Errorf("volumeClaimTemplate %q not found in %s", v.Name, scope)
+		}
+		declared := current.Spec.Resources.Requests[corev1.ResourceStorage]
+		if declared.IsZero() {
+			return fmt.Errorf("volumeClaimTemplate %q in %s has no declared storage", v.Name, scope)
+		}
+		if checkGrowth && v.Storage.Cmp(declared) < 0 {
+			return fmt.Errorf("requested storage for %s/%s cannot be less than declared size %s", scope, v.Name, declared.String())
+		}
+		plan.Targets[key] = volumeExpansionTarget{Key: key, RequestedStorage: v.Storage}
+		return nil
+	}
+	for _, v := range request.VolumeClaimTemplates {
+		current, ok := defaults[v.Name]
+		if !ok {
+			return plan, fmt.Errorf("volumeClaimTemplate %q not found in %s", v.Name, spec.Name)
+		}
+		if err := add(spec.Name, volumeExpansionTargetKey{VCTName: v.Name}, v, &current); err != nil {
+			return plan, err
+		}
+	}
+	instances := make(map[string]appsv1.InstanceTemplate, len(spec.Instances))
+	for _, instance := range spec.Instances {
+		instances[instance.Name] = instance
+	}
+	for _, instanceRequest := range request.Instances {
+		instance, ok := instances[instanceRequest.Name]
+		if !ok {
+			return plan, fmt.Errorf("instance %q not found in %s", instanceRequest.Name, spec.Name)
+		}
+		effective := make(map[string]appsv1.PersistentVolumeClaimTemplate, len(defaults)+len(instance.VolumeClaimTemplates))
+		for name, vct := range defaults {
+			effective[name] = vct
+		}
+		for _, vct := range instance.VolumeClaimTemplates {
+			effective[vct.Name] = vct
+		}
+		seen := map[string]struct{}{}
+		for _, v := range instanceRequest.VolumeClaimTemplates {
+			if _, exists := seen[v.Name]; exists {
+				return plan, fmt.Errorf("duplicate volume expansion target %s/%s", instanceRequest.Name, v.Name)
+			}
+			seen[v.Name] = struct{}{}
+			key := volumeExpansionTargetKey{InstanceTemplateName: instanceRequest.Name, VCTName: v.Name}
+			if _, exists := plan.Targets[key]; exists {
+				return plan, fmt.Errorf("duplicate volume expansion target %s/%s", instanceRequest.Name, v.Name)
+			}
+			current, exists := effective[v.Name]
+			if !exists {
+				return plan, fmt.Errorf("volumeClaimTemplate %q not found in instance %s", v.Name, instanceRequest.Name)
+			}
+			if err := add("instance "+instanceRequest.Name, key, v, &current); err != nil {
+				return plan, err
+			}
+		}
+	}
+	return plan, nil
 }

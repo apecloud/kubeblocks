@@ -1393,6 +1393,9 @@ Kubernetes core/v1.ResourceRequirements
 </table>
 <h3 id="operations.kubeblocks.io/v1alpha1.InstanceVolumeClaimTemplate">InstanceVolumeClaimTemplate
 </h3>
+<p>
+(<em>Appears on:</em><a href="#operations.kubeblocks.io/v1alpha1.VolumeExpansion">VolumeExpansion</a>)
+</p>
 <div>
 </div>
 <table>
@@ -1411,7 +1414,11 @@ string
 </em>
 </td>
 <td>
-<p>Refer to the instance template name of the component or sharding.</p>
+<p>Specifies an instance template name, not a Pod name.
+For a component selected by componentName, this must match a name in
+Cluster.spec.componentSpecs[].instances[].name.
+For a sharding selected by componentName, this must match a name in
+Cluster.spec.shardings[].template.instances[].name.</p>
 </td>
 </tr>
 <tr>
@@ -4836,8 +4843,28 @@ ComponentOps
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Specifies a list of OpsRequestVolumeClaimTemplate objects, defining the volumeClaimTemplates
 that are used to expand the storage and the desired storage size for each one.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>instances</code><br/>
+<em>
+<a href="#operations.kubeblocks.io/v1alpha1.InstanceVolumeClaimTemplate">
+[]InstanceVolumeClaimTemplate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies volume expansion targets for named instance templates.
+Each target applies to all instances generated from the named template,
+which may have multiple replicas. For a sharding, it applies across shards
+that use the shared template in spec.shardings[].template.
+A template target overrides a component-level target with the same
+volumeClaimTemplate name.</p>
 </td>
 </tr>
 </tbody>

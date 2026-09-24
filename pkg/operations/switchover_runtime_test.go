@@ -33,7 +33,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
-func TestOpsRuntimeReadsSwitchoverPod(t *testing.T) {
+func TestSwitchoverRuntimeReadsPod(t *testing.T) {
 	scheme := runtime.NewScheme()
 	if err := corev1.AddToScheme(scheme); err != nil {
 		t.Fatalf("add core scheme: %v", err)
@@ -122,39 +122,26 @@ func TestOpsRuntimeReadsSwitchoverPod(t *testing.T) {
 		WithScheme(scheme).
 		WithObjects(pod).
 		Build()
-	opsRes := &OpsResource{Cluster: cluster}
-	runtimes, err := buildOpsRuntimes(context.Background(), cli, opsRes)
-	if err != nil {
-		t.Fatalf("build runtime: %v", err)
-	}
-	opsRes.Runtimes = runtimes
-	rt, err := opsRes.GetRuntime(component)
-	if err != nil {
-		t.Fatalf("get runtime: %v", err)
-	}
-	opsRT, ok := rt.(*opsRuntime)
-	if !ok {
-		t.Fatalf("expected ops runtime, got %T", rt)
-	}
-	if !opsRT.multiCluster {
+	rt := newSwitchoverRuntime(context.Background(), cli, cluster)
+	if !rt.multiCluster {
 		t.Fatal("expected multi-cluster runtime")
 	}
 
-	instance, err := rt.GetInstance(namespace, clusterName, component, instanceName)
+	instance, err := rt.getInstance(namespace, clusterName, component, instanceName)
 	if err != nil {
 		t.Fatalf("get instance: %v", err)
 	}
-	if instance.GetRole() != "leader" {
-		t.Fatalf("unexpected role: %s", instance.GetRole())
+	if instance.getRole() != "leader" {
+		t.Fatalf("unexpected role: %s", instance.getRole())
 	}
-	if !instance.HasPod() {
+	if !instance.hasPod() {
 		t.Fatal("expected Switchover pod")
 	}
 }
 
-func TestDefaultInstanceNilPod(t *testing.T) {
-	instance := &defaultInstance{}
-	if instance.HasPod() || instance.GetRole() != "" {
+func TestSwitchoverInstanceNilPod(t *testing.T) {
+	instance := &switchoverInstance{}
+	if instance.hasPod() || instance.getRole() != "" {
 		t.Fatal("nil pod must have no role or membership")
 	}
 }

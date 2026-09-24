@@ -103,6 +103,7 @@ func (r switchoverOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCt
 // switchoverPreCheck checks whether the component need switchover.
 func switchoverPreCheck(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource, switchoverList []opsv1alpha1.Switchover) error {
 	opsRequest := opsRes.OpsRequest
+	runtime := newSwitchoverRuntime(reqCtx.Ctx, cli, opsRes.Cluster)
 	if opsRequest.Status.Components == nil {
 		opsRequest.Status.Components = make(map[string]opsv1alpha1.OpsRequestComponentStatus)
 	}
@@ -123,10 +124,6 @@ func switchoverPreCheck(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes
 			return intctrlutil.NewFatalError(fmt.Sprintf(`the component "%s" does not have any role`, compName))
 		}
 
-		runtime, err := opsRes.GetRuntime(compName)
-		if err != nil {
-			return err
-		}
 		instance, err := getSwitchoverPodBackedInstance(runtime, synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name, switchover.InstanceName)
 		if err != nil {
 			if apierrors.IsNotFound(err) {
@@ -134,7 +131,7 @@ func switchoverPreCheck(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes
 			}
 			return err
 		}
-		roleName := instance.GetRole()
+		roleName := instance.getRole()
 		if roleName == "" {
 			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeNeedWaiting, "waiting for instance %s role label", switchover.InstanceName)
 		}
@@ -223,14 +220,11 @@ func handleSwitchover(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *
 	if progressDetail == nil {
 		return fmt.Errorf("progress detail not found for component %s", compName)
 	}
-	runtime, err := opsRes.GetRuntime(compName)
-	if err != nil {
-		return err
-	}
+	runtime := newSwitchoverRuntime(reqCtx.Ctx, cli, opsRes.Cluster)
 
 	switch progressDetail.Status {
 	case opsv1alpha1.PendingProgressStatus:
-		if err = runtime.Switchover(reqCtx.Ctx, synthesizedComp, switchover.InstanceName, switchover.CandidateName); err != nil {
+		if err = runtime.switchover(reqCtx.Ctx, synthesizedComp, switchover.InstanceName, switchover.CandidateName); err != nil {
 			progressDetail.Status = opsv1alpha1.FailedProgressStatus
 			progressDetail.Message = fmt.Sprintf("component %s %s", compName, err.Error())
 		} else {
@@ -248,12 +242,12 @@ func handleSwitchover(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *
 			case err != nil:
 				progressDetail.Message = fmt.Sprintf(`component %s candidate instance "%s" not found`, compName, switchover.CandidateName)
 				progressDetail.Status = opsv1alpha1.FailedProgressStatus
-			case targetRole == candidateInstance.GetRole():
+			case targetRole == candidateInstance.getRole():
 				progressDetail.Message = "do switchover succeed"
 				progressDetail.Status = opsv1alpha1.SucceedProgressStatus
 			default:
 				progressDetail.Message = fmt.Sprintf("component %s is waiting for candidate pod %s role change, current role %q, expected role %q",
-					compName, switchover.CandidateName, candidateInstance.GetRole(), targetRole)
+					compName, switchover.CandidateName, candidateInstance.getRole(), targetRole)
 			}
 		} else {
 			observed, err := switchoverTargetRoleObserved(reqCtx.Ctx, cli, opsRes.Cluster, synthesizedComp.Name, switchover.InstanceName, targetRole)
@@ -309,12 +303,12 @@ func switchoverTargetRoleObserved(ctx context.Context, cli client.Client, cluste
 	return false, nil
 }
 
-func getSwitchoverPodBackedInstance(runtime OpsRuntime, namespace, clusterName, compName, instanceName string) (Instance, error) {
-	instance, err := runtime.GetInstance(namespace, clusterName, compName, instanceName)
+func getSwitchoverPodBackedInstance(runtime *switchoverRuntime, namespace, clusterName, compName, instanceName string) (*switchoverInstance, error) {
+	instance, err := runtime.getInstance(namespace, clusterName, compName, instanceName)
 	if err != nil {
 		return nil, err
 	}
-	if !instance.HasPod() {
+	if !instance.hasPod() {
 		return nil, apierrors.NewNotFound(schema.GroupResource{Resource: "pods"}, instanceName)
 	}
 	return instance, nil

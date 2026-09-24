@@ -539,6 +539,89 @@ func (r *OpsRequest) validateVolumeExpansion(ctx context.Context, cli client.Cli
 	if err := r.checkComponentExistence(cluster, compOpsList); err != nil {
 		return err
 	}
+	for _, volumeExpansion := range volumeExpansionList {
+		instanceNames := make([]string, 0, len(volumeExpansion.Instances))
+		seenInstances := sets.New[string]()
+		for _, instance := range volumeExpansion.Instances {
+			if instance.Name == "" || seenInstances.Has(instance.Name) {
+				return fmt.Errorf("invalid or duplicate instance template %q", instance.Name)
+			}
+			seenInstances.Insert(instance.Name)
+			instanceNames = append(instanceNames, instance.Name)
+			if len(instance.VolumeClaimTemplates) == 0 {
+				return notEmptyError("spec.volumeExpansion.instances.volumeClaimTemplates")
+			}
+		}
+		if err := r.checkInstanceTemplate(cluster, volumeExpansion.ComponentOps, instanceNames); err != nil {
+			return err
+		}
+		var spec *appsv1.ClusterComponentSpec
+		if component := cluster.Spec.GetComponentByName(volumeExpansion.ComponentName); component != nil {
+			spec = component
+		} else {
+			for i := range cluster.Spec.Shardings {
+				if cluster.Spec.Shardings[i].Name == volumeExpansion.ComponentName {
+					spec = &cluster.Spec.Shardings[i].Template
+					break
+				}
+			}
+		}
+		if spec == nil {
+			continue
+		}
+		if len(volumeExpansion.Instances) > 0 && cluster.Spec.GetComponentByName(volumeExpansion.ComponentName) == nil {
+			for _, sharding := range cluster.Spec.Shardings {
+				if sharding.Name != volumeExpansion.ComponentName {
+					continue
+				}
+				eligible := sharding.Shards
+				for _, template := range sharding.ShardTemplates {
+					if template.Shards == nil || *template.Shards == 0 {
+						continue
+					}
+					eligible -= *template.Shards
+					if template.VolumeClaimTemplates != nil {
+						continue
+					}
+					if template.Instances != nil {
+						return fmt.Errorf("instance-scoped volume expansion is not supported for sharding %q with heterogeneous shard instance templates", sharding.Name)
+					}
+				}
+				if eligible <= 0 {
+					return fmt.Errorf("instance-scoped volume expansion has no homogeneous shard target in sharding %q", sharding.Name)
+				}
+			}
+		}
+		validateTarget := func(scope string, target OpsRequestVolumeClaimTemplate, volumes []appsv1.PersistentVolumeClaimTemplate) error {
+			index := slices.IndexFunc(volumes, func(volume appsv1.PersistentVolumeClaimTemplate) bool { return volume.Name == target.Name })
+			if index < 0 {
+				return fmt.Errorf("volumeClaimTemplate %q not found in %s", target.Name, scope)
+			}
+			current := volumes[index].Spec.Resources.Requests.Storage()
+			if target.Storage.Cmp(*current) < 0 {
+				return fmt.Errorf("requested storage for %s/%s cannot be less than declared size %s", scope, target.Name, current.String())
+			}
+			return nil
+		}
+		for _, target := range volumeExpansion.VolumeClaimTemplates {
+			if err := validateTarget(volumeExpansion.ComponentName, target, spec.VolumeClaimTemplates); err != nil {
+				return err
+			}
+		}
+		for _, requested := range volumeExpansion.Instances {
+			for _, template := range spec.Instances {
+				if template.Name != requested.Name {
+					continue
+				}
+				volumes := mergeItsCmpTemplates(template.VolumeClaimTemplates, spec.VolumeClaimTemplates)
+				for _, target := range requested.VolumeClaimTemplates {
+					if err := validateTarget(requested.Name, target, volumes); err != nil {
+						return err
+					}
+				}
+			}
+		}
+	}
 	return r.checkVolumesAllowExpansion(ctx, cli, cluster)
 }
 
@@ -658,6 +741,19 @@ func (r *OpsRequest) checkVolumesAllowExpansion(ctx context.Context, cli client.
 				}
 			}
 		}
+		// Apply explicit instance targets after inherited component targets so
+		// an instance-scoped request remains the effective target.
+		for _, instance := range comp.Instances {
+			setVols(instance.VolumeClaimTemplates, fmt.Sprintf("%s.%s", comp.ComponentName, instance.Name))
+		}
+		for _, sharding := range cluster.Spec.Shardings {
+			if sharding.Name != comp.ComponentName {
+				continue
+			}
+			for _, instance := range comp.Instances {
+				setVols(instance.VolumeClaimTemplates, fmt.Sprintf("%s.%s", sharding.Name, instance.Name))
+			}
+		}
 	}
 	fillVol := func(vct appsv1.PersistentVolumeClaimTemplate, key string, isShardingComp bool) {
 		e, ok := vols[key][vct.Name]
@@ -677,13 +773,13 @@ func (r *OpsRequest) checkVolumesAllowExpansion(ctx context.Context, cli client.
 			fillVol(vct, componentName, isShardingComp)
 		}
 	}
-	fillItsVols := func(itsSpec appsv1.InstanceTemplate, cmpVcts []appsv1.PersistentVolumeClaimTemplate, key string) {
+	fillItsVols := func(itsSpec appsv1.InstanceTemplate, cmpVcts []appsv1.PersistentVolumeClaimTemplate, key string, isShardingComp bool) {
 		if _, ok := vols[key]; !ok {
 			return // ignore not-exist its
 		}
 		mergedVcts := mergeItsCmpTemplates(itsSpec.VolumeClaimTemplates, cmpVcts)
 		for _, vct := range mergedVcts {
-			fillVol(vct, key, false)
+			fillVol(vct, key, isShardingComp)
 		}
 	}
 	// traverse the spec to update volumes
@@ -691,11 +787,14 @@ func (r *OpsRequest) checkVolumesAllowExpansion(ctx context.Context, cli client.
 		fillCompVols(comp, comp.Name, false)
 		for _, its := range comp.Instances {
 			// update its vct volumes
-			fillItsVols(its, comp.VolumeClaimTemplates, fmt.Sprintf("%s.%s", comp.Name, its.Name))
+			fillItsVols(its, comp.VolumeClaimTemplates, fmt.Sprintf("%s.%s", comp.Name, its.Name), false)
 		}
 	}
 	for _, sharding := range cluster.Spec.Shardings {
 		fillCompVols(sharding.Template, sharding.Name, true)
+		for _, its := range sharding.Template.Instances {
+			fillItsVols(its, sharding.Template.VolumeClaimTemplates, fmt.Sprintf("%s.%s", sharding.Name, its.Name), true)
+		}
 	}
 
 	// check all used storage classes
@@ -787,7 +886,7 @@ func (r *OpsRequest) getSCNameByPvcAndCheckStorageSize(ctx context.Context,
 	componentName := key
 	targetInsTPLName := ""
 	if strings.Contains(key, ".") {
-		keyStrs := strings.Split(key, ".")
+		keyStrs := strings.SplitN(key, ".", 2)
 		componentName = keyStrs[0]
 		targetInsTPLName = keyStrs[1]
 	}

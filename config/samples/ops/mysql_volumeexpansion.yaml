@@ -11,3 +11,14 @@ spec:
     volumeClaimTemplates:
     - name: data
       storage: "2Gi"
+    # Optional: expand data volumes for all replicas of instance template "az-a".
+    # The name matches spec.componentSpecs[].instances[].name in the Cluster,
+    # within the component selected by componentName. It is not a Pod name.
+    # For a sharding, set componentName to the sharding name and match
+    # spec.shardings[].template.instances[].name instead; the target applies
+    # across shards using that shared template.
+    # instances:
+    # - name: az-a
+    #   volumeClaimTemplates:
+    #   - name: data
+    #     storage: "3Gi"

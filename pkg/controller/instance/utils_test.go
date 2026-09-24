@@ -792,3 +792,40 @@ func TestCopyAndMergePreservesExistingReplicaRestoreSource(t *testing.T) {
 		t.Fatalf("existing PVC restore source changed: %#v", merged)
 	}
 }
+
+func TestReplicaRestorePVCUsesOwnerSourceOnlyAtCreation(t *testing.T) {
+	inst := builder.NewInstanceBuilder("default", "mysql-3").
+		AddAnnotations(constant.KBAppClusterUIDKey, "cluster-uid").
+		AddLabels(constant.KBAppComponentLabelKey, "mysql").
+		SetInstanceSetName("mysql").
+		SetPodTemplate(corev1.PodTemplateSpec{Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "mysql", Image: "mysql:8"}}}}).
+		AddVolumeClaimTemplate(corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "data"}}).GetObject()
+	inst.Spec.ReplicaRestore = &kbappsv1.ClusterReplicaRestore{Source: kbappsv1.ClusterRestoreSource{
+		APIGroup: "dataprotection.kubeblocks.io", Kind: "Backup", Name: "backup-a",
+	}}
+	tree := kubebuilderx.NewObjectTree()
+	tree.SetRoot(inst)
+	if _, err := NewAlignmentReconciler().Reconcile(tree); err != nil {
+		t.Fatal(err)
+	}
+	old := tree.List(&corev1.PersistentVolumeClaim{})[0].(*corev1.PersistentVolumeClaim).DeepCopy()
+	if old.Annotations[constant.KBAppClusterUIDKey] != "cluster-uid" ||
+		old.Annotations[constant.RestoreVolumeTemplateAnnotationKey] != "data" ||
+		old.Annotations[constant.RestoreSourceNamespaceAnnotationKey] != "default" {
+		t.Fatalf("missing restore identity: %v", old.Annotations)
+	}
+	for _, source := range []string{"backup-b", ""} {
+		if source == "" {
+			inst.Spec.ReplicaRestore = nil
+		} else {
+			inst.Spec.ReplicaRestore.Source.Name = source
+		}
+		if _, err := NewAlignmentReconciler().Reconcile(tree); err != nil {
+			t.Fatal(err)
+		}
+		current := tree.List(&corev1.PersistentVolumeClaim{})[0].(*corev1.PersistentVolumeClaim)
+		if !reflect.DeepEqual(old, current) {
+			t.Fatalf("existing PVC changed after source update: %#v", current)
+		}
+	}
+}

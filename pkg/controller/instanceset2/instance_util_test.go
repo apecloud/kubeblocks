@@ -27,9 +27,46 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 )
+
+func TestReplicaRestoreSourceChangesPreserveInstanceRevision(t *testing.T) {
+	its := revisionTestInstanceSet()
+	its.Annotations = map[string]string{constant.KBAppClusterUIDKey: "cluster-uid"}
+	tree := kubebuilderx.NewObjectTree()
+	tree.SetRoot(its)
+	instances, names, err := buildDesiredInstancesByName(tree, its)
+	if err != nil {
+		t.Fatal(err)
+	}
+	current := instances[names[0]]
+	initialRevision := getInstanceRevision(current)
+	for _, source := range []string{"backup-a", "backup-b", ""} {
+		its.Spec.ReplicaRestore = nil
+		if source != "" {
+			its.Spec.ReplicaRestore = &appsv1.ClusterReplicaRestore{Source: appsv1.ClusterRestoreSource{
+				APIGroup: "dataprotection.kubeblocks.io", Kind: "Backup", Name: source,
+			}}
+		}
+		desired, _, err := buildDesiredInstancesByName(tree, its)
+		if err != nil {
+			t.Fatal(err)
+		}
+		current = copyAndMergeInstance(current, desired[names[0]])
+		if !reflect.DeepEqual(current.Spec.ReplicaRestore, its.Spec.ReplicaRestore) {
+			t.Fatalf("Instance restore source did not converge to %q", source)
+		}
+		if current.Annotations[constant.KBAppClusterUIDKey] != "cluster-uid" {
+			t.Fatal("Instance lost its Cluster UID")
+		}
+		if getInstanceRevision(current) != initialRevision {
+			t.Fatalf("source %q changed the Instance revision", source)
+		}
+	}
+}
 
 func TestParseParentNameAndOrdinal(t *testing.T) {
 	tests := []struct {

@@ -292,7 +292,39 @@ func TestValidateReplicaRestoreIntentUsesExistingComponentState(t *testing.T) {
 	mutated := componentSpec.DeepCopy()
 	mutated.ReplicaRestore.Source.Name = "other-backup"
 	err := applyClusterRestoreIntentWithReader(context.Background(), reader, cluster, []*appsv1.ClusterComponentSpec{mutated}, nil)
-	require.ErrorContains(t, err, "immutable")
+	require.NoError(t, err)
+}
+
+func TestReplicaRestoreWaitsForInitialClusterRestore(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, appsv1.AddToScheme(scheme))
+	cluster := &appsv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "demo"},
+		Spec: appsv1.ClusterSpec{Restore: &appsv1.ClusterRestore{Source: appsv1.ClusterRestoreSource{
+			APIGroup: dptypes.DataprotectionAPIGroup, Kind: dptypes.BackupKind, Name: "initial-backup",
+		}}},
+	}
+	component := &appsv1.Component{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "demo-mysql"},
+		Spec:       appsv1.ComponentSpec{Replicas: 3, VolumeClaimTemplates: []appsv1.PersistentVolumeClaimTemplate{{Name: "data"}}},
+	}
+	spec := &appsv1.ClusterComponentSpec{
+		Name: "mysql", Replicas: 5,
+		VolumeClaimTemplates: []appsv1.PersistentVolumeClaimTemplate{{Name: "data"}},
+		ReplicaRestore: &appsv1.ClusterReplicaRestore{Source: appsv1.ClusterRestoreSource{
+			APIGroup: dptypes.DataprotectionAPIGroup, Kind: dptypes.BackupKind, Name: "scale-out-backup",
+		}},
+	}
+	reader := fake.NewClientBuilder().WithScheme(scheme).WithObjects(component).Build()
+	for _, status := range []metav1.ConditionStatus{metav1.ConditionUnknown, metav1.ConditionFalse, metav1.ConditionTrue} {
+		cluster.Status.Conditions = []metav1.Condition{{Type: appsv1.ConditionTypeRestore, Status: status}}
+		err := applyClusterRestoreIntentWithReader(context.Background(), reader, cluster, []*appsv1.ClusterComponentSpec{spec.DeepCopy()}, nil)
+		if status == metav1.ConditionTrue {
+			require.NoError(t, err)
+		} else {
+			require.ErrorContains(t, err, "requires initial Cluster restore to complete")
+		}
+	}
 }
 
 func TestValidateReplicaRestoreIntentRejectsUnsupportedComponent(t *testing.T) {

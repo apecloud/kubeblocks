@@ -3128,7 +3128,8 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>It&rsquo;s part of the Service DNS name and must comply with the IANA service naming rule.
+<p>Specifies the Component&rsquo;s name.
+It&rsquo;s part of the Service DNS name and must comply with the IANA service naming rule.
 The name is optional when ClusterComponentSpec is used as a template (e.g., in <code>clusterSharding</code>),
 but required otherwise.</p>
 </td>
@@ -3261,12 +3262,13 @@ ClusterReplicaRestore
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the restore source for replicas added during scale-out.
+<p>Specifies the source used when creating missing replica PVCs during scale-out.
 Only existing, non-sharding Components with default contiguous ordinals
 are supported. Instance templates and offline instances are not supported.
-The source and replicas cannot change until this intent is removed.
-Remove a completed intent before starting another restore. To cancel an
-active restore, remove the intent and return replicas to its previous count.</p>
+Any initial Cluster restore must have completed before using this field.
+Existing PVCs keep their source and data. Changes to this field affect only
+PVCs created afterward. Removing it restores ordinary PVC creation and does
+not cancel restoration of PVCs that already exist.</p>
 </td>
 </tr>
 <tr>

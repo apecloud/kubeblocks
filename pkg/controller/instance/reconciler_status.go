@@ -33,6 +33,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/replicarestore"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -54,6 +55,7 @@ func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	inst := tree.GetRoot().(*workloads.Instance)
 	r.reconcileRestoreCondition(tree, inst)
+	replicaRestore := r.observeReplicaRestorePVCs(tree, inst.Name)
 
 	obj, err := tree.Get(podObj(inst))
 	if err != nil {
@@ -61,6 +63,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 	if obj == nil {
 		r.setPodUnavailableStatus(inst, workloads.InstanceCurrentStateAbsent, inst.Name, "")
+		r.setFailureCondition(inst, replicaRestore.failed)
 		return kubebuilderx.Continue, nil
 	}
 	pod := obj.(*corev1.Pod)
@@ -75,7 +78,11 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	if isCreated(pod) {
 		notReadyName = pod.Name
 	}
-	if isImageMatched(pod) && intctrlutil.IsPodReady(pod) {
+	if replicaRestore.blocksReadiness {
+		notReadyName = pod.Name
+		notAvailableName = pod.Name
+	}
+	if !replicaRestore.blocksReadiness && isImageMatched(pod) && intctrlutil.IsPodReady(pod) {
 		ready = true
 		notReadyName = ""
 		if intctrlutil.IsPodAvailable(pod, inst.Spec.MinReadySeconds) {
@@ -102,12 +109,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	availableCondition := r.buildAvailableCondition(inst, available, notAvailableName)
 	meta.SetStatusCondition(&inst.Status.Conditions, *availableCondition)
 
-	failureCondition := r.buildFailureCondition(inst, pod)
-	if failureCondition != nil {
-		meta.SetStatusCondition(&inst.Status.Conditions, *failureCondition)
-	} else {
-		meta.RemoveStatusCondition(&inst.Status.Conditions, string(workloads.InstanceFailure))
-	}
+	r.setFailureCondition(inst, replicaRestore.failed || r.podFailed(pod))
 
 	pending, observed := r.hasPendingVolumeExpansion(tree, inst)
 	if observed {
@@ -128,6 +130,29 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		return kubebuilderx.RetryAfter(time.Second), nil
 	}
 	return kubebuilderx.Continue, nil
+}
+
+type replicaRestorePVCObservation struct {
+	blocksReadiness bool
+	failed          bool
+}
+
+func (r *statusReconciler) observeReplicaRestorePVCs(tree *kubebuilderx.ObjectTree, instanceName string) replicaRestorePVCObservation {
+	var observation replicaRestorePVCObservation
+	for _, obj := range tree.List(&corev1.PersistentVolumeClaim{}) {
+		pvc, _ := obj.(*corev1.PersistentVolumeClaim)
+		if !replicarestore.IsReplicaPVC(pvc) || pvc.Labels[constant.KBAppPodNameLabelKey] != instanceName {
+			continue
+		}
+		condition := findPVCRestoreCondition(pvc)
+		if condition == nil || condition.Status != corev1.ConditionTrue {
+			observation.blocksReadiness = true
+		}
+		if condition != nil && condition.Status == corev1.ConditionFalse {
+			observation.failed = true
+		}
+	}
+	return observation
 }
 
 func (r *statusReconciler) reconcileRestoreCondition(tree *kubebuilderx.ObjectTree, inst *workloads.Instance) {
@@ -257,30 +282,31 @@ func (r *statusReconciler) buildAvailableCondition(inst *workloads.Instance, ava
 	return condition
 }
 
-func (r *statusReconciler) buildFailureCondition(inst *workloads.Instance, pod *corev1.Pod) *metav1.Condition {
+func (r *statusReconciler) podFailed(pod *corev1.Pod) bool {
 	if isTerminating(pod) {
-		return nil
+		return false
 	}
-	var failureName string
 	// Kubernetes says the Pod is 'Failed'
 	if pod.Status.Phase == corev1.PodFailed {
-		failureName = pod.Name
+		return true
 	}
 	// KubeBlocks says the Pod is 'Failed'
 	isFailed, isTimedOut, _ := intctrlutil.IsPodFailedAndTimedOut(pod)
-	if len(failureName) == 0 && isFailed && isTimedOut {
-		failureName = pod.Name
+	return isFailed && isTimedOut
+}
+
+func (r *statusReconciler) setFailureCondition(inst *workloads.Instance, failed bool) {
+	if !failed {
+		meta.RemoveStatusCondition(&inst.Status.Conditions, string(workloads.InstanceFailure))
+		return
 	}
-	if len(failureName) == 0 {
-		return nil
-	}
-	return &metav1.Condition{
+	meta.SetStatusCondition(&inst.Status.Conditions, metav1.Condition{
 		Type:               string(workloads.InstanceFailure),
 		Status:             metav1.ConditionTrue,
 		ObservedGeneration: inst.Generation,
 		Reason:             workloads.ReasonInstanceFailure,
-		Message:            failureName,
-	}
+		Message:            inst.Name,
+	})
 }
 
 func (r *statusReconciler) observedRoleOfPod(inst *workloads.Instance, pod *corev1.Pod) string {

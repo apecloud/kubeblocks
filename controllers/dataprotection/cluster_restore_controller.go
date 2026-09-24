@@ -149,7 +149,7 @@ func (r *ClusterRestoreReconciler) isClusterRestoring(ctx context.Context,
 }
 
 func clusterAllowsRestoreProgress(cluster *appsv1.Cluster) bool {
-	if hasActiveReplicaRestore(cluster) {
+	if hasReplicaRestoreSource(cluster) {
 		return true
 	}
 	if cluster.Spec.Restore == nil {
@@ -162,7 +162,7 @@ func clusterAllowsRestoreProgress(cluster *appsv1.Cluster) bool {
 	return condition == nil || condition.Status != metav1.ConditionTrue
 }
 
-func hasActiveReplicaRestore(cluster *appsv1.Cluster) bool {
+func hasReplicaRestoreSource(cluster *appsv1.Cluster) bool {
 	for _, spec := range cluster.Spec.ComponentSpecs {
 		if spec.ReplicaRestore != nil {
 			return true

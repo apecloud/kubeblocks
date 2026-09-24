@@ -234,7 +234,7 @@ func (r *VolumePopulatorReconciler) mapRestorePVCs(ctx context.Context, namespac
 	for i := range list.Items {
 		pvc := &list.Items[i]
 		if !isClusterRestorePVC(pvc) || clusterRestorePVCUID(pvc) != clusterUID ||
-			(!includeTerminal && pvcRestoreTerminal(pvc) && !isReplicaRestorePVC(pvc)) {
+			(!includeTerminal && pvcRestoreTerminal(pvc)) {
 			continue
 		}
 		requests = append(requests, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(pvc)})
@@ -334,8 +334,6 @@ func componentDependencyPredicate() predicate.Predicate {
 			oldComp, oldOK := e.ObjectOld.(*appsv1.Component)
 			newComp, newOK := e.ObjectNew.(*appsv1.Component)
 			return oldOK && newOK && (oldComp.Status.Phase != newComp.Status.Phase ||
-				oldComp.Spec.Replicas != newComp.Spec.Replicas ||
-				!reflect.DeepEqual(oldComp.Spec.ReplicaRestore, newComp.Spec.ReplicaRestore) ||
 				!reflect.DeepEqual(oldComp.DeletionTimestamp, newComp.DeletionTimestamp) ||
 				!reflect.DeepEqual(postProvisionCondition(oldComp), postProvisionCondition(newComp)))
 		},
@@ -351,26 +349,11 @@ func clusterDependencyPredicate() predicate.Predicate {
 			oldCluster, oldOK := e.ObjectOld.(*appsv1.Cluster)
 			newCluster, newOK := e.ObjectNew.(*appsv1.Cluster)
 			return oldOK && newOK && (oldCluster.Status.Phase != newCluster.Status.Phase ||
-				replicaRestoreComponentSpecsChanged(oldCluster, newCluster) ||
 				!reflect.DeepEqual(oldCluster.DeletionTimestamp, newCluster.DeletionTimestamp) ||
 				controllerutil.ContainsFinalizer(oldCluster, dptypes.RestoreProtectionFinalizerName) !=
 					controllerutil.ContainsFinalizer(newCluster, dptypes.RestoreProtectionFinalizerName))
 		},
 	}
-}
-
-func replicaRestoreComponentSpecsChanged(oldCluster, newCluster *appsv1.Cluster) bool {
-	if len(oldCluster.Spec.ComponentSpecs) != len(newCluster.Spec.ComponentSpecs) {
-		return true
-	}
-	for i := range oldCluster.Spec.ComponentSpecs {
-		oldSpec, newSpec := oldCluster.Spec.ComponentSpecs[i], newCluster.Spec.ComponentSpecs[i]
-		if oldSpec.Name != newSpec.Name || oldSpec.Replicas != newSpec.Replicas ||
-			!reflect.DeepEqual(oldSpec.ReplicaRestore, newSpec.ReplicaRestore) {
-			return true
-		}
-	}
-	return false
 }
 
 func postProvisionCondition(comp *appsv1.Component) *metav1.Condition {
@@ -432,8 +415,7 @@ func (r *VolumePopulatorReconciler) syncPVC(reqCtx intctrlutil.RequestCtx, pvc *
 	}
 	// A non-deleting bound PVC with a terminal Restore condition does not need
 	// its source Backup/Restore. Populating can finish while postReady is pending.
-	if pvc.Spec.VolumeName != "" && pvc.DeletionTimestamp.IsZero() &&
-		pvcRestoreTerminal(pvc) && (!isReplicaRestorePVC(pvc) || replicaRestoreSucceeded(pvc)) {
+	if pvc.Spec.VolumeName != "" && pvc.DeletionTimestamp.IsZero() && pvcRestoreTerminal(pvc) {
 		return nil
 	}
 	var restoreCtx *pvcRestoreContext
@@ -457,8 +439,8 @@ func (r *VolumePopulatorReconciler) syncPVC(reqCtx intctrlutil.RequestCtx, pvc *
 
 // handleRestoreParentLifecycle validates the recorded parent identity and
 // Cluster protection before restore work starts, and initiates owner-driven
-// cleanup when a supported parent is deleting or ends a replica-restore
-// intent. Target PVC deletion alone is not a termination signal.
+// cleanup when a supported parent is deleting. Changes to the owner restore
+// source affect future PVCs; existing PVCs finish using their own source.
 func (r *VolumePopulatorReconciler) handleRestoreParentLifecycle(reqCtx intctrlutil.RequestCtx,
 	pvc *corev1.PersistentVolumeClaim) (bool, error) {
 	clusterName := pvc.Labels[constant.AppInstanceLabelKey]
@@ -511,13 +493,6 @@ func (r *VolumePopulatorReconciler) handleRestoreParentLifecycle(reqCtx intctrlu
 			return false, restoreParentRequeue(err)
 		}
 		if !comp.DeletionTimestamp.IsZero() {
-			return r.terminateSourceComponentVolumePopulation(reqCtx, pvc, cluster)
-		}
-		ended, err := r.replicaRestoreIntentEnded(reqCtx.Ctx, pvc, cluster, comp)
-		if err != nil {
-			return false, err
-		}
-		if ended {
 			return r.terminateSourceComponentVolumePopulation(reqCtx, pvc, cluster)
 		}
 	}
@@ -623,54 +598,6 @@ func (r *VolumePopulatorReconciler) committedVolumePopulationComponent(ctx conte
 			pvc.Namespace, pvc.Name, pvc.Labels[dptypes.ComponentUIDLabelKey], comp.UID)
 	}
 	return comp, nil
-}
-
-func (r *VolumePopulatorReconciler) replicaRestoreIntentEnded(ctx context.Context,
-	pvc *corev1.PersistentVolumeClaim, cluster *appsv1.Cluster, comp *appsv1.Component) (bool, error) {
-	if !isReplicaRestorePVC(pvc) || replicaRestoreSucceeded(pvc) {
-		return false, nil
-	}
-	its, err := r.committedVolumePopulationInstanceSet(ctx, pvc, cluster, comp)
-	if err != nil {
-		return false, restoreParentRequeue(err)
-	}
-	if comp.Spec.ReplicaRestore != nil || its.Spec.ReplicaRestore != nil {
-		return false, nil
-	}
-	if spec := cluster.Spec.GetComponentByName(pvc.Labels[constant.KBAppComponentLabelKey]); spec != nil && spec.ReplicaRestore != nil {
-		return false, nil
-	}
-	return true, nil
-}
-
-func (r *VolumePopulatorReconciler) committedVolumePopulationInstanceSet(ctx context.Context,
-	pvc *corev1.PersistentVolumeClaim, cluster *appsv1.Cluster, comp *appsv1.Component) (*workloads.InstanceSet, error) {
-	list := &workloads.InstanceSetList{}
-	if err := r.Client.List(ctx, list, client.InNamespace(pvc.Namespace), client.MatchingLabels{
-		constant.AppInstanceLabelKey:    cluster.Name,
-		constant.KBAppComponentLabelKey: pvc.Labels[constant.KBAppComponentLabelKey],
-	}); err != nil {
-		return nil, err
-	}
-	var matched *workloads.InstanceSet
-	for i := range list.Items {
-		its := &list.Items[i]
-		owner := metav1.GetControllerOf(its)
-		if owner == nil || owner.APIVersion != appsv1.GroupVersion.String() ||
-			owner.Kind != appsv1.ComponentKind || owner.Name != comp.Name || owner.UID != comp.UID {
-			continue
-		}
-		if matched != nil {
-			return nil, fmt.Errorf("multiple InstanceSets are owned by Component %s/%s",
-				comp.Namespace, comp.Name)
-		}
-		matched = its
-	}
-	if matched == nil {
-		return nil, fmt.Errorf("no live InstanceSet is owned by Component %s/%s",
-			comp.Namespace, comp.Name)
-	}
-	return matched, nil
 }
 
 func restoreParentRequeue(err error) error {
@@ -1912,9 +1839,7 @@ func (r *VolumePopulatorReconciler) pvcNeedsDataRestore(reqCtx intctrlutil.Reque
 func (r *VolumePopulatorReconciler) ensurePostReadyRestoreCompleted(reqCtx intctrlutil.RequestCtx,
 	pvc *corev1.PersistentVolumeClaim,
 	restoreCtx *pvcRestoreContext) (bool, error) {
-	// Replica scale-out restores are deliberately prepareData-only. The marker
-	// is carried by the PVC, so skipping postReady remains effective after a
-	// controller restart without requiring in-memory operation state.
+	// Replica restores only run prepareData.
 	if isReplicaRestorePVC(pvc) {
 		return true, nil
 	}
@@ -2309,8 +2234,7 @@ func (r *VolumePopulatorReconciler) listRestorePVCsForComponent(reqCtx intctrlut
 		if item.Spec.DataSourceRef == nil || item.Spec.DataSourceRef.Name != pvc.Spec.DataSourceRef.Name {
 			continue
 		}
-		if replicaRestore && (!isReplicaRestorePVC(&item) ||
-			item.Annotations[constant.RestoreSourceNameAnnotationKey] != pvc.Annotations[constant.RestoreSourceNameAnnotationKey]) {
+		if replicaRestore && (!isReplicaRestorePVC(&item) || replicaRestoreSucceeded(&item)) {
 			continue
 		}
 		if item.Annotations[constant.RestoreSourceKindAnnotationKey] == "" {
@@ -2877,6 +2801,20 @@ func (r *VolumePopulatorReconciler) authorizedBackupNamespaceFromPVC(reqCtx intc
 func (r *VolumePopulatorReconciler) validateBackupNamespaceAuthorized(reqCtx intctrlutil.RequestCtx,
 	pvc *corev1.PersistentVolumeClaim,
 	backupNamespace string) error {
+	if isReplicaRestorePVC(pvc) {
+		ref := pvc.Spec.DataSourceRef
+		sourceNamespace := pvc.Namespace
+		if ref != nil && ref.Namespace != nil {
+			sourceNamespace = *ref.Namespace
+		}
+		if ref == nil || ref.APIGroup == nil ||
+			pvc.Annotations[constant.RestoreSourceAPIGroupAnnotationKey] != *ref.APIGroup ||
+			pvc.Annotations[constant.RestoreSourceKindAnnotationKey] != ref.Kind ||
+			pvc.Annotations[constant.RestoreSourceNameAnnotationKey] != ref.Name ||
+			pvc.Annotations[constant.RestoreSourceNamespaceAnnotationKey] != sourceNamespace || sourceNamespace != backupNamespace {
+			return fmt.Errorf("PVC %s/%s replica restore source annotations must match dataSourceRef", pvc.Namespace, pvc.Name)
+		}
+	}
 	if backupNamespace == pvc.Namespace {
 		return nil
 	}
@@ -2926,45 +2864,17 @@ func (r *VolumePopulatorReconciler) clusterSourceAuthorizesPVC(reqCtx intctrluti
 			return true
 		}
 	}
-	componentName := restoreComponentName(pvc)
-	if isReplicaRestorePVC(pvc) {
-		component := &appsv1.Component{}
-		componentErr := r.Client.Get(reqCtx.Ctx, client.ObjectKey{
-			Namespace: cluster.Namespace,
-			Name:      constant.GenerateClusterComponentName(cluster.Name, componentName),
-		}, component)
-		if componentErr == nil {
-			return r.replicaRestoreSourceAuthorizesPVC(reqCtx, cluster, pvc, componentName, matches)
-		}
-		for i := range cluster.Spec.ComponentSpecs {
-			spec := &cluster.Spec.ComponentSpecs[i]
-			if spec.Name == componentName && spec.ReplicaRestore != nil {
-				source := spec.ReplicaRestore.Source
-				return matches(source.APIGroup, source.Kind, source.Name, source.Namespace)
-			}
-		}
+	if !isReplicaRestorePVC(pvc) || cluster.UID == "" ||
+		pvc.Annotations[constant.KBAppClusterUIDKey] != string(cluster.UID) ||
+		pvc.Annotations[constant.RestoreComponentAnnotationKey] != restoreComponentName(pvc) {
 		return false
 	}
-	return false
-}
-
-func (r *VolumePopulatorReconciler) replicaRestoreSourceAuthorizesPVC(reqCtx intctrlutil.RequestCtx,
-	cluster *appsv1.Cluster, pvc *corev1.PersistentVolumeClaim, componentName string,
-	matches func(string, string, string, string) bool) bool {
-	if componentName == "" || pvc.Spec.DataSourceRef == nil {
-		return false
-	}
-	// A PVC marker is the accepted restore fact. It keeps an in-flight restore
-	// authorized after the owner removes the intent from its desired spec.
-	if pvc.Annotations[constant.KBAppClusterUIDKey] != string(cluster.UID) ||
-		pvc.Annotations[constant.RestoreComponentAnnotationKey] != componentName {
-		return false
-	}
-	apiGroup := pvc.Annotations[constant.RestoreSourceAPIGroupAnnotationKey]
-	kind := pvc.Annotations[constant.RestoreSourceKindAnnotationKey]
-	name := pvc.Annotations[constant.RestoreSourceNameAnnotationKey]
-	namespace := pvc.Annotations[constant.RestoreSourceNamespaceAnnotationKey]
-	return matches(apiGroup, kind, name, namespace)
+	// Workload ownership is checked by the caller. The PVC keeps its source
+	// after the owner changes the source used for future PVC creation.
+	return matches(pvc.Annotations[constant.RestoreSourceAPIGroupAnnotationKey],
+		pvc.Annotations[constant.RestoreSourceKindAnnotationKey],
+		pvc.Annotations[constant.RestoreSourceNameAnnotationKey],
+		pvc.Annotations[constant.RestoreSourceNamespaceAnnotationKey])
 }
 
 func (r *VolumePopulatorReconciler) validateBackupRestorePVCWorkload(reqCtx intctrlutil.RequestCtx,

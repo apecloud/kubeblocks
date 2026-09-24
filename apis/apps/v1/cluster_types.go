@@ -261,7 +261,8 @@ const (
 )
 
 // ClusterComponentSpec defines the specification of a Component within a Cluster.
-type ClusterComponentSpec struct { // Specifies the Component's name.
+type ClusterComponentSpec struct {
+	// Specifies the Component's name.
 	// It's part of the Service DNS name and must comply with the IANA service naming rule.
 	// The name is optional when ClusterComponentSpec is used as a template (e.g., in `clusterSharding`),
 	// but required otherwise.
@@ -344,12 +345,13 @@ type ClusterComponentSpec struct { // Specifies the Component's name.
 	// +kubebuilder:default=1
 	Replicas int32 `json:"replicas"`
 
-	// Specifies the restore source for replicas added during scale-out.
+	// Specifies the source used when creating missing replica PVCs during scale-out.
 	// Only existing, non-sharding Components with default contiguous ordinals
 	// are supported. Instance templates and offline instances are not supported.
-	// The source and replicas cannot change until this intent is removed.
-	// Remove a completed intent before starting another restore. To cancel an
-	// active restore, remove the intent and return replicas to its previous count.
+	// Any initial Cluster restore must have completed before using this field.
+	// Existing PVCs keep their source and data. Changes to this field affect only
+	// PVCs created afterward. Removing it restores ordinary PVC creation and does
+	// not cancel restoration of PVCs that already exist.
 	//
 	// +optional
 	ReplicaRestore *ClusterReplicaRestore `json:"replicaRestore,omitempty"`

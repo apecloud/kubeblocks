@@ -36,6 +36,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/replicarestore"
 	"github.com/apecloud/kubeblocks/pkg/controller/workloads/instancestatus"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -58,22 +59,26 @@ func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 
 func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
+	// Flat-ordinal reassignment can temporarily expose fewer authoritative names than spec.replicas.
+	// Validate before mutating any status fields so a partial view cannot replace the last complete status.
+	desiredAssignments, _, err := instancetemplate.BuildAssignments(tree, its)
+	if err != nil {
+		if its.Spec.FlatInstanceOrdinal && instancetemplate.IsAssignmentIncomplete(err) {
+			return kubebuilderx.Continue, nil
+		}
+		return kubebuilderx.Continue, err
+	}
+	desiredNames := sets.New[string]()
+	for _, assignment := range desiredAssignments {
+		desiredNames.Insert(assignment.InstanceName)
+	}
+	replicaRestores := observeReplicaRestorePVCs(tree)
 	// 1. get all pods
 	pods := tree.List(&corev1.Pod{})
 	var podList []*corev1.Pod
 	for _, object := range pods {
 		pod, _ := object.(*corev1.Pod)
 		podList = append(podList, pod)
-	}
-	// Flat-ordinal reassignment can temporarily expose fewer authoritative names than spec.replicas.
-	// Validate before mutating any status fields so a partial view cannot replace the last complete status.
-	if its.Spec.FlatInstanceOrdinal {
-		if _, _, err := instancetemplate.BuildAssignments(tree, its); err != nil {
-			if instancetemplate.IsAssignmentIncomplete(err) {
-				return kubebuilderx.Continue, nil
-			}
-			return kubebuilderx.Continue, err
-		}
 	}
 	// 2. calculate status summary
 	updateRevisions, err := GetRevisions(its.Status.UpdateRevisions)
@@ -115,7 +120,11 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			replicas++
 			template2TemplatesStatus[templateName].Replicas++
 		}
-		if isImageMatched(pod) && intctrlutil.IsPodReady(pod) {
+		replicaRestore := replicaRestorePVCObservation{}
+		if desiredNames.Has(pod.Name) {
+			replicaRestore = replicaRestores[pod.Name]
+		}
+		if !replicaRestore.blocksReadiness && isImageMatched(pod) && intctrlutil.IsPodReady(pod) {
 			readyReplicas++
 			template2TemplatesStatus[templateName].ReadyReplicas++
 			notReadyNames.Delete(pod.Name)
@@ -150,6 +159,12 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			}
 		}
 	}
+	for instanceName := range desiredNames {
+		if replicaRestores[instanceName].blocksReadiness {
+			notReadyNames.Insert(instanceName)
+			notAvailableNames.Insert(instanceName)
+		}
+	}
 	its.Status.Replicas = replicas
 	its.Status.ReadyReplicas = readyReplicas
 	its.Status.AvailableReplicas = availableReplicas
@@ -173,20 +188,20 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		}
 	}
 
-	readyCondition, err := buildReadyCondition(its, readyReplicas >= replicas, notReadyNames)
+	readyCondition, err := buildReadyCondition(its, readyReplicas >= replicas && notReadyNames.Len() == 0, notReadyNames)
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}
 	meta.SetStatusCondition(&its.Status.Conditions, *readyCondition)
 
-	availableCondition, err := buildAvailableCondition(its, availableReplicas >= replicas, notAvailableNames)
+	availableCondition, err := buildAvailableCondition(its, availableReplicas >= replicas && notAvailableNames.Len() == 0, notAvailableNames)
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}
 	meta.SetStatusCondition(&its.Status.Conditions, *availableCondition)
 
 	// 3. set InstanceFailure condition
-	failureCondition, err := buildFailureCondition(its, podList)
+	failureCondition, err := buildFailureCondition(its, podList, desiredNames, replicaRestores)
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}
@@ -231,6 +246,38 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 
 	return kubebuilderx.Continue, nil
+}
+
+type replicaRestorePVCObservation struct {
+	blocksReadiness bool
+	failed          bool
+}
+
+func observeReplicaRestorePVCs(tree *kubebuilderx.ObjectTree) map[string]replicaRestorePVCObservation {
+	result := map[string]replicaRestorePVCObservation{}
+	if tree == nil {
+		return result
+	}
+	for _, obj := range tree.List(&corev1.PersistentVolumeClaim{}) {
+		pvc, _ := obj.(*corev1.PersistentVolumeClaim)
+		if !replicarestore.IsReplicaPVC(pvc) {
+			continue
+		}
+		instanceName := pvc.Labels[constant.KBAppPodNameLabelKey]
+		if instanceName == "" {
+			continue
+		}
+		observation := result[instanceName]
+		condition := findPVCRestoreCondition(pvc)
+		if condition == nil || condition.Status != corev1.ConditionTrue {
+			observation.blocksReadiness = true
+		}
+		if condition != nil && condition.Status == corev1.ConditionFalse {
+			observation.failed = true
+		}
+		result[instanceName] = observation
+	}
+	return result
 }
 
 func (r *statusReconciler) reconcileRestoreCondition(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet) error {
@@ -411,17 +458,23 @@ func buildAvailableCondition(its *workloads.InstanceSet, available bool, notAvai
 	return condition, nil
 }
 
-func buildFailureCondition(its *workloads.InstanceSet, pods []*corev1.Pod) (*metav1.Condition, error) {
-	var failureNames []string
+func buildFailureCondition(its *workloads.InstanceSet, pods []*corev1.Pod, observedNames sets.Set[string],
+	replicaRestores map[string]replicaRestorePVCObservation) (*metav1.Condition, error) {
+	failureNames := sets.New[string]()
 	for _, pod := range pods {
 		if instancePodFailed(pod) {
-			failureNames = append(failureNames, pod.Name)
+			failureNames.Insert(pod.Name)
 		}
 	}
-	if len(failureNames) == 0 {
+	for instanceName := range observedNames {
+		if replicaRestores[instanceName].failed {
+			failureNames.Insert(instanceName)
+		}
+	}
+	if failureNames.Len() == 0 {
 		return nil, nil
 	}
-	message, err := buildConditionMessageWithNames(failureNames)
+	message, err := buildConditionMessageWithNames(failureNames.UnsortedList())
 	if err != nil {
 		return nil, err
 	}
@@ -446,6 +499,7 @@ func instancePodFailed(pod *corev1.Pod) bool {
 }
 
 func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pods []*corev1.Pod) error {
+	replicaRestores := observeReplicaRestorePVCs(tree)
 	desiredAssignments, templateNames, err := instancetemplate.BuildAssignments(tree, its)
 	if err != nil {
 		return err
@@ -487,14 +541,19 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 		if templateName, ok := instancetemplate.TemplateNameFromLabels(pod.Labels); ok {
 			templateHints = append(templateHints, instancestatus.TemplateAssignment{InstanceName: pod.Name, TemplateName: templateName})
 		}
-		ready := state == workloads.InstanceCurrentStatePresent && isImageMatched(pod) && intctrlutil.IsPodReady(pod)
+		replicaRestore := replicaRestorePVCObservation{}
+		if _, active := desiredNames[pod.Name]; active {
+			replicaRestore = replicaRestores[pod.Name]
+		}
+		ready := state == workloads.InstanceCurrentStatePresent && !replicaRestore.blocksReadiness &&
+			isImageMatched(pod) && intctrlutil.IsPodReady(pod)
 		observation := instancestatus.Observation{
 			InstanceName: pod.Name,
 			State:        state,
 			Revision:     getPodRevision(pod),
 			Ready:        ready,
 			Available:    ready && intctrlutil.IsPodAvailable(pod, its.Spec.MinReadySeconds),
-			Failed:       instancePodFailed(pod),
+			Failed:       instancePodFailed(pod) || replicaRestore.failed,
 		}
 		if state == workloads.InstanceCurrentStatePresent && intctrlutil.PodIsReadyWithLabel(*pod) {
 			if role, ok := roleMap[getRoleName(pod)]; ok {

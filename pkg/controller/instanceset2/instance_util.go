@@ -112,6 +112,7 @@ func buildInstanceByTemplate(tree *kubebuilderx.ObjectTree,
 	labels := getMatchLabels(its.Name)
 	b := builder.NewInstanceBuilder(its.Namespace, instName).
 		AddAnnotationsInMap(template.Annotations).
+		AddAnnotations(constant.KBAppClusterUIDKey, its.Annotations[constant.KBAppClusterUIDKey]).
 		AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(its.Generation, 10)).
 		AddLabelsInMap(template.Labels).
 		AddLabelsInMap(labels).

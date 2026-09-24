@@ -23,7 +23,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"reflect"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -74,6 +73,9 @@ func validateReplicaRestoreIntent(ctx context.Context, reader client.Reader, clu
 	if restore == nil {
 		return nil
 	}
+	if cluster.Spec.Restore != nil && !isClusterRestoreCompleted(cluster) {
+		return fmt.Errorf("component %q replicaRestore requires initial Cluster restore to complete", comp.Name)
+	}
 	if len(comp.Instances) != 0 || len(comp.Ordinals.Ranges) != 0 || len(comp.Ordinals.Discrete) != 0 || comp.FlatInstanceOrdinal || len(comp.OfflineInstances) != 0 {
 		return fmt.Errorf("component %q replicaRestore only supports default contiguous instances", comp.Name)
 	}
@@ -97,23 +99,14 @@ func validateReplicaRestoreIntent(ctx context.Context, reader client.Reader, clu
 	if !component.DeletionTimestamp.IsZero() {
 		return fmt.Errorf("component %q replicaRestore requires a non-deleting Component", comp.Name)
 	}
-	if existing := component.Spec.ReplicaRestore; existing != nil {
-		if component.Spec.Replicas != comp.Replicas || !reflect.DeepEqual(existing, restore) {
-			return fmt.Errorf("component %q replicaRestore source and target are immutable until the intent is removed", comp.Name)
-		}
-		return nil
-	}
-	if component.Status.Phase != appsv1.RunningComponentPhase || component.Status.ObservedGeneration != component.Generation {
-		return fmt.Errorf("component %q replicaRestore requires a stable Running Component", comp.Name)
-	}
 	if len(component.Spec.Instances) != 0 || len(component.Spec.Ordinals.Ranges) != 0 || len(component.Spec.Ordinals.Discrete) != 0 || component.Spec.FlatInstanceOrdinal || len(component.Spec.OfflineInstances) != 0 {
 		return fmt.Errorf("component %q replicaRestore requires a default contiguous live workload", comp.Name)
 	}
 	if len(component.Spec.VolumeClaimTemplates) == 0 || len(comp.VolumeClaimTemplates) == 0 {
 		return fmt.Errorf("component %q replicaRestore requires at least one volume claim template", comp.Name)
 	}
-	if comp.Replicas <= component.Spec.Replicas {
-		return fmt.Errorf("component %q replicaRestore requires scale-out beyond current replicas", comp.Name)
+	if comp.Replicas < component.Spec.Replicas {
+		return fmt.Errorf("component %q replicaRestore does not support scale-in; remove replicaRestore before reducing replicas", comp.Name)
 	}
 	return nil
 }

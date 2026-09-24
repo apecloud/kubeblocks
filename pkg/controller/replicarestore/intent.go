@@ -7,14 +7,21 @@ This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package replicarestore
 
 import (
 	"encoding/json"
-	"fmt"
-	"reflect"
+	"slices"
 
 	corev1 "k8s.io/api/core/v1"
 
@@ -26,7 +33,7 @@ import (
 // ApplyToPVC adds the current owner restore intent to a newly built PVC.
 // Existing PVCs are handled by the workload merge path, which preserves their
 // source and restore annotations.
-func ApplyToPVC(pvc *corev1.PersistentVolumeClaim, intent *appsv1.ClusterReplicaRestore, component string) {
+func ApplyToPVC(pvc *corev1.PersistentVolumeClaim, intent *appsv1.ClusterReplicaRestore, component, clusterUID string) {
 	if pvc == nil || intent == nil {
 		return
 	}
@@ -48,45 +55,16 @@ func ApplyToPVC(pvc *corev1.PersistentVolumeClaim, intent *appsv1.ClusterReplica
 	if pvc.Annotations == nil {
 		pvc.Annotations = map[string]string{}
 	}
+	for _, key := range metadataKeys {
+		delete(pvc.Annotations, key)
+	}
+	if clusterUID != "" {
+		pvc.Annotations[constant.KBAppClusterUIDKey] = clusterUID
+	}
+	pvc.Annotations[constant.RestoreVolumeTemplateAnnotationKey] = pvc.Labels[constant.VolumeClaimTemplateNameLabelKey]
 	for key, value := range annotations(intent, component, pvc.Namespace) {
 		pvc.Annotations[key] = value
 	}
-}
-
-// ValidateExistingPVC only validates PVCs that already carry the replica
-// marker. Ordinary existing PVCs remain owned by their original source and are
-// never converted by a desired PVC merge.
-func ValidateExistingPVC(existing, desired *corev1.PersistentVolumeClaim, intent *appsv1.ClusterReplicaRestore) error {
-	if existing == nil || desired == nil || intent == nil || !IsReplicaPVC(existing) {
-		return nil
-	}
-	// A completed PVC is an ordinary retained replica fact. It belongs to a
-	// previous restore and must not block a later scale-out restore with a new
-	// source. In-flight or failed PVCs remain protected by identity checks.
-	for _, condition := range existing.Status.Conditions {
-		if condition.Type == corev1.PersistentVolumeClaimConditionType(appsv1.ConditionTypeRestore) && condition.Status == corev1.ConditionTrue {
-			return nil
-		}
-	}
-	expected := desired.DeepCopy()
-	ApplyToPVC(expected, intent, desired.Annotations[constant.RestoreComponentAnnotationKey])
-	if !reflect.DeepEqual(existing.Spec.DataSourceRef, expected.Spec.DataSourceRef) {
-		return fmt.Errorf("PVC %s does not match replica restore source", existing.Name)
-	}
-	for _, key := range []string{
-		constant.RestorePurposeAnnotationKey,
-		constant.RestoreSourceAPIGroupAnnotationKey,
-		constant.RestoreSourceKindAnnotationKey,
-		constant.RestoreSourceNameAnnotationKey,
-		constant.RestoreSourceNamespaceAnnotationKey,
-		constant.RestorePITRAnnotationKey,
-		constant.RestoreParametersAnnotationKey,
-	} {
-		if existing.Annotations[key] != expected.Annotations[key] {
-			return fmt.Errorf("PVC %s does not match replica restore annotation %s", existing.Name, key)
-		}
-	}
-	return nil
 }
 
 func annotations(intent *appsv1.ClusterReplicaRestore, component, pvcNamespace string) map[string]string {
@@ -126,4 +104,35 @@ func annotations(intent *appsv1.ClusterReplicaRestore, component, pvcNamespace s
 
 func IsReplicaPVC(pvc *corev1.PersistentVolumeClaim) bool {
 	return pvc != nil && pvc.Annotations[constant.RestorePurposeAnnotationKey] == constant.RestorePurposeReplica
+}
+
+// MergePVCAnnotations preserves an existing replica PVC's restore source, even
+// after its owner changes or removes replicaRestore.
+func MergePVCAnnotations(existing, desired *corev1.PersistentVolumeClaim) {
+	for key, value := range desired.Annotations {
+		if IsReplicaPVC(existing) || IsReplicaPVC(desired) {
+			if slices.Contains(metadataKeys, key) {
+				continue
+			}
+		}
+		if existing.Annotations == nil {
+			existing.Annotations = map[string]string{}
+		}
+		existing.Annotations[key] = value
+	}
+}
+
+var metadataKeys = []string{
+	constant.KBAppClusterUIDKey,
+	constant.RestorePurposeAnnotationKey,
+	constant.RestoreSourceAPIGroupAnnotationKey,
+	constant.RestoreSourceKindAnnotationKey,
+	constant.RestoreSourceNameAnnotationKey,
+	constant.RestoreSourceNamespaceAnnotationKey,
+	constant.RestorePITRAnnotationKey,
+	constant.RestoreParametersAnnotationKey,
+	constant.RestoreComponentAnnotationKey,
+	constant.RestoreVolumeTemplateAnnotationKey,
+	dptypes.SourceTargetNameAnnotationKey,
+	dptypes.RestoreEnvParameterKey,
 }

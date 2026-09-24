@@ -264,7 +264,7 @@ func TestApplyClusterRestoreIntentHandlesInstanceTemplateVCTs(t *testing.T) {
 func TestApplyReplicaRestoreProjectionUsesLiveReplicaBoundary(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, appsv1.AddToScheme(scheme))
-	cluster := &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default", UID: "cluster-uid"}}
+	cluster := &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: "default", UID: "cluster-uid", Generation: 2}}
 	component := &appsv1.Component{ObjectMeta: metav1.ObjectMeta{Name: constant.GenerateClusterComponentName(cluster.Name, "mysql"), Namespace: cluster.Namespace}, Spec: appsv1.ComponentSpec{Replicas: 3, VolumeClaimTemplates: []appsv1.PersistentVolumeClaimTemplate{{Name: "data"}}}, Status: appsv1.ComponentStatus{Phase: appsv1.RunningComponentPhase}}
 	compSpec := &appsv1.ClusterComponentSpec{
 		Name:                 "mysql",
@@ -289,6 +289,16 @@ func TestApplyReplicaRestoreProjectionUsesLiveReplicaBoundary(t *testing.T) {
 	require.Equal(t, "backup", *projection.SourceRef.Namespace)
 	require.Equal(t, constant.RestorePurposeReplica, projection.Annotations[constant.RestorePurposeAnnotationKey])
 	require.NotEmpty(t, projection.Fingerprint)
+	require.Equal(t, "2", projection.Annotations[constant.ReplicaRestoreGenerationAnnotationKey])
+
+	// Resume the accepted intent after an unrelated Cluster update without
+	// changing the generation used to distinguish cancellation from cache lag.
+	component.Spec.ReplicaRestore = projection.DeepCopy()
+	component.Spec.Replicas = 5
+	require.NoError(t, reader.Update(context.Background(), component))
+	cluster.Generation = 3
+	require.NoError(t, applyClusterRestoreIntentWithReader(context.Background(), reader, cluster, []*appsv1.ClusterComponentSpec{compSpec}, nil))
+	require.Equal(t, "2", compSpec.ReplicaRestoreProjection.Annotations[constant.ReplicaRestoreGenerationAnnotationKey])
 }
 
 func TestApplyReplicaRestoreProjectionRejectsMutation(t *testing.T) {

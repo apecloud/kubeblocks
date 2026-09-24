@@ -4298,6 +4298,7 @@ func TestReplicaRestoreReconcilesTargetAndAuxiliaryVolumes(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, corev1.AddToScheme(scheme))
 	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
+	require.NoError(t, workloadsv1.AddToScheme(scheme))
 	backup, actionSet := restoreBackupObjects()
 	backup.Status.Target.PodSelector = &dpv1alpha1.PodSelector{
 		LabelSelector: &metav1.LabelSelector{MatchLabels: map[string]string{
@@ -4322,6 +4323,17 @@ func TestReplicaRestoreReconcilesTargetAndAuxiliaryVolumes(t *testing.T) {
 	}
 	dataPVC := newPVC("data", "mysql", "data-pvc-uid")
 	logPVC := newPVC("logs", "mysql", "logs-pvc-uid")
+	its := &workloadsv1.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "mysql", UID: "its-uid"},
+		Spec: workloadsv1.InstanceSetSpec{VolumeClaimTemplates: []corev1.PersistentVolumeClaim{
+			{ObjectMeta: metav1.ObjectMeta{Name: "data"}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "logs"}},
+		}},
+	}
+	logPVC.OwnerReferences = []metav1.OwnerReference{{
+		APIVersion: workloadsv1.GroupVersion.String(), Kind: workloadsv1.InstanceSetKind,
+		Name: its.Name, UID: its.UID, Controller: ptr.To(true),
+	}}
 	wrongComponentPVC := newPVC("logs", "redis", "wrong-component-pvc-uid")
 	worker := &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "worker", Namespace: "default"}}
 	for key, value := range map[string]string{
@@ -4334,7 +4346,7 @@ func TestReplicaRestoreReconcilesTargetAndAuxiliaryVolumes(t *testing.T) {
 	}
 	cli := fake.NewClientBuilder().WithScheme(scheme).
 		WithStatusSubresource(dataPVC, logPVC, wrongComponentPVC).
-		WithObjects(backup, actionSet, worker, dataPVC, logPVC, wrongComponentPVC).Build()
+		WithObjects(backup, actionSet, worker, its, dataPVC, logPVC, wrongComponentPVC).Build()
 	reconciler := &VolumePopulatorReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(10)}
 
 	for _, pvc := range []*corev1.PersistentVolumeClaim{dataPVC, logPVC} {
@@ -4557,6 +4569,275 @@ func TestComponentDeletionTerminatesVolumePopulationInOrder(t *testing.T) {
 			require.True(t, postReady.DeletionTimestamp.IsZero())
 		})
 	}
+}
+
+func TestReplicaRestoreCancellationCleansVolumePopulation(t *testing.T) {
+	for _, retained := range []bool{false, true} {
+		for _, crossNamespace := range []bool{false, true} {
+			t.Run(fmt.Sprintf("retained=%t/cross-namespace=%t", retained, crossNamespace), func(t *testing.T) {
+				ctx := context.Background()
+				scheme, cluster, component, its, target, helper, execution := replicaCancellationFixture(t, crossNamespace)
+				if retained {
+					target.OwnerReferences = nil
+				} else {
+					now := metav1.Now()
+					target.DeletionTimestamp = &now
+				}
+				cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(target).
+					WithObjects(cluster, component, its, target, helper, execution).Build()
+				vp := &VolumePopulatorReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(10)}
+				key := client.ObjectKeyFromObject(target)
+
+				for step := 0; step < 4; step++ {
+					result, err := vp.Reconcile(ctx, reconcile.Request{NamespacedName: key})
+					require.NoError(t, err)
+					if step < 3 {
+						require.Positive(t, result.RequeueAfter)
+					}
+				}
+
+				require.True(t, apierrors.IsNotFound(cli.Get(ctx, client.ObjectKeyFromObject(execution), &dpv1alpha1.Restore{})))
+				require.True(t, apierrors.IsNotFound(cli.Get(ctx, client.ObjectKeyFromObject(helper), &corev1.PersistentVolumeClaim{})))
+				current := &corev1.PersistentVolumeClaim{}
+				err := cli.Get(ctx, key, current)
+				if !retained {
+					require.True(t, apierrors.IsNotFound(err))
+					return
+				}
+				require.NoError(t, err)
+				require.NotContains(t, current.Finalizers, dptypes.DataProtectionFinalizerName)
+				condition := findPVCConditionByType(current, kbappsv1.ConditionTypeRestore)
+				require.NotNil(t, condition)
+				require.Equal(t, corev1.ConditionFalse, condition.Status)
+				require.Contains(t, condition.Message, "terminated")
+			})
+		}
+	}
+}
+
+func TestReplicaRestoreIntentRemovalAfterFailureCleansUnfinishedTargets(t *testing.T) {
+	// One failed target permits the owner to remove the intent at the requested
+	// replica count. Clean unfinished peers as well, preserving succeeded PVCs.
+	for _, state := range []corev1.ConditionStatus{corev1.ConditionFalse, corev1.ConditionUnknown, corev1.ConditionTrue} {
+		t.Run(string(state), func(t *testing.T) {
+			ctx := context.Background()
+			scheme, cluster, component, its, target, helper, execution := replicaCancellationFixture(t, true)
+			cluster.Spec.ComponentSpecs[0].Replicas = 5
+			component.Spec.Replicas = 5
+			its.Spec.Replicas = ptr.To[int32](5)
+			reason := ReasonPopulatingFailed
+			if state == corev1.ConditionTrue {
+				reason = ReasonPopulatingSucceed
+				target.Spec.VolumeName = "restored-pv"
+				target.Finalizers = nil
+			}
+			target.Status.Conditions = append(target.Status.Conditions, corev1.PersistentVolumeClaimCondition{
+				Type: corev1.PersistentVolumeClaimConditionType(kbappsv1.ConditionTypeRestore), Status: state, Reason: reason,
+			})
+			cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(target).
+				WithObjects(cluster, component, its, target, helper, execution).Build()
+			key := client.ObjectKeyFromObject(target)
+			for step := 0; step < 4; step++ {
+				vp := &VolumePopulatorReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(10)}
+				_, err := vp.Reconcile(ctx, reconcile.Request{NamespacedName: key})
+				require.NoError(t, err)
+			}
+			current := &corev1.PersistentVolumeClaim{}
+			require.NoError(t, cli.Get(ctx, key, current), "intent removal must not delete a desired target PVC")
+			require.NotContains(t, current.Finalizers, dptypes.DataProtectionFinalizerName)
+			condition := findPVCConditionByType(current, kbappsv1.ConditionTypeRestore)
+			require.NotNil(t, condition)
+			if state == corev1.ConditionTrue {
+				require.Equal(t, target.Spec, current.Spec)
+				require.Equal(t, target.Status, current.Status)
+				require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(helper), &corev1.PersistentVolumeClaim{}))
+				require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(execution), &dpv1alpha1.Restore{}))
+			} else {
+				require.Equal(t, corev1.ConditionFalse, condition.Status)
+				require.True(t, apierrors.IsNotFound(cli.Get(ctx, client.ObjectKeyFromObject(helper), &corev1.PersistentVolumeClaim{})))
+				require.True(t, apierrors.IsNotFound(cli.Get(ctx, client.ObjectKeyFromObject(execution), &dpv1alpha1.Restore{})))
+			}
+		})
+	}
+}
+
+func TestReplicaRestoreCancellationWaitsForProjectionConvergence(t *testing.T) {
+	for _, componentClearedFirst := range []bool{false, true} {
+		t.Run(fmt.Sprintf("component-cleared-first=%t", componentClearedFirst), func(t *testing.T) {
+			ctx := context.Background()
+			scheme, cluster, component, its, target, helper, execution := replicaCancellationFixture(t, false)
+			intent := &kbappsv1.ReplicaRestoreProjection{StartOrdinal: 3, EndOrdinal: 5, Fingerprint: "restore-3-5"}
+			if componentClearedFirst {
+				its.Spec.ReplicaRestore = intent.DeepCopy()
+				its.Spec.Replicas = ptr.To[int32](5)
+			} else {
+				component.Spec.ReplicaRestore = intent.DeepCopy()
+				component.Spec.Replicas = 5
+			}
+			cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(target).
+				WithObjects(cluster, component, its, target, helper, execution).Build()
+			key := client.ObjectKeyFromObject(target)
+			vp := &VolumePopulatorReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(10)}
+
+			result, err := vp.Reconcile(ctx, reconcile.Request{NamespacedName: key})
+			require.NoError(t, err)
+			require.Positive(t, result.RequeueAfter)
+			require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(execution), &dpv1alpha1.Restore{}))
+			require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(helper), &corev1.PersistentVolumeClaim{}))
+
+			if componentClearedFirst {
+				require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(its), its))
+				its.Spec.ReplicaRestore = nil
+				its.Spec.Replicas = ptr.To[int32](3)
+				require.NoError(t, cli.Update(ctx, its))
+			} else {
+				require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(component), component))
+				component.Spec.ReplicaRestore = nil
+				component.Spec.Replicas = 3
+				require.NoError(t, cli.Update(ctx, component))
+			}
+
+			// A fresh reconciler must resume cancellation from persisted owner state.
+			vp = &VolumePopulatorReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(10)}
+			result, err = vp.Reconcile(ctx, reconcile.Request{NamespacedName: key})
+			require.NoError(t, err)
+			require.Positive(t, result.RequeueAfter)
+			require.True(t, apierrors.IsNotFound(cli.Get(ctx, client.ObjectKeyFromObject(execution), &dpv1alpha1.Restore{})))
+			require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(helper), &corev1.PersistentVolumeClaim{}))
+		})
+	}
+}
+
+func TestReplicaRestoreCancellationWaitsForFreshClusterIntent(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		mutate func(*kbappsv1.Cluster, *corev1.PersistentVolumeClaim)
+	}{
+		{
+			name: "stale pre-operation Cluster generation",
+			mutate: func(cluster *kbappsv1.Cluster, target *corev1.PersistentVolumeClaim) {
+				cluster.Generation = 1
+				target.Annotations[constant.ReplicaRestoreGenerationAnnotationKey] = "2"
+			},
+		},
+		{
+			name: "active Cluster intent with stale workload owners",
+			mutate: func(cluster *kbappsv1.Cluster, _ *corev1.PersistentVolumeClaim) {
+				cluster.Spec.ComponentSpecs[0].Replicas = 5
+				cluster.Spec.ComponentSpecs[0].ReplicaRestore = &kbappsv1.ClusterReplicaRestore{}
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			scheme, cluster, component, its, target, helper, execution := replicaCancellationFixture(t, false)
+			tc.mutate(cluster, target)
+			cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(target).
+				WithObjects(cluster, component, its, target, helper, execution).Build()
+			vp := &VolumePopulatorReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(10)}
+
+			result, err := vp.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(target)})
+
+			require.NoError(t, err)
+			require.Positive(t, result.RequeueAfter)
+			require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(execution), &dpv1alpha1.Restore{}))
+			require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(helper), &corev1.PersistentVolumeClaim{}))
+		})
+	}
+}
+
+func TestReplicaRestoreCancellationRequiresAcceptedGeneration(t *testing.T) {
+	for _, generation := range []string{"", "invalid", "0", "-1"} {
+		t.Run(fmt.Sprintf("generation=%q", generation), func(t *testing.T) {
+			ctx := context.Background()
+			scheme, cluster, component, its, target, helper, execution := replicaCancellationFixture(t, false)
+			target.Annotations[constant.ReplicaRestoreGenerationAnnotationKey] = generation
+			cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(target).
+				WithObjects(cluster, component, its, target, helper, execution).Build()
+			vp := &VolumePopulatorReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(10)}
+
+			result, err := vp.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(target)})
+
+			require.NoError(t, err)
+			require.Positive(t, result.RequeueAfter)
+			require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(execution), &dpv1alpha1.Restore{}))
+			require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(helper), &corev1.PersistentVolumeClaim{}))
+		})
+	}
+}
+
+func TestRejectedReplicaRestoreCancellationKeepsPopulationActive(t *testing.T) {
+	ctx := context.Background()
+	scheme, cluster, component, its, target, helper, execution := replicaCancellationFixture(t, false)
+	intent := &kbappsv1.ReplicaRestoreProjection{StartOrdinal: 3, EndOrdinal: 5, Fingerprint: "restore-3-5"}
+	component.Spec.ReplicaRestore = intent.DeepCopy()
+	component.Spec.Replicas = 5
+	its.Spec.ReplicaRestore = intent.DeepCopy()
+	its.Spec.Replicas = ptr.To[int32](5)
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(target).
+		WithObjects(cluster, component, its, target, helper, execution).Build()
+	vp := &VolumePopulatorReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(10)}
+
+	_, err := vp.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(target)})
+
+	require.True(t, apierrors.IsNotFound(err), "active projection should continue to source validation: %v", err)
+	require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(execution), &dpv1alpha1.Restore{}))
+	require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(helper), &corev1.PersistentVolumeClaim{}))
+	require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(target), target))
+	require.Contains(t, target.Finalizers, dptypes.DataProtectionFinalizerName)
+}
+
+func TestCompletedReplicaRestoreIsNotCancellation(t *testing.T) {
+	ctx := context.Background()
+	scheme, cluster, component, its, target, helper, execution := replicaCancellationFixture(t, false)
+	component.Spec.Replicas = 5
+	its.Spec.Replicas = ptr.To[int32](5)
+	target.Spec.VolumeName = "restored-pv"
+	target.Status.Conditions = []corev1.PersistentVolumeClaimCondition{
+		{Type: PersistentVolumeClaimPopulating, Status: corev1.ConditionTrue, Reason: ReasonPopulatingSucceed},
+		{Type: corev1.PersistentVolumeClaimConditionType(kbappsv1.ConditionTypeRestore), Status: corev1.ConditionTrue, Reason: ReasonPopulatingSucceed},
+	}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(target).
+		WithObjects(cluster, component, its, target, helper, execution).Build()
+	vp := &VolumePopulatorReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(10)}
+
+	result, err := vp.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(target)})
+
+	require.NoError(t, err)
+	require.Zero(t, result)
+	require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(execution), &dpv1alpha1.Restore{}))
+	require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(helper), &corev1.PersistentVolumeClaim{}))
+}
+
+func replicaCancellationFixture(t *testing.T, crossNamespace bool) (*runtime.Scheme, *kbappsv1.Cluster,
+	*kbappsv1.Component, *workloadsv1.InstanceSet, *corev1.PersistentVolumeClaim,
+	*corev1.PersistentVolumeClaim, *dpv1alpha1.Restore) {
+	t.Helper()
+	scheme, cluster, component, its, target := parentRestoreObjects(t)
+	cluster.Spec.Restore = nil
+	cluster.Status.ReplicaRestores = nil
+	cluster.Generation = 2
+	cluster.Spec.ComponentSpecs = []kbappsv1.ClusterComponentSpec{{Name: "mysql", Replicas: 3}}
+	component.Spec.Replicas = 3
+	component.Spec.ReplicaRestore = nil
+	its.Spec.Replicas = ptr.To[int32](3)
+	its.Spec.ReplicaRestore = nil
+	target.Annotations[constant.RestorePurposeAnnotationKey] = constant.RestorePurposeReplica
+	target.Annotations[constant.ReplicaRestoreFingerprintAnnotationKey] = "restore-3-5"
+	target.Annotations[constant.ReplicaRestoreGenerationAnnotationKey] = "1"
+	target.Labels[dptypes.ComponentUIDLabelKey] = string(component.UID)
+	target.Labels[constant.KBAppPodNameLabelKey] = "cluster-mysql-3"
+	target.Finalizers = []string{dptypes.DataProtectionFinalizerName}
+	target.Status.Conditions = []corev1.PersistentVolumeClaimCondition{{
+		Type: PersistentVolumeClaimPopulating, Status: corev1.ConditionTrue, Reason: ReasonPopulatingProcessing,
+	}}
+	if crossNamespace {
+		sourceNamespace := "backup"
+		target.Spec.DataSourceRef.Namespace = &sourceNamespace
+		target.Annotations[constant.RestoreSourceNamespaceAnnotationKey] = sourceNamespace
+	}
+	return scheme, cluster, component, its, target,
+		restoreHelperForTarget(target, cluster), executionRestoreForTarget(target, cluster)
 }
 
 func TestSourceComponentDeletionPreservesSharedPostReadyRestore(t *testing.T) {

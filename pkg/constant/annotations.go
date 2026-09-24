@@ -72,6 +72,7 @@ const (
 	RestorePurposeAnnotationKey            = "apps.kubeblocks.io/restore-purpose"
 	RestorePurposeReplica                  = "Replica"
 	ReplicaRestoreFingerprintAnnotationKey = "apps.kubeblocks.io/replica-restore-fingerprint"
+	ReplicaRestoreGenerationAnnotationKey  = "apps.kubeblocks.io/replica-restore-generation"
 
 	// These annoations serve in a transition period when existing clusters can adopt
 	// new serviceaccount naming rules.

@@ -53,29 +53,12 @@ func ApplyToPVC(pvc *corev1.PersistentVolumeClaim, intent *appsv1.ReplicaRestore
 	if pvc.Annotations == nil {
 		pvc.Annotations = map[string]string{}
 	}
-	for _, key := range []string{
-		constant.ReplicaRestoreFingerprintAnnotationKey,
-		constant.RestoreSourceAPIGroupAnnotationKey,
-		constant.RestoreSourceKindAnnotationKey,
-		constant.RestoreSourceNameAnnotationKey,
-		constant.RestoreSourceNamespaceAnnotationKey,
-		constant.RestorePITRAnnotationKey,
-		constant.RestoreParametersAnnotationKey,
-		constant.RestoreComponentAnnotationKey,
-		constant.RestoreVolumeTemplateAnnotationKey,
-		dptypes.SourceTargetNameAnnotationKey,
-		dptypes.RestoreEnvParameterKey,
-	} {
+	for _, key := range replicaRestoreMetadataKeys(intent) {
 		delete(pvc.Annotations, key)
 	}
-	for key, value := range intent.Annotations {
+	for key, value := range expectedReplicaRestoreAnnotations(intent, pvc.Labels[constant.VolumeClaimTemplateNameLabelKey]) {
 		pvc.Annotations[key] = value
 	}
-	pvc.Annotations[constant.RestorePurposeAnnotationKey] = constant.RestorePurposeReplica
-	if intent.Fingerprint != "" {
-		pvc.Annotations[constant.ReplicaRestoreFingerprintAnnotationKey] = intent.Fingerprint
-	}
-	pvc.Annotations[constant.RestoreVolumeTemplateAnnotationKey] = pvc.Labels[constant.VolumeClaimTemplateNameLabelKey]
 }
 
 // ValidateExistingPVC prevents a normal PVC or a PVC from another restore
@@ -84,16 +67,39 @@ func ValidateExistingPVC(existing, desired *corev1.PersistentVolumeClaim, intent
 	if existing == nil || desired == nil || intent == nil || !IsReplicaPVC(desired) {
 		return nil
 	}
-	if existing.Spec.DataSourceRef == nil || !reflect.DeepEqual(existing.Spec.DataSourceRef, desired.Spec.DataSourceRef) {
-		return fmt.Errorf("PVC %s/%s does not match replica restore source", existing.Namespace, existing.Name)
+	return validateReplicaPVCIdentity(existing, desired.Spec.DataSourceRef, desired.Annotations,
+		desired.Labels[constant.VolumeClaimTemplateNameLabelKey], intent)
+}
+
+func expectedReplicaRestoreAnnotations(intent *appsv1.ReplicaRestoreProjection, volumeClaimTemplate string) map[string]string {
+	annotations := make(map[string]string, len(intent.Annotations)+3)
+	for key, value := range intent.Annotations {
+		annotations[key] = value
+	}
+	annotations[constant.RestorePurposeAnnotationKey] = constant.RestorePurposeReplica
+	if intent.Fingerprint != "" {
+		annotations[constant.ReplicaRestoreFingerprintAnnotationKey] = intent.Fingerprint
+	}
+	annotations[constant.RestoreVolumeTemplateAnnotationKey] = volumeClaimTemplate
+	return annotations
+}
+
+func validateReplicaPVCIdentity(existing *corev1.PersistentVolumeClaim, expectedSourceRef *corev1.TypedObjectReference,
+	expectedAnnotations map[string]string, expectedVolumeClaimTemplate string, intent *appsv1.ReplicaRestoreProjection) error {
+	name := existing.Name
+	if existing.Namespace != "" {
+		name = fmt.Sprintf("%s/%s", existing.Namespace, existing.Name)
+	}
+	if existing.Spec.DataSourceRef == nil || !reflect.DeepEqual(existing.Spec.DataSourceRef, expectedSourceRef) {
+		return fmt.Errorf("PVC %s does not match replica restore source", name)
 	}
 	for _, key := range replicaRestoreMetadataKeys(intent) {
-		if existing.Annotations[key] != desired.Annotations[key] {
-			return fmt.Errorf("PVC %s/%s does not match replica restore annotation %s", existing.Namespace, existing.Name, key)
+		if existing.Annotations[key] != expectedAnnotations[key] {
+			return fmt.Errorf("PVC %s does not match replica restore annotation %s", name, key)
 		}
 	}
-	if existing.Labels[constant.VolumeClaimTemplateNameLabelKey] != desired.Labels[constant.VolumeClaimTemplateNameLabelKey] {
-		return fmt.Errorf("PVC %s/%s does not match replica restore volume claim template", existing.Namespace, existing.Name)
+	if existing.Labels[constant.VolumeClaimTemplateNameLabelKey] != expectedVolumeClaimTemplate {
+		return fmt.Errorf("PVC %s does not match replica restore volume claim template", name)
 	}
 	return nil
 }
@@ -102,6 +108,7 @@ func replicaRestoreMetadataKeys(intent *appsv1.ReplicaRestoreProjection) []strin
 	keys := []string{
 		constant.RestorePurposeAnnotationKey,
 		constant.ReplicaRestoreFingerprintAnnotationKey,
+		constant.ReplicaRestoreGenerationAnnotationKey,
 		constant.RestoreSourceAPIGroupAnnotationKey,
 		constant.RestoreSourceKindAnnotationKey,
 		constant.RestoreSourceNameAnnotationKey,

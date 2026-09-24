@@ -18,7 +18,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 // Target describes the PVCs that must finish restoring before an instance is
@@ -188,23 +187,9 @@ func newStatus(component string, generation int64, targetReplicas int32) *appsv1
 }
 
 func validateObservedPVC(pvc *corev1.PersistentVolumeClaim, expected PVCIdentity, intent *appsv1.ReplicaRestoreProjection) string {
-	if !IsReplicaPVC(pvc) {
-		return fmt.Sprintf("PVC %s is not marked as a replica restore target", pvc.Name)
-	}
-	if !reflect.DeepEqual(pvc.Spec.DataSourceRef, &intent.SourceRef) {
-		return fmt.Sprintf("PVC %s does not match replica restore source", pvc.Name)
-	}
-	if intent.Fingerprint != "" && pvc.Annotations[constant.ReplicaRestoreFingerprintAnnotationKey] != intent.Fingerprint {
-		return fmt.Sprintf("PVC %s does not match replica restore fingerprint", pvc.Name)
-	}
-	if pvc.Labels[constant.VolumeClaimTemplateNameLabelKey] != expected.VolumeClaimTemplate ||
-		pvc.Annotations[constant.RestoreVolumeTemplateAnnotationKey] != expected.VolumeClaimTemplate {
-		return fmt.Sprintf("PVC %s does not match volume claim template %s", pvc.Name, expected.VolumeClaimTemplate)
-	}
-	for key, value := range intent.Annotations {
-		if pvc.Annotations[key] != value {
-			return fmt.Sprintf("PVC %s does not match replica restore annotation %s", pvc.Name, key)
-		}
+	expectedAnnotations := expectedReplicaRestoreAnnotations(intent, expected.VolumeClaimTemplate)
+	if err := validateReplicaPVCIdentity(pvc, &intent.SourceRef, expectedAnnotations, expected.VolumeClaimTemplate, intent); err != nil {
+		return err.Error()
 	}
 	return ""
 }

@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instance
 
 import (
+	"time"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 
@@ -50,21 +52,6 @@ func (r *alignmentReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubeb
 func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	inst := tree.GetRoot().(*workloads.Instance)
 
-	// create pod
-	obj, err := tree.Get(podObj(inst))
-	if err != nil {
-		return kubebuilderx.Continue, err
-	}
-	if obj == nil {
-		newPod, err := buildInstancePod(inst, "")
-		if err != nil {
-			return kubebuilderx.Continue, err
-		}
-		if err := tree.Add(newPod); err != nil {
-			return kubebuilderx.Continue, err
-		}
-	}
-
 	// handle pvcs
 	newPVCList, err := buildInstancePVCs(inst)
 	if err != nil {
@@ -87,6 +74,28 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 	deleteSet := oldPVCNameSet.Difference(newPVCNameSet)
 	updateSet := newPVCNameSet.Intersection(oldPVCNameSet)
 
+	for pvcName := range updateSet {
+		if err := replicarestore.ValidateExistingPVC(oldPVCs[pvcName], newPVCs[pvcName], inst.Spec.ReplicaRestore); err != nil {
+			// Commit the Failed condition computed earlier without applying alignment changes.
+			return kubebuilderx.RetryAfter(time.Second), nil
+		}
+	}
+
+	// create pod
+	obj, err := tree.Get(podObj(inst))
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
+	if obj == nil {
+		newPod, err := buildInstancePod(inst, "")
+		if err != nil {
+			return kubebuilderx.Continue, err
+		}
+		if err := tree.Add(newPod); err != nil {
+			return kubebuilderx.Continue, err
+		}
+	}
+
 	for pvcName := range deleteSet {
 		if err = tree.Delete(oldPVCs[pvcName]); err != nil {
 			return kubebuilderx.Continue, err
@@ -98,9 +107,6 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 		}
 	}
 	for pvcName := range updateSet {
-		if err := replicarestore.ValidateExistingPVC(oldPVCs[pvcName], newPVCs[pvcName], inst.Spec.ReplicaRestore); err != nil {
-			return kubebuilderx.Continue, err
-		}
 		// TODO: do not update PVC here
 		pvcObj := copyAndMerge(oldPVCs[pvcName], newPVCs[pvcName])
 		if pvcObj != nil {

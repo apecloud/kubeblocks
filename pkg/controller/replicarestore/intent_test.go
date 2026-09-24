@@ -12,6 +12,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 )
 
 func testIntent() *appsv1.ReplicaRestoreProjection {
@@ -124,14 +125,22 @@ func TestValidateExistingPVCSkipsOldInitialRestorePVC(t *testing.T) {
 }
 
 func TestValidateExistingPVCRejectsStaleOptionalRestoreMetadata(t *testing.T) {
-	intent := testIntent()
-	desired := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{
-		Name: "data-mysql-3", Labels: map[string]string{constant.VolumeClaimTemplateNameLabelKey: "data"},
-	}}
-	ApplyToPVC(desired, intent, "mysql-3")
-	existing := desired.DeepCopy()
-	existing.Annotations[constant.RestorePITRAnnotationKey] = "stale"
-	if err := ValidateExistingPVC(existing, desired, intent); err == nil {
-		t.Fatal("expected stale optional restore metadata to be rejected")
+	for _, key := range []string{
+		constant.RestorePITRAnnotationKey,
+		constant.RestoreParametersAnnotationKey,
+		dptypes.RestoreEnvParameterKey,
+	} {
+		t.Run(key, func(t *testing.T) {
+			intent := testIntent()
+			desired := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{
+				Name: "data-mysql-3", Labels: map[string]string{constant.VolumeClaimTemplateNameLabelKey: "data"},
+			}}
+			ApplyToPVC(desired, intent, "mysql-3")
+			existing := desired.DeepCopy()
+			existing.Annotations[key] = "stale"
+			if err := ValidateExistingPVC(existing, desired, intent); err == nil {
+				t.Fatalf("expected stale annotation %s to be rejected", key)
+			}
+		})
 	}
 }

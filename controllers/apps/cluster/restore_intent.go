@@ -25,6 +25,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
+	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -145,6 +146,7 @@ func applyReplicaRestoreProjection(ctx context.Context, reader client.Reader, cl
 		constant.RestoreComponentAnnotationKey:          comp.Name,
 		constant.RestorePurposeAnnotationKey:            constant.RestorePurposeReplica,
 		constant.ReplicaRestoreFingerprintAnnotationKey: fingerprint,
+		constant.ReplicaRestoreGenerationAnnotationKey:  strconv.FormatInt(cluster.Generation, 10),
 	}
 	if restore.PITR != "" {
 		annotations[constant.RestorePITRAnnotationKey] = restore.PITR

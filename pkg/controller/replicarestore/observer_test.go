@@ -15,6 +15,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 )
 
 func TestObservePVCsCountsCompletedInstancesAcrossAllVCTs(t *testing.T) {
@@ -68,6 +69,26 @@ func TestObservePVCsFailsClosedOnIdentityMismatch(t *testing.T) {
 			status := ObservePVCs(intent, "mysql", 7, 5, 1, []Target{target}, []*corev1.PersistentVolumeClaim{pvc})
 			if status.Phase != appsv1.ReplicaRestoreFailed {
 				t.Fatalf("identity mismatch should fail closed: %#v", status)
+			}
+		})
+	}
+}
+
+func TestObservePVCsRejectsStaleOptionalRestoreMetadata(t *testing.T) {
+	for _, key := range []string{
+		constant.RestorePITRAnnotationKey,
+		constant.RestoreParametersAnnotationKey,
+		dptypes.RestoreEnvParameterKey,
+	} {
+		t.Run(key, func(t *testing.T) {
+			intent := testIntent()
+			target := Target{InstanceName: "mysql-3", PVCs: []PVCIdentity{{Name: "data-mysql-3", VolumeClaimTemplate: "data"}}}
+			pvc := observedPVC(t, intent, "mysql-3", "data-mysql-3", "data", corev1.ConditionTrue)
+			pvc.Annotations[key] = "stale"
+
+			status := ObservePVCs(intent, "mysql", 7, 5, 1, []Target{target}, []*corev1.PersistentVolumeClaim{pvc})
+			if status.Phase != appsv1.ReplicaRestoreFailed {
+				t.Fatalf("stale annotation %s should fail the restore: %#v", key, status)
 			}
 		})
 	}

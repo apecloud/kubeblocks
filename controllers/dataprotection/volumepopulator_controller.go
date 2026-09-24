@@ -440,8 +440,8 @@ func (r *VolumePopulatorReconciler) syncPVC(reqCtx intctrlutil.RequestCtx, pvc *
 
 // handleRestoreParentLifecycle validates the recorded parent identity and
 // Cluster protection before restore work starts, and initiates owner-driven
-// cleanup when a supported parent is deleting. Target PVC deletion alone is
-// not a termination signal.
+// cleanup when a supported parent is deleting or ends a replica-restore
+// intent. Target PVC deletion alone is not a termination signal.
 func (r *VolumePopulatorReconciler) handleRestoreParentLifecycle(reqCtx intctrlutil.RequestCtx,
 	pvc *corev1.PersistentVolumeClaim) (bool, error) {
 	clusterName := pvc.Labels[constant.AppInstanceLabelKey]
@@ -494,6 +494,13 @@ func (r *VolumePopulatorReconciler) handleRestoreParentLifecycle(reqCtx intctrlu
 			return false, restoreParentRequeue(err)
 		}
 		if !comp.DeletionTimestamp.IsZero() {
+			return r.terminateSourceComponentVolumePopulation(reqCtx, pvc, cluster)
+		}
+		ended, err := r.replicaRestoreIntentEnded(reqCtx.Ctx, pvc, cluster, comp)
+		if err != nil {
+			return false, err
+		}
+		if ended {
 			return r.terminateSourceComponentVolumePopulation(reqCtx, pvc, cluster)
 		}
 	}
@@ -601,6 +608,79 @@ func (r *VolumePopulatorReconciler) committedVolumePopulationComponent(ctx conte
 	return comp, nil
 }
 
+func (r *VolumePopulatorReconciler) replicaRestoreIntentEnded(ctx context.Context,
+	pvc *corev1.PersistentVolumeClaim, cluster *appsv1.Cluster, comp *appsv1.Component) (bool, error) {
+	if !isReplicaRestorePVC(pvc) || replicaRestoreSucceeded(pvc) {
+		return false, nil
+	}
+	its, err := r.committedVolumePopulationInstanceSet(ctx, pvc, cluster, comp)
+	if err != nil {
+		return false, restoreParentRequeue(err)
+	}
+	componentProjection := comp.Spec.ReplicaRestore
+	workloadProjection := its.Spec.ReplicaRestore
+	replicasConverged := its.Spec.Replicas != nil && comp.Spec.Replicas == *its.Spec.Replicas
+	projectionsConverged := reflect.DeepEqual(componentProjection, workloadProjection)
+	if !replicasConverged || !projectionsConverged {
+		return false, intctrlutil.NewRequeueError(reconcileInterval,
+			"waiting for Replica restore intent removal to converge")
+	}
+	if componentProjection != nil {
+		return false, nil
+	}
+
+	// Both owner caches can still show their pre-operation state. Require a
+	// newer Cluster intent removal before stopping unfinished restore work.
+	// This covers rollback and removal after terminal failure alike.
+	acceptedGeneration, err := strconv.ParseInt(
+		pvc.Annotations[constant.ReplicaRestoreGenerationAnnotationKey], 10, 64)
+	if err != nil || acceptedGeneration <= 0 {
+		return false, intctrlutil.NewRequeueError(reconcileInterval,
+			"waiting for a valid Replica restore Cluster generation")
+	}
+	if cluster.Generation <= acceptedGeneration {
+		return false, intctrlutil.NewRequeueError(reconcileInterval,
+			"waiting for a newer Cluster generation to confirm Replica restore intent removal")
+	}
+	clusterComponent := cluster.Spec.GetComponentByName(pvc.Labels[constant.KBAppComponentLabelKey])
+	if clusterComponent == nil || clusterComponent.ReplicaRestore != nil ||
+		clusterComponent.Replicas != comp.Spec.Replicas {
+		return false, intctrlutil.NewRequeueError(reconcileInterval,
+			"waiting for Replica restore intent removal to converge in Cluster spec")
+	}
+	return true, nil
+}
+
+func (r *VolumePopulatorReconciler) committedVolumePopulationInstanceSet(ctx context.Context,
+	pvc *corev1.PersistentVolumeClaim, cluster *appsv1.Cluster, comp *appsv1.Component) (*workloads.InstanceSet, error) {
+	list := &workloads.InstanceSetList{}
+	if err := r.Client.List(ctx, list, client.InNamespace(pvc.Namespace), client.MatchingLabels{
+		constant.AppInstanceLabelKey:    cluster.Name,
+		constant.KBAppComponentLabelKey: pvc.Labels[constant.KBAppComponentLabelKey],
+	}); err != nil {
+		return nil, err
+	}
+	var matched *workloads.InstanceSet
+	for i := range list.Items {
+		its := &list.Items[i]
+		owner := metav1.GetControllerOf(its)
+		if owner == nil || owner.APIVersion != appsv1.GroupVersion.String() ||
+			owner.Kind != appsv1.ComponentKind || owner.Name != comp.Name || owner.UID != comp.UID {
+			continue
+		}
+		if matched != nil {
+			return nil, fmt.Errorf("multiple InstanceSets are owned by Component %s/%s",
+				comp.Namespace, comp.Name)
+		}
+		matched = its
+	}
+	if matched == nil {
+		return nil, fmt.Errorf("no live InstanceSet is owned by Component %s/%s",
+			comp.Namespace, comp.Name)
+	}
+	return matched, nil
+}
+
 func restoreParentRequeue(err error) error {
 	return intctrlutil.NewRequeueError(reconcileInterval, err.Error())
 }
@@ -661,7 +741,7 @@ func (r *VolumePopulatorReconciler) finishVolumePopulationTermination(reqCtx int
 	}
 	if isReplicaRestorePVC(pvc) && !pvcRestoreTerminal(pvc) {
 		if err := r.UpdatePVCConditions(reqCtx, pvc, ReasonPopulatingFailed,
-			"Replica restore terminated because its parent is deleting"); err != nil {
+			"Replica restore terminated by its owner lifecycle"); err != nil {
 			return err
 		}
 		// Publish the terminal condition before releasing target protection. The
@@ -967,6 +1047,11 @@ func (r *VolumePopulatorReconciler) validateRestoreAndBuildMGR(reqCtx intctrluti
 		}
 	}
 	if decision.mode == pvcRestoreModeProvisionOnly {
+		if isReplicaRestorePVC(pvc) {
+			if err = r.validateReplicaRestoreDataVolume(reqCtx, pvc, backup); err != nil {
+				return nil, err
+			}
+		}
 		restoreMgr.PrepareDataBackupSets = nil
 	}
 	saName := restore.Spec.ServiceAccountName

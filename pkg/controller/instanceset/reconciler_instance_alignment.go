@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset
 
 import (
+	"time"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -104,6 +106,24 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		isOrderedReady = false
 	}
 	// TODO(free6om): handle BestEffortParallel: always keep the majority available.
+	for name := range newNameSet {
+		pvcs, err := buildInstancePVCByTemplate(name, nameToTemplateMap[name], its)
+		if err != nil {
+			return kubebuilderx.Continue, err
+		}
+		for _, pvc := range pvcs {
+			oldPVC, err := tree.Get(pvc)
+			if err != nil {
+				return kubebuilderx.Continue, err
+			}
+			if oldPVC != nil {
+				if err := replicarestore.ValidateExistingPVC(oldPVC.(*corev1.PersistentVolumeClaim), pvc, its.Spec.ReplicaRestore); err != nil {
+					// Commit the Failed status computed earlier without applying alignment changes.
+					return kubebuilderx.RetryAfter(time.Second), nil
+				}
+			}
+		}
+	}
 
 	// 3. handle alignment (create new instances and delete useless instances)
 	// create new instances
@@ -170,9 +190,6 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 					return kubebuilderx.Continue, err
 				}
 			default:
-				if err := replicarestore.ValidateExistingPVC(oldPvc.(*corev1.PersistentVolumeClaim), pvc, its.Spec.ReplicaRestore); err != nil {
-					return kubebuilderx.Continue, err
-				}
 				pvcObj := copyAndMerge(oldPvc, pvc)
 				if pvcObj != nil {
 					if err := tryTakeOverExternalPVC(its, pvcObj.(*corev1.PersistentVolumeClaim)); err != nil {

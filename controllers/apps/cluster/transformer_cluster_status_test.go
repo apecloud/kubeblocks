@@ -227,3 +227,25 @@ var _ = Describe("syncClusterConditions", func() {
 		Expect(availCond.Status).Should(Equal(metav1.ConditionFalse))
 	})
 })
+
+var _ = DescribeTable("compose cluster phase from restore-projected component phases",
+	func(componentPhases []appsv1.ComponentPhase, expected appsv1.ClusterPhase) {
+		statuses := make([]appsv1.ClusterComponentStatus, 0, len(componentPhases))
+		for _, phase := range componentPhases {
+			statuses = append(statuses, appsv1.ClusterComponentStatus{Phase: phase})
+		}
+		Expect(composeClusterPhase(statuses)).Should(Equal(expected))
+	},
+	Entry("all components are restoring",
+		[]appsv1.ComponentPhase{appsv1.CreatingComponentPhase, appsv1.CreatingComponentPhase},
+		appsv1.CreatingClusterPhase),
+	Entry("some components are restoring",
+		[]appsv1.ComponentPhase{appsv1.CreatingComponentPhase, appsv1.RunningComponentPhase},
+		appsv1.UpdatingClusterPhase),
+	Entry("all components failed to restore",
+		[]appsv1.ComponentPhase{appsv1.FailedComponentPhase, appsv1.FailedComponentPhase},
+		appsv1.FailedClusterPhase),
+	Entry("some components failed to restore",
+		[]appsv1.ComponentPhase{appsv1.FailedComponentPhase, appsv1.RunningComponentPhase},
+		appsv1.AbnormalClusterPhase),
+)

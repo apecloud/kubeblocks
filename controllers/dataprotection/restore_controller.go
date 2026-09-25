@@ -420,7 +420,7 @@ func (r *RestoreReconciler) postReady(reqCtx intctrlutil.RequestCtx, restoreMgr 
 		isCompleted bool
 	)
 	defer func() {
-		r.handleRestoreStageError(restoreMgr.Restore, dpv1alpha1.PrepareData, err)
+		r.handleRestoreStageError(restoreMgr.Restore, dpv1alpha1.PostReady, err)
 	}()
 	if readyConfig.ReadinessProbe != nil && !meta.IsStatusConditionTrue(restoreMgr.Restore.Status.Conditions, dprestore.ConditionTypeReadinessProbe) {
 		// TODO: check readiness probe, use a job and kubectl exec?
@@ -527,7 +527,11 @@ func (r *RestoreReconciler) handleBackupActionSet(reqCtx intctrlutil.RequestCtx,
 
 func (r *RestoreReconciler) handleRestoreStageError(restore *dpv1alpha1.Restore, stage dpv1alpha1.RestoreStage, err error) {
 	if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal) {
-		condition := meta.FindStatusCondition(restore.Status.Conditions, dprestore.ConditionTypeRestorePreparedData)
+		conditionType := dprestore.ConditionTypeRestorePreparedData
+		if stage == dpv1alpha1.PostReady {
+			conditionType = dprestore.ConditionTypeRestorePostReady
+		}
+		condition := meta.FindStatusCondition(restore.Status.Conditions, conditionType)
 		if condition != nil && condition.Reason != dprestore.ReasonFailed {
 			dprestore.SetRestoreStageCondition(restore, stage, dprestore.ReasonFailed, err.Error())
 		}

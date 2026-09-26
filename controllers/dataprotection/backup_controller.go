@@ -511,6 +511,13 @@ func (r *BackupReconciler) prepareBackupRequest(
 	return request, nil
 }
 
+// targetPodResolutionWindow bounds how long an empty backup target-pod
+// resolution is treated as transient. Pods that are still starting or
+// waiting for their role label usually become selectable within minutes
+// of Backup creation; failing terminally before that strands backups
+// created shortly after provisioning.
+const targetPodResolutionWindow = 10 * time.Minute
+
 // prepareRequestTargetInfo prepares the backup target info for request object.
 func (r *BackupReconciler) prepareRequestTargetInfo(reqCtx intctrlutil.RequestCtx,
 	request *dpbackup.Request,
@@ -537,6 +544,13 @@ func (r *BackupReconciler) prepareRequestTargetInfo(reqCtx intctrlutil.RequestCt
 		return err
 	}
 	if len(targetPods) == 0 {
+		if time.Since(request.Backup.CreationTimestamp.Time) < targetPodResolutionWindow {
+			// Transient: pods may still be starting or waiting for their
+			// role label. Requeue without marking the Backup Failed.
+			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue,
+				"target pods for backup policy %s/%s are not available yet",
+				request.BackupPolicy.Namespace, request.BackupPolicy.Name)
+		}
 		if backupType == dpv1alpha1.BackupTypeContinuous {
 			// stop the sts to un-bound the pvcs when the continuous backup is failed.
 			if err = dpbackup.StopStatefulSetsWhenFailed(reqCtx.Ctx, r.Client, request.Backup, target.Name); err != nil {

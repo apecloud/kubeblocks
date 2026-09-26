@@ -2637,3 +2637,71 @@ var _ = Describe("Backup Controller test", func() {
 		})
 	})
 })
+
+func TestPrepareRequestTargetInfoTransientTargets(t *testing.T) {
+	g := NewWithT(t)
+	scheme := runtime.NewScheme()
+	g.Expect(corev1.AddToScheme(scheme)).To(Succeed())
+	g.Expect(dpv1alpha1.AddToScheme(scheme)).To(Succeed())
+
+	buildReconciler := func(backup *dpv1alpha1.Backup, policy *dpv1alpha1.BackupPolicy) (*BackupReconciler, *dpbackup.Request) {
+		cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(backup, policy).Build()
+		r := &BackupReconciler{Client: cli, Scheme: scheme}
+		request := &dpbackup.Request{
+			Backup:       backup,
+			BackupPolicy: policy,
+			Client:       cli,
+		}
+		return r, request
+	}
+	newTarget := func() *dpv1alpha1.BackupTarget {
+		return &dpv1alpha1.BackupTarget{
+			Name: "target",
+			PodSelector: &dpv1alpha1.PodSelector{
+				Strategy:      dpv1alpha1.PodSelectionStrategyAny,
+				LabelSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "no-such-pod"}},
+			},
+		}
+	}
+
+	t.Run("young backup requeues without failing", func(t *testing.T) {
+		g := NewWithT(t)
+		backup := &dpv1alpha1.Backup{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:              "backup",
+				Namespace:         "default",
+				CreationTimestamp: metav1.NewTime(time.Now()),
+			},
+			Spec: dpv1alpha1.BackupSpec{BackupPolicyName: "policy"},
+		}
+		policy := &dpv1alpha1.BackupPolicy{
+			ObjectMeta: metav1.ObjectMeta{Name: "policy", Namespace: "default"},
+		}
+		r, request := buildReconciler(backup, policy)
+		err := r.prepareRequestTargetInfo(
+			intctrlutil.RequestCtx{Ctx: context.Background()}, request, newTarget())
+		g.Expect(err).To(HaveOccurred())
+		g.Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeRequeue)).To(BeTrue())
+	})
+
+	t.Run("aged backup fails terminally", func(t *testing.T) {
+		g := NewWithT(t)
+		backup := &dpv1alpha1.Backup{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:              "backup",
+				Namespace:         "default",
+				CreationTimestamp: metav1.NewTime(time.Now().Add(-2 * targetPodResolutionWindow)),
+			},
+			Spec: dpv1alpha1.BackupSpec{BackupPolicyName: "policy"},
+		}
+		policy := &dpv1alpha1.BackupPolicy{
+			ObjectMeta: metav1.ObjectMeta{Name: "policy", Namespace: "default"},
+		}
+		r, request := buildReconciler(backup, policy)
+		err := r.prepareRequestTargetInfo(
+			intctrlutil.RequestCtx{Ctx: context.Background()}, request, newTarget())
+		g.Expect(err).To(HaveOccurred())
+		g.Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeRequeue)).To(BeFalse())
+		g.Expect(err.Error()).To(ContainSubstring("failed to get target pods"))
+	})
+}

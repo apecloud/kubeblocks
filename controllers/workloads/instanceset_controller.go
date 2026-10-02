@@ -53,6 +53,7 @@ type InstanceSetReconciler struct {
 // +kubebuilder:rbac:groups=core,resources=pods/status,verbs=get
 // +kubebuilder:rbac:groups=core,resources=pods/finalizers,verbs=update
 // +kubebuilder:rbac:groups=core,resources=pods/resize,verbs=update
+// +kubebuilder:rbac:groups=core,resources=nodes,verbs=get
 
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims/status,verbs=get
@@ -83,11 +84,11 @@ func (r *InstanceSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		Do(instanceset.NewFixMetaReconciler()).
 		Do(instanceset.NewDeletionReconciler()).
 		Do(instanceset.NewValidationReconciler()).
-		Do(instanceset.NewStatusReconciler()).
+		Do(instanceset.NewStatusReconciler(r.Client)).
 		Do(instanceset.NewRevisionUpdateReconciler()).
 		Do(instanceset.NewAssistantObjectReconciler()).
 		Do(instanceset.NewReplicasAlignmentReconciler()).
-		Do(instanceset.NewUpdateReconciler()).
+		Do(instanceset.NewUpdateReconciler(r.Client)).
 		Commit()
 
 	// TODO(free6om): handle error based on ErrorCode (after defined)

@@ -53,6 +53,7 @@ type InstanceReconciler struct {
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=pods/status,verbs=get
 // +kubebuilder:rbac:groups=core,resources=pods/finalizers,verbs=update
+// +kubebuilder:rbac:groups=core,resources=nodes,verbs=get
 
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims/status,verbs=get
@@ -94,11 +95,11 @@ func (r *InstanceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		Do(instance.NewFixMetaReconciler()).
 		Do(instance.NewDeletionReconciler(r.Client)).
 		Do(instance.NewRevisionUpdateReconciler()).
-		Do(instance.NewStatusReconciler()).
+		Do(instance.NewStatusReconciler(r.Client)).
 		// Do(instance.NewRevisionUpdateReconciler()).
 		Do(instance.NewAssistantObjectReconciler()).
 		Do(instance.NewAlignmentReconciler()).
-		Do(instance.NewUpdateReconciler()).
+		Do(instance.NewUpdateReconciler(r.Client)).
 		Commit()
 }
 

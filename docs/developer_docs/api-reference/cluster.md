@@ -3263,6 +3263,7 @@ ClusterReplicaRestore
 <td>
 <em>(Optional)</em>
 <p>Specifies the Backup source for replicas added during scale-out.
+Only prepareData is executed. Post-ready actions are not supported.
 Only existing, non-sharding Components with default contiguous ordinals
 are supported. Instance templates and offline instances are not supported.
 Any initial Cluster restore must have completed before using this field.
@@ -3965,6 +3966,7 @@ component is in <code>Creating</code> or <code>Updating</code> phase, indicates 
 horizontal scale-out. It uses the same source and restore parameters as a
 Cluster restore, while the target replicas are taken from the Component&rsquo;s
 replicas field.
+Only prepareData is executed. Post-ready actions are not supported.
 AllPods Backups containing multiple source pods are not supported.</p>
 </div>
 <table>

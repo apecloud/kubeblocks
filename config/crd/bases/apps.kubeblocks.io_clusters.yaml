@@ -2911,6 +2911,7 @@ spec:
                     replicaRestore:
                       description: |-
                         Specifies the Backup source for replicas added during scale-out.
+                        Only prepareData is executed. Post-ready actions are not supported.
                         Only existing, non-sharding Components with default contiguous ordinals
                         are supported. Instance templates and offline instances are not supported.
                         Any initial Cluster restore must have completed before using this field.
@@ -14369,6 +14370,7 @@ spec:
                         replicaRestore:
                           description: |-
                             Specifies the Backup source for replicas added during scale-out.
+                            Only prepareData is executed. Post-ready actions are not supported.
                             Only existing, non-sharding Components with default contiguous ordinals
                             are supported. Instance templates and offline instances are not supported.
                             Any initial Cluster restore must have completed before using this field.

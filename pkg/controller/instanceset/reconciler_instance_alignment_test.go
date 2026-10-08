@@ -140,46 +140,6 @@ var _ = Describe("replicas alignment reconciler test", func() {
 		}
 	})
 
-	It("rejects Backup scale-out over retained ordinary PVCs", func() {
-		its.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
-		its.Spec.PersistentVolumeClaimRetentionPolicy = &kbappsv1.PersistentVolumeClaimRetentionPolicy{
-			WhenScaled: kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType,
-		}
-		tree := kubebuilderx.NewObjectTree()
-		tree.SetRoot(its)
-		tree.EventRecorder = record.NewFakeRecorder(10)
-		_, err := NewReplicasAlignmentReconciler().Reconcile(tree)
-		Expect(err).NotTo(HaveOccurred())
-		for _, obj := range tree.List(&corev1.Pod{}) {
-			pod := obj.(*corev1.Pod)
-			pod.Status.Phase = corev1.PodRunning
-			pod.Status.Conditions = []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}}
-		}
-		original := map[string]*corev1.PersistentVolumeClaim{}
-		for _, obj := range tree.List(&corev1.PersistentVolumeClaim{}) {
-			pvc := obj.(*corev1.PersistentVolumeClaim)
-			pvc.Status.Phase = corev1.ClaimBound
-			pvc.Spec.VolumeName = "pv-" + pvc.Name
-			original[pvc.Name] = pvc.DeepCopy()
-		}
-		replicas := int32(2)
-		its.Spec.Replicas = &replicas
-		_, err = NewReplicasAlignmentReconciler().Reconcile(tree)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(tree.List(&corev1.Pod{})).To(HaveLen(2))
-		Expect(tree.List(&corev1.PersistentVolumeClaim{})).To(HaveLen(3 * len(volumeClaimTemplates)))
-
-		replicas = 3
-		its.Spec.ReplicaRestore = &kbappsv1.ClusterReplicaRestore{Source: kbappsv1.ClusterRestoreSource{
-			APIGroup: "dataprotection.kubeblocks.io", Kind: "Backup", Name: "backup",
-		}}
-		_, err = NewReplicasAlignmentReconciler().Reconcile(tree)
-		Expect(err).To(MatchError(ContainSubstring("incompatible with replicaRestore")))
-		for _, obj := range tree.List(&corev1.PersistentVolumeClaim{}) {
-			Expect(obj).To(Equal(original[obj.GetName()]))
-		}
-	})
-
 	Context("PreCondition & Reconcile", func() {
 		It("should work well", func() {
 			By("PreCondition")

@@ -26,13 +26,21 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/record"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
 var _ = Describe("revision update reconciler test", func() {
@@ -110,6 +118,128 @@ var _ = Describe("revision update reconciler test", func() {
 			Expect(res).Should(Equal(kubebuilderx.Continue))
 			Expect(tree.List(&corev1.Pod{})).Should(HaveLen(1))
 		})
+	})
+
+	Context("Backup allocation and Pod reconstruction", func() {
+		var cli client.Client
+		var reconcile func() error
+		var updateReplicas func(int32, *kbappsv1.ClusterReplicaRestore)
+		backup := func(name string) *kbappsv1.ClusterReplicaRestore {
+			return &kbappsv1.ClusterReplicaRestore{Source: kbappsv1.ClusterRestoreSource{
+				APIGroup: "dataprotection.kubeblocks.io", Kind: "Backup", Name: name,
+			}}
+		}
+		BeforeEach(func() {
+			its.Generation = 1
+			its.UID = uid
+			its.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
+			its.Spec.PersistentVolumeClaimRetentionPolicy = &kbappsv1.PersistentVolumeClaimRetentionPolicy{
+				WhenScaled: kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType,
+			}
+			cli = fake.NewClientBuilder().WithScheme(model.GetScheme()).
+				WithStatusSubresource(&workloads.InstanceSet{}, &corev1.Pod{}, &corev1.PersistentVolumeClaim{}).
+				WithObjects(its).Build()
+			reconcile = func() error {
+				_, err := kubebuilderx.NewController(ctx, cli, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(its)}, record.NewFakeRecorder(100), logger).
+					Prepare(NewTreeLoader()).
+					Do(NewStatusReconciler()).
+					Do(NewRevisionUpdateReconciler()).
+					Do(NewReplicasAlignmentReconciler()).Commit()
+				return err
+			}
+			updateReplicas = func(replicas int32, restore *kbappsv1.ClusterReplicaRestore) {
+				Expect(cli.Get(ctx, client.ObjectKeyFromObject(its), its)).To(Succeed())
+				its.Generation++
+				its.Spec.Replicas = &replicas
+				its.Spec.ReplicaRestore = restore
+				Expect(cli.Update(ctx, its)).To(Succeed())
+			}
+		})
+
+		for _, ordinal := range []int{0, 3} {
+			It(fmt.Sprintf("recreates replica %d with its original PVC input after a later Backup allocation", ordinal), func() {
+				Expect(reconcile()).To(Succeed())
+				updateReplicas(4, backup("backup-a"))
+				Expect(reconcile()).To(Succeed())
+				updateReplicas(5, backup("backup-b"))
+				Expect(reconcile()).To(Succeed())
+				instanceName := fmt.Sprintf("%s-%d", its.Name, ordinal)
+				pvc := &corev1.PersistentVolumeClaim{}
+				pvcKey := client.ObjectKey{Namespace: its.Namespace, Name: "data-" + instanceName}
+				Expect(cli.Get(ctx, pvcKey, pvc)).To(Succeed())
+				originalPVC := pvc.DeepCopy()
+				pod := &corev1.Pod{}
+				podKey := client.ObjectKey{Namespace: its.Namespace, Name: instanceName}
+				Expect(cli.Get(ctx, podKey, pod)).To(Succeed())
+				Expect(cli.Delete(ctx, pod)).To(Succeed())
+
+				Expect(reconcile()).To(Succeed())
+				Expect(cli.Get(ctx, podKey, pod)).To(Succeed())
+				Expect(cli.Get(ctx, pvcKey, pvc)).To(Succeed())
+				Expect(pvc).To(Equal(originalPVC))
+				Expect(reconcile()).To(Succeed())
+				Expect(cli.Get(ctx, pvcKey, pvc)).To(Succeed())
+				Expect(pvc).To(Equal(originalPVC))
+			})
+		}
+
+		for _, source := range []string{"", "backup-a"} {
+			for _, policy := range []appsv1.PodManagementPolicyType{appsv1.ParallelPodManagement, appsv1.OrderedReadyPodManagement} {
+				It(fmt.Sprintf("rejects incompatible retained PVCs from %q before publishing allocations with %s policy", source, policy), func() {
+					Expect(reconcile()).To(Succeed())
+					var restore *kbappsv1.ClusterReplicaRestore
+					if source != "" {
+						restore = backup(source)
+					}
+					updateReplicas(4, restore)
+					Expect(reconcile()).To(Succeed())
+					pods := &corev1.PodList{}
+					Expect(cli.List(ctx, pods, client.InNamespace(its.Namespace))).To(Succeed())
+					for i := range pods.Items {
+						pods.Items[i].Status.Phase = corev1.PodRunning
+						pods.Items[i].Status.Conditions = []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}}
+						Expect(cli.Status().Update(ctx, &pods.Items[i])).To(Succeed())
+					}
+					updateReplicas(2, nil)
+					Expect(reconcile()).To(Succeed())
+					Expect(cli.List(ctx, pods, client.InNamespace(its.Namespace))).To(Succeed())
+					Expect(pods.Items).To(HaveLen(2))
+					Expect(cli.Get(ctx, client.ObjectKeyFromObject(its), its)).To(Succeed())
+					previousStatus := its.DeepCopy().Status
+					pvcs := &corev1.PersistentVolumeClaimList{}
+					Expect(cli.List(ctx, pvcs, client.InNamespace(its.Namespace))).To(Succeed())
+					originalPVCs := map[string]*corev1.PersistentVolumeClaim{}
+					for i := range pvcs.Items {
+						pvc := &pvcs.Items[i]
+						if pvc.Labels[constant.KBAppPodNameLabelKey] == its.Name+"-2" {
+							Expect(cli.Delete(ctx, pvc)).To(Succeed())
+							continue
+						}
+						pvc.Spec.VolumeName = "pv-" + pvc.Name
+						Expect(cli.Update(ctx, pvc)).To(Succeed())
+						pvc.Status.Phase = corev1.ClaimBound
+						Expect(cli.Status().Update(ctx, pvc)).To(Succeed())
+						originalPVCs[pvc.Name] = pvc.DeepCopy()
+					}
+					updateReplicas(4, backup("backup-b"))
+					its.Spec.PodManagementPolicy = policy
+					Expect(cli.Update(ctx, its)).To(Succeed())
+					for retry := 0; retry < 2; retry++ {
+						Expect(reconcile()).To(MatchError(ContainSubstring("incompatible with replicaRestore")))
+						Expect(cli.Get(ctx, client.ObjectKeyFromObject(its), its)).To(Succeed())
+						Expect(its.Status).To(Equal(previousStatus))
+						pods := &corev1.PodList{}
+						Expect(cli.List(ctx, pods, client.InNamespace(its.Namespace))).To(Succeed())
+						Expect(pods.Items).To(HaveLen(2))
+						Expect(cli.List(ctx, pvcs, client.InNamespace(its.Namespace))).To(Succeed())
+						Expect(pvcs.Items).To(HaveLen(len(originalPVCs)))
+						for i := range pvcs.Items {
+							Expect(&pvcs.Items[i]).To(Equal(originalPVCs[pvcs.Items[i].Name]))
+						}
+					}
+				})
+			}
+		}
 	})
 })
 

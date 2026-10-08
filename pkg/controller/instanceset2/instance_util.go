@@ -147,8 +147,6 @@ func buildInstanceByTemplate(tree *kubebuilderx.ObjectTree,
 	}
 
 	inst := b.GetObject()
-	// Carry the owner restore intent into the per-instance desired object. The
-	// Instance controller applies it while constructing PVCs.
 	inst.Spec.ReplicaRestore = its.Spec.ReplicaRestore
 	stampInstanceRevision(inst)
 	if !shouldCloneInstanceAssistantObjects(its) {

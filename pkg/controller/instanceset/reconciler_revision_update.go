@@ -31,6 +31,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/replicarestore"
 	"github.com/apecloud/kubeblocks/pkg/controller/workloads/instancestatus"
 )
 
@@ -68,6 +69,34 @@ func (r *revisionUpdateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kub
 	nameMap, err := nameBuilder.BuildInstanceName2TemplateMap()
 	if err != nil {
 		return kubebuilderx.Continue, err
+	}
+
+	if its.Spec.ReplicaRestore != nil {
+		allocated, err := GetRevisions(its.Status.UpdateRevisions)
+		if err != nil {
+			return kubebuilderx.Continue, err
+		}
+		for name, template := range nameMap {
+			if _, exists := allocated[name]; exists {
+				continue
+			}
+			pvcs, err := buildInstancePVCByTemplate(name, template, its)
+			if err != nil {
+				return kubebuilderx.Continue, err
+			}
+			for _, pvc := range pvcs {
+				existing, err := tree.Get(pvc)
+				if err != nil {
+					return kubebuilderx.Continue, err
+				}
+				if existing == nil {
+					continue
+				}
+				if err := replicarestore.ValidatePVCReuse(existing.(*corev1.PersistentVolumeClaim), pvc); err != nil {
+					return kubebuilderx.Continue, err
+				}
+			}
+		}
 	}
 
 	if its.Spec.FlatInstanceOrdinal {

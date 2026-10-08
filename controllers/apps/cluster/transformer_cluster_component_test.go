@@ -50,6 +50,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	ictrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -1650,6 +1651,125 @@ var _ = Describe("cluster component transformer test", func() {
 	})
 
 	Context("sharding components", func() {
+		DescribeTable("resolve instance scheduling placeholders", func(topLevel string) {
+			policy := func(compName string) *appsv1.SchedulingPolicy {
+				term := corev1.PodAffinityTerm{
+					TopologyKey: corev1.LabelHostname,
+					LabelSelector: &metav1.LabelSelector{MatchLabels: map[string]string{
+						constant.KBAppComponentLabelKey: compName,
+					}},
+				}
+				return &appsv1.SchedulingPolicy{Affinity: &corev1.Affinity{
+					PodAffinity: &corev1.PodAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution:  []corev1.PodAffinityTerm{*term.DeepCopy()},
+						PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{{Weight: 50, PodAffinityTerm: *term.DeepCopy()}},
+					},
+					PodAntiAffinity: &corev1.PodAntiAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution:  []corev1.PodAffinityTerm{*term.DeepCopy()},
+						PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{{Weight: 50, PodAffinityTerm: *term.DeepCopy()}},
+					},
+				}}
+			}
+			transformer, transCtx, dag := newTransformerNCtx(clusterTopologyShardingOnly, func(f *testapps.MockClusterFactory) {
+				f.AddSharding(sharding1aName, "", "").SetShards(2)
+				tpl := &f.GetObject().Spec.Shardings[0].Template
+				tpl.Replicas = 4
+				switch topLevel {
+				case "component":
+					tpl.SchedulingPolicy = policy("")
+				case "cluster":
+					f.SetSchedulingPolicy(policy(""))
+				case "node affinity":
+					tpl.SchedulingPolicy = &appsv1.SchedulingPolicy{Affinity: &corev1.Affinity{NodeAffinity: &corev1.NodeAffinity{}}}
+				case "selectors without placeholders":
+					tpl.SchedulingPolicy = &appsv1.SchedulingPolicy{Affinity: &corev1.Affinity{PodAntiAffinity: &corev1.PodAntiAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{{TopologyKey: corev1.LabelHostname}},
+						PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{{Weight: 50, PodAffinityTerm: corev1.PodAffinityTerm{
+							TopologyKey: corev1.LabelHostname,
+							LabelSelector: &metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{
+								{Key: constant.KBAppComponentLabelKey, Operator: metav1.LabelSelectorOpExists},
+							}},
+						}}},
+					}}}
+				}
+				tpl.Instances = []appsv1.InstanceTemplate{
+					{Name: "pair", Replicas: ptr.To[int32](2), SchedulingPolicy: policy("")},
+					{Name: "explicit", Replicas: ptr.To[int32](1), SchedulingPolicy: policy("other-component")},
+				}
+			})
+			original := transCtx.Cluster.DeepCopy()
+			reader := &appsutil.MockReader{Objects: []client.Object{transCtx.Cluster}}
+			graphCli := model.NewGraphClient(reader)
+			transCtx.Client = graphCli
+			Expect(transformer.Transform(transCtx, dag)).Should(Succeed())
+			objs := graphCli.FindAll(dag, &appsv1.Component{})
+			Expect(objs).Should(HaveLen(2))
+			for _, obj := range objs {
+				comp := obj.(*appsv1.Component)
+				Expect(graphCli.IsAction(dag, comp, model.ActionCreatePtr())).Should(BeTrue())
+				compName := comp.Labels[constant.KBAppComponentLabelKey]
+				Expect(comp.Spec.Instances[0].SchedulingPolicy).Should(Equal(policy(compName)))
+				Expect(comp.Spec.Instances[1].SchedulingPolicy).Should(Equal(policy("other-component")))
+				if topLevel == "component" || topLevel == "cluster" {
+					Expect(comp.Spec.SchedulingPolicy).Should(Equal(policy(compName)))
+				} else {
+					Expect(comp.Spec.SchedulingPolicy).Should(Equal(original.Spec.Shardings[0].Template.SchedulingPolicy))
+				}
+
+				By("checking the effective instance Pod templates")
+				compDef := testapps.NewComponentDefinitionFactory(comp.Spec.CompDef).SetRuntime(nil).GetObject()
+				synthesized, err := component.BuildSynthesizedComponent(ctx, graphCli, compDef, comp)
+				Expect(err).ShouldNot(HaveOccurred())
+				its, err := component.BuildInstanceSet(synthesized, compDef)
+				Expect(err).ShouldNot(HaveOccurred())
+				itsExt, err := instancetemplate.BuildInstanceSetExt(its, nil)
+				Expect(err).ShouldNot(HaveOccurred())
+				for _, tpl := range instancetemplate.BuildInstanceTemplateExt(itsExt) {
+					switch tpl.Name {
+					case "pair":
+						Expect(tpl.Spec.Affinity).Should(Equal(policy(compName).Affinity))
+					case "explicit":
+						Expect(tpl.Spec.Affinity).Should(Equal(policy("other-component").Affinity))
+					default:
+						Expect(tpl.Spec.Affinity).Should(Equal(its.Spec.Template.Spec.Affinity))
+					}
+				}
+
+				// Model existing Components created before the fix.
+				running := comp.DeepCopy()
+				running.Spec.Instances[0].SchedulingPolicy = policy("")
+				reader.Objects = append(reader.Objects, running)
+			}
+			Expect(transCtx.Cluster.Spec).Should(Equal(original.Spec))
+
+			By("repairing existing Components during a Cluster update")
+			transCtx.Cluster.Generation++
+			transCtx.OrigCluster = transCtx.Cluster.DeepCopy()
+			normalizeTransformContext(transCtx)
+			dag = newDAG(graphCli, transCtx.Cluster)
+			Expect(transformer.Transform(transCtx, dag)).Should(Succeed())
+			objs = graphCli.FindAll(dag, &appsv1.Component{})
+			Expect(objs).Should(HaveLen(2))
+			for i, obj := range objs {
+				comp := obj.(*appsv1.Component)
+				Expect(graphCli.IsAction(dag, comp, model.ActionUpdatePtr())).Should(BeTrue())
+				Expect(comp.Spec.Instances[0].SchedulingPolicy).Should(Equal(policy(comp.Labels[constant.KBAppComponentLabelKey])))
+				reader.Objects[i+1] = comp.DeepCopy()
+			}
+
+			By("repeating reconciliation without changing the desired policies")
+			normalizeTransformContext(transCtx)
+			dag = newDAG(graphCli, transCtx.Cluster)
+			Expect(transformer.Transform(transCtx, dag)).Should(Succeed())
+			Expect(graphCli.FindAll(dag, &appsv1.Component{})).Should(BeEmpty())
+		},
+			Entry("with a component policy", "component"),
+			Entry("with an inherited cluster policy", "cluster"),
+			Entry("without a top-level policy", "none"),
+			Entry("with only top-level node affinity", "node affinity"),
+			Entry("with nil or expression-only selectors", "selectors without placeholders"),
+		)
+
 		It("shard pod anti-affinity", func() {
 			transformer, transCtx, dag := newTransformerNCtx(clusterTopologyNoOrders4Sharding, func(f *testapps.MockClusterFactory) {
 				f.AddAnnotations(constant.ShardPodAntiAffinityAnnotationKey, strings.Join([]string{sharding1bName, sharding2aName}, ",")).

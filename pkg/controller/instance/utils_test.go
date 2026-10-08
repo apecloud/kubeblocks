@@ -20,15 +20,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instance
 
 import (
+	"context"
 	"reflect"
+	"strings"
 	"testing"
 
+	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -793,7 +802,7 @@ func TestCopyAndMergePreservesExistingReplicaRestoreSource(t *testing.T) {
 	}
 }
 
-func TestReplicaRestorePVCUsesOwnerSourceOnlyAtCreation(t *testing.T) {
+func TestReplicaRestorePVCResumesWithFixedOwnerSource(t *testing.T) {
 	inst := builder.NewInstanceBuilder("default", "mysql-3").
 		AddAnnotations(constant.KBAppClusterUIDKey, "cluster-uid").
 		AddLabels(constant.KBAppComponentLabelKey, "mysql").
@@ -814,18 +823,13 @@ func TestReplicaRestorePVCUsesOwnerSourceOnlyAtCreation(t *testing.T) {
 		old.Annotations[constant.RestoreSourceNamespaceAnnotationKey] != "default" {
 		t.Fatalf("missing restore identity: %v", old.Annotations)
 	}
-	for _, source := range []string{"backup-b", ""} {
-		if source == "" {
-			inst.Spec.ReplicaRestore = nil
-		} else {
-			inst.Spec.ReplicaRestore.Source.Name = source
-		}
+	for i := 0; i < 2; i++ {
 		if _, err := NewAlignmentReconciler().Reconcile(tree); err != nil {
 			t.Fatal(err)
 		}
 		current := tree.List(&corev1.PersistentVolumeClaim{})[0].(*corev1.PersistentVolumeClaim)
 		if !reflect.DeepEqual(old, current) {
-			t.Fatalf("existing PVC changed after source update: %#v", current)
+			t.Fatalf("existing PVC changed during restore retry: %#v", current)
 		}
 	}
 }
@@ -859,5 +863,88 @@ func TestReplicaRestoreRejectsVolumeClaimTemplateSource(t *testing.T) {
 		if !reflect.DeepEqual(pvc.Spec, spec) {
 			t.Fatalf("ordinary PVC source changed: %#v", pvc.Spec)
 		}
+	}
+}
+
+func TestReplicaRestorePVCReuse(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		mutate   func(*corev1.PersistentVolumeClaim)
+		conflict bool
+	}{
+		{name: "same restore input", mutate: func(*corev1.PersistentVolumeClaim) {}},
+		{name: "ordinary retained PVC", conflict: true, mutate: func(pvc *corev1.PersistentVolumeClaim) {
+			pvc.Spec.DataSourceRef = nil
+			pvc.Annotations = nil
+		}},
+		{name: "different Backup", conflict: true, mutate: func(pvc *corev1.PersistentVolumeClaim) {
+			pvc.Spec.DataSourceRef.Name = "another-backup"
+			pvc.Annotations[constant.RestoreSourceNameAnnotationKey] = "another-backup"
+		}},
+		{name: "different restore parameters", conflict: true, mutate: func(pvc *corev1.PersistentVolumeClaim) {
+			pvc.Annotations[constant.RestoreParametersAnnotationKey] = `{"key":"other"}`
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			inst := builder.NewInstanceBuilder("default", "mysql-3").
+				SetInstanceSetName("mysql").
+				SetPodTemplate(corev1.PodTemplateSpec{Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "mysql", Image: "mysql:8"}}}}).
+				AddVolumeClaimTemplate(corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "data"}}).GetObject()
+			inst.Spec.ReplicaRestore = &kbappsv1.ClusterReplicaRestore{Source: kbappsv1.ClusterRestoreSource{
+				APIGroup: "dataprotection.kubeblocks.io", Kind: "Backup", Name: "backup",
+			}}
+			pvcs, err := buildInstancePVCs(inst)
+			if err != nil {
+				t.Fatal(err)
+			}
+			pvc := pvcs[0]
+			tc.mutate(pvc)
+			pvc.Status.Phase = corev1.ClaimBound
+			pvc.Spec.VolumeName = "retained-pv"
+			original := pvc.DeepCopy()
+			scheme := runtime.NewScheme()
+			if err := corev1.AddToScheme(scheme); err != nil {
+				t.Fatal(err)
+			}
+			if err := workloads.AddToScheme(scheme); err != nil {
+				t.Fatal(err)
+			}
+			if err := rbacv1.AddToScheme(scheme); err != nil {
+				t.Fatal(err)
+			}
+			ctx := context.Background()
+			cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(inst, pvc).Build()
+			for i := 0; i < 2; i++ {
+				_, err = kubebuilderx.NewController(ctx, cli,
+					reconcile.Request{NamespacedName: client.ObjectKeyFromObject(inst)}, record.NewFakeRecorder(10), logr.Discard()).
+					Prepare(NewTreeLoader()).Do(NewAlignmentReconciler()).Commit()
+				if tc.conflict {
+					if err == nil || !strings.Contains(err.Error(), "incompatible with replicaRestore") {
+						t.Fatalf("expected explicit PVC reuse conflict, got %v", err)
+					}
+				} else if err != nil {
+					t.Fatalf("matching restore PVC was rejected: %v", err)
+				}
+			}
+			current := &corev1.PersistentVolumeClaim{}
+			if err := cli.Get(ctx, client.ObjectKeyFromObject(pvc), current); err != nil {
+				t.Fatal(err)
+			}
+			// Ignore the server-assigned resource version when checking input.
+			original.ResourceVersion = current.ResourceVersion
+			if !reflect.DeepEqual(original, current) {
+				t.Fatalf("existing PVC was modified: %#v", current)
+			}
+			pods := &corev1.PodList{}
+			if err := cli.List(ctx, pods); err != nil {
+				t.Fatal(err)
+			}
+			if tc.conflict && len(pods.Items) != 0 {
+				t.Fatal("conflicting PVC reuse created a Pod")
+			}
+			if !tc.conflict && len(pods.Items) != 1 {
+				t.Fatal("matching restore PVC did not resume Pod creation")
+			}
+		})
 	}
 }

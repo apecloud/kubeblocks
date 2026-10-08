@@ -71,7 +71,7 @@ func (r *VolumePopulatorReconciler) validateReplicaRestoreDataVolume(reqCtx intc
 	if err := validatePVCControllerRef(pvc, ref, owner); err != nil {
 		return intctrlutil.NewFatalError(err.Error())
 	}
-	if backup.Status.BackupMethod.TargetVolumes != nil {
+	if backup.Status.BackupMethod != nil && backup.Status.BackupMethod.TargetVolumes != nil {
 		for _, name := range volumeNames {
 			if utils.ExistTargetVolume(backup.Status.BackupMethod.TargetVolumes, name) {
 				return nil

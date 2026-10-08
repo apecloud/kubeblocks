@@ -517,6 +517,21 @@ func (r *VolumePopulatorReconciler) handleRestoreParentLifecycle(reqCtx intctrlu
 		if !comp.DeletionTimestamp.IsZero() {
 			return true, nil
 		}
+		if isReplicaRestorePVC(pvc) {
+			backupNamespace, err := r.authorizedBackupNamespaceFromPVC(reqCtx, pvc)
+			if err != nil {
+				return false, intctrlutil.NewFatalError(err.Error())
+			}
+			backup := &dpv1alpha1.Backup{}
+			if err = r.Client.Get(reqCtx.Ctx, client.ObjectKey{Namespace: backupNamespace, Name: pvc.Spec.DataSourceRef.Name}, backup); err != nil {
+				return false, err
+			}
+			// Validate workload volumes before recording identity. Retain may
+			// detach the workload owner after registration.
+			if err = r.validateReplicaRestoreDataVolume(reqCtx, pvc, backup); err != nil {
+				return false, err
+			}
+		}
 		if err = r.registerVolumePopulation(reqCtx.Ctx, pvc, cluster, comp); err != nil {
 			return false, restoreParentRequeue(err)
 		}
@@ -966,7 +981,10 @@ func (r *VolumePopulatorReconciler) validateRestoreAndBuildMGR(reqCtx intctrluti
 		}
 	}
 	if decision.mode == pvcRestoreModeProvisionOnly {
-		if isReplicaRestorePVC(pvc) {
+		// Cluster-owned PVCs validated their workload volumes at registration.
+		// Standalone PVCs still require a live owner here.
+		if isReplicaRestorePVC(pvc) &&
+			(pvc.Labels[dptypes.ClusterUIDLabelKey] == "" || pvc.Labels[dptypes.ComponentUIDLabelKey] == "") {
 			if err = r.validateReplicaRestoreDataVolume(reqCtx, pvc, backup); err != nil {
 				return nil, err
 			}
@@ -2843,6 +2861,11 @@ func (r *VolumePopulatorReconciler) validateBackupNamespaceAuthorized(reqCtx int
 	if !r.clusterSourceAuthorizesPVC(reqCtx, cluster, pvc, backupNamespace) {
 		return fmt.Errorf("PVC %s/%s can not restore Backup %s/%s without matching cluster restore intent",
 			pvc.Namespace, pvc.Name, backupNamespace, pvc.Spec.DataSourceRef.Name)
+	}
+	if isReplicaRestorePVC(pvc) && volumePopulationIdentityCommitted(pvc, cluster) {
+		// Parent lifecycle checks the registered Cluster/Component identity.
+		// A retained PVC may legitimately have lost its workload owner.
+		return nil
 	}
 	if err := r.validateBackupRestorePVCWorkload(reqCtx, pvc, clusterName); err != nil {
 		return err

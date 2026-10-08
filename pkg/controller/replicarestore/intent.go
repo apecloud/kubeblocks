@@ -22,6 +22,7 @@ package replicarestore
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"slices"
 
 	corev1 "k8s.io/api/core/v1"
@@ -109,6 +110,24 @@ func annotations(intent *appsv1.ClusterReplicaRestore, component, pvcNamespace s
 
 func IsReplicaPVC(pvc *corev1.PersistentVolumeClaim) bool {
 	return pvc != nil && pvc.Annotations[constant.RestorePurposeAnnotationKey] == constant.RestorePurposeReplica
+}
+
+// ValidatePVCReuse rejects existing volumes with a different initialization input.
+// Call it when allocating a Backup replica, before merging any PVC metadata.
+func ValidatePVCReuse(existing, desired *corev1.PersistentVolumeClaim) error {
+	if !IsReplicaPVC(desired) {
+		return nil
+	}
+	conflict := fmt.Errorf("PVC %s/%s: existing initialization input is incompatible with replicaRestore", existing.Namespace, existing.Name)
+	if !IsReplicaPVC(existing) || !reflect.DeepEqual(existing.Spec.DataSourceRef, desired.Spec.DataSourceRef) {
+		return conflict
+	}
+	for _, key := range metadataKeys {
+		if existing.Annotations[key] != desired.Annotations[key] {
+			return conflict
+		}
+	}
+	return nil
 }
 
 // MergePVCAnnotations preserves existing PVC sources and restore metadata

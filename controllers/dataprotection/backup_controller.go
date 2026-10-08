@@ -544,7 +544,8 @@ func (r *BackupReconciler) prepareRequestTargetInfo(reqCtx intctrlutil.RequestCt
 		return err
 	}
 	if len(targetPods) == 0 {
-		if time.Since(request.Backup.CreationTimestamp.Time) < targetPodResolutionWindow {
+		if (request.Backup.Status.Phase == "" || request.Backup.Status.Phase == dpv1alpha1.BackupPhaseNew) &&
+			time.Since(request.Backup.CreationTimestamp.Time) < targetPodResolutionWindow {
 			// Transient: pods may still be starting or waiting for their
 			// role label. Requeue without marking the Backup Failed.
 			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue,

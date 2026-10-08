@@ -4254,15 +4254,114 @@ func TestReplicaRestoreAuthorizesCrossNamespaceBackup(t *testing.T) {
 	require.True(t, reconciler.clusterSourceAuthorizesPVC(
 		intctrlutil.RequestCtx{Ctx: context.Background()}, cluster, pvc, sourceNamespace))
 	cluster.Spec.ComponentSpecs[0].ReplicaRestore = nil
-	require.True(t, reconciler.clusterSourceAuthorizesPVC(
+	require.False(t, reconciler.clusterSourceAuthorizesPVC(
 		intctrlutil.RequestCtx{Ctx: context.Background()}, cluster, pvc, sourceNamespace))
+	cluster.Spec.ComponentSpecs[0].ReplicaRestore = &kbappsv1.ClusterReplicaRestore{Source: kbappsv1.ClusterRestoreSource{
+		APIGroup: apiGroup, Kind: dptypes.BackupKind, Name: "backup", Namespace: sourceNamespace,
+	}}
 	pvc.Annotations[constant.KBAppClusterUIDKey] = "foreign-cluster"
 	require.False(t, reconciler.clusterSourceAuthorizesPVC(
 		intctrlutil.RequestCtx{Ctx: context.Background()}, cluster, pvc, sourceNamespace))
 	pvc.Annotations[constant.KBAppClusterUIDKey] = string(cluster.UID)
 	pvc.Spec.DataSourceRef.Name = "other-backup"
+	setReplicaRestoreSourceAnnotations(pvc)
 	require.False(t, reconciler.clusterSourceAuthorizesPVC(
 		intctrlutil.RequestCtx{Ctx: context.Background()}, cluster, pvc, sourceNamespace))
+}
+
+func TestReplicaRestoreReconcileRequiresCrossNamespaceOwnerIntent(t *testing.T) {
+	for _, intent := range []string{"matching", "absent", "other component", "other backup", "other namespace", "other group", "other kind", "initial restore only"} {
+		t.Run(intent, func(t *testing.T) {
+			ctx := context.Background()
+			scheme, cluster, component, its, pvc := parentRestoreObjects(t)
+			sourceNamespace := "external-backups"
+			source := kbappsv1.ClusterRestoreSource{
+				APIGroup: dptypes.DataprotectionAPIGroup, Kind: dptypes.BackupKind,
+				Name: pvc.Spec.DataSourceRef.Name, Namespace: sourceNamespace,
+			}
+			cluster.Spec.Restore = nil
+			cluster.Spec.ComponentSpecs = []kbappsv1.ClusterComponentSpec{{
+				Name: "mysql", Replicas: 5, ReplicaRestore: &kbappsv1.ClusterReplicaRestore{Source: source},
+			}}
+			switch intent {
+			case "absent":
+				cluster.Spec.ComponentSpecs[0].ReplicaRestore = nil
+			case "other component":
+				cluster.Spec.ComponentSpecs[0].Name = "other"
+			case "other backup":
+				cluster.Spec.ComponentSpecs[0].ReplicaRestore.Source.Name = "other"
+			case "other namespace":
+				cluster.Spec.ComponentSpecs[0].ReplicaRestore.Source.Namespace = "other"
+			case "other group":
+				cluster.Spec.ComponentSpecs[0].ReplicaRestore.Source.APIGroup = "other"
+			case "other kind":
+				cluster.Spec.ComponentSpecs[0].ReplicaRestore.Source.Kind = dptypes.RestoreKind
+			case "initial restore only":
+				cluster.Spec.ComponentSpecs[0].ReplicaRestore = nil
+				cluster.Spec.Restore = &kbappsv1.ClusterRestore{Source: source}
+			}
+			its.Spec.Replicas = ptr.To(int32(5))
+			its.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{{ObjectMeta: metav1.ObjectMeta{Name: "data"}}}
+			pvc.Name = "data-cluster-mysql-3"
+			pvc.Labels[constant.KBAppPodNameLabelKey] = "cluster-mysql-3"
+			pvc.Labels[constant.VolumeClaimTemplateNameLabelKey] = "data"
+			pvc.Annotations[constant.RestorePurposeAnnotationKey] = constant.RestorePurposeReplica
+			pvc.Spec.DataSourceRef.Namespace = &sourceNamespace
+			setReplicaRestoreSourceAnnotations(pvc)
+			backup, actionSet := restoreBackupObjects()
+			backup.Name = source.Name
+			backup.Namespace = sourceNamespace
+			backup.Status.Target.PodSelector = &dpv1alpha1.PodSelector{
+				LabelSelector: &metav1.LabelSelector{MatchLabels: map[string]string{constant.KBAppComponentLabelKey: "mysql"}},
+				Strategy:      dpv1alpha1.PodSelectionStrategyAny,
+			}
+			worker := &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "worker", Namespace: pvc.Namespace}}
+			for key, value := range map[string]string{
+				dptypes.CfgKeyWorkerServiceAccountName: worker.Name,
+				dptypes.CfgKeyWorkerClusterRoleName:    "worker-role",
+			} {
+				previous := viper.Get(key)
+				viper.Set(key, value)
+				t.Cleanup(func() { viper.Set(key, previous) })
+			}
+			cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(pvc).
+				WithObjects(cluster, component, its, pvc, backup, actionSet, worker).Build()
+			for i := 0; i < 2; i++ {
+				vp := &VolumePopulatorReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(10)}
+				_, err := vp.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(pvc)})
+				require.NoError(t, err)
+			}
+			restores := &dpv1alpha1.RestoreList{}
+			require.NoError(t, cli.List(ctx, restores))
+			require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(pvc), pvc))
+			if intent == "matching" {
+				require.Len(t, restores.Items, 1)
+				require.Equal(t, sourceNamespace, restores.Items[0].Spec.Backup.Namespace)
+				cluster.Spec.ComponentSpecs[0].ReplicaRestore = nil
+				require.NoError(t, cli.Update(ctx, cluster))
+				vp := &VolumePopulatorReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(10)}
+				_, err := vp.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(pvc)})
+				require.NoError(t, err)
+				remaining := &dpv1alpha1.RestoreList{}
+				require.NoError(t, cli.List(ctx, remaining))
+				require.Len(t, remaining.Items, 1)
+				require.Equal(t, restores.Items[0].Spec, remaining.Items[0].Spec)
+				require.True(t, remaining.Items[0].DeletionTimestamp.IsZero())
+				require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(pvc), pvc))
+				require.Contains(t, pvc.Finalizers, dptypes.DataProtectionFinalizerName)
+				condition := findPVCConditionByType(pvc, kbappsv1.ConditionTypeRestore)
+				require.NotNil(t, condition)
+				require.Equal(t, corev1.ConditionFalse, condition.Status)
+				require.Contains(t, condition.Message, "without matching cluster restore intent")
+			} else {
+				require.Empty(t, restores.Items)
+				condition := findPVCConditionByType(pvc, kbappsv1.ConditionTypeRestore)
+				require.NotNil(t, condition)
+				require.Equal(t, corev1.ConditionFalse, condition.Status)
+				require.Contains(t, condition.Message, "without matching cluster restore intent")
+			}
+		})
+	}
 }
 
 func TestReplicaRestoreValidatesSameNamespaceSource(t *testing.T) {
@@ -5714,7 +5813,7 @@ func TestReplicaRestoreRequiresMatchingDataVolume(t *testing.T) {
 	}
 }
 
-func TestReplicaRestoreContinuesAfterOwnerSourceRemoval(t *testing.T) {
+func TestSameNamespaceReplicaRestoreContinuesAfterOwnerSourceRemoval(t *testing.T) {
 	ctx := context.Background()
 	scheme, cluster, component, its, pvc := parentRestoreObjects(t)
 	cluster.Spec.Restore = nil

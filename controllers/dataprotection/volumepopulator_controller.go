@@ -439,8 +439,8 @@ func (r *VolumePopulatorReconciler) syncPVC(reqCtx intctrlutil.RequestCtx, pvc *
 
 // handleRestoreParentLifecycle validates the recorded parent identity and
 // Cluster protection before restore work starts, and initiates owner-driven
-// cleanup when a supported parent is deleting. Changes to the owner restore
-// source affect future PVCs; existing PVCs finish using their own source.
+// cleanup when a supported parent is deleting. Existing PVCs retain their
+// source; cross-namespace restores still require matching owner intent.
 func (r *VolumePopulatorReconciler) handleRestoreParentLifecycle(reqCtx intctrlutil.RequestCtx,
 	pvc *corev1.PersistentVolumeClaim) (bool, error) {
 	clusterName := pvc.Labels[constant.AppInstanceLabelKey]
@@ -2850,10 +2850,8 @@ func (r *VolumePopulatorReconciler) validateBackupNamespaceAuthorized(reqCtx int
 	return nil
 }
 
-// clusterSourceAuthorizesPVC accepts either the initial Cluster restore source
-// or the matching component ReplicaRestore source. An in-flight PVC keeps its
-// source and owner markers so it remains authorized after the owner removes
-// the intent from Cluster.spec.
+// clusterSourceAuthorizesPVC requires the initial Cluster restore source or
+// the corresponding component ReplicaRestore source to match the PVC.
 func (r *VolumePopulatorReconciler) clusterSourceAuthorizesPVC(reqCtx intctrlutil.RequestCtx,
 	cluster *appsv1.Cluster, pvc *corev1.PersistentVolumeClaim, backupNamespace string) bool {
 	ref := pvc.Spec.DataSourceRef
@@ -2878,12 +2876,13 @@ func (r *VolumePopulatorReconciler) clusterSourceAuthorizesPVC(reqCtx intctrluti
 		pvc.Annotations[constant.RestoreComponentAnnotationKey] != restoreComponentName(pvc) {
 		return false
 	}
-	// Workload ownership is checked by the caller. The PVC keeps its source
-	// after the owner changes the source used for future PVC creation.
-	return matches(pvc.Annotations[constant.RestoreSourceAPIGroupAnnotationKey],
-		pvc.Annotations[constant.RestoreSourceKindAnnotationKey],
-		pvc.Annotations[constant.RestoreSourceNameAnnotationKey],
-		pvc.Annotations[constant.RestoreSourceNamespaceAnnotationKey])
+	for _, component := range cluster.Spec.ComponentSpecs {
+		if component.Name == restoreComponentName(pvc) && component.ReplicaRestore != nil {
+			source := component.ReplicaRestore.Source
+			return matches(source.APIGroup, source.Kind, source.Name, source.Namespace)
+		}
+	}
+	return false
 }
 
 func (r *VolumePopulatorReconciler) validateBackupRestorePVCWorkload(reqCtx intctrlutil.RequestCtx,

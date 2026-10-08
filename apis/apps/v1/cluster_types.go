@@ -349,9 +349,10 @@ type ClusterComponentSpec struct {
 	// Only existing, non-sharding Components with default contiguous ordinals
 	// are supported. Instance templates and offline instances are not supported.
 	// Any initial Cluster restore must have completed before using this field.
-	// Existing PVCs keep their source and data. Changes to this field affect only
-	// PVCs created afterward. Removing it restores ordinary PVC creation and does
-	// not cancel restoration of PVCs that already exist.
+	// Existing PVCs keep their source and data. Changes to this field select the
+	// source for PVCs created afterward. Removing it restores ordinary PVC creation
+	// and does not delete existing restore resources. Cross-namespace restores
+	// require matching owner restore intent until the PVC restore is terminal.
 	//
 	// +optional
 	ReplicaRestore *ClusterReplicaRestore `json:"replicaRestore,omitempty"`

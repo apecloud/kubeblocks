@@ -212,9 +212,8 @@ func GetReplicasStatusFunc(its *workloads.InstanceSet, f func(ReplicaStatus) boo
 	return replicas, nil
 }
 
-// GetReplicaRestoreReplicas identifies replicas whose existing or missing PVCs
-// are initialized from Backup rather than by the Component's dataLoad action,
-// and those still waiting for their PVCs to finish restoring.
+// GetReplicaRestoreReplicas identifies replicas with Backup-initialized PVCs,
+// and replicas waiting for restore PVC creation or completion.
 func GetReplicaRestoreReplicas(ctx context.Context, cli client.Reader, its *workloads.InstanceSet, replicas []string) (restored, pending sets.Set[string], err error) {
 	pvcs := &corev1.PersistentVolumeClaimList{}
 	if err := cli.List(ctx, pvcs, client.InNamespace(its.Namespace), client.MatchingLabels{
@@ -255,7 +254,6 @@ func GetReplicaRestoreReplicas(ctx context.Context, cli client.Reader, its *work
 	if its.Spec.ReplicaRestore != nil {
 		for name := range names {
 			if existing[name].Len() < volumes.Len() {
-				restored.Insert(name)
 				pending.Insert(name)
 			}
 		}

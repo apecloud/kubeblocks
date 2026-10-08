@@ -90,8 +90,6 @@ func newComponentWorkloadOps(transCtx *componentTransformContext,
 			for i := range status.Status {
 				if restoreReplicas.Has(status.Status[i].Name) {
 					status.Status[i].DataLoaded = nil
-				} else if status.Status[i].DataLoaded == nil {
-					status.Status[i].DataLoaded = ptr.To(false)
 				}
 			}
 			return nil
@@ -109,7 +107,7 @@ func newComponentWorkloadOps(transCtx *componentTransformContext,
 		dag:                    dag,
 		desiredCompPodNameSet:  sets.New(protoITSPodNames...),
 		runningItsPodNameSet:   sets.New(runningITSPodNames...),
-		restoreReplicas:        restoreReplicas,
+		restoreReplicas:        restoreReplicas.Union(restorePendingReplicas),
 		restorePendingReplicas: restorePendingReplicas,
 	}, nil
 }
@@ -273,11 +271,8 @@ func (r *componentWorkloadOps) scaleOut() error {
 	// replicas to be created
 	newReplicas := r.desiredCompPodNameSet.Difference(r.runningItsPodNameSet).UnsortedList()
 	hasMemberJoinDefined, hasDataActionDefined := hasMemberJoinNDataActionDefined(r.synthesizeComp.LifecycleActions.ComponentLifecycleActions)
-	ordinaryReplicas := slices.DeleteFunc(slices.Clone(newReplicas), r.restoreReplicas.Has)
-	if err := component.NewReplicasStatus(r.protoITS, ordinaryReplicas, hasMemberJoinDefined, hasDataActionDefined); err != nil {
-		return err
-	}
-	return component.NewReplicasStatus(r.protoITS, r.restoreReplicas.Intersection(sets.New(newReplicas...)).UnsortedList(), hasMemberJoinDefined, false)
+	// Keep data-load state until a PVC records Backup initialization.
+	return component.NewReplicasStatus(r.protoITS, newReplicas, hasMemberJoinDefined, hasDataActionDefined)
 }
 
 func (r *componentWorkloadOps) buildDataReplicationTask() error {

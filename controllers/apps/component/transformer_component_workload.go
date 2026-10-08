@@ -22,6 +22,7 @@ package component
 import (
 	"context"
 	"reflect"
+	"slices"
 	"strings"
 
 	"golang.org/x/exp/maps"
@@ -150,6 +151,16 @@ func (t *componentWorkloadTransformer) reconcileReplicasStatus(ctx context.Conte
 	}
 
 	hasMemberJoinDefined, hasDataActionDefined := hasMemberJoinNDataActionDefined(synthesizedComp.LifecycleActions.ComponentLifecycleActions)
+	if hasDataActionDefined {
+		restored, _, err := component.GetReplicaRestoreReplicas(ctx, cli, protoITS, replicas)
+		if err != nil {
+			return err
+		}
+		if err = component.StatusReplicasStatus(protoITS, restored.UnsortedList(), hasMemberJoinDefined, false); err != nil {
+			return err
+		}
+		replicas = slices.DeleteFunc(replicas, restored.Has)
+	}
 	return component.StatusReplicasStatus(protoITS, replicas, hasMemberJoinDefined, hasDataActionDefined)
 }
 

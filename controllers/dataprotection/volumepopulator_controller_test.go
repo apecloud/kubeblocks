@@ -4282,90 +4282,131 @@ func TestReplicaRestoreValidatesSameNamespaceSource(t *testing.T) {
 }
 
 func TestReplicaRestoreReconcilesTargetAndAuxiliaryVolumes(t *testing.T) {
-	scheme := runtime.NewScheme()
-	require.NoError(t, corev1.AddToScheme(scheme))
-	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
-	require.NoError(t, workloadsv1.AddToScheme(scheme))
-	backup, actionSet := restoreBackupObjects()
-	backup.Status.Target.PodSelector = &dpv1alpha1.PodSelector{
-		LabelSelector: &metav1.LabelSelector{MatchLabels: map[string]string{
-			constant.KBAppComponentLabelKey: "mysql",
-		}},
-		Strategy: dpv1alpha1.PodSelectionStrategyAny,
-	}
-	newPVC := func(volumeName, componentName string, uid types.UID) *corev1.PersistentVolumeClaim {
-		pvc := newPVCForRestoreDecision(volumeName, componentName, "")
-		pvc.UID = uid
-		pvc.Annotations[constant.RestorePurposeAnnotationKey] = constant.RestorePurposeReplica
-		pvc.Spec = corev1.PersistentVolumeClaimSpec{
-			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-			Resources: corev1.VolumeResourceRequirements{
-				Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("1Gi")},
-			},
-			DataSourceRef: &corev1.TypedObjectReference{
-				APIGroup: ptr.To(dptypes.DataprotectionAPIGroup), Kind: dptypes.BackupKind, Name: backup.Name,
-			},
-		}
-		setReplicaRestoreSourceAnnotations(pvc)
-		return pvc
-	}
-	dataPVC := newPVC("data", "mysql", "data-pvc-uid")
-	logPVC := newPVC("logs", "mysql", "logs-pvc-uid")
-	its := &workloadsv1.InstanceSet{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "mysql", UID: "its-uid"},
-		Spec: workloadsv1.InstanceSetSpec{VolumeClaimTemplates: []corev1.PersistentVolumeClaim{
-			{ObjectMeta: metav1.ObjectMeta{Name: "data"}},
-			{ObjectMeta: metav1.ObjectMeta{Name: "logs"}},
-		}},
-	}
-	logPVC.OwnerReferences = []metav1.OwnerReference{{
-		APIVersion: workloadsv1.GroupVersion.String(), Kind: workloadsv1.InstanceSetKind,
-		Name: its.Name, UID: its.UID, Controller: ptr.To(true),
-	}}
-	wrongComponentPVC := newPVC("logs", "redis", "wrong-component-pvc-uid")
-	worker := &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "worker", Namespace: "default"}}
-	for key, value := range map[string]string{
-		dptypes.CfgKeyWorkerServiceAccountName: "worker",
-		dptypes.CfgKeyWorkerClusterRoleName:    "worker-role",
+	for _, tc := range []struct {
+		name       string
+		strategy   dpv1alpha1.PodSelectionStrategy
+		sourcePods []string
+		rejected   bool
+	}{
+		{name: "Any", strategy: dpv1alpha1.PodSelectionStrategyAny},
+		{name: "All with one source", strategy: dpv1alpha1.PodSelectionStrategyAll, sourcePods: []string{"mysql-0"}},
+		{name: "All with multiple sources", strategy: dpv1alpha1.PodSelectionStrategyAll, sourcePods: []string{"mysql-0", "mysql-1", "mysql-2"}, rejected: true},
 	} {
-		previous := viper.Get(key)
-		viper.Set(key, value)
-		t.Cleanup(func() { viper.Set(key, previous) })
-	}
-	cli := fake.NewClientBuilder().WithScheme(scheme).
-		WithStatusSubresource(dataPVC, logPVC, wrongComponentPVC).
-		WithObjects(backup, actionSet, worker, its, dataPVC, logPVC, wrongComponentPVC).Build()
-	reconciler := &VolumePopulatorReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(10)}
+		t.Run(tc.name, func(t *testing.T) {
 
-	for _, pvc := range []*corev1.PersistentVolumeClaim{dataPVC, logPVC} {
-		result, err := reconciler.Reconcile(context.Background(), reconcile.Request{
-			NamespacedName: client.ObjectKeyFromObject(pvc),
+			scheme := runtime.NewScheme()
+			require.NoError(t, corev1.AddToScheme(scheme))
+			require.NoError(t, dpv1alpha1.AddToScheme(scheme))
+			require.NoError(t, workloadsv1.AddToScheme(scheme))
+			backup, actionSet := restoreBackupObjects()
+			backup.Status.Target.PodSelector = &dpv1alpha1.PodSelector{
+				LabelSelector: &metav1.LabelSelector{MatchLabels: map[string]string{
+					constant.KBAppComponentLabelKey: "mysql",
+				}},
+				Strategy: tc.strategy,
+			}
+			backup.Status.Target.SelectedTargetPods = tc.sourcePods
+			newPVC := func(volumeName, componentName string, uid types.UID) *corev1.PersistentVolumeClaim {
+				pvc := newPVCForRestoreDecision(volumeName, componentName, "")
+				pvc.UID = uid
+				pvc.Annotations[constant.RestorePurposeAnnotationKey] = constant.RestorePurposeReplica
+				pvc.Spec = corev1.PersistentVolumeClaimSpec{
+					AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+					Resources: corev1.VolumeResourceRequirements{
+						Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("1Gi")},
+					},
+					DataSourceRef: &corev1.TypedObjectReference{
+						APIGroup: ptr.To(dptypes.DataprotectionAPIGroup), Kind: dptypes.BackupKind, Name: backup.Name,
+					},
+				}
+				setReplicaRestoreSourceAnnotations(pvc)
+				return pvc
+			}
+			dataPVC := newPVC("data", "mysql", "data-pvc-uid")
+			logPVC := newPVC("logs", "mysql", "logs-pvc-uid")
+			dataPVC.Name = "data-mysql-3"
+			dataPVC.Labels[constant.KBAppPodNameLabelKey] = "mysql-3"
+			logPVC.Name = "logs-mysql-3"
+			logPVC.Labels[constant.KBAppPodNameLabelKey] = "mysql-3"
+			its := &workloadsv1.InstanceSet{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "mysql", UID: "its-uid"},
+				Spec: workloadsv1.InstanceSetSpec{VolumeClaimTemplates: []corev1.PersistentVolumeClaim{
+					{ObjectMeta: metav1.ObjectMeta{Name: "data"}},
+					{ObjectMeta: metav1.ObjectMeta{Name: "logs"}},
+				}},
+			}
+			logPVC.OwnerReferences = []metav1.OwnerReference{{
+				APIVersion: workloadsv1.GroupVersion.String(), Kind: workloadsv1.InstanceSetKind,
+				Name: its.Name, UID: its.UID, Controller: ptr.To(true),
+			}}
+			wrongComponentPVC := newPVC("logs", "redis", "wrong-component-pvc-uid")
+			worker := &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "worker", Namespace: "default"}}
+			for key, value := range map[string]string{
+				dptypes.CfgKeyWorkerServiceAccountName: "worker",
+				dptypes.CfgKeyWorkerClusterRoleName:    "worker-role",
+			} {
+				previous := viper.Get(key)
+				viper.Set(key, value)
+				t.Cleanup(func() { viper.Set(key, previous) })
+			}
+			cli := fake.NewClientBuilder().WithScheme(scheme).
+				WithStatusSubresource(dataPVC, logPVC, wrongComponentPVC).
+				WithObjects(backup, actionSet, worker, its, dataPVC, logPVC, wrongComponentPVC).Build()
+			reconciler := &VolumePopulatorReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(10)}
+
+			for _, pvc := range []*corev1.PersistentVolumeClaim{dataPVC, logPVC} {
+				result, err := reconciler.Reconcile(context.Background(), reconcile.Request{
+					NamespacedName: client.ObjectKeyFromObject(pvc),
+				})
+				require.NoError(t, err)
+				if tc.rejected {
+					require.Zero(t, result)
+					require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(pvc), pvc))
+					condition := findPVCConditionByType(pvc, kbappsv1.ConditionTypeRestore)
+					require.NotNil(t, condition)
+					require.Equal(t, corev1.ConditionFalse, condition.Status)
+					require.Contains(t, condition.Message, "multiple source pods is not supported")
+					continue
+				}
+				require.Positive(t, result.RequeueAfter)
+				helper := &corev1.PersistentVolumeClaim{}
+				require.NoError(t, cli.Get(context.Background(), types.NamespacedName{
+					Namespace: pvc.Namespace, Name: getPopulatePVCName(pvc.UID),
+				}, helper))
+			}
+
+			restores := &dpv1alpha1.RestoreList{}
+			require.NoError(t, cli.List(context.Background(), restores))
+			if tc.rejected {
+				require.Empty(t, restores.Items)
+				pvcs := &corev1.PersistentVolumeClaimList{}
+				require.NoError(t, cli.List(context.Background(), pvcs))
+				require.Len(t, pvcs.Items, 3, "unsupported Backup must not create helper PVCs")
+				return
+			}
+			require.Len(t, restores.Items, 1, "only the data volume should run prepareData")
+			require.Equal(t, getPopulatePVCName(dataPVC.UID), restores.Items[0].Name)
+			if tc.strategy == dpv1alpha1.PodSelectionStrategyAll {
+				policy := restores.Items[0].Spec.PrepareDataConfig.RequiredPolicyForAllPodSelection
+				require.NotNil(t, policy)
+				require.Equal(t, "mysql-0", policy.SourceOfOneToMany.TargetPodName)
+			}
+
+			result, err := reconciler.Reconcile(context.Background(), reconcile.Request{
+				NamespacedName: client.ObjectKeyFromObject(wrongComponentPVC),
+			})
+			require.NoError(t, err)
+			require.Zero(t, result)
+			require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(wrongComponentPVC), wrongComponentPVC))
+			condition := findPVCConditionByType(wrongComponentPVC, kbappsv1.ConditionTypeRestore)
+			require.NotNil(t, condition)
+			require.Equal(t, corev1.ConditionFalse, condition.Status)
+			require.True(t, apierrors.IsNotFound(cli.Get(context.Background(), types.NamespacedName{
+				Namespace: wrongComponentPVC.Namespace, Name: getPopulatePVCName(wrongComponentPVC.UID),
+			}, &corev1.PersistentVolumeClaim{})))
+
 		})
-		require.NoError(t, err)
-		require.Positive(t, result.RequeueAfter)
-		helper := &corev1.PersistentVolumeClaim{}
-		require.NoError(t, cli.Get(context.Background(), types.NamespacedName{
-			Namespace: pvc.Namespace, Name: getPopulatePVCName(pvc.UID),
-		}, helper))
 	}
-
-	restores := &dpv1alpha1.RestoreList{}
-	require.NoError(t, cli.List(context.Background(), restores))
-	require.Len(t, restores.Items, 1, "only the data volume should run prepareData")
-	require.Equal(t, getPopulatePVCName(dataPVC.UID), restores.Items[0].Name)
-
-	result, err := reconciler.Reconcile(context.Background(), reconcile.Request{
-		NamespacedName: client.ObjectKeyFromObject(wrongComponentPVC),
-	})
-	require.NoError(t, err)
-	require.Zero(t, result)
-	require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(wrongComponentPVC), wrongComponentPVC))
-	condition := findPVCConditionByType(wrongComponentPVC, kbappsv1.ConditionTypeRestore)
-	require.NotNil(t, condition)
-	require.Equal(t, corev1.ConditionFalse, condition.Status)
-	require.True(t, apierrors.IsNotFound(cli.Get(context.Background(), types.NamespacedName{
-		Namespace: wrongComponentPVC.Namespace, Name: getPopulatePVCName(wrongComponentPVC.UID),
-	}, &corev1.PersistentVolumeClaim{})))
 }
 
 func TestReplicaAuxiliaryVolumeRejectsPostReadyOnlyBackup(t *testing.T) {

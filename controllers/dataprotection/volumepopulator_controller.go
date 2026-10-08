@@ -945,7 +945,7 @@ func (r *VolumePopulatorReconciler) validateRestoreAndBuildMGR(reqCtx intctrluti
 	}
 	if decision.sourceTarget != nil {
 		restore.Spec.Backup.SourceTargetName = decision.sourceTarget.Name
-		if decision.mode == pvcRestoreModeRestoreData {
+		if decision.mode == pvcRestoreModeRestoreData || isReplicaRestorePVC(pvc) {
 			restore.Spec.PrepareDataConfig.RequiredPolicyForAllPodSelection, err = requiredPolicyForPVC(decision.sourceTarget, pvc)
 			if err != nil {
 				return nil, err
@@ -1291,9 +1291,18 @@ func requiredPolicyForPVC(target *dpv1alpha1.BackupStatusTarget, pvc *corev1.Per
 	if target == nil || target.PodSelector == nil || target.PodSelector.Strategy != dpv1alpha1.PodSelectionStrategyAll {
 		return nil, nil
 	}
-	sourceTargetPodName, err := resolveSourceTargetPodName(target, pvc)
-	if err != nil {
-		return nil, err
+	var sourceTargetPodName string
+	if isReplicaRestorePVC(pvc) {
+		if len(target.SelectedTargetPods) != 1 {
+			return nil, intctrlutil.NewFatalError("replica restore requires exactly one source pod for an AllPods Backup; restoring from multiple source pods is not supported")
+		}
+		sourceTargetPodName = target.SelectedTargetPods[0]
+	} else {
+		var err error
+		sourceTargetPodName, err = resolveSourceTargetPodName(target, pvc)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return &dpv1alpha1.RequiredPolicyForAllPodSelection{
 		DataRestorePolicy: dpv1alpha1.OneToManyRestorePolicy,

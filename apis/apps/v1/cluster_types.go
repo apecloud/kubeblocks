@@ -908,6 +908,7 @@ type ClusterRestore struct {
 // horizontal scale-out. It uses the same source and restore parameters as a
 // Cluster restore, while the target replicas are taken from the Component's
 // replicas field.
+// AllPods Backups containing multiple source pods are not supported.
 type ClusterReplicaRestore struct {
 	// Specifies the restore source.
 	//

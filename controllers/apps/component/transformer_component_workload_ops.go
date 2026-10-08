@@ -27,12 +27,14 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
@@ -55,9 +57,11 @@ type componentWorkloadOps struct {
 	// runningITS is a snapshot of the InstanceSet that is already running
 	runningITS *workloads.InstanceSet
 	// protoITS is the InstanceSet object that is rebuilt from scratch during each reconcile process
-	protoITS              *workloads.InstanceSet
-	desiredCompPodNameSet sets.Set[string]
-	runningItsPodNameSet  sets.Set[string]
+	protoITS               *workloads.InstanceSet
+	desiredCompPodNameSet  sets.Set[string]
+	runningItsPodNameSet   sets.Set[string]
+	restoreReplicas        sets.Set[string]
+	restorePendingReplicas sets.Set[string]
 }
 
 func newComponentWorkloadOps(transCtx *componentTransformContext,
@@ -75,16 +79,38 @@ func newComponentWorkloadOps(transCtx *componentTransformContext,
 	if err != nil {
 		return nil, err
 	}
+	restoreReplicas := sets.New[string]()
+	restorePendingReplicas := sets.New[string]()
+	if _, hasDataActions := hasMemberJoinNDataActionDefined(synthesizedComp.LifecycleActions.ComponentLifecycleActions); hasDataActions {
+		restoreReplicas, restorePendingReplicas, err = component.GetReplicaRestoreReplicas(transCtx.Context, cli, protoITS, protoITSPodNames)
+		if err != nil {
+			return nil, err
+		}
+		if err = component.UpdateReplicasStatusFunc(protoITS, func(status *component.ReplicasStatus) error {
+			for i := range status.Status {
+				if restoreReplicas.Has(status.Status[i].Name) {
+					status.Status[i].DataLoaded = nil
+				} else if status.Status[i].DataLoaded == nil {
+					status.Status[i].DataLoaded = ptr.To(false)
+				}
+			}
+			return nil
+		}); err != nil {
+			return nil, err
+		}
+	}
 	return &componentWorkloadOps{
-		transCtx:              transCtx,
-		cli:                   cli,
-		component:             comp,
-		synthesizeComp:        synthesizedComp,
-		runningITS:            runningITS,
-		protoITS:              protoITS,
-		dag:                   dag,
-		desiredCompPodNameSet: sets.New(protoITSPodNames...),
-		runningItsPodNameSet:  sets.New(runningITSPodNames...),
+		transCtx:               transCtx,
+		cli:                    cli,
+		component:              comp,
+		synthesizeComp:         synthesizedComp,
+		runningITS:             runningITS,
+		protoITS:               protoITS,
+		dag:                    dag,
+		desiredCompPodNameSet:  sets.New(protoITSPodNames...),
+		runningItsPodNameSet:   sets.New(runningITSPodNames...),
+		restoreReplicas:        restoreReplicas,
+		restorePendingReplicas: restorePendingReplicas,
 	}, nil
 }
 
@@ -247,7 +273,11 @@ func (r *componentWorkloadOps) scaleOut() error {
 	// replicas to be created
 	newReplicas := r.desiredCompPodNameSet.Difference(r.runningItsPodNameSet).UnsortedList()
 	hasMemberJoinDefined, hasDataActionDefined := hasMemberJoinNDataActionDefined(r.synthesizeComp.LifecycleActions.ComponentLifecycleActions)
-	return component.NewReplicasStatus(r.protoITS, newReplicas, hasMemberJoinDefined, hasDataActionDefined)
+	ordinaryReplicas := slices.DeleteFunc(slices.Clone(newReplicas), r.restoreReplicas.Has)
+	if err := component.NewReplicasStatus(r.protoITS, ordinaryReplicas, hasMemberJoinDefined, hasDataActionDefined); err != nil {
+		return err
+	}
+	return component.NewReplicasStatus(r.protoITS, r.restoreReplicas.Intersection(sets.New(newReplicas...)).UnsortedList(), hasMemberJoinDefined, false)
 }
 
 func (r *componentWorkloadOps) buildDataReplicationTask() error {
@@ -255,9 +285,13 @@ func (r *componentWorkloadOps) buildDataReplicationTask() error {
 	if !hasDataActionDefined {
 		return nil
 	}
+	if err := r.excludeRestoreReplicasFromDataTasks(); err != nil {
+		return err
+	}
 
 	// replicas to be provisioned
 	newReplicas := r.desiredCompPodNameSet.Difference(r.runningItsPodNameSet).UnsortedList()
+	newReplicas = slices.DeleteFunc(newReplicas, r.restoreReplicas.Has)
 	// replicas in provisioning that the data has not been loaded
 	provisioningReplicas, err := component.GetReplicasStatusFunc(r.protoITS, func(s component.ReplicaStatus) bool {
 		return s.DataLoaded != nil && !*s.DataLoaded
@@ -265,6 +299,7 @@ func (r *componentWorkloadOps) buildDataReplicationTask() error {
 	if err != nil {
 		return err
 	}
+	provisioningReplicas = slices.DeleteFunc(provisioningReplicas, r.restoreReplicas.Has)
 
 	if len(newReplicas) == 0 && len(provisioningReplicas) == 0 {
 		return nil
@@ -291,6 +326,29 @@ func (r *componentWorkloadOps) buildDataReplicationTask() error {
 	return createOrUpdateEnvConfigMap(transCtx, r.dag, nil, parameters)
 }
 
+func (r *componentWorkloadOps) excludeRestoreReplicasFromDataTasks() error {
+	if r.restoreReplicas.Len() == 0 {
+		return nil
+	}
+	env := &corev1.ConfigMap{}
+	env.Namespace = r.synthesizeComp.Namespace
+	env.Name = constant.GenerateClusterComponentEnvPattern(r.synthesizeComp.ClusterName, r.synthesizeComp.Name)
+	graphCli := r.transCtx.Client.(model.GraphClient)
+	if vertex := graphCli.FindMatchedVertex(r.dag, env); vertex != nil {
+		env = vertex.(*model.ObjectVertex).Obj.(*corev1.ConfigMap)
+	} else if err := r.cli.Get(r.transCtx.Context, client.ObjectKeyFromObject(env), env); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+	parameters, err := component.ExcludeReplicaDataTasks(env.Data, r.restoreReplicas)
+	if err != nil || parameters == nil {
+		return err
+	}
+	return createOrUpdateEnvConfigMap(r.transCtx, r.dag, nil, parameters)
+}
+
 func (r *componentWorkloadOps) sourceReplica(dataDump *appsv1.Action, provisioningReplicas []string) (*corev1.Pod, error) {
 	pods, err := component.ListOwnedInstances(r.transCtx.Context, r.cli,
 		r.component, r.runningITS, r.protoITS)
@@ -303,6 +361,9 @@ func (r *componentWorkloadOps) sourceReplica(dataDump *appsv1.Action, provisioni
 			return slices.Contains(provisioningReplicas, pod.Name)
 		})
 	}
+	pods = slices.DeleteFunc(pods, func(pod *corev1.Pod) bool {
+		return r.restorePendingReplicas.Has(pod.Name)
+	})
 	if len(pods) > 0 {
 		if len(dataDump.TargetPodSelector) == 0 && (dataDump.Exec == nil || len(dataDump.Exec.TargetPodSelector) == 0) {
 			dataDump.TargetPodSelector = appsv1.AnyReplica

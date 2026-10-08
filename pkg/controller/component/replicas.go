@@ -30,11 +30,14 @@ import (
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/replicarestore"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/kbagent"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
@@ -207,6 +210,75 @@ func GetReplicasStatusFunc(its *workloads.InstanceSet, f func(ReplicaStatus) boo
 		}
 	}
 	return replicas, nil
+}
+
+// GetReplicaRestoreReplicas identifies replicas whose existing or missing PVCs
+// are initialized from Backup rather than by the Component's dataLoad action,
+// and those still waiting for their PVCs to finish restoring.
+func GetReplicaRestoreReplicas(ctx context.Context, cli client.Reader, its *workloads.InstanceSet, replicas []string) (restored, pending sets.Set[string], err error) {
+	pvcs := &corev1.PersistentVolumeClaimList{}
+	if err := cli.List(ctx, pvcs, client.InNamespace(its.Namespace), client.MatchingLabels{
+		constant.AppInstanceLabelKey:    its.Labels[constant.AppInstanceLabelKey],
+		constant.KBAppComponentLabelKey: its.Labels[constant.KBAppComponentLabelKey],
+	}); err != nil {
+		return nil, nil, err
+	}
+	names := sets.New(replicas...)
+	volumes := sets.New[string]()
+	for _, vct := range its.Spec.VolumeClaimTemplates {
+		volumes.Insert(vct.Name)
+	}
+	restored = sets.New[string]()
+	pending = sets.New[string]()
+	existing := map[string]sets.Set[string]{}
+	for i := range pvcs.Items {
+		pvc := &pvcs.Items[i]
+		name := pvc.Labels[constant.KBAppPodNameLabelKey]
+		volume := pvc.Labels[constant.VolumeClaimTemplateNameLabelKey]
+		if !names.Has(name) || !volumes.Has(volume) {
+			continue
+		}
+		if existing[name] == nil {
+			existing[name] = sets.New[string]()
+		}
+		existing[name].Insert(volume)
+		if replicarestore.IsReplicaPVC(pvc) {
+			restored.Insert(name)
+			completed := slices.ContainsFunc(pvc.Status.Conditions, func(condition corev1.PersistentVolumeClaimCondition) bool {
+				return condition.Type == corev1.PersistentVolumeClaimConditionType(appsv1.ConditionTypeRestore) && condition.Status == corev1.ConditionTrue
+			})
+			if !completed {
+				pending.Insert(name)
+			}
+		}
+	}
+	if its.Spec.ReplicaRestore != nil {
+		for name := range names {
+			if existing[name].Len() < volumes.Len() {
+				restored.Insert(name)
+				pending.Insert(name)
+			}
+		}
+	}
+	return restored, pending, nil
+}
+
+// ExcludeReplicaDataTasks removes Backup-initialized replicas from data-copy
+// tasks already published before the owner changed its PVC creation source.
+func ExcludeReplicaDataTasks(envVars map[string]string, replicas sets.Set[string]) (map[string]string, error) {
+	return updateKBAgentTaskEnv(envVars, func(task proto.Task) *proto.Task {
+		if task.Task != newReplicaTask || task.NewReplica == nil {
+			return &task
+		}
+		names := strings.Split(task.NewReplica.Replicas, ",")
+		names = slices.DeleteFunc(names, replicas.Has)
+		if len(names) == 0 {
+			return nil
+		}
+		task.Replicas = strings.Join(names, ",")
+		task.NewReplica.Replicas = task.Replicas
+		return &task
+	})
 }
 
 func NewReplicaTask(compName, uid string, source *corev1.Pod, replicas []string) (map[string]string, error) {

@@ -69,6 +69,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	pod := obj.(*corev1.Pod)
 	if isTerminating(pod) {
 		r.setPodUnavailableStatus(inst, workloads.InstanceCurrentStateTerminating, pod.Name, getPodRevision(pod))
+		r.setFailureCondition(inst, replicaRestore.failed)
 		return kubebuilderx.Continue, nil
 	}
 

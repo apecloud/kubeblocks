@@ -20,16 +20,101 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset2
 
 import (
+	"fmt"
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	instctrl "github.com/apecloud/kubeblocks/pkg/controller/instance"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/revisionmap"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
+
+func TestReplicaRestoreSourceConvergesWithoutRollingAdmission(t *testing.T) {
+	for _, replicas := range []int32{1, 2} {
+		for _, source := range []string{"backup-b", ""} {
+			t.Run(fmt.Sprintf("replicas=%d/source=%s", replicas, source), func(t *testing.T) {
+				its := revisionTestInstanceSet()
+				its.Annotations = map[string]string{constant.KBAppClusterUIDKey: "cluster-uid"}
+				its.Labels = map[string]string{constant.KBAppComponentLabelKey: "mysql"}
+				its.Spec.Template.Spec.Containers = []corev1.Container{{Name: "db", Image: "mysql:old"}}
+				its.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{{ObjectMeta: metav1.ObjectMeta{Name: "data"}}}
+				its.Spec.ReplicaRestore = &kbappsv1.ClusterReplicaRestore{Source: kbappsv1.ClusterRestoreSource{
+					APIGroup: "dataprotection.kubeblocks.io", Kind: "Backup", Name: "backup-a",
+				}}
+				tree := kubebuilderx.NewObjectTree()
+				tree.SetRoot(its)
+				desired, names, err := buildDesiredInstancesByName(tree, its)
+				if err != nil {
+					t.Fatal(err)
+				}
+				inst := desired[names[0]].DeepCopy()
+				inst.Status.CurrentState = workloads.InstanceCurrentStateAbsent
+				oldRevision := getInstanceRevision(inst)
+				delete(inst.Annotations, constant.KBAppClusterUIDKey)
+				its.Spec.Replicas = &replicas
+				its.Spec.Template.Spec.Containers[0].Image = "mysql:new"
+				its.Spec.ReplicaRestore = nil
+				if source != "" {
+					its.Spec.ReplicaRestore = &kbappsv1.ClusterReplicaRestore{Source: kbappsv1.ClusterRestoreSource{
+						APIGroup: "dataprotection.kubeblocks.io", Kind: "Backup", Name: source,
+					}}
+				}
+				for i := 0; i < 6; i++ {
+					tree = kubebuilderx.NewObjectTree()
+					tree.SetRoot(its.DeepCopy())
+					if err := tree.Add(inst.DeepCopy()); err != nil {
+						t.Fatal(err)
+					}
+					for _, reconciler := range []kubebuilderx.Reconciler{NewAlignmentReconciler(), NewUpdateReconciler()} {
+						if _, err := reconciler.Reconcile(tree); err != nil {
+							t.Fatal(err)
+						}
+					}
+					obj, err := tree.Get(inst)
+					if err != nil {
+						t.Fatal(err)
+					}
+					inst = obj.(*workloads.Instance)
+				}
+				if !equality.Semantic.DeepEqual(inst.Spec.ReplicaRestore, its.Spec.ReplicaRestore) {
+					t.Fatalf("unavailable Instance retained a stale restore source: %#v", inst.Spec.ReplicaRestore)
+				}
+				if inst.Annotations[constant.KBAppClusterUIDKey] != "cluster-uid" {
+					t.Fatal("PVC creation lost the owner Cluster UID")
+				}
+				if inst.Spec.Template.Spec.Containers[0].Image != "mysql:old" || getInstanceRevision(inst) != oldRevision {
+					t.Fatal("restore source synchronization bypassed rolling admission for Pod updates")
+				}
+				instanceTree := kubebuilderx.NewObjectTree()
+				instanceTree.SetRoot(inst)
+				if _, err := instctrl.NewAlignmentReconciler().Reconcile(instanceTree); err != nil {
+					t.Fatal(err)
+				}
+				pvcs := instanceTree.List(&corev1.PersistentVolumeClaim{})
+				if len(pvcs) != 1 {
+					t.Fatalf("created %d PVCs, want 1", len(pvcs))
+				}
+				pvc := pvcs[0].(*corev1.PersistentVolumeClaim)
+				if source == "" {
+					if pvc.Spec.DataSourceRef != nil || pvc.Annotations[constant.RestorePurposeAnnotationKey] != "" {
+						t.Fatal("PVC inherited a removed Backup source")
+					}
+				} else if pvc.Spec.DataSourceRef == nil || pvc.Spec.DataSourceRef.Name != source ||
+					pvc.Annotations[constant.RestoreSourceNameAnnotationKey] != source {
+					t.Fatalf("PVC did not use current Backup %q: %#v", source, pvc)
+				}
+			})
+		}
+	}
+}
 
 func TestParseReplicasNMaxUnavailable(t *testing.T) {
 	tests := []struct {

@@ -22,10 +22,12 @@ package instanceset2
 import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/ptr"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -80,6 +82,24 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 	for _, object := range oldInstanceList {
 		oldNameSet.Insert(object.GetName())
 		inst, _ := object.(*workloads.Instance)
+		// PVC creation inputs converge independently of Pod rolling-update admission.
+		if newNameSet.Has(inst.Name) && inst.DeletionTimestamp.IsZero() {
+			clusterUID := its.Annotations[constant.KBAppClusterUIDKey]
+			if !equality.Semantic.DeepEqual(inst.Spec.ReplicaRestore, its.Spec.ReplicaRestore) ||
+				(clusterUID != "" && inst.Annotations[constant.KBAppClusterUIDKey] != clusterUID) {
+				inst = inst.DeepCopy()
+				inst.Spec.ReplicaRestore = its.Spec.ReplicaRestore.DeepCopy()
+				if clusterUID != "" {
+					if inst.Annotations == nil {
+						inst.Annotations = make(map[string]string)
+					}
+					inst.Annotations[constant.KBAppClusterUIDKey] = clusterUID
+				}
+				if err := tree.Update(inst); err != nil {
+					return kubebuilderx.Continue, err
+				}
+			}
+		}
 		oldInstanceMap[object.GetName()] = inst
 	}
 	createNameSet := newNameSet.Difference(oldNameSet)

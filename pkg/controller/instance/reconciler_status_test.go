@@ -256,6 +256,16 @@ func TestStatusReconcilerProjectsReplicaRestorePVCIntoInstanceHealth(t *testing.
 	if err := tree.Add(pod); err != nil {
 		t.Fatal(err)
 	}
+	pod.DeletionTimestamp = &metav1.Time{Time: metav1.Now().Time}
+	for i := 0; i < 3; i++ {
+		if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+			t.Fatal(err)
+		}
+		if inst.Status.CurrentState != workloads.InstanceCurrentStateTerminating ||
+			!intctrlutil.IsInstanceFailure(inst) || inst.Status.Ready || inst.Status.Available {
+			t.Fatalf("terminating Pod hid the PVC restore failure: %#v", inst.Status)
+		}
+	}
 	pvc.Status.Conditions[0].Status = corev1.ConditionUnknown
 	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
 		t.Fatal(err)
@@ -264,6 +274,7 @@ func TestStatusReconcilerProjectsReplicaRestorePVCIntoInstanceHealth(t *testing.
 		t.Fatalf("pending replica restore did not block ordinary readiness: %#v", inst.Status)
 	}
 
+	pod.DeletionTimestamp = nil
 	pvc.Status.Conditions[0].Status = corev1.ConditionTrue
 	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
 		t.Fatal(err)

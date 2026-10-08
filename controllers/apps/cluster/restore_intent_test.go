@@ -169,7 +169,7 @@ func TestApplyClusterRestoreIntentCleansTemplatesAfterRestoreCompleted(t *testin
 		}},
 	}
 
-	require.NoError(t, applyClusterRestoreIntent(cluster, []*appsv1.ClusterComponentSpec{component}, nil))
+	require.NoError(t, applyClusterRestoreIntent(context.Background(), nil, cluster, []*appsv1.ClusterComponentSpec{component}, nil))
 
 	vct := component.VolumeClaimTemplates[0]
 	require.Nil(t, vct.Spec.DataSourceRef)
@@ -207,7 +207,7 @@ func TestApplyClusterRestoreIntentKeepsNonRestoreDataSourceAfterRestoreCompleted
 		}},
 	}
 
-	require.NoError(t, applyClusterRestoreIntent(cluster, []*appsv1.ClusterComponentSpec{component}, nil))
+	require.NoError(t, applyClusterRestoreIntent(context.Background(), nil, cluster, []*appsv1.ClusterComponentSpec{component}, nil))
 
 	vct := component.VolumeClaimTemplates[0]
 	require.NotNil(t, vct.Spec.DataSourceRef)
@@ -242,7 +242,7 @@ func TestApplyClusterRestoreIntentHandlesInstanceTemplateVCTs(t *testing.T) {
 		}},
 	}
 
-	require.NoError(t, applyClusterRestoreIntent(cluster, []*appsv1.ClusterComponentSpec{component}, nil))
+	require.NoError(t, applyClusterRestoreIntent(context.Background(), nil, cluster, []*appsv1.ClusterComponentSpec{component}, nil))
 
 	require.Equal(t, testRestoreSourceKind, component.VolumeClaimTemplates[0].Spec.DataSourceRef.Kind)
 	require.Equal(t, testRestoreSourceKind, component.Instances[0].VolumeClaimTemplates[0].Spec.DataSourceRef.Kind)
@@ -254,7 +254,7 @@ func TestApplyClusterRestoreIntentHandlesInstanceTemplateVCTs(t *testing.T) {
 		Status: metav1.ConditionTrue,
 	}}
 
-	require.NoError(t, applyClusterRestoreIntent(cluster, []*appsv1.ClusterComponentSpec{component}, nil))
+	require.NoError(t, applyClusterRestoreIntent(context.Background(), nil, cluster, []*appsv1.ClusterComponentSpec{component}, nil))
 
 	require.Nil(t, component.VolumeClaimTemplates[0].Spec.DataSourceRef)
 	require.Nil(t, component.Instances[0].VolumeClaimTemplates[0].Spec.DataSourceRef)
@@ -284,15 +284,15 @@ func TestValidateReplicaRestoreIntentUsesExistingComponentState(t *testing.T) {
 		ReplicaRestore:       &appsv1.ClusterReplicaRestore{Source: source},
 	}
 	reader := fake.NewClientBuilder().WithScheme(scheme).WithObjects(component).Build()
-	require.NoError(t, applyClusterRestoreIntentWithReader(context.Background(), reader, cluster, []*appsv1.ClusterComponentSpec{componentSpec}, nil))
+	require.NoError(t, applyClusterRestoreIntent(context.Background(), reader, cluster, []*appsv1.ClusterComponentSpec{componentSpec}, nil))
 
 	component.Spec.ReplicaRestore = componentSpec.ReplicaRestore.DeepCopy()
 	component.Spec.Replicas = componentSpec.Replicas
 	require.NoError(t, reader.Update(context.Background(), component))
-	mutated := componentSpec.DeepCopy()
-	mutated.ReplicaRestore.Source.Name = "other-backup"
-	err := applyClusterRestoreIntentWithReader(context.Background(), reader, cluster, []*appsv1.ClusterComponentSpec{mutated}, nil)
-	require.NoError(t, err)
+	for _, replicas := range []int32{4, 3, 0} {
+		componentSpec.Replicas = replicas
+		require.NoError(t, applyClusterRestoreIntent(context.Background(), reader, cluster, []*appsv1.ClusterComponentSpec{componentSpec}, nil))
+	}
 }
 
 func TestReplicaRestoreWaitsForInitialClusterRestore(t *testing.T) {
@@ -318,7 +318,7 @@ func TestReplicaRestoreWaitsForInitialClusterRestore(t *testing.T) {
 	reader := fake.NewClientBuilder().WithScheme(scheme).WithObjects(component).Build()
 	for _, status := range []metav1.ConditionStatus{metav1.ConditionUnknown, metav1.ConditionFalse, metav1.ConditionTrue} {
 		cluster.Status.Conditions = []metav1.Condition{{Type: appsv1.ConditionTypeRestore, Status: status}}
-		err := applyClusterRestoreIntentWithReader(context.Background(), reader, cluster, []*appsv1.ClusterComponentSpec{spec.DeepCopy()}, nil)
+		err := applyClusterRestoreIntent(context.Background(), reader, cluster, []*appsv1.ClusterComponentSpec{spec.DeepCopy()}, nil)
 		if status == metav1.ConditionTrue {
 			require.NoError(t, err)
 		} else {
@@ -345,7 +345,7 @@ func TestValidateReplicaRestoreIntentRejectsUnsupportedComponent(t *testing.T) {
 		}},
 	}
 	reader := fake.NewClientBuilder().WithScheme(scheme).WithObjects(component).Build()
-	err := applyClusterRestoreIntentWithReader(context.Background(), reader, cluster, []*appsv1.ClusterComponentSpec{spec}, nil)
+	err := applyClusterRestoreIntent(context.Background(), reader, cluster, []*appsv1.ClusterComponentSpec{spec}, nil)
 	require.ErrorContains(t, err, "default contiguous instances")
 }
 

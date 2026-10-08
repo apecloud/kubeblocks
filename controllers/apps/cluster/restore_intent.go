@@ -36,20 +36,14 @@ import (
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 )
 
-func applyClusterRestoreIntent(cluster *appsv1.Cluster, components []*appsv1.ClusterComponentSpec, shardings []*appsv1.ClusterSharding) error {
-	return applyClusterRestoreIntentWithReader(context.Background(), nil, cluster, components, shardings)
-}
-
-func applyClusterRestoreIntentWithReader(ctx context.Context, reader client.Reader, cluster *appsv1.Cluster, components []*appsv1.ClusterComponentSpec, shardings []*appsv1.ClusterSharding) error {
+func applyClusterRestoreIntent(ctx context.Context, reader client.Reader, cluster *appsv1.Cluster, components []*appsv1.ClusterComponentSpec, shardings []*appsv1.ClusterSharding) error {
 	completed := isClusterRestoreCompleted(cluster)
 	for _, comp := range components {
 		if cluster.Spec.Restore != nil {
 			applyRestoreIntentToComponent(cluster, comp.Name, comp.VolumeClaimTemplates, comp.Instances, completed)
 		}
-		if reader != nil {
-			if err := validateReplicaRestoreIntent(ctx, reader, cluster, comp); err != nil {
-				return err
-			}
+		if err := validateReplicaRestoreIntent(ctx, reader, cluster, comp); err != nil {
+			return err
 		}
 	}
 	for _, sharding := range shardings {
@@ -79,14 +73,8 @@ func validateReplicaRestoreIntent(ctx context.Context, reader client.Reader, clu
 	if len(comp.Instances) != 0 || len(comp.Ordinals.Ranges) != 0 || len(comp.Ordinals.Discrete) != 0 || comp.FlatInstanceOrdinal || len(comp.OfflineInstances) != 0 {
 		return fmt.Errorf("component %q replicaRestore only supports default contiguous instances", comp.Name)
 	}
-	if comp.Replicas <= 0 {
-		return fmt.Errorf("component %q replicaRestore requires replicas greater than zero", comp.Name)
-	}
 	if restore.Source.APIGroup != dptypes.DataprotectionAPIGroup || restore.Source.Kind != dptypes.BackupKind {
 		return fmt.Errorf("component %q replicaRestore source must be a DataProtection Backup", comp.Name)
-	}
-	if reader == nil {
-		return nil
 	}
 	component := &appsv1.Component{}
 	key := types.NamespacedName{Namespace: cluster.Namespace, Name: constant.GenerateClusterComponentName(cluster.Name, comp.Name)}
@@ -104,9 +92,6 @@ func validateReplicaRestoreIntent(ctx context.Context, reader client.Reader, clu
 	}
 	if len(component.Spec.VolumeClaimTemplates) == 0 || len(comp.VolumeClaimTemplates) == 0 {
 		return fmt.Errorf("component %q replicaRestore requires at least one volume claim template", comp.Name)
-	}
-	if comp.Replicas < component.Spec.Replicas {
-		return fmt.Errorf("component %q replicaRestore does not support scale-in; remove replicaRestore before reducing replicas", comp.Name)
 	}
 	return nil
 }

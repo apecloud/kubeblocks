@@ -2463,7 +2463,7 @@ spec:
                 type: string
               replicaRestore:
                 description: |-
-                  ReplicaRestore is copied from the owning InstanceSet and is used only
+                  ReplicaRestore is copied from the owning InstanceSet at creation and is used only
                   while building PVCs for this instance.
                 properties:
                   env:

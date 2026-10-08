@@ -456,7 +456,9 @@ func buildInstancePVCByTemplate(name string, template *instancetemplate.Instance
 		if template.Name != "" {
 			pvc.Labels[constant.KBAppInstanceTemplateLabelKey] = template.Name
 		}
-		replicarestore.ApplyToPVC(pvc, parent.Spec.ReplicaRestore, parent.Labels[constant.KBAppComponentLabelKey], parent.Annotations[constant.KBAppClusterUIDKey])
+		if err := replicarestore.ApplyToPVC(pvc, parent.Spec.ReplicaRestore, parent.Labels[constant.KBAppComponentLabelKey], parent.Annotations[constant.KBAppClusterUIDKey]); err != nil {
+			return nil, err
+		}
 		pvcs = append(pvcs, pvc)
 	}
 	for _, pvc := range pvcs {

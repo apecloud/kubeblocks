@@ -27,14 +27,12 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
@@ -84,16 +82,6 @@ func newComponentWorkloadOps(transCtx *componentTransformContext,
 	if _, hasDataActions := hasMemberJoinNDataActionDefined(synthesizedComp.LifecycleActions.ComponentLifecycleActions); hasDataActions {
 		restoreReplicas, restorePendingReplicas, err = component.GetReplicaRestoreReplicas(transCtx.Context, cli, protoITS, protoITSPodNames)
 		if err != nil {
-			return nil, err
-		}
-		if err = component.UpdateReplicasStatusFunc(protoITS, func(status *component.ReplicasStatus) error {
-			for i := range status.Status {
-				if restoreReplicas.Has(status.Status[i].Name) {
-					status.Status[i].DataLoaded = nil
-				}
-			}
-			return nil
-		}); err != nil {
 			return nil, err
 		}
 	}
@@ -271,7 +259,13 @@ func (r *componentWorkloadOps) scaleOut() error {
 	// replicas to be created
 	newReplicas := r.desiredCompPodNameSet.Difference(r.runningItsPodNameSet).UnsortedList()
 	hasMemberJoinDefined, hasDataActionDefined := hasMemberJoinNDataActionDefined(r.synthesizeComp.LifecycleActions.ComponentLifecycleActions)
-	// Keep data-load state until a PVC records Backup initialization.
+	restoreReplicas := slices.DeleteFunc(slices.Clone(newReplicas), func(name string) bool {
+		return !r.restoreReplicas.Has(name)
+	})
+	if err := component.NewReplicasStatus(r.protoITS, restoreReplicas, hasMemberJoinDefined, false); err != nil {
+		return err
+	}
+	newReplicas = slices.DeleteFunc(newReplicas, r.restoreReplicas.Has)
 	return component.NewReplicasStatus(r.protoITS, newReplicas, hasMemberJoinDefined, hasDataActionDefined)
 }
 
@@ -279,9 +273,6 @@ func (r *componentWorkloadOps) buildDataReplicationTask() error {
 	_, hasDataActionDefined := hasMemberJoinNDataActionDefined(r.synthesizeComp.LifecycleActions.ComponentLifecycleActions)
 	if !hasDataActionDefined {
 		return nil
-	}
-	if err := r.excludeRestoreReplicasFromDataTasks(); err != nil {
-		return err
 	}
 
 	// replicas to be provisioned
@@ -319,29 +310,6 @@ func (r *componentWorkloadOps) buildDataReplicationTask() error {
 		Component:           r.component,
 	}
 	return createOrUpdateEnvConfigMap(transCtx, r.dag, nil, parameters)
-}
-
-func (r *componentWorkloadOps) excludeRestoreReplicasFromDataTasks() error {
-	if r.restoreReplicas.Len() == 0 {
-		return nil
-	}
-	env := &corev1.ConfigMap{}
-	env.Namespace = r.synthesizeComp.Namespace
-	env.Name = constant.GenerateClusterComponentEnvPattern(r.synthesizeComp.ClusterName, r.synthesizeComp.Name)
-	graphCli := r.transCtx.Client.(model.GraphClient)
-	if vertex := graphCli.FindMatchedVertex(r.dag, env); vertex != nil {
-		env = vertex.(*model.ObjectVertex).Obj.(*corev1.ConfigMap)
-	} else if err := r.cli.Get(r.transCtx.Context, client.ObjectKeyFromObject(env), env); err != nil {
-		if apierrors.IsNotFound(err) {
-			return nil
-		}
-		return err
-	}
-	parameters, err := component.ExcludeReplicaDataTasks(env.Data, r.restoreReplicas)
-	if err != nil || parameters == nil {
-		return err
-	}
-	return createOrUpdateEnvConfigMap(r.transCtx, r.dag, nil, parameters)
 }
 
 func (r *componentWorkloadOps) sourceReplica(dataDump *appsv1.Action, provisioningReplicas []string) (*corev1.Pod, error) {

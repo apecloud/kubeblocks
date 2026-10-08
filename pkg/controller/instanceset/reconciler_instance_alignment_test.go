@@ -29,6 +29,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -105,6 +106,37 @@ var _ = Describe("replicas alignment reconciler test", func() {
 				Expect(pvc.Spec.DataSourceRef).To(BeNil())
 				Expect(pvc.Annotations).NotTo(HaveKey(constant.RestorePurposeAnnotationKey))
 			}
+		}
+		// Removing replicas uses the ordinary deletion path even while Backup
+		// initialization has not completed.
+		tree.EventRecorder = record.NewFakeRecorder(10)
+		its.Spec.PodManagementPolicy = appsv1.OrderedReadyPodManagement
+		its.Spec.ReplicaRestore = &kbappsv1.ClusterReplicaRestore{Source: kbappsv1.ClusterRestoreSource{
+			APIGroup: "dataprotection.kubeblocks.io", Kind: "Backup", Name: "backup-b",
+		}}
+		replicas = 3
+		for i := 0; i < 3; i++ {
+			_, err = NewReplicasAlignmentReconciler().Reconcile(tree)
+			Expect(err).NotTo(HaveOccurred())
+		}
+		Expect(tree.List(&corev1.Pod{})).To(HaveLen(3))
+	})
+
+	It("rejects Backup initialization combined with a volume claim template source", func() {
+		group := "snapshot.storage.k8s.io"
+		for _, spec := range []corev1.PersistentVolumeClaimSpec{
+			{DataSource: &corev1.TypedLocalObjectReference{APIGroup: &group, Kind: "VolumeSnapshot", Name: "snapshot"}},
+			{DataSourceRef: &corev1.TypedObjectReference{APIGroup: &group, Kind: "VolumeSnapshot", Name: "snapshot"}},
+		} {
+			its.Spec.VolumeClaimTemplates[0].Spec = spec
+			its.Spec.ReplicaRestore = &kbappsv1.ClusterReplicaRestore{Source: kbappsv1.ClusterRestoreSource{
+				APIGroup: "dataprotection.kubeblocks.io", Kind: "Backup", Name: "backup",
+			}}
+			tree := kubebuilderx.NewObjectTree()
+			tree.SetRoot(its)
+			_, err := NewReplicasAlignmentReconciler().Reconcile(tree)
+			Expect(err).To(MatchError(ContainSubstring("cannot be combined")))
+			Expect(tree.List(&corev1.PersistentVolumeClaim{})).To(BeEmpty())
 		}
 	})
 

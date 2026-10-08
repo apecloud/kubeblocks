@@ -210,7 +210,9 @@ func buildInstancePVCs(inst *workloads.Instance) ([]*corev1.PersistentVolumeClai
 			AddAnnotationsInMap(claimTemplate.Annotations).
 			SetSpec(*claimTemplate.Spec.DeepCopy()).
 			GetObject()
-		replicarestore.ApplyToPVC(pvc, inst.Spec.ReplicaRestore, inst.Labels[constant.KBAppComponentLabelKey], inst.Annotations[constant.KBAppClusterUIDKey])
+		if err := replicarestore.ApplyToPVC(pvc, inst.Spec.ReplicaRestore, inst.Labels[constant.KBAppComponentLabelKey], inst.Annotations[constant.KBAppClusterUIDKey]); err != nil {
+			return nil, err
+		}
 		if inst.Spec.InstanceTemplateName != "" {
 			pvc.Labels[constant.KBAppInstanceTemplateLabelKey] = inst.Spec.InstanceTemplateName
 		}

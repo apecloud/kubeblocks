@@ -3262,14 +3262,17 @@ ClusterReplicaRestore
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the source used when creating missing replica PVCs during scale-out.
+<p>Specifies the Backup source for replicas added during scale-out.
 Only existing, non-sharding Components with default contiguous ordinals
 are supported. Instance templates and offline instances are not supported.
 Any initial Cluster restore must have completed before using this field.
-Existing PVCs keep their source and data. Changes to this field select the
-source for PVCs created afterward. Removing it restores ordinary PVC creation
-and does not delete existing restore resources. Cross-namespace restores
-require matching owner restore intent until the PVC restore is terminal.</p>
+Each replica&rsquo;s initialization method is fixed when it is added. Changing
+the method or restore input of a replica being initialized is unsupported.
+Replicas may be removed during initialization using ordinary scale-in.
+Volume claim template dataSource and dataSourceRef cannot be combined with
+replicaRestore. Existing PVC sources and restore resources are preserved.
+Cross-namespace restores require matching owner restore intent until the
+PVC restore is terminal.</p>
 </td>
 </tr>
 <tr>
@@ -18755,7 +18758,7 @@ ClusterReplicaRestore
 </td>
 <td>
 <em>(Optional)</em>
-<p>ReplicaRestore is copied from the owning InstanceSet and is used only
+<p>ReplicaRestore is copied from the owning InstanceSet at creation and is used only
 while building PVCs for this instance.</p>
 </td>
 </tr>
@@ -20479,7 +20482,7 @@ ClusterReplicaRestore
 </td>
 <td>
 <em>(Optional)</em>
-<p>ReplicaRestore is copied from the owning InstanceSet and is used only
+<p>ReplicaRestore is copied from the owning InstanceSet at creation and is used only
 while building PVCs for this instance.</p>
 </td>
 </tr>

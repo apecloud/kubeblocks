@@ -37,7 +37,7 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-func TestReplicaRestoreSourceConvergesWithoutRollingAdmission(t *testing.T) {
+func TestExistingInstanceRetainsReplicaRestoreInput(t *testing.T) {
 	for _, replicas := range []int32{1, 2} {
 		for _, source := range []string{"backup-b", ""} {
 			t.Run(fmt.Sprintf("replicas=%d/source=%s", replicas, source), func(t *testing.T) {
@@ -57,8 +57,8 @@ func TestReplicaRestoreSourceConvergesWithoutRollingAdmission(t *testing.T) {
 				}
 				inst := desired[names[0]].DeepCopy()
 				inst.Status.CurrentState = workloads.InstanceCurrentStateAbsent
+				initialRestore := inst.Spec.ReplicaRestore.DeepCopy()
 				oldRevision := getInstanceRevision(inst)
-				delete(inst.Annotations, constant.KBAppClusterUIDKey)
 				its.Spec.Replicas = &replicas
 				its.Spec.Template.Spec.Containers[0].Image = "mysql:new"
 				its.Spec.ReplicaRestore = nil
@@ -84,14 +84,14 @@ func TestReplicaRestoreSourceConvergesWithoutRollingAdmission(t *testing.T) {
 					}
 					inst = obj.(*workloads.Instance)
 				}
-				if !equality.Semantic.DeepEqual(inst.Spec.ReplicaRestore, its.Spec.ReplicaRestore) {
-					t.Fatalf("unavailable Instance retained a stale restore source: %#v", inst.Spec.ReplicaRestore)
+				if !equality.Semantic.DeepEqual(inst.Spec.ReplicaRestore, initialRestore) {
+					t.Fatalf("existing Instance changed its initialization input: %#v", inst.Spec.ReplicaRestore)
 				}
 				if inst.Annotations[constant.KBAppClusterUIDKey] != "cluster-uid" {
 					t.Fatal("PVC creation lost the owner Cluster UID")
 				}
 				if inst.Spec.Template.Spec.Containers[0].Image != "mysql:old" || getInstanceRevision(inst) != oldRevision {
-					t.Fatal("restore source synchronization bypassed rolling admission for Pod updates")
+					t.Fatal("restore input change bypassed rolling admission for Pod updates")
 				}
 				instanceTree := kubebuilderx.NewObjectTree()
 				instanceTree.SetRoot(inst)
@@ -103,13 +103,9 @@ func TestReplicaRestoreSourceConvergesWithoutRollingAdmission(t *testing.T) {
 					t.Fatalf("created %d PVCs, want 1", len(pvcs))
 				}
 				pvc := pvcs[0].(*corev1.PersistentVolumeClaim)
-				if source == "" {
-					if pvc.Spec.DataSourceRef != nil || pvc.Annotations[constant.RestorePurposeAnnotationKey] != "" {
-						t.Fatal("PVC inherited a removed Backup source")
-					}
-				} else if pvc.Spec.DataSourceRef == nil || pvc.Spec.DataSourceRef.Name != source ||
-					pvc.Annotations[constant.RestoreSourceNameAnnotationKey] != source {
-					t.Fatalf("PVC did not use current Backup %q: %#v", source, pvc)
+				if pvc.Spec.DataSourceRef == nil || pvc.Spec.DataSourceRef.Name != "backup-a" ||
+					pvc.Annotations[constant.RestoreSourceNameAnnotationKey] != "backup-a" {
+					t.Fatalf("PVC did not retain the Instance's Backup source: %#v", pvc)
 				}
 			})
 		}

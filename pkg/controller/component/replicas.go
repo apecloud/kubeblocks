@@ -261,24 +261,6 @@ func GetReplicaRestoreReplicas(ctx context.Context, cli client.Reader, its *work
 	return restored, pending, nil
 }
 
-// ExcludeReplicaDataTasks removes Backup-initialized replicas from data-copy
-// tasks already published before the owner changed its PVC creation source.
-func ExcludeReplicaDataTasks(envVars map[string]string, replicas sets.Set[string]) (map[string]string, error) {
-	return updateKBAgentTaskEnv(envVars, func(task proto.Task) *proto.Task {
-		if task.Task != newReplicaTask || task.NewReplica == nil {
-			return &task
-		}
-		names := strings.Split(task.NewReplica.Replicas, ",")
-		names = slices.DeleteFunc(names, replicas.Has)
-		if len(names) == 0 {
-			return nil
-		}
-		task.Replicas = strings.Join(names, ",")
-		task.NewReplica.Replicas = task.Replicas
-		return &task
-	})
-}
-
 func NewReplicaTask(compName, uid string, source *corev1.Pod, replicas []string) (map[string]string, error) {
 	port, err := intctrlutil.GetPortByName(*source, kbagent.ContainerName, kbagent.DefaultStreamingPortName)
 	if err != nil {

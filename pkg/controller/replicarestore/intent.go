@@ -21,6 +21,7 @@ package replicarestore
 
 import (
 	"encoding/json"
+	"fmt"
 	"slices"
 
 	corev1 "k8s.io/api/core/v1"
@@ -33,9 +34,12 @@ import (
 // ApplyToPVC adds the current owner restore intent to a newly built PVC.
 // Existing PVCs are handled by the workload merge path, which preserves their
 // source and restore annotations.
-func ApplyToPVC(pvc *corev1.PersistentVolumeClaim, intent *appsv1.ClusterReplicaRestore, component, clusterUID string) {
+func ApplyToPVC(pvc *corev1.PersistentVolumeClaim, intent *appsv1.ClusterReplicaRestore, component, clusterUID string) error {
 	if pvc == nil || intent == nil {
-		return
+		return nil
+	}
+	if pvc.Spec.DataSource != nil || pvc.Spec.DataSourceRef != nil {
+		return fmt.Errorf("PVC %q: replicaRestore cannot be combined with volume claim template dataSource or dataSourceRef", pvc.Name)
 	}
 	apiGroup := intent.Source.APIGroup
 	namespace := intent.Source.Namespace
@@ -65,6 +69,7 @@ func ApplyToPVC(pvc *corev1.PersistentVolumeClaim, intent *appsv1.ClusterReplica
 	for key, value := range annotations(intent, component, pvc.Namespace) {
 		pvc.Annotations[key] = value
 	}
+	return nil
 }
 
 func annotations(intent *appsv1.ClusterReplicaRestore, component, pvcNamespace string) map[string]string {
@@ -106,8 +111,8 @@ func IsReplicaPVC(pvc *corev1.PersistentVolumeClaim) bool {
 	return pvc != nil && pvc.Annotations[constant.RestorePurposeAnnotationKey] == constant.RestorePurposeReplica
 }
 
-// MergePVCAnnotations preserves an existing replica PVC's restore source, even
-// after its owner changes or removes replicaRestore.
+// MergePVCAnnotations preserves existing PVC sources and restore metadata
+// during workload updates.
 func MergePVCAnnotations(existing, desired *corev1.PersistentVolumeClaim) {
 	for key, value := range desired.Annotations {
 		if IsReplicaPVC(existing) || IsReplicaPVC(desired) {

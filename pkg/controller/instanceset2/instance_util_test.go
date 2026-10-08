@@ -33,7 +33,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 )
 
-func TestReplicaRestoreSourceChangesPreserveInstanceRevision(t *testing.T) {
+func TestInstanceUpdatesPreserveInitializationInput(t *testing.T) {
 	its := revisionTestInstanceSet()
 	its.Annotations = map[string]string{constant.KBAppClusterUIDKey: "cluster-uid"}
 	tree := kubebuilderx.NewObjectTree()
@@ -55,9 +55,14 @@ func TestReplicaRestoreSourceChangesPreserveInstanceRevision(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		current = copyAndMergeInstance(current, desired[names[0]])
-		if !reflect.DeepEqual(current.Spec.ReplicaRestore, its.Spec.ReplicaRestore) {
-			t.Fatalf("Instance restore source did not converge to %q", source)
+		if updated := copyAndMergeInstance(current, desired[names[0]]); updated != nil {
+			current = updated
+		}
+		if current.Spec.ReplicaRestore != nil {
+			t.Fatal("ordinary Instance changed its initialization method")
+		}
+		if !reflect.DeepEqual(desired[names[0]].Spec.ReplicaRestore, its.Spec.ReplicaRestore) {
+			t.Fatal("new Instance did not receive its initialization input")
 		}
 		if current.Annotations[constant.KBAppClusterUIDKey] != "cluster-uid" {
 			t.Fatal("Instance lost its Cluster UID")

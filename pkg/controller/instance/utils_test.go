@@ -829,3 +829,35 @@ func TestReplicaRestorePVCUsesOwnerSourceOnlyAtCreation(t *testing.T) {
 		}
 	}
 }
+
+func TestReplicaRestoreRejectsVolumeClaimTemplateSource(t *testing.T) {
+	group := "snapshot.storage.k8s.io"
+	for _, spec := range []corev1.PersistentVolumeClaimSpec{
+		{DataSource: &corev1.TypedLocalObjectReference{APIGroup: &group, Kind: "VolumeSnapshot", Name: "snapshot"}},
+		{DataSourceRef: &corev1.TypedObjectReference{APIGroup: &group, Kind: "VolumeSnapshot", Name: "snapshot"}},
+	} {
+		inst := builder.NewInstanceBuilder("default", "mysql-3").
+			SetInstanceSetName("mysql").
+			SetPodTemplate(corev1.PodTemplateSpec{Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "mysql", Image: "mysql:8"}}}}).
+			AddVolumeClaimTemplate(corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "data"}, Spec: spec}).GetObject()
+		inst.Spec.ReplicaRestore = &kbappsv1.ClusterReplicaRestore{Source: kbappsv1.ClusterRestoreSource{
+			APIGroup: "dataprotection.kubeblocks.io", Kind: "Backup", Name: "backup",
+		}}
+		tree := kubebuilderx.NewObjectTree()
+		tree.SetRoot(inst)
+		if _, err := NewAlignmentReconciler().Reconcile(tree); err == nil {
+			t.Fatal("expected conflicting initialization sources to fail")
+		}
+		if len(tree.List(&corev1.PersistentVolumeClaim{})) != 0 {
+			t.Fatal("conflicting restore PVC was created")
+		}
+		inst.Spec.ReplicaRestore = nil
+		if _, err := NewAlignmentReconciler().Reconcile(tree); err != nil {
+			t.Fatalf("ordinary PVC source was rejected: %v", err)
+		}
+		pvc := tree.List(&corev1.PersistentVolumeClaim{})[0].(*corev1.PersistentVolumeClaim)
+		if !reflect.DeepEqual(pvc.Spec, spec) {
+			t.Fatalf("ordinary PVC source changed: %#v", pvc.Spec)
+		}
+	}
+}

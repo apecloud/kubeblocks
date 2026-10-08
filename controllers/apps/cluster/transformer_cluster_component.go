@@ -985,18 +985,28 @@ func (h *clusterShardingHandler) buildAnnotations(transCtx *clusterTransformCont
 
 func (h *clusterShardingHandler) buildShardSchedulingPolicy(transCtx *clusterTransformContext,
 	shardingName, compName string, comp *appsv1.Component) {
-	var affinity *corev1.Affinity
-	if comp.Spec.SchedulingPolicy != nil {
-		affinity = comp.Spec.SchedulingPolicy.Affinity // topologySpreadConstraints?
-	}
-	if affinity == nil || (affinity.PodAffinity == nil && affinity.PodAntiAffinity == nil) {
+	if !resolveShardSchedulingPolicy(compName, comp.Spec.SchedulingPolicy) {
 		h.buildShardPodAntiAffinity(transCtx, shardingName, compName, comp) // fallback
-		return
 	}
+	for i := range comp.Spec.Instances {
+		resolveShardSchedulingPolicy(compName, comp.Spec.Instances[i].SchedulingPolicy)
+	}
+}
+
+// resolveShardSchedulingPolicy replaces empty component-name labels with the shard name.
+// It reports whether any placeholder was resolved.
+func resolveShardSchedulingPolicy(compName string, policy *appsv1.SchedulingPolicy) bool {
+	if policy == nil || policy.Affinity == nil {
+		return false
+	}
+	affinity := policy.Affinity
 
 	replace := func(terms1 []corev1.PodAffinityTerm, terms2 []corev1.WeightedPodAffinityTerm) bool {
 		found := false
 		for i := range terms1 {
+			if terms1[i].LabelSelector == nil {
+				continue
+			}
 			val, ok := terms1[i].LabelSelector.MatchLabels[constant.KBAppComponentLabelKey]
 			if ok && len(val) == 0 {
 				terms1[i].LabelSelector.MatchLabels[constant.KBAppComponentLabelKey] = compName
@@ -1004,6 +1014,9 @@ func (h *clusterShardingHandler) buildShardSchedulingPolicy(transCtx *clusterTra
 			}
 		}
 		for i := range terms2 {
+			if terms2[i].PodAffinityTerm.LabelSelector == nil {
+				continue
+			}
 			val, ok := terms2[i].PodAffinityTerm.LabelSelector.MatchLabels[constant.KBAppComponentLabelKey]
 			if ok && len(val) == 0 {
 				terms2[i].PodAffinityTerm.LabelSelector.MatchLabels[constant.KBAppComponentLabelKey] = compName
@@ -1017,16 +1030,13 @@ func (h *clusterShardingHandler) buildShardSchedulingPolicy(transCtx *clusterTra
 	if affinity.PodAffinity != nil {
 		found1 = replace(affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
 			affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution)
-
 	}
 	if affinity.PodAntiAffinity != nil {
 		found2 = replace(affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
 			affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution)
 	}
 
-	if !found1 && !found2 {
-		h.buildShardPodAntiAffinity(transCtx, shardingName, compName, comp) // fallback
-	}
+	return found1 || found2
 }
 
 func (h *clusterShardingHandler) buildShardPodAntiAffinity(transCtx *clusterTransformContext,

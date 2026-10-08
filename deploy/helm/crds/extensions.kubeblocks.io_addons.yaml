@@ -323,6 +323,26 @@ spec:
                           type: string
                         type: array
                     type: object
+                  registrySecretRef:
+                    description: |-
+                      References a kubernetes.io/dockerconfigjson Secret for OCI registry authentication.
+                      Both name and namespace are required.
+                    properties:
+                      name:
+                        description: name is unique within a namespace to reference
+                          a secret resource.
+                        type: string
+                      namespace:
+                        description: namespace defines the space within which the
+                          secret name must be unique.
+                        type: string
+                    type: object
+                    x-kubernetes-map-type: atomic
+                    x-kubernetes-validations:
+                    - message: registrySecretRef.name is required
+                      rule: has(self.name) && self.name != ''
+                    - message: registrySecretRef.namespace is required
+                      rule: has(self.__namespace__) && self.__namespace__ != ''
                   valuesMapping:
                     description: Defines the mapping of add-on normalized resources
                       parameters to Helm values' keys.

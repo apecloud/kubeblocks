@@ -31,6 +31,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -187,6 +188,7 @@ var _ = Describe("Addon controller", func() {
 			job.Status.Failed = 1
 			job.Status.Active = 0
 			job.Status.Succeeded = 0
+			job.Status.Conditions = []batchv1.JobCondition{{Type: batchv1.JobFailed, Status: corev1.ConditionTrue}}
 			g.Expect(testCtx.Cli.Status().Update(ctx, job)).Should(Succeed())
 		}
 
@@ -631,6 +633,35 @@ var _ = Describe("Addon controller", func() {
 			}).Should(Succeed())
 		})
 
+		It("should wait for a failed install Job to disappear before retrying", func() {
+			createAutoInstallAddon()
+			fakeInstallationFailedJob(2)
+			jobKey := client.ObjectKey{Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS), Name: getInstallJobName(addon)}
+			addon = &extensionsv1alpha1.Addon{}
+			Expect(testCtx.Cli.Get(ctx, key, addon)).To(Succeed())
+			addon.Spec.Helm.InstallOptions = extensionsv1alpha1.HelmInstallOptions{"timeout": "2m"}
+			Expect(testCtx.Cli.Update(ctx, addon)).To(Succeed())
+
+			result, err := doReconcile()
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result.RequeueAfter).To(BeNumerically(">", 0))
+			Expect(testCtx.Cli.Get(ctx, key, addon)).To(Succeed())
+			Expect(addon.Status.Phase).To(Equal(extensionsv1alpha1.AddonFailed))
+			oldJob := &batchv1.Job{}
+			Expect(testCtx.Cli.Get(ctx, jobKey, oldJob)).To(Succeed())
+			oldJob.Finalizers = nil
+			Expect(testCtx.Cli.Update(ctx, oldJob)).To(Succeed())
+			Eventually(func(g Gomega) {
+				_, err := doReconcile()
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(testCtx.Cli.Get(ctx, key, addon)).To(Succeed())
+				g.Expect(addon.Status.Phase).To(Equal(extensionsv1alpha1.AddonEnabling))
+				g.Expect(testCtx.Cli.Get(ctx, jobKey, &batchv1.Job{})).To(Succeed())
+			}).Should(Succeed())
+			fakeInstallationCompletedJob(3)
+			Expect(meta.FindStatusCondition(addon.Status.Conditions, extensionsv1alpha1.ConditionTypeChecked)).To(BeNil())
+		})
+
 		It("should successfully reconcile a custom resource for Addon run job with controller manager schedule settings", func() {
 			viper.Set(constant.CfgKeyCtrlrMgrAffinity,
 				"{\"nodeAffinity\":{\"preferredDuringSchedulingIgnoredDuringExecution\":[{\"preference\":{\"matchExpressions\":[{\"key\":\"kb-controller\",\"operator\":\"In\",\"values\":[\"true\"]}]},\"weight\":100}]}}")
@@ -704,6 +735,165 @@ var _ = Describe("Addon controller", func() {
 					g.Expect(addon.Status.ObservedGeneration).Should(BeEquivalentTo(1))
 				}).Should(Succeed())
 			}
+		})
+
+		registryTestSecret := func(namespace, config string) *corev1.Secret {
+			return &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{Name: "registry-auth", Namespace: namespace},
+				Type:       corev1.SecretTypeDockerConfigJson,
+				Data:       map[string][]byte{corev1.DockerConfigJsonKey: []byte(config)},
+			}
+		}
+
+		DescribeTable("should validate OCI registry Secret references",
+			func(ref *corev1.SecretReference, chartURL, expectedError string) {
+				obj := &extensionsv1alpha1.Addon{
+					ObjectMeta: metav1.ObjectMeta{GenerateName: "registry-validation-"},
+					Spec: extensionsv1alpha1.AddonSpec{
+						Type:                 extensionsv1alpha1.HelmType,
+						DefaultInstallValues: []extensionsv1alpha1.AddonDefaultInstallSpecItem{{}},
+						Helm: &extensionsv1alpha1.HelmTypeInstallSpec{
+							ChartLocationURL: chartURL, RegistrySecretRef: ref,
+						},
+					},
+				}
+				err := testCtx.Cli.Create(ctx, obj)
+				Expect(apierrors.IsInvalid(err)).To(BeTrue())
+				Expect(err.Error()).To(ContainSubstring(expectedError))
+			},
+			Entry("missing name", &corev1.SecretReference{Namespace: "credentials"}, "oci://registry.example.com/addons/test", "registrySecretRef.name is required"),
+			Entry("missing namespace", &corev1.SecretReference{Name: "auth"}, "oci://registry.example.com/addons/test", "registrySecretRef.namespace is required"),
+		)
+
+		It("should install an OCI Addon with a cross-namespace registry Secret", func() {
+			source := registryTestSecret(testCtx.GetNamespaceKey().Name, `{"auths":{"registry.example.com":{"auth":"dXNlcjpwYXNz"}}}`)
+			Expect(testCtx.Cli.Create(ctx, source)).To(Succeed())
+			DeferCleanup(func() { Expect(client.IgnoreNotFound(testCtx.Cli.Delete(ctx, source))).To(Succeed()) })
+			createAddonSpecWithRequiredAttributes(func(obj *extensionsv1alpha1.Addon) {
+				obj.Spec.Installable.AutoInstall = true
+				obj.Spec.Helm.ChartLocationURL = "oci://registry.example.com/addons/test"
+				obj.Spec.Helm.InstallValues.URLs = []string{"https://example.com/addon-values.yaml"}
+				obj.Spec.Helm.RegistrySecretRef = &corev1.SecretReference{Name: source.Name, Namespace: source.Namespace}
+			})
+			enablingPhaseCheck(2)
+			job := getJob(Default, client.ObjectKey{Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS), Name: getInstallJobName(addon)})
+			Expect(job.Spec.Template.Spec.Volumes).To(HaveLen(1))
+			Expect(job.Spec.Template.Spec.Volumes[0].Name).To(Equal("addon-registry"))
+			copyKey := client.ObjectKey{Namespace: job.Namespace, Name: job.Spec.Template.Spec.Volumes[0].Secret.SecretName}
+			DeferCleanup(func() {
+				Expect(client.IgnoreNotFound(testCtx.Cli.Delete(ctx, &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: copyKey.Name, Namespace: copyKey.Namespace}}))).To(Succeed())
+			})
+			copySecret := &corev1.Secret{}
+			Expect(testCtx.Cli.Get(ctx, copyKey, copySecret)).To(Succeed())
+			Expect(metav1.IsControlledBy(copySecret, addon)).To(BeTrue())
+			Expect(copySecret.Data).To(Equal(source.Data))
+			Expect(job.Spec.Template.Spec.Containers[0].Args).To(ContainElements("--values", "--registry-config"))
+			Expect(job.Spec.Template.Spec.Containers[0].VolumeMounts).To(ContainElement(HaveField("ReadOnly", true)))
+
+			fakeInstallationCompletedJob(2)
+			Expect(apierrors.IsNotFound(testCtx.Cli.Get(ctx, copyKey, &corev1.Secret{}))).To(BeTrue())
+			Expect(testCtx.Cli.Get(ctx, client.ObjectKeyFromObject(source), &corev1.Secret{})).To(Succeed())
+
+			By("allowing uninstall after the source Secret is removed")
+			Expect(testCtx.Cli.Delete(ctx, source)).To(Succeed())
+			fakeHelmRelease()
+			disableAddon(3)
+			uninstallJob := getJob(Default, client.ObjectKey{Namespace: copyKey.Namespace, Name: getUninstallJobName(addon)})
+			Expect(uninstallJob.Spec.Template.Spec.Containers[0].Args).NotTo(ContainElement("--registry-config"))
+		})
+
+		It("should remove the registry Secret copy after a failed install Job", func() {
+			source := registryTestSecret(testCtx.GetNamespaceKey().Name, `{"auths":{}}`)
+			Expect(testCtx.Cli.Create(ctx, source)).To(Succeed())
+			DeferCleanup(func() { Expect(client.IgnoreNotFound(testCtx.Cli.Delete(ctx, source))).To(Succeed()) })
+			createAddonSpecWithRequiredAttributes(func(obj *extensionsv1alpha1.Addon) {
+				obj.Spec.Installable.AutoInstall = true
+				obj.Spec.Helm.ChartLocationURL = "oci://registry.example.com/addons/test"
+				obj.Spec.Helm.RegistrySecretRef = &corev1.SecretReference{Name: source.Name, Namespace: source.Namespace}
+			})
+			enablingPhaseCheck(2)
+			copyKey := client.ObjectKey{Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS), Name: registrySecretCopyName(addon)}
+			DeferCleanup(func() {
+				Expect(client.IgnoreNotFound(testCtx.Cli.Delete(ctx, &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: copyKey.Name, Namespace: copyKey.Namespace}}))).To(Succeed())
+			})
+			Expect(testCtx.Cli.Get(ctx, copyKey, &corev1.Secret{})).To(Succeed())
+			fakeInstallationFailedJob(2)
+			Expect(apierrors.IsNotFound(testCtx.Cli.Get(ctx, copyKey, &corev1.Secret{}))).To(BeTrue())
+			Expect(testCtx.Cli.Get(ctx, client.ObjectKeyFromObject(source), &corev1.Secret{})).To(Succeed())
+		})
+
+		It("should remove the registry Secret copy when installation is disabled", func() {
+			source := registryTestSecret(testCtx.GetNamespaceKey().Name, `{"auths":{}}`)
+			Expect(testCtx.Cli.Create(ctx, source)).To(Succeed())
+			DeferCleanup(func() { Expect(client.IgnoreNotFound(testCtx.Cli.Delete(ctx, source))).To(Succeed()) })
+			createAddonSpecWithRequiredAttributes(func(obj *extensionsv1alpha1.Addon) {
+				obj.Spec.Installable.AutoInstall = true
+				obj.Spec.Helm.ChartLocationURL = "oci://registry.example.com/addons/test"
+				obj.Spec.Helm.RegistrySecretRef = &corev1.SecretReference{Name: source.Name, Namespace: source.Namespace}
+			})
+			enablingPhaseCheck(2)
+			copyKey := client.ObjectKey{Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS), Name: registrySecretCopyName(addon)}
+			DeferCleanup(func() {
+				Expect(client.IgnoreNotFound(testCtx.Cli.Delete(ctx, &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: copyKey.Name, Namespace: copyKey.Namespace}}))).To(Succeed())
+			})
+			Expect(testCtx.Cli.Get(ctx, copyKey, &corev1.Secret{})).To(Succeed())
+
+			disableAddon(3)
+			Eventually(func(g Gomega) {
+				_, err := doReconcile()
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(apierrors.IsNotFound(testCtx.Cli.Get(ctx, copyKey, &corev1.Secret{}))).To(BeTrue())
+			}).Should(Succeed())
+			Expect(testCtx.Cli.Get(ctx, client.ObjectKeyFromObject(source), &corev1.Secret{})).To(Succeed())
+		})
+
+		It("should report a missing registry Secret and retry after it is created", func() {
+			source := registryTestSecret(viper.GetString(constant.CfgKeyCtrlrMgrNS), `{"auths":{}}`)
+			createAddonSpecWithRequiredAttributes(func(obj *extensionsv1alpha1.Addon) {
+				obj.Spec.Installable.AutoInstall = true
+				obj.Spec.Helm.ChartLocationURL = "oci://registry.example.com/addons/test"
+				obj.Spec.Helm.RegistrySecretRef = &corev1.SecretReference{Name: source.Name, Namespace: source.Namespace}
+			})
+			Eventually(func(g Gomega) {
+				result, err := doReconcile()
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(result.RequeueAfter).To(BeNumerically(">", 0))
+				g.Expect(testCtx.Cli.Get(ctx, key, addon)).To(Succeed())
+				condition := meta.FindStatusCondition(addon.Status.Conditions, extensionsv1alpha1.ConditionTypeChecked)
+				g.Expect(condition).NotTo(BeNil())
+				g.Expect(condition.Reason).To(Equal(AddonRefObjError))
+				g.Expect(condition.Message).To(ContainSubstring(source.Namespace + "/" + source.Name))
+			}).Should(Succeed())
+			jobKey := client.ObjectKey{Namespace: source.Namespace, Name: getInstallJobName(addon)}
+			Expect(apierrors.IsNotFound(testCtx.Cli.Get(ctx, jobKey, &batchv1.Job{}))).To(BeTrue())
+			Expect(testCtx.Cli.Create(ctx, source)).To(Succeed())
+			DeferCleanup(func() { Expect(client.IgnoreNotFound(testCtx.Cli.Delete(ctx, source))).To(Succeed()) })
+			job := getJob(Default, jobKey)
+			Expect(testCtx.Cli.Get(ctx, key, addon)).To(Succeed())
+			Expect(meta.FindStatusCondition(addon.Status.Conditions, extensionsv1alpha1.ConditionTypeChecked)).To(BeNil())
+			Expect(job.Spec.Template.Spec.Volumes).To(ContainElement(HaveField("Secret.SecretName", source.Name)))
+			Expect(job.Spec.Template.Spec.Volumes).To(ContainElement(HaveField("Name", "addon-registry")))
+			fakeInstallationCompletedJob(2)
+			Expect(testCtx.Cli.Get(ctx, client.ObjectKeyFromObject(source), &corev1.Secret{})).To(Succeed())
+		})
+
+		It("should reject a registry Secret with the wrong type", func() {
+			source := registryTestSecret(viper.GetString(constant.CfgKeyCtrlrMgrNS), `{"auths":{}}`)
+			source.Type = corev1.SecretTypeOpaque
+			Expect(testCtx.Cli.Create(ctx, source)).To(Succeed())
+			DeferCleanup(func() { Expect(client.IgnoreNotFound(testCtx.Cli.Delete(ctx, source))).To(Succeed()) })
+			createAddonSpecWithRequiredAttributes(func(obj *extensionsv1alpha1.Addon) {
+				obj.Spec.Installable.AutoInstall = true
+				obj.Spec.Helm.ChartLocationURL = "oci://registry.example.com/addons/test"
+				obj.Spec.Helm.RegistrySecretRef = &corev1.SecretReference{Name: source.Name, Namespace: source.Namespace}
+			})
+			addonStatusPhaseCheck(2, extensionsv1alpha1.AddonFailed, nil)
+			condition := meta.FindStatusCondition(addon.Status.Conditions, extensionsv1alpha1.ConditionTypeChecked)
+			Expect(condition).NotTo(BeNil())
+			Expect(condition.Reason).To(Equal(AddonRefObjError))
+			Expect(condition.Message).To(ContainSubstring("must be of type kubernetes.io/dockerconfigjson"))
+			jobKey := client.ObjectKey{Namespace: source.Namespace, Name: getInstallJobName(addon)}
+			Expect(apierrors.IsNotFound(testCtx.Cli.Get(ctx, jobKey, &batchv1.Job{}))).To(BeTrue())
 		})
 
 		It("should successfully reconcile a custom resource for Addon with CM and secret ref values", func() {

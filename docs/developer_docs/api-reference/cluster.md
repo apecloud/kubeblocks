@@ -283,8 +283,8 @@ ClusterBackup
 <td>
 <code>restore</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.RestoreSpec">
-RestoreSpec
+<a href="#apps.kubeblocks.io/v1.ClusterRestore">
+ClusterRestore
 </a>
 </em>
 </td>
@@ -704,8 +704,8 @@ int32
 <td>
 <code>replicaRestore</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.RestoreSpec">
-RestoreSpec
+<a href="#apps.kubeblocks.io/v1.ClusterRestore">
+ClusterRestore
 </a>
 </em>
 </td>
@@ -3255,8 +3255,8 @@ int32
 <td>
 <code>replicaRestore</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.RestoreSpec">
-RestoreSpec
+<a href="#apps.kubeblocks.io/v1.ClusterRestore">
+ClusterRestore
 </a>
 </em>
 </td>
@@ -3946,6 +3946,125 @@ component is in <code>Creating</code> or <code>Updating</code> phase, indicates 
 </td>
 </tr></tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1.ClusterRestore">ClusterRestore
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ClusterSpec">ClusterSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSpec">InstanceSpec</a>)
+</p>
+<div>
+<p>ClusterRestore specifies how to initialize a Cluster or new replicas from a
+restore source.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>source</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ClusterRestoreSource">
+ClusterRestoreSource
+</a>
+</em>
+</td>
+<td>
+<p>Specifies the restore source.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>pitr</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the point-in-time recovery target. The value is opaque to apps and interpreted by the restore runtime.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>parameters</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies runtime-specific restore parameters.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ClusterRestoreSource">ClusterRestoreSource
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterRestore">ClusterRestore</a>)
+</p>
+<div>
+<p>ClusterRestoreSource describes the object used as a restore source.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>apiGroup</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the API group of the restore source.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>kind</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the kind of the restore source.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the name of the restore source.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>namespace</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the namespace of the restore source. If empty, the Cluster namespace is used.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1.ClusterService">ClusterService
 </h3>
 <p>
@@ -4409,8 +4528,8 @@ ClusterBackup
 <td>
 <code>restore</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.RestoreSpec">
-RestoreSpec
+<a href="#apps.kubeblocks.io/v1.ClusterRestore">
+ClusterRestore
 </a>
 </em>
 </td>
@@ -6951,8 +7070,8 @@ int32
 <td>
 <code>replicaRestore</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.RestoreSpec">
-RestoreSpec
+<a href="#apps.kubeblocks.io/v1.ClusterRestore">
+ClusterRestore
 </a>
 </em>
 </td>
@@ -10817,125 +10936,6 @@ NamedVar
 </td>
 <td>
 <em>(Optional)</em>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1.RestoreSource">RestoreSource
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.RestoreSpec">RestoreSpec</a>)
-</p>
-<div>
-<p>RestoreSource describes the object used as a restore source.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>apiGroup</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Specifies the API group of the restore source.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>kind</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Specifies the kind of the restore source.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>name</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Specifies the name of the restore source.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>namespace</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the namespace of the restore source. If empty, the Cluster namespace is used.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1.RestoreSpec">RestoreSpec
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ClusterSpec">ClusterSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSpec">InstanceSpec</a>)
-</p>
-<div>
-<p>RestoreSpec specifies how to initialize a Cluster or new replicas from a
-restore source.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>source</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.RestoreSource">
-RestoreSource
-</a>
-</em>
-</td>
-<td>
-<p>Specifies the restore source.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>pitr</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the point-in-time recovery target. The value is opaque to apps and interpreted by the restore runtime.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>parameters</code><br/>
-<em>
-map[string]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies runtime-specific restore parameters.</p>
 </td>
 </tr>
 </tbody>
@@ -18717,8 +18717,8 @@ The final name of each PVC is generated by appending the pod&rsquo;s identifier 
 <td>
 <code>replicaRestore</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.RestoreSpec">
-RestoreSpec
+<a href="#apps.kubeblocks.io/v1.ClusterRestore">
+ClusterRestore
 </a>
 </em>
 </td>
@@ -18973,8 +18973,8 @@ Defaults to 1 if unspecified.</p>
 <td>
 <code>replicaRestore</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.RestoreSpec">
-RestoreSpec
+<a href="#apps.kubeblocks.io/v1.ClusterRestore">
+ClusterRestore
 </a>
 </em>
 </td>
@@ -19727,8 +19727,8 @@ Defaults to 1 if unspecified.</p>
 <td>
 <code>replicaRestore</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.RestoreSpec">
-RestoreSpec
+<a href="#apps.kubeblocks.io/v1.ClusterRestore">
+ClusterRestore
 </a>
 </em>
 </td>
@@ -20441,8 +20441,8 @@ The final name of each PVC is generated by appending the pod&rsquo;s identifier 
 <td>
 <code>replicaRestore</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.RestoreSpec">
-RestoreSpec
+<a href="#apps.kubeblocks.io/v1.ClusterRestore">
+ClusterRestore
 </a>
 </em>
 </td>

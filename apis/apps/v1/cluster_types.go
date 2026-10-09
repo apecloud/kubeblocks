@@ -349,7 +349,7 @@ type ClusterComponentSpec struct {
 	// an existing Component. Existing replicas retain their initialization input.
 	//
 	// +optional
-	ReplicaRestore *ClusterReplicaRestore `json:"replicaRestore,omitempty"`
+	ReplicaRestore *ClusterRestore `json:"replicaRestore,omitempty"`
 
 	// Specifies the scheduling policy for the Component.
 	// If defined, it will overwrite the scheduling policy defined in ClusterSpec.
@@ -881,13 +881,13 @@ type ClusterBackup struct {
 	IncrementalCronExpression string `json:"incrementalCronExpression,omitempty"`
 }
 
-// RestoreSpec specifies how to initialize a Cluster or new replicas from a
+// ClusterRestore specifies how to initialize a Cluster or new replicas from a
 // restore source.
-type RestoreSpec struct {
+type ClusterRestore struct {
 	// Specifies the restore source.
 	//
 	// +kubebuilder:validation:Required
-	Source RestoreSource `json:"source"`
+	Source ClusterRestoreSource `json:"source"`
 
 	// Specifies the point-in-time recovery target. The value is opaque to apps and interpreted by the restore runtime.
 	//
@@ -900,14 +900,8 @@ type RestoreSpec struct {
 	Parameters map[string]string `json:"parameters,omitempty"`
 }
 
-// ClusterRestore identifies the restore options for an initial Cluster restore.
-type ClusterRestore = RestoreSpec
-
-// ClusterReplicaRestore identifies the restore options for initializing new replicas.
-type ClusterReplicaRestore = RestoreSpec
-
-// RestoreSource describes the object used as a restore source.
-type RestoreSource struct {
+// ClusterRestoreSource describes the object used as a restore source.
+type ClusterRestoreSource struct {
 	// Specifies the API group of the restore source.
 	//
 	// +kubebuilder:validation:Required
@@ -928,9 +922,6 @@ type RestoreSource struct {
 	// +optional
 	Namespace string `json:"namespace,omitempty"`
 }
-
-// ClusterRestoreSource is the source-compatible name for RestoreSource.
-type ClusterRestoreSource = RestoreSource
 
 // ClusterPhase defines the phase of the Cluster within the .status.phase field.
 //

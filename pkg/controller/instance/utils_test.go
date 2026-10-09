@@ -789,7 +789,7 @@ func TestReplicaRestoreRejectsVolumeClaimTemplateSource(t *testing.T) {
 			SetInstanceSetName("mysql").
 			SetPodTemplate(corev1.PodTemplateSpec{Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "mysql", Image: "mysql:8"}}}}).
 			AddVolumeClaimTemplate(corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "data"}, Spec: spec}).GetObject()
-		inst.Spec.ReplicaRestore = &kbappsv1.ClusterReplicaRestore{Source: kbappsv1.ClusterRestoreSource{
+		inst.Spec.ReplicaRestore = &kbappsv1.ClusterRestore{Source: kbappsv1.ClusterRestoreSource{
 			APIGroup: "dataprotection.kubeblocks.io", Kind: "Backup", Name: "backup",
 		}}
 		tree := kubebuilderx.NewObjectTree()
@@ -827,7 +827,7 @@ func TestReplicaRestorePVCReuse(t *testing.T) {
 				SetInstanceSetName("mysql").
 				SetPodTemplate(corev1.PodTemplateSpec{Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "mysql", Image: "mysql:8"}}}}).
 				AddVolumeClaimTemplate(corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "data"}}).GetObject()
-			inst.Spec.ReplicaRestore = &kbappsv1.ClusterReplicaRestore{Source: kbappsv1.ClusterRestoreSource{
+			inst.Spec.ReplicaRestore = &kbappsv1.ClusterRestore{Source: kbappsv1.ClusterRestoreSource{
 				APIGroup: "dataprotection.kubeblocks.io", Kind: "Backup", Name: "backup",
 			}}
 			pvcs, err := buildInstancePVCs(inst)

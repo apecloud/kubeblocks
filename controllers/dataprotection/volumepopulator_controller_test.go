@@ -4256,7 +4256,7 @@ func TestReplicaRestoreReconcileRequiresCrossNamespaceOwnerIntent(t *testing.T) 
 			}
 			cluster.Spec.Restore = nil
 			cluster.Spec.ComponentSpecs = []kbappsv1.ClusterComponentSpec{{
-				Name: "mysql", Replicas: 5, ReplicaRestore: &kbappsv1.ClusterReplicaRestore{Source: source},
+				Name: "mysql", Replicas: 5, ReplicaRestore: &kbappsv1.ClusterRestore{Source: source},
 			}}
 			switch intent {
 			case "absent":
@@ -5785,7 +5785,7 @@ func TestReplicaAuxiliaryRestoreContinuesAfterRetainScaleIn(t *testing.T) {
 			backup.Name = pvc.Spec.DataSourceRef.Name
 			backup.Namespace = tc.backupNamespace
 			cluster.Spec.Restore = nil
-			intent := &kbappsv1.ClusterReplicaRestore{Source: kbappsv1.ClusterRestoreSource{
+			intent := &kbappsv1.ClusterRestore{Source: kbappsv1.ClusterRestoreSource{
 				APIGroup: dptypes.DataprotectionAPIGroup, Kind: dptypes.BackupKind, Name: backup.Name, Namespace: backup.Namespace,
 			}}
 			cluster.Spec.ComponentSpecs = []kbappsv1.ClusterComponentSpec{{Name: "mysql", Replicas: 4, ReplicaRestore: intent}}

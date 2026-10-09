@@ -132,7 +132,7 @@ var _ = Describe("Component Workload Operations Test", func() {
 			protoITS := runningITS.DeepCopy()
 			protoITS.Spec.Replicas = ptr.To(from + 2)
 			if restore {
-				protoITS.Spec.ReplicaRestore = &appsv1.ClusterReplicaRestore{Source: appsv1.ClusterRestoreSource{
+				protoITS.Spec.ReplicaRestore = &appsv1.ClusterRestore{Source: appsv1.ClusterRestoreSource{
 					APIGroup: "dataprotection.kubeblocks.io", Kind: "Backup", Name: "backup",
 				}}
 			}

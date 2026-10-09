@@ -123,9 +123,9 @@ var _ = Describe("revision update reconciler test", func() {
 	Context("Backup allocation and Pod reconstruction", func() {
 		var cli client.Client
 		var reconcile func() error
-		var updateReplicas func(int32, *kbappsv1.ClusterReplicaRestore)
-		backup := func(name string) *kbappsv1.ClusterReplicaRestore {
-			return &kbappsv1.ClusterReplicaRestore{Source: kbappsv1.ClusterRestoreSource{
+		var updateReplicas func(int32, *kbappsv1.ClusterRestore)
+		backup := func(name string) *kbappsv1.ClusterRestore {
+			return &kbappsv1.ClusterRestore{Source: kbappsv1.ClusterRestoreSource{
 				APIGroup: "dataprotection.kubeblocks.io", Kind: "Backup", Name: name,
 			}}
 		}
@@ -147,7 +147,7 @@ var _ = Describe("revision update reconciler test", func() {
 					Do(NewReplicasAlignmentReconciler()).Commit()
 				return err
 			}
-			updateReplicas = func(replicas int32, restore *kbappsv1.ClusterReplicaRestore) {
+			updateReplicas = func(replicas int32, restore *kbappsv1.ClusterRestore) {
 				Expect(cli.Get(ctx, client.ObjectKeyFromObject(its), its)).To(Succeed())
 				its.Generation++
 				its.Spec.Replicas = &replicas
@@ -187,7 +187,7 @@ var _ = Describe("revision update reconciler test", func() {
 			for _, policy := range []appsv1.PodManagementPolicyType{appsv1.ParallelPodManagement, appsv1.OrderedReadyPodManagement} {
 				It(fmt.Sprintf("rejects incompatible retained PVCs from %q before publishing allocations with %s policy", source, policy), func() {
 					Expect(reconcile()).To(Succeed())
-					var restore *kbappsv1.ClusterReplicaRestore
+					var restore *kbappsv1.ClusterRestore
 					if source != "" {
 						restore = backup(source)
 					}

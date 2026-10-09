@@ -190,7 +190,7 @@ type ComponentSpec struct {
 	// Specifies the restore source used to initialize new replicas during scale-out.
 	//
 	// +optional
-	ReplicaRestore *ClusterReplicaRestore `json:"replicaRestore,omitempty"`
+	ReplicaRestore *ClusterRestore `json:"replicaRestore,omitempty"`
 
 	// Specifies the configuration content of a config template.
 	//

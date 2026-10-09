@@ -76,7 +76,7 @@ func (builder *ComponentBuilder) SetReplicas(replicas int32) *ComponentBuilder {
 	return builder
 }
 
-func (builder *ComponentBuilder) SetReplicaRestore(restore *appsv1.ClusterReplicaRestore) *ComponentBuilder {
+func (builder *ComponentBuilder) SetReplicaRestore(restore *appsv1.ClusterRestore) *ComponentBuilder {
 	builder.get().Spec.ReplicaRestore = restore
 	return builder
 }

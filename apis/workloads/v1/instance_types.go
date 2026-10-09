@@ -91,7 +91,7 @@ type InstanceSpec struct {
 	// It is fixed when the instance is created.
 	//
 	// +optional
-	ReplicaRestore *kbappsv1.ClusterReplicaRestore `json:"replicaRestore,omitempty"`
+	ReplicaRestore *kbappsv1.ClusterRestore `json:"replicaRestore,omitempty"`
 
 	// persistentVolumeClaimRetentionPolicy describes the lifecycle of persistent
 	// volume claims created from volumeClaimTemplates. By default, all persistent

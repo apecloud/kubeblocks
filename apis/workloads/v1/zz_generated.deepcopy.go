@@ -273,7 +273,7 @@ func (in *InstanceSetSpec) DeepCopyInto(out *InstanceSetSpec) {
 	}
 	if in.ReplicaRestore != nil {
 		in, out := &in.ReplicaRestore, &out.ReplicaRestore
-		*out = new(appsv1.ClusterReplicaRestore)
+		*out = new(appsv1.ClusterRestore)
 		(*in).DeepCopyInto(*out)
 	}
 	in.Ordinals.DeepCopyInto(&out.Ordinals)
@@ -446,7 +446,7 @@ func (in *InstanceSpec) DeepCopyInto(out *InstanceSpec) {
 	}
 	if in.ReplicaRestore != nil {
 		in, out := &in.ReplicaRestore, &out.ReplicaRestore
-		*out = new(appsv1.ClusterReplicaRestore)
+		*out = new(appsv1.ClusterRestore)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.PersistentVolumeClaimRetentionPolicy != nil {

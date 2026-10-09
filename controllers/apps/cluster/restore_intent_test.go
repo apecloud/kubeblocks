@@ -268,7 +268,7 @@ func TestReplicaRestoreWaitsForInitialClusterRestore(t *testing.T) {
 	}
 	spec := &appsv1.ClusterComponentSpec{
 		Name: "mysql", Replicas: 5,
-		ReplicaRestore: &appsv1.ClusterReplicaRestore{Source: appsv1.ClusterRestoreSource{
+		ReplicaRestore: &appsv1.ClusterRestore{Source: appsv1.ClusterRestoreSource{
 			APIGroup: testRestoreSourceAPIGroup, Kind: testRestoreSourceKind, Name: "replica-restore",
 		}},
 	}
@@ -287,7 +287,7 @@ func TestValidateReplicaRestoreIntentRejectsUnsupportedComponent(t *testing.T) {
 	cluster := &appsv1.Cluster{}
 	spec := &appsv1.ClusterComponentSpec{
 		Name: "mysql", Replicas: 5, OfflineInstances: []string{"mysql-0"},
-		ReplicaRestore: &appsv1.ClusterReplicaRestore{Source: appsv1.ClusterRestoreSource{
+		ReplicaRestore: &appsv1.ClusterRestore{Source: appsv1.ClusterRestoreSource{
 			APIGroup: testRestoreSourceAPIGroup, Kind: testRestoreSourceKind, Name: "restore",
 		}},
 	}

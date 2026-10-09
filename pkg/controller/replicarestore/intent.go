@@ -34,7 +34,7 @@ import (
 // ApplyToPVC adds the current owner restore intent to a newly built PVC.
 // Existing PVCs are handled by the workload merge path, which preserves their
 // source and restore annotations.
-func ApplyToPVC(pvc *corev1.PersistentVolumeClaim, intent *appsv1.ClusterReplicaRestore, component, clusterUID string) error {
+func ApplyToPVC(pvc *corev1.PersistentVolumeClaim, intent *appsv1.ClusterRestore, component, clusterUID string) error {
 	if pvc == nil || intent == nil {
 		return nil
 	}
@@ -72,7 +72,7 @@ func ApplyToPVC(pvc *corev1.PersistentVolumeClaim, intent *appsv1.ClusterReplica
 	return nil
 }
 
-func annotations(intent *appsv1.ClusterReplicaRestore, component, pvcNamespace string) map[string]string {
+func annotations(intent *appsv1.ClusterRestore, component, pvcNamespace string) map[string]string {
 	sourceNamespace := intent.Source.Namespace
 	if sourceNamespace == "" {
 		sourceNamespace = pvcNamespace

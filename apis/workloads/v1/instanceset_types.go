@@ -87,7 +87,7 @@ type InstanceSetSpec struct {
 	// Specifies the restore source used to initialize new instances during scale-out.
 	//
 	// +optional
-	ReplicaRestore *kbappsv1.ClusterReplicaRestore `json:"replicaRestore,omitempty"`
+	ReplicaRestore *kbappsv1.ClusterRestore `json:"replicaRestore,omitempty"`
 
 	// Specifies the desired Ordinals.
 	// The Ordinals used to specify the ordinal of the instance (pod) names to be generated under the InstanceSet.

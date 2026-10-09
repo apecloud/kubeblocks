@@ -47,7 +47,7 @@ func TestScaleOutPreservesExistingInstanceInitialization(t *testing.T) {
 			its.Spec.Template.Spec.Containers = []corev1.Container{{Name: "db", Image: "mysql:8"}}
 			its.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{{ObjectMeta: metav1.ObjectMeta{Name: "data"}}}
 			if source != "" {
-				its.Spec.ReplicaRestore = &kbappsv1.ClusterReplicaRestore{Source: kbappsv1.ClusterRestoreSource{
+				its.Spec.ReplicaRestore = &kbappsv1.ClusterRestore{Source: kbappsv1.ClusterRestoreSource{
 					APIGroup: "dataprotection.kubeblocks.io", Kind: "Backup", Name: source,
 				}}
 			}
@@ -59,7 +59,7 @@ func TestScaleOutPreservesExistingInstanceInitialization(t *testing.T) {
 			original := tree.List(&workloads.Instance{})[0].(*workloads.Instance).DeepCopy()
 			replicas := int32(2)
 			its.Spec.Replicas = &replicas
-			its.Spec.ReplicaRestore = &kbappsv1.ClusterReplicaRestore{Source: kbappsv1.ClusterRestoreSource{
+			its.Spec.ReplicaRestore = &kbappsv1.ClusterRestore{Source: kbappsv1.ClusterRestoreSource{
 				APIGroup: "dataprotection.kubeblocks.io", Kind: "Backup", Name: "backup-b",
 			}}
 			if _, err := NewAlignmentReconciler().Reconcile(tree); err != nil {

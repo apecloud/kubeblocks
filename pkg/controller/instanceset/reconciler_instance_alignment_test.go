@@ -64,7 +64,7 @@ var _ = Describe("replicas alignment reconciler test", func() {
 		Expect(tree.List(&corev1.Pod{})).To(HaveLen(3))
 		replicas := int32(4)
 		its.Spec.Replicas = &replicas
-		its.Spec.ReplicaRestore = &kbappsv1.ClusterReplicaRestore{Source: kbappsv1.ClusterRestoreSource{
+		its.Spec.ReplicaRestore = &kbappsv1.ClusterRestore{Source: kbappsv1.ClusterRestoreSource{
 			APIGroup: "dataprotection.kubeblocks.io", Kind: "Backup", Name: "backup-a",
 		}}
 		_, err = NewReplicasAlignmentReconciler().Reconcile(tree)
@@ -107,7 +107,7 @@ var _ = Describe("replicas alignment reconciler test", func() {
 		}
 		tree.EventRecorder = record.NewFakeRecorder(10)
 		its.Spec.PodManagementPolicy = appsv1.OrderedReadyPodManagement
-		its.Spec.ReplicaRestore = &kbappsv1.ClusterReplicaRestore{Source: kbappsv1.ClusterRestoreSource{
+		its.Spec.ReplicaRestore = &kbappsv1.ClusterRestore{Source: kbappsv1.ClusterRestoreSource{
 			APIGroup: "dataprotection.kubeblocks.io", Kind: "Backup", Name: "backup-b",
 		}}
 		replicas = 3
@@ -125,7 +125,7 @@ var _ = Describe("replicas alignment reconciler test", func() {
 			{DataSourceRef: &corev1.TypedObjectReference{APIGroup: &group, Kind: "VolumeSnapshot", Name: "snapshot"}},
 		} {
 			its.Spec.VolumeClaimTemplates[0].Spec = spec
-			its.Spec.ReplicaRestore = &kbappsv1.ClusterReplicaRestore{Source: kbappsv1.ClusterRestoreSource{
+			its.Spec.ReplicaRestore = &kbappsv1.ClusterRestore{Source: kbappsv1.ClusterRestoreSource{
 				APIGroup: "dataprotection.kubeblocks.io", Kind: "Backup", Name: "backup",
 			}}
 			tree := kubebuilderx.NewObjectTree()

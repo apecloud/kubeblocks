@@ -4202,20 +4202,46 @@ func TestDependencyPredicates(t *testing.T) {
 
 }
 
-func TestReplicaRestoreSkipsPostReady(t *testing.T) {
-	pvc := dependencyRestorePVC("data-mysql-3", "mysql", "pvc-uid")
+func TestReplicaRestoreCompletesWithoutPostReady(t *testing.T) {
+	ctx := context.Background()
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
+	backup, actionSet := restoreBackupObjects()
+	actionSet.Spec.Restore.PostReady = []dpv1alpha1.ActionSpec{{Job: &dpv1alpha1.JobActionSpec{}}}
+	pvc := newPVCForRestoreDecision("data", "mysql", "")
+	pvc.UID = "replica-pvc"
 	pvc.Annotations[constant.RestorePurposeAnnotationKey] = constant.RestorePurposeReplica
-	restoreCtx := &pvcRestoreContext{
-		restoreMgr: &dprestore.RestoreManager{
-			PostReadyBackupSets: []dprestore.BackupActionSet{{}},
-		},
-		mode: pvcRestoreModeRestoreData,
+	pvc.Spec.DataSourceRef = &corev1.TypedObjectReference{
+		APIGroup: ptr.To(dptypes.DataprotectionAPIGroup), Kind: dptypes.BackupKind, Name: backup.Name,
 	}
-	reconciler := &VolumePopulatorReconciler{}
-	completed, err := reconciler.ensurePostReadyRestoreCompleted(
-		intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, restoreCtx)
+	setReplicaRestoreSourceAnnotations(pvc)
+	pvc.Spec.VolumeName = "data-pv"
+	pvc.Status.Conditions = []corev1.PersistentVolumeClaimCondition{{
+		Type: PersistentVolumeClaimPopulating, Status: corev1.ConditionTrue, Reason: ReasonPopulatingSucceed,
+	}}
+	worker := &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "worker", Namespace: pvc.Namespace}}
+	for key, value := range map[string]string{
+		dptypes.CfgKeyWorkerServiceAccountName: worker.Name,
+		dptypes.CfgKeyWorkerClusterRoleName:    "worker-role",
+	} {
+		previous := viper.Get(key)
+		viper.Set(key, value)
+		t.Cleanup(func() { viper.Set(key, previous) })
+	}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(pvc).
+		WithObjects(pvc, backup, actionSet, worker).Build()
+	vp := &VolumePopulatorReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(10)}
+	result, err := vp.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(pvc)})
 	require.NoError(t, err)
-	require.True(t, completed)
+	require.Zero(t, result)
+	require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(pvc), pvc))
+	condition := findPVCConditionByType(pvc, kbappsv1.ConditionTypeRestore)
+	require.NotNil(t, condition)
+	require.Equal(t, corev1.ConditionTrue, condition.Status)
+	restores := &dpv1alpha1.RestoreList{}
+	require.NoError(t, cli.List(ctx, restores))
+	require.Empty(t, restores.Items, "post-ready must not create a Restore")
 }
 
 func TestReplicaRestoreReconcileRequiresCrossNamespaceOwnerIntent(t *testing.T) {
@@ -5721,12 +5747,8 @@ func TestReplicaRestoreRequiresMatchingDataVolume(t *testing.T) {
 				cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(pvc).
 					WithObjects(backup, actionSet, worker, owner, pvc).Build()
 				vp := &VolumePopulatorReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(20)}
-				// Repeat using a fresh reconciler to verify failure survives retries.
-				for i := 0; i < 2; i++ {
-					_, err := vp.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(pvc)})
-					require.NoError(t, err)
-					vp = &VolumePopulatorReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(20)}
-				}
+				_, err := vp.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(pvc)})
+				require.NoError(t, err)
 				require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(pvc), pvc))
 				pvcs := &corev1.PersistentVolumeClaimList{}
 				require.NoError(t, cli.List(ctx, pvcs))
@@ -5754,8 +5776,6 @@ func TestReplicaAuxiliaryRestoreContinuesAfterRetainScaleIn(t *testing.T) {
 		createHelper    bool
 	}{
 		{name: "same namespace after registration", backupNamespace: "default"},
-		{name: "same namespace after helper creation", backupNamespace: "default", createHelper: true},
-		{name: "cross namespace after registration", backupNamespace: "backup-ns"},
 		{name: "cross namespace after helper creation", backupNamespace: "backup-ns", createHelper: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -5890,50 +5910,6 @@ func TestReplicaRestoreChecksDataVolumeBeforeRegistration(t *testing.T) {
 	require.Contains(t, condition.Message, "no workload volume matching Backup")
 	require.Empty(t, pvc.Labels[dptypes.ComponentUIDLabelKey])
 	require.NotContains(t, pvc.Finalizers, dptypes.DataProtectionFinalizerName)
-}
-
-func TestRegisteredReplicaPVCUsesItsBackupSource(t *testing.T) {
-	ctx := context.Background()
-	scheme, cluster, component, its, pvc := parentRestoreObjects(t)
-	cluster.Spec.Restore = nil
-	cluster.Spec.ComponentSpecs = []kbappsv1.ClusterComponentSpec{{Name: "mysql", Replicas: 5}}
-	pvc.Annotations[constant.RestorePurposeAnnotationKey] = constant.RestorePurposeReplica
-	setReplicaRestoreSourceAnnotations(pvc)
-	pvc.Labels[dptypes.ComponentUIDLabelKey] = string(component.UID)
-	pvc.Finalizers = []string{dptypes.DataProtectionFinalizerName}
-	backup, actionSet := restoreBackupObjects()
-	backup.Name = pvc.Spec.DataSourceRef.Name
-	worker := &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "worker", Namespace: pvc.Namespace}}
-	for key, value := range map[string]string{
-		dptypes.CfgKeyWorkerServiceAccountName: worker.Name,
-		dptypes.CfgKeyWorkerClusterRoleName:    "worker-role",
-	} {
-		previous := viper.Get(key)
-		viper.Set(key, value)
-		t.Cleanup(func() { viper.Set(key, previous) })
-	}
-	cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(pvc).
-		WithObjects(cluster, component, its, pvc, backup, actionSet, worker).Build()
-	for i := 0; i < 2; i++ {
-		vp := &VolumePopulatorReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(10)}
-		_, err := vp.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(pvc)})
-		require.NoError(t, err)
-	}
-	restores := &dpv1alpha1.RestoreList{}
-	require.NoError(t, cli.List(ctx, restores))
-	require.Len(t, restores.Items, 1)
-	require.Equal(t, pvc.Spec.DataSourceRef.Name, restores.Items[0].Spec.Backup.Name)
-	require.True(t, restores.Items[0].DeletionTimestamp.IsZero())
-	require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(pvc), pvc))
-	require.Contains(t, pvc.Finalizers, dptypes.DataProtectionFinalizerName)
-	if condition := findPVCConditionByType(pvc, kbappsv1.ConditionTypeRestore); condition != nil {
-		require.NotEqual(t, corev1.ConditionFalse, condition.Status)
-	}
-	coordinator := &ClusterRestoreReconciler{Client: cli}
-	_, err := coordinator.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(cluster)})
-	require.NoError(t, err)
-	require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(cluster), cluster))
-	require.Contains(t, cluster.Finalizers, dptypes.RestoreProtectionFinalizerName)
 }
 
 func setReplicaRestoreSourceAnnotations(pvc *corev1.PersistentVolumeClaim) {

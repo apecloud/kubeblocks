@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
@@ -206,81 +205,64 @@ func TestStatusReconcilerAggregatesRestorePVCConditionsWithoutPod(t *testing.T) 
 	})
 }
 
-func TestStatusReconcilerProjectsReplicaRestorePVCIntoInstanceHealth(t *testing.T) {
-	inst := &workloads.Instance{
-		ObjectMeta: metav1.ObjectMeta{Name: "demo-0", Namespace: "default", Generation: 1},
-		Spec:       workloads.InstanceSpec{ReplicaRestore: &kbappsv1.ClusterReplicaRestore{}},
-		Status:     workloads.InstanceStatus2{ObservedGeneration: 1},
-	}
-	tree := kubebuilderx.NewObjectTree()
-	tree.SetRoot(inst)
-	pvc := &corev1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "data-demo-0",
-			Namespace: inst.Namespace,
-			Labels:    map[string]string{constant.KBAppPodNameLabelKey: inst.Name},
-			Annotations: map[string]string{
-				constant.RestorePurposeAnnotationKey: constant.RestorePurposeReplica,
-			},
-		},
-		Status: corev1.PersistentVolumeClaimStatus{Conditions: []corev1.PersistentVolumeClaimCondition{{
-			Type:    corev1.PersistentVolumeClaimConditionType(workloads.InstanceRestore),
-			Status:  corev1.ConditionFalse,
-			Message: "restore failed",
-		}}},
-	}
-	if err := tree.Add(pvc); err != nil {
-		t.Fatal(err)
-	}
-	succeededPVC := pvc.DeepCopy()
-	succeededPVC.Name = "logs-demo-0"
-	succeededPVC.Status.Conditions[0].Status = corev1.ConditionTrue
-	if err := tree.Add(succeededPVC); err != nil {
-		t.Fatal(err)
-	}
-	inst.Spec.ReplicaRestore = nil
-
-	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
-		t.Fatal(err)
-	}
-	if !intctrlutil.IsInstanceFailure(inst) {
-		t.Fatalf("replica restore failure was not projected into InstanceFailure: %#v", inst.Status.Conditions)
-	}
-	if meta.FindStatusCondition(inst.Status.Conditions, string(workloads.InstanceRestore)) != nil {
-		t.Fatalf("replica restore created a task-like Restore condition: %#v", inst.Status.Conditions)
-	}
-
-	pod := readyPod("current")
-	pod.Name = inst.Name
-	pod.Namespace = inst.Namespace
-	if err := tree.Add(pod); err != nil {
-		t.Fatal(err)
-	}
-	pod.DeletionTimestamp = &metav1.Time{Time: metav1.Now().Time}
-	for i := 0; i < 3; i++ {
-		if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
-			t.Fatal(err)
-		}
-		if inst.Status.CurrentState != workloads.InstanceCurrentStateTerminating ||
-			!intctrlutil.IsInstanceFailure(inst) || inst.Status.Ready || inst.Status.Available {
-			t.Fatalf("terminating Pod hid the PVC restore failure: %#v", inst.Status)
-		}
-	}
-	pvc.Status.Conditions[0].Status = corev1.ConditionUnknown
-	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
-		t.Fatal(err)
-	}
-	if inst.Status.Ready || inst.Status.Available || meta.IsStatusConditionTrue(inst.Status.Conditions, string(workloads.InstanceFailure)) {
-		t.Fatalf("pending replica restore did not block ordinary readiness: %#v", inst.Status)
-	}
-
-	pod.DeletionTimestamp = nil
-	pvc.Status.Conditions[0].Status = corev1.ConditionTrue
-	if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
-		t.Fatal(err)
-	}
-	if !intctrlutil.IsInstanceReady(inst) || !intctrlutil.IsInstanceAvailable(inst) || intctrlutil.IsInstanceFailure(inst) {
-		t.Fatalf("completed replica restore did not release ordinary readiness: %#v", inst.Status)
+func TestReplicaRestorePVCConditionsControlInstanceHealth(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		condition   corev1.ConditionStatus
+		withoutPod  bool
+		terminating bool
+	}{
+		{name: "pending", condition: corev1.ConditionUnknown},
+		{name: "failed", condition: corev1.ConditionFalse},
+		{name: "completed", condition: corev1.ConditionTrue},
+		{name: "failed without Pod", condition: corev1.ConditionFalse, withoutPod: true},
+		{name: "failed with terminating Pod", condition: corev1.ConditionFalse, terminating: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			inst := &workloads.Instance{
+				ObjectMeta: metav1.ObjectMeta{Name: "demo-0", Namespace: "default", Generation: 1},
+				Status:     workloads.InstanceStatus2{ObservedGeneration: 1},
+			}
+			tree := kubebuilderx.NewObjectTree()
+			tree.SetRoot(inst)
+			for _, volume := range []string{"data", "logs"} {
+				status := tc.condition
+				if volume == "logs" {
+					status = corev1.ConditionTrue
+				}
+				pvc := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{
+					Name: volume + "-demo-0", Namespace: inst.Namespace,
+					Labels:      map[string]string{constant.KBAppPodNameLabelKey: inst.Name},
+					Annotations: map[string]string{constant.RestorePurposeAnnotationKey: constant.RestorePurposeReplica},
+				}, Status: corev1.PersistentVolumeClaimStatus{Conditions: []corev1.PersistentVolumeClaimCondition{{
+					Type: corev1.PersistentVolumeClaimConditionType(workloads.InstanceRestore), Status: status,
+				}}}}
+				if err := tree.Add(pvc); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if !tc.withoutPod {
+				pod := readyPod("current")
+				pod.Name, pod.Namespace = inst.Name, inst.Namespace
+				if tc.terminating {
+					pod.DeletionTimestamp = &metav1.Time{Time: metav1.Now().Time}
+				}
+				if err := tree.Add(pod); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+				t.Fatal(err)
+			}
+			ready := tc.condition == corev1.ConditionTrue
+			failed := tc.condition == corev1.ConditionFalse
+			if inst.Status.Ready != ready || inst.Status.Available != ready || intctrlutil.IsInstanceFailure(inst) != failed {
+				t.Fatalf("PVC restore condition %s did not determine instance health: %#v", tc.condition, inst.Status)
+			}
+			if meta.FindStatusCondition(inst.Status.Conditions, string(workloads.InstanceRestore)) != nil {
+				t.Fatalf("replica restore added an aggregate Restore condition: %#v", inst.Status.Conditions)
+			}
+		})
 	}
 }
 

@@ -32,9 +32,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
 )
 
-// Auxiliary volumes may be provisioned without data only when the same target
-// instance has a volume that can restore data from this Backup. Check the owner
-// templates rather than sibling PVCs, which may not have been created yet.
 func (r *VolumePopulatorReconciler) validateReplicaRestoreDataVolume(reqCtx intctrlutil.RequestCtx,
 	pvc *corev1.PersistentVolumeClaim, backup *dpv1alpha1.Backup) error {
 	ref := metav1.GetControllerOf(pvc)
@@ -51,8 +48,6 @@ func (r *VolumePopulatorReconciler) validateReplicaRestoreDataVolume(reqCtx intc
 			return err
 		}
 		owner = its
-		// ReplicaRestore supports default instances only. Instance templates and
-		// custom allocation are rejected by the Cluster owner API.
 		for _, template := range its.Spec.VolumeClaimTemplates {
 			volumeNames = append(volumeNames, template.Name)
 		}

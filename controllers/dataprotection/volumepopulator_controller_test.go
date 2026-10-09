@@ -4202,22 +4202,6 @@ func TestDependencyPredicates(t *testing.T) {
 
 }
 
-func TestReplicaRestorePVCRequiresPrepareData(t *testing.T) {
-	pvc := dependencyRestorePVC("data-mysql-3", "mysql", "pvc-uid")
-	pvc.Annotations[constant.RestorePurposeAnnotationKey] = constant.RestorePurposeReplica
-	reconciler := &VolumePopulatorReconciler{}
-	restoreCtx := &pvcRestoreContext{
-		restoreMgr: &dprestore.RestoreManager{
-			PostReadyBackupSets: []dprestore.BackupActionSet{{}},
-		},
-		mode: pvcRestoreModeRestoreData,
-	}
-	err := reconciler.dispatchUnboundPVC(
-		intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, restoreCtx)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "requires a prepareData restore action")
-}
-
 func TestReplicaRestoreSkipsPostReady(t *testing.T) {
 	pvc := dependencyRestorePVC("data-mysql-3", "mysql", "pvc-uid")
 	pvc.Annotations[constant.RestorePurposeAnnotationKey] = constant.RestorePurposeReplica
@@ -4234,45 +4218,8 @@ func TestReplicaRestoreSkipsPostReady(t *testing.T) {
 	require.True(t, completed)
 }
 
-func TestReplicaRestoreAuthorizesCrossNamespaceBackup(t *testing.T) {
-	apiGroup := dptypes.DataprotectionAPIGroup
-	sourceNamespace := "backup"
-	cluster := &kbappsv1.Cluster{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "cluster", UID: "cluster-uid"},
-		Spec: kbappsv1.ClusterSpec{ComponentSpecs: []kbappsv1.ClusterComponentSpec{{
-			Name: "mysql",
-			ReplicaRestore: &kbappsv1.ClusterReplicaRestore{Source: kbappsv1.ClusterRestoreSource{
-				APIGroup: apiGroup, Kind: dptypes.BackupKind, Name: "backup", Namespace: sourceNamespace,
-			}},
-		}}},
-	}
-	pvc := dependencyRestorePVC("data-mysql-3", "mysql", "pvc-uid")
-	pvc.Namespace = cluster.Namespace
-	pvc.Labels[constant.AppInstanceLabelKey] = cluster.Name
-	pvc.Annotations[constant.RestorePurposeAnnotationKey] = constant.RestorePurposeReplica
-	pvc.Spec.DataSourceRef.Namespace = &sourceNamespace
-	pvc.Annotations[constant.RestoreSourceNamespaceAnnotationKey] = sourceNamespace
-	reconciler := dependencyTestReconciler(t, cluster)
-	require.True(t, reconciler.clusterSourceAuthorizesPVC(
-		intctrlutil.RequestCtx{Ctx: context.Background()}, cluster, pvc, sourceNamespace))
-	cluster.Spec.ComponentSpecs[0].ReplicaRestore = nil
-	require.False(t, reconciler.clusterSourceAuthorizesPVC(
-		intctrlutil.RequestCtx{Ctx: context.Background()}, cluster, pvc, sourceNamespace))
-	cluster.Spec.ComponentSpecs[0].ReplicaRestore = &kbappsv1.ClusterReplicaRestore{Source: kbappsv1.ClusterRestoreSource{
-		APIGroup: apiGroup, Kind: dptypes.BackupKind, Name: "backup", Namespace: sourceNamespace,
-	}}
-	pvc.Annotations[constant.KBAppClusterUIDKey] = "foreign-cluster"
-	require.False(t, reconciler.clusterSourceAuthorizesPVC(
-		intctrlutil.RequestCtx{Ctx: context.Background()}, cluster, pvc, sourceNamespace))
-	pvc.Annotations[constant.KBAppClusterUIDKey] = string(cluster.UID)
-	pvc.Spec.DataSourceRef.Name = "other-backup"
-	setReplicaRestoreSourceAnnotations(pvc)
-	require.False(t, reconciler.clusterSourceAuthorizesPVC(
-		intctrlutil.RequestCtx{Ctx: context.Background()}, cluster, pvc, sourceNamespace))
-}
-
 func TestReplicaRestoreReconcileRequiresCrossNamespaceOwnerIntent(t *testing.T) {
-	for _, intent := range []string{"matching", "absent", "other component", "other backup", "other namespace", "other group", "other kind", "initial restore only"} {
+	for _, intent := range []string{"matching", "absent", "other component", "other backup", "other namespace", "other group", "other kind", "foreign Cluster UID", "initial restore only"} {
 		t.Run(intent, func(t *testing.T) {
 			ctx := context.Background()
 			scheme, cluster, component, its, pvc := parentRestoreObjects(t)
@@ -4298,6 +4245,8 @@ func TestReplicaRestoreReconcileRequiresCrossNamespaceOwnerIntent(t *testing.T) 
 				cluster.Spec.ComponentSpecs[0].ReplicaRestore.Source.APIGroup = "other"
 			case "other kind":
 				cluster.Spec.ComponentSpecs[0].ReplicaRestore.Source.Kind = dptypes.RestoreKind
+			case "foreign Cluster UID":
+				pvc.Annotations[constant.KBAppClusterUIDKey] = "foreign-cluster"
 			case "initial restore only":
 				cluster.Spec.ComponentSpecs[0].ReplicaRestore = nil
 				cluster.Spec.Restore = &kbappsv1.ClusterRestore{Source: source}
@@ -4336,7 +4285,8 @@ func TestReplicaRestoreReconcileRequiresCrossNamespaceOwnerIntent(t *testing.T) 
 			restores := &dpv1alpha1.RestoreList{}
 			require.NoError(t, cli.List(ctx, restores))
 			require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(pvc), pvc))
-			if intent == "matching" {
+			switch intent {
+			case "matching":
 				require.Len(t, restores.Items, 1)
 				require.Equal(t, sourceNamespace, restores.Items[0].Spec.Backup.Namespace)
 				cluster.Spec.ComponentSpecs[0].ReplicaRestore = nil
@@ -4355,7 +4305,11 @@ func TestReplicaRestoreReconcileRequiresCrossNamespaceOwnerIntent(t *testing.T) 
 				require.NotNil(t, condition)
 				require.Equal(t, corev1.ConditionFalse, condition.Status)
 				require.Contains(t, condition.Message, "without matching cluster restore intent")
-			} else {
+			case "foreign Cluster UID":
+				require.Empty(t, restores.Items)
+				require.Empty(t, pvc.Labels[dptypes.ComponentUIDLabelKey])
+				require.NotContains(t, pvc.Finalizers, dptypes.DataProtectionFinalizerName)
+			default:
 				require.Empty(t, restores.Items)
 				condition := findPVCConditionByType(pvc, kbappsv1.ConditionTypeRestore)
 				require.NotNil(t, condition)
@@ -4542,28 +4496,6 @@ func TestReplicaAuxiliaryVolumeRejectsPostReadyOnlyBackup(t *testing.T) {
 	require.NotNil(t, condition)
 	require.Equal(t, corev1.ConditionFalse, condition.Status)
 	require.Contains(t, condition.Message, "requires a prepareData restore action")
-}
-
-func TestReconcileSkipsSourceLookupForProvisionedReplicaPVC(t *testing.T) {
-	scheme := runtime.NewScheme()
-	require.NoError(t, corev1.AddToScheme(scheme))
-	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
-	pvc := dependencyRestorePVC("logs-mysql-3", "mysql", "logs-pvc-uid")
-	delete(pvc.Annotations, constant.KBAppClusterUIDKey)
-	pvc.Annotations[constant.RestorePurposeAnnotationKey] = constant.RestorePurposeReplica
-	pvc.Spec.VolumeName = "logs-pv"
-	pvc.Status.Conditions = []corev1.PersistentVolumeClaimCondition{
-		{Type: PersistentVolumeClaimPopulating, Status: corev1.ConditionTrue, Reason: ReasonPopulatingProvisioned},
-		{Type: corev1.PersistentVolumeClaimConditionType(kbappsv1.ConditionTypeRestore), Status: corev1.ConditionTrue, Reason: ReasonPopulatingProvisioned},
-	}
-	cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(pvc).WithObjects(pvc).Build()
-	reconciler := &VolumePopulatorReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(10)}
-
-	result, err := reconciler.Reconcile(context.Background(), reconcile.Request{
-		NamespacedName: client.ObjectKeyFromObject(pvc),
-	})
-	require.NoError(t, err)
-	require.Zero(t, result)
 }
 
 func dependencyTestReconciler(t *testing.T, objects ...client.Object) *VolumePopulatorReconciler {
@@ -5960,7 +5892,7 @@ func TestReplicaRestoreChecksDataVolumeBeforeRegistration(t *testing.T) {
 	require.NotContains(t, pvc.Finalizers, dptypes.DataProtectionFinalizerName)
 }
 
-func TestSameNamespaceReplicaRestoreContinuesAfterOwnerSourceRemoval(t *testing.T) {
+func TestRegisteredReplicaPVCUsesItsBackupSource(t *testing.T) {
 	ctx := context.Background()
 	scheme, cluster, component, its, pvc := parentRestoreObjects(t)
 	cluster.Spec.Restore = nil

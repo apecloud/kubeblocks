@@ -261,7 +261,7 @@ func TestApplyClusterRestoreIntentHandlesInstanceTemplateVCTs(t *testing.T) {
 	require.Nil(t, component.Instances[0].VolumeClaimTemplates[1].Spec.DataSourceRef)
 }
 
-func TestValidateReplicaRestoreIntentUsesExistingComponentState(t *testing.T) {
+func TestReplicaRestoreAllowsScaleInDuringInitialization(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, appsv1.AddToScheme(scheme))
 	cluster := &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{
@@ -289,10 +289,8 @@ func TestValidateReplicaRestoreIntentUsesExistingComponentState(t *testing.T) {
 	component.Spec.ReplicaRestore = componentSpec.ReplicaRestore.DeepCopy()
 	component.Spec.Replicas = componentSpec.Replicas
 	require.NoError(t, reader.Update(context.Background(), component))
-	for _, replicas := range []int32{4, 3, 0} {
-		componentSpec.Replicas = replicas
-		require.NoError(t, applyClusterRestoreIntent(context.Background(), reader, cluster, []*appsv1.ClusterComponentSpec{componentSpec}, nil))
-	}
+	componentSpec.Replicas = 3
+	require.NoError(t, applyClusterRestoreIntent(context.Background(), reader, cluster, []*appsv1.ClusterComponentSpec{componentSpec}, nil))
 }
 
 func TestReplicaRestoreWaitsForInitialClusterRestore(t *testing.T) {

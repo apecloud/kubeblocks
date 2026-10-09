@@ -271,10 +271,6 @@ func isClusterRestorePVC(pvc *corev1.PersistentVolumeClaim) bool {
 		restoreComponent == pvc.Labels[constant.KBAppShardTemplateLabelKey]
 }
 
-// clusterRestorePVCUID returns the Cluster correlation identity inherited from
-// restore intent. Before VolumePopulator registers a PVC, the intent may only
-// have written the annotation; registration later adds the verified label.
-// Conflicting identities are never accepted.
 func clusterRestorePVCUID(pvc *corev1.PersistentVolumeClaim) string {
 	annotationUID := pvc.Annotations[constant.KBAppClusterUIDKey]
 	labelUID := pvc.Labels[dptypes.ClusterUIDLabelKey]
@@ -439,8 +435,8 @@ func (r *VolumePopulatorReconciler) syncPVC(reqCtx intctrlutil.RequestCtx, pvc *
 
 // handleRestoreParentLifecycle validates the recorded parent identity and
 // Cluster protection before restore work starts, and initiates owner-driven
-// cleanup when a supported parent is deleting. Existing PVCs retain their
-// source; cross-namespace restores still require matching owner intent.
+// cleanup when a supported parent is deleting. Target PVC deletion alone is
+// not a termination signal.
 func (r *VolumePopulatorReconciler) handleRestoreParentLifecycle(reqCtx intctrlutil.RequestCtx,
 	pvc *corev1.PersistentVolumeClaim) (bool, error) {
 	clusterName := pvc.Labels[constant.AppInstanceLabelKey]
@@ -526,8 +522,6 @@ func (r *VolumePopulatorReconciler) handleRestoreParentLifecycle(reqCtx intctrlu
 			if err = r.Client.Get(reqCtx.Ctx, client.ObjectKey{Namespace: backupNamespace, Name: pvc.Spec.DataSourceRef.Name}, backup); err != nil {
 				return false, err
 			}
-			// Validate workload volumes before recording identity. Retain may
-			// detach the workload owner after registration.
 			if err = r.validateReplicaRestoreDataVolume(reqCtx, pvc, backup); err != nil {
 				return false, err
 			}
@@ -678,9 +672,6 @@ func (r *VolumePopulatorReconciler) finishVolumePopulationTermination(reqCtx int
 			"Replica restore terminated by its owner lifecycle"); err != nil {
 			return err
 		}
-		// Publish the terminal condition before releasing target protection. The
-		// Cluster restore coordinator uses that condition to distinguish cleanup
-		// completion from an unregistered Replica PVC that has not started yet.
 		return intctrlutil.NewRequeueError(reconcileInterval, "waiting for Replica restore termination status")
 	}
 	return r.releaseTargetPVC(reqCtx, pvc)
@@ -849,10 +840,6 @@ func (r *VolumePopulatorReconciler) registerVolumePopulation(ctx context.Context
 func (r *VolumePopulatorReconciler) dispatchUnboundPVC(reqCtx intctrlutil.RequestCtx, pvc *corev1.PersistentVolumeClaim, restoreCtx *pvcRestoreContext) error {
 	if restoreCtx.mode == pvcRestoreModeRestoreData {
 		if len(restoreCtx.restoreMgr.PrepareDataBackupSets) == 0 {
-			if isReplicaRestorePVC(pvc) {
-				return intctrlutil.NewFatalError(fmt.Sprintf(
-					"replica restore PVC %s/%s requires a prepareData restore action", pvc.Namespace, pvc.Name))
-			}
 			if len(restoreCtx.restoreMgr.PostReadyBackupSets) > 0 {
 				return r.ProvisionOnly(reqCtx, pvc, restoreCtx)
 			}
@@ -981,8 +968,6 @@ func (r *VolumePopulatorReconciler) validateRestoreAndBuildMGR(reqCtx intctrluti
 		}
 	}
 	if decision.mode == pvcRestoreModeProvisionOnly {
-		// Cluster-owned PVCs validated their workload volumes at registration.
-		// Standalone PVCs still require a live owner here.
 		if isReplicaRestorePVC(pvc) &&
 			(pvc.Labels[dptypes.ClusterUIDLabelKey] == "" || pvc.Labels[dptypes.ComponentUIDLabelKey] == "") {
 			if err = r.validateReplicaRestoreDataVolume(reqCtx, pvc, backup); err != nil {
@@ -1003,7 +988,7 @@ func (r *VolumePopulatorReconciler) validateRestoreAndBuildMGR(reqCtx intctrluti
 	return &pvcRestoreContext{
 		restoreMgr:    restoreMgr,
 		mode:          decision.mode,
-		skipPostReady: decision.skipPostReady || isReplicaRestorePVC(pvc),
+		skipPostReady: decision.skipPostReady,
 	}, nil
 }
 
@@ -1866,7 +1851,6 @@ func (r *VolumePopulatorReconciler) pvcNeedsDataRestore(reqCtx intctrlutil.Reque
 func (r *VolumePopulatorReconciler) ensurePostReadyRestoreCompleted(reqCtx intctrlutil.RequestCtx,
 	pvc *corev1.PersistentVolumeClaim,
 	restoreCtx *pvcRestoreContext) (bool, error) {
-	// Replica restores only run prepareData.
 	if isReplicaRestorePVC(pvc) {
 		return true, nil
 	}
@@ -2858,13 +2842,11 @@ func (r *VolumePopulatorReconciler) validateBackupNamespaceAuthorized(reqCtx int
 	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Namespace: pvc.Namespace, Name: clusterName}, cluster); err != nil {
 		return err
 	}
-	if !r.clusterSourceAuthorizesPVC(reqCtx, cluster, pvc, backupNamespace) {
+	if !r.clusterSourceAuthorizesPVC(cluster, pvc, backupNamespace) {
 		return fmt.Errorf("PVC %s/%s can not restore Backup %s/%s without matching cluster restore intent",
 			pvc.Namespace, pvc.Name, backupNamespace, pvc.Spec.DataSourceRef.Name)
 	}
 	if isReplicaRestorePVC(pvc) && volumePopulationIdentityCommitted(pvc, cluster) {
-		// Parent lifecycle checks the registered Cluster/Component identity.
-		// A retained PVC may legitimately have lost its workload owner.
 		return nil
 	}
 	if err := r.validateBackupRestorePVCWorkload(reqCtx, pvc, clusterName); err != nil {
@@ -2873,10 +2855,7 @@ func (r *VolumePopulatorReconciler) validateBackupNamespaceAuthorized(reqCtx int
 	return nil
 }
 
-// clusterSourceAuthorizesPVC requires the initial Cluster restore source or
-// the corresponding component ReplicaRestore source to match the PVC.
-func (r *VolumePopulatorReconciler) clusterSourceAuthorizesPVC(reqCtx intctrlutil.RequestCtx,
-	cluster *appsv1.Cluster, pvc *corev1.PersistentVolumeClaim, backupNamespace string) bool {
+func (r *VolumePopulatorReconciler) clusterSourceAuthorizesPVC(cluster *appsv1.Cluster, pvc *corev1.PersistentVolumeClaim, backupNamespace string) bool {
 	ref := pvc.Spec.DataSourceRef
 	if ref == nil {
 		return false

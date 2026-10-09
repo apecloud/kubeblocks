@@ -285,7 +285,6 @@ func (r *componentWorkloadOps) buildDataReplicationTask() error {
 	if err != nil {
 		return err
 	}
-	provisioningReplicas = slices.DeleteFunc(provisioningReplicas, r.restoreReplicas.Has)
 
 	if len(newReplicas) == 0 && len(provisioningReplicas) == 0 {
 		return nil

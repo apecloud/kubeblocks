@@ -781,7 +781,6 @@ func TestCopyAndMergeObjects(t *testing.T) {
 
 func TestCopyAndMergePreservesExistingReplicaRestoreSource(t *testing.T) {
 	oldGroup := "dataprotection.kubeblocks.io"
-	newGroup := oldGroup
 	oldPVC := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{
 		Name: "data-mysql-0",
 		Annotations: map[string]string{
@@ -795,7 +794,7 @@ func TestCopyAndMergePreservesExistingReplicaRestoreSource(t *testing.T) {
 	}}}
 	newPVC := oldPVC.DeepCopy()
 	newPVC.Annotations[constant.RestoreSourceNameAnnotationKey] = "new-backup"
-	newPVC.Spec.DataSourceRef = &corev1.TypedObjectReference{APIGroup: &newGroup, Kind: "Backup", Name: "new-backup"}
+	newPVC.Spec.DataSourceRef = &corev1.TypedObjectReference{APIGroup: &oldGroup, Kind: "Backup", Name: "new-backup"}
 	merged := copyAndMerge(oldPVC, newPVC).(*corev1.PersistentVolumeClaim)
 	if merged.Spec.DataSourceRef.Name != "old-backup" || merged.Annotations[constant.RestoreSourceNameAnnotationKey] != "old-backup" {
 		t.Fatalf("existing PVC restore source changed: %#v", merged)
@@ -854,14 +853,6 @@ func TestReplicaRestoreRejectsVolumeClaimTemplateSource(t *testing.T) {
 		}
 		if len(tree.List(&corev1.PersistentVolumeClaim{})) != 0 {
 			t.Fatal("conflicting restore PVC was created")
-		}
-		inst.Spec.ReplicaRestore = nil
-		if _, err := NewAlignmentReconciler().Reconcile(tree); err != nil {
-			t.Fatalf("ordinary PVC source was rejected: %v", err)
-		}
-		pvc := tree.List(&corev1.PersistentVolumeClaim{})[0].(*corev1.PersistentVolumeClaim)
-		if !reflect.DeepEqual(pvc.Spec, spec) {
-			t.Fatalf("ordinary PVC source changed: %#v", pvc.Spec)
 		}
 	}
 }

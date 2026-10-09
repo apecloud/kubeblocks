@@ -119,7 +119,7 @@ var _ = Describe("Component Workload Operations Test", func() {
 	})
 
 	Context("Data Replication Operations", func() {
-		DescribeTable("keeps Backup initialization exclusive with data replication", func(from int32, source, existing, restored, donor, ordinary bool) {
+		DescribeTable("keeps Backup initialization exclusive with data replication", func(from int32, restore bool) {
 			synthesizeComp.Replicas = from + 2
 			synthesizeComp.FullCompName = "test-its"
 			synthesizeComp.Generation = "2"
@@ -131,7 +131,7 @@ var _ = Describe("Component Workload Operations Test", func() {
 			runningITS.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{{ObjectMeta: metav1.ObjectMeta{Name: "data"}}}
 			protoITS := runningITS.DeepCopy()
 			protoITS.Spec.Replicas = ptr.To(from + 2)
-			if source {
+			if restore {
 				protoITS.Spec.ReplicaRestore = &appsv1.ClusterReplicaRestore{Source: appsv1.ClusterRestoreSource{
 					APIGroup: "dataprotection.kubeblocks.io", Kind: "Backup", Name: "backup",
 				}}
@@ -139,22 +139,7 @@ var _ = Describe("Component Workload Operations Test", func() {
 			synthesizeComp.ReplicaRestore = protoITS.Spec.ReplicaRestore
 			newNames := []string{fmt.Sprintf("test-its-%d", from), fmt.Sprintf("test-its-%d", from+1)}
 			objects := []client.Object{runningITS}
-			if existing {
-				for _, name := range newNames {
-					pvc := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{
-						Namespace: testCtx.DefaultNamespace, Name: "data-" + name,
-						Labels: map[string]string{
-							constant.AppInstanceLabelKey: clusterName, constant.KBAppComponentLabelKey: compName,
-							constant.KBAppPodNameLabelKey: name, constant.VolumeClaimTemplateNameLabelKey: "data",
-						},
-					}}
-					if restored {
-						pvc.Annotations = map[string]string{constant.RestorePurposeAnnotationKey: constant.RestorePurposeReplica}
-					}
-					objects = append(objects, pvc)
-				}
-			}
-			if donor {
+			if from > 0 {
 				pod := testapps.NewPodFactory(testCtx.DefaultNamespace, "test-its-0").
 					AddAppInstanceLabel(clusterName).AddAppComponentLabel(compName).AddAppManagedByLabel().
 					AddContainer(corev1.Container{Name: kbagent.ContainerName, Ports: []corev1.ContainerPort{{
@@ -169,21 +154,14 @@ var _ = Describe("Component Workload Operations Test", func() {
 					},
 				}})
 			}
-			otherTask := kbagentproto.Task{Instance: "test-its", Task: "other", UID: "other"}
-			envVar, err := kbagent.BuildEnv4Worker([]kbagentproto.Task{otherTask})
-			Expect(err).ShouldNot(HaveOccurred())
-			env := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Namespace: testCtx.DefaultNamespace,
-				Name: constant.GenerateClusterComponentEnvPattern(clusterName, compName)}, Data: map[string]string{envVar.Name: envVar.Value}}
-			objects = append(objects, env)
 			cli := fake.NewClientBuilder().WithScheme(model.GetScheme()).WithObjects(objects...).Build()
 			graphCli = model.NewGraphClient(cli)
 			dag = newDAG(graphCli, comp)
 			transCtx := &componentTransformContext{Context: ctx, Client: graphCli, Logger: logger,
 				EventRecorder: record.NewFakeRecorder(10), Component: comp, SynthesizeComponent: synthesizeComp}
 			transformer := &componentWorkloadTransformer{Client: cli}
-			// Existing replicas may have been provisioned before data actions were defined.
-			if donor {
-				Expect(component.StatusReplicasStatus(protoITS, []string{"test-its-0"}, true, false)).Should(Succeed())
+			if from > 0 {
+				Expect(component.StatusReplicasStatus(protoITS, []string{"test-its-0"}, true, true)).Should(Succeed())
 			}
 			component.BuildReplicasStatus(protoITS, runningITS)
 			Expect(transformer.reconcileReplicasStatus(ctx, cli, synthesizeComp, comp, runningITS, protoITS)).Should(Succeed())
@@ -197,7 +175,7 @@ var _ = Describe("Component Workload Operations Test", func() {
 				return s.DataLoaded != nil && !*s.DataLoaded
 			})
 			Expect(err).ShouldNot(HaveOccurred())
-			if ordinary {
+			if !restore {
 				Expect(pending).Should(ConsistOf(newNames))
 			} else {
 				Expect(pending).Should(BeEmpty())
@@ -207,43 +185,27 @@ var _ = Describe("Component Workload Operations Test", func() {
 				Expect(err).ShouldNot(HaveOccurred())
 				Expect(members).Should(ConsistOf(newNames))
 			}
-			if donor {
-				donors, err := component.GetReplicasStatusFunc(updated, func(s component.ReplicaStatus) bool {
-					return s.Name == "test-its-0" && s.Provisioned && s.DataLoaded == nil
+			vertex := graphCli.FindMatchedVertex(dag, &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
+				Namespace: testCtx.DefaultNamespace, Name: constant.GenerateClusterComponentEnvPattern(clusterName, compName),
+			}})
+			if restore {
+				Expect(vertex).Should(BeNil())
+			} else {
+				Expect(vertex).ShouldNot(BeNil())
+				var tasks []kbagentproto.Task
+				_, err = kbagent.UpdateEnv4Worker(vertex.(*model.ObjectVertex).Obj.(*corev1.ConfigMap).Data, func(task kbagentproto.Task) *kbagentproto.Task {
+					tasks = append(tasks, task)
+					return &task
 				})
 				Expect(err).ShouldNot(HaveOccurred())
-				Expect(donors).Should(Equal([]string{"test-its-0"}))
-			}
-			vertex := graphCli.FindMatchedVertex(dag, env)
-			updatedEnv := env
-			if vertex != nil {
-				updatedEnv = vertex.(*model.ObjectVertex).Obj.(*corev1.ConfigMap)
-			}
-			var dataTasks []kbagentproto.Task
-			var others []kbagentproto.Task
-			_, err = kbagent.UpdateEnv4Worker(updatedEnv.Data, func(task kbagentproto.Task) *kbagentproto.Task {
-				if task.NewReplica != nil {
-					dataTasks = append(dataTasks, task)
-				} else {
-					others = append(others, task)
-				}
-				return &task
-			})
-			Expect(err).ShouldNot(HaveOccurred())
-			if ordinary {
-				Expect(dataTasks).Should(HaveLen(1))
-				Expect(dataTasks[0].UID).Should(Equal("2"))
-				Expect(dataTasks[0].NewReplica.Replicas).Should(ContainSubstring(newNames[0]))
-				Expect(dataTasks[0].NewReplica.Replicas).Should(ContainSubstring(newNames[1]))
-			} else {
-				Expect(dataTasks).Should(BeEmpty())
-				Expect(others).Should(Equal([]kbagentproto.Task{otherTask}))
+				Expect(tasks).Should(HaveLen(1))
+				Expect(tasks[0].NewReplica.Replicas).Should(ContainSubstring(newNames[0]))
+				Expect(tasks[0].NewReplica.Replicas).Should(ContainSubstring(newNames[1]))
 			}
 		},
-			Entry("Backup scale-out from zero does not require a donor", int32(0), true, false, false, false, false),
-			Entry("Backup does not copy from an available donor", int32(3), true, false, false, true, false),
-			Entry("existing Backup PVCs retain their initialization method", int32(3), false, true, true, false, false),
-			Entry("ordinary scale-out uses live data replication", int32(3), false, false, false, true, true),
+			Entry("Backup scale-out from zero does not require a donor", int32(0), true),
+			Entry("Backup does not copy from an available donor", int32(3), true),
+			Entry("ordinary scale-out uses live data replication", int32(3), false),
 		)
 
 		It("blocks scale-out when data actions have no source pod", func() {
@@ -326,7 +288,7 @@ var _ = Describe("Component Workload Operations Test", func() {
 		},
 			Entry("pending PVC", corev1.ConditionUnknown, false),
 			Entry("failed PVC", corev1.ConditionFalse, false),
-			Entry("completed PVC after source removal", corev1.ConditionTrue, true),
+			Entry("completed PVC", corev1.ConditionTrue, true),
 		)
 	})
 

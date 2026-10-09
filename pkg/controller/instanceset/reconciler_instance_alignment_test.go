@@ -71,8 +71,6 @@ var _ = Describe("replicas alignment reconciler test", func() {
 		Expect(err).NotTo(HaveOccurred())
 		replicas = 5
 		its.Spec.ReplicaRestore.Source.Name = "backup-b"
-		// A fresh reconciler uses the newly desired state even while the first
-		// added replica is still restoring.
 		_, err = NewReplicasAlignmentReconciler().Reconcile(tree)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(tree.List(&corev1.Pod{})).To(HaveLen(5))
@@ -107,8 +105,6 @@ var _ = Describe("replicas alignment reconciler test", func() {
 				Expect(pvc.Annotations).NotTo(HaveKey(constant.RestorePurposeAnnotationKey))
 			}
 		}
-		// Removing replicas uses the ordinary deletion path even while Backup
-		// initialization has not completed.
 		tree.EventRecorder = record.NewFakeRecorder(10)
 		its.Spec.PodManagementPolicy = appsv1.OrderedReadyPodManagement
 		its.Spec.ReplicaRestore = &kbappsv1.ClusterReplicaRestore{Source: kbappsv1.ClusterRestoreSource{

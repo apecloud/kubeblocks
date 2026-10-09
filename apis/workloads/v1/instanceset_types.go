@@ -76,10 +76,6 @@ func init() {
 
 // InstanceSetSpec defines the desired state of InstanceSet
 type InstanceSetSpec struct {
-	// ReplicaRestore carries the owner restore intent to PVC creation.
-	//
-	// +optional
-	ReplicaRestore *kbappsv1.ClusterReplicaRestore `json:"replicaRestore,omitempty"`
 	// Specifies the desired number of replicas of the given Template.
 	// These replicas are instantiations of the same Template, with each having a consistent identity.
 	// Defaults to 1 if unspecified.
@@ -87,6 +83,11 @@ type InstanceSetSpec struct {
 	// +kubebuilder:validation:Minimum=0
 	// +optional
 	Replicas *int32 `json:"replicas,omitempty"`
+
+	// Specifies the restore source used to initialize new instances during scale-out.
+	//
+	// +optional
+	ReplicaRestore *kbappsv1.ClusterReplicaRestore `json:"replicaRestore,omitempty"`
 
 	// Specifies the desired Ordinals.
 	// The Ordinals used to specify the ordinal of the instance (pod) names to be generated under the InstanceSet.

@@ -473,20 +473,6 @@ ComponentSpec
 <tbody>
 <tr>
 <td>
-<code>replicaRestore</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.ClusterReplicaRestore">
-ClusterReplicaRestore
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>ReplicaRestore carries the owner restore intent to workload PVC creation.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>terminationPolicy</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.TerminationPolicyType">
@@ -712,6 +698,20 @@ int32
 </td>
 <td>
 <p>Specifies the desired number of replicas in the Component for enhancing availability and durability, or load balancing.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>replicaRestore</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ClusterReplicaRestore">
+ClusterReplicaRestore
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the restore source used to initialize new replicas during scale-out.</p>
 </td>
 </tr>
 <tr>
@@ -3262,18 +3262,8 @@ ClusterReplicaRestore
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the Backup source for replicas added during scale-out.
-Only prepareData is executed. Post-ready actions are not supported.
-Only existing, non-sharding Components with default contiguous ordinals
-are supported. Instance templates and offline instances are not supported.
-Any initial Cluster restore must have completed before using this field.
-Each replica&rsquo;s initialization method is fixed when it is added. Changing
-the method or restore input of a replica being initialized is unsupported.
-Replicas may be removed during initialization using ordinary scale-in.
-Volume claim template dataSource and dataSourceRef cannot be combined with
-replicaRestore. Existing PVC sources and restore resources are preserved.
-Cross-namespace restores require matching owner restore intent until the
-PVC restore is terminal.</p>
+<p>Specifies the source used to initialize new replicas when scaling out
+an existing Component. Existing replicas retain their initialization input.</p>
 </td>
 </tr>
 <tr>
@@ -3962,12 +3952,8 @@ component is in <code>Creating</code> or <code>Updating</code> phase, indicates 
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSpec">InstanceSpec</a>)
 </p>
 <div>
-<p>ClusterReplicaRestore specifies how to initialize replicas added during
-horizontal scale-out. It uses the same source and restore parameters as a
-Cluster restore, while the target replicas are taken from the Component&rsquo;s
-replicas field.
-Only prepareData is executed. Post-ready actions are not supported.
-AllPods Backups containing multiple source pods are not supported.</p>
+<p>ClusterReplicaRestore specifies the source and options for initializing new
+replicas during scale-out.</p>
 </div>
 <table>
 <thead>
@@ -3999,7 +3985,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the source target in a Backup with multiple targets.</p>
+<p>Specifies a target within the restore source.</p>
 </td>
 </tr>
 <tr>
@@ -4037,7 +4023,7 @@ map[string]string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies environment variables for the restore worker.</p>
+<p>Specifies environment variables used during replica initialization.</p>
 </td>
 </tr>
 </tbody>
@@ -6935,20 +6921,6 @@ Instead, you can enable the creation of this service by specifying it explicitly
 <tbody>
 <tr>
 <td>
-<code>replicaRestore</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.ClusterReplicaRestore">
-ClusterReplicaRestore
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>ReplicaRestore carries the owner restore intent to workload PVC creation.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>terminationPolicy</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.TerminationPolicyType">
@@ -7174,6 +7146,20 @@ int32
 </td>
 <td>
 <p>Specifies the desired number of replicas in the Component for enhancing availability and durability, or load balancing.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>replicaRestore</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ClusterReplicaRestore">
+ClusterReplicaRestore
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the restore source used to initialize new replicas during scale-out.</p>
 </td>
 </tr>
 <tr>
@@ -18751,21 +18737,6 @@ InstanceSpec
 <tbody>
 <tr>
 <td>
-<code>replicaRestore</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.ClusterReplicaRestore">
-ClusterReplicaRestore
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>ReplicaRestore is copied from the owning InstanceSet at creation and is used only
-while building PVCs for this instance.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>template</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#podtemplatespec-v1-core">
@@ -18822,6 +18793,21 @@ size, and access modes.
 These templates are used to dynamically provision persistent volumes for instance upon their creation.
 The final name of each PVC is generated by appending the pod&rsquo;s identifier to the name specified in volumeClaimTemplates[*].name.</p>
 <p>VolumeClaimTemplates []corev1.PersistentVolumeClaim <code>json:&quot;volumeClaimTemplates,omitempty&quot;</code></p>
+</td>
+</tr>
+<tr>
+<td>
+<code>replicaRestore</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ClusterReplicaRestore">
+ClusterReplicaRestore
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the restore source used to initialize this instance.
+It is fixed when the instance is created.</p>
 </td>
 </tr>
 <tr>
@@ -19053,20 +19039,6 @@ InstanceSetSpec
 <tbody>
 <tr>
 <td>
-<code>replicaRestore</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.ClusterReplicaRestore">
-ClusterReplicaRestore
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>ReplicaRestore carries the owner restore intent to PVC creation.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>replicas</code><br/>
 <em>
 int32
@@ -19077,6 +19049,20 @@ int32
 <p>Specifies the desired number of replicas of the given Template.
 These replicas are instantiations of the same Template, with each having a consistent identity.
 Defaults to 1 if unspecified.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>replicaRestore</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ClusterReplicaRestore">
+ClusterReplicaRestore
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the restore source used to initialize new instances during scale-out.</p>
 </td>
 </tr>
 <tr>
@@ -19807,20 +19793,6 @@ string
 <tbody>
 <tr>
 <td>
-<code>replicaRestore</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.ClusterReplicaRestore">
-ClusterReplicaRestore
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>ReplicaRestore carries the owner restore intent to PVC creation.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>replicas</code><br/>
 <em>
 int32
@@ -19831,6 +19803,20 @@ int32
 <p>Specifies the desired number of replicas of the given Template.
 These replicas are instantiations of the same Template, with each having a consistent identity.
 Defaults to 1 if unspecified.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>replicaRestore</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ClusterReplicaRestore">
+ClusterReplicaRestore
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the restore source used to initialize new instances during scale-out.</p>
 </td>
 </tr>
 <tr>
@@ -20475,21 +20461,6 @@ to allocate next during scaling up, or which identity is preserved during a rest
 <tbody>
 <tr>
 <td>
-<code>replicaRestore</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.ClusterReplicaRestore">
-ClusterReplicaRestore
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>ReplicaRestore is copied from the owning InstanceSet at creation and is used only
-while building PVCs for this instance.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>template</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#podtemplatespec-v1-core">
@@ -20546,6 +20517,21 @@ size, and access modes.
 These templates are used to dynamically provision persistent volumes for instance upon their creation.
 The final name of each PVC is generated by appending the pod&rsquo;s identifier to the name specified in volumeClaimTemplates[*].name.</p>
 <p>VolumeClaimTemplates []corev1.PersistentVolumeClaim <code>json:&quot;volumeClaimTemplates,omitempty&quot;</code></p>
+</td>
+</tr>
+<tr>
+<td>
+<code>replicaRestore</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ClusterReplicaRestore">
+ClusterReplicaRestore
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the restore source used to initialize this instance.
+It is fixed when the instance is created.</p>
 </td>
 </tr>
 <tr>

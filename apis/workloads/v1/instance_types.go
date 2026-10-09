@@ -61,11 +61,6 @@ func init() {
 
 // InstanceSpec defines the desired state of Instance
 type InstanceSpec struct {
-	// ReplicaRestore is copied from the owning InstanceSet at creation and is used only
-	// while building PVCs for this instance.
-	// +optional
-	ReplicaRestore *kbappsv1.ClusterReplicaRestore `json:"replicaRestore,omitempty"`
-
 	Template corev1.PodTemplateSpec `json:"template"`
 
 	// Represents a label query over pods that should match the desired replica count indicated by the `replica` field.
@@ -91,6 +86,12 @@ type InstanceSpec struct {
 	// +optional
 	// VolumeClaimTemplates []corev1.PersistentVolumeClaim `json:"volumeClaimTemplates,omitempty"`
 	VolumeClaimTemplates []corev1.PersistentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
+
+	// Specifies the restore source used to initialize this instance.
+	// It is fixed when the instance is created.
+	//
+	// +optional
+	ReplicaRestore *kbappsv1.ClusterReplicaRestore `json:"replicaRestore,omitempty"`
 
 	// persistentVolumeClaimRetentionPolicy describes the lifecycle of persistent
 	// volume claims created from volumeClaimTemplates. By default, all persistent

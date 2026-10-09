@@ -345,18 +345,8 @@ type ClusterComponentSpec struct {
 	// +kubebuilder:default=1
 	Replicas int32 `json:"replicas"`
 
-	// Specifies the Backup source for replicas added during scale-out.
-	// Only prepareData is executed. Post-ready actions are not supported.
-	// Only existing, non-sharding Components with default contiguous ordinals
-	// are supported. Instance templates and offline instances are not supported.
-	// Any initial Cluster restore must have completed before using this field.
-	// Each replica's initialization method is fixed when it is added. Changing
-	// the method or restore input of a replica being initialized is unsupported.
-	// Replicas may be removed during initialization using ordinary scale-in.
-	// Volume claim template dataSource and dataSourceRef cannot be combined with
-	// replicaRestore. Existing PVC sources and restore resources are preserved.
-	// Cross-namespace restores require matching owner restore intent until the
-	// PVC restore is terminal.
+	// Specifies the source used to initialize new replicas when scaling out
+	// an existing Component. Existing replicas retain their initialization input.
 	//
 	// +optional
 	ReplicaRestore *ClusterReplicaRestore `json:"replicaRestore,omitempty"`
@@ -909,19 +899,15 @@ type ClusterRestore struct {
 	Parameters map[string]string `json:"parameters,omitempty"`
 }
 
-// ClusterReplicaRestore specifies how to initialize replicas added during
-// horizontal scale-out. It uses the same source and restore parameters as a
-// Cluster restore, while the target replicas are taken from the Component's
-// replicas field.
-// Only prepareData is executed. Post-ready actions are not supported.
-// AllPods Backups containing multiple source pods are not supported.
+// ClusterReplicaRestore specifies the source and options for initializing new
+// replicas during scale-out.
 type ClusterReplicaRestore struct {
 	// Specifies the restore source.
 	//
 	// +kubebuilder:validation:Required
 	Source ClusterRestoreSource `json:"source"`
 
-	// Specifies the source target in a Backup with multiple targets.
+	// Specifies a target within the restore source.
 	//
 	// +optional
 	SourceTargetName string `json:"sourceTargetName,omitempty"`
@@ -936,7 +922,7 @@ type ClusterReplicaRestore struct {
 	// +optional
 	Parameters map[string]string `json:"parameters,omitempty"`
 
-	// Specifies environment variables for the restore worker.
+	// Specifies environment variables used during replica initialization.
 	//
 	// +optional
 	Env []corev1.EnvVar `json:"env,omitempty"`

@@ -2910,22 +2910,12 @@ spec:
                       type: string
                     replicaRestore:
                       description: |-
-                        Specifies the Backup source for replicas added during scale-out.
-                        Only prepareData is executed. Post-ready actions are not supported.
-                        Only existing, non-sharding Components with default contiguous ordinals
-                        are supported. Instance templates and offline instances are not supported.
-                        Any initial Cluster restore must have completed before using this field.
-                        Each replica's initialization method is fixed when it is added. Changing
-                        the method or restore input of a replica being initialized is unsupported.
-                        Replicas may be removed during initialization using ordinary scale-in.
-                        Volume claim template dataSource and dataSourceRef cannot be combined with
-                        replicaRestore. Existing PVC sources and restore resources are preserved.
-                        Cross-namespace restores require matching owner restore intent until the
-                        PVC restore is terminal.
+                        Specifies the source used to initialize new replicas when scaling out
+                        an existing Component. Existing replicas retain their initialization input.
                       properties:
                         env:
-                          description: Specifies environment variables for the restore
-                            worker.
+                          description: Specifies environment variables used during
+                            replica initialization.
                           items:
                             description: EnvVar represents an environment variable
                               present in a Container.
@@ -3068,8 +3058,7 @@ spec:
                           - name
                           type: object
                         sourceTargetName:
-                          description: Specifies the source target in a Backup with
-                            multiple targets.
+                          description: Specifies a target within the restore source.
                           type: string
                       required:
                       - source
@@ -14369,22 +14358,12 @@ spec:
                           type: string
                         replicaRestore:
                           description: |-
-                            Specifies the Backup source for replicas added during scale-out.
-                            Only prepareData is executed. Post-ready actions are not supported.
-                            Only existing, non-sharding Components with default contiguous ordinals
-                            are supported. Instance templates and offline instances are not supported.
-                            Any initial Cluster restore must have completed before using this field.
-                            Each replica's initialization method is fixed when it is added. Changing
-                            the method or restore input of a replica being initialized is unsupported.
-                            Replicas may be removed during initialization using ordinary scale-in.
-                            Volume claim template dataSource and dataSourceRef cannot be combined with
-                            replicaRestore. Existing PVC sources and restore resources are preserved.
-                            Cross-namespace restores require matching owner restore intent until the
-                            PVC restore is terminal.
+                            Specifies the source used to initialize new replicas when scaling out
+                            an existing Component. Existing replicas retain their initialization input.
                           properties:
                             env:
-                              description: Specifies environment variables for the
-                                restore worker.
+                              description: Specifies environment variables used during
+                                replica initialization.
                               items:
                                 description: EnvVar represents an environment variable
                                   present in a Container.
@@ -14530,8 +14509,7 @@ spec:
                               - name
                               type: object
                             sourceTargetName:
-                              description: Specifies the source target in a Backup
-                                with multiple targets.
+                              description: Specifies a target within the restore source.
                               type: string
                           required:
                           - source

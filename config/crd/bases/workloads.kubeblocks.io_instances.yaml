@@ -2463,11 +2463,12 @@ spec:
                 type: string
               replicaRestore:
                 description: |-
-                  ReplicaRestore is copied from the owning InstanceSet at creation and is used only
-                  while building PVCs for this instance.
+                  Specifies the restore source used to initialize this instance.
+                  It is fixed when the instance is created.
                 properties:
                   env:
-                    description: Specifies environment variables for the restore worker.
+                    description: Specifies environment variables used during replica
+                      initialization.
                     items:
                       description: EnvVar represents an environment variable present
                         in a Container.
@@ -2610,8 +2611,7 @@ spec:
                     - name
                     type: object
                   sourceTargetName:
-                    description: Specifies the source target in a Backup with multiple
-                      targets.
+                    description: Specifies a target within the restore source.
                     type: string
                 required:
                 - source

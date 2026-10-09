@@ -3158,11 +3158,12 @@ spec:
                 - PreferInPlace
                 type: string
               replicaRestore:
-                description: ReplicaRestore carries the owner restore intent to workload
-                  PVC creation.
+                description: Specifies the restore source used to initialize new replicas
+                  during scale-out.
                 properties:
                   env:
-                    description: Specifies environment variables for the restore worker.
+                    description: Specifies environment variables used during replica
+                      initialization.
                     items:
                       description: EnvVar represents an environment variable present
                         in a Container.
@@ -3305,8 +3306,7 @@ spec:
                     - name
                     type: object
                   sourceTargetName:
-                    description: Specifies the source target in a Backup with multiple
-                      targets.
+                    description: Specifies a target within the restore source.
                     type: string
                 required:
                 - source

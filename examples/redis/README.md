@@ -667,13 +667,13 @@ spec:
     - name: redis-advertised  # override service named `redis-advertised` defined in ComponentDefinition
       serviceType: NodePort
       podService: true
-# irrelevant lines commited
+# irrelevant lines committed
   - name: redis-sentinel
     services:
     - name: sentinel-advertised  # override service named `sentinel-advertised` defined in ComponentDefinition
       serviceType: NodePort
       podService: true
-# irrelevant lines commited
+# irrelevant lines committed
 ```
 Service `redis-advertised` and `redis-sentinel` are defined in `ComponentDefinition` name `redis-7` and `redis-sentinel-7`.  They are used to to parse the advertised endpoints of the Redis pods and Sentinel Pods.
 

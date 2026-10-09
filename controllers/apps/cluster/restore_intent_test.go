@@ -36,7 +36,6 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 )
 
 const (
@@ -169,7 +168,7 @@ func TestApplyClusterRestoreIntentCleansTemplatesAfterRestoreCompleted(t *testin
 		}},
 	}
 
-	require.NoError(t, applyClusterRestoreIntent(context.Background(), nil, cluster, []*appsv1.ClusterComponentSpec{component}, nil))
+	require.NoError(t, applyClusterRestoreIntent(cluster, []*appsv1.ClusterComponentSpec{component}, nil))
 
 	vct := component.VolumeClaimTemplates[0]
 	require.Nil(t, vct.Spec.DataSourceRef)
@@ -207,7 +206,7 @@ func TestApplyClusterRestoreIntentKeepsNonRestoreDataSourceAfterRestoreCompleted
 		}},
 	}
 
-	require.NoError(t, applyClusterRestoreIntent(context.Background(), nil, cluster, []*appsv1.ClusterComponentSpec{component}, nil))
+	require.NoError(t, applyClusterRestoreIntent(cluster, []*appsv1.ClusterComponentSpec{component}, nil))
 
 	vct := component.VolumeClaimTemplates[0]
 	require.NotNil(t, vct.Spec.DataSourceRef)
@@ -242,7 +241,7 @@ func TestApplyClusterRestoreIntentHandlesInstanceTemplateVCTs(t *testing.T) {
 		}},
 	}
 
-	require.NoError(t, applyClusterRestoreIntent(context.Background(), nil, cluster, []*appsv1.ClusterComponentSpec{component}, nil))
+	require.NoError(t, applyClusterRestoreIntent(cluster, []*appsv1.ClusterComponentSpec{component}, nil))
 
 	require.Equal(t, testRestoreSourceKind, component.VolumeClaimTemplates[0].Spec.DataSourceRef.Kind)
 	require.Equal(t, testRestoreSourceKind, component.Instances[0].VolumeClaimTemplates[0].Spec.DataSourceRef.Kind)
@@ -254,69 +253,28 @@ func TestApplyClusterRestoreIntentHandlesInstanceTemplateVCTs(t *testing.T) {
 		Status: metav1.ConditionTrue,
 	}}
 
-	require.NoError(t, applyClusterRestoreIntent(context.Background(), nil, cluster, []*appsv1.ClusterComponentSpec{component}, nil))
+	require.NoError(t, applyClusterRestoreIntent(cluster, []*appsv1.ClusterComponentSpec{component}, nil))
 
 	require.Nil(t, component.VolumeClaimTemplates[0].Spec.DataSourceRef)
 	require.Nil(t, component.Instances[0].VolumeClaimTemplates[0].Spec.DataSourceRef)
 	require.Nil(t, component.Instances[0].VolumeClaimTemplates[1].Spec.DataSourceRef)
 }
 
-func TestReplicaRestoreAllowsScaleInDuringInitialization(t *testing.T) {
-	scheme := runtime.NewScheme()
-	require.NoError(t, appsv1.AddToScheme(scheme))
-	cluster := &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{
-		Namespace: "default", Name: "demo", UID: "cluster-uid",
-	}}
-	component := &appsv1.Component{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "default", Name: constant.GenerateClusterComponentName("demo", "mysql"), Generation: 2,
-		},
-		Spec: appsv1.ComponentSpec{
-			Replicas:             3,
-			VolumeClaimTemplates: []appsv1.PersistentVolumeClaimTemplate{{Name: "data"}},
-		},
-		Status: appsv1.ComponentStatus{Phase: appsv1.RunningComponentPhase, ObservedGeneration: 2},
-	}
-	source := appsv1.ClusterRestoreSource{APIGroup: dptypes.DataprotectionAPIGroup, Kind: dptypes.BackupKind, Name: "backup"}
-	componentSpec := &appsv1.ClusterComponentSpec{
-		Name: "mysql", Replicas: 5,
-		VolumeClaimTemplates: []appsv1.PersistentVolumeClaimTemplate{{Name: "data"}},
-		ReplicaRestore:       &appsv1.ClusterReplicaRestore{Source: source},
-	}
-	reader := fake.NewClientBuilder().WithScheme(scheme).WithObjects(component).Build()
-	require.NoError(t, applyClusterRestoreIntent(context.Background(), reader, cluster, []*appsv1.ClusterComponentSpec{componentSpec}, nil))
-
-	component.Spec.ReplicaRestore = componentSpec.ReplicaRestore.DeepCopy()
-	component.Spec.Replicas = componentSpec.Replicas
-	require.NoError(t, reader.Update(context.Background(), component))
-	componentSpec.Replicas = 3
-	require.NoError(t, applyClusterRestoreIntent(context.Background(), reader, cluster, []*appsv1.ClusterComponentSpec{componentSpec}, nil))
-}
-
 func TestReplicaRestoreWaitsForInitialClusterRestore(t *testing.T) {
-	scheme := runtime.NewScheme()
-	require.NoError(t, appsv1.AddToScheme(scheme))
 	cluster := &appsv1.Cluster{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "demo"},
 		Spec: appsv1.ClusterSpec{Restore: &appsv1.ClusterRestore{Source: appsv1.ClusterRestoreSource{
-			APIGroup: dptypes.DataprotectionAPIGroup, Kind: dptypes.BackupKind, Name: "initial-backup",
+			APIGroup: testRestoreSourceAPIGroup, Kind: testRestoreSourceKind, Name: "initial-restore",
 		}}},
-	}
-	component := &appsv1.Component{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "demo-mysql"},
-		Spec:       appsv1.ComponentSpec{Replicas: 3, VolumeClaimTemplates: []appsv1.PersistentVolumeClaimTemplate{{Name: "data"}}},
 	}
 	spec := &appsv1.ClusterComponentSpec{
 		Name: "mysql", Replicas: 5,
-		VolumeClaimTemplates: []appsv1.PersistentVolumeClaimTemplate{{Name: "data"}},
 		ReplicaRestore: &appsv1.ClusterReplicaRestore{Source: appsv1.ClusterRestoreSource{
-			APIGroup: dptypes.DataprotectionAPIGroup, Kind: dptypes.BackupKind, Name: "scale-out-backup",
+			APIGroup: testRestoreSourceAPIGroup, Kind: testRestoreSourceKind, Name: "replica-restore",
 		}},
 	}
-	reader := fake.NewClientBuilder().WithScheme(scheme).WithObjects(component).Build()
 	for _, status := range []metav1.ConditionStatus{metav1.ConditionUnknown, metav1.ConditionFalse, metav1.ConditionTrue} {
 		cluster.Status.Conditions = []metav1.Condition{{Type: appsv1.ConditionTypeRestore, Status: status}}
-		err := applyClusterRestoreIntent(context.Background(), reader, cluster, []*appsv1.ClusterComponentSpec{spec.DeepCopy()}, nil)
+		err := validateReplicaRestoreIntent(cluster, spec)
 		if status == metav1.ConditionTrue {
 			require.NoError(t, err)
 		} else {
@@ -326,25 +284,14 @@ func TestReplicaRestoreWaitsForInitialClusterRestore(t *testing.T) {
 }
 
 func TestValidateReplicaRestoreIntentRejectsUnsupportedComponent(t *testing.T) {
-	scheme := runtime.NewScheme()
-	require.NoError(t, appsv1.AddToScheme(scheme))
-	cluster := &appsv1.Cluster{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "demo"}}
-	component := &appsv1.Component{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "demo-mysql", Generation: 1},
-		Spec:       appsv1.ComponentSpec{Replicas: 3, VolumeClaimTemplates: []appsv1.PersistentVolumeClaimTemplate{{Name: "data"}}},
-		Status:     appsv1.ComponentStatus{Phase: appsv1.RunningComponentPhase, ObservedGeneration: 1},
-	}
+	cluster := &appsv1.Cluster{}
 	spec := &appsv1.ClusterComponentSpec{
-		Name: "mysql", Replicas: 5,
-		VolumeClaimTemplates: []appsv1.PersistentVolumeClaimTemplate{{Name: "data"}},
-		OfflineInstances:     []string{"mysql-0"},
+		Name: "mysql", Replicas: 5, OfflineInstances: []string{"mysql-0"},
 		ReplicaRestore: &appsv1.ClusterReplicaRestore{Source: appsv1.ClusterRestoreSource{
-			APIGroup: dptypes.DataprotectionAPIGroup, Kind: dptypes.BackupKind, Name: "backup",
+			APIGroup: testRestoreSourceAPIGroup, Kind: testRestoreSourceKind, Name: "restore",
 		}},
 	}
-	reader := fake.NewClientBuilder().WithScheme(scheme).WithObjects(component).Build()
-	err := applyClusterRestoreIntent(context.Background(), reader, cluster, []*appsv1.ClusterComponentSpec{spec}, nil)
-	require.ErrorContains(t, err, "default contiguous instances")
+	require.ErrorContains(t, validateReplicaRestoreIntent(cluster, spec), "default contiguous instances")
 }
 
 func TestSetRestoreConditionSucceedsWhenNoRestorePVCsExist(t *testing.T) {

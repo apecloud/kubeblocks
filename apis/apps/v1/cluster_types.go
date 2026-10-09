@@ -881,12 +881,13 @@ type ClusterBackup struct {
 	IncrementalCronExpression string `json:"incrementalCronExpression,omitempty"`
 }
 
-// ClusterRestore specifies how to initialize a Cluster from a restore source.
-type ClusterRestore struct {
+// RestoreSpec specifies how to initialize a Cluster or new replicas from a
+// restore source.
+type RestoreSpec struct {
 	// Specifies the restore source.
 	//
 	// +kubebuilder:validation:Required
-	Source ClusterRestoreSource `json:"source"`
+	Source RestoreSource `json:"source"`
 
 	// Specifies the point-in-time recovery target. The value is opaque to apps and interpreted by the restore runtime.
 	//
@@ -899,39 +900,15 @@ type ClusterRestore struct {
 	Parameters map[string]string `json:"parameters,omitempty"`
 }
 
-// ClusterReplicaRestore specifies the source and options for initializing new
-// replicas during scale-out.
-type ClusterReplicaRestore struct {
-	// Specifies the restore source.
-	//
-	// +kubebuilder:validation:Required
-	Source ClusterRestoreSource `json:"source"`
+// ClusterRestore identifies the restore options for an initial Cluster restore.
+type ClusterRestore = RestoreSpec
 
-	// Specifies a target within the restore source.
-	//
-	// +optional
-	SourceTargetName string `json:"sourceTargetName,omitempty"`
+// ClusterReplicaRestore identifies the restore options for initializing new replicas.
+type ClusterReplicaRestore = RestoreSpec
 
-	// Specifies the point-in-time recovery target.
-	//
-	// +optional
-	PITR string `json:"pitr,omitempty"`
-
-	// Specifies runtime-specific restore parameters.
-	//
-	// +optional
-	Parameters map[string]string `json:"parameters,omitempty"`
-
-	// Specifies environment variables used during replica initialization.
-	//
-	// +optional
-	Env []corev1.EnvVar `json:"env,omitempty"`
-}
-
-// ClusterRestoreSource describes the source object used by a Cluster restore.
-type ClusterRestoreSource struct {
-	// Specifies the API group of the restore source. For example, use "dataprotection.kubeblocks.io" for KubeBlocks
-	// data protection Backup sources.
+// RestoreSource describes the object used as a restore source.
+type RestoreSource struct {
+	// Specifies the API group of the restore source.
 	//
 	// +kubebuilder:validation:Required
 	APIGroup string `json:"apiGroup"`
@@ -951,6 +928,9 @@ type ClusterRestoreSource struct {
 	// +optional
 	Namespace string `json:"namespace,omitempty"`
 }
+
+// ClusterRestoreSource is the source-compatible name for RestoreSource.
+type ClusterRestoreSource = RestoreSource
 
 // ClusterPhase defines the phase of the Cluster within the .status.phase field.
 //

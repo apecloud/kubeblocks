@@ -29,7 +29,6 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 )
 
 // ApplyToPVC adds the current owner restore intent to a newly built PVC.
@@ -93,14 +92,6 @@ func annotations(intent *appsv1.ClusterReplicaRestore, component, pvcNamespace s
 	for key, value := range intent.Parameters {
 		parameters[key] = value
 	}
-	if intent.SourceTargetName != "" {
-		result[dptypes.SourceTargetNameAnnotationKey] = intent.SourceTargetName
-		parameters[dptypes.SourceTargetNameAnnotationKey] = intent.SourceTargetName
-	}
-	if len(intent.Env) > 0 {
-		data, _ := json.Marshal(intent.Env)
-		parameters[dptypes.RestoreEnvParameterKey] = string(data)
-	}
 	if len(parameters) > 0 {
 		data, _ := json.Marshal(parameters)
 		result[constant.RestoreParametersAnnotationKey] = string(data)
@@ -157,6 +148,4 @@ var metadataKeys = []string{
 	constant.RestoreParametersAnnotationKey,
 	constant.RestoreComponentAnnotationKey,
 	constant.RestoreVolumeTemplateAnnotationKey,
-	dptypes.SourceTargetNameAnnotationKey,
-	dptypes.RestoreEnvParameterKey,
 }

@@ -217,17 +217,17 @@ func (r *alignmentReconciler) stopInstances(tree *kubebuilderx.ObjectTree, insta
 	if !ordered {
 		for _, obj := range instances {
 			inst := obj.(*workloads.Instance)
-			if !model.IsObjectDeleting(inst) && ptr.Deref(inst.Spec.Stop, false) && !hasObservedStoppedRuntime(inst) {
+			if (model.IsObjectDeleting(inst) || ptr.Deref(inst.Spec.Stop, false)) && !hasObservedStoppedRuntime(inst) {
 				concurrency--
 			}
 		}
 	}
 	for _, obj := range instances {
 		inst := obj.(*workloads.Instance)
-		if model.IsObjectDeleting(inst) || hasObservedStoppedRuntime(inst) {
+		if hasObservedStoppedRuntime(inst) {
 			continue
 		}
-		if ptr.Deref(inst.Spec.Stop, false) {
+		if model.IsObjectDeleting(inst) || ptr.Deref(inst.Spec.Stop, false) {
 			if ordered {
 				break
 			}

@@ -101,7 +101,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 	if isStopRequested(its) {
 		for _, obj := range tree.List(&workloads.Instance{}) {
-			if inst := obj.(*workloads.Instance); !model.IsObjectDeleting(inst) && !hasObservedStoppedRuntime(inst) {
+			if inst := obj.(*workloads.Instance); !hasObservedStoppedRuntime(inst) {
 				return kubebuilderx.RetryAfter(time.Second), nil
 			}
 		}

@@ -1219,8 +1219,8 @@ func TestInstanceStopRetriesAfterCommitFailure(t *testing.T) {
 	}
 	faulty := &failStopDeleteClient{Client: cli, remaining: 1}
 	reconciler := &InstanceReconciler{Client: faulty, Scheme: cli.Scheme(), Recorder: record.NewFakeRecorder(1000)}
-	if _, err := reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKey{Namespace: "default", Name: "demo-0"}}); err == nil {
-		t.Fatal("expected commit failure")
+	if _, err := reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKey{Namespace: "default", Name: "demo-0"}}); err == nil || faulty.remaining != 0 {
+		t.Fatalf("expected injected Pod delete failure, got %v", err)
 	}
 	readStopPod(t, cli)
 	assistant := &corev1.ConfigMap{}
@@ -1405,8 +1405,8 @@ func TestInstanceStopRetriesAfterPodDeletedBeforeStatusCommit(t *testing.T) {
 	}
 	faulty := &failStopStatusClient{Client: cli, remaining: 1}
 	controller := &InstanceReconciler{Client: faulty, Recorder: record.NewFakeRecorder(1000)}
-	if _, err := controller.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(inst)}); err == nil {
-		t.Fatal("expected status commit failure after Pod deletion")
+	if _, err := controller.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(inst)}); err == nil || faulty.remaining != 0 {
+		t.Fatalf("expected injected status failure after Pod deletion, got %v", err)
 	}
 	assertStopPodAbsent(t, cli)
 	reconcileStopEntry(t, cli, 3)
@@ -1455,8 +1455,8 @@ func TestInstanceStopResumeRetriesAfterPVCCommit(t *testing.T) {
 	}
 	faulty := &failResumePodClient{Client: cli, remaining: 1}
 	controller := &InstanceReconciler{Client: faulty, Recorder: record.NewFakeRecorder(1000)}
-	if _, err := controller.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(inst)}); err == nil {
-		t.Fatal("expected resume Pod create failure")
+	if _, err := controller.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(inst)}); err == nil || faulty.remaining != 0 {
+		t.Fatalf("expected injected resume Pod create failure, got %v", err)
 	}
 	assertStopPodAbsent(t, cli)
 	committed := readStopPVC(t, cli)
@@ -1495,8 +1495,8 @@ func TestInstanceStopResumeRetriesAfterPodCreatedBeforeStatusCommit(t *testing.T
 			counting := &failResumePodClient{Client: cli}
 			faulty := &failStopStatusClient{Client: counting, remaining: 1}
 			controller := &InstanceReconciler{Client: faulty, Recorder: record.NewFakeRecorder(1000)}
-			if _, err := controller.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(inst)}); err == nil {
-				t.Fatal("expected status failure after the resumed Pod was created")
+			if _, err := controller.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(inst)}); err == nil || faulty.remaining != 0 {
+				t.Fatalf("expected injected status failure after the resumed Pod was created, got %v", err)
 			}
 			pod := readStopPod(t, cli)
 			if counting.created != 1 || pod.Spec.Containers[0].Image != "db:v2" || readStopInstance(t, cli).Status.CurrentState != workloads.InstanceCurrentStateAbsent {

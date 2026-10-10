@@ -597,6 +597,12 @@ type setStopClient struct {
 	resumeWrites      int
 }
 
+var (
+	errSetStopChildWrite  = errors.New("injected child write failure")
+	errSetStopResumeWrite = errors.New("injected resume write failure")
+	errSetStopStatusWrite = errors.New("injected parent status failure")
+)
+
 type failSetStopStatusClient struct {
 	client.Client
 	fail bool
@@ -614,48 +620,109 @@ type failSetStopStatusWriter struct {
 func (w *failSetStopStatusWriter) Update(ctx context.Context, obj client.Object, opts ...client.SubResourceUpdateOption) error {
 	if _, ok := obj.(*workloads.InstanceSet); ok && w.owner.fail {
 		w.owner.fail = false
-		return errors.New("injected parent status failure")
+		return errSetStopStatusWrite
 	}
 	return w.SubResourceWriter.Update(ctx, obj, opts...)
 }
 
 func TestInstanceSetStopRecoversAfterParentStatusFailure(t *testing.T) {
-	its := setStopFixture()
-	its.Spec.EnableInstanceAPI = ptr.To(true)
-	cli := newSetStopClient(t, its)
-	reconcileSetStop(t, cli, false, 5)
-	mutateSetStop(t, cli, func(its *workloads.InstanceSet) {
-		its.Spec.Stop = ptr.To(true)
-		its.Spec.ParallelPodManagementConcurrency = ptr.To(intstr.FromInt(1))
-	})
-	faulty := &failSetStopStatusClient{Client: cli, fail: true}
-	if _, err := reconcileSetStopParent(faulty, false); err == nil {
-		t.Fatal("parent status failure was not reached")
-	}
-	stopped := 0
-	for _, child := range listSetStopChildren(t, cli) {
-		if ptr.Deref(child.Spec.Stop, false) {
-			stopped++
+	for _, policy := range []appsv1.PodManagementPolicyType{appsv1.OrderedReadyPodManagement, appsv1.ParallelPodManagement} {
+		for _, stopping := range []bool{true, false} {
+			t.Run(fmt.Sprintf("policy=%s/stop=%t", policy, stopping), func(t *testing.T) {
+				its := setStopFixture()
+				its.Spec.EnableInstanceAPI = ptr.To(true)
+				cli := newSetStopClient(t, its)
+				reconcileSetStop(t, cli, false, 5)
+				claims := bindSetStopClaims(t, cli)
+				markSetStopPodsReady(t, cli)
+				reconcileSetStop(t, cli, false, 3)
+				if !stopping {
+					mutateSetStop(t, cli, func(its *workloads.InstanceSet) { its.Spec.Stop = ptr.To(true) })
+					reconcileSetStop(t, cli, false, 8)
+					if len(listSetStopPods(t, cli)) != 0 || readSetStop(t, cli).Status.Replicas != 0 {
+						t.Fatal("resume fixture did not finish Stop")
+					}
+					mutateSetStop(t, cli, func(its *workloads.InstanceSet) { its.Spec.Template.Spec.Containers[0].Image = "db:latest" })
+					reconcileSetStop(t, cli, false, 4)
+				}
+				mutateSetStop(t, cli, func(its *workloads.InstanceSet) {
+					its.Spec.Stop = ptr.To(stopping)
+					its.Spec.PodManagementPolicy = policy
+					its.Spec.ParallelPodManagementConcurrency = ptr.To(intstr.FromInt(1))
+					its.Spec.MinReadySeconds = 3600
+				})
+				beforeStatus := readSetStop(t, cli).Status
+				faulty := &failSetStopStatusClient{Client: cli, fail: true}
+				if _, err := reconcileSetStopParent(faulty, false); !errors.Is(err, errSetStopStatusWrite) || faulty.fail {
+					t.Fatalf("expected parent status fault after child handoff, got %v", err)
+				}
+				if !reflect.DeepEqual(readSetStop(t, cli).Status, beforeStatus) {
+					t.Fatal("failed parent status write changed the persisted status")
+				}
+				assertOneHandoff := func() {
+					t.Helper()
+					handoffs := 0
+					for _, child := range listSetStopChildren(t, cli) {
+						if ptr.Deref(child.Spec.Stop, false) == stopping {
+							handoffs++
+							if child.Generation == child.Status.ObservedGeneration {
+								t.Fatal("persisted child handoff did not invalidate the prior observation")
+							}
+							if !stopping && child.Spec.Template.Spec.Containers[0].Image != "db:latest" {
+								t.Fatal("persisted resume did not contain the latest payload")
+							}
+						}
+					}
+					if handoffs != 1 {
+						t.Fatalf("parent fault/retry admitted %d children into a one-slot budget", handoffs)
+					}
+				}
+				assertOneHandoff()
+				if _, err := reconcileSetStopParent(cli, false); err != nil {
+					t.Fatal(err)
+				}
+				assertOneHandoff()
+				if stopping {
+					reconcileSetStop(t, cli, false, 10)
+					if len(listSetStopPods(t, cli)) != 0 || readSetStop(t, cli).Status.Replicas != 0 {
+						t.Fatal("parent status failure did not converge to stopped runtime")
+					}
+					for _, child := range listSetStopChildren(t, cli) {
+						if !ptr.Deref(child.Spec.Stop, false) || child.Generation != child.Status.ObservedGeneration || child.Status.CurrentState != workloads.InstanceCurrentStateAbsent {
+							t.Fatal("Stop left an unacknowledged child")
+						}
+					}
+				} else {
+					for i := 0; i < 8; i++ {
+						reconcileSetStop(t, cli, false, 1)
+						markSetStopPodsReady(t, cli)
+					}
+					reconcileSetStop(t, cli, false, 2)
+					pods := listSetStopPods(t, cli)
+					status := readSetStop(t, cli).Status
+					if len(pods) != 2 || status.Replicas != 2 || status.ReadyReplicas != 2 || status.AvailableReplicas != 2 {
+						t.Fatalf("parent status failure did not converge to available runtime: %#v", status)
+					}
+					for _, child := range listSetStopChildren(t, cli) {
+						if ptr.Deref(child.Spec.Stop, false) || child.Spec.Template.Spec.Containers[0].Image != "db:latest" {
+							t.Fatal("resume left a stopped or obsolete child")
+						}
+					}
+					for _, pod := range pods {
+						if pod.Spec.Containers[0].Image != "db:latest" {
+							t.Fatal("resume used an obsolete Pod payload")
+						}
+					}
+				}
+				currentClaims := &corev1.PersistentVolumeClaimList{}
+				if err := cli.List(context.Background(), currentClaims); err != nil {
+					t.Fatal(err)
+				}
+				if !reflect.DeepEqual(currentClaims.Items, claims) {
+					t.Fatal("parent status failure/recovery changed storage")
+				}
+			})
 		}
-	}
-	if stopped != 1 {
-		t.Fatalf("root failure did not follow persisted child handoff: %d", stopped)
-	}
-	if _, err := reconcileSetStopParent(cli, false); err != nil {
-		t.Fatal(err)
-	}
-	stopped = 0
-	for _, child := range listSetStopChildren(t, cli) {
-		if ptr.Deref(child.Spec.Stop, false) {
-			stopped++
-		}
-	}
-	if stopped != 1 {
-		t.Fatal("root status retry repeated Stop beyond admitted budget")
-	}
-	reconcileSetStop(t, cli, false, 10)
-	if len(listSetStopPods(t, cli)) != 0 || readSetStop(t, cli).Status.Replicas != 0 {
-		t.Fatal("root status failure did not converge")
 	}
 }
 
@@ -670,11 +737,11 @@ func (c *setStopClient) Update(ctx context.Context, obj client.Object, opts ...c
 			if ptr.Deref(old.Spec.Stop, false) && !ptr.Deref(inst.Spec.Stop, false) {
 				c.resumeWrites++
 				if c.failResumeWriteAt > 0 && c.resumeWrites == c.failResumeWriteAt {
-					return errors.New("injected resume write failure")
+					return errSetStopResumeWrite
 				}
 			}
 			if c.failChildWriteAt > 0 && c.childWrites == c.failChildWriteAt {
-				return errors.New("injected child write failure")
+				return errSetStopChildWrite
 			}
 			inst.Generation = old.Generation + 1
 		}
@@ -894,6 +961,41 @@ func listSetStopPods(t *testing.T, cli client.Client) []corev1.Pod {
 	return list.Items
 }
 
+func bindSetStopClaims(t *testing.T, cli client.Client) []corev1.PersistentVolumeClaim {
+	t.Helper()
+	claims := &corev1.PersistentVolumeClaimList{}
+	if err := cli.List(context.Background(), claims); err != nil {
+		t.Fatal(err)
+	}
+	for _, claim := range claims.Items {
+		claim.UID = types.UID(claim.Name + "-uid")
+		if err := cli.Update(context.Background(), &claim); err != nil {
+			t.Fatal(err)
+		}
+		claim.Status.Phase = corev1.ClaimBound
+		claim.Status.Capacity = claim.Spec.Resources.Requests.DeepCopy()
+		if err := cli.Status().Update(context.Background(), &claim); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := cli.List(context.Background(), claims); err != nil {
+		t.Fatal(err)
+	}
+	return claims.Items
+}
+
+func markSetStopPodsReady(t *testing.T, cli client.Client) {
+	t.Helper()
+	for _, pod := range listSetStopPods(t, cli) {
+		pod.Status.Phase = corev1.PodRunning
+		pod.Status.Conditions = []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue, LastTransitionTime: metav1.NewTime(time.Now().Add(-2 * time.Hour))}}
+		pod.Status.ContainerStatuses = []corev1.ContainerStatus{{Name: "db", Image: pod.Spec.Containers[0].Image, Ready: true, State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}}}}
+		if err := cli.Status().Update(context.Background(), &pod); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
 func listSetStopChildren(t *testing.T, cli client.Client) []workloads.Instance {
 	t.Helper()
 	list := &workloads.InstanceList{}
@@ -1037,10 +1139,14 @@ func TestInstanceSetStopScaleRetirement(t *testing.T) {
 }
 
 func TestInstanceSetStopOrderedWaitsForHeldRuntime(t *testing.T) {
+	supportResize := intctrlutil.SupportResizeSubResource
+	intctrlutil.SupportResizeSubResource = func() (bool, error) { return false, nil }
+	t.Cleanup(func() { intctrlutil.SupportResizeSubResource = supportResize })
 	its := setStopFixture()
 	its.Spec.EnableInstanceAPI = ptr.To(true)
 	cli := newSetStopClient(t, its)
 	reconcileSetStop(t, cli, false, 5)
+	claims := bindSetStopClaims(t, cli)
 	held := &corev1.Pod{}
 	if err := cli.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "demo-1"}, held); err != nil {
 		t.Fatal(err)
@@ -1092,6 +1198,33 @@ func TestInstanceSetStopOrderedWaitsForHeldRuntime(t *testing.T) {
 			t.Fatal("ordered resume passed unavailable predecessor")
 		}
 	}
+	for i := 0; i < 8; i++ {
+		markSetStopPodsReady(t, cli)
+		reconcileSetStop(t, cli, false, 1)
+	}
+	reconcileSetStop(t, cli, false, 2)
+	pods := listSetStopPods(t, cli)
+	status := readSetStop(t, cli).Status
+	if len(pods) != 2 || status.Replicas != 2 || status.ReadyReplicas != 2 || status.AvailableReplicas != 2 {
+		t.Fatalf("ordered resume did not finish after predecessor availability: %#v", status)
+	}
+	for _, child := range listSetStopChildren(t, cli) {
+		if ptr.Deref(child.Spec.Stop, false) || child.Spec.Template.Spec.Containers[0].Image != "db:v3" {
+			t.Fatal("ordered resume left a stopped or obsolete child")
+		}
+	}
+	for _, pod := range pods {
+		if pod.Spec.Containers[0].Image != "db:v3" {
+			t.Fatal("ordered resume created an obsolete runtime")
+		}
+	}
+	currentClaims := &corev1.PersistentVolumeClaimList{}
+	if err := cli.List(context.Background(), currentClaims); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(currentClaims.Items, claims) {
+		t.Fatal("held Stop and ordered resume changed storage")
+	}
 }
 
 func TestInstanceSetStopParallelPartialWriteKeepsBudget(t *testing.T) {
@@ -1100,6 +1233,20 @@ func TestInstanceSetStopParallelPartialWriteKeepsBudget(t *testing.T) {
 	its.Spec.EnableInstanceAPI = ptr.To(true)
 	cli := newSetStopClient(t, its)
 	reconcileSetStop(t, cli, false, 5)
+	claims := &corev1.PersistentVolumeClaimList{}
+	if err := cli.List(context.Background(), claims); err != nil {
+		t.Fatal(err)
+	}
+	assertClaimsUnchanged := func() {
+		t.Helper()
+		current := &corev1.PersistentVolumeClaimList{}
+		if err := cli.List(context.Background(), current); err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(current.Items, claims.Items) {
+			t.Fatal("partial Stop/resume changed storage")
+		}
+	}
 	mutateSetStop(t, cli, func(its *workloads.InstanceSet) {
 		its.Spec.Stop = ptr.To(true)
 		its.Spec.ParallelPodManagementConcurrency = ptr.To(intstr.FromInt(2))
@@ -1107,9 +1254,22 @@ func TestInstanceSetStopParallelPartialWriteKeepsBudget(t *testing.T) {
 	wrapped := cli.(*setStopClient)
 	wrapped.childWrites = 0
 	wrapped.failChildWriteAt = 2
-	if _, err := reconcileSetStopParent(cli, false); err == nil {
-		t.Fatal("injected failure was not reached")
+	if _, err := reconcileSetStopParent(cli, false); !errors.Is(err, errSetStopChildWrite) || wrapped.childWrites != 2 {
+		t.Fatalf("expected second child write failure, got %v", err)
 	}
+	committedStops := 0
+	for _, child := range listSetStopChildren(t, cli) {
+		if ptr.Deref(child.Spec.Stop, false) {
+			committedStops++
+			if child.Generation == child.Status.ObservedGeneration {
+				t.Fatal("persisted Stop did not invalidate the prior observation")
+			}
+		}
+	}
+	if committedStops != 1 {
+		t.Fatalf("failed Stop invocation persisted %d handoffs, want 1", committedStops)
+	}
+	assertClaimsUnchanged()
 	wrapped.failChildWriteAt = 0
 	if _, err := reconcileSetStopParent(cli, false); err != nil {
 		t.Fatal(err)
@@ -1142,15 +1302,29 @@ func TestInstanceSetStopParallelPartialWriteKeepsBudget(t *testing.T) {
 	if len(listSetStopPods(t, cli)) != 0 {
 		t.Fatal("partial Stop did not recover")
 	}
+	assertClaimsUnchanged()
 	mutateSetStop(t, cli, func(its *workloads.InstanceSet) {
 		its.Spec.Stop = ptr.To(false)
 		its.Spec.Template.Spec.Containers[0].Image = "db:latest"
 	})
 	wrapped.resumeWrites = 0
 	wrapped.failResumeWriteAt = 2
-	if _, err := reconcileSetStopParent(cli, false); err == nil {
-		t.Fatal("partial resume failure was not reached")
+	if _, err := reconcileSetStopParent(cli, false); !errors.Is(err, errSetStopResumeWrite) || wrapped.resumeWrites != 2 {
+		t.Fatalf("expected second resume write failure, got %v", err)
 	}
+	committedResumes := 0
+	for _, child := range listSetStopChildren(t, cli) {
+		if !ptr.Deref(child.Spec.Stop, false) {
+			committedResumes++
+			if child.Generation == child.Status.ObservedGeneration || child.Spec.Template.Spec.Containers[0].Image != "db:latest" {
+				t.Fatal("persisted resume did not deliver current payload and invalidate the prior observation")
+			}
+		}
+	}
+	if committedResumes != 1 {
+		t.Fatalf("failed resume invocation persisted %d handoffs, want 1", committedResumes)
+	}
+	assertClaimsUnchanged()
 	wrapped.failResumeWriteAt = 0
 	if _, err := reconcileSetStopParent(cli, false); err != nil {
 		t.Fatal(err)
@@ -1226,45 +1400,83 @@ func TestInstanceSetStopParallelPartialWriteKeepsBudget(t *testing.T) {
 			t.Fatal("partial resume recreated an obsolete runtime")
 		}
 	}
+	assertClaimsUnchanged()
 }
 
 func TestInstanceSetStopDeletionHandsOffLatestPolicy(t *testing.T) {
-	its := setStopFixture()
-	its.Spec.EnableInstanceAPI = ptr.To(true)
-	its.Spec.PersistentVolumeClaimRetentionPolicy = &kbappsv1.PersistentVolumeClaimRetentionPolicy{WhenDeleted: kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType}
-	cli := newSetStopClient(t, its)
-	reconcileSetStop(t, cli, false, 5)
-	mutateSetStop(t, cli, func(its *workloads.InstanceSet) { its.Spec.Stop = ptr.To(true) })
-	reconcileSetStop(t, cli, false, 8)
-	mutateSetStop(t, cli, func(its *workloads.InstanceSet) {
-		its.Spec.PersistentVolumeClaimRetentionPolicy.WhenDeleted = kbappsv1.DeletePersistentVolumeClaimRetentionPolicyType
-	})
-	its = readSetStop(t, cli)
-	if err := cli.Delete(context.Background(), its); err != nil {
-		t.Fatal(err)
-	}
-	result, err := reconcileSetStopParent(cli, false)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if result.RequeueAfter != time.Second {
-		t.Fatalf("policy handoff has no bounded retry: %#v", result)
-	}
-	for _, child := range listSetStopChildren(t, cli) {
-		if !child.DeletionTimestamp.IsZero() || child.Spec.PersistentVolumeClaimRetentionPolicy.WhenDeleted != kbappsv1.DeletePersistentVolumeClaimRetentionPolicyType {
-			t.Fatal("parent deletion did not persist policy before deleting child")
-		}
-	}
-	reconcileSetStop(t, cli, false, 8)
-	claims := &corev1.PersistentVolumeClaimList{}
-	if err := cli.List(context.Background(), claims); err != nil {
-		t.Fatal(err)
-	}
-	if len(claims.Items) != 0 {
-		t.Fatal("actual parent deletion used obsolete retention policy")
-	}
-	if err := cli.Get(context.Background(), client.ObjectKeyFromObject(its), &workloads.InstanceSet{}); !apierrors.IsNotFound(err) {
-		t.Fatalf("parent deletion did not complete: %v", err)
+	for _, partialWrite := range []bool{false, true} {
+		t.Run(fmt.Sprintf("partialWrite=%t", partialWrite), func(t *testing.T) {
+			its := setStopFixture()
+			its.Spec.EnableInstanceAPI = ptr.To(true)
+			its.Spec.PersistentVolumeClaimRetentionPolicy = &kbappsv1.PersistentVolumeClaimRetentionPolicy{WhenDeleted: kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType}
+			cli := newSetStopClient(t, its)
+			reconcileSetStop(t, cli, false, 5)
+			claims := bindSetStopClaims(t, cli)
+			mutateSetStop(t, cli, func(its *workloads.InstanceSet) { its.Spec.Stop = ptr.To(true) })
+			reconcileSetStop(t, cli, false, 8)
+			mutateSetStop(t, cli, func(its *workloads.InstanceSet) {
+				its.Spec.PersistentVolumeClaimRetentionPolicy.WhenDeleted = kbappsv1.DeletePersistentVolumeClaimRetentionPolicyType
+			})
+			its = readSetStop(t, cli)
+			if err := cli.Delete(context.Background(), its); err != nil {
+				t.Fatal(err)
+			}
+			if partialWrite {
+				wrapped := cli.(*setStopClient)
+				wrapped.childWrites = 0
+				wrapped.failChildWriteAt = 2
+				beforeStatus := readSetStop(t, cli).Status
+				if _, err := reconcileSetStopParent(cli, false); !errors.Is(err, errSetStopChildWrite) || wrapped.childWrites != 2 {
+					t.Fatalf("expected second policy handoff failure, got %v", err)
+				}
+				updated := 0
+				children := listSetStopChildren(t, cli)
+				if len(children) != 2 {
+					t.Fatal("partial policy handoff removed a child")
+				}
+				for _, child := range children {
+					if !child.DeletionTimestamp.IsZero() {
+						t.Fatal("partial policy handoff started child deletion")
+					}
+					if child.Spec.PersistentVolumeClaimRetentionPolicy.WhenDeleted == kbappsv1.DeletePersistentVolumeClaimRetentionPolicyType {
+						updated++
+					} else if child.Spec.PersistentVolumeClaimRetentionPolicy.WhenDeleted != kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType {
+						t.Fatal("partial policy handoff left an unexpected policy")
+					}
+				}
+				if updated != 1 || !reflect.DeepEqual(readSetStop(t, cli).Status, beforeStatus) {
+					t.Fatalf("failed policy handoff did not leave exactly one persisted policy and unchanged parent status: updated=%d", updated)
+				}
+				currentClaims := &corev1.PersistentVolumeClaimList{}
+				if err := cli.List(context.Background(), currentClaims); err != nil || !reflect.DeepEqual(currentClaims.Items, claims) {
+					t.Fatalf("partial policy handoff changed storage: %v", err)
+				}
+				wrapped.failChildWriteAt = 0
+			}
+			result, err := reconcileSetStopParent(cli, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if result.RequeueAfter != time.Second {
+				t.Fatalf("policy handoff has no bounded retry: %#v", result)
+			}
+			for _, child := range listSetStopChildren(t, cli) {
+				if !child.DeletionTimestamp.IsZero() || child.Spec.PersistentVolumeClaimRetentionPolicy.WhenDeleted != kbappsv1.DeletePersistentVolumeClaimRetentionPolicyType {
+					t.Fatal("parent deletion did not persist policy before deleting child")
+				}
+			}
+			reconcileSetStop(t, cli, false, 8)
+			remainingClaims := &corev1.PersistentVolumeClaimList{}
+			if err := cli.List(context.Background(), remainingClaims); err != nil {
+				t.Fatal(err)
+			}
+			if len(remainingClaims.Items) != 0 || len(listSetStopChildren(t, cli)) != 0 {
+				t.Fatal("actual parent deletion did not complete with the latest retention policy")
+			}
+			if err := cli.Get(context.Background(), client.ObjectKeyFromObject(its), &workloads.InstanceSet{}); !apierrors.IsNotFound(err) {
+				t.Fatalf("parent deletion did not complete: %v", err)
+			}
+		})
 	}
 }
 
@@ -1445,3 +1657,75 @@ var _ = Describe("InstanceSet Stop path parity", func() {
 		})
 	}
 })
+
+func TestInstanceSetStopWaitsForRetiringRuntime(t *testing.T) {
+	for _, policy := range []appsv1.PodManagementPolicyType{appsv1.OrderedReadyPodManagement, appsv1.ParallelPodManagement} {
+		for _, legacy := range []bool{true, false} {
+			t.Run(fmt.Sprintf("legacy=%t/policy=%s", legacy, policy), func(t *testing.T) {
+				its := setStopFixture()
+				its.Spec.EnableInstanceAPI = ptr.To(!legacy)
+				its.Spec.PersistentVolumeClaimRetentionPolicy = &kbappsv1.PersistentVolumeClaimRetentionPolicy{WhenScaled: kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType}
+				cli := newSetStopClient(t, its)
+				reconcileSetStop(t, cli, legacy, 5)
+				held := &corev1.Pod{}
+				if err := cli.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "demo-1"}, held); err != nil {
+					t.Fatal(err)
+				}
+				held.Finalizers = append(held.Finalizers, "test/hold")
+				if err := cli.Update(context.Background(), held); err != nil {
+					t.Fatal(err)
+				}
+				mutateSetStop(t, cli, func(its *workloads.InstanceSet) {
+					its.Spec.Replicas = ptr.To(int32(1))
+					its.Spec.PodManagementPolicy = appsv1.OrderedReadyPodManagement
+				})
+				reconcileSetStop(t, cli, legacy, 4)
+				if err := cli.Get(context.Background(), client.ObjectKeyFromObject(held), held); err != nil {
+					t.Fatal(err)
+				}
+				if held.DeletionTimestamp.IsZero() {
+					t.Fatal("fixture did not hold a terminating runtime")
+				}
+				if !legacy {
+					child := &workloads.Instance{}
+					if err := cli.Get(context.Background(), client.ObjectKeyFromObject(held), child); err != nil {
+						t.Fatal(err)
+					}
+					if child.DeletionTimestamp.IsZero() {
+						t.Fatal("fixture child was not deleting")
+					}
+				}
+				mutateSetStop(t, cli, func(its *workloads.InstanceSet) {
+					its.Spec.Stop = ptr.To(true)
+					its.Spec.PodManagementPolicy = policy
+					its.Spec.ParallelPodManagementConcurrency = ptr.To(intstr.FromInt(1))
+				})
+				reconcileSetStop(t, cli, legacy, 4)
+				if !legacy {
+					result, err := reconcileSetStopParent(cli, false)
+					if err != nil || result.RequeueAfter != time.Second {
+						t.Fatalf("held retirement has no bounded Stop retry: result=%#v err=%v", result, err)
+					}
+				}
+				lower := &corev1.Pod{}
+				err := cli.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "demo-0"}, lower)
+				if err != nil || !lower.DeletionTimestamp.IsZero() {
+					t.Fatalf("Stop passed held retirement: lower Pod err=%v, deletion=%v", err, lower.DeletionTimestamp)
+				}
+				held.Finalizers = nil
+				if err := cli.Update(context.Background(), held); err != nil {
+					t.Fatal(err)
+				}
+				reconcileSetStop(t, cli, legacy, 8)
+				if len(listSetStopPods(t, cli)) != 0 || readSetStop(t, cli).Status.Replicas != 0 {
+					t.Fatal("Stop did not converge after retired runtime disappeared")
+				}
+				claims := &corev1.PersistentVolumeClaimList{}
+				if err := cli.List(context.Background(), claims); err != nil || len(claims.Items) != 2 {
+					t.Fatalf("Stop changed retained claims: %v", err)
+				}
+			})
+		}
+	}
+
+}

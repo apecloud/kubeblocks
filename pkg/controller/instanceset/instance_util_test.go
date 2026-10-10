@@ -21,6 +21,8 @@ package instanceset
 
 import (
 	"fmt"
+	"reflect"
+	"testing"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -29,6 +31,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -38,6 +41,9 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
+	workloadlifecycle "github.com/apecloud/kubeblocks/pkg/controller/workloads/lifecycle"
+	"github.com/apecloud/kubeblocks/pkg/kbagent"
+	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
 
 var _ = Describe("instance util test", func() {
@@ -631,3 +637,53 @@ var _ = Describe("instance util test", func() {
 		})
 	})
 })
+
+func TestWorkloadDataWorkerRevisionTracksConfigurationButNotTaskCleanup(t *testing.T) {
+	action := &kbappsv1.Action{Exec: &kbappsv1.ExecAction{Command: []string{"/bin/sh", "-c", "cat"}}}
+	its := builder.NewInstanceSetBuilder("runtime", "demo").SetReplicas(2).SetTemplate(corev1.PodTemplateSpec{Spec: corev1.PodSpec{ServiceAccountName: "loader", Containers: []corev1.Container{{Name: "db", Image: "db"}}}}).SetVolumeClaimTemplates(corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "data"}}).GetObject()
+	its.Spec.LifecycleActions = &workloads.LifecycleActions{DataDump: action, DataLoad: action, DataVolume: "data", Worker: &corev1.Container{Name: "context", Image: "tools", VolumeMounts: []corev1.VolumeMount{{Name: "data", MountPath: "/data"}}}}
+	its.Status.InstanceStatus = []workloads.InstanceStatus{{PodName: "demo-1", DataLoaded: ptr.To(false)}}
+	ext, err := instancetemplate.BuildInstanceSetExt(its, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	templates := instancetemplate.BuildInstanceTemplateExt(ext)
+	pod, err := buildInstancePodByTemplate("demo-1", templates[0], its, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "demo-0", Namespace: "runtime"}, Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: kbagent.ContainerName, Ports: []corev1.ContainerPort{{Name: kbagent.DefaultStreamingPortName, ContainerPort: 3502}}}}}, Status: corev1.PodStatus{PodIP: "10.0.0.1"}}
+	if err := workloadlifecycle.ConfigurePod(its, pod, source, true, false); err != nil {
+		t.Fatal(err)
+	}
+	before := filterInPlaceFields(&corev1.PodTemplateSpec{Spec: pod.Spec})
+	if err := workloadlifecycle.ConfigurePod(its, pod, nil, true, true); err != nil {
+		t.Fatal(err)
+	}
+	after := filterInPlaceFields(&corev1.PodTemplateSpec{Spec: pod.Spec})
+	if !reflect.DeepEqual(before, after) {
+		t.Fatal("cleaned task changed revision inputs")
+	}
+	first, err := buildInstanceTemplateRevision(&templates[0].PodTemplateSpec, its, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	its.Spec.LifecycleActions.DataVolume = "another-data-volume"
+	second, err := buildInstanceTemplateRevision(&templates[0].PodTemplateSpec, its, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first == second {
+		t.Fatal("configured data volume excluded from revision")
+	}
+	its.Spec.LifecycleActions.DataVolume = "data"
+	its.Spec.LifecycleActions.Worker.VolumeMounts[0].MountPath = "/different"
+	third, err := buildInstanceTemplateRevision(&templates[0].PodTemplateSpec, its, nil)
+	if err != nil || third == first {
+		t.Fatalf("configured mount excluded from revision: %s %v", third, err)
+	}
+	result := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{proto.DataLoadedAnnotationKey: "true"}}}
+	if !workloadlifecycle.ObserveData(&its.Status.InstanceStatus[0], result) {
+		t.Fatal("actual data completion not observed")
+	}
+}

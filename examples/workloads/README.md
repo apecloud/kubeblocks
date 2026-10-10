@@ -16,6 +16,7 @@ Apply the CRD and the example into one namespace:
 
 ```sh
 kubectl apply -f config/crd/bases/workloads.kubeblocks.io_instancesets.yaml
+kubectl apply -f config/crd/bases/workloads.kubeblocks.io_instances.yaml
 kubectl create namespace data-copy-example
 kubectl -n data-copy-example apply -f examples/workloads/data-load-rbac.yaml
 kubectl -n data-copy-example apply -f examples/workloads/data-copy.yaml

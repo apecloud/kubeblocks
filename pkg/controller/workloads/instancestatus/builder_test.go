@@ -463,3 +463,17 @@ func TestBuildReleasedRetentionUsesMembershipAndCurrentResources(t *testing.T) {
 		}
 	}
 }
+
+func TestBuildRetainsUnknownProvisionedMembershipUntilLeave(t *testing.T) {
+	input := Input{RequireMemberLeave: true, Previous: []workloads.InstanceStatus{{PodName: "bootstrap-0", Provisioned: true, MemberJoined: nil}}}
+	statuses, err := Build(input)
+	if err != nil || len(statuses) != 1 || statuses[0].DesiredState != workloads.InstanceDesiredStateReleased || statuses[0].MemberJoined != nil {
+		t.Fatalf("unknown membership lost before leave: %+v %v", statuses, err)
+	}
+	statuses[0].MemberJoined = ptr.To(false)
+	input.Previous = statuses
+	statuses, err = Build(input)
+	if err != nil || len(statuses) != 0 {
+		t.Fatalf("completed leave retained empty released identity: %+v %v", statuses, err)
+	}
+}

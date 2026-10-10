@@ -20,6 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset
 
 import (
+	"slices"
+	"time"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -30,14 +33,13 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	workloadlifecycle "github.com/apecloud/kubeblocks/pkg/controller/workloads/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 // instanceAlignmentReconciler is responsible for aligning the actual instances(pods) with the desired replicas specified in the spec,
 // including horizontal scaling and recovering from unintended pod deletions etc.
 // only handle instance count, don't care instance revision.
-//
-// TODO(free6om): support membership reconfiguration
 type instanceAlignmentReconciler struct{}
 
 func NewReplicasAlignmentReconciler() kubebuilderx.Reconciler {
@@ -143,6 +145,9 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 			return kubebuilderx.Continue, err
 		}
 
+		if err := lifecycleCreatePod(tree, its, newPod); err != nil {
+			return lifecycleWait(tree, its, err)
+		}
 		if err := tree.Add(newPod); err != nil {
 			return kubebuilderx.Continue, err
 		}
@@ -182,6 +187,55 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		}
 	}
 
+	if workloadlifecycle.Enabled(its) {
+		// Guard-only recovered Pods wait until the parent observes a new PVC, then restart with a current task.
+		for _, pod := range oldInstanceMap {
+			status := workloadlifecycle.Status(its, pod.Name)
+			if pod.Status.Phase != corev1.PodPending || !newNameSet.Has(pod.Name) || status == nil || status.DataLoaded == nil || *status.DataLoaded || pod.DeletionTimestamp != nil {
+				continue
+			}
+			cleaned := pod.Spec.DeepCopy()
+			changed, err := workloadlifecycle.CleanTask(cleaned)
+			if err != nil {
+				return kubebuilderx.Continue, err
+			}
+			if changed {
+				// Refresh an init worker when its donor address changed; running databases keep their completed init spec.
+				task, err := workloadlifecycle.GeneratedTask(&pod.Spec)
+				if err != nil {
+					return kubebuilderx.Continue, err
+				}
+				desiredPod := pod.DeepCopy()
+				if err := lifecycleCreatePod(tree, its, desiredPod); err != nil {
+					return lifecycleWait(tree, its, err)
+				}
+				current, err := workloadlifecycle.GeneratedTask(&desiredPod.Spec)
+				if err != nil {
+					return kubebuilderx.Continue, err
+				}
+				if task == current {
+					continue
+				}
+			}
+			if err := tree.Delete(pod); err != nil {
+				return kubebuilderx.Continue, err
+			}
+			return kubebuilderx.RetryAfter(time.Second), nil
+		}
+		retention := its.Spec.PersistentVolumeClaimRetentionPolicy
+		if !isStopRequested(its) && (retention == nil || retention.WhenScaled != kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType) {
+			for _, obj := range oldPVCList {
+				name := obj.GetLabels()[constant.KBAppPodNameLabelKey]
+				if name == "" || newNameSet.Has(name) || oldNameSet.Has(name) || (!slices.Contains(its.Spec.OfflineInstances, name) && workloadlifecycle.NeedsLeave(its, workloadlifecycle.Status(its, name))) {
+					continue
+				}
+				if err := tree.Delete(obj); err != nil {
+					return kubebuilderx.Continue, err
+				}
+			}
+		}
+	}
+
 	// delete useless instances
 	priorities := make(map[string]int)
 	sortObjects(oldInstanceList, priorities, false)
@@ -199,8 +253,14 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 				its.Name,
 				pod.Name)
 		}
+		if workloadlifecycle.Enabled(its) && !isStopRequested(its) && !slices.Contains(its.Spec.OfflineInstances, pod.Name) && workloadlifecycle.NeedsLeave(its, workloadlifecycle.Status(its, pod.Name)) {
+			return kubebuilderx.RetryAfter(time.Second), nil
+		}
 		if err := tree.Delete(pod); err != nil {
 			return kubebuilderx.Continue, err
+		}
+		if workloadlifecycle.Enabled(its) {
+			return kubebuilderx.RetryAfter(time.Second), nil
 		}
 
 		if !isStopRequested(its) {
@@ -224,6 +284,14 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		concurrency--
 	}
 
+	if workloadlifecycle.Enabled(its) {
+		for _, status := range its.Status.InstanceStatus {
+			if status.DataLoaded != nil && !*status.DataLoaded && newNameSet.Has(status.PodName) {
+				return kubebuilderx.RetryAfter(2 * time.Second), nil
+			}
+		}
+		return kubebuilderx.RetryAfter(5 * time.Second), nil
+	}
 	return kubebuilderx.Continue, nil
 }
 

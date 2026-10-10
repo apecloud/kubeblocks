@@ -59,6 +59,8 @@ type ResourceObservation struct {
 
 // Input contains the independently produced desired and observed dimensions used to build InstanceStatus.
 type Input struct {
+	// RequireMemberLeave retains provisioned identities whose bootstrap membership is unknown.
+	RequireMemberLeave bool
 	Resources          []ResourceObservation
 	Previous           []workloads.InstanceStatus
 	DesiredAssignments []TemplateAssignment
@@ -152,7 +154,7 @@ func Build(input Input) ([]workloads.InstanceStatus, error) {
 		}
 	}
 	for name, old := range previousByName {
-		if ptr.Deref(old.MemberJoined, false) {
+		if ptr.Deref(old.MemberJoined, false) || (input.RequireMemberLeave && old.Provisioned && old.MemberJoined == nil) {
 			names[name] = struct{}{}
 		}
 	}

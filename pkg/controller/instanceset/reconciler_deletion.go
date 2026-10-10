@@ -21,6 +21,7 @@ package instanceset
 
 import (
 	"maps"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,6 +30,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	workloadlifecycle "github.com/apecloud/kubeblocks/pkg/controller/workloads/lifecycle"
 )
 
 // deletionReconciler handles object and its secondary resources' deletion
@@ -46,6 +48,17 @@ func (r *deletionReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebu
 
 func (r *deletionReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
+	if workloadlifecycle.Enabled(its) {
+		pods := tree.List(&corev1.Pod{})
+		if len(pods) > 0 {
+			for _, pod := range pods {
+				if err := tree.Delete(pod); err != nil {
+					return kubebuilderx.Continue, err
+				}
+			}
+			return kubebuilderx.RetryAfter(time.Second), nil
+		}
+	}
 	pvcRetentionPolicy := its.Spec.PersistentVolumeClaimRetentionPolicy
 	retainPVC := pvcRetentionPolicy != nil && pvcRetentionPolicy.WhenDeleted == kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType
 

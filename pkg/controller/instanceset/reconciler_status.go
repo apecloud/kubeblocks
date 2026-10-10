@@ -543,6 +543,7 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 	syncObservationPVCStatus(tree, observations)
 
 	statuses, err := instancestatus.Build(instancestatus.Input{
+		RequireMemberLeave: its.Spec.LifecycleActions != nil && its.Spec.LifecycleActions.MemberLeave != nil,
 		Resources:          cleanupResourceObservations(tree, its),
 		Previous:           its.Status.InstanceStatus,
 		DesiredAssignments: desiredTemplateAssignments,

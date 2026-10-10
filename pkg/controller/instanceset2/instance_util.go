@@ -29,6 +29,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -439,4 +440,25 @@ func isInstanceUpdatedWithRevisions(inst *workloads.Instance, currentRevision st
 		return false
 	}
 	return inst.Generation == inst.Status.ObservedGeneration && inst.Status.UpToDate
+}
+
+func isStopRequested(its *workloads.InstanceSet) bool {
+	return ptr.Deref(its.Spec.Stop, false)
+}
+
+func hasObservedAbsentRuntime(inst *workloads.Instance) bool {
+	return inst.Generation == inst.Status.ObservedGeneration && inst.Status.CurrentState == workloads.InstanceCurrentStateAbsent
+}
+
+func hasObservedStoppedRuntime(inst *workloads.Instance) bool {
+	return ptr.Deref(inst.Spec.Stop, false) && hasObservedAbsentRuntime(inst)
+}
+
+func hasTerminatingRuntime(inst *workloads.Instance) bool {
+	return model.IsObjectDeleting(inst) || inst.Status.CurrentState == workloads.InstanceCurrentStateTerminating
+}
+
+func hasPresentRuntime(inst *workloads.Instance) bool {
+	return inst.Status.CurrentState == workloads.InstanceCurrentStatePresent ||
+		(inst.Status.CurrentState == "" && !ptr.Deref(inst.Spec.Stop, false))
 }

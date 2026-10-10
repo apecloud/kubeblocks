@@ -21,6 +21,12 @@ package instanceset2
 
 import (
 	"maps"
+	"time"
+
+	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/utils/ptr"
+
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -45,6 +51,25 @@ func (r *deletionReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebu
 }
 
 func (r *deletionReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
+	its := tree.GetRoot().(*workloads.InstanceSet)
+	policyChanged := false
+	for _, obj := range tree.List(&workloads.Instance{}) {
+		inst := obj.(*workloads.Instance)
+		if model.IsObjectDeleting(inst) || ptr.Deref(inst.Spec.ScaledDown, false) {
+			continue
+		}
+		if !equality.Semantic.DeepEqual(inst.Spec.PersistentVolumeClaimRetentionPolicy, its.Spec.PersistentVolumeClaimRetentionPolicy) {
+			next := inst.DeepCopy()
+			next.Spec.PersistentVolumeClaimRetentionPolicy = its.Spec.PersistentVolumeClaimRetentionPolicy.DeepCopy()
+			if err := tree.Update(next); err != nil {
+				return kubebuilderx.Continue, err
+			}
+			policyChanged = true
+		}
+	}
+	if policyChanged {
+		return kubebuilderx.RetryAfter(time.Second), nil
+	}
 	if has, err := r.deleteSecondaryObjects(tree); has {
 		return kubebuilderx.Continue, err
 	}

@@ -24,6 +24,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
@@ -95,6 +96,14 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 		}
 		isOrderedReady = false
 	}
+	if isStopRequested(its) {
+		return r.stopInstances(tree, oldInstanceList, isOrderedReady, concurrency)
+	}
+	for name, inst := range oldInstanceMap {
+		if newNameSet.Has(name) && ptr.Deref(inst.Spec.Stop, false) && !model.IsObjectDeleting(inst) {
+			createNameSet.Insert(name)
+		}
+	}
 
 	// 3. handle alignment (create new instances and delete useless instances)
 	// create new instances
@@ -114,6 +123,8 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 				if !intctrlutil.IsInstanceAvailable(oldInstanceMap[name]) {
 					concurrency--
 				}
+			} else if inst := oldInstanceMap[name]; inst != nil && !hasObservedStoppedRuntime(inst) {
+				concurrency--
 			}
 		}
 	}
@@ -124,6 +135,13 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 		if !isOrderedReady && concurrency <= 0 {
 			break
 		}
+		current := oldInstanceMap[name]
+		if current != nil && !hasObservedStoppedRuntime(current) {
+			if isOrderedReady {
+				break
+			}
+			continue
+		}
 		predecessor := getPredecessor(i)
 		if isOrderedReady && predecessor != nil && !intctrlutil.IsInstanceAvailable(predecessor) {
 			break
@@ -132,8 +150,19 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 		if err != nil {
 			return kubebuilderx.Continue, err
 		}
-		if err := tree.Add(newInst); err != nil {
-			return kubebuilderx.Continue, err
+		if current != nil {
+			merged := copyAndMergeInstance(current, newInst)
+			if merged == nil {
+				merged = current.DeepCopy()
+			}
+			merged.Spec.Stop = ptr.To(false)
+			if err := tree.Update(merged); err != nil {
+				return kubebuilderx.Continue, err
+			}
+		} else {
+			if err := tree.Add(newInst); err != nil {
+				return kubebuilderx.Continue, err
+			}
 		}
 
 		if isOrderedReady {
@@ -150,8 +179,9 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 		if _, ok := deleteNameSet[inst.Name]; !ok {
 			continue
 		}
-		if !isOrderedReady && concurrency <= 0 {
-			break
+		absentRetirement := hasObservedStoppedRuntime(inst)
+		if !absentRetirement && !isOrderedReady && concurrency <= 0 {
+			continue
 		}
 		if isOrderedReady && !intctrlutil.IsInstanceReady(inst) {
 			tree.EventRecorder.Eventf(its, corev1.EventTypeWarning, "InstanceSet %s/%s is waiting for Instance %s to be Ready",
@@ -166,15 +196,55 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 		} else {
 			instCopy := inst.DeepCopy()
 			instCopy.Spec.ScaledDown = ptr.To(true)
+			instCopy.Spec.PersistentVolumeClaimRetentionPolicy = its.Spec.PersistentVolumeClaimRetentionPolicy.DeepCopy()
 			if err := tree.Update(instCopy); err != nil {
 				return kubebuilderx.Continue, err
 			}
 		}
-		if isOrderedReady {
+		if isOrderedReady && !absentRetirement {
+			break
+		}
+		if !absentRetirement {
+			concurrency--
+		}
+	}
+
+	return kubebuilderx.Continue, nil
+}
+
+func (r *alignmentReconciler) stopInstances(tree *kubebuilderx.ObjectTree, instances []client.Object, ordered bool, concurrency int) (kubebuilderx.Result, error) {
+	sortObjects(instances, nil, false)
+	if !ordered {
+		for _, obj := range instances {
+			inst := obj.(*workloads.Instance)
+			if (model.IsObjectDeleting(inst) || ptr.Deref(inst.Spec.Stop, false)) && !hasObservedStoppedRuntime(inst) {
+				concurrency--
+			}
+		}
+	}
+	for _, obj := range instances {
+		inst := obj.(*workloads.Instance)
+		if hasObservedStoppedRuntime(inst) {
+			continue
+		}
+		if model.IsObjectDeleting(inst) || ptr.Deref(inst.Spec.Stop, false) {
+			if ordered {
+				break
+			}
+			continue
+		}
+		if !ordered && concurrency <= 0 {
+			break
+		}
+		next := inst.DeepCopy()
+		next.Spec.Stop = ptr.To(true)
+		if err := tree.Update(next); err != nil {
+			return kubebuilderx.Continue, err
+		}
+		if ordered {
 			break
 		}
 		concurrency--
 	}
-
 	return kubebuilderx.Continue, nil
 }

@@ -20,8 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instance
 
 import (
+	"time"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/ptr"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
@@ -54,6 +57,20 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}
+	if ptr.Deref(inst.Spec.Stop, false) {
+		if obj != nil && !isTerminating(obj.(*corev1.Pod)) {
+			if err := tree.Delete(obj); err != nil {
+				return kubebuilderx.Continue, err
+			}
+		}
+		if obj != nil {
+			return kubebuilderx.RetryAfter(time.Second), nil
+		}
+		return kubebuilderx.Continue, nil
+	}
+	if obj != nil && isTerminating(obj.(*corev1.Pod)) {
+		return kubebuilderx.RetryAfter(time.Second), nil
+	}
 	if obj == nil {
 		newPod, err := buildInstancePod(inst, "")
 		if err != nil {
@@ -83,14 +100,7 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 	}
 
 	createSet := newPVCNameSet.Difference(oldPVCNameSet)
-	deleteSet := oldPVCNameSet.Difference(newPVCNameSet)
 	updateSet := newPVCNameSet.Intersection(oldPVCNameSet)
-
-	for pvcName := range deleteSet {
-		if err = tree.Delete(oldPVCs[pvcName]); err != nil {
-			return kubebuilderx.Continue, err
-		}
-	}
 	for pvcName := range createSet {
 		if err = tree.Add(newPVCs[pvcName]); err != nil {
 			return kubebuilderx.Continue, err

@@ -28,6 +28,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -53,6 +54,7 @@ func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 
 func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	inst := tree.GetRoot().(*workloads.Instance)
+	stopped := ptr.Deref(inst.Spec.Stop, false)
 	r.reconcileRestoreCondition(tree, inst)
 
 	obj, err := tree.Get(podObj(inst))
@@ -84,7 +86,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			notAvailableName = pod.Name
 		}
 	}
-	if isCreated(pod) {
+	if isCreated(pod) && !stopped {
 		updated, err = isPodUpdated(inst, pod)
 		if err != nil {
 			return kubebuilderx.Continue, err
@@ -119,12 +121,12 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	inst.Status.Role = r.observedRoleOfPod(inst, pod)
 	inst.Status.VolumeExpansion = r.hasRunningVolumeExpansion(tree, inst)
 	configs, err := r.observedConfigsOfPod(pod)
-	if err != nil {
+	if err != nil && !stopped {
 		return kubebuilderx.Continue, err
 	}
 	inst.Status.Configs = configs
 
-	if inst.Spec.MinReadySeconds > 0 && !available {
+	if !stopped && inst.Spec.MinReadySeconds > 0 && !available {
 		return kubebuilderx.RetryAfter(time.Second), nil
 	}
 	return kubebuilderx.Continue, nil

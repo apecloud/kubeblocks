@@ -250,6 +250,7 @@ func runAsServer(logger logr.Logger, config server.Config, services []service.Se
 
 func runAsWorker(logger logr.Logger, services []service.Service, envVars map[string]string) error {
 	var result *proto.DataLoadResult
+	var completed bool
 	if data := envVars[dataLoadResultEnvName]; len(data) > 0 {
 		result = &proto.DataLoadResult{}
 		if err := json.Unmarshal([]byte(data), result); err != nil {
@@ -259,13 +260,11 @@ func runAsWorker(logger logr.Logger, services []service.Service, envVars map[str
 		if err != nil {
 			return err
 		}
-		if loaded {
-			return nil
-		}
+		completed = loaded
 	}
 	dt, ok := envVars[taskEnvName]
 	if !ok || len(dt) == 0 {
-		if result != nil {
+		if result != nil && !completed {
 			return fmt.Errorf("data PVC %s/%s has no completed data load and no loading task", result.Namespace, result.PVCName)
 		}
 		return nil // has no task
@@ -277,7 +276,16 @@ func runAsWorker(logger logr.Logger, services []service.Service, envVars map[str
 	if err != nil {
 		return err
 	}
-	if result != nil && !slices.ContainsFunc(tasks, func(task proto.Task) bool {
+	if completed {
+		tasks = slices.DeleteFunc(tasks, func(task proto.Task) bool {
+			return task.NewReplica != nil && task.NewReplica.DataLoadResult != nil &&
+				*task.NewReplica.DataLoadResult == *result
+		})
+		if len(tasks) == 0 {
+			return nil
+		}
+	}
+	if result != nil && !completed && !slices.ContainsFunc(tasks, func(task proto.Task) bool {
 		return task.NewReplica != nil && task.NewReplica.DataLoadResult != nil &&
 			*task.NewReplica.DataLoadResult == *result &&
 			slices.Contains(strings.Split(task.Replicas, ","), util.PodName())

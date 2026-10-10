@@ -723,3 +723,63 @@ func TestWorkerStartupGuardRequiresAPICredentials(t *testing.T) {
 		t.Fatal("worker allowed database startup without API credentials")
 	}
 }
+
+func TestWorkerCompletedGuardSkipsOnlyItsDataTask(t *testing.T) {
+	api := newWorkerPVCAPI(t)
+	api.pvc.Annotations[proto.DataLoadedAnnotationKey] = "true"
+	dataPath, countPath, source := configureDataWorker(t, `echo load >> "$COUNT_PATH"; cat > "$DATA_PATH"`, true)
+	tasks, err := deserializeTask(os.Getenv(taskEnvName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// This retained task uses the same load action but has no PVC completion
+	// contract. It must still execute after the tracked task is skipped.
+	unrelated := tasks[0]
+	unrelated.NewReplica = &proto.NewReplicaTask{
+		Remote:     tasks[0].NewReplica.Remote,
+		Port:       tasks[0].NewReplica.Port,
+		Parameters: tasks[0].NewReplica.Parameters,
+	}
+	tasks[0].NewReplica.Remote = "invalid-source.invalid"
+	env, err := BuildEnv4Worker(append(tasks, unrelated))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(env.Name, env.Value)
+	if err := launchDataWorker(t); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case err := <-source:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("completed guard skipped the unrelated task")
+	}
+	data, err := os.ReadFile(dataPath)
+	if err != nil || string(data) != "copied data\n" {
+		t.Fatalf("unrelated task data = %q, %v", data, err)
+	}
+	loads, err := os.ReadFile(countPath)
+	if err != nil || string(loads) != "load\n" {
+		t.Fatalf("expected only unrelated load once, got %q, %v", loads, err)
+	}
+	api.mu.Lock()
+	writes := api.writes
+	api.mu.Unlock()
+	if writes != 0 {
+		t.Fatalf("skipped task rewrote its completion %d times", writes)
+	}
+	// Completed tracked inputs still work after action configuration cleanup.
+	trackedEnv, err := BuildEnv4Worker(tasks)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(trackedEnv.Name, trackedEnv.Value)
+	t.Setenv(actionEnvName, "")
+	err = launchDataWorker(t)
+	if err != nil {
+		t.Fatalf("completed task required removed actions: %v", err)
+	}
+}

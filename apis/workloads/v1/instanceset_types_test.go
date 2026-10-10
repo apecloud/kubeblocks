@@ -84,6 +84,19 @@ func TestLifecycleActionsAPIRoundTrip(t *testing.T) {
 			if result == nil && (bytes.Contains(data, []byte(`"dataLoaded"`)) || bytes.Contains(data, []byte(`"memberJoined"`))) {
 				t.Fatal("unknown result serialized as tracked")
 			}
+			instance := &Instance{Spec: InstanceSpec{LifecycleActions: object.Spec.LifecycleActions}}
+			instanceData, err := runtime.Encode(codec, instance)
+			if err != nil {
+				t.Fatal(err)
+			}
+			decoded, _, err = codecs.UniversalDeserializer().Decode(instanceData, nil, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			gotInstance, ok := decoded.(*Instance)
+			if !ok || !reflect.DeepEqual(gotInstance.Spec, instance.Spec) {
+				t.Fatalf("Instance lifecycle fields lost for actions=%v: %#v", withActions, gotInstance)
+			}
 		}
 	}
 	copy := actions.DeepCopy()
@@ -120,6 +133,15 @@ func TestDataCopyExampleUsesGeneratedSchema(t *testing.T) {
 	}
 	schema := crd.Spec.Versions[0].Schema.OpenAPIV3Schema
 	lifecycle := schema.Properties["spec"].Properties["lifecycleActions"]
+	instanceCRD := readCRD("../../../config/crd/bases/workloads.kubeblocks.io_instances.yaml")
+	instanceHelm := readCRD("../../../deploy/helm/crds/workloads.kubeblocks.io_instances.yaml")
+	if !reflect.DeepEqual(instanceCRD.Spec, instanceHelm.Spec) {
+		t.Fatal("Helm Instance CRD differs from base schema")
+	}
+	instanceLifecycle := instanceCRD.Spec.Versions[0].Schema.OpenAPIV3Schema.Properties["spec"].Properties["lifecycleActions"]
+	if !reflect.DeepEqual(instanceLifecycle, lifecycle) {
+		t.Fatal("Instance and InstanceSet lifecycle schemas differ")
+	}
 	for _, name := range []string{"memberJoin", "memberLeave", "dataDump", "dataLoad", "dataVolume", "worker"} {
 		if _, ok := lifecycle.Properties[name]; !ok {
 			t.Fatalf("missing lifecycle schema: %s", name)

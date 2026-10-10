@@ -461,10 +461,10 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 	}
 	pvcsByName := persistentVolumeClaimsByName(tree)
 	desiredTemplateAssignments := make([]instancestatus.TemplateAssignment, 0, len(desiredAssignments))
-	configuredNames := make(map[string]struct{}, len(desiredAssignments))
+	desiredNames := make(map[string]struct{}, len(desiredAssignments))
 	for _, assignment := range desiredAssignments {
 		desiredTemplateAssignments = append(desiredTemplateAssignments, instancestatus.TemplateAssignment{InstanceName: assignment.InstanceName, TemplateName: assignment.TemplateName})
-		configuredNames[assignment.InstanceName] = struct{}{}
+		desiredNames[assignment.InstanceName] = struct{}{}
 	}
 	updateRevisions, err := GetRevisions(its.Status.UpdateRevisions)
 	if err != nil {
@@ -472,7 +472,7 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 	}
 	offlineNames := append([]string(nil), its.Spec.OfflineInstances...)
 	templateHints := make([]instancestatus.TemplateAssignment, 0, len(desiredTemplateAssignments)+len(pods)+len(offlineNames))
-	activeRuntimeNames := configuredNames
+	activeNames := desiredNames
 	if isStopRequested(its) {
 		// Stop removes the desired Pod assignments, but they remain useful for retaining template identity
 		// while the corresponding Pods are draining or have already disappeared.
@@ -481,7 +481,7 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 			templateHints = append(templateHints, assignment)
 		}
 		desiredTemplateAssignments = nil
-		activeRuntimeNames = nil
+		activeNames = nil
 	}
 
 	observations := make([]instancestatus.Observation, 0, len(pods))
@@ -496,7 +496,7 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 		}
 		if observation.State == workloads.InstanceCurrentStatePresent && isCreated(pod) {
 			template := desiredTemplates[pod.Name]
-			if _, active := activeRuntimeNames[pod.Name]; active && template != nil {
+			if _, active := activeNames[pod.Name]; active && template != nil {
 				podApplied, err := isDesiredPodApplied(its, pod, template)
 				if err != nil {
 					return err
@@ -516,7 +516,7 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 	}
 
 	for _, name := range append(append([]string(nil), offlineNames...), podObservationNames(observations)...) {
-		if _, ok := configuredNames[name]; ok {
+		if _, ok := desiredNames[name]; ok {
 			continue
 		}
 		if templateName, ok, err := instancetemplate.ResolveHistoricalTemplate(its, name, templateNames); err != nil {

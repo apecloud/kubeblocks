@@ -23,6 +23,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -56,8 +59,11 @@ import (
 	workloadlifecycle "github.com/apecloud/kubeblocks/pkg/controller/workloads/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
+	"github.com/apecloud/kubeblocks/pkg/kbagent"
 	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
 	kbaproto "github.com/apecloud/kubeblocks/pkg/kbagent/proto"
+	kbaserver "github.com/apecloud/kubeblocks/pkg/kbagent/server"
+	kbaservice "github.com/apecloud/kubeblocks/pkg/kbagent/service"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -1804,6 +1810,130 @@ func TestInstanceSetLifecycleMemberActionsRespectStatusFailureAndLatestSpec(t *t
 	its = step()
 	if len(lifecycleEntryPods(t, cli)) != 1 {
 		t.Fatal("committed leave did not permit runtime removal")
+	}
+}
+
+func TestInstanceSetLifecycleMemberOnlyExecutesGeneratedAgentActions(t *testing.T) {
+	ctx := context.Background()
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	port := listener.Addr().(*net.TCPAddr).Port
+	if err := listener.Close(); err != nil {
+		t.Fatal(err)
+	}
+	logPath := filepath.Join(t.TempDir(), "membership")
+	its := newDataLifecycleITS(1)
+	its.Spec.VolumeClaimTemplates = nil
+	its.Spec.Template.Spec.Containers[0].VolumeMounts = nil
+	its.Spec.LifecycleActions = &workloads.LifecycleActions{
+		MemberJoin:  &kbappsv1.Action{Exec: &kbappsv1.ExecAction{Command: []string{"sh", "-c", "printf 'join\\n' >> \"$1\"", "sh", logPath}}},
+		MemberLeave: &kbappsv1.Action{Exec: &kbappsv1.ExecAction{Command: []string{"sh", "-c", "printf 'leave\\n' >> \"$1\"", "sh", logPath}}},
+	}
+	existingEnv, err := kbagent.BuildEnv4Server([]kbaproto.Action{{Name: "reconfigure", Exec: &kbaproto.ExecAction{Commands: []string{"true"}}}}, []kbaproto.Probe{{Instance: "existing", Action: "reconfigure"}}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	its.Spec.Template.Spec.Containers = append(its.Spec.Template.Spec.Containers, corev1.Container{
+		Name: kbagent.ContainerName, Image: "tools", Env: existingEnv,
+		Ports: []corev1.ContainerPort{{Name: kbagent.DefaultHTTPPortName, ContainerPort: int32(port)}},
+	})
+	cli := newLifecycleEntryClient(t, its, interceptor.Funcs{})
+	key := client.ObjectKeyFromObject(its)
+	step := func() {
+		t.Helper()
+		var err error
+		its, _, err = reconcileLifecycleITS(t, cli, key)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	markReady := func(name string) {
+		t.Helper()
+		pod := &corev1.Pod{}
+		if err := cli.Get(ctx, client.ObjectKey{Namespace: its.Namespace, Name: name}, pod); err != nil {
+			t.Fatal(err)
+		}
+		pod.Status.PodIP = "127.0.0.1"
+		pod.Status.Phase = corev1.PodRunning
+		pod.Status.Conditions = []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue, LastTransitionTime: metav1.Now()}}
+		if err := cli.Status().Update(ctx, pod); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for i := 0; i < 3; i++ {
+		step()
+	}
+	markReady("data-lifecycle-0")
+	step()
+	its.Spec.Replicas = ptr.To(int32(2))
+	its.Generation++
+	if err := cli.Update(ctx, its); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 3; i++ {
+		step()
+	}
+	target := &corev1.Pod{}
+	if err := cli.Get(ctx, client.ObjectKey{Namespace: its.Namespace, Name: "data-lifecycle-1"}, target); err != nil {
+		t.Fatal(err)
+	}
+	var actions []kbaproto.Action
+	var probes []kbaproto.Probe
+	for _, container := range target.Spec.Containers {
+		if container.Name != kbagent.ContainerName {
+			continue
+		}
+		for _, env := range container.Env {
+			switch env.Name {
+			case "KB_AGENT_ACTION":
+				if err := json.Unmarshal([]byte(env.Value), &actions); err != nil {
+					t.Fatal(err)
+				}
+			case "KB_AGENT_PROBE":
+				if err := json.Unmarshal([]byte(env.Value), &probes); err != nil {
+					t.Fatal(err)
+				}
+			}
+		}
+	}
+	if len(actions) != 3 || len(probes) != 1 || probes[0].Action != "reconfigure" || len(target.Spec.InitContainers) != 0 {
+		t.Fatalf("member-only setup discarded existing agent configuration or added a data worker: actions=%+v probes=%+v init=%+v", actions, probes, target.Spec.InitContainers)
+	}
+	services, err := kbaservice.New(ctrl.Log, actions, probes, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := kbaserver.NewHTTPServer(ctrl.Log, kbaserver.Config{Address: "127.0.0.1", Port: port}, services)
+	if err := server.StartNonBlocking(); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = server.Close() })
+	agentClient, err := kbacli.NewClient(func() (string, int32, error) { return "127.0.0.1", int32(port), nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Route the out-of-cluster controller to the real HTTP agent instead of Kubernetes port forwarding.
+	kbacli.SetMockClient(agentClient, nil)
+	t.Cleanup(kbacli.UnsetMockClient)
+	markReady(target.Name)
+	step()
+	if !ptr.Deref(its.FindInstanceStatus(target.Name).MemberJoined, false) {
+		t.Fatalf("real agent join completion was not persisted: status=%+v conditions=%+v", its.Status.InstanceStatus, its.Status.Conditions)
+	}
+	its.Spec.Replicas = ptr.To(int32(1))
+	its.Generation++
+	if err := cli.Update(ctx, its); err != nil {
+		t.Fatal(err)
+	}
+	step()
+	if ptr.Deref(its.FindInstanceStatus(target.Name).MemberJoined, true) || len(lifecycleEntryPods(t, cli)) != 2 {
+		t.Fatal("real agent leave completion was not committed before runtime removal")
+	}
+	output, err := os.ReadFile(logPath)
+	if err != nil || string(output) != "join\nleave\n" {
+		t.Fatalf("generated member commands did not execute: output=%q err=%v", output, err)
 	}
 }
 

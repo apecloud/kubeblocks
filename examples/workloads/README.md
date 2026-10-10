@@ -52,7 +52,7 @@ kubectl -n data-copy-example exec data-copy-1 -c store -- cat /data/payload
 
 The replacement reads the retained PVC completion annotation and skips loading. The independent startup check remains after one-time task cleanup. A PVC without that result, unavailable API credentials, or missing read permission prevents worker success. A failed result write leaves the worker running and retrying the write without reloading data. The Role in `data-load-rbac.yaml` grants PVC `get` and `update` in this namespace; the Pod explicitly selects the ServiceAccount and mounts API credentials.
 
-To run through Instance instead of direct Pods, set `spec.enableInstanceAPI: true` before the first apply. For a remote ITS2 placement, install the image and apply `data-load-rbac.yaml` in the runtime cluster and namespace. The worker uses that cluster's API credentials.
+To run through Instance instead of direct Pods, set `spec.enableInstanceAPI: true` before the first apply. For a remote ITS2 placement, install the image and apply `data-load-rbac.yaml` in the runtime cluster and namespace. The worker uses that cluster's API credentials. Data-copy workers must be able to reach the selected source Pod's IP and streaming port, including between runtime clusters.
 
 This file-copy fixture demonstrates the data worker and persistence contract. It does not configure engine membership actions. The example retains PVCs after deletion; remove the namespace when the example data is no longer needed:
 

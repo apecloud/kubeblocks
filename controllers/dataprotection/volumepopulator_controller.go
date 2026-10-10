@@ -2884,6 +2884,14 @@ func (r *VolumePopulatorReconciler) clusterSourceAuthorizesPVC(cluster *appsv1.C
 			return matches(source.APIGroup, source.Kind, source.Name, source.Namespace)
 		}
 	}
+	shardingName := pvc.Labels[constant.KBAppShardingNameLabelKey]
+	for _, sharding := range cluster.Spec.Shardings {
+		if sharding.Name != shardingName || sharding.Template.ReplicaRestore == nil {
+			continue
+		}
+		source := sharding.Template.ReplicaRestore.Source
+		return matches(source.APIGroup, source.Kind, source.Name, source.Namespace)
+	}
 	return false
 }
 
@@ -2938,6 +2946,7 @@ func (r *VolumePopulatorReconciler) validateReplicaRestoreDataVolume(reqCtx intc
 	key := client.ObjectKey{Namespace: pvc.Namespace, Name: ref.Name}
 	var owner client.Object
 	var volumeNames []string
+	podName := pvc.Labels[constant.KBAppPodNameLabelKey]
 	switch ref.Kind {
 	case workloads.InstanceSetKind:
 		its := &workloads.InstanceSet{}
@@ -2945,7 +2954,16 @@ func (r *VolumePopulatorReconciler) validateReplicaRestoreDataVolume(reqCtx intc
 			return err
 		}
 		owner = its
-		for _, template := range its.Spec.VolumeClaimTemplates {
+		volumeTemplates := its.Spec.VolumeClaimTemplates
+		var err error
+		if podName != "" {
+			volumeTemplates, err = effectiveInstanceSetVolumeTemplates(its, podName,
+				pvc.Labels[constant.KBAppInstanceTemplateLabelKey])
+			if err != nil {
+				return intctrlutil.NewFatalError(err.Error())
+			}
+		}
+		for _, template := range volumeTemplates {
 			volumeNames = append(volumeNames, template.Name)
 		}
 	case "Instance":
@@ -3017,26 +3035,37 @@ func validatePVCMatchesInstanceSetTemplate(pvc *corev1.PersistentVolumeClaim, it
 }
 
 func instanceSetPVCtemplateForPod(its *workloads.InstanceSet, podName, templateName, volumeName string) (corev1.PersistentVolumeClaim, error) {
-	itsExt, err := instancetemplate.BuildInstanceSetExt(its, nil)
+	templates, err := effectiveInstanceSetVolumeTemplates(its, podName, templateName)
 	if err != nil {
 		return corev1.PersistentVolumeClaim{}, err
+	}
+	return pvcTemplateFromEffectiveTemplates(templates, volumeName)
+}
+
+func effectiveInstanceSetVolumeTemplates(its *workloads.InstanceSet, podName, templateName string) ([]corev1.PersistentVolumeClaim, error) {
+	if its.Spec.Replicas == nil {
+		return its.Spec.VolumeClaimTemplates, nil
+	}
+	itsExt, err := instancetemplate.BuildInstanceSetExt(its, nil)
+	if err != nil {
+		return nil, err
 	}
 	nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt, nil)
 	if err != nil {
-		return corev1.PersistentVolumeClaim{}, err
+		return nil, err
 	}
 	nameTemplateMap, err := nameBuilder.BuildInstanceName2TemplateMap()
 	if err != nil {
-		return corev1.PersistentVolumeClaim{}, err
+		return nil, err
 	}
 	template, ok := nameTemplateMap[podName]
 	if !ok {
-		return corev1.PersistentVolumeClaim{}, fmt.Errorf("pod %q is not an expected InstanceSet member", podName)
+		return nil, fmt.Errorf("pod %q is not an expected InstanceSet member", podName)
 	}
 	if template.Name != templateName {
-		return corev1.PersistentVolumeClaim{}, fmt.Errorf("pod %q resolves to InstanceSet template %q, not %q", podName, template.Name, templateName)
+		return nil, fmt.Errorf("pod %q resolves to InstanceSet template %q, not %q", podName, template.Name, templateName)
 	}
-	return pvcTemplateFromEffectiveTemplates(template.VolumeClaimTemplates, volumeName)
+	return template.VolumeClaimTemplates, nil
 }
 
 func pvcTemplateFromEffectiveTemplates(templates []corev1.PersistentVolumeClaim, volumeName string) (corev1.PersistentVolumeClaim, error) {

@@ -79,7 +79,7 @@ func newComponentWorkloadOps(transCtx *componentTransformContext,
 	}
 	restoreReplicas := sets.New[string]()
 	restorePendingReplicas := sets.New[string]()
-	if _, hasDataActions := hasMemberJoinNDataActionDefined(synthesizedComp.LifecycleActions.ComponentLifecycleActions); hasDataActions {
+	if _, hasDataActions := hasMemberJoinNDataActionDefined(synthesizedComp.LifecycleActions.ComponentLifecycleActions); hasDataActions || protoITS.Spec.ReplicaRestore != nil {
 		restoreReplicas, restorePendingReplicas, err = component.GetReplicaRestoreReplicas(transCtx.Context, cli, protoITS, protoITSPodNames)
 		if err != nil {
 			return nil, err
@@ -379,6 +379,9 @@ func (r *componentWorkloadOps) joinMember4ScaleOut() error {
 			status := replicas.Status[i]
 			if status.MemberJoined == nil || *status.MemberJoined {
 				continue // no need to join or already joined
+			}
+			if r.restorePendingReplicas.Has(pod.Name) {
+				continue
 			}
 
 			// TODO: should wait for the data to be loaded before joining the member?

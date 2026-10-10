@@ -4245,7 +4245,7 @@ func TestReplicaRestoreCompletesWithoutPostReady(t *testing.T) {
 }
 
 func TestReplicaRestoreReconcileRequiresCrossNamespaceOwnerIntent(t *testing.T) {
-	for _, intent := range []string{"matching", "absent", "other component", "other backup", "other namespace", "other group", "other kind", "foreign Cluster UID", "initial restore only"} {
+	for _, intent := range []string{"matching", "matching sharding", "absent", "other component", "other backup", "other namespace", "other group", "other kind", "foreign Cluster UID", "initial restore only"} {
 		t.Run(intent, func(t *testing.T) {
 			ctx := context.Background()
 			scheme, cluster, component, its, pvc := parentRestoreObjects(t)
@@ -4259,6 +4259,13 @@ func TestReplicaRestoreReconcileRequiresCrossNamespaceOwnerIntent(t *testing.T) 
 				Name: "mysql", Replicas: 5, ReplicaRestore: &kbappsv1.ClusterRestore{Source: source},
 			}}
 			switch intent {
+			case "matching sharding":
+				cluster.Spec.ComponentSpecs = nil
+				cluster.Spec.Shardings = []kbappsv1.ClusterSharding{{
+					Name: "shard", Template: kbappsv1.ClusterComponentSpec{
+						ReplicaRestore: &kbappsv1.ClusterRestore{Source: source},
+					},
+				}}
 			case "absent":
 				cluster.Spec.ComponentSpecs[0].ReplicaRestore = nil
 			case "other component":
@@ -4282,6 +4289,9 @@ func TestReplicaRestoreReconcileRequiresCrossNamespaceOwnerIntent(t *testing.T) 
 			pvc.Name = "data-cluster-mysql-3"
 			pvc.Labels[constant.KBAppPodNameLabelKey] = "cluster-mysql-3"
 			pvc.Labels[constant.VolumeClaimTemplateNameLabelKey] = "data"
+			if intent == "matching sharding" {
+				pvc.Labels[constant.KBAppShardingNameLabelKey] = "shard"
+			}
 			pvc.Annotations[constant.RestorePurposeAnnotationKey] = constant.RestorePurposeReplica
 			pvc.Spec.DataSourceRef.Namespace = &sourceNamespace
 			setReplicaRestoreSourceAnnotations(pvc)
@@ -4312,10 +4322,14 @@ func TestReplicaRestoreReconcileRequiresCrossNamespaceOwnerIntent(t *testing.T) 
 			require.NoError(t, cli.List(ctx, restores))
 			require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(pvc), pvc))
 			switch intent {
-			case "matching":
+			case "matching", "matching sharding":
 				require.Len(t, restores.Items, 1)
 				require.Equal(t, sourceNamespace, restores.Items[0].Spec.Backup.Namespace)
-				cluster.Spec.ComponentSpecs[0].ReplicaRestore = nil
+				if intent == "matching sharding" {
+					cluster.Spec.Shardings[0].Template.ReplicaRestore = nil
+				} else {
+					cluster.Spec.ComponentSpecs[0].ReplicaRestore = nil
+				}
 				require.NoError(t, cli.Update(ctx, cluster))
 				vp := &VolumePopulatorReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(10)}
 				_, err := vp.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(pvc)})
@@ -5767,6 +5781,40 @@ func TestReplicaRestoreRequiresMatchingDataVolume(t *testing.T) {
 			})
 		}
 	}
+}
+
+func TestReplicaRestoreDataVolumeUsesEffectiveInstanceTemplate(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, workloadsv1.AddToScheme(scheme))
+	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
+	backup, _ := restoreBackupObjects()
+	its := &workloadsv1.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "mysql", UID: "its-uid"},
+		Spec: workloadsv1.InstanceSetSpec{
+			Replicas: ptr.To(int32(1)),
+			Instances: []workloadsv1.InstanceTemplate{{
+				Name: "fast", Replicas: ptr.To(int32(1)),
+				VolumeClaimTemplates: []corev1.PersistentVolumeClaim{{ObjectMeta: metav1.ObjectMeta{Name: "data"}}},
+			}},
+		},
+	}
+	pvc := dependencyRestorePVC("logs-mysql-fast-0", "mysql", "pvc-uid")
+	pvc.Labels[constant.KBAppPodNameLabelKey] = "mysql-fast-0"
+	pvc.Labels[constant.KBAppInstanceTemplateLabelKey] = "fast"
+	pvc.Labels[constant.VolumeClaimTemplateNameLabelKey] = "logs"
+	pvc.Annotations[constant.RestoreVolumeTemplateAnnotationKey] = "logs"
+	pvc.OwnerReferences = []metav1.OwnerReference{{
+		APIVersion: workloadsv1.GroupVersion.String(), Kind: workloadsv1.InstanceSetKind,
+		Name: its.Name, UID: its.UID, Controller: ptr.To(true),
+	}}
+
+	reconciler := &VolumePopulatorReconciler{
+		Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(its).Build(),
+		Scheme: scheme,
+	}
+	require.NoError(t, reconciler.validateReplicaRestoreDataVolume(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, backup))
 }
 
 func TestReplicaAuxiliaryRestoreContinuesAfterRetainScaleIn(t *testing.T) {

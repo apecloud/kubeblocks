@@ -151,13 +151,13 @@ func (t *componentWorkloadTransformer) reconcileReplicasStatus(ctx context.Conte
 	}
 
 	hasMemberJoinDefined, hasDataActionDefined := hasMemberJoinNDataActionDefined(synthesizedComp.LifecycleActions.ComponentLifecycleActions)
-	if hasDataActionDefined {
+	if hasDataActionDefined || protoITS.Spec.ReplicaRestore != nil {
 		restored, pending, err := component.GetReplicaRestoreReplicas(ctx, cli, protoITS, replicas)
 		if err != nil {
 			return err
 		}
 		restoreReplicas := restored.Union(pending)
-		if err = component.StatusReplicasStatus(protoITS, restoreReplicas.UnsortedList(), hasMemberJoinDefined, false); err != nil {
+		if err = component.NewReplicasStatus(protoITS, restoreReplicas.UnsortedList(), hasMemberJoinDefined, false); err != nil {
 			return err
 		}
 		replicas = slices.DeleteFunc(replicas, restoreReplicas.Has)

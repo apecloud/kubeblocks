@@ -119,12 +119,14 @@ var _ = Describe("Component Workload Operations Test", func() {
 	})
 
 	Context("Data Replication Operations", func() {
-		DescribeTable("keeps restore initialization exclusive with data replication", func(from int32, restore bool) {
+		DescribeTable("keeps restore initialization exclusive with data replication", func(from int32, restore, dataActions bool) {
 			synthesizeComp.Replicas = from + 2
 			synthesizeComp.FullCompName = "test-its"
 			synthesizeComp.Generation = "2"
-			synthesizeComp.LifecycleActions.DataDump = testapps.NewLifecycleAction("data-dump")
-			synthesizeComp.LifecycleActions.DataLoad = testapps.NewLifecycleAction("data-load")
+			if dataActions {
+				synthesizeComp.LifecycleActions.DataDump = testapps.NewLifecycleAction("data-dump")
+				synthesizeComp.LifecycleActions.DataLoad = testapps.NewLifecycleAction("data-load")
+			}
 			runningITS := testapps.NewInstanceSetFactory(testCtx.DefaultNamespace, "test-its", clusterName, compName).
 				AddAppInstanceLabel(clusterName).AddAppComponentLabel(compName).AddAppManagedByLabel().
 				SetReplicas(from).GetObject()
@@ -203,9 +205,10 @@ var _ = Describe("Component Workload Operations Test", func() {
 				Expect(tasks[0].NewReplica.Replicas).Should(ContainSubstring(newNames[1]))
 			}
 		},
-			Entry("restore scale-out from zero does not require a donor", int32(0), true),
-			Entry("restore does not copy from an available donor", int32(3), true),
-			Entry("ordinary scale-out uses live data replication", int32(3), false),
+			Entry("restore scale-out from zero does not require a donor", int32(0), true, true),
+			Entry("restore does not copy from an available donor", int32(3), true, true),
+			Entry("restore without data actions still waits for PVC restore", int32(3), true, false),
+			Entry("ordinary scale-out uses live data replication", int32(3), false, true),
 		)
 
 		It("blocks scale-out when data actions have no source pod", func() {

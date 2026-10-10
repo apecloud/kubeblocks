@@ -250,6 +250,7 @@ func GetReplicaRestoreReplicas(ctx context.Context, cli client.Reader, its *work
 	restored = sets.New[string]()
 	pending = sets.New[string]()
 	restoredVolumes := map[string]sets.Set[string]{}
+	existingReplicas := sets.New[string]()
 	for i := range pvcs.Items {
 		pvc := &pvcs.Items[i]
 		name := pvc.Labels[constant.KBAppPodNameLabelKey]
@@ -258,6 +259,7 @@ func GetReplicaRestoreReplicas(ctx context.Context, cli client.Reader, its *work
 		if !names.Has(name) || !ok || !volumes.Has(volume) {
 			continue
 		}
+		existingReplicas.Insert(name)
 		if replicarestore.IsReplicaPVC(pvc) {
 			if restoredVolumes[name] == nil {
 				restoredVolumes[name] = sets.New[string]()
@@ -275,12 +277,9 @@ func GetReplicaRestoreReplicas(ctx context.Context, cli client.Reader, its *work
 		if volumes.Len() > 0 && restoredVolumes[name].Len() == volumes.Len() {
 			restored.Insert(name)
 		}
-	}
-	if its.Spec.ReplicaRestore != nil {
-		for name, volumes := range volumesByReplica {
-			if restoredVolumes[name].Len() < volumes.Len() {
-				pending.Insert(name)
-			}
+		if volumes.Len() > 0 && restoredVolumes[name].Len() < volumes.Len() &&
+			(restoredVolumes[name].Len() > 0 || (its.Spec.ReplicaRestore != nil && !existingReplicas.Has(name))) {
+			pending.Insert(name)
 		}
 	}
 	return restored, pending, nil

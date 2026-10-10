@@ -168,6 +168,11 @@ func hasReplicaRestoreSource(cluster *appsv1.Cluster) bool {
 			return true
 		}
 	}
+	for _, sharding := range cluster.Spec.Shardings {
+		if sharding.Template.ReplicaRestore != nil {
+			return true
+		}
+	}
 	return false
 }
 

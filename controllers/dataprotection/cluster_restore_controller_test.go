@@ -138,6 +138,26 @@ func TestClusterRestoreProtectionKeepsUnregisteredReplicaPVC(t *testing.T) {
 	require.Contains(t, cluster.Finalizers, dptypes.RestoreProtectionFinalizerName)
 }
 
+func TestClusterRestoreProtectionKeepsShardingReplicaRestoreIntent(t *testing.T) {
+	ctx := context.Background()
+	scheme, cluster, _, _, _ := parentRestoreObjects(t)
+	cluster.Spec.Restore = nil
+	cluster.Spec.Shardings = []appsv1.ClusterSharding{{
+		Name: "shard",
+		Template: appsv1.ClusterComponentSpec{
+			ReplicaRestore: &appsv1.ClusterRestore{},
+		},
+	}}
+	cluster.Finalizers = nil
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cluster).Build()
+	reconciler := &ClusterRestoreReconciler{Client: cli}
+
+	_, err := reconciler.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cluster)})
+	require.NoError(t, err)
+	require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(cluster), cluster))
+	require.Contains(t, cluster.Finalizers, dptypes.RestoreProtectionFinalizerName)
+}
+
 func TestClusterDeletionReleasesProtectionAfterReplicaPVCTermination(t *testing.T) {
 	for _, active := range []bool{false, true} {
 		t.Run(fmt.Sprintf("active=%t", active), func(t *testing.T) {

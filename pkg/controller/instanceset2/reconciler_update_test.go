@@ -59,8 +59,12 @@ func TestScaleOutPreservesExistingInstanceInitialization(t *testing.T) {
 			original := tree.List(&workloads.Instance{})[0].(*workloads.Instance).DeepCopy()
 			replicas := int32(2)
 			its.Spec.Replicas = &replicas
+			restoreSource := source
+			if restoreSource == "" {
+				restoreSource = "backup-b"
+			}
 			its.Spec.ReplicaRestore = &kbappsv1.ClusterRestore{Source: kbappsv1.ClusterRestoreSource{
-				APIGroup: "dataprotection.kubeblocks.io", Kind: "Backup", Name: "backup-b",
+				APIGroup: "dataprotection.kubeblocks.io", Kind: "Backup", Name: restoreSource,
 			}}
 			if _, err := NewAlignmentReconciler().Reconcile(tree); err != nil {
 				t.Fatal(err)
@@ -102,7 +106,7 @@ func TestScaleOutPreservesExistingInstanceInitialization(t *testing.T) {
 				if inst.Annotations[constant.KBAppClusterUIDKey] != "cluster-uid" {
 					t.Fatal("Instance lost the owner Cluster UID")
 				}
-				expectedSource := "backup-b"
+				expectedSource := restoreSource
 				if inst.Name == original.Name {
 					expectedSource = source
 				}

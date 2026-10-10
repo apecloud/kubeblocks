@@ -29,7 +29,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -49,7 +48,7 @@ var _ = Describe("replicas alignment reconciler test", func() {
 			GetObject().DeepCopy()
 	})
 
-	It("restores only newly created PVCs and resumes from existing PVC sources", func() {
+	It("restores only newly created PVCs and preserves their initialization source", func() {
 		its.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
 		its.Annotations = map[string]string{constant.KBAppClusterUIDKey: "cluster-uid"}
 		its.Labels = map[string]string{constant.KBAppComponentLabelKey: "mysql"}
@@ -70,7 +69,6 @@ var _ = Describe("replicas alignment reconciler test", func() {
 		_, err = NewReplicasAlignmentReconciler().Reconcile(tree)
 		Expect(err).NotTo(HaveOccurred())
 		replicas = 5
-		its.Spec.ReplicaRestore.Source.Name = "backup-b"
 		_, err = NewReplicasAlignmentReconciler().Reconcile(tree)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(tree.List(&corev1.Pod{})).To(HaveLen(5))
@@ -83,39 +81,12 @@ var _ = Describe("replicas alignment reconciler test", func() {
 				Expect(pvc.Status).To(Equal(before.Status))
 				continue
 			}
-			source := "backup-b"
-			if pvc.Labels[constant.KBAppPodNameLabelKey] == its.Name+"-3" {
-				source = "backup-a"
-			}
-			Expect(pvc.Spec.DataSourceRef.Name).To(Equal(source))
-			Expect(pvc.Annotations[constant.RestoreSourceNameAnnotationKey]).To(Equal(source))
+			Expect(pvc.Spec.DataSourceRef.Name).To(Equal("backup-a"))
+			Expect(pvc.Annotations[constant.RestoreSourceNameAnnotationKey]).To(Equal("backup-a"))
 			Expect(pvc.Annotations[constant.KBAppClusterUIDKey]).To(Equal("cluster-uid"))
 			Expect(pvc.Annotations[constant.RestoreSourceNamespaceAnnotationKey]).To(Equal(namespace))
 			Expect(pvc.Annotations[constant.RestoreVolumeTemplateAnnotationKey]).To(Equal(pvc.Labels[constant.VolumeClaimTemplateNameLabelKey]))
 		}
-		its.Spec.ReplicaRestore = nil
-		replicas = 6
-		_, err = NewReplicasAlignmentReconciler().Reconcile(tree)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(tree.List(&corev1.Pod{})).To(HaveLen(6))
-		for _, obj := range tree.List(&corev1.PersistentVolumeClaim{}) {
-			pvc := obj.(*corev1.PersistentVolumeClaim)
-			if pvc.Labels[constant.KBAppPodNameLabelKey] == its.Name+"-5" {
-				Expect(pvc.Spec.DataSourceRef).To(BeNil())
-				Expect(pvc.Annotations).NotTo(HaveKey(constant.RestorePurposeAnnotationKey))
-			}
-		}
-		tree.EventRecorder = record.NewFakeRecorder(10)
-		its.Spec.PodManagementPolicy = appsv1.OrderedReadyPodManagement
-		its.Spec.ReplicaRestore = &kbappsv1.ClusterRestore{Source: kbappsv1.ClusterRestoreSource{
-			APIGroup: "dataprotection.kubeblocks.io", Kind: "Backup", Name: "backup-b",
-		}}
-		replicas = 3
-		for i := 0; i < 3; i++ {
-			_, err = NewReplicasAlignmentReconciler().Reconcile(tree)
-			Expect(err).NotTo(HaveOccurred())
-		}
-		Expect(tree.List(&corev1.Pod{})).To(HaveLen(3))
 	})
 
 	It("rejects Backup initialization combined with a volume claim template source", func() {

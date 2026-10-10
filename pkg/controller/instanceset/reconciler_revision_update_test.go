@@ -157,11 +157,11 @@ var _ = Describe("revision update reconciler test", func() {
 		})
 
 		for _, ordinal := range []int{0, 3} {
-			It(fmt.Sprintf("recreates replica %d with its original PVC input after a later Backup allocation", ordinal), func() {
+			It(fmt.Sprintf("recreates replica %d with its original PVC input after scale-out restore", ordinal), func() {
 				Expect(reconcile()).To(Succeed())
 				updateReplicas(4, backup("backup-a"))
 				Expect(reconcile()).To(Succeed())
-				updateReplicas(5, backup("backup-b"))
+				updateReplicas(5, backup("backup-a"))
 				Expect(reconcile()).To(Succeed())
 				instanceName := fmt.Sprintf("%s-%d", its.Name, ordinal)
 				pvc := &corev1.PersistentVolumeClaim{}

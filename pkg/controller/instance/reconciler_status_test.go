@@ -159,7 +159,7 @@ func TestStatusReconcilerAggregatesRestorePVCConditionsWithoutPod(t *testing.T) 
 		pvc := &corev1.PersistentVolumeClaim{
 			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "default"},
 			Status: corev1.PersistentVolumeClaimStatus{Conditions: []corev1.PersistentVolumeClaimCondition{{
-				Type:    corev1.PersistentVolumeClaimConditionType(workloads.InstanceRestore),
+				Type:    corev1.PersistentVolumeClaimConditionType(workloads.Restore),
 				Status:  status,
 				Message: "restore result",
 			}}},
@@ -174,7 +174,7 @@ func TestStatusReconcilerAggregatesRestorePVCConditionsWithoutPod(t *testing.T) 
 		if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
 			t.Fatal(err)
 		}
-		cond := meta.FindStatusCondition(inst.Status.Conditions, string(workloads.InstanceRestore))
+		cond := meta.FindStatusCondition(inst.Status.Conditions, string(workloads.Restore))
 		if cond == nil || cond.Status != metav1.ConditionUnknown || cond.Reason != workloads.ReasonRestoreRunning {
 			t.Fatalf("unexpected Restore condition: %#v", cond)
 		}
@@ -186,7 +186,7 @@ func TestStatusReconcilerAggregatesRestorePVCConditionsWithoutPod(t *testing.T) 
 		if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
 			t.Fatal(err)
 		}
-		cond := meta.FindStatusCondition(inst.Status.Conditions, string(workloads.InstanceRestore))
+		cond := meta.FindStatusCondition(inst.Status.Conditions, string(workloads.Restore))
 		if cond == nil || cond.Status != metav1.ConditionTrue || cond.Reason != workloads.ReasonRestoreCompleted {
 			t.Fatalf("unexpected Restore condition: %#v", cond)
 		}
@@ -198,7 +198,7 @@ func TestStatusReconcilerAggregatesRestorePVCConditionsWithoutPod(t *testing.T) 
 		if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
 			t.Fatal(err)
 		}
-		cond := meta.FindStatusCondition(inst.Status.Conditions, string(workloads.InstanceRestore))
+		cond := meta.FindStatusCondition(inst.Status.Conditions, string(workloads.Restore))
 		if cond == nil || cond.Status != metav1.ConditionFalse || cond.Reason != workloads.ReasonRestoreFailed {
 			t.Fatalf("unexpected Restore condition: %#v", cond)
 		}

@@ -191,7 +191,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 }
 
 func (r *statusReconciler) reconcileRestoreCondition(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, instances []*workloads.Instance) error {
-	restoreCond := meta.FindStatusCondition(its.Status.Conditions, string(workloads.InstanceRestore))
+	restoreCond := meta.FindStatusCondition(its.Status.Conditions, string(workloads.Restore))
 	if restoreCond != nil && (restoreCond.Status == metav1.ConditionTrue || restoreCond.Status == metav1.ConditionFalse) {
 		return nil
 	}
@@ -200,7 +200,7 @@ func (r *statusReconciler) reconcileRestoreCondition(tree *kubebuilderx.ObjectTr
 		return err
 	}
 	if condition == nil {
-		meta.RemoveStatusCondition(&its.Status.Conditions, string(workloads.InstanceRestore))
+		meta.RemoveStatusCondition(&its.Status.Conditions, string(workloads.Restore))
 		return nil
 	}
 	meta.SetStatusCondition(&its.Status.Conditions, *condition)
@@ -237,14 +237,14 @@ func buildRestoreCondition(tree *kubebuilderx.ObjectTree, its *workloads.Instanc
 			waiting.Insert(name)
 			continue
 		}
-		cond := meta.FindStatusCondition(inst.Status.Conditions, string(workloads.InstanceRestore))
+		cond := meta.FindStatusCondition(inst.Status.Conditions, string(workloads.Restore))
 		if cond == nil || cond.Status == metav1.ConditionUnknown {
 			waiting.Insert(name)
 			continue
 		}
 		if cond.Status == metav1.ConditionFalse {
 			return &metav1.Condition{
-				Type:               string(workloads.InstanceRestore),
+				Type:               string(workloads.Restore),
 				Status:             metav1.ConditionFalse,
 				ObservedGeneration: its.Generation,
 				Reason:             workloads.ReasonRestoreFailed,
@@ -257,7 +257,7 @@ func buildRestoreCondition(tree *kubebuilderx.ObjectTree, its *workloads.Instanc
 	}
 	if completed == expectedNames.Len() {
 		return &metav1.Condition{
-			Type:               string(workloads.InstanceRestore),
+			Type:               string(workloads.Restore),
 			Status:             metav1.ConditionTrue,
 			ObservedGeneration: its.Generation,
 			Reason:             workloads.ReasonRestoreCompleted,
@@ -269,7 +269,7 @@ func buildRestoreCondition(tree *kubebuilderx.ObjectTree, its *workloads.Instanc
 		return nil, err
 	}
 	return &metav1.Condition{
-		Type:               string(workloads.InstanceRestore),
+		Type:               string(workloads.Restore),
 		Status:             metav1.ConditionUnknown,
 		ObservedGeneration: its.Generation,
 		Reason:             workloads.ReasonRestoreRunning,

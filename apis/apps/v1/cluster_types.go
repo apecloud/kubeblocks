@@ -945,7 +945,8 @@ const (
 	// DeletingClusterPhase indicates the cluster is being deleted.
 	DeletingClusterPhase ClusterPhase = "Deleting"
 
-	// FailedClusterPhase represents all components are in `Failed` phase, indicates that the cluster is unavailable.
+	// FailedClusterPhase represents all components are in `Failed` phase, indicating that the cluster failed to reach
+	// its desired state.
 	FailedClusterPhase ClusterPhase = "Failed"
 
 	// AbnormalClusterPhase represents some components are in `Failed` phase, indicates that the cluster is in

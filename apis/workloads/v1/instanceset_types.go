@@ -738,8 +738,8 @@ const (
 	// InstanceFailure is added in an instance set when at least one of its instances(pods) is in a `Failed` phase.
 	InstanceFailure ConditionType = "InstanceFailure"
 
-	// InstanceRestore indicates whether the initial data restore for this Instance or InstanceSet has completed.
-	InstanceRestore ConditionType = "Restore"
+	// Restore indicates whether the initial data restore for this Instance or InstanceSet has completed.
+	Restore ConditionType = "Restore"
 
 	// InstanceUpdateRestricted represents a ConditionType that indicates updates to an InstanceSet are blocked(when the
 	// PodUpdatePolicy is set to StrictInPlace but the pods cannot be updated in-place).
@@ -762,14 +762,14 @@ const (
 	// ReasonInstanceFailure is a reason for condition InstanceFailure.
 	ReasonInstanceFailure = "InstanceFailure"
 
-	// ReasonRestoreCompleted is a reason for condition InstanceRestore.
-	ReasonRestoreCompleted = "RestoreCompleted"
+	// ReasonRestoreCompleted is a reason for condition Restore.
+	ReasonRestoreCompleted = "Completed"
 
-	// ReasonRestoreRunning is a reason for condition InstanceRestore.
-	ReasonRestoreRunning = "RestoreRunning"
+	// ReasonRestoreRunning is a reason for condition Restore.
+	ReasonRestoreRunning = "Running"
 
-	// ReasonRestoreFailed is a reason for condition InstanceRestore.
-	ReasonRestoreFailed = "RestoreFailed"
+	// ReasonRestoreFailed is a reason for condition Restore.
+	ReasonRestoreFailed = "Failed"
 
 	// ReasonInstanceUpdateRestricted is a reason for condition InstanceUpdateRestricted.
 	ReasonInstanceUpdateRestricted = "InstanceUpdateRestricted"

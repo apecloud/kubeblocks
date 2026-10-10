@@ -107,6 +107,86 @@ var _ = Describe("Instance Controller", func() {
 		})).Should(Succeed())
 	}
 
+	It("stop preserves PVCs and resume waits for termination before applying the latest template", func() {
+		createInstObj(instName, func(f *testapps.MockInstanceFactory) {
+			f.SetMinReadySeconds(3600)
+			f.AddVolumeClaimTemplate(corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: "data"},
+				Spec: corev1.PersistentVolumeClaimSpec{
+					AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+					Resources:   corev1.VolumeResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("1Gi")}},
+				},
+			})
+		})
+		pod := &corev1.Pod{}
+		Eventually(func() error { return k8sClient.Get(ctx, instKey, pod) }).Should(Succeed())
+		oldPodUID := pod.UID
+		Eventually(testapps.GetAndChangeObj(&testCtx, instKey, func(p *corev1.Pod) {
+			p.Finalizers = append(p.Finalizers, "test.kubeblocks.io/hold")
+		})).Should(Succeed())
+		pvcKey := client.ObjectKey{Namespace: instObj.Namespace, Name: "data-" + instObj.Name}
+		claim := &corev1.PersistentVolumeClaim{}
+		Eventually(func() error { return k8sClient.Get(ctx, pvcKey, claim) }).Should(Succeed())
+		pvcUID, pvcVersion := claim.UID, claim.ResourceVersion
+		pvcSpec, pvcOwners := claim.Spec.DeepCopy(), claim.OwnerReferences
+		Expect(pvcOwners).Should(HaveLen(1))
+		Expect(pvcOwners[0].UID).Should(Equal(instObj.UID))
+
+		Eventually(testapps.GetAndChangeObj(&testCtx, instKey, func(inst *workloads.Instance) {
+			inst.Spec.Stop = ptr.To(true)
+		})).Should(Succeed())
+		Eventually(testapps.CheckObj(&testCtx, instKey, func(g Gomega, p *corev1.Pod) {
+			g.Expect(p.DeletionTimestamp.IsZero()).Should(BeFalse())
+			g.Expect(p.UID).Should(Equal(oldPodUID))
+		})).Should(Succeed())
+		Eventually(testapps.CheckObj(&testCtx, instKey, func(g Gomega, inst *workloads.Instance) {
+			g.Expect(inst.Status.CurrentState).Should(Equal(workloads.InstanceCurrentStateTerminating))
+			g.Expect(inst.Status.UpToDate).Should(BeFalse())
+			g.Expect(inst.Status.Ready).Should(BeFalse())
+			g.Expect(inst.Spec.ScaledDown).Should(BeNil())
+		})).Should(Succeed())
+
+		Eventually(testapps.GetAndChangeObj(&testCtx, instKey, func(inst *workloads.Instance) {
+			inst.Spec.Template.Spec.Containers[0].Image = "bar:v2"
+			inst.Spec.VolumeClaimTemplates = nil
+		})).Should(Succeed())
+		Consistently(func(g Gomega) {
+			current := &corev1.PersistentVolumeClaim{}
+			g.Expect(k8sClient.Get(ctx, pvcKey, current)).Should(Succeed())
+			g.Expect(current.UID).Should(Equal(pvcUID))
+			g.Expect(current.ResourceVersion).Should(Equal(pvcVersion))
+			g.Expect(current.Spec).Should(Equal(*pvcSpec))
+			g.Expect(current.OwnerReferences).Should(Equal(pvcOwners))
+		}, time.Second).Should(Succeed())
+
+		Eventually(testapps.GetAndChangeObj(&testCtx, instKey, func(inst *workloads.Instance) {
+			inst.Spec.Stop = ptr.To(false)
+			inst.Spec.MinReadySeconds = 0
+			inst.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaimTemplate{{ObjectMeta: metav1.ObjectMeta{Name: "data"}, Spec: *pvcSpec}}
+		})).Should(Succeed())
+		Consistently(func(g Gomega) {
+			currentPod := &corev1.Pod{}
+			g.Expect(k8sClient.Get(ctx, instKey, currentPod)).Should(Succeed())
+			g.Expect(currentPod.UID).Should(Equal(oldPodUID))
+			g.Expect(currentPod.Spec.Containers[0].Image).Should(Equal("bar:v1"))
+			currentPVC := &corev1.PersistentVolumeClaim{}
+			g.Expect(k8sClient.Get(ctx, pvcKey, currentPVC)).Should(Succeed())
+			g.Expect(currentPVC.ResourceVersion).Should(Equal(pvcVersion))
+		}, time.Second).Should(Succeed())
+		Eventually(testapps.GetAndChangeObj(&testCtx, instKey, func(p *corev1.Pod) { p.Finalizers = nil })).Should(Succeed())
+		Eventually(func(g Gomega) {
+			resumed := &corev1.Pod{}
+			g.Expect(k8sClient.Get(ctx, instKey, resumed)).Should(Succeed())
+			g.Expect(resumed.UID).ShouldNot(Equal(oldPodUID))
+			g.Expect(resumed.Spec.Containers[0].Image).Should(Equal("bar:v2"))
+			currentPVC := &corev1.PersistentVolumeClaim{}
+			g.Expect(k8sClient.Get(ctx, pvcKey, currentPVC)).Should(Succeed())
+			g.Expect(currentPVC.UID).Should(Equal(pvcUID))
+			g.Expect(currentPVC.OwnerReferences).Should(Equal(pvcOwners))
+			g.Expect(currentPVC.Spec).Should(Equal(*pvcSpec))
+		}).Should(Succeed())
+	})
+
 	Context("provision", func() {
 		var (
 			pvc = corev1.PersistentVolumeClaim{

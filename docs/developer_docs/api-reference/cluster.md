@@ -18821,6 +18821,21 @@ bool
 <p>Indicate whether the instance is scaled down.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>stop</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Stop requests removal of the Pod without deleting the Instance. While true, the controller
+does not create a Pod or create, delete, or update PVCs. Assistant objects continue to reconcile.
+Nil or false runs the Instance with the latest templates and reuses existing PVCs.
+Deleting the Instance still applies its persistentVolumeClaimRetentionPolicy.</p>
+</td>
+</tr>
 </tbody>
 </table>
 </td>
@@ -20500,6 +20515,21 @@ bool
 <td>
 <em>(Optional)</em>
 <p>Indicate whether the instance is scaled down.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>stop</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Stop requests removal of the Pod without deleting the Instance. While true, the controller
+does not create a Pod or create, delete, or update PVCs. Assistant objects continue to reconcile.
+Nil or false runs the Instance with the latest templates and reuses existing PVCs.
+Deleting the Instance still applies its persistentVolumeClaimRetentionPolicy.</p>
 </td>
 </tr>
 </tbody>

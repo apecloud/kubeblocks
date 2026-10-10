@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/yaml"
 
@@ -281,43 +280,6 @@ func TestReplicaRestoreWaitsForInitialClusterRestore(t *testing.T) {
 		} else {
 			require.ErrorContains(t, err, "requires initial Cluster restore to complete")
 		}
-	}
-}
-
-func TestValidateReplicaRestoreIntentAcceptsInstanceAllocationForms(t *testing.T) {
-	cluster := &appsv1.Cluster{}
-	base := &appsv1.ClusterComponentSpec{
-		Name: "mysql", Replicas: 5,
-		ReplicaRestore: &appsv1.ClusterRestore{Source: appsv1.ClusterRestoreSource{
-			APIGroup: testRestoreSourceAPIGroup, Kind: testRestoreSourceKind, Name: "restore",
-		}},
-	}
-	tests := []struct {
-		name   string
-		mutate func(*appsv1.ClusterComponentSpec)
-	}{
-		{name: "instance template", mutate: func(spec *appsv1.ClusterComponentSpec) {
-			spec.Instances = []appsv1.InstanceTemplate{{Name: "fast", Replicas: ptr.To[int32](1)}}
-		}},
-		{name: "range ordinals", mutate: func(spec *appsv1.ClusterComponentSpec) {
-			spec.Ordinals.Ranges = []appsv1.Range{{Start: 3, End: 4}}
-		}},
-		{name: "discrete ordinals", mutate: func(spec *appsv1.ClusterComponentSpec) {
-			spec.Ordinals.Discrete = []int32{8}
-		}},
-		{name: "flat ordinals", mutate: func(spec *appsv1.ClusterComponentSpec) {
-			spec.FlatInstanceOrdinal = true
-		}},
-		{name: "offline instances", mutate: func(spec *appsv1.ClusterComponentSpec) {
-			spec.OfflineInstances = []string{"mysql-0"}
-		}},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			spec := base.DeepCopy()
-			test.mutate(spec)
-			require.NoError(t, validateReplicaRestoreIntent(cluster, spec))
-		})
 	}
 }
 

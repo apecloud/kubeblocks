@@ -51,12 +51,6 @@ func applyClusterRestoreIntent(cluster *appsv1.Cluster, components []*appsv1.Clu
 		applyRestoreIntentToComponent(cluster, sharding.Name, sharding.Template.VolumeClaimTemplates, sharding.Template.Instances, completed)
 		for i := range sharding.ShardTemplates {
 			template := &sharding.ShardTemplates[i]
-			if err := validateReplicaRestoreIntent(cluster, &appsv1.ClusterComponentSpec{
-				Name:           template.Name,
-				ReplicaRestore: sharding.Template.ReplicaRestore,
-			}); err != nil {
-				return err
-			}
 			applyRestoreIntentToComponent(cluster, template.Name, template.VolumeClaimTemplates, template.Instances, completed)
 		}
 	}

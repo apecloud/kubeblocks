@@ -22,24 +22,24 @@ package workloads
 import (
 	"context"
 
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	corev1 "k8s.io/api/core/v1"
+	ctrl "sigs.k8s.io/controller-runtime"
 
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset2"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 )
 
 type InstanceSetReconciler2 struct {
@@ -56,11 +56,13 @@ func (r *InstanceSetReconciler2) Reconcile(ctx context.Context, req ctrl.Request
 		Do(instanceset2.NewFixMetaReconciler()).
 		Do(instanceset2.NewDeletionReconciler()).
 		Do(instanceset2.NewValidationReconciler()).
+		Do(instanceset2.NewLifecycleReconciler(r.Client)).
 		Do(instanceset2.NewStatusReconciler()).
 		Do(instanceset2.NewRevisionUpdateReconciler()).
 		Do(instanceset2.NewAssistantObjectReconciler()).
 		Do(instanceset2.NewAlignmentReconciler()).
 		Do(instanceset2.NewUpdateReconciler()).
+		Do(instanceset2.NewLifecyclePollingReconciler()).
 		Commit()
 }
 

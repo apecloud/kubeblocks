@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instance
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -35,7 +36,10 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	workloadlifecycle "github.com/apecloud/kubeblocks/pkg/controller/workloads/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/kbagent"
+	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
 
 type updateReconciler struct{}
@@ -72,13 +76,25 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		return kubebuilderx.Continue, nil
 	}
 
-	// do nothing if update strategy type is 'OnDelete'
+	// Regenerated data inputs recover a pending Pod even under OnDelete.
+	for _, pod := range oldPodList {
+		if !isPodPending(pod) {
+			continue
+		}
+		regenerate, err := needsDataTaskPodReplacement(tree, inst, pod)
+		if err != nil {
+			return kubebuilderx.Continue, err
+		}
+		if regenerate {
+			if err := tree.Delete(pod); err != nil {
+				return kubebuilderx.Continue, err
+			}
+			return kubebuilderx.RetryAfter(time.Second), nil
+		}
+	}
 	if inst.Spec.InstanceUpdateStrategyType != nil && *inst.Spec.InstanceUpdateStrategyType == kbappsv1.OnDeleteStrategyType {
 		return kubebuilderx.Continue, nil
 	}
-
-	// treat old and Pending pod as a special case, as they can be updated without a consequence
-	// podUpdatePolicy is ignored here since in-place update for a pending pod doesn't make much sense.
 	for _, pod := range oldPodList {
 		updatePolicy, _, err := getPodUpdatePolicy(inst, pod)
 		if err != nil {
@@ -277,4 +293,47 @@ func buildBlockedCondition(inst *workloads.Instance, message string) *metav1.Con
 		Reason:             workloads.ReasonInstanceUpdateRestricted,
 		Message:            message,
 	}
+}
+
+// A guard-only Pod cannot receive regenerated init inputs in place. Replace it only
+// after observing an unmarked data PVC and a current generated task for that PVC.
+func needsDataTaskPodReplacement(tree *kubebuilderx.ObjectTree, inst *workloads.Instance, pod *corev1.Pod) (bool, error) {
+	desired, err := buildInstancePod(inst, "")
+	if err != nil {
+		return false, err
+	}
+	currentTask, err := workloadlifecycle.GeneratedTask(&desired.Spec)
+	if err != nil {
+		return false, err
+	}
+	oldTask, err := workloadlifecycle.GeneratedTask(&pod.Spec)
+	if err != nil {
+		return false, err
+	}
+	if currentTask == "" || currentTask == oldTask {
+		return false, nil
+	}
+	guard := ""
+	for _, worker := range desired.Spec.InitContainers {
+		if worker.Name != kbagent.ContainerName4Worker {
+			continue
+		}
+		for _, env := range worker.Env {
+			if env.Name == "KB_AGENT_DATA_LOAD_RESULT" {
+				guard = env.Value
+			}
+		}
+	}
+	if guard == "" {
+		return false, nil
+	}
+	var result proto.DataLoadResult
+	if err := json.Unmarshal([]byte(guard), &result); err != nil {
+		return false, err
+	}
+	pvc, err := readDataResultPVC(tree, &result)
+	if err != nil || pvc == nil {
+		return false, err
+	}
+	return pvc.Annotations[proto.DataLoadedAnnotationKey] != "true", nil
 }

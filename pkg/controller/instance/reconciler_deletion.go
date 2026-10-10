@@ -21,6 +21,7 @@ package instance
 
 import (
 	"maps"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -59,6 +60,17 @@ func (r *deletionReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebu
 
 func (r *deletionReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	inst, _ := tree.GetRoot().(*workloads.Instance)
+	if inst.Spec.LifecycleActions != nil && inst.Spec.LifecycleActions.DataLoad != nil {
+		pods := tree.List(&corev1.Pod{})
+		if len(pods) > 0 {
+			for _, pod := range pods {
+				if err := tree.Delete(pod); err != nil {
+					return kubebuilderx.Continue, err
+				}
+			}
+			return kubebuilderx.RetryAfter(time.Second), nil
+		}
+	}
 	if err := r.deleteUnreferencedSharedAssistantObjects(tree, inst); err != nil {
 		return kubebuilderx.Continue, err
 	}

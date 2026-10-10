@@ -144,6 +144,11 @@ func isImageMatched(pod *corev1.Pod) bool {
 	return true
 }
 
+// BuildPod resolves an Instance template to its runtime Pod, including data PVC mappings.
+func BuildPod(inst *workloads.Instance) (*corev1.Pod, error) {
+	return buildInstancePod(inst, "")
+}
+
 func buildInstancePod(inst *workloads.Instance, revision string) (*corev1.Pod, error) {
 	// 1. build a pod from pod template
 	var err error

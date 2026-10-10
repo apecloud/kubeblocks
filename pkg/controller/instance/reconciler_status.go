@@ -115,7 +115,7 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	if observed {
 		inst.Status.UpToDate = !pending
 	}
-	inst.Status.UpToDate = !stopped && updated && inst.Status.UpToDate
+	inst.Status.UpToDate = updated && inst.Status.UpToDate
 	inst.Status.Ready = ready
 	inst.Status.Available = available
 	inst.Status.Role = r.observedRoleOfPod(inst, pod)

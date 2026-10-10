@@ -58,17 +58,11 @@ func (r *updateReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuil
 
 func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	inst := tree.GetRoot().(*workloads.Instance)
-	if ptr.Deref(inst.Spec.Stop, false) {
-		return kubebuilderx.Continue, nil
-	}
 
 	newNameSet := sets.New[string](podName(inst))
 	oldNameSet := sets.New[string]()
 	oldPodList := make([]*corev1.Pod, 0)
 	for _, object := range tree.List(&corev1.Pod{}) {
-		if isTerminating(object.(*corev1.Pod)) {
-			return kubebuilderx.RetryAfter(time.Second), nil
-		}
 		oldNameSet.Insert(object.GetName())
 		oldPodList = append(oldPodList, object.(*corev1.Pod))
 	}

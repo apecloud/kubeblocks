@@ -276,6 +276,7 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1.Component) *appsv1.Com
 	compObjCopy.Spec.Services = compProto.Spec.Services
 	compObjCopy.Spec.SystemAccounts = compProto.Spec.SystemAccounts
 	compObjCopy.Spec.Replicas = compProto.Spec.Replicas
+	compObjCopy.Spec.ReplicaRestore = compProto.Spec.ReplicaRestore
 	compObjCopy.Spec.Configs = mergeConfigs(compObjCopy.Spec.Configs, compProto.Spec.Configs)
 	compObjCopy.Spec.ServiceAccountName = compProto.Spec.ServiceAccountName
 	compObjCopy.Spec.ParallelPodManagementConcurrency = compProto.Spec.ParallelPodManagementConcurrency

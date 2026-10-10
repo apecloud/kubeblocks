@@ -345,6 +345,12 @@ type ClusterComponentSpec struct {
 	// +kubebuilder:default=1
 	Replicas int32 `json:"replicas"`
 
+	// Specifies the source used to initialize new replicas when scaling out
+	// an existing Component. Existing replicas retain their initialization input.
+	//
+	// +optional
+	ReplicaRestore *ClusterRestore `json:"replicaRestore,omitempty"`
+
 	// Specifies the scheduling policy for the Component.
 	// If defined, it will overwrite the scheduling policy defined in ClusterSpec.
 	//
@@ -875,7 +881,8 @@ type ClusterBackup struct {
 	IncrementalCronExpression string `json:"incrementalCronExpression,omitempty"`
 }
 
-// ClusterRestore specifies how to initialize a Cluster from a restore source.
+// ClusterRestore specifies how to initialize a Cluster or new replicas from a
+// restore source.
 type ClusterRestore struct {
 	// Specifies the restore source.
 	//
@@ -893,10 +900,9 @@ type ClusterRestore struct {
 	Parameters map[string]string `json:"parameters,omitempty"`
 }
 
-// ClusterRestoreSource describes the source object used by a Cluster restore.
+// ClusterRestoreSource describes the object used as a restore source.
 type ClusterRestoreSource struct {
-	// Specifies the API group of the restore source. For example, use "dataprotection.kubeblocks.io" for KubeBlocks
-	// data protection Backup sources.
+	// Specifies the API group of the restore source.
 	//
 	// +kubebuilder:validation:Required
 	APIGroup string `json:"apiGroup"`

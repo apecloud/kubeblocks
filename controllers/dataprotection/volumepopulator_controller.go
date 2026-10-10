@@ -271,9 +271,6 @@ func isClusterRestorePVC(pvc *corev1.PersistentVolumeClaim) bool {
 		restoreComponent == pvc.Labels[constant.KBAppShardTemplateLabelKey]
 }
 
-// clusterRestorePVCUID returns the Cluster correlation identity inherited
-// from restore intent. A later verified label may repeat it, but conflicting
-// identities are never accepted.
 func clusterRestorePVCUID(pvc *corev1.PersistentVolumeClaim) string {
 	annotationUID := pvc.Annotations[constant.KBAppClusterUIDKey]
 	labelUID := pvc.Labels[dptypes.ClusterUIDLabelKey]
@@ -500,7 +497,7 @@ func (r *VolumePopulatorReconciler) handleRestoreParentLifecycle(reqCtx intctrlu
 		return true, nil
 	}
 	// Aggregate restore status gates normal progression, not owner cleanup.
-	if !clusterAllowsRestoreProgress(cluster) && !pvcRestoreTerminal(pvc) {
+	if !clusterAllowsRestoreProgress(cluster) && !pvcRestoreTerminal(pvc) && !isReplicaRestorePVC(pvc) {
 		return false, intctrlutil.NewRequeueError(reconcileInterval, "Cluster restore is no longer active")
 	}
 	if !committed {
@@ -515,6 +512,19 @@ func (r *VolumePopulatorReconciler) handleRestoreParentLifecycle(reqCtx intctrlu
 		// registers protection or creates any restore resources.
 		if !comp.DeletionTimestamp.IsZero() {
 			return true, nil
+		}
+		if isReplicaRestorePVC(pvc) {
+			backupNamespace, err := r.authorizedBackupNamespaceFromPVC(reqCtx, pvc)
+			if err != nil {
+				return false, intctrlutil.NewFatalError(err.Error())
+			}
+			backup := &dpv1alpha1.Backup{}
+			if err = r.Client.Get(reqCtx.Ctx, client.ObjectKey{Namespace: backupNamespace, Name: pvc.Spec.DataSourceRef.Name}, backup); err != nil {
+				return false, err
+			}
+			if err = r.validateReplicaRestoreDataVolume(reqCtx, pvc, backup); err != nil {
+				return false, err
+			}
 		}
 		if err = r.registerVolumePopulation(reqCtx.Ctx, pvc, cluster, comp); err != nil {
 			return false, restoreParentRequeue(err)
@@ -656,6 +666,13 @@ func (r *VolumePopulatorReconciler) finishVolumePopulationTermination(reqCtx int
 	}
 	if pending {
 		return intctrlutil.NewRequeueError(reconcileInterval, "waiting for helper PVC to disappear")
+	}
+	if isReplicaRestorePVC(pvc) && !pvcRestoreTerminal(pvc) {
+		if err := r.UpdatePVCConditions(reqCtx, pvc, ReasonPopulatingFailed,
+			"Replica restore terminated by its owner lifecycle"); err != nil {
+			return err
+		}
+		return intctrlutil.NewRequeueError(reconcileInterval, "waiting for Replica restore termination status")
 	}
 	return r.releaseTargetPVC(reqCtx, pvc)
 }
@@ -894,6 +911,10 @@ func (r *VolumePopulatorReconciler) validateRestoreAndBuildMGR(reqCtx intctrluti
 	if err != nil {
 		return nil, err
 	}
+	if isReplicaRestorePVC(pvc) && (decision.skipPostReady || decision.sourceTarget == nil) {
+		return nil, intctrlutil.NewFatalError(fmt.Sprintf(
+			"replica restore PVC %s/%s has no matching backup target", pvc.Namespace, pvc.Name))
+	}
 	restore := &dpv1alpha1.Restore{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      getPopulatePVCName(pvc.UID),
@@ -926,7 +947,7 @@ func (r *VolumePopulatorReconciler) validateRestoreAndBuildMGR(reqCtx intctrluti
 	}
 	if decision.sourceTarget != nil {
 		restore.Spec.Backup.SourceTargetName = decision.sourceTarget.Name
-		if decision.mode == pvcRestoreModeRestoreData {
+		if decision.mode == pvcRestoreModeRestoreData || isReplicaRestorePVC(pvc) {
 			restore.Spec.PrepareDataConfig.RequiredPolicyForAllPodSelection, err = requiredPolicyForPVC(decision.sourceTarget, pvc)
 			if err != nil {
 				return nil, err
@@ -937,10 +958,22 @@ func (r *VolumePopulatorReconciler) validateRestoreAndBuildMGR(reqCtx intctrluti
 	if err = dprestore.ValidateAndInitRestoreMGR(reqCtx, r.Client, restoreMgr); err != nil {
 		return nil, err
 	}
-	if err = r.restoreSystemAccountSecrets(reqCtx, pvc, backupNamespace); err != nil {
-		return nil, err
+	if isReplicaRestorePVC(pvc) && len(restoreMgr.PrepareDataBackupSets) == 0 {
+		return nil, intctrlutil.NewFatalError(fmt.Sprintf(
+			"replica restore PVC %s/%s requires a prepareData restore action", pvc.Namespace, pvc.Name))
+	}
+	if !isReplicaRestorePVC(pvc) {
+		if err = r.restoreSystemAccountSecrets(reqCtx, pvc, backupNamespace); err != nil {
+			return nil, err
+		}
 	}
 	if decision.mode == pvcRestoreModeProvisionOnly {
+		if isReplicaRestorePVC(pvc) &&
+			(pvc.Labels[dptypes.ClusterUIDLabelKey] == "" || pvc.Labels[dptypes.ComponentUIDLabelKey] == "") {
+			if err = r.validateReplicaRestoreDataVolume(reqCtx, pvc, backup); err != nil {
+				return nil, err
+			}
+		}
 		restoreMgr.PrepareDataBackupSets = nil
 	}
 	saName := restore.Spec.ServiceAccountName
@@ -1261,9 +1294,18 @@ func requiredPolicyForPVC(target *dpv1alpha1.BackupStatusTarget, pvc *corev1.Per
 	if target == nil || target.PodSelector == nil || target.PodSelector.Strategy != dpv1alpha1.PodSelectionStrategyAll {
 		return nil, nil
 	}
-	sourceTargetPodName, err := resolveSourceTargetPodName(target, pvc)
-	if err != nil {
-		return nil, err
+	var sourceTargetPodName string
+	if isReplicaRestorePVC(pvc) {
+		if len(target.SelectedTargetPods) != 1 {
+			return nil, intctrlutil.NewFatalError("replica restore requires exactly one source pod for an AllPods Backup; restoring from multiple source pods is not supported")
+		}
+		sourceTargetPodName = target.SelectedTargetPods[0]
+	} else {
+		var err error
+		sourceTargetPodName, err = resolveSourceTargetPodName(target, pvc)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return &dpv1alpha1.RequiredPolicyForAllPodSelection{
 		DataRestorePolicy: dpv1alpha1.OneToManyRestorePolicy,
@@ -1809,6 +1851,9 @@ func (r *VolumePopulatorReconciler) pvcNeedsDataRestore(reqCtx intctrlutil.Reque
 func (r *VolumePopulatorReconciler) ensurePostReadyRestoreCompleted(reqCtx intctrlutil.RequestCtx,
 	pvc *corev1.PersistentVolumeClaim,
 	restoreCtx *pvcRestoreContext) (bool, error) {
+	if isReplicaRestorePVC(pvc) {
+		return true, nil
+	}
 	restoreMgr := restoreCtx.restoreMgr
 	if len(restoreMgr.PostReadyBackupSets) == 0 {
 		return true, nil
@@ -1922,6 +1967,20 @@ func (r *VolumePopulatorReconciler) ensurePostReadyRestoreCompleted(reqCtx intct
 		}
 		return false, nil
 	}
+}
+
+func isReplicaRestorePVC(pvc *corev1.PersistentVolumeClaim) bool {
+	return pvc != nil && pvc.Annotations != nil &&
+		pvc.Annotations[constant.RestorePurposeAnnotationKey] == constant.RestorePurposeReplica
+}
+
+func replicaRestoreSucceeded(pvc *corev1.PersistentVolumeClaim) bool {
+	if pvc == nil {
+		return false
+	}
+	condition := findPVCConditionByType(pvc, appsv1.ConditionTypeRestore)
+	return condition != nil && condition.Status == corev1.ConditionTrue &&
+		(condition.Reason == ReasonPopulatingSucceed || condition.Reason == ReasonPopulatingProvisioned)
 }
 
 func (r *VolumePopulatorReconciler) updatePVCConditionsIfPopulateNotReleased(reqCtx intctrlutil.RequestCtx,
@@ -2180,9 +2239,13 @@ func (r *VolumePopulatorReconciler) listRestorePVCsForComponent(reqCtx intctrlut
 	if err != nil {
 		return nil, intctrlutil.NewFatalError(err.Error())
 	}
+	replicaRestore := isReplicaRestorePVC(pvc)
 	for i := range pvcList.Items {
 		item := pvcList.Items[i]
 		if item.Spec.DataSourceRef == nil || item.Spec.DataSourceRef.Name != pvc.Spec.DataSourceRef.Name {
+			continue
+		}
+		if replicaRestore && (!isReplicaRestorePVC(&item) || replicaRestoreSucceeded(&item)) {
 			continue
 		}
 		if item.Annotations[constant.RestoreSourceKindAnnotationKey] == "" {
@@ -2749,6 +2812,20 @@ func (r *VolumePopulatorReconciler) authorizedBackupNamespaceFromPVC(reqCtx intc
 func (r *VolumePopulatorReconciler) validateBackupNamespaceAuthorized(reqCtx intctrlutil.RequestCtx,
 	pvc *corev1.PersistentVolumeClaim,
 	backupNamespace string) error {
+	if isReplicaRestorePVC(pvc) {
+		ref := pvc.Spec.DataSourceRef
+		sourceNamespace := pvc.Namespace
+		if ref != nil && ref.Namespace != nil {
+			sourceNamespace = *ref.Namespace
+		}
+		if ref == nil || ref.APIGroup == nil ||
+			pvc.Annotations[constant.RestoreSourceAPIGroupAnnotationKey] != *ref.APIGroup ||
+			pvc.Annotations[constant.RestoreSourceKindAnnotationKey] != ref.Kind ||
+			pvc.Annotations[constant.RestoreSourceNameAnnotationKey] != ref.Name ||
+			pvc.Annotations[constant.RestoreSourceNamespaceAnnotationKey] != sourceNamespace || sourceNamespace != backupNamespace {
+			return fmt.Errorf("PVC %s/%s replica restore source annotations must match dataSourceRef", pvc.Namespace, pvc.Name)
+		}
+	}
 	if backupNamespace == pvc.Namespace {
 		return nil
 	}
@@ -2765,26 +2842,57 @@ func (r *VolumePopulatorReconciler) validateBackupNamespaceAuthorized(reqCtx int
 	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Namespace: pvc.Namespace, Name: clusterName}, cluster); err != nil {
 		return err
 	}
-	if cluster.Spec.Restore == nil {
-		return fmt.Errorf("PVC %s/%s can not restore Backup from namespace %q without cluster restore intent",
-			pvc.Namespace, pvc.Name, backupNamespace)
-	}
-	source := cluster.Spec.Restore.Source
-	sourceNamespace := source.Namespace
-	if sourceNamespace == "" {
-		sourceNamespace = cluster.Namespace
-	}
-	if source.APIGroup != dptypes.DataprotectionAPIGroup ||
-		source.Kind != dptypes.BackupKind ||
-		source.Name != pvc.Spec.DataSourceRef.Name ||
-		sourceNamespace != backupNamespace {
+	if !r.clusterSourceAuthorizesPVC(cluster, pvc, backupNamespace) {
 		return fmt.Errorf("PVC %s/%s can not restore Backup %s/%s without matching cluster restore intent",
 			pvc.Namespace, pvc.Name, backupNamespace, pvc.Spec.DataSourceRef.Name)
+	}
+	if isReplicaRestorePVC(pvc) && volumePopulationIdentityCommitted(pvc, cluster) {
+		return nil
 	}
 	if err := r.validateBackupRestorePVCWorkload(reqCtx, pvc, clusterName); err != nil {
 		return err
 	}
 	return nil
+}
+
+func (r *VolumePopulatorReconciler) clusterSourceAuthorizesPVC(cluster *appsv1.Cluster, pvc *corev1.PersistentVolumeClaim, backupNamespace string) bool {
+	ref := pvc.Spec.DataSourceRef
+	if ref == nil {
+		return false
+	}
+	matches := func(apiGroup, kind, name, namespace string) bool {
+		if namespace == "" {
+			namespace = cluster.Namespace
+		}
+		return apiGroup == dptypes.DataprotectionAPIGroup && kind == dptypes.BackupKind &&
+			name == ref.Name && namespace == backupNamespace
+	}
+	if restore := cluster.Spec.Restore; restore != nil && matches(restore.Source.APIGroup,
+		restore.Source.Kind, restore.Source.Name, restore.Source.Namespace) {
+		if !isReplicaRestorePVC(pvc) {
+			return true
+		}
+	}
+	if !isReplicaRestorePVC(pvc) || cluster.UID == "" ||
+		pvc.Annotations[constant.KBAppClusterUIDKey] != string(cluster.UID) ||
+		pvc.Annotations[constant.RestoreComponentAnnotationKey] != restoreComponentName(pvc) {
+		return false
+	}
+	for _, component := range cluster.Spec.ComponentSpecs {
+		if component.Name == restoreComponentName(pvc) && component.ReplicaRestore != nil {
+			source := component.ReplicaRestore.Source
+			return matches(source.APIGroup, source.Kind, source.Name, source.Namespace)
+		}
+	}
+	shardingName := pvc.Labels[constant.KBAppShardingNameLabelKey]
+	for _, sharding := range cluster.Spec.Shardings {
+		if sharding.Name != shardingName || sharding.Template.ReplicaRestore == nil {
+			continue
+		}
+		source := sharding.Template.ReplicaRestore.Source
+		return matches(source.APIGroup, source.Kind, source.Name, source.Namespace)
+	}
+	return false
 }
 
 func (r *VolumePopulatorReconciler) validateBackupRestorePVCWorkload(reqCtx intctrlutil.RequestCtx,
@@ -2827,6 +2935,61 @@ func (r *VolumePopulatorReconciler) validateBackupRestorePVCWorkload(reqCtx intc
 		return fmt.Errorf("PVC %s/%s can not restore cross-namespace Backup with unsupported owner kind %s",
 			pvc.Namespace, pvc.Name, ownerRef.Kind)
 	}
+}
+
+func (r *VolumePopulatorReconciler) validateReplicaRestoreDataVolume(reqCtx intctrlutil.RequestCtx,
+	pvc *corev1.PersistentVolumeClaim, backup *dpv1alpha1.Backup) error {
+	ref := metav1.GetControllerOf(pvc)
+	if ref == nil || ref.APIVersion != workloads.GroupVersion.String() {
+		return intctrlutil.NewFatalError(fmt.Sprintf("replica restore PVC %s/%s requires a workload owner", pvc.Namespace, pvc.Name))
+	}
+	key := client.ObjectKey{Namespace: pvc.Namespace, Name: ref.Name}
+	var owner client.Object
+	var volumeNames []string
+	podName := pvc.Labels[constant.KBAppPodNameLabelKey]
+	switch ref.Kind {
+	case workloads.InstanceSetKind:
+		its := &workloads.InstanceSet{}
+		if err := r.Client.Get(reqCtx.Ctx, key, its); err != nil {
+			return err
+		}
+		owner = its
+		volumeTemplates := its.Spec.VolumeClaimTemplates
+		var err error
+		if podName != "" {
+			volumeTemplates, err = effectiveInstanceSetVolumeTemplates(its, podName,
+				pvc.Labels[constant.KBAppInstanceTemplateLabelKey])
+			if err != nil {
+				return intctrlutil.NewFatalError(err.Error())
+			}
+		}
+		for _, template := range volumeTemplates {
+			volumeNames = append(volumeNames, template.Name)
+		}
+	case "Instance":
+		inst := &workloads.Instance{}
+		if err := r.Client.Get(reqCtx.Ctx, key, inst); err != nil {
+			return err
+		}
+		owner = inst
+		for _, template := range inst.Spec.VolumeClaimTemplates {
+			volumeNames = append(volumeNames, template.Name)
+		}
+	default:
+		return intctrlutil.NewFatalError(fmt.Sprintf("replica restore PVC %s/%s has unsupported owner kind %s", pvc.Namespace, pvc.Name, ref.Kind))
+	}
+	if err := validatePVCControllerRef(pvc, ref, owner); err != nil {
+		return intctrlutil.NewFatalError(err.Error())
+	}
+	if backup.Status.BackupMethod != nil && backup.Status.BackupMethod.TargetVolumes != nil {
+		for _, name := range volumeNames {
+			if utils.ExistTargetVolume(backup.Status.BackupMethod.TargetVolumes, name) {
+				return nil
+			}
+		}
+	}
+	return intctrlutil.NewFatalError(fmt.Sprintf("replica restore PVC %s/%s has no workload volume matching Backup %s/%s target volumes",
+		pvc.Namespace, pvc.Name, backup.Namespace, backup.Name))
 }
 
 func validatePVCControllerRef(pvc *corev1.PersistentVolumeClaim, ownerRef *metav1.OwnerReference, owner client.Object) error {
@@ -2872,26 +3035,37 @@ func validatePVCMatchesInstanceSetTemplate(pvc *corev1.PersistentVolumeClaim, it
 }
 
 func instanceSetPVCtemplateForPod(its *workloads.InstanceSet, podName, templateName, volumeName string) (corev1.PersistentVolumeClaim, error) {
-	itsExt, err := instancetemplate.BuildInstanceSetExt(its, nil)
+	templates, err := effectiveInstanceSetVolumeTemplates(its, podName, templateName)
 	if err != nil {
 		return corev1.PersistentVolumeClaim{}, err
+	}
+	return pvcTemplateFromEffectiveTemplates(templates, volumeName)
+}
+
+func effectiveInstanceSetVolumeTemplates(its *workloads.InstanceSet, podName, templateName string) ([]corev1.PersistentVolumeClaim, error) {
+	if its.Spec.Replicas == nil {
+		return its.Spec.VolumeClaimTemplates, nil
+	}
+	itsExt, err := instancetemplate.BuildInstanceSetExt(its, nil)
+	if err != nil {
+		return nil, err
 	}
 	nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt, nil)
 	if err != nil {
-		return corev1.PersistentVolumeClaim{}, err
+		return nil, err
 	}
 	nameTemplateMap, err := nameBuilder.BuildInstanceName2TemplateMap()
 	if err != nil {
-		return corev1.PersistentVolumeClaim{}, err
+		return nil, err
 	}
 	template, ok := nameTemplateMap[podName]
 	if !ok {
-		return corev1.PersistentVolumeClaim{}, fmt.Errorf("pod %q is not an expected InstanceSet member", podName)
+		return nil, fmt.Errorf("pod %q is not an expected InstanceSet member", podName)
 	}
 	if template.Name != templateName {
-		return corev1.PersistentVolumeClaim{}, fmt.Errorf("pod %q resolves to InstanceSet template %q, not %q", podName, template.Name, templateName)
+		return nil, fmt.Errorf("pod %q resolves to InstanceSet template %q, not %q", podName, template.Name, templateName)
 	}
-	return pvcTemplateFromEffectiveTemplates(template.VolumeClaimTemplates, volumeName)
+	return template.VolumeClaimTemplates, nil
 }
 
 func pvcTemplateFromEffectiveTemplates(templates []corev1.PersistentVolumeClaim, volumeName string) (corev1.PersistentVolumeClaim, error) {

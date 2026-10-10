@@ -64,9 +64,11 @@ func BuildInstanceSet(synthesizedComp *SynthesizedComponent, compDef *kbappsv1.C
 		}).
 		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
 		AddAnnotationsInMap(synthesizedComp.AnnotationsInjectedToWorkload).
+		AddAnnotations(constant.KBAppClusterUIDKey, synthesizedComp.ClusterUID).
 		SetTemplate(getPodTemplate(synthesizedComp)).
 		SetSelectorMatchLabel(getPodTemplateLabels(synthesizedComp)).
 		SetReplicas(synthesizedComp.Replicas).
+		SetReplicaRestore(synthesizedComp.ReplicaRestore).
 		SetVolumeClaimTemplates(defaultVolumeClaimTemplates(synthesizedComp)...).
 		SetPVCRetentionPolicy(&synthesizedComp.PVCRetentionPolicy).
 		SetMinReadySeconds(synthesizedComp.MinReadySeconds).

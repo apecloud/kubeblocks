@@ -50,7 +50,9 @@ import (
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/instance"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
+	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dprestore "github.com/apecloud/kubeblocks/pkg/dataprotection/restore"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
@@ -4070,6 +4072,10 @@ func TestMapComponentAndClusterDependencies(t *testing.T) {
 	terminal.Status.Conditions = []corev1.PersistentVolumeClaimCondition{{
 		Type: corev1.PersistentVolumeClaimConditionType(kbappsv1.ConditionTypeRestore), Status: corev1.ConditionFalse,
 	}}
+	replicaTerminal := terminal.DeepCopy()
+	replicaTerminal.Name = "replica-terminal"
+	replicaTerminal.UID = "replica-terminal-pvc"
+	replicaTerminal.Annotations[constant.RestorePurposeAnnotationKey] = constant.RestorePurposeReplica
 	foreign := dependencyRestorePVC("foreign", "mysql", "foreign-pvc")
 	foreign.Annotations[constant.KBAppClusterUIDKey] = "another-cluster-uid"
 	comp := &kbappsv1.Component{ObjectMeta: metav1.ObjectMeta{
@@ -4085,7 +4091,7 @@ func TestMapComponentAndClusterDependencies(t *testing.T) {
 	cluster := &kbappsv1.Cluster{ObjectMeta: metav1.ObjectMeta{
 		Namespace: "default", Name: "cluster", UID: "cluster-uid",
 	}}
-	reconciler := dependencyTestReconciler(t, mysql, postgresql, invalid, terminal, foreign)
+	reconciler := dependencyTestReconciler(t, mysql, postgresql, invalid, terminal, replicaTerminal, foreign)
 
 	require.ElementsMatch(t, []reconcile.Request{
 		{NamespacedName: client.ObjectKeyFromObject(mysql)},
@@ -4097,6 +4103,7 @@ func TestMapComponentAndClusterDependencies(t *testing.T) {
 	require.ElementsMatch(t, []reconcile.Request{
 		{NamespacedName: client.ObjectKeyFromObject(mysql)},
 		{NamespacedName: client.ObjectKeyFromObject(terminal)},
+		{NamespacedName: client.ObjectKeyFromObject(replicaTerminal)},
 	}, reconciler.mapComponentToPVCs(context.Background(), deleting))
 	require.ElementsMatch(t, []reconcile.Request{
 		{NamespacedName: client.ObjectKeyFromObject(mysql)},
@@ -4192,6 +4199,343 @@ func TestDependencyPredicates(t *testing.T) {
 	clusterDeleting := clusterNew.DeepCopy()
 	clusterDeleting.DeletionTimestamp = &now
 	require.True(t, clusterDependencyPredicate().Update(event.UpdateEvent{ObjectOld: clusterNew, ObjectNew: clusterDeleting}))
+
+}
+
+func TestReplicaRestoreCompletesWithoutPostReady(t *testing.T) {
+	ctx := context.Background()
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
+	backup, actionSet := restoreBackupObjects()
+	actionSet.Spec.Restore.PostReady = []dpv1alpha1.ActionSpec{{Job: &dpv1alpha1.JobActionSpec{}}}
+	pvc := newPVCForRestoreDecision("data", "mysql", "")
+	pvc.UID = "replica-pvc"
+	pvc.Annotations[constant.RestorePurposeAnnotationKey] = constant.RestorePurposeReplica
+	pvc.Spec.DataSourceRef = &corev1.TypedObjectReference{
+		APIGroup: ptr.To(dptypes.DataprotectionAPIGroup), Kind: dptypes.BackupKind, Name: backup.Name,
+	}
+	setReplicaRestoreSourceAnnotations(pvc)
+	pvc.Spec.VolumeName = "data-pv"
+	pvc.Status.Conditions = []corev1.PersistentVolumeClaimCondition{{
+		Type: PersistentVolumeClaimPopulating, Status: corev1.ConditionTrue, Reason: ReasonPopulatingSucceed,
+	}}
+	worker := &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "worker", Namespace: pvc.Namespace}}
+	for key, value := range map[string]string{
+		dptypes.CfgKeyWorkerServiceAccountName: worker.Name,
+		dptypes.CfgKeyWorkerClusterRoleName:    "worker-role",
+	} {
+		previous := viper.Get(key)
+		viper.Set(key, value)
+		t.Cleanup(func() { viper.Set(key, previous) })
+	}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(pvc).
+		WithObjects(pvc, backup, actionSet, worker).Build()
+	vp := &VolumePopulatorReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(10)}
+	result, err := vp.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(pvc)})
+	require.NoError(t, err)
+	require.Zero(t, result)
+	require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(pvc), pvc))
+	condition := findPVCConditionByType(pvc, kbappsv1.ConditionTypeRestore)
+	require.NotNil(t, condition)
+	require.Equal(t, corev1.ConditionTrue, condition.Status)
+	restores := &dpv1alpha1.RestoreList{}
+	require.NoError(t, cli.List(ctx, restores))
+	require.Empty(t, restores.Items, "post-ready must not create a Restore")
+}
+
+func TestReplicaRestoreReconcileRequiresCrossNamespaceOwnerIntent(t *testing.T) {
+	for _, intent := range []string{"matching", "matching sharding", "absent", "other component", "other backup", "other namespace", "other group", "other kind", "foreign Cluster UID", "initial restore only"} {
+		t.Run(intent, func(t *testing.T) {
+			ctx := context.Background()
+			scheme, cluster, component, its, pvc := parentRestoreObjects(t)
+			sourceNamespace := "external-backups"
+			source := kbappsv1.ClusterRestoreSource{
+				APIGroup: dptypes.DataprotectionAPIGroup, Kind: dptypes.BackupKind,
+				Name: pvc.Spec.DataSourceRef.Name, Namespace: sourceNamespace,
+			}
+			cluster.Spec.Restore = nil
+			cluster.Spec.ComponentSpecs = []kbappsv1.ClusterComponentSpec{{
+				Name: "mysql", Replicas: 5, ReplicaRestore: &kbappsv1.ClusterRestore{Source: source},
+			}}
+			switch intent {
+			case "matching sharding":
+				cluster.Spec.ComponentSpecs = nil
+				cluster.Spec.Shardings = []kbappsv1.ClusterSharding{{
+					Name: "shard", Template: kbappsv1.ClusterComponentSpec{
+						ReplicaRestore: &kbappsv1.ClusterRestore{Source: source},
+					},
+				}}
+			case "absent":
+				cluster.Spec.ComponentSpecs[0].ReplicaRestore = nil
+			case "other component":
+				cluster.Spec.ComponentSpecs[0].Name = "other"
+			case "other backup":
+				cluster.Spec.ComponentSpecs[0].ReplicaRestore.Source.Name = "other"
+			case "other namespace":
+				cluster.Spec.ComponentSpecs[0].ReplicaRestore.Source.Namespace = "other"
+			case "other group":
+				cluster.Spec.ComponentSpecs[0].ReplicaRestore.Source.APIGroup = "other"
+			case "other kind":
+				cluster.Spec.ComponentSpecs[0].ReplicaRestore.Source.Kind = dptypes.RestoreKind
+			case "foreign Cluster UID":
+				pvc.Annotations[constant.KBAppClusterUIDKey] = "foreign-cluster"
+			case "initial restore only":
+				cluster.Spec.ComponentSpecs[0].ReplicaRestore = nil
+				cluster.Spec.Restore = &kbappsv1.ClusterRestore{Source: source}
+			}
+			its.Spec.Replicas = ptr.To(int32(5))
+			its.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{{ObjectMeta: metav1.ObjectMeta{Name: "data"}}}
+			pvc.Name = "data-cluster-mysql-3"
+			pvc.Labels[constant.KBAppPodNameLabelKey] = "cluster-mysql-3"
+			pvc.Labels[constant.VolumeClaimTemplateNameLabelKey] = "data"
+			if intent == "matching sharding" {
+				pvc.Labels[constant.KBAppShardingNameLabelKey] = "shard"
+			}
+			pvc.Annotations[constant.RestorePurposeAnnotationKey] = constant.RestorePurposeReplica
+			pvc.Spec.DataSourceRef.Namespace = &sourceNamespace
+			setReplicaRestoreSourceAnnotations(pvc)
+			backup, actionSet := restoreBackupObjects()
+			backup.Name = source.Name
+			backup.Namespace = sourceNamespace
+			backup.Status.Target.PodSelector = &dpv1alpha1.PodSelector{
+				LabelSelector: &metav1.LabelSelector{MatchLabels: map[string]string{constant.KBAppComponentLabelKey: "mysql"}},
+				Strategy:      dpv1alpha1.PodSelectionStrategyAny,
+			}
+			worker := &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "worker", Namespace: pvc.Namespace}}
+			for key, value := range map[string]string{
+				dptypes.CfgKeyWorkerServiceAccountName: worker.Name,
+				dptypes.CfgKeyWorkerClusterRoleName:    "worker-role",
+			} {
+				previous := viper.Get(key)
+				viper.Set(key, value)
+				t.Cleanup(func() { viper.Set(key, previous) })
+			}
+			cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(pvc).
+				WithObjects(cluster, component, its, pvc, backup, actionSet, worker).Build()
+			for i := 0; i < 2; i++ {
+				vp := &VolumePopulatorReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(10)}
+				_, err := vp.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(pvc)})
+				require.NoError(t, err)
+			}
+			restores := &dpv1alpha1.RestoreList{}
+			require.NoError(t, cli.List(ctx, restores))
+			require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(pvc), pvc))
+			switch intent {
+			case "matching", "matching sharding":
+				require.Len(t, restores.Items, 1)
+				require.Equal(t, sourceNamespace, restores.Items[0].Spec.Backup.Namespace)
+				if intent == "matching sharding" {
+					cluster.Spec.Shardings[0].Template.ReplicaRestore = nil
+				} else {
+					cluster.Spec.ComponentSpecs[0].ReplicaRestore = nil
+				}
+				require.NoError(t, cli.Update(ctx, cluster))
+				vp := &VolumePopulatorReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(10)}
+				_, err := vp.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(pvc)})
+				require.NoError(t, err)
+				remaining := &dpv1alpha1.RestoreList{}
+				require.NoError(t, cli.List(ctx, remaining))
+				require.Len(t, remaining.Items, 1)
+				require.Equal(t, restores.Items[0].Spec, remaining.Items[0].Spec)
+				require.True(t, remaining.Items[0].DeletionTimestamp.IsZero())
+				require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(pvc), pvc))
+				require.Contains(t, pvc.Finalizers, dptypes.DataProtectionFinalizerName)
+				condition := findPVCConditionByType(pvc, kbappsv1.ConditionTypeRestore)
+				require.NotNil(t, condition)
+				require.Equal(t, corev1.ConditionFalse, condition.Status)
+				require.Contains(t, condition.Message, "without matching cluster restore intent")
+			case "foreign Cluster UID":
+				require.Empty(t, restores.Items)
+				require.Empty(t, pvc.Labels[dptypes.ComponentUIDLabelKey])
+				require.NotContains(t, pvc.Finalizers, dptypes.DataProtectionFinalizerName)
+			default:
+				require.Empty(t, restores.Items)
+				condition := findPVCConditionByType(pvc, kbappsv1.ConditionTypeRestore)
+				require.NotNil(t, condition)
+				require.Equal(t, corev1.ConditionFalse, condition.Status)
+				require.Contains(t, condition.Message, "without matching cluster restore intent")
+			}
+		})
+	}
+}
+
+func TestReplicaRestoreValidatesSameNamespaceSource(t *testing.T) {
+	pvc := dependencyRestorePVC("data-mysql-3", "mysql", "pvc-uid")
+	pvc.Annotations[constant.RestoreSourceNamespaceAnnotationKey] = pvc.Namespace
+	pvc.Annotations[constant.RestorePurposeAnnotationKey] = constant.RestorePurposeReplica
+	reconciler := &VolumePopulatorReconciler{}
+	reqCtx := intctrlutil.RequestCtx{Ctx: context.Background()}
+	require.NoError(t, reconciler.validateBackupNamespaceAuthorized(reqCtx, pvc, pvc.Namespace))
+	for _, key := range []string{constant.RestoreSourceAPIGroupAnnotationKey, constant.RestoreSourceKindAnnotationKey,
+		constant.RestoreSourceNameAnnotationKey, constant.RestoreSourceNamespaceAnnotationKey} {
+		mismatched := pvc.DeepCopy()
+		mismatched.Annotations[key] = "other"
+		_, err := reconciler.authorizedBackupNamespaceFromPVC(reqCtx, mismatched)
+		require.ErrorContains(t, err, "must match dataSourceRef")
+	}
+}
+
+func TestReplicaRestoreReconcilesTargetAndAuxiliaryVolumes(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		strategy   dpv1alpha1.PodSelectionStrategy
+		sourcePods []string
+		rejected   bool
+	}{
+		{name: "Any", strategy: dpv1alpha1.PodSelectionStrategyAny},
+		{name: "All with one source", strategy: dpv1alpha1.PodSelectionStrategyAll, sourcePods: []string{"mysql-0"}},
+		{name: "All with multiple sources", strategy: dpv1alpha1.PodSelectionStrategyAll, sourcePods: []string{"mysql-0", "mysql-1", "mysql-2"}, rejected: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+
+			scheme := runtime.NewScheme()
+			require.NoError(t, corev1.AddToScheme(scheme))
+			require.NoError(t, dpv1alpha1.AddToScheme(scheme))
+			require.NoError(t, workloadsv1.AddToScheme(scheme))
+			backup, actionSet := restoreBackupObjects()
+			backup.Status.Target.PodSelector = &dpv1alpha1.PodSelector{
+				LabelSelector: &metav1.LabelSelector{MatchLabels: map[string]string{
+					constant.KBAppComponentLabelKey: "mysql",
+				}},
+				Strategy: tc.strategy,
+			}
+			backup.Status.Target.SelectedTargetPods = tc.sourcePods
+			newPVC := func(volumeName, componentName string, uid types.UID) *corev1.PersistentVolumeClaim {
+				pvc := newPVCForRestoreDecision(volumeName, componentName, "")
+				pvc.UID = uid
+				pvc.Annotations[constant.RestorePurposeAnnotationKey] = constant.RestorePurposeReplica
+				pvc.Spec = corev1.PersistentVolumeClaimSpec{
+					AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+					Resources: corev1.VolumeResourceRequirements{
+						Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("1Gi")},
+					},
+					DataSourceRef: &corev1.TypedObjectReference{
+						APIGroup: ptr.To(dptypes.DataprotectionAPIGroup), Kind: dptypes.BackupKind, Name: backup.Name,
+					},
+				}
+				setReplicaRestoreSourceAnnotations(pvc)
+				return pvc
+			}
+			dataPVC := newPVC("data", "mysql", "data-pvc-uid")
+			logPVC := newPVC("logs", "mysql", "logs-pvc-uid")
+			dataPVC.Name = "data-mysql-3"
+			dataPVC.Labels[constant.KBAppPodNameLabelKey] = "mysql-3"
+			logPVC.Name = "logs-mysql-3"
+			logPVC.Labels[constant.KBAppPodNameLabelKey] = "mysql-3"
+			its := &workloadsv1.InstanceSet{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "mysql", UID: "its-uid"},
+				Spec: workloadsv1.InstanceSetSpec{VolumeClaimTemplates: []corev1.PersistentVolumeClaim{
+					{ObjectMeta: metav1.ObjectMeta{Name: "data"}},
+					{ObjectMeta: metav1.ObjectMeta{Name: "logs"}},
+				}},
+			}
+			logPVC.OwnerReferences = []metav1.OwnerReference{{
+				APIVersion: workloadsv1.GroupVersion.String(), Kind: workloadsv1.InstanceSetKind,
+				Name: its.Name, UID: its.UID, Controller: ptr.To(true),
+			}}
+			wrongComponentPVC := newPVC("logs", "redis", "wrong-component-pvc-uid")
+			worker := &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "worker", Namespace: "default"}}
+			for key, value := range map[string]string{
+				dptypes.CfgKeyWorkerServiceAccountName: "worker",
+				dptypes.CfgKeyWorkerClusterRoleName:    "worker-role",
+			} {
+				previous := viper.Get(key)
+				viper.Set(key, value)
+				t.Cleanup(func() { viper.Set(key, previous) })
+			}
+			cli := fake.NewClientBuilder().WithScheme(scheme).
+				WithStatusSubresource(dataPVC, logPVC, wrongComponentPVC).
+				WithObjects(backup, actionSet, worker, its, dataPVC, logPVC, wrongComponentPVC).Build()
+			reconciler := &VolumePopulatorReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(10)}
+
+			for _, pvc := range []*corev1.PersistentVolumeClaim{dataPVC, logPVC} {
+				result, err := reconciler.Reconcile(context.Background(), reconcile.Request{
+					NamespacedName: client.ObjectKeyFromObject(pvc),
+				})
+				require.NoError(t, err)
+				if tc.rejected {
+					require.Zero(t, result)
+					require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(pvc), pvc))
+					condition := findPVCConditionByType(pvc, kbappsv1.ConditionTypeRestore)
+					require.NotNil(t, condition)
+					require.Equal(t, corev1.ConditionFalse, condition.Status)
+					require.Contains(t, condition.Message, "multiple source pods is not supported")
+					continue
+				}
+				require.Positive(t, result.RequeueAfter)
+				helper := &corev1.PersistentVolumeClaim{}
+				require.NoError(t, cli.Get(context.Background(), types.NamespacedName{
+					Namespace: pvc.Namespace, Name: getPopulatePVCName(pvc.UID),
+				}, helper))
+			}
+
+			restores := &dpv1alpha1.RestoreList{}
+			require.NoError(t, cli.List(context.Background(), restores))
+			if tc.rejected {
+				require.Empty(t, restores.Items)
+				pvcs := &corev1.PersistentVolumeClaimList{}
+				require.NoError(t, cli.List(context.Background(), pvcs))
+				require.Len(t, pvcs.Items, 3, "unsupported Backup must not create helper PVCs")
+				return
+			}
+			require.Len(t, restores.Items, 1, "only the data volume should run prepareData")
+			require.Equal(t, getPopulatePVCName(dataPVC.UID), restores.Items[0].Name)
+			if tc.strategy == dpv1alpha1.PodSelectionStrategyAll {
+				policy := restores.Items[0].Spec.PrepareDataConfig.RequiredPolicyForAllPodSelection
+				require.NotNil(t, policy)
+				require.Equal(t, "mysql-0", policy.SourceOfOneToMany.TargetPodName)
+			}
+
+			result, err := reconciler.Reconcile(context.Background(), reconcile.Request{
+				NamespacedName: client.ObjectKeyFromObject(wrongComponentPVC),
+			})
+			require.NoError(t, err)
+			require.Zero(t, result)
+			require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(wrongComponentPVC), wrongComponentPVC))
+			condition := findPVCConditionByType(wrongComponentPVC, kbappsv1.ConditionTypeRestore)
+			require.NotNil(t, condition)
+			require.Equal(t, corev1.ConditionFalse, condition.Status)
+			require.True(t, apierrors.IsNotFound(cli.Get(context.Background(), types.NamespacedName{
+				Namespace: wrongComponentPVC.Namespace, Name: getPopulatePVCName(wrongComponentPVC.UID),
+			}, &corev1.PersistentVolumeClaim{})))
+
+		})
+	}
+}
+
+func TestReplicaAuxiliaryVolumeRejectsPostReadyOnlyBackup(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
+	backup, actionSet := restoreBackupObjects()
+	actionSet.Spec.Restore.PrepareData = nil
+	actionSet.Spec.Restore.PostReady = []dpv1alpha1.ActionSpec{{Job: &dpv1alpha1.JobActionSpec{}}}
+	pvc := newPVCForRestoreDecision("logs", "mysql", "")
+	pvc.UID = "logs-pvc-uid"
+	pvc.Annotations[constant.RestorePurposeAnnotationKey] = constant.RestorePurposeReplica
+	pvc.Spec.DataSourceRef = &corev1.TypedObjectReference{
+		APIGroup: ptr.To(dptypes.DataprotectionAPIGroup), Kind: dptypes.BackupKind, Name: backup.Name,
+	}
+	setReplicaRestoreSourceAnnotations(pvc)
+	worker := &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "worker", Namespace: "default"}}
+	previousWorker := viper.Get(dptypes.CfgKeyWorkerServiceAccountName)
+	viper.Set(dptypes.CfgKeyWorkerServiceAccountName, worker.Name)
+	t.Cleanup(func() { viper.Set(dptypes.CfgKeyWorkerServiceAccountName, previousWorker) })
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(pvc).
+		WithObjects(backup, actionSet, worker, pvc).Build()
+	reconciler := &VolumePopulatorReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(10)}
+
+	result, err := reconciler.Reconcile(context.Background(), reconcile.Request{
+		NamespacedName: client.ObjectKeyFromObject(pvc),
+	})
+	require.NoError(t, err)
+	require.Zero(t, result)
+	require.NoError(t, cli.Get(context.Background(), client.ObjectKeyFromObject(pvc), pvc))
+	condition := findPVCConditionByType(pvc, kbappsv1.ConditionTypeRestore)
+	require.NotNil(t, condition)
+	require.Equal(t, corev1.ConditionFalse, condition.Status)
+	require.Contains(t, condition.Message, "requires a prepareData restore action")
 }
 
 func dependencyTestReconciler(t *testing.T, objects ...client.Object) *VolumePopulatorReconciler {
@@ -5352,4 +5696,277 @@ func TestEnsurePostReadyRestore_MultiComponent_PostReadyOnly_TargetsSlice(t *tes
 		"Restore CR owner should be the backup target component (tidb) even when target is in Status.Targets[0]")
 	require.Equal(t, "tidb", restore.Spec.Backup.SourceTargetName)
 	require.Equal(t, postReadyRestoreName(tidbComp.UID), restore.Name)
+}
+
+func TestReplicaRestoreRequiresMatchingDataVolume(t *testing.T) {
+	for _, kind := range []string{workloadsv1.InstanceSetKind, "Instance"} {
+		for _, hasDataVolume := range []bool{false, true} {
+			name := kind + "/no matching volume"
+			if hasDataVolume {
+				name = kind + "/auxiliary before data PVC creation"
+			}
+			t.Run(name, func(t *testing.T) {
+				ctx := context.Background()
+				scheme := runtime.NewScheme()
+				require.NoError(t, corev1.AddToScheme(scheme))
+				require.NoError(t, workloadsv1.AddToScheme(scheme))
+				require.NoError(t, dpv1alpha1.AddToScheme(scheme))
+				backup, actionSet := restoreBackupObjects()
+				require.NotNil(t, actionSet.Spec.Restore.PrepareData)
+				pvc := newPVCForRestoreDecision("logs", "mysql", "")
+				pvc.UID = "replica-pvc"
+				pvc.Annotations[constant.RestorePurposeAnnotationKey] = constant.RestorePurposeReplica
+				pvc.Spec = corev1.PersistentVolumeClaimSpec{
+					AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+					Resources: corev1.VolumeResourceRequirements{Requests: corev1.ResourceList{
+						corev1.ResourceStorage: resource.MustParse("1Gi"),
+					}},
+					DataSourceRef: &corev1.TypedObjectReference{
+						APIGroup: ptr.To(dptypes.DataprotectionAPIGroup), Kind: dptypes.BackupKind, Name: backup.Name,
+					},
+				}
+				setReplicaRestoreSourceAnnotations(pvc)
+				names := []string{"logs"}
+				if hasDataVolume {
+					names = append(names, "data")
+				}
+				meta := metav1.ObjectMeta{Namespace: pvc.Namespace, Name: "mysql", UID: "owner-uid"}
+				var owner client.Object
+				if kind == workloadsv1.InstanceSetKind {
+					its := &workloadsv1.InstanceSet{ObjectMeta: meta}
+					for _, name := range names {
+						its.Spec.VolumeClaimTemplates = append(its.Spec.VolumeClaimTemplates, corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: name}})
+					}
+					owner = its
+				} else {
+					inst := &workloadsv1.Instance{ObjectMeta: meta}
+					for _, name := range names {
+						inst.Spec.VolumeClaimTemplates = append(inst.Spec.VolumeClaimTemplates, corev1.PersistentVolumeClaimTemplate{ObjectMeta: metav1.ObjectMeta{Name: name}})
+					}
+					owner = inst
+				}
+				pvc.OwnerReferences = []metav1.OwnerReference{{
+					APIVersion: workloadsv1.GroupVersion.String(), Kind: kind,
+					Name: owner.GetName(), UID: owner.GetUID(), Controller: ptr.To(true),
+				}}
+				worker := &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Namespace: pvc.Namespace, Name: "worker"}}
+				for key, value := range map[string]string{
+					dptypes.CfgKeyWorkerServiceAccountName: worker.Name,
+					dptypes.CfgKeyWorkerClusterRoleName:    "worker-role",
+				} {
+					previous := viper.Get(key)
+					viper.Set(key, value)
+					t.Cleanup(func() { viper.Set(key, previous) })
+				}
+				cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(pvc).
+					WithObjects(backup, actionSet, worker, owner, pvc).Build()
+				vp := &VolumePopulatorReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(20)}
+				_, err := vp.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(pvc)})
+				require.NoError(t, err)
+				require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(pvc), pvc))
+				pvcs := &corev1.PersistentVolumeClaimList{}
+				require.NoError(t, cli.List(ctx, pvcs))
+				restores := &dpv1alpha1.RestoreList{}
+				require.NoError(t, cli.List(ctx, restores))
+				require.Empty(t, restores.Items)
+				if hasDataVolume {
+					require.Len(t, pvcs.Items, 2, "auxiliary volume can provision before the data PVC exists")
+				} else {
+					require.Len(t, pvcs.Items, 1, "no helper volume may be provisioned for an empty restore")
+					condition := findPVCConditionByType(pvc, kbappsv1.ConditionTypeRestore)
+					require.NotNil(t, condition)
+					require.Equal(t, corev1.ConditionFalse, condition.Status)
+					require.Contains(t, condition.Message, "no workload volume matching Backup")
+				}
+			})
+		}
+	}
+}
+
+func TestReplicaRestoreDataVolumeUsesEffectiveInstanceTemplate(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, workloadsv1.AddToScheme(scheme))
+	require.NoError(t, dpv1alpha1.AddToScheme(scheme))
+	backup, _ := restoreBackupObjects()
+	its := &workloadsv1.InstanceSet{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "mysql", UID: "its-uid"},
+		Spec: workloadsv1.InstanceSetSpec{
+			Replicas: ptr.To(int32(1)),
+			Instances: []workloadsv1.InstanceTemplate{{
+				Name: "fast", Replicas: ptr.To(int32(1)),
+				VolumeClaimTemplates: []corev1.PersistentVolumeClaim{{ObjectMeta: metav1.ObjectMeta{Name: "data"}}},
+			}},
+		},
+	}
+	pvc := dependencyRestorePVC("logs-mysql-fast-0", "mysql", "pvc-uid")
+	pvc.Labels[constant.KBAppPodNameLabelKey] = "mysql-fast-0"
+	pvc.Labels[constant.KBAppInstanceTemplateLabelKey] = "fast"
+	pvc.Labels[constant.VolumeClaimTemplateNameLabelKey] = "logs"
+	pvc.Annotations[constant.RestoreVolumeTemplateAnnotationKey] = "logs"
+	pvc.OwnerReferences = []metav1.OwnerReference{{
+		APIVersion: workloadsv1.GroupVersion.String(), Kind: workloadsv1.InstanceSetKind,
+		Name: its.Name, UID: its.UID, Controller: ptr.To(true),
+	}}
+
+	reconciler := &VolumePopulatorReconciler{
+		Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(its).Build(),
+		Scheme: scheme,
+	}
+	require.NoError(t, reconciler.validateReplicaRestoreDataVolume(
+		intctrlutil.RequestCtx{Ctx: context.Background()}, pvc, backup))
+}
+
+func TestReplicaAuxiliaryRestoreContinuesAfterRetainScaleIn(t *testing.T) {
+	for _, tc := range []struct {
+		name            string
+		backupNamespace string
+		createHelper    bool
+	}{
+		{name: "same namespace after registration", backupNamespace: "default"},
+		{name: "cross namespace after helper creation", backupNamespace: "backup-ns", createHelper: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			scheme, cluster, component, its, pvc := parentRestoreObjects(t)
+			backup, actionSet := restoreBackupObjects()
+			backup.Name = pvc.Spec.DataSourceRef.Name
+			backup.Namespace = tc.backupNamespace
+			cluster.Spec.Restore = nil
+			intent := &kbappsv1.ClusterRestore{Source: kbappsv1.ClusterRestoreSource{
+				APIGroup: dptypes.DataprotectionAPIGroup, Kind: dptypes.BackupKind, Name: backup.Name, Namespace: backup.Namespace,
+			}}
+			cluster.Spec.ComponentSpecs = []kbappsv1.ClusterComponentSpec{{Name: "mysql", Replicas: 4, ReplicaRestore: intent}}
+			inst := &workloadsv1.Instance{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: pvc.Namespace, Name: "cluster-mysql-3", UID: "instance-uid",
+					Labels: its.Labels, OwnerReferences: []metav1.OwnerReference{{
+						APIVersion: workloadsv1.GroupVersion.String(), Kind: workloadsv1.InstanceSetKind,
+						Name: its.Name, UID: its.UID, Controller: ptr.To(true),
+					}},
+				},
+				Spec: workloadsv1.InstanceSpec{
+					InstanceSetName: its.Name,
+					ReplicaRestore:  intent,
+					VolumeClaimTemplates: []corev1.PersistentVolumeClaimTemplate{
+						{ObjectMeta: metav1.ObjectMeta{Name: "data"}}, {ObjectMeta: metav1.ObjectMeta{Name: "logs"}},
+					},
+					ScaledDown: ptr.To(true),
+					PersistentVolumeClaimRetentionPolicy: &kbappsv1.PersistentVolumeClaimRetentionPolicy{
+						WhenScaled: kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType,
+					},
+				},
+			}
+			pvc.Name = "logs-" + inst.Name
+			pvc.Labels[constant.VolumeClaimTemplateNameLabelKey] = "logs"
+			pvc.Labels[constant.KBAppInstanceNameLabelKey] = inst.Name
+			pvc.Labels[constant.KBAppPodNameLabelKey] = inst.Name
+			pvc.Annotations[constant.RestoreVolumeTemplateAnnotationKey] = "logs"
+			pvc.Annotations[constant.RestorePurposeAnnotationKey] = constant.RestorePurposeReplica
+			if backup.Namespace != pvc.Namespace {
+				pvc.Spec.DataSourceRef.Namespace = &backup.Namespace
+			}
+			setReplicaRestoreSourceAnnotations(pvc)
+			pvc.OwnerReferences = []metav1.OwnerReference{{
+				APIVersion: workloadsv1.GroupVersion.String(), Kind: "Instance",
+				Name: inst.Name, UID: inst.UID, Controller: ptr.To(true),
+			}}
+			worker := &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Namespace: pvc.Namespace, Name: "worker"}}
+			for key, value := range map[string]string{
+				dptypes.CfgKeyWorkerServiceAccountName: worker.Name,
+				dptypes.CfgKeyWorkerClusterRoleName:    "worker-role",
+			} {
+				previous := viper.Get(key)
+				viper.Set(key, value)
+				t.Cleanup(func() { viper.Set(key, previous) })
+			}
+			cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(pvc).
+				WithObjects(cluster, component, its, inst, pvc, backup, actionSet, worker).Build()
+			reconcilePVC := func() {
+				vp := &VolumePopulatorReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(20)}
+				_, err := vp.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(pvc)})
+				require.NoError(t, err)
+				require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(pvc), pvc))
+			}
+			reconcilePVC() // register owner identity and target protection
+			helperKey := client.ObjectKey{Namespace: pvc.Namespace, Name: getPopulatePVCName(pvc.UID)}
+			if tc.createHelper {
+				reconcilePVC()
+				require.NoError(t, cli.Get(ctx, helperKey, &corev1.PersistentVolumeClaim{}))
+			}
+			require.Contains(t, pvc.Finalizers, dptypes.DataProtectionFinalizerName)
+
+			// Use the original Instance deletion path to detach retained volumes.
+			tree := kubebuilderx.NewObjectTree()
+			tree.Context = ctx
+			tree.SetRoot(inst)
+			require.NoError(t, tree.Add(pvc))
+			_, err := instance.NewDeletionReconciler(cli).Reconcile(tree)
+			require.NoError(t, err)
+			require.Nil(t, metav1.GetControllerOf(pvc))
+			require.NoError(t, cli.Update(ctx, pvc))
+			require.NoError(t, cli.Delete(ctx, inst))
+			reconcilePVC()
+			condition := findPVCConditionByType(pvc, kbappsv1.ConditionTypeRestore)
+			require.NotNil(t, condition)
+			require.NotEqual(t, corev1.ConditionFalse, condition.Status, condition.Message)
+
+			// Simulate CSI binding the helper and the target acknowledging binding.
+			helper := &corev1.PersistentVolumeClaim{}
+			require.NoError(t, cli.Get(ctx, helperKey, helper))
+			helper.UID = "helper-uid"
+			helper.Spec.VolumeName = "logs-pv"
+			require.NoError(t, cli.Update(ctx, helper))
+			pv := &corev1.PersistentVolume{ObjectMeta: metav1.ObjectMeta{Name: helper.Spec.VolumeName},
+				Spec: corev1.PersistentVolumeSpec{ClaimRef: &corev1.ObjectReference{
+					Namespace: helper.Namespace, Name: helper.Name, UID: helper.UID,
+				}},
+			}
+			require.NoError(t, cli.Create(ctx, pv))
+			reconcilePVC()
+			require.Equal(t, pv.Name, pvc.Spec.VolumeName)
+			pvc.Annotations[volume.AnnBindCompleted] = "yes"
+			require.NoError(t, cli.Update(ctx, pvc))
+			reconcilePVC()
+			require.Equal(t, corev1.ConditionTrue, findPVCConditionByType(pvc, kbappsv1.ConditionTypeRestore).Status)
+			require.NotContains(t, pvc.Finalizers, dptypes.DataProtectionFinalizerName)
+			require.True(t, apierrors.IsNotFound(cli.Get(ctx, helperKey, &corev1.PersistentVolumeClaim{})))
+		})
+	}
+}
+
+func TestReplicaRestoreChecksDataVolumeBeforeRegistration(t *testing.T) {
+	ctx := context.Background()
+	scheme, cluster, component, its, pvc := parentRestoreObjects(t)
+	backup, _ := restoreBackupObjects()
+	backup.Name = pvc.Spec.DataSourceRef.Name
+	its.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{{ObjectMeta: metav1.ObjectMeta{Name: "logs"}}}
+	pvc.Name = "logs-mysql-0"
+	pvc.Labels[constant.VolumeClaimTemplateNameLabelKey] = "logs"
+	pvc.Annotations[constant.RestoreVolumeTemplateAnnotationKey] = "logs"
+	pvc.Annotations[constant.RestorePurposeAnnotationKey] = constant.RestorePurposeReplica
+	setReplicaRestoreSourceAnnotations(pvc)
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(pvc).
+		WithObjects(cluster, component, its, pvc, backup).Build()
+	vp := &VolumePopulatorReconciler{Client: cli, Scheme: scheme, Recorder: record.NewFakeRecorder(10)}
+	_, err := vp.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(pvc)})
+	require.NoError(t, err)
+	require.NoError(t, cli.Get(ctx, client.ObjectKeyFromObject(pvc), pvc))
+	condition := findPVCConditionByType(pvc, kbappsv1.ConditionTypeRestore)
+	require.NotNil(t, condition)
+	require.Equal(t, corev1.ConditionFalse, condition.Status)
+	require.Contains(t, condition.Message, "no workload volume matching Backup")
+	require.Empty(t, pvc.Labels[dptypes.ComponentUIDLabelKey])
+	require.NotContains(t, pvc.Finalizers, dptypes.DataProtectionFinalizerName)
+}
+
+func setReplicaRestoreSourceAnnotations(pvc *corev1.PersistentVolumeClaim) {
+	ref := pvc.Spec.DataSourceRef
+	pvc.Annotations[constant.RestoreSourceAPIGroupAnnotationKey] = *ref.APIGroup
+	pvc.Annotations[constant.RestoreSourceKindAnnotationKey] = ref.Kind
+	pvc.Annotations[constant.RestoreSourceNameAnnotationKey] = ref.Name
+	pvc.Annotations[constant.RestoreSourceNamespaceAnnotationKey] = pvc.Namespace
+	if ref.Namespace != nil {
+		pvc.Annotations[constant.RestoreSourceNamespaceAnnotationKey] = *ref.Namespace
+	}
 }

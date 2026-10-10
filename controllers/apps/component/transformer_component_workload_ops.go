@@ -55,9 +55,11 @@ type componentWorkloadOps struct {
 	// runningITS is a snapshot of the InstanceSet that is already running
 	runningITS *workloads.InstanceSet
 	// protoITS is the InstanceSet object that is rebuilt from scratch during each reconcile process
-	protoITS              *workloads.InstanceSet
-	desiredCompPodNameSet sets.Set[string]
-	runningItsPodNameSet  sets.Set[string]
+	protoITS               *workloads.InstanceSet
+	desiredCompPodNameSet  sets.Set[string]
+	runningItsPodNameSet   sets.Set[string]
+	restoreReplicas        sets.Set[string]
+	restorePendingReplicas sets.Set[string]
 }
 
 func newComponentWorkloadOps(transCtx *componentTransformContext,
@@ -75,16 +77,26 @@ func newComponentWorkloadOps(transCtx *componentTransformContext,
 	if err != nil {
 		return nil, err
 	}
+	restoreReplicas := sets.New[string]()
+	restorePendingReplicas := sets.New[string]()
+	if _, hasDataActions := hasMemberJoinNDataActionDefined(synthesizedComp.LifecycleActions.ComponentLifecycleActions); hasDataActions || protoITS.Spec.ReplicaRestore != nil {
+		restoreReplicas, restorePendingReplicas, err = component.GetReplicaRestoreReplicas(transCtx.Context, cli, protoITS, protoITSPodNames)
+		if err != nil {
+			return nil, err
+		}
+	}
 	return &componentWorkloadOps{
-		transCtx:              transCtx,
-		cli:                   cli,
-		component:             comp,
-		synthesizeComp:        synthesizedComp,
-		runningITS:            runningITS,
-		protoITS:              protoITS,
-		dag:                   dag,
-		desiredCompPodNameSet: sets.New(protoITSPodNames...),
-		runningItsPodNameSet:  sets.New(runningITSPodNames...),
+		transCtx:               transCtx,
+		cli:                    cli,
+		component:              comp,
+		synthesizeComp:         synthesizedComp,
+		runningITS:             runningITS,
+		protoITS:               protoITS,
+		dag:                    dag,
+		desiredCompPodNameSet:  sets.New(protoITSPodNames...),
+		runningItsPodNameSet:   sets.New(runningITSPodNames...),
+		restoreReplicas:        restoreReplicas.Union(restorePendingReplicas),
+		restorePendingReplicas: restorePendingReplicas,
 	}, nil
 }
 
@@ -247,6 +259,13 @@ func (r *componentWorkloadOps) scaleOut() error {
 	// replicas to be created
 	newReplicas := r.desiredCompPodNameSet.Difference(r.runningItsPodNameSet).UnsortedList()
 	hasMemberJoinDefined, hasDataActionDefined := hasMemberJoinNDataActionDefined(r.synthesizeComp.LifecycleActions.ComponentLifecycleActions)
+	restoreReplicas := slices.DeleteFunc(slices.Clone(newReplicas), func(name string) bool {
+		return !r.restoreReplicas.Has(name)
+	})
+	if err := component.NewReplicasStatus(r.protoITS, restoreReplicas, hasMemberJoinDefined, false); err != nil {
+		return err
+	}
+	newReplicas = slices.DeleteFunc(newReplicas, r.restoreReplicas.Has)
 	return component.NewReplicasStatus(r.protoITS, newReplicas, hasMemberJoinDefined, hasDataActionDefined)
 }
 
@@ -258,6 +277,7 @@ func (r *componentWorkloadOps) buildDataReplicationTask() error {
 
 	// replicas to be provisioned
 	newReplicas := r.desiredCompPodNameSet.Difference(r.runningItsPodNameSet).UnsortedList()
+	newReplicas = slices.DeleteFunc(newReplicas, r.restoreReplicas.Has)
 	// replicas in provisioning that the data has not been loaded
 	provisioningReplicas, err := component.GetReplicasStatusFunc(r.protoITS, func(s component.ReplicaStatus) bool {
 		return s.DataLoaded != nil && !*s.DataLoaded
@@ -303,6 +323,9 @@ func (r *componentWorkloadOps) sourceReplica(dataDump *appsv1.Action, provisioni
 			return slices.Contains(provisioningReplicas, pod.Name)
 		})
 	}
+	pods = slices.DeleteFunc(pods, func(pod *corev1.Pod) bool {
+		return r.restorePendingReplicas.Has(pod.Name)
+	})
 	if len(pods) > 0 {
 		if len(dataDump.TargetPodSelector) == 0 && (dataDump.Exec == nil || len(dataDump.Exec.TargetPodSelector) == 0) {
 			dataDump.TargetPodSelector = appsv1.AnyReplica
@@ -356,6 +379,9 @@ func (r *componentWorkloadOps) joinMember4ScaleOut() error {
 			status := replicas.Status[i]
 			if status.MemberJoined == nil || *status.MemberJoined {
 				continue // no need to join or already joined
+			}
+			if r.restorePendingReplicas.Has(pod.Name) {
+				continue
 			}
 
 			// TODO: should wait for the data to be loaded before joining the member?

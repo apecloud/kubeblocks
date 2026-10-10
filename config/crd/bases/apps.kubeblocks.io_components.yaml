@@ -3157,6 +3157,43 @@ spec:
                 - StrictInPlace
                 - PreferInPlace
                 type: string
+              replicaRestore:
+                description: Specifies the restore source used to initialize new replicas
+                  during scale-out.
+                properties:
+                  parameters:
+                    additionalProperties:
+                      type: string
+                    description: Specifies runtime-specific restore parameters.
+                    type: object
+                  pitr:
+                    description: Specifies the point-in-time recovery target. The
+                      value is opaque to apps and interpreted by the restore runtime.
+                    type: string
+                  source:
+                    description: Specifies the restore source.
+                    properties:
+                      apiGroup:
+                        description: Specifies the API group of the restore source.
+                        type: string
+                      kind:
+                        description: Specifies the kind of the restore source.
+                        type: string
+                      name:
+                        description: Specifies the name of the restore source.
+                        type: string
+                      namespace:
+                        description: Specifies the namespace of the restore source.
+                          If empty, the Cluster namespace is used.
+                        type: string
+                    required:
+                    - apiGroup
+                    - kind
+                    - name
+                    type: object
+                required:
+                - source
+                type: object
               replicas:
                 default: 1
                 description: Specifies the desired number of replicas in the Component

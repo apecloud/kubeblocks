@@ -21,6 +21,7 @@ package cluster
 
 import (
 	"encoding/json"
+	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -31,19 +32,38 @@ import (
 )
 
 func applyClusterRestoreIntent(cluster *appsv1.Cluster, components []*appsv1.ClusterComponentSpec, shardings []*appsv1.ClusterSharding) error {
-	if cluster.Spec.Restore == nil {
-		return nil
-	}
 	completed := isClusterRestoreCompleted(cluster)
 	for _, comp := range components {
-		applyRestoreIntentToComponent(cluster, comp.Name, comp.VolumeClaimTemplates, comp.Instances, completed)
+		if cluster.Spec.Restore != nil {
+			applyRestoreIntentToComponent(cluster, comp.Name, comp.VolumeClaimTemplates, comp.Instances, completed)
+		}
+		if err := validateReplicaRestoreIntent(cluster, comp); err != nil {
+			return err
+		}
 	}
 	for _, sharding := range shardings {
+		if err := validateReplicaRestoreIntent(cluster, &sharding.Template); err != nil {
+			return err
+		}
+		if cluster.Spec.Restore == nil {
+			continue
+		}
 		applyRestoreIntentToComponent(cluster, sharding.Name, sharding.Template.VolumeClaimTemplates, sharding.Template.Instances, completed)
 		for i := range sharding.ShardTemplates {
 			template := &sharding.ShardTemplates[i]
 			applyRestoreIntentToComponent(cluster, template.Name, template.VolumeClaimTemplates, template.Instances, completed)
 		}
+	}
+	return nil
+}
+
+func validateReplicaRestoreIntent(cluster *appsv1.Cluster, comp *appsv1.ClusterComponentSpec) error {
+	restore := comp.ReplicaRestore
+	if restore == nil {
+		return nil
+	}
+	if cluster.Spec.Restore != nil && !isClusterRestoreCompleted(cluster) {
+		return fmt.Errorf("component %q replicaRestore requires initial Cluster restore to complete", comp.Name)
 	}
 	return nil
 }

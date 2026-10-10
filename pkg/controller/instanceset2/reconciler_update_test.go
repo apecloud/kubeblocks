@@ -22,14 +22,106 @@ package instanceset2
 import (
 	"testing"
 
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	instctrl "github.com/apecloud/kubeblocks/pkg/controller/instance"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/revisionmap"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
+
+func TestScaleOutPreservesExistingInstanceInitialization(t *testing.T) {
+	for _, source := range []string{"", "backup-a"} {
+		t.Run("existing source="+source, func(t *testing.T) {
+			its := revisionTestInstanceSet()
+			its.Annotations = map[string]string{constant.KBAppClusterUIDKey: "cluster-uid"}
+			its.Labels = map[string]string{constant.KBAppComponentLabelKey: "mysql"}
+			its.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
+			its.Spec.Template.Spec.Containers = []corev1.Container{{Name: "db", Image: "mysql:8"}}
+			its.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{{ObjectMeta: metav1.ObjectMeta{Name: "data"}}}
+			if source != "" {
+				its.Spec.ReplicaRestore = &kbappsv1.ClusterRestore{Source: kbappsv1.ClusterRestoreSource{
+					APIGroup: "dataprotection.kubeblocks.io", Kind: "Backup", Name: source,
+				}}
+			}
+			tree := kubebuilderx.NewObjectTree()
+			tree.SetRoot(its)
+			if _, err := NewAlignmentReconciler().Reconcile(tree); err != nil {
+				t.Fatal(err)
+			}
+			original := tree.List(&workloads.Instance{})[0].(*workloads.Instance).DeepCopy()
+			replicas := int32(2)
+			its.Spec.Replicas = &replicas
+			restoreSource := source
+			if restoreSource == "" {
+				restoreSource = "backup-b"
+			}
+			its.Spec.ReplicaRestore = &kbappsv1.ClusterRestore{Source: kbappsv1.ClusterRestoreSource{
+				APIGroup: "dataprotection.kubeblocks.io", Kind: "Backup", Name: restoreSource,
+			}}
+			if _, err := NewAlignmentReconciler().Reconcile(tree); err != nil {
+				t.Fatal(err)
+			}
+			for _, obj := range tree.List(&workloads.Instance{}) {
+				inst := obj.(*workloads.Instance)
+				inst.Status.ObservedGeneration = inst.Generation
+				inst.Status.UpToDate = true
+				inst.Status.Conditions = []metav1.Condition{
+					{Type: string(workloads.InstanceReady), Status: metav1.ConditionTrue},
+					{Type: string(workloads.InstanceAvailable), Status: metav1.ConditionTrue},
+				}
+			}
+			if _, err := NewRevisionUpdateReconciler().Reconcile(tree); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := NewUpdateReconciler().Reconcile(tree); err != nil {
+				t.Fatal(err)
+			}
+			instances := tree.List(&workloads.Instance{})
+			if len(instances) != 2 {
+				t.Fatalf("created %d Instances, want 2", len(instances))
+			}
+			for _, obj := range instances {
+				inst := obj.(*workloads.Instance)
+				if inst.Name == original.Name {
+					if !equality.Semantic.DeepEqual(inst.Spec, original.Spec) || getInstanceRevision(inst) != getInstanceRevision(original) {
+						t.Fatalf("scale-out changed an existing Instance: %#v", inst)
+					}
+				} else if !equality.Semantic.DeepEqual(inst.Spec.ReplicaRestore, its.Spec.ReplicaRestore) {
+					t.Fatalf("new Instance did not receive its Backup source: %#v", inst.Spec.ReplicaRestore)
+				}
+				instanceTree := kubebuilderx.NewObjectTree()
+				instanceTree.SetRoot(inst)
+				if _, err := instctrl.NewAlignmentReconciler().Reconcile(instanceTree); err != nil {
+					t.Fatal(err)
+				}
+				pvc := instanceTree.List(&corev1.PersistentVolumeClaim{})[0].(*corev1.PersistentVolumeClaim)
+				if inst.Annotations[constant.KBAppClusterUIDKey] != "cluster-uid" {
+					t.Fatal("Instance lost the owner Cluster UID")
+				}
+				expectedSource := restoreSource
+				if inst.Name == original.Name {
+					expectedSource = source
+				}
+				if expectedSource == "" {
+					if pvc.Spec.DataSourceRef != nil || pvc.Annotations[constant.RestorePurposeAnnotationKey] != "" {
+						t.Fatalf("ordinary Instance received a restore PVC: %#v", pvc)
+					}
+				} else if pvc.Spec.DataSourceRef == nil || pvc.Spec.DataSourceRef.Name != expectedSource ||
+					pvc.Annotations[constant.RestoreSourceNameAnnotationKey] != expectedSource {
+					t.Fatalf("PVC did not use its Instance's Backup source %q: %#v", expectedSource, pvc)
+				}
+			}
+		})
+	}
+}
 
 func TestParseReplicasNMaxUnavailable(t *testing.T) {
 	tests := []struct {

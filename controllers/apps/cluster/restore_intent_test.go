@@ -260,6 +260,42 @@ func TestApplyClusterRestoreIntentHandlesInstanceTemplateVCTs(t *testing.T) {
 	require.Nil(t, component.Instances[0].VolumeClaimTemplates[1].Spec.DataSourceRef)
 }
 
+func TestReplicaRestoreWaitsForInitialClusterRestore(t *testing.T) {
+	cluster := &appsv1.Cluster{
+		Spec: appsv1.ClusterSpec{Restore: &appsv1.ClusterRestore{Source: appsv1.ClusterRestoreSource{
+			APIGroup: testRestoreSourceAPIGroup, Kind: testRestoreSourceKind, Name: "initial-restore",
+		}}},
+	}
+	spec := &appsv1.ClusterComponentSpec{
+		Name: "mysql", Replicas: 5,
+		ReplicaRestore: &appsv1.ClusterRestore{Source: appsv1.ClusterRestoreSource{
+			APIGroup: testRestoreSourceAPIGroup, Kind: testRestoreSourceKind, Name: "replica-restore",
+		}},
+	}
+	for _, status := range []metav1.ConditionStatus{metav1.ConditionUnknown, metav1.ConditionFalse, metav1.ConditionTrue} {
+		cluster.Status.Conditions = []metav1.Condition{{Type: appsv1.ConditionTypeRestore, Status: status}}
+		err := validateReplicaRestoreIntent(cluster, spec)
+		if status == metav1.ConditionTrue {
+			require.NoError(t, err)
+		} else {
+			require.ErrorContains(t, err, "requires initial Cluster restore to complete")
+		}
+	}
+}
+
+func TestApplyClusterRestoreIntentAcceptsShardingReplicaRestore(t *testing.T) {
+	cluster := &appsv1.Cluster{}
+	shardings := []*appsv1.ClusterSharding{{
+		Name: "shard",
+		Template: appsv1.ClusterComponentSpec{
+			ReplicaRestore: &appsv1.ClusterRestore{Source: appsv1.ClusterRestoreSource{
+				APIGroup: testRestoreSourceAPIGroup, Kind: testRestoreSourceKind, Name: "restore",
+			}},
+		},
+	}}
+	require.NoError(t, applyClusterRestoreIntent(cluster, nil, shardings))
+}
+
 func TestSetRestoreConditionSucceedsWhenNoRestorePVCsExist(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, corev1.AddToScheme(scheme))

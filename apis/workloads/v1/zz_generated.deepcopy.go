@@ -271,6 +271,11 @@ func (in *InstanceSetSpec) DeepCopyInto(out *InstanceSetSpec) {
 		*out = new(int32)
 		**out = **in
 	}
+	if in.ReplicaRestore != nil {
+		in, out := &in.ReplicaRestore, &out.ReplicaRestore
+		*out = new(appsv1.ClusterRestore)
+		(*in).DeepCopyInto(*out)
+	}
 	in.Ordinals.DeepCopyInto(&out.Ordinals)
 	if in.Selector != nil {
 		in, out := &in.Selector, &out.Selector
@@ -438,6 +443,11 @@ func (in *InstanceSpec) DeepCopyInto(out *InstanceSpec) {
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
+	}
+	if in.ReplicaRestore != nil {
+		in, out := &in.ReplicaRestore, &out.ReplicaRestore
+		*out = new(appsv1.ClusterRestore)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.PersistentVolumeClaimRetentionPolicy != nil {
 		in, out := &in.PersistentVolumeClaimRetentionPolicy, &out.PersistentVolumeClaimRetentionPolicy

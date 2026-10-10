@@ -18,6 +18,7 @@ package component
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -26,7 +27,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -36,6 +40,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/kbagent"
 	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
 	kbagentproto "github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -114,6 +119,98 @@ var _ = Describe("Component Workload Operations Test", func() {
 	})
 
 	Context("Data Replication Operations", func() {
+		DescribeTable("keeps restore initialization exclusive with data replication", func(from int32, restore, dataActions bool) {
+			synthesizeComp.Replicas = from + 2
+			synthesizeComp.FullCompName = "test-its"
+			synthesizeComp.Generation = "2"
+			if dataActions {
+				synthesizeComp.LifecycleActions.DataDump = testapps.NewLifecycleAction("data-dump")
+				synthesizeComp.LifecycleActions.DataLoad = testapps.NewLifecycleAction("data-load")
+			}
+			runningITS := testapps.NewInstanceSetFactory(testCtx.DefaultNamespace, "test-its", clusterName, compName).
+				AddAppInstanceLabel(clusterName).AddAppComponentLabel(compName).AddAppManagedByLabel().
+				SetReplicas(from).GetObject()
+			runningITS.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{{ObjectMeta: metav1.ObjectMeta{Name: "data"}}}
+			protoITS := runningITS.DeepCopy()
+			protoITS.Spec.Replicas = ptr.To(from + 2)
+			if restore {
+				protoITS.Spec.ReplicaRestore = &appsv1.ClusterRestore{Source: appsv1.ClusterRestoreSource{
+					APIGroup: "dataprotection.kubeblocks.io", Kind: "Backup", Name: "backup",
+				}}
+			}
+			synthesizeComp.ReplicaRestore = protoITS.Spec.ReplicaRestore
+			newNames := []string{fmt.Sprintf("test-its-%d", from), fmt.Sprintf("test-its-%d", from+1)}
+			objects := []client.Object{runningITS}
+			if from > 0 {
+				pod := testapps.NewPodFactory(testCtx.DefaultNamespace, "test-its-0").
+					AddAppInstanceLabel(clusterName).AddAppComponentLabel(compName).AddAppManagedByLabel().
+					AddContainer(corev1.Container{Name: kbagent.ContainerName, Ports: []corev1.ContainerPort{{
+						Name: kbagent.DefaultStreamingPortName, ContainerPort: 3501,
+					}}}).GetObject()
+				objects = append(objects, pod)
+				objects = append(objects, &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{
+					Namespace: testCtx.DefaultNamespace, Name: "data-test-its-0",
+					Labels: map[string]string{
+						constant.AppInstanceLabelKey: clusterName, constant.KBAppComponentLabelKey: compName,
+						constant.KBAppPodNameLabelKey: pod.Name, constant.VolumeClaimTemplateNameLabelKey: "data",
+					},
+				}})
+			}
+			cli := fake.NewClientBuilder().WithScheme(model.GetScheme()).WithObjects(objects...).Build()
+			graphCli = model.NewGraphClient(cli)
+			dag = newDAG(graphCli, comp)
+			transCtx := &componentTransformContext{Context: ctx, Client: graphCli, Logger: logger,
+				EventRecorder: record.NewFakeRecorder(10), Component: comp, SynthesizeComponent: synthesizeComp}
+			transformer := &componentWorkloadTransformer{Client: cli}
+			if from > 0 {
+				Expect(component.StatusReplicasStatus(protoITS, []string{"test-its-0"}, true, true)).Should(Succeed())
+			}
+			component.BuildReplicasStatus(protoITS, runningITS)
+			Expect(transformer.reconcileReplicasStatus(ctx, cli, synthesizeComp, comp, runningITS, protoITS)).Should(Succeed())
+			Expect(transformer.handleUpdate(transCtx, graphCli, dag, synthesizeComp, comp, runningITS, protoITS)).Should(Succeed())
+			itsVertex := graphCli.FindMatchedVertex(dag, runningITS)
+			Expect(itsVertex).ShouldNot(BeNil())
+			updated := itsVertex.(*model.ObjectVertex).Obj.(*workloads.InstanceSet)
+			Expect(*updated.Spec.Replicas).Should(Equal(from + 2))
+			Expect(updated.Spec.ReplicaRestore).Should(Equal(protoITS.Spec.ReplicaRestore))
+			pending, err := component.GetReplicasStatusFunc(updated, func(s component.ReplicaStatus) bool {
+				return s.DataLoaded != nil && !*s.DataLoaded
+			})
+			Expect(err).ShouldNot(HaveOccurred())
+			if !restore {
+				Expect(pending).Should(ConsistOf(newNames))
+			} else {
+				Expect(pending).Should(BeEmpty())
+				members, err := component.GetReplicasStatusFunc(updated, func(s component.ReplicaStatus) bool {
+					return s.MemberJoined != nil && !*s.MemberJoined
+				})
+				Expect(err).ShouldNot(HaveOccurred())
+				Expect(members).Should(ConsistOf(newNames))
+			}
+			vertex := graphCli.FindMatchedVertex(dag, &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
+				Namespace: testCtx.DefaultNamespace, Name: constant.GenerateClusterComponentEnvPattern(clusterName, compName),
+			}})
+			if restore {
+				Expect(vertex).Should(BeNil())
+			} else {
+				Expect(vertex).ShouldNot(BeNil())
+				var tasks []kbagentproto.Task
+				_, err = kbagent.UpdateEnv4Worker(vertex.(*model.ObjectVertex).Obj.(*corev1.ConfigMap).Data, func(task kbagentproto.Task) *kbagentproto.Task {
+					tasks = append(tasks, task)
+					return &task
+				})
+				Expect(err).ShouldNot(HaveOccurred())
+				Expect(tasks).Should(HaveLen(1))
+				Expect(tasks[0].NewReplica.Replicas).Should(ContainSubstring(newNames[0]))
+				Expect(tasks[0].NewReplica.Replicas).Should(ContainSubstring(newNames[1]))
+			}
+		},
+			Entry("restore scale-out from zero does not require a donor", int32(0), true, true),
+			Entry("restore does not copy from an available donor", int32(3), true, true),
+			Entry("restore without data actions still waits for PVC restore", int32(3), true, false),
+			Entry("ordinary scale-out uses live data replication", int32(3), false, true),
+		)
+
 		It("blocks scale-out when data actions have no source pod", func() {
 			synthesizeComp.Replicas = 1
 			synthesizeComp.LifecycleActions.DataDump = testapps.NewLifecycleAction("data-dump")
@@ -143,6 +240,59 @@ var _ = Describe("Component Workload Operations Test", func() {
 
 			Expect(ops.scaleOut()).Should(MatchError("no available pod to dump data"))
 		})
+
+		DescribeTable("waits for Backup donors before ordinary data replication", func(status corev1.ConditionStatus, available bool) {
+			synthesizeComp.Replicas = 5
+			synthesizeComp.FullCompName = "test-its"
+			synthesizeComp.Generation = "2"
+			synthesizeComp.LifecycleActions.DataDump = testapps.NewLifecycleAction("data-dump")
+			synthesizeComp.LifecycleActions.DataLoad = testapps.NewLifecycleAction("data-load")
+			runningITS := testapps.NewInstanceSetFactory(testCtx.DefaultNamespace, "test-its", clusterName, compName).
+				AddAppInstanceLabel(clusterName).AddAppComponentLabel(compName).SetReplicas(4).GetObject()
+			runningITS.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{{ObjectMeta: metav1.ObjectMeta{Name: "data"}}}
+			protoITS := runningITS.DeepCopy()
+			protoITS.Spec.Replicas = ptr.To(int32(5))
+			pvc := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{
+				Namespace: testCtx.DefaultNamespace, Name: "data-test-its-3",
+				Labels: map[string]string{
+					constant.AppInstanceLabelKey: clusterName, constant.KBAppComponentLabelKey: compName,
+					constant.KBAppPodNameLabelKey: "test-its-3", constant.VolumeClaimTemplateNameLabelKey: "data",
+				},
+				Annotations: map[string]string{constant.RestorePurposeAnnotationKey: constant.RestorePurposeReplica},
+			}, Status: corev1.PersistentVolumeClaimStatus{Conditions: []corev1.PersistentVolumeClaimCondition{{
+				Type: corev1.PersistentVolumeClaimConditionType(appsv1.ConditionTypeRestore), Status: status,
+			}}}}
+			pod := testapps.NewPodFactory(testCtx.DefaultNamespace, "test-its-3").
+				AddAppInstanceLabel(clusterName).AddAppComponentLabel(compName).AddAppManagedByLabel().
+				AddContainer(corev1.Container{Name: kbagent.ContainerName, Ports: []corev1.ContainerPort{{
+					Name: kbagent.DefaultStreamingPortName, ContainerPort: 3501,
+				}}}).GetObject()
+			cli := fake.NewClientBuilder().WithScheme(model.GetScheme()).WithObjects(pvc, pod).Build()
+			graphCli = model.NewGraphClient(cli)
+			dag = newDAG(graphCli, comp)
+			transCtx := &componentTransformContext{Context: ctx, Client: graphCli, Component: comp, SynthesizeComponent: synthesizeComp}
+			ops, err := newComponentWorkloadOps(transCtx, cli, synthesizeComp, comp, runningITS, protoITS, dag)
+			Expect(err).ShouldNot(HaveOccurred())
+			err = ops.buildDataReplicationTask()
+			if available {
+				Expect(err).ShouldNot(HaveOccurred())
+				vertex := graphCli.FindMatchedVertex(dag, &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
+					Namespace: testCtx.DefaultNamespace, Name: constant.GenerateClusterComponentEnvPattern(clusterName, compName),
+				}})
+				Expect(vertex).ShouldNot(BeNil())
+				_, err = kbagent.UpdateEnv4Worker(vertex.(*model.ObjectVertex).Obj.(*corev1.ConfigMap).Data, func(task kbagentproto.Task) *kbagentproto.Task {
+					Expect(task.NewReplica.Replicas).Should(Equal("test-its-4"))
+					return &task
+				})
+				Expect(err).ShouldNot(HaveOccurred())
+			} else {
+				Expect(err).Should(MatchError("no available pod to dump data"))
+			}
+		},
+			Entry("pending PVC", corev1.ConditionUnknown, false),
+			Entry("failed PVC", corev1.ConditionFalse, false),
+			Entry("completed PVC", corev1.ConditionTrue, true),
+		)
 	})
 
 	Context("Member Leave Operations", func() {

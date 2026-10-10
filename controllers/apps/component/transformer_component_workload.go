@@ -22,6 +22,7 @@ package component
 import (
 	"context"
 	"reflect"
+	"slices"
 	"strings"
 
 	"golang.org/x/exp/maps"
@@ -150,6 +151,17 @@ func (t *componentWorkloadTransformer) reconcileReplicasStatus(ctx context.Conte
 	}
 
 	hasMemberJoinDefined, hasDataActionDefined := hasMemberJoinNDataActionDefined(synthesizedComp.LifecycleActions.ComponentLifecycleActions)
+	if hasDataActionDefined || protoITS.Spec.ReplicaRestore != nil {
+		restored, pending, err := component.GetReplicaRestoreReplicas(ctx, cli, protoITS, replicas)
+		if err != nil {
+			return err
+		}
+		restoreReplicas := restored.Union(pending)
+		if err = component.NewReplicasStatus(protoITS, restoreReplicas.UnsortedList(), hasMemberJoinDefined, false); err != nil {
+			return err
+		}
+		replicas = slices.DeleteFunc(replicas, restoreReplicas.Has)
+	}
 	return component.StatusReplicasStatus(protoITS, replicas, hasMemberJoinDefined, hasDataActionDefined)
 }
 
@@ -272,6 +284,7 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet, legacyConfigManagerP
 	itsObjCopy.Spec.DisableDefaultHeadlessService = itsProto.Spec.DisableDefaultHeadlessService
 	itsObjCopy.Spec.EnableInstanceAPI = itsProto.Spec.EnableInstanceAPI
 	itsObjCopy.Spec.InstanceAssistantObjects = itsProto.Spec.InstanceAssistantObjects
+	itsObjCopy.Spec.ReplicaRestore = itsProto.Spec.ReplicaRestore
 
 	if itsObjCopy.Spec.InstanceUpdateStrategy != nil && itsObjCopy.Spec.InstanceUpdateStrategy.RollingUpdate != nil {
 		// use oldITS because itsObjCopy has been overwritten

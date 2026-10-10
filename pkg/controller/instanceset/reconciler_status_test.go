@@ -30,6 +30,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
@@ -735,6 +736,55 @@ func TestLegacyInstanceStatusTracksConfigAndPVCConvergence(t *testing.T) {
 		}
 
 	})
+}
+
+func TestReplicaRestorePVCConditionsControlInstanceSetHealth(t *testing.T) {
+	for _, condition := range []corev1.ConditionStatus{corev1.ConditionUnknown, corev1.ConditionFalse, corev1.ConditionTrue} {
+		t.Run(string(condition), func(t *testing.T) {
+			its, tree, pods := newLegacyDefaultInstanceStatusFixture(t, 1)
+			pod := pods["demo-0"]
+			pod.Status.Conditions = []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}}
+			pvc := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{
+				Name: "data-demo-0", Namespace: its.Namespace,
+				Labels:      map[string]string{constant.KBAppPodNameLabelKey: pod.Name},
+				Annotations: map[string]string{constant.RestorePurposeAnnotationKey: constant.RestorePurposeReplica},
+			}, Status: corev1.PersistentVolumeClaimStatus{Conditions: []corev1.PersistentVolumeClaimCondition{{
+				Type: corev1.PersistentVolumeClaimConditionType(workloads.InstanceRestore), Status: condition,
+			}}}}
+			if err := tree.Add(pvc); err != nil {
+				t.Fatal(err)
+			}
+			stalePVC := pvc.DeepCopy()
+			stalePVC.Name = "data-demo-1"
+			stalePVC.Labels[constant.KBAppPodNameLabelKey] = "demo-1"
+			stalePVC.Status.Conditions[0].Status = corev1.ConditionFalse
+			if err := tree.Add(stalePVC); err != nil {
+				t.Fatal(err)
+			}
+			if condition == corev1.ConditionFalse {
+				if err := tree.Delete(pod); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+				t.Fatal(err)
+			}
+			ready := condition == corev1.ConditionTrue
+			failed := condition == corev1.ConditionFalse
+			if meta.IsStatusConditionTrue(its.Status.Conditions, string(workloads.InstanceFailure)) != failed {
+				t.Fatalf("PVC restore failure was not reflected in InstanceFailure: %#v", its.Status.Conditions)
+			}
+			if !failed {
+				status := its.FindInstanceStatus(pod.Name)
+				if status == nil || status.Ready != ready || status.Available != ready || status.Failed || (its.Status.ReadyReplicas == 1) != ready {
+					t.Fatalf("PVC restore condition %s did not determine active instance health: %#v", condition, its.Status)
+				}
+			}
+			if meta.FindStatusCondition(its.Status.Conditions, string(workloads.InstanceRestore)) != nil {
+				t.Fatalf("replica restore added an aggregate Restore condition: %#v", its.Status.Conditions)
+			}
+		})
+	}
 }
 
 func TestLegacyAllocationChangesStayInDesiredAndCurrentState(t *testing.T) {

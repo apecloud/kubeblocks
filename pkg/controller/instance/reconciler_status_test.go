@@ -205,6 +205,67 @@ func TestStatusReconcilerAggregatesRestorePVCConditionsWithoutPod(t *testing.T) 
 	})
 }
 
+func TestReplicaRestorePVCConditionsControlInstanceHealth(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		condition   corev1.ConditionStatus
+		withoutPod  bool
+		terminating bool
+	}{
+		{name: "pending", condition: corev1.ConditionUnknown},
+		{name: "failed", condition: corev1.ConditionFalse},
+		{name: "completed", condition: corev1.ConditionTrue},
+		{name: "failed without Pod", condition: corev1.ConditionFalse, withoutPod: true},
+		{name: "failed with terminating Pod", condition: corev1.ConditionFalse, terminating: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			inst := &workloads.Instance{
+				ObjectMeta: metav1.ObjectMeta{Name: "demo-0", Namespace: "default", Generation: 1},
+				Status:     workloads.InstanceStatus2{ObservedGeneration: 1},
+			}
+			tree := kubebuilderx.NewObjectTree()
+			tree.SetRoot(inst)
+			for _, volume := range []string{"data", "logs"} {
+				status := tc.condition
+				if volume == "logs" {
+					status = corev1.ConditionTrue
+				}
+				pvc := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{
+					Name: volume + "-demo-0", Namespace: inst.Namespace,
+					Labels:      map[string]string{constant.KBAppPodNameLabelKey: inst.Name},
+					Annotations: map[string]string{constant.RestorePurposeAnnotationKey: constant.RestorePurposeReplica},
+				}, Status: corev1.PersistentVolumeClaimStatus{Conditions: []corev1.PersistentVolumeClaimCondition{{
+					Type: corev1.PersistentVolumeClaimConditionType(workloads.InstanceRestore), Status: status,
+				}}}}
+				if err := tree.Add(pvc); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if !tc.withoutPod {
+				pod := readyPod("current")
+				pod.Name, pod.Namespace = inst.Name, inst.Namespace
+				if tc.terminating {
+					pod.DeletionTimestamp = &metav1.Time{Time: metav1.Now().Time}
+				}
+				if err := tree.Add(pod); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if _, err := NewStatusReconciler().Reconcile(tree); err != nil {
+				t.Fatal(err)
+			}
+			ready := tc.condition == corev1.ConditionTrue
+			failed := tc.condition == corev1.ConditionFalse
+			if inst.Status.Ready != ready || inst.Status.Available != ready || intctrlutil.IsInstanceFailure(inst) != failed {
+				t.Fatalf("PVC restore condition %s did not determine instance health: %#v", tc.condition, inst.Status)
+			}
+			if meta.FindStatusCondition(inst.Status.Conditions, string(workloads.InstanceRestore)) != nil {
+				t.Fatalf("replica restore added an aggregate Restore condition: %#v", inst.Status.Conditions)
+			}
+		})
+	}
+}
+
 func TestStatusReconcilerKeepsUpToDateFalseUntilPVCExpansionCompletes(t *testing.T) {
 	claim := corev1.PersistentVolumeClaimTemplate{
 		ObjectMeta: metav1.ObjectMeta{Name: "data"},

@@ -187,6 +187,11 @@ type ComponentSpec struct {
 	// +kubebuilder:default=1
 	Replicas int32 `json:"replicas"`
 
+	// Specifies the restore source used to initialize new replicas during scale-out.
+	//
+	// +optional
+	ReplicaRestore *ClusterRestore `json:"replicaRestore,omitempty"`
+
 	// Specifies the configuration content of a config template.
 	//
 	// +optional

@@ -331,6 +331,11 @@ func (in *ClusterComponentSpec) DeepCopyInto(out *ClusterComponentSpec) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.ReplicaRestore != nil {
+		in, out := &in.ReplicaRestore, &out.ReplicaRestore
+		*out = new(ClusterRestore)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.SchedulingPolicy != nil {
 		in, out := &in.SchedulingPolicy, &out.SchedulingPolicy
 		*out = new(SchedulingPolicy)
@@ -1665,6 +1670,11 @@ func (in *ComponentSpec) DeepCopyInto(out *ComponentSpec) {
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
+	}
+	if in.ReplicaRestore != nil {
+		in, out := &in.ReplicaRestore, &out.ReplicaRestore
+		*out = new(ClusterRestore)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.Configs != nil {
 		in, out := &in.Configs, &out.Configs

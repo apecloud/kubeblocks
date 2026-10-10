@@ -87,6 +87,12 @@ type InstanceSpec struct {
 	// VolumeClaimTemplates []corev1.PersistentVolumeClaim `json:"volumeClaimTemplates,omitempty"`
 	VolumeClaimTemplates []corev1.PersistentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
 
+	// Specifies the restore source used to initialize this instance.
+	// It is fixed when the instance is created.
+	//
+	// +optional
+	ReplicaRestore *kbappsv1.ClusterRestore `json:"replicaRestore,omitempty"`
+
 	// persistentVolumeClaimRetentionPolicy describes the lifecycle of persistent
 	// volume claims created from volumeClaimTemplates. By default, all persistent
 	// volume claims are created as needed and retained until manually deleted. This

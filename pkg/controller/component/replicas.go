@@ -30,11 +30,15 @@ import (
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
+	"github.com/apecloud/kubeblocks/pkg/controller/replicarestore"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/kbagent"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
@@ -207,6 +211,78 @@ func GetReplicasStatusFunc(its *workloads.InstanceSet, f func(ReplicaStatus) boo
 		}
 	}
 	return replicas, nil
+}
+
+// GetReplicaRestoreReplicas identifies replicas with restore-initialized PVCs,
+// and replicas waiting for restore PVC creation or completion.
+func GetReplicaRestoreReplicas(ctx context.Context, cli client.Reader, its *workloads.InstanceSet, replicas []string) (restored, pending sets.Set[string], err error) {
+	itsExt, err := instancetemplate.BuildInstanceSetExt(its, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+	nameBuilder, err := instancetemplate.NewPodNameBuilder(itsExt, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+	nameTemplateMap, err := nameBuilder.BuildInstanceName2TemplateMap()
+	if err != nil {
+		return nil, nil, err
+	}
+	volumesByReplica := make(map[string]sets.Set[string], len(replicas))
+	for _, name := range replicas {
+		if template, ok := nameTemplateMap[name]; ok {
+			volumes := sets.New[string]()
+			for _, vct := range template.VolumeClaimTemplates {
+				volumes.Insert(vct.Name)
+			}
+			volumesByReplica[name] = volumes
+		}
+	}
+
+	pvcs := &corev1.PersistentVolumeClaimList{}
+	if err := cli.List(ctx, pvcs, client.InNamespace(its.Namespace), client.MatchingLabels{
+		constant.AppInstanceLabelKey:    its.Labels[constant.AppInstanceLabelKey],
+		constant.KBAppComponentLabelKey: its.Labels[constant.KBAppComponentLabelKey],
+	}); err != nil {
+		return nil, nil, err
+	}
+	names := sets.New(replicas...)
+	restored = sets.New[string]()
+	pending = sets.New[string]()
+	restoredVolumes := map[string]sets.Set[string]{}
+	existingReplicas := sets.New[string]()
+	for i := range pvcs.Items {
+		pvc := &pvcs.Items[i]
+		name := pvc.Labels[constant.KBAppPodNameLabelKey]
+		volume := pvc.Labels[constant.VolumeClaimTemplateNameLabelKey]
+		volumes, ok := volumesByReplica[name]
+		if !names.Has(name) || !ok || !volumes.Has(volume) {
+			continue
+		}
+		existingReplicas.Insert(name)
+		if replicarestore.IsReplicaPVC(pvc) {
+			if restoredVolumes[name] == nil {
+				restoredVolumes[name] = sets.New[string]()
+			}
+			restoredVolumes[name].Insert(volume)
+			completed := slices.ContainsFunc(pvc.Status.Conditions, func(condition corev1.PersistentVolumeClaimCondition) bool {
+				return condition.Type == corev1.PersistentVolumeClaimConditionType(appsv1.ConditionTypeRestore) && condition.Status == corev1.ConditionTrue
+			})
+			if !completed {
+				pending.Insert(name)
+			}
+		}
+	}
+	for name, volumes := range volumesByReplica {
+		if volumes.Len() > 0 && restoredVolumes[name].Len() == volumes.Len() {
+			restored.Insert(name)
+		}
+		if volumes.Len() > 0 && restoredVolumes[name].Len() < volumes.Len() &&
+			(restoredVolumes[name].Len() > 0 || (its.Spec.ReplicaRestore != nil && !existingReplicas.Has(name))) {
+			pending.Insert(name)
+		}
+	}
+	return restored, pending, nil
 }
 
 func NewReplicaTask(compName, uid string, source *corev1.Pod, replicas []string) (map[string]string, error) {

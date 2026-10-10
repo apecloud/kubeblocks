@@ -31,7 +31,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 )
@@ -43,7 +45,66 @@ var _ = Describe("replicas alignment reconciler test", func() {
 			SetTemplate(template).
 			SetVolumeClaimTemplates(volumeClaimTemplates...).
 			SetRoles(roles).
-			GetObject()
+			GetObject().DeepCopy()
+	})
+
+	It("restores only newly created PVCs and preserves their initialization source", func() {
+		its.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
+		its.Annotations = map[string]string{constant.KBAppClusterUIDKey: "cluster-uid"}
+		its.Labels = map[string]string{constant.KBAppComponentLabelKey: "mysql"}
+		tree := kubebuilderx.NewObjectTree()
+		tree.SetRoot(its)
+		_, err := NewReplicasAlignmentReconciler().Reconcile(tree)
+		Expect(err).NotTo(HaveOccurred())
+		original := map[string]*corev1.PersistentVolumeClaim{}
+		for _, obj := range tree.List(&corev1.PersistentVolumeClaim{}) {
+			original[obj.GetName()] = obj.(*corev1.PersistentVolumeClaim).DeepCopy()
+		}
+		Expect(tree.List(&corev1.Pod{})).To(HaveLen(3))
+		replicas := int32(4)
+		its.Spec.Replicas = &replicas
+		its.Spec.ReplicaRestore = &kbappsv1.ClusterRestore{Source: kbappsv1.ClusterRestoreSource{
+			APIGroup: "dataprotection.kubeblocks.io", Kind: "Backup", Name: "backup-a",
+		}}
+		_, err = NewReplicasAlignmentReconciler().Reconcile(tree)
+		Expect(err).NotTo(HaveOccurred())
+		replicas = 5
+		_, err = NewReplicasAlignmentReconciler().Reconcile(tree)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(tree.List(&corev1.Pod{})).To(HaveLen(5))
+		Expect(tree.List(&corev1.PersistentVolumeClaim{})).To(HaveLen(5 * len(volumeClaimTemplates)))
+		for _, obj := range tree.List(&corev1.PersistentVolumeClaim{}) {
+			pvc := obj.(*corev1.PersistentVolumeClaim)
+			if before, ok := original[pvc.Name]; ok {
+				Expect(pvc.Spec).To(Equal(before.Spec))
+				Expect(pvc.Annotations).To(Equal(before.Annotations))
+				Expect(pvc.Status).To(Equal(before.Status))
+				continue
+			}
+			Expect(pvc.Spec.DataSourceRef.Name).To(Equal("backup-a"))
+			Expect(pvc.Annotations[constant.RestoreSourceNameAnnotationKey]).To(Equal("backup-a"))
+			Expect(pvc.Annotations[constant.KBAppClusterUIDKey]).To(Equal("cluster-uid"))
+			Expect(pvc.Annotations[constant.RestoreSourceNamespaceAnnotationKey]).To(Equal(namespace))
+			Expect(pvc.Annotations[constant.RestoreVolumeTemplateAnnotationKey]).To(Equal(pvc.Labels[constant.VolumeClaimTemplateNameLabelKey]))
+		}
+	})
+
+	It("rejects Backup initialization combined with a volume claim template source", func() {
+		group := "snapshot.storage.k8s.io"
+		for _, spec := range []corev1.PersistentVolumeClaimSpec{
+			{DataSource: &corev1.TypedLocalObjectReference{APIGroup: &group, Kind: "VolumeSnapshot", Name: "snapshot"}},
+			{DataSourceRef: &corev1.TypedObjectReference{APIGroup: &group, Kind: "VolumeSnapshot", Name: "snapshot"}},
+		} {
+			its.Spec.VolumeClaimTemplates[0].Spec = spec
+			its.Spec.ReplicaRestore = &kbappsv1.ClusterRestore{Source: kbappsv1.ClusterRestoreSource{
+				APIGroup: "dataprotection.kubeblocks.io", Kind: "Backup", Name: "backup",
+			}}
+			tree := kubebuilderx.NewObjectTree()
+			tree.SetRoot(its)
+			_, err := NewReplicasAlignmentReconciler().Reconcile(tree)
+			Expect(err).To(MatchError(ContainSubstring("cannot be combined")))
+			Expect(tree.List(&corev1.PersistentVolumeClaim{})).To(BeEmpty())
+		}
 	})
 
 	Context("PreCondition & Reconcile", func() {

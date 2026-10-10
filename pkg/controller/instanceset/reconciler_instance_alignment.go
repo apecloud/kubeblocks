@@ -92,6 +92,18 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 	createNameSet := newNameSet.Difference(oldNameSet)
 	deleteNameSet := oldNameSet.Difference(newNameSet)
 
+	policy := its.Spec.PersistentVolumeClaimRetentionPolicy
+	if !isStopRequested(its) && (policy == nil || policy.WhenScaled != kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType) {
+		for _, obj := range oldPVCList {
+			name := obj.GetLabels()[constant.KBAppPodNameLabelKey]
+			if name != "" && !newNameSet.Has(name) && !oldNameSet.Has(name) {
+				if err := tree.Delete(obj); err != nil {
+					return kubebuilderx.Continue, err
+				}
+			}
+		}
+	}
+
 	// default OrderedReady policy
 	isOrderedReady := true
 	concurrency := 0
@@ -156,6 +168,9 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 
 	// create PVCs
 	for _, name := range currentAlignedNameList {
+		if pod := oldInstanceMap[name]; pod != nil && model.IsObjectDeleting(pod) {
+			continue
+		}
 		pvcs, err := buildInstancePVCByTemplate(name, nameToTemplateMap[name], its)
 		if err != nil {
 			return kubebuilderx.Continue, err

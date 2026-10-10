@@ -480,6 +480,10 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 		}
 		desiredTemplateAssignments = nil
 	}
+	activeNames := make(map[string]struct{}, len(desiredTemplateAssignments))
+	for _, assignment := range desiredTemplateAssignments {
+		activeNames[assignment.InstanceName] = struct{}{}
+	}
 
 	observations := make([]instancestatus.Observation, 0, len(pods))
 	roleMap := composeRoleMap(*its)
@@ -514,7 +518,7 @@ func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet
 		}
 		if state == workloads.InstanceCurrentStatePresent && isCreated(pod) {
 			template := desiredTemplates[pod.Name]
-			if _, active := desiredNames[pod.Name]; active && template != nil {
+			if _, active := activeNames[pod.Name]; active && template != nil {
 				podApplied, err := isDesiredPodApplied(its, pod, template)
 				if err != nil {
 					return err

@@ -1454,6 +1454,8 @@ func TestLegacyInstanceSetStopRecoveryMinReadySeconds(t *testing.T) {
 
 func TestLegacyInstanceSetStopRecoveryMalformedObservedConfig(t *testing.T) {
 	cli := legacyStopRecoveryFixture(t, 2, 0)
+	legacyStopRecoveryReady(t, cli)
+	claims := legacyStopRecoveryClaims(t, cli)
 	for _, pod := range legacyStopRecoveryPods(t, cli) {
 		if pod.Annotations == nil {
 			pod.Annotations = map[string]string{}
@@ -1470,6 +1472,9 @@ func TestLegacyInstanceSetStopRecoveryMalformedObservedConfig(t *testing.T) {
 	legacyStopRecoveryReconcile(t, cli, 6)
 	if len(legacyStopRecoveryPods(t, cli)) != 0 || legacyStopRecoverySet(t, cli).Status.Replicas != 0 {
 		t.Fatal("malformed observed config blocked Stop")
+	}
+	if !reflect.DeepEqual(claims, legacyStopRecoveryClaims(t, cli)) {
+		t.Fatal("Stop with malformed observed config changed storage")
 	}
 }
 

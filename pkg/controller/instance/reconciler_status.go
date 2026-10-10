@@ -28,36 +28,30 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/apecloud/kubeblocks/pkg/controller/workloads/instancestatus"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-func NewStatusReconciler(reader client.Reader) *StatusReconciler {
-	return &StatusReconciler{reader: reader}
+func NewStatusReconciler() kubebuilderx.Reconciler {
+	return &statusReconciler{}
 }
 
-type StatusReconciler struct {
-	reader             client.Reader
-	observationPending bool
-}
+type statusReconciler struct{}
 
-var _ kubebuilderx.Reconciler = &StatusReconciler{}
+var _ kubebuilderx.Reconciler = &statusReconciler{}
 
-func (r *StatusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
+func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
 	if tree.GetRoot() == nil || !model.IsObjectStatusUpdating(tree.GetRoot()) {
 		return kubebuilderx.ConditionUnsatisfied
 	}
 	return kubebuilderx.ConditionSatisfied
 }
 
-func (r *StatusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
-	r.observationPending = false
+func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	inst := tree.GetRoot().(*workloads.Instance)
 	r.reconcileRestoreCondition(tree, inst)
 
@@ -65,24 +59,6 @@ func (r *StatusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}
-	var actualPod *corev1.Pod
-	if obj != nil {
-		actualPod = obj.(*corev1.Pod)
-	}
-	inst.Status.Pod = nil
-	if actualPod != nil {
-		inst.Status.Pod = instancestatus.ObjectReference(tree.Context, actualPod)
-	}
-	expected := make(map[string]string)
-	for _, template := range inst.Spec.VolumeClaimTemplates {
-		expected[intctrlutil.ComposePVCName(corev1.PersistentVolumeClaim{ObjectMeta: template.ObjectMeta}, inst.Spec.InstanceSetName, inst.Name)] = template.Name
-	}
-	pvcs := make([]*corev1.PersistentVolumeClaim, 0)
-	for _, pvc := range tree.List(&corev1.PersistentVolumeClaim{}) {
-		pvcs = append(pvcs, pvc.(*corev1.PersistentVolumeClaim))
-	}
-	pvcs, r.observationPending = instancestatus.ReadMountedClaims(tree.Context, r.reader, actualPod, pvcs)
-	inst.Status.Storage = instancestatus.ObserveStorage(tree.Context, actualPod, expected, pvcs)
 	if obj == nil {
 		r.setPodUnavailableStatus(inst, workloads.InstanceCurrentStateAbsent, inst.Name, "")
 		return kubebuilderx.Continue, nil
@@ -137,7 +113,7 @@ func (r *StatusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	if observed {
 		inst.Status.UpToDate = !pending
 	}
-	inst.Status.UpToDate = !isStopRequested(inst) && updated && inst.Status.UpToDate
+	inst.Status.UpToDate = updated && inst.Status.UpToDate
 	inst.Status.Ready = ready
 	inst.Status.Available = available
 	inst.Status.Role = r.observedRoleOfPod(inst, pod)
@@ -148,13 +124,13 @@ func (r *StatusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 	inst.Status.Configs = configs
 
-	if !isStopRequested(inst) && inst.Spec.MinReadySeconds > 0 && !available {
+	if inst.Spec.MinReadySeconds > 0 && !available {
 		return kubebuilderx.RetryAfter(time.Second), nil
 	}
 	return kubebuilderx.Continue, nil
 }
 
-func (r *StatusReconciler) reconcileRestoreCondition(tree *kubebuilderx.ObjectTree, inst *workloads.Instance) {
+func (r *statusReconciler) reconcileRestoreCondition(tree *kubebuilderx.ObjectTree, inst *workloads.Instance) {
 	restoreCond := meta.FindStatusCondition(inst.Status.Conditions, string(workloads.InstanceRestore))
 	if restoreCond != nil && (restoreCond.Status == metav1.ConditionTrue || restoreCond.Status == metav1.ConditionFalse) {
 		return
@@ -167,7 +143,7 @@ func (r *StatusReconciler) reconcileRestoreCondition(tree *kubebuilderx.ObjectTr
 	meta.SetStatusCondition(&inst.Status.Conditions, *condition)
 }
 
-func (r *StatusReconciler) buildRestoreCondition(tree *kubebuilderx.ObjectTree, inst *workloads.Instance) *metav1.Condition {
+func (r *statusReconciler) buildRestoreCondition(tree *kubebuilderx.ObjectTree, inst *workloads.Instance) *metav1.Condition {
 	expectedPVCNames := make(map[string]struct{})
 	for i := range inst.Spec.VolumeClaimTemplates {
 		vct := &inst.Spec.VolumeClaimTemplates[i]
@@ -237,7 +213,7 @@ func findPVCRestoreCondition(pvc *corev1.PersistentVolumeClaim) *corev1.Persiste
 
 // An absent or terminating Pod cannot provide a valid runtime observation. Clear every Pod-derived field and
 // condition together so values from the previous Pod do not survive the lifecycle transition.
-func (r *StatusReconciler) setPodUnavailableStatus(inst *workloads.Instance, state workloads.InstanceCurrentState, name, revision string) {
+func (r *statusReconciler) setPodUnavailableStatus(inst *workloads.Instance, state workloads.InstanceCurrentState, name, revision string) {
 	inst.Status.CurrentState = state
 	inst.Status.CurrentRevision = revision
 	inst.Status.UpToDate = false
@@ -251,7 +227,7 @@ func (r *StatusReconciler) setPodUnavailableStatus(inst *workloads.Instance, sta
 	meta.RemoveStatusCondition(&inst.Status.Conditions, string(workloads.InstanceFailure))
 }
 
-func (r *StatusReconciler) buildReadyCondition(inst *workloads.Instance, ready bool, notReadyName string) *metav1.Condition {
+func (r *statusReconciler) buildReadyCondition(inst *workloads.Instance, ready bool, notReadyName string) *metav1.Condition {
 	condition := &metav1.Condition{
 		Type:               string(workloads.InstanceReady),
 		Status:             metav1.ConditionTrue,
@@ -266,7 +242,7 @@ func (r *StatusReconciler) buildReadyCondition(inst *workloads.Instance, ready b
 	return condition
 }
 
-func (r *StatusReconciler) buildAvailableCondition(inst *workloads.Instance, available bool, notAvailableName string) *metav1.Condition {
+func (r *statusReconciler) buildAvailableCondition(inst *workloads.Instance, available bool, notAvailableName string) *metav1.Condition {
 	condition := &metav1.Condition{
 		Type:               string(workloads.InstanceAvailable),
 		Status:             metav1.ConditionTrue,
@@ -281,7 +257,7 @@ func (r *StatusReconciler) buildAvailableCondition(inst *workloads.Instance, ava
 	return condition
 }
 
-func (r *StatusReconciler) buildFailureCondition(inst *workloads.Instance, pod *corev1.Pod) *metav1.Condition {
+func (r *statusReconciler) buildFailureCondition(inst *workloads.Instance, pod *corev1.Pod) *metav1.Condition {
 	if isTerminating(pod) {
 		return nil
 	}
@@ -307,7 +283,7 @@ func (r *StatusReconciler) buildFailureCondition(inst *workloads.Instance, pod *
 	}
 }
 
-func (r *StatusReconciler) observedRoleOfPod(inst *workloads.Instance, pod *corev1.Pod) string {
+func (r *statusReconciler) observedRoleOfPod(inst *workloads.Instance, pod *corev1.Pod) string {
 	if inst.Spec.Roles != nil && intctrlutil.PodIsReadyWithLabel(*pod) {
 		roleMap := composeRoleMap(inst)
 		roleName := getRoleName(pod)
@@ -319,7 +295,7 @@ func (r *StatusReconciler) observedRoleOfPod(inst *workloads.Instance, pod *core
 	return ""
 }
 
-func (r *StatusReconciler) hasRunningVolumeExpansion(tree *kubebuilderx.ObjectTree, inst *workloads.Instance) bool {
+func (r *statusReconciler) hasRunningVolumeExpansion(tree *kubebuilderx.ObjectTree, inst *workloads.Instance) bool {
 	pvcsByName := r.persistentVolumeClaimsByName(tree)
 	for _, vct := range inst.Spec.VolumeClaimTemplates {
 		pvcName := intctrlutil.ComposePVCName(corev1.PersistentVolumeClaim{ObjectMeta: vct.ObjectMeta}, inst.Spec.InstanceSetName, inst.Name)
@@ -336,7 +312,7 @@ func (r *StatusReconciler) hasRunningVolumeExpansion(tree *kubebuilderx.ObjectTr
 	return false
 }
 
-func (r *StatusReconciler) hasPendingVolumeExpansion(tree *kubebuilderx.ObjectTree, inst *workloads.Instance) (pending, observed bool) {
+func (r *statusReconciler) hasPendingVolumeExpansion(tree *kubebuilderx.ObjectTree, inst *workloads.Instance) (pending, observed bool) {
 	pvcsByName := r.persistentVolumeClaimsByName(tree)
 	observed = true
 	for _, vct := range inst.Spec.VolumeClaimTemplates {
@@ -362,7 +338,7 @@ func (r *StatusReconciler) hasPendingVolumeExpansion(tree *kubebuilderx.ObjectTr
 	return false, observed
 }
 
-func (r *StatusReconciler) persistentVolumeClaimsByName(tree *kubebuilderx.ObjectTree) map[string]*corev1.PersistentVolumeClaim {
+func (r *statusReconciler) persistentVolumeClaimsByName(tree *kubebuilderx.ObjectTree) map[string]*corev1.PersistentVolumeClaim {
 	result := make(map[string]*corev1.PersistentVolumeClaim)
 	for _, obj := range tree.List(&corev1.PersistentVolumeClaim{}) {
 		pvc, _ := obj.(*corev1.PersistentVolumeClaim)
@@ -371,7 +347,7 @@ func (r *StatusReconciler) persistentVolumeClaimsByName(tree *kubebuilderx.Objec
 	return result
 }
 
-func (r *StatusReconciler) observedConfigsOfPod(pod *corev1.Pod) ([]workloads.InstanceConfigStatus, error) {
+func (r *statusReconciler) observedConfigsOfPod(pod *corev1.Pod) ([]workloads.InstanceConfigStatus, error) {
 	configs, err := configsFromPod(pod)
 	if err != nil {
 		return nil, err
@@ -388,6 +364,3 @@ func (r *StatusReconciler) observedConfigsOfPod(pod *corev1.Pod) ([]workloads.In
 	}
 	return status, nil
 }
-
-// ObservationPending reports an unavailable mounted claim read. The controller retries after committing the full chain.
-func (r *StatusReconciler) ObservationPending() bool { return r.observationPending }

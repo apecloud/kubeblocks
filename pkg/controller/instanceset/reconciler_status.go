@@ -20,8 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset
 
 import (
-	"context"
-
 	"encoding/json"
 	"fmt"
 	"sort"
@@ -31,10 +29,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/utils/ptr"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -46,27 +41,23 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-// StatusReconciler computes the current status
-type StatusReconciler struct {
-	reader             client.Reader
-	observationPending bool
+// statusReconciler computes the current status
+type statusReconciler struct{}
+
+var _ kubebuilderx.Reconciler = &statusReconciler{}
+
+func NewStatusReconciler() kubebuilderx.Reconciler {
+	return &statusReconciler{}
 }
 
-var _ kubebuilderx.Reconciler = &StatusReconciler{}
-
-func NewStatusReconciler(reader client.Reader) *StatusReconciler {
-	return &StatusReconciler{reader: reader}
-}
-
-func (r *StatusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
+func (r *statusReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
 	if tree.GetRoot() == nil || !model.IsObjectStatusUpdating(tree.GetRoot()) {
 		return kubebuilderx.ConditionUnsatisfied
 	}
 	return kubebuilderx.ConditionSatisfied
 }
 
-func (r *StatusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
-	r.observationPending = false
+func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
 	// 1. get all pods
 	pods := tree.List(&corev1.Pod{})
@@ -211,7 +202,7 @@ func (r *StatusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 
 	// 4. set instance status
-	if err = r.setInstanceStatus(tree, its, podList); err != nil {
+	if err = setInstanceStatus(tree, its, podList); err != nil {
 		return kubebuilderx.Continue, err
 	}
 
@@ -243,7 +234,7 @@ func (r *StatusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	return kubebuilderx.Continue, nil
 }
 
-func (r *StatusReconciler) reconcileRestoreCondition(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet) error {
+func (r *statusReconciler) reconcileRestoreCondition(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet) error {
 	restoreCond := meta.FindStatusCondition(its.Status.Conditions, string(workloads.InstanceRestore))
 	if restoreCond != nil && (restoreCond.Status == metav1.ConditionTrue || restoreCond.Status == metav1.ConditionFalse) {
 		return nil
@@ -455,7 +446,7 @@ func instancePodFailed(pod *corev1.Pod) bool {
 	return isFailed && isTimedOut
 }
 
-func (r *StatusReconciler) setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pods []*corev1.Pod) error {
+func setInstanceStatus(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pods []*corev1.Pod) error {
 	desiredAssignments, templateNames, err := instancetemplate.BuildAssignments(tree, its)
 	if err != nil {
 		return err
@@ -551,108 +542,8 @@ func (r *StatusReconciler) setInstanceStatus(tree *kubebuilderx.ObjectTree, its 
 	}
 	syncObservationPVCStatus(tree, observations)
 
-	resources := make([]instancestatus.ResourceObservation, 0)
-	resourceNames := make(map[string]struct{})
-	for _, assignment := range desiredAssignments {
-		resourceNames[assignment.InstanceName] = struct{}{}
-	}
-	for _, name := range offlineNames {
-		resourceNames[name] = struct{}{}
-	}
-	for _, previous := range its.Status.InstanceStatus {
-		resourceNames[previous.PodName] = struct{}{}
-	}
-	podsByName := make(map[string]*corev1.Pod)
-	for _, pod := range pods {
-		resourceNames[pod.Name] = struct{}{}
-		podsByName[pod.Name] = pod
-	}
-	claimsByInstance := make(map[string][]*corev1.PersistentVolumeClaim)
-	for _, pvc := range pvcsByName {
-		name := pvc.Labels[constant.KBAppPodNameLabelKey]
-		if name != "" {
-			resourceNames[name] = struct{}{}
-			claimsByInstance[name] = append(claimsByInstance[name], pvc)
-		}
-	}
-	for name := range resourceNames {
-		expected := make(map[string]string)
-		if template := desiredTemplates[name]; template != nil {
-			for _, claim := range template.VolumeClaimTemplates {
-				expected[intctrlutil.ComposePVCName(corev1.PersistentVolumeClaim{ObjectMeta: claim.ObjectMeta}, its.Name, name)] = claim.Name
-			}
-		}
-		var observationContext context.Context
-		if tree != nil {
-			observationContext = tree.Context
-		}
-		retain := its.Spec.PersistentVolumeClaimRetentionPolicy != nil && its.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled == kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType
-		actualClaims := claimsByInstance[name]
-		cleanupPending := false
-		var cleanupLocations map[types.UID]string
-		if !retain {
-			if previous := its.FindInstanceStatus(name); previous != nil {
-				actualClaims, cleanupPending, cleanupLocations = instancestatus.ReadMissingOwnedClaims(observationContext, r.reader, its.UID, previous.Storage, actualClaims)
-			}
-		}
-		observedClaims, pending := instancestatus.ReadMountedClaims(observationContext, r.reader, podsByName[name], actualClaims)
-		r.observationPending = r.observationPending || pending || cleanupPending
-		resource := instancestatus.ResourceObservation{InstanceName: name, Storage: instancestatus.ObserveStorage(observationContext, podsByName[name], expected, observedClaims)}
-		if podsByName[name] == nil && len(cleanupLocations) > 0 {
-			complete := len(resource.Storage.Volumes) > 0 && resource.Storage.EphemeralPod == nil
-			for i := range resource.Storage.Volumes {
-				volume := &resource.Storage.Volumes[i]
-				if volume.Claim != nil {
-					if location, known := cleanupLocations[volume.Claim.UID]; known {
-						volume.Claim.Cluster = ptr.To(location)
-					}
-				}
-				complete = complete && volume.Claim != nil && volume.Claim.Cluster != nil && volume.Claim.UID != "" && volume.VolumeName != ""
-			}
-			resource.Storage.Complete = complete
-		}
-		if pod := podsByName[name]; pod != nil {
-			resource.Pod = instancestatus.ObjectReference(observationContext, pod)
-		}
-
-		if cleanupPending {
-			resource.Storage.Complete = false
-			if previous := its.FindInstanceStatus(name); previous != nil && previous.Storage != nil {
-				for _, oldVolume := range previous.Storage.Volumes {
-					if oldVolume.OwnerUID != its.UID || oldVolume.Claim == nil {
-						continue
-					}
-					observed := false
-					for _, current := range resource.Storage.Volumes {
-						if current.Name == oldVolume.Name && current.Claim != nil {
-							observed = true
-							break
-						}
-					}
-					if !observed {
-						copied := oldVolume
-						copied.Claim = oldVolume.Claim.DeepCopy()
-						for i, current := range resource.Storage.Volumes {
-							if current.Name == copied.Name {
-								resource.Storage.Volumes = append(resource.Storage.Volumes[:i], resource.Storage.Volumes[i+1:]...)
-								break
-							}
-						}
-						resource.Storage.Volumes = append(resource.Storage.Volumes, copied)
-					}
-				}
-			}
-		}
-		resource.StorageCleanup = cleanupPending
-		for _, pvc := range actualClaims {
-			if !retain || !pvc.DeletionTimestamp.IsZero() {
-				resource.StorageCleanup = true
-			}
-		}
-		resources = append(resources, resource)
-	}
 	statuses, err := instancestatus.Build(instancestatus.Input{
-		Resources:          resources,
+		Resources:          cleanupResourceObservations(tree, its),
 		Previous:           its.Status.InstanceStatus,
 		DesiredAssignments: desiredTemplateAssignments,
 		Offline:            offlineNames,
@@ -665,6 +556,25 @@ func (r *StatusReconciler) setInstanceStatus(tree *kubebuilderx.ObjectTree, its 
 	}
 	its.Status.InstanceStatus = statuses
 	return nil
+}
+
+func cleanupResourceObservations(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet) []instancestatus.ResourceObservation {
+	if tree == nil {
+		return nil
+	}
+	var resources []instancestatus.ResourceObservation
+	retain := its.Spec.PersistentVolumeClaimRetentionPolicy != nil &&
+		its.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled == kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType
+	for _, object := range tree.List(&corev1.PersistentVolumeClaim{}) {
+		pvc := object.(*corev1.PersistentVolumeClaim)
+		owner := metav1.GetControllerOf(pvc)
+		name := pvc.Labels[constant.KBAppPodNameLabelKey]
+		if owner == nil || owner.UID != its.UID || name == "" || (retain && pvc.DeletionTimestamp.IsZero()) {
+			continue
+		}
+		resources = append(resources, instancestatus.ResourceObservation{InstanceName: name, StorageCleanup: true})
+	}
+	return resources
 }
 
 func podObservationNames(observations []instancestatus.Observation) []string {
@@ -766,6 +676,3 @@ func isPVCExpansionRunning(pvc *corev1.PersistentVolumeClaim) bool {
 	capacity, capacityOK := pvc.Status.Capacity[corev1.ResourceStorage]
 	return requestedOK && capacityOK && capacity.Cmp(requested) < 0
 }
-
-// ObservationPending reports an unavailable mounted claim read. The controller retries after committing the full chain.
-func (r *StatusReconciler) ObservationPending() bool { return r.observationPending }

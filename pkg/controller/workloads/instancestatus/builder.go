@@ -50,16 +50,22 @@ type Observation struct {
 	VolumeExpansion bool
 }
 
+// ResourceObservation contains current owned resources that retain an instance status entry.
+type ResourceObservation struct {
+	InstanceName    string
+	InstancePresent bool
+	StorageCleanup  bool
+}
+
 // Input contains the independently produced desired and observed dimensions used to build InstanceStatus.
 type Input struct {
+	Resources          []ResourceObservation
 	Previous           []workloads.InstanceStatus
 	DesiredAssignments []TemplateAssignment
 	Offline            []string
 	Observations       []Observation
 	TemplateHints      []TemplateAssignment
 	UpdateRevisions    map[string]string
-	Resources          []ResourceObservation
-	Lifecycle          []LifecycleObservation
 }
 
 // ConfigsApplied reports whether every desired config hash has been observed for an instance.
@@ -81,7 +87,8 @@ func ConfigsApplied(desired []workloads.ConfigTemplate, observed []workloads.Ins
 	return true
 }
 
-// Build merges actual resources and lifecycle facts by PodName. Runtime health is rebuilt from current observations.
+// Build merges InstanceStatus by PodName, carrying retained identity and recorded progress from Previous.
+// Observed revision, health, and runtime fields are rebuilt from Observations.
 func Build(input Input) ([]workloads.InstanceStatus, error) {
 	previousByName, err := indexPrevious(input.Previous)
 	if err != nil {
@@ -125,35 +132,6 @@ func Build(input Input) ([]workloads.InstanceStatus, error) {
 		observationsByName[observation.InstanceName] = observation
 	}
 
-	resourcesByName := make(map[string]ResourceObservation, len(input.Resources))
-	for _, resource := range input.Resources {
-		if resource.InstanceName == "" {
-			return nil, fmt.Errorf("resource has an empty instance name")
-		}
-		if _, exists := resourcesByName[resource.InstanceName]; exists {
-			return nil, fmt.Errorf("duplicate resources for %q", resource.InstanceName)
-		}
-		resourcesByName[resource.InstanceName] = resource
-	}
-	lifecycleByName := make(map[string]LifecycleObservation, len(input.Lifecycle))
-	for _, observation := range input.Lifecycle {
-		if observation.InstanceName == "" {
-			return nil, fmt.Errorf("lifecycle has an empty instance name")
-		}
-		if _, exists := lifecycleByName[observation.InstanceName]; exists {
-			return nil, fmt.Errorf("duplicate lifecycle for %q", observation.InstanceName)
-		}
-		lifecycleByName[observation.InstanceName] = observation
-	}
-	mergedByName := make(map[string]LifecycleObservation)
-	for name, old := range previousByName {
-		mergedByName[name] = MergeLifecycle(LifecycleObservation{Membership: old.Membership, Data: old.Data, Execution: old.Execution}, lifecycleByName[name], resourcesByName[name].Storage)
-	}
-	for name, observed := range lifecycleByName {
-		if _, exists := mergedByName[name]; !exists {
-			mergedByName[name] = MergeLifecycle(LifecycleObservation{}, observed, resourcesByName[name].Storage)
-		}
-	}
 	names := make(map[string]struct{}, len(desiredByName)+len(offlineNames)+len(observationsByName))
 	for name := range desiredByName {
 		names[name] = struct{}{}
@@ -165,28 +143,36 @@ func Build(input Input) ([]workloads.InstanceStatus, error) {
 		names[name] = struct{}{}
 	}
 
-	for name, resource := range resourcesByName {
+	for _, resource := range input.Resources {
+		if resource.InstanceName == "" {
+			return nil, fmt.Errorf("resource has an empty instance name")
+		}
 		if resource.InstancePresent || resource.StorageCleanup {
-			names[name] = struct{}{}
+			names[resource.InstanceName] = struct{}{}
 		}
 	}
-	for name, lifecycle := range mergedByName {
-		if lifecycleUnresolved(lifecycle) {
+	for name, old := range previousByName {
+		if ptr.Deref(old.MemberJoined, false) {
 			names[name] = struct{}{}
 		}
 	}
 	statuses := make([]workloads.InstanceStatus, 0, len(names))
 	for name := range names {
 		status := workloads.InstanceStatus{PodName: name, CurrentState: workloads.InstanceCurrentStateAbsent}
-		resource := resourcesByName[name]
-		status.Storage = resource.Storage.DeepCopy()
-		lifecycle := mergedByName[name]
-		status.Membership, status.Data, status.Execution = lifecycle.Membership, lifecycle.Data, lifecycle.Execution
+		if old := previousByName[name]; old != nil {
+			status.Provisioned = old.Provisioned
+			if old.DataLoaded != nil {
+				status.DataLoaded = ptr.To(*old.DataLoaded)
+			}
+			if old.MemberJoined != nil {
+				status.MemberJoined = ptr.To(*old.MemberJoined)
+			}
+		}
 		observation := observationsByName[name]
 		if observation != nil {
+			status.Provisioned = true
 			status.CurrentState = observation.State
 			status.CurrentRevision = observation.Revision
-			status.Pod = resource.Pod.DeepCopy()
 		}
 
 		switch {
@@ -211,8 +197,6 @@ func Build(input Input) ([]workloads.InstanceStatus, error) {
 			}
 		}
 
-		// Terminating observations retain only lifecycle state and revision. Runtime health belongs to a usable,
-		// present instance and must be cleared rather than inherited from its previous status.
 		if observation != nil && observation.State == workloads.InstanceCurrentStatePresent {
 			status.Ready = observation.Ready
 			status.Available = observation.Ready && observation.Available

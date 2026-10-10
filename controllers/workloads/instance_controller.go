@@ -21,7 +21,6 @@ package workloads
 
 import (
 	"context"
-	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -88,24 +87,19 @@ type InstanceReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.4/pkg/reconcile
 func (r *InstanceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	status := instance.NewStatusReconciler(r.Client)
 	logger := log.FromContext(ctx).WithValues("Instance", req.NamespacedName)
 
-	res, err := kubebuilderx.NewController(ctx, r.Client, req, r.Recorder, logger).
+	return kubebuilderx.NewController(ctx, r.Client, req, r.Recorder, logger).
 		Prepare(instance.NewTreeLoader()).
 		Do(instance.NewFixMetaReconciler()).
 		Do(instance.NewDeletionReconciler(r.Client)).
 		Do(instance.NewRevisionUpdateReconciler()).
-		Do(status).
+		Do(instance.NewStatusReconciler()).
 		// Do(instance.NewRevisionUpdateReconciler()).
 		Do(instance.NewAssistantObjectReconciler()).
 		Do(instance.NewAlignmentReconciler()).
 		Do(instance.NewUpdateReconciler()).
 		Commit()
-	if err == nil && status.ObservationPending() && ((res.RequeueAfter == 0 && !res.Requeue) || res.RequeueAfter > 5*time.Second) {
-		res.RequeueAfter = 5 * time.Second
-	}
-	return res, err
 }
 
 // SetupWithManager sets up the controller with the Manager.

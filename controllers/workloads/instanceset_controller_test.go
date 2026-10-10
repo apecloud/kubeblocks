@@ -44,7 +44,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/instancetemplate"
-	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
@@ -424,17 +423,6 @@ var _ = Describe("InstanceSet Controller", func() {
 	})
 
 	Context("reconfigure", func() {
-		readPodReference := func(g Gomega, its *workloads.InstanceSet) *workloads.InstanceObjectReference {
-			pod := &corev1.Pod{}
-			key := client.ObjectKey{Namespace: its.Namespace, Name: its.Name + "-0"}
-			g.Expect(k8sClient.Get(ctx, key, pod)).Should(Succeed())
-			g.Expect(pod.UID).ShouldNot(BeEmpty())
-			location, known := multicluster.ObjectLocation(multicluster.ObservationContext(ctx, k8sClient), pod)
-			g.Expect(known).Should(BeTrue())
-			g.Expect(location).Should(BeEmpty())
-			return &workloads.InstanceObjectReference{Name: pod.Name, Namespace: pod.Namespace, UID: pod.UID, Cluster: ptr.To(location)}
-		}
-
 		var (
 			supportResizeSubResource func() (bool, error)
 		)
@@ -480,14 +468,12 @@ var _ = Describe("InstanceSet Controller", func() {
 			By("check instance status")
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
-				podRef := readPodReference(g, its)
 				g.Expect(instanceStatusWithoutRevisionAndHealth(its.Status.InstanceStatus[0])).Should(Equal(workloads.InstanceStatus{
-					Pod:          podRef,
-					Storage:      &workloads.InstanceStorageIdentity{Complete: true, EphemeralPod: podRef},
 					PodName:      fmt.Sprintf("%s-0", itsObj.Name),
 					TemplateName: ptr.To(""),
 					DesiredState: workloads.InstanceDesiredStateActive,
 					CurrentState: workloads.InstanceCurrentStatePresent,
+					Provisioned:  true,
 					Configs: []workloads.InstanceConfigStatus{
 						{
 							Name:       "log",
@@ -544,14 +530,12 @@ var _ = Describe("InstanceSet Controller", func() {
 			By("check the init instance status")
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
-				podRef := readPodReference(g, its)
 				g.Expect(instanceStatusWithoutRevisionAndHealth(its.Status.InstanceStatus[0])).Should(Equal(workloads.InstanceStatus{
-					Pod:          podRef,
-					Storage:      &workloads.InstanceStorageIdentity{Complete: true, EphemeralPod: podRef},
 					PodName:      fmt.Sprintf("%s-0", itsObj.Name),
 					TemplateName: ptr.To(""),
 					DesiredState: workloads.InstanceDesiredStateActive,
 					CurrentState: workloads.InstanceCurrentStatePresent,
+					Provisioned:  true,
 					Configs: []workloads.InstanceConfigStatus{
 						{
 							Name:       "log",
@@ -583,14 +567,12 @@ var _ = Describe("InstanceSet Controller", func() {
 			By("check the instance status updated")
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
-				podRef := readPodReference(g, its)
 				g.Expect(instanceStatusWithoutRevisionAndHealth(its.Status.InstanceStatus[0])).Should(Equal(workloads.InstanceStatus{
-					Pod:          podRef,
-					Storage:      &workloads.InstanceStorageIdentity{Complete: true, EphemeralPod: podRef},
 					PodName:      fmt.Sprintf("%s-0", itsObj.Name),
 					TemplateName: ptr.To(""),
 					DesiredState: workloads.InstanceDesiredStateActive,
 					CurrentState: workloads.InstanceCurrentStatePresent,
+					Provisioned:  true,
 					Configs: []workloads.InstanceConfigStatus{
 						{
 							Name:       "log",
@@ -647,14 +629,12 @@ var _ = Describe("InstanceSet Controller", func() {
 			By("check the init instance status")
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
-				podRef := readPodReference(g, its)
 				g.Expect(instanceStatusWithoutRevisionAndHealth(its.Status.InstanceStatus[0])).Should(Equal(workloads.InstanceStatus{
-					Pod:          podRef,
-					Storage:      &workloads.InstanceStorageIdentity{Complete: true, EphemeralPod: podRef},
 					PodName:      fmt.Sprintf("%s-0", itsObj.Name),
 					TemplateName: ptr.To(""),
 					DesiredState: workloads.InstanceDesiredStateActive,
 					CurrentState: workloads.InstanceCurrentStatePresent,
+					Provisioned:  true,
 					Configs: []workloads.InstanceConfigStatus{
 						{
 							Name:       "log",
@@ -686,14 +666,12 @@ var _ = Describe("InstanceSet Controller", func() {
 			By("check the instance status updated")
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
-				podRef := readPodReference(g, its)
 				g.Expect(instanceStatusWithoutRevisionAndHealth(its.Status.InstanceStatus[0])).Should(Equal(workloads.InstanceStatus{
-					Pod:          podRef,
-					Storage:      &workloads.InstanceStorageIdentity{Complete: true, EphemeralPod: podRef},
 					PodName:      fmt.Sprintf("%s-0", itsObj.Name),
 					TemplateName: ptr.To(""),
 					DesiredState: workloads.InstanceDesiredStateActive,
 					CurrentState: workloads.InstanceCurrentStatePresent,
+					Provisioned:  true,
 					Configs: []workloads.InstanceConfigStatus{
 						{
 							Name:       "log",
@@ -730,14 +708,12 @@ var _ = Describe("InstanceSet Controller", func() {
 			By("check the init instance status")
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
-				podRef := readPodReference(g, its)
 				g.Expect(instanceStatusWithoutRevisionAndHealth(its.Status.InstanceStatus[0])).Should(Equal(workloads.InstanceStatus{
-					Pod:          podRef,
-					Storage:      &workloads.InstanceStorageIdentity{Complete: true, EphemeralPod: podRef},
 					PodName:      fmt.Sprintf("%s-0", itsObj.Name),
 					TemplateName: ptr.To(""),
 					DesiredState: workloads.InstanceDesiredStateActive,
 					CurrentState: workloads.InstanceCurrentStatePresent,
+					Provisioned:  true,
 					Configs: []workloads.InstanceConfigStatus{
 						{
 							Name:       "log",
@@ -766,14 +742,12 @@ var _ = Describe("InstanceSet Controller", func() {
 			By("check the instance status updated")
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
-				podRef := readPodReference(g, its)
 				g.Expect(instanceStatusWithoutRevisionAndHealth(its.Status.InstanceStatus[0])).Should(Equal(workloads.InstanceStatus{
-					Pod:          podRef,
-					Storage:      &workloads.InstanceStorageIdentity{Complete: true, EphemeralPod: podRef},
 					PodName:      fmt.Sprintf("%s-0", itsObj.Name),
 					TemplateName: ptr.To(""),
 					DesiredState: workloads.InstanceDesiredStateActive,
 					CurrentState: workloads.InstanceCurrentStatePresent,
+					Provisioned:  true,
 					Configs: []workloads.InstanceConfigStatus{
 						{
 							Name:       "log",
@@ -834,14 +808,12 @@ var _ = Describe("InstanceSet Controller", func() {
 			By("check the init instance status")
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
-				podRef := readPodReference(g, its)
 				g.Expect(instanceStatusWithoutRevisionAndHealth(its.Status.InstanceStatus[0])).Should(Equal(workloads.InstanceStatus{
-					Pod:          podRef,
-					Storage:      &workloads.InstanceStorageIdentity{Complete: true, EphemeralPod: podRef},
 					PodName:      fmt.Sprintf("%s-0", itsObj.Name),
 					TemplateName: ptr.To(""),
 					DesiredState: workloads.InstanceDesiredStateActive,
 					CurrentState: workloads.InstanceCurrentStatePresent,
+					Provisioned:  true,
 					Configs: []workloads.InstanceConfigStatus{
 						{
 							Name:       "log",
@@ -882,14 +854,12 @@ var _ = Describe("InstanceSet Controller", func() {
 			By("check the instance status updated")
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
-				podRef := readPodReference(g, its)
 				g.Expect(instanceStatusWithoutRevisionAndHealth(its.Status.InstanceStatus[0])).Should(Equal(workloads.InstanceStatus{
-					Pod:          podRef,
-					Storage:      &workloads.InstanceStorageIdentity{Complete: true, EphemeralPod: podRef},
 					PodName:      fmt.Sprintf("%s-0", itsObj.Name),
 					TemplateName: ptr.To(""),
 					DesiredState: workloads.InstanceDesiredStateActive,
 					CurrentState: workloads.InstanceCurrentStatePresent,
+					Provisioned:  true,
 					Configs: []workloads.InstanceConfigStatus{
 						{
 							Name:       "log",
@@ -957,14 +927,12 @@ var _ = Describe("InstanceSet Controller", func() {
 			By("check the init instance status")
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
-				podRef := readPodReference(g, its)
 				g.Expect(instanceStatusWithoutRevisionAndHealth(its.Status.InstanceStatus[0])).Should(Equal(workloads.InstanceStatus{
-					Pod:          podRef,
-					Storage:      &workloads.InstanceStorageIdentity{Complete: true, EphemeralPod: podRef},
 					PodName:      fmt.Sprintf("%s-0", itsObj.Name),
 					TemplateName: ptr.To(""),
 					DesiredState: workloads.InstanceDesiredStateActive,
 					CurrentState: workloads.InstanceCurrentStatePresent,
+					Provisioned:  true,
 					Configs: []workloads.InstanceConfigStatus{
 						{
 							Name:       "client",
@@ -1016,14 +984,12 @@ var _ = Describe("InstanceSet Controller", func() {
 			By("check the instance status updated")
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(its.Status.InstanceStatus).Should(HaveLen(1))
-				podRef := readPodReference(g, its)
 				g.Expect(instanceStatusWithoutRevisionAndHealth(its.Status.InstanceStatus[0])).Should(Equal(workloads.InstanceStatus{
-					Pod:          podRef,
-					Storage:      &workloads.InstanceStorageIdentity{Complete: true, EphemeralPod: podRef},
 					PodName:      fmt.Sprintf("%s-0", itsObj.Name),
 					TemplateName: ptr.To(""),
 					DesiredState: workloads.InstanceDesiredStateActive,
 					CurrentState: workloads.InstanceCurrentStatePresent,
+					Provisioned:  true,
 					Configs: []workloads.InstanceConfigStatus{
 						{
 							Name:       "client",

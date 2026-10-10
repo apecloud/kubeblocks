@@ -54,15 +54,6 @@ func (r *alignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuil
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}
-	if isStopRequested(inst) {
-		if obj != nil && !isTerminating(obj.(*corev1.Pod)) {
-			return kubebuilderx.Continue, tree.Delete(obj)
-		}
-		return kubebuilderx.Continue, nil
-	}
-	if obj != nil && isTerminating(obj.(*corev1.Pod)) {
-		return kubebuilderx.Continue, nil
-	}
 	if obj == nil {
 		newPod, err := buildInstancePod(inst, "")
 		if err != nil {

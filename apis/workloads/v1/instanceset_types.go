@@ -569,23 +569,6 @@ type ConfigTemplate struct {
 
 // InstanceStatus describes the desired allocation and observed runtime state of an instance identity.
 type InstanceStatus struct {
-
-	// Pod identifies the actual Pod while Present or Terminating. It is nil when Absent.
-	// +optional
-	Pod *InstanceObjectReference `json:"pod,omitempty"`
-	// Storage describes actual claims and ephemeral storage independently of Pod presence.
-	// +optional
-	Storage *InstanceStorageIdentity `json:"storage,omitempty"`
-	// Membership is an actual member observation; nil means unobserved.
-	// +optional
-	Membership *InstanceMembershipStatus `json:"membership,omitempty"`
-	// Data is an actual data observation; nil means unobserved.
-	// +optional
-	Data *InstanceDataStatus `json:"data,omitempty"`
-	// Execution is an actual action observation; nil means unobserved, not permission to execute an action.
-	// +optional
-	Execution *InstanceExecutionObservation `json:"execution,omitempty"`
-
 	// PodName is the stable name of the instance allocated by the InstanceSet.
 	//
 	// +kubebuilder:validation:Required
@@ -599,7 +582,8 @@ type InstanceStatus struct {
 	TemplateName *string `json:"templateName,omitempty"`
 
 	// DesiredState describes whether the instance should be running (Active), is retained without running (Offline),
-	// or is no longer allocated but still has actual resources or unresolved member or execution observations (Released).
+	// or is no longer allocated and is kept while its runtime is observed, owned resources require cleanup,
+	// or recorded membership is joined (Released).
 	// An empty value from an older object is treated as Active.
 	//
 	// +optional
@@ -612,6 +596,27 @@ type InstanceStatus struct {
 	// +optional
 	// +kubebuilder:validation:Enum=Present;Terminating;Absent
 	CurrentState InstanceCurrentState `json:"currentState,omitempty"`
+
+	// Provisioned records that a Present or Terminating runtime has been observed for this retained instance identity.
+	// Once true, it stays true while the status entry is retained. It does not indicate current presence,
+	// readiness, or completion of provisioning work.
+	//
+	// +optional
+	Provisioned bool `json:"provisioned,omitempty"`
+
+	// DataLoaded records the tracked data-loading result. nil means no result is tracked,
+	// false means loading is incomplete, and true means completion has been recorded.
+	// Runtime health and restore conditions do not determine this value.
+	//
+	// +optional
+	DataLoaded *bool `json:"dataLoaded,omitempty"`
+
+	// MemberJoined records the tracked membership result. nil means no result is tracked and does not prove absence,
+	// false records not joined, and true records joined. A successful leave can record false.
+	// Runtime health and role do not determine this value.
+	//
+	// +optional
+	MemberJoined *bool `json:"memberJoined,omitempty"`
 
 	// CurrentRevision identifies the revision currently applied to this instance.
 	// It is empty when CurrentState is Absent.
@@ -871,12 +876,7 @@ func (r *InstanceSet) OfflineInstanceStatuses() []*InstanceStatus {
 	return r.instanceStatusesByDesiredState(InstanceDesiredStateOffline)
 }
 
-// ReleasedInstanceStatuses returns instances no longer allocated but retained for actual resources or unresolved lifecycle observations.
-func (r *InstanceSet) ReleasedInstanceStatuses() []*InstanceStatus {
-	return r.instanceStatusesByDesiredState(InstanceDesiredStateReleased)
-}
-
-// RetainedInstanceStatuses returns the Active and Offline allocations retained by the InstanceSet, excluding Released records.
+// RetainedInstanceStatuses returns all instances whose identity is retained by the InstanceSet.
 func (r *InstanceSet) RetainedInstanceStatuses() []*InstanceStatus {
 	if r == nil {
 		return nil
